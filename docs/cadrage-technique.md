@@ -1,6 +1,6 @@
 # Portfolio — Cadrage technique
 
-_Version 1.0 · 2026-09-11 · Remplace le brouillon v0 du 2026-09-10. Le journal complet des questions, réponses et éclaircissements est archivé dans [archive/cadrage-journal-2026-09.md](archive/cadrage-journal-2026-09.md) ; les décisions y gardent leurs identifiants (D1 à D38)._
+_Version 1.1 · 2026-09-18 · Remplace le brouillon v0 du 2026-09-10. Le journal complet des questions, réponses et éclaircissements est archivé dans [archive/cadrage-journal-2026-09.md](archive/cadrage-journal-2026-09.md) ; les décisions y gardent leurs identifiants (D1 à D38)._
 _Le design (UI/UX) est hors périmètre de ce document._
 
 ---
@@ -32,7 +32,7 @@ _Le design (UI/UX) est hors périmètre de ce document._
 - **Email** : aucun envoi d'email, nulle part. Sujet post-MVP, peut-être jamais.
 - **Trafic** : un ou deux visiteurs occasionnels. On conçoit pour un faible trafic avec des protections robustes.
 - **Contenu** : public par nature. Les projets privés ne montrent que captures d'écran, langages et outils, sans lien. Le CV fourni au chatbot est une version publique, sans téléphone ni adresse.
-- **Frontend** : choix du framework reporté en tout dernier, après le choix des outils de design.
+- **Frontend** : application statique compilée en CI et servie par Caddy ; aucun runtime Node en production (D44).
 - **Dépôt** : privé.
 
 ## 4. Phases
@@ -71,7 +71,7 @@ Email (post-MVP, peut-être jamais) · anglais · commentaires (retirés) · MCP
 ### 5.1 Vue d'ensemble
 
 - **Bordure** : le visiteur atteint Cloudflare (DNS, proxy, CDN, WAF, rate limiting, Access ; Turnstile en phase 2), qui transmet à Caddy, seul conteneur exposé du VPS (TLS, reverse proxy).
-- **VPS** (Docker Compose, réseau privé) : Caddy route vers `web` (frontend), `api` (Django et admin), `ai` (FastAPI + LangGraph, phase 2) et `mcp` (phase 3).
+- **VPS** (Docker Compose, réseau privé) : Caddy sert le frontend en statique (compilé en CI, copié dans son image) et route vers `api` (Django et admin), `ai` (FastAPI + LangGraph, phase 2) et `mcp` (phase 3).
 - **Données** : `api`, `ai` et `mcp` lisent et écrivent Postgres (pgvector en phase 2) ; `api` et `ai` utilisent Redis. Le `worker` (vignettes, puis ingestion) travaille sur Postgres et Redis ; le conteneur `embeddings` (phase 2, modèles locaux) sert `ai` et le `worker`.
 - **Stockage** : `api` et le `worker` déposent médias et documents sur Cloudflare R2, servis via le CDN.
 - **Sauvegardes** : le conteneur `backup` dump Postgres chaque nuit vers un bucket R2 dédié et signale sa réussite à healthchecks.io.
@@ -91,7 +91,7 @@ Email (post-MVP, peut-être jamais) · anglais · commentaires (retirés) · MCP
 | Redis | Cache avec invalidation, puis broker et rate limiting | 1 | — | oui |
 | Worker (Celery ou arq) | Tâches de fond | 1 ou 2 | Temporal | oui |
 | Cloudflare R2 | Médias publics, documents privés, sauvegardes | 1 | Disque du VPS | oui |
-| Frontend | À décider en dernier | 1 | — | oui |
+| Vite + React + TypeScript + Tailwind CSS + shadcn/ui | Frontend statique, compilé en CI, servi par Caddy | 1 | Next.js, Flutter web | oui |
 | GitHub Actions + GHCR | CI/CD | 1 | — | oui |
 | Sentry, healthchecks.io | Erreurs, sauvegardes | 1 | Surveillance de disponibilité SaaS, Prometheus + Grafana | oui |
 | FastAPI + LangGraph + LangChain | Service IA | 2 | Django ASGI, sans framework | oui |
@@ -104,8 +104,7 @@ Email (post-MVP, peut-être jamais) · anglais · commentaires (retirés) · MCP
 
 | Conteneur | Rôle | Phase |
 |---|---|---|
-| `caddy` | Reverse proxy, TLS, statiques ; seul conteneur exposé (80 / 443) | 1 |
-| `web` | Frontend (peut être servi en statique par Caddy) | 1 |
+| `caddy` | Reverse proxy, TLS ; sert le frontend compilé, copié dans son image (D43, D44) ; seul conteneur exposé (80 / 443) | 1 |
 | `api` | Django : contenu, admin, API | 1 |
 | `postgres` | Image `pgvector/pgvector` | 1 |
 | `redis` | Cache, puis broker et rate limiting | 1 |
@@ -119,7 +118,7 @@ Réseau Docker privé ; aucun port de base de données exposé ; images construi
 
 ### 5.4 Flux clés
 
-1. **Consultation** : visiteur → Cloudflare (CDN, WAF) → Caddy → `web` ; le front appelle `api` ; les images viennent de R2 via le CDN ; les réponses d'API passent par le cache Redis.
+1. **Consultation** : visiteur → Cloudflare (CDN, WAF) → Caddy, qui sert le frontend statique ; le front appelle `api` ; les images viennent de R2 via le CDN ; les réponses d'API passent par le cache Redis.
 2. **Publication** : l'auteur crée ou modifie un projet ou un document dans l'admin → Django écrit en base et envoie le fichier sur R2 dans la même opération → signal de sauvegarde → événement dans la table outbox → invalidation du cache → (phase 2) le worker ingère : extraction, découpage, embeddings, chunks en base. Suppression : événement inverse, purge des chunks. Aucun redéploiement : le contenu est de la donnée, pas du code. Un fichier déposé directement dans le bucket n'existe pas pour le site : la base est la source de vérité.
 3. **Question au chatbot** (phase 2) : Turnstile et rate limiting → `ai` exécute le graphe LangGraph : routage, réécriture, retrieval hybride, reranking, génération avec citations, streaming SSE des étapes et des tokens → checkpoint Postgres → trace asynchrone vers LangSmith.
 4. **Requête MCP** (phase 3) : client MCP du visiteur → `mcp` → outils de lecture sur la base et l'index ; `send_message` écrit en base.
@@ -179,7 +178,7 @@ Réseau Docker privé ; aucun port de base de données exposé ; images construi
 - **Application** : rate limiting par IP et par session (compteurs Redis), plafond de budget journalier, system prompt durci, contenu récupéré traité comme donnée, sorties structurées pour le routage, filtrage de sortie, refus hors périmètre, journalisation des tentatives d'abus.
 - **Admin** : Cloudflare Access + mot de passe fort + 2FA, un seul compte, journal d'audit.
 - **Secrets** : 12-factor, `.env` en développement seulement, secrets hors serveur en production (gestionnaire de mots de passe, secrets GitHub Actions), rotation documentée.
-- **Chaîne d'approvisionnement** : lockfiles, Renovate ou Dependabot, scan des images (Trivy), `pip-audit` en CI ; audit des dépendances frontend selon l'outillage retenu (D15).
+- **Chaîne d'approvisionnement** : lockfiles, Renovate ou Dependabot, scan des images (Trivy), `pip-audit` et `npm audit` en CI (D44).
 - **HTTP** : HTTPS partout (`.dev` est en HSTS préchargé), CSP stricte, CORS restreint, CSRF sur l'admin, en-têtes de sécurité.
 - **Confidentialité** : page statique décrivant ce qui est collecté, pourquoi, les sous-traitants (Anthropic, LangChain, Cloudflare, hébergeur), les durées de conservation (30 jours pour les conversations) et les droits ; pas de cookie tiers ; hébergement en UE.
 
@@ -230,7 +229,7 @@ Identifiants conservés du journal v0. Les décisions remplacées sont indiquée
 | D11 | Dépôt privé (révisable) | Conçu comme s'il était public. |
 | D12 | Repartir de zéro | Ancien historique Django + Flutter supprimé localement le 2026-09-10 ; reste sur GitHub, sans valeur de référence. |
 | D14 | Contenu public par nature | Projets privés : captures, langages, outils ; CV en version publique. |
-| D15 | Décision frontend reportée en tout dernier | Après le choix des outils de design. |
+| D15 | (remplacée par D44) | — |
 | D24 | Pas d'email | Conçu sans ; post-MVP, peut-être jamais. |
 | D27 | Code minimal | Chaque ligne sert un but ; règle de revue inscrite dans la configuration Claude Code. |
 | D28, D34 | Contenu FR seul, jamais en dur | Catalogue de chaînes unique ; pas de plomberie multilingue anticipée. |
@@ -253,6 +252,7 @@ Identifiants conservés du journal v0. Les décisions remplacées sont indiquée
 | D41 | Turnstile optionnel | Produit Cloudflare, hors phase 1 ; en phase 2 seulement si abus constatés. WAF et DDoS : fournis par Cloudflare sans implémentation. |
 | D42 | Conteneur `backup` dédié confirmé | Postgres fournit `pg_dump` mais rien ne l'ordonnance ; un conteneur cron isolé, versionné dans Compose, avec ses propres droits. |
 | D43 | GHCR confirmé | Les images sont construites en CI et tirées par le VPS ; aucun build sur le serveur ; gratuit, sans exploitation. |
+| D44 | Frontend = Vite + React + TypeScript + Tailwind CSS + shadcn/ui | Compilé en CI, servi en statique par Caddy, aucun Node en production ; Next.js écarté. Compléments : motion, react-bits, bklit-ui, Rive, `openapi-typescript` (`docs/frontend-outillage.md` §3). Remplace D15. |
 | D29 | (remplacée par D36, D37) | — |
 | D21 | (remplacée par D25) | — |
 
@@ -275,18 +275,18 @@ Identifiants conservés du journal v0. Les décisions remplacées sont indiquée
 1. **Avant toute ligne de code** : configuration Claude Code du projet (`CLAUDE.md`, règles dont « chaque ligne sert un but », skills, agents, hooks) et pipeline de développement.
 2. **Flux** : issue → branche → pull request → CI (lint, types, tests, scans) → merge → déploiement. Conventional commits.
 3. **ADR** : un fichier MADR par décision structurante dans `docs/adr/`, écrit au moment de la décision, indexé dans le RAG et cité par la fiche du méta-projet.
-4. **Qualité** : Python 3.12+, `uv`, `ruff`, `pyright` strict, `pytest`, `pre-commit` ; outillage frontend décidé avec le framework (D15). Tests unitaires (découpage, parseurs, garde-fous), intégration (API + base via testcontainers), E2E (site et chat, outil choisi avec le frontend), évaluations RAG, tests de contrat MCP, scan sécurité.
+4. **Qualité** : Python 3.12+, `uv`, `ruff`, `pyright` strict, `pytest`, `pre-commit` ; TypeScript strict, ESLint avec `jsx-a11y`, Playwright + axe, Lighthouse CI (D44). Tests unitaires (découpage, parseurs, garde-fous), intégration (API + base via testcontainers), E2E Playwright (site et chat), évaluations RAG, tests de contrat MCP, scan sécurité.
 5. **Apprentissage** : `docs/learning/` alimenté au fil de l'eau.
 
 ## 9. Prochaines étapes
 
 1. Configuration Claude Code et pipeline de développement (§8.1).
-2. Squelette du monorepo : `apps/api`, `apps/web` (plus tard), `apps/ai`, `apps/mcp`, `packages/`, `infra/`, `docs/`.
-3. ADR initiaux : Django, VPS + Compose, Cloudflare, R2, Postgres sur le VPS, Redis, worker, sauvegardes.
+2. Squelette du monorepo : `apps/api`, `apps/web`, `apps/ai`, `apps/mcp`, `packages/`, `infra/`, `docs/`.
+3. ADR initiaux : Django, VPS + Compose, Cloudflare, R2, Postgres sur le VPS, Redis, worker, sauvegardes, frontend (D44).
 4. Modèle de contenu, admin personnalisé, API.
 5. Première fiche : le méta-projet.
 6. `infra/` : Compose, Caddy, bootstrap, sauvegardes, runbook ; CI/CD ; premier déploiement sur `pacome.dev`.
-7. Frontend (décision à ce moment-là), puis mise en production de la phase 1.
+7. Frontend (`apps/web`, D44), puis mise en production de la phase 1.
 8. Phase 2, puis phase 3.
 
 ---

@@ -1,8 +1,8 @@
 # Frontend — outillage et plan d'installation
 
-_2026-09-18. Tranche D15 (frontend reporté en dernier). L'ADR D15 reste à écrire à partir de ce document._
+_2026-09-18. Détaille D44 (cadrage §7), qui remplace D15. L'ADR D44 reste à écrire à partir de ce document._
 
-## 1. Décision D15
+## 1. Décision D44
 
 **Vite + React + TypeScript + Tailwind CSS + shadcn/ui, compilé en CI, servi en statique par Caddy.**
 
@@ -14,7 +14,7 @@ _2026-09-18. Tranche D15 (frontend reporté en dernier). L'ADR D15 reste à écr
 | Tailwind CSS | Style par classes utilitaires, compilé au build | Exigé par shadcn et bklit ; zéro code exécuté côté navigateur ou serveur |
 | shadcn/ui | Composants accessibles (sur Radix) copiés dans le dépôt | On possède le code, on n'ajoute que ce qu'on utilise (D27) ; format de registre utilisé par react-bits et bklit |
 
-**Rôle de Django** : API (django-ninja) et admin uniquement. L'admin garde son propre style ; Tailwind n'existe que dans `web/`.
+**Rôle de Django** : API (django-ninja) et admin uniquement. L'admin garde son propre style ; Tailwind n'existe que dans `apps/web/`.
 
 **Servi en statique** : `npm run build` produit `index.html` + JS + CSS ; Caddy les sert, le navigateur récupère le contenu via l'API.
 
@@ -76,11 +76,11 @@ Tout conservé. Les signalements, relus un par un, sont des faux positifs :
 | `prototype` | CAUTION | « never judge » : consigne de présentation des variantes |
 | autres | SAFE / CAUTION sans signalement | — |
 
-## 3. À installer à l'initialisation de `web/`
+## 3. À installer à l'initialisation de `apps/web/`
 
 Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les CLI évoluent).
 
-1. **Projet** : `npm create vite@latest web -- --template react-ts`. TypeScript strict (déjà actif dans le modèle).
+1. **Projet** : `npm create vite@latest apps/web -- --template react-ts`. TypeScript strict (déjà actif dans le modèle).
 2. **Tailwind CSS v4** : `npm i -D tailwindcss @tailwindcss/vite`, plugin dans `vite.config.ts`, `@import "tailwindcss";` dans le CSS d'entrée. **Jamais** le script CDN `cdn.tailwindcss.com` (c'est lui qui affiche « ne pas utiliser en production »).
 3. **Alias `@/`** (requis par shadcn) : `paths` dans `tsconfig.json` et `tsconfig.app.json`, `resolve.alias` dans `vite.config.ts`, `npm i -D @types/node`.
 4. **shadcn/ui** : `npx shadcn@latest init`, puis `npx shadcn@latest add <composant>` au besoin (`dialog` pour la fiche projet en modal). Radix arrive comme dépendance de chaque composant ; rien à installer à part.
@@ -95,7 +95,7 @@ Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les C
 
 ### Build et déploiement
 
-- Build dans GitHub Actions ; `web/dist` copié dans l'image Caddy publiée sur GHCR (D43). Le conteneur `web` prévu au §5.3 du cadrage disparaît → répercuter.
+- Build dans GitHub Actions ; `apps/web/dist` copié dans l'image Caddy publiée sur GHCR (D43) ; pas de conteneur `web` (cadrage §5.3).
 - Caddy : `try_files {path} /index.html` pour les routes côté client ; en-têtes `Cache-Control: immutable` sur les fichiers hachés, `no-cache` sur `index.html`.
 
 ## 4. Comptes à créer (par l'auteur)
@@ -105,7 +105,7 @@ Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les C
 
 ## 5. Points ouverts
 
-- Écrire l'ADR D15 (MADR, `docs/adr/`) et mettre à jour D15 et §5.3 dans le cadrage.
+- Écrire l'ADR D44 (MADR, `docs/adr/`).
 - Aperçus de lien : détail de la vue Django d'injection des balises meta et du routage Caddy associé.
 - API sur `api.pacome.dev` (CORS à configurer) ou même origine via Caddy (`/api` → Django, pas de CORS).
 - Tests unitaires front (Vitest) : utiles ou non, au regard de D27.

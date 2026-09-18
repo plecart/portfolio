@@ -10,30 +10,25 @@ Ordre de normativité : **en cas de contradiction, le rang le plus haut l'emport
 
 | Rang | Fichier | Portée | Où s'inscrit un amendement |
 |---|---|---|---|
-| 1 | `docs/cadrage-technique.md` | périmètre, phases, architecture, contraintes, registre des décisions D1-D43 (§7) | le § concerné + une ligne au registre §7 (une décision remplacée y reste, marquée « remplacée par ») |
+| 1 | `docs/cadrage-technique.md` | périmètre, phases, architecture, contraintes, registre des décisions D1-D44 (§7) | le § concerné + une ligne au registre §7 (une décision remplacée y reste, marquée « remplacée par ») |
 | 2 | `docs/adr/` (encore vide ; naît avec le premier ADR — ne pas créer le dossier avant) | le pourquoi d'une brique, options écartées | un nouvel ADR qui remplace l'ancien (statut MADR « remplacé par »), jamais l'édition d'un ADR accepté |
-| 3 | `docs/frontend-outillage.md` | décision D15 et plan d'installation de `web/`, provisoire | le § concerné |
+| 3 | `docs/frontend-outillage.md` | détail de D44 et plan d'installation de `apps/web/`, provisoire | le § concerné |
 | n | issues GitHub ouvertes | découpage et planification, **dérivés** des rangs supérieurs | le corps de l'issue, jamais un commentaire — voir `repercussions` |
 
 **Non normatif :** `docs/archive/` (journal du cadrage v0, à supprimer après les ADR initiaux) ;
 `docs/outils.md` (liste dérivée, même sort) ; `docs/learning/` (phase 2, pédagogique).
 
-**Contradiction connue, non arbitrée ici :** `docs/frontend-outillage.md` §1 tranche D15 (Vite +
-React + TypeScript + Tailwind + shadcn/ui) alors que `docs/cadrage-technique.md` §7 (D15) dit encore
-« reportée en tout dernier » et §5.3 prévoit un conteneur `web`. Tracée dans frontend-outillage §5 ;
-à réconcilier par `/contradiction` (mise à jour de D15 et §5.3 du cadrage, puis ADR D15).
-
 Toute référence croisée cite un **§ ou un titre de section**, jamais un numéro de ligne.
 
 ## Stack
-- langages : Python 3.12 ; TypeScript (frontend, D15)
+- langages : Python 3.12 ; TypeScript (frontend, D44)
 - frameworks :
-  - phase 1 : Django + django-ninja (API, admin) ; Vite + React + Tailwind CSS + shadcn/ui (frontend, selon `docs/frontend-outillage.md` §1)
+  - phase 1 : Django + django-ninja (API, admin) ; Vite + React + TypeScript + Tailwind CSS + shadcn/ui (frontend, cadrage §5.2, D44)
   - phase 2 : FastAPI + LangGraph / LangChain / LangSmith ; embeddings et reranking `bge-m3` + `bge-reranker-v2-m3` via `text-embeddings-inference`
   - phase 3 : SDK Python `mcp` (FastMCP)
 - infrastructure : Postgres 16 + pgvector, Redis 7, Docker Compose, Caddy, Cloudflare (DNS, CDN, WAF, Access, R2), GitHub Actions + GHCR
-- gestionnaire de paquets : `uv` (Python) ; `npm` (frontend, plus tard)
-- runtime + version : python 3.12 ; Node : à fixer à l'initialisation de `web/`
+- gestionnaire de paquets : `uv` (Python) ; `npm` (frontend)
+- runtime + version : python 3.12 ; Node : à fixer à l'initialisation de `apps/web/`
 
 ## Commandes du projet
 Lues par `cycle-pr`, `execution-qa` et la génération de CI. `n/a` = étape absente du projet.
@@ -60,7 +55,7 @@ sans code »). Le squelette monorepo (cadrage §9.2 : `apps/api`, `apps/web`, `a
 - domaines (nom métier → chemin ; chemins prévus au cadrage §9.2, à ajuster au squelette) — servent aussi de thèmes/milestones à `triage` :
   - Socle & exploitation : `infra/`, `.github/`, `packages/`, `.claude/`, `CLAUDE.md`, `CONTRIBUTING.md`, `docs/` — tout ce qui n'est pas métier, pour qu'aucune PR ne soit orpheline
   - Contenu & API : `apps/api/`
-  - Frontend : `apps/web/` (ou `web/` — tranché à la session suivante avec la contradiction D15)
+  - Frontend : `apps/web/`
   - Assistant RAG : `apps/ai/` (phase 2)
   - MCP : `apps/mcp/` (phase 3)
 - zones sensibles (arrêt humain — cadence dans `.claude/rules/contraintes.md` : une fois par PR, avant `gh pr ready`) : écrans à valider visuellement, et rien d'autre
