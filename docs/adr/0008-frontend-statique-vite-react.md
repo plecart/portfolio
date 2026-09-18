@@ -72,8 +72,9 @@ Ordre d'installation et commandes : `docs/frontend-outillage.md` §3.
 (LinkedIn, Slack, Discord) n'exécutent pas le JavaScript et afficheraient titre et image
 génériques sur `/projets/<slug>`. Parade : la CI copie `dist/index.html` dans l'image `api` comme
 gabarit ; une vue Django sur `/projets/<slug>` injecte `<title>`, `og:title`, `og:description` et
-`og:image` du projet à un emplacement marqué du gabarit et renvoie la page (slug inconnu : page
-générique, statut 404) ; Caddy route `/projets/*` vers `api` et sert tout le reste en statique.
+`og:image` du projet à un emplacement marqué du gabarit et renvoie la page (slug inconnu : gabarit
+sans balises projet, statut 404, et le front affiche sa page 404 personnalisée) ; Caddy route
+`/projets/*` vers `api` et sert tout le reste en statique.
 Un seul mécanisme pour tous les clients, robots comme humains. Coût : le build web précède le
 build de l'image `api`, et `index.html` existe dans deux images. Écarté : détecter les robots par
 `User-Agent` dans Caddy (liste à maintenir, rendu différent selon le client) ; rendre `index.html`

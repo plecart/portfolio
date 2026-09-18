@@ -39,8 +39,7 @@ fichiers n'influence donc pas la centralisation.
   dont la visibilité est `public`, que Django sert lui-même) ; un **privé** `backups` (ADR 0007).
 - **Traitement des images à l'upload** : redimensionnement, conversion WebP, vignettes (`Pillow`,
   `django-imagekit`), exécuté par le worker.
-- **Développement** : stockage disque par défaut de Django ; MinIO seulement si un comportement
-  propre à S3 doit être reproduit en local — optionnel, pas installé par défaut.
+- **Développement** : stockage disque par défaut de Django.
 - **La base est la source de vérité (D31)** : un fichier déposé directement dans le bucket, sans
   passer par l'admin, n'existe pas pour le site ni pour le RAG. Django envoie le fichier sur R2 et
   crée la ligne en base dans la même opération ; le signal de sauvegarde déclenche la suite. Un
@@ -61,7 +60,7 @@ fichiers n'influence donc pas la centralisation.
 
 - Dépendance à Cloudflare approfondie (ADR 0003).
 - Deux comportements de stockage (disque en développement, R2 en production) : l'abstraction les
-  rend identiques pour le code ; MinIO existe si un écart apparaît.
+  rend identiques pour le code.
 
 ## Comparaison des options
 
