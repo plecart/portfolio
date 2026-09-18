@@ -11,8 +11,8 @@ Ordre de normativité : **en cas de contradiction, le rang le plus haut l'emport
 | Rang | Fichier | Portée | Où s'inscrit un amendement |
 |---|---|---|---|
 | 1 | `docs/cadrage-technique.md` | périmètre, phases, architecture, contraintes, registre des décisions D1-D44 (§7) | le § concerné + une ligne au registre §7 (une décision remplacée y reste, marquée « remplacée par ») |
-| 2 | `docs/adr/` (encore vide ; naît avec le premier ADR — ne pas créer le dossier avant) | le pourquoi d'une brique, options écartées | un nouvel ADR qui remplace l'ancien (statut MADR « remplacé par »), jamais l'édition d'un ADR accepté |
-| 3 | `docs/frontend-outillage.md` | détail de D44 et plan d'installation de `apps/web/`, provisoire | le § concerné |
+| 2 | `docs/adr/` (index et conventions : `docs/adr/README.md`) | le pourquoi d'une brique, options écartées | un nouvel ADR qui remplace l'ancien (statut MADR « remplacé par »), jamais l'édition d'un ADR accepté |
+| 3 | `docs/frontend-outillage.md` | inventaire installé et plan d'installation de `apps/web/` (le pourquoi de D44 est dans l'ADR 0008), provisoire | le § concerné |
 | n | issues GitHub ouvertes | découpage et planification, **dérivés** des rangs supérieurs | le corps de l'issue, jamais un commentaire — voir `repercussions` |
 
 **Non normatif :** `docs/archive/` (journal du cadrage v0, à supprimer après les ADR initiaux) ;

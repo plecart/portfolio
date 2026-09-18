@@ -1,6 +1,6 @@
 # Frontend — outillage et plan d'installation
 
-_2026-09-18. Détaille D44 (cadrage §7), qui remplace D15. L'ADR D44 reste à écrire à partir de ce document._
+_2026-09-18. Détaille D44 (cadrage §7), qui remplace D15. Le pourquoi, les options écartées et les points tranchés sont dans l'ADR 0008 (`docs/adr/`) ; ce document garde l'inventaire installé et le plan d'installation._
 
 ## 1. Décision D44
 
@@ -20,7 +20,7 @@ _2026-09-18. Détaille D44 (cadrage §7), qui remplace D15. L'ADR D44 reste à �
 
 - Pour : aucun Node en production, rien à patcher côté front sur le VPS, RAM quasi nulle, cache Cloudflare, modifier le contenu dans l'admin ne demande pas de rebuild.
 - Contre : le HTML initial est vide. Les aperçus de lien (LinkedIn, Slack, Discord) n'exécutent pas le JS → titre et image génériques sur `/projets/<slug>`.
-- Parade : une vue Django qui renvoie `index.html` avec les balises `<title>`, `og:title`, `og:description`, `og:image` du projet. À détailler dans l'ADR.
+- Parade : une vue Django qui renvoie `index.html` avec les balises `<title>`, `og:title`, `og:description`, `og:image` du projet. Détaillée dans l'ADR 0008.
 - Next.js écarté : serveur Node permanent (conteneur, RAM, surface d'attaque, second runtime à maintenir) contraire à P1 pour un site à deux visiteurs.
 
 **Écarté à l'audit** : anime.js (doublon de motion), design-motion-principles (reconditionne Emil Kowalski), UX Engine / designmotionhq (payant, doublon), boneyard (sur-ingénierie), Spline (3D lourde — à rouvrir si un besoin 3D réel apparaît, avec three.js en alternative), watermelon-platform et motion-primitives (doublons de react-bits), dépôt 21st (inactif depuis mai 2025), ui-ux-pro-max-skill (taste-skill préféré).
@@ -85,7 +85,7 @@ Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les C
 3. **Alias `@/`** (requis par shadcn) : `paths` dans `tsconfig.json` et `tsconfig.app.json`, `resolve.alias` dans `vite.config.ts`, `npm i -D @types/node`.
 4. **shadcn/ui** : `npx shadcn@latest init`, puis `npx shadcn@latest add <composant>` au besoin (`dialog` pour la fiche projet en modal). Radix arrive comme dépendance de chaque composant ; rien à installer à part.
 5. **motion** : `npm i motion` ; import depuis `motion/react`.
-6. **react-bits** : composant par composant, `npx shadcn@latest add @react-bits/<Nom>-TS-TW`. **Licence MIT + Commons Clause** : usage libre, revente d'un produit fondé sur ces composants interdite — à citer dans l'ADR.
+6. **react-bits** : composant par composant, `npx shadcn@latest add @react-bits/<Nom>-TS-TW`. **Licence MIT + Commons Clause** : usage libre, revente d'un produit fondé sur ces composants interdite — citée dans l'ADR 0008.
 7. **bklit-ui** (graphiques) : composant par composant, `npx shadcn@latest add @bklit/<graphique>` ; vérifier si le registre `@bklit` doit être déclaré dans `components.json`. Composants MIT ; Bklit Studio (outil hébergé) propriétaire.
 8. **Rive** (animation 2D interactive) : `npm i @rive-app/react-canvas`. Fichiers `.riv` servis en statique ; le runtime charge un WASM : mesurer son poids avec Lighthouse avant d'en généraliser l'usage. Éditeur Rive : compte gratuit à créer soi-même.
 9. **Types de l'API** : `npm i -D openapi-typescript`, génération depuis le schéma OpenAPI de django-ninja ; script npm + vérification en CI (types à jour).
@@ -105,8 +105,4 @@ Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les C
 
 ## 5. Points ouverts
 
-- Écrire l'ADR D44 (MADR, `docs/adr/`).
-- Aperçus de lien : détail de la vue Django d'injection des balises meta et du routage Caddy associé.
-- API sur `api.pacome.dev` (CORS à configurer) ou même origine via Caddy (`/api` → Django, pas de CORS).
-- Tests unitaires front (Vitest) : utiles ou non, au regard de D27.
-- `.claude/skills/design-system` (hérité d'un autre projet) recoupe `taste-skill` : garder ou retirer.
+Tous tranchés le 2026-09-18 : l'ADR 0008 fixe les aperçus de lien (vue Django sur `/projets/<slug>`, `index.html` copié dans l'image `api`, Caddy route `/projets/*`), l'origine de l'API (`api.pacome.dev` + CORS restreint) et les tests unitaires du front (pas de Vitest en phase 1, condition de réexamen) ; `.claude/skills/design-system` (hérité d'un autre projet) recoupait `taste-skill` et a été retiré.

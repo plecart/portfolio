@@ -81,24 +81,26 @@ Email (post-MVP, peut-être jamais) · anglais · commentaires (retirés) · MCP
 
 | Brique | Rôle | Phase | Écarté | ADR |
 |---|---|---|---|---|
-| Cloudflare | Registrar, DNS, proxy, CDN, WAF (fourni, sans implémentation), rate limiting, Access ; Turnstile optionnel en phase 2 | 1 | Caddy seul + Tailscale | oui |
-| VPS 2 vCPU en UE (Hetzner, OVH, Scaleway), 4 Go en phase 1, 8 Go en phase 2 | Calcul, Postgres, modèles locaux | 1 | PaaS, tout managé, Kubernetes | oui |
-| Docker Compose | Orchestration locale des conteneurs | 1 | — | oui |
-| Caddy | Reverse proxy, TLS automatique, statiques | 1 | Traefik, nginx | oui |
-| Django | Contenu, admin, API | 1 | FastAPI seul | oui |
-| Django admin | Back-office | 1 | CMS headless, content-as-code, admin custom | oui |
-| Postgres 16 + pgvector | Contenu, vecteurs, checkpoints, outbox | 1 (pgvector en 2) | Postgres managé, Qdrant | oui |
-| Redis | Cache avec invalidation, puis broker et rate limiting | 1 | — | oui |
-| Worker (Celery ou arq) | Tâches de fond | 1 ou 2 | Temporal | oui |
-| Cloudflare R2 | Médias publics, documents privés, sauvegardes | 1 | Disque du VPS | oui |
-| Vite + React + TypeScript + Tailwind CSS + shadcn/ui | Frontend statique, compilé en CI, servi par Caddy | 1 | Next.js, Flutter web | oui |
-| GitHub Actions + GHCR | CI/CD | 1 | — | oui |
-| Sentry, healthchecks.io | Erreurs, sauvegardes | 1 | Surveillance de disponibilité SaaS, Prometheus + Grafana | oui |
-| FastAPI + LangGraph + LangChain | Service IA | 2 | Django ASGI, sans framework | oui |
-| LangSmith cloud (région UE) | Traces, datasets, évaluations | 2 | Langfuse | oui |
-| API Claude | Génération et étapes bon marché | 2 | — | oui |
-| Embeddings et reranking locaux (`bge-m3`, `bge-reranker-v2-m3` servis par `text-embeddings-inference`) | Vectorisation, reranking | 2 | Voyage AI, OpenAI | oui |
-| SDK Python `mcp` (FastMCP) | Serveur MCP | 3 | SDK TypeScript | oui |
+| Cloudflare | Registrar, DNS, proxy, CDN, WAF (fourni, sans implémentation), rate limiting, Access ; Turnstile optionnel en phase 2 | 1 | Caddy seul + Tailscale | 0003 |
+| VPS 2 vCPU en UE (Hetzner, OVH, Scaleway), 4 Go en phase 1, 8 Go en phase 2 | Calcul, Postgres, modèles locaux | 1 | PaaS, tout managé, Kubernetes | 0002 |
+| Docker Compose | Orchestration locale des conteneurs | 1 | — | 0002 |
+| Caddy | Reverse proxy, TLS automatique, statiques | 1 | Traefik, nginx | 0002 |
+| Django | Contenu, admin, API | 1 | FastAPI seul | 0001 |
+| Django admin | Back-office | 1 | CMS headless, content-as-code, admin custom | 0001 |
+| Postgres 16 + pgvector | Contenu, vecteurs, checkpoints, outbox | 1 (pgvector en 2) | Postgres managé, Qdrant | 0005 |
+| Redis | Cache avec invalidation, puis broker et rate limiting | 1 | — | 0006 |
+| Worker (Celery ou arq) | Tâches de fond | 1 ou 2 | Temporal | à sa phase (annexe A) |
+| Cloudflare R2 | Médias publics, documents privés, sauvegardes | 1 | Disque du VPS | 0004 |
+| Vite + React + TypeScript + Tailwind CSS + shadcn/ui | Frontend statique, compilé en CI, servi par Caddy | 1 | Next.js, Flutter web | 0008 |
+| GitHub Actions + GHCR | CI/CD | 1 | — | à écrire |
+| Sentry, healthchecks.io | Erreurs, sauvegardes | 1 | Surveillance de disponibilité SaaS, Prometheus + Grafana | à écrire (sauvegardes : 0007) |
+| FastAPI + LangGraph + LangChain | Service IA | 2 | Django ASGI, sans framework | à sa phase |
+| LangSmith cloud (région UE) | Traces, datasets, évaluations | 2 | Langfuse | à sa phase |
+| API Claude | Génération et étapes bon marché | 2 | — | à sa phase |
+| Embeddings et reranking locaux (`bge-m3`, `bge-reranker-v2-m3` servis par `text-embeddings-inference`) | Vectorisation, reranking | 2 | Voyage AI, OpenAI | à sa phase |
+| SDK Python `mcp` (FastMCP) | Serveur MCP | 3 | SDK TypeScript | à sa phase |
+
+La colonne ADR renvoie au numéro du fichier dans `docs/adr/` (index : `docs/adr/README.md`).
 
 ### 5.3 Conteneurs sur le VPS
 
@@ -282,7 +284,7 @@ Identifiants conservés du journal v0. Les décisions remplacées sont indiquée
 
 1. Configuration Claude Code et pipeline de développement (§8.1).
 2. Squelette du monorepo : `apps/api`, `apps/web`, `apps/ai`, `apps/mcp`, `packages/`, `infra/`, `docs/`.
-3. ADR initiaux : Django, VPS + Compose, Cloudflare, R2, Postgres sur le VPS, Redis, worker, sauvegardes, frontend (D44).
+3. ADR initiaux — écrits le 2026-09-18 (`docs/adr/` 0001 à 0008) : Django, VPS + Compose, Cloudflare, R2, Postgres sur le VPS, Redis, sauvegardes, frontend (D44). Le worker (Celery ou arq) n'en fait pas partie : ADR à sa phase, annexe A.
 4. Modèle de contenu, admin personnalisé, API.
 5. Première fiche : le méta-projet.
 6. `infra/` : Compose, Caddy, bootstrap, sauvegardes, runbook ; CI/CD ; premier déploiement sur `pacome.dev`.
