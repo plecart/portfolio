@@ -1,0 +1,12 @@
+# Python / uv
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.env
+
+# Claude Code — surcharges locales
+.claude/settings.local.json
+
+# strix (pentest, docs/frontend-outillage.md §2.2)
+strix_runs/

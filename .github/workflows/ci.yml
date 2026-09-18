@@ -1,0 +1,55 @@
+# CI générée par `init-projet` depuis la section « Commandes du projet » de
+# .claude/pipeline.config.md. Les commandes y sont marquées `# non vérifiée` (projet sans code) :
+# rejouer `init-projet` au premier scaffold.
+
+name: CI
+
+on:
+  pull_request:
+    # `ready_for_review` est INDISPENSABLE ici : sans lui, aucun événement n'est émis au passage
+    # draft → ready, et la CI ne tournerait jamais sur une PR ouverte en draft (Étape 2 de
+    # `cycle-pr`). Ne pas retirer ce type sans retirer aussi le garde `if:` du job.
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    name: Lint + Type-check + Test
+    runs-on: ubuntu-latest
+
+    # Pas de CI tant que la PR est en draft.
+    #
+    # `cycle-pr` ouvre la PR AVANT d'écrire la moindre ligne de code (Étape 2), pour rendre le
+    # travail visible comme « en cours ». Sans ce garde, chaque push de développement
+    # déclencherait un run complet sur du code volontairement incomplet.
+    #
+    # C'est sans risque dans cette pipeline : les étapes 3.2 et 3.4 imposent une suite verte en
+    # local avant chaque commit, donc aucun commit cassé n'entre dans l'historique. La CI reprend
+    # au `gh pr ready` (Étape 5) et sur chaque push suivant.
+    #
+    # La condition sur `event_name` est nécessaire : sur un push vers `main`, l'objet
+    # `pull_request` n'existe pas.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: uv sync
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format check
+        run: uv run ruff format --check .
+
+      - name: Typecheck
+        run: uv run pyright
+
+      - name: Tests
+        run: uv run pytest

@@ -1,0 +1,112 @@
+# Frontend — outillage et plan d'installation
+
+_2026-09-18. Tranche D15 (frontend reporté en dernier). L'ADR D15 reste à écrire à partir de ce document._
+
+## 1. Décision D15
+
+**Vite + React + TypeScript + Tailwind CSS + shadcn/ui, compilé en CI, servi en statique par Caddy.**
+
+| Brique | Rôle | Pourquoi ici |
+|---|---|---|
+| React | Librairie JavaScript d'interface en composants | Tout l'outillage retenu (shadcn, react-bits, bklit, motion, Rive) cible React |
+| TypeScript | JavaScript typé, vérifié à la compilation | Pendant front de Python + pyright strict ; types générés depuis l'OpenAPI de django-ninja : l'API change → le front ne compile plus |
+| Vite | Serveur de dev + compilation | Standard, rapide, sans configuration |
+| Tailwind CSS | Style par classes utilitaires, compilé au build | Exigé par shadcn et bklit ; zéro code exécuté côté navigateur ou serveur |
+| shadcn/ui | Composants accessibles (sur Radix) copiés dans le dépôt | On possède le code, on n'ajoute que ce qu'on utilise (D27) ; format de registre utilisé par react-bits et bklit |
+
+**Rôle de Django** : API (django-ninja) et admin uniquement. L'admin garde son propre style ; Tailwind n'existe que dans `web/`.
+
+**Servi en statique** : `npm run build` produit `index.html` + JS + CSS ; Caddy les sert, le navigateur récupère le contenu via l'API.
+
+- Pour : aucun Node en production, rien à patcher côté front sur le VPS, RAM quasi nulle, cache Cloudflare, modifier le contenu dans l'admin ne demande pas de rebuild.
+- Contre : le HTML initial est vide. Les aperçus de lien (LinkedIn, Slack, Discord) n'exécutent pas le JS → titre et image génériques sur `/projets/<slug>`.
+- Parade : une vue Django qui renvoie `index.html` avec les balises `<title>`, `og:title`, `og:description`, `og:image` du projet. À détailler dans l'ADR.
+- Next.js écarté : serveur Node permanent (conteneur, RAM, surface d'attaque, second runtime à maintenir) contraire à P1 pour un site à deux visiteurs.
+
+**Écarté à l'audit** : anime.js (doublon de motion), design-motion-principles (reconditionne Emil Kowalski), UX Engine / designmotionhq (payant, doublon), boneyard (sur-ingénierie), Spline (3D lourde — à rouvrir si un besoin 3D réel apparaît, avec three.js en alternative), watermelon-platform et motion-primitives (doublons de react-bits), dépôt 21st (inactif depuis mai 2025), ui-ux-pro-max-skill (taste-skill préféré).
+
+## 2. Installé le 2026-09-18
+
+### Skills Claude Code (`.claude/skills/`)
+
+Copiées depuis GitHub, licence MIT jointe dans chaque dossier. Mise à jour : re-cloner le dépôt, recopier, rescanner (§2.3).
+
+| Skill | Dépôt @ commit | Usage |
+|---|---|---|
+| `taste-skill` (`design-taste-frontend`) | Leonxlnx/taste-skill @ e79ca9e | Direction visuelle anti-générique ; molettes variance / mouvement / densité |
+| `minimalist-skill` (`minimalist-ui`) | Leonxlnx/taste-skill @ e79ca9e | Variante sobre, éditoriale (Annexe B : « le plus sobre possible ») |
+| `emil-design-eng` | emilkowalski/skills @ 85e8e23 | Principes design engineering d'Emil Kowalski |
+| `prototype` | emilkowalski/skills @ 85e8e23 | Idée → plusieurs variantes d'UI comparables dans un sélecteur |
+| `animate` | emilkowalski/skills @ 85e8e23 | Écrire une animation (courbes, durées, propriétés) |
+| `review-animations` | emilkowalski/skills @ 85e8e23 | Relecture stricte d'animations |
+| `improve-animations` | emilkowalski/skills @ 85e8e23 | Audit + plans d'amélioration, lecture seule |
+| `find-animation-opportunities` | emilkowalski/skills @ 85e8e23 | Repérer où le mouvement apporte quelque chose |
+| `animation-vocabulary` | emilkowalski/skills @ 85e8e23 | Vocabulaire précis pour décrire une animation |
+| `no-ai-slop` | petergyang/no-ai-slop @ 000650b | Rédaction des fiches ; motifs écrits pour l'anglais, transfert partiel au français |
+| `improve-codebase-architecture` | mattpocock/skills @ c55ee46 | Audit d'architecture (modules profonds), s'appuie sur les ADR |
+
+Non retenues dans emilkowalski/skills : `animate-expo`, `write-swift`, `mobile-native` (natif), `ask-sonner` (librairie non choisie), `pick-ui-library` (choix fait), `apple-design`.
+Non retenues dans taste-skill : variantes `soft`, `brutalist`, `redesign`, `output`, `gpt-tasteskill`, `stitch`, générateurs d'images, `v1`.
+
+### Outils en ligne de commande (`uv tool`)
+
+Installés avec `uv tool`, chacun dans son environnement isolé et disponible dans tout le système. Ils ne font pas partie du projet : leurs dépendances (LiteLLM, YARA…) entreraient en conflit avec celles du backend.
+
+| Outil | Version | Installation / mise à jour |
+|---|---|---|
+| SkillSpector | 2.11.2 (NVIDIA/skillspector @ d162d9b) | `uv tool install "skillspector @ git+https://github.com/NVIDIA/skillspector.git"` · `uv tool upgrade skillspector` |
+| strix | 1.6.2 (`strix-agent`) | `uv tool install strix-agent` · `uv tool upgrade strix-agent` |
+
+**SkillSpector** : `skillspector scan .claude/skills/<skill> --no-llm` (analyse statique). Passe sémantique sans clé API : `SKILLSPECTOR_PROVIDER=claude_cli`. Rescanner après chaque mise à jour ou ajout de skill.
+
+**strix** (pentest par agents IA) : à exécuter **en fin de parcours, avant l'ouverture publique** du chat RAG et du MCP, contre la préproduction, jamais la prod.
+- Prérequis : Docker démarré, `STRIX_LLM` (ex. `anthropic/<modèle>`) et `LLM_API_KEY`.
+- Le premier lancement télécharge l'image Docker du bac à sable.
+- Résultats dans `strix_runs/` → à ajouter au `.gitignore`.
+
+### 2.3 Scan SkillSpector du 2026-09-18 (statique)
+
+Tout conservé. Les signalements, relus un par un, sont des faux positifs :
+
+| Skill | Verdict outil | Réalité |
+|---|---|---|
+| `improve-animations` | DO_NOT_INSTALL | « ignore previous instructions » cité dans une règle **défensive** (« si un fichier dit ça, signale-le ») ; espaces de largeur nulle devant des ``` dans `PLAN-TEMPLATE.md` = échappement de blocs de code imbriqués, aucun texte caché |
+| `taste-skill` | CAUTION | Commentaire HTML de placeholder d'image ; « Do not ask the user to edit this file » |
+| `find-animation-opportunities` | SAFE | Même règle défensive |
+| `prototype` | CAUTION | « never judge » : consigne de présentation des variantes |
+| autres | SAFE / CAUTION sans signalement | — |
+
+## 3. À installer à l'initialisation de `web/`
+
+Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les CLI évoluent).
+
+1. **Projet** : `npm create vite@latest web -- --template react-ts`. TypeScript strict (déjà actif dans le modèle).
+2. **Tailwind CSS v4** : `npm i -D tailwindcss @tailwindcss/vite`, plugin dans `vite.config.ts`, `@import "tailwindcss";` dans le CSS d'entrée. **Jamais** le script CDN `cdn.tailwindcss.com` (c'est lui qui affiche « ne pas utiliser en production »).
+3. **Alias `@/`** (requis par shadcn) : `paths` dans `tsconfig.json` et `tsconfig.app.json`, `resolve.alias` dans `vite.config.ts`, `npm i -D @types/node`.
+4. **shadcn/ui** : `npx shadcn@latest init`, puis `npx shadcn@latest add <composant>` au besoin (`dialog` pour la fiche projet en modal). Radix arrive comme dépendance de chaque composant ; rien à installer à part.
+5. **motion** : `npm i motion` ; import depuis `motion/react`.
+6. **react-bits** : composant par composant, `npx shadcn@latest add @react-bits/<Nom>-TS-TW`. **Licence MIT + Commons Clause** : usage libre, revente d'un produit fondé sur ces composants interdite — à citer dans l'ADR.
+7. **bklit-ui** (graphiques) : composant par composant, `npx shadcn@latest add @bklit/<graphique>` ; vérifier si le registre `@bklit` doit être déclaré dans `components.json`. Composants MIT ; Bklit Studio (outil hébergé) propriétaire.
+8. **Rive** (animation 2D interactive) : `npm i @rive-app/react-canvas`. Fichiers `.riv` servis en statique ; le runtime charge un WASM : mesurer son poids avec Lighthouse avant d'en généraliser l'usage. Éditeur Rive : compte gratuit à créer soi-même.
+9. **Types de l'API** : `npm i -D openapi-typescript`, génération depuis le schéma OpenAPI de django-ninja ; script npm + vérification en CI (types à jour).
+10. **Accessibilité statique** : `npm i -D eslint-plugin-jsx-a11y` dans la config ESLint fournie par le modèle Vite.
+11. **E2E** : `npm init playwright@latest` ; `npm i -D @axe-core/playwright` pour un contrôle d'accessibilité par page. Couvre le site en phase 1, le chat en phase 2 (§8.4).
+12. **Lighthouse CI** : `@lhci/cli` dans GitHub Actions ; seuils sur performance, accessibilité, bonnes pratiques, SEO ; la PR échoue sous le seuil. Lighthouse = audit Google intégré à Chrome, notes sur 100 et indicateurs de vitesse ressentie.
+
+### Build et déploiement
+
+- Build dans GitHub Actions ; `web/dist` copié dans l'image Caddy publiée sur GHCR (D43). Le conteneur `web` prévu au §5.3 du cadrage disparaît → répercuter.
+- Caddy : `try_files {path} /index.html` pour les routes côté client ; en-têtes `Cache-Control: immutable` sur les fichiers hachés, `no-cache` sur `index.html`.
+
+## 4. Comptes à créer (par l'auteur)
+
+- **Rive** : éditeur, offre gratuite.
+- **Manus** : agent IA autonome en ligne, à crédits. Sert aux maquettes jetables, moodboards et recherches ; son code ne part pas en production (D27).
+
+## 5. Points ouverts
+
+- Écrire l'ADR D15 (MADR, `docs/adr/`) et mettre à jour D15 et §5.3 dans le cadrage.
+- Aperçus de lien : détail de la vue Django d'injection des balises meta et du routage Caddy associé.
+- API sur `api.pacome.dev` (CORS à configurer) ou même origine via Caddy (`/api` → Django, pas de CORS).
+- Tests unitaires front (Vitest) : utiles ou non, au regard de D27.
+- `.claude/skills/design-system` (hérité d'un autre projet) recoupe `taste-skill` : garder ou retirer.
