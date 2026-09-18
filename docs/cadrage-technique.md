@@ -1,6 +1,6 @@
 # Portfolio — Cadrage technique
 
-_Version 1.1 · 2026-09-18 · Remplace le brouillon v0 du 2026-09-10. Le journal complet des questions, réponses et éclaircissements est archivé dans [archive/cadrage-journal-2026-09.md](archive/cadrage-journal-2026-09.md) ; les décisions y gardent leurs identifiants (D1 à D38)._
+_Version 1.2 · 2026-09-18 · Remplace le brouillon v0 du 2026-09-10 et son journal de questions-réponses, supprimés le 2026-09-18 une fois leur matière (pourquoi, options écartées) reprise dans les ADR de `docs/adr/`. Les décisions gardent les identifiants du v0 (D1 à D38) ; D39 et suivantes sont nées avec la v1._
 _Le design (UI/UX) est hors périmètre de ce document._
 
 ---
@@ -215,7 +215,7 @@ Réseau Docker privé ; aucun port de base de données exposé ; images construi
 
 ## 7. Registre des décisions
 
-Identifiants conservés du journal v0. Les décisions remplacées sont indiquées.
+Identifiants hérités du cadrage v0 (D1 à D38), sans trou ni renumérotation. Une décision remplacée reste ici, marquée « remplacée par » ; le pourquoi de chaque brique est dans l'ADR indiqué en §5.2.
 
 **Périmètre et principes**
 
@@ -345,3 +345,15 @@ Recos appliquées par défaut ; chaque point sera tranché par un ADR au moment 
 - **VPS** : machine virtuelle louée, administrée par soi-même.
 - **WAF** : Web Application Firewall, filtre devant le site qui inspecte chaque requête HTTP et bloque les attaques connues (injections, XSS, bots malveillants, exploits) ; distinct du pare-feu réseau qui ne voit que ports et adresses.
 - **Worker** : processus de fond qui exécute les tâches longues ou différées (vignettes, ingestion) hors des requêtes web, en lisant une file de tâches.
+
+## Annexe C — Bibliothèques pressenties (phases 2 et 3)
+
+Non normatif : chaque ligne est à confirmer par l'ADR de sa brique au moment où sa phase commence. Les bibliothèques de la phase 1 sont fixées dans les ADR 0001 à 0008.
+
+| Phase | Brique | Bibliothèques pressenties |
+|---|---|---|
+| 2 | Ingestion (worker) | Docling ou Unstructured, `pypdf`, `langchain-text-splitters`, `langchain-huggingface`, `langsmith`, `httpx` |
+| 2 | Service IA (`ai`) | FastAPI, `uvicorn`, `sse-starlette`, LangGraph, `langgraph-checkpoint-postgres`, `langchain-core`, `langchain-anthropic`, `anthropic`, `langchain-postgres`, `langchain-huggingface`, `langsmith`, `redis`, `httpx` |
+| 2 | Embeddings et reranking | `text-embeddings-inference`, `BAAI/bge-m3`, `BAAI/bge-reranker-v2-m3` |
+| 2 | Studio en local | `langgraph-cli` (`langgraph dev`) |
+| 3 | MCP | `mcp` (FastMCP), `langchain-mcp-adapters` (le chat consomme les mêmes outils), MCP Inspector pour les tests de contrat, `PyJWT` si `send_message` passe par un jeton |

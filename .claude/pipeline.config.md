@@ -15,8 +15,9 @@ Ordre de normativité : **en cas de contradiction, le rang le plus haut l'emport
 | 3 | `docs/frontend-outillage.md` | inventaire installé et plan d'installation de `apps/web/` (le pourquoi de D44 est dans l'ADR 0008), provisoire | le § concerné |
 | n | issues GitHub ouvertes | découpage et planification, **dérivés** des rangs supérieurs | le corps de l'issue, jamais un commentaire — voir `repercussions` |
 
-**Non normatif :** `docs/archive/` (journal du cadrage v0, à supprimer après les ADR initiaux) ;
-`docs/outils.md` (liste dérivée, même sort) ; `docs/learning/` (phase 2, pédagogique).
+**Non normatif :** `docs/learning/` (phase 2, pédagogique) ; cadrage annexe C (bibliothèques
+pressenties des phases 2 et 3, à confirmer par ADR). Le journal du cadrage v0 et la liste d'outils
+dérivée ont été supprimés le 2026-09-18, leur matière reprise dans les ADR.
 
 Toute référence croisée cite un **§ ou un titre de section**, jamais un numéro de ligne.
 
