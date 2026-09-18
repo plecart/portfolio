@@ -1,6 +1,6 @@
 # Portfolio — Cadrage technique
 
-_Version 1.2 · 2026-09-18 · Remplace le brouillon v0 du 2026-09-10 et son journal de questions-réponses, supprimés le 2026-09-18 une fois leur matière (pourquoi, options écartées) reprise dans les ADR de `docs/adr/`. Les décisions gardent les identifiants du v0 (D1 à D38) ; D39 et suivantes sont nées avec la v1._
+_Version 1.3 · 2026-09-18 · Remplace le brouillon v0 du 2026-09-10 et son journal de questions-réponses, supprimés le 2026-09-18 une fois leur matière (pourquoi, options écartées) reprise dans les ADR de `docs/adr/`. Les décisions gardent les identifiants du v0 (D1 à D38) ; D39 et suivantes sont nées avec la v1._
 _Le design (UI/UX) est hors périmètre de ce document._
 
 ---
@@ -70,7 +70,7 @@ Email (post-MVP, peut-être jamais) · anglais · commentaires (retirés) · MCP
 
 ### 5.1 Vue d'ensemble
 
-- **Bordure** : le visiteur atteint Cloudflare (DNS, proxy, CDN, WAF, rate limiting, Access ; Turnstile en phase 2), qui transmet à Caddy, seul conteneur exposé du VPS (TLS, reverse proxy).
+- **Bordure** : le visiteur atteint Cloudflare (DNS, proxy, CDN, WAF, rate limiting, Access ; Turnstile en phase 2), qui transmet au VPS par Cloudflare Tunnel : le conteneur `cloudflared` sort vers Cloudflare, aucun port web n'est ouvert ; Caddy, derrière lui, route et sert les statiques.
 - **VPS** (Docker Compose, réseau privé) : Caddy sert le frontend en statique (compilé en CI, copié dans son image) et route vers `api` (Django et admin), `ai` (FastAPI + LangGraph, phase 2) et `mcp` (phase 3).
 - **Données** : `api`, `ai` et `mcp` lisent et écrivent Postgres (pgvector en phase 2) ; `api` et `ai` utilisent Redis. Le `worker` (vignettes, puis ingestion) travaille sur Postgres et Redis ; le conteneur `embeddings` (phase 2, modèles locaux) sert `ai` et le `worker`.
 - **Stockage** : `api` et le `worker` déposent médias et documents sur Cloudflare R2, servis via le CDN.
@@ -84,7 +84,7 @@ Email (post-MVP, peut-être jamais) · anglais · commentaires (retirés) · MCP
 | Cloudflare | Registrar, DNS, proxy, CDN, WAF (fourni, sans implémentation), rate limiting, Access ; Turnstile optionnel en phase 2 | 1 | Caddy seul + Tailscale | 0003 |
 | VPS 2 vCPU en UE (Hetzner, OVH, Scaleway), 4 Go en phase 1, 8 Go en phase 2 | Calcul, Postgres, modèles locaux | 1 | PaaS, tout managé, Kubernetes | 0002 |
 | Docker Compose | Orchestration locale des conteneurs | 1 | — | 0002 |
-| Caddy | Reverse proxy, TLS automatique, statiques | 1 | Traefik, nginx | 0002 |
+| Caddy | Reverse proxy interne, statiques (TLS terminé par Cloudflare) | 1 | Traefik, nginx | 0002 |
 | Django | Contenu, admin, API | 1 | FastAPI seul | 0001 |
 | Django admin | Back-office | 1 | CMS headless, content-as-code, admin custom | 0001 |
 | Postgres 16 + pgvector | Contenu, vecteurs, checkpoints, outbox | 1 (pgvector en 2) | Postgres managé, Qdrant | 0005 |
@@ -106,7 +106,8 @@ La colonne ADR renvoie au numéro du fichier dans `docs/adr/` (index : `docs/adr
 
 | Conteneur | Rôle | Phase |
 |---|---|---|
-| `caddy` | Reverse proxy, TLS ; sert le frontend compilé, copié dans son image (D43, D44) ; seul conteneur exposé (80 / 443) | 1 |
+| `cloudflared` | Cloudflare Tunnel : connexion sortante vers Cloudflare, seule entrée du VPS (D45) | 1 |
+| `caddy` | Reverse proxy interne ; sert le frontend compilé, copié dans son image (D43, D44) ; aucun port publié | 1 |
 | `api` | Django : contenu, admin, API | 1 |
 | `postgres` | Image `pgvector/pgvector` | 1 |
 | `redis` | Cache, puis broker et rate limiting | 1 |
@@ -176,7 +177,7 @@ Réseau Docker privé ; aucun port de base de données exposé ; images construi
 ### 6.6 Sécurité et confidentialité
 
 - **Modèle de menace** : abus de coût du LLM, spam via `send_message`, injection de prompt via l'entrée utilisateur, fuite de données personnelles, XSS via le rendu Markdown, upload malveillant dans l'admin, SSRF, compromission de l'admin, fuite de secrets, dépendances vulnérables.
-- **Périmètre** : Cloudflare (WAF et protection DDoS fournis sans implémentation, rate limiting, Access, IP du VPS masquée ; Turnstile optionnel en phase 2 si abus constatés) ; Caddy ; pare-feu du VPS ; aucun port interne exposé.
+- **Périmètre** : Cloudflare (WAF et protection DDoS fournis sans implémentation, rate limiting, Access, IP du VPS masquée ; Turnstile optionnel en phase 2 si abus constatés) ; Cloudflare Tunnel (aucun port web ouvert sur le VPS) ; Caddy ; pare-feu du VPS (SSH seul) ; aucun port interne exposé.
 - **Application** : rate limiting par IP et par session (compteurs Redis), plafond de budget journalier, system prompt durci, contenu récupéré traité comme donnée, sorties structurées pour le routage, filtrage de sortie, refus hors périmètre, journalisation des tentatives d'abus.
 - **Admin** : Cloudflare Access + mot de passe fort + 2FA, un seul compte, journal d'audit.
 - **Secrets** : 12-factor, `.env` en développement seulement, secrets hors serveur en production (gestionnaire de mots de passe, secrets GitHub Actions), rotation documentée.
@@ -255,6 +256,7 @@ Identifiants hérités du cadrage v0 (D1 à D38), sans trou ni renumérotation. 
 | D42 | Conteneur `backup` dédié confirmé | Postgres fournit `pg_dump` mais rien ne l'ordonnance ; un conteneur cron isolé, versionné dans Compose, avec ses propres droits. |
 | D43 | GHCR confirmé | Les images sont construites en CI et tirées par le VPS ; aucun build sur le serveur ; gratuit, sans exploitation. |
 | D44 | Frontend = Vite + React + TypeScript + Tailwind CSS + shadcn/ui | Compilé en CI, servi en statique par Caddy, aucun Node en production ; Next.js écarté. Compléments : motion, react-bits, bklit-ui, Rive, `openapi-typescript` (`docs/frontend-outillage.md` §3). Remplace D15. |
+| D45 | Origine reliée à Cloudflare par Tunnel | Aucun port web ouvert sur le VPS ; `cloudflared` sort vers Cloudflare ; Caddy reste reverse proxy interne, sans TLS. Remplace « Caddy seul conteneur exposé 80/443 » (2026-09-18). |
 | D29 | (remplacée par D36, D37) | — |
 | D21 | (remplacée par D25) | — |
 
@@ -334,7 +336,7 @@ Recos appliquées par défaut ; chaque point sera tranché par un ADR au moment 
 - **RAG** : Retrieval-Augmented Generation ; le LLM répond à partir de passages retrouvés dans une base de connaissances.
 - **Rate limiting** : plafond de requêtes par client et par fenêtre de temps (ex. 60 par minute par IP) ; au-delà, réponse 429. Appliqué au bord (Cloudflare) et dans l'application (compteurs Redis).
 - **Reranking** : second tri des passages retrouvés par un modèle spécialisé, plus précis que la recherche initiale.
-- **Reverse proxy** : serveur placé devant les services (Caddy) qui reçoit tout le trafic, termine TLS et route chaque requête vers le bon conteneur selon le nom d'hôte et le chemin.
+- **Reverse proxy** : serveur placé devant les services (Caddy) qui reçoit tout le trafic et route chaque requête vers le bon conteneur selon le nom d'hôte et le chemin.
 - **RPO / RTO** : perte de données maximale tolérée / durée maximale de remise en service.
 - **Stateful** : se dit d'une machine qui détient des données non régénérables.
 - **Surveillance de disponibilité** : service externe (BetterStack, UptimeRobot) qui appelle le site toutes les quelques minutes depuis l'extérieur et alerte s'il ne répond plus ; externe, car un outil sur le VPS ne peut pas signaler que le VPS est tombé.

@@ -35,23 +35,23 @@ le coût réduit et le contrôle total l'emportent, à ce trafic.
 
 - **Machine** : 2 vCPU, 4 Go en phase 1, 8 Go à partir de la phase 2 (modèles d'embeddings
   locaux) ; Hetzner, OVH ou Scaleway, région UE ; Ubuntu LTS.
-- **Durcissement du système** : `ufw` (seuls 22, 80 et 443 ouverts), `fail2ban`,
+- **Durcissement du système** : `ufw` (seul 22 ouvert), `fail2ban`,
   `unattended-upgrades`, OpenSSH par clés uniquement.
 - **Conteneurs** : Docker Engine + Docker Compose ; réseau Docker privé ; aucun port de base de
   données exposé ; images construites en CI et publiées sur GHCR (D43), jamais construites sur le
   serveur ; déploiement par SSH (`docker compose pull && docker compose up -d`), migrations
   automatiques.
-- **Caddy** : seul conteneur exposé (80 / 443) ; TLS automatique ; sert le frontend compilé (ADR
-  0008) ; route par nom d'hôte vers `api`, puis `ai` et `mcp`. Le certificat d'origine derrière le
-  proxy Cloudflare se fera soit par défi DNS (module `caddy-dns/cloudflare`), soit par un
-  certificat Cloudflare Origin CA : à fixer à la création de `infra/`.
+- **`cloudflared`** : Cloudflare Tunnel, seule entrée du VPS (D45, ADR 0003) ; connexion sortante
+  vers Cloudflare, aucun port web publié.
+- **Caddy** : aucun port publié, pas de TLS (terminé par Cloudflare) ; sert le frontend compilé
+  (ADR 0008) ; route par nom d'hôte vers `api`, puis `ai` et `mcp`.
 - **Reproductibilité** : `infra/` versionné (`compose.yml`, `Caddyfile`, `bootstrap.sh`,
   `RUNBOOK.md`) ; le VPS se reconstruit depuis le dépôt et la dernière sauvegarde (ADR 0007).
 - **Développement local** : même Compose avec Docker Desktop (Postgres, Redis, stockage disque).
 
 Écartés pour le reverse proxy : **Traefik** (configuration par labels, plus riche et plus verbeuse
-que le besoin) et **nginx** (pas de TLS automatique, configuration plus longue). Caddy tient en
-quelques lignes, gère les certificats seul et sert les statiques.
+que le besoin) et **nginx** (configuration plus longue). Caddy tient en quelques lignes et sert
+les statiques.
 
 ## Conséquences
 

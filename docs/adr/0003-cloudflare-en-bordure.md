@@ -35,6 +35,7 @@ domaine.
 | Registrar | Achat de `pacome.dev` à prix coûtant |
 | DNS | Zone du domaine |
 | Proxy | Masque l'IP du VPS ; TLS au bord |
+| Tunnel | Relie le VPS à Cloudflare par une connexion sortante (`cloudflared`) ; l'origine est injoignable autrement (D45) |
 | CDN | Cache des fichiers statiques et des images |
 | WAF et protection DDoS | Fournis par l'offre, sans implémentation |
 | Rate limiting | Règles au bord, en complément des compteurs applicatifs (ADR 0006) |
@@ -66,8 +67,9 @@ démontrable (ADR 0007, point 7).
   dans la page de confidentialité, avec les autres sous-traitants.
 - Effet « boîte noire » si l'on ne comprend pas ce que chaque fonction fait : chaque règle activée
   est documentée dans le runbook.
-- Le masquage de l'IP n'a de valeur que si le VPS n'accepte le trafic HTTP que depuis les plages
-  d'adresses Cloudflare : à appliquer dans le pare-feu (`infra/`).
+- Le masquage de l'IP est garanti par le Tunnel : aucun port web n'écoute sur le VPS. L'alternative
+  — ouvrir 80 / 443 et n'accepter que les plages d'adresses Cloudflare dans le pare-feu — laissait
+  une liste à tenir à jour et un certificat d'origine à gérer.
 
 ## Comparaison des options
 
