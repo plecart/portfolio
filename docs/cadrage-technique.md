@@ -1,6 +1,6 @@
 # Portfolio — Cadrage technique
 
-_Version 1.3 · 2026-09-18 · Remplace le brouillon v0 du 2026-09-10 et son journal de questions-réponses, supprimés le 2026-09-18 une fois leur matière (pourquoi, options écartées) reprise dans les ADR de `docs/adr/`. Les décisions gardent les identifiants du v0 (D1 à D38) ; D39 et suivantes sont nées avec la v1._
+_Version 1.4 · 2026-09-22 · Remplace le brouillon v0 du 2026-09-10 et son journal de questions-réponses, supprimés le 2026-09-18 une fois leur matière (pourquoi, options écartées) reprise dans les ADR de `docs/adr/`. Les décisions gardent les identifiants du v0 (D1 à D38) ; D39 et suivantes sont nées avec la v1._
 _Le design (UI/UX) est hors périmètre de ce document._
 
 ---
@@ -41,7 +41,7 @@ Strictement séquentielles : on n'attaque la suivante que lorsque la précédent
 
 ### Phase 1 — MVP portfolio (back + front)
 
-- Accueil : liste d'icônes représentant les projets (façon écran d'accueil de téléphone).
+- Accueil : grille de cartes, une par projet (image, titre, technologies principales) ; une carte s'ouvre en fiche. Style et mouvement : `docs/specification-ux.md`.
 - Fiche projet (modal) : titre, description, tags de technologies, images et texte, et **la fiche technique en sections fixes** (§6.1).
 - Back-office : Django admin personnalisé, un seul utilisateur.
 - Premier contenu : la fiche du méta-projet.
@@ -131,11 +131,11 @@ Réseau Docker privé ; aucun port de base de données exposé ; images construi
 
 ### 6.1 Modèle de contenu
 
-- **Projet** : slug, titre, résumé, description (Markdown), type (perso / pro / école), statut (en cours / terminé / archivé), dates, client, liens (dépôt, démo : absents pour les projets privés), technologies, galerie d'images avec légendes, fiche technique en sections, état brouillon / publié.
+- **Projet** : slug, titre, résumé, description (Markdown), type (perso / pro / école), statut (en cours / terminé / archivé), dates, client, liens (dépôt, démo : absents pour les projets privés), technologies, galerie d'images avec légendes, fiche technique en sections, mise en avant (booléen « vitrine », un seul projet à la fois), état brouillon / publié.
 - **Fiche technique, sections normalisées** (colonne vertébrale du site et du RAG) : Contexte et objectif · Stack · Architecture · Données · Sécurité · Asynchrone et workers · API et intégrations · Déploiement et exploitation · Tests et qualité · Décisions · Bilan. Caractère obligatoire ou optionnel de chaque section à fixer à la première fiche.
 - **Technologie** : nom, type (langage / framework / infra / outil), icône, site.
 - **Document** (phase 2) : fichier sur R2, type, langue, visibilité (`public` téléchargeable, `rag_only` indexé mais jamais servi en entier, `private` jamais indexé), état d'indexation, hash de contenu.
-- **Profil** : compétences, expériences, formation, langues, disponibilité ; faits exacts pour le RAG et page « à propos ».
+- **Profil** : compétences, expériences, formation, langues, disponibilité ; faits exacts pour le RAG. Aucune page « à propos » : le site ne présente l'auteur que par deux liens (GitHub, LinkedIn), en colonne fixe en bas à droite de la fenêtre quand la marge à côté de la grille le permet, en pied de page sinon (`docs/specification-ux.md` §1.13) ; le CV public est servi par le chatbot (phase 2).
 - **Message** (phase 3) : reçu via le MCP, lu dans l'admin.
 
 ### 6.2 Back-office
@@ -236,6 +236,10 @@ Identifiants hérités du cadrage v0 (D1 à D38), sans trou ni renumérotation. 
 | D24 | Pas d'email | Conçu sans ; post-MVP, peut-être jamais. |
 | D27 | Code minimal | Chaque ligne sert un but ; règle de revue inscrite dans la configuration Claude Code. |
 | D28, D34 | Contenu FR seul, jamais en dur | Catalogue de chaînes unique ; pas de plomberie multilingue anticipée. |
+| D46 | Accueil = grille de cartes projet | Remplace « liste d'icônes façon écran d'accueil de téléphone » (2026-09-19) ; style et mouvement dans `docs/specification-ux.md`. |
+| D47 | Pas de page « à propos » | Profil réservé au RAG ; GitHub et LinkedIn seuls liens vers l'auteur (placement : D49) ; CV public via le chatbot en phase 2 (2026-09-19). |
+| D48 | Projet « vitrine » | Booléen sur Projet, un seul à la fois, choisi dans l'admin ; sa carte est double et ouvre la table, avant l'ordre automatique de `docs/specification-ux.md` §1.9 (2026-09-22). |
+| D49 | Liens GitHub et LinkedIn en colonne fixe | En bas à droite de la fenêtre dès que la marge à côté de la grille le permet, en pied de page sinon ; seuil et valeurs dans `docs/specification-ux.md` §1.13 et §3 (2026-09-22). |
 
 **Stack et hébergement**
 

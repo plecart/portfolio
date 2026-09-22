@@ -10,14 +10,17 @@ Ordre de normativité : **en cas de contradiction, le rang le plus haut l'emport
 
 | Rang | Fichier | Portée | Où s'inscrit un amendement |
 |---|---|---|---|
-| 1 | `docs/cadrage-technique.md` | périmètre, phases, architecture, contraintes, registre des décisions D1-D45 (§7) | le § concerné + une ligne au registre §7 (une décision remplacée y reste, marquée « remplacée par ») |
-| 2 | `docs/adr/` (index et conventions : `docs/adr/README.md`) | le pourquoi d'une brique, options écartées | un nouvel ADR qui remplace l'ancien (statut MADR « remplacé par »), jamais l'édition d'un ADR accepté |
-| 3 | `docs/frontend-outillage.md` | inventaire installé et plan d'installation de `apps/web/` (le pourquoi de D44 est dans l'ADR 0008), provisoire | le § concerné |
+| 1 | `docs/cadrage-technique.md` | périmètre, phases, architecture, contraintes, registre des décisions D1-D49 (§7) | le § concerné + une ligne au registre §7 (une décision remplacée y reste, marquée « remplacée par ») |
+| 2 | `docs/specification-ux.md` | interface du site : direction (§1), jetons, écrans, composants, états, responsive, accessibilité, performance, contraintes de contenu (§2-§7, valeurs mesurées sur les prototypes retenus) | le § concerné, puis le prototype HTML correspondant (hors dépôt, `E:/Projets/Portfolio-prototypes/`, README de reprise) : les deux restent alignés |
+| 3 | `docs/adr/` (index et conventions : `docs/adr/README.md`) | le pourquoi d'une brique, options écartées | un nouvel ADR qui remplace l'ancien (statut MADR « remplacé par »), jamais l'édition d'un ADR accepté |
+| 4 | `docs/frontend-outillage.md` | inventaire installé et plan d'installation de `apps/web/` (le pourquoi de D44 est dans l'ADR 0008), provisoire | le § concerné |
 | n | issues GitHub ouvertes | découpage et planification, **dérivés** des rangs supérieurs | le corps de l'issue, jamais un commentaire — voir `repercussions` |
 
 **Non normatif :** `docs/learning/` (phase 2, pédagogique) ; cadrage annexe C (bibliothèques
 pressenties des phases 2 et 3, à confirmer par ADR). Le journal du cadrage v0 et la liste d'outils
-dérivée ont été supprimés le 2026-09-18, leur matière reprise dans les ADR.
+dérivée ont été supprimés le 2026-09-18, leur matière reprise dans les ADR. Les prototypes HTML
+de `E:/Projets/Portfolio-prototypes/` (hors dépôt) sont les sources de mesure de `docs/specification-ux.md` :
+rien ne s'y décide, et un amendement de la spec s'y répercute.
 
 Toute référence croisée cite un **§ ou un titre de section**, jamais un numéro de ligne.
 
@@ -64,7 +67,7 @@ sans code »). Le squelette monorepo (cadrage §9.2 : `apps/api`, `apps/web`, `a
 - surfaces exposées (phase 1 ; phases 2 et 3 ajoutées quand elles démarrent) — ce que la QA a le droit de vérifier :
   API HTTP (django-ninja) · interface web · admin Django (un seul compte, pas d'isolation entre comptes) · persistance Postgres · traitements asynchrones (worker) · fichiers produits (médias sur R2)
 - surfaces visibles par un utilisateur (déclenchent la vérif de fumée de `cycle-pr` et la proposition de campagne QA) :
-  accueil (grille d'icônes) · fiche projet (modal) · page « à propos » · admin Django
+  accueil (grille de cartes) · fiche projet (modal) · admin Django
 
 ## Langue
 - skills / issues / PRD / descriptions : français
