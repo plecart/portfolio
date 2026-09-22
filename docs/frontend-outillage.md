@@ -92,6 +92,8 @@ Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les C
 10. **Accessibilité statique** : `npm i -D eslint-plugin-jsx-a11y` dans la config ESLint fournie par le modèle Vite.
 11. **E2E** : `npm init playwright@latest` ; `npm i -D @axe-core/playwright` pour un contrôle d'accessibilité par page. Couvre le site en phase 1, le chat en phase 2 (§8.4).
 12. **Lighthouse CI** : `@lhci/cli` dans GitHub Actions ; seuils sur performance, accessibilité, bonnes pratiques, SEO ; la PR échoue sous le seuil. Lighthouse = audit Google intégré à Chrome, notes sur 100 et indicateurs de vitesse ressentie.
+13. **Tests unitaires** : `npm i -D vitest` ; logique pure du front (format des dates, ordre des cartes, technologies de carte) ; script npm + CI (ADR 0010).
+14. **Markdown** : `npm i markdown-to-jsx` ; description et sections rendues en éléments React, HTML brut échappé, jamais d'insertion d'HTML (ADR 0010).
 
 ### Build et déploiement
 
@@ -105,4 +107,4 @@ Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les C
 
 ## 5. Points ouverts
 
-Tous tranchés le 2026-09-18 : l'ADR 0008 fixe les aperçus de lien (vue Django sur `/projets/<slug>`, `index.html` copié dans l'image `api`, Caddy route `/projets/*`), l'origine de l'API (`api.pacome.dev` + CORS restreint) et les tests unitaires du front (pas de Vitest en phase 1, condition de réexamen) ; `.claude/skills/design-system` (hérité d'un autre projet) recoupait `taste-skill` et a été retiré.
+Tous tranchés le 2026-09-18 : l'ADR 0008 fixe les aperçus de lien (vue Django sur `/projets/<slug>`, `index.html` copié dans l'image `api`, Caddy route `/projets/*`), l'origine de l'API (`api.pacome.dev` + CORS restreint) et les tests unitaires du front (condition de réexamen atteinte : Vitest en phase 1, ADR 0010) ; `.claude/skills/design-system` (hérité d'un autre projet) recoupait `taste-skill` et a été retiré.

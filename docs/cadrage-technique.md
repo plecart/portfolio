@@ -262,6 +262,7 @@ Identifiants hérités du cadrage v0 (D1 à D38), sans trou ni renumérotation. 
 | D43 | GHCR confirmé | Les images sont construites en CI et tirées par le VPS ; aucun build sur le serveur ; gratuit, sans exploitation. |
 | D44 | Frontend = Vite + React + TypeScript + Tailwind CSS + shadcn/ui | Compilé en CI, servi en statique par Caddy, aucun Node en production ; Next.js écarté. Compléments : motion, react-bits, bklit-ui, Rive, `openapi-typescript` (`docs/frontend-outillage.md` §3). Remplace D15. |
 | D45 | Origine reliée à Cloudflare par Tunnel | Aucun port web ouvert sur le VPS ; `cloudflared` sort vers Cloudflare ; Caddy reste reverse proxy interne, sans TLS. Remplace « Caddy seul conteneur exposé 80/443 » (2026-09-18). |
+| D51 | Rendu du Markdown dans le front | L'API envoie la description et les sections en Markdown (JSON) ; le front les rend en éléments React avec `markdown-to-jsx`, HTML brut échappé ; `markdown-it-py` + `nh3` réservés à l'aperçu de l'admin ; Vitest entre en phase 1 pour la logique pure du front (ADR 0010, 2026-09-22). |
 | D29 | (remplacée par D36, D37) | — |
 | D21 | (remplacée par D25) | — |
 
@@ -355,7 +356,7 @@ Recos appliquées par défaut ; chaque point sera tranché par un ADR au moment 
 
 ## Annexe C — Bibliothèques pressenties (phases 2 et 3)
 
-Non normatif : chaque ligne est à confirmer par l'ADR de sa brique au moment où sa phase commence. Les bibliothèques de la phase 1 sont fixées dans les ADR 0001 à 0008.
+Non normatif : chaque ligne est à confirmer par l'ADR de sa brique au moment où sa phase commence. Les bibliothèques de la phase 1 sont fixées dans les ADR 0001 à 0010.
 
 | Phase | Brique | Bibliothèques pressenties |
 |---|---|---|
