@@ -240,6 +240,7 @@ Identifiants hérités du cadrage v0 (D1 à D38), sans trou ni renumérotation. 
 | D47 | Pas de page « à propos » | Profil réservé au RAG ; GitHub et LinkedIn seuls liens vers l'auteur (placement : D49) ; CV public via le chatbot en phase 2 (2026-09-19). |
 | D48 | Projet « vitrine » | Booléen sur Projet, un seul à la fois, choisi dans l'admin ; sa carte est double et ouvre la table, avant l'ordre automatique de `docs/specification-ux.md` §1.9 (2026-09-22). |
 | D49 | Liens GitHub et LinkedIn en colonne fixe | En bas à droite de la fenêtre dès que la marge à côté de la grille le permet, en pied de page sinon ; seuil et valeurs dans `docs/specification-ux.md` §1.13 et §3 (2026-09-22). |
+| D50 | Adresse de fiche inconnue → accueil | `/projets/<slug>` sans projet publié : redirection `302` vers `/`, aucune page 404 ; remplace le point « slug inconnu » de l'ADR 0008 (ADR 0009, 2026-09-22). |
 
 **Stack et hébergement**
 
