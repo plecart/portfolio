@@ -5,6 +5,10 @@ __pycache__/
 .ruff_cache/
 .env
 
+# Front (apps/web) — un seul fichier d'exclusion pour le dépôt, comme il n'y a qu'un `Makefile`
+node_modules/
+apps/web/dist/
+
 # Claude Code — surcharges locales
 .claude/settings.local.json
 

@@ -1,0 +1,27 @@
+{
+  // Options communes aux deux configurations de l'application. Elles vivaient en double dans
+  // `tsconfig.app.json` et `tsconfig.node.json` : une décision de rigueur se serait prise deux
+  // fois, et le jour où l'une des deux copies aurait été oubliée, rien ne l'aurait signalé.
+  // Ce qui reste local à chaque configuration, c'est ce qui diffère vraiment : la bibliothèque
+  // standard visée, le système de modules, les types ambiants et les fichiers couverts.
+  "compilerOptions": {
+    "target": "es2023",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    // Posé explicitement : le gabarit `create-vite` ne l'active plus (v9.2.1), et `tsc` ne
+    // signale jamais son absence — il compile simplement moins. C'est le pendant front de
+    // pyright en mode strict côté back (cadrage §8.4).
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  }
+}

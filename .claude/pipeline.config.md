@@ -32,7 +32,10 @@ Toute référence croisée cite un **§ ou un titre de section**, jamais un num�
   - phase 3 : SDK Python `mcp` (FastMCP)
 - infrastructure : Postgres 16 + pgvector, Redis 7, Docker Compose, Caddy, Cloudflare (DNS, CDN, WAF, Access, Tunnel, R2), GitHub Actions + GHCR
 - gestionnaire de paquets : `uv` (Python) ; `npm` (frontend)
-- runtime + version : python 3.12 ; Node : à fixer à l'initialisation de `apps/web/`
+- runtime + version : python 3.12 ; Node 24.21.0 — LTS active au 2026-09-23 (ligne 24 « Krypton » ;
+  la 26 est *current*, pas LTS). Épinglée deux fois, `apps/web/.nvmrc` et le champ `engines` de
+  `apps/web/package.json`, dont un test Vitest vérifie l'égalité : deux épingles qui divergeraient
+  en silence ne vaudraient pas mieux qu'aucune.
 
 ## Commandes du projet
 Lues par `cycle-pr`, `execution-qa` et la génération de CI. `n/a` = étape absente du projet.
