@@ -1,9 +1,14 @@
 /*! Manrope — Copyright 2018 The Manrope Project Authors (https://github.com/googlefonts/manrope),
-    sous SIL Open Font License 1.1. Texte intégral : src/assets/fonts/OFL.txt */
+    sous SIL Open Font License 1.1. Texte intégral : /OFL.txt */
 
-/* La notice ci-dessus ouvre par `/*!` et non `/*` : le build supprime les commentaires
-   ordinaires, et la licence doit accompagner la police partout où elle est distribuée — donc
-   dans le CSS compilé, pas seulement dans le dépôt. */
+/* Deux gestes pour une seule exigence : l'OFL veut que la notice ET le texte de la licence
+   accompagnent la police partout où elle est distribuée.
+
+   - La notice ouvre par `/*!` et non `/*` : le build supprime les commentaires ordinaires.
+   - Le renvoi pointe `/OFL.txt`, servi depuis `public/`, et non le chemin du dépôt : qui reçoit
+     la distribution n'a pas les sources. Un scénario de bout en bout le vérifie sur ce qui est
+     réellement servi — et pas seulement sur un statut 200, que le repli SPA rendrait de toute
+     façon. */
 
 /* Tailwind v4 par son plugin Vite (ADR 0008), jamais le script CDN. L'`@import` ouvre le
    fichier : une règle placée avant lui le rendrait inopérant, sans que rien ne le signale. */

@@ -132,8 +132,11 @@ deux déclarations se disputeraient la même propriété. Les jetons de couleur,
 rayon de la spec §2 viendront avec #18, au même endroit.
 
 **Police** : `src/assets/fonts/manrope-latin.woff2` — Manrope variable 200–800, sous-ensemble latin,
-Google Fonts v20, 24,3 Ko, sous SIL Open Font License 1.1 (`OFL.txt` joint, et notice reprise en
-commentaire légal dans le CSS pour accompagner la police là où elle est distribuée). C'est le
+Google Fonts v20, 24,3 Ko, sous SIL Open Font License 1.1. L'OFL veut que la notice **et** le texte
+de la licence accompagnent la police partout où elle est distribuée : la notice voyage en
+commentaire légal dans le CSS compilé, et le texte intégral est servi depuis `public/OFL.txt`, donc
+présent dans `dist/`. Un scénario de bout en bout le vérifie sur ce qui est réellement servi —
+le premier jet renvoyait au chemin du dépôt, que personne recevant la distribution ne possède. C'est le
 fichier exact sur lequel la spec §2.2 a mesuré ses 25 Ko : repris des prototypes plutôt que
 réinstallé, pour que la valeur épinglée par la spec reste vraie. Aucune dépendance npm de police.
 
