@@ -1,0 +1,27 @@
+"""Fixtures communes aux tests de `apps/api`."""
+
+import pytest
+
+# Un environnement complet et valide. Chaque test en retire ou en corrompt une seule entrée,
+# pour que l'échec attendu ne puisse venir que de celle-là.
+ENVIRONNEMENT_VALIDE = {
+    "SECRET_KEY": "clé-de-test",
+    "DEBUG": "false",
+    "ALLOWED_HOSTS": '["portfolio.test"]',
+    "DATABASE_URL": "postgresql://portfolio:secret@localhost:5432/portfolio",
+    "REDIS_URL": "redis://localhost:6379/0",
+}
+
+
+@pytest.fixture
+def variables() -> dict[str, str]:
+    """L'environnement valide, sous forme de dictionnaire — pour un sous-processus."""
+    return dict(ENVIRONNEMENT_VALIDE)
+
+
+@pytest.fixture
+def environnement(monkeypatch: pytest.MonkeyPatch, variables: dict[str, str]) -> pytest.MonkeyPatch:
+    """Pose l'environnement valide dans ce processus et rend la main pour le corrompre."""
+    for nom, valeur in variables.items():
+        monkeypatch.setenv(nom, valeur)
+    return monkeypatch

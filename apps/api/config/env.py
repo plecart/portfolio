@@ -9,10 +9,14 @@ Ajouter une variable, c'est ajouter un champ typé ici **et** une ligne dans `.e
 Aucun `os.environ` ailleurs, aucune valeur d'environnement en dur.
 """
 
+from pathlib import Path
 from typing import Self
 
 from pydantic import PostgresDsn, RedisDsn, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# `env.py` → `config` → `api` → `apps` → racine du dépôt.
+RACINE_DEPOT = Path(__file__).resolve().parents[3]
 
 
 class Env(BaseSettings):
@@ -37,7 +41,9 @@ class Env(BaseSettings):
             (le cache Django) arrive avec #7, et `django-redis` avec lui.
     """
 
-    model_config = SettingsConfigDict(env_file=".env")
+    # Chemin absolu, pas relatif : `manage.py` se lance depuis `apps/api` et les tests depuis
+    # la racine du dépôt. Un chemin relatif ferait lire deux fichiers différents.
+    model_config = SettingsConfigDict(env_file=RACINE_DEPOT / ".env")
 
     SECRET_KEY: SecretStr
     DEBUG: bool = False
