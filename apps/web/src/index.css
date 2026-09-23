@@ -33,8 +33,10 @@
   src: url('./assets/fonts/manrope-latin.woff2') format('woff2');
 }
 
-/* Ce que la feuille de base de Tailwind ne fixe pas et que la spec §2.2 impose. */
+/* `-webkit-font-smoothing` est imposé par la spec §2.2 et absent de la feuille de base de
+   Tailwind. L'interligne de 1,5, lui, n'est pas redéclaré ici : le préflight le pose déjà sur
+   `html` (`tailwindcss/preflight.css`, « Use a consistent sensible line-height in all browsers »),
+   et la même valeur écrite deux fois n'aurait servi qu'à faire croire à une divergence. */
 :root {
-  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }

@@ -103,6 +103,26 @@ puis émondés de ce que le gabarit ajoute pour sa page de démonstration :
 | `@axe-core/playwright` | 4.13.0 | Contrôle d'accessibilité par page |
 | `@types/node`, `@types/react`, `@types/react-dom` | 24.13.6 / 19.3.0 | Types ambiants |
 
+**Bloc d'aperçu de l'`index.html`.** Entre `<!--meta:start-->` et `<!--meta:end-->`, dans le
+`<head>`. La CI copie l'`index.html` compilé dans l'image `api` ; sur `/projets/<slug>`, une vue
+Django remplace **tout le bloc** par les balises du projet (#14, ADR 0008 « Aperçus de lien »). Les
+deux marqueurs sont le contrat : ils doivent rester uniques dans le fichier **compilé**, ce qu'un
+scénario de bout en bout vérifie sur la version servie et non sur la source. Trois points à savoir
+avant de toucher au bloc :
+
+- Les valeurs par défaut sont celles du site. Servies telles quelles à un robot d'aperçu, elles
+  restent correctes — c'est le comportement attendu hors `/projets/<slug>` et pour un slug inconnu
+  (ADR 0008 : « gabarit sans balises projet »).
+- **`og:image` n'a pas de valeur par défaut.** Partout où la documentation le nomme, c'est la
+  **couverture du projet** (spec §1.11 et §7, ADR 0008), et aucune image de site n'existe. #14
+  l'injecte avec les autres ; une image d'ouverture propre au site relèverait de #18.
+- Le bloc porte **quatre** balises, pas trois : `<meta name="description">` accompagne
+  `og:description` et porte le même texte — un test verrouille leur égalité. Sans elle, le score
+  SEO plafonne à 91, sous le seuil bloquant de la spec §1.16. #14 doit donc en produire quatre.
+
+L'explication vit ici et non dans l'`index.html` : ce fichier est servi à chaque visite et recopié
+dans l'image `api`, chaque ligne de commentaire y voyage sur le réseau.
+
 **Lighthouse CI.** `lighthouserc.json` sert la version compilée depuis `staticDistDir` et assied les
 quatre seuils de la spec §1.16. Trois points mesurés, non évidents :
 
@@ -144,7 +164,7 @@ Deux projets Playwright : `desktop` (descripteur « Desktop Chrome », 1280 px) 
 (descripteur « Pixel 5 », largeur ramenée à 400 px, émulation tactile conservée). Ils s'exécutent
 contre la **version compilée servie en statique**, celle que Caddy publie.
 
-**Deux errata au plan du §3**, relevés en installant — le gabarit a changé depuis le 2026-09-18 :
+**Trois errata au plan du §3**, relevés en installant — le gabarit a changé depuis le 2026-09-18 :
 
 - item 1, « TypeScript strict (déjà actif dans le modèle) » : **faux depuis `create-vite` 9.2.1**,
   qui ne pose plus `strict`. L'option est désormais posée explicitement dans
@@ -167,7 +187,7 @@ Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les C
 
 **État au 2026-09-23 (#3)** : les items **1, 2, 10, 11, 12 et 13 sont faits** — versions exactes au
 §2.4, qui fait foi sur ce qui est réellement installé. Les huit autres restent à faire, chacun avec
-l'issue qui le portera. Deux items se sont révélés partiellement faux à l'exécution ; l'écart est
+l'issue qui le portera. Trois items se sont révélés partiellement faux à l'exécution ; l'écart est
 consigné sous chacun d'eux et détaillé au §2.4.
 
 1. **Projet** ✅ *fait (#3)* : `npm create vite@latest apps/web -- --template react-ts`, puis suppression de la page de démonstration du gabarit. TypeScript strict **posé explicitement** — contrairement à ce que cet item affirmait, `create-vite` 9.2.1 ne l'active plus (§2.4).
