@@ -4,32 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Icône vide et déclarée, plutôt qu'absente : sans cette ligne le navigateur réclame
-         `/favicon.ico`, reçoit un 404 et l'inscrit dans la console — ce qui fait tomber l'audit
-         « erreurs dans la console » des bonnes pratiques (mesuré : 96 avec, sans elle). Le site
-         n'a pas encore d'identité visuelle ; l'icône réelle viendra avec #18. -->
+    <!-- Icône vide déclarée : sans elle, 404 sur `/favicon.ico` et bonnes pratiques à 96. -->
     <link rel="icon" href="data:," />
 
-    <!--
-      Emplacement marqué du gabarit (ADR 0008, « Aperçus de lien »).
-
-      La CI copie l'`index.html` compilé dans l'image `api` ; sur `/projets/<slug>`, une vue
-      Django remplace **tout le bloc** entre les deux marqueurs par les balises du projet (#14).
-      Les deux marqueurs sont donc un contrat : ils doivent rester uniques dans le fichier
-      compilé, et un test de bout en bout le vérifie sur la version servie, pas sur la source.
-
-      Les valeurs ci-dessous sont celles du site. Servies telles quelles à un robot d'aperçu,
-      elles restent correctes : c'est le comportement attendu pour toute adresse hors
-      `/projets/<slug>`, et pour un slug inconnu (ADR 0008 : « gabarit sans balises projet »).
-
-      `og:image` n'a volontairement pas de valeur par défaut : partout où la documentation le
-      nomme, c'est la **couverture du projet** (spec §1.11 et §7, ADR 0008), et il n'existe pas
-      d'image de site. #14 l'injecte avec les autres ; une image d'ouverture propre au site
-      viendra avec la direction visuelle (#18) si elle est voulue.
-
-      `description` accompagne `og:description` et porte le même texte : le résumé du projet
-      pour une fiche (spec §1.17), celui du site partout ailleurs.
-    -->
+    <!-- Emplacement marqué du gabarit : #14 remplace tout le bloc entre les deux marqueurs.
+         Contrat, valeurs par défaut et absence d'`og:image` : ADR 0008 « Aperçus de lien » et
+         docs/frontend-outillage.md §2.4. Ce fichier part chez chaque visiteur — l'explication
+         longue vit dans la doc, pas ici. -->
     <!--meta:start-->
     <title>Pacôme Bernier</title>
     <meta

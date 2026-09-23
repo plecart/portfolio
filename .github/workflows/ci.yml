@@ -13,6 +13,12 @@
 
 name: CI
 
+# Aucune étape n'écrit sur le dépôt : le jeton ne reçoit que la lecture. Le défaut d'un dépôt
+# peut être bien plus large, et il ne se resserre pas tout seul quand un workflow n'en a pas
+# besoin.
+permissions:
+  contents: read
+
 on:
   pull_request:
     # `ready_for_review` est INDISPENSABLE ici : sans lui, aucun événement n'est émis au passage
