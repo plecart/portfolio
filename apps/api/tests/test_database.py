@@ -1,10 +1,19 @@
 """Tests de la traduction d'une adresse Postgres en réglages Django."""
 
 import pytest
-from config.database import database_settings
+from config.database import NEUTRAL_SCHEMES, database_settings
 from pydantic import PostgresDsn, TypeAdapter
 
 POSTGRES_URL = TypeAdapter(PostgresDsn)
+
+# Les schémas que `PostgresDsn` accepte et qui nomment un pilote. Tirés de pydantic plutôt
+# qu'écrits à la main : une version qui en ajoute un le met sous test le jour même, et une
+# version qui déplace cet attribut casse ici, bruyamment, plutôt que de rétrécir la couverture
+# en silence.
+_ALLOWED_SCHEMES = PostgresDsn._constraints.allowed_schemes  # pyright: ignore[reportPrivateUsage]
+assert _ALLOWED_SCHEMES is not None, "pydantic n'expose plus la liste des schémas de PostgresDsn"
+
+DRIVER_SCHEMES = [schema for schema in _ALLOWED_SCHEMES if schema not in NEUTRAL_SCHEMES]
 
 
 def test_l_adresse_est_traduite_en_bloc_django() -> None:
@@ -45,12 +54,21 @@ def test_un_parametre_de_connexion_est_refuse() -> None:
         database_settings(url)
 
 
-def test_un_pilote_explicite_est_refuse() -> None:
-    """`postgresql+asyncpg` nomme un pilote que le moteur Django posé ici n'utilise pas."""
-    url = POSTGRES_URL.validate_python("postgresql+asyncpg://u:p@h:5432/db")
+@pytest.mark.parametrize("schema", DRIVER_SCHEMES)
+def test_un_pilote_explicite_est_refuse(schema: str) -> None:
+    """Tout schéma qui nomme un pilote est refusé — la liste vient de pydantic, pas d'un choix."""
+    url = POSTGRES_URL.validate_python(f"{schema}://u:p@h:5432/db")
 
     with pytest.raises(ValueError, match="schéma"):
         database_settings(url)
+
+
+@pytest.mark.parametrize("schema", NEUTRAL_SCHEMES)
+def test_un_schema_neutre_est_accepte(schema: str) -> None:
+    """Le pendant du test précédent : le garde ne doit pas mordre sur les formes légitimes."""
+    url = POSTGRES_URL.validate_python(f"{schema}://u:p@h:5432/db")
+
+    assert database_settings(url)["NAME"] == "db"
 
 
 def test_le_port_par_defaut_est_celui_de_postgres() -> None:

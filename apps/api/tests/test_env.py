@@ -4,7 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from config.env import Env
+from config.env import ConfigurationError, Env, env_file_path
 from pydantic import ValidationError
 
 # Les variables dont le type impose une forme d'URL. Toute nouvelle adresse de service s'ajoute
@@ -27,6 +27,17 @@ SECRET_TRAVEL_FORMS: list[tuple[str, Callable[[Env], str]]] = [
     ("model_dump", lambda env: str(env.model_dump())),
     ("model_dump_json", lambda env: env.model_dump_json()),
     ("model_dump en mode json", lambda env: str(env.model_dump(mode="json"))),
+]
+
+# Les façons de rendre la configuration invalide, une par mécanisme de refus : borne de
+# longueur, URL mal formée (deux fois, car deux champs distincts la portent), et validateur de
+# modèle — qui, lui, reçoit l'environnement **entier** en entrée. Chacune produit un message
+# d'erreur ; aucune ne doit y laisser paraître une valeur.
+CONFIGURATIONS_FAUTIVES = [
+    ("clé trop courte", "SECRET_KEY", "TROP-COURTE-ET-SECRETE"),
+    ("base mal formée", "DATABASE_URL", "postgres://admin:MOT-DE-PASSE-BASE@"),
+    ("redis mal formé", "REDIS_URL", "redis://admin:MOT-DE-PASSE-REDIS@"),
+    ("aucun hôte autorisé", "ALLOWED_HOSTS", "[]"),
 ]
 
 
@@ -106,6 +117,34 @@ def test_une_cle_secrete_trop_courte_est_refusee(environment: pytest.MonkeyPatch
         build_env()
 
 
+@pytest.mark.parametrize(
+    ("variable", "valeur_fautive"),
+    [(variable, valeur) for _, variable, valeur in CONFIGURATIONS_FAUTIVES],
+    ids=[nom for nom, _, _ in CONFIGURATIONS_FAUTIVES],
+)
+def test_aucune_valeur_ne_fuit_dans_l_erreur_de_demarrage(
+    environment: pytest.MonkeyPatch,
+    variables: dict[str, str],
+    variable: str,
+    valeur_fautive: str,
+) -> None:
+    """Une erreur de démarrage part sur stderr : journaux, CI, collecteur d'erreurs.
+
+    `pydantic` joint l'entrée fautive à chacun de ses messages — et le validateur de modèle
+    reçoit l'environnement entier, donc *toutes* les valeurs. Le refus doit nommer les champs
+    et taire les valeurs, quel que soit le mécanisme qui l'a déclenché.
+    """
+    environment.setenv(variable, valeur_fautive)
+
+    with pytest.raises(ConfigurationError) as refus:
+        Env.load()
+
+    message = str(refus.value)
+    assert variable in message, "le refus doit dire quel champ est en cause"
+    for valeur in [valeur_fautive, *variables.values()]:
+        assert valeur not in message
+
+
 def test_une_cle_inconnue_dans_le_fichier_env_est_refusee(
     environment: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -119,6 +158,26 @@ def test_une_cle_inconnue_dans_le_fichier_env_est_refusee(
 
 
 def test_le_fichier_env_est_cherche_a_la_racine_du_depot() -> None:
-    """`manage.py` se lance depuis `apps/api`, pytest depuis la racine : un seul `.env` pour les deux."""
+    """`manage.py` se lance depuis `apps/api`, pytest depuis la racine : un seul `.env` pour les deux.
+
+    Résolu sur un environnement vide, et non sur celui du processus : sinon un développeur qui
+    exporte `ENV_FILE` verrait rougir un test qui n'a rien à voir avec son changement.
+    """
     assert (REPOSITORY_ROOT / "pyproject.toml").exists(), "l'ancre du dépôt a bougé"
-    assert Env.model_config.get("env_file") == REPOSITORY_ROOT / ".env"
+    assert env_file_path({}) == REPOSITORY_ROOT / ".env"
+
+
+def test_un_chemin_env_relatif_est_ancre_sur_la_racine() -> None:
+    """Laisser le dossier courant trancher ferait lire deux fichiers selon l'appelant."""
+    assert env_file_path({"ENV_FILE": "ailleurs/.env"}) == REPOSITORY_ROOT / "ailleurs" / ".env"
+
+
+def test_un_chemin_env_absolu_est_respecte() -> None:
+    absolu = Path(REPOSITORY_ROOT.anchor) / "tmp" / "ailleurs.env"
+
+    assert env_file_path({"ENV_FILE": str(absolu)}) == absolu
+
+
+def test_un_env_file_vide_retombe_sur_la_racine() -> None:
+    """Une variable posée mais vide est une variable non renseignée, pas un chemin."""
+    assert env_file_path({"ENV_FILE": ""}) == REPOSITORY_ROOT / ".env"
