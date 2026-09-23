@@ -1,0 +1,24 @@
+# Hooks de pre-commit : ruff seulement (lint avec correction, puis format).
+#
+# `pyright` et `pytest` n'y figurent pas volontairement — ils sont trop lents pour un hook et
+# tournent déjà dans la boucle de développement et en CI.
+#
+# Les hooks appellent le ruff **du dépôt** (`uv run`) plutôt que le dépôt amont de ruff : une
+# version épinglée ici en doublon de `uv.lock` finirait par diverger de celle de la CI, et le
+# hook validerait alors autre chose que la gate.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
