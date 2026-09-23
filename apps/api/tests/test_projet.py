@@ -13,6 +13,10 @@ from pathlib import Path
 
 API_ROOT = Path(__file__).resolve().parent.parent
 
+# Un chemin qui n'existe pas : le sous-processus ignore ainsi le `.env` du poste, que chaque
+# développeur crée (`CONTRIBUTING.md`) et dont le contenu ne regarde pas ces tests.
+NO_ENV_FILE = API_ROOT / "aucun-fichier-env"
+
 # Lit les réglages Django résolus et les imprime en JSON. Passer par un sous-processus est
 # nécessaire : `config.settings` s'évalue à l'import, une fois par processus.
 SETTINGS_DUMP = (
@@ -34,7 +38,7 @@ def run_python(arguments: list[str], variables: dict[str, str]) -> subprocess.Co
     return subprocess.run(
         [sys.executable, *arguments],
         cwd=API_ROOT,
-        env={**os.environ, **variables},
+        env={**os.environ, "ENV_FILE": str(NO_ENV_FILE), **variables},
         capture_output=True,
         text=True,
         check=False,

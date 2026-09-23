@@ -9,6 +9,7 @@ Ajouter une variable, c'est ajouter un champ typé ici **et** une ligne dans `.e
 Aucun `os.environ` ailleurs, aucune valeur d'environnement en dur.
 """
 
+import os
 from pathlib import Path
 from typing import Self
 
@@ -22,6 +23,14 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 # caractères. Il ne s'affiche qu'en `manage.py check --deploy`, que la CI ne lance pas — d'où
 # ce refus au démarrage, qui, lui, ne peut pas passer inaperçu.
 SECRET_KEY_MIN_LENGTH = 50
+
+# Quel fichier `.env` lire. Par défaut celui de la racine du dépôt : `manage.py` se lance depuis
+# `apps/api` et les tests depuis la racine, et un chemin relatif leur ferait lire deux fichiers
+# différents. `ENV_FILE` permet de viser ailleurs — ou nulle part, en désignant un chemin qui
+# n'existe pas, ce que `pydantic-settings` ignore sans bruit.
+#
+# C'est la seule variable qui ne peut pas vivre dans `.env` : c'est elle qui le désigne.
+ENV_FILE = Path(os.environ.get("ENV_FILE") or REPOSITORY_ROOT / ".env")
 
 
 class Env(BaseSettings):
@@ -50,9 +59,7 @@ class Env(BaseSettings):
             (le cache Django) arrive avec #7, et `django-redis` avec lui.
     """
 
-    # Chemin absolu, pas relatif : `manage.py` se lance depuis `apps/api` et les tests depuis
-    # la racine du dépôt. Un chemin relatif ferait lire deux fichiers différents.
-    model_config = SettingsConfigDict(env_file=REPOSITORY_ROOT / ".env")
+    model_config = SettingsConfigDict(env_file=ENV_FILE)
 
     SECRET_KEY: SecretStr = Field(min_length=SECRET_KEY_MIN_LENGTH)
     DEBUG: bool = False
