@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- Icône vide et déclarée, plutôt qu'absente : sans cette ligne le navigateur réclame
+         `/favicon.ico`, reçoit un 404 et l'inscrit dans la console — ce qui fait tomber l'audit
+         « erreurs dans la console » des bonnes pratiques (mesuré : 96 avec, sans elle). Le site
+         n'a pas encore d'identité visuelle ; l'icône réelle viendra avec #18. -->
+    <link rel="icon" href="data:," />
+
     <!--
       Emplacement marqué du gabarit (ADR 0008, « Aperçus de lien »).
 

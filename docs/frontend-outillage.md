@@ -94,9 +94,26 @@ puis émondés de ce que le gabarit ajoute pour sa page de démonstration :
 | `typescript-eslint` | 8.70.1 | Règles TypeScript pour ESLint |
 | `eslint-plugin-jsx-a11y` | 6.10.2 | Accessibilité statique du JSX (ADR 0008) |
 | `eslint-plugin-react-hooks` | 7.1.1 | Règles des hooks React |
+| `@lhci/cli` | 0.15.1 | Lighthouse CI, seuils bloquants de la spec §1.16 |
 | `@playwright/test` | 1.63.0 | Scénarios de bout en bout, Chromium seul |
 | `@axe-core/playwright` | 4.13.0 | Contrôle d'accessibilité par page |
 | `@types/node`, `@types/react`, `@types/react-dom` | 24.13.6 / 19.3.0 | Types ambiants |
+
+**Lighthouse CI.** `lighthouserc.json` sert la version compilée depuis `staticDistDir` et assied les
+quatre seuils de la spec §1.16. Trois points mesurés, non évidents :
+
+- La porte est **`lhci autorun`, jamais `lhci assert` seul** : sans rapport collecté, `assert`
+  annonce « 0 URL(s), 0 run(s), All results processed » et sort **0**. Une collecte cassée rendrait
+  donc la porte verte sans avoir rien vérifié. `autorun` sort 1 dans le même cas.
+- **La collecte ne tourne pas sous Windows** : `chrome-launcher` échoue sur `EPERM` en supprimant
+  son dossier temporaire, que Chrome tient encore (reproduit trois fois, y compris avec `%TEMP%`
+  déplacé). C'est donc une porte **de CI seulement** ; en local, `npx lighthouse <url>` écrit bien
+  son rapport JSON avant le plantage de nettoyage, ce qui suffit à mesurer.
+- Les scores de la page minimale, mesurés le 2026-09-23 (Lighthouse 12.6.1, profil mobile) :
+  performance 100, accessibilité 100, bonnes pratiques 100, SEO 100. Deux correctifs ont été
+  nécessaires pour y arriver : `public/robots.txt` (sans lui SEO plafonne à 91) et une icône
+  déclarée `data:,` dans l'`index.html` (sans elle, le 404 sur `/favicon.ico` fait tomber l'audit
+  « erreurs dans la console » et les bonnes pratiques à 96).
 
 **ESLint est épinglé sur la ligne 9** alors que la 10 est publiée : `eslint-plugin-jsx-a11y` 6.10.2,
 sa dernière version, déclare `eslint@^3 || … || ^9`. Tourner sur la 10 demanderait de forcer un pair
