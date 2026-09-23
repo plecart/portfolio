@@ -1,9 +1,9 @@
 """Lecture de l'environnement du back.
 
 Seul point du projet qui lit l'environnement (cadrage §6.6 « 12-factor, `.env` en développement
-seulement », ADR 0001 « Configuration 12-factor : pydantic-settings »). `settings.py` instancie
-`Env` une fois et pose chaque réglage Django depuis cette instance ; le reste du code lit
-`django.conf.settings`, jamais l'environnement.
+seulement », ADR 0001 « Configuration 12-factor : pydantic-settings »). `settings.py` appelle
+`Env.load()` une fois et pose chaque réglage Django depuis l'instance obtenue ; le reste du code
+lit `django.conf.settings`, jamais l'environnement.
 
 Ajouter une variable, c'est ajouter un champ typé ici **et** une ligne dans `.env.example`.
 Aucun `os.environ` ailleurs, aucune valeur d'environnement en dur.
@@ -58,12 +58,21 @@ def env_file_path(environ: Mapping[str, str]) -> Path:
         lire deux fichiers différents selon l'appelant — le défaut même que ce chemin absolu
         existe pour éviter.
     """
-    demande = environ.get("ENV_FILE")
-    if not demande:
+    requested = environ.get("ENV_FILE")
+    if not requested:
         return REPOSITORY_ROOT / ".env"
 
-    chemin = Path(demande)
-    return chemin if chemin.is_absolute() else REPOSITORY_ROOT / chemin
+    path = Path(requested)
+    return path if path.is_absolute() else REPOSITORY_ROOT / path
+
+
+def _faulty_fields(error: ValidationError) -> str:
+    """Résume une erreur de validation par ses champs et ses motifs, sans aucune valeur."""
+    lines = [
+        f"{'.'.join(str(part) for part in details['loc']) or '<ensemble>'} : {details['msg']}"
+        for details in error.errors()
+    ]
+    return "configuration refusée :\n  " + "\n  ".join(lines)
 
 
 # Résolu une fois, au chargement du module : `model_config` est évalué à la création de la
@@ -138,16 +147,7 @@ class Env(BaseSettings):
         """
         try:
             return cls()  # pyright: ignore[reportCallIssue]
-        except ValidationError as erreur:
-            # `from None` et non `from erreur` : chaîner l'erreur d'origine remettrait les
+        except ValidationError as error:
+            # `from None` et non `from error` : chaîner l'erreur d'origine remettrait les
             # valeurs dans la trace, ce que tout ce mécanisme existe pour éviter.
-            raise ConfigurationError(_champs_fautifs(erreur)) from None
-
-
-def _champs_fautifs(erreur: ValidationError) -> str:
-    """Résume une erreur de validation par ses champs et ses motifs, sans aucune valeur."""
-    lignes = [
-        f"{'.'.join(str(partie) for partie in details['loc']) or '<ensemble>'} : {details['msg']}"
-        for details in erreur.errors()
-    ]
-    return "configuration refusée :\n  " + "\n  ".join(lignes)
+            raise ConfigurationError(_faulty_fields(error)) from None
