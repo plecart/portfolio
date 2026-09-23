@@ -36,24 +36,25 @@ Toute référence croisée cite un **§ ou un titre de section**, jamais un num�
 
 ## Commandes du projet
 Lues par `cycle-pr`, `execution-qa` et la génération de CI. `n/a` = étape absente du projet.
-Toutes marquées `# non vérifiée` : aucun code au 2026-09-18 (étape 11 d'`init-projet`, cas « projet
-sans code »). Le squelette monorepo (cadrage §9 point 2, D52 : `apps/api`, `apps/web`, `infra/` en phase 1,
-chaque dossier né avec sa première brique) les fera peut-être préfixer d'un chemin — rejouer `init-projet` à ce moment-là.
-- install      : uv sync                          # non vérifiée
-- test         : uv run pytest                    # non vérifiée — suite complète (testcontainers pour Postgres/Redis)
-- test ciblé   : uv run pytest <chemin|motif>     # non vérifiée — une seule cible, pour la boucle TDD
-- lint         : uv run ruff check .              # non vérifiée
-- format       : uv run ruff format .             # non vérifiée — écrit
-- format:check : uv run ruff format --check .     # non vérifiée — vérifie sans écrire
-- typecheck    : uv run pyright                   # non vérifiée — mode strict (cadrage §8.4)
+Vérifiées une à une le 2026-09-23 au premier scaffold du back (#2), depuis la racine du dépôt :
+chaque cible ci-dessous a été lancée et a rendu 0. Le `Makefile` en est la source unique — la CI
+appelle les mêmes cibles, de sorte qu'une commande ne peut pas diverger entre le poste et
+GitHub Actions. Les commandes du front (`apps/web/`) restent à écrire avec #3.
+- install      : make install                     # uv sync
+- test         : make test                        # suite complète ; testcontainers arrive avec #7
+- test ciblé   : uv run pytest <chemin|motif>     # une seule cible, pour la boucle TDD
+- lint         : make lint                        # ruff check
+- format       : make format                      # ruff format — écrit
+- format:check : make format-check                # vérifie sans écrire
+- typecheck    : make typecheck                   # pyright, mode strict (cadrage §8.4)
 - build        : n/a                              # tant qu'`infra/` n'existe pas
 - run local    : n/a                              # tant qu'`infra/` n'existe pas
-- hooks        : pre-commit (cadrage §8.4)        # non vérifiée — à installer au premier scaffold
+- hooks        : uv run pre-commit install        # ruff seulement (check --fix, format)
 
 ## Qualité
 - seuil de couverture : aucun (cadrage annexe A : « pragmatique ; évaluations RAG et E2E prioritaires »)
 - gates bloquants en CI : lint, format:check, typecheck, test
-- services requis en CI : aucun (testcontainers démarre Postgres et Redis dans les tests, cadrage §8.4)
+- services requis en CI : aucun — aucun test n'atteint encore Postgres ni Redis ; quand ce sera le cas, testcontainers les démarrera depuis les tests (cadrage §8.4), à partir de #7
 
 ## Périmètre
 - domaines (nom métier → chemin ; chemins cibles du cadrage §9 point 2, chaque dossier né avec sa première brique) — servent aussi de thèmes/milestones à `triage` :
