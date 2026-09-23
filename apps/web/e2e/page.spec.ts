@@ -58,6 +58,20 @@ test('la page rend son texte en Manrope, servie par le site', async ({ page }) =
   expect(fontRequests.map((url) => new URL(url).origin)).toEqual([ownOrigin(page)])
 })
 
+test('la feuille de base de Tailwind est appliquée', async ({ page }) => {
+  await page.goto('/')
+
+  const heading = await page.locator('h1').evaluate((element) => {
+    const style = getComputedStyle(element)
+    return { fontSize: style.fontSize, marginTop: style.marginTop }
+  })
+
+  // Mesure la feuille de base plutôt qu'une classe utilitaire posée pour l'occasion : sans
+  // Tailwind un `h1` pèse 2em et porte sa propre marge ; avec elle, il hérite et n'en a plus.
+  // Le test ne dépend donc d'aucun balisage écrit exprès pour lui.
+  expect(heading).toEqual({ fontSize: '16px', marginTop: '0px' })
+})
+
 test("la page ne porte aucune violation d'accessibilité", async ({ page }) => {
   await page.goto('/')
 

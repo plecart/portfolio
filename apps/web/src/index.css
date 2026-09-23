@@ -1,13 +1,25 @@
 /*! Manrope — Copyright 2018 The Manrope Project Authors (https://github.com/googlefonts/manrope),
     sous SIL Open Font License 1.1. Texte intégral : src/assets/fonts/OFL.txt */
 
-/* Police variable 200–800, sous-ensemble latin (spec §2.2).
-   Le fichier est servi par le site, jamais par un tiers : c'est ce qui rend tenable
-   « aucune requête externe » (spec §6.4) tout en gardant une seule police de 25 Ko.
-
-   La notice ci-dessus est en commentaire `/*!` et non `/*` : le build supprime les commentaires
+/* La notice ci-dessus ouvre par `/*!` et non `/*` : le build supprime les commentaires
    ordinaires, et la licence doit accompagner la police partout où elle est distribuée — donc
    dans le CSS compilé, pas seulement dans le dépôt. */
+
+/* Tailwind v4 par son plugin Vite (ADR 0008), jamais le script CDN. L'`@import` ouvre le
+   fichier : une règle placée avant lui le rendrait inopérant, sans que rien ne le signale. */
+@import 'tailwindcss';
+
+/* La famille est déclarée comme jeton de thème et non sur `:root` : Tailwind pose déjà la police
+   du document à partir de `--font-sans`, et une seconde déclaration en CSS nu ne ferait que lui
+   disputer la même propriété. Une seule source — et l'utilitaire `font-sans` désigne la même
+   chose que le texte courant. Famille et repli : spec §2.2. */
+@theme {
+  --font-sans: 'Manrope', 'Segoe UI Variable', system-ui, sans-serif;
+}
+
+/* Police variable 200–800, sous-ensemble latin (spec §2.2), servie par le site et jamais par un
+   tiers : c'est ce qui rend tenable « aucune requête externe » (spec §6.4) avec une seule police
+   de 25 Ko. */
 @font-face {
   font-family: 'Manrope';
   font-style: normal;
@@ -16,9 +28,8 @@
   src: url('./assets/fonts/manrope-latin.woff2') format('woff2');
 }
 
+/* Ce que la feuille de base de Tailwind ne fixe pas et que la spec §2.2 impose. */
 :root {
-  font-family: 'Manrope', 'Segoe UI Variable', system-ui, sans-serif;
-  font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }

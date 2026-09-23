@@ -87,11 +87,17 @@ puis émondés de ce que le gabarit ajoute pour sa page de démonstration :
 | `react`, `react-dom` | 19.3.0 | Interface en composants |
 | `typescript` | 6.0.3 | Types vérifiés à la compilation, mode strict |
 | `vite` | 8.3.0 | Serveur de développement et compilation |
+| `tailwindcss`, `@tailwindcss/vite` | 4.3.3 | Style utilitaire compilé au build, par le plugin Vite |
 | `@vitejs/plugin-react` | 6.1.1 | Prise en charge de React par Vite |
 | `vitest` | 4.1.11 | Tests unitaires (ADR 0010) |
 | `@playwright/test` | 1.63.0 | Scénarios de bout en bout, Chromium seul |
 | `@axe-core/playwright` | 4.13.0 | Contrôle d'accessibilité par page |
 | `@types/node`, `@types/react`, `@types/react-dom` | 24.13.6 / 19.3.0 | Types ambiants |
+
+La famille Manrope est déclarée **comme jeton de thème Tailwind** (`@theme { --font-sans }`) plutôt
+que sur `:root` : la feuille de base de Tailwind pose déjà la police du document depuis ce jeton, et
+deux déclarations se disputeraient la même propriété. Les jetons de couleur, d'espacement et de
+rayon de la spec §2 viendront avec #18, au même endroit.
 
 **Police** : `src/assets/fonts/manrope-latin.woff2` — Manrope variable 200–800, sous-ensemble latin,
 Google Fonts v20, 24,3 Ko, sous SIL Open Font License 1.1 (`OFL.txt` joint, et notice reprise en
