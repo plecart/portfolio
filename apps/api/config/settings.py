@@ -26,8 +26,7 @@ DATABASES = {"default": database_settings(env.DATABASE_URL)}
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 
-# ponytail: aucune application ni middleware tant qu'aucune requête n'est servie. L'admin, ses
-# dépendances imposées (auth, contenttypes, sessions, messages — ADR 0001) et les middlewares
-# de sécurité arrivent avec #7, première brique qui expose une URL.
-INSTALLED_APPS: list[str] = []
-MIDDLEWARE: list[str] = []
+# ponytail: ni `INSTALLED_APPS` ni `MIDDLEWARE` ne sont posés — vérifié, Django les fait déjà
+# vides par défaut (`django.conf.global_settings`), donc les écrire ne dirait rien. L'admin, ses
+# dépendances imposées (auth, contenttypes, sessions, messages — ADR 0001) et les middlewares de
+# sécurité arrivent avec #7, première brique qui expose une URL.
