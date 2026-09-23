@@ -5,7 +5,8 @@ import pytest
 # Un environnement complet et valide. Chaque test en retire ou en corrompt une seule entrée,
 # pour que l'échec attendu ne puisse venir que de celle-là.
 VALID_ENVIRONMENT = {
-    "SECRET_KEY": "clé-de-test",
+    # Sans accent, et au-dessus du seuil de 50 caractères exigé par `Env`.
+    "SECRET_KEY": "cle-de-test-sans-valeur-reelle-uniquement-pour-les-tests",
     "DEBUG": "false",
     "ALLOWED_HOSTS": '["portfolio.test"]',
     "DATABASE_URL": "postgresql://portfolio:secret@localhost:5432/portfolio",
