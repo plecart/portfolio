@@ -1,0 +1,24 @@
+/*! Manrope — Copyright 2018 The Manrope Project Authors (https://github.com/googlefonts/manrope),
+    sous SIL Open Font License 1.1. Texte intégral : src/assets/fonts/OFL.txt */
+
+/* Police variable 200–800, sous-ensemble latin (spec §2.2).
+   Le fichier est servi par le site, jamais par un tiers : c'est ce qui rend tenable
+   « aucune requête externe » (spec §6.4) tout en gardant une seule police de 25 Ko.
+
+   La notice ci-dessus est en commentaire `/*!` et non `/*` : le build supprime les commentaires
+   ordinaires, et la licence doit accompagner la police partout où elle est distribuée — donc
+   dans le CSS compilé, pas seulement dans le dépôt. */
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('./assets/fonts/manrope-latin.woff2') format('woff2');
+}
+
+:root {
+  font-family: 'Manrope', 'Segoe UI Variable', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}

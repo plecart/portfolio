@@ -9,7 +9,12 @@
 // (`dist/index.d.ts`), et la forme par défaut n'est pas constructible sans `esModuleInterop`,
 // que le projet n'active pas.
 import { AxeBuilder } from '@axe-core/playwright'
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
+
+/** L'origine que le site sert lui-même. Tout ce qui n'en vient pas est un tiers. */
+function ownOrigin(page: Page): string {
+  return new URL(page.url()).origin
+}
 
 test("la page déclare le français comme langue du document", async ({ page }) => {
   await page.goto('/')
@@ -25,16 +30,32 @@ test("la page ne fait aucune requête vers un tiers", async ({ page }) => {
 
   await page.goto('/', { waitUntil: 'networkidle' })
 
-  // L'origine est relevée sur la page elle-même plutôt que sur la configuration : le test reste
-  // juste si le port de test change. Les schémas `data:` et `blob:` n'ont pas d'origine et ne
-  // quittent jamais le document — les compter comme tiers rendrait la mesure fausse.
-  const own = new URL(page.url()).origin
+  // Les schémas `data:` et `blob:` n'ont pas d'origine et ne quittent jamais le document :
+  // les compter comme tiers rendrait la mesure fausse.
+  const own = ownOrigin(page)
   const thirdParty = requested.filter((url) => {
     const { protocol, origin } = new URL(url)
     return (protocol === 'http:' || protocol === 'https:') && origin !== own
   })
 
   expect(thirdParty).toEqual([])
+})
+
+test('la page rend son texte en Manrope, servie par le site', async ({ page }) => {
+  const fontRequests: string[] = []
+  page.on('request', (request) => {
+    if (request.url().endsWith('.woff2')) fontRequests.push(request.url())
+  })
+
+  await page.goto('/', { waitUntil: 'networkidle' })
+
+  const family = await page
+    .locator('h1')
+    .evaluate((element) => getComputedStyle(element).fontFamily)
+
+  expect(family).toContain('Manrope')
+  // Une seule police, servie par le site lui-même : c'est la condition des 25 Ko de la spec §6.4.
+  expect(fontRequests.map((url) => new URL(url).origin)).toEqual([ownOrigin(page)])
 })
 
 test("la page ne porte aucune violation d'accessibilité", async ({ page }) => {
