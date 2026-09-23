@@ -9,7 +9,7 @@ Ce que ce fichier **ne contient pas** est délibéré (ADR 0001, « aucun résid
 internationalisation. Chacun arrive avec la brique qui l'utilise, jamais « au cas où ».
 """
 
-from config.database import reglages_postgres
+from config.database import database_settings
 from config.env import Env
 
 # Une seule lecture de l'environnement pour tout le processus : Django importe ce module une
@@ -21,7 +21,7 @@ SECRET_KEY = env.SECRET_KEY.get_secret_value()
 DEBUG = env.DEBUG
 ALLOWED_HOSTS = env.ALLOWED_HOSTS
 
-DATABASES = {"default": reglages_postgres(env.DATABASE_URL)}
+DATABASES = {"default": database_settings(env.DATABASE_URL)}
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"

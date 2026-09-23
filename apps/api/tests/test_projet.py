@@ -11,11 +11,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-RACINE_API = Path(__file__).resolve().parent.parent
+API_ROOT = Path(__file__).resolve().parent.parent
 
 # Lit les réglages Django résolus et les imprime en JSON. Passer par un sous-processus est
 # nécessaire : `config.settings` s'évalue à l'import, une fois par processus.
-LECTURE_DES_REGLAGES = (
+SETTINGS_DUMP = (
     "import json, os;"
     "os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings');"
     "from django.conf import settings;"
@@ -29,11 +29,11 @@ LECTURE_DES_REGLAGES = (
 )
 
 
-def lancer(arguments: list[str], variables: dict[str, str]) -> subprocess.CompletedProcess[str]:
+def run_python(arguments: list[str], variables: dict[str, str]) -> subprocess.CompletedProcess[str]:
     """Exécute `python <arguments>` depuis `apps/api`, dans un environnement valide."""
     return subprocess.run(
         [sys.executable, *arguments],
-        cwd=RACINE_API,
+        cwd=API_ROOT,
         env={**os.environ, **variables},
         capture_output=True,
         text=True,
@@ -42,16 +42,16 @@ def lancer(arguments: list[str], variables: dict[str, str]) -> subprocess.Comple
 
 
 def test_le_projet_django_demarre(variables: dict[str, str]) -> None:
-    resultat = lancer(["manage.py", "check"], variables)
+    result = run_python(["manage.py", "check"], variables)
 
-    assert resultat.returncode == 0, resultat.stderr
+    assert result.returncode == 0, result.stderr
 
 
 def test_le_point_d_entree_wsgi_se_charge(variables: dict[str, str]) -> None:
     """C'est l'objet que `gunicorn` importera en production (ADR 0001)."""
-    resultat = lancer(["-c", "from config.wsgi import application"], variables)
+    result = run_python(["-c", "from config.wsgi import application"], variables)
 
-    assert resultat.returncode == 0, resultat.stderr
+    assert result.returncode == 0, result.stderr
 
 
 def test_les_reglages_django_viennent_de_l_environnement(variables: dict[str, str]) -> None:
@@ -61,15 +61,15 @@ def test_les_reglages_django_viennent_de_l_environnement(variables: dict[str, st
     des réglages entièrement codés en dur lui conviennent. Ce test compare donc les constantes
     résolues à l'environnement qui les a produites, ligne par ligne.
     """
-    resultat = lancer(["-c", LECTURE_DES_REGLAGES], variables)
-    assert resultat.returncode == 0, resultat.stderr
+    result = run_python(["-c", SETTINGS_DUMP], variables)
+    assert result.returncode == 0, result.stderr
 
-    reglages = json.loads(resultat.stdout)
+    settings = json.loads(result.stdout)
 
-    assert reglages["SECRET_KEY"] == variables["SECRET_KEY"]
-    assert reglages["DEBUG"] is False
-    assert reglages["ALLOWED_HOSTS"] == json.loads(variables["ALLOWED_HOSTS"])
-    assert reglages["DATABASES"]["default"] == {
+    assert settings["SECRET_KEY"] == variables["SECRET_KEY"]
+    assert settings["DEBUG"] is False
+    assert settings["ALLOWED_HOSTS"] == json.loads(variables["ALLOWED_HOSTS"])
+    assert settings["DATABASES"]["default"] == {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "portfolio",
         "USER": "portfolio",
@@ -79,5 +79,5 @@ def test_les_reglages_django_viennent_de_l_environnement(variables: dict[str, st
     }
     # Produit de l'arbitrage ASGI/WSGI consigné au journal de spec de #2 : sans cette ligne,
     # l'arbitrage ne serait garanti par rien.
-    assert reglages["WSGI_APPLICATION"] == "config.wsgi.application"
-    assert reglages["ROOT_URLCONF"] == "config.urls"
+    assert settings["WSGI_APPLICATION"] == "config.wsgi.application"
+    assert settings["ROOT_URLCONF"] == "config.urls"

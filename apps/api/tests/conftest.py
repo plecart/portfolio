@@ -4,7 +4,7 @@ import pytest
 
 # Un environnement complet et valide. Chaque test en retire ou en corrompt une seule entrée,
 # pour que l'échec attendu ne puisse venir que de celle-là.
-ENVIRONNEMENT_VALIDE = {
+VALID_ENVIRONMENT = {
     "SECRET_KEY": "clé-de-test",
     "DEBUG": "false",
     "ALLOWED_HOSTS": '["portfolio.test"]',
@@ -16,12 +16,12 @@ ENVIRONNEMENT_VALIDE = {
 @pytest.fixture
 def variables() -> dict[str, str]:
     """L'environnement valide, sous forme de dictionnaire — pour un sous-processus."""
-    return dict(ENVIRONNEMENT_VALIDE)
+    return dict(VALID_ENVIRONMENT)
 
 
 @pytest.fixture
-def environnement(monkeypatch: pytest.MonkeyPatch, variables: dict[str, str]) -> pytest.MonkeyPatch:
+def environment(monkeypatch: pytest.MonkeyPatch, variables: dict[str, str]) -> pytest.MonkeyPatch:
     """Pose l'environnement valide dans ce processus et rend la main pour le corrompre."""
-    for nom, valeur in variables.items():
-        monkeypatch.setenv(nom, valeur)
+    for name, value in variables.items():
+        monkeypatch.setenv(name, value)
     return monkeypatch
