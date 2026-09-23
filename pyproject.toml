@@ -36,8 +36,9 @@ testpaths = ["apps"]
 # `include` borne ruff aux fichiers Python. Sans cette ligne il formate aussi les blocs de code
 # des fichiers Markdown : `make format` réécrirait alors `docs/cadrage-technique.md` (rang 1) et
 # les ADR (rang 3), et `make format-check` échouerait sur une PR purement documentaire — mesuré,
-# sortie 2. Les hooks pre-commit, eux, sont bornés à `[python, pyi]` : sans cette ligne, le hook
-# et la gate ne regarderaient pas la même population.
+# sortie 2. Les hooks pre-commit sont bornés à `[python, pyi]` : la gate couvre donc un peu plus
+# qu'eux — les carnets et les `pyproject.toml` — et jamais moins. C'est le sens utile de
+# l'inclusion : ce qu'un hook laisse passer, la CI le voit encore.
 #
 # La liste **remplace** le défaut de ruff, elle ne s'y ajoute pas : `*.ipynb` y figure donc
 # explicitement, sans quoi les carnets de `docs/learning/` (phase 2) deviendraient invisibles

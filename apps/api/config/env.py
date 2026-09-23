@@ -18,7 +18,9 @@ from pathlib import Path
 from typing import Self
 
 from pydantic import Field, PostgresDsn, RedisDsn, SecretStr, ValidationError, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
+
+REFUSAL = "configuration refusée :\n  "
 
 
 class ConfigurationError(RuntimeError):
@@ -27,9 +29,13 @@ class ConfigurationError(RuntimeError):
     `pydantic` joint la valeur d'entrée à chacun de ses messages d'erreur. C'est commode en
     développement et inacceptable ici : cet environnement porte la clé de signature et le mot
     de passe de la base, et une erreur de démarrage part sur stderr — journaux de conteneur,
-    sortie de CI, collecteur d'erreurs. Trois formes ont été mesurées comme fuyantes (borne de
-    longueur, URL mal formée, validateur de modèle qui reçoit l'environnement entier) ;
-    `Env.load()` les reformule toutes par ce type.
+    sortie de CI, collecteur d'erreurs.
+
+    **Quatre** mécanismes de refus ont été recensés : borne de longueur, URL mal formée,
+    validateur de modèle qui reçoit l'environnement entier — les trois fuyaient — et échec de
+    lecture d'une *source*, qui ne fuit pas mais lève un type d'exception distinct. `Env.load()`
+    les reformule tous par ce type, et `INVALID_CONFIGURATIONS` (`tests/test_env.py`) en tient
+    le dénombrement : c'est le test qui garde la classe close, pas cette phrase.
     """
 
 
@@ -68,11 +74,10 @@ def env_file_path(environ: Mapping[str, str]) -> Path:
 
 def _faulty_fields(error: ValidationError) -> str:
     """Résume une erreur de validation par ses champs et ses motifs, sans aucune valeur."""
-    lines = [
+    return "\n  ".join(
         f"{'.'.join(str(part) for part in details['loc']) or '<ensemble>'} : {details['msg']}"
         for details in error.errors()
-    ]
-    return "configuration refusée :\n  " + "\n  ".join(lines)
+    )
 
 
 # Résolu une fois, au chargement du module : `model_config` est évalué à la création de la
@@ -138,16 +143,24 @@ class Env(BaseSettings):
         C'est le **seul** point d'entrée de la configuration : construire `Env()` directement
         laisse échapper une `ValidationError` de `pydantic`, qui porte les valeurs fautives.
 
+        Deux exceptions à rattraper, pas une : `pydantic` valide le modèle, mais
+        `pydantic-settings` lit d'abord les *sources*, et une valeur de champ complexe qui n'est
+        pas du JSON lisible échoue là, avant toute validation, avec un type propre.
+
         Returns:
             L'environnement validé.
 
         Raises:
-            ConfigurationError: dès qu'une variable manque, a un type faux, sort de ses bornes
-                ou rend l'ensemble incohérent. Le message ne garde que les champs et les motifs.
+            ConfigurationError: dès qu'une variable manque, a un type faux, sort de ses bornes,
+                rend l'ensemble incohérent, ou n'est pas lisible par sa source. Le message ne
+                garde que les champs et les motifs.
         """
+        # `from None` et non `from error`, dans les deux branches : chaîner l'erreur d'origine
+        # remettrait les valeurs dans la trace, ce que tout ce mécanisme existe pour éviter.
         try:
             return cls()  # pyright: ignore[reportCallIssue]
         except ValidationError as error:
-            # `from None` et non `from error` : chaîner l'erreur d'origine remettrait les
-            # valeurs dans la trace, ce que tout ce mécanisme existe pour éviter.
-            raise ConfigurationError(_faulty_fields(error)) from None
+            raise ConfigurationError(REFUSAL + _faulty_fields(error)) from None
+        except SettingsError as error:
+            # Erreur de source : le message nomme déjà le champ et la source, sans la valeur.
+            raise ConfigurationError(REFUSAL + str(error)) from None
