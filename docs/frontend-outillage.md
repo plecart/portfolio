@@ -1,6 +1,6 @@
 # Frontend — outillage et plan d'installation
 
-_2026-09-18. Détaille D44 (cadrage §7), qui remplace D15. Le pourquoi, les options écartées et les points tranchés sont dans l'ADR 0008 (`docs/adr/`) ; ce document garde l'inventaire installé et le plan d'installation._
+_2026-09-18, amendé le 2026-09-23 au scaffold de `apps/web` (#3). Détaille D44 (cadrage §7), qui remplace D15. Le pourquoi, les options écartées et les points tranchés sont dans l'ADR 0008 (`docs/adr/`) ; ce document garde l'inventaire installé et le plan d'installation._
 
 ## 1. Décision D44
 
@@ -25,9 +25,13 @@ _2026-09-18. Détaille D44 (cadrage §7), qui remplace D15. Le pourquoi, les opt
 
 **Écarté à l'audit** : anime.js (doublon de motion), design-motion-principles (reconditionne Emil Kowalski), UX Engine / designmotionhq (payant, doublon), boneyard (sur-ingénierie), Spline (3D lourde — à rouvrir si un besoin 3D réel apparaît, avec three.js en alternative), watermelon-platform et motion-primitives (doublons de react-bits), dépôt 21st (inactif depuis mai 2025), ui-ux-pro-max-skill (taste-skill préféré).
 
-## 2. Installé le 2026-09-18
+## 2. Inventaire installé
 
-### Skills Claude Code (`.claude/skills/`)
+Skills et outils en ligne de commande : 2026-09-18 (§2.1 à §2.3). Application `apps/web` :
+2026-09-23 (§2.4). C'est cette section qui fait foi sur ce qui est réellement installé ; le §3
+reste le plan, avec l'état de chaque item.
+
+### 2.1 Skills Claude Code (`.claude/skills/`)
 
 Copiées depuis GitHub, licence MIT jointe dans chaque dossier. Mise à jour : re-cloner le dépôt, recopier, rescanner (§2.3).
 
@@ -48,7 +52,7 @@ Copiées depuis GitHub, licence MIT jointe dans chaque dossier. Mise à jour : r
 Non retenues dans emilkowalski/skills : `animate-expo`, `write-swift`, `mobile-native` (natif), `ask-sonner` (librairie non choisie), `pick-ui-library` (choix fait), `apple-design`.
 Non retenues dans taste-skill : variantes `soft`, `brutalist`, `redesign`, `output`, `gpt-tasteskill`, `stitch`, générateurs d'images, `v1`.
 
-### Outils en ligne de commande (`uv tool`)
+### 2.2 Outils en ligne de commande (`uv tool`)
 
 Installés avec `uv tool`, chacun dans son environnement isolé et disponible dans tout le système. Ils ne font pas partie du projet : leurs dépendances (LiteLLM, YARA…) entreraient en conflit avec celles du backend.
 
@@ -156,20 +160,25 @@ contre la **version compilée servie en statique**, celle que Caddy publie.
 
 Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les CLI évoluent).
 
-1. **Projet** : `npm create vite@latest apps/web -- --template react-ts`. TypeScript strict (déjà actif dans le modèle).
-2. **Tailwind CSS v4** : `npm i -D tailwindcss @tailwindcss/vite`, plugin dans `vite.config.ts`, `@import "tailwindcss";` dans le CSS d'entrée. **Jamais** le script CDN `cdn.tailwindcss.com` (c'est lui qui affiche « ne pas utiliser en production »).
-3. **Alias `@/`** (requis par shadcn) : `paths` dans `tsconfig.json` et `tsconfig.app.json`, `resolve.alias` dans `vite.config.ts`, `npm i -D @types/node`.
-4. **shadcn/ui** : `npx shadcn@latest init`, puis `npx shadcn@latest add <composant>` au besoin (`dialog` pour la fiche projet en modal). Radix arrive comme dépendance de chaque composant ; rien à installer à part.
-5. **motion** : `npm i motion` ; import depuis `motion/react`.
-6. **react-bits** : composant par composant, `npx shadcn@latest add @react-bits/<Nom>-TS-TW`. **Licence MIT + Commons Clause** : usage libre, revente d'un produit fondé sur ces composants interdite — citée dans l'ADR 0008.
-7. **bklit-ui** (graphiques) : composant par composant, `npx shadcn@latest add @bklit/<graphique>` ; vérifier si le registre `@bklit` doit être déclaré dans `components.json`. Composants MIT ; Bklit Studio (outil hébergé) propriétaire.
-8. **Rive** (animation 2D interactive) : `npm i @rive-app/react-canvas`. Fichiers `.riv` servis en statique ; le runtime charge un WASM : mesurer son poids avec Lighthouse avant d'en généraliser l'usage. Éditeur Rive : compte gratuit à créer soi-même.
-9. **Types de l'API** : `npm i -D openapi-typescript`, génération depuis le schéma OpenAPI de django-ninja ; script npm + vérification en CI (types à jour).
-10. **Accessibilité statique** : `npm i -D eslint-plugin-jsx-a11y` dans la config ESLint fournie par le modèle Vite.
-11. **E2E** : `npm init playwright@latest` ; `npm i -D @axe-core/playwright` pour un contrôle d'accessibilité par page. Couvre le site en phase 1, le chat en phase 2 (§8.4).
-12. **Lighthouse CI** : `@lhci/cli` dans GitHub Actions ; seuils sur performance, accessibilité, bonnes pratiques, SEO ; la PR échoue sous le seuil. Lighthouse = audit Google intégré à Chrome, notes sur 100 et indicateurs de vitesse ressentie.
-13. **Tests unitaires** : `npm i -D vitest` ; logique pure du front (format des dates, ordre des cartes, technologies de carte) ; script npm + CI (ADR 0010).
-14. **Markdown** : `npm i markdown-to-jsx` ; description et sections rendues en éléments React, HTML brut échappé, jamais d'insertion d'HTML (ADR 0010).
+**État au 2026-09-23 (#3)** : les items **1, 2, 10, 11, 12 et 13 sont faits** — versions exactes au
+§2.4, qui fait foi sur ce qui est réellement installé. Les huit autres restent à faire, chacun avec
+l'issue qui le portera. Deux items se sont révélés partiellement faux à l'exécution ; l'écart est
+consigné sous chacun d'eux et détaillé au §2.4.
+
+1. **Projet** ✅ *fait (#3)* : `npm create vite@latest apps/web -- --template react-ts`, puis suppression de la page de démonstration du gabarit. TypeScript strict **posé explicitement** — contrairement à ce que cet item affirmait, `create-vite` 9.2.1 ne l'active plus (§2.4).
+2. **Tailwind CSS v4** ✅ *fait (#3)* : `npm i -D tailwindcss @tailwindcss/vite`, plugin dans `vite.config.ts`, `@import "tailwindcss";` dans le CSS d'entrée. **Jamais** le script CDN `cdn.tailwindcss.com` (c'est lui qui affiche « ne pas utiliser en production »).
+3. **Alias `@/`** — à faire avec #21 (requis par shadcn) : `paths` dans `tsconfig.json` et `tsconfig.app.json`, `resolve.alias` dans `vite.config.ts`, `npm i -D @types/node`.
+4. **shadcn/ui** — à faire avec #21 : `npx shadcn@latest init`, puis `npx shadcn@latest add <composant>` au besoin (`dialog` pour la fiche projet en modal). Radix arrive comme dépendance de chaque composant ; rien à installer à part.
+5. **motion** — hors phase 1 (PRD #1) : `npm i motion` ; import depuis `motion/react`.
+6. **react-bits** — hors phase 1 (PRD #1) : composant par composant, `npx shadcn@latest add @react-bits/<Nom>-TS-TW`. **Licence MIT + Commons Clause** : usage libre, revente d'un produit fondé sur ces composants interdite — citée dans l'ADR 0008.
+7. **bklit-ui** (graphiques) — hors phase 1 (PRD #1) : composant par composant, `npx shadcn@latest add @bklit/<graphique>` ; vérifier si le registre `@bklit` doit être déclaré dans `components.json`. Composants MIT ; Bklit Studio (outil hébergé) propriétaire.
+8. **Rive** (animation 2D interactive) — hors phase 1 (PRD #1) : `npm i @rive-app/react-canvas`. Fichiers `.riv` servis en statique ; le runtime charge un WASM : mesurer son poids avec Lighthouse avant d'en généraliser l'usage. Éditeur Rive : compte gratuit à créer soi-même.
+9. **Types de l'API** — à faire avec #19 : `npm i -D openapi-typescript`, génération depuis le schéma OpenAPI de django-ninja ; script npm + vérification en CI (types à jour).
+10. **Accessibilité statique** ✅ *fait (#3)* : `npm i -D eslint-plugin-jsx-a11y`. La configuration ESLint a dû être **écrite**, non héritée : contrairement à ce que cet item affirmait, le gabarit Vite ne fournit plus ESLint mais `oxlint` (§2.4).
+11. **E2E** ✅ *fait (#3)*, par `npm i -D @playwright/test` plutôt que par l'assistant `npm init playwright@latest`, qui écrit des exemples à supprimer derrière lui (§2.4) ; `npm i -D @axe-core/playwright` pour un contrôle d'accessibilité par page. Couvre le site en phase 1, le chat en phase 2 (§8.4).
+12. **Lighthouse CI** ✅ *fait (#3)* : `@lhci/cli` dans GitHub Actions ; seuils sur performance, accessibilité, bonnes pratiques, SEO ; la PR échoue sous le seuil. Lighthouse = audit Google intégré à Chrome, notes sur 100 et indicateurs de vitesse ressentie.
+13. **Tests unitaires** ✅ *fait (#3)* : `npm i -D vitest` ; logique pure du front (format des dates, ordre des cartes, technologies de carte) ; script npm + CI (ADR 0010).
+14. **Markdown** — à faire avec la fiche projet : `npm i markdown-to-jsx` ; description et sections rendues en éléments React, HTML brut échappé, jamais d'insertion d'HTML (ADR 0010).
 
 ### Build et déploiement
 
