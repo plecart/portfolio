@@ -21,7 +21,8 @@ Toute variable d'environnement est déclarée dans `.env.example` et lue par la 
 (`apps/api/config/env.py`) — nulle part ailleurs, et jamais en dur.
 
 Les hooks ne lancent que `ruff` (`check --fix`, puis `format`), avec la version installée par
-`uv sync` : le hook et la CI vérifient ainsi exactement la même chose. `pyright` et `pytest`
+`uv sync`, et sur la même population de fichiers : les fichiers Python, et eux seuls — ruff
+formate aussi les blocs de code Markdown quand on ne l'en empêche pas. `pyright` et `pytest`
 restent dans la boucle de développement et en CI, trop lents pour un hook.
 
 ## Le flux en une page
