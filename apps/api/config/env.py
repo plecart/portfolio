@@ -16,7 +16,7 @@ from pydantic import PostgresDsn, RedisDsn, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # `env.py` → `config` → `api` → `apps` → racine du dépôt.
-RACINE_DEPOT = Path(__file__).resolve().parents[3]
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Env(BaseSettings):
@@ -43,7 +43,7 @@ class Env(BaseSettings):
 
     # Chemin absolu, pas relatif : `manage.py` se lance depuis `apps/api` et les tests depuis
     # la racine du dépôt. Un chemin relatif ferait lire deux fichiers différents.
-    model_config = SettingsConfigDict(env_file=RACINE_DEPOT / ".env")
+    model_config = SettingsConfigDict(env_file=REPOSITORY_ROOT / ".env")
 
     SECRET_KEY: SecretStr
     DEBUG: bool = False
@@ -52,7 +52,7 @@ class Env(BaseSettings):
     REDIS_URL: RedisDsn
 
     @model_validator(mode="after")
-    def _exiger_un_hote_hors_debug(self) -> Self:
+    def _require_allowed_host_outside_debug(self) -> Self:
         """Refuse de démarrer en posture de production sans nom d'hôte servi.
 
         Django l'exige déjà — « When DEBUG is set to False, the ALLOWED_HOSTS setting is
