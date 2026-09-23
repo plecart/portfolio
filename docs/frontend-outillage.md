@@ -148,7 +148,9 @@ contre la **version compilée servie en statique**, celle que Caddy publie.
 
 - item 1, « TypeScript strict (déjà actif dans le modèle) » : **faux depuis `create-vite` 9.2.1**,
   qui ne pose plus `strict`. L'option est désormais posée explicitement dans
-  `apps/web/tsconfig.base.json`, et un test la mesure sur les deux configurations résolues.
+  `apps/web/tsconfig.base.json`, et un test la mesure sur **toutes** les configurations du projet —
+  liste dérivée des `references` de `tsconfig.json`, pour qu'une configuration ajoutée demain ne
+  puisse pas s'y soustraire.
 - item 11, « `npm init playwright@latest` » : l'assistant écrit des scénarios d'exemple, un
   `.gitignore` et une configuration à moitié commentée, tous à supprimer derrière lui. Remplacé
   par `npm i -D @playwright/test @axe-core/playwright` puis `npx playwright install chromium`, et

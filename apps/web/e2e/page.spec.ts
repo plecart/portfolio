@@ -22,20 +22,42 @@ test("la page déclare le français comme langue du document", async ({ page }) 
   await expect(page.locator('html')).toHaveAttribute('lang', 'fr')
 })
 
+/**
+ * Ce que ce garde couvre, et ce qu'il ne couvre pas.
+ *
+ * Dénombrement du 2026-09-24 : **23 formes** de requête sortante recensées pour une page web,
+ * **17 vues** ici — les 16 que `page.on('request')` rapporte (balises `src`/`href`, `@import`,
+ * `url()` CSS, `@font-face`, `fetch`, `XHR`, `import()`, `sendBeacon`, `EventSource`, worker,
+ * préchargements, `iframe`, `video`) plus le WebSocket, qui voyage sur un autre évènement.
+ *
+ * **6 hors portée**, à couvrir par l'issue qui les introduira, jamais à supposer couvertes ici :
+ * Service Worker (hors du contexte de page) ; requête différée au-delà de `networkidle` ;
+ * `<img loading="lazy">` sous la ligne de flottaison (#18, #20) ; `fetch` derrière une
+ * interaction (#19) ; `preconnect` et `dns-prefetch`, qui joignent le tiers en DNS et TLS sans
+ * jamais produire de requête HTTP.
+ */
 test("la page ne fait aucune requête vers un tiers", async ({ page }) => {
   const requested: string[] = []
   page.on('request', (request) => {
     requested.push(request.url())
   })
+  // Un WebSocket n'apparaît jamais dans `page.on('request')` : sans cette ligne, c'est le vecteur
+  // qui fuirait le plus silencieusement.
+  page.on('websocket', (socket) => {
+    requested.push(socket.url())
+  })
 
   await page.goto('/', { waitUntil: 'networkidle' })
 
-  // Les schémas `data:` et `blob:` n'ont pas d'origine et ne quittent jamais le document :
-  // les compter comme tiers rendrait la mesure fausse.
+  // Les schémas `data:` et `blob:` n'ont pas d'origine et ne quittent jamais le document : les
+  // compter comme tiers rendrait la mesure fausse. `ws:`/`wss:` en revanche partent bien chez un
+  // tiers, et leur origine se compare après normalisation du schéma.
   const own = ownOrigin(page)
   const thirdParty = requested.filter((url) => {
     const { protocol, origin } = new URL(url)
-    return (protocol === 'http:' || protocol === 'https:') && origin !== own
+    if (!['http:', 'https:', 'ws:', 'wss:'].includes(protocol)) return false
+
+    return origin.replace(/^wss?:/, (scheme) => (scheme === 'ws:' ? 'http:' : 'https:')) !== own
   })
 
   expect(thirdParty).toEqual([])
@@ -52,8 +74,15 @@ test('la page rend son texte en Manrope, servie par le site', async ({ page }) =
   const family = await page
     .locator('h1')
     .evaluate((element) => getComputedStyle(element).fontFamily)
+  const faces = await page.evaluate(() =>
+    [...document.fonts].map((face) => [face.family, face.weight, face.display]),
+  )
 
   expect(family).toContain('Manrope')
+  // Les trois moitiés de la décision de la spec §2.2 — famille, graisses variables 200–800 et
+  // `font-display: swap` — sont assenées ensemble. Prises séparément, deux d'entre elles
+  // n'étaient tenues que par la lecture du fichier.
+  expect(faces).toEqual([['Manrope', '200 800', 'swap']])
   // Une seule police, servie par le site lui-même : c'est la condition des 25 Ko de la spec §6.4.
   expect(fontRequests.map((url) => new URL(url).origin)).toEqual([ownOrigin(page)])
 })
@@ -70,6 +99,22 @@ test('la feuille de base de Tailwind est appliquée', async ({ page }) => {
   // Tailwind un `h1` pèse 2em et porte sa propre marge ; avec elle, il hérite et n'en a plus.
   // Le test ne dépend donc d'aucun balisage écrit exprès pour lui.
   expect(heading).toEqual({ fontSize: '16px', marginTop: '0px' })
+})
+
+test('le projet mobile émule un appareil tactile de 400 px', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'contrat du projet mobile seulement')
+
+  await page.goto('/')
+
+  // Contrat repris par #20 et #21 (brief de #3). Sans cette assertion, retirer le descripteur
+  // d'appareil de `playwright.config.ts` laissait la suite entièrement verte : un contrat que
+  // seule la lecture d'un fichier de configuration garantit n'est pas un contrat.
+  expect(
+    await page.evaluate(() => ({
+      width: window.innerWidth,
+      touch: navigator.maxTouchPoints > 0,
+    })),
+  ).toEqual({ width: 400, touch: true })
 })
 
 test("l'index compilé porte le bloc d'aperçu une seule fois", async ({ request }) => {
