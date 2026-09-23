@@ -37,9 +37,11 @@ Toute référence croisée cite un **§ ou un titre de section**, jamais un num�
 ## Commandes du projet
 Lues par `cycle-pr`, `execution-qa` et la génération de CI. `n/a` = étape absente du projet.
 Vérifiées une à une le 2026-09-23 au premier scaffold du back (#2), depuis la racine du dépôt :
-chaque cible ci-dessous a été lancée et a rendu 0. Le `Makefile` en est la source unique — la CI
-appelle les mêmes cibles, de sorte qu'une commande ne peut pas diverger entre le poste et
-GitHub Actions. Les commandes du front (`apps/web/`) restent à écrire avec #3.
+chaque cible ci-dessous a été lancée et a rendu 0. Les lignes qui nomment une cible `make` la
+tirent du `Makefile`, source unique appelée aussi par la CI : une commande ne peut donc pas
+diverger entre le poste et GitHub Actions. Deux lignes n'ont volontairement pas de cible —
+« test ciblé » prend un argument, « hooks » ne se lance qu'une fois par clone. Les commandes du
+front (`apps/web/`) restent à écrire avec #3.
 - install      : make install                     # uv sync
 - test         : make test                        # suite complète ; testcontainers arrive avec #7
 - test ciblé   : uv run pytest <chemin|motif>     # une seule cible, pour la boucle TDD

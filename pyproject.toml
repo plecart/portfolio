@@ -32,8 +32,15 @@ testpaths = ["apps"]
 
 # Même largeur que la prose du dépôt (règles, ADR, docstrings) : sans ça, le code se replie à
 # 88 colonnes et les commentaires courent jusqu'à 100 dans le même fichier.
+#
+# `include` borne ruff aux fichiers Python. Sans cette ligne il formate aussi les blocs de code
+# des fichiers Markdown : `make format` réécrirait alors `docs/cadrage-technique.md` (rang 1) et
+# les ADR (rang 3), et `make format-check` échouerait sur une PR purement documentaire — mesuré,
+# sortie 2. Les hooks pre-commit, eux, sont bornés à `[python, pyi]` : sans cette ligne, le hook
+# et la gate ne regarderaient pas la même population.
 [tool.ruff]
 line-length = 100
+include = ["*.py", "*.pyi", "**/pyproject.toml"]
 
 [tool.pyright]
 typeCheckingMode = "strict"
