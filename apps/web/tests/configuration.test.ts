@@ -52,9 +52,37 @@ test('la version de Node est la même dans .nvmrc et dans engines', () => {
   expect(manifest.engines?.node).toBe(pinned)
 })
 
-test.for(['tsconfig.app.json', 'tsconfig.node.json'])(
-  '%s résout en mode strict',
-  (configFileName) => {
-    expect(resolveCompilerOptions(configFileName).strict).toBe(true)
-  },
-)
+/**
+ * Les configurations TypeScript de l'application, lues depuis les `references` de `tsconfig.json`.
+ *
+ * Dérivée plutôt que recopiée : une liste écrite à la main devient un échantillon dès qu'une
+ * quatrième configuration apparaît, et rien ne le signale. Ici, toute configuration ajoutée au
+ * projet racine entre d'office dans la population du test.
+ */
+function projectConfigFileNames(): string[] {
+  const root = JSON.parse(readFileSync(join(APP_ROOT, 'tsconfig.json'), 'utf8')) as {
+    references: { path: string }[]
+  }
+
+  return root.references.map((reference) => reference.path.replace(/^\.\//, ''))
+}
+
+test('toutes les configurations TypeScript du projet résolvent en mode strict', () => {
+  const configFileNames = projectConfigFileNames()
+
+  expect(configFileNames.length).toBeGreaterThan(0)
+  expect(
+    configFileNames.map((name) => [name, resolveCompilerOptions(name).strict]),
+  ).toEqual(configFileNames.map((name) => [name, true]))
+})
+
+test('la porte de lint échoue sur un simple avertissement', () => {
+  const manifest = JSON.parse(readFileSync(join(APP_ROOT, 'package.json'), 'utf8')) as {
+    scripts: { lint: string }
+  }
+
+  // Sur les 114 règles actives, 3 ne sont que des avertissements — dont
+  // `react-hooks/exhaustive-deps`. Sans ce drapeau, `eslint` sort 0 devant elles et la porte
+  // passe au vert en ayant vu le défaut. C'est une option qui fait la porte, pas une préférence.
+  expect(manifest.scripts.lint).toContain('--max-warnings 0')
+})
