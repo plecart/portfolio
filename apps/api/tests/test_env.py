@@ -10,6 +10,8 @@ from pydantic import ValidationError
 # pour que l'échec attendu ne puisse venir que de celle-là.
 ENVIRONNEMENT_VALIDE = {
     "SECRET_KEY": "clé-de-test",
+    "DEBUG": "false",
+    "ALLOWED_HOSTS": '["portfolio.test"]',
     "DATABASE_URL": "postgresql://portfolio:secret@localhost:5432/portfolio",
     "REDIS_URL": "redis://localhost:6379/0",
 }
@@ -54,6 +56,31 @@ def test_une_adresse_de_service_mal_formee_est_refusee(
 
     with pytest.raises(ValidationError, match=variable):
         construire()
+
+
+def test_le_demarrage_echoue_sans_hote_autorise_hors_debug(
+    environnement: pytest.MonkeyPatch,
+) -> None:
+    """Django rejetterait chaque requête en 400 ; on préfère un démarrage qui échoue franchement."""
+    environnement.setenv("ALLOWED_HOSTS", "[]")
+
+    with pytest.raises(ValidationError, match="ALLOWED_HOSTS"):
+        construire()
+
+
+def test_debug_est_faux_par_defaut(environnement: pytest.MonkeyPatch) -> None:
+    """Un oubli doit laisser l'application en posture de production, jamais l'inverse."""
+    environnement.delenv("DEBUG")
+
+    assert construire().DEBUG is False
+
+
+def test_un_hote_absent_est_tolere_en_debug(environnement: pytest.MonkeyPatch) -> None:
+    """Le garde ne doit pas gêner le développement, où Django autorise déjà les hôtes locaux."""
+    environnement.setenv("DEBUG", "true")
+    environnement.setenv("ALLOWED_HOSTS", "[]")
+
+    assert construire().ALLOWED_HOSTS == []
 
 
 def test_la_cle_secrete_n_apparait_pas_dans_une_trace(
