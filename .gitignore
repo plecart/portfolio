@@ -10,6 +10,7 @@ node_modules/
 apps/web/dist/
 apps/web/test-results/
 apps/web/playwright-report/
+apps/web/.lighthouseci/
 
 # Claude Code — surcharges locales
 .claude/settings.local.json
