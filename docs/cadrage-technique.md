@@ -1,6 +1,6 @@
 # Portfolio — Cadrage technique
 
-_Version 1.4 · 2026-09-22 · Remplace le brouillon v0 du 2026-09-10 et son journal de questions-réponses, supprimés le 2026-09-18 une fois leur matière (pourquoi, options écartées) reprise dans les ADR de `docs/adr/`. Les décisions gardent les identifiants du v0 (D1 à D38) ; D39 et suivantes sont nées avec la v1._
+_Version 1.5 · 2026-09-23 · Remplace le brouillon v0 du 2026-09-10 et son journal de questions-réponses, supprimés le 2026-09-18 une fois leur matière (pourquoi, options écartées) reprise dans les ADR de `docs/adr/`. Les décisions gardent les identifiants du v0 (D1 à D38) ; D39 et suivantes sont nées avec la v1._
 _Le design (UI/UX) est hors périmètre de ce document._
 
 ---
@@ -263,6 +263,7 @@ Identifiants hérités du cadrage v0 (D1 à D38), sans trou ni renumérotation. 
 | D44 | Frontend = Vite + React + TypeScript + Tailwind CSS + shadcn/ui | Compilé en CI, servi en statique par Caddy, aucun Node en production ; Next.js écarté. Compléments : motion, react-bits, bklit-ui, Rive, `openapi-typescript` (`docs/frontend-outillage.md` §3). Remplace D15. |
 | D45 | Origine reliée à Cloudflare par Tunnel | Aucun port web ouvert sur le VPS ; `cloudflared` sort vers Cloudflare ; Caddy reste reverse proxy interne, sans TLS. Remplace « Caddy seul conteneur exposé 80/443 » (2026-09-18). |
 | D51 | Rendu du Markdown dans le front | L'API envoie la description et les sections en Markdown (JSON) ; le front les rend en éléments React avec `markdown-to-jsx`, HTML brut échappé ; `markdown-it-py` + `nh3` réservés à l'aperçu de l'admin ; Vitest entre en phase 1 pour la logique pure du front (ADR 0010, 2026-09-22). |
+| D52 | Le squelette du monorepo est une structure d'accueil | Cible de §9 inchangée ; chaque dossier naît avec sa première brique, jamais avant (P4) ; `packages/` au premier module partagé par deux applications ; aucune importation entre applications, communication par Postgres et HTTP (2026-09-23). |
 | D29 | (remplacée par D36, D37) | — |
 | D21 | (remplacée par D25) | — |
 
@@ -291,7 +292,7 @@ Identifiants hérités du cadrage v0 (D1 à D38), sans trou ni renumérotation. 
 ## 9. Prochaines étapes
 
 1. Configuration Claude Code et pipeline de développement (§8.1).
-2. Squelette du monorepo : `apps/api`, `apps/web`, `apps/ai`, `apps/mcp`, `packages/`, `infra/`, `docs/`.
+2. Squelette du monorepo (D52) : une **structure d'accueil**, pas des dossiers vides. Cible : `apps/api`, `apps/web`, `apps/ai`, `apps/mcp`, `packages/`, `infra/`, `docs/`. Espace de travail `uv` à la racine dont les membres sont déclarés par motif (`apps/*`, `packages/*`) ; `infra/` avec un conteneur par service ; `docs/` unique. Chaque dossier naît avec sa première brique, jamais avant (P4) ; `packages/` naît avec le premier module partagé par deux applications. Les applications ne s'importent pas entre elles : elles communiquent par Postgres et par HTTP, et ce qu'elles partagent va dans `packages/`.
 3. ADR initiaux — écrits le 2026-09-18 (`docs/adr/` 0001 à 0008) : Django, VPS + Compose, Cloudflare, R2, Postgres sur le VPS, Redis, sauvegardes, frontend (D44). Le worker (Celery ou arq) n'en fait pas partie : ADR à sa phase, annexe A.
 4. Modèle de contenu, admin personnalisé, API.
 5. Première fiche : le méta-projet.

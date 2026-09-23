@@ -37,8 +37,8 @@ Toute référence croisée cite un **§ ou un titre de section**, jamais un num�
 ## Commandes du projet
 Lues par `cycle-pr`, `execution-qa` et la génération de CI. `n/a` = étape absente du projet.
 Toutes marquées `# non vérifiée` : aucun code au 2026-09-18 (étape 11 d'`init-projet`, cas « projet
-sans code »). Le squelette monorepo (cadrage §9.2 : `apps/api`, `apps/web`, `apps/ai`, `apps/mcp`,
-`packages/`, `infra/`) les fera peut-être préfixer d'un chemin — rejouer `init-projet` à ce moment-là.
+sans code »). Le squelette monorepo (cadrage §9 point 2, D52 : `apps/api`, `apps/web`, `infra/` en phase 1,
+chaque dossier né avec sa première brique) les fera peut-être préfixer d'un chemin — rejouer `init-projet` à ce moment-là.
 - install      : uv sync                          # non vérifiée
 - test         : uv run pytest                    # non vérifiée — suite complète (testcontainers pour Postgres/Redis)
 - test ciblé   : uv run pytest <chemin|motif>     # non vérifiée — une seule cible, pour la boucle TDD
@@ -56,7 +56,7 @@ sans code »). Le squelette monorepo (cadrage §9.2 : `apps/api`, `apps/web`, `a
 - services requis en CI : aucun (testcontainers démarre Postgres et Redis dans les tests, cadrage §8.4)
 
 ## Périmètre
-- domaines (nom métier → chemin ; chemins prévus au cadrage §9.2, à ajuster au squelette) — servent aussi de thèmes/milestones à `triage` :
+- domaines (nom métier → chemin ; chemins cibles du cadrage §9 point 2, chaque dossier né avec sa première brique) — servent aussi de thèmes/milestones à `triage` :
   - Socle & exploitation : `infra/`, `.github/`, `packages/`, `.claude/`, `CLAUDE.md`, `CONTRIBUTING.md`, `docs/` — tout ce qui n'est pas métier, pour qu'aucune PR ne soit orpheline
   - Contenu & API : `apps/api/`
   - Frontend : `apps/web/`
