@@ -1,3 +1,7 @@
 export default function App() {
-  return <h1>Pacôme Bernier</h1>
+  return (
+    <main>
+      <h1>Pacôme Bernier</h1>
+    </main>
+  )
 }

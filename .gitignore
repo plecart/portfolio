@@ -8,6 +8,8 @@ __pycache__/
 # Front (apps/web) — un seul fichier d'exclusion pour le dépôt, comme il n'y a qu'un `Makefile`
 node_modules/
 apps/web/dist/
+apps/web/test-results/
+apps/web/playwright-report/
 
 # Claude Code — surcharges locales
 .claude/settings.local.json
