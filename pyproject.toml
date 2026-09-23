@@ -38,9 +38,13 @@ testpaths = ["apps"]
 # les ADR (rang 3), et `make format-check` échouerait sur une PR purement documentaire — mesuré,
 # sortie 2. Les hooks pre-commit, eux, sont bornés à `[python, pyi]` : sans cette ligne, le hook
 # et la gate ne regarderaient pas la même population.
+#
+# La liste **remplace** le défaut de ruff, elle ne s'y ajoute pas : `*.ipynb` y figure donc
+# explicitement, sans quoi les carnets de `docs/learning/` (phase 2) deviendraient invisibles
+# aux deux portes sans que rien ne le signale.
 [tool.ruff]
 line-length = 100
-include = ["*.py", "*.pyi", "**/pyproject.toml"]
+include = ["*.py", "*.pyi", "*.ipynb", "**/pyproject.toml"]
 
 [tool.pyright]
 typeCheckingMode = "strict"

@@ -7,14 +7,31 @@ seulement », ADR 0001 « Configuration 12-factor : pydantic-settings »). `sett
 
 Ajouter une variable, c'est ajouter un champ typé ici **et** une ligne dans `.env.example`.
 Aucun `os.environ` ailleurs, aucune valeur d'environnement en dur.
+
+Une seule exception, ici même : `ENV_FILE`, qui désigne le fichier `.env` et ne peut donc pas y
+être déclarée. Elle est résolue par `env_file_path`, à part du modèle.
 """
 
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Self
 
-from pydantic import Field, PostgresDsn, RedisDsn, SecretStr, model_validator
+from pydantic import Field, PostgresDsn, RedisDsn, SecretStr, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class ConfigurationError(RuntimeError):
+    """Configuration refusée au démarrage — énonce les champs fautifs, jamais leurs valeurs.
+
+    `pydantic` joint la valeur d'entrée à chacun de ses messages d'erreur. C'est commode en
+    développement et inacceptable ici : cet environnement porte la clé de signature et le mot
+    de passe de la base, et une erreur de démarrage part sur stderr — journaux de conteneur,
+    sortie de CI, collecteur d'erreurs. Trois formes ont été mesurées comme fuyantes (borne de
+    longueur, URL mal formée, validateur de modèle qui reçoit l'environnement entier) ;
+    `Env.load()` les reformule toutes par ce type.
+    """
+
 
 # `env.py` → `config` → `api` → `apps` → racine du dépôt.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -24,13 +41,37 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 # ce refus au démarrage, qui, lui, ne peut pas passer inaperçu.
 SECRET_KEY_MIN_LENGTH = 50
 
-# Quel fichier `.env` lire. Par défaut celui de la racine du dépôt : `manage.py` se lance depuis
-# `apps/api` et les tests depuis la racine, et un chemin relatif leur ferait lire deux fichiers
-# différents. `ENV_FILE` permet de viser ailleurs — ou nulle part, en désignant un chemin qui
-# n'existe pas, ce que `pydantic-settings` ignore sans bruit.
+
+def env_file_path(environ: Mapping[str, str]) -> Path:
+    """Détermine quel fichier `.env` lire, d'après l'environnement donné.
+
+    Args:
+        environ: l'environnement du processus, ou n'importe quel dictionnaire — c'est ce qui
+            rend cette résolution vérifiable sans toucher au vrai environnement.
+
+    Returns:
+        Le `.env` de la racine du dépôt par défaut. `ENV_FILE` permet de viser ailleurs : vers
+        un autre fichier, ou vers un chemin inexistant pour n'en lire aucun, ce que
+        `pydantic-settings` accepte sans bruit. Un chemin **relatif** est résolu depuis la
+        racine du dépôt, jamais depuis le dossier courant : `manage.py` se lance depuis
+        `apps/api` et les tests depuis la racine, et laisser le dossier courant décider ferait
+        lire deux fichiers différents selon l'appelant — le défaut même que ce chemin absolu
+        existe pour éviter.
+    """
+    demande = environ.get("ENV_FILE")
+    if not demande:
+        return REPOSITORY_ROOT / ".env"
+
+    chemin = Path(demande)
+    return chemin if chemin.is_absolute() else REPOSITORY_ROOT / chemin
+
+
+# Résolu une fois, au chargement du module : `model_config` est évalué à la création de la
+# classe. Poser `ENV_FILE` après cet import n'a donc aucun effet — un sous-processus, oui.
 #
-# C'est la seule variable qui ne peut pas vivre dans `.env` : c'est elle qui le désigne.
-ENV_FILE = Path(os.environ.get("ENV_FILE") or REPOSITORY_ROOT / ".env")
+# C'est la seule variable d'environnement qui n'a pas de champ dans `Env` ni de ligne dans
+# `.env` : c'est elle qui désigne `.env`.
+ENV_FILE = env_file_path(os.environ)
 
 
 class Env(BaseSettings):
@@ -80,3 +121,33 @@ class Env(BaseSettings):
         if not self.DEBUG and not self.ALLOWED_HOSTS:
             raise ValueError("ALLOWED_HOSTS est obligatoire quand DEBUG est faux")
         return self
+
+    @classmethod
+    def load(cls) -> Self:
+        """Lit l'environnement, ou refuse de démarrer sans citer la moindre valeur.
+
+        C'est le **seul** point d'entrée de la configuration : construire `Env()` directement
+        laisse échapper une `ValidationError` de `pydantic`, qui porte les valeurs fautives.
+
+        Returns:
+            L'environnement validé.
+
+        Raises:
+            ConfigurationError: dès qu'une variable manque, a un type faux, sort de ses bornes
+                ou rend l'ensemble incohérent. Le message ne garde que les champs et les motifs.
+        """
+        try:
+            return cls()  # pyright: ignore[reportCallIssue]
+        except ValidationError as erreur:
+            # `from None` et non `from erreur` : chaîner l'erreur d'origine remettrait les
+            # valeurs dans la trace, ce que tout ce mécanisme existe pour éviter.
+            raise ConfigurationError(_champs_fautifs(erreur)) from None
+
+
+def _champs_fautifs(erreur: ValidationError) -> str:
+    """Résume une erreur de validation par ses champs et ses motifs, sans aucune valeur."""
+    lignes = [
+        f"{'.'.join(str(partie) for partie in details['loc']) or '<ensemble>'} : {details['msg']}"
+        for details in erreur.errors()
+    ]
+    return "configuration refusée :\n  " + "\n  ".join(lignes)

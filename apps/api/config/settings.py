@@ -13,9 +13,9 @@ from config.database import database_settings
 from config.env import Env
 
 # Une seule lecture de l'environnement pour tout le processus : Django importe ce module une
-# fois. Le commentaire `pyright: ignore` est le contournement documenté par `pydantic-settings`
-# pour les champs sans défaut, résolus depuis l'environnement et non depuis l'appel.
-env = Env()  # pyright: ignore[reportCallIssue]
+# fois. `load()` et non `Env()` — c'est lui qui empêche une configuration refusée de recracher
+# la clé de signature et le mot de passe de la base dans la trace de démarrage.
+env = Env.load()
 
 SECRET_KEY = env.SECRET_KEY.get_secret_value()
 DEBUG = env.DEBUG
