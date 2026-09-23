@@ -21,8 +21,11 @@ Toute variable d'environnement est déclarée dans `.env.example` et lue par la 
 (`apps/api/config/env.py`) — nulle part ailleurs, et jamais en dur.
 
 Les hooks ne lancent que `ruff` (`check --fix`, puis `format`), avec la version installée par
-`uv sync`, et sur la même population de fichiers : les fichiers Python, et eux seuls — ruff
-formate aussi les blocs de code Markdown quand on ne l'en empêche pas. `pyright` et `pytest`
+`uv sync` : le hook ne peut donc pas valider autre chose que la gate. Les périmètres, eux, ne
+sont pas identiques — les hooks voient les fichiers Python, la CI y ajoute les carnets et les
+`pyproject.toml`. Aucun des deux ne touche au Markdown, et c'est délibéré : sans la ligne
+`include` de `pyproject.toml`, ruff reformaterait les blocs de code des ADR et du cadrage.
+`pyright` et `pytest`
 restent dans la boucle de développement et en CI, trop lents pour un hook.
 
 ## Le flux en une page

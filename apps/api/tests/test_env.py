@@ -29,15 +29,17 @@ SECRET_TRAVEL_FORMS: list[tuple[str, Callable[[Env], str]]] = [
     ("model_dump en mode json", lambda env: str(env.model_dump(mode="json"))),
 ]
 
-# Les façons de rendre la configuration invalide, une par mécanisme de refus : borne de
-# longueur, URL mal formée (deux fois, car deux champs distincts la portent), et validateur de
-# modèle — qui, lui, reçoit l'environnement **entier** en entrée. Chacune produit un message
-# d'erreur ; aucune ne doit y laisser paraître une valeur.
+# Les façons de rendre la configuration invalide — **quatre mécanismes de refus distincts**,
+# et c'est le dénombrement qui compte : borne de longueur, URL mal formée (deux fois, car deux
+# champs la portent), validateur de modèle qui reçoit l'environnement **entier**, et échec de
+# lecture d'une *source* avant même la validation. Le dernier ne lève pas le même type
+# d'exception que les autres : c'est précisément pourquoi il doit figurer ici.
 INVALID_CONFIGURATIONS = [
     ("clé trop courte", "SECRET_KEY", "TROP-COURTE-ET-SECRETE"),
     ("base mal formée", "DATABASE_URL", "postgres://admin:MOT-DE-PASSE-BASE@"),
     ("redis mal formé", "REDIS_URL", "redis://admin:MOT-DE-PASSE-REDIS@"),
     ("aucun hôte autorisé", "ALLOWED_HOSTS", "[]"),
+    ("liste mal formée", "ALLOWED_HOSTS", "[oups"),
 ]
 
 
