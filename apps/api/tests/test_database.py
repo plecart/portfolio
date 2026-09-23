@@ -13,7 +13,7 @@ POSTGRES_URL = TypeAdapter(PostgresDsn)
 _ALLOWED_SCHEMES = PostgresDsn._constraints.allowed_schemes  # pyright: ignore[reportPrivateUsage]
 assert _ALLOWED_SCHEMES is not None, "pydantic n'expose plus la liste des schémas de PostgresDsn"
 
-DRIVER_SCHEMES = [schema for schema in _ALLOWED_SCHEMES if schema not in NEUTRAL_SCHEMES]
+DRIVER_SCHEMES = [scheme for scheme in _ALLOWED_SCHEMES if scheme not in NEUTRAL_SCHEMES]
 
 
 def test_l_adresse_est_traduite_en_bloc_django() -> None:
@@ -54,19 +54,19 @@ def test_un_parametre_de_connexion_est_refuse() -> None:
         database_settings(url)
 
 
-@pytest.mark.parametrize("schema", DRIVER_SCHEMES)
-def test_un_pilote_explicite_est_refuse(schema: str) -> None:
+@pytest.mark.parametrize("scheme", DRIVER_SCHEMES)
+def test_un_pilote_explicite_est_refuse(scheme: str) -> None:
     """Tout schéma qui nomme un pilote est refusé — la liste vient de pydantic, pas d'un choix."""
-    url = POSTGRES_URL.validate_python(f"{schema}://u:p@h:5432/db")
+    url = POSTGRES_URL.validate_python(f"{scheme}://u:p@h:5432/db")
 
     with pytest.raises(ValueError, match="schéma"):
         database_settings(url)
 
 
-@pytest.mark.parametrize("schema", NEUTRAL_SCHEMES)
-def test_un_schema_neutre_est_accepte(schema: str) -> None:
+@pytest.mark.parametrize("scheme", NEUTRAL_SCHEMES)
+def test_un_schema_neutre_est_accepte(scheme: str) -> None:
     """Le pendant du test précédent : le garde ne doit pas mordre sur les formes légitimes."""
-    url = POSTGRES_URL.validate_python(f"{schema}://u:p@h:5432/db")
+    url = POSTGRES_URL.validate_python(f"{scheme}://u:p@h:5432/db")
 
     assert database_settings(url)["NAME"] == "db"
 

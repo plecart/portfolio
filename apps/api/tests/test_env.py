@@ -33,7 +33,7 @@ SECRET_TRAVEL_FORMS: list[tuple[str, Callable[[Env], str]]] = [
 # longueur, URL mal formée (deux fois, car deux champs distincts la portent), et validateur de
 # modèle — qui, lui, reçoit l'environnement **entier** en entrée. Chacune produit un message
 # d'erreur ; aucune ne doit y laisser paraître une valeur.
-CONFIGURATIONS_FAUTIVES = [
+INVALID_CONFIGURATIONS = [
     ("clé trop courte", "SECRET_KEY", "TROP-COURTE-ET-SECRETE"),
     ("base mal formée", "DATABASE_URL", "postgres://admin:MOT-DE-PASSE-BASE@"),
     ("redis mal formé", "REDIS_URL", "redis://admin:MOT-DE-PASSE-REDIS@"),
@@ -94,19 +94,19 @@ def test_un_hote_absent_est_tolere_en_debug(environment: pytest.MonkeyPatch) -> 
 
 
 @pytest.mark.parametrize(
-    "rendu",
-    [rendu for _, rendu in SECRET_TRAVEL_FORMS],
-    ids=[nom for nom, _ in SECRET_TRAVEL_FORMS],
+    "render",
+    [render for _, render in SECRET_TRAVEL_FORMS],
+    ids=[name for name, _ in SECRET_TRAVEL_FORMS],
 )
 def test_la_cle_secrete_n_apparait_dans_aucune_forme(
     environment: pytest.MonkeyPatch,
     variables: dict[str, str],
-    rendu: Callable[[Env], str],
+    render: Callable[[Env], str],
 ) -> None:
     """Le masquage se solde sur la classe : 8 formes recensées, 8 éprouvées ici."""
     env = build_env()
 
-    assert variables["SECRET_KEY"] not in rendu(env)
+    assert variables["SECRET_KEY"] not in render(env)
 
 
 def test_une_cle_secrete_trop_courte_est_refusee(environment: pytest.MonkeyPatch) -> None:
@@ -118,15 +118,15 @@ def test_une_cle_secrete_trop_courte_est_refusee(environment: pytest.MonkeyPatch
 
 
 @pytest.mark.parametrize(
-    ("variable", "valeur_fautive"),
-    [(variable, valeur) for _, variable, valeur in CONFIGURATIONS_FAUTIVES],
-    ids=[nom for nom, _, _ in CONFIGURATIONS_FAUTIVES],
+    ("variable", "invalid_value"),
+    [(variable, value) for _, variable, value in INVALID_CONFIGURATIONS],
+    ids=[name for name, _, _ in INVALID_CONFIGURATIONS],
 )
 def test_aucune_valeur_ne_fuit_dans_l_erreur_de_demarrage(
     environment: pytest.MonkeyPatch,
     variables: dict[str, str],
     variable: str,
-    valeur_fautive: str,
+    invalid_value: str,
 ) -> None:
     """Une erreur de démarrage part sur stderr : journaux, CI, collecteur d'erreurs.
 
@@ -134,15 +134,15 @@ def test_aucune_valeur_ne_fuit_dans_l_erreur_de_demarrage(
     reçoit l'environnement entier, donc *toutes* les valeurs. Le refus doit nommer les champs
     et taire les valeurs, quel que soit le mécanisme qui l'a déclenché.
     """
-    environment.setenv(variable, valeur_fautive)
+    environment.setenv(variable, invalid_value)
 
-    with pytest.raises(ConfigurationError) as refus:
+    with pytest.raises(ConfigurationError) as refusal:
         Env.load()
 
-    message = str(refus.value)
+    message = str(refusal.value)
     assert variable in message, "le refus doit dire quel champ est en cause"
-    for valeur in [valeur_fautive, *variables.values()]:
-        assert valeur not in message
+    for value in [invalid_value, *variables.values()]:
+        assert value not in message
 
 
 def test_une_cle_inconnue_dans_le_fichier_env_est_refusee(
@@ -173,9 +173,9 @@ def test_un_chemin_env_relatif_est_ancre_sur_la_racine() -> None:
 
 
 def test_un_chemin_env_absolu_est_respecte() -> None:
-    absolu = Path(REPOSITORY_ROOT.anchor) / "tmp" / "ailleurs.env"
+    absolute = Path(REPOSITORY_ROOT.anchor) / "tmp" / "ailleurs.env"
 
-    assert env_file_path({"ENV_FILE": str(absolu)}) == absolu
+    assert env_file_path({"ENV_FILE": str(absolute)}) == absolute
 
 
 def test_un_env_file_vide_retombe_sur_la_racine() -> None:
