@@ -72,6 +72,33 @@ test('la feuille de base de Tailwind est appliquée', async ({ page }) => {
   expect(heading).toEqual({ fontSize: '16px', marginTop: '0px' })
 })
 
+test("l'index compilé porte le bloc d'aperçu une seule fois", async ({ request }) => {
+  const html = await (await request.get('/')).text()
+
+  // Les deux marqueurs sont comptés séparément : compter les blocs bien formés laisserait
+  // passer un marqueur orphelin, et c'est sur les marqueurs que #14 découpera.
+  expect(html.match(/<!--meta:start-->/g)).toHaveLength(1)
+  expect(html.match(/<!--meta:end-->/g)).toHaveLength(1)
+
+  const [block] = html.match(/<!--meta:start-->[\s\S]*<!--meta:end-->/) ?? []
+  expect(block).toContain('<title>')
+  expect(block).toContain('property="og:title"')
+  expect(block).toContain('property="og:description"')
+})
+
+test('les deux descriptions du bloc portent le même texte', async ({ page }) => {
+  await page.goto('/')
+
+  const contentOf = (selector: string) => page.locator(selector).getAttribute('content')
+
+  // Le HTML statique ne sait pas factoriser une chaîne : `description` et `og:description` sont
+  // écrites deux fois, et #14 les réécrira toutes les deux. L'égalité est donc un invariant du
+  // gabarit, pas une coïncidence — sans ce test, rien ne la tiendrait.
+  expect(await contentOf('meta[property="og:description"]')).toBe(
+    await contentOf('meta[name="description"]'),
+  )
+})
+
 test("la page ne porte aucune violation d'accessibilité", async ({ page }) => {
   await page.goto('/')
 
