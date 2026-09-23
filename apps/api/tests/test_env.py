@@ -1,5 +1,6 @@
 """Tests de `Env`, la seule lecture de l'environnement du back."""
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,20 @@ SERVICE_URLS = ["DATABASE_URL", "REDIS_URL"]
 # `test_env.py` → `tests` → `api` → `apps` → racine du dépôt. Calculé ici pour vérifier, depuis
 # un autre point de départ, l'arithmétique de chemin que fait `config/env.py`.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+
+# Toutes les façons dont `Env` peut rendre son contenu lisible : une trace, un journal, une
+# sérialisation. Le secret ne doit apparaître dans aucune. `get_secret_value()` est
+# volontairement absent — c'est l'accesseur, son travail est précisément de rendre la valeur.
+SECRET_TRAVEL_FORMS: list[tuple[str, Callable[[Env], str]]] = [
+    ("repr du modèle", repr),
+    ("str du modèle", str),
+    ("interpolation", lambda env: f"{env}"),
+    ("repr du champ", lambda env: repr(env.SECRET_KEY)),
+    ("str du champ", lambda env: str(env.SECRET_KEY)),
+    ("model_dump", lambda env: str(env.model_dump())),
+    ("model_dump_json", lambda env: env.model_dump_json()),
+    ("model_dump en mode json", lambda env: str(env.model_dump(mode="json"))),
+]
 
 
 def build_env(env_file: Path | None = None) -> Env:
@@ -67,13 +82,28 @@ def test_un_hote_absent_est_tolere_en_debug(environment: pytest.MonkeyPatch) -> 
     assert build_env().ALLOWED_HOSTS == []
 
 
-def test_la_cle_secrete_n_apparait_pas_dans_une_trace(
-    environment: pytest.MonkeyPatch, variables: dict[str, str]
+@pytest.mark.parametrize(
+    "rendu",
+    [rendu for _, rendu in SECRET_TRAVEL_FORMS],
+    ids=[nom for nom, _ in SECRET_TRAVEL_FORMS],
+)
+def test_la_cle_secrete_n_apparait_dans_aucune_forme(
+    environment: pytest.MonkeyPatch,
+    variables: dict[str, str],
+    rendu: Callable[[Env], str],
 ) -> None:
-    """Une trace d'exception ou un journal ne doit jamais révéler la clé de signature."""
+    """Le masquage se solde sur la classe : 8 formes recensées, 8 éprouvées ici."""
     env = build_env()
 
-    assert variables["SECRET_KEY"] not in repr(env)
+    assert variables["SECRET_KEY"] not in rendu(env)
+
+
+def test_une_cle_secrete_trop_courte_est_refusee(environment: pytest.MonkeyPatch) -> None:
+    """Django n'avertit qu'en `check --deploy`, que la CI ne lance pas : on refuse au démarrage."""
+    environment.setenv("SECRET_KEY", "trop-courte")
+
+    with pytest.raises(ValidationError, match="SECRET_KEY"):
+        build_env()
 
 
 def test_une_cle_inconnue_dans_le_fichier_env_est_refusee(

@@ -12,27 +12,36 @@ Aucun `os.environ` ailleurs, aucune valeur d'environnement en dur.
 from pathlib import Path
 from typing import Self
 
-from pydantic import PostgresDsn, RedisDsn, SecretStr, model_validator
+from pydantic import Field, PostgresDsn, RedisDsn, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # `env.py` → `config` → `api` → `apps` → racine du dépôt.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
+# Seuil de Django lui-même : son contrôle `security.W009` signale une clé de moins de 50
+# caractères. Il ne s'affiche qu'en `manage.py check --deploy`, que la CI ne lance pas — d'où
+# ce refus au démarrage, qui, lui, ne peut pas passer inaperçu.
+SECRET_KEY_MIN_LENGTH = 50
+
 
 class Env(BaseSettings):
     """Variables d'environnement du back, validées une fois au démarrage.
 
-    Un environnement incomplet ou mal formé fait échouer la construction avec une
-    `ValidationError` : l'application refuse de démarrer plutôt que de tourner à moitié
-    configurée.
+    Une variable absente, d'un type faux ou hors de ses bornes fait échouer la construction
+    avec une `ValidationError` : l'application refuse de démarrer plutôt que de tourner à
+    moitié configurée. La cohérence *interne* d'une adresse de service, en revanche, n'est pas
+    vérifiée ici — `PostgresDsn` accepte des URL bien formées mais inexploitables (sans nom de
+    base, multi-hôtes) ; c'est `config/database.py` qui les refuse, au moment de les traduire.
 
     `extra="forbid"` est le défaut de `pydantic-settings` pour le fichier `.env` : une clé
     inconnue y est une faute de frappe, pas une option, et fait échouer le démarrage.
 
     Attributs :
-        SECRET_KEY: clé de signature Django. Aucun défaut — l'absence est une erreur, jamais
-            une valeur de repli. `SecretStr` pour qu'elle n'apparaisse pas dans une trace ni
-            dans un journal.
+        SECRET_KEY: clé de signature Django, d'au moins `SECRET_KEY_MIN_LENGTH` caractères.
+            Aucun défaut — l'absence est une erreur, jamais une valeur de repli. `SecretStr`
+            pour qu'elle n'apparaisse ni dans une trace, ni dans un journal, ni dans une
+            sérialisation du modèle (8 formes recensées, les 8 sous test). Une fois déballée
+            par `settings.py`, c'est Django qui en répond.
         DEBUG: mode de développement. Faux par défaut : un oubli laisse l'application en
             posture de production, jamais l'inverse.
         ALLOWED_HOSTS: noms d'hôte servis. Obligatoire dès que `DEBUG` est faux.
@@ -45,7 +54,7 @@ class Env(BaseSettings):
     # la racine du dépôt. Un chemin relatif ferait lire deux fichiers différents.
     model_config = SettingsConfigDict(env_file=REPOSITORY_ROOT / ".env")
 
-    SECRET_KEY: SecretStr
+    SECRET_KEY: SecretStr = Field(min_length=SECRET_KEY_MIN_LENGTH)
     DEBUG: bool = False
     ALLOWED_HOSTS: list[str] = []
     DATABASE_URL: PostgresDsn
