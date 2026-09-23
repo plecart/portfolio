@@ -6,19 +6,13 @@ import pytest
 from config.env import Env
 from pydantic import ValidationError
 
-# Un environnement complet et valide. Chaque test en retire ou en corrompt une seule entrée,
-# pour que l'échec attendu ne puisse venir que de celle-là.
-ENVIRONNEMENT_VALIDE = {
-    "SECRET_KEY": "clé-de-test",
-    "DEBUG": "false",
-    "ALLOWED_HOSTS": '["portfolio.test"]',
-    "DATABASE_URL": "postgresql://portfolio:secret@localhost:5432/portfolio",
-    "REDIS_URL": "redis://localhost:6379/0",
-}
-
 # Les variables dont le type impose une forme d'URL. Toute nouvelle adresse de service s'ajoute
 # ici : c'est cette liste qui fait du test suivant une garantie de classe, pas d'occurrence.
 ADRESSES_DE_SERVICE = ["DATABASE_URL", "REDIS_URL"]
+
+# `test_env.py` → `tests` → `api` → `apps` → racine du dépôt. Calculé ici pour vérifier, depuis
+# un autre point de départ, l'arithmétique de chemin que fait `config/env.py`.
+RACINE_DEPOT = Path(__file__).resolve().parents[3]
 
 
 def construire(fichier_env: Path | None = None) -> Env:
@@ -28,14 +22,6 @@ def construire(fichier_env: Path | None = None) -> Env:
     les champs sans défaut sont résolus depuis l'environnement, pas depuis l'appel.
     """
     return Env(_env_file=fichier_env)  # pyright: ignore[reportCallIssue]
-
-
-@pytest.fixture
-def environnement(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
-    """Pose un environnement valide et rend la main pour le corrompre."""
-    for nom, valeur in ENVIRONNEMENT_VALIDE.items():
-        monkeypatch.setenv(nom, valeur)
-    return monkeypatch
 
 
 def test_le_demarrage_echoue_sans_cle_secrete(
@@ -61,7 +47,7 @@ def test_une_adresse_de_service_mal_formee_est_refusee(
 def test_le_demarrage_echoue_sans_hote_autorise_hors_debug(
     environnement: pytest.MonkeyPatch,
 ) -> None:
-    """Django rejetterait chaque requête en 400 ; on préfère un démarrage qui échoue franchement."""
+    """Django exige ALLOWED_HOSTS hors debug ; échouer au démarrage vaut mieux qu'à la requête."""
     environnement.setenv("ALLOWED_HOSTS", "[]")
 
     with pytest.raises(ValidationError, match="ALLOWED_HOSTS"):
@@ -84,12 +70,12 @@ def test_un_hote_absent_est_tolere_en_debug(environnement: pytest.MonkeyPatch) -
 
 
 def test_la_cle_secrete_n_apparait_pas_dans_une_trace(
-    environnement: pytest.MonkeyPatch,
+    environnement: pytest.MonkeyPatch, variables: dict[str, str]
 ) -> None:
     """Une trace d'exception ou un journal ne doit jamais révéler la clé de signature."""
     env = construire()
 
-    assert ENVIRONNEMENT_VALIDE["SECRET_KEY"] not in repr(env)
+    assert variables["SECRET_KEY"] not in repr(env)
 
 
 def test_une_cle_inconnue_dans_le_fichier_env_est_refusee(
@@ -102,3 +88,8 @@ def test_une_cle_inconnue_dans_le_fichier_env_est_refusee(
     # La casse est normalisée par `pydantic-settings` (`case_sensitive=False` par défaut).
     with pytest.raises(ValidationError, match="(?i)SECRET_KEY_TYPO"):
         construire(fichier_env)
+
+
+def test_le_fichier_env_est_cherche_a_la_racine_du_depot() -> None:
+    """`manage.py` se lance depuis `apps/api`, pytest depuis la racine : un seul `.env` pour les deux."""
+    assert Env.model_config.get("env_file") == RACINE_DEPOT / ".env"

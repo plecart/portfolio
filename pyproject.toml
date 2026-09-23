@@ -19,10 +19,21 @@ members = ["apps/*", "packages/*"]
 api = { workspace = true }
 
 [dependency-groups]
-dev = ["pytest", "ruff", "pyright", "pre-commit"]
+dev = [
+    "pytest",
+    "ruff",
+    "pyright",
+    "pre-commit",
+    "django-stubs>=6.1.1",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["apps"]
+
+# Même largeur que la prose du dépôt (règles, ADR, docstrings) : sans ça, le code se replie à
+# 88 colonnes et les commentaires courent jusqu'à 100 dans le même fichier.
+[tool.ruff]
+line-length = 100
 
 [tool.pyright]
 typeCheckingMode = "strict"
