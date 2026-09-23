@@ -15,6 +15,11 @@ from pydantic import PostgresDsn
 POSTGRES_BACKEND = "django.db.backends.postgresql"
 DEFAULT_PORT = 5432
 
+# `postgresql+asyncpg`, `postgresql+psycopg2`… sont des schémas valides pour `PostgresDsn` qui
+# nomment un pilote ; le moteur Django ci-dessus n'en utilise aucun. Seules les deux formes
+# neutres sont acceptées.
+NEUTRAL_SCHEMES = ("postgres", "postgresql")
+
 
 def database_settings(url: PostgresDsn) -> dict[str, str | int]:
     """Construit le bloc `DATABASES["default"]` correspondant à `url`.
@@ -24,13 +29,24 @@ def database_settings(url: PostgresDsn) -> dict[str, str | int]:
 
     Returns:
         Le dictionnaire attendu par Django : `ENGINE`, `NAME`, `USER`, `PASSWORD`, `HOST`,
-        `PORT`. Les identifiants sont décodés — une URL les transporte percent-encodés.
+        `PORT`. Les **quatre** composants que l'URL transporte percent-encodés — utilisateur,
+        mot de passe, hôte et nom de base — sont décodés.
 
     Raises:
-        ValueError: si l'adresse est incomplète — plusieurs hôtes alors que le projet n'en sert
-            qu'un (ADR 0005), ou aucun nom de base. Les deux produisent une adresse plausible
-            qui n'échoue qu'à la connexion, loin du fichier qui l'a causée.
+        ValueError: dès que l'adresse dit quelque chose que cette traduction n'honorerait pas —
+            plusieurs hôtes alors que le projet n'en sert qu'un (ADR 0005), aucun nom de base,
+            un pilote explicite dans le schéma, ou des paramètres de connexion. Chacun de ces
+            cas produit sinon une connexion plausible mais fausse, qui n'échoue qu'au premier
+            accès, loin du fichier qui l'a causée.
     """
+    if url.scheme not in NEUTRAL_SCHEMES:
+        raise ValueError(
+            f"schéma « {url.scheme} » : seuls {' et '.join(NEUTRAL_SCHEMES)} sont pris en charge"
+        )
+
+    if url.query:
+        raise ValueError(f"paramètre de connexion non pris en charge : « {url.query} »")
+
     hosts = url.hosts()
     if len(hosts) != 1:
         raise ValueError(f"l'adresse Postgres doit désigner un seul hôte, {len(hosts)} trouvés")
@@ -42,9 +58,9 @@ def database_settings(url: PostgresDsn) -> dict[str, str | int]:
     host = hosts[0]
     return {
         "ENGINE": POSTGRES_BACKEND,
-        "NAME": name,
+        "NAME": unquote(name),
         "USER": unquote(host["username"] or ""),
         "PASSWORD": unquote(host["password"] or ""),
-        "HOST": host["host"] or "",
+        "HOST": unquote(host["host"] or ""),
         "PORT": host["port"] or DEFAULT_PORT,
     }

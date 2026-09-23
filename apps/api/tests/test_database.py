@@ -22,13 +22,35 @@ def test_l_adresse_est_traduite_en_bloc_django() -> None:
     }
 
 
-def test_un_mot_de_passe_encode_est_decode() -> None:
-    """Un mot de passe contenant `@` ou `/` doit être encodé dans l'URL — et décodé ici."""
+def test_les_quatre_identifiants_encodes_sont_decodes() -> None:
+    """Quatre composants de l'URL voyagent percent-encodés, et les quatre atterrissent dans
+    `DATABASES` : utilisateur, mot de passe, hôte (forme socket Unix) et nom de base. N'en
+    décoder qu'une partie donne des identifiants faux sans jamais lever d'erreur.
+    """
     settings = database_settings(
-        POSTGRES_URL.validate_python("postgresql://portfolio:a%40b%2Fc@localhost:5432/contenu")
+        POSTGRES_URL.validate_python("postgresql://a%40u:a%40p@%2Fvar%2Frun%2Fpg:5432/ma%20base")
     )
 
-    assert settings["PASSWORD"] == "a@b/c"
+    assert settings["USER"] == "a@u"
+    assert settings["PASSWORD"] == "a@p"
+    assert settings["HOST"] == "/var/run/pg"
+    assert settings["NAME"] == "ma base"
+
+
+def test_un_parametre_de_connexion_est_refuse() -> None:
+    """`?sslmode=require` change la sécurité de la connexion ; le jeter en silence, jamais."""
+    url = POSTGRES_URL.validate_python("postgresql://u:p@h:5432/db?sslmode=require")
+
+    with pytest.raises(ValueError, match="paramètre"):
+        database_settings(url)
+
+
+def test_un_pilote_explicite_est_refuse() -> None:
+    """`postgresql+asyncpg` nomme un pilote que le moteur Django posé ici n'utilise pas."""
+    url = POSTGRES_URL.validate_python("postgresql+asyncpg://u:p@h:5432/db")
+
+    with pytest.raises(ValueError, match="schéma"):
+        database_settings(url)
 
 
 def test_le_port_par_defaut_est_celui_de_postgres() -> None:
