@@ -89,13 +89,23 @@ puis émondés de ce que le gabarit ajoute pour sa page de démonstration :
 | `vite` | 8.3.0 | Serveur de développement et compilation |
 | `@vitejs/plugin-react` | 6.1.1 | Prise en charge de React par Vite |
 | `vitest` | 4.1.11 | Tests unitaires (ADR 0010) |
+| `@playwright/test` | 1.63.0 | Scénarios de bout en bout, Chromium seul |
+| `@axe-core/playwright` | 4.13.0 | Contrôle d'accessibilité par page |
 | `@types/node`, `@types/react`, `@types/react-dom` | 24.13.6 / 19.3.0 | Types ambiants |
+
+Deux projets Playwright : `desktop` (descripteur « Desktop Chrome », 1280 px) et `mobile`
+(descripteur « Pixel 5 », largeur ramenée à 400 px, émulation tactile conservée). Ils s'exécutent
+contre la **version compilée servie en statique**, celle que Caddy publie.
 
 **Deux errata au plan du §3**, relevés en installant — le gabarit a changé depuis le 2026-09-18 :
 
 - item 1, « TypeScript strict (déjà actif dans le modèle) » : **faux depuis `create-vite` 9.2.1**,
   qui ne pose plus `strict`. L'option est désormais posée explicitement dans
   `apps/web/tsconfig.base.json`, et un test la mesure sur les deux configurations résolues.
+- item 11, « `npm init playwright@latest` » : l'assistant écrit des scénarios d'exemple, un
+  `.gitignore` et une configuration à moitié commentée, tous à supprimer derrière lui. Remplacé
+  par `npm i -D @playwright/test @axe-core/playwright` puis `npx playwright install chromium`, et
+  une configuration écrite à la main — même résultat, sans le ménage.
 - item 10, « la config ESLint fournie par le modèle Vite » : **le gabarit ne fournit plus ESLint**,
   il fournit `oxlint`. La décision de l'ADR 0008 (ESLint + `eslint-plugin-jsx-a11y`) est inchangée
   et tient toujours ; c'est la provenance de la configuration qui change — elle sera écrite, pas
