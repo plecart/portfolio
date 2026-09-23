@@ -1,0 +1,29 @@
+# Racine de l'espace de travail `uv`. Virtuelle : elle ne s'installe pas elle-même, elle déclare
+# les membres du monorepo (cadrage §9 point 2, D52) et l'outillage commun à tous.
+#
+# Chaque membre est aussi une dépendance de la racine : c'est ce qui fait qu'un `uv sync` nu
+# installe tout l'espace de travail, sans `--all-packages`.
+[project]
+name = "portfolio"
+version = "0"
+requires-python = "==3.12.*"
+dependencies = ["api"]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["apps/*", "packages/*"]
+
+[tool.uv.sources]
+api = { workspace = true }
+
+[dependency-groups]
+dev = ["pytest", "ruff", "pyright", "pre-commit"]
+
+[tool.pytest.ini_options]
+testpaths = ["apps"]
+
+[tool.pyright]
+typeCheckingMode = "strict"
+include = ["apps"]
