@@ -7,6 +7,23 @@ pas ce fichier** : c'est le skill `cycle-pr` (déroulé pas à pas) et les règl
 Chaque étape ci-dessous a une commande dédiée (`/triage`, `/cycle-pr`…) — voir
 [.claude/commands/](.claude/commands/).
 
+## Démarrer en local
+
+```
+uv sync                     # installe l'espace de travail : racine + apps/api
+cp .env.example .env        # puis renseigner SECRET_KEY
+uv run pre-commit install   # branche les hooks sur ce dépôt
+```
+
+`.env` vit à la **racine** du dépôt et n'est lu qu'en développement (cadrage §6.6) ; en
+production il est écrit par `infra/bootstrap.sh` depuis les secrets, jamais édité à la main.
+Toute variable d'environnement est déclarée dans `.env.example` et lue par la classe `Env`
+(`apps/api/config/env.py`) — nulle part ailleurs, et jamais en dur.
+
+Les hooks ne lancent que `ruff` (`check --fix`, puis `format`), avec la version installée par
+`uv sync` : le hook et la CI vérifient ainsi exactement la même chose. `pyright` et `pytest`
+restent dans la boucle de développement et en CI, trop lents pour un hook.
+
 ## Le flux en une page
 
 0. **Configurer** — `init-projet` écrit `.claude/pipeline.config.md` (dépôt, sources de vérité,
