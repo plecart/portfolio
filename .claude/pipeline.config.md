@@ -43,8 +43,13 @@ Vérifiées une à une le 2026-09-23 au premier scaffold du back (#2), depuis la
 chaque cible ci-dessous a été lancée et a rendu 0. Les lignes qui nomment une cible `make` la
 tirent du `Makefile`, source unique appelée aussi par la CI : une commande ne peut donc pas
 diverger entre le poste et GitHub Actions. Deux lignes n'ont volontairement pas de cible —
-« test ciblé » prend un argument, « hooks » ne se lance qu'une fois par clone. Les commandes du
-front (`apps/web/`) restent à écrire avec #3.
+« test ciblé » prend un argument, « hooks » ne se lance qu'une fois par clone.
+
+Les deux piles gardent des cibles distinctes (`make lint` / `make web-lint`) : elles n'ont pas les
+mêmes prérequis — l'une veut `uv`, l'autre Node — et la CI en fait deux jobs séparés, pour qu'un
+rouge du front ne masque pas un rouge du back.
+
+**Back (`apps/api/`)** — vérifiées le 2026-09-23 au premier scaffold du back (#2) :
 - install      : make install                     # uv sync
 - test         : make test                        # suite complète ; testcontainers arrive avec #7
 - test ciblé   : uv run pytest <chemin|motif>     # une seule cible, pour la boucle TDD
@@ -56,9 +61,28 @@ front (`apps/web/`) restent à écrire avec #3.
 - run local    : n/a                              # tant qu'`infra/` n'existe pas
 - hooks        : uv run pre-commit install        # ruff seulement (check --fix, format)
 
+**Front (`apps/web/`)** — vérifiées le 2026-09-23 au scaffold du front (#3), chacune lancée depuis
+la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur le poste :
+- install      : make web-install                 # npm ci, à partir du verrou
+- navigateurs  : make web-browsers                # Chromium pour Playwright ; long, étape distincte en CI
+- test         : make web-test                    # Vitest
+- test ciblé   : cd apps/web && npm test -- <motif>
+- lint         : make web-lint                    # ESLint 9 + jsx-a11y, `--max-warnings 0`
+- format       : n/a                              # aucun formateur front installé — ESLint ne formate pas
+- format:check : n/a
+- typecheck    : make web-typecheck               # tsc -b, mode strict
+- build        : make web-build                   # typecheck puis `vite build` → apps/web/dist
+- e2e          : make web-e2e                     # Playwright + axe, projets desktop et mobile
+- lighthouse   : make web-lighthouse              # **CI seulement** : sous Windows, `chrome-launcher`
+                                                  # échoue sur EPERM (docs/frontend-outillage.md §2.4)
+- audit        : make web-audit                   # npm audit, seuil high, dépendances livrées seulement
+- run local    : cd apps/web && npm run dev
+
 ## Qualité
 - seuil de couverture : aucun (cadrage annexe A : « pragmatique ; évaluations RAG et E2E prioritaires »)
-- gates bloquants en CI : lint, format:check, typecheck, test
+- gates bloquants en CI :
+  - back : lint, format:check, typecheck, test
+  - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse, audit
 - services requis en CI : aucun — aucun test n'atteint encore Postgres ni Redis ; quand ce sera le cas, testcontainers les démarrera depuis les tests (cadrage §8.4), à partir de #7
 
 ## Périmètre

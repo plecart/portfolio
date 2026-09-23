@@ -1,11 +1,15 @@
 # CI générée par `init-projet` depuis la section « Commandes du projet » de
-# .claude/pipeline.config.md, régénérée au premier scaffold (#2).
+# .claude/pipeline.config.md, régénérée au scaffold du front (#3).
 #
 # Chaque étape appelle une cible du `Makefile` : la CI et le poste de développement exécutent
 # la même commande, jamais deux définitions parallèles.
 #
-# Aucune version de Python n'apparaît ici : `.python-version` l'épingle, `uv sync` la lit et la
-# provisionne. Un second canal qui déclarerait la version finirait par diverger du premier.
+# Aucune version de runtime n'apparaît ici : `.python-version` et `apps/web/.nvmrc` les épinglent,
+# et les actions de mise en place les lisent. Un second canal qui déclarerait une version
+# finirait par diverger du premier.
+#
+# Deux jobs, un par pile. Ils n'ont pas les mêmes prérequis — l'un veut `uv`, l'autre Node — et
+# les séparer évite qu'un rouge du front masque un rouge du back, ou l'inverse.
 
 name: CI
 
@@ -13,14 +17,14 @@ on:
   pull_request:
     # `ready_for_review` est INDISPENSABLE ici : sans lui, aucun événement n'est émis au passage
     # draft → ready, et la CI ne tournerait jamais sur une PR ouverte en draft (Étape 2 de
-    # `cycle-pr`). Ne pas retirer ce type sans retirer aussi le garde `if:` du job.
+    # `cycle-pr`). Ne pas retirer ce type sans retirer aussi le garde `if:` des jobs.
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 
 jobs:
-  ci:
-    name: Lint + Type-check + Test
+  api:
+    name: Back — lint, format, types, tests
     runs-on: ubuntu-latest
 
     # Pas de CI tant que la PR est en draft.
@@ -56,3 +60,48 @@ jobs:
 
       - name: Tests
         run: make test
+
+  web:
+    name: Front — lint, types, tests, build, e2e, lighthouse, audit
+    runs-on: ubuntu-latest
+
+    # Même garde que le job back : voir le commentaire ci-dessus.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: apps/web/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install
+        run: make web-install
+
+      # Avant les portes de code : un avis de sécurité sur une dépendance livrée n'a pas à
+      # attendre que la suite passe pour être signalé.
+      - name: Audit
+        run: make web-audit
+
+      - name: Lint
+        run: make web-lint
+
+      - name: Typecheck
+        run: make web-typecheck
+
+      - name: Tests
+        run: make web-test
+
+      - name: Build
+        run: make web-build
+
+      - name: Browsers
+        run: make web-browsers
+
+      - name: End-to-end + axe
+        run: make web-e2e
+
+      - name: Lighthouse
+        run: make web-lighthouse
