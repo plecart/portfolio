@@ -93,6 +93,12 @@ puis émondés de ce que le gabarit ajoute pour sa page de démonstration :
 | `@axe-core/playwright` | 4.13.0 | Contrôle d'accessibilité par page |
 | `@types/node`, `@types/react`, `@types/react-dom` | 24.13.6 / 19.3.0 | Types ambiants |
 
+**Police** : `src/assets/fonts/manrope-latin.woff2` — Manrope variable 200–800, sous-ensemble latin,
+Google Fonts v20, 24,3 Ko, sous SIL Open Font License 1.1 (`OFL.txt` joint, et notice reprise en
+commentaire légal dans le CSS pour accompagner la police là où elle est distribuée). C'est le
+fichier exact sur lequel la spec §2.2 a mesuré ses 25 Ko : repris des prototypes plutôt que
+réinstallé, pour que la valeur épinglée par la spec reste vraie. Aucune dépendance npm de police.
+
 Deux projets Playwright : `desktop` (descripteur « Desktop Chrome », 1280 px) et `mobile`
 (descripteur « Pixel 5 », largeur ramenée à 400 px, émulation tactile conservée). Ils s'exécutent
 contre la **version compilée servie en statique**, celle que Caddy publie.
