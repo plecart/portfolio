@@ -86,6 +86,16 @@ test("l'index compilé porte le bloc d'aperçu une seule fois", async ({ request
   expect(block).toContain('property="og:description"')
 })
 
+test('la licence de la police voyage avec la distribution', async ({ request }) => {
+  const response = await request.get('/OFL.txt')
+
+  // Le `.woff2` part chez chaque visiteur ; l'OFL 1.1 veut que son texte l'accompagne. Une
+  // notice qui renvoie à un chemin du dépôt ne satisfait personne qui reçoit la distribution :
+  // c'est ici, sur ce qui est réellement servi, que la condition se vérifie.
+  expect(response.status()).toBe(200)
+  expect(await response.text()).toContain('SIL OPEN FONT LICENSE Version 1.1')
+})
+
 test('les deux descriptions du bloc portent le même texte', async ({ page }) => {
   await page.goto('/')
 
