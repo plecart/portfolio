@@ -90,9 +90,20 @@ puis émondés de ce que le gabarit ajoute pour sa page de démonstration :
 | `tailwindcss`, `@tailwindcss/vite` | 4.3.3 | Style utilitaire compilé au build, par le plugin Vite |
 | `@vitejs/plugin-react` | 6.1.1 | Prise en charge de React par Vite |
 | `vitest` | 4.1.11 | Tests unitaires (ADR 0010) |
+| `eslint`, `@eslint/js` | 9.39.5 | Analyse statique — **ligne 9, pas 10** (voir ci-dessous) |
+| `typescript-eslint` | 8.70.1 | Règles TypeScript pour ESLint |
+| `eslint-plugin-jsx-a11y` | 6.10.2 | Accessibilité statique du JSX (ADR 0008) |
+| `eslint-plugin-react-hooks` | 7.1.1 | Règles des hooks React |
 | `@playwright/test` | 1.63.0 | Scénarios de bout en bout, Chromium seul |
 | `@axe-core/playwright` | 4.13.0 | Contrôle d'accessibilité par page |
 | `@types/node`, `@types/react`, `@types/react-dom` | 24.13.6 / 19.3.0 | Types ambiants |
+
+**ESLint est épinglé sur la ligne 9** alors que la 10 est publiée : `eslint-plugin-jsx-a11y` 6.10.2,
+sa dernière version, déclare `eslint@^3 || … || ^9`. Tourner sur la 10 demanderait de forcer un pair
+non déclaré, sur le plugin même dont dépend l'accessibilité. À rouvrir dès que le plugin publie son
+support de la 10. Le script de lint porte `--max-warnings 0` : sur les 114 règles actives, 3 sont en
+simple avertissement (`react-hooks/exhaustive-deps`, `incompatible-library`, `unsupported-syntax`) et
+passeraient la porte en silence sans lui — mesuré, `eslint .` sort 0 là où `--max-warnings 0` sort 1.
 
 La famille Manrope est déclarée **comme jeton de thème Tailwind** (`@theme { --font-sans }`) plutôt
 que sur `:root` : la feuille de base de Tailwind pose déjà la police du document depuis ce jeton, et
