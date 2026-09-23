@@ -76,6 +76,32 @@ Tout conservé. Les signalements, relus un par un, sont des faux positifs :
 | `prototype` | CAUTION | « never judge » : consigne de présentation des variantes |
 | autres | SAFE / CAUTION sans signalement | — |
 
+### 2.4 Application `apps/web` — 2026-09-23
+
+Node **24.21.0**, LTS active du jour, épinglée par `.nvmrc` et par `engines` (valeurs égales,
+vérifiées par un test). Paquets directs installés par `npm create vite@latest -- --template react-ts`,
+puis émondés de ce que le gabarit ajoute pour sa page de démonstration :
+
+| Paquet | Version | Rôle |
+|---|---|---|
+| `react`, `react-dom` | 19.3.0 | Interface en composants |
+| `typescript` | 6.0.3 | Types vérifiés à la compilation, mode strict |
+| `vite` | 8.3.0 | Serveur de développement et compilation |
+| `@vitejs/plugin-react` | 6.1.1 | Prise en charge de React par Vite |
+| `vitest` | 4.1.11 | Tests unitaires (ADR 0010) |
+| `@types/node`, `@types/react`, `@types/react-dom` | 24.13.6 / 19.3.0 | Types ambiants |
+
+**Deux errata au plan du §3**, relevés en installant — le gabarit a changé depuis le 2026-09-18 :
+
+- item 1, « TypeScript strict (déjà actif dans le modèle) » : **faux depuis `create-vite` 9.2.1**,
+  qui ne pose plus `strict`. L'option est désormais posée explicitement dans
+  `apps/web/tsconfig.base.json`, et un test la mesure sur les deux configurations résolues.
+- item 10, « la config ESLint fournie par le modèle Vite » : **le gabarit ne fournit plus ESLint**,
+  il fournit `oxlint`. La décision de l'ADR 0008 (ESLint + `eslint-plugin-jsx-a11y`) est inchangée
+  et tient toujours ; c'est la provenance de la configuration qui change — elle sera écrite, pas
+  héritée. `oxlint` a été retiré du projet : deux linters pour une seule règle d'accessibilité
+  seraient un doublon.
+
 ## 3. À installer à l'initialisation de `apps/web/`
 
 Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les CLI évoluent).

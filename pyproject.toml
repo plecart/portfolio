@@ -15,6 +15,13 @@ package = false
 [tool.uv.workspace]
 members = ["apps/*", "packages/*"]
 
+# `apps/web` est apparié par `apps/*` — motif prescrit par le cadrage §9 point 2 — mais n'est pas
+# un paquet Python. Sans cette exclusion, `uv sync` refuse l'espace de travail entier (« Workspace
+# member ... is missing a `pyproject.toml` », sortie 2, mesuré) et les quatre portes tombent avec
+# lui. Exclure plutôt que restreindre `members` : le motif du cadrage reste intact, et la prochaine
+# application Python y entre sans qu'on touche à ce fichier.
+exclude = ["apps/web"]
+
 [tool.uv.sources]
 api = { workspace = true }
 
