@@ -1,0 +1,84 @@
+# Environnement de développement complet : Postgres, Redis et `api` sur un réseau privé
+# (cadrage §6.7, « développement local complet en Docker Compose »). Le Compose de production
+# est #16 ; ce fichier ne sert jamais ailleurs que sur un poste. Le conteneur `worker` le
+# rejoindra avec #12, avec la même image et une autre commande.
+#
+# **Deux fichiers d'environnement, deux rôles distincts** :
+#   - `../.env` — non commité, copié de `.env.example` — est celui que lit `Env`. Compose
+#     l'injecte tel quel dans l'environnement du conteneur `api` (`env_file`). Il est orienté
+#     poste : ses adresses visent `localhost`.
+#   - `dev.env` — commité — porte ce que Compose seul connaît. Il n'est **pas** dans `env_file` :
+#     il alimente l'interpolation `${...}` ci-dessous, ce que Compose ne fait qu'avec le fichier
+#     passé en `--env-file`. Mesuré : sans ce drapeau, `${POSTGRES_USER}` est vide ici même.
+#     C'est pourquoi la pile se démarre par `make dev` et pas par un `docker compose` nu.
+#
+# Aucune valeur n'est écrite en dur : `environment:` prime sur `env_file:`, et c'est ce qui
+# permet de remplacer les adresses du poste par les noms de service sans toucher à `.env`.
+
+# Nom de projet explicite : sans lui, Compose le tire du dossier du fichier — les conteneurs
+# s'appelleraient « infra-… », et deux dépôts nommés `infra` se marcheraient dessus.
+name: portfolio-dev
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      # Lié à `127.0.0.1` et non à toutes les interfaces : sur un réseau partagé, un port de
+      # base de données publié sans adresse est joignable par la machine d'à côté.
+      - "127.0.0.1:${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # `api` joue les migrations dès son démarrage : sans cette sonde, il démarrerait pendant
+      # l'initialisation de Postgres et échouerait au premier `up` d'un clone neuf.
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:${REDIS_PORT}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      # Contexte à la racine du dépôt : l'espace de travail `uv` et son verrou y vivent.
+      context: ..
+      dockerfile: infra/api/Dockerfile
+    env_file: ../.env
+    environment:
+      # Les adresses du poste (`localhost`) ne valent rien depuis le conteneur : elles sont
+      # recomposées avec les noms de service. `environment:` prime sur `env_file:`.
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      # Le volume, pas un dossier du dépôt : un chemin d'hôte n'aurait aucun sens ici.
+      MEDIA_ROOT: /app/media
+    # Remplace le `gunicorn` de l'image (ADR 0001), qui reste sa commande de production. Le
+    # rechargement à chaud vient du serveur de développement de Django, pas d'un réglage d'image.
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    ports:
+      - "127.0.0.1:${API_PORT}:8000"
+    volumes:
+      # Le code de l'hôte recouvre celui de l'image : le membre est installé en mode éditable,
+      # donc l'environnement y renvoie et `runserver` voit les modifications.
+      - ../apps/api:/app/apps/api
+      - media:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  media:
