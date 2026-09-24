@@ -61,6 +61,14 @@ SERVICE_ADDRESS_OVERRIDES = {
 # exécute, ce que buildkit analyse, ce dont Compose tire des valeurs, et l'épingle de version que
 # `uv` relit dans l'image. Tout fichier ajouté à `infra/` et lu par un conteneur entre dans un de
 # ces motifs — et chacun est vérifié séparément, sinon un motif devenu aveugle passerait inaperçu.
+# Les fichiers qui citent des chemins dans leur prose plutôt que dans du code : commentaires
+# d'infrastructure, documentation, workflows. Un module de test renommé y laisse des renvois
+# entrants qu'aucune porte ne voit — mesuré : le Dockerfile a continué de désigner
+# `test_image.py` après que ce module soit devenu `test_infra.py`, et seule une relecture l'a vu.
+PROSE_GLOBS = ["infra/**/*", "*.md", "Makefile", ".github/workflows/*.yml", ".claude/**/*.md"]
+TESTS_DIRECTORY = REPOSITORY_ROOT / "apps" / "api" / "tests"
+TEST_MODULE_REFERENCE = re.compile(r"apps/api/tests/(?P<name>\w+\.py)")
+
 CONTAINER_TEXT_GLOBS = [
     "infra/**/*.sh",
     "infra/**/Dockerfile",
@@ -204,6 +212,31 @@ def test_la_sonde_de_postgres_interroge_le_reseau_et_non_le_socket_local() -> No
 
     assert probe, "la sonde `pg_isready` a disparu du service `postgres`"
     assert POSTGRES_PROBE_HOST in probe.group()
+
+
+def test_aucun_renvoi_vers_un_module_de_test_inexistant() -> None:
+    """Un module renommé laisse derrière lui des renvois que rien ne suit.
+
+    La population d'un renommage inclut ses **renvois entrants** : la prose qui le désigne. Ils
+    ne cassent aucune porte, se lisent comme justes, et n'échouent que pour le lecteur qui suit
+    le lien — c'est-à-dire trop tard.
+    """
+    cited: dict[str, set[str]] = {}
+    for glob in PROSE_GLOBS:
+        for path in REPOSITORY_ROOT.glob(glob):
+            if not path.is_file():
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+            for reference in TEST_MODULE_REFERENCE.finditer(text):
+                cited.setdefault(reference.group("name"), set()).add(path.name)
+
+    assert cited, "aucun renvoi trouvé — les motifs ont-ils cessé de mordre ?"
+    missing = {
+        name: sorted(where)
+        for name, where in cited.items()
+        if not (TESTS_DIRECTORY / name).exists()
+    }
+    assert not missing, f"{len(cited)} modules cités, introuvables : {missing}"
 
 
 @pytest.mark.parametrize("glob", CONTAINER_TEXT_GLOBS)

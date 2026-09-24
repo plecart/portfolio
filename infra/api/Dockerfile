@@ -7,7 +7,7 @@
 #
 # La version de Python apparaît ici, contrairement au `Makefile` et à la CI, parce qu'une image
 # de base la porte dans son nom. Elle est tenue égale à `.python-version` de deux façons : par
-# un test qui lit ce fichier (`apps/api/tests/test_image.py`), et par `uv` lui-même, qui refuse
+# un test qui lit ce fichier (`apps/api/tests/test_infra.py`), et par `uv` lui-même, qui refuse
 # de s'installer sur un interpréteur qui ne correspond pas à l'épingle (voir plus bas). C'est le
 # traitement déjà retenu côté front pour `.nvmrc` et `engines`.
 

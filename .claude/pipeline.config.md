@@ -45,9 +45,9 @@ tirent du `Makefile`, source unique appelée aussi par la CI : une commande ne p
 diverger entre le poste et GitHub Actions. Deux lignes n'ont volontairement pas de cible —
 « test ciblé » prend un argument, « hooks » ne se lance qu'une fois par clone.
 
-Les deux piles gardent des cibles distinctes (`make lint` / `make web-lint`) : elles n'ont pas les
-mêmes prérequis — l'une veut `uv`, l'autre Node — et la CI en fait deux jobs séparés, pour qu'un
-rouge du front ne masque pas un rouge du back.
+Les trois piles gardent des cibles distinctes (`make lint` / `make web-lint` / `make build`) :
+elles n'ont pas les mêmes prérequis — `uv`, Node, Docker — et la CI en fait trois jobs séparés,
+pour qu'un rouge de l'une ne masque pas un rouge d'une autre.
 
 **Back (`apps/api/`)** — vérifiées le 2026-09-23 au premier scaffold du back (#2) :
 - install      : make install                     # uv sync
