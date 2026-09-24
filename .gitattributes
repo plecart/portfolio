@@ -6,11 +6,16 @@
 # démarrage avec « exec /usr/local/bin/entrypoint.sh: no such file or directory ». Mesuré, sur
 # une image construite verte.
 #
-# Les chemins ci-dessous couvrent la classe entière : ce que le shell du conteneur exécute, ce
-# que buildkit analyse, et ce dont Compose tire des valeurs. `apps/api/tests/test_image.py` en
-# tient le dénombrement — sans quoi un fichier ajouté plus tard sortirait de la liste en silence.
+# **Un seul** de ces fichiers casse réellement sur un `\r` : le script que le shell du conteneur
+# exécute. Les autres traversent la même frontière et leur tolérance au `\r` appartient à l'outil
+# qui les lit, pas à nous — `.python-version` passe aujourd'hui parce que `uv` l'absorbe, ce qui
+# n'est pas une garantie. Ils sont donc pinés aussi, sans prétendre qu'ils étaient fautifs.
+#
+# Le dénombrement, motif par motif, vit dans `apps/api/tests/test_infra.py` : un fichier ajouté
+# plus tard qui sortirait de cette liste y ferait rougir le motif devenu aveugle.
 *.sh text eol=lf
 Dockerfile text eol=lf
 *.env text eol=lf
 .env.example text eol=lf
 .dockerignore text eol=lf
+.python-version text eol=lf
