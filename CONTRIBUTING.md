@@ -9,11 +9,33 @@ Chaque étape ci-dessous a une commande dédiée (`/triage`, `/cycle-pr`…) —
 
 ## Démarrer en local
 
+Le dépôt porte deux piles, provisionnées séparément : elles n'ont pas les mêmes prérequis, et la
+CI en fait deux jobs distincts.
+
+**Back (`apps/api`)** — Python 3.12, épinglé par `.python-version` et lu par `uv` :
+
 ```
 uv sync                     # installe l'espace de travail : racine + apps/api
 cp .env.example .env        # puis renseigner SECRET_KEY
 uv run pre-commit install   # branche les hooks sur ce dépôt
 ```
+
+**Front (`apps/web`)** — Node, épinglé par `apps/web/.nvmrc` ; un gestionnaire de version (`nvm`,
+`fnm`, `volta`…) lit ce fichier, et le champ `engines` du manifeste porte la même valeur, qu'un
+test vérifie :
+
+```
+make web-install            # npm ci, à partir du verrou
+make web-browsers           # Chromium pour Playwright — long, une fois par clone
+```
+
+`make web-lighthouse` est une cible de **CI seulement** : sous Windows, `chrome-launcher` échoue
+en supprimant son dossier temporaire. Le détail et les autres écarts d'outillage sont dans
+[docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4.
+
+Toutes les cibles disponibles : `Makefile`, repris dans la section « Commandes du projet » de
+[.claude/pipeline.config.md](.claude/pipeline.config.md) — c'est cette section que lisent les
+skills et la génération de CI.
 
 `.env` vit à la **racine** du dépôt et n'est lu qu'en développement (cadrage §6.6) ; en
 production il est écrit par `infra/bootstrap.sh` depuis les secrets, jamais édité à la main.
