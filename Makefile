@@ -18,7 +18,12 @@ WEB_NPM := cd $(WEB) && $(NPM)
 
 API_IMAGE ?= portfolio-api
 
-.PHONY: install test lint format format-check typecheck build
+# `--env-file` n'est pas une commodité : c'est la seule façon d'alimenter l'interpolation
+# `${...}` de `compose.dev.yml`. Le `env_file:` du service, lui, ne remplit que l'environnement
+# du conteneur. Nommé une fois ici pour qu'aucun appel ne puisse l'oublier.
+COMPOSE := docker compose --env-file infra/dev.env -f infra/compose.dev.yml
+
+.PHONY: install test lint format format-check typecheck build compose-config dev
 .PHONY: web-install web-browsers web-lint web-typecheck web-test web-build web-e2e web-lighthouse web-audit
 
 install:
@@ -44,6 +49,17 @@ typecheck:
 # CI soit exactement celle qu'on construit sur le poste. #15 réutilise ce build pour publier.
 build:
 	docker build -f infra/api/Dockerfile -t $(API_IMAGE) .
+
+# Vérifie que le Compose de développement se résout — interpolation comprise. Appelée par le
+# job `infra` de la CI, qui crée un `.env` depuis `.env.example` au préalable : Compose exige
+# que la cible d'un `env_file` existe, même pour une simple résolution.
+compose-config:
+	$(COMPOSE) config --quiet
+
+# Démarre la pile de développement. `--build` : l'image est reconstruite si le Dockerfile ou
+# une dépendance a changé, pour qu'un `git pull` n'exige pas de s'en souvenir.
+dev:
+	$(COMPOSE) up --build
 
 # Cibles du front. Elles restent séparées des cibles back plutôt que fondues dedans : les deux
 # piles n'ont pas les mêmes prérequis (l'une veut `uv`, l'autre Node), et la CI en fait deux jobs

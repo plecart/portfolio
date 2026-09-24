@@ -10,7 +10,7 @@ Chaque étape ci-dessous a une commande dédiée (`/triage`, `/cycle-pr`…) —
 ## Démarrer en local
 
 Le dépôt porte deux piles, provisionnées séparément : elles n'ont pas les mêmes prérequis, et la
-CI en fait deux jobs distincts.
+CI les tient dans des jobs distincts.
 
 **Back (`apps/api`)** — Python 3.12, épinglé par `.python-version` et lu par `uv` :
 
@@ -32,6 +32,29 @@ make web-browsers           # Chromium pour Playwright — long, une fois par cl
 `make web-lighthouse` est une cible de **CI seulement** : sous Windows, `chrome-launcher` échoue
 en supprimant son dossier temporaire. Le détail et les autres écarts d'outillage sont dans
 [docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4.
+
+**La pile de développement (`infra/`)** — Postgres, Redis et `api` en conteneurs sur un réseau
+privé. Demande Docker ; les ports 8000, 5432 et 6379 sont publiés sur `localhost` seulement.
+
+```
+make dev                    # construit l'image `api` si besoin, puis démarre la pile
+```
+
+`make dev` plutôt qu'un `docker compose` direct : la cible passe `--env-file infra/dev.env`, sans
+quoi les valeurs interpolées du fichier Compose seraient vides. Le `.env` de la racine doit
+exister — Compose refuse de résoudre un `env_file` absent, avant même de démarrer quoi que ce
+soit. `Ctrl-C` arrête la pile ; les données Postgres survivent dans un volume nommé.
+
+Deux fichiers d'environnement, qui ne se remplacent pas :
+
+| Fichier | Commité | Lu par | Contient |
+|---|---|---|---|
+| `.env` | non | la classe `Env` du back | les variables de `Env`, et elles seules — une clé inconnue empêche le démarrage |
+| `infra/dev.env` | oui | Compose, pour l'interpolation `${…}` | identifiants Postgres de développement et ports publiés, aucune valeur secrète |
+
+Le code de `apps/api` est monté dans le conteneur : une modification sur le poste recharge `api`.
+Les migrations s'exécutent à chaque démarrage. Les tests et les outils de qualité restent sur
+l'hôte (`make test`, `make lint`) — le conteneur fait tourner l'application, il ne la vérifie pas.
 
 Toutes les cibles disponibles : `Makefile`, repris dans la section « Commandes du projet » de
 [.claude/pipeline.config.md](.claude/pipeline.config.md) — c'est cette section que lisent les
