@@ -57,9 +57,11 @@ rouge du front ne masque pas un rouge du back.
 - format       : make format                      # ruff format — écrit
 - format:check : make format-check                # vérifie sans écrire
 - typecheck    : make typecheck                   # pyright, mode strict (cadrage §8.4)
-- build        : n/a                              # l'image vit dans le bloc « Infra » ci-dessous
-- run local    : n/a                              # idem
 - hooks        : uv run pre-commit install        # ruff seulement (check --fix, format)
+
+`build` et `run local` du back ne figurent pas ici : ils demandent Docker, pas `uv`, et vivent
+dans le bloc « Infra » ci-dessous. Aucune ligne `n/a` ne les double — une valeur trouvée en
+premier serait lue comme la bonne.
 
 **Infra (`infra/`)** — vérifiées le 2026-09-24 à la naissance d'`infra/` (#4), chacune lancée
 depuis la racine et rendant 0, la pile démarrée et regardée. Ces trois cibles demandent Docker :

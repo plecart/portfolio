@@ -22,8 +22,9 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 # Les deux fichiers d'environnement du projet, et la frontière entre eux (interrogatoire du
 # 2026-09-24). `.env.example` est le modèle de `.env`, que lit `Env` ; `infra/dev.env` porte ce
-# que Compose seul connaît. La scission n'existe que parce que `Env` refuse une clé inconnue :
-# une variable de Compose posée dans le mauvais fichier ramènerait le défaut qu'elle évite.
+# que Compose seul connaît. `Env` refuse une clé inconnue *dans son fichier*, mais pas dans
+# l'environnement du processus — donc pas dans le conteneur, où Compose injecte `.env` variable
+# par variable. Ces deux tests sont la seule chose qui tienne la frontière sur les deux chemins.
 ENV_EXAMPLE = REPOSITORY_ROOT / ".env.example"
 COMPOSE_ENV = REPOSITORY_ROOT / "infra" / "dev.env"
 
