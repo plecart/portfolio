@@ -23,6 +23,10 @@ ALLOWED_HOSTS = env.ALLOWED_HOSTS
 
 DATABASES = {"default": database_settings(env.DATABASE_URL)}
 
+# Stockage disque en développement (ADR 0004) ; R2 arrive avec #13, par un backend de fichiers,
+# sans toucher aux modèles. `MEDIA_URL` n'est pas posé : rien ne sert encore de fichier.
+MEDIA_ROOT = env.MEDIA_ROOT
+
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 

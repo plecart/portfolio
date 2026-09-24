@@ -17,7 +17,15 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Self
 
-from pydantic import Field, PostgresDsn, RedisDsn, SecretStr, ValidationError, model_validator
+from pydantic import (
+    Field,
+    PostgresDsn,
+    RedisDsn,
+    SecretStr,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
 
 REFUSAL = "configuration refusée :\n  "
@@ -48,6 +56,22 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 SECRET_KEY_MIN_LENGTH = 50
 
 
+def _anchored_path(path: Path) -> Path:
+    """Ancre un chemin relatif sur la racine du dépôt.
+
+    `manage.py` se lance depuis `apps/api` et les tests depuis la racine : laisser le dossier
+    courant trancher ferait viser deux endroits différents selon l'appelant. Tout chemin que le
+    back lit dans l'environnement passe par ici.
+
+    Args:
+        path: le chemin tel que l'environnement le donne, relatif ou absolu.
+
+    Returns:
+        `path` inchangé s'il est absolu ; sinon le même chemin sous la racine du dépôt.
+    """
+    return path if path.is_absolute() else REPOSITORY_ROOT / path
+
+
 def env_file_path(environ: Mapping[str, str]) -> Path:
     """Détermine quel fichier `.env` lire, d'après l'environnement donné.
 
@@ -58,18 +82,14 @@ def env_file_path(environ: Mapping[str, str]) -> Path:
     Returns:
         Le `.env` de la racine du dépôt par défaut. `ENV_FILE` permet de viser ailleurs : vers
         un autre fichier, ou vers un chemin inexistant pour n'en lire aucun, ce que
-        `pydantic-settings` accepte sans bruit. Un chemin **relatif** est résolu depuis la
-        racine du dépôt, jamais depuis le dossier courant : `manage.py` se lance depuis
-        `apps/api` et les tests depuis la racine, et laisser le dossier courant décider ferait
-        lire deux fichiers différents selon l'appelant — le défaut même que ce chemin absolu
-        existe pour éviter.
+        `pydantic-settings` accepte sans bruit. Un chemin **relatif** est ancré sur la racine du
+        dépôt par `_anchored_path`.
     """
     requested = environ.get("ENV_FILE")
     if not requested:
         return REPOSITORY_ROOT / ".env"
 
-    path = Path(requested)
-    return path if path.is_absolute() else REPOSITORY_ROOT / path
+    return _anchored_path(Path(requested))
 
 
 def _faulty_fields(error: ValidationError) -> str:
@@ -112,6 +132,9 @@ class Env(BaseSettings):
         DATABASE_URL: adresse du Postgres applicatif (ADR 0005).
         REDIS_URL: adresse du Redis (ADR 0006). Déclarée et validée ici ; son premier lecteur
             (le cache Django) arrive avec #7, et `django-redis` avec lui.
+        MEDIA_ROOT: dossier où atterrissent les fichiers téléversés (ADR 0004, « Développement :
+            stockage disque par défaut de Django »). Le conteneur reçoit le chemin absolu de son
+            volume ; sur le poste, un chemin relatif est ancré sur la racine du dépôt.
     """
 
     model_config = SettingsConfigDict(env_file=ENV_FILE)
@@ -121,6 +144,13 @@ class Env(BaseSettings):
     ALLOWED_HOSTS: list[str] = []
     DATABASE_URL: PostgresDsn
     REDIS_URL: RedisDsn
+    MEDIA_ROOT: Path = REPOSITORY_ROOT / "media"
+
+    @field_validator("MEDIA_ROOT")
+    @classmethod
+    def _anchor_media_root(cls, value: Path) -> Path:
+        """Ancre un `MEDIA_ROOT` relatif, comme `ENV_FILE` l'est déjà."""
+        return _anchored_path(value)
 
     @model_validator(mode="after")
     def _require_allowed_host_outside_debug(self) -> Self:

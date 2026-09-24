@@ -11,6 +11,11 @@ from pydantic import ValidationError
 # ici : c'est cette liste qui fait du test suivant une garantie de classe, pas d'occurrence.
 SERVICE_URLS = ["DATABASE_URL", "REDIS_URL"]
 
+# Les variables dont la valeur est un chemin. Même rôle que la liste ci-dessus : c'est elle qui
+# fait des deux tests d'ancrage une garantie de classe. Tout champ `Path` ajouté à `Env` s'y
+# inscrit, sans quoi son ancrage n'est garanti par rien.
+PATH_VARIABLES = ["MEDIA_ROOT"]
+
 # `test_env.py` → `tests` → `api` → `apps` → racine du dépôt. Calculé ici pour vérifier, depuis
 # un autre point de départ, l'arithmétique de chemin que fait `config/env.py`.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -183,3 +188,33 @@ def test_un_chemin_env_absolu_est_respecte() -> None:
 def test_un_env_file_vide_retombe_sur_la_racine() -> None:
     """Une variable posée mais vide est une variable non renseignée, pas un chemin."""
     assert env_file_path({"ENV_FILE": ""}) == REPOSITORY_ROOT / ".env"
+
+
+@pytest.mark.parametrize("variable", PATH_VARIABLES)
+def test_un_chemin_relatif_est_ancre_sur_la_racine(
+    environment: pytest.MonkeyPatch, variable: str
+) -> None:
+    """Même règle que pour `ENV_FILE`, et pour la même raison.
+
+    `manage.py` se lance depuis `apps/api`, `pytest` depuis la racine : laisser le dossier
+    courant trancher ferait viser deux endroits différents selon l'appelant.
+    """
+    environment.setenv(variable, "ailleurs")
+
+    assert getattr(build_env(), variable) == REPOSITORY_ROOT / "ailleurs"
+
+
+@pytest.mark.parametrize("variable", PATH_VARIABLES)
+def test_un_chemin_absolu_est_respecte(environment: pytest.MonkeyPatch, variable: str) -> None:
+    """C'est la forme que le conteneur reçoit : un chemin de volume, hors du dépôt."""
+    absolute = Path(REPOSITORY_ROOT.anchor) / "srv" / "ailleurs"
+    environment.setenv(variable, str(absolute))
+
+    assert getattr(build_env(), variable) == absolute
+
+
+def test_le_media_root_par_defaut_est_dans_le_depot(environment: pytest.MonkeyPatch) -> None:
+    """Un clone qui n'a pas renseigné la variable sait déjà où écrire (ADR 0004, disque)."""
+    environment.delenv("MEDIA_ROOT")
+
+    assert build_env().MEDIA_ROOT == REPOSITORY_ROOT / "media"
