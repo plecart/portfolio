@@ -35,7 +35,13 @@ services:
     healthcheck:
       # `api` joue les migrations dès son démarrage : sans cette sonde, il démarrerait pendant
       # l'initialisation de Postgres et échouerait au premier `up` d'un clone neuf.
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      #
+      # `-h 127.0.0.1` n'est pas décoratif. Sans hôte, `pg_isready` interroge le socket Unix —
+      # or le serveur temporaire d'`initdb` tourne avec `listen_addresses=''` : il accepte déjà
+      # le socket et refuse encore TCP. Mesuré dans cet état : la sonde sans hôte rend
+      # « accepting connections » (0) quand la même avec `-h 127.0.0.1` rend « no response » (2).
+      # La sonde doit mesurer ce dont `api` dépend — le réseau — pas ce qui est prêt en premier.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 3s
       timeout: 5s
       retries: 20

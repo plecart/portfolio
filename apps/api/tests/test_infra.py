@@ -34,6 +34,14 @@ HAND_OVER = 'exec "$@"'
 # apporte celles du poste (`localhost`), qui ne désignent rien depuis un conteneur ; ces trois
 # lignes les remplacent, et `environment:` prime sur `env_file:`. Les retirer laisse
 # `docker compose config` vert et ne casse qu'au démarrage — d'où ce test.
+# La sonde de `postgres` doit interroger le **réseau**, pas le socket Unix local. Pendant
+# `initdb`, l'image postgres démarre un serveur temporaire avec `listen_addresses=''` : il
+# accepte déjà le socket et refuse encore TCP. Mesuré sur `pgvector/pgvector:pg16` dans cet
+# état — `pg_isready -U … -d …` rend « accepting connections » (0) quand la même sonde avec
+# `-h 127.0.0.1` rend « no response » (2). Sans cet hôte, `service_healthy` peut se déclencher
+# alors qu'`api` ne peut joindre personne, et ses migrations échouent au premier `up`.
+POSTGRES_PROBE_HOST = "-h 127.0.0.1"
+
 SERVICE_ADDRESS_OVERRIDES = {
     "DATABASE_URL": "@postgres:5432/",
     "MEDIA_ROOT": "/app/media",
@@ -132,6 +140,18 @@ def test_le_service_api_recompose_ses_adresses_de_service(variable: str, expecte
 
     assert declaration, f"« {variable} » a disparu du bloc `environment:` du service `api`"
     assert expected in declaration.group("value")
+
+
+def test_la_sonde_de_postgres_interroge_le_reseau_et_non_le_socket_local() -> None:
+    """Une sonde aveugle à l'état TCP déclare saine une base qu'`api` ne peut pas encore joindre.
+
+    C'est le seul état qui compte : `api` se connecte par le réseau du Compose, jamais par le
+    socket Unix du conteneur `postgres`.
+    """
+    probe = re.search(r"pg_isready[^\"]*", COMPOSE_DEV.read_text(encoding="utf-8"))
+
+    assert probe, "la sonde `pg_isready` a disparu du service `postgres`"
+    assert POSTGRES_PROBE_HOST in probe.group()
 
 
 @pytest.mark.parametrize("glob", CONTAINER_TEXT_GLOBS)
