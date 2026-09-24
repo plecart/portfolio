@@ -19,7 +19,15 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 DOCKERFILE = REPOSITORY_ROOT / "infra" / "api" / "Dockerfile"
 ENTRYPOINT = REPOSITORY_ROOT / "infra" / "api" / "entrypoint.sh"
 COMPOSE_DEV = REPOSITORY_ROOT / "infra" / "compose.dev.yml"
+MAKEFILE = REPOSITORY_ROOT / "Makefile"
 PYTHON_VERSION_FILE = REPOSITORY_ROOT / ".python-version"
+
+# Le nom de l'image, déclaré des deux côtés : le `Makefile` le pose pour `docker build -t` et
+# l'exporte, le Compose le reprend en défaut pour qu'un `docker compose` lancé à la main ne
+# fabrique pas une seconde image sous un nom à lui. Deux noms qui dériveraient donneraient deux
+# images du même Dockerfile, et #15 ne saurait plus laquelle publier.
+MAKEFILE_IMAGE = re.compile(r"^API_IMAGE \?= (?P<name>\S+)$", re.MULTILINE)
+COMPOSE_IMAGE = re.compile(r"^\s*image: \$\{API_IMAGE:-(?P<name>[^}]+)\}$", re.MULTILINE)
 
 # Toute image de base qui embarque un interpréteur porte sa version dans son nom. Le motif les
 # capture toutes : un seul étage qui dériverait suffirait à faire tourner l'application sur une
@@ -30,10 +38,6 @@ BASE_IMAGE_VERSION = re.compile(r"^FROM python:(\d+\.\d+)[.-]", re.MULTILINE)
 # `docker stop` ne l'atteint jamais et le serveur est tué au bout du délai de grâce.
 HAND_OVER = 'exec "$@"'
 
-# Les adresses que le service `api` doit recomposer avec les noms de service. `env_file: ../.env`
-# apporte celles du poste (`localhost`), qui ne désignent rien depuis un conteneur ; ces trois
-# lignes les remplacent, et `environment:` prime sur `env_file:`. Les retirer laisse
-# `docker compose config` vert et ne casse qu'au démarrage — d'où ce test.
 # La sonde de `postgres` doit interroger le **réseau**, pas le socket Unix local. Pendant
 # `initdb`, l'image postgres démarre un serveur temporaire avec `listen_addresses=''` : il
 # accepte déjà le socket et refuse encore TCP. Mesuré sur `pgvector/pgvector:pg16` dans cet
@@ -42,6 +46,10 @@ HAND_OVER = 'exec "$@"'
 # alors qu'`api` ne peut joindre personne, et ses migrations échouent au premier `up`.
 POSTGRES_PROBE_HOST = "-h 127.0.0.1"
 
+# Les adresses que le service `api` doit recomposer avec les noms de service. `env_file: ../.env`
+# apporte celles du poste (`localhost`), qui ne désignent rien depuis un conteneur ; ces trois
+# lignes les remplacent, et `environment:` prime sur `env_file:`. Les retirer laisse
+# `docker compose config` vert et ne casse qu'au démarrage — d'où ce test.
 SERVICE_ADDRESS_OVERRIDES = {
     "DATABASE_URL": "@postgres:5432/",
     "MEDIA_ROOT": "/app/media",
@@ -92,6 +100,18 @@ def test_les_images_de_base_suivent_la_version_epinglee() -> None:
 
     assert found, "aucune image de base `python:` trouvée — le motif a-t-il cessé de mordre ?"
     assert set(found) == {pinned}
+
+
+def test_le_compose_et_le_makefile_nomment_la_meme_image() -> None:
+    """Mesuré avant correction : `make build` et `make dev` produisaient deux images distinctes."""
+    from_makefile = MAKEFILE_IMAGE.search(MAKEFILE.read_text(encoding="utf-8"))
+    from_compose = COMPOSE_IMAGE.search(COMPOSE_DEV.read_text(encoding="utf-8"))
+
+    assert from_makefile, "`API_IMAGE ?=` a disparu du `Makefile`"
+    assert from_compose, (
+        "le service `api` ne reprend plus `${API_IMAGE}` — Compose se nommerait seul"
+    )
+    assert from_makefile.group("name") == from_compose.group("name")
 
 
 def test_le_point_d_entree_cede_la_place_a_la_commande() -> None:

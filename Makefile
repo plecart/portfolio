@@ -16,6 +16,9 @@ WEB := apps/web
 # le jour où la façon d'entrer dans le front change, elle change ici seulement.
 WEB_NPM := cd $(WEB) && $(NPM)
 
+# Exportée : l'interpolation de Compose lit l'environnement du processus, et c'est ainsi que
+# `make dev` et `make build` construisent la même image au lieu de deux.
+export API_IMAGE
 API_IMAGE ?= portfolio-api
 
 # Drapeaux supplémentaires de `docker build`, vides sur un poste. La CI y passe ses options de

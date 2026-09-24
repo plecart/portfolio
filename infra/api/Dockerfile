@@ -26,10 +26,12 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /bin/uv
 #   au `.python-version` copié ci-dessous, `uv` échoue si l'image de base dérive de l'épingle,
 #   au lieu de télécharger silencieusement la bonne version et de masquer l'écart.
 # UV_COMPILE_BYTECODE=1 : les `.pyc` sont produits au build, pas au démarrage du conteneur.
-# UV_LINK_MODE=copy : le cache et la cible ne sont pas sur le même système de fichiers.
+#
+# Pas de `UV_LINK_MODE` ici : ce réglage sert quand le cache `uv` est monté depuis un autre
+# système de fichiers (`--mount=type=cache`), ce que cet étage ne fait pas — le cache vit dans
+# la même couche que sa cible, et les liens physiques y fonctionnent.
 ENV UV_PYTHON_DOWNLOADS=0 \
-    UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
+    UV_COMPILE_BYTECODE=1
 
 WORKDIR /app
 

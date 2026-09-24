@@ -23,3 +23,11 @@
 apps/web/
 docs/
 strix_runs/
+
+# La suite de tests n'a rien à faire dans une image de production. `apps/api` reste copié — le
+# membre est installé en mode éditable et le montage du développement s'appuie dessus — mais ses
+# tests, eux, ne sont exécutés ni par le conteneur ni par la CI depuis l'image.
+apps/api/tests/
+
+# Dossier local des fichiers téléversés : dans le conteneur, ils vivent dans un volume.
+/media/
