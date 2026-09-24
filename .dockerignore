@@ -1,0 +1,25 @@
+# Ce que le contexte de build ne doit pas porter — les secrets d'abord, le poids ensuite.
+#
+# Le Dockerfile ne copie que des chemins nommés, donc rien d'ici ne finirait dans l'image par
+# accident. L'exclusion vaut quand même : le contexte entier est envoyé au démon Docker avant
+# la première instruction, et un `.env` qui n'est jamais envoyé ne peut pas fuir.
+
+# Secrets et configuration locale
+.env
+.claude/settings.local.json
+
+# Historique et métadonnées
+.git/
+.github/
+
+# Environnements et caches, qui ne traversent jamais une frontière de plateforme
+**/.venv/
+**/node_modules/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+
+# Piles et dossiers étrangers à l'image `api` — le front est servi par `caddy` (#15)
+apps/web/
+docs/
+strix_runs/

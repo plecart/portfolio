@@ -57,8 +57,8 @@ rouge du front ne masque pas un rouge du back.
 - format       : make format                      # ruff format — écrit
 - format:check : make format-check                # vérifie sans écrire
 - typecheck    : make typecheck                   # pyright, mode strict (cadrage §8.4)
-- build        : n/a                              # tant qu'`infra/` n'existe pas
-- run local    : n/a                              # tant qu'`infra/` n'existe pas
+- build        : make build                       # image `api` (`infra/api/Dockerfile`)
+- run local    : n/a                              # tant que le Compose de dev n'existe pas
 - hooks        : uv run pre-commit install        # ruff seulement (check --fix, format)
 
 **Front (`apps/web/`)** — vérifiées le 2026-09-23 au scaffold du front (#3), chacune lancée depuis

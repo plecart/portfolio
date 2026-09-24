@@ -16,7 +16,9 @@ WEB := apps/web
 # le jour où la façon d'entrer dans le front change, elle change ici seulement.
 WEB_NPM := cd $(WEB) && $(NPM)
 
-.PHONY: install test lint format format-check typecheck
+API_IMAGE ?= portfolio-api
+
+.PHONY: install test lint format format-check typecheck build
 .PHONY: web-install web-browsers web-lint web-typecheck web-test web-build web-e2e web-lighthouse web-audit
 
 install:
@@ -36,6 +38,12 @@ format-check:
 
 typecheck:
 	$(UV) run pyright
+
+# Contexte de build : la racine du dépôt, où vivent l'espace de travail `uv` et son verrou.
+# La CI appelle cette cible plutôt qu'un `docker build` à elle, pour que l'image vérifiée en
+# CI soit exactement celle qu'on construit sur le poste. #15 réutilise ce build pour publier.
+build:
+	docker build -f infra/api/Dockerfile -t $(API_IMAGE) .
 
 # Cibles du front. Elles restent séparées des cibles back plutôt que fondues dedans : les deux
 # piles n'ont pas les mêmes prérequis (l'une veut `uv`, l'autre Node), et la CI en fait deux jobs
