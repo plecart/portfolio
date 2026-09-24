@@ -20,7 +20,7 @@ _2026-09-18, amendé le 2026-09-23 au scaffold de `apps/web` (#3). Détaille D44
 
 - Pour : aucun Node en production, rien à patcher côté front sur le VPS, RAM quasi nulle, cache Cloudflare, modifier le contenu dans l'admin ne demande pas de rebuild.
 - Contre : le HTML initial est vide. Les aperçus de lien (LinkedIn, Slack, Discord) n'exécutent pas le JS → titre et image génériques sur `/projets/<slug>`.
-- Parade : une vue Django qui renvoie `index.html` avec les balises `<title>`, `og:title`, `og:description`, `og:image` du projet. Détaillée dans l'ADR 0008.
+- Parade : une vue Django qui renvoie `index.html` avec les **cinq** balises du bloc marqué — `<title>`, `<meta name="description">`, `og:title`, `og:description`, `og:image` du projet. Mécanisme dans l'ADR 0008, liste des balises dans l'ADR 0011, forme du bloc au §2.4.
 - Next.js écarté : serveur Node permanent (conteneur, RAM, surface d'attaque, second runtime à maintenir) contraire à P1 pour un site à deux visiteurs.
 
 **Écarté à l'audit** : anime.js (doublon de motion), design-motion-principles (reconditionne Emil Kowalski), UX Engine / designmotionhq (payant, doublon), boneyard (sur-ingénierie), Spline (3D lourde — à rouvrir si un besoin 3D réel apparaît, avec three.js en alternative), watermelon-platform et motion-primitives (doublons de react-bits), dépôt 21st (inactif depuis mai 2025), ui-ux-pro-max-skill (taste-skill préféré).
