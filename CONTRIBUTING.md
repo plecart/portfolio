@@ -9,8 +9,9 @@ Chaque étape ci-dessous a une commande dédiée (`/triage`, `/cycle-pr`…) —
 
 ## Démarrer en local
 
-Le dépôt porte deux piles, provisionnées séparément : elles n'ont pas les mêmes prérequis, et la
-CI les tient dans des jobs distincts.
+Le dépôt porte trois piles, provisionnées séparément : le back (`uv`), le front (Node) et la pile
+de développement (Docker). Elles n'ont pas les mêmes prérequis, et la CI les tient dans trois jobs
+distincts, pour qu'un rouge de l'une ne masque pas un rouge d'une autre.
 
 **Back (`apps/api`)** — Python 3.12, épinglé par `.python-version` et lu par `uv` :
 

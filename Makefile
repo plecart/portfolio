@@ -79,9 +79,9 @@ compose-config:
 dev:
 	$(COMPOSE) up --build
 
-# Cibles du front. Elles restent séparées des cibles back plutôt que fondues dedans : les deux
-# piles n'ont pas les mêmes prérequis (l'une veut `uv`, l'autre Node), et la CI en fait deux jobs
-# distincts, de sorte qu'un rouge du front ne masque pas un rouge du back.
+# Cibles du front. Elles restent séparées des cibles back et d'infrastructure plutôt que fondues
+# dedans : les trois piles n'ont pas les mêmes prérequis — `uv`, Node, Docker — et la CI en fait
+# trois jobs distincts, de sorte qu'un rouge de l'une ne masque pas un rouge d'une autre.
 
 web-install:
 	$(WEB_NPM) ci
