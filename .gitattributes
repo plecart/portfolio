@@ -1,0 +1,16 @@
+# Fins de ligne des fichiers qu'un outil Linux lit dans la **copie de travail**.
+#
+# `core.autocrlf` réécrit la copie de travail en CRLF sur un poste Windows. Le dépôt, lui,
+# stocke du LF : la CI Linux ne voit donc jamais le problème. Mais le contexte de build Docker,
+# c'est la copie de travail — et un `#!/bin/sh` suivi d'un `\r` fait échouer le conteneur au
+# démarrage avec « exec /usr/local/bin/entrypoint.sh: no such file or directory ». Mesuré, sur
+# une image construite verte.
+#
+# Les chemins ci-dessous couvrent la classe entière : ce que le shell du conteneur exécute, ce
+# que buildkit analyse, et ce dont Compose tire des valeurs. `apps/api/tests/test_image.py` en
+# tient le dénombrement — sans quoi un fichier ajouté plus tard sortirait de la liste en silence.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.env text eol=lf
+.env.example text eol=lf
+.dockerignore text eol=lf
