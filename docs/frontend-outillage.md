@@ -139,6 +139,26 @@ quatre seuils de la spec §1.16. Trois points mesurés, non évidents :
   déclarée `data:,` dans l'`index.html` (sans elle, le 404 sur `/favicon.ico` fait tomber l'audit
   « erreurs dans la console » et les bonnes pratiques à 96).
 
+**`overrides` du manifeste — trois avis de sécurité écartés à la racine.** `@lhci/cli` 0.15.1
+traînait 10 avis (`npm audit`, arbre complet), dont 7 `high`. Trois racines, trois issues
+différentes :
+
+| Racine | Résolution | Pourquoi |
+|---|---|---|
+| `tmp` (2 × high) | `^0.2.7` | Les versions tirées (0.0.33 via `external-editor`, 0.1.0 en direct) sont vulnérables ; 0.2.7 est corrigée et expose les deux seules API appelées, `tmpNameSync` et `fileSync` (vérifié) |
+| `uuid` (moderate) | `^11.1.1` | `lhci` n'appelle que `uuid.v4()`, présent en CJS en v11 (vérifié) |
+| `extract-zip` (2 × high, CVSS 8.1) | `@puppeteer/browsers` → `^3.2.3` | **Aucune version d'`extract-zip` n'est corrigée** : les avis portent sur `<= 2.0.1`, et 2.0.1 est la dernière publiée (2023-03-04, paquet abandonné). La sortie n'est pas de le corriger mais de cesser d'en dépendre : `@puppeteer/browsers` 3.x l'a remplacé par `modern-tar`. C'est la correction que portent aussi Puppeteer 25.7 et les projets qui ont rencontré le même mur |
+
+Résultat mesuré : `npm audit` sur l'arbre **complet** rend `found 0 vulnerabilities`, et
+`npm ls extract-zip` rend vide. La porte `make web-audit` porte donc sur tout l'arbre, sans
+`--omit=dev` : une chaîne de build compromise sait écrire dans `dist/`, et l'exclure la rendrait
+aveugle à ce risque-là.
+
+Le saut de majeure `@puppeteer/browsers` 2 → 3 sous un `puppeteer-core` 24 est le vrai risque de
+cette manœuvre. Il a donc été éprouvé en exécutant réellement l'outil, pas seulement l'audit :
+Lighthouse 12.6.1 rend 100/100/100/100 sur la page, `lhci healthcheck` trouve Chrome, `lhci assert`
+sort 0, et les six portes front sont vertes après un `npm ci` depuis un verrou régénéré de zéro.
+
 **ESLint est épinglé sur la ligne 9** alors que la 10 est publiée : `eslint-plugin-jsx-a11y` 6.10.2,
 sa dernière version, déclare `eslint@^3 || … || ^9`. Tourner sur la 10 demanderait de forcer un pair
 non déclaré, sur le plugin même dont dépend l'accessibilité. À rouvrir dès que le plugin publie son
