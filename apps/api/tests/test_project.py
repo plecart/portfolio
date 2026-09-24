@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 API_ROOT = Path(__file__).resolve().parent.parent
+REPOSITORY_ROOT = API_ROOT.parent.parent
 
 # Un chemin qui n'existe pas : le sous-processus ignore ainsi le `.env` du poste, que chaque
 # développeur crée (`CONTRIBUTING.md`) et dont le contenu ne regarde pas ces tests.
@@ -28,6 +29,7 @@ SETTINGS_DUMP = (
     "'DEBUG': settings.DEBUG,"
     "'ALLOWED_HOSTS': list(settings.ALLOWED_HOSTS),"
     "'DATABASES': settings.DATABASES,"
+    "'MEDIA_ROOT': str(settings.MEDIA_ROOT),"
     "'ROOT_URLCONF': settings.ROOT_URLCONF,"
     "'WSGI_APPLICATION': settings.WSGI_APPLICATION}))"
 )
@@ -81,6 +83,10 @@ def test_les_reglages_django_viennent_de_l_environnement(variables: dict[str, st
         "HOST": "localhost",
         "PORT": 5432,
     }
+    # Django pose `MEDIA_ROOT = ''` par défaut (`django.conf.global_settings`) : sans câblage,
+    # ce réglage existe et vaut la chaîne vide. C'est pourquoi le test compare à la valeur
+    # attendue plutôt que de vérifier la présence du réglage, qui serait toujours vraie.
+    assert settings["MEDIA_ROOT"] == str(REPOSITORY_ROOT / variables["MEDIA_ROOT"])
     # Produit de l'arbitrage ASGI/WSGI consigné au journal de spec de #2 : sans cette ligne,
     # l'arbitrage ne serait garanti par rien.
     assert settings["WSGI_APPLICATION"] == "config.wsgi.application"

@@ -11,6 +11,9 @@ VALID_ENVIRONMENT = {
     "ALLOWED_HOSTS": '["portfolio.test"]',
     "DATABASE_URL": "postgresql://portfolio:secret@localhost:5432/portfolio",
     "REDIS_URL": "redis://localhost:6379/0",
+    # Relatif à dessein : c'est la forme que `.env.example` propose, donc celle que la plupart
+    # des clones porteront, et la seule qui éprouve l'ancrage sur la racine du dépôt.
+    "MEDIA_ROOT": "fichiers-de-test",
 }
 
 
