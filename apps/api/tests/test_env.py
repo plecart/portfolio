@@ -20,6 +20,13 @@ PATH_VARIABLES = ["MEDIA_ROOT"]
 # un autre point de départ, l'arithmétique de chemin que fait `config/env.py`.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
+# Les deux fichiers d'environnement du projet, et la frontière entre eux (interrogatoire du
+# 2026-09-24). `.env.example` est le modèle de `.env`, que lit `Env` ; `infra/dev.env` porte ce
+# que Compose seul connaît. La scission n'existe que parce que `Env` refuse une clé inconnue :
+# une variable de Compose posée dans le mauvais fichier ramènerait le défaut qu'elle évite.
+ENV_EXAMPLE = REPOSITORY_ROOT / ".env.example"
+COMPOSE_ENV = REPOSITORY_ROOT / "infra" / "dev.env"
+
 # Toutes les façons dont `Env` peut rendre son contenu lisible : une trace, un journal, une
 # sérialisation. Le secret ne doit apparaître dans aucune. `get_secret_value()` est
 # volontairement absent — c'est l'accesseur, son travail est précisément de rendre la valeur.
@@ -46,6 +53,23 @@ INVALID_CONFIGURATIONS = [
     ("aucun hôte autorisé", "ALLOWED_HOSTS", "[]"),
     ("liste mal formée", "ALLOWED_HOSTS", "[oups"),
 ]
+
+
+def declared_keys(dotenv: Path) -> set[str]:
+    """Les variables qu'un fichier d'environnement déclare — commentaires et lignes vides exclus.
+
+    Args:
+        dotenv: le fichier à lire, au format `CLÉ=valeur`.
+
+    Returns:
+        Les seuls noms, sans les valeurs : c'est la frontière entre les deux fichiers qui se
+        vérifie ici, jamais leur contenu.
+    """
+    return {
+        line.split("=", 1)[0].strip()
+        for raw in dotenv.read_text(encoding="utf-8").splitlines()
+        if (line := raw.strip()) and not line.startswith("#") and "=" in line
+    }
 
 
 def build_env(env_file: Path | None = None) -> Env:
@@ -183,6 +207,29 @@ def test_un_chemin_env_absolu_est_respecte() -> None:
     absolute = Path(REPOSITORY_ROOT.anchor) / "tmp" / "ailleurs.env"
 
     assert env_file_path({"ENV_FILE": str(absolute)}) == absolute
+
+
+def test_l_exemple_declare_exactement_les_champs_d_env() -> None:
+    """« Ajouter une variable, c'est ajouter un champ typé **et** une ligne » — `config/env.py`.
+
+    Cette règle est écrite en tête du module depuis #2 et n'était gardée par rien. Un champ sans
+    sa ligne laisse un clone neuf échouer au démarrage sans savoir quoi renseigner ; une ligne
+    sans son champ fait échouer le démarrage à la lecture du fichier, pour une variable morte.
+    """
+    assert declared_keys(ENV_EXAMPLE) == set(Env.model_fields)
+
+
+def test_les_variables_de_compose_sont_disjointes_de_celles_du_back() -> None:
+    """La scission en deux fichiers ne vaut que tant que personne ne les remélange.
+
+    Une variable de `Env` recopiée dans `infra/dev.env` créerait deux sources pour un même
+    réglage ; une variable de Compose glissée dans `.env.example` ferait refuser le démarrage
+    sur la copie que `CONTRIBUTING.md` demande d'en faire.
+    """
+    compose_only = declared_keys(COMPOSE_ENV)
+
+    assert compose_only, "aucune variable lue dans `infra/dev.env` — le format a-t-il changé ?"
+    assert compose_only & set(Env.model_fields) == set()
 
 
 def test_un_env_file_vide_retombe_sur_la_racine() -> None:
