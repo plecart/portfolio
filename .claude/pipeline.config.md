@@ -113,7 +113,7 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 - skills / issues / PRD / descriptions : français
 - identifiants du code : anglais
 - commentaires / docstrings / noms de tests : français
-- préfixe conventional commit : anglais (feat/fix/chore/docs/refactor)
+- préfixe conventional commit : anglais (feat/fix/chore/docs/refactor/test/ci)
 
 ## Mapping labels (rôle canonique → label GitHub)
 - bug → `bug`
