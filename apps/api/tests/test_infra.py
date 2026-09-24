@@ -115,14 +115,19 @@ def test_le_compose_et_le_makefile_nomment_la_meme_image() -> None:
     assert from_makefile.group("name") == from_compose.group("name")
 
 
-def test_la_cible_build_etiquette_bien_l_image() -> None:
+def test_la_cible_build_produit_une_commande_complete() -> None:
     """Lit la commande que `make` produira vraiment, expansion des variables comprise.
 
-    Les tests précédents comparent deux textes ; celui-ci interroge `make`. La différence n'est
-    pas théorique : un `export API_IMAGE` posé **avant** l'affectation `?=` définit la variable à
-    vide, `?=` cesse d'assigner, et `docker build … -t  .` part sans étiquette. Le `Makefile`
-    restait pourtant cohérent à la lecture, et ni les tests, ni le lint, ni `compose config` ne
-    voyaient quoi que ce soit — la CI l'a découvert après le passage en ready.
+    Les autres tests de ce module comparent deux textes ; celui-ci interroge `make`. La
+    différence n'est pas théorique — deux défauts sont passés par là, tous deux invisibles à la
+    lecture du `Makefile` et à toutes les portes locales :
+
+    - un `export API_IMAGE` posé **avant** l'affectation `?=` définit la variable à vide, `?=`
+      cesse d'assigner, et l'image part sans étiquette (`-t  .`) ;
+    - `docker build` utilise **toujours** le builder par défaut du moteur, quel que soit
+      `docker buildx use`. La documentation Docker vise explicitement ce cas : « If you use
+      build scripts, such as `make`, that use the `docker build` command, update your build
+      commands to `docker buildx build`. » Sans quoi l'export de cache échoue en CI.
     """
     declared = MAKEFILE_IMAGE.search(MAKEFILE.read_text(encoding="utf-8"))
     assert declared, "`API_IMAGE ?=` a disparu du `Makefile`"
@@ -136,6 +141,7 @@ def test_la_cible_build_etiquette_bien_l_image() -> None:
     ).stdout
     tag = re.search(r"-t\s+(?P<name>\S+)", printed)
 
+    assert "docker buildx build" in printed, "`docker build` ignorerait le builder sélectionné"
     assert tag, "la commande de build ne porte plus d'étiquette `-t`"
     assert tag.group("name") == declared.group("name")
 
