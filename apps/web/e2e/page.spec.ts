@@ -125,8 +125,13 @@ test("l'index compilé porte le bloc d'aperçu une seule fois", async ({ request
   expect(html.match(/<!--meta:start-->/g)).toHaveLength(1)
   expect(html.match(/<!--meta:end-->/g)).toHaveLength(1)
 
+  // Les **quatre** balises du contrat, vérifiées à l'intérieur du bloc — c'est la population du
+  // contrat écrit dans #14, pas un échantillon. `name="description"` en fait partie : un test qui
+  // la cherche par sélecteur DOM la trouverait n'importe où dans le document, et #14 pourrait la
+  // laisser hors du bloc, donc en double après remplacement.
   const [block] = html.match(/<!--meta:start-->[\s\S]*<!--meta:end-->/) ?? []
   expect(block).toContain('<title>')
+  expect(block).toContain('name="description"')
   expect(block).toContain('property="og:title"')
   expect(block).toContain('property="og:description"')
 })
