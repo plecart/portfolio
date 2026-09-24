@@ -61,14 +61,6 @@ SERVICE_ADDRESS_OVERRIDES = {
 # exécute, ce que buildkit analyse, ce dont Compose tire des valeurs, et l'épingle de version que
 # `uv` relit dans l'image. Tout fichier ajouté à `infra/` et lu par un conteneur entre dans un de
 # ces motifs — et chacun est vérifié séparément, sinon un motif devenu aveugle passerait inaperçu.
-# Les fichiers qui citent des chemins dans leur prose plutôt que dans du code : commentaires
-# d'infrastructure, documentation, workflows. Un module de test renommé y laisse des renvois
-# entrants qu'aucune porte ne voit — mesuré : le Dockerfile a continué de désigner
-# `test_image.py` après que ce module soit devenu `test_infra.py`, et seule une relecture l'a vu.
-PROSE_GLOBS = ["infra/**/*", "*.md", "Makefile", ".github/workflows/*.yml", ".claude/**/*.md"]
-TESTS_DIRECTORY = REPOSITORY_ROOT / "apps" / "api" / "tests"
-TEST_MODULE_REFERENCE = re.compile(r"apps/api/tests/(?P<name>\w+\.py)")
-
 CONTAINER_TEXT_GLOBS = [
     "infra/**/*.sh",
     "infra/**/Dockerfile",
@@ -77,6 +69,14 @@ CONTAINER_TEXT_GLOBS = [
     ".env.example",
     ".python-version",
 ]
+
+# Les fichiers qui citent des chemins dans leur prose plutôt que dans du code : commentaires
+# d'infrastructure, documentation, workflows. Un module de test renommé y laisse des renvois
+# entrants qu'aucune porte ne voit — mesuré : le Dockerfile a continué de désigner
+# `test_image.py` après que ce module soit devenu `test_infra.py`, et seule une relecture l'a vu.
+PROSE_GLOBS = ["infra/**/*", "*.md", "Makefile", ".github/workflows/*.yml", ".claude/**/*.md"]
+TESTS_DIRECTORY = REPOSITORY_ROOT / "apps" / "api" / "tests"
+TEST_MODULE_REFERENCE = re.compile(r"apps/api/tests/(?P<name>\w+\.py)")
 
 
 def shell_instructions(script: Path) -> list[str]:
