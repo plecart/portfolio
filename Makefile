@@ -68,9 +68,13 @@ web-e2e:
 web-lighthouse:
 	$(WEB_NPM) run lighthouse
 
-# `--omit=dev` borne la porte à ce qui est livré au navigateur. L'arbre de développement porte
-# aujourd'hui 7 avis `high` sans correctif publié, tous dans les invites interactives de
-# `@lhci/cli` (`inquirer` → `external-editor` → `tmp`), qui ne s'exécutent jamais en CI : une
-# porte bloquante sur l'arbre complet serait rouge dès le premier run et sans voie de sortie.
+# Porte sur l'**arbre entier**, dépendances de développement comprises : une chaîne de build
+# compromise sait écrire dans `dist/`, et `--omit=dev` ne la verrait pas. Tenable parce que
+# l'arbre est propre : les `overrides` du manifeste écartent les 10 avis qu'`@lhci/cli` traînait,
+# en traitant leurs 3 racines (`docs/frontend-outillage.md` §2.4).
+#
+# Seuil `high` et non le défaut : sous ce niveau, les avis d'un arbre de développement de 650
+# paquets rougissent la porte sans que rien ne soit livré — et une porte qu'on apprend à ignorer
+# ne protège plus rien.
 web-audit:
-	$(WEB_NPM) audit --audit-level=high --omit=dev
+	$(WEB_NPM) audit --audit-level=high

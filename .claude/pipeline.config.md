@@ -75,7 +75,7 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 - e2e          : make web-e2e                     # Playwright + axe, projets desktop et mobile
 - lighthouse   : make web-lighthouse              # **CI seulement** : sous Windows, `chrome-launcher`
                                                   # échoue sur EPERM (docs/frontend-outillage.md §2.4)
-- audit        : make web-audit                   # npm audit, seuil high, dépendances livrées seulement
+- audit        : make web-audit                   # npm audit, seuil high, arbre complet (dev compris)
 - run local    : cd apps/web && npm run dev
 
 ## Qualité

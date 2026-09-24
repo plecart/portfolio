@@ -37,5 +37,10 @@
     "typescript-eslint": "^8.70.1",
     "vite": "^8.3.0",
     "vitest": "^4.0.18"
+  },
+  "overrides": {
+    "tmp": "^0.2.7",
+    "uuid": "^11.1.1",
+    "@puppeteer/browsers": "^3.2.3"
   }
 }
