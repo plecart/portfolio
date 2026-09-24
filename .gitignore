@@ -12,6 +12,11 @@ apps/web/test-results/
 apps/web/playwright-report/
 apps/web/.lighthouseci/
 
+# Fichiers téléversés. `MEDIA_ROOT` vaut `media` dans `.env.example` et, sans valeur, se résout
+# sur la racine du dépôt : sans cette ligne, le premier téléversement sur le poste se retrouverait
+# prêt à être commité. Dans le conteneur, ces fichiers vivent dans un volume et ne passent pas ici.
+media/
+
 # Claude Code — surcharges locales
 .claude/settings.local.json
 
