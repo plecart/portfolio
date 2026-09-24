@@ -8,8 +8,8 @@
 # et les actions de mise en place les lisent. Un second canal qui déclarerait une version
 # finirait par diverger du premier.
 #
-# Deux jobs, un par pile. Ils n'ont pas les mêmes prérequis — l'un veut `uv`, l'autre Node — et
-# les séparer évite qu'un rouge du front masque un rouge du back, ou l'inverse.
+# Trois jobs, un par pile. Ils n'ont pas les mêmes prérequis — `uv`, Node, Docker — et les
+# séparer évite qu'un rouge de l'une masque un rouge d'une autre.
 
 name: CI
 
@@ -111,3 +111,52 @@ jobs:
 
       - name: Lighthouse
         run: make web-lighthouse
+
+  infra:
+    name: Infra — configuration Compose, image api
+    runs-on: ubuntu-latest
+
+    # Même garde que les deux autres jobs : voir le commentaire du job back.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Compose refuse de résoudre un `env_file` dont la cible manque — y compris pour un simple
+      # `config`, et y compris avec `--env-file` (mesuré). Le geste est exactement celui que
+      # `CONTRIBUTING.md` demande au développeur, et il vérifie en prime que `.env.example`
+      # reste lisible : un exemple cassé ferait échouer ce job avant tout le reste.
+      - name: Fichier d'environnement
+        run: cp .env.example .env
+
+      # Avant le build : une erreur de configuration se voit en deux secondes, la construction
+      # de l'image en prend cent fois plus.
+      - name: Configuration Compose
+        run: make compose-config
+
+      # Le pilote `docker-container` est nécessaire à `--cache-to`, que le pilote par défaut
+      # ne sait pas écrire.
+      - uses: docker/setup-buildx-action@v3
+
+      # Cache des couches entre deux runs. La clé suit les fichiers que la couche de
+      # dépendances consomme : elle ne change donc que quand cette couche change réellement —
+      # ce qui évite aussi que le cache soit réécrit, et grossisse, à chaque run.
+      - uses: actions/cache@v4
+        with:
+          path: /tmp/buildx-cache
+          key: >-
+            buildx-api-${{ hashFiles('.python-version', 'pyproject.toml', 'uv.lock',
+            'apps/api/pyproject.toml', 'infra/api/Dockerfile') }}
+          restore-keys: buildx-api-
+
+      # `make build` et non un `docker build` propre à la CI : la commande reste celle du
+      # `Makefile`, le cache et le chargement passent par des drapeaux. `--load` matérialise
+      # vraiment l'image — sans lui, le pilote conteneurisé construit et jette, et l'étiquette
+      # ne désignerait rien. #15 reprend ce build pour scanner puis publier.
+      - name: Image api
+        run: make build
+        env:
+          DOCKER_BUILD_FLAGS: >-
+            --load
+            --cache-from type=local,src=/tmp/buildx-cache
+            --cache-to type=local,dest=/tmp/buildx-cache,mode=max

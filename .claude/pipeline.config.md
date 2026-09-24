@@ -90,6 +90,7 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 - gates bloquants en CI :
   - back : lint, format:check, typecheck, test
   - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse, audit
+  - infra : compose (résolution de `infra/compose.dev.yml`), build de l'image `api` sans publication — la publication sur GHCR et le scan Trivy restent à #15
 - services requis en CI : aucun — aucun test n'atteint encore Postgres ni Redis ; quand ce sera le cas, testcontainers les démarrera depuis les tests (cadrage §8.4), à partir de #7
 
 ## Périmètre

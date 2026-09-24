@@ -18,6 +18,11 @@ WEB_NPM := cd $(WEB) && $(NPM)
 
 API_IMAGE ?= portfolio-api
 
+# Drapeaux supplémentaires de `docker build`, vides sur un poste. La CI y passe ses options de
+# cache : elle règle ainsi *comment* le build s'exécute sans redéfinir *ce qu'il* construit —
+# la cible `build` reste la seule définition, appelée à l'identique ici et sur GitHub Actions.
+DOCKER_BUILD_FLAGS ?=
+
 # `--env-file` n'est pas une commodité : c'est la seule façon d'alimenter l'interpolation
 # `${...}` de `compose.dev.yml`. Le `env_file:` du service, lui, ne remplit que l'environnement
 # du conteneur. Nommé une fois ici pour qu'aucun appel ne puisse l'oublier.
@@ -48,7 +53,7 @@ typecheck:
 # La CI appelle cette cible plutôt qu'un `docker build` à elle, pour que l'image vérifiée en
 # CI soit exactement celle qu'on construit sur le poste. #15 réutilise ce build pour publier.
 build:
-	docker build -f infra/api/Dockerfile -t $(API_IMAGE) .
+	docker build $(DOCKER_BUILD_FLAGS) -f infra/api/Dockerfile -t $(API_IMAGE) .
 
 # Vérifie que le Compose de développement se résout — interpolation comprise. Appelée par le
 # job `infra` de la CI, qui crée un `.env` depuis `.env.example` au préalable : Compose exige
