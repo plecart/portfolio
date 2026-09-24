@@ -49,8 +49,15 @@ Deux fichiers d'environnement, qui ne se remplacent pas :
 
 | Fichier | Commité | Lu par | Contient |
 |---|---|---|---|
-| `.env` | non | la classe `Env` du back | les variables de `Env`, et elles seules — une clé inconnue empêche le démarrage |
+| `.env` | non | la classe `Env` du back | les variables de `Env`, et elles seules |
 | `infra/dev.env` | oui | Compose, pour l'interpolation `${…}` | identifiants Postgres de développement et ports publiés, aucune valeur secrète |
+
+Le refus d'une clé inconnue vaut pour le **fichier**, donc sur le poste (`uv run manage.py`,
+`make test`). Dans le conteneur, Compose injecte `.env` comme variables d'environnement et
+`/app/.env` n'existe pas : une clé inconnue y est ignorée, comme n'importe quelle variable du
+système. La séparation en deux fichiers ne repose donc pas sur ce garde-fou — elle repose sur le
+fait que les variables de Compose ne sont pas des variables du back, et c'est
+[apps/api/tests/test_env.py](apps/api/tests/test_env.py) qui tient la frontière.
 
 Le code de `apps/api` est monté dans le conteneur : une modification sur le poste recharge `api`.
 Les migrations s'exécutent à chaque démarrage. Les tests et les outils de qualité restent sur
