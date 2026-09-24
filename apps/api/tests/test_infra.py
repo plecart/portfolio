@@ -10,6 +10,7 @@ de la CI, et par la pile qu'on regarde tourner.
 """
 
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -112,6 +113,31 @@ def test_le_compose_et_le_makefile_nomment_la_meme_image() -> None:
         "le service `api` ne reprend plus `${API_IMAGE}` — Compose se nommerait seul"
     )
     assert from_makefile.group("name") == from_compose.group("name")
+
+
+def test_la_cible_build_etiquette_bien_l_image() -> None:
+    """Lit la commande que `make` produira vraiment, expansion des variables comprise.
+
+    Les tests précédents comparent deux textes ; celui-ci interroge `make`. La différence n'est
+    pas théorique : un `export API_IMAGE` posé **avant** l'affectation `?=` définit la variable à
+    vide, `?=` cesse d'assigner, et `docker build … -t  .` part sans étiquette. Le `Makefile`
+    restait pourtant cohérent à la lecture, et ni les tests, ni le lint, ni `compose config` ne
+    voyaient quoi que ce soit — la CI l'a découvert après le passage en ready.
+    """
+    declared = MAKEFILE_IMAGE.search(MAKEFILE.read_text(encoding="utf-8"))
+    assert declared, "`API_IMAGE ?=` a disparu du `Makefile`"
+
+    printed = subprocess.run(
+        ["make", "--dry-run", "build"],
+        cwd=REPOSITORY_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    tag = re.search(r"-t\s+(?P<name>\S+)", printed)
+
+    assert tag, "la commande de build ne porte plus d'étiquette `-t`"
+    assert tag.group("name") == declared.group("name")
 
 
 def test_le_point_d_entree_cede_la_place_a_la_commande() -> None:
