@@ -58,8 +58,14 @@ typecheck:
 # Contexte de build : la racine du dépôt, où vivent l'espace de travail `uv` et son verrou.
 # La CI appelle cette cible plutôt qu'un `docker build` à elle, pour que l'image vérifiée en
 # CI soit exactement celle qu'on construit sur le poste. #15 réutilise ce build pour publier.
+#
+# `docker buildx build` et non `docker build` : le second garde **toujours** le builder par
+# défaut du moteur, même après un `docker buildx use`, et la documentation Docker vise
+# nommément les scripts `make` qui s'y heurtent. En CI, où le builder sélectionné est le seul
+# capable d'exporter un cache, `docker build` échoue sur « Cache export is not supported for
+# the docker driver ». Mesuré.
 build:
-	docker build $(DOCKER_BUILD_FLAGS) -f infra/api/Dockerfile -t $(API_IMAGE) .
+	docker buildx build $(DOCKER_BUILD_FLAGS) -f infra/api/Dockerfile -t $(API_IMAGE) .
 
 # Vérifie que le Compose de développement se résout — interpolation comprise. Appelée par le
 # job `infra` de la CI, qui crée un `.env` depuis `.env.example` au préalable : Compose exige
