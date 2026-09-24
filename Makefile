@@ -24,9 +24,10 @@ WEB_NPM := cd $(WEB) && $(NPM)
 API_IMAGE ?= portfolio-api
 export API_IMAGE
 
-# Drapeaux supplémentaires de `docker build`, vides sur un poste. La CI y passe ses options de
-# cache : elle règle ainsi *comment* le build s'exécute sans redéfinir *ce qu'il* construit —
-# la cible `build` reste la seule définition, appelée à l'identique ici et sur GitHub Actions.
+# Drapeaux supplémentaires de la commande de build, vides sur un poste. La CI y passe ses
+# options de cache : elle règle ainsi *comment* le build s'exécute sans redéfinir *ce qu'il*
+# construit — la cible `build` reste la seule définition, appelée à l'identique ici et sur
+# GitHub Actions.
 DOCKER_BUILD_FLAGS ?=
 
 # `--env-file` n'est pas une commodité : c'est la seule façon d'alimenter l'interpolation

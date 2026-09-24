@@ -134,8 +134,10 @@ jobs:
       - name: Configuration Compose
         run: make compose-config
 
-      # Le pilote `docker-container` est nécessaire à `--cache-to`, que le pilote par défaut
-      # ne sait pas écrire.
+      # Le pilote `docker-container` est nécessaire à `--cache-to`, que le pilote par défaut ne
+      # sait pas écrire. Cette action le crée **et** le sélectionne ; c'est parce que la cible
+      # `build` appelle `docker buildx build` que la sélection lui parvient — `docker` tout
+      # court reviendrait au pilote par défaut et l'export de cache échouerait.
       - uses: docker/setup-buildx-action@v3
 
       # Cache des couches entre deux runs. La clé suit les fichiers que la couche de
