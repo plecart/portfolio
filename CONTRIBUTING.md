@@ -96,10 +96,9 @@ ouvre chaque semaine, par écosystème (`uv`, npm, actions GitHub, images Docker
 groupe versions mineures et correctifs ; chaque montée majeure arrive seule, sauf ESLint 10,
 `@eslint/js` 10 et TypeScript 7, refusées tant qu'un pair qu'on garde ne les accepte pas — un
 test rougit le jour où il les accepte ([docs/frontend-outillage.md](docs/frontend-outillage.md)
-§2.4). Ses PR sont
-exemptées des métadonnées de PR et de la description en français (`chore(deps): bump …`,
-[.claude/rules/taille-pr.md](.claude/rules/taille-pr.md)), passent par la même CI et ne se
-mergent que sur un go humain.
+§2.4). Ses PR sont exemptées des métadonnées de PR et de la description en français
+(`chore(deps): bump …`, [.claude/rules/taille-pr.md](.claude/rules/taille-pr.md)), passent par la
+même CI et ne se mergent que sur un go humain.
 Actions et images sont épinglées par empreinte, derrière leur version la plus précise :
 Dependabot met l'une et l'autre à jour ensemble. Une nouvelle version mineure de Python (3.13)
 n'est jamais proposée — elle se change à la main, dans `.python-version` puis dans l'image ; ses
