@@ -69,7 +69,7 @@ function peerRange(lockfile: Lockfile, name: string, peer: string): string {
  * @param range Plage publiée par le plugin, par exemple `^3 || … || ^9`.
  * @param major Majeure refusée, par exemple `10`.
  * @returns `true` dès qu'une version stable de la majeure entre dans la plage. `semver` lit une
- *   plage vide ou mal formée comme `^x` en `*` : elle rend `true`, un rouge plutôt qu'un vert muet.
+ *   plage vide ou tronquée comme `^9 ||` en `*` : elle rend `true`, un rouge plutôt qu'un vert muet.
  * @throws Si `semver` ne sait pas lire la plage du tout, par exemple `latest`.
  */
 function acceptsMajor(range: string, major: string): boolean {
@@ -106,11 +106,13 @@ test('un plugin désinstallé ou un pair non déclaré est signalé, jamais lu c
   )
 })
 
-test.each(REFUSALS.map((refusal) => [refusal.peer, refusal.major, refusal.blocker, refusal]))(
+test.each(REFUSALS.map(({ peer, major, blocker, refused }) => [peer, major, blocker, refused]))(
   '%s %s reste refusé tant que %s ne le déclare pas',
-  (peer, major, blocker, { refused }) => {
+  (peer, major, blocker, refused) => {
     const range = peerRange(readAppJson<Lockfile>('package-lock.json'), blocker, peer)
 
+    // Sans le pair parmi les refusés, sa majeure passerait alors que la table la dit refusée.
+    expect(refused, `${peer} manque aux paquets refusés de son entrée`).toContain(peer)
     expect(
       acceptsMajor(range, major),
       `${blocker} accepte ${peer} ${major} (${range}) : lever le refus de ${refused.join(', ')}`,
