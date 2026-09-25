@@ -148,7 +148,8 @@ avant `gh pr ready` si elles dévient. Toute PR qui n'est pas l'œuvre d'un bot 
 ## Skills du projet
 Sélection faite à la main lors de l'audit du 2026-09-18 (`docs/frontend-outillage.md` §1-§2), sans
 `claude-code-setup` ni `find-skills`. Mise à jour d'un skill public : re-cloner le dépôt, recopier,
-rescanner avec SkillSpector (frontend-outillage §2.3).
+rescanner avec SkillSpector (frontend-outillage §2.3), puis **réappliquer les modifications locales**
+des skills marqués « modifié localement » ci-dessous (`git log -p -- .claude/skills/<skill>` les donne).
 
 **Maison** (Boilerplate `skills/`, une commande homonyme chacun dans `.claude/commands/`) :
 `init-projet`, `vers-prd`, `vers-issues`, `triage`, `interroge-moi`, `cycle-pr`, `contradiction`,
@@ -164,7 +165,7 @@ rescanner avec SkillSpector (frontend-outillage §2.3).
 | `taste-skill` (`design-taste-frontend`) | Leonxlnx/taste-skill @ e79ca9e | Direction visuelle anti-générique ; molettes variance / mouvement / densité |
 | `minimalist-skill` (`minimalist-ui`) | Leonxlnx/taste-skill @ e79ca9e | Variante sobre, éditoriale (cadrage annexe B : « le plus sobre possible ») |
 | `emil-design-eng` | emilkowalski/skills @ 85e8e23 | Principes design engineering d'Emil Kowalski |
-| `prototype` | emilkowalski/skills @ 85e8e23 | Idée → plusieurs variantes d'UI comparables dans un sélecteur |
+| `prototype` | emilkowalski/skills @ 85e8e23 | Idée → plusieurs variantes d'UI comparables dans un sélecteur — **modifié localement** (PR #34, obs 3 à 6 : vérification isolée du rendu, relecture de la spec avant promotion) |
 | `animate` | emilkowalski/skills @ 85e8e23 | Écrire une animation (courbes, durées, propriétés) |
 | `review-animations` | emilkowalski/skills @ 85e8e23 | Relecture stricte d'animations |
 | `improve-animations` | emilkowalski/skills @ 85e8e23 | Audit + plans d'amélioration, lecture seule |
@@ -174,7 +175,8 @@ rescanner avec SkillSpector (frontend-outillage §2.3).
 | `improve-codebase-architecture` | mattpocock/skills @ c55ee46 | Audit d'architecture (modules profonds), s'appuie sur les ADR |
 
 **Session** : `task-observer` (journal d'observations pour l'amélioration des skills — activé dans
-`CLAUDE.md`, section « Observation continue ») ; `i-have-adhd` (mise en forme des réponses : action
+`CLAUDE.md`, section « Observation continue » ; **modifié localement**, PR #34, obs 21 : artefacts
+plutôt que gestes, pannes connues en tête de revue) ; `i-have-adhd` (mise en forme des réponses : action
 suivante d'abord, étapes numérotées, état restitué à chaque tour ; `/i-have-adhd`).
 
 **Outils hors dépôt** (`uv tool`, environnements isolés — frontend-outillage §2.2) :
