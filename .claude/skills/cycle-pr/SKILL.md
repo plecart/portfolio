@@ -461,8 +461,9 @@ body définitif, puis de sortir du draft.
 ## Test plan
 - [x] CI locale verte
 - [x] CI verte
-- [x] <vérifs manuelles si pertinent — chacune porte les deux SHA sur lesquels elle a été prise :
-      la tête, et la base `git merge-base origin/main HEAD`>
+- [x] <vérifs manuelles si pertinent — chacune porte les deux SHA sur lesquels elle a été prise,
+      la tête et la base `git merge-base origin/main HEAD`, et « observe : » les fichiers ou
+      dossiers dont son résultat dépend (Étape 7)>
 - [x] <étape non applicable — cochée avec sa raison (« sans objet »), jamais laissée décochée>
 
 ## Relecture indépendante
@@ -560,14 +561,22 @@ que la PR ne couvre pas, **s'arrêter et le remonter** plutôt que de merger un 
 une spec périmée.
 
 **Rejouer les vérifications périmées.** Une preuve a deux ancrages : la **tête** de branche et la
-**base** (`git fetch origin`, puis `git merge-base origin/<trunk> HEAD`). Comparer les deux SHA
-portés par chaque vérification manuelle du body aux deux SHA actuels — si l'un diffère, la case
-redevient non cochée et la vérification est à rejouer avant de demander le go ; une vérification
-sans SHA se rejoue d'office. Quand c'est la base qui a bougé, **toutes** les preuves sont périmées,
-la CI comprise : elle a tourné sur un état qui n'atteindra jamais le trunk, et rien de local ne le
-signale. Fusionner le trunk dans la branche, relancer, redater. `git merge-tree --write-tree
-origin/<trunk> HEAD` dit tout de suite s'il y a conflit ; l'état `MERGEABLE` de la forge se met à
-jour en différé et ne prouve rien.
+**base** (`git fetch origin`, puis `git merge-base origin/<trunk> HEAD`) — et elle se périme quand
+**ce qu'elle observe** a changé, pas quand un identifiant a changé. Une vérification sans SHA se
+rejoue d'office. Quand la **tête** a bougé : `git diff --stat <sha de la vérification>..HEAD`,
+confronté au périmètre que la vérification déclare observer (« observe : » du Test plan) — elle se
+rejoue si le diff touche un fichier dont elle dépend ; elle reste cochée, ses deux SHA d'origine
+conservés et le nouveau noté à côté, si le diff ne touche que des commentaires, de la
+documentation ou des fichiers qu'elle n'atteint pas. Six vérifications à une minute chacune ont
+été rejouées trois fois pour des diffs de commentaires : une preuve qu'on rejoue sans qu'elle
+puisse changer de résultat n'est plus une preuve, c'est un rituel, et un rituel coûteux est le
+plus sûr moyen de faire abandonner l'étape.
+
+Quand c'est la **base** qui a bougé, **toutes** les preuves sont périmées, la CI comprise : elle a
+tourné sur un état qui n'atteindra jamais le trunk, et rien de local ne le signale. Fusionner le
+trunk dans la branche, relancer, redater. `git merge-tree --write-tree origin/<trunk> HEAD` dit
+tout de suite s'il y a conflit ; l'état `MERGEABLE` de la forge se met à jour en différé et ne
+prouve rien.
 
 **Un critère qui nomme une commande se solde par cette commande, verbatim.** « `just run` démarre
 l'app » ne se satisfait pas par `flutter build` + `adb install` : une équivalence est un résultat
