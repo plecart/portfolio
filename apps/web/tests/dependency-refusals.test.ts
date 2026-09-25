@@ -1,12 +1,12 @@
 /**
  * Les montées majeures refusées, et leur expiration.
  *
- * `.github/dependabot.yml` refuse la majeure suivante d'ESLint — et d'`@eslint/js`, qui va par
- * paire avec lui — et de TypeScript : un plugin qu'on garde ne l'accepte pas encore comme pair, et
- * `npm ci` échouerait en `ERESOLVE` (`docs/frontend-outillage.md` §2.4). Un refus ne doit pas
- * devenir permanent par oubli : chaque cas rougit le jour où la plage `peerDependencies` du plugin,
- * lue dans le verrou, accepte la majeure refusée. Il faut alors lever le refus : la règle `ignore`,
- * son cas dans `apps/api/tests/test_supply_chain.py`, et le cas d'ici.
+ * `dependency-refusals.json` liste les majeures que `.github/dependabot.yml` refuse, chacune avec
+ * le plugin gardé qui ne les déclare pas encore comme pair (`docs/frontend-outillage.md` §2.4). Un
+ * refus ne doit pas devenir permanent par oubli : chaque cas rougit le jour où la plage
+ * `peerDependencies` du plugin, lue dans le verrou, accepte la majeure refusée. Il faut alors
+ * lever le refus en entier — son entrée de la table et ses règles `ignore`, que
+ * `apps/api/tests/test_supply_chain.py` exige identiques, puis la prose du §2.4 qui le cite.
  *
  * Le verrou ne change que par une PR : le rouge apparaît dans celle qui apporte la nouvelle
  * version du plugin, celles de Dependabot comprises.
@@ -20,11 +20,19 @@ type Lockfile = {
   packages: Record<string, { peerDependencies?: Record<string, string> }>
 }
 
-/** Paquet refusé, majeure refusée, plugin dont la plage de pairs fonde le refus. */
-const REFUSALS: [refused: string, major: string, blocker: string][] = [
-  ['eslint', '10', 'eslint-plugin-jsx-a11y'],
-  ['typescript', '7', 'typescript-eslint'],
-]
+/** Un refus de `dependency-refusals.json`, la table que lit aussi `test_supply_chain.py`. */
+type Refusal = {
+  /** Plugin gardé dont la plage de pairs fonde le refus. */
+  blocker: string
+  /** Pair que le plugin ne déclare pas encore dans la majeure refusée. */
+  peer: string
+  /** Majeure refusée. */
+  major: string
+  /** Paquets dont Dependabot ignore la majeure : le pair, et ce qui va par paire avec lui. */
+  refused: string[]
+}
+
+const REFUSALS = readAppJson<Refusal[]>('dependency-refusals.json')
 
 /**
  * La plage qu'un paquet installé à la racine déclare pour l'un de ses pairs, lue dans un verrou.
@@ -98,14 +106,14 @@ test('un plugin désinstallé ou un pair non déclaré est signalé, jamais lu c
   )
 })
 
-test.each(REFUSALS)(
+test.each(REFUSALS.map((refusal) => [refusal.peer, refusal.major, refusal.blocker, refusal]))(
   '%s %s reste refusé tant que %s ne le déclare pas',
-  (refused, major, blocker) => {
-    const range = peerRange(readAppJson<Lockfile>('package-lock.json'), blocker, refused)
+  (peer, major, blocker, { refused }) => {
+    const range = peerRange(readAppJson<Lockfile>('package-lock.json'), blocker, peer)
 
     expect(
       acceptsMajor(range, major),
-      `${blocker} accepte ${refused} ${major} (${range}) : lever le refus`,
+      `${blocker} accepte ${peer} ${major} (${range}) : lever le refus de ${refused.join(', ')}`,
     ).toBe(false)
   },
 )

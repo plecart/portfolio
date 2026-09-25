@@ -1,0 +1,14 @@
+[
+  {
+    "blocker": "eslint-plugin-jsx-a11y",
+    "peer": "eslint",
+    "major": "10",
+    "refused": ["eslint", "@eslint/js"]
+  },
+  {
+    "blocker": "typescript-eslint",
+    "peer": "typescript",
+    "major": "7",
+    "refused": ["typescript"]
+  }
+]

@@ -15,6 +15,7 @@ nouvelle s'y ajoute ; les trois jugées exotiques y figurent en `xfail` strict, 
 où elles cesseraient d'échapper.
 """
 
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -26,6 +27,7 @@ import yaml
 # `test_supply_chain.py` → `tests` → `api` → `apps` → racine du dépôt.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 DEPENDABOT = REPOSITORY_ROOT / ".github" / "dependabot.yml"
+NPM_REFUSALS = REPOSITORY_ROOT / "apps" / "web" / "dependency-refusals.json"
 WORKFLOW_GLOBS = [".github/workflows/*.yml", ".github/workflows/*.yaml"]
 COMPOSITE_ACTION_GLOB = ".github/actions/**/action.y*ml"
 
@@ -72,13 +74,6 @@ PYTHON_UPGRADES_IGNORED = {
     "update-types": ["version-update:semver-major", "version-update:semver-minor"],
 }
 
-# Les montées majeures refusées sur npm (décision du 2026-09-25) : un pair qu'on garde ne les
-# accepte pas encore. `@eslint/js` va par paire avec `eslint` et suit son refus. Le refus expire :
-# `apps/web/tests/dependency-refusals.test.ts` rougit le jour où le pair accepte la majeure.
-NPM_MAJORS_REFUSED = [
-    {"dependency-name": name, "update-types": ["version-update:semver-major"]}
-    for name in ["eslint", "@eslint/js", "typescript"]
-]
 
 # Le motif de nom par lequel Dependabot reconnaît un Dockerfile (`DOCKER_REGEXP`,
 # `docker/file_fetcher.rb`) — `Dockerfile`, `Dockerfile.prod`, `Dockerfile-dev`, `api.Dockerfile`,
@@ -497,18 +492,32 @@ def test_dependabot_ne_propose_jamais_de_nouvelle_version_de_python() -> None:
     assert ignored == [PYTHON_UPGRADES_IGNORED]
 
 
-def test_dependabot_ne_propose_pas_les_majeures_refusees_sur_npm() -> None:
-    """ESLint 10 et TypeScript 7 attendent qu'un pair qu'on garde les accepte.
+def npm_majors_refused() -> list[dict[str, Any]]:
+    """Les règles `ignore` que la table des refus npm exige, dans son ordre.
 
-    Deux pairs ne les déclarent pas encore — `eslint-plugin-jsx-a11y` pour ESLint,
-    `typescript-eslint` pour TypeScript : chaque semaine, Dependabot ouvrirait une PR vouée à
-    l'échec, `npm ci` en `ERESOLVE` (`docs/frontend-outillage.md` §2.4). La liste est exacte : une
-    règle de plus refuserait en silence une mise à jour, une de moins rouvrirait la PR vouée à
-    l'échec.
+    `apps/web/dependency-refusals.json` est la seule liste des refus : chaque entrée nomme les
+    paquets dont la majeure est refusée et le plugin dont la plage de pairs fonde le refus. Le test
+    Vitest qui fait expirer les refus lit la même table.
+    """
+    refusals = json.loads(NPM_REFUSALS.read_text(encoding="utf-8"))
+    return [
+        {"dependency-name": name, "update-types": ["version-update:semver-major"]}
+        for refusal in refusals
+        for name in refusal["refused"]
+    ]
+
+
+def test_dependabot_ne_refuse_que_les_majeures_de_la_table_des_refus() -> None:
+    """Les `ignore` npm sont exactement ceux de la table, que le test Vitest fait expirer.
+
+    Une règle hors de la table refuserait en silence et pour toujours : aucun test ne la ferait
+    expirer. Une entrée de la table sans sa règle ne refuserait rien. Retirer une entrée pour faire
+    taire le test qui expire rougit donc ici, tant que la règle reste en place : le refus se lève
+    en entier, ou pas du tout (`docs/frontend-outillage.md` §2.4).
     """
     ignored = dependabot_entry("npm").get("ignore", [])
 
-    assert ignored == NPM_MAJORS_REFUSED
+    assert ignored == npm_majors_refused()
 
 
 def dockerfile_id(path: Path) -> str:
