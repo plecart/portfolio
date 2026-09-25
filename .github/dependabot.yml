@@ -54,9 +54,10 @@ updates:
       prefix: chore
       include: scope
 
-  # Les images de base de l'image `api`, épinglées par empreinte : Dependabot propose la nouvelle
-  # empreinte quand l'étiquette change de contenu — c'est ainsi qu'arrivent les correctifs de
-  # sécurité de Debian et de Python 3.12.x.
+  # Les images de base de l'image `api`, épinglées par étiquette précise et par empreinte : chaque
+  # nouvelle version de correctif (Python 3.12.x, `uv`) arrive en PR, étiquette et empreinte
+  # ensemble. La reconstruction d'une même étiquette peut ne pas être proposée (expérience
+  # `docker_digest_only_update_suppression` de Dependabot) : le scan de l'image (#15) la couvre.
   - package-ecosystem: docker
     directory: /infra/api
     schedule:
@@ -70,7 +71,7 @@ updates:
       include: scope
     ignore:
       # Changer de version de Python est une décision du projet (`.python-version`, que l'image
-      # suit sous test), pas une mise à jour : une PR `3.13-slim-bookworm` échouerait par
-      # construction, chaque semaine.
+      # suit sous test), pas une mise à jour : une PR `3.13.x-slim-bookworm` échouerait par
+      # construction, chaque semaine. Les correctifs de la 3.12 passent.
       - dependency-name: python
         update-types: [version-update:semver-major, version-update:semver-minor]

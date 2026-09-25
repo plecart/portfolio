@@ -98,7 +98,11 @@ FROM_LINE = re.compile(
 )
 COPY_OR_RUN = re.compile(r"^[ \t]*(?:COPY|RUN)\b.*$", re.MULTILINE | re.IGNORECASE)
 FROM_SOURCE = re.compile(r"(?:--|[,=])from=([^\s,]+)", re.IGNORECASE)
-DIGEST_PINNED_IMAGE = re.compile(r"^[\w./:-]+:[\w.-]+@sha256:[0-9a-f]{64}$")
+# `image:<version x.y.z>[-variante]@sha256:<empreinte>` — même règle que pour les actions : la
+# version la plus précise. Dependabot lit une épingle étiquette + empreinte comme « suivre les
+# versions » (dependabot-core, PR #15103) : c'est une nouvelle version de correctif qui lui fait
+# ouvrir une PR, et une étiquette sans correctif (`3.12`) n'en change jamais.
+PINNED_IMAGE = re.compile(r"^[\w./:-]+:v?\d+\.\d+\.\d+[\w.-]*@sha256:[0-9a-f]{64}$")
 
 
 def test_chaque_action_est_epinglee_par_empreinte_de_commit() -> None:
@@ -168,8 +172,8 @@ def test_dependabot_ne_propose_jamais_de_nouvelle_version_de_python() -> None:
     """La version de Python est une décision du projet, pas une mise à jour.
 
     `.python-version` l'épingle et l'image la suit sous test (`test_infra.py`) : une PR qui
-    proposerait `3.13-slim-bookworm` échouerait chaque semaine, par construction. Dependabot ne
-    propose donc, pour cette image, que la nouvelle empreinte de la même étiquette.
+    proposerait `3.13.x-slim-bookworm` échouerait chaque semaine, par construction. Dependabot ne
+    propose donc, pour cette image, que les versions de correctif de la 3.12.
     """
     ignored = dependabot_entry("docker").get("ignore", [])
 
@@ -205,17 +209,17 @@ def dockerfile_id(path: Path) -> str:
 def test_chaque_image_de_base_est_epinglee_par_empreinte(dockerfile: Path) -> None:
     """Une étiquette d'image peut changer de contenu ; une empreinte non.
 
-    Le guide « Building best practices » de Docker le recommande, et c'est ce qui donne prise à
-    Dependabot : il propose la nouvelle empreinte quand l'étiquette bouge. L'étiquette est gardée
-    devant l'empreinte, pour la lecture et pour que Dependabot sache quelle ligne suivre. Un
-    `FROM` indenté est refusé : Dependabot ne lit que ceux de la colonne 0 (`docker/file_parser.rb`).
+    Le guide « Building best practices » de Docker le recommande. L'étiquette reste devant
+    l'empreinte, à sa version la plus précise : c'est elle qui porte les mises à jour, Dependabot
+    proposant la version de correctif suivante, étiquette et empreinte ensemble. Un `FROM` indenté
+    est refusé : Dependabot ne lit que ceux de la colonne 0 (`docker/file_parser.rb`).
     """
     images, _ = dockerfile_stages(dockerfile)
 
     assert images, "aucune image de base trouvée — le motif a-t-il cessé de mordre ?"
     unread = [line["image"] for line in images if line["indent"]]
     assert not unread, f"`FROM` indentés, que Dependabot ne lit pas : {unread}"
-    unpinned = [line["image"] for line in images if not DIGEST_PINNED_IMAGE.match(line["image"])]
+    unpinned = [line["image"] for line in images if not PINNED_IMAGE.match(line["image"])]
     assert not unpinned, f"{len(images)} images repassées, non épinglées : {unpinned}"
 
 
