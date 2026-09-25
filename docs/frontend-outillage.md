@@ -107,6 +107,7 @@ ESLint, TypeScript et les `overrides` du manifeste ci-dessous.
 | `@playwright/test` | Scénarios de bout en bout, Chromium seul |
 | `@axe-core/playwright` | Contrôle d'accessibilité par page |
 | `@types/node`, `@types/react`, `@types/react-dom` | Types ambiants |
+| `semver`, `@types/semver` | Lecture des plages npm, qui fait expirer les refus (voir ci-dessous) |
 
 **Bloc d'aperçu de l'`index.html`.** Entre `<!--meta:start-->` et `<!--meta:end-->`, dans le
 `<head>`. La CI copie l'`index.html` compilé dans l'image `api` ; sur `/projets/<slug>`, une vue
@@ -177,7 +178,11 @@ sa dernière version, déclare `typescript >=4.8.4 <6.1.0`, et aucune 6.1 n'exis
 
 **Ces deux épingles sont des refus datés, pas des oublis.** Dependabot ne propose plus les majeures
 d'ESLint, d'`@eslint/js` — qui va par paire avec lui — et de TypeScript (`ignore` de
-`.github/dependabot.yml`, 2026-09-25), jusqu'à ce que le plugin concerné publie son support.
+`.github/dependabot.yml`, 2026-09-25), jusqu'à ce que le plugin concerné publie son support. Le
+refus expire sans qu'on y pense : `tests/dependency-refusals.test.ts` lit dans le verrou la plage de
+pairs de chaque plugin, avec `semver` — la bibliothèque par laquelle npm lui-même résout les
+plages —, et rougit le jour où elle accepte la majeure refusée. Le verrou ne bougeant que par une
+PR, le rouge apparaît dans celle qui apporte la nouvelle version du plugin ; on lève alors le refus.
 
 La famille Manrope est déclarée **comme jeton de thème Tailwind** (`@theme { --font-sans }`) plutôt
 que sur `:root` : la feuille de base de Tailwind pose déjà la police du document depuis ce jeton, et
