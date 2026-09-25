@@ -45,7 +45,7 @@ spécifie produit deux documents divergents — soit une contradiction de plus.
 
 ### 2. Mesurer la cascade
 
-Chercher les §§ qui **dépendent** de celui qu'on amende, par **deux recherches distinctes** :
+Chercher les §§ qui **dépendent** de celui qu'on amende, par **trois recherches distinctes** :
 
 1. **Par ancre lexicale** — noms de symboles, routes, champs, valeurs : `grep` dans tous les
    fichiers de rang égal ou inférieur, plus les renvois explicites (« voir §x », « cadrage §x »).
@@ -55,6 +55,13 @@ Chercher les §§ qui **dépendent** de celui qu'on amende, par **deux recherche
    d'autres mots**, en partant de la carte des documents (miroirs déclarés, renvois) plutôt que du
    texte. Un `grep` sur les mots du passage édité ne trouve que les copies, jamais les
    paraphrases — c'est structurel.
+3. **Par dénombrement** — quand l'amendement ajoute ou retire une entrée numérotée ou comptée
+   (décision, ADR, section, surface, page) : chercher la **plage** ou le **total** qui en dérive
+   (`D1-D`, « N ADR », « les N … », « trois pages ») dans les fichiers de rang égal ou inférieur
+   et dans `.claude/pipeline.config.md`. Un compteur dérivé n'a aucun mot en commun avec ce qu'il
+   compte, et aucune des deux recherches précédentes ne le vise — la plage « D1-D45 » de la
+   config est devenue fausse à l'entrée de D46, et ne s'est vue qu'à une relecture après
+   application.
 
 Établir la liste **avant** de proposer quoi que ce soit — une cascade découverte à mi-parcours
 transforme un amendement validé en chantier non validé. **Une cascade mesurée à zéro sur un
