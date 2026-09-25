@@ -1,6 +1,6 @@
 /**
  * Accès des tests aux fichiers de l'application, par des chemins ancrés sur ce module plutôt que
- * sur le dossier courant.
+ * sur le dossier courant — verrou npm compris.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -19,4 +19,27 @@ export const APP_ROOT = fileURLToPath(new URL('..', import.meta.url))
  */
 export function readAppJson<T>(fileName: string): T {
   return JSON.parse(readFileSync(join(APP_ROOT, fileName), 'utf8')) as T
+}
+
+/** Ce que les tests lisent d'une entrée du verrou npm. */
+export type LockedPackage = { version: string; peerDependencies?: Record<string, string> }
+
+/** Le verrou npm, format 3 : les entrées installées, indexées par chemin. */
+export type Lockfile = { packages: Record<string, LockedPackage> }
+
+/**
+ * L'entrée d'un paquet installé à la racine d'un verrou.
+ *
+ * @param lockfile Le verrou, par exemple `readAppJson<Lockfile>('package-lock.json')`.
+ * @param name Paquet, par exemple `@types/node` ; une dépendance directe est toujours à la racine,
+ *   `node_modules/<nom>`.
+ * @returns L'entrée : version installée, pairs déclarés.
+ * @throws Si le paquet n'est plus installé : un test qui lirait une entrée absente ne mesurerait
+ *   rien.
+ */
+export function installedPackage(lockfile: Lockfile, name: string): LockedPackage {
+  const entry = lockfile.packages[`node_modules/${name}`]
+  if (entry === undefined) throw new Error(`${name} n'est plus installé`)
+
+  return entry
 }
