@@ -59,7 +59,7 @@ Pour chaque issue retenue, depuis `main` à jour — **les deux `main`** : aprè
 s'arrêter et demander à l'utilisateur de pousser (ou l'autorisation de le faire) avant le premier
 worktree : brancher sur `origin/main` priverait la session d'un commit dont son brief dépend,
 brancher sur `main` local ferait apparaître ce commit dans le diff de sa PR. Si `origin/main` est
-en avance, `git pull --ff-only` d'abord.
+en avance, sur `main`, `git pull --ff-only` d'abord.
 
 ```
 git fetch origin
@@ -256,20 +256,28 @@ une jonction connue du système, et une liste vide autorise une suppression :
 ```
 python - <chemin du worktree> <<'EOF'
 import os, stat, sys
-from pathlib import Path
 REPARSE = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
 def est_lien(p):
     st = os.lstat(p)
     return stat.S_ISLNK(st.st_mode) or (os.name == "nt" and bool(st.st_file_attributes & REPARSE))
 temoin = r"C:\Documents and Settings" if os.name == "nt" else "/proc/self/exe"
 assert est_lien(temoin), f"témoin non détecté : {temoin} — détecteur aveugle, ne rien supprimer"
-liens = [str(p) for p in Path(sys.argv[1]).rglob("*") if est_lien(p)]
+liens = []
+for racine, dossiers, fichiers in os.walk(sys.argv[1]):
+    for nom in dossiers + fichiers:
+        chemin = os.path.join(racine, nom)
+        if est_lien(chemin):
+            liens.append(chemin)
+    dossiers[:] = [d for d in dossiers if os.path.join(racine, d) not in liens]  # jamais dans un lien
 print(f"témoin détecté ; {len(liens)} lien(s) ou jonction(s)", *liens, sep="\n")
 EOF
 ```
 
 Le témoin est une jonction que le système possède toujours ; s'il n'est pas vu, la liste ne vaut
-rien. Retirer chaque lien trouvé avec la commande qui supprime **le lien, pas sa cible**
+rien. Et **on ne descend jamais dans un lien** : un parcours qui suit une jonction vers la
+ressource partagée liste ses liens internes comme « à retirer », et boucle sur une jonction vers
+un ancêtre — `Path.rglob` fait les deux, mesuré. Retirer chaque lien trouvé avec la commande qui
+supprime **le lien, pas sa cible**
 (`cmd /c rmdir <jonction>` sous Windows, `rm <lien>` ailleurs). Une suppression récursive peut
 traverser une jonction et vider la ressource partagée qu'elle vise — c'est arrivé au SDK Flutter
 global, sans aucun avertissement. Puis seulement :
