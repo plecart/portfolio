@@ -1,6 +1,6 @@
 /**
  * Accès des tests aux fichiers de l'application, par des chemins ancrés sur ce module plutôt que
- * sur le dossier courant — verrou npm compris.
+ * sur le dossier courant ; et lecture, dans le verrou npm, d'un paquet installé.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -24,8 +24,8 @@ export function readAppJson<T>(fileName: string): T {
 /** Ce que les tests lisent d'une entrée du verrou npm. */
 export type LockedPackage = { version: string; peerDependencies?: Record<string, string> }
 
-/** Le verrou npm, format 3 : les entrées installées, indexées par chemin. */
-export type Lockfile = { packages: Record<string, LockedPackage> }
+/** Le verrou npm, format 3 : les paquets installés, indexés par chemin, racine `""` exclue. */
+export type Lockfile = { packages: Record<`node_modules/${string}`, LockedPackage> }
 
 /**
  * L'entrée d'un paquet installé à la racine d'un verrou.
