@@ -13,6 +13,7 @@ draft avec `Closes #N` avant d'écrire quoi que ce soit** — c'est ce qui rend 
 comme en cours pour le reste de la pipeline. Lis les commandes du projet (test, lint, typecheck…)
 dans `.claude/pipeline.config.md` ; ne les devine pas.
 
-Vérifie ensuite que le travail est passé par l'**interrogatoire**. Sans trace d'interrogation
-(issue jamais passée en `needs-interrogation`, brief marqué `⚠️ Non interrogée au triage`, ou
-demande directe sans issue), lance `interroge-moi` avant toute chose.
+Dès les outils éprouvés et avant le briefing, vérifie que le travail est passé par
+l'**interrogatoire**. Sans trace d'interrogation (issue jamais passée en `needs-interrogation`,
+brief marqué `⚠️ Non interrogée au triage`, ou demande directe sans issue), lance `interroge-moi`
+à ce moment-là.

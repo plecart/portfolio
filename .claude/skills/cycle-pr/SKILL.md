@@ -122,8 +122,9 @@ confirmé contre l'état actuel »).
 
 Attendre un **« go » explicite**, puis créer la branche — trunk-based depuis `main`, après avoir
 vérifié que `main` local et `origin/main` sont le même commit (`git fetch origin`, puis
-`git rev-parse main origin/main` rend deux fois le même SHA ; sinon pousser, ou
-`git pull --ff-only`, d'abord) :
+`git rev-parse main origin/main` rend deux fois le même SHA ; `main` local en avance → demander
+à l'utilisateur de pousser, ou l'autorisation de le faire ; `origin/main` en avance → sur `main`,
+`git pull --ff-only` d'abord) :
 
 ```
 git checkout -b <type>/<description>   # feat/  fix/  chore/  docs/  refactor/
@@ -350,9 +351,10 @@ le socle, lancer d'abord la première passe de relecture (4.2, « En deux temps 
 
 ## Étape 4 — Relecture indépendante (avant `git push`)
 
-Deux passes. L'auto-review (4.1) quand tous les commits sont faits. La relecture à contexte
+Deux relectures. L'auto-review (4.1) quand tous les commits sont faits. La relecture à contexte
 vierge (4.2) **en deux temps** : une première fois dès que le socle est posé, en plein cycle de
-commit ; une seconde après 4.1, sur ce qui a été écrit depuis la première.
+commit ; une seconde après 4.1, sur ce qui a été écrit depuis la première — ou sur `main..HEAD`
+si aucun commit n'a posé de socle.
 
 **4.1 Auto-review** — revue critique du **diff complet de la branche** (`main..HEAD`), en vision
 d'ensemble : problèmes d'architecture (couplage, frontières), naming incohérent entre commits,
@@ -375,7 +377,8 @@ indépendante » du body de PR — jamais de saut silencieux. L'agent reçoit **
 
 - le corps de l'issue et son brief d'agent (ou le briefing de l'Étape 1) ;
 - le diff `main..HEAD` et le droit de lire les fichiers touchés — en seconde passe, le diff
-  `<sha de fin de la première passe>..HEAD` et les constats de la première, corrigés ou écartés ;
+  `<sha de fin de la première passe>..HEAD` (ou `main..HEAD` sans première passe) et les constats
+  de la première, corrigés ou écartés ;
 - `.claude/rules/contraintes.md`, `.claude/rules/cleanup-verbatim.md` et le prompt de relecture
   **verbatim** ;
 - la consigne **frontières tierces** : pour chaque appel à une bibliothèque ou un framework tiers à
