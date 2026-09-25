@@ -11,14 +11,16 @@
 # de s'installer sur un interpréteur qui ne correspond pas à l'épingle (voir plus bas). C'est le
 # traitement déjà retenu côté front pour `.nvmrc` et `engines`.
 
-# Chaque image de base est épinglée par **empreinte**, son étiquette gardée devant pour la
-# lecture : une étiquette peut changer de contenu, une empreinte non (guide « Building best
-# practices » de Docker). Dependabot (`.github/dependabot.yml`) propose la nouvelle empreinte
-# quand l'étiquette bouge — c'est ainsi qu'arrivent les correctifs de Debian et de Python 3.12.x.
+# Chaque image de base est épinglée par **empreinte**, derrière son étiquette la plus précise : une
+# étiquette peut changer de contenu, une empreinte non (guide « Building best practices » de
+# Docker). L'étiquette porte la version de correctif (`3.12.14`, pas `3.12`) parce que c'est elle
+# qui fait avancer l'épingle : Dependabot (`.github/dependabot.yml`) propose chaque nouvelle
+# version, étiquette et empreinte ensemble. La reconstruction d'une même étiquette — correctifs
+# Debian seuls — peut ne pas être proposée ; le scan de l'image (#15) couvre ce cas.
 
 # Nommée une fois et réutilisée par les deux étages : deux `FROM` littéraux finiraient par
 # diverger, et l'étage d'exécution est justement celui qu'on relit le moins.
-FROM python:3.12-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e AS base
+FROM python:3.12.14-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e AS base
 
 # `uv` dans un étage à lui plutôt que dans un `COPY --from=<image>` : Dependabot ne lit que les
 # lignes `FROM`, et une image citée seulement par `COPY --from` ne serait jamais mise à jour.

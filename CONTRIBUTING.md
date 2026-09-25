@@ -94,9 +94,10 @@ arbre se nettoie par les `overrides` du manifeste ([docs/frontend-outillage.md](
 ouvre chaque semaine, par écosystème (`uv`, npm, actions GitHub, images Docker), une PR qui
 groupe versions mineures et correctifs ; chaque montée majeure arrive seule. Ses PR sont
 exemptées des métadonnées de PR, passent par la même CI et ne se mergent que sur un go humain.
-Actions et images sont épinglées par empreinte : Dependabot met l'empreinte à jour avec
-l'étiquette. La version de Python n'est jamais proposée — elle se change à la main, dans
-`.python-version` puis dans l'image.
+Actions et images sont épinglées par empreinte, derrière leur version la plus précise :
+Dependabot met l'une et l'autre à jour ensemble. Une nouvelle version mineure de Python (3.13)
+n'est jamais proposée — elle se change à la main, dans `.python-version` puis dans l'image ; ses
+versions de correctif (3.12.x) le sont.
 
 ## Le flux en une page
 
