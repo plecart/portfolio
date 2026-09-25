@@ -74,7 +74,6 @@ PYTHON_UPGRADES_IGNORED = {
     "update-types": ["version-update:semver-major", "version-update:semver-minor"],
 }
 
-
 # Le motif de nom par lequel Dependabot reconnaît un Dockerfile (`DOCKER_REGEXP`,
 # `docker/file_fetcher.rb`) — `Dockerfile`, `Dockerfile.prod`, `Dockerfile-dev`, `api.Dockerfile`,
 # `Containerfile` —, moins les fichiers d'exclusion `*.dockerignore`. Un document dont le nom
