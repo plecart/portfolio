@@ -182,3 +182,18 @@ def test_toute_image_copiee_passe_par_un_etage_nomme(dockerfile: Path) -> None:
 
     outside = [source for source in sources if source.lower() not in stages]
     assert not outside, f"{len(sources)} `COPY --from` repassés, hors d'un étage : {outside}"
+
+
+def test_dependabot_surveille_chaque_dockerfile() -> None:
+    """Une image épinglée que Dependabot ne surveille pas garderait son empreinte pour toujours.
+
+    Les deux tests ci-dessus s'appliquent à tout Dockerfile du dépôt ; celui-ci exige que son
+    dossier figure aussi dans `.github/dependabot.yml`, sans quoi l'épinglage figerait l'image au
+    lieu de la tenir à jour.
+    """
+    watched = REPOSITORY_ROOT / dependabot_entry("docker")["directory"].lstrip("/")
+
+    unwatched = [str(path) for path in DOCKERFILES if path.parent != watched]
+    assert not unwatched, (
+        f"{len(DOCKERFILES)} Dockerfile repassés, hors de Dependabot : {unwatched}"
+    )
