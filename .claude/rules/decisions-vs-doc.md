@@ -44,6 +44,8 @@ Contradiction avérée → **s'arrêter avant d'aller plus loin** et afficher :
 Avant  : « <la ligne exacte du document> »
 Après  : « <la décision qui vient d'être prise> »
 Cascade: <ce que le rang atteint entraîne — spec UX, issues #…, pipeline.config.md>
+Sorties: (1a) abandonner l'effet — <…> · (1b) le déplacer hors de ce que le document affirme —
+         <…> · (2) amender le document — <…>
 Es-tu sûr du changement ?
 ```
 
@@ -53,8 +55,8 @@ Es-tu sûr du changement ?
    l'arrêt : (a) l'effet de la décision est abandonné ; (b) l'effet est **conservé et déplacé**
    hors de ce que le document affirme — un bloc voisin, un autre support — ce qui rend le
    document vrai sans rien perdre. La forme (b) est souvent la moins chère et passe inaperçue
-   parce qu'on raisonne sur la décision, pas sur sa portée. Une sortie dont une seule branche
-   est présentable n'est pas une alternative : c'est une branche résumée au lieu d'explorée.
+   parce qu'on raisonne sur la décision, pas sur sa portée. Quand une seule des deux sorties est
+   présentable, c'est le signe que la branche adverse a été résumée, pas explorée.
 2. **La décision gagne** — le document est **amendé maintenant**, dans cette session, via
    `/contradiction` (qui propage aux rangs inférieurs et aux issues).
 
