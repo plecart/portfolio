@@ -232,26 +232,30 @@ Copier depuis `boilerplate/template/` vers la racine du projet :
 `<!-- init-projet : section à retirer si … -->`) et son placeholder `{{CHEMIN_JOURNAL_OBSERVATIONS}}`
 se traitent à l'étape 9, une fois les skills publics choisis.
 
-Puis **générer `.github/workflows/ci.yml`** à partir de `template/.github/workflows/ci.yml`, qui
-est un modèle à trous :
+Puis, **si le projet a déjà du code**, générer `.github/workflows/ci.yml` à partir de
+`template/.github/workflows/ci.yml`, qui est un modèle à trous — pour un projet sans code
+encore, le `ci.yml` et le `dependabot.yml` attendent sa première PR de code (étape 11) :
 
 - Remplacer chaque `{{CMD_*}}` par la commande correspondante de la section « Commandes du projet ».
 - **Supprimer purement et simplement** toute étape dont la commande vaut `n/a` — ne jamais laisser
   un placeholder ni une étape vide dans le fichier généré.
-- Remplir `{{SETUP_STEPS}}` avec l'action de mise en place officielle de l'écosystème, version
-  épinglée depuis « runtime + version » (`actions/setup-node`, `astral-sh/setup-uv`,
-  `actions/setup-go`, `actions/setup-java`…).
+- **Réécrire l'en-tête** : le commentaire « Modèle de CI » et ses règles de génération laissent
+  place à un en-tête propre au projet ; aucun `{{…}}` ne subsiste, pas même en commentaire.
+  Retirer le commentaire d'une étape supprimée, et nommer le job d'après ses étapes réelles.
+- Remplir `{{SETUP_STEPS}}` avec l'action de mise en place officielle de l'écosystème, qui
+  provisionne la version du **runtime** épinglée dans « runtime + version » (`actions/setup-node`,
+  `astral-sh/setup-uv`, `actions/setup-go`, `actions/setup-java`…).
 - Remplir `{{SERVICES}}` depuis « services requis en CI », ou retirer le bloc s'il n'y en a pas.
-- Remplir `{{CMD_AUDIT}}` depuis la commande `audit`, ou supprimer l'étape si elle vaut `n/a` ;
-  écrire en commentaire, au-dessus de l'étape, le seuil de blocage et sa raison.
+- Au-dessus de l'étape `Audit`, écrire en commentaire le seuil de blocage et sa raison.
 - **Épingler chaque `uses:` par empreinte de commit** — ceux du modèle (`{{ACTION_SHA}} #
-  {{ACTION_VERSION}}`) comme ceux de `{{SETUP_STEPS}}` : la dernière version publiée de
-  l'action, dont l'empreinte se résout à la source (`git ls-remote --tags
-  https://github.com/<owner>/<action>.git` ; pour une étiquette annotée, la ligne `^{}` donne
-  le commit), jamais de mémoire. Le commentaire porte l'étiquette **la plus précise** de ce
-  commit (`v7.0.1`, pas `v7`) : Dependabot ne réécrit qu'un commentaire dont l'étiquette pointe
-  encore sur le commit épinglé. Une étiquette peut être déplacée par qui prend la main sur le
-  dépôt de l'action ; une empreinte non (GitHub, « Secure use reference »).
+  {{ACTION_VERSION}}`) comme ceux de `{{SETUP_STEPS}}`, sur la dernière version publiée de
+  l'**action**, pré-versions exclues. L'empreinte se résout à la source, jamais de mémoire :
+  `git ls-remote --tags --sort=-v:refname https://github.com/<owner>/<repo>.git` — le dépôt,
+  pas le sous-dossier d'une action comme `github/codeql-action/init` ; pour une étiquette
+  annotée, la ligne `^{}` donne le commit. Le commentaire porte l'étiquette **la plus
+  précise** de ce commit (`v7.0.1`, pas `v7`) : Dependabot ne réécrit qu'un commentaire dont
+  l'étiquette pointe encore sur le commit épinglé. Une étiquette peut être déplacée par qui
+  prend la main sur le dépôt de l'action ; une empreinte non (GitHub, « Secure use reference »).
 - **Conserver `permissions: contents: read`** en tête : le jeton par défaut d'un dépôt peut être
   bien plus large. Un job qui doit écrire élève ses droits à son niveau, jamais le workflow.
 - **Conserver le garde `if:` et le type `ready_for_review`.** Ils forment une paire : le garde
@@ -259,19 +263,29 @@ est un modèle à trous :
   `ready_for_review` est ce qui la déclenche au passage en ready. Retirer l'un sans l'autre donne
   soit une CI qui ne tourne jamais, soit une CI qui tourne sur tous les commits de développement.
 
-Montrer le `ci.yml` généré avant de l'écrire.
-
-Puis **générer `.github/dependabot.yml`** depuis `template/.github/dependabot.yml` : les
+Puis générer `.github/dependabot.yml` depuis `template/.github/dependabot.yml` : les
 empreintes du `ci.yml` n'avancent que si Dependabot les tient, et le modèle porte déjà
 l'écosystème `github-actions`. Ajouter une entrée par écosystème de la stack — celui du
-gestionnaire de paquets déclaré, et `docker` si un Dockerfile existe —, copiée de l'entrée
-modèle avec le `directory` de son manifeste, puis retirer le bloc `{{ECOSYSTEMES_STACK}}`.
-Les valeurs de `package-ecosystem` se lisent dans la référence des options Dependabot, pas de
-mémoire. Une image de base s'épingle par son étiquette la plus précise suivie de son empreinte
-(`python:3.12.14-slim@sha256:…`) : Dependabot fait avancer les deux ensemble, alors qu'une
-étiquette sans correctif (`3.12`) ne change jamais. Valider le fichier contre le schéma
-(`uvx check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml`), puis le
-montrer avant de l'écrire.
+gestionnaire de paquets déclaré, `docker` si un `Dockerfile` ou un `Containerfile` existe,
+`docker-compose` pour les fichiers Compose —, copiée de l'entrée modèle avec le `directory`
+de son manifeste, puis retirer le bloc `{{ECOSYSTEMES_STACK}}`. Les valeurs de
+`package-ecosystem` se lisent dans la référence des options, pas de mémoire :
+https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference
+
+**Images de base** — le skill ne réécrit pas les `FROM`, il signale à l'utilisateur ceux qui
+ne suivent pas la forme `<image>:<étiquette la plus précise>@sha256:<empreinte>`
+(`python:3.12.14-slim@sha256:…`). Sous cette forme, chaque correctif arrive en PR, étiquette
+et empreinte ensemble ; une étiquette sans correctif (`3.12`) n'avance que par un
+rafraîchissement d'empreinte, que Dependabot peut ne pas proposer. Dependabot propose aussi la
+mineure suivante (`3.13`) : si la version du runtime est épinglée ailleurs (`.python-version`,
+`.nvmrc`…), ajouter à l'entrée `docker` un `ignore` des montées
+`version-update:semver-major` et `version-update:semver-minor` de cette image — changer de
+runtime est une décision du projet, et la PR échouerait sur l'épingle.
+
+**Valider les deux fichiers** contre leur schéma, sur une copie temporaire avant de les
+écrire — `check-jsonschema --builtin-schema vendor.github-workflows` pour le `ci.yml`,
+`--builtin-schema vendor.dependabot` pour le `dependabot.yml`, par `uvx` ou, sans `uv`,
+`pipx run` —, puis les montrer à l'utilisateur.
 
 **Runtime épinglé — une version, des fournisseurs.** Si le profil déclare un gestionnaire de
 version (FVM, pyenv, nvm, asdf, mise…), séparer *quelle version* de *qui la fournit* :
@@ -386,16 +400,18 @@ utile que la stack s'appuie sur des libs qui évoluent vite.
 
 ### 11. Vérifier que les commandes déclarées fonctionnent
 
-Avant de committer, lancer réellement les commandes `lint`, `typecheck` et `test` de la config.
+Avant de committer, lancer réellement `test` et chaque commande des « gates bloquants en CI » de
+la config.
 Une commande déclarée mais fausse est pire qu'absente : elle casse `cycle-pr` et la CI au premier
 usage. Corriger la config si l'une échoue pour cause d'erreur de saisie.
 
 **Projet sans code encore** : il n'y a rien à lancer. Enregistrer les commandes cibles avec le
-marqueur `# non vérifiée`, et **ne générer ni `ci.yml` ni `dependabot.yml` à l'amorçage** : un
-workflow committé avant le code qu'il vérifie est rouge dès son premier run — vu sur un projet,
-`uv sync` sans manifeste —, contre la règle « aucun commit cassé ». Les générer dans la
-**première PR de scaffold**, avec le code, en rejouant cette étape et l'étape 7 en mode
-reconfiguration — les cases de la checklist ne sont cochées qu'à ce moment.
+marqueur `# non vérifiée`, et **ne générer ni `ci.yml` ni `dependabot.yml`** : un workflow
+committé avant le code qu'il vérifie est rouge dès son premier run — vu sur un projet,
+`uv sync` sans manifeste —, contre la règle « aucun commit cassé ». Le marqueur est
+l'engagement : `cycle-pr` le lit à son Étape 1, et la première PR de code rejoue la génération
+CI et Dependabot de l'étape 7 et cette vérification, puis retire les marqueurs. Les cases
+correspondantes de la checklist ne sont cochées qu'à ce moment.
 
 Deux pièges de diagnostic à cette étape :
 
@@ -421,7 +437,8 @@ git add -A && git commit -m "chore: amorçage pipeline de dev"
 ### 13. Récapituler
 
 Afficher : dépôt GitHub, profil du projet retenu (stack + commandes + domaines), labels créés, CI
-générée, skills maison déployés, skills publics installés, context7 disponible, et les prochaines
+et Dependabot générés — ou reportés à la première PR de code, projet sans code (étape 11) —,
+skills maison déployés, skills publics installés, context7 disponible, et les prochaines
 étapes (`vers-prd` ou `vers-issues` pour démarrer la planification).
 
 ## Checklist finale
@@ -434,13 +451,14 @@ générée, skills maison déployés, skills publics installés, context7 dispon
 - [ ] `CLAUDE.md` finalisé (étape 9) : sans section de skill non installé ni `{{CHEMIN_JOURNAL_OBSERVATIONS}}` résiduel
 - [ ] section « Sources de vérité » renseignée (au minimum : les issues ouvertes)
 - [ ] `ci.yml` généré depuis les commandes réelles, sans `{{PLACEHOLDER}}` ni étape `n/a`
-- [ ] chaque `uses:` du `ci.yml` épinglé par empreinte + `# vX.Y.Z` ; `permissions: contents: read` en tête
-- [ ] `.github/dependabot.yml` généré (`github-actions` + écosystèmes de la stack), validé contre le schéma
+- [ ] chaque `uses:` du `ci.yml` épinglé par empreinte + `# <étiquette la plus précise>` ; `permissions: contents: read` en tête
+- [ ] `.github/dependabot.yml` généré (`github-actions` + écosystèmes de la stack)
+- [ ] `ci.yml` et `dependabot.yml` validés contre leur schéma — ou reportés, projet sans code (étape 11)
 - [ ] skills maison déployés dans `.claude/skills/`
 - [ ] `.claude/commands/` copié — exactement une commande par skill déployé, aucune orpheline
 - [ ] skills publics cochés installés (choisis d'après la stack, pas d'un set en dur)
 - [ ] serveur MCP context7 disponible (`claude mcp list`)
-- [ ] commandes `lint` / `typecheck` / `test` vérifiées en local
+- [ ] `test` et commandes des gates bloquants en CI vérifiées en local — ou marquées `# non vérifiée`, projet sans code
 - [ ] commit d'amorçage fait
 
 ## Note pour les autres skills

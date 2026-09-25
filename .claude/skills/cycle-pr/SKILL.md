@@ -51,6 +51,12 @@ débloquer lui-même**. Un même message de refus quelle que soit la commande se
 problème de permissions alors que c'est l'outillage ; éprouver coûte quelques commandes avant le
 briefing, et une demi-session après le « go ».
 
+**Une commande marquée `# non vérifiée`** dans `.claude/pipeline.config.md` signale un projet
+initialisé sans code : cette PR, la première qui en pose, porte aussi ce que `init-projet` a
+reporté — la génération CI et Dependabot de son étape 7, la vérification des commandes de son
+étape 11, puis le retrait des marqueurs. L'inscrire au briefing ; sans elle, le projet resterait
+sans CI.
+
 Produire un briefing écrit AVANT de créer la branche :
 
 - **Liste précise des fichiers** à créer/modifier — le chemin exact de chacun.
