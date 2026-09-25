@@ -85,7 +85,9 @@ Tout conservé. Les signalements, relus un par un, sont des faux positifs :
 
 Node **24.21.0**, LTS active du jour, épinglée par `.nvmrc` et par `engines` (valeurs égales,
 vérifiées par un test). `@types/node` suit sa majeure, vérifiée par un autre test : des types d'une
-majeure plus récente décriraient des API absentes du runtime ; les deux montent ensemble, à la main.
+majeure plus récente décriraient des API absentes du runtime ; les deux montent ensemble, à la main,
+et Dependabot ne propose plus la majeure des types (`ignore` de `.github/dependabot.yml`, hors de la
+table des refus ci-dessous : ce refus-là ne tombe jamais seul).
 Paquets directs installés par `npm create vite@latest -- --template react-ts`,
 puis émondés de ce que le gabarit ajoute pour sa page de démonstration. Leurs plages sont dans
 `package.json`, leurs versions installées dans le verrou `package-lock.json` : le tableau n'en
