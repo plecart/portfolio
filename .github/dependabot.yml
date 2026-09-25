@@ -1,0 +1,76 @@
+# Mises à jour des dépendances par Dependabot (cadrage §6.6 « chaîne d'approvisionnement » ;
+# brief de #5). Une entrée par écosystème, toutes sur la même politique :
+#
+# - passage hebdomadaire ;
+# - versions mineures et correctifs groupés en une PR par écosystème ; chaque montée majeure a
+#   sa PR à elle — elle casse plus souvent, et mêlée au lot elle bloquerait tout le reste ;
+# - aucun libellé (`labels: []`) : sans cette ligne, Dependabot crée `dependencies`, `python`…,
+#   hors du mapping de `.claude/pipeline.config.md`. Les PR du bot sont exemptées des
+#   métadonnées de PR (même fichier, « Métadonnées d'une PR ») ;
+# - commits `chore(deps): …` ou `chore(deps-dev): …` : le préfixe conventional du dépôt. La
+#   description reste en anglais, Dependabot ne sait pas l'écrire autrement.
+#
+# Une PR du bot se merge comme toute autre : CI verte et go humain, jamais d'auto-merge.
+# `apps/api/tests/test_supply_chain.py` tient la politique égale d'une entrée à l'autre — pas
+# d'ancre YAML, dont la documentation de Dependabot ne dit rien.
+
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    labels: []
+    commit-message:
+      prefix: chore
+      include: scope
+
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    labels: []
+    commit-message:
+      prefix: chore
+      include: scope
+
+  # Les empreintes de `.github/workflows/*.yml` et leur commentaire de version, mis à jour
+  # ensemble.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    labels: []
+    commit-message:
+      prefix: chore
+      include: scope
+
+  # Les images de base de l'image `api`, épinglées par empreinte : Dependabot propose la nouvelle
+  # empreinte quand l'étiquette change de contenu — c'est ainsi qu'arrivent les correctifs de
+  # sécurité de Debian et de Python 3.12.x.
+  - package-ecosystem: docker
+    directory: /infra/api
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    labels: []
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      # Changer de version de Python est une décision du projet (`.python-version`, que l'image
+      # suit sous test), pas une mise à jour : une PR `3.13-slim-bookworm` échouerait par
+      # construction, chaque semaine.
+      - dependency-name: python
+        update-types: [version-update:semver-major, version-update:semver-minor]

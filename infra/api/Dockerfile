@@ -11,16 +11,25 @@
 # de s'installer sur un interpréteur qui ne correspond pas à l'épingle (voir plus bas). C'est le
 # traitement déjà retenu côté front pour `.nvmrc` et `engines`.
 
+# Chaque image de base est épinglée par **empreinte**, son étiquette gardée devant pour la
+# lecture : une étiquette peut changer de contenu, une empreinte non (guide « Building best
+# practices » de Docker). Dependabot (`.github/dependabot.yml`) propose la nouvelle empreinte
+# quand l'étiquette bouge — c'est ainsi qu'arrivent les correctifs de Debian et de Python 3.12.x.
+
 # Nommée une fois et réutilisée par les deux étages : deux `FROM` littéraux finiraient par
 # diverger, et l'étage d'exécution est justement celui qu'on relit le moins.
-FROM python:3.12-slim-bookworm AS base
+FROM python:3.12-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e AS base
+
+# `uv` dans un étage à lui plutôt que dans un `COPY --from=<image>` : Dependabot ne lit que les
+# lignes `FROM`, et une image citée seulement par `COPY --from` ne serait jamais mise à jour.
+# Version figée, comme toutes les épingles du dépôt : `latest` ferait dépendre la
+# reproductibilité de l'image de la date du build.
+FROM ghcr.io/astral-sh/uv:0.12.5@sha256:e85be844203885286c60ffad8a858d48afb6c5a5c237ca0e67f12e74b8f174b1 AS uv
 
 
 FROM base AS build
 
-# Version figée, comme toutes les épingles du dépôt : `latest` ferait dépendre la
-# reproductibilité de l'image de la date du build.
-COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /bin/uv
+COPY --from=uv /uv /bin/uv
 
 # UV_PYTHON_DOWNLOADS=0 : l'interpréteur de l'image de base suffit. Conséquence utile — combiné
 #   au `.python-version` copié ci-dessous, `uv` échoue si l'image de base dérive de l'épingle,
