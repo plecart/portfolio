@@ -117,7 +117,11 @@ def test_une_exception_valable_est_transmise_a_pip_audit(tmp_path: Path) -> None
     result = run_audit_gate(tmp_path, exception_entry(), *offline_audit(tmp_path))
 
     assert result.returncode == 0, result.stderr
-    assert f"ignore_vulns=['{ADVISORY}']" in result.stderr
+    assert f"ignore_vulns=['{ADVISORY}']" in result.stderr, (
+        "`pip-audit -v` ne journalise plus ses arguments sous cette forme (`_cli.py`, "
+        "« parsed arguments ») : après une montée de `pip-audit`, vérifier son journal avant de "
+        "conclure que la porte ne transmet plus les exceptions"
+    )
 
 
 # Deux fuseaux extrêmes. À toute heure, l'un d'eux décale la date locale d'un jour par rapport à la
