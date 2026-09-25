@@ -86,9 +86,10 @@ restent dans la boucle de développement et en CI, trop lents pour un hook.
 CI. Côté Python, tout avis de sécurité connu bloque la PR — `pip-audit` n'expose pas de
 sévérité ; côté front, les avis `high` et `critical`. Un avis Python qui ne s'applique pas au
 projet — ou le temps qu'un correctif paraisse — se suspend par une entrée **datée** de
-[infra/ci/pip-audit-exceptions.toml](infra/ci/pip-audit-exceptions.toml), dont le format est en tête
-du fichier ; la date passée, l'audit rebloque. `npm audit` n'a pas de fichier d'exceptions : son
-arbre se nettoie par les `overrides` du manifeste ([docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4).
+[infra/ci/pip-audit-exceptions.toml](infra/ci/pip-audit-exceptions.toml), dont le format est en
+tête du fichier ; la date passée, l'audit rebloque. `npm audit` n'a pas de fichier d'exceptions :
+son arbre se nettoie par les `overrides` du manifeste
+([docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4).
 
 **Mises à jour des dépendances.** Dependabot ([.github/dependabot.yml](.github/dependabot.yml))
 ouvre chaque semaine, par écosystème (`uv`, npm, actions GitHub, images Docker), une PR qui
