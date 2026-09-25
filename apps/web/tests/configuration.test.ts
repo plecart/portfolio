@@ -56,7 +56,10 @@ test('la version de Node est la même dans .nvmrc et dans engines', () => {
  * projet racine entre d'office dans la population du test.
  */
 function projectConfigFileNames(): string[] {
-  const root = readAppJson<{ references: { path: string }[] }>('tsconfig.json')
+  // Lu par le compilateur, comme `tsc` le lit : en JSONC, commentaires admis.
+  const { config, error } = ts.readConfigFile(join(APP_ROOT, 'tsconfig.json'), ts.sys.readFile)
+  if (error) throw new Error(ts.flattenDiagnosticMessageText(error.messageText, '\n'))
+  const root = config as { references: { path: string }[] }
 
   return root.references.map((reference) => reference.path.replace(/^\.\//, ''))
 }

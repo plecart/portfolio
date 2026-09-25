@@ -1,5 +1,6 @@
 /**
- * Accès des tests aux fichiers de l'application, quel que soit le dossier d'où Vitest est lancé.
+ * Accès des tests aux fichiers de l'application, par des chemins ancrés sur ce module plutôt que
+ * sur le dossier courant.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -9,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 export const APP_ROOT = fileURLToPath(new URL('..', import.meta.url))
 
 /**
- * Lit un fichier JSON de l'application.
+ * Lit un fichier JSON strict de l'application — pas un `tsconfig`, que TypeScript lit en JSONC.
  *
  * @param fileName Chemin relatif à la racine de l'application, par exemple `package.json`.
  * @returns Le contenu analysé. Le type est une promesse de l'appelant, que rien ne vérifie : ne
