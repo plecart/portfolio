@@ -84,7 +84,9 @@ Tout conservé. Les signalements, relus un par un, sont des faux positifs :
 ### 2.4 Application `apps/web` — 2026-09-23, amendée le 2026-09-25
 
 Node **24.21.0**, LTS active du jour, épinglée par `.nvmrc` et par `engines` (valeurs égales,
-vérifiées par un test). Paquets directs installés par `npm create vite@latest -- --template react-ts`,
+vérifiées par un test). `@types/node` suit sa majeure, vérifiée par un autre test : des types d'une
+majeure plus récente décriraient des API absentes du runtime ; les deux montent ensemble, à la main.
+Paquets directs installés par `npm create vite@latest -- --template react-ts`,
 puis émondés de ce que le gabarit ajoute pour sa page de démonstration. Leurs plages sont dans
 `package.json`, leurs versions installées dans le verrou `package-lock.json` : le tableau n'en
 recopie aucune, une copie devenant fausse à la première mise à jour de Dependabot. Les contraintes
