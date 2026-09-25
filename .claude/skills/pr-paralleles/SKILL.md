@@ -54,10 +54,16 @@ soit. Recommander un degré de parallélisme raisonnable (souvent 2–4) plutôt
 
 ### 3. Créer un worktree + une branche par issue
 
-Pour chaque issue retenue, depuis `main` à jour :
+Pour chaque issue retenue, depuis `main` à jour — **les deux `main`** : après `git fetch origin`,
+`git rev-parse main origin/main` doit rendre deux fois le même SHA. Si `main` local est en avance,
+s'arrêter et demander à l'utilisateur de pousser (ou l'autorisation de le faire) avant le premier
+worktree : brancher sur `origin/main` priverait la session d'un commit dont son brief dépend,
+brancher sur `main` local ferait apparaître ce commit dans le diff de sa PR. Si `origin/main` est
+en avance, `git pull --ff-only` d'abord.
 
 ```
 git fetch origin
+git rev-parse main origin/main      # deux SHA identiques, sinon voir ci-dessus
 git worktree add ../<repo>--<numéro-issue> -b <type>/<slug> origin/main
 ```
 
