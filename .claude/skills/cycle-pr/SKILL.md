@@ -200,6 +200,16 @@ documentation via `context7` ou sources du paquet — et le noter dans les `Note
 référence. Les défauts les plus coûteux d'une PR « verte » sont des suppositions sur un paquet :
 un décodage par défaut, un retry silencieux, une fusion de valeurs, un `repr` qui affiche un secret.
 
+**Un avis de sécurité sans correctif n'est pas une impasse.** Une plage d'avis `*` — toutes les
+versions publiées affectées, paquet abandonné — ne clôt pas l'analyse, elle la déplace d'un
+étage : avant de conclure qu'un avis est irréductible, remonter la chaîne de dépendance et
+vérifier, pour **chaque** parent, s'il a cessé de dépendre du paquet fautif dans une version
+ultérieure — le correctif d'un paquet abandonné vient presque toujours de son consommateur. Puis
+regarder comment d'autres projets ont traité le même avis : un mur atteint par tout le monde a
+souvent une issue de sortie publiée. Dix avis dont sept `high` sont tombés à zéro en forçant un
+parent d'une majeure. Et un `override` qui saute une majeure sous un consommateur non prévu pour
+elle **s'éprouve en exécutant réellement l'outil**, pas en relançant l'audit.
+
 Implémenter **un comportement à la fois** en red-green-refactor. **Ne jamais** écrire tous les
 tests d'abord puis toute l'implémentation (slicing horizontal = mauvais tests) :
 
@@ -351,7 +361,8 @@ indépendante » du body de PR — jamais de saut silencieux. L'agent reçoit **
   une frontière — réseau, sérialisation/encodage, secrets, fusion avec un thème ou une config par
   défaut, cycle de vie de ressources — **vérifier le comportement réel** dans la documentation
   (`context7`) ou dans les sources du paquet, jamais de mémoire, et signaler tout écart avec ce que
-  le code suppose ;
+  le code suppose ; un avis de sécurité sans version corrigée se remonte par la chaîne de
+  dépendance (3.1) et ne se rapporte jamais « irréductible » sans ce parcours ;
 - la consigne **provenance** : chaque constat porte son marqueur — **mesuré** (commande exécutée,
   sortie citée), **lu** (fichier et ligne ouverts), **supposé** (à vérifier). Un chiffre sans
   marqueur « mesuré » est interdit ; un résultat attendu d'un sous-agent qui n'est pas arrivé se
