@@ -1,12 +1,14 @@
 /**
  * Invariants de configuration de l'application web.
  *
- * Deux règles qu'aucune autre porte ne couvre : la version de Node vit dans deux fichiers que
- * rien ne relie l'un à l'autre, et `tsc` ne signale jamais l'absence du mode strict — il compile
- * simplement moins, sans rien dire. Ces tests fixent aussi le motif Vitest du dépôt.
+ * Des règles qu'aucune autre porte ne couvre : la version de Node vit dans deux fichiers que rien
+ * ne relie l'un à l'autre, et ses types dans un troisième ; `tsc` ne signale jamais l'absence du
+ * mode strict — il compile simplement moins, sans rien dire ; et `eslint` sort 0 devant un
+ * avertissement. Ces tests fixent aussi le motif Vitest du dépôt.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { major } from 'semver'
 import * as ts from 'typescript'
 import { expect, test } from 'vitest'
 import { APP_ROOT, readAppJson } from './app-files.ts'
@@ -41,11 +43,28 @@ function resolveCompilerOptions(configFileName: string): ts.CompilerOptions {
   return parsed.options
 }
 
+/** La version de Node épinglée par `.nvmrc`, par exemple `24.21.0`. */
+function pinnedNodeVersion(): string {
+  return readFileSync(join(APP_ROOT, '.nvmrc'), 'utf8').trim()
+}
+
 test('la version de Node est la même dans .nvmrc et dans engines', () => {
-  const pinned = readFileSync(join(APP_ROOT, '.nvmrc'), 'utf8').trim()
   const manifest = readAppJson<{ engines?: { node?: string } }>('package.json')
 
-  expect(manifest.engines?.node).toBe(pinned)
+  expect(manifest.engines?.node).toBe(pinnedNodeVersion())
+})
+
+test('la majeure de @types/node est celle de Node', () => {
+  // Des types d'une majeure plus récente décriraient des API absentes du runtime : `tsc` les
+  // accepterait, Node les ignorerait à l'exécution. Les deux montent ensemble, à la main.
+  const pinned = pinnedNodeVersion()
+  const lockfile = readAppJson<{ packages: Record<string, { version?: string }> }>(
+    'package-lock.json',
+  )
+  const types = lockfile.packages['node_modules/@types/node']?.version
+  if (types === undefined) throw new Error("@types/node n'est plus installé")
+
+  expect(major(types), `@types/node ${types} pour Node ${pinned}`).toBe(major(pinned))
 })
 
 /**
