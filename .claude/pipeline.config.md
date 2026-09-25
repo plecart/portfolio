@@ -53,6 +53,8 @@ pour qu'un rouge de l'une ne masque pas un rouge d'une autre.
 - install      : make install                     # uv sync
 - test         : make test                        # suite complète ; testcontainers arrive avec #7
 - test ciblé   : uv run pytest <chemin|motif>     # une seule cible, pour la boucle TDD
+- test brut    : rtk proxy make test              # sortie du lanceur sans le résumeur RTK du poste :
+                                                  # le verdict se lit ici (cycle-pr 3.2) ; vérifiée le 2026-09-25
 - lint         : make lint                        # ruff check
 - format       : make format                      # ruff format — écrit
 - format:check : make format-check                # vérifie sans écrire
@@ -76,6 +78,8 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 - navigateurs  : make web-browsers                # Chromium pour Playwright ; long, étape distincte en CI
 - test         : make web-test                    # Vitest
 - test ciblé   : cd apps/web && npm test -- <motif>
+- test brut    : rtk proxy make web-test          # sortie du lanceur sans le résumeur RTK du poste ;
+                                                  # vérifiée le 2026-09-25
 - lint         : make web-lint                    # ESLint 9 + jsx-a11y, `--max-warnings 0`
 - format       : n/a                              # aucun formateur front installé — ESLint ne formate pas
 - format:check : n/a

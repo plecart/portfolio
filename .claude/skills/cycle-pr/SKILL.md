@@ -253,13 +253,21 @@ le même commit** — voir `.claude/rules/contraintes.md`. La doc ne se met jama
 
 ### 3.2 Premier passage de tests
 
-Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Trois contrôles complémentaires :
+Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Quatre contrôles complémentaires :
 
 - **Échec d'outillage ≠ échec de code.** Un échec « exécutable introuvable », « fichier utilisé
   par un autre processus » ou un compilateur qui sort brutalement après une commande tuée n'est
   pas un test rouge : vérifier d'abord l'environnement — processus orphelins laissés par un run
   interrompu (les lister **filtrés sur le chemin du worktree** avant de les tuer), worktree non
   provisionné — et ne diagnostiquer le code que sur un environnement propre.
+- **Un résumeur n'est pas un verdict.** Quand la commande de test passe par un filtre ou un
+  résumeur — proxy de sortie, hook de réécriture —, tout bilan qui annonce **zéro test collecté**,
+  ou tout état autre que le rouge nommé à l'avance, se relit sur la **sortie brute du lanceur**
+  avant d'être interprété : la commande `test brut` de `.claude/pipeline.config.md`, ou à défaut
+  le contournement que le résumeur documente. Un résumeur a déjà rendu « aucun test collecté »
+  sur un `1 failed, 3 passed` dont le message d'assertion portait un accent, et un rouge attendu
+  lu comme « rien collecté » se conclut « environnement cassé ». Tant qu'il n'a pas montré qu'il
+  distingue « zéro test » d'« un test rouge », son bilan n'est pas un verdict.
 - **Couverture par commit.** Lire le rapport de couverture du delta : une ligne non couverte est
   d'abord une hypothèse de **code écrit trop tôt**, à déplacer vers le commit de son premier
   appelant — avant d'être un test manquant. C'est le seul instrument qui rende opposable
@@ -378,7 +386,10 @@ comme un travail rigoureux. Trois exigences structurelles, à chaque passe :
    vert. Un harnais qui ne sait pas produire de vert ne sait rien produire.
 2. **Trois états, jamais deux** : ROUGE (assertion) / VERT (trou) / **PANNE D'OUTIL**. Le verdict se
    lit dans la ligne de bilan du lanceur (`failed` vs `error`), jamais dans le code de retour ni
-   dans un `cmd && ok || ko`.
+   dans un `cmd && ok || ko` — ni dans le bilan d'un résumeur qui n'a pas encore montré un rouge
+   nommé : la ligne de bilan se lit sur la sortie brute (3.2), et le harnais doit avoir produit
+   **au moins une fois un ROUGE lisible avec son nom de test** avant qu'on accorde du crédit à
+   ses VERTS.
 3. **Le rouge attendu est nommé avant le run** — quel test, quel paramètre — et le harnais vérifie
    que ce nom figure parmi les échecs. C'est le seul contrôle qui distingue « le garde a mordu »
    de « tout est tombé ».
