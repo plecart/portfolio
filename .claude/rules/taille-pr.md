@@ -13,8 +13,8 @@
   pas de préfixe de phase ni de numéro de PR (traçables via l'outil de suivi).
 - **Exception : les commits et PR d'un bot de dépendances** (Dependabot, Renovate…). Seul le
   préfixe conventional est tenu, réglé dans la configuration du bot (`chore(deps)`,
-  `chore(deps-dev)`) ; la description en anglais et le corps viennent du bot, qui ne sait pas
-  les écrire autrement. Même exemption que pour les métadonnées de PR
+  `chore(deps-dev)`) ; la description et le corps viennent du bot — en anglais pour Dependabot,
+  qui ne sait pas les écrire autrement. Même exemption que pour les métadonnées de PR
   (`.claude/pipeline.config.md`, « Métadonnées d'une PR »).
 
 ## Branches
