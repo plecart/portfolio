@@ -10,6 +10,13 @@
 #
 # Trois jobs, un par pile. Ils n'ont pas les mêmes prérequis — `uv`, Node, Docker — et les
 # séparer évite qu'un rouge de l'une masque un rouge d'une autre.
+#
+# Chaque action est épinglée par **empreinte de commit**, sa version en commentaire : une
+# étiquette peut être déplacée par son propriétaire ou par un attaquant, et le déplacement
+# s'exécuterait ici sans aucun signal ; une empreinte ne bouge pas. Le commentaire porte
+# l'étiquette la plus précise du commit (`v7.0.1`, pas `v7`) : c'est la seule forme que
+# Dependabot sait réécrire en même temps que l'empreinte. `apps/api/tests/test_supply_chain.py`
+# refuse toute autre forme.
 
 name: CI
 
@@ -48,9 +55,9 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
 
       - name: Install
         run: make install
@@ -75,9 +82,9 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: apps/web/.nvmrc
           cache: npm
@@ -120,7 +127,7 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Compose refuse de résoudre un `env_file` dont la cible manque — y compris pour un simple
       # `config`, et y compris avec `--env-file` (mesuré). Le geste est exactement celui que
@@ -138,12 +145,12 @@ jobs:
       # sait pas écrire. Cette action le crée **et** le sélectionne ; c'est parce que la cible
       # `build` appelle `docker buildx build` que la sélection lui parvient — `docker` tout
       # court reviendrait au pilote par défaut et l'export de cache échouerait.
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       # Cache des couches entre deux runs. La clé suit les fichiers que la couche de
       # dépendances consomme : elle ne change donc que quand cette couche change réellement —
       # ce qui évite aussi que le cache soit réécrit, et grossisse, à chaque run.
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: /tmp/buildx-cache
           key: >-
