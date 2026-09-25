@@ -74,6 +74,11 @@ PYTHON_UPGRADES_IGNORED = {
     "update-types": ["version-update:semver-major", "version-update:semver-minor"],
 }
 
+NODE_TYPES_UPGRADES_IGNORED = {
+    "dependency-name": "@types/node",
+    "update-types": ["version-update:semver-major"],
+}
+
 # Le motif de nom par lequel Dependabot reconnaît un Dockerfile (`DOCKER_REGEXP`,
 # `docker/file_fetcher.rb`) — `Dockerfile`, `Dockerfile.prod`, `Dockerfile-dev`, `api.Dockerfile`,
 # `Containerfile` —, moins les fichiers d'exclusion `*.dockerignore`. Un document dont le nom
@@ -506,17 +511,22 @@ def npm_majors_refused() -> list[dict[str, Any]]:
     ]
 
 
-def test_dependabot_ne_refuse_que_les_majeures_de_la_table_des_refus() -> None:
-    """Les `ignore` npm sont exactement ceux de la table, que le test Vitest fait expirer.
+def test_dependabot_ne_refuse_sur_npm_que_la_table_des_refus_et_les_types_de_node() -> None:
+    """Les `ignore` npm sont ceux de la table des refus, puis celui de `@types/node`.
 
     Une règle hors de la table refuserait en silence et pour toujours : aucun test ne la ferait
     expirer. Une entrée de la table sans sa règle ne refuserait rien. Retirer une entrée pour faire
     taire le test qui expire rougit donc ici, tant que la règle reste en place : le refus se lève
     en entier, ou pas du tout (`docs/frontend-outillage.md` §2.4).
+
+    `@types/node` est la seule règle hors table, parce qu'elle ne tombe jamais seule : ses types
+    suivent la majeure de Node, que le projet change à la main, comme la version de Python de
+    l'image. `apps/web/tests/configuration.test.ts` exige les deux majeures égales ; la règle
+    empêche Dependabot de proposer, chaque semaine, des types en avance sur le runtime.
     """
     ignored = dependabot_entry("npm").get("ignore", [])
 
-    assert ignored == npm_majors_refused()
+    assert ignored == [*npm_majors_refused(), NODE_TYPES_UPGRADES_IGNORED]
 
 
 def dockerfile_id(path: Path) -> str:

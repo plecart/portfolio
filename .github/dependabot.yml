@@ -42,7 +42,7 @@ updates:
       include: scope
     ignore:
       # Montées majeures refusées tant qu'un plugin qu'on garde ne les déclare pas comme pair
-      # (docs/frontend-outillage.md §2.4). Chaque règle a son entrée dans
+      # (docs/frontend-outillage.md §2.4). Ces règles-ci ont chacune leur entrée dans
       # `apps/web/dependency-refusals.json`, et un test rougit le jour où sa raison tombe : elle se
       # retire alors, sans quoi, relative à la version en place, elle refuserait aussi la majeure
       # suivante. Une mise à jour de sécurité passe outre un `update-types`.
@@ -57,6 +57,11 @@ updates:
       # TypeScript 7 : `typescript-eslint` déclare `typescript >=4.8.4 <6.1.0`, `npm ci` échouerait
       # en `ERESOLVE`.
       - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      # Hors table, et permanent : `@types/node` suit la majeure de Node (`apps/web/.nvmrc`), que le
+      # projet change à la main — des types plus récents décriraient des API absentes du runtime.
+      # `apps/web/tests/configuration.test.ts` exige les deux majeures égales.
+      - dependency-name: "@types/node"
         update-types: [version-update:semver-major]
 
   # Les empreintes de `.github/workflows/*.yml` et leur commentaire de version, mis à jour
