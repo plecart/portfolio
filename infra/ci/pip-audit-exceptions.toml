@@ -10,4 +10,4 @@
 #   [[exception]]
 #   id = "GHSA-xxxx-xxxx-xxxx"   # identifiant rapporté par pip-audit (GHSA, PYSEC ou CVE)
 #   reason = "une ligne : pourquoi l'avis ne s'applique pas ici, ou ce qu'on attend"
-#   expires = 2026-12-31         # date TOML, sans guillemets ; l'exception vaut ce jour inclus (UTC)
+#   expires = 2026-12-31         # date TOML sans guillemets ; l'exception vaut ce jour (UTC) inclus

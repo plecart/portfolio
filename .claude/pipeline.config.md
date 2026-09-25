@@ -59,8 +59,9 @@ pour qu'un rouge de l'une ne masque pas un rouge d'une autre.
 - format       : make format                      # ruff format — écrit
 - format:check : make format-check                # vérifie sans écrire
 - typecheck    : make typecheck                   # pyright, mode strict (cadrage §8.4)
-- audit        : make audit                       # pip-audit, toute vulnérabilité bloque ; exceptions
-                                                  # datées dans infra/ci/pip-audit-exceptions.toml ;
+- audit        : make audit                       # pip-audit, toute vulnérabilité bloque ;
+                                                  # exceptions datées dans
+                                                  # infra/ci/pip-audit-exceptions.toml ;
                                                   # vérifiée le 2026-09-25 (#5)
 - hooks        : uv run pre-commit install        # ruff seulement (check --fix, format)
 
