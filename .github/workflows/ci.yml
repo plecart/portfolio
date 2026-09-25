@@ -159,7 +159,7 @@ jobs:
       # sait pas écrire. Cette action le crée **et** le sélectionne ; c'est parce que la cible
       # `build` appelle `docker buildx build` que la sélection lui parvient — `docker` tout
       # court reviendrait au pilote par défaut et l'export de cache échouerait.
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       # Cache des couches entre deux runs. La clé suit les fichiers que la couche de
       # dépendances consomme : elle ne change donc que quand cette couche change réellement —
