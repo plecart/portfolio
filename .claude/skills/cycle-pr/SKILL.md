@@ -263,7 +263,7 @@ le même commit** — voir `.claude/rules/contraintes.md`. La doc ne se met jama
 
 ### 3.2 Premier passage de tests
 
-Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Cinq contrôles complémentaires :
+Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Six contrôles complémentaires :
 
 - **Échec d'outillage ≠ échec de code.** Un échec « exécutable introuvable », « fichier utilisé
   par un autre processus » ou un compilateur qui sort brutalement après une commande tuée n'est
@@ -285,6 +285,14 @@ Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Cinq contrô
   qu'en CI. Quatorze commits verts sous Windows ont rougi en onze secondes sous Linux, sur une
   règle de lint que NTFS ne peut pas déclencher ; l'inverse existe aussi, un fichier que
   `.gitattributes` pinne en LF et qu'une copie de travail CRLF fait rougir sur le seul poste.
+- **Une commande du projet que la suite n'exécute pas est invisible à toutes les portes.** Si le
+  delta touche le fichier de commandes du projet (`Makefile`, `justfile`, scripts du manifeste)
+  ou la définition d'une commande listée dans `.claude/pipeline.config.md`, **exécuter cette
+  commande** — pas seulement la suite de tests : une cible qu'aucune porte n'appelle n'est
+  vérifiée par personne, et sa cohérence à la lecture est précisément ce qui rend le défaut
+  invisible (un `export` posé avant un `?=` vide la variable, et le fichier reste lisible). Une
+  cible qui ne peut pas tourner ici — Docker, jeton, réseau — se vérifie sur la commande **après
+  expansion**, `make --dry-run <cible>`, jamais sur le texte du fichier.
 - **Couverture par commit.** Lire le rapport de couverture du delta : une ligne non couverte est
   d'abord une hypothèse de **code écrit trop tôt**, à déplacer vers le commit de son premier
   appelant — avant d'être un test manquant. C'est le seul instrument qui rende opposable
@@ -317,7 +325,8 @@ Spécifique à cette étape :
 
 ### 3.4 Second passage de tests
 
-Le cleanup a pu casser quelque chose. Relancer les tests → **vert obligatoire**.
+Le cleanup a pu casser quelque chose. Relancer les tests → **vert obligatoire** — et la commande
+du projet que 3.2 a fait exécuter, si le delta la touche.
 
 ### 3.5 Commit
 
@@ -383,6 +392,9 @@ indépendante » du body de PR — jamais de saut silencieux. L'agent reçoit **
     verte après la suppression d'un filtre PII ;
   - **correctif de fuite** — exiger le dénombrement de `cleanup-verbatim.md` : « sous combien de
     formes cette donnée voyage-t-elle, et combien en as-tu mesurées ? ».
+- la consigne **commande non exercée** : pour toute cible du fichier de commandes que la suite
+  n'appelle pas, exiger un test sur sa forme expansée (`make --dry-run <cible>`, 3.2) — la
+  différence entre vérifier ce qui est écrit et ce qui s'exécutera.
 
 Il rend : chaque critère d'acceptation ✅ / ❌ / ⚠️ avec preuve, puis ses constats classés
 bloquant / important / mineur, chacun avec fichier, raison et marqueur de provenance. **Ne pas
