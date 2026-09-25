@@ -34,13 +34,15 @@ l'Étape 6 — s'arrêter après l'outil en cours, remonter à l'utilisateur, ja
 **Éprouver les outils d'abord.** Un skill présuppose des outils ; tant qu'ils n'ont pas été
 éprouvés, son plan est une hypothèse. Avant d'écrire une ligne du briefing, lancer la commande la
 plus anodine de chaque outil dont le cycle dépend — `git status`, `gh auth status`, la commande
-`test` de `.claude/pipeline.config.md` — et exiger une **sortie plausible**, pas seulement un code
+`test` de `.claude/pipeline.config.md` (sauf si elle y porte le marqueur `# non vérifiée` : voir
+plus bas) — et exiger une **sortie plausible**, pas seulement un code
 de retour. Puis **au moins une écriture** : `git commit --allow-empty -m "chore: sonde outillage"`
 suivi de `git reset --soft HEAD~1`. Un outil branché sur un hook, un verrou ou un jeton ne se
 révèle qu'à l'opération qui le déclenche ; une commande de lecture prouve que le binaire répond,
 jamais que l'opération passera — `git status` ne déclenche aucun hook, le premier commit les
 déclenche tous. Même exigence pour `gh` — `gh api repos/<owner>/<repo> --jq .permissions.push`
-doit rendre `true` — et pour la commande de format, qui écrit. Le tout sur un arbre et un index
+doit rendre `true` — et pour la commande de format, qui écrit (même exception). Le tout sur un
+arbre et un index
 propres (`git status` vide) : la sonde de commit emporte ce qui est stagé, et la commande de
 format réécrit ce qui ne l'est pas.
 
@@ -52,10 +54,10 @@ problème de permissions alors que c'est l'outillage ; éprouver coûte quelques
 briefing, et une demi-session après le « go ».
 
 **Une commande marquée `# non vérifiée`** dans `.claude/pipeline.config.md` signale un projet
-initialisé sans code : cette PR, la première qui en pose, porte aussi ce que `init-projet` a
-reporté — la génération CI et Dependabot de son étape 7, la vérification des commandes de son
-étape 11, puis le retrait des marqueurs. L'inscrire au briefing ; sans elle, le projet resterait
-sans CI.
+initialisé sans code. Si cette PR est la première à poser du code, elle porte aussi ce que
+`init-projet` a reporté — la génération CI et Dependabot de son étape 7, la vérification des
+commandes de son étape 11, puis le retrait des marqueurs. L'inscrire au briefing ; sans elle,
+le projet resterait sans CI.
 
 Produire un briefing écrit AVANT de créer la branche :
 
