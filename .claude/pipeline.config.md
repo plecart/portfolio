@@ -93,6 +93,10 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 
 ## Qualité
 - seuil de couverture : aucun (cadrage annexe A : « pragmatique ; évaluations RAG et E2E prioritaires »)
+- règles sensibles à la plateforme (poste Windows, CI Linux) :
+  - bit exécutable POSIX (`ruff` `EXE001`) — vérifié en CI seulement
+  - fins de ligne des fichiers lus par un conteneur (`.gitattributes` + `test_infra`) — rouge
+    possible sur le seul poste, copie de travail en CRLF
 - gates bloquants en CI :
   - back : lint, format:check, typecheck, test
   - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse, audit

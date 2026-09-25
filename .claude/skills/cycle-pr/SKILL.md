@@ -39,14 +39,16 @@ de retour. Puis **au moins une écriture** : `git commit --allow-empty -m "chore
 suivi de `git reset --soft HEAD~1`. Un outil branché sur un hook, un verrou ou un jeton ne se
 révèle qu'à l'opération qui le déclenche ; une commande de lecture prouve que le binaire répond,
 jamais que l'opération passera — `git status` ne déclenche aucun hook, le premier commit les
-déclenche tous. Même exigence pour `gh` (droit d'écriture sur le dépôt) et pour la commande de
-format, qui écrit.
+déclenche tous. Même exigence pour `gh` — `gh api repos/<owner>/<repo> --jq .permissions.push`
+doit rendre `true` — et pour la commande de format, qui écrit. Le tout sur un arbre et un index
+propres (`git status` vide) : la sonde de commit emporte ce qui est stagé, et la commande de
+format réécrit ce qui ne l'est pas.
 
 Un échec ici se remonte à l'utilisateur **avant** le briefing, avec les cibles de correction
 possibles et leur portée (session, projet, machine) : c'est un arbitrage de configuration, jamais
 une décision du skill — **un skill ne modifie pas la configuration de l'utilisateur pour se
 débloquer lui-même**. Un même message de refus quelle que soit la commande se lit comme un
-problème de permissions alors que c'est l'outillage ; éprouver coûte quatre commandes avant le
+problème de permissions alors que c'est l'outillage ; éprouver coûte quelques commandes avant le
 briefing, et une demi-session après le « go ».
 
 Produire un briefing écrit AVANT de créer la branche :
@@ -62,7 +64,7 @@ maintenant coûte 30 secondes ; la même ambiguïté après 5 commits coûte une
 ### Porte d'entrée obligatoire — l'interrogatoire
 
 **Aucune PR ne démarre sans que le travail soit passé par `interroge-moi`.** Vérifier l'état de
-l'issue avant toute chose :
+l'issue dès les outils éprouvés :
 
 - **Issue interrogée** (passée par `needs-interrogation`, décisions consignées dans le brief
   d'agent) → relire ces décisions, et vérifier qu'elles tiennent encore (auto-challenge ci-dessous).
@@ -185,11 +187,12 @@ Chaque commit suit **exactement** :
 ```
 
 **La boucle s'enchaîne sans rendre la main.** Un cycle AFK va de 3.1 à 3.5 puis repart en 3.1
-jusqu'à l'Étape 4 ; l'annonce de l'étape suivante (« Next : commit 2/3 ») est un **titre**, pas
-une demande d'autorisation. Les seuls arrêts légitimes du cycle : une question dont la réponse
-change le travail, un arrêt `decisions-vs-doc`, le point d'arrêt humain de l'Étape 5 (zone
-sensible, une fois par PR) et le « go » de l'Étape 7. Ailleurs, s'arrêter est une remise de main
-que personne n'a demandée.
+jusqu'à l'Étape 4 — en lançant au passage la **première passe de relecture 4.2** dès que le
+commit qui vient d'être fait pose un invariant que les suivants supposeront vrai ; l'annonce de
+l'étape suivante (« Next : commit 2/3 ») est un **titre**, pas une demande d'autorisation. Les
+seuls arrêts légitimes du cycle : une question dont la réponse change le travail, un arrêt
+`decisions-vs-doc`, le point d'arrêt humain de l'Étape 5 (zone sensible, une fois par PR) et le
+« go » de l'Étape 7. Ailleurs, s'arrêter est une remise de main que personne n'a demandée.
 
 ### 3.1 Modification — en TDD (tracer bullet vertical)
 
@@ -281,10 +284,11 @@ Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Six contrôl
 - **Une porte verte ne vaut que pour la plateforme qui l'a rendue.** Quand le poste et la CI n'ont
   pas le même OS, recenser une fois, au premier scaffold, les règles de qualité sensibles à la
   plateforme — bit exécutable, fins de ligne, sensibilité à la casse des chemins, séparateur de
-  chemin, encodage par défaut — et dire dans les `Notes` de la PR lesquelles ne sont vérifiées
-  qu'en CI. Quatorze commits verts sous Windows ont rougi en onze secondes sous Linux, sur une
-  règle de lint que NTFS ne peut pas déclencher ; l'inverse existe aussi, un fichier que
-  `.gitattributes` pinne en LF et qu'une copie de travail CRLF fait rougir sur le seul poste.
+  chemin, encodage par défaut — dans la section « Qualité » de `.claude/pipeline.config.md`, et
+  dire dans les `Notes` de la PR lesquelles ne sont vérifiées qu'en CI. Quatorze commits verts
+  sous Windows ont rougi en onze secondes sous Linux, sur une règle de lint que NTFS ne peut pas
+  déclencher ; l'inverse existe aussi, un fichier que `.gitattributes` pinne en LF et qu'une copie
+  de travail CRLF fait rougir sur le seul poste.
 - **Une commande du projet que la suite n'exécute pas est invisible à toutes les portes.** Si le
   delta touche le fichier de commandes du projet (`Makefile`, `justfile`, scripts du manifeste)
   ou la définition d'une commande listée dans `.claude/pipeline.config.md`, **exécuter cette
@@ -292,7 +296,8 @@ Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Six contrôl
   vérifiée par personne, et sa cohérence à la lecture est précisément ce qui rend le défaut
   invisible (un `export` posé avant un `?=` vide la variable, et le fichier reste lisible). Une
   cible qui ne peut pas tourner ici — Docker, jeton, réseau — se vérifie sur la commande **après
-  expansion**, `make --dry-run <cible>`, jamais sur le texte du fichier.
+  expansion** (`make --dry-run <cible>`, ou l'équivalent du lanceur du projet), jamais sur le
+  texte du fichier.
 - **Couverture par commit.** Lire le rapport de couverture du delta : une ligne non couverte est
   d'abord une hypothèse de **code écrit trop tôt**, à déplacer vers le commit de son premier
   appelant — avant d'être un test manquant. C'est le seul instrument qui rende opposable
@@ -337,13 +342,14 @@ git commit -m "type(scope): description"
 ```
 
 Pas de corps, pas de footer, pas de `Co-Authored-By`, pas de numéro de PR. Breaking change : `!`
-dans le titre. Puis enchaîner sur le commit suivant (retour 3.1).
+dans le titre. Puis enchaîner sur le commit suivant (retour 3.1) — ou, si ce commit vient de poser
+le socle, lancer d'abord la première passe de relecture (4.2, « En deux temps »).
 
 ## Étape 4 — Relecture indépendante (avant `git push`)
 
-Deux passes, dans cet ordre. L'auto-review (4.1) quand tous les commits sont faits. La relecture
-à contexte vierge (4.2) **en deux temps** : une première fois dès que le socle est posé, une
-seconde à la fin, sur ce qui a été écrit après.
+Deux passes. L'auto-review (4.1) quand tous les commits sont faits. La relecture à contexte
+vierge (4.2) **en deux temps** : une première fois dès que le socle est posé, en plein cycle de
+commit ; une seconde après 4.1, sur ce qui a été écrit depuis la première.
 
 **4.1 Auto-review** — revue critique du **diff complet de la branche** (`main..HEAD`), en vision
 d'ensemble : problèmes d'architecture (couplage, frontières), naming incohérent entre commits,
@@ -365,7 +371,8 @@ avec le diff et le prompt de relecture verbatim, et le noter dans la section « 
 indépendante » du body de PR — jamais de saut silencieux. L'agent reçoit **uniquement** :
 
 - le corps de l'issue et son brief d'agent (ou le briefing de l'Étape 1) ;
-- le diff `main..HEAD` et le droit de lire les fichiers touchés ;
+- le diff `main..HEAD` et le droit de lire les fichiers touchés — en seconde passe, le diff
+  `<sha de fin de la première passe>..HEAD` et les constats de la première, corrigés ou écartés ;
 - `.claude/rules/contraintes.md`, `.claude/rules/cleanup-verbatim.md` et le prompt de relecture
   **verbatim** ;
 - la consigne **frontières tierces** : pour chaque appel à une bibliothèque ou un framework tiers à
@@ -394,9 +401,10 @@ indépendante » du body de PR — jamais de saut silencieux. L'agent reçoit **
     verte après la suppression d'un filtre PII ;
   - **correctif de fuite** — exiger le dénombrement de `cleanup-verbatim.md` : « sous combien de
     formes cette donnée voyage-t-elle, et combien en as-tu mesurées ? ».
-- la consigne **commande non exercée** : pour toute cible du fichier de commandes que la suite
-  n'appelle pas, exiger un test sur sa forme expansée (`make --dry-run <cible>`, 3.2) — la
-  différence entre vérifier ce qui est écrit et ce qui s'exécutera.
+- la consigne **commande non exercée** : pour toute cible du fichier de commandes touchée par le
+  delta et que la suite n'appelle pas, exiger qu'elle ait été exécutée (3.2) ou, si elle ne peut
+  pas tourner ici, un test sur sa forme expansée (`make --dry-run <cible>`, ou l'équivalent du
+  lanceur du projet) — la différence entre vérifier ce qui est écrit et ce qui s'exécutera.
 
 Il rend : chaque critère d'acceptation ✅ / ❌ / ⚠️ avec preuve, puis ses constats classés
 bloquant / important / mineur, chacun avec fichier, raison et marqueur de provenance. **Ne pas
@@ -404,11 +412,12 @@ discuter un constat depuis la mémoire de la session : le vérifier dans le code
 tout constat bloquant avant d'éditer sur sa base.
 
 **En deux temps, jamais par commit.** Une première passe dès qu'un commit pose un **invariant que
-les commits suivants supposeront vrai** — le contrat d'infrastructure : image, point d'entrée,
-fichier de composition, contrat de configuration — et une seconde, plus courte, à la fin, sur ce
-qui a été écrit après la première. Le déclencheur est le **contenu** du commit, jamais son rang :
-sur une PR, les deux premiers commits ne portaient qu'une constante et deux dépendances, et tous
-les invariants non gardés vivaient dans les troisième et quatrième. Placée seulement à la fin, la
+les commits suivants supposeront vrai** — par exemple le contrat d'infrastructure : image, point
+d'entrée, fichier de composition, contrat de configuration ; pour une PR de règles, les règles —
+et une seconde, plus courte, à la fin, sur ce qui a été écrit après la première. Le déclencheur
+est le **contenu** du commit, jamais son rang : sur une PR, les deux premiers commits ne portaient
+qu'une constante et deux dépendances, et tous les invariants non gardés vivaient dans les
+troisième et quatrième. Placée seulement à la fin, la
 relecture rend ses constats à la distance maximale du moment où ils auraient pu être absorbés —
 19 commits dont 13 en réaction à des constats arrivés après le vert, 25 tests dont 18 après la
 relecture : un travail juste, rendu cher par sa position dans le temps. Un constat de la première
@@ -443,8 +452,10 @@ Et **lancer les tests par la commande du projet** (`.claude/pipeline.config.md`)
 appel direct au lanceur : c'est elle qui porte l'environnement ; un sous-processus qui la
 court-circuite ne teste pas la même chose que la CI.
 
-Chaque constat retenu → **un commit de fix dédié** (cycle complet 3.1→3.5). La relance n'est pas
-une répétition de la revue : c'est une **revue des commits de correction**, ciblée par un diff
+Un constat retenu de la **première** passe s'absorbe dans le commit à venir qui touche sa zone,
+sinon il reçoit un commit de fix dédié ; un constat de la **seconde** passe → **un commit de fix
+dédié** (cycle complet 3.1→3.5). La relance n'est pas une répétition de la revue, ni une passe au
+sens du plafond « au plus deux » : c'est une **revue des commits de correction**, ciblée par un diff
 explicite (`<sha avant>..<sha après>`) et par la liste de ce que chaque commit prétend régler,
 avec la question obligatoire : « qu'est-ce que ce correctif a cassé, ou fait rougir à tort, que la
 version précédente voyait ? ». Un correctif est du code neuf écrit sous pression de conclure —
@@ -452,7 +463,7 @@ c'est la partie la moins éprouvée de la PR, pas la plus sûre. Boucler tant qu
 ou un important. Les constats écartés sont notés avec leur raison — ils iront dans les `Notes` de
 la PR (Étape 5).
 
-Une fois la relecture propre → `git push`.
+Une fois la seconde passe propre → `git push`.
 
 ## Étape 5 — Finalisation de la PR (passage en ready for review)
 
@@ -482,7 +493,7 @@ body définitif, puis de sortir du draft.
 - [x] <étape non applicable — cochée avec sa raison (« sans objet »), jamais laissée décochée>
 
 ## Relecture indépendante
-<verdict de l'agent de l'Étape 4.2 : constats corrigés (commit) / écartés (raison)>
+<verdicts des deux passes de l'Étape 4.2 : constats corrigés (commit) / écartés (raison)>
 
 ## Notes
 <décisions, follow-ups différés, hors-scope, comportements tiers vérifiés (doc citée)>
@@ -520,8 +531,8 @@ Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur 
 C'est aussi ce `gh pr ready` qui **déclenche le premier run de CI** (événement `ready_for_review`).
 Attendre son résultat avant l'Étape 6 — une PR fraîchement sortie du draft n'a encore aucun run.
 Ce premier run est aussi la **première exécution des portes sur la plateforme cible** : un rouge
-de la famille « sensible à la plateforme » (3.2) y est attendu, et ne se confond ni avec un rouge
-d'infrastructure ni avec un rouge de code de l'Étape 6.
+de la famille « sensible à la plateforme » (3.2) y est attendu — un rouge de code, pas un rouge
+d'infrastructure (Étape 6).
 
 **Si aucun run n'apparaît**, deux causes possibles, à départager dans cet ordre : (1) un run
 existe-t-il pour le SHA de tête (`gh api repos/<owner>/<repo>/actions/runs?head_sha=<sha>`) ?
@@ -577,12 +588,13 @@ une spec périmée.
 
 **Rejouer les vérifications périmées.** Une preuve a deux ancrages : la **tête** de branche et la
 **base** (`git fetch origin`, puis `git merge-base origin/<trunk> HEAD`) — et elle se périme quand
-**ce qu'elle observe** a changé, pas quand un identifiant a changé. Une vérification sans SHA se
-rejoue d'office. Quand la **tête** a bougé : `git diff --stat <sha de la vérification>..HEAD`,
-confronté au périmètre que la vérification déclare observer (« observe : » du Test plan) — elle se
-rejoue si le diff touche un fichier dont elle dépend ; elle reste cochée, ses deux SHA d'origine
-conservés et le nouveau noté à côté, si le diff ne touche que des commentaires, de la
-documentation ou des fichiers qu'elle n'atteint pas. Six vérifications à une minute chacune ont
+**ce qu'elle observe** a changé, pas quand un identifiant a changé. Une vérification sans SHA, ou
+sans « observe : », se rejoue d'office. Quand la **tête** a bougé : `git diff --stat <sha de la
+vérification>..HEAD`, croisé avec ce que la vérification déclare observer (« observe : » du Test
+plan), puis `git diff <sha de la vérification>..HEAD -- <fichiers observés>` pour juger le
+contenu — elle se rejoue si le diff touche du code dont elle dépend ; elle reste cochée, ses deux
+SHA d'origine conservés et le nouveau noté à côté, si le diff ne touche que des commentaires, de
+la documentation ou des fichiers qu'elle n'atteint pas. Six vérifications à une minute chacune ont
 été rejouées trois fois pour des diffs de commentaires : une preuve qu'on rejoue sans qu'elle
 puisse changer de résultat n'est plus une preuve, c'est un rituel, et un rituel coûteux est le
 plus sûr moyen de faire abandonner l'étape.

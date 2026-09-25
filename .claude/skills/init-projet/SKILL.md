@@ -159,6 +159,7 @@ Lues par `cycle-pr`, `execution-qa` et la génération de CI. `n/a` = étape abs
 
 ## Qualité
 - seuil de couverture : <ex. 80 % | aucun>
+- règles sensibles à la plateforme : <n/a si poste et CI ont le même OS | liste, et où chacune est vérifiée — cycle-pr 3.2>
 - gates bloquants en CI : <ex. lint, format:check, typecheck, test>
 - services requis en CI : <ex. postgres:16, redis:7 | aucun>
 
