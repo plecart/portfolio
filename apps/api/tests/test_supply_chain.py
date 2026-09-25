@@ -5,11 +5,14 @@ gardent ce qui ne se verrait qu'après le merge, et en silence : une action ou u
 une étiquette déplaçable, un écosystème que Dependabot ne surveille plus. La porte d'audit Python
 a ses propres tests, dans `test_pip_audit_gate.py`.
 
-Chaque garde lit les fichiers comme l'outil qu'elle protège : le YAML par un analyseur YAML, les
-`FROM` ligne à ligne comme Dependabot. Un motif qui imiterait l'analyseur à la main laisserait
-passer les formes qu'il n'a pas prévues : les relectures de #5 en ont recensé 25 (indentation,
-continuation, mapping en flux, clé entre guillemets, `RUN --mount=from=`, nom non ASCII, fichier
-pas encore suivi…), toutes rejouées contre ces gardes.
+Chaque garde lit les fichiers comme l'outil qu'elle protège : le YAML par un analyseur YAML, un
+Dockerfile instruction par instruction comme Docker, et chaque `FROM` par sa première ligne comme
+Dependabot. Un motif qui imiterait l'analyseur à la main laisserait passer les formes qu'il n'a
+pas prévues — les relectures de #5 ont rejoué 34 formes contre ces gardes (indentation,
+continuation, ancre YAML, mapping en flux, `RUN --mount=from=`, BOM, nom non ASCII, fichier pas
+encore suivi…), chacune au verdict attendu. Trois restent hors d'atteinte, jugées exotiques : une option de `RUN` dont la valeur entre guillemets contient
+une espace, une clé `uses` sous le `with:` d'une action tierce, un `from` en colonne 0 dans un
+heredoc.
 """
 
 import re
@@ -30,9 +33,10 @@ COMPOSITE_ACTION_GLOB = ".github/actions/**/action.y*ml"
 # du commit : Dependabot réécrit un commentaire qui se termine par une étiquette pointant encore
 # sur le commit épinglé (`version_commenter.rb`, dependabot-core), et une étiquette majeure
 # (`v7`) cesse d'y pointer dès qu'une version sort — précisément quand la mise à jour arrive.
-# Le motif lit la ligne, commentaire compris ; l'analyseur YAML compte les `uses` réels, et les
-# deux décomptes doivent coïncider — une forme que le motif ne lit pas (mapping en flux, clé entre
-# guillemets) fait échouer le test au lieu de passer inaperçue.
+# Le motif lit la ligne, commentaire compris ; l'analyseur YAML lit les `uses` réels, et les deux
+# ensembles de références doivent coïncider — une forme que le motif ne lit pas (mapping en flux,
+# clé entre guillemets) fait échouer le test au lieu de passer inaperçue. Des ensembles et non
+# des décomptes : une ancre YAML reprise ailleurs compte deux fois pour l'analyseur.
 USES = re.compile(r"^\s*(?:-\s+)?uses:\s*(?P<reference>\S+)(?P<comment>.*)$", re.MULTILINE)
 PINNED_REFERENCE = re.compile(r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}$")
 VERSION_COMMENT = re.compile(r"^ # v\d+\.\d+\.\d+$")
@@ -68,29 +72,27 @@ PYTHON_UPGRADES_IGNORED = {
     "update-types": ["version-update:semver-major", "version-update:semver-minor"],
 }
 
-# Les noms de fichier que Docker traite comme un Dockerfile : `Dockerfile`, `Dockerfile.<variante>`,
-# `<nom>.Dockerfile`, et leurs équivalents `Containerfile` — pas un `.md` qui en parle, ni un
-# `Dockerfile.dockerignore`.
-DOCKERFILE_NAME = re.compile(
-    r"^(?:dockerfile|containerfile)(?:\.(?!dockerignore$).+)?$|\.(?:dockerfile|containerfile)$",
-    re.IGNORECASE,
-)
+# Le motif de nom par lequel Dependabot reconnaît un Dockerfile (`DOCKER_REGEXP`,
+# `docker/file_fetcher.rb`) — `Dockerfile`, `Dockerfile.prod`, `Dockerfile-dev`, `api.Dockerfile`,
+# `Containerfile` —, moins les fichiers d'exclusion `*.dockerignore`. Un document dont le nom
+# contiendrait « dockerfile » serait lu et échouerait : un rouge visible vaut mieux qu'un trou.
+DOCKERFILE_NAME = re.compile(r"dockerfile|containerfile", re.IGNORECASE)
+DOCKERIGNORE_SUFFIX = ".dockerignore"
 
-# Deux lectures d'un `FROM`. Celle de Docker : toute ligne qui ouvre une instruction `FROM`, même
-# indentée ou continuée sur la ligne suivante. Celle de Dependabot : la colonne 0, l'image sur la
-# même ligne, seule option `--platform` (`FROM_LINE`, `docker/file_parser.rb`). Tout `FROM` de
-# Docker doit être lisible par Dependabot, sans quoi son image ne serait jamais mise à jour.
-FROM_INSTRUCTION = re.compile(r"^[ \t]*FROM\b", re.MULTILINE | re.IGNORECASE)
-READABLE_FROM = re.compile(
-    r"^FROM[ \t]+(?:--platform=\S+[ \t]+)?(?P<image>[^\s\\]\S*)(?:[ \t]+AS[ \t]+(?P<stage>\S+))?",
-    re.MULTILINE | re.IGNORECASE,
+# Un `FROM` lu comme Docker le lit : l'instruction entière, continuations jointes, indentation
+# permise. Et tel que Dependabot le lit : sa première ligne seule, en colonne 0, l'image sur cette
+# ligne, `--platform` pour seule option (`FROM_LINE`, `docker/file_parser.rb`). Les deux lectures
+# doivent trouver la même image, sans quoi Dependabot ne la mettrait jamais à jour.
+DOCKER_FROM = re.compile(
+    r"^\s*FROM\s+(?:--platform=\S+\s+)?(?P<image>\S+)(?:\s+AS\s+(?P<stage>\S+))?", re.IGNORECASE
+)
+DEPENDABOT_FROM = re.compile(
+    r"^FROM[ \t]+(?:--platform=\S+[ \t]+)?(?P<image>[^\s\\]\S*)", re.IGNORECASE
 )
 
 # Les sources `from=` d'un `COPY` ou d'un `RUN`, lues dans les **options** de l'instruction
-# seulement — un `RUN uvx --from=…` passe l'option à la commande, pas à Docker. Lignes de
-# continuation jointes d'abord : Docker les lit comme une seule instruction.
-CONTINUATION = re.compile(r"\\[ \t]*\r?\n")
-LEADING_OPTIONS = re.compile(r"^[ \t]*(?:COPY|RUN)((?:[ \t]+--\S+)+)", re.MULTILINE | re.IGNORECASE)
+# seulement — un `RUN uvx --from=…` passe l'option à la commande, pas à Docker.
+LEADING_OPTIONS = re.compile(r"^\s*(?:COPY|RUN)((?:\s+--\S+)+)", re.IGNORECASE)
 FROM_SOURCE = re.compile(r"(?:--|[,=])from=([^\s,]+)", re.IGNORECASE)
 
 # `image:<version x.y.z>[-variante]@sha256:<empreinte>` — même règle que pour les actions : la
@@ -119,7 +121,9 @@ def repository_files() -> list[str]:
 DOCKERFILES = sorted(
     path
     for path in (REPOSITORY_ROOT / name for name in repository_files())
-    if DOCKERFILE_NAME.search(path.name) and path.is_file()
+    if DOCKERFILE_NAME.search(path.name)
+    and not path.name.lower().endswith(DOCKERIGNORE_SUFFIX)
+    and path.is_file()
 )
 
 
@@ -146,7 +150,8 @@ def test_chaque_action_est_epinglee_par_empreinte_de_commit() -> None:
     for workflow in workflows:
         text = workflow.read_text(encoding="utf-8")
         matches = list(USES.finditer(text))
-        assert len(uses_values(yaml.safe_load(text))) == len(matches), (
+        parsed = {str(value) for value in uses_values(yaml.safe_load(text))}
+        assert parsed == {match["reference"] for match in matches}, (
             f"{workflow.name} : un `uses` échappe au motif — forme non lue, donc non vérifiée"
         )
         found += [(workflow.name, match) for match in matches]
@@ -222,18 +227,50 @@ def test_dependabot_ne_propose_jamais_de_nouvelle_version_de_python() -> None:
     assert ignored == [PYTHON_UPGRADES_IGNORED]
 
 
-def dockerfile_stages(dockerfile: Path) -> tuple[list[str], set[str]]:
-    """Les images citées par les `FROM` d'un Dockerfile, et les noms d'étage qu'il déclare.
-
-    Un `FROM <étage>` qui reprend un étage déjà déclaré n'est pas une image, ni `scratch`, image
-    vide réservée par Docker : ils sont écartés.
+def dockerfile_instructions(dockerfile: Path) -> list[tuple[str, str]]:
+    """Les instructions d'un Dockerfile, chacune sous deux formes.
 
     Returns:
-        Les images, dans l'ordre du fichier, et l'ensemble des noms d'étage (`AS <nom>`).
+        Pour chaque instruction, dans l'ordre : sa première ligne telle qu'écrite — ce que lit
+        Dependabot — et l'instruction entière, lignes de continuation jointes — ce que lit
+        Docker. Lignes vides et commentaires sont écartés, y compris au milieu d'une
+        continuation, comme Docker le fait.
     """
-    lines = list(READABLE_FROM.finditer(dockerfile.read_text(encoding="utf-8")))
-    stages = {line["stage"].lower() for line in lines if line["stage"]}
-    images = [line["image"] for line in lines if line["image"].lower() not in {*stages, "scratch"}]
+    instructions: list[tuple[str, str]] = []
+    first, parts = "", list[str]()
+    for line in dockerfile.read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        first = first or line
+        parts.append(line.rstrip().removesuffix("\\"))
+        if not line.rstrip().endswith("\\"):
+            instructions.append((first, " ".join(parts)))
+            first, parts = "", []
+    if first:
+        instructions.append((first, " ".join(parts)))
+    return instructions
+
+
+def base_images(dockerfile: Path) -> tuple[list[tuple[str, str]], set[str]]:
+    """Les images de base d'un Dockerfile, et les noms d'étage qu'il déclare.
+
+    Un `FROM` qui reprend un étage **déjà** déclaré n'est pas une image, ni `scratch`, image vide
+    réservée par Docker : ils sont écartés. Un `FROM node AS node` cite donc bien l'image `node`.
+
+    Returns:
+        Pour chaque image, dans l'ordre : la première ligne de son `FROM` et l'image lue par
+        Docker ; puis l'ensemble des noms d'étage, en minuscules.
+    """
+    images: list[tuple[str, str]] = []
+    stages: set[str] = set()
+    for first, instruction in dockerfile_instructions(dockerfile):
+        declaration = DOCKER_FROM.match(instruction)
+        if not declaration:
+            continue
+        if declaration["image"].lower() not in {*stages, "scratch"}:
+            images.append((first, declaration["image"]))
+        if declaration["stage"]:
+            stages.add(declaration["stage"].lower())
     return images, stages
 
 
@@ -249,18 +286,20 @@ def test_chaque_image_de_base_est_epinglee_par_empreinte(dockerfile: Path) -> No
     Le guide « Building best practices » de Docker le recommande. L'étiquette reste devant
     l'empreinte, à sa version la plus précise : c'est elle qui porte les mises à jour, Dependabot
     proposant la version de correctif suivante, étiquette et empreinte ensemble. Et chaque `FROM`
-    doit lui être lisible — colonne 0, image sur la même ligne —, sans quoi l'épingle ne bougerait
-    jamais.
+    doit lui être lisible — colonne 0, image sur la première ligne —, sans quoi l'épingle ne
+    bougerait jamais. Un BOM en tête cacherait le premier `FROM` à une lecture ligne à ligne.
     """
-    text = dockerfile.read_text(encoding="utf-8")
-    readable = READABLE_FROM.findall(text)
-    assert len(FROM_INSTRUCTION.findall(text)) == len(readable), (
-        "un `FROM` que Dependabot ne lit pas — indenté, ou image sur la ligne suivante"
-    )
-    images, _ = dockerfile_stages(dockerfile)
+    assert not dockerfile.read_text(encoding="utf-8").startswith("﻿"), "BOM en tête"
+    images, _ = base_images(dockerfile)
 
     assert images, "aucune image de base trouvée — le motif a-t-il cessé de mordre ?"
-    unpinned = [image for image in images if not PINNED_IMAGE.match(image)]
+    unread = [
+        image
+        for first, image in images
+        if not (read := DEPENDABOT_FROM.match(first)) or read["image"] != image
+    ]
+    assert not unread, f"`FROM` que Dependabot ne lit pas (indenté, image à la ligne) : {unread}"
+    unpinned = [image for _, image in images if not PINNED_IMAGE.match(image)]
     assert not unpinned, (
         f"{len(images)} images repassées, sans version x.y.z devant l'empreinte : {unpinned}"
     )
@@ -273,12 +312,12 @@ def test_toute_image_copiee_passe_par_un_etage_nomme(dockerfile: Path) -> None:
     Une image citée seulement par `COPY --from=<image>` ou `RUN --mount=from=<image>` ne serait
     jamais mise à jour : elle est déclarée dans un étage à elle, dont le nom est repris ensuite.
     """
-    _, stages = dockerfile_stages(dockerfile)
-    instructions = CONTINUATION.sub(" ", dockerfile.read_text(encoding="utf-8"))
+    _, stages = base_images(dockerfile)
     sources = [
         source
-        for options in LEADING_OPTIONS.findall(instructions)
-        for source in FROM_SOURCE.findall(options)
+        for _, instruction in dockerfile_instructions(dockerfile)
+        if (options := LEADING_OPTIONS.match(instruction))
+        for source in FROM_SOURCE.findall(options.group(1))
     ]
 
     # Un index (`--from=0`) désigne un étage par son rang : il n'échappe pas plus à Dependabot.
