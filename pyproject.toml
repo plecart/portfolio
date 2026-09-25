@@ -33,6 +33,8 @@ dev = [
     "pre-commit",
     "django-stubs>=6.1.1",
     "pip-audit>=2.10.1",
+    "pyyaml>=6.0.3",
+    "types-pyyaml>=6.0.12.20260906",
 ]
 
 [tool.pytest.ini_options]

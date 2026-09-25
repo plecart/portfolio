@@ -83,11 +83,20 @@ sont pas identiques — les hooks voient les fichiers Python, la CI y ajoute les
 restent dans la boucle de développement et en CI, trop lents pour un hook.
 
 **Audit des dépendances.** `make audit` (Python) et `make web-audit` (front) sont des portes de
-CI : un avis de sécurité bloque la PR. Un avis qui ne s'applique pas au projet — ou le temps
-qu'un correctif paraisse — se suspend par une entrée **datée** de
+CI. Côté Python, tout avis de sécurité connu bloque la PR — `pip-audit` n'expose pas de
+sévérité ; côté front, les avis `high` et `critical`. Un avis Python qui ne s'applique pas au
+projet — ou le temps qu'un correctif paraisse — se suspend par une entrée **datée** de
 [infra/ci/pip-audit-exceptions.toml](infra/ci/pip-audit-exceptions.toml), dont le format est en tête
 du fichier ; la date passée, l'audit rebloque. `npm audit` n'a pas de fichier d'exceptions : son
 arbre se nettoie par les `overrides` du manifeste ([docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4).
+
+**Mises à jour des dépendances.** Dependabot ([.github/dependabot.yml](.github/dependabot.yml))
+ouvre chaque semaine, par écosystème (`uv`, npm, actions GitHub, images Docker), une PR qui
+groupe versions mineures et correctifs ; chaque montée majeure arrive seule. Ses PR sont
+exemptées des métadonnées de PR, passent par la même CI et ne se mergent que sur un go humain.
+Actions et images sont épinglées par empreinte : Dependabot met l'empreinte à jour avec
+l'étiquette. La version de Python n'est jamais proposée — elle se change à la main, dans
+`.python-version` puis dans l'image.
 
 ## Le flux en une page
 

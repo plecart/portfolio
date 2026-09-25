@@ -13,10 +13,12 @@
 #
 # Chaque action est épinglée par **empreinte de commit**, sa version en commentaire : une
 # étiquette peut être déplacée par son propriétaire ou par un attaquant, et le déplacement
-# s'exécuterait ici sans aucun signal ; une empreinte ne bouge pas. Le commentaire porte
-# l'étiquette la plus précise du commit (`v7.0.1`, pas `v7`) : c'est la seule forme que
-# Dependabot sait réécrire en même temps que l'empreinte. `apps/api/tests/test_supply_chain.py`
-# refuse toute autre forme.
+# s'exécuterait ici sans aucun signal ; une empreinte ne bouge pas. Dependabot
+# (`.github/dependabot.yml`) les met à jour chaque semaine, empreinte et commentaire ensemble. Le
+# commentaire porte l'étiquette la plus précise du commit (`v7.0.1`, pas `v7`) : Dependabot ne
+# réécrit qu'un commentaire dont l'étiquette pointe encore sur le commit épinglé, et une étiquette
+# majeure cesse d'y pointer dès qu'une version sort — précisément quand la mise à jour arrive.
+# `apps/api/tests/test_supply_chain.py` refuse toute autre forme.
 
 name: CI
 
@@ -67,10 +69,10 @@ jobs:
       #
       # Seuil : **toute** vulnérabilité connue bloque, là où `npm audit` s'arrête à `high`.
       # `pip-audit` n'expose aucune sévérité — ni option, ni champ dans sa sortie (2.10.1,
-      # pypa/pip-audit#654) — et l'arbre Python, 59 paquets au 2026-09-25, n'a pas le bruit qui
-      # justifie `high` côté npm, où l'arbre en compte dix fois plus. Un avis qui ne s'applique pas
-      # ici passe par une exception datée de `infra/ci/pip-audit-exceptions.toml`, jamais par un
-      # seuil relevé.
+      # pypa/pip-audit#654) — et l'arbre Python, 59 paquets au verrou le 2026-09-25, n'a pas le
+      # bruit qui justifie `high` côté npm, où l'arbre en compte dix fois plus. Un avis qui ne
+      # s'applique pas ici passe par une exception datée de `infra/ci/pip-audit-exceptions.toml`,
+      # jamais par un seuil relevé.
       - name: Audit
         run: make audit
 
