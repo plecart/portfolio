@@ -49,7 +49,12 @@ Es-tu sûr du changement ?
 
 ## Deux sorties, pas trois
 
-1. **Le document gagne** — la décision est abandonnée, on reprend le fil.
+1. **Le document gagne** — sous **deux formes**, énoncées toutes les deux avant de présenter
+   l'arrêt : (a) l'effet de la décision est abandonné ; (b) l'effet est **conservé et déplacé**
+   hors de ce que le document affirme — un bloc voisin, un autre support — ce qui rend le
+   document vrai sans rien perdre. La forme (b) est souvent la moins chère et passe inaperçue
+   parce qu'on raisonne sur la décision, pas sur sa portée. Une sortie dont une seule branche
+   est présentable n'est pas une alternative : c'est une branche résumée au lieu d'explorée.
 2. **La décision gagne** — le document est **amendé maintenant**, dans cette session, via
    `/contradiction` (qui propage aux rangs inférieurs et aux issues).
 

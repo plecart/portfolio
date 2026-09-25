@@ -88,8 +88,11 @@ Montrer les **lignes** avant/après, pas une prose qui décrit le changement : u
 deux secondes. Terminer par la liste des issues candidates à la propagation (étape 5) — sans les
 traiter encore.
 
-**Rappeler l'alternative** : abandonner la décision reste une sortie valide, et souvent la bonne
-quand la cascade est large. Une section close ne se rouvre pas parce que c'était plus rapide.
+**Rappeler l'alternative**, sous ses deux formes (`decisions-vs-doc.md`, « Deux sorties ») :
+abandonner l'effet de la décision, ou le **conserver en le déplaçant** hors de ce que le document
+affirme — deux lignes là où l'amendement coûte parfois un ADR. Une seule forme présentable signale
+une branche résumée, pas explorée. Abandonner reste une sortie valide, et souvent la bonne quand
+la cascade est large. Une section close ne se rouvre pas parce que c'était plus rapide.
 
 ### 4. Appliquer — sur « go » explicite
 
