@@ -28,7 +28,7 @@ FROM python:3.12.14-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc07
 # lignes `FROM`, et une image citée seulement par `COPY --from` ne serait jamais mise à jour.
 # Version figée, comme toutes les épingles du dépôt : `latest` ferait dépendre la
 # reproductibilité de l'image de la date du build.
-FROM ghcr.io/astral-sh/uv:0.12.5@sha256:e85be844203885286c60ffad8a858d48afb6c5a5c237ca0e67f12e74b8f174b1 AS uv
+FROM ghcr.io/astral-sh/uv:0.12.19@sha256:04d046b13e60d6bcec73cbc5e1cad25d680dea90c8573340950a0ac2d1aef424 AS uv
 
 
 FROM base AS build
