@@ -18,7 +18,8 @@ distincts, pour qu'un rouge de l'une ne masque pas un rouge d'une autre.
 ```
 uv sync                     # installe l'espace de travail : racine + apps/api
 cp .env.example .env        # puis renseigner SECRET_KEY
-uv run pre-commit install   # branche les hooks sur ce dépôt
+uv run pre-commit install   # branche les hooks — depuis ce clone, jamais depuis un worktree :
+                            # .git/hooks est partagé et fige le chemin de l'interpréteur qui l'installe
 ```
 
 **Front (`apps/web`)** — Node, épinglé par `apps/web/.nvmrc` ; un gestionnaire de version (`nvm`,

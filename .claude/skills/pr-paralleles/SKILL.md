@@ -88,6 +88,14 @@ absent. Trois gestes, dans l'ordre :
    « exécutable introuvable » signale un worktree non préparé, pas un défaut du code. Consigner
    « provisionné ✅ » dans le tableau de bord.
 
+**Jamais d'installation des hooks depuis un worktree.** `.git/hooks/` vit dans le répertoire git
+commun, partagé par tous les worktrees et le clone principal, et le gabarit écrit par la commande
+`hooks` de `.claude/pipeline.config.md` y fige un **chemin absolu** vers l'interpréteur qui l'a
+installé. Lancée depuis un worktree, elle fait pointer le hook de tout le dépôt vers un
+environnement qui disparaît avec le worktree — et le clone principal refuse ensuite tout commit
+(« exécutable introuvable »), cassé par un worktree qu'il n'a jamais ouvert. Les hooks
+s'installent une fois, depuis le clone principal ; un worktree les trouve installés.
+
 ### 4. Tenir le tableau de bord
 
 Maintenir un fichier `PR-PARALLELES.md` à la racine du dépôt (et le tenir à jour à chaque
@@ -155,6 +163,8 @@ Réalise le cycle complet de l'issue #N en invoquant le skill `cycle-pr` (outil 
 brief : commentaire de l'issue.
 Tu es autorisé à lancer l'agent de relecture de l'Étape 4.2, à ses deux temps : cette
 invocation de `cycle-pr` vaut demande de l'utilisateur.
+Ne lance pas la commande `hooks` de la config ici : les hooks sont partagés entre worktrees et
+déjà installés depuis le clone principal.
 <une ligne par point de vigilance propre à cette issue : HITL attendu, fichier partagé avec une
 autre PR du lot et ordre de merge, décision verrouillée à ne pas rouvrir>
 ```
@@ -267,8 +277,12 @@ Tout contrôle qui autorise une suppression (« cette branche est bien dans `mai
 d'abord sur un **témoin positif**, un cas dont la réponse « oui » est connue : `cmd && ok || ko`
 confond condition fausse et commande en erreur, et c'est l'outil qu'on suspecte en premier.
 
-Vérifier ensuite que les ressources partagées répondent encore (le dépôt principal passe sa
-commande de fumée).
+Vérifier ensuite que les ressources partagées répondent encore : le dépôt principal passe sa
+commande de fumée, et le hook partagé pointe toujours sur lui — le chemin d'interpréteur figé
+dans `.git/hooks/pre-commit` (`grep INSTALL_PYTHON .git/hooks/pre-commit` pour pre-commit) est
+sous le clone principal, sinon relancer la commande `hooks` de la config **depuis sa racine**.
+Un worktree supprimé qui avait installé les hooks laisse ce chemin mort, et la vague sabote le
+dépôt qu'elle servait.
 
 Marquer la ligne `⚪ worktree nettoyé` dans le tableau. Quand tout le lot est nettoyé, supprimer
 `PR-PARALLELES.md` (ou archiver le tableau dans les notes du projet).
