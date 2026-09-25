@@ -166,15 +166,18 @@ sort 0, et les six portes front sont vertes après un `npm ci` depuis un verrou 
 
 **ESLint est épinglé sur la ligne 9** alors que la 10 est publiée : `eslint-plugin-jsx-a11y` 6.10.2,
 sa dernière version, déclare `eslint@^3 || … || ^9`. Tourner sur la 10 demanderait de forcer un pair
-non déclaré, sur le plugin même dont dépend l'accessibilité. À rouvrir dès que le plugin publie son
-support de la 10. Le script de lint porte `--max-warnings 0` : sur les 114 règles actives, 3 sont en
-simple avertissement (`react-hooks/exhaustive-deps`, `incompatible-library`, `unsupported-syntax`) et
-passeraient la porte en silence sans lui — mesuré, `eslint .` sort 0 là où `--max-warnings 0` sort 1.
+non déclaré, sur le plugin même dont dépend l'accessibilité. Le script de lint porte
+`--max-warnings 0` : sur les 114 règles actives, 3 sont en simple avertissement
+(`react-hooks/exhaustive-deps`, `incompatible-library`, `unsupported-syntax`) et passeraient la
+porte en silence sans lui — mesuré, `eslint .` sort 0 là où `--max-warnings 0` sort 1.
 
 **TypeScript reste sur la 6.0** (`~6.0.2`) alors que la 7 est publiée : `typescript-eslint` 8.70.1,
 sa dernière version, déclare `typescript >=4.8.4 <6.1.0`, et aucune 6.1 n'existe. Sur la 7, `npm ci`
-échoue en `ERESOLVE` — mesuré sur la PR Dependabot #43. À rouvrir dès que `typescript-eslint` publie
-son support de la 7.
+échoue en `ERESOLVE` — mesuré sur la PR Dependabot #43.
+
+**Ces deux épingles sont des refus datés, pas des oublis.** Dependabot ne propose plus les majeures
+d'ESLint, d'`@eslint/js` — qui va par paire avec lui — et de TypeScript (`ignore` de
+`.github/dependabot.yml`, 2026-09-25), jusqu'à ce que le plugin concerné publie son support.
 
 La famille Manrope est déclarée **comme jeton de thème Tailwind** (`@theme { --font-sans }`) plutôt
 que sur `:root` : la feuille de base de Tailwind pose déjà la police du document depuis ce jeton, et
