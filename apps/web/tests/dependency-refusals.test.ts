@@ -1,8 +1,9 @@
 /**
  * Les montées majeures refusées, et leur expiration.
  *
- * `dependency-refusals.json` liste les majeures que `.github/dependabot.yml` refuse, chacune avec
- * le plugin gardé qui ne les déclare pas encore comme pair (`docs/frontend-outillage.md` §2.4). Un
+ * `dependency-refusals.json` liste les majeures que `.github/dependabot.yml` refuse le temps
+ * qu'un plugin gardé les accepte, chacune avec ce plugin (`docs/frontend-outillage.md` §2.4) ;
+ * celle de `@types/node`, permanente, n'y est pas (`configuration.test.ts`). Un
  * refus ne doit pas devenir permanent par oubli : chaque cas rougit le jour où la plage
  * `peerDependencies` du plugin, lue dans le verrou, accepte la majeure refusée. Il faut alors
  * lever le refus en entier — son entrée de la table et ses règles `ignore`, que

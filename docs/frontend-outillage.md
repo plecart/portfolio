@@ -1,6 +1,6 @@
 # Frontend — outillage et plan d'installation
 
-_2026-09-18, amendé le 2026-09-23 au scaffold de `apps/web` (#3), puis le 2026-09-25 (versions retirées de l'inventaire, refus de mises à jour majeures). Détaille D44 (cadrage §7), qui remplace D15. Le pourquoi, les options écartées et les points tranchés sont dans l'ADR 0008 (`docs/adr/`) ; ce document garde l'inventaire installé et le plan d'installation._
+_2026-09-18, amendé le 2026-09-23 au scaffold de `apps/web` (#3), puis le 2026-09-25 (versions retirées de l'inventaire, refus de mises à jour majeures) et le 2026-09-26 (majeure de `@types/node` alignée sur Node). Détaille D44 (cadrage §7), qui remplace D15. Le pourquoi, les options écartées et les points tranchés sont dans l'ADR 0008 (`docs/adr/`) ; ce document garde l'inventaire installé et le plan d'installation._
 
 ## 1. Décision D44
 
@@ -28,9 +28,9 @@ _2026-09-18, amendé le 2026-09-23 au scaffold de `apps/web` (#3), puis le 2026-
 ## 2. Inventaire installé
 
 Skills et outils en ligne de commande : 2026-09-18 (§2.1 à §2.3). Application `apps/web` :
-2026-09-23, amendée le 2026-09-25 (§2.4). C'est cette section qui fait foi sur ce qui est installé
-et pourquoi ; les versions de `apps/web` se lisent dans son manifeste et son verrou (§2.4). Le §3
-reste le plan, avec l'état de chaque item.
+2026-09-23, amendée les 2026-09-25 et 26 (§2.4). C'est cette section qui fait foi sur ce qui est
+installé et pourquoi ; les versions de `apps/web` se lisent dans son manifeste et son verrou
+(§2.4). Le §3 reste le plan, avec l'état de chaque item.
 
 ### 2.1 Skills Claude Code (`.claude/skills/`)
 
@@ -81,7 +81,7 @@ Tout conservé. Les signalements, relus un par un, sont des faux positifs :
 | `prototype` | CAUTION | « never judge » : consigne de présentation des variantes |
 | autres | SAFE / CAUTION sans signalement | — |
 
-### 2.4 Application `apps/web` — 2026-09-23, amendée le 2026-09-25
+### 2.4 Application `apps/web` — 2026-09-23, amendée les 2026-09-25 et 26
 
 Node **24.21.0**, LTS active du jour, épinglée par `.nvmrc` et par `engines` (valeurs égales,
 vérifiées par un test). `@types/node` suit sa majeure, vérifiée par un autre test : des types d'une
@@ -188,7 +188,8 @@ Dependabot #43.
 (`ignore` de `.github/dependabot.yml`, 2026-09-25) tant que le plugin concerné ne les déclare pas —
 pour les mises à jour de version seulement : une mise à jour de sécurité passe outre un
 `update-types`. Le refus expire sans qu'on y pense. `dependency-refusals.json` en tient la liste —
-plugin, pair, majeure, paquets refusés —, que `test_supply_chain.py` exige identique aux `ignore` ;
+plugin, pair, majeure, paquets refusés —, que `test_supply_chain.py` exige identique aux `ignore`
+qu'elle fonde (celui de `@types/node`, hors table, vient après eux) ;
 et `tests/dependency-refusals.test.ts` lit dans le verrou la plage de pairs de chaque plugin, avec
 `semver` — la bibliothèque par laquelle npm lui-même résout les plages —, et rougit le jour où elle
 accepte la majeure refusée. Le verrou ne bougeant que par une PR, le rouge apparaît dans celle qui
@@ -244,7 +245,7 @@ partiellement faux à l'exécution ; l'écart est consigné sous chacun d'eux et
 
 1. **Projet** ✅ *fait (#3)* : `npm create vite@latest apps/web -- --template react-ts`, puis suppression de la page de démonstration du gabarit. TypeScript strict **posé explicitement** — contrairement à ce que cet item affirmait, `create-vite` 9.2.1 ne l'active plus (§2.4).
 2. **Tailwind CSS v4** ✅ *fait (#3)* : `npm i -D tailwindcss @tailwindcss/vite`, plugin dans `vite.config.ts`, `@import "tailwindcss";` dans le CSS d'entrée. **Jamais** le script CDN `cdn.tailwindcss.com` (c'est lui qui affiche « ne pas utiliser en production »).
-3. **Alias `@/`** — à faire avec #21 (requis par shadcn) : `paths` dans `tsconfig.json` et `tsconfig.app.json`, `resolve.alias` dans `vite.config.ts`, `npm i -D @types/node`.
+3. **Alias `@/`** — à faire avec #21 (requis par shadcn) : `paths` dans `tsconfig.json` et `tsconfig.app.json`, `resolve.alias` dans `vite.config.ts` (`@types/node` est déjà installé, §2.4).
 4. **shadcn/ui** — à faire avec #21 : `npx shadcn@latest init`, puis `npx shadcn@latest add <composant>` au besoin (`dialog` pour la fiche projet en modal). Radix arrive comme dépendance de chaque composant ; rien à installer à part.
 5. **motion** — hors phase 1 (PRD #1) : `npm i motion` ; import depuis `motion/react`.
 6. **react-bits** — hors phase 1 (PRD #1) : composant par composant, `npx shadcn@latest add @react-bits/<Nom>-TS-TW`. **Licence MIT + Commons Clause** : usage libre, revente d'un produit fondé sur ces composants interdite — citée dans l'ADR 0008.
