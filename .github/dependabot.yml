@@ -41,19 +41,21 @@ updates:
       prefix: chore
       include: scope
     ignore:
-      # Montées majeures refusées tant qu'un pair qu'on garde ne les accepte pas : `npm ci`
-      # échouerait en `ERESOLVE`, chaque semaine (docs/frontend-outillage.md §2.4). Chaque règle a
-      # son entrée dans `apps/web/dependency-refusals.json`, et un test rougit le jour où sa raison
-      # tombe : elle se retire alors, sans quoi, relative à la version en place, elle refuserait
-      # aussi la majeure suivante.
+      # Montées majeures refusées tant qu'un plugin qu'on garde ne les déclare pas comme pair
+      # (docs/frontend-outillage.md §2.4). Chaque règle a son entrée dans
+      # `apps/web/dependency-refusals.json`, et un test rougit le jour où sa raison tombe : elle se
+      # retire alors, sans quoi, relative à la version en place, elle refuserait aussi la majeure
+      # suivante. Une mise à jour de sécurité passe outre un `update-types`.
       #
-      # ESLint 10 : `eslint-plugin-jsx-a11y` déclare `eslint@^3 || … || ^9`. `@eslint/js` va par
-      # paire avec `eslint` et suit son refus.
+      # ESLint 10 : `eslint-plugin-jsx-a11y` déclare `eslint@^3 || … || ^9`, `npm ci` échouerait
+      # en `ERESOLVE`. `@eslint/js` 10 va par paire avec lui : seule, elle passe `npm ci`, mais
+      # déclare `eslint ^10` en pair optionnel et `npm install` échoue.
       - dependency-name: eslint
         update-types: [version-update:semver-major]
       - dependency-name: "@eslint/js"
         update-types: [version-update:semver-major]
-      # TypeScript 7 : `typescript-eslint` déclare `typescript >=4.8.4 <6.1.0`.
+      # TypeScript 7 : `typescript-eslint` déclare `typescript >=4.8.4 <6.1.0`, `npm ci` échouerait
+      # en `ERESOLVE`.
       - dependency-name: typescript
         update-types: [version-update:semver-major]
 

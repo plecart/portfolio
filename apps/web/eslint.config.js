@@ -4,11 +4,10 @@
 // version 9 (il livre `oxlint`, retiré ici — deux linters pour une seule règle d'accessibilité
 // seraient un doublon). La décision ESLint + `jsx-a11y` vient de l'ADR 0008.
 //
-// ESLint est épinglé sur la ligne 9 : `eslint-plugin-jsx-a11y` 6.10.2, sa dernière version,
-// déclare `eslint@^3 || ... || ^9`. Faire tourner sur la 10 demanderait de forcer un pair non
-// déclaré — sur le plugin même dont on dépend pour l'accessibilité. Dependabot ne propose donc
-// plus la 10 (`ignore` de `.github/dependabot.yml`), et `tests/dependency-refusals.test.ts`
-// rougit le jour où le plugin la déclare.
+// ESLint est épinglé sur la ligne 9 tant que `eslint-plugin-jsx-a11y` ne déclare pas la 10 comme
+// pair : la faire tourner demanderait de forcer un pair non déclaré — sur le plugin même dont on
+// dépend pour l'accessibilité. Le refus, et le test qui le fait expirer :
+// docs/frontend-outillage.md §2.4.
 import js from '@eslint/js'
 import jsxA11y from 'eslint-plugin-jsx-a11y'
 import reactHooks from 'eslint-plugin-react-hooks'

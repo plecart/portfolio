@@ -87,9 +87,10 @@ Node **24.21.0**, LTS active du jour, épinglée par `.nvmrc` et par `engines` (
 vérifiées par un test). Paquets directs installés par `npm create vite@latest -- --template react-ts`,
 puis émondés de ce que le gabarit ajoute pour sa page de démonstration. Leurs plages sont dans
 `package.json`, leurs versions installées dans le verrou `package-lock.json` : le tableau n'en
-recopie aucune, une copie datée devenant fausse à la première mise à jour de Dependabot. Seules les
-contraintes de version délibérées sont écrites ici, chacune avec sa raison : Node ci-dessus ;
-ESLint, TypeScript et les `overrides` du manifeste ci-dessous.
+recopie aucune, une copie devenant fausse à la première mise à jour de Dependabot. Les contraintes
+de version délibérées sont écrites avec leur raison — Node ci-dessus ; ESLint, TypeScript et les
+`overrides` du manifeste ci-dessous — ; les autres versions citées dans ce § sont des constats
+datés.
 
 | Paquet | Rôle |
 |---|---|
@@ -165,26 +166,33 @@ cette manœuvre. Il a donc été éprouvé en exécutant réellement l'outil, pa
 Lighthouse 12.6.1 rend 100/100/100/100 sur la page, `lhci healthcheck` trouve Chrome, `lhci assert`
 sort 0, et les six portes front sont vertes après un `npm ci` depuis un verrou régénéré de zéro.
 
-**ESLint est épinglé sur la ligne 9** alors que la 10 est publiée : `eslint-plugin-jsx-a11y` 6.10.2,
-sa dernière version, déclare `eslint@^3 || … || ^9`. Tourner sur la 10 demanderait de forcer un pair
-non déclaré, sur le plugin même dont dépend l'accessibilité. Le script de lint porte
-`--max-warnings 0` : sur les 114 règles actives, 3 sont en simple avertissement
+**ESLint est épinglé sur la ligne 9** alors que la 10 est publiée : `eslint-plugin-jsx-a11y` déclare
+`eslint@^3 || … || ^9` (6.10.2, sa dernière version au 2026-09-25). Tourner sur la 10 demanderait de
+forcer un pair non déclaré, sur le plugin même dont dépend l'accessibilité. `@eslint/js` va par
+paire avec ESLint et reste sur la 9 avec lui : seule, sa 10 passe `npm ci` (PR Dependabot #42), mais
+elle déclare `eslint ^10` en pair optionnel, et `npm install` échoue alors en `ERESOLVE`. Le script
+de lint porte `--max-warnings 0` : sur les 114 règles actives, 3 sont en simple avertissement
 (`react-hooks/exhaustive-deps`, `incompatible-library`, `unsupported-syntax`) et passeraient la
 porte en silence sans lui — mesuré, `eslint .` sort 0 là où `--max-warnings 0` sort 1.
 
-**TypeScript reste sur la 6.0** (`~6.0.2`) alors que la 7 est publiée : `typescript-eslint` 8.70.1,
-sa dernière version, déclare `typescript >=4.8.4 <6.1.0`, et aucune 6.1 n'existe. Sur la 7, `npm ci`
-échoue en `ERESOLVE` — mesuré sur la PR Dependabot #43.
+**TypeScript reste sur la 6.0** (plage en tilde du manifeste) alors que la 7 est publiée :
+`typescript-eslint` déclare `typescript >=4.8.4 <6.1.0` (8.70.1, sa dernière version au 2026-09-25,
+quand aucune 6.1 n'était publiée). Sur la 7, `npm ci` échoue en `ERESOLVE` — mesuré sur la PR
+Dependabot #43.
 
-**Ces deux épingles sont des refus datés, pas des oublis.** Dependabot ne propose plus les majeures
-d'ESLint, d'`@eslint/js` — qui va par paire avec lui — et de TypeScript (`ignore` de
-`.github/dependabot.yml`, 2026-09-25), jusqu'à ce que le plugin concerné publie son support. Le
-refus expire sans qu'on y pense. `dependency-refusals.json` en tient la liste — plugin, pair,
-majeure, paquets refusés —, que `test_supply_chain.py` exige identique aux `ignore` ; et
-`tests/dependency-refusals.test.ts` lit dans le verrou la plage de pairs de chaque plugin, avec
+**Ces épingles sont des refus datés, pas des oublis.** Dependabot ne propose plus ces majeures
+(`ignore` de `.github/dependabot.yml`, 2026-09-25) tant que le plugin concerné ne les déclare pas —
+pour les mises à jour de version seulement : une mise à jour de sécurité passe outre un
+`update-types`. Le refus expire sans qu'on y pense. `dependency-refusals.json` en tient la liste —
+plugin, pair, majeure, paquets refusés —, que `test_supply_chain.py` exige identique aux `ignore` ;
+et `tests/dependency-refusals.test.ts` lit dans le verrou la plage de pairs de chaque plugin, avec
 `semver` — la bibliothèque par laquelle npm lui-même résout les plages —, et rougit le jour où elle
 accepte la majeure refusée. Le verrou ne bougeant que par une PR, le rouge apparaît dans celle qui
-apporte la nouvelle version du plugin ; on lève alors le refus en entier, table et règles ensemble.
+apporte la nouvelle version du plugin — le plus souvent la PR groupée de Dependabot, qu'il bloque.
+On lève alors le refus en entier, table et règles ensemble, dans une PR à part, puis
+`@dependabot rebase` sur la PR bloquée. Avant de lever, vérifier que la dernière majeure publiée
+est acceptée elle aussi : sinon, monter à la main sur la majeure acceptée et reporter le refus sur
+la suivante, table comprise.
 
 La famille Manrope est déclarée **comme jeton de thème Tailwind** (`@theme { --font-sans }`) plutôt
 que sur `:root` : la feuille de base de Tailwind pose déjà la police du document depuis ce jeton, et
