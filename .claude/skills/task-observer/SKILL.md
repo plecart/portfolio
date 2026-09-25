@@ -300,7 +300,13 @@ silently skipped instead of triaged.
 without the original conversation.]
 
 **Suggested improvement:** [Concrete change. For existing skills, name the
-section or rule; for new skills, scope and key components.]
+section or rule; for new skills, scope and key components. Prescribe a
+change to an **artefact** — a line in a skill, a target in the project's
+command file, a config value — never a gesture to repeat; if the only fix
+in sight is a gesture, name the artefact that would make it unnecessary. A
+habit moves the cost, it does not remove it: three gesture-type
+observations were re-applied forty, nineteen and a dozen times in one
+session while none had ever been actioned.]
 
 **Principle:** [The generalisable takeaway — the most important field.]
 ```

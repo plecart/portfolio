@@ -103,6 +103,13 @@ observation has no Status line at all.** Concretely:
 If the counts differ, the delta is statusless entries — surface and
 triage them (as OPEN) rather than proceeding as if the log were clean.
 
+Order the queue by cost already paid: an observation whose workaround has
+been applied repeatedly across sessions (ten times or more, by its own
+account or by later observations citing it) is a **known failure**, not an
+observation — surface it at the top of the review with its application
+count, and read "the fix is a habit" as a finding against the observation
+itself (How to Log, Suggested improvement).
+
 Also read all active cross-cutting principles. If there are no OPEN
 observations and no outstanding principles: report "no open observations
 or outstanding principles", update the timestamp, and stop.
