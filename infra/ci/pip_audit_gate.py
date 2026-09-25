@@ -8,7 +8,8 @@ Usage — les arguments autres que `--exceptions` sont transmis tels quels à `p
 
     python pip_audit_gate.py --exceptions <fichier.toml> [options de pip-audit…]
 
-Code de sortie : celui de `pip-audit` si les exceptions sont valables, 1 sinon.
+Code de sortie : celui de `pip-audit` si les exceptions sont valables ; 1 si le fichier est
+invalide ou une exception expirée ; 2 si la ligne de commande de la porte elle-même est fausse.
 """
 
 import argparse
@@ -61,7 +62,9 @@ def load_waivers(path: Path) -> list[Waiver]:
     try:
         with path.open("rb") as file:
             document = tomllib.load(file)
-    except (OSError, tomllib.TOMLDecodeError) as error:
+    # `UnicodeDecodeError` à part : `tomllib` décode le fichier avant de l'analyser, et cette
+    # erreur-là n'est pas une `TOMLDecodeError` (mesuré, un fichier Latin-1 levait une trace).
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
         raise InvalidWaivers(f"{path} : {error}") from error
 
     unknown = sorted(set(document) - {"exception"})
@@ -98,8 +101,12 @@ def parse_waiver(entry: object, number: int) -> Waiver:
             f"exception n° {number} : champs {sorted(fields)}, attendus {sorted(FIELDS)}"
         )
     identifier, reason, expires = fields["id"], fields["reason"], fields["expires"]
-    if not (isinstance(identifier, str) and identifier.strip()):
-        raise InvalidWaivers(f"exception n° {number} : `id` doit être une chaîne non vide")
+    # Sans espaces autour : `pip-audit` compare l'identifiant exactement, et un `" GHSA-… "`
+    # ne correspondrait à aucun avis — l'exception serait inopérante sans que rien ne le dise.
+    if not (isinstance(identifier, str) and identifier and identifier == identifier.strip()):
+        raise InvalidWaivers(
+            f"exception n° {number} : `id` doit être une chaîne non vide, sans espaces autour"
+        )
     if not (isinstance(reason, str) and reason.strip()):
         raise InvalidWaivers(f"exception n° {number} ({identifier}) : `reason` est vide")
     # `datetime` hérite de `date` : sans le test de type exact, une date et heure passerait ici,
@@ -119,7 +126,8 @@ def main(argv: list[str] | None = None) -> int:
         argv: arguments de la ligne de commande, `sys.argv[1:]` par défaut.
 
     Returns:
-        Le code de sortie : 1 si une exception a expiré, celui de `pip-audit` sinon.
+        Le code de sortie : 1 si le fichier d'exceptions est invalide ou si une exception a
+        expiré, celui de `pip-audit` sinon.
     """
     parser = argparse.ArgumentParser(description="Lance pip-audit sous des exceptions datées.")
     parser.add_argument("--exceptions", type=Path, required=True)
