@@ -1,6 +1,6 @@
 # Frontend — outillage et plan d'installation
 
-_2026-09-18, amendé le 2026-09-23 au scaffold de `apps/web` (#3). Détaille D44 (cadrage §7), qui remplace D15. Le pourquoi, les options écartées et les points tranchés sont dans l'ADR 0008 (`docs/adr/`) ; ce document garde l'inventaire installé et le plan d'installation._
+_2026-09-18, amendé le 2026-09-23 au scaffold de `apps/web` (#3), puis le 2026-09-25 (versions retirées de l'inventaire, refus de mises à jour majeures). Détaille D44 (cadrage §7), qui remplace D15. Le pourquoi, les options écartées et les points tranchés sont dans l'ADR 0008 (`docs/adr/`) ; ce document garde l'inventaire installé et le plan d'installation._
 
 ## 1. Décision D44
 
@@ -28,7 +28,8 @@ _2026-09-18, amendé le 2026-09-23 au scaffold de `apps/web` (#3). Détaille D44
 ## 2. Inventaire installé
 
 Skills et outils en ligne de commande : 2026-09-18 (§2.1 à §2.3). Application `apps/web` :
-2026-09-23 (§2.4). C'est cette section qui fait foi sur ce qui est réellement installé ; le §3
+2026-09-23, amendée le 2026-09-25 (§2.4). C'est cette section qui fait foi sur ce qui est installé
+et pourquoi ; les versions de `apps/web` se lisent dans son manifeste et son verrou (§2.4). Le §3
 reste le plan, avec l'état de chaque item.
 
 ### 2.1 Skills Claude Code (`.claude/skills/`)
@@ -80,28 +81,32 @@ Tout conservé. Les signalements, relus un par un, sont des faux positifs :
 | `prototype` | CAUTION | « never judge » : consigne de présentation des variantes |
 | autres | SAFE / CAUTION sans signalement | — |
 
-### 2.4 Application `apps/web` — 2026-09-23
+### 2.4 Application `apps/web` — 2026-09-23, amendée le 2026-09-25
 
 Node **24.21.0**, LTS active du jour, épinglée par `.nvmrc` et par `engines` (valeurs égales,
 vérifiées par un test). Paquets directs installés par `npm create vite@latest -- --template react-ts`,
-puis émondés de ce que le gabarit ajoute pour sa page de démonstration :
+puis émondés de ce que le gabarit ajoute pour sa page de démonstration. Leurs plages sont dans
+`package.json`, leurs versions installées dans le verrou `package-lock.json` : le tableau n'en
+recopie aucune, une copie datée devenant fausse à la première mise à jour de Dependabot. Seules les
+contraintes de version délibérées sont écrites ici, chacune avec sa raison : Node ci-dessus ;
+ESLint, TypeScript et les `overrides` du manifeste ci-dessous.
 
-| Paquet | Version | Rôle |
-|---|---|---|
-| `react`, `react-dom` | 19.3.0 | Interface en composants |
-| `typescript` | 6.0.3 | Types vérifiés à la compilation, mode strict |
-| `vite` | 8.3.0 | Serveur de développement et compilation |
-| `tailwindcss`, `@tailwindcss/vite` | 4.3.3 | Style utilitaire compilé au build, par le plugin Vite |
-| `@vitejs/plugin-react` | 6.1.1 | Prise en charge de React par Vite |
-| `vitest` | 4.1.11 | Tests unitaires (ADR 0010) |
-| `eslint`, `@eslint/js` | 9.39.5 | Analyse statique — **ligne 9, pas 10** (voir ci-dessous) |
-| `typescript-eslint` | 8.70.1 | Règles TypeScript pour ESLint |
-| `eslint-plugin-jsx-a11y` | 6.10.2 | Accessibilité statique du JSX (ADR 0008) |
-| `eslint-plugin-react-hooks` | 7.1.1 | Règles des hooks React |
-| `@lhci/cli` | 0.15.1 | Lighthouse CI, seuils bloquants de la spec §1.16 |
-| `@playwright/test` | 1.63.0 | Scénarios de bout en bout, Chromium seul |
-| `@axe-core/playwright` | 4.13.0 | Contrôle d'accessibilité par page |
-| `@types/node`, `@types/react`, `@types/react-dom` | 24.13.6 / 19.3.0 | Types ambiants |
+| Paquet | Rôle |
+|---|---|
+| `react`, `react-dom` | Interface en composants |
+| `typescript` | Types vérifiés à la compilation, mode strict — **6.0, pas 7** (voir ci-dessous) |
+| `vite` | Serveur de développement et compilation |
+| `tailwindcss`, `@tailwindcss/vite` | Style utilitaire compilé au build, par le plugin Vite |
+| `@vitejs/plugin-react` | Prise en charge de React par Vite |
+| `vitest` | Tests unitaires (ADR 0010) |
+| `eslint`, `@eslint/js` | Analyse statique — **ligne 9, pas 10** (voir ci-dessous) |
+| `typescript-eslint` | Règles TypeScript pour ESLint |
+| `eslint-plugin-jsx-a11y` | Accessibilité statique du JSX (ADR 0008) |
+| `eslint-plugin-react-hooks` | Règles des hooks React |
+| `@lhci/cli` | Lighthouse CI, seuils bloquants de la spec §1.16 |
+| `@playwright/test` | Scénarios de bout en bout, Chromium seul |
+| `@axe-core/playwright` | Contrôle d'accessibilité par page |
+| `@types/node`, `@types/react`, `@types/react-dom` | Types ambiants |
 
 **Bloc d'aperçu de l'`index.html`.** Entre `<!--meta:start-->` et `<!--meta:end-->`, dans le
 `<head>`. La CI copie l'`index.html` compilé dans l'image `api` ; sur `/projets/<slug>`, une vue
@@ -166,6 +171,11 @@ support de la 10. Le script de lint porte `--max-warnings 0` : sur les 114 règl
 simple avertissement (`react-hooks/exhaustive-deps`, `incompatible-library`, `unsupported-syntax`) et
 passeraient la porte en silence sans lui — mesuré, `eslint .` sort 0 là où `--max-warnings 0` sort 1.
 
+**TypeScript reste sur la 6.0** (`~6.0.2`) alors que la 7 est publiée : `typescript-eslint` 8.70.1,
+sa dernière version, déclare `typescript >=4.8.4 <6.1.0`, et aucune 6.1 n'existe. Sur la 7, `npm ci`
+échoue en `ERESOLVE` — mesuré sur la PR Dependabot #43. À rouvrir dès que `typescript-eslint` publie
+son support de la 7.
+
 La famille Manrope est déclarée **comme jeton de thème Tailwind** (`@theme { --font-sans }`) plutôt
 que sur `:root` : la feuille de base de Tailwind pose déjà la police du document depuis ce jeton, et
 deux déclarations se disputeraient la même propriété. Les jetons de couleur, d'espacement et de
@@ -205,10 +215,10 @@ contre la **version compilée servie en statique**, celle que Caddy publie.
 
 Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les CLI évoluent).
 
-**État au 2026-09-23 (#3)** : les items **1, 2, 10, 11, 12 et 13 sont faits** — versions exactes au
-§2.4, qui fait foi sur ce qui est réellement installé. Les huit autres restent à faire, chacun avec
-l'issue qui le portera. Trois items se sont révélés partiellement faux à l'exécution ; l'écart est
-consigné sous chacun d'eux et détaillé au §2.4.
+**État au 2026-09-23 (#3)** : les items **1, 2, 10, 11, 12 et 13 sont faits** — inventaire au
+§2.4, qui fait foi sur ce qui est installé ; versions dans le verrou `apps/web/package-lock.json`.
+Les huit autres restent à faire, chacun avec l'issue qui le portera. Trois items se sont révélés
+partiellement faux à l'exécution ; l'écart est consigné sous chacun d'eux et détaillé au §2.4.
 
 1. **Projet** ✅ *fait (#3)* : `npm create vite@latest apps/web -- --template react-ts`, puis suppression de la page de démonstration du gabarit. TypeScript strict **posé explicitement** — contrairement à ce que cet item affirmait, `create-vite` 9.2.1 ne l'active plus (§2.4).
 2. **Tailwind CSS v4** ✅ *fait (#3)* : `npm i -D tailwindcss @tailwindcss/vite`, plugin dans `vite.config.ts`, `@import "tailwindcss";` dans le CSS d'entrée. **Jamais** le script CDN `cdn.tailwindcss.com` (c'est lui qui affiche « ne pas utiliser en production »).
