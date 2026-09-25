@@ -133,8 +133,8 @@ Voir [.claude/rules/](.claude/rules/) (chargées automatiquement via `CLAUDE.md`
 
 - **Aucun commit cassé**, jamais d'auto-merge, jamais de force-push — `contraintes.md`
 - **Cleanup pass verbatim** à chaque relecture (DRY / KISS / YAGNI) — `cleanup-verbatim.md`
-- **Format des commits** : `type(scope): description`, préfixe EN + description FR (Dependabot
-  exempté de la description) ; PR ≤ ~10 fichiers / ~500 lignes — `taille-pr.md`
+- **Format des commits** : `type(scope): description`, préfixe EN + description FR (bots de
+  dépendances exemptés de la description) ; PR ≤ ~10 fichiers / ~500 lignes — `taille-pr.md`
 - **Aucune décision ne contredit la doc en silence** : deux citations, arrêt, puis amendement ou
   abandon — `decisions-vs-doc.md`
 
