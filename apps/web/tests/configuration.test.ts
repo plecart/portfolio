@@ -11,7 +11,7 @@ import { join } from 'node:path'
 import { major } from 'semver'
 import * as ts from 'typescript'
 import { expect, test } from 'vitest'
-import { APP_ROOT, readAppJson } from './app-files.ts'
+import { APP_ROOT, installedPackage, readAppJson, type Lockfile } from './app-files.ts'
 
 /** Hôte minimal de lecture : il remonte en exception ce que `tsc` signalerait sur sa sortie. */
 const CONFIG_HOST: ts.ParseConfigFileHost = {
@@ -58,11 +58,8 @@ test('la majeure de @types/node est celle de Node', () => {
   // Des types d'une majeure plus récente décriraient des API absentes du runtime : `tsc` les
   // accepterait, Node les ignorerait à l'exécution. Les deux montent ensemble, à la main.
   const pinned = pinnedNodeVersion()
-  const lockfile = readAppJson<{ packages: Record<string, { version?: string }> }>(
-    'package-lock.json',
-  )
-  const types = lockfile.packages['node_modules/@types/node']?.version
-  if (types === undefined) throw new Error("@types/node n'est plus installé")
+  const lockfile = readAppJson<Lockfile>('package-lock.json')
+  const types = installedPackage(lockfile, '@types/node').version
 
   expect(major(types), `@types/node ${types} pour Node ${pinned}`).toBe(major(pinned))
 })
