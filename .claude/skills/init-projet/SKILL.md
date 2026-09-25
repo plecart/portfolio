@@ -62,6 +62,8 @@ corriger par l'utilisateur. Ce qui reste ambigu après inspection se **demande**
 - **Arborescence** : les dossiers de premier niveau sous la racine du code, qui suggèrent les
   domaines.
 - **Version de runtime** : `.nvmrc`, `.tool-versions`, contrainte du manifeste, image Docker.
+- **Conteneurs** : `Dockerfile`, `Containerfile` — ils ajoutent l'écosystème `docker` de
+  Dependabot (étape 7).
 
 Présenter le résultat comme un **tableau à valider**, valeur par valeur. Pour chaque commande
 absente ou introuvable, demander — ou enregistrer `n/a` si le projet n'a pas cette étape (un projet
@@ -154,13 +156,14 @@ Lues par `cycle-pr`, `execution-qa` et la génération de CI. `n/a` = étape abs
 - format       : <cmd>                  # écrit
 - format:check : <cmd>                  # vérifie sans écrire
 - typecheck    : <cmd | n/a>
+- audit        : <cmd | n/a>            # audit des dépendances, porte de CI (`pip-audit`, `npm audit`…)
 - build        : <cmd | n/a>
 - run local    : <cmd | n/a>
 
 ## Qualité
 - seuil de couverture : <ex. 80 % | aucun>
 - règles sensibles à la plateforme : <n/a si poste et CI ont le même OS | liste, et où chacune est vérifiée — cycle-pr 3.2>
-- gates bloquants en CI : <ex. lint, format:check, typecheck, test>
+- gates bloquants en CI : <ex. audit, lint, format:check, typecheck, test>
 - services requis en CI : <ex. postgres:16, redis:7 | aucun>
 
 ## Périmètre
@@ -213,7 +216,7 @@ avant `gh pr ready` si elles dévient. Toute PR qui n'est pas l'œuvre d'un bot 
 Pour chaque label du mapping absent du dépôt :
 `gh label create <nom> --description "<rôle>" --color <couleur>`. Confirmer ce qui a été créé.
 
-### 7. Copier le template + générer la CI
+### 7. Copier le template + générer la CI et Dependabot
 
 Copier depuis `boilerplate/template/` vers la racine du projet :
 
@@ -239,12 +242,36 @@ est un modèle à trous :
   épinglée depuis « runtime + version » (`actions/setup-node`, `astral-sh/setup-uv`,
   `actions/setup-go`, `actions/setup-java`…).
 - Remplir `{{SERVICES}}` depuis « services requis en CI », ou retirer le bloc s'il n'y en a pas.
+- Remplir `{{CMD_AUDIT}}` depuis la commande `audit`, ou supprimer l'étape si elle vaut `n/a` ;
+  écrire en commentaire, au-dessus de l'étape, le seuil de blocage et sa raison.
+- **Épingler chaque `uses:` par empreinte de commit** — ceux du modèle (`{{ACTION_SHA}} #
+  {{ACTION_VERSION}}`) comme ceux de `{{SETUP_STEPS}}` : la dernière version publiée de
+  l'action, dont l'empreinte se résout à la source (`git ls-remote --tags
+  https://github.com/<owner>/<action>.git` ; pour une étiquette annotée, la ligne `^{}` donne
+  le commit), jamais de mémoire. Le commentaire porte l'étiquette **la plus précise** de ce
+  commit (`v7.0.1`, pas `v7`) : Dependabot ne réécrit qu'un commentaire dont l'étiquette pointe
+  encore sur le commit épinglé. Une étiquette peut être déplacée par qui prend la main sur le
+  dépôt de l'action ; une empreinte non (GitHub, « Secure use reference »).
+- **Conserver `permissions: contents: read`** en tête : le jeton par défaut d'un dépôt peut être
+  bien plus large. Un job qui doit écrire élève ses droits à son niveau, jamais le workflow.
 - **Conserver le garde `if:` et le type `ready_for_review`.** Ils forment une paire : le garde
   empêche la CI de tourner sur les PR en draft (que `cycle-pr` ouvre avant tout code), et le type
   `ready_for_review` est ce qui la déclenche au passage en ready. Retirer l'un sans l'autre donne
   soit une CI qui ne tourne jamais, soit une CI qui tourne sur tous les commits de développement.
 
 Montrer le `ci.yml` généré avant de l'écrire.
+
+Puis **générer `.github/dependabot.yml`** depuis `template/.github/dependabot.yml` : les
+empreintes du `ci.yml` n'avancent que si Dependabot les tient, et le modèle porte déjà
+l'écosystème `github-actions`. Ajouter une entrée par écosystème de la stack — celui du
+gestionnaire de paquets déclaré, et `docker` si un Dockerfile existe —, copiée de l'entrée
+modèle avec le `directory` de son manifeste, puis retirer le bloc `{{ECOSYSTEMES_STACK}}`.
+Les valeurs de `package-ecosystem` se lisent dans la référence des options Dependabot, pas de
+mémoire. Une image de base s'épingle par son étiquette la plus précise suivie de son empreinte
+(`python:3.12.14-slim@sha256:…`) : Dependabot fait avancer les deux ensemble, alors qu'une
+étiquette sans correctif (`3.12`) ne change jamais. Valider le fichier contre le schéma
+(`uvx check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml`), puis le
+montrer avant de l'écrire.
 
 **Runtime épinglé — une version, des fournisseurs.** Si le profil déclare un gestionnaire de
 version (FVM, pyenv, nvm, asdf, mise…), séparer *quelle version* de *qui la fournit* :
@@ -364,8 +391,11 @@ Une commande déclarée mais fausse est pire qu'absente : elle casse `cycle-pr` 
 usage. Corriger la config si l'une échoue pour cause d'erreur de saisie.
 
 **Projet sans code encore** : il n'y a rien à lancer. Enregistrer les commandes cibles avec le
-marqueur `# non vérifiée`, générer le `ci.yml` quand même, et rejouer cette étape en mode
-reconfiguration au premier scaffold — la case de la checklist n'est cochée qu'à ce moment.
+marqueur `# non vérifiée`, et **ne générer ni `ci.yml` ni `dependabot.yml` à l'amorçage** : un
+workflow committé avant le code qu'il vérifie est rouge dès son premier run — vu sur un projet,
+`uv sync` sans manifeste —, contre la règle « aucun commit cassé ». Les générer dans la
+**première PR de scaffold**, avec le code, en rejouant cette étape et l'étape 7 en mode
+reconfiguration — les cases de la checklist ne sont cochées qu'à ce moment.
 
 Deux pièges de diagnostic à cette étape :
 
@@ -404,6 +434,8 @@ générée, skills maison déployés, skills publics installés, context7 dispon
 - [ ] `CLAUDE.md` finalisé (étape 9) : sans section de skill non installé ni `{{CHEMIN_JOURNAL_OBSERVATIONS}}` résiduel
 - [ ] section « Sources de vérité » renseignée (au minimum : les issues ouvertes)
 - [ ] `ci.yml` généré depuis les commandes réelles, sans `{{PLACEHOLDER}}` ni étape `n/a`
+- [ ] chaque `uses:` du `ci.yml` épinglé par empreinte + `# vX.Y.Z` ; `permissions: contents: read` en tête
+- [ ] `.github/dependabot.yml` généré (`github-actions` + écosystèmes de la stack), validé contre le schéma
 - [ ] skills maison déployés dans `.claude/skills/`
 - [ ] `.claude/commands/` copié — exactement une commande par skill déployé, aucune orpheline
 - [ ] skills publics cochés installés (choisis d'après la stack, pas d'un set en dur)
