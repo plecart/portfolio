@@ -149,6 +149,7 @@ Lues par `cycle-pr`, `execution-qa` et la génération de CI. `n/a` = étape abs
 - install      : <cmd>
 - test         : <cmd>                  # suite complète
 - test ciblé   : <cmd> <chemin|motif>   # une seule cible, pour la boucle TDD
+- test brut    : n/a                    # sortie du lanceur sans résumeur, si le poste en a un (cycle-pr 3.2)
 - lint         : <cmd>
 - format       : <cmd>                  # écrit
 - format:check : <cmd>                  # vérifie sans écrire
