@@ -93,7 +93,9 @@ arbre se nettoie par les `overrides` du manifeste ([docs/frontend-outillage.md](
 **Mises à jour des dépendances.** Dependabot ([.github/dependabot.yml](.github/dependabot.yml))
 ouvre chaque semaine, par écosystème (`uv`, npm, actions GitHub, images Docker), une PR qui
 groupe versions mineures et correctifs ; chaque montée majeure arrive seule. Ses PR sont
-exemptées des métadonnées de PR, passent par la même CI et ne se mergent que sur un go humain.
+exemptées des métadonnées de PR et de la description en français (`chore(deps): bump …`,
+[.claude/rules/taille-pr.md](.claude/rules/taille-pr.md)), passent par la même CI et ne se
+mergent que sur un go humain.
 Actions et images sont épinglées par empreinte, derrière leur version la plus précise :
 Dependabot met l'une et l'autre à jour ensemble. Une nouvelle version mineure de Python (3.13)
 n'est jamais proposée — elle se change à la main, dans `.python-version` puis dans l'image ; ses
@@ -130,8 +132,8 @@ Voir [.claude/rules/](.claude/rules/) (chargées automatiquement via `CLAUDE.md`
 
 - **Aucun commit cassé**, jamais d'auto-merge, jamais de force-push — `contraintes.md`
 - **Cleanup pass verbatim** à chaque relecture (DRY / KISS / YAGNI) — `cleanup-verbatim.md`
-- **Format des commits** : `type(scope): description`, préfixe EN + description FR ; PR ≤ ~10
-  fichiers / ~500 lignes — `taille-pr.md`
+- **Format des commits** : `type(scope): description`, préfixe EN + description FR (Dependabot
+  exempté de la description) ; PR ≤ ~10 fichiers / ~500 lignes — `taille-pr.md`
 - **Aucune décision ne contredit la doc en silence** : deux citations, arrêt, puis amendement ou
   abandon — `decisions-vs-doc.md`
 

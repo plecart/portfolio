@@ -11,6 +11,10 @@
   - Breaking change : `!` dans le titre (`feat!: …`), pas de footer.
 - Message de commit = **titre seul**. Pas de corps, pas de footer, pas de `Co-Authored-By`,
   pas de préfixe de phase ni de numéro de PR (traçables via l'outil de suivi).
+- **Exception : les commits et PR de Dependabot.** Seul le préfixe conventional est tenu
+  (`chore(deps)`, `chore(deps-dev)`, réglé dans `.github/dependabot.yml`) ; la description en
+  anglais et le corps viennent du bot, qui ne sait pas les écrire autrement. Même exemption que
+  pour les métadonnées de PR (`.claude/pipeline.config.md`, « Métadonnées d'une PR »).
 
 ## Branches
 - Trunk-based depuis `main` : `git checkout -b <type>/<description>`.
