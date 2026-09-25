@@ -205,15 +205,19 @@ Après le « go » (global, ou issue par issue si le mainteneur préfère trier)
 profiter de l'édition pour reformuler autre chose.
 
 **Amender le brief d'agent dans le même geste** quand la ligne fausse y figure aussi : édition en
-place du commentaire de brief (`gh api -X PATCH repos/<owner>/<repo>/issues/comments/<id> -F
-body=@fichier` — l'id vient de `gh api repos/<owner>/<repo>/issues/<n>/comments`), jamais un second
-commentaire qui laisserait deux briefs concurrents. Le journal de spec vit dans le corps, mais le
-contrat que `cycle-pr` exécute est le brief : un correctif appliqué au seul corps laisse le contrat
-faux.
+place du commentaire de brief (`gh api -X PATCH repos/<owner>/<repo>/issues/comments/<id>
+--field body=@fichier` — l'id vient de `gh api repos/<owner>/<repo>/issues/<n>/comments`), jamais
+un second commentaire qui laisserait deux briefs concurrents. Écrire le drapeau **en forme longue** :
+son raccourci `-F` a un jumeau `-f` qui prend la valeur pour une chaîne littérale — la forme
+destructrice que `contraintes.md`, « Écritures sur un artefact distant », décrit. Le journal de
+spec vit dans le corps, mais le contrat que `cycle-pr` exécute est le brief : un correctif appliqué
+au seul corps laisse le contrat faux.
 
 **Vérification avant de clore la passe** sur une issue portant un brief : re-télécharger le brief
-republié et y chercher chaque « citation issue » marquée `brief` — **zéro occurrence attendue**.
-Une citation encore présente signale un support oublié, pas une passe terminée.
+republié et y chercher chaque « citation issue » marquée `brief` — **zéro occurrence attendue** —
+puis la relecture après écriture de `contraintes.md` (ancre du contenu voulu présente, longueur
+plausible) : un brief vidé passe le contrôle des citations haut la main. Une citation encore
+présente signale un support oublié, pas une passe terminée.
 
 **Relire le corps — et le brief — juste avant d'écrire.** S'ils ont changé depuis la présentation
 du diff — une autre passe de répercussions a pu passer entre-temps, ou le mainteneur a édité — ne

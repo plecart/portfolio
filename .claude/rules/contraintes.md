@@ -77,6 +77,15 @@ Le code visé est **modulaire, scalable, fractionné** — objectif permanent, p
 - Une issue ouverte par le barreau 3 porte **dès sa création** son gabarit, sa catégorie et son
   thème.
 
+## Écritures sur un artefact distant
+- **Toute écriture sur un artefact distant se relit après écriture** — corps ou commentaire
+  d'issue, body de PR, label, milestone : re-télécharger et vérifier que ce qu'on voulait y est,
+  une **ancre** du contenu pour un texte, l'élément lui-même pour un label ou un milestone,
+  **et** pour un texte que la **longueur** est plausible. Le code de retour atteste que la
+  requête a abouti, jamais que le contenu écrit est celui qu'on voulait : une forme destructrice
+  (un chemin pris pour un contenu, un `-f` tapé pour `-F`) rend exactement le même succès qu'une
+  édition, et c'est un brief de 5 000 caractères remplacé par 120 qui l'a montré.
+
 ## Maintenance continue
 - Tenir à jour, sans qu'on le redemande, les supports d'exécution du projet : fichier de commandes
   (`Makefile` / `justfile` / scripts du manifeste) et `.env.example`.
