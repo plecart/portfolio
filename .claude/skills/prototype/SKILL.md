@@ -66,7 +66,11 @@ The picker's markup, styles, keyboard wiring, and placement come from [PICKER.md
 
 ### Phase 5 — Verify and hand off
 
-Run the harness. Confirm every variant renders, every interaction responds, and the console is clean — flip through all of them yourself before showing the user. If browser tooling is available, screenshot each variant.
+Run the harness. Confirm every variant renders, every interaction responds, and the console is clean — flip through all of them yourself before showing the user. If browser tooling is available, screenshot each variant. Three rules for that verification, each born from a run where it was missing:
+
+- **Isolate the instrument.** If the browser tool opens a window the user can see, tell them to open the file in their own browser and not touch that one — a verification surface shared with the user is no longer a verification surface (their clicks, theme toggles and `localStorage` produced identical light and dark captures and three diagnostic passes chasing a bug that did not exist). Prefer a separate headless context, clear `localStorage` on every load (`addInitScript`), and timestamp captures from the page (`performance.now()`), not from the script: a capture taken mid-transition proves nothing without its instant.
+- **Probe the rendered result, never the property you just set.** For every state toggle (theme, open/close, selection), read `getComputedStyle(...)` — `display`, `opacity`, `transform`, position — after the action, not the property or class you wrote. `svg.hidden = true` set a JS expando on an `SVGElement` and changed nothing on screen while the accessible label did change; the defect crossed two runs because the probe re-read the write. A before/after screenshot of the affected area accompanies each toggle.
+- **One emulated context per input modality the brief names.** A viewport width emulates a screen, not a device: for mouse, keyboard, touch, reduced motion and dark mode, use a context that really has the modality (`hasTouch`, `reducedMotion`, `colorScheme`, `hover: none`) and exercise the interaction itself (tap, Tab, scroll). Measure what must fit in what (a caption inside a photo, a title inside a card) with the longest content the brief allows — a 120-character summary plus a button overflowed a 160 px photo, unseen for two runs.
 
 Then present the set and **stop — the choice belongs to the user**:
 
@@ -82,6 +86,8 @@ Close with where the picker is running (URL or file path) and the keys to flip.
 ### Phase 6 — Promote on selection
 
 When the user picks: integrate that variant where it belongs, following the project's existing conventions (file layout, naming, token usage), then delete the prototype surface per Hard Rule 5. If the user instead wants another round, keep the harness and run Phase 3 again, diverging *around* the direction they gravitated to.
+
+**If a normative document already describes the object you prototyped** (a UX spec, a brief with rules), re-read it against the chosen variant before promoting: every sentence that describes a behaviour is confronted with what the variant actually does, and every gap is settled now, as a decision-versus-document stop (the project's `decisions-vs-doc` rule, where it has one). Picking a variant does not amend a document; the document stays true until it is re-read, and a contradiction is not noticed, it is searched for. Three passages of a spec had gone false — cards pushed off-screen vs. moved 48 px, a fixed header vs. everything scrolling, colour transitions vs. transform-only — and were only found two sessions later, sentence by sentence.
 
 ## Invocation Variants
 
