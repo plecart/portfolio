@@ -45,16 +45,47 @@ function peerRange(name: string, peer: string): string {
   return range
 }
 
+/**
+ * Une plage de pairs accepte-t-elle au moins une version d'une majeure ?
+ *
+ * `intersects` et non `satisfies` : il suffit qu'une seule version de la majeure soit acceptée
+ * pour que le refus tombe, et `satisfies('10', …)` rend `false` en silence — « 10 » n'est pas une
+ * version complète. Les préversions restent exclues, comme npm les exclut d'une plage.
+ *
+ * @param range Plage publiée par le plugin, par exemple `^3 || … || ^9`.
+ * @param major Majeure refusée, par exemple `10`.
+ * @returns `true` dès qu'une version stable de la majeure entre dans la plage.
+ * @throws Si la plage n'est pas une plage npm valide.
+ */
+function acceptsMajor(range: string, major: string): boolean {
+  return intersects(range, major)
+}
+
+/**
+ * Plages publiées ou plausibles, avec le verdict attendu pour la majeure donnée : le recueil prouve
+ * que la garde sait rougir, ce que le cas réel, vert aujourd'hui, ne montre pas.
+ */
+const RANGE_FORMS: [range: string, major: string, accepted: boolean][] = [
+  ['^3 || ^4 || ^5 || ^6 || ^7 || ^8 || ^9', '10', false],
+  ['^3 || ^4 || ^5 || ^6 || ^7 || ^8 || ^9 || ^10', '10', true],
+  ['>=4.8.4 <6.1.0', '7', false],
+  ['>=4.8.4 <7.1.0', '7', true],
+  ['^10.1.0', '10', true],
+  ['>=8', '10', true],
+  ['*', '10', true],
+]
+
+test.each(RANGE_FORMS)('la plage « %s » accepte la majeure %s : %s', (range, major, accepted) => {
+  expect(acceptsMajor(range, major)).toBe(accepted)
+})
+
 test.each(REFUSALS)(
   '%s %s reste refusé tant que %s ne le déclare pas',
   (refused, major, blocker) => {
     const range = peerRange(blocker, refused)
 
-    // `intersects` et non `satisfies` : il suffit qu'une seule version de la majeure soit
-    // acceptée pour que le refus tombe, et `satisfies('10', …)` rend `false` en silence — « 10 »
-    // n'est pas une version complète.
     expect(
-      intersects(range, major),
+      acceptsMajor(range, major),
       `${blocker} accepte ${refused} ${major} (${range}) : lever le refus`,
     ).toBe(false)
   },
