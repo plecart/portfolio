@@ -165,6 +165,12 @@ Tu es autorisé à lancer l'agent de relecture de l'Étape 4.2, à ses deux temp
 invocation de `cycle-pr` vaut demande de l'utilisateur.
 Ne lance pas la commande `hooks` de la config ici : les hooks sont partagés entre worktrees et
 déjà installés depuis le clone principal.
+Le garde de permissions de ta session refuse les commandes qu'il ne sait pas vérifier, sans
+nommer le fragment fautif — heredoc suivi d'une commande, boucle `for`, gabarit `--format` ou
+`--jq` avec accolades, `sh -c` en ligne, enchaînement de trois commandes. Écris les fichiers
+longs avec l'outil d'écriture plutôt qu'un heredoc, une commande par objet plutôt qu'une boucle,
+un script dans le répertoire temporaire de session plutôt qu'un `-c` : chaque refus coûte deux ou
+trois reformulations à l'aveugle.
 <une ligne par point de vigilance propre à cette issue : HITL attendu, fichier partagé avec une
 autre PR du lot et ordre de merge, décision verrouillée à ne pas rouvrir>
 ```
