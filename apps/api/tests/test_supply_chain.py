@@ -499,9 +499,9 @@ def test_dependabot_ne_propose_jamais_de_nouvelle_version_de_python() -> None:
 def npm_majors_refused() -> list[dict[str, Any]]:
     """Les règles `ignore` que la table des refus npm exige, dans son ordre.
 
-    `apps/web/dependency-refusals.json` est la seule liste des refus : chaque entrée nomme les
-    paquets dont la majeure est refusée et le plugin dont la plage de pairs fonde le refus. Le test
-    Vitest qui fait expirer les refus lit la même table.
+    `apps/web/dependency-refusals.json` est la seule liste des refus qui expirent : chaque entrée
+    nomme les paquets dont la majeure est refusée et le plugin dont la plage de pairs fonde le
+    refus. Le test Vitest qui les fait expirer lit la même table.
     """
     refusals = json.loads(NPM_REFUSALS.read_text(encoding="utf-8"))
     return [
