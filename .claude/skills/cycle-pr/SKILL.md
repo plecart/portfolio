@@ -339,9 +339,11 @@ git commit -m "type(scope): description"
 Pas de corps, pas de footer, pas de `Co-Authored-By`, pas de numéro de PR. Breaking change : `!`
 dans le titre. Puis enchaîner sur le commit suivant (retour 3.1).
 
-## Étape 4 — Relecture indépendante de fin de PR (avant `git push`)
+## Étape 4 — Relecture indépendante (avant `git push`)
 
-Quand tous les commits sont faits, deux passes, dans cet ordre.
+Deux passes, dans cet ordre. L'auto-review (4.1) quand tous les commits sont faits. La relecture
+à contexte vierge (4.2) **en deux temps** : une première fois dès que le socle est posé, une
+seconde à la fin, sur ce qui a été écrit après.
 
 **4.1 Auto-review** — revue critique du **diff complet de la branche** (`main..HEAD`), en vision
 d'ensemble : problèmes d'architecture (couplage, frontières), naming incohérent entre commits,
@@ -400,6 +402,19 @@ Il rend : chaque critère d'acceptation ✅ / ❌ / ⚠️ avec preuve, puis ses
 bloquant / important / mineur, chacun avec fichier, raison et marqueur de provenance. **Ne pas
 discuter un constat depuis la mémoire de la session : le vérifier dans le code** — et re-mesurer
 tout constat bloquant avant d'éditer sur sa base.
+
+**En deux temps, jamais par commit.** Une première passe dès qu'un commit pose un **invariant que
+les commits suivants supposeront vrai** — le contrat d'infrastructure : image, point d'entrée,
+fichier de composition, contrat de configuration — et une seconde, plus courte, à la fin, sur ce
+qui a été écrit après la première. Le déclencheur est le **contenu** du commit, jamais son rang :
+sur une PR, les deux premiers commits ne portaient qu'une constante et deux dépendances, et tous
+les invariants non gardés vivaient dans les troisième et quatrième. Placée seulement à la fin, la
+relecture rend ses constats à la distance maximale du moment où ils auraient pu être absorbés —
+19 commits dont 13 en réaction à des constats arrivés après le vert, 25 tests dont 18 après la
+relecture : un travail juste, rendu cher par sa position dans le temps. Un constat de la première
+passe se fond dans un commit qui restait à écrire ; un constat qui arrive après le passage en
+ready coûte un run de CI complet et le rejeu des vérifications manuelles (Étape 7). Au plus deux
+passes par PR.
 
 **La relecture n'est pas en lecture seule au sens strict.** Éprouver un test sérieusement, c'est
 casser la garde qu'il protège et la voir rougir — donc **modifier le code de production**, puis le
@@ -720,6 +735,7 @@ est « aucune répercussion »).
 3. Le cycle `modif → test → cleanup → test → commit` est **sacré et jamais raccourci** — y compris
    le cleanup sur les commits triviaux.
 4. **Deux filets de cleanup** : un par commit (regard local), un sur la PR entière avant merge
-   (regard global, inter-commits).
+   (regard global, inter-commits) — et une relecture à contexte vierge **en deux temps**, au
+   socle et à la fin, jamais par commit.
 5. La PR n'est **terminée qu'après la passe `repercussions`** : une clôture peut bouleverser les
    autres issues — on le vérifie pendant que la conversation est encore en contexte.
