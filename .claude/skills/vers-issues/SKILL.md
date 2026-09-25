@@ -31,6 +31,8 @@ Les tranches peuvent être 'HITL' ou 'AFK'. Les tranches HITL nécessitent une i
 - Préfère de nombreuses tranches fines à quelques tranches épaisses
 </vertical-slice-rules>
 
+**Ne jamais découper une tranche pour la seule taille de PR** quand ses morceaux se valident ensemble — même écran, même point d'arrêt visuel, même ADR : les séparer fait valider deux fois le même écran, ou un demi-écran. La règle de taille (`taille-pr.md`) est une règle de PR, pas de découpage fonctionnel : la tranche reste **une** issue, et si elle dépasse la taille de référence, `cycle-pr` la livre en plusieurs PR (son « cas découpé », Étape 2). Trois paires de tranches séparées pour la seule taille ont dû être refusionnées.
+
 ### 4. Interroger l'utilisateur
 
 Présente le découpage proposé sous forme de liste numérotée. Pour chaque tranche, montre :
@@ -42,7 +44,7 @@ Présente le découpage proposé sous forme de liste numérotée. Pour chaque tr
 
 Demande à l'utilisateur :
 
-- La granularité semble-t-elle correcte ? (trop grossière / trop fine)
+- Quelles tranches ont été séparées pour la seule taille de PR, et se valident-elles ensemble ? (si oui, les refusionner)
 - Les relations de dépendance sont-elles correctes ?
 - Faut-il fusionner ou découper davantage certaines tranches ?
 - Les bonnes tranches sont-elles marquées comme HITL et AFK ?
