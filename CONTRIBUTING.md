@@ -93,7 +93,9 @@ son arbre se nettoie par les `overrides` du manifeste
 
 **Mises à jour des dépendances.** Dependabot ([.github/dependabot.yml](.github/dependabot.yml))
 ouvre chaque semaine, par écosystème (`uv`, npm, actions GitHub, images Docker), une PR qui
-groupe versions mineures et correctifs ; chaque montée majeure arrive seule. Ses PR sont
+groupe versions mineures et correctifs ; chaque montée majeure arrive seule, sauf ESLint 10,
+`@eslint/js` 10 et TypeScript 7, refusées tant qu'un pair qu'on garde ne les accepte pas
+([docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4). Ses PR sont
 exemptées des métadonnées de PR et de la description en français (`chore(deps): bump …`,
 [.claude/rules/taille-pr.md](.claude/rules/taille-pr.md)), passent par la même CI et ne se
 mergent que sur un go humain.

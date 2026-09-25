@@ -51,9 +51,9 @@ ECOSYSTEM_MANIFESTS = {
 }
 
 # La politique commune à tous les écosystèmes : passage hebdomadaire, mineures et correctifs
-# groupés — les majeures restent seules, chacune dans sa PR —, aucun libellé hors du mapping de
-# `.claude/pipeline.config.md`, commits au format conventional du dépôt (brief de #5, briefing du
-# 2026-09-25).
+# groupés — les majeures restent seules, chacune dans sa PR, sauf celles qu'un `ignore` refuse —,
+# aucun libellé hors du mapping de `.claude/pipeline.config.md`, commits au format conventional du
+# dépôt (brief de #5, briefing du 2026-09-25).
 UPDATE_POLICY: dict[str, Any] = {
     "schedule": {"interval": "weekly"},
     "groups": {"minor-and-patch": {"update-types": ["minor", "patch"]}},
@@ -65,12 +65,19 @@ UPDATE_POLICY: dict[str, Any] = {
 # plus les écarts décidés écosystème par écosystème. Une clé de plus peut changer la politique en
 # silence — `open-pull-requests-limit: 0` coupe les mises à jour, un `ignore: "*"` aussi.
 ENTRY_KEYS = {"package-ecosystem", "directory", *UPDATE_POLICY}
-ECOSYSTEM_EXTRA_KEYS = {"docker": {"ignore"}}
+ECOSYSTEM_EXTRA_KEYS = {"docker": {"ignore"}, "npm": {"ignore"}}
 
 PYTHON_UPGRADES_IGNORED = {
     "dependency-name": "python",
     "update-types": ["version-update:semver-major", "version-update:semver-minor"],
 }
+
+# Les montées majeures refusées sur npm (décision du 2026-09-25) : un pair qu'on garde ne les
+# accepte pas encore. `@eslint/js` va par paire avec `eslint` et suit son refus.
+NPM_MAJORS_REFUSED = [
+    {"dependency-name": name, "update-types": ["version-update:semver-major"]}
+    for name in ["eslint", "@eslint/js", "typescript"]
+]
 
 # Le motif de nom par lequel Dependabot reconnaît un Dockerfile (`DOCKER_REGEXP`,
 # `docker/file_fetcher.rb`) — `Dockerfile`, `Dockerfile.prod`, `Dockerfile-dev`, `api.Dockerfile`,
@@ -487,6 +494,20 @@ def test_dependabot_ne_propose_jamais_de_nouvelle_version_de_python() -> None:
     ignored = dependabot_entry("docker").get("ignore", [])
 
     assert ignored == [PYTHON_UPGRADES_IGNORED]
+
+
+def test_dependabot_ne_propose_pas_les_majeures_refusees_sur_npm() -> None:
+    """ESLint 10 et TypeScript 7 attendent qu'un pair qu'on garde les accepte.
+
+    Deux pairs ne les déclarent pas encore — `eslint-plugin-jsx-a11y` pour ESLint,
+    `typescript-eslint` pour TypeScript : chaque semaine, Dependabot ouvrirait une PR vouée à
+    l'échec, `npm ci` en `ERESOLVE` (`docs/frontend-outillage.md` §2.4). La liste est exacte : une
+    règle de plus refuserait en silence une mise à jour, une de moins rouvrirait la PR vouée à
+    l'échec.
+    """
+    ignored = dependabot_entry("npm").get("ignore", [])
+
+    assert ignored == NPM_MAJORS_REFUSED
 
 
 def dockerfile_id(path: Path) -> str:
