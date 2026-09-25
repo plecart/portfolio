@@ -7,11 +7,9 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import * as ts from 'typescript'
 import { expect, test } from 'vitest'
-
-const APP_ROOT = fileURLToPath(new URL('..', import.meta.url))
+import { APP_ROOT, readAppJson } from './app-files.ts'
 
 /** Hôte minimal de lecture : il remonte en exception ce que `tsc` signalerait sur sa sortie. */
 const CONFIG_HOST: ts.ParseConfigFileHost = {
@@ -45,9 +43,7 @@ function resolveCompilerOptions(configFileName: string): ts.CompilerOptions {
 
 test('la version de Node est la même dans .nvmrc et dans engines', () => {
   const pinned = readFileSync(join(APP_ROOT, '.nvmrc'), 'utf8').trim()
-  const manifest = JSON.parse(readFileSync(join(APP_ROOT, 'package.json'), 'utf8')) as {
-    engines?: { node?: string }
-  }
+  const manifest = readAppJson<{ engines?: { node?: string } }>('package.json')
 
   expect(manifest.engines?.node).toBe(pinned)
 })
@@ -60,9 +56,7 @@ test('la version de Node est la même dans .nvmrc et dans engines', () => {
  * projet racine entre d'office dans la population du test.
  */
 function projectConfigFileNames(): string[] {
-  const root = JSON.parse(readFileSync(join(APP_ROOT, 'tsconfig.json'), 'utf8')) as {
-    references: { path: string }[]
-  }
+  const root = readAppJson<{ references: { path: string }[] }>('tsconfig.json')
 
   return root.references.map((reference) => reference.path.replace(/^\.\//, ''))
 }
@@ -77,9 +71,7 @@ test('toutes les configurations TypeScript du projet résolvent en mode strict',
 })
 
 test('la porte de lint échoue sur un simple avertissement', () => {
-  const manifest = JSON.parse(readFileSync(join(APP_ROOT, 'package.json'), 'utf8')) as {
-    scripts: { lint: string }
-  }
+  const manifest = readAppJson<{ scripts: { lint: string } }>('package.json')
 
   // Sur les 114 règles actives, 3 ne sont que des avertissements — dont
   // `react-hooks/exhaustive-deps`. Sans ce drapeau, `eslint` sort 0 devant elles et la porte

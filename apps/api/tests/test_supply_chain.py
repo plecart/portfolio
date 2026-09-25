@@ -73,7 +73,8 @@ PYTHON_UPGRADES_IGNORED = {
 }
 
 # Les montées majeures refusées sur npm (décision du 2026-09-25) : un pair qu'on garde ne les
-# accepte pas encore. `@eslint/js` va par paire avec `eslint` et suit son refus.
+# accepte pas encore. `@eslint/js` va par paire avec `eslint` et suit son refus. Le refus expire :
+# `apps/web/tests/dependency-refusals.test.ts` rougit le jour où le pair accepte la majeure.
 NPM_MAJORS_REFUSED = [
     {"dependency-name": name, "update-types": ["version-update:semver-major"]}
     for name in ["eslint", "@eslint/js", "typescript"]

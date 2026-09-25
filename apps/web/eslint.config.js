@@ -6,8 +6,9 @@
 //
 // ESLint est épinglé sur la ligne 9 : `eslint-plugin-jsx-a11y` 6.10.2, sa dernière version,
 // déclare `eslint@^3 || ... || ^9`. Faire tourner sur la 10 demanderait de forcer un pair non
-// déclaré — sur le plugin même dont on dépend pour l'accessibilité. À rouvrir quand le plugin
-// publiera son support de la 10.
+// déclaré — sur le plugin même dont on dépend pour l'accessibilité. Dependabot ne propose donc
+// plus la 10 (`ignore` de `.github/dependabot.yml`), et `tests/dependency-refusals.test.ts`
+// rougit le jour où le plugin la déclare.
 import js from '@eslint/js'
 import jsxA11y from 'eslint-plugin-jsx-a11y'
 import reactHooks from 'eslint-plugin-react-hooks'

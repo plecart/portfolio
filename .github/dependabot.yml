@@ -43,8 +43,8 @@ updates:
     ignore:
       # Montées majeures refusées tant qu'un pair qu'on garde ne les accepte pas : `npm ci`
       # échouerait en `ERESOLVE`, chaque semaine (docs/frontend-outillage.md §2.4). Une règle se
-      # retire dès que sa raison tombe : relative à la version en place, elle refuserait sinon
-      # aussi la majeure suivante.
+      # retire dès que sa raison tombe — `apps/web/tests/dependency-refusals.test.ts` rougit ce
+      # jour-là : relative à la version en place, elle refuserait sinon aussi la majeure suivante.
       #
       # ESLint 10 : `eslint-plugin-jsx-a11y` déclare `eslint@^3 || … || ^9`. `@eslint/js` va par
       # paire avec `eslint` et suit son refus.
