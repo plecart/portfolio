@@ -1,0 +1,13 @@
+# Exceptions de l'audit Python (`make audit`), lues par `infra/ci/pip_audit_gate.py`.
+#
+# Une exception suspend **un** avis de sécurité jusqu'à une date. Passée cette date, l'audit
+# rebloque avant même de tourner : c'est ce qui empêche une exception de devenir permanente par
+# oubli. Aucune exception sans date. On en ajoute une quand un avis ne s'applique pas au projet,
+# ou le temps qu'un correctif paraisse — jamais pour faire passer une PR.
+#
+# Une table par exception, les trois champs obligatoires :
+#
+#   [[exception]]
+#   id = "GHSA-xxxx-xxxx-xxxx"   # identifiant rapporté par pip-audit (GHSA, PYSEC ou CVE)
+#   reason = "une ligne : pourquoi l'avis ne s'applique pas ici, ou ce qu'on attend"
+#   expires = 2026-12-31         # date TOML, sans guillemets ; l'exception vaut ce jour inclus (UTC)

@@ -37,7 +37,7 @@ on:
 
 jobs:
   api:
-    name: Back — lint, format, types, tests
+    name: Back — audit, lint, format, types, tests
     runs-on: ubuntu-latest
 
     # Pas de CI tant que la PR est en draft.
@@ -61,6 +61,18 @@ jobs:
 
       - name: Install
         run: make install
+
+      # Avant les portes de code, comme dans le job front : un avis de sécurité sur une
+      # dépendance n'a pas à attendre que la suite passe pour être signalé.
+      #
+      # Seuil : **toute** vulnérabilité connue bloque, là où `npm audit` s'arrête à `high`.
+      # `pip-audit` n'expose aucune sévérité — ni option, ni champ dans sa sortie (2.10.1,
+      # pypa/pip-audit#654) — et l'arbre Python, 59 paquets au 2026-09-25, n'a pas le bruit qui
+      # justifie `high` côté npm, où l'arbre en compte dix fois plus. Un avis qui ne s'applique pas
+      # ici passe par une exception datée de `infra/ci/pip-audit-exceptions.toml`, jamais par un
+      # seuil relevé.
+      - name: Audit
+        run: make audit
 
       - name: Lint
         run: make lint
