@@ -274,19 +274,14 @@ https://docs.github.com/en/code-security/reference/supply-chain-security/dependa
 
 **Images de base** — le skill ne réécrit pas les `FROM`, il signale à l'utilisateur ceux qui
 ne suivent pas la forme `<image>:<étiquette la plus précise>@sha256:<empreinte>`
-(`python:3.12.14-slim@sha256:…`) ; une étiquette sans correctif (`3.12`) n'avance que par un
-rafraîchissement d'empreinte, que Dependabot peut ne pas proposer. Dependabot propose la plus
-haute version stable publiée, mineure comprise (`3.14` s'il y en a une) : si la version du
-runtime est épinglée ailleurs (`.python-version`, `.nvmrc`…), ajouter à l'entrée `docker` un
-`ignore` des montées `version-update:semver-major` et `version-update:semver-minor` de cette
-image — changer de runtime est une décision du projet, et la PR échouerait sur l'épingle.
-Chaque correctif (`3.12.15`) arrive alors en PR, étiquette et empreinte ensemble.
-
-**Valider les deux fichiers** contre leur schéma sur une copie temporaire qui garde l'extension
-`.yml` (sans elle, l'outil lit du JSON) — `check-jsonschema --builtin-schema
-vendor.github-workflows` pour le `ci.yml`, `--builtin-schema vendor.dependabot` pour le
-`dependabot.yml`, par `uvx` ou, sans `uv`, `pipx run` —, les montrer à l'utilisateur, et ne
-les écrire qu'ensuite.
+(`python:3.12.14-slim@sha256:…`). Dependabot propose la plus haute version stable publiée,
+mineure comprise (`3.14` s'il y en a une) : si la version du runtime est épinglée ailleurs
+(`.python-version`, `.nvmrc`…), ajouter à l'entrée `docker` — ou `docker-compose`, pour une image
+citée dans un fichier Compose — un `ignore` des montées `version-update:semver-major` et
+`version-update:semver-minor` de cette image : changer de runtime est une décision du projet, et
+la PR échouerait sur l'épingle. Chaque correctif (`3.12.15`) arrive alors en PR, étiquette et
+empreinte ensemble ; sous cet `ignore`, une étiquette sans correctif (`3.12`) n'avancerait que
+par un rafraîchissement d'empreinte, que Dependabot peut ne pas proposer.
 
 **Runtime épinglé — une version, des fournisseurs.** Si le profil déclare un gestionnaire de
 version (FVM, pyenv, nvm, asdf, mise…), séparer *quelle version* de *qui la fournit* :
@@ -301,6 +296,12 @@ version (FVM, pyenv, nvm, asdf, mise…), séparer *quelle version* de *qui la f
   de provisionnement pour la même version divergent silencieusement.
 - À la génération, vérifier qu'aucune recette n'invoque le binaire nu d'un runtime épinglé, et
   simuler la résolution des deux environnements.
+
+**Valider les deux fichiers** contre leur schéma sur une copie temporaire qui garde l'extension
+`.yml` (sans elle, l'outil lit du JSON) — `check-jsonschema --builtin-schema
+vendor.github-workflows` pour le `ci.yml`, `--builtin-schema vendor.dependabot` pour le
+`dependabot.yml`, par `uvx` ou, sans `uv`, `pipx run` —, les montrer à l'utilisateur, et ne
+les écrire qu'ensuite.
 
 **`.gitignore` — généré depuis le profil, puis testé.** Générer le fichier à partir des **chemins
 déclarés** (une section par langage présent, motifs indépendants de la profondeur `**/` dès qu'un
@@ -450,6 +451,7 @@ jusqu'à la première PR de code, qui les coche (étape 11).
 - [ ] git + remote GitHub en place, branche `main`
 - [ ] profil du projet confirmé par l'utilisateur (aucune valeur devinée en silence)
 - [ ] `.claude/pipeline.config.md` écrit, sans placeholder résiduel
+- [ ] projet sans code seulement : chaque commande de la config marquée `# non vérifiée` (étape 11)
 - [ ] labels manquants créés dans GitHub
 - [ ] `CLAUDE.md` + `.claude/rules/` + `.claude/agents/` + `settings.json` + `CONTRIBUTING.md` copiés
 - [ ] `CLAUDE.md` finalisé (étape 9) : sans section de skill non installé ni `{{CHEMIN_JOURNAL_OBSERVATIONS}}` résiduel
