@@ -59,6 +59,9 @@ pour qu'un rouge de l'une ne masque pas un rouge d'une autre.
 - format       : make format                      # ruff format — écrit
 - format:check : make format-check                # vérifie sans écrire
 - typecheck    : make typecheck                   # pyright, mode strict (cadrage §8.4)
+- audit        : make audit                       # pip-audit, toute vulnérabilité bloque ; exceptions
+                                                  # datées dans infra/ci/pip-audit-exceptions.toml ;
+                                                  # vérifiée le 2026-09-25 (#5)
 - hooks        : uv run pre-commit install        # ruff seulement (check --fix, format)
 
 `build` et `run local` du back ne figurent pas ici : ils demandent Docker, pas `uv`, et vivent
@@ -98,7 +101,7 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
   - fins de ligne des fichiers lus par un conteneur (`.gitattributes` + `test_infra`) — rouge
     possible sur le seul poste, copie de travail en CRLF
 - gates bloquants en CI :
-  - back : lint, format:check, typecheck, test
+  - back : audit, lint, format:check, typecheck, test
   - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse, audit
   - infra : compose (résolution de `infra/compose.dev.yml`), build de l'image `api` sans publication — la publication sur GHCR et le scan Trivy restent à #15
 - services requis en CI : aucun — aucun test n'atteint encore Postgres ni Redis ; quand ce sera le cas, testcontainers les démarrera depuis les tests (cadrage §8.4), à partir de #7

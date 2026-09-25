@@ -35,7 +35,7 @@ DOCKER_BUILD_FLAGS ?=
 # du conteneur. Nommé une fois ici pour qu'aucun appel ne puisse l'oublier.
 COMPOSE := docker compose --env-file infra/dev.env -f infra/compose.dev.yml
 
-.PHONY: install test lint format format-check typecheck build compose-config dev
+.PHONY: install test lint format format-check typecheck audit build compose-config dev
 .PHONY: web-install web-browsers web-lint web-typecheck web-test web-build web-e2e web-lighthouse web-audit
 
 install:
@@ -55,6 +55,18 @@ format-check:
 
 typecheck:
 	$(UV) run pyright
+
+# Audite l'environnement que `uv sync` a installé, dépendances de développement comprises — même
+# raison que `web-audit` : un outil de build compromis écrit dans ce qu'on livre. Le seuil et sa
+# raison sont dans le workflow, à l'étape qui appelle cette cible.
+#
+# La porte lit les exceptions datées, puis lance `pip-audit` avec les options ci-dessous.
+# `--skip-editable` : les membres de l'espace de travail (`api`) sont installés en mode éditable
+# et n'existent pas sur PyPI — les y chercher n'audite rien. Pas de `--strict`, qui compte ce
+# membre sauté comme un échec de collecte (mesuré, sortie 1 sur un arbre sans aucun avis).
+audit:
+	$(UV) run python infra/ci/pip_audit_gate.py \
+		--exceptions infra/ci/pip-audit-exceptions.toml --skip-editable
 
 # Contexte de build : la racine du dépôt, où vivent l'espace de travail `uv` et son verrou.
 # La CI appelle cette cible plutôt qu'un `docker build` à elle, pour que l'image vérifiée en

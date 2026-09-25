@@ -82,6 +82,13 @@ sont pas identiques — les hooks voient les fichiers Python, la CI y ajoute les
 `pyright` et `pytest`
 restent dans la boucle de développement et en CI, trop lents pour un hook.
 
+**Audit des dépendances.** `make audit` (Python) et `make web-audit` (front) sont des portes de
+CI : un avis de sécurité bloque la PR. Un avis qui ne s'applique pas au projet — ou le temps
+qu'un correctif paraisse — se suspend par une entrée **datée** de
+[infra/ci/pip-audit-exceptions.toml](infra/ci/pip-audit-exceptions.toml), dont le format est en tête
+du fichier ; la date passée, l'audit rebloque. `npm audit` n'a pas de fichier d'exceptions : son
+arbre se nettoie par les `overrides` du manifeste ([docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4).
+
 ## Le flux en une page
 
 0. **Configurer** — `init-projet` écrit `.claude/pipeline.config.md` (dépôt, sources de vérité,
