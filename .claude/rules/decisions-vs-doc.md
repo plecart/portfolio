@@ -55,8 +55,9 @@ Es-tu sûr du changement ?
    l'arrêt : (a) l'effet de la décision est abandonné ; (b) l'effet est **conservé et déplacé**
    hors de ce que le document affirme — un bloc voisin, un autre support — ce qui rend le
    document vrai sans rien perdre. La forme (b) est souvent la moins chère et passe inaperçue
-   parce qu'on raisonne sur la décision, pas sur sa portée. Quand une seule des deux sorties est
-   présentable, c'est le signe que la branche adverse a été résumée, pas explorée.
+   parce qu'on raisonne sur la décision, pas sur sa portée. Quand une seule des deux sorties (le
+   document gagne, la décision gagne) est présentable, c'est le signe que la branche adverse a été
+   résumée, pas explorée.
 2. **La décision gagne** — le document est **amendé maintenant**, dans cette session, via
    `/contradiction` (qui propage aux rangs inférieurs et aux issues).
 

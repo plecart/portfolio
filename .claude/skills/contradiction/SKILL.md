@@ -98,9 +98,9 @@ traiter encore.
 **Rappeler l'alternative**, sous ses deux formes (`decisions-vs-doc.md`, « Deux sorties ») :
 abandonner l'effet de la décision, ou le **conserver en le déplaçant** hors de ce que le document
 affirme — deux lignes là où l'amendement coûte parfois un ADR. Quand une seule des deux sorties
-est présentable, c'est le signe que la branche adverse a été résumée, pas explorée. Abandonner
-reste une sortie valide, et souvent la bonne quand la cascade est large. Une section close ne se
-rouvre pas parce que c'était plus rapide.
+(le document gagne, la décision gagne) est présentable, c'est le signe que la branche adverse a
+été résumée, pas explorée. Abandonner reste une sortie valide, et souvent la bonne quand la
+cascade est large. Une section close ne se rouvre pas parce que c'était plus rapide.
 
 **Une reco qui oppose deux mécanismes techniques se vérifie avant d'être présentée.** Quand
 l'argument est « l'outil fait X » — un rendu qui insère de l'HTML, un client qui rejoue, une

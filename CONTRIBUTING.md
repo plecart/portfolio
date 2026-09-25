@@ -92,8 +92,9 @@ restent dans la boucle de développement et en CI, trop lents pour un hook.
    s'atteignent que via l'état `needs-interrogation`. Les décisions tranchées sont écrites dans
    l'issue, pas laissées dans une conversation.
 3. **Implémenter** — `cycle-pr` : briefing pré-PR → **PR draft ouverte avant tout code** → TDD
-   red-green-refactor → cycle `modif → test → cleanup → test → commit` → auto-review → `gh pr ready`
-   → review → vérif de fumée → merge. Plusieurs PR en parallèle : `pr-paralleles` (worktrees ;
+   red-green-refactor → cycle `modif → test → cleanup → test → commit` → auto-review → relecture à
+   contexte vierge (au socle, puis à la fin) → `gh pr ready` → review → vérif de fumée → merge.
+   Plusieurs PR en parallèle : `pr-paralleles` (worktrees ;
    la session lead démarre les autres et vérifie chaque PR avant le go, par messages
    inter-sessions — le go lui-même reste humain, dans la fenêtre de la PR).
 3bis. **Amender** — `contradiction` dès qu'une décision de conversation contredit une source de
