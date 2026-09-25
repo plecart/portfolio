@@ -102,6 +102,13 @@ est présentable, c'est le signe que la branche adverse a été résumée, pas e
 reste une sortie valide, et souvent la bonne quand la cascade est large. Une section close ne se
 rouvre pas parce que c'était plus rapide.
 
+**Une reco qui oppose deux mécanismes techniques se vérifie avant d'être présentée.** Quand
+l'argument est « l'outil fait X » — un rendu qui insère de l'HTML, un client qui rejoue, une
+fusion par défaut —, lire ce que fait réellement la bibliothèque dans sa documentation à jour
+(`context7`) et citer dans la ligne de reco ce qui a été vérifié (« vérifié : X n'insère pas
+d'HTML »). Une reco fondée sur la sécurité n'y échappe pas : c'est celle qu'on conteste le moins,
+donc celle qui trompe le plus longtemps.
+
 ### 4. Appliquer — sur « go » explicite
 
 Dans l'ordre, sans en sauter :
