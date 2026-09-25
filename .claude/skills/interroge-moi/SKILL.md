@@ -9,7 +9,11 @@ Interroge l'utilisateur sans relâche sur chaque aspect du plan jusqu'à atteind
 partagée. Descends chaque branche de l'arbre de décision, en résolvant les dépendances entre les
 décisions une par une.
 
-- **Une question à la fois.**
+- **Une question à la fois.** Une question accolée en fin de message — même binaire, même « au
+  passage » — n'est pas lue : le lecteur répond à la dernière chose qui a demandé de l'effort, et
+  une question secondaire n'est pas une question plus petite, c'est une question invisible (trois
+  messages de suite, trois fois sans réponse ; posée seule au quatrième, tranchée aussitôt). Si
+  une décision reste en suspens, elle a droit à son propre tour, et à rien d'autre dans ce tour.
 - **Chaque question s'accompagne de ta réponse recommandée** — interroger n'est pas se décharger de
   l'analyse sur l'utilisateur.
 - **Si une question peut être résolue en explorant le code, explore le code** plutôt que de
