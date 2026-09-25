@@ -253,7 +253,7 @@ le même commit** — voir `.claude/rules/contraintes.md`. La doc ne se met jama
 
 ### 3.2 Premier passage de tests
 
-Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Quatre contrôles complémentaires :
+Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Cinq contrôles complémentaires :
 
 - **Échec d'outillage ≠ échec de code.** Un échec « exécutable introuvable », « fichier utilisé
   par un autre processus » ou un compilateur qui sort brutalement après une commande tuée n'est
@@ -268,6 +268,13 @@ Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Quatre contr
   sur un `1 failed, 3 passed` dont le message d'assertion portait un accent, et un rouge attendu
   lu comme « rien collecté » se conclut « environnement cassé ». Tant qu'il n'a pas montré qu'il
   distingue « zéro test » d'« un test rouge », son bilan n'est pas un verdict.
+- **Une porte verte ne vaut que pour la plateforme qui l'a rendue.** Quand le poste et la CI n'ont
+  pas le même OS, recenser une fois, au premier scaffold, les règles de qualité sensibles à la
+  plateforme — bit exécutable, fins de ligne, sensibilité à la casse des chemins, séparateur de
+  chemin, encodage par défaut — et dire dans les `Notes` de la PR lesquelles ne sont vérifiées
+  qu'en CI. Quatorze commits verts sous Windows ont rougi en onze secondes sous Linux, sur une
+  règle de lint que NTFS ne peut pas déclencher ; l'inverse existe aussi, un fichier que
+  `.gitattributes` pinne en LF et qu'une copie de travail CRLF fait rougir sur le seul poste.
 - **Couverture par commit.** Lire le rapport de couverture du delta : une ligne non couverte est
   d'abord une hypothèse de **code écrit trop tôt**, à déplacer vers le commit de son premier
   appelant — avant d'être un test manquant. C'est le seul instrument qui rende opposable
@@ -473,6 +480,9 @@ Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur 
 
 C'est aussi ce `gh pr ready` qui **déclenche le premier run de CI** (événement `ready_for_review`).
 Attendre son résultat avant l'Étape 6 — une PR fraîchement sortie du draft n'a encore aucun run.
+Ce premier run est aussi la **première exécution des portes sur la plateforme cible** : un rouge
+de la famille « sensible à la plateforme » (3.2) y est attendu, et ne se confond ni avec un rouge
+d'infrastructure ni avec un rouge de code de l'Étape 6.
 
 **Si aucun run n'apparaît**, deux causes possibles, à départager dans cet ordre : (1) un run
 existe-t-il pour le SHA de tête (`gh api repos/<owner>/<repo>/actions/runs?head_sha=<sha>`) ?
@@ -497,7 +507,8 @@ ni de force-push.
     le job n'a aucun step → allocation de runner (quota, incident fournisseur) — ne pas modifier
     le workflow, surveiller en fond et **rendre la main au mainteneur**. Les runs `skipped`
     (garde `if:`) se terminent sans runner et ne prouvent rien sur la disponibilité de la CI.
-  - *Rouge de code* : tout le reste → cycle complet 3.1→3.5.
+  - *Rouge de code* : tout le reste, y compris le rouge de plateforme attendu au premier run
+    (Étape 5) → cycle complet 3.1→3.5.
 - **Revue** : revue automatisée (bot) ou self-audit ligne par ligne (sécurité, correctness,
   lisibilité, KISS/DRY/YAGNI, cohérence avec la stack).
 - Chaque commentaire **pertinent** → cycle complet (3.1→3.5) + push + re-trigger de la review.
