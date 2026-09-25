@@ -7,6 +7,7 @@ a ses propres tests, dans `test_pip_audit_gate.py`.
 """
 
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,6 @@ import yaml
 
 # `test_supply_chain.py` → `tests` → `api` → `apps` → racine du dépôt.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-WORKFLOWS_DIRECTORY = REPOSITORY_ROOT / ".github" / "workflows"
 DEPENDABOT = REPOSITORY_ROOT / ".github" / "dependabot.yml"
 
 # `uses: owner/action@<empreinte> # vX.Y.Z`. Le commentaire porte l'étiquette **la plus précise**
@@ -26,12 +26,21 @@ USES = re.compile(r"^\s*(?:-\s+)?uses:\s*(?P<reference>\S+)(?P<comment>.*)$", re
 PINNED_REFERENCE = re.compile(r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}$")
 VERSION_COMMENT = re.compile(r"^ # v\d+\.\d+\.\d+$")
 
-# Toute clé `uses`, quelle que soit sa forme. Dénombrement de la relecture de #5 : 10 formes de
-# `uses:` recensées ; `USES` en lit 3 et en refuse 4 par excès (guillemets autour de la valeur,
-# action locale, `docker://`, double espace avant `#`) ; les 3 autres lui échappaient — un fichier
-# `.yaml`, un mapping en flux `{ uses: … }`, une clé entre guillemets. Le glob couvre la première,
-# ce décompte les deux suivantes : une clé que `USES` ne lit pas fait échouer le test.
-USES_KEY = re.compile(r"""\buses["']?\s*:""")
+# Les fichiers où GitHub lit des `uses:` : workflows, et actions composites du dépôt.
+WORKFLOW_GLOBS = [
+    ".github/workflows/*.yml",
+    ".github/workflows/*.yaml",
+    ".github/actions/**/action.yml",
+    ".github/actions/**/action.yaml",
+]
+
+# Toute clé `uses` hors commentaire, quelle que soit sa forme. Dénombrement des relectures de #5 :
+# 12 formes recensées. `USES` en lit 3 et en refuse 4 par excès (guillemets autour de la valeur,
+# action locale, `docker://`, double espace avant `#`) ; 3 lui échappaient — un fichier `.yaml`,
+# un mapping en flux `{ uses: … }`, une clé entre guillemets —, fermées par `WORKFLOW_GLOBS` et
+# par ce décompte ; une action composite sortait du glob ; un commentaire qui cite `uses:` faisait
+# échouer le décompte à tort, d'où l'exclusion des commentaires.
+USES_KEY = re.compile(r"""^[^#\n]*\buses["']?\s*:""", re.MULTILINE)
 
 # Les écosystèmes que Dependabot surveille (brief de #5), chacun avec un fichier qu'il doit trouver
 # dans le dossier configuré.
@@ -53,19 +62,43 @@ UPDATE_POLICY: dict[str, Any] = {
     "commit-message": {"prefix": "chore", "include": "scope"},
 }
 
+# Les clés qu'une entrée peut porter, toutes : la politique, plus ce qui identifie l'écosystème,
+# plus les écarts décidés écosystème par écosystème. Une clé de plus peut changer la politique en
+# silence — `open-pull-requests-limit: 0` coupe les mises à jour, un `ignore: "*"` aussi.
+ENTRY_KEYS = {"package-ecosystem", "directory", *UPDATE_POLICY}
+ECOSYSTEM_EXTRA_KEYS = {"docker": {"ignore"}}
+
 PYTHON_UPGRADES_IGNORED = {
     "dependency-name": "python",
     "update-types": ["version-update:semver-major", "version-update:semver-minor"],
 }
 
-# Tous les Dockerfile du dépôt : un Dockerfile ajouté est tenu aux mêmes règles sans retoucher
-# les tests. Les noms d'étage de Docker sont insensibles à la casse, d'où `re.IGNORECASE`.
-DOCKERFILES = sorted(REPOSITORY_ROOT.glob("infra/**/Dockerfile"))
-FROM_LINE = re.compile(
-    r"^FROM\s+(?:--\S+\s+)*(\S+)(?:\s+AS\s+(\S+))?", re.MULTILINE | re.IGNORECASE
+# Tous les Dockerfile suivis par git, sous le motif de nom que Dependabot reconnaît
+# (`/dockerfile|containerfile/i`, `docker/file_fetcher.rb`, dependabot-core) : un Dockerfile
+# ajouté n'importe où est tenu aux mêmes règles sans retoucher les tests.
+DOCKERFILE_NAME = re.compile(r"dockerfile|containerfile", re.IGNORECASE)
+DOCKERFILES = sorted(
+    REPOSITORY_ROOT / name
+    for name in subprocess.run(
+        ["git", "ls-files"], cwd=REPOSITORY_ROOT, capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+    if DOCKERFILE_NAME.search(Path(name).name)
 )
-COPY_FROM = re.compile(r"^COPY\s+.*?--from=(\S+)", re.MULTILINE | re.IGNORECASE)
-DIGEST_PINNED_IMAGE = re.compile(r"^[\w./-]+:[\w.-]+@sha256:[0-9a-f]{64}$")
+
+# Lecture d'un Dockerfile, les lignes de continuation jointes d'abord : une instruction par ligne.
+# Les instructions et les noms d'étage sont insensibles à la casse, d'où `re.IGNORECASE`.
+# Dénombrement des relectures de #5, 19 formes : `FROM` avec ou sans `AS`, avec `--platform`, en
+# minuscules, sur deux lignes, indenté (lu, puis refusé : Dependabot n'en lit que la colonne 0),
+# `scratch`, registre avec port ; image citée par `COPY --from` — simple, avec `--chown`/`--link`,
+# sur deux lignes, indenté, par index d'étage — ou par `RUN --mount=from=`, `type=bind,from=`.
+CONTINUATION = re.compile(r"\\\r?\n")
+FROM_LINE = re.compile(
+    r"^(?P<indent>[ \t]*)FROM\s+(?:--\S+\s+)*(?P<image>\S+)(?:\s+AS\s+(?P<stage>\S+))?",
+    re.MULTILINE | re.IGNORECASE,
+)
+COPY_OR_RUN = re.compile(r"^[ \t]*(?:COPY|RUN)\b.*$", re.MULTILINE | re.IGNORECASE)
+FROM_SOURCE = re.compile(r"(?:--|[,=])from=([^\s,]+)", re.IGNORECASE)
+DIGEST_PINNED_IMAGE = re.compile(r"^[\w./:-]+:[\w.-]+@sha256:[0-9a-f]{64}$")
 
 
 def test_chaque_action_est_epinglee_par_empreinte_de_commit() -> None:
@@ -75,7 +108,7 @@ def test_chaque_action_est_epinglee_par_empreinte_de_commit() -> None:
     redirigées vers un commit malveillant, exécuté sans signal par tous les dépôts qui les
     suivaient (brief de #5).
     """
-    workflows = sorted([*WORKFLOWS_DIRECTORY.glob("*.yml"), *WORKFLOWS_DIRECTORY.glob("*.yaml")])
+    workflows = sorted(path for glob in WORKFLOW_GLOBS for path in REPOSITORY_ROOT.glob(glob))
     found: list[tuple[str, re.Match[str]]] = []
     for workflow in workflows:
         text = workflow.read_text(encoding="utf-8")
@@ -128,6 +161,7 @@ def test_chaque_ecosysteme_suit_la_politique_de_mise_a_jour(ecosystem: str, mani
 
     assert (directory / manifest).exists(), f"{manifest} introuvable dans {entry['directory']}"
     assert {key: entry.get(key) for key in UPDATE_POLICY} == UPDATE_POLICY
+    assert set(entry) == ENTRY_KEYS | ECOSYSTEM_EXTRA_KEYS.get(ecosystem, set())
 
 
 def test_dependabot_ne_propose_jamais_de_nouvelle_version_de_python() -> None:
@@ -139,49 +173,71 @@ def test_dependabot_ne_propose_jamais_de_nouvelle_version_de_python() -> None:
     """
     ignored = dependabot_entry("docker").get("ignore", [])
 
-    assert PYTHON_UPGRADES_IGNORED in ignored
+    assert ignored == [PYTHON_UPGRADES_IGNORED]
 
 
-def dockerfile_stages(dockerfile: Path) -> tuple[list[str], set[str]]:
-    """Les images citées par les `FROM` d'un Dockerfile, et les noms d'étage qu'il déclare.
+def dockerfile_instructions(dockerfile: Path) -> str:
+    """Le Dockerfile, ses lignes de continuation jointes : une instruction par ligne."""
+    return CONTINUATION.sub(" ", dockerfile.read_text(encoding="utf-8"))
 
-    Un `FROM <étage>` qui reprend un étage déjà déclaré n'est pas une image : il est écarté.
+
+def dockerfile_stages(dockerfile: Path) -> tuple[list[re.Match[str]], set[str]]:
+    """Les `FROM` d'un Dockerfile qui citent une image, et les noms d'étage qu'il déclare.
+
+    Un `FROM <étage>` qui reprend un étage déjà déclaré n'est pas une image, ni `scratch`, image
+    vide réservée par Docker : ils sont écartés.
 
     Returns:
-        Les images, dans l'ordre du fichier, et l'ensemble des noms d'étage (`AS <nom>`).
+        Les `FROM` retenus, dans l'ordre du fichier, et l'ensemble des noms d'étage (`AS <nom>`).
     """
-    lines = FROM_LINE.findall(dockerfile.read_text(encoding="utf-8"))
-    stages = {stage.lower() for _, stage in lines if stage}
-    return [image for image, _ in lines if image.lower() not in stages], stages
+    lines = list(FROM_LINE.finditer(dockerfile_instructions(dockerfile)))
+    stages = {line["stage"].lower() for line in lines if line["stage"]}
+    images = [line for line in lines if line["image"].lower() not in {*stages, "scratch"}]
+    return images, stages
 
 
-@pytest.mark.parametrize("dockerfile", DOCKERFILES, ids=lambda path: path.parent.name)
+def dockerfile_id(path: Path) -> str:
+    """Identifiant de paramètre lisible : le chemin du Dockerfile depuis la racine du dépôt."""
+    return path.relative_to(REPOSITORY_ROOT).as_posix()
+
+
+@pytest.mark.parametrize("dockerfile", DOCKERFILES, ids=dockerfile_id)
 def test_chaque_image_de_base_est_epinglee_par_empreinte(dockerfile: Path) -> None:
     """Une étiquette d'image peut changer de contenu ; une empreinte non.
 
     Le guide « Building best practices » de Docker le recommande, et c'est ce qui donne prise à
     Dependabot : il propose la nouvelle empreinte quand l'étiquette bouge. L'étiquette est gardée
-    devant l'empreinte, pour la lecture et pour que Dependabot sache quelle ligne suivre.
+    devant l'empreinte, pour la lecture et pour que Dependabot sache quelle ligne suivre. Un
+    `FROM` indenté est refusé : Dependabot ne lit que ceux de la colonne 0 (`docker/file_parser.rb`).
     """
     images, _ = dockerfile_stages(dockerfile)
 
     assert images, "aucune image de base trouvée — le motif a-t-il cessé de mordre ?"
-    unpinned = [image for image in images if not DIGEST_PINNED_IMAGE.match(image)]
+    unread = [line["image"] for line in images if line["indent"]]
+    assert not unread, f"`FROM` indentés, que Dependabot ne lit pas : {unread}"
+    unpinned = [line["image"] for line in images if not DIGEST_PINNED_IMAGE.match(line["image"])]
     assert not unpinned, f"{len(images)} images repassées, non épinglées : {unpinned}"
 
 
-@pytest.mark.parametrize("dockerfile", DOCKERFILES, ids=lambda path: path.parent.name)
+@pytest.mark.parametrize("dockerfile", DOCKERFILES, ids=dockerfile_id)
 def test_toute_image_copiee_passe_par_un_etage_nomme(dockerfile: Path) -> None:
     """Dependabot ne lit que les lignes `FROM` (`docker/file_parser.rb`, dependabot-core).
 
-    Une image citée seulement dans un `COPY --from=<image>` ne serait jamais mise à jour : elle
-    est déclarée dans un étage à elle, et `COPY --from` en reprend le nom.
+    Une image citée seulement par `COPY --from=<image>` ou `RUN --mount=from=<image>` ne serait
+    jamais mise à jour : elle est déclarée dans un étage à elle, dont le nom est repris ensuite.
     """
     _, stages = dockerfile_stages(dockerfile)
-    sources = COPY_FROM.findall(dockerfile.read_text(encoding="utf-8"))
+    sources = [
+        source
+        for instruction in COPY_OR_RUN.finditer(dockerfile_instructions(dockerfile))
+        for source in FROM_SOURCE.findall(instruction.group())
+    ]
 
-    outside = [source for source in sources if source.lower() not in stages]
-    assert not outside, f"{len(sources)} `COPY --from` repassés, hors d'un étage : {outside}"
+    # Un index (`--from=0`) désigne un étage par son rang : il n'échappe pas plus à Dependabot.
+    outside = [
+        source for source in sources if source.lower() not in stages and not source.isdigit()
+    ]
+    assert not outside, f"{len(sources)} sources `from=` repassées, hors d'un étage : {outside}"
 
 
 def test_dependabot_surveille_chaque_dockerfile() -> None:
@@ -193,7 +249,7 @@ def test_dependabot_surveille_chaque_dockerfile() -> None:
     """
     watched = REPOSITORY_ROOT / dependabot_entry("docker")["directory"].lstrip("/")
 
-    unwatched = [str(path) for path in DOCKERFILES if path.parent != watched]
+    unwatched = [dockerfile_id(path) for path in DOCKERFILES if path.parent != watched]
     assert not unwatched, (
         f"{len(DOCKERFILES)} Dockerfile repassés, hors de Dependabot : {unwatched}"
     )
