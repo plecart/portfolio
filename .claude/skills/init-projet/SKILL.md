@@ -62,8 +62,8 @@ corriger par l'utilisateur. Ce qui reste ambigu après inspection se **demande**
 - **Arborescence** : les dossiers de premier niveau sous la racine du code, qui suggèrent les
   domaines.
 - **Version de runtime** : `.nvmrc`, `.tool-versions`, contrainte du manifeste, image Docker.
-- **Conteneurs** : `Dockerfile`, `Containerfile` — ils ajoutent l'écosystème `docker` de
-  Dependabot (étape 7).
+- **Conteneurs** : `Dockerfile`, `Containerfile`, fichiers Compose — ils ajoutent les
+  écosystèmes `docker` et `docker-compose` de Dependabot (étape 7).
 
 Présenter le résultat comme un **tableau à valider**, valeur par valeur. Pour chaque commande
 absente ou introuvable, demander — ou enregistrer `n/a` si le projet n'a pas cette étape (un projet
@@ -274,18 +274,19 @@ https://docs.github.com/en/code-security/reference/supply-chain-security/dependa
 
 **Images de base** — le skill ne réécrit pas les `FROM`, il signale à l'utilisateur ceux qui
 ne suivent pas la forme `<image>:<étiquette la plus précise>@sha256:<empreinte>`
-(`python:3.12.14-slim@sha256:…`). Sous cette forme, chaque correctif arrive en PR, étiquette
-et empreinte ensemble ; une étiquette sans correctif (`3.12`) n'avance que par un
-rafraîchissement d'empreinte, que Dependabot peut ne pas proposer. Dependabot propose aussi la
-mineure suivante (`3.13`) : si la version du runtime est épinglée ailleurs (`.python-version`,
-`.nvmrc`…), ajouter à l'entrée `docker` un `ignore` des montées
-`version-update:semver-major` et `version-update:semver-minor` de cette image — changer de
-runtime est une décision du projet, et la PR échouerait sur l'épingle.
+(`python:3.12.14-slim@sha256:…`) ; une étiquette sans correctif (`3.12`) n'avance que par un
+rafraîchissement d'empreinte, que Dependabot peut ne pas proposer. Dependabot propose la plus
+haute version stable publiée, mineure comprise (`3.14` s'il y en a une) : si la version du
+runtime est épinglée ailleurs (`.python-version`, `.nvmrc`…), ajouter à l'entrée `docker` un
+`ignore` des montées `version-update:semver-major` et `version-update:semver-minor` de cette
+image — changer de runtime est une décision du projet, et la PR échouerait sur l'épingle.
+Chaque correctif (`3.12.15`) arrive alors en PR, étiquette et empreinte ensemble.
 
-**Valider les deux fichiers** contre leur schéma, sur une copie temporaire avant de les
-écrire — `check-jsonschema --builtin-schema vendor.github-workflows` pour le `ci.yml`,
-`--builtin-schema vendor.dependabot` pour le `dependabot.yml`, par `uvx` ou, sans `uv`,
-`pipx run` —, puis les montrer à l'utilisateur.
+**Valider les deux fichiers** contre leur schéma sur une copie temporaire qui garde l'extension
+`.yml` (sans elle, l'outil lit du JSON) — `check-jsonschema --builtin-schema
+vendor.github-workflows` pour le `ci.yml`, `--builtin-schema vendor.dependabot` pour le
+`dependabot.yml`, par `uvx` ou, sans `uv`, `pipx run` —, les montrer à l'utilisateur, et ne
+les écrire qu'ensuite.
 
 **Runtime épinglé — une version, des fournisseurs.** Si le profil déclare un gestionnaire de
 version (FVM, pyenv, nvm, asdf, mise…), séparer *quelle version* de *qui la fournit* :
@@ -410,8 +411,8 @@ marqueur `# non vérifiée`, et **ne générer ni `ci.yml` ni `dependabot.yml`**
 committé avant le code qu'il vérifie est rouge dès son premier run — vu sur un projet,
 `uv sync` sans manifeste —, contre la règle « aucun commit cassé ». Le marqueur est
 l'engagement : `cycle-pr` le lit à son Étape 1, et la première PR de code rejoue la génération
-CI et Dependabot de l'étape 7 et cette vérification, puis retire les marqueurs. Les cases
-correspondantes de la checklist ne sont cochées qu'à ce moment.
+CI et Dependabot de l'étape 7 — paragraphe « Runtime épinglé » compris — et cette
+vérification, puis retire les marqueurs.
 
 Deux pièges de diagnostic à cette étape :
 
@@ -443,6 +444,9 @@ skills maison déployés, skills publics installés, context7 disponible, et les
 
 ## Checklist finale
 
+Projet sans code encore : les cases de la CI, de Dependabot et des commandes restent ouvertes
+jusqu'à la première PR de code, qui les coche (étape 11).
+
 - [ ] git + remote GitHub en place, branche `main`
 - [ ] profil du projet confirmé par l'utilisateur (aucune valeur devinée en silence)
 - [ ] `.claude/pipeline.config.md` écrit, sans placeholder résiduel
@@ -453,12 +457,12 @@ skills maison déployés, skills publics installés, context7 disponible, et les
 - [ ] `ci.yml` généré depuis les commandes réelles, sans `{{PLACEHOLDER}}` ni étape `n/a`
 - [ ] chaque `uses:` du `ci.yml` épinglé par empreinte + `# <étiquette la plus précise>` ; `permissions: contents: read` en tête
 - [ ] `.github/dependabot.yml` généré (`github-actions` + écosystèmes de la stack)
-- [ ] `ci.yml` et `dependabot.yml` validés contre leur schéma — ou reportés, projet sans code (étape 11)
+- [ ] `ci.yml` et `dependabot.yml` validés contre leur schéma
 - [ ] skills maison déployés dans `.claude/skills/`
 - [ ] `.claude/commands/` copié — exactement une commande par skill déployé, aucune orpheline
 - [ ] skills publics cochés installés (choisis d'après la stack, pas d'un set en dur)
 - [ ] serveur MCP context7 disponible (`claude mcp list`)
-- [ ] `test` et commandes des gates bloquants en CI vérifiées en local — ou marquées `# non vérifiée`, projet sans code
+- [ ] `test` et commandes des gates bloquants en CI vérifiées en local
 - [ ] commit d'amorçage fait
 
 ## Note pour les autres skills
