@@ -120,7 +120,10 @@ S'il y a un écart qui change le cours du dev, **s'arrêter et le remonter à l'
 « go » — ne pas dérouler un plan périmé en silence. Si tout tient, le dire explicitement (« plan
 confirmé contre l'état actuel »).
 
-Attendre un **« go » explicite**, puis créer la branche (trunk-based depuis `main`) :
+Attendre un **« go » explicite**, puis créer la branche — trunk-based depuis `main`, après avoir
+vérifié que `main` local et `origin/main` sont le même commit (`git fetch origin`, puis
+`git rev-parse main origin/main` rend deux fois le même SHA ; sinon pousser, ou
+`git pull --ff-only`, d'abord) :
 
 ```
 git checkout -b <type>/<description>   # feat/  fix/  chore/  docs/  refactor/
