@@ -31,6 +31,24 @@ l'Étape 6 — s'arrêter après l'outil en cours, remonter à l'utilisateur, ja
 
 ## Étape 1 — Briefing pré-PR (avant la première ligne de code)
 
+**Éprouver les outils d'abord.** Un skill présuppose des outils ; tant qu'ils n'ont pas été
+éprouvés, son plan est une hypothèse. Avant d'écrire une ligne du briefing, lancer la commande la
+plus anodine de chaque outil dont le cycle dépend — `git status`, `gh auth status`, la commande
+`test` de `.claude/pipeline.config.md` — et exiger une **sortie plausible**, pas seulement un code
+de retour. Puis **au moins une écriture** : `git commit --allow-empty -m "chore: sonde outillage"`
+suivi de `git reset --soft HEAD~1`. Un outil branché sur un hook, un verrou ou un jeton ne se
+révèle qu'à l'opération qui le déclenche ; une commande de lecture prouve que le binaire répond,
+jamais que l'opération passera — `git status` ne déclenche aucun hook, le premier commit les
+déclenche tous. Même exigence pour `gh` (droit d'écriture sur le dépôt) et pour la commande de
+format, qui écrit.
+
+Un échec ici se remonte à l'utilisateur **avant** le briefing, avec les cibles de correction
+possibles et leur portée (session, projet, machine) : c'est un arbitrage de configuration, jamais
+une décision du skill — **un skill ne modifie pas la configuration de l'utilisateur pour se
+débloquer lui-même**. Un même message de refus quelle que soit la commande se lit comme un
+problème de permissions alors que c'est l'outillage ; éprouver coûte quatre commandes avant le
+briefing, et une demi-session après le « go ».
+
 Produire un briefing écrit AVANT de créer la branche :
 
 - **Liste précise des fichiers** à créer/modifier — le chemin exact de chacun.
