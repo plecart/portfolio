@@ -263,7 +263,8 @@ def est_lien(p):
 temoin = r"C:\Documents and Settings" if os.name == "nt" else "/proc/self/exe"
 assert est_lien(temoin), f"témoin non détecté : {temoin} — détecteur aveugle, ne rien supprimer"
 liens = []
-for racine, dossiers, fichiers in os.walk(sys.argv[1]):
+def illisible(e): sys.exit(f"dossier illisible : {e} — liste incomplète, ne rien supprimer")
+for racine, dossiers, fichiers in os.walk(sys.argv[1], onerror=illisible):
     for nom in dossiers + fichiers:
         chemin = os.path.join(racine, nom)
         if est_lien(chemin):
