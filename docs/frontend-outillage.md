@@ -179,10 +179,12 @@ sa dernière version, déclare `typescript >=4.8.4 <6.1.0`, et aucune 6.1 n'exis
 **Ces deux épingles sont des refus datés, pas des oublis.** Dependabot ne propose plus les majeures
 d'ESLint, d'`@eslint/js` — qui va par paire avec lui — et de TypeScript (`ignore` de
 `.github/dependabot.yml`, 2026-09-25), jusqu'à ce que le plugin concerné publie son support. Le
-refus expire sans qu'on y pense : `tests/dependency-refusals.test.ts` lit dans le verrou la plage de
-pairs de chaque plugin, avec `semver` — la bibliothèque par laquelle npm lui-même résout les
-plages —, et rougit le jour où elle accepte la majeure refusée. Le verrou ne bougeant que par une
-PR, le rouge apparaît dans celle qui apporte la nouvelle version du plugin ; on lève alors le refus.
+refus expire sans qu'on y pense. `dependency-refusals.json` en tient la liste — plugin, pair,
+majeure, paquets refusés —, que `test_supply_chain.py` exige identique aux `ignore` ; et
+`tests/dependency-refusals.test.ts` lit dans le verrou la plage de pairs de chaque plugin, avec
+`semver` — la bibliothèque par laquelle npm lui-même résout les plages —, et rougit le jour où elle
+accepte la majeure refusée. Le verrou ne bougeant que par une PR, le rouge apparaît dans celle qui
+apporte la nouvelle version du plugin ; on lève alors le refus en entier, table et règles ensemble.
 
 La famille Manrope est déclarée **comme jeton de thème Tailwind** (`@theme { --font-sans }`) plutôt
 que sur `:root` : la feuille de base de Tailwind pose déjà la police du document depuis ce jeton, et
