@@ -16,7 +16,9 @@
 # Docker). L'étiquette porte la version de correctif (`3.12.14`, pas `3.12`) parce que c'est elle
 # qui fait avancer l'épingle : Dependabot (`.github/dependabot.yml`) propose chaque nouvelle
 # version, étiquette et empreinte ensemble. La reconstruction d'une même étiquette — correctifs
-# Debian seuls — peut ne pas être proposée ; le scan de l'image (#15) couvre ce cas.
+# Debian seuls — peut ne pas être proposée ; le scan de l'image (#15) couvre ce cas. Les lignes
+# `FROM` dépassent donc 100 colonnes : image et empreinte doivent tenir sur la première ligne de
+# l'instruction, la seule que lise Dependabot.
 
 # Nommée une fois et réutilisée par les deux étages : deux `FROM` littéraux finiraient par
 # diverger, et l'étage d'exécution est justement celui qu'on relit le moins.
