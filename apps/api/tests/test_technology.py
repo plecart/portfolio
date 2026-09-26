@@ -3,6 +3,7 @@
 import pytest
 from config import strings
 from content.models import TechnologyKind
+from content.validators import validate_svg
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.db import IntegrityError, transaction
 from factories import SVG, svg_icon, technology
@@ -111,6 +112,17 @@ def test_une_icone_qui_n_est_pas_un_document_svg_est_refusee(name: str, content:
         technology(icon=svg_icon(name, content)).clean_fields()
 
     assert refusals(refusal.value, "icon") == [("icon_not_svg", strings.ICON_NOT_SVG)]
+
+
+def test_une_icone_validee_reste_prete_a_etre_lue_depuis_le_debut() -> None:
+    """`Storage.save` attend un fichier « ready to be read from the beginning »
+    (`django/core/files/storage/base.py`) : la validation, qui le lit, le rend rembobiné. Le
+    stockage sur disque rembobine de lui-même ; un autre stockage n'y est pas tenu."""
+    icon = svg_icon()
+
+    validate_svg(icon)
+
+    assert icon.tell() == 0
 
 
 @pytest.mark.django_db
