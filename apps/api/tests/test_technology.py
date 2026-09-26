@@ -5,6 +5,15 @@ from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.db import IntegrityError, transaction
 from factories import SVG, svg_icon, technology
 
+# Les règles que la base porte en plus de la validation, une contrainte nommée chacune : l'API de
+# #10 s'y fie même pour une ligne écrite hors de l'admin (brief de #7, décision 10 : « seule règle
+# hors base : au moins une technologie »).
+DATABASE_RULES = [
+    ("type hors de sa liste", {"kind": "autre"}, "content_technology_kind_valid"),
+    ("nom vide", {"name": ""}, "content_technology_name_not_empty"),
+    ("icône vide", {"icon": ""}, "content_technology_icon_not_empty"),
+]
+
 # Les formes d'un fichier qui n'est pas un document SVG — c'est le dénombrement qui compte : une
 # extension qui ment, un contenu qui n'est pas du XML, du XML dont la racine n'est pas `svg`, et
 # une racine `svg` hors de l'espace de noms SVG, qu'aucun navigateur n'affiche.
@@ -57,6 +66,20 @@ def test_deux_technologies_ne_portent_pas_le_meme_nom_a_la_casse_pres() -> None:
         technology(name="django").full_clean()
 
     assert refusal_codes(refusal.value) == ["technology_name_taken"]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("media_root")
+@pytest.mark.parametrize(
+    ("fields", "constraint"),
+    [(fields, constraint) for _, fields, constraint in DATABASE_RULES],
+    ids=[rule for rule, _, _ in DATABASE_RULES],
+)
+def test_la_base_refuse_une_technologie_qui_enfreint_ses_regles(
+    fields: dict[str, object], constraint: str
+) -> None:
+    with pytest.raises(IntegrityError, match=constraint), transaction.atomic():
+        technology(**fields).save()
 
 
 @pytest.mark.django_db
