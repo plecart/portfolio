@@ -35,7 +35,9 @@ l'y autorise). Le Postgres a un mot de passe tiré au hasard ; Ryuk, rien. Pour 
 tous les ports publiés du poste, fixer l'adresse de liaison par défaut du démon à `127.0.0.1` —
 `"ip": "127.0.0.1"` dans sa configuration (Docker Desktop : *Settings → Docker Engine*) — puis
 redémarrer Docker. Vérifier ensuite qu'un `docker port <conteneur>` n'affiche plus que
-`127.0.0.1`.
+`127.0.0.1`. Les tests joignent leurs conteneurs par `127.0.0.1`, et `.env.example` vise la même
+adresse : sous Windows, `localhost` se résout d'abord en `::1`, où plus rien ne répondrait, et
+chaque connexion attendrait son délai.
 
 **Front (`apps/web`)** — Node, épinglé par `apps/web/.nvmrc` ; un gestionnaire de version (`nvm`,
 `fnm`, `volta`…) lit ce fichier, et le champ `engines` du manifeste porte la même valeur, qu'un

@@ -42,6 +42,14 @@ def test_la_base_des_tests_est_un_postgres_avec_pgvector() -> None:
         assert cursor.fetchone() == (1,)
 
 
+@pytest.mark.django_db
+def test_le_postgres_des_tests_est_joint_en_ipv4() -> None:
+    """`localhost` se résout d'abord en `::1` sous Windows : sur un port publié pour `127.0.0.1`
+    seulement — le réglage recommandé du poste —, chaque connexion attendrait son délai avant de
+    se replier (mesuré : 20 s, contre 0,01 s en `127.0.0.1`)."""
+    assert connection.settings_dict["HOST"] == "127.0.0.1"
+
+
 @pytest.fixture
 def postgres_class(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     """`PostgresContainer` remplacé par un double à son gabarit : la fabrique s'éprouve sur ce
