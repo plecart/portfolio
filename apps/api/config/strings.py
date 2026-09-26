@@ -6,8 +6,8 @@ fichier `.po` : le contenu est en français seulement. Les écrans et messages p
 eux, sont traduits par `LANGUAGE_CODE` (`config/settings.py`).
 
 Noms de modèle et de champ en minuscules : Django met la majuscule où il la faut. Les libellés
-sont recopiés dans les migrations : en changer un demande une migration, que
-`test_migrations.py` réclame.
+des modèles, des champs — choix compris — et des contraintes sont recopiés dans les migrations :
+en changer un demande une migration, que `test_migrations.py` réclame.
 """
 
 # Application de contenu
