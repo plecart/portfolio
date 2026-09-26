@@ -30,8 +30,8 @@ SHELL_INDEPENDENT_TESTS = [
 def test_le_processus_de_test_ne_lit_aucun_env_du_poste() -> None:
     """Le `.env` du poste appartient au développeur, pas aux tests : ils n'en lisent aucun.
 
-    `config/env.py` résout `ENV_FILE` à son import, que pytest-django déclenche en chargeant les
-    réglages : ce test prouve que le greffon est passé avant.
+    `config/env.py` résout `ENV_FILE` une fois, à son import : ce test prouve que la variable du
+    greffon était déjà posée à ce moment-là.
     """
     assert ENV_FILE == NO_ENV_FILE
     assert not NO_ENV_FILE.exists()
