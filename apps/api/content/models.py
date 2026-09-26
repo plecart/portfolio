@@ -18,10 +18,10 @@ class Technology(models.Model):
     class Kind(models.TextChoices):
         """Valeurs stockées en anglais, exposées telles quelles par l'API (ADR 0010)."""
 
-        LANGUAGE = "language", strings.LANGUAGE
-        FRAMEWORK = "framework", strings.FRAMEWORK
-        INFRASTRUCTURE = "infrastructure", strings.INFRASTRUCTURE
-        TOOL = "tool", strings.TOOL
+        LANGUAGE = "language", strings.TECHNOLOGY_KIND_LANGUAGE
+        FRAMEWORK = "framework", strings.TECHNOLOGY_KIND_FRAMEWORK
+        INFRASTRUCTURE = "infrastructure", strings.TECHNOLOGY_KIND_INFRASTRUCTURE
+        TOOL = "tool", strings.TECHNOLOGY_KIND_TOOL
 
     # Borne technique : la spec ne borne pas ce nom.
     name: models.CharField[str, str] = models.CharField(strings.TECHNOLOGY_NAME, max_length=50)
