@@ -31,13 +31,29 @@ FIELD_REFUSALS = [
     ),
 ]
 
-# Les règles que la base porte en plus de la validation, une contrainte nommée chacune : l'API de
-# #10 s'y fie même pour une ligne écrite hors de l'admin (brief de #7, décision 10 : « seule règle
-# hors base : au moins une technologie »).
+# Les règles que la base porte en plus de la validation, une contrainte nommée chacune, et le
+# refus qu'elle rend — code et message du catalogue : l'API de #10 s'y fie même pour une ligne
+# écrite hors de l'admin (brief de #7, décision 10 : « seule règle hors base : au moins une
+# technologie »).
 DATABASE_RULES = [
-    ("type hors de sa liste", {"kind": "autre"}, "content_technology_kind_valid"),
-    ("nom vide", {"name": ""}, "content_technology_name_not_empty"),
-    ("icône vide", {"icon": ""}, "content_technology_icon_not_empty"),
+    (
+        "type hors de sa liste",
+        {"kind": "autre"},
+        "content_technology_kind_valid",
+        ("technology_kind_unknown", strings.TECHNOLOGY_KIND_UNKNOWN),
+    ),
+    (
+        "nom vide",
+        {"name": ""},
+        "content_technology_name_not_empty",
+        ("technology_name_missing", strings.TECHNOLOGY_NAME_MISSING),
+    ),
+    (
+        "icône vide",
+        {"icon": ""},
+        "content_technology_icon_not_empty",
+        ("technology_icon_missing", strings.TECHNOLOGY_ICON_MISSING),
+    ),
 ]
 
 # Les formes d'un fichier qui n'est pas un document SVG — c'est le dénombrement qui compte : une
@@ -110,14 +126,31 @@ def test_deux_technologies_ne_portent_pas_le_meme_nom_a_la_casse_pres() -> None:
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     ("fields", "constraint"),
-    [(fields, constraint) for _, fields, constraint in DATABASE_RULES],
-    ids=[rule for rule, _, _ in DATABASE_RULES],
+    [(fields, constraint) for _, fields, constraint, _ in DATABASE_RULES],
+    ids=[rule for rule, _, _, _ in DATABASE_RULES],
 )
 def test_la_base_refuse_une_technologie_qui_enfreint_ses_regles(
     fields: dict[str, object], constraint: str
 ) -> None:
     with pytest.raises(IntegrityError, match=constraint), transaction.atomic():
         technology(**fields).save()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("fields", "refusal"),
+    [(fields, refusal) for _, fields, _, refusal in DATABASE_RULES],
+    ids=[rule for rule, _, _, _ in DATABASE_RULES],
+)
+def test_une_contrainte_refuse_avec_le_code_et_le_message_du_catalogue(
+    fields: dict[str, object], refusal: tuple[str, str]
+) -> None:
+    """`validate_constraints()` seul rend ces refus : `full_clean()` écarte la contrainte d'un
+    champ déjà en erreur (`blank`, `choices`), et l'admin n'affiche que le refus du champ."""
+    with pytest.raises(ValidationError) as error:
+        technology(**fields).validate_constraints()
+
+    assert refusals(error.value) == [refusal]
 
 
 @pytest.mark.django_db
