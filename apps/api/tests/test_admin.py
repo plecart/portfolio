@@ -62,6 +62,31 @@ def test_l_ecran_technologie_affiche_les_libelles_du_catalogue(admin_client: Cli
 
 
 @pytest.mark.django_db
+def test_la_liste_des_technologies_montre_l_icone_et_si_un_site_est_renseigne(
+    admin_client: Client,
+) -> None:
+    """Chaque ligne montre l'icône en petit, et ✔ ou ✘ selon qu'un site est renseigné — les
+    icônes booléennes de l'admin. Les en-têtes de colonne viennent du catalogue (décision 1)."""
+    with_website = technology(name="Django", website="https://www.djangoproject.com/")
+    with_website.save()
+    without_website = technology(name="Python")
+    without_website.save()
+
+    page = admin_client.get(reverse("admin:content_technology_changelist")).content.decode()
+
+    for column in (
+        strings.TECHNOLOGY_NAME,
+        strings.TECHNOLOGY_ICON,
+        strings.TECHNOLOGY_KIND,
+        strings.TECHNOLOGY_WEBSITE,
+    ):
+        assert f">{escape(capfirst(column))}</" in page
+    for saved in (with_website, without_website):
+        assert f'<img src="{saved.icon.url}"' in page
+    assert (page.count("icon-yes.svg"), page.count("icon-no.svg")) == (1, 1)
+
+
+@pytest.mark.django_db
 def test_l_admin_refuse_un_doublon_avec_le_message_du_catalogue(admin_client: Client) -> None:
     """La contrainte suffit : l'admin affiche son message sans second `clean()` (décision 10)."""
     technology(name="Django").save()
