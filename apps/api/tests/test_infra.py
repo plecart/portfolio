@@ -3,7 +3,7 @@
 Ces tests lisent des fichiers comme du texte, sans rien construire ni démarrer. Ils gardent des
 invariants dont la violation ne se voit qu'à l'exécution, et tard : un conteneur qui tourne en
 root, des signaux qui n'atteignent jamais le serveur, une adresse de service revenue à
-`localhost`. Chacun d'eux a été éprouvé par mutation — retiré du code, il rend ce test rouge.
+`127.0.0.1`. Chacun d'eux a été éprouvé par mutation — retiré du code, il rend ce test rouge.
 
 Que l'image **se construise** et que la pile **démarre** est prouvé ailleurs : par le job `infra`
 de la CI, et par la pile qu'on regarde tourner.
@@ -50,7 +50,7 @@ HAND_OVER = 'exec "$@"'
 POSTGRES_PROBE_HOST = "-h 127.0.0.1"
 
 # Les adresses que le service `api` doit recomposer avec les noms de service. `env_file: ../.env`
-# apporte celles du poste (`localhost`), qui ne désignent rien depuis un conteneur ; ces trois
+# apporte celles du poste (`127.0.0.1`), qui ne désignent rien depuis un conteneur ; ces trois
 # lignes les remplacent, et `environment:` prime sur `env_file:`. Les retirer laisse
 # `docker compose config` vert et ne casse qu'au démarrage — d'où ce test.
 SERVICE_ADDRESS_OVERRIDES = {

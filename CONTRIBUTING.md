@@ -53,7 +53,7 @@ en supprimant son dossier temporaire. Le détail et les autres écarts d'outilla
 [docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4.
 
 **La pile de développement (`infra/`)** — Postgres, Redis et `api` en conteneurs sur un réseau
-privé. Demande Docker ; les ports 8000, 5432 et 6379 sont publiés sur `localhost` seulement.
+privé. Demande Docker ; les ports 8000, 5432 et 6379 sont publiés sur `127.0.0.1` seulement.
 
 ```
 make dev                    # construit l'image `api` si besoin, puis démarre la pile
@@ -63,14 +63,6 @@ make dev                    # construit l'image `api` si besoin, puis démarre l
 quoi les valeurs interpolées du fichier Compose seraient vides. Le `.env` de la racine doit
 exister — Compose refuse de résoudre un `env_file` absent, avant même de démarrer quoi que ce
 soit. `Ctrl-C` arrête la pile ; les données Postgres survivent dans un volume nommé.
-
-**Regarder l'admin.** La pile démarrée, créer le compte d'administration dans le conteneur `api`
-— la commande de gestion de #6 prendra le relais —, puis ouvrir `http://127.0.0.1:8000/admin/` :
-
-```
-docker compose --env-file infra/dev.env -f infra/compose.dev.yml exec api python manage.py createsuperuser
-```
-
 
 Deux fichiers d'environnement, qui ne se remplacent pas :
 
@@ -89,6 +81,13 @@ fait que les variables de Compose ne sont pas des variables du back, et c'est
 Le code de `apps/api` est monté dans le conteneur : une modification sur le poste recharge `api`.
 Les migrations s'exécutent à chaque démarrage. Les tests et les outils de qualité restent sur
 l'hôte (`make test`, `make lint`) — le conteneur fait tourner l'application, il ne la vérifie pas.
+
+**Regarder l'admin.** La pile démarrée, créer le compte d'administration dans le conteneur `api`
+— la commande de gestion de #6 prendra le relais —, puis ouvrir `http://127.0.0.1:8000/admin/` :
+
+```
+docker compose --env-file infra/dev.env -f infra/compose.dev.yml exec api python manage.py createsuperuser
+```
 
 Toutes les cibles disponibles : `Makefile`, repris dans la section « Commandes du projet » de
 [.claude/pipeline.config.md](.claude/pipeline.config.md) — c'est cette section que lisent les
