@@ -13,19 +13,23 @@ en changer un demande une migration, que `test_migrations.py` réclame.
 # Application de contenu
 CONTENT = "Contenu"
 
-# Technologie
+# Technologie : modèle, champs et valeurs du type
 TECHNOLOGY = "technologie"
 TECHNOLOGIES = "technologies"
 TECHNOLOGY_NAME = "nom"
 TECHNOLOGY_KIND = "type"
 TECHNOLOGY_ICON = "icône"
 TECHNOLOGY_WEBSITE = "site"
-TECHNOLOGY_WEBSITE_OPEN = "{name} : ouvrir le site"
-TECHNOLOGY_WEBSITE_NONE = "Aucun site"
 TECHNOLOGY_KIND_LANGUAGE = "Langage"
 TECHNOLOGY_KIND_FRAMEWORK = "Framework"
 TECHNOLOGY_KIND_INFRASTRUCTURE = "Infra"
 TECHNOLOGY_KIND_TOOL = "Outil"
+
+# Technologie : libellés accessibles du symbole de lien, dans la liste de l'admin
+TECHNOLOGY_WEBSITE_OPEN = "{name} : ouvrir le site"
+TECHNOLOGY_WEBSITE_NONE = "Aucun site"
+
+# Technologie : refus
 TECHNOLOGY_NAME_TAKEN = "Une technologie porte déjà ce nom, majuscules et minuscules confondues."
 TECHNOLOGY_NAME_MISSING = "Une technologie porte un nom."
 TECHNOLOGY_KIND_UNKNOWN = "Le type d’une technologie est langage, framework, infra ou outil."

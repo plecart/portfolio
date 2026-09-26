@@ -39,7 +39,8 @@ class Technology(models.Model):
     icon = models.FileField(
         strings.TECHNOLOGY_ICON, upload_to="technologies/", validators=[validate_svg]
     )
-    # Stocké sans être exposé ni affiché en phase 1 : le cadrage §6.1 le nomme (décision 11).
+    # Stocké, ni exposé par l'API ni affiché sur le site en phase 1 — l'admin seul le montre : le
+    # cadrage §6.1 le nomme (décision 11).
     # Borne technique, la valeur par défaut de Django écrite ici pour être lue.
     website: models.URLField[str, str] = models.URLField(
         strings.TECHNOLOGY_WEBSITE, max_length=200, blank=True
