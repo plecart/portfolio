@@ -2,9 +2,19 @@
 
 import pytest
 from config import strings
+from content.models import TechnologyKind
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.db import IntegrityError, transaction
 from factories import SVG, svg_icon, technology
+
+# Ce que les champs acceptent : la technologie de la fabrique, le site absent, et chaque borne
+# technique atteinte sans être dépassée — l'autre côté de la borne est dans `FIELD_REFUSALS`.
+FIELD_ACCEPTANCES: list[tuple[str, dict[str, object]]] = [
+    ("icône SVG", {}),
+    ("site absent", {"website": ""}),
+    ("nom de 50 caractères", {"name": "n" * 50}),
+    ("site de 200 caractères", {"website": "https://exemple.fr/" + "a" * 181}),
+]
 
 # Les refus que les champs portent eux-mêmes — bornes techniques, liste du type, présence — et le
 # code que Django leur donne. Ces messages-là sont ceux de Django, traduits par `LANGUAGE_CODE`.
@@ -46,12 +56,19 @@ def refusals(error: ValidationError, field: str = NON_FIELD_ERRORS) -> list[tupl
     return [(refusal.code, str(refusal.message)) for refusal in error.error_dict[field]]
 
 
-def test_une_icone_svg_est_acceptee() -> None:
-    technology().clean_fields()
+@pytest.mark.parametrize(
+    "fields",
+    [fields for _, fields in FIELD_ACCEPTANCES],
+    ids=[acceptance for acceptance, _ in FIELD_ACCEPTANCES],
+)
+def test_un_champ_accepte_une_valeur_dans_ses_regles(fields: dict[str, object]) -> None:
+    technology(**fields).clean_fields()
 
 
-def test_le_site_est_facultatif() -> None:
-    technology(website="").clean_fields()
+def test_les_valeurs_du_type_sont_celles_que_l_api_expose() -> None:
+    """Les valeurs stockées sont un contrat : l'API les expose telles quelles (ADR 0010), et le
+    glossaire les nomme. Leurs libellés, eux, sont tenus par l'écran (`test_admin.py`)."""
+    assert TechnologyKind.values == ["language", "framework", "infrastructure", "tool"]
 
 
 @pytest.mark.parametrize(
