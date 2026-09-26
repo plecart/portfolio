@@ -20,8 +20,8 @@ from testcontainers.core.container import DockerContainer
 POSTGRES_IMAGE = "pgvector/pgvector:pg16"
 
 CONTAINER_REFUSED = (
-    "Le conteneur des tests n'a pas démarré : {cause}\n"
-    "Les tests qui touchent la base exigent Docker (testcontainers) : démarrer Docker, relancer."
+    "Le conteneur de test n'a pas démarré : {cause}\n"
+    "Les tests qui en dépendent exigent Docker (testcontainers) : vérifier qu'il répond, relancer."
 )
 
 
@@ -65,11 +65,26 @@ def running[C: DockerContainer](create: Callable[[], C]) -> Generator[C]:
         pytest.fail.Exception: Docker n'a pas pu créer ou démarrer le conteneur ; le message dit
             pourquoi et quoi faire.
     """
+    with _docker_required():
+        container = create()
+    # Arrêté même si son démarrage échoue — une attente de service expirée, par exemple : le
+    # conteneur existe déjà, et Ryuk ne le reprendrait qu'à la fin de la session.
     try:
-        container = create().start()
-    except DockerException as error:
-        pytest.fail(CONTAINER_REFUSED.format(cause=error), pytrace=False)
-    try:
+        with _docker_required():
+            container.start()
         yield container
     finally:
         container.stop()
+
+
+@contextmanager
+def _docker_required() -> Generator[None]:
+    """Change une panne de Docker en échec du test qui la nomme et dit quoi faire.
+
+    `from None` : sans lui, pytest affiche toute la chaîne de docker-py, urllib3 et requests
+    au-dessus du message — six messages mesurés, pour une seule cause.
+    """
+    try:
+        yield
+    except DockerException as error:
+        raise pytest.fail.Exception(CONTAINER_REFUSED.format(cause=error), pytrace=False) from None

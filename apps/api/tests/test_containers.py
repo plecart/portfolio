@@ -4,26 +4,27 @@ L'égalité de son image avec celle du Compose est tenue par `test_infra.py`, av
 fichiers d'infrastructure.
 """
 
+import os
+import re
+import subprocess
+import sys
+from unittest.mock import create_autospec
+
 import pytest
-from containers import postgres, running
+from config.env import REPOSITORY_ROOT
+from containers import running
 from django.db import connection
+from testcontainers.core.container import DockerContainer
 
-# Un démon qui ne répond pas : le port 9 (« discard ») n'écoute sur aucun poste ni aucun runner.
-UNREACHABLE_DOCKER = "tcp://127.0.0.1:9"
+# Un démon qui ne répond pas. `.invalid` ne se résout nulle part (RFC 2606) : docker-py échoue en
+# 0,01 s, quand un port fermé de `127.0.0.1` lui coûte 2 s sous Windows (mesuré).
+UNREACHABLE_DOCKER = "tcp://docker.invalid:2375"
 
-
-def test_sans_docker_un_test_de_base_echoue_en_disant_pourquoi(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Un échec qui nomme Docker, jamais un saut ni une trace de `docker-py` à déchiffrer.
-
-    `DOCKER_HOST` est la variable que testcontainers lit, sauf si `~/.testcontainers.properties`
-    pose `tc.host` — aucun poste du projet ni la CI ne le font.
-    """
-    monkeypatch.setenv("DOCKER_HOST", UNREACHABLE_DOCKER)
-
-    with pytest.raises(pytest.fail.Exception, match="exigent Docker"), running(postgres):
-        pass
+# Ce que la session imbriquée lance : un test de base, et deux tests qui n'en touchent aucune.
+BASE_TEST = (
+    "apps/api/tests/test_containers.py::test_la_base_des_tests_est_un_postgres_avec_pgvector"
+)
+BASELESS_TESTS = "apps/api/tests/test_admin.py"
 
 
 @pytest.mark.django_db
@@ -37,3 +38,50 @@ def test_la_base_des_tests_est_un_postgres_avec_pgvector() -> None:
         cursor.execute("SELECT 1 FROM pg_available_extensions WHERE name = 'vector'")
 
         assert cursor.fetchone() == (1,)
+
+
+def test_un_conteneur_dont_le_demarrage_echoue_est_arrete() -> None:
+    """Un démarrage raté laisse un conteneur créé : `running` l'arrête quand même.
+
+    Docker est une frontière du système : un double au gabarit de `DockerContainer` suffit à
+    rejouer une attente de service qui expire.
+    """
+    container = create_autospec(DockerContainer, instance=True)
+    container.start.side_effect = TimeoutError("service jamais prêt")
+
+    with pytest.raises(TimeoutError), running(lambda: container):
+        pass
+
+    container.stop.assert_called_once_with()
+
+
+def test_sans_docker_un_test_de_base_echoue_en_disant_pourquoi() -> None:
+    """Sans Docker, le test de base échoue — jamais sauté — et les autres tournent.
+
+    Éprouvé de bout en bout, dans une session pytest à part : c'est la suite entière qui doit
+    rester rouge et lisible, pas seulement un utilitaire. Un test sauté se lirait comme un vert ;
+    un conteneur démarré pour tous les tests ferait échouer ceux qui n'ont pas besoin de base ;
+    une trace de docker-py noierait le message qui dit quoi faire.
+
+    testcontainers cherche Docker dans `tc.host` (`~/.testcontainers.properties`), puis dans
+    `DOCKER_HOST`, puis dans le contexte Docker courant : `DOCKER_HOST` suffit, tant qu'aucun poste
+    ne pose `tc.host` — ni celui du projet ni la CI ne le font. Il réécrit aussi `DOCKER_HOST`
+    dans l'environnement du processus au premier conteneur : d'où la valeur passée explicitement.
+    """
+    session = subprocess.run(
+        [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", BASE_TEST, BASELESS_TESTS],
+        cwd=REPOSITORY_ROOT,
+        env={**os.environ, "DOCKER_HOST": UNREACHABLE_DOCKER},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    report = session.stdout
+
+    assert session.returncode == pytest.ExitCode.TESTS_FAILED, report
+    assert re.search(r"\b2 passed, 1 error\b", report), report
+    assert "skipped" not in report
+    assert "exigent Docker" in report
+    # Les deux formes de chaînage : « The above exception was the direct cause… » et « During
+    # handling of the above exception… ». `pytrace=False` en tait les types, jamais les messages.
+    assert "above exception" not in report, "la chaîne de docker-py remonte avec le message"
