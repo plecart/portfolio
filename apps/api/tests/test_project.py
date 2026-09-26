@@ -53,12 +53,20 @@ STARTUP_IMPORTS = [
 
 
 def run_python(arguments: list[str], variables: dict[str, str]) -> subprocess.CompletedProcess[str]:
-    """Exécute `python <arguments>` depuis `apps/api`, dans un environnement valide, sans lire le
-    `.env` du poste — celui du développeur, qui ne regarde pas ces tests."""
+    """Exécute `python <arguments>` depuis `apps/api`, comme un humain ou `gunicorn` le lancent.
+
+    Dans un environnement valide, sans le `.env` du poste — celui du développeur, qui ne regarde
+    pas ces tests — ni le `DJANGO_SETTINGS_MODULE` du processus de test : `manage.py` et
+    `config/wsgi.py` doivent le poser eux-mêmes, comme au démarrage du conteneur, où rien d'autre
+    ne le pose.
+    """
+    inherited = {
+        name: value for name, value in os.environ.items() if name != "DJANGO_SETTINGS_MODULE"
+    }
     return subprocess.run(
         [sys.executable, *arguments],
         cwd=API_ROOT,
-        env={**os.environ, "ENV_FILE": str(NO_ENV_FILE), **variables},
+        env={**inherited, "ENV_FILE": str(NO_ENV_FILE), **variables},
         capture_output=True,
         text=True,
         check=False,
