@@ -62,11 +62,12 @@ def test_l_ecran_technologie_affiche_les_libelles_du_catalogue(admin_client: Cli
 
 
 @pytest.mark.django_db
-def test_la_liste_des_technologies_montre_l_icone_et_si_un_site_est_renseigne(
+def test_la_liste_des_technologies_montre_l_icone_et_le_lien_du_site(
     admin_client: Client,
 ) -> None:
-    """Chaque ligne montre l'icône en petit, et ✔ ou ✘ selon qu'un site est renseigné — les
-    icônes booléennes de l'admin. Les en-têtes de colonne viennent du catalogue (décision 1)."""
+    """Colonnes dans l'ordre nom, type, icône, site. L'icône en petit ; le site en symbole de lien,
+    cliquable s'il est renseigné — bleu, couleur des liens de l'admin —, grisé et inerte sinon.
+    En-têtes et libellés accessibles du catalogue (décision 1)."""
     with_website = technology(name="Django", website="https://www.djangoproject.com/")
     with_website.save()
     without_website = technology(name="Python")
@@ -74,16 +75,25 @@ def test_la_liste_des_technologies_montre_l_icone_et_si_un_site_est_renseigne(
 
     page = admin_client.get(reverse("admin:content_technology_changelist")).content.decode()
 
-    for column in (
+    columns = [
         strings.TECHNOLOGY_NAME,
-        strings.TECHNOLOGY_ICON,
         strings.TECHNOLOGY_KIND,
+        strings.TECHNOLOGY_ICON,
         strings.TECHNOLOGY_WEBSITE,
-    ):
-        assert f">{escape(capfirst(column))}</" in page
+    ]
+    positions = [page.find(f">{escape(capfirst(column))}</") for column in columns]
+    assert -1 not in positions
+    assert positions == sorted(positions)
     for saved in (with_website, without_website):
         assert f'<img src="{saved.icon.url}"' in page
-    assert (page.count("icon-yes.svg"), page.count("icon-no.svg")) == (1, 1)
+    link = (
+        f'<a href="{with_website.website}" target="_blank" rel="noopener noreferrer" '
+        f'aria-label="{escape(strings.TECHNOLOGY_WEBSITE_OPEN.format(name=with_website.name))}"'
+    )
+    greyed = (
+        f'<span class="quiet" role="img" aria-label="{escape(strings.TECHNOLOGY_WEBSITE_NONE)}"'
+    )
+    assert (page.count(link), page.count(greyed)) == (1, 1)
 
 
 @pytest.mark.django_db
