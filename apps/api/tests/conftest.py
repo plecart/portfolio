@@ -23,16 +23,6 @@ def variables() -> dict[str, str]:
     return dict(VALID_ENVIRONMENT)
 
 
-@pytest.fixture
-def environment(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
-    """L'environnement valide de ce processus, à corrompre le temps d'un test.
-
-    Le greffon `process_environment` l'a déjà posé pour tout le processus ; `monkeypatch` défait
-    chaque retouche après le test.
-    """
-    return monkeypatch
-
-
 @pytest.fixture(autouse=True)
 def media_root(tmp_path: Path) -> Generator[None]:
     """Les fichiers qu'un test enregistre vont dans son dossier temporaire, jamais dans le dépôt.
