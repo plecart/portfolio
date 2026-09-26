@@ -117,7 +117,7 @@ def test_les_reglages_django_viennent_de_l_environnement(variables: dict[str, st
         "NAME": "portfolio",
         "USER": "portfolio",
         "PASSWORD": "secret",
-        "HOST": "localhost",
+        "HOST": "base.invalid",
         "PORT": 5432,
     }
     # Django pose `MEDIA_ROOT = ''` par défaut (`django.conf.global_settings`) : sans câblage,

@@ -17,10 +17,12 @@ def variables() -> dict[str, str]:
 
 
 @pytest.fixture
-def environment(monkeypatch: pytest.MonkeyPatch, variables: dict[str, str]) -> pytest.MonkeyPatch:
-    """Pose l'environnement valide dans ce processus et rend la main pour le corrompre."""
-    for name, value in variables.items():
-        monkeypatch.setenv(name, value)
+def environment(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
+    """L'environnement valide de ce processus, à corrompre le temps d'un test.
+
+    Le greffon `process_environment` l'a déjà posé pour tout le processus ; `monkeypatch` défait
+    chaque retouche après le test.
+    """
     return monkeypatch
 
 
