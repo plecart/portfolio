@@ -81,8 +81,8 @@ def build_env(env_file: Path | None = None) -> Env:
     return Env(_env_file=env_file)  # pyright: ignore[reportCallIssue]
 
 
-def test_le_demarrage_echoue_sans_cle_secrete(environment: pytest.MonkeyPatch) -> None:
-    environment.delenv("SECRET_KEY")
+def test_le_demarrage_echoue_sans_cle_secrete(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SECRET_KEY")
 
     with pytest.raises(ValidationError, match="SECRET_KEY"):
         build_env()
@@ -90,36 +90,36 @@ def test_le_demarrage_echoue_sans_cle_secrete(environment: pytest.MonkeyPatch) -
 
 @pytest.mark.parametrize("variable", SERVICE_URLS)
 def test_une_adresse_de_service_mal_formee_est_refusee(
-    environment: pytest.MonkeyPatch, variable: str
+    monkeypatch: pytest.MonkeyPatch, variable: str
 ) -> None:
     """Toute adresse de service est refusée mal formée — la liste couvre la classe entière."""
-    environment.setenv(variable, "pas-une-url")
+    monkeypatch.setenv(variable, "pas-une-url")
 
     with pytest.raises(ValidationError, match=variable):
         build_env()
 
 
 def test_le_demarrage_echoue_sans_hote_autorise_hors_debug(
-    environment: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Django exige ALLOWED_HOSTS hors debug ; échouer au démarrage vaut mieux qu'à la requête."""
-    environment.setenv("ALLOWED_HOSTS", "[]")
+    monkeypatch.setenv("ALLOWED_HOSTS", "[]")
 
     with pytest.raises(ValidationError, match="ALLOWED_HOSTS"):
         build_env()
 
 
-def test_debug_est_faux_par_defaut(environment: pytest.MonkeyPatch) -> None:
+def test_debug_est_faux_par_defaut(monkeypatch: pytest.MonkeyPatch) -> None:
     """Un oubli doit laisser l'application en posture de production, jamais l'inverse."""
-    environment.delenv("DEBUG")
+    monkeypatch.delenv("DEBUG")
 
     assert build_env().DEBUG is False
 
 
-def test_un_hote_absent_est_tolere_en_debug(environment: pytest.MonkeyPatch) -> None:
+def test_un_hote_absent_est_tolere_en_debug(monkeypatch: pytest.MonkeyPatch) -> None:
     """Le garde ne doit pas gêner le développement, où Django autorise déjà les hôtes locaux."""
-    environment.setenv("DEBUG", "true")
-    environment.setenv("ALLOWED_HOSTS", "[]")
+    monkeypatch.setenv("DEBUG", "true")
+    monkeypatch.setenv("ALLOWED_HOSTS", "[]")
 
     assert build_env().ALLOWED_HOSTS == []
 
@@ -130,9 +130,7 @@ def test_un_hote_absent_est_tolere_en_debug(environment: pytest.MonkeyPatch) -> 
     ids=[name for name, _ in SECRET_TRAVEL_FORMS],
 )
 def test_la_cle_secrete_n_apparait_dans_aucune_forme(
-    environment: pytest.MonkeyPatch,
-    variables: dict[str, str],
-    render: Callable[[Env], str],
+    variables: dict[str, str], render: Callable[[Env], str]
 ) -> None:
     """Le masquage se solde sur la classe : 8 formes recensées, 8 éprouvées ici."""
     env = build_env()
@@ -140,9 +138,9 @@ def test_la_cle_secrete_n_apparait_dans_aucune_forme(
     assert variables["SECRET_KEY"] not in render(env)
 
 
-def test_une_cle_secrete_trop_courte_est_refusee(environment: pytest.MonkeyPatch) -> None:
+def test_une_cle_secrete_trop_courte_est_refusee(monkeypatch: pytest.MonkeyPatch) -> None:
     """Django n'avertit qu'en `check --deploy`, que la CI ne lance pas : on refuse au démarrage."""
-    environment.setenv("SECRET_KEY", "trop-courte")
+    monkeypatch.setenv("SECRET_KEY", "trop-courte")
 
     with pytest.raises(ValidationError, match="SECRET_KEY"):
         build_env()
@@ -154,7 +152,7 @@ def test_une_cle_secrete_trop_courte_est_refusee(environment: pytest.MonkeyPatch
     ids=[name for name, _, _ in INVALID_CONFIGURATIONS],
 )
 def test_aucune_valeur_ne_fuit_dans_l_erreur_de_demarrage(
-    environment: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch,
     variables: dict[str, str],
     variable: str,
     invalid_value: str,
@@ -165,7 +163,7 @@ def test_aucune_valeur_ne_fuit_dans_l_erreur_de_demarrage(
     reçoit l'environnement entier, donc *toutes* les valeurs. Le refus doit nommer les champs
     et taire les valeurs, quel que soit le mécanisme qui l'a déclenché.
     """
-    environment.setenv(variable, invalid_value)
+    monkeypatch.setenv(variable, invalid_value)
 
     with pytest.raises(ConfigurationError) as refusal:
         Env.load()
@@ -176,9 +174,7 @@ def test_aucune_valeur_ne_fuit_dans_l_erreur_de_demarrage(
         assert value not in message
 
 
-def test_une_cle_inconnue_dans_le_fichier_env_est_refusee(
-    environment: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_une_cle_inconnue_dans_le_fichier_env_est_refusee(tmp_path: Path) -> None:
     """Une clé absente de `Env` est une faute de frappe, pas une option : elle doit bloquer."""
     env_file = tmp_path / ".env"
     env_file.write_text("SECRET_KEY_TYPO=oups\n", encoding="utf-8")
@@ -249,29 +245,29 @@ def test_un_env_file_vide_retombe_sur_la_racine() -> None:
 
 @pytest.mark.parametrize("variable", PATH_VARIABLES)
 def test_un_chemin_relatif_est_ancre_sur_la_racine(
-    environment: pytest.MonkeyPatch, variable: str
+    monkeypatch: pytest.MonkeyPatch, variable: str
 ) -> None:
     """Même règle que pour `ENV_FILE`, et pour la même raison.
 
     `manage.py` se lance depuis `apps/api`, `pytest` depuis la racine : laisser le dossier
     courant trancher ferait viser deux endroits différents selon l'appelant.
     """
-    environment.setenv(variable, "ailleurs")
+    monkeypatch.setenv(variable, "ailleurs")
 
     assert getattr(build_env(), variable) == REPOSITORY_ROOT / "ailleurs"
 
 
 @pytest.mark.parametrize("variable", PATH_VARIABLES)
-def test_un_chemin_absolu_est_respecte(environment: pytest.MonkeyPatch, variable: str) -> None:
+def test_un_chemin_absolu_est_respecte(monkeypatch: pytest.MonkeyPatch, variable: str) -> None:
     """C'est la forme que le conteneur reçoit : un chemin de volume, hors du dépôt."""
     absolute = Path(REPOSITORY_ROOT.anchor) / "srv" / "ailleurs"
-    environment.setenv(variable, str(absolute))
+    monkeypatch.setenv(variable, str(absolute))
 
     assert getattr(build_env(), variable) == absolute
 
 
-def test_le_media_root_par_defaut_est_dans_le_depot(environment: pytest.MonkeyPatch) -> None:
+def test_le_media_root_par_defaut_est_dans_le_depot(monkeypatch: pytest.MonkeyPatch) -> None:
     """Un clone qui n'a pas renseigné la variable sait déjà où écrire (ADR 0004, disque)."""
-    environment.delenv("MEDIA_ROOT")
+    monkeypatch.delenv("MEDIA_ROOT")
 
     assert build_env().MEDIA_ROOT == REPOSITORY_ROOT / "media"

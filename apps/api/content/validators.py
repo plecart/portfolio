@@ -18,8 +18,9 @@ def validate_svg(file: File[bytes]) -> None:
     L'extension compte autant que le contenu : c'est d'elle que le serveur de fichiers tire le
     type `image/svg+xml`, sans lequel le navigateur n'affiche pas l'icône. Le contenu est lu par
     la bibliothèque standard (décision 11 du brief de #7) : son analyseur ne résout aucune entité
-    externe, et l'expat qu'il embarque (2.7.1 mesuré, 2.4.1 au moins) écarte les expansions
-    d'entités en chaîne — documentation Python, « XML vulnerabilities ».
+    externe, et l'expat de l'image, où l'admin tourne (2.8.3, mesuré le 2026-09-26), dépasse le
+    seuil de 2.7.2 sous lequel la documentation Python le dit exposé aux expansions d'entités
+    (« XML security »).
 
     Args:
         file: le fichier du champ, téléversé ou déjà enregistré.
@@ -34,12 +35,11 @@ def validate_svg(file: File[bytes]) -> None:
 def _root_tag(file: File[bytes]) -> str | None:
     """La balise racine de `file`, ou `None` s'il ne se lit pas comme du XML.
 
-    Lu d'un bloc — une icône pèse quelques kilo-octets —, puis rembobiné : le fichier est
-    enregistré après la validation.
+    Lu d'un bloc, sans borne de taille : seul le compte de l'admin téléverse, et une icône pèse
+    quelques kilo-octets. Sans rembobiner : Django rembobine le fichier avant de l'enregistrer
+    (`File.chunks`, `django/core/files/base.py`).
     """
     try:
-        root = ElementTree.fromstring(file.read())
+        return ElementTree.fromstring(file.read()).tag
     except (ElementTree.ParseError, OSError):
         return None
-    file.seek(0)
-    return root.tag
