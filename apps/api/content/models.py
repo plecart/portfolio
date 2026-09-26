@@ -264,3 +264,39 @@ class Project(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+
+class ProjectTechnology(models.Model):
+    """Une technologie qu'un projet emploie, à sa place dans la liste du projet (PRD « Modèle de
+    contenu »). Au moins une par projet : seule règle hors base, tenue par l'écran Projet
+    (décision 10)."""
+
+    project: models.ForeignKey[Project, Project] = models.ForeignKey(
+        Project, models.CASCADE, verbose_name=strings.PROJECT
+    )
+    # Protégée : supprimer une technologie employée retirerait en silence une ligne à des projets,
+    # jusqu'à en laisser sans technologie. L'admin refuse et nomme les projets.
+    technology: models.ForeignKey[Technology, Technology] = models.ForeignKey(
+        Technology, models.PROTECT, verbose_name=strings.TECHNOLOGY
+    )
+    # Saisie par l'auteur, sans valeur par défaut (décision 2).
+    position: models.PositiveSmallIntegerField[int, int] = models.PositiveSmallIntegerField(
+        strings.PROJECT_TECHNOLOGY_POSITION
+    )
+
+    class Meta:
+        verbose_name = strings.PROJECT_TECHNOLOGY
+        verbose_name_plural = strings.PROJECT_TECHNOLOGIES
+        # L'ordre de l'admin est l'ordre stocké ; à position égale, l'ordre de saisie.
+        ordering = ("position", "id")
+        constraints = (
+            models.UniqueConstraint(
+                fields=["project", "technology"],
+                name="content_project_technology_unique",
+                violation_error_code="project_technology_taken",
+                violation_error_message=strings.PROJECT_TECHNOLOGY_TAKEN,
+            ),
+        )
+
+    def __str__(self) -> str:
+        return f"{self.project} · {self.technology}"

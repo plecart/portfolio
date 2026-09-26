@@ -81,3 +81,12 @@ PROJECT_FINISHED_ON_MISSING = "Un projet terminé ou archivé porte une date de 
 PROJECT_ONGOING_FINISHED = "Un projet en cours n’a pas de date de fin."
 PROJECT_DATES_REVERSED = "La date de fin d’un projet ne précède pas sa date de début."
 PROJECT_SHOWCASE_TAKEN = "Un autre projet est déjà la vitrine : un seul l’est à la fois."
+
+# Technologie de projet : modèle et champ ; le projet et la technologie qu'elle lie portent leurs
+# propres noms
+PROJECT_TECHNOLOGY = "technologie de projet"
+PROJECT_TECHNOLOGIES = "technologies de projet"
+PROJECT_TECHNOLOGY_POSITION = "position"
+
+# Technologie de projet : refus
+PROJECT_TECHNOLOGY_TAKEN = "Cette technologie figure déjà dans le projet."
