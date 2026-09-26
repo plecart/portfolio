@@ -30,9 +30,9 @@ permissions:
 
 on:
   pull_request:
-    # `ready_for_review` est INDISPENSABLE ici : sans lui, aucun événement n'est émis au passage
-    # draft → ready, et la CI ne tournerait jamais sur une PR ouverte en draft (Étape 2 de
-    # `cycle-pr`). Ne pas retirer ce type sans retirer aussi le garde `if:` des jobs.
+    # `ready_for_review` garantit un run au passage draft → ready, même quand le dernier push
+    # date : c'est ce run que `cycle-pr` attend à son Étape 5. Le garde `if:` des jobs, lui, ne
+    # saute que l'ouverture d'une draft — son amorce vide n'a rien à vérifier.
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
@@ -42,19 +42,16 @@ jobs:
     name: Back — audit, lint, format, types, tests
     runs-on: ubuntu-latest
 
-    # Pas de CI tant que la PR est en draft.
-    #
-    # `cycle-pr` ouvre la PR AVANT d'écrire la moindre ligne de code (Étape 2), pour rendre le
-    # travail visible comme « en cours ». Sans ce garde, chaque push de développement
-    # déclencherait un run complet sur du code volontairement incomplet.
-    #
-    # C'est sans risque dans cette pipeline : les étapes 3.2 et 3.4 imposent une suite verte en
-    # local avant chaque commit, donc aucun commit cassé n'entre dans l'historique. La CI reprend
-    # au `gh pr ready` (Étape 5) et sur chaque push suivant.
+    # La CI tourne sur chaque push d'une PR, draft comprise : un rouge propre à la plateforme
+    # cible se voit au cycle courant, pendant la relecture, pas après le passage en ready où il
+    # coûte un run complet et le rejeu des vérifications manuelles (`cycle-pr`, Étapes 2 et 4).
+    # Seule l'ouverture d'une draft est sautée : `cycle-pr` l'ouvre sur un commit vide, avant
+    # tout code (Étape 2), et ce run ne vérifierait que `main`. Une PR ouverte prête — un bot de
+    # dépendances, une branche déjà écrite — tourne dès l'ouverture.
     #
     # La condition sur `event_name` est nécessaire : sur un push vers `main`, l'objet
     # `pull_request` n'existe pas.
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: github.event_name != 'pull_request' || github.event.action != 'opened' || github.event.pull_request.draft == false
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -93,7 +90,7 @@ jobs:
     runs-on: ubuntu-latest
 
     # Même garde que le job back : voir le commentaire ci-dessus.
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: github.event_name != 'pull_request' || github.event.action != 'opened' || github.event.pull_request.draft == false
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -138,7 +135,7 @@ jobs:
     runs-on: ubuntu-latest
 
     # Même garde que les deux autres jobs : voir le commentaire du job back.
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: github.event_name != 'pull_request' || github.event.action != 'opened' || github.event.pull_request.draft == false
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
