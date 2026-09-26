@@ -8,7 +8,9 @@ pytest-django le prescrit (« Changing your app before Django gets set up »).
 Le processus de test ne dépend ni du shell qui le lance ni du `.env` du poste : chaque variable
 qui décide de ce que les tests vérifient — les champs d'`Env`, et celles des outils listées dans
 `TOOLING_ENVIRONMENT` — est posée ici, par-dessus celles du shell. Celles qui disent seulement
-comment joindre Docker (`DOCKER_HOST`, son socket, un miroir de registre) restent au poste.
+comment joindre Docker et ses conteneurs restent au poste : `DOCKER_HOST`, son socket, un miroir
+de registre, et `TESTCONTAINERS_CONNECTION_MODE` — qui passe avant `TC_HOST`
+(`testcontainers/core/container.py`), pour une CI qui tourne elle-même en conteneur.
 """
 
 import os

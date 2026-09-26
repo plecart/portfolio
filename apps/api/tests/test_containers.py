@@ -30,11 +30,21 @@ BASELESS_TESTS = [
 ]
 
 # Les façons dont un démarrage échoue une fois le conteneur créé, et ce que le test en voit : un
-# refus de Docker qui répond — un tirage d'image raté, par exemple — devient un échec qui dit quoi
-# faire ; une attente de service qui expire remonte telle quelle.
+# refus de Docker qui répond — un tirage d'image raté, par exemple — devient un échec qui en cite
+# la cause, puis dit quoi faire ; une attente de service qui expire remonte telle quelle.
 FAILED_STARTS = [
-    ("Docker refuse", APIError("tirage refusé"), pytest.fail.Exception, "exigent Docker"),
-    ("attente expirée", TimeoutError("service jamais prêt"), TimeoutError, "service jamais prêt"),
+    (
+        "Docker refuse",
+        APIError("tirage refusé"),
+        pytest.fail.Exception,
+        "tirage refusé\n.*exigent Docker",
+    ),
+    (
+        "attente expirée",
+        TimeoutError("service jamais prêt"),
+        TimeoutError,
+        "service jamais prêt",
+    ),
 ]
 
 
