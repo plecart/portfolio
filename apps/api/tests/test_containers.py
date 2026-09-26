@@ -5,12 +5,14 @@ fichiers d'infrastructure.
 """
 
 import re
-from unittest.mock import create_autospec
+from unittest.mock import MagicMock, create_autospec
 
+import containers
 import pytest
 from containers import postgres, running
 from django.db import connection
 from nested_sessions import pytest_session
+from testcontainers.community.postgres import PostgresContainer
 from testcontainers.core.container import DockerContainer
 
 # Un démon qui ne répond pas. `.invalid` ne se résout nulle part (RFC 2606) : docker-py échoue en
@@ -37,23 +39,38 @@ def test_la_base_des_tests_est_un_postgres_avec_pgvector() -> None:
         assert cursor.fetchone() == (1,)
 
 
-def test_le_postgres_des_tests_ignore_les_identifiants_du_shell(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.fixture
+def postgres_class(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """`PostgresContainer` remplacé par un double à son gabarit : la fabrique s'éprouve sur ce
+    qu'elle passe à testcontainers, sans Docker — construire le vrai conteneur l'interroge."""
+    double = create_autospec(PostgresContainer)
+    monkeypatch.setattr(containers, "PostgresContainer", double)
+    return double
+
+
+def test_le_postgres_des_tests_recoit_des_identifiants_explicites(
+    postgres_class: MagicMock,
 ) -> None:
-    """Sans identifiants explicites, testcontainers les lirait dans le shell (`POSTGRES_*`)."""
-    for variable in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"):
-        monkeypatch.setenv(variable, "du-shell")
+    """Un identifiant absent ou vide, testcontainers le lit dans le shell — `POSTGRES_USER`,
+    `POSTGRES_PASSWORD`, `POSTGRES_DB` (`username or os.environ.get(…)`, lu dans son module
+    Postgres) : un poste qui les exporte changerait la base des tests."""
+    postgres()
 
-    server = postgres()
+    arguments = postgres_class.call_args.kwargs
+    assert (arguments["username"], arguments["dbname"]) == ("portfolio", "portfolio")
+    assert arguments["password"]
 
-    assert (server.username, server.dbname) == ("portfolio", "portfolio")
-    assert server.password != "du-shell"
 
-
-def test_chaque_postgres_des_tests_tire_son_propre_mot_de_passe() -> None:
+def test_chaque_postgres_des_tests_tire_son_propre_mot_de_passe(
+    postgres_class: MagicMock,
+) -> None:
     """Son port est publié sur toutes les interfaces : un mot de passe connu y ouvrirait un
     superutilisateur à quiconque partage le réseau du poste."""
-    assert postgres().password != postgres().password
+    postgres()
+    postgres()
+
+    first, second = (call.kwargs["password"] for call in postgres_class.call_args_list)
+    assert first != second
 
 
 def test_un_conteneur_dont_le_demarrage_echoue_est_arrete() -> None:
