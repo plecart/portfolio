@@ -31,7 +31,9 @@ SETTINGS_DUMP = (
     "'DATABASES': settings.DATABASES,"
     "'MEDIA_ROOT': str(settings.MEDIA_ROOT),"
     "'ROOT_URLCONF': settings.ROOT_URLCONF,"
-    "'WSGI_APPLICATION': settings.WSGI_APPLICATION}))"
+    "'WSGI_APPLICATION': settings.WSGI_APPLICATION,"
+    "'TIME_ZONE': settings.TIME_ZONE,"
+    "'MIDDLEWARE': list(settings.MIDDLEWARE)}))"
 )
 
 
@@ -64,7 +66,9 @@ def run_python(arguments: list[str], variables: dict[str, str]) -> subprocess.Co
 
 
 def test_le_projet_django_demarre(variables: dict[str, str]) -> None:
-    result = run_python(["manage.py", "check"], variables)
+    """Sans avertissement : `check` seul ne refuse que les erreurs, et un réglage que l'admin
+    attend — le processeur de contexte `request` (`admin.W411`) — manquerait en silence."""
+    result = run_python(["manage.py", "check", "--fail-level", "WARNING"], variables)
 
     assert result.returncode == 0, result.stderr
 
@@ -128,3 +132,8 @@ def test_les_reglages_django_viennent_de_l_environnement(variables: dict[str, st
     # l'arbitrage ne serait garanti par rien.
     assert settings["WSGI_APPLICATION"] == "config.wsgi.application"
     assert settings["ROOT_URLCONF"] == "config.urls"
+    # Produits de la décision 8 du brief de #7, que rien d'autre ne garde : retirés, ils ne
+    # faisaient rougir aucun test (mesuré à la relecture). Le défaut de Django est
+    # `America/Chicago`, et l'admin se protège seul du CSRF — le middleware couvre le reste.
+    assert settings["TIME_ZONE"] == "Europe/Paris"
+    assert "django.middleware.csrf.CsrfViewMiddleware" in settings["MIDDLEWARE"]
