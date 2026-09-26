@@ -21,6 +21,9 @@ from process_environment import NO_ENV_FILE
 API_ROOT = Path(__file__).resolve().parent.parent
 REPOSITORY_ROOT = API_ROOT.parent.parent
 TESTS_ROOT = API_ROOT / "tests"
+# Les dossiers que `.dockerignore` écarte à toute profondeur (`**/…/`) et qui peuvent contenir du
+# Python : un fichier du poste rangé là n'entre jamais dans l'image.
+UNSHIPPED_DIRECTORIES = {".venv", "node_modules"}
 
 # Lit les réglages Django résolus et les imprime en JSON. Passer par un sous-processus est
 # nécessaire : `config.settings` s'évalue à l'import, une fois par processus.
@@ -184,10 +187,15 @@ def test_les_medias_ne_sont_servis_par_django_qu_en_developpement(
 
 
 def production_sources() -> list[Path]:
-    """Les fichiers Python que l'image embarque : `apps/api` entier, sans ses tests
-    (`infra/api/Dockerfile`, `.dockerignore`) — `manage.py` compris, que le conteneur lance à
-    chaque démarrage."""
-    return [source for source in API_ROOT.rglob("*.py") if not source.is_relative_to(TESTS_ROOT)]
+    """Les fichiers Python que l'image embarque : `apps/api` entier, sans ses tests ni les
+    dossiers du poste (`infra/api/Dockerfile`, `.dockerignore`) — `manage.py` compris, que le
+    conteneur lance à chaque démarrage."""
+    return [
+        source
+        for source in API_ROOT.rglob("*.py")
+        if not source.is_relative_to(TESTS_ROOT)
+        and not UNSHIPPED_DIRECTORIES & set(source.relative_to(API_ROOT).parts)
+    ]
 
 
 def imported_modules(source: Path) -> set[str]:
