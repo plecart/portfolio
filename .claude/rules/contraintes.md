@@ -30,16 +30,42 @@ Le code visé est **modulaire, scalable, fractionné** — objectif permanent, p
   modification invasive. Éviter le couplage fort et les hypothèses qui ne tiennent qu'à petite
   échelle (boucles N+1, état global, limites en dur non justifiées).
 
-## Règle d'or — toujours poser un maximum de questions
-- **Poser systématiquement un maximum de questions pour lever toute incertitude**, le plus tôt
-  possible. Une question posée maintenant coûte 30 secondes ; la même ambiguïté découverte plus
-  tard coûte une demi-journée.
-- **Au moindre doute, on s'arrête et on demande.** Jamais de supposition silencieuse sur le scope,
-  le format des données, les transitions d'état, les comportements attendus.
-- **Toute prise de décision non triviale dans le doute → demander avant de trancher.** Choix
-  d'architecture, de découpage, de format, de dépendance, de comportement : on ne décide pas en
-  silence à la place de l'utilisateur. Présenter les options + une reco, puis demander.
-- Exception : si la réponse se trouve dans le code, **explorer le code plutôt que demander**. Pour
+## Règle d'or — toute question a une voie, et une seule bloque
+Une supposition silencieuse coûte une demi-journée ; une question posée à quelqu'un d'absent en
+coûte autant — sur une PR, l'agent a attendu le mainteneur six heures pour des questions dont il
+donnait toujours la même réponse. Avant de poser une question, la **classer**, et le dire d'une
+lettre en tête de la question ou de la décision : `[T]`, `[V]` ou `[C]`.
+
+- **Voie T — technique.** Le bon choix se déduit des bonnes pratiques, des sources de vérité et
+  de la doctrine du projet, sans composante de goût ni de produit. **On ne demande pas.** On écrit
+  le cadre sourcé — documentation officielle, ADR, règle du projet —, la décision, et on avance ;
+  la trace va dans les Notes de la PR, et dans un ADR quand c'est un choix d'architecture ou de
+  dépendance. Le test de la voie T : la question se répondrait par la réponse type du mainteneur,
+  ci-dessous. Si oui, elle ne se pose pas.
+
+  > Quelles sont les bonnes pratiques pour cela ? Sans oublier que nous voulons un code organisé,
+  > structuré, optimisé, clair, cohérent, facilement maintenable, scalable et sécurisé. Éliminez
+  > tout code dupliqué, inutile ou obsolète. Et surtout, rendez-le scalable, modulaire et
+  > générique. Décomposez les fonctions et séparez les responsabilités en suivant les principes
+  > KISS, DRY et YAGNI. L'objectif est d'obtenir un code propre, clair, concis et optimisé. Ne
+  > rabote pas la qualité pour tenir dans le gabarit de PR : si le bon choix dépasse, découpe en
+  > lots (`taille-pr.md`).
+
+- **Voie V — vision.** Ce que l'utilisateur voit, le contenu, le ton, le périmètre, un compromis
+  produit : tout choix qu'un autre expert technique ferait autrement **pour une raison de goût ou
+  de produit**. Elle attend le mainteneur, mais **groupée** — au go du briefing, à l'arrêt visuel
+  ou avant le go du merge —, jamais seule au fil de l'eau. En attendant, l'agent avance sur ce qui
+  n'en dépend pas, en notant sous la question l'hypothèse réversible qu'il retient d'ici là ; il
+  ne rend la main que si tout ce qui reste dépend de la réponse.
+- **Voie C — contradiction.** La décision contredit une source de vérité : arrêt immédiat, deux
+  citations, `.claude/rules/decisions-vs-doc.md`. Rien ne change.
+
+Dans le doute sur la voie, c'est la voie V — et ce doute doit rester rare : une question de voie
+T posée au mainteneur lui fait payer un aller-retour pour une réponse qu'il donne toujours.
+
+Quelle que soit la voie :
+
+- Si la réponse se trouve dans le code, **explorer le code plutôt que demander**. Pour
   un grilling approfondi, utiliser `interroge-moi`. L'exploration ne s'arrête pas au dépôt : pour
   un comportement d'outil **non documenté**, les logs applicatifs, l'arborescence de données
   locale et les horodatages sont des sources de premier ordre — la documentation décrit
@@ -101,10 +127,15 @@ Le code visé est **modulaire, scalable, fractionné** — objectif permanent, p
 - Seule zone sensible par défaut : l'**UI à valider visuellement**. Un projet peut en déclarer
   d'autres dans `.claude/pipeline.config.md` (section « Périmètre ») ; sans déclaration, aucun
   autre changement — schéma, migration, authentification — ne provoque d'arrêt.
-- **Cadence : une fois par PR**, avant `gh pr ready`, sur l'écran monté et regardé dans les deux
-  modes — pas avant chaque commit. Un écran n'existe pas avant d'être assemblé : au commit qui pose
-  un composant, un jeton de thème ou une clé de texte, il n'y a rien à regarder, et demander de
-  valider à l'aveugle transforme le point d'arrêt en formalité qu'on apprend à expédier. C'est le
-  contraire de ce qu'il sert.
+- **Cadence : une fois par PR, dès que l'écran est assemblé** — au commit qui le rend visible,
+  jamais plus tard, et toujours avant `gh pr ready` — regardé dans les deux modes ; pas avant
+  chaque commit. Un écran n'existe pas avant d'être assemblé : au commit qui pose un composant, un
+  jeton de thème ou une clé de texte, il n'y a rien à regarder, et demander de valider à l'aveugle
+  transforme le point d'arrêt en formalité qu'on apprend à expédier. C'est le contraire de ce
+  qu'il sert. Mais attendre la fin de la PR coûte autant : les attentes du mainteneur arrivent
+  alors après la dernière relecture, et chacune rouvre un cycle — un écran assemblé à 17 h 49 et
+  montré à 20 h 50 a coûté deux commits et une heure. Si une passe de relecture indépendante part
+  au même commit (`cycle-pr` 4.2), la lancer d'abord, puis montrer l'écran : les deux attentes se
+  recouvrent, et la seconde passe absorbe ce que le mainteneur demande.
 - Une zone sensible **ajoutée** par le projet suit la même cadence, sauf si sa ligne dans
   `.claude/pipeline.config.md` en déclare une autre.
