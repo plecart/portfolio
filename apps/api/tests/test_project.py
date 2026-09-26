@@ -1,15 +1,19 @@
 """Tests du projet Django : il démarre, ses réglages viennent de l'environnement, et ce que le
 conteneur exige au démarrage est bien installé.
 
-Toutes ces vérifications passent par un sous-processus lancé depuis `apps/api`, comme le ferait
-un humain ou `gunicorn` : c'est le seul moyen d'éprouver `manage.py` et `config/wsgi.py`
-eux-mêmes, et pas une reconstitution de ce qu'ils font.
+Le démarrage s'éprouve par un sous-processus lancé depuis `apps/api`, comme le ferait un humain
+ou `gunicorn` : c'est le seul moyen d'éprouver `manage.py` et `config/wsgi.py` eux-mêmes, et pas
+une reconstitution de ce qu'ils font.
 """
 
+import ast
 import json
 import os
+import re
 import subprocess
 import sys
+import tomllib
+from importlib.metadata import packages_distributions
 from pathlib import Path
 
 import pytest
@@ -145,3 +149,74 @@ def test_les_reglages_django_viennent_de_l_environnement(variables: dict[str, st
     # `America/Chicago`, et l'admin se protège seul du CSRF — le middleware couvre le reste.
     assert settings["TIME_ZONE"] == "Europe/Paris"
     assert "django.middleware.csrf.CsrfViewMiddleware" in settings["MIDDLEWARE"]
+
+
+def production_packages() -> list[str]:
+    """Les paquets que l'image installe depuis `apps/api`, lus où `hatch` les déclare."""
+    manifest = tomllib.loads((API_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    return manifest["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"]
+
+
+def imported_modules(package: Path) -> set[str]:
+    """Les modules de premier niveau qu'un paquet importe, lus par l'analyseur de Python.
+
+    Seuls les imports absolus comptent : un import relatif reste dans le paquet.
+    """
+    modules: set[str] = set()
+    for source in package.rglob("*.py"):
+        for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                modules.update(alias.name.partition(".")[0] for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                modules.add(node.module.partition(".")[0])
+    return modules
+
+
+def canonical(distribution: str) -> str:
+    """Le nom normalisé d'une distribution (PEP 503) : `Django_Stubs.Ext` et `django-stubs-ext`
+    désignent le même paquet."""
+    return re.sub(r"[-_.]+", "-", distribution).lower()
+
+
+def runtime_distributions() -> set[str]:
+    """Ce que l'image installe — `uv sync --locked --no-dev` —, lu dans le verrou par `uv`."""
+    export = subprocess.run(
+        ["uv", "export", "--frozen", "--no-dev", "--package", "api", "--no-hashes"],
+        cwd=REPOSITORY_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    return {
+        canonical(re.split(r"[=\[ ;]", line, maxsplit=1)[0])
+        for line in export.splitlines()
+        if line and not line.startswith(("#", " ", "-e"))
+    }
+
+
+def test_chaque_import_du_code_de_production_est_une_dependance_d_execution() -> None:
+    """Un paquet importé par le code de production doit être installé par l'image.
+
+    L'image s'installe sans les dépendances de développement : un paquet que le code importe
+    mais que le verrou range en `dev` laisse l'image se construire, puis fait tomber le conteneur
+    au démarrage — `migrate` charge les réglages. Aucune autre porte ne le voit : les tests
+    tournent avec les dépendances de développement. Mesuré à la relecture sur `django-stubs-ext`.
+    """
+    packages = production_packages()
+    distributions = packages_distributions()
+    runtime = runtime_distributions()
+
+    third_party = {
+        module
+        for package in packages
+        for module in imported_modules(API_ROOT / package)
+        if module not in sys.stdlib_module_names and module not in packages
+    }
+    missing = {
+        module: distributions.get(module, [])
+        for module in third_party
+        if not {canonical(name) for name in distributions.get(module, [])} & runtime
+    }
+
+    assert third_party, "aucun import tiers trouvé — la lecture des sources a-t-elle changé ?"
+    assert not missing, f"importés en production, absents de l'image : {missing}"
