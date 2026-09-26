@@ -73,7 +73,8 @@ git worktree add ../<repo>--<numéro-issue> -b <type>/<slug> origin/main
 
 **Provisionner chaque worktree — obligatoire avant de le confier à une session.** Un worktree est
 un checkout neuf, pas une copie de l'environnement de travail : tout ce que git ignore en est
-absent. Trois gestes, dans l'ordre :
+absent. Cinq gestes, dans l'ordre — les mêmes provisionnent le worktree de relecture de
+`cycle-pr` (4.2) :
 
 1. **Copier depuis le dépôt principal** les fichiers locaux ignorés par git dont les commandes du
    projet dépendent — ex. un `.env` lu par le fichier de commandes, `.claude/settings.local.json`
@@ -84,8 +85,14 @@ absent. Trois gestes, dans l'ordre :
    crée le lien sait aussi le défaire, un lien manuel se fait traverser à la suppression (étape 8).
    Si l'outil n'est pas résolvable depuis le shell, utiliser la surcharge que la CI emploie déjà
    plutôt que d'improviser.
-3. **Commande de fumée** avant de remettre le prompt (la commande `lint` de la config) : un échec
-   « exécutable introuvable » signale un worktree non préparé, pas un défaut du code. Consigner
+3. **Installer les dépendances des piles que l'issue touche**, par la commande `install` de
+   chaque pile dans `.claude/pipeline.config.md` — une pile non touchée ne s'installe pas. Ce
+   geste manquait : deux vagues de suite, l'utilisateur l'a prescrit à la main.
+4. **Commande de fumée** avant de remettre le prompt (la commande `lint` de la config) : un échec
+   « exécutable introuvable » signale un worktree non préparé, pas un défaut du code.
+5. **Vérifier que chaque service à état recensé à l'étape 2 pour cette issue répond** — démon
+   Docker par `docker info`, base ou broker par leur commande de santé : la fumée `lint` ne les
+   exerce pas, et un échec de suite au premier test coûterait un tour de session. Consigner
    « provisionné ✅ » dans le tableau de bord.
 
 **Jamais d'installation des hooks depuis un worktree.** `.git/hooks/` vit dans le répertoire git
