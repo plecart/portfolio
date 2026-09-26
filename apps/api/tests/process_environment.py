@@ -6,7 +6,9 @@ d'importer le moindre `conftest.py`. Ce module est donc un greffon pytest, charg
 pytest-django le prescrit (« Changing your app before Django gets set up »).
 
 Le processus de test ne dépend ni du shell qui le lance ni du `.env` du poste : chaque variable
-qu'il lit est posée ici, par-dessus celles du shell.
+qui décide de ce que les tests vérifient — les champs d'`Env`, et celles des outils listées dans
+`TOOLING_ENVIRONMENT` — est posée ici, par-dessus celles du shell. Celles qui disent seulement
+comment joindre Docker (`DOCKER_HOST`, son socket, un miroir de registre) restent au poste.
 """
 
 import os
@@ -49,12 +51,13 @@ RYUK_IMAGE = (
 # l'environnement avant `pyproject.toml` —, quel fichier `Env` lit, quelle image Ryuk
 # testcontainers lance, et par quelle adresse il joint ses conteneurs. `127.0.0.1` et non le
 # `localhost` qu'il rend de lui-même : sous Windows, `localhost` se résout d'abord en `::1`, et
-# un port publié pour `127.0.0.1` seulement ferait attendre chaque connexion.
+# un port publié pour `127.0.0.1` seulement ferait attendre chaque connexion. Par `TC_HOST`, que
+# testcontainers lit avant `TESTCONTAINERS_HOST_OVERRIDE` (`testcontainers/core/config.py`).
 TOOLING_ENVIRONMENT = {
     "DJANGO_SETTINGS_MODULE": "config.settings",
     "ENV_FILE": str(NO_ENV_FILE),
     "RYUK_CONTAINER_IMAGE": RYUK_IMAGE,
-    "TESTCONTAINERS_HOST_OVERRIDE": "127.0.0.1",
+    "TC_HOST": "127.0.0.1",
 }
 
 

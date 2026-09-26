@@ -7,9 +7,14 @@ import pytest
 from config.database import database_settings
 from containers import postgres, running
 from django.conf import settings
+from django.test import override_settings
 from process_environment import VALID_ENVIRONMENT
 from pydantic import PostgresDsn, TypeAdapter
-from pytest_django.fixtures import Settings
+
+UNCONFIGURED = (
+    "Django n'est pas configuré pour les tests : le greffon `process_environment`, chargé par "
+    "l'`addopts` de `pyproject.toml`, pose `DJANGO_SETTINGS_MODULE`."
+)
 
 
 @pytest.fixture
@@ -29,14 +34,22 @@ def environment(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
 
 
 @pytest.fixture(autouse=True)
-def media_root(settings: Settings, tmp_path: Path) -> None:
+def media_root(tmp_path: Path) -> Generator[None]:
     """Les fichiers qu'un test enregistre vont dans son dossier temporaire, jamais dans le dépôt.
 
     Le `MEDIA_ROOT` du processus de test est relatif à la racine du dépôt (`process_environment`) :
     sans ce dossier, une icône enregistrée par un test y atterrirait. Automatique, pour qu'aucun
     test ne puisse l'oublier.
+
+    Sans réglages, le test échoue d'emblée, en disant pourquoi. La fixture `settings` de
+    pytest-django le sauterait — et avec lui toute la suite, par cette fixture automatique : verte
+    sans rien avoir vérifié. `override_settings` seul le laisserait tourner sur des réglages vides,
+    et n'échouerait qu'au démontage, sans dire pourquoi (mesuré).
     """
-    settings.MEDIA_ROOT = tmp_path
+    if not settings.configured:
+        pytest.fail(UNCONFIGURED, pytrace=False)
+    with override_settings(MEDIA_ROOT=tmp_path):
+        yield
 
 
 @pytest.fixture(scope="session")
