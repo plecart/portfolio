@@ -10,9 +10,11 @@ from content.models import Technology
 # Le côté de l'aperçu d'une icône dans la liste, en pixels : il tient dans une ligne de l'admin.
 ICON_PREVIEW_SIZE = 24
 
-# Le symbole « link » de Lucide (`icons/link.svg`, licences ISC et MIT), à 16 px. Tracé de la
+# Le symbole « link » de Lucide (`icons/link.svg`), dérivé de Feather, à 16 px. Tracé de la
 # couleur du texte : bleu dans un lien de l'admin, gris sous la classe `quiet` — deux couleurs que
 # le thème sombre redéfinit.
+# Copyright (c) 2026 Lucide Icons and Contributors (ISC) ; Copyright (c) 2013-present Cole Bemis
+# (MIT). Notices de permission : https://github.com/lucide-icons/lucide/blob/main/LICENSE
 LINK_SYMBOL = mark_safe(
     '<svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" '
     'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
