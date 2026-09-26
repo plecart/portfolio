@@ -4,20 +4,15 @@ import pytest
 from config import strings
 from content.models import TechnologyKind
 from content.validators import validate_svg
-from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from factories import SVG, svg_icon, technology
+from factories import SVG, svg_icon, technology, url_of_length
+from refusals import refusals
 
 # Les bornes techniques du nom et du site, décidées au lot 1 : écrites ici, et non lues sur le
 # modèle, pour qu'une borne changée dans le modèle fasse rougir ce fichier.
 NAME_MAX_LENGTH = 50
 WEBSITE_MAX_LENGTH = 200
-
-
-def website_of_length(length: int) -> str:
-    """Une adresse valide de `length` caractères."""
-    base = "https://exemple.fr/"
-    return base + "a" * (length - len(base))
 
 
 # Ce que les champs acceptent : la technologie de la fabrique, le site absent, et chaque borne
@@ -28,7 +23,7 @@ FIELD_ACCEPTANCES: list[tuple[str, dict[str, object]]] = [
     (f"nom de {NAME_MAX_LENGTH} caractères", {"name": "n" * NAME_MAX_LENGTH}),
     (
         f"site de {WEBSITE_MAX_LENGTH} caractères",
-        {"website": website_of_length(WEBSITE_MAX_LENGTH)},
+        {"website": url_of_length(WEBSITE_MAX_LENGTH)},
     ),
 ]
 
@@ -46,7 +41,7 @@ FIELD_REFUSALS = [
     ("icône absente", {"icon": None}, "icon", "blank"),
     (
         f"site de {WEBSITE_MAX_LENGTH + 1} caractères",
-        {"website": website_of_length(WEBSITE_MAX_LENGTH + 1)},
+        {"website": url_of_length(WEBSITE_MAX_LENGTH + 1)},
         "website",
         "max_length",
     ),
@@ -86,11 +81,6 @@ NOT_SVG = [
     ("racine étrangère", "icone.svg", b'<html xmlns="http://www.w3.org/1999/xhtml"/>'),
     ("racine sans espace de noms", "icone.svg", b"<svg/>"),
 ]
-
-
-def refusals(error: ValidationError, field: str = NON_FIELD_ERRORS) -> list[tuple[str | None, str]]:
-    """Les refus que `error` porte pour `field`, chacun en paire (code, message)."""
-    return [(refusal.code, str(refusal.message)) for refusal in error.error_dict[field]]
 
 
 @pytest.mark.parametrize(
