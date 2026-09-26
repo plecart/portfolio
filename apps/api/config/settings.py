@@ -9,8 +9,15 @@ résidu du squelette `startproject` »). Ce qui manque encore est délibéré : 
 sécurité et la CSP (#6), le cache Redis (#11).
 """
 
+import django_stubs_ext
+
 from config.database import database_settings
 from config.env import Env
+
+# Rend indexables à l'exécution les classes que django-stubs déclare génériques
+# (`admin.ModelAdmin[Technology]`, `models.CharField[str, str]`) : c'est ce que pyright strict
+# exige pour typer modèles et admin, et la voie que django-stubs documente.
+django_stubs_ext.monkeypatch()
 
 # Une seule lecture de l'environnement pour tout le processus : Django importe ce module une
 # fois. `load()` et non `Env()` — c'est lui qui empêche une configuration refusée de recracher
@@ -31,7 +38,8 @@ ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 
 # L'admin, seul back-office (ADR 0001), et les applications qu'il impose : `auth`,
-# `contenttypes`, `sessions`, `messages`. `staticfiles` sert son CSS en développement.
+# `contenttypes`, `sessions`, `messages`. `staticfiles` sert son CSS en développement. `content`
+# porte le contenu du portfolio.
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -39,6 +47,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "content",
 ]
 
 # Les trois que l'admin exige (contrôles `admin.E408` à `admin.E410`), plus CSRF (cadrage §6.6) :

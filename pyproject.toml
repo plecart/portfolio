@@ -65,6 +65,12 @@ addopts = ["-p", "process_environment"]
 line-length = 100
 include = ["*.py", "*.pyi", "*.ipynb", "**/pyproject.toml"]
 
+# Les migrations sont écrites par `makemigrations` : leurs listes de classe (`dependencies`,
+# `operations`) sont celles de Django, qu'on ne retouche pas à chaque migration. Tout le reste
+# des règles s'y applique, et le hook les remet en forme.
+[tool.ruff.lint.per-file-ignores]
+"**/migrations/*.py" = ["RUF012"]
+
 [tool.pyright]
 typeCheckingMode = "strict"
 # `infra` : le code Python de la CI (`infra/ci`) est tenu au même mode strict. Pas sous `.github/` :
