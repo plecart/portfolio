@@ -12,7 +12,6 @@ import os
 import re
 import subprocess
 import sys
-import tomllib
 from importlib.metadata import packages_distributions
 from pathlib import Path
 
@@ -21,6 +20,7 @@ from process_environment import NO_ENV_FILE
 
 API_ROOT = Path(__file__).resolve().parent.parent
 REPOSITORY_ROOT = API_ROOT.parent.parent
+TESTS_ROOT = API_ROOT / "tests"
 
 # Lit les réglages Django résolus et les imprime en JSON. Passer par un sous-processus est
 # nécessaire : `config.settings` s'évalue à l'import, une fois par processus.
@@ -183,24 +183,24 @@ def test_les_medias_ne_sont_servis_par_django_qu_en_developpement(
     assert result.stdout.strip() == outcome
 
 
-def production_packages() -> list[str]:
-    """Les paquets que l'image installe depuis `apps/api`, lus où `hatch` les déclare."""
-    manifest = tomllib.loads((API_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    return manifest["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"]
+def production_sources() -> list[Path]:
+    """Les fichiers Python que l'image embarque : `apps/api` entier, sans ses tests
+    (`infra/api/Dockerfile`, `.dockerignore`) — `manage.py` compris, que le conteneur lance à
+    chaque démarrage."""
+    return [source for source in API_ROOT.rglob("*.py") if not source.is_relative_to(TESTS_ROOT)]
 
 
-def imported_modules(package: Path) -> set[str]:
-    """Les modules de premier niveau qu'un paquet importe, lus par l'analyseur de Python.
+def imported_modules(source: Path) -> set[str]:
+    """Les modules de premier niveau qu'un fichier importe, lus par l'analyseur de Python.
 
-    Seuls les imports absolus comptent : un import relatif reste dans le paquet.
+    Seuls les imports absolus comptent : un import relatif reste dans son paquet.
     """
     modules: set[str] = set()
-    for source in package.rglob("*.py"):
-        for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
-            if isinstance(node, ast.Import):
-                modules.update(alias.name.partition(".")[0] for alias in node.names)
-            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-                modules.add(node.module.partition(".")[0])
+    for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Import):
+            modules.update(alias.name.partition(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            modules.add(node.module.partition(".")[0])
     return modules
 
 
@@ -212,6 +212,9 @@ def canonical(distribution: str) -> str:
 
 def runtime_distributions() -> set[str]:
     """Ce que l'image installe — `uv sync --locked --no-dev` —, lu dans le verrou par `uv`."""
+    # ponytail: marqueurs d'environnement ignorés — `tzdata ; sys_platform == 'win32'` compte comme
+    # installé dans l'image Linux. Sans effet tant qu'aucun import de production ne vise une
+    # distribution à marqueur ; sinon, les évaluer par `packaging.markers`, à déclarer en dev.
     export = subprocess.run(
         ["uv", "export", "--frozen", "--no-dev", "--package", "api", "--no-hashes"],
         cwd=REPOSITORY_ROOT,
@@ -234,15 +237,16 @@ def test_chaque_import_du_code_de_production_est_une_dependance_d_execution() ->
     au démarrage — `migrate` charge les réglages. Aucune autre porte ne le voit : les tests
     tournent avec les dépendances de développement. Mesuré à la relecture sur `django-stubs-ext`.
     """
-    packages = production_packages()
+    sources = production_sources()
+    first_party = {source.relative_to(API_ROOT).parts[0].removesuffix(".py") for source in sources}
     distributions = packages_distributions()
     runtime = runtime_distributions()
 
     third_party = {
         module
-        for package in packages
-        for module in imported_modules(API_ROOT / package)
-        if module not in sys.stdlib_module_names and module not in packages
+        for source in sources
+        for module in imported_modules(source)
+        if module not in sys.stdlib_module_names and module not in first_party
     }
     missing = {
         module: distributions.get(module, [])
