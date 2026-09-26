@@ -11,6 +11,7 @@ import containers
 import pytest
 from containers import postgres, running
 from django.db import connection
+from docker.errors import APIError
 from nested_sessions import run_nested_session
 from testcontainers.community.postgres import PostgresContainer
 from testcontainers.core.container import DockerContainer
@@ -26,6 +27,14 @@ BASE_TEST = (
 BASELESS_TESTS = [
     "apps/api/tests/test_admin.py::test_l_admin_renvoie_un_visiteur_anonyme_vers_la_connexion",
     "apps/api/tests/test_admin.py::test_l_admin_parle_francais",
+]
+
+# Les façons dont un démarrage échoue une fois le conteneur créé, et ce que le test en voit : un
+# refus de Docker qui répond — un tirage d'image raté, par exemple — devient un échec qui dit quoi
+# faire ; une attente de service qui expire remonte telle quelle.
+FAILED_STARTS = [
+    ("Docker refuse", APIError("tirage refusé"), pytest.fail.Exception, "exigent Docker"),
+    ("attente expirée", TimeoutError("service jamais prêt"), TimeoutError, "service jamais prêt"),
 ]
 
 
@@ -84,16 +93,23 @@ def test_chaque_postgres_des_tests_tire_son_propre_mot_de_passe(
     assert first != second
 
 
-def test_un_conteneur_dont_le_demarrage_echoue_est_arrete() -> None:
+@pytest.mark.parametrize(
+    ("failure", "raised", "message"),
+    [(failure, raised, message) for _, failure, raised, message in FAILED_STARTS],
+    ids=[start for start, _, _, _ in FAILED_STARTS],
+)
+def test_un_conteneur_dont_le_demarrage_echoue_est_arrete(
+    failure: Exception, raised: type[BaseException], message: str
+) -> None:
     """Un démarrage raté laisse un conteneur créé : `running` l'arrête quand même.
 
     Docker est une frontière du système : un double au gabarit de `DockerContainer` suffit à
-    rejouer une attente de service qui expire.
+    rejouer un refus de Docker ou une attente de service qui expire.
     """
     container = create_autospec(DockerContainer, instance=True)
-    container.start.side_effect = TimeoutError("service jamais prêt")
+    container.start.side_effect = failure
 
-    with pytest.raises(TimeoutError), running(lambda: container):
+    with pytest.raises(raised, match=message), running(lambda: container):
         pass
 
     container.stop.assert_called_once_with()

@@ -19,9 +19,12 @@ from testcontainers.core.container import DockerContainer
 # les extensions du développement (ADR 0005). `test_infra.py` tient l'égalité des deux.
 POSTGRES_IMAGE = "pgvector/pgvector:pg16"
 
+# Docker peut ne pas répondre, ou répondre et refuser — un tirage d'image raté, par exemple : le
+# conseil vaut pour les deux, la cause citée dit laquelle.
 CONTAINER_REFUSED = (
     "Le conteneur de test n'a pas démarré : {cause}\n"
-    "Les tests qui en dépendent exigent Docker (testcontainers) : vérifier qu'il répond, relancer."
+    "Les tests qui en dépendent exigent Docker (testcontainers) : corriger la cause ci-dessus, "
+    "puis relancer."
 )
 
 
