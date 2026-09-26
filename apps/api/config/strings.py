@@ -5,7 +5,9 @@ catalogue de chaînes unique »), lu par les modèles, les validateurs et l'admi
 fichier `.po` : le contenu est en français seulement. Les écrans et messages propres à Django,
 eux, sont traduits par `LANGUAGE_CODE` (`config/settings.py`).
 
-Noms de modèle et de champ en minuscules : Django met la majuscule où il la faut.
+Noms de modèle et de champ en minuscules : Django met la majuscule où il la faut. Les libellés
+sont recopiés dans les migrations : en changer un demande une migration, que
+`test_migrations.py` réclame.
 """
 
 # Application de contenu
@@ -18,9 +20,9 @@ TECHNOLOGY_NAME = "nom"
 TECHNOLOGY_KIND = "type"
 TECHNOLOGY_ICON = "icône"
 TECHNOLOGY_WEBSITE = "site"
-LANGUAGE = "Langage"
-FRAMEWORK = "Framework"
-INFRASTRUCTURE = "Infra"
-TOOL = "Outil"
+TECHNOLOGY_KIND_LANGUAGE = "Langage"
+TECHNOLOGY_KIND_FRAMEWORK = "Framework"
+TECHNOLOGY_KIND_INFRASTRUCTURE = "Infra"
+TECHNOLOGY_KIND_TOOL = "Outil"
 TECHNOLOGY_NAME_TAKEN = "Une technologie porte déjà ce nom, majuscules et minuscules confondues."
 ICON_NOT_SVG = "L’icône doit être un fichier SVG."
