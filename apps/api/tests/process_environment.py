@@ -38,6 +38,8 @@ NO_ENV_FILE = Path(__file__).with_name("aucun-fichier-env")
 # l'image la plus privilégiée que les tests lancent. Épinglée par empreinte, comme les images de
 # base du Dockerfile — une étiquette peut changer de contenu, une empreinte non. L'étiquette reste
 # celle que testcontainers attend : `test_process_environment.py` le vérifie à chaque montée.
+# Dependabot ne voit pas cette épingle : l'empreinte d'une nouvelle étiquette se lit sur la ligne
+# « Digest » de `docker buildx imagetools inspect testcontainers/ryuk:<étiquette>`.
 RYUK_IMAGE = (
     "testcontainers/ryuk:0.8.1"
     "@sha256:bf3f74a47dee0acda89aba4b2fc9c7fdcf994a084db02a2d06566f07baae022e"
