@@ -1,20 +1,13 @@
 """Fixtures communes aux tests de `apps/api`."""
 
-import pytest
+from collections.abc import Iterator
 
-# Un environnement complet et valide. Chaque test en retire ou en corrompt une seule entrée,
-# pour que l'échec attendu ne puisse venir que de celle-là.
-VALID_ENVIRONMENT = {
-    # Sans accent, et au-dessus du seuil de 50 caractères exigé par `Env`.
-    "SECRET_KEY": "cle-de-test-sans-valeur-reelle-uniquement-pour-les-tests",
-    "DEBUG": "false",
-    "ALLOWED_HOSTS": '["portfolio.test"]',
-    "DATABASE_URL": "postgresql://portfolio:secret@localhost:5432/portfolio",
-    "REDIS_URL": "redis://localhost:6379/0",
-    # Relatif à dessein : c'est la forme que `.env.example` propose, donc celle que la plupart
-    # des clones porteront, et la seule qui éprouve l'ancrage sur la racine du dépôt.
-    "MEDIA_ROOT": "fichiers-de-test",
-}
+import pytest
+from config.database import database_settings
+from containers import postgres, running
+from django.conf import settings
+from process_environment import VALID_ENVIRONMENT
+from pydantic import PostgresDsn, TypeAdapter
 
 
 @pytest.fixture
@@ -29,3 +22,22 @@ def environment(monkeypatch: pytest.MonkeyPatch, variables: dict[str, str]) -> p
     for name, value in variables.items():
         monkeypatch.setenv(name, value)
     return monkeypatch
+
+
+@pytest.fixture(scope="session")
+def django_db_modify_db_settings() -> Iterator[None]:
+    """Pointe la base de test sur un Postgres démarré pour la session.
+
+    Point d'extension que pytest-django documente pour déplacer la base de test : son
+    `django_db_setup` en dépend, puis crée la base de test et joue les migrations. Le conteneur ne
+    démarre donc que si un test touche la base, et s'arrête après la suppression de la base de
+    test.
+
+    L'adresse du conteneur passe par `database_settings`, la traduction qu'emprunte
+    `DATABASE_URL` en production. Le dictionnaire est mis à jour en place : les connexions de
+    Django en gardent une référence.
+    """
+    with running(postgres) as server:
+        url = TypeAdapter(PostgresDsn).validate_python(server.get_connection_url())
+        settings.DATABASES["default"].update(database_settings(url))
+        yield

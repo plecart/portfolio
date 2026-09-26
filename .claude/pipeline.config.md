@@ -51,7 +51,8 @@ pour qu'un rouge de l'une ne masque pas un rouge d'une autre.
 
 **Back (`apps/api/`)** — vérifiées le 2026-09-23 au premier scaffold du back (#2) :
 - install      : make install                     # uv sync
-- test         : make test                        # suite complète ; testcontainers arrive avec #7
+- test         : make test                        # suite complète ; exige Docker : les tests de base
+                                                  # démarrent Postgres par testcontainers (#7)
 - test ciblé   : uv run pytest <chemin|motif>     # une seule cible, pour la boucle TDD
 - test brut    : rtk proxy make test              # sortie du lanceur sans le résumeur RTK du poste :
                                                   # le verdict se lit ici (cycle-pr 3.2) ; vérifiée le 2026-09-25
@@ -105,7 +106,7 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
   - back : audit, lint, format:check, typecheck, test
   - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse, audit
   - infra : compose (résolution de `infra/compose.dev.yml`), build de l'image `api` sans publication — la publication sur GHCR et le scan Trivy restent à #15
-- services requis en CI : aucun — aucun test n'atteint encore Postgres ni Redis ; quand ce sera le cas, testcontainers les démarrera depuis les tests (cadrage §8.4), à partir de #7
+- services requis en CI : aucun déclaré — les tests de base démarrent eux-mêmes Postgres par testcontainers (cadrage §8.4), sur le Docker du runner ; Redis suivra avec #11
 
 ## Périmètre
 - domaines (nom métier → chemin ; chemins cibles du cadrage §9 point 2, chaque dossier né avec sa première brique) — servent aussi de thèmes/milestones à `triage` :

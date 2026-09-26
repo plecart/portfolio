@@ -22,6 +22,11 @@ uv run pre-commit install   # branche les hooks — depuis ce clone, jamais depu
                             # .git/hooks est partagé et fige le chemin de l'interpréteur qui l'installe
 ```
 
+`make test` exige Docker : les tests qui touchent la base démarrent un Postgres jetable — l'image
+du Compose de développement — par testcontainers, et échouent en le disant si Docker ne répond
+pas. Ils ne lisent jamais `.env` : leur environnement est posé par
+[apps/api/tests/process_environment.py](apps/api/tests/process_environment.py).
+
 **Front (`apps/web`)** — Node, épinglé par `apps/web/.nvmrc` ; un gestionnaire de version (`nvm`,
 `fnm`, `volta`…) lit ce fichier, et le champ `engines` du manifeste porte la même valeur, qu'un
 test vérifie :
