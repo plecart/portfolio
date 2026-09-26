@@ -21,6 +21,11 @@ décisions une par une.
 
 ## Réponse « quelles sont les bonnes pratiques ? »
 
+Cette réponse est le signal d'une question de **voie T** (`.claude/rules/contraintes.md`, règle
+d'or) — une question qui ne devait pas être posée : l'interrogatoire ne porte que sur les `[V]`
+et les `[C]`, et une `[T]` se tranche avec son cadre sourcé, dans le brief, sans être posée. À la
+première réponse de ce type, **reclasser toutes les questions qui restent** avant de continuer.
+
 Quand l'utilisateur répond à une question par « fais selon les bonnes pratiques » (ou équivalent),
 il demande le **cadre**, pas une opinion. Répondre en deux temps : (1) l'état de l'art en 3-5
 points nommés ; (2) chaque point confronté aux contraintes écrites du projet (rules, cadrage,

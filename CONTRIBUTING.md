@@ -163,11 +163,13 @@ Voir [.claude/rules/](.claude/rules/) (chargées automatiquement via `CLAUDE.md`
   dépendances exemptés de la description) ; PR ≤ ~10 fichiers / ~500 lignes — `taille-pr.md`
 - **Aucune décision ne contredit la doc en silence** : deux citations, arrêt, puis amendement ou
   abandon — `decisions-vs-doc.md`
+- **Toute question a une voie** : technique, elle se tranche selon les bonnes pratiques et se
+  trace ; vision, elle attend le mainteneur, groupée ; contradiction, elle arrête — `contraintes.md`
 
 ## Deux choses qui surprennent au début
 
 - **La PR existe avant le code.** Elle est ouverte en draft dès le départ, avec `Closes #N`. C'est
   ce qui signale qu'une issue est en cours de développement — sans quoi une autre session pourrait
   réécrire sa spec en croyant que personne n'y travaille.
-- **La CI ne tourne pas sur une draft.** Aucun check n'apparaît tant que la PR n'est pas passée en
-  ready. Ce n'est pas une CI cassée : les tests tournent en local à chaque commit.
+- **La CI tourne sur chaque push, draft comprise**, sauf sur l'ouverture de la draft, dont
+  l'amorce est vide. Une draft sans push de code n'a donc aucun check : ce n'est pas une CI cassée.

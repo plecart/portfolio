@@ -116,7 +116,7 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
   - Frontend : `apps/web/`
   - Assistant RAG : `apps/ai/` (phase 2)
   - MCP : `apps/mcp/` (phase 3)
-- zones sensibles (arrêt humain — cadence dans `.claude/rules/contraintes.md` : une fois par PR, avant `gh pr ready`) : écrans à valider visuellement, et rien d'autre
+- zones sensibles (arrêt humain — cadence dans `.claude/rules/contraintes.md` : une fois par PR, dès que l'écran est assemblé) : écrans à valider visuellement, et rien d'autre
 - hors périmètre (cadrage §4 « Hors périmètre ») : email, anglais, commentaires, MCP d'édition de contenu, Kubernetes, CMS headless, content-as-code, Postgres managé
 - surfaces exposées (phase 1 ; phases 2 et 3 ajoutées quand elles démarrent) — ce que la QA a le droit de vérifier :
   API HTTP (django-ninja) · interface web · admin Django (un seul compte, pas d'isolation entre comptes) · persistance Postgres · traitements asynchrones (worker) · fichiers produits (médias sur R2)

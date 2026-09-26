@@ -3,6 +3,8 @@
 ## Découpage
 - **Une PR = une unité de travail cohérente et reviewable.**
 - Au-delà de **~10 fichiers** ou **~500 lignes de diff**, découper la PR.
+- **Ne jamais raboter la qualité pour tenir dans le gabarit.** Si le bon choix technique dépasse
+  ces bornes, découper en lots (`cycle-pr`, cas découpé) — pas rogner la solution.
 
 ## Format des messages
 - **Commits et titre de PR** au format conventional commit : `type(scope): description`.
