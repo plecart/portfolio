@@ -52,7 +52,8 @@ pour qu'un rouge de l'une ne masque pas un rouge d'une autre.
 **Back (`apps/api/`)** — vérifiées le 2026-09-23 au premier scaffold du back (#2) :
 - install      : make install                     # uv sync
 - test         : make test                        # suite complète ; exige Docker : les tests de base
-                                                  # démarrent Postgres par testcontainers (#7)
+                                                  # démarrent Postgres par testcontainers (#7) ;
+                                                  # vérifiée le 2026-09-26
 - test ciblé   : uv run pytest <chemin|motif>     # une seule cible, pour la boucle TDD
 - test brut    : rtk proxy make test              # sortie du lanceur sans le résumeur RTK du poste :
                                                   # le verdict se lit ici (cycle-pr 3.2) ; vérifiée le 2026-09-25

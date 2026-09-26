@@ -4,16 +4,13 @@ L'égalité de son image avec celle du Compose est tenue par `test_infra.py`, av
 fichiers d'infrastructure.
 """
 
-import os
 import re
-import subprocess
-import sys
 from unittest.mock import create_autospec
 
 import pytest
-from config.env import REPOSITORY_ROOT
 from containers import running
 from django.db import connection
+from nested_sessions import pytest_session
 from testcontainers.core.container import DockerContainer
 
 # Un démon qui ne répond pas. `.invalid` ne se résout nulle part (RFC 2606) : docker-py échoue en
@@ -68,14 +65,7 @@ def test_sans_docker_un_test_de_base_echoue_en_disant_pourquoi() -> None:
     ne pose `tc.host` — ni celui du projet ni la CI ne le font. Il réécrit aussi `DOCKER_HOST`
     dans l'environnement du processus au premier conteneur : d'où la valeur passée explicitement.
     """
-    session = subprocess.run(
-        [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", BASE_TEST, BASELESS_TESTS],
-        cwd=REPOSITORY_ROOT,
-        env={**os.environ, "DOCKER_HOST": UNREACHABLE_DOCKER},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    session = pytest_session([BASE_TEST, BASELESS_TESTS], DOCKER_HOST=UNREACHABLE_DOCKER)
     report = session.stdout
 
     assert session.returncode == pytest.ExitCode.TESTS_FAILED, report

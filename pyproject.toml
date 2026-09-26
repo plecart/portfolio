@@ -37,14 +37,14 @@ dev = [
     "types-pyyaml>=6.0.12.20260906",
     "pytest-django>=4.14.0",
     "testcontainers>=4.15.0",
+    "docker>=7.2.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["apps"]
-DJANGO_SETTINGS_MODULE = "config.settings"
-# Le greffon `process_environment` pose l'environnement de test avant que pytest-django ne charge
-# les réglages, ce qu'aucun `conftest.py` ne peut faire : pytest les importe après. `pythonpath`
-# le rend importable — pytest l'applique avant de charger les greffons `-p`.
+# Le greffon `process_environment` pose l'environnement de test — réglages Django compris — avant
+# que pytest-django ne les charge, ce qu'aucun `conftest.py` ne peut faire : pytest les importe
+# après. `pythonpath` le rend importable — pytest l'applique avant de charger les greffons `-p`.
 pythonpath = ["apps/api/tests"]
 addopts = ["-p", "process_environment"]
 
