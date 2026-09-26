@@ -44,12 +44,15 @@ RYUK_IMAGE = (
 )
 
 # Les variables des outils, hors des champs d'`Env` : quels réglages pytest-django charge — il lit
-# l'environnement avant `pyproject.toml` —, quel fichier `Env` lit, et quelle image Ryuk
-# testcontainers lance.
+# l'environnement avant `pyproject.toml` —, quel fichier `Env` lit, quelle image Ryuk
+# testcontainers lance, et par quelle adresse il joint ses conteneurs. `127.0.0.1` et non le
+# `localhost` qu'il rend de lui-même : sous Windows, `localhost` se résout d'abord en `::1`, et
+# un port publié pour `127.0.0.1` seulement ferait attendre chaque connexion.
 TOOLING_ENVIRONMENT = {
     "DJANGO_SETTINGS_MODULE": "config.settings",
     "ENV_FILE": str(NO_ENV_FILE),
     "RYUK_CONTAINER_IMAGE": RYUK_IMAGE,
+    "TESTCONTAINERS_HOST_OVERRIDE": "127.0.0.1",
 }
 
 

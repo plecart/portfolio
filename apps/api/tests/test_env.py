@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 from config.env import ConfigurationError, Env, env_file_path
@@ -56,21 +57,19 @@ INVALID_CONFIGURATIONS = [
 ]
 
 
-def declared_keys(dotenv: Path) -> set[str]:
+def declared_variables(dotenv: Path) -> dict[str, str]:
     """Les variables qu'un fichier d'environnement déclare — commentaires et lignes vides exclus.
 
     Args:
         dotenv: le fichier à lire, au format `CLÉ=valeur`.
 
     Returns:
-        Les seuls noms, sans les valeurs : c'est la frontière entre les deux fichiers qui se
-        vérifie ici, jamais leur contenu.
+        Chaque nom et sa valeur telle qu'écrite, sans guillemets ni interpolation : les tests n'y
+        lisent que la frontière entre les deux fichiers et les adresses de service.
     """
-    return {
-        line.split("=", 1)[0].strip()
-        for raw in dotenv.read_text(encoding="utf-8").splitlines()
-        if (line := raw.strip()) and not line.startswith("#") and "=" in line
-    }
+    lines = (raw.strip() for raw in dotenv.read_text(encoding="utf-8").splitlines())
+    pairs = (line.partition("=") for line in lines if line and not line.startswith("#"))
+    return {name.strip(): value.strip() for name, separator, value in pairs if separator}
 
 
 def build_env(env_file: Path | None = None) -> Env:
@@ -217,7 +216,7 @@ def test_l_exemple_declare_exactement_les_champs_d_env() -> None:
     sa ligne laisse un clone neuf échouer au démarrage sans savoir quoi renseigner ; une ligne
     sans son champ fait échouer le démarrage à la lecture du fichier, pour une variable morte.
     """
-    assert declared_keys(ENV_EXAMPLE) == set(Env.model_fields)
+    assert set(declared_variables(ENV_EXAMPLE)) == set(Env.model_fields)
 
 
 def test_les_variables_de_compose_sont_disjointes_de_celles_du_back() -> None:
@@ -227,10 +226,20 @@ def test_les_variables_de_compose_sont_disjointes_de_celles_du_back() -> None:
     réglage ; une variable de Compose glissée dans `.env.example` ferait refuser le démarrage
     sur la copie que `CONTRIBUTING.md` demande d'en faire.
     """
-    compose_only = declared_keys(COMPOSE_ENV)
+    compose_only = set(declared_variables(COMPOSE_ENV))
 
     assert compose_only, "aucune variable lue dans `infra/dev.env` — le format a-t-il changé ?"
     assert compose_only & set(Env.model_fields) == set()
+
+
+def test_les_adresses_de_service_de_l_exemple_visent_127_0_0_1() -> None:
+    """Le Compose de développement publie ses ports pour `127.0.0.1` seulement, et sous Windows
+    `localhost` se résout d'abord en `::1` : une commande lancée depuis le poste attendrait son
+    délai à chaque connexion avant de se replier (mesuré : 20 s, contre 0,01 s en `127.0.0.1`)."""
+    example = declared_variables(ENV_EXAMPLE)
+
+    hosts = {variable: urlsplit(example[variable]).hostname for variable in SERVICE_URLS}
+    assert hosts == dict.fromkeys(SERVICE_URLS, "127.0.0.1")
 
 
 def test_un_env_file_vide_retombe_sur_la_racine() -> None:
