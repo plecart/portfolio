@@ -31,8 +31,10 @@ ALLOWED_HOSTS = env.ALLOWED_HOSTS
 DATABASES = {"default": database_settings(env.DATABASE_URL)}
 
 # Stockage disque en développement (ADR 0004) ; R2 arrive avec #13, par un backend de fichiers,
-# sans toucher aux modèles. `MEDIA_URL` n'est pas posé : rien ne sert encore de fichier.
+# sans toucher aux modèles. Les fichiers sont servis sous `MEDIA_URL` — par Django lui-même en
+# développement seulement (`config/urls.py`).
 MEDIA_ROOT = env.MEDIA_ROOT
+MEDIA_URL = "media/"
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
