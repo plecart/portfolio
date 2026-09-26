@@ -1,11 +1,17 @@
 """Écrans d'admin du contenu."""
 
+from collections.abc import Sequence
+from typing import Any, ClassVar
+
 from config import strings
 from django.contrib import admin
+from django.forms import BaseInlineFormSet, ModelForm
+from django.http import HttpRequest
 from django.utils.html import format_html
 from django.utils.safestring import SafeString, mark_safe
+from django_stubs_ext import StrOrPromise
 
-from content.models import Technology
+from content.models import Project, ProjectTechnology, Technology
 
 # Le côté de l'aperçu d'une icône dans la liste, en pixels : il tient dans une ligne de l'admin.
 ICON_PREVIEW_SIZE = 24
@@ -61,3 +67,59 @@ class TechnologyAdmin(admin.ModelAdmin[Technology]):
             label=strings.TECHNOLOGY_WEBSITE_OPEN.format(name=technology.name),
             symbol=LINK_SYMBOL,
         )
+
+
+# Le formset des lignes de technologie d'un projet, tel que l'admin le fabrique.
+ProjectTechnologyFormSetBase = BaseInlineFormSet[
+    ProjectTechnology, Project, ModelForm[ProjectTechnology]
+]
+
+
+class ProjectTechnologyFormSet(ProjectTechnologyFormSetBase):
+    """Les lignes de technologie d'un projet, avec les messages du catalogue pour les deux règles
+    que le formulaire compare entre ses lignes, avant la base.
+
+    « Au moins une technologie » : seule règle hors base (décision 10). Le message par défaut de
+    Django parle de formulaires ; `% {"num": …}`, que Django lui applique, laisse intact un texte
+    sans champ de format.
+    """
+
+    default_error_messages: ClassVar[dict[str, StrOrPromise]] = {
+        "too_few_forms": strings.PROJECT_TECHNOLOGIES_MISSING
+    }
+
+    def get_unique_error_message(self, unique_check: Sequence[str]) -> str:
+        """Le doublon (projet, technologie), seule unicité que les lignes comparent : Django
+        nommerait le champ par son identifiant anglais
+        (`BaseModelFormSet.get_unique_error_message`)."""
+        return strings.PROJECT_TECHNOLOGY_TAKEN
+
+
+class ProjectTechnologyInline(admin.TabularInline[ProjectTechnology, Project]):
+    """Les technologies d'un projet, en ligne sur l'écran Projet : chacune à sa position, saisie
+    (décision 2) ; la liste se réaffiche triée après l'enregistrement (`Meta.ordering`)."""
+
+    model = ProjectTechnology
+    formset = ProjectTechnologyFormSet
+    fields = ("technology", "position")
+    min_num = 1
+
+    def get_formset(
+        self, request: HttpRequest, obj: Project | None = None, **kwargs: Any
+    ) -> type[ProjectTechnologyFormSetBase]:
+        """Le formset, qui refuse un projet sans technologie. L'admin ne transmet pas
+        `validate_min` à la fabrique du formset (`InlineModelAdmin.get_formset`) : `min_num` seul
+        rend une ligne obligatoire, qu'un formulaire sans ligne ou la suppression des lignes
+        enregistrées contournent."""
+        return super().get_formset(request, obj, validate_min=True, **kwargs)
+
+
+@admin.register(Project)
+class ProjectAdmin(admin.ModelAdmin[Project]):
+    """Écran Projet : tous les champs du projet et ses technologies en ligne, en un seul écran
+    (PRD, US 34). Le slug se remplit depuis le titre à la saisie et reste modifiable
+    (décision 3)."""
+
+    list_display = ("title", "kind", "status", "showcase", "published")
+    prepopulated_fields: ClassVar[dict[str, Sequence[str]]] = {"slug": ("title",)}
+    inlines = (ProjectTechnologyInline,)

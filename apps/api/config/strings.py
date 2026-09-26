@@ -90,3 +90,4 @@ PROJECT_TECHNOLOGY_POSITION = "position"
 
 # Technologie de projet : refus
 PROJECT_TECHNOLOGY_TAKEN = "Cette technologie figure déjà dans le projet."
+PROJECT_TECHNOLOGIES_MISSING = "Un projet emploie au moins une technologie."

@@ -8,12 +8,20 @@ from datetime import date
 
 from content.models import Project, ProjectKind, ProjectStatus, Technology, TechnologyKind
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.models import Model
 
 # Le plus petit document SVG qu'un navigateur affiche : une racine `svg` dans son espace de noms.
 SVG = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"/>'
 
 # Le début du projet de la fabrique : les tests de dates se placent par rapport à lui.
 STARTED_ON = date(2026, 9, 1)
+
+
+def saved[M: Model](instance: M) -> M:
+    """`instance`, enregistré : les fabriques rendent des objets non enregistrés, un test qui a
+    besoin d'une ligne en base le dit par cet appel."""
+    instance.save()
+    return instance
 
 
 def url_of_length(length: int) -> str:
