@@ -8,7 +8,7 @@ from pathlib import Path
 
 from config.env import ENV_FILE, Env
 from django.conf import settings
-from nested_sessions import pytest_session
+from nested_sessions import run_nested_session
 from process_environment import NO_ENV_FILE, RYUK_IMAGE, VALID_ENVIRONMENT
 from testcontainers.core.config import testcontainers_config
 
@@ -18,10 +18,11 @@ RYUK_DEFAULT = (
     "from testcontainers.core.config import testcontainers_config as c; print(c.ryuk_image)"
 )
 
-# Ce qu'une session lancée depuis un shell pollué doit encore réussir : tout ce qui lit les
-# réglages et le fichier `.env`. Jamais ce module entier — il se relancerait lui-même.
+# Ce qu'une session lancée depuis un shell pollué doit encore réussir : des tests qui lisent les
+# réglages et le fichier `.env`.
 SHELL_INDEPENDENT_TESTS = [
-    "apps/api/tests/test_admin.py",
+    "apps/api/tests/test_admin.py::test_l_admin_renvoie_un_visiteur_anonyme_vers_la_connexion",
+    "apps/api/tests/test_admin.py::test_l_admin_parle_francais",
     "apps/api/tests/test_process_environment.py::test_le_processus_de_test_ne_lit_aucun_env_du_poste",
 ]
 
@@ -87,11 +88,11 @@ def test_un_shell_pollue_ne_change_rien_a_la_session_de_test(tmp_path: Path) -> 
     polluted_env_file = tmp_path / ".env"
     polluted_env_file.write_text("CLE_INCONNUE=refusee\n", encoding="utf-8")
 
-    session = pytest_session(
+    session = run_nested_session(
         SHELL_INDEPENDENT_TESTS,
+        tmp_path,
         DJANGO_SETTINGS_MODULE="un_autre_projet.settings",
         ENV_FILE=str(polluted_env_file),
     )
 
-    assert session.returncode == 0, session.stdout + session.stderr
-    assert re.search(r"\b3 passed\b", session.stdout), session.stdout
+    assert session.outcomes == dict.fromkeys(SHELL_INDEPENDENT_TESTS, "passed"), session.report
