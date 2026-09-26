@@ -35,10 +35,18 @@ dev = [
     "pip-audit>=2.10.1",
     "pyyaml>=6.0.3",
     "types-pyyaml>=6.0.12.20260906",
+    "pytest-django>=4.14.0",
+    "testcontainers>=4.15.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["apps"]
+DJANGO_SETTINGS_MODULE = "config.settings"
+# Le greffon `process_environment` pose l'environnement de test avant que pytest-django ne charge
+# les réglages, ce qu'aucun `conftest.py` ne peut faire : pytest les importe après. `pythonpath`
+# le rend importable — pytest l'applique avant de charger les greffons `-p`.
+pythonpath = ["apps/api/tests"]
+addopts = ["-p", "process_environment"]
 
 # Même largeur que la prose du dépôt (règles, ADR, docstrings) : sans ça, le code se replie à
 # 88 colonnes et les commentaires courent jusqu'à 100 dans le même fichier.
@@ -63,3 +71,5 @@ typeCheckingMode = "strict"
 # pyright y exclut tout dossier caché, et cette exclusion l'emporte sur `include` — mesuré, une
 # erreur de type délibérée y passait sans diagnostic.
 include = ["apps", "infra"]
+# Le `pythonpath` de pytest, vu de pyright : les modules d'appui des tests s'importent par leur nom.
+extraPaths = ["apps/api/tests"]

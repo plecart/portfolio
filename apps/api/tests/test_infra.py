@@ -14,6 +14,8 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
+from containers import POSTGRES_IMAGE
 
 # `test_infra.py` → `tests` → `api` → `apps` → racine du dépôt.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -121,6 +123,16 @@ def test_le_compose_et_le_makefile_nomment_la_meme_image() -> None:
         "le service `api` ne reprend plus `${API_IMAGE}` — Compose se nommerait seul"
     )
     assert from_makefile.group("name") == from_compose.group("name")
+
+
+def test_les_tests_de_base_tournent_sur_l_image_postgres_du_compose() -> None:
+    """Les tests vérifient les contraintes sur le moteur et les extensions du développement.
+
+    Lu avec l'analyseur YAML, pas avec un motif : c'est la valeur que Compose lira qui compte.
+    """
+    compose = yaml.safe_load(COMPOSE_DEV.read_text(encoding="utf-8"))
+
+    assert compose["services"]["postgres"]["image"] == POSTGRES_IMAGE
 
 
 def test_la_cible_build_produit_une_commande_complete() -> None:

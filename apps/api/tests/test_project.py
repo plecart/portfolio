@@ -13,13 +13,10 @@ import sys
 from pathlib import Path
 
 import pytest
+from process_environment import NO_ENV_FILE
 
 API_ROOT = Path(__file__).resolve().parent.parent
 REPOSITORY_ROOT = API_ROOT.parent.parent
-
-# Un chemin qui n'existe pas : le sous-processus ignore ainsi le `.env` du poste, que chaque
-# développeur crée (`CONTRIBUTING.md`) et dont le contenu ne regarde pas ces tests.
-NO_ENV_FILE = API_ROOT / "aucun-fichier-env"
 
 # Lit les réglages Django résolus et les imprime en JSON. Passer par un sous-processus est
 # nécessaire : `config.settings` s'évalue à l'import, une fois par processus.
@@ -54,7 +51,8 @@ STARTUP_IMPORTS = [
 
 
 def run_python(arguments: list[str], variables: dict[str, str]) -> subprocess.CompletedProcess[str]:
-    """Exécute `python <arguments>` depuis `apps/api`, dans un environnement valide."""
+    """Exécute `python <arguments>` depuis `apps/api`, dans un environnement valide, sans lire le
+    `.env` du poste — celui du développeur, qui ne regarde pas ces tests."""
     return subprocess.run(
         [sys.executable, *arguments],
         cwd=API_ROOT,
