@@ -36,10 +36,13 @@ def _root_tag(file: File[bytes]) -> str | None:
     """La balise racine de `file`, ou `None` s'il ne se lit pas comme du XML.
 
     Lu d'un bloc, sans borne de taille : seul le compte de l'admin téléverse, et une icône pèse
-    quelques kilo-octets. Sans rembobiner : Django rembobine le fichier avant de l'enregistrer
-    (`File.chunks`, `django/core/files/base.py`).
+    quelques kilo-octets. Puis rembobiné : `Storage.save`, qui suit la validation, attend un
+    fichier « ready to be read from the beginning » (`django/core/files/storage/base.py`) — le
+    stockage sur disque le tolère, un autre stockage n'y est pas tenu.
     """
     try:
-        return ElementTree.fromstring(file.read()).tag
+        root = ElementTree.fromstring(file.read())
     except (ElementTree.ParseError, OSError):
         return None
+    file.seek(0)
+    return root.tag
