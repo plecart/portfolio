@@ -40,7 +40,10 @@ class Technology(models.Model):
         strings.TECHNOLOGY_ICON, upload_to="technologies/", validators=[validate_svg]
     )
     # Stocké sans être exposé ni affiché en phase 1 : le cadrage §6.1 le nomme (décision 11).
-    website: models.URLField[str, str] = models.URLField(strings.TECHNOLOGY_WEBSITE, blank=True)
+    # Borne technique, la valeur par défaut de Django écrite ici pour être lue.
+    website: models.URLField[str, str] = models.URLField(
+        strings.TECHNOLOGY_WEBSITE, max_length=200, blank=True
+    )
 
     class Meta:
         verbose_name = strings.TECHNOLOGY

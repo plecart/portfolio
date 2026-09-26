@@ -16,4 +16,4 @@ Un langage, un framework, une brique d'infrastructure ou un outil qu'un projet e
 | nom | `name` | obligatoire, unique — majuscules et minuscules confondues ; 50 caractères au plus |
 | type | `kind` | langage `language` · framework `framework` · infra `infrastructure` · outil `tool` |
 | icône | `icon` | fichier SVG, obligatoire |
-| site | `website` | adresse facultative ; stockée, ni exposée ni affichée en phase 1 |
+| site | `website` | adresse facultative, 200 caractères au plus ; stockée, ni exposée ni affichée en phase 1 |
