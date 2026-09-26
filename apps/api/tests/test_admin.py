@@ -7,6 +7,7 @@ from django.test import Client
 from django.urls import reverse
 from django.utils.html import escape
 from django.utils.text import capfirst
+from django.utils.translation import gettext
 from factories import svg_icon, technology
 
 # Chaque champ de l'écran d'ajout d'une technologie, et son libellé du catalogue.
@@ -54,6 +55,9 @@ def test_l_ecran_technologie_affiche_les_libelles_du_catalogue(admin_client: Cli
     ]
     for link in (strings.CONTENT, strings.TECHNOLOGIES):
         assert f">{escape(capfirst(link))}</a>" in page
+    # Le nom du modèle ne s'affiche que dans le titre : « Add %s » de l'admin, traduit
+    # (`django/contrib/admin/options.py`).
+    assert f"<h1>{escape(gettext('Add %s') % strings.TECHNOLOGY)}</h1>" in page
 
 
 @pytest.mark.django_db
