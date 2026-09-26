@@ -39,3 +39,14 @@ un champ : le front le déduit de la présence du lien de la démo.
 | vitrine | `showcase` | un seul projet au plus |
 | publié | `published` | faux par défaut : un projet naît brouillon |
 | créé le, modifié le | `created_at`, `updated_at` | posés à l'enregistrement |
+
+## Technologie de projet — `ProjectTechnology`
+
+Une technologie qu'un projet emploie, à sa place dans la liste du projet. Un projet en porte au
+moins une ; l'écran Projet les saisit en ligne.
+
+| Terme | Identifiant | Règle |
+|---|---|---|
+| projet | `project` | supprimer le projet supprime ses technologies de projet |
+| technologie | `technology` | une fois au plus par projet ; une technologie employée ne se supprime pas |
+| position | `position` | entier positif, saisi ; l'ordre stocké suit la position, puis l'ordre de saisie |
