@@ -1,9 +1,11 @@
 """Table de routage racine.
 
-Vide tant qu'aucune brique n'expose d'URL : l'admin et l'API arrivent avec #7. Le module
-existe parce que `ROOT_URLCONF` le désigne — Django refuse de démarrer sans lui.
+L'admin à `/admin/` (ADR 0001) ; l'API publique arrivera avec #10.
 """
 
-from django.urls import URLPattern, URLResolver
+from django.contrib import admin
+from django.urls import URLPattern, URLResolver, path
 
-urlpatterns: list[URLPattern | URLResolver] = []
+urlpatterns: list[URLPattern | URLResolver] = [
+    path("admin/", admin.site.urls),
+]

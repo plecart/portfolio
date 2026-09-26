@@ -131,7 +131,7 @@ class Env(BaseSettings):
         ALLOWED_HOSTS: noms d'hôte servis. Obligatoire dès que `DEBUG` est faux.
         DATABASE_URL: adresse du Postgres applicatif (ADR 0005).
         REDIS_URL: adresse du Redis (ADR 0006). Déclarée et validée ici ; son premier lecteur
-            (le cache Django) arrive avec #7, et `django-redis` avec lui.
+            (le cache Django) arrive avec #11, et `django-redis` avec lui.
         MEDIA_ROOT: dossier où atterrissent les fichiers téléversés (ADR 0004, « Développement :
             stockage disque par défaut de Django »). Le conteneur reçoit le chemin absolu de son
             volume ; sur le poste, un chemin relatif est ancré sur la racine du dépôt.
