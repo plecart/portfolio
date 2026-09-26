@@ -8,25 +8,45 @@ from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.db import IntegrityError, transaction
 from factories import SVG, svg_icon, technology
 
+# Les bornes techniques du nom et du site, décidées au lot 1 : écrites ici, et non lues sur le
+# modèle, pour qu'une borne changée dans le modèle fasse rougir ce fichier.
+NAME_MAX_LENGTH = 50
+WEBSITE_MAX_LENGTH = 200
+
+
+def website_of_length(length: int) -> str:
+    """Une adresse valide de `length` caractères."""
+    base = "https://exemple.fr/"
+    return base + "a" * (length - len(base))
+
+
 # Ce que les champs acceptent : la technologie de la fabrique, le site absent, et chaque borne
 # technique atteinte sans être dépassée — l'autre côté de la borne est dans `FIELD_REFUSALS`.
 FIELD_ACCEPTANCES: list[tuple[str, dict[str, object]]] = [
     ("icône SVG", {}),
     ("site absent", {"website": ""}),
-    ("nom de 50 caractères", {"name": "n" * 50}),
-    ("site de 200 caractères", {"website": "https://exemple.fr/" + "a" * 181}),
+    (f"nom de {NAME_MAX_LENGTH} caractères", {"name": "n" * NAME_MAX_LENGTH}),
+    (
+        f"site de {WEBSITE_MAX_LENGTH} caractères",
+        {"website": website_of_length(WEBSITE_MAX_LENGTH)},
+    ),
 ]
 
 # Les refus que les champs portent eux-mêmes — bornes techniques, liste du type, présence — et le
 # code que Django leur donne. Ces messages-là sont ceux de Django, traduits par `LANGUAGE_CODE`.
 FIELD_REFUSALS = [
-    ("nom de 51 caractères", {"name": "n" * 51}, "name", "max_length"),
+    (
+        f"nom de {NAME_MAX_LENGTH + 1} caractères",
+        {"name": "n" * (NAME_MAX_LENGTH + 1)},
+        "name",
+        "max_length",
+    ),
     ("nom absent", {"name": ""}, "name", "blank"),
     ("type hors de sa liste", {"kind": "autre"}, "kind", "invalid_choice"),
     ("icône absente", {"icon": None}, "icon", "blank"),
     (
-        "site de 201 caractères",
-        {"website": "https://exemple.fr/" + "a" * 182},
+        f"site de {WEBSITE_MAX_LENGTH + 1} caractères",
+        {"website": website_of_length(WEBSITE_MAX_LENGTH + 1)},
         "website",
         "max_length",
     ),

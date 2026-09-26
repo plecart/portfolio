@@ -1,4 +1,5 @@
-"""Tests de l'environnement du processus de test, posé avant que Django ne lise ses réglages."""
+"""Tests du harnais : l'environnement du processus de test, posé avant que Django ne lise ses
+réglages, et ce qu'il garantit à chaque test — des réglages présents, des fichiers hors du dépôt."""
 
 import os
 import re

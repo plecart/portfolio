@@ -36,10 +36,9 @@ class TechnologyAdmin(admin.ModelAdmin[Technology]):
         est sur la même ligne. La taille passe par des attributs, pas par `style` : une CSP
         stricte (#6) refuse les styles en ligne."""
         return format_html(
-            '<img src="{}" alt="" width="{}" height="{}">',
-            technology.icon.url,
-            ICON_PREVIEW_SIZE,
-            ICON_PREVIEW_SIZE,
+            '<img src="{url}" alt="" width="{size}" height="{size}">',
+            url=technology.icon.url,
+            size=ICON_PREVIEW_SIZE,
         )
 
     @admin.display(description=strings.TECHNOLOGY_WEBSITE)
@@ -48,16 +47,15 @@ class TechnologyAdmin(admin.ModelAdmin[Technology]):
         — `noopener` retire à la page ouverte tout accès à l'admin —, grisé et inerte sinon."""
         if not technology.website:
             return format_html(
-                '<span class="quiet" role="img" aria-label="{}" title="{}">{}</span>',
-                strings.TECHNOLOGY_WEBSITE_NONE,
-                strings.TECHNOLOGY_WEBSITE_NONE,
-                LINK_SYMBOL,
+                '<span class="quiet" role="img" aria-label="{label}" title="{label}">'
+                "{symbol}</span>",
+                label=strings.TECHNOLOGY_WEBSITE_NONE,
+                symbol=LINK_SYMBOL,
             )
         return format_html(
-            '<a href="{}" target="_blank" rel="noopener noreferrer" aria-label="{}" title="{}">'
-            "{}</a>",
-            technology.website,
-            strings.TECHNOLOGY_WEBSITE_OPEN.format(name=technology.name),
-            technology.website,
-            LINK_SYMBOL,
+            '<a href="{url}" target="_blank" rel="noopener noreferrer" aria-label="{label}" '
+            'title="{url}">{symbol}</a>',
+            url=technology.website,
+            label=strings.TECHNOLOGY_WEBSITE_OPEN.format(name=technology.name),
+            symbol=LINK_SYMBOL,
         )

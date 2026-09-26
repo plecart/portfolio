@@ -75,12 +75,8 @@ def test_la_liste_des_technologies_montre_l_icone_et_le_lien_du_site(
 
     page = admin_client.get(reverse("admin:content_technology_changelist")).content.decode()
 
-    columns = [
-        strings.TECHNOLOGY_NAME,
-        strings.TECHNOLOGY_KIND,
-        strings.TECHNOLOGY_ICON,
-        strings.TECHNOLOGY_WEBSITE,
-    ]
+    # Les colonnes sont les champs de l'écran d'ajout, dans le même ordre.
+    columns = TECHNOLOGY_FIELD_LABELS.values()
     positions = [page.find(f">{escape(capfirst(column))}</") for column in columns]
     assert -1 not in positions
     assert positions == sorted(positions)

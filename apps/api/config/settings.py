@@ -78,6 +78,7 @@ TEMPLATES = [
     },
 ]
 
+# Exigé par `staticfiles`, qui refuse de démarrer sans lui : le défaut de Django est `None`.
 STATIC_URL = "static/"
 
 # Contenu en français seulement, sans plomberie multilingue (cadrage §3) : `LANGUAGE_CODE`
