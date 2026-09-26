@@ -1,6 +1,7 @@
 """Fixtures communes aux tests de `apps/api`."""
 
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 from config.database import database_settings
@@ -8,6 +9,7 @@ from containers import postgres, running
 from django.conf import settings
 from process_environment import VALID_ENVIRONMENT
 from pydantic import PostgresDsn, TypeAdapter
+from pytest_django.fixtures import Settings
 
 
 @pytest.fixture
@@ -24,6 +26,17 @@ def environment(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
     chaque retouche après le test.
     """
     return monkeypatch
+
+
+@pytest.fixture
+def media_root(settings: Settings, tmp_path: Path) -> Path:
+    """Les fichiers qu'un test enregistre vont dans son dossier temporaire, jamais dans le dépôt.
+
+    Le `MEDIA_ROOT` du processus de test est relatif à la racine du dépôt (`process_environment`) :
+    sans ce dossier, une icône enregistrée par un test y atterrirait.
+    """
+    settings.MEDIA_ROOT = tmp_path
+    return tmp_path
 
 
 @pytest.fixture(scope="session")

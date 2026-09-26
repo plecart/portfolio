@@ -23,6 +23,7 @@ version = "0"
 source = { editable = "apps/api" }
 dependencies = [
     { name = "django" },
+    { name = "django-stubs-ext" },
     { name = "gunicorn" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
@@ -31,6 +32,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "django", specifier = ">=6.0" },
+    { name = "django-stubs-ext", specifier = ">=6.1.1" },
     { name = "gunicorn", specifier = ">=23" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
     { name = "pydantic-settings", specifier = ">=2" },
