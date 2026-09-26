@@ -7,31 +7,25 @@ from content.models import Project, ProjectTechnology, Technology
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
-from factories import project, technology
+from factories import project, saved, technology
 from refusals import refusals
 
 
 @pytest.fixture
 def portfolio() -> Project:
     """Le projet de la fabrique, enregistré."""
-    saved = project()
-    saved.save()
-    return saved
+    return saved(project())
 
 
 def link(linked_project: Project, linked: Technology, position: int) -> ProjectTechnology:
     """Une technologie de projet enregistrée : `linked` à la place `position` de
     `linked_project`."""
-    saved = ProjectTechnology(project=linked_project, technology=linked, position=position)
-    saved.save()
-    return saved
+    return saved(ProjectTechnology(project=linked_project, technology=linked, position=position))
 
 
 def saved_technology(name: str) -> Technology:
     """Une technologie de la fabrique, enregistrée sous `name`."""
-    saved = technology(name=name)
-    saved.save()
-    return saved
+    return saved(technology(name=name))
 
 
 @pytest.mark.django_db
