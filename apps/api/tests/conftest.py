@@ -1,6 +1,6 @@
 """Fixtures communes aux tests de `apps/api`."""
 
-from collections.abc import Iterator
+from collections.abc import Generator
 
 import pytest
 from config.database import database_settings
@@ -25,7 +25,7 @@ def environment(monkeypatch: pytest.MonkeyPatch, variables: dict[str, str]) -> p
 
 
 @pytest.fixture(scope="session")
-def django_db_modify_db_settings() -> Iterator[None]:
+def django_db_modify_db_settings() -> Generator[None]:
     """Pointe la base de test sur un Postgres démarré pour la session.
 
     Point d'extension que pytest-django documente pour déplacer la base de test : son
