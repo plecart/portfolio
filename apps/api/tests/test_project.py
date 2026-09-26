@@ -40,6 +40,21 @@ SETTINGS_DUMP = (
     "'MIDDLEWARE': list(settings.MIDDLEWARE)}))"
 )
 
+# Résout l'adresse d'un fichier téléversé. Dans un processus neuf : `config.urls` s'évalue une
+# fois, à l'import, avec le `DEBUG` du moment.
+MEDIA_RESOLUTION = """
+import os, django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
+from django.urls import Resolver404, resolve
+try:
+    resolve('/media/technologies/icone.svg')
+except Resolver404:
+    print('absent')
+else:
+    print('servi')
+"""
+
 
 # Les dépendances que le conteneur exige au démarrage et qu'aucun code du dépôt n'importe
 # encore : le pilote que Django charge à sa première connexion — les migrations, au démarrage du
@@ -149,6 +164,23 @@ def test_les_reglages_django_viennent_de_l_environnement(variables: dict[str, st
     # `America/Chicago`, et l'admin se protège seul du CSRF — le middleware couvre le reste.
     assert settings["TIME_ZONE"] == "Europe/Paris"
     assert "django.middleware.csrf.CsrfViewMiddleware" in settings["MIDDLEWARE"]
+
+
+@pytest.mark.parametrize(
+    ("debug", "outcome"),
+    [("true", "servi"), ("false", "absent")],
+    ids=["développement", "production"],
+)
+def test_les_medias_ne_sont_servis_par_django_qu_en_developpement(
+    variables: dict[str, str], debug: str, outcome: str
+) -> None:
+    """En production, les fichiers vivent sur R2 (ADR 0004), et la vue de Django qui les sert est
+    réservée au développement (`django/views/static.py` : « SHOULD NOT be used in a production
+    setting »)."""
+    result = run_python(["-c", MEDIA_RESOLUTION], variables | {"DEBUG": debug})
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == outcome
 
 
 def production_packages() -> list[str]:
