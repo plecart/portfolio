@@ -4,14 +4,14 @@ L'égalité de son image avec celle du Compose est tenue par `test_infra.py`, av
 fichiers d'infrastructure.
 """
 
-import re
+from pathlib import Path
 from unittest.mock import MagicMock, create_autospec
 
 import containers
 import pytest
 from containers import postgres, running
 from django.db import connection
-from nested_sessions import pytest_session
+from nested_sessions import run_nested_session
 from testcontainers.community.postgres import PostgresContainer
 from testcontainers.core.container import DockerContainer
 
@@ -23,7 +23,10 @@ UNREACHABLE_DOCKER = "tcp://docker.invalid:2375"
 BASE_TEST = (
     "apps/api/tests/test_containers.py::test_la_base_des_tests_est_un_postgres_avec_pgvector"
 )
-BASELESS_TESTS = "apps/api/tests/test_admin.py"
+BASELESS_TESTS = [
+    "apps/api/tests/test_admin.py::test_l_admin_renvoie_un_visiteur_anonyme_vers_la_connexion",
+    "apps/api/tests/test_admin.py::test_l_admin_parle_francais",
+]
 
 
 @pytest.mark.django_db
@@ -88,7 +91,7 @@ def test_un_conteneur_dont_le_demarrage_echoue_est_arrete() -> None:
     container.stop.assert_called_once_with()
 
 
-def test_sans_docker_un_test_de_base_echoue_en_disant_pourquoi() -> None:
+def test_sans_docker_un_test_de_base_echoue_en_disant_pourquoi(tmp_path: Path) -> None:
     """Sans Docker, le test de base échoue — jamais sauté — et les autres tournent.
 
     Éprouvé de bout en bout, dans une session pytest à part : c'est la suite entière qui doit
@@ -101,13 +104,14 @@ def test_sans_docker_un_test_de_base_echoue_en_disant_pourquoi() -> None:
     ne pose `tc.host` — ni celui du projet ni la CI ne le font. Il réécrit aussi `DOCKER_HOST`
     dans l'environnement du processus au premier conteneur : d'où la valeur passée explicitement.
     """
-    session = pytest_session([BASE_TEST, BASELESS_TESTS], DOCKER_HOST=UNREACHABLE_DOCKER)
-    report = session.stdout
+    session = run_nested_session(
+        [BASE_TEST, *BASELESS_TESTS], tmp_path, DOCKER_HOST=UNREACHABLE_DOCKER
+    )
 
-    assert session.returncode == pytest.ExitCode.TESTS_FAILED, report
-    assert re.search(r"\b2 passed, 1 error\b", report), report
-    assert "skipped" not in report
-    assert "exigent Docker" in report
+    expected = {BASE_TEST: "error"} | dict.fromkeys(BASELESS_TESTS, "passed")
+    assert session.outcomes == expected, session.report
+    assert session.exit_code == pytest.ExitCode.TESTS_FAILED
+    assert "exigent Docker" in session.report
     # Les deux formes de chaînage : « The above exception was the direct cause… » et « During
     # handling of the above exception… ». `pytrace=False` en tait les types, jamais les messages.
-    assert "above exception" not in report, "la chaîne de docker-py remonte avec le message"
+    assert "above exception" not in session.report, "la chaîne de docker-py remonte"
