@@ -12,7 +12,9 @@ l'historique.
 
 Les **règles permanentes** (`.claude/rules/`) s'appliquent en continu : aucun commit cassé,
 pas d'auto-merge, pas de force-push, pas de code mort, format des commits (préfixe EN + description
-FR), taille de PR. La **règle d'or** : au moindre doute, on s'arrête et on pose la question.
+FR), taille de PR. La **règle d'or** : toute question a une voie — technique `[T]`, elle se décide
+et se trace ; vision `[V]`, elle attend le mainteneur, groupée ; contradiction `[C]`, elle arrête
+(`.claude/rules/contraintes.md`).
 
 **Commandes du projet.** Ce skill ne présuppose aucune stack : les commandes `test`, `test ciblé`,
 `lint`, `format`, `typecheck` et `build` se lisent dans la section « Commandes du projet » de
@@ -63,10 +65,14 @@ Produire un briefing écrit AVANT de créer la branche :
 - **Liste précise des fichiers** à créer/modifier — le chemin exact de chacun.
 - **Décisions verrouillées** — choix d'architecture / scope / format actés.
 - **Questions résiduelles** — découpage, format des données, transitions d'état, comportements,
-  edge cases.
+  edge cases — **chacune avec sa voie** (`contraintes.md`, règle d'or) : une `[T]` se tranche
+  ici même, avec sa source, et rejoint les décisions verrouillées ; les `[V]` se posent toutes
+  ensemble, au go du briefing ; une `[C]` arrête.
 
-Poser **un maximum de questions pour lever toute incertitude maintenant**. Une question posée
-maintenant coûte 30 secondes ; la même ambiguïté après 5 commits coûte une demi-journée.
+Lever les incertitudes **maintenant** : une `[V]` découverte après cinq commits coûte une
+demi-journée d'attente ; une `[T]` ne se pose jamais, elle se décide — sur une PR, sept questions
+formelles ont coûté trois heures et demie d'attente, et la plupart appelaient la réponse que le
+mainteneur donne toujours.
 
 ### Porte d'entrée obligatoire — l'interrogatoire
 
@@ -181,10 +187,12 @@ La PR draft porte **dès sa création** :
 Pour une **demande directe sans issue**, ouvrir quand même la draft : sans `Closes`, mais le
 travail reste visible du reste de la pipeline.
 
-> **La CI ne tourne pas sur une draft** (garde `if:` dans le `ci.yml` du template). C'est voulu :
-> les étapes 3.2 et 3.4 imposent une suite verte en local avant chaque commit, donc le filet est
-> déjà tendu — inutile de dépenser des runs sur du code incomplet. La CI démarre au `gh pr ready`
-> de l'Étape 5. **Ne pas interpréter l'absence de run comme une CI cassée.**
+> **La CI tourne sur chaque push de la branche, draft comprise** — sauf à l'ouverture de la draft
+> elle-même, dont l'amorce vide n'a rien à vérifier (garde `if:` du `ci.yml` du template). Le
+> premier run arrive donc au premier push de code (Étape 4), et c'est là que se voit un rouge de la
+> famille « sensible à la plateforme » (3.2) — au cycle courant, pas après le passage en ready, où
+> chaque constat coûte un run complet et le rejeu des vérifications manuelles. **Une draft sans
+> push de code n'a aucun run : ce n'est pas une CI cassée.**
 
 En vague parallèle (`pr-paralleles`), le lead relève lui-même le numéro de PR (`gh pr list`) pour
 son tableau de bord : rien à lui envoyer.
@@ -201,9 +209,12 @@ Chaque commit suit **exactement** :
 jusqu'à l'Étape 4 — en lançant au passage la **première passe de relecture 4.2** dès que le
 commit qui vient d'être fait pose un invariant que les suivants supposeront vrai ; l'annonce de
 l'étape suivante (« Next : commit 2/3 ») est un **titre**, pas une demande d'autorisation. Les
-seuls arrêts légitimes du cycle : une question dont la réponse change le travail, un arrêt
-`decisions-vs-doc`, le point d'arrêt humain de l'Étape 5 (zone sensible, une fois par PR) et le
-« go » de l'Étape 7. Ailleurs, s'arrêter est une remise de main que personne n'a demandée.
+seuls arrêts légitimes du cycle : une question `[V]` dont dépend **tout** ce qui reste à faire, un
+arrêt `decisions-vs-doc` (`[C]`), le point d'arrêt humain (zone sensible, une fois par PR, au
+commit qui assemble l'écran — 3.5) et le « go » de l'Étape 7. Une `[V]` dont une partie du travail
+ne dépend pas s'inscrit dans le body de la PR draft, sous « Questions en attente », avec
+l'hypothèse réversible retenue d'ici là, et le cycle continue sur cette partie ; elle sera posée
+groupée au prochain arrêt. Ailleurs, s'arrêter est une remise de main que personne n'a demandée.
 
 ### 3.1 Modification — en TDD (tracer bullet vertical)
 
@@ -354,7 +365,12 @@ git commit -m "type(scope): description"
 
 Pas de corps, pas de footer, pas de `Co-Authored-By`, pas de numéro de PR. Breaking change : `!`
 dans le titre. Puis enchaîner sur le commit suivant (retour 3.1) — ou, si ce commit vient de poser
-le socle, lancer d'abord la première passe de relecture (4.2, « En deux temps »).
+le socle, lancer d'abord la première passe de relecture (4.2, « En deux temps »). **Si ce commit
+assemble un écran d'une zone sensible** (`.claude/pipeline.config.md`, « Périmètre »), c'est
+maintenant que se prend le point d'arrêt humain (Étape 5, « Point d'arrêt humain ») — dans le
+même tour que la passe de relecture s'il y en a une : la lancer d'abord, montrer l'écran ensuite,
+et continuer sur ce qui ne dépend pas de son verdict. `.claude/rules/contraintes.md`, « Points
+d'arrêt humains », en est la source unique.
 
 ## Étape 4 — Relecture indépendante (avant `git push`)
 
@@ -435,15 +451,24 @@ relecture rend ses constats à la distance maximale du moment où ils auraient p
 19 commits dont 13 en réaction à des constats arrivés après le vert, 25 tests dont 18 après la
 relecture : un travail juste, rendu cher par sa position dans le temps. Un constat de la première
 passe se fond dans un commit qui restait à écrire ; un constat qui arrive après le passage en
-ready coûte un run de CI complet et le rejeu des vérifications manuelles (Étape 7). Au plus deux
-passes par PR.
+ready coûte un run de CI complet et le rejeu des vérifications manuelles (Étape 7).
 
-**La relecture n'est pas en lecture seule au sens strict.** Éprouver un test sérieusement, c'est
-casser la garde qu'il protège et la voir rougir — donc **modifier le code de production**, puis le
-restaurer — et le relecteur partage l'arbre de travail de cette session. Pendant toute la passe :
-**ne rien stager, ne rien committer**, et vérifier `git status` juste avant le premier `git add`
-qui suit. Le relecteur rapporte `git status --porcelain` en fin de passe — c'est le point de
-reprise sûr.
+**Le relecteur travaille dans son propre worktree, sur un SHA figé — jamais dans l'arbre de
+cette session.** Éprouver un test sérieusement, c'est casser la garde qu'il protège et la voir
+rougir — donc **modifier le code de production**, puis le restaurer. Dans l'arbre partagé, cela
+gelait l'auteur pendant toute la passe (2 h 44 d'attente mesurées sur une PR, pour trois heures de
+relecture), et la relecture portait sur un arbre qui bougeait. Avant de lancer l'agent :
+
+```
+git worktree add --detach ../<repo>--relecture-<n> <sha de tête>
+```
+
+puis le provisionner par les cinq gestes de `pr-paralleles`, Étape 3, et donner à l'agent **ce
+chemin** comme seul répertoire de travail : toutes ses commandes s'y exécutent, la commande de test
+comprise. Le SHA figé rend la passe reproductible et son diff explicite ; l'auteur continue ici
+pendant ce temps, sans rien attendre. En fin de passe, `git worktree remove --force
+../<repo>--relecture-<n>` — après avoir détaché les liens qu'il contiendrait (`pr-paralleles`,
+Étape 8). Un relecteur qui commit ou pousse depuis ce worktree a dépassé son rôle.
 
 **Éprouver un test par mutation est une procédure, pas un rappel.** Un harnais dont l'échec attendu
 et la panne d'outil produisent le même signal ne mesure rien — et une rangée de rouges se lit
@@ -465,18 +490,40 @@ Et **lancer les tests par la commande du projet** (`.claude/pipeline.config.md`)
 appel direct au lanceur : c'est elle qui porte l'environnement ; un sous-processus qui la
 court-circuite ne teste pas la même chose que la CI.
 
-Un constat retenu de la **première** passe s'absorbe dans le commit à venir qui touche sa zone,
-sinon il reçoit un commit de fix dédié ; un constat de la **seconde** passe → **un commit de fix
-dédié** (cycle complet 3.1→3.5). La relance n'est pas une répétition de la revue, ni une passe au
-sens du plafond « au plus deux » : c'est une **revue des commits de correction**, ciblée par un diff
-explicite (`<sha avant>..<sha après>`) et par la liste de ce que chaque commit prétend régler,
-avec la question obligatoire : « qu'est-ce que ce correctif a cassé, ou fait rougir à tort, que la
-version précédente voyait ? ». Un correctif est du code neuf écrit sous pression de conclure —
-c'est la partie la moins éprouvée de la PR, pas la plus sûre. Boucler tant qu'il reste un bloquant
-ou un important. Les constats écartés sont notés avec leur raison — ils iront dans les `Notes` de
-la PR (Étape 5).
+**Sévérité — trois définitions, pas trois nuances.** *Bloquant* : un défaut de comportement en
+production, une faille, une perte de données possible. *Important* : une régression que la CI ne
+verrait pas et qu'un changement plausible du code déclencherait. *Mineur* : tout le reste —
+lisibilité, nommage, doc, et « ce test pourrait tenir davantage ». Un constat qui n'entre dans
+aucune des deux premières est mineur, quelle que soit sa longueur ; quatre « importants » d'une
+relance étaient tous des tests à renforcer, et ils ont coûté une relecture de plus. Le
+relecteur rend chaque mineur sous forme d'**édit précis** — fichier, ligne, remplacement — ou
+l'écarte lui-même avec sa raison.
 
-Une fois la seconde passe propre → `git push`.
+**Traitement — par passe, jamais par constat.** Les bloquants et importants d'une passe se
+corrigent en **un commit par passe** (ou par zone, si deux correctifs n'ont rien en commun), un
+cycle complet 3.1→3.5 pour le groupe. Les mineurs d'une passe s'appliquent en **un commit groupé**
+— un lot d'édits précis est un bloc de travail d'`executant` : le lui confier en fond pendant que
+le lead lit les importants et prépare leurs correctifs, sans éditer avant son retour puisque
+l'arbre est partagé ; l'appliquer soi-même s'il ne reste rien d'autre à corriger —, ou s'écartent
+avec leur raison dans le body (Étape 5). Aucun registre ailleurs : un mineur écarté qui compte
+encore reviendra à la prochaine relecture de la zone ; s'il ne revient pas, il ne comptait pas. Un
+constat de la **première** passe s'absorbe de préférence dans le commit à venir qui touche sa
+zone. Vingt-neuf commits de correction à cycle complet, un par constat, ont coûté plus que les
+quatre commits prévus d'une PR ; c'était le rang du constat qui décidait, pas son contenu.
+
+**Plafond — deux passes et une relance.** La relance n'est pas une passe : c'est une **revue des
+commits de correction**, ciblée par un diff explicite (`<sha avant>..<sha après>`) et par la liste
+de ce que chaque commit prétend régler, avec la question obligatoire : « qu'est-ce que ce
+correctif a cassé, ou fait rougir à tort, que la version précédente voyait ? ». Un correctif est
+du code neuf écrit sous pression de conclure — c'est la partie la moins éprouvée de la PR, pas la
+plus sûre. Après la relance : un bloquant qu'elle trouve se corrige et rouvre une relance ; un
+important se corrige, se prouve par un test vu rouge (3.1), et n'est pas relu par un tiers ; un
+mineur suit la règle ci-dessus. La boucle s'arrête là, et le body le dit. Les constats écartés
+sont notés avec leur raison dans le body (Étape 5).
+
+**Pousser après chaque passe** — première passe corrigée, seconde passe corrigée, relance —, jamais
+en force : la CI éprouve la plateforme cible pendant que la relecture suivante tourne, et un rouge
+de plateforme (3.2) se corrige dans le commit groupé de la passe en cours.
 
 ## Étape 5 — Finalisation de la PR (passage en ready for review)
 
@@ -488,6 +535,9 @@ body définitif, puis de sortir du draft.
 - **Assignee**, **labels**, **milestone** : vérifier qu'ils sont toujours justes.
 - **Conserver la ligne `Closes #<N>`** — la perdre en réécrivant le body casserait à la fois la
   fermeture automatique de l'issue et la détection « en vol ».
+- **Vider « Questions en attente »** : toute `[V]` encore ouverte se pose maintenant, groupée avec
+  le point d'arrêt humain s'il reste à prendre ; sa réponse rejoint les Notes, et l'hypothèse
+  retenue d'ici là se confirme ou se défait en un commit.
 - Remplacer le corps par un **body structuré** :
 
 ```markdown
@@ -528,9 +578,12 @@ compilation (le bandeau DEBUG), appareil et densité, résolution, thème, barre
 ### Point d'arrêt humain
 
 Si la PR touche une **zone sensible** déclarée dans `.claude/pipeline.config.md` (section
-« Périmètre ») — par défaut, l'UI à valider visuellement — rendre la main pour validation manuelle
-**une fois par PR, avant `gh pr ready`**, pas avant chaque commit. `.claude/rules/contraintes.md`,
-« Points d'arrêt humains », en est la source unique : la lire, plutôt que présumer.
+« Périmètre ») — par défaut, l'UI à valider visuellement — la validation manuelle a lieu **une fois
+par PR, au commit qui assemble l'écran** (3.5), pas avant chaque commit et pas ici : arrivé à cette
+étape, elle est déjà prise. Si l'écran a bougé depuis, rejouer la vérification sur ce qui a changé
+(Étape 7, « Rejouer les vérifications périmées ») **avant `gh pr ready`**.
+`.claude/rules/contraintes.md`, « Points d'arrêt humains », en est la source unique : la lire,
+plutôt que présumer.
 
 Puis seulement, sortir du draft :
 
@@ -541,11 +594,9 @@ gh pr ready <numéro>
 Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur qui distingue
 « travail en cours » de « prêt à être relu ».
 
-C'est aussi ce `gh pr ready` qui **déclenche le premier run de CI** (événement `ready_for_review`).
-Attendre son résultat avant l'Étape 6 — une PR fraîchement sortie du draft n'a encore aucun run.
-Ce premier run est aussi la **première exécution des portes sur la plateforme cible** : un rouge
-de la famille « sensible à la plateforme » (3.2) y est attendu — un rouge de code, pas un rouge
-d'infrastructure (Étape 6).
+`gh pr ready` déclenche **un run de plus** sur la tête (événement `ready_for_review`), après ceux
+que chaque push a déjà produits (Étape 4) : c'est lui qui garantit qu'une PR prête a un run, même
+si son dernier push date. Attendre son résultat avant l'Étape 6.
 
 **Si aucun run n'apparaît**, deux causes possibles, à départager dans cet ordre : (1) un run
 existe-t-il pour le SHA de tête (`gh api repos/<owner>/<repo>/actions/runs?head_sha=<sha>`) ?
@@ -570,8 +621,8 @@ ni de force-push.
     le job n'a aucun step → allocation de runner (quota, incident fournisseur) — ne pas modifier
     le workflow, surveiller en fond et **rendre la main au mainteneur**. Les runs `skipped`
     (garde `if:`) se terminent sans runner et ne prouvent rien sur la disponibilité de la CI.
-  - *Rouge de code* : tout le reste, y compris le rouge de plateforme attendu au premier run
-    (Étape 5) → cycle complet 3.1→3.5.
+  - *Rouge de code* : tout le reste, y compris un rouge de plateforme (3.2) → cycle complet
+    3.1→3.5.
 - **Revue** : revue automatisée (bot) ou self-audit ligne par ligne (sécurité, correctness,
   lisibilité, KISS/DRY/YAGNI, cohérence avec la stack).
 - Chaque commentaire **pertinent** → cycle complet (3.1→3.5) + push + re-trigger de la review.
@@ -733,6 +784,22 @@ les têtes avant de s'éteindre à l'écran.
 Si la PR a porté des **preuves visuelles**, supprimer enfin la branche orpheline promise à
 l'Étape 5 : `git push origin --delete captures/pr-<n>`.
 
+**Bilan chiffré du cycle.** Mesurer la session sur son transcript — Python 3, sans dépendance :
+
+```
+python <répertoire de ce skill>/scripts/bilan-session.py <transcript .jsonl de cette session>
+```
+
+Le transcript vit sous `~/.claude/projects/<projet>/<uuid de session>.jsonl` — l'uuid est celui
+du répertoire scratchpad de la session. Le script rend la durée, le temps bloqué sur le
+mainteneur, le temps des relectures, le temps d'agent seul, les points de contact humains et les
+appels d'outils. Écrire ces lignes, plus trois à la main — commits prévus contre commits de
+correction, constats par passe, correctifs qui ont cassé quelque chose — dans
+`retrospectives/<date>-<issue>.md`, dossier voisin du journal d'observations (chemin dans
+`CLAUDE.md`), hors du dépôt. C'est la seule mesure qui dise si un changement de la pipeline a
+marché : une session de douze heures s'est révélée faite de trois heures d'agent et de neuf
+heures d'attente, ce qu'aucun compte rendu n'avait vu.
+
 La PR et la conversation qui l'a résolue ont pu acter des décisions, déplacer un contrat d'interface, déjà faire une partie d'un autre lot, ou rendre une
 hypothèse caduque ailleurs. **Immédiatement après le merge**, lancer le skill `repercussions` — la
 conversation qui a résolu l'issue est **encore en contexte**, c'est le moment où l'analyse est la
@@ -753,7 +820,8 @@ est « aucune répercussion »).
 
 ## Les 5 idées à retenir
 
-1. Tout l'effort de questions se fait **avant** de coder (briefing pré-PR + interrogatoire).
+1. Tout l'effort de questions se fait **avant** de coder (briefing pré-PR + interrogatoire) — et
+   une question technique ne se pose pas : elle se décide et se trace (`[T]`).
 2. **La PR draft s'ouvre avant la première ligne de code**, avec `Closes #N`. C'est ce qui rend le
    travail visible comme *en cours* : sans elle, une autre session réécrira la spec de cette issue
    en croyant que personne ne travaille dessus.
@@ -761,6 +829,7 @@ est « aucune répercussion »).
    le cleanup sur les commits triviaux.
 4. **Deux filets de cleanup** : un par commit (regard local), un sur la PR entière avant merge
    (regard global, inter-commits) — et une relecture à contexte vierge **en deux temps**, au
-   socle et à la fin, jamais par commit.
+   socle et à la fin, jamais par commit, dans son propre worktree, plafonnée à deux passes et une
+   relance.
 5. La PR n'est **terminée qu'après la passe `repercussions`** : une clôture peut bouleverser les
    autres issues — on le vérifie pendant que la conversation est encore en contexte.
