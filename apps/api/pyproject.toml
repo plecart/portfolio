@@ -8,7 +8,8 @@ requires-python = ">=3.12"
 # `gunicorn` et `psycopg` ne sont importés par aucun module du dépôt, et ce n'est pas un oubli :
 # le premier est la commande par défaut de l'image (ADR 0001), le second est chargé par Django à
 # sa première connexion — les migrations, au démarrage du conteneur. `STARTUP_IMPORTS`
-# (`tests/test_project.py`) les tient sous test : c'est ce qui les distingue de dépendances mortes.
+# (`tests/test_django_project.py`) les tient sous test : c'est ce qui les distingue de
+# dépendances mortes.
 #
 # `psycopg[binary]` plutôt que `[c]` : option recommandée par la documentation, et la seule qui
 # n'exige ni `libpq` ni outils de build — donc aucun étage de compilation dans l'image.
