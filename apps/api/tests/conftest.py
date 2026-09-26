@@ -28,15 +28,15 @@ def environment(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
     return monkeypatch
 
 
-@pytest.fixture
-def media_root(settings: Settings, tmp_path: Path) -> Path:
+@pytest.fixture(autouse=True)
+def media_root(settings: Settings, tmp_path: Path) -> None:
     """Les fichiers qu'un test enregistre vont dans son dossier temporaire, jamais dans le dépôt.
 
     Le `MEDIA_ROOT` du processus de test est relatif à la racine du dépôt (`process_environment`) :
-    sans ce dossier, une icône enregistrée par un test y atterrirait.
+    sans ce dossier, une icône enregistrée par un test y atterrirait. Automatique, pour qu'aucun
+    test ne puisse l'oublier.
     """
     settings.MEDIA_ROOT = tmp_path
-    return tmp_path
 
 
 @pytest.fixture(scope="session")

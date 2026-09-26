@@ -81,7 +81,6 @@ def test_une_icone_qui_n_est_pas_un_document_svg_est_refusee(name: str, content:
 
 
 @pytest.mark.django_db
-@pytest.mark.usefixtures("media_root")
 def test_deux_technologies_ne_portent_pas_le_meme_nom_a_la_casse_pres() -> None:
     technology(name="Django").save()
 
@@ -92,7 +91,6 @@ def test_deux_technologies_ne_portent_pas_le_meme_nom_a_la_casse_pres() -> None:
 
 
 @pytest.mark.django_db
-@pytest.mark.usefixtures("media_root")
 @pytest.mark.parametrize(
     ("fields", "constraint"),
     [(fields, constraint) for _, fields, constraint in DATABASE_RULES],
@@ -106,7 +104,6 @@ def test_la_base_refuse_une_technologie_qui_enfreint_ses_regles(
 
 
 @pytest.mark.django_db
-@pytest.mark.usefixtures("media_root")
 def test_la_base_refuse_deux_technologies_du_meme_nom() -> None:
     technology(name="Django").save()
 

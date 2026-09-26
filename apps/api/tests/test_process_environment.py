@@ -6,8 +6,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from config.env import ENV_FILE, Env
+from config.env import ENV_FILE, REPOSITORY_ROOT, Env
 from django.conf import settings
+from django.core.files.storage import default_storage
 from nested_sessions import run_nested_session
 from process_environment import NO_ENV_FILE, RYUK_IMAGE, VALID_ENVIRONMENT
 from testcontainers.core.config import testcontainers_config
@@ -75,6 +76,16 @@ def test_django_est_configure_pour_les_tests() -> None:
     ferait donc sauter une partie de la suite, qui resterait verte sans l'avoir vérifiée.
     """
     assert settings.configured
+
+
+def test_un_fichier_enregistre_par_un_test_ne_va_pas_dans_le_depot() -> None:
+    """Le `MEDIA_ROOT` du processus vise le dépôt — relatif à dessein, voir `VALID_ENVIRONMENT`.
+    Un test qui enregistre un fichier l'écrirait donc là, sans qu'aucune porte ne le voie, et un
+    `git add -A` le commiterait. Ce test ne demande aucune fixture : il vaut pour tous les autres.
+    """
+    stored = Path(default_storage.path("technologies/icone.svg"))
+
+    assert not stored.is_relative_to(REPOSITORY_ROOT), stored
 
 
 def test_un_shell_pollue_ne_change_rien_a_la_session_de_test(tmp_path: Path) -> None:

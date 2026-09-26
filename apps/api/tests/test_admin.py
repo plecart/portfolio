@@ -57,7 +57,6 @@ def test_l_ecran_technologie_affiche_les_libelles_du_catalogue(admin_client: Cli
 
 
 @pytest.mark.django_db
-@pytest.mark.usefixtures("media_root")
 def test_l_admin_refuse_un_doublon_avec_le_message_du_catalogue(admin_client: Client) -> None:
     """La contrainte suffit : l'admin affiche son message sans second `clean()` (décision 10)."""
     technology(name="Django").save()
@@ -72,7 +71,6 @@ def test_l_admin_refuse_un_doublon_avec_le_message_du_catalogue(admin_client: Cl
 
 
 @pytest.mark.django_db
-@pytest.mark.usefixtures("media_root")
 def test_la_fiche_d_une_technologie_lie_son_icone_sous_les_medias(admin_client: Client) -> None:
     """Le lien que l'admin affiche sous « Actuellement » est l'adresse servie des médias."""
     saved = technology()
