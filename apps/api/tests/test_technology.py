@@ -1,12 +1,9 @@
 """Tests de la technologie : nom unique, icône SVG obligatoire, site facultatif."""
 
 import pytest
-from content.models import Technology
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
-
-SVG = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"/>'
+from factories import SVG, svg_icon, technology
 
 # Les formes d'un fichier qui n'est pas un document SVG — c'est le dénombrement qui compte : une
 # extension qui ment, un contenu qui n'est pas du XML, du XML dont la racine n'est pas `svg`, et
@@ -17,18 +14,6 @@ NOT_SVG = [
     ("racine étrangère", "icone.svg", b'<html xmlns="http://www.w3.org/1999/xhtml"/>'),
     ("racine sans espace de noms", "icone.svg", b"<svg/>"),
 ]
-
-
-def icon(name: str = "icone.svg", content: bytes = SVG) -> SimpleUploadedFile:
-    """Un fichier téléversé, comme l'admin le reçoit."""
-    return SimpleUploadedFile(name, content, content_type="image/svg+xml")
-
-
-def technology(**fields: object) -> Technology:
-    """Une technologie valide, non enregistrée ; `fields` en remplace des champs."""
-    return Technology(
-        **{"name": "Django", "kind": Technology.Kind.FRAMEWORK, "icon": icon(), **fields}
-    )
 
 
 def refusal_codes(error: ValidationError, field: str = NON_FIELD_ERRORS) -> list[str | None]:
@@ -47,7 +32,7 @@ def test_une_icone_svg_est_acceptee() -> None:
 )
 def test_une_icone_qui_n_est_pas_un_document_svg_est_refusee(name: str, content: bytes) -> None:
     with pytest.raises(ValidationError) as refusal:
-        technology(icon=icon(name, content)).clean_fields()
+        technology(icon=svg_icon(name, content)).clean_fields()
 
     assert refusal_codes(refusal.value, "icon") == ["icon_not_svg"]
 

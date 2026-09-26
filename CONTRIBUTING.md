@@ -64,6 +64,14 @@ quoi les valeurs interpolées du fichier Compose seraient vides. Le `.env` de la
 exister — Compose refuse de résoudre un `env_file` absent, avant même de démarrer quoi que ce
 soit. `Ctrl-C` arrête la pile ; les données Postgres survivent dans un volume nommé.
 
+**Regarder l'admin.** La pile démarrée, créer le compte d'administration dans le conteneur `api`
+— la commande de gestion de #6 prendra le relais —, puis ouvrir `http://127.0.0.1:8000/admin/` :
+
+```
+docker compose --env-file infra/dev.env -f infra/compose.dev.yml exec api python manage.py createsuperuser
+```
+
+
 Deux fichiers d'environnement, qui ne se remplacent pas :
 
 | Fichier | Commité | Lu par | Contient |
