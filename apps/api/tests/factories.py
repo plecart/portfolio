@@ -4,7 +4,7 @@ Le motif que le PRD fixe aux tests du back (« fabriques minimales, un test par 
 attendu ne peut venir que du champ que le test remplace.
 """
 
-from content.models import Technology
+from content.models import Technology, TechnologyKind
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 # Le plus petit document SVG qu'un navigateur affiche : une racine `svg` dans son espace de noms.
@@ -19,5 +19,5 @@ def svg_icon(name: str = "icone.svg", content: bytes = SVG) -> SimpleUploadedFil
 def technology(**fields: object) -> Technology:
     """Une technologie valide, non enregistrée ; `fields` en remplace des champs."""
     return Technology(
-        **{"name": "Django", "kind": Technology.Kind.FRAMEWORK, "icon": svg_icon(), **fields}
+        **{"name": "Django", "kind": TechnologyKind.FRAMEWORK, "icon": svg_icon(), **fields}
     )
