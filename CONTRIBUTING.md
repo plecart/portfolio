@@ -27,6 +27,16 @@ du Compose de développement — par testcontainers, et échouent en le disant s
 pas. Ils ne lisent jamais `.env` : leur environnement est posé par
 [apps/api/tests/process_environment.py](apps/api/tests/process_environment.py).
 
+**Réglage recommandé du poste.** Docker publie par défaut chaque port sur toutes les interfaces.
+Pendant les tests, le Postgres jetable et Ryuk — le conteneur de nettoyage de testcontainers, qui
+détient le socket Docker et n'exige aucune authentification — sont donc joignables depuis le
+réseau local dès que le pare-feu laisse entrer Docker (Windows crée une règle entrante quand on
+l'y autorise). Le Postgres a un mot de passe tiré au hasard ; Ryuk, rien. Pour fermer d'un coup
+tous les ports publiés du poste, fixer l'adresse de liaison par défaut du démon à `127.0.0.1` —
+`"ip": "127.0.0.1"` dans sa configuration (Docker Desktop : *Settings → Docker Engine*) — puis
+redémarrer Docker. Vérifier ensuite qu'un `docker port <conteneur>` n'affiche plus que
+`127.0.0.1`.
+
 **Front (`apps/web`)** — Node, épinglé par `apps/web/.nvmrc` ; un gestionnaire de version (`nvm`,
 `fnm`, `volta`…) lit ce fichier, et le champ `engines` du manifeste porte la même valeur, qu'un
 test vérifie :

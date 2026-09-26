@@ -1,12 +1,22 @@
 """Tests de l'environnement du processus de test, posé avant que Django ne lise ses réglages."""
 
+import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 from config.env import ENV_FILE, Env
 from django.conf import settings
 from nested_sessions import pytest_session
-from process_environment import NO_ENV_FILE, VALID_ENVIRONMENT
+from process_environment import NO_ENV_FILE, RYUK_IMAGE, VALID_ENVIRONMENT
+from testcontainers.core.config import testcontainers_config
+
+# Imprime l'image Ryuk que testcontainers choisit de lui-même, faute de variable qui l'épingle.
+# Dans un processus à part : la configuration est lue une fois, à l'import du module.
+RYUK_DEFAULT = (
+    "from testcontainers.core.config import testcontainers_config as c; print(c.ryuk_image)"
+)
 
 # Ce qu'une session lancée depuis un shell pollué doit encore réussir : tout ce qui lit les
 # réglages et le fichier `.env`. Jamais ce module entier — il se relancerait lui-même.
@@ -30,6 +40,31 @@ def test_l_environnement_de_test_couvre_exactement_les_variables_d_env() -> None
     """Une variable d'`Env` absente d'ici serait lue dans le shell du développeur, ou tomberait
     sur son défaut : les tests vérifieraient alors une configuration que personne n'a choisie."""
     assert set(VALID_ENVIRONMENT) == set(Env.model_fields)
+
+
+def test_ryuk_tourne_sur_l_image_epinglee() -> None:
+    """testcontainers lit son image Ryuk à l'import : le greffon doit l'avoir posée avant."""
+    assert testcontainers_config.ryuk_image == RYUK_IMAGE
+
+
+def test_l_epingle_de_ryuk_suit_l_image_que_testcontainers_attend() -> None:
+    """Une montée de testcontainers qui change d'image Ryuk fait rougir ce test.
+
+    Sans lui, l'épingle garderait en silence l'ancienne image, que la nouvelle version ne sait
+    peut-être plus piloter. La mise à jour se fait alors dans la PR de montée : étiquette et
+    empreinte ensemble.
+    """
+    default = subprocess.run(
+        [sys.executable, "-c", RYUK_DEFAULT],
+        env={name: value for name, value in os.environ.items() if name != "RYUK_CONTAINER_IMAGE"},
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    tag, _, digest = RYUK_IMAGE.partition("@")
+
+    assert tag == default
+    assert re.fullmatch(r"sha256:[0-9a-f]{64}", digest)
 
 
 def test_django_est_configure_pour_les_tests() -> None:

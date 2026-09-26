@@ -8,7 +8,7 @@ import re
 from unittest.mock import create_autospec
 
 import pytest
-from containers import running
+from containers import postgres, running
 from django.db import connection
 from nested_sessions import pytest_session
 from testcontainers.core.container import DockerContainer
@@ -35,6 +35,25 @@ def test_la_base_des_tests_est_un_postgres_avec_pgvector() -> None:
         cursor.execute("SELECT 1 FROM pg_available_extensions WHERE name = 'vector'")
 
         assert cursor.fetchone() == (1,)
+
+
+def test_le_postgres_des_tests_ignore_les_identifiants_du_shell(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sans identifiants explicites, testcontainers les lirait dans le shell (`POSTGRES_*`)."""
+    for variable in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"):
+        monkeypatch.setenv(variable, "du-shell")
+
+    server = postgres()
+
+    assert (server.username, server.dbname) == ("portfolio", "portfolio")
+    assert server.password != "du-shell"
+
+
+def test_chaque_postgres_des_tests_tire_son_propre_mot_de_passe() -> None:
+    """Son port est publié sur toutes les interfaces : un mot de passe connu y ouvrirait un
+    superutilisateur à quiconque partage le réseau du poste."""
+    assert postgres().password != postgres().password
 
 
 def test_un_conteneur_dont_le_demarrage_echoue_est_arrete() -> None:
