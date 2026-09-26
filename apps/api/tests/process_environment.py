@@ -34,11 +34,22 @@ VALID_ENVIRONMENT = {
 # Un chemin qui n'existe pas : `pydantic-settings` n'y lit rien, sans bruit.
 NO_ENV_FILE = Path(__file__).with_name("aucun-fichier-env")
 
+# Ryuk, le conteneur de nettoyage de testcontainers, reçoit le socket Docker en écriture : c'est
+# l'image la plus privilégiée que les tests lancent. Épinglée par empreinte, comme les images de
+# base du Dockerfile — une étiquette peut changer de contenu, une empreinte non. L'étiquette reste
+# celle que testcontainers attend : `test_process_environment.py` le vérifie à chaque montée.
+RYUK_IMAGE = (
+    "testcontainers/ryuk:0.8.1"
+    "@sha256:bf3f74a47dee0acda89aba4b2fc9c7fdcf994a084db02a2d06566f07baae022e"
+)
+
 # Les variables des outils, hors des champs d'`Env` : quels réglages pytest-django charge — il lit
-# l'environnement avant `pyproject.toml` —, et quel fichier `Env` lit.
+# l'environnement avant `pyproject.toml` —, quel fichier `Env` lit, et quelle image Ryuk
+# testcontainers lance.
 TOOLING_ENVIRONMENT = {
     "DJANGO_SETTINGS_MODULE": "config.settings",
     "ENV_FILE": str(NO_ENV_FILE),
+    "RYUK_CONTAINER_IMAGE": RYUK_IMAGE,
 }
 
 
