@@ -1,4 +1,4 @@
-"""Modèles du contenu : les technologies ; les projets suivent (#7, lot 2).
+"""Modèles du contenu : les technologies et les projets.
 
 Toute règle que la base peut porter y est une contrainte du modèle, avec son code et son
 message du catalogue (décision 10 du brief de #7) : Django la vérifie dans `full_clean()` — donc
@@ -7,9 +7,12 @@ vérifie déjà (`blank`, `choices`), Django écarte la contrainte des champs en
 n'affiche jamais deux messages pour une même faute.
 """
 
+from datetime import date, datetime
+
 from config import strings
 from django.db import models
-from django.db.models.functions import Lower
+from django.db.models.functions import Length, Lower
+from django.db.models.lookups import LessThanOrEqual
 
 from content.validators import validate_svg
 
@@ -80,3 +83,184 @@ class Technology(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+class ProjectKind(models.TextChoices):
+    """Le type d'un projet. Valeurs stockées en anglais, exposées telles quelles par l'API
+    (ADR 0010) ; au niveau du module pour la même raison que `TechnologyKind`."""
+
+    PERSONAL = "personal", strings.PROJECT_KIND_PERSONAL
+    PROFESSIONAL = "professional", strings.PROJECT_KIND_PROFESSIONAL
+    SCHOOL = "school", strings.PROJECT_KIND_SCHOOL
+
+
+class ProjectStatus(models.TextChoices):
+    """Le statut d'un projet. Valeurs stockées en anglais, exposées telles quelles par l'API
+    (ADR 0010) ; au niveau du module pour la même raison que `TechnologyKind`."""
+
+    ONGOING = "ongoing", strings.PROJECT_STATUS_ONGOING
+    FINISHED = "finished", strings.PROJECT_STATUS_FINISHED
+    ARCHIVED = "archived", strings.PROJECT_STATUS_ARCHIVED
+
+
+# Un projet en cours : deux règles de dates en dépendent.
+IS_ONGOING = models.Q(status=ProjectStatus.ONGOING)
+
+
+class Project(models.Model):
+    """Un projet du portfolio : une carte de la table, une fiche (cadrage §6.1, PRD « Modèle de
+    contenu »).
+
+    « En ligne » n'est pas un champ : le front le déduit de `demo_url` (spec §7, « Statuts »).
+    """
+
+    title: models.CharField[str, str] = models.CharField(strings.PROJECT_TITLE)
+    # Unique par contrainte (`Meta`), dont l'index sert aussi la recherche par slug : l'index que
+    # `SlugField` pose par défaut ferait double emploi.
+    slug: models.SlugField[str, str] = models.SlugField(
+        strings.PROJECT_SLUG, max_length=50, db_index=False
+    )
+    summary: models.CharField[str, str] = models.CharField(strings.PROJECT_SUMMARY)
+    description: models.TextField[str, str] = models.TextField(strings.PROJECT_DESCRIPTION)
+    kind: models.CharField[str, str] = models.CharField(
+        strings.PROJECT_KIND, choices=ProjectKind.choices
+    )
+    status: models.CharField[str, str] = models.CharField(
+        strings.PROJECT_STATUS, choices=ProjectStatus.choices
+    )
+    started_on: models.DateField[date, date] = models.DateField(strings.PROJECT_STARTED_ON)
+    finished_on: models.DateField[date | None, date | None] = models.DateField(
+        strings.PROJECT_FINISHED_ON, null=True, blank=True
+    )
+    client: models.CharField[str, str] = models.CharField(
+        strings.PROJECT_CLIENT, max_length=100, blank=True
+    )
+    repository_url: models.URLField[str, str] = models.URLField(
+        strings.PROJECT_REPOSITORY_URL, max_length=200, blank=True
+    )
+    demo_url: models.URLField[str, str] = models.URLField(
+        strings.PROJECT_DEMO_URL, max_length=200, blank=True
+    )
+    showcase: models.BooleanField[bool, bool] = models.BooleanField(
+        strings.PROJECT_SHOWCASE, default=False
+    )
+    published: models.BooleanField[bool, bool] = models.BooleanField(
+        strings.PROJECT_PUBLISHED, default=False
+    )
+    created_at: models.DateTimeField[datetime, datetime] = models.DateTimeField(
+        strings.PROJECT_CREATED_AT, auto_now_add=True
+    )
+    updated_at: models.DateTimeField[datetime, datetime] = models.DateTimeField(
+        strings.PROJECT_UPDATED_AT, auto_now=True
+    )
+
+    class Meta:
+        verbose_name = strings.PROJECT
+        verbose_name_plural = strings.PROJECTS
+        constraints = (
+            # Une contrainte, et non `unique=True` : Django rend alors le message et le code du
+            # catalogue, au lieu de son message générique (`UniqueConstraint.validate`).
+            models.UniqueConstraint(
+                fields=["slug"],
+                name="content_project_slug_unique",
+                violation_error_code="project_slug_taken",
+                violation_error_message=strings.PROJECT_SLUG_TAKEN,
+            ),
+            # Un seul projet vitrine dans toute la table (spec §7, D48) : l'unicité ne porte que
+            # sur la valeur vraie.
+            models.UniqueConstraint(
+                fields=["showcase"],
+                condition=models.Q(showcase=True),
+                name="content_project_single_showcase",
+                violation_error_code="project_showcase_taken",
+                violation_error_message=strings.PROJECT_SHOWCASE_TAKEN,
+            ),
+            # La forme que valide le champ lui-même, lettres sans accent, chiffres, traits d'union
+            # et soulignés (`validate_slug`), et donc jamais vide : l'adresse `/projets/<slug>` de
+            # la fiche en dépend.
+            models.CheckConstraint(
+                condition=models.Q(slug__regex=r"^[-a-zA-Z0-9_]+$"),
+                name="content_project_slug_valid",
+                violation_error_code="project_slug_invalid",
+                violation_error_message=strings.PROJECT_SLUG_INVALID,
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(title=""),
+                name="content_project_title_not_empty",
+                violation_error_code="project_title_missing",
+                violation_error_message=strings.PROJECT_TITLE_MISSING,
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(summary=""),
+                name="content_project_summary_not_empty",
+                violation_error_code="project_summary_missing",
+                violation_error_message=strings.PROJECT_SUMMARY_MISSING,
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(description=""),
+                name="content_project_description_not_empty",
+                violation_error_code="project_description_missing",
+                violation_error_message=strings.PROJECT_DESCRIPTION_MISSING,
+            ),
+            models.CheckConstraint(
+                condition=models.Q(kind__in=ProjectKind.values),
+                name="content_project_kind_valid",
+                violation_error_code="project_kind_unknown",
+                violation_error_message=strings.PROJECT_KIND_UNKNOWN,
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status__in=ProjectStatus.values),
+                name="content_project_status_valid",
+                violation_error_code="project_status_unknown",
+                violation_error_message=strings.PROJECT_STATUS_UNKNOWN,
+            ),
+            # Les bornes de la spec §7 : un titre sur deux lignes du post-it, un résumé sur sept
+            # lignes de la carte la plus étroite, aucun mot qui déborde d'une ligne.
+            models.CheckConstraint(
+                condition=LessThanOrEqual(Length("title"), 30),
+                name="content_project_title_length",
+                violation_error_code="project_title_too_long",
+                violation_error_message=strings.PROJECT_TITLE_TOO_LONG,
+            ),
+            models.CheckConstraint(
+                condition=LessThanOrEqual(Length("summary"), 120),
+                name="content_project_summary_length",
+                violation_error_code="project_summary_too_long",
+                violation_error_message=strings.PROJECT_SUMMARY_TOO_LONG,
+            ),
+            # Un mot est un segment entre espaces ou traits d'union (décision 4) : aucun segment de
+            # 21 caractères ou plus. Postgres évalue l'expression, en base comme dans
+            # `full_clean()` ; une espace insécable n'y sépare pas deux mots, comme à l'écran.
+            models.CheckConstraint(
+                condition=~models.Q(summary__regex=r"[^\s-]{21,}"),
+                name="content_project_summary_words",
+                violation_error_code="project_summary_word_too_long",
+                violation_error_message=strings.PROJECT_SUMMARY_WORD_TOO_LONG,
+            ),
+            # Les dates (PRD « Modèle de contenu », décision 5) : une fin dès que le projet n'est
+            # plus en cours, aucune tant qu'il l'est, jamais avant le début.
+            models.CheckConstraint(
+                condition=IS_ONGOING | models.Q(finished_on__isnull=False),
+                name="content_project_finished_on_required",
+                violation_error_code="project_finished_on_missing",
+                violation_error_message=strings.PROJECT_FINISHED_ON_MISSING,
+            ),
+            models.CheckConstraint(
+                condition=~IS_ONGOING | models.Q(finished_on__isnull=True),
+                name="content_project_ongoing_unfinished",
+                violation_error_code="project_ongoing_finished",
+                violation_error_message=strings.PROJECT_ONGOING_FINISHED,
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(finished_on__isnull=True)
+                    | models.Q(finished_on__gte=models.F("started_on"))
+                ),
+                name="content_project_dates_ordered",
+                violation_error_code="project_dates_reversed",
+                violation_error_message=strings.PROJECT_DATES_REVERSED,
+            ),
+        )
+
+    def __str__(self) -> str:
+        return self.title

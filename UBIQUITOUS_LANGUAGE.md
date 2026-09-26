@@ -17,3 +17,25 @@ Un langage, un framework, une brique d'infrastructure ou un outil qu'un projet e
 | type | `kind` | langage `language` · framework `framework` · infra `infrastructure` · outil `tool` |
 | icône | `icon` | fichier SVG, obligatoire |
 | site | `website` | adresse facultative, 200 caractères au plus ; stockée, ni exposée par l'API ni affichée sur le site en phase 1 |
+
+## Projet — `Project`
+
+Un projet du portfolio : une carte de la table, une fiche (cadrage §6.1). « En ligne » n'est pas
+un champ : le front le déduit de la présence du lien de la démo.
+
+| Terme | Identifiant | Règle |
+|---|---|---|
+| titre | `title` | obligatoire, 30 caractères au plus |
+| slug | `slug` | obligatoire, unique ; lettres sans accent, chiffres, traits d'union et soulignés, 50 caractères au plus ; prérempli depuis le titre, toujours modifiable |
+| résumé | `summary` | obligatoire, 120 caractères au plus ; aucun mot — segment entre espaces ou traits d'union — de plus de 20 caractères |
+| description | `description` | obligatoire, en Markdown |
+| type | `kind` | perso `personal` · pro `professional` · école `school` |
+| statut | `status` | en cours `ongoing` · terminé `finished` · archivé `archived` |
+| date de début | `started_on` | obligatoire |
+| date de fin | `finished_on` | obligatoire dès que le projet n'est plus en cours, absente tant qu'il l'est ; jamais avant la date de début |
+| client | `client` | facultatif, 100 caractères au plus |
+| lien du dépôt | `repository_url` | adresse facultative, 200 caractères au plus |
+| lien de la démo | `demo_url` | adresse facultative, 200 caractères au plus ; sa présence rend le projet « en ligne » |
+| vitrine | `showcase` | un seul projet au plus |
+| publié | `published` | faux par défaut : un projet naît brouillon |
+| créé le, modifié le | `created_at`, `updated_at` | posés à l'enregistrement |
