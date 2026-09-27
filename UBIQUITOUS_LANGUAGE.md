@@ -49,4 +49,4 @@ moins une ; l'écran Projet les saisit en ligne et les ordonne par glisser-dépo
 |---|---|---|
 | projet | `project` | supprimer le projet supprime ses technologies de projet |
 | technologie | `technology` | une fois au plus par projet ; une technologie employée ne se supprime pas |
-| position | `position` | entier de 0 à 32 767, caché dans l'écran Projet : l'auteur fait glisser les lignes, une ligne neuve se range après les autres ; l'ordre stocké suit la position, puis l'ordre de saisie |
+| position | `position` | entier de 0 à 32 767, caché dans l'écran Projet : l'auteur fait glisser les lignes, enregistrées ou neuves, et la position suit l'ordre affiché à l'enregistrement ; l'ordre stocké suit la position, puis l'ordre de saisie |

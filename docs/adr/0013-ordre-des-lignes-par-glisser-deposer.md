@@ -15,72 +15,76 @@ galerie de #9 reprenait le même geste.
 
 À l'arrêt visuel de #7 (lot 2), le mainteneur l'a refusé : pour déplacer la huitième technologie
 d'une liste de dix en sixième position, il faut réécrire trois positions. Le geste attendu est de
-faire glisser la ligne.
+faire glisser la ligne, y compris une ligne qu'on vient d'ajouter : choisir les technologies, les
+placer, puis enregistrer une fois.
 
 ## Facteurs de décision
 
-- Le geste : déplacer une ligne, pas renuméroter la liste.
+- Le geste : déplacer une ligne, enregistrée ou neuve, avant d'enregistrer.
 - L'ordre stocké reste l'ordre affiché : l'API de #10 l'expose tel quel.
-- Du code à maintenir le moins possible, et aucun écart avec l'admin de Django au-delà du tri.
 - Les règles de l'écran restent tenues par le formulaire, à l'enregistrement : au moins une
   technologie, pas deux fois la même.
+- Du code et des dépendances à maintenir le moins possible.
 
 ## Options considérées
 
 1. Garder la position saisie, pré-remplie avec la suivante.
-2. Glisser-déposer par `django-admin-sortable2`.
-3. Glisser-déposer écrit pour le projet (script maison).
-4. Flèches « monter » et « descendre » par ligne, script maison.
+2. `django-admin-sortable2`, la bibliothèque de référence pour trier les lignes de l'admin.
+3. Un script du projet sur le glisser-déposer natif du navigateur.
+4. Flèches « monter » et « descendre » par ligne.
 
 ## Décision
 
-**`django-admin-sortable2`** (MIT, version 2.3.1) ordonne les lignes de l'écran Projet par
-glisser-déposer :
+**Un script du projet (`content/admin/inline_sort.js`) sur le glisser-déposer natif du
+navigateur**, sans bibliothèque :
 
-- le champ `position` reste en base, caché dans l'écran ; le script de la bibliothèque le réécrit
-  dans l'ordre des lignes, et l'ordre stocké suit (`Meta.ordering`, puis l'ordre de saisie) ;
-- seules les lignes enregistrées se déplacent : une ligne neuve arrive sans position et
-  l'enregistrement la range après les autres, dans l'ordre du formulaire ;
-- le formset du projet garde ses règles et ses messages du catalogue ; il hérite du mélange de la
-  bibliothèque qui cache la position (`CustomInlineFormSetMixin`).
+- chaque ligne, enregistrée ou neuve, porte une poignée que l'admin rend côté serveur, libellé du
+  catalogue ; on fait glisser la ligne par sa poignée, ou on la déplace par les flèches haut et bas
+  quand la poignée a le focus ;
+- le champ `position` reste en base, caché et facultatif dans le formulaire ; à l'envoi, le script
+  le remplit dans l'ordre affiché, pour chaque ligne gardée et remplie ; une ligne neuve restée vide
+  garde sa position vide, pour que Django continue de l'ignorer ;
+- sans le script — désactivé ou en échec —, une ligne neuve arrive sans position et
+  l'enregistrement la range après les autres (`ProjectTechnologyFormSet.save_new`) ;
+- générique : tout tableau en ligne de l'admin dont les lignes portent la poignée s'ordonne ainsi,
+  la galerie de #9 comprise.
 
-La bibliothèque déclare Django 4.2 à 5.2 et prépare 6.0 ; elle ne livre rien de propre à 6.1. Sur
-Django 6.1, son `SortableAdminBase.media` remplace `admin/js/actions.js` par une copie par version
-de Django, absente pour 6.1 (jrief/django-admin-sortable2#442) : l'écran demanderait un fichier
-inexistant, et le stockage à manifeste de la production refuserait la page. L'écran Projet part
-donc des fichiers de l'admin de Django et n'y ajoute que la feuille et le script de tri. Mesuré sur
-Django 6.1.1 : le tri fonctionne sur le gabarit en tableau de Django, l'ordre se réécrit et se
-stocke.
+`django-admin-sortable2` a été essayée puis écartée, sur deux constats lus dans ses sources et
+mesurés sur Django 6.1.1 : son script ne déplace que les lignes enregistrées (poignée posée sur le
+libellé d'une ligne enregistrée, déplacement refusé à côté d'une ligne neuve) ; et sa version 2.3.1
+ne suit pas Django 6.1 — son `SortableAdminBase.media` demande un fichier qui n'existe pas pour
+cette version (jrief/django-admin-sortable2#442), qu'il fallait contourner.
 
 ## Conséquences
 
 **Positives**
 
-- Réordonner une ligne est un seul geste, quelle que soit la longueur de la liste.
-- Aucun script à écrire pour le tri ; #9 réutilise le même mécanisme pour la galerie.
+- Choisir les technologies, les placer, enregistrer : un seul enregistrement, quelle que soit la
+  longueur de la liste.
+- Le tri se fait aussi au clavier.
+- Aucune dépendance ; #9 réutilise le même script pour la galerie.
 
 **Négatives, assumées**
 
-- Une dépendance d'exécution de plus, sous `pip-audit` et Dependabot comme les autres.
-- Un contournement tant que la bibliothèque ne livre pas sa copie pour 6.1 ; un test rougit le
-  jour où elle la livre, pour qu'on le retire.
-- Des types écrits pour le projet (`apps/api/typings/adminsortable2/`) : la bibliothèque n'en
-  publie pas, et pyright strict refuse une base de classe inconnue.
-- Le glisser-déposer se fait à la souris ; le tri au clavier n'existe pas dans l'admin. L'admin n'a
-  qu'un utilisateur, l'auteur.
+- Un script à maintenir (une centaine de lignes, commentées). Le serveur est tenu par les tests ;
+  le geste lui-même ne l'est pas, faute de navigateur dans la suite du back : il se vérifie à
+  l'écran, à chaque changement du script.
+- Le glisser-déposer natif ne fonctionne pas au doigt sur écran tactile ; le clavier reste. L'admin
+  a un seul utilisateur, l'auteur, sur un poste.
 
 ## Comparaison des options
 
-| | Position pré-remplie | `django-admin-sortable2` | Script maison | Flèches |
+| | Position pré-remplie | `django-admin-sortable2` | Script du projet | Flèches |
 |---|---|---|---|---|
-| Déplacer la 8e ligne en 6e | trois positions réécrites | un geste | un geste | deux clics, une ligne à la fois |
-| Code à maintenir | aucun | un contournement et des types, jusqu'au correctif | un script et ses cas limites | un script |
-| Dépendance | aucune | une, maintenue, MIT | aucune | aucune |
-| Réutilisable par #9 | oui | oui | à écrire pour être générique | à écrire pour être générique |
+| Déplacer une ligne neuve avant d'enregistrer | en réécrivant des positions | non | oui | oui, une ligne à la fois |
+| Déplacer la 8e ligne en 6e | trois positions réécrites | un geste | un geste | deux gestes |
+| Clavier | oui | non | oui | oui |
+| Dépendance | aucune | une, sans support de Django 6.1 | aucune | aucune |
+| Code à maintenir | aucun | un contournement et des types | un script | un script |
 
 ## Conditions de réexamen
 
-- Une version de `django-admin-sortable2` livre sa copie d'`actions.js` pour la version de Django
-  en place : retirer le contournement de `ProjectAdmin.media` (le test d'expiration le signale).
-- La bibliothèque cesse d'être maintenue, ou ne suit plus une majeure de Django : revenir à
-  l'option 1, sans perte de données — la colonne `position` ne change pas.
+- L'admin reçoit un second auteur, ou s'utilise sur tablette : le tactile devient un besoin, et une
+  bibliothèque qui le gère (SortableJS) se rediscute.
+- Le script grossit au-delà du tri : le remplacer par une bibliothèque maintenue plutôt que
+  l'étendre.

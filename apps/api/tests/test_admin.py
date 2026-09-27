@@ -4,7 +4,6 @@ import html
 import json
 import re
 
-import django
 import pytest
 from config import strings
 from content.models import Project, ProjectTechnology, Technology, TechnologyKind
@@ -51,8 +50,11 @@ PROJECT_TECHNOLOGY_FIELD_LABELS = {
 # inverse (`BaseInlineFormSet.get_default_prefix`).
 LINES = "projecttechnology_set"
 
-# Le script qui donne à chaque ligne en ligne le même bouton de suppression.
+# Le script qui donne à chaque ligne en ligne le même bouton de suppression, et le script et la
+# feuille qui les ordonnent par glisser-déposer.
 INLINE_DELETE_SCRIPT = "content/admin/inline_delete.js"
+INLINE_SORT_SCRIPT = "content/admin/inline_sort.js"
+INLINE_SORT_STYLE = "content/admin/inline_sort.css"
 
 # Les classes des raccourcis que Django pose à côté d'une liste d'objets liés pour modifier, voir ou
 # supprimer l'objet choisi (`admin/widgets/related_widget_wrapper.html`).
@@ -388,18 +390,25 @@ def test_la_liste_des_projets_montre_titre_type_statut_vitrine_et_publication(
 
 
 @pytest.mark.django_db
-def test_l_ecran_projet_ordonne_ses_technologies_par_glisser_deposer(admin_client: Client) -> None:
-    """Décision 2 amendée (ADR 0013) : la position ne se saisit plus, elle suit l'ordre des lignes
-    que l'auteur fait glisser. Le bloc porte la classe que lit le script de tri, et la position
-    voyage dans un champ caché que ce script réécrit."""
+def test_chaque_ligne_de_technologie_porte_une_poignee_de_tri(admin_client: Client) -> None:
+    """Décision 2 amendée (ADR 0013) : l'auteur fait glisser une ligne, enregistrée ou neuve, par
+    sa poignée — ou la déplace au clavier. La position ne se saisit plus : elle voyage dans un champ
+    caché que le script remplit à l'enregistrement, dans l'ordre affiché. Le glisser lui-même se
+    regarde à l'écran (arrêt visuel) ; ce test tient ce que le serveur en livre."""
     portfolio = saved_project(saved(technology(name="Django")))
 
     response = admin_client.get(reverse("admin:content_project_change", args=[portfolio.pk]))
     page = response.content.decode()
+    lines = response.context["inline_admin_formsets"][0].formset
 
-    assert "sortable" in response.context["inline_admin_formsets"][0].classes.split()
-    assert re.search(rf'<input type="hidden" name="{LINES}-0-position"[^>]*class="_reorder_"', page)
-    assert "adminsortable2/js/adminsortable2" in page
+    handle = f'class="sortable-handle" aria-label="{escape(strings.ADMIN_ROW_MOVE)}"'
+    # Une poignée par ligne, enregistrée ou neuve, plus celle du modèle de ligne que l'admin clone.
+    assert page.count(handle) == len(lines.forms) + 1
+    positions = re.findall(rf'<input type="hidden" name="{LINES}-\d+-position"[^>]*>', page)
+    assert len(positions) == len(lines.forms)
+    assert all('class="sortable-position"' in position for position in positions)
+    for asset in (INLINE_SORT_SCRIPT, INLINE_SORT_STYLE):
+        assert f"{settings.STATIC_URL}{asset}" in page
 
 
 @pytest.mark.django_db
@@ -439,8 +448,9 @@ def test_l_ecran_projet_charge_le_bouton_unique_de_suppression_des_lignes(
 
 @pytest.mark.django_db
 def test_une_ligne_ajoutee_sans_position_se_range_apres_les_autres(admin_client: Client) -> None:
-    """Le script ne réordonne que les lignes enregistrées : une ligne neuve arrive sans position,
-    et l'enregistrement la place après les autres, dans l'ordre du formulaire."""
+    """Sans le script — désactivé, ou en échec —, une ligne neuve arrive sans position :
+    l'enregistrement la range après les autres, dans l'ordre du formulaire, au lieu de refuser un
+    champ que l'auteur ne voit pas."""
     django_, python, react = (
         saved(technology(name=name)) for name in ("Django", "Python", "React")
     )
@@ -478,14 +488,3 @@ def test_chaque_fichier_statique_d_un_ecran_de_l_admin_existe(
 
     assert requested
     assert [path for path in requested if finders.find(path) is None] == []
-
-
-def test_le_contournement_de_la_copie_d_actions_expire_avec_sa_cause() -> None:
-    """`django-admin-sortable2` 2.3.1 remplace `admin/js/actions.js` par sa copie pour la version
-    de Django en cours, absente pour Django 6.1 (jrief/django-admin-sortable2#442) ; l'écran Projet
-    rend donc le fichier de Django (`ProjectAdmin.media`). Ce test rougit le jour où une version de
-    la bibliothèque livre la copie : le contournement est alors à retirer."""
-    major, minor = django.VERSION[:2]
-    copy = f"adminsortable2/js/actions-{major}.{minor}.js"
-
-    assert finders.find(copy) is None

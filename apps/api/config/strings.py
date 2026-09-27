@@ -89,6 +89,10 @@ PROJECT_TECHNOLOGY = "technologie de projet"
 PROJECT_TECHNOLOGIES = "technologies de projet"
 PROJECT_TECHNOLOGY_POSITION = "position"
 
+# Lignes en ligne de l'admin : la colonne et la poignée qui les ordonnent par glisser-déposer
+ADMIN_ROW_ORDER = "ordre"
+ADMIN_ROW_MOVE = "Déplacer la ligne : la faire glisser, ou flèches haut et bas"
+
 # Technologie de projet : refus
 PROJECT_TECHNOLOGY_TAKEN = "Cette technologie figure déjà dans le projet."
 PROJECT_TECHNOLOGIES_MISSING = "Un projet emploie au moins une technologie."
