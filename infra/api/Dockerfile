@@ -61,6 +61,17 @@ RUN uv sync --frozen --no-dev --no-install-workspace
 COPY apps/api apps/api
 RUN uv sync --locked --no-dev
 
+# Les fichiers statiques de l'admin, collectés pour que WhiteNoise les serve (ADR 0014).
+# `collectstatic` charge les réglages, donc `Env.load()` : il reçoit des valeurs factices, le
+# temps de cette seule commande. Le build n'attend aucun secret, et rien de ceci ne reste dans
+# l'image — une variable de `RUN`, pas un `ENV`. Les adresses visent `.invalid`, qui ne se résout
+# nulle part (RFC 2606).
+RUN SECRET_KEY=valeur-factice-du-build-qui-ne-signe-rien-hors-de-cette-commande \
+    ALLOWED_HOSTS='["build.invalid"]' \
+    DATABASE_URL=postgresql://build@base.invalid/build \
+    REDIS_URL=redis://cache.invalid/0 \
+    .venv/bin/python apps/api/manage.py collectstatic --noinput
+
 
 FROM base AS runtime
 
@@ -86,6 +97,9 @@ RUN useradd --system --create-home --shell /usr/sbin/nologin api \
     && mkdir -p /app/media \
     && chown -R api:api /app \
     && chmod +x /usr/local/bin/entrypoint.sh
+
+# Après le `chown` : les fichiers servis restent à `root`, en lecture seule pour l'application.
+COPY --from=build /app/static /app/static
 
 WORKDIR /app/apps/api
 USER api

@@ -12,7 +12,7 @@ sécurité et la CSP (#6), le cache Redis (#11).
 import django_stubs_ext
 
 from config.database import database_settings
-from config.env import Env
+from config.env import REPOSITORY_ROOT, Env
 
 # Rend indexables à l'exécution les classes que django-stubs déclare génériques
 # (`admin.ModelAdmin[Technology]`, `models.CharField[str, str]`) : c'est ce que pyright strict
@@ -40,21 +40,27 @@ ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 
 # L'admin, seul back-office (ADR 0001), et les applications qu'il impose : `auth`,
-# `contenttypes`, `sessions`, `messages`. `staticfiles` sert son CSS en développement. `content`
-# porte le contenu du portfolio.
+# `contenttypes`, `sessions`, `messages`. `staticfiles` collecte ses fichiers statiques, que
+# WhiteNoise sert (ADR 0014) — en développement aussi : `runserver_nostatic`, placé avant lui,
+# retire ce service au `runserver` de Django. `content` porte le contenu du portfolio.
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "whitenoise.runserver_nostatic",
     "django.contrib.staticfiles",
     "content",
 ]
 
-# Les trois que l'admin exige (contrôles `admin.E408` à `admin.E410`), plus CSRF (cadrage §6.6) :
-# l'admin protège déjà ses propres vues, le middleware étend la protection à toute autre vue.
+# WhiteNoise en tête : une requête de fichier statique s'arrête là, sans ouvrir de session. Le
+# `SecurityMiddleware` de #6 viendra juste devant lui (doc WhiteNoise, « Enable WhiteNoise »).
+# Puis les trois que l'admin exige (contrôles `admin.E408` à `admin.E410`), plus CSRF (cadrage
+# §6.6) : l'admin protège déjà ses propres vues, le middleware étend la protection à toute autre
+# vue.
 MIDDLEWARE = [
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -80,6 +86,17 @@ TEMPLATES = [
 
 # Exigé par `staticfiles`, qui refuse de démarrer sans lui : le défaut de Django est `None`.
 STATIC_URL = "static/"
+
+# Les fichiers statiques sont collectés au build de l'image (`/app/static`), jamais sur le poste,
+# où WhiteNoise les lit à la source (ADR 0014). Le stockage ajoute à chaque nom l'empreinte de son
+# contenu et en garde une copie compressée : le navigateur conserve un fichier indéfiniment, et
+# une nouvelle version change de nom. Il refuse aussi de rendre une page qui cite un fichier absent
+# de la collecte. `default` reste celui de Django : les fichiers téléversés, sous `MEDIA_ROOT`.
+STATIC_ROOT = REPOSITORY_ROOT / "static"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}
 
 # Contenu en français seulement, sans plomberie multilingue (cadrage §3) : `LANGUAGE_CODE`
 # traduit les écrans et messages propres à Django. Heure de Paris : le défaut de Django est

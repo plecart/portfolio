@@ -15,7 +15,9 @@ from pathlib import Path
 
 import pytest
 import yaml
+from config.env import Env
 from containers import POSTGRES_IMAGE
+from test_supply_chain import dockerfile_instructions
 
 # `test_infra.py` → `tests` → `api` → `apps` → racine du dépôt.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -36,6 +38,12 @@ COMPOSE_IMAGE = re.compile(r"^\s*image: \$\{API_IMAGE:-(?P<name>[^}]+)\}$", re.M
 # capture toutes : un seul étage qui dériverait suffirait à faire tourner l'application sur une
 # version que le dépôt n'épingle nulle part.
 BASE_IMAGE_VERSION = re.compile(r"^FROM python:(\d+\.\d+)[.-]", re.MULTILINE)
+
+# Les variables que lit le back : un `ARG` qui en nommerait une la réclamerait au build, un `ENV`
+# la figerait dans l'image. Un montage de secret, lui, en réclamerait une quelle qu'elle soit.
+ENV_FIELDS = re.compile(rf"\b(?:{'|'.join(Env.model_fields)})\b")
+BUILD_DECLARATION = re.compile(r"^\s*(?:ARG|ENV)\b", re.IGNORECASE)
+SECRET_MOUNT = "--mount=type=secret"
 
 # La dernière instruction du point d'entrée, mot pour mot. Sans `exec`, le shell reste PID 1 :
 # `docker stop` ne l'atteint jamais et le serveur est tué au bout du délai de grâce.
@@ -164,6 +172,23 @@ def test_la_cible_build_produit_une_commande_complete() -> None:
     assert "docker buildx build" in printed, "`docker build` ignorerait le builder sélectionné"
     assert tag, "la commande de build ne porte plus d'étiquette `-t`"
     assert tag.group("name") == declared.group("name")
+
+
+def test_le_build_de_l_image_ne_demande_aucun_secret() -> None:
+    """Le build n'attend aucun secret : le job `infra` construit l'image sans en avoir aucun.
+
+    `collectstatic` charge pourtant les réglages, donc `Env.load()` (ADR 0014) : ses valeurs
+    factices vivent sur sa ligne de `RUN`. Un `ARG` qui nommerait une variable d'`Env` la
+    réclamerait à la commande de build, un montage de secret aussi ; un `ENV` la figerait dans
+    l'image, lisible par `docker inspect`.
+    """
+    instructions = [
+        whole for _, whole in dockerfile_instructions(DOCKERFILE.read_text(encoding="utf-8"))
+    ]
+
+    assert instructions, "aucune instruction lue — le Dockerfile a-t-il changé de forme ?"
+    assert [i for i in instructions if BUILD_DECLARATION.match(i) and ENV_FIELDS.search(i)] == []
+    assert [i for i in instructions if SECRET_MOUNT in i] == []
 
 
 def test_le_point_d_entree_cede_la_place_a_la_commande() -> None:
