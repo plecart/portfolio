@@ -6,6 +6,7 @@ les positions dans l'ordre affiché à l'enregistrement — et remet les index l
 replace les lignes dans cet ordre quand l'écran revient en erreur, et donne à toute ligne le même
 bouton de suppression. On manipule les lignes — ajouter, retirer, déplacer —, puis on enregistre
 une fois.
+
 Le script et sa feuille valent pour tout tableau en ligne de l'écran qui les charge, ordonnable ou
 non : bouton unique de suppression et libellé des lignes enregistrées retiré compris.
 
@@ -74,6 +75,16 @@ class SortableFormSet[ChildT: Model, ParentT: Model](
     """Les lignes d'un tableau en ligne ordonné. Une ligne arrivée sans position, champ caché que
     l'auteur ne voit pas, en reçoit une au lieu d'échouer en base."""
 
+    def get_form_kwargs(self, index: int | None) -> dict[str, Any]:
+        """Toute ligne neuve peut rester vide, la première comprise : Django exige sinon les
+        `min_num` premières (`BaseFormSet._construct_form`), quelle que soit la ligne que l'auteur a
+        remplie ou placée en tête. Quand `validate_min` compte les lignes remplies, le minimum reste
+        tenu."""
+        kwargs = super().get_form_kwargs(index)
+        if self.validate_min and index is not None and index >= self.initial_form_count():
+            kwargs["empty_permitted"] = True
+        return kwargs
+
     def validate_unique(self) -> None:
         """Les unicités qui lisent le parent, entre les lignes gardées (Django) et avec les lignes
         du parent que l'envoi ne porte pas : enregistrées ailleurs depuis l'ouverture de l'écran —
@@ -122,7 +133,9 @@ class SortableInline[ChildT: Model, ParentT: Model](admin.TabularInline[ChildT, 
 
     Ses `fields` commencent par `move`, la poignée, et contiennent `position`, qui y est caché. Un
     formset propre à l'écran hérite de `SortableFormSet` ; des `readonly_fields` propres gardent
-    `move`, sans quoi Django le cherche parmi les champs du modèle.
+    `move`, sans quoi Django le cherche parmi les champs du modèle. Une unicité du modèle qui lit
+    le parent y est différée (`Deferrable.DEFERRED`, voir `InlineRowForm`) : sinon, un échange
+    entre deux lignes enregistrées lèverait une erreur de base.
     """
 
     form = InlineRowForm

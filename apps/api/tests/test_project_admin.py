@@ -195,15 +195,18 @@ def test_l_admin_reordonne_les_technologies_enregistrees(admin_client: Client) -
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     "lines",
-    [{}, {f"{LINES}-TOTAL_FORMS": 0}],
-    ids=["lignes laissées vides", "aucune ligne envoyée"],
+    [
+        {},
+        {f"{LINES}-{index}-position": index + 1 for index in range(4)},
+        {f"{LINES}-TOTAL_FORMS": 0},
+    ],
+    ids=["lignes laissées vides", "lignes vides numérotées par le script", "aucune ligne envoyée"],
 )
 def test_l_admin_refuse_un_projet_sans_technologie(
     admin_client: Client, lines: dict[str, object]
 ) -> None:
     """Seule règle hors base (décision 10) : l'écran la tient, avec le message du catalogue — même
-    quand le formulaire n'envoie aucune ligne, ce que la ligne obligatoire seule laisserait
-    passer."""
+    quand le script a numéroté les lignes vides, ou que le formulaire n'envoie aucune ligne."""
     url = reverse("admin:content_project_add")
 
     refusals = refused_lines(admin_client, url, new_project_data(admin_client, **lines))
@@ -469,14 +472,23 @@ def test_l_ecran_projet_livre_au_script_les_prises_qu_il_lit(admin_client: Clien
     """`inline_rows.js` n'a pas de test de navigateur (ADR 0013) : ce test en tient la part
     serveur. Le script lit les classes que `content/inlines.py` pose, et ce que rend le gabarit de
     Django (`admin/edit_inline/tabular.html`), qu'une montée de version peut déplacer : les options
-    du tableau — préfixe, libellé du bouton de suppression —, les lignes enregistrées, et leur case
-    de suppression, qui revient cochée quand l'écran revient en erreur."""
-    portfolio = saved_project(saved(technology(name="Django")))
+    du tableau — préfixe, libellé du bouton de suppression —, son bloc, sa ligne modèle, les lignes
+    enregistrées, la rangée des refus d'une ligne, et la case de suppression, qui revient cochée
+    quand l'écran revient en erreur."""
+    django = saved(technology(name="Django"))
+    portfolio = saved_project(django)
     url = reverse("admin:content_project_change", args=[portfolio.pk])
     found = finders.find(INLINE_ROWS_SCRIPT)
     assert isinstance(found, str)
-    script = Path(found).read_text(encoding="utf-8")
-    refused = rendered_data(admin_client, url) | {"title": "", f"{LINES}-0-DELETE": "on"}
+    # Le code seul : une prise que seul un commentaire nomme encore ne tient rien.
+    source = Path(found).read_text(encoding="utf-8")
+    script = re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.DOTALL)
+    refused = rendered_data(admin_client, url) | {
+        "title": "",
+        f"{LINES}-0-DELETE": "on",
+        **line(1, django, 1),
+        **line(2, django, 2),
+    }
 
     page = admin_client.post(url, refused).content.decode()
 
@@ -487,8 +499,11 @@ def test_l_ecran_projet_livre_au_script_les_prises_qu_il_lit(admin_client: Clien
         "tr.empty-form",
         "has_original",
         "row-form-errors",
+        ".inline-group",
         "td.delete input[type=checkbox]",
         ".js-inline-admin-formset",
+        "dataset.inlineFormset",
+        "deleteText",
     ):
         assert hook in script
     declaration = re.search(
@@ -497,7 +512,10 @@ def test_l_ecran_projet_livre_au_script_les_prises_qu_il_lit(admin_client: Clien
     assert declaration is not None
     options = json.loads(html.unescape(declaration.group(1)))["options"]
     assert (options["prefix"], options["deleteText"]) == (LINES, gettext("Remove"))
+    assert 'class="js-inline-admin-formset inline-group"' in page
     assert '<tr class="form-row has_original"' in page
+    assert re.search(rf'<tr class="form-row\s+empty-form"\s+id="{LINES}-empty"', page)
+    assert '<tr class="row-form-errors">' in page
     deleted = rf'<td class="delete"><input type="checkbox" name="{LINES}-0-DELETE"[^>]*checked'
     assert re.search(deleted, page)
 
@@ -521,6 +539,22 @@ def test_une_ligne_neuve_dont_seule_la_position_est_remplie_est_ignoree(
 
 
 @pytest.mark.django_db
+def test_une_ligne_vide_affichee_en_tete_de_l_ecran_d_ajout_est_ignoree(
+    admin_client: Client,
+) -> None:
+    """Django exige les `min_num` premières lignes neuves, quelle que soit celle que l'auteur a
+    remplie : une ligne vide glissée en tête serait refusée. « Au moins une technologie » se compte
+    sur les lignes remplies (`validate_min`), et toute ligne neuve vide est ignorée."""
+    django = saved(technology(name="Django"))
+    data = new_project_data(admin_client, **{f"{LINES}-0-position": 1}, **line(1, django, 2))
+
+    response = admin_client.post(reverse("admin:content_project_add"), data)
+
+    assert response.status_code == 302
+    assert [link.technology for link in ProjectTechnology.objects.all()] == [django]
+
+
+@pytest.mark.django_db
 def test_une_ligne_enregistree_arrivee_sans_position_garde_la_sienne(admin_client: Client) -> None:
     """La position est facultative dans le formulaire : un envoi qui la vide pour une ligne
     enregistrée — ni l'écran ni le script n'en produisent — garde la position stockée au lieu
@@ -529,10 +563,9 @@ def test_une_ligne_enregistree_arrivee_sans_position_garde_la_sienne(admin_clien
     portfolio = saved_project(django)
     saved(ProjectTechnology(project=portfolio, technology=python, position=2))
     url = reverse("admin:content_project_change", args=[portfolio.pk])
+    blanked = {f"{LINES}-0-position": "", f"{LINES}-1-position": ""}
 
-    response = admin_client.post(
-        url, rendered_data(admin_client, url) | {f"{LINES}-0-position": ""}
-    )
+    response = admin_client.post(url, rendered_data(admin_client, url) | blanked)
 
     assert response.status_code == 302
     stored = ProjectTechnology.objects.filter(project=portfolio)
