@@ -86,8 +86,8 @@ def test_l_epingle_de_ryuk_suit_l_image_que_testcontainers_attend() -> None:
 
 def test_sans_reglages_chaque_test_echoue(tmp_path: Path) -> None:
     """Sans réglages, pytest-django **saute** les tests qui en ont besoin (« no Django settings ») :
-    une configuration perdue laisserait la suite verte sans l'avoir vérifiée. La fixture
-    automatique `media_root` fait échouer chaque test à la place.
+    une configuration perdue laisserait la suite verte sans l'avoir vérifiée. Les fixtures
+    automatiques de `conftest.py` font échouer chaque test à la place (`require_settings`).
 
     Les réglages se perdent quand le greffon `process_environment` n'est pas chargé, et que le
     shell ne pose pas `DJANGO_SETTINGS_MODULE` : `-o addopts=` retire le `-p` de `pyproject.toml`.

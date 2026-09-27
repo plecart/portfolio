@@ -10,8 +10,8 @@ import pytest
 from config import strings
 from content.inlines import HANDLE_CLASS, POSITION_CLASS
 from content.models import Project, ProjectTechnology, Technology
-from django.conf import settings
 from django.contrib.staticfiles import finders
+from django.templatetags.static import static
 from django.test import Client
 from django.urls import reverse
 from django.utils.html import escape
@@ -458,7 +458,7 @@ def test_chaque_ligne_de_technologie_porte_une_poignee_de_tri(admin_client: Clie
     assert len(positions) == len(lines.forms)
     assert all('class="sortable-position"' in position for position in positions)
     for asset in (INLINE_ROWS_SCRIPT, INLINE_ROWS_STYLE):
-        assert f"{settings.STATIC_URL}{asset}" in page
+        assert static(asset) in page
 
 
 @pytest.mark.django_db
@@ -493,7 +493,7 @@ def test_l_ecran_projet_charge_le_bouton_unique_de_suppression_des_lignes(
     ).content.decode()
 
     assert f'name="{LINES}-0-DELETE"' in page
-    assert f"{settings.STATIC_URL}{INLINE_ROWS_SCRIPT}" in page
+    assert static(INLINE_ROWS_SCRIPT) in page
 
 
 @pytest.mark.django_db

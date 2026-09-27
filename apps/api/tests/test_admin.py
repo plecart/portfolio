@@ -7,7 +7,7 @@ import pytest
 from config import strings
 from content.models import ProjectTechnology, Technology, TechnologyKind
 from django.conf import settings
-from django.contrib.staticfiles import finders
+from django.contrib.staticfiles.storage import staticfiles_storage
 from django.test import Client
 from django.urls import reverse
 from django.utils.html import escape
@@ -141,12 +141,12 @@ def test_chaque_fichier_statique_d_un_ecran_de_l_admin_existe(
     admin_client: Client, screen: str
 ) -> None:
     """Un script ou une feuille de style introuvable laisse l'écran sans son comportement, sans
-    erreur visible en développement ; en production, un stockage à manifeste — choix que #15
-    tranchera — refuserait de rendre la page. Chaque fichier que l'écran demande doit exister parmi
-    les fichiers statiques."""
+    erreur visible en développement ; en production, le stockage à manifeste (ADR 0014) refuse de
+    rendre la page. Chaque fichier que l'écran demande — sous son nom versionné — doit exister
+    parmi les fichiers collectés, ceux que WhiteNoise sert."""
     page = admin_client.get(reverse(screen)).content.decode()
 
     requested = re.findall(rf'(?:src|href)="{re.escape(settings.STATIC_URL)}([^"]+)"', page)
 
     assert requested
-    assert [path for path in requested if finders.find(path) is None] == []
+    assert [path for path in requested if not staticfiles_storage.exists(path)] == []
