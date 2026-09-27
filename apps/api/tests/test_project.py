@@ -278,7 +278,7 @@ def test_un_projet_porte_les_champs_du_prd_et_aucun_champ_en_ligne() -> None:
 
 def test_les_valeurs_du_type_et_du_statut_sont_celles_que_l_api_expose() -> None:
     """Les valeurs stockées sont un contrat : l'API les expose telles quelles (ADR 0010), et le
-    glossaire les nomme. Leurs libellés, eux, sont tenus par l'écran (`test_admin.py`)."""
+    glossaire les nomme. Leurs libellés, eux, sont tenus par l'écran (`test_project_admin.py`)."""
     assert ProjectKind.values == ["personal", "professional", "school"]
     assert ProjectStatus.values == ["ongoing", "finished", "archived"]
 

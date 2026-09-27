@@ -4,11 +4,14 @@ glisser-déposer, supprimées par un seul bouton —, et les refus qu'il affiche
 import html
 import json
 import re
+from pathlib import Path
 
 import pytest
 from config import strings
+from content.inlines import HANDLE_CLASS, POSITION_CLASS
 from content.models import Project, ProjectTechnology, Technology
 from django.conf import settings
+from django.contrib.staticfiles import finders
 from django.test import Client
 from django.urls import reverse
 from django.utils.html import escape
@@ -113,9 +116,9 @@ def test_l_ecran_projet_affiche_les_libelles_du_catalogue(admin_client: Client) 
     lines = response.context["inline_admin_formsets"][0]
     page = response.content.decode()
 
-    assert {name: field.label for name, field in form.fields.items()} == {
-        name: capfirst(label) for name, label in PROJECT_FIELD_LABELS.items()
-    }
+    assert [(name, field.label) for name, field in form.fields.items()] == [
+        (name, capfirst(label)) for name, label in PROJECT_FIELD_LABELS.items()
+    ]
     assert [label for value, label in form.fields["kind"].choices if value] == [
         strings.PROJECT_KIND_PERSONAL,
         strings.PROJECT_KIND_PROFESSIONAL,
@@ -131,6 +134,7 @@ def test_l_ecran_projet_affiche_les_libelles_du_catalogue(admin_client: Client) 
     } == {name: capfirst(label) for name, label in PROJECT_TECHNOLOGY_FIELD_LABELS.items()}
     assert f"<h1>{escape(gettext('Add %s') % strings.PROJECT)}</h1>" in page
     assert escape(capfirst(strings.PROJECT_TECHNOLOGIES)) in page
+    assert f'<th class="column-move">{escape(capfirst(strings.ADMIN_ROW_ORDER))}' in page
 
 
 @pytest.mark.django_db
@@ -169,6 +173,23 @@ def test_l_admin_enregistre_un_projet_et_reaffiche_ses_technologies_dans_l_ordre
         for form in response.context["inline_admin_formsets"][0].formset.initial_forms
     ]
     assert shown == [python, django]
+
+
+@pytest.mark.django_db
+def test_l_admin_reordonne_les_technologies_enregistrees(admin_client: Client) -> None:
+    """Le geste principal (ADR 0013) : déplacer une ligne enregistrée. Le script renumérote les
+    positions cachées dans l'ordre affiché ; l'enregistrement les stocke telles quelles."""
+    django, python = saved(technology(name="Django")), saved(technology(name="Python"))
+    portfolio = saved_project(django)
+    saved(ProjectTechnology(project=portfolio, technology=python, position=2))
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
+    data = rendered_data(admin_client, url) | {f"{LINES}-0-position": 2, f"{LINES}-1-position": 1}
+
+    response = admin_client.post(url, data)
+
+    assert response.status_code == 302
+    stored = ProjectTechnology.objects.filter(project=portfolio)
+    assert [link.technology for link in stored] == [python, django]
 
 
 @pytest.mark.django_db
@@ -212,22 +233,22 @@ def test_l_admin_accepte_une_technologie_retiree_puis_rajoutee_avant_l_enregistr
     """On manipule les lignes, puis on enregistre une fois : une technologie retirée puis
     rajoutée dans le même envoi n'est pas un doublon. La ligne retirée existe encore en base
     jusqu'à l'enregistrement ; l'unicité se juge entre les lignes gardées, pas contre elle."""
-    django_, python = saved(technology(name="Django")), saved(technology(name="Python"))
-    portfolio = saved_project(django_)
+    django, python = saved(technology(name="Django")), saved(technology(name="Python"))
+    portfolio = saved_project(django)
     saved(ProjectTechnology(project=portfolio, technology=python, position=2))
     url = reverse("admin:content_project_change", args=[portfolio.pk])
     data = rendered_data(admin_client, url) | {
         f"{LINES}-0-DELETE": "on",
         f"{LINES}-1-DELETE": "on",
         **line(2, python, 1),
-        **line(3, django_, 2),
+        **line(3, django, 2),
     }
 
     response = admin_client.post(url, data)
 
     assert response.status_code == 302
     stored = ProjectTechnology.objects.filter(project=portfolio)
-    assert [link.technology for link in stored] == [python, django_]
+    assert [link.technology for link in stored] == [python, django]
 
 
 @pytest.mark.django_db
@@ -263,10 +284,10 @@ def test_l_admin_refuse_une_technologie_gardee_rajoutee_une_seconde_fois(
 ) -> None:
     """Le formset compare chaque ligne neuve aux lignes enregistrées qu'il garde : c'est lui, et
     non plus un contrôle ligne par ligne contre la base, qui refuse le doublon."""
-    django_ = saved(technology(name="Django"))
-    portfolio = saved_project(django_)
+    django = saved(technology(name="Django"))
+    portfolio = saved_project(django)
     url = reverse("admin:content_project_change", args=[portfolio.pk])
-    data = rendered_data(admin_client, url) | line(1, django_, 2)
+    data = rendered_data(admin_client, url) | line(1, django, 2)
 
     assert refused_lines(admin_client, url, data) == [strings.PROJECT_TECHNOLOGY_TAKEN]
     assert ProjectTechnology.objects.filter(project=portfolio).count() == 1
@@ -399,6 +420,44 @@ def test_l_ecran_projet_charge_le_bouton_unique_de_suppression_des_lignes(
 
 
 @pytest.mark.django_db
+def test_l_ecran_projet_livre_au_script_les_prises_qu_il_lit(admin_client: Client) -> None:
+    """`inline_rows.js` n'a pas de test de navigateur (ADR 0013) : ce test en tient la part
+    serveur. Le script lit les classes que `content/inlines.py` pose, et ce que rend le gabarit de
+    Django (`admin/edit_inline/tabular.html`), qu'une montée de version peut déplacer : les options
+    du tableau — préfixe, libellé du bouton de suppression —, les lignes enregistrées, et leur case
+    de suppression, qui revient cochée quand l'écran revient en erreur."""
+    portfolio = saved_project(saved(technology(name="Django")))
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
+    found = finders.find(INLINE_ROWS_SCRIPT)
+    assert isinstance(found, str)
+    script = Path(found).read_text(encoding="utf-8")
+    refused = rendered_data(admin_client, url) | {"title": "", f"{LINES}-0-DELETE": "on"}
+
+    page = admin_client.post(url, refused).content.decode()
+
+    for hook in (
+        f".{HANDLE_CLASS}",
+        f"input.{POSITION_CLASS}",
+        "tr.form-row",
+        "tr.empty-form",
+        "has_original",
+        "row-form-errors",
+        "td.delete input[type=checkbox]",
+        ".js-inline-admin-formset",
+    ):
+        assert hook in script
+    declaration = re.search(
+        r'class="js-inline-admin-formset[^>]*data-inline-formset="([^"]*)"', page
+    )
+    assert declaration is not None
+    options = json.loads(html.unescape(declaration.group(1)))["options"]
+    assert (options["prefix"], options["deleteText"]) == (LINES, gettext("Remove"))
+    assert '<tr class="form-row has_original"' in page
+    deleted = rf'<td class="delete"><input type="checkbox" name="{LINES}-0-DELETE"[^>]*checked'
+    assert re.search(deleted, page)
+
+
+@pytest.mark.django_db
 def test_une_ligne_neuve_dont_seule_la_position_est_remplie_est_ignoree(
     admin_client: Client,
 ) -> None:
@@ -417,14 +476,31 @@ def test_une_ligne_neuve_dont_seule_la_position_est_remplie_est_ignoree(
 
 
 @pytest.mark.django_db
+def test_une_ligne_enregistree_arrivee_sans_position_garde_la_sienne(admin_client: Client) -> None:
+    """La position est facultative dans le formulaire : un envoi qui la vide pour une ligne
+    enregistrée — ni l'écran ni le script n'en produisent — garde la position stockée au lieu
+    d'échouer en base."""
+    django, python = saved(technology(name="Django")), saved(technology(name="Python"))
+    portfolio = saved_project(django)
+    saved(ProjectTechnology(project=portfolio, technology=python, position=2))
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
+
+    response = admin_client.post(
+        url, rendered_data(admin_client, url) | {f"{LINES}-0-position": ""}
+    )
+
+    assert response.status_code == 302
+    stored = ProjectTechnology.objects.filter(project=portfolio)
+    assert [(link.technology, link.position) for link in stored] == [(django, 1), (python, 2)]
+
+
+@pytest.mark.django_db
 def test_une_ligne_ajoutee_sans_position_se_range_apres_les_autres(admin_client: Client) -> None:
     """Sans le script — désactivé, ou en échec —, une ligne neuve arrive sans position :
     l'enregistrement la range après les autres, dans l'ordre du formulaire, au lieu de refuser un
     champ que l'auteur ne voit pas."""
-    django_, python, react = (
-        saved(technology(name=name)) for name in ("Django", "Python", "React")
-    )
-    portfolio = saved_project(django_)
+    django, python, react = (saved(technology(name=name)) for name in ("Django", "Python", "React"))
+    portfolio = saved_project(django)
     url = reverse("admin:content_project_change", args=[portfolio.pk])
     new_lines = {
         f"{LINES}-1-technology": python.pk,
@@ -438,7 +514,7 @@ def test_une_ligne_ajoutee_sans_position_se_range_apres_les_autres(admin_client:
     assert response.status_code == 302
     stored = ProjectTechnology.objects.filter(project=portfolio)
     assert [(link.technology, link.position) for link in stored] == [
-        (django_, 1),
+        (django, 1),
         (python, 2),
         (react, 3),
     ]

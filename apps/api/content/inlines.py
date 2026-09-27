@@ -2,8 +2,12 @@
 
 Un tableau en ligne hérite de `SortableInline`, et son modèle porte un entier `position` : chaque
 ligne, enregistrée ou neuve, reçoit une poignée ; `inline_rows.js` réordonne les lignes, remplit
-les positions dans l'ordre affiché à l'enregistrement et donne à toute ligne le même bouton de
-suppression. On manipule les lignes — ajouter, retirer, déplacer —, puis on enregistre une fois.
+les positions dans l'ordre affiché à l'enregistrement — et remet les index là où Django les lit —,
+replace les lignes dans cet ordre quand l'écran revient en erreur, et donne à toute ligne le même
+bouton de suppression. On manipule les lignes — ajouter, retirer, déplacer —, puis on enregistre
+une fois.
+Le script et sa feuille valent pour tout tableau en ligne de l'écran qui les charge, ordonnable ou
+non : bouton unique de suppression et libellé des lignes enregistrées retiré compris.
 
 Les technologies d'un projet s'en servent ; la galerie de #9 s'en servira.
 """
@@ -66,27 +70,32 @@ class InlineRowForm[ChildT: Model](ModelForm[ChildT]):
 class SortableFormSet[ChildT: Model, ParentT: Model](
     BaseInlineFormSet[ChildT, ParentT, ModelForm[ChildT]]
 ):
-    """Les lignes d'un tableau en ligne ordonné."""
+    """Les lignes d'un tableau en ligne ordonné. Une ligne arrivée sans position, champ caché que
+    l'auteur ne voit pas, en reçoit une au lieu d'échouer en base."""
 
     def save_new(self, form: ModelForm[ChildT], commit: bool = True) -> ChildT:
         """Enregistre une ligne neuve. Sans position — le script qui la remplit n'a pas tourné —,
-        elle se range après les autres lignes du parent, au lieu d'échouer sur un champ que l'auteur
-        ne voit pas."""
-        row = super().save_new(form, commit=False)
+        elle se range après les autres lignes du parent."""
         if form.cleaned_data.get(POSITION) is None:
-            siblings = type(row)._default_manager.filter(**{self.fk.name: self.instance})
+            siblings = type(form.instance)._default_manager.filter(**{self.fk.name: self.instance})
             last = siblings.aggregate(last=Max(POSITION))["last"]
-            setattr(row, POSITION, (last or 0) + 1)
-        if commit:
-            row.save()
-        return row
+            setattr(form.instance, POSITION, (last or 0) + 1)
+        return super().save_new(form, commit=commit)
+
+    def save_existing(self, form: ModelForm[ChildT], obj: ChildT, commit: bool = True) -> ChildT:
+        """Enregistre une ligne enregistrée. Sans position — un envoi que ni l'écran ni le script ne
+        produisent —, elle garde la sienne."""
+        if form.cleaned_data.get(POSITION) is None:
+            setattr(obj, POSITION, form.initial[POSITION])
+        return super().save_existing(form, obj, commit=commit)
 
 
 class SortableInline[ChildT: Model, ParentT: Model](admin.TabularInline[ChildT, ParentT]):
     """Un tableau en ligne dont les lignes s'ordonnent par glisser-déposer, ou au clavier.
 
     Ses `fields` commencent par `move`, la poignée, et contiennent `position`, qui y est caché. Un
-    formset propre à l'écran hérite de `SortableFormSet`.
+    formset propre à l'écran hérite de `SortableFormSet` ; des `readonly_fields` propres gardent
+    `move`, sans quoi Django le cherche parmi les champs du modèle.
     """
 
     form = InlineRowForm
@@ -111,8 +120,9 @@ class SortableInline[ChildT: Model, ParentT: Model](admin.TabularInline[ChildT, 
     def formfield_for_dbfield(
         self, db_field: Field[Any, Any], request: HttpRequest, **kwargs: Any
     ) -> FormField | None:
-        """La position, cachée et facultative : `inline_rows.js` la remplit dans l'ordre affiché, et
-        une ligne arrivée sans elle se range après les autres (`SortableFormSet.save_new`)."""
+        """La position, cachée et facultative : `inline_rows.js` la remplit dans l'ordre affiché ;
+        une ligne neuve arrivée sans elle se range après les autres, une ligne enregistrée garde la
+        sienne (`SortableFormSet`)."""
         formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
         if formfield is not None and db_field.name == POSITION:
             formfield.widget = HiddenInput(attrs={"class": POSITION_CLASS})

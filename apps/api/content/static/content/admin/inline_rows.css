@@ -24,7 +24,8 @@
 /*
  * Le libellé qu'une ligne enregistrée porte au-dessus d'elle (« Projet · Technologie »,
  * `admin/edit_inline/tabular.html`) : les champs de la ligne le disent déjà. Retiré, avec l'espace
- * que l'admin lui réserve (`admin/css/forms.css`) : lignes enregistrées et neuves se ressemblent.
+ * que l'admin lui réserve (`admin/css/forms.css`, 2em) : les cellules reprennent le retrait commun
+ * de l'admin (`admin/css/base.css`, 8px), et lignes enregistrées et neuves se ressemblent.
  */
 .inline-group .tabular td.original p {
     display: none;

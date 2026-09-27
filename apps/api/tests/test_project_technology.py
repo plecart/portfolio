@@ -68,8 +68,8 @@ def test_la_base_refuse_une_technologie_de_projet_sans_position(portfolio: Proje
 
 @pytest.mark.django_db
 def test_une_position_n_est_jamais_negative(portfolio: Project) -> None:
-    """Un entier positif (glossaire) : le champ refuse une position négative, et la base aussi,
-    par la contrainte que Django pose sur un champ positif."""
+    """Un entier de 0 à 32 767 (glossaire) : le champ refuse une position négative, et la base
+    aussi, par la contrainte que Django pose sur un champ positif."""
     negative = ProjectTechnology(
         project=portfolio, technology=saved_technology("Django"), position=-1
     )

@@ -141,8 +141,9 @@ def test_chaque_fichier_statique_d_un_ecran_de_l_admin_existe(
     admin_client: Client, screen: str
 ) -> None:
     """Un script ou une feuille de style introuvable laisse l'écran sans son comportement, sans
-    erreur visible en développement ; en production, le stockage à manifeste refuse de rendre la
-    page. Chaque fichier que l'écran demande doit exister parmi les fichiers statiques."""
+    erreur visible en développement ; en production, un stockage à manifeste — choix que #15
+    tranchera — refuserait de rendre la page. Chaque fichier que l'écran demande doit exister parmi
+    les fichiers statiques."""
     page = admin_client.get(reverse(screen)).content.decode()
 
     requested = re.findall(rf'(?:src|href)="{re.escape(settings.STATIC_URL)}([^"]+)"', page)
