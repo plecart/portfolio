@@ -150,7 +150,7 @@ class ProjectTechnologyInline(admin.TabularInline[ProjectTechnology, Project]):
 
     class Media:
         # Le tri par glisser-déposer, et le même bouton de suppression pour toutes les lignes.
-        css: ClassVar[dict[str, tuple[str, ...]]] = {"all": ("content/admin/inline_sort.css",)}
+        css: ClassVar[dict[str, tuple[str, ...]]] = {"all": ("content/admin/inline_rows.css",)}
         js = ("content/admin/inline_sort.js", "content/admin/inline_delete.js")
 
     @admin.display(description=strings.ADMIN_ROW_ORDER)
