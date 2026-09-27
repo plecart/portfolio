@@ -322,6 +322,28 @@ def test_l_admin_refuse_une_technologie_enregistree_depuis_l_ouverture_de_l_ecra
 
 
 @pytest.mark.django_db
+def test_une_ligne_supprimee_ailleurs_depuis_l_ouverture_de_l_ecran_ne_bloque_pas_l_envoi(
+    admin_client: Client,
+) -> None:
+    """Un second onglet supprime une ligne après l'ouverture de l'écran : l'envoi la porte encore.
+    Django la saute à l'enregistrement (`BaseModelFormSet.save_existing_objects`), mais sa clé,
+    introuvable, refusait l'envoi sans message visible, en boucle : elle compte comme supprimée,
+    et le reste de l'envoi s'enregistre."""
+    django, react, vue = (saved(technology(name=name)) for name in ("Django", "React", "Vue"))
+    portfolio = saved_project(django)
+    gone = saved(ProjectTechnology(project=portfolio, technology=react, position=2))
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
+    data = rendered_data(admin_client, url) | line(2, vue, 3)
+    gone.delete()
+
+    response = admin_client.post(url, data)
+
+    assert response.status_code == 302
+    stored = ProjectTechnology.objects.filter(project=portfolio)
+    assert [link.technology for link in stored] == [django, vue]
+
+
+@pytest.mark.django_db
 def test_une_ligne_supprimee_ne_doublonne_pas_une_ligne_enregistree_depuis_l_ouverture(
     admin_client: Client,
 ) -> None:

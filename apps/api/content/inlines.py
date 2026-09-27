@@ -21,6 +21,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Field, Max, Model
 from django.forms import BaseInlineFormSet, HiddenInput, ModelForm
 from django.forms import Field as FormField
+from django.forms.formsets import DELETION_FIELD_NAME
 from django.forms.models import InlineForeignKeyField
 from django.http import HttpRequest
 from django.utils.html import format_html
@@ -84,6 +85,15 @@ class SortableFormSet[ChildT: Model, ParentT: Model](
         if self.validate_min and index is not None and index >= self.initial_form_count():
             kwargs["empty_permitted"] = True
         return kwargs
+
+    def _should_delete_form(self, form: ModelForm[ChildT]) -> bool:
+        """Une ligne enregistrée dont l'objet a disparu depuis l'ouverture de l'écran — supprimé
+        dans un second onglet — compte comme supprimée. Django la saute déjà à l'enregistrement
+        (`BaseModelFormSet.save_existing_objects`), mais sa clé, introuvable, refusait sinon tout
+        l'envoi, sans message visible : l'admin ne rend pas une ligne sans objet
+        (`InlineAdminFormSet.__iter__`). Sinon, la règle de Django : la case « Supprimer ? »."""
+        vanished = form in self.initial_forms and form.instance.pk is None
+        return vanished or bool(form.cleaned_data.get(DELETION_FIELD_NAME, False))
 
     def validate_unique(self) -> None:
         """Les unicités qui lisent le parent, entre les lignes gardées (Django) et avec les lignes
