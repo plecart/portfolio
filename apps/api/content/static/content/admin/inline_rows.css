@@ -1,5 +1,5 @@
 /*
- * Lignes en ligne de l'admin : leur poignée de tri (`inline_sort.js`) et leur libellé. Couleurs de
+ * Lignes en ligne de l'admin : leur poignée de tri (`inline_rows.js`) et leur libellé. Couleurs de
  * l'admin, que le thème sombre redéfinit ; aucune valeur de couleur propre.
  */
 .sortable-handle {
