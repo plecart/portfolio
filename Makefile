@@ -21,18 +21,27 @@ WEB_INDEX = $(WEB)/dist/index.html
 # le jour où la façon d'entrer dans le front change, elle change ici seulement.
 WEB_NPM := cd $(WEB) && $(NPM)
 
+# Une image par dossier `infra/<service>/` qui porte un `Dockerfile` (ADR 0014) : `make build` les
+# trouve, et ajouter un dossier suffit. Chacune a sa cible, `build-<service>`.
+IMAGES := $(patsubst infra/%/Dockerfile,%,$(wildcard infra/*/Dockerfile))
+IMAGE_BUILDS := $(addprefix build-,$(IMAGES))
+
+# Le préfixe du nom des images — `portfolio-api`, `portfolio-caddy` —, que la CI surcharge pour
+# publier sous le nom GHCR sans redéfinir la commande.
+#
 # L'affectation **avant** l'export, et pas l'inverse : un `export` nu définit la variable à vide,
-# après quoi `?=` n'assigne plus rien et l'image part sans étiquette (`-t  .`). Mesuré.
+# après quoi `?=` n'assigne plus rien. Mesuré sur l'ancien nom d'image, qui partait alors sans
+# étiquette (`-t  .`).
 #
 # Exportée parce que l'interpolation de Compose lit l'environnement du processus : c'est ce qui
-# fait que `make dev` et `make build` construisent une seule et même image.
-API_IMAGE ?= portfolio-api
-export API_IMAGE
+# fait que `make dev` et `make build` construisent une seule et même image `api`.
+IMAGE_PREFIX ?= portfolio-
+export IMAGE_PREFIX
 
 # Drapeaux supplémentaires de la commande de build, vides sur un poste. La CI y passe ses
 # options de cache : elle règle ainsi *comment* le build s'exécute sans redéfinir *ce qu'il*
-# construit — la cible `build` reste la seule définition, appelée à l'identique ici et sur
-# GitHub Actions.
+# construit — les cibles `build-<service>` restent la seule définition, appelée à l'identique ici
+# et sur GitHub Actions. Développés dans la recette, ils peuvent citer le service par `$*`.
 DOCKER_BUILD_FLAGS ?=
 
 # `--env-file` n'est pas une commodité : c'est la seule façon d'alimenter l'interpolation
@@ -40,7 +49,7 @@ DOCKER_BUILD_FLAGS ?=
 # du conteneur. Nommé une fois ici pour qu'aucun appel ne puisse l'oublier.
 COMPOSE := docker compose --env-file infra/dev.env -f infra/compose.dev.yml
 
-.PHONY: install test lint format format-check typecheck audit build compose-config dev
+.PHONY: install test lint format format-check typecheck audit build $(IMAGE_BUILDS) compose-config dev
 .PHONY: web-install web-browsers web-lint web-typecheck web-test web-build web-e2e web-lighthouse web-audit
 
 install:
@@ -73,17 +82,23 @@ audit:
 	$(UV) run python infra/ci/pip_audit_gate.py \
 		--exceptions infra/ci/pip-audit-exceptions.toml --skip-editable
 
-# Contexte de build : la racine du dépôt, où vivent l'espace de travail `uv` et son verrou.
-# La CI appelle cette cible plutôt qu'un `docker build` à elle, pour que l'image vérifiée en
-# CI soit exactement celle qu'on construit sur le poste. #15 réutilise ce build pour publier.
+# Contexte de build : la racine du dépôt, pour toutes les images — l'espace de travail `uv` et son
+# verrou y vivent, et le front compilé. La CI appelle cette cible plutôt qu'un `docker build` à
+# elle, pour que les images vérifiées en CI soient exactement celles qu'on construit sur le poste.
+# #15 réutilise ce build pour publier.
 #
 # `docker buildx build` et non `docker build` : le second garde **toujours** le builder par
 # défaut du moteur, même après un `docker buildx use`, et la documentation Docker vise
 # nommément les scripts `make` qui s'y heurtent. En CI, où le builder sélectionné est le seul
 # capable d'exporter un cache, `docker build` échoue sur « Cache export is not supported for
 # the docker driver ». Mesuré.
-build: $(WEB_INDEX)
-	docker buildx build $(DOCKER_BUILD_FLAGS) -f infra/api/Dockerfile -t $(API_IMAGE) .
+#
+# Une règle à motif statique, et non implicite : `.PHONY` écarte les règles implicites de la
+# recherche, et une cible `build-<service>` doit rester phony.
+build: $(IMAGE_BUILDS)
+
+$(IMAGE_BUILDS): build-%: $(WEB_INDEX)
+	docker buildx build $(DOCKER_BUILD_FLAGS) -f infra/$*/Dockerfile -t $(IMAGE_PREFIX)$* .
 
 # Vérifie que le Compose de développement se résout — interpolation comprise. Appelée par le
 # job `infra` de la CI, qui crée un `.env` depuis `.env.example` au préalable : Compose exige

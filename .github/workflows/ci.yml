@@ -133,7 +133,7 @@ jobs:
         run: make web-lighthouse
 
   infra:
-    name: Infra — configuration Compose, image api
+    name: Infra — configuration Compose, images
     runs-on: ubuntu-latest
 
     # Même garde que les deux autres jobs : voir le commentaire du job back.
@@ -171,25 +171,30 @@ jobs:
       # court reviendrait au pilote par défaut et l'export de cache échouerait.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      # Cache des couches entre deux runs. La clé suit les fichiers que la couche de
-      # dépendances consomme : elle ne change donc que quand cette couche change réellement —
+      # Cache des couches entre deux runs. La clé suit les fichiers que les couches de
+      # dépendances consomment : elle ne change donc que quand ces couches changent réellement —
       # ce qui évite aussi que le cache soit réécrit, et grossisse, à chaque run.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/buildx-cache
           key: >-
-            buildx-api-${{ hashFiles('.python-version', 'pyproject.toml', 'uv.lock',
-            'apps/api/pyproject.toml', 'infra/api/Dockerfile') }}
-          restore-keys: buildx-api-
+            buildx-images-${{ hashFiles('.python-version', 'pyproject.toml', 'uv.lock',
+            'apps/api/pyproject.toml', 'infra/*/Dockerfile') }}
+          restore-keys: buildx-images-
 
       # `make build` et non un `docker build` propre à la CI : la commande reste celle du
       # `Makefile`, le cache et le chargement passent par des drapeaux. `--load` matérialise
-      # vraiment l'image — sans lui, le pilote conteneurisé construit et jette, et l'étiquette
-      # ne désignerait rien. #15 reprend ce build pour scanner puis publier.
-      - name: Image api
+      # vraiment les images — sans lui, le pilote conteneurisé construit et jette, et les
+      # étiquettes ne désigneraient rien. #15 reprend ce build pour scanner puis publier.
+      #
+      # `tag=$*` : une entrée de cache par image, dans le même dossier. `make` développe `$*` en
+      # nom du service, dans la recette de `build-<service>` ; sans lui, chaque image exporterait
+      # sous `latest`, et la dernière remplacerait l'entrée de l'autre (doc Docker, « Local
+      # cache »).
+      - name: Images
         run: make build
         env:
           DOCKER_BUILD_FLAGS: >-
             --load
-            --cache-from type=local,src=/tmp/buildx-cache
-            --cache-to type=local,dest=/tmp/buildx-cache,mode=max
+            --cache-from type=local,src=/tmp/buildx-cache,tag=$*
+            --cache-to type=local,dest=/tmp/buildx-cache,tag=$*,mode=max

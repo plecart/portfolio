@@ -59,9 +59,10 @@ services:
   api:
     # Sans cette ligne, Compose fabrique son propre nom (`portfolio-dev-api`) et l'on obtient
     # deux images du même Dockerfile — celle de `make build` et celle de `make dev`. Le
-    # `Makefile` exporte `API_IMAGE` ; le défaut ci-dessous ne sert qu'à un `docker compose`
-    # lancé à la main, et un test vérifie qu'il n'a pas dérivé de celui du `Makefile`.
-    image: ${API_IMAGE:-portfolio-api}
+    # `Makefile` exporte le préfixe des images, `IMAGE_PREFIX` ; le défaut ci-dessous ne sert
+    # qu'à un `docker compose` lancé à la main, et un test vérifie qu'il n'a pas dérivé de celui
+    # du `Makefile`.
+    image: ${IMAGE_PREFIX:-portfolio-}api
     build:
       # Contexte à la racine du dépôt : l'espace de travail `uv` et son verrou y vivent.
       context: ..

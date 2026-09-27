@@ -78,12 +78,15 @@ updates:
       prefix: chore
       include: scope
 
-  # Les images de base de l'image `api`, épinglées par étiquette précise et par empreinte : chaque
-  # nouvelle version de correctif (Python 3.12.x, `uv`) arrive en PR, étiquette et empreinte
-  # ensemble. La reconstruction d'une même étiquette peut ne pas être proposée (expérience
-  # `docker_digest_only_update_suppression` de Dependabot) : le scan de l'image (#15) la couvre.
+  # Les images de base des images du dépôt, épinglées par étiquette précise et par empreinte :
+  # chaque nouvelle version de correctif (Python 3.12.x, `uv`, Caddy) arrive en PR, étiquette et
+  # empreinte ensemble. La reconstruction d'une même étiquette peut ne pas être proposée
+  # (expérience `docker_digest_only_update_suppression` de Dependabot) : le scan des images (#15)
+  # la couvre. Un dossier par image (ADR 0014) ; un test exige que chaque Dockerfile y figure.
   - package-ecosystem: docker
-    directory: /infra/api
+    directories:
+      - /infra/api
+      - /infra/caddy
     schedule:
       interval: weekly
     groups:

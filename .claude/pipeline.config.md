@@ -75,9 +75,9 @@ premier serait lue comme la bonne.
 depuis la racine et rendant 0, la pile démarrée et regardée. Ces trois cibles demandent Docker, et
 `build` et `dev` le front installé (`make web-install`) : ils le compilent s'il manque, les images
 le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node aussi.
-- build        : make build                       # image `api` (`infra/api/Dockerfile`), front compilé
-                                                  # s'il manque ; sans publication ; vérifiée le
-                                                  # 2026-09-27 (#15)
+- build        : make build                       # une image par dossier `infra/<service>/` (`api`,
+                                                  # `caddy`), front compilé s'il manque ; sans
+                                                  # publication ; vérifiée le 2026-09-27 (#15)
 - compose      : make compose-config              # résout `infra/compose.dev.yml` — exige un `.env` à la racine
 - run local    : make dev                         # pile Postgres + Redis + `api`, ports sur `127.0.0.1` ;
                                                   # front compilé s'il manque
@@ -110,7 +110,7 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 - gates bloquants en CI :
   - back : audit, lint, format:check, typecheck, test
   - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse, audit
-  - infra : compose (résolution de `infra/compose.dev.yml`), build de l'image `api` sans publication — la publication sur GHCR et le scan Trivy restent à #15
+  - infra : compose (résolution de `infra/compose.dev.yml`), build des images `api` et `caddy` sans publication — le scan Trivy et la publication sur GHCR arrivent avec les lots 2 et 3 de #15
 - services requis en CI : aucun déclaré — les tests de base démarrent eux-mêmes Postgres par testcontainers (cadrage §8.4), sur le Docker du runner ; Redis suivra avec #11
 
 ## Périmètre
