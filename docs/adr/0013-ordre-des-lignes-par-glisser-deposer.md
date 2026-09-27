@@ -47,8 +47,10 @@ bibliothèque :
   garde sa position vide, pour que Django continue de l'ignorer ;
 - sans le script — désactivé ou en échec —, une ligne neuve arrive sans position et
   l'enregistrement la range après les autres (`SortableFormSet.save_new`) ;
-- on retire une ligne, on la rajoute, on la déplace, puis on enregistre une fois : l'unicité
-  (parent, objet) se juge entre les lignes gardées (`InlineRowForm`) ;
+- on retire une ligne, on la rajoute, on la déplace, on échange les objets de deux lignes, puis on
+  enregistre une fois : l'unicité (parent, objet) se juge entre les lignes gardées
+  (`InlineRowForm`), et la base la vérifie à la fin de l'enregistrement — elle y est différée, car
+  Django écrit les lignes l'une après l'autre ;
 - générique : tout tableau en ligne de l'admin qui hérite de `SortableInline` s'ordonne ainsi, la
   galerie de #9 comprise.
 

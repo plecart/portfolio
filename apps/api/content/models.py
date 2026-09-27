@@ -298,8 +298,13 @@ class ProjectTechnology(models.Model):
         # L'ordre de l'admin est l'ordre stocké ; à position égale, l'ordre de saisie.
         ordering = ("position", "id")
         constraints = (
+            # Différée à la fin de la transaction : l'écran Projet enregistre les lignes l'une
+            # après l'autre, et un échange de technologies entre deux lignes passe par un état
+            # intermédiaire en double. Django la vérifie encore dans `full_clean()` et entre les
+            # lignes du formulaire ; Postgres, à la validation de la transaction.
             models.UniqueConstraint(
                 fields=["project", "technology"],
+                deferrable=models.Deferrable.DEFERRED,
                 name="content_project_technology_unique",
                 violation_error_code="project_technology_taken",
                 violation_error_message=strings.PROJECT_TECHNOLOGY_TAKEN,
