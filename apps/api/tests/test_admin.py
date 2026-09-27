@@ -325,6 +325,46 @@ def test_l_admin_refuse_de_retirer_la_derniere_technologie_d_un_projet(
 
 
 @pytest.mark.django_db
+def test_l_admin_accepte_une_technologie_retiree_puis_rajoutee_avant_l_enregistrement(
+    admin_client: Client,
+) -> None:
+    """On manipule les lignes, puis on enregistre une fois : une technologie retirée puis
+    rajoutée dans le même envoi n'est pas un doublon. La ligne retirée existe encore en base
+    jusqu'à l'enregistrement ; l'unicité se juge entre les lignes gardées, pas contre elle."""
+    django_, python = saved(technology(name="Django")), saved(technology(name="Python"))
+    portfolio = saved_project(django_)
+    saved(ProjectTechnology(project=portfolio, technology=python, position=2))
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
+    data = rendered_data(admin_client, url) | {
+        f"{LINES}-0-DELETE": "on",
+        f"{LINES}-1-DELETE": "on",
+        **line(2, python, 1),
+        **line(3, django_, 2),
+    }
+
+    response = admin_client.post(url, data)
+
+    assert response.status_code == 302
+    stored = ProjectTechnology.objects.filter(project=portfolio)
+    assert [link.technology for link in stored] == [python, django_]
+
+
+@pytest.mark.django_db
+def test_l_admin_refuse_une_technologie_gardee_rajoutee_une_seconde_fois(
+    admin_client: Client,
+) -> None:
+    """Le formset compare chaque ligne neuve aux lignes enregistrées qu'il garde : c'est lui, et
+    non plus un contrôle ligne par ligne contre la base, qui refuse le doublon."""
+    django_ = saved(technology(name="Django"))
+    portfolio = saved_project(django_)
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
+    data = rendered_data(admin_client, url) | line(1, django_, 2)
+
+    assert refused_lines(admin_client, url, data) == [strings.PROJECT_TECHNOLOGY_TAKEN]
+    assert ProjectTechnology.objects.filter(project=portfolio).count() == 1
+
+
+@pytest.mark.django_db
 def test_l_admin_refuse_deux_fois_la_meme_technologie_dans_un_projet(
     admin_client: Client,
 ) -> None:

@@ -6,6 +6,7 @@ from typing import Any, ClassVar
 from config import strings
 from django.contrib import admin
 from django.contrib.admin.widgets import RelatedFieldWidgetWrapper
+from django.core.exceptions import ValidationError
 from django.db.models import Field, Max
 from django.forms import BaseInlineFormSet, HiddenInput, ModelForm
 from django.forms import Field as FormField
@@ -81,6 +82,24 @@ ProjectTechnologyFormSetBase = BaseInlineFormSet[
 SORTABLE_POSITION = "sortable-position"
 
 
+class ProjectTechnologyForm(ModelForm[ProjectTechnology]):
+    """Une ligne de technologie de l'écran Projet."""
+
+    def validate_constraints(self) -> None:
+        """Les contraintes du modèle, hors l'unicité (projet, technologie).
+
+        Django la vérifierait ligne par ligne contre la base, où une ligne que le même envoi
+        supprime existe encore : une technologie retirée puis rajoutée avant l'enregistrement
+        serait refusée. Le formset la juge entre les lignes qu'il garde
+        (`BaseModelFormSet.validate_unique`, lignes supprimées écartées), et la base la garantit
+        à l'enregistrement, qui supprime avant d'ajouter.
+        """
+        try:
+            self.instance.validate_constraints(exclude={"project", *self.errors})
+        except ValidationError as error:
+            self.add_error(None, error)
+
+
 class ProjectTechnologyFormSet(ProjectTechnologyFormSetBase):
     """Les lignes de technologie d'un projet, avec les messages du catalogue pour les deux règles
     que le formulaire compare entre ses lignes, avant la base.
@@ -123,6 +142,7 @@ class ProjectTechnologyInline(admin.TabularInline[ProjectTechnology, Project]):
     (décision 2, ADR 0013)."""
 
     model = ProjectTechnology
+    form = ProjectTechnologyForm
     formset = ProjectTechnologyFormSet
     fields = ("move", "technology", "position")
     readonly_fields = ("move",)
