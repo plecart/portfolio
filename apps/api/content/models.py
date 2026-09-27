@@ -158,8 +158,10 @@ class Project(models.Model):
         verbose_name = strings.PROJECT
         verbose_name_plural = strings.PROJECTS
         constraints = (
-            # Une contrainte, et non `unique=True` : Django rend alors le message et le code du
-            # catalogue, au lieu de son message générique (`UniqueConstraint.validate`).
+            # Une contrainte, et non `unique=True` : le refus porte un code propre, là où
+            # `unique=True` impose le code `unique` de Django (décision 10). Revers : l'admin affiche
+            # ce refus en tête du formulaire, `validate_constraints` ne rangeant sous le champ que le
+            # code `unique`.
             models.UniqueConstraint(
                 fields=["slug"],
                 name="content_project_slug_unique",
@@ -230,7 +232,9 @@ class Project(models.Model):
             ),
             # Un mot est un segment entre espaces ou traits d'union (décision 4) : aucun segment de
             # 21 caractères ou plus. Postgres évalue l'expression, en base comme dans
-            # `full_clean()` ; une espace insécable n'y sépare pas deux mots, comme à l'écran.
+            # `full_clean()` ; une espace insécable n'y sépare pas deux mots, comme à l'écran. Ce
+            # dernier point tient à la locale libc de l'image (mesuré) : une locale ICU en ferait un
+            # séparateur, et les tests le verraient.
             models.CheckConstraint(
                 condition=~models.Q(summary__regex=r"[^\s-]{21,}"),
                 name="content_project_summary_words",
@@ -271,8 +275,10 @@ class ProjectTechnology(models.Model):
     contenu »). Au moins une par projet : seule règle hors base, tenue par l'écran Projet
     (décision 10)."""
 
+    # L'index de l'unicité (projet, technologie), mené par le projet, sert aussi ses recherches :
+    # l'index que `ForeignKey` pose par défaut ferait double emploi.
     project: models.ForeignKey[Project, Project] = models.ForeignKey(
-        Project, models.CASCADE, verbose_name=strings.PROJECT
+        Project, models.CASCADE, verbose_name=strings.PROJECT, db_index=False
     )
     # Protégée : supprimer une technologie employée retirerait en silence une ligne à des projets,
     # jusqu'à en laisser sans technologie. L'admin refuse et nomme les projets.

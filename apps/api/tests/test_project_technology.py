@@ -41,7 +41,7 @@ def test_les_technologies_d_un_projet_se_lisent_dans_l_ordre_de_leur_position(
     for key, linked, position in ((1, react, 2), (3, python, 1), (2, django, 1)):
         ProjectTechnology(pk=key, project=portfolio, technology=linked, position=position).save()
 
-    ordered = [link.technology for link in ProjectTechnology.objects.filter(project=portfolio)]
+    ordered = [row.technology for row in ProjectTechnology.objects.filter(project=portfolio)]
 
     assert ordered == [django, python, react]
 
@@ -56,6 +56,33 @@ def test_une_technologie_de_projet_exige_sa_position(portfolio: Project) -> None
         unpositioned.full_clean()
 
     assert [code for code, _ in refusals(refusal.value, "position")] == ["null"]
+
+
+@pytest.mark.django_db
+def test_la_base_refuse_une_technologie_de_projet_sans_position(portfolio: Project) -> None:
+    unpositioned = ProjectTechnology(project=portfolio, technology=saved_technology("Django"))
+
+    with pytest.raises(IntegrityError, match='column "position"'), transaction.atomic():
+        unpositioned.save()
+
+
+@pytest.mark.django_db
+def test_une_position_n_est_jamais_negative(portfolio: Project) -> None:
+    """Un entier positif (glossaire) : le champ refuse une position négative, et la base aussi,
+    par la contrainte que Django pose sur un champ positif."""
+    negative = ProjectTechnology(
+        project=portfolio, technology=saved_technology("Django"), position=-1
+    )
+
+    with pytest.raises(ValidationError) as refusal:
+        negative.full_clean()
+    with (
+        pytest.raises(IntegrityError, match="content_projecttechnology_position_check"),
+        transaction.atomic(),
+    ):
+        negative.save()
+
+    assert [code for code, _ in refusals(refusal.value, "position")] == ["min_value"]
 
 
 @pytest.mark.django_db
@@ -99,7 +126,7 @@ def test_deux_projets_emploient_la_meme_technologie(portfolio: Project) -> None:
 @pytest.mark.django_db
 def test_une_technologie_employee_ne_se_supprime_pas(portfolio: Project) -> None:
     """Sa suppression retirerait en silence une ligne au projet, jusqu'à le laisser sans
-    technologie : la base la refuse, l'admin nomme les projets qui l'emploient."""
+    technologie : Django la refuse (`PROTECT`), l'admin nomme les projets qui l'emploient."""
     django = saved_technology("Django")
     link(portfolio, django, 1)
 

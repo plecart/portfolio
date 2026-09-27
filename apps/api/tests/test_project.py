@@ -1,5 +1,5 @@
-"""Tests du projet : ses champs, ses règles — celles que la base porte, avec le code et le message du
-catalogue —, la vitrine unique, le brouillon par défaut et ses horodatages."""
+"""Tests du projet : ses champs, ses règles — celles que la base porte, avec le code et le message
+du catalogue —, la vitrine unique, le brouillon par défaut et les horodatages."""
 
 from datetime import UTC, datetime, timedelta
 
@@ -23,14 +23,14 @@ URL_MAX_LENGTH = 200
 
 # Deux dates autour du début du projet de la fabrique.
 DAY_BEFORE = STARTED_ON - timedelta(days=1)
-LATER = STARTED_ON + timedelta(days=29)
+DAY_AFTER = STARTED_ON + timedelta(days=1)
 
 # Deux instants d'enregistrement, pour lire les horodatages sans dépendre de l'horloge.
 CREATED_AT = datetime(2026, 9, 1, 9, 0, tzinfo=UTC)
 UPDATED_AT = datetime(2026, 9, 2, 18, 30, tzinfo=UTC)
 
-# Les champs d'un projet, dans l'ordre de l'écran : ceux du PRD (« Modèle de contenu »), moins la
-# couverture (#9), plus les horodatages.
+# Les champs d'un projet, dans l'ordre de leur déclaration : ceux du PRD (« Modèle de contenu »),
+# moins la couverture (#9), plus la clé et les horodatages.
 PROJECT_FIELDS = [
     "id",
     "title",
@@ -57,9 +57,12 @@ def summary_of_length(length: int) -> str:
 
 
 # Ce que le projet accepte : chaque borne atteinte sans être dépassée — l'autre côté est dans
-# `SPEC_RULES` —, le mot à traits d'union de la décision 4 et les dates de la décision 5.
+# `SPEC_RULES` ou `FIELD_REFUSALS` —, chaque type, le mot à traits d'union de la décision 4 et les
+# dates de la décision 5.
 ACCEPTANCES: list[tuple[str, dict[str, object]]] = [
     ("projet de la fabrique", {}),
+    ("projet pro", {"kind": ProjectKind.PROFESSIONAL}),
+    ("projet d'école", {"kind": ProjectKind.SCHOOL}),
     (f"titre de {TITLE_MAX_LENGTH} caractères", {"title": "t" * TITLE_MAX_LENGTH}),
     (
         f"résumé de {SUMMARY_MAX_LENGTH} caractères",
@@ -71,7 +74,10 @@ ACCEPTANCES: list[tuple[str, dict[str, object]]] = [
         "projet terminé le jour de son début",
         {"status": ProjectStatus.FINISHED, "finished_on": STARTED_ON},
     ),
-    ("projet archivé après son début", {"status": ProjectStatus.ARCHIVED, "finished_on": LATER}),
+    (
+        "projet archivé après son début",
+        {"status": ProjectStatus.ARCHIVED, "finished_on": DAY_AFTER},
+    ),
     (f"slug de {SLUG_MAX_LENGTH} caractères", {"slug": "s" * SLUG_MAX_LENGTH}),
     ("slug de chiffres, traits d'union et soulignés", {"slug": "projet-2_bis"}),
     (f"client de {CLIENT_MAX_LENGTH} caractères", {"client": "c" * CLIENT_MAX_LENGTH}),
@@ -97,16 +103,14 @@ FIELD_REFUSALS = [
         "max_length",
     ),
     ("slug hors de sa forme", {"slug": "mon projet"}, "slug", "invalid"),
+    ("slug accentué", {"slug": "projét"}, "slug", "invalid"),
     ("titre absent", {"title": ""}, "title", "blank"),
     ("résumé absent", {"summary": ""}, "summary", "blank"),
     ("description absente", {"description": ""}, "description", "blank"),
+    ("type absent", {"kind": ""}, "kind", "blank"),
     ("type hors de sa liste", {"kind": "autre"}, "kind", "invalid_choice"),
-    (
-        "statut hors de sa liste",
-        {"status": "autre", "finished_on": LATER},
-        "status",
-        "invalid_choice",
-    ),
+    ("statut absent", {"status": ""}, "status", "blank"),
+    ("statut hors de sa liste", {"status": "autre"}, "status", "invalid_choice"),
     ("date de début absente", {"started_on": None}, "started_on", "null"),
     (
         f"client de {CLIENT_MAX_LENGTH + 1} caractères",
@@ -130,9 +134,9 @@ FIELD_REFUSALS = [
     ("lien de la démo hors de sa forme", {"demo_url": "demo"}, "demo_url", "invalid"),
 ]
 
-# Ce que la base porte en plus d'une validation de champ (décision 8 du lot 1) : pour une ligne
-# écrite hors de l'admin, que l'API de #10 tient pour valide. Le statut hors de sa liste porte une
-# date de fin, pour n'enfreindre que sa propre contrainte.
+# Ce que la base porte en plus d'une validation de champ (PR #49, arbitrage I8 du mainteneur) :
+# pour une ligne écrite hors de l'admin, que l'API de #10 tient pour valide. Le statut hors de sa
+# liste porte une date de fin, pour n'enfreindre que sa propre contrainte.
 DATABASE_GUARDS = [
     (
         "slug vide",
@@ -143,6 +147,12 @@ DATABASE_GUARDS = [
     (
         "slug hors de sa forme",
         {"slug": "mon projet"},
+        "content_project_slug_valid",
+        ("project_slug_invalid", strings.PROJECT_SLUG_INVALID),
+    ),
+    (
+        "slug accentué",
+        {"slug": "projét"},
         "content_project_slug_valid",
         ("project_slug_invalid", strings.PROJECT_SLUG_INVALID),
     ),
@@ -172,7 +182,7 @@ DATABASE_GUARDS = [
     ),
     (
         "statut hors de sa liste",
-        {"status": "autre", "finished_on": LATER},
+        {"status": "autre", "finished_on": DAY_AFTER},
         "content_project_status_valid",
         ("project_status_unknown", strings.PROJECT_STATUS_UNKNOWN),
     ),
@@ -206,6 +216,27 @@ SPEC_RULES = [
         "content_project_summary_words",
         ("project_summary_word_too_long", strings.PROJECT_SUMMARY_WORD_TOO_LONG),
     ),
+    # La liste des séparateurs est fermée (décision 4) : ni l'espace insécable ni l'espace
+    # fine insécable, usuelles en typographie française, ni la barre oblique — un navigateur ne
+    # coupe pas la ligne à une insécable.
+    (
+        "mots joints par une espace insécable",
+        {"summary": "\N{NO-BREAK SPACE}".join(["m" * 10, "m" * 10])},
+        "content_project_summary_words",
+        ("project_summary_word_too_long", strings.PROJECT_SUMMARY_WORD_TOO_LONG),
+    ),
+    (
+        "mots joints par une espace fine insécable",
+        {"summary": "\N{NARROW NO-BREAK SPACE}".join(["m" * 10, "m" * 10])},
+        "content_project_summary_words",
+        ("project_summary_word_too_long", strings.PROJECT_SUMMARY_WORD_TOO_LONG),
+    ),
+    (
+        "mots joints par une barre oblique",
+        {"summary": "/".join(["m" * 10, "m" * 10])},
+        "content_project_summary_words",
+        ("project_summary_word_too_long", strings.PROJECT_SUMMARY_WORD_TOO_LONG),
+    ),
     (
         "projet terminé sans date de fin",
         {"status": ProjectStatus.FINISHED},
@@ -220,7 +251,7 @@ SPEC_RULES = [
     ),
     (
         "projet en cours avec une date de fin",
-        {"finished_on": LATER},
+        {"finished_on": DAY_AFTER},
         "content_project_ongoing_unfinished",
         ("project_ongoing_finished", strings.PROJECT_ONGOING_FINISHED),
     ),
@@ -231,6 +262,12 @@ SPEC_RULES = [
         ("project_dates_reversed", strings.PROJECT_DATES_REVERSED),
     ),
 ]
+
+
+# Les colonnes qu'une règle exige, obligatoires en base : une contrainte de vérification qui lit
+# NULL rend « inconnu » et laisse passer la ligne — seule la colonne `NOT NULL` la refuse. La date
+# de début est obligatoire d'elle-même (PRD « Modèle de contenu »).
+REQUIRED_COLUMNS = ["title", "slug", "summary", "description", "kind", "status", "started_on"]
 
 
 def test_un_projet_porte_les_champs_du_prd_et_aucun_champ_en_ligne() -> None:
@@ -320,16 +357,17 @@ def test_la_base_refuse_un_projet_qui_enfreint_ses_regles(
 
 
 @pytest.mark.django_db
-def test_la_base_refuse_un_projet_sans_date_de_debut() -> None:
-    """La date de début est obligatoire (PRD « Modèle de contenu ») : la colonne n'accepte pas
-    l'absence, sans contrainte nommée."""
-    with pytest.raises(IntegrityError, match="started_on"), transaction.atomic():
-        project(started_on=None).save()
+@pytest.mark.parametrize("column", REQUIRED_COLUMNS)
+def test_la_base_refuse_un_projet_sans_valeur_dans_une_colonne_obligatoire(column: str) -> None:
+    """Postgres nomme la colonne dans son refus (« null value in column … »), qu'il vérifie avant
+    toute contrainte de vérification."""
+    with pytest.raises(IntegrityError, match=f'column "{column}"'), transaction.atomic():
+        project(**{column: None}).save()
 
 
 @pytest.mark.django_db
 def test_deux_projets_ne_portent_pas_le_meme_slug() -> None:
-    """Message du catalogue, là où `unique=True` rendrait le message générique de Django."""
+    """Code et message du catalogue, là où `unique=True` imposerait le code `unique` de Django."""
     project().save()
 
     with pytest.raises(ValidationError) as refusal:
