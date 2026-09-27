@@ -43,6 +43,14 @@ class InlineRowForm[ChildT: Model](ModelForm[ChildT]):
     écrit les lignes l'une après l'autre, et un échange entre deux lignes passe par un doublon.
     """
 
+    def has_changed(self) -> bool:
+        """Une ligne neuve dont seule la position est remplie n'a pas changé : `inline_rows.js`
+        numérote toute ligne affichée, et Django doit ignorer encore une ligne neuve laissée vide
+        — sans la valider, sans l'enregistrer."""
+        if self.instance._state.adding:
+            return any(name != POSITION for name in self.changed_data)
+        return super().has_changed()
+
     def validate_constraints(self) -> None:
         """Les contraintes du modèle, hors celles qui lisent le parent et celles des champs déjà
         en erreur."""

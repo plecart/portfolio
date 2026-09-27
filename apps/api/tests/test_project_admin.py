@@ -349,7 +349,11 @@ def test_chaque_ligne_de_technologie_porte_une_poignee_de_tri(admin_client: Clie
     page = response.content.decode()
     lines = response.context["inline_admin_formsets"][0].formset
 
-    handle = f'class="sortable-handle" aria-label="{escape(strings.ADMIN_ROW_MOVE)}"'
+    # `type="button"` : sans lui, un bouton de formulaire l'envoie (`submit` par défaut, HTML).
+    handle = (
+        f'<button type="button" class="sortable-handle" '
+        f'aria-label="{escape(strings.ADMIN_ROW_MOVE)}"'
+    )
     # Une poignée par ligne, enregistrée ou neuve, plus celle du modèle de ligne que l'admin clone.
     assert page.count(handle) == len(lines.forms) + 1
     positions = re.findall(rf'<input type="hidden" name="{LINES}-\d+-position"[^>]*>', page)
@@ -392,6 +396,24 @@ def test_l_ecran_projet_charge_le_bouton_unique_de_suppression_des_lignes(
 
     assert f'name="{LINES}-0-DELETE"' in page
     assert f"{settings.STATIC_URL}{INLINE_ROWS_SCRIPT}" in page
+
+
+@pytest.mark.django_db
+def test_une_ligne_neuve_dont_seule_la_position_est_remplie_est_ignoree(
+    admin_client: Client,
+) -> None:
+    """Le script numérote toute ligne affichée, y compris une ligne neuve laissée vide ou vidée
+    après un refus : sa position seule ne la change pas, et l'écran l'ignore comme Django ignore
+    une ligne vide, au lieu de la refuser."""
+    django = saved(technology(name="Django"))
+    portfolio = saved_project(django)
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
+
+    response = admin_client.post(url, rendered_data(admin_client, url) | {f"{LINES}-1-position": 2})
+
+    assert response.status_code == 302
+    stored = ProjectTechnology.objects.filter(project=portfolio)
+    assert [link.technology for link in stored] == [django]
 
 
 @pytest.mark.django_db
