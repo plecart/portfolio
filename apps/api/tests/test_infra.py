@@ -11,10 +11,12 @@ de la CI, et par la pile qu'on regarde tourner.
 """
 
 import io
+import os
 import re
 import shutil
 import subprocess
 import tarfile
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -31,6 +33,7 @@ COMPOSE_DEV = REPOSITORY_ROOT / "infra" / "compose.dev.yml"
 MAKEFILE = REPOSITORY_ROOT / "Makefile"
 PYTHON_VERSION_FILE = REPOSITORY_ROOT / ".python-version"
 DOCKERIGNORE = REPOSITORY_ROOT / ".dockerignore"
+CI_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
 
 # Une arborescence témoin du front : ce que sa compilation produit, et tout ce qui l'entoure.
 WEB_TREE = [
@@ -43,9 +46,15 @@ WEB_TREE = [
 ]
 WEB_BUILD_OUTPUT = {"apps/web/dist/index.html", "apps/web/dist/assets/index.js"}
 
-# Le gabarit des aperçus de lien (ADR 0011) : la vue de #14 le lit à ce chemin, sa valeur par
-# défaut (brief de #15, décision 10).
-INDEX_COPY = "COPY apps/web/dist/index.html /app/web/index.html"
+# Ce que l'image `api` sert, là où l'application le lit : le gabarit des aperçus de lien (ADR
+# 0011), chemin par défaut du réglage de #14 (brief de #15, décision 10), et les fichiers
+# statiques collectés au build, que WhiteNoise sert depuis `STATIC_ROOT` (ADR 0014). Copiés
+# après le `chown` de `/app` : ils restent à `root`, en lecture seule pour l'application.
+SERVED_COPIES = [
+    "COPY apps/web/dist/index.html /app/web/index.html",
+    "COPY --from=build /app/static /app/static",
+]
+CHOWN = "chown -R api:api /app"
 
 # La commande qui compile le front, celle de `make web-build`.
 FRONT_BUILD = "npm run build"
@@ -63,6 +72,15 @@ COMPOSE_API_IMAGE = re.compile(
 BUILD_COMMAND = re.compile(
     r"^docker buildx build .*-f (?P<dockerfile>\S+) -t (?P<tag>\S+) \.$", re.MULTILINE
 )
+
+# L'étiquette d'une entrée du cache local de BuildKit, dans une commande de build imprimée.
+CACHE_TAG = re.compile(r"--cache-(?:from|to) type=local,\S*?\btag=(?P<tag>[^,\s]+)")
+
+# Les variables que le `Makefile` laisse surcharger (`?=`) : `make_dry_run` les retire de
+# l'environnement hérité, pour vérifier le `Makefile` et non le shell qui lance le test
+# (`process_environment.py`). Mesuré : `IMAGE_PREFIX` exporté faisait rougir le test du nom des
+# images.
+OVERRIDABLE = re.compile(r"^(?P<name>\w+) \?=", re.MULTILINE)
 
 # Toute image de base qui embarque un interpréteur porte sa version dans son nom. Le motif les
 # capture toutes : un seul étage qui dériverait suffirait à faire tourner l'application sur une
@@ -136,22 +154,34 @@ def shell_instructions(script: Path) -> list[str]:
     ]
 
 
-def make_dry_run(target: str, directory: Path = REPOSITORY_ROOT, **variables: str) -> str:
+def make_dry_run(
+    target: str,
+    directory: Path = REPOSITORY_ROOT,
+    environment: Mapping[str, str] | None = None,
+    **variables: str,
+) -> str:
     """Les commandes que le `Makefile` du dépôt exécuterait pour `target`, sans les exécuter.
+
+    Les variables que le `Makefile` laisse surcharger ne sont pas héritées du shell qui lance les
+    tests : seules celles que l'appel pose comptent.
 
     Args:
         target: la cible du `Makefile`.
         directory: le dossier où `make` tourne — la racine du dépôt, ou une arborescence témoin.
+        environment: des variables posées dans l'environnement, comme la CI les passe.
         variables: des variables posées sur la ligne de commande, qui priment sur le `Makefile`.
 
     Returns:
         La sortie de `make --dry-run`, variables développées — y compris celles des appels
         récursifs à `$(MAKE)`, que `--dry-run` parcourt sans rien exécuter.
     """
+    overridable = set(OVERRIDABLE.findall(MAKEFILE.read_text(encoding="utf-8")))
+    inherited = {name: value for name, value in os.environ.items() if name not in overridable}
     assignments = [f"{name}={value}" for name, value in variables.items()]
     return subprocess.run(
         ["make", "--dry-run", "-f", str(MAKEFILE), target, *assignments],
         cwd=directory,
+        env=inherited | dict(environment or {}),
         capture_output=True,
         text=True,
         check=True,
@@ -305,14 +335,40 @@ def test_le_contexte_de_build_ne_porte_du_front_que_sa_compilation(tmp_path: Pat
     assert {name for name in sent if name.startswith("apps/web/")} == WEB_BUILD_OUTPUT
 
 
-def test_l_image_api_garde_le_gabarit_du_front_la_ou_14_le_lit() -> None:
-    """Le gabarit des aperçus de lien vit en `/app/web/index.html`, chemin par défaut du réglage de
-    #14 (brief de #15, décision 10) : déplacé, la vue de #14 ne le trouverait plus."""
+@pytest.mark.parametrize("copy", SERVED_COPIES)
+def test_l_image_api_copie_ce_qu_elle_sert_apres_le_chown(copy: str) -> None:
+    """Déplacée, la copie perd son lecteur (la vue de #14, WhiteNoise) ; retirée, l'image se
+    construit encore et la CI reste verte, puis l'admin répond 500 faute de statiques (mesuré à la
+    relecture de la PR #53) ; faite avant le `chown`, elle donne ces fichiers à l'application."""
     instructions = [
         whole for _, whole in dockerfile_instructions(DOCKERFILE.read_text(encoding="utf-8"))
     ]
+    chown = [index for index, instruction in enumerate(instructions) if CHOWN in instruction]
 
-    assert INDEX_COPY in instructions
+    assert chown, "le `chown` de `/app` a disparu — le motif a-t-il cessé de mordre ?"
+    assert copy in instructions
+    assert instructions.index(copy) > chown[0]
+
+
+def test_la_ci_donne_a_chaque_image_son_entree_de_cache() -> None:
+    """Les drapeaux du job `infra`, passés par l'environnement comme en CI puis développés par
+    `make` : chaque image lit et écrit son entrée du cache local, à son nom. Sous une même
+    étiquette — le défaut, `latest` —, la dernière image construite remplace l'entrée des autres
+    (doc Docker, « Local cache » ; mesuré à la relecture de la PR #53). Rouge aussi si le
+    `Makefile` cesse de prendre ces drapeaux dans l'environnement (`=` au lieu de `?=`)."""
+    steps = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["infra"]["steps"]
+    flags = next(
+        step["env"]["DOCKER_BUILD_FLAGS"] for step in steps if step.get("run") == "make build"
+    )
+
+    printed = make_dry_run("build", environment={"DOCKER_BUILD_FLAGS": flags})
+    tags = {
+        Path(match["dockerfile"]).parent.name: CACHE_TAG.findall(match.group())
+        for match in BUILD_COMMAND.finditer(printed)
+    }
+
+    services = [path.parent.name for path in REPOSITORY_ROOT.glob("infra/*/Dockerfile")]
+    assert tags == {service: [service, service] for service in services}
 
 
 def test_le_build_de_l_image_ne_demande_aucun_secret() -> None:
