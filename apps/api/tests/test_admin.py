@@ -51,6 +51,10 @@ PROJECT_TECHNOLOGY_FIELD_LABELS = {
 # inverse (`BaseInlineFormSet.get_default_prefix`).
 LINES = "projecttechnology_set"
 
+# Les classes des raccourcis que Django pose à côté d'une liste d'objets liés pour modifier, voir ou
+# supprimer l'objet choisi (`admin/widgets/related_widget_wrapper.html`).
+RELATED_LINKS = ["change-related", "view-related", "delete-related"]
+
 
 def rendered_data(admin_client: Client, url: str) -> dict[str, object]:
     """Le formulaire que l'écran `url` rend, tel qu'un navigateur le renverrait sans rien toucher :
@@ -393,6 +397,23 @@ def test_l_ecran_projet_ordonne_ses_technologies_par_glisser_deposer(admin_clien
     assert "sortable" in response.context["inline_admin_formsets"][0].classes.split()
     assert re.search(rf'<input type="hidden" name="{LINES}-0-position"[^>]*class="_reorder_"', page)
     assert "adminsortable2/js/adminsortable2" in page
+
+
+@pytest.mark.django_db
+def test_une_ligne_de_technologie_ne_modifie_ni_ne_supprime_la_technologie(
+    admin_client: Client,
+) -> None:
+    """L'écran Projet choisit des technologies, il ne les édite pas : des raccourcis que Django pose
+    à côté de la liste, seul reste l'ajout d'une technologie manquante. Les autres ouvraient la
+    technologie elle-même — la supprimer la retirait de tout le site."""
+    portfolio = saved_project(saved(technology(name="Django")))
+
+    page = admin_client.get(
+        reverse("admin:content_project_change", args=[portfolio.pk])
+    ).content.decode()
+
+    assert "add-related" in page
+    assert [link for link in RELATED_LINKS if link in page] == []
 
 
 @pytest.mark.django_db
