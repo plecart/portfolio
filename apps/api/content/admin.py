@@ -3,15 +3,27 @@
 from collections.abc import Sequence
 from typing import Any, ClassVar
 
+from adminsortable2.admin import (
+    CustomInlineFormSetMixin,
+    SortableAdminBase,
+    SortableInlineAdminMixin,
+)
 from config import strings
 from django.contrib import admin
-from django.forms import BaseInlineFormSet, ModelForm
+from django.forms import BaseInlineFormSet, Media, ModelForm
 from django.http import HttpRequest
 from django.utils.html import format_html
 from django.utils.safestring import SafeString, mark_safe
 from django_stubs_ext import StrOrPromise
 
 from content.models import Project, ProjectTechnology, Technology
+
+# La feuille et le script du glisser-déposer que `django-admin-sortable2` livre, ajoutés par
+# `ProjectAdmin.media`.
+SORTABLE_MEDIA = Media(
+    css={"all": ["adminsortable2/css/sortable.css"]},
+    js=["adminsortable2/js/adminsortable2.min.js"],
+)
 
 # Le côté de l'aperçu d'une icône dans la liste, en pixels : il tient dans une ligne de l'admin.
 ICON_PREVIEW_SIZE = 24
@@ -75,9 +87,12 @@ ProjectTechnologyFormSetBase = BaseInlineFormSet[
 ]
 
 
-class ProjectTechnologyFormSet(ProjectTechnologyFormSetBase):
+class ProjectTechnologyFormSet(CustomInlineFormSetMixin, ProjectTechnologyFormSetBase):
     """Les lignes de technologie d'un projet, avec les messages du catalogue pour les deux règles
     que le formulaire compare entre ses lignes, avant la base.
+
+    `CustomInlineFormSetMixin` est la part de `django-admin-sortable2` qui cache la position et
+    range une ligne neuve après les autres (ADR 0013) : ce formset remplace le sien.
 
     « Au moins une technologie » : seule règle hors base (décision 10). Le message par défaut de
     Django parle de formulaires ; `% {"num": …}`, que Django lui applique, laisse intact un texte
@@ -95,9 +110,12 @@ class ProjectTechnologyFormSet(ProjectTechnologyFormSetBase):
         return strings.PROJECT_TECHNOLOGY_TAKEN
 
 
-class ProjectTechnologyInline(admin.TabularInline[ProjectTechnology, Project]):
-    """Les technologies d'un projet, en ligne sur l'écran Projet : chacune à sa position, saisie
-    (décision 2) ; la liste se réaffiche triée après l'enregistrement (`Meta.ordering`)."""
+class ProjectTechnologyInline(
+    SortableInlineAdminMixin, admin.TabularInline[ProjectTechnology, Project]
+):
+    """Les technologies d'un projet, en ligne sur l'écran Projet, dans l'ordre stocké
+    (`Meta.ordering`) ; l'auteur les réordonne en faisant glisser les lignes enregistrées, et une
+    ligne neuve se range après les autres (décision 2, ADR 0013)."""
 
     model = ProjectTechnology
     formset = ProjectTechnologyFormSet
@@ -115,7 +133,7 @@ class ProjectTechnologyInline(admin.TabularInline[ProjectTechnology, Project]):
 
 
 @admin.register(Project)
-class ProjectAdmin(admin.ModelAdmin[Project]):
+class ProjectAdmin(SortableAdminBase, admin.ModelAdmin[Project]):
     """Écran Projet : tous les champs du projet et ses technologies en ligne, en un seul écran
     (PRD, US 34). Le slug se remplit depuis le titre à la saisie et reste modifiable
     (décision 3)."""
@@ -123,3 +141,15 @@ class ProjectAdmin(admin.ModelAdmin[Project]):
     list_display = ("title", "kind", "status", "showcase", "published")
     prepopulated_fields: ClassVar[dict[str, Sequence[str]]] = {"slug": ("title",)}
     inlines = (ProjectTechnologyInline,)
+
+    @property
+    def media(self) -> Media:
+        """Les fichiers de l'écran de Django, plus la feuille et le script du glisser-déposer.
+
+        ponytail: `SortableAdminBase.media` remplace `admin/js/actions.js` par sa copie pour la
+        version de Django en cours, absente pour 6.1 dans `django-admin-sortable2` 2.3.1
+        (jrief/django-admin-sortable2#442) : l'écran demanderait un fichier inexistant. On part des
+        fichiers de Django, sans cette substitution. À retirer quand une version livre la copie —
+        `test_le_contournement_de_la_copie_d_actions_expire_avec_sa_cause` rougit alors.
+        """
+        return super(SortableAdminBase, self).media + SORTABLE_MEDIA

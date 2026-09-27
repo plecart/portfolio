@@ -48,8 +48,8 @@ def test_les_technologies_d_un_projet_se_lisent_dans_l_ordre_de_leur_position(
 
 @pytest.mark.django_db
 def test_une_technologie_de_projet_exige_sa_position(portfolio: Project) -> None:
-    """La position se saisit (décision 2) : aucune valeur par défaut ne la choisit à la place de
-    l'auteur."""
+    """Le modèle ne choisit aucune position : l'écran Projet la pose, par le glisser-déposer ou la
+    suivante pour une ligne neuve (décision 2, ADR 0013)."""
     unpositioned = ProjectTechnology(project=portfolio, technology=saved_technology("Django"))
 
     with pytest.raises(ValidationError) as refusal:

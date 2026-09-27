@@ -79,3 +79,5 @@ typeCheckingMode = "strict"
 include = ["apps", "infra"]
 # Le `pythonpath` de pytest, vu de pyright : les modules d'appui des tests s'importent par leur nom.
 extraPaths = ["apps/api/tests"]
+# Les types des dépendances qui n'en publient pas (`django-admin-sortable2`, ADR 0013).
+stubPath = "apps/api/typings"

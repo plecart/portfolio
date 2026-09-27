@@ -4,9 +4,12 @@ import html
 import json
 import re
 
+import django
 import pytest
 from config import strings
 from content.models import Project, ProjectTechnology, Technology, TechnologyKind
+from django.conf import settings
+from django.contrib.staticfiles import finders
 from django.test import Client
 from django.urls import reverse
 from django.utils.html import escape
@@ -375,3 +378,72 @@ def test_la_liste_des_projets_montre_titre_type_statut_vitrine_et_publication(
     positions = [page.find(f">{escape(capfirst(column))}</") for column in columns]
     assert -1 not in positions
     assert positions == sorted(positions)
+
+
+@pytest.mark.django_db
+def test_l_ecran_projet_ordonne_ses_technologies_par_glisser_deposer(admin_client: Client) -> None:
+    """Décision 2 amendée (ADR 0013) : la position ne se saisit plus, elle suit l'ordre des lignes
+    que l'auteur fait glisser. Le bloc porte la classe que lit le script de tri, et la position
+    voyage dans un champ caché que ce script réécrit."""
+    portfolio = saved_project(saved(technology(name="Django")))
+
+    response = admin_client.get(reverse("admin:content_project_change", args=[portfolio.pk]))
+    page = response.content.decode()
+
+    assert "sortable" in response.context["inline_admin_formsets"][0].classes.split()
+    assert re.search(rf'<input type="hidden" name="{LINES}-0-position"[^>]*class="_reorder_"', page)
+    assert "adminsortable2/js/adminsortable2" in page
+
+
+@pytest.mark.django_db
+def test_une_ligne_ajoutee_sans_position_se_range_apres_les_autres(admin_client: Client) -> None:
+    """Le script ne réordonne que les lignes enregistrées : une ligne neuve arrive sans position,
+    et l'enregistrement la place après les autres, dans l'ordre du formulaire."""
+    django_, python, react = (
+        saved(technology(name=name)) for name in ("Django", "Python", "React")
+    )
+    portfolio = saved_project(django_)
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
+    new_lines = {
+        f"{LINES}-1-technology": python.pk,
+        f"{LINES}-1-position": "",
+        f"{LINES}-2-technology": react.pk,
+        f"{LINES}-2-position": "",
+    }
+
+    response = admin_client.post(url, rendered_data(admin_client, url) | new_lines)
+
+    assert response.status_code == 302
+    stored = ProjectTechnology.objects.filter(project=portfolio)
+    assert [(link.technology, link.position) for link in stored] == [
+        (django_, 1),
+        (python, 2),
+        (react, 3),
+    ]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("screen", ["admin:content_project_add", "admin:content_technology_add"])
+def test_chaque_fichier_statique_d_un_ecran_de_l_admin_existe(
+    admin_client: Client, screen: str
+) -> None:
+    """Un script ou une feuille de style introuvable laisse l'écran sans son comportement, sans
+    erreur visible en développement ; en production, le stockage à manifeste refuse de rendre la
+    page. Chaque fichier que l'écran demande doit exister parmi les fichiers statiques."""
+    page = admin_client.get(reverse(screen)).content.decode()
+
+    requested = re.findall(rf'(?:src|href)="{re.escape(settings.STATIC_URL)}([^"]+)"', page)
+
+    assert requested
+    assert [path for path in requested if finders.find(path) is None] == []
+
+
+def test_le_contournement_de_la_copie_d_actions_expire_avec_sa_cause() -> None:
+    """`django-admin-sortable2` 2.3.1 remplace `admin/js/actions.js` par sa copie pour la version
+    de Django en cours, absente pour Django 6.1 (jrief/django-admin-sortable2#442) ; l'écran Projet
+    rend donc le fichier de Django (`ProjectAdmin.media`). Ce test rougit le jour où une version de
+    la bibliothèque livre la copie : le contournement est alors à retirer."""
+    major, minor = django.VERSION[:2]
+    copy = f"adminsortable2/js/actions-{major}.{minor}.js"
+
+    assert finders.find(copy) is None

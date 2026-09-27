@@ -40,7 +40,8 @@ ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 
 # L'admin, seul back-office (ADR 0001), et les applications qu'il impose : `auth`,
-# `contenttypes`, `sessions`, `messages`. `staticfiles` sert son CSS en développement. `content`
+# `contenttypes`, `sessions`, `messages`. `staticfiles` sert son CSS en développement.
+# `adminsortable2` livre le script qui ordonne les lignes par glisser-déposer (ADR 0013). `content`
 # porte le contenu du portfolio.
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "adminsortable2",
     "content",
 ]
 

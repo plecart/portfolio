@@ -43,10 +43,10 @@ un champ : le front le déduit de la présence du lien de la démo.
 ## Technologie de projet — `ProjectTechnology`
 
 Une technologie qu'un projet emploie, à sa place dans la liste du projet. Un projet en porte au
-moins une ; l'écran Projet les saisit en ligne.
+moins une ; l'écran Projet les saisit en ligne et les ordonne par glisser-déposer (ADR 0013).
 
 | Terme | Identifiant | Règle |
 |---|---|---|
 | projet | `project` | supprimer le projet supprime ses technologies de projet |
 | technologie | `technology` | une fois au plus par projet ; une technologie employée ne se supprime pas |
-| position | `position` | entier de 0 à 32 767, saisi ; l'ordre stocké suit la position, puis l'ordre de saisie |
+| position | `position` | entier de 0 à 32 767, caché dans l'écran Projet : l'auteur fait glisser les lignes, une ligne neuve se range après les autres ; l'ordre stocké suit la position, puis l'ordre de saisie |
