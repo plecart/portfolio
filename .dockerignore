@@ -19,8 +19,11 @@
 **/.pytest_cache/
 **/.ruff_cache/
 
-# Piles et dossiers étrangers à l'image `api` — le front est servi par `caddy` (#15)
+# Piles et dossiers étrangers aux images. Du front n'entre que sa compilation, `apps/web/dist` :
+# `caddy` la sert, `api` en garde `index.html` (ADR 0014). L'exception suit l'exclusion — c'est la
+# dernière ligne qui correspond qui décide (doc Docker, « .dockerignore files »).
 apps/web/
+!apps/web/dist
 docs/
 strix_runs/
 

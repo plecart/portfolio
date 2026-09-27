@@ -9,7 +9,9 @@
 # finirait par diverger du premier.
 #
 # Trois jobs, un par pile. Ils n'ont pas les mêmes prérequis — `uv`, Node, Docker — et les
-# séparer évite qu'un rouge de l'une masque un rouge d'une autre.
+# séparer évite qu'un rouge de l'une masque un rouge d'une autre. Le job `infra` installe aussi
+# Node : les images copient le front compilé, qu'il compile lui-même plutôt que d'attendre le job
+# `web` (ADR 0014).
 #
 # Chaque action est épinglée par **empreinte de commit**, sa version en commentaire : une
 # étiquette peut être déplacée par son propriétaire ou par un attaquant, et le déplacement
@@ -151,6 +153,17 @@ jobs:
       # de l'image en prend cent fois plus.
       - name: Configuration Compose
         run: make compose-config
+
+      # Le front compilé entre dans les images (ADR 0014) : `make build` le compile s'il manque.
+      # Deux compilations par run, ici et dans `web`, mais aucun job n'attend un autre.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: apps/web/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Front
+        run: make web-install
 
       # Le pilote `docker-container` est nécessaire à `--cache-to`, que le pilote par défaut ne
       # sait pas écrire. Cette action le crée **et** le sélectionne ; c'est parce que la cible

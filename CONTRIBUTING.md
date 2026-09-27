@@ -53,10 +53,13 @@ en supprimant son dossier temporaire. Le détail et les autres écarts d'outilla
 [docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4.
 
 **La pile de développement (`infra/`)** — Postgres, Redis et `api` en conteneurs sur un réseau
-privé. Demande Docker ; les ports 8000, 5432 et 6379 sont publiés sur `127.0.0.1` seulement.
+privé. Demande Docker, et le front installé (`make web-install`) : l'image `api` copie son
+`index.html` compilé (ADR 0014). Les ports 8000, 5432 et 6379 sont publiés sur `127.0.0.1`
+seulement.
 
 ```
-make dev                    # construit l'image `api` si besoin, puis démarre la pile
+make dev                    # compile le front s'il manque, construit l'image `api` si besoin,
+                            # puis démarre la pile
 ```
 
 `make dev` plutôt qu'un `docker compose` direct : la cible passe `--env-file infra/dev.env`, sans

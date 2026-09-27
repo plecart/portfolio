@@ -72,11 +72,15 @@ dans le bloc « Infra » ci-dessous. Aucune ligne `n/a` ne les double — une va
 premier serait lue comme la bonne.
 
 **Infra (`infra/`)** — vérifiées le 2026-09-24 à la naissance d'`infra/` (#4), chacune lancée
-depuis la racine et rendant 0, la pile démarrée et regardée. Ces trois cibles demandent Docker :
-c'est le seul bloc dont les prérequis ne sont ni `uv` ni Node, et la CI en fait un troisième job.
-- build        : make build                       # image `api` (`infra/api/Dockerfile`), sans publication
+depuis la racine et rendant 0, la pile démarrée et regardée. Ces trois cibles demandent Docker, et
+`build` et `dev` le front installé (`make web-install`) : ils le compilent s'il manque, les images
+le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node aussi.
+- build        : make build                       # image `api` (`infra/api/Dockerfile`), front compilé
+                                                  # s'il manque ; sans publication ; vérifiée le
+                                                  # 2026-09-27 (#15)
 - compose      : make compose-config              # résout `infra/compose.dev.yml` — exige un `.env` à la racine
-- run local    : make dev                         # pile Postgres + Redis + `api`, ports sur `127.0.0.1`
+- run local    : make dev                         # pile Postgres + Redis + `api`, ports sur `127.0.0.1` ;
+                                                  # front compilé s'il manque
 
 **Front (`apps/web/`)** — vérifiées le 2026-09-23 au scaffold du front (#3), chacune lancée depuis
 la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur le poste :
