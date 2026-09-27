@@ -11,6 +11,11 @@ UV ?= uv
 NPM ?= npm
 WEB := apps/web
 
+# Le front compilé, que les images copient depuis le contexte de build (ADR 0014). `index.html`
+# en est le témoin : absent, `build` et `dev` compilent le front ; présent, ils le reprennent tel
+# quel — `make web-build` le recompile à la demande.
+WEB_INDEX = $(WEB)/dist/index.html
+
 # `cd` plutôt que `npm --prefix` : mesuré, `--prefix` ne déplace pas le répertoire courant, et
 # les scripts du front résolvent leurs chemins depuis celui-ci. Le préfixe est nommé une fois :
 # le jour où la façon d'entrer dans le front change, elle change ici seulement.
@@ -77,7 +82,7 @@ audit:
 # nommément les scripts `make` qui s'y heurtent. En CI, où le builder sélectionné est le seul
 # capable d'exporter un cache, `docker build` échoue sur « Cache export is not supported for
 # the docker driver ». Mesuré.
-build:
+build: $(WEB_INDEX)
 	docker buildx build $(DOCKER_BUILD_FLAGS) -f infra/api/Dockerfile -t $(API_IMAGE) .
 
 # Vérifie que le Compose de développement se résout — interpolation comprise. Appelée par le
@@ -88,8 +93,11 @@ compose-config:
 
 # Démarre la pile de développement. `--build` : l'image est reconstruite si le Dockerfile ou
 # une dépendance a changé, pour qu'un `git pull` n'exige pas de s'en souvenir.
-dev:
+dev: $(WEB_INDEX)
 	$(COMPOSE) up --build
+
+$(WEB_INDEX):
+	$(MAKE) web-build
 
 # Cibles du front. Elles restent séparées des cibles back et d'infrastructure plutôt que fondues
 # dedans : les trois piles n'ont pas les mêmes prérequis — `uv`, Node, Docker — et la CI en fait

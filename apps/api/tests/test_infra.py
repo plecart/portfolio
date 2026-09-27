@@ -1,6 +1,7 @@
 """Tests des fichiers d'infrastructure : image `api`, point d'entrée, Compose de développement.
 
-Ces tests lisent des fichiers comme du texte, sans rien construire ni démarrer. Ils gardent des
+Ces tests lisent des fichiers, ou interrogent les outils qui les lisent — `make --dry-run`, Docker
+pour le contexte de build —, sans construire d'image ni démarrer de conteneur. Ils gardent des
 invariants dont la violation ne se voit qu'à l'exécution, et tard : un conteneur qui tourne en
 root, des signaux qui n'atteignent jamais le serveur, une adresse de service revenue à
 `127.0.0.1`. Chacun d'eux a été éprouvé par mutation — retiré du code, il rend ce test rouge.
@@ -9,8 +10,11 @@ Que l'image **se construise** et que la pile **démarre** est prouvé ailleurs :
 de la CI, et par la pile qu'on regarde tourner.
 """
 
+import io
 import re
+import shutil
 import subprocess
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -26,6 +30,25 @@ ENTRYPOINT = REPOSITORY_ROOT / "infra" / "api" / "entrypoint.sh"
 COMPOSE_DEV = REPOSITORY_ROOT / "infra" / "compose.dev.yml"
 MAKEFILE = REPOSITORY_ROOT / "Makefile"
 PYTHON_VERSION_FILE = REPOSITORY_ROOT / ".python-version"
+DOCKERIGNORE = REPOSITORY_ROOT / ".dockerignore"
+
+# Une arborescence témoin du front : ce que sa compilation produit, et tout ce qui l'entoure.
+WEB_TREE = [
+    "apps/web/dist/index.html",
+    "apps/web/dist/assets/index.js",
+    "apps/web/index.html",
+    "apps/web/package.json",
+    "apps/web/src/main.tsx",
+    "apps/web/node_modules/react/index.js",
+]
+WEB_BUILD_OUTPUT = {"apps/web/dist/index.html", "apps/web/dist/assets/index.js"}
+
+# Le gabarit des aperçus de lien (ADR 0011) : la vue de #14 le lit à ce chemin, sa valeur par
+# défaut (brief de #15, décision 10).
+INDEX_COPY = "COPY apps/web/dist/index.html /app/web/index.html"
+
+# La commande qui compile le front, celle de `make web-build`.
+FRONT_BUILD = "npm run build"
 
 # Le nom de l'image, déclaré des deux côtés : le `Makefile` le pose pour `docker build -t` et
 # l'exporte, le Compose le reprend en défaut pour qu'un `docker compose` lancé à la main ne
@@ -106,6 +129,46 @@ def shell_instructions(script: Path) -> list[str]:
     ]
 
 
+def make_dry_run(target: str, **variables: str) -> str:
+    """Les commandes que `make` exécuterait pour `target`, sans les exécuter.
+
+    Args:
+        target: la cible du `Makefile`.
+        variables: des variables posées sur la ligne de commande, qui priment sur le `Makefile`.
+
+    Returns:
+        La sortie de `make --dry-run`, variables développées — y compris celles des appels
+        récursifs à `$(MAKE)`, que `--dry-run` parcourt sans rien exécuter.
+    """
+    return subprocess.run(
+        ["make", "--dry-run", target, *(f"{name}={value}" for name, value in variables.items())],
+        cwd=REPOSITORY_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+
+
+def build_context(root: Path) -> set[str]:
+    """Les fichiers que Docker enverrait au build depuis `root`, selon son `.dockerignore`.
+
+    Docker lui-même en juge : l'arborescence est copiée dans une image vide, exportée en archive
+    sur la sortie standard. Aucune image n'est tirée, rien n'est chargé dans le moteur.
+
+    Args:
+        root: le dossier de contexte, `.dockerignore` compris.
+
+    Returns:
+        Les chemins des fichiers reçus, relatifs à `root`.
+    """
+    dockerfile = root.parent / "Dockerfile"
+    dockerfile.write_text("FROM scratch\nCOPY . /\n", encoding="utf-8")
+    export = ["docker", "buildx", "build", "-f", str(dockerfile), "--output", "type=tar,dest=-"]
+    archive = subprocess.run([*export, str(root)], capture_output=True, check=True).stdout
+    with tarfile.open(fileobj=io.BytesIO(archive)) as received:
+        return {member.name.removeprefix("./") for member in received if member.isfile()}
+
+
 def test_les_images_de_base_suivent_la_version_epinglee() -> None:
     """Deux épingles qui divergeraient en silence ne vaudraient pas mieux qu'aucune.
 
@@ -160,18 +223,61 @@ def test_la_cible_build_produit_une_commande_complete() -> None:
     declared = MAKEFILE_IMAGE.search(MAKEFILE.read_text(encoding="utf-8"))
     assert declared, "`API_IMAGE ?=` a disparu du `Makefile`"
 
-    printed = subprocess.run(
-        ["make", "--dry-run", "build"],
-        cwd=REPOSITORY_ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
+    printed = make_dry_run("build")
     tag = re.search(r"-t\s+(?P<name>\S+)", printed)
 
     assert "docker buildx build" in printed, "`docker build` ignorerait le builder sélectionné"
     assert tag, "la commande de build ne porte plus d'étiquette `-t`"
     assert tag.group("name") == declared.group("name")
+
+
+@pytest.mark.parametrize("target", ["build", "dev"])
+def test_build_et_dev_compilent_le_front_s_il_manque(tmp_path: Path, target: str) -> None:
+    """Les images copient le front compilé : sans lui, leur build échouerait. `build` et `dev` le
+    compilent donc s'il manque, et le reprennent tel quel sinon — `make web-build` le recompile à
+    la demande (brief de #15, critères du lot 1).
+
+    Le front témoin vit dans un dossier temporaire : celui du dépôt n'est ni lu ni touché.
+    """
+    web = tmp_path / "web"
+    missing = make_dry_run(target, WEB=web.as_posix())
+    compiled = web / "dist" / "index.html"
+    compiled.parent.mkdir(parents=True)
+    compiled.write_text("", encoding="utf-8")
+
+    assert FRONT_BUILD in missing
+    assert FRONT_BUILD not in make_dry_run(target, WEB=web.as_posix())
+
+
+def test_le_contexte_de_build_ne_porte_du_front_que_sa_compilation(tmp_path: Path) -> None:
+    """`caddy` sert `apps/web/dist`, `api` en garde `index.html` (ADR 0014) : ce dossier entre dans
+    le contexte de build, et rien d'autre du front — ni ses sources, ni ses dépendances, qui
+    pèseraient sur chaque build sans rien apporter aux images.
+
+    Docker en juge, avec le `.dockerignore` du dépôt, sur une arborescence témoin : c'est la
+    dernière ligne qui correspond qui décide (doc Docker), et un motif qui l'imiterait ici
+    laisserait passer les formes qu'il n'a pas prévues.
+    """
+    root = tmp_path / "contexte"
+    for name in WEB_TREE:
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+    shutil.copy(DOCKERIGNORE, root / ".dockerignore")
+
+    sent = build_context(root)
+
+    assert {name for name in sent if name.startswith("apps/web/")} == WEB_BUILD_OUTPUT
+
+
+def test_l_image_api_garde_le_gabarit_du_front_la_ou_14_le_lit() -> None:
+    """Le gabarit des aperçus de lien vit en `/app/web/index.html`, chemin par défaut du réglage de
+    #14 (brief de #15, décision 10) : déplacé, la vue de #14 ne le trouverait plus."""
+    instructions = [
+        whole for _, whole in dockerfile_instructions(DOCKERFILE.read_text(encoding="utf-8"))
+    ]
+
+    assert INDEX_COPY in instructions
 
 
 def test_le_build_de_l_image_ne_demande_aucun_secret() -> None:
