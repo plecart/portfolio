@@ -6,9 +6,17 @@
  * Tri. Chaque ligne, enregistrée ou neuve, porte une poignée (`.sortable-handle`). On fait glisser
  * la ligne par sa poignée — glisser-déposer natif du navigateur, sans bibliothèque —, ou on la
  * déplace par les flèches haut et bas quand la poignée a le focus. À l'envoi du formulaire, chaque
- * ligne gardée et remplie reçoit sa position dans l'ordre affiché, dans son champ caché
- * (`.sortable-position`) ; une ligne neuve restée vide garde sa position vide, et Django continue
- * de l'ignorer.
+ * ligne affichée reçoit sa position dans l'ordre affiché, dans son champ caché
+ * (`.sortable-position`) ; le serveur ignore une ligne neuve dont seule la position est remplie
+ * (`InlineRowForm.has_changed`). Quand l'écran revient en erreur, Django réaffiche les lignes dans
+ * l'ordre de leurs index : le script les replace dans l'ordre de leurs positions.
+ *
+ * Index. Django lit une ligne enregistrée aux premiers index, autant qu'il y a de lignes
+ * enregistrées, et une ligne neuve au-delà ; quand on retire une ligne neuve, il renumérote les
+ * lignes dans l'ordre affiché (`admin/js/inlines.js`), et une ligne neuve glissée plus haut
+ * prendrait l'index d'une ligne enregistrée. À l'envoi, le script renumérote les lignes
+ * enregistrées d'abord, puis les neuves, chacune dans l'ordre affiché : les positions portent
+ * l'ordre, les index n'en portent aucun.
  *
  * Suppression. Django donne à une ligne neuve un bouton qui la retire de l'écran, et à une ligne
  * enregistrée une case « Supprimer ? » (`admin/edit_inline/tabular.html`, `admin/js/inlines.js`).
@@ -19,6 +27,17 @@
 "use strict";
 {
     const ROW = "tr.form-row:not(.empty-form)";
+
+    // Les corps des tableaux ordonnables sous `root` : ceux dont les lignes portent une poignée.
+    const sortableBodies = (root) =>
+        new Set(
+            [...root.querySelectorAll(".sortable-handle")].map((handle) => handle.closest("tbody")),
+        );
+
+    // Les options que Django pose sur le tableau en ligne d'un élément (`data-inline-formset`,
+    // `admin/edit_inline/tabular.html`) : son préfixe, ses libellés.
+    const formsetOptions = (element) =>
+        JSON.parse(element.closest(".js-inline-admin-formset").dataset.inlineFormset).options;
 
     // La rangée des refus d'une ligne, qui la précède (`admin/edit_inline/tabular.html`), ou null.
     const errorsOf = (row) => {
@@ -38,13 +57,6 @@
             row.before(errors);
         }
     };
-
-    // Une ligne neuve dont aucun champ n'est rempli : Django l'ignore, sa position reste vide.
-    const isBlank = (row) =>
-        !row.classList.contains("has_original") &&
-        ![...row.querySelectorAll("select, textarea, input:not([type=hidden])")].some(
-            (field) => field.value,
-        );
 
     // La poignée ne rend la ligne glissable que le temps d'un glisser.
     document.addEventListener("pointerdown", (event) => {
@@ -105,24 +117,58 @@
         }
     });
 
-    // À l'envoi, les positions suivent l'ordre affiché des lignes gardées et remplies.
+    // Renumérote les lignes d'un corps, les enregistrées d'abord, puis les neuves, chacune dans
+    // l'ordre affiché : même expression et mêmes attributs que Django (`updateElementIndex`).
+    const renumber = (body) => {
+        const { prefix } = formsetOptions(body);
+        const pattern = new RegExp(`(${prefix}-(\\d+|__prefix__))`);
+        const rows = [...body.querySelectorAll(ROW)];
+        const saved = rows.filter((row) => row.classList.contains("has_original"));
+        [...saved, ...rows.filter((row) => !saved.includes(row))].forEach((row, number) => {
+            [row, ...row.querySelectorAll("*")].forEach((element) => {
+                ["id", "name", "for"].forEach((attribute) => {
+                    const value = element.getAttribute(attribute);
+                    if (value) {
+                        element.setAttribute(attribute, value.replace(pattern, `${prefix}-${number}`));
+                    }
+                });
+            });
+        });
+    };
+
+    // À l'envoi, les positions suivent l'ordre affiché des lignes gardées, puis les index sont
+    // remis à la place où Django les lit.
     document.addEventListener("submit", (event) => {
-        const bodies = new Set(
-            [...event.target.querySelectorAll(".sortable-handle")].map((handle) =>
-                handle.closest("tbody"),
-            ),
-        );
-        bodies.forEach((body) => {
+        sortableBodies(event.target).forEach((body) => {
             let position = 0;
             body.querySelectorAll(ROW).forEach((row) => {
                 const field = row.querySelector("input.sortable-position");
-                if (field && !row.hidden && !isBlank(row)) {
+                if (field && !row.hidden) {
                     position += 1;
                     field.value = `${position}`;
                 }
             });
+            renumber(body);
         });
     });
+
+    // Replace les lignes d'un corps dans l'ordre de leurs positions, celles qui n'en ont pas à la
+    // fin, avec la rangée de leurs refus. Sur un écran renvoyé en erreur, l'ordre retrouve celui de
+    // l'auteur ; sur un écran qui s'ouvre, les lignes suivent déjà l'ordre stocké.
+    const sortRows = (body) => {
+        const position = (row) =>
+            Number(row.querySelector("input.sortable-position")?.value || Number.MAX_SAFE_INTEGER);
+        const template = body.querySelector("tr.empty-form");
+        [...body.querySelectorAll(ROW)]
+            .map((row) => [errorsOf(row), row])
+            .sort(([, a], [, b]) => position(a) - position(b))
+            .forEach(([errors, row]) => {
+                if (errors) {
+                    body.insertBefore(errors, template);
+                }
+                body.insertBefore(row, template);
+            });
+    };
 
     // --- Suppression ---
 
@@ -159,6 +205,7 @@
     };
 
     window.addEventListener("load", () => {
+        sortableBodies(document).forEach(sortRows);
         document
             .querySelectorAll(".inline-group tr.has_original td.delete input[type=checkbox]")
             .forEach(replaceCheckbox);

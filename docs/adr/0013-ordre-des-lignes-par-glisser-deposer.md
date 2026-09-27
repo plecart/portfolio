@@ -43,8 +43,12 @@ bibliothèque :
   catalogue ; on fait glisser la ligne par sa poignée, ou on la déplace par les flèches haut et bas
   quand la poignée a le focus ;
 - le champ `position` reste en base, caché et facultatif dans le formulaire ; à l'envoi, le script
-  le remplit dans l'ordre affiché, pour chaque ligne gardée et remplie ; une ligne neuve restée vide
-  garde sa position vide, pour que Django continue de l'ignorer ;
+  le remplit dans l'ordre affiché, pour chaque ligne gardée, et une ligne neuve dont seule la
+  position est remplie reste ignorée, comme une ligne vide (`InlineRowForm`) ; le script remet aussi
+  les index des lignes là où Django les lit, les lignes enregistrées d'abord — l'ordre affiché n'en
+  porte aucun ;
+- quand l'écran revient en erreur, les lignes reprennent l'ordre de leurs positions : l'ordre donné
+  avant le refus n'est pas perdu ;
 - sans le script — désactivé ou en échec —, une ligne neuve arrive sans position et
   l'enregistrement la range après les autres (`SortableFormSet.save_new`) ;
 - on retire une ligne, on la rajoute, on la déplace, on échange les objets de deux lignes, puis on
