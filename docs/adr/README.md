@@ -32,7 +32,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0011](0011-balises-d-apercu-du-gabarit.md) | Balises d'aperçu du gabarit : cinq, dont la description SEO | D53 (remplace le point « balises injectées » de 0008) | accepté |
 | [0012](0012-deux-fichiers-compose.md) | Deux fichiers Compose, mêmes images | D54 (remplace le point « un seul fichier Compose » de 0002 et l'argument de 0005) | accepté |
 | [0013](0013-ordre-des-lignes-par-glisser-deposer.md) | Ordre des lignes de l'admin par glisser-déposer | D55 | accepté |
-| [0014](0014-ci-cd-github-actions-et-ghcr.md) | CI/CD : GitHub Actions et GHCR | D56 (confirme D43) | proposé |
+| [0014](0014-ci-cd-github-actions-et-ghcr.md) | CI/CD : GitHub Actions et GHCR | D56 (confirme D43) | accepté |
 
 ## À écrire à leur phase
 
