@@ -294,6 +294,51 @@ def test_l_admin_refuse_une_technologie_gardee_rajoutee_une_seconde_fois(
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    "resent",
+    [False, True],
+    ids=["ligne enregistrée depuis un autre onglet", "même envoi renvoyé"],
+)
+def test_l_admin_refuse_une_technologie_enregistree_depuis_l_ouverture_de_l_ecran(
+    admin_client: Client, resent: bool
+) -> None:
+    """Une ligne enregistrée ailleurs depuis l'ouverture de l'écran — un second onglet, un envoi
+    renvoyé — n'est dans aucune ligne de l'envoi : le formulaire la compare quand même aux lignes
+    gardées, et refuse le doublon au lieu de le laisser à la base."""
+    django, python = saved(technology(name="Django")), saved(technology(name="Python"))
+    portfolio = saved_project(django)
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
+    data = rendered_data(admin_client, url) | line(1, python, 2)
+    if resent:
+        assert admin_client.post(url, data).status_code == 302
+    else:
+        saved(ProjectTechnology(project=portfolio, technology=python, position=2))
+
+    assert refused_lines(admin_client, url, data) == [strings.PROJECT_TECHNOLOGY_TAKEN]
+    assert ProjectTechnology.objects.filter(project=portfolio).count() == 2
+
+
+@pytest.mark.django_db
+def test_une_ligne_supprimee_ne_doublonne_pas_une_ligne_enregistree_depuis_l_ouverture(
+    admin_client: Client,
+) -> None:
+    """Une ligne que l'envoi supprime ne compte pas, même changée avant sa suppression : elle ne
+    doublonne pas une ligne enregistrée ailleurs depuis l'ouverture de l'écran."""
+    django, python, react = (saved(technology(name=name)) for name in ("Django", "Python", "React"))
+    portfolio = saved_project(django)
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
+    data = rendered_data(admin_client, url) | line(1, react, 1)
+    data |= {f"{LINES}-0-technology": python.pk, f"{LINES}-0-DELETE": "on"}
+    saved(ProjectTechnology(project=portfolio, technology=python, position=2))
+
+    response = admin_client.post(url, data)
+
+    assert response.status_code == 302
+    stored = ProjectTechnology.objects.filter(project=portfolio)
+    assert [link.technology for link in stored] == [react, python]
+
+
+@pytest.mark.django_db
 def test_l_admin_refuse_deux_fois_la_meme_technologie_dans_un_projet(
     admin_client: Client,
 ) -> None:
