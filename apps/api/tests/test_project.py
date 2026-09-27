@@ -1,5 +1,5 @@
-"""Tests du projet : ses champs, ses règles — celles que la base porte, avec le code et le message
-du catalogue —, la vitrine unique, le brouillon par défaut et les horodatages."""
+"""Tests du projet : ses champs, ses règles — celles que la base porte, avec leur code et le
+message du catalogue —, la vitrine unique, le brouillon par défaut et les horodatages."""
 
 from datetime import UTC, datetime, timedelta
 
@@ -189,7 +189,7 @@ DATABASE_GUARDS = [
 ]
 
 # Les règles de la spec (§7) et du brief (décisions 4 et 5), une contrainte nommée chacune : la
-# base les garantit, et `full_clean()` — donc l'admin — les refuse avec le code et le message du
+# base les garantit, et `full_clean()` — donc l'admin — les refuse avec leur code et le message du
 # catalogue, sans autre refus.
 SPEC_RULES = [
     (
