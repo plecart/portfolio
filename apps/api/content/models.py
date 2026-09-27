@@ -302,9 +302,11 @@ class ProjectTechnology(models.Model):
             # Différée à la fin de la transaction : l'écran Projet enregistre les lignes l'une
             # après l'autre, et un échange de technologies entre deux lignes passe par un état
             # intermédiaire en double. Django la vérifie encore dans `full_clean()` et entre les
-            # lignes du formulaire ; Postgres, à la validation de la transaction seulement : un
-            # `transaction.atomic()` imbriqué n'en voit pas le refus, et Postgres refuse
-            # `ON CONFLICT` sur elle (`bulk_create(ignore_conflicts=…)`, `update_conflicts=…`).
+            # lignes du formulaire, l'écran avec les lignes que l'envoi ne porte pas
+            # (`SortableFormSet.validate_unique`) ; Postgres, à la validation de la transaction
+            # seulement : un `transaction.atomic()` imbriqué n'en voit pas le refus, et Postgres
+            # refuse `ON CONFLICT` sur elle (`bulk_create(ignore_conflicts=…)`,
+            # `update_conflicts=…`).
             models.UniqueConstraint(
                 fields=["project", "technology"],
                 deferrable=models.Deferrable.DEFERRED,

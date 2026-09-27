@@ -307,7 +307,8 @@ def test_l_admin_refuse_une_technologie_enregistree_depuis_l_ouverture_de_l_ecra
 ) -> None:
     """Une ligne enregistrée ailleurs depuis l'ouverture de l'écran — un second onglet, un envoi
     renvoyé — n'est dans aucune ligne de l'envoi : le formulaire la compare quand même aux lignes
-    gardées, et refuse le doublon au lieu de le laisser à la base."""
+    gardées, et refuse le doublon au lieu de le laisser à la base. La ligne en double est marquée,
+    comme Django marque un doublon entre les lignes de l'envoi."""
     django, python = saved(technology(name="Django")), saved(technology(name="Python"))
     portfolio = saved_project(django)
     url = reverse("admin:content_project_change", args=[portfolio.pk])
@@ -317,7 +318,13 @@ def test_l_admin_refuse_une_technologie_enregistree_depuis_l_ouverture_de_l_ecra
     else:
         saved(ProjectTechnology(project=portfolio, technology=python, position=2))
 
-    assert refused_lines(admin_client, url, data) == [strings.PROJECT_TECHNOLOGY_TAKEN]
+    lines = admin_client.post(url, data).context["inline_admin_formsets"][0].formset
+
+    assert list(lines.non_form_errors()) == [strings.PROJECT_TECHNOLOGY_TAKEN]
+    assert [list(form.non_field_errors()) for form in lines.forms[:2]] == [
+        [],
+        [lines.get_form_error()],
+    ]
     assert ProjectTechnology.objects.filter(project=portfolio).count() == 2
 
 
