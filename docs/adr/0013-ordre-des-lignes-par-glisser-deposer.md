@@ -55,6 +55,7 @@ bibliothèque :
 - on retire une ligne, on la rajoute, on la déplace, on échange les objets de deux lignes, puis on
   enregistre une fois : l'unicité (parent, objet) se juge entre les lignes gardées, et avec les
   lignes enregistrées ailleurs depuis l'ouverture de l'écran (`InlineRowForm`, `SortableFormSet`) ;
+  une ligne supprimée ailleurs dans l'intervalle compte comme supprimée ;
   la base la vérifie à la fin de l'enregistrement — elle y est différée, car Django écrit les lignes
   l'une après l'autre ;
 - générique : tout tableau en ligne de l'admin qui hérite de `SortableInline` s'ordonne ainsi, la
