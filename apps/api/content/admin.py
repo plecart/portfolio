@@ -10,7 +10,10 @@ from adminsortable2.admin import (
 )
 from config import strings
 from django.contrib import admin
+from django.contrib.admin.widgets import RelatedFieldWidgetWrapper
+from django.db.models import Field
 from django.forms import BaseInlineFormSet, Media, ModelForm
+from django.forms import Field as FormField
 from django.http import HttpRequest
 from django.utils.html import format_html
 from django.utils.safestring import SafeString, mark_safe
@@ -121,6 +124,20 @@ class ProjectTechnologyInline(
     formset = ProjectTechnologyFormSet
     fields = ("technology", "position")
     min_num = 1
+
+    def formfield_for_dbfield(
+        self, db_field: Field[Any, Any], request: HttpRequest, **kwargs: Any
+    ) -> FormField | None:
+        """La liste des technologies, sans les raccourcis qui modifient, montrent ou suppriment la
+        technologie choisie : l'écran Projet choisit des technologies, il ne les édite pas, et
+        supprimer depuis une ligne retirerait la technologie de tout le site. L'ajout d'une
+        technologie manquante reste."""
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if formfield is not None and isinstance(formfield.widget, RelatedFieldWidgetWrapper):
+            formfield.widget.can_change_related = False
+            formfield.widget.can_view_related = False
+            formfield.widget.can_delete_related = False
+        return formfield
 
     def get_formset(
         self, request: HttpRequest, obj: Project | None = None, **kwargs: Any
