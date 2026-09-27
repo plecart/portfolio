@@ -95,7 +95,7 @@ updates:
       include: scope
     ignore:
       # Changer de version de Python est une décision du projet (`.python-version`, que l'image
-      # suit sous test), pas une mise à jour : une PR `3.13.x-slim-bookworm` échouerait par
+      # suit sous test), pas une mise à jour : une PR `3.13.x-slim-trixie` échouerait par
       # construction, chaque semaine. Les correctifs de la 3.12 passent.
       - dependency-name: python
         update-types: [version-update:semver-major, version-update:semver-minor]

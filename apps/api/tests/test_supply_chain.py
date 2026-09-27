@@ -488,7 +488,7 @@ def test_dependabot_ne_propose_jamais_de_nouvelle_version_de_python() -> None:
     """La version de Python est une décision du projet, pas une mise à jour.
 
     `.python-version` l'épingle et l'image la suit sous test (`test_infra.py`) : une PR qui
-    proposerait `3.13.x-slim-bookworm` échouerait chaque semaine, par construction. Dependabot ne
+    proposerait `3.13.x-slim-trixie` échouerait chaque semaine, par construction. Dependabot ne
     propose donc, pour cette image, que les versions de correctif de la 3.12.
     """
     ignored = dependabot_entry("docker").get("ignore", [])

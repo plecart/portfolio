@@ -21,8 +21,9 @@
 # l'instruction, la seule que lise Dependabot.
 
 # Nommée une fois et réutilisée par les deux étages : deux `FROM` littéraux finiraient par
-# diverger, et l'étage d'exécution est justement celui qu'on relit le moins.
-FROM python:3.12.14-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e AS base
+# diverger, et l'étage d'exécution est justement celui qu'on relit le moins. Debian 13, la stable
+# en cours : Debian 12 est sorti du support de sécurité régulier le 2026-06-11 (ADR 0014).
+FROM python:3.12.14-slim-trixie@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f AS base
 
 # `uv` dans un étage à lui plutôt que dans un `COPY --from=<image>` : Dependabot ne lit que les
 # lignes `FROM`, et une image citée seulement par `COPY --from` ne serait jamais mise à jour.
