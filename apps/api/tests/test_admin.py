@@ -54,7 +54,7 @@ LINES = "projecttechnology_set"
 # feuille qui les ordonnent par glisser-déposer.
 INLINE_DELETE_SCRIPT = "content/admin/inline_delete.js"
 INLINE_SORT_SCRIPT = "content/admin/inline_sort.js"
-INLINE_SORT_STYLE = "content/admin/inline_sort.css"
+INLINE_ROWS_STYLE = "content/admin/inline_rows.css"
 
 # Les classes des raccourcis que Django pose à côté d'une liste d'objets liés pour modifier, voir ou
 # supprimer l'objet choisi (`admin/widgets/related_widget_wrapper.html`).
@@ -447,7 +447,7 @@ def test_chaque_ligne_de_technologie_porte_une_poignee_de_tri(admin_client: Clie
     positions = re.findall(rf'<input type="hidden" name="{LINES}-\d+-position"[^>]*>', page)
     assert len(positions) == len(lines.forms)
     assert all('class="sortable-position"' in position for position in positions)
-    for asset in (INLINE_SORT_SCRIPT, INLINE_SORT_STYLE):
+    for asset in (INLINE_SORT_SCRIPT, INLINE_ROWS_STYLE):
         assert f"{settings.STATIC_URL}{asset}" in page
 
 
