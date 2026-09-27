@@ -1,6 +1,6 @@
 # 0014 — CI/CD : GitHub Actions et GHCR
 
-- **Statut** : proposé
+- **Statut** : accepté
 - **Date** : 2026-09-27
 - **Décisions du cadrage** : D56 (`docs/cadrage-technique.md` §7) ; confirme D43 (GHCR) ; tranche la
   ligne « SBOM, Trivy » de l'annexe A ; décisions de l'interrogatoire de #15 (2026-09-26) et image
