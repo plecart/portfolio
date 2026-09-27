@@ -75,9 +75,10 @@ cette version (jrief/django-admin-sortable2#442), qu'il fallait contourner.
 
 **Négatives, assumées**
 
-- Un script à maintenir (tri et bouton de suppression, 170 lignes commentées). Le serveur est tenu
-  par les tests ; le geste lui-même ne l'est pas, faute de navigateur dans la suite du back : il se
-  vérifie à l'écran, à chaque changement du script.
+- Un script à maintenir (`inline_rows.js` : tri, index et bouton de suppression). Le serveur est
+  tenu par les tests, avec les prises que le script lit dans la page ; le geste lui-même ne l'est
+  pas, faute de navigateur dans la suite du back : il se vérifie à l'écran, à chaque changement du
+  script.
 - Le glisser-déposer natif ne fonctionne pas au doigt sur écran tactile ; le clavier reste. L'admin
   a un seul utilisateur, l'auteur, sur un poste.
 

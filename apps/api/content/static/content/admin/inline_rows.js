@@ -20,9 +20,10 @@
  *
  * Suppression. Django donne à une ligne neuve un bouton qui la retire de l'écran, et à une ligne
  * enregistrée une case « Supprimer ? » (`admin/edit_inline/tabular.html`, `admin/js/inlines.js`).
- * La case est cachée et remplacée par le bouton de Django, même classe et même libellé : un clic la
- * coche — elle reste la donnée envoyée — et retire la ligne de l'écran. La suppression en base se
- * fait à l'enregistrement, comme toute modification du formulaire, qui y vérifie encore ses règles.
+ * La case est cachée et remplacée par le bouton de Django, même classe et même libellé (`deleteText`,
+ * que Django pose dans la page) : un clic la coche — elle reste la donnée envoyée — et retire la
+ * ligne de l'écran. La suppression en base se fait à l'enregistrement, comme toute modification du
+ * formulaire, qui y vérifie encore ses règles.
  */
 "use strict";
 {
@@ -49,20 +50,35 @@
 
     let dragged = null;
 
-    // Déplace `row` avant ou après `target`, avec la rangée de ses refus.
+    // Déplace `row` avant ou après `target`, avec la rangée de ses refus ; placée avant `target`,
+    // elle passe aussi avant la rangée des refus de `target`, qui reste collée à sa ligne.
     const moveRow = (row, target, after) => {
         const errors = errorsOf(row);
-        target[after ? "after" : "before"](row);
+        if (after) {
+            target.after(row);
+        } else {
+            (errorsOf(target) || target).before(row);
+        }
         if (errors) {
             row.before(errors);
         }
     };
 
-    // La poignée ne rend la ligne glissable que le temps d'un glisser.
+    // La poignée ne rend la ligne glissable que le temps d'un glisser : relâchée sans glisser, la
+    // ligne ne l'est plus ; un glisser, lui, finit par `dragend`.
+    let armed = null;
     document.addEventListener("pointerdown", (event) => {
         const handle = event.target.closest(".sortable-handle");
         if (handle) {
-            handle.closest("tr").draggable = true;
+            armed = handle.closest("tr");
+            armed.draggable = true;
+        }
+    });
+
+    document.addEventListener("pointerup", () => {
+        if (armed) {
+            armed.draggable = false;
+            armed = null;
         }
     });
 
@@ -189,7 +205,9 @@
         button.setAttribute("role", "button");
         button.href = "#";
         button.className = "inline-deletelink";
-        button.textContent = window.gettext("Remove");
+        // Le libellé que Django donne à ses propres boutons, traduit côté serveur : « Remove »
+        // manque au catalogue JavaScript de l'admin, où `gettext` le laisserait en anglais.
+        button.textContent = formsetOptions(checkbox).deleteText;
         button.addEventListener("click", (event) => {
             event.preventDefault();
             checkbox.checked = true;
