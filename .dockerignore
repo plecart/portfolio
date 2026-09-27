@@ -1,11 +1,12 @@
 # Ce que le contexte de build ne doit pas porter — les secrets d'abord, le poids ensuite.
 #
-# Le Dockerfile ne copie que des chemins nommés, donc rien d'ici ne finirait dans l'image par
-# accident. L'exclusion vaut quand même : le contexte entier est envoyé au démon Docker avant
-# la première instruction, et un `.env` qui n'est jamais envoyé ne peut pas fuir.
+# Les Dockerfiles copient des chemins nommés, mais certains sont des dossiers entiers (`apps/api`,
+# `apps/web/dist`) : tout ce qui s'y trouve entre dans l'image. Et le contexte entier est envoyé au
+# builder avant la première instruction : un `.env` qui n'est jamais envoyé ne peut pas fuir.
 
-# Secrets et configuration locale
-.env
+# Secrets et configuration locale. `**/` : `git` ignore un `.env` à toute profondeur, Docker
+# seulement là où ce fichier le dit — mesuré, `apps/api/.env` entrait dans l'image `api`.
+**/.env
 .claude/settings.local.json
 
 # Historique et métadonnées

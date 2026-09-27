@@ -87,11 +87,12 @@ TEMPLATES = [
 # Exigé par `staticfiles`, qui refuse de démarrer sans lui : le défaut de Django est `None`.
 STATIC_URL = "static/"
 
-# Les fichiers statiques sont collectés au build de l'image (`/app/static`), jamais sur le poste,
-# où WhiteNoise les lit à la source (ADR 0014). Le stockage ajoute à chaque nom l'empreinte de son
-# contenu et en garde une copie compressée : le navigateur conserve un fichier indéfiniment, et
-# une nouvelle version change de nom. Il refuse aussi de rendre une page qui cite un fichier absent
-# de la collecte. `default` reste celui de Django : les fichiers téléversés, sous `MEDIA_ROOT`.
+# Les fichiers statiques sont collectés au build de l'image (`/app/static`), jamais dans le
+# dépôt : sur le poste, WhiteNoise les lit à la source (`DEBUG`), et les tests les collectent dans
+# un dossier temporaire (ADR 0014). Le stockage ajoute à chaque nom l'empreinte de son contenu et
+# en garde une copie compressée : le navigateur conserve un fichier indéfiniment, et une nouvelle
+# version change de nom. Il refuse aussi de rendre une page qui cite un fichier absent de la
+# collecte. `default` reste celui de Django : les fichiers téléversés, sous `MEDIA_ROOT`.
 STATIC_ROOT = REPOSITORY_ROOT / "static"
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
