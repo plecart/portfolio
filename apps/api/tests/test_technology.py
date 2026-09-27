@@ -48,9 +48,9 @@ FIELD_REFUSALS = [
 ]
 
 # Les règles que la base porte en plus de la validation, une contrainte nommée chacune, et le
-# refus qu'elle rend — code et message du catalogue : l'API de #10 s'y fie même pour une ligne
-# écrite hors de l'admin (brief de #7, décision 10 : « seule règle hors base : au moins une
-# technologie »).
+# refus qu'elle rend — son code et le message du catalogue : l'API de #10 s'y fie même pour une
+# ligne écrite hors de l'admin (brief de #7, décision 10 : « seule règle hors base : au moins
+# une technologie »).
 DATABASE_RULES = [
     (
         "type hors de sa liste",

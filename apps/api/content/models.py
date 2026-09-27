@@ -1,10 +1,11 @@
 """Modèles du contenu : les technologies et les projets.
 
-Toute règle que la base peut porter y est une contrainte du modèle, avec son code et son
-message du catalogue (décision 10 du brief de #7) : Django la vérifie dans `full_clean()` — donc
-dans l'admin —, Postgres la garantit pour toute ligne écrite hors de l'admin. Quand un champ la
-vérifie déjà (`blank`, `choices`), Django écarte la contrainte des champs en erreur : l'admin
-n'affiche jamais deux messages pour une même faute.
+Toute règle que la base peut porter y est une contrainte du modèle (décision 10 du brief de #7) :
+son code, identifiant stable du refus, est nommé sur la contrainte ; son message, texte affiché,
+vient du catalogue. Django la vérifie dans `full_clean()` — donc dans l'admin —, Postgres la
+garantit pour toute ligne écrite hors de l'admin. Quand un champ la vérifie déjà (`blank`,
+`choices`), Django écarte la contrainte des champs en erreur : l'admin n'affiche jamais deux
+messages pour une même faute.
 """
 
 from datetime import date, datetime
