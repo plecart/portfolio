@@ -231,6 +231,33 @@ def test_l_admin_accepte_une_technologie_retiree_puis_rajoutee_avant_l_enregistr
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    "swapped",
+    [True, False],
+    ids=["deux lignes échangent leurs technologies", "une ligne reprend celle d'une ligne retirée"],
+)
+def test_l_admin_accepte_une_technologie_passee_d_une_ligne_enregistree_a_une_autre(
+    admin_client: Client, swapped: bool
+) -> None:
+    """L'état final compte, pas l'ordre des écritures : Django modifie et supprime les lignes
+    enregistrées l'une après l'autre, dans l'ordre du formulaire
+    (`BaseModelFormSet.save_existing_objects`), et la première écriture reprend une technologie que
+    la seconde libère."""
+    django, python = saved(technology(name="Django")), saved(technology(name="Python"))
+    portfolio = saved_project(django)
+    saved(ProjectTechnology(project=portfolio, technology=python, position=2))
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
+    data = rendered_data(admin_client, url) | {f"{LINES}-0-technology": python.pk}
+    data |= {f"{LINES}-1-technology": django.pk} if swapped else {f"{LINES}-1-DELETE": "on"}
+
+    response = admin_client.post(url, data)
+
+    assert response.status_code == 302
+    stored = ProjectTechnology.objects.filter(project=portfolio)
+    assert [link.technology for link in stored] == ([python, django] if swapped else [python])
+
+
+@pytest.mark.django_db
 def test_l_admin_refuse_une_technologie_gardee_rajoutee_une_seconde_fois(
     admin_client: Client,
 ) -> None:

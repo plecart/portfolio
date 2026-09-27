@@ -5,7 +5,7 @@ import pytest
 from config import strings
 from content.models import Project, ProjectTechnology, Technology
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import ProtectedError
 from factories import project, saved, technology
 from refusals import refusals
@@ -100,6 +100,8 @@ def test_un_projet_ne_porte_pas_deux_fois_la_meme_technologie(portfolio: Project
 
 @pytest.mark.django_db
 def test_la_base_refuse_deux_fois_la_meme_technologie_dans_un_projet(portfolio: Project) -> None:
+    """L'unicité est différée : Postgres la vérifie à la validation de la transaction, que
+    `check_constraints()` avance ici."""
     django = saved_technology("Django")
     link(portfolio, django, 1)
 
@@ -108,6 +110,7 @@ def test_la_base_refuse_deux_fois_la_meme_technologie_dans_un_projet(portfolio: 
         transaction.atomic(),
     ):
         link(portfolio, django, 2)
+        connection.check_constraints()
 
 
 @pytest.mark.django_db

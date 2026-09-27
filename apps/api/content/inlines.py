@@ -31,13 +31,16 @@ POSITION_CLASS = "sortable-position"
 
 
 class InlineRowForm[ChildT: Model](ModelForm[ChildT]):
-    """Une ligne de tableau en ligne, qu'on peut retirer puis rajouter avant l'enregistrement.
+    """Une ligne de tableau en ligne, qu'on peut retirer, rajouter ou changer avant
+    l'enregistrement.
 
     Django vérifierait ligne par ligne, contre la base, les contraintes qui lisent le parent — une
-    unicité (parent, objet) — : une ligne que le même envoi supprime y existe encore, et la rajouter
-    serait refusé. Le formset les juge entre les lignes qu'il garde
-    (`BaseModelFormSet.validate_unique`, lignes supprimées écartées), et la base les garantit à
-    l'enregistrement, qui supprime avant d'ajouter.
+    unicité (parent, objet) — : une ligne que le même envoi supprime ou change y existe encore, et
+    reprendre son objet serait refusé. Le formset juge ces unicités entre les lignes qu'il garde
+    (`BaseModelFormSet.validate_unique` : unicités sur des champs, sans condition ni expression ;
+    lignes supprimées écartées quand toutes les lignes sont valides). La base les garantit à la fin
+    de l'enregistrement, à condition qu'elles y soient différées (`Deferrable.DEFERRED`) : Django
+    écrit les lignes l'une après l'autre, et un échange entre deux lignes passe par un doublon.
     """
 
     def validate_constraints(self) -> None:
