@@ -77,10 +77,11 @@ class SortableFormSet[ChildT: Model, ParentT: Model](
     l'auteur ne voit pas, en reçoit une au lieu d'échouer en base."""
 
     def get_form_kwargs(self, index: int | None) -> dict[str, Any]:
-        """Toute ligne neuve peut rester vide, la première comprise : Django exige sinon les
-        `min_num` premières (`BaseFormSet._construct_form`), quelle que soit la ligne que l'auteur a
-        remplie ou placée en tête. Quand `validate_min` compte les lignes remplies, le minimum reste
-        tenu."""
+        """Quand `validate_min` compte le minimum sur les lignes remplies, toute ligne neuve peut
+        rester vide, la première comprise : Django exige sinon les `min_num` premières
+        (`BaseFormSet._construct_form`), quelle que soit la ligne que l'auteur a remplie ou placée
+        en tête. Sans `validate_min`, ces lignes obligatoires sont le seul minimum du tableau :
+        elles le restent."""
         kwargs = super().get_form_kwargs(index)
         if self.validate_min and index is not None and index >= self.initial_form_count():
             kwargs["empty_permitted"] = True
@@ -106,7 +107,14 @@ class SortableFormSet[ChildT: Model, ParentT: Model](
         others = [row for row in self.get_queryset() if row.pk not in carried]
         if not others:
             return
-        kept = [form for form in self.forms if form.is_valid() and form not in self.deleted_forms]
+        deleted = self.deleted_forms
+        # Comme Django : une ligne neuve laissée vide n'a rien à comparer, et NULL ne doublonne
+        # aucune ligne en base.
+        kept = [
+            form
+            for form in self.forms
+            if form.is_valid() and form.cleaned_data and form not in deleted
+        ]
         model = self.fk.model._meta
         attnames = {field.name: field.attname for field in model.concrete_fields}
         for constraint in model.total_unique_constraints:
@@ -115,7 +123,9 @@ class SortableFormSet[ChildT: Model, ParentT: Model](
             columns = [attnames[name] for name in constraint.fields]
             taken = {tuple(getattr(row, column) for column in columns) for row in others}
             for form in kept:
-                if tuple(getattr(form.instance, column) for column in columns) in taken:
+                values = tuple(getattr(form.instance, column) for column in columns)
+                if None not in values and values in taken:
+                    form.add_error(None, self.get_form_error())
                     raise ValidationError(self.get_unique_error_message(list(constraint.fields)))
         # ponytail: deux envois simultanés échappent encore à ce contrôle et tombent sur la base à
         # la validation de la transaction, comme les clés étrangères différées de Django ;

@@ -6,12 +6,18 @@ import inspect
 import pytest
 from config import strings
 from content.inlines import InlineRowForm, SortableFormSet, SortableInline
-from content.models import Project
+from content.models import Project, ProjectTechnology
 from django.apps import apps
 from django.contrib import admin
 from django.core.exceptions import NON_FIELD_ERRORS
 from django.db.models import Deferrable
-from django.forms import model_to_dict, modelform_factory
+from django.forms import (
+    BaseInlineFormSet,
+    ModelForm,
+    inlineformset_factory,
+    model_to_dict,
+    modelform_factory,
+)
 from factories import project, saved
 
 
@@ -70,3 +76,29 @@ def test_toute_unicite_d_un_tableau_ordonnable_qui_lit_le_parent_est_differee() 
 
     assert reading_parent
     assert reading_parent == dict.fromkeys(reading_parent, Deferrable.DEFERRED)
+
+
+@pytest.mark.parametrize(
+    ("validate_min", "optional"),
+    [(False, [False, True]), (True, [True, True])],
+    ids=["minimum tenu par les lignes obligatoires", "minimum compte sur les lignes remplies"],
+)
+def test_la_premiere_ligne_neuve_n_est_facultative_que_si_le_minimum_se_compte(
+    validate_min: bool, optional: list[bool]
+) -> None:
+    """Sans `validate_min`, les `min_num` premières lignes neuves, obligatoires, sont le seul
+    minimum du tableau : `SortableFormSet` ne les rend facultatives que quand le minimum se compte
+    sur les lignes remplies."""
+    formset_class: type[BaseInlineFormSet[ProjectTechnology, Project, ModelForm[ProjectTechnology]]]
+    formset_class = inlineformset_factory(
+        Project,
+        ProjectTechnology,
+        form=InlineRowForm,
+        formset=SortableFormSet,
+        fields=("technology", "position"),
+        min_num=1,
+        validate_min=validate_min,
+        extra=1,
+    )
+
+    assert [form.empty_permitted for form in formset_class().forms] == optional
