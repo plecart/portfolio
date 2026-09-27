@@ -14,7 +14,7 @@ WEB := apps/web
 # Le front compilé, que les images copient depuis le contexte de build (ADR 0014). `index.html`
 # en est le témoin : absent, `build` et `dev` compilent le front ; présent, ils le reprennent tel
 # quel — `make web-build` le recompile à la demande.
-WEB_INDEX = $(WEB)/dist/index.html
+WEB_INDEX := $(WEB)/dist/index.html
 
 # `cd` plutôt que `npm --prefix` : mesuré, `--prefix` ne déplace pas le répertoire courant, et
 # les scripts du front résolvent leurs chemins depuis celui-ci. Le préfixe est nommé une fois :
@@ -33,8 +33,9 @@ IMAGE_BUILDS := $(addprefix build-,$(IMAGES))
 # après quoi `?=` n'assigne plus rien. Mesuré sur l'ancien nom d'image, qui partait alors sans
 # étiquette (`-t  .`).
 #
-# Exportée parce que l'interpolation de Compose lit l'environnement du processus : c'est ce qui
-# fait que `make dev` et `make build` construisent une seule et même image `api`.
+# Exportée pour que l'environnement du processus l'emporte sur `infra/dev.env`, où Compose lit
+# aussi ses variables d'interpolation : un préfixe que ce fichier nommerait donnerait à `make dev`
+# une autre image `api` que celle de `make build` (mesuré à la relecture de la PR #53).
 IMAGE_PREFIX ?= portfolio-
 export IMAGE_PREFIX
 

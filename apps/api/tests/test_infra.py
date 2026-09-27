@@ -1,4 +1,4 @@
-"""Tests des fichiers d'infrastructure : image `api`, point d'entrée, Compose de développement.
+"""Tests des fichiers d'infrastructure : images, point d'entrée, Compose de développement.
 
 Ces tests lisent des fichiers, ou interrogent les outils qui les lisent — `make --dry-run`, Docker
 pour le contexte de build —, sans construire d'image ni démarrer de conteneur. Ils gardent des
@@ -16,7 +16,7 @@ import re
 import shutil
 import subprocess
 import tarfile
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 import pytest
@@ -46,6 +46,9 @@ WEB_TREE = [
 ]
 WEB_BUILD_OUTPUT = {"apps/web/dist/index.html", "apps/web/dist/assets/index.js"}
 
+# Des fichiers d'environnement du poste, là où `git` les ignore : à toute profondeur.
+LOCAL_ENV_FILES = {".env", "apps/api/.env", "infra/caddy/.env"}
+
 # Ce que l'image `api` sert, là où l'application le lit : le gabarit des aperçus de lien (ADR
 # 0011), chemin par défaut du réglage de #14 (brief de #15, décision 10), et les fichiers
 # statiques collectés au build, que WhiteNoise sert depuis `STATIC_ROOT` (ADR 0014). Copiés
@@ -64,6 +67,9 @@ FRONT_BUILD = "npm run build"
 # fabrique pas une seconde image `api` sous un nom à lui. Deux noms qui dériveraient donneraient
 # deux images du même Dockerfile, et la publication ne saurait plus laquelle pousser.
 MAKEFILE_PREFIX = re.compile(r"^IMAGE_PREFIX \?= (?P<prefix>\S+)$", re.MULTILINE)
+# L'export du préfixe : l'environnement du processus l'emporte sur `--env-file`, donc sur un
+# préfixe que `infra/dev.env` nommerait (mesuré à la relecture de la PR #53).
+MAKEFILE_EXPORT = re.compile(r"^export IMAGE_PREFIX$", re.MULTILINE)
 COMPOSE_API_IMAGE = re.compile(
     r"^\s*image: \$\{IMAGE_PREFIX:-(?P<prefix>[^}]+)\}api$", re.MULTILINE
 )
@@ -88,8 +94,13 @@ OVERRIDABLE = re.compile(r"^(?P<name>\w+) \?=", re.MULTILINE)
 BASE_IMAGE_VERSION = re.compile(r"^FROM python:(\d+\.\d+)[.-]", re.MULTILINE)
 
 # Les variables que lit le back : un `ARG` qui en nommerait une la réclamerait au build, un `ENV`
-# la figerait dans l'image. Un montage de secret, lui, en réclamerait une quelle qu'elle soit.
-ENV_FIELDS = re.compile(rf"\b(?:{'|'.join(Env.model_fields)})\b")
+# la figerait dans l'image — sans égard à la casse, comme `pydantic-settings` les lit
+# (`case_sensitive=False` par défaut : `secret_key` configure `SECRET_KEY`, mesuré dans l'image à
+# la relecture de la PR #53). Un montage de secret, lui, en réclamerait une quelle qu'elle soit.
+ENV_FIELDS = re.compile(rf"\b(?:{'|'.join(Env.model_fields)})\b", re.IGNORECASE)
+
+# Les Dockerfiles des images du dépôt, un par dossier `infra/<service>/` (ADR 0014).
+IMAGE_DOCKERFILES = sorted(REPOSITORY_ROOT.glob("infra/*/Dockerfile"))
 BUILD_DECLARATION = re.compile(r"^\s*(?:ARG|ENV)\b", re.IGNORECASE)
 SECRET_MOUNT = "--mount=type=secret"
 
@@ -213,6 +224,20 @@ def build_context(root: Path) -> set[str]:
         return {member.name.removeprefix("./") for member in received if member.isfile()}
 
 
+def write_tree(root: Path, names: Iterable[str]) -> None:
+    """Une arborescence témoin de fichiers vides sous `root`, avec le `.dockerignore` du dépôt.
+
+    Args:
+        root: le dossier de contexte à créer.
+        names: les chemins des fichiers, relatifs à `root`.
+    """
+    for name in names:
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+    shutil.copy(DOCKERIGNORE, root / ".dockerignore")
+
+
 def test_les_images_de_base_suivent_la_version_epinglee() -> None:
     """Deux épingles qui divergeraient en silence ne vaudraient pas mieux qu'aucune.
 
@@ -238,6 +263,9 @@ def test_le_compose_et_le_makefile_nomment_la_meme_image() -> None:
         "le service `api` ne reprend plus `${IMAGE_PREFIX}` — Compose se nommerait seul"
     )
     assert from_makefile.group("prefix") == from_compose.group("prefix")
+    assert MAKEFILE_EXPORT.search(MAKEFILE.read_text(encoding="utf-8")), (
+        "`export IMAGE_PREFIX` a disparu : `infra/dev.env` pourrait nommer l'image de `make dev`"
+    )
 
 
 def test_les_tests_de_base_tournent_sur_l_image_postgres_du_compose() -> None:
@@ -274,7 +302,9 @@ def test_make_build_construit_une_image_par_dossier_d_infra() -> None:
         for path in REPOSITORY_ROOT.glob("infra/*/Dockerfile")
     }
 
-    assert built_images(make_dry_run("build")) == expected
+    printed = make_dry_run("build")
+
+    assert built_images(printed) == expected, printed
 
 
 def test_ajouter_un_dossier_a_infra_suffit_a_construire_son_image(tmp_path: Path) -> None:
@@ -324,15 +354,21 @@ def test_le_contexte_de_build_ne_porte_du_front_que_sa_compilation(tmp_path: Pat
     laisserait passer les formes qu'il n'a pas prévues.
     """
     root = tmp_path / "contexte"
-    for name in WEB_TREE:
-        path = root / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("", encoding="utf-8")
-    shutil.copy(DOCKERIGNORE, root / ".dockerignore")
+    write_tree(root, WEB_TREE)
 
     sent = build_context(root)
 
     assert {name for name in sent if name.startswith("apps/web/")} == WEB_BUILD_OUTPUT
+
+
+def test_le_contexte_de_build_ne_porte_aucun_fichier_d_environnement(tmp_path: Path) -> None:
+    """Un `.env` envoyé au build entre dans l'image dès qu'un `COPY` prend son dossier entier —
+    mesuré à la relecture de la PR #53 : `apps/api/.env` finissait dans l'image `api`. `git`
+    l'ignore à toute profondeur ; le `.dockerignore` doit en faire autant."""
+    root = tmp_path / "contexte"
+    write_tree(root, LOCAL_ENV_FILES)
+
+    assert build_context(root) & LOCAL_ENV_FILES == set()
 
 
 @pytest.mark.parametrize("copy", SERVED_COPIES)
@@ -371,16 +407,19 @@ def test_la_ci_donne_a_chaque_image_son_entree_de_cache() -> None:
     assert tags == {service: [service, service] for service in services}
 
 
-def test_le_build_de_l_image_ne_demande_aucun_secret() -> None:
-    """Le build n'attend aucun secret : le job `infra` construit l'image sans en avoir aucun.
+@pytest.mark.parametrize(
+    "dockerfile", IMAGE_DOCKERFILES, ids=[path.parent.name for path in IMAGE_DOCKERFILES]
+)
+def test_le_build_des_images_ne_demande_aucun_secret(dockerfile: Path) -> None:
+    """Le build n'attend aucun secret : le job `infra` construit les images sans en avoir aucun.
 
-    `collectstatic` charge pourtant les réglages, donc `Env.load()` (ADR 0014) : ses valeurs
-    factices vivent sur sa ligne de `RUN`. Un `ARG` qui nommerait une variable d'`Env` la
+    `collectstatic` charge pourtant les réglages de `api`, donc `Env.load()` (ADR 0014) : ses
+    valeurs factices vivent sur sa ligne de `RUN`. Un `ARG` qui nommerait une variable d'`Env` la
     réclamerait à la commande de build, un montage de secret aussi ; un `ENV` la figerait dans
-    l'image, lisible par `docker inspect`.
+    l'image, lisible par `docker inspect` — dans toute image publiée, pas seulement dans `api`.
     """
     instructions = [
-        whole for _, whole in dockerfile_instructions(DOCKERFILE.read_text(encoding="utf-8"))
+        whole for _, whole in dockerfile_instructions(dockerfile.read_text(encoding="utf-8"))
     ]
 
     assert instructions, "aucune instruction lue — le Dockerfile a-t-il changé de forme ?"
