@@ -51,6 +51,9 @@ PROJECT_TECHNOLOGY_FIELD_LABELS = {
 # inverse (`BaseInlineFormSet.get_default_prefix`).
 LINES = "projecttechnology_set"
 
+# Le script qui donne à chaque ligne en ligne le même bouton de suppression.
+INLINE_DELETE_SCRIPT = "content/admin/inline_delete.js"
+
 # Les classes des raccourcis que Django pose à côté d'une liste d'objets liés pour modifier, voir ou
 # supprimer l'objet choisi (`admin/widgets/related_widget_wrapper.html`).
 RELATED_LINKS = ["change-related", "view-related", "delete-related"]
@@ -414,6 +417,24 @@ def test_une_ligne_de_technologie_ne_modifie_ni_ne_supprime_la_technologie(
 
     assert "add-related" in page
     assert [link for link in RELATED_LINKS if link in page] == []
+
+
+@pytest.mark.django_db
+def test_l_ecran_projet_charge_le_bouton_unique_de_suppression_des_lignes(
+    admin_client: Client,
+) -> None:
+    """Django supprime une ligne neuve par un bouton, une ligne enregistrée par une case à cocher ;
+    le script de l'écran donne à toutes le même bouton. Son effet se regarde à l'écran (arrêt
+    visuel) ; ce test tient ce que le serveur en livre : la case, que le script cache, et le script.
+    """
+    portfolio = saved_project(saved(technology(name="Django")))
+
+    page = admin_client.get(
+        reverse("admin:content_project_change", args=[portfolio.pk])
+    ).content.decode()
+
+    assert f'name="{LINES}-0-DELETE"' in page
+    assert f"{settings.STATIC_URL}{INLINE_DELETE_SCRIPT}" in page
 
 
 @pytest.mark.django_db

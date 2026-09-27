@@ -125,6 +125,10 @@ class ProjectTechnologyInline(
     fields = ("technology", "position")
     min_num = 1
 
+    class Media:
+        # Le même bouton de suppression pour les lignes enregistrées que pour les lignes neuves.
+        js = ("content/admin/inline_delete.js",)
+
     def formfield_for_dbfield(
         self, db_field: Field[Any, Any], request: HttpRequest, **kwargs: Any
     ) -> FormField | None:
