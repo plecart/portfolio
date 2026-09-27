@@ -44,7 +44,8 @@ bibliothèque :
   quand la poignée a le focus ;
 - le champ `position` reste en base, caché et facultatif dans le formulaire ; à l'envoi, le script
   le remplit dans l'ordre affiché, pour chaque ligne gardée, et une ligne neuve dont seule la
-  position est remplie reste ignorée, comme une ligne vide (`InlineRowForm`) ; le script remet aussi
+  position est remplie reste ignorée, comme une ligne vide, la première comprise (`InlineRowForm`,
+  `SortableFormSet` : « au moins une » se compte sur les lignes remplies) ; le script remet aussi
   les index des lignes là où Django les lit, les lignes enregistrées d'abord — l'ordre affiché n'en
   porte aucun ;
 - quand l'écran revient en erreur, les lignes reprennent l'ordre de leurs positions : l'ordre donné

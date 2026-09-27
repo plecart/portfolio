@@ -7,9 +7,10 @@
  * la ligne par sa poignée — glisser-déposer natif du navigateur, sans bibliothèque —, ou on la
  * déplace par les flèches haut et bas quand la poignée a le focus. À l'envoi du formulaire, chaque
  * ligne affichée reçoit sa position dans l'ordre affiché, dans son champ caché
- * (`.sortable-position`) ; le serveur ignore une ligne neuve dont seule la position est remplie
- * (`InlineRowForm.has_changed`). Quand l'écran revient en erreur, Django réaffiche les lignes dans
- * l'ordre de leurs index : le script les replace dans l'ordre de leurs positions.
+ * (`.sortable-position`) ; le serveur ignore une ligne neuve dont seule la position est remplie,
+ * la première comprise (`InlineRowForm.has_changed`, `SortableFormSet.get_form_kwargs`). Quand
+ * l'écran revient en erreur, Django réaffiche les lignes dans l'ordre de leurs index : le script
+ * les replace dans l'ordre de leurs positions.
  *
  * Index. Django lit une ligne enregistrée aux premiers index, autant qu'il y a de lignes
  * enregistrées, et une ligne neuve au-delà ; quand on retire une ligne neuve, il renumérote les
