@@ -92,7 +92,7 @@ Email (post-MVP, peut-être jamais) · anglais · commentaires (retirés) · MCP
 | Worker (Celery ou arq) | Tâches de fond | 1 ou 2 | Temporal | à sa phase (annexe A) |
 | Cloudflare R2 | Médias publics, documents privés, sauvegardes | 1 | Disque du VPS | 0004 |
 | Vite + React + TypeScript + Tailwind CSS + shadcn/ui | Frontend statique, compilé en CI, servi par Caddy | 1 | Next.js, Flutter web | 0008 |
-| GitHub Actions + GHCR | CI/CD | 1 | — | à écrire |
+| GitHub Actions + GHCR | CI/CD : construction, scan et publication des images | 1 | Docker Hub, registre auto-hébergé ; agent de déploiement sur le VPS | 0014 |
 | Sentry, healthchecks.io | Erreurs, sauvegardes | 1 | Surveillance de disponibilité SaaS, Prometheus + Grafana | à écrire (sauvegardes : 0007) |
 | FastAPI + LangGraph + LangChain | Service IA | 2 | Django ASGI, sans framework | à sa phase |
 | LangSmith cloud (région UE) | Traces, datasets, évaluations | 2 | Langfuse | à sa phase |
@@ -267,6 +267,7 @@ Identifiants hérités du cadrage v0 (D1 à D38), sans trou ni renumérotation. 
 | D53 | Le bloc d'aperçu du gabarit porte cinq balises | `<title>`, `<meta name="description">`, `og:title`, `og:description` et `og:image` du projet, injectées par la vue de `/projets/<slug>` ; `description` et `og:description` portent le même texte, et le gabarit n'a pas d'`og:image` par défaut. Sans `description`, le score SEO tombe à 91, sous le seuil de la spec §1.16. Remplace le point « balises injectées » de D44 (ADR 0011, 2026-09-24). |
 | D54 | Deux fichiers Compose, mêmes images | `infra/compose.dev.yml` sur le poste, `infra/compose.yml` en production ; mêmes images, même point d'entrée, mêmes services de données ; ce qui diverge est propre à l'environnement (ports, code monté, `runserver` / Caddy, Tunnel, worker, backup). Remplace le point « environnement identique » de D19 et l'argument « un seul fichier Compose » de D32 (ADR 0012, 2026-09-24). |
 | D55 | Lignes de l'admin ordonnées par glisser-déposer | Technologies d'un projet, puis galerie de #9 : l'auteur fait glisser les lignes, enregistrées ou neuves, ou les déplace au clavier ; la position cachée suit l'ordre affiché à l'enregistrement ; script du projet, sans bibliothèque (ADR 0013, 2026-09-27). |
+| D56 | CI/CD : GitHub Actions et GHCR | Une image par dossier `infra/<service>/` ; front compilé une fois, copié dans `caddy` et, pour `index.html`, dans `api` ; statiques de l'admin servis par WhiteNoise depuis `api`, qui repose sur Debian 13 ; Trivy bloque HIGH et CRITICAL, corrigeables ou non, et la fin de vie, toute exception étant datée et évaluée en trois points ; publication par un job `publish` sur `main`, SHA et `latest`, trois versions gardées, ni attestation ni SBOM ; confirme D43 (ADR 0014, 2026-09-27). |
 | D29 | (remplacée par D36, D37) | — |
 | D21 | (remplacée par D25) | — |
 
@@ -321,7 +322,7 @@ Recos appliquées par défaut ; chaque point sera tranché par un ADR au moment 
 | Fonctionnalités LangGraph prioritaires | Routage, parallélisme, checkpointing, streaming, interruptions. |
 | Déploiement du graphe | Embarqué dans FastAPI ; Studio en local. |
 | Gestionnaire de secrets (Vault, Infisical) | Non ; gestionnaire de mots de passe + secrets GitHub. |
-| SBOM, Trivy | Trivy oui ; SBOM si peu coûteux. |
+| SBOM, Trivy | Tranché par l'ADR 0014 (D56) : Trivy bloquant ; ni SBOM ni attestation de provenance. |
 | Authentification `send_message` | OAuth 2.1 ou jeton après Turnstile ; ADR en phase 3. |
 | Staging | Non ; à réévaluer. |
 | Observabilité avancée (OpenTelemetry, Grafana) | Seulement si besoin de démonstration. |
