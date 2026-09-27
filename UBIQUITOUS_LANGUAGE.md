@@ -27,7 +27,7 @@ un champ : le front le déduit de la présence du lien de la démo.
 |---|---|---|
 | titre | `title` | obligatoire, 30 caractères au plus |
 | slug | `slug` | obligatoire, unique ; lettres sans accent, chiffres, traits d'union et soulignés, 50 caractères au plus ; prérempli depuis le titre, toujours modifiable |
-| résumé | `summary` | obligatoire, 120 caractères au plus ; aucun mot — segment entre espaces ou traits d'union — de plus de 20 caractères |
+| résumé | `summary` | obligatoire, 120 caractères au plus ; aucun mot — segment entre espaces ou traits d'union, l'espace insécable ne séparant pas — de plus de 20 caractères |
 | description | `description` | obligatoire, en Markdown |
 | type | `kind` | perso `personal` · pro `professional` · école `school` |
 | statut | `status` | en cours `ongoing` · terminé `finished` · archivé `archived` |
@@ -38,7 +38,7 @@ un champ : le front le déduit de la présence du lien de la démo.
 | lien de la démo | `demo_url` | adresse facultative, 200 caractères au plus ; sa présence rend le projet « en ligne » |
 | vitrine | `showcase` | un seul projet au plus |
 | publié | `published` | faux par défaut : un projet naît brouillon |
-| créé le, modifié le | `created_at`, `updated_at` | posés à l'enregistrement |
+| créé le, modifié le | `created_at`, `updated_at` | « créé le » posé au premier enregistrement, « modifié le » à chaque enregistrement |
 
 ## Technologie de projet — `ProjectTechnology`
 
@@ -49,4 +49,4 @@ moins une ; l'écran Projet les saisit en ligne.
 |---|---|---|
 | projet | `project` | supprimer le projet supprime ses technologies de projet |
 | technologie | `technology` | une fois au plus par projet ; une technologie employée ne se supprime pas |
-| position | `position` | entier positif, saisi ; l'ordre stocké suit la position, puis l'ordre de saisie |
+| position | `position` | entier de 0 à 32 767, saisi ; l'ordre stocké suit la position, puis l'ordre de saisie |

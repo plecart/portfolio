@@ -72,7 +72,8 @@ PROJECT_TITLE_TOO_LONG = "Le titre d’un projet tient en 30 caractères au plus
 PROJECT_SUMMARY_MISSING = "Un projet porte un résumé."
 PROJECT_SUMMARY_TOO_LONG = "Le résumé d’un projet tient en 120 caractères au plus."
 PROJECT_SUMMARY_WORD_TOO_LONG = (
-    "Aucun mot du résumé ne dépasse 20 caractères ; espaces et traits d’union séparent les mots."
+    "Aucun mot du résumé ne dépasse 20 caractères ; espaces et traits d’union séparent les mots, "
+    "pas les espaces insécables."
 )
 PROJECT_DESCRIPTION_MISSING = "Un projet porte une description."
 PROJECT_KIND_UNKNOWN = "Le type d’un projet est perso, pro ou école."
