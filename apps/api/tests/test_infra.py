@@ -50,12 +50,19 @@ INDEX_COPY = "COPY apps/web/dist/index.html /app/web/index.html"
 # La commande qui compile le front, celle de `make web-build`.
 FRONT_BUILD = "npm run build"
 
-# Le nom de l'image, déclaré des deux côtés : le `Makefile` le pose pour `docker build -t` et
+# Le préfixe du nom des images, déclaré des deux côtés : le `Makefile` le pose pour `-t` et
 # l'exporte, le Compose le reprend en défaut pour qu'un `docker compose` lancé à la main ne
-# fabrique pas une seconde image sous un nom à lui. Deux noms qui dériveraient donneraient deux
-# images du même Dockerfile, et #15 ne saurait plus laquelle publier.
-MAKEFILE_IMAGE = re.compile(r"^API_IMAGE \?= (?P<name>\S+)$", re.MULTILINE)
-COMPOSE_IMAGE = re.compile(r"^\s*image: \$\{API_IMAGE:-(?P<name>[^}]+)\}$", re.MULTILINE)
+# fabrique pas une seconde image `api` sous un nom à lui. Deux noms qui dériveraient donneraient
+# deux images du même Dockerfile, et la publication ne saurait plus laquelle pousser.
+MAKEFILE_PREFIX = re.compile(r"^IMAGE_PREFIX \?= (?P<prefix>\S+)$", re.MULTILINE)
+COMPOSE_API_IMAGE = re.compile(
+    r"^\s*image: \$\{IMAGE_PREFIX:-(?P<prefix>[^}]+)\}api$", re.MULTILINE
+)
+
+# Une commande de build telle que `make --dry-run` l'imprime : son Dockerfile, son étiquette.
+BUILD_COMMAND = re.compile(
+    r"^docker buildx build .*-f (?P<dockerfile>\S+) -t (?P<tag>\S+) \.$", re.MULTILINE
+)
 
 # Toute image de base qui embarque un interpréteur porte sa version dans son nom. Le motif les
 # capture toutes : un seul étage qui dériverait suffirait à faire tourner l'application sur une
@@ -129,24 +136,31 @@ def shell_instructions(script: Path) -> list[str]:
     ]
 
 
-def make_dry_run(target: str, **variables: str) -> str:
-    """Les commandes que `make` exécuterait pour `target`, sans les exécuter.
+def make_dry_run(target: str, directory: Path = REPOSITORY_ROOT, **variables: str) -> str:
+    """Les commandes que le `Makefile` du dépôt exécuterait pour `target`, sans les exécuter.
 
     Args:
         target: la cible du `Makefile`.
+        directory: le dossier où `make` tourne — la racine du dépôt, ou une arborescence témoin.
         variables: des variables posées sur la ligne de commande, qui priment sur le `Makefile`.
 
     Returns:
         La sortie de `make --dry-run`, variables développées — y compris celles des appels
         récursifs à `$(MAKE)`, que `--dry-run` parcourt sans rien exécuter.
     """
+    assignments = [f"{name}={value}" for name, value in variables.items()]
     return subprocess.run(
-        ["make", "--dry-run", target, *(f"{name}={value}" for name, value in variables.items())],
-        cwd=REPOSITORY_ROOT,
+        ["make", "--dry-run", "-f", str(MAKEFILE), target, *assignments],
+        cwd=directory,
         capture_output=True,
         text=True,
         check=True,
     ).stdout
+
+
+def built_images(printed: str) -> dict[str, str]:
+    """Les images d'une sortie de `make --dry-run build` : chaque Dockerfile, et son étiquette."""
+    return {match["dockerfile"]: match["tag"] for match in BUILD_COMMAND.finditer(printed)}
 
 
 def build_context(root: Path) -> set[str]:
@@ -186,14 +200,14 @@ def test_les_images_de_base_suivent_la_version_epinglee() -> None:
 
 def test_le_compose_et_le_makefile_nomment_la_meme_image() -> None:
     """Mesuré avant correction : `make build` et `make dev` produisaient deux images distinctes."""
-    from_makefile = MAKEFILE_IMAGE.search(MAKEFILE.read_text(encoding="utf-8"))
-    from_compose = COMPOSE_IMAGE.search(COMPOSE_DEV.read_text(encoding="utf-8"))
+    from_makefile = MAKEFILE_PREFIX.search(MAKEFILE.read_text(encoding="utf-8"))
+    from_compose = COMPOSE_API_IMAGE.search(COMPOSE_DEV.read_text(encoding="utf-8"))
 
-    assert from_makefile, "`API_IMAGE ?=` a disparu du `Makefile`"
+    assert from_makefile, "`IMAGE_PREFIX ?=` a disparu du `Makefile`"
     assert from_compose, (
-        "le service `api` ne reprend plus `${API_IMAGE}` — Compose se nommerait seul"
+        "le service `api` ne reprend plus `${IMAGE_PREFIX}` — Compose se nommerait seul"
     )
-    assert from_makefile.group("name") == from_compose.group("name")
+    assert from_makefile.group("prefix") == from_compose.group("prefix")
 
 
 def test_les_tests_de_base_tournent_sur_l_image_postgres_du_compose() -> None:
@@ -206,29 +220,50 @@ def test_les_tests_de_base_tournent_sur_l_image_postgres_du_compose() -> None:
     assert compose["services"]["postgres"]["image"] == POSTGRES_IMAGE
 
 
-def test_la_cible_build_produit_une_commande_complete() -> None:
-    """Lit la commande que `make` produira vraiment, expansion des variables comprise.
+def test_make_build_construit_une_image_par_dossier_d_infra() -> None:
+    """Une image par dossier `infra/<service>/` qui porte un `Dockerfile`, nommée
+    `<préfixe><service>` (ADR 0014) : rien de plus, rien de moins.
 
-    Les autres tests de ce module comparent deux textes ; celui-ci interroge `make`. La
-    différence n'est pas théorique — deux défauts sont passés par là, tous deux invisibles à la
-    lecture du `Makefile` et à toutes les portes locales :
+    Lit les commandes que `make` produira vraiment, expansion des variables comprise. Deux
+    défauts sont passés par là, invisibles à la lecture du `Makefile` et à toutes les portes
+    locales :
 
-    - un `export API_IMAGE` posé **avant** l'affectation `?=` définit la variable à vide, `?=`
-      cesse d'assigner, et l'image part sans étiquette (`-t  .`) ;
+    - un `export` posé **avant** l'affectation `?=` définit la variable à vide, `?=` cesse
+      d'assigner, et l'image part sous un autre nom — mesuré sur l'ancien nom d'image, qui partait
+      sans étiquette (`-t  .`) ;
     - `docker build` utilise **toujours** le builder par défaut du moteur, quel que soit
       `docker buildx use`. La documentation Docker vise explicitement ce cas : « If you use
       build scripts, such as `make`, that use the `docker build` command, update your build
       commands to `docker buildx build`. » Sans quoi l'export de cache échoue en CI.
     """
-    declared = MAKEFILE_IMAGE.search(MAKEFILE.read_text(encoding="utf-8"))
-    assert declared, "`API_IMAGE ?=` a disparu du `Makefile`"
+    declared = MAKEFILE_PREFIX.search(MAKEFILE.read_text(encoding="utf-8"))
+    assert declared, "`IMAGE_PREFIX ?=` a disparu du `Makefile`"
+    prefix = declared["prefix"]
+    expected = {
+        path.relative_to(REPOSITORY_ROOT).as_posix(): prefix + path.parent.name
+        for path in REPOSITORY_ROOT.glob("infra/*/Dockerfile")
+    }
 
-    printed = make_dry_run("build")
-    tag = re.search(r"-t\s+(?P<name>\S+)", printed)
+    assert built_images(make_dry_run("build")) == expected
 
-    assert "docker buildx build" in printed, "`docker build` ignorerait le builder sélectionné"
-    assert tag, "la commande de build ne porte plus d'étiquette `-t`"
-    assert tag.group("name") == declared.group("name")
+
+def test_ajouter_un_dossier_a_infra_suffit_a_construire_son_image(tmp_path: Path) -> None:
+    """`make build` trouve les images d'après les dossiers, pas d'après une liste à tenir : un
+    dossier de plus est une image de plus, un dossier sans `Dockerfile` n'en est pas une.
+
+    Le `Makefile` du dépôt tourne sur une arborescence témoin, front compilé compris.
+    """
+    for service in ("alpha", "beta"):
+        (tmp_path / "infra" / service).mkdir(parents=True)
+        (tmp_path / "infra" / service / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
+    (tmp_path / "infra" / "outils").mkdir()
+    compiled = tmp_path / "apps" / "web" / "dist" / "index.html"
+    compiled.parent.mkdir(parents=True)
+    compiled.write_text("", encoding="utf-8")
+
+    built = built_images(make_dry_run("build", directory=tmp_path))
+
+    assert sorted(built) == ["infra/alpha/Dockerfile", "infra/beta/Dockerfile"]
 
 
 @pytest.mark.parametrize("target", ["build", "dev"])

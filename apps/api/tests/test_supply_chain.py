@@ -65,8 +65,11 @@ UPDATE_POLICY: dict[str, Any] = {
 
 # Les clés qu'une entrée peut porter, toutes : la politique, plus ce qui identifie l'écosystème,
 # plus les écarts décidés écosystème par écosystème. Une clé de plus peut changer la politique en
-# silence — `open-pull-requests-limit: 0` coupe les mises à jour, un `ignore: "*"` aussi.
-ENTRY_KEYS = {"package-ecosystem", "directory", *UPDATE_POLICY}
+# silence — `open-pull-requests-limit: 0` coupe les mises à jour, un `ignore: "*"` aussi. Le ou
+# les dossiers surveillés s'y ajoutent : `directory` pour un seul, `directories` pour plusieurs,
+# jamais les deux (doc Dependabot, « directories »).
+ENTRY_KEYS = {"package-ecosystem", *UPDATE_POLICY}
+LOCATION_KEYS = {"directory", "directories"}
 ECOSYSTEM_EXTRA_KEYS = {"docker": {"ignore"}, "npm": {"ignore"}}
 
 PYTHON_UPGRADES_IGNORED = {
@@ -462,6 +465,12 @@ def dependabot_entry(ecosystem: str) -> dict[str, Any]:
     return entries[0]
 
 
+def watched_directories(entry: dict[str, Any]) -> list[Path]:
+    """Les dossiers qu'une entrée Dependabot surveille, qu'elle en nomme un ou plusieurs."""
+    names: list[str] = entry["directories"] if "directories" in entry else [entry["directory"]]
+    return [REPOSITORY_ROOT / name.lstrip("/") for name in names]
+
+
 def test_dependabot_surveille_chaque_ecosysteme_une_seule_fois() -> None:
     """Une entrée en double ferait deux jeux de PR pour les mêmes paquets ; une en moins, aucun."""
     ecosystems = sorted(entry["package-ecosystem"] for entry in dependabot_updates())
@@ -477,11 +486,13 @@ def test_chaque_ecosysteme_suit_la_politique_de_mise_a_jour(ecosystem: str, mani
     dans un onglet que personne ne lit : ce test le fait échouer ici.
     """
     entry = dependabot_entry(ecosystem)
-    directory = REPOSITORY_ROOT / entry["directory"].lstrip("/")
+    directories = watched_directories(entry)
 
-    assert (directory / manifest).exists(), f"{manifest} introuvable dans {entry['directory']}"
+    assert directories, f"l'entrée « {ecosystem} » ne surveille aucun dossier"
+    assert [path for path in directories if not (path / manifest).exists()] == []
     assert {key: entry.get(key) for key in UPDATE_POLICY} == UPDATE_POLICY
-    assert set(entry) == ENTRY_KEYS | ECOSYSTEM_EXTRA_KEYS.get(ecosystem, set())
+    assert len(set(entry) & LOCATION_KEYS) == 1, "`directory` ou `directories`, pas les deux"
+    assert set(entry) - LOCATION_KEYS == ENTRY_KEYS | ECOSYSTEM_EXTRA_KEYS.get(ecosystem, set())
 
 
 def test_dependabot_ne_propose_jamais_de_nouvelle_version_de_python() -> None:
@@ -569,9 +580,9 @@ def test_dependabot_surveille_chaque_dockerfile() -> None:
     dossier figure aussi dans `.github/dependabot.yml`, sans quoi l'épinglage figerait l'image au
     lieu de la tenir à jour.
     """
-    watched = REPOSITORY_ROOT / dependabot_entry("docker")["directory"].lstrip("/")
+    watched = watched_directories(dependabot_entry("docker"))
 
-    unwatched = [dockerfile_id(path) for path in DOCKERFILES if path.parent != watched]
+    unwatched = [dockerfile_id(path) for path in DOCKERFILES if path.parent not in watched]
     assert not unwatched, (
         f"{len(DOCKERFILES)} Dockerfile repassés, hors de Dependabot : {unwatched}"
     )
