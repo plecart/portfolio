@@ -42,7 +42,8 @@ class InlineRowForm[ChildT: Model](ModelForm[ChildT]):
     unicité (parent, objet) — : une ligne que le même envoi supprime ou change y existe encore, et
     reprendre son objet serait refusé. Le formset juge ces unicités entre les lignes qu'il garde
     (`BaseModelFormSet.validate_unique` : unicités sur des champs, sans condition ni expression ;
-    lignes supprimées écartées quand toutes les lignes sont valides). La base les garantit à la fin
+    lignes supprimées écartées quand toutes les lignes sont valides), et avec les lignes du parent
+    que l'envoi ne porte pas (`SortableFormSet.validate_unique`). La base les garantit à la fin
     de l'enregistrement, à condition qu'elles y soient différées (`Deferrable.DEFERRED`) : Django
     écrit les lignes l'une après l'autre, et un échange entre deux lignes passe par un doublon.
     """
@@ -72,6 +73,32 @@ class SortableFormSet[ChildT: Model, ParentT: Model](
 ):
     """Les lignes d'un tableau en ligne ordonné. Une ligne arrivée sans position, champ caché que
     l'auteur ne voit pas, en reçoit une au lieu d'échouer en base."""
+
+    def validate_unique(self) -> None:
+        """Les unicités qui lisent le parent, entre les lignes gardées (Django) et avec les lignes
+        du parent que l'envoi ne porte pas : enregistrées ailleurs depuis l'ouverture de l'écran —
+        un second onglet, un envoi renvoyé —, elles ne sont dans aucune ligne, et `InlineRowForm`
+        ne juge plus ces unicités contre la base. Refusées ici, elles ne tombent pas sur la base à
+        la fin de l'enregistrement."""
+        super().validate_unique()
+        carried = {form.instance.pk for form in self.initial_forms}
+        others = [row for row in self.get_queryset() if row.pk not in carried]
+        if not others:
+            return
+        kept = [form for form in self.forms if form.is_valid() and form not in self.deleted_forms]
+        model = self.fk.model._meta
+        attnames = {field.name: field.attname for field in model.concrete_fields}
+        for constraint in model.total_unique_constraints:
+            if self.fk.name not in constraint.fields:
+                continue
+            columns = [attnames[name] for name in constraint.fields]
+            taken = {tuple(getattr(row, column) for column in columns) for row in others}
+            for form in kept:
+                if tuple(getattr(form.instance, column) for column in columns) in taken:
+                    raise ValidationError(self.get_unique_error_message(list(constraint.fields)))
+        # ponytail: deux envois simultanés échappent encore à ce contrôle et tombent sur la base à
+        # la validation de la transaction, comme les clés étrangères différées de Django ;
+        # `connection.check_constraints()` en fin d'enregistrement si cela devient un usage.
 
     def save_new(self, form: ModelForm[ChildT], commit: bool = True) -> ChildT:
         """Enregistre une ligne neuve. Sans position — le script qui la remplit n'a pas tourné —,
