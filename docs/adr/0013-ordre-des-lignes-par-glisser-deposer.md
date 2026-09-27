@@ -35,8 +35,9 @@ placer, puis enregistrer une fois.
 
 ## Décision
 
-**Un script du projet (`content/admin/inline_sort.js`) sur le glisser-déposer natif du
-navigateur**, sans bibliothèque :
+**Un tableau en ligne ordonnable du projet** (`SortableInline`, `content/inlines.py`), dont le
+script (`content/admin/inline_rows.js`) s'appuie sur le glisser-déposer natif du navigateur, sans
+bibliothèque :
 
 - chaque ligne, enregistrée ou neuve, porte une poignée que l'admin rend côté serveur, libellé du
   catalogue ; on fait glisser la ligne par sa poignée, ou on la déplace par les flèches haut et bas
@@ -45,9 +46,11 @@ navigateur**, sans bibliothèque :
   le remplit dans l'ordre affiché, pour chaque ligne gardée et remplie ; une ligne neuve restée vide
   garde sa position vide, pour que Django continue de l'ignorer ;
 - sans le script — désactivé ou en échec —, une ligne neuve arrive sans position et
-  l'enregistrement la range après les autres (`ProjectTechnologyFormSet.save_new`) ;
-- générique : tout tableau en ligne de l'admin dont les lignes portent la poignée s'ordonne ainsi,
-  la galerie de #9 comprise.
+  l'enregistrement la range après les autres (`SortableFormSet.save_new`) ;
+- on retire une ligne, on la rajoute, on la déplace, puis on enregistre une fois : l'unicité
+  (parent, objet) se juge entre les lignes gardées (`InlineRowForm`) ;
+- générique : tout tableau en ligne de l'admin qui hérite de `SortableInline` s'ordonne ainsi, la
+  galerie de #9 comprise.
 
 `django-admin-sortable2` a été essayée puis écartée, sur deux constats lus dans ses sources et
 mesurés sur Django 6.1.1 : son script ne déplace que les lignes enregistrées (poignée posée sur le
@@ -66,9 +69,9 @@ cette version (jrief/django-admin-sortable2#442), qu'il fallait contourner.
 
 **Négatives, assumées**
 
-- Un script à maintenir (une centaine de lignes, commentées). Le serveur est tenu par les tests ;
-  le geste lui-même ne l'est pas, faute de navigateur dans la suite du back : il se vérifie à
-  l'écran, à chaque changement du script.
+- Un script à maintenir (tri et bouton de suppression, 170 lignes commentées). Le serveur est tenu
+  par les tests ; le geste lui-même ne l'est pas, faute de navigateur dans la suite du back : il se
+  vérifie à l'écran, à chaque changement du script.
 - Le glisser-déposer natif ne fonctionne pas au doigt sur écran tactile ; le clavier reste. L'admin
   a un seul utilisateur, l'auteur, sur un poste.
 
@@ -86,5 +89,5 @@ cette version (jrief/django-admin-sortable2#442), qu'il fallait contourner.
 
 - L'admin reçoit un second auteur, ou s'utilise sur tablette : le tactile devient un besoin, et une
   bibliothèque qui le gère (SortableJS) se rediscute.
-- Le script grossit au-delà du tri : le remplacer par une bibliothèque maintenue plutôt que
-  l'étendre.
+- Le script grossit au-delà du tri et de la suppression des lignes : le remplacer par une
+  bibliothèque maintenue plutôt que l'étendre.

@@ -6,15 +6,15 @@ from typing import Any, ClassVar
 from config import strings
 from django.contrib import admin
 from django.contrib.admin.widgets import RelatedFieldWidgetWrapper
-from django.core.exceptions import ValidationError
-from django.db.models import Field, Max
-from django.forms import BaseInlineFormSet, HiddenInput, ModelForm
+from django.db.models import Field
+from django.forms import BaseInlineFormSet, ModelForm
 from django.forms import Field as FormField
 from django.http import HttpRequest
 from django.utils.html import format_html
 from django.utils.safestring import SafeString, mark_safe
 from django_stubs_ext import StrOrPromise
 
+from content.inlines import SortableFormSet, SortableInline
 from content.models import Project, ProjectTechnology, Technology
 
 # Le côté de l'aperçu d'une icône dans la liste, en pixels : il tient dans une ligne de l'admin.
@@ -73,34 +73,7 @@ class TechnologyAdmin(admin.ModelAdmin[Technology]):
         )
 
 
-# Le formset des lignes de technologie d'un projet, tel que l'admin le fabrique.
-ProjectTechnologyFormSetBase = BaseInlineFormSet[
-    ProjectTechnology, Project, ModelForm[ProjectTechnology]
-]
-
-# La classe du champ caché qui porte la position d'une ligne, que `inline_sort.js` remplit.
-SORTABLE_POSITION = "sortable-position"
-
-
-class ProjectTechnologyForm(ModelForm[ProjectTechnology]):
-    """Une ligne de technologie de l'écran Projet."""
-
-    def validate_constraints(self) -> None:
-        """Les contraintes du modèle, hors l'unicité (projet, technologie).
-
-        Django la vérifierait ligne par ligne contre la base, où une ligne que le même envoi
-        supprime existe encore : une technologie retirée puis rajoutée avant l'enregistrement
-        serait refusée. Le formset la juge entre les lignes qu'il garde
-        (`BaseModelFormSet.validate_unique`, lignes supprimées écartées), et la base la garantit
-        à l'enregistrement, qui supprime avant d'ajouter.
-        """
-        try:
-            self.instance.validate_constraints(exclude={"project", *self.errors})
-        except ValidationError as error:
-            self.add_error(None, error)
-
-
-class ProjectTechnologyFormSet(ProjectTechnologyFormSetBase):
+class ProjectTechnologyFormSet(SortableFormSet[ProjectTechnology, Project]):
     """Les lignes de technologie d'un projet, avec les messages du catalogue pour les deux règles
     que le formulaire compare entre ses lignes, avant la base.
 
@@ -119,69 +92,25 @@ class ProjectTechnologyFormSet(ProjectTechnologyFormSetBase):
         (`BaseModelFormSet.get_unique_error_message`)."""
         return strings.PROJECT_TECHNOLOGY_TAKEN
 
-    def save_new(
-        self, form: ModelForm[ProjectTechnology], commit: bool = True
-    ) -> ProjectTechnology:
-        """Enregistre une ligne neuve. Sans position — le script qui la remplit n'a pas tourné —,
-        elle se range après les autres lignes du projet, au lieu d'échouer sur un champ que
-        l'auteur ne voit pas."""
-        link = super().save_new(form, commit=False)
-        if form.cleaned_data.get("position") is None:
-            siblings = ProjectTechnology.objects.filter(project=self.instance)
-            last = siblings.aggregate(last=Max("position"))["last"]
-            link.position = (last or 0) + 1
-        if commit:
-            link.save()
-        return link
 
-
-class ProjectTechnologyInline(admin.TabularInline[ProjectTechnology, Project]):
+class ProjectTechnologyInline(SortableInline[ProjectTechnology, Project]):
     """Les technologies d'un projet, en ligne sur l'écran Projet, dans l'ordre stocké
-    (`Meta.ordering`). L'auteur fait glisser une ligne, enregistrée ou neuve, par sa poignée, ou
-    la déplace au clavier ; la position, cachée, suit l'ordre affiché à l'enregistrement
-    (décision 2, ADR 0013)."""
+    (`Meta.ordering`) et ordonnées par glisser-déposer (décision 2, ADR 0013). Au moins une."""
 
     model = ProjectTechnology
-    form = ProjectTechnologyForm
     formset = ProjectTechnologyFormSet
     fields = ("move", "technology", "position")
-    readonly_fields = ("move",)
     min_num = 1
-
-    class Media:
-        # Le tri par glisser-déposer, et le même bouton de suppression pour toutes les lignes.
-        css: ClassVar[dict[str, tuple[str, ...]]] = {"all": ("content/admin/inline_rows.css",)}
-        js = ("content/admin/inline_sort.js", "content/admin/inline_delete.js")
-
-    @admin.display(description=strings.ADMIN_ROW_ORDER)
-    def move(self, link: ProjectTechnology) -> SafeString:
-        """La poignée de la ligne, que `inline_sort.js` rend glissable ; un bouton, pour le
-        clavier."""
-        return format_html(
-            '<button type="button" class="sortable-handle" aria-label="{label}" title="{label}">'
-            '<span aria-hidden="true">⠿</span></button>',
-            label=strings.ADMIN_ROW_MOVE,
-        )
 
     def formfield_for_dbfield(
         self, db_field: Field[Any, Any], request: HttpRequest, **kwargs: Any
     ) -> FormField | None:
-        """Les champs d'une ligne, ajustés au tri et au choix des technologies.
-
-        La position est cachée et facultative dans le formulaire : `inline_sort.js` la remplit dans
-        l'ordre affiché, et une ligne arrivée sans elle se range après les autres
-        (`ProjectTechnologyFormSet.save_new`). La liste des technologies perd les raccourcis qui
-        modifient, montrent ou suppriment la technologie choisie : l'écran Projet choisit des
-        technologies, il ne les édite pas, et supprimer depuis une ligne retirerait la technologie
-        de tout le site. L'ajout d'une technologie manquante reste.
-        """
+        """La liste des technologies, sans les raccourcis qui modifient, montrent ou suppriment la
+        technologie choisie : l'écran Projet choisit des technologies, il ne les édite pas, et
+        supprimer depuis une ligne retirerait la technologie de tout le site. L'ajout d'une
+        technologie manquante reste."""
         formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
-        if formfield is None:
-            return None
-        if db_field.name == "position":
-            formfield.widget = HiddenInput(attrs={"class": SORTABLE_POSITION})
-            formfield.required = False
-        if isinstance(formfield.widget, RelatedFieldWidgetWrapper):
+        if formfield is not None and isinstance(formfield.widget, RelatedFieldWidgetWrapper):
             formfield.widget.can_change_related = False
             formfield.widget.can_view_related = False
             formfield.widget.can_delete_related = False
@@ -189,7 +118,7 @@ class ProjectTechnologyInline(admin.TabularInline[ProjectTechnology, Project]):
 
     def get_formset(
         self, request: HttpRequest, obj: Project | None = None, **kwargs: Any
-    ) -> type[ProjectTechnologyFormSetBase]:
+    ) -> type[BaseInlineFormSet[ProjectTechnology, Project, ModelForm[ProjectTechnology]]]:
         """Le formset, qui refuse un projet sans technologie. L'admin ne transmet pas
         `validate_min` à la fabrique du formset (`InlineModelAdmin.get_formset`) : `min_num` seul
         rend une ligne obligatoire, qu'un formulaire sans ligne ou la suppression des lignes

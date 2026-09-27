@@ -286,8 +286,8 @@ class ProjectTechnology(models.Model):
     technology: models.ForeignKey[Technology, Technology] = models.ForeignKey(
         Technology, models.PROTECT, verbose_name=strings.TECHNOLOGY
     )
-    # Sans valeur par défaut : l'écran Projet la pose — par le glisser-déposer, ou la suivante pour
-    # une ligne neuve (décision 2, ADR 0013).
+    # Sans valeur par défaut : le tableau en ligne de l'écran Projet la pose, dans l'ordre affiché,
+    # ou la suivante pour une ligne arrivée sans elle (`content/inlines.py`, décision 2, ADR 0013).
     position: models.PositiveSmallIntegerField[int, int] = models.PositiveSmallIntegerField(
         strings.PROJECT_TECHNOLOGY_POSITION
     )
