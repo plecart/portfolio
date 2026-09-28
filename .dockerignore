@@ -1,13 +1,8 @@
-# Ce que le contexte de build ne doit pas porter — les secrets d'abord, le poids ensuite.
+# Ce que le contexte de build ne doit pas porter — le poids d'abord, les secrets en dernier.
 #
 # Les Dockerfiles copient des chemins nommés, mais certains sont des dossiers entiers (`apps/api`,
-# `apps/web/dist`) : tout ce qui s'y trouve entre dans l'image. Et le contexte entier est envoyé au
-# builder avant la première instruction : un `.env` qui n'est jamais envoyé ne peut pas fuir.
-
-# Secrets et configuration locale. `**/` : `git` ignore un `.env` à toute profondeur, Docker
-# seulement là où ce fichier le dit — mesuré, `apps/api/.env` entrait dans l'image `api`.
-**/.env
-.claude/settings.local.json
+# `apps/web/dist`) : tout ce qui s'y trouve entre dans l'image. Un `.env` exclu d'ici n'atteint le
+# builder par aucune instruction, et ne peut donc pas fuir.
 
 # Historique et métadonnées
 .git/
@@ -35,3 +30,10 @@ apps/api/tests/
 
 # Dossier local des fichiers téléversés : dans le conteneur, ils vivent dans un volume.
 /media/
+
+# Secrets et configuration locale, en dernier : c'est la dernière ligne qui correspond qui décide,
+# et une exception plus haut (`!apps/web/dist`) réintégrerait un `.env` rangé sous elle — mesuré,
+# l'image `caddy` le servait. `**/` : `git` ignore un `.env` à toute profondeur, Docker seulement
+# là où ce fichier le dit — mesuré, `apps/api/.env` entrait dans l'image `api`.
+**/.env
+.claude/settings.local.json
