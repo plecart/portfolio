@@ -6,8 +6,8 @@ invariants dont la violation ne se voit qu'à l'exécution, et tard : un contene
 root, des signaux qui n'atteignent jamais le serveur, une adresse de service revenue à
 `127.0.0.1`. Chacun d'eux a été éprouvé par mutation — retiré du code, il rend ce test rouge.
 
-Que l'image **se construise** et que la pile **démarre** est prouvé ailleurs : par le job `infra`
-de la CI, et par la pile qu'on regarde tourner.
+Que les images **se construisent** et que la pile **démarre** est prouvé ailleurs : par le job
+`infra` de la CI, et par la pile qu'on regarde tourner.
 """
 
 import io
@@ -35,6 +35,9 @@ PYTHON_VERSION_FILE = REPOSITORY_ROOT / ".python-version"
 DOCKERIGNORE = REPOSITORY_ROOT / ".dockerignore"
 CI_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
 
+# Les Dockerfiles des images du dépôt, un par dossier `infra/<service>/` (ADR 0014).
+IMAGE_DOCKERFILES = sorted(REPOSITORY_ROOT.glob("infra/*/Dockerfile"))
+
 # Une arborescence témoin du front : ce que sa compilation produit, et tout ce qui l'entoure.
 WEB_TREE = [
     "apps/web/dist/index.html",
@@ -46,8 +49,9 @@ WEB_TREE = [
 ]
 WEB_BUILD_OUTPUT = {"apps/web/dist/index.html", "apps/web/dist/assets/index.js"}
 
-# Des fichiers d'environnement du poste, là où `git` les ignore : à toute profondeur.
-LOCAL_ENV_FILES = {".env", "apps/api/.env", "infra/caddy/.env"}
+# Des fichiers d'environnement du poste, là où `git` les ignore : à toute profondeur, y compris
+# sous l'exception `!apps/web/dist`, que l'image `caddy` sert telle quelle.
+LOCAL_ENV_FILES = {".env", "apps/api/.env", "apps/web/dist/.env", "infra/caddy/.env"}
 
 # Ce que l'image `api` sert, là où l'application le lit : le gabarit des aperçus de lien (ADR
 # 0011), chemin par défaut du réglage de #14 (brief de #15, décision 10), et les fichiers
@@ -86,7 +90,13 @@ CACHE_TAG = re.compile(r"--cache-(?:from|to) type=local,\S*?\btag=(?P<tag>[^,\s]
 # l'environnement hérité, pour vérifier le `Makefile` et non le shell qui lance le test
 # (`process_environment.py`). Mesuré : `IMAGE_PREFIX` exporté faisait rougir le test du nom des
 # images.
-OVERRIDABLE = re.compile(r"^(?P<name>\w+) \?=", re.MULTILINE)
+OVERRIDABLE = re.compile(r"^(?P<name>\w+)[ \t]*\?=", re.MULTILINE)
+
+# Ce qu'un `make` englobant transmet au nôtre par l'environnement : ses options et les variables
+# de sa ligne de commande (`MAKEFLAGS`, doc GNU make « Communicating Options to a Sub-make »), et
+# des makefiles à lire en plus (`MAKEFILES`). Mesuré : `make test IMAGE_PREFIX=zz-` faisait
+# rougir le test du nom des images.
+MAKE_CONTROL = {"MAKEFLAGS", "GNUMAKEFLAGS", "MAKEFILES"}
 
 # Toute image de base qui embarque un interpréteur porte sa version dans son nom. Le motif les
 # capture toutes : un seul étage qui dériverait suffirait à faire tourner l'application sur une
@@ -96,11 +106,10 @@ BASE_IMAGE_VERSION = re.compile(r"^FROM python:(\d+\.\d+)[.-]", re.MULTILINE)
 # Les variables que lit le back : un `ARG` qui en nommerait une la réclamerait au build, un `ENV`
 # la figerait dans l'image — sans égard à la casse, comme `pydantic-settings` les lit
 # (`case_sensitive=False` par défaut : `secret_key` configure `SECRET_KEY`, mesuré dans l'image à
-# la relecture de la PR #53). Un montage de secret, lui, en réclamerait une quelle qu'elle soit.
-ENV_FIELDS = re.compile(rf"\b(?:{'|'.join(Env.model_fields)})\b", re.IGNORECASE)
-
-# Les Dockerfiles des images du dépôt, un par dossier `infra/<service>/` (ADR 0014).
-IMAGE_DOCKERFILES = sorted(REPOSITORY_ROOT.glob("infra/*/Dockerfile"))
+# la relecture de la PR #53). Comme nom déclaré seulement, jamais dans une valeur :
+# `ENV LOG_LEVEL=debug` ne déclare pas `DEBUG`. Un montage de secret, lui, en réclamerait une
+# quelle qu'elle soit.
+ENV_FIELDS = re.compile(rf"\s(?:{'|'.join(Env.model_fields)})(?=[=\s]|$)", re.IGNORECASE)
 BUILD_DECLARATION = re.compile(r"^\s*(?:ARG|ENV)\b", re.IGNORECASE)
 SECRET_MOUNT = "--mount=type=secret"
 
@@ -173,8 +182,9 @@ def make_dry_run(
 ) -> str:
     """Les commandes que le `Makefile` du dépôt exécuterait pour `target`, sans les exécuter.
 
-    Les variables que le `Makefile` laisse surcharger ne sont pas héritées du shell qui lance les
-    tests : seules celles que l'appel pose comptent.
+    Ni les variables que le `Makefile` laisse surcharger, ni ce qu'un `make` englobant transmet
+    (`make test IMAGE_PREFIX=…`) ne viennent du processus qui lance les tests : seules celles que
+    l'appel pose comptent.
 
     Args:
         target: la cible du `Makefile`.
@@ -186,8 +196,8 @@ def make_dry_run(
         La sortie de `make --dry-run`, variables développées — y compris celles des appels
         récursifs à `$(MAKE)`, que `--dry-run` parcourt sans rien exécuter.
     """
-    overridable = set(OVERRIDABLE.findall(MAKEFILE.read_text(encoding="utf-8")))
-    inherited = {name: value for name, value in os.environ.items() if name not in overridable}
+    ignored = set(OVERRIDABLE.findall(MAKEFILE.read_text(encoding="utf-8"))) | MAKE_CONTROL
+    inherited = {name: value for name, value in os.environ.items() if name not in ignored}
     assignments = [f"{name}={value}" for name, value in variables.items()]
     return subprocess.run(
         ["make", "--dry-run", "-f", str(MAKEFILE), target, *assignments],
@@ -255,7 +265,8 @@ def test_les_images_de_base_suivent_la_version_epinglee() -> None:
 
 def test_le_compose_et_le_makefile_nomment_la_meme_image() -> None:
     """Mesuré avant correction : `make build` et `make dev` produisaient deux images distinctes."""
-    from_makefile = MAKEFILE_PREFIX.search(MAKEFILE.read_text(encoding="utf-8"))
+    makefile = MAKEFILE.read_text(encoding="utf-8")
+    from_makefile = MAKEFILE_PREFIX.search(makefile)
     from_compose = COMPOSE_API_IMAGE.search(COMPOSE_DEV.read_text(encoding="utf-8"))
 
     assert from_makefile, "`IMAGE_PREFIX ?=` a disparu du `Makefile`"
@@ -263,7 +274,7 @@ def test_le_compose_et_le_makefile_nomment_la_meme_image() -> None:
         "le service `api` ne reprend plus `${IMAGE_PREFIX}` — Compose se nommerait seul"
     )
     assert from_makefile.group("prefix") == from_compose.group("prefix")
-    assert MAKEFILE_EXPORT.search(MAKEFILE.read_text(encoding="utf-8")), (
+    assert MAKEFILE_EXPORT.search(makefile), (
         "`export IMAGE_PREFIX` a disparu : `infra/dev.env` pourrait nommer l'image de `make dev`"
     )
 
@@ -299,7 +310,7 @@ def test_make_build_construit_une_image_par_dossier_d_infra() -> None:
     prefix = declared["prefix"]
     expected = {
         path.relative_to(REPOSITORY_ROOT).as_posix(): prefix + path.parent.name
-        for path in REPOSITORY_ROOT.glob("infra/*/Dockerfile")
+        for path in IMAGE_DOCKERFILES
     }
 
     printed = make_dry_run("build")
@@ -375,7 +386,8 @@ def test_le_contexte_de_build_ne_porte_aucun_fichier_d_environnement(tmp_path: P
 def test_l_image_api_copie_ce_qu_elle_sert_apres_le_chown(copy: str) -> None:
     """Déplacée, la copie perd son lecteur (la vue de #14, WhiteNoise) ; retirée, l'image se
     construit encore et la CI reste verte, puis l'admin répond 500 faute de statiques (mesuré à la
-    relecture de la PR #53) ; faite avant le `chown`, elle donne ces fichiers à l'application."""
+    relecture de la PR #53) ; faite avant le dernier `chown`, elle donne ces fichiers à
+    l'application."""
     instructions = [
         whole for _, whole in dockerfile_instructions(DOCKERFILE.read_text(encoding="utf-8"))
     ]
@@ -383,7 +395,7 @@ def test_l_image_api_copie_ce_qu_elle_sert_apres_le_chown(copy: str) -> None:
 
     assert chown, "le `chown` de `/app` a disparu — le motif a-t-il cessé de mordre ?"
     assert copy in instructions
-    assert instructions.index(copy) > chown[0]
+    assert instructions.index(copy) > chown[-1]
 
 
 def test_la_ci_donne_a_chaque_image_son_entree_de_cache() -> None:
@@ -394,7 +406,15 @@ def test_la_ci_donne_a_chaque_image_son_entree_de_cache() -> None:
     `Makefile` cesse de prendre ces drapeaux dans l'environnement (`=` au lieu de `?=`)."""
     steps = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["infra"]["steps"]
     flags = next(
-        step["env"]["DOCKER_BUILD_FLAGS"] for step in steps if step.get("run") == "make build"
+        (
+            step["env"]["DOCKER_BUILD_FLAGS"]
+            for step in steps
+            if "DOCKER_BUILD_FLAGS" in step.get("env", {})
+        ),
+        None,
+    )
+    assert flags, (
+        "aucune étape du job `infra` ne passe `DOCKER_BUILD_FLAGS` — sa forme a-t-elle changé ?"
     )
 
     printed = make_dry_run("build", environment={"DOCKER_BUILD_FLAGS": flags})
@@ -403,7 +423,7 @@ def test_la_ci_donne_a_chaque_image_son_entree_de_cache() -> None:
         for match in BUILD_COMMAND.finditer(printed)
     }
 
-    services = [path.parent.name for path in REPOSITORY_ROOT.glob("infra/*/Dockerfile")]
+    services = [path.parent.name for path in IMAGE_DOCKERFILES]
     assert tags == {service: [service, service] for service in services}
 
 
