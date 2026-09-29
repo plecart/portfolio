@@ -464,7 +464,8 @@ jusqu'à la première PR de code, qui les coche (étape 11).
 - [ ] `.github/dependabot.yml` généré (`github-actions` + écosystèmes de la stack)
 - [ ] `ci.yml` et `dependabot.yml` validés contre leur schéma
 - [ ] skills maison déployés dans `.claude/skills/`
-- [ ] aucun fichier dans `.claude/commands/` au nom d'un skill maison, déployé ou retiré
+- [ ] aucun fichier dans `.claude/commands/` au nom d'un skill déployé (il serait ignoré), ni d'un
+      skill maison retiré (il s'exécuterait)
 - [ ] skills publics cochés installés (choisis d'après la stack, pas d'un set en dur)
 - [ ] serveur MCP context7 disponible (`claude mcp list`)
 - [ ] `test` et commandes des gates bloquants en CI vérifiées en local

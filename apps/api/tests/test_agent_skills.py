@@ -22,8 +22,9 @@ SKILLS = sorted(REPOSITORY_ROOT.glob(".claude/skills/*/SKILL.md"))
 # Le bloc entre les deux `---` de tête, quelle que soit la fin de ligne de la copie de travail.
 FRONTMATTER = re.compile(r"\A---\r?\n(?P<yaml>.*?)\r?\n---\r?\n", re.DOTALL)
 
-# Les champs sans lesquels un skill n'est ni nommé ni déclenchable.
-REQUIRED_FIELDS = {"name", "description"}
+# Le champ sans lequel un skill ne se déclenche pas sur sa description — `name` est optionnel et
+# vaut par défaut le nom du dossier.
+REQUIRED_FIELDS = {"description"}
 
 
 def frontmatter(skill: Path) -> dict[str, object]:
@@ -39,7 +40,7 @@ def frontmatter(skill: Path) -> dict[str, object]:
         AssertionError: bloc absent, YAML illisible, ou frontmatter qui n'est pas un mapping —
             les trois états où Claude Code charge le skill sans aucun champ.
     """
-    match = FRONTMATTER.match(skill.read_text(encoding="utf-8"))
+    match = FRONTMATTER.match(skill.read_text(encoding="utf-8-sig"))
     assert match, f"{skill.parent.name} : aucun frontmatter en tête du fichier"
     try:
         fields: object = yaml.safe_load(match.group("yaml"))
@@ -63,3 +64,7 @@ def test_le_frontmatter_de_chaque_skill_parse_et_porte_ses_champs(skill: Path) -
 
     missing = REQUIRED_FIELDS - fields.keys()
     assert not missing, f"{skill.parent.name} : champs manquants {sorted(missing)}"
+    description = fields.get("description")
+    assert isinstance(description, str) and description.strip(), (
+        f"{skill.parent.name} : description absente, vide ou non textuelle — Claude Code la jette"
+    )
