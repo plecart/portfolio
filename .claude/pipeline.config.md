@@ -186,11 +186,15 @@ plutôt que gestes, pannes connues en tête de revue) ; `i-have-adhd` (mise en f
 suivante d'abord, étapes numérotées, état restitué à chaque tour ; `/i-have-adhd`).
 
 **RTK** (hook utilisateur `rtk hook claude`, `~/.claude/RTK.md`, hors dépôt) réécrit la commande
-avant son exécution — `make …`, `gh …` (sauf `gh label`), `cat`/`head`/`tail` (→ `rtk read …`), `ls`,
-`wc`, `grep`, chaque segment d'une commande composée ; ni `git …` ni `sed`. Les règles de permission sont
-évaluées sur la forme **réécrite** (doc hooks, `updatedInput`, mesuré le 2026-09-29) : c'est
-pourquoi les entrées `allow` de `.claude/settings.json` commencent par `rtk`, et pourquoi les
-lectures auto-autorisées par Claude Code (`cat`, `gh pr view`…) y figurent quand même. Même
+avant son exécution — `make …`, `gh …` (sauf `gh label` et `gh api … --jq`), `cat`/`head -N`/`tail`
+(→ `rtk read …` ; `head -n N` n'est pas réécrit), `ls`, `wc`, `grep`, chaque segment d'une commande
+composée ; ni `git …` ni `sed`. Les règles de permission sont évaluées sur la forme **réécrite**
+(doc hooks, `updatedInput`, mesuré le 2026-09-29) : c'est pourquoi les entrées `allow` de
+`.claude/settings.json` commencent par `rtk`, et pourquoi les lectures auto-autorisées par Claude
+Code (`cat`, `gh pr view`…) y figurent quand même. RTK lit aussi `permissions.allow` et renvoie
+lui-même `permissionDecision: "allow"` quand la commande **d'origine** y figure (`gh pr *`,
+`gh issue *`…) : les entrées sous forme d'origine restent actives, et les entrées `rtk` sont celles
+que le harnais évalue sans lui — les deux se doublent à dessein. Même
 logique pour les `deny` : le harnais ne reconnaît ni `rtk read` ni `rtk grep` comme des lectures de
 fichier, donc `Read(.env)` ne les arrête pas — deux `deny` Bash (`rtk read *.env*`, `rtk grep *.env*`)
 ferment les neuf formes recensées par `apps/api/tests/test_agent_permissions.py` (citation, glob,

@@ -5,7 +5,8 @@ décrit dans [CONTRIBUTING.md](CONTRIBUTING.md) et exécutable via le skill `cyc
 
 ## Règles permanentes (toujours actives)
 
-Les fichiers de `.claude/rules/` sont chargés à chaque session, au même rang que ce fichier :
+Les fichiers de `.claude/rules/` — sans frontmatter `paths:`, qui les rendrait conditionnels — sont
+chargés à chaque session, au même rang que ce fichier :
 `contraintes.md`, `taille-pr.md`, `cleanup-verbatim.md`, `decisions-vs-doc.md`.
 
 ## Configuration du projet
