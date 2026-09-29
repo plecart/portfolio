@@ -17,6 +17,9 @@ Quand plusieurs artefacts décrivent le même objet (spec textuelle, maquette HT
 trace), un audit sans hiérarchie d'autorité explicite produit des findings dont le lecteur ne
 peut pas évaluer la portée.
 
+Sans argument, l'objet audité est la spécification en discussion dans la conversation ;
+l'inventaire part d'elle.
+
 1. **Inventorier** tous les livrables qui décrivent l'objet audité.
 2. **Chercher la déclaration d'autorité** — souvent dans un fichier de trace, un en-tête
    « Source normative », ou le README. Si aucune n'existe, c'est la **première** question à poser,
