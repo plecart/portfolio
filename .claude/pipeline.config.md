@@ -198,9 +198,12 @@ que le harnais évalue sans lui — les deux se doublent à dessein. Même
 logique pour les `deny` : le harnais ne reconnaît ni `rtk read` ni `rtk grep` comme des lectures de
 fichier, donc `Read(.env)` ne les arrête pas — deux `deny` Bash (`rtk read *.env*`, `rtk grep *.env*`)
 ferment les neuf formes recensées par `apps/api/tests/test_agent_permissions.py` (citation, glob,
-`--max-lines`, `--tail-lines`, `grep`). Restent ouverts, et la doc le dit (« a Bash rule isn't a
-security boundary ») : un glob sans `.env` littéral (`.en?`), `grep -r` sans nom de fichier, tout
-sous-processus qui ouvre le fichier lui-même.
+`--max-lines`, `--tail-lines`, `grep`) — et attrapent aussi, collatéral accepté et épinglé par le
+même test, `rtk read .env.example`, `rtk read infra/dev.env` et toute recherche dont le texte
+contient `.env` (`os.environ`, `config.env`, `process.env`) : passer par l'outil Grep ou `git grep`,
+que RTK ne réécrit pas. Restent ouverts, et la doc le dit (« isn't a security boundary around the
+program ») : un glob sans `.env` littéral (`.en?`), `grep -r` sans nom de fichier, une indirection
+par variable (`f=.env; cat "$f"`), tout sous-processus qui ouvre le fichier lui-même.
 
 **Outils hors dépôt** (`uv tool`, environnements isolés — frontend-outillage §2.2) :
 - SkillSpector 2.11.2 (NVIDIA/skillspector @ d162d9b) — `skillspector scan .claude/skills/<skill> --no-llm` après chaque ajout ou mise à jour de skill

@@ -18,7 +18,6 @@
       "Bash(gh issue *)",
       "Bash(gh pr *)",
       "Bash(gh label *)",
-      "Bash(gh api repos/*)",
       "Bash(npx skills *)",
       "Bash(rtk read *)",
       "Bash(rtk grep *)",
