@@ -5,10 +5,8 @@ décrit dans [CONTRIBUTING.md](CONTRIBUTING.md) et exécutable via le skill `cyc
 
 ## Règles permanentes (toujours actives)
 
-@.claude/rules/contraintes.md
-@.claude/rules/taille-pr.md
-@.claude/rules/cleanup-verbatim.md
-@.claude/rules/decisions-vs-doc.md
+Les fichiers de `.claude/rules/` sont chargés à chaque session, au même rang que ce fichier :
+`contraintes.md`, `taille-pr.md`, `cleanup-verbatim.md`, `decisions-vs-doc.md`.
 
 ## Configuration du projet
 

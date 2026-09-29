@@ -155,7 +155,7 @@ versions de correctif (3.12.x) le sont.
 
 ## Les règles qui ne se négocient pas
 
-Voir [.claude/rules/](.claude/rules/) (chargées automatiquement via `CLAUDE.md`) :
+Voir [.claude/rules/](.claude/rules/) (chargées automatiquement à chaque session) :
 
 - **Aucun commit cassé**, jamais d'auto-merge, jamais de force-push — `contraintes.md`
 - **Cleanup pass verbatim** à chaque relecture (DRY / KISS / YAGNI) — `cleanup-verbatim.md`
