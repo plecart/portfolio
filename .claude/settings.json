@@ -30,6 +30,7 @@
       "Bash(rtk make typecheck)",
       "Bash(rtk make format-check)",
       "Bash(rtk make audit)",
+      "Bash(rtk make web-audit)",
       "Bash(rtk make web-test)",
       "Bash(rtk proxy make web-test)",
       "Bash(rtk make web-lint)",
@@ -48,7 +49,9 @@
       "Bash(git push -f*)",
       "Bash(git push * --force*)",
       "Bash(git push * -f*)",
-      "Bash(git push * +*)"
+      "Bash(git push * +*)",
+      "Bash(git push -uf*)",
+      "Bash(git push * -uf*)"
     ]
   },
   "hooks": {
