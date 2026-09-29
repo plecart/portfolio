@@ -1,6 +1,7 @@
 ---
 name: interroge-moi
 description: Interroger l'utilisateur sans relâche sur un plan, une issue ou un design jusqu'à atteindre une compréhension partagée, en résolvant chaque branche de l'arbre de décision, puis consigner les décisions tranchées. Passage obligé de la pipeline — c'est ce qui fait sortir une issue de l'état needs-interrogation. À utiliser quand l'utilisateur veut stress-tester un plan, se faire cuisiner sur son design, ou mentionne « interroge-moi » ou « cuisine-moi sur ce plan ».
+argument-hint: "[sujet, #issue ou plan à stress-tester]"
 ---
 
 # Interroge-moi

@@ -1,6 +1,7 @@
 ---
 name: cycle-pr
 description: Exécute le cycle complet de développement d'une PR — briefing pré-PR, ouverture de la PR en draft avant tout code, implémentation en TDD red-green-refactor, cycle de commit modif→test→cleanup→test→commit, auto-review, passage en ready for review, boucle de review et merge. Utiliser pour implémenter une issue ready-for-agent, développer une fonctionnalité ou corriger un bug en suivant la pipeline.
+argument-hint: "[#issue ready-for-agent | description du travail]"
 ---
 
 # Cycle PR

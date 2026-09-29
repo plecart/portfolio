@@ -4,8 +4,8 @@ Le développement suit une pipeline pilotée par les issues. **La source de vér
 pas ce fichier** : c'est le skill `cycle-pr` (déroulé pas à pas) et les règles permanentes dans
 [.claude/rules/](.claude/rules/). Ce document n'en donne que la carte.
 
-Chaque étape ci-dessous a une commande dédiée (`/triage`, `/cycle-pr`…) — voir
-[.claude/commands/](.claude/commands/).
+Chaque étape ci-dessous s'invoque par le nom de son skill (`/triage`, `/cycle-pr`…) — voir
+[.claude/skills/](.claude/skills/).
 
 ## Démarrer en local
 

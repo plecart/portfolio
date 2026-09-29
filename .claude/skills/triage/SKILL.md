@@ -1,6 +1,7 @@
 ---
 name: triage
 description: Trie les issues à travers une machine à états pilotée par des rôles de triage. À utiliser quand l'utilisateur veut créer une issue, trier des issues, examiner les bugs ou demandes de fonctionnalités entrants, préparer des issues pour un agent AFK, ou gérer le workflow des issues.
+argument-hint: "[#issue | vide pour ce qui requiert ton attention]"
 ---
 
 # Triage

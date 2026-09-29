@@ -1,6 +1,7 @@
 ---
 name: init-projet
 description: Met en place et maintient la pipeline de dev d'un projet, quelle que soit la stack — git + dépôt GitHub, profil du projet (langages, commandes de test/lint/build, domaines, zones sensibles), mapping rôle→label GitHub, template (.claude/rules, CLAUDE.md, CONTRIBUTING, CI générée), skills maison + publics, serveur MCP context7. Persiste tout dans .claude/pipeline.config.md. À utiliser au démarrage d'un projet, quand un autre skill signale « config de pipeline absente », ou pour reconfigurer (« change la commande de test », « ajoute un domaine », « réajuste les labels »).
+argument-hint: "[ce qu'il faut configurer — vide pour tout]"
 ---
 
 # Init projet
@@ -220,11 +221,10 @@ Pour chaque label du mapping absent du dépôt :
 
 Copier depuis `boilerplate/template/` vers la racine du projet :
 
-- `CLAUDE.md` (importe les règles via `@.claude/rules/...`)
+- `CLAUDE.md` (renvoie aux règles de `.claude/rules/`, chargées automatiquement)
 - `.claude/rules/` (contraintes, cleanup-verbatim, taille-pr, decisions-vs-doc)
 - `.claude/agents/` (`developpeur`, `executant` — les équipiers par rôle ; la relecture
   indépendante de l'Étape 4.2 de `cycle-pr` tourne sur `developpeur`)
-- `.claude/commands/` (une commande par skill de la pipeline — voir étape 8)
 - `.claude/settings.json` (permissions de base ; fusionner s'il en existe déjà un)
 - `CONTRIBUTING.md` (pointeur vers `cycle-pr`)
 
@@ -320,10 +320,11 @@ projet :
 `init-projet`, `vers-prd`, `vers-issues`, `triage`, `interroge-moi`, `cycle-pr`, `contradiction`,
 `repercussions`, `pr-paralleles`, `plan-qa`, `execution-qa`, `bug-vers-issue`, `audit-spec-ui`.
 
-Chaque skill a une **commande homonyme** dans `template/.claude/commands/` (`/triage`, `/cycle-pr`,
-`/plan-qa`…), copiée à l'étape 7. Ce sont des **wrappers fins** : elles ne dupliquent pas le
-process, elles invoquent le skill en lui passant `$ARGUMENTS`. La source de vérité reste le
-`SKILL.md`.
+Chaque skill s'invoque par `/<nom>` (`/triage`, `/cycle-pr`, `/plan-qa`…) : c'est le skill
+lui-même qui crée la commande, et son `argument-hint` vit dans le frontmatter du `SKILL.md`.
+**Jamais de fichier de commande homonyme** dans `.claude/commands/` : Claude Code charge le skill
+et ignore la commande (doc `skills`, table « Same name in / Which one runs »), et tout ce que la
+commande porterait — rappels, `argument-hint` — serait perdu en silence.
 
 **Un skill retiré du projet ⇒ sa commande aussi.** Après la copie, vérifier qu'il reste exactement
 une commande par skill déployé — une commande orpheline pointe vers un skill inexistant.
@@ -463,7 +464,7 @@ jusqu'à la première PR de code, qui les coche (étape 11).
 - [ ] `.github/dependabot.yml` généré (`github-actions` + écosystèmes de la stack)
 - [ ] `ci.yml` et `dependabot.yml` validés contre leur schéma
 - [ ] skills maison déployés dans `.claude/skills/`
-- [ ] `.claude/commands/` copié — exactement une commande par skill déployé, aucune orpheline
+- [ ] aucun fichier de `.claude/commands/` homonyme d'un skill déployé (il serait ignoré)
 - [ ] skills publics cochés installés (choisis d'après la stack, pas d'un set en dur)
 - [ ] serveur MCP context7 disponible (`claude mcp list`)
 - [ ] `test` et commandes des gates bloquants en CI vérifiées en local

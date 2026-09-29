@@ -157,7 +157,8 @@ Sélection faite à la main lors de l'audit du 2026-09-18 (`docs/frontend-outill
 rescanner avec SkillSpector (frontend-outillage §2.3), puis **réappliquer les modifications locales**
 des skills marqués « modifié localement » ci-dessous (`git log -p -- .claude/skills/<skill>` les donne).
 
-**Maison** (Boilerplate `skills/`, une commande homonyme chacun dans `.claude/commands/`) :
+**Maison** (Boilerplate `skills/`, chacun invocable par `/<nom>` — sans fichier de commande
+homonyme : un skill le masquerait) :
 `init-projet`, `vers-prd`, `vers-issues`, `triage`, `interroge-moi`, `cycle-pr`, `contradiction`,
 `repercussions`, `pr-paralleles`, `plan-qa`, `execution-qa`, `bug-vers-issue`, `audit-spec-ui`.
 

@@ -1,6 +1,7 @@
 ---
 name: repercussions
 description: À la clôture d'une issue (PR mergée), corrige la planification des autres issues ouvertes que cette clôture a rendues fausses — hypothèses caduques, contrats déplacés, périmètres déjà couverts, ordres de dépendance. Le livrable est une édition de la spec des issues impactées — corps et brief d'agent — jamais un commentaire. À utiliser juste après un merge qui ferme une issue, ou « vérifie l'impact de cette issue sur les autres ».
+argument-hint: "[#issue fermée]"
 ---
 
 # Répercussions
