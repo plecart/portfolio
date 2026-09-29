@@ -78,7 +78,7 @@ inhabituelles et demande avant de continuer. Un passage en force de l'interrogat
 
 ## Invocation
 
-Invoqué **sans argument**, `/triage` montre ce qui requiert l'attention (section suivante). Sinon le mainteneur décrit ce qu'il veut en langage naturel : interprète la demande et agis. Exemples :
+Invoqué **sans argument**, `/triage` montre ce qui requiert l'attention (section « Montrer ce qui requiert l'attention »). Sinon le mainteneur décrit ce qu'il veut en langage naturel : interprète la demande et agis. Exemples :
 
 - « Montre-moi tout ce qui requiert mon attention »
 - « Regardons l'issue #42 »
