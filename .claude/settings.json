@@ -36,15 +36,14 @@
       "Bash(rtk make web-typecheck)",
       "Bash(rtk gh pr *)",
       "Bash(rtk gh issue *)",
-      "Bash(rtk gh api repos/*)",
       "Bash(rtk gh run list *)",
       "mcp__context7__resolve-library-id",
       "mcp__context7__query-docs"
     ],
     "deny": [
       "Read(.env)",
-      "Bash(rtk read *.env)",
-      "Bash(rtk read *.env *)",
+      "Bash(rtk read *.env*)",
+      "Bash(rtk grep *.env*)",
       "Bash(git push --force*)",
       "Bash(git push -f*)",
       "Bash(git push * --force*)",

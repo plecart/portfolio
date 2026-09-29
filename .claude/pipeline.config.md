@@ -191,8 +191,12 @@ avant son exécution — `make …`, `gh …` (sauf `gh label`), `cat`/`head`/`t
 évaluées sur la forme **réécrite** (doc hooks, `updatedInput`, mesuré le 2026-09-29) : c'est
 pourquoi les entrées `allow` de `.claude/settings.json` commencent par `rtk`, et pourquoi les
 lectures auto-autorisées par Claude Code (`cat`, `gh pr view`…) y figurent quand même. Même
-logique pour les `deny` : le harnais ne reconnaît pas `rtk read` comme une lecture de fichier, donc
-`Read(.env)` ne l'arrête pas — les deux `deny` Bash sur `rtk read *.env` ferment ce chemin.
+logique pour les `deny` : le harnais ne reconnaît ni `rtk read` ni `rtk grep` comme des lectures de
+fichier, donc `Read(.env)` ne les arrête pas — deux `deny` Bash (`rtk read *.env*`, `rtk grep *.env*`)
+ferment les neuf formes recensées par `apps/api/tests/test_agent_permissions.py` (citation, glob,
+`--max-lines`, `--tail-lines`, `grep`). Restent ouverts, et la doc le dit (« a Bash rule isn't a
+security boundary ») : un glob sans `.env` littéral (`.en?`), `grep -r` sans nom de fichier, tout
+sous-processus qui ouvre le fichier lui-même.
 
 **Outils hors dépôt** (`uv tool`, environnements isolés — frontend-outillage §2.2) :
 - SkillSpector 2.11.2 (NVIDIA/skillspector @ d162d9b) — `skillspector scan .claude/skills/<skill> --no-llm` après chaque ajout ou mise à jour de skill
