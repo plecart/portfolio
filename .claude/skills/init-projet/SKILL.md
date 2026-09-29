@@ -1,7 +1,7 @@
 ---
 name: init-projet
 description: Met en place et maintient la pipeline de dev d'un projet, quelle que soit la stack — git + dépôt GitHub, profil du projet (langages, commandes de test/lint/build, domaines, zones sensibles), mapping rôle→label GitHub, template (.claude/rules, CLAUDE.md, CONTRIBUTING, CI générée), skills maison + publics, serveur MCP context7. Persiste tout dans .claude/pipeline.config.md. À utiliser au démarrage d'un projet, quand un autre skill signale « config de pipeline absente », ou pour reconfigurer (« change la commande de test », « ajoute un domaine », « réajuste les labels »).
-argument-hint: "[ce qu'il faut configurer — vide pour tout]"
+argument-hint: "[ce qu'il faut reconfigurer — vide pour l'amorçage complet]"
 ---
 
 # Init projet

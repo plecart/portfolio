@@ -47,6 +47,9 @@ explicite** du mainteneur.
 
 ### 1. Capturer le delta réel, puis en extraire les ancres
 
+Sans argument, l'issue est la dernière fermée par un merge sur la branche trunk
+(`gh pr list --state merged --limit 1 --json number,closingIssuesReferences`).
+
 Écrire un résumé court de **ce que cette clôture a réellement changé** — pas ce que l'issue
 promettait, ce qui a été *fait*. Sources : le **diff mergé**
 (`gh pr view <n> --json files,title,body`, `git log`), les **décisions actées** pendant le

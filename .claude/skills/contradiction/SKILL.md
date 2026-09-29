@@ -36,6 +36,10 @@ explicite.
 
 ### 1. Établir la contradiction et son rang
 
+Sans argument, la contradiction est celle du **dernier** arrêt `decisions-vs-doc` de la
+conversation ; avec un argument — une décision ou un § —, c'est lui qu'on confronte, et les deux
+citations se produisent d'abord si aucun arrêt ne les a établies.
+
 Reprendre les deux citations de l'arrêt (`.claude/rules/decisions-vs-doc.md`) et les **vérifier
 dans le fichier** — pas de mémoire, on relit la ligne. Puis lire la table « Sources de vérité » de
 `.claude/pipeline.config.md` pour situer le **rang** touché.

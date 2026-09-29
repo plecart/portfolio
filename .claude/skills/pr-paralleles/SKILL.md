@@ -22,6 +22,9 @@ Prérequis : `.claude/pipeline.config.md` existe (sinon lancer `init-projet`).
 
 ### 1. Rassembler les issues candidates
 
+Un argument borne le lot : des numéros d'issues → ne considérer que celles-là, toujours passées
+au crible ci-dessous ; un nombre → c'est le degré de parallélisme à proposer à l'étape 2.
+
 Lister les issues prêtes :
 
 ```
@@ -51,7 +54,8 @@ Présenter le lot proposé à l'utilisateur sous forme de tableau (issue, titre,
 risque de recouvrement), suivi pour chaque issue de **deux ou trois phrases en langage courant**
 qui disent ce qu'elle apporte à l'utilisateur final et ce qu'elle change dans le code — pas le
 titre reformulé, pas le brief recopié. Puis **demander confirmation** avant de créer quoi que ce
-soit. Recommander un degré de parallélisme raisonnable (souvent 2–4) plutôt que tout d'un coup.
+soit. Recommander un degré de parallélisme raisonnable (souvent 2–4, ou le nombre donné en argument)
+plutôt que tout d'un coup.
 
 ### 3. Créer un worktree + une branche par issue
 
