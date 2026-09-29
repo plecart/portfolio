@@ -1,6 +1,7 @@
 ---
 name: pr-paralleles
 description: Orchestre plusieurs PR en parallèle via des git worktrees — sélectionne des issues ready-for-agent non bloquées et à faible recouvrement de fichiers, crée un worktree + une branche par issue, prépare une session par worktree, tient un tableau de bord, et nettoie après merge. Utiliser pour développer plusieurs issues en même temps, paralléliser la réalisation de PR, ou lancer une vague de travail AFK.
+argument-hint: "[#issues | nombre de PR à lancer]"
 ---
 
 # PR parallèles

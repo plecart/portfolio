@@ -1,6 +1,7 @@
 ---
 name: vers-issues
 description: Découpe un plan, une spec ou un PRD en issues indépendamment récupérables sur GitHub (via `gh`) en utilisant des tranches verticales tracer-bullet. À utiliser quand l'utilisateur veut convertir un plan en issues, créer des tickets d'implémentation, ou découper le travail en issues.
+argument-hint: "[#issue-prd | chemin/vers/plan.md | description]"
 ---
 
 # Vers Issues

@@ -1,6 +1,7 @@
 ---
 name: bug-vers-issue
 description: À utiliser lorsqu'un bug fait surface et doit être consigné comme une issue GitHub avec le contexte QA / implémentation / PRD attaché. Déclencheurs : « ouvre une issue pour ce bug », « consigne ça comme un bug », « c'est cassé, logue-le », tout échec surfacé par execution-qa que l'utilisateur veut capturer, et les rapports libres de bug en dehors d'un plan QA actif (« ce truc est faux, logue-le »). Montre toujours un brouillon et demande confirmation avant de publier.
+argument-hint: "[description du bug | #case du plan de QA]"
 ---
 
 # Bug vers issue

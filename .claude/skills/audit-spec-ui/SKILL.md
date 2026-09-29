@@ -1,6 +1,7 @@
 ---
 name: audit-spec-ui
 description: Audit mécanique d'une spécification d'interface (document normatif UX/UI) — établir le périmètre et l'autorité des livrables, épuiser les passes vérifiables (jetons déclarés vs utilisés, tables de priorité, arithmétique de mise en page, contraste en composition réelle, cohérence prose/tables) avant tout jugement de goût, puis appliquer les corrections en trois passes (édition, propagation, résidus). À utiliser quand l'utilisateur demande de relire, auditer ou corriger une spec d'interface ou un document de design — « relis la description de l'interface », « dis-moi ce qui semble mauvais dans cette spec », « applique ces corrections à la spec ».
+argument-hint: "[document ou périmètre à auditer — vide pour la spec en discussion]"
 ---
 
 # Audit de spécification d'interface

@@ -1,6 +1,7 @@
 ---
 name: plan-qa
 description: À utiliser quand l'utilisateur veut planifier la QA d'un lot de travaux récemment implémentés — généralement après avoir fusionné des issues issues d'un PRD. Déclencheurs : « écris un plan de QA », « plan QA pour les issues #X #Y », « plan de QA pour le PRD », « je veux faire la QA de ce qu'on vient de livrer », ou après une session d'implémentation TDD.
+argument-hint: "[\"Thème\" | #issues couvertes par la QA]"
 ---
 
 # Rédacteur de plan de QA

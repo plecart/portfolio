@@ -1,6 +1,7 @@
 ---
 name: contradiction
 description: Réconcilie une décision prise en conversation avec les sources de vérité qu'elle contredit — amende le § du document concerné, archive le raisonnement, puis propage aux rangs inférieurs et aux issues ouvertes. À utiliser quand la règle decisions-vs-doc a levé un arrêt, ou « cette décision contredit la doc », « répercute cette décision dans la doc ».
+argument-hint: "[la décision, ou le § contredit]"
 ---
 
 # Contradiction

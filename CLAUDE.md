@@ -101,8 +101,8 @@ des types est figée au démarrage — repli : `general-purpose` avec le modèle
 
 ## Skills de la pipeline
 
-Chaque skill s'invoque par sa **commande homonyme** (`/triage`, `/cycle-pr`, `/plan-qa`…) ou se
-déclenche automatiquement sur sa description.
+Chaque skill s'invoque par `/<nom>` (`/triage`, `/cycle-pr`, `/plan-qa`…) ou se déclenche
+automatiquement sur sa description.
 
 | Commande | Rôle |
 |---|---|
