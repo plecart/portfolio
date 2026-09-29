@@ -1,6 +1,6 @@
 ---
 name: execution-qa
-description: À utiliser pour dérouler un plan de QA créé par plan-qa — généralement une issue GitHub étiquetée `qa-plan` (ou un fichier de repli `docs/qa/qa-plan-*.md`). Déclencheurs : « lance la QA », « continue la phase QA », « déroule le plan de QA », « valide la checklist QA », « reprends la campagne QA », « faisons la QA de #N », ou toute session où l'utilisateur veut parcourir un plan en phases avec l'agent.
+description: "À utiliser pour dérouler un plan de QA créé par plan-qa — généralement une issue GitHub étiquetée `qa-plan` (ou un fichier de repli `docs/qa/qa-plan-*.md`). Déclencheurs : « lance la QA », « continue la phase QA », « déroule le plan de QA », « valide la checklist QA », « reprends la campagne QA », « faisons la QA de #N », ou toute session où l'utilisateur veut parcourir un plan en phases avec l'agent."
 argument-hint: "[#issue du plan de QA]"
 ---
 

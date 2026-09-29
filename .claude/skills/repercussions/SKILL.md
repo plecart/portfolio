@@ -47,8 +47,9 @@ explicite** du mainteneur.
 
 ### 1. Capturer le delta réel, puis en extraire les ancres
 
-Sans argument, l'issue est la dernière fermée par un merge sur la branche trunk
-(`gh pr list --state merged --limit 1 --json number,closingIssuesReferences`).
+Sans argument, l'issue est la dernière fermée par un merge sur la branche trunk (`<trunk>` :
+`.claude/pipeline.config.md`) — `gh` trie les PR par date de création, d'où le tri explicite :
+`gh pr list --state merged --base <trunk> --limit 30 --json number,mergedAt,closingIssuesReferences --jq 'map(select(.closingIssuesReferences != [])) | sort_by(.mergedAt) | last'`.
 
 Écrire un résumé court de **ce que cette clôture a réellement changé** — pas ce que l'issue
 promettait, ce qui a été *fait*. Sources : le **diff mergé**
