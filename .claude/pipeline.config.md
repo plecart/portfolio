@@ -185,6 +185,13 @@ des skills marqués « modifié localement » ci-dessous (`git log -p -- .claude
 plutôt que gestes, pannes connues en tête de revue) ; `i-have-adhd` (mise en forme des réponses : action
 suivante d'abord, étapes numérotées, état restitué à chaque tour ; `/i-have-adhd`).
 
+**RTK** (hook utilisateur `rtk hook claude`, `~/.claude/RTK.md`, hors dépôt) réécrit la commande
+avant son exécution — `make …`, `gh …`, `cat`/`head`/`tail` (→ `rtk read …`), `ls`, `wc`, `grep`,
+chaque segment d'une commande composée ; ni `git …` ni `sed`. Les règles de permission sont
+évaluées sur la forme **réécrite** (doc hooks, `updatedInput`, mesuré le 2026-09-29) : c'est
+pourquoi les entrées `allow` de `.claude/settings.json` commencent par `rtk`, et pourquoi les
+lectures auto-autorisées par Claude Code (`cat`, `gh pr view`…) y figurent quand même.
+
 **Outils hors dépôt** (`uv tool`, environnements isolés — frontend-outillage §2.2) :
 - SkillSpector 2.11.2 (NVIDIA/skillspector @ d162d9b) — `skillspector scan .claude/skills/<skill> --no-llm` après chaque ajout ou mise à jour de skill
 - strix 1.6.2 (`strix-agent`) — pentest par agents IA, en fin de parcours contre la préproduction, jamais la prod ; sorties dans `strix_runs/` (ignoré)
