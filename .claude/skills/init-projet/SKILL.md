@@ -312,7 +312,7 @@ Puis **tester mécaniquement** avec `git check-ignore` sur une liste de chemins 
 profil : ceux qui doivent être exclus, et les lockfiles/sources qui doivent rester suivis. Un
 fichier de motifs ne se relit pas, il se teste.
 
-### 8. Déployer les skills MAISON et leurs commandes
+### 8. Déployer les skills MAISON
 
 Copier les skills de la pipeline depuis `boilerplate/skills/` vers **`.claude/skills/`** du
 projet :
@@ -326,8 +326,8 @@ lui-même qui crée la commande, et son `argument-hint` vit dans le frontmatter 
 et ignore la commande (doc `skills`, table « Same name in / Which one runs »), et tout ce que la
 commande porterait — rappels, `argument-hint` — serait perdu en silence.
 
-**Un skill retiré du projet ⇒ sa commande aussi.** Après la copie, vérifier qu'il reste exactement
-une commande par skill déployé — une commande orpheline pointe vers un skill inexistant.
+**Un skill retiré du projet ⇒ aucun fichier `.claude/commands/<nom>.md` à son nom** : plus masqué
+par le skill, il s'exécuterait et renverrait vers un skill inexistant.
 
 ### 9. Repérer les automatisations utiles, puis installer les skills publics
 
@@ -464,7 +464,7 @@ jusqu'à la première PR de code, qui les coche (étape 11).
 - [ ] `.github/dependabot.yml` généré (`github-actions` + écosystèmes de la stack)
 - [ ] `ci.yml` et `dependabot.yml` validés contre leur schéma
 - [ ] skills maison déployés dans `.claude/skills/`
-- [ ] aucun fichier de `.claude/commands/` homonyme d'un skill déployé (il serait ignoré)
+- [ ] aucun fichier dans `.claude/commands/` au nom d'un skill maison, déployé ou retiré
 - [ ] skills publics cochés installés (choisis d'après la stack, pas d'un set en dur)
 - [ ] serveur MCP context7 disponible (`claude mcp list`)
 - [ ] `test` et commandes des gates bloquants en CI vérifiées en local
