@@ -190,8 +190,12 @@ suivante d'abord, étapes numérotées, état restitué à chaque tour ; `/i-hav
 - strix 1.6.2 (`strix-agent`) — pentest par agents IA, en fin de parcours contre la préproduction, jamais la prod ; sorties dans `strix_runs/` (ignoré)
 - Manus (service en ligne, compte à créer — frontend-outillage §4) — maquettes jetables, moodboards, recherches ; son code ne part pas en production (D27)
 
-**Serveur MCP** : `context7` — déclaré en portée `user` (`~/.claude.json`, hors dépôt), vérifier avec
-`claude mcp list`.
+**Serveurs MCP** (vérifier avec `claude mcp list`) :
+- `playwright` — portée **projet**, `.mcp.json` à la racine, donc présent dans tout clone et tout
+  worktree ; outil de la vérif de fumée de `cycle-pr` sur l'interface web. Version épinglée à la
+  main — Dependabot ne lit pas ce fichier : `npm view @playwright/mcp version` pour la remonter.
+  Le wrapper `cmd /c` est celui du poste Windows.
+- `context7` — portée `user` (`~/.claude.json`, hors dépôt), installé par `init-projet`.
 
 **Écartés :**
 - `design-system` — recoupait `taste-skill` (frontend-outillage §5) ; retiré le 2026-09-18
