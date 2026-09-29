@@ -22,8 +22,9 @@ Prérequis : `.claude/pipeline.config.md` existe (sinon lancer `init-projet`).
 
 ### 1. Rassembler les issues candidates
 
-Un argument borne le lot : des numéros d'issues → ne considérer que celles-là, toujours passées
-au crible ci-dessous ; un nombre → c'est le degré de parallélisme à proposer à l'étape 2.
+Un argument borne le lot : des numéros d'issues (`#N`) → ne considérer que celles-là parmi les
+`ready-for-agent` listées ci-dessous, puis le crible de l'étape 2 ; un nombre nu → c'est le degré
+de parallélisme à proposer à l'étape 2.
 
 Lister les issues prêtes :
 
