@@ -186,11 +186,13 @@ plutôt que gestes, pannes connues en tête de revue) ; `i-have-adhd` (mise en f
 suivante d'abord, étapes numérotées, état restitué à chaque tour ; `/i-have-adhd`).
 
 **RTK** (hook utilisateur `rtk hook claude`, `~/.claude/RTK.md`, hors dépôt) réécrit la commande
-avant son exécution — `make …`, `gh …`, `cat`/`head`/`tail` (→ `rtk read …`), `ls`, `wc`, `grep`,
-chaque segment d'une commande composée ; ni `git …` ni `sed`. Les règles de permission sont
+avant son exécution — `make …`, `gh …` (sauf `gh label`), `cat`/`head`/`tail` (→ `rtk read …`), `ls`,
+`wc`, `grep`, chaque segment d'une commande composée ; ni `git …` ni `sed`. Les règles de permission sont
 évaluées sur la forme **réécrite** (doc hooks, `updatedInput`, mesuré le 2026-09-29) : c'est
 pourquoi les entrées `allow` de `.claude/settings.json` commencent par `rtk`, et pourquoi les
-lectures auto-autorisées par Claude Code (`cat`, `gh pr view`…) y figurent quand même.
+lectures auto-autorisées par Claude Code (`cat`, `gh pr view`…) y figurent quand même. Même
+logique pour les `deny` : le harnais ne reconnaît pas `rtk read` comme une lecture de fichier, donc
+`Read(.env)` ne l'arrête pas — les deux `deny` Bash sur `rtk read *.env` ferment ce chemin.
 
 **Outils hors dépôt** (`uv tool`, environnements isolés — frontend-outillage §2.2) :
 - SkillSpector 2.11.2 (NVIDIA/skillspector @ d162d9b) — `skillspector scan .claude/skills/<skill> --no-llm` après chaque ajout ou mise à jour de skill

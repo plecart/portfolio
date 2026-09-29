@@ -43,6 +43,8 @@
     ],
     "deny": [
       "Read(.env)",
+      "Bash(rtk read *.env)",
+      "Bash(rtk read *.env *)",
       "Bash(git push --force*)",
       "Bash(git push -f*)",
       "Bash(git push * --force*)",
