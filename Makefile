@@ -135,8 +135,8 @@ audit:
 
 # Contexte de build : la racine du dépôt, pour toutes les images — l'espace de travail `uv` et son
 # verrou y vivent, et le front compilé. La CI appelle cette cible plutôt qu'un `docker build` à
-# elle, pour que les images vérifiées en CI soient exactement celles qu'on construit sur le poste.
-# #15 réutilise ce build pour publier.
+# elle, pour que les images vérifiées en CI soient exactement celles qu'on construit sur le poste,
+# et que le job `publish` reprend pour publier.
 #
 # `docker buildx build` et non `docker build` : le second garde **toujours** le builder par
 # défaut du moteur, même après un `docker buildx use`, et la documentation Docker vise

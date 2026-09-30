@@ -431,14 +431,10 @@ def test_l_image_api_copie_ce_qu_elle_sert_apres_le_chown(copy: str) -> None:
     assert instructions.index(copy) > chown[-1]
 
 
-def test_la_ci_donne_a_chaque_image_son_entree_de_cache() -> None:
-    """Les drapeaux du job `infra`, passés par l'environnement comme en CI puis développés par
-    `make` : chaque image lit et écrit son entrée du cache local, à son nom. Sous une même
-    étiquette — le défaut, `latest` —, la dernière image construite remplace l'entrée des autres
-    (doc Docker, « Local cache » ; mesuré à la relecture de la PR #53). Rouge aussi si le
-    `Makefile` cesse de prendre ces drapeaux dans l'environnement (`=` au lieu de `?=`)."""
-    steps = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["infra"]["steps"]
-    flags = next(
+def ci_build_flags(job: str) -> str | None:
+    """Les drapeaux qu'une étape du job `job` de la CI passe au build par `DOCKER_BUILD_FLAGS`."""
+    steps = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"][job]["steps"]
+    return next(
         (
             step["env"]["DOCKER_BUILD_FLAGS"]
             for step in steps
@@ -446,8 +442,24 @@ def test_la_ci_donne_a_chaque_image_son_entree_de_cache() -> None:
         ),
         None,
     )
+
+
+# Les jobs qui construisent les images avec le cache local, et les entrées que chaque image y
+# cite : `infra` le lit et l'écrit ; `publish` le lit seulement — il reconstruit ce qu'`infra`
+# vient d'y écrire (ADR 0014).
+CACHED_BUILDS = {"infra": 2, "publish": 1}
+
+
+@pytest.mark.parametrize(("job", "entries"), CACHED_BUILDS.items())
+def test_la_ci_donne_a_chaque_image_son_entree_de_cache(job: str, entries: int) -> None:
+    """Les drapeaux du job, passés par l'environnement comme en CI puis développés par `make` :
+    chaque image lit — et, dans `infra`, écrit — son entrée du cache local, à son nom. Sous une
+    même étiquette — le défaut, `latest` —, la dernière image construite remplace l'entrée des
+    autres (doc Docker, « Local cache » ; mesuré à la relecture de la PR #53). Rouge aussi si le
+    `Makefile` cesse de prendre ces drapeaux dans l'environnement (`=` au lieu de `?=`)."""
+    flags = ci_build_flags(job)
     assert flags, (
-        "aucune étape du job `infra` ne passe `DOCKER_BUILD_FLAGS` — sa forme a-t-elle changé ?"
+        f"aucune étape du job `{job}` ne passe `DOCKER_BUILD_FLAGS` — sa forme a-t-elle changé ?"
     )
 
     printed = make_dry_run("build", environment={"DOCKER_BUILD_FLAGS": flags})
@@ -457,7 +469,7 @@ def test_la_ci_donne_a_chaque_image_son_entree_de_cache() -> None:
     }
 
     services = [path.parent.name for path in IMAGE_DOCKERFILES]
-    assert tags == {service: [service, service] for service in services}
+    assert tags == {service: [service] * entries for service in services}
 
 
 @pytest.mark.parametrize(
