@@ -7,6 +7,7 @@ l'analyseur YAML le lit. Comme dans `test_image_scan.py`, la garde du job est un
 texte, appliquée au dépôt et à un recueil de formes, `PUBLISH_FORMS`.
 """
 
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -28,11 +29,53 @@ from test_infra import (
 # Le SHA complet d'un commit, étiquette de l'image publiée à côté de `latest`.
 SHA = "0123456789abcdef0123456789abcdef01234567"
 
-# Les versions que chaque paquet garde (brief de #15, décision 1).
-KEPT_VERSIONS = 3
+# Une recette de `make prune` telle que `make --dry-run` l'imprime : la lecture des versions d'un
+# paquet par `gh`, avec son filtre, puis la suppression de chacune de celles qu'il rend.
+PRUNE_RECIPE = re.compile(
+    r"^ids=\$\(gh api '(?P<versions>[^'?]+)\?per_page=100' --jq '(?P<filter>[^']+)'\) && \\\n"
+    r"for id in \$ids; do gh api --method DELETE (?P=versions)/\$id \|\| exit 1; done$",
+    re.MULTILINE,
+)
 
-# Les versions qu'un paquet perd, dans le filtre `jq` de la lecture : tout, sauf les dernières.
-KEPT_SLICE = re.compile(r"\.\[:-(\d+)\]")
+# gojq, le moteur `jq` que `gh` embarque — v0.12.17 dans `gh` 2.94.0 (son `go.mod`) —, dans l'image
+# que publie son auteur, épinglée étiquette et empreinte comme Trivy et Ryuk : Dependabot ne la
+# suit pas, elle se monte à la main, avec la version de `gh`.
+GOJQ_IMAGE = (
+    "ghcr.io/itchyny/gojq:0.12.17"
+    "@sha256:e9ddedb60bb27df4c7fd9ae92f38c05d4f3745fa8a6f2179499ca243a38b65ff"
+)
+
+
+def version(number: int, created: str, *tags: str) -> dict[str, object]:
+    """Une version de paquet telle que l'API de GitHub la décrit, réduite à ce que lit le filtre."""
+    return {
+        "id": number,
+        "created_at": f"2026-10-{created}T10:00:00Z",
+        "metadata": {"package_type": "container", "container": {"tags": list(tags)}},
+    }
+
+
+# Liste de versions → celles que la rétention supprime, de la plus ancienne à la plus récente.
+# L'API ne promet aucun ordre : la liste arrive mélangée.
+RETENTION_CASES: dict[str, tuple[list[dict[str, object]], list[int]]] = {
+    "six versions, dans le désordre": (
+        [version(n, f"0{n}", f"c{n}") for n in (6, 5, 2, 4, 1, 3)],
+        [1, 2, 3],
+    ),
+    # Un job relancé sur un commit dont le build ne se reproduit pas à l'octet déplace ses deux
+    # étiquettes vers une nouvelle version : l'ancienne reste, sans étiquette, et compte.
+    "une version orpheline d'une relance": (
+        [
+            version(4, "04", "c3", "latest"),
+            version(3, "03"),
+            version(2, "02", "c2"),
+            version(1, "01", "c1"),
+        ],
+        [1],
+    ),
+    "trois versions": ([version(n, f"0{n}", f"c{n}") for n in (3, 2, 1)], []),
+    "une version": ([version(1, "01", "c1", "latest")], []),
+}
 
 # Ce que porte le job `publish` (brief de #15, décision 5) : il attend les trois autres jobs, pour
 # ne publier qu'un commit dont toute la CI est verte ; il ne tourne que sur un push vers `main` ;
@@ -79,6 +122,26 @@ def fake_gh(root: Path, failing_version: int | None = None) -> str:
 def run_prune(gh: str) -> subprocess.CompletedProcess[str]:
     """`make prune` sous le préfixe de publication, avec `gh` remplacé par `gh`."""
     return run_make("prune", IMAGE_PREFIX=PUBLISH_PREFIX, GH=gh)
+
+
+def prune_recipes() -> list[re.Match[str]]:
+    """Les recettes de `make prune` sous le préfixe de publication, telles qu'imprimées."""
+    return list(PRUNE_RECIPE.finditer(make_dry_run("prune", IMAGE_PREFIX=PUBLISH_PREFIX)))
+
+
+def stale_versions(versions: list[dict[str, object]]) -> list[int]:
+    """Les versions que `make prune` supprimerait parmi `versions` : son filtre, tel que
+    `make --dry-run` l'imprime, évalué par gojq comme `gh` l'évaluerait."""
+    recipes = prune_recipes()
+    assert recipes, "aucune recette de rétention lue — sa forme a-t-elle changé ?"
+    evaluated = subprocess.run(
+        ["docker", "run", "--rm", "-i", GOJQ_IMAGE, recipes[0]["filter"]],
+        input=json.dumps(versions),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return [int(number) for number in evaluated.stdout.split()]
 
 
 def publish_findings(workflow: str) -> list[str]:
@@ -227,10 +290,9 @@ def test_make_push_exige_l_etiquette_du_commit() -> None:
 
 
 def test_make_prune_supprime_ce_que_la_retention_ne_garde_pas(tmp_path: Path) -> None:
-    """Chaque paquet publié lit ses versions dans l'API de GitHub, filtrées pour en garder trois
-    (brief de #15, décision 1), et supprime chacune de celles que la lecture rend — ici les
-    versions 11 et 12 du `gh` témoin. Le filtre lui-même, `gh` l'évalue : ce test en lit le
-    paramètre."""
+    """Chaque paquet publié lit ses versions dans l'API de GitHub, et supprime chacune de celles
+    que la lecture rend — ici les versions 11 et 12 du `gh` témoin. Ce que le filtre de la lecture
+    garde, `test_la_retention_supprime_tout_sauf_les_trois_versions_les_plus_recentes` l'évalue."""
     assert run_prune(fake_gh(tmp_path)).returncode == 0
     calls = (tmp_path / "calls").read_text(encoding="utf-8").splitlines()
     packages = [
@@ -238,12 +300,33 @@ def test_make_prune_supprime_ce_que_la_retention_ne_garde_pas(tmp_path: Path) ->
         for image in published_images()
     ]
 
-    listings = [call.split(" --jq ") for call in calls if "--method" not in call]
-    assert [url for url, _ in listings] == [f"api {package}?per_page=100" for package in packages]
-    assert [KEPT_SLICE.findall(jq) for _, jq in listings] == [[str(KEPT_VERSIONS)]] * len(packages)
+    listings = [call.split(" --jq ")[0] for call in calls if "--method" not in call]
+    assert listings == [f"api {package}?per_page=100" for package in packages]
     assert [call for call in calls if "--method" in call] == [
-        f"api --method DELETE {package}/{version}" for package in packages for version in (11, 12)
+        f"api --method DELETE {package}/{number}" for package in packages for number in (11, 12)
     ]
+
+
+def test_make_prune_lit_et_supprime_par_gh() -> None:
+    """Sans `GH` sur la ligne de commande, la recette appelle `gh` lui-même — le défaut que la CI
+    emploie, et que les autres tests remplacent par un témoin. Un défaut changé (`GH ?= true`)
+    ferait de la rétention une étape verte qui ne supprime rien."""
+    assert [recipe["versions"] for recipe in prune_recipes()] == [
+        f"users/plecart/packages/container/{Path(image).name}/versions"
+        for image in published_images()
+    ]
+
+
+@pytest.mark.parametrize(
+    ("versions", "expected"), RETENTION_CASES.values(), ids=RETENTION_CASES.keys()
+)
+def test_la_retention_supprime_tout_sauf_les_trois_versions_les_plus_recentes(
+    versions: list[dict[str, object]], expected: list[int]
+) -> None:
+    """Chaque paquet garde ses trois versions les plus récentes par date de création, étiquetées
+    ou non (brief de #15, décision 1) — « au plus trois versions ». Le filtre est évalué par le
+    moteur de `gh` : un tri inversé supprimerait `latest`."""
+    assert stale_versions(versions) == expected
 
 
 @pytest.mark.parametrize("failing", ["lecture", "suppression"])
@@ -273,9 +356,10 @@ def test_le_job_publish_ne_publie_qu_un_commit_vert_de_main_une_fois_scanne() ->
 
 
 def test_la_publication_construit_sans_attestation() -> None:
-    """Ni provenance ni SBOM (brief de #15, décision 7) : chacune entrerait au paquet comme une
-    version sans étiquette, que la rétention ne supprime jamais, et rien ne les consomme. Sans ces
-    drapeaux, `make build` exporte une attestation (mesuré au lot 1)."""
+    """Ni provenance ni SBOM (brief de #15, décision 7) : chacune ferait de l'image un index, dont
+    chaque manifeste entrerait au paquet comme une version sans étiquette — que la rétention, qui
+    compte toute version, supprimerait sous l'index qui la cite —, et rien ne les consomme. Sans
+    ces drapeaux, `make build` exporte une attestation (mesuré au lot 1)."""
     flags = ci_build_flags("publish")
     assert flags, "aucune étape du job `publish` ne passe `DOCKER_BUILD_FLAGS`"
 
