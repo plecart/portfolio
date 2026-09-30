@@ -118,6 +118,27 @@ tête du fichier ; la date passée, l'audit rebloque. `npm audit` n'a pas de fic
 son arbre se nettoie par les `overrides` du manifeste
 ([docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4).
 
+**Scan des images.** `make scan` scanne avec Trivy chaque image que `make build` a construite :
+toute vulnérabilité HIGH ou CRITICAL bloque, corrigeable ou non, comme une image de base en fin de
+vie ([ADR 0014](docs/adr/0014-ci-cd-github-actions-et-ghcr.md)). Une vulnérabilité sans correctif
+pour l'image s'évalue en trois points — la place du composant dans l'image, l'atteinte du code
+vulnérable par ce qui tourne, les alternatives — et se consigne en exception **datée** de
+[.trivyignore.yaml](.trivyignore.yaml), dont le format est en tête du fichier ; la date passée,
+le scan rebloque et l'évaluation se refait. Quand le correctif arrive par une image de base
+reconstruite sous la même étiquette, Dependabot peut ne pas la proposer : son empreinte se monte
+à la main, lue sur la ligne « Digest » de `docker buildx imagetools inspect <image>:<étiquette>`.
+
+Trivy tourne dans son image officielle, épinglée par étiquette et empreinte dans le `Makefile`
+(`TRIVY_IMAGE`), que Dependabot ne suit pas. Pour la monter : vérifier la signature de la nouvelle
+étiquette avec cosign — installé, ou lancé depuis son image `ghcr.io/sigstore/cosign/cosign` —,
+puis relever son empreinte par la même commande `imagetools inspect` :
+
+```
+cosign verify ghcr.io/aquasecurity/trivy:<x.y.z> \
+  --certificate-identity https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v<x.y.z> \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
 **Mises à jour des dépendances.** Dependabot ([.github/dependabot.yml](.github/dependabot.yml))
 ouvre chaque semaine, par écosystème (`uv`, npm, actions GitHub, images Docker), une PR qui
 groupe versions mineures et correctifs ; chaque montée majeure arrive seule, sauf les majeures npm
