@@ -30,8 +30,9 @@ avant tout jugement, chaque finding cité par §.
   responsabilité mal séparée, code mort.
 - **Rapporter à voix haute** sous un titre `## 🧹 Cleanup pass`, pour que le relecteur vérifie
   d'un coup d'œil que l'étape n'a pas été sautée.
-- **Même rigueur sur les deltas triviaux.** Si « rien à corriger », l'expliquer ligne par ligne
-  plutôt que de l'affirmer.
+- **Même rigueur sur les deltas triviaux.** Si « rien à corriger », dire ce qui a été repassé —
+  fichiers, points contrôlés, dénombrement — en quelques lignes, pas ligne par ligne : la preuve
+  est dans ce qui a été vérifié, pas dans la longueur du compte rendu.
 - **Un constat qui décrit une classe de défaut se traite en balayant toute la population
   concernée**, jamais les seules occurrences citées — un constat de relecture est un échantillon,
   pas un inventaire. Le rapport énonce le dénombrement (« N éléments repassés, k corrigés, N−k
