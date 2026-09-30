@@ -8,7 +8,7 @@ root, des signaux qui n'atteignent jamais le serveur, une adresse de service rev
 
 Que les images **se construisent** et que la pile **démarre** est prouvé ailleurs : par le job
 `infra` de la CI, et par la pile qu'on regarde tourner. Le scan des images a ses propres tests,
-dans `test_image_scan.py`.
+dans `test_image_scan.py`, et leur publication dans `test_publication.py`.
 """
 
 import io
@@ -79,6 +79,9 @@ COMPOSE_API_IMAGE = re.compile(
     r"^\s*image: \$\{IMAGE_PREFIX:-(?P<prefix>[^}]+)\}api$", re.MULTILINE
 )
 
+# Le préfixe sous lequel la CI publie les images sur GHCR (brief de #15, décision 8).
+PUBLISH_PREFIX = "ghcr.io/plecart/portfolio-"
+
 # Une commande de build telle que `make --dry-run` l'imprime : son Dockerfile, son étiquette.
 BUILD_COMMAND = re.compile(
     r"^docker buildx build .*-f (?P<dockerfile>\S+) -t (?P<tag>\S+) \.$", re.MULTILINE
@@ -94,10 +97,11 @@ CACHE_TAG = re.compile(r"--cache-(?:from|to) type=local,\S*?\btag=(?P<tag>[^,\s]
 OVERRIDABLE = re.compile(r"^(?P<name>\w+)[ \t]*\?=", re.MULTILINE)
 
 # Ce qu'un `make` englobant transmet au nôtre par l'environnement : ses options et les variables
-# de sa ligne de commande (`MAKEFLAGS`, doc GNU make « Communicating Options to a Sub-make »), et
-# des makefiles à lire en plus (`MAKEFILES`). Mesuré : `make test IMAGE_PREFIX=zz-` faisait
-# rougir le test du nom des images.
-MAKE_CONTROL = {"MAKEFLAGS", "GNUMAKEFLAGS", "MAKEFILES"}
+# de sa ligne de commande (`MAKEFLAGS`, doc GNU make « Communicating Options to a Sub-make »), des
+# makefiles à lire en plus (`MAKEFILES`), et sa profondeur (`MAKELEVEL`), qui fait imprimer au
+# nôtre « Entering directory » comme à un sous-make. Mesuré : `make test IMAGE_PREFIX=zz-` faisait
+# rougir le test du nom des images, et `make test` la lecture ligne à ligne de `make push`.
+MAKE_CONTROL = {"MAKEFLAGS", "GNUMAKEFLAGS", "MAKEFILES", "MAKELEVEL"}
 
 # Toute image de base qui embarque un interpréteur porte sa version dans son nom. Le motif les
 # capture toutes : un seul étage qui dériverait suffirait à faire tourner l'application sur une
