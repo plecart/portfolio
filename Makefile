@@ -183,7 +183,8 @@ $(IMAGE_PUSHES): push-%:
 
 # Supprime les versions que la rétention ne garde pas. Lancée par la CI après `make push`, avec le
 # jeton du workflow dans `GH_TOKEN` : le dépôt dont le workflow a publié un paquet en reçoit le rôle
-# `admin`, qui suffit à supprimer (docs GitHub, « Deleting and restoring a package »).
+# `admin`, qui suffit à supprimer (docs GitHub, « Deleting and restoring a package » — en
+# préversion publique au 2026-09-30).
 #
 # La lecture d'abord, puis une suppression par version, chacune vérifiée : dans un tube ou une
 # boucle nue, l'échec de `gh` se perdrait et la CI resterait verte. `per_page=100` et non
@@ -192,6 +193,7 @@ $(IMAGE_PUSHES): push-%:
 prune: $(IMAGE_PRUNES)
 
 $(IMAGE_PRUNES): prune-%:
+	$(if $(filter ghcr.io/%,$(IMAGE_PREFIX)),,$(error IMAGE_PREFIX ne nomme pas un paquet GHCR))
 	ids=$$($(GH) api '$(PACKAGE_VERSIONS)?per_page=100' --jq '$(STALE_VERSIONS)') && \
 	for id in $$ids; do $(GH) api --method DELETE $(PACKAGE_VERSIONS)/$$id || exit 1; done
 

@@ -111,7 +111,7 @@ def fake_gh(root: Path, failing_version: int | None = None) -> str:
         La commande qui le lance, à passer dans `GH`.
     """
     lines = [f'echo "$*" >> "{(root / "calls").as_posix()}"']
-    if failing_version:
+    if failing_version is not None:
         lines.append(f'case "$*" in *"--method DELETE"*/{failing_version}) exit 1 ;; esac')
     lines += ['case "$*" in *"--method DELETE"*) exit 0 ;; esac', "echo 11", "echo 12"]
     script = root / "gh"
@@ -305,6 +305,15 @@ def test_make_prune_supprime_ce_que_la_retention_ne_garde_pas(tmp_path: Path) ->
     assert [call for call in calls if "--method" in call] == [
         f"api --method DELETE {package}/{number}" for package in packages for number in (11, 12)
     ]
+
+
+def test_make_prune_exige_un_prefixe_ghcr() -> None:
+    """Hors de GHCR, l'adresse des versions ne désignerait aucun paquet (`users/./packages/…`) :
+    la rétention s'arrête sur la cause, pas sur une erreur 404 de l'API."""
+    pruned = run_make("--dry-run", "prune")
+
+    assert pruned.returncode != 0
+    assert "IMAGE_PREFIX" in pruned.stderr
 
 
 def test_make_prune_lit_et_supprime_par_gh() -> None:
