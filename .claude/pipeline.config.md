@@ -83,6 +83,13 @@ le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node a
                                                   # ou non, comme une image de base en fin de vie ;
                                                   # exceptions datées dans `.trivyignore.yaml` ;
                                                   # vérifiée le 2026-09-30 (#15)
+- publication  : make push                        # **CI seulement** (job `publish`) : chaque image
+                                                  # sous `IMAGE_TAG`, le SHA du commit, puis `latest` ;
+                                                  # préfixe GHCR par `IMAGE_PREFIX` ; vérifiée le
+                                                  # 2026-09-30 contre un registre local (#15)
+- rétention    : make prune                       # **CI seulement**, après `push` : chaque paquet garde
+                                                  # ses 3 versions étiquetées les plus récentes (`gh api`,
+                                                  # jeton du workflow) ; éprouvée sur un `gh` témoin (#15)
 - compose      : make compose-config              # résout `infra/compose.dev.yml` — exige un `.env` à la racine
 - run local    : make dev                         # pile Postgres + Redis + `api`, ports sur `127.0.0.1` ;
                                                   # front compilé s'il manque

@@ -26,6 +26,7 @@ import yaml
 from test_infra import (
     CI_WORKFLOW,
     MAKEFILE,
+    PUBLISH_PREFIX,
     REPOSITORY_ROOT,
     built_images,
     make_dry_run,
@@ -483,7 +484,7 @@ def test_un_makefile_qui_ignore_l_echec_de_trivy_est_vu(
 # --- Les fichiers du dépôt --------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("prefix", ["portfolio-", "ghcr.io/plecart/portfolio-"])
+@pytest.mark.parametrize("prefix", ["portfolio-", PUBLISH_PREFIX])
 def test_make_scan_scanne_chaque_image_que_make_build_construit(prefix: str) -> None:
     """Le scan lit les images sous le nom que le build leur donne, préfixe compris — celui du
     poste comme celui sous lequel la CI publiera : une image construite et jamais scannée serait

@@ -22,10 +22,13 @@ WEB_INDEX := $(WEB)/dist/index.html
 WEB_NPM := cd $(WEB) && $(NPM)
 
 # Une image par dossier `infra/<service>/` qui porte un `Dockerfile` (ADR 0014) : `make build` les
-# trouve, et ajouter un dossier suffit. Chacune a ses cibles, `build-<service>` et `scan-<service>`.
+# trouve, et ajouter un dossier suffit. Chacune a ses cibles, `build-<service>`, `scan-<service>` et,
+# pour la publication, `push-<service>` et `prune-<service>`.
 IMAGES := $(patsubst infra/%/Dockerfile,%,$(wildcard infra/*/Dockerfile))
 IMAGE_BUILDS := $(addprefix build-,$(IMAGES))
 IMAGE_SCANS := $(addprefix scan-,$(IMAGES))
+IMAGE_PUSHES := $(addprefix push-,$(IMAGES))
+IMAGE_PRUNES := $(addprefix prune-,$(IMAGES))
 
 # Le préfixe du nom des images — `portfolio-api`, `portfolio-caddy` —, que la CI surcharge pour
 # publier sous le nom GHCR sans redéfinir la commande.
@@ -45,6 +48,10 @@ export IMAGE_PREFIX
 # construit — les cibles `build-<service>` restent la seule définition, appelée à l'identique ici
 # et sur GitHub Actions. Développés dans la recette, ils peuvent citer le service par `$*`.
 DOCKER_BUILD_FLAGS ?=
+
+# L'étiquette qu'une image publiée porte à côté de `latest` : le SHA complet du commit, que la CI
+# passe (ADR 0014). Vide sur un poste, qui ne publie pas.
+IMAGE_TAG ?=
 
 # `--env-file` n'est pas une commodité : c'est la seule façon d'alimenter l'interpolation
 # `${...}` de `compose.dev.yml`. Le `env_file:` du service, lui, ne remplit que l'environnement
@@ -75,8 +82,25 @@ TRIVY := docker run --rm \
 SCAN_FLAGS := --image-src docker --severity HIGH,CRITICAL --exit-code 1 --exit-on-eol 1 \
 	--ignorefile .trivyignore.yaml --show-suppressed
 
+# La rétention des images publiées (ADR 0014) : chaque paquet garde ses `KEEP_VERSIONS` versions
+# étiquetées les plus récentes. Le filtre `jq` rend les autres, de la plus ancienne à la plus
+# récente. Une version sans étiquette n'est jamais supprimée : sous un index multi-plateforme, ce
+# serait l'image d'une plateforme, et l'index qui la cite deviendrait inutilisable.
+KEEP_VERSIONS := 3
+STALE_VERSIONS := [.[] | select(.metadata.container.tags != [])] | sort_by(.created_at) \
+	| .[:-$(KEEP_VERSIONS)][].id
+
+# Les versions d'un paquet dans l'API de GitHub : `ghcr.io/<propriétaire>/<nom>` y devient
+# `users/<propriétaire>/packages/container/<nom>/versions`, un paquet d'utilisateur comme ceux de ce
+# dépôt. Développées dans la recette, où `$*` nomme le service.
+PACKAGE = $(patsubst ghcr.io/%,%,$(IMAGE_PREFIX)$*)
+PACKAGE_VERSIONS = users/$(dir $(PACKAGE))packages/container/$(notdir $(PACKAGE))/versions
+
+# `gh`, qui porte la rétention ; les tests le remplacent par un témoin.
+GH ?= gh
+
 .PHONY: install test lint format format-check typecheck audit build $(IMAGE_BUILDS) compose-config dev
-.PHONY: scan $(IMAGE_SCANS)
+.PHONY: scan $(IMAGE_SCANS) push $(IMAGE_PUSHES) prune $(IMAGE_PRUNES)
 .PHONY: web-install web-browsers web-lint web-typecheck web-test web-build web-e2e web-lighthouse web-audit
 
 install:
@@ -139,6 +163,33 @@ scan: $(IMAGE_SCANS)
 $(IMAGE_SCANS): export MSYS_NO_PATHCONV := 1
 $(IMAGE_SCANS): scan-%:
 	$(TRIVY) image $(SCAN_FLAGS) $(IMAGE_PREFIX)$*
+
+# Publie chaque image que `make build` a chargée, sous `IMAGE_TAG` puis sous `latest` — l'étiquette
+# que le build lui a donnée. Dans cet ordre, `latest` ne désigne jamais une image dont l'étiquette
+# du commit manque au registre. Sans dépendance vers `build` ni `scan`, pour la même raison que
+# `scan` envers `build` : la CI les lance en étapes distinctes, et se connecte au registre entre le
+# scan et le push. Réservée à la CI, seule à détenir le jeton d'écriture.
+push: $(IMAGE_PUSHES)
+
+$(IMAGE_PUSHES): push-%:
+	$(if $(IMAGE_TAG),,$(error IMAGE_TAG manque : l'étiquette du commit à publier))
+	docker tag $(IMAGE_PREFIX)$* $(IMAGE_PREFIX)$*:$(IMAGE_TAG)
+	docker push $(IMAGE_PREFIX)$*:$(IMAGE_TAG)
+	docker push $(IMAGE_PREFIX)$*:latest
+
+# Supprime les versions que la rétention ne garde pas. Lancée par la CI après `make push`, avec le
+# jeton du workflow dans `GH_TOKEN` : le dépôt dont le workflow a publié un paquet en reçoit le rôle
+# `admin`, qui suffit à supprimer (docs GitHub, « Deleting and restoring a package »).
+#
+# La lecture d'abord, puis une suppression par version, chacune vérifiée : dans un tube ou une
+# boucle nue, l'échec de `gh` se perdrait et la CI resterait verte. `per_page=100` et non
+# `--paginate`, qui appliquerait le filtre page par page : sous la rétention, un paquet ne compte
+# jamais autant de versions.
+prune: $(IMAGE_PRUNES)
+
+$(IMAGE_PRUNES): prune-%:
+	ids=$$($(GH) api '$(PACKAGE_VERSIONS)?per_page=100' --jq '$(STALE_VERSIONS)') && \
+	for id in $$ids; do $(GH) api --method DELETE $(PACKAGE_VERSIONS)/$$id || exit 1; done
 
 # Vérifie que le Compose de développement se résout — interpolation comprise. Appelée par le
 # job `infra` de la CI, qui crée un `.env` depuis `.env.example` au préalable : Compose exige
