@@ -254,9 +254,11 @@ c'est le seul autre canal, et il passe par lui.
   fichiers **réellement mergés** (`gh pr diff <PR> --name-only`) avec ceux de chaque branche en vol
   (`git diff --name-only origin/main...<branche>`). La consigne se fonde sur ce croisement, jamais
   sur la carte de recouvrement de l'étape 2 : elle décrit des issues entières, un merge livre un
-  lot. Une branche qui recouvre **fusionne `origin/main` dans sa branche** — pas de rebase d'une
-  branche poussée sans demande explicite, `contraintes.md` — et relance ses gates sur l'état
-  combiné.
+  lot. Une branche qui recouvre vérifie d'abord l'absence de conflit
+  (`git merge-tree --write-tree origin/main <branche>`) et relance sa CI, qui tourne sur la
+  référence de fusion — pas de commit de fusion sur un trunk fusionné par rebase, ni de rebase
+  d'une branche poussée sans demande explicite (`contraintes.md`) ; un conflit se résout par un
+  commit réel sur la branche.
 
 ### 8. Nettoyer après merge
 
@@ -297,12 +299,16 @@ Puis seulement :
 
 ```
 git worktree remove ../<repo>--<numéro-issue>
-git branch -d <type>/<slug>
+gh pr view <n> --json state,headRefOid   # MERGED, et headRefOid égal à `git rev-parse <branche>`
+git branch -D <type>/<slug>
 ```
 
-Tout contrôle qui autorise une suppression (« cette branche est bien dans `main` ») se valide
-d'abord sur un **témoin positif**, un cas dont la réponse « oui » est connue : `cmd && ok || ko`
-confond condition fausse et commande en erreur, et c'est l'outil qu'on suspecte en premier.
+`git branch -d` ne satisfait qu'une fusion par commit de merge : rebase et squash réécrivent les
+commits, et son contrôle « not fully merged » refuse une branche pourtant dans `main`. La preuve
+est celle de la forge — PR `MERGED` et tête identique à la branche locale, donc rien de local non
+poussé —, puis `-D`. Tout contrôle qui autorise une suppression se valide d'abord sur un
+**témoin positif**, un cas dont la réponse « oui » est connue : `cmd && ok || ko` confond
+condition fausse et commande en erreur, et c'est l'outil qu'on suspecte en premier.
 
 Vérifier ensuite que les ressources partagées répondent encore : le dépôt principal passe sa
 commande de fumée, et le hook partagé pointe toujours sur lui — le chemin d'interpréteur figé

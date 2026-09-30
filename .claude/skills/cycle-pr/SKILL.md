@@ -594,11 +594,15 @@ la documentation ou des fichiers qu'elle n'atteint pas. Une preuve qu'on rejoue 
 puisse changer de résultat n'est pas une preuve, c'est un rituel, et un rituel coûteux est le
 plus sûr moyen de faire abandonner l'étape.
 
-Quand c'est la **base** qui a bougé, **toutes** les preuves sont périmées, la CI comprise : elle a
-tourné sur un état qui n'atteindra jamais le trunk, et rien de local ne le signale. Fusionner le
-trunk dans la branche, relancer, redater. `git merge-tree --write-tree origin/<trunk> HEAD` dit
-tout de suite s'il y a conflit ; l'état `MERGEABLE` de la forge se met à jour en différé et ne
-prouve rien.
+Quand c'est la **base** qui a bougé, les preuves locales sont périmées : prises sur un état qui
+n'atteindra jamais le trunk, et rien de local ne le signale. La CI d'une PR, elle, tourne sur la
+référence de fusion avec la base du moment : si la base a bougé **avant** le dernier run, ce run
+éprouve déjà l'état combiné — vérifier l'absence de conflit par
+`git merge-tree --write-tree origin/<trunk> HEAD` (l'état `MERGEABLE` de la forge se met à jour
+en différé et ne prouve rien) et redater les preuves locales sur cette base. Si elle a bougé
+**après**, relancer la CI — un commit réel, ou `gh pr close` puis `reopen` sur accord. Sur un
+trunk fusionné par rebase ou squash, jamais de commit de fusion : il ne respecte pas le format
+des messages et tombe au merge.
 
 **Un critère qui nomme une commande se solde par cette commande, verbatim.** « `just run` démarre
 l'app » ne se satisfait pas par `flutter build` + `adb install` : une équivalence est un résultat
