@@ -91,7 +91,9 @@ n'est pas choisi par tâche, il est choisi par rôle** au moment de créer l'éq
 |---|---|---|
 | `developpeur` | Opus | l'implémentation TDD d'un brief borné, la correction de tests rouges |
 | `relecteur` | Opus, effort `medium` | la relecture à contexte vierge d'un diff (`cycle-pr` 4.2), seul, dans son propre worktree |
-| `executant` | Sonnet | tests / lint / format, exploration et cartographie du code, edits entièrement spécifiés |
+| `executant` | Sonnet, effort `low` | tests / lint / format, exploration et cartographie du code, edits entièrement spécifiés |
+
+L'effort d'un rôle se fixe dans son frontmatter (`effort`) ; celui de la session, par `/effort`.
 
 **Une commande ponctuelle se lance soi-même.** Un équipier démarre avec un contexte complet ; le
 déléguer coûte plus qu'un `git status` ou un test isolé. La délégation ne paie que pour un **bloc
