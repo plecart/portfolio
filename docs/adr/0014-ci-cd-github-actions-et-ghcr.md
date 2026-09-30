@@ -67,8 +67,8 @@ images au VPS.**
   que suit Dependabot.
 - **Statiques de l'admin : WhiteNoise dans l'image `api`**, collectés au build (`collectstatic`, sur
   des valeurs factices : aucun vrai secret n'entre dans le build) et servis compressés, avec un
-  manifeste (`CompressedManifestStaticFilesStorage`) ; en développement,
-  `whitenoise.runserver_nostatic` les sert à la place de `runserver`. Écartés : Caddy depuis un
+  manifeste (`CompressedManifestStaticFilesStorage`) ; en développement aussi, WhiteNoise les sert,
+  `whitenoise.runserver_nostatic` retirant ce service à `runserver`. Écartés : Caddy depuis un
   volume, qui n'existerait qu'en production (ADR 0012) ; R2, que l'ADR 0004 réserve aux médias et
   aux documents.
 - **Images de base** épinglées étiquette `x.y.z` et empreinte, `FROM` lisible par Dependabot (#5).
