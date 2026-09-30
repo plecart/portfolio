@@ -1,6 +1,6 @@
 ---
 name: developpeur
-description: Équipier de développement — implémente un brief borné en TDD, corrige des tests rouges, relit un diff. Jugement local, jamais d'arbitrage de scope ni de doc.
+description: Équipier de développement — implémente un brief borné en TDD, corrige des tests rouges. Jugement local, jamais d'arbitrage de scope ni de doc.
 model: opus
 ---
 

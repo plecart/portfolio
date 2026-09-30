@@ -385,61 +385,29 @@ d'ensemble : problèmes d'architecture (couplage, frontières), naming incohére
 edge cases / erreurs / race conditions, KISS/DRY/YAGNI à l'échelle de la PR — notamment la
 **duplication inter-commits**.
 
-**4.2 Relecture par un contexte vierge — obligatoire.** L'auto-review est faite par la session qui
-a écrit le code, avec les hypothèses qui l'ont produit ; elle ne les met pas à l'épreuve.
-**L'exigence** : le diff est relu par un lecteur qui n'a pas ces hypothèses. **Le moyen par
-défaut** : un **agent de relecture** (sous-agent sans accès à cette conversation — rôle
-`developpeur` s'il est disponible ; un rôle ajouté dans `.claude/agents/` pendant cette session
-n'existe pas encore pour l'outil Agent → repli `general-purpose` avec le modèle du rôle, jamais
-sauter l'étape).
-L'invocation de `cycle-pr` — `/cycle-pr` tapé par l'utilisateur, ou prompt de démarrage d'une
-vague `pr-paralleles` — **vaut demande** pour cet agent : une consigne de session « pas de
-sous-agent sans demande de l'utilisateur » est déjà satisfaite, ne pas re-demander. **Repli** si
-le harness ne permet réellement pas de lancer un sous-agent : rendre la main au relecteur humain
-avec le diff et le prompt de relecture verbatim, et le noter dans la section « Relecture
-indépendante » du body de PR — jamais de saut silencieux. L'agent reçoit **uniquement** :
+**4.2 Relecture par un contexte vierge.** L'auto-review est faite par la session qui a écrit le
+code, avec les hypothèses qui l'ont produit ; elle ne les met pas à l'épreuve. Le diff est donc
+relu par un lecteur qui ne les a pas : l'équipier **`relecteur`** (`.claude/agents/relecteur.md`),
+qui porte sa consigne complète — ce qu'il reçoit, ce qu'il vérifie, ce qu'il rend. Un rôle ajouté
+dans `.claude/agents/` pendant cette session n'existe pas encore pour l'outil Agent → repli
+`general-purpose` avec le modèle du rôle et le corps de son fichier comme prompt. L'invocation de
+`cycle-pr` — `/cycle-pr` tapé par l'utilisateur, ou prompt de démarrage d'une vague
+`pr-paralleles` — **vaut demande** pour cet agent : une consigne de session « pas de sous-agent
+sans demande de l'utilisateur » est déjà satisfaite. Si le harness ne permet réellement pas de
+lancer un sous-agent : rendre la main au relecteur humain avec le diff et le prompt de relecture
+verbatim, et le noter dans la section « Relecture indépendante » du body de PR — jamais de saut
+silencieux.
 
-- le corps de l'issue et son brief d'agent (ou le briefing de l'Étape 1) ;
-- le diff `main..HEAD` et le droit de lire les fichiers touchés — en seconde passe, le diff
-  `<sha de fin de la première passe>..HEAD` (ou `main..HEAD` sans première passe) et les constats
-  de la première, corrigés ou écartés ;
-- `.claude/rules/contraintes.md`, `.claude/rules/cleanup-verbatim.md` et le prompt de relecture
-  **verbatim** ;
-- la consigne **frontières tierces** : pour chaque appel à une bibliothèque ou un framework tiers à
-  une frontière — réseau, sérialisation/encodage, secrets, fusion avec un thème ou une config par
-  défaut, cycle de vie de ressources — **vérifier le comportement réel** dans la documentation
-  (`context7`) ou dans les sources du paquet, jamais de mémoire, et signaler tout écart avec ce que
-  le code suppose ; un avis de sécurité sans version corrigée se remonte par la chaîne de
-  dépendance (3.1) et ne se rapporte jamais « irréductible » sans ce parcours ;
-- la consigne **provenance** : chaque constat porte son marqueur — **mesuré** (commande exécutée,
-  sortie citée), **lu** (fichier et ligne ouverts), **supposé** (à vérifier). Un chiffre sans
-  marqueur « mesuré » est interdit ; un résultat attendu d'un sous-agent qui n'est pas arrivé se
-  rapporte « non vérifié », jamais comme un résultat — dans une chaîne de délégation, la preuve ne
-  se transmet pas, elle se produit ;
-- la consigne **mutation des décisions verrouillées** : pour chaque décision verrouillée qui est un
-  invariant de protocole (ordre d'opérations, atomicité, option d'une commande, confirmation avant
-  usage), **retirer ou inverser la décision dans le code** et exiger un test rouge ; une décision
-  dont la mutation passe au vert reçoit un test avant merge — un invariant que seule la lecture
-  garantit n'est pas garanti. Trois mutations obligatoires en plus :
-  - **séparation** — quand un correctif rend distincts deux identifiants jusque-là confondus
-    (clé, adresse, chemin, espace de noms), chercher ce qui **comparait par égalité exacte** sur
-    l'ensemble qui les contenait et l'éprouver sous un écrivain concurrent : « qu'est-ce qui tirait
-    profit de la confusion ? » ;
-  - **défaut injectable** — pour toute fonction injectable dont le défaut est une implémentation
-    réelle, muter **ce défaut** (retirer la ligne qui branche le filtre, le réglage, le hook), pas
-    seulement la logique qui choisit entre le vrai et le faux — une suite entière est déjà restée
-    verte après la suppression d'un filtre PII ;
-  - **correctif de fuite** — exiger le dénombrement de `cleanup-verbatim.md` : « sous combien de
-    formes cette donnée voyage-t-elle, et combien en as-tu mesurées ? ».
-- la consigne **commande non exercée** : pour toute cible du fichier de commandes touchée par le
-  delta et que la suite n'appelle pas, exiger qu'elle ait été exécutée (3.2) ou, si elle ne peut
-  pas tourner ici, un test sur sa forme expansée (`make --dry-run <cible>`, ou l'équivalent du
-  lanceur du projet) — la différence entre vérifier ce qui est écrit et ce qui s'exécutera.
+Le relecteur reçoit **uniquement** le corps de l'issue et son brief d'agent (ou le briefing de
+l'Étape 1), la plage de commits — `main..HEAD` en première passe, `<sha de fin de la première
+passe>..HEAD` en seconde — et, en seconde passe, les constats de la première, corrigés ou
+écartés. Il rend chaque critère d'acceptation ✅ / ❌ / ⚠️ avec preuve, puis ses constats classés
+bloquant / important / mineur, chacun avec fichier, raison et marqueur de provenance.
 
-Il rend : chaque critère d'acceptation ✅ / ❌ / ⚠️ avec preuve, puis ses constats classés
-bloquant / important / mineur, chacun avec fichier, raison et marqueur de provenance. **Ne pas
-discuter un constat depuis la mémoire de la session : le vérifier dans le code** — et re-mesurer
-tout constat bloquant avant d'éditer sur sa base.
+**Un relecteur par passe, un seul.** Pas de relecteur par préoccupation, pas de
+contre-vérificateur par constat, pas de workflow : chaque agent de plus repaye le contexte entier
+et rend ses constats à la même distance du code. Un constat bloquant se re-mesure par l'auteur,
+dans son arbre, en une commande, avant d'éditer sur sa base — jamais par un agent de plus.
 
 **En deux temps, jamais par commit.** Une première passe dès qu'un commit pose un **invariant que
 les commits suivants supposeront vrai** — par exemple le contrat d'infrastructure : image, point
@@ -454,42 +422,13 @@ relecture : un travail juste, rendu cher par sa position dans le temps. Un const
 passe se fond dans un commit qui restait à écrire ; un constat qui arrive après le passage en
 ready coûte un run de CI complet et le rejeu des vérifications manuelles (Étape 7).
 
-**Le relecteur travaille dans son propre worktree, sur un SHA figé — jamais dans l'arbre de
+**Le relecteur travaille dans son propre worktree, sur le SHA de tête — jamais dans l'arbre de
 cette session.** Éprouver un test sérieusement, c'est casser la garde qu'il protège et la voir
-rougir — donc **modifier le code de production**, puis le restaurer. Dans l'arbre partagé, cela
-gelait l'auteur pendant toute la passe (2 h 44 d'attente mesurées sur une PR, pour trois heures de
-relecture), et la relecture portait sur un arbre qui bougeait. Avant de lancer l'agent :
-
-```
-git worktree add --detach ../<repo>--relecture-<n> <sha de tête>
-```
-
-puis le provisionner par les cinq gestes de `pr-paralleles`, Étape 3, et donner à l'agent **ce
-chemin** comme seul répertoire de travail : toutes ses commandes s'y exécutent, la commande de test
-comprise. Le SHA figé rend la passe reproductible et son diff explicite ; l'auteur continue ici
-pendant ce temps, sans rien attendre. En fin de passe, `git worktree remove --force
-../<repo>--relecture-<n>` — après avoir détaché les liens qu'il contiendrait (`pr-paralleles`,
-Étape 8). Un relecteur qui commit ou pousse depuis ce worktree a dépassé son rôle.
-
-**Éprouver un test par mutation est une procédure, pas un rappel.** Un harnais dont l'échec attendu
-et la panne d'outil produisent le même signal ne mesure rien — et une rangée de rouges se lit
-comme un travail rigoureux. Trois exigences structurelles, à chaque passe :
-
-1. **Un témoin de non-mutation** : le harnais tourne d'abord sur l'arbre propre et doit produire un
-   vert. Un harnais qui ne sait pas produire de vert ne sait rien produire.
-2. **Trois états, jamais deux** : ROUGE (assertion) / VERT (trou) / **PANNE D'OUTIL**. Le verdict se
-   lit dans la ligne de bilan du lanceur (`failed` vs `error`), jamais dans le code de retour ni
-   dans un `cmd && ok || ko` — ni dans le bilan d'un résumeur qui n'a pas encore montré un rouge
-   nommé : la ligne de bilan se lit sur la sortie brute (3.2), et le harnais doit avoir produit
-   **au moins une fois un ROUGE lisible avec son nom de test** avant qu'on accorde du crédit à
-   ses VERTS.
-3. **Le rouge attendu est nommé avant le run** — quel test, quel paramètre — et le harnais vérifie
-   que ce nom figure parmi les échecs. C'est le seul contrôle qui distingue « le garde a mordu »
-   de « tout est tombé ».
-
-Et **lancer les tests par la commande du projet** (`.claude/pipeline.config.md`), jamais par un
-appel direct au lanceur : c'est elle qui porte l'environnement ; un sous-processus qui la
-court-circuite ne teste pas la même chose que la CI.
+rougir — donc **modifier le code de production**, puis le restaurer ; dans l'arbre partagé, cela
+gèlerait l'auteur pendant toute la passe, sur un arbre qui bouge. Le harnais crée ce worktree à
+l'appel (`isolation: worktree` du rôle) et le retire s'il revient inchangé ; l'auteur continue
+ici pendant ce temps, sans rien attendre. Un relecteur qui commit ou pousse depuis ce worktree a
+dépassé son rôle.
 
 **Sévérité — trois définitions, pas trois nuances.** *Bloquant* : un défaut de comportement en
 production, une faille, une perte de données possible. *Important* : une régression que la CI ne
@@ -515,12 +454,13 @@ quatre commits prévus d'une PR ; c'était le rang du constat qui décidait, pas
 **Plafond — deux passes et une relance.** La relance n'est pas une passe : c'est une **revue des
 commits de correction**, ciblée par un diff explicite (`<sha avant>..<sha après>`) et par la liste
 de ce que chaque commit prétend régler, avec la question obligatoire : « qu'est-ce que ce
-correctif a cassé, ou fait rougir à tort, que la version précédente voyait ? ». Un correctif est
-du code neuf écrit sous pression de conclure — c'est la partie la moins éprouvée de la PR, pas la
-plus sûre. Après la relance : un bloquant qu'elle trouve se corrige et rouvre une relance ; un
-important se corrige, se prouve par un test vu rouge (3.1), et n'est pas relu par un tiers ; un
-mineur suit la règle ci-dessus. La boucle s'arrête là, et le body le dit. Les constats écartés
-sont notés avec leur raison dans le body (Étape 5).
+correctif a cassé, ou fait rougir à tort, que la version précédente voyait ? ». Elle revient au
+**relecteur de la passe**, par `SendMessage` — son contexte est intact, il n'a rien à relire —,
+jamais à un agent neuf. Un correctif est du code neuf écrit sous pression de conclure — c'est la
+partie la moins éprouvée de la PR, pas la plus sûre. Après la relance : un bloquant qu'elle
+trouve se corrige et rouvre une relance ; un important se corrige, se prouve par un test vu rouge
+(3.1), et n'est pas relu par un tiers ; un mineur suit la règle ci-dessus. La boucle s'arrête là,
+et le body le dit. Les constats écartés sont notés avec leur raison dans le body (Étape 5).
 
 **Pousser après chaque passe** — première passe corrigée, seconde passe corrigée, relance —, jamais
 en force : la CI éprouve la plateforme cible pendant que la relecture suivante tourne, et un rouge
@@ -830,7 +770,7 @@ est « aucune répercussion »).
    le cleanup sur les commits triviaux.
 4. **Deux filets de cleanup** : un par commit (regard local), un sur la PR entière avant merge
    (regard global, inter-commits) — et une relecture à contexte vierge **en deux temps**, au
-   socle et à la fin, jamais par commit, dans son propre worktree, plafonnée à deux passes et une
-   relance.
+   socle et à la fin, jamais par commit, un seul relecteur par passe dans son propre worktree,
+   plafonnée à deux passes et une relance confiée au même relecteur.
 5. La PR n'est **terminée qu'après la passe `repercussions`** : une clôture peut bouleverser les
    autres issues — on le vérifie pendant que la conversation est encore en contexte.

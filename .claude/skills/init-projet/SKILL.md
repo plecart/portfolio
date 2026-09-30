@@ -223,8 +223,8 @@ Copier depuis `boilerplate/template/` vers la racine du projet :
 
 - `CLAUDE.md` (renvoie aux règles de `.claude/rules/`, chargées automatiquement)
 - `.claude/rules/` (contraintes, cleanup-verbatim, taille-pr, decisions-vs-doc)
-- `.claude/agents/` (`developpeur`, `executant` — les équipiers par rôle ; la relecture
-  indépendante de l'Étape 4.2 de `cycle-pr` tourne sur `developpeur`)
+- `.claude/agents/` (`developpeur`, `executant`, `relecteur` — les équipiers par rôle ; la
+  relecture indépendante de l'Étape 4.2 de `cycle-pr` tourne sur `relecteur`)
 - `.claude/settings.json` (permissions de base ; fusionner s'il en existe déjà un)
 - `CONTRIBUTING.md` (pointeur vers `cycle-pr`)
 
