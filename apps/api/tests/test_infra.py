@@ -1,14 +1,14 @@
-"""Tests des fichiers d'infrastructure : images et leur scan, point d'entrée, Compose de dev.
+"""Tests des fichiers d'infrastructure : images, point d'entrée, Compose de développement.
 
 Ces tests lisent des fichiers, ou interrogent les outils qui les lisent — `make --dry-run`, Docker
-pour le contexte de build —, sans construire ni scanner d'image, ni démarrer de conteneur. Ils
-gardent des invariants dont la violation ne se voit qu'à l'exécution, et tard : un conteneur qui
-tourne en root, des signaux qui n'atteignent jamais le serveur, une adresse de service revenue à
+pour le contexte de build —, sans construire d'image ni démarrer de conteneur. Ils gardent des
+invariants dont la violation ne se voit qu'à l'exécution, et tard : un conteneur qui tourne en
+root, des signaux qui n'atteignent jamais le serveur, une adresse de service revenue à
 `127.0.0.1`. Chacun d'eux a été éprouvé par mutation — retiré du code, il rend ce test rouge.
 
-Que les images **se construisent**, que leur scan **passe** et que la pile **démarre** est prouvé
-ailleurs : par le job `infra` de la CI, et par la pile qu'on regarde tourner. Les exceptions du
-scan ont leurs propres tests, dans `test_trivy_exceptions.py`.
+Que les images **se construisent** et que la pile **démarre** est prouvé ailleurs : par le job
+`infra` de la CI, et par la pile qu'on regarde tourner. Le scan des images a ses propres tests,
+dans `test_image_scan.py`.
 """
 
 import io
@@ -25,7 +25,7 @@ import pytest
 import yaml
 from config.env import Env
 from containers import POSTGRES_IMAGE
-from test_supply_chain import PINNED_IMAGE, dockerfile_instructions
+from test_supply_chain import dockerfile_instructions
 
 # `test_infra.py` → `tests` → `api` → `apps` → racine du dépôt.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -87,32 +87,6 @@ BUILD_COMMAND = re.compile(
 
 # L'étiquette d'une entrée du cache local de BuildKit, dans une commande de build imprimée.
 CACHE_TAG = re.compile(r"--cache-(?:from|to) type=local,\S*?\btag=(?P<tag>[^,\s]+)")
-
-# Les commandes que le job `infra` de la CI lance pour construire puis scanner les images.
-CI_BUILD = "make build"
-CI_SCAN = "make scan"
-
-# Une commande de scan telle que `make --dry-run` l'imprime : l'image de Trivy, ses options,
-# l'image scannée.
-SCAN_COMMAND = re.compile(
-    r"^docker run .* (?P<trivy>\S+) image (?P<options>.+) (?P<image>\S+)$", re.MULTILINE
-)
-
-# La politique de scan (ADR 0014) : HIGH et CRITICAL bloquent, comme une image de base en fin de
-# vie, et seules les exceptions datées de `.trivyignore.yaml` passent. `--image-src docker` : Trivy
-# ne lit que les images que `make build` a chargées dans le moteur, et n'en tire aucune d'un
-# registre sous le même nom.
-SCAN_POLICY = [
-    "--severity HIGH,CRITICAL",
-    "--exit-code 1",
-    "--exit-on-eol 1",
-    "--ignorefile .trivyignore.yaml",
-    "--image-src docker",
-]
-# L'option que la politique écarte, sous ses deux formes : le drapeau, et la variable
-# d'environnement que Trivy lit à sa place (`TRIVY_IGNORE_UNFIXED`).
-UNFIXED_IGNORED = re.compile(r"ignore[-_]unfixed", re.IGNORECASE)
-TRIVY_REPOSITORY = "ghcr.io/aquasecurity/trivy:"
 
 # Les variables que le `Makefile` laisse surcharger (`?=`) : `make_dry_run` les retire de
 # l'environnement hérité, pour vérifier le `Makefile` et non le shell qui lance le test
@@ -247,53 +221,6 @@ def built_images(printed: str) -> dict[str, str]:
 def job_steps(workflow: str, job: str) -> list[dict[str, Any]]:
     """Les étapes d'un job d'un workflow, lues par l'analyseur YAML, dans l'ordre du fichier."""
     return yaml.safe_load(workflow)["jobs"][job]["steps"]
-
-
-def ci_scan_findings(workflow: str) -> list[str]:
-    """Ce qui empêche le job `infra` d'un workflow de scanner les images qu'il construit.
-
-    Returns:
-        Un constat si le job ne lance pas le build puis le scan, dans cet ordre, et un si l'étape
-        de scan porte autre chose que son nom et sa commande. Liste vide : le scan bloque.
-    """
-    steps = job_steps(workflow, "infra")
-    commands = [step.get("run") for step in steps]
-    if CI_BUILD not in commands or CI_SCAN not in commands:
-        return [f"le job `infra` ne lance pas `{CI_BUILD}` et `{CI_SCAN}`"]
-    scan = commands.index(CI_SCAN)
-    findings = [f"`{CI_SCAN}` avant `{CI_BUILD}`"] if scan < commands.index(CI_BUILD) else []
-    extra = sorted(set(steps[scan]) - {"name", "run"})
-    return findings + ([f"l'étape de scan porte {extra}"] if extra else [])
-
-
-def scanned_images(printed: str) -> set[str]:
-    """Les images qu'une sortie de `make --dry-run scan` ferait scanner."""
-    return {command["image"] for command in SCAN_COMMAND.finditer(printed)}
-
-
-def scan_findings(printed: str) -> list[str]:
-    """Ce qui, dans une sortie de `make --dry-run scan`, s'écarte de la politique de scan.
-
-    Returns:
-        Un constat par option de `SCAN_POLICY` absente d'une commande, par commande qui écarte les
-        vulnérabilités sans correctif, et par commande dont Trivy n'est pas l'image officielle,
-        épinglée étiquette `x.y.z` et empreinte ; un constat si aucune commande n'est lue. Liste
-        vide : chaque scan suit la politique.
-    """
-    commands = list(SCAN_COMMAND.finditer(printed))
-    findings = [] if commands else ["aucune commande de scan lue — sa forme a-t-elle changé ?"]
-    for command in commands:
-        image, trivy = command["image"], command["trivy"]
-        findings += [
-            f"{image} : sans `{option}`"
-            for option in SCAN_POLICY
-            if option not in command["options"]
-        ]
-        if UNFIXED_IGNORED.search(command.group()):
-            findings.append(f"{image} : vulnérabilités sans correctif écartées")
-        if not (trivy.startswith(TRIVY_REPOSITORY) and PINNED_IMAGE.match(trivy)):
-            findings.append(f"{image} : Trivy hors de son image officielle épinglée, {trivy}")
-    return findings
 
 
 def build_context(root: Path) -> set[str]:
@@ -506,110 +433,6 @@ def test_la_ci_donne_a_chaque_image_son_entree_de_cache() -> None:
 
     services = [path.parent.name for path in IMAGE_DOCKERFILES]
     assert tags == {service: [service, service] for service in services}
-
-
-def test_make_scan_scanne_chaque_image_que_make_build_construit() -> None:
-    """Le scan lit les images sous le nom que le build leur donne, préfixe compris : une image
-    construite et jamais scannée serait publiée sans avoir été regardée (ADR 0014). Ajouter un
-    dossier à `infra/` suffit donc aussi à scanner son image."""
-    built = set(built_images(make_dry_run("build")).values())
-
-    assert scanned_images(make_dry_run("scan")) == built
-
-
-def test_make_scan_suit_la_politique_de_scan() -> None:
-    """Chaque option porte une part de la politique (ADR 0014) : sans `--exit-code 1`, Trivy liste
-    les vulnérabilités et sort en 0 ; sans `--ignorefile`, aucune exception ne vaut ; et une
-    vulnérabilité sans correctif s'évalue et se consigne, là où `--ignore-unfixed` la ferait
-    disparaître sans trace.
-
-    Trivy tourne dans son image officielle, épinglée comme les images de base. En mars 2026, les
-    étiquettes de ses deux actions ont été déplacées vers un voleur d'identifiants, et une version
-    piégée publiée sous `latest` (GHSA-69fq-xp46-6x23) ; une image citée par son empreinte n'était
-    pas touchée. Dependabot ne lit pas cette épingle : elle se monte à la main.
-    """
-    assert scan_findings(make_dry_run("scan")) == []
-
-
-# Le recueil des formes de la garde du scan : le `Makefile` du dépôt n'en montre qu'une, conforme.
-# Chaque écart à la politique y a son cas, avec le verdict attendu — c'est ici que la garde se
-# voit rouge, sans qu'il faille affaiblir la commande du dépôt pour l'éprouver.
-TRIVY_PINNED = TRIVY_REPOSITORY + "0.74.0@sha256:" + "a" * 64
-
-
-def scan_command(
-    trivy: str = TRIVY_PINNED, options: Iterable[str] = SCAN_POLICY, docker_options: str = ""
-) -> str:
-    """Une commande de scan telle que `make --dry-run` l'imprime, conforme par défaut."""
-    return f"docker run --rm {docker_options}{trivy} image {' '.join(options)} portfolio-api\n"
-
-
-# Forme → constat attendu (`True`) ou aucun (`False`).
-SCAN_FORMS = {
-    "conforme": (scan_command(), False),
-    **{
-        f"sans {option}": (scan_command(options=[o for o in SCAN_POLICY if o != option]), True)
-        for option in SCAN_POLICY
-    },
-    "--ignore-unfixed": (scan_command(options=[*SCAN_POLICY, "--ignore-unfixed"]), True),
-    "TRIVY_IGNORE_UNFIXED": (scan_command(docker_options="-e TRIVY_IGNORE_UNFIXED=true "), True),
-    "Trivy sans empreinte": (scan_command(trivy=TRIVY_REPOSITORY + "0.74.0"), True),
-    "Trivy sous latest": (scan_command(trivy=TRIVY_PINNED.replace("0.74.0", "latest")), True),
-    "Trivy d'un autre dépôt": (scan_command(trivy=TRIVY_PINNED.replace("ghcr.io/", "")), True),
-    "aucune commande": ("", True),
-}
-
-
-@pytest.mark.parametrize(("printed", "expected"), SCAN_FORMS.values(), ids=SCAN_FORMS.keys())
-def test_la_garde_du_scan_rend_son_verdict_sur_chaque_forme(printed: str, expected: bool) -> None:
-    """Chaque forme recensée : signalée si, et seulement si, elle s'écarte de la politique."""
-    assert bool(scan_findings(printed)) is expected, scan_findings(printed)
-
-
-def test_la_ci_scanne_les_images_qu_elle_vient_de_construire() -> None:
-    """Le job `infra` scanne sur chaque PR, après le build qui charge les images dans le moteur
-    (`--load`) : avant lui, Trivy ne trouverait rien à lire.
-
-    L'étape ne porte que son nom et sa commande. Un `continue-on-error` la rendrait indicative, un
-    `if:` la ferait sauter, un `env:` pourrait assouplir Trivy par ses variables (`TRIVY_*`) sans
-    toucher au `Makefile` : la politique vit dans `make scan`, et nulle part ailleurs.
-    """
-    assert ci_scan_findings(CI_WORKFLOW.read_text(encoding="utf-8")) == []
-
-
-def infra_job(*steps: str) -> str:
-    """Un workflow minimal dont le job `infra` porte les étapes données."""
-    return "jobs:\n  infra:\n    steps:\n" + "".join(f"      - {step}\n" for step in steps)
-
-
-BUILD_STEP = f"run: {CI_BUILD}"
-SCAN_STEP = f"run: {CI_SCAN}"
-
-# Forme → constat attendu (`True`) ou aucun (`False`).
-CI_SCAN_FORMS = {
-    "build puis scan": (infra_job(BUILD_STEP, SCAN_STEP), False),
-    "étape de scan nommée": (infra_job(BUILD_STEP, f"name: Scan\n        {SCAN_STEP}"), False),
-    "sans scan": (infra_job(BUILD_STEP), True),
-    "sans build": (infra_job(SCAN_STEP), True),
-    "scan avant build": (infra_job(SCAN_STEP, BUILD_STEP), True),
-    "continue-on-error": (
-        infra_job(BUILD_STEP, f"{SCAN_STEP}\n        continue-on-error: true"),
-        True,
-    ),
-    "if": (infra_job(BUILD_STEP, f"{SCAN_STEP}\n        if: github.event_name == 'push'"), True),
-    "env": (
-        infra_job(BUILD_STEP, f"{SCAN_STEP}\n        env:\n          TRIVY_IGNORE_UNFIXED: true"),
-        True,
-    ),
-}
-
-
-@pytest.mark.parametrize(("workflow", "expected"), CI_SCAN_FORMS.values(), ids=CI_SCAN_FORMS.keys())
-def test_la_garde_du_scan_en_ci_rend_son_verdict_sur_chaque_forme(
-    workflow: str, expected: bool
-) -> None:
-    """Chaque forme recensée : signalée si, et seulement si, le scan ne bloquerait plus."""
-    assert bool(ci_scan_findings(workflow)) is expected, ci_scan_findings(workflow)
 
 
 @pytest.mark.parametrize(

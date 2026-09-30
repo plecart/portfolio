@@ -205,6 +205,6 @@ jobs:
       # CRITICAL, corrigeable ou non, et sur une image de base en fin de vie ; seules passent les
       # exceptions datées de `.trivyignore.yaml`. L'étape ne porte que sa commande — ni
       # `continue-on-error`, ni `env:` : la politique vit dans le `Makefile`, et
-      # `apps/api/tests/test_infra.py` le tient.
+      # `apps/api/tests/test_image_scan.py` le tient.
       - name: Scan
         run: make scan
