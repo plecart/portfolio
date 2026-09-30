@@ -79,8 +79,7 @@ git worktree add ../<repo>--<numéro-issue> -b <type>/<slug> origin/main
 
 **Provisionner chaque worktree — obligatoire avant de le confier à une session.** Un worktree est
 un checkout neuf, pas une copie de l'environnement de travail : tout ce que git ignore en est
-absent. Cinq gestes, dans l'ordre — les mêmes provisionnent le worktree de relecture de
-`cycle-pr` (4.2) :
+absent. Cinq gestes, dans l'ordre :
 
 1. **Copier depuis le dépôt principal** les fichiers locaux ignorés par git dont les commandes du
    projet dépendent — ex. un `.env` lu par le fichier de commandes, `.claude/settings.local.json`
@@ -174,7 +173,8 @@ worktree, chemin dans CLAUDE.md). Lis CLAUDE.md, .claude/pipeline.config.md et t
 
 Réalise le cycle complet de l'issue #N en invoquant le skill `cycle-pr` (outil Skill) avec N —
 brief : commentaire de l'issue.
-Tu es autorisé à lancer l'agent de relecture de l'Étape 4.2, à ses deux temps : cette
+Tu es autorisé à lancer l'équipier `relecteur` de l'Étape 4.2, à ses deux temps, un seul par
+passe : cette
 invocation de `cycle-pr` vaut demande de l'utilisateur.
 Ne lance pas la commande `hooks` de la config ici : les hooks sont partagés entre worktrees et
 déjà installés depuis le clone principal.
