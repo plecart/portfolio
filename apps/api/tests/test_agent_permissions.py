@@ -82,16 +82,17 @@ GATED_CALLS = [
     ("PowerShell", "gh pr update-branch 56 --rebase"),
 ]
 
-# Des commandes ordinaires qu'aucun `deny` ni `ask` ne doit attraper.
-HARMLESS_COMMANDS = [
-    "rtk read README.md",
-    "rtk grep SECRET_KEY README.md",
-    "rtk read infra/compose.dev.yml",
-    "git push -u origin feat/x",
-    "git push origin main --follow-tags",
-    "rtk gh pr view 54",
-    "gh pr ready 54",
-    "gh pr update-branch 56",
+# Des commandes ordinaires, par outil, qu'aucun `deny` ni `ask` ne doit attraper.
+HARMLESS_CALLS = [
+    ("Bash", "rtk read README.md"),
+    ("Bash", "rtk grep SECRET_KEY README.md"),
+    ("Bash", "rtk read infra/compose.dev.yml"),
+    ("Bash", "git push -u origin feat/x"),
+    ("Bash", "git push origin main --follow-tags"),
+    ("Bash", "rtk gh pr view 54"),
+    ("Bash", "gh pr ready 54"),
+    ("Bash", "gh pr update-branch 56"),
+    ("PowerShell", "gh pr view 54"),
 ]
 
 Section = Literal["ask", "deny"]
@@ -142,12 +143,16 @@ def test_le_merge_ou_le_rebase_d_une_pr_demande_une_permission(tool: str, comman
     """« Jamais d'auto-merge », « jamais de force-push sur une PR ouverte sauf rebase demandé » :
     le go humain est une invite du harnais, pas une consigne."""
     assert matches_a_rule(command, "ask", tool), (
-        f"{tool} « {command} » ne tombe sur aucun `ask` — le merge passerait sans go humain"
+        f"{tool} « {command} » ne tombe sur aucun `ask` — l'appel passerait sans go humain"
     )
 
 
-@pytest.mark.parametrize("command", HARMLESS_COMMANDS)
-def test_une_commande_ordinaire_ne_tombe_ni_sur_un_deny_ni_sur_un_ask(command: str) -> None:
+@pytest.mark.parametrize(
+    ("tool", "command"), HARMLESS_CALLS, ids=[f"{t}: {c}" for t, c in HARMLESS_CALLS]
+)
+def test_une_commande_ordinaire_ne_tombe_ni_sur_un_deny_ni_sur_un_ask(
+    tool: str, command: str
+) -> None:
     """Le témoin : une garde qui attrape tout n'attrape rien de particulier."""
-    assert not matches_a_rule(command, "deny"), f"« {command} » est arrêté par un `deny`"
-    assert not matches_a_rule(command, "ask"), f"« {command} » déclenche un `ask`"
+    assert not matches_a_rule(command, "deny", tool), f"« {command} » est arrêté par un `deny`"
+    assert not matches_a_rule(command, "ask", tool), f"« {command} » déclenche un `ask`"
