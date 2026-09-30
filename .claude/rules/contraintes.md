@@ -32,8 +32,8 @@ Le code visé est **modulaire, scalable, fractionné** — objectif permanent, p
 
 ## Règle d'or — toute question a une voie, et une seule bloque
 Une supposition silencieuse coûte une demi-journée ; une question posée à quelqu'un d'absent en
-coûte autant — sur une PR, l'agent a attendu le mainteneur six heures pour des questions dont il
-donnait toujours la même réponse. Avant de poser une question, la **classer**, et le dire d'une
+coûte autant — surtout quand la réponse est celle que le mainteneur donne toujours. Avant de
+poser une question, la **classer**, et le dire d'une
 lettre en tête de la question ou de la décision : `[T]`, `[V]` ou `[C]`.
 
 - **Voie T — technique.** Le bon choix se déduit des bonnes pratiques, des sources de vérité et
@@ -88,8 +88,8 @@ Quelle que soit la voie :
 ## Création d'issues en cours de cycle
 - **Un cycle n'ouvre jamais d'issue seul.** Chaque skill a sa porte de sortie « nouvelle issue »
   (résidu de relecture, « ce que cette PR ne couvre pas », vide relevé par `repercussions`,
-  échappatoire de `decisions-vs-doc`) ; chacune est raisonnable seule, leur somme ne l'est pas —
-  une vague de deux issues en a ouvert cinq. La borne vit ici, au-dessus des skills.
+  échappatoire de `decisions-vs-doc`) ; chacune est raisonnable seule, leur somme ne l'est pas.
+  La borne vit ici, au-dessus des skills.
 - Tout vide, résidu ou hors-périmètre relevé en cours de cycle suit cet ordre et s'arrête au
   **premier barreau qui tient** :
   1. **il tient dans la PR courante en moins d'un commit** → le faire ;
@@ -110,7 +110,7 @@ Quelle que soit la voie :
   **et** pour un texte que la **longueur** est plausible. Le code de retour atteste que la
   requête a abouti, jamais que le contenu écrit est celui qu'on voulait : une forme destructrice
   (un chemin pris pour un contenu, un `-f` tapé pour `-F`) rend exactement le même succès qu'une
-  édition, et c'est un brief de 5 000 caractères remplacé par 120 qui l'a montré.
+  édition — et un brief entier remplacé par son chemin ne se voit qu'à la relecture.
 
 ## Maintenance continue
 - Tenir à jour, sans qu'on le redemande, les supports d'exécution du projet : fichier de commandes
@@ -133,9 +133,8 @@ Quelle que soit la voie :
   jeton de thème ou une clé de texte, il n'y a rien à regarder, et demander de valider à l'aveugle
   transforme le point d'arrêt en formalité qu'on apprend à expédier. C'est le contraire de ce
   qu'il sert. Mais attendre la fin de la PR coûte autant : les attentes du mainteneur arrivent
-  alors après la dernière relecture, et chacune rouvre un cycle — un écran assemblé à 17 h 49 et
-  montré à 20 h 50 a coûté deux commits et une heure. Si une passe de relecture indépendante part
-  au même commit (`cycle-pr` 4.2), la lancer d'abord, puis montrer l'écran : les deux attentes se
+  alors après la dernière relecture, et chacune rouvre un cycle. Si une passe de relecture
+  indépendante part au même commit (`cycle-pr` 4.2), la lancer d'abord, puis montrer l'écran : les deux attentes se
   recouvrent, et la seconde passe absorbe ce que le mainteneur demande.
 - Une zone sensible **ajoutée** par le projet suit la même cadence, sauf si sa ligne dans
   `.claude/pipeline.config.md` en déclare une autre.

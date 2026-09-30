@@ -412,8 +412,8 @@ usage. Corriger la config si l'une échoue pour cause d'erreur de saisie.
 
 **Projet sans code encore** : il n'y a rien à lancer. Enregistrer les commandes cibles avec le
 marqueur `# non vérifiée`, et **ne générer ni `ci.yml` ni `dependabot.yml`** : un workflow
-committé avant le code qu'il vérifie est rouge dès son premier run — vu sur un projet,
-`uv sync` sans manifeste —, contre la règle « aucun commit cassé ». Le marqueur est
+committé avant le code qu'il vérifie est rouge dès son premier run (`uv sync` sans manifeste),
+contre la règle « aucun commit cassé ». Le marqueur est
 l'engagement : `cycle-pr` le lit à son Étape 1, et la première PR de code rejoue la génération
 CI et Dependabot de l'étape 7 — paragraphe « Runtime épinglé » compris — et cette
 vérification, puis retire les marqueurs.
