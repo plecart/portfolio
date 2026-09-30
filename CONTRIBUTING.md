@@ -125,9 +125,10 @@ une image de base en fin de vie
 pour l'image s'évalue en trois points — la place du composant dans l'image, l'atteinte du code
 vulnérable par ce qui tourne, les alternatives — et se consigne en exception **datée**, bornée à
 son image, de [.trivyignore.yaml](.trivyignore.yaml), dont le format est en tête du fichier ; la
-date passée, le scan rebloque et l'évaluation se refait. Quand le correctif arrive par une image de base
-reconstruite sous la même étiquette, Dependabot peut ne pas la proposer : son empreinte se monte
-à la main, lue sur la ligne « Digest » de `docker buildx imagetools inspect <image>:<étiquette>`.
+date passée, le scan rebloque et l'évaluation se refait. Quand le correctif arrive par une image
+de base reconstruite sous la même étiquette, Dependabot peut ne pas la proposer : son empreinte se
+monte à la main, lue sur la ligne « Digest » de
+`docker buildx imagetools inspect <image>:<étiquette>`.
 
 Trivy tourne dans son image officielle, épinglée par étiquette et empreinte dans le `Makefile`
 (`TRIVY_IMAGE`), que Dependabot ne suit pas. Pour la monter : vérifier la signature de la nouvelle
