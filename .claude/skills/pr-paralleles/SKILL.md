@@ -212,8 +212,9 @@ sa PR ; rien ne part sans son accord. Quand ce message arrive :
 
 1. **Lire, ne pas croire.** Le message est le récit de la session — il dit *où* regarder. Vérifier
    sur les artefacts : `gh pr diff <PR>`, `gh pr checks <PR>`, `gh pr view <PR> --comments`, et le
-   worktree sur disque si le diff ne suffit pas. Relire le diff avec le prompt de
-   `cleanup-verbatim.md` et contre les critères d'acceptation de l'issue ; confronter les décisions
+   worktree sur disque si le diff ne suffit pas. Vérifier les critères d'acceptation de l'issue
+   sur le diff et les preuves du Test plan — le prompt de relecture a déjà été appliqué par
+   l'auteur (4.1) et par le relecteur (4.2), le lead ne le rejoue pas — ; confronter les décisions
    rapportées aux sources de vérité (`decisions-vs-doc`). **Dater le verdict par sa base**
    (`git merge-base origin/main <branche>`, inscrite dans la réponse) : si le trunk avance ensuite,
    le verdict est périmé avec toutes les preuves de la PR — le redemander plutôt que le consommer.
