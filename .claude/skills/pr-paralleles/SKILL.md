@@ -91,8 +91,7 @@ absent. Cinq gestes, dans l'ordre :
    Si l'outil n'est pas résolvable depuis le shell, utiliser la surcharge que la CI emploie déjà
    plutôt que d'improviser.
 3. **Installer les dépendances des piles que l'issue touche**, par la commande `install` de
-   chaque pile dans `.claude/pipeline.config.md` — une pile non touchée ne s'installe pas. Ce
-   geste manquait : deux vagues de suite, l'utilisateur l'a prescrit à la main.
+   chaque pile dans `.claude/pipeline.config.md` — une pile non touchée ne s'installe pas.
 4. **Commande de fumée** avant de remettre le prompt (la commande `lint` de la config) : un échec
    « exécutable introuvable » signale un worktree non préparé, pas un défaut du code.
 5. **Vérifier que chaque service à état recensé à l'étape 2 pour cette issue répond** — démon
@@ -293,8 +292,8 @@ ressource partagée liste ses liens internes comme « à retirer », et boucle s
 un ancêtre — `Path.rglob` fait les deux, mesuré. Retirer chaque lien trouvé avec la commande qui
 supprime **le lien, pas sa cible**
 (`cmd /c rmdir <jonction>` sous Windows, `rm <lien>` ailleurs). Une suppression récursive peut
-traverser une jonction et vider la ressource partagée qu'elle vise — c'est arrivé au SDK Flutter
-global, sans aucun avertissement. Puis seulement :
+traverser une jonction et vider la ressource partagée qu'elle vise, sans aucun avertissement.
+Puis seulement :
 
 ```
 git worktree remove ../<repo>--<numéro-issue>

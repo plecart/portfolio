@@ -71,9 +71,8 @@ Produire un briefing écrit AVANT de créer la branche :
   ensemble, au go du briefing ; une `[C]` arrête.
 
 Lever les incertitudes **maintenant** : une `[V]` découverte après cinq commits coûte une
-demi-journée d'attente ; une `[T]` ne se pose jamais, elle se décide — sur une PR, sept questions
-formelles ont coûté trois heures et demie d'attente, et la plupart appelaient la réponse que le
-mainteneur donne toujours.
+demi-journée d'attente ; une `[T]` ne se pose jamais, elle se décide — la plupart appellent la
+réponse que le mainteneur donne toujours.
 
 ### Porte d'entrée obligatoire — l'interrogatoire
 
@@ -232,9 +231,8 @@ versions publiées affectées, paquet abandonné — ne clôt pas l'analyse, ell
 vérifier, pour **chaque** parent, s'il a cessé de dépendre du paquet fautif dans une version
 ultérieure — le correctif d'un paquet abandonné vient presque toujours de son consommateur. Puis
 regarder comment d'autres projets ont traité le même avis : un mur atteint par tout le monde a
-souvent une issue de sortie publiée. Dix avis dont sept `high` sont tombés à zéro en forçant un
-parent d'une majeure. Et un `override` qui saute une majeure sous un consommateur non prévu pour
-elle **s'éprouve en exécutant réellement l'outil**, pas en relançant l'audit.
+souvent une issue de sortie publiée. Et un `override` qui saute une majeure sous un consommateur
+non prévu pour elle **s'éprouve en exécutant réellement l'outil**, pas en relançant l'audit.
 
 Implémenter **un comportement à la fois** en red-green-refactor. **Ne jamais** écrire tous les
 tests d'abord puis toute l'implémentation (slicing horizontal = mauvais tests) :
@@ -300,18 +298,17 @@ Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Six contrôl
   résumeur — proxy de sortie, hook de réécriture —, tout bilan qui annonce **zéro test collecté**,
   ou tout état autre que le rouge nommé à l'avance, se relit sur la **sortie brute du lanceur**
   avant d'être interprété : la commande `test brut` de `.claude/pipeline.config.md`, ou à défaut
-  le contournement que le résumeur documente. Un résumeur a déjà rendu « aucun test collecté »
-  sur un `1 failed, 3 passed` dont le message d'assertion portait un accent, et un rouge attendu
-  lu comme « rien collecté » se conclut « environnement cassé ». Tant qu'il n'a pas montré qu'il
+  le contournement que le résumeur documente. Un résumeur peut rendre « aucun test collecté »
+  sur une suite qui a un rouge — un accent dans un message d'assertion suffit —, et ce rouge se
+  conclut alors « environnement cassé ». Tant qu'il n'a pas montré qu'il
   distingue « zéro test » d'« un test rouge », son bilan n'est pas un verdict.
 - **Une porte verte ne vaut que pour la plateforme qui l'a rendue.** Quand le poste et la CI n'ont
   pas le même OS, recenser une fois, au premier scaffold, les règles de qualité sensibles à la
   plateforme — bit exécutable, fins de ligne, sensibilité à la casse des chemins, séparateur de
   chemin, encodage par défaut — dans la section « Qualité » de `.claude/pipeline.config.md`, et
-  dire dans les `Notes` de la PR lesquelles ne sont vérifiées qu'en CI. Quatorze commits verts
-  sous Windows ont rougi en onze secondes sous Linux, sur une règle de lint que NTFS ne peut pas
-  déclencher ; l'inverse existe aussi, un fichier que `.gitattributes` pinne en LF et qu'une copie
-  de travail CRLF fait rougir sur le seul poste.
+  dire dans les `Notes` de la PR lesquelles ne sont vérifiées qu'en CI. Une règle de lint que
+  NTFS ne peut pas déclencher ne rougit qu'en CI ; l'inverse existe aussi, un fichier que
+  `.gitattributes` pinne en LF et qu'une copie de travail CRLF fait rougir sur le seul poste.
 - **Une commande du projet que la suite n'exécute pas est invisible à toutes les portes.** Si le
   delta touche le fichier de commandes du projet (`Makefile`, `justfile`, scripts du manifeste)
   ou la définition d'une commande listée dans `.claude/pipeline.config.md`, **exécuter cette
@@ -415,12 +412,10 @@ dans son arbre, en une commande, avant d'éditer sur sa base — jamais par un a
 les commits suivants supposeront vrai** — par exemple le contrat d'infrastructure : image, point
 d'entrée, fichier de composition, contrat de configuration ; pour une PR de règles, les règles —
 et une seconde, plus courte, à la fin, sur ce qui a été écrit après la première. Le déclencheur
-est le **contenu** du commit, jamais son rang : sur une PR, les deux premiers commits ne portaient
-qu'une constante et deux dépendances, et tous les invariants non gardés vivaient dans les
-troisième et quatrième. Placée seulement à la fin, la
-relecture rend ses constats à la distance maximale du moment où ils auraient pu être absorbés —
-19 commits dont 13 en réaction à des constats arrivés après le vert, 25 tests dont 18 après la
-relecture : un travail juste, rendu cher par sa position dans le temps. Un constat de la première
+est le **contenu** du commit, jamais son rang : les premiers commits d'une PR portent souvent une
+constante et deux dépendances, et les invariants non gardés arrivent plus tard. Placée seulement
+à la fin, la relecture rend ses constats à la distance maximale du moment où ils auraient pu
+être absorbés. Un constat de la première
 passe se fond dans un commit qui restait à écrire ; un constat qui arrive après le passage en
 ready coûte un run de CI complet et le rejeu des vérifications manuelles (Étape 7).
 
@@ -436,9 +431,8 @@ dépassé son rôle.
 production, une faille, une perte de données possible. *Important* : une régression que la CI ne
 verrait pas et qu'un changement plausible du code déclencherait. *Mineur* : tout le reste —
 lisibilité, nommage, doc, et « ce test pourrait tenir davantage ». Un constat qui n'entre dans
-aucune des deux premières est mineur, quelle que soit sa longueur ; quatre « importants » d'une
-relance étaient tous des tests à renforcer, et ils ont coûté une relecture de plus. Le
-relecteur rend chaque mineur sous forme d'**édit précis** — fichier, ligne, remplacement — ou
+aucune des deux premières est mineur, quelle que soit sa longueur — « ce test pourrait tenir
+davantage » en est le cas le plus fréquent. Le relecteur rend chaque mineur sous forme d'**édit précis** — fichier, ligne, remplacement — ou
 l'écarte lui-même avec sa raison.
 
 **Traitement — par passe, jamais par constat.** Les bloquants et importants d'une passe se
@@ -450,8 +444,7 @@ l'arbre est partagé ; l'appliquer soi-même s'il ne reste rien d'autre à corri
 avec leur raison dans le body (Étape 5). Aucun registre ailleurs : un mineur écarté qui compte
 encore reviendra à la prochaine relecture de la zone ; s'il ne revient pas, il ne comptait pas. Un
 constat de la **première** passe s'absorbe de préférence dans le commit à venir qui touche sa
-zone. Vingt-neuf commits de correction à cycle complet, un par constat, ont coûté plus que les
-quatre commits prévus d'une PR ; c'était le rang du constat qui décidait, pas son contenu.
+zone.
 
 **Plafond — deux passes et une relance.** La relance n'est pas une passe : c'est une **revue des
 commits de correction**, ciblée par un diff explicite (`<sha avant>..<sha après>`) et par la liste
@@ -597,9 +590,8 @@ vérification>..HEAD`, croisé avec ce que la vérification déclare observer (�
 plan), puis `git diff <sha de la vérification>..HEAD -- <fichiers observés>` pour juger le
 contenu — elle se rejoue si le diff touche du code dont elle dépend ; elle reste cochée, ses deux
 SHA d'origine conservés et le nouveau noté à côté, si le diff ne touche que des commentaires, de
-la documentation ou des fichiers qu'elle n'atteint pas. Six vérifications à une minute chacune ont
-été rejouées trois fois pour des diffs de commentaires : une preuve qu'on rejoue sans qu'elle
-puisse changer de résultat n'est plus une preuve, c'est un rituel, et un rituel coûteux est le
+la documentation ou des fichiers qu'elle n'atteint pas. Une preuve qu'on rejoue sans qu'elle
+puisse changer de résultat n'est pas une preuve, c'est un rituel, et un rituel coûteux est le
 plus sûr moyen de faire abandonner l'étape.
 
 Quand c'est la **base** qui a bougé, **toutes** les preuves sont périmées, la CI comprise : elle a
@@ -736,8 +728,7 @@ appels d'outils. Écrire ces lignes, plus trois à la main — commits prévus c
 correction, constats par passe, correctifs qui ont cassé quelque chose — dans
 `retrospectives/<date>-<issue>.md`, dossier voisin du journal d'observations (chemin dans
 `CLAUDE.md`), hors du dépôt. C'est la seule mesure qui dise si un changement de la pipeline a
-marché : une session de douze heures s'est révélée faite de trois heures d'agent et de neuf
-heures d'attente, ce qu'aucun compte rendu n'avait vu.
+marché : l'attente et le coût des relectures ne se voient dans aucun compte rendu.
 
 La PR et la conversation qui l'a résolue ont pu acter des décisions, déplacer un contrat d'interface, déjà faire une partie d'un autre lot, ou rendre une
 hypothèse caduque ailleurs. **Immédiatement après le merge**, lancer le skill `repercussions` — la

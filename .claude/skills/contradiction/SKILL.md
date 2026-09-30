@@ -64,9 +64,8 @@ Chercher les §§ qui **dépendent** de celui qu'on amende, par **trois recherch
    (décision, ADR, section, surface, page) : chercher la **plage** ou le **total** qui en dérive
    (`D1-D`, « N ADR », « les N … », « trois pages ») dans les fichiers de rang égal ou inférieur
    et dans `.claude/pipeline.config.md`. Un compteur dérivé n'a aucun mot en commun avec ce qu'il
-   compte, et aucune des deux recherches précédentes ne le vise — la plage « D1-D45 » de la
-   config est devenue fausse à l'entrée de D46, et ne s'est vue qu'à une relecture après
-   application.
+   compte, et aucune des deux recherches précédentes ne le vise — une plage « D1-Dn » devient
+   fausse à l'entrée de Dn+1 sans qu'aucun mot du § amendé ne la désigne.
 
 Établir la liste **avant** de proposer quoi que ce soit — une cascade découverte à mi-parcours
 transforme un amendement validé en chantier non validé. **Une cascade mesurée à zéro sur un

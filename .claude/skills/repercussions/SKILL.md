@@ -21,10 +21,7 @@ C'est la règle qui structure tout le reste.
   brief que `cycle-pr` lit comme contrat à son briefing. Si l'un ou l'autre est devenu faux, on le
   **réécrit**. Un commentaire ne remplace pas le texte faux — il s'assoit à côté, et l'issue
   continue d'affirmer une chose fausse pendant qu'un commentaire plus bas la contredit. Corriger le
-  corps en laissant le brief intact a le même effet : le contrat qu'on exécute reste faux. (Mesuré
-  le 3 septembre 2026 : quatre réconciliations successives consignées au corps d'une issue, dont
-  une disant « pas celui cité dans le brief », sans qu'aucune n'atteigne le brief — repasse manuelle
-  complète requise avant de pouvoir développer.)
+  corps en laissant le brief intact a le même effet : le contrat qu'on exécute reste faux.
 - **Ce skill ne commente jamais une issue.** La trace du *pourquoi* tient en une ligne dans le
   « Journal de spec » du corps ; l'historique d'édition GitHub garde le détail ; le récapitulatif
   complet reste dans la conversation, pour le mainteneur.
