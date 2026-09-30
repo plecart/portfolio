@@ -86,13 +86,36 @@ PUBLISH_IF = "github.event_name == 'push' && github.ref == 'refs/heads/main'"
 READ_ONLY = {"contents": "read"}
 PUBLISH_PERMISSIONS = {"contents": "read", "packages": "write"}
 
-# Ce que le job lance après son build, dans cet ordre : le scan, puis le push de ce qui vient
-# d'être scanné, sous l'étiquette du commit, puis la rétention.
-PUBLISH_COMMANDS = [
-    SCANNING_JOBS["publish"][1],
-    f'make push IMAGE_PREFIX={PUBLISH_PREFIX} IMAGE_TAG="$GITHUB_SHA"',
-    f"make prune IMAGE_PREFIX={PUBLISH_PREFIX}",
+# Les commandes du job, mot pour mot : le build et le scan de `SCANNING_JOBS`, la connexion au
+# registre, le push de ce qui vient d'être scanné, sous l'étiquette du commit, puis la rétention.
+PUBLISH_BUILD, PUBLISH_SCAN = SCANNING_JOBS["publish"]
+PUBLISH_LOGIN = (
+    'echo "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin'
+)
+PUBLISH_PUSH = f'make push IMAGE_PREFIX={PUBLISH_PREFIX} IMAGE_TAG="$GITHUB_SHA"'
+PUBLISH_PRUNE = f"make prune IMAGE_PREFIX={PUBLISH_PREFIX}"
+
+# Les étapes du job, dans l'ordre — l'action, sans son empreinte, ou la commande —, et aucune
+# autre : rien n'atteint le registre avant le scan. Une connexion placée plus tôt donnerait son
+# identifiant au build, une étape de plus pourrait pousser.
+PUBLISH_STEPS = [
+    "actions/checkout",
+    "actions/download-artifact",
+    "docker/setup-buildx-action",
+    "actions/cache/restore",
+    PUBLISH_BUILD,
+    PUBLISH_SCAN,
+    PUBLISH_LOGIN,
+    PUBLISH_PUSH,
+    PUBLISH_PRUNE,
 ]
+
+# Les drapeaux du build, seule variable de son étape : l'image chargée dans le moteur, où Trivy la
+# lit, sans attestation (décision 7), depuis le cache d'`infra`. Mot pour mot : un drapeau de plus
+# (`--push`, `--output type=registry`) enverrait l'image au registre avant son scan.
+PUBLISH_BUILD_FLAGS = (
+    "--load --cache-from type=local,src=/tmp/buildx-cache,tag=$* --provenance=false --sbom=false"
+)
 
 
 def published_images() -> list[str]:
@@ -149,8 +172,9 @@ def publish_findings(workflow: str) -> list[str]:
 
     Returns:
         Un constat si le job manque ; sinon un par propriété altérée — `needs`, `if`, permissions
-        du job, du workflow ou d'un autre job, `concurrency`, et l'ordre scan, push, rétention.
-        Liste vide : le job est conforme.
+        du job, du workflow ou d'un autre job, `concurrency`, la liste exacte de ses étapes
+        (`PUBLISH_STEPS`), les drapeaux du build, et le checkout qui ne garde pas l'identifiant
+        du dépôt. Liste vide : le job est conforme.
     """
     document = yaml.safe_load(workflow)
     jobs = document["jobs"]
@@ -180,17 +204,32 @@ def publish_findings(workflow: str) -> list[str]:
             "`concurrency` doit nommer son groupe et porter `cancel-in-progress: false`"
         )
     steps: list[dict[str, object]] = job.get("steps") or []
-    launched = [step.get("run") for step in steps]
-    if [command for command in launched if command in PUBLISH_COMMANDS] != PUBLISH_COMMANDS:
-        findings.append(
-            f"le job ne lance pas, une fois chacune et dans cet ordre, {PUBLISH_COMMANDS}"
-        )
+    launched = [step.get("run") or str(step.get("uses", "")).split("@")[0] for step in steps]
+    if launched != PUBLISH_STEPS:
+        findings.append(f"le job lance {launched}, attendu, dans cet ordre, {PUBLISH_STEPS}")
+    build_env = [step.get("env") for step in steps if step.get("run") == PUBLISH_BUILD]
+    if build_env != [{"DOCKER_BUILD_FLAGS": PUBLISH_BUILD_FLAGS}]:
+        findings.append(f"le build reçoit {build_env}, attendu {PUBLISH_BUILD_FLAGS!r}")
+    checkout = [
+        step.get("with")
+        for step, name in zip(steps, launched, strict=True)
+        if name == "actions/checkout"
+    ]
+    if checkout != [{"persist-credentials": False}]:
+        findings.append(f"le checkout reçoit {checkout}, attendu `persist-credentials: false`")
     return findings
 
 
 # --- Le recueil des formes : chaque cas recensé, avec son verdict attendu ---------------------
 
-SCAN_LINE, PUSH_LINE, PRUNE_LINE = (f"      - run: {command}\n" for command in PUBLISH_COMMANDS)
+PERSIST_LINES = "        with:\n          persist-credentials: false\n"
+CHECKOUT_LINE = "      - uses: actions/checkout@v0\n" + PERSIST_LINES
+BUILD_FLAGS_LINE = f"          DOCKER_BUILD_FLAGS: {PUBLISH_BUILD_FLAGS}\n"
+SCAN_LINE, LOGIN_LINE, PUSH_LINE, PRUNE_LINE = (
+    f"      - run: {command}\n"
+    for command in (PUBLISH_SCAN, PUBLISH_LOGIN, PUBLISH_PUSH, PUBLISH_PRUNE)
+)
+LOGIN_ACTION_LINE = "      - uses: docker/login-action@v0\n"
 CONFORMING_WORKFLOW = f"""\
 permissions:
   contents: read
@@ -211,7 +250,13 @@ jobs:
       group: publish
       cancel-in-progress: false
     steps:
-{SCAN_LINE}{PUSH_LINE}{PRUNE_LINE}"""
+{CHECKOUT_LINE}\
+      - uses: actions/download-artifact@v0
+      - uses: docker/setup-buildx-action@v0
+      - uses: actions/cache/restore@v0
+      - run: {PUBLISH_BUILD}
+        env:
+{BUILD_FLAGS_LINE}{SCAN_LINE}{LOGIN_LINE}{PUSH_LINE}{PRUNE_LINE}"""
 
 # Forme → (texte remplacé, remplacement, constat attendu). Le texte remplacé est pris dans
 # `CONFORMING_WORKFLOW` : une forme qui ne le changerait pas resterait conforme, et son verdict
@@ -248,11 +293,34 @@ PUBLISH_CHANGES = {
         "",
         True,
     ),
-    "push avant scan": (SCAN_LINE + PUSH_LINE, PUSH_LINE + SCAN_LINE, True),
+    "push avant scan": (
+        SCAN_LINE + LOGIN_LINE + PUSH_LINE,
+        PUSH_LINE + SCAN_LINE + LOGIN_LINE,
+        True,
+    ),
     "sans rétention": (PRUNE_LINE, "", True),
     "rétention avant push": (PUSH_LINE + PRUNE_LINE, PRUNE_LINE + PUSH_LINE, True),
     "push sans l'étiquette du commit": (' IMAGE_TAG="$GITHUB_SHA"', "", True),
     "push en double": (PUSH_LINE, PUSH_LINE + PUSH_LINE, True),
+    # Une image atteint le registre avant son scan : poussée par le build, qui trouverait
+    # l'identifiant d'une connexion placée plus tôt, ou par une étape de plus.
+    "connexion avant le scan": (SCAN_LINE + LOGIN_LINE, LOGIN_LINE + SCAN_LINE, True),
+    "connexion par une action": (LOGIN_LINE, LOGIN_ACTION_LINE, True),
+    "connexion de plus en tête du job": (CHECKOUT_LINE, LOGIN_ACTION_LINE + CHECKOUT_LINE, True),
+    "build qui pousse": ("--load", "--load --push", True),
+    "build exporté vers le registre": ("--load", "--load --output type=registry", True),
+    "build sans chargement dans le moteur": ("--load ", "", True),
+    "identifiant passé au build": (
+        BUILD_FLAGS_LINE,
+        BUILD_FLAGS_LINE + "          GH_TOKEN: ${{ github.token }}\n",
+        True,
+    ),
+    "étape de push avant le scan": (
+        SCAN_LINE,
+        "      - uses: docker/build-push-action@v0\n" + SCAN_LINE,
+        True,
+    ),
+    "checkout qui garde l'identifiant du dépôt": (PERSIST_LINES, "", True),
 }
 PUBLISH_FORMS = {
     form: (CONFORMING_WORKFLOW.replace(old, new) if old else CONFORMING_WORKFLOW, expected)
@@ -357,7 +425,8 @@ def test_la_garde_du_job_publish_rend_son_verdict_sur_chaque_forme(
 
 def test_le_job_publish_ne_publie_qu_un_commit_vert_de_main_une_fois_scanne() -> None:
     """`needs` sur les trois autres jobs, push vers `main` seulement, `packages: write` sur ce
-    seul job, publications sans annulation ; scan, push puis rétention (brief de #15, décision 5).
+    seul job, publications sans annulation ; build, scan, connexion, push puis rétention, et rien
+    n'atteint le registre avant le scan (brief de #15, décision 5).
     Un `workflow_run` ou une publication depuis `infra` sont écartés : le premier publierait
     depuis le workflow de la branche par défaut, la seconde un commit dont `api` ou `web` a
     échoué (ADR 0014)."""
