@@ -200,9 +200,10 @@ et les entrées `rtk` sont celles que le harnais évalue sans lui — les deux s
 
 Un `ask` passe avant tout `allow`, y compris celui qu'un hook renvoie (doc permissions : « a
 matching ask rule still prompts even when the hook returned "allow" »), en mode auto compris
-(« Explicit ask rules still force a prompt ») : `permissions.ask` sur `gh pr merge` — forme
-d'origine, forme `rtk`, `rtk proxy`, outil PowerShell — est la porte de « jamais d'auto-merge »,
-épinglée par `apps/api/tests/test_agent_permissions.py`. Restent ouverts : un merge local suivi de
+(doc permission-modes, § auto mode : « Explicit ask rules still force a prompt ») :
+`permissions.ask` sur `gh pr merge` et sur `gh pr update-branch … --rebase` — forme d'origine,
+forme `rtk`, `rtk proxy`, outil PowerShell — est la porte de « jamais d'auto-merge » et du « rebase
+explicitement demandé » (`contraintes.md`), épinglée par `apps/api/tests/test_agent_permissions.py`. Restent ouverts : un merge local suivi de
 `git push origin main` (`main` n'est pas protégée côté GitHub), `gh api -X PUT …/pulls/<n>/merge`
 et `gh -R … pr merge` — aucun `allow` ne les couvre, ils demandent en mode manuel et passent au
 classifieur en mode auto.
