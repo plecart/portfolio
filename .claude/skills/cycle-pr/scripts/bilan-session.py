@@ -4,8 +4,10 @@ Usage : python bilan-session.py <transcript.jsonl>
 
 Rend, sans double compte : la durée de la session, le temps bloqué sur le mainteneur (dernière
 sortie de l'agent → message humain suivant, plus les questions formelles restées ouvertes), le
-temps des sous-agents (lancement → notification de fin), le temps d'agent seul, les attentes
-humaines de plus de cinq minutes, les points de contact humains et les appels d'outils.
+temps des sous-agents et workflows (lancement → notification de fin), le temps d'agent seul, les
+attentes humaines de plus de cinq minutes, les points de contact humains, les appels d'outils, et
+les jetons facturés — sortie, cache lu, cache écrit — de la session et de ses sous-agents, dont
+les transcripts vivent sous `<répertoire du transcript>/<uuid de session>/`.
 Python 3.11 ou plus, bibliothèque standard seule.
 """
 
@@ -16,10 +18,11 @@ import sys
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, cast
 
 WAIT_THRESHOLD = timedelta(minutes=5)
-SUBAGENT_TOOLS = {"Agent", "Task"}
+SUBAGENT_TOOLS = {"Agent", "Task", "Workflow"}
 QUESTION_TOOL = "AskUserQuestion"
 SYSTEM_REMINDER = re.compile(r"<system-reminder>.*?</system-reminder>", re.DOTALL)
 
@@ -43,6 +46,48 @@ class ToolCall:
     name: str
     started: datetime
     duration: timedelta
+
+
+@dataclass
+class Usage:
+    """Jetons facturés par un ensemble de transcripts, un seul compte par message."""
+
+    output: int = 0
+    cache_read: int = 0
+    cache_write: int = 0
+    transcripts: int = 0
+
+
+def token_usage(paths: list[Path]) -> Usage:
+    """Somme l'`usage` du dernier enregistrement de chaque message assistant.
+
+    Un message diffusé en plusieurs blocs occupe plusieurs lignes qui portent le même `id` et le
+    même `usage` : une seule compte.
+    """
+    usage = Usage(transcripts=len(paths))
+    for path in paths:
+        last: dict[str, dict[str, int]] = {}
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                try:
+                    obj: dict[str, Any] = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                message = obj.get("message") or {}
+                if obj.get("type") == "assistant" and message.get("usage"):
+                    last[message.get("id") or obj.get("uuid", "")] = message["usage"]
+        for u in last.values():
+            usage.output += u.get("output_tokens") or 0
+            usage.cache_read += u.get("cache_read_input_tokens") or 0
+            usage.cache_write += u.get("cache_creation_input_tokens") or 0
+    return usage
+
+
+def tokens(u: Usage) -> str:
+    return (
+        f"sortie {u.output / 1e3:6.0f} k · cache lu {u.cache_read / 1e6:5.1f} M"
+        f" · écrit {u.cache_write / 1e6:4.1f} M"
+    )
 
 
 def read_events(path: str) -> list[Event]:
@@ -156,7 +201,7 @@ def local(t: datetime) -> str:
     return f"{t.astimezone():%H:%M}"
 
 
-def report(events: list[Event]) -> str:
+def report(events: list[Event], session: Usage, subagents: Usage) -> str:
     calls = tool_calls(events)
     blocked = blocked_windows(events, calls)
     reviews = subagent_windows(events, calls)
@@ -173,6 +218,8 @@ def report(events: list[Event]) -> str:
         f"bloqué sur le mainteneur     {hm(total(blocked)):>9}   {total(blocked) / span:4.0%}",
         f"sous-agents en cours         {hm(total(reviews)):>9}   {total(reviews) / span:4.0%}",
         f"agent seul                   {hm(span - idle):>9}   {(span - idle) / span:4.0%}",
+        f"jetons de la session         {tokens(session)}",
+        f"jetons des sous-agents       {tokens(subagents)}   ({subagents.transcripts} transcripts)",
         f"points de contact humains    {kinds['human'] + questions:>9}   {contacts}",
         "sous-agents :",
         *(f"  {local(a)} → {local(b)}   {hm(b - a)}" for a, b in reviews),
@@ -189,4 +236,9 @@ if __name__ == "__main__":
     transcript = read_events(sys.argv[1])
     if not transcript:
         sys.exit("transcript vide ou illisible")
-    io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8").write(report(transcript) + "\n")
+    main_path = Path(sys.argv[1])
+    session = token_usage([main_path])
+    subagents = token_usage(sorted(main_path.with_suffix("").rglob("*.jsonl")))
+    io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8").write(
+        report(transcript, session, subagents) + "\n"
+    )
