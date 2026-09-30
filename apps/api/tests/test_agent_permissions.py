@@ -69,12 +69,15 @@ FORCE_PUSHES = [
 
 # Le merge d'une PR, par chaque outil et sous chaque forme qui peut le lancer : celle que Claude
 # écrit, celle que RTK lui substitue, le passage brut par `rtk proxy`, et l'outil PowerShell que le
-# hook RTK ne voit pas (son matcher ne vise que `Bash`).
-MERGE_CALLS = [
+# hook RTK ne voit pas (son matcher ne vise que `Bash`). Et `update-branch --rebase`, qui réécrit la
+# branche d'une PR ouverte — le « rebase explicitement demandé » de `contraintes.md`.
+GATED_CALLS = [
     ("Bash", "gh pr merge 54 --rebase --delete-branch"),
     ("Bash", "rtk gh pr merge 54 --rebase --delete-branch"),
     ("Bash", "rtk proxy gh pr merge 54 --rebase"),
     ("PowerShell", "gh pr merge 54 --rebase --delete-branch"),
+    ("Bash", "gh pr update-branch 56 --rebase"),
+    ("Bash", "rtk gh pr update-branch 56 --rebase"),
 ]
 
 # Des commandes ordinaires qu'aucun `deny` ni `ask` ne doit attraper.
@@ -86,6 +89,7 @@ HARMLESS_COMMANDS = [
     "git push origin main --follow-tags",
     "rtk gh pr view 54",
     "gh pr ready 54",
+    "gh pr update-branch 56",
 ]
 
 Section = Literal["ask", "deny"]
@@ -130,10 +134,11 @@ def test_chaque_forme_a_refuser_tombe_sur_un_deny(command: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("tool", "command"), MERGE_CALLS, ids=[f"{t}: {c}" for t, c in MERGE_CALLS]
+    ("tool", "command"), GATED_CALLS, ids=[f"{t}: {c}" for t, c in GATED_CALLS]
 )
-def test_le_merge_d_une_pr_demande_une_permission(tool: str, command: str) -> None:
-    """« Jamais d'auto-merge » : le go humain est une invite du harnais, pas une consigne."""
+def test_le_merge_ou_le_rebase_d_une_pr_demande_une_permission(tool: str, command: str) -> None:
+    """« Jamais d'auto-merge », « jamais de force-push sur une PR ouverte sauf rebase demandé » :
+    le go humain est une invite du harnais, pas une consigne."""
     assert matches_a_rule(command, "ask", tool), (
         f"{tool} « {command} » ne tombe sur aucun `ask` — le merge passerait sans go humain"
     )
