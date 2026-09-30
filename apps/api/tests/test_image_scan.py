@@ -2,10 +2,10 @@
 
 Le scan lui-même tourne ailleurs — sur le poste par `make scan`, en CI dans les jobs `infra` et
 `publish`. Ces tests gardent ce qui l'affaiblirait sans bruit : une option de Trivy retirée, une
-étape de CI devenue indicative, une exception sans date. Trivy n'exige d'une exception que son `id` — une
-entrée sans `expired_at` vaut pour toujours, une clé mal orthographiée est ignorée sans un mot —,
-et la règle du projet est plus stricte (ADR 0014) : chaque exception porte l'évaluation qui la
-fonde et la date où elle se refait.
+étape de CI devenue indicative, une exception sans date. Trivy n'exige d'une exception que son
+`id` — une entrée sans `expired_at` vaut pour toujours, une clé mal orthographiée est ignorée
+sans un mot —, et la règle du projet est plus stricte (ADR 0014) : chaque exception porte
+l'évaluation qui la fonde et la date où elle se refait.
 
 Comme dans `test_supply_chain.py`, chaque garde est une fonction sur du texte, appliquée au dépôt
 et à un recueil de formes — `SCAN_FORMS`, `CI_SCAN_FORMS`, `EXCEPTION_FORMS` —, chacune avec son
