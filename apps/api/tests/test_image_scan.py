@@ -379,13 +379,16 @@ def test_la_garde_des_exceptions_rend_son_verdict_sur_chaque_forme(
 # --- Les fichiers du dépôt --------------------------------------------------------------------
 
 
-def test_make_scan_scanne_chaque_image_que_make_build_construit() -> None:
-    """Le scan lit les images sous le nom que le build leur donne, préfixe compris : une image
-    construite et jamais scannée serait publiée sans avoir été regardée (ADR 0014). Ajouter un
-    dossier à `infra/` suffit donc aussi à scanner son image."""
-    built = set(built_images(make_dry_run("build")).values())
+@pytest.mark.parametrize("prefix", ["portfolio-", "ghcr.io/plecart/portfolio-"])
+def test_make_scan_scanne_chaque_image_que_make_build_construit(prefix: str) -> None:
+    """Le scan lit les images sous le nom que le build leur donne, préfixe compris — celui du
+    poste comme celui sous lequel la CI publiera : une image construite et jamais scannée serait
+    publiée sans avoir été regardée (ADR 0014). Ajouter un dossier à `infra/` suffit donc aussi à
+    scanner son image."""
+    built = set(built_images(make_dry_run("build", IMAGE_PREFIX=prefix)).values())
 
-    assert scanned_images(make_dry_run("scan")) == built
+    assert built, "aucune image construite lue — la forme de la commande a-t-elle changé ?"
+    assert scanned_images(make_dry_run("scan", IMAGE_PREFIX=prefix)) == built
 
 
 def test_make_scan_suit_la_politique_de_scan() -> None:

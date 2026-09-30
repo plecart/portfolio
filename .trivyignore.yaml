@@ -30,7 +30,7 @@
 #
 # `apps/api/tests/test_image_scan.py` refuse une entrée incomplète ou expirée.
 #
-# Les exceptions ci-dessous ont été évaluées au premier scan, le 2026-09-30 (Trivy 0.74.0).
+# Les exceptions ci-dessous ont été évaluées au scan du 2026-09-30 (Trivy 0.74.0).
 # Réévaluation : 90 jours ; 30 jours quand le correctif n'attend que la reconstruction d'une
 # image de base sous la même étiquette, que Dependabot peut ne pas proposer.
 
