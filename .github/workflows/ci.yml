@@ -275,8 +275,9 @@ jobs:
           restore-keys: buildx-images-
 
       # Le build du job `infra`, sous le nom GHCR (brief de #15, décision 8) : même commande,
-      # même cache par image (`tag=$*`). Ni provenance ni SBOM : chacune entrerait au paquet comme
-      # une version sans étiquette, que la rétention ne supprime jamais (décision 7).
+      # même cache par image (`tag=$*`). Ni provenance ni SBOM (décision 7) : chacune ferait de
+      # l'image un index, dont chaque manifeste entrerait au paquet comme une version sans
+      # étiquette — que la rétention, qui compte toute version, supprimerait sous l'index.
       - name: Images
         run: make build IMAGE_PREFIX=ghcr.io/plecart/portfolio-
         env:

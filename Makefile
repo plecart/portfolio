@@ -83,12 +83,16 @@ SCAN_FLAGS := --image-src docker --severity HIGH,CRITICAL --exit-code 1 --exit-o
 	--ignorefile .trivyignore.yaml --show-suppressed
 
 # La rétention des images publiées (ADR 0014) : chaque paquet garde ses `KEEP_VERSIONS` versions
-# étiquetées les plus récentes. Le filtre `jq` rend les autres, de la plus ancienne à la plus
-# récente. Une version sans étiquette n'est jamais supprimée : sous un index multi-plateforme, ce
-# serait l'image d'une plateforme, et l'index qui la cite deviendrait inutilisable.
+# les plus récentes. Le filtre `jq` rend les autres, de la plus ancienne à la plus récente.
+#
+# Toute version compte, étiquetée ou non : un job relancé sur un commit dont le build ne se
+# reproduit pas à l'octet déplace ses étiquettes et laisse une version orpheline, que la rétention
+# doit aussi emporter. Tenable parce que chaque publication est une image à un seul manifeste —
+# ni attestation ni plateforme multiple (décision 7 du brief de #15).
+# ponytail: un index multi-plateforme ferait supprimer ses manifestes par plateforme, versions
+# sans étiquette — ne compter alors que les versions étiquetées.
 KEEP_VERSIONS := 3
-STALE_VERSIONS := [.[] | select(.metadata.container.tags != [])] | sort_by(.created_at) \
-	| .[:-$(KEEP_VERSIONS)][].id
+STALE_VERSIONS := sort_by(.created_at) | .[:-$(KEEP_VERSIONS)][].id
 
 # Les versions d'un paquet dans l'API de GitHub : `ghcr.io/<propriétaire>/<nom>` y devient
 # `users/<propriétaire>/packages/container/<nom>/versions`, un paquet d'utilisateur comme ceux de ce

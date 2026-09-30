@@ -88,8 +88,9 @@ le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node a
                                                   # préfixe GHCR par `IMAGE_PREFIX` ; vérifiée le
                                                   # 2026-09-30 contre un registre local (#15)
 - rétention    : make prune                       # **CI seulement**, après `push` : chaque paquet garde
-                                                  # ses 3 versions étiquetées les plus récentes (`gh api`,
-                                                  # jeton du workflow) ; éprouvée sur un `gh` témoin (#15)
+                                                  # ses 3 versions les plus récentes (`gh api`, jeton du
+                                                  # workflow) ; éprouvée sur un `gh` témoin et son
+                                                  # filtre par gojq, le moteur de `gh` (#15)
 - compose      : make compose-config              # résout `infra/compose.dev.yml` — exige un `.env` à la racine
 - run local    : make dev                         # pile Postgres + Redis + `api`, ports sur `127.0.0.1` ;
                                                   # front compilé s'il manque
