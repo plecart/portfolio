@@ -22,8 +22,8 @@ WEB_INDEX := $(WEB)/dist/index.html
 WEB_NPM := cd $(WEB) && $(NPM)
 
 # Une image par dossier `infra/<service>/` qui porte un `Dockerfile` (ADR 0014) : `make build` les
-# trouve, et ajouter un dossier suffit. Chacune a ses cibles, `build-<service>`, `scan-<service>` et,
-# pour la publication, `push-<service>` et `prune-<service>`.
+# trouve, et ajouter un dossier suffit. Chacune a ses cibles, `build-<service>`, `scan-<service>`
+# et, pour la publication, `push-<service>` et `prune-<service>`.
 IMAGES := $(patsubst infra/%/Dockerfile,%,$(wildcard infra/*/Dockerfile))
 IMAGE_BUILDS := $(addprefix build-,$(IMAGES))
 IMAGE_SCANS := $(addprefix scan-,$(IMAGES))
@@ -139,8 +139,8 @@ audit:
 
 # Contexte de build : la racine du dépôt, pour toutes les images — l'espace de travail `uv` et son
 # verrou y vivent, et le front compilé. La CI appelle cette cible plutôt qu'un `docker build` à
-# elle, pour que les images vérifiées en CI soient exactement celles qu'on construit sur le poste,
-# et que le job `publish` reprend pour publier.
+# elle, pour que les images vérifiées en CI soient exactement celles qu'on construit sur le poste
+# — celles aussi que le job `publish` reconstruit pour publier.
 #
 # `docker buildx build` et non `docker build` : le second garde **toujours** le builder par
 # défaut du moteur, même après un `docker buildx use`, et la documentation Docker vise

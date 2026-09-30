@@ -449,9 +449,9 @@ def test_la_publication_construit_sans_attestation() -> None:
 
 
 def test_la_publication_reconstruit_depuis_le_cache_du_job_infra() -> None:
-    """`publish` restaure, sous la même clé, l'entrée de cache qu'`infra` vient d'écrire dans le
-    même run, et ne l'écrit pas. Deux clés qui dériveraient le feraient reconstruire à froid, sans
-    un signal."""
+    """`publish` restaure l'entrée de cache d'`infra` sous la même clé — celle qu'`infra` a
+    restaurée, ou écrite si la clé manquait —, et ne l'écrit pas. Deux clés qui dériveraient le
+    feraient reconstruire à froid, sans un signal."""
     jobs = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"]
 
     def cache_inputs(job: str, action: str) -> object:

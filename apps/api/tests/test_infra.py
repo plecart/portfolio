@@ -445,8 +445,8 @@ def ci_build_flags(job: str) -> str | None:
 
 
 # Les jobs qui construisent les images avec le cache local, et les entrées que chaque image y
-# cite : `infra` le lit et l'écrit ; `publish` le lit seulement — il reconstruit ce qu'`infra`
-# vient d'y écrire (ADR 0014).
+# cite : `infra` le lit et l'écrit ; `publish` le lit seulement — il restaure l'entrée d'`infra`,
+# sous la même clé (ADR 0014).
 CACHED_BUILDS = {"infra": 2, "publish": 1}
 
 
