@@ -189,23 +189,34 @@ suivante d'abord, étapes numérotées, état restitué à chaque tour ; `/i-hav
 **RTK** (hook utilisateur `rtk hook claude`, `~/.claude/RTK.md`, hors dépôt) réécrit la commande
 avant son exécution — `make …`, `gh …` (sauf `gh label` et `gh api … --jq`), `cat`/`head -N`/`tail`
 (→ `rtk read …` ; `head -n N` n'est pas réécrit), `ls`, `wc`, `grep`, chaque segment d'une commande
-composée ; ni `git …` ni `sed`. Les règles de permission sont évaluées sur la forme **réécrite**
-(doc hooks, `updatedInput`, mesuré le 2026-09-29) : c'est pourquoi les entrées `allow` de
-`.claude/settings.json` commencent par `rtk`, et pourquoi les lectures auto-autorisées par Claude
-Code (`cat`, `gh pr view`…) y figurent quand même. RTK lit aussi `permissions.allow` et renvoie
-lui-même `permissionDecision: "allow"` quand la commande **d'origine** y figure (`gh pr *`,
-`gh issue *`…) : les entrées sous forme d'origine restent actives, et les entrées `rtk` sont celles
-que le harnais évalue sans lui — les deux se doublent à dessein. Un `ask` passe avant tout
-`allow`, y compris celui que RTK renvoie : `permissions.ask` sur `gh pr merge` (les deux formes)
-est la porte de « jamais d'auto-merge ». Même logique pour les `deny` : le harnais ne reconnaît ni `rtk read` ni `rtk grep` comme des lectures de
-fichier, donc `Read(.env)` ne les arrête pas — deux `deny` Bash (`rtk read *.env*`, `rtk grep *.env*`)
-ferment les neuf formes recensées par `apps/api/tests/test_agent_permissions.py` (citation, glob,
-`--max-lines`, `--tail-lines`, `grep`) — et attrapent aussi, collatéral accepté et épinglé par le
-même test, `rtk read .env.example`, `rtk read infra/dev.env` et toute recherche dont le texte
-contient `.env` (`os.environ`, `config.env`, `process.env`) : passer par l'outil Grep ou `git grep`,
-que RTK ne réécrit pas. Restent ouverts, et la doc le dit (« isn't a security boundary around the
+composée ; ni `git …` ni `sed`, ni l'outil PowerShell (son matcher ne vise que `Bash`). Les règles
+de permission sont évaluées sur la forme **réécrite** (doc hooks, `updatedInput`, mesuré le
+2026-09-29) : c'est pourquoi les entrées `allow` de `.claude/settings.json` commencent par `rtk`, et
+pourquoi les lectures auto-autorisées par Claude Code (`cat`, `gh pr view`…) y figurent quand même.
+RTK lit aussi `permissions.allow` et renvoie lui-même `permissionDecision: "allow"` quand la
+commande **d'origine** y figure (`gh pr *`, `gh issue *`…), et retient cet `allow` dès que la forme
+d'origine figure en `ask` (mesuré, rtk 0.43.0) : les entrées sous forme d'origine restent actives,
+et les entrées `rtk` sont celles que le harnais évalue sans lui — les deux se doublent à dessein.
+
+Un `ask` passe avant tout `allow`, y compris celui qu'un hook renvoie (doc permissions : « a
+matching ask rule still prompts even when the hook returned "allow" »), en mode auto compris
+(« Explicit ask rules still force a prompt ») : `permissions.ask` sur `gh pr merge` — forme
+d'origine, forme `rtk`, `rtk proxy`, outil PowerShell — est la porte de « jamais d'auto-merge »,
+épinglée par `apps/api/tests/test_agent_permissions.py`. Restent ouverts : un merge local suivi de
+`git push origin main` (`main` n'est pas protégée côté GitHub), `gh api -X PUT …/pulls/<n>/merge`
+et `gh -R … pr merge` — aucun `allow` ne les couvre, ils demandent en mode manuel et passent au
+classifieur en mode auto.
+
+Même logique de forme réécrite pour les `deny` : le harnais ne reconnaît ni `rtk read` ni `rtk grep`
+comme des lectures de fichier, donc `Read(.env)` ne les arrête pas — deux `deny` Bash
+(`rtk read *.env*`, `rtk grep *.env*`) ferment les neuf formes recensées par le même test
+(citation, glob, `--max-lines`, `--tail-lines`, `grep`) — et attrapent aussi, collatéral accepté et
+épinglé, `rtk read .env.example`, `rtk read infra/dev.env` et toute recherche dont le texte contient
+`.env` (`os.environ`, `config.env`, `process.env`) : passer par l'outil Grep ou `git grep`, que RTK
+ne réécrit pas. Restent ouverts, et la doc le dit (« isn't a security boundary around the
 program ») : un glob sans `.env` littéral (`.en?`), `grep -r` sans nom de fichier, une indirection
-par variable (`f=.env; cat "$f"`), tout sous-processus qui ouvre le fichier lui-même.
+par variable (`f=.env; cat "$f"`), une lecture par l'outil PowerShell (`Get-Content .env`, non
+vérifiée), tout sous-processus qui ouvre le fichier lui-même.
 
 **Outils hors dépôt** (`uv tool`, environnements isolés — frontend-outillage §2.2) :
 - SkillSpector 2.11.2 (NVIDIA/skillspector @ d162d9b) — `skillspector scan .claude/skills/<skill> --no-llm` après chaque ajout ou mise à jour de skill
