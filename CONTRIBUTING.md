@@ -141,6 +141,14 @@ cosign verify ghcr.io/aquasecurity/trivy:<x.y.z> \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
+**Publication des images.** Rien à faire à la main : à chaque push sur `main`, une fois la CI
+verte, le job `publish` reconstruit les images, les scanne comme sur une PR, puis les pousse sur
+GHCR — `ghcr.io/plecart/portfolio-<service>`, paquets privés — sous le SHA complet du commit et
+sous `latest` (`make push`) ; chaque paquet garde ses trois versions les plus récentes
+(`make prune`). Le jeton du workflow suffit, aucun secret n'est à créer
+([ADR 0014](docs/adr/0014-ci-cd-github-actions-et-ghcr.md)). Un déploiement vise l'étiquette du
+commit : `latest` peut désigner l'avant-dernier quand deux pushes se suivent de près.
+
 **Mises à jour des dépendances.** Dependabot ([.github/dependabot.yml](.github/dependabot.yml))
 ouvre chaque semaine, par écosystème (`uv`, npm, actions GitHub, images Docker), une PR qui
 groupe versions mineures et correctifs ; chaque montée majeure arrive seule, sauf les majeures npm

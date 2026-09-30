@@ -1,8 +1,8 @@
 """Tests du scan des images : la commande `make scan`, son étape en CI, ses exceptions datées.
 
-Le scan lui-même tourne ailleurs — sur le poste par `make scan`, en CI dans le job `infra`. Ces
-tests gardent ce qui l'affaiblirait sans bruit : une option de Trivy retirée, une étape de CI
-devenue indicative, une exception sans date. Trivy n'exige d'une exception que son `id` — une
+Le scan lui-même tourne ailleurs — sur le poste par `make scan`, en CI dans les jobs `infra` et
+`publish`. Ces tests gardent ce qui l'affaiblirait sans bruit : une option de Trivy retirée, une
+étape de CI devenue indicative, une exception sans date. Trivy n'exige d'une exception que son `id` — une
 entrée sans `expired_at` vaut pour toujours, une clé mal orthographiée est ignorée sans un mot —,
 et la règle du projet est plus stricte (ADR 0014) : chaque exception porte l'évaluation qui la
 fonde et la date où elle se refait.
@@ -72,9 +72,19 @@ SCAN_MOUNTS = [
 ]
 TRIVY_REPOSITORY = "ghcr.io/aquasecurity/trivy:"
 
-# Les commandes que le job `infra` de la CI lance pour construire puis scanner les images.
-CI_BUILD = "make build"
-CI_SCAN = "make scan"
+# Les jobs de la CI qui construisent puis scannent les images, chacun avec ses deux commandes, mot
+# pour mot : `infra` sur chaque PR, sous le nom du poste ; `publish` avant de pousser, sous le nom
+# GHCR. L'image y est nommée sans étiquette : les exceptions des paquets du système suivent la
+# cible `…/portfolio-<service> (<système> <version>)` du rapport de Trivy, qu'une étiquette
+# changerait (mesuré à la PR #62). Mot pour mot, parce qu'une variable de plus sur la ligne de
+# commande (`SCAN_FLAGS=`) prime sur le `Makefile`.
+SCANNING_JOBS = {
+    "infra": ("make build", "make scan"),
+    "publish": (
+        f"make build IMAGE_PREFIX={PUBLISH_PREFIX}",
+        f"make scan IMAGE_PREFIX={PUBLISH_PREFIX}",
+    ),
+}
 # Ce qui, posé sur le job, ferait ignorer l'échec du scan : le job toléré en échec, ou un
 # environnement qui réglerait `make` (`MAKEFLAGS: -i`).
 LENIENT_JOB_KEYS = ["continue-on-error", "env"]
@@ -135,27 +145,35 @@ def scan_findings(printed: str) -> list[str]:
     return findings
 
 
-def ci_scan_findings(workflow: str) -> list[str]:
-    """Ce qui empêche le job `infra` d'un workflow de scanner les images qu'il construit.
+def ci_scan_findings(workflow: str, name: str) -> list[str]:
+    """Ce qui empêche un job de `SCANNING_JOBS` de scanner les images qu'il construit.
+
+    Args:
+        workflow: le texte du workflow.
+        name: le nom du job, clé de `SCANNING_JOBS`, qui donne ses deux commandes.
 
     Returns:
-        Un constat si le job ne lance pas le build puis le scan, dans cet ordre ; un si l'étape de
-        scan porte autre chose que son nom et sa commande ; un par réglage qui ferait ignorer
-        l'échec du scan — `continue-on-error` sur le job, ou un `env:` sur le job ou le workflow,
-        par lequel `MAKEFLAGS: -i` atteindrait `make`. Liste vide : le scan bloque.
+        Un constat si le job manque, ou s'il ne lance pas ses deux commandes, le build puis le
+        scan ; un si l'étape de scan porte autre chose que son nom et sa commande ; un par réglage
+        qui ferait ignorer l'échec du scan — `continue-on-error` sur le job, ou un `env:` sur le
+        job ou le workflow, par lequel `MAKEFLAGS: -i` atteindrait `make`. Liste vide : le scan
+        bloque.
     """
+    build, scan = SCANNING_JOBS[name]
     document = yaml.safe_load(workflow)
-    job = document["jobs"]["infra"]
+    job = document["jobs"].get(name)
+    if job is None:
+        return [f"aucun job `{name}`"]
     steps = job["steps"]
     commands = [step.get("run") for step in steps]
-    if CI_BUILD not in commands or CI_SCAN not in commands:
-        return [f"le job `infra` ne lance pas `{CI_BUILD}` et `{CI_SCAN}`"]
-    scan = commands.index(CI_SCAN)
-    findings = [f"`{CI_SCAN}` avant `{CI_BUILD}`"] if scan < commands.index(CI_BUILD) else []
-    extra = sorted(set(steps[scan]) - {"name", "run"})
+    if build not in commands or scan not in commands:
+        return [f"le job `{name}` ne lance pas `{build}` et `{scan}`"]
+    position = commands.index(scan)
+    findings = [f"`{scan}` avant `{build}`"] if position < commands.index(build) else []
+    extra = sorted(set(steps[position]) - {"name", "run"})
     if extra:
         findings.append(f"l'étape de scan porte {extra}")
-    findings += [f"le job `infra` porte `{key}`" for key in LENIENT_JOB_KEYS if key in job]
+    findings += [f"le job `{name}` porte `{key}`" for key in LENIENT_JOB_KEYS if key in job]
     if "env" in document:
         findings.append("le workflow porte `env`")
     return findings
@@ -332,39 +350,48 @@ SCAN_FORMS = {
 }
 
 
-def infra_job(*steps: str, job_options: str = "") -> str:
-    """Un workflow minimal dont le job `infra` porte les étapes données."""
-    listed = "".join(f"      - {step}\n" for step in steps)
-    return f"jobs:\n  infra:\n{job_options}    steps:\n{listed}"
+def ci_scan_forms(name: str) -> dict[str, tuple[str, bool]]:
+    """Les formes recensées d'un job de `SCANNING_JOBS`, chacune avec son verdict attendu.
 
+    Chaque forme est un workflow minimal où le job `name` porte les étapes de la forme.
+    """
+    build_step, scan_step = (f"run: {command}" for command in SCANNING_JOBS[name])
 
-BUILD_STEP = f"run: {CI_BUILD}"
-SCAN_STEP = f"run: {CI_SCAN}"
+    def job(*steps: str, job_options: str = "") -> str:
+        """Un workflow minimal dont le job `name` porte `job_options`, puis les étapes données."""
+        listed = "".join(f"      - {step}\n" for step in steps)
+        return f"jobs:\n  {name}:\n{job_options}    steps:\n{listed}"
+
+    return {
+        "build puis scan": (job(build_step, scan_step), False),
+        "étape de scan nommée": (job(build_step, f"name: Scan\n        {scan_step}"), False),
+        "sans le job": (job(build_step, scan_step).replace(f"  {name}:", "  autre:"), True),
+        "sans scan": (job(build_step), True),
+        "sans build": (job(scan_step), True),
+        "scan avant build": (job(scan_step, build_step), True),
+        "variable de plus sur le scan": (job(build_step, f"{scan_step} SCAN_FLAGS="), True),
+        "continue-on-error": (
+            job(build_step, f"{scan_step}\n        continue-on-error: true"),
+            True,
+        ),
+        "if": (job(build_step, f"{scan_step}\n        if: github.event_name == 'push'"), True),
+        "env": (job(build_step, f"{scan_step}\n        env:\n          MAKEFLAGS: -i"), True),
+        "job qui tolère ses échecs": (
+            job(build_step, scan_step, job_options="    continue-on-error: true\n"),
+            True,
+        ),
+        "env sur le job": (
+            job(build_step, scan_step, job_options="    env:\n      MAKEFLAGS: -i\n"),
+            True,
+        ),
+        "env sur le workflow": ("env:\n  MAKEFLAGS: -i\n" + job(build_step, scan_step), True),
+    }
+
 
 CI_SCAN_FORMS = {
-    "build puis scan": (infra_job(BUILD_STEP, SCAN_STEP), False),
-    "étape de scan nommée": (infra_job(BUILD_STEP, f"name: Scan\n        {SCAN_STEP}"), False),
-    "sans scan": (infra_job(BUILD_STEP), True),
-    "sans build": (infra_job(SCAN_STEP), True),
-    "scan avant build": (infra_job(SCAN_STEP, BUILD_STEP), True),
-    "continue-on-error": (
-        infra_job(BUILD_STEP, f"{SCAN_STEP}\n        continue-on-error: true"),
-        True,
-    ),
-    "if": (infra_job(BUILD_STEP, f"{SCAN_STEP}\n        if: github.event_name == 'push'"), True),
-    "env": (
-        infra_job(BUILD_STEP, f"{SCAN_STEP}\n        env:\n          MAKEFLAGS: -i"),
-        True,
-    ),
-    "job qui tolère ses échecs": (
-        infra_job(BUILD_STEP, SCAN_STEP, job_options="    continue-on-error: true\n"),
-        True,
-    ),
-    "env sur le job": (
-        infra_job(BUILD_STEP, SCAN_STEP, job_options="    env:\n      MAKEFLAGS: -i\n"),
-        True,
-    ),
-    "env sur le workflow": ("env:\n  MAKEFLAGS: -i\n" + infra_job(BUILD_STEP, SCAN_STEP), True),
+    f"{name} — {form}": (name, workflow, expected)
+    for name in SCANNING_JOBS
+    for form, (workflow, expected) in ci_scan_forms(name).items()
 }
 
 # Les façons dont un `Makefile` fait ignorer à `make` l'échec d'une recette : le texte du dépôt,
@@ -448,12 +475,17 @@ def test_la_garde_du_scan_rend_son_verdict_sur_chaque_forme(printed: str, expect
     assert bool(scan_findings(printed)) is expected, scan_findings(printed)
 
 
-@pytest.mark.parametrize(("workflow", "expected"), CI_SCAN_FORMS.values(), ids=CI_SCAN_FORMS.keys())
+@pytest.mark.parametrize(
+    ("name", "workflow", "expected"), CI_SCAN_FORMS.values(), ids=CI_SCAN_FORMS.keys()
+)
 def test_la_garde_du_scan_en_ci_rend_son_verdict_sur_chaque_forme(
-    workflow: str, expected: bool
+    name: str, workflow: str, expected: bool
 ) -> None:
-    """Chaque forme recensée : signalée si, et seulement si, le scan ne bloquerait plus."""
-    assert bool(ci_scan_findings(workflow)) is expected, ci_scan_findings(workflow)
+    """Chaque forme recensée, pour chaque job qui scanne : signalée si, et seulement si, le scan
+    ne bloquerait plus."""
+    findings = ci_scan_findings(workflow, name)
+
+    assert bool(findings) is expected, findings
 
 
 @pytest.mark.parametrize(("text", "expected"), EXCEPTION_FORMS.values(), ids=EXCEPTION_FORMS.keys())
@@ -526,16 +558,18 @@ def test_make_scan_echoue_quand_trivy_echoue() -> None:
     assert scan_fails_with_trivy()
 
 
-def test_la_ci_scanne_les_images_qu_elle_vient_de_construire() -> None:
-    """Le job `infra` scanne sur chaque PR, après le build qui charge les images dans le moteur
-    (`--load`) : avant lui, Trivy ne trouverait rien à lire.
+@pytest.mark.parametrize("name", SCANNING_JOBS)
+def test_la_ci_scanne_les_images_qu_elle_vient_de_construire(name: str) -> None:
+    """Le job `infra` scanne sur chaque PR, le job `publish` avant de pousser — chacun après le
+    build qui charge les images dans le moteur (`--load`) : avant lui, Trivy ne trouverait rien à
+    lire. Aucune image n'est publiée sans avoir été scannée (ADR 0014).
 
     L'étape ne porte que son nom et sa commande. Un `continue-on-error` la rendrait indicative, un
     `if:` la ferait sauter, un `env:` pourrait régler `make` lui-même (`MAKEFLAGS: -i` ignore
     l'échec de Trivy) sans toucher au `Makefile` — sur l'étape, le job ou le workflow : la
     politique vit dans `make scan`, et nulle part ailleurs.
     """
-    assert ci_scan_findings(CI_WORKFLOW.read_text(encoding="utf-8")) == []
+    assert ci_scan_findings(CI_WORKFLOW.read_text(encoding="utf-8"), name) == []
 
 
 def test_chaque_exception_du_scan_est_complete_et_en_vigueur() -> None:

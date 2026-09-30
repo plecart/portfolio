@@ -11,7 +11,8 @@
 # Trois jobs, un par pile. Ils n'ont pas les mêmes prérequis — `uv`, Node, Docker — et les
 # séparer évite qu'un rouge de l'une masque un rouge d'une autre. Le job `infra` installe aussi
 # Node : les images copient le front compilé, qu'il compile lui-même plutôt que d'attendre le job
-# `web` (ADR 0014).
+# `web` (ADR 0014). Un quatrième, `publish`, ne tourne qu'après un push sur `main`, une fois les
+# trois autres verts : il publie les images sur GHCR.
 #
 # Chaque action est épinglée par **empreinte de commit**, sa version en commentaire : une
 # étiquette peut être déplacée par son propriétaire ou par un attaquant, et le déplacement
@@ -26,7 +27,8 @@ name: CI
 
 # Aucune étape n'écrit sur le dépôt : le jeton ne reçoit que la lecture. Le défaut d'un dépôt
 # peut être bien plus large, et il ne se resserre pas tout seul quand un workflow n'en a pas
-# besoin.
+# besoin. Seul le job `publish` reçoit en plus l'écriture des paquets, pour pousser les images et
+# supprimer leurs anciennes versions — dans le registre, jamais sur le dépôt.
 permissions:
   contents: read
 
@@ -123,6 +125,16 @@ jobs:
       - name: Build
         run: make web-build
 
+      # Le front compilé, que le job `publish` copie dans les images au lieu de le compiler une
+      # troisième fois. Un jour de rétention : il ne sert que dans ce run, et l'espace des
+      # artefacts se partage avec celui des paquets.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist
+          path: apps/web/dist
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Browsers
         run: make web-browsers
 
@@ -185,8 +197,8 @@ jobs:
       # `make build` et non un `docker build` propre à la CI : la commande reste celle du
       # `Makefile`, le cache et le chargement passent par des drapeaux. `--load` matérialise
       # vraiment les images — sans lui, le pilote conteneurisé construit et jette, et les
-      # étiquettes ne désigneraient rien : l'étape suivante les scanne. #15 reprend ce build pour
-      # publier.
+      # étiquettes ne désigneraient rien : l'étape suivante les scanne. Le job `publish` reprend
+      # ce build pour publier.
       #
       # `tag=$*` : une entrée de cache par image, dans le même dossier. `make` développe `$*` en
       # nom du service, dans la recette de `build-<service>` ; sans lui, chaque image exporterait
@@ -208,3 +220,91 @@ jobs:
       # `apps/api/tests/test_image_scan.py` le tient.
       - name: Scan
         run: make scan
+
+  publish:
+    name: Publication — images sur GHCR
+    runs-on: ubuntu-latest
+
+    # Après les trois autres jobs, sur un push vers `main` seulement : une image publiée vient d'un
+    # commit dont toute la CI est verte (ADR 0014). `apps/api/tests/test_publication.py` tient ces
+    # réglages.
+    needs: [api, web, infra]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    # Le seul job qui écrit, et seulement dans le registre : pousser les images, supprimer leurs
+    # anciennes versions. `contents: read` se répète ici — des permissions de job remplacent
+    # celles du workflow, et sans lecture le checkout d'un dépôt privé échoue.
+    permissions:
+      contents: read
+      packages: write
+
+    # Une publication à la fois : la suivante attend la fin de celle en cours, sans l'annuler —
+    # une publication coupée entre le push et la rétention laisserait un paquet à moitié tenu.
+    # GitHub ne garde qu'une publication en attente : une plus récente la remplace, et seule la
+    # plus récente compte. L'ordre est celui d'arrivée au job, pas celui des commits : si deux
+    # pushes se suivent de près et que le premier finit sa CI après le second, `latest` désigne
+    # l'avant-dernier commit jusqu'au push suivant — un déploiement vise l'étiquette du commit.
+    concurrency:
+      group: publish
+      cancel-in-progress: false
+
+    steps:
+      # Le jeton de ce job écrit dans le registre : il ne reste pas dans `.git/config`, où toute
+      # étape suivante le lirait.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Le front que le job `web` a compilé et testé : `make build` le trouve et ne le recompile
+      # pas — ce job n'installe pas Node.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: apps/web/dist
+
+      # Même builder que le job `infra`, pour lire le même cache local.
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # L'entrée que le job `infra` vient d'écrire, sous la même clé : restaurée, jamais réécrite.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/buildx-cache
+          key: >-
+            buildx-images-${{ hashFiles('.python-version', 'pyproject.toml', 'uv.lock',
+            'apps/api/pyproject.toml', 'infra/*/Dockerfile') }}
+          restore-keys: buildx-images-
+
+      # Le build du job `infra`, sous le nom GHCR (brief de #15, décision 8) : même commande,
+      # même cache par image (`tag=$*`). Ni provenance ni SBOM : chacune entrerait au paquet comme
+      # une version sans étiquette, que la rétention ne supprime jamais (décision 7).
+      - name: Images
+        run: make build IMAGE_PREFIX=ghcr.io/plecart/portfolio-
+        env:
+          DOCKER_BUILD_FLAGS: >-
+            --load
+            --cache-from type=local,src=/tmp/buildx-cache,tag=$*
+            --provenance=false
+            --sbom=false
+
+      # Le scan juste avant le push, sur les images mêmes qui partent. Nommées sans étiquette :
+      # les exceptions de `.trivyignore.yaml` suivent la cible `…/portfolio-<service> (<système>
+      # <version>)` du rapport, qu'une étiquette changerait. Comme dans `infra`, l'étape ne porte
+      # que sa commande (`apps/api/tests/test_image_scan.py`).
+      - name: Scan
+        run: make scan IMAGE_PREFIX=ghcr.io/plecart/portfolio-
+
+      # Après le scan seulement : aucune étape de build ne voit l'identifiant du registre.
+      - name: Connexion à GHCR
+        run: echo "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Push
+        run: make push IMAGE_PREFIX=ghcr.io/plecart/portfolio- IMAGE_TAG="$GITHUB_SHA"
+
+      # Trois versions par paquet (décision 1), par l'API de GitHub : le dépôt dont le workflow a
+      # publié un paquet en reçoit le rôle `admin`, et le jeton du job suffit à supprimer.
+      - name: Rétention
+        run: make prune IMAGE_PREFIX=ghcr.io/plecart/portfolio-
+        env:
+          GH_TOKEN: ${{ github.token }}
