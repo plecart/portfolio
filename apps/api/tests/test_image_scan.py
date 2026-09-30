@@ -59,11 +59,16 @@ SCAN_OPTIONS = [
     "--show-suppressed",
 ]
 
-# Ce que le conteneur de Trivy reçoit du poste, par sa cible : le socket du moteur, le cache de la
-# base de vulnérabilités, les exceptions en lecture seule — et rien d'autre. Une variable
-# d'environnement (`-e TRIVY_IGNORE_UNFIXED=true`) ou un `trivy.yaml` monté dans son répertoire de
-# travail régleraient Trivy sans toucher à ses options.
-SCAN_MOUNTS = ["/var/run/docker.sock", "/root/.cache/", "/.trivyignore.yaml:ro"]
+# Ce que le conteneur de Trivy reçoit du poste, par la fin de chaque montage : le socket du moteur,
+# le cache de la base de vulnérabilités, et les exceptions en lecture seule, depuis le fichier que
+# ces tests lisent — et rien d'autre. Une variable d'environnement (`-e TRIVY_IGNORE_UNFIXED=true`)
+# ou un `trivy.yaml` monté dans son répertoire de travail régleraient Trivy sans toucher à ses
+# options ; des exceptions montées d'un autre fichier échapperaient à leur garde.
+SCAN_MOUNTS = [
+    "/var/run/docker.sock:/var/run/docker.sock",
+    ":/root/.cache/",
+    "/.trivyignore.yaml:/.trivyignore.yaml:ro",
+]
 TRIVY_REPOSITORY = "ghcr.io/aquasecurity/trivy:"
 
 # Les commandes que le job `infra` de la CI lance pour construire puis scanner les images.
@@ -111,13 +116,10 @@ def scan_findings(printed: str) -> list[str]:
                 f"{image} : options de Trivy en trop {sorted((given - expected).elements())}, "
                 f"manquantes {sorted((expected - given).elements())}"
             )
-        # `--rm`, puis une paire `-v <montage>` par cible attendue.
+        # `--rm`, puis une paire `-v <montage>` par montage attendu.
         docker = shlex.split(command["docker"])
         mounted = [
-            target
-            for mount in docker[2::2]
-            for target in SCAN_MOUNTS
-            if mount.endswith(f":{target}")
+            target for mount in docker[2::2] for target in SCAN_MOUNTS if mount.endswith(target)
         ]
         if docker[:1] + docker[1::2] != ["--rm", *["-v"] * len(SCAN_MOUNTS)] or sorted(
             mounted
@@ -305,6 +307,17 @@ SCAN_FORMS = {
         scan_command(docker=["--rm", SOCKET_MOUNT, CACHE_MOUNT]),
         True,
     ),
+    "exceptions montées depuis un autre fichier": (
+        scan_command(
+            docker=[
+                "--rm",
+                SOCKET_MOUNT,
+                CACHE_MOUNT,
+                '-v "/depot/infra/ci/autre.yaml:/.trivyignore.yaml:ro"',
+            ]
+        ),
+        True,
+    ),
     "Trivy sans empreinte": (scan_command(trivy=TRIVY_REPOSITORY + "0.74.0"), True),
     "Trivy sous latest": (scan_command(trivy=TRIVY_PINNED.replace("0.74.0", "latest")), True),
     "Trivy d'un autre dépôt": (scan_command(trivy=TRIVY_PINNED.replace("ghcr.io/", "")), True),
@@ -333,7 +346,7 @@ CI_SCAN_FORMS = {
     ),
     "if": (infra_job(BUILD_STEP, f"{SCAN_STEP}\n        if: github.event_name == 'push'"), True),
     "env": (
-        infra_job(BUILD_STEP, f"{SCAN_STEP}\n        env:\n          TRIVY_IGNORE_UNFIXED: true"),
+        infra_job(BUILD_STEP, f"{SCAN_STEP}\n        env:\n          MAKEFLAGS: -i"),
         True,
     ),
     "job qui tolère ses échecs": (
@@ -496,8 +509,9 @@ def test_la_ci_scanne_les_images_qu_elle_vient_de_construire() -> None:
     (`--load`) : avant lui, Trivy ne trouverait rien à lire.
 
     L'étape ne porte que son nom et sa commande. Un `continue-on-error` la rendrait indicative, un
-    `if:` la ferait sauter, un `env:` pourrait assouplir Trivy par ses variables (`TRIVY_*`) sans
-    toucher au `Makefile` : la politique vit dans `make scan`, et nulle part ailleurs.
+    `if:` la ferait sauter, un `env:` pourrait régler `make` lui-même (`MAKEFLAGS: -i` ignore
+    l'échec de Trivy) sans toucher au `Makefile` — sur l'étape, le job ou le workflow : la
+    politique vit dans `make scan`, et nulle part ailleurs.
     """
     assert ci_scan_findings(CI_WORKFLOW.read_text(encoding="utf-8")) == []
 

@@ -26,7 +26,9 @@
 #
 # « Atteint par ce qui tourne » se juge image par image, et ce fichier vaut pour toutes : sans
 # `paths`, une image ajoutée hériterait des exceptions des autres, scan vert, sans évaluation.
-# Une image construite sous un autre préfixe que `portfolio-` n'en reçoit donc aucune.
+# Les exceptions des paquets du système suivent le nom de l'image, `portfolio-<service>`, quel que
+# soit le registre placé devant ; celles d'un binaire suivent son chemin, dans toute image qui le
+# porte.
 #
 # `apps/api/tests/test_image_scan.py` refuse une entrée incomplète ou expirée.
 #
