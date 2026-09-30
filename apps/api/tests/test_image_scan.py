@@ -87,6 +87,10 @@ LENIENT_JOB_KEYS = ["continue-on-error", "env"]
 # ajoutée hériterait des exceptions des autres, scan vert, sans évaluation.
 FIELDS = {"id", "paths", "statement", "expired_at"}
 
+# La durée la plus longue d'une exception, décidée par le mainteneur à la PR #62 : passé ce délai,
+# l'évaluation se refait. Sans cette borne, `2099-01-01` serait une exception permanente datée.
+MAX_LIFETIME = timedelta(days=90)
+
 
 # --- Les gardes : des fonctions sur du texte ---------------------------------------------------
 
@@ -215,6 +219,8 @@ def entry_findings(entry: object, today: date) -> list[str]:
     # `pkg/result/ignore.go`) : l'exception cesse de valoir dès le début de ce jour-là.
     elif expired_at <= today:
         findings.append(f"{fields['id']} : expirée depuis le {expired_at}, évaluation à refaire")
+    elif expired_at > today + MAX_LIFETIME:
+        findings.append(f"`expired_at` au-delà de {MAX_LIFETIME.days} jours : {expired_at}")
     return findings
 
 
@@ -417,6 +423,11 @@ EXCEPTION_FORMS = {
     ),
     "expire aujourd'hui": (exception_file(expired_at=TODAY.isoformat()), True),
     "expirée hier": (exception_file(expired_at=YESTERDAY), True),
+    "expire dans 90 jours": (exception_file(expired_at=(TODAY + MAX_LIFETIME).isoformat()), False),
+    "expire dans 91 jours": (
+        exception_file(expired_at=(TODAY + MAX_LIFETIME + timedelta(days=1)).isoformat()),
+        True,
+    ),
     "date entre guillemets": (exception_file(expired_at=f'"{TOMORROW}"'), True),
     "date et heure": (exception_file(expired_at=f"{TOMORROW}T00:00:00Z"), True),
     "champ mal orthographié": (exception_file(expired_at=None, expire_at=TOMORROW), True),
@@ -448,7 +459,7 @@ def test_la_garde_des_exceptions_rend_son_verdict_sur_chaque_forme(
     text: str, expected: bool
 ) -> None:
     """Chaque forme recensée : signalée si, et seulement si, l'exception est incomplète, mal
-    typée ou expirée."""
+    typée, expirée ou datée trop loin."""
     assert bool(exception_findings(text, TODAY)) is expected, exception_findings(text, TODAY)
 
 
