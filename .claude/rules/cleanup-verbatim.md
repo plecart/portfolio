@@ -3,8 +3,8 @@
 **Dès que le travail demande de relire, nettoyer ou améliorer du code**, exécuter **ce prompt mot
 pour mot**. Ne jamais le paraphraser, ne jamais le raccourcir, ne jamais le recopier ailleurs.
 
-Cela couvre aussi bien les étapes de la pipeline (cycle de commit, auto-review de PR, refactor
-TDD, avant merge) qu'une **demande directe et informelle** de l'utilisateur — « relis ça »,
+Cela couvre aussi bien les étapes de la pipeline (cycle de commit, cleanup holistique de PR,
+refactor TDD, relecture indépendante) qu'une **demande directe et informelle** de l'utilisateur — « relis ça »,
 « nettoie ce fichier », « améliore ce code », « tu peux revoir ce que tu viens d'écrire ? ».
 Il n'y a pas de relecture « informelle » qui échapperait à ce prompt : s'il s'agit de repasser sur
 du code, c'est ce prompt qui s'applique.

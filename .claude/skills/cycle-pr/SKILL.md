@@ -375,18 +375,20 @@ d'arrêt humains », en est la source unique.
 
 ## Étape 4 — Relecture indépendante (avant `git push`)
 
-Deux relectures. L'auto-review (4.1) quand tous les commits sont faits. La relecture à contexte
-vierge (4.2) **en deux temps** : une première fois dès que le socle est posé, en plein cycle de
-commit ; une seconde après 4.1, sur ce qui a été écrit depuis la première — ou sur `main..HEAD`
-si aucun commit n'a posé de socle.
+Deux relectures. Le cleanup pass holistique (4.1) quand tous les commits sont faits. La relecture
+à contexte vierge (4.2) **en deux temps** : une première fois dès que le socle est posé, en plein
+cycle de commit ; une seconde après 4.1, sur ce qui a été écrit depuis la première — ou sur
+`main..HEAD` si aucun commit n'a posé de socle.
 
-**4.1 Auto-review** — revue critique du **diff complet de la branche** (`main..HEAD`), en vision
-d'ensemble : problèmes d'architecture (couplage, frontières), naming incohérent entre commits,
-edge cases / erreurs / race conditions, KISS/DRY/YAGNI à l'échelle de la PR — notamment la
-**duplication inter-commits**.
+**4.1 Cleanup pass holistique** — le prompt de `.claude/rules/cleanup-verbatim.md` sur le **diff
+complet de la branche** (`main..HEAD`), à l'échelle de la PR : architecture (couplage,
+frontières), naming entre commits, edge cases / erreurs / race conditions, **duplication
+inter-commits**. C'est le seul regard global de l'auteur — le regard local, c'est 3.3, à chaque
+commit ; il n'y en a pas de troisième avant le merge. Findings → un commit (cycle 3.1→3.5), puis
+la seconde passe 4.2.
 
-**4.2 Relecture par un contexte vierge.** L'auto-review est faite par la session qui a écrit le
-code, avec les hypothèses qui l'ont produit ; elle ne les met pas à l'épreuve. Le diff est donc
+**4.2 Relecture par un contexte vierge.** Le cleanup holistique est fait par la session qui a
+écrit le code, avec les hypothèses qui l'ont produit ; il ne les met pas à l'épreuve. Le diff est donc
 relu par un lecteur qui ne les a pas : l'équipier **`relecteur`** (`.claude/agents/relecteur.md`),
 qui porte sa consigne complète — ce qu'il reçoit, ce qu'il vérifie, ce qu'il rend. Un rôle ajouté
 dans `.claude/agents/` pendant cette session n'existe pas encore pour l'outil Agent → repli
@@ -564,8 +566,8 @@ ni de force-push.
     (garde `if:`) se terminent sans runner et ne prouvent rien sur la disponibilité de la CI.
   - *Rouge de code* : tout le reste, y compris un rouge de plateforme (3.2) → cycle complet
     3.1→3.5.
-- **Revue** : revue automatisée (bot) ou self-audit ligne par ligne (sécurité, correctness,
-  lisibilité, KISS/DRY/YAGNI, cohérence avec la stack).
+- **Revue** : les commentaires d'une revue automatisée (bot), s'il y en a une. L'auteur a relu en
+  4.1, un tiers en 4.2 : pas de troisième lecture ici.
 - Chaque commentaire **pertinent** → cycle complet (3.1→3.5) + push + re-trigger de la review.
   Chaque commentaire **non pertinent** → noter brièvement pourquoi, ne pas corriger.
 - **Boucler jusqu'à review vide.**
@@ -578,12 +580,8 @@ ni de force-push.
 
 ## Étape 7 — Avant le merge
 
-Quand la review est vide et la CI verte, **avant de demander le go** : un **dernier cleanup pass
-holistique** sur le diff complet de la branche (même prompt verbatim qu'en 3.3, mais à l'échelle
-de la PR). C'est le filet final pour les findings inter-commits.
-
-- Findings → présenter, corriger (cycle complet), re-tester, push.
-- Sinon → verdict explicite « code propre, prêt à merger ».
+Quand la review est vide et la CI verte, **avant de demander le go** — sans nouvelle relecture du
+code : le regard global a eu lieu en 4.1, la relecture indépendante en 4.2.
 
 **Relire l'issue une dernière fois.** Le corps a pu bouger depuis le briefing de l'Étape 1 — d'autres
 PR ont été mergées entre-temps, et une passe `repercussions` a pu la corriger ou déposer un
@@ -768,8 +766,8 @@ est « aucune répercussion »).
    en croyant que personne ne travaille dessus.
 3. Le cycle `modif → test → cleanup → test → commit` est **sacré et jamais raccourci** — y compris
    le cleanup sur les commits triviaux.
-4. **Deux filets de cleanup** : un par commit (regard local), un sur la PR entière avant merge
-   (regard global, inter-commits) — et une relecture à contexte vierge **en deux temps**, au
+4. **Deux filets de cleanup** : un par commit (regard local), un sur la PR entière avant la
+   seconde relecture (4.1, regard global, inter-commits) — et une relecture à contexte vierge **en deux temps**, au
    socle et à la fin, jamais par commit, un seul relecteur par passe dans son propre worktree,
    plafonnée à deux passes et une relance confiée au même relecteur.
 5. La PR n'est **terminée qu'après la passe `repercussions`** : une clôture peut bouleverser les
