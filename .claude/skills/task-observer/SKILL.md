@@ -86,17 +86,10 @@ above).
 3. Read `skill-observations/last-review-date.txt`. The value carries the
    truth: a date = when the last review actually ran; `never` = no review
    has run yet. A missing file is abnormal (step 1 creates it) — recreate
-   it with `never`, don't invent a date. If the value is `never` or older
-   than 7 days AND there are OPEN observations: in an interactive session,
-   offer the review in one line ("the observation backlog hasn't been
-   reviewed [in N days / yet] — run it now, or carry on with your task?")
-   and proceed with the user's task unless they opt in; never gate their
-   work on the review. Only a scheduled/autonomous run loads
-   `references/weekly-review.md` and runs the review unprompted.
-4. Once per session: if no CLAUDE.md (or equivalent) activation instruction
-   for this skill exists, briefly suggest adding one (see
-   `references/environments.md`). Skip if already configured.
-5. Note the log's modification time. If modified in the last few hours,
+   it with `never`, don't invent a date. An overdue backlog is noted, not
+   announced: the review runs when the user asks for it
+   (`references/weekly-review.md`).
+4. Note the log's modification time. If modified in the last few hours,
    another session may be writing to it — re-read immediately before every
    append, never trust a remembered "current number".
 
@@ -148,33 +141,9 @@ an open-source skill (unless an internal skill is the right home).
 Append to the log **silently, within the same turn or the next** — never
 batch mentally for later; the act of writing is the enforcement mechanism.
 
-**Mandatory observation checkpoint after every 3rd TodoWrite completion:** After
-marking the 3rd, 6th, 9th (etc.) TodoWrite item as completed in a session, you
-must **write to the log** — not merely pause to ask yourself a question. Either
-append any pending observations, or, if genuinely none have accumulated, append
-an explicit acknowledgement marker (a one-line `no observations` note for that
-checkpoint). The required action is a concrete log write; a remembered "ask
-whether" is not enforcement. This is a hard checkpoint, not a suggestion — the
-skill has demonstrated that softer "check when completing items" or "pause and
-ask" guidance gets lost during cognitively demanding analytical work, exactly
-when the most observations accumulate. The count doesn't need to be precise;
-the rule is: roughly every third completion, write to the log (observations or
-the acknowledgement marker). The write itself is the enforcement mechanism: it
-forces the mental check to surface as a recorded action, and it prevents the
-common failure mode where the skill is loaded but no observations are written
-until the user explicitly asks.
-
-**Deliverable-event flush:** Hard enforcement that hooks onto tool calls you are
-already making is the only reliable mechanism; soft prompts that rely on memory
-don't survive cognitive load during long substantive sessions (when the most
-insights surface). So tie observation-flushing to deliverable and workflow events
-that already involve a tool call. Whenever you present or render a major
-deliverable — `present_files`, a deck or PDF render, a staged skill file handed
-to the user — or complete a task/todo batch, flush any pending observations to
-the log at that moment, before moving on. These are natural, already-occurring
-checkpoints; piggy-backing the flush onto them means the write happens as a
-side effect of work you were doing anyway, rather than depending on a separate
-act of memory.
+**When to write:** in the turn where the observation surfaces, or the next one. The project's
+CLAUDE.md (« Observation continue ») sets the threshold (high) and the cap (three per session);
+there is no cadence tied to TodoWrite or to deliverables, and no acknowledgement marker to write.
 
 **Numbering discipline (mandatory, every append):**
 
@@ -398,36 +367,12 @@ resolved statuses always carry their resolution date
 
 ## Surfacing Protocol
 
-Default: at end of session, as a grouped summary — improvements grouped by
-skill, new-skill candidates listed separately; for each, one sentence plus
-suggested type; ask which to act on. Surface earlier when an observation
-needs user input to be complete, when a skill is actively producing wrong
-output, or when observations cluster on one skill.
-
-**Default to log-and-defer.** Surfacing an observation is not an invitation
-to act on it. The default is log-and-defer: state that the observation is
-logged for the next review, and stop. Reserve in-session application
-strictly for the two triggers already defined under "Acting on
-Observations" — an explicit user request that names the action, or
-correcting a skill that is producing wrong output in the current session.
-
-Do NOT routinely offer a binary "apply now vs leave for next review" choice
-when surfacing observations. For users who run regular reviews, that offer is
-unwanted friction repeated every session. If a user has expressed a standing
-preference to always defer to the next review, suppress the in-session
-"act now?" offer entirely rather than asking each time.
-
-**Self-check before surfacing:** observations were logged throughout the
-whole session (including discussion phases); logged silently; each follows
-Issue → Improvement → Principle; each is typed; existing-skill items name
-the section; no open-source Principle contains client-identifying info;
-every appended observation carries a Status line (`**Status:** OPEN` at
-write time) — a statusless entry is invisible to any status-filtered review
-pass, so if any observation lacks one, add it now. Finally, run the
-survival check (Log-write safety rule 5): grep the log for every entry
-number this session wrote and confirm each still exists exactly once — a
-concurrent session's write-back deletes silently. Fix failures before
-surfacing.
+Log and defer. Nothing is surfaced unless the user explicitly asks for the log or a review:
+the project's CLAUDE.md (« Observation continue ») replaces the upstream end-of-session summary,
+the in-session « act now? » offer and the review reminder. Before answering such a request, run
+the self-check: every observation carries `**Status:** OPEN`, follows Issue → Improvement →
+Principle, names its skill section, and still exists exactly once in the log (Log-write safety
+rule 5).
 
 ## Acting on Observations
 
@@ -451,11 +396,11 @@ same reference).
 |----------|--------|
 | When do I observe? | The whole session, including feedback and reflection phases |
 | How do I log? | Silently, immediately, appended to the end, with the 3-step numbering discipline |
-| When do I surface? | End of session, or earlier if needed |
+| When do I surface? | Only when the user asks (project CLAUDE.md) |
 | Status line? | Mandatory `**Status:** OPEN` as the first field of every new observation; reviews treat statusless entries as OPEN, never as nonexistent |
 | Citing an observation number? | Only from its literal `### Observation N:` header — `grep -n` line numbers are positional metadata, not IDs; sanity-check against the known counter range |
 | Open-source or internal? | Default open-source; the boundary is confidential |
 | Small fix or substantial? | Additive → apply directly; restructuring/new skill → `references/skill-authoring.md` |
 | Rewriting the log (archival/renumber/status)? | Backup → re-read live and merge → bounded mutation → verify count against live pre-write file → confirm own entries survived |
-| Weekly review? | Trigger check at session start; procedure in `references/weekly-review.md` |
+| Weekly review? | On the user's request; procedure in `references/weekly-review.md` |
 | No filesystem? | Handoff-doc mode — `references/environments.md` |
