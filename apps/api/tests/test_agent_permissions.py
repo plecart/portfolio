@@ -78,6 +78,8 @@ GATED_CALLS = [
     ("PowerShell", "gh pr merge 54 --rebase --delete-branch"),
     ("Bash", "gh pr update-branch 56 --rebase"),
     ("Bash", "rtk gh pr update-branch 56 --rebase"),
+    ("Bash", "rtk proxy gh pr update-branch 56 --rebase"),
+    ("PowerShell", "gh pr update-branch 56 --rebase"),
 ]
 
 # Des commandes ordinaires qu'aucun `deny` ni `ask` ne doit attraper.
