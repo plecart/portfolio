@@ -118,9 +118,10 @@ tête du fichier ; la date passée, l'audit rebloque. `npm audit` n'a pas de fic
 son arbre se nettoie par les `overrides` du manifeste
 ([docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4).
 
-**Scan des images.** `make scan` scanne avec Trivy chaque image que `make build` a construite :
-toute vulnérabilité HIGH ou CRITICAL bloque, corrigeable ou non, comme une image de base en fin de
-vie ([ADR 0014](docs/adr/0014-ci-cd-github-actions-et-ghcr.md)). Une vulnérabilité sans correctif
+**Scan des images.** `make scan`, porte de CI sur chaque PR, scanne avec Trivy chaque image que
+`make build` a construite : toute vulnérabilité HIGH ou CRITICAL bloque, corrigeable ou non, comme
+une image de base en fin de vie
+([ADR 0014](docs/adr/0014-ci-cd-github-actions-et-ghcr.md)). Une vulnérabilité sans correctif
 pour l'image s'évalue en trois points — la place du composant dans l'image, l'atteinte du code
 vulnérable par ce qui tourne, les alternatives — et se consigne en exception **datée** de
 [.trivyignore.yaml](.trivyignore.yaml), dont le format est en tête du fichier ; la date passée,

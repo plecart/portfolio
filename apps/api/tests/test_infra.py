@@ -19,6 +19,7 @@ import subprocess
 import tarfile
 from collections.abc import Iterable, Mapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -86,6 +87,10 @@ BUILD_COMMAND = re.compile(
 
 # L'étiquette d'une entrée du cache local de BuildKit, dans une commande de build imprimée.
 CACHE_TAG = re.compile(r"--cache-(?:from|to) type=local,\S*?\btag=(?P<tag>[^,\s]+)")
+
+# Les commandes que le job `infra` de la CI lance pour construire puis scanner les images.
+CI_BUILD = "make build"
+CI_SCAN = "make scan"
 
 # Une commande de scan telle que `make --dry-run` l'imprime : l'image de Trivy, ses options,
 # l'image scannée.
@@ -237,6 +242,28 @@ def make_dry_run(
 def built_images(printed: str) -> dict[str, str]:
     """Les images d'une sortie de `make --dry-run build` : chaque Dockerfile, et son étiquette."""
     return {match["dockerfile"]: match["tag"] for match in BUILD_COMMAND.finditer(printed)}
+
+
+def job_steps(workflow: str, job: str) -> list[dict[str, Any]]:
+    """Les étapes d'un job d'un workflow, lues par l'analyseur YAML, dans l'ordre du fichier."""
+    return yaml.safe_load(workflow)["jobs"][job]["steps"]
+
+
+def ci_scan_findings(workflow: str) -> list[str]:
+    """Ce qui empêche le job `infra` d'un workflow de scanner les images qu'il construit.
+
+    Returns:
+        Un constat si le job ne lance pas le build puis le scan, dans cet ordre, et un si l'étape
+        de scan porte autre chose que son nom et sa commande. Liste vide : le scan bloque.
+    """
+    steps = job_steps(workflow, "infra")
+    commands = [step.get("run") for step in steps]
+    if CI_BUILD not in commands or CI_SCAN not in commands:
+        return [f"le job `infra` ne lance pas `{CI_BUILD}` et `{CI_SCAN}`"]
+    scan = commands.index(CI_SCAN)
+    findings = [f"`{CI_SCAN}` avant `{CI_BUILD}`"] if scan < commands.index(CI_BUILD) else []
+    extra = sorted(set(steps[scan]) - {"name", "run"})
+    return findings + ([f"l'étape de scan porte {extra}"] if extra else [])
 
 
 def scanned_images(printed: str) -> set[str]:
@@ -459,11 +486,10 @@ def test_la_ci_donne_a_chaque_image_son_entree_de_cache() -> None:
     étiquette — le défaut, `latest` —, la dernière image construite remplace l'entrée des autres
     (doc Docker, « Local cache » ; mesuré à la relecture de la PR #53). Rouge aussi si le
     `Makefile` cesse de prendre ces drapeaux dans l'environnement (`=` au lieu de `?=`)."""
-    steps = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["infra"]["steps"]
     flags = next(
         (
             step["env"]["DOCKER_BUILD_FLAGS"]
-            for step in steps
+            for step in job_steps(CI_WORKFLOW.read_text(encoding="utf-8"), "infra")
             if "DOCKER_BUILD_FLAGS" in step.get("env", {})
         ),
         None,
@@ -538,6 +564,52 @@ SCAN_FORMS = {
 def test_la_garde_du_scan_rend_son_verdict_sur_chaque_forme(printed: str, expected: bool) -> None:
     """Chaque forme recensée : signalée si, et seulement si, elle s'écarte de la politique."""
     assert bool(scan_findings(printed)) is expected, scan_findings(printed)
+
+
+def test_la_ci_scanne_les_images_qu_elle_vient_de_construire() -> None:
+    """Le job `infra` scanne sur chaque PR, après le build qui charge les images dans le moteur
+    (`--load`) : avant lui, Trivy ne trouverait rien à lire.
+
+    L'étape ne porte que son nom et sa commande. Un `continue-on-error` la rendrait indicative, un
+    `if:` la ferait sauter, un `env:` pourrait assouplir Trivy par ses variables (`TRIVY_*`) sans
+    toucher au `Makefile` : la politique vit dans `make scan`, et nulle part ailleurs.
+    """
+    assert ci_scan_findings(CI_WORKFLOW.read_text(encoding="utf-8")) == []
+
+
+def infra_job(*steps: str) -> str:
+    """Un workflow minimal dont le job `infra` porte les étapes données."""
+    return "jobs:\n  infra:\n    steps:\n" + "".join(f"      - {step}\n" for step in steps)
+
+
+BUILD_STEP = f"run: {CI_BUILD}"
+SCAN_STEP = f"run: {CI_SCAN}"
+
+# Forme → constat attendu (`True`) ou aucun (`False`).
+CI_SCAN_FORMS = {
+    "build puis scan": (infra_job(BUILD_STEP, SCAN_STEP), False),
+    "étape de scan nommée": (infra_job(BUILD_STEP, f"name: Scan\n        {SCAN_STEP}"), False),
+    "sans scan": (infra_job(BUILD_STEP), True),
+    "sans build": (infra_job(SCAN_STEP), True),
+    "scan avant build": (infra_job(SCAN_STEP, BUILD_STEP), True),
+    "continue-on-error": (
+        infra_job(BUILD_STEP, f"{SCAN_STEP}\n        continue-on-error: true"),
+        True,
+    ),
+    "if": (infra_job(BUILD_STEP, f"{SCAN_STEP}\n        if: github.event_name == 'push'"), True),
+    "env": (
+        infra_job(BUILD_STEP, f"{SCAN_STEP}\n        env:\n          TRIVY_IGNORE_UNFIXED: true"),
+        True,
+    ),
+}
+
+
+@pytest.mark.parametrize(("workflow", "expected"), CI_SCAN_FORMS.values(), ids=CI_SCAN_FORMS.keys())
+def test_la_garde_du_scan_en_ci_rend_son_verdict_sur_chaque_forme(
+    workflow: str, expected: bool
+) -> None:
+    """Chaque forme recensée : signalée si, et seulement si, le scan ne bloquerait plus."""
+    assert bool(ci_scan_findings(workflow)) is expected, ci_scan_findings(workflow)
 
 
 @pytest.mark.parametrize(

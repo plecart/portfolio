@@ -115,7 +115,7 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 - gates bloquants en CI :
   - back : audit, lint, format:check, typecheck, test
   - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse, audit
-  - infra : compose (résolution de `infra/compose.dev.yml`), build des images `api` et `caddy` sans publication — le scan Trivy et la publication sur GHCR arrivent avec les lots 2 et 3 de #15
+  - infra : compose (résolution de `infra/compose.dev.yml`), build des images `api` et `caddy` sans publication, scan (Trivy : HIGH et CRITICAL, corrigeables ou non, et fin de vie ; exceptions datées de `.trivyignore.yaml`) — la publication sur GHCR arrive avec le lot 3 de #15
 - services requis en CI : aucun déclaré — les tests de base démarrent eux-mêmes Postgres par testcontainers (cadrage §8.4), sur le Docker du runner ; Redis suivra avec #11
 
 ## Périmètre
