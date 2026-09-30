@@ -186,13 +186,37 @@ homonyme : un skill le masquerait) :
 plutôt que gestes, pannes connues en tête de revue) ; `i-have-adhd` (mise en forme des réponses : action
 suivante d'abord, étapes numérotées, état restitué à chaque tour ; `/i-have-adhd`).
 
+**RTK** (hook utilisateur `rtk hook claude`, `~/.claude/RTK.md`, hors dépôt) réécrit la commande
+avant son exécution — `make …`, `gh …` (sauf `gh label` et `gh api … --jq`), `cat`/`head -N`/`tail`
+(→ `rtk read …` ; `head -n N` n'est pas réécrit), `ls`, `wc`, `grep`, chaque segment d'une commande
+composée ; ni `git …` ni `sed`. Les règles de permission sont évaluées sur la forme **réécrite**
+(doc hooks, `updatedInput`, mesuré le 2026-09-29) : c'est pourquoi les entrées `allow` de
+`.claude/settings.json` commencent par `rtk`, et pourquoi les lectures auto-autorisées par Claude
+Code (`cat`, `gh pr view`…) y figurent quand même. RTK lit aussi `permissions.allow` et renvoie
+lui-même `permissionDecision: "allow"` quand la commande **d'origine** y figure (`gh pr *`,
+`gh issue *`…) : les entrées sous forme d'origine restent actives, et les entrées `rtk` sont celles
+que le harnais évalue sans lui — les deux se doublent à dessein. Même
+logique pour les `deny` : le harnais ne reconnaît ni `rtk read` ni `rtk grep` comme des lectures de
+fichier, donc `Read(.env)` ne les arrête pas — deux `deny` Bash (`rtk read *.env*`, `rtk grep *.env*`)
+ferment les neuf formes recensées par `apps/api/tests/test_agent_permissions.py` (citation, glob,
+`--max-lines`, `--tail-lines`, `grep`) — et attrapent aussi, collatéral accepté et épinglé par le
+même test, `rtk read .env.example`, `rtk read infra/dev.env` et toute recherche dont le texte
+contient `.env` (`os.environ`, `config.env`, `process.env`) : passer par l'outil Grep ou `git grep`,
+que RTK ne réécrit pas. Restent ouverts, et la doc le dit (« isn't a security boundary around the
+program ») : un glob sans `.env` littéral (`.en?`), `grep -r` sans nom de fichier, une indirection
+par variable (`f=.env; cat "$f"`), tout sous-processus qui ouvre le fichier lui-même.
+
 **Outils hors dépôt** (`uv tool`, environnements isolés — frontend-outillage §2.2) :
 - SkillSpector 2.11.2 (NVIDIA/skillspector @ d162d9b) — `skillspector scan .claude/skills/<skill> --no-llm` après chaque ajout ou mise à jour de skill
 - strix 1.6.2 (`strix-agent`) — pentest par agents IA, en fin de parcours contre la préproduction, jamais la prod ; sorties dans `strix_runs/` (ignoré)
 - Manus (service en ligne, compte à créer — frontend-outillage §4) — maquettes jetables, moodboards, recherches ; son code ne part pas en production (D27)
 
-**Serveur MCP** : `context7` — déclaré en portée `user` (`~/.claude.json`, hors dépôt), vérifier avec
-`claude mcp list`.
+**Serveurs MCP** (vérifier avec `claude mcp list`) :
+- `playwright` — portée **projet**, `.mcp.json` à la racine, donc présent dans tout clone et tout
+  worktree ; outil de la vérif de fumée de `cycle-pr` sur l'interface web. Version épinglée à la
+  main — Dependabot ne lit pas ce fichier : `npm view @playwright/mcp version` pour la remonter.
+  Le wrapper `cmd /c` est celui du poste Windows.
+- `context7` — portée `user` (`~/.claude.json`, hors dépôt), installé par `init-projet`.
 
 **Écartés :**
 - `design-system` — recoupait `taste-skill` (frontend-outillage §5) ; retiré le 2026-09-18
