@@ -22,9 +22,10 @@ WEB_INDEX := $(WEB)/dist/index.html
 WEB_NPM := cd $(WEB) && $(NPM)
 
 # Une image par dossier `infra/<service>/` qui porte un `Dockerfile` (ADR 0014) : `make build` les
-# trouve, et ajouter un dossier suffit. Chacune a sa cible, `build-<service>`.
+# trouve, et ajouter un dossier suffit. Chacune a ses cibles, `build-<service>` et `scan-<service>`.
 IMAGES := $(patsubst infra/%/Dockerfile,%,$(wildcard infra/*/Dockerfile))
 IMAGE_BUILDS := $(addprefix build-,$(IMAGES))
+IMAGE_SCANS := $(addprefix scan-,$(IMAGES))
 
 # Le préfixe du nom des images — `portfolio-api`, `portfolio-caddy` —, que la CI surcharge pour
 # publier sous le nom GHCR sans redéfinir la commande.
@@ -50,7 +51,32 @@ DOCKER_BUILD_FLAGS ?=
 # du conteneur. Nommé une fois ici pour qu'aucun appel ne puisse l'oublier.
 COMPOSE := docker compose --env-file infra/dev.env -f infra/compose.dev.yml
 
+# Trivy, dans son image officielle plutôt qu'installé : même commande sur le poste et en CI, et une
+# seule épingle (ADR 0014). Étiquette et empreinte, comme les images de base. Dependabot ne lit pas
+# cette épingle ; elle se monte à la main : nouvelle étiquette, signature vérifiée par `cosign
+# verify`, empreinte lue sur la ligne « Digest » de `docker buildx imagetools inspect` — la
+# procédure est dans `CONTRIBUTING.md`. `:=` et non `?=` : l'environnement ne peut pas la remplacer.
+TRIVY_IMAGE := ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+
+# Le conteneur de Trivy reçoit le socket du moteur, pour lire les images que `make build` y a
+# chargées ; un volume pour sa base de vulnérabilités, téléchargée une fois pour toutes les images ;
+# et les exceptions datées, en lecture seule, à la racine — son répertoire de travail.
+TRIVY := docker run --rm \
+	-v /var/run/docker.sock:/var/run/docker.sock \
+	-v portfolio-trivy-cache:/root/.cache/ \
+	-v "$(CURDIR)/.trivyignore.yaml:/.trivyignore.yaml:ro" \
+	$(TRIVY_IMAGE)
+
+# La politique de scan (ADR 0014) : toute vulnérabilité HIGH ou CRITICAL bloque, corrigeable ou
+# non — jamais `--ignore-unfixed` —, comme une image de base en fin de vie ; seules passent les
+# exceptions datées de `.trivyignore.yaml`, que `--show-suppressed` liste dans le rapport : le
+# journal de CI dit lesquelles étaient en vigueur. `--image-src docker` : Trivy ne lit que le moteur
+# local, et ne tire pas d'un registre une image qui porterait le même nom.
+SCAN_FLAGS := --image-src docker --severity HIGH,CRITICAL --exit-code 1 --exit-on-eol 1 \
+	--ignorefile .trivyignore.yaml --show-suppressed
+
 .PHONY: install test lint format format-check typecheck audit build $(IMAGE_BUILDS) compose-config dev
+.PHONY: scan $(IMAGE_SCANS)
 .PHONY: web-install web-browsers web-lint web-typecheck web-test web-build web-e2e web-lighthouse web-audit
 
 install:
@@ -100,6 +126,19 @@ build: $(IMAGE_BUILDS)
 
 $(IMAGE_BUILDS): build-%: $(WEB_INDEX)
 	docker buildx build $(DOCKER_BUILD_FLAGS) -f infra/$*/Dockerfile -t $(IMAGE_PREFIX)$* .
+
+# Scanne les images que `make build` a construites, sous le même nom. Sans dépendance vers
+# `build` : en CI, `make scan` reconstruirait chaque image pour rien — sans `--load`, le pilote
+# conteneurisé construit et jette.
+#
+# `MSYS_NO_PATHCONV` : lancé depuis Git Bash, `make` passe ses recettes à un shell qui réécrit en
+# chemins Windows les arguments commençant par `/` — le socket du moteur devenait
+# `C:\Program Files\Git\var\run\docker.sock` (mesuré). Sans effet ailleurs.
+scan: $(IMAGE_SCANS)
+
+$(IMAGE_SCANS): export MSYS_NO_PATHCONV := 1
+$(IMAGE_SCANS): scan-%:
+	$(TRIVY) image $(SCAN_FLAGS) $(IMAGE_PREFIX)$*
 
 # Vérifie que le Compose de développement se résout — interpolation comprise. Appelée par le
 # job `infra` de la CI, qui crée un `.env` depuis `.env.example` au préalable : Compose exige

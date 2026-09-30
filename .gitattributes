@@ -19,3 +19,4 @@ Dockerfile text eol=lf
 .env.example text eol=lf
 .dockerignore text eol=lf
 .python-version text eol=lf
+.trivyignore.yaml text eol=lf
