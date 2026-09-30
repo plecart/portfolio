@@ -1,6 +1,6 @@
 ---
 name: relecteur
-description: Relecteur à contexte vierge d'un diff de PR (cycle-pr, Étape 4.2) — lit le brief et le diff dans son propre worktree figé, éprouve les tests par mutation, rend des constats classés avec leur provenance. Lecture et mutations temporaires seulement : ne commit pas, ne pousse pas, ne corrige pas.
+description: "Relecteur à contexte vierge d'un diff de PR (cycle-pr, Étape 4.2) — lit le brief et le diff dans son propre worktree figé, éprouve les tests par mutation, rend des constats classés avec leur provenance. Lecture et mutations temporaires seulement : ne commit pas, ne pousse pas, ne corrige pas."
 model: opus
 effort: medium
 isolation: worktree
