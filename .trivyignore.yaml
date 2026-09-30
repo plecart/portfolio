@@ -1,0 +1,264 @@
+# Exceptions du scan des images (`make scan`), lues par Trivy (`--ignorefile`).
+#
+# Le scan bloque toute vulnérabilité HIGH ou CRITICAL, corrigeable ou non (ADR 0014). Une
+# vulnérabilité sans correctif pour l'image arrête la CI le temps d'une évaluation en trois
+# points, que le `statement` de son exception résume :
+#
+#   1. Place — le composant fautif a-t-il sa place dans l'image ?
+#   2. Atteinte — le code vulnérable est-il atteint par ce qui tourne ?
+#   3. Alternatives — autre image de base, retrait du paquet, correctif annoncé.
+#
+# Est sans correctif, pour l'image, ce qui est corrigé en amont mais absent de toute version
+# publiée de ce qui l'embarque. Une exception ne sert jamais à faire passer une PR : si
+# l'évaluation conclut que le code est atteint, on corrige l'image.
+#
+# Une entrée par vulnérabilité, les trois champs obligatoires, aucun autre :
+#
+#   - id: CVE-2026-0001          # l'identifiant rapporté par Trivy
+#     statement: >-              # les trois points, dans l'ordre
+#       Place : … Atteinte : … Alternatives : …
+#     expired_at: 2026-12-29     # date YAML sans guillemets ; l'exception cesse de valoir à
+#                                # 00:00 UTC ce jour-là, et l'évaluation se refait
+#
+# `apps/api/tests/test_trivy_exceptions.py` refuse une entrée incomplète ou expirée.
+#
+# Les exceptions ci-dessous ont été évaluées au premier scan, le 2026-09-30 (Trivy 0.74.0).
+# Réévaluation : 90 jours ; 30 jours quand le correctif n'attend que la reconstruction d'une
+# image de base sous la même étiquette, que Dependabot peut ne pas proposer.
+
+vulnerabilities:
+  # --- Image `api` : paquets Debian 13 de l'image de base `python:3.12.14-slim-trixie` -------
+  #
+  # Ce qui tourne : gunicorn, sous l'utilisateur `api`, sans privilège. Mesuré dans l'image :
+  # `/etc/fstab` est vide, ni `systemd-homed` ni le module Perl `Archive::Tar` n'y sont.
+
+  - id: CVE-2026-76642
+    statement: >-
+      Place : util-linux (`mount`, `login`, `bsdutils` et leurs bibliothèques), paquets essentiels
+      de Debian venus de l'image de base, impossibles à retirer. Atteinte : non — le défaut
+      demande une entrée de `/etc/fstab` qui autorise un montage à un utilisateur, et celui de
+      l'image est vide. Alternatives : aucun correctif dans Debian 13 ; une image de base sans
+      util-linux rouvrirait le choix de Debian 13 (ADR 0014).
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-78408
+    statement: >-
+      Place : util-linux, paquets essentiels de Debian venus de l'image de base, impossibles à
+      retirer. Atteinte : non — le défaut demande qu'un opérateur privilégié lance
+      `nsenter --join-cgroup`, que rien dans l'image n'appelle. Alternatives : aucun correctif
+      dans Debian 13 ; une image de base sans util-linux rouvrirait le choix de Debian 13
+      (ADR 0014).
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-78409
+    statement: >-
+      Place : util-linux, paquets essentiels de Debian venus de l'image de base, impossibles à
+      retirer. Atteinte : non — le défaut demande une entrée de `/etc/fstab` portant
+      `X-mount.subdir`, et celui de l'image est vide. Alternatives : aucun correctif dans
+      Debian 13 ; une image de base sans util-linux rouvrirait le choix de Debian 13 (ADR 0014).
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-78410
+    statement: >-
+      Place : util-linux, paquets essentiels de Debian venus de l'image de base, impossibles à
+      retirer. Atteinte : non — le défaut demande une entrée de `/etc/fstab` qui autorise un
+      montage lié à un utilisateur, et celui de l'image est vide. Alternatives : aucun correctif
+      dans Debian 13 ; une image de base sans util-linux rouvrirait le choix de Debian 13
+      (ADR 0014).
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-54369
+    statement: >-
+      Place : libacl1, dépendance des paquets essentiels de Debian (coreutils), venue de l'image
+      de base. Atteinte : non — le défaut demande un processus privilégié qui lit ou pose des
+      ACL sur un chemin que l'attaquant contrôle ; le seul processus de l'image est gunicorn,
+      sans privilège, qui n'appelle pas libacl. Alternatives : corrigé en amont par acl 2.4.0,
+      sans correctif dans Debian 13.
+    expired_at: 2026-12-29
+
+  - id: CVE-2025-69720
+    statement: >-
+      Place : ncurses, paquets essentiels de Debian venus de l'image de base. Atteinte : non —
+      le défaut est dans la commande `infocmp`, présente dans l'image mais que rien n'appelle.
+      Alternatives : corrigé en amont par ncurses 6.5-20251213, sans correctif dans Debian 13.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-16742
+    statement: >-
+      Place : libsystemd0 et libudev1, bibliothèques dont dépendent les paquets essentiels de
+      Debian, venues de l'image de base. Atteinte : non — le défaut est dans le service
+      `systemd-homed`, absent de l'image. Alternatives : aucun correctif dans Debian 13.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-9538
+    statement: >-
+      Place : perl-base, paquet essentiel de Debian venu de l'image de base, impossible à
+      retirer. Atteinte : non — le défaut est dans le module `Archive::Tar`, absent de perl-base,
+      et l'application n'exécute pas Perl. Alternatives : correctif reporté par Debian
+      (`fix_deferred`) ; corrigé en amont par Archive::Tar 3.10.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-75804
+    statement: >-
+      Place : OpenSSL, venu de l'image de base, dont dépend le module `ssl` de Python. Atteinte :
+      non — le défaut est dans la pile QUIC d'OpenSSL ; Python ne fait que du TLS sur TCP, et
+      rien dans l'image n'ouvre de connexion QUIC. Alternatives : corrigé dans Debian 13 par
+      `3.5.7-1~deb13u3`, absent de l'image `python:3.12.14-slim-trixie` publiée (construite le
+      2026-09-19) — monter l'empreinte dès sa reconstruction (ADR 0014) ; pas d'`apt-get upgrade`
+      au build, qui ferait dépendre l'image de sa date de construction.
+    expired_at: 2026-10-30
+
+  - id: CVE-2026-84782
+    statement: >-
+      Place : OpenSSL, venu de l'image de base, dont dépend le module `ssl` de Python. Atteinte :
+      non — le défaut est dans la retransmission DTLS ; Python ne fait que du TLS sur TCP, et
+      rien dans l'image n'ouvre de connexion DTLS. Alternatives : corrigé dans Debian 13 par
+      `3.5.7-1~deb13u3`, absent de l'image `python:3.12.14-slim-trixie` publiée (construite le
+      2026-09-19) — monter l'empreinte dès sa reconstruction (ADR 0014) ; pas d'`apt-get upgrade`
+      au build, qui ferait dépendre l'image de sa date de construction.
+    expired_at: 2026-10-30
+
+  # --- Image `caddy` : le binaire `caddy` 2.11.4, compilé avec Go 1.26.3 ----------------------
+  #
+  # Ce qui tourne : un serveur de fichiers statiques et un reverse proxy interne, en HTTP, sans
+  # TLS — Cloudflare le termine, `cloudflared` est la seule entrée (cadrage §7, D45). L'atteinte
+  # est jugée sur cette configuration, pas sur un graphe d'appels : `govulncheck` trouve tous les
+  # symboles vulnérables dans le binaire, qui embarque tous les modules de Caddy. Le Caddyfile
+  # de production arrive avec #16, qui relira ces évaluations.
+  #
+  # Alternatives, pour toutes : caddy 2.11.4 (2026-06-03) est la dernière version publiée ; la
+  # suivante arrivera par Dependabot. Si elle tarde, compiler caddy dans un étage du projet
+  # (ADR 0014, « Conditions de réexamen »).
+
+  - id: CVE-2026-56854
+    statement: >-
+      Place : module `golang.org/x/crypto` du binaire `caddy`, raison d'être de l'image.
+      Atteinte : non — le défaut vise un serveur SSH (`x/crypto/ssh`), et Caddy n'en ouvre aucun.
+      Alternatives : corrigé par x/crypto 0.55.0, absent de caddy 2.11.4, dernière version
+      publiée.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-46600
+    statement: >-
+      Place : analyseur DNS de Go (`x/net` et bibliothèque standard) du binaire `caddy`, raison
+      d'être de l'image. Atteinte : seulement par une réponse DNS forgée — Caddy ne résout que
+      le nom du service `api`, auprès du DNS interne de Docker, et ne demande aucun certificat
+      (D45). Alternatives : corrigé par Go 1.26.6 et x/net 0.56.0, absents de caddy 2.11.4,
+      dernière version publiée.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-56852
+    statement: >-
+      Place : module `golang.org/x/text` du binaire `caddy`, raison d'être de l'image. Atteinte :
+      non établie — aucun appel de `norm.Iter` sur le chemin d'une requête n'a été cherché dans
+      les sources de Caddy ; au pire, un déni de service. Alternatives : corrigé par x/text
+      0.39.0, absent de caddy 2.11.4, dernière version publiée.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-84304
+    statement: >-
+      Place : module gRPC du binaire `caddy`, raison d'être de l'image, embarqué par ses
+      dépendances. Atteinte : non — Caddy n'écoute en gRPC sur aucun port, et la seule directive
+      connue pour ouvrir une connexion gRPC, `tracing`, n'est pas configurée. Alternatives :
+      corrigé par grpc 1.83.1, absent de caddy 2.11.4, dernière version publiée.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-84445
+    statement: >-
+      Place : module gRPC du binaire `caddy`, raison d'être de l'image, embarqué par ses
+      dépendances. Atteinte : non — le défaut vise un serveur gRPC xDS, et Caddy n'écoute en gRPC
+      sur aucun port. Alternatives : corrigé par grpc 1.82.2, absent de caddy 2.11.4, dernière
+      version publiée.
+    expired_at: 2026-12-29
+
+  - id: GHSA-hrxh-6v49-42gf
+    statement: >-
+      Place : module gRPC du binaire `caddy`, raison d'être de l'image, embarqué par ses
+      dépendances. Atteinte : non — les défauts visent un serveur gRPC et ses règles xDS RBAC, et
+      Caddy n'écoute en gRPC sur aucun port. Alternatives : corrigé par grpc 1.82.1, absent de
+      caddy 2.11.4, dernière version publiée.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-27145
+    statement: >-
+      Place : bibliothèque standard Go (`crypto/x509`) du binaire `caddy`, raison d'être de
+      l'image. Atteinte : non — le défaut se déclenche à la vérification d'un certificat, et
+      Caddy n'en vérifie aucun : ni TLS entrant, ni amont en HTTPS (D45). Alternatives : corrigé
+      par Go 1.26.4, absent de caddy 2.11.4, dernière version publiée.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-33818
+    statement: >-
+      Place : bibliothèque standard Go (`encoding/asn1`) du binaire `caddy`, raison d'être de
+      l'image. Atteinte : non — l'ASN.1 que lit Caddy vient des certificats, et il n'en traite
+      aucun (D45). Alternatives : corrigé par Go 1.26.6, absent de caddy 2.11.4, dernière version
+      publiée.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-39821
+    statement: >-
+      Place : bibliothèque standard Go (`idna`, dans `net/http`) du binaire `caddy`, raison
+      d'être de l'image. Atteinte : non — le défaut demande un contrôle d'accès fait sur un nom
+      d'hôte avant sa conversion en Unicode, et Caddy n'en porte aucun : un seul site, sans
+      règle par hôte. Alternatives : corrigé par Go 1.26.6, absent de caddy 2.11.4, dernière
+      version publiée.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-39822
+    statement: >-
+      Place : bibliothèque standard Go (`os.Root`) du binaire `caddy`, raison d'être de l'image.
+      Atteinte : non — le défaut demande un lien symbolique dans l'arborescence servie, et le
+      front compilé n'en contient aucun. Alternatives : corrigé par Go 1.26.5, absent de caddy
+      2.11.4, dernière version publiée.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-42504
+    statement: >-
+      Place : bibliothèque standard Go (`mime`) du binaire `caddy`, raison d'être de l'image.
+      Atteinte : non établie — le défaut est dans le décodage des mots encodés d'un en-tête
+      MIME ; Caddy transmet en-têtes et corps sans les décoder, ce qui n'a pas été vérifié dans
+      ses sources ; au pire, un déni de service. Alternatives : corrigé par Go 1.26.4, absent de
+      caddy 2.11.4, dernière version publiée.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-56853
+    statement: >-
+      Place : bibliothèque standard Go (`net/http`) du binaire `caddy`, raison d'être de l'image.
+      Atteinte : non — le défaut demande un serveur configuré pour HTTP/2 sans chiffrement
+      (`h2c`), que Caddy n'active pas par défaut ; à ne pas activer dans le Caddyfile de #16.
+      Alternatives : corrigé par Go 1.26.6, absent de caddy 2.11.4, dernière version publiée.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-56858
+    statement: >-
+      Place : bibliothèque standard Go (`html/template`) du binaire `caddy`, raison d'être de
+      l'image. Atteinte : non — Caddy n'exécute de gabarit qu'avec les directives `templates` ou
+      `file_server browse`, et aucune n'est configurée. Alternatives : corrigé par Go 1.26.6,
+      absent de caddy 2.11.4, dernière version publiée.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-56859
+    statement: >-
+      Place : bibliothèque standard Go (`encoding/xml`) du binaire `caddy`, raison d'être de
+      l'image. Atteinte : non établie — servir des fichiers et relayer vers `api` ne décode
+      aucun XML, ce qui n'a pas été vérifié dans les sources de Caddy ; au pire, un déni de
+      service. Alternatives : corrigé par Go 1.26.6, absent de caddy 2.11.4, dernière version
+      publiée.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-56860
+    statement: >-
+      Place : bibliothèque standard Go (`net/url`) du binaire `caddy`, raison d'être de l'image.
+      Atteinte : non établie — aucun appel de la résolution de chemins relatifs depuis une
+      requête n'a été cherché dans les sources de Caddy ; au pire, un déni de service, borné par
+      la longueur d'URL que Cloudflare laisse passer. Alternatives : corrigé par Go 1.26.6,
+      absent de caddy 2.11.4, dernière version publiée.
+    expired_at: 2026-12-29
+
+  - id: CVE-2026-56862
+    statement: >-
+      Place : bibliothèque standard Go (`crypto/tls`) du binaire `caddy`, raison d'être de
+      l'image. Atteinte : non — le défaut vise un serveur TLS, et Caddy n'en termine aucun :
+      Cloudflare le fait (D45). Alternatives : corrigé par Go 1.26.6, absent de caddy 2.11.4,
+      dernière version publiée.
+    expired_at: 2026-12-29
