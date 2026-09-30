@@ -95,27 +95,34 @@ PUBLISH_LOGIN = (
 PUBLISH_PUSH = f'make push IMAGE_PREFIX={PUBLISH_PREFIX} IMAGE_TAG="$GITHUB_SHA"'
 PUBLISH_PRUNE = f"make prune IMAGE_PREFIX={PUBLISH_PREFIX}"
 
-# Les étapes du job, dans l'ordre — l'action, sans son empreinte, ou la commande —, et aucune
-# autre : rien n'atteint le registre avant le scan. Une connexion placée plus tôt donnerait son
-# identifiant au build, une étape de plus pourrait pousser.
-PUBLISH_STEPS = [
-    "actions/checkout",
-    "actions/download-artifact",
-    "docker/setup-buildx-action",
-    "actions/cache/restore",
-    PUBLISH_BUILD,
-    PUBLISH_SCAN,
-    PUBLISH_LOGIN,
-    PUBLISH_PUSH,
-    PUBLISH_PRUNE,
-]
-
 # Les drapeaux du build, seule variable de son étape : l'image chargée dans le moteur, où Trivy la
 # lit, sans attestation (décision 7), depuis le cache d'`infra`. Mot pour mot : un drapeau de plus
 # (`--push`, `--output type=registry`) enverrait l'image au registre avant son scan.
 PUBLISH_BUILD_FLAGS = (
     "--load --cache-from type=local,src=/tmp/buildx-cache,tag=$* --provenance=false --sbom=false"
 )
+# L'environnement des étapes qui parlent au registre : le jeton du job, rien d'autre.
+WORKFLOW_TOKEN_ENV = {"GH_TOKEN": "${{ github.token }}"}
+
+# Les étapes du job, dans l'ordre — l'action, sans son empreinte, ou la commande —, chacune avec
+# son environnement, et aucune autre : rien n'atteint le registre avant le scan. Une connexion
+# placée plus tôt donnerait son identifiant au build, une étape de plus pourrait pousser, une
+# variable de plus (`MAKEFLAGS: -i`) ferait ignorer un échec.
+PUBLISH_STEPS: list[tuple[str, dict[str, str] | None]] = [
+    ("actions/checkout", None),
+    ("actions/download-artifact", None),
+    ("docker/setup-buildx-action", None),
+    ("actions/cache/restore", None),
+    (PUBLISH_BUILD, {"DOCKER_BUILD_FLAGS": PUBLISH_BUILD_FLAGS}),
+    (PUBLISH_SCAN, None),
+    (PUBLISH_LOGIN, WORKFLOW_TOKEN_ENV),
+    (PUBLISH_PUSH, None),
+    (PUBLISH_PRUNE, WORKFLOW_TOKEN_ENV),
+]
+
+# Les clés qu'une étape du job peut porter : ni `if` qui la sauterait, ni `continue-on-error` qui
+# tolérerait son échec, ni `shell` ou `working-directory` qui changeraient ce qu'elle lance.
+STEP_KEYS = {"name", "uses", "with", "run", "env"}
 
 
 def published_images() -> list[str]:
@@ -172,9 +179,9 @@ def publish_findings(workflow: str) -> list[str]:
 
     Returns:
         Un constat si le job manque ; sinon un par propriété altérée — `needs`, `if`, permissions
-        du job, du workflow ou d'un autre job, `concurrency`, la liste exacte de ses étapes
-        (`PUBLISH_STEPS`), les drapeaux du build, et le checkout qui ne garde pas l'identifiant
-        du dépôt. Liste vide : le job est conforme.
+        du job, du workflow ou d'un autre job, `concurrency`, la liste exacte de ses étapes et de
+        leur environnement (`PUBLISH_STEPS`), une clé d'étape hors de `STEP_KEYS`, et le checkout
+        qui ne garde pas l'identifiant du dépôt. Liste vide : le job est conforme.
     """
     document = yaml.safe_load(workflow)
     jobs = document["jobs"]
@@ -204,15 +211,20 @@ def publish_findings(workflow: str) -> list[str]:
             "`concurrency` doit nommer son groupe et porter `cancel-in-progress: false`"
         )
     steps: list[dict[str, object]] = job.get("steps") or []
-    launched = [step.get("run") or str(step.get("uses", "")).split("@")[0] for step in steps]
+    launched = [
+        (step.get("run") or str(step.get("uses", "")).split("@")[0], step.get("env"))
+        for step in steps
+    ]
     if launched != PUBLISH_STEPS:
         findings.append(f"le job lance {launched}, attendu, dans cet ordre, {PUBLISH_STEPS}")
-    build_env = [step.get("env") for step in steps if step.get("run") == PUBLISH_BUILD]
-    if build_env != [{"DOCKER_BUILD_FLAGS": PUBLISH_BUILD_FLAGS}]:
-        findings.append(f"le build reçoit {build_env}, attendu {PUBLISH_BUILD_FLAGS!r}")
+    findings += [
+        f"l'étape `{name}` porte {sorted(set(step) - STEP_KEYS)}"
+        for step, (name, _) in zip(steps, launched, strict=True)
+        if set(step) - STEP_KEYS
+    ]
     checkout = [
         step.get("with")
-        for step, name in zip(steps, launched, strict=True)
+        for step, (name, _) in zip(steps, launched, strict=True)
         if name == "actions/checkout"
     ]
     if checkout != [{"persist-credentials": False}]:
@@ -225,9 +237,10 @@ def publish_findings(workflow: str) -> list[str]:
 PERSIST_LINES = "        with:\n          persist-credentials: false\n"
 CHECKOUT_LINE = "      - uses: actions/checkout@v0\n" + PERSIST_LINES
 BUILD_FLAGS_LINE = f"          DOCKER_BUILD_FLAGS: {PUBLISH_BUILD_FLAGS}\n"
-SCAN_LINE, LOGIN_LINE, PUSH_LINE, PRUNE_LINE = (
-    f"      - run: {command}\n"
-    for command in (PUBLISH_SCAN, PUBLISH_LOGIN, PUBLISH_PUSH, PUBLISH_PRUNE)
+TOKEN_LINES = f"        env:\n          GH_TOKEN: {WORKFLOW_TOKEN_ENV['GH_TOKEN']}\n"
+SCAN_LINE, PUSH_LINE = (f"      - run: {command}\n" for command in (PUBLISH_SCAN, PUBLISH_PUSH))
+LOGIN_LINE, PRUNE_LINE = (
+    f"      - run: {command}\n{TOKEN_LINES}" for command in (PUBLISH_LOGIN, PUBLISH_PRUNE)
 )
 LOGIN_ACTION_LINE = "      - uses: docker/login-action@v0\n"
 CONFORMING_WORKFLOW = f"""\
@@ -302,6 +315,20 @@ PUBLISH_CHANGES = {
     "rétention avant push": (PUSH_LINE + PRUNE_LINE, PRUNE_LINE + PUSH_LINE, True),
     "push sans l'étiquette du commit": (' IMAGE_TAG="$GITHUB_SHA"', "", True),
     "push en double": (PUSH_LINE, PUSH_LINE + PUSH_LINE, True),
+    # Une étape tolérée en échec, sautée, ou dont `make` ignore les erreurs : la CI reste verte,
+    # rien n'est publié, ou les versions s'accumulent jusqu'au quota du compte.
+    "push toléré en échec": (PUSH_LINE, PUSH_LINE + "        continue-on-error: true\n", True),
+    "push sauté": (PUSH_LINE, PUSH_LINE + "        if: false\n", True),
+    "rétention tolérée en échec": (
+        PRUNE_LINE,
+        PRUNE_LINE + "        continue-on-error: true\n",
+        True,
+    ),
+    "rétention qui ignore ses erreurs": (
+        PRUNE_LINE,
+        PRUNE_LINE + "          MAKEFLAGS: -i\n",
+        True,
+    ),
     # Une image atteint le registre avant son scan : poussée par le build, qui trouverait
     # l'identifiant d'une connexion placée plus tôt, ou par une étape de plus.
     "connexion avant le scan": (SCAN_LINE + LOGIN_LINE, LOGIN_LINE + SCAN_LINE, True),
