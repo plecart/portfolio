@@ -197,9 +197,9 @@ travail reste visible du reste de la pipeline.
 En vague parallèle (`pr-paralleles`), le lead relève lui-même le numéro de PR (`gh pr list`) pour
 son tableau de bord : rien à lui envoyer.
 
-## Étape 3 — Le cycle de commit (jamais sauté, jamais raccourci)
+## Étape 3 — Le cycle de commit
 
-Chaque commit suit **exactement** :
+Chaque commit suit :
 
 ```
 1. modif (TDD)  →  2. test (vert)  →  3. cleanup pass  →  4. test (vert)  →  5. commit
@@ -234,8 +234,8 @@ regarder comment d'autres projets ont traité le même avis : un mur atteint par
 souvent une issue de sortie publiée. Et un `override` qui saute une majeure sous un consommateur
 non prévu pour elle **s'éprouve en exécutant réellement l'outil**, pas en relançant l'audit.
 
-Implémenter **un comportement à la fois** en red-green-refactor. **Ne jamais** écrire tous les
-tests d'abord puis toute l'implémentation (slicing horizontal = mauvais tests) :
+Implémenter **un comportement à la fois** en red-green-refactor — pas tous les tests d'abord puis
+toute l'implémentation, le découpage horizontal produit de mauvais tests :
 
 ```
 ROUGE : écrire UN test du prochain comportement → il échoue
@@ -350,8 +350,8 @@ Spécifique à cette étape :
 
 ### 3.4 Second passage de tests
 
-Le cleanup a pu casser quelque chose. Relancer les tests → **vert obligatoire** — et la commande
-du projet que 3.2 a fait exécuter, si le delta la touche.
+Le cleanup a pu casser quelque chose. Relancer les tests, et la commande du projet que 3.2 a fait
+exécuter si le delta la touche ; rouge → pas de commit.
 
 ### 3.5 Commit
 
@@ -363,12 +363,9 @@ git commit -m "type(scope): description"
 
 Pas de corps, pas de footer, pas de `Co-Authored-By`, pas de numéro de PR. Breaking change : `!`
 dans le titre. Puis enchaîner sur le commit suivant (retour 3.1) — ou, si ce commit vient de poser
-le socle, lancer d'abord la première passe de relecture (4.2, « En deux temps »). **Si ce commit
-assemble un écran d'une zone sensible** (`.claude/pipeline.config.md`, « Périmètre »), c'est
-maintenant que se prend le point d'arrêt humain (Étape 5, « Point d'arrêt humain ») — dans le
-même tour que la passe de relecture s'il y en a une : la lancer d'abord, montrer l'écran ensuite,
-et continuer sur ce qui ne dépend pas de son verdict. `.claude/rules/contraintes.md`, « Points
-d'arrêt humains », en est la source unique.
+le socle, lancer d'abord la première passe de relecture (4.2). Si ce commit assemble un écran
+d'une zone sensible, c'est maintenant que se prend le point d'arrêt humain — cadence et forme
+dans `.claude/rules/contraintes.md`, « Points d'arrêt humains », source unique.
 
 ## Étape 4 — Relecture indépendante (avant `git push`)
 
@@ -513,13 +510,9 @@ compilation (le bandeau DEBUG), appareil et densité, résolution, thème, barre
 
 ### Point d'arrêt humain
 
-Si la PR touche une **zone sensible** déclarée dans `.claude/pipeline.config.md` (section
-« Périmètre ») — par défaut, l'UI à valider visuellement — la validation manuelle a lieu **une fois
-par PR, au commit qui assemble l'écran** (3.5), pas avant chaque commit et pas ici : arrivé à cette
-étape, elle est déjà prise. Si l'écran a bougé depuis, rejouer la vérification sur ce qui a changé
-(Étape 7, « Rejouer les vérifications périmées ») **avant `gh pr ready`**.
-`.claude/rules/contraintes.md`, « Points d'arrêt humains », en est la source unique : la lire,
-plutôt que présumer.
+Sur une zone sensible, il a été pris au commit qui assemble l'écran (3.5). Si l'écran a bougé
+depuis, rejouer la vérification sur ce qui a changé (Étape 7, « Rejouer les vérifications
+périmées ») **avant `gh pr ready`**.
 
 Puis seulement, sortir du draft :
 
@@ -759,8 +752,8 @@ est « aucune répercussion »).
 2. **La PR draft s'ouvre avant la première ligne de code**, avec `Closes #N`. C'est ce qui rend le
    travail visible comme *en cours* : sans elle, une autre session réécrira la spec de cette issue
    en croyant que personne ne travaille dessus.
-3. Le cycle `modif → test → cleanup → test → commit` est **sacré et jamais raccourci** — y compris
-   le cleanup sur les commits triviaux.
+3. Le cycle `modif → test → cleanup → test → commit` s'applique à chaque commit, triviaux
+   compris.
 4. **Deux filets de cleanup** : un par commit (regard local), un sur la PR entière avant la
    seconde relecture (4.1, regard global, inter-commits) — et une relecture à contexte vierge **en deux temps**, au
    socle et à la fin, jamais par commit, un seul relecteur par passe dans son propre worktree,
