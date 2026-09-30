@@ -195,8 +195,9 @@ composée ; ni `git …` ni `sed`. Les règles de permission sont évaluées sur
 Code (`cat`, `gh pr view`…) y figurent quand même. RTK lit aussi `permissions.allow` et renvoie
 lui-même `permissionDecision: "allow"` quand la commande **d'origine** y figure (`gh pr *`,
 `gh issue *`…) : les entrées sous forme d'origine restent actives, et les entrées `rtk` sont celles
-que le harnais évalue sans lui — les deux se doublent à dessein. Même
-logique pour les `deny` : le harnais ne reconnaît ni `rtk read` ni `rtk grep` comme des lectures de
+que le harnais évalue sans lui — les deux se doublent à dessein. Un `ask` passe avant tout
+`allow`, y compris celui que RTK renvoie : `permissions.ask` sur `gh pr merge` (les deux formes)
+est la porte de « jamais d'auto-merge ». Même logique pour les `deny` : le harnais ne reconnaît ni `rtk read` ni `rtk grep` comme des lectures de
 fichier, donc `Read(.env)` ne les arrête pas — deux `deny` Bash (`rtk read *.env*`, `rtk grep *.env*`)
 ferment les neuf formes recensées par `apps/api/tests/test_agent_permissions.py` (citation, glob,
 `--max-lines`, `--tail-lines`, `grep`) — et attrapent aussi, collatéral accepté et épinglé par le

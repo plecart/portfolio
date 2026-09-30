@@ -6,13 +6,15 @@ commandes avant l'évaluation des permissions — `cat .env` devient `rtk read .
 devient `rtk grep X .env` — et ces formes-là, la garde native ne les reconnaît pas. Des règles
 `allow` du même fichier les autorisent en bloc (`Bash(rtk read *)`, `Bash(rtk grep *)`) : sans un
 `deny` évalué avant elles, `.env` se lit sans permission. Même logique pour le force-push, que
-`.claude/rules/contraintes.md` interdit : seul un `deny` en fait une porte du harnais.
+`.claude/rules/contraintes.md` interdit : seul un `deny` en fait une porte du harnais. Et pour le
+merge d'une PR, que la même règle réserve à un « go » humain : seul un `ask` — évalué avant tout
+`allow`, y compris celui que le hook renvoie — en fait une porte.
 
 Ce module émule l'appariement des règles Bash — `*` vaut n'importe quel texte, y compris vide
 (doc « Configure permissions », § Wildcard patterns) — et épingle le dénombrement : chaque forme
-à refuser tombe sur un `deny`, chaque témoin ordinaire n'en touche aucun. Une première version
-des règles fermait `rtk read .env` seul ; la relecture de la PR #54 a mesuré trois contournements
-(guillemets, glob, `grep`) — d'où la liste.
+à refuser tombe sur un `deny`, chaque merge tombe sur un `ask`, chaque témoin ordinaire ne touche
+ni l'un ni l'autre. Une première version des règles fermait `rtk read .env` seul ; la relecture
+de la PR #54 a mesuré trois contournements (guillemets, glob, `grep`) — d'où la liste.
 """
 
 import json
@@ -63,49 +65,73 @@ FORCE_PUSHES = [
     "git push --force-with-lease origin main",
 ]
 
-# Des commandes que les `allow` doivent continuer de couvrir sans qu'un `deny` les attrape.
+# Le merge d'une PR, sous la forme que Claude écrit et sous celle que RTK lui substitue.
+MERGE_COMMANDS = [
+    "gh pr merge 54 --rebase --delete-branch",
+    "rtk gh pr merge 54 --rebase --delete-branch",
+]
+
+# Des commandes que les `allow` doivent continuer de couvrir sans qu'un `deny` ni un `ask` les
+# attrape.
 HARMLESS_COMMANDS = [
     "rtk read README.md",
     "rtk grep SECRET_KEY README.md",
     "rtk read infra/compose.dev.yml",
     "git push -u origin feat/x",
     "git push origin main --follow-tags",
+    "rtk gh pr view 54",
+    "gh pr ready 54",
 ]
 
 BASH_RULE = re.compile(r"^Bash\((?P<pattern>.*)\)$")
 
 
-def bash_deny_patterns() -> list[re.Pattern[str]]:
-    """Les règles `deny` Bash du projet, traduites en expressions régulières.
+def bash_rule_patterns(section: str) -> list[re.Pattern[str]]:
+    """Les règles Bash d'une section de `permissions`, traduites en expressions régulières.
+
+    Args:
+        section: `deny`, `ask` ou `allow` — absente du fichier, elle vaut la liste vide.
 
     Returns:
-        Une expression par règle `Bash(...)` de `permissions.deny`, où chaque `*` devient `.*`
-        et tout le reste est pris au pied de la lettre — l'émulation de l'appariement documenté,
-        pas l'appariement lui-même. Elle ne découpe pas les commandes composées (`;`, `&&`, `|`),
+        Une expression par règle `Bash(...)` de la section, où chaque `*` devient `.*` et tout
+        le reste est pris au pied de la lettre — l'émulation de l'appariement documenté, pas
+        l'appariement lui-même. Elle ne découpe pas les commandes composées (`;`, `&&`, `|`),
         n'applique ni la règle du ` *` final qui accepte aussi la commande nue, ni le retrait des
         enveloppes (`timeout`, `FOO=1`) : les listes de ce module ne contiennent donc que des
         formes simples, sans séparateur.
     """
     settings = json.loads(SETTINGS.read_text(encoding="utf-8"))
     patterns: list[re.Pattern[str]] = []
-    for rule in settings["permissions"]["deny"]:
+    for rule in settings["permissions"].get(section, []):
         if match := BASH_RULE.match(rule):
             parts = match.group("pattern").split("*")
             patterns.append(re.compile(".*".join(re.escape(part) for part in parts)))
     return patterns
 
 
+def matches_a_rule(command: str, section: str) -> bool:
+    """Vrai si une règle Bash de la section apparie la commande entière."""
+    return any(pattern.fullmatch(command) for pattern in bash_rule_patterns(section))
+
+
 @pytest.mark.parametrize("command", LEAKING_COMMANDS + ACCEPTED_COLLATERAL + FORCE_PUSHES)
 def test_chaque_forme_a_refuser_tombe_sur_un_deny(command: str) -> None:
     """Un `deny` se lit avant tout `allow` : c'est la seule règle qui ferme ces formes."""
-    assert any(pattern.fullmatch(command) for pattern in bash_deny_patterns()), (
+    assert matches_a_rule(command, "deny"), (
         f"« {command} » n'est arrêté par aucun `deny` — la garde a rétréci"
     )
 
 
-@pytest.mark.parametrize("command", HARMLESS_COMMANDS)
-def test_une_commande_ordinaire_ne_tombe_sur_aucun_deny(command: str) -> None:
-    """Le témoin : une garde qui attrape tout n'attrape rien de particulier."""
-    assert not any(pattern.fullmatch(command) for pattern in bash_deny_patterns()), (
-        f"« {command} » est arrêté par un `deny` — la garde déborde sur l'ordinaire"
+@pytest.mark.parametrize("command", MERGE_COMMANDS)
+def test_le_merge_d_une_pr_demande_une_permission(command: str) -> None:
+    """« Jamais d'auto-merge » : le go humain est une invite du harnais, pas une consigne."""
+    assert matches_a_rule(command, "ask"), (
+        f"« {command} » ne tombe sur aucun `ask` — le merge passerait sans go humain"
     )
+
+
+@pytest.mark.parametrize("command", HARMLESS_COMMANDS)
+def test_une_commande_ordinaire_ne_tombe_ni_sur_un_deny_ni_sur_un_ask(command: str) -> None:
+    """Le témoin : une garde qui attrape tout n'attrape rien de particulier."""
+    assert not matches_a_rule(command, "deny"), f"« {command} » est arrêté par un `deny`"
+    assert not matches_a_rule(command, "ask"), f"« {command} » déclenche un `ask`"
