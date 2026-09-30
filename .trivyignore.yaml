@@ -12,13 +12,21 @@
 # publiée de ce qui l'embarque. Une exception ne sert jamais à faire passer une PR : si
 # l'évaluation conclut que le code est atteint, on corrige l'image.
 #
-# Une entrée par vulnérabilité, les trois champs obligatoires, aucun autre :
+# Une entrée par vulnérabilité, les quatre champs obligatoires, aucun autre :
 #
 #   - id: CVE-2026-0001          # l'identifiant rapporté par Trivy
+#     paths:                     # l'image pour laquelle l'évaluation vaut, par la cible que
+#       - usr/bin/caddy          # nomme le rapport de Trivy : le chemin d'un binaire, ou
+#                                # "**/portfolio-<service> (<système> <version>.*)" pour les
+#                                # paquets du système
 #     statement: >-              # les trois points, dans l'ordre
 #       Place : … Atteinte : … Alternatives : …
 #     expired_at: 2026-12-29     # date YAML sans guillemets ; l'exception cesse de valoir à
 #                                # 00:00 UTC ce jour-là, et l'évaluation se refait
+#
+# « Atteint par ce qui tourne » se juge image par image, et ce fichier vaut pour toutes : sans
+# `paths`, une image ajoutée hériterait des exceptions des autres, scan vert, sans évaluation.
+# Une image construite sous un autre préfixe que `portfolio-` n'en reçoit donc aucune.
 #
 # `apps/api/tests/test_image_scan.py` refuse une entrée incomplète ou expirée.
 #
@@ -33,6 +41,8 @@ vulnerabilities:
   # `/etc/fstab` est vide, ni `systemd-homed` ni le module Perl `Archive::Tar` n'y sont.
 
   - id: CVE-2026-76642
+    paths:
+      - "**/portfolio-api (debian 13.*)"
     statement: >-
       Place : util-linux (`mount`, `login`, `bsdutils` et leurs bibliothèques), paquets essentiels
       de Debian venus de l'image de base, impossibles à retirer. Atteinte : non — le défaut
@@ -42,6 +52,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-78408
+    paths:
+      - "**/portfolio-api (debian 13.*)"
     statement: >-
       Place : util-linux, paquets essentiels de Debian venus de l'image de base, impossibles à
       retirer. Atteinte : non — le défaut demande qu'un opérateur privilégié lance
@@ -51,6 +63,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-78409
+    paths:
+      - "**/portfolio-api (debian 13.*)"
     statement: >-
       Place : util-linux, paquets essentiels de Debian venus de l'image de base, impossibles à
       retirer. Atteinte : non — le défaut demande une entrée de `/etc/fstab` portant
@@ -59,6 +73,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-78410
+    paths:
+      - "**/portfolio-api (debian 13.*)"
     statement: >-
       Place : util-linux, paquets essentiels de Debian venus de l'image de base, impossibles à
       retirer. Atteinte : non — le défaut demande une entrée de `/etc/fstab` qui autorise un
@@ -68,6 +84,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-54369
+    paths:
+      - "**/portfolio-api (debian 13.*)"
     statement: >-
       Place : libacl1, dépendance des paquets essentiels de Debian (coreutils), venue de l'image
       de base. Atteinte : non — le défaut demande un processus privilégié qui lit ou pose des
@@ -77,6 +95,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2025-69720
+    paths:
+      - "**/portfolio-api (debian 13.*)"
     statement: >-
       Place : ncurses, paquets essentiels de Debian venus de l'image de base. Atteinte : non —
       le défaut est dans la commande `infocmp`, présente dans l'image mais que rien n'appelle.
@@ -84,6 +104,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-16742
+    paths:
+      - "**/portfolio-api (debian 13.*)"
     statement: >-
       Place : libsystemd0 et libudev1, bibliothèques dont dépendent les paquets essentiels de
       Debian, venues de l'image de base. Atteinte : non — le défaut est dans le service
@@ -91,6 +113,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-9538
+    paths:
+      - "**/portfolio-api (debian 13.*)"
     statement: >-
       Place : perl-base, paquet essentiel de Debian venu de l'image de base, impossible à
       retirer. Atteinte : non — le défaut est dans le module `Archive::Tar`, absent de perl-base,
@@ -99,6 +123,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-75804
+    paths:
+      - "**/portfolio-api (debian 13.*)"
     statement: >-
       Place : OpenSSL, venu de l'image de base, dont dépend le module `ssl` de Python. Atteinte :
       non — le défaut est dans la pile QUIC d'OpenSSL ; Python ne fait que du TLS sur TCP, et
@@ -109,6 +135,8 @@ vulnerabilities:
     expired_at: 2026-10-30
 
   - id: CVE-2026-84782
+    paths:
+      - "**/portfolio-api (debian 13.*)"
     statement: >-
       Place : OpenSSL, venu de l'image de base, dont dépend le module `ssl` de Python. Atteinte :
       non — le défaut est dans la retransmission DTLS ; Python ne fait que du TLS sur TCP, et
@@ -131,6 +159,8 @@ vulnerabilities:
   # (ADR 0014, « Conditions de réexamen »).
 
   - id: CVE-2026-56854
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : module `golang.org/x/crypto` du binaire `caddy`, raison d'être de l'image.
       Atteinte : non — le défaut vise un serveur SSH (`x/crypto/ssh`), et Caddy n'en ouvre aucun.
@@ -139,6 +169,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-46600
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : analyseur DNS de Go (`x/net` et bibliothèque standard) du binaire `caddy`, raison
       d'être de l'image. Atteinte : seulement par une réponse DNS forgée — Caddy ne résout que
@@ -148,6 +180,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-56852
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : module `golang.org/x/text` du binaire `caddy`, raison d'être de l'image. Atteinte :
       non établie — aucun appel de `norm.Iter` sur le chemin d'une requête n'a été cherché dans
@@ -156,6 +190,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-84304
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : module gRPC du binaire `caddy`, raison d'être de l'image, embarqué par ses
       dépendances. Atteinte : non — Caddy n'écoute en gRPC sur aucun port, et la seule directive
@@ -164,6 +200,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-84445
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : module gRPC du binaire `caddy`, raison d'être de l'image, embarqué par ses
       dépendances. Atteinte : non — le défaut vise un serveur gRPC xDS, et Caddy n'écoute en gRPC
@@ -172,6 +210,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: GHSA-hrxh-6v49-42gf
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : module gRPC du binaire `caddy`, raison d'être de l'image, embarqué par ses
       dépendances. Atteinte : non — les défauts visent un serveur gRPC et ses règles xDS RBAC, et
@@ -180,6 +220,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-27145
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : bibliothèque standard Go (`crypto/x509`) du binaire `caddy`, raison d'être de
       l'image. Atteinte : non — le défaut se déclenche à la vérification d'un certificat, et
@@ -188,6 +230,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-33818
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : bibliothèque standard Go (`encoding/asn1`) du binaire `caddy`, raison d'être de
       l'image. Atteinte : non — l'ASN.1 que lit Caddy vient des certificats, et il n'en traite
@@ -196,6 +240,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-39821
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : bibliothèque standard Go (`idna`, dans `net/http`) du binaire `caddy`, raison
       d'être de l'image. Atteinte : non — le défaut demande un contrôle d'accès fait sur un nom
@@ -205,6 +251,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-39822
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : bibliothèque standard Go (`os.Root`) du binaire `caddy`, raison d'être de l'image.
       Atteinte : non — le défaut demande un lien symbolique dans l'arborescence servie, et le
@@ -213,6 +261,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-42504
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : bibliothèque standard Go (`mime`) du binaire `caddy`, raison d'être de l'image.
       Atteinte : non établie — le défaut est dans le décodage des mots encodés d'un en-tête
@@ -222,6 +272,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-56853
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : bibliothèque standard Go (`net/http`) du binaire `caddy`, raison d'être de l'image.
       Atteinte : non — le défaut demande un serveur configuré pour HTTP/2 sans chiffrement
@@ -230,6 +282,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-56858
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : bibliothèque standard Go (`html/template`) du binaire `caddy`, raison d'être de
       l'image. Atteinte : non — Caddy n'exécute de gabarit qu'avec les directives `templates` ou
@@ -238,6 +292,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-56859
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : bibliothèque standard Go (`encoding/xml`) du binaire `caddy`, raison d'être de
       l'image. Atteinte : non établie — servir des fichiers et relayer vers `api` ne décode
@@ -247,6 +303,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-56860
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : bibliothèque standard Go (`net/url`) du binaire `caddy`, raison d'être de l'image.
       Atteinte : non établie — aucun appel de la résolution de chemins relatifs depuis une
@@ -256,6 +314,8 @@ vulnerabilities:
     expired_at: 2026-12-29
 
   - id: CVE-2026-56862
+    paths:
+      - usr/bin/caddy
     statement: >-
       Place : bibliothèque standard Go (`crypto/tls`) du binaire `caddy`, raison d'être de
       l'image. Atteinte : non — le défaut vise un serveur TLS, et Caddy n'en termine aucun :

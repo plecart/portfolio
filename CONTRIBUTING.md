@@ -123,8 +123,8 @@ son arbre se nettoie par les `overrides` du manifeste
 une image de base en fin de vie
 ([ADR 0014](docs/adr/0014-ci-cd-github-actions-et-ghcr.md)). Une vulnérabilité sans correctif
 pour l'image s'évalue en trois points — la place du composant dans l'image, l'atteinte du code
-vulnérable par ce qui tourne, les alternatives — et se consigne en exception **datée** de
-[.trivyignore.yaml](.trivyignore.yaml), dont le format est en tête du fichier ; la date passée,
+vulnérable par ce qui tourne, les alternatives — et se consigne en exception **datée**, bornée à
+son image, de [.trivyignore.yaml](.trivyignore.yaml), dont le format est en tête du fichier ; la date passée,
 le scan rebloque et l'évaluation se refait. Quand le correctif arrive par une image de base
 reconstruite sous la même étiquette, Dependabot peut ne pas la proposer : son empreinte se monte
 à la main, lue sur la ligne « Digest » de `docker buildx imagetools inspect <image>:<étiquette>`.
