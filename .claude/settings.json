@@ -43,7 +43,9 @@
     ],
     "ask": [
       "Bash(gh pr merge *)",
-      "Bash(rtk gh pr merge *)"
+      "Bash(rtk gh pr merge *)",
+      "Bash(rtk proxy gh pr merge *)",
+      "PowerShell(gh pr merge *)"
     ],
     "deny": [
       "Read(.env)",
