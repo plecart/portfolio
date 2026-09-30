@@ -177,6 +177,42 @@ def shell_instructions(script: Path) -> list[str]:
     ]
 
 
+def run_make(
+    *arguments: str,
+    makefile: Path = MAKEFILE,
+    directory: Path = REPOSITORY_ROOT,
+    environment: Mapping[str, str] | None = None,
+    **variables: str,
+) -> subprocess.CompletedProcess[str]:
+    """Lance `make` sur le `Makefile` du dépôt, sans hériter du shell qui lance les tests.
+
+    Ni les variables que le `Makefile` laisse surcharger, ni ce qu'un `make` englobant transmet
+    (`make test IMAGE_PREFIX=…`) ne viennent du processus qui lance les tests : seules celles que
+    l'appel pose comptent.
+
+    Args:
+        arguments: les options et la cible de `make`.
+        makefile: le fichier de commandes — celui du dépôt, ou une copie témoin.
+        directory: le dossier où `make` tourne — la racine du dépôt, ou une arborescence témoin.
+        environment: des variables posées dans l'environnement, comme la CI les passe.
+        variables: des variables posées sur la ligne de commande, qui priment sur le `Makefile`.
+
+    Returns:
+        Le processus terminé, sorties capturées ; son code de sortie n'est pas vérifié.
+    """
+    ignored = set(OVERRIDABLE.findall(MAKEFILE.read_text(encoding="utf-8"))) | MAKE_CONTROL
+    inherited = {name: value for name, value in os.environ.items() if name not in ignored}
+    assignments = [f"{name}={value}" for name, value in variables.items()]
+    return subprocess.run(
+        ["make", "-f", str(makefile), *arguments, *assignments],
+        cwd=directory,
+        env=inherited | dict(environment or {}),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
 def make_dry_run(
     target: str,
     directory: Path = REPOSITORY_ROOT,
@@ -185,31 +221,20 @@ def make_dry_run(
 ) -> str:
     """Les commandes que le `Makefile` du dépôt exécuterait pour `target`, sans les exécuter.
 
-    Ni les variables que le `Makefile` laisse surcharger, ni ce qu'un `make` englobant transmet
-    (`make test IMAGE_PREFIX=…`) ne viennent du processus qui lance les tests : seules celles que
-    l'appel pose comptent.
-
-    Args:
-        target: la cible du `Makefile`.
-        directory: le dossier où `make` tourne — la racine du dépôt, ou une arborescence témoin.
-        environment: des variables posées dans l'environnement, comme la CI les passe.
-        variables: des variables posées sur la ligne de commande, qui priment sur le `Makefile`.
-
     Returns:
         La sortie de `make --dry-run`, variables développées — y compris celles des appels
         récursifs à `$(MAKE)`, que `--dry-run` parcourt sans rien exécuter.
     """
-    ignored = set(OVERRIDABLE.findall(MAKEFILE.read_text(encoding="utf-8"))) | MAKE_CONTROL
-    inherited = {name: value for name, value in os.environ.items() if name not in ignored}
-    assignments = [f"{name}={value}" for name, value in variables.items()]
-    return subprocess.run(
-        ["make", "--dry-run", "-f", str(MAKEFILE), target, *assignments],
-        cwd=directory,
-        env=inherited | dict(environment or {}),
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
+    printed = run_make(
+        "--dry-run",
+        target,
+        makefile=MAKEFILE,
+        directory=directory,
+        environment=environment,
+        **variables,
+    )
+    printed.check_returncode()
+    return printed.stdout
 
 
 def built_images(printed: str) -> dict[str, str]:

@@ -18,11 +18,19 @@ import shlex
 from collections import Counter
 from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 from typing import cast
 
 import pytest
 import yaml
-from test_infra import CI_WORKFLOW, REPOSITORY_ROOT, built_images, make_dry_run
+from test_infra import (
+    CI_WORKFLOW,
+    MAKEFILE,
+    REPOSITORY_ROOT,
+    built_images,
+    make_dry_run,
+    run_make,
+)
 from test_supply_chain import PINNED_IMAGE
 
 EXCEPTIONS = REPOSITORY_ROOT / ".trivyignore.yaml"
@@ -61,6 +69,9 @@ TRIVY_REPOSITORY = "ghcr.io/aquasecurity/trivy:"
 # Les commandes que le job `infra` de la CI lance pour construire puis scanner les images.
 CI_BUILD = "make build"
 CI_SCAN = "make scan"
+# Ce qui, posé sur le job, ferait ignorer l'échec du scan : le job toléré en échec, ou un
+# environnement qui réglerait `make` (`MAKEFLAGS: -i`).
+LENIENT_JOB_KEYS = ["continue-on-error", "env"]
 
 # Les champs d'une exception, tous obligatoires. Un champ en plus est refusé comme un champ en
 # moins, comme pour les exceptions de `pip-audit` : c'est presque toujours une faute de frappe sur
@@ -122,10 +133,12 @@ def ci_scan_findings(workflow: str) -> list[str]:
 
     Returns:
         Un constat si le job ne lance pas le build puis le scan, dans cet ordre ; un si l'étape de
-        scan porte autre chose que son nom et sa commande ; un si le job tolère ses propres échecs.
-        Liste vide : le scan bloque.
+        scan porte autre chose que son nom et sa commande ; un par réglage qui ferait ignorer
+        l'échec du scan — `continue-on-error` sur le job, ou un `env:` sur le job ou le workflow,
+        par lequel `MAKEFLAGS: -i` atteindrait `make`. Liste vide : le scan bloque.
     """
-    job = yaml.safe_load(workflow)["jobs"]["infra"]
+    document = yaml.safe_load(workflow)
+    job = document["jobs"]["infra"]
     steps = job["steps"]
     commands = [step.get("run") for step in steps]
     if CI_BUILD not in commands or CI_SCAN not in commands:
@@ -135,14 +148,37 @@ def ci_scan_findings(workflow: str) -> list[str]:
     extra = sorted(set(steps[scan]) - {"name", "run"})
     if extra:
         findings.append(f"l'étape de scan porte {extra}")
-    if "continue-on-error" in job:
-        findings.append("le job `infra` porte `continue-on-error`")
+    findings += [f"le job `infra` porte `{key}`" for key in LENIENT_JOB_KEYS if key in job]
+    if "env" in document:
+        findings.append("le workflow porte `env`")
     return findings
+
+
+def scan_fails_with_trivy(makefile: Path = MAKEFILE) -> bool:
+    """`make scan` sort-il en échec quand Trivy échoue ?
+
+    Trivy est remplacé par `false` : rien n'est scanné, seul le code de sortie de `make` est lu.
+    `make --dry-run` ne le dirait pas — il n'imprime ni le `-` qui préfixe une recette, ni
+    `.IGNORE`, ni `MAKEFLAGS`.
+
+    Args:
+        makefile: le fichier de commandes — celui du dépôt, ou une copie témoin.
+    """
+    return run_make("scan", makefile=makefile, TRIVY="false").returncode != 0
 
 
 def is_text(value: object) -> bool:
     """La valeur est-elle une chaîne qui porte autre chose que des espaces ?"""
     return isinstance(value, str) and bool(value.strip())
+
+
+def is_bounded_path(value: object) -> bool:
+    """La valeur est-elle un motif de chemin qui nomme quelque chose ?
+
+    `**`, `*` ou `**/*` valent pour toute cible, donc pour toute image : l'exception ne serait
+    bornée à rien (mesuré à la relecture de la PR #62 : `paths: ["**"]` passait).
+    """
+    return is_text(value) and bool(cast(str, value).strip("*?/ "))
 
 
 def entry_findings(entry: object, today: date) -> list[str]:
@@ -165,8 +201,10 @@ def entry_findings(entry: object, today: date) -> list[str]:
         if not is_text(fields[name]):
             findings.append(f"`{name}` doit être une chaîne non vide")
     paths = fields["paths"]
-    if not (isinstance(paths, list) and paths and all(map(is_text, cast(list[object], paths)))):
-        findings.append("`paths` doit être une liste non vide de chaînes non vides")
+    if not (
+        isinstance(paths, list) and paths and all(map(is_bounded_path, cast(list[object], paths)))
+    ):
+        findings.append("`paths` doit être une liste non vide de chemins qui nomment une cible")
     expired_at = fields["expired_at"]
     # `datetime` hérite de `date` : sans le test de type exact, une date et heure passerait ici.
     if type(expired_at) is not date:
@@ -302,6 +340,20 @@ CI_SCAN_FORMS = {
         infra_job(BUILD_STEP, SCAN_STEP, job_options="    continue-on-error: true\n"),
         True,
     ),
+    "env sur le job": (
+        infra_job(BUILD_STEP, SCAN_STEP, job_options="    env:\n      MAKEFLAGS: -i\n"),
+        True,
+    ),
+    "env sur le workflow": ("env:\n  MAKEFLAGS: -i\n" + infra_job(BUILD_STEP, SCAN_STEP), True),
+}
+
+# Les façons dont un `Makefile` fait ignorer à `make` l'échec d'une recette : le texte du dépôt,
+# et ce qui le remplace dans la copie témoin. `make --dry-run` n'en montre aucune.
+SCAN_TARGET = "scan: $(IMAGE_SCANS)"
+LENIENT_MAKEFILES = {
+    "recette préfixée de -": ("\t$(TRIVY) image", "\t-$(TRIVY) image"),
+    ".IGNORE": (SCAN_TARGET, f".IGNORE:\n{SCAN_TARGET}"),
+    "MAKEFLAGS += -i": (SCAN_TARGET, f"MAKEFLAGS += -i\n{SCAN_TARGET}"),
 }
 
 TODAY = date(2026, 9, 30)
@@ -339,6 +391,17 @@ EXCEPTION_FORMS = {
     "paths vide": (exception_file(paths="[]"), True),
     "paths qui n'est pas une liste": (exception_file(paths="usr/bin/caddy"), True),
     "paths dont un chemin est vide": (exception_file(paths='[usr/bin/caddy, ""]'), True),
+    **{
+        f"paths qui vaut pour toute cible, {pattern}": (
+            exception_file(paths=f'["{pattern}"]'),
+            True,
+        )
+        for pattern in ["**", "*", "**/*"]
+    },
+    "paths des paquets du système": (
+        exception_file(paths='["**/portfolio-api (debian 13.*)"]'),
+        False,
+    ),
     "expire aujourd'hui": (exception_file(expired_at=TODAY.isoformat()), True),
     "expirée hier": (exception_file(expired_at=YESTERDAY), True),
     "date entre guillemets": (exception_file(expired_at=f'"{TOMORROW}"'), True),
@@ -376,6 +439,22 @@ def test_la_garde_des_exceptions_rend_son_verdict_sur_chaque_forme(
     assert bool(exception_findings(text, TODAY)) is expected, exception_findings(text, TODAY)
 
 
+@pytest.mark.parametrize(
+    ("strict", "lenient"), LENIENT_MAKEFILES.values(), ids=LENIENT_MAKEFILES.keys()
+)
+def test_un_makefile_qui_ignore_l_echec_de_trivy_est_vu(
+    tmp_path: Path, strict: str, lenient: str
+) -> None:
+    """Chaque forme recensée, dans une copie témoin du `Makefile` : `make scan` y sort en 0 quand
+    Trivy échoue, et la garde le voit."""
+    text = MAKEFILE.read_text(encoding="utf-8")
+    assert text.count(strict) == 1, f"« {strict} » n'est plus dans le `Makefile` — forme changée ?"
+    copy = tmp_path / "Makefile"
+    copy.write_text(text.replace(strict, lenient), encoding="utf-8")
+
+    assert not scan_fails_with_trivy(copy)
+
+
 # --- Les fichiers du dépôt --------------------------------------------------------------------
 
 
@@ -403,6 +482,13 @@ def test_make_scan_suit_la_politique_de_scan() -> None:
     pas touchée. Dependabot ne lit pas cette épingle : elle se monte à la main.
     """
     assert scan_findings(make_dry_run("scan")) == []
+
+
+def test_make_scan_echoue_quand_trivy_echoue() -> None:
+    """Un scan dont `make` ignore l'échec liste les vulnérabilités et laisse la CI verte : une
+    recette préfixée de `-`, pour lire le rapport de chaque image au lieu de s'arrêter à la
+    première, suffit (mesuré à la relecture de la PR #62)."""
+    assert scan_fails_with_trivy()
 
 
 def test_la_ci_scanne_les_images_qu_elle_vient_de_construire() -> None:
