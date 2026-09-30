@@ -14,37 +14,48 @@ garde se voit rouge, sans qu'il faille affaiblir le scan du dépôt pour l'épro
 """
 
 import re
+import shlex
+from collections import Counter
 from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
 from typing import cast
 
 import pytest
 import yaml
-from test_infra import CI_WORKFLOW, REPOSITORY_ROOT, built_images, job_steps, make_dry_run
+from test_infra import CI_WORKFLOW, REPOSITORY_ROOT, built_images, make_dry_run
 from test_supply_chain import PINNED_IMAGE
 
 EXCEPTIONS = REPOSITORY_ROOT / ".trivyignore.yaml"
 
-# Une commande de scan telle que `make --dry-run` l'imprime : l'image de Trivy, ses options,
-# l'image scannée.
+# Une commande de scan telle que `make --dry-run` l'imprime : les options de `docker run`, l'image
+# de Trivy, ses options, l'image scannée.
 SCAN_COMMAND = re.compile(
-    r"^docker run .* (?P<trivy>\S+) image (?P<options>.+) (?P<image>\S+)$", re.MULTILINE
+    r"^docker run (?P<docker>.+) (?P<trivy>\S+) image (?P<options>.+) (?P<image>\S+)$",
+    re.MULTILINE,
 )
 
-# La politique de scan (ADR 0014) : HIGH et CRITICAL bloquent, comme une image de base en fin de
-# vie, et seules les exceptions datées de `.trivyignore.yaml` passent. `--image-src docker` : Trivy
-# ne lit que les images que `make build` a chargées dans le moteur, et n'en tire aucune d'un
-# registre sous le même nom.
-SCAN_POLICY = [
+# La politique de scan (ADR 0014), en liste blanche : ces options de Trivy, toutes, et aucune
+# autre. HIGH et CRITICAL bloquent, comme une image de base en fin de vie ; seules passent les
+# exceptions datées de `.trivyignore.yaml`, que le rapport liste ; Trivy ne lit que les images que
+# `make build` a chargées dans le moteur, et n'en tire aucune d'un registre sous le même nom.
+#
+# Une liste noire ne tenait pas : `--ignore-unfixed` s'écrit aussi `--ignore-status …`, et
+# `--scanners secret`, `--pkg-types os` ou un second `--exit-code 0` vident le scan autrement
+# (mesuré à la relecture de la PR #62, Trivy 0.74.0).
+SCAN_OPTIONS = [
     "--severity HIGH,CRITICAL",
     "--exit-code 1",
     "--exit-on-eol 1",
     "--ignorefile .trivyignore.yaml",
     "--image-src docker",
+    "--show-suppressed",
 ]
-# L'option que la politique écarte, sous ses deux formes : le drapeau, et la variable
-# d'environnement que Trivy lit à sa place (`TRIVY_IGNORE_UNFIXED`).
-UNFIXED_IGNORED = re.compile(r"ignore[-_]unfixed", re.IGNORECASE)
+
+# Ce que le conteneur de Trivy reçoit du poste, par sa cible : le socket du moteur, le cache de la
+# base de vulnérabilités, les exceptions en lecture seule — et rien d'autre. Une variable
+# d'environnement (`-e TRIVY_IGNORE_UNFIXED=true`) ou un `trivy.yaml` monté dans son répertoire de
+# travail régleraient Trivy sans toucher à ses options.
+SCAN_MOUNTS = ["/var/run/docker.sock", "/root/.cache/", "/.trivyignore.yaml:ro"]
 TRIVY_REPOSITORY = "ghcr.io/aquasecurity/trivy:"
 
 # Les commandes que le job `infra` de la CI lance pour construire puis scanner les images.
@@ -54,7 +65,11 @@ CI_SCAN = "make scan"
 # Les champs d'une exception, tous obligatoires. Un champ en plus est refusé comme un champ en
 # moins, comme pour les exceptions de `pip-audit` : c'est presque toujours une faute de frappe sur
 # un champ requis (`expire_at`), que Trivy ignorerait — l'exception deviendrait permanente.
-FIELDS = {"id", "statement", "expired_at"}
+#
+# `paths` borne l'exception à l'image pour laquelle elle a été évaluée : « atteint par ce qui
+# tourne » se juge image par image, et un seul fichier vaut pour toutes. Sans lui, une image
+# ajoutée hériterait des exceptions des autres, scan vert, sans évaluation.
+FIELDS = {"id", "paths", "statement", "expired_at"}
 
 
 # --- Les gardes : des fonctions sur du texte ---------------------------------------------------
@@ -69,22 +84,34 @@ def scan_findings(printed: str) -> list[str]:
     """Ce qui, dans une sortie de `make --dry-run scan`, s'écarte de la politique de scan.
 
     Returns:
-        Un constat par option de `SCAN_POLICY` absente d'une commande, par commande qui écarte les
-        vulnérabilités sans correctif, et par commande dont Trivy n'est pas l'image officielle,
-        épinglée étiquette `x.y.z` et empreinte ; un constat si aucune commande n'est lue. Liste
-        vide : chaque scan suit la politique.
+        Un constat par commande dont les options de Trivy ne sont pas exactement `SCAN_OPTIONS`,
+        dont le conteneur reçoit autre chose que `SCAN_MOUNTS`, ou dont Trivy n'est pas l'image
+        officielle, épinglée étiquette `x.y.z` et empreinte ; un constat si aucune commande n'est
+        lue. Liste vide : chaque scan suit la politique.
     """
     commands = list(SCAN_COMMAND.finditer(printed))
     findings = [] if commands else ["aucune commande de scan lue — sa forme a-t-elle changé ?"]
+    expected = Counter(" ".join(SCAN_OPTIONS).split())
     for command in commands:
         image, trivy = command["image"], command["trivy"]
-        findings += [
-            f"{image} : sans `{option}`"
-            for option in SCAN_POLICY
-            if option not in command["options"]
+        given = Counter(command["options"].split())
+        if given != expected:
+            findings.append(
+                f"{image} : options de Trivy en trop {sorted((given - expected).elements())}, "
+                f"manquantes {sorted((expected - given).elements())}"
+            )
+        # `--rm`, puis une paire `-v <montage>` par cible attendue.
+        docker = shlex.split(command["docker"])
+        mounted = [
+            target
+            for mount in docker[2::2]
+            for target in SCAN_MOUNTS
+            if mount.endswith(f":{target}")
         ]
-        if UNFIXED_IGNORED.search(command.group()):
-            findings.append(f"{image} : vulnérabilités sans correctif écartées")
+        if docker[:1] + docker[1::2] != ["--rm", *["-v"] * len(SCAN_MOUNTS)] or sorted(
+            mounted
+        ) != sorted(SCAN_MOUNTS):
+            findings.append(f"{image} : `docker run` porte {docker}, attendus {SCAN_MOUNTS}")
         if not (trivy.startswith(TRIVY_REPOSITORY) and PINNED_IMAGE.match(trivy)):
             findings.append(f"{image} : Trivy hors de son image officielle épinglée, {trivy}")
     return findings
@@ -94,17 +121,28 @@ def ci_scan_findings(workflow: str) -> list[str]:
     """Ce qui empêche le job `infra` d'un workflow de scanner les images qu'il construit.
 
     Returns:
-        Un constat si le job ne lance pas le build puis le scan, dans cet ordre, et un si l'étape
-        de scan porte autre chose que son nom et sa commande. Liste vide : le scan bloque.
+        Un constat si le job ne lance pas le build puis le scan, dans cet ordre ; un si l'étape de
+        scan porte autre chose que son nom et sa commande ; un si le job tolère ses propres échecs.
+        Liste vide : le scan bloque.
     """
-    steps = job_steps(workflow, "infra")
+    job = yaml.safe_load(workflow)["jobs"]["infra"]
+    steps = job["steps"]
     commands = [step.get("run") for step in steps]
     if CI_BUILD not in commands or CI_SCAN not in commands:
         return [f"le job `infra` ne lance pas `{CI_BUILD}` et `{CI_SCAN}`"]
     scan = commands.index(CI_SCAN)
     findings = [f"`{CI_SCAN}` avant `{CI_BUILD}`"] if scan < commands.index(CI_BUILD) else []
     extra = sorted(set(steps[scan]) - {"name", "run"})
-    return findings + ([f"l'étape de scan porte {extra}"] if extra else [])
+    if extra:
+        findings.append(f"l'étape de scan porte {extra}")
+    if "continue-on-error" in job:
+        findings.append("le job `infra` porte `continue-on-error`")
+    return findings
+
+
+def is_text(value: object) -> bool:
+    """La valeur est-elle une chaîne qui porte autre chose que des espaces ?"""
+    return isinstance(value, str) and bool(value.strip())
 
 
 def entry_findings(entry: object, today: date) -> list[str]:
@@ -124,9 +162,11 @@ def entry_findings(entry: object, today: date) -> list[str]:
         return [f"champs {sorted(map(str, fields))}, attendus {sorted(FIELDS)}"]
     findings: list[str] = []
     for name in ("id", "statement"):
-        value = fields[name]
-        if not (isinstance(value, str) and value.strip()):
+        if not is_text(fields[name]):
             findings.append(f"`{name}` doit être une chaîne non vide")
+    paths = fields["paths"]
+    if not (isinstance(paths, list) and paths and all(map(is_text, cast(list[object], paths)))):
+        findings.append("`paths` doit être une liste non vide de chaînes non vides")
     expired_at = fields["expired_at"]
     # `datetime` hérite de `date` : sans le test de type exact, une date et heure passerait ici.
     if type(expired_at) is not date:
@@ -170,24 +210,63 @@ def exception_findings(text: str, today: date) -> list[str]:
 # --- Le recueil des formes : chaque cas recensé, avec son verdict attendu ---------------------
 
 TRIVY_PINNED = TRIVY_REPOSITORY + "0.74.0@sha256:" + "a" * 64
+SOCKET_MOUNT = "-v /var/run/docker.sock:/var/run/docker.sock"
+CACHE_MOUNT = "-v portfolio-trivy-cache:/root/.cache/"
+EXCEPTIONS_MOUNT = '-v "/depot/.trivyignore.yaml:/.trivyignore.yaml:ro"'
+DOCKER_OPTIONS = ["--rm", SOCKET_MOUNT, CACHE_MOUNT, EXCEPTIONS_MOUNT]
 
 
 def scan_command(
-    trivy: str = TRIVY_PINNED, options: Iterable[str] = SCAN_POLICY, docker_options: str = ""
+    trivy: str = TRIVY_PINNED,
+    options: Iterable[str] = SCAN_OPTIONS,
+    docker: Iterable[str] = DOCKER_OPTIONS,
 ) -> str:
     """Une commande de scan telle que `make --dry-run` l'imprime, conforme par défaut."""
-    return f"docker run --rm {docker_options}{trivy} image {' '.join(options)} portfolio-api\n"
+    return f"docker run {' '.join(docker)} {trivy} image {' '.join(options)} portfolio-api\n"
 
 
-# Forme → constat attendu (`True`) ou aucun (`False`).
+# Forme → constat attendu (`True`) ou aucun (`False`). Les options en trop sont celles dont
+# l'effet a été mesuré : chacune laisse le scan vert sur une image vulnérable.
 SCAN_FORMS = {
     "conforme": (scan_command(), False),
+    "dépôt dont le chemin porte une espace": (
+        scan_command(
+            docker=[
+                "--rm",
+                SOCKET_MOUNT,
+                CACHE_MOUNT,
+                '-v "/mes projets/depot/.trivyignore.yaml:/.trivyignore.yaml:ro"',
+            ]
+        ),
+        False,
+    ),
     **{
-        f"sans {option}": (scan_command(options=[o for o in SCAN_POLICY if o != option]), True)
-        for option in SCAN_POLICY
+        f"sans {option}": (scan_command(options=[o for o in SCAN_OPTIONS if o != option]), True)
+        for option in SCAN_OPTIONS
     },
-    "--ignore-unfixed": (scan_command(options=[*SCAN_POLICY, "--ignore-unfixed"]), True),
-    "TRIVY_IGNORE_UNFIXED": (scan_command(docker_options="-e TRIVY_IGNORE_UNFIXED=true "), True),
+    **{
+        f"avec {option}": (scan_command(options=[*SCAN_OPTIONS, option]), True)
+        for option in [
+            "--ignore-unfixed",
+            "--ignore-status affected,will_not_fix,fix_deferred",
+            "--exit-code 0",
+            "--scanners secret",
+            "--pkg-types os",
+        ]
+    },
+    **{
+        f"docker run {option}": (scan_command(docker=[*DOCKER_OPTIONS, option]), True)
+        for option in [
+            "-e TRIVY_IGNORE_UNFIXED=true",
+            "--env TRIVY_IGNORE_STATUS=affected",
+            "--env-file infra/dev.env",
+            "-v ./trivy.yaml:/trivy.yaml",
+        ]
+    },
+    "sans le montage des exceptions": (
+        scan_command(docker=["--rm", SOCKET_MOUNT, CACHE_MOUNT]),
+        True,
+    ),
     "Trivy sans empreinte": (scan_command(trivy=TRIVY_REPOSITORY + "0.74.0"), True),
     "Trivy sous latest": (scan_command(trivy=TRIVY_PINNED.replace("0.74.0", "latest")), True),
     "Trivy d'un autre dépôt": (scan_command(trivy=TRIVY_PINNED.replace("ghcr.io/", "")), True),
@@ -195,9 +274,10 @@ SCAN_FORMS = {
 }
 
 
-def infra_job(*steps: str) -> str:
+def infra_job(*steps: str, job_options: str = "") -> str:
     """Un workflow minimal dont le job `infra` porte les étapes données."""
-    return "jobs:\n  infra:\n    steps:\n" + "".join(f"      - {step}\n" for step in steps)
+    listed = "".join(f"      - {step}\n" for step in steps)
+    return f"jobs:\n  infra:\n{job_options}    steps:\n{listed}"
 
 
 BUILD_STEP = f"run: {CI_BUILD}"
@@ -218,6 +298,10 @@ CI_SCAN_FORMS = {
         infra_job(BUILD_STEP, f"{SCAN_STEP}\n        env:\n          TRIVY_IGNORE_UNFIXED: true"),
         True,
     ),
+    "job qui tolère ses échecs": (
+        infra_job(BUILD_STEP, SCAN_STEP, job_options="    continue-on-error: true\n"),
+        True,
+    ),
 }
 
 TODAY = date(2026, 9, 30)
@@ -234,6 +318,7 @@ def exception_file(section: str = "vulnerabilities", **changes: str | None) -> s
     """
     fields: dict[str, str | None] = {
         "id": "CVE-2026-0001",
+        "paths": "[usr/bin/caddy]",
         "statement": "Place, atteinte, alternatives.",
         "expired_at": TOMORROW,
         **changes,
@@ -250,6 +335,10 @@ EXCEPTION_FORMS = {
     "sans id": (exception_file(id=None), True),
     "statement vide": (exception_file(statement='""'), True),
     "id vide": (exception_file(id='""'), True),
+    "sans paths": (exception_file(paths=None), True),
+    "paths vide": (exception_file(paths="[]"), True),
+    "paths qui n'est pas une liste": (exception_file(paths="usr/bin/caddy"), True),
+    "paths dont un chemin est vide": (exception_file(paths='[usr/bin/caddy, ""]'), True),
     "expire aujourd'hui": (exception_file(expired_at=TODAY.isoformat()), True),
     "expirée hier": (exception_file(expired_at=YESTERDAY), True),
     "date entre guillemets": (exception_file(expired_at=f'"{TOMORROW}"'), True),

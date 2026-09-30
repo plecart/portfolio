@@ -19,7 +19,6 @@ import subprocess
 import tarfile
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any
 
 import pytest
 import yaml
@@ -218,11 +217,6 @@ def built_images(printed: str) -> dict[str, str]:
     return {match["dockerfile"]: match["tag"] for match in BUILD_COMMAND.finditer(printed)}
 
 
-def job_steps(workflow: str, job: str) -> list[dict[str, Any]]:
-    """Les étapes d'un job d'un workflow, lues par l'analyseur YAML, dans l'ordre du fichier."""
-    return yaml.safe_load(workflow)["jobs"][job]["steps"]
-
-
 def build_context(root: Path) -> set[str]:
     """Les fichiers que Docker enverrait au build depuis `root`, selon son `.dockerignore`.
 
@@ -413,10 +407,11 @@ def test_la_ci_donne_a_chaque_image_son_entree_de_cache() -> None:
     étiquette — le défaut, `latest` —, la dernière image construite remplace l'entrée des autres
     (doc Docker, « Local cache » ; mesuré à la relecture de la PR #53). Rouge aussi si le
     `Makefile` cesse de prendre ces drapeaux dans l'environnement (`=` au lieu de `?=`)."""
+    steps = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["infra"]["steps"]
     flags = next(
         (
             step["env"]["DOCKER_BUILD_FLAGS"]
-            for step in job_steps(CI_WORKFLOW.read_text(encoding="utf-8"), "infra")
+            for step in steps
             if "DOCKER_BUILD_FLAGS" in step.get("env", {})
         ),
         None,
