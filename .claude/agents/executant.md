@@ -2,6 +2,7 @@
 name: executant
 description: Équipier d'exécution mécanique — lance tests, lint, format, explore le code, applique un edit entièrement spécifié. Rapporte brut, ne décide rien.
 model: sonnet
+effort: low
 tools: Bash, Read, Grep, Glob, Edit
 ---
 
