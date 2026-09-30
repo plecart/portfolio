@@ -184,7 +184,8 @@ def run_make(
     environment: Mapping[str, str] | None = None,
     **variables: str,
 ) -> subprocess.CompletedProcess[str]:
-    """Lance `make` sur le `Makefile` du dépôt, sans hériter du shell qui lance les tests.
+    """Lance `make` sur un `Makefile` — celui du dépôt par défaut —, sans hériter du shell qui
+    lance les tests.
 
     Ni les variables que le `Makefile` laisse surcharger, ni ce qu'un `make` englobant transmet
     (`make test IMAGE_PREFIX=…`) ne viennent du processus qui lance les tests : seules celles que
@@ -200,7 +201,7 @@ def run_make(
     Returns:
         Le processus terminé, sorties capturées ; son code de sortie n'est pas vérifié.
     """
-    ignored = set(OVERRIDABLE.findall(MAKEFILE.read_text(encoding="utf-8"))) | MAKE_CONTROL
+    ignored = set(OVERRIDABLE.findall(makefile.read_text(encoding="utf-8"))) | MAKE_CONTROL
     inherited = {name: value for name, value in os.environ.items() if name not in ignored}
     assignments = [f"{name}={value}" for name, value in variables.items()]
     return subprocess.run(

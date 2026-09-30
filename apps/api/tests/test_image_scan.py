@@ -367,7 +367,8 @@ CI_SCAN_FORMS = {
 }
 
 # Les façons dont un `Makefile` fait ignorer à `make` l'échec d'une recette : le texte du dépôt,
-# et ce qui le remplace dans la copie témoin. `make --dry-run` n'en montre aucune.
+# et ce qui le remplace dans la copie témoin. `make --dry-run` n'en montre aucune. Une quatrième,
+# le `-` en tête de la variable `TRIVY`, se lit dans le texte : remplacer `TRIVY` la masquerait.
 SCAN_TARGET = "scan: $(IMAGE_SCANS)"
 LENIENT_MAKEFILES = {
     "recette préfixée de -": ("\t$(TRIVY) image", "\t-$(TRIVY) image"),
@@ -511,7 +512,16 @@ def test_make_scan_suit_la_politique_de_scan() -> None:
 def test_make_scan_echoue_quand_trivy_echoue() -> None:
     """Un scan dont `make` ignore l'échec liste les vulnérabilités et laisse la CI verte : une
     recette préfixée de `-`, pour lire le rapport de chaque image au lieu de s'arrêter à la
-    première, suffit (mesuré à la relecture de la PR #62)."""
+    première, suffit (mesuré à la relecture de la PR #62).
+
+    Le `-` peut aussi se loger en tête de la variable `TRIVY`, que ce test remplace : son début
+    est donc lu dans le `Makefile`.
+    """
+    makefile = MAKEFILE.read_text(encoding="utf-8")
+
+    assert re.search(r"^TRIVY := docker run\b", makefile, re.MULTILINE), (
+        "`TRIVY` ne commence plus par `docker run` — un `-` en tête ferait ignorer son échec"
+    )
     assert scan_fails_with_trivy()
 
 
