@@ -16,7 +16,7 @@ Le plan de QA doit être **cadré** (uniquement ce qui vient d'être livré), **
 
 **Une case n'a le droit d'exister que si un test automatisé ne peut structurellement pas la couvrir.**
 
-`cycle-pr` a déjà imposé du TDD avec suite verte à chaque commit, un cleanup verbatim, une auto-review de branche et des gates CI. Réécrire « la suite de tests passe » ou « l'API répond 200 » dans un plan de QA, c'est faire refaire à la main ce qu'une machine vient de faire — et c'est ce qui rend un plan si long que personne ne le déroule.
+`cycle-pr` a déjà imposé du TDD avec suite verte à chaque commit, un cleanup verbatim par commit et sur la branche, une relecture indépendante et des gates CI. Réécrire « la suite de tests passe » ou « l'API répond 200 » dans un plan de QA, c'est faire refaire à la main ce qu'une machine vient de faire — et c'est ce qui rend un plan si long que personne ne le déroule.
 
 Ce qui mérite une case, c'est ce qu'aucun test ne voit :
 

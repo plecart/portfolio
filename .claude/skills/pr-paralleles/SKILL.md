@@ -202,7 +202,7 @@ fenêtres. La vérification de placement existe parce qu'un prompt envoyé à la
 travaillerait sur `main` ou sur le worktree d'une autre issue, sans rien signaler.
 
 Chaque session est **indépendante** : elle déroule le briefing pré-PR, **ouvre sa PR draft**, puis
-le cycle de commit, l'auto-review, et sort du draft en fin de parcours. Ses questions à
+le cycle de commit, les relectures, et sort du draft en fin de parcours. Ses questions à
 l'utilisateur s'affichent dans **sa** fenêtre, pas dans celle du lead. Les worktrees partageant le
 même `.git`, les branches sont visibles entre elles, mais les fichiers de travail sont isolés.
 
