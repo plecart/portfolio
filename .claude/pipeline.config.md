@@ -183,7 +183,8 @@ homonyme : un skill le masquerait) :
 
 **Session** : `task-observer` (journal d'observations pour l'amélioration des skills — activé dans
 `CLAUDE.md`, section « Observation continue » ; **modifié localement**, PR #34, obs 21 : artefacts
-plutôt que gestes, pannes connues en tête de revue) ; `i-have-adhd` (mise en forme des réponses : action
+plutôt que gestes, pannes connues en tête de revue ; audit du 2026-09-30 : cadence et surfaçage
+retirés, `CLAUDE.md` les remplace) ; `i-have-adhd` (mise en forme des réponses : action
 suivante d'abord, étapes numérotées, état restitué à chaque tour ; `/i-have-adhd`).
 
 **RTK** (hook utilisateur `rtk hook claude`, `~/.claude/RTK.md`, hors dépôt) réécrit la commande
