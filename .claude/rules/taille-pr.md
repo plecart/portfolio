@@ -15,7 +15,7 @@
   pas de préfixe de phase ni de numéro de PR (traçables via l'outil de suivi).
 - **Aucune ligne d'attribution**, ni `Co-Authored-By` dans un commit ni pied « Generated with … »
   dans un body de PR : `attribution.commit` et `attribution.pr` valent `""` dans
-  `.claude/settings.json`, le harnais n'en injecte plus.
+  `.claude/settings.json`.
 - **Exception : les commits et PR d'un bot de dépendances** (Dependabot, Renovate…). Seul le
   préfixe conventional est tenu, réglé dans la configuration du bot (`chore(deps)`,
   `chore(deps-dev)`) ; la description et le corps viennent du bot — en anglais pour Dependabot,
