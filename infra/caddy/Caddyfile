@@ -12,6 +12,11 @@
 		# `cloudflared`, il les garde : le `X-Forwarded-Proto: https` du visiteur atteint Django
 		# (`SECURE_PROXY_SSL_HEADER`, #6). Venus d'ailleurs, ils seraient forgés.
 		trusted_proxies static private_ranges
+
+		# HTTP/1.1 seulement : `cloudflared` n'en parle pas d'autre à l'origine. Sans cette ligne,
+		# Caddy 2.11.4 accepte HTTP/2 en clair (`h2c`) sur son port HTTP — mesuré à la relecture de
+		# la PR #67 —, la configuration que vise CVE-2026-56853 (`.trivyignore.yaml`).
+		protocols h1
 	}
 }
 
