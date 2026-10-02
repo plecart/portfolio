@@ -10,7 +10,7 @@ from content.models import Project, Section, SectionKey
 from django.db.models.signals import post_save
 from django.test import Client
 from django.urls import reverse
-from factories import saved, section, technology
+from factories import BLANK, saved, section, technology
 from test_project_admin import LINES, line, new_project_data, rendered_data, saved_project
 
 # Le titre de chaque bloc, dans l'ordre de la fiche (cadrage §6.1, décision 4).
@@ -30,9 +30,6 @@ SECTION_TITLES = [
 
 # Le nom du bloc de chaque section dans le formulaire de l'écran Projet.
 BLOCKS = {key: f"section_{key.name.lower()}" for key in SectionKey}
-
-# Un bloc fait d'espaces seulement : vide pour l'auteur comme pour le site (décision 7).
-BLANK = " \n\t "
 
 
 def stored(owner: Project) -> dict[str, str]:

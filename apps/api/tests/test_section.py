@@ -6,12 +6,8 @@ from config import strings
 from content.models import Project, Section, SectionKey
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.db import IntegrityError, transaction
-from factories import project, saved, section
+from factories import BLANK, project, saved, section
 from refusals import refusals
-
-# Un corps fait d'espaces seulement — espace, retour à la ligne, tabulation : vide pour l'auteur
-# comme pour le site (décision 7).
-BLANK_BODY = " \n\t "
 
 # Les règles que la base porte, une contrainte nommée chacune (décision 5), avec le refus de la
 # contrainte — code et message du catalogue — et celui que `full_clean()` rend, champ et code. Le
@@ -28,7 +24,7 @@ DATABASE_GUARDS = [
     ),
     (
         "corps fait d'espaces",
-        {"body": BLANK_BODY},
+        {"body": BLANK},
         "content_section_body_not_empty",
         ("section_body_missing", strings.SECTION_BODY_MISSING),
         (NON_FIELD_ERRORS, "section_body_missing"),
