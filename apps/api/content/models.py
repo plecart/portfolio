@@ -380,7 +380,8 @@ class Section(models.Model):
             ),
             # Au moins un caractère qui n'est pas une espace : un corps d'espaces est vide
             # (décision 7). `\S` suit la locale libc de l'image, comme pour les mots du résumé :
-            # une espace insécable seule y compte comme un texte.
+            # une espace insécable seule y compte comme un texte, et les tests le verraient
+            # changer.
             models.CheckConstraint(
                 condition=models.Q(body__regex=r"\S"),
                 name="content_section_body_not_empty",

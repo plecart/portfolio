@@ -133,6 +133,17 @@ def test_la_base_refuse_une_section_qui_enfreint_ses_regles(
 
 
 @pytest.mark.django_db
+def test_une_espace_insecable_seule_compte_comme_un_texte_en_base(portfolio: Project) -> None:
+    """`\\S` suit la locale libc de l'image : une locale ICU ferait de l'espace insécable une
+    espace, et la règle changerait sans un mot. L'écran Projet, lui, la tient pour vide
+    (`ProjectForm.save_sections`)."""
+    lone = section(portfolio, body=" ")
+
+    lone.full_clean()
+    lone.save()
+
+
+@pytest.mark.django_db
 def test_un_projet_ne_porte_pas_deux_fois_la_meme_section(portfolio: Project) -> None:
     saved(section(portfolio))
 

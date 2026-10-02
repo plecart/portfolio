@@ -3,8 +3,9 @@
 Les termes du portfolio, en français, et leurs identifiants dans le code, en anglais
 (`.claude/pipeline.config.md`, section « Langue »). Les noms de tests, les titres d'issues et de
 PR emploient ces termes ; le code, ces identifiants. Les valeurs stockées sont en anglais — sauf
-les clés de section, que la spec fixe en français — et l'API les expose telles quelles (ADR 0010) : les libellés français vivent dans le catalogue de
-chaînes du back (`apps/api/config/strings.py`).
+les clés de section, que la spec fixe en français — et l'API les expose telles quelles
+(ADR 0010) : les libellés français vivent dans le catalogue de chaînes du back
+(`apps/api/config/strings.py`).
 
 ## Technologie — `Technology`
 
@@ -62,7 +63,7 @@ enregistre sa section, un bloc vide n'enregistre rien, un bloc vidé la supprime
 |---|---|---|
 | projet | `project` | supprimer le projet supprime ses sections |
 | clé | `key` | l'une des onze ci-dessous, une fois au plus par projet ; stable — le site et le RAG y renvoient par l'ancre `#s-<clé>` |
-| corps | `body` | Markdown, sans borne de longueur ; jamais vide ni fait d'espaces seulement |
+| corps | `body` | Markdown, sans borne de longueur, gardé tel que saisi ; jamais vide ni fait d'espaces seulement — l'écran Projet tient pour espace tout blanc Unicode, la base pas l'espace insécable |
 
 Les clés, dans l'ordre de la fiche, et leur titre. Par exception à la règle des valeurs stockées
 en anglais, ce sont les ancres françaises de la spec (§4.3), que l'API expose telles quelles.
