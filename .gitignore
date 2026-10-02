@@ -20,5 +20,9 @@ apps/web/.lighthouseci/
 # Claude Code — surcharges locales
 .claude/settings.local.json
 
+# Instantanés et journaux de console du serveur MCP `playwright` (`.mcp.json`), écrits à la racine
+# du clone à chaque vérification au navigateur.
+.playwright-mcp/
+
 # strix (pentest, docs/frontend-outillage.md §2.2)
 strix_runs/
