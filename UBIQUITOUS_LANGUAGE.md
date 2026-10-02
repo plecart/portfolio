@@ -55,7 +55,8 @@ moins une ; l'écran Projet les saisit en ligne et les ordonne par glisser-dépo
 
 Une section de la fiche technique d'un projet (cadrage §6.1). Onze sections possibles, dans un
 ordre fixe, toutes facultatives : une section sans texte n'est pas enregistrée, et le site l'omet
-(spec §7).
+(spec §7). L'écran Projet les saisit en onze blocs fixes, sous les technologies : un bloc rempli
+enregistre sa section, un bloc vide n'enregistre rien, un bloc vidé la supprime.
 
 | Terme | Identifiant | Règle |
 |---|---|---|

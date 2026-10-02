@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from config import strings
+from content.forms import SectionField
 from content.inlines import HANDLE_CLASS, POSITION_CLASS
 from content.models import Project, ProjectTechnology, Technology
 from django.contrib.staticfiles import finders
@@ -110,15 +111,18 @@ def refused_lines(admin_client: Client, url: str, data: dict[str, object]) -> li
 @pytest.mark.django_db
 def test_l_ecran_projet_affiche_les_libelles_du_catalogue(admin_client: Client) -> None:
     """Toute chaîne du projet que l'écran montre vient du catalogue (décision 1) : champs dans
-    l'ordre de l'écran, valeurs du type et du statut, titre, lignes de technologie."""
+    l'ordre de l'écran, valeurs du type et du statut, titre, lignes de technologie. Les blocs de
+    la fiche technique ont leurs propres tests (`test_section_admin.py`)."""
     response = admin_client.get(reverse("admin:content_project_add"))
     form = response.context["adminform"].form
     lines = response.context["inline_admin_formsets"][0]
     page = response.content.decode()
 
-    assert [(name, field.label) for name, field in form.fields.items()] == [
-        (name, capfirst(label)) for name, label in PROJECT_FIELD_LABELS.items()
-    ]
+    assert [
+        (name, field.label)
+        for name, field in form.fields.items()
+        if not isinstance(field, SectionField)
+    ] == [(name, capfirst(label)) for name, label in PROJECT_FIELD_LABELS.items()]
     assert [label for value, label in form.fields["kind"].choices if value] == [
         strings.PROJECT_KIND_PERSONAL,
         strings.PROJECT_KIND_PROFESSIONAL,
