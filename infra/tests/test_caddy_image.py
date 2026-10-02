@@ -12,8 +12,10 @@ attribue : le moteur est partagé avec d'autres piles. Les requêtes partent de 
 import os
 import subprocess
 import time
+import uuid
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
+from html.parser import HTMLParser
 from http.client import HTTPConnection, HTTPException, HTTPMessage
 from pathlib import Path
 
@@ -21,7 +23,9 @@ import pytest
 from test_infra import built_images, make_dry_run
 
 STACK = Path(__file__).with_name("caddy.yml")
-PROJECT = "portfolio-test-caddy"
+# Un nom par lancement : deux lancements simultanés sur le même moteur — un poste et une relecture,
+# deux sessions — ne se partagent ni conteneurs ni réseau, et l'arrêt de l'un n'emporte pas l'autre.
+PROJECT = f"portfolio-test-caddy-{uuid.uuid4().hex[:8]}"
 
 # Les noms d'hôte que le Caddyfile reçoit, sous le domaine réservé aux tests (RFC 2606).
 HOSTS = {"SITE_HOST": "site.test"}
@@ -32,6 +36,22 @@ STARTUP_DEADLINE = 10.0
 
 # La coquille de l'application, que toute route du front doit rendre.
 APP_SHELL = '<div id="root"></div>'
+
+# Le cache d'un fichier haché par la compilation : un nom ne désigne jamais qu'un contenu.
+IMMUTABLE = "public, max-age=31536000, immutable"
+
+
+class ScriptSources(HTMLParser):
+    """Les `src` des balises `<script>` d'une page, dans l'ordre."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.sources: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        source = dict(attrs).get("src")
+        if tag == "script" and source:
+            self.sources.append(source)
 
 
 @dataclass(frozen=True)
@@ -141,3 +161,31 @@ def test_une_route_du_front_rend_l_accueil(stack: Stack) -> None:
     assert reply.status == 200
     assert APP_SHELL in reply.body
     assert reply.headers.get_all("Cache-Control") == ["no-cache"]
+
+
+def hashed_script(stack: Stack) -> str:
+    """Le chemin du script compilé qu'`index.html` charge — un fichier haché par la compilation."""
+    page = ScriptSources()
+    page.feed(stack.get(SITE, "/").body)
+    assert page.sources, "aucun `<script src>` dans `index.html` — sa forme a-t-elle changé ?"
+    return page.sources[0]
+
+
+def test_un_fichier_hache_est_servi_immuable(stack: Stack) -> None:
+    """Son nom porte une empreinte de son contenu : sous ce nom, il ne change jamais. Mis en cache
+    un an sans revalidation, il n'est téléchargé qu'une fois par visiteur et par compilation."""
+    reply = stack.get(SITE, hashed_script(stack))
+
+    assert reply.status == 200
+    assert reply.headers.get_all("Cache-Control") == [IMMUTABLE]
+
+
+def test_un_fichier_hache_absent_rend_404_sans_cache_long(stack: Stack) -> None:
+    """Un nom d'une compilation précédente — un visiteur qui garde une page ouverte pendant un
+    déploiement — ne rend pas `index.html` : servie sous un nom de script et marquée immuable, la
+    page resterait un an dans les caches, du navigateur comme de Cloudflare, à la place du script."""
+    reply = stack.get(SITE, "/assets/index-absent00.js")
+
+    assert reply.status == 404
+    assert APP_SHELL not in reply.body
+    assert IMMUTABLE not in (reply.headers.get_all("Cache-Control") or [])
