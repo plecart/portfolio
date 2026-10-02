@@ -69,8 +69,13 @@ class Stack:
 
 
 def caddy_image() -> str:
-    """Le nom que `make build` donne à l'image `caddy` — celle que le test doit trouver chargée."""
-    return built_images(make_dry_run("build"))["infra/caddy/Dockerfile"]
+    """Le nom que `make build` donne à l'image `caddy` — celle que le test doit trouver chargée.
+
+    Sous le préfixe de cet appel, s'il en pose un : le `Makefile` exporte `IMAGE_PREFIX`, donc
+    `make image-test IMAGE_PREFIX=…` teste l'image que `make build IMAGE_PREFIX=…` a construite.
+    """
+    prefix = {"IMAGE_PREFIX": os.environ["IMAGE_PREFIX"]} if "IMAGE_PREFIX" in os.environ else {}
+    return built_images(make_dry_run("build", environment=prefix))["infra/caddy/Dockerfile"]
 
 
 def compose(*arguments: str, environment: Mapping[str, str]) -> str:
