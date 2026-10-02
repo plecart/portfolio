@@ -22,7 +22,7 @@ services:
   # aucune image de plus à épingler. Il répond comme Django sur ce que le test observe : ses propres
   # en-têtes de sécurité, que Caddy doit remplacer sur l'hôte du site — même valeur pour `nosniff`,
   # pour qu'un doublon se voie — et garder sur l'hôte de l'API ; un cache long sur les statiques de
-  # l'admin, que Caddy doit laisser intact.
+  # l'admin, que Caddy doit laisser intact ; et, en écho, le schéma que Caddy lui transmet.
   api:
     image: ${CADDY_IMAGE:?}
     pull_policy: never
@@ -42,5 +42,6 @@ configs:
           Referrer-Policy same-origin
         }
         header /static/* Cache-Control "${UPSTREAM_STATIC_CACHE:?}"
+        header ${UPSTREAM_PROTO_ECHO:?} "{header.X-Forwarded-Proto}"
         respond "${UPSTREAM_BODY:?}"
       }
