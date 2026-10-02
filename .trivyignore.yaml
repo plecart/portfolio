@@ -37,8 +37,8 @@
 # `apps/api/tests/test_image_scan.py` refuse une entrée incomplète, expirée, ou datée au-delà de
 # 90 jours.
 #
-# Les exceptions ci-dessous ont été évaluées au scan du 2026-09-30 (Trivy 0.74.0), sauf
-# CVE-2026-103111, au scan du 2026-10-02.
+# Chaque exception a été évaluée avec Trivy 0.74.0, au scan du jour qui précède son `expired_at`
+# de sa durée (30 ou 90 jours, ci-dessus).
 
 vulnerabilities:
   # --- Image `api` : paquets Debian 13 de l'image de base `python:3.12.14-slim-trixie` -------
@@ -157,10 +157,11 @@ vulnerabilities:
       - "**/portfolio-api (debian 13.*)"
     statement: >-
       Place : libpcre2-8-0, venu de l'image de base, dépendance de `grep`, paquet essentiel de
-      Debian, et de `libselinux1`. Atteinte : non — le défaut demande de compiler une expression
-      régulière forgée ; seuls `grep` et `libselinux1` lient la bibliothèque, ni Python ni
-      l'environnement de l'application (mesuré), rien de ce qui tourne n'appelle `grep`, et
-      `libselinux1` ne compile que les motifs d'une politique SELinux, absente de l'image.
+      Debian, et de `libselinux1`. Atteinte : non — le défaut demande de compiler, avec le JIT,
+      une expression régulière forgée par l'attaquant ; seuls `grep` et `libselinux1` lient la
+      bibliothèque, ni Python ni l'environnement de l'application (mesuré), rien de ce qui tourne
+      n'appelle `grep`, et `libselinux1` ne compile que les motifs d'une politique SELinux,
+      absente de l'image.
       Alternatives : corrigé dans Debian 13 par `10.46-1~deb13u3`, absent de l'image
       `python:3.12.14-slim-trixie` publiée (construite le 2026-09-19, empreinte inchangée au
       2026-10-02) — monter l'empreinte dès sa reconstruction (ADR 0014) ; pas
