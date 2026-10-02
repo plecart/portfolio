@@ -13,7 +13,7 @@ import os
 import subprocess
 import time
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from http.client import HTTPConnection, HTTPException, HTTPMessage
@@ -28,8 +28,8 @@ STACK = Path(__file__).with_name("caddy.yml")
 PROJECT = f"portfolio-test-caddy-{uuid.uuid4().hex[:8]}"
 
 # Les noms d'hôte que le Caddyfile reçoit, sous le domaine réservé aux tests (RFC 2606).
-HOSTS = {"SITE_HOST": "site.test", "API_HOST": "api.test"}
-SITE, API = HOSTS["SITE_HOST"], HOSTS["API_HOST"]
+HOSTS = {"SITE_HOST": "site.test", "API_HOST": "api.test", "MEDIA_HOST": "media.test"}
+SITE, API, MEDIA = HOSTS["SITE_HOST"], HOSTS["API_HOST"], HOSTS["MEDIA_HOST"]
 
 # Le temps laissé à Caddy pour ouvrir son port, une fois son conteneur démarré.
 STARTUP_DEADLINE = 10.0
@@ -40,12 +40,26 @@ APP_SHELL = '<div id="root"></div>'
 # Le cache d'un fichier haché par la compilation : un nom ne désigne jamais qu'un contenu.
 IMMUTABLE = "public, max-age=31536000, immutable"
 
-# Ce que répond l'amont factice de `caddy.yml`, et le cache qu'il pose sur les statiques de
-# l'admin — celui de WhiteNoise, différent de celui de Caddy : intact, il prouve que Caddy n'y a pas
-# touché.
+# Ce que répond l'amont factice de `caddy.yml` : son corps, sa politique de sécurité — celle que
+# `django-csp` poserait —, et le cache qu'il pose sur les statiques de l'admin — celui de
+# WhiteNoise. Chacun diffère de ce que Caddy poserait : intact, il prouve que Caddy n'y a pas touché.
 UPSTREAM = {
     "UPSTREAM_BODY": "amont",
+    "UPSTREAM_CSP": "default-src 'none'",
     "UPSTREAM_STATIC_CACHE": "max-age=315360000, public, immutable",
+}
+
+# Les en-têtes de sécurité de l'hôte du site (brief de #16, décision 3 ; PRD « Sécurité ») : la
+# politique n'admet que des fichiers servis par le site, les appels à l'API et les images de
+# `media` — `data:` pour l'icône vide d'`index.html` ; aucun `unsafe-inline`.
+SITE_SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        f"default-src 'self'; connect-src https://{API}; img-src 'self' data: https://{MEDIA}; "
+        "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+    ),
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
 }
 
 
@@ -223,3 +237,35 @@ def test_les_statiques_de_l_admin_gardent_leur_cache(stack: Stack) -> None:
 
     assert reply.status == 200
     assert reply.headers.get_all("Cache-Control") == [UPSTREAM["UPSTREAM_STATIC_CACHE"]]
+
+
+# Ce que sert l'hôte du site, sous chacune de ses formes : la page, un fichier haché, une fiche
+# relayée vers `api` — dont les en-têtes de Django doivent être remplacés, jamais doublés.
+SITE_RESPONSES: dict[str, Callable[[Stack], str]] = {
+    "accueil": lambda stack: "/",
+    "fichier haché": hashed_script,
+    "fiche projet": lambda stack: "/projets/x",
+}
+
+
+@pytest.mark.parametrize("path", SITE_RESPONSES.values(), ids=SITE_RESPONSES.keys())
+def test_l_hote_du_site_pose_ses_en_tetes_de_securite(
+    stack: Stack, path: Callable[[Stack], str]
+) -> None:
+    """Une politique par réponse : deux politiques de sécurité s'additionnent, la plus stricte
+    l'emporte directive par directive (MDN « Content Security Policy »). Sur `/projets/*`, celle de
+    Caddy remplace donc celle de Django au lieu de s'y ajouter (préfixe `>` de `header`)."""
+    reply = stack.get(SITE, path(stack))
+
+    assert reply.status == 200
+    assert {name: reply.headers.get_all(name) for name in SITE_SECURITY_HEADERS} == {
+        name: [value] for name, value in SITE_SECURITY_HEADERS.items()
+    }
+
+
+def test_l_hote_de_l_api_garde_les_en_tetes_de_django(stack: Stack) -> None:
+    """L'admin et l'API ont leur propre politique, posée par `django-csp` (#6) : celle du site, qui
+    n'admet ni leurs formulaires ni leurs scripts, n'y entre pas."""
+    reply = stack.get(API, "/admin/")
+
+    assert reply.headers.get_all("Content-Security-Policy") == [UPSTREAM["UPSTREAM_CSP"]]

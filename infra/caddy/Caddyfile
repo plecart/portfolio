@@ -9,6 +9,21 @@
 http://{$SITE_HOST} {
 	root * /usr/share/caddy
 
+	# Les en-têtes de sécurité de l'hôte du site (PRD « Sécurité », brief de #16, décision 3) — sur
+	# ce que Caddy sert comme sur `/projets/*` qu'il relaie. Le préfixe `>` diffère leur écriture
+	# après celle de l'amont (doc Caddy « header ») : ceux de Django sont remplacés, pas doublés —
+	# deux politiques de sécurité s'additionneraient. La politique n'admet que des fichiers servis
+	# par le site, les appels à l'API et les images de `media`, sans `unsafe-inline` (OWASP « Content
+	# Security Policy ») ; `data:` dans `img-src` seulement, pour l'icône vide d'`index.html` — une
+	# image n'exécute rien, et c'est la seule violation mesurée sur le front compilé (2026-10-03). `X-Frame-Options` double `frame-ancestors` pour les navigateurs qui
+	# l'ignorent (OWASP « Clickjacking Defense »). Pas de HSTS : le domaine `.dev` l'impose déjà.
+	header {
+		>Content-Security-Policy "default-src 'self'; connect-src https://{$API_HOST}; img-src 'self' data: https://{$MEDIA_HOST}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		>X-Frame-Options DENY
+		>X-Content-Type-Options nosniff
+		>Referrer-Policy strict-origin-when-cross-origin
+	}
+
 	# La seule sortie HTML du back : la vue des aperçus de lien (ADR 0011, #14) répond sur l'adresse
 	# d'une fiche, en injectant ses balises, ou redirige.
 	handle /projets/* {
