@@ -143,9 +143,8 @@ SERVICE_ADDRESS_OVERRIDES = {
 # Les fichiers qu'un outil Linux lit dans la **copie de travail** : ce que le shell du conteneur
 # exécute, ce que buildkit analyse, la configuration que Caddy lit dans son image, ce dont Compose
 # tire des valeurs, l'épingle de version que `uv` relit dans l'image, et les exceptions que Trivy
-# lit depuis son conteneur. Tout fichier
-# ajouté à `infra/` et lu par un conteneur entre dans un de ces motifs — et chacun est vérifié
-# séparément, sinon un motif devenu aveugle passerait inaperçu.
+# lit depuis son conteneur. Tout fichier ajouté à `infra/` et lu par un conteneur entre dans un de
+# ces motifs — et chacun est vérifié séparément, sinon un motif devenu aveugle passerait inaperçu.
 CONTAINER_TEXT_GLOBS = [
     "infra/**/*.sh",
     "infra/**/Dockerfile",

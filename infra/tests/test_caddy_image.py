@@ -157,6 +157,14 @@ def wait_until_serving(stack: Stack) -> None:
             time.sleep(0.2)
 
 
+def hashed_script(stack: Stack) -> str:
+    """Le chemin du script compilé qu'`index.html` charge — un fichier haché par la compilation."""
+    page = ScriptSources()
+    page.feed(stack.get(SITE, "/").body)
+    assert page.sources, "aucun `<script src>` dans `index.html` — sa forme a-t-elle changé ?"
+    return page.sources[0]
+
+
 @pytest.fixture(scope="module")
 def stack() -> Iterator[Stack]:
     """La pile démarrée pour le module, arrêtée et supprimée à la fin, même en cas d'échec."""
@@ -190,14 +198,6 @@ def test_une_route_du_front_rend_l_accueil(stack: Stack) -> None:
     assert reply.status == 200
     assert APP_SHELL in reply.body
     assert reply.headers.get_all("Cache-Control") == ["no-cache"]
-
-
-def hashed_script(stack: Stack) -> str:
-    """Le chemin du script compilé qu'`index.html` charge — un fichier haché par la compilation."""
-    page = ScriptSources()
-    page.feed(stack.get(SITE, "/").body)
-    assert page.sources, "aucun `<script src>` dans `index.html` — sa forme a-t-elle changé ?"
-    return page.sources[0]
 
 
 def test_un_hote_inconnu_ne_recoit_pas_le_site(stack: Stack) -> None:
@@ -298,6 +298,8 @@ def test_le_schema_transmis_par_le_reseau_prive_atteint_api(stack: Stack, host: 
 
     assert reply.headers.get_all(UPSTREAM["UPSTREAM_PROTO_ECHO"]) == ["https"]
 
+
+# --- La confiance dans les en-têtes transmis : une garde sur la configuration de Caddy -----------
 
 # Le réseau privé, au sens de `private_ranges` de Caddy (doc Caddy, options globales) — où Docker
 # place ses réseaux. Pas `ipaddress.is_private`, plus large : il compte les plages de documentation.
