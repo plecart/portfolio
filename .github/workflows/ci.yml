@@ -11,8 +11,9 @@
 # Trois jobs, un par pile. Ils n'ont pas les mêmes prérequis — `uv`, Node, Docker — et les
 # séparer évite qu'un rouge de l'une masque un rouge d'une autre. Le job `infra` installe aussi
 # Node : les images copient le front compilé, qu'il compile lui-même plutôt que d'attendre le job
-# `web` (ADR 0014) ; et `uv`, pour les tests des images qu'il vient de construire. Un quatrième, `publish`, ne tourne qu'après un push sur `main`, une fois les
-# trois autres verts : il publie les images sur GHCR.
+# `web` (ADR 0014) ; et `uv`, pour les tests des images qu'il vient de construire. Un quatrième,
+# `publish`, ne tourne qu'après un push sur `main`, une fois les trois autres verts : il publie les
+# images sur GHCR.
 #
 # Chaque action est épinglée par **empreinte de commit**, sa version en commentaire : une
 # étiquette peut être déplacée par son propriétaire ou par un attaquant, et le déplacement
