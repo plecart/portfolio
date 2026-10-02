@@ -1,4 +1,4 @@
-"""Modèles du contenu : les technologies et les projets.
+"""Modèles du contenu : les technologies, les projets et les sections de leur fiche technique.
 
 Toute règle que la base peut porter y est une contrainte du modèle (décision 10 du brief de #7) :
 son code, identifiant stable du refus, est nommé sur la contrainte ; son message, texte affiché,
@@ -318,3 +318,76 @@ class ProjectTechnology(models.Model):
 
     def __str__(self) -> str:
         return f"{self.project} · {self.technology}"
+
+
+class SectionKey(models.TextChoices):
+    """La clé d'une section de fiche technique, dans l'ordre de la fiche : celui de l'écran Projet et
+    du site (cadrage §6.1, spec §7).
+
+    Les valeurs sont les ancres `#s-<clé>` du site et du RAG (spec §4.3, US 57), que l'API expose
+    telles quelles : françaises, par exception à la règle des valeurs stockées en anglais — la spec
+    les fixe (décision 3 du brief de #8). Au niveau du module pour la même raison que
+    `TechnologyKind`.
+    """
+
+    CONTEXT = "contexte", strings.SECTION_CONTEXT
+    STACK = "stack", strings.SECTION_STACK
+    ARCHITECTURE = "architecture", strings.SECTION_ARCHITECTURE
+    DATA = "donnees", strings.SECTION_DATA
+    SECURITY = "securite", strings.SECTION_SECURITY
+    ASYNC = "asynchrone", strings.SECTION_ASYNC
+    API = "api", strings.SECTION_API
+    DEPLOYMENT = "deploiement", strings.SECTION_DEPLOYMENT
+    TESTS = "tests", strings.SECTION_TESTS
+    DECISIONS = "decisions", strings.SECTION_DECISIONS
+    RETROSPECTIVE = "bilan", strings.SECTION_RETROSPECTIVE
+
+
+class Section(models.Model):
+    """Une section de la fiche technique d'un projet : sa clé et son corps en Markdown (cadrage
+    §6.1, PRD « Modèle de contenu »).
+
+    Toutes facultatives, et jamais vides : une section sans texte n'est pas enregistrée, le site
+    l'omet (spec §7).
+    """
+
+    # L'index de l'unicité (projet, clé), mené par le projet, sert aussi ses recherches : l'index
+    # que `ForeignKey` pose par défaut ferait double emploi.
+    project: models.ForeignKey[Project, Project] = models.ForeignKey(
+        Project, models.CASCADE, verbose_name=strings.PROJECT, db_index=False
+    )
+    key: models.CharField[str, str] = models.CharField(
+        strings.SECTION_KEY, choices=SectionKey.choices
+    )
+    # Aucune borne : la spec §7 n'en fixe pas (décision 5).
+    body: models.TextField[str, str] = models.TextField(strings.SECTION_BODY)
+
+    class Meta:
+        verbose_name = strings.SECTION
+        verbose_name_plural = strings.SECTIONS
+        constraints = (
+            models.UniqueConstraint(
+                fields=["project", "key"],
+                name="content_section_key_unique",
+                violation_error_code="section_key_taken",
+                violation_error_message=strings.SECTION_KEY_TAKEN,
+            ),
+            models.CheckConstraint(
+                condition=models.Q(key__in=SectionKey.values),
+                name="content_section_key_valid",
+                violation_error_code="section_key_unknown",
+                violation_error_message=strings.SECTION_KEY_UNKNOWN,
+            ),
+            # Au moins un caractère qui n'est pas une espace : un corps d'espaces est vide
+            # (décision 7). `\S` suit la locale libc de l'image, comme pour les mots du résumé :
+            # une espace insécable seule y compte comme un texte.
+            models.CheckConstraint(
+                condition=models.Q(body__regex=r"\S"),
+                name="content_section_body_not_empty",
+                violation_error_code="section_body_missing",
+                violation_error_message=strings.SECTION_BODY_MISSING,
+            ),
+        )
+
+    def __str__(self) -> str:
+        return f"{self.project} · {self.key}"
