@@ -173,9 +173,10 @@ vulnerabilities:
   # Ce qui tourne : le Caddyfile de production (`infra/caddy/Caddyfile`) — un serveur de fichiers
   # statiques et un reverse proxy interne vers `api`, routés par nom d'hôte, en HTTP, sans TLS ni
   # certificat : Cloudflare le termine, `cloudflared` est la seule entrée (cadrage §7, D45).
-  # HTTP/1.1 seulement (`protocols h1`) ; ni `templates`, ni `file_server browse`, ni `tracing`, ni amont en
-  # HTTPS. L'atteinte est jugée sur cette configuration, pas sur un graphe d'appels : `govulncheck`
-  # trouve tous les symboles vulnérables dans le binaire, qui embarque tous les modules de Caddy.
+  # HTTP/1.1 seulement (`protocols h1`) ; ni `templates`, ni `file_server browse`, ni `tracing`,
+  # ni amont en HTTPS. L'atteinte est jugée sur cette configuration, pas sur un graphe d'appels :
+  # `govulncheck` trouve tous les symboles vulnérables dans le binaire, qui embarque tous les
+  # modules de Caddy.
   # Évaluations relues avec ce Caddyfile (#16) : CVE-2026-39821, qui supposait un seul site, et
   # CVE-2026-56853, qui supposait `h2c` inactif par défaut — faux, mesuré —, réévaluées.
   #
