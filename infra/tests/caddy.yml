@@ -1,0 +1,17 @@
+# Pile du test de fumée de l'image `caddy` (`test_caddy_image.py`) : l'image que `make build` a
+# chargée, lancée par le test sous son propre nom de projet — le moteur Docker est partagé avec
+# d'autres piles (brief de #16).
+#
+# Le test fournit chaque valeur par l'environnement — l'image, que `make build` nomme, et les noms
+# d'hôte qu'il interroge : une seule source pour les deux côtés.
+
+services:
+  caddy:
+    image: ${CADDY_IMAGE:?}
+    # L'image du poste ou du job, jamais une image homonyme tirée d'un registre.
+    pull_policy: never
+    environment:
+      SITE_HOST: ${SITE_HOST:?}
+    ports:
+      # Un port hôte libre, que Docker attribue : aucun conflit avec une pile voisine.
+      - "127.0.0.1::80"
