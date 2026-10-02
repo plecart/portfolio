@@ -11,6 +11,7 @@ attribue : le moteur est partagé avec d'autres piles. Les requêtes partent de 
 
 import json
 import os
+import socket
 import subprocess
 import time
 import uuid
@@ -45,7 +46,8 @@ IMMUTABLE = "public, max-age=31536000, immutable"
 
 # Ce que répond l'amont factice de `caddy.yml` : son corps, sa politique de sécurité — celle que
 # `django-csp` poserait —, et le cache qu'il pose sur les statiques de l'admin — celui de
-# WhiteNoise. Chacun diffère de ce que Caddy poserait : intact, il prouve que Caddy n'y a pas touché.
+# WhiteNoise. Chacun diffère de ce que Caddy poserait : intact, il prouve que Caddy n'y a pas
+# touché.
 # Il renvoie aussi, sous l'en-tête `UPSTREAM_PROTO_ECHO`, le `X-Forwarded-Proto` qu'il a reçu.
 UPSTREAM = {
     "UPSTREAM_BODY": "amont",
@@ -92,7 +94,7 @@ class Reply:
 
 @dataclass(frozen=True)
 class Stack:
-    """La pile démarrée : l'environnement de Compose qui la désigne, le port hôte où Caddy écoute."""
+    """La pile démarrée : l'environnement qui la désigne à Compose, le port où Caddy écoute."""
 
     environment: Mapping[str, str]
     port: int
@@ -221,7 +223,8 @@ def test_un_fichier_hache_est_servi_immuable(stack: Stack) -> None:
 def test_un_fichier_hache_absent_rend_404_sans_cache_long(stack: Stack) -> None:
     """Un nom d'une compilation précédente — un visiteur qui garde une page ouverte pendant un
     déploiement — ne rend pas `index.html` : servie sous un nom de script et marquée immuable, la
-    page resterait un an dans les caches, du navigateur comme de Cloudflare, à la place du script."""
+    page resterait un an dans les caches, du navigateur comme de Cloudflare, à la place du
+    script."""
     reply = stack.get(SITE, "/assets/index-absent00.js")
 
     assert reply.status == 404
@@ -231,7 +234,8 @@ def test_un_fichier_hache_absent_rend_404_sans_cache_long(stack: Stack) -> None:
 
 def test_les_fiches_projet_sont_relayees_vers_api(stack: Stack) -> None:
     """`/projets/<slug>` est la seule sortie HTML du back : la vue des aperçus de lien (#14, ADR
-    0011) y injecte les balises du projet, ou redirige. Caddy la relaie au lieu de servir le front."""
+    0011) y injecte les balises du projet, ou redirige. Caddy la relaie au lieu de servir le
+    front."""
     reply = stack.get(SITE, "/projets/x")
 
     assert reply.status == 200
@@ -297,6 +301,25 @@ def test_le_schema_transmis_par_le_reseau_prive_atteint_api(stack: Stack, host: 
     reply = stack.get(host, "/projets/x", headers={"X-Forwarded-Proto": "https"})
 
     assert reply.headers.get_all(UPSTREAM["UPSTREAM_PROTO_ECHO"]) == ["https"]
+
+
+# La préface d'un client HTTP/2 en clair « en connaissance préalable » (RFC 9113 §3.3), et le type
+# de la trame SETTINGS (RFC 9113 §6.5), que tout serveur HTTP/2 envoie en premier — au quatrième
+# octet de son en-tête de trame.
+H2C_PREFACE = b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
+SETTINGS_FRAME_TYPE = 0x04
+
+
+def test_caddy_ne_parle_pas_http2_en_clair(stack: Stack) -> None:
+    """`cloudflared` joint Caddy en HTTP/1.1 : HTTP/2 en clair (`h2c`) n'a rien à servir, et c'est
+    la configuration que vise CVE-2026-56853 (`.trivyignore.yaml`). Caddy 2.11.4 l'accepte pourtant
+    sans qu'on le lui demande — mesuré à la relecture de la PR #67 : sa réponse à la préface
+    commence par une trame SETTINGS. Une réponse HTTP/1.1 ou une connexion fermée conviennent."""
+    with socket.create_connection(("127.0.0.1", stack.port), timeout=5) as connection:
+        connection.sendall(H2C_PREFACE)
+        answer = connection.recv(9)
+
+    assert not (len(answer) > 3 and answer[3] == SETTINGS_FRAME_TYPE), answer
 
 
 # --- La confiance dans les en-têtes transmis : une garde sur la configuration de Caddy -----------
@@ -372,8 +395,8 @@ def test_la_garde_de_confiance_rend_son_verdict_sur_chaque_forme(
 
 
 def test_caddy_ne_fait_confiance_qu_au_reseau_prive(stack: Stack) -> None:
-    """Un `X-Forwarded-*` venu d'ailleurs est forgé : seul le réseau privé, où vit `cloudflared`, est
-    cru. Lu dans la configuration que Caddy tire lui-même du Caddyfile (`caddy adapt`)."""
+    """Un `X-Forwarded-*` venu d'ailleurs est forgé : seul le réseau privé, où vit `cloudflared`,
+    est cru. Lu dans la configuration que Caddy tire lui-même du Caddyfile (`caddy adapt`)."""
     adapted = compose(
         "exec",
         "-T",

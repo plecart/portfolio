@@ -172,11 +172,12 @@ vulnerabilities:
   #
   # Ce qui tourne : le Caddyfile de production (`infra/caddy/Caddyfile`) — un serveur de fichiers
   # statiques et un reverse proxy interne vers `api`, routés par nom d'hôte, en HTTP, sans TLS ni
-  # certificat : Cloudflare le termine, `cloudflared` est la seule entrée (cadrage §7, D45). Ni
-  # `h2c`, ni `templates`, ni `file_server browse`, ni `tracing`, ni amont en HTTPS. L'atteinte
-  # est jugée sur cette configuration, pas sur un graphe d'appels : `govulncheck` trouve tous les
-  # symboles vulnérables dans le binaire, qui embarque tous les modules de Caddy. Évaluations
-  # relues avec ce Caddyfile (#16) : seule CVE-2026-39821 en dépendait, réévaluée.
+  # certificat : Cloudflare le termine, `cloudflared` est la seule entrée (cadrage §7, D45).
+  # HTTP/1.1 seulement (`protocols h1`) ; ni `templates`, ni `file_server browse`, ni `tracing`, ni amont en
+  # HTTPS. L'atteinte est jugée sur cette configuration, pas sur un graphe d'appels : `govulncheck`
+  # trouve tous les symboles vulnérables dans le binaire, qui embarque tous les modules de Caddy.
+  # Évaluations relues avec ce Caddyfile (#16) : CVE-2026-39821, qui supposait un seul site, et
+  # CVE-2026-56853, qui supposait `h2c` inactif par défaut — faux, mesuré —, réévaluées.
   #
   # Alternatives, pour toutes : caddy 2.11.4 (2026-06-03) est la dernière version publiée ; la
   # suivante arrivera par Dependabot. Si elle tarde, compiler caddy dans un étage du projet
@@ -302,10 +303,12 @@ vulnerabilities:
       - usr/bin/caddy
     statement: >-
       Place : bibliothèque standard Go (`net/http`) du binaire `caddy`, raison d'être de l'image.
-      Atteinte : non — le défaut demande un serveur configuré pour HTTP/2 sans chiffrement
-      (`h2c`), que Caddy n'active pas par défaut ; à ne jamais activer dans `infra/caddy/Caddyfile`.
-      Alternatives : corrigé par Go 1.26.6, absent de caddy 2.11.4, dernière version publiée.
-    expired_at: 2026-12-29
+      Atteinte : non — le défaut demande un serveur qui accepte HTTP/2 sans chiffrement (`h2c`).
+      Caddy 2.11.4 l'accepte par défaut sur un port HTTP (mesuré) ; `infra/caddy/Caddyfile`
+      restreint ses serveurs à HTTP/1.1 (`protocols h1`), et le test de fumée de l'image vérifie
+      que la préface `h2c` ne reçoit aucune réponse HTTP/2. Alternatives : corrigé par Go 1.26.6,
+      absent de caddy 2.11.4, dernière version publiée.
+    expired_at: 2026-12-31
 
   - id: CVE-2026-56858
     paths:
