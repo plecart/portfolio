@@ -452,6 +452,21 @@ def ci_build_flags(job: str) -> str | None:
 CACHED_BUILDS = {"infra": 2, "publish": 1}
 
 
+def test_le_job_infra_teste_les_images_qu_il_vient_de_construire() -> None:
+    """`make image-test` démarre les images que `make build` a chargées : avant le build, il n'a
+    rien à démarrer ; absent, le Caddyfile de production n'est éprouvé nulle part en CI — mesuré à
+    la relecture de la PR #67, l'étape retirée laissait toute la suite verte. Son étape ne porte
+    que son nom et sa commande : ni `if` qui la sauterait, ni `continue-on-error` qui tolérerait
+    son échec."""
+    steps = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["infra"]["steps"]
+    commands = [step.get("run") for step in steps]
+
+    assert "make build" in commands and "make image-test" in commands, commands
+    position = commands.index("make image-test")
+    assert commands.index("make build") < position
+    assert set(steps[position]) == {"name", "run"}
+
+
 @pytest.mark.parametrize(("job", "entries"), CACHED_BUILDS.items())
 def test_la_ci_donne_a_chaque_image_son_entree_de_cache(job: str, entries: int) -> None:
     """Les drapeaux du job, passés par l'environnement comme en CI puis développés par `make` :

@@ -169,7 +169,7 @@ def stack() -> Iterator[Stack]:
         wait_until_serving(started)
         yield started
     finally:
-        compose("down", "--volumes", environment=environment)
+        compose("down", environment=environment)
 
 
 def test_l_accueil_est_servi_sans_cache(stack: Stack) -> None:
@@ -198,6 +198,15 @@ def hashed_script(stack: Stack) -> str:
     page.feed(stack.get(SITE, "/").body)
     assert page.sources, "aucun `<script src>` dans `index.html` — sa forme a-t-elle changé ?"
     return page.sources[0]
+
+
+def test_un_hote_inconnu_ne_recoit_pas_le_site(stack: Stack) -> None:
+    """Le site ne répond que sous son nom. Un `SITE_HOST` vide, ou un nom de variable qui aurait
+    dérivé entre le Caddyfile et ce qui le démarre, en ferait un site sans nom, servi sous tout
+    hôte — mesuré à la relecture de la PR #67, sans qu'aucun autre test ne rougisse."""
+    reply = stack.get("inconnu.test", "/")
+
+    assert APP_SHELL not in reply.body
 
 
 def test_un_fichier_hache_est_servi_immuable(stack: Stack) -> None:

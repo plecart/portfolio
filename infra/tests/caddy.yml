@@ -3,7 +3,9 @@
 # d'autres piles (brief de #16).
 #
 # Le test fournit chaque valeur par l'environnement — l'image, que `make build` nomme, les noms
-# d'hôte qu'il interroge, ce que l'amont répond : une seule source pour les deux côtés.
+# d'hôte qu'il interroge, ce que l'amont répond : une seule source pour les deux côtés. Les noms des
+# variables d'hôte sont ceux que le Caddyfile lit ; un nom qui dériverait servirait le site sous
+# tout hôte, ce que `test_un_hote_inconnu_ne_recoit_pas_le_site` voit.
 
 services:
   caddy:
