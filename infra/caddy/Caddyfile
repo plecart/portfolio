@@ -1,0 +1,19 @@
+# Caddyfile de production de l'image `caddy` (cadrage §5.3, ADR 0008). Caddy est le proxy interne
+# du VPS, derrière `cloudflared`, seule entrée (D45) : il écoute en HTTP, Cloudflare termine TLS.
+#
+# Les noms d'hôte viennent de l'environnement du conteneur, lus au démarrage : le Compose de
+# production les fixera (#16), le test de fumée (`infra/tests/test_caddy_image.py`) les remplace
+# par des noms réservés aux tests.
+
+# L'hôte du site : le front compilé, que l'image copie dans `/usr/share/caddy` (ADR 0014).
+http://{$SITE_HOST} {
+	root * /usr/share/caddy
+
+	# `index.html` change à chaque compilation et cite les fichiers hachés du moment : revalidé à
+	# chaque visite, jamais servi périmé.
+	header Cache-Control no-cache
+
+	# Le front route lui-même : un chemin qu'aucun fichier ne porte rend `index.html`.
+	try_files {path} /index.html
+	file_server
+}

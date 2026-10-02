@@ -118,6 +118,12 @@ tête du fichier ; la date passée, l'audit rebloque. `npm audit` n'a pas de fic
 son arbre se nettoie par les `overrides` du manifeste
 ([docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4).
 
+**Tests des images.** `make image-test`, porte de CI sur chaque PR, démarre les images que
+`make build` a chargées et les interroge — d'abord le test de fumée du Caddyfile de production
+([infra/tests/](infra/tests/)). Il ne fait pas partie de `make test` : il lui faut l'image construite,
+donc le front compilé. Sur le poste, `make build` d'abord. Chaque test démarre sa pile sous son
+propre nom de projet Compose, sur un port hôte que Docker attribue, et la supprime en partant.
+
 **Scan des images.** `make scan`, porte de CI sur chaque PR, scanne avec Trivy chaque image que
 `make build` a construite : toute vulnérabilité HIGH ou CRITICAL bloque, corrigeable ou non, comme
 une image de base en fin de vie

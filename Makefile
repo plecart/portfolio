@@ -104,7 +104,7 @@ PACKAGE_VERSIONS = users/$(dir $(PACKAGE))packages/container/$(notdir $(PACKAGE)
 GH ?= gh
 
 .PHONY: install test lint format format-check typecheck audit build $(IMAGE_BUILDS) compose-config dev
-.PHONY: scan $(IMAGE_SCANS) push $(IMAGE_PUSHES) prune $(IMAGE_PRUNES)
+.PHONY: scan $(IMAGE_SCANS) image-test push $(IMAGE_PUSHES) prune $(IMAGE_PRUNES)
 .PHONY: web-install web-browsers web-lint web-typecheck web-test web-build web-e2e web-lighthouse web-audit
 
 install:
@@ -167,6 +167,12 @@ scan: $(IMAGE_SCANS)
 $(IMAGE_SCANS): export MSYS_NO_PATHCONV := 1
 $(IMAGE_SCANS): scan-%:
 	$(TRIVY) image $(SCAN_FLAGS) $(IMAGE_PREFIX)$*
+
+# Les tests des images que `make build` a chargées — le test de fumée de `caddy`, d'abord. Hors de
+# `make test`, qui ne lit que `apps` : ils démarrent les images, donc il leur faut le front compilé.
+# Sans dépendance vers `build`, pour la même raison que `scan` : la CI les lance après son build.
+image-test:
+	$(UV) run pytest infra/tests
 
 # Publie chaque image que `make build` a chargée, sous `IMAGE_TAG` puis sous `latest` — l'étiquette
 # que le build lui a donnée. Dans cet ordre, `latest` ne désigne jamais une image dont l'étiquette

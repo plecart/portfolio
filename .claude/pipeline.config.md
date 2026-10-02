@@ -83,6 +83,10 @@ le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node a
                                                   # ou non, comme une image de base en fin de vie ;
                                                   # exceptions datées dans `.trivyignore.yaml` ;
                                                   # vérifiée le 2026-09-30 (#15)
+- tests images : make image-test                  # pytest sur `infra/tests` : démarre les images que
+                                                  # `make build` a chargées — test de fumée du
+                                                  # Caddyfile ; hors de `make test`, `make build`
+                                                  # d'abord ; vérifiée le 2026-10-03 (#16)
 - publication  : make push                        # **CI seulement** (job `publish`) : chaque image
                                                   # sous `IMAGE_TAG`, le SHA du commit, puis `latest` ;
                                                   # préfixe GHCR par `IMAGE_PREFIX` ; vérifiée le
@@ -123,7 +127,7 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 - gates bloquants en CI :
   - back : audit, lint, format:check, typecheck, test
   - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse, audit
-  - infra : compose (résolution de `infra/compose.dev.yml`), build des images `api` et `caddy` sans publication, scan (Trivy : HIGH et CRITICAL, corrigeables ou non, et fin de vie ; exceptions datées de `.trivyignore.yaml`)
+  - infra : compose (résolution de `infra/compose.dev.yml`), build des images `api` et `caddy` sans publication, tests des images (`make image-test`), scan (Trivy : HIGH et CRITICAL, corrigeables ou non, et fin de vie ; exceptions datées de `.trivyignore.yaml`)
 - publication (job `publish`, push vers `main` seulement, après les trois jobs verts ; pas une gate de PR) : front compilé repris du job `web`, images reconstruites depuis le cache sans attestation, scannées par `make scan`, poussées sur GHCR (`ghcr.io/plecart/portfolio-<service>`, SHA complet et `latest`) par `make push`, trois versions par paquet gardées par `make prune`
 - services requis en CI : aucun déclaré — les tests de base démarrent eux-mêmes Postgres par testcontainers (cadrage §8.4), sur le Docker du runner ; Redis suivra avec #11
 

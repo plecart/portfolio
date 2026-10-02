@@ -11,7 +11,7 @@
 # Trois jobs, un par pile. Ils n'ont pas les mêmes prérequis — `uv`, Node, Docker — et les
 # séparer évite qu'un rouge de l'une masque un rouge d'une autre. Le job `infra` installe aussi
 # Node : les images copient le front compilé, qu'il compile lui-même plutôt que d'attendre le job
-# `web` (ADR 0014). Un quatrième, `publish`, ne tourne qu'après un push sur `main`, une fois les
+# `web` (ADR 0014) ; et `uv`, pour les tests des images qu'il vient de construire. Un quatrième, `publish`, ne tourne qu'après un push sur `main`, une fois les
 # trois autres verts : il publie les images sur GHCR.
 #
 # Chaque action est épinglée par **empreinte de commit**, sa version en commentaire : une
@@ -145,7 +145,7 @@ jobs:
         run: make web-lighthouse
 
   infra:
-    name: Infra — configuration Compose, images, scan
+    name: Infra — configuration Compose, images, tests des images, scan
     runs-on: ubuntu-latest
 
     # Même garde que les deux autres jobs : voir le commentaire du job back.
@@ -211,6 +211,17 @@ jobs:
             --load
             --cache-from type=local,src=/tmp/buildx-cache,tag=$*
             --cache-to type=local,dest=/tmp/buildx-cache,tag=$*,mode=max
+
+      # Les tests des images que l'étape précédente a chargées — le test de fumée de `caddy` —,
+      # écrits en pytest comme ceux du back : `uv` et l'environnement Python d'abord. Avant le scan,
+      # plus long : un Caddyfile cassé se voit en quelques secondes.
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+
+      - name: Environnement Python
+        run: make install
+
+      - name: Tests des images
+        run: make image-test
 
       # Trivy, par `make scan` : la commande du poste, dans l'image officielle que le `Makefile`
       # épingle — aucune action à installer (ADR 0014). Rouge sur toute vulnérabilité HIGH ou
