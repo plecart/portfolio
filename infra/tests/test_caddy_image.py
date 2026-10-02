@@ -9,6 +9,7 @@ attribue : le moteur est partagé avec d'autres piles. Les requêtes partent de 
 `Host` que `cloudflared` transmettrait.
 """
 
+import json
 import os
 import subprocess
 import time
@@ -17,7 +18,9 @@ from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from http.client import HTTPConnection, HTTPException, HTTPMessage
+from ipaddress import ip_network
 from pathlib import Path
+from typing import Any
 
 import pytest
 from test_infra import built_images, make_dry_run
@@ -43,10 +46,12 @@ IMMUTABLE = "public, max-age=31536000, immutable"
 # Ce que répond l'amont factice de `caddy.yml` : son corps, sa politique de sécurité — celle que
 # `django-csp` poserait —, et le cache qu'il pose sur les statiques de l'admin — celui de
 # WhiteNoise. Chacun diffère de ce que Caddy poserait : intact, il prouve que Caddy n'y a pas touché.
+# Il renvoie aussi, sous l'en-tête `UPSTREAM_PROTO_ECHO`, le `X-Forwarded-Proto` qu'il a reçu.
 UPSTREAM = {
     "UPSTREAM_BODY": "amont",
     "UPSTREAM_CSP": "default-src 'none'",
     "UPSTREAM_STATIC_CACHE": "max-age=315360000, public, immutable",
+    "UPSTREAM_PROTO_ECHO": "X-Amont-Forwarded-Proto",
 }
 
 # Les en-têtes de sécurité de l'hôte du site (brief de #16, décision 3 ; PRD « Sécurité ») : la
@@ -87,23 +92,25 @@ class Reply:
 
 @dataclass(frozen=True)
 class Stack:
-    """La pile démarrée : le port hôte où Caddy écoute."""
+    """La pile démarrée : l'environnement de Compose qui la désigne, le port hôte où Caddy écoute."""
 
+    environment: Mapping[str, str]
     port: int
 
-    def get(self, host: str, path: str) -> Reply:
+    def get(self, host: str, path: str, headers: Mapping[str, str] | None = None) -> Reply:
         """Une requête `GET` sur `path`, sous le nom d'hôte `host`.
 
         Args:
             host: la valeur de l'en-tête `Host`, celle que `cloudflared` transmettrait.
             path: le chemin demandé.
+            headers: des en-têtes de plus, comme `cloudflared` en ajoute.
 
         Returns:
             La réponse, corps lu et décodé.
         """
         connection = HTTPConnection("127.0.0.1", self.port, timeout=5)
         try:
-            connection.request("GET", path, headers={"Host": host})
+            connection.request("GET", path, headers={"Host": host, **(headers or {})})
             response = connection.getresponse()
             return Reply(response.status, response.headers, response.read().decode())
         finally:
@@ -158,7 +165,7 @@ def stack() -> Iterator[Stack]:
         # Dans le `try` : un démarrage raté laisse un réseau et des conteneurs créés.
         compose("up", "--detach", "--wait", environment=environment)
         published = compose("port", "caddy", "80", environment=environment)
-        started = Stack(int(published.strip().rsplit(":", 1)[1]))
+        started = Stack(environment, int(published.strip().rsplit(":", 1)[1]))
         wait_until_serving(started)
         yield started
     finally:
@@ -269,3 +276,102 @@ def test_l_hote_de_l_api_garde_les_en_tetes_de_django(stack: Stack) -> None:
     reply = stack.get(API, "/admin/")
 
     assert reply.headers.get_all("Content-Security-Policy") == [UPSTREAM["UPSTREAM_CSP"]]
+
+
+@pytest.mark.parametrize("host", [SITE, API])
+def test_le_schema_transmis_par_le_reseau_prive_atteint_api(stack: Stack, host: str) -> None:
+    """`cloudflared` joint Caddy en HTTP et transmet `X-Forwarded-Proto: https`. Caddy, qui
+    réécrit par défaut ces en-têtes d'après sa propre connexion, le garde quand il vient du réseau
+    privé : Django y lit que la requête du visiteur était en HTTPS (`SECURE_PROXY_SSL_HEADER`, #6),
+    sans quoi sa vérification d'origine du CSRF refuse les envois de l'admin. Les requêtes du test
+    arrivent par la passerelle du réseau de Docker, une adresse privée."""
+    reply = stack.get(host, "/projets/x", headers={"X-Forwarded-Proto": "https"})
+
+    assert reply.headers.get_all(UPSTREAM["UPSTREAM_PROTO_ECHO"]) == ["https"]
+
+
+# Le réseau privé, au sens de `private_ranges` de Caddy (doc Caddy, options globales) — où Docker
+# place ses réseaux. Pas `ipaddress.is_private`, plus large : il compte les plages de documentation.
+PRIVATE_NETWORKS = [
+    ip_network(network)
+    for network in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "fd00::/8")
+] + [ip_network("::1/128")]
+
+
+def is_private(network: str) -> bool:
+    """`network` tient-il tout entier dans le réseau privé ?"""
+    candidate = ip_network(network, strict=False)
+    return any(
+        candidate.network_address in private and candidate.broadcast_address in private
+        for private in PRIVATE_NETWORKS
+    )
+
+
+def trust_findings(servers: Mapping[str, Any]) -> list[str]:
+    """Ce qui, dans les serveurs d'une configuration JSON de Caddy, croit des `X-Forwarded-*` venus
+    d'ailleurs que du réseau privé.
+
+    Returns:
+        Un constat si aucun serveur n'est lu, un par serveur sans plage de confiance, un par plage
+        qui n'est pas privée. Liste vide : seuls les proxys du réseau privé sont crus.
+    """
+    if not servers:
+        return ["aucun serveur — la forme de la configuration a-t-elle changé ?"]
+    findings: list[str] = []
+    for name, server in servers.items():
+        proxies: dict[str, Any] = server.get("trusted_proxies") or {}
+        ranges: list[str] = proxies.get("ranges") or []
+        findings += [f"`{name}` ne croit aucun proxy"] if not ranges else []
+        findings += [f"`{name}` croit {network}" for network in ranges if not is_private(network)]
+    return findings
+
+
+def trusting(*ranges: str) -> dict[str, Any]:
+    """Un serveur de configuration JSON qui croit les proxys de `ranges`."""
+    return {"trusted_proxies": {"source": "static", "ranges": list(ranges)}}
+
+
+# Forme → (serveurs, constat attendu). Le premier cas est ce que `private_ranges` devient.
+TRUST_FORMS: dict[str, tuple[dict[str, Any], bool]] = {
+    "réseau privé": (
+        {
+            "srv0": trusting(
+                "192.168.0.0/16", "172.16.0.0/12", "10.0.0.0/8", "127.0.0.1/8", "fd00::/8", "::1"
+            )
+        },
+        False,
+    ),
+    "toute adresse": ({"srv0": trusting("0.0.0.0/0")}, True),
+    "une adresse publique de plus": ({"srv0": trusting("10.0.0.0/8", "1.1.1.1/32")}, True),
+    "une plage de documentation": ({"srv0": trusting("203.0.113.0/24")}, True),
+    "toute adresse IPv6": ({"srv0": trusting("::/0")}, True),
+    "aucun proxy cru": ({"srv0": {}}, True),
+    "un second serveur sans plage": ({"srv0": trusting("10.0.0.0/8"), "srv1": {}}, True),
+    "aucun serveur": ({}, True),
+}
+
+
+@pytest.mark.parametrize(("servers", "expected"), TRUST_FORMS.values(), ids=TRUST_FORMS.keys())
+def test_la_garde_de_confiance_rend_son_verdict_sur_chaque_forme(
+    servers: dict[str, Any], expected: bool
+) -> None:
+    """Chaque forme recensée : signalée si, et seulement si, elle croit un proxy hors du réseau
+    privé ou n'en croit aucun. La garde se prouve ici, sans affaiblir le Caddyfile du dépôt."""
+    assert bool(trust_findings(servers)) is expected, trust_findings(servers)
+
+
+def test_caddy_ne_fait_confiance_qu_au_reseau_prive(stack: Stack) -> None:
+    """Un `X-Forwarded-*` venu d'ailleurs est forgé : seul le réseau privé, où vit `cloudflared`, est
+    cru. Lu dans la configuration que Caddy tire lui-même du Caddyfile (`caddy adapt`)."""
+    adapted = compose(
+        "exec",
+        "-T",
+        "caddy",
+        "caddy",
+        "adapt",
+        "--config",
+        "/etc/caddy/Caddyfile",
+        environment=stack.environment,
+    )
+
+    assert trust_findings(json.loads(adapted)["apps"]["http"]["servers"]) == []
