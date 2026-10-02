@@ -22,9 +22,9 @@ services:
 
   # L'amont factice, au nom et au port de `api` : la même image, sous une autre configuration —
   # aucune image de plus à épingler. Il répond comme Django sur ce que le test observe : ses propres
-  # en-têtes de sécurité, que Caddy doit remplacer sur l'hôte du site — même valeur pour `nosniff`,
-  # pour qu'un doublon se voie — et garder sur l'hôte de l'API ; un cache long sur les statiques de
-  # l'admin, que Caddy doit laisser intact ; et, en écho, le schéma que Caddy lui transmet.
+  # en-têtes de sécurité, que Caddy doit remplacer sur l'hôte du site et garder sur l'hôte de l'API ;
+  # un cache long sur les statiques de l'admin, que Caddy doit laisser intact ; et, en écho, le
+  # schéma que Caddy lui transmet.
   api:
     image: ${CADDY_IMAGE:?}
     pull_policy: never
@@ -38,10 +38,7 @@ configs:
     content: |
       :8000 {
         header {
-          Content-Security-Policy "${UPSTREAM_CSP:?}"
-          X-Frame-Options SAMEORIGIN
-          X-Content-Type-Options nosniff
-          Referrer-Policy same-origin
+          ${UPSTREAM_SECURITY_HEADERS:?}
         }
         header /static/* Cache-Control "${UPSTREAM_STATIC_CACHE:?}"
         header ${UPSTREAM_PROTO_ECHO:?} "{header.X-Forwarded-Proto}"

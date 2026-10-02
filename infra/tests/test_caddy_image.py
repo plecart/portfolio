@@ -44,14 +44,25 @@ APP_SHELL = '<div id="root"></div>'
 # Le cache d'un fichier haché par la compilation : un nom ne désigne jamais qu'un contenu.
 IMMUTABLE = "public, max-age=31536000, immutable"
 
-# Ce que répond l'amont factice de `caddy.yml` : son corps, sa politique de sécurité — celle que
-# `django-csp` poserait —, et le cache qu'il pose sur les statiques de l'admin — celui de
-# WhiteNoise. Chacun diffère de ce que Caddy poserait : intact, il prouve que Caddy n'y a pas
-# touché.
-# Il renvoie aussi, sous l'en-tête `UPSTREAM_PROTO_ECHO`, le `X-Forwarded-Proto` qu'il a reçu.
+# Les en-têtes de sécurité de l'amont factice — ceux que Django poserait, `django-csp` compris. Ceux
+# du site doivent les remplacer sur `/projets/*`, ceux de l'hôte de l'API les laisser : chacun a une
+# autre valeur que celui du site, sauf `nosniff`, dont un doublon se verrait au décompte.
+UPSTREAM_SECURITY_HEADERS = {
+    "Content-Security-Policy": "default-src 'none'",
+    "X-Frame-Options": "SAMEORIGIN",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "same-origin",
+}
+
+# Ce que répond l'amont factice de `caddy.yml` : son corps, ses en-têtes de sécurité, et le cache
+# qu'il pose sur les statiques de l'admin — celui de WhiteNoise, différent de celui de Caddy :
+# intact, il prouve que Caddy n'y a pas touché. Il renvoie aussi, sous l'en-tête
+# `UPSTREAM_PROTO_ECHO`, le `X-Forwarded-Proto` qu'il a reçu.
 UPSTREAM = {
     "UPSTREAM_BODY": "amont",
-    "UPSTREAM_CSP": "default-src 'none'",
+    "UPSTREAM_SECURITY_HEADERS": "\n".join(
+        f'{name} "{value}"' for name, value in UPSTREAM_SECURITY_HEADERS.items()
+    ),
     "UPSTREAM_STATIC_CACHE": "max-age=315360000, public, immutable",
     "UPSTREAM_PROTO_ECHO": "X-Amont-Forwarded-Proto",
 }
@@ -288,7 +299,9 @@ def test_l_hote_de_l_api_garde_les_en_tetes_de_django(stack: Stack) -> None:
     n'admet ni leurs formulaires ni leurs scripts, n'y entre pas."""
     reply = stack.get(API, "/admin/")
 
-    assert reply.headers.get_all("Content-Security-Policy") == [UPSTREAM["UPSTREAM_CSP"]]
+    assert {name: reply.headers.get_all(name) for name in UPSTREAM_SECURITY_HEADERS} == {
+        name: [value] for name, value in UPSTREAM_SECURITY_HEADERS.items()
+    }
 
 
 @pytest.mark.parametrize("host", [SITE, API])

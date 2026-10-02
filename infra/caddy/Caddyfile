@@ -4,7 +4,6 @@
 # Les noms d'hôte viennent de l'environnement du conteneur, lus au démarrage : le Compose de
 # production les fixera (#16), le test de fumée (`infra/tests/test_caddy_image.py`) les remplace
 # par des noms réservés aux tests.
-
 {
 	servers {
 		# Caddy réécrit par défaut les `X-Forwarded-*` reçus d'après sa propre connexion, donc en
