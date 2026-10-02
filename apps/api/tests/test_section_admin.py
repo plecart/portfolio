@@ -127,9 +127,12 @@ def test_un_bloc_garde_son_texte_tel_que_saisi(admin_client: Client) -> None:
 
 @pytest.mark.django_db
 def test_l_ecran_reaffiche_chaque_section_dans_son_bloc(admin_client: Client) -> None:
-    portfolio = saved_project(saved(technology(name="Django")))
+    """Les sections du projet, et elles seules : celle d'un autre projet reste hors de l'écran."""
+    django = saved(technology(name="Django"))
+    portfolio = saved_project(django)
     saved(section(portfolio, key=SectionKey.CONTEXT, body="Pourquoi."))
     saved(section(portfolio, key=SectionKey.RETROSPECTIVE, body="Ce que j'en retiens."))
+    saved(section(saved_project(django, slug="autre"), key=SectionKey.DATA))
 
     response = admin_client.get(reverse("admin:content_project_change", args=[portfolio.pk]))
     form = response.context["adminform"].form
@@ -146,10 +149,14 @@ def test_un_bloc_vide_supprime_sa_section_et_un_bloc_change_la_remplace(
     admin_client: Client, emptied: str
 ) -> None:
     """Le bloc de chaque section enregistrée est rempli à l'ouverture de l'écran : l'auteur le vide,
-    le change ou n'y touche pas, et l'enregistrement suit — les autres sections restent."""
-    portfolio = saved_project(saved(technology(name="Django")))
+    le change ou n'y touche pas, et l'enregistrement suit — les autres sections restent, celles
+    d'un autre projet aux mêmes clés comprises."""
+    django = saved(technology(name="Django"))
+    portfolio, other = saved_project(django), saved_project(django, slug="autre")
     for key in (SectionKey.CONTEXT, SectionKey.STACK, SectionKey.RETROSPECTIVE):
         saved(section(portfolio, key=key, body=f"Avant : {key.label}."))
+    for key in (SectionKey.CONTEXT, SectionKey.STACK):
+        saved(section(other, key=key, body="Ailleurs."))
     url = reverse("admin:content_project_change", args=[portfolio.pk])
     data = rendered_data(admin_client, url) | {
         BLOCKS[SectionKey.CONTEXT]: emptied,
@@ -163,6 +170,7 @@ def test_un_bloc_vide_supprime_sa_section_et_un_bloc_change_la_remplace(
         SectionKey.STACK: "Après.",
         SectionKey.RETROSPECTIVE: f"Avant : {SectionKey.RETROSPECTIVE.label}.",
     }
+    assert stored(other) == {SectionKey.CONTEXT: "Ailleurs.", SectionKey.STACK: "Ailleurs."}
 
 
 @pytest.mark.django_db
