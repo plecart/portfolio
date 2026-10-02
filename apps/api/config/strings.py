@@ -93,6 +93,29 @@ PROJECT_TECHNOLOGY_POSITION = "position"
 PROJECT_TECHNOLOGY_TAKEN = "Cette technologie figure déjà dans le projet."
 PROJECT_TECHNOLOGIES_MISSING = "Un projet emploie au moins une technologie."
 
+# Section de fiche technique : modèle, champs, et le titre de chaque section, dans l'ordre de la
+# fiche (cadrage §6.1)
+SECTION = "section"
+SECTIONS = "sections"
+SECTION_KEY = "clé"
+SECTION_BODY = "corps"
+SECTION_CONTEXT = "Contexte et objectif"
+SECTION_STACK = "Stack"
+SECTION_ARCHITECTURE = "Architecture"
+SECTION_DATA = "Données"
+SECTION_SECURITY = "Sécurité"
+SECTION_ASYNC = "Asynchrone et workers"
+SECTION_API = "API et intégrations"
+SECTION_DEPLOYMENT = "Déploiement et exploitation"
+SECTION_TESTS = "Tests et qualité"
+SECTION_DECISIONS = "Décisions"
+SECTION_RETROSPECTIVE = "Bilan"
+
+# Section de fiche technique : refus
+SECTION_KEY_TAKEN = "Ce projet porte déjà cette section."
+SECTION_KEY_UNKNOWN = "La clé d’une section est l’une des onze de la fiche technique."
+SECTION_BODY_MISSING = "Une section porte un texte, et pas seulement des espaces."
+
 # Lignes en ligne de l'admin : la colonne et la poignée qui les ordonnent par glisser-déposer
 ADMIN_ROW_ORDER = "ordre"
 ADMIN_ROW_MOVE = "Déplacer la ligne : la faire glisser, ou flèches haut et bas"

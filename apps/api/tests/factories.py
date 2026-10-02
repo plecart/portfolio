@@ -6,7 +6,15 @@ attendu ne peut venir que du champ que le test remplace.
 
 from datetime import date
 
-from content.models import Project, ProjectKind, ProjectStatus, Technology, TechnologyKind
+from content.models import (
+    Project,
+    ProjectKind,
+    ProjectStatus,
+    Section,
+    SectionKey,
+    Technology,
+    TechnologyKind,
+)
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import Model
 
@@ -55,4 +63,11 @@ def project(**fields: object) -> Project:
             "started_on": STARTED_ON,
             **fields,
         }
+    )
+
+
+def section(owner: Project, **fields: object) -> Section:
+    """Une section valide de `owner`, non enregistrée ; `fields` en remplace des champs."""
+    return Section(
+        **{"project": owner, "key": SectionKey.CONTEXT, "body": "Pourquoi ce projet.", **fields}
     )

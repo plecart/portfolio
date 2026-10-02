@@ -2,8 +2,8 @@
 
 Les termes du portfolio, en français, et leurs identifiants dans le code, en anglais
 (`.claude/pipeline.config.md`, section « Langue »). Les noms de tests, les titres d'issues et de
-PR emploient ces termes ; le code, ces identifiants. Les valeurs stockées sont en anglais et
-l'API les expose telles quelles (ADR 0010) : les libellés français vivent dans le catalogue de
+PR emploient ces termes ; le code, ces identifiants. Les valeurs stockées sont en anglais — sauf
+les clés de section, que la spec fixe en français — et l'API les expose telles quelles (ADR 0010) : les libellés français vivent dans le catalogue de
 chaînes du back (`apps/api/config/strings.py`).
 
 ## Technologie — `Technology`
@@ -50,3 +50,32 @@ moins une ; l'écran Projet les saisit en ligne et les ordonne par glisser-dépo
 | projet | `project` | supprimer le projet supprime ses technologies de projet |
 | technologie | `technology` | une fois au plus par projet ; une technologie employée ne se supprime pas |
 | position | `position` | entier de 0 à 32 767, caché dans l'écran Projet : l'auteur fait glisser les lignes, enregistrées ou neuves, et la position suit l'ordre affiché à l'enregistrement ; l'ordre stocké suit la position, puis l'ordre de saisie |
+
+## Section — `Section`
+
+Une section de la fiche technique d'un projet (cadrage §6.1). Onze sections possibles, dans un
+ordre fixe, toutes facultatives : une section sans texte n'est pas enregistrée, et le site l'omet
+(spec §7).
+
+| Terme | Identifiant | Règle |
+|---|---|---|
+| projet | `project` | supprimer le projet supprime ses sections |
+| clé | `key` | l'une des onze ci-dessous, une fois au plus par projet ; stable — le site et le RAG y renvoient par l'ancre `#s-<clé>` |
+| corps | `body` | Markdown, sans borne de longueur ; jamais vide ni fait d'espaces seulement |
+
+Les clés, dans l'ordre de la fiche, et leur titre. Par exception à la règle des valeurs stockées
+en anglais, ce sont les ancres françaises de la spec (§4.3), que l'API expose telles quelles.
+
+| Clé | Membre | Titre |
+|---|---|---|
+| `contexte` | `CONTEXT` | Contexte et objectif |
+| `stack` | `STACK` | Stack |
+| `architecture` | `ARCHITECTURE` | Architecture |
+| `donnees` | `DATA` | Données |
+| `securite` | `SECURITY` | Sécurité |
+| `asynchrone` | `ASYNC` | Asynchrone et workers |
+| `api` | `API` | API et intégrations |
+| `deploiement` | `DEPLOYMENT` | Déploiement et exploitation |
+| `tests` | `TESTS` | Tests et qualité |
+| `decisions` | `DECISIONS` | Décisions |
+| `bilan` | `RETROSPECTIVE` | Bilan |
