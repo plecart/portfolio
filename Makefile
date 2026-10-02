@@ -244,8 +244,8 @@ web-lighthouse:
 
 # Porte sur l'**arbre entier**, dépendances de développement comprises : une chaîne de build
 # compromise sait écrire dans `dist/`, et `--omit=dev` ne la verrait pas. Tenable parce que
-# l'arbre est propre : les `overrides` du manifeste écartent les 10 avis qu'`@lhci/cli` traînait,
-# en traitant leurs 3 racines (`docs/frontend-outillage.md` §2.4).
+# l'arbre est propre : les `overrides` du manifeste écartent les avis qu'`@lhci/cli` traîne, en
+# traitant leurs 4 racines (`docs/frontend-outillage.md` §2.4).
 #
 # Seuil `high` et non le défaut : sous ce niveau, les avis d'un arbre de développement de 650
 # paquets rougissent la porte sans que rien ne soit livré — et une porte qu'on apprend à ignorer

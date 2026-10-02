@@ -28,9 +28,9 @@ _2026-09-18, amendé le 2026-09-23 au scaffold de `apps/web` (#3), puis le 2026-
 ## 2. Inventaire installé
 
 Skills et outils en ligne de commande : 2026-09-18 (§2.1 à §2.3). Application `apps/web` :
-2026-09-23, amendée les 2026-09-25 et 26 (§2.4). C'est cette section qui fait foi sur ce qui est
-installé et pourquoi ; les versions de `apps/web` se lisent dans son manifeste et son verrou
-(§2.4). Le §3 reste le plan, avec l'état de chaque item.
+2026-09-23, amendée les 2026-09-25, 26 et 2026-10-02 (§2.4). C'est cette section qui fait foi
+sur ce qui est installé et pourquoi ; les versions de `apps/web` se lisent dans son manifeste et
+son verrou (§2.4). Le §3 reste le plan, avec l'état de chaque item.
 
 ### 2.1 Skills Claude Code (`.claude/skills/`)
 
@@ -81,7 +81,7 @@ Tout conservé. Les signalements, relus un par un, sont des faux positifs :
 | `prototype` | CAUTION | « never judge » : consigne de présentation des variantes |
 | autres | SAFE / CAUTION sans signalement | — |
 
-### 2.4 Application `apps/web` — 2026-09-23, amendée les 2026-09-25 et 26
+### 2.4 Application `apps/web` — 2026-09-23, amendée les 2026-09-25, 26 et 2026-10-02
 
 Node **24.21.0**, LTS active du jour, épinglée par `.nvmrc` et par `engines` (valeurs égales,
 vérifiées par un test). `@types/node` suit sa majeure, vérifiée par un autre test : des types d'une
@@ -150,25 +150,37 @@ quatre seuils de la spec §1.16. Trois points mesurés, non évidents :
   déclarée `data:,` dans l'`index.html` (sans elle, le 404 sur `/favicon.ico` fait tomber l'audit
   « erreurs dans la console » et les bonnes pratiques à 96).
 
-**`overrides` du manifeste — trois avis de sécurité écartés à la racine.** `@lhci/cli` 0.15.1
-traînait 10 avis (`npm audit`, arbre complet), dont 7 `high`. Trois racines, trois issues
-différentes :
+**`overrides` du manifeste — quatre avis de sécurité écartés à la racine.** `@lhci/cli` 0.15.1
+traînait 10 avis (`npm audit`, arbre complet), dont 7 `high`, sur trois racines (2026-09-25). Un
+avis publié le 2026-10-01 en a ajouté une quatrième, `basic-ftp`, que l'audit compte 9 fois en
+`high` — le paquet et les huit qui le tirent (#64). Quatre racines, quatre issues différentes :
 
 | Racine | Résolution | Pourquoi |
 |---|---|---|
 | `tmp` (2 × high) | `^0.2.7` | Les versions tirées (0.0.33 via `external-editor`, 0.1.0 en direct) sont vulnérables ; 0.2.7 est corrigée et expose les deux seules API appelées, `tmpNameSync` et `fileSync` (vérifié) |
 | `uuid` (moderate) | `^11.1.1` | `lhci` n'appelle que `uuid.v4()`, présent en CJS en v11 (vérifié) |
 | `extract-zip` (2 × high, CVSS 8.1) | `@puppeteer/browsers` → `^3.2.3` | **Aucune version d'`extract-zip` n'est corrigée** : les avis portent sur `<= 2.0.1`, et 2.0.1 est la dernière publiée (2023-03-04, paquet abandonné). La sortie n'est pas de le corriger mais de cesser d'en dépendre : `@puppeteer/browsers` 3.x l'a remplacé par `modern-tar`. C'est la correction que portent aussi Puppeteer 25.7 et les projets qui ont rencontré le même mur |
+| `basic-ftp` (high, GHSA-c475-qrg2-pj4r) | `^6.2.1` | Seule la 6.2.1 est corrigée, et aucun parent n'a cessé d'en dépendre : `get-uri` demande `basic-ftp ^5.3.1` jusqu'à sa dernière version (8.0.1 au 2026-10-02), et `@lhci/cli` fige sa chaîne sur `get-uri` 6 (`proxy-agent` 6 → `pac-proxy-agent` 7). La correction amont prend la même voie (TooTallNate/proxy-agents#500, ouverte au 2026-10-02) ; la résolution se retire quand la chaîne de `@lhci/cli` atteint un `get-uri` qui demande la 6.2.1 |
 
-Résultat mesuré : `npm audit` sur l'arbre **complet** rend `found 0 vulnerabilities`, et
-`npm ls extract-zip` rend vide. La porte `make web-audit` porte donc sur tout l'arbre, sans
-`--omit=dev` : une chaîne de build compromise sait écrire dans `dist/`, et l'exclure la rendrait
-aveugle à ce risque-là.
+Résultat mesuré : `npm audit` sur l'arbre **complet** rend `found 0 vulnerabilities`,
+`npm ls extract-zip` rend vide et `npm ls basic-ftp` ne rend que la 6.2.1. La porte
+`make web-audit` porte donc sur tout l'arbre, sans `--omit=dev` : une chaîne de build compromise
+sait écrire dans `dist/`, et l'exclure la rendrait aveugle à ce risque-là.
 
 Le saut de majeure `@puppeteer/browsers` 2 → 3 sous un `puppeteer-core` 24 est le vrai risque de
 cette manœuvre. Il a donc été éprouvé en exécutant réellement l'outil, pas seulement l'audit :
 Lighthouse 12.6.1 rend 100/100/100/100 sur la page, `lhci healthcheck` trouve Chrome, `lhci assert`
 sort 0, et les six portes front sont vertes après un `npm ci` depuis un verrou régénéré de zéro.
+
+Même exigence pour `basic-ftp` 5 → 6 sous `get-uri` 6.0.5 (2026-10-02). La 6.0.0 déclare une
+seule rupture : un serveur sans `EPSV` dont la réponse `PASV` désigne un autre hôte que celui de la
+connexion de contrôle est refusé — derrière un NAT compris, que la 5.x contournait —, et `get-uri`
+ne permet pas de le réautoriser. Le module `ftp` de `get-uri` a été exécuté contre un serveur FTP
+factice local, sur la 5.3.1 puis sur la 6.2.1 : mêmes résultats sur ses quatre chemins — date lue
+par `MDTM`, repli sur `MLSD`, repli sur `LIST` passé par le parseur Unix que vise l'avis, fichier
+absent (550). Le verrou n'a changé que sur l'entrée `basic-ftp`, et les portes front sont vertes
+après `npm ci` ; Lighthouse CI, qui ne tourne pas sous Windows, se prouve par le job `web` de la
+PR #65.
 
 **ESLint est épinglé sur la ligne 9** alors que la 10 est publiée : `eslint-plugin-jsx-a11y` déclare
 `eslint@^3 || … || ^9` (6.10.2, sa dernière version au 2026-09-25). Tourner sur la 10 demanderait de
