@@ -24,6 +24,10 @@ SVG = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"/>'
 # Le début du projet de la fabrique : les tests de dates se placent par rapport à lui.
 STARTED_ON = date(2026, 9, 1)
 
+# Un texte fait d'espaces seulement — espace, retour à la ligne, tabulation : vide pour l'auteur
+# comme pour le site (décision 7 du brief de #8).
+BLANK = " \n\t "
+
 
 def saved[M: Model](instance: M) -> M:
     """`instance`, enregistré : les fabriques rendent des objets non enregistrés, un test qui a
