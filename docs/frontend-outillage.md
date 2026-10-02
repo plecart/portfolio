@@ -176,8 +176,9 @@ Même exigence pour `basic-ftp` 5 → 6 sous `get-uri` 6.0.5 (2026-10-02). La 6.
 seule rupture : un serveur sans `EPSV` dont la réponse `PASV` désigne un autre hôte que celui de la
 connexion de contrôle est refusé — derrière un NAT compris, que la 5.x contournait —, et `get-uri`
 ne permet pas de le réautoriser. Le module `ftp` de `get-uri` a été exécuté contre un serveur FTP
-factice local, sur la 5.3.1 puis sur la 6.2.1 : mêmes résultats sur ses quatre chemins — date lue
-par `MDTM`, repli sur `MLSD`, repli sur `LIST` passé par le parseur Unix que vise l'avis, fichier
+factice local, sur la 5.3.1 puis sur la 6.2.1, avec les mêmes résultats sur ses quatre chemins : la
+date lue par `MDTM` ou, à défaut, par `MLSD` donne le fichier ; le repli sur `LIST`, qui passe par
+le parseur Unix que vise l'avis, ne donne pas de date et rend « introuvable », comme un fichier
 absent (550). Le verrou n'a changé que sur l'entrée `basic-ftp`, et les portes front sont vertes
 après `npm ci` ; Lighthouse CI, qui ne tourne pas sous Windows, se prouve par le job `web` de la
 PR #65.
