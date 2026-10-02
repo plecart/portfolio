@@ -28,8 +28,8 @@ STACK = Path(__file__).with_name("caddy.yml")
 PROJECT = f"portfolio-test-caddy-{uuid.uuid4().hex[:8]}"
 
 # Les noms d'hôte que le Caddyfile reçoit, sous le domaine réservé aux tests (RFC 2606).
-HOSTS = {"SITE_HOST": "site.test"}
-SITE = HOSTS["SITE_HOST"]
+HOSTS = {"SITE_HOST": "site.test", "API_HOST": "api.test"}
+SITE, API = HOSTS["SITE_HOST"], HOSTS["API_HOST"]
 
 # Le temps laissé à Caddy pour ouvrir son port, une fois son conteneur démarré.
 STARTUP_DEADLINE = 10.0
@@ -39,6 +39,14 @@ APP_SHELL = '<div id="root"></div>'
 
 # Le cache d'un fichier haché par la compilation : un nom ne désigne jamais qu'un contenu.
 IMMUTABLE = "public, max-age=31536000, immutable"
+
+# Ce que répond l'amont factice de `caddy.yml`, et le cache qu'il pose sur les statiques de
+# l'admin — celui de WhiteNoise, différent de celui de Caddy : intact, il prouve que Caddy n'y a pas
+# touché.
+UPSTREAM = {
+    "UPSTREAM_BODY": "amont",
+    "UPSTREAM_STATIC_CACHE": "max-age=315360000, public, immutable",
+}
 
 
 class ScriptSources(HTMLParser):
@@ -131,7 +139,7 @@ def wait_until_serving(stack: Stack) -> None:
 @pytest.fixture(scope="module")
 def stack() -> Iterator[Stack]:
     """La pile démarrée pour le module, arrêtée et supprimée à la fin, même en cas d'échec."""
-    environment = {**os.environ, "CADDY_IMAGE": caddy_image(), **HOSTS}
+    environment = {**os.environ, "CADDY_IMAGE": caddy_image(), **HOSTS, **UPSTREAM}
     try:
         # Dans le `try` : un démarrage raté laisse un réseau et des conteneurs créés.
         compose("up", "--detach", "--wait", environment=environment)
@@ -189,3 +197,29 @@ def test_un_fichier_hache_absent_rend_404_sans_cache_long(stack: Stack) -> None:
     assert reply.status == 404
     assert APP_SHELL not in reply.body
     assert IMMUTABLE not in (reply.headers.get_all("Cache-Control") or [])
+
+
+def test_les_fiches_projet_sont_relayees_vers_api(stack: Stack) -> None:
+    """`/projets/<slug>` est la seule sortie HTML du back : la vue des aperçus de lien (#14, ADR
+    0011) y injecte les balises du projet, ou redirige. Caddy la relaie au lieu de servir le front."""
+    reply = stack.get(SITE, "/projets/x")
+
+    assert reply.status == 200
+    assert reply.body == UPSTREAM["UPSTREAM_BODY"]
+
+
+def test_l_hote_de_l_api_est_relaye_vers_api(stack: Stack) -> None:
+    """L'API publique et l'admin vivent sur leur propre hôte : tout y part vers `api`."""
+    reply = stack.get(API, "/admin/")
+
+    assert reply.status == 200
+    assert reply.body == UPSTREAM["UPSTREAM_BODY"]
+
+
+def test_les_statiques_de_l_admin_gardent_leur_cache(stack: Stack) -> None:
+    """`api` sert lui-même les statiques de l'admin, sous `/static/`, avec ses en-têtes de cache
+    (WhiteNoise, ADR 0014) : Caddy les relaie sans y toucher."""
+    reply = stack.get(API, "/static/admin/css/base.css")
+
+    assert reply.status == 200
+    assert reply.headers.get_all("Cache-Control") == [UPSTREAM["UPSTREAM_STATIC_CACHE"]]
