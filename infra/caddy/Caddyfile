@@ -9,6 +9,12 @@
 http://{$SITE_HOST} {
 	root * /usr/share/caddy
 
+	# La seule sortie HTML du back : la vue des aperçus de lien (ADR 0011, #14) répond sur l'adresse
+	# d'une fiche, en injectant ses balises, ou redirige.
+	handle /projets/* {
+		reverse_proxy api:8000
+	}
+
 	# Les fichiers hachés de la compilation : leur nom porte une empreinte de leur contenu, il ne
 	# désigne jamais qu'un contenu — mis en cache un an, sans revalidation. Un nom absent rend 404,
 	# jamais `index.html` : servie sous un nom de script, la page resterait un an dans les caches.
@@ -27,4 +33,10 @@ http://{$SITE_HOST} {
 		try_files {path} /index.html
 		file_server
 	}
+}
+
+# L'hôte de l'API : l'API publique et l'admin, tout entiers servis par `api` — statiques de l'admin
+# compris, avec leurs propres en-têtes de cache (WhiteNoise, ADR 0014).
+http://{$API_HOST} {
+	reverse_proxy api:8000
 }

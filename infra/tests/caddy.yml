@@ -2,8 +2,8 @@
 # chargée, lancée par le test sous son propre nom de projet — le moteur Docker est partagé avec
 # d'autres piles (brief de #16).
 #
-# Le test fournit chaque valeur par l'environnement — l'image, que `make build` nomme, et les noms
-# d'hôte qu'il interroge : une seule source pour les deux côtés.
+# Le test fournit chaque valeur par l'environnement — l'image, que `make build` nomme, les noms
+# d'hôte qu'il interroge, ce que l'amont répond : une seule source pour les deux côtés.
 
 services:
   caddy:
@@ -12,6 +12,26 @@ services:
     pull_policy: never
     environment:
       SITE_HOST: ${SITE_HOST:?}
+      API_HOST: ${API_HOST:?}
     ports:
       # Un port hôte libre, que Docker attribue : aucun conflit avec une pile voisine.
       - "127.0.0.1::80"
+
+  # L'amont factice, au nom et au port de `api` : la même image, sous une autre configuration —
+  # aucune image de plus à épingler. Il répond comme Django sur ce que le test observe : un cache
+  # long sur les statiques de l'admin, que Caddy doit laisser intact.
+  api:
+    image: ${CADDY_IMAGE:?}
+    pull_policy: never
+    command: [caddy, run, --config, /etc/caddy/amont.Caddyfile, --adapter, caddyfile]
+    configs:
+      - source: amont
+        target: /etc/caddy/amont.Caddyfile
+
+configs:
+  amont:
+    content: |
+      :8000 {
+        header /static/* Cache-Control "${UPSTREAM_STATIC_CACHE:?}"
+        respond "${UPSTREAM_BODY:?}"
+      }
