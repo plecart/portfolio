@@ -6,10 +6,11 @@
 # démarrage avec « exec /usr/local/bin/entrypoint.sh: no such file or directory ». Mesuré, sur
 # une image construite verte.
 #
-# **Un seul** de ces fichiers casse réellement sur un `\r` : le script que le shell du conteneur
-# exécute. Les autres traversent la même frontière et leur tolérance au `\r` appartient à l'outil
-# qui les lit, pas à nous — `.python-version` passe aujourd'hui parce que `uv` l'absorbe, ce qui
-# n'est pas une garantie. Ils sont donc pinés aussi, sans prétendre qu'ils étaient fautifs.
+# Les fichiers qui cassent réellement sur un `\r` sont les scripts qu'un shell exécute : le point
+# d'entrée du conteneur, et `infra/bootstrap.sh`, copié de la copie de travail sur le VPS. Les
+# autres traversent la même frontière et leur tolérance au `\r` appartient à l'outil qui les lit,
+# pas à nous — `.python-version` passe aujourd'hui parce que `uv` l'absorbe, ce qui n'est pas une
+# garantie. Ils sont donc pinés aussi, sans prétendre qu'ils étaient fautifs.
 #
 # Le dénombrement, motif par motif, vit dans `apps/api/tests/test_infra.py` : un fichier ajouté
 # plus tard qui sortirait de cette liste y ferait rougir le motif devenu aveugle.
