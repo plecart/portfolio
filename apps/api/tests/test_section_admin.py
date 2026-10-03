@@ -28,8 +28,9 @@ SECTION_FIELD_LABELS = {
 
 
 def row(index: int, title: str, body: str, position: int, anchor: str = "") -> dict[str, object]:
-    """Les champs de la ligne `index` des sections d'un projet ; l'ancre, à défaut, est celle que
-    l'écran préremplirait depuis le titre."""
+    """Les champs de la ligne `index` des sections d'un projet ; l'ancre, à défaut, est un slug du
+    titre — proche de celle que l'écran préremplit, qui garde le souligné et retire
+    l'apostrophe."""
     slug = anchor or re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
     return {
         f"{ROWS}-{index}-title": title,
