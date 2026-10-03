@@ -2,15 +2,26 @@
 décision 8), et sa frontière — l'aperçu seul atteint les deux bibliothèques (ADR 0010, D51)."""
 
 import ast
+import inspect
+import re
+from collections.abc import Callable, Iterator, Sequence
 from html.parser import HTMLParser
 from pathlib import Path
+from typing import Any
 
 import pytest
 from content.preview import render
+from django.contrib.auth.models import User
+from django.test import Client
+from django.urls import URLPattern, URLResolver, get_resolver, reverse
 
 # Le dossier de l'application et ses paquets : ce qu'une route peut atteindre, tests exclus.
 APPLICATION = Path(__file__).resolve().parents[1]
 PACKAGES = ("config", "content")
+
+# Le nom de la route de l'aperçu, que le script appelle, et ce qu'il lui envoie.
+PREVIEW = "markdown_preview"
+SENT = {"text": "Un *mot*."}
 
 # La liste blanche de l'aperçu (brief de #8, décision 8), écrite ici sans la lire dans le module :
 # paragraphes, listes, emphases, code, citations, sauts de ligne, titres et liens.
@@ -91,13 +102,17 @@ def tags(fragment: str) -> list[tuple[str, dict[str, str | None]]]:
 
 def imported_names(path: Path) -> set[str]:
     """Les modules que le fichier `path` importe, lus dans sa syntaxe : `import a.b` donne `a.b`,
-    `from a import b` donne `a` et `a.b` — `b` peut être un module."""
+    `from a import b` donne `a` et `a.b` — `b` peut être un module ; un import relatif se lit
+    depuis le paquet du fichier."""
+    package = path.relative_to(APPLICATION).parent.parts
     names: set[str] = set()
     for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
         if isinstance(node, ast.Import):
             names |= {alias.name for alias in node.names}
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            names |= {node.module} | {f"{node.module}.{alias.name}" for alias in node.names}
+        elif isinstance(node, ast.ImportFrom):
+            base = package[: len(package) - node.level + 1] if node.level else ()
+            module = ".".join([*base, *([node.module] if node.module else [])])
+            names |= {module} | {f"{module}.{alias.name}" for alias in node.names}
     return names
 
 
@@ -112,11 +127,86 @@ def importers(target: str) -> set[str]:
     return found
 
 
+def routes(
+    patterns: Sequence[URLPattern | URLResolver], prefix: str = ""
+) -> Iterator[tuple[str, Callable[..., Any]]]:
+    """Chaque route de `patterns`, avec la vue qu'elle appelle, dégagée de ses enveloppes."""
+    for pattern in patterns:
+        if isinstance(pattern, URLResolver):
+            yield from routes(pattern.url_patterns, prefix + str(pattern.pattern))
+        else:
+            yield prefix + str(pattern.pattern), inspect.unwrap(pattern.callback)
+
+
 @pytest.mark.parametrize("library", ["markdown_it", "nh3"])
 def test_seul_l_apercu_importe_markdown_it_py_et_nh3(library: str) -> None:
     """Les deux bibliothèques ne servent qu'à l'aperçu de l'admin (ADR 0010, D51) : aucun autre
     module de l'application ne les importe."""
     assert importers(library) == {"content.preview"}
+
+
+def test_seules_des_routes_de_l_admin_atteignent_l_apercu() -> None:
+    """Aucune vue publique n'appelle les bibliothèques de l'aperçu (critère du corps de #8) : seuls
+    l'admin et la table de routage importent son module, et la seule route qui mène à sa vue est
+    sous `admin/`."""
+    reaching = {
+        route
+        for route, view in routes(get_resolver().url_patterns)
+        if view.__module__ == "content.preview"
+    }
+
+    assert importers("content.preview") <= {"content.admin", "config.urls"}
+    assert reaching == {"admin/markdown-preview/"}
+
+
+@pytest.mark.django_db
+def test_la_vue_d_apercu_rend_le_texte_recu(admin_client: Client) -> None:
+    """Le script envoie le texte saisi ; la vue en rend l'aperçu, sans rien enregistrer (brief de
+    #8, décision 2)."""
+    response = admin_client.post(reverse(PREVIEW), SENT)
+
+    assert response.status_code == 200
+    assert response["Content-Type"] == "text/html; charset=utf-8"
+    assert response.content.decode() == "<p>Un <em>mot</em>.</p>\n"
+
+
+def test_un_anonyme_est_renvoye_de_l_apercu_vers_la_connexion(client: Client) -> None:
+    """L'aperçu est réservé à l'utilisateur connecté de l'admin (décision 2)."""
+    response = client.post(reverse(PREVIEW), SENT)
+
+    assert response.status_code == 302
+    assert response["Location"].startswith(reverse("admin:login"))
+
+
+@pytest.mark.django_db
+def test_l_apercu_exige_le_jeton_csrf_du_formulaire(admin_user: User) -> None:
+    """Refusé sans jeton CSRF, rendu avec celui que le script lit dans le formulaire de l'écran et
+    envoie en en-tête. Le client de test de Django saute ce contrôle ; celui-ci l'exige, comme un
+    navigateur."""
+    client = Client(enforce_csrf_checks=True)
+    client.force_login(admin_user)
+    page = client.get(reverse("admin:content_project_add")).content.decode()
+    token = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', page)
+    assert token is not None
+
+    refused = client.post(reverse(PREVIEW), SENT)
+    accepted = client.post(reverse(PREVIEW), SENT, headers={"X-CSRFToken": token.group(1)})
+
+    assert (refused.status_code, accepted.status_code) == (403, 200)
+
+
+@pytest.mark.django_db
+def test_l_apercu_ne_repond_qu_en_post(admin_client: Client) -> None:
+    """Le texte voyage dans le corps de la requête, jamais dans l'adresse (décision 2)."""
+    assert admin_client.get(reverse(PREVIEW), SENT).status_code == 405
+
+
+@pytest.mark.django_db
+def test_l_apercu_n_est_jamais_mis_en_cache(admin_client: Client) -> None:
+    """Chaque aperçu est celui du texte du moment (décision 2)."""
+    response = admin_client.post(reverse(PREVIEW), SENT)
+
+    assert "no-store" in response["Cache-Control"]
 
 
 def test_l_apercu_rend_les_paragraphes_et_les_listes() -> None:
