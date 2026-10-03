@@ -113,6 +113,11 @@ SECTION_ANCHOR_INVALID = (
 SECTION_ANCHOR_TAKEN = "Une autre section de ce projet porte déjà cette ancre."
 SECTION_BODY_MISSING = "Une section porte un texte, et pas seulement des espaces."
 
+# Aperçu Markdown de l'admin, sous la description d'un projet et le corps d'une section : sa
+# légende, et ce qu'il montre quand il ne peut pas se rafraîchir
+MARKDOWN_PREVIEW = "Aperçu"
+MARKDOWN_PREVIEW_FAILED = "Aperçu indisponible."
+
 # Lignes en ligne de l'admin : la colonne et la poignée qui les ordonnent par glisser-déposer
 ADMIN_ROW_ORDER = "ordre"
 ADMIN_ROW_MOVE = "Déplacer la ligne : la faire glisser, ou flèches haut et bas"
