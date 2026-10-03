@@ -28,7 +28,7 @@ un champ : le front le déduit de la présence du lien de la démo.
 | titre | `title` | obligatoire, 30 caractères au plus |
 | slug | `slug` | obligatoire, unique ; lettres sans accent, chiffres, traits d'union et soulignés, 50 caractères au plus ; prérempli depuis le titre, toujours modifiable |
 | résumé | `summary` | obligatoire, 120 caractères au plus ; aucun mot — segment entre espaces ou traits d'union, l'espace insécable ne séparant pas — de plus de 20 caractères |
-| description | `description` | obligatoire, en Markdown, gardée telle que saisie ; jamais faite d'espaces seulement |
+| description | `description` | obligatoire, en Markdown, gardée telle que saisie ; jamais faite d'espaces seulement — une espace insécable seule y compte comme un texte (locale de l'image) |
 | type | `kind` | perso `personal` · pro `professional` · école `school` |
 | statut | `status` | en cours `ongoing` · terminé `finished` · archivé `archived` |
 | date de début | `started_on` | obligatoire |
