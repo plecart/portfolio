@@ -37,9 +37,10 @@ DEPLOYED_IMAGE = re.compile(
 
 # Une interpolation Compose : `${NOM…}`, ou `$NOM` sans accolades — que Compose résout aussi, à
 # vide s'il manque, sur un simple avertissement (mesuré à la relecture de la PR #69). `$$` échappe
-# le `$` destiné au shell du conteneur.
+# le `$` destiné au shell du conteneur : les paires se lisent d'abord, et le `$` qui reste derrière
+# elles interpole (`$$$X` rend `$` suivi de la valeur de `X`, mesuré).
 INTERPOLATION = re.compile(
-    r"(?<!\$)\$(?:\{(?P<name>\w+)(?P<modifier>[^}]*)\}|(?P<bare>[A-Za-z_]\w*))"
+    r"(?<!\$)(?:\$\$)*\$(?:\{(?P<name>\w+)(?P<modifier>[^}]*)\}|(?P<bare>[A-Za-z_]\w*))"
 )
 
 # Ce qu'un service de production ne porte jamais : toute clé qui le rendrait joignable autrement
@@ -72,10 +73,11 @@ SERVICE_ADDRESS_OVERRIDES = {
 
 
 def read_services(compose_file: Path) -> dict[str, dict[str, Any]]:
-    """Les services d'un fichier Compose du dépôt, par nom."""
-    return cast(
-        dict[str, dict[str, Any]], compose_services(compose_file.read_text(encoding="utf-8"))
-    )
+    """Les services d'un fichier Compose du dépôt, par nom — jamais une table vide : un test qui
+    parcourt les services passerait à vide sur un fichier qu'on ne sait plus lire."""
+    services = compose_services(compose_file.read_text(encoding="utf-8"))
+    assert services, f"{compose_file.name} : aucun service lu"
+    return cast(dict[str, dict[str, Any]], services)
 
 
 def exposure_findings(text: str) -> list[str]:
@@ -140,6 +142,8 @@ INTERPOLATION_FORMS = {
     "sans accolades": (environment_value("redis://redis:6379/$X"), True),
     "accolades échappées": (environment_value("$${X}"), False),
     "nom échappé": (environment_value("$$X"), False),
+    "échappement suivi d'un nom": (environment_value("$$$X"), True),
+    "deux échappements": (environment_value("$$$$X"), False),
 }
 
 
