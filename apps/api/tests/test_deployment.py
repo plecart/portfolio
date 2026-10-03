@@ -294,6 +294,15 @@ def test_un_echec_sur_le_vps_fait_echouer_le_job(tmp_path: Path) -> None:
     assert finished.returncode != 0
 
 
+def test_l_amorcage_prepare_le_dossier_ou_le_job_depose_la_pile() -> None:
+    """Le job dépose le Compose et réécrit `IMAGE_TAG` dans le dossier que `infra/bootstrap.sh`
+    a créé et où il a écrit le `.env` : deux noms qui divergeraient ne casseraient qu'au premier
+    déploiement réel."""
+    bootstrap = (REPOSITORY_ROOT / "infra" / "bootstrap.sh").read_text(encoding="utf-8")
+
+    assert f"\nSTACK_DIR={DEPLOY_DIRECTORY}\n" in bootstrap
+
+
 def test_le_script_de_deploiement_ne_cite_jamais_latest() -> None:
     """`latest` peut désigner l'avant-dernier commit quand deux publications se croisent (job
     `publish`) : le déploiement vise toujours l'étiquette du commit. Le runner du job,
