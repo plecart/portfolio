@@ -19,6 +19,7 @@ from config.env import Env
 from containers import POSTGRES_IMAGE
 from test_env import declared_variables
 from test_infra import COMPOSE_DEV, IMAGE_DOCKERFILES, PUBLISH_PREFIX, make_dry_run
+from test_supply_chain import compose_services
 
 COMPOSE_PROD = COMPOSE_DEV.with_name("compose.yml")
 PROD_ENV_EXAMPLE = COMPOSE_DEV.with_name("prod.env.example")
@@ -43,9 +44,13 @@ INTERPOLATION = re.compile(
 
 # Ce qu'un service de production ne porte jamais : toute clé qui le rendrait joignable autrement
 # que par le réseau du projet — un port publié, le réseau de l'hôte ou d'un autre conteneur, un
-# réseau nommé qui pourrait être externe. `cloudflared` est la seule entrée, par une connexion
-# sortante (D45).
-EXPOSING_KEYS = ["ports", "network_mode", "networks"]
+# réseau nommé qui pourrait être externe — ou qui reprendrait un autre fichier, hors de la vue de
+# cette garde. `cloudflared` est la seule entrée, par une connexion sortante (D45).
+EXPOSING_KEYS = ["ports", "network_mode", "networks", "extends"]
+
+# Les clés du fichier qui ajoutent des services ou des réseaux : un réseau déclaré, même `default`,
+# peut devenir externe ; un fichier inclus apporte ses propres services.
+EXPOSING_TOP_LEVEL_KEYS = ["networks", "include"]
 
 # La sonde de `postgres` doit interroger le **réseau**, pas le socket Unix local. Pendant
 # `initdb`, l'image postgres démarre un serveur temporaire avec `listen_addresses=''` : il
@@ -68,21 +73,21 @@ SERVICE_ADDRESS_OVERRIDES = {
 
 def read_services(compose_file: Path) -> dict[str, dict[str, Any]]:
     """Les services d'un fichier Compose du dépôt, par nom."""
-    return yaml.safe_load(compose_file.read_text(encoding="utf-8"))["services"]
+    return cast(
+        dict[str, dict[str, Any]], compose_services(compose_file.read_text(encoding="utf-8"))
+    )
 
 
 def exposure_findings(text: str) -> list[str]:
     """Ce par quoi un fichier Compose rendrait un service joignable hors du réseau du projet.
 
     Returns:
-        Un constat par réseau déclaré au niveau du fichier — même le réseau `default`, qu'une
-        déclaration peut rendre externe — et par clé de `EXPOSING_KEYS` portée par un service.
-        Liste vide : chaque service n'a que le réseau privé du projet.
+        Un constat par clé de `EXPOSING_TOP_LEVEL_KEYS` portée par le fichier et par clé de
+        `EXPOSING_KEYS` portée par un service. Liste vide : chaque service, tout entier écrit dans
+        ce fichier, n'a que le réseau privé du projet.
     """
     document: dict[str, Any] = yaml.safe_load(text)
-    declared = (
-        [f"réseaux déclarés : {sorted(document['networks'])}"] if "networks" in document else []
-    )
+    declared = [f"fichier : {key}" for key in EXPOSING_TOP_LEVEL_KEYS if key in document]
     return declared + [
         f"{name} : {key}"
         for name, service in document["services"].items()
@@ -157,6 +162,11 @@ EXPOSURE_FORMS = {
     ),
     "réseau par défaut redéfini en externe": (
         single_service("") + "networks:\n  default:\n    name: host\n    external: true\n",
+        True,
+    ),
+    "fichier inclus": ("include: [autre.yml]\n" + single_service(""), True),
+    "service étendu": (
+        single_service("    extends:\n      file: autre.yml\n      service: web\n"),
         True,
     ),
 }

@@ -285,8 +285,9 @@ def third_party_images(text: str) -> list[str]:
 
     Une image nommée ou étiquetée par une variable (`${…}`) est une image du dépôt, construite par
     `make build` et publiée sur GHCR : Dependabot la saute (`docker_compose/file_parser.rb`). Une
-    image tierce écrite derrière une variable à valeur par défaut échapperait donc à cette lecture ;
-    la forme figure au recueil, en `xfail`.
+    image tierce nommée ou étiquetée par une variable échapperait donc à cette lecture, comme à
+    Dependabot ; les deux formes figurent au recueil, en `xfail`. En production, une telle image
+    rougit tout de même : `test_compose.py` n'y admet d'image interpolée que celles du dépôt.
     """
     images = [
         cast(dict[str, object], service).get("image")
@@ -458,6 +459,9 @@ COMPOSE_FORMS = {
     "service construit, sans image": ("services:\n  api:\n    build: .\n", False),
     "image tierce derrière une variable à défaut": pytest.param(
         compose("${CACHE_IMAGE:-redis:7-alpine}"), True, marks=EXOTIC
+    ),
+    "image tierce, étiquette interpolée": pytest.param(
+        compose("redis:${CACHE_TAG:-7-alpine}"), True, marks=EXOTIC
     ),
 }
 

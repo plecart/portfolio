@@ -107,8 +107,8 @@ updates:
   # images de base, et à la même épingle dans les deux fichiers (ADR 0012). Dependabot lit dans
   # `/infra` tout fichier dont le nom contient `compose….yml`, et saute les images du dépôt, que
   # nomme une variable ; il ne propose qu'une étiquette de même suffixe (`-pg16-trixie`, `-alpine`) :
-  # ni un autre Postgres, ni une autre version d'Alpine (dependabot-core, `docker/tag.rb`). Un test
-  # exige que chaque fichier Compose qui cite une image tierce soit lu ici.
+  # ni un autre Postgres, ni une autre variante d'image comme `-alpine3.22` (dependabot-core,
+  # `docker/tag.rb`). Un test exige que chaque fichier Compose qui cite une image tierce soit lu ici.
   - package-ecosystem: docker-compose
     directory: /infra
     schedule:
