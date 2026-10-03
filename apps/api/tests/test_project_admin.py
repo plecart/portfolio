@@ -17,7 +17,7 @@ from django.urls import reverse
 from django.utils.html import escape
 from django.utils.text import capfirst
 from django.utils.translation import gettext
-from factories import project, saved, technology
+from factories import BLANK, project, saved, technology
 
 # Chaque champ de l'écran d'ajout d'un projet, dans l'ordre de l'écran, et son libellé du
 # catalogue ; puis ceux d'une ligne de technologie.
@@ -168,6 +168,23 @@ def test_la_description_d_un_projet_garde_son_texte_tel_que_saisi(admin_client: 
 
     assert response.status_code == 302
     assert Project.objects.get().description == code
+
+
+@pytest.mark.django_db
+def test_l_admin_refuse_une_description_faite_d_espaces(admin_client: Client) -> None:
+    """Gardée telle que saisie, une description d'espaces n'est plus retaillée en description vide :
+    l'admin la refuse avec le message du catalogue, sans rien enregistrer."""
+    data = new_project_data(
+        admin_client, description=BLANK, **line(0, saved(technology(name="Django")), 1)
+    )
+
+    response = admin_client.post(reverse("admin:content_project_add"), data)
+
+    assert response.status_code == 200
+    assert strings.PROJECT_DESCRIPTION_MISSING in response.context["adminform"].form.errors.get(
+        "__all__", []
+    )
+    assert not Project.objects.exists()
 
 
 @pytest.mark.django_db

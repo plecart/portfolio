@@ -199,8 +199,11 @@ class Project(models.Model):
                 violation_error_code="project_summary_missing",
                 violation_error_message=strings.PROJECT_SUMMARY_MISSING,
             ),
+            # Au moins un caractère qui n'est pas une espace, comme le corps d'une section :
+            # l'admin garde la description telle que saisie (aperçu Markdown, #8), une description
+            # d'espaces n'y devient plus vide. `\S` suit la locale libc de l'image.
             models.CheckConstraint(
-                condition=~models.Q(description=""),
+                condition=models.Q(description__regex=r"\S"),
                 name="content_project_description_not_empty",
                 violation_error_code="project_description_missing",
                 violation_error_message=strings.PROJECT_DESCRIPTION_MISSING,

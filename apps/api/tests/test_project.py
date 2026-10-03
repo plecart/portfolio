@@ -9,7 +9,7 @@ from content.models import Project, ProjectKind, ProjectStatus
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
-from factories import STARTED_ON, project, url_of_length
+from factories import BLANK, STARTED_ON, project, url_of_length
 from refusals import refusals
 
 # Les bornes de la spec (§7) et les bornes techniques décidées au lot 1 : écrites ici, et non lues
@@ -209,6 +209,14 @@ SPEC_RULES = [
         {"summary": "m" * (WORD_MAX_LENGTH + 1)},
         "content_project_summary_words",
         ("project_summary_word_too_long", strings.PROJECT_SUMMARY_WORD_TOO_LONG),
+    ),
+    # Une description d'espaces est vide pour l'auteur comme pour le site ; l'admin la garde
+    # telle que saisie (aperçu Markdown, #8), c'est donc la base qui la refuse.
+    (
+        "description faite d'espaces",
+        {"description": BLANK},
+        "content_project_description_not_empty",
+        ("project_description_missing", strings.PROJECT_DESCRIPTION_MISSING),
     ),
     (
         "mot trop long au milieu d'un résumé",
