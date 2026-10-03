@@ -352,7 +352,11 @@ def test_l_ecran_projet_charge_le_script_d_apercu_sans_code_dans_la_page(
 def test_le_script_d_apercu_lit_les_prises_que_l_ecran_lui_livre() -> None:
     """Le script n'a pas de test de navigateur (ADR 0013) : ce test en tient la part serveur. Il lit
     le bloc et l'aperçu que pose le widget, les deux données du bloc, le jeton CSRF du formulaire,
-    et envoie le texte dans le champ que lit la vue."""
+    et envoie le texte dans le champ que lit la vue.
+
+    Il garde aussi la forme de ses gardes hors du chemin nominal — pause relancée à chaque frappe,
+    requête précédente annulée, redirection refusée, statut hors 2xx en échec : leur effet ne se
+    voit qu'au navigateur, éprouvé à l'écran (PR #70, Test plan)."""
     found = finders.find(PREVIEW_SCRIPT)
     assert isinstance(found, str)
     # Le code seul : une prise que seul un commentaire nomme encore ne tient rien.
@@ -367,5 +371,9 @@ def test_le_script_d_apercu_lit_les_prises_que_l_ecran_lui_livre() -> None:
         "[name=csrfmiddlewaretoken]",
         '"X-CSRFToken"',
         "{ text: ",
+        "clearTimeout(",
+        "?.abort()",
+        'redirect: "error"',
+        "!response.ok",
     ):
         assert hook in script
