@@ -63,7 +63,7 @@ _Document normatif de rang 2 (`.claude/pipeline.config.md`, « Sources de vérit
 
 ### 1.10 Fiche projet
 
-- **Desktop** : deux colonnes dans un panneau centré, dimensionné depuis la photo. Gauche : la galerie, fixe, légende et compteur sous l'image. Droite : en haut, fixes, le titre sur son post-it, les liens démo et dépôt sur des post-its **seulement s'ils existent** (rien à leur place sinon, cadrage §3), puis la rangée de rubans de la carte (trois technologies, « en cours », « en ligne ») ; dessous, une colonne qui défile : ligne de faits (type, dates, client), résumé, stack « Technologies » puis « Outils » (toutes, ordre de l'admin, rubans avec icône), description Markdown, puis les onze sections de la fiche technique (cadrage §6.1), repliées, chacune avec une ancre qui l'ouvre (liens profonds du RAG, cadrage §6.3) ; une section vide n'apparaît pas. Valeurs en §4.
+- **Desktop** : deux colonnes dans un panneau centré, dimensionné depuis la photo. Gauche : la galerie, fixe, légende et compteur sous l'image. Droite : en haut, fixes, le titre sur son post-it, les liens démo et dépôt sur des post-its **seulement s'ils existent** (rien à leur place sinon, cadrage §3), puis la rangée de rubans de la carte (trois technologies, « en cours », « en ligne ») ; dessous, une colonne qui défile : ligne de faits (type, dates, client), résumé, stack « Technologies » puis « Outils » (toutes, ordre de l'admin, rubans avec icône), description Markdown, puis les sections de la fiche technique (cadrage §6.1), dans l'ordre de l'admin, repliées, chacune avec une ancre qui l'ouvre (liens profonds du RAG, cadrage §6.3) ; une section vide n'apparaît pas. Valeurs en §4.
 - **Mobile** : galerie en haut, texte dessous, le tout défile ; galerie non fixe.
 - **Fermeture** : bouton fixe en haut à droite, `Échap`, bouton « retour » du navigateur.
 - **Galerie** : balayage tactile, flèches gauche/droite à l'écran, flèches du clavier, compteur « n / N », légende sous l'image, texte alternatif = légende. Une seule image : ni flèches ni compteur.
@@ -118,6 +118,7 @@ Ancres vérifiées : frontend-outillage §3 item 12 (seuils annoncés sans valeu
 - Dates : date de début obligatoire ; date de fin pour les projets terminés (ordre §1.9).
 - Liens : dépôt et démo facultatifs ; « en ligne » découle de la démo.
 - Vitrine : un projet au plus porte le booléen ; l'admin refuse un second.
+- Sections : autant que l'auteur en crée, titre de **40 caractères** au plus, ancre unique dans le projet.
 
 ## 2. Jetons
 
@@ -286,7 +287,7 @@ La carte du projet « vitrine » (§1.9) est une carte polaroid aux dimensions d
   2. résumé, 16 px, marge basse 16 px ;
   3. stack : intertitre « Technologies » (marge 12 px 0 8 px) puis toutes les technologies dans l'ordre de l'admin (rubans de 20 px, marge intérieure 0 8 px, 6 px entre icône et texte, liste à retours à la ligne, écart 4 px 8 px) ; intertitre « Outils » et ses rubans, seulement s'il y a des outils ;
   4. description (Markdown rendu : paragraphes à marge basse 12 px, listes à retrait 18 px), marge haute 16 px ;
-  5. sections : bloc à marge haute 16 px et filet haut 1 px `--line` ; un `<details id="s-<clé>">` fermé par section, filet bas 1 px chacun ; `<summary>` de 47 px (marge 12 px 0), titre 15 / 700 à gauche, « + » (« − » ouvert) 18 px `--ink-2` à droite, marqueur natif masqué ; corps à marge basse 12 px, paragraphes 16 px à marge basse 8 px. Une section vide n'est pas rendue. Clés d'ancre, dans l'ordre : `contexte`, `stack`, `architecture`, `donnees`, `securite`, `asynchrone`, `api`, `deploiement`, `tests`, `decisions`, `bilan`. Un lien vers `#s-<clé>` ouvre la section et la fait défiler en vue (`scroll-margin-top` 8 px ; défilement animé, instantané en mouvement réduit).
+  5. sections : bloc à marge haute 16 px et filet haut 1 px `--line` ; un `<details id="s-<ancre>">` fermé par section, filet bas 1 px chacun ; `<summary>` de 47 px (marge 12 px 0), titre 15 / 700 à gauche, « + » (« − » ouvert) 18 px `--ink-2` à droite, marqueur natif masqué ; corps à marge basse 12 px, paragraphes 16 px à marge basse 8 px. Une section vide n'est pas rendue. Ordre et ancres : ceux de l'admin, l'ancre de chaque section unique dans le projet (§7). Un lien vers `#s-<ancre>` ouvre la section et la fait défiler en vue (`scroll-margin-top` 8 px ; défilement animé, instantané en mouvement réduit).
 - **Mobile** : galerie, en-tête, colonne, dans cet ordre ; tout défile avec le panneau (§3.2).
 
 ### 4.4 Galerie
@@ -404,6 +405,6 @@ Base : §1.17. Les capacités ci-dessous sont mesurées sur la carte simple mobi
 - **Faits** : type parmi Perso, Pro, École ; dates « Depuis <mois année> » pour un projet en cours, « <Mois année> – <mois année> » sinon ; client facultatif ; affichés « Type · Dates · Client ».
 - **Statuts** : « en cours » découle du statut du modèle ; « en ligne » découle de la présence d'un lien démo ; un projet sans lien ne porte rien de plus (§1.6).
 - **Liens** : démo → « Voir le site », dépôt → « Voir le dépôt », facultatifs, jamais de lien vide.
-- **Sections** : les onze de cadrage §6.1, dans cet ordre, en Markdown (paragraphes et listes) ; une section vide est omise ; les clés d'ancre sont celles de §4.3.
+- **Sections** : autant que l'auteur en crée (cadrage §6.1), dans l'ordre de l'admin ; chacune un titre de 40 caractères au plus, une ancre (lettres sans accent, chiffres, traits d'union ; préremplie depuis le titre, unique dans le projet) et un corps en Markdown (paragraphes et listes) ; une section vide est omise. Sur la fiche mobile de 360 px (`<summary>` de 326 px, titre 15 / 700), un titre courant de 40 caractères tient sur une ligne.
 - **Vitrine** : un projet au plus ; l'admin refuse un second.
 - **Nombre de projets** : aucune limite ; la table à douze cartes est le cas de référence (§5.5).
