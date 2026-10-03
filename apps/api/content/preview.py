@@ -1,10 +1,12 @@
-"""L'aperçu Markdown de l'admin : son rendu (brief de #8, décision 8).
+"""L'aperçu Markdown de l'admin : son rendu, et la vue qui le sert (brief de #8, décisions 2 et 8).
 
 Indicatif : le rendu de référence est celui du site, en éléments React (ADR 0010). `markdown-it-py`
-et `nh3` ne servent qu'ici.
+et `nh3` ne servent qu'ici, et la vue n'est servie que dans l'admin (`config/urls.py`).
 """
 
 import nh3
+from django.http import HttpRequest, HttpResponse
+from django.views.decorators.http import require_POST
 from markdown_it import MarkdownIt
 
 # CommonMark, comme le site (ADR 0010), HTML brut désactivé : il est montré comme du texte, comme
@@ -57,3 +59,20 @@ def render(text: str) -> str:
         Un fragment HTML sûr à insérer dans une page de l'admin.
     """
     return _cleaner.clean(_markdown.render(text))
+
+
+@require_POST
+def preview(request: HttpRequest) -> HttpResponse:
+    """L'aperçu du texte que le script envoie pendant la saisie, sans rien enregistrer.
+
+    La route l'enveloppe par `admin_view` : utilisateur de l'admin connecté — un anonyme est
+    renvoyé vers la connexion —, jeton CSRF exigé, réponse jamais mise en cache.
+
+    Args:
+        request: une requête POST dont le champ `text` porte le Markdown ; absent, l'aperçu est
+            vide.
+
+    Returns:
+        Le fragment HTML de `render`, en `text/html`. Une autre méthode que POST reçoit un 405.
+    """
+    return HttpResponse(render(request.POST.get("text", "")))
