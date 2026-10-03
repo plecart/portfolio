@@ -13,7 +13,7 @@
 # Node : les images copient le front compilé, qu'il compile lui-même plutôt que d'attendre le job
 # `web` (ADR 0014) ; et `uv`, pour les tests des images qu'il vient de construire. Un quatrième,
 # `publish`, ne tourne qu'après un push sur `main`, une fois les trois autres verts : il publie les
-# images sur GHCR.
+# images sur GHCR. Un cinquième, `deploy`, les déploie ensuite sur le VPS, une fois celui-ci prêt.
 #
 # Chaque action est épinglée par **empreinte de commit**, sa version en commentaire : une
 # étiquette peut être déplacée par son propriétaire ou par un attaquant, et le déplacement
@@ -322,3 +322,62 @@ jobs:
         run: make prune IMAGE_PREFIX=ghcr.io/plecart/portfolio-
         env:
           GH_TOKEN: ${{ github.token }}
+
+  deploy:
+    name: Déploiement — production par SSH
+    runs-on: ubuntu-latest
+
+    # Après la publication des images du commit, sur un push vers `main`, et seulement une fois le
+    # VPS prêt : la variable de dépôt `DEPLOY_ENABLED` vaut `true` quand ses secrets existent
+    # (`infra/RUNBOOK.md`). Avant, le job est sauté et `main` ne rougit pas ; après, un secret
+    # manquant le fait échouer. Le `if` d'un job lit `vars`, jamais `secrets` (doc GitHub
+    # « Contexts »). Aucun `permissions` : le jeton du workflow, en lecture, suffit à lire la tête
+    # de `main` ; le VPS tire les images avec son propre jeton. `apps/api/tests/test_deployment.py`
+    # tient ces réglages et exécute le script.
+    needs: publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    timeout-minutes: 15
+
+    # Un déploiement à la fois, sans couper celui en cours au milieu de son `up`.
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Seule la tête de `main` se déploie : la publication range les runs par ordre d'arrivée, et
+      # un run plus lent que le suivant redéploierait l'ancien code sur un schéma déjà migré — le
+      # run du commit plus récent déploie à sa place.
+      #
+      # Puis le Compose du commit sur le VPS, son étiquette — le SHA complet, jamais `latest` —
+      # dans le `.env` que `infra/bootstrap.sh` y a écrit, `pull` et `up --wait`. `--wait` échoue
+      # si un service ne devient pas sain, chacun ayant sa sonde (`infra/compose.yml`) ; 300 s
+      # couvrent les 3 minutes après lesquelles un service qui tourne sans répondre est malade.
+      #
+      # La connexion n'accepte que l'hôte dont l'empreinte est épinglée par secret : jamais de
+      # première connexion de confiance (`StrictHostKeyChecking=yes`, aucun `ssh-keyscan`). La clé
+      # est dédiée au déploiement, sans phrase de passe, lisible du seul utilisateur du runner.
+      # `$options` sans guillemets, à dessein : le shell le découpe en options — les chemins de
+      # `RUNNER_TEMP` n'ont pas d'espace.
+      - name: Déploiement
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+        run: |
+          main=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$main" != "$GITHUB_SHA" ]; then
+            echo "::notice::main est passée à $main, que son propre run déploie."
+            exit 0
+          fi
+          key="$RUNNER_TEMP/deploy_key"
+          known_hosts="$RUNNER_TEMP/known_hosts"
+          (umask 077 && printf '%s\n' "$SSH_KEY" > "$key")
+          printf '%s\n' "$KNOWN_HOSTS" > "$known_hosts"
+          options="-i $key -o IdentitiesOnly=yes -o UserKnownHostsFile=$known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=30"
+          scp $options infra/compose.yml "$TARGET:/srv/portfolio/compose.yml"
+          ssh $options "$TARGET" "cd /srv/portfolio && sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=$GITHUB_SHA/' .env && docker compose pull --quiet && docker compose up -d --wait --wait-timeout 300"
