@@ -320,68 +320,77 @@ class ProjectTechnology(models.Model):
         return f"{self.project} · {self.technology}"
 
 
-class SectionKey(models.TextChoices):
-    """La clé d'une section de fiche technique, dans l'ordre de la fiche : celui de l'écran Projet et
-    du site (cadrage §6.1, spec §7).
-
-    Les valeurs sont les ancres `#s-<clé>` du site et du RAG (spec §4.3, US 57), que l'API expose
-    telles quelles : françaises, par exception à la règle des valeurs stockées en anglais — la spec
-    les fixe (décision 3 du brief de #8). Au niveau du module pour la même raison que
-    `TechnologyKind`.
-    """
-
-    CONTEXT = "contexte", strings.SECTION_CONTEXT
-    STACK = "stack", strings.SECTION_STACK
-    ARCHITECTURE = "architecture", strings.SECTION_ARCHITECTURE
-    DATA = "donnees", strings.SECTION_DATA
-    SECURITY = "securite", strings.SECTION_SECURITY
-    ASYNC = "asynchrone", strings.SECTION_ASYNC
-    API = "api", strings.SECTION_API
-    DEPLOYMENT = "deploiement", strings.SECTION_DEPLOYMENT
-    TESTS = "tests", strings.SECTION_TESTS
-    DECISIONS = "decisions", strings.SECTION_DECISIONS
-    RETROSPECTIVE = "bilan", strings.SECTION_RETROSPECTIVE
-
-
 class Section(models.Model):
-    """Une section de la fiche technique d'un projet : sa clé et son corps en Markdown (cadrage
-    §6.1, PRD « Modèle de contenu »).
+    """Une section de la fiche technique d'un projet, à sa place dans la fiche : un titre, une
+    ancre stable et un corps en Markdown (cadrage §6.1, D57).
 
-    Toutes facultatives, et jamais vides : une section sans texte n'est pas enregistrée, le site
+    L'auteur en crée autant qu'il veut, sans titre imposé, et les ordonne ; aucune n'est
+    obligatoire, et aucune n'est vide : une section sans texte n'est pas enregistrée, le site
     l'omet (spec §7).
     """
 
-    # L'index de l'unicité (projet, clé), mené par le projet, sert aussi ses recherches : l'index
+    # L'index de l'unicité (projet, ancre), mené par le projet, sert aussi ses recherches : l'index
     # que `ForeignKey` pose par défaut ferait double emploi.
     project: models.ForeignKey[Project, Project] = models.ForeignKey(
         Project, models.CASCADE, verbose_name=strings.PROJECT, db_index=False
     )
-    key: models.CharField[str, str] = models.CharField(
-        strings.SECTION_KEY, choices=SectionKey.choices
+    # Borné par une contrainte (`Meta`), comme le titre d'un projet : le refus porte un code propre.
+    title: models.CharField[str, str] = models.CharField(strings.SECTION_TITLE)
+    # Préremplie depuis le titre dans l'écran Projet, et toujours modifiable : c'est elle que le site
+    # et le RAG citent (`#s-<ancre>`, US 57), elle ne suit pas un titre retouché. Borne technique :
+    # le slug d'un titre de 40 caractères est plus court. L'index de l'unicité suffit.
+    anchor: models.SlugField[str, str] = models.SlugField(
+        strings.SECTION_ANCHOR, max_length=50, db_index=False
     )
-    # Aucune borne : la spec §7 n'en fixe pas (décision 5).
+    # Aucune borne : la spec §7 n'en fixe pas.
     body: models.TextField[str, str] = models.TextField(strings.SECTION_BODY)
+    # Sans valeur par défaut : le tableau en ligne de l'écran Projet la pose, dans l'ordre affiché
+    # (`content/inlines.py`, D55).
+    position: models.PositiveSmallIntegerField[int, int] = models.PositiveSmallIntegerField(
+        strings.SECTION_POSITION
+    )
 
     class Meta:
         verbose_name = strings.SECTION
         verbose_name_plural = strings.SECTIONS
+        # L'ordre de l'admin est l'ordre stocké ; à position égale, l'ordre de saisie.
+        ordering = ("position", "id")
         constraints = (
+            # Différée à la fin de la transaction, comme celle des technologies d'un projet : deux
+            # lignes qui échangent leurs ancres passent par un état intermédiaire en double
+            # (`content/inlines.py`).
             models.UniqueConstraint(
-                fields=["project", "key"],
-                name="content_section_key_unique",
-                violation_error_code="section_key_taken",
-                violation_error_message=strings.SECTION_KEY_TAKEN,
+                fields=["project", "anchor"],
+                deferrable=models.Deferrable.DEFERRED,
+                name="content_section_anchor_unique",
+                violation_error_code="section_anchor_taken",
+                violation_error_message=strings.SECTION_ANCHOR_TAKEN,
             ),
             models.CheckConstraint(
-                condition=models.Q(key__in=SectionKey.values),
-                name="content_section_key_valid",
-                violation_error_code="section_key_unknown",
-                violation_error_message=strings.SECTION_KEY_UNKNOWN,
+                condition=~models.Q(title=""),
+                name="content_section_title_not_empty",
+                violation_error_code="section_title_missing",
+                violation_error_message=strings.SECTION_TITLE_MISSING,
             ),
-            # Au moins un caractère qui n'est pas une espace : un corps d'espaces est vide
-            # (décision 7). `\S` suit la locale libc de l'image, comme pour les mots du résumé :
-            # une espace insécable seule y compte comme un texte, et les tests le verraient
-            # changer.
+            # La borne de la spec §7 : un titre courant de 40 caractères tient sur une ligne de la
+            # fiche mobile de 360 px.
+            models.CheckConstraint(
+                condition=LessThanOrEqual(Length("title"), 40),
+                name="content_section_title_length",
+                violation_error_code="section_title_too_long",
+                violation_error_message=strings.SECTION_TITLE_TOO_LONG,
+            ),
+            # La forme de la spec §7 — lettres sans accent, chiffres, traits d'union —, donc
+            # jamais vide : le souligné, que le champ de slug admet, n'en est pas.
+            models.CheckConstraint(
+                condition=models.Q(anchor__regex=r"^[-a-zA-Z0-9]+$"),
+                name="content_section_anchor_valid",
+                violation_error_code="section_anchor_invalid",
+                violation_error_message=strings.SECTION_ANCHOR_INVALID,
+            ),
+            # Au moins un caractère qui n'est pas une espace : un corps d'espaces est vide.
+            # `\S` suit la locale libc de l'image, comme pour les mots du résumé : une espace
+            # insécable seule y compte comme un texte, et les tests le verraient changer.
             models.CheckConstraint(
                 condition=models.Q(body__regex=r"\S"),
                 name="content_section_body_not_empty",
@@ -391,4 +400,4 @@ class Section(models.Model):
         )
 
     def __str__(self) -> str:
-        return f"{self.project} · {self.key}"
+        return f"{self.project} · {self.title}"

@@ -1,197 +1,225 @@
-"""Tests des blocs de la fiche technique dans l'écran Projet : onze blocs fixes, dans l'ordre de la
-fiche, sous les tableaux en ligne ; un bloc rempli enregistre sa section, un bloc vide n'enregistre
-rien, un bloc vidé la supprime."""
+"""Tests de la fiche technique dans l'écran Projet : des sections libres en tableau en ligne, sous
+les technologies, que l'auteur ajoute, retire et ordonne avant d'enregistrer (D55, D57)."""
+
+import html
+import json
+import re
 
 import pytest
 from config import strings
-from content.forms import SectionField
 from content.inlines import HANDLE_CLASS
-from content.models import Project, Section, SectionKey
-from django.db.models.signals import post_save
+from content.models import Project, Section
 from django.test import Client
 from django.urls import reverse
+from django.utils.text import capfirst
 from factories import BLANK, saved, section, technology
 from test_project_admin import LINES, line, new_project_data, rendered_data, saved_project
 
-# Le titre de chaque bloc, dans l'ordre de la fiche (cadrage §6.1, décision 4).
-SECTION_TITLES = [
-    strings.SECTION_CONTEXT,
-    strings.SECTION_STACK,
-    strings.SECTION_ARCHITECTURE,
-    strings.SECTION_DATA,
-    strings.SECTION_SECURITY,
-    strings.SECTION_ASYNC,
-    strings.SECTION_API,
-    strings.SECTION_DEPLOYMENT,
-    strings.SECTION_TESTS,
-    strings.SECTION_DECISIONS,
-    strings.SECTION_RETROSPECTIVE,
-]
+# Le préfixe des lignes de section dans le formulaire de l'écran Projet : le nom de la relation
+# inverse (`BaseInlineFormSet.get_default_prefix`).
+ROWS = "section_set"
 
-# Le nom du bloc de chaque section dans le formulaire de l'écran Projet.
-BLOCKS = {key: f"section_{key.name.lower()}" for key in SectionKey}
+# Chaque champ d'une ligne de section que l'auteur voit, et son libellé du catalogue.
+SECTION_FIELD_LABELS = {
+    "title": strings.SECTION_TITLE,
+    "anchor": strings.SECTION_ANCHOR,
+    "body": strings.SECTION_BODY,
+}
 
 
-def stored(owner: Project) -> dict[str, str]:
-    """Les sections enregistrées de `owner`, clé et corps."""
-    return dict(Section.objects.filter(project=owner).values_list("key", "body"))
+def row(index: int, title: str, body: str, position: int, anchor: str = "") -> dict[str, object]:
+    """Les champs de la ligne `index` des sections d'un projet ; l'ancre, à défaut, est celle que
+    l'écran préremplirait depuis le titre."""
+    slug = anchor or re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    return {
+        f"{ROWS}-{index}-title": title,
+        f"{ROWS}-{index}-anchor": slug,
+        f"{ROWS}-{index}-body": body,
+        f"{ROWS}-{index}-position": position,
+    }
+
+
+def stored(owner: Project) -> list[tuple[str, str, str]]:
+    """Les sections enregistrées de `owner`, dans l'ordre stocké : ancre, titre, corps."""
+    return list(Section.objects.filter(project=owner).values_list("anchor", "title", "body"))
 
 
 @pytest.mark.django_db
-def test_l_ecran_projet_affiche_les_onze_blocs_dans_l_ordre_de_la_fiche(
+def test_l_ecran_projet_montre_la_fiche_technique_sous_les_technologies(
     admin_client: Client,
 ) -> None:
-    """Un groupe à part, titré ; un bloc par section, titré du catalogue, dans l'ordre de la fiche,
-    jamais un douzième (critère du corps)."""
+    """Un tableau en ligne titré, ses champs libellés du catalogue, rendu après celui des
+    technologies (brief, « Comportement souhaité »)."""
     response = admin_client.get(reverse("admin:content_project_add"))
-    fieldsets = list(response.context["adminform"])
+    lines, sections = response.context["inline_admin_formsets"]
+    page = response.content.decode()
 
-    assert [fieldset.name for fieldset in fieldsets] == [None, strings.SECTIONS_HEADING]
-    blocks = [field.field for line in fieldsets[1] for field in line]
-    assert [block.name for block in blocks] == list(BLOCKS.values())
-    assert [block.label for block in blocks] == SECTION_TITLES
-    assert all(isinstance(block.field, SectionField) for block in blocks)
+    assert lines.formset.prefix == LINES
+    assert sections.formset.prefix == ROWS
+    assert sections.opts.verbose_name_plural == strings.SECTIONS_HEADING
+    assert {
+        name: sections.formset.form.base_fields[name].label for name in SECTION_FIELD_LABELS
+    } == {name: capfirst(label) for name, label in SECTION_FIELD_LABELS.items()}
+    assert page.index(f'id="{LINES}-group"') < page.index(f'id="{ROWS}-group"')
 
 
 @pytest.mark.django_db
-def test_les_blocs_de_la_fiche_suivent_les_champs_et_les_tableaux_en_ligne(
+def test_les_sections_ont_la_poignee_de_tri_des_lignes(admin_client: Client) -> None:
+    """Le tableau des sections est un tableau en ligne ordonnable : chaque ligne porte la poignée
+    que `inline_rows.js` rend glissable (ADR 0013)."""
+    page = admin_client.get(reverse("admin:content_project_add")).content.decode()
+    group = page[page.index(f'id="{ROWS}-group"') :]
+
+    assert HANDLE_CLASS in group
+
+
+@pytest.mark.django_db
+def test_l_ancre_d_une_ligne_neuve_se_remplit_depuis_le_titre_pas_celle_d_une_ligne_enregistree(
     admin_client: Client,
 ) -> None:
-    """Sous les champs et les technologies du projet (brief, « Comportement souhaité » ; PRD,
-    « Back-office »), que le gabarit de l'écran Projet rend avant eux."""
-    page = admin_client.get(reverse("admin:content_project_add")).content.decode()
+    """Le script de l'admin préremplit l'ancre d'une ligne neuve depuis son titre ; l'ancre d'une
+    section enregistrée ne suit plus un titre retouché : le site et le RAG la citent (US 57)."""
+    portfolio = saved_project(saved(technology(name="Django")))
+    saved(section(portfolio))
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
 
-    marks = [
-        'name="published"',
-        f'id="{LINES}-group"',
-        f'name="{BLOCKS[SectionKey.CONTEXT]}"',
-        f'name="{BLOCKS[SectionKey.RETROSPECTIVE]}"',
+    page = admin_client.get(url).content.decode()
+    declaration = re.search(r'data-prepopulated-fields="([^"]*)"', page)
+
+    assert declaration is not None
+    prepopulated = json.loads(html.unescape(declaration.group(1)))
+    rows = [(field["id"], field["dependency_ids"]) for field in prepopulated if ROWS in field["id"]]
+    assert rows == [
+        (f"#id_{ROWS}-1-anchor", [f"#id_{ROWS}-1-title"]),
+        (f"#id_{ROWS}-__prefix__-anchor", [f"#id_{ROWS}-__prefix__-title"]),
     ]
-    assert [page.count(mark) for mark in marks] == [1, 1, 1, 1]
-    assert [page.index(mark) for mark in marks] == sorted(page.index(mark) for mark in marks)
 
 
 @pytest.mark.django_db
-def test_le_script_des_lignes_ne_donne_aux_blocs_ni_poignee_ni_bouton_de_suppression(
-    admin_client: Client,
-) -> None:
-    """`inline_rows.js` agit sur tout tableau en ligne de l'écran, par deux sélecteurs : la poignée
-    de tri (`.sortable-handle`) et la case « Supprimer ? » qu'il remplace par un bouton
-    (décision 6). Le groupe des blocs n'a ni l'une ni l'autre — quand celui des technologies,
-    témoin, a la poignée."""
-    page = admin_client.get(reverse("admin:content_project_add")).content.decode()
-    heading = page.index(f">{strings.SECTIONS_HEADING}</h2>")
-    blocks = page[page.rindex("<fieldset", 0, heading) : page.index("</fieldset>", heading)]
-    lines = page[page.index(f'id="{LINES}-group"') : heading]
-
-    assert HANDLE_CLASS in lines
-    assert all(name in blocks for name in BLOCKS.values())
-    assert HANDLE_CLASS not in blocks
-    assert 'type="checkbox"' not in blocks
-
-
-@pytest.mark.django_db
-def test_un_bloc_rempli_enregistre_sa_section_et_un_bloc_vide_ou_d_espaces_rien(
-    admin_client: Client,
-) -> None:
+def test_l_admin_enregistre_les_sections_dans_l_ordre_affiche(admin_client: Client) -> None:
     django = saved(technology(name="Django"))
     data = new_project_data(
         admin_client,
         **line(0, django, 1),
-        **{
-            BLOCKS[SectionKey.CONTEXT]: "Pourquoi ce projet.",
-            BLOCKS[SectionKey.STACK]: "",
-            BLOCKS[SectionKey.DATA]: BLANK,
-        },
+        **row(0, "Bilan", "Ce que j'en retiens.", 2),
+        **row(1, "Contexte", "Pourquoi ce projet.", 1),
+        **{f"{ROWS}-TOTAL_FORMS": 2},
     )
 
     response = admin_client.post(reverse("admin:content_project_add"), data)
 
     assert response.status_code == 302
-    assert stored(Project.objects.get()) == {SectionKey.CONTEXT: "Pourquoi ce projet."}
+    assert stored(Project.objects.get()) == [
+        ("contexte", "Contexte", "Pourquoi ce projet."),
+        ("bilan", "Bilan", "Ce que j'en retiens."),
+    ]
 
 
 @pytest.mark.django_db
-def test_un_bloc_garde_son_texte_tel_que_saisi(admin_client: Client) -> None:
-    """En Markdown, une ligne de tête indentée de quatre espaces est un bloc de code : le texte
-    s'enregistre sans être retaillé."""
+def test_une_ligne_de_section_laissee_vide_n_enregistre_rien(admin_client: Client) -> None:
+    """Le script numérote toute ligne affichée : une ligne neuve dont seule la position est
+    remplie est ignorée (`InlineRowForm.has_changed`)."""
     django = saved(technology(name="Django"))
-    code = "    make dev\n"
-    data = new_project_data(admin_client, **line(0, django, 1), **{BLOCKS[SectionKey.TESTS]: code})
+    data = new_project_data(admin_client, **line(0, django, 1), **{f"{ROWS}-0-position": 1})
 
     response = admin_client.post(reverse("admin:content_project_add"), data)
 
     assert response.status_code == 302
-    assert stored(Project.objects.get()) == {SectionKey.TESTS: code}
+    assert stored(Project.objects.get()) == []
 
 
 @pytest.mark.django_db
-def test_l_ecran_reaffiche_chaque_section_dans_son_bloc(admin_client: Client) -> None:
-    """Les sections du projet, et elles seules : celle d'un autre projet reste hors de l'écran."""
-    django = saved(technology(name="Django"))
-    portfolio = saved_project(django)
-    saved(section(portfolio, key=SectionKey.CONTEXT, body="Pourquoi."))
-    saved(section(portfolio, key=SectionKey.RETROSPECTIVE, body="Ce que j'en retiens."))
-    saved(section(saved_project(django, slug="autre"), key=SectionKey.DATA))
-
-    response = admin_client.get(reverse("admin:content_project_change", args=[portfolio.pk]))
-    form = response.context["adminform"].form
-
-    assert {name: form[name].value() for name in BLOCKS.values() if form[name].value()} == {
-        BLOCKS[SectionKey.CONTEXT]: "Pourquoi.",
-        BLOCKS[SectionKey.RETROSPECTIVE]: "Ce que j'en retiens.",
-    }
-
-
-@pytest.mark.django_db
-@pytest.mark.parametrize("emptied", ["", BLANK], ids=["bloc vidé", "bloc réduit à des espaces"])
-def test_un_bloc_vide_supprime_sa_section_et_un_bloc_change_la_remplace(
-    admin_client: Client, emptied: str
+@pytest.mark.parametrize("body", ["", BLANK], ids=["texte vide", "texte fait d'espaces"])
+def test_une_ligne_titree_sans_texte_est_refusee_avec_le_message_du_catalogue(
+    admin_client: Client, body: str
 ) -> None:
-    """Le bloc de chaque section enregistrée est rempli à l'ouverture de l'écran : l'auteur le vide,
-    le change ou n'y touche pas, et l'enregistrement suit — les autres sections restent, celles
-    d'un autre projet aux mêmes clés comprises."""
+    """Décision du mainteneur : pas de titre sans texte. Le champ refuse le vide, la contrainte
+    les espaces ; même message du catalogue sous le champ ou en tête de la ligne."""
+    django = saved(technology(name="Django"))
+    data = new_project_data(admin_client, **line(0, django, 1), **row(0, "Stack", body, 1))
+
+    response = admin_client.post(reverse("admin:content_project_add"), data)
+
+    form = response.context["inline_admin_formsets"][1].formset.forms[0]
+    assert response.status_code == 200
+    assert [*form.errors.get("body", []), *form.non_field_errors()] == [
+        strings.SECTION_BODY_MISSING
+    ]
+    assert not Project.objects.exists()
+
+
+@pytest.mark.django_db
+def test_le_corps_d_une_section_garde_son_texte_tel_que_saisi(admin_client: Client) -> None:
+    """En Markdown, une ligne de tête indentée de quatre espaces est un bloc de code : le texte
+    s'enregistre sans être retaillé."""
+    django = saved(technology(name="Django"))
+    code = "    make dev\n"
+    data = new_project_data(admin_client, **line(0, django, 1), **row(0, "Tests", code, 1))
+
+    response = admin_client.post(reverse("admin:content_project_add"), data)
+
+    assert response.status_code == 302
+    assert stored(Project.objects.get()) == [("tests", "Tests", code)]
+
+
+@pytest.mark.django_db
+def test_deux_lignes_ne_portent_pas_la_meme_ancre(admin_client: Client) -> None:
+    django = saved(technology(name="Django"))
+    data = new_project_data(
+        admin_client,
+        **line(0, django, 1),
+        **row(0, "Stack", "Django.", 1),
+        **row(1, "Stack", "React.", 2),
+        **{f"{ROWS}-TOTAL_FORMS": 2},
+    )
+
+    response = admin_client.post(reverse("admin:content_project_add"), data)
+
+    sections = response.context["inline_admin_formsets"][1].formset
+    assert list(sections.non_form_errors()) == [strings.SECTION_ANCHOR_TAKEN]
+    assert not Project.objects.exists()
+
+
+@pytest.mark.django_db
+def test_l_auteur_retire_et_reordonne_les_sections_enregistrees(admin_client: Client) -> None:
+    """On retire une ligne et on en déplace une autre, puis on enregistre une fois ; les sections
+    d'un autre projet, aux mêmes ancres, ne bougent pas."""
     django = saved(technology(name="Django"))
     portfolio, other = saved_project(django), saved_project(django, slug="autre")
-    for key in (SectionKey.CONTEXT, SectionKey.STACK, SectionKey.RETROSPECTIVE):
-        saved(section(portfolio, key=key, body=f"Avant : {key.label}."))
-    for key in (SectionKey.CONTEXT, SectionKey.STACK):
-        saved(section(other, key=key, body="Ailleurs."))
+    for position, title in enumerate(("Contexte", "Stack", "Bilan"), start=1):
+        saved(section(portfolio, title=title, anchor=title.lower(), position=position))
+        saved(section(other, title=title, anchor=title.lower(), position=position))
     url = reverse("admin:content_project_change", args=[portfolio.pk])
     data = rendered_data(admin_client, url) | {
-        BLOCKS[SectionKey.CONTEXT]: emptied,
-        BLOCKS[SectionKey.STACK]: "Après.",
+        f"{ROWS}-0-DELETE": "on",
+        f"{ROWS}-1-position": 2,
+        f"{ROWS}-2-position": 1,
     }
 
     response = admin_client.post(url, data)
 
     assert response.status_code == 302
-    assert stored(portfolio) == {
-        SectionKey.STACK: "Après.",
-        SectionKey.RETROSPECTIVE: f"Avant : {SectionKey.RETROSPECTIVE.label}.",
-    }
-    assert stored(other) == {SectionKey.CONTEXT: "Ailleurs.", SectionKey.STACK: "Ailleurs."}
+    assert [anchor for anchor, _, _ in stored(portfolio)] == ["bilan", "stack"]
+    assert [anchor for anchor, _, _ in stored(other)] == ["contexte", "stack", "bilan"]
 
 
 @pytest.mark.django_db
-def test_seul_le_bloc_change_ecrit_sa_section_et_emet_son_signal(admin_client: Client) -> None:
-    """Une écriture par bloc changé, signal compris — la purge du cache de #11 s'y branchera ;
-    une section dont le bloc n'a pas changé n'est pas réécrite."""
+def test_deux_sections_enregistrees_echangent_leurs_ancres(admin_client: Client) -> None:
+    """L'état final compte, pas l'ordre des écritures : Django enregistre les lignes l'une après
+    l'autre, et la première reprend une ancre que la seconde libère — l'unicité est différée."""
     portfolio = saved_project(saved(technology(name="Django")))
-    for key in (SectionKey.CONTEXT, SectionKey.STACK):
-        saved(section(portfolio, key=key))
+    saved(section(portfolio, title="Contexte", anchor="contexte", position=1))
+    saved(section(portfolio, title="Stack", anchor="stack", position=2))
     url = reverse("admin:content_project_change", args=[portfolio.pk])
-    data = rendered_data(admin_client, url) | {BLOCKS[SectionKey.STACK]: "Après."}
-    written: list[str] = []
+    data = rendered_data(admin_client, url) | {
+        f"{ROWS}-0-anchor": "stack",
+        f"{ROWS}-1-anchor": "contexte",
+    }
 
-    def record(sender: type[Section], instance: Section, **kwargs: object) -> None:
-        written.append(instance.key)
-
-    post_save.connect(record, sender=Section)
-    try:
-        response = admin_client.post(url, data)
-    finally:
-        post_save.disconnect(record, sender=Section)
+    response = admin_client.post(url, data)
 
     assert response.status_code == 302
-    assert written == [SectionKey.STACK]
+    assert [(anchor, title) for anchor, title, _ in stored(portfolio)] == [
+        ("stack", "Contexte"),
+        ("contexte", "Stack"),
+    ]

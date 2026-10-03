@@ -10,7 +10,7 @@ une fois.
 Le script et sa feuille valent pour tout tableau en ligne de l'écran qui les charge, ordonnable ou
 non : bouton unique de suppression et libellé des lignes enregistrées retiré compris.
 
-Les technologies d'un projet s'en servent ; la galerie de #9 s'en servira.
+Les technologies et les sections d'un projet s'en servent ; la galerie de #9 s'en servira.
 """
 
 from typing import Any, ClassVar
