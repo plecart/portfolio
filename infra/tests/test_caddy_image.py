@@ -24,9 +24,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from test_infra import built_images, make_dry_run
 
 STACK = Path(__file__).with_name("caddy.yml")
+# Le Compose de production, dont la sonde de `caddy` s'exécute ici dans l'image.
+COMPOSE_PROD = Path(__file__).parents[1] / "compose.yml"
 # Un nom par lancement : deux lancements simultanés sur le même moteur — un poste et une relecture,
 # deux sessions — ne se partagent ni conteneurs ni réseau, et l'arrêt de l'un n'emporte pas l'autre.
 PROJECT = f"portfolio-test-caddy-{uuid.uuid4().hex[:8]}"
@@ -140,6 +143,11 @@ def caddy_image() -> str:
     return built_images(make_dry_run("build", environment=prefix))["infra/caddy/Dockerfile"]
 
 
+def compose_command(*arguments: str) -> list[str]:
+    """La commande `docker compose` sur la pile du test, sous son nom de projet."""
+    return ["docker", "compose", "--project-name", PROJECT, "--file", str(STACK), *arguments]
+
+
 def compose(*arguments: str, environment: Mapping[str, str]) -> str:
     """Lance `docker compose` sur la pile du test, sous son nom de projet.
 
@@ -147,9 +155,8 @@ def compose(*arguments: str, environment: Mapping[str, str]) -> str:
         La sortie standard. Une erreur de Compose fait échouer le test ; sa sortie d'erreur, non
         capturée ici, s'affiche avec l'échec — « No such image » si `make build` n'a pas tourné.
     """
-    command = ["docker", "compose", "--project-name", PROJECT, "--file", str(STACK), *arguments]
     return subprocess.run(
-        command, env=environment, stdout=subprocess.PIPE, text=True, check=True
+        compose_command(*arguments), env=environment, stdout=subprocess.PIPE, text=True, check=True
     ).stdout
 
 
@@ -268,6 +275,36 @@ def test_les_statiques_de_l_admin_gardent_leur_cache(stack: Stack) -> None:
 
     assert reply.status == 200
     assert reply.headers.get_all("Cache-Control") == [UPSTREAM["UPSTREAM_STATIC_CACHE"]]
+
+
+def production_probe() -> str:
+    """La commande de la sonde de `caddy` dans `infra/compose.yml`, telle que Compose la passe au
+    conteneur : `$$`, qui y échappe le `$` destiné au shell du conteneur, rendu à `$`."""
+    services = yaml.safe_load(COMPOSE_PROD.read_text(encoding="utf-8"))["services"]
+    kind, command = services["caddy"]["healthcheck"]["test"]
+    assert kind == "CMD-SHELL", kind
+    return command.replace("$$", "$")
+
+
+@pytest.mark.parametrize(("site_host", "healthy"), [(SITE, True), ("inconnu.test", False)])
+def test_la_sonde_de_production_ne_dit_sain_que_le_site_servi(
+    stack: Stack, site_host: str, healthy: bool
+) -> None:
+    """Le déploiement attend `caddy` sain (`up --wait`) : sa sonde doit lire la page du site sous
+    son nom. Le code ne suffit pas — à un hôte qu'aucun bloc ne sert, Caddy rend un 200 vide
+    (mesuré à la relecture de la PR #71). Sous un `SITE_HOST` que le Caddyfile ne sert pas, la
+    même sonde doit échouer."""
+    probed = subprocess.run(
+        compose_command(
+            "exec", "-T", "-e", f"SITE_HOST={site_host}", "caddy", "sh", "-c", production_probe()
+        ),
+        env=stack.environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert (probed.returncode == 0) is healthy, probed.stderr
 
 
 # Ce que sert l'hôte du site, sous chacune de ses formes : la page, un fichier haché, une fiche
