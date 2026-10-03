@@ -13,10 +13,16 @@ requires-python = ">=3.12"
 #
 # `psycopg[binary]` plutôt que `[c]` : option recommandée par la documentation, et la seule qui
 # n'exige ni `libpq` ni outils de build — donc aucun étage de compilation dans l'image.
+#
+# `markdown-it-py` et `nh3` ne servent qu'à l'aperçu Markdown de l'admin (ADR 0010) :
+# `content/preview.py` est le seul module qui les importe, ce que `tests/test_markdown_preview.py`
+# tient.
 dependencies = [
     "django>=6.0",
     "django-stubs-ext>=6.1.1",
     "gunicorn>=23",
+    "markdown-it-py>=4.2.0",
+    "nh3>=0.3.7",
     "psycopg[binary]>=3.2",
     "pydantic-settings>=2",
     "whitenoise>=6.12.0",
