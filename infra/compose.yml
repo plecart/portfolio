@@ -1,0 +1,95 @@
+# Production, sur le VPS (cadrage §5.3, ADR 0002) : `cloudflared`, `caddy`, `api`, `postgres` et
+# `redis` sur le réseau privé du projet, aucun port publié — `cloudflared` sort vers Cloudflare et
+# c'est la seule entrée (D45). Le `worker` arrive avec #12, le conteneur `backup` avec #23.
+#
+# Le pendant de `compose.dev.yml` (ADR 0012) : mêmes images — épingle comprise pour Postgres et
+# Redis —, même point d'entrée, mêmes services de données ; le reste est propre à la production.
+# `apps/api/tests/test_compose.py` tient cet invariant.
+#
+# **Les variables** viennent du `.env` du VPS, à côté de ce fichier : Compose le lit pour
+# l'interpolation `${…}`, et `infra/bootstrap.sh` l'écrit depuis les secrets. `prod.env.example`
+# les déclare toutes, aux valeurs factices : c'est avec lui que `make compose-config` résout ce
+# fichier. Chacune est exigée (`:?`) : absente, la résolution échoue au lieu de démarrer un service
+# sur une valeur vide. Aucun `env_file:` : chaque service reçoit les siennes et elles seules — le
+# jeton du Tunnel ne va qu'à `cloudflared`.
+#
+# `restart: unless-stopped` partout : un conteneur arrêté par une panne ou par un redémarrage du
+# VPS repart seul (cadrage §6.7, « politiques de redémarrage »).
+
+name: portfolio
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.3@sha256:072c067d25ccbe61d46e18f0d0723255f2bb5304f7317caa95b27031520ff92c
+    # Le point d'entrée de l'image est `cloudflared --no-autoupdate` : la version est celle de
+    # l'épingle, que Dependabot monte. Le Tunnel est géré depuis Cloudflare, qui route les noms
+    # d'hôte vers `http://caddy:80` (#25) ; `tunnel run` lit son jeton dans `TUNNEL_TOKEN`.
+    command: [tunnel, run]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?}
+    restart: unless-stopped
+
+  caddy:
+    # Les images du dépôt, telles que le job `publish` les a poussées, à l'étiquette du commit que
+    # le job de déploiement fixe — jamais `latest`, qu'une publication croisée peut laisser sur
+    # l'avant-dernier commit (`ci.yml`, job `publish`).
+    image: ghcr.io/plecart/portfolio-caddy:${IMAGE_TAG:?}
+    # Les noms d'hôte que le Caddyfile lit (`infra/caddy/Caddyfile`).
+    environment:
+      SITE_HOST: ${SITE_HOST:?}
+      API_HOST: ${API_HOST:?}
+      MEDIA_HOST: ${MEDIA_HOST:?}
+    restart: unless-stopped
+
+  api:
+    image: ghcr.io/plecart/portfolio-api:${IMAGE_TAG:?}
+    # Chaque variable de `Env`, sauf `DEBUG` : absente, elle vaut faux. Les adresses désignent les
+    # services par leur nom.
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?}
+      # Les deux hôtes que Caddy relaie vers `api` : celui de l'API, et celui du site pour
+      # `/projets/*`. Caddy transmet `Host` tel quel (doc Caddy « reverse_proxy », § Headers).
+      ALLOWED_HOSTS: '["${SITE_HOST:?}","${API_HOST:?}"]'
+      DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
+      REDIS_URL: redis://redis:6379/0
+      # Le volume, en attendant R2 (#13).
+      MEDIA_ROOT: /app/media
+    volumes:
+      - media:/app/media
+    # `api` joue les migrations à son démarrage (`infra/api/entrypoint.sh`) : la base doit répondre.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg16-trixie@sha256:40d828eda66737aaacb934387a337babf1455ebd56e9bdd13fc08e211257c972
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    # La sonde de `compose.dev.yml`, et pour la même raison : `-h 127.0.0.1` mesure le réseau, dont
+    # `api` dépend, pas le socket local, prêt avant lui.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4.11-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  media:

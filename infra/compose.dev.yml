@@ -1,7 +1,7 @@
 # Environnement de développement complet : Postgres, Redis et `api` sur un réseau privé
 # (cadrage §6.7, « développement local complet en Docker Compose »). Le Compose de production
-# est #16 ; ce fichier ne sert jamais ailleurs que sur un poste. Le conteneur `worker` le
-# rejoindra avec #12, avec la même image et une autre commande.
+# est `compose.yml`, aux mêmes images (ADR 0012) ; ce fichier ne sert jamais ailleurs que sur un
+# poste. Le conteneur `worker` le rejoindra avec #12, avec la même image et une autre commande.
 #
 # **Deux fichiers d'environnement, deux rôles distincts** :
 #   - `../.env` — non commité, copié de `.env.example` — est celui que lit `Env`. Compose

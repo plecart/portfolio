@@ -76,12 +76,13 @@ disparaît ; repartir d'un volume neuf convient aussi :
 docker compose --env-file infra/dev.env -f infra/compose.dev.yml exec postgres psql -U portfolio -d portfolio -c "REINDEX DATABASE portfolio" -c "ALTER DATABASE portfolio REFRESH COLLATION VERSION"
 ```
 
-Deux fichiers d'environnement, qui ne se remplacent pas :
+Trois fichiers d'environnement, qui ne se remplacent pas :
 
 | Fichier | Commité | Lu par | Contient |
 |---|---|---|---|
 | `.env` | non | la classe `Env` du back | les variables de `Env`, et elles seules |
 | `infra/dev.env` | oui | Compose, pour l'interpolation `${…}` | identifiants Postgres de développement et ports publiés, aucune valeur secrète |
+| `infra/prod.env.example` | oui | `make compose-config`, qui résout `infra/compose.yml` | le modèle du `.env` du VPS : chaque variable que le Compose de production interpole, valeurs factices |
 
 Le refus d'une clé inconnue vaut pour le **fichier**, donc sur le poste (`uv run manage.py`,
 `make test`). Dans le conteneur, Compose injecte `.env` comme variables d'environnement et
@@ -105,10 +106,12 @@ Toutes les cibles disponibles : `Makefile`, repris dans la section « Commandes 
 [.claude/pipeline.config.md](.claude/pipeline.config.md) — c'est cette section que lisent les
 skills et la génération de CI.
 
-`.env` vit à la **racine** du dépôt et n'est lu qu'en développement (cadrage §6.6) ; en
-production il est écrit par `infra/bootstrap.sh` depuis les secrets, jamais édité à la main.
-Toute variable d'environnement est déclarée dans `.env.example` et lue par la classe `Env`
-(`apps/api/config/env.py`) — nulle part ailleurs, et jamais en dur.
+`.env` vit à la **racine** du dépôt et n'est lu qu'en développement (cadrage §6.6). En
+production, le `.env` du VPS — modèle `infra/prod.env.example` — est écrit par
+`infra/bootstrap.sh` depuis les secrets, jamais édité à la main ; Compose le lit et donne à chaque
+service ses variables, et à `api` celles de `Env`. Toute variable du back est déclarée dans
+`.env.example` et lue par la classe `Env` (`apps/api/config/env.py`) — nulle part ailleurs, et
+jamais en dur.
 
 Les hooks ne lancent que `ruff` (`check --fix`, puis `format`), avec la version installée par
 `uv sync` : le hook ne peut donc pas valider autre chose que la gate. Les périmètres, eux, ne

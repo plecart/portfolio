@@ -58,6 +58,10 @@ IMAGE_TAG ?=
 # du conteneur. Nommé une fois ici pour qu'aucun appel ne puisse l'oublier.
 COMPOSE := docker compose --env-file infra/dev.env -f infra/compose.dev.yml
 
+# Le Compose de production, avec le modèle de son `.env` : le vrai n'existe que sur le VPS. Ses
+# valeurs factices ne servent qu'à résoudre le fichier (ADR 0012, brief de #16).
+COMPOSE_PROD := docker compose --env-file infra/prod.env.example -f infra/compose.yml
+
 # Trivy, dans son image officielle plutôt qu'installé : même commande sur le poste et en CI, et une
 # seule épingle (ADR 0014). Étiquette et empreinte, comme les images de base. Dependabot ne lit pas
 # cette épingle ; elle se monte à la main : nouvelle étiquette, signature vérifiée par `cosign
@@ -203,11 +207,13 @@ $(IMAGE_PRUNES): prune-%:
 	ids=$$($(GH) api '$(PACKAGE_VERSIONS)?per_page=100' --jq '$(STALE_VERSIONS)') && \
 	for id in $$ids; do $(GH) api --method DELETE $(PACKAGE_VERSIONS)/$$id || exit 1; done
 
-# Vérifie que le Compose de développement se résout — interpolation comprise. Appelée par le
-# job `infra` de la CI, qui crée un `.env` depuis `.env.example` au préalable : Compose exige
-# que la cible d'un `env_file` existe, même pour une simple résolution.
+# Vérifie que les deux fichiers Compose se résolvent — interpolation comprise : une variable de
+# production que son modèle ne déclare pas fait échouer la cible. Appelée par le job `infra` de la
+# CI, qui crée un `.env` depuis `.env.example` au préalable : Compose exige que la cible d'un
+# `env_file` existe, même pour une simple résolution, et le fichier de développement en cite un.
 compose-config:
 	$(COMPOSE) config --quiet
+	$(COMPOSE_PROD) config --quiet
 
 # Démarre la pile de développement. `--build` : l'image est reconstruite si le Dockerfile ou
 # une dépendance a changé, pour qu'un `git pull` n'exige pas de s'en souvenir.
