@@ -75,7 +75,7 @@ PROJECT_SUMMARY_WORD_TOO_LONG = (
     "Aucun mot du résumé ne dépasse 20 caractères ; espaces et traits d’union séparent les mots, "
     "pas les espaces insécables."
 )
-PROJECT_DESCRIPTION_MISSING = "Un projet porte une description."
+PROJECT_DESCRIPTION_MISSING = "Un projet porte une description, et pas seulement des espaces."
 PROJECT_KIND_UNKNOWN = "Le type d’un projet est perso, pro ou école."
 PROJECT_STATUS_UNKNOWN = "Le statut d’un projet est en cours, terminé ou archivé."
 PROJECT_FINISHED_ON_MISSING = "Un projet terminé ou archivé porte une date de fin."
