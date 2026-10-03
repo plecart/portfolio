@@ -17,7 +17,10 @@ from testcontainers.core.container import DockerContainer
 
 # L'image du service `postgres` de `infra/compose.dev.yml` : les tests tournent sur le moteur et
 # les extensions du développement (ADR 0005). `test_infra.py` tient l'égalité des deux.
-POSTGRES_IMAGE = "pgvector/pgvector:pg16"
+POSTGRES_IMAGE = (
+    "pgvector/pgvector:0.8.7-pg16-trixie"
+    "@sha256:40d828eda66737aaacb934387a337babf1455ebd56e9bdd13fc08e211257c972"
+)
 
 # Docker peut ne pas répondre, ou répondre et refuser — un tirage d'image raté, par exemple : le
 # conseil vaut pour les deux, la cause citée dit laquelle.

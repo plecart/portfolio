@@ -9,7 +9,8 @@ Chaque garde lit les fichiers comme l'outil qu'elle protège : le YAML par un an
 Dockerfile instruction par instruction comme Docker, et chaque `FROM` par sa première ligne comme
 Dependabot. Un motif qui imiterait l'analyseur à la main laisserait passer les formes qu'il n'a
 pas prévues. Les gardes sont donc des fonctions sur du texte, appliquées aux fichiers du dépôt et
-à un recueil de formes — `WORKFLOW_FORMS`, `IMAGE_FORMS`, `SOURCE_FORMS`, `DOCKERFILE_NAMES` :
+à un recueil de formes — `WORKFLOW_FORMS`, `IMAGE_FORMS`, `SOURCE_FORMS`, `DOCKERFILE_NAMES`,
+`COMPOSE_FORMS`, `COMPOSE_NAMES` :
 chaque forme recensée par les relectures de #5 y a son cas, avec le verdict attendu. Une forme
 nouvelle s'y ajoute ; les trois jugées exotiques y figurent en `xfail` strict, qui signale le jour
 où elles cesseraient d'échapper.
@@ -50,6 +51,7 @@ ECOSYSTEM_MANIFESTS = {
     "npm": "package-lock.json",
     "github-actions": ".github/workflows",
     "docker": "Dockerfile",
+    "docker-compose": "compose.dev.yml",
 }
 
 # La politique commune à tous les écosystèmes : passage hebdomadaire, mineures et correctifs
@@ -70,7 +72,7 @@ UPDATE_POLICY: dict[str, Any] = {
 # jamais les deux (doc Dependabot, « directories »).
 ENTRY_KEYS = {"package-ecosystem", *UPDATE_POLICY}
 LOCATION_KEYS = {"directory", "directories"}
-ECOSYSTEM_EXTRA_KEYS = {"docker": {"ignore"}, "npm": {"ignore"}}
+ECOSYSTEM_EXTRA_KEYS = {"docker": {"ignore"}, "docker-compose": {"ignore"}, "npm": {"ignore"}}
 
 PYTHON_UPGRADES_IGNORED = {
     "dependency-name": "python",
@@ -82,12 +84,23 @@ NODE_TYPES_UPGRADES_IGNORED = {
     "update-types": ["version-update:semver-major"],
 }
 
+REDIS_UPGRADES_IGNORED = {
+    "dependency-name": "redis",
+    "update-types": ["version-update:semver-major"],
+}
+
 # Le motif de nom par lequel Dependabot reconnaît un Dockerfile (`DOCKER_REGEXP`,
 # `docker/file_fetcher.rb`) — `Dockerfile`, `Dockerfile.prod`, `Dockerfile-dev`, `api.Dockerfile`,
 # `Containerfile` —, moins les fichiers d'exclusion `*.dockerignore`. Un document dont le nom
 # contiendrait « dockerfile » serait lu et échouerait : un rouge visible vaut mieux qu'un trou.
 DOCKERFILE_NAME = re.compile(r"dockerfile|containerfile", re.IGNORECASE)
 DOCKERIGNORE_SUFFIX = ".dockerignore"
+
+# Le motif de nom par lequel Dependabot reconnaît un fichier Compose (`FILENAME_REGEX`,
+# `docker_compose/file_fetcher.rb`), recopié tel quel : non ancré, il reconnaît `compose.dev.yml`
+# comme `compose.yml`. Dependabot ne l'applique qu'aux fichiers du dossier configuré, sans descendre
+# dans ses sous-dossiers.
+COMPOSE_NAME = re.compile(r"(docker-)?compose(-[\w]+)?(?>\.[\w-]+)?\.ya?ml", re.IGNORECASE)
 
 # Un `FROM` lu comme Docker le lit : l'instruction entière, continuations jointes, indentation
 # permise. Et tel que Dependabot le lit : sa première ligne seule, en colonne 0, l'image sur cette
@@ -253,10 +266,54 @@ def source_findings(text: str) -> list[str]:
     return [source for source in sources if source.lower() not in stages and not source.isdigit()]
 
 
+def compose_services(text: str) -> dict[str, object]:
+    """Les services d'un fichier Compose ; une table vide si le document YAML n'en est pas un.
+
+    Un fichier Compose se reconnaît à son contenu — sa clé `services` est une table —, pas à son
+    nom : celui de la pile du test de fumée de `caddy` (`infra/tests/caddy.yml`) n'en porte pas la
+    marque.
+    """
+    document: object = yaml.safe_load(text)
+    if not isinstance(document, dict):
+        return {}
+    services = cast(dict[str, object], document).get("services")
+    return cast(dict[str, object], services) if isinstance(services, dict) else {}
+
+
+def third_party_images(text: str) -> list[str]:
+    """Les images tierces d'un fichier Compose, dans l'ordre de ses services.
+
+    Une image nommée ou étiquetée par une variable (`${…}`) est une image du dépôt, construite par
+    `make build` et publiée sur GHCR : Dependabot la saute (`docker_compose/file_parser.rb`). Une
+    image tierce écrite derrière une variable à valeur par défaut échapperait donc à cette lecture ;
+    la forme figure au recueil, en `xfail`.
+    """
+    images = [
+        cast(dict[str, object], service).get("image")
+        for service in compose_services(text).values()
+        if isinstance(service, dict)
+    ]
+    return [image for image in images if isinstance(image, str) and "${" not in image]
+
+
+def compose_findings(text: str) -> list[str]:
+    """Les images tierces d'un fichier Compose que Dependabot ne pourrait pas tenir à jour : celles
+    qui ne sont pas épinglées comme une image de base (`PINNED_IMAGE`)."""
+    return [image for image in third_party_images(text) if not PINNED_IMAGE.match(image)]
+
+
 DOCKERFILES = sorted(
     path
     for path in (REPOSITORY_ROOT / name for name in repository_files())
     if is_dockerfile(path.name) and path.is_file()
+)
+
+COMPOSE_FILES = sorted(
+    path
+    for path in (REPOSITORY_ROOT / name for name in repository_files())
+    if path.suffix in {".yml", ".yaml"}
+    and path.is_file()
+    and compose_services(path.read_text(encoding="utf-8"))
 )
 
 
@@ -380,6 +437,38 @@ DOCKERFILE_NAMES = {
     "compose.dev.yml": False,
 }
 
+REDIS = "redis:7.4.11-alpine@sha256:" + "c" * 64
+
+
+def compose(image: str) -> str:
+    """Un fichier Compose minimal dont le seul service porte l'image donnée."""
+    return f"services:\n  cache:\n    image: {image}\n"
+
+
+COMPOSE_FORMS = {
+    "image tierce épinglée": (compose(REDIS), False),
+    "étiquette de majeure": (compose("redis:7-alpine"), True),
+    "étiquette sans empreinte": (compose("redis:7.4.11-alpine"), True),
+    "empreinte sans étiquette": (compose(f"redis@sha256:{'c' * 64}"), True),
+    "image du dépôt, préfixe interpolé": (compose("${IMAGE_PREFIX:-portfolio-}api"), False),
+    "image du dépôt, étiquette interpolée": (
+        compose("ghcr.io/plecart/portfolio-api:${IMAGE_TAG:?}"),
+        False,
+    ),
+    "service construit, sans image": ("services:\n  api:\n    build: .\n", False),
+    "image tierce derrière une variable à défaut": pytest.param(
+        compose("${CACHE_IMAGE:-redis:7-alpine}"), True, marks=EXOTIC
+    ),
+}
+
+COMPOSE_NAMES = {
+    "compose.yml": True,
+    "compose.dev.yml": True,
+    "docker-compose.yaml": True,
+    "compose-prod.yml": True,
+    "caddy.yml": False,
+}
+
 
 @pytest.mark.parametrize(("text", "expected"), WORKFLOW_FORMS.values(), ids=WORKFLOW_FORMS.keys())
 def test_la_garde_des_actions_rend_son_verdict_sur_chaque_forme(text: str, expected: bool) -> None:
@@ -403,6 +492,21 @@ def test_la_garde_des_sources_rend_son_verdict_sur_chaque_forme(text: str, expec
 def test_un_dockerfile_se_reconnait_a_son_nom(name: str, expected: bool) -> None:
     """Le filtre de nom suit celui de Dependabot, moins les fichiers `*.dockerignore`."""
     assert is_dockerfile(name) is expected
+
+
+@pytest.mark.parametrize(("text", "expected"), COMPOSE_FORMS.values(), ids=COMPOSE_FORMS.keys())
+def test_la_garde_des_compose_rend_son_verdict_sur_chaque_forme(text: str, expected: bool) -> None:
+    """Chaque forme d'`image:` recensée : signalée si, et seulement si, c'est une image tierce que
+    Dependabot ne pourrait pas tenir à jour."""
+    assert bool(compose_findings(text)) is expected, compose_findings(text)
+
+
+@pytest.mark.parametrize(("name", "expected"), COMPOSE_NAMES.items())
+def test_un_fichier_compose_se_reconnait_a_son_nom_comme_dependabot(
+    name: str, expected: bool
+) -> None:
+    """Le motif de Dependabot, non ancré : `compose.dev.yml` en est, `caddy.yml` non."""
+    assert bool(COMPOSE_NAME.search(name)) is expected
 
 
 def test_un_dockerfile_pas_encore_suivi_est_deja_vu(tmp_path: Path) -> None:
@@ -507,6 +611,14 @@ def test_dependabot_ne_propose_jamais_de_nouvelle_version_de_python() -> None:
     assert ignored == [PYTHON_UPGRADES_IGNORED]
 
 
+def test_dependabot_ne_propose_jamais_de_nouvelle_majeure_de_redis() -> None:
+    """Redis 7 est une décision du projet (ADR 0006), comme la version de Python : une PR Redis 8
+    se refuserait à chaque passage. Les versions de correctif de la 7 passent."""
+    ignored = dependabot_entry("docker-compose").get("ignore", [])
+
+    assert ignored == [REDIS_UPGRADES_IGNORED]
+
+
 def npm_majors_refused() -> list[dict[str, Any]]:
     """Les règles `ignore` que la table des refus npm exige, dans son ordre.
 
@@ -540,12 +652,12 @@ def test_dependabot_ne_refuse_sur_npm_que_la_table_des_refus_et_les_types_de_nod
     assert ignored == [*npm_majors_refused(), NODE_TYPES_UPGRADES_IGNORED]
 
 
-def dockerfile_id(path: Path) -> str:
-    """Identifiant de paramètre lisible : le chemin du Dockerfile depuis la racine du dépôt."""
+def repository_id(path: Path) -> str:
+    """Identifiant de paramètre lisible : le chemin du fichier depuis la racine du dépôt."""
     return path.relative_to(REPOSITORY_ROOT).as_posix()
 
 
-@pytest.mark.parametrize("dockerfile", DOCKERFILES, ids=dockerfile_id)
+@pytest.mark.parametrize("dockerfile", DOCKERFILES, ids=repository_id)
 def test_chaque_image_de_base_est_epinglee_par_empreinte(dockerfile: Path) -> None:
     """Une étiquette d'image peut changer de contenu ; une empreinte non.
 
@@ -561,7 +673,7 @@ def test_chaque_image_de_base_est_epinglee_par_empreinte(dockerfile: Path) -> No
     assert not image_findings(text), image_findings(text)
 
 
-@pytest.mark.parametrize("dockerfile", DOCKERFILES, ids=dockerfile_id)
+@pytest.mark.parametrize("dockerfile", DOCKERFILES, ids=repository_id)
 def test_toute_image_copiee_passe_par_un_etage_nomme(dockerfile: Path) -> None:
     """Dependabot ne lit que les lignes `FROM` (`docker/file_parser.rb`, dependabot-core).
 
@@ -582,7 +694,36 @@ def test_dependabot_surveille_chaque_dockerfile() -> None:
     """
     watched = watched_directories(dependabot_entry("docker"))
 
-    unwatched = [dockerfile_id(path) for path in DOCKERFILES if path.parent not in watched]
+    unwatched = [repository_id(path) for path in DOCKERFILES if path.parent not in watched]
     assert not unwatched, (
         f"{len(DOCKERFILES)} Dockerfile repassés, hors de Dependabot : {unwatched}"
+    )
+
+
+@pytest.mark.parametrize("compose_file", COMPOSE_FILES, ids=repository_id)
+def test_chaque_image_tierce_d_un_compose_est_epinglee_par_empreinte(compose_file: Path) -> None:
+    """Même règle que pour les images de base, pour la même raison : une étiquette peut changer de
+    contenu, une empreinte non, et l'étiquette précise devant elle porte les mises à jour (brief de
+    #16, décision 5)."""
+    findings = compose_findings(compose_file.read_text(encoding="utf-8"))
+
+    assert not findings, f"images tierces non épinglées : {findings}"
+
+
+def test_dependabot_lit_chaque_compose_qui_cite_une_image_tierce() -> None:
+    """Une image épinglée que Dependabot ne lit pas garderait son empreinte pour toujours. Il ne
+    lit que les fichiers du dossier configuré dont le nom répond à son motif (`COMPOSE_NAME`)."""
+    watched = watched_directories(dependabot_entry("docker-compose"))
+    citing = [
+        path for path in COMPOSE_FILES if third_party_images(path.read_text(encoding="utf-8"))
+    ]
+
+    assert citing, "aucun fichier Compose ne cite d'image tierce — la lecture a-t-elle cessé ?"
+    unread = [
+        repository_id(path)
+        for path in citing
+        if path.parent not in watched or not COMPOSE_NAME.search(path.name)
+    ]
+    assert not unread, (
+        f"{len(COMPOSE_FILES)} fichiers Compose repassés, hors de Dependabot : {unread}"
     )
