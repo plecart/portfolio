@@ -26,9 +26,12 @@ réécrite par chaque déploiement. Projet Compose `portfolio` : `cloudflared`, 
 | `SECRET_KEY` | `.env` du VPS seulement | `bootstrap.sh`, qui l'engendre | `bootstrap.sh SECRET_KEY` |
 | `POSTGRES_PASSWORD` | `.env` du VPS et la base | `bootstrap.sh`, qui l'engendre | `bootstrap.sh POSTGRES_PASSWORD`, pile démarrée |
 | Jeton GHCR (classic, `read:packages`) | gestionnaire ; configuration Docker de `deploy` | `bootstrap.sh` (`docker login`) | `bootstrap.sh GHCR_TOKEN` |
-| Clé privée de déploiement | secret d'Actions `DEPLOY_SSH_KEY` seulement | le mainteneur | nouvelle paire, `bootstrap.sh DEPLOY_KEY` |
-| Empreinte de l'hôte | secret d'Actions `DEPLOY_KNOWN_HOSTS` | le mainteneur | à chaque VPS reconstruit |
-| Hôte et utilisateur | secrets d'Actions `DEPLOY_HOST`, `DEPLOY_USER` (`deploy`) | le mainteneur | à chaque VPS reconstruit |
+| Clé privée de déploiement | secret `DEPLOY_SSH_KEY` de l'environnement `production` seulement | le mainteneur | nouvelle paire, `bootstrap.sh DEPLOY_KEY` |
+| Empreinte de l'hôte | secret `DEPLOY_KNOWN_HOSTS` de `production` | le mainteneur | à chaque VPS reconstruit |
+| Hôte et utilisateur | secrets `DEPLOY_HOST`, `DEPLOY_USER` (`deploy`) de `production` | le mainteneur | à chaque VPS reconstruit |
+
+L'environnement GitHub `production` n'admet que `main` : un workflow lancé depuis une autre branche
+ne lit pas ses secrets, même modifié.
 
 `SECRET_KEY` et `POSTGRES_PASSWORD` ne vivent que sur le VPS : rien hors de la pile ne s'en sert,
 et un VPS reconstruit en reçoit de neufs — la base restaurée garde ses données, pas son mot de
@@ -67,15 +70,20 @@ l'empreinte de l'hôte : compare-la à celle que la console du fournisseur rend 
    `healthy`, et la ligne de la clé de l'hôte. Il s'arrête sur la première erreur ; relancé, il
    reprend sans rien refaire de ce qui est en place. `cloudflared` ne devient sain qu'avec un
    Tunnel configuré (#25) : sinon `--wait` s'arrête sur « cloudflared is unhealthy ».
-6. **Les secrets d'Actions**, depuis le poste, dans le dépôt :
+6. **L'environnement `production` et ses secrets**, depuis le poste, dans le dépôt — d'abord
+   l'environnement restreint à `main` (doc GitHub « Deployments and environments »), puis les
+   quatre secrets :
    ```
-   gh secret set DEPLOY_SSH_KEY < deploy_key
-   printf '%s %s\n' <ip> "<ligne de la clé de l'hôte affichée par bootstrap.sh>" | gh secret set DEPLOY_KNOWN_HOSTS
-   gh secret set DEPLOY_HOST --body <ip>
-   gh secret set DEPLOY_USER --body deploy
+   echo '{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}' | gh api -X PUT repos/plecart/portfolio/environments/production --input -
+   gh api -X POST repos/plecart/portfolio/environments/production/deployment-branch-policies -f name=main -f type=branch
+   gh secret set DEPLOY_SSH_KEY --env production < deploy_key
+   printf '%s %s\n' <ip> "<ligne de la clé de l'hôte affichée par bootstrap.sh>" | gh secret set DEPLOY_KNOWN_HOSTS --env production
+   gh secret set DEPLOY_HOST --env production --body <ip>
+   gh secret set DEPLOY_USER --env production --body deploy
    rm deploy_key deploy_key.pub
    ```
-   `gh secret list` liste-t-il les quatre noms ? (Il n'affiche jamais les valeurs.)
+   `gh secret list --env production` liste-t-il les quatre noms ? (Il n'affiche jamais les
+   valeurs.)
 7. **Le déploiement continu** : `gh variable set DEPLOY_ENABLED --body true`. Le prochain push sur
    `main` déploie ; tant que la variable ne vaut pas `true`, le job `deploy` est sauté.
 
@@ -143,7 +151,7 @@ autres, et relance la pile, qui recrée les services touchés.
 - `TUNNEL_TOKEN` — régénéré dans Cloudflare d'abord.
 - `GHCR_TOKEN` — un nouveau jeton (étape 2 de l'amorçage), puis l'ancien révoqué.
 - `DEPLOY_KEY` — une nouvelle paire (étape 1), sa clé publique donnée à `bootstrap.sh DEPLOY_KEY`,
-  sa clé privée à `gh secret set DEPLOY_SSH_KEY < deploy_key` ; entre les deux, un déploiement
+  sa clé privée à `gh secret set DEPLOY_SSH_KEY --env production < deploy_key` ; entre les deux, un déploiement
   échoue.
 
 ## Mises à jour
@@ -158,7 +166,7 @@ puis `docker compose ps` en `deploy` — le démon redémarre, la pile revient s
 
 - **Le groupe `docker` vaut `root`** (doc Docker « Docker Engine security ») : `deploy`, qui en est
   membre, et donc la clé de la CI, ont tout pouvoir sur le VPS. Cette clé ne vit que dans le secret
-  d'Actions ; aucune copie ne reste sur un poste.
+  de l'environnement `production`, que seule `main` lit ; aucune copie ne reste sur un poste.
 - SSH par clés seulement ; `root` par clé seulement ; `ufw` n'ouvre que SSH ; `fail2ban` bannit
   les adresses qui échouent sur SSH.
 - Aucun port de la pile n'est publié (`apps/api/tests/test_compose.py`) : Docker contournerait
