@@ -60,11 +60,13 @@ check_host() {
 }
 
 # 1. Les paquets du système : pare-feu, `fail2ban` et son lecteur du journal de systemd, mises à
-#    jour automatiques, et de quoi tirer la clé du dépôt de Docker.
+#    jour automatiques, et de quoi tirer la clé du dépôt de Docker. `--no-upgrade` ici et à
+#    l'étape 2 : un paquet présent n'est pas mis à niveau — une relance, pour renouveler un secret,
+#    ne redémarre pas Docker et la pile ; les mises à jour ont leur procédure (`infra/RUNBOOK.md`).
 install_packages() {
 	step "Paquets du système"
 	apt-get update
-	apt-get install -y ca-certificates curl openssl ufw fail2ban python3-systemd \
+	apt-get install -y --no-upgrade ca-certificates curl openssl ufw fail2ban python3-systemd \
 		unattended-upgrades
 }
 
@@ -85,7 +87,7 @@ Architectures: $(dpkg --print-architecture)
 Signed-By: /etc/apt/keyrings/docker.asc
 EOF
 	apt-get update
-	apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+	apt-get install -y --no-upgrade docker-ce docker-ce-cli containerd.io docker-compose-plugin
 }
 
 # 3. Les mises à jour de sécurité d'Ubuntu, chaque jour, sans intervention. Docker, venu d'un autre
@@ -252,10 +254,12 @@ change_postgres_password() {
 		stack exec -T postgres psql -v ON_ERROR_STOP=1 -U "$1" -d "$2"
 }
 
-# 10. La pile, aux images de `IMAGE_TAG`, attendue saine comme le fait le job `deploy`.
+# 10. La pile, aux images de `IMAGE_TAG`, attendue saine comme le fait le job `deploy`. Sans `pull` :
+#     `up` tire les images absentes (`pull_policy` par défaut, `missing`) et ne contacte pas le
+#     registre pour une image présente — un renouvellement, qui a déjà changé le mot de passe dans
+#     la base, recrée `api` même si GHCR refuse le jeton.
 start_stack() {
 	step "Pile"
-	stack pull --quiet
 	stack up -d --wait --wait-timeout 300
 	stack ps
 }
