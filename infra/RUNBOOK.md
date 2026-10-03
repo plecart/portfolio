@@ -61,7 +61,9 @@ l'empreinte de l'hôte : compare-la à celle que la console du fournisseur rend 
    git show <sha>:infra/compose.yml > compose.yml
    git show <sha>:infra/prod.env.example > prod.env.example
    scp bootstrap.sh compose.yml prod.env.example root@<ip>:
+   rm bootstrap.sh compose.yml prod.env.example
    ```
+   (Un `compose.yml` laissé à la racine du dépôt serait pris par tout `docker compose` lancé là.)
 5. **L'amorçage**, en `root` sur le VPS — `-t` pour les saisies sans écho :
    ```
    ssh -t root@<ip> bash bootstrap.sh
@@ -117,6 +119,7 @@ commits publiés ont encore leurs images (`make prune`) :
    ```
    git show <sha>:infra/compose.yml > compose.yml
    scp compose.yml root@<ip>:/tmp/compose.yml
+   rm compose.yml
    ```
 2. Sur le VPS, les gestes du job `deploy` :
    ```
@@ -147,9 +150,14 @@ tourne sur un schéma plus récent que le sien. Le prochain déploiement de la C
 ## Tourner un secret
 
 Jamais pendant un déploiement : le job et le script écrivent le même `.env`, et le script
-remettrait l'étiquette qu'il a lue avant le job — `gh run list --branch main --status in_progress`
-est-il vide ? Puis copie sur le VPS les trois fichiers de la tête de `main` (étape 4 de
-l'amorçage), et `sudo bash bootstrap.sh <NOM>…` : il redemande ou réengendre les valeurs nommées,
+remettrait l'étiquette qu'il a lue avant le job. Suspends d'abord le déploiement continu —
+`gh variable set DEPLOY_ENABLED --body false` —, puis vérifie qu'aucun run de `main` ne tourne ni
+n'attend : `gh run list --branch main --status in_progress`, puis `--status queued`, vides ?
+Remets `--body true` une fois la rotation faite ; un push arrivé entre-temps se déploie au suivant,
+ou par « Déployer à la main ».
+
+Copie ensuite sur le VPS les trois fichiers de la tête de `main` (étape 4 de l'amorçage), et
+`sudo bash bootstrap.sh <NOM>…` : il redemande ou réengendre les valeurs nommées,
 garde les autres, et relance la pile, qui recrée les services touchés — sans mettre Docker à
 niveau ni tirer d'image déjà présente.
 
