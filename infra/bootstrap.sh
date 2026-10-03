@@ -131,7 +131,10 @@ PermitRootLogin prohibit-password
 EOF
 	sshd -t
 	systemctl reload ssh
-	sshd -T | grep -qx 'passwordauthentication no' || die "un autre réglage rouvre les mots de passe"
+	# `grep` sans `-q` : il lit tout, `sshd` n'écrit jamais dans un tube fermé — sous `pipefail`,
+	# le signal qu'il recevrait ferait échouer la vérification à tort.
+	sshd -T | grep -x 'passwordauthentication no' >/dev/null ||
+		die "un autre réglage rouvre les mots de passe"
 }
 
 # 6. Le pare-feu : tout entrant refusé, sauf SSH. Aucun port de la pile n'est publié
@@ -243,7 +246,7 @@ write_env() {
 # Le nouveau mot de passe (3ᵉ argument) du rôle (1ᵉʳ) dans la base (2ᵉ) qui tourne, par l'entrée
 # standard de `psql` — jamais en argument. Pile arrêtée : impossible, la base garderait l'ancien.
 change_postgres_password() {
-	stack ps --status running --quiet postgres | grep -q . ||
+	[[ -n $(stack ps --status running --quiet postgres) ]] ||
 		die "démarrer la pile avant de renouveler POSTGRES_PASSWORD (infra/RUNBOOK.md)"
 	printf "ALTER ROLE \"%s\" PASSWORD '%s';\n" "$1" "$3" |
 		stack exec -T postgres psql -v ON_ERROR_STOP=1 -U "$1" -d "$2"

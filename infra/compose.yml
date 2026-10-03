@@ -19,7 +19,7 @@
 # **Une sonde par service** : le déploiement attend la pile par `docker compose up -d --wait`, qui
 # n'attend d'un service sans sonde que l'état « en marche » — et `unless-stopped` le lui rend même
 # quand le conteneur sort aussitôt en erreur : la commande réussit sur un conteneur qui boucle.
-# Avec une sonde, elle échoue (« is unhealthy ») — mesuré sur Compose 5.0.2, PR de #16 lot 3.
+# Avec une sonde, elle échoue (« is unhealthy ») — mesuré sur Compose 5.0.2, PR #71.
 # `apps/api/tests/test_compose.py` exige une sonde de chaque service.
 
 # Les sondes des services applicatifs : toutes les 2 s au démarrage, pour que `--wait` rende la
