@@ -18,11 +18,11 @@ import yaml
 from config.env import Env
 from containers import POSTGRES_IMAGE
 from test_env import declared_variables
-from test_infra import COMPOSE_DEV, IMAGE_DOCKERFILES, PUBLISH_PREFIX
+from test_infra import COMPOSE_DEV, IMAGE_DOCKERFILES, PUBLISH_PREFIX, make_dry_run
 
 COMPOSE_PROD = COMPOSE_DEV.with_name("compose.yml")
 PROD_ENV_EXAMPLE = COMPOSE_DEV.with_name("prod.env.example")
-COMPOSE_FILES = {"développement": COMPOSE_DEV, "production": COMPOSE_PROD}
+COMPOSE_BY_ENVIRONMENT = {"développement": COMPOSE_DEV, "production": COMPOSE_PROD}
 
 # Les services de données, à la même image dans les deux fichiers (ADR 0012).
 DATA_SERVICES = ["postgres", "redis"]
@@ -34,8 +34,12 @@ DEPLOYED_IMAGE = re.compile(
     rf"^{re.escape(PUBLISH_PREFIX)}(?P<image>[\w-]+):\$\{{IMAGE_TAG:\?[^}}]*\}}$"
 )
 
-# Une interpolation Compose, `${NOM…}` ; `$$` échappe le `$` destiné au shell du conteneur.
-INTERPOLATION = re.compile(r"(?<!\$)\$\{(?P<name>\w+)(?P<modifier>[^}]*)\}")
+# Une interpolation Compose : `${NOM…}`, ou `$NOM` sans accolades — que Compose résout aussi, à
+# vide s'il manque, sur un simple avertissement (mesuré à la relecture de la PR #69). `$$` échappe
+# le `$` destiné au shell du conteneur.
+INTERPOLATION = re.compile(
+    r"(?<!\$)\$(?:\{(?P<name>\w+)(?P<modifier>[^}]*)\}|(?P<bare>[A-Za-z_]\w*))"
+)
 
 # Ce qu'un service de production ne porte jamais : toute clé qui le rendrait joignable autrement
 # que par le réseau du projet — un port publié, le réseau de l'hôte ou d'un autre conteneur, un
@@ -99,22 +103,60 @@ def strings(node: object) -> Iterator[str]:
         yield node
 
 
-def compose(service: str) -> str:
+def interpolations(text: str) -> list[re.Match[str]]:
+    """Les interpolations d'un fichier Compose, lues dans ses chaînes — commentaires exclus."""
+    return [
+        match for value in strings(yaml.safe_load(text)) for match in INTERPOLATION.finditer(value)
+    ]
+
+
+def interpolation_findings(text: str) -> list[str]:
+    """Les interpolations d'un fichier Compose qui ne sont pas exigées (`${NOM:?…}`) : une variable
+    absente y deviendrait une valeur vide ou une valeur par défaut, au lieu d'arrêter Compose."""
+    return [
+        match.group()
+        for match in interpolations(text)
+        if match["bare"] or not match["modifier"].startswith(":?")
+    ]
+
+
+def environment_value(value: str) -> str:
+    """Un fichier Compose minimal dont le seul service reçoit une variable de la valeur donnée."""
+    return f"services:\n  api:\n    environment:\n      A: '{value}'\n"
+
+
+# Forme → constat attendu (`True`) ou aucun (`False`).
+INTERPOLATION_FORMS = {
+    "exigée": (environment_value("${X:?}"), False),
+    "exigée, avec message": (environment_value("${X:?absente}"), False),
+    "sans modificateur": (environment_value("${X}"), True),
+    "valeur par défaut": (environment_value("${X:-d}"), True),
+    "exigée si absente seulement": (environment_value("${X?}"), True),
+    "sans accolades": (environment_value("redis://redis:6379/$X"), True),
+    "accolades échappées": (environment_value("$${X}"), False),
+    "nom échappé": (environment_value("$$X"), False),
+}
+
+
+def single_service(block: str) -> str:
     """Un fichier Compose minimal dont le seul service porte le bloc donné."""
-    return f"services:\n  caddy:\n    image: caddy\n{service}"
+    return f"services:\n  caddy:\n    image: caddy\n{block}"
 
 
 # Forme → constat attendu (`True`) ou aucun (`False`).
 EXPOSURE_FORMS = {
-    "aucune clé de réseau": (compose(""), False),
-    "port exposé au réseau du projet seulement": (compose('    expose: ["80"]\n'), False),
-    "port publié": (compose('    ports: ["80:80"]\n'), True),
-    "port publié, syntaxe longue": (compose("    ports:\n      - target: 80\n"), True),
-    "réseau de l'hôte": (compose("    network_mode: host\n"), True),
-    "réseau d'un autre service": (compose('    network_mode: "service:api"\n'), True),
-    "réseau nommé": (compose("    networks: [bordure]\n") + "networks:\n  bordure: {}\n", True),
+    "aucune clé de réseau": (single_service(""), False),
+    "port exposé au réseau du projet seulement": (single_service('    expose: ["80"]\n'), False),
+    "port publié": (single_service('    ports: ["80:80"]\n'), True),
+    "port publié, syntaxe longue": (single_service("    ports:\n      - target: 80\n"), True),
+    "réseau de l'hôte": (single_service("    network_mode: host\n"), True),
+    "réseau d'un autre service": (single_service('    network_mode: "service:api"\n'), True),
+    "réseau nommé": (
+        single_service("    networks: [bordure]\n") + "networks:\n  bordure: {}\n",
+        True,
+    ),
     "réseau par défaut redéfini en externe": (
-        compose("") + "networks:\n  default:\n    name: host\n    external: true\n",
+        single_service("") + "networks:\n  default:\n    name: host\n    external: true\n",
         True,
     ),
 }
@@ -141,7 +183,9 @@ def test_les_services_de_donnees_ont_la_meme_image_sur_le_poste_et_en_production
 ) -> None:
     """L'invariant de l'ADR 0012 : un défaut de Postgres ou de Redis se reproduit sur le poste
     parce que c'est la même image, épingle comprise (brief de #16, décision 5)."""
-    images = {name: read_services(path)[service]["image"] for name, path in COMPOSE_FILES.items()}
+    images = {
+        name: read_services(path)[service]["image"] for name, path in COMPOSE_BY_ENVIRONMENT.items()
+    }
 
     assert len(set(images.values())) == 1, images
 
@@ -163,7 +207,9 @@ def test_la_production_tire_chaque_image_du_depot_publiee_a_l_etiquette_du_commi
     assert [name for name, service in production.items() if "build" in service] == []
 
 
-@pytest.mark.parametrize("compose_file", COMPOSE_FILES.values(), ids=COMPOSE_FILES.keys())
+@pytest.mark.parametrize(
+    "compose_file", COMPOSE_BY_ENVIRONMENT.values(), ids=COMPOSE_BY_ENVIRONMENT.keys()
+)
 def test_aucun_service_ne_remplace_le_point_d_entree_de_son_image(compose_file: Path) -> None:
     """Le point d'entrée partagé — migrations, puis la commande — est celui de l'image, dans les
     deux fichiers (ADR 0012) : un `entrypoint:` le court-circuiterait sur un seul environnement."""
@@ -185,15 +231,36 @@ def test_chaque_variable_de_production_est_exigee_et_declaree_dans_son_modele() 
     """`${NOM:?…}` partout : une variable absente du `.env` du VPS fait échouer la résolution,
     au lieu de démarrer un service sur une valeur vide. Et `infra/prod.env.example` les déclare
     toutes, rien de plus : c'est le modèle de ce `.env`, et ce que `make compose-config` résout."""
-    found = [
-        match
-        for text in strings(yaml.safe_load(COMPOSE_PROD.read_text(encoding="utf-8")))
-        for match in INTERPOLATION.finditer(text)
-    ]
+    text = COMPOSE_PROD.read_text(encoding="utf-8")
+    found = interpolations(text)
 
     assert found, "aucune interpolation lue — le motif a-t-il cessé de mordre ?"
-    assert [match.group() for match in found if not match["modifier"].startswith(":?")] == []
-    assert {match["name"] for match in found} == set(declared_variables(PROD_ENV_EXAMPLE))
+    assert interpolation_findings(text) == []
+    names = {match["name"] or match["bare"] for match in found}
+    assert names == set(declared_variables(PROD_ENV_EXAMPLE))
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"), INTERPOLATION_FORMS.values(), ids=INTERPOLATION_FORMS.keys()
+)
+def test_la_garde_des_interpolations_rend_son_verdict_sur_chaque_forme(
+    text: str, expected: bool
+) -> None:
+    """Chaque forme d'interpolation recensée : signalée si, et seulement si, une variable absente
+    ne ferait pas échouer la résolution."""
+    assert bool(interpolation_findings(text)) is expected, interpolation_findings(text)
+
+
+@pytest.mark.parametrize(
+    "compose_file", COMPOSE_BY_ENVIRONMENT.values(), ids=COMPOSE_BY_ENVIRONMENT.keys()
+)
+def test_make_compose_config_resout_chaque_fichier_compose(compose_file: Path) -> None:
+    """Le job `infra` ne prouve la résolution que des fichiers que la cible lui fait résoudre :
+    sans sa ligne, le Compose de production n'était résolu nulle part, et toute la suite restait
+    verte (mesuré à la relecture de la PR #69)."""
+    printed = make_dry_run("compose-config")
+
+    assert f"-f infra/{compose_file.name} config --quiet" in printed
 
 
 def test_les_tests_de_base_tournent_sur_l_image_postgres_du_compose() -> None:
@@ -202,7 +269,9 @@ def test_les_tests_de_base_tournent_sur_l_image_postgres_du_compose() -> None:
     assert read_services(COMPOSE_DEV)["postgres"]["image"] == POSTGRES_IMAGE
 
 
-@pytest.mark.parametrize("compose_file", COMPOSE_FILES.values(), ids=COMPOSE_FILES.keys())
+@pytest.mark.parametrize(
+    "compose_file", COMPOSE_BY_ENVIRONMENT.values(), ids=COMPOSE_BY_ENVIRONMENT.keys()
+)
 @pytest.mark.parametrize(("variable", "expected"), sorted(SERVICE_ADDRESS_OVERRIDES.items()))
 def test_le_service_api_recoit_ses_adresses_de_service(
     compose_file: Path, variable: str, expected: str
@@ -214,7 +283,9 @@ def test_le_service_api_recoit_ses_adresses_de_service(
     assert expected in environment[variable]
 
 
-@pytest.mark.parametrize("compose_file", COMPOSE_FILES.values(), ids=COMPOSE_FILES.keys())
+@pytest.mark.parametrize(
+    "compose_file", COMPOSE_BY_ENVIRONMENT.values(), ids=COMPOSE_BY_ENVIRONMENT.keys()
+)
 def test_la_sonde_de_postgres_interroge_le_reseau_et_non_le_socket_local(
     compose_file: Path,
 ) -> None:
