@@ -1,4 +1,5 @@
-"""Tests du job `deploy` de la CI : le déploiement de la production par SSH (brief de #16, décision 6).
+"""Tests du job `deploy` de la CI : le déploiement de la production par SSH (brief de #16,
+décision 6).
 
 Le déploiement tourne sur GitHub Actions, après chaque publication sur `main` ; le poste n'a ni la
 clé ni le VPS. Ces tests lisent le job tel que l'analyseur YAML le lit, et exécutent son script
@@ -230,7 +231,8 @@ def run_deploy(
     """
     tools, calls = root / "bin", root / "calls"
     tools.mkdir()
-    record = f'printf "%s\\t" "$(basename "$0")" "$@" >> "{calls.as_posix()}"\necho >> "{calls.as_posix()}"\n'
+    log = calls.as_posix()
+    record = f'printf "%s\\t" "$(basename "$0")" "$@" >> "{log}"\necho >> "{log}"\n'
     replies = {"gh": f"echo {main}\n", "scp": "", "ssh": ""}
     if failing:
         replies[failing] += "exit 1\n"
