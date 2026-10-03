@@ -13,6 +13,7 @@ non : bouton unique de suppression et libellé des lignes enregistrées retiré 
 Les technologies et les sections d'un projet s'en servent ; la galerie de #9 s'en servira.
 """
 
+from collections.abc import Sequence
 from typing import Any, ClassVar
 
 from config import strings
@@ -75,6 +76,15 @@ class SortableFormSet[ChildT: Model, ParentT: Model](
 ):
     """Les lignes d'un tableau en ligne ordonné. Une ligne arrivée sans position, champ caché que
     l'auteur ne voit pas, en reçoit une au lieu d'échouer en base."""
+
+    # Le message du catalogue pour un doublon entre les lignes, sur l'unicité qui lit le parent ; à
+    # défaut, celui de Django, qui nomme les champs par leur identifiant anglais
+    # (`BaseModelFormSet.get_unique_error_message`).
+    unique_error_message: ClassVar[str | None] = None
+
+    def get_unique_error_message(self, unique_check: Sequence[str]) -> str:
+        """Le message du doublon : celui du tableau, sinon celui de Django."""
+        return self.unique_error_message or super().get_unique_error_message(unique_check)
 
     def get_form_kwargs(self, index: int | None) -> dict[str, Any]:
         """Quand `validate_min` compte le minimum sur les lignes remplies, toute ligne neuve peut

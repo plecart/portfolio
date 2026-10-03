@@ -75,7 +75,8 @@ class TechnologyAdmin(admin.ModelAdmin[Technology]):
 
 class ProjectTechnologyFormSet(SortableFormSet[ProjectTechnology, Project]):
     """Les lignes de technologie d'un projet, avec les messages du catalogue pour les deux règles
-    que le formulaire compare entre ses lignes, avant la base.
+    que le formulaire compare entre ses lignes, avant la base : le doublon (projet, technologie),
+    et « au moins une technologie ».
 
     « Au moins une technologie » : seule règle hors base (décision 10). Le message par défaut de
     Django parle de formulaires ; `% {"num": …}`, que Django lui applique, laisse intact un texte
@@ -85,12 +86,7 @@ class ProjectTechnologyFormSet(SortableFormSet[ProjectTechnology, Project]):
     default_error_messages: ClassVar[dict[str, StrOrPromise]] = {
         "too_few_forms": strings.PROJECT_TECHNOLOGIES_MISSING
     }
-
-    def get_unique_error_message(self, unique_check: Sequence[str]) -> str:
-        """Le doublon (projet, technologie), seule unicité que les lignes comparent : Django
-        nommerait le champ par son identifiant anglais
-        (`BaseModelFormSet.get_unique_error_message`)."""
-        return strings.PROJECT_TECHNOLOGY_TAKEN
+    unique_error_message = strings.PROJECT_TECHNOLOGY_TAKEN
 
 
 class ProjectTechnologyInline(SortableInline[ProjectTechnology, Project]):
@@ -130,10 +126,7 @@ class SectionFormSet(SortableFormSet[Section, Project]):
     """Les sections d'un projet, avec le message du catalogue pour la seule unicité que le
     formulaire compare entre ses lignes, avant la base : l'ancre."""
 
-    def get_unique_error_message(self, unique_check: Sequence[str]) -> str:
-        """Le doublon (projet, ancre) : Django nommerait le champ par son identifiant anglais
-        (`BaseModelFormSet.get_unique_error_message`)."""
-        return strings.SECTION_ANCHOR_TAKEN
+    unique_error_message = strings.SECTION_ANCHOR_TAKEN
 
 
 class SectionInline(SortableInline[Section, Project]):
