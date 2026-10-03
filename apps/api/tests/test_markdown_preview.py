@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 from config import strings
-from content.preview import FIELD_CLASS, PREVIEW_CLASS, render_markdown
+from content.preview import FIELD_CLASS, PREVIEW_CLASS, PREVIEW_ROUTE, render_markdown
 from django.contrib.auth.models import User
 from django.contrib.staticfiles import finders
 from django.templatetags.static import static
@@ -26,8 +26,7 @@ from test_project_admin import saved_project
 APPLICATION = Path(__file__).resolve().parents[1]
 TESTS = Path(__file__).resolve().parent
 
-# Le nom de la route de l'aperçu, que le script appelle, et ce qu'il lui envoie.
-PREVIEW = "markdown_preview"
+# Ce que le script envoie à la vue d'aperçu.
 SENT = {"text": "Un *mot*."}
 
 # Le script qui rafraîchit les aperçus pendant la saisie.
@@ -185,7 +184,7 @@ def test_seules_des_routes_de_l_admin_atteignent_l_apercu() -> None:
 def test_la_vue_d_apercu_rend_le_texte_recu(admin_client: Client) -> None:
     """Le script envoie le texte saisi ; la vue en rend l'aperçu, sans rien enregistrer (brief de
     #8, décision 2)."""
-    response = admin_client.post(reverse(PREVIEW), SENT)
+    response = admin_client.post(reverse(PREVIEW_ROUTE), SENT)
 
     assert response.status_code == 200
     assert response["Content-Type"] == "text/html; charset=utf-8"
@@ -194,7 +193,7 @@ def test_la_vue_d_apercu_rend_le_texte_recu(admin_client: Client) -> None:
 
 def test_un_anonyme_est_renvoye_de_l_apercu_vers_la_connexion(client: Client) -> None:
     """L'aperçu est réservé à l'utilisateur connecté de l'admin (décision 2)."""
-    response = client.post(reverse(PREVIEW), SENT)
+    response = client.post(reverse(PREVIEW_ROUTE), SENT)
 
     assert response.status_code == 302
     assert response["Location"].startswith(reverse("admin:login"))
@@ -211,8 +210,8 @@ def test_l_apercu_exige_le_jeton_csrf_du_formulaire(admin_user: User) -> None:
     token = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', page)
     assert token is not None
 
-    refused = client.post(reverse(PREVIEW), SENT)
-    accepted = client.post(reverse(PREVIEW), SENT, headers={"X-CSRFToken": token.group(1)})
+    refused = client.post(reverse(PREVIEW_ROUTE), SENT)
+    accepted = client.post(reverse(PREVIEW_ROUTE), SENT, headers={"X-CSRFToken": token.group(1)})
 
     assert (refused.status_code, accepted.status_code) == (403, 200)
 
@@ -220,13 +219,13 @@ def test_l_apercu_exige_le_jeton_csrf_du_formulaire(admin_user: User) -> None:
 @pytest.mark.django_db
 def test_l_apercu_ne_repond_qu_en_post(admin_client: Client) -> None:
     """Le texte voyage dans le corps de la requête, jamais dans l'adresse (décision 2)."""
-    assert admin_client.get(reverse(PREVIEW), SENT).status_code == 405
+    assert admin_client.get(reverse(PREVIEW_ROUTE), SENT).status_code == 405
 
 
 @pytest.mark.django_db
 def test_l_apercu_n_est_jamais_mis_en_cache(admin_client: Client) -> None:
     """Chaque aperçu est celui du texte du moment (décision 2)."""
-    response = admin_client.post(reverse(PREVIEW), SENT)
+    response = admin_client.post(reverse(PREVIEW_ROUTE), SENT)
 
     assert "no-store" in response["Cache-Control"]
 
@@ -335,7 +334,7 @@ def test_l_ecran_projet_montre_l_apercu_sous_la_description_et_sous_chaque_secti
     ]
     assert {
         (field["url"], field["failed"], field["caption"]) for field in MARKDOWN_FIELD.finditer(page)
-    } == {(reverse(PREVIEW), strings.MARKDOWN_PREVIEW_FAILED, strings.MARKDOWN_PREVIEW)}
+    } == {(reverse(PREVIEW_ROUTE), strings.MARKDOWN_PREVIEW_FAILED, strings.MARKDOWN_PREVIEW)}
 
 
 @pytest.mark.django_db
