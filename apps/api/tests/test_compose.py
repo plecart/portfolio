@@ -127,6 +127,28 @@ def interpolation_findings(text: str) -> list[str]:
     ]
 
 
+def probe_findings(text: str) -> list[str]:
+    """Les services d'un fichier Compose qui n'ont pas de sonde à eux — que `up --wait` déclare
+    prêts dès qu'ils tournent, même en boucle de redémarrage (mesure : en-tête de
+    `infra/compose.yml`). Les images du dépôt et celle de `cloudflared` n'en déclarent aucune : un
+    `healthcheck:` sans `test` n'hériterait de rien.
+
+    Returns:
+        Un constat par service sans `healthcheck.test`, ou dont la sonde est coupée (`disable`,
+        `["NONE"]`). Liste vide : `--wait` attend que chaque service soit sain.
+    """
+    services: dict[str, dict[str, Any]] = yaml.safe_load(text)["services"]
+    probes = {
+        name: cast(dict[str, Any], service.get("healthcheck") or {})
+        for name, service in services.items()
+    }
+    return [
+        name
+        for name, probe in probes.items()
+        if not probe.get("test") or probe.get("disable") or probe["test"] == ["NONE"]
+    ]
+
+
 def environment_value(value: str) -> str:
     """Un fichier Compose minimal dont le seul service reçoit une variable de la valeur donnée."""
     return f"services:\n  api:\n    environment:\n      A: '{value}'\n"
@@ -174,6 +196,32 @@ EXPOSURE_FORMS = {
         True,
     ),
 }
+
+
+# Forme → constat attendu (`True`) ou aucun (`False`).
+PROBE_FORMS = {
+    "sonde": (single_service('    healthcheck:\n      test: ["CMD", "true"]\n'), False),
+    "sonde par le shell": (single_service("    healthcheck:\n      test: true\n"), False),
+    "sans sonde": (single_service(""), True),
+    "réglages sans commande": (single_service("    healthcheck:\n      interval: 3s\n"), True),
+    "sonde coupée": (
+        single_service('    healthcheck:\n      test: ["CMD", "true"]\n      disable: true\n'),
+        True,
+    ),
+    "sonde NONE": (single_service('    healthcheck:\n      test: ["NONE"]\n'), True),
+}
+
+
+@pytest.mark.parametrize(("text", "expected"), PROBE_FORMS.values(), ids=PROBE_FORMS.keys())
+def test_la_garde_des_sondes_rend_son_verdict_sur_chaque_forme(text: str, expected: bool) -> None:
+    """Chaque forme recensée : signalée si, et seulement si, le service n'a pas de sonde."""
+    assert bool(probe_findings(text)) is expected, probe_findings(text)
+
+
+def test_chaque_service_de_production_a_une_sonde() -> None:
+    """Le job de déploiement rougit par `docker compose up -d --wait` : il ne voit un conteneur
+    qui ne démarre pas que si ce conteneur a une sonde (`probe_findings`)."""
+    assert probe_findings(COMPOSE_PROD.read_text(encoding="utf-8")) == []
 
 
 @pytest.mark.parametrize(("text", "expected"), EXPOSURE_FORMS.values(), ids=EXPOSURE_FORMS.keys())

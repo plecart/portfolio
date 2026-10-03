@@ -15,6 +15,25 @@
 #
 # `restart: unless-stopped` partout : un conteneur arrêté par une panne ou par un redémarrage du
 # VPS repart seul (cadrage §6.7, « politiques de redémarrage »).
+#
+# **Une sonde par service** : le déploiement attend la pile par `docker compose up -d --wait`, qui
+# n'attend d'un service sans sonde que l'état « en marche » — et `unless-stopped` le lui rend même
+# quand le conteneur sort aussitôt en erreur : la commande réussit sur un conteneur qui boucle.
+# Avec une sonde, elle échoue (« is unhealthy ») — mesuré sur Compose 5.0.2, PR de #16 lot 3.
+# `apps/api/tests/test_compose.py` exige une sonde de chaque service.
+
+# Les sondes des services applicatifs : toutes les 2 s au démarrage, pour que `--wait` rende la
+# main dès qu'ils répondent, puis toutes les 30 s — une sonde coûte un processus dans le conteneur.
+# Un service qui tourne sans jamais devenir sain est déclaré malade au bout de 3 minutes environ
+# (2 de démarrage, 3 échecs) ; un service qui boucle, dès sa première sortie. `start_interval`
+# demande Docker Engine 25 ou plus : le VPS l'installe depuis le dépôt de Docker (brief de #16,
+# décision 7).
+x-probe-timing: &probe-timing
+  interval: 30s
+  timeout: 5s
+  retries: 3
+  start_period: 2m
+  start_interval: 2s
 
 name: portfolio
 
@@ -27,6 +46,14 @@ services:
     command: [tunnel, run]
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:?}
+      # Le serveur de métriques, que la sonde interroge : dans le conteneur seulement — par défaut,
+      # il écoute sur toutes les interfaces, donc sur le réseau du projet.
+      TUNNEL_METRICS: 127.0.0.1:20241
+    # Sain quand le Tunnel tient au moins une connexion vers Cloudflare (`/ready`). L'image n'a
+    # pas de shell : la sonde est le binaire lui-même, qui lit la même adresse dans l'environnement.
+    healthcheck:
+      <<: *probe-timing
+      test: [CMD, cloudflared, tunnel, ready]
     restart: unless-stopped
 
   caddy:
@@ -39,6 +66,10 @@ services:
       SITE_HOST: ${SITE_HOST:?}
       API_HOST: ${API_HOST:?}
       MEDIA_HOST: ${MEDIA_HOST:?}
+    # Sain quand l'hôte du site sert sa page : la sonde passe par le Caddyfile, nom d'hôte compris.
+    healthcheck:
+      <<: *probe-timing
+      test: [CMD-SHELL, 'wget -q -O /dev/null --header "Host: $$SITE_HOST" http://127.0.0.1/']
     restart: unless-stopped
 
   api:
@@ -62,6 +93,21 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Sain quand Django répond par un succès ou une redirection à la page de connexion de l'admin
+    # (ADR 0001), sous un nom d'hôte qu'il accepte : migrations jouées, `gunicorn` et ses workers
+    # en place, table de routage chargée. Une page qui n'interroge pas la base et n'écrit aucun
+    # journal, contrairement à une 404.
+    healthcheck:
+      <<: *probe-timing
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import http.client, json, os;
+          c = http.client.HTTPConnection("127.0.0.1", 8000, timeout=5);
+          c.request("GET", "/admin/login/", headers={"Host": json.loads(os.environ["ALLOWED_HOSTS"])[0]});
+          exit(c.getresponse().status >= 400)
     restart: unless-stopped
 
   postgres:
