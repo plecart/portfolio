@@ -283,11 +283,12 @@ def compose_services(text: str) -> dict[str, object]:
 def third_party_images(text: str) -> list[str]:
     """Les images tierces d'un fichier Compose, dans l'ordre de ses services.
 
-    Une image nommée ou étiquetée par une variable (`${…}`) est une image du dépôt, construite par
-    `make build` et publiée sur GHCR : Dependabot la saute (`docker_compose/file_parser.rb`). Une
-    image tierce nommée ou étiquetée par une variable échapperait donc à cette lecture, comme à
-    Dependabot ; les deux formes figurent au recueil, en `xfail`. En production, une telle image
-    rougit tout de même : `test_compose.py` n'y admet d'image interpolée que celles du dépôt.
+    Une image étiquetée par une variable, ou nommée par une variable sans défaut (`${…}`), est une
+    image du dépôt, construite par `make build` et publiée sur GHCR : Dependabot la saute
+    (`docker_compose/file_parser.rb`). Une image tierce écrite ainsi échapperait donc à cette
+    lecture ; Dependabot, lui, lit la valeur par défaut d'un nom interpolé, mais saute une
+    étiquette interpolée. Les deux formes figurent au recueil, en `xfail`. En production, une telle
+    image rougit tout de même : `test_compose.py` n'y admet d'image interpolée que celles du dépôt.
     """
     images = [
         cast(dict[str, object], service).get("image")
