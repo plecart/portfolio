@@ -1,0 +1,187 @@
+# Runbook — la production
+
+Ce qu'il faut savoir pour amorcer, déployer, réparer et entretenir le VPS de production (ADR 0002),
+sans rien retrouver de mémoire (PRD, US 47 et 50). Les commandes sont celles du dépôt : le job
+`deploy` de [`.github/workflows/ci.yml`](../.github/workflows/ci.yml),
+[`bootstrap.sh`](bootstrap.sh) et [`compose.yml`](compose.yml) font foi s'ils divergent d'ici.
+
+**Aucune étape ne demande d'afficher un secret, ni d'en recopier un extrait.** Un secret passe
+d'un fichier ou du gestionnaire de mots de passe à sa destination — `gh secret set` le lit sur son
+entrée, `bootstrap.sh` le saisit sans écho — et une vérification se lit oui / non. Ne colle jamais
+un secret dans une issue, une PR ou une conversation.
+
+## La pile
+
+`/srv/portfolio`, sur le VPS : `compose.yml`, déposé par le job `deploy` à chaque déploiement, et
+`.env`, écrit par `bootstrap.sh` — sa ligne `IMAGE_TAG`, le SHA complet du commit déployé, est
+réécrite par chaque déploiement. Projet Compose `portfolio` : `cloudflared`, `caddy`, `api`,
+`postgres`, `redis`, chacun avec sa sonde, aucun port publié ; `cloudflared` est la seule entrée
+(D45). L'utilisateur `deploy` possède le dossier et tire les images de GHCR.
+
+## Où vit chaque secret
+
+| Secret | Où il vit | Écrit par | Se tourne par |
+|---|---|---|---|
+| Jeton du Tunnel (`TUNNEL_TOKEN`) | gestionnaire de mots de passe ; `.env` du VPS | `bootstrap.sh` | Cloudflare, puis `bootstrap.sh TUNNEL_TOKEN` |
+| `SECRET_KEY` | `.env` du VPS seulement | `bootstrap.sh`, qui l'engendre | `bootstrap.sh SECRET_KEY` |
+| `POSTGRES_PASSWORD` | `.env` du VPS et la base | `bootstrap.sh`, qui l'engendre | `bootstrap.sh POSTGRES_PASSWORD`, pile démarrée |
+| Jeton GHCR (classic, `read:packages`) | gestionnaire ; configuration Docker de `deploy` | `bootstrap.sh` (`docker login`) | `bootstrap.sh GHCR_TOKEN` |
+| Clé privée de déploiement | secret d'Actions `DEPLOY_SSH_KEY` seulement | le mainteneur | nouvelle paire, `bootstrap.sh DEPLOY_KEY` |
+| Empreinte de l'hôte | secret d'Actions `DEPLOY_KNOWN_HOSTS` | le mainteneur | à chaque VPS reconstruit |
+| Hôte et utilisateur | secrets d'Actions `DEPLOY_HOST`, `DEPLOY_USER` (`deploy`) | le mainteneur | à chaque VPS reconstruit |
+
+`SECRET_KEY` et `POSTGRES_PASSWORD` ne vivent que sur le VPS : rien hors de la pile ne s'en sert,
+et un VPS reconstruit en reçoit de neufs — la base restaurée garde ses données, pas son mot de
+passe. La clé de chiffrement des sauvegardes, elle, ne vit jamais seulement sur le VPS (#23).
+
+## Amorcer un VPS neuf
+
+Prérequis : un VPS Ubuntu LTS en UE (ADR 0002), joignable en `root` par ta clé SSH ; le jeton du
+Tunnel (#25) dans le gestionnaire de mots de passe. À la première connexion, `ssh` affiche
+l'empreinte de l'hôte : compare-la à celle que la console du fournisseur rend pour
+`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` — identiques, oui ou non ? Non : n'accepte pas.
+
+1. **La clé de déploiement**, sur le poste, dédiée et sans phrase de passe — la CI ne peut pas en
+   saisir une :
+   ```
+   ssh-keygen -t ed25519 -N "" -C deploy@portfolio -f deploy_key
+   ```
+2. **Le jeton GHCR** : un jeton *classic*, portée `read:packages` seule — GHCR n'accepte pas les
+   jetons à droits fins (doc GitHub « Working with the Container registry ») —, créé sur
+   `https://github.com/settings/tokens/new?scopes=read:packages`, rangé dans le gestionnaire.
+3. **Le commit à déployer** : la tête de `main`, si son run a publié (`gh run list --branch main
+   --limit 1` : `completed success` ?). Son SHA complet : `git fetch origin && git rev-parse
+   origin/main`.
+4. **Les trois fichiers de ce commit**, copiés sur le VPS :
+   ```
+   git switch --detach <sha>
+   scp infra/bootstrap.sh infra/compose.yml infra/prod.env.example root@<ip>:
+   ```
+5. **L'amorçage**, en `root` sur le VPS — `-t` pour les saisies sans écho :
+   ```
+   ssh -t root@<ip> bash bootstrap.sh
+   ```
+   Il demande : la clé publique (le contenu de `deploy_key.pub`), le jeton GHCR, `IMAGE_TAG` (le
+   SHA de l'étape 3), `TUNNEL_TOKEN`, puis les noms d'hôte — `SITE_HOST`, `API_HOST`,
+   `MEDIA_HOST` (ADR 0003). Il finit par `== Fait`, `docker compose ps` où chaque service est
+   `healthy`, et la ligne de la clé de l'hôte. Il s'arrête sur la première erreur ; relancé, il
+   reprend sans rien refaire de ce qui est en place. `cloudflared` ne devient sain qu'avec un
+   Tunnel configuré (#25) : sinon `--wait` s'arrête sur « cloudflared is unhealthy ».
+6. **Les secrets d'Actions**, depuis le poste, dans le dépôt :
+   ```
+   gh secret set DEPLOY_SSH_KEY < deploy_key
+   printf '%s %s\n' <ip> "<ligne de la clé de l'hôte affichée par bootstrap.sh>" | gh secret set DEPLOY_KNOWN_HOSTS
+   gh secret set DEPLOY_HOST --body <ip>
+   gh secret set DEPLOY_USER --body deploy
+   rm deploy_key deploy_key.pub
+   ```
+   `gh secret list` liste-t-il les quatre noms ? (Il n'affiche jamais les valeurs.)
+7. **Le déploiement continu** : `gh variable set DEPLOY_ENABLED --body true`. Le prochain push sur
+   `main` déploie ; tant que la variable ne vaut pas `true`, le job `deploy` est sauté.
+
+## Commandes sur le VPS
+
+En `deploy`, dans le dossier de la pile — `root` lit l'état aussi, mais n'a pas d'accès à GHCR :
+```
+ssh root@<ip>
+sudo -iu deploy
+cd /srv/portfolio
+docker compose ps
+docker compose logs --tail 100 api
+docker compose restart caddy
+```
+
+Chaque commande Compose exige `IMAGE_TAG` (`${IMAGE_TAG:?}` dans `compose.yml`) : elle le lit dans
+le `.env`, qui porte le SHA du dernier déploiement (`grep IMAGE_TAG .env`). Pour viser un autre
+commit le temps d'une commande, l'environnement l'emporte sur le `.env` :
+`IMAGE_TAG=<sha> docker compose …` — un SHA complet, jamais `latest`, que deux publications
+croisées peuvent laisser sur l'avant-dernier commit.
+
+## Déployer à la main
+
+Quand la CI ne peut pas le faire, ou pour revenir à un commit antérieur. Seuls les trois derniers
+commits publiés ont encore leurs images (`make prune`) :
+`gh api users/plecart/packages/container/portfolio-api/versions --jq '.[].metadata.container.tags'`.
+
+1. Le Compose de ce commit, depuis le poste :
+   ```
+   git show <sha>:infra/compose.yml > compose.yml
+   scp compose.yml root@<ip>:/tmp/compose.yml
+   ```
+2. Sur le VPS, les gestes du job `deploy` :
+   ```
+   install -m 640 -o deploy -g deploy /tmp/compose.yml /srv/portfolio/compose.yml
+   sudo -iu deploy
+   cd /srv/portfolio && sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=<sha>/' .env && docker compose pull --quiet && docker compose up -d --wait --wait-timeout 300
+   ```
+
+Revenir en arrière ne défait aucune migration : un commit antérieur à une migration déjà jouée
+tourne sur un schéma plus récent que le sien. Le prochain déploiement de la CI remet la tête de
+`main`.
+
+## Un déploiement rouge
+
+- **« required variable X is missing a value »** — une variable est apparue dans `compose.yml` et
+  `prod.env.example`. Copie les deux, avec `bootstrap.sh`, depuis ce commit, et relance
+  `bash bootstrap.sh` : il ne demande que la nouvelle. Puis relance le job.
+- **« container portfolio-<service>-1 is unhealthy »** ou **« application not healthy »** — ce
+  service ne répond pas à sa sonde : `docker compose logs <service>`. Un service qui tourne sans
+  répondre est déclaré malade au bout de trois minutes environ ; un service qui sort, aussitôt.
+- **« Host key verification failed »** — l'hôte n'a plus la clé épinglée : VPS reconstruit, ou
+  autre machine. Vérifie l'empreinte comme à l'amorçage avant de remplacer `DEPLOY_KNOWN_HOSTS`.
+- **« main est passée à … »** — pas une erreur : un commit plus récent se déploie par son propre
+  run.
+
+## Tourner un secret
+
+Copie sur le VPS `bootstrap.sh` et `prod.env.example` de la tête de `main`, puis
+`sudo bash bootstrap.sh <NOM>…` : il redemande ou réengendre les valeurs nommées, garde les
+autres, et relance la pile, qui recrée les services touchés.
+
+- `SECRET_KEY` — les sessions ouvertes sont perdues.
+- `POSTGRES_PASSWORD` — pile démarrée : le script change d'abord le mot de passe dans la base.
+- `TUNNEL_TOKEN` — régénéré dans Cloudflare d'abord.
+- `GHCR_TOKEN` — un nouveau jeton (étape 2 de l'amorçage), puis l'ancien révoqué.
+- `DEPLOY_KEY` — une nouvelle paire (étape 1), sa clé publique donnée à `bootstrap.sh DEPLOY_KEY`,
+  sa clé privée à `gh secret set DEPLOY_SSH_KEY < deploy_key` ; entre les deux, un déploiement
+  échoue.
+
+## Mises à jour
+
+Les correctifs de sécurité d'Ubuntu s'installent chaque jour (`unattended-upgrades`). Docker vient
+de son propre dépôt : chaque mois, en `root`,
+`apt-get update && apt-get install --only-upgrade docker-ce docker-ce-cli containerd.io docker-compose-plugin`,
+puis `docker compose ps` en `deploy` — le démon redémarre, la pile revient seule
+(`restart: unless-stopped`). `/var/run/reboot-required` présent : `reboot`.
+
+## Sécurité de l'hôte
+
+- **Le groupe `docker` vaut `root`** (doc Docker « Docker Engine security ») : `deploy`, qui en est
+  membre, et donc la clé de la CI, ont tout pouvoir sur le VPS. Cette clé ne vit que dans le secret
+  d'Actions ; aucune copie ne reste sur un poste.
+- SSH par clés seulement ; `root` par clé seulement ; `ufw` n'ouvre que SSH ; `fail2ban` bannit
+  les adresses qui échouent sur SSH.
+- Aucun port de la pile n'est publié (`apps/api/tests/test_compose.py`) : Docker contournerait
+  `ufw` pour un port publié.
+
+## Admin
+
+La création du compte unique et l'enrôlement de la 2FA arrivent avec #6, qui écrit ici leur
+procédure de production.
+
+## Cloudflare — l'état attendu
+
+Un état documenté (cadrage §6.7, point 7 ; ADR 0003) ; #25 le complète au premier déploiement,
+règle par règle.
+
+- **Tunnel** — géré depuis Cloudflare ; son jeton est `TUNNEL_TOKEN`. Les noms d'hôte publics du
+  site (apex) et de l'API (`api.`) mènent à `http://caddy:80`, qui route par nom d'hôte
+  (`infra/caddy/Caddyfile`).
+- **DNS** — `www` redirige vers l'apex ; `media.` sert R2 (#13).
+- **Access** — devant l'admin, `/admin/` sur l'hôte de l'API (#6, #25).
+- **WAF et protection DDoS** — ceux de l'offre gratuite, sans réglage. Turnstile : absent (D41).
+
+## Sauvegarde et restauration
+
+Arrivent avec #23 et #24, qui écrivent ici leurs procédures — dont le scénario « le VPS a
+disparu » : louer, pointer le DNS, `bootstrap.sh`, restaurer, vérifier.
