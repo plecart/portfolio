@@ -66,10 +66,11 @@ services:
       SITE_HOST: ${SITE_HOST:?}
       API_HOST: ${API_HOST:?}
       MEDIA_HOST: ${MEDIA_HOST:?}
-    # Sain quand l'hôte du site sert sa page : la sonde passe par le Caddyfile, nom d'hôte compris.
+    # Sain quand l'hôte du site sert sa page HTML. Le contenu compte, pas le code : à un hôte qu'aucun
+    # bloc du Caddyfile ne sert, Caddy rend un 200 vide (mesuré à la relecture de la PR #71).
     healthcheck:
       <<: *probe-timing
-      test: [CMD-SHELL, 'wget -q -O /dev/null --header "Host: $$SITE_HOST" http://127.0.0.1/']
+      test: [CMD-SHELL, 'wget -q -O - --header "Host: $$SITE_HOST" http://127.0.0.1/ | grep -q "<html"']
     restart: unless-stopped
 
   api:

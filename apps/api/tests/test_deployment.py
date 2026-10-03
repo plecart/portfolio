@@ -20,13 +20,25 @@ from test_publication import SHA, STEP_KEYS, WORKFLOW_TOKEN_ENV
 # Ce que porte le job (décision 6) : il suit la publication des images du commit, ne tourne que
 # sur un push vers `main`, et seulement une fois le VPS prêt — la variable de dépôt
 # `DEPLOY_ENABLED`, qu'un `if` de job lit dans `vars`, jamais dans `secrets` (doc GitHub
-# « Contexts »). Aucun `permissions` : le jeton du workflow, en lecture, suffit.
+# « Contexts »). Aucun `permissions` : le jeton du workflow, en lecture, suffit. Ses secrets sont
+# ceux de l'environnement `production`, que seule `main` peut viser (`infra/RUNBOOK.md`) : un run
+# d'une autre branche ne les lit pas.
 DEPLOY_NEEDS = ["publish"]
 DEPLOY_IF = (
     "github.event_name == 'push' && github.ref == 'refs/heads/main'"
     " && vars.DEPLOY_ENABLED == 'true'"
 )
-DEPLOY_JOB_KEYS = {"name", "runs-on", "needs", "if", "timeout-minutes", "concurrency", "steps"}
+DEPLOY_ENVIRONMENT = "production"
+DEPLOY_JOB_KEYS = {
+    "name",
+    "runs-on",
+    "needs",
+    "if",
+    "environment",
+    "timeout-minutes",
+    "concurrency",
+    "steps",
+}
 
 # L'environnement du script, et lui seul : le jeton du workflow pour lire la tête de `main`, et
 # les quatre secrets du VPS — la clé dédiée, l'empreinte de l'hôte, l'utilisateur et l'hôte.
@@ -55,8 +67,9 @@ def deploy_findings(workflow: str) -> list[str]:
     ce qui l'entoure — ce qui le déclenche, le saute ou tolère son échec, et ce qu'il reçoit.
 
     Returns:
-        Un constat si le job manque ; sinon un par propriété altérée — `needs`, `if`, une clé de
-        job hors de `DEPLOY_JOB_KEYS` (`permissions`, `continue-on-error`, `env`…),
+        Un constat si le job manque ; sinon un par propriété altérée — `needs`, `if`,
+        `environment`, une clé de job hors de `DEPLOY_JOB_KEYS` (`permissions`,
+        `continue-on-error`, `env`…),
         `concurrency`, des étapes autres qu'un checkout sans identifiant suivi d'un script, son
         environnement autre que `DEPLOY_ENV`, une clé d'étape hors de `STEP_KEYS`. Liste vide :
         le job est conforme.
@@ -70,6 +83,10 @@ def deploy_findings(workflow: str) -> list[str]:
         findings.append(f"`needs` vaut {needs}, attendu {DEPLOY_NEEDS}")
     if job.get("if") != DEPLOY_IF:
         findings.append(f"`if` vaut {job.get('if')!r}, attendu {DEPLOY_IF!r}")
+    if job.get("environment") != DEPLOY_ENVIRONMENT:
+        findings.append(
+            f"`environment` vaut {job.get('environment')!r}, attendu {DEPLOY_ENVIRONMENT!r}"
+        )
     if extra := sorted(set(job) - DEPLOY_JOB_KEYS):
         findings.append(f"le job porte {extra}")
     concurrency = job.get("concurrency")
@@ -111,6 +128,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: publish
     if: {DEPLOY_IF}
+    environment: {DEPLOY_ENVIRONMENT}
     timeout-minutes: 15
 {CONCURRENCY_LINES}\
     steps:
@@ -128,6 +146,8 @@ DEPLOY_CHANGES = {
     "sans la variable du VPS prêt": (" && vars.DEPLOY_ENABLED == 'true'", "", True),
     "variable lue dans les secrets": ("vars.DEPLOY_ENABLED", "secrets.DEPLOY_ENABLED", True),
     "sur un push vers toute branche": (" && github.ref == 'refs/heads/main'", "", True),
+    "sans environnement": (f"    environment: {DEPLOY_ENVIRONMENT}\n", "", True),
+    "autre environnement": (f"environment: {DEPLOY_ENVIRONMENT}", "environment: essai", True),
     "permissions sur le job": (
         "    timeout-minutes: 15\n",
         "    timeout-minutes: 15\n    permissions:\n      packages: read\n",
@@ -193,15 +213,17 @@ def deploy_script() -> str:
 
 
 def run_deploy(
-    root: Path, main: str = SHA, ssh_status: int = 0
+    root: Path, main: str = SHA, failing: str | None = None
 ) -> tuple[subprocess.CompletedProcess[str], list[list[str]]]:
-    """Exécute le script du job comme GitHub Actions (`sh -e`), avec des témoins de `gh`, `scp` et
-    `ssh` qui consignent leurs arguments.
+    """Exécute le script du job avec `-e`, comme GitHub Actions — qui le lance par `bash -e` ; le
+    script reste POSIX, donc `sh -e` ici —, avec des témoins de `gh`, `scp` et `ssh` qui
+    consignent leurs arguments.
 
     Args:
         root: un dossier vide — témoins, appels consignés et `RUNNER_TEMP` y vivent.
         main: le SHA que le témoin de `gh` rend pour la tête de `main`.
-        ssh_status: le code de sortie du témoin de `ssh`, celui de la commande lancée sur le VPS.
+        failing: le témoin qui sort en erreur — `scp` qui ne dépose pas le Compose, `ssh` dont la
+            commande échoue sur le VPS —, ou aucun.
 
     Returns:
         Le processus terminé, et les appels des témoins dans l'ordre, outil en tête.
@@ -209,7 +231,9 @@ def run_deploy(
     tools, calls = root / "bin", root / "calls"
     tools.mkdir()
     record = f'printf "%s\\t" "$(basename "$0")" "$@" >> "{calls.as_posix()}"\necho >> "{calls.as_posix()}"\n'
-    replies = {"gh": f"echo {main}\n", "scp": "", "ssh": f"exit {ssh_status}\n"}
+    replies = {"gh": f"echo {main}\n", "scp": "", "ssh": ""}
+    if failing:
+        replies[failing] += "exit 1\n"
     for tool, reply in replies.items():
         (tools / tool).write_text(f"#!/bin/sh\n{record}{reply}", encoding="utf-8", newline="\n")
         (tools / tool).chmod(0o755)
@@ -286,12 +310,15 @@ def test_un_commit_que_main_a_depasse_ne_se_deploie_pas(tmp_path: Path) -> None:
     assert [call[0] for call in calls] == ["gh"]
 
 
-def test_un_echec_sur_le_vps_fait_echouer_le_job(tmp_path: Path) -> None:
-    """Un service qui ne devient pas sain fait sortir `up --wait` en erreur sur le VPS ; `ssh`
-    rend ce code, et le job rougit au lieu de laisser `main` verte sur une pile en panne."""
-    finished, _ = run_deploy(tmp_path, ssh_status=1)
+@pytest.mark.parametrize("failing", ["scp", "ssh"])
+def test_un_echec_vers_le_vps_fait_echouer_le_job(tmp_path: Path, failing: str) -> None:
+    """Un Compose qui n'a pas été déposé — les nouvelles images tourneraient sous l'ancien —, ou
+    un service qui ne devient pas sain, dont `up --wait` sort en erreur et dont `ssh` rend le code :
+    le job rougit au lieu de laisser `main` verte sur une pile en panne."""
+    finished, calls = run_deploy(tmp_path, failing=failing)
 
     assert finished.returncode != 0
+    assert calls[-1][0] == failing
 
 
 def test_l_amorcage_prepare_le_dossier_ou_le_job_depose_la_pile() -> None:

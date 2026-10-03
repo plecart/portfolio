@@ -224,6 +224,14 @@ def test_chaque_service_de_production_a_une_sonde() -> None:
     assert probe_findings(COMPOSE_PROD.read_text(encoding="utf-8")) == []
 
 
+def test_les_metriques_de_cloudflared_restent_dans_son_conteneur() -> None:
+    """Le serveur de métriques que sa sonde interroge écoute par défaut sur toutes les interfaces,
+    donc sur le réseau du projet : il n'écoute que dans le conteneur."""
+    metrics = read_services(COMPOSE_PROD)["cloudflared"]["environment"]["TUNNEL_METRICS"]
+
+    assert metrics.startswith("127.0.0.1:")
+
+
 @pytest.mark.parametrize(("text", "expected"), EXPOSURE_FORMS.values(), ids=EXPOSURE_FORMS.keys())
 def test_la_garde_d_exposition_rend_son_verdict_sur_chaque_forme(text: str, expected: bool) -> None:
     """Chaque façon recensée de rendre un service joignable hors du réseau du projet."""
