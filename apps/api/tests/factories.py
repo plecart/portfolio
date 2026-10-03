@@ -11,7 +11,6 @@ from content.models import (
     ProjectKind,
     ProjectStatus,
     Section,
-    SectionKey,
     Technology,
     TechnologyKind,
 )
@@ -71,7 +70,15 @@ def project(**fields: object) -> Project:
 
 
 def section(owner: Project, **fields: object) -> Section:
-    """Une section valide de `owner`, non enregistrée ; `fields` en remplace des champs."""
+    """Une section valide de `owner`, non enregistrée, à la première place ; `fields` en remplace
+    des champs."""
     return Section(
-        **{"project": owner, "key": SectionKey.CONTEXT, "body": "Pourquoi ce projet.", **fields}
+        **{
+            "project": owner,
+            "title": "Contexte et objectif",
+            "anchor": "contexte-et-objectif",
+            "body": "Pourquoi ce projet.",
+            "position": 1,
+            **fields,
+        }
     )

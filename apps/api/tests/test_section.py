@@ -1,20 +1,67 @@
-"""Tests de la section de fiche technique : ses onze clés, ses règles en base et dans
-`full_clean()`, et ce que la suppression d'un projet en fait."""
+"""Tests de la section de fiche technique : ses champs, ses règles en base et dans
+`full_clean()`, l'ordre qu'elle stocke, et ce que la suppression d'un projet en fait."""
 
 import pytest
 from config import strings
-from content.models import Project, Section, SectionKey
+from content.models import Project, Section
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from factories import BLANK, project, saved, section
 from refusals import refusals
 
-# Les règles que la base porte, une contrainte nommée chacune (décision 5), avec le refus de la
-# contrainte — code et message du catalogue — et celui que `full_clean()` rend, champ et code. Le
-# champ refuse lui-même un corps vide et une clé hors de ses choix, et Django écarte alors la
-# contrainte : l'admin n'affiche jamais deux messages pour une faute. Un corps d'espaces, que le
-# champ accepte, n'est refusé que par la contrainte.
+# La borne du titre (spec §7) : un titre courant de cette longueur tient sur une ligne de la fiche
+# mobile.
+TITLE_MAX_LENGTH = 40
+
+# Les règles que la base porte, une contrainte nommée chacune (décision 7), avec le refus de la
+# contrainte — code et message du catalogue — et celui que `full_clean()` rend, champ et code.
+# Quand le champ refuse lui-même la valeur (vide, hors de la forme d'un slug), Django écarte la
+# contrainte : l'admin n'affiche jamais deux messages pour une faute.
 DATABASE_GUARDS = [
+    (
+        "titre vide",
+        {"title": ""},
+        "content_section_title_not_empty",
+        ("section_title_missing", strings.SECTION_TITLE_MISSING),
+        ("title", "blank"),
+    ),
+    (
+        f"titre de {TITLE_MAX_LENGTH + 1} caractères",
+        {"title": "t" * (TITLE_MAX_LENGTH + 1)},
+        "content_section_title_length",
+        ("section_title_too_long", strings.SECTION_TITLE_TOO_LONG),
+        (NON_FIELD_ERRORS, "section_title_too_long"),
+    ),
+    (
+        "ancre vide",
+        {"anchor": ""},
+        "content_section_anchor_valid",
+        ("section_anchor_invalid", strings.SECTION_ANCHOR_INVALID),
+        ("anchor", "blank"),
+    ),
+    (
+        "ancre avec une espace",
+        {"anchor": "mon ancre"},
+        "content_section_anchor_valid",
+        ("section_anchor_invalid", strings.SECTION_ANCHOR_INVALID),
+        ("anchor", "invalid"),
+    ),
+    (
+        "ancre accentuée",
+        {"anchor": "données"},
+        "content_section_anchor_valid",
+        ("section_anchor_invalid", strings.SECTION_ANCHOR_INVALID),
+        ("anchor", "invalid"),
+    ),
+    # Le champ de slug accepte le souligné ; la spec §7 ne le prévoit pas : seule la contrainte le
+    # refuse.
+    (
+        "ancre avec un souligné",
+        {"anchor": "mon_ancre"},
+        "content_section_anchor_valid",
+        ("section_anchor_invalid", strings.SECTION_ANCHOR_INVALID),
+        (NON_FIELD_ERRORS, "section_anchor_invalid"),
+    ),
     (
         "corps vide",
         {"body": ""},
@@ -29,13 +76,6 @@ DATABASE_GUARDS = [
         ("section_body_missing", strings.SECTION_BODY_MISSING),
         (NON_FIELD_ERRORS, "section_body_missing"),
     ),
-    (
-        "clé hors de l'énumération",
-        {"key": "autre"},
-        "content_section_key_valid",
-        ("section_key_unknown", strings.SECTION_KEY_UNKNOWN),
-        ("key", "invalid_choice"),
-    ),
 ]
 GUARD_IDS = [guard for guard, *_ in DATABASE_GUARDS]
 
@@ -46,37 +86,28 @@ def portfolio() -> Project:
     return saved(project())
 
 
-def test_les_cles_des_sections_sont_les_ancres_de_la_spec_dans_l_ordre() -> None:
-    """Les valeurs stockées sont les ancres `#s-<clé>` du site et du RAG (spec §4.3, US 57),
-    exposées telles quelles par l'API (#10) : un contrat, dans l'ordre de l'écran et du site."""
-    assert SectionKey.values == [
-        "contexte",
-        "stack",
-        "architecture",
-        "donnees",
-        "securite",
-        "asynchrone",
-        "api",
-        "deploiement",
-        "tests",
-        "decisions",
-        "bilan",
-    ]
-
-
-def test_une_section_porte_un_projet_une_cle_et_un_corps() -> None:
+def test_une_section_porte_un_projet_un_titre_une_ancre_un_corps_et_une_position() -> None:
     assert [field.name for field in Section._meta.concrete_fields] == [
         "id",
         "project",
-        "key",
+        "title",
+        "anchor",
         "body",
+        "position",
     ]
 
 
 @pytest.mark.django_db
-def test_une_section_valide_passe_ses_regles(portfolio: Project) -> None:
+@pytest.mark.parametrize(
+    "fields",
+    [{}, {"title": "t" * TITLE_MAX_LENGTH}, {"anchor": "Tests-et-qualite-2"}],
+    ids=["section de la fabrique", "titre à la borne", "ancre en majuscules et chiffres"],
+)
+def test_une_section_accepte_des_valeurs_dans_ses_regles(
+    portfolio: Project, fields: dict[str, object]
+) -> None:
     """`django_db` : `full_clean()` fait évaluer les contraintes par la base."""
-    section(portfolio).full_clean()
+    section(portfolio, **fields).full_clean()
 
 
 @pytest.mark.django_db
@@ -131,8 +162,7 @@ def test_la_base_refuse_une_section_qui_enfreint_ses_regles(
 @pytest.mark.django_db
 def test_une_espace_insecable_seule_compte_comme_un_texte_en_base(portfolio: Project) -> None:
     """`\\S` suit la locale libc de l'image : une locale ICU ferait de l'espace insécable une
-    espace, et la règle changerait sans un mot. L'écran Projet, lui, la tient pour vide
-    (`ProjectForm.save_sections`)."""
+    espace, et la règle changerait sans un mot."""
     lone = section(portfolio, body=" ")
 
     lone.full_clean()
@@ -140,25 +170,54 @@ def test_une_espace_insecable_seule_compte_comme_un_texte_en_base(portfolio: Pro
 
 
 @pytest.mark.django_db
-def test_un_projet_ne_porte_pas_deux_fois_la_meme_section(portfolio: Project) -> None:
+def test_une_section_exige_sa_position(portfolio: Project) -> None:
+    """Le modèle ne choisit aucune position : l'écran Projet la pose, par le glisser-déposer ou la
+    suivante pour une ligne neuve (D55)."""
+    with pytest.raises(ValidationError) as refusal:
+        section(portfolio, position=None).full_clean()
+
+    assert [code for code, _ in refusals(refusal.value, "position")] == ["null"]
+
+
+@pytest.mark.django_db
+def test_les_sections_d_un_projet_se_lisent_dans_l_ordre_de_leur_position(
+    portfolio: Project,
+) -> None:
+    """L'ordre stocké est celui de l'admin : par position, puis dans l'ordre de saisie — l'API de
+    #10 l'expose tel quel. Trois ordres qui divergent : position, clé, écriture en table."""
+    for key, anchor, position in ((1, "bilan", 2), (3, "stack", 1), (2, "contexte", 1)):
+        Section(
+            pk=key, project=portfolio, title=anchor, anchor=anchor, body="Texte.", position=position
+        ).save()
+
+    ordered = [row.anchor for row in Section.objects.filter(project=portfolio)]
+
+    assert ordered == ["contexte", "stack", "bilan"]
+
+
+@pytest.mark.django_db
+def test_un_projet_ne_porte_pas_deux_fois_la_meme_ancre(portfolio: Project) -> None:
     saved(section(portfolio))
 
     with pytest.raises(ValidationError) as refusal:
-        section(portfolio, body="Autre texte.").full_clean()
+        section(portfolio, title="Autre titre", position=2).full_clean()
 
-    assert refusals(refusal.value) == [("section_key_taken", strings.SECTION_KEY_TAKEN)]
+    assert refusals(refusal.value) == [("section_anchor_taken", strings.SECTION_ANCHOR_TAKEN)]
 
 
 @pytest.mark.django_db
-def test_la_base_refuse_deux_fois_la_meme_section_dans_un_projet(portfolio: Project) -> None:
+def test_la_base_refuse_deux_fois_la_meme_ancre_dans_un_projet(portfolio: Project) -> None:
+    """L'unicité est différée : Postgres la vérifie à la validation de la transaction, que
+    `check_constraints()` avance ici."""
     saved(section(portfolio))
 
-    with pytest.raises(IntegrityError, match="content_section_key_unique"), transaction.atomic():
-        section(portfolio, body="Autre texte.").save()
+    with pytest.raises(IntegrityError, match="content_section_anchor_unique"), transaction.atomic():
+        saved(section(portfolio, title="Autre titre", position=2))
+        connection.check_constraints()
 
 
 @pytest.mark.django_db
-def test_deux_projets_portent_chacun_la_meme_section(portfolio: Project) -> None:
+def test_deux_projets_portent_chacun_la_meme_ancre(portfolio: Project) -> None:
     """L'unicité vaut dans un projet, pas entre projets."""
     saved(section(portfolio))
     other = saved(project(slug="autre"))

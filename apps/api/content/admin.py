@@ -1,27 +1,21 @@
 """Écrans d'admin du contenu."""
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import Any, ClassVar
 
 from config import strings
 from django.contrib import admin
 from django.contrib.admin.widgets import RelatedFieldWidgetWrapper
 from django.db.models import Field
-from django.forms import BaseInlineFormSet, ModelForm
+from django.forms import BaseInlineFormSet, CharField, ModelForm
 from django.forms import Field as FormField
 from django.http import HttpRequest
 from django.utils.html import format_html
 from django.utils.safestring import SafeString, mark_safe
 from django_stubs_ext import StrOrPromise
 
-from content.forms import ProjectForm
 from content.inlines import SortableFormSet, SortableInline
-from content.models import Project, ProjectTechnology, Technology
-
-if TYPE_CHECKING:
-    # Le type des groupes de champs, que seuls les stubs de Django nomment : sans lui, une liste
-    # de groupes construite ici ne se lit pas comme celle que l'admin attend.
-    from django.contrib.admin.options import _FieldsetSpec  # pyright: ignore[reportPrivateUsage]
+from content.models import Project, ProjectTechnology, Section, Technology
 
 # Le côté de l'aperçu d'une icône dans la liste, en pixels : il tient dans une ligne de l'admin.
 ICON_PREVIEW_SIZE = 24
@@ -132,32 +126,50 @@ class ProjectTechnologyInline(SortableInline[ProjectTechnology, Project]):
         return super().get_formset(request, obj, validate_min=True, **kwargs)
 
 
+class SectionFormSet(SortableFormSet[Section, Project]):
+    """Les sections d'un projet, avec le message du catalogue pour la seule unicité que le
+    formulaire compare entre ses lignes, avant la base : l'ancre."""
+
+    def get_unique_error_message(self, unique_check: Sequence[str]) -> str:
+        """Le doublon (projet, ancre) : Django nommerait le champ par son identifiant anglais
+        (`BaseModelFormSet.get_unique_error_message`)."""
+        return strings.SECTION_ANCHOR_TAKEN
+
+
+class SectionInline(SortableInline[Section, Project]):
+    """La fiche technique d'un projet, en ligne sur l'écran Projet, sous ses technologies : des
+    sections libres que l'auteur ajoute, retire et ordonne par glisser-déposer (D55, D57).
+    L'ancre se remplit depuis le titre à la saisie et reste modifiable, comme le slug du
+    projet."""
+
+    model = Section
+    formset = SectionFormSet
+    fields = ("move", "title", "anchor", "body", "position")
+    prepopulated_fields: ClassVar[dict[str, Sequence[str]]] = {"anchor": ("title",)}
+    verbose_name_plural = strings.SECTIONS_HEADING
+    # Une seule ligne neuve à l'ouverture, et non les trois de Django : une section, son corps
+    # surtout, tient de la place ; l'auteur en ajoute d'autres par le bouton de l'écran.
+    extra = 1
+
+    def formfield_for_dbfield(
+        self, db_field: Field[Any, Any], request: HttpRequest, **kwargs: Any
+    ) -> FormField | None:
+        """Le corps, gardé tel que saisi — en Markdown, une ligne de tête indentée est un bloc de
+        code — et refusé vide avec le message du catalogue, comme s'il était fait d'espaces : la
+        contrainte de la base dit la même chose."""
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if isinstance(formfield, CharField) and db_field.name == "body":
+            formfield.strip = False
+            formfield.error_messages["required"] = strings.SECTION_BODY_MISSING
+        return formfield
+
+
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin[Project]):
-    """Écran Projet : tous les champs du projet, ses technologies en ligne, puis les onze blocs de
-    sa fiche technique, en un seul écran (PRD, US 34). Le slug se remplit depuis le titre à la
-    saisie et reste modifiable (décision 3)."""
+    """Écran Projet : tous les champs du projet, ses technologies en ligne, puis sa fiche technique,
+    en un seul écran (PRD, US 34). Le slug se remplit depuis le titre à la saisie et reste
+    modifiable (décision 3)."""
 
-    form = ProjectForm
     list_display = ("title", "kind", "status", "showcase", "published")
     prepopulated_fields: ClassVar[dict[str, Sequence[str]]] = {"slug": ("title",)}
-    inlines = (ProjectTechnologyInline,)
-
-    def get_fieldsets(self, request: HttpRequest, obj: Project | None = None) -> "_FieldsetSpec":
-        """Deux groupes : les champs du projet, puis les blocs de la fiche technique sous leur
-        titre. Le gabarit de l'écran (`admin/content/project/change_form.html`) rend le premier à
-        sa place et le second sous les tableaux en ligne."""
-        blocks = tuple(ProjectForm.section_fields())
-        fields = tuple(name for name in self.get_fields(request, obj) if name not in blocks)
-        return ((None, {"fields": fields}), (strings.SECTIONS_HEADING, {"fields": blocks}))
-
-    def save_related(
-        self,
-        request: HttpRequest,
-        form: ProjectForm,
-        formsets: Sequence[BaseInlineFormSet[Any, Project, ModelForm[Any]]],
-        change: bool,
-    ) -> None:
-        """Les technologies, puis les sections, le projet enregistré."""
-        super().save_related(request, form, formsets, change)
-        form.save_sections()
+    inlines = (ProjectTechnologyInline, SectionInline)
