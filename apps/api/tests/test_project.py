@@ -80,6 +80,9 @@ ACCEPTANCES: list[tuple[str, dict[str, object]]] = [
     ),
     (f"slug de {SLUG_MAX_LENGTH} caractères", {"slug": "s" * SLUG_MAX_LENGTH}),
     ("slug de chiffres, traits d'union et soulignés", {"slug": "projet-2_bis"}),
+    # `\S` suit la locale libc de l'image, comme pour le corps d'une section : une espace
+    # insécable seule y compte comme un texte.
+    ("description d'une espace insécable seule", {"description": "\N{NO-BREAK SPACE}"}),
     (f"client de {CLIENT_MAX_LENGTH} caractères", {"client": "c" * CLIENT_MAX_LENGTH}),
     (
         f"liens de {URL_MAX_LENGTH} caractères",
