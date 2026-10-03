@@ -1,7 +1,7 @@
 """Tests du Postgres des tests : l'image du développement, démarrée pour la session.
 
-L'égalité de son image avec celle du Compose est tenue par `test_infra.py`, avec les autres
-fichiers d'infrastructure.
+L'égalité de son image avec celle du Compose est tenue par `test_compose.py`, avec le reste du
+contenu des fichiers Compose.
 """
 
 from pathlib import Path

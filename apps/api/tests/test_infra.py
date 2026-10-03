@@ -1,4 +1,4 @@
-"""Tests des fichiers d'infrastructure : images, point d'entrée, Compose de développement.
+"""Tests des fichiers d'infrastructure : images, point d'entrée, `Makefile`.
 
 Ces tests lisent des fichiers, ou interrogent les outils qui les lisent — `make --dry-run`, Docker
 pour le contexte de build —, sans construire d'image ni démarrer de conteneur. Ils gardent des
@@ -8,7 +8,8 @@ root, des signaux qui n'atteignent jamais le serveur, une adresse de service rev
 
 Que les images **se construisent** et que la pile **démarre** est prouvé ailleurs : par le job
 `infra` de la CI, et par la pile qu'on regarde tourner. Le scan des images a ses propres tests,
-dans `test_image_scan.py`, et leur publication dans `test_publication.py`.
+dans `test_image_scan.py`, leur publication dans `test_publication.py`, et le contenu des fichiers
+Compose dans `test_compose.py`.
 """
 
 import io
@@ -23,7 +24,6 @@ from pathlib import Path
 import pytest
 import yaml
 from config.env import Env
-from containers import POSTGRES_IMAGE
 from test_supply_chain import dockerfile_instructions
 
 # `test_infra.py` → `tests` → `api` → `apps` → racine du dépôt.
@@ -121,24 +121,6 @@ SECRET_MOUNT = "--mount=type=secret"
 # La dernière instruction du point d'entrée, mot pour mot. Sans `exec`, le shell reste PID 1 :
 # `docker stop` ne l'atteint jamais et le serveur est tué au bout du délai de grâce.
 HAND_OVER = 'exec "$@"'
-
-# La sonde de `postgres` doit interroger le **réseau**, pas le socket Unix local. Pendant
-# `initdb`, l'image postgres démarre un serveur temporaire avec `listen_addresses=''` : il
-# accepte déjà le socket et refuse encore TCP. Mesuré sur `pgvector/pgvector:pg16` dans cet
-# état — `pg_isready -U … -d …` rend « accepting connections » (0) quand la même sonde avec
-# `-h 127.0.0.1` rend « no response » (2). Sans cet hôte, `service_healthy` peut se déclencher
-# alors qu'`api` ne peut joindre personne, et ses migrations échouent au premier `up`.
-POSTGRES_PROBE_HOST = "-h 127.0.0.1"
-
-# Les adresses que le service `api` doit recomposer avec les noms de service. `env_file: ../.env`
-# apporte celles du poste (`127.0.0.1`), qui ne désignent rien depuis un conteneur ; ces trois
-# lignes les remplacent, et `environment:` prime sur `env_file:`. Les retirer laisse
-# `docker compose config` vert et ne casse qu'au démarrage — d'où ce test.
-SERVICE_ADDRESS_OVERRIDES = {
-    "DATABASE_URL": "@postgres:5432/",
-    "MEDIA_ROOT": "/app/media",
-    "REDIS_URL": "redis://redis:6379",
-}
 
 # Les fichiers qu'un outil Linux lit dans la **copie de travail** : ce que le shell du conteneur
 # exécute, ce que buildkit analyse, la configuration que Caddy lit dans son image, ce dont Compose
@@ -311,16 +293,6 @@ def test_le_compose_et_le_makefile_nomment_la_meme_image() -> None:
     assert MAKEFILE_EXPORT.search(makefile), (
         "`export IMAGE_PREFIX` a disparu : `infra/dev.env` pourrait nommer l'image de `make dev`"
     )
-
-
-def test_les_tests_de_base_tournent_sur_l_image_postgres_du_compose() -> None:
-    """Les tests vérifient les contraintes sur le moteur et les extensions du développement.
-
-    Lu avec l'analyseur YAML, pas avec un motif : c'est la valeur que Compose lira qui compte.
-    """
-    compose = yaml.safe_load(COMPOSE_DEV.read_text(encoding="utf-8"))
-
-    assert compose["services"]["postgres"]["image"] == POSTGRES_IMAGE
 
 
 def test_make_build_construit_une_image_par_dossier_d_infra() -> None:
@@ -537,35 +509,6 @@ def test_l_image_bascule_sur_un_utilisateur_non_root() -> None:
     assert switch, "aucune instruction `USER` : l'image démarrerait en root"
     assert switch.group("name") != "root"
     assert creation.start() < switch.start(), "`USER` doit suivre la création de l'utilisateur"
-
-
-@pytest.mark.parametrize(("variable", "expected"), sorted(SERVICE_ADDRESS_OVERRIDES.items()))
-def test_le_service_api_recompose_ses_adresses_de_service(variable: str, expected: str) -> None:
-    """`env_file` apporte les adresses du poste ; seules ces lignes les rendent joignables.
-
-    Les retirer ne fait rougir ni `make test` ni `make compose-config` : la pile démarre, puis
-    `api` sort en 1 sur une connexion refusée pendant que les autres services restent vivants.
-    """
-    declaration = re.search(
-        rf"^\s*{variable}:\s*(?P<value>\S.*)$",
-        COMPOSE_DEV.read_text(encoding="utf-8"),
-        re.MULTILINE,
-    )
-
-    assert declaration, f"« {variable} » a disparu du bloc `environment:` du service `api`"
-    assert expected in declaration.group("value")
-
-
-def test_la_sonde_de_postgres_interroge_le_reseau_et_non_le_socket_local() -> None:
-    """Une sonde aveugle à l'état TCP déclare saine une base qu'`api` ne peut pas encore joindre.
-
-    C'est le seul état qui compte : `api` se connecte par le réseau du Compose, jamais par le
-    socket Unix du conteneur `postgres`.
-    """
-    probe = re.search(r"pg_isready[^\"]*", COMPOSE_DEV.read_text(encoding="utf-8"))
-
-    assert probe, "la sonde `pg_isready` a disparu du service `postgres`"
-    assert POSTGRES_PROBE_HOST in probe.group()
 
 
 def test_aucun_renvoi_vers_un_module_de_test_inexistant() -> None:
