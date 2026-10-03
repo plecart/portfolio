@@ -42,7 +42,7 @@ Strictement séquentielles : on n'attaque la suivante que lorsque la précédent
 ### Phase 1 — MVP portfolio (back + front)
 
 - Accueil : grille de cartes, une par projet (image, titre, technologies principales) ; une carte s'ouvre en fiche. Style et mouvement : `docs/specification-ux.md`.
-- Fiche projet (modal) : titre, description, tags de technologies, images et texte, et **la fiche technique en sections fixes** (§6.1).
+- Fiche projet (modal) : titre, description, tags de technologies, images et texte, et **la fiche technique en sections libres** (§6.1).
 - Back-office : Django admin personnalisé, un seul utilisateur.
 - Premier contenu : la fiche du méta-projet.
 - Socle d'exploitation complet dès cette phase : VPS, Docker Compose, Cloudflare, R2, CI/CD, sauvegardes et plan de reprise, supervision, Redis (cache).
@@ -132,7 +132,7 @@ Réseau Docker privé ; aucun port de base de données exposé ; images construi
 ### 6.1 Modèle de contenu
 
 - **Projet** : slug, titre, résumé, description (Markdown), type (perso / pro / école), statut (en cours / terminé / archivé), dates, client, liens (dépôt, démo : absents pour les projets privés), technologies, galerie d'images avec légendes, fiche technique en sections, mise en avant (booléen « vitrine », un seul projet à la fois), état brouillon / publié.
-- **Fiche technique, sections normalisées** (colonne vertébrale du site et du RAG) : Contexte et objectif · Stack · Architecture · Données · Sécurité · Asynchrone et workers · API et intégrations · Déploiement et exploitation · Tests et qualité · Décisions · Bilan. Caractère obligatoire ou optionnel de chaque section à fixer à la première fiche.
+- **Fiche technique, sections libres** (colonne vertébrale du site et du RAG) : l'auteur crée les sections de chaque projet, autant qu'il en veut, chacune un titre, une ancre stable et un corps en Markdown, et les ordonne ; aucune n'est obligatoire, aucun titre n'est imposé (D57).
 - **Technologie** : nom, type (langage / framework / infra / outil), icône, site.
 - **Document** (phase 2) : fichier sur R2, type, langue, visibilité (`public` téléchargeable, `rag_only` indexé mais jamais servi en entier, `private` jamais indexé), état d'indexation, hash de contenu.
 - **Profil** : compétences, expériences, formation, langues, disponibilité ; faits exacts pour le RAG. Aucune page « à propos » : le site ne présente l'auteur que par deux liens (GitHub, LinkedIn), en colonne fixe en bas à droite de la fenêtre quand la marge à côté de la grille le permet, en pied de page sinon (`docs/specification-ux.md` §1.13) ; le CV public est servi par le chatbot (phase 2).
@@ -268,6 +268,7 @@ Identifiants hérités du cadrage v0 (D1 à D38), sans trou ni renumérotation. 
 | D54 | Deux fichiers Compose, mêmes images | `infra/compose.dev.yml` sur le poste, `infra/compose.yml` en production ; mêmes images, même point d'entrée, mêmes services de données ; ce qui diverge est propre à l'environnement (ports, code monté, `runserver` / Caddy, Tunnel, worker, backup). Remplace le point « environnement identique » de D19 et l'argument « un seul fichier Compose » de D32 (ADR 0012, 2026-09-24). |
 | D55 | Lignes de l'admin ordonnées par glisser-déposer | Technologies d'un projet, puis galerie de #9 : l'auteur fait glisser les lignes, enregistrées ou neuves, ou les déplace au clavier ; la position cachée suit l'ordre affiché à l'enregistrement ; script du projet, sans bibliothèque (ADR 0013, 2026-09-27). |
 | D56 | CI/CD : GitHub Actions et GHCR | Une image par dossier `infra/<service>/` ; front compilé une fois, copié dans `caddy` et, pour `index.html`, dans `api` ; statiques de l'admin servis par WhiteNoise depuis `api`, qui repose sur Debian 13 ; Trivy bloque HIGH et CRITICAL, corrigeables ou non, et la fin de vie, toute exception étant datée et évaluée en trois points ; publication par un job `publish` sur `main`, SHA et `latest`, trois versions gardées, ni attestation ni SBOM ; confirme D43 (ADR 0014, 2026-09-27). |
+| D57 | Fiche technique en sections libres | L'auteur crée, nomme, ordonne (glisser-déposer, D55) et retire les sections de chaque projet ; ancre `s-<slug>` préremplie depuis le titre, modifiable, unique dans le projet ; remplace les onze sections normalisées de §6.1 (arrêt visuel de la PR #66, 2026-10-03). |
 | D29 | (remplacée par D36, D37) | — |
 | D21 | (remplacée par D25) | — |
 
@@ -312,7 +313,6 @@ Recos appliquées par défaut ; chaque point sera tranché par un ADR au moment 
 
 | Sujet | Reco par défaut |
 |---|---|
-| Sections de la fiche technique obligatoires ou optionnelles | À fixer à la première fiche. |
 | Worker : Celery ou arq | Celery (compétence reconnue) ou arq (légèreté) ; ADR en phase 1 ou 2. |
 | Serveur des modèles locaux : `text-embeddings-inference` ou Ollama | TEI par défaut (CPU, embeddings et reranking dans un seul conteneur). |
 | Répartition des modèles Claude | `claude-opus-5` réponse finale, `claude-haiku-4-5` étapes bon marché ; `claude-sonnet-5` en option coût. |
