@@ -149,7 +149,8 @@ enable_firewall() {
 	ufw --force enable
 }
 
-# 7. `fail2ban` sur SSH, qui lit le journal de systemd plutôt qu'un fichier de log.
+# 7. `fail2ban` sur SSH, lu dans le journal de systemd — ce que le paquet d'Ubuntu 24.04 pose déjà,
+#    épinglé ici contre un changement du paquet.
 enable_fail2ban() {
 	step "fail2ban"
 	cat >/etc/fail2ban/jail.d/sshd.local <<'EOF'

@@ -55,10 +55,12 @@ l'empreinte de l'hôte : compare-la à celle que la console du fournisseur rend 
 3. **Le commit à déployer** : la tête de `main`, si son run a publié (`gh run list --branch main
    --limit 1` : `completed success` ?). Son SHA complet : `git fetch origin && git rev-parse
    origin/main`.
-4. **Les trois fichiers de ce commit**, copiés sur le VPS :
+4. **Les trois fichiers de ce commit**, tirés sans changer de branche, puis copiés sur le VPS :
    ```
-   git switch --detach <sha>
-   scp infra/bootstrap.sh infra/compose.yml infra/prod.env.example root@<ip>:
+   git show <sha>:infra/bootstrap.sh > bootstrap.sh
+   git show <sha>:infra/compose.yml > compose.yml
+   git show <sha>:infra/prod.env.example > prod.env.example
+   scp bootstrap.sh compose.yml prod.env.example root@<ip>:
    ```
 5. **L'amorçage**, en `root` sur le VPS — `-t` pour les saisies sans écho :
    ```
@@ -135,6 +137,8 @@ tourne sur un schéma plus récent que le sien. Le prochain déploiement de la C
 - **« container portfolio-<service>-1 is unhealthy »** ou **« application not healthy »** — ce
   service ne répond pas à sa sonde : `docker compose logs <service>`. Un service qui tourne sans
   répondre est déclaré malade au bout de trois minutes environ ; un service qui sort, aussitôt.
+- **« unauthorized » ou « denied » au `pull`** — le jeton GHCR a expiré ou a été révoqué :
+  `sudo bash bootstrap.sh GHCR_TOKEN` (« Tourner un secret »), puis relance le job.
 - **« Host key verification failed »** — l'hôte n'a plus la clé épinglée : VPS reconstruit, ou
   autre machine. Vérifie l'empreinte comme à l'amorçage avant de remplacer `DEPLOY_KNOWN_HOSTS`.
 - **« main est passée à … »** — pas une erreur : un commit plus récent se déploie par son propre
@@ -142,9 +146,12 @@ tourne sur un schéma plus récent que le sien. Le prochain déploiement de la C
 
 ## Tourner un secret
 
-Copie sur le VPS `bootstrap.sh` et `prod.env.example` de la tête de `main`, puis
-`sudo bash bootstrap.sh <NOM>…` : il redemande ou réengendre les valeurs nommées, garde les
-autres, et relance la pile, qui recrée les services touchés.
+Jamais pendant un déploiement : le job et le script écrivent le même `.env`, et le script
+remettrait l'étiquette qu'il a lue avant le job — `gh run list --branch main --status in_progress`
+est-il vide ? Puis copie sur le VPS les trois fichiers de la tête de `main` (étape 4 de
+l'amorçage), et `sudo bash bootstrap.sh <NOM>…` : il redemande ou réengendre les valeurs nommées,
+garde les autres, et relance la pile, qui recrée les services touchés — sans mettre Docker à
+niveau ni tirer d'image déjà présente.
 
 - `SECRET_KEY` — les sessions ouvertes sont perdues.
 - `POSTGRES_PASSWORD` — pile démarrée : le script change d'abord le mot de passe dans la base.
