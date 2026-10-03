@@ -108,7 +108,8 @@ skills et la génération de CI.
 
 `.env` vit à la **racine** du dépôt et n'est lu qu'en développement (cadrage §6.6). En
 production, le `.env` du VPS — modèle `infra/prod.env.example` — est écrit par
-`infra/bootstrap.sh` depuis les secrets, jamais édité à la main ; Compose le lit et donne à chaque
+`infra/bootstrap.sh` depuis les secrets, jamais édité à la main — seule sa ligne `IMAGE_TAG` est
+réécrite, par le job de déploiement ; Compose le lit et donne à chaque
 service ses variables, et à `api` celles de `Env`. Toute variable du back est déclarée dans
 `.env.example` et lue par la classe `Env` (`apps/api/config/env.py`) — nulle part ailleurs, et
 jamais en dur.
@@ -166,6 +167,13 @@ sous `latest` (`make push`) ; chaque paquet garde ses trois versions les plus r�
 (`make prune`). Le jeton du workflow suffit, aucun secret n'est à créer
 ([ADR 0014](docs/adr/0014-ci-cd-github-actions-et-ghcr.md)). Un déploiement vise l'étiquette du
 commit : `latest` peut désigner l'avant-dernier quand deux pushes se suivent de près.
+
+**Déploiement.** Rien à faire à la main non plus : après chaque publication sur `main`, le job
+`deploy` se connecte au VPS par SSH, y dépose `infra/compose.yml`, fixe `IMAGE_TAG` au SHA du
+commit dans son `.env`, puis lance `docker compose pull` et `up -d --wait` — il rougit si un
+service ne devient pas sain. Il ne déploie que la tête de `main`, et reste sauté tant que la
+variable de dépôt `DEPLOY_ENABLED` ne vaut pas `true`. Amorçage du VPS, secrets et déploiement de
+secours : [infra/RUNBOOK.md](infra/RUNBOOK.md).
 
 **Mises à jour des dépendances.** Dependabot ([.github/dependabot.yml](.github/dependabot.yml))
 ouvre chaque semaine, par écosystème (`uv`, npm, actions GitHub, images Docker), une PR qui
