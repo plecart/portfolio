@@ -102,3 +102,25 @@ updates:
       # construction, chaque semaine. Les correctifs de la 3.12 passent.
       - dependency-name: python
         update-types: [version-update:semver-major, version-update:semver-minor]
+
+  # Les images tierces des fichiers Compose — Postgres, Redis, `cloudflared` —, épinglées comme les
+  # images de base, et à la même épingle dans les deux fichiers (ADR 0012). Dependabot lit dans
+  # `/infra` tout fichier dont le nom contient `compose….yml`, et saute les images du dépôt, que
+  # nomme une variable ; il ne propose qu'une étiquette de même suffixe (`-pg16-trixie`, `-alpine`) :
+  # ni un autre Postgres, ni une autre version d'Alpine (dependabot-core, `docker/tag.rb`). Un test
+  # exige que chaque fichier Compose qui cite une image tierce soit lu ici.
+  - package-ecosystem: docker-compose
+    directory: /infra
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    labels: []
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      # Redis 7 est une décision du projet (ADR 0006), pas une mise à jour. Les correctifs passent.
+      - dependency-name: redis
+        update-types: [version-update:semver-major]

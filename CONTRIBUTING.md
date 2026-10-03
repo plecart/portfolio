@@ -67,6 +67,15 @@ quoi les valeurs interpolées du fichier Compose seraient vides. Le `.env` de la
 exister — Compose refuse de résoudre un `env_file` absent, avant même de démarrer quoi que ce
 soit. `Ctrl-C` arrête la pile ; les données Postgres survivent dans un volume nommé.
 
+**Volume Postgres antérieur au 2026-10-03.** L'image Postgres est passée de Debian 12 à Debian 13
+(brief de #16, décision 5) : une base créée avant avertit à chaque connexion d'un écart de version
+de collation (bibliothèque C 2.36, puis 2.41). Une fois, la pile démarrée — mesuré, l'avertissement
+disparaît ; repartir d'un volume neuf convient aussi :
+
+```
+docker compose --env-file infra/dev.env -f infra/compose.dev.yml exec postgres psql -U portfolio -d portfolio -c "REINDEX DATABASE portfolio" -c "ALTER DATABASE portfolio REFRESH COLLATION VERSION"
+```
+
 Deux fichiers d'environnement, qui ne se remplacent pas :
 
 | Fichier | Commité | Lu par | Contient |
