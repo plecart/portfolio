@@ -6,7 +6,7 @@ seulement : `static()` ne rend aucune route hors `DEBUG`, et en production ils v
 0004).
 """
 
-from content.preview import preview
+from content.preview import PREVIEW_ROUTE, preview
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -16,7 +16,7 @@ urlpatterns: list[URLPattern | URLResolver] = [
     # Avant les routes de l'admin, dont la dernière attrape toute adresse restante
     # (`AdminSite.catch_all_view`) ; `admin_view` applique à l'aperçu leurs règles : connexion,
     # CSRF, jamais de cache.
-    path("admin/markdown-preview/", admin.site.admin_view(preview), name="markdown_preview"),
+    path("admin/markdown-preview/", admin.site.admin_view(preview), name=PREVIEW_ROUTE),
     path("admin/", admin.site.urls),
     *static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT),
 ]

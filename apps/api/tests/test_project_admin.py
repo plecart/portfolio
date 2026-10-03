@@ -156,6 +156,21 @@ def test_l_ecran_projet_preremplit_le_slug_depuis_le_titre(admin_client: Client)
 
 
 @pytest.mark.django_db
+def test_la_description_d_un_projet_garde_son_texte_tel_que_saisi(admin_client: Client) -> None:
+    """En Markdown, une ligne de tête indentée de quatre espaces est un bloc de code : la
+    description s'enregistre sans être retaillée, comme le corps d'une section."""
+    code = "    make dev\n"
+    data = new_project_data(
+        admin_client, description=code, **line(0, saved(technology(name="Django")), 1)
+    )
+
+    response = admin_client.post(reverse("admin:content_project_add"), data)
+
+    assert response.status_code == 302
+    assert Project.objects.get().description == code
+
+
+@pytest.mark.django_db
 def test_l_admin_enregistre_un_projet_et_reaffiche_ses_technologies_dans_l_ordre(
     admin_client: Client,
 ) -> None:

@@ -1,0 +1,54 @@
+/*
+ * Aperçu Markdown de l'admin, sous la zone de texte de chaque champ Markdown (`content/preview.py`).
+ * Couleurs : variables de l'admin, que son thème sombre redéfinit.
+ *
+ * L'admin habille listes et titres à sa façon dans un formulaire — puces retirées dans un formulaire
+ * aligné (`forms.css`), titre de niveau 2 en bandeau dans un module (`base.css`) : dans l'aperçu,
+ * ils retrouvent la forme d'un texte, et les deux classes du sélecteur passent devant ces règles.
+ */
+
+.markdown-field figure {
+    margin: 0.5em 0 0;
+}
+
+/* Un aperçu vide — texte vide, ligne neuve — ne montre rien, pas même sa légende. */
+.markdown-field figure:has(.markdown-preview:empty) {
+    display: none;
+}
+
+.markdown-field figcaption {
+    color: var(--body-quiet-color);
+    font-size: 0.75rem;
+    margin-bottom: 0.25em;
+}
+
+.markdown-field .markdown-preview {
+    border: 1px solid var(--hairline-color);
+    border-radius: 4px;
+    padding: 0.5em 0.75em;
+    overflow-wrap: anywhere;
+}
+
+.markdown-field .markdown-preview :is(ul, ol) {
+    margin-left: 0;
+    padding-left: 1.5em;
+}
+
+.markdown-field .markdown-preview ul > li {
+    list-style: disc;
+}
+
+.markdown-field .markdown-preview ol > li {
+    list-style: decimal;
+}
+
+.markdown-field .markdown-preview :is(h1, h2, h3, h4, h5, h6) {
+    background: none;
+    color: inherit;
+    font-size: 1em;
+    font-weight: bold;
+    letter-spacing: normal;
+    margin: 0.8em 0 0.4em;
+    padding: 0;
+    text-transform: none;
+}
