@@ -95,7 +95,9 @@ le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node a
                                                   # ses 3 versions les plus récentes (`gh api`, jeton du
                                                   # workflow) ; éprouvée sur un `gh` témoin et son
                                                   # filtre par gojq, le moteur de `gh` (#15)
-- compose      : make compose-config              # résout `infra/compose.dev.yml` — exige un `.env` à la racine
+- compose      : make compose-config              # résout `infra/compose.dev.yml` — exige un `.env` à la
+                                                  # racine — et `infra/compose.yml`, avec le modèle
+                                                  # `infra/prod.env.example` ; vérifiée le 2026-10-03 (#16)
 - run local    : make dev                         # pile Postgres + Redis + `api`, ports sur `127.0.0.1` ;
                                                   # front compilé s'il manque
 
@@ -127,7 +129,7 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 - gates bloquants en CI :
   - back : audit, lint, format:check, typecheck, test
   - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse, audit
-  - infra : compose (résolution de `infra/compose.dev.yml`), build des images `api` et `caddy` sans publication, tests des images (`make image-test`), scan (Trivy : HIGH et CRITICAL, corrigeables ou non, et fin de vie ; exceptions datées de `.trivyignore.yaml`)
+  - infra : compose (résolution de `infra/compose.dev.yml` et `infra/compose.yml`), build des images `api` et `caddy` sans publication, tests des images (`make image-test`), scan (Trivy : HIGH et CRITICAL, corrigeables ou non, et fin de vie ; exceptions datées de `.trivyignore.yaml`)
 - publication (job `publish`, push vers `main` seulement, après les trois jobs verts ; pas une gate de PR) : front compilé repris du job `web`, images reconstruites depuis le cache sans attestation, scannées par `make scan`, poussées sur GHCR (`ghcr.io/plecart/portfolio-<service>`, SHA complet et `latest`) par `make push`, trois versions par paquet gardées par `make prune`
 - services requis en CI : aucun déclaré — les tests de base démarrent eux-mêmes Postgres par testcontainers (cadrage §8.4), sur le Docker du runner ; Redis suivra avec #11
 

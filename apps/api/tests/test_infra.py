@@ -132,6 +132,7 @@ CONTAINER_TEXT_GLOBS = [
     "infra/**/Dockerfile",
     "infra/**/Caddyfile",
     "infra/**/*.env",
+    "infra/**/*.env.example",
     ".dockerignore",
     ".env.example",
     ".python-version",
