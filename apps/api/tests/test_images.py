@@ -114,8 +114,10 @@ def test_un_original_de_plus_de_10_mo_est_refuse() -> None:
 def test_une_bombe_de_decompression_est_refusee(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pillow refuse de décoder une image dont l'en-tête annonce plus de deux fois
     `MAX_IMAGE_PIXELS` pixels, et quelques kilo-octets suffisent à en porter une : un refus du
-    catalogue, jamais une exception. La limite est abaissée le temps du test — un carré de 1200 px
-    la dépasse alors."""
+    catalogue, jamais une exception de `validate_original`. L'affectation au modèle, elle, lit les
+    dimensions avec Django (`get_image_dimensions`), qui laisse passer l'exception — le formulaire
+    de l'admin la rattrape avant. La limite est abaissée le temps du test : un carré de 1200 px la
+    dépasse alors."""
     monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 1000)
 
     with pytest.raises(ValidationError) as refusal:
