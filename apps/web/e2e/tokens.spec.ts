@@ -3,10 +3,10 @@
  * mode forcé restauré avant le premier rendu.
  *
  * Un jeton se lit **résolu** : appliqué à une propriété réelle d'un élément sonde, puis comparé à
- * la valeur que la spec écrit, appliquée de la même façon. Lire la propriété personnalisée brute
- * ne prouverait rien — la compilation réécrit `light-dark()` en bascule de variables
- * (docs/frontend-outillage.md §2.4), et Chrome sérialise à sa manière ce qu'il calcule : seule la
- * valeur calculée des deux côtés se compare.
+ * la valeur que la spec écrit, appliquée de la même façon. La propriété personnalisée brute
+ * dépendrait du mode de compilation — `light-dark()` en développement, la couleur résolue après la
+ * réécriture du build (docs/frontend-outillage.md §2.4) —, et Chrome sérialise à sa manière ce
+ * qu'il calcule : seule la valeur calculée des deux côtés se compare.
  */
 import { expect, test, type Page } from '@playwright/test'
 
@@ -131,7 +131,7 @@ async function resolveAll(page: Page, declarations: [string, string][]): Promise
   }, declarations)
 }
 
-/** Pose un bouton à focaliser : la page du lot 1 de #18 n'a encore rien de focalisable. */
+/** Pose un bouton à focaliser, propre au scénario : il ne dépend d'aucun élément de la page. */
 async function appendButton(page: Page) {
   await page.evaluate(() => {
     const button = document.createElement('button')
@@ -337,6 +337,25 @@ test("l'index compilé ne porte que des scripts servis en fichier, la restaurati
     200,
     expect.stringContaining('javascript'),
   ])
+})
+
+test("la base de page cède à l'utilitaire d'un composant", async ({ page }) => {
+  await page.goto('/')
+  // Les cartes de #20 décaleront l'anneau par un utilitaire : la base doit rester dans la couche
+  // `base`, sous `utilities`. Hors couche, elle battrait toute classe.
+  await page.evaluate(() => {
+    const style = document.createElement('style')
+    style.textContent = '@layer utilities { .probe-offset { outline-offset: 7px } }'
+    document.head.append(style)
+  })
+  await appendButton(page)
+  await page.locator('button').evaluate((button) => button.classList.add('probe-offset'))
+
+  await page.keyboard.press('Tab')
+
+  expect(
+    await page.locator('button').evaluate((button) => getComputedStyle(button).outlineOffset),
+  ).toBe('7px')
 })
 
 test("l'anneau de focus n'apparaît pas au pointeur", async ({ page }) => {

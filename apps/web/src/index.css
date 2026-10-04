@@ -15,6 +15,11 @@
 @import 'tailwindcss';
 @import './tokens.css';
 
+/* Tailwind lit tout le dossier de l'application pour y trouver des classes : le texte des tests
+   lui en donnait (`table`, `ring`, `outline`), livrées sans que rien ne les emploie. */
+@source not '../tests';
+@source not '../e2e';
+
 /* La famille est déclarée comme jeton de thème et non sur `:root` : Tailwind pose déjà la police
    du document à partir de `--font-sans`, et une seconde déclaration en CSS nu ne ferait que lui
    disputer la même propriété. Une seule source — et l'utilitaire `font-sans` désigne la même
@@ -63,7 +68,9 @@
     scrollbar-color: var(--line) transparent;
   }
 
-  /* WebKit ne lit pas `scrollbar-color` : 6 px de large, curseur en disque (§2.4). */
+  /* WebKit ne lit pas `scrollbar-color` : 6 px de large, curseur en disque (§2.4). Hors des
+     scénarios : Chromium, seul moteur de la suite, ignore ces pseudo-éléments dès que
+     `scrollbar-*` est posé. */
   html::-webkit-scrollbar {
     width: 6px;
   }

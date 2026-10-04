@@ -217,10 +217,11 @@ que sur `:root` : la feuille de base de Tailwind pose déjà la police du docume
 deux déclarations se disputeraient la même propriété.
 
 **Les jetons de la spec §2** vivent dans `src/tokens.css` : les 32, sur `:root`, sous leur nom de
-spec et hors de toute couche — pas dans `@theme`. Aucun de ces noms n'entre dans un espace de noms
-de Tailwind, qui n'en ferait donc pas d'utilitaires, et `@theme` n'émet que les variables
-utilisées. Les composants les lisent par la syntaxe `(--jeton)` de Tailwind 4 : `bg-(--paper)`,
-`ease-(--ease-out)`.
+spec et hors de toute couche — pas dans `@theme`, qui n'émet que les variables utilisées. Cinq de
+ces noms tombent dans un espace de noms de Tailwind (`--shadow-*` : `--shadow-rest`,
+`--shadow-lift` ; `--ease-*` : les trois courbes) ; déclarés hors de `@theme`, ils ne produisent
+aucun utilitaire nommé. Les composants les lisent par la syntaxe `(--jeton)` de Tailwind 4 :
+`bg-(--paper)`, `ease-(--ease-out)`.
 
 Tailwind, lui, perd ses couleurs et ses courbes (`--color-*: initial`, `--ease-*: initial`, dans
 le `@theme` d'`index.css`). Sans cela, il émettait son propre `--ease-out`,
@@ -235,9 +236,13 @@ La palette sombre ne vit dans aucun sélecteur : chaque couleur porte ses deux v
 `light-dark()`, et `color-scheme` choisit — `light dark` par défaut, le mode de `data-theme` quand
 il est forcé. La minification de Vite 8.3 (Lightning CSS, cible « baseline widely available »)
 réécrit `light-dark()` en une bascule de variables `--lightningcss-light` / `--lightningcss-dark`,
-posée par `prefers-color-scheme` et par les deux règles `data-theme` : même comportement, mais la
-valeur brute d'un jeton de couleur lue depuis le JavaScript n'est pas une couleur. L'appliquer à
-une propriété et lire la valeur calculée, comme le fait `e2e/tokens.spec.ts`.
+posée sur `:root` par `prefers-color-scheme` et par les deux règles `data-theme`. Même comportement
+tant que seul `:root` porte `color-scheme` : un `color-scheme` local ne rebascule pas les jetons
+dans le build, alors qu'il le fait en développement, où `light-dark()` reste natif (mesuré à la
+première relecture de #18) ; aucun composant ne branche sur le mode, les jetons portent la palette.
+La valeur brute d'un jeton lue depuis le JavaScript diffère aussi — `light-dark(…)` en
+développement, la couleur résolue dans le build : l'appliquer à une propriété et lire sa valeur
+calculée, comme le fait `e2e/tokens.spec.ts`.
 
 **Restauration du mode forcé** : `public/theme.js`, copié tel quel par Vite, chargé dans le
 `<head>` par `<script src="/theme.js">`, hors du bloc d'aperçu. Script classique — sans
