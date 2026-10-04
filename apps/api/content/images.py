@@ -1,10 +1,9 @@
 """L'original d'une image de projet : le fichier que l'auteur téléverse, gardé tel quel.
 
 Seul module de l'application, tests exclus, qui importe Pillow (brief de #9, décision 12 ; tenu
-par `tests/test_images.py`). L'original y est reconnu à
-son contenu, jamais à son nom (décision 6), nommé par l'application (décision 7), jamais relu une
-fois stocké (décision 9), et retiré du stockage après la transaction qui le remplace ou supprime
-son image (décision 10).
+par `tests/test_images.py`). L'original y est reconnu à son contenu, jamais à son nom
+(décision 6), nommé par l'application (décision 7), jamais relu une fois stocké (décision 9), et
+retiré du stockage après la transaction qui le remplace ou supprime son image (décision 10).
 """
 
 from collections.abc import Iterable
@@ -58,6 +57,10 @@ def original_extension(file: File[Any]) -> str:
     `Image.open`) : une image d'un autre format n'est pas reconnue, quel que soit son nom. Puis
     le fichier est rembobiné : `Storage.save`, qui suit la validation, attend un fichier « ready
     to be read from the beginning » (`django/core/files/storage/base.py`).
+
+    La restriction vaut pour cette lecture seulement : Django lit les dimensions d'un
+    téléversement (`get_image_dimensions`) et le champ de formulaire de l'admin l'ouvre
+    (`forms.ImageField`) avec tous les décodeurs de Pillow — limite connue de la décision 6.
 
     Args:
         file: le fichier téléversé, lisible depuis le début.
