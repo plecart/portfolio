@@ -21,6 +21,7 @@ from factories import BLANK, SVG, cover, gallery_image, image_upload, project, s
 from PIL import Image
 from pytest_django import DjangoCaptureOnCommitCallbacks
 from refusals import refusals
+from test_markdown_preview import importers
 
 type ImageFactory = Callable[..., ProjectImage]
 
@@ -61,6 +62,12 @@ NOT_ACCEPTED = [
     ("TIFF nommé .webp", image_upload("image.webp", image_format="TIFF")),
     ("SVG nommé .png", SimpleUploadedFile("icone.png", SVG)),
 ]
+
+
+def test_seul_le_module_des_originaux_importe_pillow() -> None:
+    """Pillow ne sert qu'à lire l'original téléversé (décision 12) : aucun autre module de
+    l'application, tests exclus, ne l'importe."""
+    assert importers("PIL") == {"content.images"}
 
 
 @pytest.mark.parametrize(
