@@ -75,7 +75,7 @@ les variantes.
 
 | Terme | Identifiant | Règle |
 |---|---|---|
-| original | `original` | image JPEG, PNG ou WebP, reconnue à son contenu, jamais à son nom ; 10 Mo au plus ; stockée sous un nom engendré — `images/<identifiant aléatoire>/original.<extension du format>` —, nouveau à chaque téléversement ; validée et lue au téléversement seulement : un fichier stocké n'est jamais relu |
+| original | `original` | image JPEG — à plusieurs images comprise, comme bien des photos de téléphone —, PNG ou WebP, reconnue à son contenu, jamais à son nom ; 10 Mo au plus ; stockée sous un nom engendré — `images/<identifiant aléatoire>/original.<extension du format>` —, nouveau à chaque téléversement ; validée et lue au téléversement seulement : un fichier stocké n'est jamais relu |
 | largeur, hauteur | `width`, `height` | en pixels, lues dans l'original téléversé, jamais saisies |
 | légende | `caption` | obligatoire, 50 caractères au plus, jamais faite d'espaces seulement ; elle sert de texte alternatif |
 | état | `state` | en attente `pending` · prêt `ready` · échec `failed` ; une image naît en attente, et y revient quand son original est remplacé ; seul le worker le fait avancer |

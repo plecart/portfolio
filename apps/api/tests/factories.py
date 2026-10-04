@@ -55,16 +55,19 @@ def image_upload(
     size: tuple[int, int] = (1200, 1200),
     image_format: str = "PNG",
     padding: int = 0,
+    frames: int = 1,
 ) -> SimpleUploadedFile:
     """Une image téléversée, fabriquée en mémoire par Pillow : `size` en pixels, au format
     `image_format`, sous le nom `name` — qui peut mentir sur le format.
 
     Par défaut, un carré de 1200 px : une couverture valide, et une image de galerie aussi.
     `padding` octets nuls suivent l'image, que ses lecteurs ignorent : un poids s'atteint sans
-    fabriquer une grande image.
+    fabriquer une grande image. `frames` images dans le fichier, pour un format qui en porte
+    plusieurs — un MPO n'en est un qu'à partir de deux.
     """
     content = BytesIO()
-    Image.new("RGB", size).save(content, image_format)
+    others = [Image.new("RGB", size)] * (frames - 1)
+    Image.new("RGB", size).save(content, image_format, save_all=bool(others), append_images=others)
     return SimpleUploadedFile(name, content.getvalue() + bytes(padding))
 
 

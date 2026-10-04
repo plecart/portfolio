@@ -18,6 +18,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.test import override_settings
 from factories import BLANK, SVG, cover, gallery_image, image_upload, project, saved
+from PIL import Image
 from pytest_django import DjangoCaptureOnCommitCallbacks
 from refusals import refusals
 
@@ -46,6 +47,8 @@ ACCEPTED = [
     ("WebP", image_upload("image.webp", image_format="WEBP")),
     ("PNG nommé .jpg", image_upload("image.jpg", image_format="PNG")),
     ("JPEG sans extension", image_upload("photo", image_format="JPEG")),
+    # Un JPEG à plusieurs images, comme bien des photos de téléphone : Pillow le nomme « MPO ».
+    ("JPEG à plusieurs images", image_upload("photo.jpg", image_format="MPO", frames=2)),
 ]
 
 # Les formes d'un fichier qui n'est pas une image JPEG, PNG ou WebP — c'est le dénombrement qui
@@ -98,6 +101,22 @@ def test_un_original_de_plus_de_10_mo_est_refuse() -> None:
     assert (refusal.value.code, refusal.value.message) == (
         "image_too_large",
         strings.IMAGE_TOO_LARGE,
+    )
+
+
+def test_une_bombe_de_decompression_est_refusee(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pillow refuse de décoder une image dont l'en-tête annonce plus de deux fois
+    `MAX_IMAGE_PIXELS` pixels, et quelques kilo-octets suffisent à en porter une : un refus du
+    catalogue, jamais une exception. La limite est abaissée le temps du test — un carré de 1200 px
+    la dépasse alors."""
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 1000)
+
+    with pytest.raises(ValidationError) as refusal:
+        validate_original(image_upload())
+
+    assert (refusal.value.code, refusal.value.message) == (
+        "image_too_many_pixels",
+        strings.IMAGE_TOO_MANY_PIXELS,
     )
 
 
@@ -333,19 +352,36 @@ def test_le_nom_stocke_ne_reprend_rien_du_nom_de_l_auteur(
 
 
 @pytest.mark.django_db
-def test_un_png_nomme_jpg_est_enregistre_sous_png(portfolio: Project) -> None:
+@pytest.mark.parametrize(
+    ("upload", "extension"),
+    [
+        (image_upload("photo.png", image_format="JPEG"), "jpg"),
+        (image_upload("photo.png", image_format="MPO", frames=2), "jpg"),
+        (image_upload("image.jpg", image_format="PNG"), "png"),
+        (image_upload("image.jpg", image_format="WEBP"), "webp"),
+    ],
+    ids=["JPEG nommé .png", "MPO nommé .png", "PNG nommé .jpg", "WebP nommé .jpg"],
+)
+def test_l_original_est_enregistre_sous_l_extension_de_son_format(
+    portfolio: Project, upload: SimpleUploadedFile, extension: str
+) -> None:
     """L'extension est celle du format reconnu, d'où le serveur de fichiers tire le type servi."""
-    made = saved(gallery_image(portfolio, original=image_upload("image.jpg", image_format="PNG")))
+    made = saved(gallery_image(portfolio, original=upload))
 
-    assert (made.original.name or "").endswith("/original.png")
+    assert (made.original.name or "").endswith(f"/original.{extension}")
 
 
 @pytest.mark.django_db
-def test_deux_televersements_du_meme_fichier_ont_deux_noms(portfolio: Project) -> None:
+def test_deux_televersements_du_meme_fichier_ont_chacun_leur_dossier(portfolio: Project) -> None:
+    """Le dossier aléatoire distingue deux téléversements : sur R2, `django-storages` écraserait
+    un objet de même nom (décision 7) — le stockage sur disque, lui, renomme le second, ce qui
+    masquerait la faute si l'on ne comparait que les noms."""
     first = saved(gallery_image(portfolio, original=image_upload("image.png")))
     second = saved(gallery_image(portfolio, original=image_upload("image.png"), position=2))
 
-    assert first.original.name != second.original.name
+    names = [made.original.name or "" for made in (first, second)]
+    assert all(STORED_NAME.fullmatch(name) for name in names), names
+    assert names[0].rsplit("/", 1)[0] != names[1].rsplit("/", 1)[0]
 
 
 @pytest.mark.django_db
@@ -400,17 +436,18 @@ def test_enregistrer_une_image_sans_changer_son_fichier_n_ouvre_pas_l_original(
     """Sur R2, chaque ouverture serait un téléchargement (décision 9). Le chemin de l'admin, pas à
     pas : la ligne relue, validée, son fichier réaffecté tel quel — ce que fait le formulaire
     (`construct_instance`) —, puis enregistrée."""
-    stored = saved(image(portfolio))
-    loaded = type(stored).objects.get(pk=stored.pk)
-    loaded.caption = "Une autre légende."
+    made = saved(image(portfolio))
+    loaded = type(made).objects.get(pk=made.pk)
 
+    loaded.refresh_from_db()
+    loaded.caption = "Une autre légende."
     loaded.full_clean()
     loaded.original = loaded.original
     loaded.save()
+    loaded.refresh_from_db()
 
     assert witness.opened == []
-    loaded.refresh_from_db()
-    assert (loaded.width, loaded.height) == (stored.width, stored.height)
+    assert (loaded.width, loaded.height) == (made.width, made.height)
 
 
 class Rollback(Exception):
@@ -527,6 +564,48 @@ def test_un_remplacement_annule_ne_supprime_aucun_fichier(
         raise Rollback
 
     assert stored(names) == [True, True]
+
+
+@pytest.mark.django_db
+def test_remplacer_l_original_par_son_enregistrement_direct_lit_le_nouveau_contenu(
+    portfolio: Project,
+    image: ImageFactory,
+    witness: CountingStorage,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    """`image.original.save(nom, contenu)` — une commande, un script de reprise : le format et le
+    nom se lisent dans le contenu qui s'enregistre, jamais dans l'original stocké, et l'image
+    repart en attente comme après un téléversement."""
+    made = image(portfolio)
+    names = ready(made)
+    loaded = type(made).objects.get(pk=made.pk)
+    jpeg = image_upload(image_format="JPEG").read()
+
+    with django_capture_on_commit_callbacks(execute=True):
+        loaded.original.save("photo.png", ContentFile(jpeg))
+
+    loaded.refresh_from_db()
+    assert (loaded.original.name or "").endswith("/original.jpg")
+    assert (loaded.state, loaded.variants) == (ProcessingState.PENDING, [])
+    assert stored(names) == [False, False]
+    assert witness.opened == []
+
+
+@pytest.mark.django_db
+def test_l_enregistrement_direct_d_un_fichier_qui_n_est_pas_une_image_est_refuse(
+    portfolio: Project,
+) -> None:
+    """Sans validation, le nommage refuse encore : rien n'est stocké, la ligne ne change pas."""
+    made = saved(gallery_image(portfolio))
+    name = made.original.name
+
+    with pytest.raises(ValidationError) as refusal:
+        made.original.save("notes.png", ContentFile(b"Pas une image."))
+
+    assert refusal.value.code == "image_format_unsupported"
+    assert GalleryImage.objects.get(pk=made.pk).original.name == name
+    folders, _ = default_storage.listdir("images")
+    assert len(folders) == 1
 
 
 @pytest.mark.django_db

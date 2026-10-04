@@ -127,6 +127,7 @@ PROCESSING_STATE_FAILED = "Échec"
 # Image d'un projet : refus
 IMAGE_FORMAT_UNSUPPORTED = "L’image doit être un fichier JPEG, PNG ou WebP."
 IMAGE_TOO_LARGE = "L’image pèse 10 Mo au plus."
+IMAGE_TOO_MANY_PIXELS = "L’image compte trop de pixels pour être traitée."
 IMAGE_ORIGINAL_MISSING = "Une image porte son fichier."
 IMAGE_CAPTION_MISSING = "Une image porte une légende, et pas seulement des espaces."
 IMAGE_CAPTION_TOO_LONG = "La légende d’une image tient en 50 caractères au plus."
