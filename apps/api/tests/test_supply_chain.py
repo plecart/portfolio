@@ -12,7 +12,7 @@ pas prévues. Les gardes sont donc des fonctions sur du texte, appliquées aux f
 à un recueil de formes — `WORKFLOW_FORMS`, `IMAGE_FORMS`, `SOURCE_FORMS`, `DOWNLOAD_FORMS`,
 `DOCKERFILE_NAMES`, `COMPOSE_FORMS`, `COMPOSE_NAMES` :
 chaque forme recensée par les relectures de #5 y a son cas, avec le verdict attendu. Une forme
-nouvelle s'y ajoute ; les trois jugées exotiques y figurent en `xfail` strict, qui signale le jour
+nouvelle s'y ajoute ; celles jugées exotiques y figurent en `xfail` strict, qui signale le jour
 où elles cesseraient d'échapper.
 """
 
@@ -126,9 +126,14 @@ ADD_INSTRUCTION = re.compile(r"^\s*ADD(?P<options>(?:\s+--\S+)*)\s+(?P<sources>.
 REMOTE_SOURCE = re.compile(r"(?:^|[\s\[\",])https?://", re.IGNORECASE)
 CHECKSUM_OPTION = re.compile(r"(?:^|\s)--checksum=sha256:[0-9a-f]{64}(?:\s|$)")
 
-# Un téléchargement par un `RUN` — `curl` ou `wget` vers une adresse HTTP(S) —, que rien ne
-# vérifie : tout téléchargement passe par `ADD --checksum`.
-RUN_DOWNLOAD = re.compile(r"^\s*RUN\b.*\b(?:curl|wget)\b[^&;|]*https?://", re.IGNORECASE)
+# Un téléchargement par un `RUN` — `curl` ou `wget` vers une adresse HTTP(S) écrite en clair —,
+# que rien ne vérifie : tout téléchargement passe par `ADD --checksum`. Le nom de l'outil est un mot
+# entier, tiret compris : `curl-cffi` n'est pas `curl`. Les formes que ce motif ne lit pas —
+# `git clone`, adresse tenue par un `ARG`, autre langage, `ADD git@` — figurent au recueil, en
+# `xfail`.
+RUN_DOWNLOAD = re.compile(
+    r"^\s*RUN\b.*(?<![\w-])(?:curl|wget)(?![\w-])[^&;|]*https?://", re.IGNORECASE
+)
 
 # `image:<version x.y.z>[-variante]@sha256:<empreinte>` — même règle que pour les actions : la
 # version la plus précise. Dependabot lit une épingle étiquette + empreinte comme « suivre les
@@ -488,6 +493,28 @@ DOWNLOAD_FORMS = {
         True,
     ),
     "RUN qui installe curl": (BASE + "RUN apk add --no-cache curl\n", False),
+    "paquet dont le nom commence par curl": (
+        BASE + "RUN pip install curl-cffi --index-url https://exemple.org/simple\n",
+        False,
+    ),
+    "RUN git clone": pytest.param(
+        BASE + "RUN git clone https://exemple.org/outil.git\n", True, marks=EXOTIC
+    ),
+    "adresse tenue par un ARG": pytest.param(
+        BASE + 'ARG URL=https://exemple.org/outil\nRUN curl -fsSLo /outil "$URL"\n',
+        True,
+        marks=EXOTIC,
+    ),
+    "téléchargement par un autre langage": pytest.param(
+        BASE
+        + 'RUN python -c "import urllib.request as u; '
+        + "u.urlretrieve('https://exemple.org/o', '/o')\"\n",
+        True,
+        marks=EXOTIC,
+    ),
+    "ADD d'un dépôt git": pytest.param(
+        BASE + "ADD git@exemple.org:outil.git /outil\n", True, marks=EXOTIC
+    ),
 }
 
 DOCKERFILE_NAMES = {
