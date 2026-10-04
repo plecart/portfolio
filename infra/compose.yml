@@ -159,6 +159,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # Les fichiers de travail de la chaîne — le dump en clair — en mémoire : un `tmpfs`, ni volume
+    # ni couche du conteneur, que l'arrêt du conteneur vide. `docker stop` tue une sauvegarde en
+    # cours sans qu'aucun piège du script ne joue (mesuré à la relecture de la PR #73).
+    tmpfs: [/tmp]
     # Sain quand son rôle ouvre une session sur la base. Rien hors du réseau du projet : une panne
     # de R2 ou de healthchecks.io ne rougit pas un déploiement — c'est l'absence de ping qui la dit.
     healthcheck:
