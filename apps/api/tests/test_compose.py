@@ -61,8 +61,8 @@ EXPOSING_TOP_LEVEL_KEYS = ["networks", "include"]
 # alors qu'`api` ne peut joindre personne, et ses migrations échouent au premier `up`.
 POSTGRES_PROBE_HOST = "-h 127.0.0.1"
 
-# Ce que `backup` ne reçoit jamais : le mot de passe de l'application, la clé de signature de Django,
-# le jeton du Tunnel. Il ne connaît de la base que son rôle en lecture seule (brief de #23,
+# Ce que `backup` ne reçoit jamais : le mot de passe de l'application, la clé de signature de
+# Django, le jeton du Tunnel. Il ne connaît de la base que son rôle en lecture seule (brief de #23,
 # décision 9).
 BACKUP_FORBIDDEN = {"POSTGRES_PASSWORD", "SECRET_KEY", "TUNNEL_TOKEN"}
 
@@ -163,6 +163,30 @@ def probe_findings(text: str) -> list[str]:
     ]
 
 
+def received_variables(service: dict[str, Any]) -> set[str]:
+    """Les variables qu'un service reçoit : les noms de son `environment` — table ou liste, valeur
+    écrite ou reprise de l'environnement de Compose (`NOM:` sans valeur, `- NOM`) —, et celles
+    qu'interpolent ses valeurs."""
+    environment: object = service.get("environment") or {}
+    names = (
+        set(cast(dict[str, object], environment))
+        if isinstance(environment, dict)
+        else {str(entry).split("=", 1)[0] for entry in cast(list[object], environment)}
+    )
+    return names | interpolated_names(service)
+
+
+def backup_secret_findings(text: str) -> list[str]:
+    """Les secrets de l'application que le service `backup` d'un fichier Compose recevrait.
+
+    Returns:
+        Les variables de `BACKUP_FORBIDDEN` qu'il reçoit (`received_variables`), triées. Liste
+        vide : il ne connaît de la base que son rôle.
+    """
+    service: dict[str, Any] = yaml.safe_load(text)["services"]["backup"]
+    return sorted(received_variables(service) & BACKUP_FORBIDDEN)
+
+
 def environment_value(value: str) -> str:
     """Un fichier Compose minimal dont le seul service reçoit une variable de la valeur donnée."""
     return f"services:\n  api:\n    environment:\n      A: '{value}'\n"
@@ -183,9 +207,9 @@ INTERPOLATION_FORMS = {
 }
 
 
-def single_service(block: str) -> str:
-    """Un fichier Compose minimal dont le seul service porte le bloc donné."""
-    return f"services:\n  caddy:\n    image: caddy\n{block}"
+def single_service(block: str, name: str = "caddy") -> str:
+    """Un fichier Compose minimal dont le seul service, `name`, porte le bloc donné."""
+    return f"services:\n  {name}:\n    image: {name}\n{block}"
 
 
 # Forme → constat attendu (`True`) ou aucun (`False`).
@@ -223,6 +247,34 @@ PROBE_FORMS = {
         True,
     ),
     "sonde NONE": (single_service('    healthcheck:\n      test: ["NONE"]\n'), True),
+}
+
+
+def backup_service(block: str) -> str:
+    """Un fichier Compose minimal dont le seul service, `backup`, porte le bloc donné."""
+    return single_service(block, name="backup")
+
+
+# Forme → constat attendu (`True`) ou aucun (`False`).
+BACKUP_SECRET_FORMS = {
+    "son rôle seulement": (
+        backup_service("    environment:\n      PGPASSWORD: ${BACKUP_POSTGRES_PASSWORD:?}\n"),
+        False,
+    ),
+    "mot de passe de l'application interpolé": (
+        backup_service("    environment:\n      PGPASSWORD: ${POSTGRES_PASSWORD:?}\n"),
+        True,
+    ),
+    "clé sans valeur, reprise de l'environnement": (
+        backup_service("    environment:\n      SECRET_KEY:\n"),
+        True,
+    ),
+    "liste, nom seul": (backup_service("    environment:\n      - TUNNEL_TOKEN\n"), True),
+    "liste, nom et valeur": (backup_service("    environment:\n      - TUNNEL_TOKEN=x\n"), True),
+    "interpolé dans la sonde": (
+        backup_service("    healthcheck:\n      test: [CMD, echo, $SECRET_KEY]\n"),
+        True,
+    ),
 }
 
 
@@ -311,14 +363,36 @@ def test_api_recoit_en_production_chaque_variable_du_back() -> None:
     assert set(environment) == set(Env.model_fields) - {"DEBUG"}
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"), BACKUP_SECRET_FORMS.values(), ids=BACKUP_SECRET_FORMS.keys()
+)
+def test_la_garde_des_secrets_de_backup_rend_son_verdict_sur_chaque_forme(
+    text: str, expected: bool
+) -> None:
+    """Chaque façon recensée de passer une variable à un service : signalée si, et seulement si,
+    `backup` reçoit un secret de l'application (formes relevées à la relecture de la PR #73)."""
+    assert bool(backup_secret_findings(text)) is expected, backup_secret_findings(text)
+
+
 def test_backup_ne_recoit_aucun_secret_de_l_application() -> None:
     """Le conteneur de sauvegarde lit la base sous un rôle qui ne peut rien écrire : lui passer le
     mot de passe de l'application, la clé de signature ou le jeton du Tunnel lui rendrait ce que ce
-    rôle lui retire. Lu dans toutes les valeurs du service — variables, sonde, commande."""
-    received = interpolated_names(read_services(COMPOSE_PROD)["backup"])
+    rôle lui retire (brief de #23, décision 9)."""
+    text = COMPOSE_PROD.read_text(encoding="utf-8")
 
-    assert received, "aucune interpolation lue — le motif a-t-il cessé de mordre ?"
-    assert received & BACKUP_FORBIDDEN == set()
+    assert received_variables(yaml.safe_load(text)["services"]["backup"]), "rien lu"
+    assert backup_secret_findings(text) == []
+
+
+def test_aucun_service_de_production_ne_lit_de_fichier_d_environnement() -> None:
+    """Chaque service reçoit ses variables par `environment:`, et elles seules (en-tête de
+    `infra/compose.yml`) : un `env_file` lui donnerait le `.env` entier du VPS — à `backup` le mot
+    de passe de l'application, à `api` le jeton du Tunnel."""
+    reading = [
+        name for name, service in read_services(COMPOSE_PROD).items() if "env_file" in service
+    ]
+
+    assert reading == []
 
 
 def test_chaque_variable_de_production_est_exigee_et_declaree_dans_son_modele() -> None:
