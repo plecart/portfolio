@@ -112,10 +112,8 @@ class Stack:
             "BACKUP_PING_URL": f"http://ping:8080{ping_path}",
             **overrides,
         }
-        options = [
-            option for name, value in variables.items() for option in ("-e", f"{name}={value}")
-        ]
-        return Run(self.compose("exec", "-T", *options, "backup", "backup.sh"), bucket, ping_path)
+        process = self.compose("exec", "-T", *environment_options(variables), "backup", "backup.sh")
+        return Run(process, bucket, ping_path)
 
     def objects(self, bucket: str) -> list[str]:
         """Les objets d'un bucket du témoin S3."""
@@ -153,6 +151,11 @@ class Stack:
     def leftovers(self) -> list[str]:
         """Ce qui reste dans le dossier des fichiers de travail du conteneur `backup`."""
         return self.output("exec", "-T", "backup", "ls", "-A", "/tmp").split()
+
+
+def environment_options(variables: Mapping[str, str]) -> list[str]:
+    """Les options `-e NOM=valeur` de `docker compose exec` qui posent ces variables."""
+    return [option for name, value in variables.items() for option in ("-e", f"{name}={value}")]
 
 
 def compose_command(*arguments: str) -> list[str]:
@@ -305,9 +308,10 @@ def test_une_sauvegarde_interrompue_ne_laisse_aucun_fichier_de_travail(
 ) -> None:
     """Le dump en clair ne survit pas à l'exécution, même interrompue (décision 4) : le signal
     arrive pendant le dump, la chaîne sort en échec et ses fichiers de travail disparaissent."""
-    options = [option for item in UNREACHABLE_DATABASE.items() for option in ("-e", "=".join(item))]
     running = subprocess.Popen(
-        compose_command("exec", "-T", *options, "backup", "backup.sh"),
+        compose_command(
+            "exec", "-T", *environment_options(UNREACHABLE_DATABASE), "backup", "backup.sh"
+        ),
         env=stack.environment,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
