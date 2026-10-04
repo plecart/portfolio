@@ -11,6 +11,7 @@ from config import strings
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.db import models
+from django.db.models.fields.files import ImageFieldFile
 from PIL import Image, UnidentifiedImageError
 
 # Les formats qu'accepte un original, au nom que leur donne Pillow, et l'extension de chacun : un
@@ -68,12 +69,51 @@ def original_extension(file: File[bytes]) -> str:
         file.seek(0)
 
 
+class OriginalFile(ImageFieldFile):
+    """L'original tel que le modèle le tient : un fichier téléversé, ou celui que le stockage
+    garde déjà."""
+
+    # Posé par `FieldFile`, absent des annotations de django-stubs.
+    _committed: bool
+
+    @property
+    def stored(self) -> bool:
+        """Vrai si le stockage tient déjà ce fichier — faux pour un téléversement à enregistrer,
+        et pour une image sans fichier."""
+        return bool(self) and self._committed
+
+
 class OriginalField(models.ImageField):
-    """Le champ de l'original d'une image : `ImageField`, nommé par ce module.
+    """Le champ de l'original d'une image : `ImageField`, nommé par ce module, et qui ne relit
+    jamais un fichier stocké.
 
     Son nom de stockage ne reprend rien de celui de l'auteur (décision 7, `generate_filename`).
-    Les dimensions restent remplies par Django (`width_field`, `height_field`, décision 8).
+    Les dimensions restent remplies par Django (`width_field`, `height_field`, décision 8), depuis
+    le téléversement seulement.
+
+    Un fichier stocké n'est jamais relu (décision 9) : sur R2, chaque lecture serait un
+    téléchargement. Django, lui, relit l'original stocké à chaque réaffectation du champ — et
+    `full_clean()` en fait une, comme le formulaire de l'admin (`Model.clean_fields`,
+    `ImageFileDescriptor.__set__`, qui force `update_dimension_fields`). Ici, un fichier stocké
+    garde ses colonnes, et ses validateurs ne s'appliquent qu'à un téléversement.
     """
+
+    attr_class = OriginalFile
+
+    def run_validators(self, value: OriginalFile) -> None:
+        """Les validateurs du champ, sur un téléversement seulement : un fichier stocké a été validé
+        à son arrivée."""
+        if not value.stored:
+            super().run_validators(value)
+
+    def update_dimension_fields(
+        self, instance: models.Model, force: bool = False, *args: object, **kwargs: object
+    ) -> None:
+        """Les dimensions de Django, lues dans un téléversement ; celles d'un fichier stocké restent
+        celles de ses colonnes. Un champ différé n'est pas lu non plus, comme chez Django."""
+        if self.attname in instance.__dict__ and getattr(instance, self.attname).stored:
+            return
+        super().update_dimension_fields(instance, force, *args, **kwargs)
 
     def generate_filename(self, instance: models.Model, filename: str | PathLike[str]) -> str:
         """`images/<identifiant aléatoire>/original.<extension du format reconnu>`.
