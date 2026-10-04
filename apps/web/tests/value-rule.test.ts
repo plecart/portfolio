@@ -6,9 +6,10 @@
  * gabarits de `src/` — classes et styles ; un balayage lit toute autre feuille CSS de `src/` ; les
  * deux appliquent les motifs de `forbidden-values.json`, sans tenir compte de la casse. Tailwind,
  * enfin, n'a plus ni couleurs, ni ombres, ni animations, ni courbes à lui (`@theme` de
- * `index.css`), et sa transition par défaut lit les jetons.
+ * `index.css`), sauf le blanc par défaut de `ring-offset-*`, et sa transition par défaut lit les
+ * jetons.
  *
- * Dénombrement du 2026-10-04, repris à la seconde relecture : **20 formes** d'une couleur, d'une
+ * Dénombrement du 2026-10-04, repris à la seconde relecture : **21 formes** d'une couleur, d'une
  * ombre, d'une durée ou d'une courbe écrite en dur dans ce front, **15 couvertes**. Dans un
  * composant — classe, valeurs arbitraires comprises, où `_` tient lieu d'espace ; style ;
  * gabarit —, 11 : hexadécimal ; fonction de couleur ; classe de palette de Tailwind ; ombre par
@@ -16,14 +17,24 @@
  * unité ; durée numérique de Tailwind ; animation par défaut de Tailwind ; fonction de courbe ;
  * courbe par défaut de Tailwind ; `ease-linear` ; transition par défaut de Tailwind. Dans une
  * feuille CSS, 4 : hexadécimal, fonction de couleur, durée à unité, fonction de courbe.
- * **5 hors portée**, à ne jamais supposer couvertes : couleur nommée (`red`, `white`) dans un
+ * **6 hors portée**, à ne jamais supposer couvertes : couleur nommée (`red`, `white`) dans un
  * composant et dans une feuille CSS ; couleur système (`Canvas`) ; mot-clé de courbe (`ease`,
- * `linear`) dans un composant et dans une feuille CSS. Hors de tout dénombrement, comme pour toute
- * règle qui lit du texte : une valeur assemblée par une expression ou passée par une variable.
+ * `linear`) dans un composant et dans une feuille CSS ; décalage d'anneau sans couleur
+ * (`ring-offset-2` sans `ring-offset-(--jeton)`), que Tailwind peint en `#fff` — la spec trace
+ * l'anneau de focus par `outline`. Hors de tout dénombrement, comme pour toute règle qui lit du
+ * texte : une valeur assemblée par une expression ou passée par une variable.
+ *
+ * Pour Tailwind, la population est mesurée, pas supposée : ses 8 568 classes (4.3.3) compilées avec
+ * `index.css`, seules portent encore une valeur interdite `duration-N`, `delay-N` et `ease-linear`,
+ * qu'ESLint refuse, des valeurs neutres (`#0000` transparent, masques `#fff`) et le `#fff` de
+ * `ring-offset-*`. Mesure faite une fois (liste des classes par l'API instable de Tailwind), à
+ * refaire à une montée de Tailwind.
  *
  * Faux positifs connus, refusés à tort : une ancre ou un fragment fait de lettres hexadécimales
- * (`#add`, `#face`), un texte « #123 » ou « 2s », `duration-0`. Les écrire autrement — aucun motif
- * simple ne les distingue d'une valeur.
+ * (`#add`, `#face`, `#add_item`) ; un texte « #123 », « 2s », ou un nom de fonction CSS suivi d'une
+ * parenthèse, quelle que soit la casse (« Lab( », « COLOR( ») ; une durée dans un nom de fichier
+ * (`url(/x_2s.png)`) ; `duration-0`. Les écrire autrement — aucun motif simple ne les distingue
+ * d'une valeur.
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -178,9 +189,12 @@ describe("Tailwind n'apporte ni couleur, ni ombre, ni animation, ni courbe à lu
     expect(await generates(className)).toBe(false)
   })
 
-  test('une classe sur un jeton produit sa règle', async () => {
-    expect(await generates('bg-(--paper)')).toBe(true)
-  })
+  test.each(['bg-(--paper)', 'shadow-(--shadow-rest)', 'ease-(--ease-out)'])(
+    '%s, une classe sur un jeton, produit sa règle',
+    async (className) => {
+      expect(await generates(className)).toBe(true)
+    },
+  )
 
   test('la transition par défaut prend la durée et la courbe des jetons', async () => {
     const css = (await compileIndexCss()).build(['transition-colors'])

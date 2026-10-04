@@ -55,5 +55,8 @@ export default tseslint.config(
       sourceType: 'script',
       globals: { document: 'readonly', localStorage: 'readonly' },
     },
+    // Rendue par typescript-eslint aux seuls fichiers TypeScript : une comparaison tapée pour une
+    // affectation passerait sinon.
+    rules: { 'no-unused-expressions': 'error' },
   },
 )
