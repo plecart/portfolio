@@ -225,6 +225,14 @@ def stack() -> Iterator[Stack]:
         started.compose("down", "--volumes")
 
 
+@pytest.fixture(autouse=True)
+def empty_work_directory(stack: Stack) -> Iterator[None]:
+    """Chaque test laisse vide le dossier des fichiers de travail du conteneur `backup` : ce qu'un
+    test rouge y laisserait ne fait pas rougir les suivants (mesuré à la relecture de la PR #73)."""
+    yield
+    stack.output("exec", "-T", "backup", "find", "/tmp", "-mindepth", "1", "-delete")
+
+
 def major_version(printed: str) -> str:
     """La majeure d'une sortie `--version` de PostgreSQL : `pg_dump (PostgreSQL) 16.15` → `16`."""
     found = re.search(r"\(PostgreSQL\) (\d+)\.", printed)
@@ -324,6 +332,16 @@ def test_une_sauvegarde_interrompue_ne_laisse_aucun_fichier_de_travail(
     running.communicate(timeout=30)
 
     assert running.returncode != 0
+    assert stack.leftovers() == []
+
+
+def test_les_fichiers_de_travail_ne_survivent_pas_a_l_arret_du_conteneur(stack: Stack) -> None:
+    """`docker stop` n'envoie `SIGTERM` qu'à `supercronic`, qui attend la tâche, puis le moteur la
+    tue (`SIGKILL`) : aucun piège ne joue, et une sauvegarde interrompue ainsi laisse son dump en
+    clair dans `/tmp` (mesuré à la relecture de la PR #73). Le conteneur arrêté n'en garde rien."""
+    stack.output("exec", "-T", "backup", "mkdir", "/tmp/tmp.interrompue")
+    stack.output("restart", "backup")
+
     assert stack.leftovers() == []
 
 

@@ -27,7 +27,8 @@ finish() {
 trap finish EXIT
 # Un signal — `Ctrl-C`, terminal fermé, `kill` — fait sortir la chaîne en échec, donc par `finish` :
 # sans ce piège, le shell sortirait sans jouer celui de la sortie (mesuré, busybox `ash`). Un
-# `SIGKILL` reste hors d'atteinte de tout piège.
+# `SIGKILL` reste hors d'atteinte de tout piège — c'est ainsi que `docker stop` arrête une
+# sauvegarde en cours : `/tmp` est un `tmpfs` (`infra/compose.yml`), que l'arrêt du conteneur vide.
 trap 'exit 1' INT TERM HUP
 
 # Le contrat avec la restauration (#24, décision 6) : `<base>-<AAAAMMJJ>T<HHMMSS>Z.dump.age`, à la
