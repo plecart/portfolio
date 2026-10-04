@@ -31,7 +31,9 @@ const valueSelectors = forbiddenValues.flatMap(({ name, pattern }) => {
 export default tseslint.config(
   { ignores: ['dist'] },
   js.configs.recommended,
-  tseslint.configs.recommended,
+  // L'analyseur et les règles TypeScript sur les seuls fichiers TypeScript : appliqués partout, ils
+  // liraient aussi les scripts classiques de `public/` en modules, sans y refuser un `export`.
+  { files: ['**/*.{ts,tsx,mts,cts}'], extends: [tseslint.configs.recommended] },
   // `configs.flat['recommended-latest']`, et non `configs['recommended-latest']` : dans
   // `eslint-plugin-react-hooks` 7.1.1, l'entrée de premier niveau est encore au format
   // `.eslintrc` (sa clé `plugins` est un tableau de chaînes) et ESLint 9 la refuse.
@@ -41,7 +43,7 @@ export default tseslint.config(
   // les options d'une règle au lieu de les cumuler. Toute autre liste de sélecteurs sur `src/`
   // s'ajoute donc à celle-ci.
   {
-    files: ['src/**/*.{ts,tsx}'],
+    files: ['src/**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'],
     rules: { 'no-restricted-syntax': ['error', ...valueSelectors] },
   },
   // `public/` est copié tel quel par Vite et chargé en script classique, hors de toute

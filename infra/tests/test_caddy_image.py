@@ -250,6 +250,8 @@ def test_le_script_de_restauration_du_mode_est_servi_sans_cache(stack: Stack) ->
     assert reply.status == 200
     assert "localStorage" in reply.body
     assert reply.headers.get_all("Cache-Control") == ["no-cache"]
+    # Sous `nosniff`, un autre type ferait refuser le script par le navigateur.
+    assert "javascript" in (reply.headers.get("Content-Type") or "")
 
 
 def test_un_fichier_hache_absent_rend_404_sans_cache_long(stack: Stack) -> None:

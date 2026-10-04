@@ -16,7 +16,8 @@
 @import './tokens.css';
 
 /* Tailwind lit tout le dossier de l'application pour y trouver des classes : le texte des tests
-   lui en donnait (`table`, `ring`, `outline`), livrées sans que rien ne les emploie. */
+   lui en donnait, livrées sans que rien ne les emploie — dont des valeurs que la règle refuse,
+   tirées du recueil de `tests/value-rule.test.ts` (`ease-linear`, `duration-200`). */
 @source not '../tests';
 @source not '../e2e';
 

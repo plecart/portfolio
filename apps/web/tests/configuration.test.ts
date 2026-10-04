@@ -110,6 +110,9 @@ test('la porte de lint lit le script de restauration du mode', async () => {
   expect(await lintRuleIds(filePath, source.replace('localStorage', 'locaStorage'))).toEqual([
     'no-undef',
   ])
+  // Une syntaxe de module ferait du script une erreur au chargement — donc pas de restauration :
+  // lu en script classique, il ne s'analyse plus (erreur sans règle).
+  expect(await lintRuleIds(filePath, `${source}export {}\n`)).toEqual([null])
 })
 
 test('la porte de lint échoue sur un simple avertissement', () => {
