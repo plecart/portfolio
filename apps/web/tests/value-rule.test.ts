@@ -1,0 +1,150 @@
+/**
+ * La règle des valeurs : aucune couleur, durée ou courbe en dur hors de `src/tokens.css`
+ * (spec §2 ; CONTRIBUTING.md, « Valeurs du front »).
+ *
+ * Trois portes sur une même population. ESLint (`no-restricted-syntax`) lit les littéraux et les
+ * gabarits de `src/` — classes et styles ; un balayage lit toute autre feuille CSS de `src/` ; les
+ * deux appliquent les motifs de `forbidden-values.json`. Tailwind, enfin, n'a plus de couleurs ni
+ * de courbes à lui (`@theme` de `index.css`), et sa transition par défaut lit les jetons.
+ *
+ * Dénombrement du 2026-10-04 : **17 formes** d'une couleur, d'une durée ou d'une courbe écrite en
+ * dur dans ce front, **13 couvertes**. Dans un composant (classe, style ou gabarit), 9 :
+ * hexadécimal, fonction de couleur, durée à unité, durée numérique de Tailwind, fonction de courbe,
+ * `ease-linear`, classe de palette et courbe par défaut de Tailwind, transition par défaut de
+ * Tailwind. Dans une feuille CSS, 4 : hexadécimal, fonction de couleur, durée à unité, fonction de
+ * courbe. **4 hors portée**, à ne jamais supposer couvertes : couleur nommée (`red`, `white`) dans
+ * un composant et dans une feuille CSS, couleur système (`Canvas`), mot-clé de courbe en style
+ * (`ease`). Hors de tout dénombrement, comme pour toute règle qui lit du texte : une valeur
+ * assemblée par une expression ou passée par une variable.
+ */
+import { readdirSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { dirname, join, resolve } from 'node:path'
+import { compile } from 'tailwindcss'
+import { describe, expect, test } from 'vitest'
+import { APP_ROOT, lintRuleIds, readAppJson } from './app-files.ts'
+
+/** Une forme interdite : son nom, rendu dans le message d'ESLint, et son motif. */
+type ForbiddenValue = { name: string; pattern: string }
+
+const FORBIDDEN_VALUES = readAppJson<ForbiddenValue[]>('forbidden-values.json')
+
+/** Le seul fichier où un littéral de couleur, de durée ou de courbe a sa place. */
+const TOKENS_SHEET = 'tokens.css'
+
+const SRC = join(APP_ROOT, 'src')
+
+/** Formes interdites présentes dans une feuille CSS, commentaires exclus : leurs noms. */
+function forbiddenIn(css: string): string[] {
+  const code = css.replace(/\/\*[\s\S]*?\*\//g, '')
+
+  return FORBIDDEN_VALUES.filter(({ pattern }) => new RegExp(pattern).test(code)).map(
+    ({ name }) => name,
+  )
+}
+
+/** Les règles qu'ESLint lève sur un extrait, lu comme un composant de `src/`. */
+const lintComponent = (code: string) => lintRuleIds('src/value-rule-probe.tsx', code)
+
+describe('ESLint refuse une valeur en dur dans un composant', () => {
+  test.each([
+    ['hexadécimal en classe', '<p className="bg-[#B4471F]" />'],
+    ['hexadécimal court en classe', '<p className="text-[#fff]" />'],
+    ['rgb() en style', "<p style={{ color: 'rgb(42, 38, 34)' }} />"],
+    ['oklch() en classe', '<p className="bg-[oklch(70%_0.1_50)]" />'],
+    ['durée à unité en classe', '<p className="duration-[240ms]" />'],
+    ['durée numérique de Tailwind', '<p className="duration-200" />'],
+    ['délai numérique sous variante', '<p className="md:delay-75" />'],
+    ['durée en style', "<p style={{ transition: 'opacity .2s' }} />"],
+    ['courbe en gabarit', '`ease-[cubic-bezier(.22,1,.36,1)]`'],
+    ['linear() en style', "<p style={{ transitionTimingFunction: 'linear(0, 1)' }} />"],
+    ['ease-linear en classe', '<p className="ease-linear" />'],
+    ['hexadécimal après une expression de gabarit', '`${base} bg-[#2a2622]`'],
+  ])('%s', async (_, code) => {
+    expect(await lintComponent(`export const probe = ${code}`)).toContain('no-restricted-syntax')
+  })
+
+  test.each([
+    ['jetons en classe', '<p className="bg-(--paper) text-(--ink) shadow-(--shadow-rest)" />'],
+    ['durée et courbe en jetons', '<p className="duration-(--dur) ease-(--ease-out)" />'],
+    ['dimensions', '<p className="p-(--s-4) rounded-(--r-card) h-14 w-[76px]" />'],
+    // `bac` est hexadécimal : l'ancre ne passe que parce que le motif exige une fin de mot.
+    ['ancre de page', '<a href="#bac-a-sable">bac à sable</a>'],
+    ['transition par défaut', '<p className="transition-colors" />'],
+    ['nombre', '200'],
+  ])('%s passe', async (_, code) => {
+    expect(await lintComponent(`export const probe = ${code}`)).not.toContain(
+      'no-restricted-syntax',
+    )
+  })
+})
+
+describe('aucune feuille CSS hors des jetons ne porte de valeur en dur', () => {
+  const sheets = readdirSync(SRC, { recursive: true, encoding: 'utf8' }).filter(
+    (path) => path.endsWith('.css') && path !== TOKENS_SHEET,
+  )
+
+  test('la population balayée est celle du dépôt', () => {
+    expect(sheets).toContain('index.css')
+  })
+
+  test.each(sheets)('%s', (path) => {
+    expect(forbiddenIn(readFileSync(join(SRC, path), 'utf8'))).toEqual([])
+  })
+
+  test('le balayage voit chaque famille, et la feuille des jetons en est pleine', () => {
+    expect(
+      forbiddenIn(
+        'a { color: #fff; background: rgb(0 0 0); transition: color .2s cubic-bezier(.4, 0, .2, 1) }',
+      ),
+    ).toEqual(['couleur hexadécimale', 'fonction de couleur', 'durée à unité', 'fonction de courbe'])
+    expect(forbiddenIn(readFileSync(join(SRC, TOKENS_SHEET), 'utf8'))).not.toEqual([])
+  })
+
+  test('un commentaire ne compte pas', () => {
+    // Un renvoi d'issue à trois chiffres a la forme d'une couleur hexadécimale.
+    expect(forbiddenIn('/* voir #164, 2s */ a { color: var(--ink) }')).toEqual([])
+  })
+})
+
+/**
+ * Compile `src/index.css` par Tailwind lui-même, comme le fait son plugin Vite.
+ *
+ * @returns Le compilateur : `build(classes)` rend la feuille produite pour ces classes.
+ */
+async function compileIndexCss() {
+  const require = createRequire(import.meta.url)
+  const loadStylesheet = async (id: string, base: string) => {
+    const path = id.startsWith('.') ? resolve(base, id) : require.resolve(`${id}/index.css`)
+    return { path, base: dirname(path), content: readFileSync(path, 'utf8') }
+  }
+
+  return compile(readFileSync(join(SRC, 'index.css'), 'utf8'), { base: SRC, loadStylesheet })
+}
+
+/** Vrai si la classe ajoute quelque chose à la feuille que Tailwind produit sans elle. */
+async function generates(className: string): Promise<boolean> {
+  const [bare, withClass] = await Promise.all([compileIndexCss(), compileIndexCss()])
+
+  return withClass.build([className]) !== bare.build([])
+}
+
+describe("Tailwind n'apporte ni couleur ni courbe à lui", () => {
+  test.each(['bg-red-500', 'text-white', 'border-black', 'ease-in', 'ease-out', 'ease-in-out'])(
+    '%s ne produit rien',
+    async (className) => {
+      expect(await generates(className)).toBe(false)
+    },
+  )
+
+  test('une classe sur un jeton produit sa règle', async () => {
+    expect(await generates('bg-(--paper)')).toBe(true)
+  })
+
+  test('la transition par défaut prend la durée et la courbe des jetons', async () => {
+    const css = (await compileIndexCss()).build(['transition-colors'])
+
+    expect(css).toMatch(/--default-transition-duration:\s*var\(--dur-fast\)/)
+    expect(css).toMatch(/--default-transition-timing-function:\s*var\(--ease-out\)/)
+  })
+})

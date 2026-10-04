@@ -218,11 +218,18 @@ deux déclarations se disputeraient la même propriété.
 
 **Les jetons de la spec §2** vivent dans `src/tokens.css` : les 32, sur `:root`, sous leur nom de
 spec et hors de toute couche — pas dans `@theme`. Aucun de ces noms n'entre dans un espace de noms
-de Tailwind, qui n'en ferait donc pas d'utilitaires ; `@theme` n'émet que les variables
-utilisées ; et une déclaration hors couche l'emporte sur la couche `theme`, où Tailwind définit
-`--ease-out` et `--ease-in-out` avec d'autres valeurs (mesuré, Tailwind 4.3.3, 2026-10-04). Les
-composants les lisent par la syntaxe `(--jeton)` de Tailwind 4 : `bg-(--paper)`,
+de Tailwind, qui n'en ferait donc pas d'utilitaires, et `@theme` n'émet que les variables
+utilisées. Les composants les lisent par la syntaxe `(--jeton)` de Tailwind 4 : `bg-(--paper)`,
 `ease-(--ease-out)`.
+
+Tailwind, lui, perd ses couleurs et ses courbes (`--color-*: initial`, `--ease-*: initial`, dans
+le `@theme` d'`index.css`). Sans cela, il émettait son propre `--ease-out`,
+`cubic-bezier(0, 0, .2, 1)`, dès qu'une classe `ease-out` apparaissait dans les sources, et toute
+classe de palette (`bg-red-500`) apportait une couleur étrangère à la spec — mesuré, Tailwind
+4.3.3, 2026-10-04. Sa transition par défaut (`transition-colors` sans durée ni courbe) lit
+`--dur-fast` et `--ease-out`. C'est l'une des trois portes de la règle des valeurs
+(CONTRIBUTING.md, « Valeurs du front ») ; les deux autres, ESLint et le balayage des feuilles CSS,
+lisent les motifs de `forbidden-values.json`.
 
 La palette sombre ne vit dans aucun sélecteur : chaque couleur porte ses deux valeurs dans
 `light-dark()`, et `color-scheme` choisit — `light dark` par défaut, le mode de `data-theme` quand

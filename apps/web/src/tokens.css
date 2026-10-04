@@ -2,7 +2,9 @@
 
    Déclarés sur `:root` hors de toute couche : ils sont tous émis, utilisés ou non, et l'emportent
    sur la couche de thème de Tailwind. Les composants les lisent par la syntaxe `(--jeton)` de
-   Tailwind 4 — `bg-(--paper)`, `shadow-(--shadow-rest)`, `ease-(--ease-out)`.
+   Tailwind 4 — `bg-(--paper)`, `shadow-(--shadow-rest)`, `ease-(--ease-out)`. C'est le seul
+   fichier où un littéral de couleur, de durée ou de courbe a sa place (CONTRIBUTING.md, « Valeurs
+   du front »).
 
    Palette : les deux valeurs d'un jeton côte à côte dans `light-dark()`, et `color-scheme` choisit
    — le système par défaut, `data-theme` quand le mode est forcé (spec §1.5). La compilation

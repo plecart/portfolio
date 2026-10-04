@@ -8,11 +8,16 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ESLint } from 'eslint'
 import { major } from 'semver'
 import * as ts from 'typescript'
 import { expect, test } from 'vitest'
-import { APP_ROOT, installedPackage, readAppJson, type Lockfile } from './app-files.ts'
+import {
+  APP_ROOT,
+  installedPackage,
+  lintRuleIds,
+  readAppJson,
+  type Lockfile,
+} from './app-files.ts'
 
 /** Hôte minimal de lecture : il remonte en exception ce que `tsc` signalerait sur sa sortie. */
 const CONFIG_HOST: ts.ParseConfigFileHost = {
@@ -94,15 +99,13 @@ test('la porte de lint lit le script de restauration du mode', async () => {
   // Servi tel quel depuis `public/`, hors de la compilation : `tsc` ne le lit pas (hors de ses
   // `include`). Le lint est la seule porte statique qui le couvre — encore faut-il qu'il le lise
   // en script classique de navigateur, sans quoi ses globales seraient des fautes.
-  const filePath = join(APP_ROOT, 'public', 'theme.js')
-  const source = readFileSync(filePath, 'utf8')
-  const eslint = new ESLint({ cwd: APP_ROOT })
+  const filePath = 'public/theme.js'
+  const source = readFileSync(join(APP_ROOT, filePath), 'utf8')
 
-  const lint = async (text: string) =>
-    (await eslint.lintText(text, { filePath }))[0].messages.map((message) => message.ruleId)
-
-  expect(await lint(source)).toEqual([])
-  expect(await lint(source.replace('localStorage', 'locaStorage'))).toEqual(['no-undef'])
+  expect(await lintRuleIds(filePath, source)).toEqual([])
+  expect(await lintRuleIds(filePath, source.replace('localStorage', 'locaStorage'))).toEqual([
+    'no-undef',
+  ])
 })
 
 test('la porte de lint échoue sur un simple avertissement', () => {
