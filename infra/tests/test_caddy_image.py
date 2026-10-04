@@ -178,11 +178,14 @@ def wait_until_serving(stack: Stack) -> None:
 
 
 def hashed_script(stack: Stack) -> str:
-    """Le chemin du script compilé qu'`index.html` charge — un fichier haché par la compilation."""
+    """Le chemin du script compilé qu'`index.html` charge — un fichier haché par la compilation,
+    sous `/assets/`. La page charge aussi `/theme.js` (#18), servi sous son nom, sans empreinte :
+    l'ordre des balises ne désigne donc pas le script haché."""
     page = ScriptSources()
     page.feed(stack.get(SITE, "/").body)
-    assert page.sources, "aucun `<script src>` dans `index.html` — sa forme a-t-elle changé ?"
-    return page.sources[0]
+    hashed = [source for source in page.sources if source.startswith("/assets/")]
+    assert hashed, "aucun `<script src>` sous `/assets/` dans `index.html` — sa forme a changé ?"
+    return hashed[0]
 
 
 @pytest.fixture(scope="module")
@@ -236,6 +239,17 @@ def test_un_fichier_hache_est_servi_immuable(stack: Stack) -> None:
 
     assert reply.status == 200
     assert reply.headers.get_all("Cache-Control") == [IMMUTABLE]
+
+
+def test_le_script_de_restauration_du_mode_est_servi_sans_cache(stack: Stack) -> None:
+    """`/theme.js` garde son nom d'une compilation à l'autre : marqué immuable, une version
+    corrigée n'atteindrait jamais un visiteur déjà passé. Servi en `no-cache`, il est revalidé
+    comme `index.html` — le prix accepté par le brief de #18, décision 4."""
+    reply = stack.get(SITE, "/theme.js")
+
+    assert reply.status == 200
+    assert "localStorage" in reply.body
+    assert reply.headers.get_all("Cache-Control") == ["no-cache"]
 
 
 def test_un_fichier_hache_absent_rend_404_sans_cache_long(stack: Stack) -> None:
