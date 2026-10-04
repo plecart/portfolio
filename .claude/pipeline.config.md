@@ -76,8 +76,8 @@ depuis la racine et rendant 0, la pile démarrée et regardée. Ces cibles deman
 `build` et `dev` le front installé (`make web-install`) : ils le compilent s'il manque, les images
 le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node aussi.
 - build        : make build                       # une image par dossier `infra/<service>/` (`api`,
-                                                  # `caddy`), front compilé s'il manque ; sans
-                                                  # publication ; vérifiée le 2026-09-27 (#15)
+                                                  # `backup`, `caddy`), front compilé s'il manque ;
+                                                  # sans publication ; vérifiée le 2026-10-04 (#23)
 - scan         : make scan                        # Trivy sur chaque image que `make build` a
                                                   # chargée : HIGH et CRITICAL bloquent, corrigeables
                                                   # ou non, comme une image de base en fin de vie ;
@@ -85,8 +85,9 @@ le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node a
                                                   # vérifiée le 2026-09-30 (#15)
 - tests images : make image-test                  # pytest sur `infra/tests` : démarre les images que
                                                   # `make build` a chargées — test de fumée du
-                                                  # Caddyfile ; hors de `make test`, `make build`
-                                                  # d'abord ; vérifiée le 2026-10-03 (#16)
+                                                  # Caddyfile, chaîne de sauvegarde de `backup` ;
+                                                  # hors de `make test`, `make build` d'abord ;
+                                                  # vérifiée le 2026-10-04 (#23)
 - publication  : make push                        # **CI seulement** (job `publish`) : chaque image
                                                   # sous `IMAGE_TAG`, le SHA du commit, puis `latest` ;
                                                   # préfixe GHCR par `IMAGE_PREFIX` ; vérifiée le
@@ -129,7 +130,7 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 - gates bloquants en CI :
   - back : audit, lint, format:check, typecheck, test
   - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse, audit
-  - infra : compose (résolution de `infra/compose.dev.yml` et `infra/compose.yml`), build des images `api` et `caddy` sans publication, tests des images (`make image-test`), scan (Trivy : HIGH et CRITICAL, corrigeables ou non, et fin de vie ; exceptions datées de `.trivyignore.yaml`)
+  - infra : compose (résolution de `infra/compose.dev.yml` et `infra/compose.yml`), build des images `api`, `backup` et `caddy` sans publication, tests des images (`make image-test`), scan (Trivy : HIGH et CRITICAL, corrigeables ou non, et fin de vie ; exceptions datées de `.trivyignore.yaml`)
 - publication (job `publish`, push vers `main` seulement, après les trois jobs verts ; pas une gate de PR) : front compilé repris du job `web`, images reconstruites depuis le cache sans attestation, scannées par `make scan`, poussées sur GHCR (`ghcr.io/plecart/portfolio-<service>`, SHA complet et `latest`) par `make push`, trois versions par paquet gardées par `make prune`
 - déploiement (job `deploy`, après `publish`, push vers `main` seulement, sauté tant que la variable de dépôt `DEPLOY_ENABLED` ne vaut pas `true` ; pas une gate de PR) : seule la tête de `main` se déploie ; par SSH (clé dédiée, empreinte de l'hôte épinglée, secrets de l'environnement `production`, restreint à `main`), le job dépose `infra/compose.yml` dans `/srv/portfolio`, y fixe `IMAGE_TAG` au SHA du commit, puis `docker compose pull` et `up -d --wait` — rouge si un service ne devient pas sain, chacun ayant sa sonde ; procédures dans `infra/RUNBOOK.md`
 - services requis en CI : aucun déclaré — les tests de base démarrent eux-mêmes Postgres par testcontainers (cadrage §8.4), sur le Docker du runner ; Redis suivra avec #11

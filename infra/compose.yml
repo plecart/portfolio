@@ -1,6 +1,6 @@
-# Production, sur le VPS (cadrage §5.3, ADR 0002) : `cloudflared`, `caddy`, `api`, `postgres` et
-# `redis` sur le réseau privé du projet, aucun port publié — `cloudflared` sort vers Cloudflare et
-# c'est la seule entrée (D45). Le `worker` arrive avec #12, le conteneur `backup` avec #23.
+# Production, sur le VPS (cadrage §5.3, ADR 0002) : `cloudflared`, `caddy`, `api`, `postgres`,
+# `redis` et `backup` sur le réseau privé du projet, aucun port publié — `cloudflared` sort vers
+# Cloudflare et c'est la seule entrée (D45). Le `worker` arrive avec #12.
 #
 # Le pendant de `compose.dev.yml` (ADR 0012) : mêmes images — épingle comprise pour Postgres et
 # Redis —, même point d'entrée, mêmes services de données ; le reste est propre à la production.
@@ -135,6 +135,35 @@ services:
       interval: 3s
       timeout: 5s
       retries: 20
+    restart: unless-stopped
+
+  # La sauvegarde nocturne de la base (ADR 0007, `infra/backup/`). Production seulement : absente de
+  # `compose.dev.yml` (cadrage §7, D54).
+  backup:
+    image: ghcr.io/plecart/portfolio-backup:${IMAGE_TAG:?}
+    # Le rôle en lecture seule, par les variables de libpq que `pg_dump`, `psql` et la sonde lisent ;
+    # la clé publique `age` ; le bucket des sauvegardes et son jeton ; l'adresse de ping. Rien de
+    # plus : ni le mot de passe de l'application, ni `SECRET_KEY`, ni le jeton du Tunnel
+    # (`apps/api/tests/test_compose.py`).
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:?}
+      PGUSER: ${BACKUP_POSTGRES_USER:?}
+      PGPASSWORD: ${BACKUP_POSTGRES_PASSWORD:?}
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:?}
+      BACKUP_R2_ENDPOINT: ${BACKUP_R2_ENDPOINT:?}
+      BACKUP_R2_ACCESS_KEY_ID: ${BACKUP_R2_ACCESS_KEY_ID:?}
+      BACKUP_R2_SECRET_ACCESS_KEY: ${BACKUP_R2_SECRET_ACCESS_KEY:?}
+      BACKUP_R2_BUCKET: ${BACKUP_R2_BUCKET:?}
+      BACKUP_PING_URL: ${BACKUP_PING_URL:?}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Sain quand son rôle ouvre une session sur la base. Rien hors du réseau du projet : une panne de
+    # R2 ou de healthchecks.io ne rougit pas un déploiement — c'est l'absence de ping qui la dit.
+    healthcheck:
+      <<: *probe-timing
+      test: [CMD, psql, --no-psqlrc, --quiet, --command, SELECT 1]
     restart: unless-stopped
 
 volumes:

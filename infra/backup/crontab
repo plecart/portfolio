@@ -1,0 +1,4 @@
+# La sauvegarde, chaque nuit à 03:00 UTC (brief de #23, décision 8) : l'heure est celle de l'image,
+# pas une variable. `supercronic` planifie dans le fuseau de `/etc/localtime`, que l'image n'a pas :
+# UTC (mesuré).
+0 3 * * * backup.sh

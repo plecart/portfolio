@@ -1,0 +1,66 @@
+# Pile du test de l'image `backup` (`test_backup_image.py`) : surcharge du Compose de production,
+# lancée par le test sous son propre nom de projet — le moteur Docker est partagé avec d'autres piles
+# (brief de #23, décision 11).
+#
+# `postgres` et `backup` y gardent leur définition de production — image Postgres, sondes,
+# variables — ; ce fichier n'y change que ce que la pile de test exige :
+#
+# - `backup` tourne sur l'image que `make build` a chargée ;
+# - la base crée le rôle de sauvegarde à son initialisation, ce que fera `bootstrap.sh` sur le VPS
+#   (lot 2 de #23, qui reprendra ici sa SQL) ;
+# - deux témoins remplacent les services externes : un stockage S3, `rclone serve s3` tiré de l'image
+#   `backup` — aucune image de plus à épingler ; et un récepteur de ping, tiré de l'image `caddy`, qui
+#   répond 200 à toute requête et la journalise.
+#
+# Aucun port publié : le test agit par `docker compose exec`. Chaque valeur vient de l'environnement
+# du test, par-dessus le modèle `prod.env.example`.
+
+services:
+  backup:
+    image: ${BACKUP_IMAGE:?}
+    # L'image du poste ou du job, jamais une image homonyme tirée d'un registre.
+    pull_policy: never
+    # Les deux témoins répondent avant que le test ne lance la chaîne.
+    depends_on:
+      s3:
+        condition: service_healthy
+      ping:
+        condition: service_healthy
+
+  postgres:
+    configs:
+      - source: backup-role
+        target: /docker-entrypoint-initdb.d/backup-role.sql
+
+  s3:
+    image: ${BACKUP_IMAGE:?}
+    pull_policy: never
+    command:
+      - rclone
+      - serve
+      - s3
+      - --auth-key
+      - ${BACKUP_R2_ACCESS_KEY_ID:?},${BACKUP_R2_SECRET_ACCESS_KEY:?}
+      - --addr
+      - ":8080"
+      - /tmp/s3
+    healthcheck:
+      test: [CMD, nc, -z, 127.0.0.1, "8080"]
+      interval: 1s
+      retries: 30
+
+  ping:
+    image: ${CADDY_IMAGE:?}
+    pull_policy: never
+    command: [caddy, respond, --listen, ":8080", --access-log]
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/sonde]
+      interval: 1s
+      retries: 30
+
+configs:
+  # Le rôle de la décision 3 du brief : connexion, lecture de toutes les données, rien d'autre.
+  backup-role:
+    content: |
+      CREATE ROLE "${BACKUP_POSTGRES_USER:?}" LOGIN PASSWORD '${BACKUP_POSTGRES_PASSWORD:?}'
+        IN ROLE pg_read_all_data;

@@ -132,10 +132,12 @@ son arbre se nettoie par les `overrides` du manifeste
 ([docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4).
 
 **Tests des images.** `make image-test`, porte de CI sur chaque PR, démarre les images que
-`make build` a chargées et les interroge — d'abord le test de fumée du Caddyfile de production
-([infra/tests/](infra/tests/)). Il ne fait pas partie de `make test` : il lui faut l'image construite,
-donc le front compilé. Sur le poste, `make build` d'abord. Chaque test démarre sa pile sous son
-propre nom de projet Compose, sur un port hôte que Docker attribue, et la supprime en partant.
+`make build` a chargées et les interroge ([infra/tests/](infra/tests/)) : le test de fumée du
+Caddyfile de production, et la chaîne de sauvegarde de l'image `backup`, jouée dans le Compose de
+production contre un témoin S3 et un témoin de ping. Il ne fait pas partie de `make test` : il lui
+faut les images construites, donc le front compilé. Sur le poste, `make build` d'abord. Chaque test
+démarre sa pile sous son propre nom de projet Compose — sans port publié, ou sur un port hôte que
+Docker attribue — et la supprime en partant, volumes compris.
 
 **Scan des images.** `make scan`, porte de CI sur chaque PR, scanne avec Trivy chaque image que
 `make build` a construite : toute vulnérabilité HIGH ou CRITICAL bloque, corrigeable ou non, comme
@@ -159,6 +161,21 @@ cosign verify ghcr.io/aquasecurity/trivy:<x.y.z> \
   --certificate-identity https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v<x.y.z> \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
+
+`age` et `supercronic` entrent dans l'image `backup` par les fichiers `linux-amd64` de leur
+release, à la somme SHA-256 épinglée dans [infra/backup/Dockerfile](infra/backup/Dockerfile)
+(`ADD --checksum`, que BuildKit vérifie) : Dependabot ne les suit pas, le scan les ouvre. Pour
+monter une épingle : relever la somme que GitHub publie pour le fichier de la nouvelle version,
+
+```
+gh api repos/FiloSottile/age/releases/tags/v<x.y.z> --jq '.assets[] | select(.name | endswith("linux-amd64.tar.gz")) | .digest'
+gh api repos/aptible/supercronic/releases/tags/v<x.y.z> --jq '.assets[] | select(.name == "supercronic-linux-amd64") | .digest'
+```
+
+puis la recouper par ce que chaque projet publie — pour `age`, sa preuve Sigsum (`sigsum-verify`
+sur l'archive et son `.proof`, procédure dans le `SIGSUM.md` de son dépôt) ; pour `supercronic`, la
+somme SHA-1 de ses notes de release —, et changer adresse et somme ensemble. Enfin
+`make build-backup scan-backup`, puis `make build image-test`.
 
 **Publication des images.** Rien à faire à la main : à chaque push sur `main`, une fois la CI
 verte, le job `publish` reconstruit les images, les scanne comme sur une PR, puis les pousse sur
