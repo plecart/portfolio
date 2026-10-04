@@ -5,21 +5,34 @@ from typing import Any, ClassVar
 
 from config import strings
 from django.contrib import admin
+from django.contrib.admin.options import BaseModelAdmin
 from django.contrib.admin.widgets import RelatedFieldWidgetWrapper
 from django.db.models import Field
-from django.forms import BaseInlineFormSet, CharField, ModelForm
+from django.forms import CharField
 from django.forms import Field as FormField
 from django.http import HttpRequest
 from django.utils.html import format_html
 from django.utils.safestring import SafeString, mark_safe
 from django_stubs_ext import StrOrPromise
 
-from content.inlines import SortableFormSet, SortableInline
-from content.models import Project, ProjectTechnology, Section, Technology
+from content.inlines import InlineRowFormSet, InlineTable, SortableFormSet, SortableInline
+from content.models import Cover, Project, ProjectImage, ProjectTechnology, Section, Technology
 from content.preview import MarkdownFieldsAdmin
 
 # Le côté de l'aperçu d'une icône dans la liste, en pixels : il tient dans une ligne de l'admin.
 ICON_PREVIEW_SIZE = 24
+
+# Le côté du cadre carré où l'aperçu d'une image du projet tient entière, en pixels (décision 11).
+IMAGE_PREVIEW_SIZE = 120
+
+# La classe de l'aperçu d'une image, que `image_preview.css` lit.
+IMAGE_PREVIEW_CLASS = "image-preview"
+
+# Le refus d'un champ d'une image laissé vide : celui de la contrainte qui dit la même chose.
+IMAGE_REQUIRED_MESSAGES = {
+    "original": strings.IMAGE_ORIGINAL_MISSING,
+    "caption": strings.IMAGE_CAPTION_MISSING,
+}
 
 # Le symbole « link » de Lucide (`icons/link.svg`), dérivé de Feather, à 16 px. Tracé de la
 # couleur du texte : bleu dans un lien de l'admin, gris sous la classe `quiet` — deux couleurs que
@@ -74,6 +87,70 @@ class TechnologyAdmin(admin.ModelAdmin[Technology]):
         )
 
 
+class ImageFieldsAdmin[ImageT: ProjectImage](BaseModelAdmin[ImageT]):
+    """Un tableau en ligne d'images d'un projet — sa couverture, sa galerie : l'aperçu de chaque
+    original enregistré, et les refus du catalogue pour un fichier ou une légende manquants.
+
+    Ses `fields` nomment `preview` et `state`, et ses `readonly_fields` les gardent : l'état, que
+    seul le worker de #12 fait avancer (décision 5), s'affiche en texte, sous son libellé.
+    """
+
+    class Media:
+        css: ClassVar[dict[str, tuple[str, ...]]] = {"all": ("content/admin/image_preview.css",)}
+
+    @admin.display(description=strings.IMAGE_PREVIEW)
+    def preview(self, image: ImageT) -> str:
+        """L'original enregistré, dans un `<img>` : un cadre carré nommé en attributs, où
+        `image_preview.css` le fait tenir entier, proportions gardées — l'orientation EXIF
+        comprise, que les dimensions stockées ignorent. Jamais de `style` en ligne : une CSP
+        stricte (#6) le refuse. La légende sert de texte alternatif (spec §4.4).
+
+        Rien pour une image dont l'original n'est pas stocké : une ligne neuve, ou un fichier
+        choisi dans un envoi refusé — l'aperçu apparaît après l'enregistrement (décision 3)."""
+        if not image.original.stored:
+            return ""
+        return format_html(
+            '<img src="{url}" alt="{alt}" width="{side}" height="{side}" class="{preview}">',
+            url=image.original.url,
+            alt=image.caption,
+            side=IMAGE_PREVIEW_SIZE,
+            preview=IMAGE_PREVIEW_CLASS,
+        )
+
+    def formfield_for_dbfield(
+        self, db_field: Field[Any, Any], request: HttpRequest, **kwargs: Any
+    ) -> FormField | None:
+        """Le champ de Django ; l'original et la légende, refusés vides avec le message du
+        catalogue que leurs contraintes portent."""
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+        message = IMAGE_REQUIRED_MESSAGES.get(db_field.name)
+        if formfield is not None and message is not None:
+            formfield.error_messages["required"] = message
+        return formfield
+
+
+class CoverFormSet(InlineRowFormSet[Cover, Project]):
+    """Le bloc de la couverture, avec le message du catalogue quand il manque. Le message par
+    défaut de Django parle de formulaires."""
+
+    default_error_messages: ClassVar[dict[str, StrOrPromise]] = {
+        "too_few_forms": strings.PROJECT_COVER_MISSING
+    }
+
+
+class CoverInline(ImageFieldsAdmin[Cover], InlineTable[Cover, Project]):
+    """La couverture d'un projet, en tête des tableaux en ligne de l'écran Projet : une ligne,
+    sans ajout ni suppression, exigée — brouillon compris (décisions 2 et 11). Django n'offre
+    qu'une ligne à un lien un-pour-un (`inlineformset_factory`)."""
+
+    model = Cover
+    formset = CoverFormSet
+    fields = ("preview", "original", "caption", "state")
+    readonly_fields = ("preview", "state")
+    min_num = 1
+    can_delete = False
+
+
 class ProjectTechnologyFormSet(SortableFormSet[ProjectTechnology, Project]):
     """Les lignes de technologie d'un projet, avec les messages du catalogue pour les deux règles
     que le formulaire compare entre ses lignes, avant la base : le doublon (projet, technologie),
@@ -113,15 +190,6 @@ class ProjectTechnologyInline(SortableInline[ProjectTechnology, Project]):
             formfield.widget.can_delete_related = False
         return formfield
 
-    def get_formset(
-        self, request: HttpRequest, obj: Project | None = None, **kwargs: Any
-    ) -> type[BaseInlineFormSet[ProjectTechnology, Project, ModelForm[ProjectTechnology]]]:
-        """Le formset, qui refuse un projet sans technologie. L'admin ne transmet pas
-        `validate_min` à la fabrique du formset (`InlineModelAdmin.get_formset`) : `min_num` seul
-        rend une ligne obligatoire, qu'un formulaire sans ligne ou la suppression des lignes
-        enregistrées contournent."""
-        return super().get_formset(request, obj, validate_min=True, **kwargs)
-
 
 class SectionFormSet(SortableFormSet[Section, Project]):
     """Les sections d'un projet, avec le message du catalogue pour la seule unicité que le
@@ -159,11 +227,11 @@ class SectionInline(MarkdownFieldsAdmin[Section], SortableInline[Section, Projec
 
 @admin.register(Project)
 class ProjectAdmin(MarkdownFieldsAdmin[Project], admin.ModelAdmin[Project]):
-    """Écran Projet : tous les champs du projet, ses technologies en ligne, puis sa fiche technique,
-    en un seul écran (PRD, US 34). Le slug se remplit depuis le titre à la saisie et reste
-    modifiable (décision 3) ; la description, en Markdown, a son aperçu."""
+    """Écran Projet : tous les champs du projet, sa couverture, ses technologies en ligne, puis sa
+    fiche technique, en un seul écran (PRD, US 34). Le slug se remplit depuis le titre à la saisie
+    et reste modifiable (décision 3) ; la description, en Markdown, a son aperçu."""
 
     list_display = ("title", "kind", "status", "showcase", "published")
     markdown_fields = ("description",)
     prepopulated_fields: ClassVar[dict[str, Sequence[str]]] = {"slug": ("title",)}
-    inlines = (ProjectTechnologyInline, SectionInline)
+    inlines = (CoverInline, ProjectTechnologyInline, SectionInline)

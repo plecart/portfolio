@@ -13,7 +13,14 @@ from django.test import Client
 from django.urls import reverse
 from django.utils.text import capfirst
 from factories import BLANK, saved, section, technology
-from test_project_admin import LINES, line, new_project_data, rendered_data, saved_project
+from test_project_admin import (
+    LINES,
+    inline_group,
+    line,
+    new_project_data,
+    rendered_data,
+    saved_project,
+)
 
 # Le préfixe des lignes de section dans le formulaire de l'écran Projet : le nom de la relation
 # inverse (`BaseInlineFormSet.get_default_prefix`).
@@ -52,11 +59,9 @@ def test_l_ecran_projet_montre_la_fiche_technique_sous_les_technologies(
     """Un tableau en ligne titré, ses champs libellés du catalogue, rendu après celui des
     technologies (brief, « Comportement souhaité »)."""
     response = admin_client.get(reverse("admin:content_project_add"))
-    lines, sections = response.context["inline_admin_formsets"]
+    sections = inline_group(response, ROWS)
     page = response.content.decode()
 
-    assert lines.formset.prefix == LINES
-    assert sections.formset.prefix == ROWS
     assert sections.opts.verbose_name_plural == strings.SECTIONS_HEADING
     assert {
         name: sections.formset.form.base_fields[name].label for name in SECTION_FIELD_LABELS
@@ -141,7 +146,7 @@ def test_une_ligne_titree_sans_texte_est_refusee_avec_le_message_du_catalogue(
 
     response = admin_client.post(reverse("admin:content_project_add"), data)
 
-    form = response.context["inline_admin_formsets"][1].formset.forms[0]
+    form = inline_group(response, ROWS).formset.forms[0]
     assert response.status_code == 200
     assert [*form.errors.get("body", []), *form.non_field_errors()] == [
         strings.SECTION_BODY_MISSING
@@ -176,7 +181,7 @@ def test_deux_lignes_ne_portent_pas_la_meme_ancre(admin_client: Client) -> None:
 
     response = admin_client.post(reverse("admin:content_project_add"), data)
 
-    sections = response.context["inline_admin_formsets"][1].formset
+    sections = inline_group(response, ROWS).formset
     assert list(sections.non_form_errors()) == [strings.SECTION_ANCHOR_TAKEN]
     assert not Project.objects.exists()
 

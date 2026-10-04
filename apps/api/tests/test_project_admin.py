@@ -5,19 +5,22 @@ import html
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 import pytest
 from config import strings
 from content.inlines import HANDLE_CLASS, POSITION_CLASS
 from content.models import Project, ProjectTechnology, Technology
+from django.contrib.admin.helpers import InlineAdminFormSet
 from django.contrib.staticfiles import finders
+from django.forms import FileField
 from django.templatetags.static import static
 from django.test import Client
 from django.urls import reverse
 from django.utils.html import escape
 from django.utils.text import capfirst
 from django.utils.translation import gettext
-from factories import BLANK, project, saved, technology
+from factories import BLANK, cover, image_upload, project, saved, technology
 
 # Chaque champ de l'écran d'ajout d'un projet, dans l'ordre de l'écran, et son libellé du
 # catalogue ; puis ceux d'une ligne de technologie.
@@ -41,9 +44,10 @@ PROJECT_TECHNOLOGY_FIELD_LABELS = {
     "position": strings.PROJECT_TECHNOLOGY_POSITION,
 }
 
-# Le préfixe des lignes de technologie dans le formulaire de l'écran Projet : le nom de la relation
-# inverse (`BaseInlineFormSet.get_default_prefix`).
+# Le préfixe des lignes de technologie, puis celui du bloc de la couverture, dans le formulaire de
+# l'écran Projet : le nom de la relation inverse (`BaseInlineFormSet.get_default_prefix`).
 LINES = "projecttechnology_set"
+COVER = "cover"
 
 # Le script et la feuille des lignes en ligne : tri par glisser-déposer, bouton unique de
 # suppression (`content/inlines.py`).
@@ -55,9 +59,17 @@ INLINE_ROWS_STYLE = "content/admin/inline_rows.css"
 RELATED_LINKS = ["change-related", "view-related", "delete-related"]
 
 
+def inline_group(response: Any, prefix: str) -> InlineAdminFormSet:
+    """Le tableau en ligne `prefix` de l'écran que `response`, réponse du client de test, rend."""
+    groups: list[InlineAdminFormSet] = response.context["inline_admin_formsets"]
+    return next(group for group in groups if group.formset.prefix == prefix)
+
+
 def rendered_data(admin_client: Client, url: str) -> dict[str, object]:
     """Le formulaire que l'écran `url` rend, tel qu'un navigateur le renverrait sans rien toucher :
-    champs du projet, formulaire de gestion et lignes de technologie, cases cochées comprises."""
+    champs du projet, formulaire de gestion et lignes de chaque tableau en ligne, cases cochées
+    comprises. Un fichier déjà enregistré ne se renvoie pas : le navigateur n'envoie que celui que
+    l'auteur choisit."""
     response = admin_client.get(url)
     forms = [response.context["adminform"].form]
     data: dict[str, object] = {}
@@ -66,8 +78,10 @@ def rendered_data(admin_client: Client, url: str) -> dict[str, object]:
         data |= {management.add_prefix(name): value for name, value in management.initial.items()}
         forms += inline.formset.forms
     for form in forms:
-        for name in form.fields:
+        for name, field in form.fields.items():
             value = form[name].value()
+            if isinstance(field, FileField):
+                continue
             if value is True:
                 data[form.add_prefix(name)] = "on"
             elif value not in (None, False, ""):
@@ -75,11 +89,18 @@ def rendered_data(admin_client: Client, url: str) -> dict[str, object]:
     return data
 
 
+def cover_row(**fields: object) -> dict[str, object]:
+    """Le bloc de la couverture rempli : une image valide et sa légende ; `fields` en remplace des
+    champs, sous leur nom de modèle (`original`, `caption`)."""
+    row = {"original": image_upload(), "caption": "La table des projets.", **fields}
+    return {f"{COVER}-0-{name}": value for name, value in row.items()}
+
+
 def new_project_data(admin_client: Client, **fields: object) -> dict[str, object]:
-    """Le formulaire d'ajout d'un projet, rempli avec le projet de la fabrique ; `fields` en
-    remplace des champs ou remplit des lignes (`f"{LINES}-0-technology"`…)."""
+    """Le formulaire d'ajout d'un projet, rempli avec le projet de la fabrique et sa couverture ;
+    `fields` en remplace des champs ou remplit des lignes (`f"{LINES}-0-technology"`…)."""
     source = project()
-    data = rendered_data(admin_client, reverse("admin:content_project_add"))
+    data = rendered_data(admin_client, reverse("admin:content_project_add")) | cover_row()
     data |= {
         name: value
         for name in PROJECT_FIELD_LABELS
@@ -94,17 +115,21 @@ def line(index: int, linked: Technology, position: int) -> dict[str, object]:
 
 
 def saved_project(linked: Technology, **fields: object) -> Project:
-    """Un projet de la fabrique, enregistré avec `linked` pour seule technologie."""
+    """Un projet de la fabrique, enregistré avec sa couverture et `linked` pour seule
+    technologie."""
     linking = saved(project(**fields))
+    saved(cover(linking))
     saved(ProjectTechnology(project=linking, technology=linked, position=1))
     return linking
 
 
-def refused_lines(admin_client: Client, url: str, data: dict[str, object]) -> list[str]:
-    """Envoie `data` à l'écran Projet `url` et rend les refus qu'il affiche au-dessus des lignes de
-    technologie."""
+def refused_rows(
+    admin_client: Client, url: str, data: dict[str, object], prefix: str = LINES
+) -> list[str]:
+    """Envoie `data` à l'écran Projet `url` et rend les refus qu'il affiche au-dessus du tableau en
+    ligne `prefix`, les technologies par défaut."""
     response = admin_client.post(url, data)
-    return list(response.context["inline_admin_formsets"][0].formset.non_form_errors())
+    return list(inline_group(response, prefix).formset.non_form_errors())
 
 
 @pytest.mark.django_db
@@ -114,7 +139,7 @@ def test_l_ecran_projet_affiche_les_libelles_du_catalogue(admin_client: Client) 
     la fiche technique ont leurs propres tests (`test_section_admin.py`)."""
     response = admin_client.get(reverse("admin:content_project_add"))
     form = response.context["adminform"].form
-    lines = response.context["inline_admin_formsets"][0]
+    lines = inline_group(response, LINES)
     page = response.content.decode()
 
     assert [(name, field.label) for name, field in form.fields.items()] == [
@@ -205,8 +230,7 @@ def test_l_admin_enregistre_un_projet_et_reaffiche_ses_technologies_dans_l_ordre
     created = Project.objects.get()
     response = admin_client.get(reverse("admin:content_project_change", args=[created.pk]))
     shown = [
-        form.instance.technology
-        for form in response.context["inline_admin_formsets"][0].formset.initial_forms
+        form.instance.technology for form in inline_group(response, LINES).formset.initial_forms
     ]
     assert shown == [python, django]
 
@@ -245,7 +269,7 @@ def test_l_admin_refuse_un_projet_sans_technologie(
     quand le script a numéroté les lignes vides, ou que le formulaire n'envoie aucune ligne."""
     url = reverse("admin:content_project_add")
 
-    refusals = refused_lines(admin_client, url, new_project_data(admin_client, **lines))
+    refusals = refused_rows(admin_client, url, new_project_data(admin_client, **lines))
 
     assert refusals == [strings.PROJECT_TECHNOLOGIES_MISSING]
     assert not Project.objects.exists()
@@ -261,7 +285,7 @@ def test_l_admin_refuse_de_retirer_la_derniere_technologie_d_un_projet(
 
     data = rendered_data(admin_client, url) | {f"{LINES}-0-DELETE": "on"}
 
-    assert refused_lines(admin_client, url, data) == [strings.PROJECT_TECHNOLOGIES_MISSING]
+    assert refused_rows(admin_client, url, data) == [strings.PROJECT_TECHNOLOGIES_MISSING]
     assert ProjectTechnology.objects.filter(project=portfolio).exists()
 
 
@@ -328,7 +352,7 @@ def test_l_admin_refuse_une_technologie_gardee_rajoutee_une_seconde_fois(
     url = reverse("admin:content_project_change", args=[portfolio.pk])
     data = rendered_data(admin_client, url) | line(1, django, 2)
 
-    assert refused_lines(admin_client, url, data) == [strings.PROJECT_TECHNOLOGY_TAKEN]
+    assert refused_rows(admin_client, url, data) == [strings.PROJECT_TECHNOLOGY_TAKEN]
     assert ProjectTechnology.objects.filter(project=portfolio).count() == 1
 
 
@@ -354,7 +378,7 @@ def test_l_admin_refuse_une_technologie_enregistree_depuis_l_ouverture_de_l_ecra
     else:
         saved(ProjectTechnology(project=portfolio, technology=python, position=2))
 
-    lines = admin_client.post(url, data).context["inline_admin_formsets"][0].formset
+    lines = inline_group(admin_client.post(url, data), LINES).formset
 
     assert list(lines.non_form_errors()) == [strings.PROJECT_TECHNOLOGY_TAKEN]
     assert [list(form.non_field_errors()) for form in lines.forms[:2]] == [
@@ -415,7 +439,7 @@ def test_l_admin_refuse_deux_fois_la_meme_technologie_dans_un_projet(
     django = saved(technology(name="Django"))
     data = new_project_data(admin_client, **line(0, django, 1), **line(1, django, 2))
 
-    refusals = refused_lines(admin_client, reverse("admin:content_project_add"), data)
+    refusals = refused_rows(admin_client, reverse("admin:content_project_add"), data)
 
     assert refusals == [strings.PROJECT_TECHNOLOGY_TAKEN]
     assert not Project.objects.exists()
@@ -481,7 +505,7 @@ def test_chaque_ligne_de_technologie_porte_une_poignee_de_tri(admin_client: Clie
 
     response = admin_client.get(reverse("admin:content_project_change", args=[portfolio.pk]))
     page = response.content.decode()
-    lines = response.context["inline_admin_formsets"][0].formset
+    lines = inline_group(response, LINES).formset
 
     # `type="button"` : sans lui, un bouton de formulaire l'envoie (`submit` par défaut, HTML).
     handle = (
@@ -576,12 +600,13 @@ def test_l_ecran_projet_livre_au_script_les_prises_qu_il_lit(admin_client: Clien
         "deleteText",
     ):
         assert hook in script
-    declaration = re.search(
+    declarations = re.findall(
         r'class="js-inline-admin-formset[^>]*data-inline-formset="([^"]*)"', page
     )
-    assert declaration is not None
-    options = json.loads(html.unescape(declaration.group(1)))["options"]
-    assert (options["prefix"], options["deleteText"]) == (LINES, gettext("Remove"))
+    options = [json.loads(html.unescape(declaration))["options"] for declaration in declarations]
+    assert (LINES, gettext("Remove")) in [
+        (option["prefix"], option["deleteText"]) for option in options
+    ]
     assert 'class="js-inline-admin-formset inline-group"' in page
     assert '<tr class="form-row has_original"' in page
     assert re.search(rf'<tr class="form-row\s+empty-form"\s+id="{LINES}-empty"', page)

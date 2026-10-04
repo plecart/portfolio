@@ -1,0 +1,10 @@
+/*
+ * Aperçu d'une image du projet dans l'écran Projet (`ImageFieldsAdmin.preview`) : l'original tient
+ * entier dans son cadre carré, proportions gardées, quelle que soit son orientation EXIF — le
+ * navigateur l'applique, les dimensions stockées l'ignorent. Fond des zones neutres de l'admin, que
+ * le thème sombre redéfinit ; aucune valeur de couleur propre.
+ */
+.image-preview {
+    object-fit: contain;
+    background: var(--darkened-bg);
+}

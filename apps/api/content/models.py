@@ -671,6 +671,9 @@ class Cover(ProjectImage):
             ),
         )
 
+    def __str__(self) -> str:
+        return f"{self.project} · {self.caption}"
+
 
 class GalleryImage(ProjectImage):
     """Une image de la galerie d'un projet, à sa place dans la galerie (`project.gallery`). Le

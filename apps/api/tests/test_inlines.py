@@ -5,7 +5,7 @@ import inspect
 
 import pytest
 from config import strings
-from content.inlines import InlineRowForm, SortableFormSet, SortableInline
+from content.inlines import InlineRowForm, InlineTable, SortableFormSet, SortableInline
 from content.models import Project, ProjectTechnology
 from django.apps import apps
 from django.contrib import admin
@@ -55,21 +55,21 @@ def test_un_tableau_ordonnable_range_par_defaut_ses_lignes_neuves_sans_position(
     assert issubclass(inspect.getattr_static(SortableInline, "formset"), SortableFormSet)
 
 
-def test_toute_unicite_d_un_tableau_ordonnable_qui_lit_le_parent_est_differee() -> None:
+def test_toute_unicite_d_un_tableau_en_ligne_qui_lit_le_parent_est_differee() -> None:
     """Django écrit les lignes l'une après l'autre (`BaseModelFormSet.save_existing_objects`) :
     deux lignes qui échangent leurs objets passent par un doublon, que la base ne doit juger qu'à
     la fin de l'enregistrement (`InlineRowForm`). Vaut pour tout tableau en ligne de l'admin qui
-    hérite de `SortableInline`, la galerie de #9 comprise."""
-    sortable = [
+    hérite de `InlineTable`, ordonnable ou non."""
+    tables = [
         (parent, inspect.getattr_static(inline, "model"))
         for parent in apps.get_models()
         if admin.site.is_registered(parent)
         for inline in admin.site.get_model_admin(parent).inlines
-        if issubclass(inline, SortableInline)
+        if issubclass(inline, InlineTable)
     ]
     reading_parent = {
         f"{child.__name__}.{constraint.name}": constraint.deferrable
-        for parent, child in sortable
+        for parent, child in tables
         for constraint in child._meta.total_unique_constraints
         if any(child._meta.get_field(name).related_model is parent for name in constraint.fields)
     }
