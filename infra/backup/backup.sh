@@ -1,7 +1,7 @@
 #!/bin/sh
 # La sauvegarde de la base (ADR 0007 point 3, brief de #23 décision 4) : dump, chiffrement, envoi,
-# ping — chaque étape sur des fichiers de travail, jamais un tube jusqu'au bucket. Lancée chaque nuit
-# par `supercronic` (`crontab`), ou à la main : `docker compose exec backup backup.sh`.
+# ping — chaque étape sur des fichiers de travail, jamais un tube jusqu'au bucket. Lancée chaque
+# nuit par `supercronic` (`crontab`), ou à la main : `docker compose exec backup backup.sh`.
 #
 # Chaque étape écrit son nom ; la première qui échoue arrête la chaîne (`set -e`), avant le ping —
 # l'absence de ping est l'alerte (D33). Les fichiers de travail sont supprimés en partant : le dump
@@ -25,6 +25,10 @@ finish() {
 	[ "$status" -eq 0 ] || echo "échec à l'étape : $step" >&2
 }
 trap finish EXIT
+# Un signal — `Ctrl-C`, terminal fermé, `kill` — fait sortir la chaîne en échec, donc par `finish` :
+# sans ce piège, le shell sortirait sans jouer celui de la sortie (mesuré, busybox `ash`). Un
+# `SIGKILL` reste hors d'atteinte de tout piège.
+trap 'exit 1' INT TERM HUP
 
 # Le contrat avec la restauration (#24, décision 6) : `<base>-<AAAAMMJJ>T<HHMMSS>Z.dump.age`, à la
 # date du début de l'exécution, en UTC — l'ordre des noms est l'ordre du temps.
