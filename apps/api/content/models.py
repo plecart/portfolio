@@ -9,7 +9,7 @@ garantit pour toute ligne écrite hors de l'admin. Quand un champ la vérifie d�
 messages pour une même faute.
 """
 
-from collections.abc import Collection
+from collections.abc import Collection, Iterable
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, Self, TypedDict
 
@@ -24,6 +24,7 @@ from content.images import OriginalField, delete_after_commit, validate_original
 from content.validators import validate_svg
 
 if TYPE_CHECKING:
+    from django.db.models import QuerySet
     from django.db.models.fetch_modes import FetchMode
     from django.db.models.fields.related_descriptors import RelatedManager
 
@@ -550,6 +551,26 @@ class ProjectImage(models.Model):
             image._stored_original = image.original.name
         return image
 
+    def refresh_from_db(
+        self,
+        using: str | None = None,
+        fields: Iterable[str] | None = None,
+        from_queryset: "QuerySet[Any] | None" = None,
+    ) -> None:
+        """La ligne relue, qui retient le nom de son original s'il a été relu — le chargement à
+        la demande d'un champ différé passe par ici (`DeferredAttribute`).
+
+        Args:
+            using, fields, from_queryset: ceux de `Model.refresh_from_db`.
+        """
+        fields = None if fields is None else set(fields)
+        reloads_original = (
+            "original" not in self.get_deferred_fields() if fields is None else "original" in fields
+        )
+        super().refresh_from_db(using=using, fields=fields, from_queryset=from_queryset)
+        if reloads_original:
+            self._stored_original = self.original.name
+
     def save(self, **kwargs: Any) -> None:
         """Enregistre l'image ; un original remplacé la remet en attente et sort du stockage.
 
@@ -558,19 +579,26 @@ class ProjectImage(models.Model):
         variantes : elles décrivaient l'ancien fichier (décision 5). Les fichiers que la ligne
         référençait sortent du stockage une fois la transaction validée, jamais si elle est
         annulée (décision 10). Un enregistrement partiel (`update_fields`) ne remplace que s'il
-        écrit l'original, et écrit alors aussi l'état et les variantes.
+        écrit l'original ; il écrit alors aussi ses dimensions — les règles de la couverture les
+        lisent —, et l'état et les variantes qu'un remplacement remet à zéro.
 
         Args:
             kwargs: ceux de `Model.save`.
         """
+        # Un itérable quelconque, que Django relira : lu une fois ici, gardé en ensemble.
         update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = frozenset(update_fields)
         writes_original = update_fields is None or "original" in update_fields
         replaced = self._replaced_files() if writes_original else []
         if replaced:
             self.state = ProcessingState.PENDING
             self.variants = []
-            if update_fields is not None:
-                kwargs["update_fields"] = {*update_fields, "state", "variants"}
+        if update_fields is not None:
+            if writes_original:
+                reset = {"state", "variants"} if replaced else set[str]()
+                update_fields |= {"width", "height", *reset}
+            kwargs["update_fields"] = update_fields
         super().save(**kwargs)
         if writes_original:
             self._stored_original = self.original.name
@@ -678,6 +706,9 @@ def delete_image_files(
         instance: l'image supprimée.
         kwargs: le reste du signal.
     """
+    # ponytail: une lecture par image supprimée, cascades comprises — une galerie compte quelques
+    # images ; si elles se comptent par centaines, lire les noms d'un coup au `pre_delete` du
+    # projet.
     row = sender.objects.only("original", "variants").filter(pk=instance.pk).first()
     if row is not None:
         delete_after_commit(row.original.storage, row.stored_files())
