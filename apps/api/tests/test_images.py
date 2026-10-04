@@ -638,30 +638,141 @@ def test_enregistrer_une_image_sans_changer_son_fichier_garde_ses_fichiers_et_so
     assert stored(names) == [True, True]
 
 
+def replaced_elsewhere(made: ProjectImage, name: str) -> ProjectImage:
+    """Remplace l'original de la ligne de `made` par un autre enregistrement que `made` ; rend
+    cet enregistrement."""
+    other = type(made).objects.get(pk=made.pk)
+    other.original = image_upload(name)
+    other.save()
+    return other
+
+
+def stale_instance(made: ProjectImage, how: str) -> ProjectImage:
+    """Une instance de la ligne de `made`, de la façon `how`, que la suite rendra périmée."""
+    if how == "créée puis enregistrée":
+        return made
+    if how == "différée":
+        stale = type(made).objects.only("id", "caption").get(pk=made.pk)
+        assert stale.original.name  # le chargement à la demande passe par `refresh_from_db`
+        return stale
+    stale = type(made).objects.get(pk=made.pk)
+    if how == "rafraîchie":
+        replaced_elsewhere(made, "intermediaire.png")
+        stale.refresh_from_db()
+    return stale
+
+
 @pytest.mark.django_db
-@pytest.mark.parametrize("reread", [True, False], ids=["lue en base", "créée puis enregistrée"])
+@pytest.mark.parametrize("how", ["lue en base", "créée puis enregistrée", "rafraîchie", "différée"])
 def test_une_instance_perimee_ne_supprime_pas_l_original_qu_un_autre_enregistrement_a_pose(
     portfolio: Project,
     image: ImageFactory,
-    reread: bool,
+    how: str,
     django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
 ) -> None:
     """Deux écrivains sur la même image — deux onglets de l'admin, l'admin et le worker de #12 :
     celui qui n'a pas touché à l'original ne le supprime pas, même quand la ligne en porte un
     autre que celui qu'il a lu. Seul ce que l'instance a remplacé sort du stockage. L'instance
-    périmée retient ce qu'elle a lu (`from_db`) ou écrit (`save`)."""
+    périmée retient l'original qu'elle a lu (`from_db`, `refresh_from_db` — chargement d'un champ
+    différé compris) ou écrit (`save`)."""
     made = image(portfolio)
     ready(made)
-    stale = type(made).objects.get(pk=made.pk) if reread else made
-    fresh = type(made).objects.get(pk=made.pk)
+    stale = stale_instance(made, how)
 
     with django_capture_on_commit_callbacks(execute=True):
-        fresh.original = image_upload("nouvelle.png")
-        fresh.save()
+        fresh = replaced_elsewhere(made, "nouvelle.png")
         stale.caption = "Une autre légende."
         stale.save()
 
     assert stored([fresh.original.name or ""]) == [True]
+
+
+@pytest.mark.django_db
+def test_une_instance_qui_reprend_l_original_de_la_ligne_ne_le_supprime_pas(
+    portfolio: Project,
+    image: ImageFactory,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    """Ce que la ligne référencera après l'écriture ne sort jamais du stockage : une instance
+    périmée à qui l'on rend le nom que la ligne porte déjà n'a rien remplacé."""
+    made = image(portfolio)
+    ready(made)
+    stale = type(made).objects.get(pk=made.pk)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        fresh = replaced_elsewhere(made, "nouvelle.png")
+        stale.original = fresh.original.name
+        stale.save()
+
+    assert stored([fresh.original.name or ""]) == [True]
+
+
+@pytest.mark.django_db
+def test_un_enregistrement_partiel_de_l_original_ecrit_ses_dimensions(
+    portfolio: Project, image: ImageFactory
+) -> None:
+    """Les règles de la couverture lisent les dimensions : l'original ne s'écrit jamais sans
+    elles."""
+    made = saved(image(portfolio))
+    loaded = type(made).objects.get(pk=made.pk)
+    loaded.original = image_upload(size=(1300, 1300))
+
+    loaded.save(update_fields=["original"])
+
+    row = type(made).objects.get(pk=made.pk)
+    assert (row.width, row.height) == (1300, 1300)
+
+
+@pytest.mark.django_db
+def test_un_enregistrement_partiel_accepte_des_champs_donnes_par_un_generateur(
+    portfolio: Project,
+) -> None:
+    """Django accepte tout itérable : le lire avant lui ne doit pas le vider."""
+    made = saved(gallery_image(portfolio))
+    made.caption = "Une autre légende."
+
+    made.save(update_fields=(field for field in ["caption"]))
+
+    assert GalleryImage.objects.get(pk=made.pk).caption == "Une autre légende."
+
+
+@pytest.mark.django_db
+def test_un_original_ecarte_d_un_enregistrement_partiel_reste_a_remplacer(
+    portfolio: Project,
+    image: ImageFactory,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    """L'enregistrement partiel qui n'écrit pas l'original ne fait pas croire à l'instance que la
+    ligne porte celui qu'elle tient : l'enregistrement complet qui suit le remplace pour de bon."""
+    made = image(portfolio)
+    names = ready(made)
+    loaded = type(made).objects.get(pk=made.pk)
+    loaded.original = image_upload("nouvelle.png")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        loaded.save(update_fields=["caption"])
+        loaded.save()
+
+    row = type(made).objects.get(pk=made.pk)
+    assert (row.state, row.variants) == (ProcessingState.PENDING, [])
+    assert stored(names) == [False, False]
+
+
+@pytest.mark.django_db
+def test_supprimer_une_image_deja_supprimee_ne_supprime_rien_de_plus(
+    portfolio: Project, django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks
+) -> None:
+    """Deux instances de la même ligne, supprimées l'une après l'autre : la seconde ne trouve plus
+    de ligne, et rien ne casse."""
+    made = gallery_image(portfolio)
+    names = ready(made)
+    first, second = (GalleryImage.objects.get(pk=made.pk) for _ in range(2))
+
+    with django_capture_on_commit_callbacks(execute=True):
+        first.delete()
+        second.delete()
+
+    assert stored(names) == [False, False]
 
 
 @pytest.mark.django_db
