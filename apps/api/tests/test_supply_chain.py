@@ -118,13 +118,17 @@ DEPENDABOT_FROM = re.compile(
 LEADING_OPTIONS = re.compile(r"^\s*(?:COPY|RUN)((?:\s+--\S+)+)", re.IGNORECASE)
 FROM_SOURCE = re.compile(r"(?:--|[,=])from=([^\s,]+)", re.IGNORECASE)
 
-# Un `ADD` qui télécharge, lu comme Docker : ses options en tête d'instruction, puis ses sources,
-# dont une adresse HTTP(S). BuildKit vérifie la somme d'un tel fichier avant de le copier quand les
-# options portent `--checksum=sha256:<somme>` (doc Docker, « ADD --checksum ») ; sans elle, le
-# fichier entre tel que le serveur le rend.
+# Un `ADD` qui télécharge, lu comme Docker : ses options en tête d'instruction, puis ses sources —
+# en liste d'arguments ou en tableau JSON —, dont une adresse HTTP(S). BuildKit vérifie la somme
+# d'un tel fichier avant de le copier quand les options portent `--checksum=sha256:<somme>` (doc
+# Docker, « ADD --checksum ») ; sans elle, le fichier entre tel que le serveur le rend.
 ADD_INSTRUCTION = re.compile(r"^\s*ADD(?P<options>(?:\s+--\S+)*)\s+(?P<sources>.*)$", re.IGNORECASE)
-REMOTE_SOURCE = re.compile(r"(?:^|\s)https?://", re.IGNORECASE)
+REMOTE_SOURCE = re.compile(r"(?:^|[\s\[\",])https?://", re.IGNORECASE)
 CHECKSUM_OPTION = re.compile(r"(?:^|\s)--checksum=sha256:[0-9a-f]{64}(?:\s|$)")
+
+# Un téléchargement par un `RUN` — `curl` ou `wget` vers une adresse HTTP(S) —, que rien ne
+# vérifie : tout téléchargement passe par `ADD --checksum`.
+RUN_DOWNLOAD = re.compile(r"^\s*RUN\b.*\b(?:curl|wget)\b[^&;|]*https?://", re.IGNORECASE)
 
 # `image:<version x.y.z>[-variante]@sha256:<empreinte>` — même règle que pour les actions : la
 # version la plus précise. Dependabot lit une épingle étiquette + empreinte comme « suivre les
@@ -286,12 +290,19 @@ def downloads(text: str) -> list[tuple[str, str]]:
 
 def download_findings(text: str) -> list[str]:
     """Les téléchargements d'un Dockerfile que BuildKit ne vérifie pas : les `ADD` d'une adresse
-    HTTP(S) dont les options ne portent pas de somme SHA-256 complète."""
-    return [
+    HTTP(S) dont les options ne portent pas de somme SHA-256 complète, et les `RUN` qui
+    téléchargent par `curl` ou `wget`."""
+    unchecked = [
         instruction
         for options, instruction in downloads(text)
         if not CHECKSUM_OPTION.search(options)
     ]
+    fetched = [
+        instruction
+        for _, instruction in dockerfile_instructions(text)
+        if RUN_DOWNLOAD.match(instruction)
+    ]
+    return unchecked + fetched
 
 
 def compose_services(text: str) -> dict[str, object]:
@@ -464,8 +475,19 @@ DOWNLOAD_FORMS = {
     "sans somme, source à la ligne": (BASE + f"ADD \\\n    {TOOL}\n", True),
     "en minuscules, sans somme": (BASE + f"add {TOOL}\n", True),
     "somme tronquée": (BASE + f"ADD --checksum=sha256:{SUM[:12]} {TOOL}\n", True),
-    "somme hors des options": (BASE + f"ADD {TOOL}--checksum=sha256:{SUM}\n", True),
+    "somme hors des options": (BASE + f"ADD {TOOL} --checksum=sha256:{SUM}\n", True),
     "adresse en seconde source": (BASE + f"ADD outil.tar.gz {TOOL}\n", True),
+    "JSON, somme épinglée": (
+        BASE + f'ADD --checksum=sha256:{SUM} ["https://exemple.org/outil", "/outil"]\n',
+        False,
+    ),
+    "JSON, sans somme": (BASE + 'ADD ["https://exemple.org/outil", "/outil"]\n', True),
+    "RUN curl": (BASE + "RUN curl -fsSLo /outil https://exemple.org/outil\n", True),
+    "RUN wget après un paquet": (
+        BASE + "RUN apk add curl && wget -qO- https://exemple.org/outil | tar -x\n",
+        True,
+    ),
+    "RUN qui installe curl": (BASE + "RUN apk add --no-cache curl\n", False),
 }
 
 DOCKERFILE_NAMES = {
@@ -745,7 +767,8 @@ def test_toute_image_copiee_passe_par_un_etage_nomme(dockerfile: Path) -> None:
 def test_chaque_telechargement_d_une_image_est_verifie_par_sa_somme(dockerfile: Path) -> None:
     """Un binaire sans image officielle entre par le fichier de sa release (`age`, `supercronic` :
     brief de #23, décision 1), que Dependabot ne suit pas : sa somme épinglée est la seule chose
-    qui l'empêche de changer en silence, chez l'éditeur ou en chemin."""
+    qui l'empêche de changer en silence, chez l'éditeur ou en chemin. Un `RUN curl` ou `wget`
+    n'en a aucune : tout téléchargement passe par `ADD --checksum`."""
     findings = download_findings(dockerfile.read_text(encoding="utf-8"))
 
     assert not findings, f"téléchargements sans somme : {findings}"

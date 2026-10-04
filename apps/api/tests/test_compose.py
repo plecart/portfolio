@@ -66,6 +66,12 @@ POSTGRES_PROBE_HOST = "-h 127.0.0.1"
 # décision 9).
 BACKUP_FORBIDDEN = {"POSTGRES_PASSWORD", "SECRET_KEY", "TUNNEL_TOKEN"}
 
+# Ce par quoi un service reçoit des valeurs que son `environment` ne nomme pas : un fichier
+# d'environnement, un service étendu, un secret ou une configuration de Compose — chacun peut lui
+# apporter un secret de l'application (formes mesurées à la relecture de la PR #73). `backup` ne
+# reçoit rien que par `environment` (brief de #23, décision 9).
+INDIRECT_CHANNELS = ["env_file", "extends", "secrets", "configs"]
+
 # Les adresses que le service `api` reçoit avec les noms de service. Sur le poste, `env_file`
 # apporte celles du `.env` (`127.0.0.1`), qui ne désignent rien depuis un conteneur, et
 # `environment:` les remplace ; en production, rien d'autre ne les apporte. Absentes, elles
@@ -177,14 +183,15 @@ def received_variables(service: dict[str, Any]) -> set[str]:
 
 
 def backup_secret_findings(text: str) -> list[str]:
-    """Les secrets de l'application que le service `backup` d'un fichier Compose recevrait.
+    """Ce par quoi le service `backup` d'un fichier Compose recevrait un secret de l'application.
 
     Returns:
-        Les variables de `BACKUP_FORBIDDEN` qu'il reçoit (`received_variables`), triées. Liste
-        vide : il ne connaît de la base que son rôle.
+        Les variables de `BACKUP_FORBIDDEN` qu'il reçoit (`received_variables`), triées, puis les
+        clés de `INDIRECT_CHANNELS` qu'il porte. Liste vide : il ne connaît de la base que son rôle.
     """
     service: dict[str, Any] = yaml.safe_load(text)["services"]["backup"]
-    return sorted(received_variables(service) & BACKUP_FORBIDDEN)
+    forbidden = sorted(received_variables(service) & BACKUP_FORBIDDEN)
+    return forbidden + [key for key in INDIRECT_CHANNELS if key in service]
 
 
 def environment_value(value: str) -> str:
@@ -273,6 +280,18 @@ BACKUP_SECRET_FORMS = {
     "liste, nom et valeur": (backup_service("    environment:\n      - TUNNEL_TOKEN=x\n"), True),
     "interpolé dans la sonde": (
         backup_service("    healthcheck:\n      test: [CMD, echo, $SECRET_KEY]\n"),
+        True,
+    ),
+    "fichier d'environnement": (backup_service("    env_file: [.env]\n"), True),
+    "service étendu": (backup_service("    extends: api\n"), True),
+    "secret de Compose": (
+        backup_service("    secrets: [app]\n")
+        + "secrets:\n  app:\n    environment: POSTGRES_PASSWORD\n",
+        True,
+    ),
+    "configuration de Compose": (
+        backup_service("    configs: [app]\n")
+        + "configs:\n  app:\n    environment: POSTGRES_PASSWORD\n",
         True,
     ),
 }
@@ -379,8 +398,11 @@ def test_backup_ne_recoit_aucun_secret_de_l_application() -> None:
     mot de passe de l'application, la clé de signature ou le jeton du Tunnel lui rendrait ce que ce
     rôle lui retire (brief de #23, décision 9)."""
     text = COMPOSE_PROD.read_text(encoding="utf-8")
+    backup = yaml.safe_load(text)["services"]["backup"]
 
-    assert received_variables(yaml.safe_load(text)["services"]["backup"]), "rien lu"
+    assert interpolated_names(backup), (
+        "aucune interpolation lue — le motif a-t-il cessé de mordre ?"
+    )
     assert backup_secret_findings(text) == []
 
 
