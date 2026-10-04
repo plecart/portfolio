@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, Self, overload
 from uuid import uuid4
 
 from config import strings
+from django import forms
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.core.files.storage import Storage
@@ -31,6 +32,10 @@ EXTENSIONS = {"JPEG": "jpg", "MPO": "jpg", "PNG": "png", "WEBP": "webp"}
 # Borne technique, qu'aucune source ne fixe (décision 6) : 10 Mo de 1 024² octets, ceux
 # qu'affiche `filesizeformat` de Django.
 MAX_SIZE = 10 * 1024 * 1024
+
+# Les types que le sélecteur de fichiers du navigateur propose : ceux des trois formats. Un
+# confort, pas une règle — le contenu reste seul juge.
+ACCEPTED_TYPES = "image/jpeg,image/png,image/webp"
 
 
 def validate_original(file: File[bytes]) -> None:
@@ -58,9 +63,9 @@ def original_extension(file: File[Any]) -> str:
     le fichier est rembobiné : `Storage.save`, qui suit la validation, attend un fichier « ready
     to be read from the beginning » (`django/core/files/storage/base.py`).
 
-    La restriction vaut pour cette lecture seulement : Django lit les dimensions d'un
-    téléversement (`get_image_dimensions`) et le champ de formulaire de l'admin l'ouvre
-    (`forms.ImageField`) avec tous les décodeurs de Pillow — limite connue de la décision 6.
+    La restriction vaut pour cette lecture seulement : Django lit ensuite les dimensions d'un
+    téléversement (`get_image_dimensions`) avec tous les décodeurs de Pillow — limite connue de la
+    décision 6. Un formulaire, lui, valide l'original avant cette lecture (`OriginalFormField`).
 
     Args:
         file: le fichier téléversé, lisible depuis le début.
@@ -140,6 +145,23 @@ class OriginalFile(ImageFieldFile):
         super().save(stored_name, content, save)
 
 
+class OriginalFormField(forms.FileField):
+    """Le champ de formulaire de l'original — celui de l'admin : un fichier, que jugent les seuls
+    validateurs du champ du modèle (`OriginalField.formfield`).
+
+    Il remplace `forms.ImageField`, le champ de formulaire d'`ImageField`, qui refuse un fichier
+    sans extension d'image connue et l'ouvre avec tous les décodeurs de Pillow (décision 6). Il
+    valide avant que le formulaire n'affecte le fichier au modèle (`construct_instance`) :
+    l'affectation en lit les dimensions avec Django (`get_image_dimensions`), qui laisse passer
+    l'exception de Pillow pour une bombe de décompression. Sans nouveau fichier, il rend l'original
+    stocké, sans le valider ni l'ouvrir (`forms.FileField.clean`, décision 9).
+    """
+
+    def widget_attrs(self, widget: forms.Widget) -> dict[str, Any]:
+        """Les attributs du sélecteur de fichiers : ceux de Django, et les types qu'il propose."""
+        return {**super().widget_attrs(widget), "accept": ACCEPTED_TYPES}
+
+
 class OriginalField(models.ImageField):
     """Le champ de l'original d'une image : `ImageField`, nommé par ce module, et qui ne relit
     jamais un fichier stocké.
@@ -167,6 +189,24 @@ class OriginalField(models.ImageField):
         @overload
         def __get__(self, instance: Any, owner: Any) -> Self: ...
         def __get__(self, instance: Any, owner: Any) -> Any: ...
+
+    def formfield(self, **kwargs: Any) -> forms.Field | None:
+        """Le champ de formulaire de l'original : `OriginalFormField`, que jugent les validateurs
+        de ce champ, sans borne sur la longueur du nom du fichier téléversé — le nom de l'auteur
+        n'est pas gardé (décision 7).
+
+        Args:
+            kwargs: ceux de `Field.formfield` ; l'admin y passe son widget de fichier.
+
+        Returns:
+            Le champ de formulaire.
+        """
+        defaults: dict[str, Any] = {
+            "form_class": OriginalFormField,
+            "validators": self.validators,
+            "max_length": None,
+        }
+        return super().formfield(**{**defaults, **kwargs})
 
     def run_validators(self, value: OriginalFile) -> None:
         """Les validateurs du champ, sur un téléversement seulement : un fichier stocké a été validé

@@ -17,7 +17,9 @@ from django.core.files.storage import FileSystemStorage, default_storage, storag
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.db.models import FETCH_PEERS
+from django.forms import ModelForm, modelform_factory
 from django.test import override_settings
+from django.utils.datastructures import MultiValueDict
 from factories import BLANK, SVG, cover, gallery_image, image_upload, project, saved
 from PIL import Image
 from pytest_django import DjangoCaptureOnCommitCallbacks
@@ -116,9 +118,9 @@ def test_une_bombe_de_decompression_est_refusee(monkeypatch: pytest.MonkeyPatch)
     """Pillow refuse de décoder une image dont l'en-tête annonce plus de deux fois
     `MAX_IMAGE_PIXELS` pixels, et quelques kilo-octets suffisent à en porter une : un refus du
     catalogue, jamais une exception de `validate_original`. L'affectation au modèle, elle, lit les
-    dimensions avec Django (`get_image_dimensions`), qui laisse passer l'exception — le formulaire
-    de l'admin la rattrape avant. La limite est abaissée le temps du test : un carré de 1200 px la
-    dépasse alors."""
+    dimensions avec Django (`get_image_dimensions`), qui laisse passer l'exception — un formulaire
+    valide l'original avant de l'affecter (`OriginalFormField`). La limite est abaissée le temps du
+    test : un carré de 1200 px la dépasse alors."""
     monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 1000)
 
     with pytest.raises(ValidationError) as refusal:
@@ -139,6 +141,82 @@ def test_un_original_valide_reste_pret_a_etre_lu_depuis_le_debut() -> None:
     validate_original(upload)
 
     assert upload.tell() == 0
+
+
+# Le formulaire d'une image, réduit à ce que l'auteur saisit : l'original et la légende.
+ImageForm = modelform_factory(GalleryImage, fields=("original", "caption"))
+
+
+def image_form(upload: SimpleUploadedFile) -> ModelForm[GalleryImage]:
+    """Le formulaire d'une image neuve, `upload` choisi pour original et la légende remplie, tel
+    que l'admin le reçoit."""
+    return ImageForm({"caption": "La fiche d'un projet."}, MultiValueDict({"original": [upload]}))
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "upload", [upload for _, upload in ACCEPTED], ids=[form for form, _ in ACCEPTED]
+)
+def test_le_formulaire_d_une_image_accepte_un_original_jpeg_png_ou_webp(
+    upload: SimpleUploadedFile,
+) -> None:
+    """Le formulaire juge l'original comme le modèle, à son contenu (décision 6) : un JPEG sans
+    extension compris, que le champ de formulaire de Django, `forms.ImageField`, refuse."""
+    form = image_form(upload)
+
+    assert form.is_valid(), form.errors
+
+
+# Ce que le formulaire refuse, avec le seul message du catalogue : chaque forme qu'un original
+# refuse.
+FORM_REFUSALS = [
+    *[(form, upload, strings.IMAGE_FORMAT_UNSUPPORTED) for form, upload in NOT_ACCEPTED],
+    ("plus de 10 Mo", upload_of_size(MAX_SIZE + 1), strings.IMAGE_TOO_LARGE),
+]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("upload", "message"),
+    [(upload, message) for _, upload, message in FORM_REFUSALS],
+    ids=[form for form, _, _ in FORM_REFUSALS],
+)
+def test_le_formulaire_d_une_image_refuse_un_original_avec_le_seul_message_du_catalogue(
+    upload: SimpleUploadedFile, message: str
+) -> None:
+    """Un refus, celui de l'original : jamais en plus celui de Django pour une image invalide."""
+    form = image_form(upload)
+
+    assert form.errors == {"original": [message]}
+
+
+@pytest.mark.django_db
+def test_le_formulaire_d_une_image_refuse_une_bombe_de_decompression(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Le formulaire valide l'original avant de l'affecter au modèle : affecté, il ferait lire ses
+    dimensions par Django (`get_image_dimensions`), qui laisse passer l'exception de Pillow."""
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 1000)
+
+    form = image_form(image_upload())
+
+    assert form.errors == {"original": [strings.IMAGE_TOO_MANY_PIXELS]}
+
+
+@pytest.mark.django_db
+def test_le_formulaire_d_une_image_ignore_la_longueur_du_nom_de_l_auteur() -> None:
+    """Le nom de l'auteur n'est pas gardé (décision 7) : sa longueur ne compte pas, là où
+    `forms.FileField` la borne à celle de la colonne, 100 caractères."""
+    form = image_form(image_upload(f"{'n' * 200}.png"))
+
+    assert form.is_valid(), form.errors
+
+
+def test_le_selecteur_de_fichiers_de_l_original_propose_les_trois_formats() -> None:
+    """Un confort : le sélecteur du navigateur filtre sur ces types ; le contenu reste seul juge."""
+    field = image_form(image_upload()).fields["original"]
+
+    assert field.widget.attrs["accept"] == "image/jpeg,image/png,image/webp"
 
 
 # Les règles que la base porte, communes aux deux modèles — une contrainte nommée chacune, par
@@ -458,6 +536,22 @@ def test_enregistrer_une_image_sans_changer_son_fichier_n_ouvre_pas_l_original(
 
     assert witness.opened == []
     assert (loaded.width, loaded.height) == (made.width, made.height)
+
+
+@pytest.mark.django_db
+def test_le_formulaire_d_une_image_dont_le_fichier_ne_change_pas_n_ouvre_pas_l_original(
+    portfolio: Project, witness: CountingStorage
+) -> None:
+    """Le même chemin, par le formulaire lui-même : sans nouveau fichier, son champ rend l'original
+    stocké sans le valider (décision 9)."""
+    made = saved(gallery_image(portfolio))
+    form = ImageForm(
+        {"caption": "Une autre légende."}, instance=GalleryImage.objects.get(pk=made.pk)
+    )
+
+    form.save()
+
+    assert witness.opened == []
 
 
 class Rollback(Exception):
