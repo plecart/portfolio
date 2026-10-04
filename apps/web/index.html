@@ -7,6 +7,10 @@
     <!-- Icône vide déclarée : sans elle, 404 sur `/favicon.ico` et bonnes pratiques à 96. -->
     <link rel="icon" href="data:," />
 
+    <!-- Mode forcé posé avant le premier rendu : script classique et bloquant, servi en fichier
+         par un chemin absolu — docs/frontend-outillage.md §2.4. -->
+    <script src="/theme.js"></script>
+
     <!-- Emplacement marqué du gabarit : #14 remplace tout le bloc entre les deux marqueurs.
          Contrat, valeurs par défaut et absence d'`og:image` : ADR 0008 « Aperçus de lien » et
          docs/frontend-outillage.md §2.4. Ce fichier part chez chaque visiteur — l'explication

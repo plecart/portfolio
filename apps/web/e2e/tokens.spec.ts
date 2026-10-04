@@ -1,5 +1,6 @@
 /**
- * Les jetons de la spec §2 et la base de page, mesurés sur la page servie.
+ * Le module « Jetons » mesuré sur la page servie : les jetons de la spec §2, la base de page, et le
+ * mode forcé restauré avant le premier rendu.
  *
  * Un jeton se lit **résolu** : appliqué à une propriété réelle d'un élément sonde, puis comparé à
  * la valeur que la spec écrit, appliquée de la même façon. Lire la propriété personnalisée brute
@@ -221,6 +222,122 @@ for (const state of PALETTE_STATES) {
     expect(ring).toEqual([expected, '3px'])
   })
 }
+
+/**
+ * Restauration du mode forcé, avant le premier rendu.
+ *
+ * Le script d'application est bloqué : ce qui reste visible est ce que voit le premier rendu,
+ * avant React. La seconde adresse prouve le chemin absolu du script — la même page est servie
+ * sous `/projets/<slug>`, où un chemin relatif rendrait la page elle-même par le repli SPA.
+ */
+for (const path of ['/', '/projets/exemple']) {
+  for (const system of ['light', 'dark'] as const) {
+    const stored = system === 'light' ? 'dark' : 'light'
+
+    test(`le mode mémorisé est en place avant le script d'application — ${path}, système ${system}`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme: system })
+      await page.addInitScript((mode) => localStorage.setItem('theme', mode), stored)
+      await page.route('**/assets/*.js', (route) => route.abort())
+
+      await page.goto(path)
+
+      const first = await page.evaluate(() => [
+        document.documentElement.dataset.theme,
+        getComputedStyle(document.documentElement).backgroundColor,
+        document.getElementById('root')?.innerHTML,
+      ])
+      const [background] = await resolveAll(page, [
+        ['background-color', specValue(SPEC_TOKENS['--bg'], stored)],
+      ])
+      // `#root` vide : le témoin que l'application n'a pas tourné.
+      expect(first).toEqual([stored, background, ''])
+    })
+  }
+}
+
+test('une valeur mémorisée autre que light ou dark est ignorée', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('theme', 'sepia'))
+
+  await page.goto('/')
+
+  expect(await page.evaluate(() => document.documentElement.hasAttribute('data-theme'))).toBe(false)
+})
+
+test('un stockage qui lève une exception ne casse rien', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  // Navigation privée, cookies bloqués : l'accès même à `localStorage` lève une exception.
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'localStorage', {
+      get() {
+        throw new DOMException('Stockage refusé', 'SecurityError')
+      },
+    })
+  })
+
+  await page.goto('/')
+
+  await expect(page.locator('h1')).toBeVisible()
+  expect([errors, await page.evaluate(() => document.documentElement.dataset.theme)]).toEqual([
+    [],
+    undefined,
+  ])
+})
+
+/**
+ * L'`index.html` compilé, lu par l'analyseur HTML du navigateur.
+ *
+ * La politique du site n'admet que des fichiers servis par le site (`default-src 'self'`, sans
+ * `unsafe-inline` — Caddyfile, #16) ; `vite preview` ne la pose pas, d'où ce contrôle sur le HTML
+ * lui-même.
+ */
+test("l'index compilé ne porte que des scripts servis en fichier, la restauration en tête", async ({
+  page,
+  request,
+}) => {
+  const html = await (await request.get('/')).text()
+
+  const inspection = await page.evaluate((source) => {
+    const doc = new DOMParser().parseFromString(source, 'text/html')
+    const elements = [...doc.querySelectorAll('*')]
+    const headNodes = [...doc.head.childNodes]
+    const marker = (text: string) =>
+      headNodes.findIndex((node) => node.nodeType === Node.COMMENT_NODE && node.textContent === text)
+    const restore = doc.head.querySelector('script[src="/theme.js"]')
+    const index = restore ? headNodes.indexOf(restore) : -1
+
+    return {
+      inlineScripts: [...doc.scripts].filter((script) => !script.hasAttribute('src')).length,
+      styles: doc.querySelectorAll('style').length,
+      styleAttributes: elements.filter((element) => element.hasAttribute('style')).length,
+      handlers: elements.flatMap((element) =>
+        [...element.attributes]
+          .filter((attribute) => attribute.name.startsWith('on'))
+          .map((attribute) => `${element.tagName} ${attribute.name}`),
+      ),
+      restore: restore && {
+        // Classique et bloquant : ni module, ni `async`, ni `defer` (brief de #18, décision 4).
+        blocking: ['type', 'async', 'defer'].every((name) => !restore.hasAttribute(name)),
+        outsidePreviewBlock: index < marker('meta:start') || index > marker('meta:end'),
+      },
+    }
+  }, html)
+  const script = await request.get('/theme.js')
+
+  expect(inspection).toEqual({
+    inlineScripts: 0,
+    styles: 0,
+    styleAttributes: 0,
+    handlers: [],
+    restore: { blocking: true, outsidePreviewBlock: true },
+  })
+  expect([script.status(), script.headers()['content-type']]).toEqual([
+    200,
+    expect.stringContaining('javascript'),
+  ])
+})
 
 test("l'anneau de focus n'apparaît pas au pointeur", async ({ page }) => {
   await page.goto('/')
