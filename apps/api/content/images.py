@@ -1,12 +1,16 @@
 """L'original d'une image de projet : le fichier que l'auteur téléverse, gardé tel quel.
 
 Seul module du dépôt qui importe Pillow (brief de #9, décision 12) : l'original y est reconnu à
-son contenu, jamais à son nom (décision 6).
+son contenu, jamais à son nom (décision 6), et nommé par l'application (décision 7).
 """
+
+from os import PathLike
+from uuid import uuid4
 
 from config import strings
 from django.core.exceptions import ValidationError
 from django.core.files import File
+from django.db import models
 from PIL import Image, UnidentifiedImageError
 
 # Les formats qu'accepte un original, au nom que leur donne Pillow, et l'extension de chacun : un
@@ -62,3 +66,34 @@ def original_extension(file: File[bytes]) -> str:
         ) from error
     finally:
         file.seek(0)
+
+
+class OriginalField(models.ImageField):
+    """Le champ de l'original d'une image : `ImageField`, nommé par ce module.
+
+    Son nom de stockage ne reprend rien de celui de l'auteur (décision 7, `generate_filename`).
+    Les dimensions restent remplies par Django (`width_field`, `height_field`, décision 8).
+    """
+
+    def generate_filename(self, instance: models.Model, filename: str | PathLike[str]) -> str:
+        """`images/<identifiant aléatoire>/original.<extension du format reconnu>`.
+
+        Le nom de l'auteur est ignoré : `django-storages` écrase par défaut un objet de même nom,
+        l'extension donne son type au fichier servi, et un nom neuf à chaque téléversement donne
+        une adresse dont le contenu ne change jamais, qui se met en cache sans purge. Le worker de
+        #12 range ses variantes où il le décide — le dossier de l'original s'y prête.
+
+        Args:
+            instance: l'image dont le téléversement s'enregistre ; son champ porte le fichier.
+            filename: le nom que l'auteur a donné au fichier, ignoré.
+
+        Returns:
+            Le nom sous lequel le stockage enregistre l'original.
+
+        Raises:
+            ValidationError: code `image_format_unsupported`, pour un fichier qui n'est pas une
+                image JPEG, PNG ou WebP enregistré sans validation : sans format, pas de nom, et
+                rien n'est stocké.
+        """
+        extension = original_extension(getattr(instance, self.attname))
+        return super().generate_filename(instance, f"images/{uuid4().hex}/original.{extension}")

@@ -66,3 +66,38 @@ n'enregistre rien, une ligne titrée sans texte est refusée.
 | ancre | `anchor` | lettres sans accent, chiffres et traits d'union, une fois au plus par projet ; préremplie depuis le titre d'une ligne neuve, toujours modifiable, elle ne suit pas un titre retouché — le site et le RAG y renvoient par `#s-<ancre>` |
 | corps | `body` | Markdown, sans borne de longueur, gardé tel que saisi ; jamais vide ni fait d'espaces seulement — une espace insécable seule y compte comme un texte (locale de l'image) |
 | position | `position` | comme celle d'une technologie de projet : cachée dans l'écran Projet, elle suit l'ordre affiché à l'enregistrement ; l'ordre stocké suit la position, puis l'ordre de saisie |
+
+## Image — `ProjectImage`
+
+Ce que la couverture et l'image de galerie ont en commun, défini une fois. L'original est gardé
+tel que téléversé, à l'octet près, jamais recadré ni réencodé (spec §1.11) ; le worker en produit
+les variantes.
+
+| Terme | Identifiant | Règle |
+|---|---|---|
+| original | `original` | image JPEG, PNG ou WebP, reconnue à son contenu, jamais à son nom ; 10 Mo au plus ; stockée sous un nom engendré — `images/<identifiant aléatoire>/original.<extension du format>` —, nouveau à chaque téléversement |
+| largeur, hauteur | `width`, `height` | en pixels, lues dans l'original téléversé, jamais saisies |
+| légende | `caption` | obligatoire, 50 caractères au plus, jamais faite d'espaces seulement ; elle sert de texte alternatif |
+| état | `state` | en attente `pending` · prêt `ready` · échec `failed` ; une image naît en attente ; seul le worker le fait avancer |
+| variantes | `variants` | liste d'objets `{name, width, height}` — `name` est le nom de stockage de la variante —, vide sauf à l'état prêt ; seul le worker l'écrit |
+
+## Couverture — `Cover`
+
+L'image d'un projet : la photo de sa carte, la première image de sa galerie et son `og:image`
+(spec §1.11). Une par projet (`project.cover`) ; supprimer le projet la supprime.
+
+| Terme | Identifiant | Règle |
+|---|---|---|
+| projet | `project` | une couverture par projet |
+| forme | `width`, `height` | carrée — largeur égale à la hauteur —, 1200 px de côté au moins |
+
+## Image de galerie — `GalleryImage`
+
+Une image de la galerie d'un projet (`project.gallery`), à sa place dans la galerie ; le site
+l'affiche entière dans le cadre carré, sur fond neutre (spec §1.11). Supprimer le projet supprime
+sa galerie.
+
+| Terme | Identifiant | Règle |
+|---|---|---|
+| projet | `project` | un projet en porte autant qu'il veut |
+| position | `position` | comme celle d'une technologie de projet : l'ordre stocké suit la position, puis l'ordre de saisie |

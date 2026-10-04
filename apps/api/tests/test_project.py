@@ -30,7 +30,7 @@ CREATED_AT = datetime(2026, 9, 1, 9, 0, tzinfo=UTC)
 UPDATED_AT = datetime(2026, 9, 2, 18, 30, tzinfo=UTC)
 
 # Les champs d'un projet, dans l'ordre de leur déclaration : ceux du PRD (« Modèle de contenu »),
-# moins la couverture (#9), plus la clé et les horodatages.
+# moins la couverture, qui vit à part (`Cover`, un-pour-un), plus la clé et les horodatages.
 PROJECT_FIELDS = [
     "id",
     "title",
