@@ -5,10 +5,11 @@ Lancé par `make image-test`, jamais par `make test` : il lui faut les images qu
 chargées — `backup`, et `caddy` pour le témoin de ping. Le job `infra` de la CI le lance après son
 build ; sur un poste, `make build` d'abord.
 
-La pile est le Compose de production, résolu avec son modèle de `.env` et surchargé par `backup.yml` :
-`postgres` et `backup` y gardent leur image, leur sonde et leurs variables, dont le test ne remplace
-que les valeurs. Aucun service externe : un témoin S3 et un témoin de ping en tiennent lieu. Elle
-tourne sous son propre nom de projet, sans port publié : le test agit par `docker compose exec`.
+La pile est le Compose de production, résolu avec son modèle de `.env` et surchargé par
+`backup.yml` : `postgres` et `backup` y gardent leur image, leur sonde et leurs variables, dont le
+test ne remplace que les valeurs. Aucun service externe : un témoin S3 et un témoin de ping en
+tiennent lieu. Elle tourne sous son propre nom de projet, sans port publié : le test agit par
+`docker compose exec`.
 """
 
 import json
@@ -16,6 +17,7 @@ import os
 import re
 import secrets
 import subprocess
+import time
 import uuid
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
@@ -30,8 +32,8 @@ INFRA = Path(__file__).parents[1]
 COMPOSE_PROD = INFRA / "compose.yml"
 PROD_ENV_EXAMPLE = INFRA / "prod.env.example"
 STACK = Path(__file__).with_name("backup.yml")
-# Un nom par lancement : deux lancements simultanés sur le même moteur ne se partagent ni conteneurs,
-# ni réseau, ni volume, et l'arrêt de l'un n'emporte pas l'autre.
+# Un nom par lancement : deux lancements simultanés sur le même moteur ne se partagent ni
+# conteneurs, ni réseau, ni volume, et l'arrêt de l'un n'emporte pas l'autre.
 PROJECT = f"portfolio-test-backup-{uuid.uuid4().hex[:8]}"
 
 # Les valeurs du modèle que le test ne remplace pas : la base sauvegardée, qui nomme les objets
@@ -47,8 +49,8 @@ S3_ROOT = "/tmp/s3"
 WITNESS_TABLE = "temoin_de_sauvegarde"
 
 # Ce que le test donne à la pile, par-dessus le modèle : le rôle de sauvegarde et les adresses des
-# témoins. Les clés du témoin S3 sont tirées à chaque lancement, assez longues pour qu'il les accepte
-# — mesuré le 2026-10-03 : une paire trop courte y est refusée en 403.
+# témoins. Les clés du témoin S3 sont tirées à chaque lancement, assez longues pour qu'il les
+# accepte — mesuré le 2026-10-03 : une paire trop courte y est refusée en 403.
 STACK_VALUES = {
     "BACKUP_POSTGRES_USER": "sauvegarde",
     "BACKUP_POSTGRES_PASSWORD": secrets.token_hex(16),
@@ -74,7 +76,7 @@ class Run:
 
 @dataclass(frozen=True)
 class Stack:
-    """La pile démarrée : l'environnement qui la désigne à Compose, et la clé privée `age` du test."""
+    """La pile démarrée : l'environnement qui la désigne à Compose, la clé privée `age` du test."""
 
     environment: Mapping[str, str]
     identity: str
@@ -127,8 +129,8 @@ class Stack:
         return sum(1 for entry in entries if entry.get("request", {}).get("uri") == path)
 
     def restored_listing(self, bucket: str, name: str) -> str:
-        """La table des matières de l'archive d'un objet : déchiffrée par la clé privée du test, puis
-        lue par le `pg_restore` du Postgres de production, celui qui la restaurera (#24)."""
+        """La table des matières de l'archive d'un objet : déchiffrée par la clé privée du test,
+        puis lue par le `pg_restore` du Postgres de production, celui qui la restaurera (#24)."""
         decrypted = self.compose(
             "exec",
             "-T",
@@ -137,7 +139,8 @@ class Stack:
             "s3",
             "sh",
             "-c",
-            'printf "%s\\n" "$AGE_IDENTITY" > /tmp/identity && age --decrypt --identity /tmp/identity "$0"',
+            'printf "%s\\n" "$AGE_IDENTITY" > /tmp/identity'
+            ' && age --decrypt --identity /tmp/identity "$0"',
             f"{S3_ROOT}/{bucket}/{name}",
         )
         decrypted.check_returncode()
@@ -220,7 +223,7 @@ def stack() -> Iterator[Stack]:
 
 
 def major_version(printed: str) -> str:
-    """La majeure d'une sortie `--version` de PostgreSQL : `pg_dump (PostgreSQL) 16.15` rend `16`."""
+    """La majeure d'une sortie `--version` de PostgreSQL : `pg_dump (PostgreSQL) 16.15` → `16`."""
     found = re.search(r"\(PostgreSQL\) (\d+)\.", printed)
     assert found, printed
     return found[1]
@@ -235,9 +238,9 @@ def production_probe() -> list[str]:
 
 
 def test_pg_dump_est_de_la_majeure_du_postgres_de_production(stack: Stack) -> None:
-    """Une archive écrite par un `pg_dump` plus récent n'est pas garantie lisible par un serveur plus
-    ancien (doc PostgreSQL 16, « pg_dump », Notes) : la restauration (#24) se fait dans ce serveur-ci.
-    Les deux binaires, interrogés dans leurs images (décision 2)."""
+    """Une archive écrite par un `pg_dump` plus récent n'est pas garantie lisible par un serveur
+    plus ancien (doc PostgreSQL 16, « pg_dump », Notes) : la restauration (#24) se fait dans ce
+    serveur-ci. Les deux binaires, interrogés dans leurs images (décision 2)."""
     client = stack.output("exec", "-T", "backup", "pg_dump", "--version")
     server = stack.output("exec", "-T", "postgres", "postgres", "--version")
 
@@ -283,12 +286,65 @@ def test_une_etape_qui_echoue_arrete_la_chaine_sans_objet_ni_ping(
     assert stack.leftovers() == []
 
 
+# Les signaux qui interrompent une exécution lancée à la main — `Ctrl-C`, terminal fermé, `kill`.
+# Un shell non interactif qui les reçoit sans les piéger sort sans jouer son `trap … EXIT` (mesuré à
+# la relecture de la PR #73, busybox `ash`).
+SIGNALS = ["INT", "TERM", "HUP"]
+
+# Une base qui ne répond pas — une adresse réservée à la documentation (RFC 5737) —, et le délai au
+# bout duquel `pg_dump` y renonce : assez long pour que le signal tombe pendant le dump.
+UNREACHABLE_DATABASE = {"PGHOST": "192.0.2.1", "PGCONNECT_TIMEOUT": "5"}
+
+# Le temps laissé à la chaîne pour créer ses fichiers de travail.
+STARTUP_DEADLINE = 10.0
+
+
+@pytest.mark.parametrize("signal", SIGNALS)
+def test_une_sauvegarde_interrompue_ne_laisse_aucun_fichier_de_travail(
+    stack: Stack, signal: str
+) -> None:
+    """Le dump en clair ne survit pas à l'exécution, même interrompue (décision 4) : le signal
+    arrive pendant le dump, la chaîne sort en échec et ses fichiers de travail disparaissent."""
+    options = [option for item in UNREACHABLE_DATABASE.items() for option in ("-e", "=".join(item))]
+    running = subprocess.Popen(
+        compose_command("exec", "-T", *options, "backup", "backup.sh"),
+        env=stack.environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    deadline = time.monotonic() + STARTUP_DEADLINE
+    while not stack.leftovers():
+        assert time.monotonic() < deadline, "la chaîne n'a créé aucun fichier de travail"
+        time.sleep(0.2)
+    stack.output("exec", "-T", "backup", "pkill", f"-{signal}", "-f", "backup.sh")
+    running.communicate(timeout=30)
+
+    assert running.returncode != 0
+    assert stack.leftovers() == []
+
+
+def test_supercronic_lance_la_chaine_chaque_nuit(stack: Stack) -> None:
+    """`supercronic` est le processus du conteneur, et sa table lance la chaîne chaque nuit à 03:00
+    (décision 8) : une autre commande d'image, ou une table qui lance autre chose, laisserait la
+    pile saine sans qu'aucune sauvegarde ne parte — seule l'absence de ping le dirait."""
+    jobs = [
+        line
+        for line in stack.output("exec", "-T", "backup", "cat", "/etc/crontab").splitlines()
+        if line.strip() and not line.startswith("#")
+    ]
+
+    assert stack.output("exec", "-T", "backup", "cat", "/proc/1/comm").strip() == "supercronic"
+    stack.output("exec", "-T", "backup", "supercronic", "-test", "/etc/crontab")
+    assert jobs == ["0 3 * * * backup.sh"]
+
+
 def test_une_sauvegarde_reussie_laisse_un_objet_chiffre_lisible_et_un_seul_ping(
     stack: Stack,
 ) -> None:
-    """La chaîne complète, contre les témoins : un objet au nom du contrat avec #24, que la clé privée
-    déchiffre en une archive que `pg_restore` lit — la base entière, table témoin comprise —, puis
-    un ping, un seul. Les fichiers de travail, dump en clair compris, ne survivent pas à l'exécution."""
+    """La chaîne complète, contre les témoins : un objet au nom du contrat avec #24, que la clé
+    privée déchiffre en une archive que `pg_restore` lit — la base entière, table témoin comprise —,
+    puis un ping, un seul. Les fichiers de travail, dump en clair compris, ne survivent pas à
+    l'exécution."""
     run = stack.backup()
 
     assert run.process.returncode == 0, run.log

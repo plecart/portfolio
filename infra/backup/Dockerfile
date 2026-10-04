@@ -40,13 +40,14 @@ COPY --from=rclone /usr/local/bin/rclone /usr/local/bin/rclone
 # s'engendre hors du VPS, où la clé privée ne vient jamais (ADR 0007, point 2).
 COPY --from=age /tmp/age/age /tmp/age/age-keygen /usr/local/bin/
 ADD --checksum=sha256:a53ae236602c7338aba3fbaff40bda6300eae3b9fedb8261eb06cfe3724430c1 --chmod=755 \
-    https://github.com/aptible/supercronic/releases/download/v0.2.49/supercronic-linux-amd64 /usr/local/bin/supercronic
+    https://github.com/aptible/supercronic/releases/download/v0.2.49/supercronic-linux-amd64 \
+    /usr/local/bin/supercronic
 
 COPY --chmod=755 infra/backup/backup.sh /usr/local/bin/backup.sh
 COPY infra/backup/crontab /etc/crontab
 
-# Utilisateur système, sans mot de passe ni dossier personnel : la chaîne n'écrit que ses fichiers de
-# travail, dans `/tmp`.
+# Utilisateur système, sans mot de passe ni dossier personnel : la chaîne n'écrit que ses fichiers
+# de travail, dans `/tmp`.
 RUN adduser -S -D -H backup
 USER backup
 
