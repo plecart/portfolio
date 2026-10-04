@@ -223,11 +223,13 @@ ces noms tombent dans un espace de noms de Tailwind (`--shadow-*` : `--shadow-re
 aucun utilitaire nommé. Les composants les lisent par la syntaxe `(--jeton)` de Tailwind 4 :
 `bg-(--paper)`, `ease-(--ease-out)`.
 
-Tailwind, lui, perd ses couleurs et ses courbes (`--color-*: initial`, `--ease-*: initial`, dans
-le `@theme` d'`index.css`). Sans cela, il émettait son propre `--ease-out`,
-`cubic-bezier(0, 0, .2, 1)`, dès qu'une classe `ease-out` apparaissait dans les sources, et toute
-classe de palette (`bg-red-500`) apportait une couleur étrangère à la spec — mesuré, Tailwind
-4.3.3, 2026-10-04. Sa transition par défaut (`transition-colors` sans durée ni courbe) lit
+Tailwind, lui, perd ses couleurs, ses ombres, ses animations et ses courbes : `--color-*`,
+`--shadow-*`, `--inset-shadow-*`, `--drop-shadow-*`, `--text-shadow-*`, `--animate-*` et
+`--ease-*` valent `initial` dans le `@theme` d'`index.css` — les seuls espaces de noms de son
+thème qui portent une couleur, une durée ou une courbe. Sans cela, il émettait son propre
+`--ease-out`, `cubic-bezier(0, 0, .2, 1)`, dès qu'une classe `ease-out` apparaissait dans les
+sources, et `bg-red-500`, `shadow-lg` ou `animate-spin` apportaient des valeurs étrangères à la
+spec — mesuré, Tailwind 4.3.3, 2026-10-04. Sa transition par défaut (`transition-colors` sans durée ni courbe) lit
 `--dur-fast` et `--ease-out`. C'est l'une des trois portes de la règle des valeurs
 (CONTRIBUTING.md, « Valeurs du front ») ; les deux autres, ESLint et le balayage des feuilles CSS,
 lisent les motifs de `forbidden-values.json`.

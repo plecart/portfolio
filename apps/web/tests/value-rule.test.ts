@@ -4,25 +4,41 @@
  *
  * Trois portes sur une même population. ESLint (`no-restricted-syntax`) lit les littéraux et les
  * gabarits de `src/` — classes et styles ; un balayage lit toute autre feuille CSS de `src/` ; les
- * deux appliquent les motifs de `forbidden-values.json`. Tailwind, enfin, n'a plus de couleurs ni
- * de courbes à lui (`@theme` de `index.css`), et sa transition par défaut lit les jetons.
+ * deux appliquent les motifs de `forbidden-values.json`, sans tenir compte de la casse. Tailwind,
+ * enfin, n'a plus ni couleurs, ni ombres, ni animations, ni courbes à lui (`@theme` de
+ * `index.css`), et sa transition par défaut lit les jetons.
  *
- * Dénombrement du 2026-10-04 : **17 formes** d'une couleur, d'une durée ou d'une courbe écrite en
- * dur dans ce front, **13 couvertes**. Dans un composant (classe, style ou gabarit), 9 :
- * hexadécimal, fonction de couleur, durée à unité, durée numérique de Tailwind, fonction de courbe,
- * `ease-linear`, classe de palette et courbe par défaut de Tailwind, transition par défaut de
- * Tailwind. Dans une feuille CSS, 4 : hexadécimal, fonction de couleur, durée à unité, fonction de
- * courbe. **4 hors portée**, à ne jamais supposer couvertes : couleur nommée (`red`, `white`) dans
- * un composant et dans une feuille CSS, couleur système (`Canvas`), mot-clé de courbe en style
- * (`ease`). Hors de tout dénombrement, comme pour toute règle qui lit du texte : une valeur
- * assemblée par une expression ou passée par une variable.
+ * Dénombrement du 2026-10-04, repris à la seconde relecture : **20 formes** d'une couleur, d'une
+ * ombre, d'une durée ou d'une courbe écrite en dur dans ce front, **15 couvertes**. Dans un
+ * composant — classe, valeurs arbitraires comprises, où `_` tient lieu d'espace ; style ;
+ * gabarit —, 11 : hexadécimal ; fonction de couleur ; classe de palette de Tailwind ; ombre par
+ * défaut de Tailwind (`shadow-*`, `inset-shadow-*`, `drop-shadow-*`, `text-shadow-*`) ; durée à
+ * unité ; durée numérique de Tailwind ; animation par défaut de Tailwind ; fonction de courbe ;
+ * courbe par défaut de Tailwind ; `ease-linear` ; transition par défaut de Tailwind. Dans une
+ * feuille CSS, 4 : hexadécimal, fonction de couleur, durée à unité, fonction de courbe.
+ * **5 hors portée**, à ne jamais supposer couvertes : couleur nommée (`red`, `white`) dans un
+ * composant et dans une feuille CSS ; couleur système (`Canvas`) ; mot-clé de courbe (`ease`,
+ * `linear`) dans un composant et dans une feuille CSS. Hors de tout dénombrement, comme pour toute
+ * règle qui lit du texte : une valeur assemblée par une expression ou passée par une variable.
+ *
+ * Faux positifs connus, refusés à tort : une ancre ou un fragment fait de lettres hexadécimales
+ * (`#add`, `#face`), un texte « #123 » ou « 2s », `duration-0`. Les écrire autrement — aucun motif
+ * simple ne les distingue d'une valeur.
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { compile } from 'tailwindcss'
-import { describe, expect, test } from 'vitest'
-import { APP_ROOT, lintRuleIds, readAppJson } from './app-files.ts'
+import { beforeAll, describe, expect, test } from 'vitest'
+import {
+  APP_ROOT,
+  LINT_WARM_UP_MS,
+  lintRuleIds,
+  readAppJson,
+  warmUpLint,
+} from './app-files.ts'
+
+beforeAll(warmUpLint, LINT_WARM_UP_MS)
 
 /** Une forme interdite : son nom, rendu dans le message d'ESLint, et son motif. */
 type ForbiddenValue = { name: string; pattern: string }
@@ -38,7 +54,7 @@ const SRC = join(APP_ROOT, 'src')
 function forbiddenIn(css: string): string[] {
   const code = css.replace(/\/\*[\s\S]*?\*\//g, '')
 
-  return FORBIDDEN_VALUES.filter(({ pattern }) => new RegExp(pattern).test(code)).map(
+  return FORBIDDEN_VALUES.filter(({ pattern }) => new RegExp(pattern, 'i').test(code)).map(
     ({ name }) => name,
   )
 }
@@ -60,6 +76,15 @@ describe('ESLint refuse une valeur en dur dans un composant', () => {
     ['linear() en style', "<p style={{ transitionTimingFunction: 'linear(0, 1)' }} />"],
     ['ease-linear en classe', '<p className="ease-linear" />'],
     ['hexadécimal après une expression de gabarit', '`${base} bg-[#2a2622]`'],
+    // Dans une valeur arbitraire, Tailwind lit `_` comme une espace.
+    ['fonction de couleur après `_`', '<p className="shadow-[0_1px_rgb(0,0,0)]" />'],
+    ['durée entre `_`', '<p className="[transition:opacity_200ms]" />'],
+    ['durée d’une animation arbitraire', '<p className="animate-[spin_1s_linear_infinite]" />'],
+    ['courbe après `_`', '<p className="[transition:all_var(--dur)_cubic-bezier(.4,0,.2,1)]" />'],
+    ['hexadécimal avant `_`', '<p className="shadow-[0_0_0_#fff_inset]" />'],
+    // CSS ne tient pas compte de la casse des fonctions ni des unités.
+    ['fonction de couleur en capitales', "<p style={{ color: 'RGB(42, 38, 34)' }} />"],
+    ['unité en capitale', "<p style={{ transition: 'opacity .2S' }} />"],
   ])('%s', async (_, code) => {
     expect(await lintComponent(`export const probe = ${code}`)).toContain('no-restricted-syntax')
   })
@@ -129,13 +154,23 @@ async function generates(className: string): Promise<boolean> {
   return withClass.build([className]) !== bare.build([])
 }
 
-describe("Tailwind n'apporte ni couleur ni courbe à lui", () => {
-  test.each(['bg-red-500', 'text-white', 'border-black', 'ease-in', 'ease-out', 'ease-in-out'])(
-    '%s ne produit rien',
-    async (className) => {
-      expect(await generates(className)).toBe(false)
-    },
-  )
+describe("Tailwind n'apporte ni couleur, ni ombre, ni animation, ni courbe à lui", () => {
+  test.each([
+    'bg-red-500',
+    'text-white',
+    'border-black',
+    'shadow-lg',
+    'inset-shadow-sm',
+    'drop-shadow-md',
+    'text-shadow-md',
+    'animate-spin',
+    'animate-ping',
+    'ease-in',
+    'ease-out',
+    'ease-in-out',
+  ])('%s ne produit rien', async (className) => {
+    expect(await generates(className)).toBe(false)
+  })
 
   test('une classe sur un jeton produit sa règle', async () => {
     expect(await generates('bg-(--paper)')).toBe(true)

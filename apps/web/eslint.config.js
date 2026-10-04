@@ -17,13 +17,14 @@ import forbiddenValues from './forbidden-values.json' with { type: 'json' }
 // Règle des valeurs : aucune couleur, durée ou courbe en dur dans un composant — elles viennent
 // des jetons de `src/tokens.css` (spec §2). Chaque motif de `forbidden-values.json`, que le
 // balayage des feuilles CSS lit aussi, vise les chaînes et les gabarits : classes et styles.
-// esquery ne garde pas les antislashs d'une expression régulière de sélecteur, d'où des motifs
-// faits de classes entre crochets. Formes couvertes et hors portée : tests/value-rule.test.ts.
+// Insensibles à la casse, comme CSS l'est pour ses fonctions et ses unités. esquery ne garde pas
+// les antislashs d'une expression régulière de sélecteur, d'où des motifs faits de classes entre
+// crochets. Formes couvertes et hors portée : tests/value-rule.test.ts.
 const valueSelectors = forbiddenValues.flatMap(({ name, pattern }) => {
   const message = `Valeur en dur (${name}) : passer par un jeton de src/tokens.css (spec §2).`
   return [
-    { selector: `Literal[value=/${pattern}/]`, message },
-    { selector: `TemplateElement[value.raw=/${pattern}/]`, message },
+    { selector: `Literal[value=/${pattern}/i]`, message },
+    { selector: `TemplateElement[value.raw=/${pattern}/i]`, message },
   ]
 })
 

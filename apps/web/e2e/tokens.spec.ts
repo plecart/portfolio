@@ -230,6 +230,11 @@ for (const state of PALETTE_STATES) {
  * avant React. La seconde adresse prouve le chemin absolu du script — la même page est servie
  * sous `/projets/<slug>`, où un chemin relatif rendrait la page elle-même par le repli SPA.
  */
+/** Relève, là où il s'exécute, le mode posé et le fond de page calculé. */
+const RECORD =
+  'globalThis.firstRender = [document.documentElement.dataset.theme, ' +
+  'getComputedStyle(document.documentElement).backgroundColor]'
+
 for (const path of ['/', '/projets/exemple']) {
   for (const system of ['light', 'dark'] as const) {
     const stored = system === 'light' ? 'dark' : 'light'
@@ -240,19 +245,29 @@ for (const path of ['/', '/projets/exemple']) {
       await page.emulateMedia({ colorScheme: system })
       await page.addInitScript((mode) => localStorage.setItem('theme', mode), stored)
       await page.route('**/assets/*.js', (route) => route.abort())
+      // Le relevé se fait à l'ouverture de `<body>`, avant tout rendu : lu après le chargement,
+      // il accepterait un script qui différerait son travail (`DOMContentLoaded`) — et le flash
+      // qui va avec. Script en ligne propre au scénario : `vite preview` ne pose pas la CSP.
+      await page.route(
+        (url) => url.pathname === path,
+        async (route) => {
+          const response = await route.fetch()
+          const html = (await response.text()).replace('<body>', `<body><script>${RECORD}</script>`)
+          await route.fulfill({ response, body: html })
+        },
+      )
 
       await page.goto(path)
 
-      const first = await page.evaluate(() => [
-        document.documentElement.dataset.theme,
-        getComputedStyle(document.documentElement).backgroundColor,
+      const [first, root] = await page.evaluate(() => [
+        (globalThis as unknown as { firstRender: string[] }).firstRender,
         document.getElementById('root')?.innerHTML,
       ])
       const [background] = await resolveAll(page, [
         ['background-color', specValue(SPEC_TOKENS['--bg'], stored)],
       ])
       // `#root` vide : le témoin que l'application n'a pas tourné.
-      expect(first).toEqual([stored, background, ''])
+      expect([first, root]).toEqual([[stored, background], ''])
     })
   }
 }
