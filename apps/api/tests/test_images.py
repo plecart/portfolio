@@ -16,6 +16,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage, default_storage, storages
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
+from django.db.models import FETCH_PEERS
 from django.test import override_settings
 from factories import BLANK, SVG, cover, gallery_image, image_upload, project, saved
 from PIL import Image
@@ -647,13 +648,22 @@ def replaced_elsewhere(made: ProjectImage, name: str) -> ProjectImage:
     return other
 
 
-def stale_instance(made: ProjectImage, how: str) -> ProjectImage:
-    """Une instance de la ligne de `made`, de la façon `how`, que la suite rendra périmée."""
+def stale_instance(image: ImageFactory, made: ProjectImage, how: str) -> ProjectImage:
+    """Une instance de la ligne de `made`, de la façon `how`, que la suite rendra périmée ;
+    `image` fabrique une ligne du même modèle."""
     if how == "créée puis enregistrée":
         return made
     if how == "différée":
         stale = type(made).objects.only("id", "caption").get(pk=made.pk)
         assert stale.original.name  # le chargement à la demande passe par `refresh_from_db`
+        return stale
+    if how == "différée par lot":
+        # Une seule ligne se recharge seule (`refresh_from_db`) : un pair, sur un autre projet,
+        # fait charger l'original du lot d'une requête, sans elle (`DeferredAttribute.fetch_many`).
+        saved(image(saved(project(slug="pair"))))
+        lot = list(type(made).objects.all().fetch_mode(FETCH_PEERS).only("id", "caption"))
+        stale = next(row for row in lot if row.pk == made.pk)
+        assert stale.original.name
         return stale
     stale = type(made).objects.get(pk=made.pk)
     if how == "rafraîchie":
@@ -663,7 +673,9 @@ def stale_instance(made: ProjectImage, how: str) -> ProjectImage:
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("how", ["lue en base", "créée puis enregistrée", "rafraîchie", "différée"])
+@pytest.mark.parametrize(
+    "how", ["lue en base", "créée puis enregistrée", "rafraîchie", "différée", "différée par lot"]
+)
 def test_une_instance_perimee_ne_supprime_pas_l_original_qu_un_autre_enregistrement_a_pose(
     portfolio: Project,
     image: ImageFactory,
@@ -672,12 +684,17 @@ def test_une_instance_perimee_ne_supprime_pas_l_original_qu_un_autre_enregistrem
 ) -> None:
     """Deux écrivains sur la même image — deux onglets de l'admin, l'admin et le worker de #12 :
     celui qui n'a pas touché à l'original ne le supprime pas, même quand la ligne en porte un
-    autre que celui qu'il a lu. Seul ce que l'instance a remplacé sort du stockage. L'instance
-    périmée retient l'original qu'elle a lu (`from_db`, `refresh_from_db` — chargement d'un champ
-    différé compris) ou écrit (`save`)."""
+    autre que celui qu'il a lu. Seul ce que l'instance a remplacé sort du stockage.
+
+    Les voies par lesquelles un nom d'original stocké arrive sur une instance, recensées dans
+    Django 6.1 : quatre, toutes ici — lecture (`from_db`), écriture (`save`), relecture
+    (`refresh_from_db`, rafraîchie ou champ différé chargé seul) et chargement d'un champ différé
+    avec ses pairs (`FETCH_PEERS`, `DeferredAttribute.fetch_many`), qui ne passe par aucune
+    méthode du modèle : l'instance y ignore le nom, et ne supprime donc rien. L'affectation
+    directe d'un fichier, cinquième voie, est un remplacement."""
     made = image(portfolio)
     ready(made)
-    stale = stale_instance(made, how)
+    stale = stale_instance(image, made, how)
 
     with django_capture_on_commit_callbacks(execute=True):
         fresh = replaced_elsewhere(made, "nouvelle.png")
@@ -685,6 +702,27 @@ def test_une_instance_perimee_ne_supprime_pas_l_original_qu_un_autre_enregistrem
         stale.save()
 
     assert stored([fresh.original.name or ""]) == [True]
+
+
+@pytest.mark.django_db
+def test_un_televersement_remplace_meme_sur_une_instance_qui_n_a_pas_lu_son_original(
+    portfolio: Project,
+    image: ImageFactory,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    """Un téléversement remplace ce que la ligne référence au moment de l'écriture, quoi que
+    l'instance ait lu : une ligne chargée sans son original (`only`) le remplace pour de bon."""
+    made = image(portfolio)
+    names = ready(made)
+    loaded = type(made).objects.only("id").get(pk=made.pk)
+    loaded.original = image_upload("nouvelle.png")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        loaded.save()
+
+    row = type(made).objects.get(pk=made.pk)
+    assert (row.state, row.variants) == (ProcessingState.PENDING, [])
+    assert stored(names) == [False, False]
 
 
 @pytest.mark.django_db

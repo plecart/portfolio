@@ -615,14 +615,19 @@ class ProjectImage(models.Model):
         """Les fichiers que la ligne référence et que cette instance remplace en s'enregistrant ;
         aucun pour une image neuve, ou dont cette instance n'a pas changé l'original.
 
-        L'instance a changé l'original quand son nom n'est plus celui qu'elle a lu ou écrit : un
-        téléversement affecté au champ — il porte le nom de l'auteur — comme un fichier enregistré
-        par `OriginalFile.save`. La ligne est alors relue, jamais le fichier : ce qu'elle
-        référence au moment de l'écriture sort du stockage, même si un autre enregistrement l'a
-        changé depuis la lecture de cette instance. Une instance qui n'a pas touché à l'original
-        ne supprime rien, quoi que la ligne porte.
+        Un téléversement affecté au champ remplace toujours : ce que la ligne référence au moment
+        de l'écriture ne l'est plus après, quoi que l'instance ait lu. Un nom déjà stocké ne
+        remplace que si l'instance sait lequel elle a lu ou écrit, et l'a changé — un fichier
+        enregistré par `OriginalFile.save` ; une instance qui ignore ce nom — son original chargé
+        avec ses pairs (`FETCH_PEERS`), sans passer par `refresh_from_db` — ne supprime rien.
+        La ligne est relue, jamais le fichier, et ce qu'elle porte sort du stockage s'il n'est pas
+        ce que l'instance écrit.
         """
-        if self._state.adding or self.original.name == self._stored_original:
+        if self._state.adding:
+            return []
+        uploading = bool(self.original) and not self.original.stored
+        known = self._stored_original is not None
+        if not uploading and not (known and self.original.name != self._stored_original):
             return []
         row = type(self).objects.only("original", "variants").filter(pk=self.pk).first()
         if row is None or row.original.name == self.original.name:
