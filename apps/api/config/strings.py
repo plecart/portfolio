@@ -82,6 +82,7 @@ PROJECT_FINISHED_ON_MISSING = "Un projet terminé ou archivé porte une date de 
 PROJECT_ONGOING_FINISHED = "Un projet en cours n’a pas de date de fin."
 PROJECT_DATES_REVERSED = "La date de fin d’un projet ne précède pas sa date de début."
 PROJECT_SHOWCASE_TAKEN = "Un autre projet est déjà la vitrine : un seul l’est à la fois."
+PROJECT_COVER_MISSING = "Un projet porte une couverture."
 
 # Technologie de projet : modèle et champ ; le projet et la technologie qu'elle lie portent leurs
 # propres noms
@@ -123,6 +124,9 @@ IMAGE_VARIANTS = "variantes"
 PROCESSING_STATE_PENDING = "En attente"
 PROCESSING_STATE_READY = "Prêt"
 PROCESSING_STATE_FAILED = "Échec"
+
+# Image d'un projet : la colonne de son aperçu dans l'écran Projet
+IMAGE_PREVIEW = "aperçu"
 
 # Image d'un projet : refus
 IMAGE_FORMAT_UNSUPPORTED = "L’image doit être un fichier JPEG, PNG ou WebP."

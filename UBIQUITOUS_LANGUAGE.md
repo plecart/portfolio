@@ -88,11 +88,14 @@ n'en supprime aucun.
 ## Couverture — `Cover`
 
 L'image d'un projet : la photo de sa carte, la première image de sa galerie et son `og:image`
-(spec §1.11). Une par projet (`project.cover`) ; supprimer le projet la supprime.
+(spec §1.11). Une par projet (`project.cover`) ; supprimer le projet la supprime. L'écran Projet
+la saisit dans un bloc d'une ligne, avant les technologies, et refuse un projet sans elle,
+brouillon compris ; il montre l'aperçu de l'original enregistré et son état, qui ne s'y modifie
+pas.
 
 | Terme | Identifiant | Règle |
 |---|---|---|
-| projet | `project` | une couverture par projet |
+| projet | `project` | une couverture par projet, exigée |
 | forme | `width`, `height` | carrée — largeur égale à la hauteur —, 1200 px de côté au moins |
 
 ## Image de galerie — `GalleryImage`
