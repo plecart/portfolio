@@ -1,0 +1,71 @@
+/* Jetons de l'interface — spec §2, sous les noms de la spec.
+
+   Déclarés sur `:root` hors de toute couche : ils sont tous émis, utilisés ou non, et l'emportent
+   sur la couche de thème de Tailwind. Les composants les lisent par la syntaxe `(--jeton)` de
+   Tailwind 4 — `bg-(--paper)`, `shadow-(--shadow-rest)`, `ease-(--ease-out)`.
+
+   Palette : les deux valeurs d'un jeton côte à côte dans `light-dark()`, et `color-scheme` choisit
+   — le système par défaut, `data-theme` quand le mode est forcé (spec §1.5). La compilation
+   réécrit `light-dark()` pour les navigateurs qui ne le connaissent pas : détail dans
+   docs/frontend-outillage.md §2.4. */
+:root {
+  color-scheme: light dark;
+
+  /* §2.1 — couleurs */
+  --bg: light-dark(#F3EDE4, #1C1A17);
+  --paper: light-dark(#FBF8F2, #2B2724);
+  --ink: light-dark(#2A2622, #EDE6DA);
+  --ink-2: light-dark(#6B635A, #A69C8F);
+  --line: light-dark(#DCD3C6, #3B3631);
+  --accent: light-dark(#B4471F, #E88A5E);
+  --postit: light-dark(#F4E3A1, #B59F55);
+  --postit-ink: light-dark(#2A2622, #1C1A17);
+  --postit-link: color-mix(in srgb, var(--accent) 22%, var(--postit));
+  --tape: light-dark(#E8DFCF, #3D372F);
+  --tape-ink: light-dark(#2A2622, #D8CFC0);
+
+  /* §2.2 — échelle typographique */
+  --fs-body: 16px;
+  --fs-small: 13px;
+  --fs-tiny: 11px;
+
+  /* §2.3 — espacements */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+
+  /* §2.4 — rayons */
+  --r-card: 2px;
+  --r-tape: 2px;
+  --r-button: 6px;
+
+  /* §2.5 — ombres : la géométrie est commune aux deux modes, seule la couleur change */
+  --shadow-rest:
+    0 1px 2px light-dark(rgba(42,38,34,.08), rgba(0,0,0,.30)),
+    0 4px 12px light-dark(rgba(42,38,34,.10), rgba(0,0,0,.35));
+  --shadow-lift:
+    0 4px 8px light-dark(rgba(42,38,34,.10), rgba(0,0,0,.35)),
+    0 20px 40px light-dark(rgba(42,38,34,.20), rgba(0,0,0,.55));
+
+  /* §2.7 — durées et courbes */
+  --dur-fast: 150ms;
+  --dur: 240ms;
+  --dur-open: 280ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-spring: linear(0, .28 6%, .62 13%, .88 20%, 1.03 28%, 1.01 40%, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+}
+
+/* Mode forcé, par le bouton de l'entête ou restauré au chargement : le schéma suit, et avec lui
+   `light-dark()` et les éléments natifs du navigateur. */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}

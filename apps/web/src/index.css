@@ -13,6 +13,7 @@
 /* Tailwind v4 par son plugin Vite (ADR 0008), jamais le script CDN. L'`@import` ouvre le
    fichier : une règle placée avant lui le rendrait inopérant, sans que rien ne le signale. */
 @import 'tailwindcss';
+@import './tokens.css';
 
 /* La famille est déclarée comme jeton de thème et non sur `:root` : Tailwind pose déjà la police
    du document à partir de `--font-sans`, et une seconde déclaration en CSS nu ne ferait que lui
@@ -39,4 +40,35 @@
    et la même valeur écrite deux fois n'aurait servi qu'à faire croire à une divergence. */
 :root {
   -webkit-font-smoothing: antialiased;
+}
+
+/* Base de page — fond et texte (spec §2.1), barre de défilement (§2.6), anneau de focus (§6.2) —,
+   toute en jetons. Dans la couche `base`, pour qu'un utilitaire posé par un composant l'emporte. */
+@layer base {
+  html {
+    background-color: var(--bg);
+    color: var(--ink);
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+
+  /* WebKit ne lit pas `scrollbar-color` : 6 px de large, curseur en disque (§2.4). */
+  html::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  html::-webkit-scrollbar-thumb {
+    background-color: var(--line);
+    border-radius: 999px;
+  }
+
+  html::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+
+  /* Au clavier seulement. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
 }
