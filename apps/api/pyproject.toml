@@ -19,7 +19,8 @@ requires-python = ">=3.12"
 # tient.
 #
 # `pillow` lit les images téléversées dans l'admin : `ImageField` l'exige (doc Django), et
-# `content/images.py` est le seul module du dépôt qui l'importe. Le plancher n'est pas décoratif :
+# `content/images.py` est le seul module de l'application, tests exclus, qui l'importe, ce que
+# `tests/test_images.py` tient. Le plancher n'est pas décoratif :
 # quatre avis de gravité haute, publiés le 2026-07-20, ne sont corrigés qu'en 12.3.0 (brief de #9,
 # décision 12).
 dependencies = [
