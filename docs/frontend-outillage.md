@@ -81,7 +81,7 @@ Tout conservé. Les signalements, relus un par un, sont des faux positifs :
 | `prototype` | CAUTION | « never judge » : consigne de présentation des variantes |
 | autres | SAFE / CAUTION sans signalement | — |
 
-### 2.4 Application `apps/web` — 2026-09-23, amendée les 2026-09-25, 26 et 2026-10-02
+### 2.4 Application `apps/web` — 2026-09-23, amendée les 2026-09-25, 26, 2026-10-02 et 04
 
 Node **24.21.0**, LTS active du jour, épinglée par `.nvmrc` et par `engines` (valeurs égales,
 vérifiées par un test). `@types/node` suit sa majeure, vérifiée par un autre test : des types d'une
@@ -214,8 +214,23 @@ la suivante, table comprise.
 
 La famille Manrope est déclarée **comme jeton de thème Tailwind** (`@theme { --font-sans }`) plutôt
 que sur `:root` : la feuille de base de Tailwind pose déjà la police du document depuis ce jeton, et
-deux déclarations se disputeraient la même propriété. Les jetons de couleur, d'espacement et de
-rayon de la spec §2 viendront avec #18, au même endroit.
+deux déclarations se disputeraient la même propriété.
+
+**Les jetons de la spec §2** vivent dans `src/tokens.css` : les 32, sur `:root`, sous leur nom de
+spec et hors de toute couche — pas dans `@theme`. Aucun de ces noms n'entre dans un espace de noms
+de Tailwind, qui n'en ferait donc pas d'utilitaires ; `@theme` n'émet que les variables
+utilisées ; et une déclaration hors couche l'emporte sur la couche `theme`, où Tailwind définit
+`--ease-out` et `--ease-in-out` avec d'autres valeurs (mesuré, Tailwind 4.3.3, 2026-10-04). Les
+composants les lisent par la syntaxe `(--jeton)` de Tailwind 4 : `bg-(--paper)`,
+`ease-(--ease-out)`.
+
+La palette sombre ne vit dans aucun sélecteur : chaque couleur porte ses deux valeurs dans
+`light-dark()`, et `color-scheme` choisit — `light dark` par défaut, le mode de `data-theme` quand
+il est forcé. La minification de Vite 8.3 (Lightning CSS, cible « baseline widely available »)
+réécrit `light-dark()` en une bascule de variables `--lightningcss-light` / `--lightningcss-dark`,
+posée par `prefers-color-scheme` et par les deux règles `data-theme` : même comportement, mais la
+valeur brute d'un jeton de couleur lue depuis le JavaScript n'est pas une couleur. L'appliquer à
+une propriété et lire la valeur calculée, comme le fait `e2e/tokens.spec.ts`.
 
 **Police** : `src/assets/fonts/manrope-latin.woff2` — Manrope variable 200–800, sous-ensemble latin,
 Google Fonts v20, 24,3 Ko, sous SIL Open Font License 1.1. L'OFL veut que la notice **et** le texte
