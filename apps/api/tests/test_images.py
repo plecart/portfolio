@@ -13,7 +13,7 @@ from counting_storage import CountingStorage
 from django.conf import settings
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage, storages
+from django.core.files.storage import FileSystemStorage, default_storage, storages
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.test import override_settings
@@ -634,3 +634,132 @@ def test_enregistrer_une_image_sans_changer_son_fichier_garde_ses_fichiers_et_so
     loaded.refresh_from_db()
     assert loaded.state == ProcessingState.READY
     assert stored(names) == [True, True]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("reread", [True, False], ids=["lue en base", "créée puis enregistrée"])
+def test_une_instance_perimee_ne_supprime_pas_l_original_qu_un_autre_enregistrement_a_pose(
+    portfolio: Project,
+    image: ImageFactory,
+    reread: bool,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    """Deux écrivains sur la même image — deux onglets de l'admin, l'admin et le worker de #12 :
+    celui qui n'a pas touché à l'original ne le supprime pas, même quand la ligne en porte un
+    autre que celui qu'il a lu. Seul ce que l'instance a remplacé sort du stockage. L'instance
+    périmée retient ce qu'elle a lu (`from_db`) ou écrit (`save`)."""
+    made = image(portfolio)
+    ready(made)
+    stale = type(made).objects.get(pk=made.pk) if reread else made
+    fresh = type(made).objects.get(pk=made.pk)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        fresh.original = image_upload("nouvelle.png")
+        fresh.save()
+        stale.caption = "Une autre légende."
+        stale.save()
+
+    assert stored([fresh.original.name or ""]) == [True]
+
+
+@pytest.mark.django_db
+def test_un_enregistrement_partiel_sans_l_original_ne_remplace_rien(
+    portfolio: Project,
+    image: ImageFactory,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    """`save(update_fields=…)` sans l'original n'écrit pas le fichier affecté au champ : la ligne
+    garde le sien, ses variantes et son état — rien à supprimer."""
+    made = image(portfolio)
+    names = ready(made)
+    loaded = type(made).objects.get(pk=made.pk)
+    loaded.original = image_upload("nouvelle.png")
+    loaded.caption = "Une autre légende."
+
+    with django_capture_on_commit_callbacks(execute=True):
+        loaded.save(update_fields=["caption"])
+
+    row = type(made).objects.get(pk=made.pk)
+    assert (row.original.name, row.state) == (names[0], ProcessingState.READY)
+    assert stored(names) == [True, True]
+
+
+@pytest.mark.django_db
+def test_un_enregistrement_partiel_qui_remplace_l_original_remet_l_image_en_attente(
+    portfolio: Project,
+    image: ImageFactory,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    """L'état et les variantes rejoignent les champs écrits : sans eux, la ligne garderait
+    l'état « prêt » et des variantes déjà supprimées."""
+    made = image(portfolio)
+    names = ready(made)
+    loaded = type(made).objects.get(pk=made.pk)
+    loaded.original = image_upload("nouvelle.png")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        loaded.save(update_fields=["original", "width", "height"])
+
+    row = type(made).objects.get(pk=made.pk)
+    assert (row.state, row.variants) == (ProcessingState.PENDING, [])
+    assert stored(names) == [False, False]
+
+
+@pytest.mark.django_db
+def test_supprimer_une_image_dont_l_original_vient_d_etre_remplace_supprime_l_original_stocke(
+    portfolio: Project,
+    image: ImageFactory,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    """Ce que la ligne référence sort du stockage, pas ce que l'instance tient en mémoire : c'est
+    le cas d'une ligne de galerie cochée pour suppression avec un nouveau fichier choisi."""
+    made = image(portfolio)
+    names = ready(made)
+    loaded = type(made).objects.get(pk=made.pk)
+    loaded.original = image_upload("nouvelle.png")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        loaded.delete()
+
+    assert stored(names) == [False, False]
+
+
+@pytest.mark.django_db
+def test_supprimer_une_image_chargee_sans_ses_fichiers_supprime_ses_fichiers(
+    portfolio: Project,
+    image: ImageFactory,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    """Une instance différée (`only`) : ses noms se lisent dans la ligne avant sa suppression."""
+    made = image(portfolio)
+    names = ready(made)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        type(made).objects.only("id").get(pk=made.pk).delete()
+
+    assert stored(names) == [False, False]
+
+
+@pytest.mark.django_db
+def test_une_panne_du_stockage_n_empeche_pas_les_autres_suppressions(
+    portfolio: Project,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La ligne est déjà supprimée quand les fichiers sortent du stockage : un fichier qui résiste
+    est journalisé, les suivants sortent quand même, et rien ne remonte à la requête."""
+    made = gallery_image(portfolio)
+    original, variant = ready(made)
+    delete = FileSystemStorage.delete
+
+    def failing_delete(storage: FileSystemStorage, name: str) -> None:
+        if name == original:
+            raise OSError("panne du stockage")
+        delete(storage, name)
+
+    monkeypatch.setattr(FileSystemStorage, "delete", failing_delete)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        made.delete()
+
+    assert stored([original, variant]) == [True, False]

@@ -9,20 +9,22 @@ garantit pour toute ligne écrite hors de l'admin. Quand un champ la vérifie d�
 messages pour une même faute.
 """
 
+from collections.abc import Collection
 from datetime import date, datetime
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any, Self, TypedDict
 
 from config import strings
 from django.db import models
 from django.db.models.functions import Length, Lower
 from django.db.models.lookups import LessThanOrEqual
-from django.db.models.signals import post_delete
+from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
 from content.images import OriginalField, delete_after_commit, validate_original
 from content.validators import validate_svg
 
 if TYPE_CHECKING:
+    from django.db.models.fetch_modes import FetchMode
     from django.db.models.fields.related_descriptors import RelatedManager
 
 
@@ -528,46 +530,76 @@ class ProjectImage(models.Model):
             ),
         )
 
+    # Le nom de l'original que la ligne portait quand cette instance l'a lue ou écrite pour la
+    # dernière fois : ce qu'elle-même change, et rien d'autre (`_replaced_files`).
+    _stored_original: str | None = None
+
+    @classmethod
+    def from_db(
+        cls,
+        db: str | None,
+        field_names: Collection[str],
+        values: Collection[Any],
+        *,
+        fetch_mode: "FetchMode | None" = None,
+    ) -> Self:
+        """La ligne lue, qui retient le nom de son original s'il a été chargé (doc Django,
+        « Customizing model loading »)."""
+        image = super().from_db(db, field_names, values, fetch_mode=fetch_mode)
+        if "original" in field_names:
+            image._stored_original = image.original.name
+        return image
+
     def save(self, **kwargs: Any) -> None:
         """Enregistre l'image ; un original remplacé la remet en attente et sort du stockage.
 
-        Remplacer l'original d'une image enregistrée — un nouveau fichier sur une ligne qui
-        existe, téléversé ou enregistré par `OriginalFile.save` — la remet à l'état « en
-        attente » et vide ses variantes : elles décrivaient l'ancien fichier (décision 5). L'ancien original et ses variantes sont supprimés du stockage une
-        fois la transaction validée, jamais si elle est annulée (décision 10).
+        Remplacer l'original d'une image enregistrée — un nouveau fichier, téléversé ou
+        enregistré par `OriginalFile.save` — la remet à l'état « en attente » et vide ses
+        variantes : elles décrivaient l'ancien fichier (décision 5). Les fichiers que la ligne
+        référençait sortent du stockage une fois la transaction validée, jamais si elle est
+        annulée (décision 10). Un enregistrement partiel (`update_fields`) ne remplace que s'il
+        écrit l'original, et écrit alors aussi l'état et les variantes.
 
         Args:
             kwargs: ceux de `Model.save`.
         """
-        replaced = self._replaced_files()
+        update_fields = kwargs.get("update_fields")
+        writes_original = update_fields is None or "original" in update_fields
+        replaced = self._replaced_files() if writes_original else []
         if replaced:
             self.state = ProcessingState.PENDING
             self.variants = []
+            if update_fields is not None:
+                kwargs["update_fields"] = {*update_fields, "state", "variants"}
         super().save(**kwargs)
+        if writes_original:
+            self._stored_original = self.original.name
         delete_after_commit(self.original.storage, replaced)
 
     def stored_files(self) -> list[str]:
         """Les noms que le stockage tient pour cette image : son original s'il y est, puis ses
-        variantes."""
+        variantes. Sur une ligne lue en base, ce que la ligne référence."""
         name = self.original.name
         original = [name] if name and self.original.stored else []
         return [*original, *(variant["name"] for variant in self.variants)]
 
     def _replaced_files(self) -> list[str]:
-        """Les fichiers de la ligne enregistrée que l'original en cours remplace ; aucun pour une
-        image neuve, ou dont l'original n'a pas changé.
+        """Les fichiers que la ligne référence et que cette instance remplace en s'enregistrant ;
+        aucun pour une image neuve, ou dont cette instance n'a pas changé l'original.
 
-        L'original a changé quand son nom n'est plus celui de la ligne : un téléversement affecté
-        au champ — il porte encore le nom de l'auteur — comme un fichier déjà enregistré par
-        `OriginalFile.save`. Une lecture de la ligne à chaque mise à jour d'une image, jamais de
-        son fichier : l'instance ne garde pas trace de ce qu'elle a chargé.
+        L'instance a changé l'original quand son nom n'est plus celui qu'elle a lu ou écrit : un
+        téléversement affecté au champ — il porte le nom de l'auteur — comme un fichier enregistré
+        par `OriginalFile.save`. La ligne est alors relue, jamais le fichier : ce qu'elle
+        référence au moment de l'écriture sort du stockage, même si un autre enregistrement l'a
+        changé depuis la lecture de cette instance. Une instance qui n'a pas touché à l'original
+        ne supprime rien, quoi que la ligne porte.
         """
-        if self._state.adding:
+        if self._state.adding or self.original.name == self._stored_original:
             return []
-        previous = type(self).objects.only("original", "variants").filter(pk=self.pk).first()
-        if previous is None or previous.original.name == self.original.name:
+        row = type(self).objects.only("original", "variants").filter(pk=self.pk).first()
+        if row is None or row.original.name == self.original.name:
             return []
-        return previous.stored_files()
+        return row.stored_files()
 
 
 class Cover(ProjectImage):
@@ -628,16 +660,24 @@ class GalleryImage(ProjectImage):
         ordering = ("position", "id")
 
 
-@receiver(post_delete, sender=Cover)
-@receiver(post_delete, sender=GalleryImage)
-def delete_image_files(instance: ProjectImage, **kwargs: object) -> None:
+@receiver(pre_delete, sender=Cover)
+@receiver(pre_delete, sender=GalleryImage)
+def delete_image_files(
+    sender: type[ProjectImage], instance: ProjectImage, **kwargs: object
+) -> None:
     """Une image supprimée — seule, ou avec son projet : Django envoie le signal pour chaque ligne
     qu'une cascade emporte — sort du stockage une fois la transaction validée, original et
     variantes (décision 10). Django ne le fait pas de lui-même, et le bucket des images est
     public (ADR 0004) : une image retirée resterait servie.
 
+    Les noms se lisent dans la ligne, avant sa suppression : pas dans l'instance, qui peut tenir
+    un original remplacé en mémoire, des valeurs périmées ou différées (`only`).
+
     Args:
+        sender: le modèle de l'image.
         instance: l'image supprimée.
         kwargs: le reste du signal.
     """
-    delete_after_commit(instance.original.storage, instance.stored_files())
+    row = sender.objects.only("original", "variants").filter(pk=instance.pk).first()
+    if row is not None:
+        delete_after_commit(row.original.storage, row.stored_files())
