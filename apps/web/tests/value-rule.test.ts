@@ -102,6 +102,12 @@ describe('ESLint refuse une valeur en dur dans un composant', () => {
       'no-restricted-syntax',
     )
   })
+
+  test('un script JavaScript de src/ est lu aussi', async () => {
+    expect(await lintRuleIds('src/value-rule-probe.js', "export const tone = '#ff0000'\n")).toContain(
+      'no-restricted-syntax',
+    )
+  })
 })
 
 describe('aucune feuille CSS hors des jetons ne porte de valeur en dur', () => {
