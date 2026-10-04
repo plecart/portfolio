@@ -8,6 +8,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { ESLint } from 'eslint'
 import { major } from 'semver'
 import * as ts from 'typescript'
 import { expect, test } from 'vitest'
@@ -87,6 +88,21 @@ test('toutes les configurations TypeScript du projet résolvent en mode strict',
   expect(
     configFileNames.map((name) => [name, resolveCompilerOptions(name).strict]),
   ).toEqual(configFileNames.map((name) => [name, true]))
+})
+
+test('la porte de lint lit le script de restauration du mode', async () => {
+  // Servi tel quel depuis `public/`, hors de la compilation : `tsc` ne le lit pas (hors de ses
+  // `include`). Le lint est la seule porte statique qui le couvre — encore faut-il qu'il le lise
+  // en script classique de navigateur, sans quoi ses globales seraient des fautes.
+  const filePath = join(APP_ROOT, 'public', 'theme.js')
+  const source = readFileSync(filePath, 'utf8')
+  const eslint = new ESLint({ cwd: APP_ROOT })
+
+  const lint = async (text: string) =>
+    (await eslint.lintText(text, { filePath }))[0].messages.map((message) => message.ruleId)
+
+  expect(await lint(source)).toEqual([])
+  expect(await lint(source.replace('localStorage', 'locaStorage'))).toEqual(['no-undef'])
 })
 
 test('la porte de lint échoue sur un simple avertissement', () => {

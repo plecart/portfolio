@@ -22,4 +22,14 @@ export default tseslint.config(
   // `.eslintrc` (sa clé `plugins` est un tableau de chaînes) et ESLint 9 la refuse.
   reactHooks.configs.flat['recommended-latest'],
   jsxA11y.flatConfigs.recommended,
+  // `public/` est copié tel quel par Vite et chargé en script classique, hors de toute
+  // compilation : ni module, ni Node — seulement les globales du navigateur qu'il lit, déclarées
+  // une à une plutôt que par un paquet de globales qui n'apporterait que cela.
+  {
+    files: ['public/**/*.js'],
+    languageOptions: {
+      sourceType: 'script',
+      globals: { document: 'readonly', localStorage: 'readonly' },
+    },
+  },
 )

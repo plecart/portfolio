@@ -232,6 +232,17 @@ posée par `prefers-color-scheme` et par les deux règles `data-theme` : même c
 valeur brute d'un jeton de couleur lue depuis le JavaScript n'est pas une couleur. L'appliquer à
 une propriété et lire la valeur calculée, comme le fait `e2e/tokens.spec.ts`.
 
+**Restauration du mode forcé** : `public/theme.js`, copié tel quel par Vite, chargé dans le
+`<head>` par `<script src="/theme.js">`, hors du bloc d'aperçu. Script classique — sans
+`type="module"`, `async` ni `defer` : un module est différé après l'analyse du document, donc le
+premier rendu pourrait le précéder ; un script classique retient l'analyse et le rendu jusqu'à ce
+que `data-theme` soit posé. Il ne retient que `light` ou `dark` sous la clé `theme`, et se tait
+quand le stockage est refusé. Chemin absolu : la même page est servie sous `/projets/<slug>`. Le
+prix, accepté par le brief de #18 (décision 4) : une requête bloquante de plus par visite, et un
+nom sans empreinte, que Caddy sert `no-cache` comme `index.html`. `tsc` ne le lit pas ; le lint le
+lit en script classique — un test le vérifie — et `e2e/tokens.spec.ts` l'exécute, application
+bloquée.
+
 **Police** : `src/assets/fonts/manrope-latin.woff2` — Manrope variable 200–800, sous-ensemble latin,
 Google Fonts v20, 24,3 Ko, sous SIL Open Font License 1.1. L'OFL veut que la notice **et** le texte
 de la licence accompagnent la police partout où elle est distribuée : la notice voyage en
