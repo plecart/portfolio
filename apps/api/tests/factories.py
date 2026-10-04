@@ -8,6 +8,8 @@ from datetime import date
 from io import BytesIO
 
 from content.models import (
+    Cover,
+    GalleryImage,
     Project,
     ProjectKind,
     ProjectStatus,
@@ -84,6 +86,33 @@ def project(**fields: object) -> Project:
             "kind": ProjectKind.PERSONAL,
             "status": ProjectStatus.ONGOING,
             "started_on": STARTED_ON,
+            **fields,
+        }
+    )
+
+
+def cover(owner: Project, **fields: object) -> Cover:
+    """Une couverture valide de `owner`, non enregistrée : un carré de 1200 px en PNG ;
+    `fields` en remplace des champs."""
+    return Cover(
+        **{
+            "project": owner,
+            "original": image_upload(),
+            "caption": "La table des projets.",
+            **fields,
+        }
+    )
+
+
+def gallery_image(owner: Project, **fields: object) -> GalleryImage:
+    """Une image de galerie valide de `owner`, non enregistrée, à la première place ; `fields` en
+    remplace des champs."""
+    return GalleryImage(
+        **{
+            "project": owner,
+            "original": image_upload(),
+            "caption": "La fiche d'un projet.",
+            "position": 1,
             **fields,
         }
     )

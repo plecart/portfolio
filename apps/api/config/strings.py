@@ -113,9 +113,36 @@ SECTION_ANCHOR_INVALID = (
 SECTION_ANCHOR_TAKEN = "Une autre section de ce projet porte déjà cette ancre."
 SECTION_BODY_MISSING = "Une section porte un texte, et pas seulement des espaces."
 
-# Image d'un projet, couverture ou image de galerie : refus de l'original
+# Image d'un projet, couverture ou image de galerie : champs et valeurs de l'état de traitement
+IMAGE_ORIGINAL = "original"
+IMAGE_WIDTH = "largeur"
+IMAGE_HEIGHT = "hauteur"
+IMAGE_CAPTION = "légende"
+IMAGE_STATE = "état"
+IMAGE_VARIANTS = "variantes"
+PROCESSING_STATE_PENDING = "En attente"
+PROCESSING_STATE_READY = "Prêt"
+PROCESSING_STATE_FAILED = "Échec"
+
+# Image d'un projet : refus
 IMAGE_FORMAT_UNSUPPORTED = "L’image doit être un fichier JPEG, PNG ou WebP."
 IMAGE_TOO_LARGE = "L’image pèse 10 Mo au plus."
+IMAGE_ORIGINAL_MISSING = "Une image porte son fichier."
+IMAGE_CAPTION_MISSING = "Une image porte une légende, et pas seulement des espaces."
+IMAGE_CAPTION_TOO_LONG = "La légende d’une image tient en 50 caractères au plus."
+IMAGE_STATE_UNKNOWN = "L’état d’une image est en attente, prêt ou échec."
+IMAGE_VARIANTS_UNREADY = "Seule une image prête porte des variantes."
+
+# Couverture : modèle et refus
+COVER = "couverture"
+COVERS = "couvertures"
+COVER_NOT_SQUARE = "Une couverture est carrée : sa largeur égale sa hauteur."
+COVER_TOO_SMALL = "Une couverture mesure au moins 1200 px de côté."
+
+# Image de galerie : modèle et champ
+GALLERY_IMAGE = "image de galerie"
+GALLERY_IMAGES = "images de galerie"
+GALLERY_IMAGE_POSITION = "position"
 
 # Aperçu Markdown de l'admin, sous la description d'un projet et le corps d'une section : sa
 # légende, et ce qu'il montre quand il ne peut pas se rafraîchir
