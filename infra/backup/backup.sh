@@ -15,9 +15,16 @@
 #   BACKUP_PING_URL                      l'adresse de ping
 set -eu
 
+step=préparation
 work=$(mktemp -d)
-# En partant, réussite ou échec : les fichiers de travail supprimés.
-trap 'rm -rf "$work"' EXIT
+
+# En partant, réussite ou échec : les fichiers de travail supprimés, l'étape qui a échoué nommée.
+finish() {
+	status=$?
+	rm -rf "$work"
+	[ "$status" -eq 0 ] || echo "échec à l'étape : $step" >&2
+}
+trap finish EXIT
 
 # Le contrat avec la restauration (#24, décision 6) : `<base>-<AAAAMMJJ>T<HHMMSS>Z.dump.age`, à la
 # date du début de l'exécution, en UTC — l'ordre des noms est l'ordre du temps.
@@ -33,10 +40,11 @@ export RCLONE_CONFIG_R2_TYPE=s3 \
 	RCLONE_CONFIG_R2_ACCESS_KEY_ID="$BACKUP_R2_ACCESS_KEY_ID" \
 	RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$BACKUP_R2_SECRET_ACCESS_KEY"
 
-# Une étape : son nom (1ᵉʳ argument), écrit avant sa commande.
+# Une étape : son nom (1ᵉʳ argument), écrit avant sa commande et retenu pour le message d'échec.
 run() {
-	echo "== $1"
+	step=$1
 	shift
+	echo "== $step"
 	"$@"
 }
 
