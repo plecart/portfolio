@@ -4,14 +4,18 @@ Seul module du dépôt qui importe Pillow (brief de #9, décision 12) : l'origin
 son contenu, jamais à son nom (décision 6), et nommé par l'application (décision 7).
 """
 
+from collections.abc import Iterable
+from functools import partial
 from os import PathLike
+from typing import TYPE_CHECKING, Any, Self, overload
 from uuid import uuid4
 
 from config import strings
 from django.core.exceptions import ValidationError
 from django.core.files import File
-from django.db import models
-from django.db.models.fields.files import ImageFieldFile
+from django.core.files.storage import Storage
+from django.db import models, transaction
+from django.db.models.fields.files import ImageFieldFile, ImageFileDescriptor
 from PIL import Image, UnidentifiedImageError
 
 # Les formats qu'accepte un original, au nom que leur donne Pillow, et l'extension de chacun : un
@@ -100,6 +104,17 @@ class OriginalField(models.ImageField):
 
     attr_class = OriginalFile
 
+    if TYPE_CHECKING:
+        # Ce que l'attribut du modèle rend, `attr_class` : django-stubs ne le déduit pas d'une
+        # sous-classe, et typerait `image.original` en `ImageFieldFile`.
+        @overload
+        def __get__(self, instance: None, owner: Any) -> ImageFileDescriptor: ...
+        @overload
+        def __get__(self, instance: models.Model, owner: Any) -> OriginalFile: ...
+        @overload
+        def __get__(self, instance: Any, owner: Any) -> Self: ...
+        def __get__(self, instance: Any, owner: Any) -> Any: ...
+
     def run_validators(self, value: OriginalFile) -> None:
         """Les validateurs du champ, sur un téléversement seulement : un fichier stocké a été validé
         à son arrivée."""
@@ -137,3 +152,20 @@ class OriginalField(models.ImageField):
         """
         extension = original_extension(getattr(instance, self.attname))
         return super().generate_filename(instance, f"images/{uuid4().hex}/original.{extension}")
+
+
+def delete_after_commit(storage: Storage, names: Iterable[str]) -> None:
+    """Supprime `names` de `storage` une fois la transaction en cours validée — aussitôt hors de
+    toute transaction ; aucun si elle est annulée (doc Django, « Performing actions after
+    commit »).
+
+    Un rappel par fichier, chacun `robust` : la ligne est déjà validée quand il s'exécute, une
+    panne du stockage sur un fichier est journalisée (`django.db.backends.base`) sans empêcher les
+    suivants ni faire échouer la requête qui a validé.
+
+    Args:
+        storage: le stockage qui tient les fichiers.
+        names: leurs noms de stockage.
+    """
+    for name in names:
+        transaction.on_commit(partial(storage.delete, name), robust=True)

@@ -78,8 +78,12 @@ les variantes.
 | original | `original` | image JPEG, PNG ou WebP, reconnue à son contenu, jamais à son nom ; 10 Mo au plus ; stockée sous un nom engendré — `images/<identifiant aléatoire>/original.<extension du format>` —, nouveau à chaque téléversement ; validée et lue au téléversement seulement : un fichier stocké n'est jamais relu |
 | largeur, hauteur | `width`, `height` | en pixels, lues dans l'original téléversé, jamais saisies |
 | légende | `caption` | obligatoire, 50 caractères au plus, jamais faite d'espaces seulement ; elle sert de texte alternatif |
-| état | `state` | en attente `pending` · prêt `ready` · échec `failed` ; une image naît en attente ; seul le worker le fait avancer |
+| état | `state` | en attente `pending` · prêt `ready` · échec `failed` ; une image naît en attente, et y revient quand son original est remplacé ; seul le worker le fait avancer |
 | variantes | `variants` | liste d'objets `{name, width, height}` — `name` est le nom de stockage de la variante —, vide sauf à l'état prêt ; seul le worker l'écrit |
+
+Supprimer une image, seule ou avec son projet, ou remplacer son original supprime du stockage
+l'ancien original et ses variantes, une fois la transaction validée ; une transaction annulée
+n'en supprime aucun.
 
 ## Couverture — `Cover`
 
