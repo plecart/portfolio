@@ -1,4 +1,4 @@
-"""Tests de la chaîne d'approvisionnement : actions et images épinglées, Dependabot.
+"""Tests de la chaîne d'approvisionnement : actions, images et téléchargements épinglés, Dependabot.
 
 Comme `test_infra.py`, ces tests lisent des fichiers de configuration sans rien exécuter. Ils
 gardent ce qui ne se verrait qu'après le merge, et en silence : une action ou une image qui suit
@@ -9,8 +9,8 @@ Chaque garde lit les fichiers comme l'outil qu'elle protège : le YAML par un an
 Dockerfile instruction par instruction comme Docker, et chaque `FROM` par sa première ligne comme
 Dependabot. Un motif qui imiterait l'analyseur à la main laisserait passer les formes qu'il n'a
 pas prévues. Les gardes sont donc des fonctions sur du texte, appliquées aux fichiers du dépôt et
-à un recueil de formes — `WORKFLOW_FORMS`, `IMAGE_FORMS`, `SOURCE_FORMS`, `DOCKERFILE_NAMES`,
-`COMPOSE_FORMS`, `COMPOSE_NAMES` :
+à un recueil de formes — `WORKFLOW_FORMS`, `IMAGE_FORMS`, `SOURCE_FORMS`, `DOWNLOAD_FORMS`,
+`DOCKERFILE_NAMES`, `COMPOSE_FORMS`, `COMPOSE_NAMES` :
 chaque forme recensée par les relectures de #5 y a son cas, avec le verdict attendu. Une forme
 nouvelle s'y ajoute ; les trois jugées exotiques y figurent en `xfail` strict, qui signale le jour
 où elles cesseraient d'échapper.
@@ -117,6 +117,14 @@ DEPENDABOT_FROM = re.compile(
 # seulement — un `RUN uvx --from=…` passe l'option à la commande, pas à Docker.
 LEADING_OPTIONS = re.compile(r"^\s*(?:COPY|RUN)((?:\s+--\S+)+)", re.IGNORECASE)
 FROM_SOURCE = re.compile(r"(?:--|[,=])from=([^\s,]+)", re.IGNORECASE)
+
+# Un `ADD` qui télécharge, lu comme Docker : ses options en tête d'instruction, puis ses sources,
+# dont une adresse HTTP(S). BuildKit vérifie la somme d'un tel fichier avant de le copier quand les
+# options portent `--checksum=sha256:<somme>` (doc Docker, « ADD --checksum ») ; sans elle, le
+# fichier entre tel que le serveur le rend.
+ADD_INSTRUCTION = re.compile(r"^\s*ADD(?P<options>(?:\s+--\S+)*)\s+(?P<sources>.*)$", re.IGNORECASE)
+REMOTE_SOURCE = re.compile(r"(?:^|\s)https?://", re.IGNORECASE)
+CHECKSUM_OPTION = re.compile(r"(?:^|\s)--checksum=sha256:[0-9a-f]{64}(?:\s|$)")
 
 # `image:<version x.y.z>[-variante]@sha256:<empreinte>` — même règle que pour les actions : la
 # version la plus précise. Dependabot lit une épingle étiquette + empreinte comme « suivre les
@@ -264,6 +272,26 @@ def source_findings(text: str) -> list[str]:
         for source in FROM_SOURCE.findall(options.group(1))
     ]
     return [source for source in sources if source.lower() not in stages and not source.isdigit()]
+
+
+def downloads(text: str) -> list[tuple[str, str]]:
+    """Les `ADD` d'un Dockerfile qui téléchargent : pour chacun, ses options et l'instruction
+    entière, continuations jointes."""
+    return [
+        (match["options"], instruction)
+        for _, instruction in dockerfile_instructions(text)
+        if (match := ADD_INSTRUCTION.match(instruction)) and REMOTE_SOURCE.search(match["sources"])
+    ]
+
+
+def download_findings(text: str) -> list[str]:
+    """Les téléchargements d'un Dockerfile que BuildKit ne vérifie pas : les `ADD` d'une adresse
+    HTTP(S) dont les options ne portent pas de somme SHA-256 complète."""
+    return [
+        instruction
+        for options, instruction in downloads(text)
+        if not CHECKSUM_OPTION.search(options)
+    ]
 
 
 def compose_services(text: str) -> dict[str, object]:
@@ -425,6 +453,21 @@ SOURCE_FORMS = {
     ),
 }
 
+SUM = "d" * 64
+TOOL = "https://exemple.org/outil /usr/local/bin/outil"
+DOWNLOAD_FORMS = {
+    "somme épinglée": (BASE + f"ADD --checksum=sha256:{SUM} {TOOL}\n", False),
+    "somme et droits": (BASE + f"ADD --chmod=755 --checksum=sha256:{SUM} {TOOL}\n", False),
+    "somme, source à la ligne": (BASE + f"ADD --checksum=sha256:{SUM} \\\n    {TOOL}\n", False),
+    "fichier du contexte": (BASE + "ADD outil.tar.gz /opt/\n", False),
+    "sans somme": (BASE + f"ADD {TOOL}\n", True),
+    "sans somme, source à la ligne": (BASE + f"ADD \\\n    {TOOL}\n", True),
+    "en minuscules, sans somme": (BASE + f"add {TOOL}\n", True),
+    "somme tronquée": (BASE + f"ADD --checksum=sha256:{SUM[:12]} {TOOL}\n", True),
+    "somme hors des options": (BASE + f"ADD {TOOL}--checksum=sha256:{SUM}\n", True),
+    "adresse en seconde source": (BASE + f"ADD outil.tar.gz {TOOL}\n", True),
+}
+
 DOCKERFILE_NAMES = {
     "Dockerfile": True,
     "Dockerfile.prod": True,
@@ -491,6 +534,14 @@ def test_la_garde_des_images_rend_son_verdict_sur_chaque_forme(text: str, expect
 def test_la_garde_des_sources_rend_son_verdict_sur_chaque_forme(text: str, expected: bool) -> None:
     """Chaque forme de `from=` recensée : signalée si l'image échappe à un étage nommé."""
     assert bool(source_findings(text)) is expected, source_findings(text)
+
+
+@pytest.mark.parametrize(("text", "expected"), DOWNLOAD_FORMS.values(), ids=DOWNLOAD_FORMS.keys())
+def test_la_garde_des_telechargements_rend_son_verdict_sur_chaque_forme(
+    text: str, expected: bool
+) -> None:
+    """Chaque forme d'`ADD` recensée : signalée si, et seulement si, elle télécharge sans somme."""
+    assert bool(download_findings(text)) is expected, download_findings(text)
 
 
 @pytest.mark.parametrize(("name", "expected"), DOCKERFILE_NAMES.items())
@@ -688,6 +739,23 @@ def test_toute_image_copiee_passe_par_un_etage_nomme(dockerfile: Path) -> None:
     outside = source_findings(dockerfile.read_text(encoding="utf-8"))
 
     assert not outside, f"sources `from=` hors d'un étage : {outside}"
+
+
+@pytest.mark.parametrize("dockerfile", DOCKERFILES, ids=repository_id)
+def test_chaque_telechargement_d_une_image_est_verifie_par_sa_somme(dockerfile: Path) -> None:
+    """Un binaire sans image officielle entre par le fichier de sa release (`age`, `supercronic` :
+    brief de #23, décision 1), que Dependabot ne suit pas : sa somme épinglée est la seule chose
+    qui l'empêche de changer en silence, chez l'éditeur ou en chemin."""
+    findings = download_findings(dockerfile.read_text(encoding="utf-8"))
+
+    assert not findings, f"téléchargements sans somme : {findings}"
+
+
+def test_la_garde_des_telechargements_lit_ceux_du_depot() -> None:
+    """Une garde qui ne lit aucun téléchargement passe à vide : l'image `backup` en porte."""
+    assert any(downloads(path.read_text(encoding="utf-8")) for path in DOCKERFILES), (
+        "aucun `ADD` d'une adresse lu — le motif a-t-il cessé de mordre ?"
+    )
 
 
 def test_dependabot_surveille_chaque_dockerfile() -> None:

@@ -141,9 +141,9 @@ services:
   # `compose.dev.yml` (cadrage §7, D54).
   backup:
     image: ghcr.io/plecart/portfolio-backup:${IMAGE_TAG:?}
-    # Le rôle en lecture seule, par les variables de libpq que `pg_dump`, `psql` et la sonde lisent ;
-    # la clé publique `age` ; le bucket des sauvegardes et son jeton ; l'adresse de ping. Rien de
-    # plus : ni le mot de passe de l'application, ni `SECRET_KEY`, ni le jeton du Tunnel
+    # Le rôle en lecture seule, par les variables de libpq que `pg_dump`, `psql` et la sonde
+    # lisent ; la clé publique `age` ; le bucket des sauvegardes et son jeton ; l'adresse de ping.
+    # Rien de plus : ni le mot de passe de l'application, ni `SECRET_KEY`, ni le jeton du Tunnel
     # (`apps/api/tests/test_compose.py`).
     environment:
       PGHOST: postgres
@@ -159,8 +159,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # Sain quand son rôle ouvre une session sur la base. Rien hors du réseau du projet : une panne de
-    # R2 ou de healthchecks.io ne rougit pas un déploiement — c'est l'absence de ping qui la dit.
+    # Sain quand son rôle ouvre une session sur la base. Rien hors du réseau du projet : une panne
+    # de R2 ou de healthchecks.io ne rougit pas un déploiement — c'est l'absence de ping qui la dit.
     healthcheck:
       <<: *probe-timing
       test: [CMD, psql, --no-psqlrc, --quiet, --command, SELECT 1]
