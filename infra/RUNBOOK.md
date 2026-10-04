@@ -15,8 +15,8 @@ un secret dans une issue, une PR ou une conversation.
 `/srv/portfolio`, sur le VPS : `compose.yml`, déposé par le job `deploy` à chaque déploiement, et
 `.env`, écrit par `bootstrap.sh` — sa ligne `IMAGE_TAG`, le SHA complet du commit déployé, est
 réécrite par chaque déploiement. Projet Compose `portfolio` : `cloudflared`, `caddy`, `api`,
-`postgres`, `redis`, chacun avec sa sonde, aucun port publié ; `cloudflared` est la seule entrée
-(D45). L'utilisateur `deploy` possède le dossier et tire les images de GHCR.
+`postgres`, `redis`, `backup`, chacun avec sa sonde, aucun port publié ; `cloudflared` est la seule
+entrée (D45). L'utilisateur `deploy` possède le dossier et tire les images de GHCR.
 
 ## Où vit chaque secret
 
@@ -69,11 +69,13 @@ l'empreinte de l'hôte : compare-la à celle que la console du fournisseur rend 
    ssh -t root@<ip> bash bootstrap.sh
    ```
    Il demande : la clé publique (le contenu de `deploy_key.pub`), le jeton GHCR, `IMAGE_TAG` (le
-   SHA de l'étape 3), `TUNNEL_TOKEN`, puis les noms d'hôte — `SITE_HOST`, `API_HOST`,
-   `MEDIA_HOST` (ADR 0003). Il finit par `== Fait`, `docker compose ps` où chaque service est
-   `healthy`, et la ligne de la clé de l'hôte. Il s'arrête sur la première erreur ; relancé, il
-   reprend sans rien refaire de ce qui est en place. `cloudflared` ne devient sain qu'avec un
-   Tunnel configuré (#25) : sinon `--wait` s'arrête sur « cloudflared is unhealthy ».
+   SHA de l'étape 3), `TUNNEL_TOKEN`, les noms d'hôte — `SITE_HOST`, `API_HOST`,
+   `MEDIA_HOST` (ADR 0003) —, puis les variables de la sauvegarde, `BACKUP_*`. Il finit par
+   `== Fait`, `docker compose ps` où chaque service est `healthy`, et la ligne de la clé de l'hôte.
+   Il s'arrête sur la première erreur ; relancé, il reprend sans rien refaire de ce qui est en
+   place. `cloudflared` ne devient sain qu'avec un Tunnel configuré (#25) : sinon `--wait`
+   s'arrête sur « cloudflared is unhealthy ». De même pour `backup` tant que le script ne crée pas
+   son rôle Postgres, ce qu'il apprend au lot 2 de #23.
 6. **L'environnement `production` et ses secrets**, depuis le poste, dans le dépôt — d'abord
    l'environnement restreint à `main` (doc GitHub « Deployments and environments »), puis les
    quatre secrets :

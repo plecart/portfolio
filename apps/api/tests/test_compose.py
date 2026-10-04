@@ -61,6 +61,11 @@ EXPOSING_TOP_LEVEL_KEYS = ["networks", "include"]
 # alors qu'`api` ne peut joindre personne, et ses migrations échouent au premier `up`.
 POSTGRES_PROBE_HOST = "-h 127.0.0.1"
 
+# Ce que `backup` ne reçoit jamais : le mot de passe de l'application, la clé de signature de Django,
+# le jeton du Tunnel. Il ne connaît de la base que son rôle en lecture seule (brief de #23,
+# décision 9).
+BACKUP_FORBIDDEN = {"POSTGRES_PASSWORD", "SECRET_KEY", "TUNNEL_TOKEN"}
+
 # Les adresses que le service `api` reçoit avec les noms de service. Sur le poste, `env_file`
 # apporte celles du `.env` (`127.0.0.1`), qui ne désignent rien depuis un conteneur, et
 # `environment:` les remplace ; en production, rien d'autre ne les apporte. Absentes, elles
@@ -115,6 +120,15 @@ def interpolations(text: str) -> list[re.Match[str]]:
     return [
         match for value in strings(yaml.safe_load(text)) for match in INTERPOLATION.finditer(value)
     ]
+
+
+def interpolated_names(node: object) -> set[str]:
+    """Les noms des variables qu'interpolent les chaînes d'un document YAML, à toute profondeur."""
+    return {
+        match["name"] or match["bare"]
+        for value in strings(node)
+        for match in INTERPOLATION.finditer(value)
+    }
 
 
 def interpolation_findings(text: str) -> list[str]:
@@ -297,6 +311,16 @@ def test_api_recoit_en_production_chaque_variable_du_back() -> None:
     assert set(environment) == set(Env.model_fields) - {"DEBUG"}
 
 
+def test_backup_ne_recoit_aucun_secret_de_l_application() -> None:
+    """Le conteneur de sauvegarde lit la base sous un rôle qui ne peut rien écrire : lui passer le
+    mot de passe de l'application, la clé de signature ou le jeton du Tunnel lui rendrait ce que ce
+    rôle lui retire. Lu dans toutes les valeurs du service — variables, sonde, commande."""
+    received = interpolated_names(read_services(COMPOSE_PROD)["backup"])
+
+    assert received, "aucune interpolation lue — le motif a-t-il cessé de mordre ?"
+    assert received & BACKUP_FORBIDDEN == set()
+
+
 def test_chaque_variable_de_production_est_exigee_et_declaree_dans_son_modele() -> None:
     """`${NOM:?…}` partout : une variable absente du `.env` du VPS fait échouer la résolution,
     au lieu de démarrer un service sur une valeur vide. Et `infra/prod.env.example` les déclare
@@ -306,8 +330,7 @@ def test_chaque_variable_de_production_est_exigee_et_declaree_dans_son_modele() 
 
     assert found, "aucune interpolation lue — le motif a-t-il cessé de mordre ?"
     assert interpolation_findings(text) == []
-    names = {match["name"] or match["bare"] for match in found}
-    assert names == set(declared_variables(PROD_ENV_EXAMPLE))
+    assert interpolated_names(yaml.safe_load(text)) == set(declared_variables(PROD_ENV_EXAMPLE))
 
 
 @pytest.mark.parametrize(

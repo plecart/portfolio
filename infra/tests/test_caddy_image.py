@@ -25,7 +25,7 @@ from typing import Any
 
 import pytest
 import yaml
-from test_infra import built_images, make_dry_run
+from test_infra import loaded_image
 
 STACK = Path(__file__).with_name("caddy.yml")
 # Le Compose de production, dont la sonde de `caddy` s'exécute ici dans l'image.
@@ -133,16 +133,6 @@ class Stack:
             connection.close()
 
 
-def caddy_image() -> str:
-    """Le nom que `make build` donne à l'image `caddy` — celle que le test doit trouver chargée.
-
-    Sous le préfixe de cet appel, s'il en pose un : le `Makefile` exporte `IMAGE_PREFIX`, donc
-    `make image-test IMAGE_PREFIX=…` teste l'image que `make build IMAGE_PREFIX=…` a construite.
-    """
-    prefix = {"IMAGE_PREFIX": os.environ["IMAGE_PREFIX"]} if "IMAGE_PREFIX" in os.environ else {}
-    return built_images(make_dry_run("build", environment=prefix))["infra/caddy/Dockerfile"]
-
-
 def compose_command(*arguments: str) -> list[str]:
     """La commande `docker compose` sur la pile du test, sous son nom de projet."""
     return ["docker", "compose", "--project-name", PROJECT, "--file", str(STACK), *arguments]
@@ -191,7 +181,7 @@ def hashed_script(stack: Stack) -> str:
 @pytest.fixture(scope="module")
 def stack() -> Iterator[Stack]:
     """La pile démarrée pour le module, arrêtée et supprimée à la fin, même en cas d'échec."""
-    environment = {**os.environ, "CADDY_IMAGE": caddy_image(), **HOSTS, **UPSTREAM}
+    environment = {**os.environ, "CADDY_IMAGE": loaded_image("caddy"), **HOSTS, **UPSTREAM}
     try:
         # Dans le `try` : un démarrage raté laisse un réseau et des conteneurs créés.
         compose("up", "--detach", "--wait", environment=environment)

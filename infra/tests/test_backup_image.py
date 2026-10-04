@@ -1,0 +1,273 @@
+"""Tests de l'image `backup` : sa chaîne de sauvegarde, sa sonde, la majeure de son `pg_dump` (brief
+de #23, décisions 2 à 6, 10 et 11).
+
+Lancé par `make image-test`, jamais par `make test` : il lui faut les images que `make build` a
+chargées — `backup`, et `caddy` pour le témoin de ping. Le job `infra` de la CI le lance après son
+build ; sur un poste, `make build` d'abord.
+
+La pile est le Compose de production, résolu avec son modèle de `.env` et surchargé par `backup.yml` :
+`postgres` et `backup` y gardent leur image, leur sonde et leurs variables, dont le test ne remplace
+que les valeurs. Aucun service externe : un témoin S3 et un témoin de ping en tiennent lieu. Elle
+tourne sous son propre nom de projet, sans port publié : le test agit par `docker compose exec`.
+"""
+
+import json
+import os
+import re
+import secrets
+import subprocess
+import uuid
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
+from pathlib import Path
+
+import pytest
+import yaml
+from test_env import declared_variables
+from test_infra import loaded_image
+
+INFRA = Path(__file__).parents[1]
+COMPOSE_PROD = INFRA / "compose.yml"
+PROD_ENV_EXAMPLE = INFRA / "prod.env.example"
+STACK = Path(__file__).with_name("backup.yml")
+# Un nom par lancement : deux lancements simultanés sur le même moteur ne se partagent ni conteneurs,
+# ni réseau, ni volume, et l'arrêt de l'un n'emporte pas l'autre.
+PROJECT = f"portfolio-test-backup-{uuid.uuid4().hex[:8]}"
+
+# Les valeurs du modèle que le test ne remplace pas : la base sauvegardée, qui nomme les objets
+# (décision 6), et le propriétaire de son schéma.
+MODEL = declared_variables(PROD_ENV_EXAMPLE)
+DATABASE = MODEL["POSTGRES_DB"]
+# Le nom d'un objet de sauvegarde : `<base>-<AAAAMMJJ>T<HHMMSS>Z.dump.age`, en UTC (décision 6).
+OBJECT_NAME = re.compile(rf"^{re.escape(DATABASE)}-\d{{8}}T\d{{6}}Z\.dump\.age$")
+
+# Où le témoin S3 range les buckets, un dossier chacun.
+S3_ROOT = "/tmp/s3"
+# Une table que la base porte avant la sauvegarde, et que l'archive doit contenir.
+WITNESS_TABLE = "temoin_de_sauvegarde"
+
+# Ce que le test donne à la pile, par-dessus le modèle : le rôle de sauvegarde et les adresses des
+# témoins. Les clés du témoin S3 sont tirées à chaque lancement, assez longues pour qu'il les accepte
+# — mesuré le 2026-10-03 : une paire trop courte y est refusée en 403.
+STACK_VALUES = {
+    "BACKUP_POSTGRES_USER": "sauvegarde",
+    "BACKUP_POSTGRES_PASSWORD": secrets.token_hex(16),
+    "BACKUP_R2_ENDPOINT": "http://s3:8080",
+    "BACKUP_R2_ACCESS_KEY_ID": secrets.token_hex(16),
+    "BACKUP_R2_SECRET_ACCESS_KEY": secrets.token_hex(32),
+}
+
+
+@dataclass(frozen=True)
+class Run:
+    """Une exécution de la chaîne : son processus terminé, son bucket, le chemin de son ping."""
+
+    process: subprocess.CompletedProcess[bytes]
+    bucket: str
+    ping_path: str
+
+    @property
+    def log(self) -> str:
+        """Ce que la chaîne a écrit, sortie standard puis sortie d'erreur."""
+        return (self.process.stdout + self.process.stderr).decode()
+
+
+@dataclass(frozen=True)
+class Stack:
+    """La pile démarrée : l'environnement qui la désigne à Compose, et la clé privée `age` du test."""
+
+    environment: Mapping[str, str]
+    identity: str
+
+    def compose(
+        self, *arguments: str, stdin: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        """Lance `docker compose` sur la pile, sans vérifier son code de sortie."""
+        return subprocess.run(
+            compose_command(*arguments),
+            env=self.environment,
+            input=stdin,
+            capture_output=True,
+            check=False,
+        )
+
+    def output(self, *arguments: str) -> str:
+        """La sortie standard de `docker compose`, qui doit réussir."""
+        completed = self.compose(*arguments)
+        completed.check_returncode()
+        return completed.stdout.decode()
+
+    def backup(self, **overrides: str) -> Run:
+        """Lance la chaîne dans le conteneur `backup`, comme on le ferait à la main.
+
+        Chaque exécution a son bucket et son chemin de ping : les tests ne voient que ce que la leur
+        a produit. `overrides` remplace des variables du conteneur, le temps de cette exécution.
+        """
+        bucket, ping_path = uuid.uuid4().hex, f"/{uuid.uuid4().hex}"
+        self.output("exec", "-T", "s3", "mkdir", "-p", f"{S3_ROOT}/{bucket}")
+        variables = {
+            "BACKUP_R2_BUCKET": bucket,
+            "BACKUP_PING_URL": f"http://ping:8080{ping_path}",
+            **overrides,
+        }
+        options = [
+            option for name, value in variables.items() for option in ("-e", f"{name}={value}")
+        ]
+        return Run(self.compose("exec", "-T", *options, "backup", "backup.sh"), bucket, ping_path)
+
+    def objects(self, bucket: str) -> list[str]:
+        """Les objets d'un bucket du témoin S3."""
+        return self.output("exec", "-T", "s3", "ls", "-A", f"{S3_ROOT}/{bucket}").split()
+
+    def pings(self, path: str) -> int:
+        """Le nombre de requêtes que le témoin de ping a reçues sur `path` — une ligne de son
+        journal d'accès chacune."""
+        logs = self.output("logs", "--no-log-prefix", "ping").splitlines()
+        entries = [json.loads(line) for line in logs if line.startswith("{")]
+        return sum(1 for entry in entries if entry.get("request", {}).get("uri") == path)
+
+    def restored_listing(self, bucket: str, name: str) -> str:
+        """La table des matières de l'archive d'un objet : déchiffrée par la clé privée du test, puis
+        lue par le `pg_restore` du Postgres de production, celui qui la restaurera (#24)."""
+        decrypted = self.compose(
+            "exec",
+            "-T",
+            "-e",
+            f"AGE_IDENTITY={self.identity}",
+            "s3",
+            "sh",
+            "-c",
+            'printf "%s\\n" "$AGE_IDENTITY" > /tmp/identity && age --decrypt --identity /tmp/identity "$0"',
+            f"{S3_ROOT}/{bucket}/{name}",
+        )
+        decrypted.check_returncode()
+        listing = self.compose(
+            "exec", "-T", "postgres", "pg_restore", "--list", stdin=decrypted.stdout
+        )
+        listing.check_returncode()
+        return listing.stdout.decode()
+
+    def leftovers(self) -> list[str]:
+        """Ce qui reste dans le dossier des fichiers de travail du conteneur `backup`."""
+        return self.output("exec", "-T", "backup", "ls", "-A", "/tmp").split()
+
+
+def compose_command(*arguments: str) -> list[str]:
+    """La commande `docker compose` sur la pile : le Compose de production et son modèle de `.env`,
+    surchargés par `backup.yml`, sous le nom de projet du test."""
+    return [
+        "docker",
+        "compose",
+        "--project-name",
+        PROJECT,
+        "--env-file",
+        str(PROD_ENV_EXAMPLE),
+        "--file",
+        str(COMPOSE_PROD),
+        "--file",
+        str(STACK),
+        *arguments,
+    ]
+
+
+def age_key_pair(image: str) -> tuple[str, str]:
+    """Une paire `age` neuve, engendrée par l'image : sa clé publique, sa clé privée. Jamais
+    commitée, perdue à la fin du lancement."""
+    printed = subprocess.run(
+        ["docker", "run", "--rm", image, "age-keygen"], capture_output=True, text=True, check=True
+    ).stdout
+    public = re.search(r"^# public key: (age1\w+)$", printed, re.MULTILINE)
+    private = re.search(r"^AGE-SECRET-KEY-1\w+$", printed, re.MULTILINE)
+    assert public and private, printed
+    return public[1], private[0]
+
+
+@pytest.fixture(scope="module")
+def stack() -> Iterator[Stack]:
+    """La pile démarrée pour le module, arrêtée et supprimée à la fin — volumes compris —, même en
+    cas d'échec."""
+    image = loaded_image("backup")
+    recipient, identity = age_key_pair(image)
+    environment = {
+        **os.environ,
+        **STACK_VALUES,
+        "BACKUP_IMAGE": image,
+        "CADDY_IMAGE": loaded_image("caddy"),
+        "BACKUP_AGE_RECIPIENT": recipient,
+    }
+    started = Stack(environment, identity)
+    try:
+        # Dans le `try` : un démarrage raté laisse un réseau et des conteneurs créés. Les services
+        # nommés seulement : le reste du Compose de production ne démarre pas ici.
+        started.output("up", "--detach", "--wait", "backup")
+        started.output(
+            "exec",
+            "-T",
+            "postgres",
+            "psql",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-U",
+            MODEL["POSTGRES_USER"],
+            "-d",
+            DATABASE,
+            "-c",
+            f"CREATE TABLE {WITNESS_TABLE} (id integer)",
+        )
+        yield started
+    finally:
+        started.compose("down", "--volumes")
+
+
+def major_version(printed: str) -> str:
+    """La majeure d'une sortie `--version` de PostgreSQL : `pg_dump (PostgreSQL) 16.15` rend `16`."""
+    found = re.search(r"\(PostgreSQL\) (\d+)\.", printed)
+    assert found, printed
+    return found[1]
+
+
+def production_probe() -> list[str]:
+    """La commande de la sonde de `backup` dans `infra/compose.yml`, sans son type (`CMD`)."""
+    services = yaml.safe_load(COMPOSE_PROD.read_text(encoding="utf-8"))["services"]
+    kind, *command = services["backup"]["healthcheck"]["test"]
+    assert kind == "CMD", kind
+    return command
+
+
+def test_pg_dump_est_de_la_majeure_du_postgres_de_production(stack: Stack) -> None:
+    """Une archive écrite par un `pg_dump` plus récent n'est pas garantie lisible par un serveur plus
+    ancien (doc PostgreSQL 16, « pg_dump », Notes) : la restauration (#24) se fait dans ce serveur-ci.
+    Les deux binaires, interrogés dans leurs images (décision 2)."""
+    client = stack.output("exec", "-T", "backup", "pg_dump", "--version")
+    server = stack.output("exec", "-T", "postgres", "postgres", "--version")
+
+    assert major_version(client) == major_version(server)
+
+
+@pytest.mark.parametrize(("password", "healthy"), [(None, True), ("mot-de-passe-faux", False)])
+def test_la_sonde_de_production_ne_dit_sain_que_le_role_qui_ouvre_une_session(
+    stack: Stack, password: str | None, healthy: bool
+) -> None:
+    """Le déploiement attend `backup` sain (`up --wait`) : sain quand son rôle ouvre une session sur
+    la base, malade quand il ne le peut pas (décision 10). Une sonde qui ne s'authentifie pas — un
+    `pg_isready` — dirait sain un conteneur qui ne sauvegardera jamais rien."""
+    options = ["-e", f"PGPASSWORD={password}"] if password else []
+    probed = stack.compose("exec", "-T", *options, "backup", *production_probe())
+
+    assert (probed.returncode == 0) is healthy, probed.stderr
+
+
+def test_une_sauvegarde_reussie_laisse_un_objet_chiffre_lisible_et_un_seul_ping(
+    stack: Stack,
+) -> None:
+    """La chaîne complète, contre les témoins : un objet au nom du contrat avec #24, que la clé privée
+    déchiffre en une archive que `pg_restore` lit — la base entière, table témoin comprise —, puis
+    un ping, un seul. Les fichiers de travail, dump en clair compris, ne survivent pas à l'exécution."""
+    run = stack.backup()
+
+    assert run.process.returncode == 0, run.log
+    objects = stack.objects(run.bucket)
+    assert len(objects) == 1 and OBJECT_NAME.match(objects[0]), objects
+    assert f"TABLE public {WITNESS_TABLE}" in stack.restored_listing(run.bucket, objects[0])
+    assert stack.pings(run.ping_path) == 1
+    assert stack.leftovers() == []

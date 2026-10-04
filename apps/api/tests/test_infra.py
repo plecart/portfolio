@@ -39,6 +39,10 @@ CI_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
 # Les Dockerfiles des images du dépôt, un par dossier `infra/<service>/` (ADR 0014).
 IMAGE_DOCKERFILES = sorted(REPOSITORY_ROOT.glob("infra/*/Dockerfile"))
 
+# Les images qui créent leur utilisateur et tournent sous lui : `useradd` sous Debian (`api`),
+# `adduser` sous Alpine (`backup`). `caddy` tourne sous celui de son image officielle, `root`.
+NON_ROOT_SERVICES = ["api", "backup"]
+
 # Une arborescence témoin du front : ce que sa compilation produit, et tout ce qui l'entoure.
 WEB_TREE = [
     "apps/web/dist/index.html",
@@ -124,14 +128,15 @@ HAND_OVER = 'exec "$@"'
 
 # Les fichiers qu'un outil Linux lit dans la **copie de travail** : ce qu'un shell exécute — dans
 # le conteneur, ou sur le VPS (`infra/bootstrap.sh`) —, ce que buildkit analyse, la configuration
-# que Caddy lit dans son image, ce dont Compose tire des valeurs, l'épingle de version que `uv`
-# relit dans l'image, et les exceptions que Trivy lit depuis son conteneur. Tout fichier ajouté à
-# `infra/` et lu par un conteneur entre dans un de ces motifs — et chacun est vérifié séparément,
-# sinon un motif devenu aveugle passerait inaperçu.
+# que Caddy lit dans son image, l'horaire que `supercronic` lit dans la sienne, ce dont Compose tire
+# des valeurs, l'épingle de version que `uv` relit dans l'image, et les exceptions que Trivy lit
+# depuis son conteneur. Tout fichier ajouté à `infra/` et lu par un conteneur entre dans un de ces
+# motifs — et chacun est vérifié séparément, sinon un motif devenu aveugle passerait inaperçu.
 CONTAINER_TEXT_GLOBS = [
     "infra/**/*.sh",
     "infra/**/Dockerfile",
     "infra/**/Caddyfile",
+    "infra/**/crontab",
     "infra/**/*.env",
     "infra/**/*.env.example",
     ".dockerignore",
@@ -230,6 +235,17 @@ def make_dry_run(
 def built_images(printed: str) -> dict[str, str]:
     """Les images d'une sortie de `make --dry-run build` : chaque Dockerfile, et son étiquette."""
     return {match["dockerfile"]: match["tag"] for match in BUILD_COMMAND.finditer(printed)}
+
+
+def loaded_image(service: str) -> str:
+    """Le nom que `make build` donne à l'image d'un service — celle qu'un test d'image
+    (`infra/tests/`) doit trouver chargée.
+
+    Sous le préfixe de l'appel, s'il en pose un : le `Makefile` exporte `IMAGE_PREFIX`, donc
+    `make image-test IMAGE_PREFIX=…` teste les images que `make build IMAGE_PREFIX=…` a construites.
+    """
+    prefix = {"IMAGE_PREFIX": os.environ["IMAGE_PREFIX"]} if "IMAGE_PREFIX" in os.environ else {}
+    return built_images(make_dry_run("build", environment=prefix))[f"infra/{service}/Dockerfile"]
 
 
 def build_context(root: Path) -> set[str]:
@@ -501,13 +517,16 @@ def test_le_point_d_entree_joue_ses_etapes_avant_la_commande() -> None:
     assert steps[0] < instructions.index(HAND_OVER)
 
 
-def test_l_image_bascule_sur_un_utilisateur_non_root() -> None:
+@pytest.mark.parametrize("service", NON_ROOT_SERVICES)
+def test_l_image_bascule_sur_un_utilisateur_non_root(service: str) -> None:
     """Un `USER` retiré laisse l'image tourner en root, et aucune autre porte ne le voit."""
-    dockerfile = DOCKERFILE.read_text(encoding="utf-8")
-    creation = re.search(r"^RUN useradd .*?(?P<name>\w+)\s*\\?$", dockerfile, re.MULTILINE)
+    dockerfile = (REPOSITORY_ROOT / "infra" / service / "Dockerfile").read_text(encoding="utf-8")
+    creation = re.search(
+        r"^RUN (?:useradd|adduser) .*?(?P<name>\w+)\s*\\?$", dockerfile, re.MULTILINE
+    )
     switch = re.search(r"^USER (?P<name>\w+)$", dockerfile, re.MULTILINE)
 
-    assert creation, "aucun `RUN useradd` — l'image crée-t-elle encore son utilisateur ?"
+    assert creation, "aucun `RUN useradd` ni `adduser` — l'image crée-t-elle son utilisateur ?"
     assert switch, "aucune instruction `USER` : l'image démarrerait en root"
     assert switch.group("name") != "root"
     assert creation.start() < switch.start(), "`USER` doit suivre la création de l'utilisateur"

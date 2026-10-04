@@ -352,3 +352,23 @@ vulnerabilities:
       Cloudflare le fait (D45). Alternatives : corrigé par Go 1.26.6, absent de caddy 2.11.4,
       dernière version publiée.
     expired_at: 2026-12-29
+
+  # --- Image `backup` : le binaire `rclone` 1.75.1, copié de son image officielle -------------
+  #
+  # Ce qui tourne : `supercronic`, puis la chaîne de `infra/backup/backup.sh` une fois par nuit,
+  # sous l'utilisateur `backup`, sans privilège. `rclone` n'y sert que de client S3 (`copyto` vers
+  # R2) : le conteneur n'écoute sur aucun port. Les paquets d'Alpine et les binaires `age` et
+  # `supercronic` n'ont aucune vulnérabilité au scan du 2026-10-04.
+
+  - id: CVE-2026-84445
+    paths:
+      - usr/local/bin/rclone
+    statement: >-
+      Place : module `google.golang.org/grpc` du binaire `rclone`, dépendance indirecte — les
+      sources de rclone ne le citent que dans leur `go.mod` —, impossible à retirer sans compiler
+      rclone. Atteinte : non — le défaut fait tomber un serveur gRPC construit par
+      `xds.NewGRPCServer()` (GHSA-2v4p-qf9q-27wj) ; mesuré dans le binaire livré, les paquets
+      `grpc/xds` sont absents (le transport de gRPC y est), et l'image ne lance aucun serveur.
+      Alternatives : corrigé par grpc 1.82.2, 1.83.2 et 1.84.0, absent de rclone 1.75.1, dernière
+      version publiée ; la suivante arrivera par Dependabot.
+    expired_at: 2027-01-02

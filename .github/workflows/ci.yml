@@ -213,9 +213,10 @@ jobs:
             --cache-from type=local,src=/tmp/buildx-cache,tag=$*
             --cache-to type=local,dest=/tmp/buildx-cache,tag=$*,mode=max
 
-      # Les tests des images que l'étape précédente a chargées — le test de fumée de `caddy` —,
-      # écrits en pytest comme ceux du back : `uv` et l'environnement Python d'abord. Avant le scan,
-      # plus long : un Caddyfile cassé se voit en quelques secondes.
+      # Les tests des images que l'étape précédente a chargées — le test de fumée de `caddy`, la
+      # chaîne de sauvegarde de `backup` —, écrits en pytest comme ceux du back : `uv` et
+      # l'environnement Python d'abord. Avant le scan, plus long : un Caddyfile ou une chaîne cassés
+      # se voient en quelques secondes.
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
 
       - name: Environnement Python
