@@ -531,9 +531,9 @@ class ProjectImage(models.Model):
     def save(self, **kwargs: Any) -> None:
         """Enregistre l'image ; un original remplacé la remet en attente et sort du stockage.
 
-        Remplacer l'original d'une image enregistrée — un téléversement sur une ligne qui existe
-        — la remet à l'état « en attente » et vide ses variantes : elles décrivaient l'ancien
-        fichier (décision 5). L'ancien original et ses variantes sont supprimés du stockage une
+        Remplacer l'original d'une image enregistrée — un nouveau fichier sur une ligne qui
+        existe, téléversé ou enregistré par `OriginalFile.save` — la remet à l'état « en
+        attente » et vide ses variantes : elles décrivaient l'ancien fichier (décision 5). L'ancien original et ses variantes sont supprimés du stockage une
         fois la transaction validée, jamais si elle est annulée (décision 10).
 
         Args:
@@ -554,16 +554,20 @@ class ProjectImage(models.Model):
         return [*original, *(variant["name"] for variant in self.variants)]
 
     def _replaced_files(self) -> list[str]:
-        """Les fichiers de la ligne enregistrée que le téléversement en cours remplace ; aucun
-        pour une image neuve, sans fichier, ou dont le fichier n'a pas changé.
+        """Les fichiers de la ligne enregistrée que l'original en cours remplace ; aucun pour une
+        image neuve, ou dont l'original n'a pas changé.
 
-        Une lecture de la ligne, au remplacement seulement : l'instance ne garde pas trace de ce
-        qu'elle a chargé.
+        L'original a changé quand son nom n'est plus celui de la ligne : un téléversement affecté
+        au champ — il porte encore le nom de l'auteur — comme un fichier déjà enregistré par
+        `OriginalFile.save`. Une lecture de la ligne à chaque mise à jour d'une image, jamais de
+        son fichier : l'instance ne garde pas trace de ce qu'elle a chargé.
         """
-        if self._state.adding or not self.original or self.original.stored:
+        if self._state.adding:
             return []
         previous = type(self).objects.only("original", "variants").filter(pk=self.pk).first()
-        return previous.stored_files() if previous else []
+        if previous is None or previous.original.name == self.original.name:
+            return []
+        return previous.stored_files()
 
 
 class Cover(ProjectImage):

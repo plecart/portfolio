@@ -8,7 +8,6 @@ son image (décision 10).
 
 from collections.abc import Iterable
 from functools import partial
-from os import PathLike
 from typing import TYPE_CHECKING, Any, Self, overload
 from uuid import uuid4
 
@@ -20,9 +19,14 @@ from django.db import models, transaction
 from django.db.models.fields.files import ImageFieldFile, ImageFileDescriptor
 from PIL import Image, UnidentifiedImageError
 
-# Les formats qu'accepte un original, au nom que leur donne Pillow, et l'extension de chacun : un
-# `<img>` de l'admin les affiche, et le worker de #12 les convertit (décision 6).
-EXTENSIONS = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp"}
+# Les décodeurs qu'ouvre Pillow, au nom de leur greffon : ceux des formats qu'accepte un original
+# — un `<img>` de l'admin les affiche, et le worker de #12 les convertit (décision 6).
+DECODERS = ("JPEG", "PNG", "WEBP")
+
+# L'extension de chaque format que ces décodeurs reconnaissent. Le décodeur JPEG rend « MPO » pour
+# un JPEG à plusieurs images — une photo de téléphone, souvent : un fichier JPEG, dont la première
+# image est l'image principale.
+EXTENSIONS = {"JPEG": "jpg", "MPO": "jpg", "PNG": "png", "WEBP": "webp"}
 
 # Borne technique, qu'aucune source ne fixe (décision 6) : 10 Mo de 1 024² octets, ceux
 # qu'affiche `filesizeformat` de Django.
@@ -46,7 +50,7 @@ def validate_original(file: File[bytes]) -> None:
     original_extension(file)
 
 
-def original_extension(file: File[bytes]) -> str:
+def original_extension(file: File[Any]) -> str:
     """L'extension du format de `file`, reconnu à son contenu : `jpg`, `png` ou `webp`.
 
     Pillow ne lit que l'en-tête, avec les seuls décodeurs des trois formats (`formats` de
@@ -61,18 +65,32 @@ def original_extension(file: File[bytes]) -> str:
         L'extension, sans point.
 
     Raises:
-        ValidationError: code `image_format_unsupported`, message du catalogue.
+        ValidationError: code `image_format_unsupported` pour un fichier que ces décodeurs ne
+            reconnaissent pas, ou dans un format qui n'a pas d'extension ici ;
+            `image_too_many_pixels` pour une image dont l'en-tête annonce plus de pixels que
+            Pillow n'accepte d'en décoder (`DecompressionBombError`, deux fois
+            `Image.MAX_IMAGE_PIXELS`) — une bombe de décompression, qu'un fichier de quelques
+            kilo-octets suffit à porter. Messages du catalogue.
     """
     try:
-        with Image.open(file, formats=tuple(EXTENSIONS)) as image:
-            # Reconnue par l'un des trois décodeurs, l'image en porte le nom.
-            return EXTENSIONS[str(image.format)]
+        with Image.open(file, formats=DECODERS) as image:
+            extension = EXTENSIONS.get(str(image.format))
     except UnidentifiedImageError as error:
+        raise unsupported() from error
+    except Image.DecompressionBombError as error:
         raise ValidationError(
-            strings.IMAGE_FORMAT_UNSUPPORTED, code="image_format_unsupported"
+            strings.IMAGE_TOO_MANY_PIXELS, code="image_too_many_pixels"
         ) from error
     finally:
         file.seek(0)
+    if extension is None:
+        raise unsupported()
+    return extension
+
+
+def unsupported() -> ValidationError:
+    """Le refus d'un fichier qui n'est pas une image JPEG, PNG ou WebP."""
+    return ValidationError(strings.IMAGE_FORMAT_UNSUPPORTED, code="image_format_unsupported")
 
 
 class OriginalFile(ImageFieldFile):
@@ -88,12 +106,41 @@ class OriginalFile(ImageFieldFile):
         et pour une image sans fichier."""
         return bool(self) and self._committed
 
+    def save(self, name: str, content: File[Any], save: bool = True) -> None:
+        """Enregistre `content` sous un nom engendré : `images/<identifiant aléatoire>/original.
+        <extension du format reconnu>` (décision 7).
+
+        Le nom de l'auteur, `name`, est ignoré : `django-storages` écrase par défaut un objet de
+        même nom, l'extension donne son type au fichier servi, et un nom neuf à chaque
+        téléversement donne une adresse dont le contenu ne change jamais, qui se met en cache sans
+        purge. Le worker de #12 range ses variantes où il le décide — le dossier de l'original s'y
+        prête.
+
+        Le format se lit dans `content`, le fichier qui s'enregistre — jamais dans l'original déjà
+        stocké : c'est le chemin de l'enregistrement du modèle (`FileField.pre_save`) comme d'un
+        appel direct.
+
+        Args:
+            name: le nom que l'auteur a donné au fichier, ignoré.
+            content: le fichier à enregistrer, lisible depuis le début.
+            save: enregistrer aussi l'image, comme chez Django.
+
+        Raises:
+            ValidationError: refus d'`original_extension`, pour un fichier enregistré sans
+                validation : sans format, pas de nom, et rien n'est stocké.
+        """
+        stored_name = f"images/{uuid4().hex}/original.{original_extension(content)}"
+        # Django lit les dimensions dans `content`, qu'il tient pour vide sans nom : un
+        # `ContentFile` anonyme, l'usage documenté, laisserait la largeur et la hauteur nulles.
+        content.name = content.name or stored_name
+        super().save(stored_name, content, save)
+
 
 class OriginalField(models.ImageField):
     """Le champ de l'original d'une image : `ImageField`, nommé par ce module, et qui ne relit
     jamais un fichier stocké.
 
-    Son nom de stockage ne reprend rien de celui de l'auteur (décision 7, `generate_filename`).
+    Son nom de stockage ne reprend rien de celui de l'auteur (décision 7, `OriginalFile.save`).
     Les dimensions restent remplies par Django (`width_field`, `height_field`, décision 8), depuis
     le téléversement seulement.
 
@@ -131,29 +178,6 @@ class OriginalField(models.ImageField):
         if self.attname in instance.__dict__ and getattr(instance, self.attname).stored:
             return
         super().update_dimension_fields(instance, force, *args, **kwargs)
-
-    def generate_filename(self, instance: models.Model, filename: str | PathLike[str]) -> str:
-        """`images/<identifiant aléatoire>/original.<extension du format reconnu>`.
-
-        Le nom de l'auteur est ignoré : `django-storages` écrase par défaut un objet de même nom,
-        l'extension donne son type au fichier servi, et un nom neuf à chaque téléversement donne
-        une adresse dont le contenu ne change jamais, qui se met en cache sans purge. Le worker de
-        #12 range ses variantes où il le décide — le dossier de l'original s'y prête.
-
-        Args:
-            instance: l'image dont le téléversement s'enregistre ; son champ porte le fichier.
-            filename: le nom que l'auteur a donné au fichier, ignoré.
-
-        Returns:
-            Le nom sous lequel le stockage enregistre l'original.
-
-        Raises:
-            ValidationError: code `image_format_unsupported`, pour un fichier qui n'est pas une
-                image JPEG, PNG ou WebP enregistré sans validation : sans format, pas de nom, et
-                rien n'est stocké.
-        """
-        extension = original_extension(getattr(instance, self.attname))
-        return super().generate_filename(instance, f"images/{uuid4().hex}/original.{extension}")
 
 
 def delete_after_commit(storage: Storage, names: Iterable[str]) -> None:
