@@ -110,6 +110,10 @@ test('la porte de lint lit le script de restauration du mode', async () => {
   expect(await lintRuleIds(filePath, source.replace('localStorage', 'locaStorage'))).toEqual([
     'no-undef',
   ])
+  // Une comparaison tapée pour l'affectation ne pose jamais le mode.
+  expect(
+    await lintRuleIds(filePath, source.replace('dataset.theme = theme', 'dataset.theme == theme')),
+  ).toEqual(['no-unused-expressions'])
   // Une syntaxe de module ferait du script une erreur au chargement — donc pas de restauration :
   // lu en script classique, il ne s'analyse plus (erreur sans règle).
   expect(await lintRuleIds(filePath, `${source}export {}\n`)).toEqual([null])

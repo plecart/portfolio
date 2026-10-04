@@ -229,10 +229,13 @@ Tailwind, lui, perd ses couleurs, ses ombres, ses animations et ses courbes : `-
 thème qui portent une couleur, une durée ou une courbe. Sans cela, il émettait son propre
 `--ease-out`, `cubic-bezier(0, 0, .2, 1)`, dès qu'une classe `ease-out` apparaissait dans les
 sources, et `bg-red-500`, `shadow-lg` ou `animate-spin` apportaient des valeurs étrangères à la
-spec — mesuré, Tailwind 4.3.3, 2026-10-04. Sa transition par défaut (`transition-colors` sans durée ni courbe) lit
-`--dur-fast` et `--ease-out`. C'est l'une des trois portes de la règle des valeurs
-(CONTRIBUTING.md, « Valeurs du front ») ; les deux autres, ESLint et le balayage des feuilles CSS,
-lisent les motifs de `forbidden-values.json`.
+spec — mesuré, Tailwind 4.3.3, 2026-10-04. Sa transition par défaut (`transition-colors` sans
+durée ni courbe) lit `--dur-fast` et `--ease-out`. Reste une couleur que porte un utilitaire et non
+le thème : le `#fff` par défaut de `ring-offset-*`, seule couleur visible parmi les 8 568 classes
+de Tailwind une fois ces remises à zéro faites (mesuré) — un décalage d'anneau prend donc toujours
+sa couleur. C'est l'une des trois portes de la règle des valeurs (CONTRIBUTING.md, « Valeurs du
+front ») ; les deux autres, ESLint et le balayage des feuilles CSS, lisent les motifs de
+`forbidden-values.json`.
 
 La palette sombre ne vit dans aucun sélecteur : chaque couleur porte ses deux valeurs dans
 `light-dark()`, et `color-scheme` choisit — `light dark` par défaut, le mode de `data-theme` quand
