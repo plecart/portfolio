@@ -1,18 +1,21 @@
 """Tests de ce que la couverture et l'image de galerie ont en commun, éprouvé sur l'une et l'autre :
-l'original — le fichier que l'auteur téléverse —, sa validation et son nom de stockage, la légende,
-l'état de traitement et les variantes."""
+l'original — le fichier que l'auteur téléverse —, sa validation, son nom de stockage et ses
+lectures, la légende, l'état de traitement et les variantes."""
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 
 import pytest
 from config import strings
 from content.images import validate_original
 from content.models import Cover, GalleryImage, ProcessingState, Project, ProjectImage
+from counting_storage import CountingStorage
+from django.conf import settings
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
-from django.core.files.storage import default_storage
+from django.core.files.storage import default_storage, storages
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
+from django.test import override_settings
 from factories import BLANK, SVG, cover, gallery_image, image_upload, project, saved
 from refusals import refusals
 
@@ -372,3 +375,37 @@ def test_la_sauvegarde_brute_d_un_fichier_qui_n_est_pas_une_image_ne_stocke_rien
 
     assert refusal.value.code == "image_format_unsupported"
     assert not default_storage.exists("images")
+
+
+@pytest.fixture
+def witness() -> Generator[CountingStorage]:
+    """Le stockage par défaut, le temps du test : un stockage sur disque qui compte ses
+    ouvertures."""
+    witness_storages = {
+        **settings.STORAGES,
+        "default": {"BACKEND": "counting_storage.CountingStorage"},
+    }
+    with override_settings(STORAGES=witness_storages):
+        storage = storages["default"]
+        assert isinstance(storage, CountingStorage)
+        yield storage
+
+
+@pytest.mark.django_db
+def test_enregistrer_une_image_sans_changer_son_fichier_n_ouvre_pas_l_original(
+    portfolio: Project, image: ImageFactory, witness: CountingStorage
+) -> None:
+    """Sur R2, chaque ouverture serait un téléchargement (décision 9). Le chemin de l'admin, pas à
+    pas : la ligne relue, validée, son fichier réaffecté tel quel — ce que fait le formulaire
+    (`construct_instance`) —, puis enregistrée."""
+    stored = saved(image(portfolio))
+    loaded = type(stored).objects.get(pk=stored.pk)
+    loaded.caption = "Une autre légende."
+
+    loaded.full_clean()
+    loaded.original = loaded.original
+    loaded.save()
+
+    assert witness.opened == []
+    loaded.refresh_from_db()
+    assert (loaded.width, loaded.height) == (stored.width, stored.height)
