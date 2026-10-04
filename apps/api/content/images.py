@@ -1,7 +1,9 @@
 """L'original d'une image de projet : le fichier que l'auteur téléverse, gardé tel quel.
 
-Seul module du dépôt qui importe Pillow (brief de #9, décision 12) : l'original y est reconnu à
-son contenu, jamais à son nom (décision 6), et nommé par l'application (décision 7).
+Seul module du dépôt qui importe Pillow (brief de #9, décision 12). L'original y est reconnu à
+son contenu, jamais à son nom (décision 6), nommé par l'application (décision 7), jamais relu une
+fois stocké (décision 9), et retiré du stockage après la transaction qui le remplace ou supprime
+son image (décision 10).
 """
 
 from collections.abc import Iterable
