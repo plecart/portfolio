@@ -58,9 +58,9 @@ en supprimant son dossier temporaire. Le détail et les autres écarts d'outilla
 classes et les styles de `apps/web/src/`, par un test dans toute autre feuille CSS —, et Tailwind
 n'a plus ni couleurs, ni ombres, ni animations, ni courbes à lui, sauf le blanc par défaut de
 `ring-offset-*` : un décalage d'anneau prend toujours sa couleur, `ring-offset-(--bg)`. Les
-espacements n'ont pas de porte : un écart de
-l'échelle passe par son jeton `--s-1` à `--s-7` ; une dimension propre à un objet (56, 36, 22,
-76 px…) s'écrit telle quelle et cite son § de spec. Formes couvertes et hors portée :
+espacements n'ont pas de porte : un écart de l'échelle passe par son jeton `--s-1` à `--s-7` ;
+une dimension propre à un objet (56, 36, 22, 76 px…) s'écrit telle quelle et cite son § de spec.
+Formes couvertes et hors portée :
 [apps/web/tests/value-rule.test.ts](apps/web/tests/value-rule.test.ts).
 
 **La pile de développement (`infra/`)** — Postgres, Redis et `api` en conteneurs sur un réseau

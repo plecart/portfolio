@@ -223,6 +223,11 @@ for (const state of PALETTE_STATES) {
   })
 }
 
+/** Relève, là où il s'exécute, le mode posé et le fond de page calculé. */
+const RECORD =
+  'globalThis.firstRender = [document.documentElement.dataset.theme, ' +
+  'getComputedStyle(document.documentElement).backgroundColor]'
+
 /**
  * Restauration du mode forcé, avant le premier rendu.
  *
@@ -230,11 +235,6 @@ for (const state of PALETTE_STATES) {
  * avant React. La seconde adresse prouve le chemin absolu du script — la même page est servie
  * sous `/projets/<slug>`, où un chemin relatif rendrait la page elle-même par le repli SPA.
  */
-/** Relève, là où il s'exécute, le mode posé et le fond de page calculé. */
-const RECORD =
-  'globalThis.firstRender = [document.documentElement.dataset.theme, ' +
-  'getComputedStyle(document.documentElement).backgroundColor]'
-
 for (const path of ['/', '/projets/exemple']) {
   for (const system of ['light', 'dark'] as const) {
     const stored = system === 'light' ? 'dark' : 'light'
