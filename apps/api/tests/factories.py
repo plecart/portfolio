@@ -5,6 +5,7 @@ attendu ne peut venir que du champ que le test remplace.
 """
 
 from datetime import date
+from io import BytesIO
 
 from content.models import (
     Project,
@@ -16,6 +17,7 @@ from content.models import (
 )
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import Model
+from PIL import Image
 
 # Le plus petit document SVG qu'un navigateur affiche : une racine `svg` dans son espace de noms.
 SVG = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"/>'
@@ -44,6 +46,24 @@ def url_of_length(length: int) -> str:
 def svg_icon(name: str = "icone.svg", content: bytes = SVG) -> SimpleUploadedFile:
     """Un fichier téléversé, tel que l'admin le reçoit."""
     return SimpleUploadedFile(name, content, content_type="image/svg+xml")
+
+
+def image_upload(
+    name: str = "image.png",
+    size: tuple[int, int] = (1200, 1200),
+    image_format: str = "PNG",
+    padding: int = 0,
+) -> SimpleUploadedFile:
+    """Une image téléversée, fabriquée en mémoire par Pillow : `size` en pixels, au format
+    `image_format`, sous le nom `name` — qui peut mentir sur le format.
+
+    Par défaut, un carré de 1200 px : une couverture valide, et une image de galerie aussi.
+    `padding` octets nuls suivent l'image, que ses lecteurs ignorent : un poids s'atteint sans
+    fabriquer une grande image.
+    """
+    content = BytesIO()
+    Image.new("RGB", size).save(content, image_format)
+    return SimpleUploadedFile(name, content.getvalue() + bytes(padding))
 
 
 def technology(**fields: object) -> Technology:
