@@ -10,14 +10,16 @@ messages pour une même faute.
 """
 
 from datetime import date, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from config import strings
 from django.db import models
 from django.db.models.functions import Length, Lower
 from django.db.models.lookups import LessThanOrEqual
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
-from content.images import OriginalField, validate_original
+from content.images import OriginalField, delete_after_commit, validate_original
 from content.validators import validate_svg
 
 if TYPE_CHECKING:
@@ -427,6 +429,15 @@ class ProcessingState(models.TextChoices):
     FAILED = "failed", strings.PROCESSING_STATE_FAILED
 
 
+class Variant(TypedDict):
+    """Une variante d'une image, telle que le worker de #12 l'écrit et que l'API de #10 l'expose
+    (décision 5) : `name` est son nom de stockage, dont le stockage déduit l'adresse."""
+
+    name: str
+    width: int
+    height: int
+
+
 # La borne de la spec §7 : une légende tient sur la ligne de la barre de galerie, à côté du
 # compteur.
 CAPTION_MAX_LENGTH = 50
@@ -474,9 +485,9 @@ class ProjectImage(models.Model):
         default=ProcessingState.PENDING,
         editable=False,
     )
-    # Une liste d'objets `{name, width, height}` : `name` est le nom de stockage de la variante,
-    # dont le stockage déduit l'adresse (décision 5).
-    variants = models.JSONField(strings.IMAGE_VARIANTS, default=list, editable=False)
+    variants: models.JSONField[list[Variant], list[Variant]] = models.JSONField(
+        strings.IMAGE_VARIANTS, default=list, editable=False
+    )
 
     class Meta:
         abstract = True
@@ -516,6 +527,43 @@ class ProjectImage(models.Model):
                 violation_error_message=strings.IMAGE_VARIANTS_UNREADY,
             ),
         )
+
+    def save(self, **kwargs: Any) -> None:
+        """Enregistre l'image ; un original remplacé la remet en attente et sort du stockage.
+
+        Remplacer l'original d'une image enregistrée — un téléversement sur une ligne qui existe
+        — la remet à l'état « en attente » et vide ses variantes : elles décrivaient l'ancien
+        fichier (décision 5). L'ancien original et ses variantes sont supprimés du stockage une
+        fois la transaction validée, jamais si elle est annulée (décision 10).
+
+        Args:
+            kwargs: ceux de `Model.save`.
+        """
+        replaced = self._replaced_files()
+        if replaced:
+            self.state = ProcessingState.PENDING
+            self.variants = []
+        super().save(**kwargs)
+        delete_after_commit(self.original.storage, replaced)
+
+    def stored_files(self) -> list[str]:
+        """Les noms que le stockage tient pour cette image : son original s'il y est, puis ses
+        variantes."""
+        name = self.original.name
+        original = [name] if name and self.original.stored else []
+        return [*original, *(variant["name"] for variant in self.variants)]
+
+    def _replaced_files(self) -> list[str]:
+        """Les fichiers de la ligne enregistrée que le téléversement en cours remplace ; aucun
+        pour une image neuve, sans fichier, ou dont le fichier n'a pas changé.
+
+        Une lecture de la ligne, au remplacement seulement : l'instance ne garde pas trace de ce
+        qu'elle a chargé.
+        """
+        if self._state.adding or not self.original or self.original.stored:
+            return []
+        previous = type(self).objects.only("original", "variants").filter(pk=self.pk).first()
+        return previous.stored_files() if previous else []
 
 
 class Cover(ProjectImage):
@@ -574,3 +622,18 @@ class GalleryImage(ProjectImage):
         verbose_name_plural = strings.GALLERY_IMAGES
         # L'ordre de l'admin est l'ordre stocké ; à position égale, l'ordre de saisie.
         ordering = ("position", "id")
+
+
+@receiver(post_delete, sender=Cover)
+@receiver(post_delete, sender=GalleryImage)
+def delete_image_files(instance: ProjectImage, **kwargs: object) -> None:
+    """Une image supprimée — seule, ou avec son projet : Django envoie le signal pour chaque ligne
+    qu'une cascade emporte — sort du stockage une fois la transaction validée, original et
+    variantes (décision 10). Django ne le fait pas de lui-même, et le bucket des images est
+    public (ADR 0004) : une image retirée resterait servie.
+
+    Args:
+        instance: l'image supprimée.
+        kwargs: le reste du signal.
+    """
+    delete_after_commit(instance.original.storage, instance.stored_files())

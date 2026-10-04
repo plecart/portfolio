@@ -12,11 +12,13 @@ from content.models import Cover, GalleryImage, ProcessingState, Project, Projec
 from counting_storage import CountingStorage
 from django.conf import settings
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
+from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage, storages
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.test import override_settings
 from factories import BLANK, SVG, cover, gallery_image, image_upload, project, saved
+from pytest_django import DjangoCaptureOnCommitCallbacks
 from refusals import refusals
 
 type ImageFactory = Callable[..., ProjectImage]
@@ -409,3 +411,140 @@ def test_enregistrer_une_image_sans_changer_son_fichier_n_ouvre_pas_l_original(
     assert witness.opened == []
     loaded.refresh_from_db()
     assert (loaded.width, loaded.height) == (stored.width, stored.height)
+
+
+class Rollback(Exception):
+    """Annule la transaction d'un test, comme une erreur après l'écriture."""
+
+
+def ready(made: ProjectImage) -> list[str]:
+    """Enregistre `made` prête, avec une variante stockée à côté de son original, comme le worker
+    de #12 le fera ; rend les noms que le stockage tient pour elle."""
+    saved(made)
+    folder = (made.original.name or "").rsplit("/", 1)[0]
+    variant = default_storage.save(f"{folder}/w640.webp", ContentFile(b"variante"))
+    made.state = ProcessingState.READY
+    made.variants = [{"name": variant, "width": 640, "height": 640}]
+    made.save()
+    return [made.original.name or "", variant]
+
+
+def stored(names: list[str]) -> list[bool]:
+    """Pour chacun de `names`, si le stockage le tient encore."""
+    return [default_storage.exists(name) for name in names]
+
+
+@pytest.mark.django_db
+def test_supprimer_une_image_supprime_ses_fichiers_apres_la_transaction(
+    portfolio: Project,
+    image: ImageFactory,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    """L'original et ses variantes : le bucket des images est public (ADR 0004), une image
+    retirée resterait servie (décision 10)."""
+    made = image(portfolio)
+    names = ready(made)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        made.delete()
+        assert stored(names) == [True, True]
+
+    assert stored(names) == [False, False]
+
+
+@pytest.mark.django_db
+def test_supprimer_un_projet_supprime_les_fichiers_de_ses_images(
+    portfolio: Project, django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks
+) -> None:
+    names = [*ready(cover(portfolio)), *ready(gallery_image(portfolio))]
+
+    with django_capture_on_commit_callbacks(execute=True):
+        portfolio.delete()
+
+    assert stored(names) == [False] * 4
+
+
+@pytest.mark.django_db
+def test_une_suppression_annulee_ne_supprime_aucun_fichier(
+    portfolio: Project,
+    image: ImageFactory,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    made = image(portfolio)
+    names = ready(made)
+
+    with (
+        django_capture_on_commit_callbacks(execute=True),
+        pytest.raises(Rollback),
+        transaction.atomic(),
+    ):
+        made.delete()
+        raise Rollback
+
+    assert stored(names) == [True, True]
+
+
+@pytest.mark.django_db
+def test_remplacer_le_fichier_d_une_image_prete_la_remet_en_attente_et_supprime_l_ancien(
+    portfolio: Project,
+    image: ImageFactory,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    """Les variantes de l'ancien original ne valent plus rien : vidées, et supprimées avec lui une
+    fois la transaction validée. Le worker de #12 repartira de l'état « en attente »."""
+    made = image(portfolio)
+    names = ready(made)
+    loaded = type(made).objects.get(pk=made.pk)
+    loaded.original = image_upload("nouvelle.png")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        loaded.save()
+        assert stored(names) == [True, True]
+
+    loaded.refresh_from_db()
+    assert (loaded.state, loaded.variants) == (ProcessingState.PENDING, [])
+    assert stored(names) == [False, False]
+    assert stored([loaded.original.name or ""]) == [True]
+
+
+@pytest.mark.django_db
+def test_un_remplacement_annule_ne_supprime_aucun_fichier(
+    portfolio: Project,
+    image: ImageFactory,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    made = image(portfolio)
+    names = ready(made)
+    loaded = type(made).objects.get(pk=made.pk)
+    loaded.original = image_upload("nouvelle.png")
+
+    with (
+        django_capture_on_commit_callbacks(execute=True),
+        pytest.raises(Rollback),
+        transaction.atomic(),
+    ):
+        loaded.save()
+        raise Rollback
+
+    assert stored(names) == [True, True]
+
+
+@pytest.mark.django_db
+def test_enregistrer_une_image_sans_changer_son_fichier_garde_ses_fichiers_et_son_etat(
+    portfolio: Project,
+    image: ImageFactory,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    """Seul un téléversement remplace : une légende retouchée ne touche ni l'état ni les
+    fichiers."""
+    made = image(portfolio)
+    names = ready(made)
+    loaded = type(made).objects.get(pk=made.pk)
+    loaded.caption = "Une autre légende."
+
+    with django_capture_on_commit_callbacks(execute=True):
+        loaded.save()
+
+    loaded.refresh_from_db()
+    assert loaded.state == ProcessingState.READY
+    assert stored(names) == [True, True]
