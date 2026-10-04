@@ -345,6 +345,17 @@ def test_les_fichiers_de_travail_ne_survivent_pas_a_l_arret_du_conteneur(stack: 
     assert stack.leftovers() == []
 
 
+def test_les_fichiers_de_travail_ont_une_place_bornee(stack: Stack) -> None:
+    """`/tmp` est en mémoire : sans taille, il prendrait jusqu'à la moitié de la RAM de l'hôte et
+    pèserait sur toute la pile, Postgres compris (mesuré à la relecture de la PR #73). Borné, un
+    dump trop gros échoue à son étape, nommée, sans ping — l'alerte de healthchecks.io."""
+    mounts = stack.output("exec", "-T", "backup", "cat", "/proc/mounts").splitlines()
+    tmp = [line.split() for line in mounts if line.split()[1:3] == ["/tmp", "tmpfs"]]
+
+    assert len(tmp) == 1, mounts
+    assert any(option.startswith("size=") for option in tmp[0][3].split(",")), tmp
+
+
 def test_supercronic_lance_la_chaine_chaque_nuit(stack: Stack) -> None:
     """`supercronic` est le processus du conteneur, et sa table lance la chaîne chaque nuit à 03:00
     (décision 8) : une autre commande d'image, ou une table qui lance autre chose, laisserait la
