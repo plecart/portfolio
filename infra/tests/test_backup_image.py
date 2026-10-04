@@ -257,6 +257,32 @@ def test_la_sonde_de_production_ne_dit_sain_que_le_role_qui_ouvre_une_session(
     assert (probed.returncode == 0) is healthy, probed.stderr
 
 
+# Étape → ce qui la fait échouer, le temps d'une exécution : un mot de passe que la base refuse, un
+# destinataire que `age` ne sait pas lire, une clé d'accès que le stockage refuse.
+FAILURES = {
+    "dump": {"PGPASSWORD": "mot-de-passe-faux"},
+    "chiffrement": {"BACKUP_AGE_RECIPIENT": "age1-destinataire-illisible"},
+    "envoi": {"BACKUP_R2_SECRET_ACCESS_KEY": secrets.token_hex(32)},
+}
+
+
+@pytest.mark.parametrize(("step", "overrides"), FAILURES.items(), ids=FAILURES.keys())
+def test_une_etape_qui_echoue_arrete_la_chaine_sans_objet_ni_ping(
+    stack: Stack, step: str, overrides: dict[str, str]
+) -> None:
+    """La première étape qui échoue arrête la chaîne : sortie non nulle, l'étape nommée dans le
+    journal, aucun ping — healthchecks.io alerte de son absence (décision 5). Rien n'arrive dans le
+    bucket : l'envoi est la seule étape qui y écrit, et un objet S3 n'est visible qu'entier
+    (décision 4). Les fichiers de travail sont supprimés aussi en cas d'échec."""
+    run = stack.backup(**overrides)
+
+    assert run.process.returncode != 0, run.log
+    assert f"échec à l'étape : {step}" in run.log
+    assert stack.pings(run.ping_path) == 0
+    assert stack.objects(run.bucket) == []
+    assert stack.leftovers() == []
+
+
 def test_une_sauvegarde_reussie_laisse_un_objet_chiffre_lisible_et_un_seul_ping(
     stack: Stack,
 ) -> None:
