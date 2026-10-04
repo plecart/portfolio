@@ -113,6 +113,10 @@ SECTION_ANCHOR_INVALID = (
 SECTION_ANCHOR_TAKEN = "Une autre section de ce projet porte déjà cette ancre."
 SECTION_BODY_MISSING = "Une section porte un texte, et pas seulement des espaces."
 
+# Image d'un projet, couverture ou image de galerie : refus de l'original
+IMAGE_FORMAT_UNSUPPORTED = "L’image doit être un fichier JPEG, PNG ou WebP."
+IMAGE_TOO_LARGE = "L’image pèse 10 Mo au plus."
+
 # Aperçu Markdown de l'admin, sous la description d'un projet et le corps d'une section : sa
 # légende, et ce qu'il montre quand il ne peut pas se rafraîchir
 MARKDOWN_PREVIEW = "Aperçu"
