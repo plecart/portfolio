@@ -10,14 +10,18 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { major } from 'semver'
 import * as ts from 'typescript'
-import { expect, test } from 'vitest'
+import { beforeAll, expect, test } from 'vitest'
 import {
   APP_ROOT,
   installedPackage,
+  LINT_WARM_UP_MS,
   lintRuleIds,
   readAppJson,
+  warmUpLint,
   type Lockfile,
 } from './app-files.ts'
+
+beforeAll(warmUpLint, LINT_WARM_UP_MS)
 
 /** Hôte minimal de lecture : il remonte en exception ce que `tsc` signalerait sur sa sortie. */
 const CONFIG_HOST: ts.ParseConfigFileHost = {

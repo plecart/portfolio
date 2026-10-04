@@ -31,6 +31,19 @@ export async function lintRuleIds(filePath: string, text: string): Promise<(stri
 }
 
 /**
+ * Délai accordé au premier passage d'ESLint d'un fichier de test : configuration, analyseur
+ * TypeScript et extensions se chargent alors, au-delà des 5 s par défaut de Vitest à froid, juste
+ * après `npm ci` (mesuré une fois sur six à la relecture de #18).
+ */
+export const LINT_WARM_UP_MS = 60_000
+
+/** Premier passage d'ESLint, à lancer en `beforeAll` avec `LINT_WARM_UP_MS` : les tests gardent
+ *  ensuite le délai par défaut. */
+export async function warmUpLint(): Promise<void> {
+  await lintRuleIds('src/warm-up.ts', '')
+}
+
+/**
  * Lit un fichier JSON strict de l'application — pas un `tsconfig`, que TypeScript lit en JSONC.
  *
  * @param fileName Chemin relatif à la racine de l'application, par exemple `package.json`.
