@@ -1,13 +1,34 @@
 /**
  * Accès des tests aux fichiers de l'application, par des chemins ancrés sur ce module plutôt que
- * sur le dossier courant ; et lecture, dans le verrou npm, d'un paquet installé.
+ * sur le dossier courant ; lecture, dans le verrou npm, d'un paquet installé ; et lecture d'un
+ * texte par la configuration ESLint du projet.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { ESLint } from 'eslint'
 
 /** Racine de l'application : le dossier qui contient `package.json`. */
 export const APP_ROOT = fileURLToPath(new URL('..', import.meta.url))
+
+/** ESLint tel que la porte `npm run lint` le lance : configuration du projet, depuis sa racine. */
+const ESLINT = new ESLint({ cwd: APP_ROOT })
+
+/**
+ * Les règles qu'ESLint lève sur un texte, lu comme s'il était le fichier donné.
+ *
+ * @param filePath Chemin relatif à la racine de l'application, par exemple `src/App.tsx` : c'est
+ *   lui qui décide des blocs de configuration appliqués. Le fichier n'a pas à exister.
+ * @param text Le contenu à analyser.
+ * @returns L'identifiant de règle de chaque message, dans l'ordre d'ESLint ; `null` pour une
+ *   erreur d'analyse, et un message sans règle aussi pour un fichier ignoré — un texte que la
+ *   porte ne lirait pas ne rend donc jamais une liste vide.
+ */
+export async function lintRuleIds(filePath: string, text: string): Promise<(string | null)[]> {
+  const [result] = await ESLINT.lintText(text, { filePath: join(APP_ROOT, filePath) })
+
+  return result.messages.map((message) => message.ruleId)
+}
 
 /**
  * Lit un fichier JSON strict de l'application — pas un `tsconfig`, que TypeScript lit en JSONC.

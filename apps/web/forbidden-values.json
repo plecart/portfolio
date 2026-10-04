@@ -1,0 +1,26 @@
+[
+  {
+    "name": "couleur hexadécimale",
+    "pattern": "#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})([^0-9a-zA-Z_-]|$)"
+  },
+  {
+    "name": "fonction de couleur",
+    "pattern": "(^|[^0-9a-zA-Z_-])(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)[(]"
+  },
+  {
+    "name": "durée à unité",
+    "pattern": "(^|[^0-9a-zA-Z_.-])[0-9]*[.]?[0-9]+m?s([^0-9a-zA-Z_-]|$)"
+  },
+  {
+    "name": "durée numérique de Tailwind",
+    "pattern": "(^|[^0-9a-zA-Z_-])(duration|delay)-[0-9]"
+  },
+  {
+    "name": "fonction de courbe",
+    "pattern": "(^|[^0-9a-zA-Z_-])(cubic-bezier|linear|steps)[(]"
+  },
+  {
+    "name": "courbe linéaire de Tailwind",
+    "pattern": "(^|[^0-9a-zA-Z_-])ease-linear([^0-9a-zA-Z_-]|$)"
+  }
+]

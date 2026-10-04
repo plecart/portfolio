@@ -12,6 +12,20 @@ import js from '@eslint/js'
 import jsxA11y from 'eslint-plugin-jsx-a11y'
 import reactHooks from 'eslint-plugin-react-hooks'
 import tseslint from 'typescript-eslint'
+import forbiddenValues from './forbidden-values.json' with { type: 'json' }
+
+// Règle des valeurs : aucune couleur, durée ou courbe en dur dans un composant — elles viennent
+// des jetons de `src/tokens.css` (spec §2). Chaque motif de `forbidden-values.json`, que le
+// balayage des feuilles CSS lit aussi, vise les chaînes et les gabarits : classes et styles.
+// esquery ne garde pas les antislashs d'une expression régulière de sélecteur, d'où des motifs
+// faits de classes entre crochets. Formes couvertes et hors portée : tests/value-rule.test.ts.
+const valueSelectors = forbiddenValues.flatMap(({ name, pattern }) => {
+  const message = `Valeur en dur (${name}) : passer par un jeton de src/tokens.css (spec §2).`
+  return [
+    { selector: `Literal[value=/${pattern}/]`, message },
+    { selector: `TemplateElement[value.raw=/${pattern}/]`, message },
+  ]
+})
 
 export default tseslint.config(
   { ignores: ['dist'] },
@@ -22,6 +36,13 @@ export default tseslint.config(
   // `.eslintrc` (sa clé `plugins` est un tableau de chaînes) et ESLint 9 la refuse.
   reactHooks.configs.flat['recommended-latest'],
   jsxA11y.flatConfigs.recommended,
+  // Une seule entrée `no-restricted-syntax` par fichier : d'un bloc à l'autre, ESLint remplace
+  // les options d'une règle au lieu de les cumuler. Toute autre liste de sélecteurs sur `src/`
+  // s'ajoute donc à celle-ci.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: { 'no-restricted-syntax': ['error', ...valueSelectors] },
+  },
   // `public/` est copié tel quel par Vite et chargé en script classique, hors de toute
   // compilation : ni module, ni Node — seulement les globales du navigateur qu'il lit, déclarées
   // une à une plutôt que par un paquet de globales qui n'apporterait que cela.
