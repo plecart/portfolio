@@ -695,6 +695,9 @@ class GalleryImage(ProjectImage):
         # L'ordre de l'admin est l'ordre stocké ; à position égale, l'ordre de saisie.
         ordering = ("position", "id")
 
+    def __str__(self) -> str:
+        return f"{self.project} · {self.caption}"
+
 
 @receiver(pre_delete, sender=Cover)
 @receiver(pre_delete, sender=GalleryImage)

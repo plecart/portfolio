@@ -1,5 +1,5 @@
 """Tests de la fiche technique dans l'écran Projet : des sections libres en tableau en ligne, sous
-les technologies, que l'auteur ajoute, retire et ordonne avant d'enregistrer (D55, D57)."""
+la galerie, que l'auteur ajoute, retire et ordonne avant d'enregistrer (D55, D57)."""
 
 import html
 import json
@@ -14,17 +14,14 @@ from django.urls import reverse
 from django.utils.text import capfirst
 from factories import BLANK, saved, section, technology
 from test_project_admin import (
-    LINES,
+    ROWS,
+    group,
     inline_group,
     line,
     new_project_data,
     rendered_data,
     saved_project,
 )
-
-# Le préfixe des lignes de section dans le formulaire de l'écran Projet : le nom de la relation
-# inverse (`BaseInlineFormSet.get_default_prefix`).
-ROWS = "section_set"
 
 # Chaque champ d'une ligne de section que l'auteur voit, et son libellé du catalogue.
 SECTION_FIELD_LABELS = {
@@ -53,20 +50,15 @@ def stored(owner: Project) -> list[tuple[str, str, str]]:
 
 
 @pytest.mark.django_db
-def test_l_ecran_projet_montre_la_fiche_technique_sous_les_technologies(
-    admin_client: Client,
-) -> None:
-    """Un tableau en ligne titré, ses champs libellés du catalogue, rendu après celui des
-    technologies (brief, « Comportement souhaité »)."""
-    response = admin_client.get(reverse("admin:content_project_add"))
-    sections = inline_group(response, ROWS)
-    page = response.content.decode()
+def test_l_ecran_projet_montre_la_fiche_technique(admin_client: Client) -> None:
+    """Un tableau en ligne titré, ses champs libellés du catalogue. Sa place, en dernier, est tenue
+    avec celle des autres tableaux (`test_project_admin.py`)."""
+    sections = inline_group(admin_client.get(reverse("admin:content_project_add")), ROWS)
 
     assert sections.opts.verbose_name_plural == strings.SECTIONS_HEADING
     assert {
         name: sections.formset.form.base_fields[name].label for name in SECTION_FIELD_LABELS
     } == {name: capfirst(label) for name, label in SECTION_FIELD_LABELS.items()}
-    assert page.index(f'id="{LINES}-group"') < page.index(f'id="{ROWS}-group"')
 
 
 @pytest.mark.django_db
@@ -74,9 +66,8 @@ def test_les_sections_ont_la_poignee_de_tri_des_lignes(admin_client: Client) -> 
     """Le tableau des sections est un tableau en ligne ordonnable : chaque ligne porte la poignée
     que `inline_rows.js` rend glissable (ADR 0013)."""
     page = admin_client.get(reverse("admin:content_project_add")).content.decode()
-    group = page[page.index(f'id="{ROWS}-group"') :]
 
-    assert HANDLE_CLASS in group
+    assert HANDLE_CLASS in group(page, ROWS)
 
 
 @pytest.mark.django_db

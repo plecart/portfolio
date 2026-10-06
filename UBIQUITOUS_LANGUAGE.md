@@ -102,7 +102,10 @@ pas.
 
 Une image de la galerie d'un projet (`project.gallery`), à sa place dans la galerie ; le site
 l'affiche entière dans le cadre carré, sur fond neutre (spec §1.11). Supprimer le projet supprime
-sa galerie.
+sa galerie. L'écran Projet la saisit dans un tableau, sous les technologies, où l'auteur ajoute,
+retire et ordonne les images par glisser-déposer avant d'enregistrer une fois ; une ligne neuve
+laissée vide n'enregistre rien. Il montre l'aperçu de chaque original enregistré et son état, qui
+ne s'y modifie pas.
 
 | Terme | Identifiant | Règle |
 |---|---|---|

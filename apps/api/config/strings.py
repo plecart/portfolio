@@ -149,6 +149,9 @@ GALLERY_IMAGE = "image de galerie"
 GALLERY_IMAGES = "images de galerie"
 GALLERY_IMAGE_POSITION = "position"
 
+# Image de galerie : le titre de leur tableau dans l'écran Projet
+GALLERY_HEADING = "Galerie"
+
 # Aperçu Markdown de l'admin, sous la description d'un projet et le corps d'une section : sa
 # légende, et ce qu'il montre quand il ne peut pas se rafraîchir
 MARKDOWN_PREVIEW = "Aperçu"
