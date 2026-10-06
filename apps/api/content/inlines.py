@@ -15,7 +15,7 @@ on enregistre une fois.
 Le script et sa feuille valent pour tout tableau en ligne de l'écran qui les charge, ordonnable ou
 non : bouton unique de suppression et libellé des lignes enregistrées retiré compris.
 
-Les technologies et les sections d'un projet sont ordonnables.
+Les technologies, la galerie et les sections d'un projet sont ordonnables.
 """
 
 from collections.abc import Sequence

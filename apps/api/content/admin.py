@@ -16,7 +16,15 @@ from django.utils.safestring import SafeString, mark_safe
 from django_stubs_ext import StrOrPromise
 
 from content.inlines import InlineRowFormSet, InlineTable, SortableFormSet, SortableInline
-from content.models import Cover, Project, ProjectImage, ProjectTechnology, Section, Technology
+from content.models import (
+    Cover,
+    GalleryImage,
+    Project,
+    ProjectImage,
+    ProjectTechnology,
+    Section,
+    Technology,
+)
 from content.preview import MarkdownFieldsAdmin
 
 # Le côté de l'aperçu d'une icône dans la liste, en pixels : il tient dans une ligne de l'admin.
@@ -191,6 +199,24 @@ class ProjectTechnologyInline(SortableInline[ProjectTechnology, Project]):
         return formfield
 
 
+class GalleryInline(ImageFieldsAdmin[GalleryImage], SortableInline[GalleryImage, Project]):
+    """La galerie d'un projet, sous ses technologies : des images que l'auteur ajoute, retire et
+    ordonne par glisser-déposer, puis enregistre une fois (décision 11, ADR 0013). Son modèle n'a
+    aucune unicité qui lise le projet : à position égale, l'ordre de saisie."""
+
+    # Les feuilles et le script de ses deux bases. Django les réunit déjà le long de l'héritage
+    # (`forms.widgets.media_property`) ; la déclaration dit à pyright que les deux se combinent.
+    class Media(ImageFieldsAdmin.Media, SortableInline.Media): ...
+
+    model = GalleryImage
+    fields = ("move", "preview", "original", "caption", "state", "position")
+    readonly_fields = ("move", "preview", "state")
+    verbose_name_plural = strings.GALLERY_HEADING
+    # Une seule ligne neuve à l'ouverture, comme la fiche technique : l'auteur en ajoute d'autres
+    # par le bouton de l'écran.
+    extra = 1
+
+
 class SectionFormSet(SortableFormSet[Section, Project]):
     """Les sections d'un projet, avec le message du catalogue pour la seule unicité que le
     formulaire compare entre ses lignes, avant la base : l'ancre."""
@@ -199,7 +225,7 @@ class SectionFormSet(SortableFormSet[Section, Project]):
 
 
 class SectionInline(MarkdownFieldsAdmin[Section], SortableInline[Section, Project]):
-    """La fiche technique d'un projet, en ligne sur l'écran Projet, sous ses technologies : des
+    """La fiche technique d'un projet, en ligne sur l'écran Projet, sous sa galerie : des
     sections libres que l'auteur ajoute, retire et ordonne par glisser-déposer (D55, D57).
     L'ancre se remplit depuis le titre à la saisie et reste modifiable, comme le slug du
     projet ; le corps, en Markdown, a son aperçu."""
@@ -227,11 +253,12 @@ class SectionInline(MarkdownFieldsAdmin[Section], SortableInline[Section, Projec
 
 @admin.register(Project)
 class ProjectAdmin(MarkdownFieldsAdmin[Project], admin.ModelAdmin[Project]):
-    """Écran Projet : tous les champs du projet, sa couverture, ses technologies en ligne, puis sa
-    fiche technique, en un seul écran (PRD, US 34). Le slug se remplit depuis le titre à la saisie
-    et reste modifiable (décision 3) ; la description, en Markdown, a son aperçu."""
+    """Écran Projet : tous les champs du projet, sa couverture, ses technologies en ligne, sa
+    galerie, puis sa fiche technique, en un seul écran (PRD, US 34). Le slug se remplit depuis le
+    titre à la saisie et reste modifiable (décision 3) ; la description, en Markdown, a son
+    aperçu."""
 
     list_display = ("title", "kind", "status", "showcase", "published")
     markdown_fields = ("description",)
     prepopulated_fields: ClassVar[dict[str, Sequence[str]]] = {"slug": ("title",)}
-    inlines = (CoverInline, ProjectTechnologyInline, SectionInline)
+    inlines = (CoverInline, ProjectTechnologyInline, GalleryInline, SectionInline)

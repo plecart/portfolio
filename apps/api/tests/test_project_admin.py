@@ -13,6 +13,7 @@ from content.inlines import HANDLE_CLASS, POSITION_CLASS
 from content.models import Project, ProjectTechnology, Technology
 from django.contrib.admin.helpers import InlineAdminFormSet
 from django.contrib.staticfiles import finders
+from django.core.files import File
 from django.forms import FileField
 from django.templatetags.static import static
 from django.test import Client
@@ -44,10 +45,13 @@ PROJECT_TECHNOLOGY_FIELD_LABELS = {
     "position": strings.PROJECT_TECHNOLOGY_POSITION,
 }
 
-# Le préfixe des lignes de technologie, puis celui du bloc de la couverture, dans le formulaire de
-# l'écran Projet : le nom de la relation inverse (`BaseInlineFormSet.get_default_prefix`).
+# Le préfixe des lignes de technologie, du bloc de la couverture, des lignes de la galerie et de
+# celles de la fiche technique, dans le formulaire de l'écran Projet : le nom de la relation
+# inverse (`BaseInlineFormSet.get_default_prefix`).
 LINES = "projecttechnology_set"
 COVER = "cover"
+GALLERY = "gallery"
+ROWS = "section_set"
 
 # Le script et la feuille des lignes en ligne : tri par glisser-déposer, bouton unique de
 # suppression (`content/inlines.py`).
@@ -63,6 +67,13 @@ def inline_group(response: Any, prefix: str) -> InlineAdminFormSet:
     """Le tableau en ligne `prefix` de l'écran que `response`, réponse du client de test, rend."""
     groups: list[InlineAdminFormSet] = response.context["inline_admin_formsets"]
     return next(group for group in groups if group.formset.prefix == prefix)
+
+
+def group(page: str, prefix: str) -> str:
+    """Le tableau en ligne `prefix` dans `page`, l'écran Projet rendu, jusqu'au tableau suivant."""
+    start = page.index(f'id="{prefix}-group"')
+    end = page.find("js-inline-admin-formset", start)
+    return page[start : end if end != -1 else None]
 
 
 def rendered_data(admin_client: Client, url: str) -> dict[str, object]:
@@ -89,18 +100,23 @@ def rendered_data(admin_client: Client, url: str) -> dict[str, object]:
     return data
 
 
-def cover_row(**fields: object) -> dict[str, object]:
-    """Le bloc de la couverture rempli : une image valide et sa légende ; `fields` en remplace des
-    champs, sous leur nom de modèle (`original`, `caption`)."""
+def image_row(prefix: str, index: int = 0, /, **fields: object) -> dict[str, object]:
+    """La ligne `index` du tableau d'images `prefix` remplie : une image valide et sa légende ;
+    `fields` en remplace ou en ajoute, sous leur nom de modèle (`original`, `caption`,
+    `position`). Un fichier est rembobiné : le client de test l'envoie depuis là où il en est, et
+    une même table de cas sert à plusieurs tests."""
     row = {"original": image_upload(), "caption": "La table des projets.", **fields}
-    return {f"{COVER}-0-{name}": value for name, value in row.items()}
+    for value in row.values():
+        if isinstance(value, File):
+            value.seek(0)
+    return {f"{prefix}-{index}-{name}": value for name, value in row.items()}
 
 
 def new_project_data(admin_client: Client, **fields: object) -> dict[str, object]:
     """Le formulaire d'ajout d'un projet, rempli avec le projet de la fabrique et sa couverture ;
     `fields` en remplace des champs ou remplit des lignes (`f"{LINES}-0-technology"`…)."""
     source = project()
-    data = rendered_data(admin_client, reverse("admin:content_project_add")) | cover_row()
+    data = rendered_data(admin_client, reverse("admin:content_project_add")) | image_row(COVER)
     data |= {
         name: value
         for name in PROJECT_FIELD_LABELS
@@ -161,6 +177,19 @@ def test_l_ecran_projet_affiche_les_libelles_du_catalogue(admin_client: Client) 
     assert f"<h1>{escape(gettext('Add %s') % strings.PROJECT)}</h1>" in page
     assert escape(capfirst(strings.PROJECT_TECHNOLOGIES)) in page
     assert f'<th class="column-move">{escape(capfirst(strings.ADMIN_ROW_ORDER))}' in page
+
+
+@pytest.mark.django_db
+def test_l_ecran_projet_range_couverture_technologies_galerie_puis_fiche_technique(
+    admin_client: Client,
+) -> None:
+    """L'ordre des tableaux en ligne du PRD, « Back-office » (brief de #9, décision 11)."""
+    page = admin_client.get(reverse("admin:content_project_add")).content.decode()
+
+    positions = [page.find(f'id="{prefix}-group"') for prefix in (COVER, LINES, GALLERY, ROWS)]
+
+    assert -1 not in positions
+    assert positions == sorted(positions)
 
 
 @pytest.mark.django_db
@@ -512,13 +541,9 @@ def test_chaque_ligne_de_technologie_porte_une_poignee_de_tri(admin_client: Clie
         f'<button type="button" class="sortable-handle" '
         f'aria-label="{escape(strings.ADMIN_ROW_MOVE)}"'
     )
-    # Le tableau des technologies seul, jusqu'au tableau en ligne suivant : les sections ont leurs
-    # propres poignées.
-    start = page.index(f'id="{LINES}-group"')
-    end = page.find("js-inline-admin-formset", start)
-    group = page[start : end if end != -1 else None]
-    # Une poignée par ligne, enregistrée ou neuve, plus celle du modèle de ligne que l'admin clone.
-    assert group.count(handle) == len(lines.forms) + 1
+    # Une poignée par ligne, enregistrée ou neuve, plus celle du modèle de ligne que l'admin clone ;
+    # dans le tableau des technologies seul : la galerie et les sections ont leurs propres poignées.
+    assert group(page, LINES).count(handle) == len(lines.forms) + 1
     positions = re.findall(rf'<input type="hidden" name="{LINES}-\d+-position"[^>]*>', page)
     assert len(positions) == len(lines.forms)
     assert all('class="sortable-position"' in position for position in positions)

@@ -1,5 +1,5 @@
-"""Tests du tableau en ligne ordonnable générique (`content/inlines.py`), hors de tout écran : ce
-dont la galerie de #9 héritera."""
+"""Tests des tableaux en ligne génériques (`content/inlines.py`), hors de tout écran : ce dont la
+couverture, les technologies, la galerie et les sections d'un projet héritent."""
 
 import inspect
 
