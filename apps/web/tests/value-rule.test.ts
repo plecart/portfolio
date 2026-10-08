@@ -57,6 +57,9 @@ type ForbiddenValue = { name: string; pattern: string }
 
 const FORBIDDEN_VALUES = readAppJson<ForbiddenValue[]>('forbidden-values.json')
 
+/** Le refus de cette règle, et pas celui de la règle des chaînes, qui partage son identifiant. */
+const VALUE_REFUSAL = expect.stringContaining('Valeur en dur')
+
 /** Le seul fichier où un littéral de couleur, de durée ou de courbe a sa place. */
 const TOKENS_SHEET = 'tokens.css'
 
@@ -95,7 +98,7 @@ describe('ESLint refuse une valeur en dur dans un composant', () => {
     ['fonction de couleur en capitales', "<p style={{ color: 'RGB(42, 38, 34)' }} />"],
     ['unité en capitale', "<p style={{ transition: 'opacity .2S' }} />"],
   ])('%s', async (_, code) => {
-    expect(await lintComponent(code)).toContain('no-restricted-syntax')
+    expect(await lintComponent(code)).toContainEqual(VALUE_REFUSAL)
   })
 
   test.each([
@@ -107,7 +110,7 @@ describe('ESLint refuse une valeur en dur dans un composant', () => {
     ['transition par défaut', '<p className="transition-colors" />'],
     ['nombre', '200'],
   ])('%s passe', async (_, code) => {
-    expect(await lintComponent(code)).not.toContain('no-restricted-syntax')
+    expect(await lintComponent(code)).not.toContainEqual(VALUE_REFUSAL)
   })
 
   test('un script JavaScript de src/ est lu aussi', async () => {
