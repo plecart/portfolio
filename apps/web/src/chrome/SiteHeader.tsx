@@ -1,0 +1,44 @@
+import { strings } from '../strings.ts'
+import { useHeaderScroll } from './useHeaderScroll.ts'
+
+/**
+ * Classes de l'entête, par intention. Les dimensions — 56 px de haut (`h-14`), nom en 15 px — sont
+ * propres à l'objet (spec §2.2, §2.3) ; le reste vient des jetons.
+ */
+const HEADER_CLASSES = [
+  // Boîte : fixe en haut, au-dessus de la table ; 16 px de marge sous 600 px, 24 au-delà (§3.3).
+  'fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between px-(--s-4) sm:px-(--s-5)',
+  // Décollée dès 1 px : papier à 94 % (§2.1) et filet, la seule ombre de l'entête (§2.5).
+  'data-detached:bg-[color-mix(in_srgb,var(--paper)_94%,transparent)]',
+  'data-detached:[box-shadow:0_1px_0_var(--line)]',
+  // Sortie et retour en 240 ms, fond et filet en 150 ms (§2.7).
+  '[transition:translate_var(--dur)_var(--ease-out),opacity_var(--dur-fast)_var(--ease-out),background-color_var(--dur-fast)_var(--ease-out),box-shadow_var(--dur-fast)_var(--ease-out)]',
+  // Sortie par le haut ; en mouvement réduit, fondu sans translation (§6.3). Le focus la retient.
+  'motion-safe:data-hidden:not-focus-within:-translate-y-full',
+  'motion-reduce:data-hidden:not-focus-within:pointer-events-none',
+  'motion-reduce:data-hidden:not-focus-within:opacity-0',
+].join(' ')
+
+/**
+ * L'entête du site (spec §1.12, §3.3) : une ligne fixe, le nom à gauche — seul titre de niveau 1
+ * de la page (brief de #18, décision 9), lien vers l'accueil. Transparente en haut de page, elle se
+ * décolle au défilement, sort en descendant, revient en remontant, et reste visible tant qu'elle
+ * contient le focus clavier.
+ */
+export function SiteHeader() {
+  const { detached, hidden } = useHeaderScroll()
+
+  return (
+    <header
+      data-detached={detached || undefined}
+      data-hidden={hidden || undefined}
+      className={HEADER_CLASSES}
+    >
+      <h1 className="text-[15px] font-semibold tracking-[.01em]">
+        <a href="/" className="transition-colors hover:text-(--accent)">
+          {strings.siteName}
+        </a>
+      </h1>
+    </header>
+  )
+}

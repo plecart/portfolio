@@ -237,6 +237,10 @@ sa couleur. C'est l'une des trois portes de la règle des valeurs (CONTRIBUTING.
 front ») ; les deux autres, ESLint et le balayage des feuilles CSS, lisent les motifs de
 `forbidden-values.json`.
 
+Ses points de rupture aussi : `--breakpoint-*` vaut `initial`, et `--breakpoint-sm` 600 px — le
+seul point de rupture de la spec (§6.1), au lieu des 640 px de Tailwind. `md:` ou `lg:` ne
+produisent plus rien ; le scénario de l'entête à 599 et 600 px de large prouve la valeur.
+
 La palette sombre ne vit dans aucun sélecteur : chaque couleur porte ses deux valeurs dans
 `light-dark()`, et `color-scheme` choisit — `light dark` par défaut, le mode de `data-theme` quand
 il est forcé. La minification de Vite 8.3 (Lightning CSS, cible « baseline widely available »)
