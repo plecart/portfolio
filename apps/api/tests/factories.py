@@ -8,7 +8,6 @@ from datetime import date
 from io import BytesIO
 
 from content.models import (
-    Cover,
     GalleryImage,
     Project,
     ProjectKind,
@@ -60,7 +59,8 @@ def image_upload(
     """Une image téléversée, fabriquée en mémoire par Pillow : `size` en pixels, au format
     `image_format`, sous le nom `name` — qui peut mentir sur le format.
 
-    Par défaut, un carré de 1200 px : une couverture valide, et une image de galerie aussi.
+    Par défaut, un carré de 1200 px : une image de galerie valide, à la première place comme aux
+    autres — la couverture.
     `padding` octets nuls suivent l'image, que ses lecteurs ignorent : un poids s'atteint sans
     fabriquer une grande image. `frames` images dans le fichier, pour un format qui en porte
     plusieurs — un MPO n'en est un qu'à partir de deux.
@@ -94,22 +94,9 @@ def project(**fields: object) -> Project:
     )
 
 
-def cover(owner: Project, **fields: object) -> Cover:
-    """Une couverture valide de `owner`, non enregistrée : un carré de 1200 px en PNG ;
-    `fields` en remplace des champs."""
-    return Cover(
-        **{
-            "project": owner,
-            "original": image_upload(),
-            "caption": "La table des projets.",
-            **fields,
-        }
-    )
-
-
 def gallery_image(owner: Project, **fields: object) -> GalleryImage:
-    """Une image de galerie valide de `owner`, non enregistrée, à la première place ; `fields` en
-    remplace des champs."""
+    """Une image de galerie valide de `owner`, non enregistrée, à la première place — la
+    couverture : un carré de 1200 px en PNG ; `fields` en remplace des champs."""
     return GalleryImage(
         **{
             "project": owner,

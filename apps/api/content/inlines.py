@@ -1,21 +1,16 @@
-"""Tableaux en ligne de l'admin, et ceux dont l'auteur ordonne les lignes par glisser-déposer
-(ADR 0013).
+"""Tableaux en ligne de l'admin dont l'auteur ordonne les lignes par glisser-déposer (ADR 0013).
 
-Tout tableau en ligne de l'écran hérite de `InlineTable` : chaque ligne y juge toutes les règles
-de son modèle (`InlineRowForm`), et son minimum se compte sur les lignes remplies
-(`InlineRowFormSet`). La couverture d'un projet s'en sert.
-
-Un tableau ordonnable hérite de `SortableInline`, et son modèle porte un entier `position` :
-chaque ligne, enregistrée ou neuve, reçoit une poignée ; `inline_rows.js` réordonne les lignes,
-remplit les positions dans l'ordre affiché à l'enregistrement — et remet les index là où Django
-les lit —, replace les lignes dans cet ordre quand l'écran revient en erreur, et donne à toute
-ligne le même bouton de suppression. On manipule les lignes — ajouter, retirer, déplacer —, puis
-on enregistre une fois.
+Un tableau en ligne hérite de `SortableInline`, et son modèle porte un entier `position` : chaque
+ligne, enregistrée ou neuve, reçoit une poignée ; `inline_rows.js` réordonne les lignes, remplit
+les positions dans l'ordre affiché à l'enregistrement — et remet les index là où Django les lit —,
+replace les lignes dans cet ordre quand l'écran revient en erreur, et donne à toute ligne le même
+bouton de suppression. On manipule les lignes — ajouter, retirer, déplacer —, puis on enregistre
+une fois.
 
 Le script et sa feuille valent pour tout tableau en ligne de l'écran qui les charge, ordonnable ou
 non : bouton unique de suppression et libellé des lignes enregistrées retiré compris.
 
-Les technologies, la galerie et les sections d'un projet sont ordonnables.
+Les technologies, la galerie et les sections d'un projet s'en servent.
 """
 
 from collections.abc import Sequence
@@ -44,7 +39,7 @@ POSITION_CLASS = "sortable-position"
 
 class InlineRowForm[ChildT: Model](ModelForm[ChildT]):
     """Une ligne de tableau en ligne, qu'on peut retirer, rajouter ou changer avant
-    l'enregistrement, et qui juge toutes les règles de son modèle.
+    l'enregistrement.
 
     Django vérifierait ligne par ligne, contre la base, les contraintes qui lisent le parent — une
     unicité (parent, objet) — : une ligne que le même envoi supprime ou change y existe encore, et
@@ -54,10 +49,6 @@ class InlineRowForm[ChildT: Model](ModelForm[ChildT]):
     que l'envoi ne porte pas (`SortableFormSet.validate_unique`). La base les garantit à la fin
     de l'enregistrement, à condition qu'elles y soient différées (`Deferrable.DEFERRED`) : Django
     écrit les lignes l'une après l'autre, et un échange entre deux lignes passe par un doublon.
-
-    Django écarterait aussi les contraintes qui lisent un champ absent du formulaire
-    (`BaseModelForm._get_validation_exclusions`) — les dimensions d'une image, lues dans son
-    fichier — : la base les refuserait seule, en erreur d'enregistrement. La ligne les juge.
     """
 
     def has_changed(self) -> bool:
@@ -80,25 +71,9 @@ class InlineRowForm[ChildT: Model](ModelForm[ChildT]):
             self.add_error(None, error)
 
 
-class InlineRowFormSet[ChildT: Model, ParentT: Model](
+class SortableFormSet[ChildT: Model, ParentT: Model](
     BaseInlineFormSet[ChildT, ParentT, ModelForm[ChildT]]
 ):
-    """Les lignes d'un tableau en ligne, dont le minimum se compte sur les lignes remplies."""
-
-    def get_form_kwargs(self, index: int | None) -> dict[str, Any]:
-        """Quand `validate_min` compte le minimum sur les lignes remplies, toute ligne neuve peut
-        rester vide, la première comprise : Django exige sinon les `min_num` premières
-        (`BaseFormSet._construct_form`), quelle que soit la ligne que l'auteur a remplie ou placée
-        en tête, et une ligne laissée vide afficherait les refus de ses champs au lieu de celui du
-        tableau. Sans `validate_min`, ces lignes obligatoires sont le seul minimum du tableau :
-        elles le restent."""
-        kwargs = super().get_form_kwargs(index)
-        if self.validate_min and index is not None and index >= self.initial_form_count():
-            kwargs["empty_permitted"] = True
-        return kwargs
-
-
-class SortableFormSet[ChildT: Model, ParentT: Model](InlineRowFormSet[ChildT, ParentT]):
     """Les lignes d'un tableau en ligne ordonné. Une ligne arrivée sans position, champ caché que
     l'auteur ne voit pas, en reçoit une au lieu d'échouer en base."""
 
@@ -110,6 +85,17 @@ class SortableFormSet[ChildT: Model, ParentT: Model](InlineRowFormSet[ChildT, Pa
     def get_unique_error_message(self, unique_check: Sequence[str]) -> str:
         """Le message du doublon : celui du tableau, sinon celui de Django."""
         return self.unique_error_message or super().get_unique_error_message(unique_check)
+
+    def get_form_kwargs(self, index: int | None) -> dict[str, Any]:
+        """Quand `validate_min` compte le minimum sur les lignes remplies, toute ligne neuve peut
+        rester vide, la première comprise : Django exige sinon les `min_num` premières
+        (`BaseFormSet._construct_form`), quelle que soit la ligne que l'auteur a remplie ou placée
+        en tête. Sans `validate_min`, ces lignes obligatoires sont le seul minimum du tableau :
+        elles le restent."""
+        kwargs = super().get_form_kwargs(index)
+        if self.validate_min and index is not None and index >= self.initial_form_count():
+            kwargs["empty_permitted"] = True
+        return kwargs
 
     def _should_delete_form(self, form: ModelForm[ChildT]) -> bool:
         """Une ligne enregistrée dont l'objet a disparu depuis l'ouverture de l'écran — supprimé
@@ -172,36 +158,18 @@ class SortableFormSet[ChildT: Model, ParentT: Model](InlineRowFormSet[ChildT, Pa
         return super().save_existing(form, obj, commit=commit)
 
 
-class InlineTable[ChildT: Model, ParentT: Model](admin.TabularInline[ChildT, ParentT]):
-    """Un tableau en ligne de l'écran : chaque ligne juge toutes les règles de son modèle
-    (`InlineRowForm`), et un `min_num` est une règle, comptée sur les lignes remplies.
-
-    Un formset propre à l'écran hérite de `InlineRowFormSet`. Une unicité du modèle qui lit le
-    parent y est différée (`Deferrable.DEFERRED`, voir `InlineRowForm`) : sinon, un échange entre
-    deux lignes enregistrées lèverait une erreur de base.
-    """
-
-    form = InlineRowForm
-    formset = InlineRowFormSet
-
-    def get_formset(
-        self, request: HttpRequest, obj: ParentT | None = None, **kwargs: Any
-    ) -> type[BaseInlineFormSet[ChildT, ParentT, ModelForm[ChildT]]]:
-        """Le formset, qui refuse un parent sous son minimum. L'admin ne transmet pas
-        `validate_min` à la fabrique du formset (`InlineModelAdmin.get_formset`) : `min_num` seul
-        rend des lignes obligatoires, qu'un formulaire sans ligne ou la suppression des lignes
-        enregistrées contournent. Sans `min_num`, le minimum est nul : rien ne change."""
-        return super().get_formset(request, obj, validate_min=True, **kwargs)
-
-
-class SortableInline[ChildT: Model, ParentT: Model](InlineTable[ChildT, ParentT]):
+class SortableInline[ChildT: Model, ParentT: Model](admin.TabularInline[ChildT, ParentT]):
     """Un tableau en ligne dont les lignes s'ordonnent par glisser-déposer, ou au clavier.
 
     Ses `fields` commencent par `move`, la poignée, et contiennent `position`, qui y est caché. Un
     formset propre à l'écran hérite de `SortableFormSet` ; des `readonly_fields` propres gardent
-    `move`, sans quoi Django le cherche parmi les champs du modèle.
+    `move`, sans quoi Django le cherche parmi les champs du modèle. Une unicité du modèle qui lit
+    le parent y est différée (`Deferrable.DEFERRED`, voir `InlineRowForm`) : sinon, un échange
+    entre deux lignes enregistrées lèverait une erreur de base. Un `min_num` est une règle, comptée
+    sur les lignes remplies.
     """
 
+    form = InlineRowForm
     formset = SortableFormSet
     readonly_fields = ("move",)
 
@@ -219,6 +187,15 @@ class SortableInline[ChildT: Model, ParentT: Model](InlineTable[ChildT, ParentT]
             handle=HANDLE_CLASS,
             label=strings.ADMIN_ROW_MOVE,
         )
+
+    def get_formset(
+        self, request: HttpRequest, obj: ParentT | None = None, **kwargs: Any
+    ) -> type[BaseInlineFormSet[ChildT, ParentT, ModelForm[ChildT]]]:
+        """Le formset, qui refuse un parent sous son minimum. L'admin ne transmet pas
+        `validate_min` à la fabrique du formset (`InlineModelAdmin.get_formset`) : `min_num` seul
+        rend des lignes obligatoires, qu'un formulaire sans ligne ou la suppression des lignes
+        enregistrées contournent. Sans `min_num`, le minimum est nul : rien ne change."""
+        return super().get_formset(request, obj, validate_min=True, **kwargs)
 
     def formfield_for_dbfield(
         self, db_field: Field[Any, Any], request: HttpRequest, **kwargs: Any

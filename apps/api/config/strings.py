@@ -82,7 +82,7 @@ PROJECT_FINISHED_ON_MISSING = "Un projet terminé ou archivé porte une date de 
 PROJECT_ONGOING_FINISHED = "Un projet en cours n’a pas de date de fin."
 PROJECT_DATES_REVERSED = "La date de fin d’un projet ne précède pas sa date de début."
 PROJECT_SHOWCASE_TAKEN = "Un autre projet est déjà la vitrine : un seul l’est à la fois."
-PROJECT_COVER_MISSING = "Un projet porte une couverture."
+PROJECT_IMAGES_MISSING = "Un projet porte au moins une image."
 
 # Technologie de projet : modèle et champ ; le projet et la technologie qu'elle lie portent leurs
 # propres noms
@@ -114,7 +114,7 @@ SECTION_ANCHOR_INVALID = (
 SECTION_ANCHOR_TAKEN = "Une autre section de ce projet porte déjà cette ancre."
 SECTION_BODY_MISSING = "Une section porte un texte, et pas seulement des espaces."
 
-# Image d'un projet, couverture ou image de galerie : champs et valeurs de l'état de traitement
+# Image d'un projet : champs et valeurs de l'état de traitement
 IMAGE_ORIGINAL = "original"
 IMAGE_WIDTH = "largeur"
 IMAGE_HEIGHT = "hauteur"
@@ -138,12 +138,6 @@ IMAGE_CAPTION_TOO_LONG = "La légende d’une image tient en 50 caractères au p
 IMAGE_STATE_UNKNOWN = "L’état d’une image est en attente, prêt ou échec."
 IMAGE_VARIANTS_UNREADY = "Seule une image prête porte des variantes."
 
-# Couverture : modèle et refus
-COVER = "couverture"
-COVERS = "couvertures"
-COVER_NOT_SQUARE = "Une couverture est carrée : sa largeur égale sa hauteur."
-COVER_TOO_SMALL = "Une couverture mesure au moins 1200 px de côté."
-
 # Image de galerie : modèle et champ
 GALLERY_IMAGE = "image de galerie"
 GALLERY_IMAGES = "images de galerie"
@@ -151,6 +145,14 @@ GALLERY_IMAGE_POSITION = "position"
 
 # Image de galerie : le titre de leur tableau dans l'écran Projet
 GALLERY_HEADING = "Galerie"
+
+# Image de galerie : refus de la première, la couverture
+GALLERY_COVER_NOT_SQUARE = (
+    "La première image est la couverture : elle est carrée, sa largeur égale sa hauteur."
+)
+GALLERY_COVER_TOO_SMALL = (
+    "La première image est la couverture : elle mesure au moins 1200 px de côté."
+)
 
 # Aperçu Markdown de l'admin, sous la description d'un projet et le corps d'une section : sa
 # légende, et ce qu'il montre quand il ne peut pas se rafraîchir

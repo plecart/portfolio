@@ -1,14 +1,14 @@
-"""Tests des images d'un projet dans l'écran Projet : le bloc de la couverture, exigée, et le
-tableau de la galerie, ordonnable ; leurs aperçus et leurs états (brief de #9, décisions 2, 3 et
-11). Les règles des images elles-mêmes sont éprouvées dans `test_images.py` et `test_cover.py` ;
-ici, ce que l'écran en montre et en refuse."""
+"""Tests des images d'un projet dans l'écran Projet : le tableau de la galerie, ordonnable, exigé,
+dont la première image est la couverture ; ses aperçus et ses états (brief de #9, décisions 2, 3,
+4 et 11). Les règles de chaque image sont éprouvées dans `test_images.py` ; ici, ce que l'écran en
+montre et en refuse, et la forme de la couverture, qu'il est seul à tenir."""
 
 import re
 
 import pytest
 from config import strings
 from content.inlines import HANDLE_CLASS
-from content.models import Cover, GalleryImage, ProcessingState, Project
+from content.models import GalleryImage, ProcessingState, Project
 from django.contrib.admin.helpers import InlineAdminFormSet
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -21,7 +21,6 @@ from django.utils.text import capfirst
 from factories import BLANK, gallery_image, image_upload, project, saved, technology
 from pytest_django import DjangoCaptureOnCommitCallbacks
 from test_project_admin import (
-    COVER,
     GALLERY,
     INLINE_ROWS_SCRIPT,
     INLINE_ROWS_STYLE,
@@ -35,11 +34,10 @@ from test_project_admin import (
     saved_project,
 )
 
-# La feuille de l'aperçu des images (`ImageFieldsAdmin`).
+# La feuille de l'aperçu des images (`GalleryInline`).
 IMAGE_PREVIEW_STYLE = "content/admin/image_preview.css"
 
-# Les colonnes que la couverture et la galerie ont en commun, dans l'ordre, et leur libellé du
-# catalogue.
+# Les colonnes d'une image, dans l'ordre, et leur libellé du catalogue.
 IMAGE_COLUMNS = {
     "preview": strings.IMAGE_PREVIEW,
     "original": strings.IMAGE_ORIGINAL,
@@ -61,13 +59,30 @@ IMAGE_REFUSALS = [
     ("légende sans fichier", {"original": ""}, strings.IMAGE_ORIGINAL_MISSING),
 ]
 
-# Ce que le bloc de la couverture refuse en plus : sa forme, que la base porte sur des colonnes
-# absentes du formulaire.
-COVER_REFUSALS = [
-    ("non carrée", {"original": image_upload(size=(1200, 1201))}, strings.COVER_NOT_SQUARE),
-    ("trop petite", {"original": image_upload(size=(1199, 1199))}, strings.COVER_TOO_SMALL),
-    *IMAGE_REFUSALS,
+# Le côté minimal de la couverture (spec §1.11 et §7), écrit ici et non lu sur le modèle, pour
+# qu'une borne changée fasse rougir ce fichier.
+MIN_SIDE = 1200
+
+# Les formes que la couverture refuse, bornes éprouvées des deux côtés, chacune avec ses refus.
+SHAPE_REFUSALS = [
+    (
+        f"{MIN_SIDE - 1} × {MIN_SIDE - 1}",
+        (MIN_SIDE - 1, MIN_SIDE - 1),
+        [strings.GALLERY_COVER_TOO_SMALL],
+    ),
+    (f"{MIN_SIDE} × {MIN_SIDE + 1}", (MIN_SIDE, MIN_SIDE + 1), [strings.GALLERY_COVER_NOT_SQUARE]),
+    (f"{MIN_SIDE + 1} × {MIN_SIDE}", (MIN_SIDE + 1, MIN_SIDE), [strings.GALLERY_COVER_NOT_SQUARE]),
+    # Le petit côté compte : plus large que la borne, mais trop basse.
+    (
+        f"{MIN_SIDE + 100} × {MIN_SIDE - 100}",
+        (MIN_SIDE + 100, MIN_SIDE - 100),
+        [strings.GALLERY_COVER_NOT_SQUARE, strings.GALLERY_COVER_TOO_SMALL],
+    ),
 ]
+
+# Une image libre, qui ne peut pas être la couverture : en paysage, assez haute pour ne recevoir
+# qu'un refus en tête.
+LANDSCAPE = (1600, MIN_SIDE)
 
 
 def messages(form: BaseForm) -> list[str]:
@@ -80,19 +95,12 @@ def columns(block: InlineAdminFormSet) -> list[tuple[str, str]]:
     return [(str(field["name"]), capfirst(str(field["label"]))) for field in block.fields()]
 
 
-@pytest.mark.django_db
-def test_l_ecran_projet_montre_le_bloc_de_la_couverture(admin_client: Client) -> None:
-    """Un bloc titré « Couverture », au singulier, d'une seule ligne, sans ajout ni suppression,
-    colonnes libellées du catalogue (décision 11)."""
-    response = admin_client.get(reverse("admin:content_project_add"))
-    block = inline_group(response, COVER)
-    cover_group = group(response.content.decode(), COVER)
-
-    assert columns(block) == [(name, capfirst(label)) for name, label in IMAGE_COLUMNS.items()]
-    assert (block.formset.max_num, block.formset.can_delete) == (1, False)
-    assert escape(capfirst(strings.COVER)) in cover_group
-    assert escape(capfirst(strings.COVERS)) not in cover_group
-    assert static(IMAGE_PREVIEW_STYLE) in str(block.media)
+def with_landscape_second() -> tuple[Project, str]:
+    """Un projet enregistré dont la galerie porte la couverture, carrée, puis une image en
+    paysage ; et l'adresse de son écran."""
+    portfolio = saved_project(saved(technology(name="Django")))
+    saved(gallery_image(portfolio, original=image_upload(size=LANDSCAPE), position=2))
+    return portfolio, reverse("admin:content_project_change", args=[portfolio.pk])
 
 
 @pytest.mark.django_db
@@ -116,13 +124,14 @@ def test_l_ecran_projet_montre_la_galerie_en_tableau_ordonnable(admin_client: Cl
 
 @pytest.mark.django_db
 def test_l_admin_enregistre_un_projet_avec_sa_couverture_en_attente(admin_client: Client) -> None:
-    """La couverture naît avec le projet, « en attente », sans variante : rien ici ne la traite."""
+    """La couverture naît avec le projet, première image de sa galerie, « en attente », sans
+    variante : rien ici ne la traite."""
     data = new_project_data(admin_client, **line(0, saved(technology(name="Django")), 1))
 
     response = admin_client.post(reverse("admin:content_project_add"), data)
 
     assert response.status_code == 302
-    made = Project.objects.get().cover
+    made = Project.objects.get().gallery.get()
     assert (made.caption, made.state, made.variants) == (
         "La table des projets.",
         ProcessingState.PENDING,
@@ -134,158 +143,259 @@ def test_l_admin_enregistre_un_projet_avec_sa_couverture_en_attente(admin_client
 @pytest.mark.parametrize(
     "fields",
     [
-        {f"{COVER}-0-original": "", f"{COVER}-0-caption": ""},
-        {f"{COVER}-TOTAL_FORMS": 0},
+        {f"{GALLERY}-0-original": "", f"{GALLERY}-0-caption": ""},
+        {f"{GALLERY}-TOTAL_FORMS": 0},
     ],
-    ids=["bloc laissé vide", "aucun bloc envoyé"],
+    ids=["lignes laissées vides", "aucune ligne envoyée"],
 )
-def test_l_admin_refuse_un_projet_sans_couverture(
+def test_l_admin_refuse_un_projet_sans_image(
     admin_client: Client, fields: dict[str, object]
 ) -> None:
-    """Une couverture, toujours, brouillon compris (décision 2) : seconde règle hors base, après
-    « au moins une technologie » ; un seul message, celui du catalogue, au-dessus du bloc."""
+    """Une image au moins, toujours, brouillon compris (décision 2) : un seul message, celui du
+    catalogue, au-dessus du tableau."""
     data = new_project_data(admin_client, **line(0, saved(technology(name="Django")), 1), **fields)
 
     response = admin_client.post(reverse("admin:content_project_add"), data)
 
-    block = inline_group(response, COVER).formset
-    assert list(block.non_form_errors()) == [strings.PROJECT_COVER_MISSING]
-    assert [messages(form) for form in block.forms if form.errors] == []
+    gallery = inline_group(response, GALLERY).formset
+    assert list(gallery.non_form_errors()) == [strings.PROJECT_IMAGES_MISSING]
+    assert [messages(form) for form in gallery.forms if form.errors] == []
     assert not Project.objects.exists()
 
 
 @pytest.mark.django_db
-def test_un_projet_ne_sans_couverture_la_recoit_a_son_prochain_enregistrement(
+def test_un_projet_ne_sans_image_recoit_sa_couverture_a_son_prochain_enregistrement(
     admin_client: Client,
 ) -> None:
-    """Aucune reprise de données (décision 2) : un projet du poste né avant l'écran n'a pas de
+    """Aucune reprise de données (décision 2) : un projet du poste né sans image n'a pas de
     couverture ; l'écran la lui demande au prochain enregistrement."""
     portfolio = saved(project())
     url = reverse("admin:content_project_change", args=[portfolio.pk])
     data = rendered_data(admin_client, url) | line(0, saved(technology(name="Django")), 1)
 
-    refusals = refused_rows(admin_client, url, data, COVER)
-    response = admin_client.post(url, data | image_row(COVER))
+    refusals = refused_rows(admin_client, url, data, GALLERY)
+    response = admin_client.post(url, data | image_row(GALLERY))
 
-    assert refusals == [strings.PROJECT_COVER_MISSING]
+    assert refusals == [strings.PROJECT_IMAGES_MISSING]
     assert response.status_code == 302
-    assert Cover.objects.filter(project=portfolio).exists()
+    assert GalleryImage.objects.filter(project=portfolio).exists()
 
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    ("prefix", "fields", "message"),
-    [(COVER, fields, message) for _, fields, message in COVER_REFUSALS]
-    + [(GALLERY, fields, message) for _, fields, message in IMAGE_REFUSALS],
-    ids=[f"couverture {refusal}" for refusal, _, _ in COVER_REFUSALS]
-    + [f"galerie {refusal}" for refusal, _, _ in IMAGE_REFUSALS],
+    ("fields", "message"),
+    [(fields, message) for _, fields, message in IMAGE_REFUSALS],
+    ids=[refusal for refusal, _, _ in IMAGE_REFUSALS],
 )
 def test_l_admin_refuse_une_image_hors_de_ses_regles(
-    admin_client: Client, prefix: str, fields: dict[str, object], message: str
+    admin_client: Client, fields: dict[str, object], message: str
 ) -> None:
-    """Chaque refus avec son seul message, sans rien enregistrer — une ligne de galerie légendée
-    sans fichier comprise (décision 11), et la forme de la couverture, que Django n'éprouverait
-    qu'en base : un formulaire écarte d'ordinaire les contraintes qui lisent un champ qu'il n'a
-    pas, et la largeur et la hauteur n'y sont pas."""
+    """Chaque refus avec son seul message, sans rien enregistrer — une ligne légendée sans fichier
+    comprise (décision 11). La ligne refusée est la première : la forme de la couverture ne s'y
+    juge pas, ses dimensions ne décrivent rien d'admis."""
     data = new_project_data(
-        admin_client, **line(0, saved(technology(name="Django")), 1), **image_row(prefix, **fields)
+        admin_client, **line(0, saved(technology(name="Django")), 1), **image_row(GALLERY, **fields)
     )
 
     response = admin_client.post(reverse("admin:content_project_add"), data)
 
     assert response.status_code == 200
-    assert messages(inline_group(response, prefix).formset.forms[0]) == [message]
+    assert messages(inline_group(response, GALLERY).formset.forms[0]) == [message]
     assert not Project.objects.exists()
 
 
 @pytest.mark.django_db
-def test_l_ecran_accepte_une_couverture_sans_extension(admin_client: Client) -> None:
-    """L'original est reconnu à son contenu, jamais à son nom (décision 6) : le bloc emploie le champ
-    de formulaire de l'original, pas celui de Django."""
+@pytest.mark.parametrize(
+    "size", [(MIN_SIDE, MIN_SIDE), (MIN_SIDE + 1, MIN_SIDE + 1)], ids=["à la borne", "au-delà"]
+)
+def test_une_couverture_carree_d_au_moins_1200_px_est_acceptee(
+    admin_client: Client, size: tuple[int, int]
+) -> None:
     data = new_project_data(
         admin_client,
         **line(0, saved(technology(name="Django")), 1),
-        **image_row(COVER, original=image_upload("photo", image_format="JPEG")),
+        **image_row(GALLERY, original=image_upload(size=size)),
     )
 
     response = admin_client.post(reverse("admin:content_project_add"), data)
 
     assert response.status_code == 302
-    assert (Project.objects.get().cover.original.name or "").endswith("/original.jpg")
 
 
 @pytest.mark.django_db
-def test_l_admin_refuse_une_seconde_couverture(admin_client: Client) -> None:
-    """L'écran n'offre qu'une ligne ; un envoi qui en porte deux est refusé, et la couverture
-    enregistrée reste seule."""
-    portfolio = saved_project(saved(technology(name="Django")))
-    url = reverse("admin:content_project_change", args=[portfolio.pk])
-    second = {
-        f"{COVER}-TOTAL_FORMS": 2,
-        f"{COVER}-1-original": image_upload(),
-        f"{COVER}-1-caption": "Une autre couverture.",
-    }
+@pytest.mark.parametrize(
+    ("size", "expected"),
+    [(size, expected) for _, size, expected in SHAPE_REFUSALS],
+    ids=[shape for shape, _, _ in SHAPE_REFUSALS],
+)
+def test_l_admin_refuse_une_couverture_hors_de_sa_forme(
+    admin_client: Client, size: tuple[int, int], expected: list[str]
+) -> None:
+    """La première image est la couverture : carrée, 1200 px de côté au moins (décision 8). Ses
+    refus s'affichent sous sa ligne, avec les messages du catalogue, et rien ne s'enregistre."""
+    data = new_project_data(
+        admin_client,
+        **line(0, saved(technology(name="Django")), 1),
+        **image_row(GALLERY, original=image_upload(size=size)),
+    )
 
-    response = admin_client.post(url, rendered_data(admin_client, url) | second)
+    response = admin_client.post(reverse("admin:content_project_add"), data)
 
     assert response.status_code == 200
-    assert Cover.objects.filter(project=portfolio).count() == 1
+    assert messages(inline_group(response, GALLERY).formset.forms[0]) == expected
+    assert not Project.objects.exists()
 
 
 @pytest.mark.django_db
-def test_l_auteur_remplace_le_fichier_de_la_couverture(admin_client: Client) -> None:
-    """Le geste du bloc enregistré : choisir un autre fichier. La couverture le prend, et revient
+def test_une_image_libre_a_la_seconde_place_est_acceptee(admin_client: Client) -> None:
+    """Seule la première image est la couverture : les autres sont libres (spec §1.11)."""
+    data = new_project_data(
+        admin_client,
+        **line(0, saved(technology(name="Django")), 1),
+        **image_row(GALLERY, 0, position=1),
+        **image_row(GALLERY, 1, original=image_upload(size=LANDSCAPE), position=2),
+    )
+
+    response = admin_client.post(reverse("admin:content_project_add"), data)
+
+    assert response.status_code == 302
+    assert [image.width for image in Project.objects.get().gallery.all()] == [MIN_SIDE, 1600]
+
+
+@pytest.mark.django_db
+def test_une_image_libre_glissee_en_tete_est_refusee(admin_client: Client) -> None:
+    """Glisser une image en tête en fait la couverture, et lui en applique les règles : l'image en
+    paysage est refusée sous sa ligne, et la galerie garde son ordre."""
+    portfolio, url = with_landscape_second()
+    swapped = {f"{GALLERY}-0-position": 2, f"{GALLERY}-1-position": 1}
+
+    response = admin_client.post(url, rendered_data(admin_client, url) | swapped)
+
+    assert response.status_code == 200
+    forms = inline_group(response, GALLERY).formset.forms
+    assert [messages(form) for form in forms[:2]] == [[], [strings.GALLERY_COVER_NOT_SQUARE]]
+    assert [image.width for image in portfolio.gallery.all()] == [MIN_SIDE, 1600]
+
+
+@pytest.mark.django_db
+def test_retirer_la_couverture_fait_de_l_image_suivante_la_couverture(admin_client: Client) -> None:
+    """Une ligne retirée ne compte plus : l'image suivante devient la couverture, et en reçoit les
+    règles — l'image en paysage est refusée, et la couverture retirée reste."""
+    portfolio, url = with_landscape_second()
+
+    response = admin_client.post(
+        url, rendered_data(admin_client, url) | {f"{GALLERY}-0-DELETE": "on"}
+    )
+
+    assert response.status_code == 200
+    forms = inline_group(response, GALLERY).formset.forms
+    assert messages(forms[1]) == [strings.GALLERY_COVER_NOT_SQUARE]
+    assert portfolio.gallery.count() == 2
+
+
+@pytest.mark.django_db
+def test_une_couverture_enregistree_arrivee_sans_position_reste_la_couverture(
+    admin_client: Client,
+) -> None:
+    """Une ligne enregistrée arrivée sans position — ni l'écran ni le script n'en produisent —
+    garde la sienne à l'enregistrement (`SortableFormSet`) : elle garde aussi sa place de
+    couverture, et l'image en paysage qui la suit n'est pas jugée comme telle."""
+    portfolio, url = with_landscape_second()
+
+    response = admin_client.post(
+        url, rendered_data(admin_client, url) | {f"{GALLERY}-0-position": ""}
+    )
+
+    assert response.status_code == 302
+    assert [image.width for image in portfolio.gallery.all()] == [MIN_SIDE, 1600]
+
+
+@pytest.mark.django_db
+def test_sans_le_script_la_premiere_ligne_du_formulaire_est_la_couverture(
+    admin_client: Client,
+) -> None:
+    """Sans le script — désactivé, ou en échec —, les lignes neuves arrivent sans position et se
+    rangent dans l'ordre du formulaire : la première est la couverture."""
+    data = new_project_data(
+        admin_client,
+        **line(0, saved(technology(name="Django")), 1),
+        **image_row(GALLERY, 0, original=image_upload(size=LANDSCAPE), position=""),
+        **image_row(GALLERY, 1, position=""),
+    )
+
+    response = admin_client.post(reverse("admin:content_project_add"), data)
+
+    assert response.status_code == 200
+    forms = inline_group(response, GALLERY).formset.forms
+    assert [messages(form) for form in forms[:2]] == [[strings.GALLERY_COVER_NOT_SQUARE], []]
+
+
+@pytest.mark.django_db
+def test_l_ecran_accepte_une_image_sans_extension(admin_client: Client) -> None:
+    """L'original est reconnu à son contenu, jamais à son nom (décision 6) : le tableau emploie le
+    champ de formulaire de l'original, pas celui de Django."""
+    data = new_project_data(
+        admin_client,
+        **line(0, saved(technology(name="Django")), 1),
+        **image_row(GALLERY, original=image_upload("photo", image_format="JPEG")),
+    )
+
+    response = admin_client.post(reverse("admin:content_project_add"), data)
+
+    assert response.status_code == 302
+    assert (Project.objects.get().gallery.get().original.name or "").endswith("/original.jpg")
+
+
+@pytest.mark.django_db
+def test_l_auteur_remplace_le_fichier_d_une_image(admin_client: Client) -> None:
+    """Le geste d'une ligne enregistrée : choisir un autre fichier. L'image le prend, et revient
     « en attente » (décision 5)."""
     portfolio = saved_project(saved(technology(name="Django")))
-    before = portfolio.cover.original.name
+    before = portfolio.gallery.get().original.name
     url = reverse("admin:content_project_change", args=[portfolio.pk])
     data = rendered_data(admin_client, url) | {
-        f"{COVER}-0-original": image_upload(size=(1300, 1300))
+        f"{GALLERY}-0-original": image_upload(size=(1300, 1300))
     }
 
     response = admin_client.post(url, data)
 
     assert response.status_code == 302
-    replaced = Cover.objects.get(project=portfolio)
+    replaced = portfolio.gallery.get()
     assert replaced.original.name != before
     assert (replaced.width, replaced.state) == (1300, ProcessingState.PENDING)
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("prefix", [COVER, GALLERY], ids=["couverture", "galerie"])
-def test_l_apercu_montre_l_original_enregistre_et_son_etat_en_texte(
-    admin_client: Client, prefix: str
-) -> None:
+def test_l_apercu_montre_l_original_enregistre_et_son_etat_en_texte(admin_client: Client) -> None:
     """L'original dans un `<img>` : dimensions en attributs, sans `style` en ligne (CSP de #6),
     légende en texte alternatif (décision 11). L'état, en texte, ne se modifie pas."""
     portfolio = saved_project(saved(technology(name="Django")))
-    made = {COVER: portfolio.cover, GALLERY: saved(gallery_image(portfolio))}[prefix]
+    made = portfolio.gallery.get()
     url = reverse("admin:content_project_change", args=[portfolio.pk])
 
     page = admin_client.get(url).content.decode()
 
-    image_group = group(page, prefix)
-    images = re.findall(r"<img [^>]*>", image_group)
+    gallery = group(page, GALLERY)
+    images = re.findall(r"<img [^>]*>", gallery)
     assert len(images) == 1
     assert f'src="{made.original.url}"' in images[0]
     assert f'alt="{escape(made.caption)}"' in images[0]
     assert re.search(r'width="\d+" height="\d+"', images[0])
     assert "style" not in images[0]
-    assert escape(strings.PROCESSING_STATE_PENDING) in image_group
-    assert f'name="{prefix}-0-state"' not in page
+    assert escape(strings.PROCESSING_STATE_PENDING) in gallery
+    assert f'name="{GALLERY}-0-state"' not in page
 
 
 @pytest.mark.django_db
 def test_une_image_choisie_mais_pas_enregistree_n_a_pas_d_apercu(admin_client: Client) -> None:
-    """L'aperçu apparaît après l'enregistrement (décision 3) : sur un écran revenu en erreur, les
-    fichiers choisis ne sont pas stockés, et rien ne les montre."""
-    data = new_project_data(admin_client, **image_row(GALLERY))
+    """L'aperçu apparaît après l'enregistrement (décision 3) : sur un écran revenu en erreur, le
+    fichier choisi n'est pas stocké, et rien ne le montre."""
+    data = new_project_data(admin_client)
 
     response = admin_client.post(reverse("admin:content_project_add"), data)
 
     assert response.status_code == 200
-    page = response.content.decode()
-    assert ["<img " in group(page, prefix) for prefix in (COVER, GALLERY)] == [False, False]
+    assert "<img " not in group(response.content.decode(), GALLERY)
 
 
 @pytest.mark.django_db
@@ -296,7 +406,7 @@ def test_l_auteur_retire_ajoute_et_reordonne_les_images_de_la_galerie_en_un_enre
     une fois (décision 11). L'image retirée sort du stockage, une fois la transaction validée
     (décision 10)."""
     portfolio = saved_project(saved(technology(name="Django")))
-    removed = saved(gallery_image(portfolio, caption="L'accueil.", position=1)).original.name or ""
+    removed = portfolio.gallery.get().original.name or ""
     saved(gallery_image(portfolio, caption="La fiche.", position=2))
     url = reverse("admin:content_project_change", args=[portfolio.pk])
     data = rendered_data(admin_client, url) | {
@@ -309,8 +419,7 @@ def test_l_auteur_retire_ajoute_et_reordonne_les_images_de_la_galerie_en_un_enre
         response = admin_client.post(url, data)
 
     assert response.status_code == 302
-    stored = GalleryImage.objects.filter(project=portfolio)
-    assert [image.caption for image in stored] == ["La recherche.", "La fiche."]
+    assert [image.caption for image in portfolio.gallery.all()] == ["La recherche.", "La fiche."]
     assert not default_storage.exists(removed)
 
 
@@ -321,25 +430,25 @@ def test_une_ligne_de_galerie_neuve_laissee_vide_n_enregistre_rien(admin_client:
     data = new_project_data(
         admin_client,
         **line(0, saved(technology(name="Django")), 1),
-        **{f"{GALLERY}-0-position": 1},
+        **{f"{GALLERY}-1-position": 2},
     )
 
     response = admin_client.post(reverse("admin:content_project_add"), data)
 
     assert response.status_code == 302
-    assert not GalleryImage.objects.exists()
+    assert Project.objects.get().gallery.count() == 1
 
 
 @pytest.mark.django_db
 def test_la_page_de_suppression_d_un_projet_nomme_ses_images(admin_client: Client) -> None:
-    """Django y nomme chaque objet que la suppression emporte : la couverture et chaque image de
-    la galerie, par leur projet et leur légende, comme une technologie de projet."""
+    """Django y nomme chaque objet que la suppression emporte : chaque image de la galerie, par
+    son projet et sa légende, comme une technologie de projet."""
     portfolio = saved_project(saved(technology(name="Django")))
-    made = saved(gallery_image(portfolio))
+    saved(gallery_image(portfolio, caption="La fiche.", position=2))
 
     page = admin_client.get(
         reverse("admin:content_project_delete", args=[portfolio.pk])
     ).content.decode()
 
-    for image in (portfolio.cover, made):
+    for image in portfolio.gallery.all():
         assert escape(f"{portfolio.title} · {image.caption}") in page
