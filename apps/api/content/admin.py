@@ -1,26 +1,25 @@
 """Écrans d'admin du contenu."""
 
+import math
 from collections.abc import Sequence
 from typing import Any, ClassVar
 
 from config import strings
 from django.contrib import admin
-from django.contrib.admin.options import BaseModelAdmin
 from django.contrib.admin.widgets import RelatedFieldWidgetWrapper
 from django.db.models import Field
-from django.forms import CharField
+from django.forms import CharField, ModelForm
 from django.forms import Field as FormField
 from django.http import HttpRequest
 from django.utils.html import format_html
 from django.utils.safestring import SafeString, mark_safe
 from django_stubs_ext import StrOrPromise
 
-from content.inlines import InlineRowFormSet, InlineTable, SortableFormSet, SortableInline
+from content.inlines import POSITION, SortableFormSet, SortableInline
 from content.models import (
-    Cover,
+    COVER_MIN_SIDE,
     GalleryImage,
     Project,
-    ProjectImage,
     ProjectTechnology,
     Section,
     Technology,
@@ -95,78 +94,14 @@ class TechnologyAdmin(admin.ModelAdmin[Technology]):
         )
 
 
-class ImageFieldsAdmin[ImageT: ProjectImage](BaseModelAdmin[ImageT]):
-    """Un tableau en ligne d'images d'un projet — sa couverture, sa galerie : l'aperçu de chaque
-    original enregistré, et les refus du catalogue pour un fichier ou une légende manquants.
-
-    Ses `fields` nomment `preview` et `state`, et ses `readonly_fields` les gardent : l'état, que
-    seul le worker de #12 fait avancer (décision 5), s'affiche en texte, sous son libellé.
-    """
-
-    class Media:
-        css: ClassVar[dict[str, tuple[str, ...]]] = {"all": ("content/admin/image_preview.css",)}
-
-    @admin.display(description=strings.IMAGE_PREVIEW)
-    def preview(self, image: ImageT) -> str:
-        """L'original enregistré, dans un `<img>` : un cadre carré nommé en attributs, où
-        `image_preview.css` le fait tenir entier, proportions gardées — l'orientation EXIF
-        comprise, que les dimensions stockées ignorent. Jamais de `style` en ligne : une CSP
-        stricte (#6) le refuse. La légende sert de texte alternatif (spec §4.4).
-
-        Rien pour une image dont l'original n'est pas stocké : une ligne neuve, ou un fichier
-        choisi dans un envoi refusé — l'aperçu apparaît après l'enregistrement (décision 3)."""
-        if not image.original.stored:
-            return ""
-        return format_html(
-            '<img src="{url}" alt="{alt}" width="{side}" height="{side}" class="{preview}">',
-            url=image.original.url,
-            alt=image.caption,
-            side=IMAGE_PREVIEW_SIZE,
-            preview=IMAGE_PREVIEW_CLASS,
-        )
-
-    def formfield_for_dbfield(
-        self, db_field: Field[Any, Any], request: HttpRequest, **kwargs: Any
-    ) -> FormField | None:
-        """Le champ de Django ; l'original et la légende, refusés vides avec le message du
-        catalogue que leurs contraintes portent."""
-        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
-        message = IMAGE_REQUIRED_MESSAGES.get(db_field.name)
-        if formfield is not None and message is not None:
-            formfield.error_messages["required"] = message
-        return formfield
-
-
-class CoverFormSet(InlineRowFormSet[Cover, Project]):
-    """Le bloc de la couverture, avec le message du catalogue quand il manque. Le message par
-    défaut de Django parle de formulaires."""
-
-    default_error_messages: ClassVar[dict[str, StrOrPromise]] = {
-        "too_few_forms": strings.PROJECT_COVER_MISSING
-    }
-
-
-class CoverInline(ImageFieldsAdmin[Cover], InlineTable[Cover, Project]):
-    """La couverture d'un projet, en tête des tableaux en ligne de l'écran Projet : une ligne,
-    sans ajout ni suppression, exigée — brouillon compris (décisions 2 et 11). Django n'offre
-    qu'une ligne à un lien un-pour-un (`inlineformset_factory`)."""
-
-    model = Cover
-    formset = CoverFormSet
-    fields = ("preview", "original", "caption", "state")
-    readonly_fields = ("preview", "state")
-    min_num = 1
-    can_delete = False
-
-
 class ProjectTechnologyFormSet(SortableFormSet[ProjectTechnology, Project]):
     """Les lignes de technologie d'un projet, avec les messages du catalogue pour les deux règles
     que le formulaire compare entre ses lignes, avant la base : le doublon (projet, technologie),
     et « au moins une technologie ».
 
-    « Au moins une technologie » : seule règle hors base (décision 10). Le message par défaut de
-    Django parle de formulaires ; `% {"num": …}`, que Django lui applique, laisse intact un texte
-    sans champ de format.
+    « Au moins une technologie » : règle hors base (décision 10). Le message par défaut de Django
+    parle de formulaires ; `% {"num": …}`, que Django lui applique, laisse intact un texte sans
+    champ de format.
     """
 
     default_error_messages: ClassVar[dict[str, StrOrPromise]] = {
@@ -199,22 +134,99 @@ class ProjectTechnologyInline(SortableInline[ProjectTechnology, Project]):
         return formfield
 
 
-class GalleryInline(ImageFieldsAdmin[GalleryImage], SortableInline[GalleryImage, Project]):
-    """La galerie d'un projet, sous ses technologies : des images que l'auteur ajoute, retire et
-    ordonne par glisser-déposer, puis enregistre une fois (décision 11, ADR 0013). Son modèle n'a
-    aucune unicité qui lise le projet : à position égale, l'ordre de saisie."""
+class GalleryFormSet(SortableFormSet[GalleryImage, Project]):
+    """Les images d'un projet : une au moins, brouillon compris, et la première — la couverture —
+    carrée, d'au moins 1200 px de côté (brief de #9, décisions 2, 4 et 8). Ces règles lisent les
+    images ensemble : la base ne peut pas les porter, le formulaire les tient, comme « au moins une
+    technologie ». Le message par défaut de Django pour le minimum parle de formulaires."""
 
-    # Les feuilles et le script de ses deux bases. Django les réunit déjà le long de l'héritage
-    # (`forms.widgets.media_property`) ; la déclaration dit à pyright que les deux se combinent.
-    class Media(ImageFieldsAdmin.Media, SortableInline.Media): ...
+    default_error_messages: ClassVar[dict[str, StrOrPromise]] = {
+        "too_few_forms": strings.PROJECT_IMAGES_MISSING
+    }
+
+    def clean(self) -> None:
+        """La couverture, première des images gardées dans l'ordre de la galerie : refusée sous
+        sa ligne si elle n'est pas carrée, ou si son petit côté fait moins de 1200 px. Une ligne
+        déjà refusée n'est pas jugée une seconde fois : ses dimensions ne décrivent rien d'admis.
+        Une image glissée en tête devient la couverture, et en reçoit les règles."""
+        kept = [
+            form for form in self.forms if form.cleaned_data and not self._should_delete_form(form)
+        ]
+        if not kept:
+            return
+        cover = min(kept, key=self._place)
+        if cover.errors:
+            return
+        width, height = cover.instance.width, cover.instance.height
+        if width != height:
+            cover.add_error(None, strings.GALLERY_COVER_NOT_SQUARE)
+        if min(width, height) < COVER_MIN_SIDE:
+            cover.add_error(None, strings.GALLERY_COVER_TOO_SMALL)
+
+    def _place(self, form: ModelForm[GalleryImage]) -> float:
+        """La place d'une ligne dans la galerie : sa position ; une ligne enregistrée arrivée sans
+        elle garde la sienne, une ligne neuve sans elle se range après les autres
+        (`SortableFormSet`). À place égale, l'ordre du formulaire, qui est celui de la saisie."""
+        position = form.cleaned_data.get(POSITION)
+        if position is None and form in self.initial_forms:
+            position = form.initial.get(POSITION)
+        return math.inf if position is None else position
+
+
+class GalleryInline(SortableInline[GalleryImage, Project]):
+    """La galerie d'un projet, sous ses technologies : des images que l'auteur ajoute, retire et
+    ordonne par glisser-déposer, puis enregistre une fois ; la première est la couverture
+    (décision 11, ADR 0013). Son modèle n'a aucune unicité qui lise le projet : à position égale,
+    l'ordre de saisie.
+
+    Chaque image enregistrée montre son aperçu, et son état en texte, sous son libellé : seul le
+    worker de #12 le fait avancer (décision 5).
+    """
+
+    # La feuille des aperçus ; le script et la feuille des lignes ordonnables viennent de
+    # `SortableInline`, Django réunit les deux le long de l'héritage.
+    class Media(SortableInline.Media):
+        css: ClassVar[dict[str, tuple[str, ...]]] = {"all": ("content/admin/image_preview.css",)}
 
     model = GalleryImage
+    formset = GalleryFormSet
     fields = ("move", "preview", "original", "caption", "state", "position")
     readonly_fields = ("move", "preview", "state")
     verbose_name_plural = strings.GALLERY_HEADING
-    # Une seule ligne neuve à l'ouverture, comme la fiche technique : l'auteur en ajoute d'autres
-    # par le bouton de l'écran.
+    min_num = 1
+    # Une ligne neuve en plus des images enregistrées, comme la fiche technique : l'auteur en
+    # ajoute d'autres par le bouton de l'écran.
     extra = 1
+
+    @admin.display(description=strings.IMAGE_PREVIEW)
+    def preview(self, image: GalleryImage) -> str:
+        """L'original enregistré, dans un `<img>` : un cadre carré nommé en attributs, où
+        `image_preview.css` le fait tenir entier, proportions gardées — l'orientation EXIF
+        comprise, que les dimensions stockées ignorent. Jamais de `style` en ligne : une CSP
+        stricte (#6) le refuse. La légende sert de texte alternatif (spec §4.4).
+
+        Rien pour une image dont l'original n'est pas stocké : une ligne neuve, ou un fichier
+        choisi dans un envoi refusé — l'aperçu apparaît après l'enregistrement (décision 3)."""
+        if not image.original.stored:
+            return ""
+        return format_html(
+            '<img src="{url}" alt="{alt}" width="{side}" height="{side}" class="{preview}">',
+            url=image.original.url,
+            alt=image.caption,
+            side=IMAGE_PREVIEW_SIZE,
+            preview=IMAGE_PREVIEW_CLASS,
+        )
+
+    def formfield_for_dbfield(
+        self, db_field: Field[Any, Any], request: HttpRequest, **kwargs: Any
+    ) -> FormField | None:
+        """Le champ de Django ; l'original et la légende, refusés vides avec le message du
+        catalogue que leurs contraintes portent."""
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+        message = IMAGE_REQUIRED_MESSAGES.get(db_field.name)
+        if formfield is not None and message is not None:
+            formfield.error_messages["required"] = message
+        return formfield
 
 
 class SectionFormSet(SortableFormSet[Section, Project]):
@@ -253,12 +265,12 @@ class SectionInline(MarkdownFieldsAdmin[Section], SortableInline[Section, Projec
 
 @admin.register(Project)
 class ProjectAdmin(MarkdownFieldsAdmin[Project], admin.ModelAdmin[Project]):
-    """Écran Projet : tous les champs du projet, sa couverture, ses technologies en ligne, sa
-    galerie, puis sa fiche technique, en un seul écran (PRD, US 34). Le slug se remplit depuis le
-    titre à la saisie et reste modifiable (décision 3) ; la description, en Markdown, a son
-    aperçu."""
+    """Écran Projet : tous les champs du projet, ses technologies en ligne, sa galerie — dont la
+    première image est la couverture —, puis sa fiche technique, en un seul écran (PRD, US 34). Le
+    slug se remplit depuis le titre à la saisie et reste modifiable (décision 3) ; la description,
+    en Markdown, a son aperçu."""
 
     list_display = ("title", "kind", "status", "showcase", "published")
     markdown_fields = ("description",)
     prepopulated_fields: ClassVar[dict[str, Sequence[str]]] = {"slug": ("title",)}
-    inlines = (CoverInline, ProjectTechnologyInline, GalleryInline, SectionInline)
+    inlines = (ProjectTechnologyInline, GalleryInline, SectionInline)

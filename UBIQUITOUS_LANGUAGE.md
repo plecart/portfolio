@@ -67,11 +67,16 @@ n'enregistre rien, une ligne titrée sans texte est refusée.
 | corps | `body` | Markdown, sans borne de longueur, gardé tel que saisi ; jamais vide ni fait d'espaces seulement — une espace insécable seule y compte comme un texte (locale de l'image) |
 | position | `position` | comme celle d'une technologie de projet : cachée dans l'écran Projet, elle suit l'ordre affiché à l'enregistrement ; l'ordre stocké suit la position, puis l'ordre de saisie |
 
-## Image — `ProjectImage`
+## Image de galerie — `GalleryImage`
 
-Ce que la couverture et l'image de galerie ont en commun, défini une fois. L'original est gardé
-tel que téléversé, à l'octet près, jamais recadré ni réencodé (spec §1.11) ; le worker en produit
-les variantes.
+Une image de la galerie d'un projet (`project.gallery`), à sa place dans la galerie ; le site
+l'affiche entière dans le cadre carré, sur fond neutre (spec §1.11). L'original est gardé tel que
+téléversé, à l'octet près, jamais recadré ni réencodé ; le worker en produit les variantes.
+Supprimer le projet supprime sa galerie. L'écran Projet la saisit dans un tableau, sous les
+technologies, où l'auteur ajoute, retire et ordonne les images par glisser-déposer avant
+d'enregistrer une fois ; une ligne neuve laissée vide n'enregistre rien, et un projet sans image
+est refusé, brouillon compris. Il montre l'aperçu de chaque original enregistré et son état, qui
+ne s'y modifie pas.
 
 | Terme | Identifiant | Règle |
 |---|---|---|
@@ -80,34 +85,19 @@ les variantes.
 | légende | `caption` | obligatoire, 50 caractères au plus, jamais faite d'espaces seulement ; elle sert de texte alternatif |
 | état | `state` | en attente `pending` · prêt `ready` · échec `failed` ; une image naît en attente, et y revient quand son original est remplacé ; seul le worker le fait avancer |
 | variantes | `variants` | liste d'objets `{name, width, height}` — `name` est le nom de stockage de la variante —, vide sauf à l'état prêt ; seul le worker l'écrit |
+| projet | `project` | un projet en porte une au moins |
+| position | `position` | comme celle d'une technologie de projet : cachée dans l'écran Projet, elle suit l'ordre affiché à l'enregistrement ; l'ordre stocké suit la position, puis l'ordre de saisie |
 
 Supprimer une image, seule ou avec son projet, ou remplacer son original supprime du stockage
 l'ancien original et ses variantes, une fois la transaction validée ; une transaction annulée
 n'en supprime aucun.
 
-## Couverture — `Cover`
+## Couverture
 
-L'image d'un projet : la photo de sa carte, la première image de sa galerie et son `og:image`
-(spec §1.11). Une par projet (`project.cover`) ; supprimer le projet la supprime. L'écran Projet
-la saisit dans un bloc d'une ligne, avant les technologies, et refuse un projet sans elle,
-brouillon compris ; il montre l'aperçu de l'original enregistré et son état, qui ne s'y modifie
-pas.
+La première image de la galerie d'un projet : la photo de sa carte, la première image de sa fiche
+et son `og:image` (spec §1.11). Ce n'est pas un modèle : glisser une autre image en tête en fait
+la couverture, et lui en applique les règles.
 
 | Terme | Identifiant | Règle |
 |---|---|---|
-| projet | `project` | une couverture par projet, exigée |
-| forme | `width`, `height` | carrée — largeur égale à la hauteur —, 1200 px de côté au moins |
-
-## Image de galerie — `GalleryImage`
-
-Une image de la galerie d'un projet (`project.gallery`), à sa place dans la galerie ; le site
-l'affiche entière dans le cadre carré, sur fond neutre (spec §1.11). Supprimer le projet supprime
-sa galerie. L'écran Projet la saisit dans un tableau, sous les technologies, où l'auteur ajoute,
-retire et ordonne les images par glisser-déposer avant d'enregistrer une fois ; une ligne neuve
-laissée vide n'enregistre rien. Il montre l'aperçu de chaque original enregistré et son état, qui
-ne s'y modifie pas.
-
-| Terme | Identifiant | Règle |
-|---|---|---|
-| projet | `project` | un projet en porte autant qu'il veut |
-| position | `position` | comme celle d'une technologie de projet : l'ordre stocké suit la position, puis l'ordre de saisie |
+| forme | `width`, `height` | carrée — largeur égale à la hauteur —, 1200 px de côté au moins ; l'écran Projet la tient, la base ne le peut pas |

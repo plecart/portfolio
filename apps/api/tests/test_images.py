@@ -1,6 +1,7 @@
-"""Tests de ce que la couverture et l'image de galerie ont en commun, éprouvé sur l'une et l'autre :
-l'original — le fichier que l'auteur téléverse —, sa validation, son nom de stockage et ses
-lectures, la légende, l'état de traitement et les variantes."""
+"""Tests de l'image de galerie, couverture comprise : l'original — le fichier que l'auteur
+téléverse —, sa validation, son nom de stockage et ses lectures, la légende, l'état de traitement
+et les variantes. La forme de la couverture, première image, est une règle de l'écran
+(`test_image_admin.py`)."""
 
 import re
 from collections.abc import Callable, Generator
@@ -8,7 +9,7 @@ from collections.abc import Callable, Generator
 import pytest
 from config import strings
 from content.images import validate_original
-from content.models import Cover, GalleryImage, ProcessingState, Project, ProjectImage
+from content.models import GalleryImage, ProcessingState, Project
 from counting_storage import CountingStorage
 from django.conf import settings
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
@@ -20,13 +21,13 @@ from django.db.models import FETCH_PEERS
 from django.forms import ModelForm, modelform_factory
 from django.test import override_settings
 from django.utils.datastructures import MultiValueDict
-from factories import BLANK, SVG, cover, gallery_image, image_upload, project, saved
+from factories import BLANK, SVG, gallery_image, image_upload, project, saved
 from PIL import Image
 from pytest_django import DjangoCaptureOnCommitCallbacks
 from refusals import refusals
 from test_markdown_preview import importers
 
-type ImageFactory = Callable[..., ProjectImage]
+type ImageFactory = Callable[..., GalleryImage]
 
 # La borne de la légende (spec §7), écrite ici et non lue sur le modèle, pour qu'une borne changée
 # fasse rougir ce fichier.
@@ -297,27 +298,22 @@ def portfolio() -> Project:
     return saved(project())
 
 
-@pytest.fixture(params=[cover, gallery_image], ids=["couverture", "image de galerie"])
-def image(request: pytest.FixtureRequest) -> ImageFactory:
-    """La fabrique de chacun des deux modèles : une règle commune vaut pour l'un et l'autre."""
-    return request.param
+@pytest.fixture
+def image() -> ImageFactory:
+    """La fabrique des images de la galerie, couverture comprise : une règle d'image vaut pour
+    toutes."""
+    return gallery_image
 
 
-def constraint_name(made: ProjectImage, rule: str) -> str:
+def constraint_name(made: GalleryImage, rule: str) -> str:
     """Le nom que porte la contrainte `rule` dans la table du modèle de `made`."""
     return f"content_{made._meta.model_name}_{rule}"
 
 
-@pytest.mark.parametrize(
-    ("model", "own_fields"),
-    [(Cover, ["project"]), (GalleryImage, ["project", "position"])],
-    ids=["couverture", "image de galerie"],
-)
-def test_une_image_porte_son_original_ses_dimensions_sa_legende_son_etat_et_ses_variantes(
-    model: type[ProjectImage], own_fields: list[str]
-) -> None:
-    """Une seule définition des champs communs (critère du corps) : ceux de la base d'abord."""
-    assert [field.name for field in model._meta.concrete_fields] == [
+def test_une_image_porte_son_original_ses_dimensions_sa_legende_son_etat_et_ses_variantes() -> None:
+    """Une seule définition des champs (critère du corps) : ceux de l'image, puis sa place dans la
+    galerie de son projet."""
+    assert [field.name for field in GalleryImage._meta.concrete_fields] == [
         "id",
         "original",
         "width",
@@ -325,7 +321,8 @@ def test_une_image_porte_son_original_ses_dimensions_sa_legende_son_etat_et_ses_
         "caption",
         "state",
         "variants",
-        *own_fields,
+        "project",
+        "position",
     ]
 
 
@@ -558,7 +555,7 @@ class Rollback(Exception):
     """Annule la transaction d'un test, comme une erreur après l'écriture."""
 
 
-def ready(made: ProjectImage) -> list[str]:
+def ready(made: GalleryImage) -> list[str]:
     """Enregistre `made` prête, avec une variante stockée à côté de son original, comme le worker
     de #12 le fera ; rend les noms que le stockage tient pour elle."""
     saved(made)
@@ -597,7 +594,7 @@ def test_supprimer_une_image_supprime_ses_fichiers_apres_la_transaction(
 def test_supprimer_un_projet_supprime_les_fichiers_de_ses_images(
     portfolio: Project, django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks
 ) -> None:
-    names = [*ready(cover(portfolio)), *ready(gallery_image(portfolio))]
+    names = [*ready(gallery_image(portfolio)), *ready(gallery_image(portfolio, position=2))]
 
     with django_capture_on_commit_callbacks(execute=True):
         portfolio.delete()
@@ -733,7 +730,7 @@ def test_enregistrer_une_image_sans_changer_son_fichier_garde_ses_fichiers_et_so
     assert stored(names) == [True, True]
 
 
-def replaced_elsewhere(made: ProjectImage, name: str) -> ProjectImage:
+def replaced_elsewhere(made: GalleryImage, name: str) -> GalleryImage:
     """Remplace l'original de la ligne de `made` par un autre enregistrement que `made` ; rend
     cet enregistrement."""
     other = type(made).objects.get(pk=made.pk)
@@ -742,7 +739,7 @@ def replaced_elsewhere(made: ProjectImage, name: str) -> ProjectImage:
     return other
 
 
-def stale_instance(image: ImageFactory, made: ProjectImage, how: str) -> ProjectImage:
+def stale_instance(image: ImageFactory, made: GalleryImage, how: str) -> GalleryImage:
     """Une instance de la ligne de `made`, de la façon `how`, que la suite rendra périmée ;
     `image` fabrique une ligne du même modèle."""
     if how == "créée puis enregistrée":
@@ -843,8 +840,8 @@ def test_une_instance_qui_reprend_l_original_de_la_ligne_ne_le_supprime_pas(
 def test_un_enregistrement_partiel_de_l_original_ecrit_ses_dimensions(
     portfolio: Project, image: ImageFactory
 ) -> None:
-    """Les règles de la couverture lisent les dimensions : l'original ne s'écrit jamais sans
-    elles."""
+    """Les dimensions décrivent l'original — la forme de la couverture se juge sur elles : il ne
+    s'écrit jamais sans elles."""
     made = saved(image(portfolio))
     loaded = type(made).objects.get(pk=made.pk)
     loaded.original = image_upload(size=(1300, 1300))

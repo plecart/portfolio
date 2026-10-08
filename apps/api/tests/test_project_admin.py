@@ -21,7 +21,7 @@ from django.urls import reverse
 from django.utils.html import escape
 from django.utils.text import capfirst
 from django.utils.translation import gettext
-from factories import BLANK, cover, image_upload, project, saved, technology
+from factories import BLANK, gallery_image, image_upload, project, saved, technology
 
 # Chaque champ de l'écran d'ajout d'un projet, dans l'ordre de l'écran, et son libellé du
 # catalogue ; puis ceux d'une ligne de technologie.
@@ -45,11 +45,10 @@ PROJECT_TECHNOLOGY_FIELD_LABELS = {
     "position": strings.PROJECT_TECHNOLOGY_POSITION,
 }
 
-# Le préfixe des lignes de technologie, du bloc de la couverture, des lignes de la galerie et de
-# celles de la fiche technique, dans le formulaire de l'écran Projet : le nom de la relation
-# inverse (`BaseInlineFormSet.get_default_prefix`).
+# Le préfixe des lignes de technologie, de celles de la galerie et de celles de la fiche technique,
+# dans le formulaire de l'écran Projet : le nom de la relation inverse
+# (`BaseInlineFormSet.get_default_prefix`).
 LINES = "projecttechnology_set"
-COVER = "cover"
 GALLERY = "gallery"
 ROWS = "section_set"
 
@@ -113,10 +112,11 @@ def image_row(prefix: str, index: int = 0, /, **fields: object) -> dict[str, obj
 
 
 def new_project_data(admin_client: Client, **fields: object) -> dict[str, object]:
-    """Le formulaire d'ajout d'un projet, rempli avec le projet de la fabrique et sa couverture ;
-    `fields` en remplace des champs ou remplit des lignes (`f"{LINES}-0-technology"`…)."""
+    """Le formulaire d'ajout d'un projet, rempli avec le projet de la fabrique et sa première
+    image, la couverture ; `fields` en remplace des champs ou remplit des lignes
+    (`f"{LINES}-0-technology"`…)."""
     source = project()
-    data = rendered_data(admin_client, reverse("admin:content_project_add")) | image_row(COVER)
+    data = rendered_data(admin_client, reverse("admin:content_project_add")) | image_row(GALLERY)
     data |= {
         name: value
         for name in PROJECT_FIELD_LABELS
@@ -131,10 +131,10 @@ def line(index: int, linked: Technology, position: int) -> dict[str, object]:
 
 
 def saved_project(linked: Technology, **fields: object) -> Project:
-    """Un projet de la fabrique, enregistré avec sa couverture et `linked` pour seule
-    technologie."""
+    """Un projet de la fabrique, enregistré avec sa première image, la couverture, et `linked`
+    pour seule technologie."""
     linking = saved(project(**fields))
-    saved(cover(linking))
+    saved(gallery_image(linking))
     saved(ProjectTechnology(project=linking, technology=linked, position=1))
     return linking
 
@@ -180,13 +180,13 @@ def test_l_ecran_projet_affiche_les_libelles_du_catalogue(admin_client: Client) 
 
 
 @pytest.mark.django_db
-def test_l_ecran_projet_range_couverture_technologies_galerie_puis_fiche_technique(
+def test_l_ecran_projet_range_technologies_galerie_puis_fiche_technique(
     admin_client: Client,
 ) -> None:
     """L'ordre des tableaux en ligne du PRD, « Back-office » (brief de #9, décision 11)."""
     page = admin_client.get(reverse("admin:content_project_add")).content.decode()
 
-    positions = [page.find(f'id="{prefix}-group"') for prefix in (COVER, LINES, GALLERY, ROWS)]
+    positions = [page.find(f'id="{prefix}-group"') for prefix in (LINES, GALLERY, ROWS)]
 
     assert -1 not in positions
     assert positions == sorted(positions)

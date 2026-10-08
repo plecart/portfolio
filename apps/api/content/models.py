@@ -1,5 +1,5 @@
 """Modèles du contenu : les technologies, les projets, les sections de leur fiche technique et
-leurs images — la couverture et la galerie.
+les images de leur galerie, dont la première est la couverture.
 
 Toute règle que la base peut porter y est une contrainte du modèle (décision 10 du brief de #7) :
 son code, identifiant stable du refus, est nommé sur la contrainte ; son message, texte affiché,
@@ -166,9 +166,8 @@ class Project(models.Model):
         strings.PROJECT_UPDATED_AT, auto_now=True
     )
 
-    # Ses images, que Django pose à l'exécution depuis `Cover` et `GalleryImage` : déclarées ici
-    # pour que le typage les connaisse.
-    cover: "Cover"
+    # Sa galerie, que Django pose à l'exécution depuis `GalleryImage` : déclarée ici pour que le
+    # typage la connaisse.
     gallery: "RelatedManager[GalleryImage]"
 
     class Meta:
@@ -445,20 +444,22 @@ class Variant(TypedDict):
 # compteur.
 CAPTION_MAX_LENGTH = 50
 
-# Le côté minimal d'une couverture (spec §1.11 et §7).
+# Le côté minimal de la couverture, première image de la galerie (spec §1.11 et §7).
 COVER_MIN_SIDE = 1200
 
 
-class ProjectImage(models.Model):
-    """Une image d'un projet — sa couverture ou une image de sa galerie : ce que les deux ont en
-    commun, défini une fois (brief de #9, décision 4).
+class GalleryImage(models.Model):
+    """Une image de la galerie d'un projet, à sa place dans la galerie (`project.gallery`). Le
+    site l'affiche entière dans le cadre carré, sur fond neutre (spec §1.11).
+
+    La première est la couverture : la photo de la carte, la première image de la fiche et
+    l'`og:image` (spec §1.11 et §7, ADR 0011), carrée, d'au moins 1200 px de côté. Ces règles
+    lisent l'ordre des images d'un projet, comme « une image au moins » : la base ne peut pas les
+    porter, l'écran Projet les tient (brief de #9, décision 4).
 
     L'original est gardé tel que téléversé, jamais recadré ni réencodé (spec §1.11). Le worker de
     #12 en produit les variantes et seul il écrit l'état et les variantes (décision 5) : ici, une
     image naît « en attente », sans variante.
-
-    Les contraintes se nomment par modèle (`%(app_label)s_%(class)s_…`, doc Django, « Constraints
-    in abstract base classes ») : chaque table porte les siennes.
     """
 
     original = OriginalField(
@@ -491,13 +492,25 @@ class ProjectImage(models.Model):
     variants: models.JSONField[list[Variant], list[Variant]] = models.JSONField(
         strings.IMAGE_VARIANTS, default=list, editable=False
     )
+    project: models.ForeignKey[Project, Project] = models.ForeignKey(
+        Project, models.CASCADE, related_name="gallery", verbose_name=strings.PROJECT
+    )
+    # Sans valeur par défaut : le tableau en ligne de l'écran Projet la pose, dans l'ordre affiché
+    # (`content/inlines.py`, D55). Aucune unicité ne lit le projet : à position égale, l'ordre de
+    # saisie.
+    position: models.PositiveSmallIntegerField[int, int] = models.PositiveSmallIntegerField(
+        strings.GALLERY_IMAGE_POSITION
+    )
 
     class Meta:
-        abstract = True
+        verbose_name = strings.GALLERY_IMAGE
+        verbose_name_plural = strings.GALLERY_IMAGES
+        # L'ordre de l'admin est l'ordre stocké ; à position égale, l'ordre de saisie.
+        ordering = ("position", "id")
         constraints = (
             models.CheckConstraint(
                 condition=~models.Q(original=""),
-                name="%(app_label)s_%(class)s_original_not_empty",
+                name="content_galleryimage_original_not_empty",
                 violation_error_code="image_original_missing",
                 violation_error_message=strings.IMAGE_ORIGINAL_MISSING,
             ),
@@ -505,19 +518,19 @@ class ProjectImage(models.Model):
             # légende d'espaces ne dit rien au lecteur d'écran.
             models.CheckConstraint(
                 condition=models.Q(caption__regex=r"\S"),
-                name="%(app_label)s_%(class)s_caption_not_empty",
+                name="content_galleryimage_caption_not_empty",
                 violation_error_code="image_caption_missing",
                 violation_error_message=strings.IMAGE_CAPTION_MISSING,
             ),
             models.CheckConstraint(
                 condition=LessThanOrEqual(Length("caption"), CAPTION_MAX_LENGTH),
-                name="%(app_label)s_%(class)s_caption_length",
+                name="content_galleryimage_caption_length",
                 violation_error_code="image_caption_too_long",
                 violation_error_message=strings.IMAGE_CAPTION_TOO_LONG,
             ),
             models.CheckConstraint(
                 condition=models.Q(state__in=ProcessingState.values),
-                name="%(app_label)s_%(class)s_state_valid",
+                name="content_galleryimage_state_valid",
                 violation_error_code="image_state_unknown",
                 violation_error_message=strings.IMAGE_STATE_UNKNOWN,
             ),
@@ -525,11 +538,14 @@ class ProjectImage(models.Model):
             # jamais celles d'une image en attente ou en échec.
             models.CheckConstraint(
                 condition=models.Q(state=ProcessingState.READY) | models.Q(variants=[]),
-                name="%(app_label)s_%(class)s_variants_ready",
+                name="content_galleryimage_variants_ready",
                 violation_error_code="image_variants_unready",
                 violation_error_message=strings.IMAGE_VARIANTS_UNREADY,
             ),
         )
+
+    def __str__(self) -> str:
+        return f"{self.project} · {self.caption}"
 
     # Le nom de l'original que la ligne portait quand cette instance l'a lue ou écrite pour la
     # dernière fois : ce qu'elle-même change, et rien d'autre (`_replaced_files`).
@@ -579,8 +595,8 @@ class ProjectImage(models.Model):
         variantes : elles décrivaient l'ancien fichier (décision 5). Les fichiers que la ligne
         référençait sortent du stockage une fois la transaction validée, jamais si elle est
         annulée (décision 10). Un enregistrement partiel (`update_fields`) ne remplace que s'il
-        écrit l'original ; il écrit alors aussi ses dimensions — les règles de la couverture les
-        lisent —, et l'état et les variantes qu'un remplacement remet à zéro.
+        écrit l'original ; il écrit alors aussi ses dimensions, qui décrivent le nouveau fichier,
+        et l'état et les variantes qu'un remplacement remet à zéro.
 
         Args:
             kwargs: ceux de `Model.save`.
@@ -635,74 +651,9 @@ class ProjectImage(models.Model):
         return row.stored_files()
 
 
-class Cover(ProjectImage):
-    """La couverture d'un projet : carrée, d'au moins 1200 px de côté (spec §1.11 et §7). C'est
-    la photo de la carte, la première image de la galerie et l'`og:image` (ADR 0011).
-
-    Une par projet (`project.cover`). « Un projet porte une couverture » n'est pas une règle que
-    la base peut porter : l'écran Projet la tient (décision 4), comme « au moins une
-    technologie ».
-    """
-
-    project: models.OneToOneField[Project, Project] = models.OneToOneField(
-        Project, models.CASCADE, related_name="cover", verbose_name=strings.PROJECT
-    )
-
-    class Meta(ProjectImage.Meta):
-        verbose_name = strings.COVER
-        verbose_name_plural = strings.COVERS
-        constraints = (
-            *ProjectImage.Meta.constraints,
-            # Carré strict (décision 8) : la couverture remplit le cadre (spec §4.1), une
-            # tolérance voudrait dire recadrer ou laisser une marge.
-            models.CheckConstraint(
-                condition=models.Q(width=models.F("height")),
-                name="content_cover_square",
-                violation_error_code="cover_not_square",
-                violation_error_message=strings.COVER_NOT_SQUARE,
-            ),
-            # Sur les deux côtés : une image qui n'est pas carrée est trop petite dès que son
-            # petit côté l'est.
-            models.CheckConstraint(
-                condition=models.Q(width__gte=COVER_MIN_SIDE, height__gte=COVER_MIN_SIDE),
-                name="content_cover_min_side",
-                violation_error_code="cover_too_small",
-                violation_error_message=strings.COVER_TOO_SMALL,
-            ),
-        )
-
-    def __str__(self) -> str:
-        return f"{self.project} · {self.caption}"
-
-
-class GalleryImage(ProjectImage):
-    """Une image de la galerie d'un projet, à sa place dans la galerie (`project.gallery`). Le
-    site l'affiche entière dans le cadre carré, sur fond neutre (spec §1.11)."""
-
-    project: models.ForeignKey[Project, Project] = models.ForeignKey(
-        Project, models.CASCADE, related_name="gallery", verbose_name=strings.PROJECT
-    )
-    # Sans valeur par défaut : le tableau en ligne de l'écran Projet la pose, dans l'ordre affiché
-    # (`content/inlines.py`, D55). Aucune unicité ne lit le projet : à position égale, l'ordre de
-    # saisie.
-    position: models.PositiveSmallIntegerField[int, int] = models.PositiveSmallIntegerField(
-        strings.GALLERY_IMAGE_POSITION
-    )
-
-    class Meta(ProjectImage.Meta):
-        verbose_name = strings.GALLERY_IMAGE
-        verbose_name_plural = strings.GALLERY_IMAGES
-        # L'ordre de l'admin est l'ordre stocké ; à position égale, l'ordre de saisie.
-        ordering = ("position", "id")
-
-    def __str__(self) -> str:
-        return f"{self.project} · {self.caption}"
-
-
-@receiver(pre_delete, sender=Cover)
 @receiver(pre_delete, sender=GalleryImage)
 def delete_image_files(
-    sender: type[ProjectImage], instance: ProjectImage, **kwargs: object
+    sender: type[GalleryImage], instance: GalleryImage, **kwargs: object
 ) -> None:
     """Une image supprimée — seule, ou avec son projet : Django envoie le signal pour chaque ligne
     qu'une cascade emporte — sort du stockage une fois la transaction validée, original et
