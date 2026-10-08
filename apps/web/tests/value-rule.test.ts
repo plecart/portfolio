@@ -44,6 +44,7 @@ import { beforeAll, describe, expect, test } from 'vitest'
 import {
   APP_ROOT,
   LINT_WARM_UP_MS,
+  lintComponent,
   lintRuleIds,
   readAppJson,
   warmUpLint,
@@ -70,9 +71,6 @@ function forbiddenIn(css: string): string[] {
   )
 }
 
-/** Les règles qu'ESLint lève sur un extrait, lu comme un composant de `src/`. */
-const lintComponent = (code: string) => lintRuleIds('src/value-rule-probe.tsx', code)
-
 describe('ESLint refuse une valeur en dur dans un composant', () => {
   test.each([
     ['hexadécimal en classe', '<p className="bg-[#B4471F]" />'],
@@ -97,7 +95,7 @@ describe('ESLint refuse une valeur en dur dans un composant', () => {
     ['fonction de couleur en capitales', "<p style={{ color: 'RGB(42, 38, 34)' }} />"],
     ['unité en capitale', "<p style={{ transition: 'opacity .2S' }} />"],
   ])('%s', async (_, code) => {
-    expect(await lintComponent(`export const probe = ${code}`)).toContain('no-restricted-syntax')
+    expect(await lintComponent(code)).toContain('no-restricted-syntax')
   })
 
   test.each([
@@ -105,13 +103,11 @@ describe('ESLint refuse une valeur en dur dans un composant', () => {
     ['durée et courbe en jetons', '<p className="duration-(--dur) ease-(--ease-out)" />'],
     ['dimensions', '<p className="p-(--s-4) rounded-(--r-card) h-14 w-[76px]" />'],
     // `bac` est hexadécimal : l'ancre ne passe que parce que le motif exige une fin de mot.
-    ['ancre de page', '<a href="#bac-a-sable">bac à sable</a>'],
+    ['ancre de page', '<a href="#bac-a-sable" />'],
     ['transition par défaut', '<p className="transition-colors" />'],
     ['nombre', '200'],
   ])('%s passe', async (_, code) => {
-    expect(await lintComponent(`export const probe = ${code}`)).not.toContain(
-      'no-restricted-syntax',
-    )
+    expect(await lintComponent(code)).not.toContain('no-restricted-syntax')
   })
 
   test('un script JavaScript de src/ est lu aussi', async () => {

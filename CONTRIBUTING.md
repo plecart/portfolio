@@ -63,6 +63,13 @@ une dimension propre à un objet (56, 36, 22, 76 px…) s'écrit telle quelle et
 Formes couvertes et hors portée :
 [apps/web/tests/value-rule.test.ts](apps/web/tests/value-rule.test.ts).
 
+**Chaînes du front.** Tout texte que l'interface rend ou annonce vient du catalogue
+[apps/web/src/strings.ts](apps/web/src/strings.ts) : identifiants en anglais, valeurs en français,
+apostrophe typographique « ’ » (spec §6.2). ESLint refuse un texte qui contient une lettre écrit en
+dur dans un composant de `apps/web/src/` — enfant JSX ou attribut annoncé (`aria-label`, `title`,
+`alt`…). Il ne lit ni une variable, ni une expression, ni le bloc d'aperçu d'`index.html`. Formes
+couvertes et hors portée : [apps/web/tests/string-rule.test.ts](apps/web/tests/string-rule.test.ts).
+
 **La pile de développement (`infra/`)** — Postgres, Redis et `api` en conteneurs sur un réseau
 privé. Demande Docker, et le front installé (`make web-install`) : l'image `api` copie son
 `index.html` compilé (ADR 0014). Les ports 8000, 5432 et 6379 sont publiés sur `127.0.0.1`
