@@ -28,6 +28,33 @@ const valueSelectors = forbiddenValues.flatMap(({ name, pattern }) => {
   ]
 })
 
+// Règle des chaînes : aucun texte d'interface en dur dans un composant — il vient du catalogue
+// `src/strings.ts` (spec §6.2). Visé : un texte qui contient une lettre, là où l'interface le rend
+// (enfant JSX) ou l'annonce (attribut ci-dessous). Lettres en classe entre crochets, pour la même
+// raison que les motifs des valeurs. Formes couvertes et hors portée : tests/string-rule.test.ts.
+const LETTER = '/[a-zà-öø-ÿœæ]/i'
+const ANNOUNCED_ATTRIBUTES = [
+  'aria-label',
+  'aria-description',
+  'aria-roledescription',
+  'aria-valuetext',
+  'aria-placeholder',
+  'title',
+  'alt',
+  'placeholder',
+  'label',
+]
+const ANNOUNCED = `JSXAttribute[name.name=/^(${ANNOUNCED_ATTRIBUTES.join('|')})$/]`
+const stringSelectors = [
+  `JSXText[value=${LETTER}]`,
+  `:matches(JSXElement, JSXFragment, ${ANNOUNCED}) > JSXExpressionContainer > Literal[value=${LETTER}]`,
+  `:matches(JSXElement, JSXFragment, ${ANNOUNCED}) > JSXExpressionContainer > TemplateLiteral > TemplateElement[value.raw=${LETTER}]`,
+  `${ANNOUNCED} > Literal[value=${LETTER}]`,
+].map((selector) => ({
+  selector,
+  message: "Texte d'interface en dur : passer par le catalogue src/strings.ts (spec §6.2).",
+}))
+
 export default tseslint.config(
   { ignores: ['dist'] },
   js.configs.recommended,
@@ -40,11 +67,11 @@ export default tseslint.config(
   reactHooks.configs.flat['recommended-latest'],
   jsxA11y.flatConfigs.recommended,
   // Une seule entrée `no-restricted-syntax` par fichier : d'un bloc à l'autre, ESLint remplace
-  // les options d'une règle au lieu de les cumuler. Toute autre liste de sélecteurs sur `src/`
-  // s'ajoute donc à celle-ci.
+  // les options d'une règle au lieu de les cumuler. Valeurs et chaînes partagent donc cette entrée,
+  // et toute autre liste de sélecteurs sur `src/` s'y ajoute.
   {
     files: ['src/**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'],
-    rules: { 'no-restricted-syntax': ['error', ...valueSelectors] },
+    rules: { 'no-restricted-syntax': ['error', ...valueSelectors, ...stringSelectors] },
   },
   // `public/` est copié tel quel par Vite et chargé en script classique, hors de toute
   // compilation : ni module, ni Node — seulement les globales du navigateur qu'il lit, déclarées

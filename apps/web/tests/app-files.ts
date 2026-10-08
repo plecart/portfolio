@@ -31,6 +31,16 @@ export async function lintRuleIds(filePath: string, text: string): Promise<(stri
 }
 
 /**
+ * Les règles qu'ESLint lève sur une expression, exportée depuis un composant de `src/`.
+ *
+ * @param expression Une expression TypeScript ou JSX, par exemple `<p className="flex" />`.
+ * @returns Comme {@link lintRuleIds}.
+ */
+export async function lintComponent(expression: string): Promise<(string | null)[]> {
+  return lintRuleIds('src/probe.tsx', `export const probe = ${expression}`)
+}
+
+/**
  * Délai accordé au premier passage d'ESLint d'un fichier de test : configuration, analyseur
  * TypeScript et extensions se chargent alors, au-delà des 5 s par défaut de Vitest à froid, juste
  * après `npm ci` (mesuré une fois sur six à la relecture de #18).
