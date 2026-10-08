@@ -45,6 +45,13 @@
   --default-transition-timing-function: var(--ease-out);
 }
 
+/* Un seul point de rupture, 600 px (spec §6.1) : `sm:` s'y place, au lieu des 640 px de Tailwind,
+   et ses autres points de rupture sont retirés — `md:` ou `lg:` ne produisent plus rien. */
+@theme {
+  --breakpoint-*: initial;
+  --breakpoint-sm: 600px;
+}
+
 /* Police variable 200–800, sous-ensemble latin (spec §2.2), servie par le site et jamais par un
    tiers : c'est ce qui rend tenable « aucune requête externe » (spec §6.4) avec une seule police
    de 25 Ko. */

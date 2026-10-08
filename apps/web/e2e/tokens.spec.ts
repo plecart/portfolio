@@ -2,13 +2,13 @@
  * Le module « Jetons » mesuré sur la page servie : les jetons de la spec §2, la base de page, et le
  * mode forcé restauré avant le premier rendu.
  *
- * Un jeton se lit **résolu** : appliqué à une propriété réelle d'un élément sonde, puis comparé à
- * la valeur que la spec écrit, appliquée de la même façon. La propriété personnalisée brute
- * dépendrait du mode de compilation — `light-dark()` en développement, la couleur résolue après la
- * réécriture du build (docs/frontend-outillage.md §2.4) —, et Chrome sérialise à sa manière ce
- * qu'il calcule : seule la valeur calculée des deux côtés se compare.
+ * Un jeton se lit **résolu** (`css.ts`) : appliqué à une propriété réelle d'un élément sonde, puis
+ * comparé à la valeur que la spec écrit, appliquée de la même façon. La propriété personnalisée
+ * brute dépendrait du mode de compilation — `light-dark()` en développement, la couleur résolue
+ * après la réécriture du build (docs/frontend-outillage.md §2.4).
  */
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
+import { resolveAll } from './css.ts'
 
 type Mode = 'light' | 'dark'
 
@@ -109,35 +109,21 @@ async function openInState(page: Page, { system, forced }: PaletteState) {
 }
 
 /**
- * Valeurs calculées de déclarations appliquées une à une à un élément sonde du document.
+ * Pose un bouton à focaliser, propre au scénario : il ne dépend d'aucun élément de la page. En
+ * tête du document, il reçoit le premier Tab, avant le nom et le bouton de mode de l'entête ; fixé
+ * en bas de la fenêtre, il n'est pas recouvert par l'entête fixe, qui prendrait son clic.
  *
- * @param page Page ouverte : la sonde hérite des propriétés personnalisées de `:root`.
- * @param declarations Paires `[propriété, valeur]`, par exemple `['color', 'var(--bg)']`.
- * @returns La valeur calculée de chaque propriété, dans l'ordre reçu ; une valeur invalide ou un
- *   jeton absent rend la valeur initiale de la propriété, qui ne correspond à aucune attente.
+ * @returns Le bouton, trouvé par son libellé : la page a d'autres boutons.
  */
-async function resolveAll(page: Page, declarations: [string, string][]): Promise<string[]> {
-  return page.evaluate((pairs) => {
-    const probe = document.createElement('div')
-    document.body.append(probe)
-    const values = pairs.map(([property, value]) => {
-      probe.style.setProperty(property, value)
-      const resolved = getComputedStyle(probe).getPropertyValue(property)
-      probe.style.removeProperty(property)
-      return resolved
-    })
-    probe.remove()
-    return values
-  }, declarations)
-}
-
-/** Pose un bouton à focaliser, propre au scénario : il ne dépend d'aucun élément de la page. */
-async function appendButton(page: Page) {
+async function prependButton(page: Page): Promise<Locator> {
   await page.evaluate(() => {
     const button = document.createElement('button')
     button.textContent = 'cible'
-    document.body.append(button)
+    button.style.position = 'fixed'
+    button.style.bottom = '0'
+    document.body.prepend(button)
   })
+  return page.getByRole('button', { name: 'cible' })
 }
 
 test('la table des jetons compte les 32 jetons de la spec', () => {
@@ -206,16 +192,14 @@ for (const state of PALETTE_STATES) {
 
   test(`l'anneau de focus clavier est l'accent, à 3 px — ${label}`, async ({ page }) => {
     await openInState(page, state)
-    await appendButton(page)
+    const button = await prependButton(page)
 
     await page.keyboard.press('Tab')
 
-    const ring = await page
-      .locator('button')
-      .evaluate((button) => {
-        const style = getComputedStyle(button)
-        return [style.outline, style.outlineOffset]
-      })
+    const ring = await button.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return [style.outline, style.outlineOffset]
+    })
     const [expected] = await resolveAll(page, [
       ['outline', `2px solid ${specValue(SPEC_TOKENS['--accent'], mode)}`],
     ])
@@ -363,27 +347,25 @@ test("la base de page cède à l'utilitaire d'un composant", async ({ page }) =>
     style.textContent = '@layer utilities { .probe-offset { outline-offset: 7px } }'
     document.head.append(style)
   })
-  await appendButton(page)
-  await page.locator('button').evaluate((button) => button.classList.add('probe-offset'))
+  const button = await prependButton(page)
+  await button.evaluate((element) => element.classList.add('probe-offset'))
 
   await page.keyboard.press('Tab')
 
-  expect(
-    await page.locator('button').evaluate((button) => getComputedStyle(button).outlineOffset),
-  ).toBe('7px')
+  expect(await button.evaluate((element) => getComputedStyle(element).outlineOffset)).toBe('7px')
 })
 
 test("l'anneau de focus n'apparaît pas au pointeur", async ({ page }) => {
   await page.goto('/')
-  await appendButton(page)
+  const button = await prependButton(page)
 
-  await page.locator('button').click()
+  await button.click()
 
   // Focalisé, mais sans anneau : `:focus-visible` ne s'allume qu'au clavier (spec §6.2).
   expect(
-    await page.locator('button').evaluate((button) => [
-      button === document.activeElement,
-      getComputedStyle(button).outlineStyle,
+    await button.evaluate((element) => [
+      element === document.activeElement,
+      getComputedStyle(element).outlineStyle,
     ]),
   ).toEqual([true, 'none'])
 })

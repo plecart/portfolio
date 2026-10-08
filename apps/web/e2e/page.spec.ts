@@ -32,7 +32,7 @@ test("la page déclare le français comme langue du document", async ({ page }) 
  *
  * **6 hors portée**, à couvrir par l'issue qui les introduira, jamais à supposer couvertes ici :
  * Service Worker (hors du contexte de page) ; requête différée au-delà de `networkidle` ;
- * `<img loading="lazy">` sous la ligne de flottaison (#18, #20) ; `fetch` derrière une
+ * `<img loading="lazy">` sous la ligne de flottaison (#20) ; `fetch` derrière une
  * interaction (#19) ; `preconnect` et `dns-prefetch`, qui joignent le tiers en DNS et TLS sans
  * jamais produire de requête HTTP.
  */
@@ -90,14 +90,16 @@ test('la page rend son texte en Manrope, servie par le site', async ({ page }) =
 test('la feuille de base de Tailwind est appliquée', async ({ page }) => {
   await page.goto('/')
 
-  const heading = await page.locator('h1').evaluate((element) => {
-    const style = getComputedStyle(element)
+  // Un `h1` sans classe, posé par le scénario : celui de la page porte la taille du nom (spec
+  // §3.3). Sans Tailwind, un `h1` pèse 2em et porte sa propre marge ; avec sa feuille de base, il
+  // hérite et n'en a plus. Le test ne dépend donc d'aucun balisage de l'application.
+  const heading = await page.evaluate(() => {
+    const probe = document.createElement('h1')
+    document.body.append(probe)
+    const style = getComputedStyle(probe)
     return { fontSize: style.fontSize, marginTop: style.marginTop }
   })
 
-  // Mesure la feuille de base plutôt qu'une classe utilitaire posée pour l'occasion : sans
-  // Tailwind un `h1` pèse 2em et porte sa propre marge ; avec elle, il hérite et n'en a plus.
-  // Le test ne dépend donc d'aucun balisage écrit exprès pour lui.
   expect(heading).toEqual({ fontSize: '16px', marginTop: '0px' })
 })
 
