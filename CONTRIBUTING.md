@@ -67,8 +67,10 @@ Formes couvertes et hors portée :
 [apps/web/src/strings.ts](apps/web/src/strings.ts) : identifiants en anglais, valeurs en français,
 apostrophe typographique « ’ » (spec §6.2). ESLint refuse un texte qui contient une lettre écrit en
 dur dans un composant de `apps/web/src/` — enfant JSX ou attribut annoncé (`aria-label`, `title`,
-`alt`…). Il ne lit ni une variable, ni une expression, ni le bloc d'aperçu d'`index.html`. Formes
-couvertes et hors portée : [apps/web/tests/string-rule.test.ts](apps/web/tests/string-rule.test.ts).
+`alt`…). Il ne lit ni une variable, ni une expression, ni une décomposition (`{...props}`), ni le
+HTML de `dangerouslySetInnerHTML`, ni un texte produit par CSS (`content`), ni le bloc d'aperçu
+d'`index.html`. Formes couvertes et hors portée, dénombrées :
+[apps/web/tests/string-rule.test.ts](apps/web/tests/string-rule.test.ts).
 
 **La pile de développement (`infra/`)** — Postgres, Redis et `api` en conteneurs sur un réseau
 privé. Demande Docker, et le front installé (`make web-install`) : l'image `api` copie son

@@ -37,18 +37,22 @@ const ANNOUNCED_ATTRIBUTES = [
   'aria-label',
   'aria-description',
   'aria-roledescription',
+  'aria-braillelabel',
+  'aria-brailleroledescription',
   'aria-valuetext',
   'aria-placeholder',
   'title',
   'alt',
+  'abbr',
   'placeholder',
   'label',
 ]
 const ANNOUNCED = `JSXAttribute[name.name=/^(${ANNOUNCED_ATTRIBUTES.join('|')})$/]`
+const IN_BRACES = `:matches(JSXElement, JSXFragment, ${ANNOUNCED}) > JSXExpressionContainer`
 const stringSelectors = [
   `JSXText[value=${LETTER}]`,
-  `:matches(JSXElement, JSXFragment, ${ANNOUNCED}) > JSXExpressionContainer > Literal[value=${LETTER}]`,
-  `:matches(JSXElement, JSXFragment, ${ANNOUNCED}) > JSXExpressionContainer > TemplateLiteral > TemplateElement[value.raw=${LETTER}]`,
+  `${IN_BRACES} > Literal[value=${LETTER}]`,
+  `${IN_BRACES} > TemplateLiteral > TemplateElement[value.raw=${LETTER}]`,
   `${ANNOUNCED} > Literal[value=${LETTER}]`,
 ].map((selector) => ({
   selector,

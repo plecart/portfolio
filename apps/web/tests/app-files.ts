@@ -25,19 +25,29 @@ const ESLINT = new ESLint({ cwd: APP_ROOT })
  *   porte ne lirait pas ne rend donc jamais une liste vide.
  */
 export async function lintRuleIds(filePath: string, text: string): Promise<(string | null)[]> {
-  const [result] = await ESLINT.lintText(text, { filePath: join(APP_ROOT, filePath) })
-
-  return result.messages.map((message) => message.ruleId)
+  return (await lint(filePath, text)).map((message) => message.ruleId)
 }
 
 /**
- * Les règles qu'ESLint lève sur une expression, exportée depuis un composant de `src/`.
+ * Les messages qu'ESLint lève sur une expression, exportée depuis un composant de `src/`.
+ *
+ * Des messages, pas des identifiants : la règle des valeurs et celle des chaînes partagent
+ * `no-restricted-syntax`, et seul le message dit laquelle a refusé.
  *
  * @param expression Une expression TypeScript ou JSX, par exemple `<p className="flex" />`.
- * @returns Comme {@link lintRuleIds}.
+ * @returns Le texte de chaque message, dans l'ordre d'ESLint.
  */
-export async function lintComponent(expression: string): Promise<(string | null)[]> {
-  return lintRuleIds('src/probe.tsx', `export const probe = ${expression}`)
+export async function lintComponent(expression: string): Promise<string[]> {
+  const messages = await lint('src/probe.tsx', `export const probe = ${expression}`)
+
+  return messages.map((message) => message.message)
+}
+
+/** Les messages qu'ESLint lève sur un texte, lu comme s'il était le fichier donné. */
+async function lint(filePath: string, text: string): Promise<ESLint.LintResult['messages']> {
+  const [result] = await ESLINT.lintText(text, { filePath: join(APP_ROOT, filePath) })
+
+  return result.messages
 }
 
 /**
