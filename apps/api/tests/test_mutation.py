@@ -6,6 +6,8 @@ un test jamais vu rouge (obs 37, deux défauts mesurés sur sept réécritures).
 c'est la seule porte qui éprouve son comportement, `pyright` n'atteignant pas les dossiers cachés.
 """
 
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -609,3 +611,156 @@ def test_un_refus_de_securite_arrete_la_mutation_dans_play(tmp_path: Path) -> No
     assert [v.verdict for v in verdicts] == ["PANNE"]
     assert "réglage de sécurité" in verdicts[0].detail
     assert "recueil de formes fautives" in verdicts[0].detail
+
+
+# --- Ce que les sondes de la passe 2 ont trouvé (2026-10-09) -----------------------------------
+#
+# Ces quatre gardes viennent de sondes écrites par un relecteur interrompu par une limite
+# d'usage avant d'avoir pu rendre son rapport. Ses fichiers de sonde sont restés dans son
+# worktree ; les relire et les jouer a coûté moins que de redécouvrir ce qu'il avait vu.
+
+
+def test_un_expect_ecrit_en_chaine_est_refuse_avant_toute_resolution(tmp_path: Path) -> None:
+    """Une chaîne est itérable : chaque **lettre** deviendrait un fragment de `expect`.
+
+    Mesuré le 2026-10-09 : sur une suite témoin à un seul test, chaque lettre s'y résolvait, et
+    `"expect": "un"` rendait **ROUGE** — comme `"expect": "test_refuse_un_negatiff"`, un nom mal
+    orthographié. C'est le défaut que `resolve` ferme, rouvert par une erreur de type : le refus
+    doit donc venir **avant** la résolution.
+    """
+    root = build_repo(tmp_path)
+
+    verdicts = mutation.play(
+        root,
+        spec(
+            name="expect mal typé",
+            file="source.py",
+            old="if n < 0:",
+            new="if False:",
+            expect="test_refuse_un_negatif",
+        ),
+    )
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert "`expect` est une chaîne" in verdicts[0].detail
+
+
+CLES_OBLIGATOIRES = ("file", "old", "new")
+
+
+@pytest.mark.parametrize("missing", CLES_OBLIGATOIRES)
+def test_une_cle_obligatoire_absente_est_une_panne(tmp_path: Path, missing: str) -> None:
+    """Le fichier de mutations s'écrit à la main : une clé oubliée rendait une `KeyError` nue,
+    qui abandonnait les mutations suivantes du lot avec une trace au lieu d'un verdict."""
+    root = build_repo(tmp_path)
+    entry = {
+        "name": "clé manquante",
+        "file": "source.py",
+        "old": "if n < 0:",
+        "new": "if False:",
+        "expect": ["test_refuse_un_negatif"],
+    }
+    del entry[missing]
+
+    verdicts = mutation.play(root, {"targets": ["test_source.py"], "mutations": [entry]})
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert f"clé « {missing} » absente" in verdicts[0].detail
+
+
+MAUVAIS_DELAIS = {
+    "texte": "beaucoup",
+    "zéro": 0,
+    "négatif": -5,
+    "booléen": True,
+    "nul": None,
+}
+
+
+@pytest.mark.parametrize("value", MAUVAIS_DELAIS.values(), ids=MAUVAIS_DELAIS.keys())
+def test_un_delai_qui_n_est_pas_un_nombre_positif_est_une_panne(
+    tmp_path: Path, value: object
+) -> None:
+    """`int("beaucoup")` levait une `ValueError` nue depuis la construction de la suite.
+
+    `True` est refusé aussi : il vaudrait une seconde, et toute suite dépasserait ce délai —
+    une PANNE généralisée qui se lirait comme un environnement cassé.
+    """
+    root = build_repo(tmp_path)
+
+    verdicts = mutation.play(
+        root,
+        {
+            "targets": ["test_source.py"],
+            "timeout": value,
+            "mutations": [
+                {
+                    "name": "délai absurde",
+                    "file": "source.py",
+                    "old": "if n < 0:",
+                    "new": "if False:",
+                    "expect": ["test_refuse_un_negatif"],
+                }
+            ],
+        },
+    )
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert "`timeout`" in verdicts[0].detail
+
+
+def test_un_lien_dur_vers_un_fichier_hors_racine_est_refuse(tmp_path: Path) -> None:
+    """`resolve()` ne suit pas un lien **dur** : ce n'est pas un lien dans le chemin, c'est le
+    même fichier sous un autre nom.
+
+    Mesuré le 2026-10-09 : un lien dur créé dans la racine vers un fichier extérieur passait la
+    borne, et l'écriture atteignait bien le fichier extérieur — la jonction NTFS, le lien
+    symbolique et le chemin UNC, eux, étaient déjà refusés. Les 239 fichiers suivis du dépôt ont
+    tous exactement un lien, donc la garde ne refuse aucun travail ordinaire.
+    """
+    root = tmp_path / "depot"
+    root.mkdir()
+    outside = tmp_path / "hors.txt"
+    outside.write_text("secret\n", encoding="utf-8")
+    inside = root / "innocent.txt"
+    try:
+        os.link(outside, inside)
+    except (OSError, NotImplementedError) as refus:  # pragma: no cover — selon le système
+        pytest.skip(f"liens durs indisponibles ici : {refus}")
+
+    with pytest.raises(mutation.Unusable, match="liens durs"):
+        mutation.within(root, "innocent.txt")
+
+    assert outside.read_text(encoding="utf-8") == "secret\n"
+
+
+def test_une_jonction_vers_l_exterieur_est_refusee_par_la_borne(tmp_path: Path) -> None:
+    """Un répertoire de la racine qui *pointe* ailleurs, et dont la cible **existe**.
+
+    Première écriture de ce test : il nommait un chemin UNC et une jonction **inexistants**, et
+    assertait seulement « ça lève ». Mesuré par mutation : la borne retirée, il restait vert —
+    `is_file()` refusait les deux pour une tout autre raison. Un test d'évasion doit donc porter
+    sur une cible qui existe, et asserter **le motif**, pas le seul fait qu'on a refusé.
+
+    Dénombrement de la classe, 4 formes recensées : jonction et lien symbolique refusés par
+    `resolve()` + `is_relative_to`, chemin absolu et remontée par `..` de même, lien dur refusé
+    par le compte de liens — qu'aucun des deux mécanismes précédents n'aurait attrapé.
+    """
+    root = tmp_path / "depot"
+    root.mkdir()
+    elsewhere = tmp_path / "ailleurs"
+    elsewhere.mkdir()
+    (elsewhere / "hors.txt").write_text("secret\n", encoding="utf-8")
+    made = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(root / "pont"), str(elsewhere)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if not (root / "pont").exists():  # pragma: no cover — selon le système de fichiers
+        pytest.skip(f"jonctions indisponibles ici : {made.stdout or made.stderr}")
+
+    with pytest.raises(mutation.Unusable, match="sort de la racine"):
+        mutation.within(root, "pont/hors.txt")
+
+    assert (elsewhere / "hors.txt").read_text(encoding="utf-8") == "secret\n"
