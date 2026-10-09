@@ -345,6 +345,8 @@ class Suite:
         Raises:
             Unusable: le rapporteur nommé n'existe pas. Une clé inconnue doit rendre un verdict,
                 pas une `KeyError` nue sur une entrée écrite à la main.
+            LookupError: propagé par `project_command` — le libellé n'existe pas pour cette
+                pile, ou la ligne y vaut `n/a`. `play` traduit les deux en PANNE de témoin.
         """
         name = str(spec.get("reporter", "junit"))
         if name not in REPORTERS:
