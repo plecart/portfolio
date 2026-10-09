@@ -146,19 +146,35 @@ PINNED_IMAGE = re.compile(r"^[\w./:-]+:v?\d+\.\d+\.\d+[\w.-]*@sha256:[0-9a-f]{64
 # --- Les gardes : des fonctions sur du texte ---------------------------------------------------
 
 
-def repository_files(root: Path = REPOSITORY_ROOT) -> list[str]:
-    """Les fichiers que le prochain commit peut contenir : suivis, ou nouveaux et non ignorés.
+def git_listing(root: Path, *flags: str) -> list[str]:
+    """Les chemins que `git ls-files` rend sous ces drapeaux.
 
     `-z` rend les chemins bruts : sans lui, git met entre guillemets et échappe tout chemin non
     ASCII, qui ne désignerait plus aucun fichier.
     """
     listing = subprocess.run(
-        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        ["git", "ls-files", "-z", *flags],
         cwd=root,
         capture_output=True,
         check=True,
     ).stdout.decode("utf-8")
     return [name for name in listing.split("\0") if name]
+
+
+def repository_files(root: Path = REPOSITORY_ROOT) -> list[str]:
+    """Les fichiers que le prochain commit peut contenir : suivis, ou nouveaux et non ignorés."""
+    return git_listing(root, "--cached", "--others", "--exclude-standard")
+
+
+def tracked_files(root: Path = REPOSITORY_ROOT) -> list[str]:
+    """Les fichiers que le dépôt **contient**, index compris — le bloc-notes de personne.
+
+    Distinct de `repository_files` : celui-ci inclut les fichiers nouveaux non ignorés, ce qui
+    est juste pour une porte qui demande « que peut contenir le prochain commit ? », et faux
+    pour une porte dont le verdict doit être le même sur tous les postes et en CI. Un brouillon
+    non suivi à la racine d'un clone suffit sinon à faire rougir chez une personne seule.
+    """
+    return git_listing(root, "--cached")
 
 
 def is_dockerfile(name: str) -> bool:

@@ -24,7 +24,11 @@ from pathlib import Path
 import pytest
 import yaml
 from config.env import Env
-from test_supply_chain import dockerfile_instructions, repository_files
+from test_supply_chain import (
+    dockerfile_instructions,
+    repository_files,
+    tracked_files,
+)
 
 # `test_infra.py` → `tests` → `api` → `apps` → racine du dépôt.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -152,6 +156,30 @@ CONTAINER_TEXT_GLOBS = [
 PROSE_GLOBS = ["infra/**/*", "*.md", "Makefile", ".github/workflows/*.yml", ".claude/**/*.md"]
 TESTS_DIRECTORY = REPOSITORY_ROOT / "apps" / "api" / "tests"
 TEST_MODULE_REFERENCE = re.compile(r"apps/api/tests/(?P<name>\w+\.py)")
+
+
+def cited_test_modules(root: Path, population: Iterable[str]) -> dict[str, set[str]]:
+    """Les modules de test que la prose du dépôt désigne, par nom, avec les fichiers qui citent.
+
+    Args:
+        root: la racine à parcourir.
+        population: les chemins relatifs, en POSIX, que la porte a le droit de lire. Tout
+            fichier présent sur le disque mais absent de cette liste est ignoré : c'est ce qui
+            rend le verdict indépendant du répertoire de travail de chacun.
+
+    Returns:
+        Les noms de modules cités, chacun avec le nom des fichiers qui les citent.
+    """
+    allowed = set(population)
+    cited: dict[str, set[str]] = {}
+    for glob in PROSE_GLOBS:
+        for path in root.glob(glob):
+            if not path.is_file() or path.relative_to(root).as_posix() not in allowed:
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+            for reference in TEST_MODULE_REFERENCE.finditer(text):
+                cited.setdefault(reference.group("name"), set()).add(path.name)
+    return cited
 
 
 def shell_instructions(script: Path) -> list[str]:
@@ -539,22 +567,16 @@ def test_aucun_renvoi_vers_un_module_de_test_inexistant() -> None:
     ne cassent aucune porte, se lisent comme justes, et n'échouent que pour le lecteur qui suit
     le lien — c'est-à-dire trop tard.
 
-    La population est celle du dépôt — `repository_files()` —, jamais celle du disque : un
-    bloc-notes non suivi fait sinon dépendre le verdict du répertoire de travail de chacun, et
-    rougit sur un seul poste. Mesuré le 2026-10-09 : `PR-PARALLELES.md`, tableau de bord
-    éphémère d'une vague, citait un module de test d'une branche en vol.
+    La population est celle que le dépôt **contient** — `tracked_files()`, soit l'index —,
+    jamais celle du disque : le verdict doit être le même sur tous les postes et en CI, et un
+    brouillon non suivi suffirait sinon à faire rougir chez une personne seule. Mesuré le
+    2026-10-09, deux fois : `PR-PARALLELES.md`, tableau de bord éphémère d'une vague, citait un
+    module de test d'une branche en vol ; puis, en relecture, un fichier de prose non suivi
+    **et non ignoré** rougissait encore, parce qu'une population « suivis **ou** nouveaux non
+    ignorés » les comprend. L'exclusion d'un artefact nommé ne ferme pas la classe ; la
+    population, oui.
     """
-    cited: dict[str, set[str]] = {}
-    in_repository = set(repository_files())
-    for glob in PROSE_GLOBS:
-        for path in REPOSITORY_ROOT.glob(glob):
-            if not path.is_file():
-                continue
-            if path.relative_to(REPOSITORY_ROOT).as_posix() not in in_repository:
-                continue
-            text = path.read_text(encoding="utf-8", errors="replace")
-            for reference in TEST_MODULE_REFERENCE.finditer(text):
-                cited.setdefault(reference.group("name"), set()).add(path.name)
+    cited = cited_test_modules(REPOSITORY_ROOT, tracked_files())
 
     assert cited, "aucun renvoi trouvé — les motifs ont-ils cessé de mordre ?"
     missing = {
@@ -563,6 +585,40 @@ def test_aucun_renvoi_vers_un_module_de_test_inexistant() -> None:
         if not (TESTS_DIRECTORY / name).exists()
     }
     assert not missing, f"{len(cited)} modules cités, introuvables : {missing}"
+
+
+def test_un_brouillon_non_suivi_n_entre_pas_dans_la_population(tmp_path: Path) -> None:
+    """C'est la **population** qui décide, pas l'exclusion d'un artefact nommé.
+
+    Ignorer `PR-PARALLELES.md` fermait l'occurrence ; seul le choix de la population ferme la
+    classe — n'importe quel brouillon de prose non suivi la rouvrirait. Ce test le prouve dans
+    les deux sens : hors population, le fichier n'est pas lu ; dedans, il l'est.
+    """
+    draft = tmp_path / "brouillon.md"
+    draft.write_text("voir apps/api/tests/test_inexistant.py", encoding="utf-8")
+
+    assert cited_test_modules(tmp_path, []) == {}
+    assert cited_test_modules(tmp_path, ["brouillon.md"]) == {
+        "test_inexistant.py": {"brouillon.md"}
+    }
+
+
+def test_les_deux_populations_de_fichiers_ne_sont_pas_la_meme(tmp_path: Path) -> None:
+    """La porte a choisi la plus étroite des deux, et ce choix doit rester lisible.
+
+    Éprouvé sur un dépôt jetable, jamais sur celui-ci : une comparaison des deux populations
+    du clone courant serait vraie ou fausse selon ce que la personne a en cours, soit le défaut
+    même que ce resserrement corrige. Première écriture de ce test, mesuré : l'assertion
+    `tracked_files() < repository_files()` passait tant qu'un fichier non suivi existait et
+    tombait dès que l'arbre était propre.
+    """
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+    (tmp_path / "suivi.md").write_text("suivi", encoding="utf-8")
+    (tmp_path / "brouillon.md").write_text("brouillon", encoding="utf-8")
+    subprocess.run(["git", "add", "suivi.md"], cwd=tmp_path, check=True)
+
+    assert tracked_files(tmp_path) == ["suivi.md"]
+    assert sorted(repository_files(tmp_path)) == ["brouillon.md", "suivi.md"]
 
 
 @pytest.mark.parametrize("glob", CONTAINER_TEXT_GLOBS)
