@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 import yaml
 from config.env import Env
-from test_supply_chain import dockerfile_instructions
+from test_supply_chain import dockerfile_instructions, repository_files
 
 # `test_infra.py` → `tests` → `api` → `apps` → racine du dépôt.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -538,11 +538,19 @@ def test_aucun_renvoi_vers_un_module_de_test_inexistant() -> None:
     La population d'un renommage inclut ses **renvois entrants** : la prose qui le désigne. Ils
     ne cassent aucune porte, se lisent comme justes, et n'échouent que pour le lecteur qui suit
     le lien — c'est-à-dire trop tard.
+
+    La population est celle du dépôt — `repository_files()` —, jamais celle du disque : un
+    bloc-notes non suivi fait sinon dépendre le verdict du répertoire de travail de chacun, et
+    rougit sur un seul poste. Mesuré le 2026-10-09 : `PR-PARALLELES.md`, tableau de bord
+    éphémère d'une vague, citait un module de test d'une branche en vol.
     """
     cited: dict[str, set[str]] = {}
+    in_repository = set(repository_files())
     for glob in PROSE_GLOBS:
         for path in REPOSITORY_ROOT.glob(glob):
             if not path.is_file():
+                continue
+            if path.relative_to(REPOSITORY_ROOT).as_posix() not in in_repository:
                 continue
             text = path.read_text(encoding="utf-8", errors="replace")
             for reference in TEST_MODULE_REFERENCE.finditer(text):

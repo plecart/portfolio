@@ -64,6 +64,11 @@ addopts = ["-p", "process_environment"]
 [tool.ruff]
 line-length = 100
 include = ["*.py", "*.pyi", "*.ipynb", "**/pyproject.toml"]
+# Les worktrees d'une vague `pr-paralleles` sont des copies complètes du dépôt : sans cette
+# exclusion, `ruff check .` analyse chaque fichier deux ou trois fois et un rouge d'une branche
+# en vol rougit le clone principal. `exclude` par défaut ne les couvre pas — il ne connaît ni
+# `.claude/` ni les dossiers cachés en général (contrairement à pyright, qui les saute tous).
+extend-exclude = [".claude/worktrees"]
 
 # Les migrations sont écrites par `makemigrations` : leurs listes de classe (`dependencies`,
 # `operations`) sont celles de Django, qu'on ne retouche pas à chaque migration. Tout le reste
