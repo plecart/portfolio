@@ -123,9 +123,13 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
                                                   # Vérifiée le 2026-10-09 **par `--list`**
                                                   # (62 specs énumérées, 124 ms) : un run réel
                                                   # démarre le serveur web, donc compile le
-                                                  # front. Le rapporteur qui la consomme, lui,
-                                                  # est éprouvé de bout en bout sur une spec
-                                                  # jetable (`apps/api/tests/test_mutation.py`)
+                                                  # front. Le rapporteur qui la consomme est
+                                                  # éprouvé **dans la suite** sur un rapport
+                                                  # JSON réel recopié (`PLAYWRIGHT_REPORT` de
+                                                  # `apps/api/tests/test_mutation.py`) ; le
+                                                  # bout-en-bout contre le vrai lanceur a été
+                                                  # joué **à la main** le 2026-10-09, il n'est
+                                                  # pas dans la suite — aucune porte ne le rejoue
 - lighthouse   : make web-lighthouse              # **CI seulement** : sous Windows, `chrome-launcher`
                                                   # échoue sur EPERM (docs/frontend-outillage.md §2.4)
 - audit        : make web-audit                   # npm audit, seuil high, arbre complet (dev compris)

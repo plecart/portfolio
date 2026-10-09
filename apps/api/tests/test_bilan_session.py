@@ -14,12 +14,14 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import pytest
 from skill_scripts import load_script
 
 bilan = load_script("cycle-pr", "bilan-session")
 
 AGENT_CALL = "toolu_agent0000000000000001"
 BASH_CALL = "toolu_bash00000000000000002"
+WORKFLOW_CALL = "toolu_workflow000000000003"
 AGENT_TOKENS = 177864
 AGENT_NAME = 'Agent "Relecture 4.2 passe 1 #5" finished'
 
@@ -106,6 +108,8 @@ TIMELINE: list[dict[str, Any]] = [
     SNAPSHOT_TRAP,
     notification("10:02:00", BASH_CALL, "b1uc6odr8"),
     QUEUED_TRAP,
+    assistant("10:05:00", (WORKFLOW_CALL, "Workflow")),
+    notification("10:15:00", WORKFLOW_CALL, "w3k9fjz2q", status="completed"),
     # La même tâche peut notifier plusieurs fois — le harnais le dit dans sa propre note. Seule
     # une notification `completed` ferme la fenêtre ; celle-ci la fermerait 10 minutes trop tôt.
     notification("10:10:00", AGENT_CALL, "a25bc5b33dbf83cd2", status="in_progress"),
@@ -114,6 +118,15 @@ TIMELINE: list[dict[str, Any]] = [
         AGENT_CALL,
         "a25bc5b33dbf83cd2",
         f"<usage><subagent_tokens>{AGENT_TOKENS}</subagent_tokens></usage>\n",
+    ),
+    # Reprise puis arrêt : une seconde `completed` du **même** appel, avec un autre compte de
+    # jetons. La première l'emporte, donc fenêtre close à 10:20 et AGENT_TOKENS ; la dernière
+    # donnerait 10:22 et 999. C'est ce qui épingle la décision verrouillée du critère 3.
+    notification(
+        "10:22:00",
+        AGENT_CALL,
+        "a25bc5b33dbf83cd2",
+        "<usage><subagent_tokens>999</subagent_tokens></usage>\n",
     ),
     said("10:25:10", "Base directory for this skill: E:\\Projets\\Portfolio\\.claude\\skills\\x"),
     said("10:30:00", "Another Claude session sent a message: <cross-session-message from='lead'>"),
@@ -164,7 +177,7 @@ def test_chaque_forme_de_message_est_classee_dans_sa_categorie(tmp_path: Path) -
     assert counted["human"] == 4, "les 4 vrais messages du mainteneur, et eux seuls"
     assert counted["peer"] == 1
     assert counted["system"] == 1
-    assert counted["notification"] == 2, "les deux vraies notifications, pas le prompt_snapshot"
+    assert counted["notification"] == 4, "les quatre vraies, pas le prompt_snapshot ni le piège"
 
 
 def test_la_fenetre_d_un_sous_agent_est_bornee_par_l_identifiant_de_son_appel(
@@ -186,7 +199,7 @@ def test_la_fenetre_d_un_sous_agent_est_bornee_par_l_identifiant_de_son_appel(
 def test_l_attente_du_mainteneur_exclut_le_temps_des_sous_agents(tmp_path: Path) -> None:
     """Sinon le mainteneur est facturé du temps qu'il n'a pas fait attendre (obs 41).
 
-    Deux attentes réelles ici : 14 min 50 après le dernier tour de l'agent, et 1 h 24 min 30
+    Deux attentes réelles ici : 15 min après le dernier tour de l'agent, et 1 h 24 min 30
     ensuite. Le chargement de skill de 10:25:10 n'en borne aucune.
     """
     events = read(tmp_path)
@@ -217,7 +230,11 @@ def test_chaque_agent_porte_son_nom_et_ses_jetons(tmp_path: Path) -> None:
     events = read(tmp_path)
     runs = bilan.agent_runs(events, bilan.tool_calls(events))
 
-    assert [(run.name, run.tokens) for run in runs] == [("Relecture 4.2 passe 1 #5", AGENT_TOKENS)]
+    assert [(run.tool, run.tokens) for run in runs] == [
+        ("Agent", AGENT_TOKENS),
+        ("Workflow", 0),
+    ]
+    assert {run.name for run in runs} == {"Relecture 4.2 passe 1 #5"}
 
 
 def test_le_rapport_porte_les_lignes_que_le_mainteneur_lit(tmp_path: Path) -> None:
@@ -236,7 +253,7 @@ def test_le_rapport_porte_les_lignes_que_le_mainteneur_lit(tmp_path: Path) -> No
     assert "relais à" in report
     assert "Relecture 4.2 passe 1 #5" in report
     assert "177" in report, "les jetons de l'agent, en milliers"
-    # L'attente hors absences se lit avant l'agrégat : 14 min 50 sur 2 h 40 de session.
+    # L'attente hors absences se lit avant l'agrégat : 15 min sur 2 h 40 de session.
     assert report.index("réactivité") < report.index("absences")
 
 
@@ -286,3 +303,235 @@ def test_un_sous_agent_sans_notification_de_fin_est_denombre(tmp_path: Path) -> 
     assert "sans notification de fin : 1" in bilan.report(events, bilan.Usage(), bilan.Usage())
     assert bilan.agent_runs(events, calls) == []
     assert len(bilan.launched_subagents(events, calls)) == 1
+
+
+# --- Ce que la passe 2 a trouvé (2026-10-09) ---------------------------------------------------
+
+
+# Le recueil des formes réelles, recensées sur les **84 transcripts** du projet le 2026-10-09,
+# avec leur dénombrement. La classe « pair » avait été fermée sur la seule forme qui l'avait
+# révélée : 188 messages portent `<cross-session-message`, mais **48 portent `<agent-message`**
+# et étaient comptés comme des messages du mainteneur. Au total **536 messages classés humains,
+# dont 108 ne l'étaient pas** — 20 %, et toujours dans le sens qui alourdit le mainteneur.
+FORMES_REELLES = {
+    "message de pair, balise historique": (
+        "Another Claude session sent a message:\n<cross-session-message from='lead'>",
+        "peer",
+        188,
+    ),
+    "message de pair, balise actuelle": (
+        "Another Claude session sent a message:\n<agent-message from='relecteur'>",
+        "peer",
+        48,
+    ),
+    "avis d'inactivité d'une session voisine": (
+        '[Cross-session idle notice] "uds:\\\\.\\pipe\\LOCAL" est au repos',
+        "system",
+        20,
+    ),
+    "mise en garde d'une commande locale": (
+        "<local-command-caveat>Caveat: The messages below were generated by the user",
+        "system",
+        13,
+    ),
+    "référence d'écriture de workflow": (
+        "# Workflow authoring reference\n\nA workflow structures work…",
+        "system",
+        7,
+    ),
+    "fichier ouvert dans l'éditeur": (
+        "<ide_opened_file>The user opened the file e:\\Projets\\Portfolio\\x.py",
+        "system",
+        9,
+    ),
+    "sortie d'une commande locale": (
+        "<local-command-stdout>Set model to `claude-opus-5`",
+        "system",
+        4,
+    ),
+    "chargement d'un skill": (
+        "Base directory for this skill: E:\\Projets\\Portfolio\\.claude\\skills\\x",
+        "system",
+        1,
+    ),
+    "un vrai message du mainteneur": ("go", "human", 60),
+    "une vraie phrase du mainteneur": ("Quelles sont les bonnes pratiques pour cela ?", "human", 4),
+}
+
+
+@pytest.mark.parametrize(
+    ("text", "expected", "seen"), FORMES_REELLES.values(), ids=FORMES_REELLES.keys()
+)
+def test_chaque_forme_reelle_tombe_dans_sa_classe(text: str, expected: str, seen: int) -> None:
+    """Dénombrement : **10 formes recensées** sur les transcripts du projet, 10 classées ici.
+
+    Une table de préfixes se referme à chaque balise neuve du harnais : c'est pourquoi la famille
+    des balises est reconnue par sa **forme** (`INJECTED_TAG`) et non énumérée une par une. Ce
+    recueil garde les deux mécanismes — la règle de forme et les quelques préfixes qui n'en sont
+    pas — contre les formes qui existent vraiment.
+
+    Args:
+        text: la forme, telle qu'elle apparaît en tête d'un message réel.
+        expected: la classe attendue.
+        seen: le nombre d'occurrences au recensement du 2026-10-09, pour mémoire.
+    """
+    assert seen > 0, "une forme recensée zéro fois n'a rien à faire dans ce recueil"
+
+    assert bilan.classify("user", [{"type": "text", "text": text}]) == expected
+
+
+def test_les_chiffres_du_rapport_sont_epingles_un_a_un(tmp_path: Path) -> None:
+    """`Measures` existe pour rendre les chiffres assertables ; encore faut-il les asserter.
+
+    Mesuré en relecture : **10 mutations sur 15** de `bilan-session.py` restaient vertes, dont la
+    frontière de l'heure, la **première** notification `completed` — une décision verrouillée du
+    critère 3 —, tout `token_usage`, le compte de relais et la fusion des intervalles jointifs.
+    Le rapport n'était gardé que par des présences de sous-chaînes, qui épinglent la mise en page
+    et aucun nombre.
+    """
+    events = read(tmp_path)
+    m = bilan.measure(events)
+
+    assert m.span == timedelta(hours=2, minutes=40)
+    assert m.sessions == 2
+    assert m.relayed == [datetime.fromisoformat(at("12:30:00"))]
+    assert bilan.total(m.reactivity) == timedelta(minutes=15)
+    assert bilan.total(m.absences) == timedelta(hours=1, minutes=24, seconds=30)
+    assert bilan.total(m.blocked) == timedelta(hours=1, minutes=39, seconds=30)
+    assert bilan.total(m.windows) == timedelta(minutes=19, seconds=30), (
+        "le workflow est imbriqué dans la fenêtre de l'agent : l'union ne double pas"
+    )
+    assert m.alone == m.span - bilan.total(bilan.union(list(m.blocked) + list(m.windows)))
+    assert len(m.runs) == 2
+    assert len(m.workflows) == 1, "le critère 4 exige un workflow dans le transcript synthétique"
+    assert m.dangling == 0
+    assert m.kinds["human"] == 4
+    assert m.kinds["peer"] == 1
+    assert m.kinds["system"] == 1
+    assert m.questions == 0
+
+
+def test_le_relais_se_date_par_le_temps_pas_par_l_ordre_des_arguments(tmp_path: Path) -> None:
+    """Le skill autorise à donner les transcripts dans n'importe quel ordre.
+
+    Mesuré : classés par index d'argument, l'ordre inverse annonçait « relais à 12:00 » — le
+    début de la session — au lieu de 12:30. Le test d'ordre existant passait bien les chemins à
+    l'envers, mais n'assérait que l'ordre des événements, pas l'heure rendue.
+    """
+    chronologique = bilan.read_events(
+        [
+            write_transcript(tmp_path / "session.jsonl", TIMELINE),
+            write_transcript(tmp_path / "relais.jsonl", RELAY),
+        ]
+    )
+    inverse = bilan.read_events(
+        [tmp_path / "relais.jsonl", tmp_path / "session.jsonl"],
+    )
+
+    attendu = [datetime.fromisoformat(at("12:30:00"))]
+    assert bilan.relays(chronologique) == attendu
+    assert bilan.relays(inverse) == attendu
+
+
+def test_mesurer_une_session_vide_leve_au_lieu_de_rendre_des_zeros(tmp_path: Path) -> None:
+    """`events[0]` levait un `IndexError` : `measure` et `report` sont publics et appelés
+    directement par cette suite, et seul `main` gardait le cas."""
+    with pytest.raises(ValueError, match="aucun événement"):
+        bilan.measure([])
+
+
+def test_les_jetons_se_comptent_une_fois_par_message(tmp_path: Path) -> None:
+    """Un message diffusé en plusieurs blocs occupe plusieurs lignes du même `id` et du même
+    `usage` : une seule compte. Prémisse vérifiée sur les transcripts réels du projet —
+    305 répétitions, **zéro** divergence — et le dédoublonnage y évite un facteur 3,2."""
+    diffuse: list[dict[str, Any]] = [
+        {
+            "type": "assistant",
+            "timestamp": at("10:00:00"),
+            "message": {"id": "msg_1", "usage": {"output_tokens": 100}, "content": []},
+        },
+        {
+            "type": "assistant",
+            "timestamp": at("10:00:01"),
+            "message": {"id": "msg_1", "usage": {"output_tokens": 100}, "content": []},
+        },
+        {
+            "type": "assistant",
+            "timestamp": at("10:00:02"),
+            "message": {"id": "msg_2", "usage": {"output_tokens": 7}, "content": []},
+        },
+    ]
+
+    usage = bilan.token_usage([write_transcript(tmp_path / "jetons.jsonl", diffuse)])
+
+    assert usage.output == 107, "msg_1 compte une fois, pas deux"
+    assert usage.transcripts == 1
+
+
+QUESTION_CALL = "toolu_question0000000004"
+
+
+def test_les_fenetres_de_question_formelle_comptent_comme_attente(tmp_path: Path) -> None:
+    """Une question formelle est du temps passé à attendre le mainteneur, même sans message.
+
+    Elle n'est bornée par aucun message humain — l'outil rend lui-même le résultat —, donc sans
+    sa fenêtre explicite elle disparaît de l'attente et le pourcentage flatte la pipeline.
+    """
+    posee: list[dict[str, Any]] = [
+        said("10:00:00", "démarre"),
+        assistant("10:01:00", (QUESTION_CALL, "AskUserQuestion")),
+        {
+            "type": "user",
+            "timestamp": at("10:06:00"),
+            "message": {"content": [{"type": "tool_result", "tool_use_id": QUESTION_CALL}]},
+        },
+        assistant("10:07:00"),
+    ]
+    events = bilan.read_events([write_transcript(tmp_path / "question.jsonl", posee)])
+    m = bilan.measure(events)
+
+    assert m.questions == 1
+    assert bilan.total(m.blocked) == timedelta(minutes=5)
+
+
+def test_les_intervalles_jointifs_fusionnent() -> None:
+    """Deux attentes qui se touchent sont une seule attente : sans la fusion, une absence de
+    deux heures en deux morceaux jointifs passerait pour deux heures de réactivité."""
+    debut = datetime.fromisoformat(at("10:00:00"))
+    milieu = debut + timedelta(minutes=30)
+    fin = debut + timedelta(minutes=90)
+
+    assert bilan.union([(debut, milieu), (milieu, fin)]) == [(debut, fin)]
+    assert bilan.split_waits([(debut, fin)])[1] == [(debut, fin)], "90 min est une absence"
+
+
+def test_un_message_de_sous_agent_ne_compte_pas_dans_la_session(tmp_path: Path) -> None:
+    """Les tours d'un sous-agent vivent dans le même fichier, marqués `isSidechain`.
+
+    Les compter ferait du travail de l'agent des points de contact humains, et allongerait la
+    session de tours que le mainteneur n'a jamais vus.
+    """
+    melange: list[dict[str, Any]] = [
+        said("10:00:00", "démarre"),
+        {**said("10:01:00", "un tour de sous-agent"), "isSidechain": True},
+        assistant("10:02:00"),
+    ]
+
+    events = bilan.read_events([write_transcript(tmp_path / "melange.jsonl", melange)])
+
+    assert len(events) == 2
+    assert sum(1 for event in events if event.kind == "human") == 1
+
+
+def test_une_attente_d_exactement_une_heure_est_une_absence() -> None:
+    """La frontière est inclusive, et seul ce montage la distingue.
+
+    L'absence du transcript synthétique fait 1 h 24 : `>` et `>=` y rendent le même résultat.
+    Mesuré en relecture — relâcher la comparaison laissait la suite verte.
+    """
+    debut = datetime.fromisoformat(at("10:00:00"))
+    pile = debut + timedelta(hours=1)
+    juste_avant = debut + timedelta(minutes=59, seconds=59)
+
+    assert bilan.split_waits([(debut, pile)]) == ([], [(debut, pile)])
+    assert bilan.split_waits([(debut, juste_avant)]) == ([(debut, juste_avant)], [])
