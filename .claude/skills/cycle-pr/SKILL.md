@@ -318,6 +318,14 @@ Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Six contrôl
   cible qui ne peut pas tourner ici — Docker, jeton, réseau — se vérifie sur la commande **après
   expansion** (`make --dry-run <cible>`, ou l'équivalent du lanceur du projet), jamais sur le
   texte du fichier.
+- **Un delta sur `.claude/` ou `CLAUDE.md` passe par le validateur du harnais avant tout push**
+  — ligne « validation » de `.claude/pipeline.config.md`. C'est la porte la plus large de ce que
+  Claude Code charge : un frontmatter de skill absent, une `description` non textuelle, un
+  manifeste, une entrée MCP. **Avec `--strict`**, sans quoi un avertissement sort en 0. Elle ne
+  dispense pas de la suite : mesuré le 2026-10-09 (v2.1.295), elle est **muette** sur un
+  frontmatter de rôle absent ou illisible — un ` : ` non cité dans une `description` fait charger
+  le rôle sans aucun champ, en silence —, et ce sont les tests de frontmatter du projet qui
+  gardent cette classe. Deux portes, deux populations : ni l'une ni l'autre ne couvre tout.
 - **Couverture par commit.** Lire le rapport de couverture du delta : une ligne non couverte est
   d'abord une hypothèse de **code écrit trop tôt**, à déplacer vers le commit de son premier
   appelant — avant d'être un test manquant. C'est le seul instrument qui rende opposable
@@ -712,20 +720,32 @@ les têtes avant de s'éteindre à l'écran.
 Si la PR a porté des **preuves visuelles**, supprimer enfin la branche orpheline promise à
 l'Étape 5 : `git push origin --delete captures/pr-<n>`.
 
-**Bilan chiffré du cycle.** Mesurer la session sur son transcript — Python 3, sans dépendance :
+**Bilan chiffré du cycle.** Mesurer la session sur **tous** ses transcripts — Python 3, sans
+dépendance :
 
 ```
-python <répertoire de ce skill>/scripts/bilan-session.py <transcript .jsonl de cette session>
+python <répertoire de ce skill>/scripts/bilan-session.py <transcript .jsonl> [<relais .jsonl> …]
 ```
 
-Le transcript vit sous `~/.claude/projects/<projet>/<uuid de session>.jsonl` — l'uuid est celui
-du répertoire scratchpad de la session. Le script rend la durée, le temps bloqué sur le
-mainteneur, le temps des relectures, le temps d'agent seul, les points de contact humains et les
-appels d'outils. Écrire ces lignes, plus trois à la main — commits prévus contre commits de
-correction, constats par passe, correctifs qui ont cassé quelque chose — dans
-`retrospectives/<date>-<issue>.md`, dossier voisin du journal d'observations (chemin dans
-`CLAUDE.md`), hors du dépôt. C'est la seule mesure qui dise si un changement de la pipeline a
-marché : l'attente et le coût des relectures ne se voient dans aucun compte rendu.
+Les transcripts vivent sous `~/.claude/projects/<projet>/<uuid de session>.jsonl` — l'uuid est
+celui du répertoire scratchpad de la session. **Un cycle qui a rempli un contexte en a
+plusieurs** : les donner tous, relais compris, dans n'importe quel ordre ; un bilan à un seul
+transcript manque la moitié du cycle, et c'est la moitié la plus chère. Le script rend la durée,
+l'attente du mainteneur **scindée** en réactivité et absences, le temps des sous-agents et des
+workflows, le temps d'agent seul, les jetons par agent, les points de contact humains et les
+appels d'outils.
+
+Écrire ces lignes, plus trois à la main — commits prévus contre commits de correction, constats
+par passe, correctifs qui ont cassé quelque chose — dans `retrospectives/<date>-<issue>.md`,
+dossier voisin du journal d'observations (chemin dans `CLAUDE.md`), hors du dépôt. C'est la seule
+mesure qui dise si un changement de la pipeline a marché : l'attente et le coût des relectures ne
+se voient dans aucun compte rendu.
+
+**La ligne de comparaison au cycle précédent porte l'attente hors absences**, jamais l'agrégat.
+Les deux n'ont ni la même cause ni le même remède : la réactivité relève de la pipeline —
+questions groupées, arrêt au bon moment —, une absence relève du calendrier, et un cycle lancé le
+soir rencontre une nuit. Une absence se commente **à part**, en disant ce que l'agent n'avait
+plus d'indépendant à faire à ce moment-là. Mêlées, elles font lire un succès comme un échec.
 
 La PR et la conversation qui l'a résolue ont pu acter des décisions, déplacer un contrat d'interface, déjà faire une partie d'un autre lot, ou rendre une
 hypothèse caduque ailleurs. **Immédiatement après le merge**, lancer le skill `repercussions` — la

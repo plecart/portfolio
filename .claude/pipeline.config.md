@@ -121,6 +121,25 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 - audit        : make web-audit                   # npm audit, seuil high, arbre complet (dev compris)
 - run local    : cd apps/web && npm run dev
 
+**Harnais (`.claude/`, `CLAUDE.md`)** — vérifiée le 2026-10-09 depuis la racine, avec témoins.
+Sans cible `make` : le binaire n'est pas installé dans le runner de CI, et une cible que la CI ne
+peut pas appeler ferait croire à une porte qui n'existe pas là-bas. Lancée par `cycle-pr` à
+l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
+- validation   : claude plugin validate . --strict  # `--strict` est ce qui la rend bloquante :
+                                                  # sans lui un avertissement sort en 0. Couvre
+                                                  # `.claude/{skills,agents,commands}` (doc :
+                                                  # « those three directories under its
+                                                  # `.claude` »), le manifeste s'il existe et
+                                                  # les entrées MCP. **Muette** sur un
+                                                  # frontmatter de rôle absent ou illisible —
+                                                  # mesuré sur v2.1.295, 3 classes de faute :
+                                                  # c'est `apps/api/tests/test_agent_skills.py`
+                                                  # qui garde celle-là. Installée hors dépôt
+                                                  # (`npm i -g @anthropic-ai/claude-code`) ; se
+                                                  # lance **depuis la racine**, le PATH du poste
+                                                  # portant une entrée relative qui résout un
+                                                  # shim cassé ailleurs.
+
 ## Qualité
 - seuil de couverture : aucun (cadrage annexe A : « pragmatique ; évaluations RAG et E2E prioritaires »)
 - règles sensibles à la plateforme (poste Windows, CI Linux) :
