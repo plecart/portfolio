@@ -26,3 +26,11 @@ apps/web/.lighthouseci/
 
 # strix (pentest, docs/frontend-outillage.md §2.2)
 strix_runs/
+
+# Artefacts éphémères d'une vague `pr-paralleles` : les worktrees que le harnais crée pour les
+# équipiers et le tableau de bord, que le skill dit de supprimer en fin de vague. Non ignorés,
+# ils entraient dans la population des portes qui énumèrent le dépôt par le système de fichiers —
+# mesuré le 2026-10-09 : `PR-PARALLELES.md` citait un module de test d'une branche en vol et
+# rendait rouge `test_aucun_renvoi_vers_un_module_de_test_inexistant` sur le seul poste.
+.claude/worktrees/
+/PR-PARALLELES.md
