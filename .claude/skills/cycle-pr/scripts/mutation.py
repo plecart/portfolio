@@ -32,15 +32,17 @@ resté vert — le test ne tient pas), `PANNE` (`old` absent ou multiple, rappor
 Python 3.11 ou plus, bibliothèque standard seule.
 """
 
+import contextlib
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import tempfile
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, cast
 from xml.etree import ElementTree
 
@@ -283,7 +285,9 @@ def security_refusal(mutation: Mapping[str, Any]) -> str | None:
     Returns:
         Le motif du refus, suivi de la forme à employer à la place, ou `None`.
     """
-    target = str(mutation.get("file", "")).replace("\\", "/")
+    # Replié avant appariement : `.github//workflows/ci.yml` et `apps/api/config//settings.py`
+    # traversaient le refus, mesuré le 2026-10-09. `PurePosixPath` normalise `//` et `./`.
+    target = PurePosixPath(str(mutation.get("file", "")).replace("\\", "/")).as_posix()
     fired = [label for label, pattern in SECURITY_PATHS.items() if pattern.search(target)]
     if is_configuration(target):
         texts = f"{mutation.get('old', '')}\n{mutation.get('new', '')}"
@@ -299,6 +303,8 @@ RED = "failed"
 CONFIG = Path(".claude") / "pipeline.config.md"
 # Une mutation fabrique des boucles sans fin : la condition d'arrêt est ce qu'on vient de casser.
 DEFAULT_TIMEOUT = 900
+# Le temps laissé aux tubes après que la descendance a été tuée, borné lui aussi.
+GRACE_SECONDS = 10
 
 
 class Unusable(Exception):
@@ -320,6 +326,64 @@ class Verdict:
 
     def __str__(self) -> str:
         return f"{self.verdict:<6} {self.name} : {self.detail}"
+
+
+def terminate_tree(process: "subprocess.Popen[str]") -> None:
+    """Tue le processus **et toute sa descendance**, sans lever.
+
+    `shell=True` fait de l'enfant direct un interpréteur de commandes : le lanceur — pytest,
+    node, make — est toujours un **petit-fils**, que `Popen.kill()` ne touche pas. Mesuré le
+    2026-10-09 : un petit-fils en boucle sans fin laissait le harnais bloqué bien au-delà de son
+    délai, **le fichier muté sur disque pendant tout ce temps**. `taskkill /T` descend l'arbre
+    sous Windows ; ailleurs, le groupe de processus créé au lancement se tue d'un signal.
+    """
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+            capture_output=True,
+            check=False,
+        )
+    else:  # pragma: no cover — ce poste est Windows ; la CI l'emprunte
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+    with contextlib.suppress(Exception):
+        process.kill()
+
+
+def run_bounded(command: str, root: Path, environment: Mapping[str, str], timeout: float) -> str:
+    """Lance la commande sous le shell, bornée dans le temps, et rend sa sortie d'erreur.
+
+    Le délai porte sur **l'arbre entier** : à l'expiration, la descendance est tuée avant toute
+    lecture des tubes. `subprocess.run(timeout=…)` ne suffit pas — il ne tue que l'enfant
+    direct, puis attend que les tubes hérités se ferment, ce qu'un petit-fils survivant empêche.
+
+    Raises:
+        Unusable: le délai est dépassé. L'appelant restaure alors le fichier muté, ce que seul
+            un retour — jamais un blocage — lui permet de faire.
+    """
+    with subprocess.Popen(
+        command,
+        cwd=root,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        errors="replace",
+        env=dict(environment),
+        **({} if os.name == "nt" else {"start_new_session": True}),
+    ) as process:
+        try:
+            _, errors = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired as expired:
+            terminate_tree(process)
+            # Second recours borné : les tubes peuvent rester ouverts le temps que la
+            # descendance meure, et une attente non bornée ici annulerait tout le propos.
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                process.communicate(timeout=GRACE_SECONDS)
+            raise Unusable(
+                f"délai de {timeout:g} s dépassé par « {command} » — processus et descendance tués"
+            ) from expired
+    return errors
 
 
 def positive_seconds(value: object) -> float:
@@ -371,7 +435,7 @@ class Suite:
                 root / CONFIG, str(spec.get("label", "test ciblé")), str(spec.get("stack", "Back"))
             ),
             REPORTERS[name],
-            cast(list[str], spec.get("targets") or []),
+            string_list(spec.get("targets", []), "targets", allow_empty=True),
             positive_seconds(spec.get("timeout", DEFAULT_TIMEOUT)),
         )
 
@@ -395,31 +459,13 @@ class Suite:
                 name: value.format(report=report) for name, value in self.reporter.env.items()
             }
             command = self.command + self.reporter.flags.format(report=report) + quoted
-            try:
-                finished = subprocess.run(
-                    command,
-                    cwd=self.root,
-                    shell=True,
-                    capture_output=True,
-                    check=False,
-                    text=True,
-                    errors="replace",
-                    env=environment,
-                    timeout=self.timeout,
-                )
-            except subprocess.TimeoutExpired as expired:
-                # Une mutation est précisément ce qui fabrique une boucle sans fin : la
-                # condition d'arrêt est ce qu'on vient de casser. Sans délai, le harnais se
-                # bloque le fichier muté, et un arrêt brutal laisserait le dépôt dans cet état.
-                raise Unusable(
-                    f"délai de {self.timeout:g} s dépassé par « {command} »"
-                ) from expired
+            errors = run_bounded(command, self.root, environment, self.timeout)
             if not report.is_file():
                 raise Unusable(
                     f"aucun rapport produit par « {command} » — le libellé doit nommer une ligne "
                     f"qui **invoque le lanceur directement** : les options du rapport sont "
                     f"ajoutées à la commande, et une cible `make` ou `just` les refuse. "
-                    f"Fin de sa sortie d'erreur : {tail(finished.stderr)}"
+                    f"Fin de sa sortie d'erreur : {tail(errors)}"
                 )
             try:
                 return self.reporter.outcomes(report.read_text(encoding="utf-8"))
@@ -501,30 +547,52 @@ def text_field(entry: Mapping[str, Any], key: str) -> str:
     return value
 
 
-def expected_fragments(entry: Mapping[str, Any]) -> list[str]:
-    """Les fragments de `expect`, qui doit être une **liste** de chaînes non vides.
+def string_list(value: object, field: str, *, allow_empty: bool = False) -> list[str]:
+    """Une liste de chaînes non vides, venue d'un fichier de mutations écrit à la main.
 
-    Une chaîne y serait itérée **caractère par caractère** : chaque lettre deviendrait un
-    fragment, et sur une suite témoin à un seul test chacune s'y résoudrait. Mesuré le
-    2026-10-09 : `"expect": "un"` rendait ROUGE, et `"expect": "test_refuse_un_negatiff"` —
-    un nom mal orthographié — aussi. C'est le défaut que `resolve` existe pour fermer,
-    rouvert par une erreur de type ; le refus doit donc venir avant la résolution.
+    **Une chaîne est itérable**, et c'est tout le danger : écrite là où une liste est attendue,
+    elle est parcourue **caractère par caractère**, et chaque lettre devient un élément. Mesuré
+    le 2026-10-09 sur `expect` : `"un"` rendait ROUGE, et `"test_refuse_un_negatiff"` — un nom
+    mal orthographié — aussi, parce que sur une suite témoin à un seul test chaque lettre s'y
+    résolvait. Le défaut que `resolve` ferme, rouvert par une erreur de type.
+
+    Les **trois** champs de liste du fichier passent par ici — `targets`, `expect`, et les noms
+    des `mutations` — parce qu'un constat sur l'un d'eux est un échantillon, pas un inventaire :
+    `targets` écrit en chaîne aurait envoyé une lettre par argument au lanceur.
+
+    Args:
+        value: la valeur lue dans le fichier.
+        field: le nom du champ, pour le message.
+        allow_empty: si la liste vide est acceptable.
 
     Raises:
-        Unusable: `expect` est une chaîne, est vide, ou contient autre chose que des chaînes.
+        Unusable: une chaîne, autre chose qu'une liste, ou une liste contenant autre chose que
+            des chaînes non vides.
     """
-    value = entry.get("expect")
     if isinstance(value, str):
         raise Unusable(
-            "`expect` est une chaîne ; il faut une **liste** de noms — une chaîne serait lue "
-            f"lettre par lettre, et chaque lettre résolue séparément : {[value[:1], '…']}"
+            f"`{field}` est une chaîne ; il faut une **liste** — une chaîne serait lue lettre "
+            f"par lettre, et chaque lettre traitée séparément (ici : {value[:1]!r}, …)"
         )
-    if not isinstance(value, list) or not value:
-        raise Unusable("aucun rouge attendu nommé dans `expect`")
-    wrong = [item for item in cast(list[object], value) if not isinstance(item, str) or not item]
+    if not isinstance(value, list):
+        raise Unusable(f"`{field}` : {type(value).__name__} au lieu d'une liste")
+    items = cast(list[object], value)
+    if not items and not allow_empty:
+        raise Unusable(f"`{field}` est vide")
+    wrong = [item for item in items if not isinstance(item, str) or not item]
     if wrong:
-        raise Unusable(f"`expect` contient des entrées qui ne sont pas des noms : {wrong}")
-    return cast(list[str], value)
+        raise Unusable(f"`{field}` contient des entrées qui ne sont pas des noms : {wrong}")
+    return cast(list[str], items)
+
+
+def expected_fragments(entry: Mapping[str, Any]) -> list[str]:
+    """Les fragments de `expect` — une liste de noms, jamais une chaîne.
+
+    Raises:
+        Unusable: `expect` est absent, vide, ou mal typé. Sans rouge attendu nommé, il n'y a
+            rien à conclure : c'est le nom qui porte la preuve, pas le code de sortie.
+    """
+    return string_list(entry.get("expect"), "expect")
 
 
 def within(root: Path, declared: str) -> Path:
@@ -591,6 +659,14 @@ def judge(suite: Suite, entry: Mapping[str, Any], witness: Mapping[str, str]) ->
         return Verdict("PANNE", name, str(reason))
 
     red = sorted(test for test, state in outcomes.items() if state == RED)
+    absent = [test for test in aimed if test not in outcomes]
+    if absent:
+        # Une mutation qui empêche la **collecte** fait disparaître le test visé du rapport : il
+        # n'a ni rougi ni tenu, il n'a pas tourné. Le compter survivant condamnait un test que
+        # personne n'a éprouvé — exactement ce que `Unusable` existe pour distinguer.
+        return Verdict(
+            "PANNE", name, f"attendus absents du rapport muté : {absent} ; rouges : {red}"
+        )
     survivors = [test for test in aimed if test not in red]
     detail = f"rouges : {red}"
     return Verdict(
@@ -614,10 +690,21 @@ def play(root: Path, spec: Mapping[str, Any]) -> list[Verdict]:
     Returns:
         Un `Verdict` par mutation, dans l'ordre du fichier.
     """
-    mutations = cast(list[dict[str, Any]], spec.get("mutations") or [])
+    raw = spec.get("mutations")
+    if isinstance(raw, str):
+        # Même classe que `targets` et `expect` : une chaîne est itérable, donc lue lettre par
+        # lettre, et `.get` serait appelé sur une lettre. Même vocabulaire pour les trois.
+        return [Verdict("PANNE", "—", "`mutations` est une chaîne ; il faut une liste d'entrées")]
+    if not isinstance(raw, list):
+        return [Verdict("PANNE", "—", f"`mutations` : {type(raw).__name__} au lieu d'une liste")]
+    entries = cast(list[object], raw)
+    if not entries:
+        return [Verdict("PANNE", "—", "`mutations` est vide — rien à jouer")]
+    wrong = [entry for entry in entries if not isinstance(entry, Mapping)]
+    if wrong:
+        return [Verdict("PANNE", "—", f"`mutations` contient des entrées non nommables : {wrong}")]
+    mutations = cast(list[dict[str, Any]], entries)
     names = [str(entry.get("name", "?")) for entry in mutations]
-    if not mutations:
-        return [Verdict("PANNE", "—", "aucune mutation dans le fichier de mutations")]
 
     try:
         suite = Suite.from_spec(root, spec)

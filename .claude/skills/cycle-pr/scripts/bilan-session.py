@@ -48,15 +48,30 @@ SUBAGENT_TOKENS = re.compile(r"<subagent_tokens>(?P<count>\d+)</subagent_tokens>
 # `Agent "<nom>" finished`, `Workflow "<nom>" completed` : le nom seul nous intéresse.
 QUOTED_NAME = re.compile(r'"(?P<name>[^"]+)"')
 
-# Textes injectés dans le rôle `user` sans qu'un humain les tape. Comptés humains, ils gonflent
-# les points de contact et bornent des fenêtres d'attente qui n'ont jamais existé.
+# Les deux balises qu'un message de pair peut porter. Recensé le 2026-10-09 sur les 84
+# transcripts du projet : **188 portent `<cross-session-message`, 48 portent `<agent-message`**.
+# N'en chercher qu'une classait 48 messages d'équipier comme des messages du mainteneur — la
+# classe « pair » avait été fermée sur la seule forme qui l'avait révélée.
+PEER_TAGS = ("<cross-session-message", "<agent-message")
+
+# Le harnais injecte ses textes dans le rôle `user` sous une **balise** en tête : `<command-
+# message>`, `<task-notification>`, `<local-command-caveat>`, `<local-command-stdout>`,
+# `<ide_opened_file>`… Les énumérer une par une, c'est rouvrir le défaut à chaque balise neuve ;
+# cette forme-là ferme la famille entière. Une balise se reconnaît à son nom en minuscules sans
+# espace, immédiatement en tête du texte une fois les rappels système retirés.
+INJECTED_TAG = re.compile(r"\A</?[a-z][a-z0-9_-]*>")
+
+# Et les formes injectées qui ne sont **pas** des balises — à énumérer, elles. Recensé le
+# 2026-10-09 : `[Cross-session idle notice]` 20, `# Workflow authoring reference` 7,
+# `Base directory for this skill:` (chargement de skill), `[Request interrupted`, et la reprise
+# de conversation. `Caveat: The messages below were generated` y figurait et n'a jamais mordu :
+# la forme réelle est `<local-command-caveat>Caveat: …`, donc une balise.
 INJECTED = (
     "Base directory for this skill:",
-    "<command-message>",
-    "<command-name>",
-    "<task-notification>",
+    "[Cross-session idle notice]",
     "[Request interrupted",
-    "Caveat: The messages below were generated",
+    "# Workflow authoring reference",
+    "This session is being continued from a previous conversation",
 )
 
 Interval = tuple[datetime, datetime]
@@ -222,10 +237,10 @@ def classify(role: str, blocks: list[dict[str, Any]]) -> str:
     if any(block.get("type") == "tool_result" for block in blocks):
         return "tool_result"
     text = "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
-    if "<cross-session-message" in text:
+    if any(tag in text for tag in PEER_TAGS):
         return "peer"
     stripped = SYSTEM_REMINDER.sub("", text).strip()
-    if not stripped or stripped.startswith(INJECTED):
+    if not stripped or stripped.startswith(INJECTED) or INJECTED_TAG.match(stripped):
         return "system"
     return "human"
 
@@ -293,7 +308,11 @@ def subagent_windows(events: Sequence[Event], calls: Sequence[ToolCall]) -> list
     return union([run.window for run in agent_runs(events, calls)])
 
 
-def blocked_windows(events: Sequence[Event], calls: Sequence[ToolCall]) -> list[Interval]:
+def blocked_windows(
+    events: Sequence[Event],
+    calls: Sequence[ToolCall],
+    subagents: Sequence[Interval] | None = None,
+) -> list[Interval]:
     """Dernière sortie de l'agent → message humain suivant, moins le temps des sous-agents.
 
     Le retrait est le cœur d'obs 41 : sans lui, une session à relectures parallèles facture au
@@ -311,7 +330,8 @@ def blocked_windows(events: Sequence[Event], calls: Sequence[ToolCall]) -> list[
     windows += [
         (call.started, call.started + call.duration) for call in calls if call.name == QUESTION_TOOL
     ]
-    return without(union(windows), subagent_windows(events, calls))
+    busy = subagent_windows(events, calls) if subagents is None else subagents
+    return without(union(windows), busy)
 
 
 def split_waits(blocked: Sequence[Interval]) -> tuple[list[Interval], list[Interval]]:
@@ -386,7 +406,10 @@ def relays(events: Sequence[Event]) -> list[datetime]:
     first: dict[int, datetime] = {}
     for event in events:
         first.setdefault(event.source, event.when)
-    return [when for source, when in sorted(first.items()) if source > 0]
+    # Dans l'ordre du **temps**, pas dans celui des arguments : le skill autorise à donner
+    # les transcripts dans n'importe quel ordre, et classer par index d'argument annonçait
+    # alors le début de la session comme heure de relais. Mesuré le 2026-10-09.
+    return sorted(first.values())[1:]
 
 
 @dataclass(frozen=True)
@@ -421,11 +444,16 @@ class Measures:
 
 def measure(events: Sequence[Event]) -> Measures:
     """Mesure une session à partir de ses événements, sans rien mettre en forme."""
+    if not events:
+        raise ValueError("aucun événement à mesurer — transcripts vides ou illisibles")
     calls = tool_calls(events)
-    blocked = blocked_windows(events, calls)
-    reactivity, absences = split_waits(blocked)
     runs = agent_runs(events, calls)
-    windows = subagent_windows(events, calls)
+    # Les fenêtres se déduisent des `runs` déjà calculés, et sont **passées** à
+    # `blocked_windows`. Chacune des trois les recalculait, soit trois parcours complets de la
+    # liste d'événements — sensible sur un transcript de plusieurs dizaines de méga-octets.
+    windows = union([run.window for run in runs])
+    blocked = blocked_windows(events, calls, windows)
+    reactivity, absences = split_waits(blocked)
     start, end = events[0].when, events[-1].when
     span = end - start
     return Measures(

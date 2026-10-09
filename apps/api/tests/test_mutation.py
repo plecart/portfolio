@@ -9,7 +9,9 @@ c'est la seule porte qui éprouve son comportement, `pyright` n'atteignant pas l
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 from skill_scripts import load_script
@@ -323,6 +325,23 @@ SECURITY_MUTATIONS = {
         "old": "python:3.12@sha256:" + "0" * 64,
         "new": "python:3.12",
     },
+    # Formes de chemin repliables : mesurées en relecture, `//` et `./` traversaient le refus,
+    # qui appariait la chaîne déclarée sans la normaliser. La classe se traite entière.
+    "porte de CI, double barre": {
+        "file": ".github//workflows/ci.yml",
+        "old": "a",
+        "new": "b",
+    },
+    "réglages de l'application, double barre": {
+        "file": "apps/api/config//settings.py",
+        "old": "a",
+        "new": "b",
+    },
+    "permission d'agent, préfixe point-barre": {
+        "file": "./.claude/settings.json",
+        "old": "a",
+        "new": "b",
+    },
 }
 
 
@@ -353,7 +372,7 @@ def test_une_mutation_sans_rouge_attendu_est_une_panne(tmp_path: Path) -> None:
     )
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
-    assert "aucun rouge attendu" in verdicts[0].detail
+    assert "`expect` est vide" in verdicts[0].detail
 
 
 # --- Ce que la première passe de relecture a trouvé (2026-10-09) -------------------------------
@@ -545,7 +564,7 @@ def test_un_fichier_de_mutations_sans_mutation_est_une_panne(tmp_path: Path) -> 
     verdicts = mutation.play(build_repo(tmp_path), {"targets": [], "mutations": []})
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
-    assert "aucune mutation" in verdicts[0].detail
+    assert "`mutations` est vide" in verdicts[0].detail
 
 
 ORDINAIRES = {
@@ -764,3 +783,141 @@ def test_une_jonction_vers_l_exterieur_est_refusee_par_la_borne(tmp_path: Path) 
         mutation.within(root, "pont/hors.txt")
 
     assert (elsewhere / "hors.txt").read_text(encoding="utf-8") == "secret\n"
+
+
+# Les **trois** champs de liste du fichier de mutations. Un constat sur l'un d'eux est un
+# échantillon, pas un inventaire : `expect` a été trouvé par une sonde de relecture, `targets` et
+# `mutations` le partageaient sans que personne les ait regardés.
+CHAMPS_DE_LISTE = {
+    "expect": {"expect": "test_refuse_un_negatif"},
+    "targets": {"targets": "test_source.py"},
+    "mutations": {"mutations": "une mutation"},
+}
+
+
+@pytest.mark.parametrize("surcharge", CHAMPS_DE_LISTE.values(), ids=CHAMPS_DE_LISTE.keys())
+def test_aucun_champ_de_liste_n_accepte_une_chaine(
+    tmp_path: Path, surcharge: dict[str, str]
+) -> None:
+    """Une chaîne est itérable : écrite là où une liste est attendue, elle est lue lettre par
+    lettre, et chaque lettre devient un élément.
+
+    Mesuré sur `expect` : `"un"` rendait ROUGE. La même forme sur `targets` aurait envoyé une
+    lettre par argument au lanceur, et sur `mutations` aurait fait appeler `.get` sur une lettre.
+    Dénombrement de la classe : **3 champs de liste recensés, 3 refusés.**
+    """
+    root = build_repo(tmp_path)
+    entry: dict[str, Any] = {
+        "name": "sonde",
+        "file": "source.py",
+        "old": "if n < 0:",
+        "new": "if False:",
+        "expect": ["test_refuse_un_negatif"],
+    }
+    base: dict[str, Any] = {"targets": ["test_source.py"], "mutations": [entry]}
+    if "expect" in surcharge:
+        entry["expect"] = surcharge["expect"]
+    else:
+        base.update(surcharge)
+
+    verdicts = mutation.play(root, base)
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    # Le message **spécifique**, pas le repli générique « au lieu d'une liste » : une assertion
+    # jointe par `or` ne distingue pas quelle branche a mordu, et la mutation qui retire la
+    # garde de la chaîne la laisse verte. Mesuré — trois fois, sur trois tests différents.
+    assert "est une chaîne" in verdicts[0].detail
+
+
+def test_un_petit_fils_en_boucle_sans_fin_ne_bloque_pas_le_harnais(tmp_path: Path) -> None:
+    """Le délai doit porter sur **l'arbre entier**, pas sur l'enfant direct.
+
+    `shell=True` fait de l'enfant direct un interpréteur de commandes : pytest, node ou make
+    sont donc **toujours** des petits-fils. `subprocess.run(timeout=…)` ne tue que l'enfant
+    direct, puis attend la fermeture des tubes hérités — qu'un petit-fils survivant tient
+    ouverts. Mesuré le 2026-10-09 : un petit-fils en boucle sans fin laissait `judge()` bloqué
+    bien au-delà du délai, **le fichier muté sur disque pendant tout ce temps**.
+
+    Le test précédent ne l'attrapait pas : `time.sleep(30)` n'a pas d'enfant.
+    """
+    root = build_repo(tmp_path)
+    before = (root / "source.py").read_bytes()
+    marker = tmp_path / "le-petit-fils-vit.txt"
+    # Le petit-fils **écrit** en boucle : c'est ce qui rend le test décisif. Un test qui
+    # n'assérerait que le message et une borne de temps passerait même si la descendance
+    # survivait, la grâce bornée rendant PANNE de toute façon.
+    # Borné à 20 s : s'il survit, il écrit bien au-delà de la fenêtre d'observation — donc
+    # l'assertion le voit —, mais il meurt seul, et une régression de la garde ne laisse pas un
+    # processus immortel derrière chaque exécution de la suite.
+    (root / "petit_fils.py").write_text(
+        "import sys, time, pathlib\n"
+        "marque = pathlib.Path(sys.argv[1])\n"
+        "fin = time.monotonic() + 20\n"
+        "while time.monotonic() < fin:\n"
+        "    marque.write_text(str(time.time()))\n"
+        "    time.sleep(0.02)\n",
+        encoding="utf-8",
+    )
+    (root / "lanceur.py").write_text(
+        "import subprocess, sys\nsubprocess.run([sys.executable, 'petit_fils.py', sys.argv[1]])\n",
+        encoding="utf-8",
+    )
+    (root / ".claude" / "pipeline.config.md").write_text(
+        "## Commandes du projet\n\n**Back (`.`)** — v :\n"
+        f'- test ciblé   : "{sys.executable}" lanceur.py "{marker}"\n',
+        encoding="utf-8",
+    )
+    started = time.monotonic()
+
+    verdicts = mutation.play(
+        root,
+        {
+            "targets": [],
+            "timeout": 3,
+            "mutations": [
+                {
+                    "name": "petit-fils immortel",
+                    "file": "source.py",
+                    "old": "if n < 0:",
+                    "new": "if False:",
+                    "expect": ["test_refuse_un_negatif"],
+                }
+            ],
+        },
+    )
+    elapsed = time.monotonic() - started
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert "descendance tués" in verdicts[0].detail
+    assert elapsed < 60, f"le délai n'a pas borné l'arbre : {elapsed:.0f} s"
+    assert (root / "source.py").read_bytes() == before
+
+    # La preuve que le petit-fils est bien mort : son marqueur cesse de bouger.
+    assert marker.exists(), "le petit-fils n'a jamais tourné — le montage ne prouve rien"
+    first = marker.read_text(encoding="utf-8")
+    time.sleep(1)
+    assert marker.read_text(encoding="utf-8") == first, "le petit-fils écrit encore"
+
+
+def test_un_attendu_absent_du_rapport_mute_est_une_panne_pas_un_vert(tmp_path: Path) -> None:
+    """Une mutation qui empêche la **collecte** fait disparaître le test visé du rapport.
+
+    Il n'a alors ni rougi ni tenu : il n'a pas tourné. Mesuré en relecture — il était compté
+    « survivant », donc VERT, ce qui condamne un test que personne n'a éprouvé. C'est
+    exactement la distinction que `Unusable` existe pour tenir.
+    """
+    root = build_repo(tmp_path)
+
+    verdicts = mutation.play(
+        root,
+        spec(
+            name="collecte impossible",
+            file="source.py",
+            old="def positive(n):",
+            new="def renommee(n):",
+            expect=["test_refuse_un_negatif"],
+        ),
+    )
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert "absents du rapport muté" in verdicts[0].detail
