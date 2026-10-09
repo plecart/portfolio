@@ -116,6 +116,16 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 - typecheck    : make web-typecheck               # tsc -b, mode strict
 - build        : make web-build                   # typecheck puis `vite build` → apps/web/dist
 - e2e          : make web-e2e                     # Playwright + axe, projets desktop et mobile
+- e2e ciblé    : cd apps/web && npx playwright test   # une seule spec, et la seule forme à
+                                                  # laquelle on peut ajouter les options d'un
+                                                  # rapport : `make web-e2e` les refuserait,
+                                                  # l'option partant à `make` et non au lanceur.
+                                                  # Vérifiée le 2026-10-09 **par `--list`**
+                                                  # (62 specs énumérées, 124 ms) : un run réel
+                                                  # démarre le serveur web, donc compile le
+                                                  # front. Le rapporteur qui la consomme, lui,
+                                                  # est éprouvé de bout en bout sur une spec
+                                                  # jetable (`apps/api/tests/test_mutation.py`)
 - lighthouse   : make web-lighthouse              # **CI seulement** : sous Windows, `chrome-launcher`
                                                   # échoue sur EPERM (docs/frontend-outillage.md §2.4)
 - audit        : make web-audit                   # npm audit, seuil high, arbre complet (dev compris)
