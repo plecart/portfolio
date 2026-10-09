@@ -342,11 +342,6 @@ def test_une_mutation_d_un_reglage_de_securite_est_refusee(
     assert "recueil de formes fautives" in refusal
 
 
-def test_une_mutation_ordinaire_n_est_pas_refusee() -> None:
-    """Un refus trop large rendrait le harnais inutilisable — et on apprendrait à le contourner."""
-    assert mutation.security_refusal({"file": "source.py", "old": "if n < 0:", "new": ""}) is None
-
-
 def test_une_mutation_sans_rouge_attendu_est_une_panne(tmp_path: Path) -> None:
     """« Le rouge attendu nommé » est tout le propos : sans nom, il n'y a rien à conclure."""
     root = build_repo(tmp_path)
@@ -357,3 +352,260 @@ def test_une_mutation_sans_rouge_attendu_est_une_panne(tmp_path: Path) -> None:
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
     assert "aucun rouge attendu" in verdicts[0].detail
+
+
+# --- Ce que la première passe de relecture a trouvé (2026-10-09) -------------------------------
+
+
+def test_un_rouge_attendu_ambigu_est_une_panne_pas_un_rouge(tmp_path: Path) -> None:
+    """Le défaut d'obs 37, rouvert d'un cran plus étroit : apparié en sous-chaîne, `expect`
+    accepte le rouge d'un **frère de préfixe** pendant que le test visé reste vert.
+
+    Mesuré : une suite portant `test_refuse_un_negatif` et
+    `test_refuse_un_negatif_et_double_le_reste` rendait ROUGE pour le premier sur le rouge du
+    second. Désormais un fragment doit désigner **un** test de la suite témoin — la symétrie de
+    l'unicité exigée de `old`.
+    """
+    root = build_repo(
+        tmp_path,
+        suite=SUITE + "\n\ndef test_refuse_un_negatif_et_double_le_reste():\n    assert True\n",
+    )
+
+    verdicts = mutation.play(
+        root,
+        spec(
+            name="retour faussé",
+            file="source.py",
+            old="    return n\n",
+            new="    return n + 1\n",
+            expect=["test_refuse_un_negatif"],
+        ),
+    )
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert "apparie 2 tests" in verdicts[0].detail
+
+
+def test_un_rouge_attendu_introuvable_est_une_panne(tmp_path: Path) -> None:
+    """Une faute de frappe dans `expect`, ou un identifiant que le lanceur échappe — pytest
+    échappe les non-ASCII des cas paramétrés —, rendait VERT : un verdict sur un test jamais
+    nommé. Zéro appariement est une panne, pas un test qui ne tient pas."""
+    root = build_repo(tmp_path)
+
+    verdicts = mutation.play(
+        root,
+        spec(
+            name="attendu mal orthographié",
+            file="source.py",
+            old="if n < 0:",
+            new="if False:",
+            expect=["test_refuse_un_negatiff"],
+        ),
+    )
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert "apparie 0 tests" in verdicts[0].detail
+
+
+# Des chemins **neutres** à dessein : un chemin absolu de réglage de sécurité serait arrêté par
+# le refus de sécurité, et le test prouverait l'autre garde. Ici seule la borne peut mordre.
+HORS_RACINE = {
+    "chemin absolu": "{anchor}hors-du-depot-sonde.txt",
+    "remontée par deux points": "../../hors-du-depot-sonde.txt",
+    "remontée déguisée": "sous/../../../hors-du-depot-sonde.txt",
+}
+
+
+@pytest.mark.parametrize("declared", HORS_RACINE.values(), ids=HORS_RACINE.keys())
+def test_un_fichier_hors_de_la_racine_est_refuse(tmp_path: Path, declared: str) -> None:
+    """`Path` ne borne rien : joint à un chemin absolu, il le rend tel quel.
+
+    Un `file` qui sort de la racine fait muter — et restaurer — hors du worktree isolé, donc
+    dans le clone principal où l'auteur travaille au même moment. C'est la rupture d'isolation
+    que la vérification de `git rev-parse --show-toplevel` existe pour empêcher, et elle
+    contourne au passage le refus de sécurité, qui n'apparie que le chemin **déclaré**.
+    """
+    root = build_repo(tmp_path)
+
+    verdicts = mutation.play(
+        root,
+        spec(
+            name="évasion",
+            file=declared.format(anchor=tmp_path.anchor.replace("\\", "/")),
+            old="quoi que ce soit",
+            new="",
+            expect=["test_refuse_un_negatif"],
+        ),
+    )
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert "sort de la racine" in verdicts[0].detail
+
+
+def test_un_rapport_illisible_est_une_panne(tmp_path: Path) -> None:
+    """Le docstring promettait PANNE ; l'exception du lecteur s'échappait et emportait les
+    mutations suivantes du lot avec une trace au lieu d'un verdict.
+
+    Le rapporteur de ce test écrit la sortie de la commande à la place du rapport : c'est la
+    forme d'un lanceur tué en cours d'écriture, ou d'une sortie mêlée au rapport.
+    """
+    root = build_repo(tmp_path)
+    garbled = mutation.Reporter(' > "{report}"', mutation.junit_outcomes)
+
+    with pytest.raises(mutation.Unusable, match="illisible"):
+        mutation.Suite(root, "echo pas du xml", garbled, []).outcomes()
+
+
+def test_un_lanceur_qui_ne_demarre_pas_est_une_panne_d_outil(tmp_path: Path) -> None:
+    """La troisième des « trois états » du critère : ni ROUGE ni VERT, et qui dit pourquoi.
+
+    Le message nomme la cause la plus fréquente — les options du rapport sont ajoutées à la
+    commande, et une cible `make` ou `just` les refuse.
+    """
+    root = build_repo(tmp_path)
+    (root / ".claude" / "pipeline.config.md").write_text(
+        "## Commandes du projet\n\n**Back (`.`)** — v :\n"
+        "- test ciblé   : binaire-absent-pour-la-sonde --run\n",
+        encoding="utf-8",
+    )
+
+    verdicts = mutation.play(
+        root,
+        spec(
+            name="jamais jouée",
+            file="source.py",
+            old="if n < 0:",
+            new="if False:",
+            expect=["test_refuse_un_negatif"],
+        ),
+    )
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert "aucun rapport produit" in verdicts[0].detail
+    assert "invoque le lanceur directement" in verdicts[0].detail
+
+
+def test_un_delai_depasse_est_une_panne_et_restaure_le_fichier(tmp_path: Path) -> None:
+    """Une mutation fabrique des boucles sans fin : la condition d'arrêt est ce qu'on casse.
+
+    Sans délai, le harnais se bloque **le fichier muté**, et un arrêt brutal laisse le dépôt
+    affaibli — le `finally` ne tourne pas sous un signal non rattrapable.
+    """
+    root = build_repo(tmp_path)
+    before = (root / "source.py").read_bytes()
+    (root / ".claude" / "pipeline.config.md").write_text(
+        "## Commandes du projet\n\n**Back (`.`)** — v :\n"
+        f'- test ciblé   : "{sys.executable}" -c "import time; time.sleep(30)"\n',
+        encoding="utf-8",
+    )
+
+    verdicts = mutation.play(
+        root,
+        {
+            "targets": [],
+            "timeout": 2,
+            "mutations": [
+                {
+                    "name": "boucle sans fin",
+                    "file": "source.py",
+                    "old": "if n < 0:",
+                    "new": "if False:",
+                    "expect": ["test_refuse_un_negatif"],
+                }
+            ],
+        },
+    )
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert "délai de 2 s dépassé" in verdicts[0].detail
+    assert (root / "source.py").read_bytes() == before
+
+
+def test_un_rapporteur_inconnu_est_une_panne(tmp_path: Path) -> None:
+    """Une clé écrite à la main doit rendre un verdict, jamais une `KeyError` nue."""
+    root = build_repo(tmp_path)
+
+    verdicts = mutation.play(
+        root,
+        {
+            "targets": [],
+            "reporter": "jupiter",
+            "mutations": [{"name": "x", "file": "source.py", "old": "a", "new": "b"}],
+        },
+    )
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert "inconnu" in verdicts[0].detail
+
+
+def test_un_fichier_de_mutations_sans_mutation_est_une_panne(tmp_path: Path) -> None:
+    """Zéro mutation jouée ne doit pas se lire « toutes attrapées »."""
+    verdicts = mutation.play(build_repo(tmp_path), {"targets": [], "mutations": []})
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert "aucune mutation" in verdicts[0].detail
+
+
+ORDINAIRES = {
+    "le propre test de refus du harnais": {
+        "file": "apps/api/tests/test_mutation.py",
+        "old": '"old": "--exit-code 1"',
+        "new": '"old": ""',
+    },
+    "le recueil de motifs du harnais": {
+        "file": ".claude/skills/cycle-pr/scripts/mutation.py",
+        "old": "--ignore-unfixed|--exit-code",
+        "new": "--ignore-unfixed",
+    },
+    "une épingle de digest dans un module de support de test": {
+        "file": "apps/api/tests/containers.py",
+        "old": "postgres@sha256:" + "0" * 64,
+        "new": "postgres@sha256:" + "1" * 64,
+    },
+    "un dict produit portant une clé allow": {
+        "file": "apps/api/content/models.py",
+        "old": '"allow": True',
+        "new": '"allow": False',
+    },
+    "une option de saut de lanceur": {
+        "file": "apps/api/tests/test_project.py",
+        "old": "--skip-slow",
+        "new": "",
+    },
+    "une garde ordinaire": {"file": "source.py", "old": "if n < 0:", "new": ""},
+}
+
+
+@pytest.mark.parametrize("candidate", ORDINAIRES.values(), ids=ORDINAIRES.keys())
+def test_une_mutation_ordinaire_n_est_jamais_refusee(candidate: dict[str, str]) -> None:
+    """Un refus qui mord sur le travail ordinaire est un refus qu'on apprend à contourner.
+
+    Mesuré en relecture : les motifs de contenu, appliqués à tout fichier, refusaient 5 cas sur
+    6 — dont le propre recueil de ce script et son propre test de refus, donc le harnais ne
+    pouvait pas éprouver son critère de sécurité par mutation. Ils sont maintenant bornés aux
+    fichiers de configuration.
+    """
+    assert mutation.security_refusal(candidate) is None
+
+
+def test_un_refus_de_securite_arrete_la_mutation_dans_play(tmp_path: Path) -> None:
+    """La garde vivait en deux endroits qui se masquaient : retirer l'un laissait l'autre rendre
+    le même verdict, donc aucun test ne pouvait épingler ni l'un ni l'autre. Il n'en reste
+    qu'un, et ce test l'éprouve au niveau où il agit."""
+    root = build_repo(tmp_path)
+    (root / "compose.yml").write_text("services:\n  api:\n    image: x\n", encoding="utf-8")
+
+    verdicts = mutation.play(
+        root,
+        spec(
+            name="composition affaiblie",
+            file="compose.yml",
+            old="image: x",
+            new="image: y",
+            expect=["test_refuse_un_negatif"],
+        ),
+    )
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert "réglage de sécurité" in verdicts[0].detail
+    assert "recueil de formes fautives" in verdicts[0].detail
