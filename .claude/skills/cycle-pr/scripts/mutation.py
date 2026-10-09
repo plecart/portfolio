@@ -322,6 +322,20 @@ class Verdict:
         return f"{self.verdict:<6} {self.name} : {self.detail}"
 
 
+def positive_seconds(value: object) -> float:
+    """Un délai en secondes, strictement positif.
+
+    `int("beaucoup")` levait une `ValueError` nue depuis la construction de la suite, et le lot
+    entier s'arrêtait sur une trace. Un booléen est refusé aussi : `True` vaudrait une seconde.
+
+    Raises:
+        Unusable: la valeur n'est pas un nombre strictement positif.
+    """
+    if isinstance(value, bool) or not isinstance(value, int | float) or value <= 0:
+        raise Unusable(f"`timeout` : {value!r} n'est pas un nombre de secondes positif")
+    return float(value)
+
+
 def tail(text: str, lines: int = 6) -> str:
     """Les dernières lignes non vides d'une sortie, pour qu'une PANNE dise ce qui a échoué."""
     kept = [line for line in (text or "").splitlines() if line.strip()][-lines:]
@@ -336,7 +350,7 @@ class Suite:
     command: str
     reporter: Reporter
     targets: Sequence[str]
-    timeout: int = DEFAULT_TIMEOUT
+    timeout: float = DEFAULT_TIMEOUT
 
     @classmethod
     def from_spec(cls, root: Path, spec: Mapping[str, Any]) -> "Suite":
@@ -358,7 +372,7 @@ class Suite:
             ),
             REPORTERS[name],
             cast(list[str], spec.get("targets") or []),
-            int(spec.get("timeout", DEFAULT_TIMEOUT)),
+            positive_seconds(spec.get("timeout", DEFAULT_TIMEOUT)),
         )
 
     def outcomes(self) -> dict[str, str]:
@@ -397,7 +411,9 @@ class Suite:
                 # Une mutation est précisément ce qui fabrique une boucle sans fin : la
                 # condition d'arrêt est ce qu'on vient de casser. Sans délai, le harnais se
                 # bloque le fichier muté, et un arrêt brutal laisserait le dépôt dans cet état.
-                raise Unusable(f"délai de {self.timeout} s dépassé par « {command} »") from expired
+                raise Unusable(
+                    f"délai de {self.timeout:g} s dépassé par « {command} »"
+                ) from expired
             if not report.is_file():
                 raise Unusable(
                     f"aucun rapport produit par « {command} » — le libellé doit nommer une ligne "
@@ -468,6 +484,49 @@ def resolve(expected: Sequence[str], known: Mapping[str, str]) -> list[str]:
     return resolved
 
 
+def text_field(entry: Mapping[str, Any], key: str) -> str:
+    """La valeur d'une clé obligatoire d'une entrée de mutations, qui doit être une chaîne.
+
+    Le fichier de mutations s'écrit à la main : une clé oubliée ou mal typée doit rendre un
+    verdict, pas une `KeyError` nue qui abandonne les mutations suivantes du lot avec une trace.
+
+    Raises:
+        Unusable: la clé est absente, ou sa valeur n'est pas textuelle.
+    """
+    if key not in entry:
+        raise Unusable(f"clé « {key} » absente de l'entrée de mutations")
+    value = entry[key]
+    if not isinstance(value, str):
+        raise Unusable(f"clé « {key} » : {type(value).__name__} au lieu d'une chaîne")
+    return value
+
+
+def expected_fragments(entry: Mapping[str, Any]) -> list[str]:
+    """Les fragments de `expect`, qui doit être une **liste** de chaînes non vides.
+
+    Une chaîne y serait itérée **caractère par caractère** : chaque lettre deviendrait un
+    fragment, et sur une suite témoin à un seul test chacune s'y résoudrait. Mesuré le
+    2026-10-09 : `"expect": "un"` rendait ROUGE, et `"expect": "test_refuse_un_negatiff"` —
+    un nom mal orthographié — aussi. C'est le défaut que `resolve` existe pour fermer,
+    rouvert par une erreur de type ; le refus doit donc venir avant la résolution.
+
+    Raises:
+        Unusable: `expect` est une chaîne, est vide, ou contient autre chose que des chaînes.
+    """
+    value = entry.get("expect")
+    if isinstance(value, str):
+        raise Unusable(
+            "`expect` est une chaîne ; il faut une **liste** de noms — une chaîne serait lue "
+            f"lettre par lettre, et chaque lettre résolue séparément : {[value[:1], '…']}"
+        )
+    if not isinstance(value, list) or not value:
+        raise Unusable("aucun rouge attendu nommé dans `expect`")
+    wrong = [item for item in cast(list[object], value) if not isinstance(item, str) or not item]
+    if wrong:
+        raise Unusable(f"`expect` contient des entrées qui ne sont pas des noms : {wrong}")
+    return cast(list[str], value)
+
+
 def within(root: Path, declared: str) -> Path:
     """Le fichier à muter, à condition qu'il soit **sous** la racine désignée.
 
@@ -487,6 +546,17 @@ def within(root: Path, declared: str) -> Path:
         raise Unusable(f"« {declared} » sort de la racine {base} — mutation refusée")
     if not path.is_file():
         raise Unusable(f"« {declared} » ne désigne aucun fichier sous {base}")
+    links = path.stat().st_nlink
+    if links > 1:
+        # `resolve()` ne suit pas un lien **dur** : ce n'est pas un lien dans le chemin, c'est le
+        # même fichier sous un autre nom. Mesuré le 2026-10-09 : un lien dur créé dans la racine
+        # vers un fichier hors racine passait la borne, et l'écriture atteignait bien le fichier
+        # extérieur. Les 239 fichiers suivis de ce dépôt ont tous exactement un lien, donc la
+        # garde ne coûte rien — git n'en crée pas dans une copie de travail.
+        raise Unusable(
+            f"« {declared} » porte {links} liens durs : les mêmes octets sont désignés par un "
+            f"autre nom, possiblement hors de la racine — mutation refusée"
+        )
     return path
 
 
@@ -509,12 +579,9 @@ def judge(suite: Suite, entry: Mapping[str, Any], witness: Mapping[str, str]) ->
         refusal = security_refusal(entry)
         if refusal:
             raise Unusable(refusal)
-        expected = cast(list[str], entry.get("expect") or [])
-        if not expected:
-            raise Unusable("aucun rouge attendu nommé dans `expect`")
-        aimed = resolve(expected, witness)
-        path = within(suite.root, str(entry["file"]))
-        original, mutated = mutated_bytes(path, str(entry["old"]), str(entry["new"]))
+        aimed = resolve(expected_fragments(entry), witness)
+        path = within(suite.root, text_field(entry, "file"))
+        original, mutated = mutated_bytes(path, text_field(entry, "old"), text_field(entry, "new"))
         try:
             path.write_bytes(mutated)
             outcomes = suite.outcomes()
