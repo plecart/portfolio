@@ -47,7 +47,13 @@ from xml.etree import ElementTree
 # Une pile de « Commandes du projet » : `**Back (`apps/api/`)** — vérifiées le …`.
 STACK_HEADING = re.compile(r"^\*\*(?P<stack>\w+) \(")
 # Une ligne de commande : `- test ciblé   : uv run pytest <chemin|motif>     # commentaire`.
-COMMAND_LINE = re.compile(r"^- (?P<label>[^:]+?)\s*:\s(?P<command>.+)$")
+# Le libellé peut contenir un `:` — `format:check` en est un, et un `[^:]+?` le rendait
+# introuvable alors que sa ligne existe. Ce qui sépare le libellé de la commande est l'espace
+# **avant** le deux-points, que l'alignement du fichier garantit.
+COMMAND_LINE = re.compile(r"^- (?P<label>.+?)\s+:\s(?P<command>.+)$")
+# Un commentaire de fin de ligne, aligné sur au moins deux espaces — pas un `#` dans une
+# commande, qui serait tronquée.
+TRAILING_COMMENT = re.compile(r"\s{2,}#.*$")
 # Un gabarit à remplir par l'appelant : `<chemin|motif>`.
 PLACEHOLDER = re.compile(r"\s*<[^>]+>")
 COMMANDS_SECTION = "## Commandes du projet"
@@ -88,7 +94,8 @@ def project_command(config: Path, label: str, stack: str = "Back") -> str:
         found = COMMAND_LINE.match(line)
         if not found or current != stack or found.group("label").strip() != label:
             continue
-        command = PLACEHOLDER.sub("", found.group("command").split("#")[0]).strip()
+        bare = TRAILING_COMMENT.sub("", found.group("command"))
+        command = PLACEHOLDER.sub("", bare).strip()
         if command == UNAVAILABLE:
             raise LookupError(f"« {label} » vaut `n/a` pour la pile {stack} : étape absente")
         return command
@@ -213,11 +220,27 @@ REPORTERS = {
 # compte le plus — celles qui protègent un réglage de sécurité. Le harnais ne tente rien : il
 # refuse, et renvoie à la forme qui prouve autant sans toucher au dépôt.
 
+# Chemins dont le contenu *est* un réglage de sécurité. Recensés sur ce dépôt le 2026-10-09,
+# après qu'une relecture en a mesuré 12 formes réelles non couvertes par les trois premiers
+# motifs. Un projet qui range ses réglages ailleurs ajoute son motif ici.
 SECURITY_PATHS = {
     "exception de scanner": re.compile(r"(^|/)\.trivyignore|pip-audit-exceptions"),
     "porte de CI": re.compile(r"(^|/)\.github/(workflows|actions)/"),
-    "permission d'agent": re.compile(r"(^|/)settings\.json$"),
+    "configuration de Dependabot": re.compile(r"(^|/)\.github/dependabot\.ya?ml$"),
+    "propriétaires du code": re.compile(r"(^|/)CODEOWNERS$"),
+    "permission d'agent": re.compile(r"(^|/)settings(\.local)?\.json$|(^|/)\.claude/settings"),
+    "serveurs MCP": re.compile(r"(^|/)\.mcp\.json$"),
+    "hooks de pré-commit": re.compile(r"(^|/)\.pre-commit-config\.ya?ml$"),
+    "en-têtes du serveur web": re.compile(r"(^|/)Caddyfile$"),
+    "composition de production": re.compile(r"(^|/)compose([.-][\w.-]+)?\.ya?ml$"),
+    "réglages de l'application": re.compile(r"(^|/)config/settings\.py$"),
 }
+
+# Motifs de **contenu**, cherchés dans `old` et `new` — mais seulement dans un fichier de
+# configuration. Appliqués partout, ils refusaient des mutations parfaitement ordinaires :
+# mesuré en relecture, 5 cas sur 6, dont le propre recueil de ce script, son propre test de
+# refus, et deux épingles de digest dans des modules de support de test. Un refus qui mord sur
+# le travail ordinaire est un refus qu'on apprend à contourner.
 SECURITY_CONTENTS = {
     "option de blocage d'un scanner": re.compile(
         r"--ignore-unfixed|--exit-code|--severity|--fail-on|--no-verify|--skip-"
@@ -225,6 +248,11 @@ SECURITY_CONTENTS = {
     "épingle d'empreinte": re.compile(r"@sha256:[0-9a-f]{64}"),
     "règle de permission": re.compile(r'"(allow|deny|ask)"\s*:'),
 }
+
+# Ce qui compte comme fichier de configuration, pour borner les motifs de contenu ci-dessus.
+CONFIGURATION_SUFFIXES = (".yml", ".yaml", ".toml", ".json", ".cfg", ".ini", ".sh", ".ps1", ".env")
+CONFIGURATION_NAMES = ("Makefile", "justfile", "Dockerfile", "Caddyfile", "crontab")
+
 ALTERNATIVE = (
     "écrire la garde en fonction sur du texte et la voir rouge sur un recueil de formes "
     "fautives construites en mémoire, à côté du test qui l'applique au dépôt (modèle "
@@ -232,8 +260,22 @@ ALTERNATIVE = (
 )
 
 
+def is_configuration(target: str) -> bool:
+    """Le chemin désigne-t-il un fichier de configuration, au sens des motifs de contenu ?"""
+    name = target.rsplit("/", 1)[-1]
+    return name.startswith(CONFIGURATION_NAMES) or name.endswith(CONFIGURATION_SUFFIXES)
+
+
 def security_refusal(mutation: Mapping[str, Any]) -> str | None:
     """Pourquoi cette mutation est refusée, ou `None` si elle est ordinaire.
+
+    **Une heuristique, pas une frontière.** Elle ne peut pas être complète : le même
+    affaiblissement s'obtient par un point de contrôle équivalent qu'aucun motif ne décrit —
+    retirer la dépendance d'une cible `make` qui charge les images à scanner affaiblit le scan
+    sans qu'aucune option de scanner apparaisse dans le diff. Son office est d'arrêter les
+    formes courantes et de **renvoyer à la forme qui prouve autant sans toucher au dépôt** ;
+    l'auteur reste responsable de reconnaître les autres. Un refus présenté comme une garantie
+    serait plus nuisible que son absence.
 
     Args:
         mutation: l'entrée `{name, file, old, new, …}` du fichier de mutations.
@@ -242,9 +284,10 @@ def security_refusal(mutation: Mapping[str, Any]) -> str | None:
         Le motif du refus, suivi de la forme à employer à la place, ou `None`.
     """
     target = str(mutation.get("file", "")).replace("\\", "/")
-    texts = f"{mutation.get('old', '')}\n{mutation.get('new', '')}"
     fired = [label for label, pattern in SECURITY_PATHS.items() if pattern.search(target)]
-    fired += [label for label, pattern in SECURITY_CONTENTS.items() if pattern.search(texts)]
+    if is_configuration(target):
+        texts = f"{mutation.get('old', '')}\n{mutation.get('new', '')}"
+        fired += [label for label, pattern in SECURITY_CONTENTS.items() if pattern.search(texts)]
     if not fired:
         return None
     return f"refus — réglage de sécurité ({', '.join(fired)}) ; à la place : {ALTERNATIVE}"
@@ -254,6 +297,8 @@ def security_refusal(mutation: Mapping[str, Any]) -> str | None:
 
 RED = "failed"
 CONFIG = Path(".claude") / "pipeline.config.md"
+# Une mutation fabrique des boucles sans fin : la condition d'arrêt est ce qu'on vient de casser.
+DEFAULT_TIMEOUT = 900
 
 
 class Unusable(Exception):
@@ -277,6 +322,12 @@ class Verdict:
         return f"{self.verdict:<6} {self.name} : {self.detail}"
 
 
+def tail(text: str, lines: int = 6) -> str:
+    """Les dernières lignes non vides d'une sortie, pour qu'une PANNE dise ce qui a échoué."""
+    kept = [line for line in (text or "").splitlines() if line.strip()][-lines:]
+    return " / ".join(kept) if kept else "(vide)"
+
+
 @dataclass(frozen=True)
 class Suite:
     """La suite à relancer entre deux mutations : sa commande, ses cibles, son rapporteur."""
@@ -285,17 +336,27 @@ class Suite:
     command: str
     reporter: Reporter
     targets: Sequence[str]
+    timeout: int = DEFAULT_TIMEOUT
 
     @classmethod
     def from_spec(cls, root: Path, spec: Mapping[str, Any]) -> "Suite":
-        """Construit la suite d'un fichier de mutations, commande lue dans la configuration."""
+        """Construit la suite d'un fichier de mutations, commande lue dans la configuration.
+
+        Raises:
+            Unusable: le rapporteur nommé n'existe pas. Une clé inconnue doit rendre un verdict,
+                pas une `KeyError` nue sur une entrée écrite à la main.
+        """
+        name = str(spec.get("reporter", "junit"))
+        if name not in REPORTERS:
+            raise Unusable(f"rapporteur « {name} » inconnu ; connus : {sorted(REPORTERS)}")
         return cls(
             root,
             project_command(
                 root / CONFIG, str(spec.get("label", "test ciblé")), str(spec.get("stack", "Back"))
             ),
-            REPORTERS[str(spec.get("reporter", "junit"))],
+            REPORTERS[name],
             cast(list[str], spec.get("targets") or []),
+            int(spec.get("timeout", DEFAULT_TIMEOUT)),
         )
 
     def outcomes(self) -> dict[str, str]:
@@ -305,8 +366,11 @@ class Suite:
         `make test`), et les découper en arguments les casserait.
 
         Raises:
-            Unusable: le lanceur n'a produit aucun rapport — sans rapport, aucun verdict ne peut
-                nommer le test qui a rougi, et un code de sortie n'y suffit pas.
+            Unusable: le lanceur n'a produit aucun rapport, a dépassé le délai, ou a produit un
+                rapport illisible. Sans rapport exploitable, aucun verdict ne peut nommer le
+                test qui a rougi, et un code de sortie n'y suffit pas. **Jamais une exception
+                nue** : une mutation au milieu d'un lot abandonnerait les suivantes sur une
+                trace au lieu d'un verdict.
         """
         with tempfile.TemporaryDirectory() as folder:
             report = Path(folder) / "report"
@@ -314,17 +378,38 @@ class Suite:
             environment = dict(os.environ) | {
                 name: value.format(report=report) for name, value in self.reporter.env.items()
             }
-            subprocess.run(
-                self.command + self.reporter.flags.format(report=report) + quoted,
-                cwd=self.root,
-                shell=True,
-                capture_output=True,
-                check=False,
-                env=environment,
-            )
+            command = self.command + self.reporter.flags.format(report=report) + quoted
+            try:
+                finished = subprocess.run(
+                    command,
+                    cwd=self.root,
+                    shell=True,
+                    capture_output=True,
+                    check=False,
+                    text=True,
+                    errors="replace",
+                    env=environment,
+                    timeout=self.timeout,
+                )
+            except subprocess.TimeoutExpired as expired:
+                # Une mutation est précisément ce qui fabrique une boucle sans fin : la
+                # condition d'arrêt est ce qu'on vient de casser. Sans délai, le harnais se
+                # bloque le fichier muté, et un arrêt brutal laisserait le dépôt dans cet état.
+                raise Unusable(f"délai de {self.timeout} s dépassé par « {command} »") from expired
             if not report.is_file():
-                raise Unusable(f"aucun rapport produit par « {self.command} »")
-            return self.reporter.outcomes(report.read_text(encoding="utf-8"))
+                raise Unusable(
+                    f"aucun rapport produit par « {command} » — le libellé doit nommer une ligne "
+                    f"qui **invoque le lanceur directement** : les options du rapport sont "
+                    f"ajoutées à la commande, et une cible `make` ou `just` les refuse. "
+                    f"Fin de sa sortie d'erreur : {tail(finished.stderr)}"
+                )
+            try:
+                return self.reporter.outcomes(report.read_text(encoding="utf-8"))
+            # Large à dessein : trois lecteurs, trois familles d'erreur (`ParseError`,
+            # `JSONDecodeError`, `KeyError`), et un rapport tronqué par un lanceur tué en produit
+            # d'autres. Ce qui compte est qu'aucune ne s'échappe en abandonnant le lot.
+            except Exception as unreadable:
+                raise Unusable(f"rapport illisible : {unreadable!r}") from unreadable
 
 
 def mutated_bytes(path: Path, old: str, new: str) -> tuple[bytes, bytes]:
@@ -348,16 +433,74 @@ def mutated_bytes(path: Path, old: str, new: str) -> tuple[bytes, bytes]:
     return original, original.replace(pattern, new.replace("\n", newline).encode("utf-8"))
 
 
-def judge(suite: Suite, entry: Mapping[str, Any]) -> Verdict:
+def resolve(expected: Sequence[str], known: Mapping[str, str]) -> list[str]:
+    """Résout chaque fragment de `expect` en **un** nom de test de la suite témoin.
+
+    C'est la symétrie de l'unicité exigée de `old` : le motif muté doit désigner un seul
+    endroit, le rouge attendu doit désigner un seul test. Sans elle, l'appariement se fait en
+    sous-chaîne sur le nom complet, et deux formes banales rendent ROUGE sans que le test visé
+    ait rougi — un frère de préfixe (`…_negatif` apparié par `…_negatif_et_double_le_reste`) et
+    le nom du module, qui est une partie de chaque clé. C'est le défaut mesuré le 2026-10-04,
+    déplacé du code de sortie vers le nom : un nom ambigu ne nomme rien.
+
+    Args:
+        expected: les fragments de `expect`, tels que le fichier de mutations les écrit.
+        known: les tests de la suite témoin, par nom complet.
+
+    Returns:
+        Un nom complet par fragment, dans l'ordre.
+
+    Raises:
+        Unusable: un fragment apparie zéro test — faute de frappe, ou identifiant que le
+            lanceur échappe (pytest échappe les non-ASCII des cas paramétrés) — ou plusieurs.
+    """
+    resolved: list[str] = []
+    for fragment in expected:
+        matches = sorted(name for name in known if fragment in name)
+        if len(matches) != 1:
+            raise Unusable(
+                f"« {fragment} » apparie {len(matches)} tests de la suite témoin, il en faut "
+                f"exactement un{' : ' + str(matches[:3]) if matches else ''}"
+            )
+        resolved.append(matches[0])
+    return resolved
+
+
+def within(root: Path, declared: str) -> Path:
+    """Le fichier à muter, à condition qu'il soit **sous** la racine désignée.
+
+    Un `file` absolu, ou qui remonte par `..`, fait muter — et restaurer — hors du worktree
+    isolé : dans le clone principal où l'auteur travaille au même moment, voire dans la
+    configuration du poste. C'est la rupture d'isolation que la vérification de
+    `git rev-parse --show-toplevel` existe pour empêcher, et elle contourne au passage le refus
+    de sécurité, qui n'apparie que le chemin déclaré. `Path` ne borne rien : joint à un chemin
+    absolu, il le rend tel quel.
+
+    Raises:
+        Unusable: le chemin sort de la racine, ou ne désigne aucun fichier.
+    """
+    base = root.resolve()
+    path = (base / declared).resolve()
+    if not path.is_relative_to(base):
+        raise Unusable(f"« {declared} » sort de la racine {base} — mutation refusée")
+    if not path.is_file():
+        raise Unusable(f"« {declared} » ne désigne aucun fichier sous {base}")
+    return path
+
+
+def judge(suite: Suite, entry: Mapping[str, Any], witness: Mapping[str, str]) -> Verdict:
     """Joue une mutation et rend son verdict, le fichier restauré octet pour octet.
 
     Args:
         suite: la suite à relancer sous la mutation.
         entry: l'entrée `{name, file, old, new, expect}` du fichier de mutations.
+        witness: les tests de la suite témoin, par nom complet — ce contre quoi `expect` se
+            résout, et ce qui rend le verdict opposable à un nom précis.
 
     Returns:
-        `ROUGE` si **tous** les noms de `expect` figurent parmi les rouges, `VERT` si l'un d'eux
-        est resté vert, `PANNE` si la mutation n'a pas pu être jouée.
+        `ROUGE` si **tous** les tests résolus depuis `expect` ont rougi, `VERT` si l'un d'eux est
+        resté vert — sauté et instable compris, qui ne sont pas des rouges —, `PANNE` si la
+        mutation n'a pas pu être jouée.
     """
     name = str(entry.get("name", "?"))
     try:
@@ -367,7 +510,8 @@ def judge(suite: Suite, entry: Mapping[str, Any]) -> Verdict:
         expected = cast(list[str], entry.get("expect") or [])
         if not expected:
             raise Unusable("aucun rouge attendu nommé dans `expect`")
-        path = suite.root / str(entry["file"])
+        aimed = resolve(expected, witness)
+        path = within(suite.root, str(entry["file"]))
         original, mutated = mutated_bytes(path, str(entry["old"]), str(entry["new"]))
         try:
             path.write_bytes(mutated)
@@ -378,12 +522,12 @@ def judge(suite: Suite, entry: Mapping[str, Any]) -> Verdict:
         return Verdict("PANNE", name, str(reason))
 
     red = sorted(test for test, state in outcomes.items() if state == RED)
-    missing = [fragment for fragment in expected if not any(fragment in test for test in red)]
+    survivors = [test for test in aimed if test not in red]
     detail = f"rouges : {red}"
     return Verdict(
-        "VERT" if missing else "ROUGE",
+        "VERT" if survivors else "ROUGE",
         name,
-        f"attendus restés verts : {missing} ; {detail}" if missing else detail,
+        f"attendus restés verts : {survivors} ; {detail}" if survivors else detail,
     )
 
 
@@ -401,22 +545,26 @@ def play(root: Path, spec: Mapping[str, Any]) -> list[Verdict]:
     Returns:
         Un `Verdict` par mutation, dans l'ordre du fichier.
     """
-    mutations = cast(list[dict[str, Any]], spec["mutations"])
+    mutations = cast(list[dict[str, Any]], spec.get("mutations") or [])
     names = [str(entry.get("name", "?")) for entry in mutations]
-    refusals = [security_refusal(entry) for entry in mutations]
-    if mutations and all(refusals):
-        return [Verdict("PANNE", name, str(why)) for name, why in zip(names, refusals)]
+    if not mutations:
+        return [Verdict("PANNE", "—", "aucune mutation dans le fichier de mutations")]
 
-    suite = Suite.from_spec(root, spec)
     try:
+        suite = Suite.from_spec(root, spec)
         witness = suite.outcomes()
         already = sorted(test for test, state in witness.items() if state == RED)
         if already:
             raise Unusable(f"rouges déjà présents avant toute mutation : {already}")
-    except Unusable as reason:
+    except (Unusable, LookupError) as reason:
         return [Verdict("PANNE", name, f"témoin : {reason}") for name in names]
 
-    return [judge(suite, entry) for entry in mutations]
+    # Le refus de sécurité vit dans `judge`, et là seulement. Un court-circuit ici — « si tout
+    # est refusé, ne pas lancer le témoin » — épargnait un lancement, mais les deux gardes se
+    # masquaient mutuellement : retirer l'une laissait l'autre rendre le même verdict, donc
+    # aucun test ne pouvait épingler ni l'une ni l'autre. Mesuré en relecture : les deux
+    # mutations correspondantes rendaient VERT. Une seule garde, éprouvable.
+    return [judge(suite, entry, witness) for entry in mutations]
 
 
 def main(argv: Sequence[str]) -> int:
