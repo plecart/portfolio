@@ -48,24 +48,27 @@ SUBAGENT_TOKENS = re.compile(r"<subagent_tokens>(?P<count>\d+)</subagent_tokens>
 # `Agent "<nom>" finished`, `Workflow "<nom>" completed` : le nom seul nous intéresse.
 QUOTED_NAME = re.compile(r'"(?P<name>[^"]+)"')
 
-# Les deux balises qu'un message de pair peut porter. Recensé le 2026-10-09 sur les 84
-# transcripts du projet : **188 portent `<cross-session-message`, 48 portent `<agent-message`**.
-# N'en chercher qu'une classait 48 messages d'équipier comme des messages du mainteneur — la
-# classe « pair » avait été fermée sur la seule forme qui l'avait révélée.
+# Les deux balises qu'un message de pair peut porter. N'en chercher qu'une classait les messages
+# d'équipier portant l'autre comme des messages du mainteneur — la classe avait été fermée sur
+# la seule forme qui l'avait révélée. Dénombrement et population : `FORMES_REELLES` dans la
+# suite, seul endroit où les chiffres vivent — recopiés ici, ils dérivent au recensement suivant.
 PEER_TAGS = ("<cross-session-message", "<agent-message")
 
-# Le harnais injecte ses textes dans le rôle `user` sous une **balise** en tête : `<command-
-# message>`, `<task-notification>`, `<local-command-caveat>`, `<local-command-stdout>`,
-# `<ide_opened_file>`… Les énumérer une par une, c'est rouvrir le défaut à chaque balise neuve ;
-# cette forme-là ferme la famille entière. Une balise se reconnaît à son nom en minuscules sans
-# espace, immédiatement en tête du texte une fois les rappels système retirés.
-INJECTED_TAG = re.compile(r"\A</?[a-z][a-z0-9_-]*>")
+# Le harnais injecte ses textes dans le rôle `user` sous des **balises** : `<task-notification>`,
+# `<command-message>`, `<local-command-caveat>`, `<ide_opened_file>`… Les énumérer une par une,
+# c'est rouvrir le défaut à chaque balise neuve ; cette forme-là ferme la famille entière.
+#
+# Mais une balise **en tête** ne suffit pas à classer : le harnais préfixe le texte humain d'une
+# balise de contexte au lieu de l'injecter seule — `<ide_opened_file>…</ide_opened_file>oui go` —
+# et s'arrêter à la tête perdait ce « oui go ». Un message n'est injecté que s'il n'est **rien
+# d'autre** que des blocs de balises équilibrés ; ce qui dépasse est de la main du mainteneur.
+# Le nom se lit sans attribut à dessein : `<pasted_content id="…">` en porte un, et son contenu
+# est du texte que le mainteneur a collé. Population et dénombrement : `FORMES_REELLES`.
+INJECTED_BLOCKS = re.compile(r"\A(?:\s*<([a-z][a-z0-9_-]*)>.*?</\1>)+\s*\Z", re.DOTALL)
 
-# Et les formes injectées qui ne sont **pas** des balises — à énumérer, elles. Recensé le
-# 2026-10-09 : `[Cross-session idle notice]` 20, `# Workflow authoring reference` 7,
-# `Base directory for this skill:` (chargement de skill), `[Request interrupted`, et la reprise
-# de conversation. `Caveat: The messages below were generated` y figurait et n'a jamais mordu :
-# la forme réelle est `<local-command-caveat>Caveat: …`, donc une balise.
+# Et les formes injectées qui ne sont **pas** des balises — à énumérer, elles. `Caveat: The
+# messages below were generated` y figurait et n'a jamais mordu : la forme réelle est
+# `<local-command-caveat>Caveat: …`, donc une balise. Dénombrement : `FORMES_REELLES`.
 INJECTED = (
     "Base directory for this skill:",
     "[Cross-session idle notice]",
@@ -230,7 +233,8 @@ def classify(role: str, blocks: list[dict[str, Any]]) -> str:
     Un message de pair **commence** par « Another Claude session sent a message: » et porte la
     balise plus loin : le chercher en tête le classait humain. Un texte injecté par le harnais —
     chargement de skill, commande, notification — est dans le rôle `user` sans qu'un humain
-    l'ait tapé.
+    l'ait tapé. Une balise de contexte **suivie** d'un texte reste un message du mainteneur :
+    c'est lui qui a tapé ce qui dépasse la balise.
     """
     if role == "assistant":
         return "assistant"
@@ -240,7 +244,7 @@ def classify(role: str, blocks: list[dict[str, Any]]) -> str:
     if any(tag in text for tag in PEER_TAGS):
         return "peer"
     stripped = SYSTEM_REMINDER.sub("", text).strip()
-    if not stripped or stripped.startswith(INJECTED) or INJECTED_TAG.match(stripped):
+    if not stripped or stripped.startswith(INJECTED) or INJECTED_BLOCKS.match(stripped):
         return "system"
     return "human"
 
