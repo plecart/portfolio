@@ -64,7 +64,14 @@ PEER_TAGS = ("<cross-session-message", "<agent-message")
 # d'autre** que des blocs de balises équilibrés ; ce qui dépasse est de la main du mainteneur.
 # Le nom se lit sans attribut à dessein : `<pasted_content id="…">` en porte un, et son contenu
 # est du texte que le mainteneur a collé. Population et dénombrement : `FORMES_REELLES`.
-INJECTED_BLOCKS = re.compile(r"\A(?:\s*<([a-z][a-z0-9_-]*)>.*?</\1>)+\s*\Z", re.DOTALL)
+#
+# Le corps d'un bloc ne peut pas contenir sa propre fermeture — `(?:(?!</\1>).)*` et non `.*?`.
+# Ce n'est pas un raffinement : avec `.*?`, un découpage ambigu rend le motif **exponentiel**,
+# parce que chaque bloc peut se fermer sur n'importe quelle fermeture suivante. Mesuré le
+# 2026-10-10 sur `<a>x</a>` répété puis un caractère qui fait échouer : 0,03 s à 18 blocs,
+# 0,09 s à 20, ×3 tous les deux blocs — quelques dizaines de blocs suffisent à figer la mesure.
+# Sous cette forme, le découpage est unique : 20 000 blocs, 160 ko, temps non mesurable.
+INJECTED_BLOCKS = re.compile(r"\A(?:\s*<([a-z][a-z0-9_-]*)>(?:(?!</\1>).)*</\1>)+\s*\Z", re.DOTALL)
 
 # Et les formes injectées qui ne sont **pas** des balises — à énumérer, elles. `Caveat: The
 # messages below were generated` y figurait et n'a jamais mordu : la forme réelle est
