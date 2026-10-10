@@ -244,18 +244,50 @@ def test_le_rapport_porte_les_lignes_que_le_mainteneur_lit(tmp_path: Path) -> No
 
     Le nombre de sessions n'est pas un paramètre : il se **déduit** des événements, qui portent
     chacun le rang de leur transcript. Un compte passé à côté des données peut être faux.
+
+    Les ancres d'ordre sont les **libellés de ligne**, pas les mots qu'ils contiennent : la ligne
+    du dénominateur porte elle-même le mot « absences », et une assertion sur le mot nu la
+    trouvait d'abord, donc rougissait sur une mise en page correcte.
     """
     events = read(tmp_path)
     report = bilan.report(events, bilan.Usage(), bilan.Usage())
 
-    assert "réactivité" in report
-    assert "absences" in report
+    assert "réactivité (< 1 h)" in report
+    assert "absences (≥ 1 h)" in report
+    assert "actif (hors absences)" in report, "le dénominateur doit se lire, pas se deviner"
     assert "sessions : 2" in report
     assert "relais à" in report
     assert "Relecture 4.2 passe 1 #5" in report
     assert "177" in report, "les jetons de l'agent, en milliers"
-    # L'attente hors absences se lit avant l'agrégat : 15 min sur 2 h 40 de session.
-    assert report.index("réactivité") < report.index("absences")
+    # L'attente hors absences se lit avant l'agrégat : 15 min sur 1 h 15 de temps actif.
+    assert report.index("réactivité (< 1 h)") < report.index("absences (≥ 1 h)")
+
+
+def test_la_reactivite_se_rapporte_au_temps_actif_et_les_absences_a_la_session(
+    tmp_path: Path,
+) -> None:
+    """Deux dénominateurs, et c'est tout le propos du critère « pourcentage hors absences ».
+
+    Sur le transcript synthétique : 2 h 40 de session dont 1 h 24 d'absence, donc **1 h 15 de
+    temps actif** (l'arrondi d'affichage près). Les 15 min d'attente valent **20 % du temps
+    actif** et seulement 9 % de la session — rapporter la réactivité à la session la dilue
+    d'autant que le mainteneur a été absent, et fait croire à un gain que personne n'a obtenu.
+    C'est le sens d'erreur d'obs 41, appliqué au dénominateur au lieu du numérateur.
+    """
+    measures = bilan.measure(read(tmp_path))
+
+    assert measures.active == measures.span - bilan.total(measures.absences)
+    assert measures.active < measures.span, "le montage doit porter une absence"
+
+    report = bilan.report(read(tmp_path), bilan.Usage(), bilan.Usage())
+    reactivite = next(l for l in report.splitlines() if l.startswith("réactivité"))
+    absences = next(l for l in report.splitlines() if l.startswith("absences"))
+    part_active = bilan.total(measures.reactivity) / measures.active
+    part_session = bilan.total(measures.reactivity) / measures.span
+
+    assert f"{part_active:4.0%}" in reactivite
+    assert f"{part_session:4.0%}" not in reactivite, "la réactivité est diluée par les absences"
+    assert f"{bilan.total(measures.absences) / measures.span:4.0%}" in absences
 
 
 def test_un_transcript_vide_ou_illisible_ne_rend_pas_un_bilan_faux(tmp_path: Path) -> None:
