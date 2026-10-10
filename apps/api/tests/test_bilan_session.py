@@ -10,6 +10,7 @@ ressemble à celle d'un sous-agent.
 """
 
 import json
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -309,10 +310,15 @@ def test_un_sous_agent_sans_notification_de_fin_est_denombre(tmp_path: Path) -> 
 
 
 # Le recueil des formes réelles, avec sa **population** : les 87 transcripts du projet au
-# 2026-10-10 (`~/.claude/projects/*ortfolio*/*.jsonl`), soit **1137 messages de rôle `user` hors
-# résultat d'outil**. Les 16 formes ci-dessous en font la somme exacte — c'est ce que
-# `test_le_recueil_couvre_la_population_entiere` assère, pour qu'une famille neuve ne puisse pas
-# entrer sans que la population soit re-mesurée.
+# 2026-10-10 à 09 h (`~/.claude/projects/*ortfolio*/*.jsonl`), soit **1137 messages de rôle
+# `user` hors résultat d'outil**.
+#
+# **Cette population est vivante** : les sessions en écrivent, et le harnais fait tourner les
+# transcripts. Re-mesurée une heure plus tard le même jour, elle valait 85 transcripts et 1106
+# messages. Les nombres ci-dessous sont donc un relevé **daté**, qu'un nouveau recensement ne
+# reproduira pas — et ce n'est pas eux que la suite assère. Ce qu'elle assère est l'**invariant** :
+# les 16 formes couvrent la population sans résidu, leur somme et leurs classes se répondent. Une
+# famille neuve ne peut donc pas entrer sans que la population soit re-mesurée avec elle.
 #
 # Deux dénombrements ont déjà menti ici. La classe « pair » avait été fermée sur la seule forme
 # qui l'avait révélée (`<cross-session-message`), alors que 48 messages portent `<agent-message`.
@@ -320,7 +326,10 @@ def test_un_sous_agent_sans_notification_de_fin_est_denombre(tmp_path: Path) -> 
 # du mainteneur d'une balise de contexte au lieu de l'injecter seule, et une balise *en tête*
 # suffisait à classer. Les deux fois, le correctif a été déclaré clos sur la seule famille qui
 # l'avait révélé ; les deux fois, la relecture suivante en a trouvé une autre. D'où la forme de
-# ce recueil : **les 7 familles de balises y sont, pas les 3 qui ont servi de preuve**.
+# ce recueil : **les 7 familles qui apparaissent en tête y sont, pas les 3 qui ont servi de
+# preuve**. Il y en a **9 en comptant toutes les positions** : `<command-args>` (23 messages) et
+# `<skill-format>` (7) n'arrivent **jamais** en tête, toujours à la suite d'un autre bloc — c'est
+# précisément ce que la règle de tête ne pouvait pas voir, et ce que le `+` du motif couvre.
 FORMES_REELLES = {
     # Les 7 familles de balises. Un message n'est injecté que s'il n'est *rien d'autre* que des
     # blocs équilibrés : les deux familles de contexte IDE portent un texte humain après leur
@@ -460,6 +469,33 @@ def test_une_balise_non_fermee_reste_un_message_du_mainteneur() -> None:
     que de deviner où finit le bloc et d'avaler le texte qui le suit.
     """
     assert bilan.classify("user", [{"type": "text", "text": "<ide_opened_file>tronqué"}]) == "human"
+
+
+def test_une_suite_de_blocs_qui_echoue_ne_fait_pas_exploser_le_classement() -> None:
+    """Le découpage d'un message en blocs doit être **unique**, sinon le motif est exponentiel.
+
+    Avec un corps en `.*?`, chaque bloc peut se fermer sur n'importe quelle fermeture suivante :
+    mesuré le 2026-10-10, 1,5 s à 24 blocs, 6,1 s à 26, 24 s à 28, 98 s à 30 — ×4 tous les deux
+    blocs. Et les messages à plusieurs blocs sont ordinaires : 48 en portent deux ou trois. Le
+    corps interdit donc sa propre fermeture, ce qui rend le découpage unique — 20 000 blocs,
+    160 ko, temps non mesurable.
+
+    **26 blocs, pas 2 000** : à 2 000 le motif ambigu ne rend jamais la main, et un test qui
+    pend prive le relecteur du nom du test fautif — le harnais rend PANNE sur son propre délai
+    au lieu de ROUGE sur ce test. À 26, la forme ambigue met 6 s contre une borne de 1 s : elle
+    **échoue**, et se nomme.
+
+    26 blocs suivis d'un caractère qui fait échouer : le cas le plus défavorable, puisque
+    l'échec est ce qui force le moteur à tout réessayer. La borne est large à dessein — elle
+    attrape une explosion, pas une lenteur de poste.
+    """
+    message = "<a>x</a>" * 26 + "z"
+    started = time.monotonic()
+
+    assert bilan.classify("user", [{"type": "text", "text": message}]) == "human"
+
+    elapsed = time.monotonic() - started
+    assert elapsed < 1, f"le découpage est ambigu : {elapsed:.2f} s pour 26 blocs"
 
 
 def test_les_chiffres_du_rapport_sont_epingles_un_a_un(tmp_path: Path) -> None:
@@ -617,3 +653,27 @@ def test_une_attente_d_exactement_une_heure_est_une_absence() -> None:
 
     assert bilan.split_waits([(debut, pile)]) == ([], [(debut, pile)])
     assert bilan.split_waits([(debut, juste_avant)]) == ([(debut, juste_avant)], [])
+
+
+def test_plusieurs_blocs_enchaines_restent_un_message_injecte() -> None:
+    """Le `+` du motif : un message du harnais porte souvent **plusieurs** blocs de suite.
+
+    Dénombré le 2026-10-10 sur la même population : des messages à bloc en tête, **111 en
+    portent un, 18 en portent deux, 30 en portent trois**. C'est là que vivent les deux familles
+    qui n'arrivent jamais en tête — `<command-args>` et `<skill-format>` —, donc le `+` n'est pas
+    de la largeur spéculative : il couvre 48 messages réels, et les deux formes ci-dessous sont
+    recopiées de transcripts.
+
+    Le bloc vide (`<command-args></command-args>`) est le cas limite du corps : zéro caractère.
+    """
+    deux = (
+        "<command-message>i-have-adhd</command-message>\n<command-name>/i-have-adhd</command-name>"
+    )
+    trois = (
+        "<command-name>/mcp</command-name>\n<command-message>mcp</command-message>\n"
+        "<command-args></command-args>"
+    )
+
+    assert bilan.classify("user", [{"type": "text", "text": deux}]) == "system"
+    assert bilan.classify("user", [{"type": "text", "text": trois}]) == "system"
+    assert bilan.classify("user", [{"type": "text", "text": trois + "et vas-y"}]) == "human"
