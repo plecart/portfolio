@@ -536,12 +536,21 @@ def resolve(expected: Sequence[str], known: Mapping[str, str]) -> list[str]:
         Un nom complet par fragment, dans l'ordre.
 
     Raises:
-        Unusable: un fragment apparie zéro test — faute de frappe, ou identifiant que le
-            lanceur échappe (pytest échappe les non-ASCII des cas paramétrés) — ou plusieurs.
+        Unusable: un fragment apparie zéro test — une faute de frappe — ou plusieurs. Un
+            identifiant paramétré s'écrit dans sa forme naturelle : l'échappement que pytest
+            applique aux non-ASCII est appliqué au fragment avant la comparaison.
     """
     resolved: list[str] = []
     for fragment in expected:
-        matches = sorted(name for name in known if fragment in name)
+        # pytest échappe les non-ASCII des identifiants paramétrés — `tâche` devient le littéral
+        # `t\xe2che` —, et c'est ce nom-là qui arrive dans le rapport comme sur la ligne de
+        # commande. Le dépôt en porte **279 sur 1025 tests, répartis sur 19 fichiers** (mesuré le
+        # 2026-10-10) : un harnais qui ne sait nommer que l'ASCII laisse un quart de la suite
+        # hors de sa portée. Le fragment se résout donc tel qu'il est écrit **ou** tel que le
+        # lanceur l'écrit, par la transformation même du lanceur ; l'unicité porte sur le
+        # résultat, pas sur la forme, et reste donc entière.
+        forms = {fragment, fragment.encode("unicode_escape").decode("ascii")}
+        matches = sorted({name for name in known for form in forms if form in name})
         if len(matches) != 1:
             raise Unusable(
                 f"« {fragment} » apparie {len(matches)} tests de la suite témoin, il en faut "

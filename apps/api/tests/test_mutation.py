@@ -661,7 +661,69 @@ def test_un_expect_ecrit_en_chaine_est_refuse_avant_toute_resolution(tmp_path: P
     )
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert [v.verdict for v in verdicts] == ["PANNE"]
     assert "`expect` est une chaîne" in verdicts[0].detail
+
+
+# Une suite témoin dont le cas paramétré porte un accent, comme 279 des 1025 tests du dépôt.
+SUITE_ACCENTUEE = """\
+import pytest
+
+from source import positive
+
+
+@pytest.mark.parametrize("valeur", [-1], ids=["à la borne"])
+def test_refuse_un_negatif(valeur):
+    with pytest.raises(ValueError):
+        positive(valeur)
+"""
+
+
+def test_un_identifiant_accentue_se_nomme_dans_sa_forme_naturelle(tmp_path: Path) -> None:
+    """`expect` nomme un cas paramétré accentué comme on l'écrit, pas comme pytest l'échappe.
+
+    pytest échappe les non-ASCII des identifiants paramétrés : `à la borne` devient le littéral
+    `\\xe0 la borne`, dans le rapport comme sur la ligne de commande. **279 des 1025 tests du
+    dépôt, sur 19 fichiers**, en portent un (mesuré le 2026-10-10) — un harnais qui ne sait
+    nommer que l'ASCII laisse un quart de la suite hors de sa portée, et rend PANNE « apparie 0
+    tests » sur un test qui existe, ce qui se lit comme une faute de frappe.
+    """
+    root = build_repo(tmp_path, suite=SUITE_ACCENTUEE)
+
+    verdicts = mutation.play(
+        root,
+        spec(
+            name="garde du négatif retirée",
+            file="source.py",
+            old="if n < 0:",
+            new="if False:",
+            expect=["test_refuse_un_negatif[à la borne]"],
+        ),
+    )
+
+    assert [v.verdict for v in verdicts] == ["ROUGE"]
+
+
+def test_un_identifiant_accentue_se_nomme_aussi_dans_la_forme_du_lanceur(tmp_path: Path) -> None:
+    """La forme échappée, celle que le rapport affiche, reste acceptée : les deux mènent au test.
+
+    C'est ce que la PANNE donne à lire à qui l'a rencontrée ; la refuser l'obligerait à
+    deviner laquelle des deux formes le harnais attend.
+    """
+    root = build_repo(tmp_path, suite=SUITE_ACCENTUEE)
+
+    verdicts = mutation.play(
+        root,
+        spec(
+            name="garde du négatif retirée",
+            file="source.py",
+            old="if n < 0:",
+            new="if False:",
+            expect=["test_refuse_un_negatif[\\xe0 la borne]"],
+        ),
+    )
+
+    assert [v.verdict for v in verdicts] == ["ROUGE"]
 
 
 CLES_OBLIGATOIRES = ("file", "old", "new")
