@@ -18,6 +18,12 @@ from skill_scripts import load_script
 
 mutation = load_script("cycle-pr", "mutation")
 
+# La marge laissée aux bornes de temps : démarrage de l'interpréteur, ouverture des tubes. Les
+# trois tests qui assèrent une borne la partagent — « le temps est la décision », et un nombre
+# recopié trois fois se relâche une fois. Mesuré le 2026-10-10 sur ce poste : un délai de 2 s
+# rend 2,09 s, un délai de 3 s avec petit-fils rend 3,1 s.
+MARGE_SECONDS = 5
+
 # Un extrait de « Commandes du projet » fidèle au vrai fichier : trois piles, des libellés qui se
 # répètent d'une pile à l'autre, des commentaires alignés, un gabarit entre chevrons, un `n/a`.
 CONFIG = """\
@@ -94,6 +100,18 @@ VITEST_REPORT = """\
   {"name": "/w/tests/sonde.test.ts", "status": "failed", "assertionResults": [
     {"status": "passed", "fullName": "sonde passe", "title": "passe", "ancestorTitles": ["sonde"]},
     {"status": "failed", "fullName": "sonde echoue", "title": "echoue", "ancestorTitles": ["sonde"]}
+  ]}]}
+"""
+
+# Un rapport Vitest réel, relevé le 2026-10-10 en jouant `it`, `it.skip` et `it.todo` sur le
+# lanceur du dépôt (`npx vitest run --reporter=json`). C'est lui qui dit le vocabulaire des
+# états « n'a pas tourné » — et qu'il vaut `skipped` et `todo`, jamais le `pending` de Jest.
+VITEST_NOT_RUN_REPORT = """\
+{"numTotalTests": 3, "success": true, "testResults": [
+  {"name": "/w/tests/sonde-etats.test.ts", "status": "passed", "assertionResults": [
+    {"status": "passed", "fullName": "sonde un test qui passe", "title": "un test qui passe"},
+    {"status": "skipped", "fullName": "sonde un test saute", "title": "un test saute"},
+    {"status": "todo", "fullName": "sonde un test a faire", "title": "un test a faire"}
   ]}]}
 """
 
@@ -511,6 +529,12 @@ def test_un_delai_depasse_est_une_panne_et_restaure_le_fichier(tmp_path: Path) -
 
     Sans délai, le harnais se bloque **le fichier muté**, et un arrêt brutal laisse le dépôt
     affaibli — le `finally` ne tourne pas sous un signal non rattrapable.
+
+    Le temps écoulé est asséré, parce que **le temps est la décision** : le verdict et la
+    restauration tiennent aussi quand la borne ne borne rien. Mesuré en relecture : `/T` retiré
+    du `taskkill`, la suite restait verte et ce test mettait **30,08 s** pour un délai de 2 s
+    (2,08 s sur l'arbre propre). La marge est celle du second recours borné, pas une tolérance
+    de confort : au-delà, c'est que l'arbre a survécu.
     """
     root = build_repo(tmp_path)
     before = (root / "source.py").read_bytes()
@@ -519,6 +543,7 @@ def test_un_delai_depasse_est_une_panne_et_restaure_le_fichier(tmp_path: Path) -
         f'- test ciblé   : "{sys.executable}" -c "import time; time.sleep(30)"\n',
         encoding="utf-8",
     )
+    started = time.monotonic()
 
     verdicts = mutation.play(
         root,
@@ -536,10 +561,12 @@ def test_un_delai_depasse_est_une_panne_et_restaure_le_fichier(tmp_path: Path) -
             ],
         },
     )
+    elapsed = time.monotonic() - started
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
     assert "délai de 2 s dépassé" in verdicts[0].detail
     assert (root / "source.py").read_bytes() == before
+    assert elapsed < 2 + MARGE_SECONDS, f"la borne n'a pas tenu : {elapsed:.2f} s"
 
 
 def test_un_rapporteur_inconnu_est_une_panne(tmp_path: Path) -> None:
@@ -607,6 +634,95 @@ def test_une_mutation_ordinaire_n_est_jamais_refusee(candidate: dict[str, str]) 
     fichiers de configuration.
     """
     assert mutation.security_refusal(candidate) is None
+
+
+# La casse d'un chemin de réglage de sécurité : les systèmes de fichiers du poste et de la CI
+# sont insensibles à la casse — NTFS, APFS par défaut —, donc `.github/WORKFLOWS/ci.yml`
+# **est** `.github/workflows/ci.yml` et passait le refus. Une forme par appariement insensible :
+# les 10 motifs de chemin, et le test de fichier de configuration qui borne ceux de contenu.
+CASSES = {
+    "porte de CI en majuscules": {"file": ".github/WORKFLOWS/ci.yml", "old": "a", "new": "b"},
+    "permission d'agent en majuscules": {
+        "file": ".CLAUDE/settings.json",
+        "old": "a",
+        "new": "b",
+    },
+    "propriétaires du code en minuscules": {"file": "codeowners", "old": "a", "new": "b"},
+    "composition de production en capitales": {
+        "file": "COMPOSE.PROD.YAML",
+        "old": "a",
+        "new": "b",
+    },
+    "suffixe de configuration en majuscules": {
+        "file": "infra/ci/scan.YML",
+        "old": "trivy image",
+        "new": "trivy image --exit-code 0",
+    },
+    "nom de configuration en minuscules": {
+        "file": "makefile",
+        "old": "trivy image",
+        "new": "trivy image --severity HIGH",
+    },
+}
+
+
+@pytest.mark.parametrize("candidate", CASSES.values(), ids=CASSES.keys())
+def test_la_casse_du_chemin_ne_contourne_pas_le_refus(candidate: dict[str, str]) -> None:
+    """Un refus qu'une majuscule contourne n'est pas un refus.
+
+    Mesuré en relecture sur `.github/WORKFLOWS/ci.yml`. Les deux derniers cas visent le second
+    appariement, celui qui décide si les motifs de **contenu** s'appliquent : un suffixe ou un
+    nom de fichier en majuscules sortait le fichier du périmètre de configuration, donc aucune
+    option de scanner n'y était cherchée.
+    """
+    assert mutation.security_refusal(candidate), "la casse a contourné le refus"
+
+
+def test_les_motifs_de_contenu_restent_sensibles_a_la_casse() -> None:
+    """Le troisième appariement est volontairement sensible, et le dénombrement le dit.
+
+    `--SEVERITY` n'est pas une option, `@SHA256:` n'est pas une empreinte, et les clés JSON que
+    cherche la règle de permission sont elles-mêmes sensibles à la casse. Les rendre insensibles
+    élargirait le refus sans fermer aucune voie réelle.
+    """
+    assert (
+        mutation.security_refusal(
+            {"file": "infra/ci/scan.yml", "old": "trivy image", "new": "trivy image --SEVERITY"}
+        )
+        is None
+    )
+
+
+def test_un_attendu_saute_est_une_panne_pas_un_vert(tmp_path: Path) -> None:
+    """Un test sauté n'a pas tourné : le même état qu'un attendu absent du rapport.
+
+    Il rendait VERT — « le test ne tient pas » — pour un test que personne n'a joué, et c'est
+    l'erreur qui coûte le plus : elle envoie renforcer une garde qui tenait déjà. `flaky` reste
+    hors de cette classe, lui : il a tourné, et n'a pas attrapé la mutation de façon fiable.
+    """
+    root = build_repo(
+        tmp_path,
+        suite=(
+            "import pytest\n\nfrom source import positive\n\n\n"
+            '@pytest.mark.skip(reason="sauté à dessein")\n'
+            "def test_refuse_un_negatif():\n"
+            "    with pytest.raises(ValueError):\n        positive(-1)\n"
+        ),
+    )
+
+    verdicts = mutation.play(
+        root,
+        spec(
+            name="garde du négatif retirée",
+            file="source.py",
+            old="if n < 0:",
+            new="if False:",
+            expect=["test_refuse_un_negatif"],
+        ),
+    )
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert "n'ont pas tourné" in verdicts[0].detail
 
 
 def test_un_refus_de_securite_arrete_la_mutation_dans_play(tmp_path: Path) -> None:
@@ -954,7 +1070,7 @@ def test_un_petit_fils_en_boucle_sans_fin_ne_bloque_pas_le_harnais(tmp_path: Pat
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
     assert "descendance tués" in verdicts[0].detail
-    assert elapsed < 60, f"le délai n'a pas borné l'arbre : {elapsed:.0f} s"
+    assert elapsed < 3 + MARGE_SECONDS, f"le délai n'a pas borné l'arbre : {elapsed:.2f} s"
     assert (root / "source.py").read_bytes() == before
 
     # La preuve que le petit-fils est bien mort : son marqueur cesse de bouger.
@@ -962,6 +1078,106 @@ def test_un_petit_fils_en_boucle_sans_fin_ne_bloque_pas_le_harnais(tmp_path: Pat
     first = marker.read_text(encoding="utf-8")
     time.sleep(1)
     assert marker.read_text(encoding="utf-8") == first, "le petit-fils écrit encore"
+
+
+def casse_le_tueur_d_arbre(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Rend indisponible le tueur d'arbre de **cette** plateforme.
+
+    `taskkill` hors du `PATH` sous Windows, groupe de processus hors de portée ailleurs : les
+    deux formes de la même panne. Les deux voies de `terminate_tree` sont donc éprouvées, une
+    par plateforme — un test qui n'en couvrirait qu'une passerait pour rien sur l'autre.
+
+    Le remplacement ne délègue rien : `subprocess.run` n'a **qu'un seul** appel dans le harnais,
+    celui du tueur d'arbre, donc le neutraliser entier ne masque aucun autre travail. Si un jour
+    un second appel apparaît, c'est ce test qui le dira.
+    """
+    if os.name == "nt":
+
+        def sans_taskkill(*_: Any, **__: Any) -> None:
+            raise FileNotFoundError(2, "introuvable", "taskkill")
+
+        monkeypatch.setattr(subprocess, "run", sans_taskkill)
+    else:  # pragma: no cover — ce poste est Windows ; la CI emprunte cette branche
+
+        def sans_killpg(*_: Any) -> None:
+            raise PermissionError("groupe de processus hors de portée")
+
+        monkeypatch.setattr(os, "killpg", sans_killpg)
+
+
+def test_un_tueur_d_arbre_indisponible_laisse_la_borne_et_le_lot_intacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Un tueur d'arbre absent coûte une descendance survivante, jamais la borne ni le lot.
+
+    Mesuré en relecture : avec un `taskkill` introuvable, l'`OSError` sortait de
+    `terminate_tree` — dont le contrat est pourtant de ne jamais lever. Elle sautait le `kill()`
+    qui suit, puis le `raise Unusable` qui borne, et la sortie du `with Popen(…)` attendait les
+    tubes **sans délai** : un délai de 2 s dépassé de 23 s, et le lot entier abandonné sur une
+    trace nue — la classe même que `text_field` et `positive_seconds` ferment.
+
+    Les deux pièces sont éprouvées d'un coup : un verdict rendu prouve que rien n'a levé, et le
+    temps écoulé prouve qu'aucune attente n'est restée sans borne. La borne admet ici le second
+    recours en entier : le tueur absent, la descendance tient les tubes jusqu'au bout de la
+    grâce — c'est le prix voulu, et il est fini.
+    """
+    root = build_repo(tmp_path)
+    before = (root / "source.py").read_bytes()
+    (root / ".claude" / "pipeline.config.md").write_text(
+        "## Commandes du projet\n\n**Back (`.`)** — v :\n"
+        f'- test ciblé   : "{sys.executable}" -c "import time; time.sleep(30)"\n',
+        encoding="utf-8",
+    )
+    casse_le_tueur_d_arbre(monkeypatch)
+    started = time.monotonic()
+
+    verdicts = mutation.play(
+        root,
+        {
+            "targets": [],
+            "timeout": 2,
+            "mutations": [
+                {
+                    "name": "boucle sans fin, tueur d'arbre absent",
+                    "file": "source.py",
+                    "old": "if n < 0:",
+                    "new": "if False:",
+                    "expect": ["test_refuse_un_negatif"],
+                }
+            ],
+        },
+    )
+    elapsed = time.monotonic() - started
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert "délai de 2 s dépassé" in verdicts[0].detail
+    assert (root / "source.py").read_bytes() == before
+    assert elapsed < 2 + mutation.GRACE_SECONDS + MARGE_SECONDS, (
+        f"la borne n'a pas tenu : {elapsed:.2f} s"
+    )
+
+
+def test_terminate_tree_ne_leve_pas_quand_son_tueur_manque(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Le contrat de `terminate_tree` — « sans lever » — pris au mot, sur un processus vivant.
+
+    Le test ci-dessus l'éprouve à travers `play` ; celui-ci nomme la fonction, pour que le
+    constat se lise à l'endroit du contrat plutôt qu'à travers trois couches.
+    """
+    casse_le_tueur_d_arbre(monkeypatch)
+    process = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(30)"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        # Accepté et ignoré sous Windows (vérifié) ; ailleurs, c'est le groupe que tue le signal.
+        start_new_session=True,
+    )
+    try:
+        mutation.terminate_tree(process)
+    finally:
+        process.kill()
+        process.wait(timeout=mutation.GRACE_SECONDS)
 
 
 def test_un_attendu_absent_du_rapport_mute_est_une_panne_pas_un_vert(tmp_path: Path) -> None:
@@ -985,7 +1201,7 @@ def test_un_attendu_absent_du_rapport_mute_est_une_panne_pas_un_vert(tmp_path: P
     )
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
-    assert "absents du rapport muté" in verdicts[0].detail
+    assert "n'ont pas tourné" in verdicts[0].detail
 
 
 def test_une_mutation_de_meme_longueur_change_la_date_du_fichier(tmp_path: Path) -> None:
@@ -1006,3 +1222,28 @@ def test_une_mutation_de_meme_longueur_change_la_date_du_fichier(tmp_path: Path)
 
     assert apres.st_size == avant.st_size, "le montage ne vaut que pour une longueur identique"
     assert apres.st_mtime != avant.st_mtime
+
+
+def test_le_vocabulaire_des_etats_qui_nont_pas_tourne_couvre_les_trois_rapporteurs() -> None:
+    """Le dénombrement de `NOT_RUN`, éprouvé sur les rapports des trois lanceurs.
+
+    Le constat est né sur un `skipped` de pytest ; le fermer là aurait laissé Vitest rendre
+    VERT sur un `todo`. Les trois vocabulaires sont donc lus dans un rapport de chaque
+    rapporteur : **JUnit `skipped`, Vitest `skipped` et `todo`, Playwright `skipped`** — et le
+    `pending` de Jest, qu'aucun des trois n'émet, reste dehors.
+    """
+    junit = mutation.REPORTERS["junit"].outcomes(
+        '<testsuites><testsuite><testcase classname="m" name="saute">'
+        '<skipped message="x"/></testcase></testsuite></testsuites>'
+    )
+    vitest = mutation.REPORTERS["vitest"].outcomes(VITEST_NOT_RUN_REPORT)
+    playwright = mutation.REPORTERS["playwright"].outcomes(
+        '{"suites": [{"title": "s.spec.ts", "specs": [{"title": "saute", "ok": true, '
+        '"tests": [{"status": "skipped", "results": [{"status": "skipped"}]}]}]}]}'
+    )
+
+    assert junit == {"m::saute": "skipped"}
+    assert set(vitest.values()) == {"passed", "skipped", "todo"}
+    assert playwright == {"s.spec.ts > saute": "skipped"}
+    assert {state for state in vitest.values() if state != "passed"} <= mutation.NOT_RUN
+    assert "skipped" in mutation.NOT_RUN and "pending" not in mutation.NOT_RUN
