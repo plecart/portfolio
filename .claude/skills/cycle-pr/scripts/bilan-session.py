@@ -452,6 +452,18 @@ class Measures:
         """Les seuls sous-agents lancés par l'outil `Workflow`."""
         return [run for run in self.runs if run.tool == WORKFLOW_TOOL]
 
+    @property
+    def active(self) -> timedelta:
+        """La durée de la session **hors absences** — le seul denominateur actionnable.
+
+        Rapporter la réactivité à la session entière la dilue d'autant que le mainteneur a été
+        absent : une nuit de dix heures fait tomber « 0 h 17 d'attente » à 2 %, et le chiffre
+        flatte la pipeline sans que rien n'ait été amélioré — le sens d'erreur même d'obs 41.
+        Hors absences, la même attente vaut 12 %, et c'est cette part que la pipeline peut
+        réduire. Les absences, elles, se rapportent à la session : c'est leur poids réel.
+        """
+        return self.span - total(self.absences)
+
 
 def measure(events: Sequence[Event]) -> Measures:
     """Mesure une session à partir de ses événements, sans rien mettre en forme."""
@@ -491,14 +503,20 @@ def report(events: Sequence[Event], session: Usage, subagents: Usage) -> str:
 
     L'ordre des lignes est celui de leur lecture : l'attente **hors absences** d'abord, parce
     que c'est la seule que la pipeline peut réduire ; l'agrégat brut ensuite, pour mémoire.
+
+    Deux dénominateurs, et chaque ligne dit le sien. Ce que la pipeline peut réduire se rapporte
+    au temps **actif** (session moins absences) ; les absences et l'attente totale se rapportent
+    à la session. Tout rapporter à la session diluait la réactivité d'autant que le mainteneur
+    avait été absent — 2 % au lieu de 12 % sur une session mesurée —, et un pourcentage dont le
+    dénominateur ne se lit pas est le défaut, pas le chiffre.
     """
     m = measure(events)
     humans = m.kinds["human"]
     relayed = ", ".join(f"relais à {local(moment)}" for moment in m.relayed)
 
-    def row(label: str, duration: timedelta, note: str = "") -> str:
-        """Une ligne « libellé · durée · part de la session », le gabarit de cinq des six."""
-        share = f"{duration / m.span:4.0%}" if m.span else "   —"
+    def row(label: str, duration: timedelta, basis: timedelta, note: str = "") -> str:
+        """Une ligne « libellé · durée · part de son dénominateur »."""
+        share = f"{duration / basis:4.0%}" if basis else "   —"
         return f"{label:<28} {hm(duration):>9}   {share}{'   ' + note if note else ''}"
 
     def typical(windows: Sequence[Interval]) -> str:
@@ -509,19 +527,24 @@ def report(events: Sequence[Event], session: Usage, subagents: Usage) -> str:
             f"session          {local(m.start)} → {local(m.end)}   {hm(m.span)}   "
             f"(sessions : {m.sessions}{', ' + relayed if relayed else ''})"
         ),
+        f"actif (hors absences)        {hm(m.active):>9}   — dénominateur des trois lignes qui suivent",
         row(
             "réactivité (< 1 h)",
             total(m.reactivity),
+            m.active,
             f"({len(m.reactivity)} attentes, médiane {typical(m.reactivity)})",
         ),
-        row("absences (≥ 1 h)", total(m.absences), f"({len(m.absences)} — détail plus bas)"),
-        row("attente totale", total(m.blocked)),
         row(
             "sous-agents en cours",
             total(m.windows),
+            m.active,
             f"(workflows {len(m.workflows)} / {len(m.runs)})",
         ),
-        row("agent seul", m.alone),
+        row("agent seul", m.alone, m.active),
+        row(
+            "absences (≥ 1 h)", total(m.absences), m.span, f"({len(m.absences)} — détail plus bas)"
+        ),
+        row("attente totale", total(m.blocked), m.span),
         *(
             [f"sous-agents sans notification de fin : {m.dangling} (encore en cours, ou morts)"]
             if m.dangling
