@@ -770,12 +770,15 @@ def test_une_jonction_vers_l_exterieur_est_refusee_par_la_borne(tmp_path: Path) 
     elsewhere = tmp_path / "ailleurs"
     elsewhere.mkdir()
     (elsewhere / "hors.txt").write_text("secret\n", encoding="utf-8")
-    made = subprocess.run(
-        ["cmd", "/c", "mklink", "/J", str(root / "pont"), str(elsewhere)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        made = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(root / "pont"), str(elsewhere)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except (FileNotFoundError, OSError) as absent:  # pragma: no cover — hors Windows
+        pytest.skip(f"`mklink` indisponible ici : {absent}")
     if not (root / "pont").exists():  # pragma: no cover — selon le système de fichiers
         pytest.skip(f"jonctions indisponibles ici : {made.stdout or made.stderr}")
 
@@ -921,3 +924,23 @@ def test_un_attendu_absent_du_rapport_mute_est_une_panne_pas_un_vert(tmp_path: P
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
     assert "absents du rapport muté" in verdicts[0].detail
+
+
+def test_une_mutation_de_meme_longueur_change_la_date_du_fichier(tmp_path: Path) -> None:
+    """Sinon un cache de compilation sert la version témoin, et le verdict est faux.
+
+    `__pycache__` s'invalide sur (date, taille) : une mutation de même longueur écrite dans la
+    même seconde ne change ni l'un ni l'autre. Mesuré en **CI Linux** le 2026-10-09 — deux
+    mutations de longueur identique rendaient VERT un test qui tient. Invisible sur le poste
+    Windows, dont l'horodatage de fichier est plus fin : c'est une règle sensible à la
+    plateforme, inscrite comme telle dans `pipeline.config.md`.
+    """
+    cible = tmp_path / "source.py"
+    cible.write_bytes(b"if n < 0:")
+    avant = cible.stat()
+
+    mutation.rewrite(cible, b"if False:", avant.st_mtime + 1)
+    apres = cible.stat()
+
+    assert apres.st_size == avant.st_size, "le montage ne vaut que pour une longueur identique"
+    assert apres.st_mtime != avant.st_mtime
