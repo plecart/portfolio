@@ -386,6 +386,22 @@ def run_bounded(command: str, root: Path, environment: Mapping[str, str], timeou
     return errors
 
 
+def rewrite(path: Path, data: bytes, when: float) -> None:
+    """Écrit le contenu **et fixe** la date de modification du fichier.
+
+    Un cache de compilation s'invalide sur le couple (date, taille) : `__pycache__` pour Python,
+    et le même principe pour tout cache de build. Une mutation de **même longueur** écrite dans
+    la même seconde ne change ni l'un ni l'autre — le lanceur sert alors la version **témoin**,
+    et le harnais rend VERT un test qui tient. Mesuré le 2026-10-09 en CI Linux sur deux
+    mutations de longueur identique (`if n < 0:` → `if False:`, `def positive(n):` →
+    `def renommee(n):`) ; invisible sur le poste Windows, dont l'horodatage de fichier est plus
+    fin. L'erreur va dans le sens qui fait condamner un bon test, donc dépenser une session à
+    renforcer ce qui tenait déjà.
+    """
+    path.write_bytes(data)
+    os.utime(path, (when, when))
+
+
 def positive_seconds(value: object) -> float:
     """Un délai en secondes, strictement positif.
 
@@ -455,9 +471,14 @@ class Suite:
         with tempfile.TemporaryDirectory() as folder:
             report = Path(folder) / "report"
             quoted = "".join(f' "{target}"' for target in self.targets)
-            environment = dict(os.environ) | {
-                name: value.format(report=report) for name, value in self.reporter.env.items()
-            }
+            environment = (
+                dict(os.environ)
+                # Pour que nos propres lancements ne déposent pas de cache qu'un lancement
+                # suivant servirait — la date du fichier muté est déjà distincte, ceci ferme
+                # l'autre côté du même défaut et ne laisse rien derrière.
+                | {"PYTHONDONTWRITEBYTECODE": "1"}
+                | {name: value.format(report=report) for name, value in self.reporter.env.items()}
+            )
             command = self.command + self.reporter.flags.format(report=report) + quoted
             errors = run_bounded(command, self.root, environment, self.timeout)
             if not report.is_file():
@@ -650,11 +671,12 @@ def judge(suite: Suite, entry: Mapping[str, Any], witness: Mapping[str, str]) ->
         aimed = resolve(expected_fragments(entry), witness)
         path = within(suite.root, text_field(entry, "file"))
         original, mutated = mutated_bytes(path, text_field(entry, "old"), text_field(entry, "new"))
+        stamp = path.stat().st_mtime
         try:
-            path.write_bytes(mutated)
+            rewrite(path, mutated, stamp + 1)
             outcomes = suite.outcomes()
         finally:
-            path.write_bytes(original)
+            rewrite(path, original, stamp)
     except Unusable as reason:
         return Verdict("PANNE", name, str(reason))
 
