@@ -27,7 +27,8 @@ Tout tient dans ce fichier, racine mise à part : un harnais paramétré par sa 
 n'est pas transmissible tel quel, et c'est ce qui a fait le réécrire sept fois (obs 37).
 
 Verdict par mutation : `ROUGE` (tous les attendus ont rougi), `VERT` (au moins un attendu est
-resté vert — le test ne tient pas), `PANNE` (`old` absent ou multiple, rapport illisible, refus).
+resté vert — le test ne tient pas), `PANNE` (`old` absent ou multiple, rapport illisible, refus,
+ou un attendu qui n'a pas tourné — sauté, à faire, absent du rapport : il n'a ni rougi ni tenu).
 
 Python 3.11 ou plus, bibliothèque standard seule.
 """
@@ -225,17 +226,28 @@ REPORTERS = {
 # Chemins dont le contenu *est* un réglage de sécurité. Recensés sur ce dépôt le 2026-10-09,
 # après qu'une relecture en a mesuré 12 formes réelles non couvertes par les trois premiers
 # motifs. Un projet qui range ses réglages ailleurs ajoute son motif ici.
+#
+# Appariés **sans égard à la casse**. Le dépôt vit sur des systèmes de fichiers insensibles à la
+# casse — NTFS, APFS par défaut — où `.github/WORKFLOWS/ci.yml` désigne exactement le même
+# fichier que `.github/workflows/ci.yml`, et traversait le refus. Un refus qu'une majuscule
+# contourne n'est pas un refus. Trois appariements composent ce refus : ces 10 motifs de chemin
+# et le test de fichier de configuration sont insensibles, les motifs de **contenu** restent
+# sensibles — `--SEVERITY` n'est pas une option et `@SHA256:` n'est pas une empreinte, et les
+# clés JSON qu'ils cherchent sont elles-mêmes sensibles à la casse.
 SECURITY_PATHS = {
-    "exception de scanner": re.compile(r"(^|/)\.trivyignore|pip-audit-exceptions"),
-    "porte de CI": re.compile(r"(^|/)\.github/(workflows|actions)/"),
-    "configuration de Dependabot": re.compile(r"(^|/)\.github/dependabot\.ya?ml$"),
-    "propriétaires du code": re.compile(r"(^|/)CODEOWNERS$"),
-    "permission d'agent": re.compile(r"(^|/)settings(\.local)?\.json$|(^|/)\.claude/settings"),
-    "serveurs MCP": re.compile(r"(^|/)\.mcp\.json$"),
-    "hooks de pré-commit": re.compile(r"(^|/)\.pre-commit-config\.ya?ml$"),
-    "en-têtes du serveur web": re.compile(r"(^|/)Caddyfile$"),
-    "composition de production": re.compile(r"(^|/)compose([.-][\w.-]+)?\.ya?ml$"),
-    "réglages de l'application": re.compile(r"(^|/)config/settings\.py$"),
+    label: re.compile(pattern, re.IGNORECASE)
+    for label, pattern in {
+        "exception de scanner": r"(^|/)\.trivyignore|pip-audit-exceptions",
+        "porte de CI": r"(^|/)\.github/(workflows|actions)/",
+        "configuration de Dependabot": r"(^|/)\.github/dependabot\.ya?ml$",
+        "propriétaires du code": r"(^|/)CODEOWNERS$",
+        "permission d'agent": r"(^|/)settings(\.local)?\.json$|(^|/)\.claude/settings",
+        "serveurs MCP": r"(^|/)\.mcp\.json$",
+        "hooks de pré-commit": r"(^|/)\.pre-commit-config\.ya?ml$",
+        "en-têtes du serveur web": r"(^|/)Caddyfile$",
+        "composition de production": r"(^|/)compose([.-][\w.-]+)?\.ya?ml$",
+        "réglages de l'application": r"(^|/)config/settings\.py$",
+    }.items()
 }
 
 # Motifs de **contenu**, cherchés dans `old` et `new` — mais seulement dans un fichier de
@@ -252,8 +264,10 @@ SECURITY_CONTENTS = {
 }
 
 # Ce qui compte comme fichier de configuration, pour borner les motifs de contenu ci-dessus.
+# Comparés repliés en minuscules, pour la même raison que les chemins ci-dessus : `ci.YML` est
+# le même fichier que `ci.yml`, et sortait les motifs de contenu du périmètre.
 CONFIGURATION_SUFFIXES = (".yml", ".yaml", ".toml", ".json", ".cfg", ".ini", ".sh", ".ps1", ".env")
-CONFIGURATION_NAMES = ("Makefile", "justfile", "Dockerfile", "Caddyfile", "crontab")
+CONFIGURATION_NAMES = ("makefile", "justfile", "dockerfile", "caddyfile", "crontab")
 
 ALTERNATIVE = (
     "écrire la garde en fonction sur du texte et la voir rouge sur un recueil de formes "
@@ -264,7 +278,7 @@ ALTERNATIVE = (
 
 def is_configuration(target: str) -> bool:
     """Le chemin désigne-t-il un fichier de configuration, au sens des motifs de contenu ?"""
-    name = target.rsplit("/", 1)[-1]
+    name = target.rsplit("/", 1)[-1].casefold()
     return name.startswith(CONFIGURATION_NAMES) or name.endswith(CONFIGURATION_SUFFIXES)
 
 
@@ -300,6 +314,15 @@ def security_refusal(mutation: Mapping[str, Any]) -> str | None:
 # --- La boucle : témoin, mutation, restauration, verdict ---------------------------------------
 
 RED = "failed"
+SKIPPED = "skipped"
+# Les états qui disent « ce test n'a pas tourné ». **Mesurés**, pas supposés : `skipped` par les
+# trois rapporteurs, `todo` en plus par Vitest — relevé le 2026-10-10 sur le lanceur du dépôt,
+# `it.skip` rendant `skipped` et `it.todo` rendant `todo`. Le `pending` de Jest n'y est pas :
+# Vitest ne l'émet pas. Un attendu dans un de ces états est dans l'état exact d'un attendu
+# **absent** du rapport — il n'a ni rougi ni tenu —, et il rendait VERT, c'est-à-dire « le test
+# ne tient pas », pour un test que personne n'a joué. `flaky` n'en fait pas partie : il a
+# tourné, et n'a pas attrapé la mutation de façon fiable.
+NOT_RUN = {SKIPPED, "todo"}
 CONFIG = Path(".claude") / "pipeline.config.md"
 # Une mutation fabrique des boucles sans fin : la condition d'arrêt est ce qu'on vient de casser.
 DEFAULT_TIMEOUT = 900
@@ -336,15 +359,22 @@ def terminate_tree(process: "subprocess.Popen[str]") -> None:
     2026-10-09 : un petit-fils en boucle sans fin laissait le harnais bloqué bien au-delà de son
     délai, **le fichier muté sur disque pendant tout ce temps**. `taskkill /T` descend l'arbre
     sous Windows ; ailleurs, le groupe de processus créé au lancement se tue d'un signal.
+
+    « Sans lever » est le contrat, et il porte sur **les deux** voies. Le tueur d'arbre peut
+    manquer — `taskkill` hors du `PATH`, groupe de processus hors de portée — et cette panne-là
+    est la pire des trois : l'exception sautait le `kill()` qui suit, puis le `raise` qui borne,
+    et laissait l'appelant attendre sans délai. Un tueur absent doit coûter une descendance
+    survivante, jamais la borne.
     """
     if os.name == "nt":
-        subprocess.run(
-            ["taskkill", "/F", "/T", "/PID", str(process.pid)],
-            capture_output=True,
-            check=False,
-        )
+        with contextlib.suppress(OSError):
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                capture_output=True,
+                check=False,
+            )
     else:  # pragma: no cover — ce poste est Windows ; la CI l'emprunte
-        with contextlib.suppress(ProcessLookupError, PermissionError):
+        with contextlib.suppress(OSError):
             os.killpg(os.getpgid(process.pid), signal.SIGKILL)
     with contextlib.suppress(Exception):
         process.kill()
@@ -357,11 +387,22 @@ def run_bounded(command: str, root: Path, environment: Mapping[str, str], timeou
     lecture des tubes. `subprocess.run(timeout=…)` ne suffit pas — il ne tue que l'enfant
     direct, puis attend que les tubes hérités se ferment, ce qu'un petit-fils survivant empêche.
 
+    Aucune attente n'est laissée sans borne, et c'est pourquoi **rien n'est fermé à la main en
+    sortie**. Ce qui bloque n'est pas le `wait()` : c'est la **fermeture des tubes**, qui réclame
+    le verrou du tampon que le fil lecteur de `communicate` détient tant que la descendance
+    écrit. `with Popen(…)` ferme les deux tubes avant d'attendre, donc son bloc `__exit__` paie
+    ce verrou ; un `finally` qui les ferme le paie aussi. Mesuré le 2026-10-10, tueur d'arbre
+    rendu indisponible, délai de 2 s : la fermeture rend la main à **30 s**, c'est-à-dire la fin
+    du petit-fils, contre **12 s** — le délai plus la grâce — quand on ne ferme rien. Le `wait()`
+    seul, lui, a été mesuré **inoffensif** : `terminate_tree` ayant tué l'enfant direct, il rend
+    la main aussitôt. Et ne rien faire ne fuit pas : le fil lecteur est démon et referme les
+    tubes quand la descendance meurt.
+
     Raises:
         Unusable: le délai est dépassé. L'appelant restaure alors le fichier muté, ce que seul
             un retour — jamais un blocage — lui permet de faire.
     """
-    with subprocess.Popen(
+    process = subprocess.Popen(
         command,
         cwd=root,
         shell=True,
@@ -371,18 +412,18 @@ def run_bounded(command: str, root: Path, environment: Mapping[str, str], timeou
         errors="replace",
         env=dict(environment),
         **({} if os.name == "nt" else {"start_new_session": True}),
-    ) as process:
-        try:
-            _, errors = process.communicate(timeout=timeout)
-        except subprocess.TimeoutExpired as expired:
-            terminate_tree(process)
-            # Second recours borné : les tubes peuvent rester ouverts le temps que la
-            # descendance meure, et une attente non bornée ici annulerait tout le propos.
-            with contextlib.suppress(subprocess.TimeoutExpired):
-                process.communicate(timeout=GRACE_SECONDS)
-            raise Unusable(
-                f"délai de {timeout:g} s dépassé par « {command} » — processus et descendance tués"
-            ) from expired
+    )
+    try:
+        _, errors = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as expired:
+        terminate_tree(process)
+        # Second recours borné : les tubes peuvent rester ouverts le temps que la descendance
+        # meure, et une attente non bornée ici annulerait tout le propos.
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            process.communicate(timeout=GRACE_SECONDS)
+        raise Unusable(
+            f"délai de {timeout:g} s dépassé par « {command} » — processus et descendance tués"
+        ) from expired
     return errors
 
 
@@ -669,8 +710,9 @@ def judge(suite: Suite, entry: Mapping[str, Any], witness: Mapping[str, str]) ->
 
     Returns:
         `ROUGE` si **tous** les tests résolus depuis `expect` ont rougi, `VERT` si l'un d'eux est
-        resté vert — sauté et instable compris, qui ne sont pas des rouges —, `PANNE` si la
-        mutation n'a pas pu être jouée.
+        resté vert — instable compris, qui a tourné sans attraper la mutation de façon fiable —,
+        `PANNE` si la mutation n'a pas pu être jouée **ou** si un attendu n'a pas tourné : sauté,
+        à faire, ou absent du rapport muté.
     """
     name = str(entry.get("name", "?"))
     try:
@@ -690,14 +732,13 @@ def judge(suite: Suite, entry: Mapping[str, Any], witness: Mapping[str, str]) ->
         return Verdict("PANNE", name, str(reason))
 
     red = sorted(test for test, state in outcomes.items() if state == RED)
-    absent = [test for test in aimed if test not in outcomes]
-    if absent:
-        # Une mutation qui empêche la **collecte** fait disparaître le test visé du rapport : il
-        # n'a ni rougi ni tenu, il n'a pas tourné. Le compter survivant condamnait un test que
-        # personne n'a éprouvé — exactement ce que `Unusable` existe pour distinguer.
-        return Verdict(
-            "PANNE", name, f"attendus absents du rapport muté : {absent} ; rouges : {red}"
-        )
+    not_run = [test for test in aimed if outcomes.get(test, SKIPPED) in NOT_RUN]
+    if not_run:
+        # Une mutation qui empêche la **collecte** fait disparaître le test visé du rapport, et
+        # un test sauté y figure sans avoir tourné : les deux états sont le même, et un attendu
+        # absent prend donc l'état d'un sauté par défaut. Le compter survivant condamnait un
+        # test que personne n'a éprouvé — exactement ce que `Unusable` existe pour distinguer.
+        return Verdict("PANNE", name, f"attendus qui n'ont pas tourné : {not_run} ; rouges : {red}")
     survivors = [test for test in aimed if test not in red]
     detail = f"rouges : {red}"
     return Verdict(
