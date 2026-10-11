@@ -14,7 +14,7 @@
 FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS base
 
 # `rclone` depuis son image officielle, dans un étage à lui : Dependabot ne lit que les `FROM`.
-FROM rclone/rclone:1.75.1@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5 AS rclone
+FROM rclone/rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5 AS rclone
 
 # `age` et `supercronic` n'ont pas d'image officielle : les fichiers de leur release, à la somme
 # SHA-256 épinglée, que BuildKit vérifie avant de les copier. Dependabot ne les suit pas : la
