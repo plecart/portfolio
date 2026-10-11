@@ -23,6 +23,15 @@
 http://{$SITE_HOST} {
 	root * /usr/share/caddy
 
+	# `Range` retiré des requêtes de cet hôte : c'est la configuration que vise CVE-2026-78667
+	# (`.trivyignore.yaml`), l'absence de borne sur la taille d'un `Range` analysé par un serveur.
+	# Le seul analyseur de l'image est `file_server` (`net/http.ServeContent`) ; les routes
+	# `reverse_proxy` transmettent l'en-tête sans le lire. Rien ici n'a besoin d'un téléchargement
+	# partiel : Caddy ne sert que le front compilé, et les médias vivent sur R2 (cadrage, surfaces
+	# exposées). Le test de fumée de l'image vérifie qu'un `Range` sur un fichier haché rend 200 et
+	# le corps entier, jamais 206.
+	request_header -Range
+
 	# Les en-têtes de sécurité de l'hôte du site (PRD « Sécurité », brief de #16, décision 3) — sur
 	# ce que Caddy sert comme sur `/projets/*` qu'il relaie. Le préfixe `>` diffère leur écriture
 	# après celle de l'amont (doc Caddy « header ») : ceux de Django sont remplacés, pas doublés —

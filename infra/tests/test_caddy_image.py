@@ -366,6 +366,23 @@ H2C_PREFACE = b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 SETTINGS_FRAME_TYPE = 0x04
 
 
+def test_caddy_ne_sert_aucun_telechargement_partiel(stack: Stack) -> None:
+    """`Range` est retiré des requêtes de l'hôte du site, et c'est la configuration que vise
+    CVE-2026-78667 (`.trivyignore.yaml`) : l'absence de borne sur la taille d'un `Range` analysé
+    par un serveur. Le seul analyseur de l'image est `file_server` ; sans cette garde il rendrait
+    206 et une tranche. Rien ici n'a besoin de téléchargement partiel — le front compilé est
+    servi entier, les médias vivent sur R2."""
+    chemin = hashed_script(stack)
+    entier = stack.get(SITE, chemin)
+
+    tranche = stack.get(SITE, chemin, {"Range": "bytes=0-10"})
+
+    assert entier.status == 200, "le montage ne prouve rien si le fichier n'est pas servi"
+    assert tranche.status == 200, f"206 attendu nulle part : {tranche.status}"
+    assert tranche.body == entier.body, "le corps doit être entier, pas une tranche"
+    assert "Content-Range" not in tranche.headers
+
+
 def test_caddy_ne_parle_pas_http2_en_clair(stack: Stack) -> None:
     """`cloudflared` joint Caddy en HTTP/1.1 : HTTP/2 en clair (`h2c`) n'a rien à servir, et c'est
     la configuration que vise CVE-2026-56853 (`.trivyignore.yaml`). Caddy 2.11.4 l'accepte pourtant
