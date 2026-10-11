@@ -352,3 +352,63 @@ vulnerabilities:
       Cloudflare le fait (D45). Alternatives : corrigé par Go 1.26.6, absent de caddy 2.11.4,
       dernière version publiée.
     expired_at: 2026-12-29
+
+  # --- Image `backup` : les binaires Go `age`, `age-keygen` et `supercronic` ------------------
+  #
+  # Ce qui tourne : `supercronic`, puis la chaîne de `infra/backup/backup.sh` une fois par nuit,
+  # sous l'utilisateur `backup`, sans privilège. `age` chiffre le dump (`backup.sh`),
+  # `age-keygen` engendre la paire des tests, `supercronic` ordonnance. L'image **n'écoute sur
+  # aucun port** : aucun `EXPOSE`, aucun serveur dans la chaîne. `rclone` n'y figure plus depuis
+  # la 1.75.2, qui l'a reconstruit avec Go 1.26.9 : son exception a été retirée, pas déplacée.
+  #
+  # Les trois binaires portent la même bibliothèque standard Go vulnérable — `age` et
+  # `age-keygen` en v1.27.0, `supercronic` en v1.26.6 —, et les trois mêmes avis. `age` 1.3.2
+  # (2026-08-29) et `supercronic` 0.2.49 (2026-08-14) sont les **dernières versions publiées**,
+  # toutes deux antérieures à Go 1.26.9 : leur correctif n'attend qu'une release amont, que
+  # Dependabot ne propose pas pour un fichier de release épinglé par somme. D'où la fenêtre
+  # courte de 30 jours, et non 90.
+
+  - id: CVE-2026-78667
+    paths:
+      - usr/local/bin/age
+      - usr/local/bin/age-keygen
+      - usr/local/bin/supercronic
+    statement: >-
+      Place : bibliothèque standard Go des trois binaires, chacun nécessaire à l'image — `age`
+      chiffre le dump, `age-keygen` engendre la paire des tests, `supercronic` ordonnance la
+      nuit. Atteinte : non — le défaut est l'absence de borne sur la taille d'un en-tête `Range`
+      analysé par un **serveur** HTTP ; l'image n'écoute sur aucun port, aucun des trois
+      binaires ne sert de HTTP, et `age` ne fait que lire et écrire des fichiers.
+      Alternatives : corrigé par Go 1.26.9 et 1.27.2, absents de `age` 1.3.2 et `supercronic`
+      0.2.49, dernières versions publiées ; la suivante de chacune arrivera reconstruite.
+    expired_at: 2026-11-10
+
+  - id: CVE-2026-78669
+    paths:
+      - usr/local/bin/age
+      - usr/local/bin/age-keygen
+      - usr/local/bin/supercronic
+    statement: >-
+      Place : bibliothèque standard Go des trois binaires, chacun nécessaire à l'image — `age`
+      chiffre le dump, `age-keygen` engendre la paire des tests, `supercronic` ordonnance la
+      nuit. Atteinte : non — le défaut consomme le processeur d'un **serveur** HTTP/2 qui reçoit
+      des `SETTINGS` de fenêtre répétés ; l'image n'écoute sur aucun port, et aucun des trois
+      binaires n'ouvre de connexion HTTP/2 entrante ni sortante dans la chaîne de sauvegarde.
+      Alternatives : corrigé par Go 1.26.9 et 1.27.2, absents de `age` 1.3.2 et `supercronic`
+      0.2.49, dernières versions publiées ; la suivante de chacune arrivera reconstruite.
+    expired_at: 2026-11-10
+
+  - id: CVE-2026-97031
+    paths:
+      - usr/local/bin/age
+      - usr/local/bin/age-keygen
+      - usr/local/bin/supercronic
+    statement: >-
+      Place : bibliothèque standard Go des trois binaires, chacun nécessaire à l'image — `age`
+      chiffre le dump, `age-keygen` engendre la paire des tests, `supercronic` ordonnance la
+      nuit. Atteinte : non — le défaut vise un pair TLS qui traite des références d'extension
+      externe ECH dans un `ClientHello` ; aucun des trois ne termine de TLS entrant, et le
+      chiffrement d'`age` est le sien (X25519 sur fichier), pas celui de `crypto/tls`.
+      Alternatives : corrigé par Go 1.26.9 et 1.27.2, absents de `age` 1.3.2 et `supercronic`
+      0.2.49, dernières versions publiées ; la suivante de chacune arrivera reconstruite.
+    expired_at: 2026-11-10
