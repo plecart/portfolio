@@ -413,8 +413,8 @@ silencieux.
 **Les portes bon marché d'abord.** Un relecteur coûte un contexte entier ; ce qu'une commande
 trouve en dix secondes ne se paie pas en jetons. Avant chaque appel, dans cet ordre :
 
-Les quatre lignes se lisent dans « Commandes du projet » de `.claude/pipeline.config.md`, avec ce
-que chacune couvre et ce qu'elle ne voit pas — jamais de mémoire :
+Chaque commande se lit dans « Commandes du projet » de `.claude/pipeline.config.md`, avec ce
+qu'elle couvre et ce qu'elle ne voit pas — jamais de mémoire :
 
 1. **`lint`, `typecheck` et la suite** verts, et la ligne **validation** si le delta touche
    `.claude/` ou `CLAUDE.md`.
