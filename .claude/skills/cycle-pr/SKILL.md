@@ -402,6 +402,23 @@ lancer un sous-agent : rendre la main au relecteur humain avec le diff et le pro
 verbatim, et le noter dans la section « Relecture indépendante » du body de PR — jamais de saut
 silencieux.
 
+**Les portes bon marché d'abord.** Un relecteur coûte un contexte entier ; ce qu'une commande
+trouve en dix secondes ne se paie pas en jetons. Avant chaque appel, dans cet ordre :
+
+1. **`lint`, `typecheck` et la suite** verts (`.claude/pipeline.config.md`), et
+   `claude plugin validate . --strict` si le delta touche `.claude/` ou `CLAUDE.md`.
+2. **`/code-review`** en balayage mécanique du diff. C'est la session qui l'invoque elle-même —
+   à la différence de `/code-review ultra`, qui demande un geste du mainteneur et reste hors
+   pipeline.
+3. **`/security-review`** quand le diff touche une zone sensible ou une surface exposée
+   (sections « Périmètre » de la config).
+
+Ces trois portes sont **additives**. Aucune ne remplace le prompt de
+`.claude/rules/cleanup-verbatim.md`, que la règle exige mot pour mot, ni la relecture à contexte
+vierge : elles retirent du plateau du relecteur ce qu'un outil sait trouver, pour qu'il dépense
+son contexte sur ce qu'aucun outil ne voit — les hypothèses de l'auteur et les affirmations
+attachées au code.
+
 À la première passe, le relecteur reçoit **uniquement** le corps de l'issue et son brief d'agent
 (ou le briefing de l'Étape 1), la plage `main..HEAD` et le SHA complet de tête. À la seconde, il
 a déjà tout cela : il ne reçoit que la plage `<sha de fin de la première passe>..HEAD` et les
@@ -511,6 +528,42 @@ avec leur raison dans le body (Étape 5). Aucun registre ailleurs : un mineur é
 encore reviendra à la prochaine relecture de la zone ; s'il ne revient pas, il ne comptait pas. Un
 constat de la **première** passe s'absorbe de préférence dans le commit à venir qui touche sa
 zone.
+
+**Le cliquet — dénombrer avant de corriger, pas après.** Un constat de relecture est un
+échantillon, jamais un inventaire : dès qu'un correctif ferme **un chemin** d'une classe (voir le
+déclencheur de `cleanup-verbatim.md`), le dénombrement des chemins de cette classe s'écrit
+**avant** le premier correctif, dans la **docstring du test paramétré** qui les éprouve — N
+recensés, k fuyaient —, et la relance reçoit ce dénombrement avec la consigne de chercher celui
+qui manque. Écrit après, il se fait par morceaux : trois correctifs de suite sur une même classe,
+chacun rouvert par la relecture suivante, et le dénombrement rendu à la quatrième — par le
+relecteur. Le cliquet est ce qui empêche la classe de se re-payer.
+
+**Quand une garde imite un analyseur, c'est l'analyseur qui la corrige.** Si une passe renvoie
+**plusieurs** formes qui échappent à une garde lisant un format structuré par motif — YAML, TOML,
+Dockerfile, HTML, prose —, ne pas élargir le motif : lire le fichier avec l'analyseur du format,
+ou avec la règle exacte de l'outil que la garde protège, et comparer les décomptes des deux
+lectures. Un élargissement par constat est un correctif de symptôme, et chacun introduit sa
+régression — mesuré : trois tours, une vingtaine de formes, des décomptes cassés par
+l'élargissement précédent. La classe n'est pas « le motif est trop étroit », c'est « le motif
+n'est pas l'analyseur ». Quand aucun analyseur ne s'applique, la sortie est le **retrait** de la
+garde, sa population explicitement bornée dans sa docstring, jamais un motif de plus.
+
+**Une lentille navigateur, dès qu'un script client entre dans le delta.** Un comportement vérifié
+« à l'écran » l'est sur le parcours où il a été conçu ; ses défauts vivent sur les autres. La
+lentille est un **script de navigateur rejouable** — la commande `e2e ciblé` de
+`.claude/pipeline.config.md`, cache HTTP désactivé, données jetables —, jamais une démonstration
+regardée : un parcours joué à la main ne se rejoue pas au commit suivant, et c'est le relecteur
+qui le lance, dans son worktree, parce que l'auteur l'a déjà vérifié sur le chemin qu'il a
+choisi. Matrice minimale, quatre points :
+
+1. chaque geste sur l'écran **renvoyé en erreur par le serveur** ;
+2. chaque geste **combiné aux gestionnaires que le framework pose sur les mêmes éléments** ;
+3. les combinaisons de gestes qui atteignent le même état final **par des chemins différents** ;
+4. la **console**.
+
+Mesuré : quatre bloquants sortis de cette seule matrice, tous hors du parcours nominal, sur un
+script que l'auteur avait vérifié à l'écran et le mainteneur validé à l'arrêt visuel — et dont un
+correctif de lot précédent s'était déclaré clos sur le geste nominal.
 
 **Plafond — deux passes et une relance.** La relance n'est pas une passe : c'est une **revue des
 commits de correction**, ciblée par un diff explicite (`<sha avant>..<sha après>`) et par la liste
