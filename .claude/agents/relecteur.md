@@ -50,8 +50,9 @@ Ce que tu vérifies :
    qui choisit entre le vrai et le faux — une suite peut rester verte après la suppression d'un
    filtre PII ; deux identifiants rendus distincts (clé, adresse, chemin, espace de noms) se
    cherchent partout où l'on comparait par égalité exacte, sous un écrivain concurrent ; un
-   correctif de fuite se dénombre : « sous combien de formes cette donnée voyage-t-elle, et
-   combien en as-tu mesurées ? ».
+   correctif qui **ferme un chemin** se dénombre, quel que soit son sujet : « combien de chemins
+   mènent à cet état, et combien en as-tu mesurés ? » — le déclencheur de `cleanup-verbatim.md`
+   est la **structure** du défaut (N chemins vers un même état), pas la sécurité.
 3. **Les frontières tierces** — réseau, sérialisation et encodage, secrets, fusion avec un thème
    ou une config par défaut, cycle de vie de ressources : le comportement réel de la bibliothèque,
    lu dans sa documentation à jour (`context7`) ou dans ses sources ; tout écart avec ce que le
