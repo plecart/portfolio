@@ -26,6 +26,7 @@ import yaml
 from config.env import Env
 from test_supply_chain import (
     dockerfile_instructions,
+    prose_citations,
     repository_files,
     tracked_files,
 )
@@ -163,8 +164,9 @@ def cited_test_modules(root: Path, population: Iterable[str]) -> dict[str, set[s
 
     **Ce que cette porte ne couvre pas, et pourquoi on ne l'a pas élargie.** Elle apparie un
     chemin de *module* (`TEST_MODULE_REFERENCE`). Les renvois vers un *nom* de test ne sont
-    gardés par rien, et `PROSE_GLOBS` n'inclut aucun `.py`, donc ceux qui vivent dans les
-    docstrings et dans `.claude/skills/*/scripts/` échappent même à cette porte-ci. Population
+    gardés par rien, et `PROSE_GLOBS` n'inclut pas les sources Python du back — il en inclut
+    trois par `infra/**/*` (mesuré) —, donc les renvois qui vivent dans les docstrings de
+    `apps/api/` et dans `.claude/skills/*/scripts/` échappent même à cette porte-ci. Population
     recensée le 2026-10-12 sur `baaf79c` : **9 renvois, 0 cassé**.
 
     Deux élargissements ont été mesurés et écartés : une porte sur `` `test_\\w+` `` rend
@@ -185,15 +187,9 @@ def cited_test_modules(root: Path, population: Iterable[str]) -> dict[str, set[s
     Returns:
         Les noms de modules cités, chacun avec le nom des fichiers qui les citent.
     """
-    allowed = set(population)
     cited: dict[str, set[str]] = {}
-    for glob in PROSE_GLOBS:
-        for path in root.glob(glob):
-            if not path.is_file() or path.relative_to(root).as_posix() not in allowed:
-                continue
-            text = path.read_text(encoding="utf-8", errors="replace")
-            for reference in TEST_MODULE_REFERENCE.finditer(text):
-                cited.setdefault(reference.group("name"), set()).add(path.name)
+    for citing, reference in prose_citations(root, population, PROSE_GLOBS, TEST_MODULE_REFERENCE):
+        cited.setdefault(reference.group("name"), set()).add(citing.name)
     return cited
 
 
