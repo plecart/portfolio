@@ -499,9 +499,10 @@ Trois gestes, et le dernier a un moment :
   raisonnement qu'obs 74 a payé. Le retrait doit tenir les deux états :
   `git worktree remove <chemin>`, et s'il refuse pour cause de verrou,
   `git worktree unlock <chemin>` puis `remove`. Puis
-  `git branch -d worktree-agent-<id>` — la branche naît sur le trunk et le relecteur ne commit
-  pas, donc `-d` devrait suffire ; **non vérifié**, le cas ne s'est pas encore présenté sur un
-  retrait réel.
+  `git branch -d worktree-agent-<id>` : mesuré sur un retrait réel, `-d` suffit — la branche
+  rend « was <sha du trunk> », donc elle n'a jamais divergé, le relecteur ne commitant pas. Et
+  ce même relevé est la troisième mesure du point « Naissance » : la branche pointe sur le
+  trunk, pas sur la tête de la PR.
 
   Le moment : **après la relance, ou après le dernier constat traité s'il n'y en a pas** — jamais
   à la lecture d'un rapport. Le retirer **termine** l'agent : « This agent cannot be resumed: its
