@@ -183,8 +183,15 @@ def tracked_files(root: Path = REPOSITORY_ROOT) -> list[str]:
     `test_les_deux_populations_de_fichiers_ne_sont_pas_la_meme` met `suivi.md` à l'index sans
     le commiter. Ce qui ne l'est **pas**, c'est que la porte emploie bien la population
     étroite — mesuré le 2026-10-12 : la porte remise sur `repository_files()` laisse la suite
-    **entièrement verte**, parce que sur un arbre propre les deux populations coïncident. Ce
-    choix-là ne tient que par la lecture, et aucune mutation ne peut le dire.
+    **entièrement verte**, parce que sur un arbre propre les deux populations coïncident
+    (239 chemins de part et d'autre).
+
+    Aucun test ne le dit **aujourd'hui** ; ce n'est pas qu'aucun ne le pourrait. Un fichier de
+    prose non suivi planté à la racine, citant un module de test inexistant, fait diverger les
+    deux populations : mesuré le 2026-10-12, l'étroite rend 11 modules cités et l'ignore, la
+    large en rend 12 et le lit. Un test qui plante ce fichier et exige la porte verte
+    épinglerait donc le choix de population ; il n'est pas écrit ici parce que ce lot est une
+    passe « affirmations », pas une passe de couverture.
     """
     return git_listing(root, "--cached")
 
