@@ -178,9 +178,13 @@ def tracked_files(root: Path = REPOSITORY_ROOT) -> list[str]:
     entre, et fait alors rougir sur ce poste une porte que la CI voit verte. Mesuré le
     2026-10-12 sur `ee21cb5` : un fichier citant un module de test inexistant, `git add`-é et
     jamais commité, rend `test_aucun_renvoi_vers_un_module_de_test_inexistant` rouge en local.
-    Le resserrement ferme le cas non suivi, pas la classe. Ce qu'il ferme est épinglé par
-    `test_les_deux_populations_de_fichiers_ne_sont_pas_la_meme`, qui met `suivi.md` à l'index
-    sans le commiter.
+    Le resserrement ferme le cas non suivi, pas la classe. Ce qui est épinglé, c'est la
+    **différence entre les deux populations** :
+    `test_les_deux_populations_de_fichiers_ne_sont_pas_la_meme` met `suivi.md` à l'index sans
+    le commiter. Ce qui ne l'est **pas**, c'est que la porte emploie bien la population
+    étroite — mesuré le 2026-10-12 : la porte remise sur `repository_files()` laisse la suite
+    **entièrement verte**, parce que sur un arbre propre les deux populations coïncident. Ce
+    choix-là ne tient que par la lecture, et aucune mutation ne peut le dire.
     """
     return git_listing(root, "--cached")
 
