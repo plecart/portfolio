@@ -160,10 +160,10 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
   - bit exécutable POSIX (`ruff` `EXE001`) — vérifié en CI seulement
   - fins de ligne des fichiers lus par un conteneur (`.gitattributes` + `test_infra`) — rouge
     possible sur le seul poste, copie de travail en CRLF
-  - **cache de compilation et mutation de même longueur** (`cycle-pr/scripts/mutation.py`,
-    fonction `rewrite`) — `__pycache__` s'invalide sur le couple (date, taille) : une mutation
-    qui ne change ni l'une ni l'autre fait servir la version témoin, et le harnais rend VERT un
-    test qui tient. Rouge **en CI seulement**, l'horodatage de fichier de NTFS étant plus fin
+  - **cache de compilation et mutation de même longueur**
+    (`.claude/skills/cycle-pr/scripts/mutation.py`, fonction `rewrite`) — `__pycache__`
+    s'invalide sur le couple (date, taille) : une mutation qui ne change ni l'une ni l'autre
+    fait servir la version témoin, et le harnais rend VERT un test qui tient. Rouge **en CI seulement**, l'horodatage de fichier de NTFS étant plus fin
     que celui des runners ; mesuré le 2026-10-09 sur deux mutations de longueur identique
 - gates bloquants en CI :
   - back : audit, lint, format:check, typecheck, test
