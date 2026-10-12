@@ -402,16 +402,31 @@ lancer un sous-agent : rendre la main au relecteur humain avec le diff et le pro
 verbatim, et le noter dans la section « Relecture indépendante » du body de PR — jamais de saut
 silencieux.
 
-Le relecteur reçoit **uniquement** le corps de l'issue et son brief d'agent (ou le briefing de
-l'Étape 1), la plage de commits — `main..HEAD` en première passe, `<sha de fin de la première
-passe>..HEAD` en seconde — et, en seconde passe, les constats de la première, corrigés ou
-écartés. Il rend chaque critère d'acceptation ✅ / ❌ / ⚠️ avec preuve, puis ses constats classés
-bloquant / important / mineur, chacun avec fichier, raison et marqueur de provenance.
+À la première passe, le relecteur reçoit **uniquement** le corps de l'issue et son brief d'agent
+(ou le briefing de l'Étape 1), la plage `main..HEAD` et le SHA complet de tête. À la seconde, il
+a déjà tout cela : il ne reçoit que la plage `<sha de fin de la première passe>..HEAD` et les
+constats de la première, corrigés ou écartés. Il rend chaque critère d'acceptation ✅ / ❌ / ⚠️
+avec preuve, puis ses constats classés bloquant / important / mineur, chacun avec fichier, raison
+et marqueur de provenance.
 
-**Un relecteur par passe, un seul.** Pas de relecteur par préoccupation, pas de
-contre-vérificateur par constat, pas de workflow : chaque agent de plus repaye le contexte entier
-et rend ses constats à la même distance du code. Un constat bloquant se re-mesure par l'auteur,
-dans son arbre, en une commande, avant d'éditer sur sa base — jamais par un agent de plus.
+**Un seul relecteur pour la PR — les deux passes et la relance.** Pas de relecteur par
+préoccupation, pas de contre-vérificateur par constat, pas de workflow : chaque agent de plus
+repaye le contexte entier et rend ses constats à la même distance du code. Un constat bloquant se
+re-mesure par l'auteur, dans son arbre, en une commande, avant d'éditer sur sa base — jamais par
+un agent de plus.
+
+**La seconde passe revient au relecteur de la première, par `SendMessage`** — pas à un agent
+neuf. Son contexte est intact : il a déjà lu le brief, les critères et le socle, et son worktree
+est en place ; il ne reçoit donc que la nouvelle plage et les constats de la première passe,
+corrigés ou écartés. C'est le même argument que l'Étape 4.2 tient déjà pour la relance, et il
+vaut autant pour la passe : mesuré au lot 1b de #77, la passe 2 confiée à un agent neuf a coûté
+**~122 k jetons** de contexte repayé — pour un diff que le relecteur de la passe 1 connaissait
+déjà.
+
+Repli vers un **agent neuf** dans un seul cas : le relecteur n'est plus joignable (worktree
+disparu, session perdue, agent terminé). Il part alors avec la vérification d'isolation
+ci-dessous en tête de son prompt, parce qu'un agent repris hérite d'un répertoire courant qui
+n'est pas forcément le sien.
 
 **En deux temps, jamais par commit.** Une première passe dès qu'un commit pose un **invariant que
 les commits suivants supposeront vrai** — par exemple le contrat d'infrastructure : image, point
@@ -424,13 +439,59 @@ constante et deux dépendances, et les invariants non gardés arrivent plus tard
 passe se fond dans un commit qui restait à écrire ; un constat qui arrive après le passage en
 ready coûte un run de CI complet et le rejeu des vérifications manuelles (Étape 7).
 
-**Le relecteur travaille dans son propre worktree, sur le SHA de tête — jamais dans l'arbre de
-cette session.** Éprouver un test sérieusement, c'est casser la garde qu'il protège et la voir
-rougir — donc **modifier le code de production**, puis le restaurer ; dans l'arbre partagé, cela
-gèlerait l'auteur pendant toute la passe, sur un arbre qui bouge. Le harnais crée ce worktree à
-l'appel (`isolation: worktree` du rôle) et le retire s'il revient inchangé ; l'auteur continue
-ici pendant ce temps, sans rien attendre. Un relecteur qui commit ou pousse depuis ce worktree a
-dépassé son rôle.
+**Un worktree de relecture par PR, jamais l'arbre de cette session.** Éprouver un test
+sérieusement, c'est casser la garde qu'il protège et la voir rougir — donc **modifier le code de
+production**, puis le restaurer ; dans l'arbre partagé, cela gèlerait l'auteur pendant toute la
+passe, sur un arbre qui bouge. L'auteur continue ici pendant ce temps, sans rien attendre. Un
+relecteur qui commit ou pousse depuis ce worktree a dépassé son rôle.
+
+Trois gestes, et le dernier a un moment :
+
+- **Naissance.** Le harnais crée le worktree à l'appel (`isolation: worktree` du rôle), mais
+  depuis `origin/<trunk>` — `worktree.baseRef` par défaut, mesuré — et non sur la tête de la PR.
+  Le lead transmet donc le **SHA complet** de tête, et le relecteur s'y détache avant toute
+  autre commande. Un relecteur qui ne le fait pas relit le trunk et conclut sur un diff vide.
+- **Réutilisation.** Le même worktree sert aux **deux passes** et à la relance, puisque c'est le
+  même relecteur : à la seconde passe, il se re-détache sur la nouvelle tête. Rien à récupérer du
+  distant, le worktree partage le dépôt d'objets du clone principal.
+- **Retrait — à la fermeture de la boucle.** Celui qui a créé le worktree le retire, lui et sa
+  branche (`git worktree remove <chemin>`, puis `git branch -d worktree-agent-<id>`), **après la
+  relance, ou après le dernier constat traité s'il n'y en a pas** — jamais à la lecture d'un
+  rapport. Le retirer **termine** l'agent : « This agent cannot be resumed: its worktree no
+  longer exists », et la relance, qui doit lui revenir, n'a plus d'interlocuteur. Mesuré au
+  lot 1b de #77 : le retrait fait par hygiène dès le rapport lu a coûté un contexte entier
+  repayé. Le nettoyage conditionné à « inchangé » du harnais, lui, ne se déclenche jamais quand
+  le relecteur s'est correctement placé — HEAD détaché suffit à le faire juger modifié.
+
+**Un relecteur repris a pu perdre son isolation.** Le message de reprise lui rappelle la
+vérification que porte son rôle — `git rev-parse --show-toplevel` sous `.claude/worktrees/`, et
+`git rev-parse HEAD` sur le SHA attendu — et ne lui demande **jamais** de restaurer une mutation
+sans elle : un agent relancé peut reprendre dans l'arbre vivant de l'auteur, mutations de
+l'auteur comprises, et « restaure octet pour octet » y détruirait son travail en cours.
+
+**La mutation s'appelle, elle ne se décrit pas.** Le harnais existe et il est versionné :
+
+```
+python <répertoire de ce skill>/scripts/mutation.py <racine du dépôt> <mutations.json>
+```
+
+Son `--help` porte le contrat complet — le JSON `{targets, reporter, label, stack, mutations}`,
+les trois verdicts `ROUGE` / `VERT` / `PANNE`, le témoin joué **une seule fois** sur l'arbre
+propre avant toute mutation, les fins de ligne du fichier muté appliquées à `old`, la
+restauration octet pour octet. Ni 4.2 ni `relecteur.md` ne le redécrivent : un harnais décrit
+est un harnais réécrit, et celui-ci l'a été **sept fois**, deux fois faux dans le sens qui mente.
+
+Deux réglages tiennent tout l'écart de coût : `targets` reçoit le **fichier de test visé**, pas
+la suite entière, et `file` est indépendant de `targets` — muter un fichier en lançant le test
+d'un autre ne demande donc aucune cérémonie, ce qui rend bon marché la preuve d'un épinglage
+inter-fichiers. Deux pièges d'usage, payés : une ancre `old` se relit dans le fichier
+**formaté** (une ancre tapée avant la commande de format rend `PANNE`), et un `expect` qui nomme
+un test absent des `targets` rend « apparie 0 tests de la suite témoin » — ce n'est pas une faute
+de frappe, c'est une mauvaise cible.
+
+Un couple **VERT sur arbre propre, ROUGE avec une sonde plantée** n'est pas un échec du harnais :
+c'est la mesure qu'un invariant *non gardé* est *gardable*, donc le signal qu'il faut écrire le
+test.
 
 **Sévérité — trois définitions, pas trois nuances.** *Bloquant* : un défaut de comportement en
 production, une faille, une perte de données possible. *Important* : une régression que la CI ne
@@ -455,12 +516,16 @@ zone.
 commits de correction**, ciblée par un diff explicite (`<sha avant>..<sha après>`) et par la liste
 de ce que chaque commit prétend régler, avec la question obligatoire : « qu'est-ce que ce
 correctif a cassé, ou fait rougir à tort, que la version précédente voyait ? ». Elle revient au
-**relecteur de la passe**, par `SendMessage` — son contexte est intact, il n'a rien à relire —,
+**relecteur de la PR**, par `SendMessage` — son contexte est intact, il n'a rien à relire —,
 jamais à un agent neuf. Un correctif est du code neuf écrit sous pression de conclure — c'est la
 partie la moins éprouvée de la PR, pas la plus sûre. Après la relance : un bloquant qu'elle
 trouve se corrige et rouvre une relance ; un important se corrige, se prouve par un test vu rouge
 (3.1), et n'est pas relu par un tiers ; un mineur suit la règle ci-dessus. La boucle s'arrête là,
 et le body le dit. Les constats écartés sont notés avec leur raison dans le body (Étape 5).
+
+C'est **cette fermeture** — et elle seule — qui autorise le retrait du worktree de relecture.
+Tant que la boucle peut rouvrir une relance, le worktree est ce qui maintient le relecteur
+joignable : le retirer n'est pas un nettoyage, c'est une terminaison.
 
 **Pousser après chaque passe** — première passe corrigée, seconde passe corrigée, relance —, jamais
 en force : la CI éprouve la plateforme cible pendant que la relecture suivante tourne, et un rouge
@@ -775,8 +840,10 @@ est « aucune répercussion »).
 3. Le cycle `modif → test → cleanup → test → commit` s'applique à chaque commit, triviaux
    compris.
 4. **Deux filets de cleanup** : un par commit (regard local), un sur la PR entière avant la
-   seconde relecture (4.1, regard global, inter-commits) — et une relecture à contexte vierge **en deux temps**, au
-   socle et à la fin, jamais par commit, un seul relecteur par passe dans son propre worktree,
-   plafonnée à deux passes et une relance confiée au même relecteur.
+   seconde relecture (4.1, regard global, inter-commits) — et une relecture à contexte vierge
+   **en deux temps**, au socle et à la fin, jamais par commit, **un seul relecteur pour toute la
+   PR** dans un worktree qui lui survit d'une passe à l'autre, plafonnée à deux passes et une
+   relance qui lui revient. Son worktree ne se retire qu'à la fermeture de la boucle : le
+   retirer plus tôt termine l'agent.
 5. La PR n'est **terminée qu'après la passe `repercussions`** : une clôture peut bouleverser les
    autres issues — on le vérifie pendant que la conversation est encore en contexte.

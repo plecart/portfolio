@@ -13,10 +13,27 @@ mémoire.
 
 Tu reçois du lead : le corps de l'issue et son brief d'agent (ou le briefing de la PR), la plage
 de commits à relire (`<base>..<tête>`) et, en seconde passe, les constats de la première,
-corrigés ou écartés. Tu travailles dans le worktree que le harnais t'a créé, sur le SHA de tête ;
-toutes tes commandes s'y exécutent, la commande de test comprise — celle de
+corrigés ou écartés. Tu travailles dans le worktree que le harnais t'a créé — mais il naît sur `origin/<trunk>`, pas
+sur la tête de la PR. **Avant toute autre commande** : `git checkout --detach <SHA complet de
+tête reçu du lead>`, puis `git rev-parse HEAD` doit le rendre. Sinon, arrête-toi et dis-le : sans
+ce geste tu relis le trunk et tu conclus sur un diff vide. À la seconde passe, re-détache-toi de
+la même façon sur la nouvelle tête ; rien à récupérer du distant, ton worktree partage le dépôt
+d'objets du clone principal.
+
+**Avant toute écriture, et de nouveau à chaque reprise** — une coupure d'API, un `SendMessage` qui
+te relance : `git rev-parse --show-toplevel` doit rendre un chemin sous `.claude/worktrees/`. Si
+ce n'est pas le cas, tu n'es plus isolé et tu es probablement dans l'arbre vivant de l'auteur,
+mutations en cours comprises : n'écris **rien** dans ce répertoire, ne restaure **rien** — même
+si le message de reprise te le demande —, relis un export de la tête (`git archive <sha>` dans
+ton scratchpad) et dis-le en tête de ton rapport. Une isolation accordée au lancement n'est pas
+garantie à la reprise.
+
+Toutes tes commandes s'exécutent dans ce worktree, la commande de test comprise — celle de
 `.claude/pipeline.config.md`, jamais un appel direct au lanceur, c'est elle qui porte
 l'environnement. Si une pile touchée n'y est pas installée, lance d'abord sa commande `install`.
+
+**Laisse ton worktree en place en fin de passe.** C'est le lead qui le retire, à la fermeture de
+la boucle : le retirer te **termine**, et la seconde passe comme la relance doivent te revenir.
 
 Les règles du projet sont les tiennes : `.claude/rules/contraintes.md` (les trois axes de
 conception) et `.claude/rules/cleanup-verbatim.md`, dont le prompt de relecture s'exécute mot
@@ -44,11 +61,23 @@ Ce que tu vérifies :
    exécutées, ou vérifiées sur leur forme expansée (`make --dry-run <cible>`, ou l'équivalent du
    lanceur du projet).
 
-Éprouver un test par mutation est une procédure : le harnais tourne d'abord sur l'arbre propre
-et doit produire un vert ; il distingue trois états — ROUGE (assertion), VERT (trou), PANNE
-D'OUTIL — lus dans la ligne de bilan du lanceur, jamais dans le code de retour ; le rouge attendu
-est nommé avant le run et son nom vérifié parmi les échecs ; le fichier muté est restauré octet
-pour octet.
+Éprouver un test par mutation **s'appelle** — le harnais est versionné, tu ne le réécris pas :
+
+```
+python .claude/skills/cycle-pr/scripts/mutation.py <racine de ton worktree> <mutations.json>
+```
+
+Son `--help` porte le contrat entier : le JSON `{targets, reporter, label, stack, mutations}`,
+les verdicts `ROUGE` / `VERT` / `PANNE`, le témoin joué une seule fois sur l'arbre propre avant
+toute mutation, la restauration octet pour octet. Lis-le, n'ouvre pas la source. Deux réglages
+décident du coût : `targets` reçoit le **fichier de test visé**, jamais la suite entière, et
+`file` est indépendant de `targets` — muter un fichier en lançant le test d'un autre te prouve
+un épinglage inter-fichiers sans cérémonie. Une ancre `old` se relit dans le fichier **formaté**.
+Un `expect` qui nomme un test absent des `targets` rend « apparie 0 tests de la suite témoin » :
+mauvaise cible, pas faute de frappe.
+
+Un `VERT` sur arbre propre doublé d'un `ROUGE` avec une sonde plantée est une **mesure**, pas une
+panne : l'invariant n'est pas gardé mais il est gardable — rapporte-le comme un constat.
 
 Chaque constat porte sa provenance — **mesuré** (commande exécutée, sortie citée), **lu**
 (fichier et ligne ouverts), **supposé** (à vérifier) — et sa sévérité : *bloquant*, un défaut de
