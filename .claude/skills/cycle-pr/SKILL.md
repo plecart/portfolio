@@ -485,12 +485,14 @@ Trois gestes, et le dernier a un moment :
 - **Retrait — à la fermeture de la boucle.** **La session qui a lancé le relecteur** le retire,
   lui et sa branche — jamais « celui qui a créé le worktree », qui est le harnais et ne lance
   aucune commande, ni « le lead », qui sous `pr-paralleles` est une autre session que celle qui
-  appelle. Le harnais **verrouille** ce worktree (`.git/worktrees/<id>/locked`), et git refuse de
-  retirer un worktree verrouillé : la forme qui marche est
-  `git worktree remove --force --force <chemin>` — « to remove a locked worktree, specify
-  `--force` twice », doc `git-worktree` —, ou `git worktree unlock <chemin>` puis `remove`. Puis
-  `git branch -d worktree-agent-<id>` : la branche naît sur le trunk et le relecteur ne commit
-  pas, donc elle reste fusionnée et `-d` suffit.
+  appelle. Le harnais **verrouille** ce worktree tant que son agent est vivant
+  (`.git/worktrees/<id>/locked`, avec le pid — mesuré pendant une passe) et le déverrouille à
+  l'arrêt de l'agent (mesuré après). Comme la boucle peut se fermer sur un agent encore
+  joignable, le retrait doit tenir **les deux états** : `git worktree remove <chemin>`, et s'il
+  refuse pour cause de verrou, `git worktree unlock <chemin>` puis `remove`. Puis
+  `git branch -d worktree-agent-<id>` — la branche naît sur le trunk et le relecteur ne commit
+  pas, donc `-d` devrait suffire ; **non vérifié**, le cas ne s'est pas encore présenté sur un
+  retrait réel.
 
   Le moment : **après la relance, ou après le dernier constat traité s'il n'y en a pas** — jamais
   à la lecture d'un rapport. Le retirer **termine** l'agent : « This agent cannot be resumed: its
