@@ -165,7 +165,9 @@ def cited_test_modules(root: Path, population: Iterable[str]) -> dict[str, set[s
         root: la racine à parcourir.
         population: les chemins relatifs, en POSIX, que la porte a le droit de lire. Tout
             fichier présent sur le disque mais absent de cette liste est ignoré : c'est ce qui
-            rend le verdict indépendant du répertoire de travail de chacun.
+            écarte le brouillon **non suivi** d'une personne seule. Un brouillon mis à l'index,
+            lui, entre dans la population et change le verdict — voir le docstring de
+            `tracked_files`.
 
     Returns:
         Les noms de modules cités, chacun avec le nom des fichiers qui les citent.
