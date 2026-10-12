@@ -182,16 +182,20 @@ def tracked_files(root: Path = REPOSITORY_ROOT) -> list[str]:
     **différence entre les deux populations** :
     `test_les_deux_populations_de_fichiers_ne_sont_pas_la_meme` met `suivi.md` à l'index sans
     le commiter. Ce qui ne l'est **pas**, c'est que la porte emploie bien la population
-    étroite — mesuré le 2026-10-12 : la porte remise sur `repository_files()` laisse la suite
-    **entièrement verte**, parce que sur un arbre propre les deux populations coïncident
-    (239 chemins de part et d'autre).
+    étroite — mesuré le 2026-10-12 sur `0b1790d` : la porte remise sur `repository_files()`
+    laisse la suite **entièrement verte**, parce que sur un arbre propre les deux populations
+    coïncident (239 chemins de part et d'autre — un décompte qui grossit à chaque lot, il se
+    relit et ne se recopie pas).
 
     Aucun test ne le dit **aujourd'hui** ; ce n'est pas qu'aucun ne le pourrait. Un fichier de
     prose non suivi planté à la racine, citant un module de test inexistant, fait diverger les
-    deux populations : mesuré le 2026-10-12, l'étroite rend 11 modules cités et l'ignore, la
-    large en rend 12 et le lit. Un test qui plante ce fichier et exige la porte verte
-    épinglerait donc le choix de population ; il n'est pas écrit ici parce que ce lot est une
-    passe « affirmations », pas une passe de couverture.
+    deux populations : mesuré le 2026-10-12 sur `0b1790d`, l'étroite rend 11 modules cités et
+    l'ignore, la large en rend 12 et le lit (ces deux décomptes bougent aussi, pour la même
+    raison). Un test qui plante ce fichier et exige la porte verte **en l'appelant**
+    épinglerait donc le choix de population — l'appeler est ce qui distingue ce test d'un
+    doublon de `test_un_brouillon_non_suivi_n_entre_pas_dans_la_population`, qui recalcule la
+    population étroite au lieu de lire celle que la porte a choisie. Il n'est pas écrit ici
+    parce que ce lot est une passe « affirmations », pas une passe de couverture.
     """
     return git_listing(root, "--cached")
 
