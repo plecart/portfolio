@@ -237,8 +237,8 @@ c'est le seul autre canal, et il passe par lui.
 
 - `git worktree list` montre tous les worktrees actifs — **deux familles, à ne pas confondre** :
   un worktree **d'issue**, qui a sa ligne au tableau de bord, et un worktree **de relecture**
-  (`.claude/worktrees/agent-<id>`, verrouillé par le harnais), qui n'en a jamais et vit tant que
-  la boucle 4.2 d'une PR n'est pas fermée. Le second n'est pas une dérive : le retirer termine le
+  (`.claude/worktrees/agent-<id>`), qui n'en a jamais et vit tant que la boucle 4.2 d'une PR
+  n'est pas fermée — verrouillé par le harnais pendant que son agent tourne. Le second n'est pas une dérive : le retirer termine le
   relecteur et ferme la voie de la relance (`cycle-pr` 4.2, « Retrait »). Seule la session qui l'a
   lancé le retire.
 - Quand une PR passe en review puis est mergée, mettre à jour `PR-PARALLELES.md`.
