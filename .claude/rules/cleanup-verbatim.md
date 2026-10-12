@@ -72,11 +72,18 @@ avant tout jugement, chaque finding cité par §.
   La passe est **mécanique et dénombrable**, dans l'esprit des passes d'`audit-spec-ui` :
   énumérer chaque assertion que le delta fait sur lui-même — propriété annoncée dans un
   docstring, commentaire « mesuré », ligne de `pipeline.config.md`, case de Test plan, message
-  d'assertion — puis, pour chacune, **nommer la commande qui l'établit**, ou la marquer « non
-  vérifiée ». Rendre le dénombrement : N affirmations, k établies par une commande citée, N−k non
-  vérifiées. Les messages d'assertion se comptent par analyse syntaxique (`ast`), jamais par
-  expression régulière : une regex qui franchit les lignes a rendu deux dénombrements faux avant
-  le bon.
+  d'assertion — puis, pour chacune, l'une des **trois** provenances que porte déjà
+  `.claude/agents/relecteur.md` : **la commande qui l'établit** (mesuré), **la mesure datée et
+  citée dont elle est tirée** (lu), ou **« non vérifiée »** (supposé). Rendre le dénombrement :
+  N affirmations, k établies, N−k non vérifiées. Les messages d'assertion se comptent par analyse
+  syntaxique (`ast`), jamais par expression régulière : une regex qui franchit les lignes a rendu
+  deux dénombrements faux avant le bon.
+
+  **Pourquoi trois et non deux** : une mesure héritée d'une observation datée n'a pas de commande
+  et n'est pas pour autant non vérifiée. Dénombré sur le delta qui a introduit cette passe —
+  six énoncés justes et cités seraient partis en « non vérifiée ». Une étiquette qui classe six
+  affirmations vraies comme douteuses devient le bruit qu'on apprend à ignorer, et c'est
+  exactement le seuil que `decisions-vs-doc` protège.
 
   **Une exception, mesurée** : une **chronométrie** n'a pas de commande qui l'établisse — quatre
   bornes publiées, quatre dépassées au relevé suivant. Pour une grandeur que le poste et le
