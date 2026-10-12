@@ -70,7 +70,9 @@ PEER_TAGS = ("<cross-session-message", "<agent-message")
 # parce que chaque bloc peut se fermer sur n'importe quelle fermeture suivante. Mesuré le
 # 2026-10-10 sur `<a>x</a>` répété puis un caractère qui fait échouer : 0,03 s à 18 blocs,
 # 0,09 s à 20, ×3 tous les deux blocs — quelques dizaines de blocs suffisent à figer la mesure.
-# Sous cette forme, le découpage est unique : 20 000 blocs, 160 ko, temps non mesurable.
+# Sous cette forme, le découpage est unique et le coût redevient linéaire : 20 000 blocs,
+# 160 000 octets, **9 ms** — contre un motif naïf qui n'atteint pas 25 blocs (relevé du
+# 2026-10-12 sur ce poste ; c'est l'ordre de grandeur qui porte, pas la milliseconde).
 INJECTED_BLOCKS = re.compile(r"\A(?:\s*<([a-z][a-z0-9_-]*)>(?:(?!</\1>).)*</\1>)+\s*\Z", re.DOTALL)
 
 # Et les formes injectées qui ne sont **pas** des balises — à énumérer, elles. `Caveat: The
@@ -457,10 +459,18 @@ class Measures:
         """La durée de la session **hors absences** — le seul denominateur actionnable.
 
         Rapporter la réactivité à la session entière la dilue d'autant que le mainteneur a été
-        absent : une nuit de dix heures fait tomber « 0 h 17 d'attente » à 2 %, et le chiffre
-        flatte la pipeline sans que rien n'ait été amélioré — le sens d'erreur même d'obs 41.
-        Hors absences, la même attente vaut 12 %, et c'est cette part que la pipeline peut
-        réduire. Les absences, elles, se rapportent à la session : c'est leur poids réel.
+        absent, et le chiffre flatte alors la pipeline sans que rien n'ait été amélioré — le
+        sens d'erreur même d'obs 41. Hors absences, la même attente pèse ce que la pipeline peut
+        réellement réduire. Les absences, elles, se rapportent à la session : c'est leur poids
+        réel.
+
+        Les deux dénominateurs sont épinglés, sur un montage dont les durées sont celles du
+        transcript synthétique, par
+        `test_la_reactivite_se_rapporte_au_temps_actif_et_les_absences_a_la_session` — seul
+        endroit où ces pourcentages vivent. Aucun n'est recopié ici : un chiffre pris sur une
+        session réelle n'est pas reproductible, son transcript pouvant avoir disparu (obs 73),
+        et l'arrondi d'affichage des durées ne redonne pas le pourcentage que le rapport
+        imprime, qui se calcule sur les secondes.
         """
         return self.span - total(self.absences)
 
@@ -507,8 +517,9 @@ def report(events: Sequence[Event], session: Usage, subagents: Usage) -> str:
     Deux dénominateurs, et chaque ligne dit le sien. Ce que la pipeline peut réduire se rapporte
     au temps **actif** (session moins absences) ; les absences et l'attente totale se rapportent
     à la session. Tout rapporter à la session diluait la réactivité d'autant que le mainteneur
-    avait été absent — 2 % au lieu de 12 % sur une session mesurée —, et un pourcentage dont le
-    dénominateur ne se lit pas est le défaut, pas le chiffre.
+    avait été absent, d'un facteur qui croît avec l'absence — et un pourcentage dont le
+    dénominateur ne se lit pas est le défaut, pas le chiffre. Les deux parts sont épinglées par
+    `test_la_reactivite_se_rapporte_au_temps_actif_et_les_absences_a_la_session`.
     """
     m = measure(events)
     humans = m.kinds["human"]

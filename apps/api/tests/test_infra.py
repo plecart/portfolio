@@ -568,8 +568,10 @@ def test_aucun_renvoi_vers_un_module_de_test_inexistant() -> None:
     le lien — c'est-à-dire trop tard.
 
     La population est celle que le dépôt **contient** — `tracked_files()`, soit l'index —,
-    jamais celle du disque : le verdict doit être le même sur tous les postes et en CI, et un
-    brouillon non suivi suffirait sinon à faire rougir chez une personne seule. Mesuré le
+    jamais celle du disque : un brouillon **non suivi** suffirait sinon à faire rougir chez une
+    personne seule. Ce que ce choix ne donne pas, c'est un verdict identique partout : l'index
+    est local, donc un brouillon simplement `git add`-é y entre et rougit ici quand la CI reste
+    verte (mesuré le 2026-10-12 sur `ee21cb5`, voir le docstring de `tracked_files`). Mesuré le
     2026-10-09, deux fois : `PR-PARALLELES.md`, tableau de bord éphémère d'une vague, citait un
     module de test d'une branche en vol ; puis, en relecture, un fichier de prose non suivi
     **et non ignoré** rougissait encore, parce qu'une population « suivis **ou** nouveaux non
