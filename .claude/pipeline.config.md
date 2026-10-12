@@ -153,6 +153,29 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
                                                   # lance **depuis la racine**, le PATH du poste
                                                   # portant une entrée relative qui résout un
                                                   # shim cassé ailleurs.
+- relecture    : /code-review <niveau>            # commande **intégrée au binaire**, pas un
+                                                  # skill du dépôt : rien dans `.claude/` ne la
+                                                  # porte. Lancée par `cycle-pr` 4.2 avant
+                                                  # chaque appel du relecteur, **additive** au
+                                                  # prompt de `cleanup-verbatim.md` (D27). Ce
+                                                  # qu'elle couvre, mesuré le 2026-10-12 sur le
+                                                  # delta de #85 (672 lignes, niveau `medium`) :
+                                                  # **1 défaut de correction réel** qu'aucune
+                                                  # des deux passes de relecture n'avait vu —
+                                                  # un motif non ancré à gauche qui jetait le
+                                                  # préfixe d'un chemin. Ce qu'elle ne couvre
+                                                  # pas, mesuré au même run : **zéro** constat
+                                                  # sur la prose de protocole, où vivaient les
+                                                  # 2 bloquants et 7 importants de la relecture
+                                                  # à contexte vierge. Deux portes, deux
+                                                  # populations — elle ne remplace rien.
+- sécurité     : /security-review                 # même nature. Lancée par `cycle-pr` 4.2
+                                                  # **seulement** si le diff touche une zone
+                                                  # sensible ou une surface exposée (section
+                                                  # « Périmètre »). **Non mesurée** : aucun
+                                                  # delta ne l'a encore déclenchée — le premier
+                                                  # qui la lance inscrit ici ce qu'elle couvre,
+                                                  # comme les deux lignes au-dessus.
 
 ## Qualité
 - seuil de couverture : aucun (cadrage annexe A : « pragmatique ; évaluations RAG et E2E prioritaires »)
