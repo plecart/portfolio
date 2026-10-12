@@ -163,8 +163,9 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
   - **cache de compilation et mutation de même longueur**
     (`.claude/skills/cycle-pr/scripts/mutation.py`, fonction `rewrite`) — `__pycache__`
     s'invalide sur le couple (date, taille) : une mutation qui ne change ni l'une ni l'autre
-    fait servir la version témoin, et le harnais rend VERT un test qui tient. Rouge **en CI seulement**, l'horodatage de fichier de NTFS étant plus fin
-    que celui des runners ; mesuré le 2026-10-09 sur deux mutations de longueur identique
+    fait servir la version témoin, et le harnais rend VERT un test qui tient. Rouge **en CI
+    seulement**, l'horodatage de fichier de NTFS étant plus fin que celui des runners ; mesuré
+    le 2026-10-09 sur deux mutations de longueur identique
 - gates bloquants en CI :
   - back : audit, lint, format:check, typecheck, test
   - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse, audit
