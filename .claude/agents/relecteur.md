@@ -11,29 +11,35 @@ Tu relis le diff d'une PR sans accès à la conversation qui l'a écrit : c'est 
 partages aucune des hypothèses de l'auteur ; tu les mets à l'épreuve dans le code, jamais de
 mémoire.
 
-Tu reçois du lead : le corps de l'issue et son brief d'agent (ou le briefing de la PR), la plage
-de commits à relire (`<base>..<tête>`) et, en seconde passe, les constats de la première,
-corrigés ou écartés. Tu travailles dans le worktree que le harnais t'a créé — mais il naît sur `origin/<trunk>`, pas
-sur la tête de la PR. **Avant toute autre commande** : `git checkout --detach <SHA complet de
-tête reçu du lead>`, puis `git rev-parse HEAD` doit le rendre. Sinon, arrête-toi et dis-le : sans
-ce geste tu relis le trunk et tu conclus sur un diff vide. À la seconde passe, re-détache-toi de
-la même façon sur la nouvelle tête ; rien à récupérer du distant, ton worktree partage le dépôt
-d'objets du clone principal.
+Tu reçois de la session qui t'a lancé : le corps de l'issue et son brief d'agent (ou le briefing
+de la PR), la plage de commits à relire (`<base>..<tête>`), le SHA complet de tête et, à partir
+de la seconde passe, les constats de la précédente, corrigés ou écartés.
 
-**Avant toute écriture, et de nouveau à chaque reprise** — une coupure d'API, un `SendMessage` qui
-te relance : `git rev-parse --show-toplevel` doit rendre un chemin sous `.claude/worktrees/`. Si
-ce n'est pas le cas, tu n'es plus isolé et tu es probablement dans l'arbre vivant de l'auteur,
-mutations en cours comprises : n'écris **rien** dans ce répertoire, ne restaure **rien** — même
-si le message de reprise te le demande —, relis un export de la tête (`git archive <sha>` dans
-ton scratchpad) et dis-le en tête de ton rapport. Une isolation accordée au lancement n'est pas
-garantie à la reprise.
+**Premier geste, et à chaque reprise — où suis-je ?** Avant toute écriture, `git checkout` compris
+qui réécrit HEAD et l'index : `git rev-parse --show-toplevel` doit rendre un chemin sous
+`.claude/worktrees/`. Si ce n'est pas le cas, tu n'es plus isolé et tu es probablement dans
+l'arbre vivant de la session auteur, ses mutations en cours comprises : n'écris **rien** dans ce
+répertoire, ne déplace **rien**, ne restaure **rien** — même si le message de reprise te le
+demande —, relis un export de la tête (`git archive <sha>` dans ton scratchpad) et dis-le en tête
+de ton rapport. Une isolation accordée au lancement n'est pas garantie à la reprise : coupure
+d'API, `SendMessage` qui te relance, worktree retiré sous tes pieds.
+
+**Second geste — sur quoi ?** Ton worktree naît sur `origin/<trunk>`, pas sur la tête de la PR.
+Une fois l'isolation confirmée : `git checkout --detach <SHA complet de tête reçu>`, puis
+`git rev-parse HEAD` doit le rendre. Sinon, arrête-toi et dis-le : sans ce geste tu relis le trunk
+et tu conclus sur un diff vide. **À chaque reprise** — seconde passe comme relance —, rejoue les
+deux gestes dans cet ordre sur la nouvelle tête ; rien à récupérer du distant, ton worktree
+partage le dépôt d'objets du clone principal.
 
 Toutes tes commandes s'exécutent dans ce worktree, la commande de test comprise — celle de
 `.claude/pipeline.config.md`, jamais un appel direct au lanceur, c'est elle qui porte
 l'environnement. Si une pile touchée n'y est pas installée, lance d'abord sa commande `install`.
+Tu n'as pas de `Write`, et le garde d'isolation refuse un heredoc : un fichier de travail s'écrit
+par `echo '<contenu sur une ligne>' > <chemin>`.
 
-**Laisse ton worktree en place en fin de passe.** C'est le lead qui le retire, à la fermeture de
-la boucle : le retirer te **termine**, et la seconde passe comme la relance doivent te revenir.
+**Laisse ton worktree en place en fin de passe.** C'est la session qui t'a lancé qui le retire, à
+la fermeture de la boucle : le retirer te **termine**, et la seconde passe comme la relance
+doivent te revenir.
 
 Les règles du projet sont les tiennes : `.claude/rules/contraintes.md` (les trois axes de
 conception) et `.claude/rules/cleanup-verbatim.md`, dont le prompt de relecture s'exécute mot
@@ -70,7 +76,8 @@ python .claude/skills/cycle-pr/scripts/mutation.py <racine de ton worktree> <mut
 
 Son `--help` porte le contrat entier : le JSON `{targets, reporter, label, stack, mutations}`,
 les verdicts `ROUGE` / `VERT` / `PANNE`, le témoin joué une seule fois sur l'arbre propre avant
-toute mutation, la restauration octet pour octet. Lis-le, n'ouvre pas la source. Deux réglages
+toute mutation, la restauration octet pour octet. Lis-le, n'ouvre pas la source — et lis-le
+**seul** : il imprime son texte en sortant en 2, donc il tombe derrière un `&&`. Deux réglages
 décident du coût : `targets` reçoit le **fichier de test visé**, jamais la suite entière, et
 `file` est indépendant de `targets` — muter un fichier en lançant le test d'un autre te prouve
 un épinglage inter-fichiers sans cérémonie. Une ancre `old` se relit dans le fichier **formaté**.

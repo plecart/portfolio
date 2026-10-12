@@ -235,7 +235,12 @@ c'est le seul autre canal, et il passe par lui.
 
 ### 7. Surveiller et faire converger
 
-- `git worktree list` montre tous les worktrees actifs.
+- `git worktree list` montre tous les worktrees actifs — **deux familles, à ne pas confondre** :
+  un worktree **d'issue**, qui a sa ligne au tableau de bord, et un worktree **de relecture**
+  (`.claude/worktrees/agent-<id>`, verrouillé par le harnais), qui n'en a jamais et vit tant que
+  la boucle 4.2 d'une PR n'est pas fermée. Le second n'est pas une dérive : le retirer termine le
+  relecteur et ferme la voie de la relance (`cycle-pr` 4.2, « Retrait »). Seule la session qui l'a
+  lancé le retire.
 - Quand une PR passe en review puis est mergée, mettre à jour `PR-PARALLELES.md`.
 - Après chaque merge, la session concernée déroule la clôture de l'Étape 8 de `cycle-pr` —
   label d'état retiré, critères d'acceptation cochés, puis la passe `repercussions`. **C'est le
@@ -245,8 +250,9 @@ c'est le seul autre canal, et il passe par lui.
     il **n'édite pas** leur corps et **ne change pas** leurs labels, il dépose un commentaire sur
     **leur PR ouverte**, que `cycle-pr` traite à son Étape 6.
   - **Tenir `PR-PARALLELES.md` à jour est donc fonctionnel, pas décoratif** : une ligne périmée
-    (issue mergée encore marquée en cours, ou worktree actif absent du tableau) fait mal classer
-    une issue — et une issue en vol traitée comme dormante se fait réécrire sa spec sous les pieds.
+    (issue mergée encore marquée en cours, ou worktree **d'issue** actif absent du tableau) fait
+    mal classer une issue — et une issue en vol traitée comme dormante se fait réécrire sa spec
+    sous les pieds. Un worktree de relecture absent du tableau, lui, est l'état normal.
   - Un signalement **bloquant** sur une issue du lot : le lead **interrompt la session** par
     `SendMessage` (« arrête-toi après l'outil en cours, signalement bloquant : … ») — une session
     occupée lit ses messages entre deux appels d'outils, pas seulement en fin de tâche. Le temps

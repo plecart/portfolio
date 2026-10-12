@@ -444,9 +444,10 @@ un agent de plus.
 neuf. Son contexte est intact : il a déjà lu le brief, les critères et le socle, et son worktree
 est en place ; il ne reçoit donc que la nouvelle plage et les constats de la première passe,
 corrigés ou écartés. C'est le même argument que l'Étape 4.2 tient déjà pour la relance, et il
-vaut autant pour la passe : mesuré au lot 1b de #77, la passe 2 confiée à un agent neuf a coûté
-**~122 k jetons** de contexte repayé — pour un diff que le relecteur de la passe 1 connaissait
-déjà.
+vaut autant pour la passe : au lot 1b de #77, la passe 2 confiée à un agent neuf a repayé **un
+contexte entier** pour un diff que le relecteur de la passe 1 connaissait déjà. Le relevé
+par agent de `bilan-session.py` ne cumule pas un agent repris — un chiffre tiré de sa première
+notification de fin sous-compte la reprise, et c'est le relevé final de l'agent qui fait foi.
 
 Repli vers un **agent neuf** dans un seul cas : le relecteur n'est plus joignable (worktree
 disparu, session perdue, agent terminé). Il part alors avec la vérification d'isolation
@@ -474,25 +475,39 @@ Trois gestes, et le dernier a un moment :
 
 - **Naissance.** Le harnais crée le worktree à l'appel (`isolation: worktree` du rôle), mais
   depuis `origin/<trunk>` — `worktree.baseRef` par défaut, mesuré — et non sur la tête de la PR.
-  Le lead transmet donc le **SHA complet** de tête, et le relecteur s'y détache avant toute
-  autre commande. Un relecteur qui ne le fait pas relit le trunk et conclut sur un diff vide.
+  La session transmet donc le **SHA complet** de tête, et le relecteur s'y détache ; son rôle
+  ordonne les deux gestes, isolation d'abord, détachement ensuite, parce que `git checkout` est
+  lui-même une écriture. Un relecteur qui ne se détache pas relit le trunk et conclut sur un
+  diff vide.
 - **Réutilisation.** Le même worktree sert aux **deux passes** et à la relance, puisque c'est le
-  même relecteur : à la seconde passe, il se re-détache sur la nouvelle tête. Rien à récupérer du
-  distant, le worktree partage le dépôt d'objets du clone principal.
-- **Retrait — à la fermeture de la boucle.** Celui qui a créé le worktree le retire, lui et sa
-  branche (`git worktree remove <chemin>`, puis `git branch -d worktree-agent-<id>`), **après la
-  relance, ou après le dernier constat traité s'il n'y en a pas** — jamais à la lecture d'un
-  rapport. Le retirer **termine** l'agent : « This agent cannot be resumed: its worktree no
-  longer exists », et la relance, qui doit lui revenir, n'a plus d'interlocuteur. Mesuré au
-  lot 1b de #77 : le retrait fait par hygiène dès le rapport lu a coûté un contexte entier
-  repayé. Le nettoyage conditionné à « inchangé » du harnais, lui, ne se déclenche jamais quand
-  le relecteur s'est correctement placé — HEAD détaché suffit à le faire juger modifié.
+  même relecteur : à chaque reprise, il rejoue les deux gestes sur la nouvelle tête. Rien à
+  récupérer du distant, le worktree partage le dépôt d'objets du clone principal.
+- **Retrait — à la fermeture de la boucle.** **La session qui a lancé le relecteur** le retire,
+  lui et sa branche — jamais « celui qui a créé le worktree », qui est le harnais et ne lance
+  aucune commande, ni « le lead », qui sous `pr-paralleles` est une autre session que celle qui
+  appelle. Le harnais **verrouille** ce worktree (`.git/worktrees/<id>/locked`), et git refuse de
+  retirer un worktree verrouillé : la forme qui marche est
+  `git worktree remove --force --force <chemin>` — « to remove a locked worktree, specify
+  `--force` twice », doc `git-worktree` —, ou `git worktree unlock <chemin>` puis `remove`. Puis
+  `git branch -d worktree-agent-<id>` : la branche naît sur le trunk et le relecteur ne commit
+  pas, donc elle reste fusionnée et `-d` suffit.
 
-**Un relecteur repris a pu perdre son isolation.** Le message de reprise lui rappelle la
-vérification que porte son rôle — `git rev-parse --show-toplevel` sous `.claude/worktrees/`, et
-`git rev-parse HEAD` sur le SHA attendu — et ne lui demande **jamais** de restaurer une mutation
-sans elle : un agent relancé peut reprendre dans l'arbre vivant de l'auteur, mutations de
-l'auteur comprises, et « restaure octet pour octet » y détruirait son travail en cours.
+  Le moment : **après la relance, ou après le dernier constat traité s'il n'y en a pas** — jamais
+  à la lecture d'un rapport. Le retirer **termine** l'agent : « This agent cannot be resumed: its
+  worktree no longer exists », et la relance, qui doit lui revenir, n'a plus d'interlocuteur.
+  Mesuré au lot 1b de #77 : le retrait fait par hygiène dès le rapport lu a coûté un contexte
+  entier repayé. **Non vérifié** : si le nettoyage automatique du harnais (« retiré s'il revient
+  inchangé ») se déclenche sur un relecteur correctement placé. Le seul échantillon disponible
+  portait trois causes de « modifié » à la fois — HEAD détaché, branche locale créée, worktree
+  verrouillé —, donc aucune n'est établie. Le geste de retrait explicite ne dépend pas de la
+  réponse ; ne pas le remplacer par une attente de ce nettoyage.
+
+**Un relecteur repris a pu perdre son isolation.** Le message de reprise lui rappelle les deux
+vérifications que porte son rôle, **dans leur ordre** — `git rev-parse --show-toplevel` sous
+`.claude/worktrees/` d'abord, `git rev-parse HEAD` sur le SHA attendu ensuite — et ne lui demande
+**jamais** de restaurer une mutation, ni de se déplacer, avant elles : un agent relancé peut
+reprendre dans l'arbre vivant de l'auteur, mutations de l'auteur comprises, et « restaure octet
+pour octet » y détruirait son travail en cours.
 
 **La mutation s'appelle, elle ne se décrit pas.** Le harnais existe et il est versionné :
 
@@ -503,8 +518,9 @@ python <répertoire de ce skill>/scripts/mutation.py <racine du dépôt> <mutati
 Son `--help` porte le contrat complet — le JSON `{targets, reporter, label, stack, mutations}`,
 les trois verdicts `ROUGE` / `VERT` / `PANNE`, le témoin joué **une seule fois** sur l'arbre
 propre avant toute mutation, les fins de ligne du fichier muté appliquées à `old`, la
-restauration octet pour octet. Ni 4.2 ni `relecteur.md` ne le redécrivent : un harnais décrit
-est un harnais réécrit, et celui-ci l'a été **sept fois**, deux fois faux dans le sens qui mente.
+restauration octet pour octet. Il l'imprime en **sortant en 2** : le lire seul, jamais enchaîné
+derrière un `&&`. Ni 4.2 ni `relecteur.md` ne le redécrivent : un harnais décrit est un harnais
+réécrit, et celui-ci l'a été **sept fois**, deux fois faux dans le sens qui mente.
 
 Deux réglages tiennent tout l'écart de coût : `targets` reçoit le **fichier de test visé**, pas
 la suite entière, et `file` est indépendant de `targets` — muter un fichier en lançant le test
