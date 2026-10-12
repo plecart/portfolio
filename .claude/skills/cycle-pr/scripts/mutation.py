@@ -586,9 +586,11 @@ def resolve(expected: Sequence[str], known: Mapping[str, str]) -> list[str]:
         # pytest échappe les non-ASCII des identifiants paramétrés — `tâche` devient le littéral
         # `t\xe2che` —, et c'est ce nom-là qui arrive dans le rapport comme sur la ligne de
         # commande. Un harnais qui ne sait nommer que l'ASCII laisse hors de sa portée la part de
-        # la suite qui en porte — environ un quart de celle de ce dépôt ; le dénombrement et la
-        # commande qui le produit vivent dans le test, jamais ici, parce qu'un chiffre recopié
-        # dérive au recensement suivant. Le fragment se résout donc tel qu'il est écrit **ou**
+        # la suite qui en porte — près de trois dixièmes de celle de ce dépôt ; le dénombrement
+        # et la commande qui le produit vivent dans
+        # `test_un_identifiant_accentue_se_nomme_dans_sa_forme_naturelle`, jamais ici, parce
+        # qu'un chiffre recopié dérive au recensement suivant. Le fragment se résout tel qu'il
+        # est écrit **ou**
         # tel que le lanceur l'écrit, par la transformation même du lanceur ; l'unicité porte sur
         # le résultat, pas sur la forme, et reste donc entière.
         forms = {fragment, fragment.encode("unicode_escape").decode("ascii")}
