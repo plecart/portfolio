@@ -152,39 +152,51 @@ HARNESS_PROSE_GLOBS = [".claude/**/*.md", "CLAUDE.md", "CONTRIBUTING.md", ".gith
 # classe de défaut que cette porte existe précisément pour attraper.
 SCRIPTS_DIRECTORY = "scripts"
 
-# Les **deux** formes sous lesquelles un script de skill se cite, et elles seules :
+# Les **trois** formes sous lesquelles un renvoi vers un script de skill apparaît :
 #
 # 1. **relative** (`<répertoire de ce skill>/scripts/x.py`, ou `scripts/x.py` nu) — la forme des
 #    fichiers d'un skill, qui est recopié dans le seed où son chemin absolu diffère ; elle se
 #    résout contre le dossier du skill qui porte le fichier citant ;
 # 2. **depuis la racine** (`.claude/skills/<skill>/scripts/x.py`) — la forme d'un rôle ou d'une
-#    règle, qui vit hors de l'arborescence des skills et n'a donc pas de dossier de référence.
+#    règle, qui vit hors de l'arborescence des skills et n'a donc pas de dossier de référence ;
+# 3. **préfixée par un nom de skill** (`cycle-pr/scripts/x.py`) — relative à `.claude/skills/`
+#    sans le dire. C'est un défaut, et le seul qui se soit produit dans ce dépôt.
 #
-# Un renvoi relatif porté par un fichier qui ne vit **pas** sous un skill ne se résout contre
-# rien : il est rendu tel quel, donc introuvable. C'est un défaut, pas un cas à ignorer — c'est
-# exactement la forme qu'un rôle prendrait s'il recopiait la phrase d'un skill.
-# L'ancrage à gauche n'est pas décoratif : sans lui, le motif apparie `scripts/<x>.py` **au
-# milieu** de n'importe quel chemin et jette son préfixe réel. `infra/scripts/deploy.py` se
-# résolvait alors en `scripts/deploy.py`, introuvable — un renvoi juste rendait la porte rouge —,
-# et pire sous un skill, où il se résolvait en `.claude/skills/<ce skill>/scripts/deploy.py`, une
-# cible fausse qu'un homonyme aurait rendue verte. `[\w/-]` interdit la lettre, le chiffre, le
-# tiret et le slash juste avant le motif ; un espace, un backtick ou un début de ligne les
-# laissent passer, donc les trois formes canoniques sont intactes.
+# Le motif capture le segment qui précède (`prefix`) **sans décider** : c'est `script_target` qui
+# tranche, par `(.claude/skills/<prefix>).is_dir()`. Deux raisons. D'abord `cycle-pr/scripts/x.py`
+# et `infra/scripts/x.py` ont **exactement la même forme** — aucun motif ne les distingue, et un
+# ancrage qui refuse le premier refuse le second : mesuré, un ancrage `(?<![\w/-])` tuait la
+# détection de la forme 3 dans sa seule orthographe réelle. Ensuite la distinction *est* décidable
+# — par l'arborescence, c'est-à-dire par « la règle exacte de l'outil que la garde protège » que
+# `cleanup-verbatim.md` prescrit au lieu d'un motif plus large (obs 28).
+#
+# L'ancrage qui reste, `(?<![\w-])`, empêche seulement d'apparier le milieu d'un segment
+# (`monscripts/x.py`). Il laisse passer un `/`, donc un chemin absolu vers la forme 2 reste
+# détecté.
 SCRIPT_REFERENCE = re.compile(
-    r"(?<![\w/-])(?:\.claude/skills/(?P<skill>[\w-]+)/|<répertoire de ce skill>/)?"
+    r"(?<![\w-])"
+    r"(?:\.claude/skills/(?P<skill>[\w-]+)/|<répertoire de ce skill>/|(?P<prefix>[\w.-]+)/)?"
     rf"{SCRIPTS_DIRECTORY}/(?P<script>[\w.-]+\.py)"
 )
 
-# Les préfixes de chemin qui ne sont pas ceux d'un script de skill, et qu'aucune résolution ne
-# doit tenter. Dénombrement : 2 formes mesurées — un chemin d'infrastructure et un chemin
-# applicatif —, les deux appariées avant l'ancrage, les deux refusées après.
+# Les préfixes qui ne nomment pas un skill : le renvoi ne concerne alors pas cette porte et
+# s'ignore, au lieu de rougir sur un chemin juste. Dénombrement : 2 formes mesurées — un chemin
+# d'infrastructure et un chemin applicatif. Noter que `[\w.-]+` s'arrête au `/`, donc
+# `apps/api/scripts/seed.py` rend `prefix = "api"` : c'est sans effet, aucun skill ne s'appelle
+# ainsi, et le jour où l'un s'appellerait `api` ce renvoi deviendrait un défaut à signaler.
 FOREIGN_PREFIXES = {
     "chemin d-infrastructure": "voir infra/scripts/deploy.py pour le détail",
     "chemin applicatif": "lance apps/api/scripts/seed.py",
+    # Ce qu'il reste à l'ancrage, et lui seul : `scripts/` au milieu d'un segment. Mesuré —
+    # sans `(?<![\w-])`, `monscripts/x.py` rend `scripts/x.py`, introuvable, donc un rouge sur
+    # un chemin qui n'a rien à voir. Les deux cas ci-dessus, eux, sont désormais écartés par
+    # `is_dir()` et non par l'ancrage : sans ce troisième témoin, retirer l'ancrage ne faisait
+    # plus rien rougir (mutation vue VERTE).
+    "segment-englobant": "voir monscripts/x.py",
 }
 
 
-def script_target(root: Path, citing: Path, reference: re.Match[str]) -> str:
+def script_target(root: Path, citing: Path, reference: re.Match[str]) -> str | None:
     """Le chemin, relatif à `root` et en POSIX, du script que ce renvoi désigne.
 
     Args:
@@ -193,17 +205,23 @@ def script_target(root: Path, citing: Path, reference: re.Match[str]) -> str:
         reference: l'appariement de `SCRIPT_REFERENCE`.
 
     Returns:
-        Le chemin visé. Pour un renvoi **relatif**, il est résolu contre le dossier du skill qui
-        contient `citing` ; faute d'un tel dossier, le renvoi est rendu sans base — il ne
-        désigne alors aucun fichier, et la porte le rapporte introuvable.
+        Le chemin visé, ou `None` si l'appariement ne concerne pas un script de skill — un
+        préfixe qui ne nomme aucun dossier de `.claude/skills/`. Un renvoi de forme 3, ou un
+        renvoi relatif porté par un fichier qui ne vit pas sous un skill, est rendu **sans
+        base** : il ne désigne alors aucun fichier, et la porte le rapporte introuvable, ce qui
+        est le but — c'est ainsi que la forme 3 se fait normaliser en forme 2.
     """
     script = reference.group("script")
-    if skill := reference.group("skill"):
-        return f".claude/skills/{skill}/{SCRIPTS_DIRECTORY}/{script}"
     # La base se dérive de `root`, jamais d'une constante de module : la porte est appelée sur le
     # dépôt **et** sur des témoins en répertoire temporaire, et une base figée sur le dépôt rend
-    # la branche relative muette chez le témoin — la seule qui l'éprouve.
+    # les branches relatives muettes chez le témoin — les seules qui les éprouvent.
     skills = root / ".claude" / "skills"
+    if skill := reference.group("skill"):
+        return f".claude/skills/{skill}/{SCRIPTS_DIRECTORY}/{script}"
+    if prefix := reference.group("prefix"):
+        if not (skills / prefix).is_dir():
+            return None
+        return f"{SCRIPTS_DIRECTORY}/{script}"
     own = next((parent for parent in citing.parents if parent.parent == skills), None)
     if own is None:
         return f"{SCRIPTS_DIRECTORY}/{script}"
@@ -227,7 +245,8 @@ def cited_scripts(root: Path, population: Iterable[str]) -> dict[str, set[str]]:
     for citing, reference in prose_citations(
         root, population, HARNESS_PROSE_GLOBS, SCRIPT_REFERENCE
     ):
-        cited.setdefault(script_target(root, citing, reference), set()).add(citing.name)
+        if (target := script_target(root, citing, reference)) is not None:
+            cited.setdefault(target, set()).add(citing.name)
     return cited
 
 
@@ -303,11 +322,14 @@ def test_chaque_script_cite_par_la_prose_du_harnais_existe() -> None:
 # mémoire. C'est la seule place du dépôt où un identifiant de test renonce à sa forme naturelle,
 # et c'est l'outil qui l'impose, pas le style.
 #
-# Chaque témoin porte la profondeur et l'extension **réelles** de ce qu'il représente, pas un
-# représentant commode : le glob `.github/**/*` existe pour les workflows `.yml` en profondeur 2,
-# et un témoin `.md` en profondeur 1 le laissait vert quand on le restreignait aux `.md` (mutation
-# vue VERTE). Un glob représenté par un fichier qui n'a ni sa profondeur ni son extension n'est
-# pas représenté.
+# Chaque témoin porte l'**orthographe réelle** de ce qu'il représente, pas un représentant
+# commode. Mesuré deux fois, dans les deux directions : le glob `.github/**/*` existe pour les
+# workflows `.yml` en profondeur 2, et un témoin `.md` en profondeur 1 le laissait vert quand on
+# le restreignait aux `.md` ; la forme 3 ne s'est produite que **préfixée par un nom de skill**
+# (`cycle-pr/scripts/x.py`), et un témoin qui l'écrivait nue (`scripts/z.py`) a laissé un ancrage
+# tuer sa détection sans rien faire rougir. Les deux orthographes de la forme 3 sont donc des cas
+# distincts. Un témoin qui n'a ni la profondeur, ni l'extension, ni l'orthographe de ce qu'il
+# représente ne le représente pas.
 SCRIPT_REFERENCE_WITNESSES = {
     "forme-1-relative-dans-un-skill": (
         ".claude/skills/cycle-pr/SKILL.md",
@@ -319,7 +341,17 @@ SCRIPT_REFERENCE_WITNESSES = {
         "lance .claude/skills/cycle-pr/scripts/y.py",
         ".claude/skills/cycle-pr/scripts/y.py",
     ),
-    "forme-3-orpheline-hors-skill": (
+    "forme-2-precedee-d-un-chemin": (
+        "CONTRIBUTING.md",
+        "python E:/Projets/Portfolio/.claude/skills/cycle-pr/scripts/abs.py",
+        ".claude/skills/cycle-pr/scripts/abs.py",
+    ),
+    "forme-3-prefixee-par-un-nom-de-skill": (
+        ".claude/pipeline.config.md",
+        "(`cycle-pr/scripts/mutation.py`, fonction `rewrite`)",
+        "scripts/mutation.py",
+    ),
+    "forme-3-orpheline-sans-prefixe": (
         ".claude/agents/orphelin.md",
         "lance scripts/z.py",
         "scripts/z.py",
@@ -355,13 +387,18 @@ SCRIPT_REFERENCE_WITNESSES = {
 def test_chaque_forme_de_renvoi_vers_un_script_se_resout(
     tmp_path: Path, citing: str, prose: str, expected: str
 ) -> None:
-    """**Dénombrement de la classe** : 3 formes de renvoi, 4 globs de population, 7 témoins.
+    """**Dénombrement de la classe** : 3 formes en 5 orthographes, 4 globs, 9 témoins.
 
-    Une porte qui n'apparie qu'une forme laisse les autres vertes par absence : c'est la classe
-    d'obs 63 — une règle formulée dans le vocabulaire de son premier domaine ne se déclenche pas
-    sur la même forme ailleurs. Les trois formes sont donc éprouvées ici, sur témoins, et non
+    Une porte qui n'apparie qu'une orthographe laisse les autres vertes par absence : c'est la
+    classe d'obs 63 — une règle formulée dans le vocabulaire de son premier domaine ne se
+    déclenche pas sur la même forme ailleurs. Toutes sont donc éprouvées ici, sur témoins, et non
     sur le dépôt, où la forme 2 n'existait pas avant ce lot et où aucun renvoi ne vit hors de
     `.claude/`.
+
+    Le dossier `.claude/skills/cycle-pr/` est créé dans chaque cas, vide : c'est lui qui rend la
+    forme 3 décidable. `script_target` ne tranche pas sur l'orthographe du préfixe mais sur son
+    existence comme dossier de skill — sans ce dossier, le même texte serait un préfixe étranger
+    et s'ignorerait (voir `FOREIGN_PREFIXES`).
 
     Le dénombrement vit dans ce recueil et non dans une phrase : chaque ligne de
     `SCRIPT_REFERENCE_WITNESSES` est un cas exécutable, et retirer un glob de
@@ -374,6 +411,7 @@ def test_chaque_forme_de_renvoi_vers_un_script_se_resout(
     date et se re-dérive par la commande que porte la porte, jamais par une assertion qui
     rougirait au prochain renvoi légitime.
     """
+    (tmp_path / ".claude" / "skills" / "cycle-pr").mkdir(parents=True)
     path = tmp_path / citing
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(prose, encoding="utf-8")
@@ -432,8 +470,31 @@ def test_un_prefixe_de_chemin_etranger_n_est_pas_pris_pour_un_script_de_skill(
     Ce test est la face négative de `SCRIPT_REFERENCE_WITNESSES` : celui-là dit ce que la porte
     doit voir, celui-ci ce qu'elle doit ignorer. Une porte qui n'a que la face positive s'élargit
     sans fin, puisque rien ne mesure ce qu'elle attrape de trop.
+
+    Le dossier `.claude/skills/cycle-pr/` existe ici aussi, et c'est le cœur du cas : la prose
+    `infra/scripts/deploy.py` a **exactement la même forme** que `cycle-pr/scripts/mutation.py`,
+    que le témoin positif exige de voir. Seule l'existence du dossier les distingue — un ancrage,
+    lui, les refuse ou les accepte ensemble, et c'est mesuré : un ancrage qui fermait ce faux
+    rouge a tué du même coup la détection de la forme 3.
     """
+    (tmp_path / ".claude" / "skills" / "cycle-pr").mkdir(parents=True)
     citing = tmp_path / "CONTRIBUTING.md"
     citing.write_text(prose, encoding="utf-8")
 
     assert cited_scripts(tmp_path, ["CONTRIBUTING.md"]) == {}
+
+
+def test_plusieurs_fichiers_citant_une_meme_cible_sont_tous_rapportes(tmp_path: Path) -> None:
+    """La carte « cible → fichiers citants » agrège, elle n'écrase pas.
+
+    Le dépôt a une cible citée par trois fichiers, et c'est cette carte qui fait le message
+    d'échec de la porte : écrasée, elle ne nommerait qu'un seul coupable sur trois. Le recueil
+    paramétré ne peut pas l'épingler — un cas y vaut un fichier —, donc ce cas vit à côté, et la
+    mutation `cited[target] = {citing.name}` le rend rouge.
+    """
+    for nom in ("CLAUDE.md", "CONTRIBUTING.md"):
+        (tmp_path / nom).write_text("voir .claude/skills/cycle-pr/scripts/x.py", encoding="utf-8")
+
+    cited = cited_scripts(tmp_path, ["CLAUDE.md", "CONTRIBUTING.md"])
+
+    assert cited == {".claude/skills/cycle-pr/scripts/x.py": {"CLAUDE.md", "CONTRIBUTING.md"}}
