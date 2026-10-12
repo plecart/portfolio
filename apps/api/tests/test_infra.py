@@ -161,6 +161,19 @@ TEST_MODULE_REFERENCE = re.compile(r"apps/api/tests/(?P<name>\w+\.py)")
 def cited_test_modules(root: Path, population: Iterable[str]) -> dict[str, set[str]]:
     """Les modules de test que la prose du dépôt désigne, par nom, avec les fichiers qui citent.
 
+    **Ce que cette porte ne couvre pas, et pourquoi on ne l'a pas élargie.** Elle apparie un
+    chemin de *module* (`TEST_MODULE_REFERENCE`). Les renvois vers un *nom* de test ne sont
+    gardés par rien, et `PROSE_GLOBS` n'inclut aucun `.py`, donc ceux qui vivent dans les
+    docstrings et dans `.claude/skills/*/scripts/` échappent même à cette porte-ci. Population
+    recensée le 2026-10-12 sur `baaf79c` : **9 renvois, 0 cassé**.
+
+    Deux élargissements ont été mesurés et écartés : une porte sur `` `test_\\w+` `` rend
+    **3 faux positifs sur 8**, et `PROSE_GLOBS` étendu aux sources Python **3 sur 19**. Les
+    trois sont les mêmes — les noms de test **synthétiques** des suites témoins de
+    `test_mutation.py`, et le `test_x.py` d'exemple du `--help` de `mutation.py`. Fermer la
+    classe demanderait de distinguer un renvoi d'un fixture, ce qu'aucun motif simple ne fait ;
+    et un refus qui mord sur le travail ordinaire est un refus qu'on apprend à contourner.
+
     Args:
         root: la racine à parcourir.
         population: les chemins relatifs, en POSIX, que l'appelant a le droit de lire. Tout
