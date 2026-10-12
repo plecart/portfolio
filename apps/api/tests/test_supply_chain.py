@@ -226,7 +226,8 @@ def prose_citations(
         reference: le motif du renvoi, dont les groupes nommés sont lus par l'appelant.
 
     Yields:
-        Le couple (fichier citant, appariement), dans l'ordre des globs puis des appariements.
+        Le couple (fichier citant, appariement). L'ordre n'est pas un engagement : les deux
+        appelants agrègent dans un `dict` de `set`, et aucune porte n'en dépend.
     """
     allowed = set(population)
     for glob in globs:

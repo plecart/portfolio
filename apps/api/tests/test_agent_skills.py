@@ -233,6 +233,14 @@ def test_chaque_script_cite_par_la_prose_du_harnais_existe() -> None:
        le commit qui ouvre ce lot, non appariée par un motif de plus : une porte qui gagne un
        motif par occurrence hérite de toutes les formes qu'on n'a pas prévues (obs 28).
 
+       La forme 3 n'est un défaut **que tant qu'aucun `scripts/` ne vit à la racine du dépôt** :
+       `python scripts/foo.py` relatif à la racine est la convention d'un workflow, et la
+       population inclut `.github/`. Condition vérifiée le 2026-10-12 —
+       `git ls-files "scripts/"` rend vide, et `ci.yml` ne cite que des modules de
+       `apps/api/tests/`, qui relèvent de l'autre porte. Le jour où un `scripts/` racine
+       apparaît, cette porte rougira sur un renvoi juste : la sortie est alors de résoudre la
+       forme 3 contre la racine en dernier recours, pas d'écarter le fichier citant.
+
     Population recensée le 2026-10-12 sur `228d820`, avant que ce lot n'écrive une ligne de
     prose : **2 renvois, dont 1 cassé** — un de forme 1, un de forme 3, aucun de forme 2. La
     commande qui les rend, et qui doit rendre 2 :
@@ -270,65 +278,126 @@ def test_chaque_script_cite_par_la_prose_du_harnais_existe() -> None:
     assert not missing, f"{len(cited)} scripts cités, introuvables : {missing}"
 
 
-def test_chaque_forme_de_renvoi_vers_un_script_se_resout(tmp_path: Path) -> None:
-    """Les trois formes, et chaque glob de la population déclarée, sur témoins.
+# Le recueil de la classe : un témoin par **forme** de renvoi et par **glob** de la population,
+# chacun (fichier citant, prose, chemin attendu). Ajouter une forme ou un glob, c'est ajouter une
+# ligne — la porte s'étend, elle ne se modifie pas.
+#
+# Les clés sont en **ASCII** parce qu'elles deviennent des identifiants de cas pytest : un tiret
+# cadratin ou un accent y est échappé en `—` dans le nom de nœud, et un `expect` de
+# `mutation.py` — qui exige d'apparier exactement un test — devient alors impossible à écrire de
+# mémoire. C'est la seule place du dépôt où un identifiant de test renonce à sa forme naturelle,
+# et c'est l'outil qui l'impose, pas le style.
+#
+# Chaque témoin porte la profondeur et l'extension **réelles** de ce qu'il représente, pas un
+# représentant commode : le glob `.github/**/*` existe pour les workflows `.yml` en profondeur 2,
+# et un témoin `.md` en profondeur 1 le laissait vert quand on le restreignait aux `.md` (mutation
+# vue VERTE). Un glob représenté par un fichier qui n'a ni sa profondeur ni son extension n'est
+# pas représenté.
+SCRIPT_REFERENCE_WITNESSES = {
+    "forme-1-relative-dans-un-skill": (
+        ".claude/skills/cycle-pr/SKILL.md",
+        "python <répertoire de ce skill>/scripts/x.py",
+        ".claude/skills/cycle-pr/scripts/x.py",
+    ),
+    "forme-2-depuis-la-racine-dans-un-role": (
+        ".claude/agents/relecteur.md",
+        "lance .claude/skills/cycle-pr/scripts/y.py",
+        ".claude/skills/cycle-pr/scripts/y.py",
+    ),
+    "forme-3-orpheline-hors-skill": (
+        ".claude/agents/orphelin.md",
+        "lance scripts/z.py",
+        "scripts/z.py",
+    ),
+    "glob-claude-md-a-la-racine": (
+        ".claude/pipeline.config.md",
+        "voir .claude/skills/cycle-pr/scripts/config.py",
+        ".claude/skills/cycle-pr/scripts/config.py",
+    ),
+    "glob-CLAUDE.md": (
+        "CLAUDE.md",
+        "voir .claude/skills/cycle-pr/scripts/tete.py",
+        ".claude/skills/cycle-pr/scripts/tete.py",
+    ),
+    "glob-CONTRIBUTING.md": (
+        "CONTRIBUTING.md",
+        "voir .claude/skills/cycle-pr/scripts/contrib.py",
+        ".claude/skills/cycle-pr/scripts/contrib.py",
+    ),
+    "glob-github-yml-profondeur-2": (
+        ".github/workflows/ci.yml",
+        "run: python .claude/skills/cycle-pr/scripts/forge.py",
+        ".claude/skills/cycle-pr/scripts/forge.py",
+    ),
+}
 
-    Une porte qui n'apparie qu'une forme laisse l'autre verte par absence : c'est la classe
+
+@pytest.mark.parametrize(
+    ("citing", "prose", "expected"),
+    SCRIPT_REFERENCE_WITNESSES.values(),
+    ids=SCRIPT_REFERENCE_WITNESSES.keys(),
+)
+def test_chaque_forme_de_renvoi_vers_un_script_se_resout(
+    tmp_path: Path, citing: str, prose: str, expected: str
+) -> None:
+    """**Dénombrement de la classe** : 3 formes de renvoi, 4 globs de population, 7 témoins.
+
+    Une porte qui n'apparie qu'une forme laisse les autres vertes par absence : c'est la classe
     d'obs 63 — une règle formulée dans le vocabulaire de son premier domaine ne se déclenche pas
-    sur la même forme ailleurs. Les trois formes sont donc éprouvées ici, pas sur le dépôt, où
-    la forme 2 n'existait pas avant ce lot.
+    sur la même forme ailleurs. Les trois formes sont donc éprouvées ici, sur témoins, et non
+    sur le dépôt, où la forme 2 n'existait pas avant ce lot et où aucun renvoi ne vit hors de
+    `.claude/`.
 
-    **Chaque glob de `HARNESS_PROSE_GLOBS` est représenté**, et c'est ce qui l'épingle : la
-    mutation qui retire `CLAUDE.md` et `CONTRIBUTING.md` de la liste a été vue **VERTE** tant
-    qu'aucun témoin ne vivait hors de `.claude/`. Une population seulement déclarée dans un
-    docstring rétrécit en silence, CI verte — un fichier de tête cessant d'être lu ne casse rien
-    tant que personne n'y cite de script.
+    Le dénombrement vit dans ce recueil et non dans une phrase : chaque ligne de
+    `SCRIPT_REFERENCE_WITNESSES` est un cas exécutable, et retirer un glob de
+    `HARNESS_PROSE_GLOBS` ou une branche de `script_target` rougit le cas qui lui correspond.
+    C'est ce que la règle de `cleanup-verbatim.md` demande d'un dénombrement : épinglé dans
+    l'artefact, pas déclaré à côté.
+
+    **Ce que ce test ne dit pas** : combien de renvois vivent dans le dépôt. Ce recensement-là
+    est une population **vivante** — il grossit à chaque lot qui cite un script —, donc il se
+    date et se re-dérive par la commande que porte la porte, jamais par une assertion qui
+    rougirait au prochain renvoi légitime.
     """
-    skill = tmp_path / ".claude" / "skills" / "cycle-pr"
-    skill.mkdir(parents=True)
-    (skill / "SKILL.md").write_text(
-        "python <répertoire de ce skill>/scripts/x.py", encoding="utf-8"
-    )
-    role = tmp_path / ".claude" / "agents"
-    role.mkdir(parents=True)
-    (role / "relecteur.md").write_text(
-        "lance .claude/skills/cycle-pr/scripts/y.py", encoding="utf-8"
-    )
-    (role / "orphelin.md").write_text("lance scripts/z.py", encoding="utf-8")
-    (tmp_path / ".claude" / "pipeline.config.md").write_text(
-        "voir .claude/skills/cycle-pr/scripts/config.py", encoding="utf-8"
-    )
-    (tmp_path / "CLAUDE.md").write_text(
-        "voir .claude/skills/cycle-pr/scripts/tete.py", encoding="utf-8"
-    )
-    (tmp_path / "CONTRIBUTING.md").write_text(
-        "voir .claude/skills/cycle-pr/scripts/contrib.py", encoding="utf-8"
-    )
-    workflows = tmp_path / ".github"
-    workflows.mkdir()
-    (workflows / "PULL_REQUEST_TEMPLATE.md").write_text(
-        "voir .claude/skills/cycle-pr/scripts/forge.py", encoding="utf-8"
+    path = tmp_path / citing
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(prose, encoding="utf-8")
+
+    assert cited_scripts(tmp_path, [citing]) == {expected: {path.name}}
+
+
+def test_un_repertoire_dans_la_population_n_est_pas_lu(tmp_path: Path) -> None:
+    """Le garde `is_file()` du collecteur partagé, et pourquoi il n'est pas mort.
+
+    Sous la population que les portes emploient — `tracked_files()`, qui ne liste jamais de
+    répertoire — ce garde est inatteignable, et la mutation qui le retire reste **VERTE**. Il
+    redevient nécessaire dès qu'un glob apparie autre chose que des fichiers : `.github/**/*`
+    apparie `.github/workflows`, et un appelant qui écrit sa population à la main y ferait
+    lever `read_text`. Ce témoin est ce qui distingue un garde vivant d'un garde mort.
+    """
+    (tmp_path / ".github" / "workflows").mkdir(parents=True)
+
+    assert cited_scripts(tmp_path, [".github/workflows"]) == {}
+
+
+def test_le_relecteur_ne_declare_aucun_outil_d_ecriture_de_fichier() -> None:
+    """Le rôle `relecteur` dit à son lecteur « tu n'as pas de `Write` » : la liste doit le tenir.
+
+    Ce n'est pas qu'une phrase à garder vraie. Le mandat du rôle est de ne rien changer — « ne
+    commit pas, ne pousse pas, ne corrige pas » —, et il en tire une conséquence pratique : un
+    fichier de travail s'écrit par redirection, parce que le garde d'isolation refuse un
+    heredoc. Ajouter `Write` à la liste rendrait la consigne fausse **en silence**, exactement
+    la classe d'obs 50 : rien dans le harnais ne relit la prose d'un rôle contre son frontmatter.
+
+    `Edit` reste : une mutation modifie un fichier existant, elle n'en crée pas.
+    """
+    frontmatter = FRONTMATTER.match(
+        (REPOSITORY_ROOT / ".claude" / "agents" / "relecteur.md").read_text(encoding="utf-8-sig")
     )
 
-    cited = cited_scripts(
-        tmp_path,
-        [
-            ".claude/skills/cycle-pr/SKILL.md",
-            ".claude/agents/relecteur.md",
-            ".claude/agents/orphelin.md",
-            ".claude/pipeline.config.md",
-            "CLAUDE.md",
-            "CONTRIBUTING.md",
-            ".github/PULL_REQUEST_TEMPLATE.md",
-        ],
+    assert frontmatter, "le frontmatter de `relecteur` ne parse plus — voir la porte voisine"
+    declared = cast(dict[str, object], yaml.safe_load(frontmatter.group("yaml"))).get("tools")
+    assert isinstance(declared, str), f"`tools` absent ou non textuel : {declared!r}"
+    assert "Write" not in declared, (
+        f"`relecteur` déclare `Write` ({declared}) — son texte dit à son lecteur le contraire"
     )
-
-    assert cited == {
-        ".claude/skills/cycle-pr/scripts/x.py": {"SKILL.md"},
-        ".claude/skills/cycle-pr/scripts/y.py": {"relecteur.md"},
-        "scripts/z.py": {"orphelin.md"},
-        ".claude/skills/cycle-pr/scripts/config.py": {"pipeline.config.md"},
-        ".claude/skills/cycle-pr/scripts/tete.py": {"CLAUDE.md"},
-        ".claude/skills/cycle-pr/scripts/contrib.py": {"CONTRIBUTING.md"},
-        ".claude/skills/cycle-pr/scripts/forge.py": {"PULL_REQUEST_TEMPLATE.md"},
-    }

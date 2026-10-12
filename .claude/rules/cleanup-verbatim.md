@@ -65,9 +65,9 @@ avant tout jugement, chaque finding cité par §.
 - **Passe « affirmations » — ce que le delta dit de lui-même.** Le prompt ci-dessus fait relire le
   **code** : duplication, naming, responsabilités. Il ne fait jamais relire les **affirmations
   attachées au code**, et c'est là que l'angle mort de l'auteur est maximal — une affirmation est
-  précisément ce qu'on ne re-dérive pas une fois écrite. Mesuré deux fois : au lot 1 de #77,
-  quatre bloquants, **zéro** trouvé par le cleanup de commit ni par le cleanup holistique (un
-  seul constat sur 2923 lignes), et les quatre portaient sur une affirmation.
+  précisément ce qu'on ne re-dérive pas une fois écrite. Mesuré : au lot 1 de #77, quatre
+  bloquants, **zéro** trouvé par le cleanup de commit ni par le cleanup holistique (un seul
+  constat sur 2923 lignes), et les quatre portaient sur une affirmation.
 
   La passe est **mécanique et dénombrable**, dans l'esprit des passes d'`audit-spec-ui` :
   énumérer chaque assertion que le delta fait sur lui-même — propriété annoncée dans un
