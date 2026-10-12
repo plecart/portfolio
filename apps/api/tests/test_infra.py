@@ -607,6 +607,32 @@ def test_un_brouillon_non_suivi_n_entre_pas_dans_la_population(tmp_path: Path) -
     }
 
 
+def test_la_porte_des_renvois_ignore_un_brouillon_non_suivi() -> None:
+    """Épingle le choix de population **de la porte**, et non la population elle-même.
+
+    Le test ci-dessus prouve qu'une population décide de ce qui est lu ; il ne prouve pas que
+    la porte a choisi l'étroite. L'écart se mesure : sur un **arbre propre** les deux
+    populations coïncident, donc la ligne d'appel remise sur `repository_files()` laisse la
+    suite entièrement verte — mutation vue VERTE le 2026-10-12. Avec un brouillon **non suivi**
+    planté à la racine, elles divergent — 11 modules cités contre 12 — et la même mutation
+    rougit.
+
+    D'où la forme : ce test **appelle la porte**, au lieu de recalculer la population étroite.
+    C'est ce seul détail qui le distingue d'un doublon, et c'est lui qui fait mordre la
+    mutation de la ligne d'appel.
+
+    La sonde n'est pas suivie, donc invisible à `tracked_files()` : un résidu laissé par un
+    `SIGKILL` ne rougirait rien — mesuré, suite entière verte avec la sonde en place. Le
+    `finally` couvre l'échec d'assertion comme l'exception.
+    """
+    draft = REPOSITORY_ROOT / "zz-brouillon-non-suivi-de-la-porte.md"
+    draft.write_text("voir apps/api/tests/test_inexistant_de_la_porte.py", encoding="utf-8")
+    try:
+        test_aucun_renvoi_vers_un_module_de_test_inexistant()
+    finally:
+        draft.unlink()
+
+
 def test_les_deux_populations_de_fichiers_ne_sont_pas_la_meme(tmp_path: Path) -> None:
     """La porte a choisi la plus étroite des deux, et ce choix doit rester lisible.
 
