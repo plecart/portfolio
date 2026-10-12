@@ -19,7 +19,7 @@ from typing import cast
 
 import pytest
 import yaml
-from test_supply_chain import tracked_files
+from test_supply_chain import prose_citations, tracked_files
 
 # `test_agent_skills.py` → `tests` → `api` → `apps` → racine du dépôt.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -131,7 +131,20 @@ def test_chaque_forme_fautive_de_frontmatter_est_refusee(text: str, expected: st
 # déplacé ou renommé y laisse des renvois entrants qu'aucune porte ne voit — la prose se lit
 # comme juste et n'échoue que pour celui qui suit le chemin, c'est-à-dire pendant la passe de
 # relecture que le script devait outiller.
-HARNESS_PROSE_GLOBS = [".claude/**/*.md", "CLAUDE.md", "CONTRIBUTING.md"]
+# La population est exactement celle que `cleanup-verbatim.md` prescrit pour balayer les renvois
+# entrants d'une édition : `.claude/`, `CLAUDE.md`, `CONTRIBUTING.md`, `.github/`. La faire plus
+# étroite que la règle qui la nomme laisserait un trou dont rien ne dirait le motif — aucun renvoi
+# `scripts/*.py` n'y vit aujourd'hui hors de `.claude/`, le trou était donc latent, pas actuel.
+#
+# Deux bornes volontaires. `.claude/` est borné aux `.md` : l'élargir y ferait entrer les scripts
+# eux-mêmes, donc les renvois de docstring que la porte écarte à dessein (voir son docstring).
+# `.github/` ne l'est pas, parce qu'un renvoi y vivrait aussi bien dans un workflow `.yml` que
+# dans un gabarit `.md`, et qu'aucun `.py` n'y est suivi.
+#
+# Ces globs sont consommés par `Path.glob`, où `**` admet zéro composant : `.claude/**/*.md`
+# apparie donc `.claude/pipeline.config.md`. Transposée telle quelle en pathspec git, la liste
+# n'y arriverait pas — voir `prose_citations`, et la commande citée par la porte ci-dessous.
+HARNESS_PROSE_GLOBS = [".claude/**/*.md", "CLAUDE.md", "CONTRIBUTING.md", ".github/**/*"]
 
 # Le dossier qui porte les scripts d'un skill. Nommé une fois : il entre à la fois dans le motif
 # qui apparie les renvois et dans les chemins que `script_target` reconstruit, et deux littéraux
@@ -195,15 +208,11 @@ def cited_scripts(root: Path, population: Iterable[str]) -> dict[str, set[str]]:
     Returns:
         Le chemin visé par chaque renvoi → le nom des fichiers qui le portent.
     """
-    allowed = set(population)
     cited: dict[str, set[str]] = {}
-    for glob in HARNESS_PROSE_GLOBS:
-        for path in root.glob(glob):
-            if not path.is_file() or path.relative_to(root).as_posix() not in allowed:
-                continue
-            text = path.read_text(encoding="utf-8", errors="replace")
-            for reference in SCRIPT_REFERENCE.finditer(text):
-                cited.setdefault(script_target(root, path, reference), set()).add(path.name)
+    for citing, reference in prose_citations(
+        root, population, HARNESS_PROSE_GLOBS, SCRIPT_REFERENCE
+    ):
+        cited.setdefault(script_target(root, citing, reference), set()).add(citing.name)
     return cited
 
 
@@ -211,27 +220,41 @@ def test_chaque_script_cite_par_la_prose_du_harnais_existe() -> None:
     """Un script renommé laisse derrière lui des renvois que rien ne suit.
 
     **Dénombrement de la classe, écrit avant le premier correctif** (`cycle-pr` Étape 4.2,
-    cliquet). Population recensée le 2026-10-12 sur `228d820`, avant que ce lot n'écrive une
-    ligne de prose — `git grep -n "scripts/[a-z-]*\\.py"` sur `HARNESS_PROSE_GLOBS` : **2 renvois**,
-    sous **3 formes** distinctes, dont **2 canoniques** et **1 cassée**.
+    cliquet). Les renvois vers un script se répartissent en **3 formes**, dont `script_target`
+    résout les 2 **canoniques** et laisse la 3ᵉ introuvable :
 
-    Les deux canoniques sont les seules que `script_target` résout : **relative** dans les
-    fichiers d'un skill (`bilan-session.py`, cité par `cycle-pr/SKILL.md`), **depuis la racine**
-    partout ailleurs. La troisième — `cycle-pr/scripts/mutation.py` dans
-    `pipeline.config.md`, relative à `.claude/skills/` sans le dire — ne se résout contre rien
-    et a été **normalisée dans ce commit**, non appariée par une forme de plus : une porte qui
-    gagne un motif par occurrence hérite de toutes les formes qu'on n'a pas prévues (obs 28).
-    Chacune des deux formes canoniques, et l'orpheline, sont éprouvées sur témoins par
-    `test_chaque_forme_de_renvoi_vers_un_script_se_resout` : une porte dont une branche
-    n'a jamais tourné ne garde rien, et la forme depuis la racine n'avait aucune occurrence
-    dans le dépôt avant ce lot.
+    1. **relative**, dans les fichiers d'un skill (`<répertoire de ce skill>/scripts/x.py`, ou
+       `scripts/x.py` nu) — résolue contre le dossier du skill qui porte le fichier citant ;
+    2. **depuis la racine** (`.claude/skills/<skill>/scripts/x.py`) — la forme d'un rôle ou
+       d'une règle, qui vit hors de l'arborescence des skills ;
+    3. **orpheline** : une forme relative portée par un fichier qui n'est pas sous un skill —
+       `cycle-pr/scripts/mutation.py` dans `pipeline.config.md`, relative à `.claude/skills/`
+       sans le dire. Elle ne se résout contre rien, et elle a été **normalisée** en forme 2 par
+       le commit qui ouvre ce lot, non appariée par un motif de plus : une porte qui gagne un
+       motif par occurrence hérite de toutes les formes qu'on n'a pas prévues (obs 28).
+
+    Population recensée le 2026-10-12 sur `228d820`, avant que ce lot n'écrive une ligne de
+    prose : **2 renvois, dont 1 cassé** — un de forme 1, un de forme 3, aucun de forme 2. La
+    commande qui les rend, et qui doit rendre 2 :
+
+        git grep -n "scripts/[a-z-]*\\.py" 228d820 -- \\
+            ".claude/*.md" ".claude/**/*.md" "CLAUDE.md" "CONTRIBUTING.md" ".github/**/*"
+
+    Le pathspec `".claude/*.md"` y est **en plus** de `HARNESS_PROSE_GLOBS` : le `**` de git
+    exige au moins un composant et n'apparie pas `.claude/pipeline.config.md`, là où celui de
+    `Path.glob` admet zéro composant et l'apparie (mesuré — voir `prose_citations`). Sans ce
+    pathspec, la commande rend 1 et rate précisément le renvoi cassé qui motive la
+    normalisation. Les trois formes sont éprouvées sur témoins par
+    `test_chaque_forme_de_renvoi_vers_un_script_se_resout` : une porte dont une branche n'a
+    jamais tourné ne garde rien, et la forme 2 n'avait aucune occurrence avant ce lot.
 
     **Ce que cette porte ne couvre pas**, et pourquoi on ne l'a pas élargie : elle apparie un
     chemin de *script*. Un renvoi vers un script écrit sans son dossier `scripts/` — « le
     harnais de mutation », « le bilan » — n'est gardé par rien, et aucun motif simple ne
-    distingue une telle prose d'une phrase ordinaire. `HARNESS_PROSE_GLOBS` n'inclut aucun `.py` : les
-    renvois qui vivent dans les docstrings échappent donc aussi à cette porte-ci, par le même
-    arbitrage que la porte des renvois de `test_infra.py`.
+    distingue une telle prose d'une phrase ordinaire. `HARNESS_PROSE_GLOBS` ne contient aucun
+    glob de source Python, donc les renvois qui vivent dans les docstrings échappent à cette
+    porte-ci, par le même arbitrage que la porte des renvois de `test_infra.py` — dont les globs
+    en appariaient trois, par `infra/**/*`, sans que la phrase qui les décrivait le dise.
 
     La population est celle que le dépôt **contient** (`tracked_files()`), jamais celle du
     disque : un brouillon non suivi suffirait sinon à faire rougir chez une personne seule.
@@ -248,11 +271,18 @@ def test_chaque_script_cite_par_la_prose_du_harnais_existe() -> None:
 
 
 def test_chaque_forme_de_renvoi_vers_un_script_se_resout(tmp_path: Path) -> None:
-    """Les deux formes ne se résolvent pas contre la même base, et la troisième est un défaut.
+    """Les trois formes, et chaque glob de la population déclarée, sur témoins.
 
     Une porte qui n'apparie qu'une forme laisse l'autre verte par absence : c'est la classe
     d'obs 63 — une règle formulée dans le vocabulaire de son premier domaine ne se déclenche pas
-    sur la même forme ailleurs. Les trois cas sont donc éprouvés sur témoins, pas sur le dépôt.
+    sur la même forme ailleurs. Les trois formes sont donc éprouvées ici, pas sur le dépôt, où
+    la forme 2 n'existait pas avant ce lot.
+
+    **Chaque glob de `HARNESS_PROSE_GLOBS` est représenté**, et c'est ce qui l'épingle : la
+    mutation qui retire `CLAUDE.md` et `CONTRIBUTING.md` de la liste a été vue **VERTE** tant
+    qu'aucun témoin ne vivait hors de `.claude/`. Une population seulement déclarée dans un
+    docstring rétrécit en silence, CI verte — un fichier de tête cessant d'être lu ne casse rien
+    tant que personne n'y cite de script.
     """
     skill = tmp_path / ".claude" / "skills" / "cycle-pr"
     skill.mkdir(parents=True)
@@ -265,6 +295,20 @@ def test_chaque_forme_de_renvoi_vers_un_script_se_resout(tmp_path: Path) -> None
         "lance .claude/skills/cycle-pr/scripts/y.py", encoding="utf-8"
     )
     (role / "orphelin.md").write_text("lance scripts/z.py", encoding="utf-8")
+    (tmp_path / ".claude" / "pipeline.config.md").write_text(
+        "voir .claude/skills/cycle-pr/scripts/config.py", encoding="utf-8"
+    )
+    (tmp_path / "CLAUDE.md").write_text(
+        "voir .claude/skills/cycle-pr/scripts/tete.py", encoding="utf-8"
+    )
+    (tmp_path / "CONTRIBUTING.md").write_text(
+        "voir .claude/skills/cycle-pr/scripts/contrib.py", encoding="utf-8"
+    )
+    workflows = tmp_path / ".github"
+    workflows.mkdir()
+    (workflows / "PULL_REQUEST_TEMPLATE.md").write_text(
+        "voir .claude/skills/cycle-pr/scripts/forge.py", encoding="utf-8"
+    )
 
     cited = cited_scripts(
         tmp_path,
@@ -272,6 +316,10 @@ def test_chaque_forme_de_renvoi_vers_un_script_se_resout(tmp_path: Path) -> None
             ".claude/skills/cycle-pr/SKILL.md",
             ".claude/agents/relecteur.md",
             ".claude/agents/orphelin.md",
+            ".claude/pipeline.config.md",
+            "CLAUDE.md",
+            "CONTRIBUTING.md",
+            ".github/PULL_REQUEST_TEMPLATE.md",
         ],
     )
 
@@ -279,4 +327,8 @@ def test_chaque_forme_de_renvoi_vers_un_script_se_resout(tmp_path: Path) -> None
         ".claude/skills/cycle-pr/scripts/x.py": {"SKILL.md"},
         ".claude/skills/cycle-pr/scripts/y.py": {"relecteur.md"},
         "scripts/z.py": {"orphelin.md"},
+        ".claude/skills/cycle-pr/scripts/config.py": {"pipeline.config.md"},
+        ".claude/skills/cycle-pr/scripts/tete.py": {"CLAUDE.md"},
+        ".claude/skills/cycle-pr/scripts/contrib.py": {"CONTRIBUTING.md"},
+        ".claude/skills/cycle-pr/scripts/forge.py": {"PULL_REQUEST_TEMPLATE.md"},
     }

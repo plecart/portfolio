@@ -19,6 +19,7 @@ où elles cesseraient d'échapper.
 import json
 import re
 import subprocess
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any, cast
 
@@ -196,6 +197,44 @@ def tracked_files(root: Path = REPOSITORY_ROOT) -> list[str]:
     fait la preuve, pas l'un des deux verdicts.
     """
     return git_listing(root, "--cached")
+
+
+def prose_citations(
+    root: Path, population: Iterable[str], globs: Iterable[str], reference: re.Pattern[str]
+) -> Iterator[tuple[Path, re.Match[str]]]:
+    """Chaque renvoi que la prose du dépôt porte vers un artefact, avec le fichier qui le porte.
+
+    La **lecture** est commune à toutes les portes de renvois entrants — parcourir des globs,
+    écarter ce qui n'est pas dans la population, lire le fichier, apparier le motif. Ce qui
+    diffère d'une porte à l'autre, c'est la population, le motif et la façon de résoudre le
+    renvoi en chemin : chaque porte garde donc les trois chez elle, et une classe de renvoi
+    supplémentaire s'ajoute par **extension** — un appel de plus — sans toucher à cette lecture.
+
+    **Pathlib, pas wildmatch.** Les globs sont consommés par `Path.glob`, où `**` admet **zéro**
+    composant : `.claude/**/*.md` apparie donc `.claude/pipeline.config.md`. Le `**` d'un pathspec
+    git exige au moins un composant et ne l'apparie pas — mesuré. Une liste de globs transposée
+    telle quelle en commande `git grep` rend donc moins de résultats que la porte, et c'est
+    exactement ce qu'un dénombrement cité fait croire reproductible. Toute commande citée à côté
+    d'une de ces populations ajoute le pathspec de la racine (`.claude/*.md`).
+
+    Args:
+        root: la racine à parcourir.
+        population: les chemins relatifs, en POSIX, que l'appelant a le droit de lire. Tout
+            fichier présent sur le disque mais absent de cette liste est ignoré — le choix de la
+            population appartient donc à l'appelant.
+        globs: les motifs de chemin, au sens de `Path.glob`, qui décrivent la prose à lire.
+        reference: le motif du renvoi, dont les groupes nommés sont lus par l'appelant.
+
+    Yields:
+        Le couple (fichier citant, appariement), dans l'ordre des globs puis des appariements.
+    """
+    allowed = set(population)
+    for glob in globs:
+        for path in root.glob(glob):
+            if not path.is_file() or path.relative_to(root).as_posix() not in allowed:
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+            yield from ((path, reference_found) for reference_found in reference.finditer(text))
 
 
 def is_dockerfile(name: str) -> bool:
