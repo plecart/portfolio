@@ -271,6 +271,14 @@ test.** Cinq cas à traiter explicitement :
   rendent le même résultat (un sélecteur sur la classe de base ne voit pas la sous-classe) ; s'il
   passe à ce moment-là, le défaut est dans le sélecteur, jamais dans le sujet. Un garde d'absence
   jamais vu rouge n'est pas un garde, c'est un commentaire exécutable.
+- **L'assertion ne distingue pas quelle branche a mordu** — jointe par `or`, ou réduite à « ça
+  lève » (`assertRaises` sans vérifier le type ni le message, `assert a or b`, une appartenance à
+  un ensemble de valeurs acceptables) → elle reste verte quand la garde qu'elle croit éprouver
+  disparaît, parce que l'autre branche la satisfait. Le rouge se constate en **retirant une
+  branche à la fois** : si le test tient dans les deux cas, il n'éprouve aucune des deux. Trois
+  occurrences au lot 1 de #77, trouvées chaque fois par le harnais de mutation (une mutation
+  `VERT` sur une garde retirée), jamais par relecture — une assertion jointe se lit exactement
+  comme une assertion forte.
 
 - Bons vs mauvais tests : [references/tests.md](references/tests.md)
 - Quand mocker (frontières du système uniquement) : [references/mocking.md](references/mocking.md)
