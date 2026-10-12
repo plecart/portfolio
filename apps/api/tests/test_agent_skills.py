@@ -13,11 +13,13 @@ hors CI). Même cause possible — un « seulement : » sans guillemets dans la 
 """
 
 import re
+from collections.abc import Iterable
 from pathlib import Path
 from typing import cast
 
 import pytest
 import yaml
+from test_supply_chain import tracked_files
 
 # `test_agent_skills.py` → `tests` → `api` → `apps` → racine du dépôt.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -123,3 +125,158 @@ def test_chaque_forme_fautive_de_frontmatter_est_refusee(text: str, expected: st
 
     assert found is not None, "cette forme devrait être refusée"
     assert expected in found, f"message inattendu : {found}"
+
+
+# La prose du harnais : skills, rôles, règles, et les deux fichiers de tête du dépôt. Un script
+# déplacé ou renommé y laisse des renvois entrants qu'aucune porte ne voit — la prose se lit
+# comme juste et n'échoue que pour celui qui suit le chemin, c'est-à-dire pendant la passe de
+# relecture que le script devait outiller.
+HARNESS_PROSE_GLOBS = [".claude/**/*.md", "CLAUDE.md", "CONTRIBUTING.md"]
+
+# Le dossier qui porte les scripts d'un skill. Nommé une fois : il entre à la fois dans le motif
+# qui apparie les renvois et dans les chemins que `script_target` reconstruit, et deux littéraux
+# qui divergeraient laisseraient la porte apparier une forme pour en résoudre une autre — la
+# classe de défaut que cette porte existe précisément pour attraper.
+SCRIPTS_DIRECTORY = "scripts"
+
+# Les **deux** formes sous lesquelles un script de skill se cite, et elles seules :
+#
+# 1. **relative** (`<répertoire de ce skill>/scripts/x.py`, ou `scripts/x.py` nu) — la forme des
+#    fichiers d'un skill, qui est recopié dans le seed où son chemin absolu diffère ; elle se
+#    résout contre le dossier du skill qui porte le fichier citant ;
+# 2. **depuis la racine** (`.claude/skills/<skill>/scripts/x.py`) — la forme d'un rôle ou d'une
+#    règle, qui vit hors de l'arborescence des skills et n'a donc pas de dossier de référence.
+#
+# Un renvoi relatif porté par un fichier qui ne vit **pas** sous un skill ne se résout contre
+# rien : il est rendu tel quel, donc introuvable. C'est un défaut, pas un cas à ignorer — c'est
+# exactement la forme qu'un rôle prendrait s'il recopiait la phrase d'un skill.
+SCRIPT_REFERENCE = re.compile(
+    r"(?:\.claude/skills/(?P<skill>[\w-]+)/|<répertoire de ce skill>/)?"
+    rf"{SCRIPTS_DIRECTORY}/(?P<script>[\w.-]+\.py)"
+)
+
+
+def script_target(root: Path, citing: Path, reference: re.Match[str]) -> str:
+    """Le chemin, relatif à `root` et en POSIX, du script que ce renvoi désigne.
+
+    Args:
+        root: la racine du dépôt.
+        citing: le fichier de prose qui porte le renvoi.
+        reference: l'appariement de `SCRIPT_REFERENCE`.
+
+    Returns:
+        Le chemin visé. Pour un renvoi **relatif**, il est résolu contre le dossier du skill qui
+        contient `citing` ; faute d'un tel dossier, le renvoi est rendu sans base — il ne
+        désigne alors aucun fichier, et la porte le rapporte introuvable.
+    """
+    script = reference.group("script")
+    if skill := reference.group("skill"):
+        return f".claude/skills/{skill}/{SCRIPTS_DIRECTORY}/{script}"
+    # La base se dérive de `root`, jamais d'une constante de module : la porte est appelée sur le
+    # dépôt **et** sur des témoins en répertoire temporaire, et une base figée sur le dépôt rend
+    # la branche relative muette chez le témoin — la seule qui l'éprouve.
+    skills = root / ".claude" / "skills"
+    own = next((parent for parent in citing.parents if parent.parent == skills), None)
+    if own is None:
+        return f"{SCRIPTS_DIRECTORY}/{script}"
+    return f"{own.relative_to(root).as_posix()}/{SCRIPTS_DIRECTORY}/{script}"
+
+
+def cited_scripts(root: Path, population: Iterable[str]) -> dict[str, set[str]]:
+    """Les scripts que la prose du harnais désigne, chacun avec les fichiers qui le citent.
+
+    Args:
+        root: la racine à parcourir.
+        population: les chemins relatifs, en POSIX, que l'appelant a le droit de lire. Tout
+            fichier présent sur le disque mais absent de cette liste est ignoré — le choix de la
+            population appartient donc à l'appelant, comme pour la porte des renvois de
+            `test_infra.py`.
+
+    Returns:
+        Le chemin visé par chaque renvoi → le nom des fichiers qui le portent.
+    """
+    allowed = set(population)
+    cited: dict[str, set[str]] = {}
+    for glob in HARNESS_PROSE_GLOBS:
+        for path in root.glob(glob):
+            if not path.is_file() or path.relative_to(root).as_posix() not in allowed:
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+            for reference in SCRIPT_REFERENCE.finditer(text):
+                cited.setdefault(script_target(root, path, reference), set()).add(path.name)
+    return cited
+
+
+def test_chaque_script_cite_par_la_prose_du_harnais_existe() -> None:
+    """Un script renommé laisse derrière lui des renvois que rien ne suit.
+
+    **Dénombrement de la classe, écrit avant le premier correctif** (`cycle-pr` Étape 4.2,
+    cliquet). Population recensée le 2026-10-12 sur `228d820`, avant que ce lot n'écrive une
+    ligne de prose — `git grep -n "scripts/[a-z-]*\\.py"` sur `HARNESS_PROSE_GLOBS` : **2 renvois**,
+    sous **3 formes** distinctes, dont **2 canoniques** et **1 cassée**.
+
+    Les deux canoniques sont les seules que `script_target` résout : **relative** dans les
+    fichiers d'un skill (`bilan-session.py`, cité par `cycle-pr/SKILL.md`), **depuis la racine**
+    partout ailleurs. La troisième — `cycle-pr/scripts/mutation.py` dans
+    `pipeline.config.md`, relative à `.claude/skills/` sans le dire — ne se résout contre rien
+    et a été **normalisée dans ce commit**, non appariée par une forme de plus : une porte qui
+    gagne un motif par occurrence hérite de toutes les formes qu'on n'a pas prévues (obs 28).
+    Chacune des deux formes canoniques, et l'orpheline, sont éprouvées sur témoins par
+    `test_chaque_forme_de_renvoi_vers_un_script_se_resout` : une porte dont une branche
+    n'a jamais tourné ne garde rien, et la forme depuis la racine n'avait aucune occurrence
+    dans le dépôt avant ce lot.
+
+    **Ce que cette porte ne couvre pas**, et pourquoi on ne l'a pas élargie : elle apparie un
+    chemin de *script*. Un renvoi vers un script écrit sans son dossier `scripts/` — « le
+    harnais de mutation », « le bilan » — n'est gardé par rien, et aucun motif simple ne
+    distingue une telle prose d'une phrase ordinaire. `HARNESS_PROSE_GLOBS` n'inclut aucun `.py` : les
+    renvois qui vivent dans les docstrings échappent donc aussi à cette porte-ci, par le même
+    arbitrage que la porte des renvois de `test_infra.py`.
+
+    La population est celle que le dépôt **contient** (`tracked_files()`), jamais celle du
+    disque : un brouillon non suivi suffirait sinon à faire rougir chez une personne seule.
+    """
+    cited = cited_scripts(REPOSITORY_ROOT, tracked_files())
+
+    assert cited, "aucun renvoi vers un script trouvé — le motif a-t-il cessé de mordre ?"
+    missing = {
+        target: sorted(where)
+        for target, where in cited.items()
+        if not (REPOSITORY_ROOT / target).exists()
+    }
+    assert not missing, f"{len(cited)} scripts cités, introuvables : {missing}"
+
+
+def test_chaque_forme_de_renvoi_vers_un_script_se_resout(tmp_path: Path) -> None:
+    """Les deux formes ne se résolvent pas contre la même base, et la troisième est un défaut.
+
+    Une porte qui n'apparie qu'une forme laisse l'autre verte par absence : c'est la classe
+    d'obs 63 — une règle formulée dans le vocabulaire de son premier domaine ne se déclenche pas
+    sur la même forme ailleurs. Les trois cas sont donc éprouvés sur témoins, pas sur le dépôt.
+    """
+    skill = tmp_path / ".claude" / "skills" / "cycle-pr"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text(
+        "python <répertoire de ce skill>/scripts/x.py", encoding="utf-8"
+    )
+    role = tmp_path / ".claude" / "agents"
+    role.mkdir(parents=True)
+    (role / "relecteur.md").write_text(
+        "lance .claude/skills/cycle-pr/scripts/y.py", encoding="utf-8"
+    )
+    (role / "orphelin.md").write_text("lance scripts/z.py", encoding="utf-8")
+
+    cited = cited_scripts(
+        tmp_path,
+        [
+            ".claude/skills/cycle-pr/SKILL.md",
+            ".claude/agents/relecteur.md",
+            ".claude/agents/orphelin.md",
+        ],
+    )
+
+    assert cited == {
+        ".claude/skills/cycle-pr/scripts/x.py": {"SKILL.md"},
+        ".claude/skills/cycle-pr/scripts/y.py": {"relecteur.md"},
+        "scripts/z.py": {"orphelin.md"},
+    }
