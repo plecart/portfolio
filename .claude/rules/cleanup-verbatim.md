@@ -44,11 +44,45 @@ avant tout jugement, chaque finding cité par §.
   `CONTRIBUTING.md` et `.github/`, puis vérifier
   pour chaque hit que la cible dit bien ce que le renvoi lui prête — une paraphrase paraît à jour
   en ayant perdu la moitié du contenu.
-- **Un correctif de fuite se déclare clos sur une classe, jamais sur l'occurrence qui l'a
-  révélée.** « La seule voie », « le seul cas », « le dernier endroit » sont interdits dans un
-  correctif de sécurité tant qu'un **dénombrement** ne les accompagne pas — N formes recensées,
-  k fuyaient — épinglé dans l'artefact par un test paramétré, pas par une phrase de docstring : la
-  preuve que le chemin connu est fermé se lit spontanément comme la preuve qu'il n'y en avait qu'un.
+- **Un correctif qui ferme un chemin se déclare clos sur une classe, jamais sur l'occurrence qui
+  l'a révélée.** Le déclencheur est la **structure** du défaut — N chemins vers un même état —,
+  jamais son sujet : fuite d'une donnée, voie par laquelle un état arrive ou sort (chargement,
+  cache, signal, écriture partielle), cas d'un dispatch, **frontière d'entrée écrite à la main**.
+  Cette liste est ouverte à dessein : une règle qui se re-formule à chaque domaine ne se
+  déclenche jamais sur le suivant, et c'est ainsi que celle-ci est passée à côté d'une détection
+  d'état parce qu'elle était écrite pour la sécurité, puis à côté de cinq défauts de validation
+  d'entrée découverts un par un sur trois relectures. Conséquence directe : quand un delta
+  introduit un **format saisi par un humain** — fichier de configuration, JSON de paramétrage,
+  argument de ligne de commande —, tous ses champs se balayent pour le type et la présence en
+  **une** passe, pas au fil des constats.
+
+  « La seule voie », « le seul cas », « le dernier endroit » sont interdits tant qu'un
+  **dénombrement** ne les accompagne pas — N formes recensées, k fuyaient — écrit **avant le
+  premier correctif** et épinglé dans l'artefact par un test paramétré, pas par une phrase de
+  docstring : la preuve que le chemin connu est fermé se lit spontanément comme la preuve qu'il
+  n'y en avait qu'un. Écrit après, le dénombrement se fait par morceaux, un correctif par
+  relecture.
+- **Passe « affirmations » — ce que le delta dit de lui-même.** Le prompt ci-dessus fait relire le
+  **code** : duplication, naming, responsabilités. Il ne fait jamais relire les **affirmations
+  attachées au code**, et c'est là que l'angle mort de l'auteur est maximal — une affirmation est
+  précisément ce qu'on ne re-dérive pas une fois écrite. Mesuré deux fois : au lot 1 de #77,
+  quatre bloquants, **zéro** trouvé par le cleanup de commit ni par le cleanup holistique (un
+  seul constat sur 2923 lignes), et les quatre portaient sur une affirmation.
+
+  La passe est **mécanique et dénombrable**, dans l'esprit des passes d'`audit-spec-ui` :
+  énumérer chaque assertion que le delta fait sur lui-même — propriété annoncée dans un
+  docstring, commentaire « mesuré », ligne de `pipeline.config.md`, case de Test plan, message
+  d'assertion — puis, pour chacune, **nommer la commande qui l'établit**, ou la marquer « non
+  vérifiée ». Rendre le dénombrement : N affirmations, k établies par une commande citée, N−k non
+  vérifiées. Les messages d'assertion se comptent par analyse syntaxique (`ast`), jamais par
+  expression régulière : une regex qui franchit les lignes a rendu deux dénombrements faux avant
+  le bon.
+
+  **Une exception, mesurée** : une **chronométrie** n'a pas de commande qui l'établisse — quatre
+  bornes publiées, quatre dépassées au relevé suivant. Pour une grandeur que le poste et le
+  nombre de runs font varier, l'**ordre de grandeur est la mesure**, et c'est l'invariant sous
+  test qui rougit, jamais le relevé. La forme « population + commande » vaut pour une population
+  **figée par un commit**, pas pour un temps.
 - **Vérifier aussi les 3 axes de conception** de `.claude/rules/contraintes.md` (modulaire /
   fractionné / scalable), en plus de KISS / DRY / YAGNI.
 - **Relancer les tests après le cleanup** : il a pu casser quelque chose.
