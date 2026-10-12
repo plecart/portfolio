@@ -510,11 +510,13 @@ def test_une_suite_de_blocs_qui_echoue_ne_fait_pas_exploser_le_classement() -> N
     mesuré le 2026-10-10, 1,5 s à 24 blocs, 6,1 s à 26, 24 s à 28, 98 s à 30 — ×4 tous les deux
     blocs. Et les messages à plusieurs blocs sont ordinaires : 48 en portent deux ou trois. Le
     corps interdit donc sa propre fermeture, ce qui rend le découpage unique et le coût
-    linéaire. **Domicile du relevé**, mesuré le 2026-10-12 par `timeit` sur
+    quasi linéaire. **Domicile du relevé**, mesuré le 2026-10-12 par `timeit` sur
     `INJECTED_BLOCKS.match("<a>x</a>" * n + "Z")`, le module chargé par `load_script` comme
-    ci-dessus : **7 à 9 ms** pour n = 20 000 (160 000 octets) et 2 ms pour n = 5 000 — linéaire,
-    et dispersé d'un run à l'autre, donc c'est la plage qui se cite et non un point. Ce qui
-    **rougit** est la borne de 1 s ci-dessous, jamais ce relevé.
+    ci-dessus : **6,7 à 9,3 ms** pour n = 20 000 (160 000 octets) et **1,5 à 2,1 ms** pour
+    n = 5 000, soit **×1,9 à ×2,3 par doublement de n** de 5 000 à 40 000 — pas tout à fait
+    linéaire. Ces bornes couvrent **deux postes et quatorze runs** ; une chronométrie se cite
+    en plage, et la plage s'élargit au relevé suivant, donc elle porte son nombre de runs. Ce
+    qui **rougit** est la borne de 1 s ci-dessous, jamais ce relevé.
 
     **26 blocs, pas 2 000** : à 2 000 le motif ambigu ne rend jamais la main, et un test qui
     pend prive le relecteur du nom du test fautif — le harnais rend PANNE sur son propre délai

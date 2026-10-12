@@ -70,8 +70,8 @@ PEER_TAGS = ("<cross-session-message", "<agent-message")
 # parce que chaque bloc peut se fermer sur n'importe quelle fermeture suivante. Mesuré le
 # 2026-10-10 sur `<a>x</a>` répété puis un caractère qui fait échouer : 0,03 s à 18 blocs,
 # 0,09 s à 20, ×3 tous les deux blocs — quelques dizaines de blocs suffisent à figer la mesure.
-# Sous cette forme, le découpage est unique et le coût redevient linéaire — là où le motif naïf
-# n'atteint pas 25 blocs. Relevé et commande dans
+# Sous cette forme, le découpage est unique et le coût redevient quasi linéaire — là où le motif
+# naïf n'atteint pas 25 blocs. Relevé, plage et commande dans
 # `test_une_suite_de_blocs_qui_echoue_ne_fait_pas_exploser_le_classement`, jamais ici.
 INJECTED_BLOCKS = re.compile(r"\A(?:\s*<([a-z][a-z0-9_-]*)>(?:(?!</\1>).)*</\1>)+\s*\Z", re.DOTALL)
 
