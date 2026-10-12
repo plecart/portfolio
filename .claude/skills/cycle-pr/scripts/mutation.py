@@ -585,11 +585,12 @@ def resolve(expected: Sequence[str], known: Mapping[str, str]) -> list[str]:
     for fragment in expected:
         # pytest échappe les non-ASCII des identifiants paramétrés — `tâche` devient le littéral
         # `t\xe2che` —, et c'est ce nom-là qui arrive dans le rapport comme sur la ligne de
-        # commande. Le dépôt en porte **279 sur 1025 tests, répartis sur 19 fichiers** (mesuré le
-        # 2026-10-10) : un harnais qui ne sait nommer que l'ASCII laisse un quart de la suite
-        # hors de sa portée. Le fragment se résout donc tel qu'il est écrit **ou** tel que le
-        # lanceur l'écrit, par la transformation même du lanceur ; l'unicité porte sur le
-        # résultat, pas sur la forme, et reste donc entière.
+        # commande. Un harnais qui ne sait nommer que l'ASCII laisse hors de sa portée la part de
+        # la suite qui en porte — environ un quart de celle de ce dépôt ; le dénombrement et la
+        # commande qui le produit vivent dans le test, jamais ici, parce qu'un chiffre recopié
+        # dérive au recensement suivant. Le fragment se résout donc tel qu'il est écrit **ou**
+        # tel que le lanceur l'écrit, par la transformation même du lanceur ; l'unicité porte sur
+        # le résultat, pas sur la forme, et reste donc entière.
         forms = {fragment, fragment.encode("unicode_escape").decode("ascii")}
         matches = sorted({name for name in known for form in forms if form in name})
         if len(matches) != 1:

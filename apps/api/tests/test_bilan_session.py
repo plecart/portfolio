@@ -509,8 +509,9 @@ def test_une_suite_de_blocs_qui_echoue_ne_fait_pas_exploser_le_classement() -> N
     Avec un corps en `.*?`, chaque bloc peut se fermer sur n'importe quelle fermeture suivante :
     mesuré le 2026-10-10, 1,5 s à 24 blocs, 6,1 s à 26, 24 s à 28, 98 s à 30 — ×4 tous les deux
     blocs. Et les messages à plusieurs blocs sont ordinaires : 48 en portent deux ou trois. Le
-    corps interdit donc sa propre fermeture, ce qui rend le découpage unique — 20 000 blocs,
-    160 ko, temps non mesurable.
+    corps interdit donc sa propre fermeture, ce qui rend le découpage unique et le coût
+    linéaire — 20 000 blocs, 160 000 octets, **9 ms** (relevé du 2026-10-12 sur ce poste ; c'est
+    l'ordre de grandeur qui porte, pas la milliseconde).
 
     **26 blocs, pas 2 000** : à 2 000 le motif ambigu ne rend jamais la main, et un test qui
     pend prive le relecteur du nom du test fautif — le harnais rend PANNE sur son propre délai

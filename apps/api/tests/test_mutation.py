@@ -781,7 +781,8 @@ def test_un_expect_ecrit_en_chaine_est_refuse_avant_toute_resolution(tmp_path: P
     assert "`expect` est une chaîne" in verdicts[0].detail
 
 
-# Une suite témoin dont le cas paramétré porte un accent, comme 279 des 1025 tests du dépôt.
+# Une suite témoin dont le cas paramétré porte un accent, comme un quart de ceux du dépôt —
+# dénombrement et commande dans `test_un_identifiant_accentue_se_nomme_dans_sa_forme_naturelle`.
 SUITE_ACCENTUEE = """\
 import pytest
 
@@ -799,10 +800,17 @@ def test_un_identifiant_accentue_se_nomme_dans_sa_forme_naturelle(tmp_path: Path
     """`expect` nomme un cas paramétré accentué comme on l'écrit, pas comme pytest l'échappe.
 
     pytest échappe les non-ASCII des identifiants paramétrés : `à la borne` devient le littéral
-    `\\xe0 la borne`, dans le rapport comme sur la ligne de commande. **279 des 1025 tests du
-    dépôt, sur 19 fichiers**, en portent un (mesuré le 2026-10-10) — un harnais qui ne sait
-    nommer que l'ASCII laisse un quart de la suite hors de sa portée, et rend PANNE « apparie 0
-    tests » sur un test qui existe, ce qui se lit comme une faute de frappe.
+    `\\xe0 la borne`, dans le rapport comme sur la ligne de commande. Un harnais qui ne sait
+    nommer que l'ASCII laisse hors de sa portée la part de la suite qui en porte, et rend PANNE
+    « apparie 0 tests » sur un test qui existe, ce qui se lit comme une faute de frappe.
+
+    **Ce test est le seul endroit où ce chiffre vit**, et c'est le dénombrement qui bouge, pas
+    l'invariant : ce qui rougit ici est la résolution de la forme échappée, qui ne dépend
+    d'aucun décompte. Relevé du **2026-10-12 sur `ee21cb5`**, par
+    `uv run pytest --collect-only -q` filtré sur les identifiants portant `\\x` :
+    **280 des 1041 tests collectés, sur 19 fichiers** — soit 26,9 %, environ un quart. La
+    population est figée par un commit, donc reproductible à SHA égal ; elle grossit à chaque
+    lot, donc le couple 280/1041 se relit, jamais se recopie.
     """
     root = build_repo(tmp_path, suite=SUITE_ACCENTUEE)
 

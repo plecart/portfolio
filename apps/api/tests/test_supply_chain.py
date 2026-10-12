@@ -171,8 +171,16 @@ def tracked_files(root: Path = REPOSITORY_ROOT) -> list[str]:
 
     Distinct de `repository_files` : celui-ci inclut les fichiers nouveaux non ignorés, ce qui
     est juste pour une porte qui demande « que peut contenir le prochain commit ? », et faux
-    pour une porte dont le verdict doit être le même sur tous les postes et en CI. Un brouillon
-    non suivi à la racine d'un clone suffit sinon à faire rougir chez une personne seule.
+    pour une porte qui doit ignorer le brouillon **non suivi** d'une personne seule.
+
+    Ce que cette population ne garantit pas : un verdict identique partout. `--cached` lit
+    l'**index**, qui est local et ne se pousse pas — un brouillon simplement mis à l'index y
+    entre, et fait alors rougir sur ce poste une porte que la CI voit verte. Mesuré le
+    2026-10-12 sur `ee21cb5` : un fichier citant un module de test inexistant, `git add`-é et
+    jamais commité, rend `test_aucun_renvoi_vers_un_module_de_test_inexistant` rouge en local.
+    Le resserrement ferme le cas non suivi, pas la classe. Ce qu'il ferme est épinglé par
+    `test_les_deux_populations_de_fichiers_ne_sont_pas_la_meme`, qui met `suivi.md` à l'index
+    sans le commiter.
     """
     return git_listing(root, "--cached")
 
