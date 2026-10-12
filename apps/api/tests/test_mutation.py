@@ -812,8 +812,8 @@ def test_un_identifiant_accentue_se_nomme_dans_sa_forme_naturelle(tmp_path: Path
 
     Relevé du **2026-10-12 sur `ee21cb5`**, par `uv run pytest --collect-only -q` sur les
     identifiants collectés portant un échappement non-ASCII : **302 des 1041 tests, sur
-    19 fichiers** — soit
-    29,0 %, dont 280 en `\\x` et 22 en `\\u` seulement (`test_image_scan.py`, des bornes du type
+    19 fichiers** — soit 29,0 %, dont 280 en `\\x` et 22 en `\\u` seulement
+    (`test_image_scan.py`, des bornes du type
     `[infra \\u2014 sans scan]`). Compter la seule forme `\\x` sous-décrit la population que
     `resolve` doit couvrir, puisque `encode("unicode_escape")` rend les deux. La population est
     figée par un commit, donc reproductible à SHA égal ; elle grossit à chaque lot, donc le
