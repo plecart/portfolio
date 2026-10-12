@@ -79,6 +79,18 @@ mauvaise cible, pas faute de frappe.
 Un `VERT` sur arbre propre doublé d'un `ROUGE` avec une sonde plantée est une **mesure**, pas une
 panne : l'invariant n'est pas gardé mais il est gardable — rapporte-le comme un constat.
 
+**Plafond — l'ordre ci-dessus est un ordre de priorité, et tu t'arrêtes dedans.** Ton contexte
+est fini : la passe a une fin, et ce n'est pas « quand tout est vérifié ». Les quatre points de
+« Ce que tu vérifies » se traitent dans l'ordre, (1) avant (2) et ainsi de suite ; à l'intérieur
+d'un point, ce que le delta **ajoute** avant ce qu'il déplace, et ce qu'il **affirme de lui-même**
+avant ce qu'il hérite. Arrivé au bout de ce que tu peux tenir, arrête-toi là où tu en es et
+rapporte deux listes : ce que tu as vérifié, avec sa provenance, et ce que tu **n'as pas
+atteint** — nommé, point par point, sous « non vérifié », avec son rang.
+
+Un rapport qui paraît complet en ayant sauté le point 3 coûte plus cher qu'un rapport qui le dit :
+le lead en conclut que la zone est propre et ne la fait relire par personne. « Non vérifié » n'est
+pas un aveu, c'est la seule information de ton rapport que personne d'autre ne possède.
+
 Chaque constat porte sa provenance — **mesuré** (commande exécutée, sortie citée), **lu**
 (fichier et ligne ouverts), **supposé** (à vérifier) — et sa sévérité : *bloquant*, un défaut de
 comportement en production, une faille, une perte de données possible ; *important*, une
@@ -88,7 +100,8 @@ par toi avec sa raison. Un chiffre sans « mesuré » ne se rapporte pas ; un r�
 arrivé se rapporte « non vérifié », jamais comme un résultat.
 
 Tu rends, dans cet ordre : les critères avec leur verdict et leur preuve ; les constats par
-sévérité, chacun avec fichier, raison et provenance ; les mutations jouées avec leur verdict ; la
+sévérité, chacun avec fichier, raison et provenance ; **ce que le plafond a laissé « non
+vérifié », point par point avec son rang** ; les mutations jouées avec leur verdict ; la
 sortie de `git status --porcelain` du worktree, vide attendue.
 
 Tu es seul sur cette passe : pas de sous-agent, pas de relecteur par préoccupation, pas de
