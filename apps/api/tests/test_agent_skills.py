@@ -163,10 +163,25 @@ SCRIPTS_DIRECTORY = "scripts"
 # Un renvoi relatif porté par un fichier qui ne vit **pas** sous un skill ne se résout contre
 # rien : il est rendu tel quel, donc introuvable. C'est un défaut, pas un cas à ignorer — c'est
 # exactement la forme qu'un rôle prendrait s'il recopiait la phrase d'un skill.
+# L'ancrage à gauche n'est pas décoratif : sans lui, le motif apparie `scripts/<x>.py` **au
+# milieu** de n'importe quel chemin et jette son préfixe réel. `infra/scripts/deploy.py` se
+# résolvait alors en `scripts/deploy.py`, introuvable — un renvoi juste rendait la porte rouge —,
+# et pire sous un skill, où il se résolvait en `.claude/skills/<ce skill>/scripts/deploy.py`, une
+# cible fausse qu'un homonyme aurait rendue verte. `[\w/-]` interdit la lettre, le chiffre, le
+# tiret et le slash juste avant le motif ; un espace, un backtick ou un début de ligne les
+# laissent passer, donc les trois formes canoniques sont intactes.
 SCRIPT_REFERENCE = re.compile(
-    r"(?:\.claude/skills/(?P<skill>[\w-]+)/|<répertoire de ce skill>/)?"
+    r"(?<![\w/-])(?:\.claude/skills/(?P<skill>[\w-]+)/|<répertoire de ce skill>/)?"
     rf"{SCRIPTS_DIRECTORY}/(?P<script>[\w.-]+\.py)"
 )
+
+# Les préfixes de chemin qui ne sont pas ceux d'un script de skill, et qu'aucune résolution ne
+# doit tenter. Dénombrement : 2 formes mesurées — un chemin d'infrastructure et un chemin
+# applicatif —, les deux appariées avant l'ancrage, les deux refusées après.
+FOREIGN_PREFIXES = {
+    "chemin d-infrastructure": "voir infra/scripts/deploy.py pour le détail",
+    "chemin applicatif": "lance apps/api/scripts/seed.py",
+}
 
 
 def script_target(root: Path, citing: Path, reference: re.Match[str]) -> str:
@@ -401,3 +416,24 @@ def test_le_relecteur_ne_declare_aucun_outil_d_ecriture_de_fichier() -> None:
     assert "Write" not in declared, (
         f"`relecteur` déclare `Write` ({declared}) — son texte dit à son lecteur le contraire"
     )
+
+
+@pytest.mark.parametrize("prose", FOREIGN_PREFIXES.values(), ids=FOREIGN_PREFIXES.keys())
+def test_un_prefixe_de_chemin_etranger_n_est_pas_pris_pour_un_script_de_skill(
+    tmp_path: Path, prose: str
+) -> None:
+    """Un renvoi juste vers un script qui n'est pas celui d'un skill ne doit rien déclencher.
+
+    Sans ancrage à gauche, le motif appariait `scripts/<x>.py` au milieu du chemin et en jetait
+    le préfixe : la porte rougissait sur `infra/scripts/deploy.py`, c'est-à-dire sur un renvoi
+    correct. Le mode d'échec est le pire des deux possibles — une porte qui bloque la CI sur du
+    travail juste est une porte qu'on apprend à contourner.
+
+    Ce test est la face négative de `SCRIPT_REFERENCE_WITNESSES` : celui-là dit ce que la porte
+    doit voir, celui-ci ce qu'elle doit ignorer. Une porte qui n'a que la face positive s'élargit
+    sans fin, puisque rien ne mesure ce qu'elle attrape de trop.
+    """
+    citing = tmp_path / "CONTRIBUTING.md"
+    citing.write_text(prose, encoding="utf-8")
+
+    assert cited_scripts(tmp_path, ["CONTRIBUTING.md"]) == {}

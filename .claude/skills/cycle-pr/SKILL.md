@@ -413,19 +413,25 @@ silencieux.
 **Les portes bon marché d'abord.** Un relecteur coûte un contexte entier ; ce qu'une commande
 trouve en dix secondes ne se paie pas en jetons. Avant chaque appel, dans cet ordre :
 
-1. **`lint`, `typecheck` et la suite** verts (`.claude/pipeline.config.md`), et
-   `claude plugin validate . --strict` si le delta touche `.claude/` ou `CLAUDE.md`.
-2. **`/code-review`** en balayage mécanique du diff. C'est la session qui l'invoque elle-même —
-   à la différence de `/code-review ultra`, qui demande un geste du mainteneur et reste hors
-   pipeline.
-3. **`/security-review`** quand le diff touche une zone sensible ou une surface exposée
-   (sections « Périmètre » de la config).
+Les quatre lignes se lisent dans « Commandes du projet » de `.claude/pipeline.config.md`, avec ce
+que chacune couvre et ce qu'elle ne voit pas — jamais de mémoire :
 
-Ces trois portes sont **additives**. Aucune ne remplace le prompt de
+1. **`lint`, `typecheck` et la suite** verts, et la ligne **validation** si le delta touche
+   `.claude/` ou `CLAUDE.md`.
+2. La ligne **relecture**, en balayage mécanique du diff. C'est la session qui l'invoque
+   elle-même — à la différence de `/code-review ultra`, qui demande un geste du mainteneur et
+   reste hors pipeline.
+3. La ligne **sécurité**, quand le diff touche une zone sensible ou une surface exposée
+   (section « Périmètre » de la config). Sinon, le dire en une ligne et passer.
+
+Ces portes sont **additives**. Aucune ne remplace le prompt de
 `.claude/rules/cleanup-verbatim.md`, que la règle exige mot pour mot, ni la relecture à contexte
 vierge : elles retirent du plateau du relecteur ce qu'un outil sait trouver, pour qu'il dépense
 son contexte sur ce qu'aucun outil ne voit — les hypothèses de l'auteur et les affirmations
-attachées au code.
+attachées au code. Mesuré sur le delta de cette PR : la relecture mécanique a rendu **un** défaut
+de correction que les deux passes à contexte vierge n'avaient pas vu, et **zéro** constat sur la
+prose de protocole, où vivaient leurs neuf constats. Une porte neuve s'inscrit dans la config avec
+ses deux populations — ce qu'elle couvre, ce qu'elle rate — avant d'être rendue obligatoire.
 
 À la première passe, le relecteur reçoit **uniquement** le corps de l'issue et son brief d'agent
 (ou le briefing de l'Étape 1), la plage `main..HEAD` et le SHA complet de tête. À la seconde, il
