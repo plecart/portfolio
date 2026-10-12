@@ -172,8 +172,8 @@ worktree, chemin dans CLAUDE.md). Lis CLAUDE.md, .claude/pipeline.config.md et t
 
 Réalise le cycle complet de l'issue #N en invoquant le skill `cycle-pr` (outil Skill) avec N —
 brief : commentaire de l'issue.
-Tu es autorisé à lancer l'équipier `relecteur` de l'Étape 4.2, à ses deux temps, un seul par
-passe : cette
+Tu es autorisé à lancer l'équipier `relecteur` de l'Étape 4.2 : **un seul pour toute la PR**, à
+qui reviennent la seconde passe et la relance par `SendMessage`. Cette
 invocation de `cycle-pr` vaut demande de l'utilisateur.
 Ne lance pas la commande `hooks` de la config ici : les hooks sont partagés entre worktrees et
 déjà installés depuis le clone principal.
