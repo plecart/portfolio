@@ -781,8 +781,9 @@ def test_un_expect_ecrit_en_chaine_est_refuse_avant_toute_resolution(tmp_path: P
     assert "`expect` est une chaîne" in verdicts[0].detail
 
 
-# Une suite témoin dont le cas paramétré porte un accent, comme un quart de ceux du dépôt —
-# dénombrement et commande dans `test_un_identifiant_accentue_se_nomme_dans_sa_forme_naturelle`.
+# Une suite témoin dont le cas paramétré porte un accent, comme près de trois dixièmes de ceux
+# du dépôt — dénombrement et commande dans
+# `test_un_identifiant_accentue_se_nomme_dans_sa_forme_naturelle`.
 SUITE_ACCENTUEE = """\
 import pytest
 
@@ -806,11 +807,16 @@ def test_un_identifiant_accentue_se_nomme_dans_sa_forme_naturelle(tmp_path: Path
 
     **Ce test est le seul endroit où ce chiffre vit**, et c'est le dénombrement qui bouge, pas
     l'invariant : ce qui rougit ici est la résolution de la forme échappée, qui ne dépend
-    d'aucun décompte. Relevé du **2026-10-12 sur `ee21cb5`**, par
-    `uv run pytest --collect-only -q` filtré sur les identifiants portant `\\x` :
-    **280 des 1041 tests collectés, sur 19 fichiers** — soit 26,9 %, environ un quart. La
-    population est figée par un commit, donc reproductible à SHA égal ; elle grossit à chaque
-    lot, donc le couple 280/1041 se relit, jamais se recopie.
+    d'aucun décompte. Avec `test_un_identifiant_accentue_se_nomme_aussi_dans_la_forme_du_lanceur`,
+    les **deux** branches de l'union sont couvertes — retirer l'une ou l'autre fait rougir.
+
+    Relevé du **2026-10-12**, par `uv run pytest --collect-only -q` sur les identifiants
+    collectés portant un échappement non-ASCII : **302 des 1041 tests, sur 19 fichiers** — soit
+    29,0 %, dont 280 en `\\x` et 22 en `\\u` seulement (`test_image_scan.py`, des bornes du type
+    `[infra \\u2014 sans scan]`). Compter la seule forme `\\x` sous-décrit la population que
+    `resolve` doit couvrir, puisque `encode("unicode_escape")` rend les deux. La population est
+    figée par un commit, donc reproductible à SHA égal ; elle grossit à chaque lot, donc le
+    couple 302/1041 se relit, jamais se recopie.
     """
     root = build_repo(tmp_path, suite=SUITE_ACCENTUEE)
 

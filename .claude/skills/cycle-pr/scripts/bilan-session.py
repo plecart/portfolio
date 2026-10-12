@@ -70,9 +70,9 @@ PEER_TAGS = ("<cross-session-message", "<agent-message")
 # parce que chaque bloc peut se fermer sur n'importe quelle fermeture suivante. Mesuré le
 # 2026-10-10 sur `<a>x</a>` répété puis un caractère qui fait échouer : 0,03 s à 18 blocs,
 # 0,09 s à 20, ×3 tous les deux blocs — quelques dizaines de blocs suffisent à figer la mesure.
-# Sous cette forme, le découpage est unique et le coût redevient linéaire : 20 000 blocs,
-# 160 000 octets, **9 ms** — contre un motif naïf qui n'atteint pas 25 blocs (relevé du
-# 2026-10-12 sur ce poste ; c'est l'ordre de grandeur qui porte, pas la milliseconde).
+# Sous cette forme, le découpage est unique et le coût redevient linéaire — là où le motif naïf
+# n'atteint pas 25 blocs. Relevé et commande dans
+# `test_une_suite_de_blocs_qui_echoue_ne_fait_pas_exploser_le_classement`, jamais ici.
 INJECTED_BLOCKS = re.compile(r"\A(?:\s*<([a-z][a-z0-9_-]*)>(?:(?!</\1>).)*</\1>)+\s*\Z", re.DOTALL)
 
 # Et les formes injectées qui ne sont **pas** des balises — à énumérer, elles. `Caveat: The
@@ -469,8 +469,10 @@ class Measures:
         `test_la_reactivite_se_rapporte_au_temps_actif_et_les_absences_a_la_session` — seul
         endroit où ces pourcentages vivent. Aucun n'est recopié ici : un chiffre pris sur une
         session réelle n'est pas reproductible, son transcript pouvant avoir disparu (obs 73),
-        et l'arrondi d'affichage des durées ne redonne pas le pourcentage que le rapport
-        imprime, qui se calcule sur les secondes.
+        et l'arrondi d'affichage des durées ne redonne **pas toujours** le pourcentage que le
+        rapport imprime, qui se calcule sur les secondes — il le redonne sur le montage ci-dessus
+        (15 min sur 1 h 15 affichés, 20 % imprimés), et pas sur une session dont les durées
+        tombent entre deux minutes.
         """
         return self.span - total(self.absences)
 
