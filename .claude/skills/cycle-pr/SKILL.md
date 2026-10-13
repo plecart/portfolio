@@ -996,6 +996,13 @@ contexte le permettrait. Deux raisons :
 C'est aussi pourquoi le prompt du lot suivant est un **artefact remis**, et pas une consigne qu'on
 se donne à soi-même.
 
+**En vague parallèle, le message de clôture au lead porte deux lignes de plus.** « Je suis sortie
+du worktree (`ExitWorktree`) » — un dossier qui est le répertoire courant d'un processus ne
+s'efface pas, et sans cette sortie le `git worktree remove` du lead efface le contenu du worktree
+puis échoue sur son dossier racine (obs 42, `pr-paralleles` Étape 8). Et, sur un lot
+intermédiaire, « le prompt du lot suivant est écrit, remis au mainteneur ». Une session sait
+qu'elle a fini avant que le lead ne le sache : c'est elle qui porte ces deux faits.
+
 ## Les 5 idées à retenir
 
 1. Tout l'effort de questions se fait **avant** de coder (briefing pré-PR + interrogatoire) — et

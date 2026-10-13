@@ -331,12 +331,51 @@ c'est le seul autre canal, et il passe par lui.
   d'une branche poussée sans demande explicite (`contraintes.md`) ; un conflit se résout par un
   commit réel sur la branche.
 
+**Session disparue.** Une session absente de `ListAgents` alors que sa PR est ouverte est **morte,
+pas en attente** : l'abonnement idle ne les distingue pas — une session morte et une session qui
+attend un go rendent le même silence (obs 54). Dans cet ordre :
+
+1. **Mesurer les artefacts** — tête, base, CI, body de PR, worktrees : c'est ce qui est *prouvé*,
+   et ça ne dépend pas d'elle.
+2. **Lire la fin de son récit**, et celui de ses sous-agents :
+
+   ```
+   python <répertoire de ce skill>/scripts/fin-transcript.py <transcript .jsonl> [<tours>]
+   ```
+
+   Le transcript vit sous `~/.claude/projects/<id du répertoire de travail>/<uuid>.jsonl`, ses
+   sous-agents dans `<uuid>/subagents/`. L'uuid est celui du répertoire scratchpad de la session
+   (étape 5), et pour une session placée en worktree c'est le dossier **du worktree** qui porte le
+   projet, pas celui du clone principal. Le script rend les derniers tours, les messages du
+   mainteneur — débarrassés des blocs que le harnais injecte — et le dernier texte de chaque
+   sous-agent, « mort avant de rendre » compris.
+3. **Écrire la passation en séparant prouvé et récit** : le point 1 donne le premier, le point 2 le
+   second, et les mêler fait hériter la reprise d'un récit comme s'il était mesuré.
+4. **Proposer d'abord de rouvrir la même conversation** — son contexte est intact, elle coûte bien
+   moins qu'un relais neuf. Un relais neuf sinon, avec le prompt de l'étape 5.
+5. **Identifier la reprise par son scratchpad** (étape 5) : même UUID → un prompt court suffit ;
+   autre UUID → `EnterWorktree`, puis le prompt de relais.
+
+Un **sous-agent de fond lancé avant l'arrêt est perdu** : le relancer sur la même plage. C'est ce
+qu'obs 54 a payé — une seconde passe de relecture partie six minutes avant l'arrêt, morte sans
+rapport, et un body de PR rédigé dans le contexte sans avoir jamais été posé.
+
 ### 8. Nettoyer après merge
 
-Une fois une PR mergée et sa branche supprimée côté distant, **d'abord détacher ce qui n'appartient
-pas au worktree** : énumérer les liens et jonctions qu'il contient avec un détecteur qui **prouve
-d'abord qu'il voit** — le filtre `Where-Object LinkType` de PowerShell a rendu une liste vide sur
-une jonction connue du système, et une liste vide autorise une suppression :
+Une fois une PR mergée et sa branche supprimée côté distant, **faire d'abord sortir du worktree
+toute session qu'on y a placée.** Un dossier qui est le répertoire courant d'un processus ne
+s'efface pas sous Windows : `git worktree remove` désenregistre le worktree, **efface tout son
+contenu**, puis échoue sur le dossier racine (« Permission denied ») — on découvre le verrou par
+l'erreur, avec un dossier à moitié supprimé et déjà désenregistré, état que la procédure ne décrit
+nulle part (obs 42). Demander donc à chaque session placée là un `ExitWorktree`, ou de se placer
+dans le clone principal, et **attendre sa réponse** : son message de clôture porte la ligne « je
+suis sortie du worktree » (`cycle-pr` Étape 8), parce qu'une session sait qu'elle a fini avant que
+le lead ne le sache.
+
+Puis **détacher ce qui n'appartient pas au worktree** : énumérer les liens et jonctions qu'il
+contient avec un détecteur qui **prouve d'abord qu'il voit** — le filtre `Where-Object LinkType`
+de PowerShell a rendu une liste vide sur une jonction connue du système, et une liste vide
+autorise une suppression :
 
 ```
 python - <chemin du worktree> <<'EOF'
