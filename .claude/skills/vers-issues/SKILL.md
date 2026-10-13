@@ -30,6 +30,7 @@ Les tranches peuvent être 'HITL' ou 'AFK'. Les tranches HITL nécessitent une i
 - Chaque tranche livre un chemin étroit mais COMPLET à travers chaque couche (schéma, API, UI, tests)
 - Une tranche terminée est démontrable ou vérifiable à elle seule
 - Préfère de nombreuses tranches fines à quelques tranches épaisses
+- Chaque élément visible qu'une tranche ajoute à un écran nomme le comportement — de cette tranche ou d'une tranche déjà livrée — qui le fait changer ; un élément dont le seul comportement arrive avec une autre tranche va dans celle-ci, en critère, et la tranche courante n'en pose que la donnée (obs 65)
 </vertical-slice-rules>
 
 **Ne jamais découper une tranche pour la seule taille de PR** quand ses morceaux se valident ensemble — même écran, même point d'arrêt visuel, même ADR : les séparer fait valider deux fois le même écran, ou un demi-écran. La règle de taille (`taille-pr.md`) est une règle de PR, pas de découpage fonctionnel : la tranche reste **une** issue, et si elle dépasse la taille de référence, `cycle-pr` la livre en plusieurs PR (son « cas découpé », Étape 2).
