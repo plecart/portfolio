@@ -270,10 +270,11 @@ encore, le `ci.yml` et le `dependabot.yml` attendent sa première PR de code (é
   job dont aucune d'elles ne dépend — lint, typecheck, tests, publication, déploiement — porte un
   `if:` qui écarte ces deux déclencheurs ; checkout, mise en place, installation et construction
   de ce que le scan lit restent. Sans horloge, un avis n'est vu qu'au run suivant d'une PR
-  quelconque, qui hérite d'un rouge hors de son sujet — deux fois en deux jours (obs 56). `workflow_dispatch` éprouve ce chemin sans attendre un jour ;
-  `schedule` ne part que de la branche par défaut, et GitHub le désactive dans un dépôt public
-  resté 60 jours sans activité (doc GitHub Actions : « Troubleshooting workflows », « Disabling
-  and enabling a workflow »). Sans porte d'avis dans la config, rien à ajouter.
+  quelconque, qui hérite d'un rouge hors de son sujet — deux fois en deux jours (obs 56).
+  `workflow_dispatch` éprouve ce chemin sans attendre un jour ; `schedule` ne part que de la
+  branche par défaut, et GitHub le désactive dans un dépôt public resté 60 jours sans activité
+  (doc GitHub Actions : « Troubleshooting workflows », « Disabling and enabling a workflow »).
+  Sans porte d'avis dans la config, rien à ajouter.
 
 Puis générer `.github/dependabot.yml` depuis `template/.github/dependabot.yml` : les
 empreintes du `ci.yml` n'avancent que si Dependabot les tient, et le modèle porte déjà
