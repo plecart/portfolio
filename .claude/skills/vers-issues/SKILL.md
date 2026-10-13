@@ -67,7 +67,7 @@ Publie les issues dans l'ordre des dépendances (bloqueurs d'abord) afin de pouv
 
 **Une issue qui pose une infrastructure de test porte sa barre.** Un harnais (conteneurs jetables, greffon de réglages, fabriques) attire les tests de ses propres tests : sans barre écrite, le harnais grossit plus vite que la fonctionnalité qu'il sert. La barre par défaut, à inscrire dans ses critères : (1) sans le service, la suite échoue en disant pourquoi, en une ligne ; (2) réglages et image viennent du dépôt, jamais du shell, tenus par un seul garde ; (3) un test de fumée démarre le service et exécute une requête. Tout le reste — sessions de test imbriquées, épinglage par empreinte sans incident, tests des gardes — est hors barre tant qu'un défaut réel ne l'a pas demandé. Et un socle de test est une tranche à part, jamais fondue dans la première fonctionnalité qui en a besoin.
 
-**Un critère chiffré, ou qui décrit une sortie, suit « Critères d'acceptation complets » de `triage/brief-agent.md`** : un dénombrement porte sa population et la commande qui la recense ; une sortie, sa valeur attendue sur une entrée nommée. Écrit ici pour la première fois, un chiffre sans population se recopie dans chaque issue qui en dérive (obs 68, 72).
+**Un critère chiffré, ou qui décrit une sortie, suit « Critères d'acceptation complets » de `triage/brief-agent.md`** : un dénombrement porte sa population et la commande qui la recense ; une sortie, sa valeur attendue sur une entrée nommée. Écrit ici pour la première fois, un chiffre sans population se recopie dans chaque issue, ou chaque lot, qui en dérive (obs 68, 72).
 
 <issue-template>
 ## Parent

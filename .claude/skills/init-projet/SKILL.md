@@ -266,11 +266,11 @@ encore, le `ci.yml` et le `dependabot.yml` attendent sa première PR de code (é
   plateforme après le ready, où il coûte un run complet et le rejeu des vérifications manuelles.
 - **Donner une horloge aux portes qui lisent une base d'avis** — audit des dépendances, scan
   d'images : leur verdict change sans commit, quand un avis se publie. Ajouter au `on:` un
-  déclencheur `schedule` quotidien et `workflow_dispatch`, réservés à ces portes : toute autre
-  étape ou job — lint, typecheck, build, tests, publication, déploiement — porte un `if:` qui les
-  exclut. Sans horloge, un avis
-  n'est vu qu'au run suivant d'une PR quelconque, qui hérite d'un rouge hors de son sujet — deux
-  fois en deux jours (obs 56). `workflow_dispatch` prouve le déclencheur sans attendre un jour ;
+  déclencheur `schedule` quotidien et `workflow_dispatch`, réservés à ces portes : toute étape ou
+  job dont aucune d'elles ne dépend — lint, typecheck, tests, publication, déploiement — porte un
+  `if:` qui écarte ces deux déclencheurs ; checkout, mise en place, installation et construction
+  de ce que le scan lit restent. Sans horloge, un avis n'est vu qu'au run suivant d'une PR
+  quelconque, qui hérite d'un rouge hors de son sujet — deux fois en deux jours (obs 56). `workflow_dispatch` éprouve ce chemin sans attendre un jour ;
   `schedule` ne part que de la branche par défaut, et GitHub le désactive dans un dépôt public
   resté 60 jours sans activité (doc GitHub Actions : « Troubleshooting workflows », « Disabling
   and enabling a workflow »). Sans porte d'avis dans la config, rien à ajouter.
@@ -471,7 +471,7 @@ jusqu'à la première PR de code, qui les coche (étape 11).
 - [ ] section « Sources de vérité » renseignée (au minimum : les issues ouvertes)
 - [ ] `ci.yml` généré depuis les commandes réelles, sans `{{PLACEHOLDER}}` ni étape `n/a`
 - [ ] chaque `uses:` du `ci.yml` épinglé par empreinte + `# <étiquette la plus précise>` ; `permissions: contents: read` en tête
-- [ ] portes à base d'avis (audit, scan) : `schedule` quotidien et `workflow_dispatch`, réservés à elles
+- [ ] portes à base d'avis (audit, scan) : `schedule` quotidien et `workflow_dispatch`, réservés à elles et à ce dont elles dépendent
 - [ ] `.github/dependabot.yml` généré (`github-actions` + écosystèmes de la stack)
 - [ ] `ci.yml` et `dependabot.yml` validés contre leur schéma
 - [ ] skills maison déployés dans `.claude/skills/`
