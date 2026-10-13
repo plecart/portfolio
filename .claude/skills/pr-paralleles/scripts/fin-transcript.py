@@ -38,9 +38,10 @@ EXTRAIT = 400
 #
 # `bilan-session.py` (skill `cycle-pr`) porte une version plus stricte de cette distinction, parce
 # qu'il **compte** les contacts humains et doit donc trancher pour chaque message. Ici on ne compte
-# rien : on rend du texte à lire, et un retrait trop généreux laisse voir un message vide, pas un
-# faux chiffre. Les deux ne s'importent pas l'un l'autre à dessein — un skill recopié dans un dépôt
-# sans l'autre doit fonctionner seul.
+# rien : on rend du texte à lire, et une erreur de classement se voit — un retrait trop généreux
+# laisse un message vide, une forme injectée non reconnue apparaît en clair parmi les messages du
+# mainteneur, reconnaissable à sa balise. Les deux scripts ne s'importent pas l'un l'autre à
+# dessein : un skill recopié dans un dépôt sans l'autre doit fonctionner seul.
 BLOC_INJECTE = re.compile(r"<(?P<balise>[a-z][a-z0-9_-]*)>.*?</(?P=balise)>", re.DOTALL)
 
 # Les textes injectés qui ne sont pas des blocs balisés.

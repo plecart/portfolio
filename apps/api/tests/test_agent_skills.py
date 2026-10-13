@@ -469,12 +469,10 @@ def role_frontmatter(role: str) -> dict[str, object]:
 # La commande compte l'index, pas le disque : lancée avant le `git add` du rôle qu'on ajoute, elle
 # rend un de moins, et c'est la bonne population (celle du dépôt, comme `tracked_files()`).
 # Les **affirmations**, elles, se *lisent* — aucune commande ne distingue « ma prose affirme un
-# champ » d'une phrase ordinaire —, donc chacune ci-dessous est citée par sa phrase, et non
-# dénombrée par un motif.
-# Chaque citation est **verbatim** du fichier nommé : c'est la seule provenance que cette table
-# accepte, et une citation reformulée y est un défaut au même titre qu'un champ faux — mesuré, la
-# première rédaction attribuait au `verificateur` une phrase (« Tu ne travailles pas dans un
-# worktree ») qui n'existait nulle part.
+# champ » d'une phrase ordinaire —, donc chacune ci-dessous est citée par sa phrase, **verbatim**
+# du fichier nommé. C'est la seule provenance que cette table accepte, et une citation reformulée
+# y est un défaut au même titre qu'un champ faux : mesuré, la première rédaction attribuait au
+# `verificateur` une phrase (« Tu ne travailles pas dans un worktree ») qui n'existait nulle part.
 ROLE_FRONTMATTER_CLAIMS: list[tuple[str, str, str | None]] = [
     # « Tu n'as pas de `Write` » (`relecteur.md`) — et `Edit` reste : une mutation modifie un
     # fichier existant, elle n'en crée pas.
@@ -505,8 +503,9 @@ def test_le_frontmatter_d_un_role_tient_ce_que_sa_prose_affirme(
     Ce n'est pas qu'une phrase à garder vraie. Chaque rôle tire de son frontmatter une
     conséquence pratique que son lecteur applique sans la revérifier — le `relecteur` écrit ses
     fichiers de travail par redirection *parce qu'il* n'a pas de `Write` ; le `verificateur`
-    vérifie son placement sans se détacher *parce qu'il* n'a pas de worktree. Changer le champ
-    rendrait la consigne fausse **en silence**, exactement la classe d'obs 50.
+    n'écrit rien et ne se détache sur aucune tête *parce qu'il* partage l'arbre vivant de la
+    session, n'ayant pas de worktree. Changer le champ rendrait la consigne fausse **en
+    silence**, exactement la classe d'obs 50.
 
     La table est paramétrée, et non répliquée en un test par rôle : l'affirmation de frontmatter
     est une **classe**, pas la propriété d'un rôle. Née sur le seul `relecteur`, elle a eu son
@@ -629,9 +628,10 @@ def gate_repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
 # en 0, donc l'action enchaînée part quand même (obs 69, l'incident d'origine).
 #
 # Le cas « ancêtre strict » est la **borne** de la forme, pas un détail : `--is-ancestor` dit
-# « ancêtre ou égal », donc il ne distingue l'égalité du retard que dans un seul sens. C'est
-# pourquoi les skills écrivent l'argument dans l'ordre qui bloque le cas mesuré (le trunk a
-# avancé) et nomment l'autre direction comme non couverte, au lieu de la taire.
+# « ancêtre ou égal », donc un seul appel ne distingue l'égalité du retard que dans un sens. C'est
+# pourquoi les skills chaînent **deux** prédicats, un par direction, partout où l'égalité est la
+# condition (création de branche, création de worktree) — et un seul là où le trunk n'avance que
+# vers l'avant (le merge, obs 60).
 FRESHNESS_GATE_FORMS = {
     "is-ancestor-rend-0-sur-deux-refs-egales": (
         ("merge-base", "--is-ancestor", "trunk", "trunk"),
@@ -800,9 +800,10 @@ def test_chaque_porte_prescrite_est_un_predicat_chaine_a_son_action(
     C'est le cliquet de la classe : `cleanup-verbatim.md` exige qu'un correctif qui ferme un chemin
     soit « épinglé dans l'artefact par un test paramétré, pas par une phrase de docstring ». Le
     dénombrement de la classe vit dans
-    `test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie` ; ici vivent les
-    **3 portes convertibles** qui restaient à épingler — la quatrième, la création de worktree,
-    partage la ligne d'action de la troisième.
+    `test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie`. Des 6 portes qui
+    fuyaient, cette table en épingle **3** : celles que la prose prescrit en **bloc de commandes**,
+    où une action unique suit le prédicat. Les 3 `merge-tree` sont des prédicats nommés en prose
+    sans action unique en bloc — pas épinglables par cette forme, et c'est dit, pas tu.
 
     Le prédicat doit se trouver **à gauche de l'action sur la même ligne**, avec un `&&` entre les
     deux : c'est exactement ce qui distingue une porte d'une lecture suivie d'une seconde commande
