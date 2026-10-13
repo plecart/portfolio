@@ -64,6 +64,12 @@ briefing ; sans elle, le projet resterait sans CI.
 Produire un briefing écrit AVANT de créer la branche :
 
 - **Liste précise des fichiers** à créer/modifier — le chemin exact de chacun.
+- **Estimation** — comptée **par critère**, en artefacts que le critère doit laisser, jamais en
+  prose qui le décrit : une porte ou un invariant → un test paramétré à témoins des deux côtés
+  (~100-150 lignes) ; un script → le script et son fichier de test (~400) ; une règle de skill → sa
+  ligne, plus la docstring de dénombrement si elle ferme une classe. Calibration mesurée : les
+  lots 1, 2 et 3 de #77 ont dépassé la leur de 2 à 5×, tous du même côté — une estimation en
+  prose est un plancher. C'est elle que consomme le seuil relatif de `taille-pr.md` (obs 78).
 - **Décisions verrouillées** — choix d'architecture / scope / format actés.
 - **Questions résiduelles** — découpage, format des données, transitions d'état, comportements,
   edge cases — **chacune avec sa voie** (`contraintes.md`, règle d'or) : une `[T]` se tranche
@@ -88,7 +94,8 @@ l'issue dès les outils éprouvés :
   parce que le travail n'a pas de ticket.
 
 Le point n'est pas de cocher une case : c'est que **les décisions tranchées soient écrites**, dans
-l'issue ou dans le briefing. Elles seront relues par une autre session que celle-ci.
+l'issue — brief amendé s'il est contredit — et dans le briefing. Elles seront relues par une
+autre session que celle-ci.
 
 ### Auto-challenge du plan — le plan est-il encore exact ?
 
@@ -132,6 +139,12 @@ peut-être bougé. Confronter le plan à la réalité **actuelle** du code :
 S'il y a un écart qui change le cours du dev, **s'arrêter et le remonter à l'utilisateur** avant le
 « go » — ne pas dérouler un plan périmé en silence. Si tout tient, le dire explicitement (« plan
 confirmé contre l'état actuel »).
+
+**Une réponse `[V]` du go qui contredit le brief l'amende avant la première ligne de code** —
+décision verrouillée, critère ou interface : décision réécrite avec son motif et sa date, critères
+déplacés, une ligne datée au « Journal de spec » du corps (`decisions-vs-doc`, sortie 2), relue
+après écriture. Le corps de la PR ne remplace pas le brief : les lots suivants et `repercussions`
+ne lisent que l'issue (obs 44).
 
 Attendre un **« go » explicite**, puis créer la branche — trunk-based depuis `main`, derrière une
 **porte**, c'est-à-dire une commande dont le code de sortie porte la condition :
@@ -440,7 +453,13 @@ git commit -m "type(scope): description"
 ```
 
 Pas de corps, pas de footer, pas de `Co-Authored-By`, pas de numéro de PR. Breaking change : `!`
-dans le titre. Puis enchaîner sur le commit suivant (retour 3.1) — ou, si ce commit vient de poser
+dans le titre.
+
+**Puis relire le gabarit**, le chiffre étant sous la main : `git diff --stat main..HEAD` contre
+les deux seuils de `taille-pr.md` — l'absolu, et le double de l'estimation du briefing. Franchi,
+le re-découpage se rouvre maintenant, pas à l'Étape 5 (obs 70).
+
+Puis enchaîner sur le commit suivant (retour 3.1) — ou, si ce commit vient de poser
 le socle, lancer d'abord la première passe de relecture (4.2). Si ce commit assemble un écran
 d'une zone sensible, c'est maintenant que se prend le point d'arrêt humain — cadence et forme
 dans `.claude/rules/contraintes.md`, « Points d'arrêt humains », source unique.
