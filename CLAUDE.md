@@ -91,8 +91,16 @@ n'est pas choisi par tâche, il est choisi par rôle** au moment de créer l'éq
 |---|---|---|
 | `developpeur` | Opus | l'implémentation TDD d'un brief borné, la correction de tests rouges |
 | `relecteur` | Opus, effort `medium` | la relecture à contexte vierge d'un diff (`cycle-pr` 4.2), seul, dans son propre worktree |
-| `executant` | Sonnet, effort `low` | tests / lint / format, exploration et cartographie du code, edits entièrement spécifiés |
+| `executant` | Sonnet, effort `max` | tests / lint / format, exploration et cartographie du code, edits entièrement spécifiés, codage d'une tranche entièrement spécifiée |
 | `verificateur` | Opus, effort `medium` | la vérification d'avant-go d'une PR (`pr-paralleles` Étape 6), **éphémère, un par (PR, go)**, sans worktree et sans lancer de commande du projet |
+
+**Ce qui rend un rôle éligible au modèle le moins cher : un mandat sans aucune décision** — pas
+une tâche qui paraît facile. Le mandat (ce que le rôle peut trancher) et l'effort (la profondeur
+de réflexion) sont deux axes : un rôle sans décision peut porter un effort élevé, qui paie alors
+de la vérification et non de l'architecture. Déléguer à un tel rôle suppose que le lead ait écrit
+la tranche entièrement — fichiers, signatures, tests attendus, comportement — avant l'envoi : si
+la spécifier demande encore de réfléchir, c'est le travail du lead. Chaque rôle dit en tête de
+son fichier s'il tranche.
 
 L'effort d'un rôle se fixe dans son frontmatter (`effort`) ; celui de la session, par `/effort`.
 
