@@ -61,7 +61,10 @@ Ce que tu vérifies :
    cherchent partout où l'on comparait par égalité exacte, sous un écrivain concurrent ; un
    correctif qui **ferme un chemin** se dénombre, quel que soit son sujet : « combien de chemins
    mènent à cet état, et combien en as-tu mesurés ? » — le déclencheur de `cleanup-verbatim.md`
-   est la **structure** du défaut (N chemins vers un même état), pas la sécurité.
+   est la **structure** du défaut (N chemins vers un même état), pas la sécurité. Une mutation
+   qui affaiblirait un **réglage de sécurité** ne se joue pas, que le harnais la reconnaisse ou
+   non : ajoute plutôt une forme au recueil de formes fautives de la garde, rapportée comme édit
+   précis (`cycle-pr` 3.1).
 3. **Les frontières tierces** — réseau, sérialisation et encodage, secrets, fusion avec un thème
    ou une config par défaut, cycle de vie de ressources : le comportement réel de la bibliothèque,
    lu dans sa documentation à jour (`context7`) ou dans ses sources ; tout écart avec ce que le
