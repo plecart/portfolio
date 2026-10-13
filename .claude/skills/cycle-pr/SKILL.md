@@ -836,12 +836,12 @@ ni de force-push.
     (garde `if:`) se terminent sans runner et ne prouvent rien sur la disponibilité de la CI.
   - *Rouge d'avis* : le step d'audit ou de scan rougit sur un paquet que le diff ne touche pas →
     une base d'avis a changé sans commit. Vérifier que le trunk rougit aussi — son dernier run
-    planifié s'il en a un, sinon le seul job d'audit ou de scan de son dernier run, rejoué
-    (`gh run rerun <id> --job <id du job>`, lu par `gh run view <id> --json jobs`) — jamais le
-    run entier, qui relancerait publication et déploiement, ni `--failed`, qui sur un run vert ne
-    rejoue rien —, puis appliquer « Création d'issues en cours de cycle »
-    (`.claude/rules/contraintes.md`), barreau par barreau. Un rerun de la PR, lui, ne prouve
-    rien : l'avis ne part pas (obs 56).
+    planifié ou un `workflow_dispatch` s'il en a, sinon la porte elle-même, sa commande du projet
+    lancée sur `origin/<trunk>` dans un worktree jetable. Jamais un rerun d'un run du trunk :
+    `--job` comme le run entier relancent les jobs qui en dépendent (REST : « Re-run a job and
+    its dependent jobs »), publication et déploiement compris. Puis appliquer « Création
+    d'issues en cours de cycle » (`.claude/rules/contraintes.md`), barreau par barreau. Un rerun
+    de la PR, lui, ne prouve rien : l'avis ne part pas (obs 56).
   - *Rouge de code* : tout le reste, y compris un rouge de plateforme (3.2) → cycle complet
     3.1→3.5.
 - **Revue** : les commentaires d'une revue automatisée (bot), s'il y en a une. L'auteur a relu en

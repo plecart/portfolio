@@ -1058,3 +1058,64 @@ def test_chaque_creation_de_branche_hors_porte_nomme_son_point_de_depart(fichier
     assert not sans_depart, (
         f"création de branche sans point de départ dans `{fichier}` : {sans_depart}"
     )
+
+
+# Les portes à base d'avis (obs 56) lisent une base qui change sans commit. La prose qui prescrit
+# un geste sur elles a fui deux fois à la relecture du lot 4b de #77, dans deux sens opposés :
+# vérifier un avis sur le trunk en **rejouant** un de ses runs relance les jobs qui en dépendent —
+# `publish`, puis `deploy` (REST : « Re-run a job and its dependent jobs ») ; et réserver
+# l'horloge à ces portes en excluant **toute autre étape** retire l'installation et la
+# construction dont elles dépendent, si bien que le run planifié rougit chaque jour.
+#
+# Dénombrement, écrit avant le correctif : les passages de la prose du harnais
+# (`.claude/**/*.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `.github/`) qui nomment une porte d'avis —
+# motif `base d'avis|rouge d'avis|portes? d'avis|portes? à base d'avis`, insensible à la casse —
+# sont 5 ; 3 prescrivent un geste, 2 fuyaient, le troisième (une case de checklist) portait la
+# même ambiguïté que le second. Les 2 autres décrivent sans prescrire : l'écart de ce projet
+# (`pipeline.config.md`, « Qualité ») et la règle des populations vivantes (`cleanup-verbatim.md`).
+# Cas : (fichier, début du passage, fin du passage, ce qu'il ne cite pas — `None` si la forme
+# fautive est un préfixe de la juste —, ce qu'il dit).
+ADVISORY_GATE_RULES = {
+    "cycle-pr-rouge-d-avis": (
+        ".claude/skills/cycle-pr/SKILL.md",
+        "*Rouge d'avis*",
+        "*Rouge de code*",
+        "gh run rerun",
+        "Jamais un rerun d'un run du trunk",
+    ),
+    "init-projet-horloge": (
+        ".claude/skills/init-projet/SKILL.md",
+        "**Donner une horloge",
+        "Sans porte d'avis",
+        "build, tests",
+        "installation et construction",
+    ),
+    "init-projet-checklist": (
+        ".claude/skills/init-projet/SKILL.md",
+        "- [ ] portes à base d'avis",
+        "\n",
+        None,
+        "ce dont elles dépendent",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("fichier", "debut", "fin", "interdit", "exige"),
+    ADVISORY_GATE_RULES.values(),
+    ids=ADVISORY_GATE_RULES.keys(),
+)
+def test_une_regle_de_porte_d_avis_ne_relance_ni_ne_retire_ce_dont_elle_depend(
+    fichier: str, debut: str, fin: str, interdit: str | None, exige: str
+) -> None:
+    """Le passage qui prescrit un geste sur une porte d'avis ne rejoue aucun run du trunk et garde
+    ce dont la porte dépend. Le début du passage doit apparaître **une** fois : un passage
+    renommé fait rougir ici au lieu de rendre le test vacant."""
+    texte = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig").replace("\r\n", "\n")
+
+    assert texte.count(debut) == 1, f"`{debut}` apparaît {texte.count(debut)} fois dans `{fichier}`"
+    passage = texte[texte.index(debut) :]
+    passage = passage[: passage.index(fin, len(debut))]
+    if interdit is not None:
+        assert interdit not in passage, f"`{fichier}` prescrit encore « {interdit} » : {passage!r}"
+    assert exige in passage, f"`{fichier}` ne dit plus « {exige} » : {passage!r}"
