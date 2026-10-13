@@ -5,7 +5,7 @@
 - Au-delà de **~10 fichiers** ou **~500 lignes de diff**, découper la PR.
 - **Ne jamais raboter la qualité pour tenir dans le gabarit.** Si le bon choix technique dépasse
   ces bornes, découper en lots (`cycle-pr`, cas découpé) — pas rogner la solution.
-- **Le gabarit se re-mesure à chaque commit** (`git diff --stat main..HEAD`, `cycle-pr` 3.5), pas
+- **Le gabarit se re-mesure à chaque commit** (`git diff --stat main...HEAD`, `cycle-pr` 3.5), pas
   à la fin. Deux seuils, deux effets : l'**absolu** ci-dessus mesure la relisabilité et
   **découpe** ; le **double de l'estimation du briefing** mesure que le plan était faux et
   **rouvre** le découpage — un lot de plus, ou une ligne qui nomme ce qui, dans le bon choix

@@ -321,9 +321,10 @@ test.** Sept cas à traiter explicitement :
   converger le chemin nominal et le chemin fautif vers la même observation : trouver un point où
   les deux divergent. Quand la ligne gardée est un **réglage de sécurité** — option d'un scanner,
   épingle, permission, porte de CI —, on ne mute pas le dépôt : on écrit la garde en fonction sur
-  du texte, vue rouge sur un recueil de formes fautives construites en mémoire. Le classifieur du
-  mode auto refuse de lancer une suite sur une configuration de sécurité affaiblie, par quelque
-  voie que ce soit (obs 53). `mutation.py` refuse ce que ses motifs de chemin et de contenu
+  du texte, vue rouge sur un recueil de formes fautives construites en mémoire (modèle :
+  `WORKFLOW_FORMS` de `apps/api/tests/test_supply_chain.py`). Le classifieur du mode auto refuse de
+  lancer une suite sur une configuration de sécurité affaiblie, par quelque voie que ce soit
+  (obs 53). `mutation.py` refuse ce que ses motifs de chemin et de contenu
   reconnaissent et renvoie à cette forme ; un réglage rangé ailleurs y ajoute son motif.
 - **Le test est dicté par un tiers** (relecteur, lead de vague, issue) → même règle que pour un
   test écrit soi-même : mutation avant de le garder. L'autorité de la source ne remplace pas le
@@ -455,7 +456,7 @@ git commit -m "type(scope): description"
 Pas de corps, pas de footer, pas de `Co-Authored-By`, pas de numéro de PR. Breaking change : `!`
 dans le titre.
 
-**Puis relire le gabarit**, le chiffre étant sous la main : `git diff --stat main..HEAD` contre
+**Puis relire le gabarit**, le chiffre étant sous la main : `git diff --stat main...HEAD` contre
 les deux seuils de `taille-pr.md` — l'absolu, et le double de l'estimation du briefing. Franchi,
 le re-découpage se rouvre maintenant, pas à l'Étape 5 (obs 70).
 

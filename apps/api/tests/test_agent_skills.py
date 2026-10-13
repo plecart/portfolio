@@ -540,9 +540,11 @@ ORCHESTRATION_ROW = re.compile(
 MANDATE_LINE = re.compile(
     r"\A\*\*Ton mandat (?P<verdict>ne contient aucune décision|contient des décisions)"
 )
-# Le modèle le moins cher de la table, écrit en littéral : le seul que le critère autorise pour un
-# mandat sans décision, et le seul qu'un mandat sans décision doive porter.
-CHEAPEST_MODEL = "sonnet"
+# Le seul modèle d'un mandat qui tranche, écrit en littéral. Tout autre est moins cher, donc
+# réservé au mandat sans décision : comparer au modèle le moins cher de la table laissait passer
+# un rôle qui tranche, déplacé sur un modèle plus modeste encore (sonde `haiku` VERTE, passe 2 de
+# la PR #87).
+DECIDING_MODEL = "opus"
 
 
 def orchestration_table() -> dict[str, tuple[str, str | None]]:
@@ -596,8 +598,8 @@ def test_la_table_d_orchestration_et_le_frontmatter_d_un_role_disent_le_meme_mod
 def test_un_role_dit_en_tete_s_il_tranche_et_son_modele_le_suit(path: Path) -> None:
     """« Chaque rôle dit en tête de son fichier s'il tranche » (`CLAUDE.md`, critère d'éligibilité).
 
-    Et ce qu'il en dit commande son modèle : un mandat sans décision va au modèle le moins cher,
-    un mandat qui tranche n'y va jamais. Un rôle qui change de modèle sans que sa première ligne
+    Et ce qu'il en dit commande son modèle : un mandat qui tranche reste sur Opus, un mandat sans
+    décision va à un modèle moins cher. Un rôle qui change de modèle sans que sa première ligne
     suive — ou l'inverse — rend fausse la seule phrase que son lecteur lit d'abord.
     """
     head = MANDATE_LINE.match(role_body(path.stem))
@@ -606,9 +608,56 @@ def test_un_role_dit_en_tete_s_il_tranche_et_son_modele_le_suit(path: Path) -> N
     )
     model = str(role_frontmatter(path.stem).get("model")).lower()
 
-    assert (head["verdict"] == "ne contient aucune décision") == (model == CHEAPEST_MODEL), (
+    assert (head["verdict"] == "ne contient aucune décision") == (model != DECIDING_MODEL), (
         f"`{path.stem}` est sur `{model}` et dit « {head['verdict']} »"
     )
+
+
+# `git diff A..B` compare deux **arbres** ; ce n'est pas une plage de commits. Entre le trunk et la
+# tête, il compte donc en sens inverse tout ce que le trunk a reçu depuis le point de fork — le
+# gabarit d'une PR franchit alors ses seuils à tort dès que `main` avance. La forme qui mesure la
+# branche est à **trois** points, `main...HEAD`, qui part de la base de fusion. Mesuré à la passe 2
+# de la PR #87 : `446a3a6` dans le rôle d'un `main` avancé, `e89e19b` dans celui de la branche —
+# deux points rendent 6 fichiers et 173 suppressions, trois points rendent un diff vide.
+# Dénombrement à l'écriture de cette porte, sur la prose du harnais : 3 `git diff … ..HEAD`, dont 2
+# entre le trunk et la tête (la commande du gabarit, `cycle-pr` 3.5 et `taille-pr.md`) qui
+# fuyaient ; le troisième part d'un SHA de vérification, **ancêtre** de la tête, où deux et trois
+# points rendent le même diff — le motif ne vise que le trunk.
+TRUNK_DIFF_TWO_DOTS = re.compile(r"git diff\b[^`\n]*?\s(?:origin/)?(?:main|<trunk>)\.\.(?!\.)")
+
+TRUNK_DIFF_FORMS = {
+    "gabarit à deux points": ("`git diff --stat main..HEAD`", True),
+    "trunk distant à deux points": ("`git diff origin/main..HEAD`", True),
+    "trunk générique à deux points": ("`git diff --stat origin/<trunk>..HEAD`", True),
+    "gabarit à trois points": ("`git diff --stat main...HEAD`", False),
+    "plage de commits de git log": ("`git log --oneline main..HEAD`", False),
+    "diff depuis un ancêtre de la tête": ("`git diff <sha de la vérification>..HEAD`", False),
+}
+
+
+@pytest.mark.parametrize(("prose", "flagged"), TRUNK_DIFF_FORMS.values(), ids=TRUNK_DIFF_FORMS)
+def test_le_motif_du_diff_de_branche_ne_vise_que_le_trunk_a_deux_points(
+    prose: str, flagged: bool
+) -> None:
+    """Le motif mord sur les trois écritures du trunk à deux points, et sur aucune voisine juste.
+
+    Les voisines comptent autant que les fautives : `git log main..HEAD` **est** la plage de
+    commits de la branche, et un diff depuis un ancêtre de la tête n'a pas de base de fusion à
+    prendre — rougir sur l'une ou l'autre ferait corriger un texte juste.
+    """
+    assert bool(TRUNK_DIFF_TWO_DOTS.search(prose)) is flagged
+
+
+def test_aucun_diff_entre_le_trunk_et_la_tete_ne_s_ecrit_a_deux_points() -> None:
+    """La prose du harnais prescrit des commandes qu'un agent tape telles quelles."""
+    found = [
+        f"{path.relative_to(REPOSITORY_ROOT).as_posix()} : {match.group(0)}"
+        for path, match in prose_citations(
+            REPOSITORY_ROOT, tracked_files(), HARNESS_PROSE_GLOBS, TRUNK_DIFF_TWO_DOTS
+        )
+    ]
+
+    assert not found, f"diff du trunk à deux points — écrire `…...HEAD` : {found}"
 
 
 @pytest.mark.parametrize("prose", FOREIGN_PREFIXES.values(), ids=FOREIGN_PREFIXES.keys())
