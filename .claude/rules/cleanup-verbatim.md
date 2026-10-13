@@ -90,6 +90,27 @@ avant tout jugement, chaque finding cité par §.
   nombre de runs font varier, l'**ordre de grandeur est la mesure**, et c'est l'invariant sous
   test qui rougit, jamais le relevé. La forme « population + commande » vaut pour une population
   **figée par un commit**, pas pour un temps.
+
+  **Même exception pour une population vivante** — corpus de transcripts, base d'avis, inventaire
+  d'un outil, sortie d'un service tiers : le relevé porte son **horodatage à l'heure** et la
+  mention « population vivante », avec une seconde mesure quand on en a une, et le texte distingue
+  le **chiffre relevé** de l'**invariant sous test**. Le test paramétré n'assère que l'invariant —
+  les formes couvrent la population sans résidu —, jamais la valeur absolue : il reste vert quand
+  la population grossit, et rougit quand une forme entre sans re-mesure. Mesuré : 87 transcripts
+  et 1137 messages, puis 85 et 1106 une heure plus tard, même commande (obs 71).
+- **Un texte procédural se relit dans l'ordre d'exécution.** Un delta qui ajoute une condition,
+  une exception ou un report à un texte exécuté pas à pas — skill, règle, runbook — se relit en
+  agent qui le suit à la lettre : l'exception se place à l'étape qui agit, ou y est annoncée,
+  jamais seulement plus loin. Chaque étape qui agit sur le cas couvert se relit avec la question
+  « à ce point, l'agent sait-il déjà qu'il ne doit pas le faire ? ». Mesuré : deux exceptions
+  placées après l'étape qu'elles suspendaient, dans une même PR, aucune vue par le cleanup fait
+  paragraphe par paragraphe — chacun était juste isolément (obs 30).
+- **Une uniformisation de syntaxe est un changement de comportement tant qu'elle n'est pas
+  prouvée entrée par entrée.** Normaliser N entrées — jokers, guillemets, chemins, drapeaux — se
+  prouve équivalent **par entrée**, une mesure ou un cas de test chacune, jamais par l'équivalence
+  générale de la doc ; une entrée qui s'avère morte se **retire**, elle ne se réveille pas.
+  Mesuré : `Bash(gh api repos/:*)`, normalisé en `Bash(gh api repos/*)`, a rendu vivante une
+  règle morte depuis l'amorçage, et silencieuses les écritures REST qu'elle couvrait (obs 47).
 - **Vérifier aussi les 3 axes de conception** de `.claude/rules/contraintes.md` (modulaire /
   fractionné / scalable), en plus de KISS / DRY / YAGNI.
 - **Relancer les tests après le cleanup** : il a pu casser quelque chose.
