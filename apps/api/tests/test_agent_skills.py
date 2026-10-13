@@ -433,26 +433,88 @@ def test_un_repertoire_dans_la_population_n_est_pas_lu(tmp_path: Path) -> None:
     assert cited_scripts(tmp_path, [".github/workflows"]) == {}
 
 
-def test_le_relecteur_ne_declare_aucun_outil_d_ecriture_de_fichier() -> None:
-    """Le rôle `relecteur` dit à son lecteur « tu n'as pas de `Write` » : la liste doit le tenir.
+def role_frontmatter(role: str) -> dict[str, object]:
+    """Le frontmatter d'un rôle de `.claude/agents/`, parsé.
 
-    Ce n'est pas qu'une phrase à garder vraie. Le mandat du rôle est de ne rien changer — « ne
-    commit pas, ne pousse pas, ne corrige pas » —, et il en tire une conséquence pratique : un
-    fichier de travail s'écrit par redirection, parce que le garde d'isolation refuse un
-    heredoc. Ajouter `Write` à la liste rendrait la consigne fausse **en silence**, exactement
-    la classe d'obs 50 : rien dans le harnais ne relit la prose d'un rôle contre son frontmatter.
+    Args:
+        role: le nom du fichier du rôle, sans son extension.
 
-    `Edit` reste : une mutation modifie un fichier existant, elle n'en crée pas.
+    Returns:
+        Les champs que ce rôle déclare.
+
+    Raises:
+        AssertionError: le fichier est absent, ou son frontmatter ne parse pas — les deux états
+            où une affirmation sur ce frontmatter passerait pour une raison étrangère à elle.
     """
-    frontmatter = FRONTMATTER.match(
-        (REPOSITORY_ROOT / ".claude" / "agents" / "relecteur.md").read_text(encoding="utf-8-sig")
-    )
+    path = REPOSITORY_ROOT / ".claude" / "agents" / f"{role}.md"
+    assert path.is_file(), f"rôle introuvable : {path}"
+    frontmatter = FRONTMATTER.match(path.read_text(encoding="utf-8-sig"))
+    assert frontmatter, f"le frontmatter de `{role}` ne parse plus — voir la porte voisine"
+    fields: object = yaml.safe_load(frontmatter.group("yaml"))
+    assert isinstance(fields, dict), f"le frontmatter de `{role}` n'est pas un mapping"
+    return cast(dict[str, object], fields)
 
-    assert frontmatter, "le frontmatter de `relecteur` ne parse plus — voir la porte voisine"
-    declared = cast(dict[str, object], yaml.safe_load(frontmatter.group("yaml"))).get("tools")
-    assert isinstance(declared, str), f"`tools` absent ou non textuel : {declared!r}"
-    assert "Write" not in declared, (
-        f"`relecteur` déclare `Write` ({declared}) — son texte dit à son lecteur le contraire"
+
+# Ce que la **prose** d'un rôle affirme de son propre frontmatter — et que rien ne relit (obs 50) :
+# `claude plugin validate` est muet sur le frontmatter d'un rôle (mesuré le 2026-10-09 sur
+# v2.1.295), et aucune porte ne confronte le texte d'un rôle aux champs qu'il déclare.
+#
+# Une ligne par affirmation : le rôle, le champ, et le fragment que ce champ ne doit **pas**
+# porter — `None` quand c'est le champ entier qui doit être absent ou nul. Ajouter une
+# affirmation, c'est ajouter une ligne : la porte s'étend, elle ne se modifie pas.
+#
+# Deux provenances, à ne pas mélanger. La **population** est mécanique : les rôles **suivis** que
+# `git ls-files ".claude/agents/*.md"` rend — 4 au 2026-10-13, le quatrième étant `verificateur`.
+# La commande compte l'index, pas le disque : lancée avant le `git add` du rôle qu'on ajoute, elle
+# rend un de moins, et c'est la bonne population (celle du dépôt, comme `tracked_files()`).
+# Les **affirmations**, elles, se *lisent* — aucune commande ne distingue « ma prose affirme un
+# champ » d'une phrase ordinaire —, donc chacune ci-dessous est citée par sa phrase, et non
+# dénombrée par un motif.
+ROLE_FRONTMATTER_CLAIMS = {
+    # « Tu n'as pas de `Write` » (`relecteur.md`) — et `Edit` reste : une mutation modifie un
+    # fichier existant, elle n'en crée pas.
+    "relecteur-n-a-pas-de-Write": ("relecteur", "tools", "Write"),
+    # « tu n'écris rien » (`verificateur.md`) : le mandat est un verdict, pas un correctif.
+    "verificateur-n-a-pas-de-Write": ("verificateur", "tools", "Write"),
+    # « Tu ne travailles pas dans un worktree » (`verificateur.md`) : c'est ce qui le garde bon
+    # marché, et un `isolation` déclaré en ferait créer un à chaque (PR, go).
+    "verificateur-n-a-pas-de-worktree": ("verificateur", "isolation", None),
+}
+
+
+@pytest.mark.parametrize(
+    ("role", "field", "forbidden"),
+    ROLE_FRONTMATTER_CLAIMS.values(),
+    ids=ROLE_FRONTMATTER_CLAIMS.keys(),
+)
+def test_le_frontmatter_d_un_role_tient_ce_que_sa_prose_affirme(
+    role: str, field: str, forbidden: str | None
+) -> None:
+    """Une affirmation qu'un rôle fait sur son propre frontmatter doit rougir quand elle devient
+    fausse.
+
+    Ce n'est pas qu'une phrase à garder vraie. Chaque rôle tire de son frontmatter une
+    conséquence pratique que son lecteur applique sans la revérifier — le `relecteur` écrit ses
+    fichiers de travail par redirection *parce qu'il* n'a pas de `Write` ; le `verificateur`
+    vérifie son placement sans se détacher *parce qu'il* n'a pas de worktree. Changer le champ
+    rendrait la consigne fausse **en silence**, exactement la classe d'obs 50.
+
+    La table est paramétrée, et non répliquée en un test par rôle : l'affirmation de frontmatter
+    est une **classe**, pas la propriété d'un rôle. Née sur le seul `relecteur`, elle a eu son
+    deuxième et son troisième membre dès le rôle suivant.
+    """
+    declared = role_frontmatter(role).get(field)
+
+    if forbidden is None:
+        assert declared is None, (
+            f"`{role}` déclare `{field}: {declared!r}` — sa prose dit le contraire"
+        )
+        return
+    assert isinstance(declared, str), (
+        f"`{field}` absent ou non textuel chez `{role}` : {declared!r}"
+    )
+    assert forbidden not in declared, (
+        f"`{role}` déclare `{field}: {declared}` — son texte dit à son lecteur le contraire"
     )
 
 
