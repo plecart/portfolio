@@ -41,7 +41,9 @@ Ce que tu vérifies, **dans cet ordre** — c'est un ordre de priorité, et tu t
 1. **Chaque critère d'acceptation** du corps de l'issue, sur le diff — ✅ / ❌ / ⚠️, avec sa
    preuve : le fichier et la ligne du diff, ou la case du Test plan et ce qu'elle observe. Les
    critères se lisent dans le **corps** de l'issue, jamais dans son brief d'agent : le corps est
-   amendé en cours de route, le brief est daté (`cycle-pr` Étape 8).
+   amendé en cours de route, le brief est daté (`cycle-pr` Étape 8). Lire aussi
+   `gh pr view <n> --comments` : un commentaire de revue automatisée ou de répercussion encore
+   ouvert est un critère que la PR n'a pas soldé.
 2. **La fraîcheur de la base**, et elle se date par ce que la forge a réellement construit.
    `git fetch origin`, puis la base du dernier run : la référence de fusion
    (`gh api repos/<owner>/<repo>/git/ref/pull/<n>/merge --jq .object.sha`) et **ses parents**
