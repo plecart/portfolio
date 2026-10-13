@@ -91,7 +91,7 @@ Interroge GitHub (via `gh`) et présente cinq catégories, des plus anciennes au
 
 1. **Sans label** — jamais triées.
 2. **`needs-triage`** — évaluation en cours.
-3. **`needs-interrogation`** — en attente d'une session `/interroge-moi` avec le mainteneur. C'est la file qui bloque l'alimentation des agents : la signaler explicitement si elle s'allonge.
+3. **`needs-interrogation`** — en attente d'une session `/interroge-moi` avec le mainteneur. C'est la file qui bloque l'alimentation des agents : la signaler explicitement si elle s'allonge. La présenter scindée, d'après l'état des numéros de « Bloquée par » lu dans GitHub : *interrogeables maintenant* (bloqueurs fermés) et *en attente d'un bloqueur* (le nommer) — seule la première vaut une session (étape 4 de « Trier une issue spécifique »).
 4. **`needs-info` avec activité du rapporteur depuis les dernières notes de triage** — nécessite une réévaluation.
 5. **Fermées portant encore un rôle d'état** — la passe de clôture (`cycle-pr` Étape 8 : retrait du label, critères d'acceptation cochés) leur est due et personne ne l'a faite, typiquement parce que le mainteneur a fermé l'issue lui-même. Seule catégorie portant sur des issues fermées ; `wontfix` en est exclu, c'est le seul rôle qui survit à une fermeture.
 
@@ -107,8 +107,9 @@ Affiche les décomptes et un résumé d'une ligne par issue, en indiquant le th�
 
 4. **Interroger — systématiquement.** Toute issue destinée à `ready-for-agent` ou `ready-for-human` passe par l'interrogatoire, sans exception. Ce n'est pas conditionné à ton impression que « l'issue a l'air claire » : c'est précisément quand elle en a l'air que les hypothèses tacites passent.
 
-   - Passe l'issue en `needs-interrogation`, puis lance le skill `interroge-moi` si le mainteneur est disponible tout de suite.
-   - S'il ne l'est pas, **laisse l'issue en `needs-interrogation` et arrête-toi là** — elle attendra sa session. Ne la promeus pas « en attendant ».
+   - Passe l'issue en `needs-interrogation`. Puis, si **tous les bloqueurs de « Bloquée par » sont fermés** et que le mainteneur est disponible tout de suite, lance le skill `interroge-moi`. L'état de chaque bloqueur se lit dans GitHub (`gh issue view <n> --json state`), jamais dans la mémoire de la session.
+   - **Un bloqueur encore ouvert → pas d'interrogatoire.** L'issue reste en `needs-interrogation`, annoncée *en attente de #N* : au merge de #N, `repercussions` réécrit son corps, et un interrogatoire mené avant serait à refaire sur une spec qui n'existe plus — payé deux fois, sur deux issues (obs 26).
+   - Si le mainteneur n'est pas disponible, **laisse l'issue en `needs-interrogation` et arrête-toi là** — elle attendra sa session. Ne la promeus pas « en attendant ».
    - **Consigne le résultat dans l'issue**, sinon le garde-fou n'est que décoratif : les points tranchés vont dans « Décisions verrouillées » du brief d'agent, les questions restées ouvertes en notes de triage. *Une interrogation dont les conclusions ne sont pas écrites n'a pas eu lieu* — c'est `cycle-pr` qui les relira, des jours plus tard, sans accès à cette conversation.
 
 5. **Appliquer le résultat :**
@@ -133,7 +134,7 @@ Si le mainteneur dit « passe l'issue #42 en ready-for-agent », fais-lui confia
 **L'interrogatoire reste dû**, même en mode rapide. Trois cas :
 
 - L'issue est déjà passée par `needs-interrogation` avec ses conclusions écrites → applique `ready-for-agent` et propose de rédiger le brief d'agent.
-- Elle n'y est pas passée → dis-le et propose de lancer `interroge-moi` maintenant.
+- Elle n'y est pas passée → dis-le et propose de lancer `interroge-moi` maintenant — si ses bloqueurs sont fermés ; sinon, annonce-la *en attente de #N* (étape 4 de « Trier une issue spécifique »).
 - Le mainteneur veut passer outre malgré tout → applique `ready-for-agent`, et **note explicitement dans le brief d'agent que l'issue n'a pas été interrogée**, sous un titre `**⚠️ Non interrogée au triage**`. C'est ce qui permet à `cycle-pr` de rattraper le coup à l'Étape 1 au lieu de partir sur des hypothèses tacites.
 
 Même en mode rapide, si l'état cible n'est pas `wontfix` et que l'issue n'a pas encore de thème, rattache-la au thème de son domaine (existant ou créé à la volée) dans la même opération ([themes-milestones.md](themes-milestones.md)).
