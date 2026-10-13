@@ -235,10 +235,12 @@ déjà installés depuis le clone principal.
 Le garde de permissions de ta session refuse les commandes qu'il ne sait pas vérifier, sans
 nommer le fragment fautif — substitution de commande dans une condition, heredoc suivi d'une
 commande, boucle `for`, gabarit `--format` ou `--jq` avec accolades, `sh -c` en ligne. Une chaîne
-de trois commandes vérifiables passe, elle (mesuré en worktree isolé) : c'est la forme des portes
-de `cycle-pr` Étapes 1 et 7. Écris les fichiers longs avec l'outil d'écriture plutôt qu'un
-heredoc, une commande par objet plutôt qu'une boucle, un script dans le répertoire temporaire de
-session plutôt qu'un `-c` : chaque refus coûte deux ou trois reformulations à l'aveugle.
+de trois commandes `&&` n'est pas refusée en soi — mesuré en worktree isolé avec une troisième
+commande **en lecture**, la forme écrivante n'ayant pas été provoquée (`cycle-pr` Étape 1 porte
+la mesure et sa borne) : c'est la forme de la porte de l'Étape 1. Écris les fichiers longs avec
+l'outil d'écriture plutôt qu'un heredoc, une commande par objet plutôt qu'une boucle, un script
+dans le répertoire temporaire de session plutôt qu'un `-c` : chaque refus coûte deux ou trois
+reformulations à l'aveugle.
 <une ligne par point de vigilance propre à cette issue : HITL attendu, fichier partagé avec une
 autre PR du lot et ordre de merge, décision verrouillée à ne pas rouvrir>
 ```
@@ -449,10 +451,12 @@ qui meurt, c'est la **branche** : sous un trunk fusionné par rebase ou squash, 
 réécrits doubleraient dans la PR du lot suivant. Nommer explicitement les deux à chaque frontière,
 sinon une session prolonge un artefact mort (obs 36). La voie normale est celle de l'étape 5 — la
 session sortante remet le prompt, la session neuve crée sa branche depuis `origin/main` et
-supprime la précédente, locale et distante. **Repli**, si la session sortante a disparu : le lead
-fait les deux gestes à sa place — `git checkout -b <type>/<slug> origin/main` dans le worktree,
-suppression de la branche mergée, réinstallation et fumée —, puis place une session neuve comme à
-l'étape 5.
+supprime la précédente, locale et distante. Dans les deux cas le point de départ est **explicite** :
+une session dans ce worktree est sur la branche mergée, et `git checkout -b` sans point de départ
+en emporterait les commits réécrits (mesuré). **Repli**, si la session sortante a disparu : le lead
+fait les deux gestes à sa place — `git fetch origin`, puis `git checkout -b <type>/<slug>
+origin/main` dans le worktree, suppression de la branche mergée, réinstallation et fumée —, puis
+place une session neuve comme à l'étape 5.
 
 **Bilan de vague.** Compter les issues ouvertes pendant la vague
 (`gh issue list --state all --search "created:>=<date de début>"`) et justifier chacune par le

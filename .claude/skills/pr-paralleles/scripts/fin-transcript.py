@@ -186,20 +186,53 @@ def rapport(transcript: Path, tours: int) -> list[str]:
     ]
 
 
+def nombre_de_tours(argument: str | None) -> int | None:
+    """Le nombre de tours demandé, ou `None` si l'argument n'est pas un entier positif.
+
+    Args:
+        argument: le second argument de la ligne de commande, absent → `TOURS`.
+
+    Returns:
+        L'entier, ou `None` pour tout ce qui n'en est pas un ou vaut moins de 1 — les deux
+        refus sont le même refus pour l'appelant, qui n'a qu'un code de sortie à rendre.
+    """
+    if argument is None:
+        return TOURS
+    try:
+        valeur = int(argument)
+    except ValueError:
+        return None
+    return valeur if valeur >= 1 else None
+
+
 def main(arguments: list[str]) -> int:
-    """Imprime le rapport, ou l'usage en sortant en 2."""
-    if not arguments or arguments[0] in ("-h", "--help"):
+    """Imprime le rapport ; sort en 2 sur un usage fautif, en 1 si le transcript est introuvable.
+
+    La ligne de commande est une frontière d'entrée saisie à la main : chaque champ est vérifié
+    pour sa présence **et** son type, en une passe — le transcript (présent, existant), le nombre
+    de tours (entier, positif), et rien de plus. Un usage fautif sort en 2, distinct du 1 de
+    l'absence : un `abc` qui sortait sur une trace en 1 se lisait comme « transcript introuvable ».
+    """
+    if not arguments or arguments[0] in ("-h", "--help") or len(arguments) > 2:
         print(__doc__, file=sys.stderr)
         return 2
     transcript = Path(arguments[0])
     if not transcript.is_file():
         print(f"transcript introuvable : {transcript}", file=sys.stderr)
         return 1
-    tours = int(arguments[1]) if len(arguments) > 1 else TOURS
-    if tours < 1:
-        print(f"nombre de tours invalide : {tours}", file=sys.stderr)
+    tours = nombre_de_tours(arguments[1] if len(arguments) > 1 else None)
+    if tours is None:
+        print(f"nombre de tours invalide : {arguments[1]!r}", file=sys.stderr)
         return 2
-    print("\n".join(rapport(transcript, tours)))
+    # La console du poste est en cp1252 et les transcripts sont pleins de flèches et d'emojis :
+    # imprimé tel quel, le rapport mourait sur le premier `→` — rc 1, rien d'imprimé, l'outil
+    # d'incident mort à l'incident (mesuré). D'où des octets UTF-8 écrits sur le tampon, **sans**
+    # envelopper `sys.stdout` dans un `TextIOWrapper` : collecté, il ferme le flux qu'il enveloppe,
+    # et un appelant en processus — la suite de tests — perdait sa sortie derrière (mesuré : toute
+    # la suite suivante rougissait).
+    sys.stdout.flush()
+    sys.stdout.buffer.write(("\n".join(rapport(transcript, tours)) + "\n").encode("utf-8"))
+    sys.stdout.buffer.flush()
     return 0
 
 

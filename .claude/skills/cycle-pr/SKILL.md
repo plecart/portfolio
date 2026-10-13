@@ -141,6 +141,13 @@ git fetch origin
 git merge-base --is-ancestor main origin/<trunk> && git merge-base --is-ancestor origin/<trunk> main && git checkout -b <type>/<description>
 ```
 
+Cette porte suppose d'être **sur `main`**, dans le clone principal. Une session placée dans le
+worktree d'une issue en lots est sur la branche **mergée** du lot précédent : elle ne compare
+rien, elle part d'`origin/<trunk>` explicitement — `git fetch origin`, puis
+`git checkout -b <type>/<description> origin/<trunk>`. Sans point de départ, `checkout -b` part
+de la branche morte et emporte ses commits réécrits (mesuré ; la voie complète est dans
+[references/prompt-lot-suivant.md](references/prompt-lot-suivant.md)).
+
 **Deux prédicats, pas un.** `--is-ancestor` dit « ancêtre **ou égal** » : une seule direction ne
 distingue donc pas l'égalité du retard, et la porte laisserait passer l'autre cas. Les deux
 ensemble valent l'égalité — `main` ancêtre d'`origin/<trunk>` **et** l'inverse ⇔ même commit.
