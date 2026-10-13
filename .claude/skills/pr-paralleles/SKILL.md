@@ -454,9 +454,9 @@ session sortante remet le prompt, la session neuve crée sa branche depuis `orig
 supprime la précédente, locale et distante. Dans les deux cas le point de départ est **explicite** :
 une session dans ce worktree est sur la branche mergée, et `git checkout -b` sans point de départ
 en emporterait les commits réécrits (mesuré). **Repli**, si la session sortante a disparu : le lead
-fait les deux gestes à sa place — `git fetch origin`, puis `git checkout -b <type>/<slug>
-origin/main` dans le worktree, suppression de la branche mergée, réinstallation et fumée —, puis
-place une session neuve comme à l'étape 5.
+fait les deux gestes à sa place — `git fetch origin`, puis
+`git checkout -b <type>/<slug> origin/main` dans le worktree, suppression de la branche mergée,
+réinstallation et fumée —, puis place une session neuve comme à l'étape 5.
 
 **Bilan de vague.** Compter les issues ouvertes pendant la vague
 (`gh issue list --state all --search "created:>=<date de début>"`) et justifier chacune par le
