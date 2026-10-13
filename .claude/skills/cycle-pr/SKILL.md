@@ -823,7 +823,7 @@ ni de force-push.
 
 - **CI verte** : tous les gates déclarés dans `.claude/pipeline.config.md` (« gates bloquants en
   CI »), dont le seuil de couverture s'il y en a un.
-- **Trier un rouge avant de toucher au code** — un gate rouge a deux familles de causes, et le
+- **Trier un rouge avant de toucher au code** — chaque famille de causes a son remède, et le
   premier message d'erreur du step les sépare presque toujours :
   - *Rouge d'infrastructure* : échec de téléchargement (403/5xx/timeout d'un dépôt d'artefacts,
     « error while downloading ») alors que le diff ne touche aucune dépendance et qu'un run
@@ -834,6 +834,12 @@ ni de force-push.
     le job n'a aucun step → allocation de runner (quota, incident fournisseur) — ne pas modifier
     le workflow, surveiller en fond et **rendre la main au mainteneur**. Les runs `skipped`
     (garde `if:`) se terminent sans runner et ne prouvent rien sur la disponibilité de la CI.
+  - *Rouge d'avis* : le step d'audit ou de scan rougit sur un paquet que le diff ne touche pas →
+    une base d'avis a changé sans commit. Vérifier que le trunk rougit aussi — son dernier run
+    planifié s'il en a un, sinon son dernier run rejoué en entier (`gh run rerun <id>`, sans
+    `--failed` : ce run était vert) —, puis appliquer « Création d'issues en cours de cycle »
+    (`.claude/rules/contraintes.md`), barreau par barreau. Un rerun de la PR, lui, ne prouve
+    rien : l'avis ne part pas (obs 56).
   - *Rouge de code* : tout le reste, y compris un rouge de plateforme (3.2) → cycle complet
     3.1→3.5.
 - **Revue** : les commentaires d'une revue automatisée (bot), s'il y en a une. L'auteur a relu en
