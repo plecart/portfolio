@@ -630,6 +630,13 @@ encore reviendra à la prochaine relecture de la zone ; s'il ne revient pas, il 
 constat de la **première** passe s'absorbe de préférence dans le commit à venir qui touche sa
 zone.
 
+**Un bloquant ou un important se ferme par un test, jamais par une édition de prose seule.**
+Avant la passe suivante ou la relance, chaque constat corrigé nomme le test qui tient sa
+fermeture — identifiant de cas — et joue la **mutation inverse du correctif**, la forme fautive
+remise, qui doit rendre `ROUGE`. Une fermeture que la mutation inverse laisse `VERT` est une
+lecture, et c'est le relecteur qui la paie à la passe suivante — deux fois au lot 3 de #77, un
+contact de relecture chacune (obs 79).
+
 **Le cliquet — dénombrer avant de corriger, pas après.** Un constat de relecture est un
 échantillon, jamais un inventaire : dès qu'un correctif ferme **un chemin** d'une classe (voir le
 déclencheur de `cleanup-verbatim.md`), le dénombrement des chemins de cette classe s'écrit
@@ -648,6 +655,12 @@ régression — mesuré : trois tours, une vingtaine de formes, des décomptes c
 l'élargissement précédent. La classe n'est pas « le motif est trop étroit », c'est « le motif
 n'est pas l'analyseur ». Quand aucun analyseur ne s'applique, la sortie est le **retrait** de la
 garde, sa population explicitement bornée dans sa docstring, jamais un motif de plus.
+Le déclencheur est la **structure** du correctif, jamais sa direction : tout correctif qui
+**change la population appariée** par un motif — l'élargir comme la rétrécir — relève de ce
+paragraphe, et une mutation de **chaque** occurrence réelle de la classe doit rester `ROUGE`
+après lui. Le **rejeu des mutations déjà jouées** est la seule mesure qui distingue un correctif
+d'un défaut déplacé : au lot 2 de #77, un ancrage ajouté pour fermer un faux positif tuait la
+détection de la seule occurrence réelle, et seul ce rejeu l'a vu (obs 76).
 
 **Une lentille navigateur, dès qu'un script client entre dans le delta.** Un comportement vérifié
 « à l'écran » l'est sur le parcours où il a été conçu ; ses défauts vivent sur les autres. La
@@ -668,8 +681,9 @@ correctif de lot précédent s'était déclaré clos sur le geste nominal.
 
 **Plafond — deux passes et une relance.** La relance n'est pas une passe : c'est une **revue des
 commits de correction**, ciblée par un diff explicite (`<sha avant>..<sha après>`) et par la liste
-de ce que chaque commit prétend régler, avec la question obligatoire : « qu'est-ce que ce
-correctif a cassé, ou fait rougir à tort, que la version précédente voyait ? ». Elle revient au
+de ce que chaque commit prétend régler et du test qui épingle chacun, avec la question
+obligatoire : « qu'est-ce que ce correctif a cassé, ou fait rougir à tort, que la version
+précédente voyait ? ». Elle revient au
 **relecteur de la PR**, par `SendMessage` — son contexte est intact, il n'a rien à relire —,
 jamais à un agent neuf. Un correctif est du code neuf écrit sous pression de conclure — c'est la
 partie la moins éprouvée de la PR, pas la plus sûre. Après la relance : un bloquant qu'elle

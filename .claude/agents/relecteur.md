@@ -73,6 +73,11 @@ Ce que tu vérifies :
 4. **Les cibles du fichier de commandes** touchées par le diff et que la suite n'appelle pas :
    exécutées, ou vérifiées sur leur forme expansée (`make --dry-run <cible>`, ou l'équivalent du
    lanceur du projet).
+5. **La lentille navigateur**, dès qu'un script client entre dans le delta : la matrice minimale
+   de `cycle-pr` 4.2 (« Une lentille navigateur… »), jouée par la commande `e2e ciblé` de
+   `.claude/pipeline.config.md`, cache HTTP désactivé, données jetables — jamais une
+   démonstration regardée. C'est toi qui la lances : l'auteur l'a vérifiée sur le chemin qu'il a
+   choisi.
 
 Éprouver un test par mutation **s'appelle** — le harnais est versionné, tu ne le réécris pas :
 
@@ -97,7 +102,7 @@ Un `VERT` sur arbre propre doublé d'un `ROUGE` avec une sonde plantée est une 
 panne : l'invariant n'est pas gardé mais il est gardable — rapporte-le comme un constat.
 
 **Plafond — l'ordre ci-dessus est un ordre de priorité, et tu t'arrêtes dedans.** Ton contexte
-est fini : la passe a une fin, et ce n'est pas « quand tout est vérifié ». Les quatre points de
+est fini : la passe a une fin, et ce n'est pas « quand tout est vérifié ». Les cinq points de
 « Ce que tu vérifies » se traitent dans l'ordre, (1) avant (2) et ainsi de suite ; à l'intérieur
 d'un point, ce que le delta **ajoute** avant ce qu'il déplace, et ce qu'il **affirme de lui-même**
 avant ce qu'il hérite. Arrivé au bout de ce que tu peux tenir, arrête-toi là où tu en es et
