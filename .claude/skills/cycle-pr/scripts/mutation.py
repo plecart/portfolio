@@ -27,8 +27,9 @@ Tout tient dans ce fichier, racine mise à part : un harnais paramétré par sa 
 n'est pas transmissible tel quel, et c'est ce qui a fait le réécrire sept fois (obs 37).
 
 Verdict par mutation : `ROUGE` (tous les attendus ont rougi), `VERT` (au moins un attendu est
-resté vert — le test ne tient pas), `PANNE` (`old` absent ou multiple, rapport illisible, refus,
-ou un attendu qui n'a pas tourné — sauté, à faire, absent du rapport : il n'a ni rougi ni tenu).
+resté vert — le test ne tient pas), `PANNE` (`old` absent ou multiple, `new` identique à `old`,
+rapport illisible, refus, ou un attendu qui n'a pas tourné — sauté, à faire, absent du rapport :
+il n'a ni rougi ni tenu).
 
 Python 3.11 ou plus, bibliothèque standard seule.
 """
@@ -548,7 +549,9 @@ def mutated_bytes(path: Path, old: str, new: str) -> tuple[bytes, bytes]:
 
     Raises:
         Unusable: `old` n'apparaît pas exactement une fois ; le remplacement porterait alors
-            sur autre chose que ce que la mutation annonce.
+            sur autre chose que ce que la mutation annonce. Ou le contenu muté est identique à
+            l'original : une mutation qui ne mute rien rendrait VERT, le verdict qui se lit
+            « l'invariant n'est pas gardé » (obs 77).
     """
     original = path.read_bytes()
     newline = "\r\n" if b"\r\n" in original else "\n"
@@ -556,7 +559,10 @@ def mutated_bytes(path: Path, old: str, new: str) -> tuple[bytes, bytes]:
     count = original.count(pattern)
     if count != 1:
         raise Unusable(f"`old` trouvé {count} fois dans {path.name}, il en faut exactement une")
-    return original, original.replace(pattern, new.replace("\n", newline).encode("utf-8"))
+    mutated = original.replace(pattern, new.replace("\n", newline).encode("utf-8"))
+    if mutated == original:
+        raise Unusable(f"`new` identique à `old` dans {path.name} : la mutation ne mute rien")
+    return original, mutated
 
 
 def resolve(expected: Sequence[str], known: Mapping[str, str]) -> list[str]:

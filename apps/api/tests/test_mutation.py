@@ -297,6 +297,30 @@ def test_un_old_absent_ou_multiple_est_une_panne_et_ne_touche_rien(tmp_path: Pat
     assert (root / "source.py").read_bytes() == before
 
 
+def test_une_mutation_qui_ne_mute_rien_est_une_panne(tmp_path: Path) -> None:
+    """`new` identique à `old` réécrit le fichier à l'identique : le test visé reste vert, et ce
+    VERT se lit « l'invariant n'est pas gardé » alors que rien n'a été muté (obs 77). Mesuré au
+    lot 2 de #77 : une ancre choisie par sous-chaîne avait pris le commentaire qui citait le code,
+    et son remplacement ne trouvait rien."""
+    root = build_repo(tmp_path)
+    before = (root / "source.py").read_bytes()
+
+    verdicts = mutation.play(
+        root,
+        spec(
+            name="sans effet",
+            file="source.py",
+            old="if n < 0:",
+            new="if n < 0:",
+            expect=["test_refuse_un_negatif"],
+        ),
+    )
+
+    assert [v.verdict for v in verdicts] == ["PANNE"]
+    assert "ne mute rien" in verdicts[0].detail
+    assert (root / "source.py").read_bytes() == before
+
+
 def test_les_fins_de_ligne_du_fichier_mute_sont_respectees(tmp_path: Path) -> None:
     """Les worktrees sont extraits en CRLF, l'arbre de l'auteur en LF : un `old` en LF n'y est
     jamais trouvé (obs 37, complément du 2026-09-27)."""
