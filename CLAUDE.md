@@ -92,6 +92,7 @@ n'est pas choisi par tâche, il est choisi par rôle** au moment de créer l'éq
 | `developpeur` | Opus | l'implémentation TDD d'un brief borné, la correction de tests rouges |
 | `relecteur` | Opus, effort `medium` | la relecture à contexte vierge d'un diff (`cycle-pr` 4.2), seul, dans son propre worktree |
 | `executant` | Sonnet, effort `low` | tests / lint / format, exploration et cartographie du code, edits entièrement spécifiés |
+| `verificateur` | Opus, effort `medium` | la vérification d'avant-go d'une PR (`pr-paralleles` Étape 6), **éphémère, un par (PR, go)**, sans worktree et sans lancer de commande du projet |
 
 L'effort d'un rôle se fixe dans son frontmatter (`effort`) ; celui de la session, par `/effort`.
 
