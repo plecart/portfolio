@@ -264,6 +264,15 @@ encore, le `ci.yml` et le `dependabot.yml` attendent sa première PR de code (é
   relecture et non après le passage en ready. Le type `ready_for_review` garantit un run à ce
   passage, même si le dernier push date. Élargir le garde à toute draft renverrait chaque rouge de
   plateforme après le ready, où il coûte un run complet et le rejeu des vérifications manuelles.
+- **Donner une horloge aux portes qui lisent une base d'avis** — audit des dépendances, scan
+  d'images : leur verdict change sans commit, quand un avis se publie. Ajouter au `on:` un
+  déclencheur `schedule` quotidien et `workflow_dispatch`, réservés à ces portes : toute autre
+  porte — lint, typecheck, build, tests — porte un `if:` qui les exclut. Sans horloge, un avis
+  n'est vu qu'au run suivant d'une PR quelconque, qui hérite d'un rouge hors de son sujet — deux
+  fois en deux jours (obs 56). `workflow_dispatch` prouve le déclencheur sans attendre un jour ;
+  `schedule` ne part que de la branche par défaut, et GitHub le désactive dans un dépôt public
+  resté 60 jours sans activité (doc GitHub Actions : « Troubleshooting workflows », « Disabling
+  and enabling a workflow »). Sans porte d'avis dans la config, rien à ajouter.
 
 Puis générer `.github/dependabot.yml` depuis `template/.github/dependabot.yml` : les
 empreintes du `ci.yml` n'avancent que si Dependabot les tient, et le modèle porte déjà
@@ -461,6 +470,7 @@ jusqu'à la première PR de code, qui les coche (étape 11).
 - [ ] section « Sources de vérité » renseignée (au minimum : les issues ouvertes)
 - [ ] `ci.yml` généré depuis les commandes réelles, sans `{{PLACEHOLDER}}` ni étape `n/a`
 - [ ] chaque `uses:` du `ci.yml` épinglé par empreinte + `# <étiquette la plus précise>` ; `permissions: contents: read` en tête
+- [ ] portes à base d'avis (audit, scan) : `schedule` quotidien et `workflow_dispatch`, réservés à elles
 - [ ] `.github/dependabot.yml` généré (`github-actions` + écosystèmes de la stack)
 - [ ] `ci.yml` et `dependabot.yml` validés contre leur schéma
 - [ ] skills maison déployés dans `.claude/skills/`
