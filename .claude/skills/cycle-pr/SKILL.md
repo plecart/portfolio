@@ -769,7 +769,7 @@ body définitif, puis de sortir du draft.
       la tête et la base de branche `git merge-base origin/main HEAD`, et « observe : » les fichiers ou
       dossiers dont son résultat dépend (Étape 7)>
 - [x] <exécutable livré : sa sortie réelle (entrée : <nommée>), chaque ligne confrontée au
-      critère qui la décrit (3.2)>
+      critère qui la décrit (3.2) — avec les deux SHA et « observe : », comme ci-dessus>
 - [x] <étape non applicable — cochée avec sa raison (« sans objet »), jamais laissée décochée>
 
 ## Relecture indépendante
