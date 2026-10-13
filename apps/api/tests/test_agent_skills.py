@@ -777,25 +777,54 @@ def test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie(
 # prescription d'une mention en prose, et la prose de ces skills cite les formes fautives à dessein
 # pour les condamner. C'est le cas où `cleanup-verbatim.md` demande de **borner** plutôt que
 # d'élargir un motif qui imite un analyseur.
-PORTES_PRESCRITES: list[tuple[str, str, str]] = [
-    (".claude/skills/cycle-pr/SKILL.md", "git checkout -b", "git merge-base --is-ancestor"),
-    (".claude/skills/cycle-pr/SKILL.md", "gh pr merge", "git merge-base --is-ancestor"),
-    (".claude/skills/pr-paralleles/SKILL.md", "git worktree add", "git merge-base --is-ancestor"),
+# Le quatrième champ est le **nombre** de prédicats attendus : 2 là où la condition est l'égalité
+# (création de branche, de worktree — un par direction, parce que `--is-ancestor` dit « ancêtre ou
+# égal »), 1 au merge, où le trunk n'avance que vers l'avant. Sans ce champ, ramener la porte à un
+# seul prédicat — le bloquant de la passe 1, « `main` en avance passe » — restait VERT (mesuré,
+# passe 2) : la table exigeait qu'un prédicat existe, pas qu'il y en ait deux.
+PORTES_PRESCRITES: list[tuple[str, str, str, int]] = [
+    (".claude/skills/cycle-pr/SKILL.md", "git checkout -b", "git merge-base --is-ancestor", 2),
+    (".claude/skills/cycle-pr/SKILL.md", "gh pr merge", "git merge-base --is-ancestor", 1),
+    (
+        ".claude/skills/pr-paralleles/SKILL.md",
+        "git worktree add",
+        "git merge-base --is-ancestor",
+        2,
+    ),
 ]
 
 
+def predicats_a_gauche(ligne: str, action: str, predicat: str) -> list[list[str]]:
+    """Les arguments de chaque prédicat placé à gauche de l'action sur cette ligne, dans l'ordre.
+
+    Args:
+        ligne: une ligne de prose de skill.
+        action: la commande que la porte garde.
+        predicat: la commande dont le code de sortie porte la condition.
+
+    Returns:
+        Une liste par occurrence du prédicat à gauche de l'action — ses arguments, jusqu'au `&&`
+        qui le chaîne —, vide si rien ne chaîne : un prédicat sans `&&` est une lecture.
+    """
+    gauche = ligne.split(action)[0]
+    if "&&" not in gauche:
+        return []
+    return [segment.split("&&")[0].split() for segment in gauche.split(predicat)[1:]]
+
+
 @pytest.mark.parametrize(
-    ("skill", "action", "predicat"),
+    ("skill", "action", "predicat", "attendus"),
     PORTES_PRESCRITES,
     ids=[
         f"{Path(skill).parent.name}-{action.replace(' ', '-')}"
-        for skill, action, _ in PORTES_PRESCRITES
+        for skill, action, _, _ in PORTES_PRESCRITES
     ],
 )
 def test_chaque_porte_prescrite_est_un_predicat_chaine_a_son_action(
-    skill: str, action: str, predicat: str
+    skill: str, action: str, predicat: str, attendus: int
 ) -> None:
-    """Une porte réécrite en affichage, ou scindée de son action, ne rougissait nulle part.
+    """Une porte réécrite en affichage, scindée de son action, ou ramenée à un seul prédicat ne
+    rougissait nulle part.
 
     C'est le cliquet de la classe : `cleanup-verbatim.md` exige qu'un correctif qui ferme un chemin
     soit « épinglé dans l'artefact par un test paramétré, pas par une phrase de docstring ». Le
@@ -806,20 +835,24 @@ def test_chaque_porte_prescrite_est_un_predicat_chaine_a_son_action(
     sans action unique en bloc — pas épinglables par cette forme, et c'est dit, pas tu.
 
     Le prédicat doit se trouver **à gauche de l'action sur la même ligne**, avec un `&&` entre les
-    deux : c'est exactement ce qui distingue une porte d'une lecture suivie d'une seconde commande
-    (obs 59). Les lignes de prose qui *citent* les formes fautives pour les condamner ne peuvent pas
-    apparier, puisqu'elles ne nomment pas `git merge-base --is-ancestor`.
+    deux — ce qui distingue une porte d'une lecture suivie d'une seconde commande (obs 59) —, en
+    **autant d'exemplaires** que la table l'exige, et pour deux exemplaires, avec les **deux ordres
+    d'arguments** : deux prédicats dans le même sens couvrent la même direction deux fois. Les
+    lignes de prose qui *citent* les formes fautives pour les condamner ne peuvent pas apparier,
+    puisqu'elles ne nomment pas `git merge-base --is-ancestor`.
     """
     lignes = (REPOSITORY_ROOT / skill).read_text(encoding="utf-8-sig").splitlines()
     nommant = [ligne for ligne in lignes if action in ligne]
-    gardees = [
-        ligne
-        for ligne in nommant
-        if predicat in ligne.split(action)[0] and "&&" in ligne.split(action)[0]
+    trouves = [predicats_a_gauche(ligne, action, predicat) for ligne in nommant]
+    conformes = [
+        args
+        for args in trouves
+        if len(args) == attendus and (attendus == 1 or args[0] == args[1][::-1])
     ]
 
     assert nommant, f"`{skill}` ne nomme plus `{action}` — le motif a-t-il cessé de mordre ?"
-    assert gardees, (
-        f"`{skill}` ne prescrit `{action}` derrière `{predicat} … &&` sur aucune de ses "
-        f"{len(nommant)} ligne(s) qui le nomment : la porte est redevenue une lecture"
+    assert conformes, (
+        f"`{skill}` ne prescrit `{action}` derrière {attendus} `{predicat}` chaîné(s) par `&&` "
+        f"— les deux ordres d'arguments pour deux — sur aucune de ses {len(nommant)} ligne(s) qui "
+        f"le nomment ; trouvé : {trouves}"
     )

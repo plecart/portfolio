@@ -292,7 +292,13 @@ matching ask rule still prompts even when the hook returned "allow" »), en mode
 (doc permission-modes, § auto mode : « Explicit ask rules still force a prompt ») :
 `permissions.ask` sur `gh pr merge` et sur `gh pr update-branch … --rebase` — forme d'origine,
 forme `rtk`, `rtk proxy`, outil PowerShell — est la porte de « jamais d'auto-merge » et du « rebase
-explicitement demandé » (`contraintes.md`), épinglée par `apps/api/tests/test_agent_permissions.py`. Restent ouverts : un merge local suivi de
+explicitement demandé » (`contraintes.md`), épinglée par `apps/api/tests/test_agent_permissions.py`.
+Elle se déclenche aussi sur `gh pr merge` placé **après `&&`** dans une commande composée —
+mesuré le 2026-10-13 avec `git merge-base --is-ancestor HEAD HEAD && gh pr merge --help` :
+l'invite est apparue dans la fenêtre du mainteneur, et la commande n'a tourné qu'après. C'est ce
+qui rend sûre la porte de merge **à une commande** de `cycle-pr` Étape 7 (« Le go, puis le
+merge ») ; l'émulation du test, elle, ne sait pas le vérifier — elle ne découpe pas les commandes
+composées, et le dit. Restent ouverts : un merge local suivi de
 `git push origin main` (`main` n'est pas protégée côté GitHub), `gh api -X PUT …/pulls/<n>/merge`
 et `gh -R … pr merge` — aucun `allow` ne les couvre, ils demandent en mode manuel et passent au
 classifieur en mode auto.
