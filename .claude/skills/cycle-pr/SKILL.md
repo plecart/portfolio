@@ -966,6 +966,36 @@ qui n'existe plus.
 Ne pas considérer la PR « terminée » tant que cette passe n'a pas été faite (même si la conclusion
 est « aucune répercussion »).
 
+**Cas découpé : la frontière de lot se franchit par la session sortante.** Sur un lot
+intermédiaire, et **après** la passe `repercussions`, écrire le prompt du lot suivant depuis
+[references/prompt-lot-suivant.md](references/prompt-lot-suivant.md) et le **remettre au
+mainteneur** — c'est lui qui ouvre la session neuve et y colle le prompt. Pas le lead : sur une
+vague de cinq lots, chaque frontière passée par lui lui coûte un brief relu et un prompt écrit, et
+son contexte a grossi jusqu'à devoir être relayé lui-même (obs 62). La session sortante connaît son
+lot ; le lead connaît la vague, et c'est ce qu'il garde — croisement des fichiers après merge,
+tableau de bord, vigilance de vague. Le repli, quand la session sortante a disparu, est
+`pr-paralleles` Étape 7, « Session disparue ».
+
+Le gabarit ne porte que des **pointeurs** vers les artefacts, jamais une règle recopiée : un énoncé
+recopié hérite des erreurs de son auteur en empruntant la crédibilité de la source qu'il cite
+(obs 52).
+
+**Une session neuve par lot.** Le lot suivant ne se déroule pas dans cette session, même si son
+contexte le permettrait. Deux raisons :
+
+- le contexte d'un lot porte les **hypothèses** qui l'ont produit, et les relire au lot suivant,
+  c'est se priver du seul regard neuf gratuit du cycle — le même argument qui fonde la relecture à
+  contexte vierge de 4.2 ;
+- **mesuré** : un lot **seul** a rempli un contexte en plein Étape 4 et a dû être relayé, ce qui a
+  coûté deux artefacts — `bilan-session.py` accepte N transcripts, `pr-paralleles` Étape 5 a son
+  paragraphe « Session relayée » (obs 40). Une session qui *entame* un lot avec un contexte à
+  moitié plein part donc plus près de cette limite. Ce second point est une déduction de la
+  mesure, pas une mesure : aucun cycle n'a enchaîné deux lots dans une session, précisément parce
+  que la règle l'interdit.
+
+C'est aussi pourquoi le prompt du lot suivant est un **artefact remis**, et pas une consigne qu'on
+se donne à soi-même.
+
 ## Les 5 idées à retenir
 
 1. Tout l'effort de questions se fait **avant** de coder (briefing pré-PR + interrogatoire) — et
