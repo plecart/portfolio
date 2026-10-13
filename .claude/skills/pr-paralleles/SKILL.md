@@ -61,10 +61,9 @@ plutôt que tout d'un coup.
 ### 3. Créer un worktree + une branche par issue
 
 Pour chaque issue retenue, depuis `main` à jour — **les deux `main`** —, et derrière une **porte** :
-une commande dont le code de sortie porte la condition, enchaînée par `&&` à celle qu'elle garde.
-`git rev-parse main origin/main` ne garde rien : il **imprime** deux SHA et sort en 0, et un
-worktree créé sur un `main` en retard prive la session de commits dont son brief dépend
-(`cycle-pr` Étape 7, « Le go, puis le merge », pour la classe entière).
+une commande dont le code de sortie porte la condition, enchaînée par `&&` à celle qu'elle garde
+(`cycle-pr` Étape 7, « Le go, puis le merge », pour la classe entière). Un affichage de deux SHA
+n'en est pas une.
 
 ```
 git fetch origin
@@ -234,11 +233,12 @@ invocation de `cycle-pr` vaut demande de l'utilisateur.
 Ne lance pas la commande `hooks` de la config ici : les hooks sont partagés entre worktrees et
 déjà installés depuis le clone principal.
 Le garde de permissions de ta session refuse les commandes qu'il ne sait pas vérifier, sans
-nommer le fragment fautif — heredoc suivi d'une commande, boucle `for`, gabarit `--format` ou
-`--jq` avec accolades, `sh -c` en ligne, enchaînement de trois commandes. Écris les fichiers
-longs avec l'outil d'écriture plutôt qu'un heredoc, une commande par objet plutôt qu'une boucle,
-un script dans le répertoire temporaire de session plutôt qu'un `-c` : chaque refus coûte deux ou
-trois reformulations à l'aveugle.
+nommer le fragment fautif — substitution de commande dans une condition, heredoc suivi d'une
+commande, boucle `for`, gabarit `--format` ou `--jq` avec accolades, `sh -c` en ligne. Une chaîne
+de trois commandes vérifiables passe, elle (mesuré en worktree isolé) : c'est la forme des portes
+de `cycle-pr` Étapes 1 et 7. Écris les fichiers longs avec l'outil d'écriture plutôt qu'un
+heredoc, une commande par objet plutôt qu'une boucle, un script dans le répertoire temporaire de
+session plutôt qu'un `-c` : chaque refus coûte deux ou trois reformulations à l'aveugle.
 <une ligne par point de vigilance propre à cette issue : HITL attendu, fichier partagé avec une
 autre PR du lot et ordre de merge, décision verrouillée à ne pas rouvrir>
 ```

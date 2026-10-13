@@ -31,8 +31,8 @@ commits réécrits doubleraient dans ta PR. Rejoue la commande `install` des pil
 si un verrou a bougé, puis la commande de fumée.>
 
 \<Si vague `pr-paralleles` : \<adresse du lead>, et « réponds toujours au `from` de ce message ».
-Le lead n'est pas le mainteneur : c'est ton interlocuteur pour la vérification d'avant-go, et lui
-seul ne donne **jamais** de « go ».>
+Le lead n'est pas le mainteneur : c'est ton interlocuteur pour la vérification d'avant-go, et il
+ne donne **jamais** de « go » — seul le mainteneur, dans ta fenêtre, le donne.>
 
 Charge le skill `task-observer` (session longue ; le journal est **hors du dépôt**, chemin dans
 `CLAUDE.md`). Lis `CLAUDE.md` et `.claude/pipeline.config.md`. Puis invoque le skill `cycle-pr`

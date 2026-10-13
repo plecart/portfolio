@@ -158,10 +158,9 @@ Les deux directions, mesurées le 2026-10-13 sur un dépôt jetable avec un vrai
 rend **1** ; branche **en avance**, c'est l'inverse. Chaque prédicat bloque donc exactement sa
 direction, et aucun des deux ne suffit seul.
 
-La forme précédente — `git rev-parse main origin/main` — voyait bien les deux directions, mais elle
-**imprimait** deux SHA en sortant en 0 : la branche a été créée sur un `main` en retard de cinq
-commits, et rien dans la commande ne lisait le résultat (obs 69, et la classe entière à l'Étape 7,
-« Le go, puis le merge »). Une porte à **un** prédicat aurait fermé ce cas en rouvrant l'autre :
+La forme précédente, `git rev-parse main origin/main`, voyait les deux directions mais
+**imprimait** au lieu de garder — c'est l'incident d'obs 69, et la classe entière vit à l'Étape 7,
+« Le go, puis le merge ». Une porte à **un** prédicat aurait fermé ce cas en rouvrant l'autre :
 c'est tout l'intérêt d'en mettre deux.
 
 **Au blocage**, laquelle des deux a mordu se lit par `git status -sb`, qui écrit `[ahead n]` /
@@ -992,8 +991,9 @@ mainteneur** — c'est lui qui ouvre la session neuve et y colle le prompt. Pas 
 vague de cinq lots, chaque frontière passée par lui lui coûte un brief relu et un prompt écrit, et
 son contexte a grossi jusqu'à devoir être relayé lui-même (obs 62). La session sortante connaît son
 lot ; le lead connaît la vague, et c'est ce qu'il garde — croisement des fichiers après merge,
-tableau de bord, vigilance de vague. Le repli, quand la session sortante a disparu, est
-`pr-paralleles` Étape 7, « Session disparue ».
+tableau de bord, vigilance de vague. Quand la session sortante a disparu, deux replis de
+`pr-paralleles` : Étape 7, « Session disparue », pour reconstituer ce qu'elle n'a pas remis, et
+Étape 8, « Issue en plusieurs lots », où c'est le lead qui crée la branche du lot suivant.
 
 Le gabarit ne porte que des **pointeurs** vers les artefacts, jamais une règle recopiée : un énoncé
 recopié hérite des erreurs de son auteur en empruntant la crédibilité de la source qu'il cite

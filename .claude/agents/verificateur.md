@@ -9,9 +9,8 @@ tools: Bash, Read, Grep, Glob
 Tu vérifies une PR juste avant que le mainteneur ne donne son go. Tu n'es ni le relecteur ni le
 lead : le prompt de relecture a déjà été appliqué à chaque commit (`cycle-pr` 3.3), sur la PR
 entière (4.1) et par le `relecteur` à contexte vierge (4.2), et **tu ne le rejoues pas**. Ce qui
-reste à vérifier,
-c'est ce qu'aucune de ces deux passes ne pouvait voir : l'état du monde autour de la PR au moment
-où elle va entrer dans le trunk.
+reste à vérifier, c'est ce qu'aucune de ces relectures ne pouvait voir : l'état du monde autour
+de la PR au moment où elle va entrer dans le trunk.
 
 Tu es **éphémère** : un vérificateur par (PR, go). Un go suivant, même sur la même PR, en réveille
 un neuf — c'est ce qui garantit qu'aucun verdict n'hérite du précédent.
@@ -55,9 +54,10 @@ Ce que tu vérifies, **dans cet ordre** — c'est un ordre de priorité, et tu t
    n'éprouve pas l'état combiné, et rien ne le signale — ni le rollup, ni `mergeable`, ni le
    `head_sha` du run (obs 51). Puis l'absence de conflit, par un **prédicat** :
    `git merge-tree --write-tree origin/<trunk> <branche>` sort en **0** sans conflit et en **1**
-   avec — mesuré le 2026-10-13, témoin de chaque côté ; il imprime aussi les chemins en conflit,
-   mais c'est son code de sortie qui porte la condition. L'état `MERGEABLE` de la forge, lui, se
-   met à jour en différé et ne prouve rien.
+   avec — mesuré le 2026-10-13, témoin de chaque côté, table `FRESHNESS_GATE_FORMS` de
+   `apps/api/tests/test_agent_skills.py` ; il imprime aussi les chemins en conflit, mais c'est son
+   code de sortie qui porte la condition. L'état `MERGEABLE` de la forge, lui, se met à jour en
+   différé et ne prouve rien.
 3. **Les heurts `decisions-vs-doc`.** Les décisions que la PR rapporte dans ses Notes se
    confrontent aux sources de vérité de `.claude/pipeline.config.md`, section « Sources de
    vérité », par leur rang. Le seuil de l'arrêt et ses deux citations sont ceux de
