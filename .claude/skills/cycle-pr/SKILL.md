@@ -260,6 +260,16 @@ documentation via `context7` ou sources du paquet — et le noter dans les `Note
 référence. Les défauts les plus coûteux d'une PR « verte » sont des suppositions sur un paquet :
 un décodage par défaut, un retry silencieux, une fusion de valeurs, un `repr` qui affiche un secret.
 
+Deux cas de cette frontière se paient plus cher que les autres. **Un comportement par défaut
+invoqué pour écarter un risque de sécurité** — un protocole inactif, une option refusée — se
+mesure sur le **binaire livré**, jamais sur sa documentation ou sa réputation : une exception de
+scan adossée à « inactif par défaut » est tombée au premier test sur l'image (obs 57). **Une
+limite du geste** se pose avant l'intégration : quand une bibliothèque est retenue pour un
+comportement visible, dresser d'abord, depuis ses sources, la liste de ce qu'elle ne fait pas du
+geste demandé — cas non couverts, états refusés ; chaque entrée est une question `[V]`, posée
+avant la première ligne avec l'alternative chiffrée, jamais une note découverte après l'ADR
+(obs 38).
+
 **Un avis de sécurité sans correctif n'est pas une impasse.** Une plage d'avis `*` — toutes les
 versions publiées affectées, paquet abandonné — ne clôt pas l'analyse, elle la déplace d'un
 étage : avant de conclure qu'un avis est irréductible, remonter la chaîne de dépendance et
@@ -281,7 +291,7 @@ Règles : un test à la fois ; juste assez de code pour passer le test courant ;
 les tests futurs ; tester le comportement observable via l'interface publique.
 
 **Le rouge se constate, il ne se suppose pas — un test qui n'a pas été vu rouge n'est pas un
-test.** Cinq cas à traiter explicitement :
+test.** Sept cas à traiter explicitement :
 
 - **Le test passe du premier coup, avant tout changement de production** → il mesure autre chose ;
   ne jamais conclure « le défaut n'existe pas ». Cas fréquent : lire une configuration statique
@@ -296,7 +306,12 @@ test.** Cinq cas à traiter explicitement :
 - **La garde protège une ligne existante** (délégation, `override`, clause de `catch`) → la faire
   rougir en **supprimant cette ligne**, pas en raisonnant. Si le test reste vert, son montage fait
   converger le chemin nominal et le chemin fautif vers la même observation : trouver un point où
-  les deux divergent.
+  les deux divergent. Quand la ligne gardée est un **réglage de sécurité** — option d'un scanner,
+  épingle, permission, porte de CI —, on ne mute pas le dépôt : on écrit la garde en fonction sur
+  du texte, vue rouge sur un recueil de formes fautives construites en mémoire. Le classifieur du
+  mode auto refuse de lancer une suite sur une configuration de sécurité affaiblie, par quelque
+  voie que ce soit (obs 53). `mutation.py` refuse ce que ses motifs de chemin et de contenu
+  reconnaissent et renvoie à cette forme ; un réglage rangé ailleurs y ajoute son motif.
 - **Le test est dicté par un tiers** (relecteur, lead de vague, issue) → même règle que pour un
   test écrit soi-même : mutation avant de le garder. L'autorité de la source ne remplace pas le
   rouge observé.
@@ -314,6 +329,12 @@ test.** Cinq cas à traiter explicitement :
   occurrences au lot 1 de #77, trouvées chaque fois par le harnais de mutation (une mutation
   `VERT` sur une garde retirée), jamais par relecture — une assertion jointe se lit exactement
   comme une assertion forte.
+- **La table de cas est dérivée de l'artefact sous test** (`for x in module.CONSTANTE`) → retirer
+  un élément de l'artefact retire son cas au lieu de le faire rougir : le test et le code ont la
+  même source, le test ne peut contredire le code sur rien. Les cas s'écrivent en **littéraux**,
+  dans l'orthographe réelle ; l'égalité entre la table et la constante est un **second** test, qui
+  garde l'autre sens. Mesuré au lot 3 de #77 : la mutation « préfixe retiré » est restée `VERT`
+  après un correctif qui construisait ses cas depuis le tuple du script (obs 80).
 
 - Bons vs mauvais tests : [references/tests.md](references/tests.md)
 - Quand mocker (frontières du système uniquement) : [references/mocking.md](references/mocking.md)
@@ -376,7 +397,13 @@ Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Six contrôl
 - **Atteignabilité.** Une suite verte ne prouve que ce qu'elle compile : un fichier ajouté que ni
   la production ni les tests n'importent est invisible à toutes les gates à la fois (profil
   typique d'une PR foundation qui pose jetons ou constantes). Exiger au moins un point d'appel
-  depuis les tests, et l'avoir vu rougir en cassant ce qu'il référence.
+  depuis les tests, et l'avoir vu rougir en cassant ce qu'il référence. Symétrique, côté porte :
+  un fichier ajouté dans un dossier que la PR crée, ou qu'aucune porte ne couvrait encore, se
+  prouve **lu** par chaque porte qui prétend le couvrir — lint, typecheck, format — en y injectant
+  une faute délibérée, vue rouge, puis restaurée. Les exclusions par défaut des outils (dossiers
+  cachés, `node_modules`, environnements virtuels) priment souvent sur l'`include` du projet :
+  pyright a rendu « 0 errors » sur un script de `.github/scripts/` qu'il n'avait pas analysé, et
+  y a trouvé 11 erreurs une fois le script déplacé (obs 27).
 
 ### 3.3 Le « cleanup pass » — relecture distincte du delta
 

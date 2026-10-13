@@ -74,7 +74,9 @@ Quelle que soit la voie :
 - **Un « go » autorise l'exécution, il n'éteint pas le cadrage.** En particulier pour
   l'installation d'un outil : une demande qui nomme un outil précis est une solution déjà choisie,
   qui masque le problème qui l'a motivée. Faire remonter l'objectif avant d'installer — l'outil
-  demandé peut ne pas le résoudre, ou le besoin peut être déjà couvert sans rien installer.
+  demandé peut ne pas le résoudre, ou le besoin peut être déjà couvert sans rien installer. Une
+  **limite du geste** relevée dans l'outil nommé remonte de même, avant l'installation
+  (`cycle-pr` 3.1, « Frontières tierces »).
 - **« Comment faire X » présuppose que X existe.** Avant de répondre par un mode d'emploi, vérifier
   la prémisse — en source officielle, jamais de mémoire — dès que X touche aux capacités, quotas,
   identifiants ou facturation d'un service tiers : une prémisse fausse y coûte de l'argent réel.

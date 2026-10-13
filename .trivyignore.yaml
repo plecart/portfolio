@@ -34,6 +34,11 @@
 # correctif qui n'attend que la reconstruction d'une image de base sous la même étiquette, que
 # Dependabot peut ne pas proposer, ou une atteinte qui n'a pas pu être établie.
 #
+# Une « Atteinte : non » qui repose sur un comportement de l'outil — un défaut, une option
+# inactive, un protocole refusé — cite le test qui l'exerce sur l'image (`make image-test`) ; sans
+# test, elle s'écrit « non établie » et prend 30 jours. Mesuré sur CVE-2026-56853 : « `h2c`
+# inactif par défaut » était faux, Caddy servait HTTP/2 en clair.
+#
 # `apps/api/tests/test_image_scan.py` refuse une entrée incomplète, expirée, ou datée au-delà de
 # 90 jours.
 #
