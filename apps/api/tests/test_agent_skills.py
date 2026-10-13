@@ -804,12 +804,17 @@ def predicats_a_gauche(ligne: str, action: str, predicat: str) -> list[list[str]
 
     Returns:
         Une liste par occurrence du prédicat à gauche de l'action — ses arguments, jusqu'au `&&`
-        qui le chaîne —, vide si rien ne chaîne : un prédicat sans `&&` est une lecture.
+        qui le chaîne —, vide si rien ne chaîne. Chaque prédicat doit porter **son** `&&`, et le
+        texte qui touche l'action doit finir par `&&` : un `;` entre le dernier prédicat et
+        l'action n'est pas une chaîne, même si un `&&` apparaît plus à gauche — mesuré à la relance,
+        `git fetch origin && git merge-base … ; gh pr merge …` passait pour une porte.
     """
     gauche = ligne.split(action)[0]
-    if "&&" not in gauche:
+    if not gauche.rstrip().endswith("&&"):
         return []
-    return [segment.split("&&")[0].split() for segment in gauche.split(predicat)[1:]]
+    return [
+        segment.split("&&")[0].split() for segment in gauche.split(predicat)[1:] if "&&" in segment
+    ]
 
 
 @pytest.mark.parametrize(
@@ -855,4 +860,48 @@ def test_chaque_porte_prescrite_est_un_predicat_chaine_a_son_action(
         f"`{skill}` ne prescrit `{action}` derrière {attendus} `{predicat}` chaîné(s) par `&&` "
         f"— les deux ordres d'arguments pour deux — sur aucune de ses {len(nommant)} ligne(s) qui "
         f"le nomment ; trouvé : {trouves}"
+    )
+
+
+# Les créations de branche **hors porte** — celles qu'une session fait depuis le worktree d'une
+# issue en lots, donc depuis la branche **mergée** du lot précédent — doivent nommer leur point de
+# départ : `git checkout -b <nouvelle> origin/<trunk>`. Sans lui, `checkout -b` part de HEAD et
+# emporte les commits réécrits du lot mort (mesuré : 1 commit emporté, 0 depuis `origin/main`).
+# Le bloquant B-1 de la passe 2 s'était fermé dans la prose sans cliquet, et la relance l'a
+# mesuré : retirer `origin/<trunk>` du gabarit restait VERT — la seconde fois dans ce lot qu'un
+# bloquant se ferme sans test (I-1 avant lui).
+#
+# Population : les commandes entre backticks qui commencent par `git checkout -b <`, dans les
+# fichiers où une session peut être **ailleurs que sur `main`**. Deux formes nues existent à
+# dessein et n'entrent pas ici : `taille-pr.md`, qui nomme la convention de branche, et le bloc de
+# commandes de `cycle-pr` Étape 1, qui crée la branche **sur `main`**, derrière la porte à deux
+# prédicats — un bloc n'est pas entre backticks, donc le motif ne le voit pas. La prose qui
+# *condamne* la forme nue n'a pas de `<` derrière `-b`, et n'apparie pas non plus.
+DEPARTS_EXPLICITES = [
+    ".claude/skills/cycle-pr/references/prompt-lot-suivant.md",
+    ".claude/skills/pr-paralleles/SKILL.md",
+    ".claude/skills/cycle-pr/SKILL.md",
+]
+CHECKOUT_CITE = re.compile(r"`git checkout -b \\?<[^`]*`")
+
+
+@pytest.mark.parametrize(
+    "fichier",
+    DEPARTS_EXPLICITES,
+    ids=[f"{Path(f).parent.name}-{Path(f).name}" for f in DEPARTS_EXPLICITES],
+)
+def test_chaque_creation_de_branche_hors_porte_nomme_son_point_de_depart(fichier: str) -> None:
+    """Une création de branche sans `origin/` dans un fichier où l'on n'est pas sur `main` est la
+    branche du lot précédent qui continue — ce que `pr-paralleles` Étape 8 interdit en toutes
+    lettres, et que rien ne tenait."""
+    texte = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig")
+    commandes = CHECKOUT_CITE.findall(texte)
+    sans_depart = [commande for commande in commandes if "origin/" not in commande]
+
+    assert commandes, (
+        f"`{fichier}` ne cite plus `git checkout -b <…>` entre backticks — le motif a-t-il cessé "
+        "de mordre ?"
+    )
+    assert not sans_depart, (
+        f"création de branche sans point de départ dans `{fichier}` : {sans_depart}"
     )

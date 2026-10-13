@@ -6,6 +6,7 @@ un test jamais vu rouge (obs 37, deux défauts mesurés sur sept réécritures).
 c'est la seule porte qui éprouve son comportement, `pyright` n'atteignant pas les dossiers cachés.
 """
 
+import io
 import os
 import subprocess
 import sys
@@ -1262,3 +1263,41 @@ def test_le_vocabulaire_des_etats_qui_nont_pas_tourne_couvre_les_trois_rapporteu
     assert playwright == {"s.spec.ts > saute": "skipped"}
     assert {state for state in vitest.values() if state != "passed"} <= mutation.NOT_RUN
     assert "skipped" in mutation.NOT_RUN and "pending" not in mutation.NOT_RUN
+
+
+class _VerdictAvecFleche:
+    """Un verdict factice dont le texte porte un caractère hors cp1252, comme un vrai nom."""
+
+    verdict = "ROUGE"
+
+    def __str__(self) -> str:
+        return "ROUGE  flèche → absente : rouges : ['test_x']"
+
+
+def test_les_verdicts_s_impriment_sur_une_console_cp1252(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Mesuré à la relance de la PR #86 : une mutation nommée avec `→`, console cp1252 →
+    `UnicodeEncodeError` au premier `print(verdict)`, **après** que toutes les mutations ont tourné
+    — fichiers restaurés, mais tous les verdicts perdus. Ce dépôt a 279 identifiants de test
+    accentués (journal de spec de #77, 2026-10-12) ; les accents passent en cp1252, les flèches
+    et les emojis non.
+
+    Le mécanisme est rejoué en processus : `sys.stdout` est un flux texte encodé en cp1252 sur un
+    tampon d'octets, et `play()` rend un verdict dont le texte porte `→`. Le harnais doit écrire
+    ses verdicts en octets UTF-8 sur le tampon, sans dépendre de l'encodage de la couche texte.
+    """
+    spec = tmp_path / "mutations.json"
+    spec.write_text("{}", encoding="utf-8")
+    tampon = io.BytesIO()
+
+    def play_factice(_racine: Path, _spec: object) -> list[_VerdictAvecFleche]:
+        return [_VerdictAvecFleche()]
+
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(tampon, encoding="cp1252"))
+    monkeypatch.setattr(mutation, "play", play_factice)
+
+    code = mutation.main([str(tmp_path), str(spec)])
+
+    assert code == 0
+    assert "flèche → absente" in tampon.getvalue().decode("utf-8")

@@ -797,6 +797,24 @@ def play(root: Path, spec: Mapping[str, Any]) -> list[Verdict]:
     return [judge(suite, entry, witness) for entry in mutations]
 
 
+def dire(texte: str) -> None:
+    """Écrit une ligne sur la sortie standard en octets UTF-8, quelle que soit la console.
+
+    La console du poste est en cp1252 : un nom de mutation, un identifiant de test ou un extrait
+    d'ancre portant `→` ou un emoji faisait lever `UnicodeEncodeError` au premier verdict imprimé
+    — **après** que toutes les mutations ont tourné, donc en perdant tous les verdicts (mesuré,
+    relance de la PR #86). Les octets vont au tampon sans envelopper `sys.stdout` : un
+    `TextIOWrapper` collecté ferme le flux qu'il enveloppe, et un appelant en processus — la
+    suite de tests — perd sa sortie derrière.
+
+    Args:
+        texte: la ligne, sans son saut final.
+    """
+    sys.stdout.flush()
+    sys.stdout.buffer.write(f"{texte}\n".encode())
+    sys.stdout.buffer.flush()
+
+
 def main(argv: Sequence[str]) -> int:
     """Point d'entrée : rend 0 si *toutes* les mutations sont ROUGE, 1 sinon.
 
@@ -804,13 +822,13 @@ def main(argv: Sequence[str]) -> int:
     partielle n'est pas une preuve.
     """
     if len(argv) != 2:
-        print(__doc__)
+        dire(__doc__ or "")
         return 2
     verdicts = play(Path(argv[0]), json.loads(Path(argv[1]).read_text(encoding="utf-8")))
     for verdict in verdicts:
-        print(verdict)
+        dire(str(verdict))
     caught = sum(1 for verdict in verdicts if verdict.verdict == "ROUGE")
-    print(f"\n{caught}/{len(verdicts)} mutations attrapées")
+    dire(f"\n{caught}/{len(verdicts)} mutations attrapées")
     return 0 if verdicts and caught == len(verdicts) else 1
 
 
