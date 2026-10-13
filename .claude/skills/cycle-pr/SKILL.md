@@ -289,6 +289,11 @@ geste demandé — cas non couverts, états refusés ; chaque entrée est une qu
 avant la première ligne avec l'alternative chiffrée, jamais une note découverte après l'ADR
 (obs 38).
 
+**Un zéro rendu par un outil de contrôle se lit avec son inventaire** — types de cibles, nombre
+de composants analysés : un composant que l'outil n'a pas ouvert n'est pas mesuré, et se
+contre-éprouve sous une forme que l'outil lit (règle complète : `interroge-moi`, « Avant de
+verrouiller », obs 61).
+
 **Un avis de sécurité sans correctif n'est pas une impasse.** Une plage d'avis `*` — toutes les
 versions publiées affectées, paquet abandonné — ne clôt pas l'analyse, elle la déplace d'un
 étage : avant de conclure qu'un avis est irréductible, remonter la chaîne de dépendance et
