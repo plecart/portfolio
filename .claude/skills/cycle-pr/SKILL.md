@@ -576,8 +576,9 @@ inter-fichiers. Trois pièges d'usage, payés : une ancre `old` se relit dans le
 **formaté** (une ancre tapée avant la commande de format rend `PANNE`) ; un `expect` qui nomme
 un test absent des `targets` rend « apparie 0 tests de la suite témoin » — ce n'est pas une faute
 de frappe, c'est une mauvaise cible ; et une ancre se choisit sur un candidat **unique**, jamais
-par sous-chaîne, la prose d'un fichier citant souvent le code qu'elle décrit — une ancre prise
-dans un commentaire ne mute rien, et le harnais le refuse en `PANNE` (obs 77).
+par sous-chaîne, la prose d'un fichier citant souvent le code qu'elle décrit. Prise dans un
+commentaire, l'ancre mute le commentaire et rend `VERT` sans rien prouver — seul le cas où elle
+ne mute rien du tout est refusé en `PANNE` par le harnais (obs 77).
 
 Un couple **VERT sur arbre propre, ROUGE avec une sonde plantée** n'est pas un échec du harnais :
 c'est la mesure qu'un invariant *non gardé* est *gardable*, donc le signal qu'il faut écrire le
