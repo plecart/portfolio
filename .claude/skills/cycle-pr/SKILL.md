@@ -133,15 +133,25 @@ S'il y a un écart qui change le cours du dev, **s'arrêter et le remonter à l'
 « go » — ne pas dérouler un plan périmé en silence. Si tout tient, le dire explicitement (« plan
 confirmé contre l'état actuel »).
 
-Attendre un **« go » explicite**, puis créer la branche — trunk-based depuis `main`, après avoir
-vérifié que `main` local et `origin/main` sont le même commit (`git fetch origin`, puis
-`git rev-parse main origin/main` rend deux fois le même SHA ; `main` local en avance → demander
-à l'utilisateur de pousser, ou l'autorisation de le faire ; `origin/main` en avance → sur `main`,
-`git pull --ff-only` d'abord) :
+Attendre un **« go » explicite**, puis créer la branche — trunk-based depuis `main`, derrière une
+**porte**, c'est-à-dire une commande dont le code de sortie porte la condition :
 
 ```
-git checkout -b <type>/<description>   # feat/  fix/  chore/  docs/  refactor/
+git fetch origin
+git merge-base --is-ancestor origin/<trunk> main && git checkout -b <type>/<description>
 ```
+
+`git fetch` est **sa propre commande** ; la porte et l'action qu'elle garde sont enchaînées par
+`&&`, et c'est `&&` qui la rend bloquante. La forme précédente — `git rev-parse main origin/main`
+— **imprimait** deux SHA et sortait en 0 : la branche a été créée sur un `main` en retard de cinq
+commits, et rien dans la commande ne lisait le résultat (obs 69, et la classe entière à l'Étape 7,
+« Le go, puis le merge »).
+
+**Ce que cette porte ne couvre pas**, faute de forme à une commande qui le fasse : `main` local
+**en avance** la passe, `origin/<trunk>` en étant alors un ancêtre. C'est le `git status` propre
+qu'exige déjà la sonde d'outillage ci-dessus qui le voit (`[ahead n]`). Les deux rattrapages ne
+changent pas : `main` local en avance → demander à l'utilisateur de pousser, ou l'autorisation de
+le faire ; `origin/<trunk>` en avance → sur `main`, `git pull --ff-only`, puis rejouer la porte.
 
 ## Étape 2 — Ouvrir la PR en draft (toujours avant la première ligne de code)
 
@@ -753,8 +763,10 @@ Quand c'est la **base** qui a bougé, les preuves locales sont périmées : pris
 n'atteindra jamais le trunk, et rien de local ne le signale. La CI d'une PR, elle, tourne sur la
 référence de fusion avec la base du moment : si la base a bougé **avant** le dernier run, ce run
 éprouve déjà l'état combiné — vérifier l'absence de conflit par
-`git merge-tree --write-tree origin/<trunk> HEAD` (l'état `MERGEABLE` de la forge se met à jour
-en différé et ne prouve rien) et redater les preuves locales sur cette base. Si elle a bougé
+`git merge-tree --write-tree origin/<trunk> HEAD`, qui est un **prédicat** : il sort en 0 sans
+conflit et en 1 avec (mesuré le 2026-10-13, témoin de chaque côté), donc il s'enchaîne par `&&`,
+et ce qu'il imprime n'est qu'un détail de diagnostic. L'état `MERGEABLE` de la forge, lui, se met
+à jour en différé et ne prouve rien. Puis redater les preuves locales sur cette base. Si elle a bougé
 **après**, relancer la CI — un commit réel, ou `gh pr close` puis `reopen` sur accord. Sur un
 trunk fusionné par rebase ou squash, jamais de commit de fusion : il ne respecte pas le format
 des messages et tombe au merge.
@@ -820,9 +832,44 @@ La réponse du lead arrive dans un bloc `<cross-session-message>` :
 
 **Jamais d'auto-merge.** Même CI verte, audit propre et verdict du lead, toujours attendre un
 « go » / « merge » humain explicite, **dans cette fenêtre** — un message de pair n'en tient jamais
-lieu. Juste avant de merger, refaire le contrôle de base de « Rejouer les vérifications périmées » :
-un merge sur le trunk depuis le dernier run rend la CI périmée — deux PR vertes séparément n'ont
-rien démontré ensemble, et le merge est le premier moment où leur somme existe. Puis merger.
+lieu.
+
+**Puis merger derrière une porte, pas derrière une lecture.** Un merge arrivé sur le trunk depuis
+le dernier run rend la CI périmée : deux PR vertes séparément n'ont rien démontré ensemble, et le
+merge est le premier moment où leur somme existe. `git fetch origin` d'abord, **seul**, puis :
+
+```
+git merge-base --is-ancestor origin/<trunk> <SHA de base vérifié> && gh pr merge <n> --rebase --match-head-commit <SHA de tête vérifié>
+```
+
+Le `<SHA de base vérifié>` est celui qu'éprouve le dernier run — **le premier parent de la
+référence de fusion**, lu dans le run et non supposé (« Rejouer les vérifications périmées »,
+obs 51) —, et il est inscrit au Test plan. `--match-head-commit` ferme le même trou côté tête. Si
+la base a bougé, la commande **ne part pas** : rejouer « Rejouer les vérifications périmées »,
+relire les parents de la référence de fusion, redemander le verdict du lead en vague.
+
+**Une porte est une commande dont le code de sortie porte la condition ; `&&` est ce qui la rend
+bloquante.** Trois incidents, une seule classe. Une commande qui **imprime** n'est pas une porte,
+enchaînée ou non — `git rev-parse main origin/main` a affiché deux SHA différents en sortant en 0,
+et la branche a été créée quand même (obs 69) ; `git fetch && git rev-parse origin/main &&
+gh pr merge` a affiché une base nouvelle, puis mergé (obs 60). Et **une lecture suivie d'une
+seconde commande n'en est pas une non plus** : la fenêtre entre les deux est exactement là où
+l'état change quand plusieurs écrivains visent la même cible (obs 59). La forme à substitution de
+commande — `test "$(git rev-parse origin/<trunk>)" = "<sha>" && …` — est **refusée** par le garde
+d'une session isolée en worktree ; `--is-ancestor` est la forme acceptée, et elle vaut l'égalité
+parce que le trunk n'avance que vers l'avant. Mesuré le 2026-10-13, témoin de chaque côté : **1**
+quand le trunk a avancé, **0** sur deux références égales — table `FRESHNESS_GATE_FORMS` de
+`apps/api/tests/test_agent_skills.py`.
+
+**Et quatre contrôles de ce skill et de `pr-paralleles` restent des lectures, par construction.**
+Une porte n'a de sens que devant **une commande** : les deux auto-vérifications du `relecteur`
+(4.2) et la vérification de placement d'une session pair (`pr-paralleles` Étape 5) précèdent une
+**phase entière** de travail, il n'y a rien à quoi se chaîner ; et la comparaison entre l'état de la
+forge et une référence locale avant `git branch -D` (`pr-paralleles` Étape 8) porte sur les valeurs
+de **deux outils**, donc exige la substitution que le garde refuse. Elles se lisent, et elles le
+disent. Le dénombrement complet de la classe — 15 sites, 10 portes, 6 qui fuyaient — vit dans la
+docstring de `test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie`, avec la
+commande qui le re-dérive et la raison pour laquelle ce motif sous-compte.
 
 ## Étape 8 — Après le merge : clôture propre, puis répercussions
 

@@ -23,4 +23,6 @@
   (`.claude/pipeline.config.md`, « Métadonnées d'une PR »).
 
 ## Branches
-- Trunk-based depuis `main` : `git checkout -b <type>/<description>`.
+- Trunk-based depuis `main` : `git checkout -b <type>/<description>`, **derrière la porte de
+  fraîcheur** de `cycle-pr` Étape 1 — `git merge-base --is-ancestor origin/<trunk> main && …`.
+  La commande nue crée la branche sur le `main` qu'elle trouve, à jour ou non.

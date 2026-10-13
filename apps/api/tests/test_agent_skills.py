@@ -13,6 +13,7 @@ hors CI). Même cause possible — un « seulement : » sans guillemets dans la 
 """
 
 import re
+import subprocess
 from collections.abc import Iterable
 from pathlib import Path
 from typing import cast
@@ -560,3 +561,141 @@ def test_plusieurs_fichiers_citant_une_meme_cible_sont_tous_rapportes(tmp_path: 
     cited = cited_scripts(tmp_path, ["CLAUDE.md", "CONTRIBUTING.md"])
 
     assert cited == {".claude/skills/cycle-pr/scripts/x.py": {"CLAUDE.md", "CONTRIBUTING.md"}}
+
+
+def git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    """Lance `git` dans `repo`, **sans shell**, et rend le processus terminé.
+
+    Sans shell à dessein : sur le poste Windows, MSYS réécrit certains arguments avant que git ne
+    les voie — un `<rev>:<chemin>` devient un chemin, `git show` rend zéro octet, et le résultat se
+    lit comme « fichier différent » au lieu de « rien lu ».
+
+    Args:
+        repo: le dépôt dans lequel lancer la commande.
+        *args: les arguments de `git`, sans le nom du programme.
+
+    Returns:
+        Le processus terminé, code de sortie compris — jamais `check=True` : ici le **code de
+        sortie est la mesure**, pas un incident.
+    """
+    return subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+@pytest.fixture(scope="module")
+def gate_repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Un dépôt jetable portant les trois états qu'une porte de fraîcheur doit distinguer.
+
+    Trois références, toutes sur la même ligne du même fichier pour que la fusion morde :
+    le tag `base` (l'état que la PR a vérifié), la branche `trunk` (le trunk qui a avancé depuis)
+    et la branche `lateral` (une autre PR de la vague, en conflit avec `trunk`).
+    """
+    repo = tmp_path_factory.mktemp("portes")
+    git(repo, "init", "-q", "-b", "trunk")
+    (repo / "f.txt").write_text("base\n", encoding="utf-8")
+    git(repo, "add", "f.txt")
+    git(repo, "commit", "-qm", "base")
+    git(repo, "tag", "base")
+    git(repo, "branch", "lateral")
+    (repo / "f.txt").write_text("avance\n", encoding="utf-8")
+    git(repo, "commit", "-qam", "avance")
+    git(repo, "checkout", "-q", "lateral")
+    (repo / "f.txt").write_text("autre\n", encoding="utf-8")
+    git(repo, "commit", "-qam", "autre")
+    return repo
+
+
+# Les codes de sortie sur lesquels repose la **forme** que `cycle-pr` et `pr-paralleles`
+# prescrivent pour une porte de fraîcheur : une commande dont le code de sortie porte la
+# condition, `&&` la rendant bloquante. Une commande qui **imprime** n'est pas une porte, et le
+# dernier cas ci-dessous est ce qui le mesure — `rev-parse` rend deux SHA différents en sortant
+# en 0, donc l'action enchaînée part quand même (obs 69, l'incident d'origine).
+#
+# Le cas « ancêtre strict » est la **borne** de la forme, pas un détail : `--is-ancestor` dit
+# « ancêtre ou égal », donc il ne distingue l'égalité du retard que dans un seul sens. C'est
+# pourquoi les skills écrivent l'argument dans l'ordre qui bloque le cas mesuré (le trunk a
+# avancé) et nomment l'autre direction comme non couverte, au lieu de la taire.
+FRESHNESS_GATE_FORMS = {
+    "is-ancestor-rend-0-sur-deux-refs-egales": (
+        ("merge-base", "--is-ancestor", "trunk", "trunk"),
+        0,
+    ),
+    "is-ancestor-rend-1-quand-le-trunk-a-avance": (
+        ("merge-base", "--is-ancestor", "trunk", "base"),
+        1,
+    ),
+    "is-ancestor-rend-0-sur-un-ancetre-strict": (
+        ("merge-base", "--is-ancestor", "base", "trunk"),
+        0,
+    ),
+    "merge-tree-rend-0-sans-conflit": (("merge-tree", "--write-tree", "base", "trunk"), 0),
+    "merge-tree-rend-1-avec-conflit": (("merge-tree", "--write-tree", "trunk", "lateral"), 1),
+    "rev-parse-rend-0-sur-deux-SHA-differents": (("rev-parse", "base", "trunk"), 0),
+}
+
+
+def test_le_depot_temoin_porte_bien_trois_etats_distincts(gate_repo: Path) -> None:
+    """Le témoin positif du dépôt jetable : sans lui, les codes de sortie ne prouvent rien.
+
+    Trois références égales rendraient 0 partout, et la table se lirait comme une mesure. C'est
+    la classe du principe transverse n° 1 — une seule méthode qui conclut n'est pas une mesure.
+    """
+    heads = {
+        ref: git(gate_repo, "rev-parse", ref).stdout.strip() for ref in ("base", "trunk", "lateral")
+    }
+
+    assert all(heads.values()), f"une référence du témoin ne résout pas : {heads}"
+    assert len(set(heads.values())) == 3, f"les trois références ne sont pas distinctes : {heads}"
+
+
+@pytest.mark.parametrize(
+    ("args", "expected"),
+    FRESHNESS_GATE_FORMS.values(),
+    ids=FRESHNESS_GATE_FORMS.keys(),
+)
+def test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie(
+    gate_repo: Path, args: tuple[str, ...], expected: int
+) -> None:
+    """**Dénombrement de la classe « une porte qui ne garde pas », écrit avant le premier
+    correctif** (`cycle-pr` 4.2, cliquet).
+
+    Recensement du 2026-10-13 sur `5cd7bf7`, par la commande ci-dessous — **15 sites**, en
+    17 lignes appariées plus **un site que le motif ne voit pas** :
+
+        git grep -n -E "rev-parse|merge-base|merge-tree|doit rendre|rend deux fois|--json state|is-ancestor|--quiet" \
+            -- .claude/skills/cycle-pr/SKILL.md .claude/skills/pr-paralleles/SKILL.md .claude/agents/ .claude/rules/
+
+    Répartition : **4 relevés** (une datation de preuve, qui ne garde aucune action), **1 sonde**
+    d'outillage, et **10 portes**, dont **6 fuyaient** en étant écrites comme un affichage —
+    création de branche, création de worktree, le merge lui-même, et les trois `merge-tree`, qui
+    étaient déjà des prédicats sans être employés comme tels.
+
+    Le motif **sous-compte, et sur le site qui compte le plus** : la porte de merge de `cycle-pr`
+    Étape 7 ne nommait **aucune** commande (« refaire le contrôle de base »), donc aucun grep ne
+    pouvait l'apparier. Un recensement par motif d'une classe « porte absente » est par
+    construction une borne inférieure, et c'est l'inverse de ce dont on a besoin.
+
+    **4 portes restent des lectures, avec leur raison** — ce n'est pas un reste à faire :
+    trois (les deux auto-vérifications du `relecteur`, la vérification de placement d'une session
+    pair) sont suivies d'une **phase entière** de travail et non d'une commande unique, donc il
+    n'y a rien à quoi se chaîner ; la quatrième (`gh pr view --json state,headRefOid` avant
+    `git branch -D`) compare les valeurs de **deux outils**, ce qui exige une substitution de
+    commande — refusée par le garde d'une session isolée (obs 60). Ce qu'elle garde est une
+    suppression locale, récupérable par le reflog.
+
+    Ce test n'éprouve pas du code du projet : il **établit** les affirmations que les deux skills
+    font sur ces commandes. Il passe donc dès sa première exécution, et c'est attendu
+    (`cycle-pr` 3.1, premier cas) — le rouge se constate en mutant un code attendu de la table,
+    pas en retirant du code de production.
+    """
+    done = git(gate_repo, *args)
+
+    assert done.returncode == expected, (
+        f"`git {' '.join(args)}` rend {done.returncode} au lieu de {expected} — "
+        f"sortie : {done.stdout.strip()!r} / {done.stderr.strip()!r}"
+    )
