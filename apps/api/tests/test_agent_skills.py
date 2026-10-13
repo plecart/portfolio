@@ -610,6 +610,10 @@ def gate_repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return repo
 
 
+# Le motif de recensement du docstring ci-dessous est volontairement **sans `--quiet`** : cette
+# alternative n'appariait aucune des 17 lignes de la population, et une alternative morte fait
+# chercher une famille de portes qui n'existe pas.
+#
 # Les codes de sortie sur lesquels repose la **forme** que `cycle-pr` et `pr-paralleles`
 # prescrivent pour une porte de fraîcheur : une commande dont le code de sortie porte la
 # condition, `&&` la rendant bloquante. Une commande qui **imprime** n'est pas une porte, et le
@@ -642,14 +646,24 @@ FRESHNESS_GATE_FORMS = {
 def test_le_depot_temoin_porte_bien_trois_etats_distincts(gate_repo: Path) -> None:
     """Le témoin positif du dépôt jetable : sans lui, les codes de sortie ne prouvent rien.
 
-    Trois références égales rendraient 0 partout, et la table se lirait comme une mesure. C'est
-    la classe du principe transverse n° 1 — une seule méthode qui conclut n'est pas une mesure.
+    Trois références égales rendraient 0 partout, et la table ci-dessous se lirait comme une
+    mesure. C'est la classe du principe transverse n° 1 — une seule méthode qui conclut n'est pas
+    une mesure.
+
+    **Et ce témoin-là l'a d'abord enfreinte.** Jugé sur `stdout` seul, il passait sur un dépôt où
+    **aucune** référence ne résout : mesuré le 2026-10-13, `git rev-parse base` y écrit `base` sur
+    **stdout** et sort en 128, donc trois références inexistantes rendent trois valeurs non vides
+    et distinctes. D'où `--verify` et la lecture du code de sortie. Dénombrement de la classe sur
+    ce delta : **2** lectures de la sortie d'une commande git, **1** fuyait — l'autre est la table
+    ci-dessous, où le code de sortie *est* la mesure.
     """
-    heads = {
-        ref: git(gate_repo, "rev-parse", ref).stdout.strip() for ref in ("base", "trunk", "lateral")
+    resolved = {
+        ref: git(gate_repo, "rev-parse", "--verify", ref) for ref in ("base", "trunk", "lateral")
     }
 
-    assert all(heads.values()), f"une référence du témoin ne résout pas : {heads}"
+    failed = {ref: done.stderr.strip() for ref, done in resolved.items() if done.returncode != 0}
+    assert not failed, f"une référence du témoin ne résout pas : {failed}"
+    heads = {ref: done.stdout.strip() for ref, done in resolved.items()}
     assert len(set(heads.values())) == 3, f"les trois références ne sont pas distinctes : {heads}"
 
 
@@ -664,11 +678,20 @@ def test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie(
     """**Dénombrement de la classe « une porte qui ne garde pas », écrit avant le premier
     correctif** (`cycle-pr` 4.2, cliquet).
 
-    Recensement du 2026-10-13 sur `5cd7bf7`, par la commande ci-dessous — **15 sites**, en
-    17 lignes appariées plus **un site que le motif ne voit pas** :
+    Recensement du 2026-10-13 sur **`c459f04`**, la base du lot — l'état *avant* le premier
+    correctif, qui est le seul où la classe se dénombre. **15 sites**, en 17 lignes appariées
+    plus **un site que le motif ne voit pas** :
 
-        git grep -n -E "rev-parse|merge-base|merge-tree|doit rendre|rend deux fois|--json state|is-ancestor|--quiet" \
-            -- .claude/skills/cycle-pr/SKILL.md .claude/skills/pr-paralleles/SKILL.md .claude/agents/ .claude/rules/
+        git grep -c -E "rev-parse|merge-base|merge-tree|doit rendre|rend deux fois|is-ancestor" \
+            c459f04 -- .claude/skills/cycle-pr/SKILL.md .claude/skills/pr-paralleles/SKILL.md \
+            .claude/agents/ .claude/rules/
+
+    Elle rend `relecteur.md:2`, `cycle-pr/SKILL.md:8`, `pr-paralleles/SKILL.md:7` — 17 lignes pour
+    14 contrôles distincts (deux lignes de `cycle-pr` sont des **renvois** aux deux
+    auto-vérifications du `relecteur`, et deux lignes de `pr-paralleles` décrivent la même porte,
+    en prose puis en bloc de commandes). **La révision est dans la commande à dessein** : sans
+    elle, le même grep grossit à chaque commit de ce lot, qui nomme ces commandes pour les
+    prescrire — 20 lignes dès `5cd7bf7`, où `verificateur.md` en ajoute 3.
 
     Répartition : **4 relevés** (une datation de preuve, qui ne garde aucune action), **1 sonde**
     d'outillage, et **10 portes**, dont **6 fuyaient** en étant écrites comme un affichage —
