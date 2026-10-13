@@ -267,7 +267,8 @@ encore, le `ci.yml` et le `dependabot.yml` attendent sa première PR de code (é
 - **Donner une horloge aux portes qui lisent une base d'avis** — audit des dépendances, scan
   d'images : leur verdict change sans commit, quand un avis se publie. Ajouter au `on:` un
   déclencheur `schedule` quotidien et `workflow_dispatch`, réservés à ces portes : toute autre
-  porte — lint, typecheck, build, tests — porte un `if:` qui les exclut. Sans horloge, un avis
+  étape ou job — lint, typecheck, build, tests, publication, déploiement — porte un `if:` qui les
+  exclut. Sans horloge, un avis
   n'est vu qu'au run suivant d'une PR quelconque, qui hérite d'un rouge hors de son sujet — deux
   fois en deux jours (obs 56). `workflow_dispatch` prouve le déclencheur sans attendre un jour ;
   `schedule` ne part que de la branche par défaut, et GitHub le désactive dans un dépôt public
