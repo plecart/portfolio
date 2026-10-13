@@ -138,20 +138,39 @@ Attendre un **« go » explicite**, puis créer la branche — trunk-based depui
 
 ```
 git fetch origin
-git merge-base --is-ancestor origin/<trunk> main && git checkout -b <type>/<description>
+git merge-base --is-ancestor main origin/<trunk> && git merge-base --is-ancestor origin/<trunk> main && git checkout -b <type>/<description>
 ```
 
-`git fetch` est **sa propre commande** ; la porte et l'action qu'elle garde sont enchaînées par
-`&&`, et c'est `&&` qui la rend bloquante. La forme précédente — `git rev-parse main origin/main`
-— **imprimait** deux SHA et sortait en 0 : la branche a été créée sur un `main` en retard de cinq
-commits, et rien dans la commande ne lisait le résultat (obs 69, et la classe entière à l'Étape 7,
-« Le go, puis le merge »).
+**Deux prédicats, pas un.** `--is-ancestor` dit « ancêtre **ou égal** » : une seule direction ne
+distingue donc pas l'égalité du retard, et la porte laisserait passer l'autre cas. Les deux
+ensemble valent l'égalité — `main` ancêtre d'`origin/<trunk>` **et** l'inverse ⇔ même commit.
+`git fetch` est **sa propre commande** et précède les deux : c'est lui qui rend `origin/<trunk>`
+significatif. Et c'est `&&` qui rend la porte bloquante — une chaîne de trois commandes passe le
+garde de permissions, **en worktree isolé compris** (mesuré le 2026-10-13 : ce que le garde refuse
+est la **substitution de commande**, pas la longueur de la chaîne — obs 60). **Non vérifié** :
+cette mesure a été prise avec une troisième commande **en lecture** ; la forme écrivante n'a pas
+été provoquée, parce qu'elle n'est pas inoffensive. Un refus à cet endroit se reconnaîtrait tout
+seul, et la sortie serait de jouer les deux prédicats en une commande chacun, puis l'action — en
+acceptant que la porte redevienne alors une lecture, et en le disant.
 
-**Ce que cette porte ne couvre pas**, faute de forme à une commande qui le fasse : `main` local
-**en avance** la passe, `origin/<trunk>` en étant alors un ancêtre. C'est le `git status` propre
-qu'exige déjà la sonde d'outillage ci-dessus qui le voit (`[ahead n]`). Les deux rattrapages ne
-changent pas : `main` local en avance → demander à l'utilisateur de pousser, ou l'autorisation de
-le faire ; `origin/<trunk>` en avance → sur `main`, `git pull --ff-only`, puis rejouer la porte.
+Les deux directions, mesurées le 2026-10-13 sur un dépôt jetable avec un vrai distant : branche
+**en retard**, `--is-ancestor main origin/<trunk>` rend 0 et `--is-ancestor origin/<trunk> main`
+rend **1** ; branche **en avance**, c'est l'inverse. Chaque prédicat bloque donc exactement sa
+direction, et aucun des deux ne suffit seul.
+
+La forme précédente — `git rev-parse main origin/main` — voyait bien les deux directions, mais elle
+**imprimait** deux SHA en sortant en 0 : la branche a été créée sur un `main` en retard de cinq
+commits, et rien dans la commande ne lisait le résultat (obs 69, et la classe entière à l'Étape 7,
+« Le go, puis le merge »). Une porte à **un** prédicat aurait fermé ce cas en rouvrant l'autre :
+c'est tout l'intérêt d'en mettre deux.
+
+**Au blocage**, laquelle des deux a mordu se lit par `git status -sb`, qui écrit `[ahead n]` /
+`[behind n]`. Pas `git status` nu, qui le dit en prose, et **surtout pas**
+`git status --porcelain`, **vide** sur une branche en avance (mesuré) — c'est pourquoi la sonde
+d'outillage ci-dessus, qui exige un `git status` vide, ne voit pas ce cas et ne peut pas servir de
+contrôle compensatoire. Rattrapages : `main` local en avance → demander à l'utilisateur de
+pousser, ou l'autorisation de le faire ; `origin/<trunk>` en avance → sur `main`,
+`git pull --ff-only`. Dans les deux cas, rejouer la porte.
 
 ## Étape 2 — Ouvrir la PR en draft (toujours avant la première ligne de code)
 

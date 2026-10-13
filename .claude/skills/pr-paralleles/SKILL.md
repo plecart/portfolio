@@ -68,14 +68,21 @@ worktree créé sur un `main` en retard prive la session de commits dont son bri
 
 ```
 git fetch origin
-git merge-base --is-ancestor origin/main main && git worktree add ../<repo>--<numéro-issue> -b <type>/<slug> origin/main
+git merge-base --is-ancestor main origin/main && git merge-base --is-ancestor origin/main main && git worktree add ../<repo>--<numéro-issue> -b <type>/<slug> origin/main
 ```
 
-Ce que la porte ne couvre pas, et qui se voit au `git status` : `main` local **en avance** la
-passe. S'arrêter alors et demander à l'utilisateur de pousser (ou l'autorisation de le faire)
-avant le premier worktree — brancher sur `main` local ferait apparaître ses commits non poussés
-dans le diff de chaque PR du lot. Si c'est `origin/main` qui est en avance, la porte bloque : sur
-`main`, `git pull --ff-only`, puis la rejouer.
+**Deux prédicats**, parce que `--is-ancestor` dit « ancêtre ou égal » et qu'une seule direction
+laisse passer l'autre cas : les deux ensemble valent l'égalité. Les deux directions comptent ici —
+`origin/main` en avance prive chaque session de commits dont son brief dépend ; `main` local en
+avance ferait apparaître ses commits non poussés dans le diff de **chaque** PR du lot. Le
+raisonnement complet, le rôle de `&&` et la mesure du garde de permissions sont à `cycle-pr`
+Étape 1 ; ne pas les recopier ici.
+
+**Au blocage**, laquelle des deux a mordu se lit par `git status -sb` (`[ahead n]` / `[behind n]`),
+jamais par `git status --porcelain`, **vide** sur une branche en avance (mesuré). Rattrapages :
+`main` local en avance → s'arrêter et demander à l'utilisateur de pousser, ou l'autorisation de le
+faire, **avant le premier worktree** ; `origin/main` en avance → sur `main`, `git pull --ff-only`.
+Dans les deux cas, rejouer la porte.
 
 - `<type>` = `feat` / `fix` / `chore` / `docs` / `refactor` selon la catégorie de l'issue.
 - `<slug>` = description courte en kebab-case.
