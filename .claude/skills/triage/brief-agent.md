@@ -39,6 +39,19 @@ L'agent doit savoir quand il a terminé. Chaque brief d'agent doit comporter des
 - **Bon :** « Lancer `gh issue list --label needs-triage` retourne les issues passées par la classification initiale »
 - **Mauvais :** « Le triage doit fonctionner correctement »
 
+Deux formes de critère ne sont vérifiables que si elles portent de quoi se reproduire :
+
+- **Un dénombrement porte sa population et la commande qui la recense** — « <N> <éléments> —
+  population : <ce qui est compté>, commande : <ce qui les recense> ». Sans elles, le chiffre ne
+  se vérifie pas, il se croit : « 29 fichiers identiques », répété dans quatre lots, ne se
+  reproduisait sur aucune population, et chaque lot héritait d'une base fausse (obs 68). `cycle-pr`
+  reproduit un tel chiffre à son Étape 1.
+- **Un critère qui décrit une sortie donne la valeur attendue sur une entrée nommée** — « sur un
+  transcript de 12 h dont 10 h d'absence, la réactivité vaut 13 %, pas 2 % » —, pas seulement la
+  règle de calcul. Sans valeur attendue, le critère se déclare tenu par l'auteur du code, dont les
+  tests assèrent ce que le code calcule : seule la sortie produite sur l'entrée nommée le confronte
+  à ce que le critère demandait (obs 72).
+
 ### Limites de périmètre explicites
 
 Indique ce qui est hors périmètre. Cela empêche l'agent de sur-développer ou de faire des suppositions sur des fonctionnalités adjacentes.

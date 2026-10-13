@@ -113,6 +113,12 @@ peut-être bougé. Confronter le plan à la réalité **actuelle** du code :
   de création) se lit comme un erratum potentiel — une réconciliation a pu ne pas atteindre le
   brief. En cas d'écart entre les deux, le journal (adossé aux sources de vérité) l'emporte, et
   l'écart se signale dans le briefing.
+- **Reproduire chaque chiffre de référence qu'un critère demande de retrouver**, par la commande
+  qui recense sa population (`triage/brief-agent.md`, « Critères d'acceptation complets »), avant
+  la première ligne de code. Un chiffre qui ne se reproduit pas fait amender le critère, avec sa
+  ligne au « Journal de spec » — **partout** où la phrase se répète, sinon chaque lot suivant hérite
+  d'une base fausse. Un critère muet sur sa population : prendre celle que son intention désigne et
+  l'écrire dans l'amendement, jamais chercher celle qui rend le chiffre annoncé (obs 68).
 - **Vérifier que la suite du dev tient** : ce que cette PR prépare pour les issues suivantes est-il
   toujours cohérent, ou l'ordre / le découpage doit-il être revu ?
 - **Vérifier la faisabilité de l'ordre des commits** : pour chaque commit prévu, ce dont ses tests
@@ -365,7 +371,7 @@ le même commit** — voir `.claude/rules/contraintes.md`. La doc ne se met jama
 
 ### 3.2 Premier passage de tests
 
-Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Six contrôles complémentaires :
+Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Contrôles complémentaires :
 
 - **Échec d'outillage ≠ échec de code.** Un échec « exécutable introuvable », « fichier utilisé
   par un autre processus » ou un compilateur qui sort brutalement après une commande tuée n'est
@@ -396,6 +402,14 @@ Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Six contrôl
   cible qui ne peut pas tourner ici — Docker, jeton, réseau — se vérifie sur la commande **après
   expansion** (`make --dry-run <cible>`, ou l'équivalent du lanceur du projet), jamais sur le
   texte du fichier.
+- **Un exécutable livré se lance sur une entrée réelle.** Si le delta livre un exécutable —
+  script, commande, rapport —, le lancer au moins une fois sur une entrée **réelle**, pas
+  seulement sur les fixtures de ses tests, et lire sa sortie ligne à ligne contre les critères qui
+  la décrivent ; entrée et sortie vont au Test plan (Étape 5) avant `gh pr ready`. Un test écrit
+  par l'auteur assère ce que le code calcule ; seule l'exécution le confronte à ce que le critère
+  demandait. Mesuré : 38 tests verts autour d'un script dont la première sortie réelle divisait
+  chaque pourcentage par la durée totale, absences comprises — 2 % affichés là où le critère
+  demandait la part hors absences, 13 % (obs 72).
 - **Un delta sur `.claude/` ou `CLAUDE.md` passe par le validateur du harnais avant tout push**
   — ligne « validation » de `.claude/pipeline.config.md`. C'est la porte la plus large de ce que
   Claude Code charge : un frontmatter de skill absent, une `description` non textuelle, un
@@ -749,6 +763,8 @@ body définitif, puis de sortir du draft.
 - [x] <vérifs manuelles si pertinent — chacune porte les deux SHA sur lesquels elle a été prise,
       la tête et la base de branche `git merge-base origin/main HEAD`, et « observe : » les fichiers ou
       dossiers dont son résultat dépend (Étape 7)>
+- [x] <exécutable livré : sa sortie réelle (entrée : <nommée>), chaque ligne confrontée au
+      critère qui la décrit (3.2)>
 - [x] <étape non applicable — cochée avec sa raison (« sans objet »), jamais laissée décochée>
 
 ## Relecture indépendante
