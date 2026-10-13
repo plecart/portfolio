@@ -30,6 +30,14 @@
   `chore(deps-dev)`) ; la description et le corps viennent du bot — en anglais pour Dependabot,
   qui ne sait pas les écrire autrement. Même exemption que pour les métadonnées de PR
   (`.claude/pipeline.config.md`, « Métadonnées d'une PR »).
+- **Refuser une PR de bot sans laisser d'état hors du dépôt.** Jamais de fermeture à la main ni
+  de commande `@dependabot ignore …` : l'une et l'autre mémorisent un refus côté forge, invisible,
+  et la seconde bloque aussi les mises à jour de sécurité. Le refus s'écrit en règle `ignore` du
+  fichier de configuration du bot — raison et condition de réexamen en commentaire, liste figée
+  par un test — et un second test lit la cause du refus là où elle vit (verrou, plage de pairs)
+  avec l'analyseur de l'écosystème, puis rougit le jour où elle tombe, vu rouge par mutation. Le
+  bot ferme ses PR de lui-même au push de la configuration : le constater, puis commenter chacune
+  en citant le commit. Exemple en place : `docs/frontend-outillage.md` §2.4 (obs 31).
 
 ## Branches
 - Trunk-based depuis `main` : `git checkout -b <type>/<description>`, **derrière la porte de
