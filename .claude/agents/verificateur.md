@@ -44,8 +44,8 @@ Ce que tu vérifies, **dans cet ordre** — c'est un ordre de priorité, et tu t
    amendé en cours de route, le brief est daté (`cycle-pr` Étape 8). Lire aussi
    `gh pr view <n> --comments` : un commentaire de revue automatisée ou de répercussion encore
    ouvert est un critère que la PR n'a pas soldé.
-2. **La fraîcheur de la base**, et elle se date par ce que la forge a réellement construit.
-   `git fetch origin`, puis la base du dernier run : la référence de fusion
+2. **La fraîcheur du trunk éprouvé**, et elle se date par ce que la forge a réellement construit.
+   `git fetch origin`, puis le trunk que le dernier run a réellement combiné : la référence de fusion
    (`gh api repos/<owner>/<repo>/git/ref/pull/<n>/merge --jq .object.sha`) et **ses parents**
    (`gh api repos/<owner>/<repo>/commits/<sha> --jq ".parents[].sha"` — le `--jq` se cite, `[]`
    étant un motif de glob pour le shell). Le premier parent doit être

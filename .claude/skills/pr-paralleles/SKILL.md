@@ -279,7 +279,8 @@ sa PR ; rien ne part sans son accord. Quand ce message arrive :
    quatre artefacts en aval l'ont reprise sur trois sessions.
 
    Le lead ne garde que le **verdict structuré** que le rôle rend : critères ✅/❌/⚠️ avec preuve,
-   base du dernier run et ses parents, conflit, heurts `decisions-vs-doc`, fichiers croisés, et ce
+   trunk éprouvé par le dernier run (parents de la référence de fusion), conflit, heurts
+   `decisions-vs-doc`, fichiers croisés, et ce
    que le plafond a laissé « non vérifié ». C'est ce qui empêche son contexte de grossir d'un diff
    complet par PR et par go, jusqu'à devoir être relayé (obs 62). Le rôle porte **ce qu'il
    vérifie** et dans quel ordre : ne pas le recopier ici, deux énoncés de la même consigne

@@ -183,6 +183,13 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
   - bit exécutable POSIX (`ruff` `EXE001`) — vérifié en CI seulement
   - fins de ligne des fichiers lus par un conteneur (`.gitattributes` + `test_infra`) — rouge
     possible sur le seul poste, copie de travail en CRLF
+  - **argument `<rev>:<chemin>` dans le shell** — sur ce poste, MSYS réécrit un argument de la
+    forme `<rev>:<chemin>` avant que git ne le voie : `git show main:<chemin>` lancé par l'outil
+    Bash rend **zéro octet** en sortant en 0, et tout ce qui le lit ensuite conclut « fichier
+    différent » ou « 0 occurrence » sur du vide. Quatrième occurrence dans le cycle de #77 au
+    2026-10-13, comptée par le lead de la vague ; c'est l'évidence n° 1 du principe transverse
+    « une seule méthode qui conclut n'est pas une mesure ». Appeler `git show` **sans shell**
+    (`subprocess.run([...])`), et exiger un témoin d'octets lus avant de conclure
   - **heredoc de l'outil Bash et antislashs** — un fichier écrit par `cat >> … <<'EOF'` depuis
     l'outil Bash du poste arrive sur disque avec ses antislashs **divisés par deux** : mesuré le
     2026-10-13, un motif `\\?<` tapé est devenu `\?<`, soit un `?` littéral, et une porte sur la
