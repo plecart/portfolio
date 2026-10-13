@@ -183,6 +183,12 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
   - bit exécutable POSIX (`ruff` `EXE001`) — vérifié en CI seulement
   - fins de ligne des fichiers lus par un conteneur (`.gitattributes` + `test_infra`) — rouge
     possible sur le seul poste, copie de travail en CRLF
+  - **heredoc de l'outil Bash et antislashs** — un fichier écrit par `cat >> … <<'EOF'` depuis
+    l'outil Bash du poste arrive sur disque avec ses antislashs **divisés par deux** : mesuré le
+    2026-10-13, un motif `\\?<` tapé est devenu `\?<`, soit un `?` littéral, et une porte sur la
+    prose des skills n'appariait plus rien — vue rouge sur son témoin, pas sur son motif. Écrire
+    les fichiers par l'outil d'écriture ou d'édition (littéraux) ; un heredoc ne convient qu'à un
+    contenu sans antislash
   - **cache de compilation et mutation de même longueur**
     (`.claude/skills/cycle-pr/scripts/mutation.py`, fonction `rewrite`) — `__pycache__`
     s'invalide sur le couple (date, taille) : une mutation qui ne change ni l'une ni l'autre
