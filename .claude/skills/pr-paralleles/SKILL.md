@@ -60,18 +60,22 @@ plutôt que tout d'un coup.
 
 ### 3. Créer un worktree + une branche par issue
 
-Pour chaque issue retenue, depuis `main` à jour — **les deux `main`** : après `git fetch origin`,
-`git rev-parse main origin/main` doit rendre deux fois le même SHA. Si `main` local est en avance,
-s'arrêter et demander à l'utilisateur de pousser (ou l'autorisation de le faire) avant le premier
-worktree : brancher sur `origin/main` priverait la session d'un commit dont son brief dépend,
-brancher sur `main` local ferait apparaître ce commit dans le diff de sa PR. Si `origin/main` est
-en avance, sur `main`, `git pull --ff-only` d'abord.
+Pour chaque issue retenue, depuis `main` à jour — **les deux `main`** —, et derrière une **porte** :
+une commande dont le code de sortie porte la condition, enchaînée par `&&` à celle qu'elle garde.
+`git rev-parse main origin/main` ne garde rien : il **imprime** deux SHA et sort en 0, et un
+worktree créé sur un `main` en retard prive la session de commits dont son brief dépend
+(`cycle-pr` Étape 7, « Le go, puis le merge », pour la classe entière).
 
 ```
 git fetch origin
-git rev-parse main origin/main      # deux SHA identiques, sinon voir ci-dessus
-git worktree add ../<repo>--<numéro-issue> -b <type>/<slug> origin/main
+git merge-base --is-ancestor origin/main main && git worktree add ../<repo>--<numéro-issue> -b <type>/<slug> origin/main
 ```
+
+Ce que la porte ne couvre pas, et qui se voit au `git status` : `main` local **en avance** la
+passe. S'arrêter alors et demander à l'utilisateur de pousser (ou l'autorisation de le faire)
+avant le premier worktree — brancher sur `main` local ferait apparaître ses commits non poussés
+dans le diff de chaque PR du lot. Si c'est `origin/main` qui est en avance, la porte bloque : sur
+`main`, `git pull --ff-only`, puis la rejouer.
 
 - `<type>` = `feat` / `fix` / `chore` / `docs` / `refactor` selon la catégorie de l'issue.
 - `<slug>` = description courte en kebab-case.
@@ -218,8 +222,10 @@ sa PR ; rien ne part sans son accord. Quand ce message arrive :
    rapportées aux sources de vérité (`decisions-vs-doc`). **Dater le verdict par sa base**
    (`git merge-base origin/main <branche>`, inscrite dans la réponse) : si le trunk avance ensuite,
    le verdict est périmé avec toutes les preuves de la PR — le redemander plutôt que le consommer.
-   `git merge-tree --write-tree origin/main <branche>` dit s'il y a conflit, l'état `MERGEABLE` de
-   la forge le dit en retard.
+   `git merge-tree --write-tree origin/main <branche>` dit s'il y a conflit, et il le dit par son
+   **code de sortie** — 0 sans conflit, 1 avec, mesuré le 2026-10-13 avec un témoin de chaque côté
+   (table `FRESHNESS_GATE_FORMS` de `apps/api/tests/test_agent_skills.py`) —, donc il s'enchaîne
+   par `&&` à ce qu'il garde ; l'état `MERGEABLE` de la forge, lui, le dit en retard.
 2. **Répondre à la session** (`SendMessage`, au `from` du message), sous l'une des deux formes :
    `Verdict : rien à corriger.` — ou `À corriger avant merge :` suivi d'une liste numérotée, chaque
    point avec fichier et raison. Le lead ne donne **jamais** le « go merge » : c'est l'utilisateur,
@@ -263,8 +269,8 @@ c'est le seul autre canal, et il passe par lui.
   fichiers **réellement mergés** (`gh pr diff <PR> --name-only`) avec ceux de chaque branche en vol
   (`git diff --name-only origin/main...<branche>`). La consigne se fonde sur ce croisement, jamais
   sur la carte de recouvrement de l'étape 2 : elle décrit des issues entières, un merge livre un
-  lot. Une branche qui recouvre vérifie d'abord l'absence de conflit
-  (`git merge-tree --write-tree origin/main <branche>`) et relance sa CI, qui tourne sur la
+  lot. Une branche qui recouvre vérifie d'abord l'absence de conflit — `git merge-tree
+  --write-tree origin/main <branche>`, le prédicat de l'étape 6 — et relance sa CI, qui tourne sur la
   référence de fusion — pas de commit de fusion sur un trunk fusionné par rebase, ni de rebase
   d'une branche poussée sans demande explicite (`contraintes.md`) ; un conflit se résout par un
   commit réel sur la branche.
@@ -318,6 +324,12 @@ est celle de la forge — PR `MERGED` et tête identique à la branche locale, d
 poussé —, puis `-D`. Tout contrôle qui autorise une suppression se valide d'abord sur un
 **témoin positif**, un cas dont la réponse « oui » est connue : `cmd && ok || ko` confond
 condition fausse et commande en erreur, et c'est l'outil qu'on suspecte en premier.
+
+**Ce contrôle-ci reste une lecture, et c'est structurel** : il compare la valeur rendue par la
+forge à celle d'une référence locale, donc deux outils, ce qu'aucune commande ne porte sans
+substitution — refusée par le garde d'une session isolée. Il n'est pas une porte au sens de
+`cycle-pr` Étape 7 (« Le go, puis le merge »), où vit le dénombrement de la classe, et ce qu'il
+garde est une suppression **locale**, récupérable par le reflog.
 
 Vérifier ensuite que les ressources partagées répondent encore : le dépôt principal passe sa
 commande de fumée, et le hook partagé pointe toujours sur lui — le chemin d'interpréteur figé
