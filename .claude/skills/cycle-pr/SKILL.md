@@ -681,7 +681,7 @@ body définitif, puis de sortir du draft.
 - [x] CI locale verte
 - [x] CI verte
 - [x] <vérifs manuelles si pertinent — chacune porte les deux SHA sur lesquels elle a été prise,
-      la tête et la base `git merge-base origin/main HEAD`, et « observe : » les fichiers ou
+      la tête et la base de branche `git merge-base origin/main HEAD`, et « observe : » les fichiers ou
       dossiers dont son résultat dépend (Étape 7)>
 - [x] <étape non applicable — cochée avec sa raison (« sans objet »), jamais laissée décochée>
 
@@ -773,8 +773,12 @@ que la PR ne couvre pas, **s'arrêter et le remonter** plutôt que de merger un 
 une spec périmée.
 
 **Rejouer les vérifications périmées.** Une preuve a deux ancrages : la **tête** de branche et la
-**base** (`git fetch origin`, puis `git merge-base origin/<trunk> HEAD`) — et elle se périme quand
-**ce qu'elle observe** a changé, pas quand un identifiant a changé. Une vérification sans SHA, ou
+**base de branche** (`git fetch origin`, puis `git merge-base origin/<trunk> HEAD` — le point de
+fork) — et elle se périme quand **ce qu'elle observe** a changé, pas quand un identifiant a
+changé. « Base » désigne ici **cette** grandeur, et elle seule ; la grandeur voisine qui lui
+ressemble tant que le trunk n'a pas avancé — le **trunk éprouvé**, ce que la CI a réellement
+combiné — porte son propre nom, au paragraphe de la référence de fusion ci-dessous, parce qu'un
+paramètre de porte dont le nom désigne deux valeurs se remplit un jour avec la mauvaise. Une vérification sans SHA, ou
 sans « observe : », se rejoue d'office. Quand la **tête** a bougé : `git diff --stat <sha de la
 vérification>..HEAD`, croisé avec ce que la vérification déclare observer (« observe : » du Test
 plan), puis `git diff <sha de la vérification>..HEAD -- <fichiers observés>` pour juger le
@@ -784,10 +788,23 @@ la documentation ou des fichiers qu'elle n'atteint pas. Une preuve qu'on rejoue 
 puisse changer de résultat n'est pas une preuve, c'est un rituel, et un rituel coûteux est le
 plus sûr moyen de faire abandonner l'étape.
 
-Quand c'est la **base** qui a bougé, les preuves locales sont périmées : prises sur un état qui
+Quand c'est le **trunk** qui a bougé, les preuves locales sont périmées : prises sur un état qui
 n'atteindra jamais le trunk, et rien de local ne le signale. La CI d'une PR, elle, tourne sur la
-référence de fusion avec la base du moment : si la base a bougé **avant** le dernier run, ce run
-éprouve déjà l'état combiné — vérifier l'absence de conflit par
+**référence de fusion** avec le trunk du moment : si le trunk a bougé **avant** le dernier run, ce
+run éprouve déjà l'état combiné — **à condition de le lire**, parce que GitHub ne recalcule cette
+référence ni à chaque merge sur le trunk ni au passage en ready (obs 51) :
+
+```
+gh api repos/<owner>/<repo>/git/ref/pull/<n>/merge --jq .object.sha
+gh api repos/<owner>/<repo>/commits/<sha de la référence> --jq ".parents[].sha"
+```
+
+Le **premier parent** est le **trunk éprouvé** — ce que le dernier run a réellement combiné à la
+tête —, et c'est **lui** que la porte de merge consomme, sous le nom `<SHA du trunk éprouvé>`. Il
+doit valoir `git rev-parse origin/<trunk>` ; le second parent doit être la tête de la PR. Si le
+premier parent n'est pas la tête du trunk, le run ne prouve rien de l'état combiné : relancer par
+un commit réel, ou `close`/`reopen` sur accord, puis relire les parents. Le `--jq` se cite, `[]`
+étant un motif de glob pour le shell. Puis vérifier l'absence de conflit par
 `git merge-tree --write-tree origin/<trunk> HEAD`, qui est un **prédicat** : il sort en 0 sans
 conflit et en 1 avec (mesuré le 2026-10-13, témoin de chaque côté), donc il s'enchaîne par `&&`,
 et ce qu'il imprime n'est qu'un détail de diagnostic. L'état `MERGEABLE` de la forge, lui, se met
@@ -837,8 +854,8 @@ l'état de la PR au lead, et n'envoyer que sur son oui. Sans lead, passer direct
 Le message, au `from` du lead :
 
 ```
-PR #<PR> prête pour vérification — issue #N, worktree <chemin absolu>, base <sha de
-`git merge-base origin/main HEAD`>
+PR #<PR> prête pour vérification — issue #N, worktree <chemin absolu>, base de branche <sha de
+`git merge-base origin/main HEAD`>, trunk éprouvé <premier parent de la référence de fusion>
 Vert : <tests, lint, CI, relecture 4.2, cleanup holistique>
 Décisions prises en route : <une ligne chacune, avec le § de doc si concerné>
 Douteux / non fait : <ce qui n'est pas couvert, ce qui a gêné, constats écartés et pourquoi>
@@ -864,14 +881,15 @@ le dernier run rend la CI périmée : deux PR vertes séparément n'ont rien dé
 merge est le premier moment où leur somme existe. `git fetch origin` d'abord, **seul**, puis :
 
 ```
-git merge-base --is-ancestor origin/<trunk> <SHA de base vérifié> && gh pr merge <n> --rebase --match-head-commit <SHA de tête vérifié>
+git merge-base --is-ancestor origin/<trunk> <SHA du trunk éprouvé> && gh pr merge <n> --rebase --match-head-commit <SHA de tête vérifié>
 ```
 
-Le `<SHA de base vérifié>` est celui qu'éprouve le dernier run — **le premier parent de la
-référence de fusion**, lu dans le run et non supposé (« Rejouer les vérifications périmées »,
-obs 51) —, et il est inscrit au Test plan. `--match-head-commit` ferme le même trou côté tête. Si
-la base a bougé, la commande **ne part pas** : rejouer « Rejouer les vérifications périmées »,
-relire les parents de la référence de fusion, redemander le verdict du lead en vague.
+Le `<SHA du trunk éprouvé>` est **le premier parent de la référence de fusion**, obtenu par les
+deux commandes de « Rejouer les vérifications périmées » — lu dans ce que la forge a construit,
+jamais supposé égal à la base de branche, et inscrit au Test plan. `--match-head-commit` ferme le
+même trou côté tête. Si le trunk a avancé depuis, la commande **ne part pas** : rejouer « Rejouer
+les vérifications périmées », relire les parents de la référence de fusion, redemander le verdict
+du lead en vague.
 
 **Une porte est une commande dont le code de sortie porte la condition ; `&&` est ce qui la rend
 bloquante.** Trois incidents, une seule classe. Une commande qui **imprime** n'est pas une porte,
