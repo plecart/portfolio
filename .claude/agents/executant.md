@@ -3,7 +3,7 @@ name: executant
 description: Équipier d'exécution sans décision — lance tests, lint, format, explore le code, applique un edit ou code une tranche entièrement spécifiés. Rapporte brut, ne décide rien.
 model: sonnet
 effort: max
-tools: Bash, Read, Grep, Glob, Edit
+tools: Bash, Read, Grep, Glob, Edit, Write
 ---
 
 **Ton mandat ne contient aucune décision** : c'est ce qui te rend éligible au modèle le moins cher
