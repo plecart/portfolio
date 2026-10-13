@@ -48,6 +48,19 @@ vocabulaire du domaine, et ne marquer « (Recommandé) » que si l'utilisateur p
 recommandation — sinon c'est l'agent qui décide sous couvert de consultation, et l'accord obtenu
 n'est qu'un acquiescement à son autorité.
 
+## Avant de verrouiller — mesurer ce que la décision engage
+
+**Une décision qui verrouille une porte bloquante se mesure avant d'être posée** — scanner,
+audit, seuil de qualité, règle de lint : lancer l'outil sur l'état actuel du dépôt, et écrire dans
+la décision le résultat chiffré et daté **avec l'inventaire de l'outil** — types de cibles et
+nombre de composants analysés. Un résultat non nul est un coût à présenter au mainteneur pendant
+l'interrogatoire — exceptions, alternatives, découpage —, pas une surprise de l'Étape 1 de
+`cycle-pr` : une politique de scan verrouillée avec un fichier d'exceptions « créé vide » a
+rencontré 37 vulnérabilités sans correctif au premier passage (obs 45). Un zéro sur un composant
+absent de l'inventaire n'est pas une mesure : le contre-éprouver en présentant le même composant
+sous une forme que l'outil analyse, et comparer — un « 0 vulnérabilité » cachait 31 HIGH dans des
+binaires que le scanner n'avait pas ouverts, ce que son journal disait d'une ligne (obs 61).
+
 ## Sa place dans la pipeline
 
 Ce skill n'est pas seulement un outil à la demande : c'est le **garde-fou obligatoire** avant tout
