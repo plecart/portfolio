@@ -1065,7 +1065,9 @@ def test_chaque_creation_de_branche_hors_porte_nomme_son_point_de_depart(fichier
 # vérifier un avis sur le trunk en **rejouant** un de ses runs relance les jobs qui en dépendent —
 # `publish`, puis `deploy` (REST : « Re-run a job and its dependent jobs ») ; et réserver
 # l'horloge à ces portes en excluant **toute autre étape** retire l'installation et la
-# construction dont elles dépendent, si bien que le run planifié rougit chaque jour.
+# construction dont elles dépendent, si bien que le run planifié rougit chaque jour. À la relance,
+# le remède du premier fuyait à son tour pour un scan : lancé dans un worktree du trunk sous le
+# nom d'image par défaut, il lit, sur le démon partagé, les images construites depuis la branche.
 #
 # Dénombrement, écrit avant le correctif : les passages de la prose du harnais
 # (`.claude/**/*.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `.github/`) qui nomment une porte d'avis —
@@ -1073,49 +1075,55 @@ def test_chaque_creation_de_branche_hors_porte_nomme_son_point_de_depart(fichier
 # sont 5 ; 3 prescrivent un geste, 2 fuyaient, le troisième (une case de checklist) portait la
 # même ambiguïté que le second. Les 2 autres décrivent sans prescrire : l'écart de ce projet
 # (`pipeline.config.md`, « Qualité ») et la règle des populations vivantes (`cleanup-verbatim.md`).
-# Cas : (fichier, début du passage, fin du passage, ce qu'il ne cite pas — `None` si la forme
-# fautive est un préfixe de la juste —, ce qu'il dit).
+#
+# Un défaut se garde sous **toutes** ses tournures, pas sous celle qui l'a révélé : la relance a
+# réintroduit chacun des trois sous une autre forme, et les trois sont restées vertes contre un
+# interdit qui n'en visait qu'une orthographe. D'où un interdit par racine (`rejou`, `build`) et une
+# exigence par phrase entière.
+# Cas : (fichier, début du passage, fin du passage, ce qu'il ne cite pas, ce qu'il dit).
 ADVISORY_GATE_RULES = {
     "cycle-pr-rouge-d-avis": (
         ".claude/skills/cycle-pr/SKILL.md",
         "*Rouge d'avis*",
         "*Rouge de code*",
-        "gh run rerun",
-        "Jamais un rerun d'un run du trunk",
+        ("gh run rerun", "rejou"),
+        ("Jamais un rerun d'un run du trunk", "sous un nom propre au trunk"),
     ),
     "init-projet-horloge": (
         ".claude/skills/init-projet/SKILL.md",
         "**Donner une horloge",
         "Sans porte d'avis",
-        "build, tests",
-        "installation et construction",
+        ("build",),
+        ("installation et construction",),
     ),
     "init-projet-checklist": (
         ".claude/skills/init-projet/SKILL.md",
         "- [ ] portes à base d'avis",
         "\n",
-        None,
-        "ce dont elles dépendent",
+        (),
+        ("réservés à elles et à ce dont elles dépendent",),
     ),
 }
 
 
 @pytest.mark.parametrize(
-    ("fichier", "debut", "fin", "interdit", "exige"),
+    ("fichier", "debut", "fin", "interdits", "exiges"),
     ADVISORY_GATE_RULES.values(),
     ids=ADVISORY_GATE_RULES.keys(),
 )
 def test_une_regle_de_porte_d_avis_ne_relance_ni_ne_retire_ce_dont_elle_depend(
-    fichier: str, debut: str, fin: str, interdit: str | None, exige: str
+    fichier: str, debut: str, fin: str, interdits: tuple[str, ...], exiges: tuple[str, ...]
 ) -> None:
-    """Le passage qui prescrit un geste sur une porte d'avis ne rejoue aucun run du trunk et garde
-    ce dont la porte dépend. Le début du passage doit apparaître **une** fois : un passage
-    renommé fait rougir ici au lieu de rendre le test vacant."""
+    """Le passage qui prescrit un geste sur une porte d'avis ne rejoue aucun run du trunk, ne lit
+    pas les images de la branche, et garde ce dont la porte dépend. Le début du passage doit
+    apparaître **une** fois : un passage renommé fait rougir ici au lieu de rendre le test
+    vacant."""
     texte = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig").replace("\r\n", "\n")
 
     assert texte.count(debut) == 1, f"`{debut}` apparaît {texte.count(debut)} fois dans `{fichier}`"
     passage = texte[texte.index(debut) :]
     passage = passage[: passage.index(fin, len(debut))]
-    if interdit is not None:
-        assert interdit not in passage, f"`{fichier}` prescrit encore « {interdit} » : {passage!r}"
-    assert exige in passage, f"`{fichier}` ne dit plus « {exige} » : {passage!r}"
+    presents = [interdit for interdit in interdits if interdit in passage]
+    absents = [exige for exige in exiges if exige not in passage]
+    assert not presents, f"`{fichier}` prescrit encore {presents} : {passage!r}"
+    assert not absents, f"`{fichier}` ne dit plus {absents} : {passage!r}"

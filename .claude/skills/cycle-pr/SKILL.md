@@ -837,7 +837,10 @@ ni de force-push.
   - *Rouge d'avis* : le step d'audit ou de scan rougit sur un paquet que le diff ne touche pas →
     une base d'avis a changé sans commit. Vérifier que le trunk rougit aussi — son dernier run
     planifié ou un `workflow_dispatch` s'il en a, sinon la porte elle-même, sa commande du projet
-    lancée sur `origin/<trunk>` dans un worktree jetable. Jamais un rerun d'un run du trunk :
+    lancée sur `origin/<trunk>` dans un worktree jetable — et pour un scan d'images, précédée de
+    leur construction depuis ce worktree sous un nom propre au trunk : le démon de conteneurs est
+    partagé, et un scan sous le nom par défaut lirait les images de la branche, celles mêmes qu'il
+    s'agit de mettre hors de cause. Jamais un rerun d'un run du trunk :
     `--job` comme le run entier relancent les jobs qui en dépendent (REST : « Re-run a job and
     its dependent jobs »), publication et déploiement compris. Puis appliquer « Création
     d'issues en cours de cycle » (`.claude/rules/contraintes.md`), barreau par barreau. Un rerun
