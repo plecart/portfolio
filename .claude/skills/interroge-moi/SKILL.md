@@ -48,7 +48,7 @@ vocabulaire du domaine, et ne marquer « (Recommandé) » que si l'utilisateur p
 recommandation — sinon c'est l'agent qui décide sous couvert de consultation, et l'accord obtenu
 n'est qu'un acquiescement à son autorité.
 
-## Avant de verrouiller — mesurer ce que la décision engage
+## Avant de verrouiller — mesurer la porte, montrer l'écran
 
 **Une décision qui verrouille une porte bloquante se mesure avant d'être posée** — scanner,
 audit, seuil de qualité, règle de lint : lancer l'outil sur l'état actuel du dépôt, et écrire dans
@@ -60,6 +60,19 @@ rencontré 37 vulnérabilités sans correctif au premier passage (obs 45). Un z�
 absent de l'inventaire n'est pas une mesure : le contre-éprouver en présentant le même composant
 sous une forme que l'outil analyse, et comparer — un « 0 vulnérabilité » cachait 31 HIGH dans des
 binaires que le scanner n'avait pas ouverts, ce que son journal disait d'une ligne (obs 61).
+
+**Une tranche qui façonne un écran (HITL) montre l'écran avant de le verrouiller.** Lister les
+décisions héritées des rangs 1-2 (« Sources de vérité » de `.claude/pipeline.config.md`) qui
+déterminent ce que l'utilisateur y verra — structure, fixe ou libre, nombres, ordre — et les
+soumettre au mainteneur en **une** question `[V]`, avec une esquisse de l'écran (ASCII, ou le
+prototype existant) : « toujours voulu tel quel ? ». Une décision écrite avant que quiconque ait vu
+son écran est une hypothèse de goût : héritée du cadrage sans avoir été montrée, une structure de
+onze blocs fixes a été renversée à l'arrêt visuel, et environ la moitié du lot refaite (obs 58).
+Sur la même esquisse, **chaque élément visible nomme le comportement qui le fait changer** — de
+cette tranche ou d'une tranche déjà livrée ; un élément dont le seul comportement arrive avec une
+autre issue va dans cette issue-là, en critère, et la tranche courante n'en pose que la donnée :
+une colonne d'état figée, faute du worker qui la fait avancer, a coûté une question à l'arrêt
+visuel (obs 65).
 
 ## Sa place dans la pipeline
 
