@@ -619,45 +619,64 @@ def test_un_role_dit_en_tete_s_il_tranche_et_son_modele_le_suit(path: Path) -> N
 # branche est à **trois** points, `main...HEAD`, qui part de la base de fusion. Mesuré à la passe 2
 # de la PR #87 : `446a3a6` dans le rôle d'un `main` avancé, `e89e19b` dans celui de la branche —
 # deux points rendent 6 fichiers et 173 suppressions, trois points rendent un diff vide.
-# Dénombrement à l'écriture de cette porte, sur la prose du harnais : 3 `git diff … ..HEAD`, dont 2
-# entre le trunk et la tête (la commande du gabarit, `cycle-pr` 3.5 et `taille-pr.md`) qui
-# fuyaient ; le troisième part d'un SHA de vérification, **ancêtre** de la tête, où deux et trois
-# points rendent le même diff — le motif ne vise que le trunk.
-TRUNK_DIFF_TWO_DOTS = re.compile(r"git diff\b[^`\n]*?\s(?:origin/)?(?:main|<trunk>)\.\.(?!\.)")
+#
+# La classe est la **plage adossée au nom du trunk**, pas la commande : une plage nue remise à un
+# relecteur, qui la diffe, fuit autant que le `git diff` du gabarit. Seul `git log` la lit juste
+# (les commits de la branche) ; trois points y seraient faux à leur tour (différence symétrique),
+# d'où, pour une plage qui sert aux deux, `<base>..HEAD` avec `<base>` le point de fork.
+# Dénombrement, sur la prose du harnais au 2026-10-14 : **5** plages à deux points adossées au
+# trunk, **5** fuyaient — les 2 `git diff` du gabarit (`cycle-pr` 3.5, `taille-pr.md`, passe 2),
+# et 3 plages nues de `cycle-pr` 4.1 et 4.2 que le premier motif, limité au préfixe `git diff`, ne
+# voyait pas (relance). Justes et hors classe : 2 croisements déjà à trois points
+# (`verificateur.md`, `pr-paralleles`), 1 diff depuis un SHA **ancêtre** de la tête.
+# Borne déclarée : le motif lit les plages **entre accents graves**, la forme de toute commande de
+# cette prose ; une plage écrite hors code lui échappe.
+TRUNK_TWO_DOTS = re.compile(
+    r"`(?!git log\b)[^`\n]*?(?<![\w/<>.-])(?:origin/)?(?:main|<trunk>)\.\.(?!\.)"
+)
 
-TRUNK_DIFF_FORMS = {
+TRUNK_TWO_DOTS_FORMS = {
     "gabarit à deux points": ("`git diff --stat main..HEAD`", True),
     "trunk distant à deux points": ("`git diff origin/main..HEAD`", True),
     "trunk générique à deux points": ("`git diff --stat origin/<trunk>..HEAD`", True),
+    "plage nue remise au relecteur": ("la plage `main..HEAD` et le SHA", True),
+    "plage nue du trunk distant": ("(`origin/<trunk>..HEAD`)", True),
     "gabarit à trois points": ("`git diff --stat main...HEAD`", False),
     "plage de commits de git log": ("`git log --oneline main..HEAD`", False),
     "diff depuis un ancêtre de la tête": ("`git diff <sha de la vérification>..HEAD`", False),
+    "plage depuis le point de fork": ("la plage `<base>..HEAD`", False),
 }
 
 
-@pytest.mark.parametrize(("prose", "flagged"), TRUNK_DIFF_FORMS.values(), ids=TRUNK_DIFF_FORMS)
-def test_le_motif_du_diff_de_branche_ne_vise_que_le_trunk_a_deux_points(
+@pytest.mark.parametrize(
+    ("prose", "flagged"), TRUNK_TWO_DOTS_FORMS.values(), ids=TRUNK_TWO_DOTS_FORMS
+)
+def test_le_motif_des_plages_du_trunk_ne_vise_que_les_deux_points(
     prose: str, flagged: bool
 ) -> None:
-    """Le motif mord sur les trois écritures du trunk à deux points, et sur aucune voisine juste.
+    """Le motif mord sur les cinq écritures fautives, et sur aucune voisine juste.
 
     Les voisines comptent autant que les fautives : `git log main..HEAD` **est** la plage de
-    commits de la branche, et un diff depuis un ancêtre de la tête n'a pas de base de fusion à
-    prendre — rougir sur l'une ou l'autre ferait corriger un texte juste.
+    commits de la branche, un diff depuis un ancêtre de la tête n'a pas de base de fusion à
+    prendre, et `<base>..HEAD` est la forme prescrite — rougir sur l'une d'elles ferait corriger
+    un texte juste.
     """
-    assert bool(TRUNK_DIFF_TWO_DOTS.search(prose)) is flagged
+    assert bool(TRUNK_TWO_DOTS.search(prose)) is flagged
 
 
-def test_aucun_diff_entre_le_trunk_et_la_tete_ne_s_ecrit_a_deux_points() -> None:
-    """La prose du harnais prescrit des commandes qu'un agent tape telles quelles."""
+def test_aucune_plage_adossee_au_trunk_ne_s_ecrit_a_deux_points() -> None:
+    """La prose du harnais prescrit des commandes et des plages qu'un agent tape telles quelles."""
     found = [
         f"{path.relative_to(REPOSITORY_ROOT).as_posix()} : {match.group(0)}"
         for path, match in prose_citations(
-            REPOSITORY_ROOT, tracked_files(), HARNESS_PROSE_GLOBS, TRUNK_DIFF_TWO_DOTS
+            REPOSITORY_ROOT, tracked_files(), HARNESS_PROSE_GLOBS, TRUNK_TWO_DOTS
         )
     ]
 
-    assert not found, f"diff du trunk à deux points — écrire `…...HEAD` : {found}"
+    assert not found, (
+        f"plage du trunk à deux points — `main...HEAD` pour un diff, `<base>..HEAD` pour une "
+        f"plage remise : {found}"
+    )
 
 
 @pytest.mark.parametrize("prose", FOREIGN_PREFIXES.values(), ids=FOREIGN_PREFIXES.keys())
