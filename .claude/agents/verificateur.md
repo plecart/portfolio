@@ -7,8 +7,9 @@ tools: Bash, Read, Grep, Glob
 ---
 
 Tu vérifies une PR juste avant que le mainteneur ne donne son go. Tu n'es ni le relecteur ni le
-lead : le prompt de relecture a déjà été appliqué deux fois — par l'auteur (`cycle-pr` 4.1) et par
-le `relecteur` à contexte vierge (4.2) —, et **tu ne le rejoues pas**. Ce qui reste à vérifier,
+lead : le prompt de relecture a déjà été appliqué à chaque commit (`cycle-pr` 3.3), sur la PR
+entière (4.1) et par le `relecteur` à contexte vierge (4.2), et **tu ne le rejoues pas**. Ce qui
+reste à vérifier,
 c'est ce qu'aucune de ces deux passes ne pouvait voir : l'état du monde autour de la PR au moment
 où elle va entrer dans le trunk.
 

@@ -471,22 +471,30 @@ def role_frontmatter(role: str) -> dict[str, object]:
 # Les **affirmations**, elles, se *lisent* — aucune commande ne distingue « ma prose affirme un
 # champ » d'une phrase ordinaire —, donc chacune ci-dessous est citée par sa phrase, et non
 # dénombrée par un motif.
-ROLE_FRONTMATTER_CLAIMS = {
+# Chaque citation est **verbatim** du fichier nommé : c'est la seule provenance que cette table
+# accepte, et une citation reformulée y est un défaut au même titre qu'un champ faux — mesuré, la
+# première rédaction attribuait au `verificateur` une phrase (« Tu ne travailles pas dans un
+# worktree ») qui n'existait nulle part.
+ROLE_FRONTMATTER_CLAIMS: list[tuple[str, str, str | None]] = [
     # « Tu n'as pas de `Write` » (`relecteur.md`) — et `Edit` reste : une mutation modifie un
     # fichier existant, elle n'en crée pas.
-    "relecteur-n-a-pas-de-Write": ("relecteur", "tools", "Write"),
+    ("relecteur", "tools", "Write"),
     # « tu n'écris rien » (`verificateur.md`) : le mandat est un verdict, pas un correctif.
-    "verificateur-n-a-pas-de-Write": ("verificateur", "tools", "Write"),
-    # « Tu ne travailles pas dans un worktree » (`verificateur.md`) : c'est ce qui le garde bon
-    # marché, et un `isolation` déclaré en ferait créer un à chaque (PR, go).
-    "verificateur-n-a-pas-de-worktree": ("verificateur", "isolation", None),
-}
+    ("verificateur", "tools", "Write"),
+    # « Tu n'as **pas** de worktree » (`verificateur.md`) : c'est ce qui le garde bon marché, et un
+    # `isolation` déclaré en ferait créer un à chaque (PR, go).
+    ("verificateur", "isolation", None),
+]
 
 
+# Les identifiants de cas se **dérivent** des valeurs, jamais d'une clé saisie à la main : sous une
+# clé écrite à part, remplacer `("verificateur", "isolation", None)` par un autre rôle laissait le
+# cas vert sous un nom qui annonçait toujours `verificateur` (mesuré, mutation VERTE). Un
+# identifiant qui ne dérive pas de ce qu'il nomme est un commentaire, pas une étiquette.
 @pytest.mark.parametrize(
     ("role", "field", "forbidden"),
-    ROLE_FRONTMATTER_CLAIMS.values(),
-    ids=ROLE_FRONTMATTER_CLAIMS.keys(),
+    ROLE_FRONTMATTER_CLAIMS,
+    ids=[f"{role}-{field}" for role, field, _ in ROLE_FRONTMATTER_CLAIMS],
 )
 def test_le_frontmatter_d_un_role_tient_ce_que_sa_prose_affirme(
     role: str, field: str, forbidden: str | None
@@ -643,28 +651,58 @@ FRESHNESS_GATE_FORMS = {
 }
 
 
+def references_resolues(repo: Path, *refs: str) -> dict[str, str]:
+    """Les SHA de ces références, par un `rev-parse --verify` dont le **code de sortie** décide.
+
+    Lire `stdout` seul ne suffit pas, et c'est mesuré : sans `--verify`, `git rev-parse <absente>`
+    écrit le **nom de la référence** sur stdout en sortant en 128 — trois références inexistantes
+    rendraient donc trois valeurs non vides et distinctes. C'est la classe du principe transverse
+    n° 1 : une seule méthode qui conclut n'est pas une mesure.
+
+    Args:
+        repo: le dépôt où résoudre.
+        *refs: les références attendues résolubles.
+
+    Returns:
+        Chaque référence et son SHA.
+
+    Raises:
+        AssertionError: une référence ne résout pas — l'état même que le témoin doit exclure.
+    """
+    resolues: dict[str, str] = {}
+    for ref in refs:
+        done = git(repo, "rev-parse", "--verify", ref)
+        assert done.returncode == 0, (
+            f"`{ref}` ne résout pas dans {repo} ({done.returncode}) : {done.stderr.strip()}"
+        )
+        resolues[ref] = done.stdout.strip()
+    return resolues
+
+
 def test_le_depot_temoin_porte_bien_trois_etats_distincts(gate_repo: Path) -> None:
     """Le témoin positif du dépôt jetable : sans lui, les codes de sortie ne prouvent rien.
 
     Trois références égales rendraient 0 partout, et la table ci-dessous se lirait comme une
-    mesure. C'est la classe du principe transverse n° 1 — une seule méthode qui conclut n'est pas
-    une mesure.
-
-    **Et ce témoin-là l'a d'abord enfreinte.** Jugé sur `stdout` seul, il passait sur un dépôt où
-    **aucune** référence ne résout : mesuré le 2026-10-13, `git rev-parse base` y écrit `base` sur
-    **stdout** et sort en 128, donc trois références inexistantes rendent trois valeurs non vides
-    et distinctes. D'où `--verify` et la lecture du code de sortie. Dénombrement de la classe sur
-    ce delta : **2** lectures de la sortie d'une commande git, **1** fuyait — l'autre est la table
-    ci-dessous, où le code de sortie *est* la mesure.
+    mesure. Dénombrement de la classe sur ce delta : **2** lectures de la sortie d'une commande
+    git, **1** fuyait — l'autre est la table ci-dessous, où le code de sortie *est* la mesure.
     """
-    resolved = {
-        ref: git(gate_repo, "rev-parse", "--verify", ref) for ref in ("base", "trunk", "lateral")
-    }
+    heads = references_resolues(gate_repo, "base", "trunk", "lateral")
 
-    failed = {ref: done.stderr.strip() for ref, done in resolved.items() if done.returncode != 0}
-    assert not failed, f"une référence du témoin ne résout pas : {failed}"
-    heads = {ref: done.stdout.strip() for ref, done in resolved.items()}
     assert len(set(heads.values())) == 3, f"les trois références ne sont pas distinctes : {heads}"
+
+
+def test_une_reference_absente_est_refusee_par_la_resolution(tmp_path: Path) -> None:
+    """Le correctif du témoin, épinglé — sans ce cas-ci, rien ne le gardait.
+
+    Le témoin ci-dessus ne peut pas prouver son propre correctif : sa fixture construit toujours
+    les trois références, donc l'état où la lecture de `stdout` seul mentait n'y existe pas, et
+    retirer `--verify` l'y laissait **VERT** (mesuré). Ce cas crée cet état — un dépôt neuf, sans
+    aucune référence — et c'est lui qui rougit si la résolution cesse de lire le code de sortie.
+    """
+    git(tmp_path, "init", "-q", "-b", "trunk")
+
+    with pytest.raises(AssertionError, match="ne résout pas"):
+        references_resolues(tmp_path, "base")
 
 
 @pytest.mark.parametrize(
@@ -721,4 +759,66 @@ def test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie(
     assert done.returncode == expected, (
         f"`git {' '.join(args)}` rend {done.returncode} au lieu de {expected} — "
         f"sortie : {done.stdout.strip()!r} / {done.stderr.strip()!r}"
+    )
+
+
+# Les portes que les deux skills **prescrivent** : le fichier, l'action que la porte garde, et le
+# prédicat qui doit la précéder — sur **une seule ligne**, reliés par `&&`.
+#
+# `FRESHNESS_GATE_FORMS` épingle les **codes de sortie de git**, un fait tiers qui ne régresse
+# jamais. Cette table-ci épingle la **forme écrite dans les skills**, qui a régressé **trois** fois
+# (obs 59, 60, 69). Les deux sont nécessaires, et c'est mesuré : rendre l'Étape 1 à
+# `git rev-parse main origin/main`, ou scinder la porte de merge en deux commandes, laissait la
+# première table entièrement VERTE.
+#
+# **Ce que cette porte ne couvre pas**, borné à dessein : elle exige qu'une forme gardée
+# **existe**, pas qu'aucune forme non gardée ne subsiste ailleurs dans le fichier. Un second
+# passage qui prescrirait la même action sans porte ne rougirait pas — aucun motif ne distingue une
+# prescription d'une mention en prose, et la prose de ces skills cite les formes fautives à dessein
+# pour les condamner. C'est le cas où `cleanup-verbatim.md` demande de **borner** plutôt que
+# d'élargir un motif qui imite un analyseur.
+PORTES_PRESCRITES: list[tuple[str, str, str]] = [
+    (".claude/skills/cycle-pr/SKILL.md", "git checkout -b", "git merge-base --is-ancestor"),
+    (".claude/skills/cycle-pr/SKILL.md", "gh pr merge", "git merge-base --is-ancestor"),
+    (".claude/skills/pr-paralleles/SKILL.md", "git worktree add", "git merge-base --is-ancestor"),
+]
+
+
+@pytest.mark.parametrize(
+    ("skill", "action", "predicat"),
+    PORTES_PRESCRITES,
+    ids=[
+        f"{Path(skill).parent.name}-{action.replace(' ', '-')}"
+        for skill, action, _ in PORTES_PRESCRITES
+    ],
+)
+def test_chaque_porte_prescrite_est_un_predicat_chaine_a_son_action(
+    skill: str, action: str, predicat: str
+) -> None:
+    """Une porte réécrite en affichage, ou scindée de son action, ne rougissait nulle part.
+
+    C'est le cliquet de la classe : `cleanup-verbatim.md` exige qu'un correctif qui ferme un chemin
+    soit « épinglé dans l'artefact par un test paramétré, pas par une phrase de docstring ». Le
+    dénombrement de la classe vit dans
+    `test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie` ; ici vivent les
+    **3 portes convertibles** qui restaient à épingler — la quatrième, la création de worktree,
+    partage la ligne d'action de la troisième.
+
+    Le prédicat doit se trouver **à gauche de l'action sur la même ligne**, avec un `&&` entre les
+    deux : c'est exactement ce qui distingue une porte d'une lecture suivie d'une seconde commande
+    (obs 59). Les lignes de prose qui *citent* les formes fautives pour les condamner ne peuvent pas
+    apparier, puisqu'elles ne nomment pas `git merge-base --is-ancestor`.
+    """
+    lignes = (REPOSITORY_ROOT / skill).read_text(encoding="utf-8-sig").splitlines()
+    nommant = [ligne for ligne in lignes if action in ligne]
+    gardees = [
+        ligne
+        for ligne in nommant
+        if predicat in ligne.split(action)[0] and "&&" in ligne.split(action)[0]
+    ]
+
+    assert nommant, f"`{skill}` ne nomme plus `{action}` — le motif a-t-il cessé de mordre ?"
+    assert gardees, (
+        f"`{skill}` ne prescrit `{action}` derrière `{predicat} … &&` sur aucune de ses "
+        f"{len(nommant)} ligne(s) qui le nomment : la porte est redevenue une lecture"
     )
