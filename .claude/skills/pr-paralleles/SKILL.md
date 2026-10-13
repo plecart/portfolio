@@ -119,14 +119,27 @@ changement d'état) :
 ```markdown
 # PR en parallèle — <date>
 
-| Issue | PR | Branche | Worktree | Session | État |
-|-------|----|---------|----------|---------|------|
-| #51 | #62 (draft) | feat/extraction-pdf | ../app--51 | app-40 | 🟡 en cours |
-| #52 | #63 (draft) | fix/quota-upload | ../app--52 | app-73 | 🟡 en cours |
+| Issue | PR | Branche | Worktree | Session | Base du verdict | État |
+|-------|----|---------|----------|---------|-----------------|------|
+| #51 lot 1/2 | #62 (draft) | feat/extraction-pdf | ../app--51 | app-40 · 7534fbb3 | — | 🟡 en cours |
+| #52 | #63 | fix/quota-upload | ../app--52 | app-73 · 2afdedb5, 9c1e0a4f (relais) | 863d606 | 🔵 en review |
 ```
 
-La colonne **Session** porte le nom du pair tel que `ListAgents` l'a montré au dernier contact —
-un repère, pas une adresse : les noms tournent (étape 5).
+Trois colonnes portent chacune une identité qu'un nom ne suffit pas à tenir :
+
+- **Issue** — `#N lot k/n` dès qu'une issue est réalisée en plusieurs lots. Le worktree survit au
+  merge d'un lot, la branche non : sans le rang, une ligne mergée et une ligne en vol se
+  ressemblent (obs 36). Seul le dernier lot porte `Closes`, les autres `En vol pour #N (lot k/n)`.
+- **Session** — le nom **et l'UUID**. Le nom est un repère qui tourne : une session passe de
+  `app-6b` à `app-ef` en cours de vie sans que rien ne le signale. L'UUID ne change pas, et c'est
+  lui qu'un ordre **durable** comme `EnterWorktree` doit viser (obs 34, étape 5). Une session
+  **relayée** ajoute son UUID à côté de ceux qui l'ont précédée au lieu de les remplacer :
+  l'unité qui survit au relais est le cycle, et c'est elle qui porte la liste de ses sessions
+  (obs 40) — c'est aussi cette liste que `cycle-pr` Étape 8 passe à son bilan, un transcript par
+  UUID.
+- **Base du verdict** — le SHA d'`origin/main` pour lequel le dernier verdict d'avant-go a été
+  rendu (étape 6). Un verdict ne vaut que pour sa base : si le trunk avance, il est périmé avec
+  toutes les preuves de la PR. Sans ce SHA, on relit un verdict sans savoir de quel état il parle.
 
 États : `🟡 en cours` → `🔵 en review` → `🟢 mergée` → `⚪ worktree nettoyé`.
 
@@ -147,8 +160,20 @@ session **se déplace elle-même** dans son worktree (ci-dessous). Tout le reste
 `SendMessage`, que les sessions Claude Code d'une même machine partagent sans configuration — un
 message de pair suffit à donner son premier tour à une session vierge.
 
-**Placement.** `ListAgents` liste les pairs `interactive` ; les nouveaux sont ceux dont l'âge
-est inférieur à celui de la vague. Envoyer à chacun son affectation :
+**Placement — l'identité d'abord, l'ordre ensuite.** `ListAgents` liste les pairs `interactive`,
+mais ni l'âge ni le nom ne **désignent** une session : l'utilisateur ouvre ses propres fenêtres
+pendant la vague, et deux sessions plus jeunes que la vague se ressemblent. Un `EnterWorktree`
+envoyé à la mauvaise déplace **durablement** une session qui travaillait dans le clone principal
+(obs 34). Dès qu'il y a **plus d'une** session plus jeune que la vague, ou que l'utilisateur en
+désigne une par son identifiant, demander d'abord l'identité, **sans rien faire changer** :
+
+```
+Réponds-moi le chemin de ton répertoire scratchpad, rien d'autre, et ne change rien.
+```
+
+Ce chemin porte l'**UUID de session** ; les refs de `ListAgents` (`[79236b]`) n'en dérivent pas, et
+le nom « #N » que l'utilisateur a donné à une fenêtre est un indice, pas une preuve. Reporter
+l'UUID dans la colonne « Session » du tableau (étape 4). **Puis** seulement l'affectation :
 
 ```
 Entre dans le worktree `<chemin absolu>` avec l'outil `EnterWorktree`, puis réponds-moi la
@@ -160,10 +185,19 @@ simple `cd` ne suffirait pas. La réponse arrive dans un bloc
 `<cross-session-message from="…" from-name="…">` : `from-name` est la session, la sortie prouve
 son placement. **N'envoyer le prompt de démarrage qu'à une session dont la réponse nomme le bon
 worktree** — c'est la vérification qui empêche un prompt de partir vers une session restée sur
-`main` ou placée sur le worktree d'une autre issue. Reporter le nom dans la colonne « Session »
-du tableau. **Les noms tournent** — une session peut passer de `app-6b` à `app-ef` en cours de
-vie sans que rien ne le signale : relancer `ListAgents` avant chaque envoi, jamais d'envoi à un
-nom noté plus tôt sans l'avoir revu dans la liste.
+`main` ou placée sur le worktree d'une autre issue. **Les noms tournent** : relancer `ListAgents`
+avant chaque envoi, jamais d'envoi à un nom noté plus tôt sans l'avoir revu dans la liste.
+
+Cette vérification est une **lecture**, pas une porte, et c'est structurel : elle franchit une
+frontière de session, où aucune commande du lead ne peut porter la condition de l'ordre suivant
+(`cycle-pr` Étape 7, « Le go, puis le merge », pour le dénombrement de la classe).
+
+**Session relayée.** Un cycle peut durer plus qu'un contexte : la session qui reprend un worktree
+envoie d'abord au lead son chemin de scratchpad et la sortie de `git rev-parse --show-toplevel`,
+et le lead **ajoute** son UUID à la colonne « Session » en gardant ceux des sessions précédentes,
+puis repose son abonnement idle — celui de la session remplie ne distingue plus rien (obs 40). La
+passation que la session sortante écrit porte donc deux choses que le relais ne peut pas deviner :
+l'adresse du lead, et cette consigne-ci.
 
 **Démarrage.** Envoyer ensuite à chaque session son prompt, dans cet ordre :
 
@@ -209,23 +243,31 @@ le cycle de commit, les relectures, et sort du draft en fin de parcours. Ses que
 l'utilisateur s'affichent dans **sa** fenêtre, pas dans celle du lead. Les worktrees partageant le
 même `.git`, les branches sont visibles entre elles, mais les fichiers de travail sont isolés.
 
-### 6. Vérifier chaque PR avant le go — le rôle du lead
+### 6. Vérifier chaque PR avant le go — un vérificateur éphémère par (PR, go)
 
 À l'Étape 7 de `cycle-pr`, chaque session **propose à l'utilisateur** d'envoyer au lead l'état de
 sa PR ; rien ne part sans son accord. Quand ce message arrive :
 
-1. **Lire, ne pas croire.** Le message est le récit de la session — il dit *où* regarder. Vérifier
-   sur les artefacts : `gh pr diff <PR>`, `gh pr checks <PR>`, `gh pr view <PR> --comments`, et le
-   worktree sur disque si le diff ne suffit pas. Vérifier les critères d'acceptation de l'issue
-   sur le diff et les preuves du Test plan — le prompt de relecture a déjà été appliqué par
-   l'auteur (4.1) et par le relecteur (4.2), le lead ne le rejoue pas — ; confronter les décisions
-   rapportées aux sources de vérité (`decisions-vs-doc`). **Dater le verdict par sa base**
-   (`git merge-base origin/main <branche>`, inscrite dans la réponse) : si le trunk avance ensuite,
-   le verdict est périmé avec toutes les preuves de la PR — le redemander plutôt que le consommer.
-   `git merge-tree --write-tree origin/main <branche>` dit s'il y a conflit, et il le dit par son
-   **code de sortie** — 0 sans conflit, 1 avec, mesuré le 2026-10-13 avec un témoin de chaque côté
-   (table `FRESHNESS_GATE_FORMS` de `apps/api/tests/test_agent_skills.py`) —, donc il s'enchaîne
-   par `&&` à ce qu'il garde ; l'état `MERGEABLE` de la forge, lui, le dit en retard.
+1. **Déléguer la vérification, ne pas la lire soi-même.** Lancer l'équipier **`verificateur`**
+   (`.claude/agents/verificateur.md`), **un par (PR, go)** — jamais réutilisé d'un go au suivant,
+   c'est ce qui garantit qu'aucun verdict n'hérite du précédent. Il reçoit le numéro de la PR,
+   celui de l'issue, le chemin absolu du worktree et la liste des autres branches en vol. Il ne
+   reçoit **ni** le message de la session **ni** aucun résumé du lead, et c'est là tout le
+   dispositif : un vérificateur neuf ouvre l'artefact, sur disque et sur la forge, donc il n'a
+   **rien à désapprendre**. C'est le mode d'échec exact d'obs 52 — une consigne recopiée d'une
+   mémoire de phase citait un correctif en énonçant la règle que ce correctif avait retirée, et
+   quatre artefacts en aval l'ont reprise sur trois sessions.
+
+   Le lead ne garde que le **verdict structuré** que le rôle rend : critères ✅/❌/⚠️ avec preuve,
+   base du dernier run et ses parents, conflit, heurts `decisions-vs-doc`, fichiers croisés, et ce
+   que le plafond a laissé « non vérifié ». C'est ce qui empêche son contexte de grossir d'un diff
+   complet par PR et par go, jusqu'à devoir être relayé (obs 62). Le rôle porte **ce qu'il
+   vérifie** et dans quel ordre : ne pas le recopier ici, deux énoncés de la même consigne
+   divergent au premier amendement.
+
+   Inscrire la **base du verdict** dans le tableau (étape 4), et la reporter dans la réponse : un
+   verdict ne vaut que pour l'`origin/main` sur lequel il a été pris. Si le trunk avance ensuite,
+   le redemander — un vérificateur neuf, puisqu'ils sont éphémères — plutôt que le consommer.
 2. **Répondre à la session** (`SendMessage`, au `from` du message), sous l'une des deux formes :
    `Verdict : rien à corriger.` — ou `À corriger avant merge :` suivi d'une liste numérotée, chaque
    point avec fichier et raison. Le lead ne donne **jamais** le « go merge » : c'est l'utilisateur,
@@ -248,7 +290,8 @@ c'est le seul autre canal, et il passe par lui.
   git : le verrou ne tient que pendant l'invocation initiale de l'agent (`cycle-pr` 4.2,
   « Retrait »). Le second n'est pas une dérive : le retirer termine le
   relecteur et ferme la voie de la relance (`cycle-pr` 4.2, « Retrait »). Seule la session qui l'a
-  lancé le retire.
+  lancé le retire. Le `verificateur` de l'étape 6, lui, n'en crée **aucun** — il n'a pas
+  d'`isolation` : un worktree par (PR, go) serait précisément le coût que son éphémérité évite.
 - Quand une PR passe en review puis est mergée, mettre à jour `PR-PARALLELES.md`.
 - Après chaque merge, la session concernée déroule la clôture de l'Étape 8 de `cycle-pr` —
   label d'état retiré, critères d'acceptation cochés, puis la passe `repercussions`. **C'est le
@@ -270,7 +313,9 @@ c'est le seul autre canal, et il passe par lui.
   (`git diff --name-only origin/main...<branche>`). La consigne se fonde sur ce croisement, jamais
   sur la carte de recouvrement de l'étape 2 : elle décrit des issues entières, un merge livre un
   lot. Une branche qui recouvre vérifie d'abord l'absence de conflit — `git merge-tree
-  --write-tree origin/main <branche>`, le prédicat de l'étape 6 — et relance sa CI, qui tourne sur la
+  --write-tree origin/main <branche>`, **prédicat** : 0 sans conflit, 1 avec, mesuré le 2026-10-13
+  avec un témoin de chaque côté (table `FRESHNESS_GATE_FORMS` de
+  `apps/api/tests/test_agent_skills.py`) — et relance sa CI, qui tourne sur la
   référence de fusion — pas de commit de fusion sur un trunk fusionné par rebase, ni de rebase
   d'une branche poussée sans demande explicite (`contraintes.md`) ; un conflit se résout par un
   commit réel sur la branche.
