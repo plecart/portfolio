@@ -526,6 +526,91 @@ def test_le_frontmatter_d_un_role_tient_ce_que_sa_prose_affirme(
     )
 
 
+# Le modèle et l'effort d'un rôle s'écrivent à trois endroits : son frontmatter, sa ligne de la
+# table « Orchestration » de `CLAUDE.md`, et la première ligne de son corps, qui dit si son mandat
+# contient des décisions — le critère d'éligibilité au modèle le moins cher (obs 66). Aucune des
+# trois ne se dérive d'une autre ici : c'est leur **accord** qui est sous test. Mesuré à la passe 1
+# de la PR #87 : rôle repassé en `effort: low`, rôle d'Opus passé sur Sonnet, table repassée en
+# effort `low` — trois mutations VERTES sur toute cette suite, alors que l'incohérence que le lot 4
+# de #77 a corrigée à la main était exactement la première.
+ORCHESTRATION_ROW = re.compile(
+    r"^\| `(?P<role>[a-z]+)` \| (?P<model>[A-Za-z]+)(?:, effort `(?P<effort>[a-z]+)`)? \|",
+    re.MULTILINE,
+)
+MANDATE_LINE = re.compile(
+    r"\A\*\*Ton mandat (?P<verdict>ne contient aucune décision|contient des décisions)"
+)
+# Le modèle le moins cher de la table, écrit en littéral : le seul que le critère autorise pour un
+# mandat sans décision, et le seul qu'un mandat sans décision doive porter.
+CHEAPEST_MODEL = "sonnet"
+
+
+def orchestration_table() -> dict[str, tuple[str, str | None]]:
+    """Le couple (modèle, effort) que la table « Orchestration » de `CLAUDE.md` donne à chaque rôle.
+
+    Le modèle est rendu en minuscules, comme le frontmatter l'écrit ; l'effort vaut `None` quand
+    la ligne n'en porte pas, comme un frontmatter qui ne déclare pas le champ.
+    """
+    text = (REPOSITORY_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    return {
+        row["role"]: (row["model"].lower(), row["effort"])
+        for row in ORCHESTRATION_ROW.finditer(text)
+    }
+
+
+def role_body(role: str) -> str:
+    """Le corps d'un rôle, frontmatter retiré et blancs de tête ôtés."""
+    text = (REPOSITORY_ROOT / ".claude" / "agents" / f"{role}.md").read_text(encoding="utf-8-sig")
+    frontmatter = FRONTMATTER.match(text)
+    assert frontmatter, f"le frontmatter de `{role}` ne parse plus — voir la porte voisine"
+    return text[frontmatter.end() :].lstrip()
+
+
+def test_la_table_d_orchestration_couvre_exactement_les_roles_du_depot() -> None:
+    """Une ligne de table sans rôle, ou un rôle sans ligne, sort des deux tests suivants en silence.
+
+    Les cas de ceux-là se tirent des fichiers de rôle ; c'est ce test-ci qui garde l'autre sens.
+    """
+    assert set(orchestration_table()) == {path.stem for path in AGENTS}
+
+
+@pytest.mark.parametrize("path", AGENTS, ids=[label(path) for path in AGENTS])
+def test_la_table_d_orchestration_et_le_frontmatter_d_un_role_disent_le_meme_modele(
+    path: Path,
+) -> None:
+    """La table de `CLAUDE.md` choisit l'équipier ; le frontmatter le fait tourner.
+
+    Qu'ils divergent, et le lead délègue en croyant un effort que le rôle n'applique pas, ou un
+    modèle que le rôle ne porte pas — sans qu'aucune des deux lectures ne paraisse fausse seule.
+    """
+    fields = role_frontmatter(path.stem)
+    declared = (str(fields.get("model")).lower(), fields.get("effort"))
+    listed = orchestration_table().get(path.stem)
+
+    assert listed == declared, (
+        f"`CLAUDE.md` donne à `{path.stem}` {listed}, son frontmatter {declared}"
+    )
+
+
+@pytest.mark.parametrize("path", AGENTS, ids=[label(path) for path in AGENTS])
+def test_un_role_dit_en_tete_s_il_tranche_et_son_modele_le_suit(path: Path) -> None:
+    """« Chaque rôle dit en tête de son fichier s'il tranche » (`CLAUDE.md`, critère d'éligibilité).
+
+    Et ce qu'il en dit commande son modèle : un mandat sans décision va au modèle le moins cher,
+    un mandat qui tranche n'y va jamais. Un rôle qui change de modèle sans que sa première ligne
+    suive — ou l'inverse — rend fausse la seule phrase que son lecteur lit d'abord.
+    """
+    head = MANDATE_LINE.match(role_body(path.stem))
+    assert head, (
+        f"`{path.stem}` ne dit pas en tête de son corps si son mandat contient des décisions"
+    )
+    model = str(role_frontmatter(path.stem).get("model")).lower()
+
+    assert (head["verdict"] == "ne contient aucune décision") == (model == CHEAPEST_MODEL), (
+        f"`{path.stem}` est sur `{model}` et dit « {head['verdict']} »"
+    )
+
+
 @pytest.mark.parametrize("prose", FOREIGN_PREFIXES.values(), ids=FOREIGN_PREFIXES.keys())
 def test_un_prefixe_de_chemin_etranger_n_est_pas_pris_pour_un_script_de_skill(
     tmp_path: Path, prose: str
