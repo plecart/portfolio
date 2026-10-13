@@ -83,7 +83,9 @@ toute mutation, la restauration octet pour octet. Lis-le, n'ouvre pas la source 
 **seul** : il imprime son texte en sortant en 2, donc il tombe derrière un `&&`. Deux réglages
 décident du coût : `targets` reçoit le **fichier de test visé**, jamais la suite entière, et
 `file` est indépendant de `targets` — muter un fichier en lançant le test d'un autre te prouve
-un épinglage inter-fichiers sans cérémonie. Une ancre `old` se relit dans le fichier **formaté**.
+un épinglage inter-fichiers sans cérémonie. Une ancre `old` se relit dans le fichier **formaté**,
+et se choisit sur un candidat unique, jamais par sous-chaîne : la prose cite le code qu'elle
+décrit, et une ancre prise dans un commentaire ne mute rien — `PANNE`.
 Un `expect` qui nomme un test absent des `targets` rend « apparie 0 tests de la suite témoin » :
 mauvaise cible, pas faute de frappe.
 

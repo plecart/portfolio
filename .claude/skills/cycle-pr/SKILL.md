@@ -572,10 +572,12 @@ réécrit, et celui-ci l'a été **sept fois**, deux fois faux dans le sens qui 
 Deux réglages tiennent tout l'écart de coût : `targets` reçoit le **fichier de test visé**, pas
 la suite entière, et `file` est indépendant de `targets` — muter un fichier en lançant le test
 d'un autre ne demande donc aucune cérémonie, ce qui rend bon marché la preuve d'un épinglage
-inter-fichiers. Deux pièges d'usage, payés : une ancre `old` se relit dans le fichier
-**formaté** (une ancre tapée avant la commande de format rend `PANNE`), et un `expect` qui nomme
+inter-fichiers. Trois pièges d'usage, payés : une ancre `old` se relit dans le fichier
+**formaté** (une ancre tapée avant la commande de format rend `PANNE`) ; un `expect` qui nomme
 un test absent des `targets` rend « apparie 0 tests de la suite témoin » — ce n'est pas une faute
-de frappe, c'est une mauvaise cible.
+de frappe, c'est une mauvaise cible ; et une ancre se choisit sur un candidat **unique**, jamais
+par sous-chaîne, la prose d'un fichier citant souvent le code qu'elle décrit — une ancre prise
+dans un commentaire ne mute rien, et le harnais le refuse en `PANNE` (obs 77).
 
 Un couple **VERT sur arbre propre, ROUGE avec une sonde plantée** n'est pas un échec du harnais :
 c'est la mesure qu'un invariant *non gardé* est *gardable*, donc le signal qu'il faut écrire le
