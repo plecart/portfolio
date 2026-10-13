@@ -469,11 +469,13 @@ dans `.claude/rules/contraintes.md`, « Points d'arrêt humains », source uniqu
 
 Deux relectures. Le cleanup pass holistique (4.1) quand tous les commits sont faits. La relecture
 à contexte vierge (4.2) **en deux temps** : une première fois dès que le socle est posé, en plein
-cycle de commit ; une seconde après 4.1, sur ce qui a été écrit depuis la première — ou sur
-`main..HEAD` si aucun commit n'a posé de socle.
+cycle de commit ; une seconde après 4.1, sur ce qui a été écrit depuis la première — ou sur toute
+la branche, `<base>..HEAD`, si aucun commit n'a posé de socle. `<base>` est le point de fork,
+`git merge-base origin/main HEAD`, jamais le nom du trunk : une plage adossée à un trunk qui
+avance se diffe à l'envers.
 
 **4.1 Cleanup pass holistique** — le prompt de `.claude/rules/cleanup-verbatim.md` sur le **diff
-complet de la branche** (`main..HEAD`), à l'échelle de la PR : architecture (couplage,
+complet de la branche** (`git diff main...HEAD`), à l'échelle de la PR : architecture (couplage,
 frontières), naming entre commits, edge cases / erreurs / race conditions, **duplication
 inter-commits**. C'est le seul regard global de l'auteur — le regard local, c'est 3.3, à chaque
 commit ; il n'y en a pas de troisième avant le merge. Findings → un commit (cycle 3.1→3.5), puis
@@ -516,7 +518,7 @@ prose de protocole, où vivaient leurs neuf constats. Une porte neuve s'inscrit 
 ses deux populations — ce qu'elle couvre, ce qu'elle rate — avant d'être rendue obligatoire.
 
 À la première passe, le relecteur reçoit **uniquement** le corps de l'issue et son brief d'agent
-(ou le briefing de l'Étape 1), la plage `main..HEAD` et le SHA complet de tête. À la seconde, il
+(ou le briefing de l'Étape 1), la plage `<base>..HEAD` et le SHA complet de tête. À la seconde, il
 a déjà tout cela : il ne reçoit que la plage `<sha de fin de la première passe>..HEAD` et les
 constats de la première, corrigés ou écartés. Il rend chaque critère d'acceptation ✅ / ❌ / ⚠️
 avec preuve, puis ses constats classés bloquant / important / mineur, chacun avec fichier, raison
