@@ -92,9 +92,9 @@ toute mutation, la restauration octet pour octet. Lis-le, n'ouvre pas la source 
 décident du coût : `targets` reçoit le **fichier de test visé**, jamais la suite entière, et
 `file` est indépendant de `targets` — muter un fichier en lançant le test d'un autre te prouve
 un épinglage inter-fichiers sans cérémonie. Une ancre `old` se relit dans le fichier **formaté**,
-et se choisit sur un candidat unique, jamais par sous-chaîne : la prose cite le code qu'elle
-décrit. Prise dans un commentaire, elle mute le commentaire et rend `VERT` sans rien prouver ;
-seule une mutation qui ne change aucun octet est refusée en `PANNE`.
+et se choisit dans le code, jamais dans la prose qui le cite — le harnais vérifie qu'elle est
+unique, pas qu'elle est du code. Prise dans un commentaire, elle mute le commentaire et rend
+`VERT` sans rien prouver ; seule une mutation qui ne change aucun octet est refusée en `PANNE`.
 Un `expect` qui nomme un test absent des `targets` rend « apparie 0 tests de la suite témoin » :
 mauvaise cible, pas faute de frappe.
 

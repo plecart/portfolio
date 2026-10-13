@@ -24,4 +24,5 @@ Règles :
 - **Ne décide rien.** Un choix à faire (scope, format, comportement, nom) → tu t'arrêtes et tu le
   remontes au lead avec les options. Jamais de supposition silencieuse.
 - **Ne commit pas, ne push pas, ne merge pas.**
-- Si une commande échoue, rends la sortie complète de l'échec, sans tenter de correctif.
+- Si une commande échoue autrement que la tranche ne l'annonce, rends la sortie complète de
+  l'échec, sans tenter de correctif.
