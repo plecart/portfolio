@@ -543,6 +543,121 @@ def test_chaque_forme_reelle_rouvre_un_tour_selon_sa_classe(
     assert [bilan.total([window]) for window in bilan.measure(events).blocked] == attendu
 
 
+def labelled(text: str, origin: str | None = None, meta: bool = False) -> dict[str, Any]:
+    """Un message `user` portant les étiquettes que le harnais écrit lui-même.
+
+    Args:
+        text: le texte du message.
+        origin: la valeur de `origin.kind`, ou `None` pour un message sans `origin`.
+        meta: la valeur de `isMeta`.
+    """
+    record = said("09:20:00", text)
+    if origin is not None:
+        record["origin"] = {"kind": origin}
+    if meta:
+        record["isMeta"] = True
+    return record
+
+
+# Les étiquettes du harnais, au relevé du 2026-10-14 vers 16 h UTC (population vivante) : sur
+# 1064 messages `user` hors résultat d'outil, 439 `origin.kind=human`, 234 `peer`,
+# 83 `task-notification`, 259 `isMeta` sans origine, 49 sans aucune étiquette. `origin.kind`
+# concorde avec le texte sur les 756 messages qu'il étiquette : il n'est pas lu. `isMeta`, lui,
+# corrige le texte sur **9** messages qu'il classait `human` — corps de `/code-review` (3), de
+# `/security-review` (2) et de `/fewer-permission-prompts` (1), reprise après coupure (2), image
+# jointe (1) : aucune liste de préfixes ne les rattrape. Chaque cas ci-dessous est une forme
+# réelle, portant les étiquettes de son enregistrement.
+ETIQUETTES = {
+    "commande tapée, étiquetée humaine": (
+        labelled(FORMES_REELLES["skill tapé par le mainteneur"][0], origin="human"),
+        "human",
+    ),
+    "prose étiquetée humaine": (labelled("oui go", origin="human"), "human"),
+    "message de pair étiqueté": (labelled(PEER_MESSAGE, origin="peer", meta=True), "peer"),
+    "notification étiquetée": (
+        labelled(FORMES_REELLES["notification de fin de tâche"][0], origin="task-notification"),
+        "system",
+    ),
+    "corps de /code-review, isMeta": (
+        labelled("Review target: `91 medium`\n\n`xhigh effort → 10 inline angles`", meta=True),
+        "system",
+    ),
+    "reprise après coupure, isMeta": (
+        labelled("Your response above was cut off mid-stream. Resume directly.", meta=True),
+        "system",
+    ),
+    "avis de repos, isMeta": (
+        labelled(FORMES_REELLES["avis d'inactivité d'une session voisine"][0], meta=True),
+        "peer",
+    ),
+    "commande locale sans étiquette": (
+        labelled(FORMES_REELLES["commande locale tapée par le mainteneur"][0]),
+        "human",
+    ),
+    "interruption sans étiquette": (labelled("[Request interrupted by user]"), "system"),
+}
+
+
+@pytest.mark.parametrize(("record", "expected"), ETIQUETTES.values(), ids=ETIQUETTES.keys())
+def test_une_injection_du_harnais_n_est_jamais_du_mainteneur(
+    tmp_path: Path, record: dict[str, Any], expected: str
+) -> None:
+    """`isMeta` marque une injection, qui n'est jamais du mainteneur — elle peut rester un pair,
+    comme l'avis de repos. Sans `isMeta`, le texte décide, comme avant : témoins des messages
+    du mainteneur, étiquetés ou non, d'un pair et d'une interruption.
+
+    Args:
+        record: le message, avec ses étiquettes.
+        expected: la classe attendue.
+    """
+    events = bilan.read_events([write_transcript(tmp_path / "un.jsonl", [record])])
+
+    assert [event.kind for event in events] == [expected]
+
+
+def test_une_commande_tapee_se_reconnait_en_tete_du_message() -> None:
+    """La barre oblique ne fait une commande tapée qu'en tête : citée dans un autre bloc — le
+    résumé d'une notification, la sortie d'une commande —, elle n'en fait pas un message du
+    mainteneur."""
+    cite = (
+        "<task-notification><status>completed</status><summary>a relancé "
+        "<command-name>/model</command-name></summary></task-notification>"
+    )
+
+    assert bilan.classify("user", [{"type": "text", "text": cite}]) == "system"
+
+
+def test_une_balise_de_pair_dans_un_rappel_systeme_ne_fait_pas_un_pair() -> None:
+    """Un rappel système joint au message du mainteneur peut citer une balise de pair : le
+    classement se fait sur le texte sans ses rappels, comme pour toutes les autres règles."""
+    message = "oui go<system-reminder>arrivé dans un <cross-session-message></system-reminder>"
+
+    assert bilan.classify("user", [{"type": "text", "text": message}]) == "human"
+
+
+def test_un_message_livre_apres_un_retour_d_outil_n_ouvre_pas_d_attente(tmp_path: Path) -> None:
+    """L'agent travaille jusqu'au retour de son outil : un message livré juste après n'a rien
+    fait attendre. Ouverte à la sortie qui a lancé l'outil, l'attente comptait la durée de
+    l'outil — 16 min 48 s sur 368 attentes du mainteneur au relevé du 2026-10-14, et désormais
+    aussi chaque message de pair livré après un outil.
+    """
+    tour = [
+        assistant("09:00:00", (BASH_CALL, "Bash")),
+        {
+            "type": "user",
+            "timestamp": at("09:05:00"),
+            "message": {"content": [{"type": "tool_result", "tool_use_id": BASH_CALL}]},
+        },
+        said("09:05:01", PEER_MESSAGE),
+        assistant("09:06:00"),
+    ]
+    events = bilan.read_events([write_transcript(tmp_path / "outil.jsonl", tour)])
+
+    assert [bilan.total([window]) for window in bilan.measure(events).blocked] == [
+        timedelta(seconds=1)
+    ]
+
+
 def test_l_attente_court_jusqu_au_dernier_message_avant_la_reprise(tmp_path: Path) -> None:
     """Deux messages avant que l'agent ne reprenne : l'attente court jusqu'au second.
 
