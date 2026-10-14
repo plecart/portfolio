@@ -9,11 +9,12 @@
  * de grille** — l'élément que la grille place, sans transformation : la pose et l'animation
  * d'entrée vont sur un élément enfant, sinon la mesure suivrait l'inclinaison et la montée.
  *
- * Quatre voies changent la marge ; `useAuthorLinksPlacement` en relit deux — la fenêtre
- * redimensionnée, un élément ajouté ou retiré dans la table. Les deux autres restent à la charge
- * de la table : une cellule redimensionnée sans changement du DOM (la table remplace une cellule
- * plutôt que de la redimensionner), et une barre de défilement qui apparaît ou disparaît sans
- * redimensionnement (voir le `ponytail:` du crochet).
+ * Une cellule masquée (`display: none`, `hidden`) ne compte pas. La mesure se relit au
+ * redimensionnement de la fenêtre, à chaque élément ajouté ou retiré dans la table et à chaque
+ * attribut `data-table-cell`, `hidden`, `style` ou `class` changé (`useAuthorLinksPlacement`).
+ * Restent à la charge de la table : une taille changée par une feuille sans mutation du DOM, et
+ * une transformation posée sur un **ancêtre** de la cellule, que la mesure suit comme la sienne.
+ * Dénombrement des voies : `e2e/author-links.spec.ts`.
  */
 export const TABLE_CELL_SELECTOR = '[data-table-cell]'
 
@@ -31,21 +32,28 @@ export type AuthorLinksPlacement = 'column' | 'footer'
 
 /**
  * La marge entre le bord de la fenêtre et la cellule la plus proche (spec §3.4), des deux côtés,
- * comme au prototype retenu (`cadre.html`, variante « Retrait »).
+ * comme au prototype retenu (`cadre.html`, variante « Retrait »), comptée **hors barre de
+ * défilement** : la grille, centrée dans la largeur visible, recule de la moitié de la barre, et la
+ * lui rendre fait de la marge une grandeur de la seule mise en page. Les repères de §3.4 tiennent
+ * avec ou sans barre, et la forme ne dépend pas du chemin — le pied de page dans le flux, qui
+ * allonge la page, fait naître la barre (choix du mainteneur, arrêt visuel du lot 3 de #18).
  *
  * @param cells Les bords des cellules, en px depuis le bord gauche de la fenêtre
- *   (`getBoundingClientRect`).
- * @param viewportWidth La largeur visible de la fenêtre, barre de défilement exclue
- *   (`clientWidth`) : c'est depuis son bord que la colonne se pose à 24 px.
- * @returns La plus petite marge, à gauche ou à droite, sur toutes les cellules ; `null` sans
- *   cellule.
+ *   (`getBoundingClientRect`) ; une cellule de largeur nulle — masquée — est ignorée.
+ * @param widths La largeur de la fenêtre (`innerWidth`) et sa largeur visible, barre exclue
+ *   (`clientWidth`).
+ * @returns La plus petite marge, à gauche ou à droite, sur les cellules visibles ; `null` sans
+ *   cellule visible.
  */
 export function nearestCellMargin(
   cells: readonly { left: number; right: number }[],
-  viewportWidth: number,
+  { windowWidth, viewportWidth }: { windowWidth: number; viewportWidth: number },
 ): number | null {
-  if (cells.length === 0) return null
-  return Math.min(...cells.map((cell) => Math.min(cell.left, viewportWidth - cell.right)))
+  const shown = cells.filter((cell) => cell.right > cell.left)
+  if (shown.length === 0) return null
+  const scrollbarHalf = (windowWidth - viewportWidth) / 2
+  const margins = shown.map((cell) => Math.min(cell.left, viewportWidth - cell.right))
+  return Math.min(...margins) + scrollbarHalf
 }
 
 /**

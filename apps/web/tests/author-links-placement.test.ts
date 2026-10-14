@@ -32,17 +32,20 @@ describe("la forme des liens de l'auteur", () => {
 })
 
 describe('la marge à côté de la table', () => {
+  /** Une fenêtre sans barre de défilement : la largeur visible est celle de la fenêtre. */
+  const noScrollbar = (width: number) => ({ windowWidth: width, viewportWidth: width })
+
   test('aucune sans cellule', () => {
-    expect(nearestCellMargin([], 1280)).toBeNull()
+    expect(nearestCellMargin([], noScrollbar(1280))).toBeNull()
   })
 
   test("celle d'une table centrée : 118 px à 1280 px (spec §3.1)", () => {
-    expect(nearestCellMargin([{ left: 118, right: 1162 }], 1280)).toBe(118)
+    expect(nearestCellMargin([{ left: 118, right: 1162 }], noScrollbar(1280))).toBe(118)
   })
 
   test('le bord le plus proche, à droite comme à gauche', () => {
-    expect(nearestCellMargin([{ left: 200, right: 1250 }], 1280)).toBe(30)
-    expect(nearestCellMargin([{ left: 30, right: 1000 }], 1280)).toBe(30)
+    expect(nearestCellMargin([{ left: 200, right: 1250 }], noScrollbar(1280))).toBe(30)
+    expect(nearestCellMargin([{ left: 30, right: 1000 }], noScrollbar(1280))).toBe(30)
   })
 
   test('la cellule la plus proche du bord, parmi plusieurs', () => {
@@ -52,6 +55,26 @@ describe('la marge à côté de la table', () => {
       { left: 100, right: 340 },
     ]
 
-    expect(nearestCellMargin(cells, 1280)).toBe(80)
+    expect(nearestCellMargin(cells, noScrollbar(1280))).toBe(80)
+  })
+
+  test('hors barre de défilement : 78 px à 1200 px, barre de 10 px comprise (spec §3.4)', () => {
+    // La grille de 1044 px, centrée dans les 1190 px visibles, recule de 5 px.
+    const cells = [{ left: 73, right: 1117 }]
+
+    expect(nearestCellMargin(cells, { windowWidth: 1200, viewportWidth: 1190 })).toBe(78)
+  })
+
+  test('une cellule masquée, de largeur nulle, ne compte pas', () => {
+    const cells = [
+      { left: 370, right: 730 },
+      { left: 0, right: 0 },
+    ]
+
+    expect(nearestCellMargin(cells, noScrollbar(1100))).toBe(370)
+  })
+
+  test('aucune quand toutes les cellules sont masquées', () => {
+    expect(nearestCellMargin([{ left: 0, right: 0 }], noScrollbar(1100))).toBeNull()
   })
 })
