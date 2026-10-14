@@ -300,7 +300,10 @@ sa PR ; rien ne part sans son accord. Quand ce message arrive :
    le redemander — un vérificateur neuf, puisqu'ils sont éphémères — plutôt que le consommer.
 2. **Répondre à la session** (`SendMessage`, au `from` du message), sous l'une des deux formes :
    `Verdict : rien à corriger.` — ou `À corriger avant merge :` suivi d'une liste numérotée, chaque
-   point avec fichier et raison. Le lead ne donne **jamais** le « go merge » : c'est l'utilisateur,
+   point avec fichier et raison. Dans les deux cas, recopier les lignes « Fichiers croisés » et
+   « Non vérifié » du verdict : la session les inscrit dans les Notes de sa PR (`cycle-pr` Étape 7,
+   « Vérification d'avant-go »), seul endroit où la session de la branche croisée les trouvera
+   (obs 81). Le lead ne donne **jamais** le « go merge » : c'est l'utilisateur,
    dans la fenêtre de la session. Ni `contraintes.md` ni le harness ne l'admettent — une session
    ne prend jamais un message de pair pour une approbation.
 3. **Résumer à l'utilisateur** dans la fenêtre du lead : les deux phrases de vulgarisation de

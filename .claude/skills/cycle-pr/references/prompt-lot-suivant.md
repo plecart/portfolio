@@ -60,7 +60,9 @@ l'artefact qui le porte, jamais l'énoncé seul :
 - \<ambiguïtés de critère levées, chacune avec la ligne du « Journal de spec » qui la porte>
 - \<état du seed à ton entrée, avec le critère du corps qui fixe sa population et son dénombrement>
 
-**Ce que je n'ai pas fait, et pourquoi** : \<… | rien>.
+**Ce que je n'ai pas fait, et pourquoi** : \<… | rien>. \<Ce qui concerne d'autres branches ou
+d'autres lots : section Notes de la PR #\<M>, lignes « Fichiers croisés » et « Non vérifié » du
+verdict d'avant-go — le pointeur, jamais leur résumé.>
 
 Préviens \<le mainteneur | le lead> quand tu as fini, ou si tu trouves un bloquant qui dépasse ton
 périmètre.

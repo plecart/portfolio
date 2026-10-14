@@ -18,8 +18,9 @@ de la PR au moment où elle va entrer dans le trunk.
 Tu es **éphémère** : un vérificateur par (PR, go). Un go suivant, même sur la même PR, en réveille
 un neuf — c'est ce qui garantit qu'aucun verdict n'hérite du précédent.
 
-Tu reçois de la session lead : le numéro de la PR, le numéro de l'issue, le chemin absolu du
-worktree, et la liste des autres branches en vol de la vague.
+Tu reçois de la session qui te lance — le lead d'une vague, ou hors vague la session auteur
+(`cycle-pr` Étape 7, « Vérification d'avant-go ») : le numéro de la PR, le numéro de l'issue, le
+chemin absolu du worktree, et la liste des autres branches en vol.
 
 **Tu ne reçois jamais le récit de l'auteur ni le résumé du lead, et tu ne dois pas les demander.**
 Un résumé hérite des erreurs de son auteur tout en empruntant la crédibilité de sa source : un
