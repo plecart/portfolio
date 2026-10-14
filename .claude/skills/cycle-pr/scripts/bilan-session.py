@@ -431,7 +431,7 @@ def classify(role: str, blocks: list[dict[str, Any]]) -> str:
 
     Un texte injecté se reconnaît à son **début**, donc avant toute recherche de balise de pair :
     le texte d'un skill peut citer `<cross-session-message>`, et cette citation classait son
-    chargement `peer` (40 messages au recensement de `FORMES_REELLES`). Une commande tapée par
+    chargement `peer` (dénombrement : `FORMES_REELLES`). Une commande tapée par
     le mainteneur est faite de blocs de balises, mais c'est lui qui agit : `human`.
     """
     if role == "assistant":
@@ -536,9 +536,8 @@ def waits(events: Sequence[Event], calls: Sequence[ToolCall]) -> list[Interval]:
     qu'il a lancé (`AGENT_ACTIVITY`) — au **dernier** message qui rouvre son tour avant la
     sortie suivante — du mainteneur ou d'un pair (`TURN_OPENERS`). Le dernier, pas le premier :
     un message qui n'a rien déclenché n'a pas mis l'agent au travail. Ne compter que le
-    mainteneur faisait passer en travail d'agent toute attente close par un pair, écart entre
-    deux transcripts compris — 242 h 30 d'agent seul au bilan du lot 1 de #23, pour 2 h 53 de
-    travail (`test_un_relais_ouvert_par_un_pair_le_lendemain_est_une_absence`).
+    mainteneur faisait passer en travail d'agent toute attente close par un pair — l'écart entre
+    deux transcripts compris (`test_un_relais_ouvert_par_un_pair_le_lendemain_est_une_absence`).
 
     Brutes : le temps des sous-agents s'en retire dans `measure`, **après** leur classement —
     le retrait est le cœur d'obs 41, sans lui une session à relectures parallèles facture au
@@ -672,10 +671,10 @@ class Measures:
         """La durée de la session **hors absences** — le seul denominateur actionnable.
 
         Rapporter la réactivité à la session entière la dilue d'autant que la session a dormi —
-        mainteneur absent, pair attendu, écart entre deux transcripts —, et le chiffre flatte alors la pipeline sans que rien n'ait été amélioré — le
-        sens d'erreur même d'obs 41. Hors absences, la même attente pèse ce que la pipeline peut
-        réellement réduire. Les absences, elles, se rapportent à la session : c'est leur poids
-        réel.
+        mainteneur absent, pair attendu, écart entre deux transcripts —, et le chiffre flatte
+        alors la pipeline sans que rien n'ait été amélioré — le sens d'erreur même d'obs 41. Hors
+        absences, la même attente pèse ce que la pipeline peut réellement réduire. Les absences,
+        elles, se rapportent à la session : c'est leur poids réel.
 
         Les deux dénominateurs sont épinglés, sur un montage dont les durées sont celles du
         transcript synthétique, par
@@ -761,8 +760,8 @@ def report(events: Sequence[Event], session: Usage, agents: Sequence[Subagent]) 
     Deux dénominateurs, et chaque ligne dit le sien. Ce que la pipeline peut réduire se rapporte
     au temps **actif** (session moins absences) ; les absences et l'attente totale se rapportent
     à la session. Tout rapporter à la session diluait la réactivité d'autant que la session avait
-    dormi, d'un facteur qui croît avec l'absence — et un pourcentage dont le
-    dénominateur ne se lit pas est le défaut, pas le chiffre. Les deux parts sont épinglées par
+    dormi, d'un facteur qui croît avec l'absence — et un pourcentage dont le dénominateur ne se
+    lit pas est le défaut, pas le chiffre. Les deux parts sont épinglées par
     `test_la_reactivite_se_rapporte_au_temps_actif_et_les_absences_a_la_session`.
 
     Chaque sous-agent se rend **contact par contact**, consommation comprise : c'est la seule
