@@ -97,7 +97,9 @@ def texte(enregistrement: dict[str, Any]) -> str:
 def message_du_mainteneur(enregistrement: dict[str, Any]) -> str | None:
     """Ce que le mainteneur a tapé dans cet enregistrement du rôle `user`, prêt à afficher.
 
-    Une commande tapée se rend `/nom arguments`. Sinon, un message n'est injecté que s'il ne reste
+    Le harnais marque `isMeta` ce qu'il injecte : un corps de skill intégré ou un avis de reprise
+    ne commence par aucun préfixe commun, et seule l'étiquette les écarte. Une commande tapée se
+    rend `/nom arguments`. Sinon, un message n'est injecté que s'il ne reste
     **rien** après retrait des blocs balisés : le harnais préfixe parfois le texte humain d'un bloc
     de contexte au lieu de l'injecter seul (`<ide_opened_file>…</ide_opened_file>oui go`), et
     s'arrêter à la tête perdrait ce « oui go ».
@@ -108,6 +110,8 @@ def message_du_mainteneur(enregistrement: dict[str, Any]) -> str | None:
     Returns:
         Le texte du mainteneur, blocs du harnais retirés, ou `None` si le harnais l'a injecté.
     """
+    if enregistrement.get("isMeta"):
+        return None
     brut = texte(enregistrement).strip()
     commande = COMMANDE_TAPEE.search(brut)
     if commande:

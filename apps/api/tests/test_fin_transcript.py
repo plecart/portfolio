@@ -35,6 +35,11 @@ def tour(role: str, contenu: str, horodatage: str = HORODATAGE) -> dict[str, Any
     }
 
 
+def injecte(contenu: str) -> dict[str, Any]:
+    """Un message du rôle `user` que le harnais a injecté, marqué `isMeta` comme il le fait."""
+    return {**tour("user", contenu), "isMeta": True}
+
+
 def ecrire(chemin: Path, enregistrements: list[dict[str, Any]]) -> Path:
     """Écrit un transcript JSONL et rend son chemin."""
     chemin.write_text(
@@ -110,6 +115,27 @@ PROVENANCES = {
             "workflow-authoring</command-name>\n<skill-format>true</skill-format>",
         ),
         None,
+    ),
+    # Le harnais marque `isMeta` ce qu'il injecte. Les corps de skills intégrés, la référence
+    # d'écriture de workflow ou l'avis de reprise après coupure ne commencent par aucun préfixe
+    # commun : sans l'étiquette, ils passaient pour des messages du mainteneur (dénombrement : corps
+    # de la PR #95). Le dernier cas est le témoin — le même texte, sans l'étiquette, que rien
+    # d'autre ne permet d'écarter.
+    "corps-de-code-review-injecte": (
+        injecte("Review target: `91 medium`\n\n`xhigh effort → 10 inline angles`"),
+        None,
+    ),
+    "reference-de-workflow-injectee": (
+        injecte("# Workflow authoring reference\n\nA workflow structures work…"),
+        None,
+    ),
+    "reprise-apres-coupure-injectee": (
+        injecte("Your response above was cut off mid-stream. Resume directly."),
+        None,
+    ),
+    "meme-texte-sans-etiquette": (
+        tour("user", "Review target: `91 medium`\n\n`xhigh effort → 10 inline angles`"),
+        "Review target: `91 medium`\n\n`xhigh effort → 10 inline angles`",
     ),
     # Un cas **littéral** par préfixe injecté, dans l'orthographe réelle du harnais. Pas une
     # dérivation du tuple du script : dérivés, les cas suivaient la mutation — retirer un préfixe
