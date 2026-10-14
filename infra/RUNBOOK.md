@@ -229,5 +229,45 @@ règle par règle.
 
 ## Sauvegarde et restauration
 
-Arrivent avec #23 et #24, qui écrivent ici leurs procédures — dont le scénario « le VPS a
-disparu » : louer, pointer le DNS, `bootstrap.sh`, restaurer, vérifier.
+Chaque nuit à 03:00 UTC, `backup` enchaîne dump, chiffrement, envoi, purge et ping
+([`backup/backup.sh`](backup/backup.sh)) : l'objet `<base>-<AAAAMMJJ>T<HHMMSS>Z.dump.age` arrive
+dans le bucket des sauvegardes, la purge n'y garde que 7 quotidiennes et 4 hebdomadaires de plus
+(la règle de `borg prune --keep-daily 7 --keep-weekly 4`, [`backup/retention.sh`](backup/retention.sh)),
+puis healthchecks.io reçoit le ping. La première étape qui échoue arrête tout, sans ping :
+healthchecks.io alerte de son absence. La restauration arrive avec #24, qui l'écrit ici — dont le
+scénario « le VPS a disparu » : louer, pointer le DNS, `bootstrap.sh`, restaurer, vérifier.
+
+**Lancer une sauvegarde à la main**, en `deploy` dans `/srv/portfolio` (« Commandes sur le VPS ») —
+pas autour de 03:00 UTC, où deux chaînes se disputeraient la purge :
+```
+docker compose exec backup backup.sh
+```
+Elle écrit `== dump`, `== chiffrement`, `== envoi`, `== purge` — puis `supprimé : <objet>` pour
+chaque objet purgé —, `== ping`, et sort en 0. Un échec écrit `échec à l'étape : <étape>`.
+
+**Vérifier qu'une sauvegarde est arrivée** — trois réponses oui / non :
+1. Le journal : `docker compose logs --since 24h backup` montre les étapes de la nuit
+   (`msg="== dump"`… `msg="== ping"`), sans ligne `level=error` ni `échec à l'étape`.
+2. Le bucket : tableau de bord Cloudflare, R2, bucket des sauvegardes — un objet daté de la nuit,
+   d'une taille proche de celle de la veille.
+3. Le ping : healthchecks.io, contrôle de la sauvegarde — état « up », dernier ping de la nuit.
+
+**Au premier déploiement qui porte `backup`** (#25) — ce qu'aucun test ne peut voir :
+- [ ] **Le rôle** : `bootstrap.sh` l'a créé si `docker compose ps backup` le dit `healthy` — sa
+  sonde ouvre une session sous ce rôle.
+- [ ] **Le jeton écrit, liste et supprime dans le vrai bucket** : trois sauvegardes à la main, le
+  même jour. Les trois réussissent (écrire, lister), et la deuxième disparaît du bucket à la
+  troisième (supprimer) : la règle quotidienne garde la plus récente du jour, la plus ancienne
+  reste tant que le bucket est jeune.
+- [ ] **Le ping arrive, et l'alerte part quand il manque** : après une sauvegarde à la main, le
+  contrôle est « up » ; puis, sa période et son délai de grâce réduits au plus court dans
+  healthchecks.io, l'alerte arrive une fois les deux écoulés sans ping — remets ensuite la période
+  d'un jour et son délai de grâce.
+- [ ] **La clé privée déchiffre une sauvegarde, sur le poste** : l'objet téléchargé du tableau de
+  bord R2, le fichier `age.key` tiré du gestionnaire de mots de passe, puis
+  ```
+  age --decrypt --identity age.key <objet> | docker run --rm -i <image de postgres dans infra/compose.yml> pg_restore --list
+  rm age.key <objet>
+  ```
+  La table des matières liste les tables de l'application ; le dump en clair ne touche pas le
+  disque.
