@@ -1099,9 +1099,10 @@ bilan partiel muet : le harnais a le droit de libérer un transcript entre deux 
 et le relevé que la session sortante a déposé avant de passer la main (« Relais en cours de
 cycle », plus bas) s'additionne alors à la main. Le script rend la durée,
 l'attente du mainteneur **scindée** en réactivité et absences, le temps des sous-agents et des
-workflows, le temps d'agent seul, la consommation de chaque sous-agent **contact par contact** —
-lue dans son propre transcript, sous `<uuid>/subagents/`, reprises et agents au premier plan
-compris —, les points de contact humains et les appels d'outils.
+workflows, le temps d'agent seul, le cache que chaque sous-agent a lu et écrit **contact par
+contact** — lu dans son propre transcript, sous `<uuid>/subagents/`, reprises et agents au premier
+plan compris ; pas sa sortie, que ce transcript sous-compte —, les points de contact humains et
+les appels d'outils.
 
 Écrire ces lignes, plus trois à la main — commits prévus contre commits de correction, constats
 par passe, correctifs qui ont cassé quelque chose — dans `retrospectives/<date>-<issue>.md`,

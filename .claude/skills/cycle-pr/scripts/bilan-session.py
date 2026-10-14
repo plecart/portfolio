@@ -10,10 +10,11 @@ réactivité (moins d'une heure) et absences (une heure ou plus), le pourcentage
 tête — les deux n'ont ni la même cause ni le même remède, et leur somme se lit comme un défaut
 de la pipeline alors qu'une nuit relève du calendrier (obs 43) ; le temps des sous-agents et des
 workflows, **retiré** de l'attente du mainteneur, qui serait sinon facturé du temps qu'il n'a pas
-fait attendre ; le temps d'agent seul ; les jetons facturés par la session ; ce que chaque
-sous-agent a consommé, **contact par contact**, lu dans son propre transcript — la notification
+fait attendre ; le temps d'agent seul ; les jetons facturés par la session ; le cache que chaque
+sous-agent a lu et écrit, **contact par contact**, lu dans son propre transcript — la notification
 de fin de son lancement ne porte que le contexte en fin de premier contact, et un agent au
-premier plan n'en émet aucune ; les points de contact humains et les appels d'outils.
+premier plan n'en émet aucune ; sa sortie, que ce transcript ne porte pas de façon fiable, n'est
+pas rendue ; les points de contact humains et les appels d'outils.
 
 Python 3.11 ou plus, bibliothèque standard seule.
 """
@@ -169,7 +170,8 @@ class Contact:
             compte une fois.
         context: le contexte du dernier appel — ce que la notification de fin rapporte, et
             **pas** une consommation.
-        used: la consommation du contact, sommée sur ses appels.
+        used: la consommation du contact, sommée sur ses appels — sa sortie n'est pas rendue,
+            le transcript d'un sous-agent ne la portant pas de façon fiable (`consumed`).
     """
 
     window: Interval
@@ -281,11 +283,15 @@ def measure_contact(segment: Sequence[Mapping[str, Any]]) -> Contact:
 
 
 def consumed(agents: Sequence[Subagent]) -> Usage:
-    """Ce que ces sous-agents ont consommé, somme de leurs contacts."""
+    """Le cache que ces sous-agents ont lu et écrit, somme de leurs contacts.
+
+    Pas leur sortie : dans un transcript de sous-agent, une partie des messages porte un
+    `output_tokens` figé bien en dessous de ce qu'ils contiennent — population et mesure dans
+    `test_la_sortie_d_un_sous_agent_ne_se_rend_pas`. Elle reste à zéro ici, et le rapport le dit.
+    """
     usage = Usage(transcripts=len(agents))
     for agent in agents:
         for contact in agent.contacts:
-            usage.output += contact.used.output
             usage.cache_read += contact.used.cache_read
             usage.cache_write += contact.used.cache_write
     return usage
@@ -541,12 +547,14 @@ def thousands(count: int) -> str:
     return f"{count:,}".replace(",", " ")
 
 
+def cached(usage: Usage) -> str:
+    """Le cache lu et écrit d'un ensemble de transcripts, en millions."""
+    return f"cache lu {usage.cache_read / 1e6:5.1f} M · écrit {usage.cache_write / 1e6:4.1f} M"
+
+
 def tokens(usage: Usage) -> str:
-    """La ligne de jetons d'un ensemble de transcripts."""
-    return (
-        f"sortie {usage.output / 1e3:6.0f} k · cache lu {usage.cache_read / 1e6:5.1f} M"
-        f" · écrit {usage.cache_write / 1e6:4.1f} M"
-    )
+    """La ligne de jetons de la session : sa sortie, puis son cache."""
+    return f"sortie {usage.output / 1e3:6.0f} k · {cached(usage)}"
 
 
 def relays(events: Sequence[Event]) -> list[datetime]:
@@ -656,14 +664,14 @@ def measure(events: Sequence[Event], agents: Sequence[Subagent] = ()) -> Measure
 
 
 def contact_line(contact: Contact) -> str:
-    """Une ligne de contact : sa fenêtre, ses appels, son contexte final et sa consommation."""
+    """Une ligne de contact : sa fenêtre, ses appels, son contexte final et le cache consommé —
+    pas la sortie, que le transcript d'un sous-agent ne porte pas de façon fiable (`consumed`)."""
     start, end = contact.window
     return (
         f"    {local(start)} → {local(end)}   {hm(end - start):>7}   {contact.calls:>4} appels   "
         f"contexte final {thousands(contact.context):>9}   "
         f"cache lu {thousands(contact.used.cache_read):>11}"
         f" · écrit {thousands(contact.used.cache_write):>9}"
-        f" · sortie {thousands(contact.used.output):>7}"
     )
 
 
@@ -732,7 +740,10 @@ def report(events: Sequence[Event], session: Usage, agents: Sequence[Subagent]) 
             else []
         ),
         f"jetons de la session         {tokens(session)}",
-        f"jetons des sous-agents       {tokens(used)}   ({used.transcripts} transcripts)",
+        (
+            f"jetons des sous-agents       {cached(used)} · sortie non mesurée"
+            f"   ({used.transcripts} transcripts)"
+        ),
         (
             f"points de contact humains    {humans + m.questions:>9}   "
             f"(messages {humans}, questions formelles {m.questions}, "
