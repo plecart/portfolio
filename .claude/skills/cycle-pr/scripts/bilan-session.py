@@ -10,8 +10,10 @@ réactivité (moins d'une heure) et absences (une heure ou plus), le pourcentage
 tête — les deux n'ont ni la même cause ni le même remède, et leur somme se lit comme un défaut
 de la pipeline alors qu'une nuit relève du calendrier (obs 43) ; le temps des sous-agents et des
 workflows, **retiré** de l'attente du mainteneur, qui serait sinon facturé du temps qu'il n'a pas
-fait attendre ; le temps d'agent seul ; les jetons facturés, globaux et **par agent** ; les points
-de contact humains et les appels d'outils.
+fait attendre ; le temps d'agent seul ; les jetons facturés par la session ; ce que chaque
+sous-agent a consommé, **contact par contact**, lu dans son propre transcript — la notification
+de fin de son lancement ne porte que le contexte en fin de premier contact, et un agent au
+premier plan n'en émet aucune ; les points de contact humains et les appels d'outils.
 
 Python 3.11 ou plus, bibliothèque standard seule.
 """
@@ -21,7 +23,7 @@ import json
 import re
 import sys
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -36,23 +38,26 @@ SUBAGENT_TOOLS = {"Agent", "Task", "Workflow"}
 WORKFLOW_TOOL = "Workflow"
 SYSTEM_REMINDER = re.compile(r"<system-reminder>.*?</system-reminder>", re.DOTALL)
 
-# Une notification de fin de tâche, telle que le harnais l'injecte : une pièce jointe
-# `queued_command` dont le `commandMode` le dit. Un test sur la *ligne* entière — la chaîne
-# `<task-notification` apparaît aussi dans le texte du prompt système d'un `prompt_snapshot` —
-# compte ces citations comme des fins de sous-agent.
+# Une notification de fin de tâche, telle que le harnais la livre — sous deux formes : une pièce
+# jointe `queued_command` dont le `commandMode` le dit, ou un message `user` dont le texte nu
+# **commence** par la balise. Un test sur la *ligne* entière — la chaîne `<task-notification`
+# apparaît aussi dans le texte du prompt système d'un `prompt_snapshot`, et dans les messages
+# qui en citent une — compte ces citations comme des fins de sous-agent. Dénombrement et
+# population : `FORMES_DE_LIVRAISON` dans la suite.
 NOTIFICATION_MODE = "task-notification"
+NOTIFICATION_TAG = "<task-notification>"
 TOOL_USE_ID = re.compile(r"<tool-use-id>(?P<id>[^<]+)</tool-use-id>")
 STATUS_COMPLETED = "<status>completed</status>"
-SUMMARY = re.compile(r"<summary>(?P<text>.*?)</summary>", re.DOTALL)
-SUBAGENT_TOKENS = re.compile(r"<subagent_tokens>(?P<count>\d+)</subagent_tokens>")
-# `Agent "<nom>" finished`, `Workflow "<nom>" completed` : le nom seul nous intéresse.
-QUOTED_NAME = re.compile(r'"(?P<name>[^"]+)"')
 
 # Les deux balises qu'un message de pair peut porter. N'en chercher qu'une classait les messages
 # d'équipier portant l'autre comme des messages du mainteneur — la classe avait été fermée sur
 # la seule forme qui l'avait révélée. Dénombrement et population : `FORMES_REELLES` dans la
 # suite, seul endroit où les chiffres vivent — recopiés ici, ils dérivent au recensement suivant.
 PEER_TAGS = ("<cross-session-message", "<agent-message")
+
+# Dans le transcript d'un sous-agent, le message par lequel le coordinateur le reprend — un
+# `SendMessage`, que l'agent ait fini ou non. C'est lui qui ouvre un nouveau contact.
+COORDINATOR = "The coordinator sent a message"
 
 # Le harnais injecte ses textes dans le rôle `user` sous des **balises** : `<task-notification>`,
 # `<command-message>`, `<local-command-caveat>`, `<ide_opened_file>`… Les énumérer une par une,
@@ -100,9 +105,7 @@ class Event:
         results: les identifiants d'outils dont le résultat revient ici.
         ends: pour une notification, l'identifiant de l'appel d'outil qu'elle termine — c'est
             lui qui l'apparie à son lancement, et non son ordre d'arrivée.
-        label: pour une notification, le nom de l'agent, lu dans son `<summary>`.
-        tokens: pour une notification, les jetons que le sous-agent a facturés.
-        source: le rang de son transcript, pour datar les relais.
+        source: le rang de son transcript, pour dater les relais.
     """
 
     when: datetime
@@ -110,8 +113,6 @@ class Event:
     uses: list[tuple[str, str]] = field(default_factory=list)
     results: list[str] = field(default_factory=list)
     ends: str = ""
-    label: str = ""
-    tokens: int = 0
     source: int = 0
 
 
@@ -127,111 +128,255 @@ class ToolCall:
 
 @dataclass
 class AgentRun:
-    """Un sous-agent ou un workflow, de son lancement à sa notification de fin."""
+    """Un sous-agent ou un workflow, de son lancement à sa notification de fin.
 
-    name: str
+    Rien de plus : le nom et la consommation se lisent dans le transcript du sous-agent
+    (`subagents`), la notification de son lancement ne portant que le contexte en fin de premier
+    contact.
+    """
+
+    uid: str
     tool: str
-    tokens: int
     window: Interval
 
 
 @dataclass
 class Usage:
-    """Jetons facturés par un ensemble de transcripts, un seul compte par message."""
+    """Jetons facturés par un ensemble d'appels d'API, un seul compte par message."""
 
     output: int = 0
     cache_read: int = 0
     cache_write: int = 0
     transcripts: int = 0
 
+    def add(self, counts: Mapping[str, int]) -> None:
+        """Ajoute l'`usage` d'un appel d'API."""
+        self.output += counts.get("output_tokens") or 0
+        self.cache_read += counts.get("cache_read_input_tokens") or 0
+        self.cache_write += counts.get("cache_creation_input_tokens") or 0
 
-def token_usage(paths: Sequence[Path]) -> Usage:
-    """Somme l'`usage` du dernier enregistrement de chaque message assistant.
+
+# Ce qu'un appel d'API a eu en contexte : son entrée hors cache, et le cache qu'il a lu ou écrit.
+CONTEXT_KEYS = ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+
+
+@dataclass
+class Contact:
+    """Un contact d'un sous-agent : son lancement, ou une reprise par le coordinateur.
+
+    Attributes:
+        window: du premier enregistrement du contact à son dernier appel d'API.
+        calls: les appels d'API, un par message — un message diffusé sur plusieurs lignes
+            compte une fois.
+        context: le contexte du dernier appel — ce que la notification de fin rapporte, et
+            **pas** une consommation.
+        used: la consommation du contact, sommée sur ses appels.
+    """
+
+    window: Interval
+    calls: int = 0
+    context: int = 0
+    used: Usage = field(default_factory=Usage)
+
+
+@dataclass
+class Subagent:
+    """Un sous-agent tel que son transcript le raconte, contact par contact.
+
+    Attributes:
+        role: son `agentType` (`relecteur`, `verificateur`…).
+        name: sa description, à défaut son nom, à défaut le nom de son transcript.
+        launcher: l'identifiant de l'appel d'outil qui l'a lancé — vide pour un agent de
+            workflow, que le harnais lance sans appel de la session.
+        contacts: ses contacts, dans l'ordre.
+    """
+
+    role: str
+    name: str
+    launcher: str
+    contacts: list[Contact]
+
+
+def records(path: Path | str) -> Iterator[dict[str, Any]]:
+    """Les enregistrements d'un transcript JSONL, lignes illisibles écartées."""
+    with open(path, encoding="utf-8") as stream:
+        for line in stream:
+            try:
+                yield json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+
+def content_blocks(record: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Les blocs d'un message, qu'il porte une liste de blocs ou un texte nu."""
+    content = (record.get("message") or {}).get("content", [])
+    if isinstance(content, list):
+        return cast(list[dict[str, Any]], content)
+    return [{"type": "text", "text": content}]
+
+
+def api_call(record: Mapping[str, Any]) -> tuple[str, Mapping[str, int]] | None:
+    """L'identifiant de message et l'`usage` d'un appel d'API, ou `None`.
 
     Un message diffusé en plusieurs blocs occupe plusieurs lignes qui portent le même `id` et le
-    même `usage` : une seule compte.
+    même `usage` : c'est l'identifiant qui permet de n'en compter qu'une.
     """
+    message = record.get("message") or {}
+    if record.get("type") == "assistant" and message.get("usage"):
+        return message.get("id") or record.get("uuid", ""), message["usage"]
+    return None
+
+
+def token_usage(paths: Sequence[Path]) -> Usage:
+    """Somme l'`usage` de chaque message assistant de ces transcripts, une fois par message."""
     usage = Usage(transcripts=len(paths))
     for path in paths:
-        last: dict[str, dict[str, int]] = {}
-        with open(path, encoding="utf-8") as stream:
-            for line in stream:
-                try:
-                    record: dict[str, Any] = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                message = record.get("message") or {}
-                if record.get("type") == "assistant" and message.get("usage"):
-                    last[message.get("id") or record.get("uuid", "")] = message["usage"]
-        for counts in last.values():
-            usage.output += counts.get("output_tokens") or 0
-            usage.cache_read += counts.get("cache_read_input_tokens") or 0
-            usage.cache_write += counts.get("cache_creation_input_tokens") or 0
+        calls = dict(call for record in records(path) if (call := api_call(record)))
+        for counts in calls.values():
+            usage.add(counts)
     return usage
 
 
-def notification_event(when: datetime, attachment: Mapping[str, Any], source: int) -> Event | None:
-    """L'événement d'une notification de fin de tâche, ou `None` si ce n'en est pas une.
-
-    Seul un `commandMode` égal à `task-notification` en fait une. Et seule une notification
-    `completed` ferme une fenêtre : la même tâche peut notifier plusieurs fois, le harnais le dit
-    lui-même dans sa note.
-    """
-    if attachment.get("commandMode") != NOTIFICATION_MODE:
-        return None
-    prompt = str(attachment.get("prompt", ""))
-    if STATUS_COMPLETED not in prompt:
-        return None
-    call = TOOL_USE_ID.search(prompt)
-    summary = SUMMARY.search(prompt)
-    quoted = QUOTED_NAME.search(summary.group("text")) if summary else None
-    tokens = SUBAGENT_TOKENS.search(prompt)
-    return Event(
-        when,
-        "notification",
-        ends=call.group("id") if call else "",
-        label=quoted.group("name") if quoted else "",
-        tokens=int(tokens.group("count")) if tokens else 0,
-        source=source,
+def resumes(record: Mapping[str, Any]) -> bool:
+    """Vrai si l'enregistrement est un message du coordinateur, qui reprend le sous-agent."""
+    return record.get("type") == "user" and any(
+        str(block.get("text", "")).startswith(COORDINATOR)
+        for block in content_blocks(record)
+        if block.get("type") == "text"
     )
+
+
+def contacts(path: Path) -> list[Contact]:
+    """Les contacts d'un transcript de sous-agent, et ce que chacun a consommé.
+
+    Un contact s'ouvre au premier enregistrement, puis à chaque message du coordinateur — la
+    seule forme qui reprenne un agent. Les relances du harnais (« [Your previous response had
+    no visible output… », « [SYSTEM NOTIFICATION… », « [Request interrupted… ») restent dans
+    le contact en cours. Population et dénombrement : la docstring de
+    `test_un_sous_agent_se_mesure_contact_par_contact_dans_son_transcript`.
+    """
+    segments: list[list[dict[str, Any]]] = []
+    for record in records(path):
+        if record.get("timestamp"):
+            if not segments or resumes(record):
+                segments.append([])
+            segments[-1].append(record)
+    return [measure_contact(segment) for segment in segments]
+
+
+def measure_contact(segment: Sequence[Mapping[str, Any]]) -> Contact:
+    """La fenêtre, les appels, le contexte final et la consommation d'un contact non vide."""
+    start = end = datetime.fromisoformat(segment[0]["timestamp"])
+    calls: dict[str, Mapping[str, int]] = {}
+    for record in segment:
+        if call := api_call(record):
+            calls[call[0]] = call[1]
+            end = datetime.fromisoformat(record["timestamp"])
+    contact = Contact((start, end), calls=len(calls))
+    for counts in calls.values():
+        contact.used.add(counts)
+    if calls:
+        last = list(calls.values())[-1]
+        contact.context = sum(last.get(key) or 0 for key in CONTEXT_KEYS)
+    return contact
+
+
+def consumed(agents: Sequence[Subagent]) -> Usage:
+    """Ce que ces sous-agents ont consommé, somme de leurs contacts."""
+    usage = Usage(transcripts=len(agents))
+    for agent in agents:
+        for contact in agent.contacts:
+            usage.output += contact.used.output
+            usage.cache_read += contact.used.cache_read
+            usage.cache_write += contact.used.cache_write
+    return usage
+
+
+def subagents(paths: Sequence[Path]) -> list[Subagent]:
+    """Les sous-agents de ces transcripts de session, lus dans leurs propres transcripts.
+
+    Le harnais les range sous `<uuid de session>/subagents/` — ceux d'un workflow un cran plus
+    bas —, chacun avec un `.meta.json`. Partir de là, et non des notifications de fin, voit
+    l'agent lancé au premier plan, qui n'en émet aucune, et chaque reprise d'un agent repris.
+    """
+    found: list[Subagent] = []
+    for path in paths:
+        for transcript in sorted(path.with_suffix("").glob("subagents/**/agent-*.jsonl")):
+            meta_path = transcript.with_name(transcript.stem + ".meta.json")
+            meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
+            found.append(
+                Subagent(
+                    role=str(meta.get("agentType", "")),
+                    name=str(meta.get("description") or meta.get("name") or transcript.stem),
+                    launcher=str(meta.get("toolUseId", "")),
+                    contacts=contacts(transcript),
+                )
+            )
+    # L'ordre du temps, pas celui des noms de fichier, qui sont des identifiants aléatoires.
+    # Un transcript sans enregistrement daté n'a pas de contact : il passe en tête.
+    return sorted(found, key=lambda agent: [contact.window[0] for contact in agent.contacts[:1]])
+
+
+def delivered_notification(record: Mapping[str, Any]) -> str | None:
+    """Le texte de la notification de fin que cet enregistrement **livre**, ou `None`.
+
+    Deux formes, et elles seules : une pièce jointe dont le `commandMode` vaut
+    `task-notification`, ou un message `user` dont le texte nu commence par la balise. Un
+    message qui en cite une plus loin n'en livre pas.
+    """
+    if record.get("type") == "attachment":
+        attachment = cast(dict[str, Any], record.get("attachment") or {})
+        if attachment.get("commandMode") == NOTIFICATION_MODE:
+            return str(attachment.get("prompt", ""))
+        return None
+    content = (record.get("message") or {}).get("content")
+    if (
+        record.get("type") == "user"
+        and isinstance(content, str)
+        and content.lstrip().startswith(NOTIFICATION_TAG)
+    ):
+        return content
+    return None
+
+
+def notification_event(when: datetime, text: str, source: int) -> Event | None:
+    """L'événement d'une notification livrée, ou `None` si elle ne ferme rien.
+
+    Seule une notification `completed` ferme une fenêtre : la même tâche peut notifier plusieurs
+    fois, le harnais le dit lui-même dans sa note.
+    """
+    if STATUS_COMPLETED not in text:
+        return None
+    call = TOOL_USE_ID.search(text)
+    return Event(when, "notification", ends=call.group("id") if call else "", source=source)
 
 
 def read_events(paths: Sequence[Path | str]) -> list[Event]:
     """Lit tous les transcripts d'une session et rend leurs événements, ordonnés par le temps."""
     events: list[Event] = []
     for source, path in enumerate(paths):
-        with open(path, encoding="utf-8") as stream:
-            for line in stream:
-                try:
-                    record: dict[str, Any] = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if not record.get("timestamp") or record.get("isSidechain"):
-                    continue
-                when = datetime.fromisoformat(record["timestamp"])
-                if record.get("type") == "attachment":
-                    attachment = cast(dict[str, Any], record.get("attachment") or {})
-                    found = notification_event(when, attachment, source)
-                    if found:
-                        events.append(found)
-                    continue
-                if record.get("type") not in ("user", "assistant"):
-                    continue
-                content = (record.get("message") or {}).get("content", [])
-                blocks = (
-                    cast(list[dict[str, Any]], content)
-                    if isinstance(content, list)
-                    else [{"type": "text", "text": content}]
+        for record in records(path):
+            if not record.get("timestamp") or record.get("isSidechain"):
+                continue
+            when = datetime.fromisoformat(record["timestamp"])
+            delivered = delivered_notification(record)
+            if delivered is not None:
+                found = notification_event(when, delivered, source)
+                if found:
+                    events.append(found)
+                continue
+            if record.get("type") not in ("user", "assistant"):
+                continue
+            blocks = content_blocks(record)
+            events.append(
+                Event(
+                    when,
+                    classify(str(record["type"]), blocks),
+                    [(b["id"], b["name"]) for b in blocks if b.get("type") == "tool_use"],
+                    [b["tool_use_id"] for b in blocks if b.get("type") == "tool_result"],
+                    source=source,
                 )
-                events.append(
-                    Event(
-                        when,
-                        classify(str(record["type"]), blocks),
-                        [(b["id"], b["name"]) for b in blocks if b.get("type") == "tool_use"],
-                        [b["tool_use_id"] for b in blocks if b.get("type") == "tool_result"],
-                        source=source,
-                    )
-                )
+            )
     events.sort(key=lambda event: event.when)
     return events
 
@@ -291,7 +436,7 @@ def agent_runs(events: Sequence[Event], calls: Sequence[ToolCall]) -> list[Agent
         end = ended.get(uid)
         if end is None:
             continue
-        runs.append(AgentRun(end.label, tool, end.tokens, (started, end.when)))
+        runs.append(AgentRun(uid, tool, (started, end.when)))
     return runs
 
 
@@ -477,7 +622,7 @@ class Measures:
         return self.span - total(self.absences)
 
 
-def measure(events: Sequence[Event]) -> Measures:
+def measure(events: Sequence[Event], agents: Sequence[Subagent] = ()) -> Measures:
     """Mesure une session à partir de ses événements, sans rien mettre en forme."""
     if not events:
         raise ValueError("aucun événement à mesurer — transcripts vides ou illisibles")
@@ -486,7 +631,12 @@ def measure(events: Sequence[Event]) -> Measures:
     # Les fenêtres se déduisent des `runs` déjà calculés, et sont **passées** à
     # `blocked_windows`. Chacune des trois les recalculait, soit trois parcours complets de la
     # liste d'événements — sensible sur un transcript de plusieurs dizaines de méga-octets.
-    windows = union([run.window for run in runs])
+    # S'y ajoutent les contacts lus dans les transcripts des sous-agents : une notification ne
+    # borne que le premier contact d'un agent de fond, et un agent au premier plan n'en a pas.
+    windows = union(
+        [run.window for run in runs] + [c.window for agent in agents for c in agent.contacts]
+    )
+    seen = {run.uid for run in runs} | {agent.launcher for agent in agents}
     blocked = blocked_windows(events, calls, windows)
     reactivity, absences = split_waits(blocked)
     start, end = events[0].when, events[-1].when
@@ -503,14 +653,33 @@ def measure(events: Sequence[Event]) -> Measures:
         windows=windows,
         alone=span - total(union(list(blocked) + list(windows))),
         runs=runs,
-        dangling=len(launched_subagents(events, calls)) - len(runs),
+        dangling=sum(1 for uid, _ in launched_subagents(events, calls) if uid not in seen),
         calls=calls,
         kinds=Counter(event.kind for event in events),
         questions=sum(1 for call in calls if call.name == QUESTION_TOOL),
     )
 
 
-def report(events: Sequence[Event], session: Usage, subagents: Usage) -> str:
+def contact_line(contact: Contact) -> str:
+    """Une ligne de contact : sa fenêtre, ses appels, son contexte final et sa consommation."""
+    start, end = contact.window
+    return (
+        f"    {local(start)} → {local(end)}   {hm(end - start):>7}   {contact.calls:>4} appels   "
+        f"contexte final {thousands(contact.context):>9}   "
+        f"cache lu {thousands(contact.used.cache_read):>11}"
+        f" · écrit {thousands(contact.used.cache_write):>9}"
+        f" · sortie {thousands(contact.used.output):>7}"
+    )
+
+
+def agent_lines(agent: Subagent) -> list[str]:
+    """Le titre d'un sous-agent, puis une ligne par contact."""
+    count = len(agent.contacts)
+    title = f"  {agent.role} « {agent.name} » — {count} contact{'s' if count > 1 else ''}"
+    return [title, *(contact_line(contact) for contact in agent.contacts)]
+
+
+def report(events: Sequence[Event], session: Usage, agents: Sequence[Subagent]) -> str:
     """Le bilan, prêt à être recopié dans une rétrospective.
 
     L'ordre des lignes est celui de leur lecture : l'attente **hors absences** d'abord, parce
@@ -522,9 +691,13 @@ def report(events: Sequence[Event], session: Usage, subagents: Usage) -> str:
     avait été absent, d'un facteur qui croît avec l'absence — et un pourcentage dont le
     dénominateur ne se lit pas est le défaut, pas le chiffre. Les deux parts sont épinglées par
     `test_la_reactivite_se_rapporte_au_temps_actif_et_les_absences_a_la_session`.
+
+    Chaque sous-agent se rend **contact par contact**, consommation comprise : c'est la seule
+    grandeur que deux lots peuvent comparer, un total dépendant de la taille du delta relu.
     """
-    m = measure(events)
+    m = measure(events, agents)
     humans = m.kinds["human"]
+    used = consumed(agents)
     relayed = ", ".join(f"relais à {local(moment)}" for moment in m.relayed)
 
     def row(label: str, duration: timedelta, basis: timedelta, note: str = "") -> str:
@@ -559,24 +732,23 @@ def report(events: Sequence[Event], session: Usage, subagents: Usage) -> str:
         ),
         row("attente totale", total(m.blocked), m.span),
         *(
-            [f"sous-agents sans notification de fin : {m.dangling} (encore en cours, ou morts)"]
+            [f"sous-agents sans transcript ni notification de fin : {m.dangling}"]
             if m.dangling
             else []
         ),
         f"jetons de la session         {tokens(session)}",
-        f"jetons des sous-agents       {tokens(subagents)}   ({subagents.transcripts} transcripts)",
+        f"jetons des sous-agents       {tokens(used)}   ({used.transcripts} transcripts)",
         (
             f"points de contact humains    {humans + m.questions:>9}   "
             f"(messages {humans}, questions formelles {m.questions}, "
             f"pairs {m.kinds['peer']}, injectés {m.kinds['system']})"
         ),
-        *(["par agent :"] if m.runs else []),
         *(
-            f"  {local(run.window[0])} → {local(run.window[1])}   "
-            f"{hm(total([run.window])):>7}   {thousands(run.tokens):>9} jetons   "
-            f"{run.tool} « {run.name} »"
-            for run in m.runs
+            ["par agent — consommation lue dans ses transcripts, contact par contact :"]
+            if agents
+            else []
         ),
+        *(line for agent in agents for line in agent_lines(agent)),
         *(["absences, une à une :"] if m.absences else []),
         *(f"  {local(start)} → {local(end)}   {hm(end - start)}" for start, end in m.absences),
         "appels d'outils : "
@@ -597,9 +769,8 @@ def main(argv: Sequence[str]) -> int:
     if not events:
         print("transcripts vides ou illisibles")
         return 1
-    subagents = [found for path in paths for found in sorted(path.with_suffix("").rglob("*.jsonl"))]
     out = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-    out.write(report(events, token_usage(paths), token_usage(subagents)) + "\n")
+    out.write(report(events, token_usage(paths), subagents(paths)) + "\n")
     out.flush()
     return 0
 
