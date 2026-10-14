@@ -12,4 +12,7 @@ export const strings = {
   /** Bouton de mode : il dit le mode visé, l'autre que celui affiché (spec §3.3). */
   switchToDark: 'Passer en mode sombre',
   switchToLight: 'Passer en mode clair',
+  /** Liens de l'auteur, dans leur ordre (spec §3.4). */
+  authorGitHub: 'GitHub de Pacôme Bernier',
+  authorLinkedIn: 'LinkedIn de Pacôme Bernier',
 } as const
