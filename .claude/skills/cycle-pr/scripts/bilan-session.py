@@ -61,13 +61,16 @@ PEER_TAGS = ("<cross-session-message", "<agent-message")
 PEER_NOTICE = "[Cross-session idle notice]"
 
 # Une commande **tapée** par le mainteneur — skill ou commande locale — porte la barre oblique
-# dans son nom ; un skill que le harnais charge de lui-même n'en porte pas. Population :
-# `FORMES_REELLES`.
-TYPED_COMMAND = "<command-name>/"
+# dans le bloc de premier niveau qui la nomme ; un skill que le harnais charge de lui-même n'en
+# porte pas. Population : `FORMES_REELLES`.
+TYPED_COMMAND = ("command-name", "/")
 
 # Les classes de message qui rouvrent un tour de l'agent, donc ferment son attente : le
 # mainteneur, prose ou commande tapée, et un pair.
 TURN_OPENERS = ("human", "peer")
+
+# Ce qui montre l'agent au travail : sa sortie, et le retour d'un outil qu'il a lancé.
+AGENT_ACTIVITY = ("assistant", "tool_result")
 
 # Dans le transcript d'un sous-agent, le message par lequel le coordinateur le reprend — un
 # `SendMessage`, que l'agent ait fini ou non. C'est lui qui ouvre un nouveau contact.
@@ -92,7 +95,11 @@ COORDINATOR = "The coordinator sent a message"
 # Sous cette forme, le découpage est unique et le coût redevient quasi linéaire — là où le motif
 # naïf n'atteint pas 25 blocs. Relevé, plage et commande dans
 # `test_une_suite_de_blocs_qui_echoue_ne_fait_pas_exploser_le_classement`, jamais ici.
-INJECTED_BLOCKS = re.compile(r"\A(?:\s*<([a-z][a-z0-9_-]*)>(?:(?!</\1>).)*</\1>)+\s*\Z", re.DOTALL)
+_BLOCK = r"\s*<([a-z][a-z0-9_-]*)>((?:(?!</\1>).)*)</\1>"
+INJECTED_BLOCKS = re.compile(rf"\A(?:{_BLOCK})+\s*\Z", re.DOTALL)
+
+# Un seul bloc de premier niveau, pour les parcourir un à un — même motif, même coût.
+BLOCK = re.compile(_BLOCK, re.DOTALL)
 
 # Et les formes injectées qui ne sont **pas** des balises — à énumérer, elles. `Caveat: The
 # messages below were generated` y figurait et n'a jamais mordu : la forme réelle est
@@ -389,7 +396,7 @@ def read_events(paths: Sequence[Path | str]) -> list[Event]:
             events.append(
                 Event(
                     when,
-                    classify(str(record["type"]), blocks),
+                    kind_of(record, blocks),
                     [(b["id"], b["name"]) for b in blocks if b.get("type") == "tool_use"],
                     [b["tool_use_id"] for b in blocks if b.get("type") == "tool_result"],
                     source=source,
@@ -399,8 +406,22 @@ def read_events(paths: Sequence[Path | str]) -> list[Event]:
     return events
 
 
+def kind_of(record: Mapping[str, Any], blocks: list[dict[str, Any]]) -> str:
+    """La classe d'un enregistrement : celle de son texte, sauf qu'une injection du harnais
+    n'est jamais du mainteneur.
+
+    Le harnais marque `isMeta` ce qu'il injecte. Le texte seul classait `human` des corps de
+    skills intégrés et des avis de reprise qu'aucun préfixe commun ne réunit ; l'étiquette les
+    rend tous `system`. Elle laisse un pair en pair : l'avis de repos en porte une. Population
+    et dénombrement : `ETIQUETTES` dans la suite.
+    """
+    found = classify(str(record["type"]), blocks)
+    return "system" if found == "human" and record.get("isMeta") else found
+
+
 def classify(role: str, blocks: list[dict[str, Any]]) -> str:
-    """La classe d'un message : d'où il vient, et s'il rouvre le tour de l'agent.
+    """La classe d'un message d'après son seul texte : d'où il vient, et s'il rouvre le tour de
+    l'agent. `kind_of` y ajoute l'étiquette `isMeta` du harnais.
 
     Un message de pair **commence** par « Another Claude session sent a message: » et porte la
     balise plus loin : le chercher en tête le classait humain. Un texte injecté par le harnais —
@@ -421,11 +442,32 @@ def classify(role: str, blocks: list[dict[str, Any]]) -> str:
     stripped = SYSTEM_REMINDER.sub("", text).strip()
     if not stripped or stripped.startswith(INJECTED):
         return "system"
-    if stripped.startswith(PEER_NOTICE) or any(tag in text for tag in PEER_TAGS):
+    if stripped.startswith(PEER_NOTICE) or any(tag in stripped for tag in PEER_TAGS):
         return "peer"
-    if INJECTED_BLOCKS.match(stripped) and TYPED_COMMAND not in stripped:
+    if INJECTED_BLOCKS.match(stripped) and not typed_command(stripped):
         return "system"
     return "human"
+
+
+def typed_command(message: str) -> bool:
+    """Si l'un des blocs de **premier niveau** du message nomme une commande tapée.
+
+    Cité à l'intérieur d'un autre bloc — le résumé d'une notification, la sortie d'une
+    commande —, `<command-name>/…` ne fait pas une commande du mainteneur.
+
+    Args:
+        message: un texte fait de blocs de balises, rappels système retirés.
+
+    Returns:
+        Vrai si un bloc `<command-name>` de premier niveau commence par la barre oblique.
+    """
+    name, prefix = TYPED_COMMAND
+    position = 0
+    while block := BLOCK.match(message, position):
+        if block.group(1) == name and block.group(2).startswith(prefix):
+            return True
+        position = block.end()
+    return False
 
 
 def tool_calls(events: Sequence[Event]) -> list[ToolCall]:
@@ -490,7 +532,8 @@ def launched_subagents(
 def waits(events: Sequence[Event], calls: Sequence[ToolCall]) -> list[Interval]:
     """Les attentes de l'agent et les questions formelles, fusionnées.
 
-    Une attente court de sa dernière sortie au **dernier** message qui rouvre son tour avant la
+    Une attente court de la dernière activité de l'agent — sa sortie, ou le retour d'un outil
+    qu'il a lancé (`AGENT_ACTIVITY`) — au **dernier** message qui rouvre son tour avant la
     sortie suivante — du mainteneur ou d'un pair (`TURN_OPENERS`). Le dernier, pas le premier :
     un message qui n'a rien déclenché n'a pas mis l'agent au travail. Ne compter que le
     mainteneur faisait passer en travail d'agent toute attente close par un pair, écart entre
@@ -504,7 +547,7 @@ def waits(events: Sequence[Event], calls: Sequence[ToolCall]) -> list[Interval]:
     reopened: dict[datetime, datetime] = {}
     idle_since: datetime | None = None
     for event in events:
-        if event.kind == "assistant":
+        if event.kind in AGENT_ACTIVITY:
             idle_since = event.when
         elif event.kind in TURN_OPENERS and idle_since is not None:
             reopened[idle_since] = event.when
@@ -628,8 +671,8 @@ class Measures:
     def active(self) -> timedelta:
         """La durée de la session **hors absences** — le seul denominateur actionnable.
 
-        Rapporter la réactivité à la session entière la dilue d'autant que le mainteneur a été
-        absent, et le chiffre flatte alors la pipeline sans que rien n'ait été amélioré — le
+        Rapporter la réactivité à la session entière la dilue d'autant que la session a dormi —
+        mainteneur absent, pair attendu, écart entre deux transcripts —, et le chiffre flatte alors la pipeline sans que rien n'ait été amélioré — le
         sens d'erreur même d'obs 41. Hors absences, la même attente pèse ce que la pipeline peut
         réellement réduire. Les absences, elles, se rapportent à la session : c'est leur poids
         réel.
@@ -717,8 +760,8 @@ def report(events: Sequence[Event], session: Usage, agents: Sequence[Subagent]) 
 
     Deux dénominateurs, et chaque ligne dit le sien. Ce que la pipeline peut réduire se rapporte
     au temps **actif** (session moins absences) ; les absences et l'attente totale se rapportent
-    à la session. Tout rapporter à la session diluait la réactivité d'autant que le mainteneur
-    avait été absent, d'un facteur qui croît avec l'absence — et un pourcentage dont le
+    à la session. Tout rapporter à la session diluait la réactivité d'autant que la session avait
+    dormi, d'un facteur qui croît avec l'absence — et un pourcentage dont le
     dénominateur ne se lit pas est le défaut, pas le chiffre. Les deux parts sont épinglées par
     `test_la_reactivite_se_rapporte_au_temps_actif_et_les_absences_a_la_session`.
 

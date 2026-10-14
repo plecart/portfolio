@@ -1116,6 +1116,10 @@ Les deux n'ont ni la même cause ni le même remède : la réactivité relève d
 questions groupées, arrêt au bon moment —, une absence relève du calendrier, et un cycle lancé le
 soir rencontre une nuit. Une absence se commente **à part**, en disant ce que l'agent n'avait
 plus d'indépendant à faire à ce moment-là. Mêlées, elles font lire un succès comme un échec.
+Un bilan pris avant la PR #91 ne se compare pas tel quel : les attentes closes par un pair, les
+commandes tapées et les écarts entre transcripts y comptaient en travail d'agent. Re-mesurer le
+cycle précédent avec le script courant, si ses transcripts existent encore, ou le dire sur la
+ligne de comparaison.
 
 La PR et la conversation qui l'a résolue ont pu acter des décisions, déplacer un contrat d'interface, déjà faire une partie d'un autre lot, ou rendre une
 hypothèse caduque ailleurs. **Immédiatement après le merge**, lancer le skill `repercussions` — la
