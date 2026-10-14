@@ -5,11 +5,13 @@
  * La porte est `no-restricted-syntax` d'ESLint sur `src/` : un texte qui contient une lettre,
  * écrit en dur là où l'interface le rend ou l'annonce.
  *
- * Dénombrement du 2026-10-08, repris à la première relecture : **17 formes** d'un texte
- * d'interface écrit en dur dans ce front, **6 couvertes** — texte JSX ; littéral entre accolades
+ * Dénombrement du 2026-10-08, repris aux deux relectures (la seconde, le 2026-10-14, y a ajouté
+ * l'attribut `children`) : **18 formes** d'un texte d'interface écrit en dur dans ce front,
+ * **7 couvertes** — texte JSX ; littéral entre accolades
  * en enfant ; gabarit en enfant, expressions comprises ; littéral dans un attribut annoncé ;
- * littéral entre accolades dans un attribut annoncé ; gabarit dans un attribut annoncé —, enfant
- * d'un élément ou d'un fragment. Attributs annoncés : `aria-label`, `aria-description`,
+ * littéral entre accolades dans un attribut annoncé ; gabarit dans un attribut annoncé ; les mêmes
+ * dans l'attribut `children`, que React rend comme un enfant —, enfant d'un élément ou d'un
+ * fragment. Attributs annoncés : `aria-label`, `aria-description`,
  * `aria-roledescription`, `aria-braillelabel`, `aria-brailleroledescription`, `aria-valuetext`,
  * `aria-placeholder`, `title`, `alt`, `abbr`, `placeholder`, `label`.
  *
@@ -58,6 +60,7 @@ describe('ESLint refuse un texte d’interface en dur dans un composant', () => 
     ['abbr', '<th abbr="Nombre" />'],
     ['placeholder', '<input placeholder="Chercher" />'],
     ['label', '<option label="Clair" />'],
+    ['attribut children', '<p children="Bonjour" />'],
     ['littéral entre accolades dans un attribut', "<button aria-label={'Fermer'} />"],
     ['gabarit dans un attribut', '<img alt={`Photo de ${name}`} />'],
   ])('%s', async (_, code) => {

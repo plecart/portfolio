@@ -46,6 +46,8 @@ const ANNOUNCED_ATTRIBUTES = [
   'abbr',
   'placeholder',
   'label',
+  // Rendu en texte par React, comme un enfant JSX.
+  'children',
 ]
 const ANNOUNCED = `JSXAttribute[name.name=/^(${ANNOUNCED_ATTRIBUTES.join('|')})$/]`
 const IN_BRACES = `:matches(JSXElement, JSXFragment, ${ANNOUNCED}) > JSXExpressionContainer`
