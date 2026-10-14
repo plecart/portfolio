@@ -189,6 +189,16 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
                                                   # Son prompt prescrit des sous-tâches (une de
                                                   # recherche, une de filtre par constat) ; la
                                                   # session l'a déroulée sans elles.
+                                                  # Prérequis : `origin/HEAD`, qu'elle diffe
+                                                  # (`git diff origin/HEAD...`) — absent, elle
+                                                  # échoue avant toute analyse ; `git remote
+                                                  # set-head origin main` le pose (mesuré et
+                                                  # posé dans ce dépôt le 2026-10-14). Autre
+                                                  # mesure, même jour, sur le delta de la PR
+                                                  # #75 (17 fichiers, dont 7 hors tests et
+                                                  # documentation : admin, téléversement,
+                                                  # migration) : **zéro** constat, de lecture
+                                                  # aussi, déroulée sans les sous-tâches.
 
 ## Qualité
 - seuil de couverture : aucun (cadrage annexe A : « pragmatique ; évaluations RAG et E2E prioritaires »)
