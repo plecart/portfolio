@@ -678,10 +678,11 @@ def test_une_ligne_vide_affichee_en_tete_de_l_ecran_d_ajout_est_ignoree(
 def test_une_ligne_enregistree_arrivee_sans_position_garde_la_sienne(admin_client: Client) -> None:
     """La position est facultative dans le formulaire : un envoi qui la vide pour une ligne
     enregistrée — ni l'écran ni le script n'en produisent — garde la position stockée au lieu
-    d'échouer en base."""
+    d'échouer en base. La seconde n'est pas celle qu'une renumérotation lui donnerait : garder et
+    renuméroter se distinguent."""
     django, python = saved(technology(name="Django")), saved(technology(name="Python"))
     portfolio = saved_project(django)
-    saved(ProjectTechnology(project=portfolio, technology=python, position=2))
+    saved(ProjectTechnology(project=portfolio, technology=python, position=5))
     url = reverse("admin:content_project_change", args=[portfolio.pk])
     blanked = {f"{LINES}-0-position": "", f"{LINES}-1-position": ""}
 
@@ -689,7 +690,7 @@ def test_une_ligne_enregistree_arrivee_sans_position_garde_la_sienne(admin_clien
 
     assert response.status_code == 302
     stored = ProjectTechnology.objects.filter(project=portfolio)
-    assert [(link.technology, link.position) for link in stored] == [(django, 1), (python, 2)]
+    assert [(link.technology, link.position) for link in stored] == [(django, 1), (python, 5)]
 
 
 @pytest.mark.django_db

@@ -15,7 +15,7 @@ from django.utils.html import format_html
 from django.utils.safestring import SafeString, mark_safe
 from django_stubs_ext import StrOrPromise
 
-from content.inlines import POSITION, SortableFormSet, SortableInline
+from content.inlines import SortableFormSet, SortableInline
 from content.models import (
     COVER_MIN_SIDE,
     GalleryImage,
@@ -145,16 +145,20 @@ class GalleryFormSet(SortableFormSet[GalleryImage, Project]):
     }
 
     def clean(self) -> None:
-        """La couverture, première des images gardées dans l'ordre de la galerie : refusée sous
-        sa ligne si elle n'est pas carrée, ou si son petit côté fait moins de 1200 px. Une ligne
-        déjà refusée n'est pas jugée une seconde fois : ses dimensions ne décrivent rien d'admis.
-        Une image glissée en tête devient la couverture, et en reçoit les règles."""
-        kept = [
-            form for form in self.forms if form.cleaned_data and not self._should_delete_form(form)
-        ]
+        """Les règles de `SortableFormSet`, puis la couverture : la première des images gardées,
+        dans l'ordre que l'enregistrement donne à la galerie (`_rank`), refusée sous sa ligne si
+        elle n'est pas carrée, ou si son petit côté fait moins de 1200 px. Une ligne déjà refusée
+        n'est pas jugée une seconde fois : ses dimensions ne décrivent rien d'admis. Une image
+        glissée en tête devient la couverture, et en reçoit les règles."""
+        super().clean()
+        kept = self.kept_forms()
         if not kept:
             return
-        cover = min(kept, key=self._place)
+        # ponytail: seules les lignes de l'envoi sont jugées ; une image enregistrée ailleurs
+        # depuis l'ouverture de l'écran (un second onglet) peut se ranger devant la couverture
+        # jugée. Juger aussi ces lignes, comme `validate_unique`, si deux onglets deviennent un
+        # usage.
+        cover = min(kept, key=self._rank)
         if cover.errors:
             return
         width, height = cover.instance.width, cover.instance.height
@@ -163,13 +167,11 @@ class GalleryFormSet(SortableFormSet[GalleryImage, Project]):
         if min(width, height) < COVER_MIN_SIDE:
             cover.add_error(None, strings.GALLERY_COVER_TOO_SMALL)
 
-    def _place(self, form: ModelForm[GalleryImage]) -> float:
-        """La place d'une ligne dans la galerie : sa position ; une ligne enregistrée arrivée sans
-        elle garde la sienne, une ligne neuve sans elle se range après les autres
-        (`SortableFormSet`). À place égale, l'ordre du formulaire, qui est celui de la saisie."""
-        position = form.cleaned_data.get(POSITION)
-        if position is None and form in self.initial_forms:
-            position = form.initial.get(POSITION)
+    def _rank(self, form: ModelForm[GalleryImage]) -> float:
+        """Le rang d'une ligne dans la galerie enregistrée : sa position (`position_of`) ; une
+        ligne neuve sans position vient après toutes les autres, là où `save_new` la range. À
+        rang égal, `min` garde l'ordre du formulaire, celui de l'enregistrement."""
+        position = self.position_of(form)
         return math.inf if position is None else position
 
 

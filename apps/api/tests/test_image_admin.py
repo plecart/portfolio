@@ -337,6 +337,62 @@ def test_sans_le_script_la_premiere_ligne_du_formulaire_est_la_couverture(
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    "placed_ahead",
+    [{}, {f"{GALLERY}-0-DELETE": "on", f"{GALLERY}-TOTAL_FORMS": 3}],
+    ids=["après les lignes enregistrées", "après une ligne neuve placée"],
+)
+def test_une_ligne_neuve_sans_position_n_est_pas_jugee_couverture(
+    admin_client: Client, placed_ahead: dict[str, object]
+) -> None:
+    """La couverture jugée est la première image enregistrée : une ligne neuve arrivée sans
+    position se range après toutes les autres, et n'est pas jugée comme telle.
+
+    Les voies par lesquelles une ligne reçoit sa place — 6 recensées : la position que le script
+    remplit (`test_une_image_libre_glissee_en_tete_est_refusee`) ; une ligne enregistrée arrivée
+    sans position, qui garde la sienne
+    (`test_une_couverture_enregistree_arrivee_sans_position_reste_la_couverture`) ; des lignes
+    neuves toutes sans position, dans l'ordre du formulaire
+    (`test_sans_le_script_la_premiere_ligne_du_formulaire_est_la_couverture`) ; une ligne neuve
+    sans position après une image enregistrée ailleurs
+    (`test_une_ligne_neuve_sans_position_se_range_apres_une_image_enregistree_ailleurs`), après
+    les lignes enregistrées, puis après une ligne neuve placée (ici). La dernière fuyait tant que
+    `save_new` ne comptait que les lignes déjà en base : jugée après la ligne placée, la ligne en
+    paysage s'enregistrait devant elle."""
+    portfolio = saved_project(saved(technology(name="Django")))
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
+    data = rendered_data(admin_client, url) | image_row(
+        GALLERY, 1, original=image_upload(size=LANDSCAPE), position=""
+    )
+    if placed_ahead:
+        data |= placed_ahead | image_row(GALLERY, 2, position=5)
+
+    response = admin_client.post(url, data)
+
+    assert response.status_code == 302
+    assert [image.width for image in portfolio.gallery.all()] == [MIN_SIDE, 1600]
+
+
+@pytest.mark.django_db
+def test_une_ligne_neuve_sans_position_se_range_apres_une_image_enregistree_ailleurs(
+    admin_client: Client,
+) -> None:
+    """Une image enregistrée depuis l'ouverture de l'écran — un second onglet — n'est dans aucune
+    ligne de l'envoi : la ligne neuve arrivée sans position se range après elle aussi."""
+    portfolio = saved_project(saved(technology(name="Django")))
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
+    data = rendered_data(admin_client, url) | image_row(
+        GALLERY, 1, original=image_upload(size=LANDSCAPE), position=""
+    )
+    saved(gallery_image(portfolio, original=image_upload(size=(1300, 1300)), position=7))
+
+    response = admin_client.post(url, data)
+
+    assert response.status_code == 302
+    assert [image.width for image in portfolio.gallery.all()] == [MIN_SIDE, 1300, 1600]
+
+
+@pytest.mark.django_db
 def test_l_ecran_accepte_une_image_sans_extension(admin_client: Client) -> None:
     """L'original est reconnu à son contenu, jamais à son nom (décision 6) : le tableau emploie le
     champ de formulaire de l'original, pas celui de Django."""

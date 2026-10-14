@@ -106,6 +106,23 @@ class SortableFormSet[ChildT: Model, ParentT: Model](
         vanished = form in self.initial_forms and form.instance.pk is None
         return vanished or bool(form.cleaned_data.get(DELETION_FIELD_NAME, False))
 
+    def kept_forms(self) -> list[ModelForm[ChildT]]:
+        """Les lignes que l'envoi garde : remplies, ni supprimées ni disparues."""
+        return [
+            form for form in self.forms if form.cleaned_data and not self._should_delete_form(form)
+        ]
+
+    def position_of(self, form: ModelForm[ChildT]) -> int | None:
+        """La position d'une ligne gardée : celle qu'elle porte ; à défaut, pour une ligne
+        enregistrée, la sienne. `None` pour une ligne neuve arrivée sans position — le script qui
+        remplit ce champ caché n'a pas tourné, ou un envoi l'a vidé : `save_new` la range après
+        toutes les autres. Une règle qui lit l'ordre des lignes passe par ici, comme
+        l'enregistrement."""
+        position: int | None = form.cleaned_data.get(POSITION)
+        if position is None and form in self.initial_forms:
+            return form.initial[POSITION]
+        return position
+
     def validate_unique(self) -> None:
         """Les unicités qui lisent le parent, entre les lignes gardées (Django) et avec les lignes
         du parent que l'envoi ne porte pas : enregistrées ailleurs depuis l'ouverture de l'écran —
@@ -142,19 +159,24 @@ class SortableFormSet[ChildT: Model, ParentT: Model](
         # `connection.check_constraints()` en fin d'enregistrement si cela devient un usage.
 
     def save_new(self, form: ModelForm[ChildT], commit: bool = True) -> ChildT:
-        """Enregistre une ligne neuve. Sans position — le script qui la remplit n'a pas tourné —,
-        elle se range après les autres lignes du parent."""
-        if form.cleaned_data.get(POSITION) is None:
+        """Enregistre une ligne neuve. Sans position, elle se range après toutes les autres
+        lignes du parent : celles déjà en base — enregistrées par cet envoi ou ailleurs —, et
+        celles que l'envoi place et qui restent à écrire. Django écrit les lignes neuves dans
+        l'ordre du formulaire : plusieurs lignes sans position le gardent."""
+        if self.position_of(form) is None:
             siblings = type(form.instance)._default_manager.filter(**{self.fk.name: self.instance})
-            last = siblings.aggregate(last=Max(POSITION))["last"]
-            setattr(form.instance, POSITION, (last or 0) + 1)
+            stored = siblings.aggregate(last=Max(POSITION))["last"]
+            placed = [self.position_of(kept) for kept in self.kept_forms()]
+            last = max(
+                (position for position in (stored, *placed) if position is not None), default=0
+            )
+            setattr(form.instance, POSITION, last + 1)
         return super().save_new(form, commit=commit)
 
     def save_existing(self, form: ModelForm[ChildT], obj: ChildT, commit: bool = True) -> ChildT:
-        """Enregistre une ligne enregistrée. Sans position — un envoi que ni l'écran ni le script ne
-        produisent —, elle garde la sienne."""
-        if form.cleaned_data.get(POSITION) is None:
-            setattr(obj, POSITION, form.initial[POSITION])
+        """Enregistre une ligne enregistrée, à sa position (`position_of`) : sans position — un
+        envoi que ni l'écran ni le script ne produisent —, elle garde la sienne."""
+        setattr(obj, POSITION, self.position_of(form))
         return super().save_existing(form, obj, commit=commit)
 
 
