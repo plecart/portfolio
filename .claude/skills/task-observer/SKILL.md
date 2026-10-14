@@ -142,7 +142,9 @@ Append to the log **silently, within the same turn or the next** — never
 batch mentally for later; the act of writing is the enforcement mechanism.
 
 **When to write:** in the turn where the observation surfaces, or the next one. The project's
-CLAUDE.md (« Observation continue ») sets the threshold (high) and the cap (three per session);
+CLAUDE.md (« Observation continue ») sets the threshold (high) and the cap (three per cycle — a
+PR, relays included, the relay handoff carrying the count already written; outside a PR, a
+session);
 there is no cadence tied to TodoWrite or to deliverables, and no acknowledgement marker to write.
 
 **Numbering discipline (mandatory, every append):**

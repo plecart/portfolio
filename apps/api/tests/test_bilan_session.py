@@ -9,7 +9,9 @@ notification dans le texte du prompt système, et une commande Bash de fond dont
 ressemble à celle d'un sous-agent.
 """
 
+import io
 import json
+import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -928,3 +930,53 @@ def test_le_rapport_rend_chaque_contact_avec_sa_consommation(tmp_path: Path) -> 
     assert bilan.consumed(agents) == bilan.Usage(
         output=960 + 600, cache_read=45_000 + 55_000, cache_write=26_000 + 3_500, transcripts=1
     )
+
+
+# --- Un transcript demandé qui n'existe plus (obs 73) --------------------------------------------
+
+
+def run_main(argv: list[str], monkeypatch: pytest.MonkeyPatch) -> tuple[int, str]:
+    """Lance `main` sur une console cp1252, celle du poste, et rend son code et sa sortie.
+
+    Un rapport plein de `→` mourait sur cette console ; `sys.stdout` est donc un flux texte cp1252
+    sur un tampon d'octets, que le script doit contourner en écrivant de l'UTF-8 sur le tampon —
+    sans l'envelopper : un `TextIOWrapper` collecté ferme le flux qu'il enveloppe (même mécanisme
+    que `test_les_verdicts_s_impriment_sur_une_console_cp1252` de `test_mutation.py`).
+    """
+    tampon = io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(tampon, encoding="cp1252"))
+    code = bilan.main(argv)
+    return code, tampon.getvalue().decode("utf-8")
+
+
+def test_un_transcript_absent_se_dit_au_lieu_d_un_bilan_partiel_muet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le transcript d'une session relayée peut disparaître avant l'Étape 8 : le harnais l'a
+    libéré 50 minutes avant que le relais ne commence (obs 73). Ceux des lots 4a et 4b de #77
+    n'étaient déjà plus là le 2026-10-14 au matin — mesuré : aucun transcript du projet n'a
+    d'horodatage entre 00:34 et 08:54, et quatre marqueurs `.desktop-released.json` datent de
+    08:40 à 08:52. Le script plantait alors sur `FileNotFoundError` ; le chemin retiré, il rendait
+    un bilan normal sur la moitié du cycle. Il doit le **dire**, et renvoyer au relevé que la
+    session sortante a déposé."""
+    present = write_transcript(tmp_path / "session.jsonl", TIMELINE)
+    absent = tmp_path / "libere.jsonl"
+
+    code, sortie = run_main([str(absent), str(present)], monkeypatch)
+
+    assert code == 0
+    assert f"transcripts demandés 2, lus 1 — absents : {absent}" in sortie
+    assert "(sessions : 1)" in sortie, "le bilan porte sur le seul transcript lu"
+    assert "relevé déposé" in sortie, "le remède se lit à côté du constat"
+
+
+def test_aucun_transcript_lisible_ne_rend_pas_de_bilan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Zéro transcript présent : pas de bilan du tout, et la liste de ce qui manque."""
+    absent = tmp_path / "libere.jsonl"
+
+    code, sortie = run_main([str(absent)], monkeypatch)
+
+    assert code == 1
+    assert f"absents : {absent}" in sortie

@@ -66,7 +66,8 @@ un audit, une passe de spec. Pas pour une question, une commande isolée ou un c
 **Seuil de consignation — haut.** Ne consigner que ce qui changerait le comportement d'un skill :
 une règle violée de façon répétée, une correction de l'utilisateur qui se généralise, un manque
 rencontré sur plusieurs sessions. Une friction isolée ne se consigne pas. **Maximum 3 entrées par
-session** ; au-delà, ne garder que les plus fortes.
+cycle** — une PR, relais compris, la passation de relais portant le compte déjà écrit ; hors PR,
+une session. Au-delà, ne garder que les plus fortes.
 
 **Ne jamais interrompre pour le journal.** Pas de proposition de revue spontanée, pas de résumé
 d'observations en fin de session, pas de relance sur le retard de revue. Le journal ne se surface

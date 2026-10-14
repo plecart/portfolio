@@ -201,9 +201,10 @@ frontière de session, où aucune commande du lead ne peut porter la condition d
 **Session relayée.** Un cycle peut durer plus qu'un contexte : la session qui reprend un worktree
 envoie d'abord au lead son chemin de scratchpad et la sortie de `git rev-parse --show-toplevel`,
 et le lead **ajoute** son UUID à la colonne « Session » en gardant ceux des sessions précédentes,
-puis repose son abonnement idle — celui de la session remplie ne distingue plus rien (obs 40). La
-passation que la session sortante écrit porte donc deux choses que le relais ne peut pas deviner :
-l'adresse du lead, et cette consigne-ci.
+puis repose son abonnement idle — celui de la session remplie ne distingue plus rien (obs 40).
+C'est la session sortante qui sait que son contexte se remplit, pas le lead : sa passation suit la
+variante « relais » de `.claude/skills/cycle-pr/references/prompt-lot-suivant.md` (`cycle-pr`
+Étape 8, « Relais en cours de cycle »), qui porte l'adresse du lead et renvoie à ce paragraphe.
 
 **Une session neuve par lot, et c'est la session sortante qui la fait démarrer.** Une issue
 réalisée en plusieurs lots ne garde **pas** la même session d'un lot au suivant : le contexte d'un
