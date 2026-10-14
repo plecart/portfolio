@@ -70,12 +70,13 @@ l'empreinte de l'hôte : compare-la à celle que la console du fournisseur rend 
    ```
    Il demande : la clé publique (le contenu de `deploy_key.pub`), le jeton GHCR, `IMAGE_TAG` (le
    SHA de l'étape 3), `TUNNEL_TOKEN`, les noms d'hôte — `SITE_HOST`, `API_HOST`,
-   `MEDIA_HOST` (ADR 0003) —, puis les variables de la sauvegarde, `BACKUP_*`. Il finit par
+   `MEDIA_HOST` (ADR 0003) —, puis ceux de la sauvegarde : la clé publique `age`, l'adresse, le
+   jeton et le nom du bucket R2, l'adresse de ping. Il engendre le mot de passe du rôle Postgres
+   de `backup`, et crée ce rôle une fois la base saine, avant de démarrer le reste. Il finit par
    `== Fait`, `docker compose ps` où chaque service est `healthy`, et la ligne de la clé de l'hôte.
    Il s'arrête sur la première erreur ; relancé, il reprend sans rien refaire de ce qui est en
    place. `cloudflared` ne devient sain qu'avec un Tunnel configuré (#25) : sinon `--wait`
-   s'arrête sur « cloudflared is unhealthy ». De même pour `backup` tant que le script ne crée pas
-   son rôle Postgres, ce qu'il apprend au lot 2 de #23.
+   s'arrête sur « cloudflared is unhealthy ».
 6. **L'environnement `production` et ses secrets**, depuis le poste, dans le dépôt — d'abord
    l'environnement restreint à `main` (doc GitHub « Deployments and environments »), puis les
    quatre secrets :

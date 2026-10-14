@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Amorçage d'un VPS neuf (cadrage §6.7 point 1, ADR 0002, brief de #16 décision 7) : Docker,
 # utilisateur de déploiement, pare-feu SSH seul, `fail2ban`, mises à jour automatiques, SSH par
-# clés, connexion à GHCR, `.env` écrit depuis les secrets, puis la pile démarrée. La procédure qui
-# l'entoure — copier les fichiers, créer les secrets — est dans `infra/RUNBOOK.md`.
+# clés, connexion à GHCR, `.env` écrit depuis les secrets, puis la pile démarrée, avec le rôle
+# Postgres de la sauvegarde. La procédure qui l'entoure — copier les fichiers, créer les secrets —
+# est dans `infra/RUNBOOK.md`.
 #
 # En root sur le VPS, à côté de `compose.yml` et de `prod.env.example` copiés du même commit :
 #   sudo bash bootstrap.sh         amorce le VPS ; relancé, il ne change rien
@@ -13,7 +14,8 @@
 # et la liste des processus garderaient. Une valeur déjà écrite est gardée : le mot de passe
 # Postgres, en particulier, est celui que la base a reçu à sa création.
 #
-# Non testé automatiquement (PRD « Décisions de test, Socle ») : vérifié à la main par #25.
+# Non testé automatiquement (PRD « Décisions de test, Socle ») : vérifié à la main par #25 — sauf la
+# SQL du rôle de la sauvegarde, que `infra/tests/test_backup_image.py` joue sur l'image Postgres.
 
 set -euo pipefail
 
@@ -28,11 +30,13 @@ REGISTRY_USER=plecart
 # Les secrets que le script engendre : 32 octets en hexadécimal, donc 64 caractères — au-delà des
 # 50 que `Env` exige de `SECRET_KEY` —, sans `$` ni caractère réservé d'URL : le mot de passe
 # Postgres entre tel quel dans `DATABASE_URL`.
-GENERATED=(SECRET_KEY POSTGRES_PASSWORD)
+GENERATED=(SECRET_KEY POSTGRES_PASSWORD BACKUP_POSTGRES_PASSWORD)
 # Les valeurs que le modèle fixe lui-même, reprises telles quelles.
-FROM_MODEL=(POSTGRES_USER POSTGRES_DB)
+FROM_MODEL=(POSTGRES_USER POSTGRES_DB BACKUP_POSTGRES_USER)
 # Les valeurs renouvelables qui ne vivent pas dans le `.env`.
 OTHER_SECRETS=(GHCR_TOKEN DEPLOY_KEY)
+# Les valeurs du `.env`, par nom, telles que `write_env` les a écrites.
+declare -A VALUES=()
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -235,6 +239,7 @@ write_env() {
 		if [[ $name == POSTGRES_PASSWORD && -n ${current[$name]:-} && $value != "${current[$name]}" ]]; then
 			change_postgres_password "${current[POSTGRES_USER]}" "${current[POSTGRES_DB]}" "$value"
 		fi
+		VALUES[$name]=$value
 		lines+=("$name='$value'")
 	done
 
@@ -246,22 +251,46 @@ write_env() {
 	mv "$draft" "$env_file"
 }
 
-# Le nouveau mot de passe (3ᵉ argument) du rôle (1ᵉʳ) dans la base (2ᵉ) qui tourne, par l'entrée
-# standard de `psql` — jamais en argument. Pile arrêtée : impossible, la base garderait l'ancien.
+# La SQL de l'entrée standard, jouée dans la base (2ᵉ argument) sous le rôle de l'application (1ᵉʳ),
+# qui l'administre — jamais en argument, qu'un `ps` lirait.
+run_sql() {
+	stack exec -T postgres psql --quiet -v ON_ERROR_STOP=1 -U "$1" -d "$2"
+}
+
+# Le nouveau mot de passe (3ᵉ argument) du rôle (1ᵉʳ) dans la base (2ᵉ) qui tourne. Pile arrêtée :
+# impossible, la base garderait l'ancien.
 change_postgres_password() {
 	[[ -n $(stack ps --status running --quiet postgres) ]] ||
 		die "démarrer la pile avant de renouveler POSTGRES_PASSWORD (infra/RUNBOOK.md)"
-	printf "ALTER ROLE \"%s\" PASSWORD '%s';\n" "$1" "$3" |
-		stack exec -T postgres psql -v ON_ERROR_STOP=1 -U "$1" -d "$2"
+	printf "ALTER ROLE \"%s\" PASSWORD '%s';\n" "$1" "$3" | run_sql "$1" "$2"
 }
 
-# 10. La pile, aux images de `IMAGE_TAG`, attendue saine comme le fait le job `deploy`. Sans `pull` :
-#     `up` tire les images absentes (`pull_policy` par défaut, `missing`) et ne contacte pas le
-#     registre pour une image présente — un renouvellement, qui a déjà changé le mot de passe dans
-#     la base, recrée `api` même si GHCR refuse le jeton.
+# La SQL du rôle de `backup` (brief de #23, décision 3), nommé par le 1ᵉʳ argument : connexion et
+# lecture de toutes les données, rien d'autre. Rejouable : le rôle est créé s'il manque, et reçoit
+# à chaque passage le mot de passe du 2ᵉ argument — c'est ainsi qu'on le renouvelle. Le nom vient du
+# modèle, le mot de passe est engendré : ni guillemet ni apostrophe. `infra/tests/` la joue sur
+# l'image Postgres de la pile.
+backup_role_sql() {
+	cat <<EOF
+SELECT 'CREATE ROLE "$1" LOGIN IN ROLE pg_read_all_data'
+WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$1')
+\gexec
+ALTER ROLE "$1" PASSWORD '$2';
+EOF
+}
+
+# 10. La pile, aux images de `IMAGE_TAG`, attendue saine comme le fait le job `deploy` — la base
+#     d'abord, puis le rôle de `backup`, dont la sonde ouvre une session, puis le reste. Sans
+#     `pull` : `up` tire les images absentes (`pull_policy` par défaut, `missing`) et ne contacte
+#     pas le registre pour une image présente — un renouvellement, qui a déjà changé le mot de
+#     passe dans la base, recrée `api` même si GHCR refuse le jeton.
 start_stack() {
 	step "Pile"
-	stack up -d --wait --wait-timeout 300
+	local up=(up -d --wait --wait-timeout 300)
+	stack "${up[@]}" postgres
+	backup_role_sql "${VALUES[BACKUP_POSTGRES_USER]}" "${VALUES[BACKUP_POSTGRES_PASSWORD]}" |
+		run_sql "${VALUES[POSTGRES_USER]}" "${VALUES[POSTGRES_DB]}"
+	stack "${up[@]}"
 	stack ps
 }
 

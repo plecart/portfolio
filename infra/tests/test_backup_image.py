@@ -1,5 +1,5 @@
-"""Tests de l'image `backup` : sa chaîne de sauvegarde, sa sonde, la majeure de son `pg_dump` (brief
-de #23, décisions 2 à 6, 10 et 11).
+"""Tests de l'image `backup` : sa chaîne de sauvegarde, sa sonde, la majeure de son `pg_dump`, son
+rôle Postgres (brief de #23, décisions 2 à 6, 10 et 11).
 
 Lancé par `make image-test`, jamais par `make test` : il lui faut les images que `make build` a
 chargées — `backup`, et `caddy` pour le témoin de ping. Le job `infra` de la CI le lance après son
@@ -7,9 +7,10 @@ build ; sur un poste, `make build` d'abord.
 
 La pile est le Compose de production, résolu avec son modèle de `.env` et surchargé par
 `backup.yml` : `postgres` et `backup` y gardent leur image, leur sonde et leurs variables, dont le
-test ne remplace que les valeurs. Aucun service externe : un témoin S3 et un témoin de ping en
-tiennent lieu. Elle tourne sous son propre nom de projet, sans port publié : le test agit par
-`docker compose exec`.
+test ne remplace que les valeurs. Elle démarre comme `bootstrap.sh` la démarre : la base saine,
+puis le rôle de sauvegarde, créé par la SQL du script, puis `backup`. Aucun service externe : un
+témoin S3 et un témoin de ping en tiennent lieu. Elle tourne sous son propre nom de projet, sans
+port publié : le test agit par `docker compose exec`.
 """
 
 import json
@@ -29,6 +30,7 @@ from test_env import declared_variables
 from test_infra import loaded_image
 
 INFRA = Path(__file__).parents[1]
+BOOTSTRAP = INFRA / "bootstrap.sh"
 COMPOSE_PROD = INFRA / "compose.yml"
 PROD_ENV_EXAMPLE = INFRA / "prod.env.example"
 STACK = Path(__file__).with_name("backup.yml")
@@ -95,9 +97,73 @@ class Stack:
 
     def output(self, *arguments: str) -> str:
         """La sortie standard de `docker compose`, qui doit réussir."""
-        completed = self.compose(*arguments)
-        completed.check_returncode()
-        return completed.stdout.decode()
+        return succeeded(self.compose(*arguments)).stdout.decode()
+
+    def psql(self, service: str, sql: str, *options: str) -> subprocess.CompletedProcess[bytes]:
+        """Joue `sql` par l'entrée standard de `psql`, dans le conteneur `service` : arrêt à la
+        première erreur, dont la sortie d'erreur ne donne que le code SQLSTATE. Dans `backup`, la
+        session est celle de son rôle (variables de libpq du Compose de production)."""
+        return self.compose(
+            "exec",
+            "-T",
+            service,
+            "psql",
+            "--no-psqlrc",
+            "--quiet",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-v",
+            "VERBOSITY=sqlstate",
+            *options,
+            stdin=sql.encode(),
+        )
+
+    def as_owner(self, sql: str, *options: str) -> subprocess.CompletedProcess[bytes]:
+        """Joue `sql` sous le rôle de l'application, propriétaire de la base, par le socket du
+        conteneur Postgres — comme `bootstrap.sh` la joue."""
+        return self.psql("postgres", sql, "-U", MODEL["POSTGRES_USER"], "-d", DATABASE, *options)
+
+    def backup_role_sql(self, password: str) -> str:
+        """La SQL du rôle de sauvegarde, écrite par `bootstrap.sh` lui-même — pas une copie : le
+        script chargé par `source`, qui n'y définit que ses fonctions, puis la sienne appelée. Dans
+        le conteneur Postgres, qui a `bash` ; le script, en LF partout (`.gitattributes`)."""
+        printed = self.compose(
+            "exec",
+            "-T",
+            "postgres",
+            "bash",
+            "-c",
+            'source /dev/stdin && backup_role_sql "$@"',
+            BOOTSTRAP.name,
+            STACK_VALUES["BACKUP_POSTGRES_USER"],
+            password,
+            stdin=BOOTSTRAP.read_bytes(),
+        )
+        return succeeded(printed).stdout.decode()
+
+    def apply_backup_role(self, password: str) -> None:
+        """Crée le rôle de sauvegarde, ou lui donne `password`, par la SQL de `bootstrap.sh`."""
+        succeeded(self.as_owner(self.backup_role_sql(password)))
+
+    def backup_role(self) -> str:
+        """Ce que la base sait du rôle de sauvegarde, mot de passe excepté — `pg_roles` le masque :
+        son identifiant, ses attributs, les rôles dont il est membre."""
+        described = self.as_owner(
+            "SELECT to_jsonb(r) || jsonb_build_object('member_of', ARRAY("
+            "SELECT roleid::regrole::text FROM pg_auth_members WHERE member = r.oid))"
+            f" FROM pg_roles r WHERE rolname = '{STACK_VALUES['BACKUP_POSTGRES_USER']}'",
+            "--tuples-only",
+            "--no-align",
+        )
+        role = succeeded(described).stdout.decode()
+        assert role.strip(), "le rôle de sauvegarde est absent"
+        return role
+
+    def probe(self, password: str | None = None) -> subprocess.CompletedProcess[bytes]:
+        """La sonde de `backup` du Compose de production, exécutée dans son conteneur — sous un
+        autre mot de passe que le sien, si `password` en donne un."""
+        options = ["-e", f"PGPASSWORD={password}"] if password else []
+        return self.compose("exec", "-T", *options, "backup", *production_probe())
 
     def backup(self, **overrides: str) -> Run:
         """Lance la chaîne dans le conteneur `backup`, comme on le ferait à la main.
@@ -141,16 +207,22 @@ class Stack:
             ' && age --decrypt --identity /tmp/identity "$0"',
             f"{S3_ROOT}/{bucket}/{name}",
         )
-        decrypted.check_returncode()
         listing = self.compose(
-            "exec", "-T", "postgres", "pg_restore", "--list", stdin=decrypted.stdout
+            "exec", "-T", "postgres", "pg_restore", "--list", stdin=succeeded(decrypted).stdout
         )
-        listing.check_returncode()
-        return listing.stdout.decode()
+        return succeeded(listing).stdout.decode()
 
     def leftovers(self) -> list[str]:
         """Ce qui reste dans le dossier des fichiers de travail du conteneur `backup`."""
         return self.output("exec", "-T", "backup", "ls", "-A", "/tmp").split()
+
+
+def succeeded(
+    completed: subprocess.CompletedProcess[bytes],
+) -> subprocess.CompletedProcess[bytes]:
+    """`completed`, qui doit avoir réussi : sinon, sa sortie d'erreur fait le message d'échec."""
+    assert completed.returncode == 0, completed.stderr.decode()
+    return completed
 
 
 def environment_options(variables: Mapping[str, str]) -> list[str]:
@@ -204,22 +276,12 @@ def stack() -> Iterator[Stack]:
     started = Stack(environment, identity)
     try:
         # Dans le `try` : un démarrage raté laisse un réseau et des conteneurs créés. Les services
-        # nommés seulement : le reste du Compose de production ne démarre pas ici.
+        # nommés seulement : le reste du Compose de production ne démarre pas ici. L'ordre de
+        # `bootstrap.sh` : la sonde de `backup` ouvre une session sous son rôle.
+        started.output("up", "--detach", "--wait", "postgres")
+        started.apply_backup_role(STACK_VALUES["BACKUP_POSTGRES_PASSWORD"])
         started.output("up", "--detach", "--wait", "backup")
-        started.output(
-            "exec",
-            "-T",
-            "postgres",
-            "psql",
-            "-v",
-            "ON_ERROR_STOP=1",
-            "-U",
-            MODEL["POSTGRES_USER"],
-            "-d",
-            DATABASE,
-            "-c",
-            f"CREATE TABLE {WITNESS_TABLE} (id integer)",
-        )
+        succeeded(started.as_owner(f"CREATE TABLE {WITNESS_TABLE} (id integer)"))
         yield started
     finally:
         started.compose("down", "--volumes")
@@ -265,10 +327,71 @@ def test_la_sonde_de_production_ne_dit_sain_que_le_role_qui_ouvre_une_session(
     """Le déploiement attend `backup` sain (`up --wait`) : sain quand son rôle ouvre une session sur
     la base, malade quand il ne le peut pas (décision 10). Une sonde qui ne s'authentifie pas — un
     `pg_isready` — dirait sain un conteneur qui ne sauvegardera jamais rien."""
-    options = ["-e", f"PGPASSWORD={password}"] if password else []
-    probed = stack.compose("exec", "-T", *options, "backup", *production_probe())
+    probed = stack.probe(password)
 
     assert (probed.returncode == 0) is healthy, probed.stderr
+
+
+# Les sept écritures que la décision 3 refuse au rôle de sauvegarde, sur une table de l'application.
+WRITES = {
+    "insert": f"INSERT INTO {WITNESS_TABLE} VALUES (1)",
+    "update": f"UPDATE {WITNESS_TABLE} SET id = 2",
+    "delete": f"DELETE FROM {WITNESS_TABLE}",
+    "truncate": f"TRUNCATE {WITNESS_TABLE}",
+    "create-table": "CREATE TABLE intrus (id integer)",
+    "drop-table": f"DROP TABLE {WITNESS_TABLE}",
+    "create-role": "CREATE ROLE intrus",
+}
+
+# Le code SQLSTATE d'un défaut de droit, `insufficient_privilege` (doc PostgreSQL 16, annexe A
+# « PostgreSQL Error Codes ») : un refus pour une autre cause — syntaxe, objet absent — n'en est pas
+# un.
+INSUFFICIENT_PRIVILEGE = "42501"
+
+
+def in_cancelled_transaction(statement: str) -> str:
+    """`statement` dans une transaction annulée : qu'il réussisse ou non, la base n'en garde rien."""
+    return f"BEGIN;\n{statement};\nROLLBACK;\n"
+
+
+@pytest.mark.parametrize("statement", WRITES.values(), ids=WRITES.keys())
+def test_le_role_cree_par_bootstrap_se_voit_refuser_chaque_ecriture(
+    stack: Stack, statement: str
+) -> None:
+    """Le rôle que crée la SQL de `bootstrap.sh` lit tout et n'écrit rien (décision 3) : chaque
+    écriture lui est refusée faute de droit. Qu'il prenne un dump complet, la chaîne réussie le
+    montre (`test_une_sauvegarde_reussie_laisse_un_objet_chiffre_lisible_et_un_seul_ping`)."""
+    refused = stack.psql("backup", in_cancelled_transaction(statement))
+
+    assert refused.returncode != 0
+    assert INSUFFICIENT_PRIVILEGE in refused.stderr.decode(), refused.stderr
+
+
+@pytest.mark.parametrize("statement", WRITES.values(), ids=WRITES.keys())
+def test_chaque_ecriture_refusee_au_role_passe_sous_le_proprietaire(
+    stack: Stack, statement: str
+) -> None:
+    """Le témoin du test précédent : la même écriture réussit sous le propriétaire de la base — le
+    refus vient du rôle, pas de l'instruction."""
+    applied = stack.as_owner(in_cancelled_transaction(statement))
+
+    assert applied.returncode == 0, applied.stderr
+
+
+def test_rejouee_la_sql_du_role_ne_change_que_son_mot_de_passe(stack: Stack) -> None:
+    """`bootstrap.sh` joue la SQL du rôle à chaque passage, et c'est ainsi qu'il en renouvelle le mot
+    de passe (décision 3) : rejouée, elle ne recrée pas le rôle et ne touche ni à ses attributs ni à
+    ses appartenances ; l'ancien mot de passe n'ouvre plus de session, le nouveau si."""
+    before = stack.backup_role()
+    renewed = secrets.token_hex(16)
+    try:
+        stack.apply_backup_role(renewed)
+
+        assert stack.backup_role() == before
+        assert stack.probe(STACK_VALUES["BACKUP_POSTGRES_PASSWORD"]).returncode != 0
+        assert stack.probe(renewed).returncode == 0
+    finally:
+        stack.apply_backup_role(STACK_VALUES["BACKUP_POSTGRES_PASSWORD"])
 
 
 # Étape → ce qui la fait échouer, le temps d'une exécution : un mot de passe que la base refuse, un
