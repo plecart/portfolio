@@ -7,6 +7,9 @@
  */
 import { expect, type Page } from '@playwright/test'
 
+/** La largeur de référence du bureau : la table sans cellule y laisse la colonne (spec §3.4). */
+export const COLUMN_VIEWPORT = { width: 1280, height: 800 }
+
 /** La forme des liens, lue sur leur boîte : fixe en colonne, dans le flux en pied de page. */
 export async function expectPlacement(page: Page, placement: 'column' | 'footer') {
   await expect(page.getByRole('contentinfo')).toHaveCSS(

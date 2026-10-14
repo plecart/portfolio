@@ -14,7 +14,7 @@
  * attribut `data-table-cell`, `hidden`, `style` ou `class` changé (`useAuthorLinksPlacement`).
  * Restent à la charge de la table : une taille changée par une feuille sans mutation du DOM, et
  * une transformation posée sur un **ancêtre** de la cellule, que la mesure suit comme la sienne.
- * Dénombrement des voies : `e2e/author-links.spec.ts`.
+ * Dénombrement des voies : `e2e/author-links-measure.spec.ts`.
  */
 export const TABLE_CELL_SELECTOR = '[data-table-cell]'
 
