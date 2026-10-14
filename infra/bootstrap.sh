@@ -182,7 +182,9 @@ login_registry() {
 }
 
 # Une nouvelle valeur pour une variable du modèle : engendrée, reprise du modèle, ou saisie — sans
-# écho pour un secret, vérifiée pour l'étiquette des images.
+# écho pour un secret, vérifiée pour l'étiquette des images. Un secret se reconnaît à son nom, ou
+# se nomme ici quand son nom ne le dit pas : l'adresse de ping de `backup`, avec laquelle n'importe
+# qui signale une sauvegarde réussie (brief de #23, décision 9).
 new_value() {
 	local name=$1 value
 	if contains "$name" "${GENERATED[@]}"; then
@@ -194,7 +196,7 @@ new_value() {
 		return
 	fi
 	case $name in
-	*TOKEN* | *SECRET* | *PASSWORD* | *KEY*)
+	*TOKEN* | *SECRET* | *PASSWORD* | *KEY* | BACKUP_PING_URL)
 		read -r -s -p "$name (sans écho) : " value
 		echo >&2
 		;;
