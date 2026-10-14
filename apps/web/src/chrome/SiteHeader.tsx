@@ -14,10 +14,11 @@ const HEADER_CLASSES = [
   'data-detached:[box-shadow:0_1px_0_var(--line)]',
   // Sortie et retour en 240 ms, fond et filet en 150 ms (§2.7).
   '[transition:translate_var(--dur)_var(--ease-out),opacity_var(--dur-fast)_var(--ease-out),background-color_var(--dur-fast)_var(--ease-out),box-shadow_var(--dur-fast)_var(--ease-out)]',
-  // Sortie par le haut ; en mouvement réduit, fondu sans translation (§6.3). Le focus la retient.
-  'motion-safe:data-hidden:not-focus-within:-translate-y-full',
-  'motion-reduce:data-hidden:not-focus-within:pointer-events-none',
-  'motion-reduce:data-hidden:not-focus-within:opacity-0',
+  // Sortie par le haut ; en mouvement réduit, fondu sans translation (§6.3). Le focus clavier la
+  // retient, pas un focus posé au pointeur (§3.3).
+  'motion-safe:data-hidden:not-has-focus-visible:-translate-y-full',
+  'motion-reduce:data-hidden:not-has-focus-visible:pointer-events-none',
+  'motion-reduce:data-hidden:not-has-focus-visible:opacity-0',
 ].join(' ')
 
 /**
