@@ -91,6 +91,12 @@ SHAPE_REFUSALS = [
 LANDSCAPE = (1600, MIN_SIDE)
 
 
+def with_rows(count: int) -> dict[str, object]:
+    """Le formulaire de gestion d'une galerie de `count` lignes : l'écran d'ajout n'en montre
+    qu'une, le bouton « Ajouter » de l'admin en ajoute d'autres."""
+    return {f"{GALLERY}-TOTAL_FORMS": count}
+
+
 def messages(form: BaseForm) -> list[str]:
     """Tous les refus qu'une ligne affiche, sous ses champs ou en tête."""
     return [str(message) for errors in form.errors.values() for message in errors]
@@ -126,6 +132,20 @@ def test_l_ecran_projet_montre_la_galerie_en_tableau_ordonnable(admin_client: Cl
     assert HANDLE_CLASS in group(response.content.decode(), GALLERY)
     for asset in (IMAGE_PREVIEW_STYLE, INLINE_ROWS_SCRIPT, INLINE_ROWS_STYLE):
         assert static(asset) in str(gallery.media)
+
+
+@pytest.mark.django_db
+def test_l_ecran_d_ajout_ne_montre_qu_une_ligne_de_galerie(admin_client: Client) -> None:
+    """À l'ajout, la ligne obligatoire est la seule, vide (arrêt visuel du 2026-10-14) ; un projet
+    enregistré montre ses images et une ligne neuve en plus."""
+    portfolio = saved_project(saved(technology(name="Django")))
+    change = reverse("admin:content_project_change", args=[portfolio.pk])
+
+    added = inline_group(admin_client.get(reverse("admin:content_project_add")), GALLERY)
+    changed = inline_group(admin_client.get(change), GALLERY)
+
+    assert len(added.formset.forms) == 1
+    assert len(changed.formset.forms) == 2
 
 
 @pytest.mark.django_db
@@ -260,6 +280,7 @@ def test_une_image_libre_a_la_seconde_place_est_acceptee(admin_client: Client) -
         **line(0, saved(technology(name="Django")), 1),
         **image_row(GALLERY, 0, position=1),
         **image_row(GALLERY, 1, original=image_upload(size=LANDSCAPE), position=2),
+        **with_rows(2),
     )
 
     response = admin_client.post(reverse("admin:content_project_add"), data)
@@ -327,6 +348,7 @@ def test_sans_le_script_la_premiere_ligne_du_formulaire_est_la_couverture(
         **line(0, saved(technology(name="Django")), 1),
         **image_row(GALLERY, 0, original=image_upload(size=LANDSCAPE), position=""),
         **image_row(GALLERY, 1, position=""),
+        **with_rows(2),
     )
 
     response = admin_client.post(reverse("admin:content_project_add"), data)
@@ -339,7 +361,7 @@ def test_sans_le_script_la_premiere_ligne_du_formulaire_est_la_couverture(
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     "placed_ahead",
-    [{}, {f"{GALLERY}-0-DELETE": "on", f"{GALLERY}-TOTAL_FORMS": 3}],
+    [{}, {f"{GALLERY}-0-DELETE": "on", **with_rows(3)}],
     ids=["après les lignes enregistrées", "après une ligne neuve placée"],
 )
 def test_une_ligne_neuve_sans_position_n_est_pas_jugee_couverture(
@@ -506,6 +528,7 @@ def test_une_ligne_de_galerie_neuve_laissee_vide_n_enregistre_rien(admin_client:
         admin_client,
         **line(0, saved(technology(name="Django")), 1),
         **{f"{GALLERY}-1-position": 2},
+        **with_rows(2),
     )
 
     response = admin_client.post(reverse("admin:content_project_add"), data)
