@@ -14,6 +14,10 @@ from factories import image_upload, project, saved
 BEFORE = [("content", "0005_cover_galleryimage")]
 AFTER = [("content", "0006_cover_to_gallery")]
 
+# Les variantes d'une couverture déjà traitée : ni l'état ni elles ne sont les valeurs par défaut
+# d'une image, qu'une recopie oubliée rendrait aussi.
+READY_VARIANTS = [{"name": "images/couverture/w600.webp", "width": 600, "height": 600}]
+
 
 def migrate(targets: list[tuple[str, str]]) -> Any:
     """Migre la base de test vers `targets`, et rend les modèles historiques de cet état."""
@@ -31,9 +35,9 @@ def image_fields(**fields: object) -> dict[str, object]:
 def test_la_migration_fait_de_chaque_couverture_la_premiere_image_de_sa_galerie() -> None:
     """La couverture passe en tête, les images de la galerie reculent d'une place — même celle
     qui tenait la place 0, que la couverture prend : à place égale, l'ordre de saisie la mettrait
-    devant. Même fichier, mêmes dimensions, même légende, même état ; le fichier reste dans le
-    stockage, qu'aucune suppression n'atteint. Le projet ne change pas entre les deux états : la
-    fabrique l'écrit."""
+    devant. Même fichier, mêmes dimensions, même légende, même état, mêmes variantes ; le fichier
+    reste dans le stockage, qu'aucune suppression n'atteint. Le projet ne change pas entre les
+    deux états : la fabrique l'écrit."""
     before = migrate(BEFORE)
     portfolio = saved(project())
     stored = default_storage.save(
@@ -46,6 +50,8 @@ def test_la_migration_fait_de_chaque_couverture_la_premiere_image_de_sa_galerie(
             width=1200,
             height=1200,
             caption="La table des projets.",
+            state="ready",
+            variants=READY_VARIANTS,
         )
     )
     before.get_model("content", "GalleryImage").objects.create(
@@ -63,11 +69,11 @@ def test_la_migration_fait_de_chaque_couverture_la_premiere_image_de_sa_galerie(
 
     gallery = after.get_model("content", "GalleryImage").objects.filter(project_id=portfolio.pk)
     assert [
-        (image.caption, image.original.name, image.width, image.height, image.state)
+        (image.caption, image.original.name, image.width, image.height, image.state, image.variants)
         for image in gallery.order_by("position", "id")
     ] == [
-        ("La table des projets.", stored, 1200, 1200, "pending"),
-        ("La fiche.", "images/fiche/original.png", 800, 600, "pending"),
+        ("La table des projets.", stored, 1200, 1200, "ready", READY_VARIANTS),
+        ("La fiche.", "images/fiche/original.png", 800, 600, "pending", []),
     ]
     assert default_storage.exists(stored)
     with pytest.raises(LookupError):
