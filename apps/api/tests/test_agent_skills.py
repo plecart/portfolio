@@ -1127,3 +1127,38 @@ def test_une_regle_de_porte_d_avis_ne_relance_ni_ne_retire_ce_dont_elle_depend(
     absents = [exige for exige in exiges if exige not in passage]
     assert not presents, f"`{fichier}` prescrit encore {presents} : {passage!r}"
     assert not absents, f"`{fichier}` ne dit plus {absents} : {passage!r}"
+
+
+# --- Ce que `cycle-pr` renvoie au go du briefing est annoncé à l'Étape 1 (#77, lot 4c) ----------
+
+CYCLE_PR = REPOSITORY_ROOT / ".claude/skills/cycle-pr/SKILL.md"
+
+# Chaque question qu'une étape **ultérieure** dit « demandée au go du briefing », et le mot que
+# l'Étape 1 doit porter pour qu'un agent qui suit le skill dans l'ordre la pose à ce moment-là —
+# une exception placée après l'étape qui agit n'est jamais appliquée (obs 30). Dénombré le
+# 2026-10-14 avant le correctif, relecture de la PR #89, passe 2 : `go du briefing` apparaît
+# 2 fois dans `cycle-pr`, l'une à l'Étape 1 (la règle des `[V]` groupées), l'autre à l'Étape 7
+# (l'accord pour le vérificateur hors vague) — 1 renvoi hors de l'Étape 1, 1 fuyait.
+QUESTIONS_DU_GO = {"accord pour le vérificateur hors vague": "verificateur"}
+
+
+def etape_1() -> str:
+    """Le texte de l'Étape 1 de `cycle-pr`, de son titre à celui de l'Étape 2."""
+    texte = CYCLE_PR.read_text(encoding="utf-8")
+    return texte[texte.index("## Étape 1 ") : texte.index("## Étape 2 ")]
+
+
+@pytest.mark.parametrize("mot", QUESTIONS_DU_GO.values(), ids=QUESTIONS_DU_GO.keys())
+def test_une_question_renvoyee_au_go_du_briefing_est_nommee_a_l_etape_1(mot: str) -> None:
+    """Sans elle, la question part à l'étape qui la cite : 6 h 37 d'absence au lot 4b de #77,
+    posée à l'Étape 7, à un moment où il ne restait rien d'indépendant à faire."""
+    assert mot in etape_1()
+
+
+def test_chaque_renvoi_au_go_du_briefing_a_sa_question_dans_le_recueil() -> None:
+    """L'autre sens : un renvoi au go ajouté hors de l'Étape 1 fait rougir ici tant qu'il n'est
+    pas inscrit au recueil — donc nommé à l'Étape 1."""
+    texte = CYCLE_PR.read_text(encoding="utf-8")
+    hors_etape_1 = texte.count("go du briefing") - etape_1().count("go du briefing")
+
+    assert hors_etape_1 == len(QUESTIONS_DU_GO)

@@ -78,7 +78,8 @@ Produire un briefing écrit AVANT de créer la branche :
 - **Questions résiduelles** — découpage, format des données, transitions d'état, comportements,
   edge cases — **chacune avec sa voie** (`contraintes.md`, règle d'or) : une `[T]` se tranche
   ici même, avec sa source, et rejoint les décisions verrouillées ; les `[V]` se posent toutes
-  ensemble, au go du briefing ; une `[C]` arrête.
+  ensemble, au go du briefing — hors vague, l'accord pour lancer soi-même le `verificateur`
+  d'avant-go (Étape 7) en fait partie ; une `[C]` arrête.
 
 Lever les incertitudes **maintenant** : une `[V]` découverte après cinq commits coûte une
 demi-journée d'attente ; une `[T]` ne se pose jamais, elle se décide — la plupart appellent la
