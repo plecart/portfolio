@@ -1,6 +1,6 @@
 # Image `backup` : la sauvegarde nocturne de Postgres (ADR 0007, D42) — `pg_dump`, `age`, `rclone`
 # et `curl`, ordonnancés par `supercronic`, sous un utilisateur sans privilège. La chaîne elle-même
-# est `backup.sh`, son horaire `crontab`.
+# est `backup.sh`, sa rétention `retention.sh`, son horaire `crontab`.
 #
 # Contexte de build : la racine du dépôt, comme pour les autres images (ADR 0014).
 #
@@ -44,7 +44,7 @@ ADD --checksum=sha256:a53ae236602c7338aba3fbaff40bda6300eae3b9fedb8261eb06cfe372
     https://github.com/aptible/supercronic/releases/download/v0.2.49/supercronic-linux-amd64 \
     /usr/local/bin/supercronic
 
-COPY --chmod=755 infra/backup/backup.sh /usr/local/bin/backup.sh
+COPY --chmod=755 infra/backup/backup.sh infra/backup/retention.sh /usr/local/bin/
 COPY infra/backup/crontab /etc/crontab
 
 # Utilisateur système, sans mot de passe ni dossier personnel : la chaîne n'écrit que ses fichiers
