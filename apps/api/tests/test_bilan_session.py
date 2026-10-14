@@ -949,9 +949,10 @@ def test_une_absence_reste_une_absence_quand_un_sous_agent_y_travaille(tmp_path:
 
     **Cas synthétique**, et la forme réelle est plus étroite : une reprise passe par un
     `SendMessage`, donc un tour de la session, qui coupe l'attente — une fenêtre de sous-agent ne
-    recouvre une attente qu'à partir de son début (agent lancé juste avant une absence). Le
-    défaut y vit pareil : une absence de 1 h 05 dont un agent ronge les 10 premières minutes
-    passait en réactivité. Le montage le pousse à l'extrême pour que les deux classements
+    recouvre une attente qu'à partir de son début (agent lancé juste avant une absence), et
+    seulement si sa fin ne réveille pas la session — agent mort, ou contact repris sans
+    notification `completed` de son lancement. Le défaut y vit pareil, **non observé** : une
+    absence de 1 h 05 dont un tel agent ronge les 10 premières minutes passait en réactivité. Le montage le pousse à l'extrême pour que les deux classements
     divergent sans ambiguïté."""
     session = write_transcript(tmp_path / "session.jsonl", TIMELINE)
     write_subagent(session, "agent-a1", RELECTEUR, RELECTEUR_META)
