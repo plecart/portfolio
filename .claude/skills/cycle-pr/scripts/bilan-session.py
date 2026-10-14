@@ -445,8 +445,9 @@ def launched_subagents(
     """Tous les sous-agents et workflows **lancés**, par ordre de lancement.
 
     Distinct de `agent_runs`, qui ne garde que ceux dont la notification de fin est arrivée :
-    un agent encore en cours, ou mort sans notifier, n'a pas de fenêtre et serait écarté sans
-    laisser de trace. Le rapport compare les deux dénombrements pour que l'écart se voie.
+    un agent au premier plan n'en émet aucune, et un agent mort sans notifier serait écarté sans
+    laisser de trace. Le rapport compte les lancements ici, et les rapproche des notifications
+    et des transcripts pour que l'écart se voie.
     """
     launches = {
         uid: (name, event.when)
@@ -460,28 +461,13 @@ def launched_subagents(
     return sorted(launches.items(), key=lambda item: item[1][1])
 
 
-def subagent_windows(events: Sequence[Event], calls: Sequence[ToolCall]) -> list[Interval]:
-    """Les fenêtres pendant lesquelles un sous-agent ou un workflow tournait, fusionnées."""
-    return union([run.window for run in agent_runs(events, calls)])
-
-
-def blocked_windows(
-    events: Sequence[Event],
-    calls: Sequence[ToolCall],
-    busy: Sequence[Interval] | None = None,
-) -> list[Interval]:
-    """Les attentes du mainteneur, moins le temps des sous-agents (`busy`, par défaut les
-    fenêtres des notifications).
-
-    Le retrait est le cœur d'obs 41 : sans lui, une session à relectures parallèles facture au
-    mainteneur le temps de ses sous-agents, et le chiffre cache précisément le gain que ces
-    relectures produisent.
-    """
-    return without(waits(events, calls), subagent_windows(events, calls) if busy is None else busy)
-
-
 def waits(events: Sequence[Event], calls: Sequence[ToolCall]) -> list[Interval]:
-    """Dernière sortie de l'agent → message humain suivant, et les questions formelles, fusionnées."""
+    """Dernière sortie de l'agent → message humain suivant, et les questions formelles, fusionnées.
+
+    Brutes : le temps des sous-agents s'en retire dans `measure`, **après** leur classement —
+    le retrait est le cœur d'obs 41, sans lui une session à relectures parallèles facture au
+    mainteneur le temps de ses sous-agents.
+    """
     windows: list[Interval] = []
     last_agent: datetime | None = None
     for event in events:
@@ -592,16 +578,16 @@ class Measures:
     absences: list[Interval]
     windows: list[Interval]
     alone: timedelta
-    runs: list[AgentRun]
+    launched: list[str]
     dangling: int
     calls: list[ToolCall]
     kinds: Counter[str]
     questions: int
 
     @property
-    def workflows(self) -> list[AgentRun]:
-        """Les seuls sous-agents lancés par l'outil `Workflow`."""
-        return [run for run in self.runs if run.tool == WORKFLOW_TOOL]
+    def workflows(self) -> int:
+        """Combien de lancements sont des `Workflow` — notifiés ou non."""
+        return self.launched.count(WORKFLOW_TOOL)
 
     @property
     def active(self) -> timedelta:
@@ -641,6 +627,7 @@ def measure(events: Sequence[Event], agents: Sequence[Subagent] = ()) -> Measure
         [run.window for run in runs] + [c.window for agent in agents for c in agent.contacts]
     )
     seen = {run.uid for run in runs} | {agent.launcher for agent in agents}
+    launched = launched_subagents(events, calls)
     # Une attente se classe sur sa durée **brute**, puis perd le temps des sous-agents : retiré
     # d'abord, un sous-agent au milieu d'une absence la coupait en morceaux de moins d'une heure,
     # reclassés en réactivité (`test_une_absence_reste_une_absence_quand_un_sous_agent_y_travaille`).
@@ -660,8 +647,8 @@ def measure(events: Sequence[Event], agents: Sequence[Subagent] = ()) -> Measure
         absences=absences,
         windows=windows,
         alone=span - total(union(list(blocked) + list(windows))),
-        runs=runs,
-        dangling=sum(1 for uid, _ in launched_subagents(events, calls) if uid not in seen),
+        launched=[tool for _, (tool, _) in launched],
+        dangling=sum(1 for uid, _ in launched if uid not in seen),
         calls=calls,
         kinds=Counter(event.kind for event in events),
         questions=sum(1 for call in calls if call.name == QUESTION_TOOL),
@@ -732,7 +719,7 @@ def report(events: Sequence[Event], session: Usage, agents: Sequence[Subagent]) 
             "sous-agents en cours",
             total(m.windows),
             m.active,
-            f"(workflows {len(m.workflows)} / {len(m.runs)})",
+            f"({len(m.launched)} lancés, dont {m.workflows} workflows)",
         ),
         row("agent seul", m.alone, m.active),
         row(
@@ -740,7 +727,7 @@ def report(events: Sequence[Event], session: Usage, agents: Sequence[Subagent]) 
         ),
         row("attente totale", total(m.blocked), m.span),
         *(
-            [f"sous-agents sans transcript ni notification de fin : {m.dangling}"]
+            [f"sous-agents sans notification de fin ni transcript rattaché : {m.dangling}"]
             if m.dangling
             else []
         ),

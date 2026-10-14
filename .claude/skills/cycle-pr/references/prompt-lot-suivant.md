@@ -80,8 +80,9 @@ Tu **reprends** le lot \<k>/\<n> de l'issue #\<N> en relais de la session `\<uui
 contexte s'est rempli à l'Étape \<x> de `cycle-pr`. La PR #\<M> est ouverte (\<draft | ready>),
 tête `\<SHA complet>` ; reprends à \<l'étape et au commit qui suivent>.
 
-Bilan de la session sortante, déposé : `retrospectives/\<date>-\<issue>-relais-\<k>.txt` — ce
-qu'en fait ton Étape 8 : `cycle-pr` Étape 8, « Bilan chiffré du cycle ».
+Bilan de la session sortante, déposé hors du dépôt :
+`retrospectives/\<date>-\<issue>-relais-\<k>.txt` (dossier voisin du journal, chemin dans
+`CLAUDE.md`) — ce qu'en fait ton Étape 8 : `cycle-pr` Étape 8, « Bilan chiffré du cycle ».
 
 Entrées du journal d'observations déjà écrites pour ce cycle : \<numéros | aucune> — plafond :
 `CLAUDE.md`, « Observation continue ».
