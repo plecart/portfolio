@@ -394,16 +394,22 @@ def classify(role: str, blocks: list[dict[str, Any]]) -> str:
     chargement de skill, commande, notification — est dans le rôle `user` sans qu'un humain
     l'ait tapé. Une balise de contexte **suivie** d'un texte reste un message du mainteneur :
     c'est lui qui a tapé ce qui dépasse la balise.
+
+    Un texte injecté se reconnaît à son **début**, donc avant toute recherche de balise de pair :
+    le texte d'un skill peut citer `<cross-session-message>`, et cette citation classait son
+    chargement `peer` (40 messages au recensement de `FORMES_REELLES`).
     """
     if role == "assistant":
         return "assistant"
     if any(block.get("type") == "tool_result" for block in blocks):
         return "tool_result"
     text = "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
+    stripped = SYSTEM_REMINDER.sub("", text).strip()
+    if not stripped or stripped.startswith(INJECTED):
+        return "system"
     if any(tag in text for tag in PEER_TAGS):
         return "peer"
-    stripped = SYSTEM_REMINDER.sub("", text).strip()
-    if not stripped or stripped.startswith(INJECTED) or INJECTED_BLOCKS.match(stripped):
+    if INJECTED_BLOCKS.match(stripped):
         return "system"
     return "human"
 

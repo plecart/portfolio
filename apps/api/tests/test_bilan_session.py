@@ -327,42 +327,59 @@ def test_un_sous_agent_sans_notification_de_fin_est_denombre(tmp_path: Path) -> 
 # --- Ce que la passe 2 a trouvé (2026-10-09) ---------------------------------------------------
 
 
-# Le recueil des formes réelles, avec sa **population** : les 87 transcripts du projet au
-# 2026-10-10 à 09 h (`~/.claude/projects/*ortfolio*/*.jsonl`), soit **1137 messages de rôle
+# Le recueil des formes réelles, avec sa **population** : les 80 transcripts du projet au
+# 2026-10-14 à 14:08 UTC (`~/.claude/projects/*ortfolio*/*.jsonl`), soit **1083 messages de rôle
 # `user` hors résultat d'outil**.
 #
 # **Cette population est vivante** : les sessions en écrivent, et le harnais fait tourner les
-# transcripts. Re-mesurée une heure plus tard le même jour, elle valait 85 transcripts et 1106
-# messages. Les nombres ci-dessous sont donc un relevé **daté**, qu'un nouveau recensement ne
-# reproduira pas — et ce n'est pas eux que la suite assère. Ce qu'elle assère est l'**invariant** :
-# les 16 formes couvrent la population sans résidu, leur somme et leurs classes se répondent. Une
-# famille neuve ne peut donc pas entrer sans que la population soit re-mesurée avec elle.
+# transcripts. Le 2026-10-10, elle valait 87 transcripts et 1137 messages à 09 h, puis 85 et 1106
+# une heure plus tard. Les nombres ci-dessous sont donc un relevé **daté**, qu'un nouveau
+# recensement ne reproduira pas — et ce n'est pas eux que la suite assère. Ce qu'elle assère est
+# l'**invariant** : les 17 formes couvrent la population sans résidu, leur somme et leurs classes
+# se répondent. Une famille neuve ne peut donc pas entrer sans que la population soit re-mesurée
+# avec elle.
 #
 # Deux dénombrements ont déjà menti ici. La classe « pair » avait été fermée sur la seule forme
-# qui l'avait révélée (`<cross-session-message`), alors que 48 messages portent `<agent-message`.
-# Puis la règle de forme a classé `system` **10 messages humains** : le harnais préfixe le texte
-# du mainteneur d'une balise de contexte au lieu de l'injecter seule, et une balise *en tête*
-# suffisait à classer. Les deux fois, le correctif a été déclaré clos sur la seule famille qui
-# l'avait révélé ; les deux fois, la relecture suivante en a trouvé une autre. D'où la forme de
-# ce recueil : **les 7 familles qui apparaissent en tête y sont, pas les 3 qui ont servi de
-# preuve**. Il y en a **9 en comptant toutes les positions** : `<command-args>` (23 messages) et
-# `<skill-format>` (7) n'arrivent **jamais** en tête, toujours à la suite d'un autre bloc — c'est
+# qui l'avait révélée (`<cross-session-message`), alors que 48 messages portaient
+# `<agent-message`. Puis la règle de forme a classé `system` **10 messages humains** : le harnais
+# préfixe le texte du mainteneur d'une balise de contexte au lieu de l'injecter seule, et une
+# balise *en tête* suffisait à classer. Les deux fois, le correctif a été déclaré clos sur la
+# seule famille qui l'avait révélé ; les deux fois, la relecture suivante en a trouvé une autre.
+# D'où la forme de ce recueil : **les 6 familles qui apparaissent en tête y sont**, plus la
+# balise à attributs, et les trois formes de commande sont recopiées du relevé du 2026-10-14. Il
+# y en a **8 en comptant toutes les positions** : `<command-args>` (23 messages) et
+# `<skill-format>` (6) n'arrivent **jamais** en tête, toujours à la suite d'un autre bloc — c'est
 # précisément ce que la règle de tête ne pouvait pas voir, et ce que le `+` du motif couvre.
 FORMES_REELLES = {
-    # Les 7 familles de balises. Un message n'est injecté que s'il n'est *rien d'autre* que des
-    # blocs équilibrés : les deux familles de contexte IDE portent un texte humain après leur
-    # bloc, et ce texte est de la main du mainteneur.
+    # Les 6 familles de balises. Un message n'est injecté que s'il n'est *rien d'autre* que des
+    # blocs équilibrés : la famille de contexte IDE porte un texte humain après son bloc, et ce
+    # texte est de la main du mainteneur.
     "notification de fin de tâche": (
         "<task-notification><status>completed</status></task-notification>",
         "system",
-        86,
+        79,
     ),
-    "message d'une commande locale": (
-        "<command-message>cycle-pr is running…</command-message>",
+    "skill tapé par le mainteneur": (
+        "<command-message>i-have-adhd</command-message>\n<command-name>/i-have-adhd</command-name>",
         "system",
-        37,
+        27,
     ),
-    "nom d'une commande locale": ("<command-name>cycle-pr</command-name>", "system", 13),
+    "commande locale tapée par le mainteneur": (
+        (
+            "<command-name>/model</command-name>\n            <command-message>model"
+            "</command-message>\n            <command-args></command-args>"
+        ),
+        "system",
+        13,
+    ),
+    "skill lancé par l'agent": (
+        (
+            "<command-message>workflow-authoring</command-message>\n<command-name>"
+            "workflow-authoring</command-name>\n<skill-format>true</skill-format>"
+        ),
+        "system",
+        6,
+    ),
     "mise en garde d'une commande locale": (
         (
             "<local-command-caveat>Caveat: The messages below were generated by the "
@@ -382,15 +399,7 @@ FORMES_REELLES = {
             " IDE.</ide_opened_file>oui go"
         ),
         "human",
-        9,
-    ),
-    "sélection dans l'éditeur, puis le texte du mainteneur": (
-        (
-            "<ide_selection>The user selected the lines 140 to 140 from e:\\x.md"
-            "</ide_selection>On a donc un ADR et un system design défini."
-        ),
-        "human",
-        1,
+        6,
     ),
     # La balise **à attributs** : elle n'est pas du harnais, c'est un collage du mainteneur. Elle
     # borne la règle de forme par le haut — un nom suivi d'un attribut n'est pas une injection.
@@ -403,18 +412,30 @@ FORMES_REELLES = {
     "chargement d'un skill": (
         "Base directory for this skill: E:\\Projets\\Portfolio\\.claude\\skills\\x",
         "system",
-        179,
+        169,
     ),
-    "interruption par le mainteneur": ("[Request interrupted by user]", "system", 33),
+    # Le texte d'un skill peut citer une balise de pair — `cycle-pr` le fait pour décrire une
+    # vague. Classé `peer` sur cette seule citation, son chargement comptait un contact de pair
+    # de plus.
+    "chargement d'un skill qui cite une balise de pair": (
+        (
+            "Base directory for this skill: E:\\Projets\\Portfolio\\.claude\\skills\\cycle-pr\n\n"
+            "**Vague parallèle.** Si le prompt de démarrage de cette session est arrivé dans un"
+            " bloc `<cross-session-message>`, la session émettrice est le **lead**"
+        ),
+        "system",
+        40,
+    ),
+    "interruption par le mainteneur": ("[Request interrupted by user]", "system", 32),
     "avis d'inactivité d'une session voisine": (
         '[Cross-session idle notice] "uds:\\\\.\\pipe\\LOCAL" est au repos',
         "system",
-        22,
+        23,
     ),
     "référence d'écriture de workflow": (
         "# Workflow authoring reference\n\nA workflow structures work…",
         "system",
-        9,
+        6,
     ),
     "reprise d'une conversation compactée": (
         "This session is being continued from a previous conversation that ran out of context",
@@ -426,20 +447,20 @@ FORMES_REELLES = {
     "message de pair, balise historique": (
         "Another Claude session sent a message:\n<cross-session-message from='lead'>",
         "peer",
-        233,
+        185,
     ),
     "message de pair, balise actuelle": (
         "Another Claude session sent a message:\n<agent-message from='relecteur'>",
         "peer",
-        48,
+        50,
     ),
     # Et la prose du mainteneur, qui ne commence par rien de tout cela.
-    "prose du mainteneur": ("Quelles sont les bonnes pratiques pour cela ?", "human", 434),
+    "prose du mainteneur": ("Quelles sont les bonnes pratiques pour cela ?", "human", 414),
 }
 
-# Le recensement du 2026-10-10, que le recueil doit couvrir sans résidu.
-POPULATION = 1137
-PAR_CLASSE = {"human": 456, "system": 400, "peer": 281}
+# Le recensement du 2026-10-14 à 14:08 UTC, que le recueil doit couvrir sans résidu.
+POPULATION = 1083
+PAR_CLASSE = {"human": 432, "system": 416, "peer": 235}
 
 
 @pytest.mark.parametrize(
@@ -455,7 +476,7 @@ def test_chaque_forme_reelle_tombe_dans_sa_classe(text: str, expected: str, seen
     Args:
         text: la forme, telle qu'elle arrive dans un message réel.
         expected: la classe attendue.
-        seen: ses occurrences au recensement du 2026-10-10.
+        seen: ses occurrences au recensement du 2026-10-14.
     """
     assert seen > 0, "une forme recensée zéro fois n'a rien à faire dans ce recueil"
 
