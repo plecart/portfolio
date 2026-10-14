@@ -1098,7 +1098,8 @@ se dit en tête de sortie — « transcripts demandés N, lus M — absents : �
 bilan partiel muet : le harnais a le droit de libérer un transcript entre deux sessions (obs 73),
 et le relevé que la session sortante a déposé avant de passer la main (« Relais en cours de
 cycle », plus bas) s'additionne alors à la main. Le script rend la durée,
-l'attente du mainteneur **scindée** en réactivité et absences, le temps des sous-agents et des
+l'attente **scindée** en réactivité et absences — celle du mainteneur comme celle d'un pair, un
+écart entre deux transcripts compris —, le temps des sous-agents et des
 workflows, le temps d'agent seul, le cache que chaque sous-agent a lu et écrit **contact par
 contact** — lu dans son propre transcript, sous `<uuid>/subagents/`, reprises et agents au premier
 plan compris ; pas sa sortie, que ce transcript sous-compte —, les points de contact humains et
