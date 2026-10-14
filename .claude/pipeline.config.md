@@ -172,7 +172,7 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
 - sécurité     : /security-review                 # même nature. Lancée par `cycle-pr` 4.2
                                                   # **seulement** si le diff touche une zone
                                                   # sensible ou une surface exposée (section
-                                                  # « Périmètre »). Première mesure le
+                                                  # « Périmètre »). Mesure le
                                                   # 2026-10-14, commit 1 de la PR #92 (rôle
                                                   # Postgres de `backup`, 5 fichiers, +204/−63,
                                                   # surface « persistance Postgres ») : **zéro**
