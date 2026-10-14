@@ -7,10 +7,11 @@ build ; sur un poste, `make build` d'abord.
 
 La pile est le Compose de production, résolu avec son modèle de `.env` et surchargé par
 `backup.yml` : `postgres` et `backup` y gardent leur image, leur sonde et leurs variables, dont le
-test ne remplace que les valeurs. Elle démarre comme `bootstrap.sh` la démarre : la base saine,
-puis le rôle de sauvegarde, créé par la SQL du script, puis `backup`. Aucun service externe : un
-témoin S3 et un témoin de ping en tiennent lieu. Elle tourne sous son propre nom de projet, sans
-port publié : le test agit par `docker compose exec`.
+test ne remplace que les valeurs. Elle démarre dans l'ordre que suit `start_stack` de
+`bootstrap.sh` : la base saine, puis le rôle de sauvegarde, créé par la SQL du script, puis
+`backup`. Cet ordre est recopié ici, pas éprouvé : le script reste vérifié à la main par #25, sauf
+cette SQL. Aucun service externe : un témoin S3 et un témoin de ping en tiennent lieu. Elle tourne
+sous son propre nom de projet, sans port publié : le test agit par `docker compose exec`.
 """
 
 import json
