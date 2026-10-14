@@ -5,7 +5,7 @@
  * La page est allongée par le scénario (`scroll.ts`). Les seuils exacts du défilement sont prouvés
  * en Vitest (`tests/header-scroll.test.ts`) ; ici, leur effet à l'écran.
  */
-import { expect, test } from '@playwright/test'
+import { expect, test, type Locator } from '@playwright/test'
 import { resolveAll } from './css.ts'
 import { lengthenPage, scrollThrough } from './scroll.ts'
 
@@ -89,18 +89,54 @@ test("l'entête sort après 8 px vers le bas au-delà de 56 px, et revient aprè
   await expect(header).toBeInViewport()
 })
 
-test("l'entête sortie revient dès qu'elle reçoit le focus", async ({ page }) => {
-  await page.goto('/')
-  await lengthenPage(page)
-  const header = page.getByRole('banner')
-  await scrollThrough(page, 300)
-  await expect(header).not.toBeInViewport()
+/*
+ * La retenue par le focus — « tant qu'elle contient le focus clavier » (spec §3.3) — tient en trois
+ * lignes de `SiteHeader.tsx` : la translation, et en mouvement réduit l'opacité et le pointeur.
+ * Éprouvée dans les deux mouvements, au clavier qui la retient et au pointeur qui ne la retient pas.
+ * Dénombré avant le correctif : 4 cas, 2 fuyaient — un focus posé au pointeur la retenait, dans les
+ * deux mouvements — et la retenue en mouvement réduit n'était gardée par aucun test.
+ */
+for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+  /** L'entête visible ou sortie : par sa place sans mouvement réduit, par son fondu avec (§6.3). */
+  const expectShown = async (header: Locator, shown: boolean) => {
+    if (reducedMotion === 'reduce') {
+      await expect(header).toHaveCSS('opacity', shown ? '1' : '0')
+      await expect(header).toHaveCSS('pointer-events', shown ? 'auto' : 'none')
+    } else if (shown) await expect(header).toBeInViewport()
+    else await expect(header).not.toBeInViewport()
+  }
 
-  await page.keyboard.press('Tab')
+  test(`l'entête sortie revient dès qu'elle reçoit le focus clavier — mouvement ${reducedMotion}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion })
+    await page.goto('/')
+    await lengthenPage(page)
+    const header = page.getByRole('banner')
+    await scrollThrough(page, 300)
+    await expectShown(header, false)
 
-  await expect(header.getByRole('link', { name: 'Pacôme Bernier' })).toBeFocused()
-  await expect(header).toBeInViewport()
-})
+    await page.keyboard.press('Tab')
+
+    await expect(header.getByRole('link', { name: 'Pacôme Bernier' })).toBeFocused()
+    await expectShown(header, true)
+  })
+
+  test(`un focus posé au pointeur ne retient pas l'entête — mouvement ${reducedMotion}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion })
+    await page.goto('/')
+    await lengthenPage(page)
+    const header = page.getByRole('banner')
+    await header.getByRole('button').click()
+    await expect(header.getByRole('button')).toBeFocused()
+
+    await scrollThrough(page, 300)
+
+    await expectShown(header, false)
+  })
+}
 
 test("en mouvement réduit, l'entête sort et revient par un fondu, sans translation", async ({
   page,
