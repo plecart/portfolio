@@ -29,18 +29,25 @@ entrée (D45). L'utilisateur `deploy` possède le dossier et tire les images de 
 | Clé privée de déploiement | secret `DEPLOY_SSH_KEY` de l'environnement `production` seulement | le mainteneur | nouvelle paire, `bootstrap.sh DEPLOY_KEY` |
 | Empreinte de l'hôte | secret `DEPLOY_KNOWN_HOSTS` de `production` | le mainteneur | à chaque VPS reconstruit |
 | Hôte et utilisateur | secrets `DEPLOY_HOST`, `DEPLOY_USER` (`deploy`) de `production` | le mainteneur | à chaque VPS reconstruit |
+| Mot de passe du rôle de sauvegarde (`BACKUP_POSTGRES_PASSWORD`) | `.env` du VPS et la base | `bootstrap.sh`, qui l'engendre et le pose dans la base | `bootstrap.sh BACKUP_POSTGRES_PASSWORD` |
+| Jeton du bucket des sauvegardes (`BACKUP_R2_ACCESS_KEY_ID`, `BACKUP_R2_SECRET_ACCESS_KEY`) | gestionnaire ; `.env` du VPS | `bootstrap.sh` | un nouveau jeton R2, `bootstrap.sh` avec les deux noms, puis l'ancien révoqué |
+| Adresse de ping (`BACKUP_PING_URL`) | le contrôle healthchecks.io ; `.env` du VPS | `bootstrap.sh` | un nouveau contrôle, `bootstrap.sh BACKUP_PING_URL`, puis l'ancien supprimé |
+| Clé privée `age` des sauvegardes | gestionnaire seulement — ni le VPS, ni le dépôt, ni une image (ADR 0007, point 2) ; secret d'Actions avec #24 | le mainteneur, sur le poste | une nouvelle paire, sa clé publique à `bootstrap.sh BACKUP_AGE_RECIPIENT` ; l'ancienne gardée |
 
 L'environnement GitHub `production` n'admet que `main` : un workflow lancé depuis une autre branche
 ne lit pas ses secrets, même modifié.
 
-`SECRET_KEY` et `POSTGRES_PASSWORD` ne vivent que sur le VPS : rien hors de la pile ne s'en sert,
-et un VPS reconstruit en reçoit de neufs — la base restaurée garde ses données, pas son mot de
-passe. La clé de chiffrement des sauvegardes, elle, ne vit jamais seulement sur le VPS (#23).
+`SECRET_KEY`, `POSTGRES_PASSWORD` et `BACKUP_POSTGRES_PASSWORD` ne vivent que sur le VPS : rien hors
+de la pile ne s'en sert, et un VPS reconstruit en reçoit de neufs — la base restaurée garde ses
+données, pas ses rôles, que `bootstrap.sh` recrée. La clé privée `age`, elle, ne vient jamais sur
+le VPS : une sauvegarde volée avec lui reste illisible. La clé publique (`BACKUP_AGE_RECIPIENT`)
+n'est pas un secret.
 
 ## Amorcer un VPS neuf
 
-Prérequis : un VPS Ubuntu LTS en UE (ADR 0002), joignable en `root` par ta clé SSH ; le jeton du
-Tunnel (#25) dans le gestionnaire de mots de passe. À la première connexion, `ssh` affiche
+Prérequis : un VPS Ubuntu LTS en UE (ADR 0002), joignable en `root` par ta clé SSH ; dans le
+gestionnaire de mots de passe, le jeton du Tunnel, le jeton du bucket des sauvegardes et la paire
+`age` ; l'adresse de ping du contrôle healthchecks.io (#25). À la première connexion, `ssh` affiche
 l'empreinte de l'hôte : compare-la à celle que la console du fournisseur rend pour
 `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` — identiques, oui ou non ? Non : n'accepte pas.
 
@@ -171,6 +178,19 @@ niveau ni tirer d'image déjà présente.
 - `DEPLOY_KEY` — une nouvelle paire (étape 1), sa clé publique donnée à `bootstrap.sh DEPLOY_KEY`,
   sa clé privée à `gh secret set DEPLOY_SSH_KEY --env production < deploy_key` ; entre les deux, un déploiement
   échoue.
+- `BACKUP_POSTGRES_PASSWORD` — pile démarrée ou non : le script pose le nouveau dans la base une
+  fois celle-ci saine, puis recrée `backup`. Pas autour de 03:00 UTC : entre les deux, le
+  conteneur garde l'ancien, et une sauvegarde lancée là échoue, sans ping.
+- `BACKUP_R2_ACCESS_KEY_ID BACKUP_R2_SECRET_ACCESS_KEY`, ensemble — un nouveau jeton d'abord,
+  « Object Read & Write » borné au seul bucket des sauvegardes, puis l'ancien révoqué, une fois
+  `backup` recréé : les deux valent pendant la bascule.
+- `BACKUP_PING_URL` — l'adresse d'un contrôle ne change pas, son UUID « is immutable » (doc
+  healthchecks.io « HTTP API ») : un nouveau contrôle, même période et même délai de grâce, puis
+  l'ancien supprimé — sinon il alerte, faute de ping.
+- `BACKUP_AGE_RECIPIENT` — une nouvelle paire sur le poste, `age-keygen -o age.key`, qui n'affiche
+  que la clé publique : celle-ci à `bootstrap.sh BACKUP_AGE_RECIPIENT`, le fichier joint à une entrée
+  du gestionnaire, puis `rm age.key`. Garde l'ancienne clé privée tant que le bucket porte une sauvegarde chiffrée
+  pour elle : elle seule la déchiffre.
 
 ## Mises à jour
 
