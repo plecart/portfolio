@@ -812,9 +812,12 @@ gh pr ready <numéro>
 Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur qui distingue
 « travail en cours » de « prêt à être relu ».
 
-`gh pr ready` déclenche **un run de plus** sur la tête (événement `ready_for_review`), après ceux
-que chaque push a déjà produits (Étape 4) : c'est lui qui garantit qu'une PR prête a un run, même
-si son dernier push date. Attendre son résultat avant l'Étape 6.
+`gh pr ready` déclenche **un run de plus** (événement `ready_for_review`), après ceux que chaque
+push a déjà produits (Étape 4) : c'est lui qui garantit qu'une PR prête a un run, même si son
+dernier push date. Attendre son résultat avant l'Étape 6. Il tourne sur la référence de fusion
+**existante**, que GitHub ne recalcule pas au passage en ready : il peut combiner la tête à un
+trunk vieux de plusieurs merges — mesuré, 8 des 30 commits de `main` (obs 51). Ce qu'il prouve
+de l'état combiné se lit dans les parents de cette référence, à l'Étape 7.
 
 **Si aucun run n'apparaît**, deux causes possibles, à départager dans cet ordre : (1) un run
 existe-t-il pour le SHA de tête (`gh api repos/<owner>/<repo>/actions/runs?head_sha=<sha>`) ?
