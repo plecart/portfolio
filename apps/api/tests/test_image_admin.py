@@ -4,12 +4,14 @@ dont la première image est la couverture ; ses aperçus et ses états (brief de
 montre et en refuse, et la forme de la couverture, qu'il est seul à tenir."""
 
 import re
+from pathlib import Path
 
 import pytest
 from config import strings
 from content.inlines import HANDLE_CLASS
 from content.models import GalleryImage, ProcessingState, Project
 from django.contrib.admin.helpers import InlineAdminFormSet
+from django.contrib.staticfiles import finders
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.forms import BaseForm
@@ -36,6 +38,10 @@ from test_project_admin import (
 
 # La feuille de l'aperçu des images (`GalleryInline`).
 IMAGE_PREVIEW_STYLE = "content/admin/image_preview.css"
+
+# La classe de l'aperçu, que la feuille lit : écrite ici et non lue sur l'admin, pour qu'un nom
+# changé d'un seul côté fasse rougir ce fichier.
+PREVIEW_CLASS = "image-preview"
 
 # Les colonnes d'une image, dans l'ordre, et leur libellé du catalogue.
 IMAGE_COLUMNS = {
@@ -381,9 +387,22 @@ def test_l_apercu_montre_l_original_enregistre_et_son_etat_en_texte(admin_client
     assert f'src="{made.original.url}"' in images[0]
     assert f'alt="{escape(made.caption)}"' in images[0]
     assert re.search(r'width="\d+" height="\d+"', images[0])
+    assert f'class="{PREVIEW_CLASS}"' in images[0]
     assert "style" not in images[0]
     assert escape(strings.PROCESSING_STATE_PENDING) in gallery
     assert f'name="{GALLERY}-0-state"' not in page
+
+
+def test_la_feuille_de_l_apercu_fait_tenir_l_original_entier_dans_son_cadre() -> None:
+    """Le cadre de l'aperçu est un carré, nommé en attributs : sans `object-fit: contain` sur la
+    classe de l'`<img>`, une image en paysage y serait écrasée (décision 11)."""
+    path = finders.find(IMAGE_PREVIEW_STYLE)
+    assert isinstance(path, str)
+
+    rule = re.search(rf"\.{PREVIEW_CLASS}\s*\{{([^}}]*)\}}", Path(path).read_text(encoding="utf-8"))
+
+    assert rule is not None
+    assert re.search(r"object-fit:\s*contain\s*;", rule.group(1))
 
 
 @pytest.mark.django_db
