@@ -251,6 +251,14 @@ gardent l'invariant — jamais l'énoncé seul : une reformulation dérive vers 
 « ne l'assouplis pas » décourage précisément la vérification que la session doit faire à son
 Étape 1. Une divergence remonte au mainteneur.
 
+**Et elle se relit dans cet artefact, sur disque, au moment de l'envoi** — jamais recopiée d'une
+mémoire de phase, d'une passation ou d'un tableau de bord, qui héritent des erreurs de leur
+auteur. Un correctif cité par son SHA se lit par `git show <sha>`, son diff et non son titre : un
+prompt de relais a énoncé la règle qu'un correctif avait **retirée**, en le citant, et quatre
+artefacts en aval l'ont reprise sur trois sessions (obs 52). Un prompt hérité — d'un lead
+précédent, d'une passation — ne s'envoie donc jamais « tel quel » : chaque règle qu'il cite se
+relit d'abord dans l'artefact cité.
+
 Les skills s'invoquent **par l'outil Skill, jamais par `/commande`** : un `/nom` dans un message
 de pair n'est pas une saisie de l'utilisateur, la session peut ne pas le déclencher. Ne jamais
 inscrire dans le prompt un skill marqué `disable-model-invocation` (frontmatter à vérifier avant
@@ -338,7 +346,9 @@ c'est le seul autre canal, et il passe par lui.
   --write-tree origin/main <branche>`, **prédicat** : 0 sans conflit, 1 avec, mesuré le 2026-10-13
   avec un témoin de chaque côté (table `FRESHNESS_GATE_FORMS` de
   `apps/api/tests/test_agent_skills.py`) — et relance sa CI, qui tourne sur la
-  référence de fusion — pas de commit de fusion sur un trunk fusionné par rebase, ni de rebase
+  référence de fusion ; ce que le run prouve se lit dans les parents de cette référence, que
+  GitHub ne recalcule pas d'office (`cycle-pr` Étape 7, « Rejouer les vérifications périmées »,
+  obs 51) — pas de commit de fusion sur un trunk fusionné par rebase, ni de rebase
   d'une branche poussée sans demande explicite (`contraintes.md`) ; un conflit se résout par un
   commit réel sur la branche.
 
