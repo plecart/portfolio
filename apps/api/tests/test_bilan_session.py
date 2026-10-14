@@ -1006,7 +1006,7 @@ def test_la_sortie_d_un_sous_agent_ne_se_rend_pas(tmp_path: Path) -> None:
     total = next(line for line in lines if line.startswith("jetons des sous-agents"))
     assert "sortie non mesurée" in total, total
     session_line = next(line for line in lines if line.startswith("jetons de la session"))
-    assert "sortie      5 k" in session_line, session_line
+    assert bilan.tokens(bilan.Usage(output=5_000)) in session_line, session_line
 
 
 # --- Un transcript demandé qui n'existe plus (obs 73) --------------------------------------------
