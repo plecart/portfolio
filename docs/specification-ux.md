@@ -36,7 +36,7 @@ _Document normatif de rang 2 (`.claude/pipeline.config.md`, « Sources de vérit
 
 ### 1.5 Modes clair et sombre
 
-- Les deux modes, **suivant le réglage du système** (`prefers-color-scheme`), avec un bouton qui force l'autre ; le choix forcé est mémorisé côté navigateur. Deux palettes en §2. Le point d'arrêt visuel de chaque PR se fait dans les deux modes (`contraintes.md`). Ancres vérifiées : cadrage muet ; `contraintes.md` « Points d'arrêt humains » conforme.
+- Les deux modes, **suivant le réglage du système** (`prefers-color-scheme`), avec un bouton qui force l'autre ; le choix forcé est mémorisé côté navigateur. Le clic qui ramène au mode du système efface le choix et sa mémoire : le site suit de nouveau le système. Un choix mémorisé devenu égal au mode du système (le système a changé entre-temps) reste jusqu'au prochain clic (brief de #18, décision 2). Deux palettes en §2. Le point d'arrêt visuel de chaque PR se fait dans les deux modes (`contraintes.md`). Ancres vérifiées : cadrage muet ; `contraintes.md` « Points d'arrêt humains » conforme.
 
 ### 1.6 Responsive
 
@@ -122,7 +122,7 @@ Ancres vérifiées : frontend-outillage §3 item 12 (seuils annoncés sans valeu
 
 ## 2. Jetons
 
-Les jetons sont des propriétés CSS déclarées sur `:root`. La palette suit `prefers-color-scheme` ; `data-theme="light"` ou `data-theme="dark"` sur `<html>` force l'autre mode et se mémorise dans `localStorage` (clé `theme`) ; `color-scheme: light dark`. Les sections 3 à 7 citent les couleurs, ombres et courbes par leur jeton ; elles citent tailles, rayons, durées et espacements par leur valeur, qui appartient toujours aux échelles de cette section, hors les dimensions propres à un objet listées en §2.3.
+Les jetons sont des propriétés CSS déclarées sur `:root`. La palette suit `prefers-color-scheme` ; `data-theme="light"` ou `data-theme="dark"` sur `<html>` force l'autre mode et se mémorise dans `localStorage` (clé `theme`), et le retour au mode du système retire l'un et l'autre (§1.5) ; `color-scheme: light dark`, ou le seul mode forcé quand `data-theme` est posé — les éléments natifs du navigateur suivent alors le mode affiché. Les sections 3 à 7 citent les couleurs, ombres et courbes par leur jeton ; elles citent tailles, rayons, durées et espacements par leur valeur, qui appartient toujours aux échelles de cette section, hors les dimensions propres à un objet listées en §2.3.
 
 ### 2.1 Couleurs
 

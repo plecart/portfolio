@@ -10,6 +10,7 @@
 // que le projet n'active pas.
 import { AxeBuilder } from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
+import { detachHeader } from './scroll.ts'
 
 /** L'origine que le site sert lui-même. Tout ce qui n'en vient pas est un tiers. */
 function ownOrigin(page: Page): string {
@@ -161,12 +162,22 @@ test('les deux descriptions du bloc portent le même texte', async ({ page }) =>
   )
 })
 
-test("la page ne porte aucune violation d'accessibilité", async ({ page }) => {
-  await page.goto('/')
+// Dans les deux modes, entête en haut de page et décollée — son fond change le contraste du nom
+// et de l'icône (spec §6.2) ; aux deux largeurs, par les deux projets.
+for (const colorScheme of ['light', 'dark'] as const) {
+  for (const detached of [false, true]) {
+    test(`la page ne porte aucune violation d'accessibilité — ${colorScheme}, entête ${detached ? 'décollée' : 'en haut'}`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme })
+      await page.goto('/')
+      if (detached) await detachHeader(page)
 
-  const { violations } = await new AxeBuilder({ page }).analyze()
+      const { violations } = await new AxeBuilder({ page }).analyze()
 
-  // Les identifiants de règle suffisent au diagnostic et tiennent sur une ligne ; le rapport
-  // complet d'axe noierait l'échec sous plusieurs écrans de contexte DOM.
-  expect(violations.map((violation) => violation.id)).toEqual([])
-})
+      // Les identifiants de règle suffisent au diagnostic et tiennent sur une ligne ; le rapport
+      // complet d'axe noierait l'échec sous plusieurs écrans de contexte DOM.
+      expect(violations.map((violation) => violation.id)).toEqual([])
+    })
+  }
+}

@@ -9,4 +9,7 @@
 export const strings = {
   /** Nom de l'auteur : titre de la page et lien vers l'accueil (spec §3.3). */
   siteName: 'Pacôme Bernier',
+  /** Bouton de mode : il dit le mode visé, l'autre que celui affiché (spec §3.3). */
+  switchToDark: 'Passer en mode sombre',
+  switchToLight: 'Passer en mode clair',
 } as const
