@@ -6,14 +6,13 @@
 # variables — ; ce fichier n'y change que ce que la pile de test exige :
 #
 # - `backup` tourne sur l'image que `make build` a chargée ;
-# - la base crée le rôle de sauvegarde à son initialisation, ce que fera `bootstrap.sh` sur le VPS
-#   (lot 2 de #23, qui reprendra ici sa SQL) ;
 # - deux témoins remplacent les services externes : un stockage S3, `rclone serve s3` tiré de
 #   l'image `backup` — aucune image de plus à épingler ; et un récepteur de ping, tiré de l'image
 #   `caddy`, qui répond 200 à toute requête et la journalise.
 #
-# Aucun port publié : le test agit par `docker compose exec`. Chaque valeur vient de l'environnement
-# du test, par-dessus le modèle `prod.env.example`.
+# Le rôle de sauvegarde n'y est pas : le test le crée par la SQL de `bootstrap.sh`, la base démarrée,
+# comme le script le fait sur le VPS. Aucun port publié : le test agit par `docker compose exec`.
+# Chaque valeur vient de l'environnement du test, par-dessus le modèle `prod.env.example`.
 
 services:
   backup:
@@ -26,11 +25,6 @@ services:
         condition: service_healthy
       ping:
         condition: service_healthy
-
-  postgres:
-    configs:
-      - source: backup-role
-        target: /docker-entrypoint-initdb.d/backup-role.sql
 
   s3:
     image: ${BACKUP_IMAGE:?}
@@ -57,10 +51,3 @@ services:
       test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/sonde]
       interval: 1s
       retries: 30
-
-configs:
-  # Le rôle de la décision 3 du brief : connexion, lecture de toutes les données, rien d'autre.
-  backup-role:
-    content: |
-      CREATE ROLE "${BACKUP_POSTGRES_USER:?}" LOGIN PASSWORD '${BACKUP_POSTGRES_PASSWORD:?}'
-        IN ROLE pg_read_all_data;
