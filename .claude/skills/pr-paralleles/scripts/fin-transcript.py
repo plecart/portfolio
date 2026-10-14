@@ -33,8 +33,9 @@ EXTRAIT = 400
 
 # Les blocs que le harnais injecte dans le rôle `user` : `<task-notification>`, `<command-message>`,
 # `<system-reminder>`, `<ide_opened_file>`… Un `sub` **non gourmand** les retire ; ce qui reste est
-# de la main du mainteneur — sauf la commande tapée, faite de blocs, que `COMMANDE_TAPEE` rend. Le nom se lit sans attribut à dessein — `<pasted_content id="…">` en
-# porte un, et son contenu est du texte que le mainteneur a collé, donc il doit rester.
+# de la main du mainteneur — sauf la commande tapée, faite de blocs, que `COMMANDE_TAPEE` rend. Le
+# nom se lit sans attribut à dessein — `<pasted_content id="…">` en porte un, et son contenu est du
+# texte que le mainteneur a collé, donc il doit rester.
 #
 # `bilan-session.py` (skill `cycle-pr`) porte une version plus stricte de cette distinction, parce
 # qu'il **compte** les contacts humains et doit donc trancher pour chaque message. Ici on ne compte
@@ -47,7 +48,10 @@ BLOC_INJECTE = re.compile(r"<(?P<balise>[a-z][a-z0-9_-]*)>.*?</(?P=balise)>", re
 # Une commande **tapée** par le mainteneur — skill ou commande locale — porte la barre oblique dans
 # son `<command-name>`, et ses arguments vivent dans `<command-args>`. Retirée avec les autres
 # blocs, elle disparaissait, arguments compris ; un skill que le harnais charge de lui-même n'a pas
-# de barre oblique. Dénombrement : corps de la PR #95.
+# de barre oblique. Elle n'est faite que de blocs, et commence par l'un des deux qui la nomment :
+# citée dans une prose ou une notification, elle n'en est pas une. Dénombrement : corps de la
+# PR #95.
+TETES_DE_COMMANDE = ("<command-message>", "<command-name>")
 COMMANDE_TAPEE = re.compile(r"<command-name>(/[^<]+)</command-name>")
 ARGUMENTS = re.compile(r"<command-args>(.*?)</command-args>", re.DOTALL)
 
@@ -99,10 +103,10 @@ def message_du_mainteneur(enregistrement: dict[str, Any]) -> str | None:
 
     Le harnais marque `isMeta` ce qu'il injecte : un corps de skill intégré ou un avis de reprise
     ne commence par aucun préfixe commun, et seule l'étiquette les écarte. Une commande tapée se
-    rend `/nom arguments`. Sinon, un message n'est injecté que s'il ne reste
-    **rien** après retrait des blocs balisés : le harnais préfixe parfois le texte humain d'un bloc
-    de contexte au lieu de l'injecter seul (`<ide_opened_file>…</ide_opened_file>oui go`), et
-    s'arrêter à la tête perdrait ce « oui go ».
+    rend `/nom arguments`. Sinon, un message n'est injecté que s'il ne reste **rien** après
+    retrait des blocs balisés : le harnais préfixe parfois le texte humain d'un bloc de contexte au
+    lieu de l'injecter seul (`<ide_opened_file>…</ide_opened_file>oui go`), et s'arrêter à la tête
+    perdrait ce « oui go ».
 
     Args:
         enregistrement: une ligne décodée du transcript.
@@ -113,12 +117,14 @@ def message_du_mainteneur(enregistrement: dict[str, Any]) -> str | None:
     if enregistrement.get("isMeta"):
         return None
     brut = texte(enregistrement).strip()
-    commande = COMMANDE_TAPEE.search(brut)
-    if commande:
-        arguments = ARGUMENTS.search(brut)
-        return " ".join(filter(None, (commande[1], arguments[1].strip() if arguments else "")))
     reste = BLOC_INJECTE.sub("", brut).strip()
-    return reste if reste and not reste.startswith(PREFIXES_INJECTES) else None
+    if reste:
+        return None if reste.startswith(PREFIXES_INJECTES) else reste
+    commande = COMMANDE_TAPEE.search(brut) if brut.startswith(TETES_DE_COMMANDE) else None
+    if commande is None:
+        return None
+    arguments = ARGUMENTS.search(brut)
+    return " ".join(filter(None, (commande[1], arguments[1].strip() if arguments else "")))
 
 
 def extrait(brut: str) -> str:

@@ -108,6 +108,20 @@ PROVENANCES = {
         ),
         "/model",
     ),
+    # Cités ailleurs, les blocs d'une commande ne font pas une commande tapée : la prose qui les
+    # cite reste la prose du mainteneur, et une notification qui les cite reste une injection.
+    "prose-qui-cite-une-commande": (
+        tour("user", "regarde : <command-name>/model</command-name> ne compte pas"),
+        "regarde :  ne compte pas",
+    ),
+    "notification-qui-cite-une-commande": (
+        tour(
+            "user",
+            "<task-notification><summary>a relancé <command-name>/model</command-name>"
+            "</summary></task-notification>",
+        ),
+        None,
+    ),
     "skill-charge-par-le-harnais": (
         tour(
             "user",
@@ -119,8 +133,9 @@ PROVENANCES = {
     # Le harnais marque `isMeta` ce qu'il injecte. Les corps de skills intégrés, la référence
     # d'écriture de workflow ou l'avis de reprise après coupure ne commencent par aucun préfixe
     # commun : sans l'étiquette, ils passaient pour des messages du mainteneur (dénombrement : corps
-    # de la PR #95). Le dernier cas est le témoin — le même texte, sans l'étiquette, que rien
-    # d'autre ne permet d'écarter.
+    # de la PR #95). Le dernier cas est le témoin, et il épingle une **limite**, pas un comportement
+    # voulu : le même texte sans l'étiquette, que la règle textuelle ne sait pas écarter. Le voir
+    # rougir un jour signalera une règle textuelle plus fine, à confirmer, pas une régression.
     "corps-de-code-review-injecte": (
         injecte("Review target: `91 medium`\n\n`xhigh effort → 10 inline angles`"),
         None,
