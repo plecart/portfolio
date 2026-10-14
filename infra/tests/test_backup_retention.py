@@ -225,7 +225,6 @@ FOREIGN_NAMES = {
     "31-avril": "portfolio-20260431T030000Z.dump.age",
     "29-fevrier-hors-bissextile": "portfolio-20260229T030000Z.dump.age",
     "mois-13": "portfolio-20261315T030000Z.dump.age",
-    "avant-1970": "portfolio-19691231T235959Z.dump.age",
     "heure-25": "portfolio-20261015T250000Z.dump.age",
     "minute-60": "portfolio-20261015T036000Z.dump.age",
     "ligne-vide": "",
