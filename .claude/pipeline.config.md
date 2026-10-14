@@ -176,13 +176,16 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
                                                   # 2026-10-14, commit 1 de la PR #92 (rôle
                                                   # Postgres de `backup`, 5 fichiers, +204/−63,
                                                   # surface « persistance Postgres ») : **zéro**
-                                                  # constat. Inventaire : son prompt exclut les
-                                                  # tests et la documentation, il a donc lu 2
-                                                  # fichiers sur 5 (`bootstrap.sh`, le modèle de
-                                                  # `.env`) — ni la pile de test, ni le runbook où
-                                                  # vivent les rotations. Elle ne lance rien : un
-                                                  # zéro de lecture, sur des droits que les tests
-                                                  # du rôle et quatre mutations tenaient déjà.
+                                                  # constat. Inventaire : son prompt écarte les
+                                                  # constats portant sur les tests et la
+                                                  # documentation (exclusions 11 et 16) — seuls 2
+                                                  # fichiers sur 5 pouvaient en porter
+                                                  # (`bootstrap.sh`, le modèle de `.env`), ni la
+                                                  # pile de test, ni le runbook où vivent les
+                                                  # rotations. Son prompt lui interdit de lancer
+                                                  # une commande : un zéro de lecture, sur des
+                                                  # droits que les tests du rôle et quatre
+                                                  # mutations tenaient déjà.
                                                   # Son prompt prescrit des sous-tâches (une de
                                                   # recherche, une de filtre par constat) ; la
                                                   # session l'a déroulée sans elles.
