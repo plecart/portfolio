@@ -35,7 +35,8 @@ GENERATED=(SECRET_KEY POSTGRES_PASSWORD BACKUP_POSTGRES_PASSWORD)
 FROM_MODEL=(POSTGRES_USER POSTGRES_DB BACKUP_POSTGRES_USER)
 # Les valeurs renouvelables qui ne vivent pas dans le `.env`.
 OTHER_SECRETS=(GHCR_TOKEN DEPLOY_KEY)
-# Les valeurs du `.env`, par nom, telles que `write_env` les a écrites.
+# Les valeurs du `.env`, par nom, telles que `write_env` les a écrites — `start_stack` les lit :
+# `main` appelle toujours `write_env` avant lui.
 declare -A VALUES=()
 
 export DEBIAN_FRONTEND=noninteractive
@@ -270,8 +271,8 @@ change_postgres_password() {
 # La SQL du rôle de `backup` (brief de #23, décision 3), nommé par le 1ᵉʳ argument : connexion et
 # lecture de toutes les données, rien d'autre. Rejouable : le rôle est créé s'il manque, et reçoit
 # à chaque passage le mot de passe du 2ᵉ argument — c'est ainsi qu'on le renouvelle. Le nom vient du
-# modèle, le mot de passe est engendré : ni guillemet ni apostrophe. `infra/tests/` la joue sur
-# l'image Postgres de la pile.
+# modèle versionné, le mot de passe est engendré en hexadécimal : ni l'un ni l'autre ne porte de
+# guillemet ni d'apostrophe. `infra/tests/` la joue sur l'image Postgres de la pile.
 backup_role_sql() {
 	cat <<EOF
 SELECT 'CREATE ROLE "$1" LOGIN IN ROLE pg_read_all_data'
