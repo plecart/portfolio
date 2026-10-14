@@ -242,7 +242,7 @@ De haut en bas : l'entête (§3.3), la table (`<main>`), les liens de l'auteur (
 
 Deux liens, GitHub puis LinkedIn, icônes au trait 22 px, libellés « GitHub de Pacôme Bernier » et « LinkedIn de Pacôme Bernier » ; même élément `<footer>` sous les deux formes, dernier dans l'ordre de tabulation.
 
-- **Colonne fixe** : dès que la marge entre le bord de la fenêtre et la cellule de carte la plus proche atteint 76 px (36 px de disque + 24 px du bord + 16 px de garde), le pied devient une colonne fixe en bas à droite : à 24 px des bords, z-index 40, 36 px de large ; un disque de 36 px par lien, écart 8 px (80 px de haut pour deux), papier, `--shadow-rest`, icône `--ink-2` ; survol : `--ink` et montée de 2 px (240 ms). Recalculée au redimensionnement. Repères : colonne à 1280 px (marge 118), 1200 px (78) et 1000 px (112, trois colonnes de cartes) ; pied de page à 1100 px (28, quatre colonnes), 600 px (46) et sur mobile (16).
+- **Colonne fixe** : dès que la marge entre le bord de la fenêtre et la cellule de carte la plus proche atteint 76 px (36 px de disque + 24 px du bord + 16 px de garde), le pied devient une colonne fixe en bas à droite : à 24 px des bords, z-index 40, 36 px de large ; un disque de 36 px par lien, écart 8 px (80 px de haut pour deux), papier, `--shadow-rest`, icône `--ink-2` ; survol : `--ink` et montée de 2 px (240 ms). La marge se mesure sur les cellules présentes dans la table — cartes et cadres de chargement, chacun sur sa boîte de grille, hors pose et hors animation — ; une table sans cellule (écrans vide et erreur) a sa colonne fixe dès 600 px de large et son pied de page en dessous (brief de #18, décision 1). Recalculée au redimensionnement et quand les cellules changent. Repères : colonne à 1280 px (marge 118), 1200 px (78) et 1000 px (112, trois colonnes de cartes) ; pied de page à 1100 px (28, quatre colonnes), 600 px (46) et sur mobile (16).
 - **Pied de page** : après la table, une rangée centrée, marge 48 px 0 32 px, écart 24 px, un filet de 48 × 1 px `--line` centré au-dessus ; chaque icône dans une zone de 38 px (marge intérieure 8 px), sans disque, `--ink-2` → `--ink` et montée de 2 px au survol.
 - **Place réservée** (§1.13) : un disque de plus en haut de la colonne, ou un lien de plus dans la rangée.
 
@@ -356,7 +356,7 @@ Le serveur répond par une redirection `302` vers `/` (ADR 0009) : le visiteur v
 
 ### 6.1 Responsive
 
-Un seul point de rupture, 600 px ; la colonne fixe des liens dépend de la marge à côté de la table, pas de la largeur (§3.4).
+Un seul point de rupture, 600 px ; la colonne fixe des liens dépend de la marge à côté de la table, pas de la seule largeur (§3.4).
 
 | | ≥ 600 px | ≤ 599 px |
 |---|---|---|
@@ -367,7 +367,7 @@ Un seul point de rupture, 600 px ; la colonne fixe des liens dépend de la marge
 | Post-it de carte | 14 px (vitrine 18) | 13 px (vitrine 16) |
 | Cadre / bande | 10 / 52 px (vitrine 14 / 64) | 8 / 46 px (vitrine 12 / 56) |
 | Fiche | panneau centré dimensionné depuis la photo, deux colonnes, en-tête fixe | plein écran, une colonne, tout défile |
-| Liens de l'auteur | colonne fixe si la marge ≥ 76 px, sinon pied de page | pied de page (marge de 16 px) |
+| Liens de l'auteur | colonne fixe si la marge ≥ 76 px ou si la table n'a aucune cellule, sinon pied de page | pied de page (marge de 16 px) |
 | Survol et inclinaison | sur les appareils à survol | non ; révélation au toucher |
 
 Repères mesurés : 1280 × 800 → table 1044 px, carte 240 / 508 px, fiche 1232 × 650 px, colonne de liens ; 400 × 800 → carte 176 / 368 px, fiche 400 × 800 px, pied de page.
