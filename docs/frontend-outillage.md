@@ -126,7 +126,8 @@ avant de toucher au bloc :
   (ADR 0008 : « gabarit sans balises projet »).
 - **`og:image` n'a pas de valeur par défaut.** Partout où la documentation le nomme, c'est la
   **couverture du projet** (spec §1.11 et §7, ADR 0008), et aucune image de site n'existe. #14
-  l'injecte avec les autres ; une image d'ouverture propre au site relèverait de #18.
+  l'injecte avec les autres ; une image d'ouverture propre au site n'existe pas en phase 1 (PRD #1,
+  « Hors périmètre »).
 - Le bloc porte **quatre** balises, pas trois : `<meta name="description">` accompagne
   `og:description` et porte le même texte — un test verrouille leur égalité. Sans elle, le score
   SEO plafonne à 91, sous le seuil bloquant de la spec §1.16. #14 doit donc en produire quatre.
