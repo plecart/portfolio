@@ -194,8 +194,8 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
                                                   # échoue avant toute analyse ; `git remote
                                                   # set-head origin main` le pose (mesuré et
                                                   # posé dans ce dépôt le 2026-10-14). Autre
-                                                  # mesure, même jour, sur le delta de la PR
-                                                  # #75 (17 fichiers, dont 7 hors tests et
+                                                  # mesure, même jour, au commit `b5b0b2a` de
+                                                  # la PR #75 (17 fichiers, dont 7 hors tests et
                                                   # documentation : admin, téléversement,
                                                   # migration) : **zéro** constat, de lecture
                                                   # aussi, déroulée sans les sous-tâches.
