@@ -560,8 +560,8 @@ corrigés ou écartés. C'est le même argument que l'Étape 4.2 tient déjà po
 vaut autant pour la passe : au lot 1b de #77, la passe 2 confiée à un agent neuf a repayé **un
 contexte entier** pour un diff que le relecteur de la passe 1 connaissait déjà. Le coût se
 compare **par contact** — passe, reprise, relance —, tel que `bilan-session.py` le lit dans le
-transcript du relecteur : la notification de fin ne porte que le contexte de son premier
-contact, pas une consommation.
+transcript du relecteur : la notification de fin de son lancement ne porte que le contexte en
+fin de premier contact, pas une consommation.
 
 Repli vers un **agent neuf** dans un seul cas : le relecteur n'est plus joignable (worktree
 disparu, session perdue, agent terminé). Il part alors avec la vérification d'isolation
