@@ -197,8 +197,14 @@ class GalleryInline(SortableInline[GalleryImage, Project]):
     verbose_name_plural = strings.GALLERY_HEADING
     min_num = 1
     # Une ligne neuve en plus des images enregistrées, comme la fiche technique : l'auteur en
-    # ajoute d'autres par le bouton de l'écran.
+    # ajoute d'autres par le bouton de l'écran. Aucune à l'ajout (`get_extra`).
     extra = 1
+
+    def get_extra(self, request: HttpRequest, obj: Project | None = None, **kwargs: Any) -> int:
+        """Les lignes neuves en plus : aucune sur l'écran d'ajout, où la ligne obligatoire
+        (`min_num`) est déjà vide — une seule ligne s'y montre (arrêt visuel du 2026-10-14) ;
+        `extra` sur un projet enregistré."""
+        return 0 if obj is None else self.extra
 
     @admin.display(description=strings.IMAGE_PREVIEW)
     def preview(self, image: GalleryImage) -> str:
