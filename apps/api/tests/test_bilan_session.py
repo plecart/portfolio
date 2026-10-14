@@ -192,10 +192,9 @@ def test_la_fenetre_d_un_sous_agent_est_bornee_par_l_identifiant_de_son_appel(
     de fond. « La première notification non attribuée » rendrait 30 s ou 1 min 30 au lieu de
     19 min 30 — l'erreur va toujours dans le sens qui masque le coût des sous-agents.
     """
-    events = read(tmp_path)
-    windows = bilan.subagent_windows(events, bilan.tool_calls(events))
+    m = bilan.measure(read(tmp_path))
 
-    assert [bilan.total([window]) for window in windows] == [timedelta(minutes=19, seconds=30)]
+    assert [bilan.total([window]) for window in m.windows] == [timedelta(minutes=19, seconds=30)]
 
 
 def test_l_attente_du_mainteneur_exclut_le_temps_des_sous_agents(tmp_path: Path) -> None:
@@ -204,10 +203,9 @@ def test_l_attente_du_mainteneur_exclut_le_temps_des_sous_agents(tmp_path: Path)
     Deux attentes réelles ici : 15 min après le dernier tour de l'agent, et 1 h 24 min 30
     ensuite. Le chargement de skill de 10:25:10 n'en borne aucune.
     """
-    events = read(tmp_path)
-    blocked = bilan.blocked_windows(events, bilan.tool_calls(events))
+    m = bilan.measure(read(tmp_path))
 
-    assert [bilan.total([window]) for window in blocked] == [
+    assert [bilan.total([window]) for window in m.blocked] == [
         timedelta(minutes=15),
         timedelta(hours=1, minutes=24, seconds=30),
     ]
@@ -217,12 +215,10 @@ def test_les_attentes_se_scindent_en_reactivite_et_absences(tmp_path: Path) -> N
     """Deux phénomènes, deux remèdes : la réactivité relève de la pipeline, l'absence du
     calendrier. Les additionner sous un seul chiffre a fait lire la mesure comme un défaut
     alors que les changements avaient marché (obs 43)."""
-    events = read(tmp_path)
-    blocked = bilan.blocked_windows(events, bilan.tool_calls(events))
-    reactivity, absences = bilan.split_waits(blocked)
+    m = bilan.measure(read(tmp_path))
 
-    assert [bilan.total([window]) for window in reactivity] == [timedelta(minutes=15)]
-    assert [bilan.total([window]) for window in absences] == [
+    assert [bilan.total([window]) for window in m.reactivity] == [timedelta(minutes=15)]
+    assert [bilan.total([window]) for window in m.absences] == [
         timedelta(hours=1, minutes=24, seconds=30)
     ]
 
@@ -322,7 +318,8 @@ def test_un_sous_agent_sans_notification_de_fin_est_denombre(tmp_path: Path) -> 
     events = bilan.read_events([write_transcript(tmp_path / "seul.jsonl", lonely)])
     calls = bilan.tool_calls(events)
 
-    assert "sans transcript ni notification de fin : 1" in bilan.report(events, bilan.Usage(), [])
+    report = bilan.report(events, bilan.Usage(), [])
+    assert "sans notification de fin ni transcript rattaché : 1" in report
     assert bilan.agent_runs(events, calls) == []
     assert len(bilan.launched_subagents(events, calls)) == 1
 
@@ -552,8 +549,8 @@ def test_les_chiffres_du_rapport_sont_epingles_un_a_un(tmp_path: Path) -> None:
         "le workflow est imbriqué dans la fenêtre de l'agent : l'union ne double pas"
     )
     assert m.alone == m.span - bilan.total(bilan.union(list(m.blocked) + list(m.windows)))
-    assert len(m.runs) == 2
-    assert len(m.workflows) == 1, "le critère 4 exige un workflow dans le transcript synthétique"
+    assert m.launched == ["Agent", "Workflow"]
+    assert m.workflows == 1, "le critère 4 exige un workflow dans le transcript synthétique"
     assert m.dangling == 0
     assert m.kinds["human"] == 4
     assert m.kinds["peer"] == 1
@@ -759,11 +756,37 @@ RELECTEUR_META = {
 def write_subagent(
     session: Path, stem: str, records: list[dict[str, Any]], meta: dict[str, Any]
 ) -> None:
-    """Range un transcript de sous-agent là où le harnais le range : `<session>/subagents/`."""
-    folder = session.with_suffix("") / "subagents"
-    folder.mkdir(parents=True, exist_ok=True)
-    write_transcript(folder / f"{stem}.jsonl", records)
-    (folder / f"{stem}.meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    """Range un transcript de sous-agent là où le harnais le range : `<session>/subagents/`, et
+    un cran plus bas pour un agent de workflow (`stem` = `workflows/<id>/agent-…`)."""
+    target = session.with_suffix("") / "subagents" / f"{stem}.jsonl"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    write_transcript(target, records)
+    target.with_name(target.stem + ".meta.json").write_text(json.dumps(meta), encoding="utf-8")
+
+
+def test_un_agent_de_workflow_se_lit_un_cran_plus_bas_et_le_journal_du_workflow_non(
+    tmp_path: Path,
+) -> None:
+    """Le harnais range les agents d'un workflow sous `subagents/workflows/<id>/`, à côté d'un
+    `journal.jsonl` qui n'est pas un transcript d'agent. Recensé le 2026-10-14 à 09 h 36 par la
+    relecture de la PR #89 (population vivante) : 57 des 91 transcripts de sous-agents du projet
+    sont à ce niveau, sans `toolUseId` dans leur meta ; 9 journaux de workflow, sans horodatage,
+    entreraient sinon comme des agents à zéro contact."""
+    session = write_transcript(tmp_path / "session.jsonl", TIMELINE)
+    write_subagent(
+        session,
+        "workflows/wf_1/agent-a3",
+        [said("10:05:10", "obs 25-37"), api_call("10:09:00", "msg_w", 0, 4_000, 70)],
+        {"agentType": "general-purpose", "description": "obs 25-37"},
+    )
+    write_transcript(
+        session.with_suffix("") / "subagents" / "workflows" / "wf_1" / "journal.jsonl",
+        [{"type": "launched"}],
+    )
+
+    assert [(agent.name, agent.launcher) for agent in bilan.subagents([session])] == [
+        ("obs 25-37", "")
+    ]
 
 
 def test_un_sous_agent_se_mesure_contact_par_contact_dans_son_transcript(tmp_path: Path) -> None:
@@ -826,8 +849,9 @@ def delivered_as_text(clock: str, call: str, task: str) -> dict[str, Any]:
 # commencent par la balise — dont 10 fins de workflow. Le script ne lisait que la première : le
 # bilan de la session de revue du journal (#77) annonçait « workflows 0 / 1 » et un
 # lancement « sans notification de fin ». Écartés à dessein : les `queue-operation` (la file du
-# harnais, pas une livraison — `enqueue` 137, `remove` 94) et les 12 messages qui **citent** une
-# notification sans commencer par elle. Deux formes recensées, une lue.
+# harnais, pas une livraison — `enqueue` 137, `remove` 94) et les 12 messages en blocs (9 `user`,
+# 3 `assistant`) qui **citent** une notification sans commencer par elle. Deux formes recensées,
+# une lue.
 FORMES_DE_LIVRAISON = {
     "pièce jointe queued_command": notification,
     "message user en texte nu": delivered_as_text,
@@ -855,7 +879,7 @@ def test_chaque_forme_de_livraison_ferme_la_fenetre_de_son_appel(
     events = bilan.read_events([write_transcript(tmp_path / "revue.jsonl", transcript)])
     m = bilan.measure(events)
 
-    assert [run.window for run in m.workflows] == [
+    assert m.windows == [
         (datetime.fromisoformat(at("09:00:10")), datetime.fromisoformat(at("09:06:10")))
     ]
     assert m.dangling == 0
@@ -875,6 +899,12 @@ def test_un_agent_au_premier_plan_et_une_reprise_comptent_dans_le_temps_des_sous
     le 2026-10-14 sur les 12 agents repris du corpus (2 ou 3 contacts chacun, population
     vivante) : 10 n'ont qu'**une** notification `completed` portant leur appel lanceur, 2 n'en
     ont aucune.
+
+    Le compte des lancements est la troisième garde. Un sous-agent entre au rapport par **5
+    chemins** — fenêtres, lancements perdus, lignes par agent, jetons des sous-agents, compte des
+    lancements —, recensés avant le correctif : **1 fuyait**, ce compte, seul à lire encore les
+    notifications (« workflows 0 / 0 » avec un relecteur au premier plan listé deux lignes plus
+    bas, relecture de la PR #89, passe 1).
     """
     session = write_transcript(
         tmp_path / "session.jsonl",
@@ -900,13 +930,14 @@ def test_un_agent_au_premier_plan_et_une_reprise_comptent_dans_le_temps_des_sous
         {"agentType": "verificateur", "toolUseId": VERIF_CALL, "requestShape": "foreground"},
     )
 
-    m = bilan.measure(bilan.read_events([session]), bilan.subagents([session]))
+    events, agents = bilan.read_events([session]), bilan.subagents([session])
+    m = bilan.measure(events, agents)
 
     assert m.dangling == 0, "le vérificateur a un transcript : il n'est ni en cours ni mort"
-    assert len(m.runs) == 2, "la notification reste la seule source de fenêtre d'un workflow"
     assert bilan.total(m.windows) == timedelta(minutes=19, seconds=30) + timedelta(
         minutes=5
     ) + timedelta(minutes=2, seconds=19), "premier contact, reprise, et vérificateur"
+    assert "(3 lancés, dont 1 workflows)" in bilan.report(events, bilan.Usage(), agents)
 
 
 def test_une_absence_reste_une_absence_quand_un_sous_agent_y_travaille(tmp_path: Path) -> None:
@@ -914,7 +945,14 @@ def test_une_absence_reste_une_absence_quand_un_sous_agent_y_travaille(tmp_path:
     l'ordre inverse, la reprise du relecteur (11:00 → 11:05) coupait l'absence de 10:35:30 à
     12:00 en deux morceaux de moins d'une heure, reclassés en réactivité : 1 h 19 de réactivité
     en plus, et plus d'absence du tout — le sens d'erreur d'obs 43 (relevé par `/code-review`
-    sur la PR #89)."""
+    sur la PR #89).
+
+    **Cas synthétique**, et la forme réelle est plus étroite : une reprise passe par un
+    `SendMessage`, donc un tour de la session, qui coupe l'attente — une fenêtre de sous-agent ne
+    recouvre une attente qu'à partir de son début (agent lancé juste avant une absence). Le
+    défaut y vit pareil : une absence de 1 h 05 dont un agent ronge les 10 premières minutes
+    passait en réactivité. Le montage le pousse à l'extrême pour que les deux classements
+    divergent sans ambiguïté."""
     session = write_transcript(tmp_path / "session.jsonl", TIMELINE)
     write_subagent(session, "agent-a1", RELECTEUR, RELECTEUR_META)
 
@@ -983,6 +1021,21 @@ def test_un_transcript_absent_se_dit_au_lieu_d_un_bilan_partiel_muet(
     assert f"transcripts demandés 2, lus 1 — absents : {absent}" in sortie
     assert "(sessions : 1)" in sortie, "le bilan porte sur le seul transcript lu"
     assert "relevé déposé" in sortie, "le remède se lit à côté du constat"
+
+
+def test_main_rend_le_releve_des_sous_agents_de_la_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le point d'entrée passe au rapport les sous-agents rangés à côté du transcript : sans ce
+    branchement, la suite restait verte sur un `main` qui n'en rendait aucun (mutation jouée
+    par la relecture de la PR #89, passe 1)."""
+    session = write_transcript(tmp_path / "session.jsonl", TIMELINE)
+    write_subagent(session, "agent-a1", RELECTEUR, RELECTEUR_META)
+
+    code, sortie = run_main([str(session)], monkeypatch)
+
+    assert code == 0
+    assert "  relecteur « Relecture 4.2, passe 1 » — 2 contacts" in sortie
 
 
 def test_aucun_transcript_lisible_ne_rend_pas_de_bilan(

@@ -1170,9 +1170,13 @@ sortante écrit sa passation depuis la variante « relais » de
 Trois choses que le relais ne peut pas reconstituer, chacune payée :
 
 - **son bilan, déposé avant de rendre la main** — `bilan-session.py` sur son propre transcript,
-  sortie écrite dans `retrospectives/<date>-<issue>-relais-<k>.txt` : le harnais a libéré le
-  transcript d'une session sortante 50 minutes avant que son relais ne commence, et un relevé
-  déposé, lui, ne se libère pas (obs 73) ;
+  sortie écrite dans `retrospectives/<date>-<issue>-relais-<k>.txt`, **hors du dépôt** (dossier
+  voisin du journal, chemin dans `CLAUDE.md`) : un relevé écrit dans un worktree part avec lui.
+  Le harnais a libéré le transcript d'une session sortante 50 minutes avant que son relais ne
+  commence (obs 73) ; ses marqueurs de libération ne visent que des transcripts de session — 15
+  sur 15 au 2026-10-14, et `retrospectives/` garde ses fichiers depuis le 2026-09-26. Que le
+  harnais ne libère jamais un fichier déposé n'est écrit nulle part : c'est un constat, pas une
+  garantie ;
 - **les numéros des entrées du journal d'observations déjà écrites pour ce cycle** — le plafond
   de `CLAUDE.md` se compte par cycle, relais compris, et un relais qui ignore le compte le
   recommence : le lot 1 de #77, sur trois sessions, a versé sept entrées sous un plafond de
