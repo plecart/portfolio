@@ -1139,7 +1139,7 @@ CYCLE_PR = REPOSITORY_ROOT / ".claude/skills/cycle-pr/SKILL.md"
 # 2026-10-14 avant le correctif, relecture de la PR #89, passe 2 : `go du briefing` apparaît
 # 2 fois dans `cycle-pr`, l'une à l'Étape 1 (la règle des `[V]` groupées), l'autre à l'Étape 7
 # (l'accord pour le vérificateur hors vague) — 1 renvoi hors de l'Étape 1, 1 fuyait.
-QUESTIONS_DU_GO = {"accord pour le vérificateur hors vague": "verificateur"}
+QUESTIONS_DU_GO = {"accord pour le vérificateur hors vague": "l'accord pour lancer soi-même"}
 
 
 def etape_1() -> str:
@@ -1161,4 +1161,8 @@ def test_chaque_renvoi_au_go_du_briefing_a_sa_question_dans_le_recueil() -> None
     texte = CYCLE_PR.read_text(encoding="utf-8")
     hors_etape_1 = texte.count("go du briefing") - etape_1().count("go du briefing")
 
-    assert hors_etape_1 == len(QUESTIONS_DU_GO)
+    assert hors_etape_1 == len(QUESTIONS_DU_GO), (
+        f"{hors_etape_1} renvoi(s) au go du briefing hors Étape 1 pour {len(QUESTIONS_DU_GO)} "
+        "question(s) au recueil : une question renvoyée au go s'inscrit à QUESTIONS_DU_GO et se "
+        "nomme à l'Étape 1 ; une mention qui n'est pas une question se reformule"
+    )
