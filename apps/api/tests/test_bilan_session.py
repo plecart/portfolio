@@ -812,11 +812,10 @@ def test_un_sous_agent_se_mesure_contact_par_contact_dans_son_transcript(tmp_pat
         AGENT_CALL,
     )
     assert [
-        (c.calls, c.context, c.used.cache_read, c.used.cache_write, c.used.output)
-        for c in agent.contacts
+        (c.calls, c.context, c.used.cache_read, c.used.cache_write) for c in agent.contacts
     ] == [
-        (3, 2 + 25_000 + 1_000, 45_000, 26_000, 960),
-        (2, 2 + 29_000 + 500, 55_000, 3_500, 600),
+        (3, 2 + 25_000 + 1_000, 45_000, 26_000),
+        (2, 2 + 29_000 + 500, 55_000, 3_500),
     ], "msg_a compte une fois ; la relance du harnais n'ouvre pas de contact"
     assert [bilan.total([c.window]) for c in agent.contacts] == [
         timedelta(minutes=19, seconds=30),
@@ -977,13 +976,37 @@ def test_le_rapport_rend_chaque_contact_avec_sa_consommation(tmp_path: Path) -> 
 
     titre = lines.index("  relecteur « Relecture 4.2, passe 1 » — 2 contacts")
     premier, reprise = lines[titre + 1], lines[titre + 2]
-    for attendu in ("0 h 19", "3 appels", *map(bilan.thousands, (26_002, 45_000, 26_000, 960))):
+    for attendu in ("0 h 19", "3 appels", *map(bilan.thousands, (26_002, 45_000, 26_000))):
         assert attendu in premier, f"{attendu!r} manque au premier contact : {premier}"
-    for attendu in ("0 h 05", "2 appels", *map(bilan.thousands, (29_502, 55_000, 3_500, 600))):
+    for attendu in ("0 h 05", "2 appels", *map(bilan.thousands, (29_502, 55_000, 3_500))):
         assert attendu in reprise, f"{attendu!r} manque à la reprise : {reprise}"
     assert bilan.consumed(agents) == bilan.Usage(
-        output=960 + 600, cache_read=45_000 + 55_000, cache_write=26_000 + 3_500, transcripts=1
+        cache_read=45_000 + 55_000, cache_write=26_000 + 3_500, transcripts=1
     )
+
+
+def test_la_sortie_d_un_sous_agent_ne_se_rend_pas(tmp_path: Path) -> None:
+    """Dans un transcript de sous-agent, une partie des messages porte un `output_tokens` figé
+    bien en dessous de ce qu'ils contiennent : mesuré le 2026-10-14 vers 10 h, 5 à 33 messages
+    par agent sur 10 examinés — 238 notés pour ~7 500 produits au vérificateur de la PR #86 —,
+    aucun dans les transcripts de session (0 sur 436). Un chiffre plausible et faux se lit comme
+    une mesure : la sortie d'un sous-agent ne se rend donc pas, ni par contact ni au total, et
+    le total le dit. Celle de la session, juste, reste."""
+    session = write_transcript(tmp_path / "session.jsonl", TIMELINE)
+    write_subagent(session, "agent-a1", RELECTEUR, RELECTEUR_META)
+    agents = bilan.subagents([session])
+
+    lines = bilan.report(
+        bilan.read_events([session]), bilan.Usage(output=5_000), agents
+    ).splitlines()
+
+    titre = lines.index("  relecteur « Relecture 4.2, passe 1 » — 2 contacts")
+    for contact in lines[titre + 1 : titre + 3]:
+        assert "sortie" not in contact, contact
+    total = next(line for line in lines if line.startswith("jetons des sous-agents"))
+    assert "sortie non mesurée" in total, total
+    session_line = next(line for line in lines if line.startswith("jetons de la session"))
+    assert "sortie      5 k" in session_line, session_line
 
 
 # --- Un transcript demandé qui n'existe plus (obs 73) --------------------------------------------
