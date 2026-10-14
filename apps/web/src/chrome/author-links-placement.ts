@@ -15,8 +15,9 @@
  * attribut `data-table-cell`, `hidden`, `style` ou `class` changé sur une cellule ou sur un élément
  * qui en contient — jamais dans une cellule, où vivent sa pose et son animation
  * (`useAuthorLinksPlacement`).
- * Restent à la charge de la table : une taille changée par une feuille sans mutation du DOM, et
- * une transformation posée sur un **ancêtre** de la cellule, que la mesure suit comme la sienne.
+ * Restent à la charge de la table : une taille changée par une feuille sans mutation du DOM, un
+ * attribut changé sur un élément sans cellule qui en déplace une (frère, intercalaire), et une
+ * transformation posée sur un **ancêtre** de la cellule, que la mesure suit comme la sienne.
  * Dénombrement des voies : `e2e/author-links-measure.spec.ts`.
  */
 export const TABLE_CELL_SELECTOR = '[data-table-cell]'

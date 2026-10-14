@@ -54,7 +54,7 @@ test('devant des cellules, la marge mesurée décide, et se relit au redimension
 
 /**
  * Chaque voie qui change la marge la fait relire. Dénombrées avant correctif, le 2026-10-14
- * (première relecture de la PR #93) : sept voies.
+ * (première relecture de la PR #93) : sept voies ; une huitième, hors portée, relevée à la relance.
  *
  * - relues : la fenêtre redimensionnée (test ci-dessus) ; un élément ajouté ou retiré ;
  * - fuyaient : un attribut changé sur un élément en place — `data-table-cell` posé ou retiré,
@@ -63,7 +63,8 @@ test('devant des cellules, la marge mesurée décide, et se relit au redimension
  * - neutralisée : une barre de défilement qui apparaît ou disparaît, la marge se comptant hors
  *   barre (`author-links-scrollbar.spec.ts`) ;
  * - hors portée, à la charge de la table (`TABLE_CELL_SELECTOR`) : une taille changée par une
- *   feuille sans mutation ; une transformation posée sur un ancêtre de la cellule.
+ *   feuille sans mutation ; un attribut changé sur un élément sans cellule qui en déplace une
+ *   (frère, intercalaire) ; une transformation posée sur un ancêtre de la cellule.
  *
  * Les cas partent d'une cellule de 360 px à 1100 px — colonne, 370 px de marge — et passent la
  * page en pied de page par leur voie, ou l'inverse depuis une cellule de 1044 px.
