@@ -21,7 +21,7 @@ function systemMode(): Mode {
  * que la spec §2.7 fait glisser — survol, fond et filet de l'entête — glisseraient sinon au
  * changement de mode, quand le reste de la page bascule : `data-switching` coupe toute transition
  * (`src/tokens.css`) le temps du calcul de style qui pose la nouvelle palette, forcé ici avant de
- * le retirer.
+ * le retirer. Mesuré sur Chromium, seul moteur de la suite (ADR 0008).
  *
  * ponytail: côté système, la coupure vit dans l'écouteur de `change`, qui arrive parfois une image
  * après le changement ; un calcul de style qu'un script force entre les deux laisse encore glisser

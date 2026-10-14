@@ -44,6 +44,44 @@ test("la marge intérieure de l'entête passe de 16 à 24 px à 600 px de large"
   await expect(header).toHaveCSS('padding', '0px 24px')
 })
 
+test('le bouton de mode fait 36 px, son icône 20 px (spec §3.3)', async ({ page }) => {
+  await page.goto('/')
+  const button = page.getByRole('banner').getByRole('button')
+
+  const [buttonBox, iconBox] = await Promise.all([
+    button.boundingBox(),
+    button.locator('svg').boundingBox(),
+  ])
+
+  expect([buttonBox?.width, buttonBox?.height, iconBox?.width, iconBox?.height]).toEqual([
+    36, 36, 20, 20,
+  ])
+})
+
+test("au survol, le nom prend l'accent et l'icône l'encre (spec §3.3)", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, 'un écran tactile ne survole pas : `hover:` exige `(hover: hover)`')
+  await page.goto('/')
+  const header = page.getByRole('banner')
+  const name = header.getByRole('link', { name: 'Pacôme Bernier' })
+  const button = header.getByRole('button')
+  const [ink, ink2, accent] = await resolveAll(page, [
+    ['color', 'var(--ink)'],
+    ['color', 'var(--ink-2)'],
+    ['color', 'var(--accent)'],
+  ])
+  await expect(name).toHaveCSS('color', ink)
+  await expect(button).toHaveCSS('color', ink2)
+
+  await name.hover()
+  await expect(name).toHaveCSS('color', accent)
+
+  await button.hover()
+  await expect(button).toHaveCSS('color', ink)
+})
+
 test("l'entête prend son fond et son filet dès 1 px de défilement", async ({ page }) => {
   await page.goto('/')
   await lengthenPage(page)
