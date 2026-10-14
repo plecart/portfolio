@@ -952,10 +952,22 @@ sort du périmètre de la PR, appliquer « Création d'issues en cours de cycle 
 a fait taire se répare, elle ne se doublonne pas), puis brouillon soumis au mainteneur. Jamais un
 `gh issue create` de la session.
 
-### Vérification par le lead — en vague parallèle seulement
+### Vérification d'avant-go — le `verificateur`
 
 Session démarrée par un lead (« Vague parallèle », en tête) : **proposer** à l'utilisateur d'envoyer
-l'état de la PR au lead, et n'envoyer que sur son oui. Sans lead, passer directement au go.
+l'état de la PR au lead, et n'envoyer que sur son oui — c'est le lead qui lance le vérificateur
+(`pr-paralleles` Étape 6). Sans lead : passer au go, ou lancer soi-même le rôle `verificateur`
+(`.claude/agents/verificateur.md`) avec ce qu'un lead lui donnerait, **sur l'accord du mainteneur
+demandé avec les `[V]` du go du briefing** (Étape 1) — demandé à la fin, il attend la prochaine
+présence : 6 h 37 d'absence au lot 4b de #77 sur cette seule question, à un moment où il ne restait
+rien d'indépendant à faire.
+
+**Le verdict s'inscrit dans les Notes du body avant le go**, relu après écriture
+(`contraintes.md`, « Écritures sur un artefact distant ») — au moins ses lignes « Fichiers
+croisés » et « Non vérifié », qui parlent d'**autres** branches et d'autres lots. Rendu seulement à
+la session qui l'a commandé, il ne survit que par sa mémoire, et la passation suivante le relaie
+comme un énoncé sans source : deux lots de suite, le prompt du lot suivant a cité un verdict que ni
+le corps ni les commentaires de la PR ne portaient (obs 81).
 
 Le message, au `from` du lead :
 
