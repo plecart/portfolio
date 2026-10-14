@@ -26,9 +26,9 @@ dated() {
 		esac
 		stamp=${name#"$base"-}
 		stamp=${stamp%.dump.age}
-		# `date` refuse un mois 13, une heure 25 ou un instant d'avant 1970, mais normalise un jour
-		# qui n'existe pas — un 31 avril devient un 1ᵉʳ mai (mesuré, busybox) : relue au format du
-		# nom, la date doit le rendre tel quel.
+		# `date` refuse un mois 13 ou une heure 25, mais normalise un jour qui n'existe pas — un
+		# 31 avril devient un 1ᵉʳ mai (mesuré, busybox) : relue au format du nom, la date doit le
+		# rendre tel quel.
 		read_back=$(date -u -D %Y%m%dT%H%M%SZ -d "$stamp" '+%Y%m%dT%H%M%SZ %G-%V' 2>/dev/null) ||
 			continue
 		[ "${read_back% *}" = "$stamp" ] || continue
