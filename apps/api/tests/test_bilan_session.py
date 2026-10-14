@@ -200,14 +200,16 @@ def test_la_fenetre_d_un_sous_agent_est_bornee_par_l_identifiant_de_son_appel(
 def test_l_attente_du_mainteneur_exclut_le_temps_des_sous_agents(tmp_path: Path) -> None:
     """Sinon le mainteneur est facturé du temps qu'il n'a pas fait attendre (obs 41).
 
-    Deux attentes réelles ici : 15 min après le dernier tour de l'agent, et 1 h 24 min 30
-    ensuite. Le chargement de skill de 10:25:10 n'en borne aucune.
+    Deux attentes réelles ici : 15 min après la fin du sous-agent, et 1 h 54 min 30 ensuite. Le
+    chargement de skill de 10:25:10 n'en borne aucune. Chacune court jusqu'au **dernier**
+    message qui précède la reprise de l'agent : le message de pair de 10:30 n'a rien déclenché
+    avant le « ok » de 10:35, ni le « reprends » de 12:00 avant le relais ouvert à 12:30.
     """
     m = bilan.measure(read(tmp_path))
 
     assert [bilan.total([window]) for window in m.blocked] == [
         timedelta(minutes=15),
-        timedelta(hours=1, minutes=24, seconds=30),
+        timedelta(hours=1, minutes=54, seconds=30),
     ]
 
 
@@ -219,7 +221,7 @@ def test_les_attentes_se_scindent_en_reactivite_et_absences(tmp_path: Path) -> N
 
     assert [bilan.total([window]) for window in m.reactivity] == [timedelta(minutes=15)]
     assert [bilan.total([window]) for window in m.absences] == [
-        timedelta(hours=1, minutes=24, seconds=30)
+        timedelta(hours=1, minutes=54, seconds=30)
     ]
 
 
@@ -243,7 +245,7 @@ def test_le_rapport_porte_les_lignes_que_le_mainteneur_lit(tmp_path: Path) -> No
     assert "actif (hors absences)" in report, "le dénominateur doit se lire, pas se deviner"
     assert "sessions : 2" in report
     assert "relais à" in report
-    # L'attente hors absences se lit avant l'agrégat : 15 min sur 1 h 15 de temps actif.
+    # L'attente hors absences se lit avant l'agrégat : 15 min sur 45 min 30 de temps actif.
     assert report.index("réactivité (< 1 h)") < report.index("absences (≥ 1 h)")
 
 
@@ -252,9 +254,9 @@ def test_la_reactivite_se_rapporte_au_temps_actif_et_les_absences_a_la_session(
 ) -> None:
     """Deux dénominateurs, et c'est tout le propos du critère « pourcentage hors absences ».
 
-    Sur le transcript synthétique : 2 h 40 de session dont 1 h 24 d'absence, donc **1 h 15 de
-    temps actif** (l'arrondi d'affichage près). Les 15 min d'attente valent **20 % du temps
-    actif** et seulement 9 % de la session — rapporter la réactivité à la session la dilue
+    Sur le transcript synthétique : 2 h 40 de session dont 1 h 54 min 30 d'absence, donc
+    **45 min 30 de temps actif**. Les 15 min d'attente valent **33 % du temps actif** et
+    seulement 9 % de la session — rapporter la réactivité à la session la dilue
     d'autant que le mainteneur a été absent, et fait croire à un gain que personne n'a obtenu.
     C'est le sens d'erreur d'obs 41, appliqué au dénominateur au lieu du numérateur.
     """
@@ -359,9 +361,14 @@ FORMES_REELLES = {
         "system",
         79,
     ),
+    # Une commande **tapée** porte la barre oblique dans `<command-name>` : c'est le mainteneur
+    # qui agit, et son message rouvre un tour comme sa prose. Classée `system`, elle laissait
+    # compter en travail d'agent l'attente qui la précède — 15 attentes et 1 j 17 h 45 au relevé
+    # des attentes du 2026-10-14 à 13:47 UTC. Le skill que l'agent lance lui-même n'a pas de barre
+    # oblique.
     "skill tapé par le mainteneur": (
         "<command-message>i-have-adhd</command-message>\n<command-name>/i-have-adhd</command-name>",
-        "system",
+        "human",
         27,
     ),
     "commande locale tapée par le mainteneur": (
@@ -369,10 +376,12 @@ FORMES_REELLES = {
             "<command-name>/model</command-name>\n            <command-message>model"
             "</command-message>\n            <command-args></command-args>"
         ),
-        "system",
+        "human",
         13,
     ),
-    "skill lancé par l'agent": (
+    # Chargé par le harnais à la suite d'un message du mainteneur, sans commande tapée : les 6
+    # occurrences suivent un message `human`, aucune un appel d'outil de l'agent.
+    "skill chargé par le harnais": (
         (
             "<command-message>workflow-authoring</command-message>\n<command-name>"
             "workflow-authoring</command-name>\n<skill-format>true</skill-format>"
@@ -427,9 +436,11 @@ FORMES_REELLES = {
         40,
     ),
     "interruption par le mainteneur": ("[Request interrupted by user]", "system", 32),
+    # L'avis qu'une session voisine est au repos, que l'agent a demandé en l'attendant : il
+    # rouvre un tour de pair, comme le message qu'elle aurait envoyé.
     "avis d'inactivité d'une session voisine": (
         '[Cross-session idle notice] "uds:\\\\.\\pipe\\LOCAL" est au repos',
-        "system",
+        "peer",
         23,
     ),
     "référence d'écriture de workflow": (
@@ -460,7 +471,7 @@ FORMES_REELLES = {
 
 # Le recensement du 2026-10-14 à 14:08 UTC, que le recueil doit couvrir sans résidu.
 POPULATION = 1083
-PAR_CLASSE = {"human": 432, "system": 416, "peer": 235}
+PAR_CLASSE = {"human": 472, "system": 353, "peer": 258}
 
 
 @pytest.mark.parametrize(
@@ -498,6 +509,84 @@ def test_le_recueil_couvre_la_population_entiere() -> None:
         for classe in PAR_CLASSE
     }
     assert par_classe == PAR_CLASSE
+
+
+PEER_MESSAGE = FORMES_REELLES["message de pair, balise historique"][0]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [(text, expected) for text, expected, _ in FORMES_REELLES.values()],
+    ids=FORMES_REELLES.keys(),
+)
+def test_chaque_forme_reelle_rouvre_un_tour_selon_sa_classe(
+    tmp_path: Path, text: str, expected: str
+) -> None:
+    """Une attente court de la dernière sortie de l'agent au message qui rouvre son tour.
+
+    Seuls le mainteneur — prose ou commande tapée — et un pair — message ou avis de repos —
+    rouvrent un tour. Dénombrement sur les 17 formes du recueil : **8** rouvrent un tour, dont
+    **5** ne fermaient aucune attente avant ce correctif — les deux commandes tapées, les deux
+    balises de pair, l'avis de repos —, seul un message `human` fermant alors une attente. Au
+    relevé des attentes du 2026-10-14 à 13:47 UTC, les 213 attentes closes par un message de
+    pair, 6 j 18 h 46 au total, se comptaient ainsi en travail d'agent. Témoins des deux côtés :
+    les 9 formes `system` du recueil ne rouvrent rien.
+
+    Args:
+        text: la forme, telle qu'elle arrive dans un message réel.
+        expected: sa classe au recueil.
+    """
+    tour = [assistant("09:00:00"), said("09:20:00", text), assistant("09:21:00")]
+    events = bilan.read_events([write_transcript(tmp_path / "tour.jsonl", tour)])
+
+    attendu = [timedelta(minutes=20)] if expected in ("human", "peer") else []
+    assert [bilan.total([window]) for window in bilan.measure(events).blocked] == attendu
+
+
+def test_l_attente_court_jusqu_au_dernier_message_avant_la_reprise(tmp_path: Path) -> None:
+    """Deux messages avant que l'agent ne reprenne : l'attente court jusqu'au second.
+
+    Le premier n'a rien déclenché — l'agent n'a rien rendu entre les deux, par exemple parce que
+    la session tenait le message de pair pour approbation. Fermer au premier compterait en
+    travail d'agent un temps où il n'a rien fait. Au relevé des attentes du 2026-10-14 à
+    13:47 UTC, les deux règles ne diffèrent que sur 16 attentes, 34 min au total : c'est ce
+    montage qui les départage.
+    """
+    tour = [
+        assistant("09:00:00"),
+        said("09:10:00", PEER_MESSAGE),
+        said("09:30:00", "ok"),
+        assistant("09:31:00"),
+    ]
+    events = bilan.read_events([write_transcript(tmp_path / "tour.jsonl", tour)])
+
+    assert [bilan.total([window]) for window in bilan.measure(events).blocked] == [
+        timedelta(minutes=30)
+    ]
+
+
+def test_un_relais_ouvert_par_un_pair_le_lendemain_est_une_absence(tmp_path: Path) -> None:
+    """Le cas qui a révélé le défaut : le bilan du lot 1 de #23, trois transcripts fusionnés,
+    rendait 242 h 30 d'agent seul contre 2 h 53 en sommant leurs sorties séparées. La première
+    reprise s'ouvrait par un message de pair, la seconde par une commande tapée — deux formes que
+    `waits` ne comptait pas : l'écart entre deux transcripts, une nuit puis dix jours, passait
+    en travail d'agent. Ce montage rejoue la première.
+    """
+    veille = [said("20:00:00", "go"), assistant("20:10:00")]
+    lendemain = [
+        {**said("08:00:00", PEER_MESSAGE), "timestamp": "2026-09-28T08:00:00.000Z"},
+        {**assistant("08:05:00"), "timestamp": "2026-09-28T08:05:00.000Z"},
+    ]
+    events = bilan.read_events(
+        [
+            write_transcript(tmp_path / "veille.jsonl", veille),
+            write_transcript(tmp_path / "lendemain.jsonl", lendemain),
+        ]
+    )
+    m = bilan.measure(events)
+
+    assert bilan.total(m.absences) == timedelta(hours=11, minutes=50)
+    assert m.alone == timedelta(minutes=15), "10 min la veille, 5 min le lendemain"
 
 
 def test_une_balise_non_fermee_reste_un_message_du_mainteneur() -> None:
@@ -564,8 +653,8 @@ def test_les_chiffres_du_rapport_sont_epingles_un_a_un(tmp_path: Path) -> None:
     assert m.sessions == 2
     assert m.relayed == [datetime.fromisoformat(at("12:30:00"))]
     assert bilan.total(m.reactivity) == timedelta(minutes=15)
-    assert bilan.total(m.absences) == timedelta(hours=1, minutes=24, seconds=30)
-    assert bilan.total(m.blocked) == timedelta(hours=1, minutes=39, seconds=30)
+    assert bilan.total(m.absences) == timedelta(hours=1, minutes=54, seconds=30)
+    assert bilan.total(m.blocked) == timedelta(hours=2, minutes=9, seconds=30)
     assert bilan.total(m.windows) == timedelta(minutes=19, seconds=30), (
         "le workflow est imbriqué dans la fenêtre de l'agent : l'union ne double pas"
     )
@@ -694,7 +783,7 @@ def test_un_message_de_sous_agent_ne_compte_pas_dans_la_session(tmp_path: Path) 
 def test_une_attente_d_exactement_une_heure_est_une_absence() -> None:
     """La frontière est inclusive, et seul ce montage la distingue.
 
-    L'absence du transcript synthétique fait 1 h 24 : `>` et `>=` y rendent le même résultat.
+    L'absence du transcript synthétique fait 1 h 54 : `>` et `>=` y rendent le même résultat.
     Mesuré en relecture — relâcher la comparaison laissait la suite verte.
     """
     debut = datetime.fromisoformat(at("10:00:00"))
@@ -715,6 +804,10 @@ def test_plusieurs_blocs_enchaines_restent_un_message_injecte() -> None:
     recopiées de transcripts.
 
     Le bloc vide (`<command-args></command-args>`) est le cas limite du corps : zéro caractère.
+
+    Les deux premières formes sont des commandes **tapées** : le motif les reconnaît comme des
+    blocs, mais `classify` les rend `human` (`TYPED_COMMAND`). Le motif s'éprouve donc seul, et la
+    classe sur la forme à trois blocs que le harnais injecte quand il charge un skill de lui-même.
     """
     deux = (
         "<command-message>i-have-adhd</command-message>\n<command-name>/i-have-adhd</command-name>"
@@ -723,10 +816,12 @@ def test_plusieurs_blocs_enchaines_restent_un_message_injecte() -> None:
         "<command-name>/mcp</command-name>\n<command-message>mcp</command-message>\n"
         "<command-args></command-args>"
     )
+    charge_par_le_harnais = FORMES_REELLES["skill chargé par le harnais"][0]
 
-    assert bilan.classify("user", [{"type": "text", "text": deux}]) == "system"
-    assert bilan.classify("user", [{"type": "text", "text": trois}]) == "system"
-    assert bilan.classify("user", [{"type": "text", "text": trois + "et vas-y"}]) == "human"
+    assert bilan.INJECTED_BLOCKS.match(deux)
+    assert bilan.INJECTED_BLOCKS.match(trois)
+    assert not bilan.INJECTED_BLOCKS.match(trois + "et vas-y")
+    assert bilan.classify("user", [{"type": "text", "text": charge_par_le_harnais}]) == "system"
 
 
 # --- Ce que chaque sous-agent a consommé, contact par contact (#77, lot 4c) --------------------

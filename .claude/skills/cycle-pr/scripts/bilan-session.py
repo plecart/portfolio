@@ -5,16 +5,17 @@ Usage : python bilan-session.py <transcript.jsonl> [<relais.jsonl> …]
 Un cycle qui a rempli un contexte a **plusieurs** transcripts : le script en accepte autant
 qu'on lui en donne, les fusionne dans l'ordre du temps et rend l'heure de chaque relais (obs 40).
 
-Rend, sans double compte : la durée de la session ; l'attente du mainteneur **scindée** en
-réactivité (moins d'une heure) et absences (une heure ou plus), le pourcentage hors absences en
-tête — les deux n'ont ni la même cause ni le même remède, et leur somme se lit comme un défaut
-de la pipeline alors qu'une nuit relève du calendrier (obs 43) ; le temps des sous-agents et des
-workflows, **retiré** de l'attente du mainteneur, qui serait sinon facturé du temps qu'il n'a pas
-fait attendre ; le temps d'agent seul ; les jetons facturés par la session ; le cache que chaque
-sous-agent a lu et écrit, **contact par contact**, lu dans son propre transcript — la notification
-de fin de son lancement ne porte que le contexte en fin de premier contact, et un agent au
-premier plan n'en émet aucune ; sa sortie, que ce transcript ne porte pas de façon fiable, n'est
-pas rendue ; les points de contact humains et les appels d'outils.
+Rend, sans double compte : la durée de la session ; l'attente — du mainteneur ou d'un pair,
+jusqu'au dernier message qui rouvre le tour de l'agent — **scindée** en réactivité (moins d'une
+heure) et absences (une heure ou plus), le pourcentage hors absences en tête — les deux n'ont ni
+la même cause ni le même remède, et leur somme se lit comme un défaut de la pipeline alors
+qu'une nuit relève du calendrier (obs 43) ; le temps des sous-agents et des workflows,
+**retiré** de cette attente, qui le compterait sinon comme du temps passé à attendre ; le temps
+d'agent seul ; les jetons facturés par la session ; le cache que chaque sous-agent a lu et écrit,
+**contact par contact**, lu dans son propre transcript — la notification de fin de son lancement
+ne porte que le contexte en fin de premier contact, et un agent au premier plan n'en émet
+aucune ; sa sortie, que ce transcript ne porte pas de façon fiable, n'est pas rendue ; les points
+de contact humains et les appels d'outils.
 
 Python 3.11 ou plus, bibliothèque standard seule.
 """
@@ -55,6 +56,19 @@ STATUS_COMPLETED = "<status>completed</status>"
 # suite, seul endroit où les chiffres vivent — recopiés ici, ils dérivent au recensement suivant.
 PEER_TAGS = ("<cross-session-message", "<agent-message")
 
+# L'avis qu'une session voisine est au repos, que l'agent a demandé pour l'attendre : il rouvre un
+# tour de pair au même titre que le message qu'elle aurait envoyé.
+PEER_NOTICE = "[Cross-session idle notice]"
+
+# Une commande **tapée** par le mainteneur — skill ou commande locale — porte la barre oblique
+# dans son nom ; un skill que le harnais charge de lui-même n'en porte pas. Population :
+# `FORMES_REELLES`.
+TYPED_COMMAND = "<command-name>/"
+
+# Les classes de message qui rouvrent un tour de l'agent, donc ferment son attente : le
+# mainteneur, prose ou commande tapée, et un pair.
+TURN_OPENERS = ("human", "peer")
+
 # Dans le transcript d'un sous-agent, le message par lequel le coordinateur le reprend — un
 # `SendMessage`, que l'agent ait fini ou non. C'est lui qui ouvre un nouveau contact.
 COORDINATOR = "The coordinator sent a message"
@@ -85,7 +99,6 @@ INJECTED_BLOCKS = re.compile(r"\A(?:\s*<([a-z][a-z0-9_-]*)>(?:(?!</\1>).)*</\1>)
 # `<local-command-caveat>Caveat: …`, donc une balise. Dénombrement : `FORMES_REELLES`.
 INJECTED = (
     "Base directory for this skill:",
-    "[Cross-session idle notice]",
     "[Request interrupted",
     "# Workflow authoring reference",
     "This session is being continued from a previous conversation",
@@ -387,7 +400,7 @@ def read_events(paths: Sequence[Path | str]) -> list[Event]:
 
 
 def classify(role: str, blocks: list[dict[str, Any]]) -> str:
-    """La classe d'un message : d'où il vient, et s'il borne une attente du mainteneur.
+    """La classe d'un message : d'où il vient, et s'il rouvre le tour de l'agent.
 
     Un message de pair **commence** par « Another Claude session sent a message: » et porte la
     balise plus loin : le chercher en tête le classait humain. Un texte injecté par le harnais —
@@ -397,7 +410,8 @@ def classify(role: str, blocks: list[dict[str, Any]]) -> str:
 
     Un texte injecté se reconnaît à son **début**, donc avant toute recherche de balise de pair :
     le texte d'un skill peut citer `<cross-session-message>`, et cette citation classait son
-    chargement `peer` (40 messages au recensement de `FORMES_REELLES`).
+    chargement `peer` (40 messages au recensement de `FORMES_REELLES`). Une commande tapée par
+    le mainteneur est faite de blocs de balises, mais c'est lui qui agit : `human`.
     """
     if role == "assistant":
         return "assistant"
@@ -407,9 +421,9 @@ def classify(role: str, blocks: list[dict[str, Any]]) -> str:
     stripped = SYSTEM_REMINDER.sub("", text).strip()
     if not stripped or stripped.startswith(INJECTED):
         return "system"
-    if any(tag in text for tag in PEER_TAGS):
+    if stripped.startswith(PEER_NOTICE) or any(tag in text for tag in PEER_TAGS):
         return "peer"
-    if INJECTED_BLOCKS.match(stripped):
+    if INJECTED_BLOCKS.match(stripped) and TYPED_COMMAND not in stripped:
         return "system"
     return "human"
 
@@ -474,20 +488,27 @@ def launched_subagents(
 
 
 def waits(events: Sequence[Event], calls: Sequence[ToolCall]) -> list[Interval]:
-    """Dernière sortie de l'agent → message humain suivant, et les questions formelles, fusionnées.
+    """Les attentes de l'agent et les questions formelles, fusionnées.
+
+    Une attente court de sa dernière sortie au **dernier** message qui rouvre son tour avant la
+    sortie suivante — du mainteneur ou d'un pair (`TURN_OPENERS`). Le dernier, pas le premier :
+    un message qui n'a rien déclenché n'a pas mis l'agent au travail. Ne compter que le
+    mainteneur faisait passer en travail d'agent toute attente close par un pair, écart entre
+    deux transcripts compris — 242 h 30 d'agent seul au bilan du lot 1 de #23, pour 2 h 53 de
+    travail (`test_un_relais_ouvert_par_un_pair_le_lendemain_est_une_absence`).
 
     Brutes : le temps des sous-agents s'en retire dans `measure`, **après** leur classement —
     le retrait est le cœur d'obs 41, sans lui une session à relectures parallèles facture au
     mainteneur le temps de ses sous-agents.
     """
-    windows: list[Interval] = []
-    last_agent: datetime | None = None
+    reopened: dict[datetime, datetime] = {}
+    idle_since: datetime | None = None
     for event in events:
         if event.kind == "assistant":
-            last_agent = event.when
-        elif event.kind == "human" and last_agent is not None:
-            windows.append((last_agent, event.when))
-            last_agent = None
+            idle_since = event.when
+        elif event.kind in TURN_OPENERS and idle_since is not None:
+            reopened[idle_since] = event.when
+    windows = list(reopened.items())
     windows += [
         (call.started, call.started + call.duration) for call in calls if call.name == QUESTION_TOOL
     ]
@@ -620,7 +641,7 @@ class Measures:
         session réelle n'est pas reproductible, son transcript pouvant avoir disparu (obs 73),
         et l'arrondi d'affichage des durées ne redonne **pas toujours** le pourcentage que le
         rapport imprime, qui se calcule sur les secondes — il le redonne sur le montage ci-dessus
-        (15 min sur 1 h 15 affichés, 20 % imprimés), et pas sur une session dont les durées
+        (15 min sur 0 h 45 affichés, 33 % imprimés), et pas sur une session dont les durées
         tombent entre deux minutes.
         """
         return self.span - total(self.absences)
