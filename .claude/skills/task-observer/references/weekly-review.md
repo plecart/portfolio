@@ -110,6 +110,9 @@ observation — surface it at the top of the review with its application
 count, and read "the fix is a habit" as a finding against the observation
 itself (How to Log, Suggested improvement).
 
+Any breakdown of the queue by date reads each entry's `**Date:**` field, never
+the `## <date>` section headers: an append can land under a stale header.
+
 Also read all active cross-cutting principles. If there are no OPEN
 observations and no outstanding principles: report "no open observations
 or outstanding principles", update the timestamp, and stop.

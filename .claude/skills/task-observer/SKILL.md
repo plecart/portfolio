@@ -257,6 +257,21 @@ optional.** Reviews classify entries by their Status line; an observation
 written without one is invisible to any status-filtered pass and risks being
 silently skipped instead of triaged.
 
+If the log's last `## <date>` section header is not today's date, write
+`## <today>` before the entry: the grouping headers are only true if every
+append maintains them — seventeen entries once landed under a header up to
+two days old, and a review that trusted the headers misreported the log's
+age. Any breakdown by date reads each entry's `**Date:**` field, never the
+section headers.
+
+The optional **Application window** field names where the entry becomes
+applicable — "the next delta on `<file>` §`<section>`". It makes an OPEN entry
+addressable by location: whoever briefs work on that section (a brief, a lot,
+a review) can pull the entry in by searching the field, instead of waiting for
+a review. It never makes a session apply the entry outside its brief — an
+unbriefed load in a PR is what the project's « Création d'issues en cours de
+cycle » rule (`.claude/rules/contraintes.md`) forbids.
+
 ```markdown
 ### Observation [N]: [Short descriptive title]
 
@@ -266,6 +281,7 @@ silently skipped instead of triaged.
 **Skill:** [existing skill name, or "New skill candidate: [working name]"]
 **Type:** [open-source | internal]
 **Phase/Area:** [which part of the skill or workflow]
+**Application window:** [optional — "the next delta on <file> §<section>"]
 
 **Issue:** [What happened — specific enough to understand weeks later
 without the original conversation.]
@@ -391,6 +407,16 @@ creation: load `references/skill-authoring.md` first and follow its editing
 and staging rules. If an observation reveals a principle that applies to
 skills generally, propose it for the cross-cutting principles file (see the
 same reference).
+
+**An observation that credits a tool with a behaviour is dated by the version
+it observed.** Before inscribing such a credit in an artefact — a gate in the
+project's command list, a locked decision in a brief, a skill rule —
+re-measure it on the installed version: injected fault, valid witness beside
+it. The inscribed line carries the measured version and what the gate does
+*not* cover. An observation credited a validator with catching a malformed
+role frontmatter; re-measured before inscription, the installed version was
+silent on exactly that class. A gate whose coverage is believed rather than
+measured is worse than no gate: it gets the one that works removed.
 
 ## Quick Reference
 
