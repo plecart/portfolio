@@ -450,11 +450,12 @@ JANUARY_2000 = [f"{DATABASE}-200001{day:02d}T030000Z.dump.age" for day in range(
 @dataclass(frozen=True)
 class Sabotage:
     """Ce qui fait échouer une étape, le temps d'une exécution : des variables du conteneur
-    remplacées, des objets que le stockage refuse de supprimer — et si l'envoi a eu lieu avant."""
+    remplacées, des objets que le stockage refuse de supprimer — et combien d'objets l'envoi a
+    posés avant l'échec."""
 
     overrides: Mapping[str, str]
     locked: tuple[str, ...] = ()
-    uploaded: bool = False
+    uploaded: int = 0
 
 
 # Étape → son sabotage : un mot de passe que la base refuse, un destinataire que `age` ne sait pas
@@ -468,7 +469,7 @@ FAILURES = {
     "purge": Sabotage(
         {"RCLONE_RETRIES": "1", "RCLONE_LOW_LEVEL_RETRIES": "1"},
         locked=tuple(JANUARY_2000),
-        uploaded=True,
+        uploaded=1,
     ),
 }
 
