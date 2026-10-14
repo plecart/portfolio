@@ -468,14 +468,20 @@ def subagent_windows(events: Sequence[Event], calls: Sequence[ToolCall]) -> list
 def blocked_windows(
     events: Sequence[Event],
     calls: Sequence[ToolCall],
-    subagents: Sequence[Interval] | None = None,
+    busy: Sequence[Interval] | None = None,
 ) -> list[Interval]:
-    """Dernière sortie de l'agent → message humain suivant, moins le temps des sous-agents.
+    """Les attentes du mainteneur, moins le temps des sous-agents (`busy`, par défaut les
+    fenêtres des notifications).
 
     Le retrait est le cœur d'obs 41 : sans lui, une session à relectures parallèles facture au
     mainteneur le temps de ses sous-agents, et le chiffre cache précisément le gain que ces
     relectures produisent.
     """
+    return without(waits(events, calls), subagent_windows(events, calls) if busy is None else busy)
+
+
+def waits(events: Sequence[Event], calls: Sequence[ToolCall]) -> list[Interval]:
+    """Dernière sortie de l'agent → message humain suivant, et les questions formelles, fusionnées."""
     windows: list[Interval] = []
     last_agent: datetime | None = None
     for event in events:
@@ -487,8 +493,7 @@ def blocked_windows(
     windows += [
         (call.started, call.started + call.duration) for call in calls if call.name == QUESTION_TOOL
     ]
-    busy = subagent_windows(events, calls) if subagents is None else subagents
-    return without(union(windows), busy)
+    return union(windows)
 
 
 def split_waits(blocked: Sequence[Interval]) -> tuple[list[Interval], list[Interval]]:
@@ -627,17 +632,21 @@ def measure(events: Sequence[Event], agents: Sequence[Subagent] = ()) -> Measure
         raise ValueError("aucun événement à mesurer — transcripts vides ou illisibles")
     calls = tool_calls(events)
     runs = agent_runs(events, calls)
-    # Les fenêtres se déduisent des `runs` déjà calculés, et sont **passées** à
-    # `blocked_windows`. Chacune des trois les recalculait, soit trois parcours complets de la
-    # liste d'événements — sensible sur un transcript de plusieurs dizaines de méga-octets.
-    # S'y ajoutent les contacts lus dans les transcripts des sous-agents : une notification ne
-    # borne que le premier contact d'un agent de fond, et un agent au premier plan n'en a pas.
+    # Les fenêtres se déduisent des `runs` déjà calculés, une seule fois : les recalculer à
+    # chaque usage coûtait un parcours complet de la liste d'événements par usage — sensible
+    # sur un transcript de plusieurs dizaines de méga-octets. S'y ajoutent les contacts lus dans
+    # les transcripts des sous-agents : une notification ne borne que le premier contact d'un
+    # agent de fond, et un agent au premier plan n'en a pas.
     windows = union(
         [run.window for run in runs] + [c.window for agent in agents for c in agent.contacts]
     )
     seen = {run.uid for run in runs} | {agent.launcher for agent in agents}
-    blocked = blocked_windows(events, calls, windows)
-    reactivity, absences = split_waits(blocked)
+    # Une attente se classe sur sa durée **brute**, puis perd le temps des sous-agents : retiré
+    # d'abord, un sous-agent au milieu d'une absence la coupait en morceaux de moins d'une heure,
+    # reclassés en réactivité (`test_une_absence_reste_une_absence_quand_un_sous_agent_y_travaille`).
+    raw_reactivity, raw_absences = split_waits(waits(events, calls))
+    reactivity, absences = without(raw_reactivity, windows), without(raw_absences, windows)
+    blocked = union(reactivity + absences)
     start, end = events[0].when, events[-1].when
     span = end - start
     return Measures(
@@ -785,9 +794,10 @@ def main(argv: Sequence[str]) -> int:
     present = [path for path in paths if path.is_file()]
     absent = ", ".join(str(path) for path in paths if not path.is_file())
     if absent:
+        partial = " (bilan partiel : additionner le relevé déposé par chaque session absente)"
         say(
             f"transcripts demandés {len(paths)}, lus {len(present)} — absents : {absent}"
-            " (bilan partiel : additionner le relevé déposé par chaque session absente)"
+            + (partial if present else "")
         )
     events = read_events(present)
     if not events:

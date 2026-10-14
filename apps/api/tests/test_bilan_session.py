@@ -909,6 +909,21 @@ def test_un_agent_au_premier_plan_et_une_reprise_comptent_dans_le_temps_des_sous
     ) + timedelta(minutes=2, seconds=19), "premier contact, reprise, et vérificateur"
 
 
+def test_une_absence_reste_une_absence_quand_un_sous_agent_y_travaille(tmp_path: Path) -> None:
+    """Une attente se classe sur sa durée **brute**, puis perd le temps des sous-agents. Dans
+    l'ordre inverse, la reprise du relecteur (11:00 → 11:05) coupait l'absence de 10:35:30 à
+    12:00 en deux morceaux de moins d'une heure, reclassés en réactivité : 1 h 19 de réactivité
+    en plus, et plus d'absence du tout — le sens d'erreur d'obs 43 (relevé par `/code-review`
+    sur la PR #89)."""
+    session = write_transcript(tmp_path / "session.jsonl", TIMELINE)
+    write_subagent(session, "agent-a1", RELECTEUR, RELECTEUR_META)
+
+    m = bilan.measure(bilan.read_events([session]), bilan.subagents([session]))
+
+    assert bilan.total(m.reactivity) == timedelta(minutes=15)
+    assert bilan.total(m.absences) == timedelta(hours=1, minutes=19, seconds=30)
+
+
 def test_le_rapport_rend_chaque_contact_avec_sa_consommation(tmp_path: Path) -> None:
     """Une ligne par contact, sous le nom de son agent : c'est le coût **par contact** que les
     lots se comparent — un total dépend de la taille du delta relu (journal de spec de #77,
@@ -980,3 +995,4 @@ def test_aucun_transcript_lisible_ne_rend_pas_de_bilan(
 
     assert code == 1
     assert f"absents : {absent}" in sortie
+    assert "bilan partiel" not in sortie, "aucun bilan n'est rendu (relevé par `/code-review`)"
