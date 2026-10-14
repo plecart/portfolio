@@ -3,19 +3,27 @@ import type { ReactNode } from 'react'
 /**
  * Icônes au trait du prototype retenu (`cadre.html`, hors dépôt ; brief de #18, décision 10) :
  * tracées ici, sans paquet d'icônes (D27). Décoratives — l'élément qui les porte a son libellé —,
- * dans la couleur du texte, 20 px (spec §3.3).
+ * dans la couleur du texte. Par défaut, celles de l'entête : 20 px (spec §3.3), trait de 1,6.
  */
-function StrokeIcon({ children }: { children: ReactNode }) {
+function StrokeIcon({
+  children,
+  strokeWidth = 1.6,
+  className = 'size-5',
+}: {
+  children: ReactNode
+  strokeWidth?: number
+  className?: string
+}) {
   return (
     <svg
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.6}
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      className="size-5"
+      className={className}
     >
       {children}
     </svg>
@@ -38,5 +46,33 @@ export function MoonIcon() {
     <StrokeIcon>
       <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />
     </StrokeIcon>
+  )
+}
+
+/** Icônes des liens de l'auteur : 22 px (spec §3.4), trait de 1,5 comme au prototype. */
+function AuthorLinkIcon({ children }: { children: ReactNode }) {
+  return (
+    <StrokeIcon strokeWidth={1.5} className="size-[22px]">
+      {children}
+    </StrokeIcon>
+  )
+}
+
+/** GitHub. */
+export function GitHubIcon() {
+  return (
+    <AuthorLinkIcon>
+      <path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21" />
+    </AuthorLinkIcon>
+  )
+}
+
+/** LinkedIn. */
+export function LinkedInIcon() {
+  return (
+    <AuthorLinkIcon>
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <path d="M8 10v7M8 7v.01M12 17v-7M16 17v-4a2 2 0 0 0-4 0" />
+    </AuthorLinkIcon>
   )
 }
