@@ -989,9 +989,11 @@ def test_la_sortie_d_un_sous_agent_ne_se_rend_pas(tmp_path: Path) -> None:
     """Dans un transcript de sous-agent, une partie des messages porte un `output_tokens` figé
     bien en dessous de ce qu'ils contiennent : mesuré le 2026-10-14 vers 10 h, 5 à 33 messages
     par agent sur 10 examinés — 238 notés pour ~7 500 produits au vérificateur de la PR #86 —,
-    aucun dans les transcripts de session (0 sur 436). Un chiffre plausible et faux se lit comme
-    une mesure : la sortie d'un sous-agent ne se rend donc pas, ni par contact ni au total, et
-    le total le dit. Celle de la session, juste, reste."""
+    quasi aucun dans les transcripts de session (0 sur 436 à ce relevé ; 1 sur 6 904 sur toute
+    la population, mesuré par la relecture de la PR #90 à 10 h 38, contre 414 sur 4 179 côté
+    sous-agents). Un chiffre plausible et faux se lit comme une mesure : la sortie d'un
+    sous-agent ne se rend donc pas, ni par contact ni au total, et le total le dit. Celle de la
+    session, juste à l'arrondi près, reste."""
     session = write_transcript(tmp_path / "session.jsonl", TIMELINE)
     write_subagent(session, "agent-a1", RELECTEUR, RELECTEUR_META)
     agents = bilan.subagents([session])
@@ -1005,6 +1007,7 @@ def test_la_sortie_d_un_sous_agent_ne_se_rend_pas(tmp_path: Path) -> None:
         assert "sortie" not in contact, contact
     total = next(line for line in lines if line.startswith("jetons des sous-agents"))
     assert "sortie non mesurée" in total, total
+    assert total.count("sortie") == 1, f"un chiffre de sortie à côté de la mention : {total}"
     session_line = next(line for line in lines if line.startswith("jetons de la session"))
     assert bilan.tokens(bilan.Usage(output=5_000)) in session_line, session_line
 
