@@ -135,9 +135,53 @@ for (const [exit, apply] of CELL_EXITS) {
   })
 }
 
-test('la forme est posée avant la première peinture', async ({
-  page,
-}) => {
+test('la marge se relit quand un attribut de la grille déplace ses cellules', async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 800 })
+  await page.goto('/')
+  await placeCells(page, [360])
+  await expectPlacement(page, 'column')
+
+  // La cellule, centrée dans 400 px de contenu après 700 px de marge, finit à 20 px du bord.
+  await page.getByRole('main').evaluate((table) => (table.style.paddingLeft = '700px'))
+
+  await expectPlacement(page, 'footer')
+})
+
+test("la pose d'une cellule, sur son élément enfant, ne relit pas la marge", async ({ page }) => {
+  // Compte les lectures de boîte des cellules : chacune force une mise en page.
+  await page.addInitScript(() => {
+    const read = Element.prototype.getBoundingClientRect
+    let cellReads = 0
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      if (this.matches('[data-table-cell]')) cellReads += 1
+      return read.call(this)
+    }
+    Object.defineProperty(window, 'cellReads', { get: () => cellReads })
+  })
+  const cellReads = () => page.evaluate(() => (window as unknown as { cellReads: number }).cellReads)
+  await page.setViewportSize({ width: 1100, height: 800 })
+  await page.goto('/')
+  await placeCells(page, [360])
+  await page.locator('[data-table-cell]').evaluate(async (cell) => {
+    cell.append(document.createElement('div'))
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+  })
+  await expectPlacement(page, 'column')
+  const before = await cellReads()
+
+  // Une inclinaison écrite à chaque image, comme un survol qui suit le pointeur (#20, #22).
+  await page.locator('[data-table-cell] > div').evaluate(async (pose) => {
+    for (const angle of [1, -1, 2]) {
+      pose.style.rotate = `${angle}deg`
+      pose.classList.toggle('lifted')
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+    }
+  })
+
+  expect(await cellReads()).toBe(before)
+})
+
+test('la forme est posée avant la première peinture', async ({ page }) => {
   // Relevée dans la tâche même qui insère le `<footer>` : aucune peinture ne la précède.
   await page.addInitScript(() => {
     const inserted = new MutationObserver(() => {

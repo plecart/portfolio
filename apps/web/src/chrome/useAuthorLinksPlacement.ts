@@ -7,6 +7,18 @@ import {
 } from './author-links-placement.ts'
 
 /**
+ * Une mutation qui peut changer la marge : un élément ajouté ou retiré, l'attribut de cellule posé
+ * ou retiré, ou un autre attribut changé sur une cellule ou sur un élément qui en contient (la
+ * grille). Jamais un attribut changé **dans** une cellule : sa pose et son animation y vivent
+ * (contrat de `TABLE_CELL_SELECTOR`), et les relire forcerait une mise en page à chaque image.
+ */
+function mayMoveCells(record: MutationRecord): boolean {
+  if (record.type === 'childList' || record.attributeName === 'data-table-cell') return true
+  const target = record.target as Element
+  return target.matches(TABLE_CELL_SELECTOR) || target.querySelector(TABLE_CELL_SELECTOR) !== null
+}
+
+/**
  * La forme des liens de l'auteur, mesurée sur la table (spec §3.4 ; brief de #18, décision 1).
  *
  * Mesure avant la première peinture — les liens ne sautent pas du pied de page à la colonne au
@@ -37,7 +49,9 @@ export function useAuthorLinksPlacement(
     }
 
     update()
-    const cellsChanged = new MutationObserver(update)
+    const cellsChanged = new MutationObserver((records) => {
+      if (records.some(mayMoveCells)) update()
+    })
     cellsChanged.observe(root, {
       childList: true,
       subtree: true,

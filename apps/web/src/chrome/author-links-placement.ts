@@ -9,9 +9,12 @@
  * de grille** — l'élément que la grille place, sans transformation : la pose et l'animation
  * d'entrée vont sur un élément enfant, sinon la mesure suivrait l'inclinaison et la montée.
  *
- * Une cellule masquée (`display: none`, `hidden`) ne compte pas. La mesure se relit au
+ * La table est centrée dans la largeur visible (spec §3.1) : `nearestCellMargin` en dépend. Une
+ * cellule masquée (`display: none`, `hidden`) ne compte pas. La mesure se relit au
  * redimensionnement de la fenêtre, à chaque élément ajouté ou retiré dans la table et à chaque
- * attribut `data-table-cell`, `hidden`, `style` ou `class` changé (`useAuthorLinksPlacement`).
+ * attribut `data-table-cell`, `hidden`, `style` ou `class` changé sur une cellule ou sur un élément
+ * qui en contient — jamais dans une cellule, où vivent sa pose et son animation
+ * (`useAuthorLinksPlacement`).
  * Restent à la charge de la table : une taille changée par une feuille sans mutation du DOM, et
  * une transformation posée sur un **ancêtre** de la cellule, que la mesure suit comme la sienne.
  * Dénombrement des voies : `e2e/author-links-measure.spec.ts`.
@@ -34,9 +37,10 @@ export type AuthorLinksPlacement = 'column' | 'footer'
  * La marge entre le bord de la fenêtre et la cellule la plus proche (spec §3.4), des deux côtés,
  * comme au prototype retenu (`cadre.html`, variante « Retrait »), comptée **hors barre de
  * défilement** : la grille, centrée dans la largeur visible, recule de la moitié de la barre, et la
- * lui rendre fait de la marge une grandeur de la seule mise en page. Les repères de §3.4 tiennent
- * avec ou sans barre, et la forme ne dépend pas du chemin — le pied de page dans le flux, qui
- * allonge la page, fait naître la barre (choix du mainteneur, arrêt visuel du lot 3 de #18).
+ * lui rendre fait de la marge une grandeur de la seule mise en page. Pour une table centrée — la
+ * seule que la spec pose (§3.1) —, les repères de §3.4 tiennent avec ou sans barre, et la forme ne
+ * dépend pas du chemin — le pied de page dans le flux, qui allonge la page, fait naître la barre
+ * (choix du mainteneur, arrêt visuel du lot 3 de #18).
  *
  * @param cells Les bords des cellules, en px depuis le bord gauche de la fenêtre
  *   (`getBoundingClientRect`) ; une cellule de largeur nulle — masquée — est ignorée.
