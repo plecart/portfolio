@@ -1,7 +1,7 @@
 #!/bin/sh
 # La sauvegarde de la base (ADR 0007 point 3, brief de #23 décision 4) : dump, chiffrement, envoi,
-# ping — chaque étape sur des fichiers de travail, jamais un tube jusqu'au bucket. Lancée chaque
-# nuit par `supercronic` (`crontab`), ou à la main : `docker compose exec backup backup.sh`.
+# purge, ping — chaque étape sur des fichiers de travail, jamais un tube jusqu'au bucket. Lancée
+# chaque nuit par `supercronic` (`crontab`), ou à la main : `docker compose exec backup backup.sh`.
 #
 # Chaque étape écrit son nom ; la première qui échoue arrête la chaîne (`set -e`), avant le ping —
 # l'absence de ping est l'alerte (D33). Les fichiers de travail sont supprimés en partant : le dump
@@ -53,12 +53,25 @@ run() {
 	"$@"
 }
 
+# La rétention (décision 7) : la liste du bucket, ce que `retention.sh` en écarte, chaque objet
+# écarté supprimé puis nommé. Après l'envoi seulement — l'objet de l'exécution compte —, et la
+# première suppression refusée arrête la chaîne, sans ping.
+purge() {
+	rclone lsf --files-only "r2:$BACKUP_R2_BUCKET" > "$work/objects"
+	retention.sh "$PGDATABASE" < "$work/objects" > "$work/expired"
+	while IFS= read -r object; do
+		rclone deletefile "r2:$BACKUP_R2_BUCKET/$object"
+		echo "supprimé : $object"
+	done < "$work/expired"
+}
+
 # L'archive `custom`, compressée, que lit `pg_restore` (ADR 0007 point 4) : la base entière, sans
 # option qui en retire propriétaires ou droits — la restauration choisit (décision 6).
 run dump pg_dump --format=custom --file="$work/base.dump"
 run chiffrement age --recipient "$BACKUP_AGE_RECIPIENT" --output "$work/$name" "$work/base.dump"
 # La seule étape qui écrit dans le bucket : un stockage S3 ne rend un objet visible qu'entier.
 run envoi rclone copyto "$work/$name" "r2:$BACKUP_R2_BUCKET/$name"
+run purge purge
 # Un seul signal, à la fin, en cas de réussite (décision 5). Délai et réessais : la forme que
 # recommande healthchecks.io (docs « Shell scripts », lue le 2026-10-04).
 run ping curl -fsS -m 10 --retry 5 -o /dev/null "$BACKUP_PING_URL"
