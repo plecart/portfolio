@@ -64,3 +64,25 @@ l'artefact qui le porte, jamais l'énoncé seul :
 
 Préviens \<le mainteneur | le lead> quand tu as fini, ou si tu trouves un bloquant qui dépasse ton
 périmètre.
+
+---
+
+## Variante — relais en cours de lot
+
+Écrite par la session dont le contexte se remplit avant la fin de son cycle (`cycle-pr` Étape 8,
+« Relais en cours de cycle »), et remise au mainteneur comme le prompt ci-dessus. Elle en garde
+les lignes « Tu travailles dans… », « Charge le skill… », « Ton brief… », le relecteur et
+« Préviens… » ; elle remplace la première ligne par la suivante, et ajoute les trois d'après.
+
+Tu **reprends** le lot \<k>/\<n> de l'issue #\<N> en relais de la session `\<uuid>`, dont le
+contexte s'est rempli à l'Étape \<x> de `cycle-pr`. La PR #\<M> est ouverte (\<draft | ready>),
+tête `\<SHA complet>` ; reprends à \<l'étape et au commit qui suivent>.
+
+Bilan de la session sortante, déposé : `retrospectives/\<date>-\<issue>-relais-\<k>.txt` — ce
+qu'en fait ton Étape 8 : `cycle-pr` Étape 8, « Bilan chiffré du cycle ».
+
+Entrées du journal d'observations déjà écrites pour ce cycle : \<numéros | aucune> — plafond :
+`CLAUDE.md`, « Observation continue ».
+
+\<Si vague `pr-paralleles` : \<adresse du lead> ; ton premier message au lead : `pr-paralleles`
+Étape 5, « Session relayée ».>

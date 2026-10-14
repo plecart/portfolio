@@ -32,6 +32,10 @@ dans cette fenêtre. Dans l'autre sens, le lead peut écrire en plein travail �
 bloquant, ordre de merge du lot : son message se traite comme le commentaire de répercussion de
 l'Étape 6 — s'arrêter après l'outil en cours, remonter à l'utilisateur, jamais merger par-dessus.
 
+**Relais.** Un contexte qui se remplit avant la fin du cycle, à quelque étape que ce soit, se
+passe à une session neuve par la passation de l'Étape 8, « Relais en cours de cycle » — écrite
+**avant** de rendre la main, puisqu'elle porte ce que seule la session sortante possède.
+
 ## Étape 1 — Briefing pré-PR (avant la première ligne de code)
 
 **Éprouver les outils d'abord.** Un skill présuppose des outils ; tant qu'ils n'ont pas été
@@ -1073,7 +1077,11 @@ python <répertoire de ce skill>/scripts/bilan-session.py <transcript .jsonl> [<
 Les transcripts vivent sous `~/.claude/projects/<projet>/<uuid de session>.jsonl` — l'uuid est
 celui du répertoire scratchpad de la session. **Un cycle qui a rempli un contexte en a
 plusieurs** : les donner tous, relais compris, dans n'importe quel ordre ; un bilan à un seul
-transcript manque la moitié du cycle, et c'est la moitié la plus chère. Le script rend la durée,
+transcript manque la moitié du cycle, et c'est la moitié la plus chère. Un transcript introuvable
+se dit en tête de sortie — « transcripts demandés N, lus M — absents : … » — au lieu de rendre un
+bilan partiel muet : le harnais a le droit de libérer un transcript entre deux sessions (obs 73),
+et le relevé que la session sortante a déposé avant de passer la main (« Relais en cours de
+cycle », plus bas) s'additionne alors à la main. Le script rend la durée,
 l'attente du mainteneur **scindée** en réactivité et absences, le temps des sous-agents et des
 workflows, le temps d'agent seul, la consommation de chaque sous-agent **contact par contact** —
 lue dans son propre transcript, sous `<uuid>/subagents/`, reprises et agents au premier plan
@@ -1139,6 +1147,24 @@ contexte le permettrait. Deux raisons :
 
 C'est aussi pourquoi le prompt du lot suivant est un **artefact remis**, et pas une consigne qu'on
 se donne à soi-même.
+
+**Relais en cours de cycle — la session sortante passe ce qu'elle seule possède.** Un cycle peut
+remplir un contexte avant son Étape 8, et une session neuve reprend alors le même lot. La session
+sortante écrit sa passation depuis la variante « relais » de
+[references/prompt-lot-suivant.md](references/prompt-lot-suivant.md) et la remet au mainteneur.
+Trois choses que le relais ne peut pas reconstituer, chacune payée :
+
+- **son bilan, déposé avant de rendre la main** — `bilan-session.py` sur son propre transcript,
+  sortie écrite dans `retrospectives/<date>-<issue>-relais-<k>.txt` : le harnais a libéré le
+  transcript d'une session sortante 50 minutes avant que son relais ne commence, et un relevé
+  déposé, lui, ne se libère pas (obs 73) ;
+- **les numéros des entrées du journal d'observations déjà écrites pour ce cycle** — le plafond
+  de `CLAUDE.md` se compte par cycle, relais compris, et un relais qui ignore le compte le
+  recommence : le lot 1 de #77, sur trois sessions, a versé sept entrées sous un plafond de
+  trois par session (obs 75) ;
+- en vague, **l'adresse du lead**, à qui le relais se présente d'abord (`pr-paralleles` Étape 5,
+  « Session relayée ») : c'est la session sortante qui sait que son contexte se remplit, pas le
+  lead (obs 40).
 
 **En vague parallèle, le message de clôture au lead porte deux lignes de plus.** « Je suis sortie
 du worktree (`ExitWorktree`) » — un dossier qui est le répertoire courant d'un processus ne

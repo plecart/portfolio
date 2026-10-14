@@ -18,7 +18,6 @@ premier plan n'en émet aucune ; les points de contact humains et les appels d'o
 Python 3.11 ou plus, bibliothèque standard seule.
 """
 
-import io
 import json
 import re
 import sys
@@ -759,19 +758,42 @@ def report(events: Sequence[Event], session: Usage, agents: Sequence[Subagent]) 
     return "\n".join(lines)
 
 
+def say(text: str) -> None:
+    """Écrit une ligne sur la sortie standard en octets UTF-8, quelle que soit la console.
+
+    La console du poste est en cp1252, et le rapport porte des `→` et des `≥` : imprimé tel quel,
+    il lèverait `UnicodeEncodeError`. Les octets vont au tampon **sans** envelopper `sys.stdout` :
+    un `TextIOWrapper` collecté ferme le flux qu'il enveloppe, et un appelant en processus — la
+    suite de tests — perd sa sortie derrière. Même forme que `dire` de `mutation.py`.
+    """
+    sys.stdout.flush()
+    sys.stdout.buffer.write(f"{text}\n".encode())
+    sys.stdout.buffer.flush()
+
+
 def main(argv: Sequence[str]) -> int:
-    """Point d'entrée : un ou plusieurs transcripts de la **même** session, relais compris."""
+    """Point d'entrée : un ou plusieurs transcripts de la **même** session, relais compris.
+
+    Un transcript absent se **dit**, il ne fait ni planter le script ni rendre en silence un
+    bilan sur la moitié du cycle : le harnais a le droit de supprimer un transcript entre deux
+    sessions (obs 73), et le relevé que la session sortante a déposé s'additionne alors à la main.
+    """
     if not argv:
-        print(__doc__)
+        say(str(__doc__))
         return 2
     paths = [Path(argument) for argument in argv]
-    events = read_events(paths)
+    present = [path for path in paths if path.is_file()]
+    absent = ", ".join(str(path) for path in paths if not path.is_file())
+    if absent:
+        say(
+            f"transcripts demandés {len(paths)}, lus {len(present)} — absents : {absent}"
+            " (bilan partiel : additionner le relevé déposé par chaque session absente)"
+        )
+    events = read_events(present)
     if not events:
-        print("transcripts vides ou illisibles")
+        say("transcripts vides ou illisibles")
         return 1
-    out = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-    out.write(report(events, token_usage(paths), subagents(paths)) + "\n")
-    out.flush()
+    say(report(events, token_usage(present), subagents(present)))
     return 0
 
 
