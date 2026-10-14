@@ -33,7 +33,7 @@ EXTRAIT = 400
 
 # Les blocs que le harnais injecte dans le rôle `user` : `<task-notification>`, `<command-message>`,
 # `<system-reminder>`, `<ide_opened_file>`… Un `sub` **non gourmand** les retire ; ce qui reste est
-# de la main du mainteneur. Le nom se lit sans attribut à dessein — `<pasted_content id="…">` en
+# de la main du mainteneur — sauf la commande tapée, faite de blocs, que `COMMANDE_TAPEE` rend. Le nom se lit sans attribut à dessein — `<pasted_content id="…">` en
 # porte un, et son contenu est du texte que le mainteneur a collé, donc il doit rester.
 #
 # `bilan-session.py` (skill `cycle-pr`) porte une version plus stricte de cette distinction, parce
@@ -43,6 +43,13 @@ EXTRAIT = 400
 # mainteneur, reconnaissable à sa balise. Les deux scripts ne s'importent pas l'un l'autre à
 # dessein : un skill recopié dans un dépôt sans l'autre doit fonctionner seul.
 BLOC_INJECTE = re.compile(r"<(?P<balise>[a-z][a-z0-9_-]*)>.*?</(?P=balise)>", re.DOTALL)
+
+# Une commande **tapée** par le mainteneur — skill ou commande locale — porte la barre oblique dans
+# son `<command-name>`, et ses arguments vivent dans `<command-args>`. Retirée avec les autres
+# blocs, elle disparaissait, arguments compris ; un skill que le harnais charge de lui-même n'a pas
+# de barre oblique. Dénombrement : corps de la PR #95.
+COMMANDE_TAPEE = re.compile(r"<command-name>(/[^<]+)</command-name>")
+ARGUMENTS = re.compile(r"<command-args>(.*?)</command-args>", re.DOTALL)
 
 # Les textes injectés qui ne sont pas des blocs balisés.
 PREFIXES_INJECTES = (
@@ -87,15 +94,27 @@ def texte(enregistrement: dict[str, Any]) -> str:
     )
 
 
-def de_la_main_du_mainteneur(brut: str) -> bool:
-    """Vrai si ce texte du rôle `user` a été tapé par un humain, et non injecté par le harnais.
+def message_du_mainteneur(enregistrement: dict[str, Any]) -> str | None:
+    """Ce que le mainteneur a tapé dans cet enregistrement du rôle `user`, prêt à afficher.
 
-    Un message n'est injecté que s'il ne reste **rien** après retrait des blocs balisés : le
-    harnais préfixe parfois le texte humain d'un bloc de contexte au lieu de l'injecter seul
-    (`<ide_opened_file>…</ide_opened_file>oui go`), et s'arrêter à la tête perdrait ce « oui go ».
+    Une commande tapée se rend `/nom arguments`. Sinon, un message n'est injecté que s'il ne reste
+    **rien** après retrait des blocs balisés : le harnais préfixe parfois le texte humain d'un bloc
+    de contexte au lieu de l'injecter seul (`<ide_opened_file>…</ide_opened_file>oui go`), et
+    s'arrêter à la tête perdrait ce « oui go ».
+
+    Args:
+        enregistrement: une ligne décodée du transcript.
+
+    Returns:
+        Le texte du mainteneur, blocs du harnais retirés, ou `None` si le harnais l'a injecté.
     """
+    brut = texte(enregistrement).strip()
+    commande = COMMANDE_TAPEE.search(brut)
+    if commande:
+        arguments = ARGUMENTS.search(brut)
+        return " ".join(filter(None, (commande[1], arguments[1].strip() if arguments else "")))
     reste = BLOC_INJECTE.sub("", brut).strip()
-    return bool(reste) and not reste.startswith(PREFIXES_INJECTES)
+    return reste if reste and not reste.startswith(PREFIXES_INJECTES) else None
 
 
 def extrait(brut: str) -> str:
@@ -158,8 +177,8 @@ def rapport(transcript: Path, tours: int) -> list[str]:
             continue
         horodatage = str(enregistrement.get("timestamp", ""))
         derniers.append((horodatage, str(type_), brut))
-        if type_ == "user" and de_la_main_du_mainteneur(brut):
-            humains.append((horodatage, BLOC_INJECTE.sub("", brut).strip()))
+        if type_ == "user" and (tape := message_du_mainteneur(enregistrement)):
+            humains.append((horodatage, tape))
 
     agents = sous_agents(transcript)
     puces_humains = [f"- `{quand}` {extrait(corps)}" for quand, corps in humains]

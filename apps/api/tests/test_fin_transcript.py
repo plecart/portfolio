@@ -43,41 +43,89 @@ def ecrire(chemin: Path, enregistrements: list[dict[str, Any]]) -> Path:
     return chemin
 
 
-# Le recueil de la classe « d'où vient ce texte du rôle `user` ? ». Les clés sont en **ASCII**
-# parce qu'elles deviennent des identifiants de cas pytest, et qu'un `expect` de `mutation.py` doit
+# Le recueil de la classe « d'où vient ce texte du rôle `user` ? », chaque cas avec le texte que le
+# rapport rend au mainteneur, ou `None` s'il n'est pas de lui. Les clés sont en **ASCII** parce
+# qu'elles deviennent des identifiants de cas pytest, et qu'un `expect` de `mutation.py` doit
 # apparier exactement un test. Chaque cas porte l'**orthographe réelle** du harnais, pas un
 # représentant commode : le cas qui compte le plus est le quatrième, où le texte humain est
 # *précédé* d'un bloc au lieu d'être seul — s'arrêter à la tête du message le perdait.
 PROVENANCES = {
-    "texte-tape-nu": ("go, merge", True),
-    "bloc-injecte-seul": ("<task-notification>fini</task-notification>", False),
+    "texte-tape-nu": (tour("user", "go, merge"), "go, merge"),
+    "bloc-injecte-seul": (tour("user", "<task-notification>fini</task-notification>"), None),
     "deux-blocs-injectes": (
-        "<command-message>a</command-message><system-reminder>b</system-reminder>",
-        False,
+        tour("user", "<command-message>a</command-message><system-reminder>b</system-reminder>"),
+        None,
     ),
-    "bloc-de-contexte-puis-texte-humain": ("<ide_opened_file>x.py</ide_opened_file>oui go", True),
-    "message-de-pair": ("Another Claude session sent a message: fais X", False),
-    "chargement-de-skill": ("Base directory for this skill: E:/x", False),
+    "bloc-de-contexte-puis-texte-humain": (
+        tour("user", "<ide_opened_file>x.py</ide_opened_file>oui go"),
+        "oui go",
+    ),
+    "message-de-pair": (tour("user", "Another Claude session sent a message: fais X"), None),
+    "chargement-de-skill": (tour("user", "Base directory for this skill: E:/x"), None),
     "contenu-colle-par-le-mainteneur": (
+        tour("user", '<pasted_content id="7">un plan collé</pasted_content>'),
         '<pasted_content id="7">un plan collé</pasted_content>',
-        True,
     ),
     # Deux blocs de **même balise** autour du texte humain : seule cette forme distingue le retrait
     # non gourmand du gourmand — avec une seule balise, les deux rendent pareil, et une mutation
     # `.*?` → `.*` est restée VERTE (passe 2 du relecteur). Gourmand, `<s>…</s>` avale « oui go ».
     "bloc-texte-bloc-de-meme-balise": (
-        "<system-reminder>a</system-reminder>oui go<system-reminder>b</system-reminder>",
-        True,
+        tour(
+            "user", "<system-reminder>a</system-reminder>oui go<system-reminder>b</system-reminder>"
+        ),
+        "oui go",
+    ),
+    # Une commande **tapée** est faite de blocs, mais c'est le mainteneur qui agit, et ses
+    # arguments sont de sa main : retirée avec les autres blocs, elle disparaissait, arguments
+    # compris (dénombrement : corps de la PR #95). Le skill que le harnais charge de lui-même n'a
+    # pas de barre oblique. Formes recopiées de transcripts.
+    "skill-tape-avec-arguments": (
+        tour(
+            "user",
+            "<command-message>i-have-adhd</command-message>\n<command-name>/i-have-adhd"
+            "</command-name>\n<command-args>De quelle relecture d'ADR tu parles</command-args>",
+        ),
+        "/i-have-adhd De quelle relecture d'ADR tu parles",
+    ),
+    "skill-tape-sans-arguments": (
+        tour(
+            "user",
+            "<command-message>i-have-adhd</command-message>\n<command-name>/i-have-adhd"
+            "</command-name>",
+        ),
+        "/i-have-adhd",
+    ),
+    "commande-locale-tapee": (
+        tour(
+            "user",
+            "<command-name>/model</command-name>\n            <command-message>model"
+            "</command-message>\n            <command-args></command-args>",
+        ),
+        "/model",
+    ),
+    "skill-charge-par-le-harnais": (
+        tour(
+            "user",
+            "<command-message>workflow-authoring</command-message>\n<command-name>"
+            "workflow-authoring</command-name>\n<skill-format>true</skill-format>",
+        ),
+        None,
     ),
     # Un cas **littéral** par préfixe injecté, dans l'orthographe réelle du harnais. Pas une
     # dérivation du tuple du script : dérivés, les cas suivaient la mutation — retirer un préfixe
     # du script retirait son cas au lieu de le faire rougir (mesuré, VERT). Une table qui se
     # construit depuis l'artefact qu'elle éprouve est une seule méthode qui conclut.
-    "interruption-de-requete": ("[Request interrupted by user]", False),
-    "avis-d-inactivite-de-pair": ("[Cross-session idle notice] app-6b est inactive", False),
+    "interruption-de-requete": (tour("user", "[Request interrupted by user]"), None),
+    "avis-d-inactivite-de-pair": (
+        tour("user", "[Cross-session idle notice] app-6b est inactive"),
+        None,
+    ),
     "reprise-de-conversation": (
-        "This session is being continued from a previous conversation that ran out of context.",
-        False,
+        tour(
+            "user",
+            "This session is being continued from a previous conversation that ran out of context.",
+        ),
+        None,
     ),
 }
 
@@ -86,19 +134,23 @@ def test_chaque_prefixe_injecte_du_script_a_son_cas_litteral() -> None:
     """L'autre moitié de la garde des préfixes : un préfixe ajouté au script sans son cas littéral
     rougit ici, et un cas retiré rougit à la mutation. Les deux listes se gardent l'une l'autre ;
     aucune des deux ne se dérive de l'autre."""
-    refuses = [brut for brut, attendu in PROVENANCES.values() if attendu is False]
+    refuses = [fin.texte(e) for e, attendu in PROVENANCES.values() if attendu is None]
 
     sans_cas = [p for p in fin.PREFIXES_INJECTES if not any(t.startswith(p) for t in refuses)]
 
     assert not sans_cas, f"préfixes du script sans cas littéral : {sans_cas}"
 
 
-@pytest.mark.parametrize(("brut", "attendu"), PROVENANCES.values(), ids=PROVENANCES.keys())
-def test_chaque_provenance_d_un_texte_user_est_classee(brut: str, attendu: bool) -> None:
+@pytest.mark.parametrize(
+    ("enregistrement", "attendu"), PROVENANCES.values(), ids=PROVENANCES.keys()
+)
+def test_chaque_provenance_d_un_texte_user_est_classee(
+    enregistrement: dict[str, Any], attendu: str | None
+) -> None:
     """Un texte injecté compté comme une décision rend la passation fausse ; un « go » perdu la
     rend incomplète, ce qui est pire — c'est la seule matière du transcript qui ne se re-dérive
     pas des artefacts."""
-    assert fin.de_la_main_du_mainteneur(brut) is attendu
+    assert fin.message_du_mainteneur(enregistrement) == attendu
 
 
 def test_le_rapport_ne_garde_que_les_derniers_tours_dans_l_ordre(tmp_path: Path) -> None:
@@ -130,6 +182,22 @@ def test_les_messages_du_mainteneur_sont_rendus_sans_les_blocs_du_harnais(tmp_pa
 
     assert "## Messages du mainteneur (1)" in lignes
     assert any(ligne.endswith("oui go") for ligne in lignes), lignes
+
+
+def test_une_commande_tapee_est_rendue_avec_ses_arguments(tmp_path: Path) -> None:
+    """Une réponse tapée sous forme de commande est une décision : le rapport la rend telle que le
+    mainteneur l'a tapée, barre oblique et arguments compris."""
+    transcript = ecrire(
+        tmp_path / "s.jsonl",
+        [PROVENANCES["skill-tape-avec-arguments"][0], tour("assistant", "ok")],
+    )
+
+    lignes = fin.rapport(transcript, 5)
+
+    assert "## Messages du mainteneur (1)" in lignes
+    assert any(
+        ligne.endswith("/i-have-adhd De quelle relecture d'ADR tu parles") for ligne in lignes
+    )
 
 
 def test_un_sous_agent_mort_avant_de_rendre_est_nomme_comme_tel(tmp_path: Path) -> None:
