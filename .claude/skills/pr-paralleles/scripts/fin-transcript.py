@@ -49,8 +49,8 @@ BLOC_INJECTE = re.compile(r"<(?P<balise>[a-z][a-z0-9_-]*)>.*?</(?P=balise)>", re
 # son `<command-name>`, et ses arguments vivent dans `<command-args>`. Retirée avec les autres
 # blocs, elle disparaissait, arguments compris ; un skill que le harnais charge de lui-même n'a pas
 # de barre oblique. Elle n'est faite que de blocs, et commence par l'un des deux qui la nomment :
-# citée dans une prose ou une notification, elle n'en est pas une. Dénombrement : corps de la
-# PR #95.
+# citée dans une prose, ou dans une notification qui ouvre le message, elle n'en est pas une.
+# Dénombrement : corps de la PR #95.
 TETES_DE_COMMANDE = ("<command-message>", "<command-name>")
 COMMANDE_TAPEE = re.compile(r"<command-name>(/[^<]+)</command-name>")
 ARGUMENTS = re.compile(r"<command-args>(.*?)</command-args>", re.DOTALL)
@@ -112,7 +112,8 @@ def message_du_mainteneur(enregistrement: dict[str, Any]) -> str | None:
         enregistrement: une ligne décodée du transcript.
 
     Returns:
-        Le texte du mainteneur, blocs du harnais retirés, ou `None` si le harnais l'a injecté.
+        Le texte du mainteneur — blocs du harnais retirés, ou sa commande rendue `/nom
+        arguments` —, ou `None` si le harnais l'a injecté.
     """
     if enregistrement.get("isMeta"):
         return None
