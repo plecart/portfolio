@@ -23,7 +23,6 @@ bilan = load_script("cycle-pr", "bilan-session")
 AGENT_CALL = "toolu_agent0000000000000001"
 BASH_CALL = "toolu_bash00000000000000002"
 WORKFLOW_CALL = "toolu_workflow000000000003"
-AGENT_TOKENS = 177864
 AGENT_NAME = 'Agent "Relecture 4.2 passe 1 #5" finished'
 
 
@@ -86,7 +85,7 @@ SNAPSHOT_TRAP: dict[str, Any] = {
 # Le second piège, celui qui éprouve la garde du `commandMode` : une pièce jointe
 # `queued_command` — donc porteuse d'un `prompt` — qui **cite** une notification complète, avec
 # son `<tool-use-id>` et son `<status>completed</status>`. Sans la garde, elle fermerait la
-# fenêtre de l'agent 17 minutes trop tôt, avec un compte de jetons inventé.
+# fenêtre de l'agent 17 minutes trop tôt.
 QUEUED_TRAP: dict[str, Any] = {
     "type": "attachment",
     "timestamp": at("10:03:00"),
@@ -118,11 +117,11 @@ TIMELINE: list[dict[str, Any]] = [
         "10:20:00",
         AGENT_CALL,
         "a25bc5b33dbf83cd2",
-        f"<usage><subagent_tokens>{AGENT_TOKENS}</subagent_tokens></usage>\n",
+        "<usage><subagent_tokens>177864</subagent_tokens></usage>\n",
     ),
-    # Reprise puis arrêt : une seconde `completed` du **même** appel, avec un autre compte de
-    # jetons. La première l'emporte, donc fenêtre close à 10:20 et AGENT_TOKENS ; la dernière
-    # donnerait 10:22 et 999. C'est ce qui épingle la décision verrouillée du critère 3.
+    # Reprise puis arrêt : une seconde `completed` du **même** appel. La première l'emporte,
+    # donc fenêtre close à 10:20 ; la dernière donnerait 10:22. C'est ce qui épingle la décision
+    # verrouillée du critère 3 — la reprise, elle, se lit dans le transcript du sous-agent.
     notification(
         "10:22:00",
         AGENT_CALL,
@@ -226,21 +225,10 @@ def test_les_attentes_se_scindent_en_reactivite_et_absences(tmp_path: Path) -> N
     ]
 
 
-def test_chaque_agent_porte_son_nom_et_ses_jetons(tmp_path: Path) -> None:
-    """Les jetons par agent se lisent dans la notification elle-même, pas par `rglob`."""
-    events = read(tmp_path)
-    runs = bilan.agent_runs(events, bilan.tool_calls(events))
-
-    assert [(run.tool, run.tokens) for run in runs] == [
-        ("Agent", AGENT_TOKENS),
-        ("Workflow", 0),
-    ]
-    assert {run.name for run in runs} == {"Relecture 4.2 passe 1 #5"}
-
-
 def test_le_rapport_porte_les_lignes_que_le_mainteneur_lit(tmp_path: Path) -> None:
     """Le pourcentage **hors absences** en tête, l'agrégat brut en second (obs 43), le nombre de
-    transcripts et l'heure du relais (obs 40), et une ligne par agent.
+    transcripts et l'heure du relais (obs 40). Les lignes par agent ont leur propre test,
+    `test_le_rapport_rend_chaque_contact_avec_sa_consommation`.
 
     Le nombre de sessions n'est pas un paramètre : il se **déduit** des événements, qui portent
     chacun le rang de leur transcript. Un compte passé à côté des données peut être faux.
@@ -250,15 +238,13 @@ def test_le_rapport_porte_les_lignes_que_le_mainteneur_lit(tmp_path: Path) -> No
     trouvait d'abord, donc rougissait sur une mise en page correcte.
     """
     events = read(tmp_path)
-    report = bilan.report(events, bilan.Usage(), bilan.Usage())
+    report = bilan.report(events, bilan.Usage(), [])
 
     assert "réactivité (< 1 h)" in report
     assert "absences (≥ 1 h)" in report
     assert "actif (hors absences)" in report, "le dénominateur doit se lire, pas se deviner"
     assert "sessions : 2" in report
     assert "relais à" in report
-    assert "Relecture 4.2 passe 1 #5" in report
-    assert "177" in report, "les jetons de l'agent, en milliers"
     # L'attente hors absences se lit avant l'agrégat : 15 min sur 1 h 15 de temps actif.
     assert report.index("réactivité (< 1 h)") < report.index("absences (≥ 1 h)")
 
@@ -279,7 +265,7 @@ def test_la_reactivite_se_rapporte_au_temps_actif_et_les_absences_a_la_session(
     assert measures.active == measures.span - bilan.total(measures.absences)
     assert measures.active < measures.span, "le montage doit porter une absence"
 
-    report = bilan.report(read(tmp_path), bilan.Usage(), bilan.Usage())
+    report = bilan.report(read(tmp_path), bilan.Usage(), [])
     reactivite = next(l for l in report.splitlines() if l.startswith("réactivité"))
     absences = next(l for l in report.splitlines() if l.startswith("absences"))
     part_active = bilan.total(measures.reactivity) / measures.active
@@ -319,8 +305,9 @@ def test_les_transcripts_sont_fusionnes_dans_l_ordre_du_temps(tmp_path: Path) ->
 
 
 def test_un_sous_agent_sans_notification_de_fin_est_denombre(tmp_path: Path) -> None:
-    """Un agent encore en cours, ou mort sans notifier, n'a pas de fenêtre — et serait écarté
-    sans trace. L'écart entre les lancements et les fins se lit dans le rapport.
+    """Un lancement sans notification de fin **ni** transcript de sous-agent n'a pas de fenêtre
+    — et serait écarté sans trace. L'écart se lit dans le rapport. Un agent qui a un transcript
+    n'y entre pas : le relevé par contact le montre déjà, en cours ou mort.
 
     Mesuré en écrivant ce script : le bilan de la session qui l'écrivait annonçait « workflows
     0 / 0 » alors qu'un relecteur tournait.
@@ -333,7 +320,7 @@ def test_un_sous_agent_sans_notification_de_fin_est_denombre(tmp_path: Path) -> 
     events = bilan.read_events([write_transcript(tmp_path / "seul.jsonl", lonely)])
     calls = bilan.tool_calls(events)
 
-    assert "sans notification de fin : 1" in bilan.report(events, bilan.Usage(), bilan.Usage())
+    assert "sans transcript ni notification de fin : 1" in bilan.report(events, bilan.Usage(), [])
     assert bilan.agent_runs(events, calls) == []
     assert len(bilan.launched_subagents(events, calls)) == 1
 
@@ -720,3 +707,224 @@ def test_plusieurs_blocs_enchaines_restent_un_message_injecte() -> None:
     assert bilan.classify("user", [{"type": "text", "text": deux}]) == "system"
     assert bilan.classify("user", [{"type": "text", "text": trois}]) == "system"
     assert bilan.classify("user", [{"type": "text", "text": trois + "et vas-y"}]) == "human"
+
+
+# --- Ce que chaque sous-agent a consommé, contact par contact (#77, lot 4c) --------------------
+
+
+def api_call(clock: str, message: str, read: int, written: int, output: int) -> dict[str, Any]:
+    """Un appel d'API d'un sous-agent : un enregistrement `assistant` porteur de son `usage`.
+
+    `input_tokens` vaut 2, l'ordre de grandeur réel d'une entrée hors cache.
+    """
+    usage = {
+        "input_tokens": 2,
+        "cache_read_input_tokens": read,
+        "cache_creation_input_tokens": written,
+        "output_tokens": output,
+    }
+    return {
+        "type": "assistant",
+        "timestamp": at(clock),
+        "message": {"id": message, "content": [], "usage": usage},
+    }
+
+
+# Un relecteur lancé en fond par `AGENT_CALL`, puis repris par `SendMessage`. Deux pièges : un
+# même message diffusé sur deux lignes (`msg_a`), et une relance du harnais qui n'est **pas** un
+# contact — seul le coordinateur en ouvre un.
+RELECTEUR: list[dict[str, Any]] = [
+    said("10:00:30", "Première passe de relecture 4.2 — PR #89"),
+    said("10:00:31", "<system-reminder>Your final report is delivered…</system-reminder>"),
+    api_call("10:01:00", "msg_a", 0, 20_000, 10),
+    api_call("10:01:01", "msg_a", 0, 20_000, 10),
+    api_call("10:19:00", "msg_b", 20_000, 5_000, 900),
+    said("10:19:30", "[Your previous response had no visible output. Please continue.]"),
+    api_call("10:20:00", "msg_c", 25_000, 1_000, 50),
+    said("11:00:00", "The coordinator sent a message while you were working: Seconde passe"),
+    api_call("11:00:10", "msg_d", 26_000, 3_000, 200),
+    api_call("11:05:00", "msg_e", 29_000, 500, 400),
+]
+RELECTEUR_META = {
+    "agentType": "relecteur",
+    "name": "relecteur-p1",
+    "description": "Relecture 4.2, passe 1",
+    "toolUseId": AGENT_CALL,
+    "requestShape": "background",
+}
+
+
+def write_subagent(
+    session: Path, stem: str, records: list[dict[str, Any]], meta: dict[str, Any]
+) -> None:
+    """Range un transcript de sous-agent là où le harnais le range : `<session>/subagents/`."""
+    folder = session.with_suffix("") / "subagents"
+    folder.mkdir(parents=True, exist_ok=True)
+    write_transcript(folder / f"{stem}.jsonl", records)
+    (folder / f"{stem}.meta.json").write_text(json.dumps(meta), encoding="utf-8")
+
+
+def test_un_sous_agent_se_mesure_contact_par_contact_dans_son_transcript(tmp_path: Path) -> None:
+    """La consommation se lit dans les `usage` du transcript du sous-agent, pas dans sa
+    notification de fin : celle-ci porte le **contexte** en fin de contact (mesuré au lot 4a :
+    72 099 notifiés, 68 613 de contexte final), et ne voit que le premier contact d'un agent
+    repris.
+
+    Un contact s'ouvre au lancement, puis à chaque message du coordinateur. Forme mesurée le
+    2026-10-14 à 09 h sur les transcripts de sous-agents du projet, **population vivante** :
+    14 reprises sur 12 transcripts, toutes « The coordinator sent a message while you were
+    working: », y compris pour un agent qui avait fini — chacune après un dernier tour sans
+    appel d'outil.
+    """
+    session = write_transcript(tmp_path / "session.jsonl", TIMELINE)
+    write_subagent(session, "agent-a1", RELECTEUR, RELECTEUR_META)
+
+    [agent] = bilan.subagents([session])
+
+    assert (agent.role, agent.name, agent.launcher) == (
+        "relecteur",
+        "Relecture 4.2, passe 1",
+        AGENT_CALL,
+    )
+    assert [
+        (c.calls, c.context, c.used.cache_read, c.used.cache_write, c.used.output)
+        for c in agent.contacts
+    ] == [
+        (3, 2 + 25_000 + 1_000, 45_000, 26_000, 960),
+        (2, 2 + 29_000 + 500, 55_000, 3_500, 600),
+    ], "msg_a compte une fois ; la relance du harnais n'ouvre pas de contact"
+    assert [bilan.total([c.window]) for c in agent.contacts] == [
+        timedelta(minutes=19, seconds=30),
+        timedelta(minutes=5),
+    ]
+
+
+def test_les_sous_agents_se_rendent_dans_l_ordre_du_temps(tmp_path: Path) -> None:
+    """Le harnais nomme un transcript de sous-agent par un identifiant aléatoire : rangés par
+    nom, la seconde passe d'une relecture sortait avant la première (mesuré sur la session de
+    la PR #75)."""
+    session = write_transcript(tmp_path / "session.jsonl", TIMELINE)
+    write_subagent(
+        session, "agent-a0", [said("11:30:00", "Seconde passe")], {"description": "passe 2"}
+    )
+    write_subagent(session, "agent-a9", RELECTEUR, {"description": "passe 1"})
+
+    assert [agent.name for agent in bilan.subagents([session])] == ["passe 1", "passe 2"]
+
+
+def delivered_as_text(clock: str, call: str, task: str) -> dict[str, Any]:
+    """La seconde forme de livraison : un message `user` dont le texte nu **est** la notification."""
+    body = notification(clock, call, task)["attachment"]["prompt"]
+    return {"type": "user", "timestamp": at(clock), "message": {"role": "user", "content": body}}
+
+
+# Les formes sous lesquelles le harnais **livre** une notification de fin `completed`, recensées
+# le 2026-10-14 à 09 h 14 sur les 67 transcripts de session du projet (58 247 lignes lues,
+# population vivante) : 70 pièces jointes `queued_command` et 43 messages `user` en texte nu qui
+# commencent par la balise — dont 10 fins de workflow. Le script ne lisait que la première : le
+# bilan de la session de revue du journal (#77) annonçait « workflows 0 / 1 » et un
+# lancement « sans notification de fin ». Écartés à dessein : les `queue-operation` (la file du
+# harnais, pas une livraison — `enqueue` 137, `remove` 94) et les 12 messages qui **citent** une
+# notification sans commencer par elle. Deux formes recensées, une lue.
+FORMES_DE_LIVRAISON = {
+    "pièce jointe queued_command": notification,
+    "message user en texte nu": delivered_as_text,
+}
+
+
+@pytest.mark.parametrize("deliver", FORMES_DE_LIVRAISON.values(), ids=FORMES_DE_LIVRAISON.keys())
+def test_chaque_forme_de_livraison_ferme_la_fenetre_de_son_appel(
+    tmp_path: Path, deliver: Any
+) -> None:
+    """Un workflow notifié sous l'une ou l'autre forme a sa fenêtre, et n'est pas un lancement
+    perdu. Le message de 09:03 **cite** une notification complète sans commencer par elle : la
+    fenêtre se fermerait là si une citation livrait."""
+    cite = delivered_as_text("09:03:00", WORKFLOW_CALL, "wu6toltz4")
+    cite["message"]["content"] = (
+        "regarde ce que le harnais m'a envoyé : " + cite["message"]["content"]
+    )
+    transcript = [
+        said("09:00:00", "lance la revue"),
+        assistant("09:00:10", (WORKFLOW_CALL, "Workflow")),
+        cite,
+        deliver("09:06:10", WORKFLOW_CALL, "wu6toltz4"),
+        assistant("09:06:20"),
+    ]
+    events = bilan.read_events([write_transcript(tmp_path / "revue.jsonl", transcript)])
+    m = bilan.measure(events)
+
+    assert [run.window for run in m.workflows] == [
+        (datetime.fromisoformat(at("09:00:10")), datetime.fromisoformat(at("09:06:10")))
+    ]
+    assert m.dangling == 0
+
+
+VERIF_CALL = "toolu_verif000000000000005"
+
+
+def test_un_agent_au_premier_plan_et_une_reprise_comptent_dans_le_temps_des_sous_agents(
+    tmp_path: Path,
+) -> None:
+    """Deux fenêtres que les notifications ne voyaient pas. Un agent lancé **au premier plan**
+    n'émet aucune notification de fin : il était compté « sans notification de fin (encore en
+    cours, ou morts) » — le vérificateur du lot 4b, 2 min 47, faisait exactement ce « 1 ». Et la
+    **reprise** d'un agent de fond n'a pas de notification de son lancement : seul le premier
+    contact entrait dans le temps des sous-agents (0 h 05 lus au lot 4b, ~12 min réels). Mesuré
+    le 2026-10-14 sur les 12 agents repris du corpus (2 ou 3 contacts chacun, population
+    vivante) : 10 n'ont qu'**une** notification `completed` portant leur appel lanceur, 2 n'en
+    ont aucune.
+    """
+    session = write_transcript(
+        tmp_path / "session.jsonl",
+        [
+            *TIMELINE,
+            assistant("12:00:30", (VERIF_CALL, "Agent")),
+            {
+                "type": "user",
+                "timestamp": at("12:03:00"),
+                "message": {"content": [{"type": "tool_result", "tool_use_id": VERIF_CALL}]},
+            },
+            assistant("12:03:10"),
+        ],
+    )
+    write_subagent(session, "agent-a1", RELECTEUR, RELECTEUR_META)
+    write_subagent(
+        session,
+        "agent-a2",
+        [
+            said("12:00:31", "Vérification d'avant-go de la PR #89"),
+            api_call("12:02:50", "msg_v", 10_000, 500, 300),
+        ],
+        {"agentType": "verificateur", "toolUseId": VERIF_CALL, "requestShape": "foreground"},
+    )
+
+    m = bilan.measure(bilan.read_events([session]), bilan.subagents([session]))
+
+    assert m.dangling == 0, "le vérificateur a un transcript : il n'est ni en cours ni mort"
+    assert len(m.runs) == 2, "la notification reste la seule source de fenêtre d'un workflow"
+    assert bilan.total(m.windows) == timedelta(minutes=19, seconds=30) + timedelta(
+        minutes=5
+    ) + timedelta(minutes=2, seconds=19), "premier contact, reprise, et vérificateur"
+
+
+def test_le_rapport_rend_chaque_contact_avec_sa_consommation(tmp_path: Path) -> None:
+    """Une ligne par contact, sous le nom de son agent : c'est le coût **par contact** que les
+    lots se comparent — un total dépend de la taille du delta relu (journal de spec de #77,
+    2026-10-13). Et les jetons des sous-agents sont la somme de ces contacts, pas un second
+    parcours des fichiers qui pourrait ne pas tomber juste.
+    """
+    session = write_transcript(tmp_path / "session.jsonl", TIMELINE)
+    write_subagent(session, "agent-a1", RELECTEUR, RELECTEUR_META)
+    agents = bilan.subagents([session])
+
+    lines = bilan.report(bilan.read_events([session]), bilan.Usage(), agents).splitlines()
+
+    titre = lines.index("  relecteur « Relecture 4.2, passe 1 » — 2 contacts")
+    premier, reprise = lines[titre + 1], lines[titre + 2]
+    for attendu in ("0 h 19", "3 appels", *map(bilan.thousands, (26_002, 45_000, 26_000, 960))):
+        assert attendu in premier, f"{attendu!r} manque au premier contact : {premier}"
+    for attendu in ("0 h 05", "2 appels", *map(bilan.thousands, (29_502, 55_000, 3_500, 600))):
+        assert attendu in reprise, f"{attendu!r} manque à la reprise : {reprise}"
+    assert bilan.consumed(agents) == bilan.Usage(
+        output=960 + 600, cache_read=45_000 + 55_000, cache_write=26_000 + 3_500, transcripts=1
+    )

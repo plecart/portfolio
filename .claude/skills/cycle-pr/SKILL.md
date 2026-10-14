@@ -554,9 +554,10 @@ neuf. Son contexte est intact : il a déjà lu le brief, les critères et le soc
 est en place ; il ne reçoit donc que la nouvelle plage et les constats de la première passe,
 corrigés ou écartés. C'est le même argument que l'Étape 4.2 tient déjà pour la relance, et il
 vaut autant pour la passe : au lot 1b de #77, la passe 2 confiée à un agent neuf a repayé **un
-contexte entier** pour un diff que le relecteur de la passe 1 connaissait déjà. Le relevé
-par agent de `bilan-session.py` ne cumule pas un agent repris — un chiffre tiré de sa première
-notification de fin sous-compte la reprise, et c'est le relevé final de l'agent qui fait foi.
+contexte entier** pour un diff que le relecteur de la passe 1 connaissait déjà. Le coût se
+compare **par contact** — passe, reprise, relance —, tel que `bilan-session.py` le lit dans le
+transcript du relecteur : la notification de fin ne porte que le contexte de son premier
+contact, pas une consommation.
 
 Repli vers un **agent neuf** dans un seul cas : le relecteur n'est plus joignable (worktree
 disparu, session perdue, agent terminé). Il part alors avec la vérification d'isolation
@@ -1074,8 +1075,9 @@ celui du répertoire scratchpad de la session. **Un cycle qui a rempli un contex
 plusieurs** : les donner tous, relais compris, dans n'importe quel ordre ; un bilan à un seul
 transcript manque la moitié du cycle, et c'est la moitié la plus chère. Le script rend la durée,
 l'attente du mainteneur **scindée** en réactivité et absences, le temps des sous-agents et des
-workflows, le temps d'agent seul, les jetons par agent, les points de contact humains et les
-appels d'outils.
+workflows, le temps d'agent seul, la consommation de chaque sous-agent **contact par contact** —
+lue dans son propre transcript, sous `<uuid>/subagents/`, reprises et agents au premier plan
+compris —, les points de contact humains et les appels d'outils.
 
 Écrire ces lignes, plus trois à la main — commits prévus contre commits de correction, constats
 par passe, correctifs qui ont cassé quelque chose — dans `retrospectives/<date>-<issue>.md`,
