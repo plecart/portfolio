@@ -71,3 +71,9 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 }
+
+/* Changement de mode en cours (`src/chrome/useTheme.ts`) : rien ne glisse, la palette bascule d'un
+   coup (spec §4.6). Hors couche, donc au-dessus des utilitaires. */
+:root[data-switching] * {
+  transition: none;
+}

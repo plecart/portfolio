@@ -2,38 +2,12 @@
  * L'entête sur la page servie (spec §1.12, §3.3) : sa boîte aux deux largeurs, son fond au
  * défilement, sa sortie et son retour, le focus qui la ramène, et le mouvement réduit (§6.3).
  *
- * Rien ne fait défiler la page avant les cartes de #20 : chaque scénario l'allonge lui-même, et
- * rien n'entre dans l'application pour cela (brief de #18, décision 12). Les seuils exacts du
- * défilement sont prouvés en Vitest (`tests/header-scroll.test.ts`) ; ici, leur effet à l'écran.
+ * La page est allongée par le scénario (`scroll.ts`). Les seuils exacts du défilement sont prouvés
+ * en Vitest (`tests/header-scroll.test.ts`) ; ici, leur effet à l'écran.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { resolveAll } from './css.ts'
-
-/** Allonge la page de quatre hauteurs de fenêtre, sous la table. */
-async function lengthenPage(page: Page) {
-  await page.evaluate(() => {
-    const filler = document.createElement('div')
-    filler.style.height = '400vh'
-    document.querySelector('main')?.append(filler)
-  })
-}
-
-/**
- * Défile jusqu'à chaque position, une à une : l'entête lit le défilement une fois par image, et
- * deux positions dans la même image n'en feraient qu'une.
- */
-async function scrollThrough(page: Page, ...positions: number[]) {
-  for (const y of positions) {
-    await page.evaluate(
-      (top) =>
-        new Promise<void>((resolve) => {
-          window.scrollTo(0, top)
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-        }),
-      y,
-    )
-  }
-}
+import { lengthenPage, scrollThrough } from './scroll.ts'
 
 test("l'entête est une ligne fixe de 56 px, et son nom le titre de la page", async ({ page }) => {
   await page.goto('/')

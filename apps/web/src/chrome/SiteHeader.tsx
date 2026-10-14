@@ -1,4 +1,5 @@
 import { strings } from '../strings.ts'
+import { ThemeToggle } from './ThemeToggle.tsx'
 import { useHeaderScroll } from './useHeaderScroll.ts'
 
 /**
@@ -21,7 +22,8 @@ const HEADER_CLASSES = [
 
 /**
  * L'entête du site (spec §1.12, §3.3) : une ligne fixe, le nom à gauche — seul titre de niveau 1
- * de la page (brief de #18, décision 9), lien vers l'accueil. Transparente en haut de page, elle se
+ * de la page (brief de #18, décision 9), lien vers l'accueil —, le bouton de mode à droite, seul
+ * en phase 1 : la place « Chat » est absente du DOM. Transparente en haut de page, elle se
  * décolle au défilement, sort en descendant, revient en remontant, et reste visible tant qu'elle
  * contient le focus clavier.
  */
@@ -39,6 +41,7 @@ export function SiteHeader() {
           {strings.siteName}
         </a>
       </h1>
+      <ThemeToggle />
     </header>
   )
 }
