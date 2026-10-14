@@ -188,9 +188,9 @@ niveau ni tirer d'image déjà présente.
   healthchecks.io « HTTP API ») : un nouveau contrôle, même période et même délai de grâce, puis
   l'ancien supprimé — sinon il alerte, faute de ping.
 - `BACKUP_AGE_RECIPIENT` — une nouvelle paire sur le poste, `age-keygen -o age.key`, qui n'affiche
-  que la clé publique : celle-ci à `bootstrap.sh BACKUP_AGE_RECIPIENT`, le fichier joint à une entrée
-  du gestionnaire, puis `rm age.key`. Garde l'ancienne clé privée tant que le bucket porte une sauvegarde chiffrée
-  pour elle : elle seule la déchiffre.
+  que la clé publique : celle-ci à `bootstrap.sh BACKUP_AGE_RECIPIENT`, le fichier joint à une
+  entrée du gestionnaire, puis `rm age.key`. Garde l'ancienne clé privée tant que le bucket porte
+  une sauvegarde chiffrée pour elle : elle seule la déchiffre.
 
 ## Mises à jour
 
