@@ -8,6 +8,8 @@ tiré du script : un test dont les cas viennent de l'artefact ne peut le contred
 Lancé par `make image-test`, sur l'image que `make build` a chargée. Le script est celui de la copie
 de travail, joué par le shell d'un conteneur de cette image : ses outils — `date`, `sort`, `awk` de
 busybox — sont ceux de la production, et une mutation du script se voit sans reconstruire l'image.
+Que l'image porte ce script-là, c'est la purge dans la pile qui le montre (`test_backup_image.py`,
+`test_la_purge_supprime_du_bucket_exactement_ce_que_la_retention_ecarte`).
 """
 
 import subprocess
@@ -25,7 +27,7 @@ BASE = "portfolio"
 # Le temps laissé à un lancement du script, en secondes ; une seconde suffit d'ordinaire.
 RUN_DEADLINE = 60
 
-type Expired = Callable[[Iterable[str]], set[str]]
+type Expired = Callable[..., set[str]]
 
 
 def name(stamp: str) -> str:
@@ -54,10 +56,10 @@ def expired() -> Iterator[Expired]:
     )
     container = started.stdout.strip()
 
-    def run(names: Iterable[str]) -> set[str]:
+    def run(names: Iterable[str], timezone: str = "UTC") -> set[str]:
         printed = subprocess.run(
-            ["docker", "exec", "-i", container, "sh", "-c", SCRIPT.read_text(encoding="utf-8")]
-            + ["retention.sh", BASE],
+            ["docker", "exec", "-i", "-e", f"TZ={timezone}", container, "sh", "-c"]
+            + [SCRIPT.read_text(encoding="utf-8"), "retention.sh", BASE],
             input="".join(f"{each}\n" for each in names).encode(),
             capture_output=True,
             check=False,
@@ -204,7 +206,8 @@ def test_un_bucket_vide_ne_supprime_rien(expired: Expired) -> None:
 
 # Les manières dont un nom peut s'écarter du format de la décision 6,
 # `<base>-<AAAAMMJJ>T<HHMMSS>Z.dump.age` à une date qui existe — une forme chacune, toutes datées du
-# 15 octobre 2026 ou d'avant le régime établi : comptée, chacune y déplacerait ce qui est gardé.
+# 15 octobre 2026 ou d'avant le régime établi : comptée, chacune y déplacerait ce qui est gardé, ou
+# serait elle-même supprimée.
 FOREIGN_NAMES = {
     "sans-base": "20261015T030000Z.dump.age",
     "autre-base": "autre-20261015T030000Z.dump.age",
@@ -222,6 +225,7 @@ FOREIGN_NAMES = {
     "31-avril": "portfolio-20260431T030000Z.dump.age",
     "29-fevrier-hors-bissextile": "portfolio-20260229T030000Z.dump.age",
     "mois-13": "portfolio-20261315T030000Z.dump.age",
+    "avant-1970": "portfolio-19691231T235959Z.dump.age",
     "heure-25": "portfolio-20261015T250000Z.dump.age",
     "minute-60": "portfolio-20261015T036000Z.dump.age",
     "ligne-vide": "",
@@ -242,5 +246,17 @@ def test_un_nom_au_format_compte(expired: Expired) -> None:
     """Le témoin du test précédent : la nuit du jeudi 15 octobre, au format, entre dans les 7 jours
     gardés et en fait sortir le 8 — un ajout compté se voit."""
     assert expired([*ESTABLISHED, name("20261015T030000")]) == (
+        set(ESTABLISHED) - ESTABLISHED_KEPT | {name("20261008T030000")}
+    )
+
+
+def test_le_fuseau_du_conteneur_ne_change_pas_ce_qui_compte(expired: Expired) -> None:
+    """Les noms sont en UTC, et le script les lit en UTC quel que soit le fuseau du conteneur : sous
+    l'heure d'Europe centrale, 02:30 le 28 mars 2027 n'existe pas — l'heure saute de 2 h à 3 h —, et
+    une lecture locale ne compterait pas ce nom (mesuré à la relecture de la PR #96). Compté, il
+    fait sortir le 8 octobre des 7 jours gardés, comme le témoin ci-dessus."""
+    dst_gap = name("20270328T023000")
+
+    assert expired([*ESTABLISHED, dst_gap], timezone="CET-1CEST,M3.5.0,M10.5.0/3") == (
         set(ESTABLISHED) - ESTABLISHED_KEPT | {name("20261008T030000")}
     )

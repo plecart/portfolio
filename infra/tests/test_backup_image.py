@@ -1,5 +1,5 @@
-"""Tests de l'image `backup` : sa chaîne de sauvegarde, sa sonde, la majeure de son `pg_dump`, son
-rôle Postgres (brief de #23, décisions 2 à 6, 10 et 11).
+"""Tests de l'image `backup` : sa chaîne de sauvegarde et sa purge, sa sonde, la majeure de son
+`pg_dump`, son rôle Postgres (brief de #23, décisions 2 à 7, 10 et 11).
 
 Lancé par `make image-test`, jamais par `make test` : il lui faut les images que `make build` a
 chargées — `backup`, et `caddy` pour le témoin de ping. Le job `infra` de la CI le lance après son
@@ -21,7 +21,7 @@ import secrets
 import subprocess
 import time
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -166,14 +166,47 @@ class Stack:
         options = ["-e", f"PGPASSWORD={password}"] if password else []
         return self.compose("exec", "-T", *options, "backup", *production_probe())
 
-    def backup(self, **overrides: str) -> Run:
+    def bucket(self, *objects: str) -> str:
+        """Un bucket neuf du témoin S3, qui porte déjà `objects` — vides : la purge n'en lit que
+        les noms."""
+        bucket = uuid.uuid4().hex
+        self.output(
+            "exec",
+            "-T",
+            "s3",
+            "sh",
+            "-c",
+            'mkdir -p "$0" && cd "$0" && for object; do : > "$object"; done',
+            f"{S3_ROOT}/{bucket}",
+            *objects,
+        )
+        return bucket
+
+    def lock(self, bucket: str, *objects: str) -> None:
+        """Pose dans `bucket` des objets que le stockage refuse de supprimer, comme sous un verrou
+        de bucket (#25) : à `root`, dans un dossier au sticky bit, où le témoin — sous l'utilisateur
+        `backup` — écrit encore mais ne supprime que ce qui est à lui (mesuré : réponse 500)."""
+        self.output(
+            "exec",
+            "-T",
+            "--user",
+            "root",
+            "s3",
+            "sh",
+            "-c",
+            'cd "$0" && chown root . && chmod 1777 . && for object; do : > "$object"; done',
+            f"{S3_ROOT}/{bucket}",
+            *objects,
+        )
+
+    def backup(self, bucket: str | None = None, **overrides: str) -> Run:
         """Lance la chaîne dans le conteneur `backup`, comme on le ferait à la main.
 
-        Chaque exécution a son bucket et son chemin de ping : les tests ne voient que ce que la leur
-        a produit. `overrides` remplace des variables du conteneur, le temps de cette exécution.
+        Chaque exécution a son chemin de ping, et son bucket — neuf, sauf si `bucket` en désigne
+        un : les tests ne voient que ce que la leur a produit. `overrides` remplace des variables
+        du conteneur, le temps de cette exécution.
         """
-        bucket, ping_path = uuid.uuid4().hex, f"/{uuid.uuid4().hex}"
-        self.output("exec", "-T", "s3", "mkdir", "-p", f"{S3_ROOT}/{bucket}")
+        bucket, ping_path = bucket or self.bucket(), f"/{uuid.uuid4().hex}"
         variables = {
             "BACKUP_R2_BUCKET": bucket,
             "BACKUP_PING_URL": f"http://ping:8080{ping_path}",
@@ -181,6 +214,19 @@ class Stack:
         }
         process = self.compose("exec", "-T", *environment_options(variables), "backup", "backup.sh")
         return Run(process, bucket, ping_path)
+
+    def expired(self, names: Iterable[str]) -> set[str]:
+        """Ce que la rétention de l'image écarte de `names` : `retention.sh`, tel que l'image le
+        porte, lancé dans le conteneur `backup` sur la base de la chaîne."""
+        printed = self.compose(
+            "exec",
+            "-T",
+            "backup",
+            "retention.sh",
+            DATABASE,
+            stdin="".join(f"{name}\n" for name in names).encode(),
+        )
+        return set(succeeded(printed).stdout.decode().splitlines())
 
     def objects(self, bucket: str) -> list[str]:
         """Les objets d'un bucket du témoin S3."""
@@ -395,29 +441,57 @@ def test_rejouee_la_sql_du_role_ne_change_que_son_mot_de_passe(stack: Stack) -> 
         stack.apply_backup_role(STACK_VALUES["BACKUP_POSTGRES_PASSWORD"])
 
 
-# Étape → ce qui la fait échouer, le temps d'une exécution : un mot de passe que la base refuse, un
-# destinataire que `age` ne sait pas lire, une clé d'accès que le stockage refuse.
+# Des sauvegardes de janvier 2000, une par nuit du 1ᵉʳ au 12 : à côté de celle d'une exécution
+# d'aujourd'hui, la rétention en écarte quatre, du 3 au 6 — la règle quotidienne garde les 7 au 12,
+# la semaine du 27 décembre sa fin, le 2, et la plus ancienne reste, le 1ᵉʳ (décision 7).
+JANUARY_2000 = [f"{DATABASE}-200001{day:02d}T030000Z.dump.age" for day in range(1, 13)]
+
+
+@dataclass(frozen=True)
+class Sabotage:
+    """Ce qui fait échouer une étape, le temps d'une exécution : des variables du conteneur
+    remplacées, des objets que le stockage refuse de supprimer — et si l'envoi a eu lieu avant."""
+
+    overrides: Mapping[str, str]
+    locked: tuple[str, ...] = ()
+    uploaded: bool = False
+
+
+# Étape → son sabotage : un mot de passe que la base refuse, un destinataire que `age` ne sait pas
+# lire, une clé d'accès que le stockage refuse, des objets écartés que le stockage refuse de
+# supprimer. Pour la purge, `rclone` n'essaie qu'une fois : sans cela, il réessaie la même
+# suppression refusée pendant des minutes (mesuré : 17 essais en 2 min 30, toujours en cours).
 FAILURES = {
-    "dump": {"PGPASSWORD": "mot-de-passe-faux"},
-    "chiffrement": {"BACKUP_AGE_RECIPIENT": "age1-destinataire-illisible"},
-    "envoi": {"BACKUP_R2_SECRET_ACCESS_KEY": secrets.token_hex(32)},
+    "dump": Sabotage({"PGPASSWORD": "mot-de-passe-faux"}),
+    "chiffrement": Sabotage({"BACKUP_AGE_RECIPIENT": "age1-destinataire-illisible"}),
+    "envoi": Sabotage({"BACKUP_R2_SECRET_ACCESS_KEY": secrets.token_hex(32)}),
+    "purge": Sabotage(
+        {"RCLONE_RETRIES": "1", "RCLONE_LOW_LEVEL_RETRIES": "1"},
+        locked=tuple(JANUARY_2000),
+        uploaded=True,
+    ),
 }
 
 
-@pytest.mark.parametrize(("step", "overrides"), FAILURES.items(), ids=FAILURES.keys())
-def test_une_etape_qui_echoue_arrete_la_chaine_sans_objet_ni_ping(
-    stack: Stack, step: str, overrides: dict[str, str]
+@pytest.mark.parametrize(("step", "sabotage"), FAILURES.items(), ids=FAILURES.keys())
+def test_une_etape_qui_echoue_arrete_la_chaine_sans_ping(
+    stack: Stack, step: str, sabotage: Sabotage
 ) -> None:
     """La première étape qui échoue arrête la chaîne : sortie non nulle, l'étape nommée dans le
-    journal, aucun ping — healthchecks.io alerte de son absence (décision 5). Rien n'arrive dans le
-    bucket : l'envoi est la seule étape qui y écrit, et un objet S3 n'est visible qu'entier
-    (décision 4). Les fichiers de travail sont supprimés aussi en cas d'échec."""
-    run = stack.backup(**overrides)
+    journal, aucun ping — healthchecks.io alerte de son absence (décision 5). Avant l'envoi, rien
+    n'arrive dans le bucket : l'envoi est la seule étape qui y écrit, et un objet S3 n'est visible
+    qu'entier (décision 4). Les fichiers de travail sont supprimés aussi en cas d'échec."""
+    bucket = stack.bucket()
+    if sabotage.locked:
+        stack.lock(bucket, *sabotage.locked)
+
+    run = stack.backup(bucket, **sabotage.overrides)
 
     assert run.process.returncode != 0, run.log
     assert f"échec à l'étape : {step}" in run.log
     assert stack.pings(run.ping_path) == 0
-    assert stack.objects(run.bucket) == []
+    uploaded = set(stack.objects(bucket)) - set(sabotage.locked)
+    assert len(uploaded) == sabotage.uploaded, uploaded
     assert stack.leftovers() == []
 
 
@@ -510,3 +584,21 @@ def test_une_sauvegarde_reussie_laisse_un_objet_chiffre_lisible_et_un_seul_ping(
     assert f"TABLE public {WITNESS_TABLE}" in stack.restored_listing(run.bucket, objects[0])
     assert stack.pings(run.ping_path) == 1
     assert stack.leftovers() == []
+
+
+def test_la_purge_supprime_du_bucket_exactement_ce_que_la_retention_ecarte(stack: Stack) -> None:
+    """Après l'envoi, la purge liste le bucket, et supprime ce que `retention.sh` de l'image en
+    écarte — ni plus, ni moins, chaque objet supprimé nommé dans le journal (décision 7). L'objet
+    de l'exécution compte dans la liste, et un objet que la chaîne n'a pas écrit reste."""
+    before = [*JANUARY_2000, "notes.txt"]
+    run = stack.backup(stack.bucket(*before))
+
+    assert run.process.returncode == 0, run.log
+    after = set(stack.objects(run.bucket))
+    uploaded = after - set(before)
+    assert len(uploaded) == 1 and all(OBJECT_NAME.match(name) for name in uploaded), uploaded
+    listed = set(before) | uploaded
+    expired = stack.expired(listed)
+    assert expired == {JANUARY_2000[day] for day in range(2, 6)}
+    assert after == listed - expired
+    assert all(f"supprimé : {name}" in run.log for name in expired), run.log

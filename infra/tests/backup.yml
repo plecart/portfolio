@@ -37,6 +37,11 @@ services:
       - ${BACKUP_R2_ACCESS_KEY_ID:?},${BACKUP_R2_SECRET_ACCESS_KEY:?}
       - --addr
       - ":8080"
+      # Le test crée ses buckets et leurs objets sur le disque du témoin, sans passer par lui : sans
+      # cache de dossiers, le témoin les voit dès qu'ils existent — avec celui de 5 min par défaut,
+      # un bucket créé après une première liste lui reste inconnu (mesuré : `NoSuchBucket`).
+      - --dir-cache-time
+      - 0s
       - /tmp/s3
     healthcheck:
       test: [CMD, nc, -z, 127.0.0.1, "8080"]
