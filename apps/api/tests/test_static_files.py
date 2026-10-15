@@ -81,7 +81,7 @@ def test_les_statiques_sont_servis_versionnes_et_compresses(client: Client) -> N
 def test_la_collecte_laisse_les_docs_interactives_de_django_ninja() -> None:
     """`ninja` n'est installé que pour sa commande d'export du schéma (brief de #10, décision 10) :
     les fichiers de ses docs interactives, désactivées — près de 8 Mo de scripts Swagger et ReDoc
-    —, n'entrent ni dans l'image ni dans ce que WhiteNoise sert. Lu dans la collecte de la session
+    —, n'entrent pas dans la collecte, donc pas dans l'image. Lu dans la collecte de la session
     (`collected_static_files`), celle de l'admin à côté pour témoin."""
     collected = Path(settings.STATIC_ROOT)
 
