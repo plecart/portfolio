@@ -11,6 +11,7 @@ lisent dans ce journal.
 """
 
 import subprocess
+import time
 import uuid
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
@@ -30,6 +31,8 @@ from test_infra import loaded_image
 
 SCRIPT = Path(__file__).parents[1] / "restore.sh"
 PROJECT = f"portfolio-test-restore-{uuid.uuid4().hex[:8]}"
+# Le temps laissé à un conteneur jetable pour partir après la fin du script, en secondes.
+ONE_OFF_DEADLINE = 30
 
 # Les étapes, dans l'ordre de la décision 4.
 STEPS = [
@@ -48,6 +51,14 @@ STEPS = [
 WITNESS_TABLE = "temoin_de_restauration"
 # Une table créée après la sauvegarde, que l'archive ne porte pas.
 LATER_TABLE = "posterieure_a_la_sauvegarde"
+# Une table de 200 000 lignes : l'archive dépasse de loin le tampon d'un tube, comme une sauvegarde
+# réelle — une étape qui ne lit qu'une partie du flux ferait mourir son écrivain (mesuré à la
+# relecture de la PR #100 : `pg_restore --list` ne lit que la table des matières, `age` meurt en
+# SIGPIPE et le déchiffrement échouait).
+VOLUME_TABLE = "volumineuse"
+VOLUME_ROWS = 200_000
+# Ce que la base sait de son schéma `public` : son propriétaire et ses droits.
+PUBLIC_SCHEMA = "SELECT nspowner::regrole, nspacl FROM pg_namespace WHERE nspname = 'public'"
 
 # Des objets que la rétention ne reconnaît pas comme des sauvegardes, et qui suivent dans l'ordre
 # des noms toute sauvegarde d'aujourd'hui : un 31 avril, que `date` normaliserait en 1ᵉʳ mai ; un
@@ -96,10 +107,17 @@ class Restoration:
 
 @pytest.fixture(scope="module")
 def stack() -> Iterator[Stack]:
-    """La pile démarrée pour le module, `api` compris ; sa base porte la table témoin."""
+    """La pile démarrée pour le module, `api` compris ; sa base porte la table témoin et la table
+    volumineuse."""
     with started_stack(PROJECT) as started:
         started.output("up", "--detach", "--wait", "api")
         succeeded(started.as_owner(f"CREATE TABLE {WITNESS_TABLE} (id integer)"))
+        succeeded(
+            started.as_owner(
+                f"CREATE TABLE {VOLUME_TABLE} AS"
+                f" SELECT n, md5(n::text) FROM generate_series(1, {VOLUME_ROWS}) n"
+            )
+        )
         yield started
 
 
@@ -139,6 +157,12 @@ def table_exists(stack: Stack, table: str) -> bool:
     return succeeded(printed).stdout.decode().strip() == "t"
 
 
+def query(stack: Stack, sql: str) -> str:
+    """Le résultat de `sql`, une valeur par ligne, joué sous le propriétaire de la base."""
+    printed = stack.as_owner(sql, "--tuples-only", "--no-align")
+    return succeeded(printed).stdout.decode().strip()
+
+
 def running_services(stack: Stack) -> list[str]:
     """Les services de la pile qui tournent."""
     return stack.output("ps", "--status", "running", "--services").split()
@@ -158,9 +182,11 @@ def restore(
 
     Vérifie, à chaque exécution, réussie ou non, que la clé n'a paru dans aucun argument de la
     commande Compose — donc d'aucun conteneur — et qu'aucun conteneur jetable ne survit : son
-    `/tmp`, le `tmpfs` du Compose de production, part avec lui (brief, critère « Clé »).
+    `/tmp`, le `tmpfs` du Compose de production, part avec lui (brief, critère « Clé »). Et que le
+    dossier de travail de l'hôte, où attend l'archive chiffrée, est supprimé en partant.
     """
-    witness, log = tmp_path / "compose.sh", tmp_path / "calls"
+    witness, log, host_tmp = tmp_path / "compose.sh", tmp_path / "calls", tmp_path / "hote"
+    host_tmp.mkdir()
     witness.write_text(recording(log) + COMPOSE_WITNESS, encoding="utf-8", newline="\n")
     key = identity or stack.identity
     process = subprocess.run(
@@ -172,6 +198,8 @@ def restore(
             "BACKUP_R2_BUCKET": bucket,
             # Sur le poste, le `sh` de Git réécrirait en chemins Windows les arguments en `/…`.
             "MSYS_NO_PATHCONV": "1",
+            # Le dossier où `mktemp` crée celui de l'hôte, que le test inspecte en sortant.
+            "TMPDIR": host_tmp.as_posix(),
             **(environment or {}),
         },
         capture_output=True,
@@ -181,16 +209,31 @@ def restore(
         timeout=600,
     )
     calls = [arguments for _, *arguments in recorded_calls(log)]
-    one_off = subprocess.run(
-        ["docker", "ps", "--all", "--quiet", "--filter", "label=com.docker.compose.oneoff=True"]
-        + ["--filter", f"label=com.docker.compose.project={PROJECT}"],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
     assert all(key not in argument for call in calls for argument in call)
-    assert one_off.stdout == ""
+    assert surviving_one_offs() == []
+    assert list(host_tmp.iterdir()) == []
     return Restoration(process, calls)
+
+
+def surviving_one_offs() -> list[str]:
+    """Les conteneurs jetables de la pile qui existent encore, attendus `ONE_OFF_DEADLINE`
+    secondes au plus : quand la restauration coupe un flux en route, le client `compose run` de
+    son écrivain meurt en SIGPIPE avant lui, et le conteneur ne part que lorsque `age` sort à son
+    tour (mesuré le 2026-10-15 : un conteneur encore là au relevé immédiat, une fois sur deux
+    lancements ; sa durée de survie n'a pas été mesurée). Un conteneur qui ne partirait jamais reste
+    attrapé."""
+    deadline = time.monotonic() + ONE_OFF_DEADLINE
+    while True:
+        listed = subprocess.run(
+            ["docker", "ps", "--all", "--quiet", "--filter", "label=com.docker.compose.oneoff=True"]
+            + ["--filter", f"label=com.docker.compose.project={PROJECT}"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.split()
+        if not listed or time.monotonic() > deadline:
+            return listed
+        time.sleep(0.5)
 
 
 @pytest.mark.parametrize("by_timestamp", [False, True], ids=["derniere", "horodatage"])
@@ -199,10 +242,13 @@ def test_la_chaine_restaure_la_sauvegarde_choisie_puis_redemarre_api(
 ) -> None:
     """La chaîne complète (décisions 3 à 7) : chaque étape annoncée dans l'ordre, la sauvegarde
     choisie — la plus récente des objets reconnus, ou celle de l'horodatage —, la base revenue à
-    son état sauvegardé, `api` arrêté avant la restauration et redémarré après, `migrate --check`
-    joué, le contrôle écrit."""
+    son état sauvegardé — une table supprimée depuis revenue, une table créée depuis disparue, le
+    schéma `public` à son propriétaire et ses droits —, `api` arrêté avant la restauration et
+    redémarré après, `migrate --check` joué, le contrôle écrit."""
     bucket, name = backed_up(stack)
     selector = name.removeprefix(f"{DATABASE}-").removesuffix(".dump.age")
+    schema = query(stack, PUBLIC_SCHEMA)
+    succeeded(stack.as_owner(f"DROP TABLE {WITNESS_TABLE}"))
     # Une table que la sauvegarde n'a pas connue — celle d'une migration plus récente : la base
     # restaurée est celle de l'archive, sans elle, sinon `migrate` la recréerait et échouerait.
     succeeded(stack.as_owner(f"CREATE TABLE {LATER_TABLE} (id integer)"))
@@ -213,12 +259,30 @@ def test_la_chaine_restaure_la_sauvegarde_choisie_puis_redemarre_api(
     assert done.steps == STEPS
     assert f"sauvegarde : {name}" in done.log
     assert witness_rows(stack) == "0"
-    assert table_exists(stack, WITNESS_TABLE) and not table_exists(stack, LATER_TABLE)
+    assert not table_exists(stack, LATER_TABLE)
+    assert query(stack, f"SELECT count(*) FROM {VOLUME_TABLE}") == str(VOLUME_ROWS)
+    assert query(stack, PUBLIC_SCHEMA) == schema
     pg_restore = next(i for i, call in enumerate(done.calls) if "pg_restore --file" in call[-1])
     assert done.index("stop", "api") < pg_restore < done.index("start", "--wait", "api")
     assert done.index("python", "manage.py", "migrate", "--check") > pg_restore
     assert "projets publiés : 0 (attendu ≥ 0)" in done.log
     assert "api" in running_services(stack)
+
+
+def test_un_service_arrete_avant_la_restauration_le_reste_apres(
+    stack: Stack, tmp_path: Path
+) -> None:
+    """Les services ne sont redémarrés que s'ils tournaient (décision 5) : sur le runner du test
+    mensuel, rien ne tourne, et la restauration n'y démarre rien."""
+    bucket, _ = backed_up(stack)
+    stack.output("stop", "api")
+
+    done = restore(stack, tmp_path, bucket, "derniere")
+
+    assert done.process.returncode == 0, done.log
+    assert "arrêtés : aucun" in done.log and "redémarrés : aucun" in done.log
+    assert not [call for call in done.calls if {"stop", "start"} & set(call)]
+    assert "api" not in running_services(stack)
 
 
 # Cas → (arguments, environnement, clé privée autre que celle du test, étape qui échoue).

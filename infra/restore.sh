@@ -103,6 +103,10 @@ $script" restore "$@"
 # variables sont celles du conteneur — ; arrêt à la première erreur SQL.
 PSQL='psql --no-psqlrc --quiet -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 
+# L'ouverture de la transaction de restauration : le schéma `public` vidé, puis recréé.
+RESET_SCHEMA='BEGIN; DROP SCHEMA public CASCADE;
+CREATE SCHEMA public AUTHORIZATION pg_database_owner; GRANT USAGE ON SCHEMA public TO PUBLIC;'
+
 # Lance `$1` par `sh -c` dans le conteneur Postgres.
 in_postgres() {
 	$COMPOSE exec -T postgres sh -c "$1"
@@ -150,9 +154,12 @@ download() {
 	in_backup 'rclone cat "r2:$BACKUP_R2_BUCKET/$1"' "$name" > "$work/archive"
 }
 
-# L'archive entière, lisible : la clé l'ouvre, et `pg_restore` en lit la table des matières.
+# L'archive éprouvée avant tout geste sur la base : `pg_restore` en lit la table des matières, puis
+# le reste du flux est lu jusqu'au bout — `age` authentifie ainsi chaque bloc. `pg_restore --list`
+# seul s'arrête après la table des matières : `age` mourait alors en SIGPIPE sur toute archive plus
+# grosse que le tampon du tube (mesuré à la relecture de la PR #100).
 check_archive() {
-	decrypted ' | pg_restore --list > /dev/null'
+	decrypted ' | { pg_restore --list > /dev/null && cat > /dev/null; }'
 }
 
 stop_writers() {
@@ -165,14 +172,17 @@ stop_writers() {
 }
 
 # La base devient celle de l'archive, en une transaction : le schéma `public` vidé — un objet que
-# la sauvegarde n'a pas connu, la table d'une migration plus récente, ferait échouer `migrate` —,
-# puis le script SQL de l'archive, que `pg_restore` écrit et que `psql` joue. `COMMIT` n'est envoyé
+# la sauvegarde n'a pas connu, la table d'une migration plus récente, ferait échouer `migrate` — et
+# recréé tel qu'une base neuve de PostgreSQL 16 le porte — propriétaire `pg_database_owner`,
+# `USAGE` à tous : l'archive ne le recrée pas, et un `CREATE SCHEMA` nu le donnait au rôle qui
+# restaure, sans droit pour personne (mesuré à la relecture de la PR #100) —, puis le script SQL
+# de l'archive, que `pg_restore` écrit et que `psql` joue. `COMMIT` n'est envoyé
 # que si `pg_restore` a lu l'archive entière : sinon `psql` sort sans valider, et la base reste telle
 # qu'elle était. Dans le conteneur, `pipefail` rend cet échec — le `dash` de l'image l'applique
 # (mesuré le 2026-10-15). Côté hôte, sans `pipefail`, un flux tronqué se lit dans ce même échec.
 restore_database() {
 	decrypted '' | in_postgres "set -o pipefail
-{ echo 'BEGIN; DROP SCHEMA public CASCADE; CREATE SCHEMA public;'; pg_restore --file=- && echo COMMIT; } | $PSQL"
+{ echo '$RESET_SCHEMA'; pg_restore --file=- && echo COMMIT; } | $PSQL"
 }
 
 # `migrate` par le point d'entrée d'`api`, qui nomme chaque migration appliquée, puis `--check` :
