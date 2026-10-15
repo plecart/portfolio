@@ -373,6 +373,53 @@ def test_aucun_service_ne_remplace_le_point_d_entree_de_son_image(compose_file: 
     assert overriding == []
 
 
+# L'origine admise à appeler l'API en production : le site, en HTTPS, par l'hôte que Caddy sert
+# (brief de #10, décision 8). Une garde en fonction, éprouvée sur des formes en mémoire : le
+# harnais de mutation refuse de muter le Compose de production.
+PRODUCTION_CORS_ORIGINS = '["https://${SITE_HOST:?}"]'
+
+# Forme → constat attendu (`True`) ou aucun (`False`).
+CORS_ORIGIN_FORMS = {
+    "le site en HTTPS": (PRODUCTION_CORS_ORIGINS, False),
+    "en HTTP": ('["http://${SITE_HOST:?}"]', True),
+    "l'hôte de l'API": ('["https://${API_HOST:?}"]', True),
+    "sans exigence": ('["https://${SITE_HOST}"]', True),
+    "avec un chemin": ('["https://${SITE_HOST:?}/"]', True),
+    "absente": (None, True),
+}
+
+
+def cors_origin_findings(environment: dict[str, Any]) -> list[str]:
+    """Ce par quoi l'`environment:` du service `api` donnerait à l'API une autre origine admise que
+    le site en HTTPS.
+
+    Returns:
+        Un constat si `CORS_ALLOWED_ORIGINS` n'est pas exactement `PRODUCTION_CORS_ORIGINS`,
+        absente comprise ; liste vide sinon.
+    """
+    value = environment.get("CORS_ALLOWED_ORIGINS")
+    return [] if value == PRODUCTION_CORS_ORIGINS else [f"CORS_ALLOWED_ORIGINS : {value!r}"]
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"), CORS_ORIGIN_FORMS.values(), ids=CORS_ORIGIN_FORMS.keys()
+)
+def test_la_garde_de_l_origine_cors_rend_son_verdict_sur_chaque_forme(
+    value: str | None, expected: bool
+) -> None:
+    """Chaque façon recensée de dévier de l'origine du site : signalée si, et seulement si, elle
+    dévie."""
+    environment = {} if value is None else {"CORS_ALLOWED_ORIGINS": value}
+
+    assert bool(cors_origin_findings(environment)) is expected
+
+
+def test_api_n_admet_en_production_que_l_origine_du_site() -> None:
+    """Un `http://`, l'hôte de l'API ou un `/` final passerait la CI et priverait le site de l'API,
+    visible au seul déploiement (relecture de la PR #101)."""
+    assert cors_origin_findings(read_services(COMPOSE_PROD)["api"]["environment"]) == []
+
+
 def test_api_recoit_en_production_chaque_variable_du_back() -> None:
     """Sans `env_file` en production, chaque variable de `Env` passe par `environment:` : un champ
     ajouté au back sans sa ligne ici empêcherait `api` de démarrer, au déploiement seulement.

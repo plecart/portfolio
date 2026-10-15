@@ -1,5 +1,6 @@
 """Tests de `Env`, la seule lecture de l'environnement du back."""
 
+import re
 from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -57,23 +58,29 @@ INVALID_CONFIGURATIONS = [
     ("liste mal formée", "ALLOWED_HOSTS", "[oups"),
     ("origine avec chemin", "CORS_ALLOWED_ORIGINS", '["http://SITE-SECRET.test/chemin"]'),
     ("origine sans schéma", "CORS_ALLOWED_ORIGINS", '["//SITE-SECRET.test"]'),
+    ("hôte nu", "CORS_ALLOWED_ORIGINS", '["SITE-SECRET.test"]'),
     ("aucune origine", "CORS_ALLOWED_ORIGINS", "[]"),
     ("liste d'origines mal formée", "CORS_ALLOWED_ORIGINS", "[oups"),
 ]
 
-# Ce qu'une origine CORS n'est pas : une origine est un schéma et un hôte, rien d'autre
-# (`django-cors-headers`, contrôles `E013` et `E014`), et c'est au démarrage qu'on le refuse —
-# une origine qui ne peut rien apparier laisserait le site sans API, sans qu'aucune erreur ne le
-# dise. Sept formes : une par composant d'URL qui ne doit pas y être, ou qui y manque ; l'hôte
-# nu — que `urlsplit` lit comme un chemin, pas comme un schéma absent (mesuré : la forme
-# protocolaire `//hôte` est la seule qui éprouve la garde du schéma) ; l'hôte en majuscules, que
-# cors-headers compare tel quel à ce que le navigateur envoie en minuscules.
+# Ce qu'une origine CORS n'est pas. Une origine est ce qu'un navigateur envoie dans `Origin` :
+# `schéma://hôte[:port]`, hôte en minuscules, port absent s'il est celui du schéma — et
+# `django-cors-headers` la compare telle quelle (`_url_in_whitelist`). Tout écart laisse le site
+# sans API sans qu'aucune erreur ne le dise ; c'est au démarrage qu'on le refuse. Onze formes :
+# une par composant d'URL qui ne doit pas y être (chemin, requête, fragment, identifiant, port
+# par défaut, port vide) ou qui y manque (schéma, hôte) ; le schéma hors HTTP ; l'hôte nu — que
+# `urlsplit` lit comme un chemin, pas comme un schéma absent, si bien que la forme protocolaire
+# `//hôte` éprouve la garde du schéma et l'hôte nu non (mesuré) ; l'hôte en majuscules.
 REFUSED_ORIGINS = [
     ("chemin", "https://site.test/chemin"),
     ("requête", "https://site.test?x=1"),
     ("fragment", "https://site.test#ancre"),
+    ("identifiant", "https://user@site.test"),
+    ("port par défaut", "https://site.test:443"),
+    ("port vide", "https://site.test:"),
     ("sans schéma", "//site.test"),
     ("sans hôte", "https://"),
+    ("schéma hors HTTP", "ftp://site.test"),
     ("hôte nu", "site.test"),
     ("majuscules", "https://Site.test"),
 ]
@@ -92,6 +99,14 @@ def declared_variables(dotenv: Path) -> dict[str, str]:
     lines = (raw.strip() for raw in dotenv.read_text(encoding="utf-8").splitlines())
     pairs = (line.partition("=") for line in lines if line and not line.startswith("#"))
     return {name.strip(): value.strip() for name, separator, value in pairs if separator}
+
+
+def value_fragments(value: str) -> list[str]:
+    """Ce qu'un message pourrait citer d'une valeur : la valeur, et chaque élément d'une liste
+    JSON — un validateur qui nomme l'origine fautive, crochets et guillemets retirés, fuit
+    autant que celui qui recopie la liste (mesuré à la relecture : une mutation qui citait
+    l'origine restait verte sur la valeur entière)."""
+    return [piece for piece in re.split(r'[\[\]",]', value) if piece]
 
 
 def build_env(env_file: Path | None = None) -> Env:
@@ -149,9 +164,16 @@ def test_un_hote_absent_est_tolere_en_debug(monkeypatch: pytest.MonkeyPatch) -> 
 def test_les_origines_cors_sont_lues_telles_quelles(monkeypatch: pytest.MonkeyPatch) -> None:
     """Une liste JSON d'origines, comme `ALLOWED_HOSTS` (brief de #10, décision 8), lue telle
     quelle — le `/` final qu'un type d'URL de pydantic ajouterait ferait rougir ce test."""
-    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", '["https://site.test","http://localhost:5173"]')
+    monkeypatch.setenv(
+        "CORS_ALLOWED_ORIGINS",
+        '["https://site.test","http://localhost:5173","http://site.test:443"]',
+    )
 
-    assert build_env().CORS_ALLOWED_ORIGINS == ["https://site.test", "http://localhost:5173"]
+    assert build_env().CORS_ALLOWED_ORIGINS == [
+        "https://site.test",
+        "http://localhost:5173",
+        "http://site.test:443",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -229,7 +251,8 @@ def test_aucune_valeur_ne_fuit_dans_l_erreur_de_demarrage(
     message = str(refusal.value)
     assert variable in message, "le refus doit dire quel champ est en cause"
     for value in [invalid_value, *variables.values()]:
-        assert value not in message
+        for fragment in value_fragments(value):
+            assert fragment not in message
 
 
 def test_une_cle_inconnue_dans_le_fichier_env_est_refusee(tmp_path: Path) -> None:

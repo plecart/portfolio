@@ -74,6 +74,34 @@ def _anchored_path(path: Path) -> Path:
     return path if path.is_absolute() else REPOSITORY_ROOT / path
 
 
+# Le port que le navigateur tait dans `Origin`, par schéma — et les seuls schémas qu'il y écrit.
+DEFAULT_PORTS = {"http": 80, "https": 443}
+
+
+def _browser_origin(origin: str) -> str | None:
+    """La forme sous laquelle un navigateur enverrait `origin` dans l'en-tête `Origin`.
+
+    Args:
+        origin: une origine telle que l'environnement la donne.
+
+    Returns:
+        `schéma://hôte[:port]` — hôte en minuscules, port seulement s'il n'est pas celui du
+        schéma — ou `None` si rien de tel ne se déduit : schéma hors HTTP, hôte absent, port
+        illisible. Tout ce qui n'y figure pas (chemin, requête, fragment, identifiant) est perdu,
+        ce qui rend une entrée non canonique différente de sa forme canonique. Un hôte IPv6 n'est
+        pas rendu entre crochets : une telle origine est refusée.
+    """
+    parts = urlsplit(origin)
+    try:
+        port = parts.port
+    except ValueError:
+        return None
+    if parts.scheme not in DEFAULT_PORTS or not parts.hostname:
+        return None
+    suffix = "" if port in (None, DEFAULT_PORTS[parts.scheme]) else f":{port}"
+    return f"{parts.scheme}://{parts.hostname}{suffix}"
+
+
 def env_file_path(environ: Mapping[str, str]) -> Path:
     """Détermine quel fichier `.env` lire, d'après l'environnement donné.
 
@@ -161,30 +189,24 @@ class Env(BaseSettings):
 
     @field_validator("CORS_ALLOWED_ORIGINS")
     @classmethod
-    def _require_bare_origins(cls, origins: list[str]) -> list[str]:
-        """Refuse toute origine qui n'est pas exactement un schéma et un hôte.
+    def _require_browser_origins(cls, origins: list[str]) -> list[str]:
+        """Refuse toute origine qui n'est pas écrite comme un navigateur l'enverrait.
 
-        `django-cors-headers` n'apparie que le schéma et l'hôte (`_url_in_whitelist`), tels
-        quels : une origine avec un chemin, une requête ou un fragment n'apparierait jamais
-        rien, et son contrôle `E014` ne le dit qu'à `manage.py check`, que le conteneur ne lance
-        pas ; une origine sans schéma ou sans hôte (`E013`), de même ; un hôte en majuscules,
-        qu'aucun navigateur n'envoie et qu'aucun contrôle ne voit, de même. Refusée au démarrage,
-        comme le reste.
+        `django-cors-headers` compare l'en-tête `Origin` à chaque entrée, schéma et hôte tels
+        quels (`_url_in_whitelist`), et un navigateur l'envoie sous une seule forme :
+        `schéma://hôte[:port]`, hôte en minuscules, port absent s'il est celui du schéma. Une
+        entrée qui s'en écarte — chemin, identifiant, majuscule, port par défaut écrit — passe
+        les contrôles `E013`/`E014` de cors-headers, ou ne les rencontre jamais (`manage.py
+        check`, que le conteneur ne lance pas), et laisse le site sans API sans qu'aucune erreur
+        ne le dise. D'où le refus au démarrage, comme le reste : l'entrée doit être égale à sa
+        forme canonique (`_browser_origin`).
 
         `list[str]` et non `list[AnyHttpUrl]` : pydantic ajoute un `/` final (mesuré le
         2026-10-15, pydantic 2.13.5 : `https://site.test` → `https://site.test/`), que cors-headers
         lirait comme un chemin.
         """
-        for origin in origins:
-            parts = urlsplit(origin)
-            if (
-                not (parts.scheme and parts.netloc)
-                or any((parts.path, parts.query, parts.fragment))
-                or parts.netloc != parts.netloc.lower()
-            ):
-                raise ValueError(
-                    "chaque origine est un schéma et un hôte en minuscules, rien d'autre"
-                )
+        if any(_browser_origin(origin) != origin for origin in origins):
+            raise ValueError("chaque origine s'écrit `schéma://hôte[:port]`, comme un navigateur")
         return origins
 
     @model_validator(mode="after")
