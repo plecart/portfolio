@@ -160,8 +160,9 @@ son arbre se nettoie par les `overrides` du manifeste
 
 **Tests des images.** `make image-test`, porte de CI sur chaque PR, démarre les images que
 `make build` a chargées et les interroge ([infra/tests/](infra/tests/)) : le test de fumée du
-Caddyfile de production, et la chaîne de sauvegarde de l'image `backup`, jouée dans le Compose de
-production contre un témoin S3 et un témoin de ping. Il ne fait pas partie de `make test` : il lui
+Caddyfile de production, la chaîne de sauvegarde de l'image `backup`, jouée dans le Compose de
+production contre un témoin S3 et un témoin de ping, et la restauration de ses sauvegardes par
+[infra/restore.sh](infra/restore.sh), `api` compris. Il ne fait pas partie de `make test` : il lui
 faut les images construites, donc le front compilé. Sur le poste, `make build` d'abord. Chaque test
 démarre sa pile sous son propre nom de projet Compose — sans port publié, ou sur un port hôte que
 Docker attribue — et la supprime en partant, volumes compris.

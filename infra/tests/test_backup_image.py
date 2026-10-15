@@ -1,9 +1,10 @@
-"""Tests de l'image `backup` : sa chaîne de sauvegarde et sa purge, sa sonde, la majeure de son
-`pg_dump`, son rôle Postgres (brief de #23, décisions 2 à 7, 10 et 11).
+"""Tests de l'image `backup` : sa chaîne de sauvegarde et sa purge, sa sonde, la majeure de ses
+clients Postgres, son rôle Postgres (brief de #23, décisions 2 à 7, 10 et 11).
 
 Lancé par `make image-test`, jamais par `make test` : il lui faut les images que `make build` a
-chargées — `backup`, et `caddy` pour le témoin de ping. Le job `infra` de la CI le lance après son
-build ; sur un poste, `make build` d'abord.
+chargées — `backup`, `caddy` pour le témoin de ping, et `api`, que la pile déclare pour la
+restauration (`test_restore.py`). Le job `infra` de la CI le lance après son build ; sur un poste,
+`make build` d'abord.
 
 La pile est le Compose de production, résolu avec son modèle de `.env` et surchargé par
 `backup.yml` : `postgres` et `backup` y gardent leur image, leur sonde et leurs variables, dont le
@@ -21,7 +22,8 @@ import secrets
 import subprocess
 import time
 import uuid
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Generator, Iterable, Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -279,18 +281,18 @@ def environment_options(variables: Mapping[str, str]) -> list[str]:
 
 def compose_command(*arguments: str) -> list[str]:
     """La commande `docker compose` sur la pile : le Compose de production et son modèle de `.env`,
-    surchargés par `backup.yml`, sous le nom de projet du test."""
+    surchargés par `backup.yml`. Le nom de projet n'y est pas : il vient de l'environnement de la
+    pile (`COMPOSE_PROJECT_NAME`), qui prime sur le `name:` du Compose de production — un nom par
+    module, que la restauration (`test_restore.py`) hérite en lançant cette même commande."""
     return [
         "docker",
         "compose",
-        "--project-name",
-        PROJECT,
         "--env-file",
-        str(PROD_ENV_EXAMPLE),
+        PROD_ENV_EXAMPLE.as_posix(),
         "--file",
-        str(COMPOSE_PROD),
+        COMPOSE_PROD.as_posix(),
         "--file",
-        str(STACK),
+        STACK.as_posix(),
         *arguments,
     ]
 
@@ -307,31 +309,43 @@ def age_key_pair(image: str) -> tuple[str, str]:
     return public[1], private[0]
 
 
-@pytest.fixture(scope="module")
-def stack() -> Iterator[Stack]:
-    """La pile démarrée pour le module, arrêtée et supprimée à la fin — volumes compris —, même en
-    cas d'échec."""
+@contextmanager
+def started_stack(project: str) -> Generator[Stack]:
+    """La pile démarrée sous le nom de projet `project` — `postgres`, puis le rôle de sauvegarde,
+    puis `backup` —, arrêtée et supprimée en sortant, volumes compris, même en cas d'échec.
+
+    Les services nommés seulement : le reste du Compose de production ne démarre pas ici, et la
+    restauration ajoute `api` (`test_restore.py`). L'ordre de `bootstrap.sh` : la sonde de `backup`
+    ouvre une session sous son rôle.
+    """
     image = loaded_image("backup")
     recipient, identity = age_key_pair(image)
     environment = {
         **os.environ,
         **STACK_VALUES,
+        "COMPOSE_PROJECT_NAME": project,
         "BACKUP_IMAGE": image,
         "CADDY_IMAGE": loaded_image("caddy"),
+        "API_IMAGE": loaded_image("api"),
         "BACKUP_AGE_RECIPIENT": recipient,
     }
     started = Stack(environment, identity)
     try:
-        # Dans le `try` : un démarrage raté laisse un réseau et des conteneurs créés. Les services
-        # nommés seulement : le reste du Compose de production ne démarre pas ici. L'ordre de
-        # `bootstrap.sh` : la sonde de `backup` ouvre une session sous son rôle.
+        # Dans le `try` : un démarrage raté laisse un réseau et des conteneurs créés.
         started.output("up", "--detach", "--wait", "postgres")
         started.apply_backup_role(STACK_VALUES["BACKUP_POSTGRES_PASSWORD"])
         started.output("up", "--detach", "--wait", "backup")
-        succeeded(started.as_owner(f"CREATE TABLE {WITNESS_TABLE} (id integer)"))
         yield started
     finally:
         started.compose("down", "--volumes")
+
+
+@pytest.fixture(scope="module")
+def stack() -> Iterator[Stack]:
+    """La pile démarrée pour le module, sa base portant la table témoin."""
+    with started_stack(PROJECT) as started:
+        succeeded(started.as_owner(f"CREATE TABLE {WITNESS_TABLE} (id integer)"))
+        yield started
 
 
 @pytest.fixture(autouse=True)
@@ -357,14 +371,28 @@ def production_probe() -> list[str]:
     return command
 
 
-def test_pg_dump_est_de_la_majeure_du_postgres_de_production(stack: Stack) -> None:
+# Les clients de la chaîne et le conteneur qui les porte : `pg_dump` écrit l'archive ; le `pg_restore`
+# de `backup` la lit pour éprouver le déchiffrement, celui de `postgres` la restaure (#24, brief,
+# décisions 1 et 5).
+CLIENTS = {
+    "pg_dump de backup": ("backup", "pg_dump"),
+    "pg_restore de backup": ("backup", "pg_restore"),
+    "pg_restore de postgres": ("postgres", "pg_restore"),
+}
+
+
+@pytest.mark.parametrize(("service", "client"), CLIENTS.values(), ids=CLIENTS.keys())
+def test_les_clients_de_la_chaine_sont_de_la_majeure_du_postgres_de_production(
+    stack: Stack, service: str, client: str
+) -> None:
     """Une archive écrite par un `pg_dump` plus récent n'est pas garantie lisible par un serveur
     plus ancien (doc PostgreSQL 16, « pg_dump », Notes) : la restauration (#24) se fait dans ce
-    serveur-ci. Les deux binaires, interrogés dans leurs images (décision 2)."""
-    client = stack.output("exec", "-T", "backup", "pg_dump", "--version")
+    serveur-ci, par des clients de sa majeure. Chaque binaire, interrogé dans son image (brief de
+    #23, décision 2)."""
+    printed = stack.output("exec", "-T", service, client, "--version")
     server = stack.output("exec", "-T", "postgres", "postgres", "--version")
 
-    assert major_version(client) == major_version(server)
+    assert major_version(printed) == major_version(server)
 
 
 @pytest.mark.parametrize(("password", "healthy"), [(None, True), ("mot-de-passe-faux", False)])

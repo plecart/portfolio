@@ -32,15 +32,16 @@ entrée (D45). L'utilisateur `deploy` possède le dossier et tire les images de 
 | Mot de passe du rôle de sauvegarde (`BACKUP_POSTGRES_PASSWORD`) | `.env` du VPS et la base | `bootstrap.sh`, qui l'engendre et le pose dans la base | `bootstrap.sh BACKUP_POSTGRES_PASSWORD` |
 | Jeton du bucket des sauvegardes (`BACKUP_R2_ACCESS_KEY_ID`, `BACKUP_R2_SECRET_ACCESS_KEY`) | gestionnaire ; `.env` du VPS | `bootstrap.sh` | un nouveau jeton R2, `bootstrap.sh` avec les deux noms, puis l'ancien révoqué |
 | Adresse de ping (`BACKUP_PING_URL`) | le contrôle healthchecks.io ; `.env` du VPS | `bootstrap.sh` | un nouveau contrôle, `bootstrap.sh BACKUP_PING_URL`, puis l'ancien supprimé |
-| Clé privée `age` des sauvegardes | gestionnaire seulement — ni le VPS, ni le dépôt, ni une image (ADR 0007, point 2) ; secret d'Actions avec #24 | le mainteneur, sur le poste | une nouvelle paire, sa clé publique à `bootstrap.sh BACKUP_AGE_RECIPIENT` ; l'ancienne gardée |
+| Clé privée `age` des sauvegardes | gestionnaire seulement — ni le dépôt, ni une image (ADR 0007, point 2) ; jamais stockée sur le VPS : elle transite par `ssh` vers la mémoire d'un conteneur jetable, le temps d'une restauration ; secret d'Actions avec #24 | le mainteneur, sur le poste | une nouvelle paire, sa clé publique à `bootstrap.sh BACKUP_AGE_RECIPIENT` ; l'ancienne gardée |
 
 L'environnement GitHub `production` n'admet que `main` : un workflow lancé depuis une autre branche
 ne lit pas ses secrets, même modifié.
 
 `SECRET_KEY`, `POSTGRES_PASSWORD` et `BACKUP_POSTGRES_PASSWORD` ne vivent que sur le VPS : rien hors
 de la pile ne s'en sert, et un VPS reconstruit en reçoit de neufs — la base restaurée garde ses
-données, pas ses rôles, que `bootstrap.sh` recrée. La clé privée `age`, elle, ne vient jamais sur
-le VPS : une sauvegarde volée avec lui reste illisible. La clé publique (`BACKUP_AGE_RECIPIENT`)
+données, pas ses rôles, que `bootstrap.sh` recrée. La clé privée `age`, elle, n'est jamais stockée
+sur le VPS — elle n'y passe que le temps d'une restauration, dans le `tmpfs` d'un conteneur
+jetable : une sauvegarde volée avec lui reste illisible. La clé publique (`BACKUP_AGE_RECIPIENT`)
 n'est pas un secret.
 
 ## Amorcer un VPS neuf
@@ -234,8 +235,8 @@ Chaque nuit à 03:00 UTC, `backup` enchaîne dump, chiffrement, envoi, purge et 
 dans le bucket des sauvegardes, la purge n'y garde que 7 quotidiennes et 4 hebdomadaires de plus
 (la règle de `borg prune --keep-daily 7 --keep-weekly 4`, [`backup/retention.sh`](backup/retention.sh)),
 puis healthchecks.io reçoit le ping. La première étape qui échoue arrête tout, sans ping :
-healthchecks.io alerte de son absence. La restauration arrive avec #24, qui l'écrit ici — dont le
-scénario « le VPS a disparu » : louer, `bootstrap.sh`, restaurer, vérifier.
+healthchecks.io alerte de son absence. Pour revenir à une sauvegarde : « Restaurer une sauvegarde »,
+et, si la machine elle-même est perdue, « Le VPS a disparu », plus bas.
 
 **Lancer une sauvegarde à la main**, en `deploy` dans `/srv/portfolio` (« Commandes sur le VPS ») —
 pas autour de 03:00 UTC, où deux chaînes se disputeraient la purge :
@@ -271,3 +272,70 @@ chaque objet purgé —, `== ping`, et sort en 0. Un échec écrit `échec à l'
   ```
   La table des matières liste les tables de l'application ; le dump en clair ne touche pas le
   disque.
+
+### Restaurer une sauvegarde
+
+Depuis le poste, à la racine d'un clone à jour du dépôt :
+[`make restore`](../Makefile) copie [`restore.sh`](restore.sh) sur le VPS et l'y lance, en `root`,
+dans `/srv/portfolio`. La base de production est **remplacée** par celle de la sauvegarde, et le
+site est indisponible le temps de la restauration — quelques minutes.
+
+1. **La clé privée** : le fichier `age.key` de l'entrée du gestionnaire de mots de passe, déposé à
+   la racine du clone (`.gitignore` l'écarte). Une sauvegarde antérieure à une rotation de la paire
+   ne s'ouvre qu'avec l'ancienne clé (« Tourner un secret », `BACKUP_AGE_RECIPIENT`).
+2. **La sauvegarde** : `derniere`, ou l'horodatage d'un objet du bucket — `20261015T030000Z` pour
+   `portfolio-20261015T030000Z.dump.age` (tableau de bord Cloudflare, R2, bucket des sauvegardes).
+3. **La restauration** :
+   ```
+   make restore HOST=<ip> BACKUP=derniere
+   ```
+   `HOST` : une adresse IPv4 ou un nom d'hôte — lettres, chiffres, `.` et `-` ; pour un VPS en
+   IPv6 seul, un alias de `~/.ssh/config`.
+   Elle écrit, dans l'ordre : `== sélection` et `sauvegarde : <objet>` ; `== téléchargement` ;
+   `== déchiffrement` ; `== arrêt` et `arrêtés : api` ; `== restauration` ; `== migrations`, avec
+   chaque migration que Django applique ; `== contrôle` et
+   `projets publiés : <N> (attendu ≥ <M>)` ; `== redémarrage` et `redémarrés : api` — puis sort en
+   0. Le seuil `M` vaut 0, ou `RESTORE_MIN_PROJECTS=<M>` sur la ligne de commande.
+4. **La clé effacée** : `rm age.key`.
+
+Un échec écrit `échec à l'étape : <étape>` et sort en erreur. Ce qu'il veut dire, et quoi faire
+(commandes en `deploy`, « Commandes sur le VPS ») :
+
+| Étape | La base, `api` | Cause probable, et quoi faire |
+|---|---|---|
+| `préparation`, `sélection` | intactes, `api` tourne | `BACKUP` ou le seuil mal formé, aucune clé dans le fichier, ou aucun objet de ce nom : corrige la commande, relance |
+| `téléchargement`, `déchiffrement` | intactes, `api` tourne | jeton du bucket refusé (`bootstrap.sh BACKUP_R2_ACCESS_KEY_ID BACKUP_R2_SECRET_ACCESS_KEY`) ; clé d'une autre paire ; archive illisible : relance avec une sauvegarde plus ancienne |
+| `arrêt` | intacte, `api` peut-être arrêté | `docker compose ps` ; `docker compose start api` |
+| `restauration` | intacte — la restauration se fait en une transaction —, `api` arrêté | la sortie de `pg_restore` ou de `psql` le dit ; relance, ou `docker compose start api` pour revenir à la base d'avant |
+| `migrations` | restaurée, `api` arrêté | une migration a échoué, ou `migrate --check` en voit une non appliquée : la sortie de Django la nomme ; une fois réglé, `docker compose up -d --wait api`, qui migre à son démarrage |
+| `contrôle` | restaurée et migrée, `api` arrêté | moins de projets publiés que le seuil : une sauvegarde trop ancienne, ou le mauvais seuil — relance avec une autre sauvegarde, ou `docker compose start api` si la base est la bonne |
+| `redémarrage` | restaurée, `api` ne devient pas sain | `docker compose logs api` |
+
+Une sauvegarde **plus récente** que le code — des migrations appliquées que le code ne connaît pas —
+ne se détecte pas : Django ne les voit pas. Le commit déployé doit être au moins aussi récent que la
+sauvegarde (« Déployer à la main » porte le même avertissement).
+
+### Le VPS a disparu
+
+Reconstruire la production sur une machine neuve, en une heure au plus (cadrage §6.7, RTO 1 h) —
+temps visé par étape. Les noms d'hôte ne changent pas : le Tunnel suit son jeton (D58), aucun geste
+DNS.
+
+1. **Suspendre le déploiement continu** (1 min) — sinon chaque push vise l'ancien hôte :
+   `gh variable set DEPLOY_ENABLED --body false`.
+2. **Louer un VPS** Ubuntu LTS en UE (ADR 0002), joignable en `root` par ta clé SSH (10 min).
+3. **L'amorcer** : « Amorcer un VPS neuf », étapes 1 à 5 (25 min) — une clé de déploiement neuve,
+   le jeton GHCR, `bootstrap.sh` —, puis, de son étape 6, les trois secrets que la machine change
+   seulement, l'environnement `production` et sa règle de branche existant déjà :
+   `gh secret set DEPLOY_SSH_KEY …`, `DEPLOY_KNOWN_HOSTS …` et `DEPLOY_HOST …`, suivis de
+   `rm deploy_key deploy_key.pub`. `docker compose ps` dit `cloudflared` `healthy` : le Tunnel a
+   repris les noms d'hôte. La base est vide, migrée par `api`.
+4. **Restaurer** : « Restaurer une sauvegarde » ci-dessus, `BACKUP=derniere` (10 min).
+5. **Vérifier** (10 min) — oui / non : le site répond et affiche ses projets ; l'admin s'ouvre
+   (Access, puis la page de connexion) ; la restauration a écrit `projets publiés` et `migrate
+   --check` vert. Le lendemain : la sauvegarde de la nuit est arrivée (« Vérifier qu'une
+   sauvegarde est arrivée »).
+6. **Reprendre le déploiement continu** (1 min) : `gh variable set DEPLOY_ENABLED --body true`.
+
+Les médias : sur R2 une fois #13 livrée, rien à restaurer ; d'ici là, ils vivent dans le volume
+`media` du VPS, qu'aucune sauvegarde ne couvre — ils sont perdus avec lui.
