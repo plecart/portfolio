@@ -1,0 +1,240 @@
+"""Tests de l'API publique : la liste des projets publiés, `GET /api/projets` (brief de #10,
+décisions 1 à 5 et 12)."""
+
+from collections.abc import Iterator
+from datetime import date
+from typing import Any, cast
+
+import pytest
+from content.models import (
+    ProcessingState,
+    Project,
+    ProjectStatus,
+    ProjectTechnology,
+    Technology,
+    TechnologyKind,
+)
+from django.db import connection
+from django.test import Client
+from django.test.utils import CaptureQueriesContext
+from factories import gallery_image, project, saved, section, technology
+from test_markdown_preview import importers
+
+PROJECTS = "/api/projets"
+
+# Une variante d'image prête, telle que le worker de #12 l'écrira.
+VARIANT = {"name": "images/x/800.webp", "width": 800, "height": 800}
+
+# Ce que le contrat n'expose à aucun niveau (décisions 2 et 3), écrit ici sans le lire dans le
+# module des schémas.
+UNEXPOSED_KEYS = {
+    "cover",
+    "original",
+    "published",
+    "position",
+    "id",
+    "created_at",
+    "updated_at",
+    "website",
+}
+
+
+def linked(owner: Project, *employed: Technology) -> None:
+    """Rattache `employed` à `owner`, dans cet ordre."""
+    for position, used in enumerate(employed, start=1):
+        saved(ProjectTechnology(project=owner, technology=used, position=position))
+
+
+def listed(client: Client) -> list[dict[str, Any]]:
+    """Le corps de la liste, décodé, après avoir vérifié qu'elle répond `200`."""
+    response = client.get(PROJECTS)
+    assert response.status_code == 200
+    return response.json()
+
+
+def complete_project(slug: str, employed: Technology) -> Project:
+    """Un projet publié de slug `slug`, avec `employed` pour technologie, une image et une
+    section : chaque liste du contrat a de quoi déclencher sa requête."""
+    published = saved(project(slug=slug, title=slug, published=True))
+    linked(published, employed)
+    saved(gallery_image(published))
+    saved(section(published))
+    return published
+
+
+def keys(value: object) -> Iterator[str]:
+    """Chaque clé d'objet de `value`, un JSON décodé, à tous les niveaux d'imbrication."""
+    if isinstance(value, dict):
+        for key, nested in cast("dict[str, object]", value).items():
+            yield key
+            yield from keys(nested)
+    elif isinstance(value, list):
+        for nested in cast("list[object]", value):
+            yield from keys(nested)
+
+
+@pytest.mark.django_db
+def test_la_liste_rend_un_projet_publie_dans_le_contrat(client: Client) -> None:
+    """L'entrée nommée du brief : technologies et sections dans l'ordre de l'admin, une image en
+    attente sans variante puis une image prête, chaque fichier par son adresse absolue."""
+    published = saved(project(published=True))
+    linked(
+        published,
+        saved(technology(name="Vite", kind=TechnologyKind.TOOL)),
+        saved(technology(name="Django")),
+    )
+    saved(section(published, position=2, title="Résultat", anchor="resultat", body="Livré."))
+    saved(section(published))
+    saved(gallery_image(published))
+    saved(
+        gallery_image(
+            published,
+            position=2,
+            caption="Le détail.",
+            state=ProcessingState.READY,
+            variants=[VARIANT],
+        )
+    )
+
+    [listed_project] = listed(client)
+
+    technologies = listed_project.pop("technologies")
+    assert [(used["name"], used["kind"]) for used in technologies] == [
+        ("Vite", "tool"),
+        ("Django", "framework"),
+    ]
+    assert all(
+        used["icon"].startswith("http://testserver/media/technologies/") for used in technologies
+    )
+    assert listed_project.pop("sections") == [
+        {
+            "title": "Contexte et objectif",
+            "anchor": "contexte-et-objectif",
+            "body": "Pourquoi ce projet.",
+        },
+        {"title": "Résultat", "anchor": "resultat", "body": "Livré."},
+    ]
+    assert listed_project.pop("gallery") == [
+        {
+            "caption": "La fiche d'un projet.",
+            "width": 1200,
+            "height": 1200,
+            "state": "pending",
+            "variants": [],
+        },
+        {
+            "caption": "Le détail.",
+            "width": 1200,
+            "height": 1200,
+            "state": "ready",
+            "variants": [
+                {"url": "http://testserver/media/images/x/800.webp", "width": 800, "height": 800}
+            ],
+        },
+    ]
+    assert listed_project == {
+        "slug": "portfolio",
+        "title": "Portfolio",
+        "summary": "Le site qui présente mes projets.",
+        "description": "Une table de projets et leurs fiches.",
+        "kind": "personal",
+        "status": "ongoing",
+        "started_on": "2026-09-01",
+        "finished_on": None,
+        "client": "",
+        "repository_url": "",
+        "demo_url": "",
+        "showcase": False,
+    }
+
+
+@pytest.mark.django_db
+def test_un_brouillon_n_est_jamais_liste(client: Client) -> None:
+    """Seuls les projets publiés figurent dans la liste."""
+    employed = saved(technology())
+    complete_project("publie", employed)
+    draft = complete_project("brouillon", employed)
+    draft.published = False
+    draft.save()
+
+    assert [listed_project["slug"] for listed_project in listed(client)] == ["publie"]
+
+
+@pytest.mark.django_db
+def test_sans_projet_publie_la_liste_est_vide(client: Client) -> None:
+    """Une liste vide est `[]` en `200`, jamais une erreur."""
+    saved(project())
+
+    assert listed(client) == []
+
+
+@pytest.mark.django_db
+def test_un_projet_termine_rend_ses_deux_dates_iso(client: Client) -> None:
+    """Les dates sont en ISO 8601 ; la date de fin d'un projet terminé est exposée."""
+    finished = complete_project("termine", saved(technology()))
+    finished.status = ProjectStatus.FINISHED
+    finished.finished_on = date(2026, 9, 30)
+    finished.save()
+
+    [listed_project] = listed(client)
+
+    assert (listed_project["started_on"], listed_project["finished_on"]) == (
+        "2026-09-01",
+        "2026-09-30",
+    )
+
+
+@pytest.mark.django_db
+def test_la_liste_suit_l_ordre_des_slugs(client: Client) -> None:
+    """Un même contenu rend toujours le même corps : la liste suit le slug, pas l'ordre physique
+    des lignes. Réenregistrer « alpha » le place après « zeta » dans la table — Postgres écrit une
+    nouvelle version de la ligne —, si bien qu'une liste sans tri rendrait l'ordre inverse."""
+    employed = saved(technology())
+    alpha = complete_project("alpha", employed)
+    complete_project("zeta", employed)
+    alpha.save()
+
+    assert [listed_project["slug"] for listed_project in listed(client)] == ["alpha", "zeta"]
+
+
+@pytest.mark.django_db
+def test_le_contrat_n_expose_aucun_champ_ecarte(client: Client) -> None:
+    """Aucune clé écartée par les décisions 2 et 3, à aucun niveau du corps — projet,
+    technologies, galerie, variantes, sections."""
+    published = complete_project("complet", saved(technology()))
+    saved(gallery_image(published, position=2, state=ProcessingState.READY, variants=[VARIANT]))
+
+    body = listed(client)
+
+    assert {"technologies", "gallery", "url", "sections", "anchor"} <= set(keys(body))
+    assert UNEXPOSED_KEYS.isdisjoint(keys(body))
+
+
+@pytest.mark.django_db
+def test_la_liste_coute_autant_de_requetes_pour_un_projet_que_pour_douze(client: Client) -> None:
+    """Le nombre de requêtes SQL ne dépend pas du nombre de projets (décision 12) : l'invariant est
+    l'égalité des deux décomptes, jamais leur valeur."""
+    employed = saved(technology())
+    complete_project("projet-0", employed)
+    with CaptureQueriesContext(connection) as single:
+        listed(client)
+    for index in range(1, 12):
+        complete_project(f"projet-{index}", employed)
+
+    with CaptureQueriesContext(connection) as twelve:
+        assert len(listed(client)) == 12
+
+    assert len(twelve) == len(single)
+
+
+@pytest.mark.parametrize("route", ["/api/docs", "/api/openapi.json"])
+def test_ni_docs_ni_schema_ne_sont_servis_en_ligne(client: Client, route: str) -> None:
+    """Rien ne consomme les docs interactives ni le schéma en ligne (décision 10) : le schéma vit
+    dans `apps/api/openapi.json`."""
+    assert client.get(route).status_code == 404
+
+
+def test_seuls_les_modules_de_l_api_importent_django_ninja() -> None:
+    """django-ninja ne sert qu'à l'API publique : son instance et son contrat, que les tests
+    ci-dessus atteignent par la route."""
+    assert importers("ninja") == {"content.api", "content.schemas"}
