@@ -1,11 +1,13 @@
-# Pile du test de l'image `backup` (`test_backup_image.py`) : surcharge du Compose de production,
-# lancée par le test sous son propre nom de projet — le moteur Docker est partagé avec d'autres
-# piles (brief de #23, décision 11).
+# Pile des tests de l'image `backup` et de la restauration (`test_backup_image.py`,
+# `test_restore.py`) : surcharge du Compose de production, lancée par chaque test sous son propre
+# nom de projet — le moteur Docker est partagé avec d'autres piles (brief de #23, décision 11 ;
+# brief de #24, décision 11).
 #
-# `postgres` et `backup` y gardent leur définition de production — image Postgres, sondes,
-# variables — ; ce fichier n'y change que ce que la pile de test exige :
+# `postgres`, `redis`, `api` et `backup` y gardent leur définition de production — image Postgres,
+# sondes, variables — ; ce fichier n'y change que ce que la pile de test exige :
 #
-# - `backup` tourne sur l'image que `make build` a chargée ;
+# - `backup` et `api` tournent sur les images que `make build` a chargées — `api`, démarré par la
+#   restauration seulement, migre la base au démarrage : elle porte le vrai schéma ;
 # - deux témoins remplacent les services externes : un stockage S3, `rclone serve s3` tiré de
 #   l'image `backup` — aucune image de plus à épingler ; et un récepteur de ping, tiré de l'image
 #   `caddy`, qui répond 200 à toute requête et la journalise.
@@ -15,6 +17,10 @@
 # Chaque valeur vient de l'environnement du test, par-dessus le modèle `prod.env.example`.
 
 services:
+  api:
+    image: ${API_IMAGE:?}
+    pull_policy: never
+
   backup:
     image: ${BACKUP_IMAGE:?}
     # L'image du poste ou du job, jamais une image homonyme tirée d'un registre.
