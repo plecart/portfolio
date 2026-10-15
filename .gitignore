@@ -17,6 +17,10 @@ apps/web/.lighthouseci/
 # prêt à être commité. Dans le conteneur, ces fichiers vivent dans un volume et ne passent pas ici.
 /media/
 
+# La clé privée `age` des sauvegardes, que `make restore` lit par défaut à la racine du clone le
+# temps d'une restauration (`infra/RUNBOOK.md`) : jamais dans le dépôt (ADR 0007, point 2).
+/age.key
+
 # Claude Code — surcharges locales
 .claude/settings.local.json
 

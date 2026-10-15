@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from call_witness import recorded_calls, recording
 from test_backup_image import (
     DATABASE,
     Stack,
@@ -47,10 +48,6 @@ STEPS = [
 WITNESS_TABLE = "temoin_de_restauration"
 # Une table créée après la sauvegarde, que l'archive ne porte pas.
 LATER_TABLE = "posterieure_a_la_sauvegarde"
-
-# Le témoin de la commande Compose : chaque appel consigné, arguments séparés par US (0x1f), appels
-# par RS (0x1e) — un argument peut porter des sauts de ligne —, puis exécuté tel quel.
-COMPOSE_WITNESS = 'printf "%s\\037" "$@" >> "$0.calls"\nprintf "\\036" >> "$0.calls"\nexec "$@"\n'
 
 # Des objets que la rétention ne reconnaît pas comme des sauvegardes, et qui suivent dans l'ordre
 # des noms toute sauvegarde d'aujourd'hui : un 31 avril, que `date` normaliserait en 1ᵉʳ mai ; un
@@ -153,8 +150,10 @@ def restore(
     commande Compose — donc d'aucun conteneur — et qu'aucun conteneur jetable ne survit : son
     `/tmp`, le `tmpfs` du Compose de production, part avec lui (brief, critère « Clé »).
     """
-    witness = tmp_path / "compose.sh"
-    witness.write_text(COMPOSE_WITNESS, encoding="utf-8", newline="\n")
+    # Le témoin de la commande Compose : chaque appel consigné (`call_witness`), puis exécuté tel
+    # quel.
+    witness, log = tmp_path / "compose.sh", tmp_path / "calls"
+    witness.write_text(recording(log) + 'exec "$@"\n', encoding="utf-8", newline="\n")
     key = identity or stack.identity
     process = subprocess.run(
         ["sh", SCRIPT.as_posix(), *arguments],
@@ -173,9 +172,7 @@ def restore(
         check=False,
         timeout=600,
     )
-    log = Path(f"{witness}.calls")
-    recorded = log.read_text(encoding="utf-8") if log.exists() else ""
-    calls = [call.split("\x1f")[:-1] for call in recorded.split("\x1e")[:-1]]
+    calls = [arguments for _, *arguments in recorded_calls(log)]
     one_off = subprocess.run(
         ["docker", "ps", "--all", "--quiet", "--filter", "label=com.docker.compose.oneoff=True"]
         + ["--filter", f"label=com.docker.compose.project={PROJECT}"],

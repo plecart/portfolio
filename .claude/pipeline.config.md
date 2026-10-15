@@ -85,7 +85,8 @@ le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node a
                                                   # vérifiée le 2026-09-30 (#15)
 - tests images : make image-test                  # pytest sur `infra/tests` : démarre les images que
                                                   # `make build` a chargées — test de fumée du
-                                                  # Caddyfile, chaîne de sauvegarde de `backup` ;
+                                                  # Caddyfile, chaîne de sauvegarde de `backup`,
+                                                  # restauration par `infra/restore.sh` (#24) ;
                                                   # hors de `make test`, `make build` d'abord ;
                                                   # vérifiée le 2026-10-04 (#23)
 - publication  : make push                        # **CI seulement** (job `publish`) : chaque image
@@ -101,6 +102,16 @@ le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node a
                                                   # `infra/prod.env.example` ; vérifiée le 2026-10-03 (#16)
 - run local    : make dev                         # pile Postgres + Redis + `api`, ports sur `127.0.0.1` ;
                                                   # front compilé s'il manque
+- restauration : make restore HOST=<ip> BACKUP=<derniere|AAAAMMJJTHHMMSSZ>
+                                                  # **production seulement**, du poste : copie
+                                                  # `infra/restore.sh` sur le VPS et l'y lance, la clé
+                                                  # privée `age` (`AGE_IDENTITY`, défaut `age.key`)
+                                                  # sur l'entrée standard, seuil
+                                                  # `RESTORE_MIN_PROJECTS` (défaut 0) ; la cible est
+                                                  # éprouvée avec des témoins de `scp` et `ssh`
+                                                  # (`make test`), le script contre la pile de test
+                                                  # (`make image-test`) — jamais contre un vrai VPS
+                                                  # avant #25 (#24, 2026-10-15)
 
 **Front (`apps/web/`)** — vérifiées le 2026-09-23 au scaffold du front (#3), chacune lancée depuis
 la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur le poste :
