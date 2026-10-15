@@ -16,6 +16,7 @@ import os
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Self
+from urllib.parse import urlsplit
 
 from pydantic import (
     Field,
@@ -39,9 +40,10 @@ class ConfigurationError(RuntimeError):
     de passe de la base, et une erreur de démarrage part sur stderr — journaux de conteneur,
     sortie de CI, collecteur d'erreurs.
 
-    **Quatre** mécanismes de refus ont été recensés : borne de longueur, URL mal formée,
-    validateur de modèle qui reçoit l'environnement entier — les trois fuyaient — et échec de
-    lecture d'une *source*, qui ne fuit pas mais lève un type d'exception distinct. `Env.load()`
+    **Cinq** mécanismes de refus ont été recensés : borne de longueur, URL mal formée,
+    validateur de modèle qui reçoit l'environnement entier, validateur de champ qui reçoit la
+    liste entière des origines — les quatre fuyaient — et échec de lecture d'une *source*, qui
+    ne fuit pas mais lève un type d'exception distinct. `Env.load()`
     les reformule tous par ce type, et `INVALID_CONFIGURATIONS` (`tests/test_env.py`) en tient
     le dénombrement : c'est le test qui garde la classe close, pas cette phrase.
     """
@@ -135,6 +137,10 @@ class Env(BaseSettings):
         MEDIA_ROOT: dossier où atterrissent les fichiers téléversés (ADR 0004, « Développement :
             stockage disque par défaut de Django »). Le conteneur reçoit le chemin absolu de son
             volume ; sur le poste, un chemin relatif est ancré sur la racine du dépôt.
+        CORS_ALLOWED_ORIGINS: les origines admises à appeler l'API publique — celle du site
+            (ADR 0008, « CORS restreint à l'origine du site »), liste JSON comme `ALLOWED_HOSTS`.
+            Une origine est un schéma et un hôte, rien d'autre ; au moins une, en `DEBUG` aussi :
+            le site ne peut pas appeler l'API sans elle.
     """
 
     model_config = SettingsConfigDict(env_file=ENV_FILE)
@@ -145,12 +151,31 @@ class Env(BaseSettings):
     DATABASE_URL: PostgresDsn
     REDIS_URL: RedisDsn
     MEDIA_ROOT: Path = REPOSITORY_ROOT / "media"
+    CORS_ALLOWED_ORIGINS: list[str] = Field(min_length=1)
 
     @field_validator("MEDIA_ROOT")
     @classmethod
     def _anchor_media_root(cls, value: Path) -> Path:
         """Ancre un `MEDIA_ROOT` relatif, comme `ENV_FILE` l'est déjà."""
         return _anchored_path(value)
+
+    @field_validator("CORS_ALLOWED_ORIGINS")
+    @classmethod
+    def _require_bare_origins(cls, origins: list[str]) -> list[str]:
+        """Refuse toute origine qui n'est pas exactement un schéma et un hôte.
+
+        `django-cors-headers` n'apparie que le schéma et l'hôte (`_url_in_whitelist`) : une
+        origine avec un chemin, une requête ou un fragment n'apparierait jamais rien, et son
+        contrôle `E014` ne le dit qu'à `manage.py check`, que le conteneur ne lance pas. Une
+        origine sans schéma ou sans hôte (`E013`), de même. Refusée au démarrage, comme le reste.
+        """
+        for origin in origins:
+            parts = urlsplit(origin)
+            if not (parts.scheme and parts.netloc) or any(
+                (parts.path, parts.query, parts.fragment)
+            ):
+                raise ValueError("chaque origine est un schéma et un hôte, rien d'autre")
+        return origins
 
     @model_validator(mode="after")
     def _require_allowed_host_outside_debug(self) -> Self:

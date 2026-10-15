@@ -43,10 +43,11 @@ SECRET_TRAVEL_FORMS: list[tuple[str, Callable[[Env], str]]] = [
     ("model_dump en mode json", lambda env: str(env.model_dump(mode="json"))),
 ]
 
-# Les façons de rendre la configuration invalide — **quatre mécanismes de refus distincts**,
+# Les façons de rendre la configuration invalide — **cinq mécanismes de refus distincts**,
 # et c'est le dénombrement qui compte : borne de longueur, URL mal formée (deux fois, car deux
-# champs la portent), validateur de modèle qui reçoit l'environnement **entier**, et échec de
-# lecture d'une *source* avant même la validation. Le dernier ne lève pas le même type
+# champs la portent), validateur de modèle qui reçoit l'environnement **entier**, validateur de
+# champ qui reçoit la liste entière des origines, et échec de lecture d'une *source* avant même
+# la validation (deux fois, car deux champs sont des listes). Le dernier ne lève pas le même type
 # d'exception que les autres : c'est précisément pourquoi il doit figurer ici.
 INVALID_CONFIGURATIONS = [
     ("clé trop courte", "SECRET_KEY", "TROP-COURTE-ET-SECRETE"),
@@ -54,6 +55,22 @@ INVALID_CONFIGURATIONS = [
     ("redis mal formé", "REDIS_URL", "redis://admin:MOT-DE-PASSE-REDIS@"),
     ("aucun hôte autorisé", "ALLOWED_HOSTS", "[]"),
     ("liste mal formée", "ALLOWED_HOSTS", "[oups"),
+    ("origine avec chemin", "CORS_ALLOWED_ORIGINS", '["http://SITE-SECRET.test/chemin"]'),
+    ("origine sans schéma", "CORS_ALLOWED_ORIGINS", '["SITE-SECRET.test"]'),
+    ("aucune origine", "CORS_ALLOWED_ORIGINS", "[]"),
+    ("liste d'origines mal formée", "CORS_ALLOWED_ORIGINS", "[oups"),
+]
+
+# Ce qu'une origine CORS n'est pas : une origine est un schéma et un hôte, rien d'autre
+# (`django-cors-headers`, contrôles `E013` et `E014`), et c'est au démarrage qu'on le refuse —
+# une origine qui ne peut rien apparier laisserait le site sans API, sans qu'aucune erreur ne le
+# dise. Cinq formes, une par composant d'URL qui ne doit pas y être, ou qui y manque.
+REFUSED_ORIGINS = [
+    ("chemin", "https://site.test/chemin"),
+    ("requête", "https://site.test?x=1"),
+    ("fragment", "https://site.test#ancre"),
+    ("sans schéma", "site.test"),
+    ("sans hôte", "https://"),
 ]
 
 
@@ -122,6 +139,42 @@ def test_un_hote_absent_est_tolere_en_debug(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setenv("ALLOWED_HOSTS", "[]")
 
     assert build_env().ALLOWED_HOSTS == []
+
+
+def test_les_origines_cors_sont_lues_telles_quelles(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Une liste JSON d'origines, comme `ALLOWED_HOSTS` (brief de #10, décision 8) — sans `/`
+    final ajouté, que `django-cors-headers` refuserait comme un chemin."""
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", '["https://site.test","http://localhost:5173"]')
+
+    assert build_env().CORS_ALLOWED_ORIGINS == ["https://site.test", "http://localhost:5173"]
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [origin for _, origin in REFUSED_ORIGINS],
+    ids=[name for name, _ in REFUSED_ORIGINS],
+)
+def test_une_origine_cors_mal_formee_est_refusee(
+    monkeypatch: pytest.MonkeyPatch, origin: str
+) -> None:
+    """Chaque composant d'URL qui n'a rien à faire dans une origine, ou qui y manque : refusé au
+    démarrage, la liste entière couvrant la classe."""
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", f'["https://site.test","{origin}"]')
+
+    with pytest.raises(ValidationError, match="CORS_ALLOWED_ORIGINS"):
+        build_env()
+
+
+def test_le_demarrage_echoue_sans_origine_cors_meme_en_debug(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sans origine admise, le site ne peut pas appeler l'API, en développement aussi : le serveur
+    Vite parle au back depuis une autre origine."""
+    monkeypatch.setenv("DEBUG", "true")
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", "[]")
+
+    with pytest.raises(ValidationError, match="CORS_ALLOWED_ORIGINS"):
+        build_env()
 
 
 @pytest.mark.parametrize(

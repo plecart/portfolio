@@ -33,6 +33,8 @@ VALID_ENVIRONMENT = {
     # Relatif à dessein : c'est la forme que `.env.example` propose, donc celle que la plupart
     # des clones porteront, et la seule qui éprouve l'ancrage sur la racine du dépôt.
     "MEDIA_ROOT": "fichiers-de-test",
+    # L'origine du site, telle que les tests de CORS l'envoient ; une autre, pour l'origine refusée.
+    "CORS_ALLOWED_ORIGINS": '["https://site.test"]',
 }
 
 # Un chemin qui n'existe pas : `pydantic-settings` n'y lit rien, sans bruit.

@@ -82,6 +82,8 @@ services:
       # Les deux hôtes que Caddy relaie vers `api` : celui de l'API, et celui du site pour
       # `/projets/*`. Caddy transmet `Host` tel quel (doc Caddy « reverse_proxy », § Headers).
       ALLOWED_HOSTS: '["${SITE_HOST:?}","${API_HOST:?}"]'
+      # La seule origine admise à appeler l'API : le site (ADR 0008), toujours en HTTPS.
+      CORS_ALLOWED_ORIGINS: '["https://${SITE_HOST:?}"]'
       DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
       REDIS_URL: redis://redis:6379/0
       # Le volume, en attendant R2 (#13).

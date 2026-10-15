@@ -13,8 +13,10 @@ Compose dans `test_compose.py`.
 """
 
 import io
+import itertools
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import tarfile
@@ -535,6 +537,40 @@ def test_le_build_des_images_ne_demande_aucun_secret(dockerfile: Path) -> None:
     assert instructions, "aucune instruction lue — le Dockerfile a-t-il changé de forme ?"
     assert [i for i in instructions if BUILD_DECLARATION.match(i) and ENV_FIELDS.search(i)] == []
     assert [i for i in instructions if SECRET_MOUNT in i] == []
+
+
+def build_environment(dockerfile: Path) -> dict[str, str]:
+    """Les variables que la ligne `RUN … collectstatic` de `dockerfile` pose devant sa commande.
+
+    Lues comme le shell du build les lit : chaque `NOM=valeur` qui précède la commande, citations
+    retirées. La première chose qui n'est pas une affectation est la commande.
+    """
+    [instruction] = [
+        whole
+        for _, whole in dockerfile_instructions(dockerfile.read_text(encoding="utf-8"))
+        if "collectstatic" in whole
+    ]
+    words = shlex.split(instruction.removeprefix("RUN"))
+    assignments = itertools.takewhile(lambda word: "=" in word, words)
+    return dict(word.split("=", 1) for word in assignments)
+
+
+def test_l_environnement_factice_du_build_est_accepte_par_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un champ ajouté à `Env` sans sa valeur factice ici casse `make build` — en CI seulement,
+    au job `infra`, loin du fichier qui l'a causé. La ligne se prouve donc comme le build la
+    joue : ces variables, et elles seules, doivent faire démarrer `Env`."""
+    for name in Env.model_fields:
+        monkeypatch.delenv(name, raising=False)
+    environment = build_environment(DOCKERFILE)
+    assert environment, (
+        "aucune affectation lue — la ligne `collectstatic` a-t-elle changé de forme ?"
+    )
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
+
+    Env.load()
 
 
 def test_le_point_d_entree_cede_la_place_a_la_commande() -> None:
