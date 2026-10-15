@@ -4,14 +4,14 @@ le front dérive ses types (#19) — frais, typé strictement, et conforme au co
 
 import json
 from collections.abc import Iterator
+from io import StringIO
 from pathlib import Path
 from typing import Any
 
 import pytest
-from content.api import api
+from django.core.management import call_command
 from django.test import Client
 from jsonschema import Draft202012Validator
-from ninja.responses import NinjaJSONEncoder
 from test_api import PROJECTS, listed, project_with_variant
 
 # Le fichier versionné, que `make openapi` écrit.
@@ -40,16 +40,21 @@ def versioned() -> dict[str, Any]:
 
 
 def generated() -> dict[str, Any]:
-    """Le schéma que le code produit, passé par l'encodeur de la commande d'export : décodé, il se
-    compare au fichier valeur pour valeur."""
-    return json.loads(json.dumps(api.get_openapi_schema(), cls=NinjaJSONEncoder))
+    """Le schéma que le code produit, rendu par la commande même que `make openapi` lance, avec
+    son `--api` : décodé, il se compare au fichier valeur pour valeur. Passer par la commande, et
+    non par l'instance, tient aussi ce dont elle dépend — `ninja` installé, sans quoi Django ne la
+    trouve pas."""
+    output = StringIO()
+    call_command("export_openapi_schema", "--api", "content.api.api", stdout=output)
+    return json.loads(output.getvalue())
 
 
 def loose_nodes(node: dict[str, Any], path: str) -> Iterator[str]:
     """Le chemin de chaque nœud de `node` qui n'est pas typé strictement (décision 11).
 
     Un nœud est typé par `$ref`, par `type` ou par `anyOf` dont chaque branche est typée. Un
-    objet nomme ses propriétés et n'en admet pas d'autres ; un tableau type ses éléments.
+    objet nomme ses propriétés et n'en déclare pas d'autres (`additionalProperties` absent ou
+    `false`) ; un tableau type ses éléments.
     """
     if "$ref" in node:
         return
