@@ -161,9 +161,9 @@ tourne sur un schéma plus récent que le sien. Le prochain déploiement de la C
 
 ## Tourner un secret
 
-`RESTORE_R2_*` mis à part — ils ne vivent que dans `production`, dernière entrée —, jamais pendant
-un déploiement : le job et le script écrivent le même `.env`, et le script remettrait l'étiquette
-qu'il a lue avant le job. Suspends d'abord le déploiement continu —
+Pour toutes les entrées sauf `RESTORE_R2_*` — la dernière, qui se tourne sans rien de ce qui suit
+— : jamais pendant un déploiement ; le job et le script écrivent le même `.env`, et le script
+remettrait l'étiquette qu'il a lue avant le job. Suspends d'abord le déploiement continu —
 `gh variable set DEPLOY_ENABLED --body false` —, puis vérifie qu'aucun run de `main` ne tourne ni
 n'attend : `gh run list --branch main --status in_progress`, puis `--status queued`, vides ?
 Remets `--body true` une fois la rotation faite ; un push arrivé entre-temps se déploie au suivant,
