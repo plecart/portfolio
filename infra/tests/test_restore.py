@@ -57,6 +57,16 @@ UNRECOGNIZED = [
     f"{DATABASE}-29991231T030000Z.dump.age.partiel",
     "zz-notes.txt",
 ]
+# Le témoin de la commande Compose, après la consignation de l'appel (`call_witness`) : l'appel
+# exécuté tel quel — sauf, si `TRUNCATE_RESTORE` est posée, celui qui restaure, dont l'entrée est
+# coupée après 4 Kio, comme un flux interrompu en route.
+COMPOSE_WITNESS = """\
+case "$*" in
+*"pg_restore --file"*) [ -z "${TRUNCATE_RESTORE:-}" ] || { head -c 4096 | "$@"; exit; } ;;
+esac
+exec "$@"
+"""
+
 # Une sauvegarde reconnue, plus ancienne, que « derniere » ne doit pas prendre : vide, elle ferait
 # échouer le déchiffrement.
 OLDER = f"{DATABASE}-20000101T030000Z.dump.age"
@@ -150,10 +160,8 @@ def restore(
     commande Compose — donc d'aucun conteneur — et qu'aucun conteneur jetable ne survit : son
     `/tmp`, le `tmpfs` du Compose de production, part avec lui (brief, critère « Clé »).
     """
-    # Le témoin de la commande Compose : chaque appel consigné (`call_witness`), puis exécuté tel
-    # quel.
     witness, log = tmp_path / "compose.sh", tmp_path / "calls"
-    witness.write_text(recording(log) + 'exec "$@"\n', encoding="utf-8", newline="\n")
+    witness.write_text(recording(log) + COMPOSE_WITNESS, encoding="utf-8", newline="\n")
     key = identity or stack.identity
     process = subprocess.run(
         ["sh", SCRIPT.as_posix(), *arguments],
@@ -220,10 +228,14 @@ FAILURES: dict[str, tuple[list[str], dict[str, str], bool, str]] = {
     "BACKUP absent": ([], {}, False, "sélection"),
     "seuil mal formé": (["derniere"], {"RESTORE_MIN_PROJECTS": "un"}, False, "préparation"),
     "clé fausse": (["derniere"], {}, True, "déchiffrement"),
+    "flux tronqué": (["derniere"], {"TRUNCATE_RESTORE": "1"}, False, "restauration"),
     "seuil non atteint": (["derniere"], {"RESTORE_MIN_PROJECTS": "1"}, False, "contrôle"),
 }
-# Les étapes qui précèdent l'arrêt : leur échec ne touche ni la base ni `api`.
+# Les étapes qui précèdent l'arrêt : leur échec laisse `api` tourner.
 BEFORE_STOP = {"préparation", "sélection", "téléchargement", "déchiffrement"}
+# Celles dont l'échec laisse la base telle qu'elle était : avant l'arrêt, et la restauration, qui se
+# fait en une transaction.
+UNCHANGED = BEFORE_STOP | {"restauration"}
 
 
 @pytest.mark.parametrize(
@@ -239,7 +251,8 @@ def test_une_etape_qui_echoue_arrete_la_chaine_en_la_nommant(
 ) -> None:
     """La première étape qui échoue arrête la chaîne : code non nul, étape nommée (décision 4).
     Avant l'arrêt, rien n'a changé — la base garde la ligne posée après la sauvegarde, `api`
-    tourne ; après, la base est restaurée et `api` reste arrêté (décision 6)."""
+    tourne ; après, `api` reste arrêté (décision 6), et la base n'est restaurée que si la
+    restauration est allée à son terme : une archive lue à moitié ne valide rien."""
     bucket, _ = backed_up(stack)
     identity = age_key_pair(loaded_image("backup"))[1] if foreign_key else None
 
@@ -249,6 +262,5 @@ def test_une_etape_qui_echoue_arrete_la_chaine_en_la_nommant(
 
     assert failed.process.returncode != 0
     assert f"échec à l'étape : {step}" in failed.log
-    untouched = step in BEFORE_STOP
-    assert witness_rows(stack) == ("1" if untouched else "0")
-    assert ("api" in running_services(stack)) is untouched
+    assert witness_rows(stack) == ("1" if step in UNCHANGED else "0")
+    assert ("api" in running_services(stack)) is (step in BEFORE_STOP)

@@ -10,10 +10,10 @@ from pathlib import Path
 
 
 def recording(log: Path) -> str:
-    """Les lignes `sh` qui consignent l'appel — `$0`, puis chaque argument — dans `log`."""
-    return (
-        f'printf "%s\\037" "$0" "$@" >> "{log.as_posix()}"\nprintf "\\036" >> "{log.as_posix()}"\n'
-    )
+    """Les lignes `sh` qui consignent l'appel — `$0`, puis chaque argument — dans `log`, en une
+    seule écriture : deux témoins lancés ensemble, les deux bouts d'un tube, écrivent dans le même
+    journal, et deux écritures par appel s'y entrelaçaient (mesuré : un appel vide au journal)."""
+    return f'call=$(printf "%s\\037" "$0" "$@")\nprintf "%s\\036" "$call" >> "{log.as_posix()}"\n'
 
 
 def recorded_calls(log: Path) -> list[list[str]]:
