@@ -102,11 +102,17 @@ def declared_variables(dotenv: Path) -> dict[str, str]:
 
 
 def value_fragments(value: str) -> list[str]:
-    """Ce qu'un message pourrait citer d'une valeur : la valeur, et chaque élément d'une liste
-    JSON — un validateur qui nomme l'origine fautive, crochets et guillemets retirés, fuit
-    autant que celui qui recopie la liste (mesuré à la relecture : une mutation qui citait
-    l'origine restait verte sur la valeur entière)."""
-    return [piece for piece in re.split(r'[\[\]",]', value) if piece]
+    """Ce qu'un message pourrait citer d'une valeur, en minuscules comme le message est lu.
+
+    Trois formes, chacune mesurée à la relecture sur une mutation qui citait la valeur et
+    laissait le test vert : la valeur entière ; chaque élément d'une liste JSON, crochets et
+    guillemets retirés — un validateur qui nomme l'origine fautive ; l'hôte de chaque élément
+    qui est une URL — un validateur qui suggère la forme canonique, hôte en minuscules et
+    chemin retiré.
+    """
+    pieces = [piece.strip() for piece in re.split(r'[\[\]",]', value) if piece.strip()]
+    hosts = [urlsplit(piece).hostname for piece in pieces]
+    return [fragment.lower() for fragment in [*pieces, *hosts] if fragment]
 
 
 def build_env(env_file: Path | None = None) -> Env:
@@ -252,7 +258,7 @@ def test_aucune_valeur_ne_fuit_dans_l_erreur_de_demarrage(
     assert variable in message, "le refus doit dire quel champ est en cause"
     for value in [invalid_value, *variables.values()]:
         for fragment in value_fragments(value):
-            assert fragment not in message
+            assert fragment not in message.lower()
 
 
 def test_une_cle_inconnue_dans_le_fichier_env_est_refusee(tmp_path: Path) -> None:
