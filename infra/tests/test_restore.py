@@ -281,8 +281,12 @@ def test_la_chaine_tient_dans_l_etat_du_runner_du_test_mensuel(
     arrive vide tant que la variable de dépôt n'existe pas (doc GitHub « Contexts », `vars`).
     Les services ne sont redémarrés que s'ils tournaient (décision 5) ; l'archive ne cite aucun
     rôle que la base n'a pas — le rôle de sauvegarde lit par appartenance à `pg_read_all_data`,
-    que `pg_dump` n'écrit pas ; un `GRANT` qui lui serait donné entrerait dans l'archive et
-    ferait échouer la restauration du runner — ; le seuil vide vaut 0 (décision 7)."""
+    que `pg_dump` n'écrit pas ; un `GRANT` qui lui serait donné sur les tables existantes
+    entrerait dans l'archive et ferait échouer la restauration du runner. Sa SQL est donc
+    rejouée ici sur la base peuplée, comme `bootstrap.sh` la rejoue à chaque rotation : créé avant
+    les migrations, le rôle ne recevrait de droits sur aucune table — le seuil vide vaut 0
+    (décision 7)."""
+    stack.apply_backup_role(STACK_VALUES["BACKUP_POSTGRES_PASSWORD"])
     bucket, _ = backed_up(stack)
     stack.output("stop", "api")
     role = STACK_VALUES["BACKUP_POSTGRES_USER"]
@@ -299,6 +303,27 @@ def test_la_chaine_tient_dans_l_etat_du_runner_du_test_mensuel(
     assert not [call for call in done.calls if {"stop", "up"} & set(call)]
     assert "api" not in running_services(stack)
     assert "projets publiés : 0 (attendu ≥ 0)" in done.log
+
+
+def test_une_erreur_sql_en_cours_de_flux_echoue_a_la_restauration(
+    stack: Stack, tmp_path: Path
+) -> None:
+    """Une archive qui cite un rôle que la base n'a pas — le cas du runner si un droit était donné
+    au rôle de sauvegarde — : `psql` s'arrête sur l'erreur au milieu du flux, et la chaîne échoue
+    à l'étape « restauration », base intacte — une transaction —, sans rester bloquée ni laisser
+    de conteneur jetable (`restore` le vérifie). « Flux tronqué » éprouve l'autre côté : le flux
+    qui s'arrête avant `psql`."""
+    succeeded(stack.as_owner(f"CREATE ROLE ephemere; GRANT SELECT ON {WITNESS_TABLE} TO ephemere"))
+    bucket, _ = backed_up(stack)
+    succeeded(stack.as_owner("DROP OWNED BY ephemere; DROP ROLE ephemere"))
+
+    failed = restore(stack, tmp_path, bucket, "derniere")
+
+    assert failed.process.returncode != 0
+    assert "échec à l'étape : restauration" in failed.log
+    assert 'role "ephemere" does not exist' in failed.log
+    assert witness_rows(stack) == "1"
+    assert failed.writer_exits == ["0"]
 
 
 # Cas → (arguments, environnement, clé privée autre que celle du test, étape qui échoue).
