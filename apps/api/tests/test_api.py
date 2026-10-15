@@ -290,6 +290,68 @@ def test_cors_est_borne_aux_routes_de_l_api(client: Client) -> None:
     assert not response.has_header(ALLOW_ORIGIN)
 
 
+@pytest.mark.django_db
+def test_la_liste_se_revalide_a_chaque_visite(client: Client) -> None:
+    """`Cache-Control: no-cache`, exactement : stocker, revalider à chaque visite, `304` si rien
+    n'a changé (décision 7) — ni `max-age`, ni `no-store`, qui empêcherait l'`ETag`."""
+    response = client.get(PROJECTS)
+
+    assert response.status_code == 200
+    assert response["Cache-Control"] == "no-cache"
+
+
+@pytest.mark.django_db
+def test_la_liste_ne_pose_aucun_cookie(client: Client) -> None:
+    """Ni session ni CSRF : la liste n'ouvre aucune session et ne pose aucun cookie (décision 9,
+    ADR 0008 « sans cookie »)."""
+    response = client.get(PROJECTS)
+
+    assert response.status_code == 200
+    assert not response.has_header("Set-Cookie")
+    assert not response.cookies
+
+
+@pytest.mark.django_db
+def test_l_etag_est_l_empreinte_du_corps(client: Client) -> None:
+    """Même contenu, même `ETag` ; une légende modifiée — un changement qu'`updated_at` du projet
+    ne voit pas — en change (décision 6)."""
+    published = complete_project("empreinte", saved(technology()))
+
+    first, second = client.get(PROJECTS), client.get(PROJECTS)
+    image = published.gallery.get()
+    image.caption = "Une autre légende."
+    image.save()
+    third = client.get(PROJECTS)
+
+    assert first["ETag"] == second["ETag"]
+    assert third["ETag"] != first["ETag"]
+
+
+@pytest.mark.django_db
+def test_un_etag_correspondant_rend_304_sans_corps(client: Client) -> None:
+    """`If-None-Match` égal → `304` à corps vide, qui garde l'en-tête CORS : le navigateur du
+    site lit la réponse conditionnelle comme les autres (décision 6)."""
+    complete_project("conditionnel", saved(technology()))
+    etag = client.get(PROJECTS)["ETag"]
+
+    response = client.get(PROJECTS, headers={"if-none-match": etag, "origin": SITE_ORIGIN})
+
+    assert response.status_code == 304
+    assert response.content == b""
+    assert response[ALLOW_ORIGIN] == SITE_ORIGIN
+
+
+@pytest.mark.django_db
+def test_un_etag_different_rend_le_corps(client: Client) -> None:
+    """`If-None-Match` différent → `200` avec le corps."""
+    complete_project("perime", saved(technology()))
+
+    response = client.get(PROJECTS, headers={"if-none-match": '"perime"'})
+
+    assert response.status_code == 200
+    assert response.json()
+
+
 def test_seuls_les_modules_de_l_api_importent_django_ninja() -> None:
     """django-ninja ne sert qu'à l'API publique : son instance et son contrat, que les tests
     ci-dessus atteignent par la route."""

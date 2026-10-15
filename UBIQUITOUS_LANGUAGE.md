@@ -123,3 +123,7 @@ ordre des cartes, libellés, technologies de carte (ADR 0010). Son contrat est l
 Ne sont pas exposés : `published`, `created_at` et `updated_at`, `position` et `id` (l'ordre est
 celui de la liste), le site d'une technologie (`website`) et l'original d'une image (`original`).
 Ni HTML ni libellé : les valeurs stockées, en anglais, telles quelles.
+
+Politique HTTP de la liste : appelable depuis la seule origine du site (CORS, `CORS_ALLOWED_ORIGINS`),
+sans session ni cookie ; `Cache-Control: no-cache` et `ETag` d'empreinte du corps — le navigateur
+revalide à chaque visite et reçoit `304` tant que rien n'a changé.

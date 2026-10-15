@@ -63,12 +63,17 @@ INSTALLED_APPS = [
 # WhiteNoise en tête : une requête de fichier statique s'arrête là, sans ouvrir de session. Le
 # `SecurityMiddleware` de #6 viendra juste devant lui (doc WhiteNoise, « Enable WhiteNoise »).
 # Puis CORS, borné aux routes de l'API (`CORS_URLS_REGEX`) — après WhiteNoise, et non avant comme
-# le propose django-cors-headers : aucun fichier statique n'est servi sous `/api/`. Puis les trois
-# que l'admin exige (contrôles `admin.E408` à `admin.E410`), plus CSRF (cadrage §6.6) : l'admin
-# protège déjà ses propres vues, le middleware étend la protection à toute autre vue.
+# le propose django-cors-headers : aucun fichier statique n'est servi sous `/api/`. Puis le `GET`
+# conditionnel : `ETag` d'empreinte du corps et `304` sur `If-None-Match` (cadrage §6.7), pour
+# toute réponse qui n'est pas `no-store` — l'admin, en `never_cache`, n'en reçoit pas ; **après**
+# CORS, parce que le `304` qu'il construit ne recopie pas `Access-Control-Allow-Origin`
+# (`get_conditional_response`, Django 6.1.1), et CORS doit le reposer. Puis les trois que l'admin
+# exige (contrôles `admin.E408` à `admin.E410`), plus CSRF (cadrage §6.6) : l'admin protège déjà
+# ses propres vues, le middleware étend la protection à toute autre vue.
 MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.http.ConditionalGetMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",

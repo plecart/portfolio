@@ -64,9 +64,10 @@ INVALID_CONFIGURATIONS = [
 # Ce qu'une origine CORS n'est pas : une origine est un schéma et un hôte, rien d'autre
 # (`django-cors-headers`, contrôles `E013` et `E014`), et c'est au démarrage qu'on le refuse —
 # une origine qui ne peut rien apparier laisserait le site sans API, sans qu'aucune erreur ne le
-# dise. Six formes : une par composant d'URL qui ne doit pas y être, ou qui y manque, plus l'hôte
+# dise. Sept formes : une par composant d'URL qui ne doit pas y être, ou qui y manque ; l'hôte
 # nu — que `urlsplit` lit comme un chemin, pas comme un schéma absent (mesuré : la forme
-# protocolaire `//hôte` est la seule qui éprouve la garde du schéma).
+# protocolaire `//hôte` est la seule qui éprouve la garde du schéma) ; l'hôte en majuscules, que
+# cors-headers compare tel quel à ce que le navigateur envoie en minuscules.
 REFUSED_ORIGINS = [
     ("chemin", "https://site.test/chemin"),
     ("requête", "https://site.test?x=1"),
@@ -74,6 +75,7 @@ REFUSED_ORIGINS = [
     ("sans schéma", "//site.test"),
     ("sans hôte", "https://"),
     ("hôte nu", "site.test"),
+    ("majuscules", "https://Site.test"),
 ]
 
 
@@ -145,8 +147,8 @@ def test_un_hote_absent_est_tolere_en_debug(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_les_origines_cors_sont_lues_telles_quelles(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Une liste JSON d'origines, comme `ALLOWED_HOSTS` (brief de #10, décision 8) — sans `/`
-    final ajouté, que `django-cors-headers` refuserait comme un chemin."""
+    """Une liste JSON d'origines, comme `ALLOWED_HOSTS` (brief de #10, décision 8), lue telle
+    quelle — le `/` final qu'un type d'URL de pydantic ajouterait ferait rougir ce test."""
     monkeypatch.setenv("CORS_ALLOWED_ORIGINS", '["https://site.test","http://localhost:5173"]')
 
     assert build_env().CORS_ALLOWED_ORIGINS == ["https://site.test", "http://localhost:5173"]

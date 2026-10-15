@@ -164,17 +164,27 @@ class Env(BaseSettings):
     def _require_bare_origins(cls, origins: list[str]) -> list[str]:
         """Refuse toute origine qui n'est pas exactement un schéma et un hôte.
 
-        `django-cors-headers` n'apparie que le schéma et l'hôte (`_url_in_whitelist`) : une
-        origine avec un chemin, une requête ou un fragment n'apparierait jamais rien, et son
-        contrôle `E014` ne le dit qu'à `manage.py check`, que le conteneur ne lance pas. Une
-        origine sans schéma ou sans hôte (`E013`), de même. Refusée au démarrage, comme le reste.
+        `django-cors-headers` n'apparie que le schéma et l'hôte (`_url_in_whitelist`), tels
+        quels : une origine avec un chemin, une requête ou un fragment n'apparierait jamais
+        rien, et son contrôle `E014` ne le dit qu'à `manage.py check`, que le conteneur ne lance
+        pas ; une origine sans schéma ou sans hôte (`E013`), de même ; un hôte en majuscules,
+        qu'aucun navigateur n'envoie et qu'aucun contrôle ne voit, de même. Refusée au démarrage,
+        comme le reste.
+
+        `list[str]` et non `list[AnyHttpUrl]` : pydantic ajoute un `/` final (mesuré le
+        2026-10-15, pydantic 2.13.5 : `https://site.test` → `https://site.test/`), que cors-headers
+        lirait comme un chemin.
         """
         for origin in origins:
             parts = urlsplit(origin)
-            if not (parts.scheme and parts.netloc) or any(
-                (parts.path, parts.query, parts.fragment)
+            if (
+                not (parts.scheme and parts.netloc)
+                or any((parts.path, parts.query, parts.fragment))
+                or parts.netloc != parts.netloc.lower()
             ):
-                raise ValueError("chaque origine est un schéma et un hôte, rien d'autre")
+                raise ValueError(
+                    "chaque origine est un schéma et un hôte en minuscules, rien d'autre"
+                )
         return origins
 
     @model_validator(mode="after")
