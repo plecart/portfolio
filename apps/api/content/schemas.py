@@ -10,9 +10,9 @@ horodatages, `position` et `id` (l'ordre est celui de la liste), `Technology.web
 et `GalleryImage.original` (le site sert les variantes). La couverture n'a pas de clé : c'est
 `gallery[0]` (décision 3).
 
-Chaque résolveur reçoit la requête dans le contexte de validation que django-ninja passe à
-pydantic (`context["request"]`, « What's new in Django Ninja 1.0 ») : c'est d'elle que vient le
-schéma et l'hôte d'une adresse relative.
+Un résolveur qui déclare `context` reçoit la requête dans le contexte de validation que
+django-ninja passe à pydantic (`context["request"]`, « What's new in Django Ninja 1.0 ») : c'est
+d'elle que viennent le schéma et l'hôte d'une adresse relative.
 """
 
 from datetime import date
@@ -38,7 +38,8 @@ def absolute_url(context: dict[str, Any], url: str) -> str:
 
     Le stockage disque rend une adresse relative (`/media/…`), que la requête complète de son
     schéma et de son hôte ; une adresse que le stockage rend déjà absolue (R2 après #13) reste
-    telle quelle — `build_absolute_uri` ne touche pas une adresse qui porte son schéma.
+    telle quelle — `build_absolute_uri` garde le schéma et l'hôte d'une adresse qui les porte, à
+    l'encodage IRI près, sans effet sur l'adresse déjà encodée que rend un stockage.
 
     Args:
         context: le contexte de validation, qui porte la requête en cours sous `request`.

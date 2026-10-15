@@ -42,7 +42,10 @@ WSGI_APPLICATION = "config.wsgi.application"
 # L'admin, seul back-office (ADR 0001), et les applications qu'il impose : `auth`,
 # `contenttypes`, `sessions`, `messages`. `staticfiles` collecte ses fichiers statiques, que
 # WhiteNoise sert (ADR 0014) — en développement aussi : `runserver_nostatic`, placé avant lui,
-# retire ce service au `runserver` de Django. `content` porte le contenu du portfolio.
+# retire ce service au `runserver` de Django ; sa configuration
+# (`config/apps.py`) écarte les fichiers de `ninja` de la collecte. `ninja` n'est installé que pour
+# sa commande `export_openapi_schema` (`make openapi`) : Django ne cherche les commandes de gestion
+# que dans les applications installées. `content` porte le contenu du portfolio.
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -50,7 +53,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "whitenoise.runserver_nostatic",
-    "django.contrib.staticfiles",
+    "config.apps.StaticFilesConfig",
+    "ninja",
     "content",
 ]
 

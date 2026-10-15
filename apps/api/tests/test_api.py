@@ -15,7 +15,7 @@ from content.models import (
     TechnologyKind,
 )
 from django.db import connection
-from django.test import Client
+from django.test import Client, override_settings
 from django.test.utils import CaptureQueriesContext
 from factories import gallery_image, project, saved, section, technology
 from test_markdown_preview import importers
@@ -146,6 +146,23 @@ def test_la_liste_rend_un_projet_publie_dans_le_contrat(client: Client) -> None:
         "demo_url": "",
         "showcase": False,
     }
+
+
+@pytest.mark.django_db
+def test_une_adresse_que_le_stockage_rend_absolue_reste_telle_quelle(client: Client) -> None:
+    """R2 rendra des adresses absolues, sur l'hôte des médias (#13) : la liste les garde telles
+    quelles, jamais réécrites sur l'hôte de la requête (décision 5). Un `MEDIA_URL` absolu fait
+    rendre au stockage disque la même forme d'adresse."""
+    published = complete_project("medias", saved(technology()))
+    saved(gallery_image(published, position=2, state=ProcessingState.READY, variants=[VARIANT]))
+
+    with override_settings(MEDIA_URL="https://media.test/"):
+        [listed_project] = listed(client)
+
+    assert listed_project["technologies"][0]["icon"].startswith("https://media.test/technologies/")
+    assert listed_project["gallery"][1]["variants"][0]["url"] == (
+        "https://media.test/images/x/800.webp"
+    )
 
 
 @pytest.mark.django_db

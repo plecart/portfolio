@@ -1,0 +1,287 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Portfolio",
+    "version": "1",
+    "description": ""
+  },
+  "paths": {
+    "/api/projets": {
+      "get": {
+        "operationId": "content_api_projects",
+        "summary": "Projects",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            }
+          }
+        },
+        "description": "`GET /api/projets` : la liste nue des projets publiés, `[]` s'il n'y en a aucun."
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "GalleryImageOut": {
+        "description": "Une image de la galerie. Une image en attente ou en échec est exposée avec son état et\nsans variante (décision 4) : le front décide ce qu'il dessine.",
+        "properties": {
+          "caption": {
+            "title": "Caption",
+            "type": "string"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ProcessingState"
+          },
+          "variants": {
+            "items": {
+              "$ref": "#/components/schemas/VariantOut"
+            },
+            "title": "Variants",
+            "type": "array"
+          }
+        },
+        "required": [
+          "caption",
+          "width",
+          "height",
+          "state",
+          "variants"
+        ],
+        "title": "GalleryImageOut",
+        "type": "object"
+      },
+      "ProcessingState": {
+        "description": "L'état de traitement d'une image : le worker de #12 la convertit et en produit les\nvariantes. Valeurs stockées en anglais, exposées telles quelles par l'API (ADR 0010) ; au\nniveau du module pour la même raison que `TechnologyKind`.",
+        "enum": [
+          "pending",
+          "ready",
+          "failed"
+        ],
+        "title": "ProcessingState",
+        "type": "string"
+      },
+      "ProjectKind": {
+        "description": "Le type d'un projet. Valeurs stockées en anglais, exposées telles quelles par l'API\n(ADR 0010) ; au niveau du module pour la même raison que `TechnologyKind`.",
+        "enum": [
+          "personal",
+          "professional",
+          "school"
+        ],
+        "title": "ProjectKind",
+        "type": "string"
+      },
+      "ProjectOut": {
+        "description": "Un projet publié, complet : ses faits, ses technologies, sa galerie — dont la première\nimage est la couverture — et les sections de sa fiche, chaque liste dans l'ordre de l'admin.\n\n`finished_on` vaut `null` tant que le projet est en cours ; un lien absent est une chaîne\nvide, comme stocké.",
+        "properties": {
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProjectKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProjectStatus"
+          },
+          "started_on": {
+            "format": "date",
+            "title": "Started On",
+            "type": "string"
+          },
+          "finished_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished On"
+          },
+          "client": {
+            "title": "Client",
+            "type": "string"
+          },
+          "repository_url": {
+            "title": "Repository Url",
+            "type": "string"
+          },
+          "demo_url": {
+            "title": "Demo Url",
+            "type": "string"
+          },
+          "showcase": {
+            "title": "Showcase",
+            "type": "boolean"
+          },
+          "technologies": {
+            "items": {
+              "$ref": "#/components/schemas/TechnologyOut"
+            },
+            "title": "Technologies",
+            "type": "array"
+          },
+          "gallery": {
+            "items": {
+              "$ref": "#/components/schemas/GalleryImageOut"
+            },
+            "title": "Gallery",
+            "type": "array"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SectionOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "summary",
+          "description",
+          "kind",
+          "status",
+          "started_on",
+          "finished_on",
+          "client",
+          "repository_url",
+          "demo_url",
+          "showcase",
+          "technologies",
+          "gallery",
+          "sections"
+        ],
+        "title": "ProjectOut",
+        "type": "object"
+      },
+      "ProjectStatus": {
+        "description": "Le statut d'un projet. Valeurs stockées en anglais, exposées telles quelles par l'API\n(ADR 0010) ; au niveau du module pour la même raison que `TechnologyKind`.",
+        "enum": [
+          "ongoing",
+          "finished",
+          "archived"
+        ],
+        "title": "ProjectStatus",
+        "type": "string"
+      },
+      "SectionOut": {
+        "description": "Une section de la fiche technique : titre, ancre et corps Markdown.",
+        "properties": {
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "anchor": {
+            "title": "Anchor",
+            "type": "string"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "anchor",
+          "body"
+        ],
+        "title": "SectionOut",
+        "type": "object"
+      },
+      "TechnologyKind": {
+        "description": "Le type d'une technologie. Valeurs stockées en anglais, exposées telles quelles par l'API\n(ADR 0010).\n\nAu niveau du module, et non dans `Technology` : la contrainte de `Meta` qui borne le type à\nces valeurs ne voit pas les noms du corps de la classe qui l'entoure.",
+        "enum": [
+          "language",
+          "framework",
+          "infrastructure",
+          "tool"
+        ],
+        "title": "TechnologyKind",
+        "type": "string"
+      },
+      "TechnologyOut": {
+        "description": "Une technologie qu'un projet emploie : son nom, son type et l'adresse de son icône SVG,\nque le site charge en `<img>` (décision 5) — jamais le SVG lui-même.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TechnologyKind"
+          },
+          "icon": {
+            "title": "Icon",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "icon"
+        ],
+        "title": "TechnologyOut",
+        "type": "object"
+      },
+      "VariantOut": {
+        "description": "Une variante d'une image prête : son adresse à la place de son nom de stockage.",
+        "properties": {
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "url",
+          "width",
+          "height"
+        ],
+        "title": "VariantOut",
+        "type": "object"
+      }
+    }
+  },
+  "servers": []
+}
