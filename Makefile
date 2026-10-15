@@ -224,27 +224,31 @@ AGE_IDENTITY ?= age.key
 RESTORE_MIN_PROJECTS ?= 0
 SCP ?= scp
 SSH ?= ssh
-RESTORE_REMOTE := /tmp/portfolio-restore.sh
+RESTORE_REMOTE := /root/portfolio-restore.sh
 
 .PHONY: restore
 
 # Restaure une sauvegarde dans la base de production, depuis le poste (brief de #24, décision 1) :
 #   make restore HOST=<adresse du VPS> BACKUP=<derniere|AAAAMMJJTHHMMSSZ>
-# `infra/restore.sh` de ce commit copié sur le VPS, puis lancé dans le dossier de la pile, la clé
-# privée sur l'entrée standard — jamais en argument. En `root`, comme l'amorçage : `deploy`
-# n'admet que la clé de la CI. `HOST` et `BACKUP` se donnent sur la ligne de commande, sans défaut
-# — restaurer détruit — : une variable homonyme de l'environnement ne compte pas. Le script vérifie
-# le format de `BACKUP` ; la cible borne ses caractères, et ceux du seuil, avant qu'ils n'entrent
-# dans la commande que le shell du VPS interprète. Procédure : `infra/RUNBOOK.md`.
-restore: export MSYS_NO_PATHCONV := 1
+# La copie de travail de `infra/restore.sh` copiée sur le VPS, puis lancée dans le dossier de la
+# pile, la clé privée sur l'entrée standard — jamais en argument. En `root`, comme l'amorçage :
+# `deploy` n'admet que la clé de la CI. `HOST` et `BACKUP` se donnent sur la ligne de commande,
+# sans défaut — restaurer détruit — : une variable homonyme de l'environnement ne compte pas. Le
+# script vérifie le format de `BACKUP` ; la cible borne les caractères de `HOST`, qui entre dans la
+# commande du poste, et ceux de `BACKUP` et du seuil, qui entrent dans celle du shell du VPS. Le
+# chemin de la clé est cité : un dossier du poste peut porter une espace. Procédure :
+# `infra/RUNBOOK.md`.
 restore:
 	$(if $(and $(filter command line,$(origin HOST)),$(HOST)),,$(error HOST manque : l'adresse du VPS))
 	$(if $(and $(filter command line,$(origin BACKUP)),$(BACKUP)),,$(error BACKUP manque : derniere, ou l'horodatage <AAAAMMJJ>T<HHMMSS>Z))
-	$(if $(wildcard $(AGE_IDENTITY)),,$(error AGE_IDENTITY : $(AGE_IDENTITY) introuvable, le fichier de la clé privée age))
+	@test -r '$(AGE_IDENTITY)' || { \
+		echo "AGE_IDENTITY : $(AGE_IDENTITY) introuvable, le fichier de la clé privée age" >&2; exit 1; }
+	@case '$(HOST)' in *[!A-Za-z0-9.-]*) \
+		echo "HOST : une adresse IPv4 ou un nom d'hôte seulement" >&2; exit 1 ;; esac
 	@case '$(BACKUP)$(RESTORE_MIN_PROJECTS)' in *[!A-Za-z0-9]*) \
 		echo "BACKUP et RESTORE_MIN_PROJECTS : lettres et chiffres seulement" >&2; exit 1 ;; esac
 	$(SCP) infra/restore.sh root@$(HOST):$(RESTORE_REMOTE)
-	$(SSH) root@$(HOST) 'cd /srv/portfolio && RESTORE_MIN_PROJECTS=$(RESTORE_MIN_PROJECTS) sh $(RESTORE_REMOTE) $(BACKUP)' < $(AGE_IDENTITY)
+	$(SSH) root@$(HOST) 'cd /srv/portfolio && RESTORE_MIN_PROJECTS=$(RESTORE_MIN_PROJECTS) sh $(RESTORE_REMOTE) $(BACKUP)' < '$(AGE_IDENTITY)'
 
 # Démarre la pile de développement. `--build` : l'image est reconstruite si le Dockerfile ou
 # une dépendance a changé, pour qu'un `git pull` n'exige pas de s'en souvenir.

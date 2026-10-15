@@ -18,8 +18,12 @@
 #
 # La clé privée `age` arrive sur l'entrée standard, jamais en argument : elle passe à l'entrée
 # standard de chaque conteneur jetable qui déchiffre, qui l'écrit dans son `/tmp` — le `tmpfs` du
-# Compose de production — le temps du déchiffrement. Le clair ne touche aucun disque : il va en flux
-# à `pg_restore`. L'archive chiffrée attend sur l'hôte, dans un dossier supprimé en partant.
+# Compose de production — le temps du déchiffrement. Le clair va en flux à `pg_restore` et ne
+# survit pas à l'exécution : il passe aussi par le journal du conteneur jetable, que le démon
+# Docker écrit (pilote `json-file`, mesuré à la relecture de la PR #100) et supprime avec lui — et
+# la restauration lit ce flux jusqu'au bout, pour qu'aucun conteneur jetable ne lui survive (brief,
+# décision 4, amendée le 2026-10-15). L'archive chiffrée attend sur l'hôte, dans un dossier
+# supprimé en partant.
 #
 # Lit l'environnement :
 #   COMPOSE               la commande Compose de la pile, découpée sur les espaces ;
@@ -180,9 +184,19 @@ stop_writers() {
 # que si `pg_restore` a lu l'archive entière : sinon `psql` sort sans valider, et la base reste telle
 # qu'elle était. Dans le conteneur, `pipefail` rend cet échec — le `dash` de l'image l'applique
 # (mesuré le 2026-10-15). Côté hôte, sans `pipefail`, un flux tronqué se lit dans ce même échec.
+#
+# Quand le côté Postgres s'arrête avant la fin du flux — `psql` sur une erreur, `pg_restore` sur
+# une archive tronquée —, le reste est lu ici jusqu'au bout : sinon le client `compose run` de
+# l'écrivain meurt en SIGPIPE, et son conteneur reste, `age` bloqué et la clé dans son `/tmp`,
+# sans limite de temps (mesuré à la relecture de la PR #100 : 18 minutes, jusqu'à suppression).
 restore_database() {
-	decrypted '' | in_postgres "set -o pipefail
-{ echo '$RESET_SCHEMA'; pg_restore --file=- && echo COMMIT; } | $PSQL > /dev/null"
+	decrypted '' | {
+		in_postgres "set -o pipefail
+{ echo '$RESET_SCHEMA'; pg_restore --file=- && echo COMMIT; } | $PSQL > /dev/null" &&
+			status=0 || status=$?
+		cat > /dev/null
+		exit "$status"
+	}
 }
 
 # `migrate` par le point d'entrée d'`api`, qui nomme chaque migration appliquée, puis `--check` :

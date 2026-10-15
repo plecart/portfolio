@@ -11,7 +11,6 @@ lisent dans ce journal.
 """
 
 import subprocess
-import time
 import uuid
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
@@ -31,8 +30,6 @@ from test_infra import loaded_image
 
 SCRIPT = Path(__file__).parents[1] / "restore.sh"
 PROJECT = f"portfolio-test-restore-{uuid.uuid4().hex[:8]}"
-# Le temps laissé à un conteneur jetable pour partir après la fin du script, en secondes.
-ONE_OFF_DEADLINE = 30
 
 # Les étapes, dans l'ordre de la décision 4.
 STEPS = [
@@ -69,11 +66,16 @@ UNRECOGNIZED = [
     "zz-notes.txt",
 ]
 # Le témoin de la commande Compose, après la consignation de l'appel (`call_witness`) : l'appel
-# exécuté tel quel — sauf, si `TRUNCATE_RESTORE` est posée, celui qui restaure, dont l'entrée est
-# coupée après 4 Kio, comme un flux interrompu en route.
+# exécuté tel quel, sauf deux. Celui qui restaure, si `TRUNCATE_RESTORE` est posée : son entrée est
+# coupée après 4 Kio, comme un flux interrompu en route. Et l'écrivain du clair — le déchiffrement
+# de l'étape « restauration », que rien ne suit dans son script : son code de sortie est consigné
+# dans `<témoin>.writer`. Un écrivain dont le lecteur s'arrête avant la fin du flux sort en erreur
+# — SIGPIPE sous Linux, où son conteneur survivait alors, la clé dans son `/tmp` ; une erreur
+# d'écriture sous Windows, où le client supprime son conteneur : le code de sortie voit les deux.
 COMPOSE_WITNESS = """\
 case "$*" in
 *"pg_restore --file"*) [ -z "${TRUNCATE_RESTORE:-}" ] || { head -c 4096 | "$@"; exit; } ;;
+*'--identity "$identity" restore') "$@"; status=$?; echo "$status" >> "$0.writer"; exit "$status" ;;
 esac
 exec "$@"
 """
@@ -85,10 +87,12 @@ OLDER = f"{DATABASE}-20000101T030000Z.dump.age"
 
 @dataclass(frozen=True)
 class Restoration:
-    """Une exécution du script : son processus terminé, et les appels de sa commande Compose."""
+    """Une exécution du script : son processus terminé, les appels de sa commande Compose, et les
+    codes de sortie de l'écrivain du clair — un par étape « restauration » atteinte."""
 
     process: subprocess.CompletedProcess[str]
     calls: list[list[str]]
+    writer_exits: list[str]
 
     @property
     def log(self) -> str:
@@ -183,7 +187,8 @@ def restore(
     Vérifie, à chaque exécution, réussie ou non, que la clé n'a paru dans aucun argument de la
     commande Compose — donc d'aucun conteneur — et qu'aucun conteneur jetable ne survit : son
     `/tmp`, le `tmpfs` du Compose de production, part avec lui (brief, critère « Clé »). Et que le
-    dossier de travail de l'hôte, où attend l'archive chiffrée, est supprimé en partant.
+    dossier de travail de l'hôte, où attend l'archive chiffrée, est supprimé en partant ; et que
+    l'écrivain du clair, s'il a tourné, est allé au bout de son flux.
     """
     witness, log, host_tmp = tmp_path / "compose.sh", tmp_path / "calls", tmp_path / "hote"
     host_tmp.mkdir()
@@ -212,28 +217,25 @@ def restore(
     assert all(key not in argument for call in calls for argument in call)
     assert surviving_one_offs() == []
     assert list(host_tmp.iterdir()) == []
-    return Restoration(process, calls)
+    writer = Path(f"{witness}.writer")
+    writer_exits = writer.read_text().split() if writer.exists() else []
+    assert set(writer_exits) <= {"0"}, writer_exits
+    return Restoration(process, calls, writer_exits)
 
 
 def surviving_one_offs() -> list[str]:
-    """Les conteneurs jetables de la pile qui existent encore, attendus `ONE_OFF_DEADLINE`
-    secondes au plus : quand la restauration coupe un flux en route, le client `compose run` de
-    son écrivain meurt en SIGPIPE avant lui, et le conteneur ne part que lorsque `age` sort à son
-    tour (mesuré le 2026-10-15 : un conteneur encore là au relevé immédiat, une fois sur deux
-    lancements ; sa durée de survie n'a pas été mesurée). Un conteneur qui ne partirait jamais reste
-    attrapé."""
-    deadline = time.monotonic() + ONE_OFF_DEADLINE
-    while True:
-        listed = subprocess.run(
-            ["docker", "ps", "--all", "--quiet", "--filter", "label=com.docker.compose.oneoff=True"]
-            + ["--filter", f"label=com.docker.compose.project={PROJECT}"],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.split()
-        if not listed or time.monotonic() > deadline:
-            return listed
-        time.sleep(0.5)
+    """Les conteneurs jetables de la pile qui existent encore, relevés dès la fin du script, sans
+    attente : un conteneur de déchiffrement qui survit garde la clé dans son `/tmp` — mesuré à la
+    relecture de la PR #100, 18 minutes après un flux coupé, avant que le script ne lise le reste
+    du flux."""
+    listed = subprocess.run(
+        ["docker", "ps", "--all", "--quiet", "--filter", "label=com.docker.compose.oneoff=True"]
+        + ["--filter", f"label=com.docker.compose.project={PROJECT}"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return listed.stdout.split()
 
 
 @pytest.mark.parametrize("by_timestamp", [False, True], ids=["derniere", "horodatage"])
@@ -266,6 +268,7 @@ def test_la_chaine_restaure_la_sauvegarde_choisie_puis_redemarre_api(
     assert done.index("stop", "api") < pg_restore < done.index("--no-recreate", "--no-deps", "api")
     assert done.index("python", "manage.py", "migrate", "--check") > pg_restore
     assert "projets publiés : 0 (attendu ≥ 0)" in done.log
+    assert done.writer_exits == ["0"]
     assert "api" in running_services(stack)
 
 
@@ -328,3 +331,5 @@ def test_une_etape_qui_echoue_arrete_la_chaine_en_la_nommant(
     assert f"échec à l'étape : {step}" in failed.log
     assert witness_rows(stack) == ("1" if step in UNCHANGED else "0")
     assert ("api" in running_services(stack)) is (step in BEFORE_STOP)
+    # L'écrivain du clair va au bout de son flux même quand la restauration s'arrête en route.
+    assert failed.writer_exits == ([] if step in BEFORE_STOP else ["0"])

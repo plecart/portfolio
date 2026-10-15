@@ -322,10 +322,12 @@ DNS.
 1. **Suspendre le déploiement continu** (1 min) — sinon chaque push vise l'ancien hôte :
    `gh variable set DEPLOY_ENABLED --body false`.
 2. **Louer un VPS** Ubuntu LTS en UE (ADR 0002), joignable en `root` par ta clé SSH (10 min).
-3. **L'amorcer** : « Amorcer un VPS neuf », étapes 1 à 6 (25 min) — une clé de déploiement neuve,
-   le jeton GHCR, `bootstrap.sh`, puis `DEPLOY_HOST`, `DEPLOY_KNOWN_HOSTS` et `DEPLOY_SSH_KEY`
-   remplacés dans l'environnement `production`. `docker compose ps` dit `cloudflared` `healthy` :
-   le Tunnel a repris les noms d'hôte. La base est vide, migrée par `api`.
+3. **L'amorcer** : « Amorcer un VPS neuf », étapes 1 à 5 (25 min) — une clé de déploiement neuve,
+   le jeton GHCR, `bootstrap.sh` —, puis, de son étape 6, les trois secrets que la machine change
+   seulement, l'environnement `production` et sa règle de branche existant déjà :
+   `gh secret set DEPLOY_SSH_KEY …`, `DEPLOY_KNOWN_HOSTS …` et `DEPLOY_HOST …`, suivis de
+   `rm deploy_key deploy_key.pub`. `docker compose ps` dit `cloudflared` `healthy` : le Tunnel a
+   repris les noms d'hôte. La base est vide, migrée par `api`.
 4. **Restaurer** : « Restaurer une sauvegarde » ci-dessus, `BACKUP=derniere` (10 min).
 5. **Vérifier** (10 min) — oui / non : le site répond et affiche ses projets ; l'admin s'ouvre
    (Access, puis la page de connexion) ; la restauration a écrit `projets publiés` et `migrate

@@ -16,7 +16,7 @@ from call_witness import recorded_calls, recording
 from test_infra import MAKEFILE, REPOSITORY_ROOT, run_make
 
 HOST = "vps.example"
-REMOTE_SCRIPT = "/tmp/portfolio-restore.sh"
+REMOTE_SCRIPT = "/root/portfolio-restore.sh"
 KEY = "AGE-SECRET-KEY-1TEMOINTEMOINTEMOINTEMOINTEMOINTEMOINTEMOINTEMOINTEMOIN"
 
 # Ce que chaque témoin fait de plus que consigner ses arguments : `ssh` recopie son entrée standard.
@@ -49,8 +49,10 @@ def witnessed(root: Path) -> list[list[str]]:
 
 
 def identity_file(root: Path) -> Path:
-    """Un fichier d'identité `age`, comme `age-keygen -o age.key` l'écrit."""
-    path = root / "age.key"
+    """Un fichier d'identité `age`, comme `age-keygen -o age.key` l'écrit, dans un dossier dont le
+    nom porte une espace — comme celui d'un utilisateur du poste."""
+    path = root / "Prénom Nom" / "age.key"
+    path.parent.mkdir(exist_ok=True)
     path.write_text(f"# created: 2026-10-15T00:00:00Z\n# public key: age1x\n{KEY}\n")
     return path
 
@@ -108,6 +110,7 @@ REFUSED = {
     "BACKUP vide": ({"HOST": HOST, "BACKUP": ""}, "BACKUP"),
     "clé introuvable": ({"HOST": HOST, "BACKUP": "derniere", "AGE_IDENTITY": "absente"}, "absente"),
     "BACKUP qui sort de la commande": ({"HOST": HOST, "BACKUP": "derniere;id"}, "BACKUP"),
+    "HOST qui sort de la commande": ({"HOST": "vps.example;id", "BACKUP": "derniere"}, "HOST"),
     "seuil qui sort de la commande": (
         {"HOST": HOST, "BACKUP": "derniere", "RESTORE_MIN_PROJECTS": "0 id"},
         "RESTORE_MIN_PROJECTS",

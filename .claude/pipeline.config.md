@@ -86,7 +86,8 @@ le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node a
 - tests images : make image-test                  # pytest sur `infra/tests` : démarre les images que
                                                   # `make build` a chargées — test de fumée du
                                                   # Caddyfile, chaîne de sauvegarde de `backup`,
-                                                  # restauration par `infra/restore.sh` (#24) ;
+                                                  # restauration par `infra/restore.sh`, vérifiée
+                                                  # le 2026-10-15 (#24) ;
                                                   # hors de `make test`, `make build` d'abord ;
                                                   # vérifiée le 2026-10-04 (#23)
 - publication  : make push                        # **CI seulement** (job `publish`) : chaque image
