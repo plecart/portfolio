@@ -182,7 +182,7 @@ stop_writers() {
 # (mesuré le 2026-10-15). Côté hôte, sans `pipefail`, un flux tronqué se lit dans ce même échec.
 restore_database() {
 	decrypted '' | in_postgres "set -o pipefail
-{ echo '$RESET_SCHEMA'; pg_restore --file=- && echo COMMIT; } | $PSQL"
+{ echo '$RESET_SCHEMA'; pg_restore --file=- && echo COMMIT; } | $PSQL > /dev/null"
 }
 
 # `migrate` par le point d'entrée d'`api`, qui nomme chaque migration appliquée, puis `--check` :
@@ -199,8 +199,10 @@ check_projects() {
 	[ "$count" -ge "$min_projects" ]
 }
 
+# `up --no-recreate` redémarre le conteneur arrêté tel quel, et `--wait` attend qu'il soit sain —
+# `start --wait` n'existe pas dans le Compose du runner de la CI (mesuré : « unknown flag: --wait »).
 restart_writers() {
-	[ -z "$stopped" ] || $COMPOSE start --wait $stopped
+	[ -z "$stopped" ] || $COMPOSE up --detach --wait --no-recreate --no-deps $stopped
 	echo "redémarrés :${stopped:- aucun}"
 }
 

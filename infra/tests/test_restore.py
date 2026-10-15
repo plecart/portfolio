@@ -263,7 +263,7 @@ def test_la_chaine_restaure_la_sauvegarde_choisie_puis_redemarre_api(
     assert query(stack, f"SELECT count(*) FROM {VOLUME_TABLE}") == str(VOLUME_ROWS)
     assert query(stack, PUBLIC_SCHEMA) == schema
     pg_restore = next(i for i, call in enumerate(done.calls) if "pg_restore --file" in call[-1])
-    assert done.index("stop", "api") < pg_restore < done.index("start", "--wait", "api")
+    assert done.index("stop", "api") < pg_restore < done.index("--no-recreate", "--no-deps", "api")
     assert done.index("python", "manage.py", "migrate", "--check") > pg_restore
     assert "projets publiés : 0 (attendu ≥ 0)" in done.log
     assert "api" in running_services(stack)
@@ -281,7 +281,7 @@ def test_un_service_arrete_avant_la_restauration_le_reste_apres(
 
     assert done.process.returncode == 0, done.log
     assert "arrêtés : aucun" in done.log and "redémarrés : aucun" in done.log
-    assert not [call for call in done.calls if {"stop", "start"} & set(call)]
+    assert not [call for call in done.calls if {"stop", "up"} & set(call)]
     assert "api" not in running_services(stack)
 
 
