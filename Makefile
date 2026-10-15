@@ -107,18 +107,7 @@ PACKAGE_VERSIONS = users/$(dir $(PACKAGE))packages/container/$(notdir $(PACKAGE)
 # `gh`, qui porte la rétention ; les tests le remplacent par un témoin.
 GH ?= gh
 
-# La restauration (`make restore`, brief de #24) : le fichier de la clé privée `age`, tiré du
-# gestionnaire de mots de passe ; le nombre de projets publiés attendu au moins après la
-# restauration (décision 7, #27 le passe à 1) ; `scp` et `ssh`, que les tests remplacent par des
-# témoins ; où le script attend sur le VPS — hors de `/srv/portfolio`, qui ne porte que
-# `compose.yml` et `.env` (#16 lot 3).
-AGE_IDENTITY ?= age.key
-RESTORE_MIN_PROJECTS ?= 0
-SCP ?= scp
-SSH ?= ssh
-RESTORE_REMOTE := /tmp/portfolio-restore.sh
-
-.PHONY: install test lint format format-check typecheck audit build $(IMAGE_BUILDS) compose-config dev restore
+.PHONY: install test lint format format-check typecheck audit build $(IMAGE_BUILDS) compose-config dev
 .PHONY: scan $(IMAGE_SCANS) image-test push $(IMAGE_PUSHES) prune $(IMAGE_PRUNES)
 .PHONY: web-install web-browsers web-lint web-typecheck web-test web-build web-e2e web-lighthouse web-audit
 
@@ -225,6 +214,19 @@ $(IMAGE_PRUNES): prune-%:
 compose-config:
 	$(COMPOSE) config --quiet
 	$(COMPOSE_PROD) config --quiet
+
+# La restauration (`make restore`, brief de #24) : le fichier de la clé privée `age`, tiré du
+# gestionnaire de mots de passe ; le nombre de projets publiés attendu au moins après la
+# restauration (décision 7, #27 le passe à 1) ; `scp` et `ssh`, que les tests remplacent par des
+# témoins ; où le script attend sur le VPS — hors de `/srv/portfolio`, qui ne porte que
+# `compose.yml` et `.env` (#16 lot 3).
+AGE_IDENTITY ?= age.key
+RESTORE_MIN_PROJECTS ?= 0
+SCP ?= scp
+SSH ?= ssh
+RESTORE_REMOTE := /tmp/portfolio-restore.sh
+
+.PHONY: restore
 
 # Restaure une sauvegarde dans la base de production, depuis le poste (brief de #24, décision 1) :
 #   make restore HOST=<adresse du VPS> BACKUP=<derniere|AAAAMMJJTHHMMSSZ>
