@@ -32,7 +32,8 @@ entrée (D45). L'utilisateur `deploy` possède le dossier et tire les images de 
 | Mot de passe du rôle de sauvegarde (`BACKUP_POSTGRES_PASSWORD`) | `.env` du VPS et la base | `bootstrap.sh`, qui l'engendre et le pose dans la base | `bootstrap.sh BACKUP_POSTGRES_PASSWORD` |
 | Jeton du bucket des sauvegardes (`BACKUP_R2_ACCESS_KEY_ID`, `BACKUP_R2_SECRET_ACCESS_KEY`) | gestionnaire ; `.env` du VPS | `bootstrap.sh` | un nouveau jeton R2, `bootstrap.sh` avec les deux noms, puis l'ancien révoqué |
 | Adresse de ping (`BACKUP_PING_URL`) | le contrôle healthchecks.io ; `.env` du VPS | `bootstrap.sh` | un nouveau contrôle, `bootstrap.sh BACKUP_PING_URL`, puis l'ancien supprimé |
-| Clé privée `age` des sauvegardes | gestionnaire seulement — ni le dépôt, ni une image (ADR 0007, point 2) ; jamais stockée sur le VPS : elle transite par `ssh` vers la mémoire d'un conteneur jetable, le temps d'une restauration ; secret d'Actions avec #24 | le mainteneur, sur le poste | une nouvelle paire, sa clé publique à `bootstrap.sh BACKUP_AGE_RECIPIENT` ; l'ancienne gardée |
+| Clé privée `age` des sauvegardes | gestionnaire ; secret `BACKUP_AGE_IDENTITY` de `production`, pour le test mensuel — ni le dépôt, ni une image (ADR 0007, point 2) ; jamais stockée sur le VPS : elle transite par `ssh` vers la mémoire d'un conteneur jetable, le temps d'une restauration | le mainteneur, sur le poste | une nouvelle paire, sa clé publique à `bootstrap.sh BACKUP_AGE_RECIPIENT`, sa clé privée à `BACKUP_AGE_IDENTITY` ; l'ancienne gardée |
+| Jeton du bucket en lecture seule (`RESTORE_R2_ACCESS_KEY_ID`, `RESTORE_R2_SECRET_ACCESS_KEY`) | gestionnaire ; secrets de `production` — le test mensuel seul s'en sert, jamais le VPS | le mainteneur | un nouveau jeton R2, les deux secrets remplacés, puis l'ancien révoqué |
 
 L'environnement GitHub `production` n'admet que `main` : un workflow lancé depuis une autre branche
 ne lit pas ses secrets, même modifié.
@@ -190,8 +191,17 @@ niveau ni tirer d'image déjà présente.
   l'ancien supprimé — sinon il alerte, faute de ping.
 - `BACKUP_AGE_RECIPIENT` — une nouvelle paire sur le poste, `age-keygen -o age.key`, qui n'affiche
   que la clé publique : celle-ci à `bootstrap.sh BACKUP_AGE_RECIPIENT`, le fichier joint à une
-  entrée du gestionnaire, puis `rm age.key`. Garde l'ancienne clé privée tant que le bucket porte
-  une sauvegarde chiffrée pour elle : elle seule la déchiffre.
+  entrée du gestionnaire, et au secret du test mensuel —
+  `gh secret set BACKUP_AGE_IDENTITY --env production < age.key` —, puis `rm age.key`. Garde
+  l'ancienne clé privée tant que le bucket porte une sauvegarde chiffrée pour elle : elle seule la
+  déchiffre. Jusqu'à la sauvegarde de la nuit suivante, la dernière l'est encore : le test mensuel
+  lancé avant échouerait au déchiffrement.
+- `RESTORE_R2_ACCESS_KEY_ID RESTORE_R2_SECRET_ACCESS_KEY` — sans `bootstrap.sh` ni suspension du
+  déploiement : ils ne vivent que dans `production`. Un nouveau jeton R2, « Object Read only »
+  borné au seul bucket des sauvegardes, puis `gh secret set RESTORE_R2_ACCESS_KEY_ID --env
+  production` et `gh secret set RESTORE_R2_SECRET_ACCESS_KEY --env production`, chacun saisi au
+  clavier, jamais en argument ; puis l'ancien révoqué, et le test mensuel lancé à la main (« Le
+  test mensuel »).
 
 ## Mises à jour
 
@@ -236,7 +246,8 @@ dans le bucket des sauvegardes, la purge n'y garde que 7 quotidiennes et 4 hebdo
 (la règle de `borg prune --keep-daily 7 --keep-weekly 4`, [`backup/retention.sh`](backup/retention.sh)),
 puis healthchecks.io reçoit le ping. La première étape qui échoue arrête tout, sans ping :
 healthchecks.io alerte de son absence. Pour revenir à une sauvegarde : « Restaurer une sauvegarde »,
-et, si la machine elle-même est perdue, « Le VPS a disparu », plus bas.
+et, si la machine elle-même est perdue, « Le VPS a disparu », plus bas. Que la dernière se restaure,
+un workflow le prouve chaque mois : « Le test mensuel ».
 
 **Lancer une sauvegarde à la main**, en `deploy` dans `/srv/portfolio` (« Commandes sur le VPS ») —
 pas autour de 03:00 UTC, où deux chaînes se disputeraient la purge :
@@ -339,3 +350,53 @@ DNS.
 
 Les médias : sur R2 une fois #13 livrée, rien à restaurer ; d'ici là, ils vivent dans le volume
 `media` du VPS, qu'aucune sauvegarde ne couvre — ils sont perdus avec lui.
+
+### Le test mensuel
+
+Le 1ᵉʳ de chaque mois à 04:00 UTC, le workflow « Test de restauration »
+([`restore.yml`](../.github/workflows/restore.yml)) rejoue la chaîne de « Restaurer une
+sauvegarde » — `restore.sh derniere` — dans une pile jetable du runner : la dernière sauvegarde du
+bucket, dans un Postgres vide, migrée par les images publiées sous `latest`. Il écrit les mêmes
+étapes, `arrêtés : aucun` et `redémarrés : aucun` compris. Il est sauté tant que `DEPLOY_ENABLED`
+ne vaut pas `true`.
+
+Ce qu'il lit, dans l'environnement `production` : les secrets `BACKUP_AGE_IDENTITY` (le fichier
+`age.key`), `RESTORE_R2_ACCESS_KEY_ID` et `RESTORE_R2_SECRET_ACCESS_KEY` — un second jeton R2,
+« Object Read only », borné au seul bucket des sauvegardes, distinct de celui du VPS ; les
+variables `BACKUP_R2_ENDPOINT` et `BACKUP_R2_BUCKET`. Et la variable de dépôt
+`RESTORE_MIN_PROJECTS`, le seuil de projets publiés : absente ou vide, 0 ; #27 la passe à 1.
+
+**L'alerte est un run rouge.** GitHub notifie qui a créé le workflow, ou changé sa ligne `cron` en
+dernier (doc GitHub « Notifications for workflow runs ») : ce compte garde les notifications
+d'Actions activées (GitHub, Settings, Notifications, « Actions »). Le journal du run nomme l'étape
+— `échec à l'étape : <étape>` — et la table de « Restaurer une sauvegarde » en donne la cause ; la
+pile est jetable, il n'y a rien à remettre en place. `sélection` ou `téléchargement` : bucket vide,
+ou jeton en lecture seule refusé ; `déchiffrement` : `BACKUP_AGE_IDENTITY` d'une autre paire
+(« Tourner un secret », `BACKUP_AGE_RECIPIENT`) ; `contrôle` : moins de projets publiés que le
+seuil.
+
+**Le lancer à la main** — après une rotation, ou pour vérifier une correction :
+```
+gh workflow run restore.yml
+gh run watch
+```
+
+**Au premier déploiement** (#25) — ce qu'aucun test ne peut voir :
+- [ ] **Les secrets et variables** dans l'environnement `production`, le fichier `age.key` tiré du
+  gestionnaire ; les deux `RESTORE_R2_*` saisis au clavier, jamais en argument :
+  ```
+  gh secret set BACKUP_AGE_IDENTITY --env production < age.key
+  gh secret set RESTORE_R2_ACCESS_KEY_ID --env production
+  gh secret set RESTORE_R2_SECRET_ACCESS_KEY --env production
+  gh variable set BACKUP_R2_ENDPOINT --env production --body <adresse S3 du compte>
+  gh variable set BACKUP_R2_BUCKET --env production --body <nom du bucket>
+  rm age.key
+  ```
+  Si l'environnement n'est pas disponible sur le plan du compte, mêmes noms en secrets et
+  variables de dépôt (#25).
+- [ ] **Le workflow, lancé à la main, est vert** — `DEPLOY_ENABLED` à `true` et une sauvegarde dans
+  le bucket : le tirage des images par le jeton du workflow, le vrai jeton en lecture seule, la
+  vraie clé.
+- [ ] **Une restauration réelle, chronométrée** : `make restore HOST=<ip> BACKUP=derniere`
+  (« Restaurer une sauvegarde »), de la commande au site vérifié — la mesure du RTO (1 h), notée
+  ici.

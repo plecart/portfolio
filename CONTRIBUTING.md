@@ -220,6 +220,12 @@ service ne devient pas sain. Il ne déploie que la tête de `main`, et reste sau
 variable de dépôt `DEPLOY_ENABLED` ne vaut pas `true`. Amorçage du VPS, secrets et déploiement de
 secours : [infra/RUNBOOK.md](infra/RUNBOOK.md).
 
+**Test de restauration.** Rien à faire à la main : le 1ᵉʳ de chaque mois, le workflow
+[`restore.yml`](.github/workflows/restore.yml) restaure la dernière sauvegarde dans une pile
+jetable du runner, par le script de `make restore`, et rougit si une étape échoue — c'est l'alerte.
+Sauté lui aussi tant que `DEPLOY_ENABLED` ne vaut pas `true`. Ses secrets et son lancement à la
+main : [infra/RUNBOOK.md](infra/RUNBOOK.md), « Le test mensuel ».
+
 **Mises à jour des dépendances.** Dependabot ([.github/dependabot.yml](.github/dependabot.yml))
 ouvre chaque semaine, par écosystème (`uv`, npm, actions GitHub, images Docker), une PR qui
 groupe versions mineures et correctifs ; chaque montée majeure arrive seule, sauf les majeures npm

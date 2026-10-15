@@ -21,3 +21,9 @@ def recorded_calls(log: Path) -> list[list[str]]:
     n'a jamais été appelé."""
     recorded = log.read_text(encoding="utf-8") if log.exists() else ""
     return [call.split("\x1f")[:-1] for call in recorded.split("\x1e")[:-1]]
+
+
+def witnessed(log: Path) -> list[list[str]]:
+    """Les appels consignés dans `log`, chacun `[témoin, argument…]` — le témoin réduit à son nom de
+    fichier : son chemin change d'un test à l'autre, pas ce qu'il remplace."""
+    return [[Path(tool).name, *arguments] for tool, *arguments in recorded_calls(log)]

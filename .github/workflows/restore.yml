@@ -1,0 +1,71 @@
+# Le test de restauration mensuel (cadrage §6.7 point 5, ADR 0007 point 5, brief de #24) : la
+# dernière sauvegarde réelle du bucket, rejouée dans une pile jetable, par la chaîne même de
+# `make restore` — `infra/restore.sh` : téléchargement, déchiffrement, `pg_restore` dans le conteneur
+# Postgres, migrations, requête de contrôle. Une étape qui échoue fait échouer le workflow, et cet
+# échec est l'alerte : GitHub notifie qui a créé le workflow, ou changé sa ligne `cron` en dernier
+# (doc GitHub « Notifications for workflow runs »). Procédures : `infra/RUNBOOK.md`, « Le test
+# mensuel ».
+#
+# Un fichier à part de `ci.yml`, dont les jobs n'ont pas à tourner chaque mois. Chaque action est
+# épinglée par empreinte, comme dans `ci.yml` (`apps/api/tests/test_supply_chain.py`) ;
+# `apps/api/tests/test_restore_workflow.py` tient la forme du workflow et exécute ses scripts.
+
+name: Test de restauration
+
+# Lire le dépôt, et tirer les images privées de GHCR : le dépôt qui les publie en a le rôle `admin`
+# (doc GitHub « Publishing and installing a package with GitHub Actions »). Rien d'autre.
+permissions:
+  contents: read
+  packages: read
+
+on:
+  # Le 1ᵉʳ du mois à 04:00 UTC, une heure après la sauvegarde de 03:00. GitHub peut retarder un
+  # run planifié en période de charge, et le lance sur le dernier commit de `main` (doc GitHub
+  # « Events that trigger workflows »).
+  schedule:
+    - cron: "0 4 1 * *"
+  # À la main : au premier déploiement (#25), après une rotation de la clé ou du jeton.
+  workflow_dispatch:
+
+jobs:
+  restore:
+    name: Restauration — la dernière sauvegarde dans une pile jetable
+    runs-on: ubuntu-latest
+
+    # Sauté tant que la production n'existe pas — la garde du job `deploy` de `ci.yml`, un seul
+    # interrupteur : avant, le bucket est vide et le job serait rouge chaque mois. Les secrets sont
+    # ceux de l'environnement `production`, restreint à `main` (`infra/RUNBOOK.md`).
+    if: vars.DEPLOY_ENABLED == 'true'
+    environment: production
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Seule étape à recevoir le jeton du workflow ; Docker garde la connexion pour les tirages
+      # que `compose run` fait à l'étape suivante.
+      - name: Connexion à GHCR
+        run: echo "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # La pile du runner est le Compose de production, sans surcharge : `compose run` y démarre
+      # `postgres` et `redis`, vides, sous les définitions de production. Son modèle porte les
+      # noms réels de la base et de son propriétaire — `bootstrap.sh` les reprend au VPS — ;
+      # l'environnement de l'étape prime sur lui pour le reste : les images publiées sous `latest`,
+      # la dernière publication verte, et le bucket, lu par un jeton en lecture seule, distinct de
+      # celui du VPS. La clé privée sur l'entrée standard, jamais en argument ; le seuil vide
+      # vaut 0 (brief de #24, décisions 7 à 10).
+      - name: Restauration
+        run: printf '%s\n' "$AGE_IDENTITY" | sh infra/restore.sh derniere
+        env:
+          COMPOSE: docker compose --project-name restauration --env-file infra/prod.env.example -f infra/compose.yml
+          IMAGE_TAG: latest
+          AGE_IDENTITY: ${{ secrets.BACKUP_AGE_IDENTITY }}
+          BACKUP_R2_ENDPOINT: ${{ vars.BACKUP_R2_ENDPOINT }}
+          BACKUP_R2_BUCKET: ${{ vars.BACKUP_R2_BUCKET }}
+          BACKUP_R2_ACCESS_KEY_ID: ${{ secrets.RESTORE_R2_ACCESS_KEY_ID }}
+          BACKUP_R2_SECRET_ACCESS_KEY: ${{ secrets.RESTORE_R2_SECRET_ACCESS_KEY }}
+          RESTORE_MIN_PROJECTS: ${{ vars.RESTORE_MIN_PROJECTS }}
