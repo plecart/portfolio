@@ -12,7 +12,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from call_witness import recorded_calls, recording
+from call_witness import recording, witnessed
 from test_infra import MAKEFILE, REPOSITORY_ROOT, run_make
 
 HOST = "vps.example"
@@ -43,11 +43,6 @@ def restore_target(
     )
 
 
-def witnessed(root: Path) -> list[list[str]]:
-    """Les appels consignés par les témoins, outil en tête — son seul nom de fichier."""
-    return [[Path(tool).name, *arguments] for tool, *arguments in recorded_calls(root / "calls")]
-
-
 def identity_file(root: Path) -> Path:
     """Un fichier d'identité `age`, comme `age-keygen -o age.key` l'écrit, dans un dossier dont le
     nom porte une espace — comme celui d'un utilisateur du poste."""
@@ -74,7 +69,7 @@ def test_la_cible_copie_le_script_puis_le_lance_dans_la_pile_la_cle_sur_l_entree
     )
 
     assert done.returncode == 0, done.stderr
-    assert witnessed(tmp_path) == [
+    assert witnessed(tmp_path / "calls") == [
         ["scp", "infra/restore.sh", f"root@{HOST}:{REMOTE_SCRIPT}"],
         [
             "ssh",
@@ -97,7 +92,7 @@ def test_le_seuil_vaut_zero_par_defaut(tmp_path: Path) -> None:
     )
 
     assert done.returncode == 0, done.stderr
-    assert witnessed(tmp_path)[-1][-1].endswith(
+    assert witnessed(tmp_path / "calls")[-1][-1].endswith(
         f"RESTORE_MIN_PROJECTS=0 sh {REMOTE_SCRIPT} 20261015T030000Z"
     )
 
@@ -131,7 +126,7 @@ def test_une_variable_absente_ou_hors_bornes_arrete_la_cible_avant_tout_appel(
 
     assert done.returncode != 0
     assert named in done.stderr
-    assert witnessed(tmp_path) == []
+    assert witnessed(tmp_path / "calls") == []
 
 
 def test_host_et_backup_de_l_environnement_ne_comptent_pas(tmp_path: Path) -> None:
@@ -145,4 +140,4 @@ def test_host_et_backup_de_l_environnement_ne_comptent_pas(tmp_path: Path) -> No
 
     assert done.returncode != 0
     assert "HOST" in done.stderr
-    assert witnessed(tmp_path) == []
+    assert witnessed(tmp_path / "calls") == []
