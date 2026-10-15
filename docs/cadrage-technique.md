@@ -198,7 +198,7 @@ Réseau Docker privé ; aucun port de base de données exposé ; images construi
   3. Sauvegarde nocturne : `pg_dump` → chiffrement `age` → `rclone` vers le bucket R2 `backups` → ping healthchecks.io ; rétention 7 quotidiennes + 4 hebdomadaires.
   4. Restauration en une commande, `make restore BACKUP=<date>` : téléchargement, déchiffrement, `pg_restore`, vérification des migrations, test de fumée ; documentée dans le runbook.
   5. Test de restauration automatisé et mensuel dans un Postgres jetable, avec requête de contrôle et alerte en cas d'échec.
-  6. Scénario « le VPS a disparu » : louer un VPS, pointer le DNS Cloudflare, `bootstrap.sh`, `make restore`, vérifier ; médias déjà sur R2.
+  6. Scénario « le VPS a disparu » : louer un VPS, `bootstrap.sh` — le Tunnel reprend les noms d'hôte avec son jeton (D45, D58) —, `make restore`, vérifier ; médias déjà sur R2.
   7. La configuration Cloudflare (DNS, Access, Turnstile) est un état : documentée dans le runbook ; Terraform avec le provider Cloudflare en option (ADR).
   8. Snapshots du fournisseur (~1 €/mois) en complément, jamais en remplacement.
 - **Domaine** : `pacome.dev`, acheté chez Cloudflare Registrar avant le premier déploiement (tarif à vérifier, premium possible). Sous-domaines : `www` (ou apex) pour le site, `api`, `media` (R2), `mcp` ; admin derrière Access.
@@ -269,6 +269,7 @@ Identifiants hérités du cadrage v0 (D1 à D38), sans trou ni renumérotation. 
 | D55 | Lignes de l'admin ordonnées par glisser-déposer | Technologies d'un projet, puis galerie de #9 : l'auteur fait glisser les lignes, enregistrées ou neuves, ou les déplace au clavier ; la position cachée suit l'ordre affiché à l'enregistrement ; script du projet, sans bibliothèque (ADR 0013, 2026-09-27). |
 | D56 | CI/CD : GitHub Actions et GHCR | Une image par dossier `infra/<service>/` ; front compilé une fois, copié dans `caddy` et, pour `index.html`, dans `api` ; statiques de l'admin servis par WhiteNoise depuis `api`, qui repose sur Debian 13 ; Trivy bloque HIGH et CRITICAL, corrigeables ou non, et la fin de vie, toute exception étant datée et évaluée en trois points ; publication par un job `publish` sur `main`, SHA et `latest`, trois versions gardées, ni attestation ni SBOM ; confirme D43 (ADR 0014, 2026-09-27). |
 | D57 | Fiche technique en sections libres | L'auteur crée, nomme, ordonne (glisser-déposer, D55) et retire les sections de chaque projet ; ancre en forme de slug, préremplie depuis le titre, modifiable, unique dans le projet, citée par `#s-<ancre>` ; remplace les onze sections normalisées de §6.1 (arrêt visuel de la PR #66, 2026-10-03). |
+| D58 | Reprise d'un VPS sans geste DNS | Le Tunnel suit son jeton : un VPS neuf amorcé par `bootstrap.sh` reprend les noms d'hôte dès que `cloudflared` y est sain ; remplace « pointer le DNS Cloudflare » du scénario 6 de §6.7 et du point 6 de l'ADR 0007 (précision de D45, interrogatoire de #24, 2026-10-15). |
 | D29 | (remplacée par D36, D37) | — |
 | D21 | (remplacée par D25) | — |
 

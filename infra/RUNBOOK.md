@@ -235,7 +235,7 @@ dans le bucket des sauvegardes, la purge n'y garde que 7 quotidiennes et 4 hebdo
 (la règle de `borg prune --keep-daily 7 --keep-weekly 4`, [`backup/retention.sh`](backup/retention.sh)),
 puis healthchecks.io reçoit le ping. La première étape qui échoue arrête tout, sans ping :
 healthchecks.io alerte de son absence. La restauration arrive avec #24, qui l'écrit ici — dont le
-scénario « le VPS a disparu » : louer, pointer le DNS, `bootstrap.sh`, restaurer, vérifier.
+scénario « le VPS a disparu » : louer, `bootstrap.sh`, restaurer, vérifier.
 
 **Lancer une sauvegarde à la main**, en `deploy` dans `/srv/portfolio` (« Commandes sur le VPS ») —
 pas autour de 03:00 UTC, où deux chaînes se disputeraient la purge :
