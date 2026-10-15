@@ -27,7 +27,7 @@
             }
           }
         },
-        "description": "`GET /api/projets` : la liste nue des projets publiés, `[]` s'il n'y en a aucun."
+        "description": "`GET /api/projets` : la liste nue des projets publiés, `[]` s'il n'y en a aucun.\n\nSans cookie. `Cache-Control: no-cache` et `ETag` : la réponse se revalide à chaque visite par\n`If-None-Match`, `304` tant que rien n'a changé."
       }
     }
   },

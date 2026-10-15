@@ -1,5 +1,5 @@
 """Tests de l'API publique : la liste des projets publiés, `GET /api/projets` (brief de #10,
-décisions 1 à 5 et 12)."""
+décisions 1 à 5 et 12), et sa politique HTTP (décisions 6 à 9)."""
 
 from collections.abc import Iterator
 from datetime import date
@@ -21,6 +21,11 @@ from factories import gallery_image, project, saved, section, technology
 from test_markdown_preview import importers
 
 PROJECTS = "/api/projets"
+
+# L'origine admise par l'environnement de test (`process_environment.py`), et une autre.
+SITE_ORIGIN = "https://site.test"
+OTHER_ORIGIN = "https://autre.test"
+ALLOW_ORIGIN = "Access-Control-Allow-Origin"
 
 # Une variante d'image prête, telle que le worker de #12 l'écrira.
 VARIANT = {"name": "images/x/800.webp", "width": 800, "height": 800}
@@ -254,6 +259,97 @@ def test_ni_docs_ni_schema_ne_sont_servis_en_ligne(client: Client, route: str) -
     """Rien ne consomme les docs interactives ni le schéma en ligne (décision 10) : le schéma vit
     dans `apps/api/openapi.json`."""
     assert client.get(route).status_code == 404
+
+
+@pytest.mark.django_db
+def test_l_origine_du_site_est_admise(client: Client) -> None:
+    """L'origine admise reçoit la sienne en retour, et la réponse varie par origine : un cache
+    partagé ne doit jamais servir à une origine ce qui a été répondu à une autre (décision 8)."""
+    response = client.get(PROJECTS, headers={"origin": SITE_ORIGIN})
+
+    assert response.status_code == 200
+    assert response[ALLOW_ORIGIN] == SITE_ORIGIN
+    assert "origin" in response["Vary"].lower()
+
+
+@pytest.mark.django_db
+def test_une_autre_origine_ne_recoit_rien(client: Client) -> None:
+    """Toute autre origine est refusée par le navigateur : aucun en-tête CORS (décision 8)."""
+    response = client.get(PROJECTS, headers={"origin": OTHER_ORIGIN})
+
+    assert response.status_code == 200
+    assert not response.has_header(ALLOW_ORIGIN)
+
+
+def test_cors_est_borne_aux_routes_de_l_api(client: Client) -> None:
+    """L'admin n'a pas vocation à être appelé depuis le site, même depuis l'origine admise
+    (décision 8, `CORS_URLS_REGEX`)."""
+    response = client.get("/admin/login/", headers={"origin": SITE_ORIGIN})
+
+    assert response.status_code == 200
+    assert not response.has_header(ALLOW_ORIGIN)
+
+
+@pytest.mark.django_db
+def test_la_liste_se_revalide_a_chaque_visite(client: Client) -> None:
+    """`Cache-Control: no-cache`, exactement : stocker, revalider à chaque visite, `304` si rien
+    n'a changé (décision 7) — ni `max-age`, ni `no-store`, qui empêcherait l'`ETag`."""
+    response = client.get(PROJECTS)
+
+    assert response.status_code == 200
+    assert response["Cache-Control"] == "no-cache"
+
+
+@pytest.mark.django_db
+def test_la_liste_ne_pose_aucun_cookie(client: Client) -> None:
+    """Ni session ni CSRF : la liste n'ouvre aucune session et ne pose aucun cookie (décision 9,
+    ADR 0008 « sans cookie »)."""
+    response = client.get(PROJECTS)
+
+    assert response.status_code == 200
+    assert not response.has_header("Set-Cookie")
+    assert not response.cookies
+
+
+@pytest.mark.django_db
+def test_l_etag_est_l_empreinte_du_corps(client: Client) -> None:
+    """Même contenu, même `ETag` ; une légende modifiée — un changement qu'`updated_at` du projet
+    ne voit pas — en change (décision 6)."""
+    published = complete_project("empreinte", saved(technology()))
+
+    first, second = client.get(PROJECTS), client.get(PROJECTS)
+    image = published.gallery.get()
+    image.caption = "Une autre légende."
+    image.save()
+    third = client.get(PROJECTS)
+
+    assert first["ETag"] == second["ETag"]
+    assert third["ETag"] != first["ETag"]
+
+
+@pytest.mark.django_db
+def test_un_etag_correspondant_rend_304_sans_corps(client: Client) -> None:
+    """`If-None-Match` égal → `304` à corps vide, qui garde l'en-tête CORS : le navigateur du
+    site lit la réponse conditionnelle comme les autres (décision 6)."""
+    complete_project("conditionnel", saved(technology()))
+    etag = client.get(PROJECTS)["ETag"]
+
+    response = client.get(PROJECTS, headers={"if-none-match": etag, "origin": SITE_ORIGIN})
+
+    assert response.status_code == 304
+    assert response.content == b""
+    assert response[ALLOW_ORIGIN] == SITE_ORIGIN
+
+
+@pytest.mark.django_db
+def test_un_etag_different_rend_le_corps(client: Client) -> None:
+    """`If-None-Match` différent → `200` avec le corps."""
+    complete_project("perime", saved(technology()))
+
+    response = client.get(PROJECTS, headers={"if-none-match": '"perime"'})
+
+    assert response.status_code == 200
+    assert response.json()
 
 
 def test_seuls_les_modules_de_l_api_importent_django_ninja() -> None:

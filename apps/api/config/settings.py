@@ -45,7 +45,8 @@ WSGI_APPLICATION = "config.wsgi.application"
 # retire ce service au `runserver` de Django ; sa configuration
 # (`config/apps.py`) écarte les fichiers de `ninja` de la collecte. `ninja` n'est installé que pour
 # sa commande `export_openapi_schema` (`make openapi`) : Django ne cherche les commandes de gestion
-# que dans les applications installées. `content` porte le contenu du portfolio.
+# que dans les applications installées. `corsheaders` porte ses contrôles de réglages (`manage.py
+# check`). `content` porte le contenu du portfolio.
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -55,21 +56,35 @@ INSTALLED_APPS = [
     "whitenoise.runserver_nostatic",
     "config.apps.StaticFilesConfig",
     "ninja",
+    "corsheaders",
     "content",
 ]
 
 # WhiteNoise en tête : une requête de fichier statique s'arrête là, sans ouvrir de session. Le
 # `SecurityMiddleware` de #6 viendra juste devant lui (doc WhiteNoise, « Enable WhiteNoise »).
-# Puis les trois que l'admin exige (contrôles `admin.E408` à `admin.E410`), plus CSRF (cadrage
-# §6.6) : l'admin protège déjà ses propres vues, le middleware étend la protection à toute autre
-# vue.
+# Puis CORS, borné aux routes de l'API (`CORS_URLS_REGEX`) — après WhiteNoise, et non avant comme
+# le propose django-cors-headers : aucun fichier statique n'est servi sous `/api/`. Puis le `GET`
+# conditionnel : `ETag` d'empreinte du corps et `304` sur `If-None-Match` (cadrage §6.7), pour
+# toute réponse qui n'est pas `no-store` — l'admin, en `never_cache`, n'en reçoit pas ; **après**
+# CORS, parce que le `304` qu'il construit ne recopie pas `Access-Control-Allow-Origin`
+# (`get_conditional_response`, Django 6.1.1), et CORS doit le reposer. Puis les trois que l'admin
+# exige (contrôles `admin.E408` à `admin.E410`), plus CSRF (cadrage §6.6) : l'admin protège déjà
+# ses propres vues, le middleware étend la protection à toute autre vue.
 MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.http.ConditionalGetMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
 ]
+
+# CORS restreint à l'origine du site (ADR 0008), pour les seules routes de l'API publique : l'admin
+# n'a pas vocation à être appelé depuis le site. Un `GET` sans cookie : aucune autre option de
+# django-cors-headers n'est nécessaire.
+CORS_ALLOWED_ORIGINS = env.CORS_ALLOWED_ORIGINS
+CORS_URLS_REGEX = r"^/api/"
 
 # Les gabarits de l'admin vivent dans son application (`APP_DIRS`). Ses processeurs de contexte :
 # `auth` et `messages` sont exigés (`admin.E402`, `admin.E404`), `request` alimente sa barre de

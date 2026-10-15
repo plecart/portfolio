@@ -69,6 +69,7 @@ RUN uv sync --locked --no-dev
 # nulle part (RFC 2606).
 RUN SECRET_KEY=valeur-factice-du-build-qui-ne-signe-rien-hors-de-cette-commande \
     ALLOWED_HOSTS='["build.invalid"]' \
+    CORS_ALLOWED_ORIGINS='["https://build.invalid"]' \
     DATABASE_URL=postgresql://build@base.invalid/build \
     REDIS_URL=redis://cache.invalid/0 \
     .venv/bin/python apps/api/manage.py collectstatic --noinput

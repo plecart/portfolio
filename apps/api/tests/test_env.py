@@ -1,5 +1,6 @@
 """Tests de `Env`, la seule lecture de l'environnement du back."""
 
+import re
 from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -43,10 +44,11 @@ SECRET_TRAVEL_FORMS: list[tuple[str, Callable[[Env], str]]] = [
     ("model_dump en mode json", lambda env: str(env.model_dump(mode="json"))),
 ]
 
-# Les façons de rendre la configuration invalide — **quatre mécanismes de refus distincts**,
+# Les façons de rendre la configuration invalide — **cinq mécanismes de refus distincts**,
 # et c'est le dénombrement qui compte : borne de longueur, URL mal formée (deux fois, car deux
-# champs la portent), validateur de modèle qui reçoit l'environnement **entier**, et échec de
-# lecture d'une *source* avant même la validation. Le dernier ne lève pas le même type
+# champs la portent), validateur de modèle qui reçoit l'environnement **entier**, validateur de
+# champ qui reçoit la liste entière des origines, et échec de lecture d'une *source* avant même
+# la validation (deux fois, car deux champs sont des listes). Le dernier ne lève pas le même type
 # d'exception que les autres : c'est précisément pourquoi il doit figurer ici.
 INVALID_CONFIGURATIONS = [
     ("clé trop courte", "SECRET_KEY", "TROP-COURTE-ET-SECRETE"),
@@ -54,6 +56,33 @@ INVALID_CONFIGURATIONS = [
     ("redis mal formé", "REDIS_URL", "redis://admin:MOT-DE-PASSE-REDIS@"),
     ("aucun hôte autorisé", "ALLOWED_HOSTS", "[]"),
     ("liste mal formée", "ALLOWED_HOSTS", "[oups"),
+    ("origine avec chemin", "CORS_ALLOWED_ORIGINS", '["http://SITE-SECRET.test/chemin"]'),
+    ("origine sans schéma", "CORS_ALLOWED_ORIGINS", '["//SITE-SECRET.test"]'),
+    ("hôte nu", "CORS_ALLOWED_ORIGINS", '["SITE-SECRET.test"]'),
+    ("aucune origine", "CORS_ALLOWED_ORIGINS", "[]"),
+    ("liste d'origines mal formée", "CORS_ALLOWED_ORIGINS", "[oups"),
+]
+
+# Ce qu'une origine CORS n'est pas. Une origine est ce qu'un navigateur envoie dans `Origin` :
+# `schéma://hôte[:port]`, hôte en minuscules, port absent s'il est celui du schéma — et
+# `django-cors-headers` la compare telle quelle (`_url_in_whitelist`). Tout écart laisse le site
+# sans API sans qu'aucune erreur ne le dise ; c'est au démarrage qu'on le refuse. Onze formes :
+# une par composant d'URL qui ne doit pas y être (chemin, requête, fragment, identifiant, port
+# par défaut, port vide) ou qui y manque (schéma, hôte) ; le schéma hors HTTP ; l'hôte nu — que
+# `urlsplit` lit comme un chemin, pas comme un schéma absent, si bien que la forme protocolaire
+# `//hôte` éprouve la garde du schéma et l'hôte nu non (mesuré) ; l'hôte en majuscules.
+REFUSED_ORIGINS = [
+    ("chemin", "https://site.test/chemin"),
+    ("requête", "https://site.test?x=1"),
+    ("fragment", "https://site.test#ancre"),
+    ("identifiant", "https://user@site.test"),
+    ("port par défaut", "https://site.test:443"),
+    ("port vide", "https://site.test:"),
+    ("sans schéma", "//site.test"),
+    ("sans hôte", "https://"),
+    ("schéma hors HTTP", "ftp://site.test"),
+    ("hôte nu", "site.test"),
+    ("majuscules", "https://Site.test"),
 ]
 
 
@@ -70,6 +99,20 @@ def declared_variables(dotenv: Path) -> dict[str, str]:
     lines = (raw.strip() for raw in dotenv.read_text(encoding="utf-8").splitlines())
     pairs = (line.partition("=") for line in lines if line and not line.startswith("#"))
     return {name.strip(): value.strip() for name, separator, value in pairs if separator}
+
+
+def value_fragments(value: str) -> list[str]:
+    """Ce qu'un message pourrait citer d'une valeur, en minuscules comme le message est lu.
+
+    Trois formes, chacune mesurée à la relecture sur une mutation qui citait la valeur et
+    laissait le test vert : la valeur entière ; chaque élément d'une liste JSON, crochets et
+    guillemets retirés — un validateur qui nomme l'origine fautive ; l'hôte de chaque élément
+    qui est une URL — un validateur qui suggère la forme canonique, hôte en minuscules et
+    chemin retiré.
+    """
+    pieces = [piece.strip() for piece in re.split(r'[\[\]",]', value) if piece.strip()]
+    hosts = [urlsplit(piece).hostname for piece in pieces]
+    return [fragment.lower() for fragment in [*pieces, *hosts] if fragment]
 
 
 def build_env(env_file: Path | None = None) -> Env:
@@ -124,6 +167,49 @@ def test_un_hote_absent_est_tolere_en_debug(monkeypatch: pytest.MonkeyPatch) -> 
     assert build_env().ALLOWED_HOSTS == []
 
 
+def test_les_origines_cors_sont_lues_telles_quelles(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Une liste JSON d'origines, comme `ALLOWED_HOSTS` (brief de #10, décision 8), lue telle
+    quelle — le `/` final qu'un type d'URL de pydantic ajouterait ferait rougir ce test."""
+    monkeypatch.setenv(
+        "CORS_ALLOWED_ORIGINS",
+        '["https://site.test","http://localhost:5173","http://site.test:443"]',
+    )
+
+    assert build_env().CORS_ALLOWED_ORIGINS == [
+        "https://site.test",
+        "http://localhost:5173",
+        "http://site.test:443",
+    ]
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [origin for _, origin in REFUSED_ORIGINS],
+    ids=[name for name, _ in REFUSED_ORIGINS],
+)
+def test_une_origine_cors_mal_formee_est_refusee(
+    monkeypatch: pytest.MonkeyPatch, origin: str
+) -> None:
+    """Chaque composant d'URL qui n'a rien à faire dans une origine, ou qui y manque : refusé au
+    démarrage, la liste entière couvrant la classe."""
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", f'["https://site.test","{origin}"]')
+
+    with pytest.raises(ValidationError, match="CORS_ALLOWED_ORIGINS"):
+        build_env()
+
+
+def test_le_demarrage_echoue_sans_origine_cors_meme_en_debug(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sans origine admise, le site ne peut pas appeler l'API, en développement aussi : le serveur
+    Vite parle au back depuis une autre origine."""
+    monkeypatch.setenv("DEBUG", "true")
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", "[]")
+
+    with pytest.raises(ValidationError, match="CORS_ALLOWED_ORIGINS"):
+        build_env()
+
+
 @pytest.mark.parametrize(
     "render",
     [render for _, render in SECRET_TRAVEL_FORMS],
@@ -171,7 +257,8 @@ def test_aucune_valeur_ne_fuit_dans_l_erreur_de_demarrage(
     message = str(refusal.value)
     assert variable in message, "le refus doit dire quel champ est en cause"
     for value in [invalid_value, *variables.values()]:
-        assert value not in message
+        for fragment in value_fragments(value):
+            assert fragment not in message.lower()
 
 
 def test_une_cle_inconnue_dans_le_fichier_env_est_refusee(tmp_path: Path) -> None:

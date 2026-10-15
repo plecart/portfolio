@@ -16,6 +16,7 @@ import os
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Self
+from urllib.parse import urlsplit
 
 from pydantic import (
     Field,
@@ -39,9 +40,10 @@ class ConfigurationError(RuntimeError):
     de passe de la base, et une erreur de démarrage part sur stderr — journaux de conteneur,
     sortie de CI, collecteur d'erreurs.
 
-    **Quatre** mécanismes de refus ont été recensés : borne de longueur, URL mal formée,
-    validateur de modèle qui reçoit l'environnement entier — les trois fuyaient — et échec de
-    lecture d'une *source*, qui ne fuit pas mais lève un type d'exception distinct. `Env.load()`
+    **Cinq** mécanismes de refus ont été recensés : borne de longueur, URL mal formée,
+    validateur de modèle qui reçoit l'environnement entier, validateur de champ qui reçoit la
+    liste entière des origines — les quatre fuyaient — et échec de lecture d'une *source*, qui
+    ne fuit pas mais lève un type d'exception distinct. `Env.load()`
     les reformule tous par ce type, et `INVALID_CONFIGURATIONS` (`tests/test_env.py`) en tient
     le dénombrement : c'est le test qui garde la classe close, pas cette phrase.
     """
@@ -70,6 +72,34 @@ def _anchored_path(path: Path) -> Path:
         `path` inchangé s'il est absolu ; sinon le même chemin sous la racine du dépôt.
     """
     return path if path.is_absolute() else REPOSITORY_ROOT / path
+
+
+# Le port que le navigateur tait dans `Origin`, par schéma — et les seuls schémas qu'il y écrit.
+DEFAULT_PORTS = {"http": 80, "https": 443}
+
+
+def _browser_origin(origin: str) -> str | None:
+    """La forme sous laquelle un navigateur enverrait `origin` dans l'en-tête `Origin`.
+
+    Args:
+        origin: une origine telle que l'environnement la donne.
+
+    Returns:
+        `schéma://hôte[:port]` — hôte en minuscules, port seulement s'il n'est pas celui du
+        schéma — ou `None` si rien de tel ne se déduit : schéma hors HTTP, hôte absent, port
+        illisible. Tout ce qui n'y figure pas (chemin, requête, fragment, identifiant) est perdu,
+        ce qui rend une entrée non canonique différente de sa forme canonique. Un hôte IPv6 n'est
+        pas rendu entre crochets : une telle origine est refusée.
+    """
+    parts = urlsplit(origin)
+    try:
+        port = parts.port
+    except ValueError:
+        return None
+    if parts.scheme not in DEFAULT_PORTS or not parts.hostname:
+        return None
+    suffix = "" if port in (None, DEFAULT_PORTS[parts.scheme]) else f":{port}"
+    return f"{parts.scheme}://{parts.hostname}{suffix}"
 
 
 def env_file_path(environ: Mapping[str, str]) -> Path:
@@ -135,6 +165,10 @@ class Env(BaseSettings):
         MEDIA_ROOT: dossier où atterrissent les fichiers téléversés (ADR 0004, « Développement :
             stockage disque par défaut de Django »). Le conteneur reçoit le chemin absolu de son
             volume ; sur le poste, un chemin relatif est ancré sur la racine du dépôt.
+        CORS_ALLOWED_ORIGINS: les origines admises à appeler l'API publique — celle du site
+            (ADR 0008, « CORS restreint à l'origine du site »), liste JSON comme `ALLOWED_HOSTS`.
+            Une origine est un schéma et un hôte, rien d'autre ; au moins une, en `DEBUG` aussi :
+            le site ne peut pas appeler l'API sans elle.
     """
 
     model_config = SettingsConfigDict(env_file=ENV_FILE)
@@ -145,12 +179,35 @@ class Env(BaseSettings):
     DATABASE_URL: PostgresDsn
     REDIS_URL: RedisDsn
     MEDIA_ROOT: Path = REPOSITORY_ROOT / "media"
+    CORS_ALLOWED_ORIGINS: list[str] = Field(min_length=1)
 
     @field_validator("MEDIA_ROOT")
     @classmethod
     def _anchor_media_root(cls, value: Path) -> Path:
         """Ancre un `MEDIA_ROOT` relatif, comme `ENV_FILE` l'est déjà."""
         return _anchored_path(value)
+
+    @field_validator("CORS_ALLOWED_ORIGINS")
+    @classmethod
+    def _require_browser_origins(cls, origins: list[str]) -> list[str]:
+        """Refuse toute origine qui n'est pas écrite comme un navigateur l'enverrait.
+
+        `django-cors-headers` compare l'en-tête `Origin` à chaque entrée, schéma et hôte tels
+        quels (`_url_in_whitelist`), et un navigateur l'envoie sous une seule forme :
+        `schéma://hôte[:port]`, hôte en minuscules, port absent s'il est celui du schéma. Une
+        entrée qui s'en écarte — chemin, identifiant, majuscule, port par défaut écrit — passe
+        les contrôles `E013`/`E014` de cors-headers, ou ne les rencontre jamais (`manage.py
+        check`, que le conteneur ne lance pas), et laisse le site sans API sans qu'aucune erreur
+        ne le dise. D'où le refus au démarrage, comme le reste : l'entrée doit être égale à sa
+        forme canonique (`_browser_origin`).
+
+        `list[str]` et non `list[AnyHttpUrl]` : pydantic ajoute un `/` final (mesuré le
+        2026-10-15, pydantic 2.13.5 : `https://site.test` → `https://site.test/`), que cors-headers
+        lirait comme un chemin.
+        """
+        if any(_browser_origin(origin) != origin for origin in origins):
+            raise ValueError("chaque origine s'écrit `schéma://hôte[:port]`, comme un navigateur")
+        return origins
 
     @model_validator(mode="after")
     def _require_allowed_host_outside_debug(self) -> Self:
