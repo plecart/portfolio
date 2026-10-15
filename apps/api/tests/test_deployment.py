@@ -96,17 +96,38 @@ def deploy_findings(workflow: str) -> list[str]:
         findings.append(
             "`concurrency` doit nommer son groupe et porter `cancel-in-progress: false`"
         )
-    steps: list[dict[str, Any]] = job.get("steps") or []
+    return findings + checkout_then_scripts_findings(job.get("steps") or [], [DEPLOY_ENV])
+
+
+def checkout_then_scripts_findings(
+    steps: list[dict[str, Any]], environments: list[dict[str, str]]
+) -> list[str]:
+    """Ce qui écarte les étapes d'un job de la forme « un checkout qui ne garde pas l'identifiant du
+    dépôt, puis un script par environnement attendu » — la forme des jobs qui lancent un script
+    sur un secret (`deploy`, et le test de restauration mensuel de `test_restore_workflow.py`).
+
+    Args:
+        steps: les étapes du job, telles que l'analyseur YAML les lit.
+        environments: l'environnement exact de chaque script, dans l'ordre.
+
+    Returns:
+        Un constat par écart — étapes autres qu'un checkout suivi d'autant de scripts que
+        d'environnements, checkout qui garde l'identifiant, script dont l'environnement diffère,
+        clé d'étape hors de `STEP_KEYS` (`if`, `continue-on-error`…). Liste vide : conforme.
+    """
+    findings: list[str] = []
     launched = [
         "run" if "run" in step else str(step.get("uses", "")).split("@")[0] for step in steps
     ]
-    if launched != ["actions/checkout", "run"]:
-        findings.append(f"le job lance {launched}, attendu un checkout puis un script")
+    expected = ["actions/checkout"] + ["run"] * len(environments)
+    if launched != expected:
+        findings.append(f"le job lance {launched}, attendu {expected}")
     else:
         if steps[0].get("with") != {"persist-credentials": False}:
             findings.append("le checkout garde l'identifiant du dépôt")
-        if steps[1].get("env") != DEPLOY_ENV:
-            findings.append(f"le script reçoit {steps[1].get('env')}, attendu {DEPLOY_ENV}")
+        for step, environment in zip(steps[1:], environments, strict=True):
+            if step.get("env") != environment:
+                findings.append(f"un script reçoit {step.get('env')}, attendu {environment}")
     findings += [
         f"l'étape {index} porte {sorted(set(step) - STEP_KEYS)}"
         for index, step in enumerate(steps)

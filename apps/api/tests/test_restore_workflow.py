@@ -18,8 +18,9 @@ from typing import Any
 import pytest
 import yaml
 from call_witness import recording, witnessed
+from test_deployment import checkout_then_scripts_findings
 from test_infra import REPOSITORY_ROOT
-from test_publication import STEP_KEYS, WORKFLOW_TOKEN_ENV
+from test_publication import WORKFLOW_TOKEN_ENV
 
 RESTORE_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "restore.yml"
 
@@ -56,7 +57,6 @@ RESTORE_ENV = {
     "BACKUP_R2_SECRET_ACCESS_KEY": "${{ secrets.RESTORE_R2_SECRET_ACCESS_KEY }}",
     "RESTORE_MIN_PROJECTS": "${{ vars.RESTORE_MIN_PROJECTS }}",
 }
-STEPS = ["actions/checkout", "run", "run"]
 
 
 def triggers(workflow: dict[Any, Any]) -> object:
@@ -74,9 +74,9 @@ def restore_findings(text: str) -> list[str]:
     Returns:
         Un constat par propriété altérée — déclencheurs, `permissions` du workflow, un job autre
         que `restore` seul, son `if`, son `environment`, une clé de job hors de `JOB_KEYS`
-        (`permissions`, `continue-on-error`, `env`…), des étapes autres qu'un checkout sans
-        identifiant suivi de deux scripts, l'environnement de chacun autre que `LOGIN_ENV` et
-        `RESTORE_ENV`, une clé d'étape hors de `STEP_KEYS`. Liste vide : le workflow est conforme.
+        (`permissions`, `continue-on-error`, `env`…), et des étapes autres qu'un checkout sans
+        identifiant suivi de deux scripts, sous `LOGIN_ENV` puis `RESTORE_ENV`
+        (`checkout_then_scripts_findings`). Liste vide : le workflow est conforme.
     """
     workflow: dict[Any, Any] = yaml.safe_load(text)
     findings: list[str] = []
@@ -94,24 +94,9 @@ def restore_findings(text: str) -> list[str]:
         findings.append(f"`environment` vaut {job.get('environment')!r}, attendu {ENVIRONMENT!r}")
     if extra := sorted(set(job) - JOB_KEYS):
         findings.append(f"le job porte {extra}")
-    steps: list[dict[str, Any]] = job.get("steps") or []
-    launched = [
-        "run" if "run" in step else str(step.get("uses", "")).split("@")[0] for step in steps
-    ]
-    if launched != STEPS:
-        findings.append(f"le job lance {launched}, attendu {STEPS}")
-    else:
-        if steps[0].get("with") != {"persist-credentials": False}:
-            findings.append("le checkout garde l'identifiant du dépôt")
-        for step, expected in zip(steps[1:], [LOGIN_ENV, RESTORE_ENV], strict=True):
-            if step.get("env") != expected:
-                findings.append(f"l'étape {step.get('name')!r} reçoit {step.get('env')}")
-    findings += [
-        f"l'étape {index} porte {sorted(set(step) - STEP_KEYS)}"
-        for index, step in enumerate(steps)
-        if set(step) - STEP_KEYS
-    ]
-    return findings
+    return findings + checkout_then_scripts_findings(
+        job.get("steps") or [], [LOGIN_ENV, RESTORE_ENV]
+    )
 
 
 # --- Le recueil des formes : chaque cas recensé, avec son verdict attendu ---------------------
@@ -374,7 +359,12 @@ def test_les_valeurs_que_le_workflow_substitue_sont_des_variables_du_modele() ->
     être une variable, sans quoi Compose garderait la valeur factice."""
     model = (REPOSITORY_ROOT / "infra" / "prod.env.example").read_text(encoding="utf-8")
     declared = set(re.findall(r"^([A-Z_][A-Z0-9_]*)=", model, re.MULTILINE))
-    substituted = {"IMAGE_TAG", *(name for name in RESTORE_ENV if name.startswith("BACKUP_R2_"))}
+    restore_env: dict[str, str] = workflow_steps()[-1]["env"]
+    substituted = {
+        name for name in restore_env if name == "IMAGE_TAG" or name.startswith("BACKUP_")
+    }
+
+    assert substituted >= {"IMAGE_TAG", "BACKUP_R2_ACCESS_KEY_ID", "BACKUP_R2_BUCKET"}
 
     assert substituted - declared == set()
 
