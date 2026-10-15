@@ -9,12 +9,10 @@ from typing import Any
 
 import pytest
 from content.api import api
-from content.models import ProcessingState
 from django.test import Client
-from factories import gallery_image, saved, technology
 from jsonschema import Draft202012Validator
 from ninja.responses import NinjaJSONEncoder
-from test_api import PROJECTS, VARIANT, complete_project, listed
+from test_api import PROJECTS, listed, project_with_variant
 
 # Le fichier versionné, que `make openapi` écrit.
 OPENAPI = Path(__file__).resolve().parents[1] / "openapi.json"
@@ -110,8 +108,7 @@ def test_le_corps_reel_valide_contre_le_schema_versionne(client: Client) -> None
         "components": document["components"],
     }
     Draft202012Validator.check_schema(schema)
-    published = complete_project("complet", saved(technology()))
-    saved(gallery_image(published, position=2, state=ProcessingState.READY, variants=[VARIANT]))
+    project_with_variant("complet")
 
     body = listed(client)
 

@@ -62,6 +62,13 @@ def complete_project(slug: str, employed: Technology) -> Project:
     return published
 
 
+def project_with_variant(slug: str) -> None:
+    """Un projet complet de slug `slug` dont la galerie porte aussi une image prête et sa
+    variante : chaque clé du contrat figure dans le corps."""
+    published = complete_project(slug, saved(technology()))
+    saved(gallery_image(published, position=2, state=ProcessingState.READY, variants=[VARIANT]))
+
+
 def keys(value: object) -> Iterator[str]:
     """Chaque clé d'objet de `value`, un JSON décodé, à tous les niveaux d'imbrication."""
     if isinstance(value, dict):
@@ -153,8 +160,7 @@ def test_une_adresse_que_le_stockage_rend_absolue_reste_telle_quelle(client: Cli
     """R2 rendra des adresses absolues, sur l'hôte des médias (#13) : la liste les garde telles
     quelles, jamais réécrites sur l'hôte de la requête (décision 5). Un `MEDIA_URL` absolu fait
     rendre au stockage disque la même forme d'adresse."""
-    published = complete_project("medias", saved(technology()))
-    saved(gallery_image(published, position=2, state=ProcessingState.READY, variants=[VARIANT]))
+    project_with_variant("medias")
 
     with override_settings(MEDIA_URL="https://media.test/"):
         [listed_project] = listed(client)
@@ -218,8 +224,7 @@ def test_la_liste_suit_l_ordre_des_slugs(client: Client) -> None:
 def test_le_contrat_n_expose_aucun_champ_ecarte(client: Client) -> None:
     """Aucune clé écartée par les décisions 2 et 3, à aucun niveau du corps — projet,
     technologies, galerie, variantes, sections."""
-    published = complete_project("complet", saved(technology()))
-    saved(gallery_image(published, position=2, state=ProcessingState.READY, variants=[VARIANT]))
+    project_with_variant("complet")
 
     body = listed(client)
 
