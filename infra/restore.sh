@@ -155,12 +155,16 @@ stop_writers() {
 	echo "arrêtés :${stopped:- aucun}"
 }
 
-# Les objets de l'archive remplacent ceux de la base, en une transaction : un échec la laisse telle
-# qu'elle était. Sans pipefail dans `sh`, un flux tronqué se lit dans l'échec de `pg_restore`, qui
-# ne restaure pas une archive incomplète.
+# La base devient celle de l'archive, en une transaction : le schéma `public` vidé — un objet que
+# la sauvegarde n'a pas connu, la table d'une migration plus récente, ferait échouer `migrate` —,
+# puis le script SQL de l'archive, que `pg_restore` écrit et que `psql` joue. `COMMIT` n'est envoyé
+# que si `pg_restore` a lu l'archive entière : sinon `psql` sort sans valider, et la base reste telle
+# qu'elle était. `bash` pour `pipefail`, que le `sh` de l'image Postgres n'a pas. Côté hôte, sans
+# `pipefail`, un flux tronqué se lit dans cet échec de `pg_restore`.
 restore_database() {
-	decrypted '' | $COMPOSE exec -T postgres sh -c \
-		'pg_restore --clean --if-exists --single-transaction -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+	decrypted '' | $COMPOSE exec -T postgres bash -c 'set -o pipefail
+{ echo "BEGIN; DROP SCHEMA public CASCADE; CREATE SCHEMA public;"; pg_restore --file=- && echo COMMIT; } |
+	psql --no-psqlrc --quiet -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 }
 
 # `migrate` par le point d'entrée d'`api`, qui nomme chaque migration appliquée, puis `--check` :

@@ -45,6 +45,8 @@ STEPS = [
 # Une table du schéma sauvegardé, vide dans l'archive : une ligne posée après la sauvegarde dit si la
 # base a changé — une restauration la remet vide.
 WITNESS_TABLE = "temoin_de_restauration"
+# Une table créée après la sauvegarde, que l'archive ne porte pas.
+LATER_TABLE = "posterieure_a_la_sauvegarde"
 
 # Le témoin de la commande Compose : chaque appel consigné, arguments séparés par US (0x1f), appels
 # par RS (0x1e) — un argument peut porter des sauts de ligne —, puis exécuté tel quel.
@@ -124,6 +126,12 @@ def witness_rows(stack: Stack) -> str:
     return succeeded(printed).stdout.decode().strip()
 
 
+def table_exists(stack: Stack, table: str) -> bool:
+    """La base porte-t-elle `table` ?"""
+    printed = stack.as_owner(f"SELECT to_regclass('{table}') IS NOT NULL", "--tuples-only")
+    return succeeded(printed).stdout.decode().strip() == "t"
+
+
 def running_services(stack: Stack) -> list[str]:
     """Les services de la pile qui tournent."""
     return stack.output("ps", "--status", "running", "--services").split()
@@ -190,6 +198,9 @@ def test_la_chaine_restaure_la_sauvegarde_choisie_puis_redemarre_api(
     joué, le contrôle écrit."""
     bucket, name = backed_up(stack)
     selector = name.removeprefix(f"{DATABASE}-").removesuffix(".dump.age")
+    # Une table que la sauvegarde n'a pas connue — celle d'une migration plus récente : la base
+    # restaurée est celle de l'archive, sans elle, sinon `migrate` la recréerait et échouerait.
+    succeeded(stack.as_owner(f"CREATE TABLE {LATER_TABLE} (id integer)"))
 
     done = restore(stack, tmp_path, bucket, selector if by_timestamp else "derniere")
 
@@ -197,7 +208,8 @@ def test_la_chaine_restaure_la_sauvegarde_choisie_puis_redemarre_api(
     assert done.steps == STEPS
     assert f"sauvegarde : {name}" in done.log
     assert witness_rows(stack) == "0"
-    pg_restore = next(i for i, call in enumerate(done.calls) if call[-1].startswith("pg_restore"))
+    assert table_exists(stack, WITNESS_TABLE) and not table_exists(stack, LATER_TABLE)
+    pg_restore = next(i for i, call in enumerate(done.calls) if "pg_restore --file" in call[-1])
     assert done.index("stop", "api") < pg_restore < done.index("start", "--wait", "api")
     assert done.index("python", "manage.py", "migrate", "--check") > pg_restore
     assert "projets publiés : 0 (attendu ≥ 0)" in done.log
