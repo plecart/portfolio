@@ -289,6 +289,8 @@ site est indisponible le temps de la restauration — quelques minutes.
    ```
    make restore HOST=<ip> BACKUP=derniere
    ```
+   `HOST` : une adresse IPv4 ou un nom d'hôte — lettres, chiffres, `.` et `-` ; pour un VPS en
+   IPv6 seul, un alias de `~/.ssh/config`.
    Elle écrit, dans l'ordre : `== sélection` et `sauvegarde : <objet>` ; `== téléchargement` ;
    `== déchiffrement` ; `== arrêt` et `arrêtés : api` ; `== restauration` ; `== migrations`, avec
    chaque migration que Django applique ; `== contrôle` et
