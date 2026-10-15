@@ -56,7 +56,7 @@ INVALID_CONFIGURATIONS = [
     ("aucun hôte autorisé", "ALLOWED_HOSTS", "[]"),
     ("liste mal formée", "ALLOWED_HOSTS", "[oups"),
     ("origine avec chemin", "CORS_ALLOWED_ORIGINS", '["http://SITE-SECRET.test/chemin"]'),
-    ("origine sans schéma", "CORS_ALLOWED_ORIGINS", '["SITE-SECRET.test"]'),
+    ("origine sans schéma", "CORS_ALLOWED_ORIGINS", '["//SITE-SECRET.test"]'),
     ("aucune origine", "CORS_ALLOWED_ORIGINS", "[]"),
     ("liste d'origines mal formée", "CORS_ALLOWED_ORIGINS", "[oups"),
 ]
@@ -64,13 +64,16 @@ INVALID_CONFIGURATIONS = [
 # Ce qu'une origine CORS n'est pas : une origine est un schéma et un hôte, rien d'autre
 # (`django-cors-headers`, contrôles `E013` et `E014`), et c'est au démarrage qu'on le refuse —
 # une origine qui ne peut rien apparier laisserait le site sans API, sans qu'aucune erreur ne le
-# dise. Cinq formes, une par composant d'URL qui ne doit pas y être, ou qui y manque.
+# dise. Six formes : une par composant d'URL qui ne doit pas y être, ou qui y manque, plus l'hôte
+# nu — que `urlsplit` lit comme un chemin, pas comme un schéma absent (mesuré : la forme
+# protocolaire `//hôte` est la seule qui éprouve la garde du schéma).
 REFUSED_ORIGINS = [
     ("chemin", "https://site.test/chemin"),
     ("requête", "https://site.test?x=1"),
     ("fragment", "https://site.test#ancre"),
-    ("sans schéma", "site.test"),
+    ("sans schéma", "//site.test"),
     ("sans hôte", "https://"),
+    ("hôte nu", "site.test"),
 ]
 
 
