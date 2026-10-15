@@ -99,6 +99,15 @@ in_backup() {
 $script" restore "$@"
 }
 
+# `psql` dans le conteneur Postgres, sous le propriétaire de la base, par le socket local — les
+# variables sont celles du conteneur — ; arrêt à la première erreur SQL.
+PSQL='psql --no-psqlrc --quiet -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+
+# Lance `$1` par `sh -c` dans le conteneur Postgres.
+in_postgres() {
+	$COMPOSE exec -T postgres sh -c "$1"
+}
+
 # La clé puis l'archive, sur l'entrée standard du déchiffrement, suivi de `$1` dans le conteneur.
 decrypted() {
 	{ printf '%s\n' "$key"; cat "$work/archive"; } | in_backup "$DECRYPT$1"
@@ -162,9 +171,8 @@ stop_writers() {
 # qu'elle était. Dans le conteneur, `pipefail` rend cet échec — le `dash` de l'image l'applique
 # (mesuré le 2026-10-15). Côté hôte, sans `pipefail`, un flux tronqué se lit dans ce même échec.
 restore_database() {
-	decrypted '' | $COMPOSE exec -T postgres sh -c 'set -o pipefail
-{ echo "BEGIN; DROP SCHEMA public CASCADE; CREATE SCHEMA public;"; pg_restore --file=- && echo COMMIT; } |
-	psql --no-psqlrc --quiet -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+	decrypted '' | in_postgres "set -o pipefail
+{ echo 'BEGIN; DROP SCHEMA public CASCADE; CREATE SCHEMA public;'; pg_restore --file=- && echo COMMIT; } | $PSQL"
 }
 
 # `migrate` par le point d'entrée d'`api`, qui nomme chaque migration appliquée, puis `--check` :
@@ -175,9 +183,8 @@ migrate() {
 
 # La requête de contrôle : les projets publiés, au moins `RESTORE_MIN_PROJECTS` (décision 7).
 check_projects() {
-	count=$($COMPOSE exec -T postgres sh -c 'psql --no-psqlrc --tuples-only --no-align \
-		-v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-		-c "SELECT count(*) FROM content_project WHERE published"')
+	count=$(in_postgres "$PSQL --tuples-only --no-align \
+		-c 'SELECT count(*) FROM content_project WHERE published'")
 	echo "projets publiés : $count (attendu ≥ $min_projects)"
 	[ "$count" -ge "$min_projects" ]
 }
