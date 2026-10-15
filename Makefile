@@ -107,7 +107,7 @@ PACKAGE_VERSIONS = users/$(dir $(PACKAGE))packages/container/$(notdir $(PACKAGE)
 # `gh`, qui porte la rétention ; les tests le remplacent par un témoin.
 GH ?= gh
 
-.PHONY: install test lint format format-check typecheck audit build $(IMAGE_BUILDS) compose-config dev
+.PHONY: install test lint format format-check typecheck openapi audit build $(IMAGE_BUILDS) compose-config dev
 .PHONY: scan $(IMAGE_SCANS) image-test push $(IMAGE_PUSHES) prune $(IMAGE_PRUNES)
 .PHONY: web-install web-browsers web-lint web-typecheck web-test web-build web-e2e web-lighthouse web-audit
 
@@ -128,6 +128,14 @@ format-check:
 
 typecheck:
 	$(UV) run pyright
+
+# Le schéma OpenAPI de l'API publique, versionné : le front en dérive ses types (#19). À relancer
+# après tout changement du contrat — sinon le test de fraîcheur de `make test` rougit. La commande
+# est celle de django-ninja ; `--api` la mène à l'instance, qu'elle chercherait sinon sous `/api/`.
+# Comme toute commande `manage.py`, elle lit l'environnement du back (`.env`).
+openapi:
+	$(UV) run python apps/api/manage.py export_openapi_schema --api content.api.api --indent 2 \
+		--output apps/api/openapi.json
 
 # Audite l'environnement que `uv sync` a installé, dépendances de développement comprises — même
 # raison que `web-audit` : un outil de build compromis écrit dans ce qu'on livre. Le seuil et sa

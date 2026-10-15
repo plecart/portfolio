@@ -61,6 +61,12 @@ pour qu'un rouge de l'une ne masque pas un rouge d'une autre.
 - format       : make format                      # ruff format — écrit
 - format:check : make format-check                # vérifie sans écrire
 - typecheck    : make typecheck                   # pyright, mode strict (cadrage §8.4)
+- openapi      : make openapi                     # écrit `apps/api/openapi.json`, le schéma de
+                                                  # l'API publique (commande de django-ninja) ;
+                                                  # à relancer après tout changement du contrat,
+                                                  # que le test de fraîcheur de `make test` exige ;
+                                                  # lit l'environnement du back comme tout
+                                                  # `manage.py` ; vérifiée le 2026-10-15 (#10)
 - audit        : make audit                       # pip-audit, toute vulnérabilité bloque ;
                                                   # exceptions datées dans
                                                   # infra/ci/pip-audit-exceptions.toml ;

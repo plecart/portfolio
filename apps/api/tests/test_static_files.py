@@ -7,6 +7,7 @@ compressés. La suite rend l'admin sur ce même stockage, à partir de la collec
 """
 
 import re
+from pathlib import Path
 
 from django.conf import settings
 from django.http import StreamingHttpResponse
@@ -16,7 +17,8 @@ from django.urls import reverse
 WHITENOISE = "whitenoise.middleware.WhiteNoiseMiddleware"
 SECURITY = "django.middleware.security.SecurityMiddleware"
 RUNSERVER_NOSTATIC = "whitenoise.runserver_nostatic"
-STATICFILES = "django.contrib.staticfiles"
+# `django.contrib.staticfiles`, par sa configuration propre au projet (`config/apps.py`).
+STATICFILES = "config.apps.StaticFilesConfig"
 
 # Une empreinte de manifeste : douze chiffres hexadécimaux entre le nom et l'extension.
 VERSIONED_STYLESHEET = r"admin/css/base\.[0-9a-f]{12}\.css"
@@ -74,3 +76,14 @@ def test_les_statiques_sont_servis_versionnes_et_compresses(client: Client) -> N
     assert response.headers.get("Content-Encoding") == "gzip"
     assert body.startswith(GZIP_MAGIC)
     assert "immutable" in response.headers["Cache-Control"]
+
+
+def test_la_collecte_laisse_les_docs_interactives_de_django_ninja() -> None:
+    """`ninja` n'est installé que pour sa commande d'export du schéma (brief de #10, décision 10) :
+    les fichiers de ses docs interactives, désactivées — près de 8 Mo de scripts Swagger et ReDoc
+    —, n'entrent ni dans l'image ni dans ce que WhiteNoise sert. Lu dans la collecte de la session
+    (`collected_static_files`), celle de l'admin à côté pour témoin."""
+    collected = Path(settings.STATIC_ROOT)
+
+    assert (collected / "admin").is_dir()
+    assert not (collected / "ninja").exists()
