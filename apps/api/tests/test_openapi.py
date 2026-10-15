@@ -113,5 +113,7 @@ def test_le_corps_reel_valide_contre_le_schema_versionne(client: Client) -> None
     body = listed(client)
 
     assert body[0]["gallery"][1]["variants"]
+    # Les formats (`date`) ne sont qu'annotations sans vérificateur (Draft 2020-12, « format »).
     # jsonschema ne publie pas `py.typed` : pyright ne voit pas la signature de `validate`.
-    Draft202012Validator(schema).validate(body)  # pyright: ignore[reportUnknownMemberType]
+    validator = Draft202012Validator(schema, format_checker=Draft202012Validator.FORMAT_CHECKER)
+    validator.validate(body)  # pyright: ignore[reportUnknownMemberType]
