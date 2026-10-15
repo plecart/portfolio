@@ -26,8 +26,13 @@ requires-python = ">=3.12"
 #
 # `django-ninja` porte l'API publique (ADR 0001) : `content/api.py` et `content/schemas.py` sont
 # les seuls modules qui l'importent, ce que `tests/test_api.py` tient.
+#
+# `django-cors-headers` restreint CORS à l'origine du site (ADR 0008). Aucun module ne l'importe :
+# Django le charge par `INSTALLED_APPS` et `MIDDLEWARE`, et les tests de CORS de `tests/test_api.py`
+# l'atteignent par la route.
 dependencies = [
     "django>=6.0",
+    "django-cors-headers>=4.9.0",
     "django-ninja>=1.7.1",
     "django-stubs-ext>=6.1.1",
     "gunicorn>=23",

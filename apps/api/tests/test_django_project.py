@@ -40,6 +40,7 @@ SETTINGS_DUMP = (
     "'ROOT_URLCONF': settings.ROOT_URLCONF,"
     "'WSGI_APPLICATION': settings.WSGI_APPLICATION,"
     "'TIME_ZONE': settings.TIME_ZONE,"
+    "'CORS_ALLOWED_ORIGINS': list(settings.CORS_ALLOWED_ORIGINS),"
     "'MIDDLEWARE': list(settings.MIDDLEWARE)}))"
 )
 
@@ -167,6 +168,7 @@ def test_les_reglages_django_viennent_de_l_environnement(variables: dict[str, st
     # `America/Chicago`, et l'admin se protège seul du CSRF — le middleware couvre le reste.
     assert settings["TIME_ZONE"] == "Europe/Paris"
     assert "django.middleware.csrf.CsrfViewMiddleware" in settings["MIDDLEWARE"]
+    assert settings["CORS_ALLOWED_ORIGINS"] == json.loads(variables["CORS_ALLOWED_ORIGINS"])
 
 
 @pytest.mark.parametrize(
