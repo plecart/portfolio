@@ -20,6 +20,7 @@ import pytest
 from call_witness import recorded_calls, recording
 from test_backup_image import (
     DATABASE,
+    STACK_VALUES,
     Stack,
     age_key_pair,
     compose_command,
@@ -272,20 +273,32 @@ def test_la_chaine_restaure_la_sauvegarde_choisie_puis_redemarre_api(
     assert "api" in running_services(stack)
 
 
-def test_un_service_arrete_avant_la_restauration_le_reste_apres(
+def test_la_chaine_tient_dans_l_etat_du_runner_du_test_mensuel(
     stack: Stack, tmp_path: Path
 ) -> None:
-    """Les services ne sont redémarrés que s'ils tournaient (décision 5) : sur le runner du test
-    mensuel, rien ne tourne, et la restauration n'y démarre rien."""
+    """Le runner du test mensuel (`.github/workflows/restore.yml`) : rien n'y tourne, sa base neuve
+    n'a pas le rôle de sauvegarde — `bootstrap.sh` ne le crée que sur le VPS —, et le seuil y
+    arrive vide tant que la variable de dépôt n'existe pas (doc GitHub « Contexts », `vars`).
+    Les services ne sont redémarrés que s'ils tournaient (décision 5) ; l'archive ne cite aucun
+    rôle que la base n'a pas — le rôle de sauvegarde lit par appartenance à `pg_read_all_data`,
+    que `pg_dump` n'écrit pas ; un `GRANT` qui lui serait donné entrerait dans l'archive et
+    ferait échouer la restauration du runner — ; le seuil vide vaut 0 (décision 7)."""
     bucket, _ = backed_up(stack)
     stack.output("stop", "api")
-
-    done = restore(stack, tmp_path, bucket, "derniere")
+    role = STACK_VALUES["BACKUP_POSTGRES_USER"]
+    succeeded(stack.as_owner(f'DROP OWNED BY "{role}"; DROP ROLE "{role}"'))
+    try:
+        done = restore(
+            stack, tmp_path, bucket, "derniere", environment={"RESTORE_MIN_PROJECTS": ""}
+        )
+    finally:
+        stack.apply_backup_role(STACK_VALUES["BACKUP_POSTGRES_PASSWORD"])
 
     assert done.process.returncode == 0, done.log
     assert "arrêtés : aucun" in done.log and "redémarrés : aucun" in done.log
     assert not [call for call in done.calls if {"stop", "up"} & set(call)]
     assert "api" not in running_services(stack)
+    assert "projets publiés : 0 (attendu ≥ 0)" in done.log
 
 
 # Cas → (arguments, environnement, clé privée autre que celle du test, étape qui échoue).

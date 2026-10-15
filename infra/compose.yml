@@ -58,8 +58,9 @@ services:
 
   caddy:
     # Les images du dépôt, telles que le job `publish` les a poussées, à l'étiquette du commit que
-    # le job de déploiement fixe — jamais `latest`, qu'une publication croisée peut laisser sur
-    # l'avant-dernier commit (`ci.yml`, job `publish`).
+    # le job de déploiement fixe — jamais `latest` sur le VPS, qu'une publication croisée peut
+    # laisser sur l'avant-dernier commit (`ci.yml`, job `publish`) ; seul le test de restauration
+    # mensuel, sur un runner, tire `latest` (`.github/workflows/restore.yml`).
     image: ghcr.io/plecart/portfolio-caddy:${IMAGE_TAG:?}
     # Les noms d'hôte que le Caddyfile lit (`infra/caddy/Caddyfile`).
     environment:
