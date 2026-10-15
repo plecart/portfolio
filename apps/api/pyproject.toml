@@ -23,8 +23,12 @@ requires-python = ">=3.12"
 # `tests/test_images.py` tient. Le plancher n'est pas décoratif :
 # quatre avis de gravité haute, publiés le 2026-07-20, ne sont corrigés qu'en 12.3.0 (brief de #9,
 # décision 12).
+#
+# `django-ninja` porte l'API publique (ADR 0001) : `content/api.py` et `content/schemas.py` sont
+# les seuls modules qui l'importent, ce que `tests/test_api.py` tient.
 dependencies = [
     "django>=6.0",
+    "django-ninja>=1.7.1",
     "django-stubs-ext>=6.1.1",
     "gunicorn>=23",
     "markdown-it-py>=4.2.0",

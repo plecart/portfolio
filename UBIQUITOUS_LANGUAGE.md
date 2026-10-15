@@ -101,3 +101,25 @@ la couverture, et lui en applique les règles.
 | Terme | Identifiant | Règle |
 |---|---|---|
 | forme | `width`, `height` | carrée — largeur égale à la hauteur —, 1200 px de côté au moins ; l'écran Projet la tient, la base ne le peut pas |
+
+## API publique
+
+L'unique point d'entrée de la phase 1 : `GET /api/projets`, la liste nue des projets publiés —
+un tableau JSON, `[]` s'il n'y en a aucun, sans pagination ni route par slug (PRD « Hors
+périmètre »). Un brouillon n'y figure jamais. Le site la charge en une fois et calcule le reste :
+ordre des cartes, libellés, technologies de carte (ADR 0010). Son contrat est le schéma
+`apps/api/openapi.json`, régénéré par `make openapi` ; le front en dérive ses types (#19).
+
+| Terme | Identifiant | Règle |
+|---|---|---|
+| projet | `ProjectOut` | `slug`, `title`, `summary`, `description` (Markdown brut), `kind`, `status`, `started_on`, `finished_on` (`null` tant que le projet est en cours), `client`, `repository_url`, `demo_url` (chaîne vide quand absent, comme stocké), `showcase`, puis ses trois listes ; les projets sont triés par slug |
+| technologie | `TechnologyOut` | `name`, `kind`, `icon` — l'adresse de l'icône SVG, jamais le SVG lui-même ; dans l'ordre de l'admin |
+| image | `GalleryImageOut` | `caption`, `width`, `height`, `state`, `variants` ; dans l'ordre de l'admin ; une image en attente ou en échec figure avec son état et sans variante |
+| variante | `VariantOut` | `url`, `width`, `height` — l'adresse à la place du nom de stockage |
+| section | `SectionOut` | `title`, `anchor`, `body` (Markdown brut) ; dans l'ordre de l'admin |
+| couverture | `gallery[0]` | aucune clé à part : c'est la première image de la galerie |
+| adresse | — | chaque fichier par son adresse absolue : celle du stockage, complétée du schéma et de l'hôte de la requête quand elle est relative (disque en développement) |
+
+Ne sont pas exposés : `published`, `created_at` et `updated_at`, `position` et `id` (l'ordre est
+celui de la liste), le site d'une technologie (`website`) et l'original d'une image (`original`).
+Ni HTML ni libellé : les valeurs stockées, en anglais, telles quelles.

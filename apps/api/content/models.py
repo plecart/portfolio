@@ -166,8 +166,10 @@ class Project(models.Model):
         strings.PROJECT_UPDATED_AT, auto_now=True
     )
 
-    # Sa galerie, que Django pose à l'exécution depuis `GalleryImage` : déclarée ici pour que le
-    # typage la connaisse.
+    # Ses lignes de technologie, ses sections et sa galerie, que Django pose à l'exécution depuis
+    # leurs modèles : déclarées ici pour que le typage les connaisse.
+    projecttechnology_set: "RelatedManager[ProjectTechnology]"
+    section_set: "RelatedManager[Section]"
     gallery: "RelatedManager[GalleryImage]"
 
     class Meta:
