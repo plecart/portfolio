@@ -375,7 +375,9 @@ ou jeton en lecture seule refusé ; `déchiffrement` : `BACKUP_AGE_IDENTITY` d'u
 (« Tourner un secret », `BACKUP_AGE_RECIPIENT`) ; `contrôle` : moins de projets publiés que le
 seuil.
 
-**Le lancer à la main** — après une rotation, ou pour vérifier une correction :
+**Le lancer à la main** — après une rotation, ou pour vérifier une correction ; sur `main`, la
+branche par défaut de `gh workflow run` : l'environnement `production` refuse toute autre branche,
+et le run y est rouge sans avoir rien restauré.
 ```
 gh workflow run restore.yml
 gh run watch
