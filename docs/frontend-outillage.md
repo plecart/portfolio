@@ -81,7 +81,7 @@ Tout conservé. Les signalements, relus un par un, sont des faux positifs :
 | `prototype` | CAUTION | « never judge » : consigne de présentation des variantes |
 | autres | SAFE / CAUTION sans signalement | — |
 
-### 2.4 Application `apps/web` — 2026-09-23, amendée les 2026-09-25, 26, 2026-10-02 et 04
+### 2.4 Application `apps/web` — 2026-09-23, amendée les 2026-09-25, 26, 2026-10-02, 04 et 16
 
 Node **24.21.0**, LTS active du jour, épinglée par `.nvmrc` et par `engines` (valeurs égales,
 vérifiées par un test). `@types/node` suit sa majeure, vérifiée par un autre test : des types d'une
@@ -113,6 +113,7 @@ datés.
 | `@axe-core/playwright` | Contrôle d'accessibilité par page |
 | `@types/node`, `@types/react`, `@types/react-dom` | Types ambiants |
 | `semver`, `@types/semver` | Lecture des plages npm, qui fait expirer les refus (voir ci-dessous) |
+| `openapi-typescript` | Types de l'API générés depuis `apps/api/openapi.json` (ADR 0008) — **pair `typescript` forcé** (voir ci-dessous) |
 
 **Bloc d'aperçu de l'`index.html`.** Entre `<!--meta:start-->` et `<!--meta:end-->`, dans le
 `<head>`. La CI copie l'`index.html` compilé dans l'image `api` ; sur `/projets/<slug>`, une vue
@@ -212,6 +213,21 @@ On lève alors le refus en entier, table et règles ensemble, dans une PR à par
 `@dependabot rebase` sur la PR bloquée. Avant de lever, vérifier que la dernière majeure publiée
 est acceptée elle aussi : sinon, monter à la main sur la majeure acceptée et reporter le refus sur
 la suivante, table comprise.
+
+**`openapi-typescript` tourne sous TypeScript 6 par un pair forcé** (#19, 2026-10-16) : sa dernière
+version, la 7.13.0 (publiée le 2026-06-15), déclare `typescript ^5.x`, et `npm install` échoue en
+`ERESOLVE` sans rien d'autre — l'ajout de la 6 est demandé en amont depuis le 2026-03-27
+(openapi-ts/openapi-typescript#2723). L'`overrides` du manifeste,
+`"openapi-typescript": { "typescript": "$typescript" }`, lui donne la version installée à la racine.
+C'est l'inverse des refus ci-dessus, et il ne se paie pas de la même façon : ESLint et TypeScript
+sont refusés pour ne pas forcer un pair non déclaré sous un plugin dont dépend une porte, alors
+qu'ici l'outil n'écrit qu'un fichier, relu par `tsc` et par le test de fraîcheur des types — une
+rupture serait bruyante, jamais silencieuse. Mesuré avant l'installation, Node 24.3.0 : `npm ci`
+depuis le verrou dans un dossier neuf, génération des neuf schémas, sonde `tsc --strict` sur
+`ProjectOut`. Rien dans la table des refus ni dans `.github/dependabot.yml` : rien n'est refusé, la
+majeure suivante du générateur arrive en PR comme les autres. L'override expire comme un refus —
+`tests/dependency-refusals.test.ts` lit dans le verrou la plage de pair d'`openapi-typescript` et
+rougit le jour où elle accepte la majeure installée : on retire alors l'override.
 
 La famille Manrope est déclarée **comme jeton de thème Tailwind** (`@theme { --font-sans }`) plutôt
 que sur `:root` : la feuille de base de Tailwind pose déjà la police du document depuis ce jeton, et
