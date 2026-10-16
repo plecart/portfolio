@@ -23,13 +23,13 @@
 # Nommée une fois et réutilisée par les deux étages : deux `FROM` littéraux finiraient par
 # diverger, et l'étage d'exécution est justement celui qu'on relit le moins. Debian 13, la stable
 # en cours : Debian 12 est sorti du support de sécurité régulier le 2026-06-11 (ADR 0014).
-FROM python:3.12.14-slim-trixie@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f AS base
+FROM python:3.12.15-slim-trixie@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS base
 
 # `uv` dans un étage à lui plutôt que dans un `COPY --from=<image>` : Dependabot ne lit que les
 # lignes `FROM`, et une image citée seulement par `COPY --from` ne serait jamais mise à jour.
 # Version figée, comme toutes les épingles du dépôt : `latest` ferait dépendre la
 # reproductibilité de l'image de la date du build.
-FROM ghcr.io/astral-sh/uv:0.12.19@sha256:04d046b13e60d6bcec73cbc5e1cad25d680dea90c8573340950a0ac2d1aef424 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.1@sha256:4a1f3666816dafadd20ceb71eac9a7d56d7ef30279f7d64048519ab901ada336 AS uv
 
 
 FROM base AS build
