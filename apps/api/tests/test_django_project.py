@@ -1,5 +1,6 @@
-"""Tests du projet Django : il démarre, ses réglages viennent de l'environnement, et ce que le
-conteneur exige au démarrage est bien installé.
+"""Tests du projet Django : il démarre, ses réglages viennent de l'environnement, ce que le
+conteneur exige au démarrage est bien installé, et son application Celery trouve son broker —
+puis s'exécute de façon synchrone dans la suite.
 
 Le démarrage s'éprouve par un sous-processus lancé depuis `apps/api`, comme le ferait un humain
 ou `gunicorn` : c'est le seul moyen d'éprouver `manage.py` et `config/wsgi.py` eux-mêmes, et pas
@@ -16,6 +17,7 @@ from importlib.metadata import packages_distributions
 from pathlib import Path
 
 import pytest
+from celery import shared_task
 from process_environment import NO_ENV_FILE
 
 API_ROOT = Path(__file__).resolve().parent.parent
@@ -72,7 +74,19 @@ STARTUP_IMPORTS = [
         "from django.db.backends.postgresql.base import DatabaseWrapper",
     ),
     ("serveur WSGI (ADR 0001)", "import gunicorn"),
+    ("client Redis du broker (ADR 0015)", "import redis"),
 ]
+
+# Le broker de l'application Celery que le démarrage de Django rend courante — celle qu'une tâche
+# déclarée par `shared_task` emprunte pour s'enfiler depuis `api`. Dans un processus neuf, comme
+# `gunicorn` le démarre.
+CELERY_BROKER = """
+import os, django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
+from celery import current_app
+print(current_app.conf.broker_url)
+"""
 
 
 def run_python(arguments: list[str], variables: dict[str, str]) -> subprocess.CompletedProcess[str]:
@@ -186,6 +200,63 @@ def test_les_medias_ne_sont_servis_par_django_qu_en_developpement(
 
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == outcome
+
+
+@pytest.mark.parametrize(
+    "redis_url",
+    ["redis://cache.invalid:6379/0", "redis://autre.invalid:6380/1"],
+    ids=["environnement de test", "autre adresse"],
+)
+def test_le_demarrage_de_django_charge_l_application_celery_et_son_broker(
+    variables: dict[str, str], redis_url: str
+) -> None:
+    """Le broker vient d'`Env` (`REDIS_URL`, ADR 0015), par les réglages et leur espace de noms
+    `CELERY_` — deux adresses, qu'aucune valeur écrite en dur ne satisfait ensemble ; et
+    l'application est chargée au démarrage de Django, sans quoi une tâche enfilée par `api`
+    partirait vers le broker par défaut de Celery."""
+    result = run_python(["-c", CELERY_BROKER], variables | {"REDIS_URL": redis_url})
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == redis_url
+
+
+def test_la_commande_du_worker_trouve_l_application_et_ses_reglages(
+    variables: dict[str, str],
+) -> None:
+    """`celery -A config …` — la commande du conteneur `worker` — ne passe ni par `manage.py` ni
+    par `config/wsgi.py` : rien d'autre que l'application ne lui désigne les réglages Django.
+    `report` imprime la configuration — sous les noms des réglages Django dont elle vient — sans
+    joindre le broker."""
+    result = run_python(["-m", "celery", "-A", "config", "report"], variables)
+
+    assert result.returncode == 0, result.stderr
+    assert f"CELERY_BROKER_URL: {variables['REDIS_URL']!r}" in result.stdout
+
+
+@shared_task
+def doubled(value: int) -> int:
+    """Une tâche de test : le double de `value`."""
+    return 2 * value
+
+
+@shared_task
+def failing() -> None:
+    """Une tâche de test qui échoue toujours."""
+    raise RuntimeError("échec de la tâche")
+
+
+def test_une_tache_s_execute_de_facon_synchrone_dans_la_suite() -> None:
+    """Le harnais de test met l'application en mode synchrone (`conftest.py`, ADR 0015) : la suite
+    n'a besoin d'aucun Redis — le broker du processus de test, `cache.invalid`, ne se résout
+    nulle part (`process_environment.py`)."""
+    assert doubled.delay(21).get() == 42
+
+
+def test_l_exception_d_une_tache_sort_de_l_enfilement_dans_la_suite() -> None:
+    """Sans propagation, le mode synchrone garderait l'exception dans le résultat, et un test
+    d'échec verrait l'enfilement réussir."""
+    with pytest.raises(RuntimeError, match="échec de la tâche"):
+        failing.delay()
 
 
 def production_sources() -> list[Path]:

@@ -39,6 +39,7 @@ dev = [
     "testcontainers>=4.15.0",
     "docker>=7.2.0",
     "jsonschema>=4.26.0",
+    "celery-types>=0.26.0",
 ]
 
 [tool.pytest.ini_options]
