@@ -93,7 +93,12 @@ WORKER_COMMAND = ["celery", "-A", "config", "worker", "--loglevel", "info", "--c
 
 # Sa sonde de production : son propre nœud répond, broker joint (décision 10). `$$` : le `$` va au
 # shell de la sonde, qui lit le nom d'hôte du conteneur — celui que Celery donne au nœud.
-WORKER_PROBE = "celery -A config inspect ping --destination celery@$$HOSTNAME"
+WORKER_PROBE = "celery -A config inspect ping --destination celery@$$HOSTNAME --timeout 10"
+
+# Son délai propre, plus long que les 5 s des autres sondes (`x-probe-timing`) : la commande charge
+# Django avant d'interroger le nœud, dans un conteneur que Pillow peut occuper (décision 10). Il
+# couvre les 10 s d'attente du nœud de `WORKER_PROBE`.
+WORKER_PROBE_TIMEOUT = "30s"
 
 
 def worker_findings(text: str) -> list[str]:
@@ -124,23 +129,30 @@ def worker_findings(text: str) -> list[str]:
 
 def worker_production_findings(text: str) -> list[str]:
     """Ce qui manque au `worker` du Compose de production : démarrer après qu'`api` a joué les
-    migrations, repartir seul, et sa sonde sur son propre nœud (décision 10).
+    migrations et que le broker répond, repartir seul, et sa sonde sur son propre nœud, à son délai
+    propre (décision 10).
 
     Returns:
-        Un constat par propriété absente — `depends_on` d'`api` sain, `restart: unless-stopped`,
-        une sonde par le shell qui lance `WORKER_PROBE`. Liste vide : conforme.
+        Un constat par propriété absente — `depends_on` d'`api` et de `redis` sains,
+        `restart: unless-stopped`, une sonde par le shell qui lance `WORKER_PROBE`, son délai
+        `WORKER_PROBE_TIMEOUT`. Liste vide : conforme.
     """
     worker: dict[str, Any] = yaml.safe_load(text)["services"]["worker"]
     findings: list[str] = []
     dependencies: dict[str, object] = worker.get("depends_on") or {}
-    if dependencies.get("api") != {"condition": "service_healthy"}:
-        findings.append("worker : n'attend pas qu'`api` soit sain")
+    findings += [
+        f"worker : n'attend pas que `{service}` soit sain"
+        for service in ["api", "redis"]
+        if dependencies.get(service) != {"condition": "service_healthy"}
+    ]
     if worker.get("restart") != "unless-stopped":
         findings.append(f"worker : `restart` vaut {worker.get('restart')!r}")
-    healthcheck: dict[str, list[str]] = worker.get("healthcheck") or {}
-    probe = healthcheck.get("test") or []
+    healthcheck: dict[str, Any] = worker.get("healthcheck") or {}
+    probe: list[str] = healthcheck.get("test") or []
     if probe[:1] != ["CMD-SHELL"] or WORKER_PROBE not in " ".join(probe[1:]):
         findings.append(f"worker : sonde {probe}")
+    if healthcheck.get("timeout") != WORKER_PROBE_TIMEOUT:
+        findings.append(f"worker : délai de sonde {healthcheck.get('timeout')!r}")
     return findings
 
 
@@ -380,9 +392,12 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: [CMD-SHELL, celery -A config inspect ping --destination celery@$$HOSTNAME --timeout 10]
+      timeout: 30s
 """
 
 # Forme → (texte remplacé, remplacement, constat attendu). Le texte remplacé est pris dans
@@ -413,11 +428,18 @@ WORKER_CHANGES = {
 WORKER_PRODUCTION_CHANGES = {
     "conforme": ("", "", False),
     "sans attendre api": ("      api:\n        condition: service_healthy\n", "", True),
-    "api démarré seulement": ("condition: service_healthy", "condition: service_started", True),
+    "api démarré seulement": (
+        "api:\n        condition: service_healthy",
+        "api:\n        condition: service_started",
+        True,
+    ),
+    "sans attendre redis": ("      redis:\n        condition: service_healthy\n", "", True),
     "sans redémarrage": ("    restart: unless-stopped\n", "", True),
     "sonde sans shell": ("[CMD-SHELL, celery", "[CMD, celery", True),
     "sonde de tous les nœuds": (" --destination celery@$$HOSTNAME", "", True),
     "sans sonde": ("    healthcheck:\n", "    autre:\n", True),
+    "délai des autres sondes": ("      timeout: 30s\n", "", True),
+    "attente du nœud par défaut": (" --timeout 10]", "]", True),
 }
 
 
@@ -467,6 +489,15 @@ def test_la_garde_du_worker_de_production_rend_son_verdict_sur_chaque_forme(
     text = changed_worker(old, new)
 
     assert bool(worker_production_findings(text)) is expected, worker_production_findings(text)
+
+
+def test_le_worker_du_poste_attend_les_services_de_donnees_comme_api() -> None:
+    """Sur le poste, le `worker` attend Postgres et Redis sains, comme `api` (décision 10) — et pas
+    `api` lui-même, qui n'y a pas de sonde : `runserver` recharge le code. En production, ses
+    dépendances diffèrent de celles d'`api` à dessein (`worker_production_findings`)."""
+    services = read_services(COMPOSE_DEV)
+
+    assert services["worker"].get("depends_on") == services["api"]["depends_on"]
 
 
 def test_le_worker_de_production_attend_api_repart_seul_et_sonde_son_noeud() -> None:
@@ -526,7 +557,7 @@ def test_les_services_de_donnees_ont_la_meme_image_sur_le_poste_et_en_production
 def test_la_production_tire_chaque_image_du_depot_publiee_a_l_etiquette_du_commit() -> None:
     """Chaque image du dépôt — une par dossier `infra/<service>/` — tourne en production telle que
     `publish` l'a poussée : préfixe GHCR, étiquette du commit, aucune construction sur le VPS. Une
-    même image peut servir plusieurs services (le `worker` de #12 reprendra celle d'`api`)."""
+    même image peut servir plusieurs services (le `worker` reprend celle d'`api`)."""
     production = read_services(COMPOSE_PROD)
     deployed = {
         name: DEPLOYED_IMAGE.match(service["image"])
