@@ -30,10 +30,11 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0009](0009-adresse-de-fiche-inconnue.md) | Adresse de fiche inconnue : redirection vers l'accueil | D50 (remplace le point « slug inconnu » de 0008) | accepté |
 | [0010](0010-rendu-markdown-dans-le-front.md) | Rendu du Markdown dans le front ; Vitest en phase 1 | D51 (remplace le point « Rendu Markdown » de 0001) | accepté ; décompte « quatre balises » corrigé par 0011 |
 | [0011](0011-balises-d-apercu-du-gabarit.md) | Balises d'aperçu du gabarit : cinq, dont la description SEO | D53 (remplace le point « balises injectées » de 0008) | accepté |
-| [0012](0012-deux-fichiers-compose.md) | Deux fichiers Compose, mêmes images | D54 (remplace le point « un seul fichier Compose » de 0002 et l'argument de 0005) | accepté |
+| [0012](0012-deux-fichiers-compose.md) | Deux fichiers Compose, mêmes images | D54 (remplace le point « un seul fichier Compose » de 0002 et l'argument de 0005) | accepté ; `worker` parmi ce que la production porte en propre remplacé par 0016 |
 | [0013](0013-ordre-des-lignes-par-glisser-deposer.md) | Ordre des lignes de l'admin par glisser-déposer | D55 | accepté |
 | [0014](0014-ci-cd-github-actions-et-ghcr.md) | CI/CD : GitHub Actions et GHCR | D56 (confirme D43) | accepté |
 | [0015](0015-moteur-du-worker-celery.md) | Moteur du worker : Celery ; variantes par Pillow seul | D59 (remplace le point « `django-imagekit` » de 0001 et 0004, et la règle « outbox » de 0006 pour le worker d'images ; rôle 2 « broker » de 0006 avancé en phase 1) | accepté |
+| [0016](0016-le-worker-dans-les-deux-fichiers-compose.md) | Le worker dans les deux fichiers Compose | D60 (remplace « le worker » parmi ce que la production porte en propre dans 0012 et D54) | accepté |
 
 ## À écrire à leur phase
 
