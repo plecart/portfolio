@@ -459,9 +459,10 @@ class GalleryImage(models.Model):
     lisent l'ordre des images d'un projet, comme « une image au moins » : la base ne peut pas les
     porter, l'écran Projet les tient (brief de #9, décision 4).
 
-    L'original est gardé tel que téléversé, jamais recadré ni réencodé (spec §1.11). Le worker de
-    #12 en produit les variantes et seul il écrit l'état et les variantes (décision 5) : ici, une
-    image naît « en attente », sans variante.
+    L'original est gardé tel que téléversé, jamais recadré ni réencodé (spec §1.11). Le worker en
+    produit les variantes et seul il écrit l'état et les variantes (brief de #9, décision 5 ;
+    `content/tasks.py`) : ici, une image naît « en attente », sans variante, et son traitement est
+    enfilé après la validation de la transaction qui la crée ou remplace son original.
     """
 
     original = OriginalField(
@@ -590,7 +591,8 @@ class GalleryImage(models.Model):
             self._stored_original = self.original.name
 
     def save(self, **kwargs: Any) -> None:
-        """Enregistre l'image ; un original remplacé la remet en attente et sort du stockage.
+        """Enregistre l'image ; un original remplacé la remet en attente et sort du stockage ; un
+        original neuf est traité par le worker.
 
         Remplacer l'original d'une image enregistrée — un nouveau fichier, téléversé ou
         enregistré par `OriginalFile.save` — la remet à l'état « en attente » et vide ses
@@ -600,9 +602,14 @@ class GalleryImage(models.Model):
         écrit l'original ; il écrit alors aussi ses dimensions, qui décrivent le nouveau fichier,
         et l'état et les variantes qu'un remplacement remet à zéro.
 
+        Les deux enregistrements qui mettent l'image « en attente » — sa création, le
+        remplacement de son original — enfilent son traitement, une fois la transaction validée
+        (`process_after_commit`, brief de #12, décision 5) ; aucun autre.
+
         Args:
             kwargs: ceux de `Model.save`.
         """
+        creating = self._state.adding
         # Un itérable quelconque, que Django relira : lu une fois ici, gardé en ensemble.
         update_fields = kwargs.get("update_fields")
         if update_fields is not None:
@@ -621,6 +628,11 @@ class GalleryImage(models.Model):
         if writes_original:
             self._stored_original = self.original.name
         delete_after_commit(self.original.storage, replaced)
+        if creating or replaced:
+            # Importée ici : la tâche lit ce module, qui ne peut donc pas la lire à son chargement.
+            from content.tasks import process_after_commit
+
+            process_after_commit(self.pk, self.original.name or "")
 
     def stored_files(self) -> list[str]:
         """Les noms que le stockage tient pour cette image : son original s'il y est, puis ses

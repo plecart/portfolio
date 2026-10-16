@@ -27,7 +27,7 @@ SITE_ORIGIN = "https://site.test"
 OTHER_ORIGIN = "https://autre.test"
 ALLOW_ORIGIN = "Access-Control-Allow-Origin"
 
-# Une variante d'image prête, telle que le worker de #12 l'écrira.
+# Une variante d'image prête, telle que le worker l'écrit.
 VARIANT = {"name": "images/x/800.webp", "width": 800, "height": 800}
 
 # Ce que le contrat n'expose à aucun niveau (décisions 2 et 3), écrit ici sans le lire dans le
