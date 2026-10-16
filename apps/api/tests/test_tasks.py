@@ -464,3 +464,54 @@ def test_l_echec_d_un_original_remplace_pendant_les_reessais_ne_touche_pas_le_no
         ProcessingState.PENDING,
         [],
     )
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("unpropagated")
+def test_une_erreur_de_la_base_au_dernier_essai_fait_aussi_passer_l_image_en_echec(
+    portfolio: Project, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """« Échec » s'écrit réessais épuisés, quelle que soit l'origine de l'erreur, si la base est
+    joignable (ADR 0015 § Décision, « Échecs ») : l'écriture de « prêt » qui lève à chaque essai
+    laisse l'image en échec, sans variante ni fichier."""
+    made = saved(gallery_image(portfolio))
+    update: Callable[..., int] = QuerySet.update  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+    def failing_ready(queryset: QuerySet[Any], **values: Any) -> int:
+        if values.get("state") == ProcessingState.READY:
+            raise DatabaseError("écriture refusée")
+        return update(queryset, **values)
+
+    monkeypatch.setattr(QuerySet, "update", failing_ready)
+
+    result = process_image.delay(made.pk, made.original.name or "")
+
+    assert result.state == "FAILURE"
+    row = GalleryImage.objects.get(pk=made.pk)
+    assert (row.state, row.variants) == (ProcessingState.FAILED, [])
+    assert variant_files(made) == []
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("unpropagated")
+def test_une_base_injoignable_laisse_l_image_en_attente_et_son_erreur_sort(
+    portfolio: Project, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sinon elle reste « en attente » : l'écriture de « échec » qui échoue à son tour ne masque
+    pas l'erreur d'origine, celle que le worker journalise."""
+    made = saved(gallery_image(portfolio))
+
+    def unreadable(*arguments: object, **values: object) -> object:
+        raise DatabaseError("lecture impossible")
+
+    def unwritable(*arguments: object, **values: object) -> object:
+        raise DatabaseError("écriture impossible")
+
+    monkeypatch.setattr(QuerySet, "exists", unreadable)
+    monkeypatch.setattr(QuerySet, "update", unwritable)
+
+    result = process_image.delay(made.pk, made.original.name or "")
+
+    assert result.state == "FAILURE"
+    assert str(result.result) == "lecture impossible"
+    assert GalleryImage.objects.get(pk=made.pk).state == ProcessingState.PENDING
