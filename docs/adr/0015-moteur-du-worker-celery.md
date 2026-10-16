@@ -6,7 +6,9 @@
   « `django-imagekit` » de l'ADR 0001 (§ Décision, « Bibliothèques retenues autour de Django ») et
   de l'ADR 0004 (§ Décision, « Traitement des images à l'upload »), et, pour le seul worker
   d'images, la règle « les événements qui déclenchent le worker vivent dans la table outbox » de
-  l'ADR 0006 (§ Décision, « Règles ») ; les trois ADR restent acceptés pour tout le reste
+  l'ADR 0006 (§ Décision, « Règles ») ; avance en phase 1, avec le worker d'images, le rôle 2
+  « broker » que l'ADR 0006 (§ Décision) plaçait en phase 2 avec l'ingestion ; les trois ADR
+  restent acceptés pour tout le reste
 
 ## Contexte
 
@@ -14,13 +16,13 @@ Une image de galerie téléversée dans l'admin naît « en attente » (`pending
 attend un traitement qui ne doit pas tenir la requête de l'admin : convertir l'original en WebP aux
 largeurs que le site affiche, puis écrire l'état « prêt » (`ready`) et la liste des variantes, ou
 l'état « échec » (`failed`). Le contrat est en code depuis #9 : `GalleryImage.state`,
-`GalleryImage.variants` (`{name, width, height}`), et une contrainte de base qui refuse des variantes
-hors de l'état « prêt ». L'ADR 0004 confie ce traitement au worker. En phase 2, ce même worker
-ingérera les documents du RAG (cadrage §6.3).
+`GalleryImage.variants` (`{name, width, height}`), et une contrainte de base qui refuse des
+variantes hors de l'état « prêt ». L'ADR 0004 confie ce traitement au worker. En phase 2, ce même
+worker ingérera les documents du RAG (cadrage §6.3).
 
-L'annexe A du cadrage laissait le moteur ouvert, « Celery ou arq, ADR en phase 1 ou 2 ». Les images
-le font entrer en phase 1. Django 6.0 a ajouté depuis son propre cadre de tâches, `django.tasks` :
-c'est une troisième option.
+L'annexe A du cadrage laissait le moteur ouvert : « Celery (compétence reconnue) ou arq (légèreté) ;
+ADR en phase 1 ou 2 ». Les images le font entrer en phase 1. Django 6.0 a ajouté depuis son propre
+cadre de tâches, `django.tasks` : c'est une troisième option.
 
 Trois points d'ADR antérieurs sont à revoir :
 
@@ -73,14 +75,19 @@ la transaction.**
   Django sous l'espace de noms `CELERY_`, eux-mêmes lus dans `Env` (ADR 0001, 12-factor). Le broker
   est `REDIS_URL` : le rôle 2 de l'ADR 0006 commence en phase 1. Sérialisation JSON (défaut).
 - **Aucun backend de résultats.** Le résultat d'un traitement est l'état de l'image, écrit en base ;
-  rien ne vit dans Redis qui ne soit régénérable.
+  Redis ne porte que des messages, et un message perdu laisse l'image « en attente », état vrai en
+  base.
+- **Le Redis partagé n'évince jamais la file du broker.** Une limite de mémoire posée pour le cache
+  (#11) prend une politique `volatile-*`, qui n'évince que les clés à durée de vie (doc Redis,
+  « Eviction policies ») : celles du cache (ADR 0006, TTL courts), jamais la file.
 - **Worker** : un conteneur `worker`, même image qu'`api` (ADR 0012), autre commande,
   `celery -A config worker --concurrency 1`. Un seul processus de traitement, ce qui borne la
   mémoire. Il ne joue pas les migrations, qu'`api` joue au démarrage. En production, sa sonde est
   `celery inspect ping` sur son propre nœud : elle prouve que le processus répond et que le broker
   est joignable.
 - **Accusé de réception par défaut** : Celery accuse réception d'un message « just before » son
-  exécution (doc Celery 5.6, `task_acks_late`, désactivé par défaut). Une tâche commencée n'est
+  exécution (doc Celery 5.6, guide « Tasks », `Task.acks_late` ; réglage `task_acks_late`,
+  désactivé par défaut). Une tâche commencée n'est
   jamais redistribuée après un arrêt du worker ; seuls ses réessais la ré-exécutent.
 - **Déclenchement** : `GalleryImage.save` enfile la tâche après validation de la transaction, quand
   l'enregistrement crée l'image ou remplace son original. La tâche reçoit l'identifiant de l'image
@@ -99,9 +106,9 @@ la transaction.**
 - **Variantes par `Pillow` seul**, dans un module de conversion, second et dernier module de
   l'application à importer Pillow après celui qui lit l'original au téléversement. WebP, échelle
   unique de largeurs 320, 480, 720, 960 et 1200 px : la photo de carte (spec §4.1), la galerie
-  (spec §3.2), largeurs doublées pour les écrans denses, et l'aperçu de lien (spec §1.11, ADR 0011),
-  dont les 1200 px plafonnent l'échelle. Une image n'est jamais agrandie ni recadrée ; l'orientation EXIF est appliquée ;
-  l'original n'est jamais réécrit.
+  (spec §3.2), largeurs doublées pour les écrans denses, et l'aperçu de lien (spec §1.11,
+  ADR 0011), dont les 1200 px plafonnent l'échelle. Une image n'est jamais agrandie ni recadrée ;
+  l'orientation EXIF est appliquée ; l'original n'est jamais réécrit.
 - **Tests** : le harnais de test met l'application Celery en mode synchrone (`task_always_eager`,
   `task_eager_propagates`) ; les réglages de production n'ont aucune branche « si test ». La suite
   n'a besoin d'aucun Redis.
@@ -123,9 +130,11 @@ la transaction.**
   de téléversements se traite à la suite.
 - **Accusé de réception avant exécution** : un worker tué en plein traitement perd la tâche, et
   l'image reste « en attente », visible dans l'admin. Remplacer le fichier relance le traitement.
-- **Sans outbox** : un déclenchement perdu, si le broker est injoignable à l'enregistrement, se
-  rattrape de la même façon. Aucune donnée n'est perdue : l'état en base reste vrai, seul le
-  traitement manque.
+- **Sans outbox** : un déclenchement perdu se rattrape de la même façon. Quatre chemins y mènent,
+  le worker tué ci-dessus compris : broker injoignable à l'enregistrement, message perdu par Redis
+  (redémarrage, éviction), processus `api` arrêté entre la validation et l'enfilement. Aucune donnée
+  n'est perdue : l'état en base reste vrai, seul le traitement manque, et rien ne le relance sans
+  geste humain.
 - **Le mode synchrone est une émulation.** La doc Celery le dit « by definition not suitable for
   unit tests » (« Testing with Celery »). La tâche reste donc mince, la conversion se teste
   directement, et le vrai worker est éprouvé par la fumée sur la pile complète (#26).
