@@ -3,7 +3,8 @@
 # sort vers Cloudflare et c'est la seule entrée (D45).
 #
 # Le pendant de `compose.dev.yml` (ADR 0012) : mêmes images — épingle comprise pour Postgres et
-# Redis —, même point d'entrée, mêmes services de données ; le reste est propre à la production.
+# Redis —, même point d'entrée, mêmes services de données, le même `worker` (D60, ADR 0016) ; le
+# reste est propre à la production.
 # `apps/api/tests/test_compose.py` tient cet invariant.
 #
 # **Les variables** viennent du `.env` du VPS, à côté de ce fichier : Compose le lit pour
