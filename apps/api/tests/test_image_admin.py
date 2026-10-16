@@ -471,6 +471,30 @@ def test_l_apercu_montre_l_original_enregistre_et_son_etat_en_texte(admin_client
     assert f'name="{GALLERY}-0-state"' not in page
 
 
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("state", "label"),
+    [
+        (ProcessingState.PENDING, "En attente"),
+        (ProcessingState.READY, "Prêt"),
+        (ProcessingState.FAILED, "Échec"),
+    ],
+    ids=["en attente", "prête", "en échec"],
+)
+def test_l_ecran_projet_montre_l_etat_que_le_worker_a_ecrit(
+    admin_client: Client, state: str, label: str
+) -> None:
+    """L'état tel que le worker l'écrit — par une requête, hors de l'admin —, sans motif (brief de
+    #12, décision 2) : « Échec » se lit à l'écran comme « Prêt »."""
+    portfolio = saved_project(saved(technology(name="Django")))
+    GalleryImage.objects.filter(project=portfolio).update(state=state)
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
+
+    gallery = group(admin_client.get(url).content.decode(), GALLERY)
+
+    assert escape(label) in gallery
+
+
 def test_la_feuille_de_l_apercu_fait_tenir_l_original_entier_dans_son_cadre() -> None:
     """Le cadre de l'aperçu est un carré, nommé en attributs : sans `object-fit: contain` sur la
     classe de l'`<img>`, une image en paysage y serait écrasée (décision 11)."""
