@@ -109,6 +109,18 @@ def test_une_variante_garde_la_transparence_de_l_original_et_rien_d_autre(
     assert written(variant).mode == expected
 
 
+def test_un_png_de_16_bits_garde_ses_niveaux_de_gris() -> None:
+    """Pillow ouvre un PNG gris de 16 bits en entiers (`I;16`) et les écrête à 255 en passant en
+    RGB (mesuré : 30 000 devenait blanc) ; la variante garde le gris de l'original, 30 000 / 256,
+    à la perte du WebP près."""
+    original = stored_original(encoded(Image.new("I;16", (300, 300), 30000)))
+
+    (variant,) = make_variants(default_storage, original)
+
+    level = written(variant).convert("L").getpixel((150, 150))
+    assert isinstance(level, int) and abs(level - 117) <= 2, level
+
+
 def test_l_original_est_identique_a_l_octet_apres_la_conversion() -> None:
     """Lu, jamais réécrit (spec §1.11)."""
     content = encoded(Image.new("RGB", (1300, 1300)))

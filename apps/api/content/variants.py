@@ -66,6 +66,13 @@ def make_variants(storage: Storage, original_name: str) -> list[Variant]:
     try:
         with storage.open(original_name) as file, Image.open(file, formats=DECODERS) as opened:
             image = ImageOps.exif_transpose(opened)
+        if image.mode.startswith("I"):
+            # Un PNG gris de 16 bits s'ouvre en entiers, qu'une conversion directe en RGB écrête à
+            # 255 — en L comme en RGB, Pillow 12.3 mesuré : ramenés d'abord sur 8 bits. `point`
+            # admet aussi un tableau numpy, inconnu de pyright comme pour `resize` ci-dessous.
+            image = image.convert("I").point(  # pyright: ignore[reportUnknownMemberType]
+                lambda value: value / 256, "L"
+            )
         image = image.convert("RGBA" if image.has_transparency_data else "RGB")
         for width in variant_widths(image.width):
             height = round(image.height * width / image.width)
