@@ -107,8 +107,8 @@ le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node a
 - compose      : make compose-config              # résout `infra/compose.dev.yml` — exige un `.env` à la
                                                   # racine — et `infra/compose.yml`, avec le modèle
                                                   # `infra/prod.env.example` ; vérifiée le 2026-10-03 (#16)
-- run local    : make dev                         # pile Postgres + Redis + `api`, ports sur `127.0.0.1` ;
-                                                  # front compilé s'il manque
+- run local    : make dev                         # pile Postgres + Redis + `api` + `worker`, ports sur
+                                                  # `127.0.0.1` ; front compilé s'il manque
 - restauration : make restore HOST=<ip> BACKUP=<derniere|AAAAMMJJTHHMMSSZ>
                                                   # **production seulement**, du poste : copie
                                                   # `infra/restore.sh` sur le VPS et l'y lance, la clé

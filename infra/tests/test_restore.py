@@ -2,12 +2,12 @@
 décisions 3 à 7 et 11).
 
 Lancé par `make image-test`, après `make build` : la pile est celle de `test_backup_image.py`,
-démarrée sous un nom de projet à ce module, `api` en plus — il migre la base au démarrage, qui
-porte donc le vrai schéma. Une sauvegarde de `backup.sh` dépose son objet dans le témoin S3, puis
-le script le restaure, lancé par `sh` comme `make restore` le lance sur le VPS. Sa commande Compose
-(`COMPOSE`, décision 8) est celle de la pile, précédée d'un témoin qui consigne chacun de ses
-appels avant de les exécuter : l'ordre des gestes et l'absence de la clé dans leurs arguments se
-lisent dans ce journal.
+démarrée sous un nom de projet à ce module, `api` et `worker` en plus — `api` migre la base au
+démarrage, qui porte donc le vrai schéma. Une sauvegarde de `backup.sh` dépose son objet dans le
+témoin S3, puis le script le restaure, lancé par `sh` comme `make restore` le lance sur le VPS. Sa
+commande Compose (`COMPOSE`, décision 8) est celle de la pile, précédée d'un témoin qui consigne
+chacun de ses appels avant de les exécuter : l'ordre des gestes et l'absence de la clé dans leurs
+arguments se lisent dans ce journal.
 """
 
 import subprocess
@@ -81,6 +81,10 @@ esac
 exec "$@"
 """
 
+# Les services qui écrivent dans la base, que la restauration arrête puis redémarre (décision 5),
+# dans l'ordre de `WRITERS` du script.
+WRITERS = ["api", "worker"]
+
 # Une sauvegarde reconnue, plus ancienne, que « derniere » ne doit pas prendre : vide, elle ferait
 # échouer le déchiffrement.
 OLDER = f"{DATABASE}-20000101T030000Z.dump.age"
@@ -112,10 +116,10 @@ class Restoration:
 
 @pytest.fixture(scope="module")
 def stack() -> Iterator[Stack]:
-    """La pile démarrée pour le module, `api` compris ; sa base porte la table témoin et la table
-    volumineuse."""
+    """La pile démarrée pour le module, ses écrivains compris ; sa base porte la table témoin et la
+    table volumineuse."""
     with started_stack(PROJECT) as started:
-        started.output("up", "--detach", "--wait", "api")
+        started.output("up", "--detach", "--wait", *WRITERS)
         succeeded(started.as_owner(f"CREATE TABLE {WITNESS_TABLE} (id integer)"))
         succeeded(
             started.as_owner(
@@ -127,11 +131,11 @@ def stack() -> Iterator[Stack]:
 
 
 @pytest.fixture(autouse=True)
-def api_running(stack: Stack) -> Iterator[None]:
-    """`api` tourne en sortant de chaque test : un échec après l'arrêt le laisse arrêté (brief,
-    décision 6), et le test suivant le trouverait ainsi."""
+def writers_running(stack: Stack) -> Iterator[None]:
+    """Les écrivains tournent en sortant de chaque test : un échec après l'arrêt les laisse arrêtés
+    (brief, décision 6), et le test suivant les trouverait ainsi."""
     yield
-    stack.output("up", "--detach", "--wait", "api")
+    stack.output("up", "--detach", "--wait", *WRITERS)
 
 
 def backed_up(stack: Stack) -> tuple[str, str]:
@@ -240,14 +244,14 @@ def surviving_one_offs() -> list[str]:
 
 
 @pytest.mark.parametrize("by_timestamp", [False, True], ids=["derniere", "horodatage"])
-def test_la_chaine_restaure_la_sauvegarde_choisie_puis_redemarre_api(
+def test_la_chaine_restaure_la_sauvegarde_choisie_puis_redemarre_ses_ecrivains(
     stack: Stack, tmp_path: Path, by_timestamp: bool
 ) -> None:
     """La chaîne complète (décisions 3 à 7) : chaque étape annoncée dans l'ordre, la sauvegarde
     choisie — la plus récente des objets reconnus, ou celle de l'horodatage —, la base revenue à
     son état sauvegardé — une table supprimée depuis revenue, une table créée depuis disparue, le
-    schéma `public` à son propriétaire et ses droits —, `api` arrêté avant la restauration et
-    redémarré après, `migrate --check` joué, le contrôle écrit."""
+    schéma `public` à son propriétaire et ses droits —, `api` et `worker` arrêtés avant la
+    restauration et redémarrés après, `migrate --check` joué, le contrôle écrit."""
     bucket, name = backed_up(stack)
     selector = name.removeprefix(f"{DATABASE}-").removesuffix(".dump.age")
     schema = query(stack, PUBLIC_SCHEMA)
@@ -266,11 +270,15 @@ def test_la_chaine_restaure_la_sauvegarde_choisie_puis_redemarre_api(
     assert query(stack, f"SELECT count(*) FROM {VOLUME_TABLE}") == str(VOLUME_ROWS)
     assert query(stack, PUBLIC_SCHEMA) == schema
     pg_restore = next(i for i, call in enumerate(done.calls) if "pg_restore --file" in call[-1])
-    assert done.index("stop", "api") < pg_restore < done.index("--no-recreate", "--no-deps", "api")
+    assert (
+        done.index("stop", *WRITERS)
+        < pg_restore
+        < done.index("--no-recreate", "--no-deps", *WRITERS)
+    )
     assert done.index("python", "manage.py", "migrate", "--check") > pg_restore
     assert "projets publiés : 0 (attendu ≥ 0)" in done.log
     assert done.writer_exits == ["0"]
-    assert "api" in running_services(stack)
+    assert set(WRITERS) <= set(running_services(stack))
 
 
 def test_la_chaine_tient_dans_l_etat_du_runner_du_test_mensuel(
@@ -288,7 +296,7 @@ def test_la_chaine_tient_dans_l_etat_du_runner_du_test_mensuel(
     (décision 7)."""
     stack.apply_backup_role(STACK_VALUES["BACKUP_POSTGRES_PASSWORD"])
     bucket, _ = backed_up(stack)
-    stack.output("stop", "api")
+    stack.output("stop", *WRITERS)
     role = STACK_VALUES["BACKUP_POSTGRES_USER"]
     succeeded(stack.as_owner(f'DROP OWNED BY "{role}"; DROP ROLE "{role}"'))
     try:
@@ -301,7 +309,7 @@ def test_la_chaine_tient_dans_l_etat_du_runner_du_test_mensuel(
     assert done.process.returncode == 0, done.log
     assert "arrêtés : aucun" in done.log and "redémarrés : aucun" in done.log
     assert not [call for call in done.calls if {"stop", "up"} & set(call)]
-    assert "api" not in running_services(stack)
+    assert not set(WRITERS) & set(running_services(stack))
     assert "projets publiés : 0 (attendu ≥ 0)" in done.log
 
 
@@ -336,7 +344,7 @@ FAILURES: dict[str, tuple[list[str], dict[str, str], bool, str]] = {
     "flux tronqué": (["derniere"], {"TRUNCATE_RESTORE": "1"}, False, "restauration"),
     "seuil non atteint": (["derniere"], {"RESTORE_MIN_PROJECTS": "1"}, False, "contrôle"),
 }
-# Les étapes qui précèdent l'arrêt : leur échec laisse `api` tourner.
+# Les étapes qui précèdent l'arrêt : leur échec laisse les écrivains tourner.
 BEFORE_STOP = {"préparation", "sélection", "téléchargement", "déchiffrement"}
 # Celles dont l'échec laisse la base telle qu'elle était : avant l'arrêt, et la restauration, qui se
 # fait en une transaction.
@@ -355,9 +363,9 @@ def test_une_etape_qui_echoue_arrete_la_chaine_en_la_nommant(
     step: str,
 ) -> None:
     """La première étape qui échoue arrête la chaîne : code non nul, étape nommée (décision 4).
-    Avant l'arrêt, rien n'a changé — la base garde la ligne posée après la sauvegarde, `api`
-    tourne ; après, `api` reste arrêté (décision 6), et la base n'est restaurée que si la
-    restauration est allée à son terme : une archive lue à moitié ne valide rien."""
+    Avant l'arrêt, rien n'a changé — la base garde la ligne posée après la sauvegarde, les
+    écrivains tournent ; après, ils restent arrêtés (décision 6), et la base n'est restaurée que si
+    la restauration est allée à son terme : une archive lue à moitié ne valide rien."""
     bucket, _ = backed_up(stack)
     identity = age_key_pair(loaded_image("backup"))[1] if foreign_key else None
 
@@ -368,6 +376,7 @@ def test_une_etape_qui_echoue_arrete_la_chaine_en_la_nommant(
     assert failed.process.returncode != 0
     assert f"échec à l'étape : {step}" in failed.log
     assert witness_rows(stack) == ("1" if step in UNCHANGED else "0")
-    assert ("api" in running_services(stack)) is (step in BEFORE_STOP)
+    running = set(running_services(stack))
+    assert [writer in running for writer in WRITERS] == [step in BEFORE_STOP] * len(WRITERS)
     # L'écrivain du clair va au bout de son flux même quand la restauration s'arrête en route.
     assert failed.writer_exits == ([] if step in BEFORE_STOP else ["0"])

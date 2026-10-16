@@ -83,6 +83,67 @@ SERVICE_ADDRESS_OVERRIDES = {
 }
 
 
+# Ce que le `worker` partage avec `api`, tel quel : l'image — le même point d'entrée —, le fichier
+# d'environnement du poste et les volumes, `media` compris — il lit l'original et écrit les
+# variantes sur le stockage d'`api` tant que #13 ne les a pas déplacés (brief de #12, décision 10).
+WORKER_SHARED_KEYS = ["image", "env_file", "volumes"]
+
+# Sa commande : un seul processus de traitement, sur un VPS de 4 Go (décision 9).
+WORKER_COMMAND = ["celery", "-A", "config", "worker", "--loglevel", "info", "--concurrency", "1"]
+
+# Sa sonde de production : son propre nœud répond, broker joint (décision 10). `$$` : le `$` va au
+# shell de la sonde, qui lit le nom d'hôte du conteneur — celui que Celery donne au nœud.
+WORKER_PROBE = "celery -A config inspect ping --destination celery@$$HOSTNAME"
+
+
+def worker_findings(text: str) -> list[str]:
+    """Ce par quoi le service `worker` d'un fichier Compose s'écarte de ce qu'il doit partager avec
+    `api` (brief de #12, décision 10).
+
+    Returns:
+        Un constat si `worker` manque ; sinon un par clé de `WORKER_SHARED_KEYS` qui diffère de
+        celle d'`api`, un si son `environment` n'est pas exactement celui d'`api` plus
+        `STARTUP_STEPS` vide — le point d'entrée ne joue alors aucune étape (`entrypoint.sh`) —,
+        un si sa commande n'est pas `WORKER_COMMAND`. Liste vide : le `worker` est conforme.
+    """
+    services: dict[str, dict[str, Any]] = yaml.safe_load(text)["services"]
+    if "worker" not in services:
+        return ["worker : absent"]
+    api, worker = services["api"], services["worker"]
+    findings = [
+        f"worker : `{key}` diffère d'`api`"
+        for key in WORKER_SHARED_KEYS
+        if worker.get(key) != api.get(key)
+    ]
+    if worker.get("environment") != {**(api.get("environment") or {}), "STARTUP_STEPS": ""}:
+        findings.append("worker : `environment` n'est pas celui d'`api` plus `STARTUP_STEPS` vide")
+    if worker.get("command") != WORKER_COMMAND:
+        findings.append(f"worker : commande {worker.get('command')}")
+    return findings
+
+
+def worker_production_findings(text: str) -> list[str]:
+    """Ce qui manque au `worker` du Compose de production : démarrer après qu'`api` a joué les
+    migrations, repartir seul, et sa sonde sur son propre nœud (décision 10).
+
+    Returns:
+        Un constat par propriété absente — `depends_on` d'`api` sain, `restart: unless-stopped`,
+        une sonde par le shell qui lance `WORKER_PROBE`. Liste vide : conforme.
+    """
+    worker: dict[str, Any] = yaml.safe_load(text)["services"]["worker"]
+    findings: list[str] = []
+    dependencies: dict[str, object] = worker.get("depends_on") or {}
+    if dependencies.get("api") != {"condition": "service_healthy"}:
+        findings.append("worker : n'attend pas qu'`api` soit sain")
+    if worker.get("restart") != "unless-stopped":
+        findings.append(f"worker : `restart` vaut {worker.get('restart')!r}")
+    healthcheck: dict[str, list[str]] = worker.get("healthcheck") or {}
+    probe = healthcheck.get("test") or []
+    if probe[:1] != ["CMD-SHELL"] or WORKER_PROBE not in " ".join(probe[1:]):
+        findings.append(f"worker : sonde {probe}")
+    return findings
+
+
 def read_services(compose_file: Path) -> dict[str, dict[str, Any]]:
     """Les services d'un fichier Compose du dépôt, par nom — jamais une table vide : un test qui
     parcourt les services passerait à vide sur un fichier qu'on ne sait plus lire."""
@@ -297,6 +358,123 @@ BACKUP_SECRET_FORMS = {
 }
 
 
+# Un fichier Compose minimal où `worker` reprend `api` par des ancres YAML, comme les deux fichiers
+# du dépôt : le recueil éprouve donc aussi la lecture des ancres et de la clé de fusion `<<`.
+CONFORMING_WORKER = """\
+services:
+  api:
+    image: depot-api
+    env_file: ../.env
+    environment: &app-environment
+      REDIS_URL: redis://redis:6379/0
+    volumes: &app-volumes
+      - media:/app/media
+  worker:
+    image: depot-api
+    env_file: ../.env
+    environment:
+      <<: *app-environment
+      STARTUP_STEPS: ""
+    command: [celery, -A, config, worker, --loglevel, info, --concurrency, "1"]
+    volumes: *app-volumes
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, celery -A config inspect ping --destination celery@$$HOSTNAME --timeout 10]
+"""
+
+# Forme → (texte remplacé, remplacement, constat attendu). Le texte remplacé est pris dans
+# `CONFORMING_WORKER` : une forme qui ne le changerait pas resterait conforme, et son verdict
+# attendu la ferait rougir.
+WORKER_CHANGES = {
+    "conforme": ("", "", False),
+    "absent": ("  worker:\n", "  autre:\n", True),
+    "autre image": (
+        "    image: depot-api\n    env_file: ../.env\n    environment:\n",
+        "    image: autre\n    env_file: ../.env\n    environment:\n",
+        True,
+    ),
+    "sans fichier d'environnement": (
+        "    env_file: ../.env\n    environment:\n      <<",
+        "    environment:\n      <<",
+        True,
+    ),
+    "migre au démarrage": ('STARTUP_STEPS: ""', "STARTUP_STEPS: migrate", True),
+    "étapes par défaut": ('      STARTUP_STEPS: ""\n', "", True),
+    "variable en moins": ("      <<: *app-environment\n", "", True),
+    "variable en plus": ('STARTUP_STEPS: ""', 'STARTUP_STEPS: ""\n      SECRET_KEY: x', True),
+    "sans le volume des médias": ("    volumes: *app-volumes\n", "", True),
+    "deux processus": ('--concurrency, "1"', '--concurrency, "2"', True),
+}
+
+# Forme → (texte remplacé, remplacement, constat attendu), pour la garde de production.
+WORKER_PRODUCTION_CHANGES = {
+    "conforme": ("", "", False),
+    "sans attendre api": ("      api:\n        condition: service_healthy\n", "", True),
+    "api démarré seulement": ("condition: service_healthy", "condition: service_started", True),
+    "sans redémarrage": ("    restart: unless-stopped\n", "", True),
+    "sonde sans shell": ("[CMD-SHELL, celery", "[CMD, celery", True),
+    "sonde de tous les nœuds": (" --destination celery@$$HOSTNAME", "", True),
+    "sans sonde": ("    healthcheck:\n", "    autre:\n", True),
+}
+
+
+def changed_worker(old: str, new: str) -> str:
+    """`CONFORMING_WORKER`, `old` remplacé par `new` — exactement une fois ; tel quel si `old` est
+    vide."""
+    if not old:
+        return CONFORMING_WORKER
+    assert CONFORMING_WORKER.count(old) == 1, old
+    return CONFORMING_WORKER.replace(old, new)
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "expected"), WORKER_CHANGES.values(), ids=WORKER_CHANGES.keys()
+)
+def test_la_garde_du_worker_rend_son_verdict_sur_chaque_forme(
+    old: str, new: str, expected: bool
+) -> None:
+    """Chaque façon recensée pour le `worker` de s'écarter d'`api` : signalée si, et seulement si,
+    il s'en écarte."""
+    text = changed_worker(old, new)
+
+    assert bool(worker_findings(text)) is expected, worker_findings(text)
+
+
+@pytest.mark.parametrize(
+    "compose_file", COMPOSE_BY_ENVIRONMENT.values(), ids=COMPOSE_BY_ENVIRONMENT.keys()
+)
+def test_le_worker_reprend_l_image_l_environnement_et_les_volumes_d_api(
+    compose_file: Path,
+) -> None:
+    """Même image, donc même point d'entrée, que `STARTUP_STEPS` vide empêche de migrer ; mêmes
+    variables et même stockage qu'`api` (brief de #12, décision 10)."""
+    assert worker_findings(compose_file.read_text(encoding="utf-8")) == []
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "expected"),
+    WORKER_PRODUCTION_CHANGES.values(),
+    ids=WORKER_PRODUCTION_CHANGES.keys(),
+)
+def test_la_garde_du_worker_de_production_rend_son_verdict_sur_chaque_forme(
+    old: str, new: str, expected: bool
+) -> None:
+    """Chaque propriété de production recensée, retirée : signalée si, et seulement si, elle
+    manque."""
+    text = changed_worker(old, new)
+
+    assert bool(worker_production_findings(text)) is expected, worker_production_findings(text)
+
+
+def test_le_worker_de_production_attend_api_repart_seul_et_sonde_son_noeud() -> None:
+    """`api` joue les migrations avant tout traitement ; `up -d --wait` attend que le `worker`
+    réponde et que le broker soit joint, sans rien prouver de plus (décision 10)."""
+    assert worker_production_findings(COMPOSE_PROD.read_text(encoding="utf-8")) == []
+
+
 @pytest.mark.parametrize(("text", "expected"), PROBE_FORMS.values(), ids=PROBE_FORMS.keys())
 def test_la_garde_des_sondes_rend_son_verdict_sur_chaque_forme(text: str, expected: bool) -> None:
     """Chaque forme recensée : signalée si, et seulement si, le service n'a pas de sonde."""
@@ -423,7 +601,9 @@ def test_api_n_admet_en_production_que_l_origine_du_site() -> None:
 def test_api_recoit_en_production_chaque_variable_du_back() -> None:
     """Sans `env_file` en production, chaque variable de `Env` passe par `environment:` : un champ
     ajouté au back sans sa ligne ici empêcherait `api` de démarrer, au déploiement seulement.
-    `DEBUG` seul en est absent : absent vaut faux, la posture de production (`.env.example`)."""
+    `DEBUG` seul en est absent : absent vaut faux, la posture de production (`.env.example`).
+    Le `worker` reçoit exactement les mêmes, plus `STARTUP_STEPS` (`worker_findings`) : un champ
+    ajouté ici l'atteint donc aussi."""
     environment = read_services(COMPOSE_PROD)["api"]["environment"]
 
     assert set(environment) == set(Env.model_fields) - {"DEBUG"}

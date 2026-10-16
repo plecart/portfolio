@@ -9,9 +9,14 @@
 # produirait des erreurs à la première requête, loin de la cause.
 set -eu
 
+# Absente, `migrate` ; **vide, aucune étape** — c'est ainsi que le `worker`, qui partage l'image,
+# démarre sans migrer (brief de #12, décision 11). D'où `=` sans deux-points : `${VAR:=défaut}`
+# traite une valeur vide comme une absence, et migrerait (mesuré à la clôture de #4) ; `${VAR-…}`,
+# lui, substitue sans assigner, et la boucle ne verrait jamais `migrate`.
+#
 # ponytail: étapes sans argument — la boucle découpe sur les espaces. Le jour où une étape en
 # réclame un, passer à un découpage sur les lignes (`IFS`) plutôt qu'à un format de configuration.
-: "${STARTUP_STEPS:=migrate}"
+: "${STARTUP_STEPS=migrate}"
 
 for step in $STARTUP_STEPS; do
     echo "démarrage : manage.py $step"

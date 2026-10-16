@@ -1,12 +1,12 @@
-# Environnement de développement complet : Postgres, Redis et `api` sur un réseau privé
+# Environnement de développement complet : Postgres, Redis, `api` et `worker` sur un réseau privé
 # (cadrage §6.7, « développement local complet en Docker Compose »). Le Compose de production
 # est `compose.yml`, aux mêmes images (ADR 0012) ; ce fichier ne sert jamais ailleurs que sur un
-# poste. Le conteneur `worker` le rejoindra avec #12, avec la même image et une autre commande.
+# poste. Le `worker` partage l'image d'`api`, avec une autre commande (ADR 0015).
 #
 # **Deux fichiers d'environnement, deux rôles distincts** :
 #   - `../.env` — non commité, copié de `.env.example` — est celui que lit `Env`. Compose
-#     l'injecte tel quel dans l'environnement du conteneur `api` (`env_file`). Il est orienté
-#     poste : ses adresses visent `127.0.0.1`.
+#     l'injecte tel quel dans l'environnement des conteneurs `api` et `worker` (`env_file`). Il
+#     est orienté poste : ses adresses visent `127.0.0.1`.
 #   - `dev.env` — commité — porte ce que Compose seul connaît. Il n'est **pas** dans `env_file` :
 #     il alimente l'interpolation `${...}` ci-dessous, ce que Compose ne fait qu'avec le fichier
 #     passé en `--env-file`. Mesuré : sans ce drapeau, `${POSTGRES_USER}` est vide ici même.
@@ -72,7 +72,8 @@ services:
       context: ..
       dockerfile: infra/api/Dockerfile
     env_file: ../.env
-    environment:
+    # Ancrés pour que le `worker` les reprenne tels quels (brief de #12, décision 10).
+    environment: &app-environment
       # Les adresses du poste (`127.0.0.1`) ne valent rien depuis le conteneur : elles sont
       # recomposées avec les noms de service. `environment:` prime sur `env_file:`.
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -84,16 +85,33 @@ services:
     command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
     ports:
       - "127.0.0.1:${API_PORT}:8000"
-    volumes:
+    volumes: &app-volumes
       # Le code de l'hôte recouvre celui de l'image : le membre est installé en mode éditable,
       # donc l'environnement y renvoie et `runserver` voit les modifications.
       - ../apps/api:/app/apps/api
       - media:/app/media
-    depends_on:
+    depends_on: &data-services
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  # Le worker d'images (ADR 0015) : l'image d'`api` et une autre commande. Sans `build:` : `api` la
+  # construit, et `up --build` démarre le `worker` sur l'image construite — l'échec du pull de son
+  # nom, que Compose tente d'abord, ne bloque rien (mesuré sur Compose 5.0.2, image absente).
+  # Mêmes variables et mêmes volumes : il lit l'original et écrit les variantes sur le stockage
+  # d'`api`. Il ne recharge pas le code modifié : `docker compose restart worker`.
+  worker:
+    image: ${IMAGE_PREFIX:-portfolio-}api
+    env_file: ../.env
+    environment:
+      <<: *app-environment
+      # Vide : le point d'entrée ne joue aucune étape — c'est `api` qui migre (`entrypoint.sh`).
+      STARTUP_STEPS: ""
+    # Un seul processus de traitement (décision 9).
+    command: [celery, -A, config, worker, --loglevel, info, --concurrency, "1"]
+    volumes: *app-volumes
+    depends_on: *data-services
 
 volumes:
   postgres-data:

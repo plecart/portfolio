@@ -15,7 +15,7 @@ un secret dans une issue, une PR ou une conversation.
 `/srv/portfolio`, sur le VPS : `compose.yml`, déposé par le job `deploy` à chaque déploiement, et
 `.env`, écrit par `bootstrap.sh` — sa ligne `IMAGE_TAG`, le SHA complet du commit déployé, est
 réécrite par chaque déploiement. Projet Compose `portfolio` : `cloudflared`, `caddy`, `api`,
-`postgres`, `redis`, `backup`, chacun avec sa sonde, aucun port publié ; `cloudflared` est la seule
+`worker`, `postgres`, `redis`, `backup`, chacun avec sa sonde, aucun port publié ; `cloudflared` est la seule
 entrée (D45). L'utilisateur `deploy` possède le dossier et tire les images de GHCR.
 
 ## Où vit chaque secret
@@ -304,24 +304,24 @@ site est indisponible le temps de la restauration — quelques minutes.
    `HOST` : une adresse IPv4 ou un nom d'hôte — lettres, chiffres, `.` et `-` ; pour un VPS en
    IPv6 seul, un alias de `~/.ssh/config`.
    Elle écrit, dans l'ordre : `== sélection` et `sauvegarde : <objet>` ; `== téléchargement` ;
-   `== déchiffrement` ; `== arrêt` et `arrêtés : api` ; `== restauration` ; `== migrations`, avec
+   `== déchiffrement` ; `== arrêt` et `arrêtés : api worker` ; `== restauration` ; `== migrations`, avec
    chaque migration que Django applique ; `== contrôle` et
-   `projets publiés : <N> (attendu ≥ <M>)` ; `== redémarrage` et `redémarrés : api` — puis sort en
+   `projets publiés : <N> (attendu ≥ <M>)` ; `== redémarrage` et `redémarrés : api worker` — puis sort en
    0. Le seuil `M` vaut 0, ou `RESTORE_MIN_PROJECTS=<M>` sur la ligne de commande.
 4. **La clé effacée** : `rm age.key`.
 
 Un échec écrit `échec à l'étape : <étape>` et sort en erreur. Ce qu'il veut dire, et quoi faire
 (commandes en `deploy`, « Commandes sur le VPS ») :
 
-| Étape | La base, `api` | Cause probable, et quoi faire |
+| Étape | La base, `api` et `worker` | Cause probable, et quoi faire |
 |---|---|---|
-| `préparation`, `sélection` | intactes, `api` tourne | `BACKUP` ou le seuil mal formé, aucune clé dans le fichier, ou aucun objet de ce nom : corrige la commande, relance |
-| `téléchargement`, `déchiffrement` | intactes, `api` tourne | jeton du bucket refusé (`bootstrap.sh BACKUP_R2_ACCESS_KEY_ID BACKUP_R2_SECRET_ACCESS_KEY`) ; clé d'une autre paire ; archive illisible : relance avec une sauvegarde plus ancienne |
-| `arrêt` | intacte, `api` peut-être arrêté | `docker compose ps` ; `docker compose start api` |
-| `restauration` | intacte — la restauration se fait en une transaction —, `api` arrêté | la sortie de `pg_restore` ou de `psql` le dit ; relance, ou `docker compose start api` pour revenir à la base d'avant |
-| `migrations` | restaurée, `api` arrêté | une migration a échoué, ou `migrate --check` en voit une non appliquée : la sortie de Django la nomme ; une fois réglé, `docker compose up -d --wait api`, qui migre à son démarrage |
-| `contrôle` | restaurée et migrée, `api` arrêté | moins de projets publiés que le seuil : une sauvegarde trop ancienne, ou le mauvais seuil — relance avec une autre sauvegarde, ou `docker compose start api` si la base est la bonne |
-| `redémarrage` | restaurée, `api` ne devient pas sain | `docker compose logs api` |
+| `préparation`, `sélection` | intactes, `api` et `worker` tournent | `BACKUP` ou le seuil mal formé, aucune clé dans le fichier, ou aucun objet de ce nom : corrige la commande, relance |
+| `téléchargement`, `déchiffrement` | intactes, `api` et `worker` tournent | jeton du bucket refusé (`bootstrap.sh BACKUP_R2_ACCESS_KEY_ID BACKUP_R2_SECRET_ACCESS_KEY`) ; clé d'une autre paire ; archive illisible : relance avec une sauvegarde plus ancienne |
+| `arrêt` | intacte, `api` ou `worker` peut-être arrêté | `docker compose ps` ; `docker compose start api worker` |
+| `restauration` | intacte — la restauration se fait en une transaction —, `api` et `worker` arrêtés | la sortie de `pg_restore` ou de `psql` le dit ; relance, ou `docker compose start api worker` pour revenir à la base d'avant |
+| `migrations` | restaurée, `api` et `worker` arrêtés | une migration a échoué, ou `migrate --check` en voit une non appliquée : la sortie de Django la nomme ; une fois réglé, `docker compose up -d --wait api worker` — `api` migre à son démarrage |
+| `contrôle` | restaurée et migrée, `api` et `worker` arrêtés | moins de projets publiés que le seuil : une sauvegarde trop ancienne, ou le mauvais seuil — relance avec une autre sauvegarde, ou `docker compose start api worker` si la base est la bonne |
+| `redémarrage` | restaurée, `api` ou `worker` ne devient pas sain | `docker compose logs api worker` |
 
 Une sauvegarde **plus récente** que le code — des migrations appliquées que le code ne connaît pas —
 ne se détecte pas : Django ne les voit pas. Le commit déployé doit être au moins aussi récent que la

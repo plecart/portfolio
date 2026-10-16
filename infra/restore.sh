@@ -34,9 +34,9 @@ set -eu
 
 COMPOSE=${COMPOSE:-docker compose}
 min_projects=${RESTORE_MIN_PROJECTS:-0}
-# Les services applicatifs qui écrivent dans la base, arrêtés pendant la restauration (décision 5).
-# ponytail: `api` seul ; le `worker` de #12 s'ajoute ici.
-WRITERS=api
+# Les services applicatifs qui écrivent dans la base, arrêtés pendant la restauration (décision 5) :
+# `api`, et le `worker`, qui y écrit l'état des images (ADR 0015).
+WRITERS="api worker"
 
 step=préparation
 work=$(mktemp -d)

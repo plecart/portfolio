@@ -25,6 +25,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from call_witness import recording, witnessed
 from config.env import Env
 from test_supply_chain import (
     dockerfile_instructions,
@@ -590,6 +591,58 @@ def test_le_point_d_entree_joue_ses_etapes_avant_la_commande() -> None:
     assert steps, "la boucle d'étapes a disparu du point d'entrée"
     assert HAND_OVER in instructions, "la remise de main a disparu du point d'entrée"
     assert steps[0] < instructions.index(HAND_OVER)
+
+
+def entrypoint_calls(tmp_path: Path, steps: str | None) -> list[list[str]]:
+    """Exécute le point d'entrée sous `sh`, `STARTUP_STEPS` valant `steps` — absente si `None` —,
+    avec `python commande` pour commande reçue, et un témoin de `python` en tête du `PATH`
+    (`call_witness`).
+
+    Returns:
+        Les appels du témoin, dans l'ordre : les étapes jouées par `manage.py`, puis la commande.
+    """
+    tools, log = tmp_path / "outils", tmp_path / "appels"
+    tools.mkdir()
+    witness = tools / "python"
+    # `#!` : sans lui, le shell du poste Windows ne tient pas le témoin pour un exécutable, et le
+    # `PATH` mène au vrai `python` (mesuré par `test_restore_workflow.py`).
+    witness.write_text("#!/bin/sh\n" + recording(log), encoding="utf-8", newline="\n")
+    witness.chmod(0o755)
+    environment = {name: value for name, value in os.environ.items() if name != "STARTUP_STEPS"}
+    environment["PATH"] = f"{tools}{os.pathsep}{os.environ['PATH']}"
+    if steps is not None:
+        environment["STARTUP_STEPS"] = steps
+    done = subprocess.run(
+        ["sh", ENTRYPOINT.as_posix(), "python", "commande"],
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    return witnessed(log)
+
+
+MIGRATE = ["python", "manage.py", "migrate"]
+COMMAND = ["python", "commande"]
+
+# `STARTUP_STEPS` → les appels attendus. Vide, aucune étape : c'est ce qui permet au `worker` de
+# partager l'image d'`api` sans rejouer les migrations (brief de #12, décision 11) — la forme
+# `${VAR:=défaut}` traitait le vide comme l'absence, et migrait (mesuré à la clôture de #4).
+STARTUP_FORMS = {
+    "absente": (None, [MIGRATE, COMMAND]),
+    "vide": ("", [COMMAND]),
+    "deux étapes": ("migrate check", [MIGRATE, ["python", "manage.py", "check"], COMMAND]),
+}
+
+
+@pytest.mark.parametrize(("steps", "expected"), STARTUP_FORMS.values(), ids=STARTUP_FORMS.keys())
+def test_le_point_d_entree_joue_les_etapes_demandees_puis_la_commande(
+    tmp_path: Path, steps: str | None, expected: list[list[str]]
+) -> None:
+    """Absente, `STARTUP_STEPS` migre : c'est la posture d'`api`. Vide, rien ne précède la
+    commande : celle du `worker`, qu'`api` a migré avant lui."""
+    assert entrypoint_calls(tmp_path, steps) == expected
 
 
 @pytest.mark.parametrize("service", NON_ROOT_SERVICES)
