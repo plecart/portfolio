@@ -1,7 +1,8 @@
 # Gabarit — le prompt du lot suivant
 
-Écrit par la **session sortante**, après sa passe `repercussions` (Étape 8, « Cas découpé »), et
-remis au mainteneur — qui le colle dans une session neuve. Pas par le lead : sur une vague de cinq
+Écrit par la **session sortante**, après sa passe `repercussions` (Étape 8, « Cas découpé »), au
+chemin fixe de [sessions-liees.md](sessions-liees.md) (« Passation »), et remis au mainteneur par
+ce chemin — qui le donne à une session neuve. Pas par le lead : sur une vague de cinq
 lots, chaque frontière passée par lui lui coûte un brief relu et un prompt écrit, et son contexte
 a grossi jusqu'à devoir être relayé (obs 62). La session sortante, elle, connaît son lot.
 
@@ -65,7 +66,7 @@ d'autres lots : section Notes de la PR #\<M>, lignes « Fichiers croisés » et 
 verdict d'avant-go — le pointeur, jamais leur résumé.>
 
 Préviens \<le mainteneur | le lead> quand tu as fini, ou si tu trouves un bloquant qui dépasse ton
-périmètre.
+périmètre — message de fin : `sessions-liees.md`, « Fin de travail ».
 
 ---
 

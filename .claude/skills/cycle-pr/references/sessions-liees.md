@@ -28,17 +28,18 @@ de l'application ci-dessous porte sa date de mesure. Le relevé complet — enfa
   (mesuré le 2026-10-16).
 - Le parent désigne l'enfant par le `session_id` (`local_…`) que `start_session` lui rend et que
   `list_sessions` relit. C'est l'adresse de `SendMessage`.
-- Ni le nom d'une session, qui tourne, ni le chemin de son scratchpad : l'UUID du scratchpad n'est
-  pas l'identifiant de session, et `SendMessage` vers lui rend « session not found » (mesuré le
-  2026-10-16, vague #12 / #19).
+- Ni le nom d'une session, qui tourne, ni le chemin de son scratchpad : l'UUID du scratchpad est
+  celui du transcript (`~/.claude/projects/<projet>/<uuid>.jsonl`), pas l'identifiant `local_…`
+  de l'application (mesuré le 2026-10-16 : la session du lot 1 de #107 a son scratchpad et son
+  transcript sous le même UUID, `4efeea8f-…`).
 
 ## Premier geste dans un worktree de l'application
 
 L'application place l'enfant sous `<repo>/.claude/worktrees/<slug>-<hex>`, sur une branche
 `claude/<slug>-<hex>` coupée sur le **`main` local sans fetch**, sans upstream (mesuré le
 2026-10-16 : 4 commits de retard sur `origin/main`). Avant toute écriture, l'enfant crée sa
-branche depuis le distant, en une commande : `git fetch origin`, puis
-`git checkout -b <type>/<slug> --no-track origin/<base>`, enchaînés par `&&`.
+branche depuis le distant, en une commande :
+`git fetch origin && git checkout -b <type>/<slug> --no-track origin/<base>`.
 
 `<base>` est la branche que visera sa PR — le trunk pour une issue. Le point de départ explicite
 remplace la porte de fraîcheur de `cycle-pr` Étape 1 : la fraîcheur vient du distant, pas d'un
@@ -58,9 +59,10 @@ approbation (`cycle-pr`, « Vague parallèle »).
 
 ## Fin de travail — un message, jamais une fin de tour
 
-Le parent est réveillé à la fin de **chaque** tour de l'enfant, avec les 400 premiers caractères
-de son rapport ; un tour piloté par le mainteneur dans l'enfant ne le réveille pas (mesuré le
-2026-10-16). Une fin de tour n'est donc pas une fin de travail : un enfant s'arrête sur une
+Le parent est réveillé à la fin d'un tour de l'enfant, avec les 400 premiers caractères de son
+rapport ; un tour piloté par le mainteneur dans l'enfant ne le réveille pas (mesuré le
+2026-10-16). Les consignes de l'application au parent, lues le même jour, ne distinguent aucun
+tour : « when it ends a turn, a note reaches you ». Une fin de tour n'est donc pas une fin de travail : un enfant s'arrête sur une
 question, une commande intégrée clôt son tour (obs 94, 98), une passation part avec des points
 encore ouverts (obs 85). La note automatique n'est **jamais** un signal.
 
@@ -93,7 +95,7 @@ La passation se remet par son chemin, dans le message de fin, jamais par son tex
 
 Archiver un enfant (`archive_session`, réversible) détache son HEAD et ne retire ni le worktree,
 ni le dossier, ni les branches (mesuré le 2026-10-16, relevé à 5 s et à 30 s), quoi qu'en dise la
-description de l'outil (« cleans up its worktree »). La session qui l'a démarré nettoie après
+description de l'outil, lue le même jour (« cleans up its worktree »). La session qui l'a démarré nettoie après
 lui : `git worktree remove <chemin>`, puis l'échafaudage derrière sa porte d'ancêtre :
 
 ```
