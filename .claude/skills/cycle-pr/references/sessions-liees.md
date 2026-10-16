@@ -84,6 +84,9 @@ s'écrivent **hors dépôt**, dans `passations/`, à côté du journal d'observa
 - `passations/<date>-issue-<N>-lot-<k>-prompt.md` — lot `k` **terminé**, prompt du lot `k+1` ;
 - `passations/<date>-issue-<N>-lot-<k>-relais.md` — relais en cours du lot `k`.
 
+Les fichiers antérieurs au 2026-10-16 nommaient le lot **à venir** (`…-issue-23-lot-2-prompt.md`,
+écrit à la fin du lot 1) : ne pas en déduire le chemin d'une passation nouvelle.
+
 La passation se remet par son chemin, dans le message de fin, jamais par son texte : un fichier
 écrit dans un worktree part avec lui, et un rapport se lit tronqué à 400 caractères.
 

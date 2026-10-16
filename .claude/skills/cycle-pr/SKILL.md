@@ -24,8 +24,8 @@ et se trace ; vision `[V]`, elle attend le mainteneur, groupée ; contradiction 
 
 **Vague parallèle.** Si le prompt de démarrage de cette session vient d'une autre session — bloc
 `<cross-session-message>`, ou session parente lue dans `startedBy`
-([references/sessions-liees.md](references/sessions-liees.md), « Identité ») —, l'émettrice est
-le **lead** de la vague (`pr-paralleles`) : retenir son identifiant. Le lead intervient à un seul
+([references/sessions-liees.md](references/sessions-liees.md), « Identité ») — et se présente
+comme le lead, l'émettrice est le **lead** de la vague (`pr-paralleles`) : retenir son identifiant. Le lead intervient à un seul
 moment prévu — la vérification avant merge de l'Étape 7 — et sur demande de l'utilisateur
 (« discute de ça avec le lead ») : rédiger le message et l'envoyer par `SendMessage`, **sans
 confirmation** — un message n'est pas une action (même référence, « Messages »). Et un message du
@@ -536,6 +536,12 @@ qu'elle couvre et ce qu'elle ne voit pas — jamais de mémoire :
    reste hors pipeline.
 3. La ligne **sécurité**, quand le diff touche une zone sensible ou une surface exposée
    (section « Périmètre » de la config). Sinon, le dire en une ligne et passer.
+
+**Ces deux commandes ne terminent pas le tour.** Leur prompt exige une réponse finale faite de
+leur seul rapport — `/security-review` : « Your final reply must contain the markdown report and
+nothing else » ; `/code-review` : son outil de rapport, seule sortie. Sous `cycle-pr`, la consigne
+vaut pour la forme du rapport, pas pour l'arrêt du cycle : la session en tire ses constats et
+enchaîne dans le même tour ; les arrêts légitimes restent ceux de l'Étape 3 (obs 94, 98).
 
 Ces portes sont **additives**. Aucune ne remplace le prompt de
 `.claude/rules/cleanup-verbatim.md`, que la règle exige mot pour mot, ni la relecture à contexte
