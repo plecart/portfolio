@@ -160,6 +160,23 @@ for (const [failure, answer] of Object.entries(FAILURES)) {
   })
 }
 
+test('erreur : « Réessayer » est un lien à la ligne, centré, souligné à 3 px, à l’accent (spec §4.5)', async ({
+  page,
+}) => {
+  await openAnswered(page, FAILURES['statut 500'])
+  const status = page.getByRole('status')
+  const retry = status.getByRole('button')
+  const [accent] = await resolveAll(page, [['color', 'var(--accent)']])
+
+  await expect(retry).toHaveCSS('color', accent)
+  await expect(retry).toHaveCSS('text-decoration-line', 'underline')
+  await expect(retry).toHaveCSS('text-underline-offset', '3px')
+  // Deux lignes de 24 px : le texte, puis le lien seul, centré comme lui.
+  const [paragraph, button] = [(await status.boundingBox())!, (await retry.boundingBox())!]
+  expect([paragraph.height, button.height, button.y - paragraph.y]).toEqual([48, 24, 24])
+  expect(Math.round(button.x + button.width / 2)).toBe(Math.round(paragraph.x + paragraph.width / 2))
+})
+
 test('erreur : le message est centré entre l’entête et les liens de l’auteur (spec §4.5)', async ({
   page,
   isMobile,

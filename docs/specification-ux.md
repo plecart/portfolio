@@ -301,7 +301,7 @@ La carte du projet « vitrine » (§1.9) est une carte polaroid aux dimensions d
 
 ### 4.5 Message d'erreur
 
-Un paragraphe (`role="status"`) centré, horizontalement et verticalement, dans l'espace entre l'entête et les liens de l'auteur, à la place de la table : 16 px `--ink`, « Les projets ne se chargent pas. » puis, après une espace, le lien « Réessayer » — un bouton au style de lien, `--accent`, souligné à 3 px sous la ligne, sans bordure ni fond, `--ink` au survol, anneau de focus §6.2 ; clic ou Entrée relance le chargement (§5.1). Aucun cadre, aucune icône.
+Un paragraphe (`role="status"`) centré, horizontalement et verticalement, dans l'espace entre l'entête et les liens de l'auteur, à la place de la table : 16 px `--ink`, « Les projets ne se chargent pas. » puis, à la ligne, le lien « Réessayer » — un bouton au style de lien, `--accent`, souligné à 3 px sous la ligne, sans bordure ni fond, `--ink` au survol, anneau de focus §6.2 ; clic ou Entrée relance le chargement (§5.1). Aucun cadre, aucune icône.
 
 ### 4.6 Chorégraphie d'ouverture et de fermeture
 
