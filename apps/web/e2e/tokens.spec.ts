@@ -16,7 +16,7 @@ type Mode = 'light' | 'dark'
 /** Un jeton : la propriété qui le résout, sa valeur claire, et sa valeur sombre s'il en a une. */
 type SpecToken = { property: string; light: string; dark?: string }
 
-/** Les 32 jetons de la spec §2, valeurs recopiées telles que la spec les écrit. */
+/** Les 37 jetons de la spec §2, valeurs recopiées telles que la spec les écrit. */
 const SPEC_TOKENS: Record<string, SpecToken> = {
   // §2.1 — couleurs
   '--bg': { property: 'color', light: '#F3EDE4', dark: '#1C1A17' },
@@ -66,6 +66,12 @@ const SPEC_TOKENS: Record<string, SpecToken> = {
   '--dur-fast': { property: 'transition-duration', light: '150ms' },
   '--dur': { property: 'transition-duration', light: '240ms' },
   '--dur-open': { property: 'transition-duration', light: '280ms' },
+  // Les durées fixes de §2.7, nommées par #19 (décision 3).
+  '--dur-content': { property: 'transition-duration', light: '200ms' },
+  '--dur-press': { property: 'transition-duration', light: '80ms' },
+  '--delay-column': { property: 'transition-delay', light: '40ms' },
+  '--delay-ribbon': { property: 'transition-delay', light: '20ms' },
+  '--dur-pulse': { property: 'animation-duration', light: '1.8s' },
   '--ease-out': { property: 'transition-timing-function', light: 'cubic-bezier(.22, 1, .36, 1)' },
   '--ease-spring': {
     property: 'transition-timing-function',
@@ -112,7 +118,9 @@ async function openInState(page: Page, { system, forced }: PaletteState) {
 /**
  * Pose un bouton à focaliser, propre au scénario : il ne dépend d'aucun élément de la page. En
  * tête du document, il reçoit le premier Tab, avant le nom et le bouton de mode de l'entête ; fixé
- * en bas de la fenêtre, il n'est pas recouvert par l'entête fixe, qui prendrait son clic.
+ * au milieu de la fenêtre, sur la table vide, il n'est recouvert ni par l'entête fixe ni par les
+ * liens de l'auteur, que la page en colonne pose en bas de la fenêtre — l'un ou l'autre prendrait
+ * son clic.
  *
  * @returns Le bouton, trouvé par son libellé : la page a d'autres boutons.
  */
@@ -121,14 +129,14 @@ async function prependButton(page: Page): Promise<Locator> {
     const button = document.createElement('button')
     button.textContent = 'cible'
     button.style.position = 'fixed'
-    button.style.bottom = '0'
+    button.style.top = '50%'
     document.body.prepend(button)
   })
   return page.getByRole('button', { name: 'cible' })
 }
 
-test('la table des jetons compte les 32 jetons de la spec', () => {
-  expect(Object.keys(SPEC_TOKENS)).toHaveLength(32)
+test('la table des jetons compte les 37 jetons de la spec', () => {
+  expect(Object.keys(SPEC_TOKENS)).toHaveLength(37)
 })
 
 for (const state of PALETTE_STATES) {

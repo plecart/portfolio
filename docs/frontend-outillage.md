@@ -244,8 +244,9 @@ La famille Manrope est déclarée **comme jeton de thème Tailwind** (`@theme { 
 que sur `:root` : la feuille de base de Tailwind pose déjà la police du document depuis ce jeton, et
 deux déclarations se disputeraient la même propriété.
 
-**Les jetons de la spec §2** vivent dans `src/tokens.css` : les 32, sur `:root`, sous leur nom de
-spec et hors de toute couche — pas dans `@theme`, qui n'émet que les variables utilisées. Cinq de
+**Les jetons de la spec §2** vivent dans `src/tokens.css` : les 37, sur `:root`, sous leur nom de
+spec — dont les cinq durées fixes de §2.7, nommées par #19 pour que la règle des valeurs n'admette
+aucun littéral de durée hors de ce fichier — et hors de toute couche — pas dans `@theme`, qui n'émet que les variables utilisées. Cinq de
 ces noms tombent dans un espace de noms de Tailwind (`--shadow-*` : `--shadow-rest`,
 `--shadow-lift` ; `--ease-*` : les trois courbes) ; déclarés hors de `@theme`, ils ne produisent
 aucun utilitaire nommé. Les composants les lisent par la syntaxe `(--jeton)` de Tailwind 4 :
