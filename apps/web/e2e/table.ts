@@ -1,9 +1,11 @@
 /**
  * La table et la forme des liens de l'auteur, partagées par les scénarios.
  *
- * Aucune cellule n'existe avant #19 : le scénario les pose lui-même, au sens du contrat « cellule
- * de la table » — l'attribut `data-table-cell` sur la boîte de grille —, et rien n'entre dans
- * l'application pour cela.
+ * La table a ses propres cellules — les cadres de chargement de #19, puis les cartes de #20 — ;
+ * pour éprouver la mesure sur des largeurs quelconques, le scénario en pose de factices, au sens du
+ * contrat « cellule de la table » — l'attribut `data-table-cell` sur la boîte de grille —, et rien
+ * n'entre dans l'application pour cela. Il les pose sur la table servie vide (le `test` d'`api.ts`),
+ * que plus rien ne réécrit une fois la liste arrivée.
  */
 import { expect, type Page } from '@playwright/test'
 

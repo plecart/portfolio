@@ -5,7 +5,9 @@
  * Toute page sert `[]` par défaut — le `test` de ce module, que chaque scénario importe à la place
  * de celui de Playwright : sans lui, la version compilée appellerait l'API de production. Un geste
  * posé par le scénario l'emporte, Playwright jouant les routes dans l'ordre inverse de leur pose.
- * Les gestes visent le chemin de la liste sur toute origine.
+ * Les gestes visent le chemin de la liste sur toute origine. Leurs réponses ne portent pas
+ * d'en-tête CORS : Chromium ne l'exige pas d'une réponse interceptée (mesuré le 2026-10-16, en-tête
+ * retiré, scénarios verts) ; la politique CORS réelle de l'API est éprouvée côté back (#10).
  */
 import { join } from 'node:path'
 import { test as base, type Page, type Route } from '@playwright/test'
@@ -24,14 +26,6 @@ export const API_ORIGIN = new URL(loadEnv('production', join(import.meta.dirname
 /** La liste, sur toute origine. */
 const PROJECTS_PATH = '**/api/projets'
 
-/**
- * Répond à la requête. L'en-tête CORS est celui que l'API pose pour l'origine du site : la page
- * l'appelle depuis une autre origine, et le navigateur refuserait la réponse sans lui.
- */
-function respond(route: Route, response: { status?: number; json?: unknown; body?: string }) {
-  return route.fulfill({ headers: { 'access-control-allow-origin': '*' }, ...response })
-}
-
 /** Une réponse à la requête de la liste : un jeu servi, ou une défaillance. */
 export type Answer = (route: Route) => Promise<void>
 
@@ -39,13 +33,13 @@ export type Answer = (route: Route) => Promise<void>
 export const serving =
   (projects: Project[]): Answer =>
   (route) =>
-    respond(route, { json: projects })
+    route.fulfill({ json: projects })
 
 /** Les trois défaillances que le site traite comme une seule : l'état erreur (décision 6). */
 export const FAILURES: Record<string, Answer> = {
   'réseau injoignable': (route) => route.abort(),
-  'statut 500': (route) => respond(route, { status: 500, json: { detail: 'Erreur' } }),
-  'corps non JSON': (route) => respond(route, { body: '<!doctype html>' }),
+  'statut 500': (route) => route.fulfill({ status: 500, json: { detail: 'Erreur' } }),
+  'corps non JSON': (route) => route.fulfill({ body: '<!doctype html>' }),
 }
 
 /** Sert un jeu de projets à chaque requête de la liste. */

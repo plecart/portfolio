@@ -5,9 +5,10 @@
 
 /**
  * Le contrat « cellule de la table », par lequel la table déclare ce que la mesure regarde : un
- * cadre de chargement (#19) ou une carte (#20) porte l'attribut `data-table-cell` sur sa **boîte
- * de grille** — l'élément que la grille place, sans transformation : la pose et l'animation
- * d'entrée vont sur un élément enfant, sinon la mesure suivrait l'inclinaison et la montée.
+ * cadre de chargement (`src/table/Table.tsx`, #19) ou une carte (#20) porte l'attribut
+ * `data-table-cell` sur sa **boîte de grille** — l'élément que la grille place, sans
+ * transformation : la pose et l'animation vont sur un élément enfant (la pulsation d'un cadre sur
+ * sa face), sinon la mesure suivrait l'inclinaison et la montée.
  *
  * La table est centrée dans la largeur visible (spec §3.1) : `nearestCellMargin` en dépend. Une
  * cellule masquée (`display: none`, `hidden`) ne compte pas. La mesure se relit au

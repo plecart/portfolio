@@ -45,6 +45,19 @@
   --default-transition-timing-function: var(--ease-out);
 }
 
+/* La pulsation des cadres de chargement (spec §5.1, §2.7) : l'opacité descend à 55 % et remonte,
+   durée et courbe en jetons. L'utilitaire `animate-frame-pulse` la pose ; rien n'est émis tant
+   qu'aucun composant ne l'emploie. */
+@theme {
+  --animate-frame-pulse: frame-pulse var(--dur-pulse) var(--ease-in-out) infinite;
+
+  @keyframes frame-pulse {
+    50% {
+      opacity: 0.55;
+    }
+  }
+}
+
 /* Un seul point de rupture, 600 px (spec §6.1) : `sm:` s'y place, au lieu des 640 px de Tailwind,
    et ses autres points de rupture sont retirés — `md:` ou `lg:` ne produisent plus rien. */
 @theme {
@@ -95,6 +108,14 @@
 
   html::-webkit-scrollbar-track {
     background-color: transparent;
+  }
+
+  /* La page est une colonne de la hauteur de la fenêtre : la table s'y étire entre l'entête et les
+     liens de l'auteur, et le message d'erreur se centre dans cet espace (spec §4.5). */
+  #root {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
   }
 
   /* Au clavier seulement. */
