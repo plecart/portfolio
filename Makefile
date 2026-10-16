@@ -109,7 +109,7 @@ GH ?= gh
 
 .PHONY: install test lint format format-check typecheck openapi audit build $(IMAGE_BUILDS) compose-config dev
 .PHONY: scan $(IMAGE_SCANS) image-test push $(IMAGE_PUSHES) prune $(IMAGE_PRUNES)
-.PHONY: web-install web-browsers web-lint web-typecheck web-test web-build web-e2e web-lighthouse web-audit
+.PHONY: web-install web-browsers web-lint web-typecheck web-test web-openapi web-build web-e2e web-lighthouse web-audit
 
 install:
 	$(UV) sync
@@ -287,6 +287,12 @@ web-typecheck:
 
 web-test:
 	$(WEB_NPM) test
+
+# Les types de l'API, écrits dans `apps/web/src/api/schema.ts` depuis `apps/api/openapi.json` : à
+# lancer après `make openapi`, quand le contrat change — sinon le test de fraîcheur de `web-test`
+# rougit. Sans dépendance vers `openapi`, qui demande `uv` et l'environnement du back.
+web-openapi:
+	$(WEB_NPM) run openapi
 
 web-build:
 	$(WEB_NPM) run build

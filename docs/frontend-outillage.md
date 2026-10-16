@@ -317,7 +317,8 @@ Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les C
 
 **État au 2026-09-23 (#3)** : les items **1, 2, 10, 11, 12 et 13 sont faits** — inventaire au
 §2.4, qui fait foi sur ce qui est installé ; versions dans le verrou `apps/web/package-lock.json`.
-Les huit autres restent à faire, chacun avec l'issue qui le portera. Trois items se sont révélés
+L'item **9** l'est depuis le 2026-10-16 (#19). Les sept autres restent à faire, chacun avec
+l'issue qui le portera. Trois items se sont révélés
 partiellement faux à l'exécution ; l'écart est consigné sous chacun d'eux et détaillé au §2.4.
 
 1. **Projet** ✅ *fait (#3)* : `npm create vite@latest apps/web -- --template react-ts`, puis suppression de la page de démonstration du gabarit. TypeScript strict **posé explicitement** — contrairement à ce que cet item affirmait, `create-vite` 9.2.1 ne l'active plus (§2.4).
@@ -328,7 +329,7 @@ partiellement faux à l'exécution ; l'écart est consigné sous chacun d'eux et
 6. **react-bits** — hors phase 1 (PRD #1) : composant par composant, `npx shadcn@latest add @react-bits/<Nom>-TS-TW`. **Licence MIT + Commons Clause** : usage libre, revente d'un produit fondé sur ces composants interdite — citée dans l'ADR 0008.
 7. **bklit-ui** (graphiques) — hors phase 1 (PRD #1) : composant par composant, `npx shadcn@latest add @bklit/<graphique>` ; vérifier si le registre `@bklit` doit être déclaré dans `components.json`. Composants MIT ; Bklit Studio (outil hébergé) propriétaire.
 8. **Rive** (animation 2D interactive) — hors phase 1 (PRD #1) : `npm i @rive-app/react-canvas`. Fichiers `.riv` servis en statique ; le runtime charge un WASM : mesurer son poids avec Lighthouse avant d'en généraliser l'usage. Éditeur Rive : compte gratuit à créer soi-même.
-9. **Types de l'API** — à faire avec #19 : `npm i -D openapi-typescript`, génération depuis le schéma OpenAPI de django-ninja ; script npm + vérification en CI (types à jour).
+9. **Types de l'API** ✅ *fait (#19)* : `npm i -D openapi-typescript`, sous TypeScript 6 par un pair forcé (§2.4) ; `scripts/api-types.ts` génère `src/api/schema.ts` depuis le schéma OpenAPI de django-ninja, par `make web-openapi` ; la vérification en CI est un test de la suite (`tests/api-types.test.ts`), que `make web-test` lance.
 10. **Accessibilité statique** ✅ *fait (#3)* : `npm i -D eslint-plugin-jsx-a11y`. La configuration ESLint a dû être **écrite**, non héritée : contrairement à ce que cet item affirmait, le gabarit Vite ne fournit plus ESLint mais `oxlint` (§2.4).
 11. **E2E** ✅ *fait (#3)*, par `npm i -D @playwright/test` plutôt que par l'assistant `npm init playwright@latest`, qui écrit des exemples à supprimer derrière lui (§2.4) ; `npm i -D @axe-core/playwright` pour un contrôle d'accessibilité par page. Couvre le site en phase 1, le chat en phase 2 (§8.4).
 12. **Lighthouse CI** ✅ *fait (#3)* : `@lhci/cli` dans GitHub Actions ; seuils sur performance, accessibilité, bonnes pratiques, SEO ; la PR échoue sous le seuil. Lighthouse = audit Google intégré à Chrome, notes sur 100 et indicateurs de vitesse ressentie.

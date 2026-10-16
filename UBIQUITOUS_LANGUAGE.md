@@ -108,7 +108,8 @@ L'unique point d'entrée de la phase 1 : `GET /api/projets`, la liste nue des pr
 un tableau JSON, `[]` s'il n'y en a aucun, sans pagination ni route par slug (PRD « Hors
 périmètre »). Un brouillon n'y figure jamais. Le site la charge en une fois et calcule le reste :
 ordre des cartes, libellés, technologies de carte (ADR 0010). Son contrat est le schéma
-`apps/api/openapi.json`, régénéré par `make openapi` ; le front en dérive ses types (#19).
+`apps/api/openapi.json`, régénéré par `make openapi` ; le front en dérive ses types,
+`apps/web/src/api/schema.ts`, régénéré par `make web-openapi` (#19).
 
 | Terme | Identifiant | Règle |
 |---|---|---|
