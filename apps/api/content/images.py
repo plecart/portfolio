@@ -266,7 +266,10 @@ def delete_folder(storage: Storage, folder: str) -> None:
 
     Args:
         storage: le stockage qui tient le dossier.
-        folder: le dossier, sans barre finale.
+        folder: le dossier, sans barre finale ; déjà absent, il n'a rien à supprimer.
     """
-    _, files = storage.listdir(folder)
+    try:
+        _, files = storage.listdir(folder)
+    except FileNotFoundError:
+        return
     delete_after_commit(storage, (f"{folder}/{name}" for name in files))
