@@ -135,9 +135,12 @@ def worker_production_findings(text: str) -> list[str]:
     Returns:
         Un constat par propriété absente — `depends_on` d'`api` et de `redis` sains,
         `restart: unless-stopped`, une sonde par le shell qui lance `WORKER_PROBE`, son délai
-        `WORKER_PROBE_TIMEOUT`. Liste vide : conforme.
+        `WORKER_PROBE_TIMEOUT`, et le rythme des autres sondes (`x-probe-timing`, délai excepté) :
+        sans lui, `start_period` et `start_interval` disparaissent, et `up --wait` attend la
+        première sonde 30 s. Liste vide : conforme.
     """
-    worker: dict[str, Any] = yaml.safe_load(text)["services"]["worker"]
+    document: dict[str, Any] = yaml.safe_load(text)
+    worker: dict[str, Any] = document["services"]["worker"]
     findings: list[str] = []
     dependencies: dict[str, object] = worker.get("depends_on") or {}
     findings += [
@@ -153,6 +156,10 @@ def worker_production_findings(text: str) -> list[str]:
         findings.append(f"worker : sonde {probe}")
     if healthcheck.get("timeout") != WORKER_PROBE_TIMEOUT:
         findings.append(f"worker : délai de sonde {healthcheck.get('timeout')!r}")
+    timing: dict[str, Any] = document.get("x-probe-timing") or {}
+    drifted = [key for key in timing if key != "timeout" and healthcheck.get(key) != timing[key]]
+    if not timing or drifted:
+        findings.append(f"worker : sonde hors du rythme `x-probe-timing` ({drifted})")
     return findings
 
 
@@ -373,6 +380,11 @@ BACKUP_SECRET_FORMS = {
 # Un fichier Compose minimal où `worker` reprend `api` par des ancres YAML, comme les deux fichiers
 # du dépôt : le recueil éprouve donc aussi la lecture des ancres et de la clé de fusion `<<`.
 CONFORMING_WORKER = """\
+x-probe-timing: &probe-timing
+  interval: 30s
+  timeout: 5s
+  start_period: 2m
+  start_interval: 2s
 services:
   api:
     image: depot-api
@@ -396,6 +408,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
+      <<: *probe-timing
       test: [CMD-SHELL, celery -A config inspect ping --destination celery@$$HOSTNAME --timeout 10]
       timeout: 30s
 """
@@ -439,6 +452,12 @@ WORKER_PRODUCTION_CHANGES = {
     "sonde de tous les nœuds": (" --destination celery@$$HOSTNAME", "", True),
     "sans sonde": ("    healthcheck:\n", "    autre:\n", True),
     "délai des autres sondes": ("      timeout: 30s\n", "", True),
+    "sans le rythme des autres sondes": ("      <<: *probe-timing\n", "", True),
+    "délai de grâce raccourci": (
+        "      timeout: 30s\n",
+        "      timeout: 30s\n      start_period: 0s\n",
+        True,
+    ),
     "attente du nœud par défaut": (" --timeout 10]", "]", True),
 }
 
