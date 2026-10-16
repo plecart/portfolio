@@ -1,6 +1,6 @@
 # 0015 — Moteur du worker : Celery
 
-- **Statut** : proposé
+- **Statut** : accepté
 - **Date** : 2026-10-16
 - **Décisions du cadrage** : D59 (`docs/cadrage-technique.md` §7) ; remplace le point
   « `django-imagekit` » de l'ADR 0001 (§ Décision, « Bibliothèques retenues autour de Django ») et

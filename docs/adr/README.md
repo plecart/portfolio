@@ -33,7 +33,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0012](0012-deux-fichiers-compose.md) | Deux fichiers Compose, mêmes images | D54 (remplace le point « un seul fichier Compose » de 0002 et l'argument de 0005) | accepté |
 | [0013](0013-ordre-des-lignes-par-glisser-deposer.md) | Ordre des lignes de l'admin par glisser-déposer | D55 | accepté |
 | [0014](0014-ci-cd-github-actions-et-ghcr.md) | CI/CD : GitHub Actions et GHCR | D56 (confirme D43) | accepté |
-| [0015](0015-moteur-du-worker-celery.md) | Moteur du worker : Celery ; variantes par Pillow seul | D59 (remplace le point « `django-imagekit` » de 0001 et 0004, et la règle « outbox » de 0006 pour le worker d'images ; rôle 2 « broker » de 0006 avancé en phase 1) | proposé |
+| [0015](0015-moteur-du-worker-celery.md) | Moteur du worker : Celery ; variantes par Pillow seul | D59 (remplace le point « `django-imagekit` » de 0001 et 0004, et la règle « outbox » de 0006 pour le worker d'images ; rôle 2 « broker » de 0006 avancé en phase 1) | accepté |
 
 ## À écrire à leur phase
 
