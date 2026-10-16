@@ -1,5 +1,6 @@
 """Tests des fichiers Compose : celui du poste, celui de la production, et l'invariant que
-l'ADR 0012 tient entre les deux — mêmes images, même point d'entrée, mêmes services de données.
+l'ADR 0012 tient entre les deux — mêmes images, même point d'entrée, mêmes services de données, et
+le même `worker` (D60, ADR 0016).
 
 Comme `test_infra.py`, ces tests lisent des fichiers sans démarrer de conteneur, avec l'analyseur
 YAML : c'est la valeur que Compose lira qui compte. Qu'un fichier se résolve est prouvé par
