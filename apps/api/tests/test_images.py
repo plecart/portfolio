@@ -68,10 +68,11 @@ NOT_ACCEPTED = [
 ]
 
 
-def test_seul_le_module_des_originaux_importe_pillow() -> None:
-    """Pillow ne sert qu'à lire l'original téléversé (décision 12) : aucun autre module de
-    l'application, tests exclus, ne l'importe."""
-    assert importers("PIL") == {"content.images"}
+def test_seuls_les_modules_des_originaux_et_des_variantes_importent_pillow() -> None:
+    """Une seule chaîne d'image (brief de #12, décision 1) : Pillow lit l'original téléversé
+    (décision 12 de #9) et en produit les variantes ; aucun autre module de l'application, tests
+    exclus, ne l'importe."""
+    assert importers("PIL") == {"content.images", "content.variants"}
 
 
 @pytest.mark.parametrize(

@@ -1,9 +1,11 @@
 """L'original d'une image de projet : le fichier que l'auteur téléverse, gardé tel quel.
 
-Seul module de l'application, tests exclus, qui importe Pillow (brief de #9, décision 12 ; tenu
-par `tests/test_images.py`). L'original y est reconnu à son contenu, jamais à son nom
-(décision 6), nommé par l'application (décision 7), jamais relu une fois stocké (décision 9), et
-retiré du stockage après la transaction qui le remplace ou supprime son image (décision 10).
+L'un des deux modules de l'application, tests exclus, qui importent Pillow, avec celui des
+variantes, `content/variants.py` (brief de #9, décision 12, étendue par le brief de #12,
+décision 1 ; tenu par `tests/test_images.py`). L'original y est reconnu à son contenu, jamais à
+son nom (décision 6), nommé par l'application (décision 7), jamais relu une fois stocké
+(décision 9) — hors du module des variantes, qui le lit pour les produire —, et retiré du stockage
+après la transaction qui le remplace ou supprime son image (décision 10).
 """
 
 from collections.abc import Iterable
