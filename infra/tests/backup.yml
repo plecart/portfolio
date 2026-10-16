@@ -3,11 +3,12 @@
 # nom de projet — le moteur Docker est partagé avec d'autres piles (brief de #23, décision 11 ;
 # brief de #24, décision 11).
 #
-# `postgres`, `redis`, `api` et `backup` y gardent leur définition de production — image Postgres,
-# sondes, variables — ; ce fichier n'y change que ce que la pile de test exige :
+# `postgres`, `redis`, `api`, `worker` et `backup` y gardent leur définition de production — image
+# Postgres, sondes, variables — ; ce fichier n'y change que ce que la pile de test exige :
 #
-# - `backup` et `api` tournent sur les images que `make build` a chargées — `api`, démarré par la
-#   restauration seulement, migre la base au démarrage : elle porte le vrai schéma ;
+# - `backup`, `api` et `worker` tournent sur les images que `make build` a chargées — `api` et
+#   `worker`, démarrés par la restauration seulement : `api` migre la base au démarrage, qui porte
+#   donc le vrai schéma, et le `worker` y attend qu'`api` soit sain, sa sonde éprouvée sur l'image ;
 # - deux témoins remplacent les services externes : un stockage S3, `rclone serve s3` tiré de
 #   l'image `backup` — aucune image de plus à épingler ; et un récepteur de ping, tiré de l'image
 #   `caddy`, qui répond 200 à toute requête et la journalise.
@@ -18,6 +19,10 @@
 
 services:
   api:
+    image: ${API_IMAGE:?}
+    pull_policy: never
+
+  worker:
     image: ${API_IMAGE:?}
     pull_policy: never
 

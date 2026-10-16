@@ -1,6 +1,6 @@
-# Production, sur le VPS (cadrage §5.3, ADR 0002) : `cloudflared`, `caddy`, `api`, `postgres`,
-# `redis` et `backup` sur le réseau privé du projet, aucun port publié — `cloudflared` sort vers
-# Cloudflare et c'est la seule entrée (D45). Le `worker` arrive avec #12.
+# Production, sur le VPS (cadrage §5.3, ADR 0002) : `cloudflared`, `caddy`, `api`, `worker`,
+# `postgres`, `redis` et `backup` sur le réseau privé du projet, aucun port publié — `cloudflared`
+# sort vers Cloudflare et c'est la seule entrée (D45).
 #
 # Le pendant de `compose.dev.yml` (ADR 0012) : mêmes images — épingle comprise pour Postgres et
 # Redis —, même point d'entrée, mêmes services de données ; le reste est propre à la production.
@@ -77,8 +77,8 @@ services:
   api:
     image: ghcr.io/plecart/portfolio-api:${IMAGE_TAG:?}
     # Chaque variable de `Env`, sauf `DEBUG` : absente, elle vaut faux. Les adresses désignent les
-    # services par leur nom.
-    environment:
+    # services par leur nom. Ancrées pour que le `worker` les reprenne telles quelles.
+    environment: &app-environment
       SECRET_KEY: ${SECRET_KEY:?}
       # Les deux hôtes que Caddy relaie vers `api` : celui de l'API, et celui du site pour
       # `/projets/*`. Caddy transmet `Host` tel quel (doc Caddy « reverse_proxy », § Headers).
@@ -89,7 +89,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       # Le volume, en attendant R2 (#13).
       MEDIA_ROOT: /app/media
-    volumes:
+    volumes: &app-volumes
       - media:/app/media
     # `api` joue les migrations à son démarrage (`infra/api/entrypoint.sh`) : la base doit répondre.
     depends_on:
@@ -112,6 +112,32 @@ services:
           c = http.client.HTTPConnection("127.0.0.1", 8000, timeout=5);
           c.request("GET", "/admin/login/", headers={"Host": json.loads(os.environ["ALLOWED_HOSTS"])[0]});
           exit(c.getresponse().status >= 400)
+    restart: unless-stopped
+
+  # Le worker d'images (ADR 0015) : l'image d'`api`, à la même étiquette, et une autre commande ;
+  # mêmes variables, et le volume des médias, où il lit l'original et écrit les variantes.
+  worker:
+    image: ghcr.io/plecart/portfolio-api:${IMAGE_TAG:?}
+    environment:
+      <<: *app-environment
+      # Vide : le point d'entrée ne joue aucune étape — c'est `api` qui migre (`entrypoint.sh`).
+      STARTUP_STEPS: ""
+    # Un seul processus de traitement : un VPS de 4 Go partagé avec Postgres et Redis (ADR 0002).
+    command: [celery, -A, config, worker, --loglevel, info, --concurrency, "1"]
+    volumes: *app-volumes
+    # `api` sain : ses migrations sont jouées avant le premier traitement.
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Sain quand son propre nœud répond — `celery@<nom d'hôte>`, le nom que Celery lui donne —, ce
+    # qui prouve aussi que le broker est joint ; rien de l'état d'une tâche. Délai plus long que
+    # celui des autres sondes : la commande charge Django avant d'interroger le nœud.
+    healthcheck:
+      <<: *probe-timing
+      test: [CMD-SHELL, celery -A config inspect ping --destination celery@$$HOSTNAME --timeout 10]
+      timeout: 30s
     restart: unless-stopped
 
   postgres:

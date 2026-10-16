@@ -286,7 +286,7 @@ EOF
 #     d'abord, puis le rôle de `backup`, dont la sonde ouvre une session, puis le reste. Sans
 #     `pull` : `up` tire les images absentes (`pull_policy` par défaut, `missing`) et ne contacte
 #     pas le registre pour une image présente — un renouvellement, qui a déjà changé le mot de
-#     passe dans la base, recrée `api` même si GHCR refuse le jeton.
+#     passe dans la base, recrée `api` et `worker` même si GHCR refuse le jeton.
 start_stack() {
 	step "Pile"
 	local up=(up -d --wait --wait-timeout 300)
