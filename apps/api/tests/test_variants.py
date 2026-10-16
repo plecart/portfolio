@@ -233,6 +233,14 @@ def test_l_original_est_identique_a_l_octet_apres_la_conversion() -> None:
         assert file.read() == content
 
 
+def folder_files(storage: FileSystemStorage) -> list[str]:
+    """Les fichiers du dossier `images/abc` de `storage`, triés : `listdir` les rend dans l'ordre du
+    système de fichiers — trié sous NTFS, pas sous ext4 (rouge en CI seulement, mesuré)."""
+    folders, files = storage.listdir("images/abc")
+    assert folders == []
+    return sorted(files)
+
+
 class Interrupted(BaseException):
     """Une interruption qui n'est pas une `Exception` — l'arrêt du worker, par exemple."""
 
@@ -305,7 +313,7 @@ def test_une_conversion_qui_echoue_ne_laisse_aucune_variante(
     with pytest.raises(error):
         make_variants(storage, original)
 
-    assert storage.listdir("images/abc") == ([], sorted([*kept, "original.png"]))
+    assert folder_files(storage) == sorted([*kept, "original.png"])
     for name in kept:
         with storage.open(f"images/abc/{name}") as file:
             assert file.read() == b"ancien"
@@ -329,4 +337,4 @@ def test_une_suppression_qui_echoue_n_empeche_pas_les_autres_ni_ne_masque_l_erre
     with pytest.raises(OSError, match="stockage plein"):
         make_variants(storage, original)
 
-    assert storage.listdir("images/abc") == ([], ["320.webp", "original.png"])
+    assert folder_files(storage) == ["320.webp", "original.png"]
