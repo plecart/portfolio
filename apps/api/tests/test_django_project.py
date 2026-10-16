@@ -86,6 +86,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 from celery import current_app
 print(current_app.conf.broker_url)
+print(current_app.conf.result_backend)
 """
 
 
@@ -213,11 +214,12 @@ def test_le_demarrage_de_django_charge_l_application_celery_et_son_broker(
     """Le broker vient d'`Env` (`REDIS_URL`, ADR 0015), par les réglages et leur espace de noms
     `CELERY_` — deux adresses, qu'aucune valeur écrite en dur ne satisfait ensemble ; et
     l'application est chargée au démarrage de Django, sans quoi une tâche enfilée par `api`
-    partirait vers le broker par défaut de Celery."""
+    partirait vers le broker par défaut de Celery. Aucun backend de résultats : l'état d'un
+    traitement vit en base, Redis ne transporte que les messages (ADR 0015)."""
     result = run_python(["-c", CELERY_BROKER], variables | {"REDIS_URL": redis_url})
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == redis_url
+    assert result.stdout.split() == [redis_url, "None"]
 
 
 def test_la_commande_du_worker_trouve_l_application_et_ses_reglages(

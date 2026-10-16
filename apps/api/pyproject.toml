@@ -32,8 +32,8 @@ requires-python = ">=3.12"
 # l'atteignent par la route.
 #
 # `celery[redis]` porte le worker d'images, broker Redis, sans backend de résultats (ADR 0015) ;
-# `config/celery.py` en construit l'application. L'extra installe le client `redis`, que
-# kombu charge seul à la première connexion au broker — `STARTUP_IMPORTS`
+# `config/celery.py` en construit l'application. L'extra installe le client `redis`, que kombu
+# charge seul, au premier usage du transport — un enfilement, même synchrone ; `STARTUP_IMPORTS`
 # (`tests/test_django_project.py`) le tient. kombu 5.6.2 le borne sous 6.5.
 dependencies = [
     "celery[redis]>=5.6.3",
