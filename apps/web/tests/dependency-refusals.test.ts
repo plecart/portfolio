@@ -11,8 +11,13 @@
  *
  * Le verrou ne change que par une PR : le rouge apparaît dans celle qui apporte la nouvelle
  * version du plugin, celles de Dependabot comprises.
+ *
+ * Le sens inverse a le même mécanisme et une seule occurrence : `openapi-typescript`, dont le pair
+ * `typescript` est **forcé** par l'`overrides` du manifeste sur la majeure installée, qu'il ne
+ * déclare pas (§2.4). Hors de la table, puisque rien n'est refusé à Dependabot : le cas rougit le
+ * jour où la plage du paquet accepte cette majeure, et l'override se retire alors.
  */
-import { intersects } from 'semver'
+import { intersects, major } from 'semver'
 import { expect, test } from 'vitest'
 import { installedPackage, readAppJson, type Lockfile } from './app-files.ts'
 
@@ -43,7 +48,7 @@ const REFUSALS = readAppJson<Refusal[]>('dependency-refusals.json')
 function peerRange(lockfile: Lockfile, name: string, peer: string): string {
   const range = installedPackage(lockfile, name).peerDependencies?.[peer]
   if (range === undefined) {
-    throw new Error(`${name} ne déclare plus de pair ${peer} : le refus tient-il encore ?`)
+    throw new Error(`${name} ne déclare plus de pair ${peer} : la contrainte tient-elle encore ?`)
   }
 
   return range
@@ -58,7 +63,7 @@ function peerRange(lockfile: Lockfile, name: string, peer: string): string {
  * ci-dessous).
  *
  * @param range Plage publiée par le plugin, par exemple `^3 || … || ^9`.
- * @param major Majeure refusée, par exemple `10`.
+ * @param major Majeure refusée, ou installée sous un pair forcé, par exemple `10`.
  * @returns `true` dès qu'une version stable de la majeure entre dans la plage. `semver` lit une
  *   plage vide ou tronquée comme `^9 ||` en `*` : elle rend `true`, un rouge plutôt qu'un vert muet.
  * @throws Si `semver` ne sait pas lire la plage du tout, par exemple `latest`.
@@ -82,6 +87,8 @@ const RANGE_FORMS: [range: string, major: string, accepted: boolean][] = [
   ['^9 || 10.0.0-rc.1', '10', false],
   ['10.1.0-rc.1', '10', false],
   ['^9 || ^10.0.0-rc.0', '10', true],
+  ['^5.x', '6', false],
+  ['^5.x || ^6.x', '6', true],
 ]
 
 test.each(RANGE_FORMS)('la plage « %s » accepte la majeure %s : %s', (range, major, accepted) => {
@@ -112,3 +119,14 @@ test.each(REFUSALS.map(({ peer, major, blocker, refused }) => [peer, major, bloc
     ).toBe(false)
   },
 )
+
+test("l'override du pair typescript d'openapi-typescript reste nécessaire", () => {
+  const lockfile = readAppJson<Lockfile>('package-lock.json')
+  const installed = String(major(installedPackage(lockfile, 'typescript').version))
+  const range = peerRange(lockfile, 'openapi-typescript', 'typescript')
+
+  expect(
+    acceptsMajor(range, installed),
+    `openapi-typescript accepte typescript ${installed} (${range}) : retirer son override du manifeste`,
+  ).toBe(false)
+})
