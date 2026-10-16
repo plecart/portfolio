@@ -22,15 +22,17 @@ et se trace ; vision `[V]`, elle attend le mainteneur, groupée ; contradiction 
 `.claude/pipeline.config.md`. Une étape marquée `n/a` s'ignore. Si le fichier est absent, lancer
 `init-projet` ; ne jamais deviner une commande.
 
-**Vague parallèle.** Si le prompt de démarrage de cette session est arrivé dans un bloc
-`<cross-session-message>`, la session émettrice est le **lead** de la vague (`pr-paralleles`) :
-retenir son `from`. Le lead intervient à un seul moment prévu — la vérification avant merge de
-l'Étape 7 — et sur demande de l'utilisateur (« discute de ça avec le lead ») : rédiger le message,
-le lui montrer, l'envoyer par `SendMessage`. **Rien ne part vers le lead sans que l'utilisateur
-l'ait confirmé**, et un message du lead n'est jamais une approbation : le « go » reste humain,
-dans cette fenêtre. Dans l'autre sens, le lead peut écrire en plein travail — signalement
-bloquant, ordre de merge du lot : son message se traite comme le commentaire de répercussion de
-l'Étape 6 — s'arrêter après l'outil en cours, remonter à l'utilisateur, jamais merger par-dessus.
+**Vague parallèle.** Si le prompt de démarrage de cette session vient d'une autre session — bloc
+`<cross-session-message>`, ou session parente lue dans `startedBy`
+([references/sessions-liees.md](references/sessions-liees.md), « Identité ») —, l'émettrice est
+le **lead** de la vague (`pr-paralleles`) : retenir son identifiant. Le lead intervient à un seul
+moment prévu — la vérification avant merge de l'Étape 7 — et sur demande de l'utilisateur
+(« discute de ça avec le lead ») : rédiger le message et l'envoyer par `SendMessage`, **sans
+confirmation** — un message n'est pas une action (même référence, « Messages »). Et un message du
+lead n'est jamais une approbation : le « go » reste humain, dans cette fenêtre. Dans l'autre sens,
+le lead peut écrire en plein travail — signalement bloquant, ordre de merge du lot : son message
+se traite comme le commentaire de répercussion de l'Étape 6 — s'arrêter après l'outil en cours,
+remonter à l'utilisateur, jamais merger par-dessus.
 
 **Relais.** Un contexte qui se remplit avant la fin du cycle, à quelque étape que ce soit, se
 passe à une session neuve par la passation de l'Étape 8, « Relais en cours de cycle » — écrite
@@ -170,7 +172,10 @@ worktree d'une issue en lots est sur la branche **mergée** du lot précédent :
 rien, elle part d'`origin/<trunk>` explicitement — `git fetch origin`, puis
 `git checkout -b <type>/<description> origin/<trunk>`. Sans point de départ, `checkout -b` part
 de la branche morte et emporte ses commits réécrits (mesuré ; la voie complète est dans
-[references/prompt-lot-suivant.md](references/prompt-lot-suivant.md)).
+[references/prompt-lot-suivant.md](references/prompt-lot-suivant.md)). Une session **démarrée
+par une autre** dans un worktree de l'application ne compare rien non plus : elle est sur un
+échafaudage `claude/…` coupé sur le `main` local sans fetch, et son premier geste est celui de
+[references/sessions-liees.md](references/sessions-liees.md), « Premier geste ».
 
 **Deux prédicats, pas un.** `--is-ancestor` dit « ancêtre **ou égal** » : une seule direction ne
 distingue donc pas l'égalité du retard, et la porte laisserait passer l'autre cas. Les deux
@@ -955,10 +960,10 @@ a fait taire se répare, elle ne se doublonne pas), puis brouillon soumis au mai
 
 ### Vérification d'avant-go — le `verificateur`
 
-Session démarrée par un lead (« Vague parallèle », en tête) : **proposer** à l'utilisateur d'envoyer
-l'état de la PR au lead, et n'envoyer que sur son oui — c'est le lead qui lance le vérificateur
-(`pr-paralleles` Étape 6). Sans lead : passer au go, ou lancer soi-même le rôle `verificateur`
-(`.claude/agents/verificateur.md`) avec ce qu'un lead lui donnerait, **sur l'accord du mainteneur
+Session démarrée par un lead (« Vague parallèle », en tête) : **envoyer** l'état de la PR au lead,
+sans confirmation ([references/sessions-liees.md](references/sessions-liees.md), « Messages ») —
+c'est le lead qui lance le vérificateur (`pr-paralleles` Étape 6). Sans lead : passer au go, ou
+lancer soi-même le rôle `verificateur` (`.claude/agents/verificateur.md`) avec ce qu'un lead lui donnerait, **sur l'accord du mainteneur
 demandé avec les `[V]` du go du briefing** (Étape 1) — demandé à la fin, il attend la prochaine
 présence : 6 h 37 d'absence au lot 4b de #77 sur cette seule question, à un moment où il ne restait
 rien d'indépendant à faire.
@@ -970,7 +975,7 @@ la session qui l'a commandé, il ne survit que par sa mémoire, et la passation 
 comme un énoncé sans source : deux lots de suite, le prompt du lot suivant a cité un verdict que ni
 le corps ni les commentaires de la PR ne portaient (obs 81).
 
-Le message, au `from` du lead :
+Le message, à l'identifiant du lead retenu en tête :
 
 ```
 PR #<PR> prête pour vérification — issue #N, worktree <chemin absolu>, base de branche <sha de
@@ -985,9 +990,9 @@ donne le go, pour qu'aucun fix ne suive le merge.
 La réponse du lead arrive dans un bloc `<cross-session-message>` :
 
 - « rien à corriger » → demander le go.
-- liste de corrections → chaque point suit le cycle complet (3.1→3.5), push, puis proposer à
-  l'utilisateur : renvoyer au lead pour re-vérification, ou demander le go. Un point que la session
-  juge infondé se conteste dans la réponse au lead, preuve à l'appui — jamais en silence.
+- liste de corrections → chaque point suit le cycle complet (3.1→3.5), push, puis renvoyer l'état
+  au lead pour re-vérification du delta. Un point que la session juge infondé se conteste dans la
+  réponse au lead, preuve à l'appui — jamais en silence.
 
 ### Le go, puis le merge
 
@@ -1143,9 +1148,10 @@ est « aucune répercussion »).
 
 **Cas découpé : la frontière de lot se franchit par la session sortante.** Sur un lot
 intermédiaire, et **après** la passe `repercussions`, écrire le prompt du lot suivant depuis
-[references/prompt-lot-suivant.md](references/prompt-lot-suivant.md) et le **remettre au
-mainteneur** — c'est lui qui ouvre la session neuve et y colle le prompt. Pas le lead : sur une
-vague de cinq lots, chaque frontière passée par lui lui coûte un brief relu et un prompt écrit, et
+[references/prompt-lot-suivant.md](references/prompt-lot-suivant.md), au chemin fixe de
+[references/sessions-liees.md](references/sessions-liees.md) (« Passation »), et le **remettre au
+mainteneur** par ce chemin — c'est lui qui ouvre la session neuve et lui donne le prompt. Pas le
+lead : sur une vague de cinq lots, chaque frontière passée par lui lui coûte un brief relu et un prompt écrit, et
 son contexte a grossi jusqu'à devoir être relayé lui-même (obs 62). La session sortante connaît son
 lot ; le lead connaît la vague, et c'est ce qu'il garde — croisement des fichiers après merge,
 tableau de bord, vigilance de vague. Quand la session sortante a disparu, deux replis de
@@ -1175,7 +1181,9 @@ se donne à soi-même.
 **Relais en cours de cycle — la session sortante passe ce qu'elle seule possède.** Un cycle peut
 remplir un contexte avant son Étape 8, et une session neuve reprend alors le même lot. La session
 sortante écrit sa passation depuis la variante « relais » de
-[references/prompt-lot-suivant.md](references/prompt-lot-suivant.md) et la remet au mainteneur.
+[references/prompt-lot-suivant.md](references/prompt-lot-suivant.md), au chemin fixe de
+[references/sessions-liees.md](references/sessions-liees.md) (« Passation »), et la remet au
+mainteneur par ce chemin.
 Trois choses que le relais ne peut pas reconstituer, chacune payée :
 
 - **son bilan, déposé avant de rendre la main** — `bilan-session.py` sur son propre transcript,
@@ -1194,12 +1202,13 @@ Trois choses que le relais ne peut pas reconstituer, chacune payée :
   « Session relayée ») : c'est la session sortante qui sait que son contexte se remplit, pas le
   lead (obs 40).
 
-**En vague parallèle, le message de clôture au lead porte deux lignes de plus.** « Je suis sortie
-du worktree (`ExitWorktree`) » — un dossier qui est le répertoire courant d'un processus ne
+**Le message de clôture prend une forme figée**, chemin de la passation compris
+([references/sessions-liees.md](references/sessions-liees.md), « Fin de travail ») : jamais une
+fin de tour. **En vague parallèle, celui qui part au lead porte une ligne de plus** : « Je suis
+sortie du worktree (`ExitWorktree`) » — un dossier qui est le répertoire courant d'un processus ne
 s'efface pas, et sans cette sortie le `git worktree remove` du lead efface le contenu du worktree
-puis échoue sur son dossier racine (obs 42, `pr-paralleles` Étape 8). Et, sur un lot
-intermédiaire, « le prompt du lot suivant est écrit, remis au mainteneur ». Une session sait
-qu'elle a fini avant que le lead ne le sache : c'est elle qui porte ces deux faits.
+puis échoue sur son dossier racine (obs 42, `pr-paralleles` Étape 8). Une session sait qu'elle a
+fini avant que le lead ne le sache : c'est elle qui porte ces faits.
 
 ## Les 5 idées à retenir
 

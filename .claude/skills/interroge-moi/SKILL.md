@@ -119,3 +119,8 @@ ultérieure, en arrêt de chantier.
 Puis, si la session partait d'une issue en `needs-interrogation`, dire à l'utilisateur que l'issue
 peut passer à `ready-for-agent` (ou `ready-for-human`) — la transition elle-même appartient à
 `triage`.
+
+**Session démarrée par une autre** (`startedBy`,
+`.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») : une fois les décisions
+écrites et la transition proposée, prévenir le parent par le message de fin de la même référence
+(« Fin de travail ») — la fin du tour ne le prévient pas.
