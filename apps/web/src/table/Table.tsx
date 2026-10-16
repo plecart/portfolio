@@ -61,7 +61,9 @@ function LoadingFrame({ size }: { size: keyof typeof FRAMES }) {
 
 /**
  * Le message d'erreur (spec §4.5), à la place de la table : centré dans l'espace entre l'entête et
- * les liens de l'auteur ; « Réessayer » est un bouton au style de lien, qui relance le chargement.
+ * les liens de l'auteur ; « Réessayer », à la ligne, est un bouton au style de lien, qui relance le
+ * chargement. L'espace qui le précède ne se voit pas, mais garde les deux phrases séparées dans le
+ * texte que lisent les technologies d'assistance.
  *
  * @param focusRetry Donne le focus à « Réessayer » à l'apparition : après une relance échouée, le
  *   bouton activé a disparu avec le message, et le focus serait retombé sur le document. Jamais au
@@ -82,7 +84,7 @@ function LoadError({ onRetry, focusRetry }: { onRetry: () => void; focusRetry: b
           ref={retry}
           type="button"
           onClick={onRetry}
-          className="cursor-pointer text-(--accent) underline underline-offset-[3px] transition-colors hover:text-(--ink)"
+          className="mx-auto block cursor-pointer text-(--accent) underline underline-offset-[3px] transition-colors hover:text-(--ink)"
         >
           {strings.retry}
         </button>
