@@ -231,6 +231,15 @@ après un changement du contrat. L'override expire comme un refus —
 `tests/dependency-refusals.test.ts` lit dans le verrou la plage de pair d'`openapi-typescript` et
 rougit le jour où elle accepte la majeure installée : on retire alors l'override.
 
+**L'origine de l'API vient des fichiers de mode de Vite** (#19, décision 4) : `VITE_API_URL` vaut
+`http://127.0.0.1:8000` dans `.env.development` — le back de `make dev`, qui admet le serveur de
+développement en CORS — et `https://api.pacome.dev` dans `.env.production`, l'origine que fixe
+l'ADR 0008. Les deux sont committés : ils ne portent aucun secret, et le `.gitignore` n'exclut que
+`.env`. Pas de valeur par défaut dans le code : `vite.config.ts` refuse de compiler sans la
+variable. **Invariant de déploiement** : la CSP de Caddy n'admet que `https://{$API_HOST}` en
+`connect-src` (`infra/caddy/Caddyfile`), donc `API_HOST` du VPS vaut l'hôte de
+`.env.production` — sinon le navigateur bloque l'appel, et le site montre l'état erreur.
+
 La famille Manrope est déclarée **comme jeton de thème Tailwind** (`@theme { --font-sans }`) plutôt
 que sur `:root` : la feuille de base de Tailwind pose déjà la police du document depuis ce jeton, et
 deux déclarations se disputeraient la même propriété.
