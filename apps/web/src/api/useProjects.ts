@@ -12,10 +12,11 @@ const LOADING: ProjectsState = { status: 'loading', projects: [] }
  * La liste des projets, chargée une fois au montage (spec §1.3) ; la requête est abandonnée au
  * démontage.
  *
- * @returns L'état du chargement, les projets — vides tant que la liste n'est pas arrivée — et
- *   `retry`, qui relance le même chargement sans recharger la page (spec §5.2).
+ * @returns L'état du chargement, les projets — vides tant que la liste n'est pas arrivée —,
+ *   `retry`, qui relance le même chargement sans recharger la page (spec §5.2), et `retried`, vrai
+ *   dès la première relance.
  */
-export function useProjects(): ProjectsState & { retry: () => void } {
+export function useProjects(): ProjectsState & { retry: () => void; retried: boolean } {
   const [state, setState] = useState(LOADING)
   // Chaque tentative relance l'effet : « Réessayer » rejoue la requête de démarrage, rien d'autre.
   const [attempt, setAttempt] = useState(0)
@@ -37,5 +38,5 @@ export function useProjects(): ProjectsState & { retry: () => void } {
     setAttempt((count) => count + 1)
   }
 
-  return { ...state, retry }
+  return { ...state, retry, retried: attempt > 0 }
 }

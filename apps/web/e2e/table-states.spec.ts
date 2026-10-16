@@ -203,15 +203,26 @@ test('erreur : « Réessayer » relance la requête sans recharger la page — c
   expect(await page.evaluate(() => (window as unknown as { witness?: boolean }).witness)).toBe(true)
 })
 
-test('« Réessayer » se relance aussi au clavier', async ({ page }) => {
+test('« Réessayer » relance aussi au clavier, et reprend le focus si la relance échoue', async ({
+  page,
+}) => {
+  let requests = 0
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/projets')) requests += 1
+  })
   await openAnswered(page, FAILURES['statut 500'])
+  // Le premier échec ne suit aucune action du visiteur : rien ne prend le focus.
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true)
   const release = await holdProjects(page)
 
   await page.getByRole('button', { name: 'Réessayer' }).focus()
   await page.keyboard.press('Enter')
 
   await expect(cells(page)).toHaveCount(3)
-  await release(serving([]))
+  expect(requests).toBe(2)
+  await release(FAILURES['statut 500'])
+  // Le bouton activé a disparu avec le message : celui qui revient reprend le focus.
+  await expect(page.getByRole('button', { name: 'Réessayer' })).toBeFocused()
 })
 
 test('vide : ni cadre, ni message (spec §5.3)', async ({ page }) => {

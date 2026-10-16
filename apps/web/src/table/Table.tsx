@@ -1,4 +1,4 @@
-import type { Ref } from 'react'
+import { useEffect, useRef, type Ref } from 'react'
 import type { ProjectsStatus } from '../api/useProjects.ts'
 import { strings } from '../strings.ts'
 
@@ -62,13 +62,24 @@ function LoadingFrame({ size }: { size: keyof typeof FRAMES }) {
 /**
  * Le message d'erreur (spec §4.5), à la place de la table : centré dans l'espace entre l'entête et
  * les liens de l'auteur ; « Réessayer » est un bouton au style de lien, qui relance le chargement.
+ *
+ * @param focusRetry Donne le focus à « Réessayer » à l'apparition : après une relance échouée, le
+ *   bouton activé a disparu avec le message, et le focus serait retombé sur le document. Jamais au
+ *   premier échec, qui ne suit aucune action du visiteur.
  */
-function LoadError({ onRetry }: { onRetry: () => void }) {
+function LoadError({ onRetry, focusRetry }: { onRetry: () => void; focusRetry: boolean }) {
+  const retry = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (focusRetry) retry.current?.focus()
+  }, [focusRetry])
+
   return (
     <div className="grid flex-1 place-items-center px-(--s-4) py-(--s-5)">
       <p role="status" className="text-center">
         {strings.loadError}{' '}
         <button
+          ref={retry}
           type="button"
           onClick={onRetry}
           className="cursor-pointer text-(--accent) underline underline-offset-[3px] transition-colors hover:text-(--ink)"
@@ -88,21 +99,24 @@ function LoadError({ onRetry }: { onRetry: () => void }) {
  * @param ref La table, que les liens de l'auteur mesurent.
  * @param status L'état du chargement ; `loading` rend la table occupée (`aria-busy`).
  * @param onRetry Relance le chargement, depuis le message d'erreur.
+ * @param retried Une relance a déjà eu lieu : le message qui revient reprend le focus.
  */
 export function Table({
   ref,
   status,
   onRetry,
+  retried,
 }: {
   ref: Ref<HTMLElement>
   status: ProjectsStatus
   onRetry: () => void
+  retried: boolean
 }) {
   return (
     // Le corps de page commence sous l'entête fixe de 56 px (spec §3.3).
     <main ref={ref} aria-busy={status === 'loading' || undefined} className="flex flex-1 flex-col pt-14">
       {status === 'error' ? (
-        <LoadError onRetry={onRetry} />
+        <LoadError onRetry={onRetry} focusRetry={retried} />
       ) : (
         <div className={GRID_CLASSES}>
           {status === 'loading' &&
