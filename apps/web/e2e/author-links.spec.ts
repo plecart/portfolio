@@ -3,7 +3,7 @@
  * adresses, leurs deux formes, l'ordre de tabulation, l'anneau de focus et les cibles. La mesure qui
  * choisit entre les deux formes : `author-links-measure.spec.ts`.
  */
-import { expect, test } from '@playwright/test'
+import { expect, test } from './api.ts'
 import { resolveAll } from './css.ts'
 import { COLUMN_VIEWPORT, expectPlacement } from './table.ts'
 

@@ -5,7 +5,7 @@
  * Les seuils exacts sont prouvés en Vitest (`tests/author-links-placement.test.ts`) ; la marge sous
  * une barre de défilement visible, dans `author-links-scrollbar.spec.ts`.
  */
-import { expect, test } from '@playwright/test'
+import { expect, test } from './api.ts'
 import { COLUMN_VIEWPORT, expectPlacement, placeCells } from './table.ts'
 
 test.skip(({ isMobile }) => isMobile, 'largeurs de bureau : le projet desktop les porte')
