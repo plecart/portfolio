@@ -62,9 +62,10 @@ approbation (`cycle-pr`, « Vague parallèle »).
 Le parent est réveillé à la fin d'un tour de l'enfant, avec les 400 premiers caractères de son
 rapport ; un tour piloté par le mainteneur dans l'enfant ne le réveille pas (mesuré le
 2026-10-16). Les consignes de l'application au parent, lues le même jour, ne distinguent aucun
-tour : « when it ends a turn, a note reaches you ». Une fin de tour n'est donc pas une fin de travail : un enfant s'arrête sur une
-question, une commande intégrée clôt son tour (obs 94, 98), une passation part avec des points
-encore ouverts (obs 85). La note automatique n'est **jamais** un signal.
+tour : « when it ends a turn, a note reaches you ». Une fin de tour n'est donc pas une fin de
+travail : un enfant s'arrête sur une question, une commande intégrée clôt son tour (obs 94, 98),
+une passation part avec des points encore ouverts (obs 85). La note automatique n'est **jamais**
+un signal.
 
 L'enfant envoie au parent, par `SendMessage`, un message explicite sous l'une de ces formes figées :
 
@@ -94,15 +95,16 @@ La passation se remet par son chemin, dans le message de fin, jamais par son tex
 ## Nettoyage — archiver ne nettoie pas
 
 Archiver un enfant (`archive_session`, réversible) détache son HEAD et ne retire ni le worktree,
-ni le dossier, ni les branches (mesuré le 2026-10-16, relevé à 5 s et à 30 s), quoi qu'en dise la
-description de l'outil, lue le même jour (« cleans up its worktree »). La session qui l'a démarré nettoie après
-lui : `git worktree remove <chemin>`, puis l'échafaudage derrière sa porte d'ancêtre :
+ni le dossier, ni les branches (mesuré le 2026-10-16, relevé à 5 s et à 30 s), quoi qu'en dise
+la description de l'outil, lue le même jour (« cleans up its worktree »). La session qui l'a
+démarré nettoie après lui : `git worktree remove <chemin>`, puis l'échafaudage derrière sa porte
+d'ancêtre :
 
 ```
 git merge-base --is-ancestor claude/<slug>-<hex> origin/<trunk> && git branch -D claude/<slug>-<hex>
 ```
 
 Un refus de la porte signale un commit sur l'échafaudage, ou un `main` local en avance sur le
-distant, sur lequel il a été coupé (`git status -sb` sur `main`) : le remonter au mainteneur,
-jamais `-D` sans la porte. Une branche
+distant, sur lequel il a été coupé — `git log --oneline origin/<trunk>..claude/<slug>-<hex>`
+liste les commits qui bloquent : le remonter au mainteneur, jamais `-D` sans la porte. Une branche
 de PR mergée suit `pr-paralleles` Étape 8.

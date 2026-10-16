@@ -1098,26 +1098,66 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 
 
 # Les invariants que le lot 1 de #107 inscrit dans la prose, chacun avec la phrase qui le porte.
-# **Dénombrement écrit avant le correctif** (relecture de la PR #109, passe 1, `cycle-pr` 4.2,
-# cliquet) : 9 invariants verrouillés par le lot — le point de départ `origin/`, `--no-track` et le
-# chaînage `&&` du premier geste (décision 10) ; « un message du lead n'est jamais une
-# approbation », mot pour mot (décision 3) ; la confirmation retirée à l'en-tête « Vague
-# parallèle », à l'Étape 7 et à `pr-paralleles` Étape 6 ; le renvoi des trois skills ; la porte
-# d'ancêtre du nettoyage. 2 étaient gardés (`DEPARTS_EXPLICITES`, `SKILLS_DES_SESSIONS_LIEES`),
-# 7 tenaient par la seule lecture : la porte rejoint `PORTES_PRESCRITES`, les 6 autres tiennent
-# par les 5 phrases ci-dessous — la commande du premier geste en porte deux. Une phrase réécrite
-# fait rougir, et c'est voulu : la réécriture d'un invariant verrouillé se relit. La même passe en
-# a ajouté 2, fermés ici aussi : le lead est la session que le prompt désigne, pas tout parent
-# (constat I3), et l'UUID de scratchpad n'adresse pas une session liée (constat I4).
+#
+# **Population** : une entrée par point du bloc « Lot 1/4 » de #107 et par décision de son brief
+# que le lot fait écrire (3, 7, 9, 10, 11), plus les deux que la relecture a ajoutées (le lead
+# désigné par le prompt, l'UUID de scratchpad qui n'adresse pas une session liée). La commande du
+# premier geste porte trois invariants à elle seule (`origin/`, `--no-track`, `&&`). Gardés
+# ailleurs : les trois renvois (`SKILLS_DES_SESSIONS_LIEES`), le point de départ `origin/`
+# (`DEPARTS_EXPLICITES`), la porte du nettoyage (`PORTES_PRESCRITES`). Restent en lecture, à
+# dessein : les quatre formes du message de fin autres que celle d'un lot, que rien ne consomme.
+#
+# **Recensée à la passe 2 de la relecture de la PR #109**, après qu'un premier dénombrement à
+# 9 invariants s'est révélé n'être que les échantillons de la passe 1 : 4 invariants verrouillés
+# restaient sans garde (héritage du mode, `fresh`, note automatique, commandes intégrées) et 2
+# renvois après corrections pouvaient retrouver leur confirmation (mesuré : mutations VERTES).
+#
+# **Borne** : le test exige que la phrase **existe**, pas qu'aucune phrase contraire ne s'ajoute
+# ailleurs — une confirmation rétablie à côté d'une phrase intacte reste verte (mesuré, passe 2).
+# Une phrase réécrite fait rougir, et c'est voulu : la réécriture d'un invariant verrouillé se
+# relit.
+SESSIONS_LIEES_REF = ".claude/skills/cycle-pr/references/sessions-liees.md"
+PR_PARALLELES_SKILL = ".claude/skills/pr-paralleles/SKILL.md"
+INTERROGE_MOI_SKILL = ".claude/skills/interroge-moi/SKILL.md"
 CYCLE_PR_SKILL = ".claude/skills/cycle-pr/SKILL.md"
 INVARIANTS_DES_SESSIONS_LIEES = {
+    # Héritage (décision 7).
+    "heritage-sans-permission-mode": (
+        SESSIONS_LIEES_REF,
+        "**Jamais de `permission_mode`** au démarrage d'un enfant : il hérite de celui du parent",
+    ),
+    "contexte-neuf-jamais-fork": (SESSIONS_LIEES_REF, "`context: fresh`, jamais `fork`"),
+    # Identité.
+    "enfant-lit-son-parent-dans-startedby": (
+        SESSIONS_LIEES_REF,
+        'L\'enfant retrouve son parent dans le champ `startedBy` de `list_sessions {"linked": true}`',
+    ),
+    "parent-designe-l-enfant-par-son-session-id": (
+        SESSIONS_LIEES_REF,
+        "Le parent désigne l'enfant par le `session_id` (`local_…`)",
+    ),
+    "scratchpad-n-adresse-pas-une-session-liee": (
+        PR_PARALLELES_SKILL,
+        "pas l'identifiant `local_…` qui adresse une session liée",
+    ),
+    # Premier geste (décision 10).
     "premier-geste-chaine-sans-suivi": (
-        ".claude/skills/cycle-pr/references/sessions-liees.md",
+        SESSIONS_LIEES_REF,
         "`git fetch origin && git checkout -b <type>/<slug> --no-track origin/<base>`",
     ),
+    "echafaudage-sans-commit": (
+        SESSIONS_LIEES_REF,
+        "La branche `claude/…` reste un **échafaudage** : rien ne s'y commit",
+    ),
+    # Messages sans confirmation, jamais une approbation (décision 3).
+    "messages-sans-confirmation": (SESSIONS_LIEES_REF, "**part sans confirmation du mainteneur**"),
     "message-du-lead-jamais-approbation": (
         CYCLE_PR_SKILL,
         "un message du lead n'est jamais une approbation",
+    ),
+    "lead-designe-par-le-prompt": (
+        CYCLE_PR_SKILL,
+        "est la session que ce prompt désigne comme tel, à défaut l'émettrice",
     ),
     "en-tete-sans-confirmation": (
         CYCLE_PR_SKILL,
@@ -1127,17 +1167,70 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         CYCLE_PR_SKILL,
         "**envoyer** l'état de la PR au lead, sans confirmation",
     ),
+    "etape-7-renvoi-sans-confirmation": (
+        CYCLE_PR_SKILL,
+        "push, puis renvoyer l'état au lead pour re-vérification du delta",
+    ),
     "pr-paralleles-sans-confirmation": (
-        ".claude/skills/pr-paralleles/SKILL.md",
+        PR_PARALLELES_SKILL,
         "chaque session envoie au lead l'état de sa PR, sans confirmation",
     ),
-    "lead-designe-par-le-prompt": (
-        CYCLE_PR_SKILL,
-        "est la session que ce prompt désigne comme tel, à défaut l'émettrice",
+    "pr-paralleles-renvoi-sans-confirmation": (
+        PR_PARALLELES_SKILL,
+        "Après corrections, la session renvoie l'état ; le lead refait la passe sur le delta.",
     ),
-    "scratchpad-n-adresse-pas-une-session-liee": (
-        ".claude/skills/pr-paralleles/SKILL.md",
-        "pas l'identifiant `local_…` qui adresse une session liée",
+    # Fin de travail (décision 11, obs 85, 94, 98).
+    "fin-de-tour-jamais-un-signal": (
+        SESSIONS_LIEES_REF,
+        "La note automatique n'est **jamais** un signal.",
+    ),
+    "forme-de-fin-d-un-lot": (
+        SESSIONS_LIEES_REF,
+        r"« lot \<k>/\<n> terminé — PR #\<M> mergée dans \<base> — passation : \<chemin> »",
+    ),
+    "message-de-fin-aussi-au-lead": (
+        SESSIONS_LIEES_REF,
+        "En vague, le même message part aussi au lead s'il n'est pas le parent.",
+    ),
+    "interroge-moi-previent-le-parent": (
+        INTERROGE_MOI_SKILL,
+        "prévenir le parent par le message de fin de la même référence",
+    ),
+    # Passation (décision 9).
+    "passation-du-lot-termine": (
+        SESSIONS_LIEES_REF,
+        "`passations/<date>-issue-<N>-lot-<k>-prompt.md` — lot `k` **terminé**",
+    ),
+    "passation-de-relais": (SESSIONS_LIEES_REF, "`passations/<date>-issue-<N>-lot-<k>-relais.md`"),
+    "passation-par-pointeur": (
+        SESSIONS_LIEES_REF,
+        "La passation se remet par son chemin, dans le message de fin, jamais par son texte",
+    ),
+    # Nettoyage (décision 16).
+    "archiver-ne-nettoie-pas": (
+        SESSIONS_LIEES_REF,
+        "Archiver un enfant (`archive_session`, réversible) détache son HEAD et ne retire ni",
+    ),
+    # Commandes intégrées (obs 94, 98).
+    "commandes-integrees-sans-fin-de-tour": (
+        CYCLE_PR_SKILL,
+        "**Ces deux commandes ne terminent pas le tour.**",
+    ),
+    "config-relecture-sans-fin-de-tour": (
+        ".claude/pipeline.config.md",
+        "termine pas le tour (`cycle-pr` 4.2, obs 94).",
+    ),
+    "config-securite-sans-fin-de-tour": (
+        ".claude/pipeline.config.md",
+        "termine pas le tour (`cycle-pr` 4.2, obs 98).",
+    ),
+    # Question à la fois et groupement des `[V]` (obs 102).
+    "interroge-moi-moment-et-forme": (
+        INTERROGE_MOI_SKILL,
+        (
+            "le groupement porte sur le **moment** — un point d'arrêt, jamais le fil de l'eau —, "
+            "cette règle sur la **forme**"
+        ),
     ),
 }
 
