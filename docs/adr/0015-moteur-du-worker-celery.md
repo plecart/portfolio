@@ -75,11 +75,12 @@ la transaction.**
   Django sous l'espace de noms `CELERY_`, eux-mêmes lus dans `Env` (ADR 0001, 12-factor). Le broker
   est `REDIS_URL` : le rôle 2 de l'ADR 0006 commence en phase 1. Sérialisation JSON (défaut).
 - **Aucun backend de résultats.** Le résultat d'un traitement est l'état de l'image, écrit en base ;
-  Redis ne porte que des messages, et un message perdu laisse l'image « en attente », état vrai en
-  base.
+  Celery ne met dans Redis que des messages, et un message perdu laisse l'image « en attente », état
+  vrai en base.
 - **Le Redis partagé n'évince jamais la file du broker.** Une limite de mémoire posée pour le cache
   (#11) prend une politique `volatile-*`, qui n'évince que les clés à durée de vie (doc Redis,
-  « Eviction policies ») : celles du cache (ADR 0006, TTL courts), jamais la file.
+  « Eviction policies ») : celles du cache (ADR 0006, TTL courts ; aucune clé de cache sans durée
+  de vie), jamais la file.
 - **Worker** : un conteneur `worker`, même image qu'`api` (ADR 0012), autre commande,
   `celery -A config worker --concurrency 1`. Un seul processus de traitement, ce qui borne la
   mémoire. Il ne joue pas les migrations, qu'`api` joue au démarrage. En production, sa sonde est
@@ -87,8 +88,8 @@ la transaction.**
   est joignable.
 - **Accusé de réception par défaut** : Celery accuse réception d'un message « just before » son
   exécution (doc Celery 5.6, guide « Tasks », `Task.acks_late` ; réglage `task_acks_late`,
-  désactivé par défaut). Une tâche commencée n'est
-  jamais redistribuée après un arrêt du worker ; seuls ses réessais la ré-exécutent.
+  désactivé par défaut). Une tâche commencée n'est jamais redistribuée après un arrêt du
+  worker ; seuls ses réessais la ré-exécutent.
 - **Déclenchement** : `GalleryImage.save` enfile la tâche après validation de la transaction, quand
   l'enregistrement crée l'image ou remplace son original. La tâche reçoit l'identifiant de l'image
   et le nom de l'original à traiter. Un broker injoignable à ce moment n'empêche pas
@@ -101,7 +102,8 @@ la transaction.**
   sur l'identifiant **et** le nom de l'original traité. Si l'original a été remplacé ou l'image
   supprimée entre-temps, rien n'est écrit et les variantes produites sont supprimées.
 - **Échecs** : trois réessais à délai croissant. Réessais épuisés, l'image passe à « échec », sans
-  variante, les fichiers partiels sont supprimés et l'exception sort de la tâche : le worker la
+  variante, par la même requête conditionnelle — si la base est joignable ; sinon elle reste « en
+  attente ». Les fichiers partiels sont supprimés et l'exception sort de la tâche : le worker la
   journalise, et Sentry la recevra avec #17. L'admin affiche « Échec », sans motif.
 - **Variantes par `Pillow` seul**, dans un module de conversion, second et dernier module de
   l'application à importer Pillow après celui qui lit l'original au téléversement. WebP, échelle
@@ -130,11 +132,12 @@ la transaction.**
   de téléversements se traite à la suite.
 - **Accusé de réception avant exécution** : un worker tué en plein traitement perd la tâche, et
   l'image reste « en attente », visible dans l'admin. Remplacer le fichier relance le traitement.
-- **Sans outbox** : un déclenchement perdu se rattrape de la même façon. Quatre chemins y mènent,
-  le worker tué ci-dessus compris : broker injoignable à l'enregistrement, message perdu par Redis
-  (redémarrage, éviction), processus `api` arrêté entre la validation et l'enfilement. Aucune donnée
-  n'est perdue : l'état en base reste vrai, seul le traitement manque, et rien ne le relance sans
-  geste humain.
+- **Sans outbox** : un traitement perdu se rattrape de la même façon. La classe est « ni « prêt »
+  ni « échec » ne s'écrit » ; cinq chemins recensés le 2026-10-16, liste non close : le worker tué
+  ci-dessus ; le broker injoignable à l'enregistrement ; un message perdu par Redis (redémarrage,
+  éviction) ; le processus `api` arrêté entre la validation et l'enfilement ; la base injoignable
+  pendant toute la fenêtre de réessais, écriture de « échec » comprise. Aucune donnée n'est perdue :
+  l'état en base reste vrai, seul le traitement manque, et rien ne le relance sans geste humain.
 - **Le mode synchrone est une émulation.** La doc Celery le dit « by definition not suitable for
   unit tests » (« Testing with Celery »). La tâche reste donc mince, la conversion se teste
   directement, et le vrai worker est éprouvé par la fumée sur la pile complète (#26).
@@ -167,7 +170,7 @@ la transaction.**
 
 | | `on_commit`, sans outbox | Outbox + relais |
 |---|---|---|
-| Déclenchement perdu si Redis tombe | l'image reste « en attente », visible ; remplacer le fichier relance | jamais |
+| Déclenchement perdu si Redis tombe | l'image reste « en attente », visible ; remplacer le fichier relance | jamais à l'enfilement ; un message perdu par Redis après publication l'est aussi |
 | Coût | aucun mécanisme de plus | une table, une migration, un relais et un processus |
 | Verdict | **Retenu** pour les images | Gardé pour l'ingestion (D31), construit avec elle |
 
