@@ -41,7 +41,9 @@ def process_image(self: "Task[[int, str], None]", image_id: int, original_name: 
 
     Une erreur de traitement est réessayée `MAX_RETRIES` fois ; au dernier essai, l'image passe à
     « échec » par la même écriture conditionnelle, puis l'erreur sort de la tâche : le worker la
-    journalise (Sentry la recevra avec #17). Aucun essai ne laisse de fichier (`make_variants`).
+    journalise (Sentry la recevra avec #17). Une erreur de la conversion ne laisse aucun fichier
+    (`make_variants`) ; une erreur de l'écriture du résultat, après elle, laisse encore les
+    variantes de l'essai — limite connue, levée par le lot 3c de #12.
 
     Args:
         self: la tâche, liée (`bind`) : son contexte d'exécution dit le numéro de l'essai.
