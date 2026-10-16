@@ -89,7 +89,7 @@ Email (post-MVP, peut-être jamais) · anglais · commentaires (retirés) · MCP
 | Django admin | Back-office | 1 | CMS headless, content-as-code, admin custom | 0001 |
 | Postgres 16 + pgvector | Contenu, vecteurs, checkpoints, outbox | 1 (pgvector en 2) | Postgres managé, Qdrant | 0005 |
 | Redis | Cache avec invalidation, puis broker et rate limiting | 1 | — | 0006 |
-| Worker (Celery ou arq) | Tâches de fond | 1 ou 2 | Temporal | à sa phase (annexe A) |
+| Worker (Celery) | Tâches de fond | 1 | arq, `django.tasks`, Temporal | 0015 |
 | Cloudflare R2 | Médias publics, documents privés, sauvegardes | 1 | Disque du VPS | 0004 |
 | Vite + React + TypeScript + Tailwind CSS + shadcn/ui | Frontend statique, compilé en CI, servi par Caddy | 1 | Next.js, Flutter web | 0008 |
 | GitHub Actions + GHCR | CI/CD : construction, scan et publication des images | 1 | Docker Hub, registre auto-hébergé ; agent de déploiement sur le VPS | 0014 |
@@ -111,7 +111,7 @@ La colonne ADR renvoie au numéro du fichier dans `docs/adr/` (index : `docs/adr
 | `api` | Django : contenu, admin, API | 1 |
 | `postgres` | Image `pgvector/pgvector` | 1 |
 | `redis` | Cache, puis broker et rate limiting | 1 |
-| `worker` | Vignettes, puis ingestion | 1 ou 2 |
+| `worker` | Vignettes, puis ingestion | 1 |
 | `backup` | Cron nocturne : dump, chiffrement, envoi R2, ping | 1 |
 | `ai` | LangGraph, chat en streaming | 2 |
 | `embeddings` | Modèles d'embeddings et de reranking locaux (`text-embeddings-inference`, CPU) | 2 |
@@ -270,6 +270,7 @@ Identifiants hérités du cadrage v0 (D1 à D38), sans trou ni renumérotation. 
 | D56 | CI/CD : GitHub Actions et GHCR | Une image par dossier `infra/<service>/` ; front compilé une fois, copié dans `caddy` et, pour `index.html`, dans `api` ; statiques de l'admin servis par WhiteNoise depuis `api`, qui repose sur Debian 13 ; Trivy bloque HIGH et CRITICAL, corrigeables ou non, et la fin de vie, toute exception étant datée et évaluée en trois points ; publication par un job `publish` sur `main`, SHA et `latest`, trois versions gardées, ni attestation ni SBOM ; confirme D43 (ADR 0014, 2026-09-27). |
 | D57 | Fiche technique en sections libres | L'auteur crée, nomme, ordonne (glisser-déposer, D55) et retire les sections de chaque projet ; ancre en forme de slug, préremplie depuis le titre, modifiable, unique dans le projet, citée par `#s-<ancre>` ; remplace les onze sections normalisées de §6.1 (arrêt visuel de la PR #66, 2026-10-03). |
 | D58 | Reprise d'un VPS sans geste DNS | Le Tunnel suit son jeton : un VPS neuf amorcé par `bootstrap.sh` reprend les noms d'hôte dès que `cloudflared` y est sain ; remplace « pointer le DNS Cloudflare » du scénario 6 de §6.7 et du point 6 de l'ADR 0007 (précision de D45, interrogatoire de #24, 2026-10-15). |
+| D59 | Worker : Celery, variantes par Pillow seul | Celery, broker Redis, sans backend de résultats, concurrence 1, accusé de réception par défaut ; tâche enfilée après validation de la transaction, sans outbox pour les images (l'outbox reste celle de l'ingestion, D31) ; variantes WebP par Pillow seul ; remplace le point `django-imagekit` des ADR 0001 et 0004 et, pour le worker d'images, la règle « outbox » de l'ADR 0006 (ADR 0015, 2026-10-16). |
 | D29 | (remplacée par D36, D37) | — |
 | D21 | (remplacée par D25) | — |
 
@@ -314,7 +315,7 @@ Recos appliquées par défaut ; chaque point sera tranché par un ADR au moment 
 
 | Sujet | Reco par défaut |
 |---|---|
-| Worker : Celery ou arq | Celery (compétence reconnue) ou arq (légèreté) ; ADR en phase 1 ou 2. |
+| Worker : Celery ou arq | Tranché par l'ADR 0015 (D59) : Celery, broker Redis ; arq et `django.tasks` écartés. |
 | Serveur des modèles locaux : `text-embeddings-inference` ou Ollama | TEI par défaut (CPU, embeddings et reranking dans un seul conteneur). |
 | Répartition des modèles Claude | `claude-opus-5` réponse finale, `claude-haiku-4-5` étapes bon marché ; `claude-sonnet-5` en option coût. |
 | Latence d'ingestion acceptable | Minutes. |
@@ -362,7 +363,7 @@ Recos appliquées par défaut ; chaque point sera tranché par un ADR au moment 
 
 ## Annexe C — Bibliothèques pressenties (phases 2 et 3)
 
-Non normatif : chaque ligne est à confirmer par l'ADR de sa brique au moment où sa phase commence. Les bibliothèques de la phase 1 sont fixées dans les ADR 0001 à 0010.
+Non normatif : chaque ligne est à confirmer par l'ADR de sa brique au moment où sa phase commence. Les bibliothèques de la phase 1 sont fixées par les ADR de `docs/adr/`.
 
 | Phase | Brique | Bibliothèques pressenties |
 |---|---|---|
