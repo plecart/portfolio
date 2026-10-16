@@ -13,8 +13,10 @@ from content.models import GalleryImage, ProcessingState, Project, Variant
 from content.tasks import process_image
 from content.variants import make_variants
 from django.core.files.base import ContentFile
-from django.core.files.storage import Storage, default_storage
-from django.db import transaction
+from django.core.files.storage import FileSystemStorage, Storage, default_storage
+from django.db import DatabaseError, transaction
+from django.db.models import QuerySet
+from django.db.models.signals import pre_delete
 from factories import gallery_image, image_upload, project, saved
 from kombu.exceptions import OperationalError
 from PIL import UnidentifiedImageError
@@ -223,6 +225,122 @@ def test_une_image_supprimee_pendant_le_traitement_ne_laisse_aucune_variante(
     assert variant_files(made) == []
 
 
+@pytest.fixture
+def unpropagated(monkeypatch: pytest.MonkeyPatch) -> None:
+    """La propagation du mode synchrone coupée le temps du test : Celery 5.6.3 y relance le
+    `Retry` dès la première erreur (`on_error` de `celery/app/trace.py`), et aucun réessai ne se
+    rejouerait ; l'issue d'une tâche se lit alors dans son résultat."""
+    monkeypatch.setitem(celery_app.conf, "task_eager_propagates", False)
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("unpropagated")
+def test_une_ecriture_du_resultat_qui_echoue_ne_laisse_aucune_variante(
+    portfolio: Project, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """La base perdue au moment d'écrire « prêt » : les variantes de l'essai sortent du stockage
+    avant le réessai, qui écrit les siennes — le dossier ne tient que l'original et ce que la ligne
+    nomme."""
+    made = saved(gallery_image(portfolio))
+    update: Callable[..., int] = QuerySet.update  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    failures = [DatabaseError("base perdue")]
+
+    def failing_once(queryset: QuerySet[Any], **values: Any) -> int:
+        if values.get("state") == ProcessingState.READY and failures:
+            raise failures.pop()
+        return update(queryset, **values)
+
+    monkeypatch.setattr(QuerySet, "update", failing_once)
+
+    result = process_image.delay(made.pk, made.original.name or "")
+
+    assert result.state == "SUCCESS"
+    made.refresh_from_db()
+    named = sorted(variant["name"].rsplit("/", 1)[1] for variant in made.variants)
+    assert variant_files(made) == named
+
+
+@pytest.mark.django_db
+def test_un_nettoyage_qui_echoue_n_arrete_pas_les_autres_suppressions(
+    portfolio: Project, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Zéro ligne mise à jour, et une variante que le stockage refuse de supprimer : les autres
+    sortent quand même, et la tâche se termine sans erreur."""
+    made = saved(gallery_image(portfolio))
+    old = made.original.name or ""
+    replacing = GalleryImage.objects.get(pk=made.pk)
+    replacing.original = image_upload("nouvelle.png")
+    during_processing(monkeypatch, replacing.save)
+    delete = FileSystemStorage.delete
+
+    def refusing(storage: FileSystemStorage, name: str) -> None:
+        if name.endswith("/320.webp"):
+            raise OSError("suppression refusée")
+        delete(storage, name)
+
+    monkeypatch.setattr(FileSystemStorage, "delete", refusing)
+
+    process_image.delay(made.pk, old)
+
+    assert variant_files(made) == ["320.webp"]
+
+
+def old_folder_files(name: str) -> list[str]:
+    """Les fichiers que le stockage tient encore dans le dossier de l'original `name`."""
+    _, files = default_storage.listdir(name.rsplit("/", 1)[0])
+    return sorted(files)
+
+
+@pytest.mark.django_db
+def test_une_tache_qui_ecrit_entre_la_lecture_et_l_ecriture_d_un_remplacement_ne_laisse_rien(
+    portfolio: Project,
+    monkeypatch: pytest.MonkeyPatch,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    """Deux écrivains, dans l'ordre que la condition de la tâche ne voit pas : l'auteur lit la
+    ligne — sans variante —, la tâche y écrit « prêt » et ses variantes, puis l'auteur écrit le
+    nouvel original. Ce que la tâche a écrit sort du stockage avec l'ancien original : c'est son
+    dossier qui sort, pas les seuls noms que l'auteur a lus."""
+    made = saved(gallery_image(portfolio))
+    old = made.original.name or ""
+    read_row = GalleryImage._replaced_original  # pyright: ignore[reportPrivateUsage]
+
+    def read_then_processed(image: GalleryImage) -> str | None:
+        replaced = read_row(image)
+        process_image.delay(made.pk, old)
+        return replaced
+
+    monkeypatch.setattr(GalleryImage, "_replaced_original", read_then_processed)
+    made.original = image_upload("nouvelle.png")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        made.save()
+
+    assert old_folder_files(old) == []
+
+
+@pytest.mark.django_db
+def test_une_tache_qui_ecrit_entre_la_lecture_et_la_suppression_d_une_image_ne_laisse_rien(
+    portfolio: Project, django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks
+) -> None:
+    """Le même ordre à la suppression : la ligne lue au `pre_delete`, la tâche y écrit, puis la
+    ligne disparaît."""
+    made = saved(gallery_image(portfolio))
+    old = made.original.name or ""
+
+    def processed(**kwargs: object) -> None:
+        process_image.delay(made.pk, old)
+
+    pre_delete.connect(processed, sender=GalleryImage, weak=False)
+    try:
+        with django_capture_on_commit_callbacks(execute=True):
+            made.delete()
+    finally:
+        pre_delete.disconnect(processed, sender=GalleryImage)
+
+    assert old_folder_files(old) == []
+
+
 @pytest.mark.django_db
 @pytest.mark.parametrize("how", ["supprimée", "remplacée"])
 def test_une_tache_dont_l_image_a_change_avant_le_traitement_ne_fait_rien(
@@ -251,18 +369,14 @@ def test_une_tache_dont_l_image_a_change_avant_le_traitement_ne_fait_rien(
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("unpropagated")
 def test_une_erreur_de_traitement_est_reessayee_trois_fois_puis_l_image_passe_en_echec(
     portfolio: Project, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Un original devenu illisible : quatre essais, chacun sur une image encore en attente, à
     délai croissant (1, 2 puis 4 s) ; puis « échec » sans variante, aucun fichier produit, et
     l'erreur sort de la tâche — son issue est l'échec, l'exception son résultat, ce que le worker
-    journalise.
-
-    La propagation du mode synchrone est coupée le temps du test : Celery 5.6.3 y relance le
-    `Retry` dès la première erreur (`on_error` de `celery/app/trace.py`), et aucun réessai ne se
-    rejouerait."""
-    monkeypatch.setitem(celery_app.conf, "task_eager_propagates", False)
+    journalise."""
     made = saved(gallery_image(portfolio))
     name = made.original.name or ""
     default_storage.delete(name)
@@ -292,3 +406,35 @@ def test_une_erreur_de_traitement_est_reessayee_trois_fois_puis_l_image_passe_en
     row = GalleryImage.objects.get(pk=made.pk)
     assert (row.state, row.variants) == (ProcessingState.FAILED, [])
     assert variant_files(made) == []
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("unpropagated")
+def test_l_echec_d_un_original_remplace_pendant_les_reessais_ne_touche_pas_le_nouveau(
+    portfolio: Project, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """« Échec » s'écrit par la même requête conditionnelle que « prêt » (décision 7) : l'original
+    remplacé pendant le dernier essai, la ligne reste celle du nouveau fichier, en attente."""
+    made = saved(gallery_image(portfolio))
+    old = made.original.name or ""
+    replacing = GalleryImage.objects.get(pk=made.pk)
+    replacing.original = image_upload("nouvelle.png")
+    attempts: list[str] = []
+
+    def failing(storage: Storage, original_name: str) -> list[Variant]:
+        attempts.append(original_name)
+        if len(attempts) == tasks.MAX_RETRIES + 1:
+            replacing.save()
+        raise OSError("stockage injoignable")
+
+    monkeypatch.setattr(tasks, "make_variants", failing)
+
+    result = process_image.delay(made.pk, old)
+
+    assert result.state == "FAILURE"
+    row = GalleryImage.objects.get(pk=made.pk)
+    assert (row.original.name, row.state, row.variants) == (
+        replacing.original.name,
+        ProcessingState.PENDING,
+        [],
+    )
