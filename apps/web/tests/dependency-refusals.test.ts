@@ -12,7 +12,8 @@
  * Le verrou ne change que par une PR : le rouge apparaît dans celle qui apporte la nouvelle
  * version du plugin, celles de Dependabot comprises.
  *
- * Le sens inverse a le même mécanisme et une seule occurrence : `openapi-typescript`, dont le pair
+ * Le sens inverse a le même mécanisme et une seule occurrence au 2026-10-16 — une entrée imbriquée
+ * sur les cinq de l'`overrides` du manifeste : `openapi-typescript`, dont le pair
  * `typescript` est **forcé** par l'`overrides` du manifeste sur la majeure installée, qu'il ne
  * déclare pas (§2.4). Hors de la table, puisque rien n'est refusé à Dependabot : le cas rougit le
  * jour où la plage du paquet accepte cette majeure, et l'override se retire alors.

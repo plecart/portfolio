@@ -13,7 +13,7 @@ import { writeFileSync } from 'node:fs'
 import openapiTS, { astToString } from 'openapi-typescript'
 
 /** Le schéma, écrit par `make openapi` côté back : le front le lit, il ne l'écrit jamais. */
-const SCHEMA_URL =new URL('../../api/openapi.json', import.meta.url)
+const SCHEMA_URL = new URL('../../api/openapi.json', import.meta.url)
 
 /** Le module des types, committé : les composants importent `components['schemas'][…]` d'ici. */
 export const TYPES_URL = new URL('../src/api/schema.ts', import.meta.url)
