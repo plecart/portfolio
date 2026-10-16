@@ -30,7 +30,13 @@ requires-python = ">=3.12"
 # `django-cors-headers` restreint CORS à l'origine du site (ADR 0008). Aucun module ne l'importe :
 # Django le charge par `INSTALLED_APPS` et `MIDDLEWARE`, et les tests de CORS de `tests/test_api.py`
 # l'atteignent par la route.
+#
+# `celery[redis]` porte le worker d'images, broker Redis, sans backend de résultats (ADR 0015) ;
+# `config/celery.py` en construit l'application. L'extra installe le client `redis`, que
+# kombu charge seul à la première connexion au broker — `STARTUP_IMPORTS`
+# (`tests/test_django_project.py`) le tient. kombu 5.6.2 le borne sous 6.5.
 dependencies = [
+    "celery[redis]>=5.6.3",
     "django>=6.0",
     "django-cors-headers>=4.9.0",
     "django-ninja>=1.7.1",

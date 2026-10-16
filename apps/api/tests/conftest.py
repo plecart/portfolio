@@ -4,6 +4,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
+from config.celery import app as celery_app
 from config.database import database_settings
 from containers import postgres, running
 from django.conf import settings
@@ -62,6 +63,19 @@ def collected_static_files(tmp_path_factory: pytest.TempPathFactory) -> Generato
     with override_settings(STATIC_ROOT=tmp_path_factory.mktemp("static")):
         call_command("collectstatic", interactive=False, verbosity=0)
         yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def synchronous_tasks() -> None:
+    """Les tâches Celery s'exécutent dans le processus de test, à l'enfilement, et leur exception
+    en sort : la suite n'a besoin d'aucun Redis (ADR 0015, « Tests »).
+
+    Posé ici sur l'application, jamais par une branche des réglages : la configuration de
+    production vient d'`Env`, sans « si test » (brief de #12, décision 12). Le mode synchrone est
+    une émulation — la doc Celery le dit « by definition not suitable for unit tests » : il ne
+    prouve rien du worker, que la fumée sur la pile complète éprouve (#26).
+    """
+    celery_app.conf.update(task_always_eager=True, task_eager_propagates=True)
 
 
 @pytest.fixture(scope="session")
