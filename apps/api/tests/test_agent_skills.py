@@ -1025,7 +1025,9 @@ def test_chaque_porte_prescrite_est_un_predicat_chaine_a_son_action(
 # bloquant se ferme sans test (I-1 avant lui).
 #
 # Population : les commandes entre backticks qui commencent par `git checkout -b <`, dans les
-# fichiers où une session peut être **ailleurs que sur `main`**. Deux formes nues existent à
+# fichiers où une session peut être **ailleurs que sur `main`** — 4 depuis le lot 1 de #107, qui
+# ajoute le premier geste d'un enfant placé sur l'échafaudage `claude/…` d'un worktree de
+# l'application (`sessions-liees.md`). Deux formes nues existent à
 # dessein et n'entrent pas ici : `taille-pr.md`, qui nomme la convention de branche, et le bloc de
 # commandes de `cycle-pr` Étape 1, qui crée la branche **sur `main`**, derrière la porte à deux
 # prédicats — un bloc n'est pas entre backticks, donc le motif ne le voit pas. La prose qui
@@ -1034,6 +1036,7 @@ DEPARTS_EXPLICITES = [
     ".claude/skills/cycle-pr/references/prompt-lot-suivant.md",
     ".claude/skills/pr-paralleles/SKILL.md",
     ".claude/skills/cycle-pr/SKILL.md",
+    ".claude/skills/cycle-pr/references/sessions-liees.md",
 ]
 CHECKOUT_CITE = re.compile(r"`git checkout -b \\?<[^`]*`")
 
@@ -1058,6 +1061,28 @@ def test_chaque_creation_de_branche_hors_porte_nomme_son_point_de_depart(fichier
     assert not sans_depart, (
         f"création de branche sans point de départ dans `{fichier}` : {sans_depart}"
     )
+
+
+# Le protocole des sessions liées (#107, lot 1) vit dans une référence unique, que les skills qui
+# le suivent citent sans le recopier (obs 52) : un skill qui perd son renvoi applique de mémoire ce
+# que la référence fixe — héritage du mode, identité, premier geste, signal de fin.
+SESSIONS_LIEES = "references/sessions-liees.md"
+SKILLS_DES_SESSIONS_LIEES = [
+    ".claude/skills/cycle-pr/SKILL.md",
+    ".claude/skills/pr-paralleles/SKILL.md",
+    ".claude/skills/interroge-moi/SKILL.md",
+]
+
+
+@pytest.mark.parametrize(
+    "skill", SKILLS_DES_SESSIONS_LIEES, ids=[Path(s).parent.name for s in SKILLS_DES_SESSIONS_LIEES]
+)
+def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None:
+    """Le renvoi existe dans le skill, et la référence qu'il vise existe sur le disque."""
+    texte = (REPOSITORY_ROOT / skill).read_text(encoding="utf-8-sig")
+
+    assert (REPOSITORY_ROOT / ".claude/skills/cycle-pr" / SESSIONS_LIEES).is_file()
+    assert SESSIONS_LIEES in texte, f"`{skill}` ne cite plus `{SESSIONS_LIEES}`"
 
 
 # Les portes à base d'avis (obs 56) lisent une base qui change sans commit. La prose qui prescrit

@@ -274,8 +274,9 @@ même `.git`, les branches sont visibles entre elles, mais les fichiers de trava
 
 ### 6. Vérifier chaque PR avant le go — un vérificateur éphémère par (PR, go)
 
-À l'Étape 7 de `cycle-pr`, chaque session **propose à l'utilisateur** d'envoyer au lead l'état de
-sa PR ; rien ne part sans son accord. Quand ce message arrive :
+À l'Étape 7 de `cycle-pr`, chaque session envoie au lead l'état de sa PR, sans confirmation du
+mainteneur — un message n'est pas une action (`.claude/skills/cycle-pr/references/sessions-liees.md`,
+« Messages »). Quand ce message arrive :
 
 1. **Déléguer la vérification, ne pas la lire soi-même.** Lancer l'équipier **`verificateur`**
    (`.claude/agents/verificateur.md`), **un par (PR, go)** — jamais réutilisé d'un go au suivant,
@@ -310,7 +311,7 @@ sa PR ; rien ne part sans son accord. Quand ce message arrive :
    l'étape 2 de ce skill sur ce que fait la PR, le verdict, et où taper le go — « go merge dans
    `<session>` ».
 
-Après corrections, la session propose à nouveau l'envoi ; le lead refait la passe sur le delta.
+Après corrections, la session renvoie l'état ; le lead refait la passe sur le delta.
 À tout moment, l'utilisateur peut aussi dire à une session « discute de ça avec le lead » —
 c'est le seul autre canal, et il passe par lui.
 
