@@ -37,13 +37,17 @@ def process_image(self: "Task[[int, str], None]", image_id: int, original_name: 
     l'identifiant **et** le nom de l'original, jamais `GalleryImage.save` — qui décrit les
     écritures de l'auteur. Une image supprimée, ou dont l'original a été remplacé, avant le
     traitement : rien n'est fait. Pendant le traitement : zéro ligne mise à jour, les variantes
-    écrites sont supprimées, le nouveau fichier n'est pas touché ; la tâche se termine sans erreur.
+    écrites sont supprimées, le nouveau fichier n'est pas touché, et la tâche se termine.
 
-    Une erreur de traitement est réessayée `MAX_RETRIES` fois ; au dernier essai, l'image passe à
-    « échec » par la même écriture conditionnelle, puis l'erreur sort de la tâche : le worker la
-    journalise (Sentry la recevra avec #17). Une erreur de la conversion ne laisse aucun fichier
-    (`make_variants`) ; une erreur de l'écriture du résultat, après elle, laisse encore les
-    variantes de l'essai — limite connue, levée par le lot 3c de #12.
+    Toute erreur est réessayée `MAX_RETRIES` fois. Une erreur de la conversion, au dernier essai,
+    fait passer l'image à « échec » par la même écriture conditionnelle ; une erreur de la base —
+    lecture de la ligne, écriture du résultat — n'écrit rien, et l'image reste « en attente »
+    (ADR 0015 : « échec » s'écrit « si la base est joignable »). L'erreur du dernier essai sort de
+    la tâche : le worker la journalise (Sentry la recevra avec #17).
+
+    Limites connues, levées par le lot 3c de #12 : une erreur de l'écriture du résultat laisse les
+    variantes de l'essai ; une suppression refusée par le stockage laisse son fichier, et, à zéro
+    ligne, fait réessayer la tâche sans supprimer les variantes suivantes.
 
     Args:
         self: la tâche, liée (`bind`) : son contexte d'exécution dit le numéro de l'essai.
@@ -51,7 +55,7 @@ def process_image(self: "Task[[int, str], None]", image_id: int, original_name: 
         original_name: le nom de stockage de l'original que la sauvegarde a enfilé.
 
     Raises:
-        Exception: l'erreur du dernier essai, l'état « échec » une fois écrit.
+        Exception: l'erreur du dernier essai — « échec » écrit si elle vient de la conversion.
     """
     image = GalleryImage.objects.filter(pk=image_id, original=original_name)
     if not image.exists():
