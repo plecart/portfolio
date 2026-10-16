@@ -1100,7 +1100,8 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 # Les invariants que le lot 1 de #107 inscrit dans la prose, chacun avec la phrase qui le porte.
 #
 # **Population** : une entrée par point du bloc « Lot 1/4 » de #107 et par décision de son brief
-# que le lot fait écrire (3, 7, 9, 10, 11), plus les deux que la relecture a ajoutées (le lead
+# que le lot fait écrire (3, 7, 9, 10, 11, 16), par observation que le bloc fait fermer (94, 98,
+# 102), plus les deux que la relecture a ajoutées (le lead
 # désigné par le prompt, l'UUID de scratchpad qui n'adresse pas une session liée). La commande du
 # premier geste porte trois invariants à elle seule (`origin/`, `--no-track`, `&&`). Gardés
 # ailleurs : les trois renvois (`SKILLS_DES_SESSIONS_LIEES`), le point de départ `origin/`
@@ -1241,9 +1242,11 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ids=INVARIANTS_DES_SESSIONS_LIEES.keys(),
 )
 def test_chaque_invariant_des_sessions_liees_garde_sa_phrase(fichier: str, phrase: str) -> None:
-    """La phrase est lue sur le texte aux espaces normalisés : un retour à la ligne de la prose ne
-    la casse pas, une réécriture si."""
-    texte = " ".join((REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig").split())
+    """La phrase est lue sur le texte aux espaces normalisés, marges `# ` de tête de ligne retirées :
+    un retour à la ligne de la prose, ou du commentaire en colonne de `pipeline.config.md`, ne la
+    casse pas, une réécriture si."""
+    brut = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig")
+    texte = " ".join(re.sub(r"(?m)^[ \t]*#[ \t]?", "", brut).split())
 
     assert phrase in texte, f"`{fichier}` ne porte plus « {phrase} »"
 
