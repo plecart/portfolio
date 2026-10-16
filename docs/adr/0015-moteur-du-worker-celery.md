@@ -81,7 +81,7 @@ la transaction.**
   est joignable.
 - **Accusé de réception par défaut** : Celery accuse réception d'un message « just before » son
   exécution (doc Celery 5.6, `task_acks_late`, désactivé par défaut). Une tâche commencée n'est
-  jamais rejouée.
+  jamais redistribuée après un arrêt du worker ; seuls ses réessais la ré-exécutent.
 - **Déclenchement** : `GalleryImage.save` enfile la tâche après validation de la transaction, quand
   l'enregistrement crée l'image ou remplace son original. La tâche reçoit l'identifiant de l'image
   et le nom de l'original à traiter. Un broker injoignable à ce moment n'empêche pas
@@ -99,8 +99,8 @@ la transaction.**
 - **Variantes par `Pillow` seul**, dans un module de conversion, second et dernier module de
   l'application à importer Pillow après celui qui lit l'original au téléversement. WebP, échelle
   unique de largeurs 320, 480, 720, 960 et 1200 px : la photo de carte (spec §4.1), la galerie
-  (spec §3.2) et l'aperçu de lien (spec §1.11, ADR 0011), chaque largeur doublée pour les écrans
-  denses. Une image n'est jamais agrandie ni recadrée ; l'orientation EXIF est appliquée ;
+  (spec §3.2), largeurs doublées pour les écrans denses, et l'aperçu de lien (spec §1.11, ADR 0011),
+  dont les 1200 px plafonnent l'échelle. Une image n'est jamais agrandie ni recadrée ; l'orientation EXIF est appliquée ;
   l'original n'est jamais réécrit.
 - **Tests** : le harnais de test met l'application Celery en mode synchrone (`task_always_eager`,
   `task_eager_propagates`) ; les réglages de production n'ont aucune branche « si test ». La suite
@@ -142,7 +142,7 @@ la transaction.**
 | File en production | Redis (ADR 0006) | Redis | aucune dans Django ; backend tiers `django-tasks` en base |
 | Réessais à délai croissant | intégrés (`autoretry_for`, `retry_backoff`) | à la main (exception `Retry`, `max_tries`) | aucun dans l'API de `Task` (doc Django 6.1) |
 | Outbox | non | non | native avec un backend en base |
-| Démonstration (annexe A) | compétence reconnue | légèreté | la plus récente, écosystème jeune |
+| Démonstration | compétence reconnue (annexe A) | légèreté (annexe A) | la plus récente, écosystème jeune |
 | Verdict | **Retenu** | Écarté : asynchrone autour d'un ORM et d'un traitement synchrones | Écarté : backend de production et réessais hors de Django |
 
 **Variantes**

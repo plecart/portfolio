@@ -300,7 +300,7 @@ Identifiants hérités du cadrage v0 (D1 à D38), sans trou ni renumérotation. 
 
 1. Configuration Claude Code et pipeline de développement (§8.1).
 2. Squelette du monorepo (D52) : une **structure d'accueil**, pas des dossiers vides. Cible : `apps/api`, `apps/web`, `apps/ai`, `apps/mcp`, `packages/`, `infra/`, `docs/`. Espace de travail `uv` à la racine dont les membres sont déclarés par motif (`apps/*`, `packages/*`) ; `infra/` avec un conteneur par service ; `docs/` unique. Chaque dossier naît avec sa première brique, jamais avant (P4) ; `packages/` naît avec le premier module partagé par deux applications. Les applications ne s'importent pas entre elles : elles communiquent par Postgres et par HTTP, et ce qu'elles partagent va dans `packages/`.
-3. ADR initiaux — écrits le 2026-09-18 (`docs/adr/` 0001 à 0008) : Django, VPS + Compose, Cloudflare, R2, Postgres sur le VPS, Redis, sauvegardes, frontend (D44). Le worker (Celery ou arq) n'en fait pas partie : ADR à sa phase, annexe A.
+3. ADR initiaux — écrits le 2026-09-18 (`docs/adr/` 0001 à 0008) : Django, VPS + Compose, Cloudflare, R2, Postgres sur le VPS, Redis, sauvegardes, frontend (D44). Le worker n'en fait pas partie : ADR à sa phase, l'ADR 0015 (D59), en phase 1.
 4. Modèle de contenu, admin personnalisé, API.
 5. Première fiche : le méta-projet.
 6. `infra/` : Compose, Caddy, bootstrap, sauvegardes, runbook ; CI/CD ; premier déploiement sur `pacome.dev`.
