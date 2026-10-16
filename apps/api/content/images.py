@@ -240,3 +240,33 @@ def delete_after_commit(storage: Storage, names: Iterable[str]) -> None:
     """
     for name in names:
         transaction.on_commit(partial(storage.delete, name), robust=True)
+
+
+def delete_folder_after_commit(storage: Storage, original_name: str) -> None:
+    """Supprime de `storage`, une fois la transaction en cours validée, chaque fichier du dossier
+    de l'original `original_name` — lui et ses variantes, que le worker y range (brief de #12,
+    décision 6) ; aucun si elle est annulée.
+
+    Le dossier se lit au moment de la suppression, pas les noms que la ligne portait : le worker a
+    pu y écrire des variantes entre la lecture de la ligne et son écriture, que la ligne ne nomme
+    jamais. Le dossier n'appartient qu'à cet original (`images/<identifiant>/`, décision 7 de #9).
+
+    Args:
+        storage: le stockage qui tient l'original.
+        original_name: son nom de stockage, `images/<identifiant>/original.<ext>`.
+    """
+    folder = original_name.rsplit("/", 1)[0]
+    transaction.on_commit(partial(delete_folder, storage, folder), robust=True)
+
+
+def delete_folder(storage: Storage, folder: str) -> None:
+    """Supprime chaque fichier de `folder`, chacun par son propre rappel (`delete_after_commit`) :
+    hors de toute transaction, ils s'exécutent aussitôt, et une panne du stockage sur un fichier
+    n'empêche pas les suivants.
+
+    Args:
+        storage: le stockage qui tient le dossier.
+        folder: le dossier, sans barre finale.
+    """
+    _, files = storage.listdir(folder)
+    delete_after_commit(storage, (f"{folder}/{name}" for name in files))

@@ -20,7 +20,7 @@ from django.db.models.lookups import LessThanOrEqual
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
-from content.images import OriginalField, delete_after_commit, validate_original
+from content.images import OriginalField, delete_folder_after_commit, validate_original
 from content.validators import validate_svg
 
 if TYPE_CHECKING:
@@ -551,7 +551,7 @@ class GalleryImage(models.Model):
         return f"{self.project} · {self.caption}"
 
     # Le nom de l'original que la ligne portait quand cette instance l'a lue ou écrite pour la
-    # dernière fois : ce qu'elle-même change, et rien d'autre (`_replaced_files`).
+    # dernière fois : ce qu'elle-même change, et rien d'autre (`_replaced_original`).
     _stored_original: str | None = None
 
     @classmethod
@@ -596,9 +596,10 @@ class GalleryImage(models.Model):
 
         Remplacer l'original d'une image enregistrée — un nouveau fichier, téléversé ou
         enregistré par `OriginalFile.save` — la remet à l'état « en attente » et vide ses
-        variantes : elles décrivaient l'ancien fichier (décision 5). Les fichiers que la ligne
-        référençait sortent du stockage une fois la transaction validée, jamais si elle est
-        annulée (décision 10). Un enregistrement partiel (`update_fields`) ne remplace que s'il
+        variantes : elles décrivaient l'ancien fichier (décision 5). L'original que la ligne
+        référençait sort du stockage avec son dossier — ses variantes, celles qu'un worker y a
+        écrites pendant cet enregistrement comprises — une fois la transaction validée, jamais si
+        elle est annulée (décision 10 ; `delete_folder_after_commit`). Un enregistrement partiel (`update_fields`) ne remplace que s'il
         écrit l'original ; il écrit alors aussi ses dimensions, qui décrivent le nouveau fichier,
         et l'état et les variantes qu'un remplacement remet à zéro.
 
@@ -615,7 +616,7 @@ class GalleryImage(models.Model):
         if update_fields is not None:
             update_fields = frozenset(update_fields)
         writes_original = update_fields is None or "original" in update_fields
-        replaced = self._replaced_files() if writes_original else []
+        replaced = self._replaced_original() if writes_original else None
         if replaced:
             self.state = ProcessingState.PENDING
             self.variants = []
@@ -627,42 +628,37 @@ class GalleryImage(models.Model):
         super().save(**kwargs)
         if writes_original:
             self._stored_original = self.original.name
-        delete_after_commit(self.original.storage, replaced)
+        if replaced:
+            delete_folder_after_commit(self.original.storage, replaced)
         if creating or replaced:
             # Importée ici : la tâche lit ce module, qui ne peut donc pas la lire à son chargement.
             from content.tasks import process_after_commit
 
             process_after_commit(self.pk, self.original.name or "")
 
-    def stored_files(self) -> list[str]:
-        """Les noms que le stockage tient pour cette image : son original s'il y est, puis ses
-        variantes. Sur une ligne lue en base, ce que la ligne référence."""
-        name = self.original.name
-        original = [name] if name and self.original.stored else []
-        return [*original, *(variant["name"] for variant in self.variants)]
-
-    def _replaced_files(self) -> list[str]:
-        """Les fichiers que la ligne référence et que cette instance remplace en s'enregistrant ;
-        aucun pour une image neuve, ou dont cette instance n'a pas changé l'original.
+    def _replaced_original(self) -> str | None:
+        """Le nom de l'original que la ligne référence et que cette instance remplace en
+        s'enregistrant ; aucun pour une image neuve, ou dont cette instance n'a pas changé
+        l'original.
 
         Un téléversement affecté au champ remplace toujours : ce que la ligne référence au moment
         de l'écriture ne l'est plus après, quoi que l'instance ait lu. Un nom déjà stocké ne
         remplace que si l'instance sait lequel elle a lu ou écrit, et l'a changé — un fichier
         enregistré par `OriginalFile.save` ; une instance qui ignore ce nom — son original chargé
         avec ses pairs (`FETCH_PEERS`), sans passer par `refresh_from_db` — ne supprime rien.
-        La ligne est relue, jamais le fichier, et ce qu'elle porte sort du stockage s'il n'est pas
-        ce que l'instance écrit.
+        La ligne est relue, jamais le fichier, et son original sort du stockage avec son dossier
+        s'il n'est pas ce que l'instance écrit.
         """
         if self._state.adding:
-            return []
+            return None
         uploading = bool(self.original) and not self.original.stored
         known = self._stored_original is not None
         if not uploading and not (known and self.original.name != self._stored_original):
-            return []
-        row = type(self).objects.only("original", "variants").filter(pk=self.pk).first()
+            return None
+        row = type(self).objects.only("original").filter(pk=self.pk).first()
         if row is None or row.original.name == self.original.name:
-            return []
-        return row.stored_files()
+            return None
+        return row.original.name
 
 
 @receiver(pre_delete, sender=GalleryImage)
@@ -674,8 +670,10 @@ def delete_image_files(
     variantes (décision 10). Django ne le fait pas de lui-même, et le bucket des images est
     public (ADR 0004) : une image retirée resterait servie.
 
-    Les noms se lisent dans la ligne, avant sa suppression : pas dans l'instance, qui peut tenir
-    un original remplacé en mémoire, des valeurs périmées ou différées (`only`).
+    L'original se lit dans la ligne, avant sa suppression : pas dans l'instance, qui peut tenir
+    un original remplacé en mémoire, des valeurs périmées ou différées (`only`). Son dossier sort
+    entier, variantes comprises — y compris celles qu'un worker y écrit entre cette lecture et la
+    suppression, que la ligne ne nomme pas (`delete_folder_after_commit`).
 
     Args:
         sender: le modèle de l'image.
@@ -685,6 +683,6 @@ def delete_image_files(
     # ponytail: une lecture par image supprimée, cascades comprises — une galerie compte quelques
     # images ; si elles se comptent par centaines, lire les noms d'un coup au `pre_delete` du
     # projet.
-    row = sender.objects.only("original", "variants").filter(pk=instance.pk).first()
-    if row is not None:
-        delete_after_commit(row.original.storage, row.stored_files())
+    row = sender.objects.only("original").filter(pk=instance.pk).first()
+    if row is not None and row.original.name:
+        delete_folder_after_commit(row.original.storage, row.original.name)

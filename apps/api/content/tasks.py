@@ -6,13 +6,14 @@ Le worker la trouve par `app.autodiscover_tasks()` (`config/celery.py`), qui imp
 transaction qui crée l'image ou remplace son original.
 """
 
+from contextlib import suppress
 from functools import partial
 
 from celery import Task, shared_task
 from django.core.files.storage import default_storage
 from django.db import transaction
 
-from content.models import GalleryImage, ProcessingState
+from content.models import GalleryImage, ProcessingState, Variant
 from content.variants import make_variants
 
 # Les réessais d'un traitement en erreur (décision 8) : quatre essais en tout, séparés de 1, 2 puis
@@ -37,17 +38,17 @@ def process_image(self: "Task[[int, str], None]", image_id: int, original_name: 
     l'identifiant **et** le nom de l'original, jamais `GalleryImage.save` — qui décrit les
     écritures de l'auteur. Une image supprimée, ou dont l'original a été remplacé, avant le
     traitement : rien n'est fait. Pendant le traitement : zéro ligne mise à jour, les variantes
-    écrites sont supprimées, le nouveau fichier n'est pas touché, et la tâche se termine.
+    écrites sont supprimées, le nouveau fichier n'est pas touché, et la tâche se termine. Une
+    écriture du résultat qui échoue, ou qu'une interruption coupe, supprime aussi les variantes de
+    l'essai avant de sortir.
 
     Toute erreur est réessayée `MAX_RETRIES` fois. Une erreur de la conversion, au dernier essai,
     fait passer l'image à « échec » par la même écriture conditionnelle ; une erreur de la base —
     lecture de la ligne, écriture du résultat — n'écrit rien, et l'image reste « en attente »
     (ADR 0015 : « échec » s'écrit « si la base est joignable »). L'erreur du dernier essai sort de
-    la tâche : le worker la journalise (Sentry la recevra avec #17).
-
-    Limites connues, levées par le lot 3c de #12 : une erreur de l'écriture du résultat laisse les
-    variantes de l'essai ; une suppression refusée par le stockage laisse son fichier, et, à zéro
-    ligne, fait réessayer la tâche sans supprimer les variantes suivantes.
+    la tâche : le worker la journalise (Sentry la recevra avec #17). Aucun essai ne laisse de
+    fichier que la ligne ne nomme pas, sauf celui qu'une suppression refuse (`make_variants`,
+    `discard`).
 
     Args:
         self: la tâche, liée (`bind`) : son contexte d'exécution dit le numéro de l'essai.
@@ -66,8 +67,25 @@ def process_image(self: "Task[[int, str], None]", image_id: int, original_name: 
         if self.request.retries >= MAX_RETRIES:
             image.update(state=ProcessingState.FAILED)
         raise
-    if not image.update(state=ProcessingState.READY, variants=variants):
-        for variant in variants:
+    try:
+        written = image.update(state=ProcessingState.READY, variants=variants)
+    except BaseException:
+        discard(variants)
+        raise
+    if not written:
+        discard(variants)
+
+
+def discard(variants: list[Variant]) -> None:
+    """Supprime du stockage les fichiers de `variants`, qu'aucune ligne ne nomme : chaque
+    suppression qui échoue laisse son fichier, sans arrêter les suivantes ni masquer l'erreur en
+    cours.
+
+    Args:
+        variants: les variantes que la tâche vient d'écrire.
+    """
+    for variant in variants:
+        with suppress(Exception):
             default_storage.delete(variant["name"])
 
 
