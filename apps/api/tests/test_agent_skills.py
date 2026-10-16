@@ -1101,8 +1101,10 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 #
 # **Population** : une entrée par point du bloc « Lot 1/4 » de #107 et par décision de son brief
 # que le lot fait écrire (3, 7, 9, 10, 11, 16), par observation que le bloc fait fermer (94, 98,
-# 102), plus les deux que la relecture a ajoutées (le lead
-# désigné par le prompt, l'UUID de scratchpad qui n'adresse pas une session liée). La commande du
+# 102), plus les deux que la relecture a ajoutées (le lead désigné par le prompt, l'UUID de
+# scratchpad qui n'adresse pas une session liée) et les deux de l'amendement qui a suivi la mesure
+# sur l'enfant jetable (l'enfant lit son parent dans son prompt, la porte du nettoyage compare
+# l'échafaudage à sa source — journal de spec de #107, 2026-10-16). La commande du
 # premier geste porte trois invariants à elle seule (`origin/`, `--no-track`, `&&`). Gardés
 # ailleurs : les trois renvois (`SKILLS_DES_SESSIONS_LIEES`), le point de départ `origin/`
 # (`DEPARTS_EXPLICITES`), la porte du nettoyage (`PORTES_PRESCRITES`). Restent en lecture, à
@@ -1129,13 +1131,17 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "contexte-neuf-jamais-fork": (SESSIONS_LIEES_REF, "`context: fresh`, jamais `fork`"),
     # Identité.
-    "enfant-lit-son-parent-dans-startedby": (
+    "enfant-lit-son-parent-dans-son-prompt": (
         SESSIONS_LIEES_REF,
-        'L\'enfant retrouve son parent dans le champ `startedBy` de `list_sessions {"linked": true}`',
+        "L'enfant lit l'adresse de son parent dans **son prompt système**",
     ),
     "parent-designe-l-enfant-par-son-session-id": (
         SESSIONS_LIEES_REF,
         "Le parent désigne l'enfant par le `session_id` (`local_…`)",
+    ),
+    "porte-du-nettoyage-sur-la-source": (
+        SESSIONS_LIEES_REF,
+        "git merge-base --is-ancestor claude/<slug>-<hex> <source> && git branch -D",
     ),
     "scratchpad-n-adresse-pas-une-session-liee": (
         PR_PARALLELES_SKILL,

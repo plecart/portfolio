@@ -24,21 +24,27 @@ de l'application ci-dessous porte sa date de mesure. Le relevé complet — enfa
 
 ## Identité — un identifiant, jamais un chemin
 
-- L'enfant retrouve son parent dans le champ `startedBy` de `list_sessions {"linked": true}`
-  (mesuré le 2026-10-16).
-- Le parent désigne l'enfant par le `session_id` (`local_…`) que `start_session` lui rend et que
-  `list_sessions` relit. C'est l'adresse de `SendMessage`.
+- L'enfant lit l'adresse de son parent dans **son prompt système**, où l'application l'écrit
+  (`to: local_…`). Il ne la lit pas dans `startedBy` : `list_sessions` exclut la session
+  courante, donc l'enfant ne voit jamais sa propre ligne (mesuré le 2026-10-16, enfant jetable
+  `local_1c8a08b0…`).
+- Le parent désigne l'enfant par le `session_id` (`local_…`) que `start_session` lui rend ; il le
+  retrouve dans `list_sessions {"linked": true}`, où la ligne de l'enfant porte `startedBy` égal à
+  l'identifiant du parent (même mesure). C'est l'adresse de `SendMessage`.
 - Ni le nom d'une session, qui tourne, ni le chemin de son scratchpad : l'UUID du scratchpad est
   celui du transcript (`~/.claude/projects/<projet>/<uuid>.jsonl`), pas l'identifiant `local_…`
   de l'application (mesuré le 2026-10-16 : la session du lot 1 de #107 a son scratchpad et son
-  transcript sous le même UUID, `4efeea8f-…`).
+  transcript sous `4efeea8f-…`, et l'identifiant `local_8b381acb-…`).
 
 ## Premier geste dans un worktree de l'application
 
 L'application place l'enfant sous `<repo>/.claude/worktrees/<slug>-<hex>`, sur une branche
-`claude/<slug>-<hex>` coupée sur le **`main` local sans fetch**, sans upstream (mesuré le
-2026-10-16 : 4 commits de retard sur `origin/main`). Avant toute écriture, l'enfant crée sa
-branche depuis le distant, en une commande :
+`claude/<slug>-<hex>` sans upstream, coupée **sans fetch** sur sa **source** : le `main` local
+quand le parent travaille dans le clone principal (mesuré le 2026-10-16 : 4 commits de retard sur
+`origin/main`), la tête du parent quand il travaille dans un worktree (même jour : `fee1e2a`, tête
+de la PR #109). Le registre de l'application garde ensuite ce nom de branche, même après le
+premier geste (même mesure). Avant toute écriture, l'enfant crée sa branche depuis le distant,
+en une commande :
 `git fetch origin && git checkout -b <type>/<slug> --no-track origin/<base>`.
 
 `<base>` est la branche que visera sa PR — le trunk pour une issue. Le point de départ explicite
@@ -101,10 +107,11 @@ démarré nettoie après lui : `git worktree remove <chemin>`, puis l'échafauda
 d'ancêtre :
 
 ```
-git merge-base --is-ancestor claude/<slug>-<hex> origin/<trunk> && git branch -D claude/<slug>-<hex>
+git merge-base --is-ancestor claude/<slug>-<hex> <source> && git branch -D claude/<slug>-<hex>
 ```
 
-Un refus de la porte signale un commit sur l'échafaudage, ou un `main` local en avance sur le
-distant, sur lequel il a été coupé — `git log --oneline origin/<trunk>..claude/<slug>-<hex>`
-liste les commits qui bloquent : le remonter au mainteneur, jamais `-D` sans la porte. Une branche
+`<source>` est ce sur quoi l'échafaudage a été coupé (« Premier geste ») : `main`, ou la branche
+du parent. Un refus de la porte signale un commit sur l'échafaudage —
+`git log --oneline <source>..claude/<slug>-<hex>` liste les commits qui bloquent : le remonter
+au mainteneur, jamais `-D` sans la porte. Une branche
 de PR mergée suit `pr-paralleles` Étape 8.
