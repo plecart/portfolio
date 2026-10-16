@@ -137,25 +137,38 @@ def test_une_variante_garde_la_transparence_de_l_original_et_rien_d_autre(
     assert written(variant).mode == expected
 
 
-def test_le_profil_de_couleur_d_un_original_rgb_suit_ses_variantes() -> None:
+# Les originaux dont le profil ICC suit les variantes, et ceux dont il ne suit pas : la forme,
+# l'original encodé avec un profil, et si la variante le porte.
+PROFILES = [
+    ("JPEG RGB", encoded(Image.new("RGB", (300, 300)), "JPEG", icc_profile=SRGB_PROFILE), True),
+    (
+        "PNG en palette transparente",
+        encoded(Image.new("P", (300, 300)), transparency=0, icc_profile=SRGB_PROFILE),
+        True,
+    ),
+    ("JPEG CMYK", encoded(Image.new("CMYK", (300, 300)), "JPEG", icc_profile=SRGB_PROFILE), False),
+    (
+        "PNG en niveaux de gris",
+        encoded(Image.new("L", (300, 300)), icc_profile=SRGB_PROFILE),
+        False,
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("content", "kept"),
+    [(content, kept) for _, content, kept in PROFILES],
+    ids=[form for form, _, _ in PROFILES],
+)
+def test_le_profil_de_couleur_d_un_original_rgb_suit_ses_variantes_et_aucun_autre(
+    content: bytes, kept: bool
+) -> None:
     """Sans son profil ICC, une photo de téléphone en Display P3 serait lue en sRGB, ses couleurs
-    ternies : Pillow ne reprend pas le profil de lui-même à l'écriture d'un WebP."""
-    profile = SRGB_PROFILE
-    original = stored_original(encoded(Image.new("RGB", (300, 300)), "JPEG", icc_profile=profile))
+    ternies : Pillow ne reprend pas le profil de lui-même à l'écriture d'un WebP. Une palette est
+    en RGB ; un profil CMYK ou gris décrirait mal une variante RGB, qui n'en porte alors aucun."""
+    (variant,) = make_variants(default_storage, stored_original(content))
 
-    (variant,) = make_variants(default_storage, original)
-
-    assert written(variant).info.get("icc_profile") == profile
-
-
-def test_le_profil_d_un_original_cmyk_ne_suit_pas_ses_variantes_rgb() -> None:
-    """Un profil CMYK décrirait mal une variante RGB : elle n'en porte aucun."""
-    profile = SRGB_PROFILE
-    original = stored_original(encoded(Image.new("CMYK", (300, 300)), "JPEG", icc_profile=profile))
-
-    (variant,) = make_variants(default_storage, original)
-
-    assert "icc_profile" not in written(variant).info
+    assert written(variant).info.get("icc_profile") == (SRGB_PROFILE if kept else None)
 
 
 def test_un_original_tres_allonge_garde_une_hauteur_d_un_pixel() -> None:
@@ -256,34 +269,46 @@ class FailingStorage(FileSystemStorage):
 # Les chemins par lesquels un essai qui échoue après avoir écrit pourrait laisser un fichier —
 # recensés à la relecture du lot 3a, avant le correctif : cinq, dont trois fuyaient (l'écriture
 # qui échoue après avoir créé son fichier, la suppression qui échoue pendant le nettoyage, une
-# interruption qui n'est pas une `Exception`). Le premier, une erreur avant toute écriture —
-# lecture, décodage —, n'écrit rien : `test_un_original_d_un_autre_format_n_est_pas_decode`.
-FAILURES = [
-    ("enregistrement refusé avant l'écriture", "avant l'écriture", frozenset[str](), OSError),
-    ("enregistrement qui échoue après l'écriture", "après l'écriture", frozenset[str](), OSError),
-    ("interruption", "interruption", frozenset[str](), Interrupted),
+# interruption qui n'est pas une `Exception`) ; la relance en a rendu un sixième, l'écriture qui
+# échoue sous un nom déjà pris — un orphelin qu'une suppression a refusé. Une erreur avant toute
+# écriture — lecture, décodage — n'écrit rien : `test_un_original_d_un_autre_format_n_est_pas_decode`.
+# Reste ouvert, et le seul : un écrivain concurrent qui prend le nom réservé entre la réservation
+# et l'écriture, exclu par la concurrence 1 du worker et un dossier par original (décision 9).
+# Chaque forme : le chemin, l'échec, le rang de l'enregistrement qui échoue — l'original est le
+# premier —, le nom déjà pris dans le dossier, et l'erreur attendue.
+FAILURES: list[tuple[str, str, int, str | None, type[BaseException]]] = [
+    ("enregistrement refusé avant l'écriture", "avant l'écriture", 4, None, OSError),
+    ("enregistrement qui échoue après l'écriture", "après l'écriture", 4, None, OSError),
+    ("interruption", "interruption", 4, None, Interrupted),
+    ("échec après l'écriture sous un nom déjà pris", "après l'écriture", 3, "320.webp", OSError),
 ]
 
 
 @pytest.mark.parametrize(
-    ("failure", "undeletable", "error"),
-    [(failure, undeletable, error) for _, failure, undeletable, error in FAILURES],
+    ("failure", "failing", "taken", "error"),
+    [(failure, failing, taken, error) for _, failure, failing, taken, error in FAILURES],
     ids=[path for path, *_ in FAILURES],
 )
 def test_une_conversion_qui_echoue_ne_laisse_aucune_variante(
-    tmp_path: Path, failure: str, undeletable: frozenset[str], error: type[BaseException]
+    tmp_path: Path, failure: str, failing: int, taken: str | None, error: type[BaseException]
 ) -> None:
     """L'erreur sort telle quelle, et l'essai ne laisse aucun fichier : le suivant repart de rien.
-    La troisième variante échoue, les deux premières sont écrites."""
-    storage = FailingStorage(str(tmp_path), failing=4, failure=failure, undeletable=undeletable)
+    Un fichier qui était là avant l'essai reste, intact."""
+    storage = FailingStorage(str(tmp_path), failing=failing, failure=failure)
     original = storage.save(
         "images/abc/original.png", ContentFile(encoded(Image.new("RGB", (1300, 1300))))
     )
+    kept = [taken] if taken else []
+    for name in kept:
+        storage.save(f"images/abc/{name}", ContentFile(b"ancien"))
 
     with pytest.raises(error):
         make_variants(storage, original)
 
-    assert storage.listdir("images/abc") == ([], ["original.png"])
+    assert storage.listdir("images/abc") == ([], sorted([*kept, "original.png"]))
+    for name in kept:
+        with storage.open(f"images/abc/{name}") as file:
+            assert file.read() == b"ancien"
 
 
 def test_une_suppression_qui_echoue_n_empeche_pas_les_autres_ni_ne_masque_l_erreur(

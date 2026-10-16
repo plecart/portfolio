@@ -51,7 +51,8 @@ def make_variants(storage: Storage, original_name: str) -> list[Variant]:
     hauteur en proportion arrondie — un pixel au moins —, jamais recadré (spec §1.11), et encodé
     par `encode_variant`. Chaque variante est rangée dans le dossier de l'original sous sa
     largeur, `images/<identifiant>/<largeur>.webp` (décision 6) ; son `name` est celui que le
-    stockage a retenu, que le nom soit pris ou non.
+    stockage a retenu, que le nom soit pris ou non — sur un stockage qui n'écrase pas, comme celui
+    du disque ; celui de R2 écrase par défaut (#13).
 
     Args:
         storage: le stockage qui tient l'original et recevra les variantes.
