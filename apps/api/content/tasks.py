@@ -8,6 +8,7 @@ transaction qui crée l'image ou remplace son original.
 
 from contextlib import suppress
 from functools import partial
+from typing import TYPE_CHECKING
 
 from celery import Task, shared_task
 from django.core.files.storage import default_storage
@@ -15,6 +16,9 @@ from django.db import transaction
 
 from content.models import GalleryImage, ProcessingState, Variant
 from content.variants import make_variants
+
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
 
 # Les réessais d'un traitement en erreur (décision 8) : quatre essais en tout, séparés de 1, 2 puis
 # 4 s (`retry_backoff`, sans l'aléa que Celery y met par défaut).
@@ -42,13 +46,12 @@ def process_image(self: "Task[[int, str], None]", image_id: int, original_name: 
     écriture du résultat qui échoue, ou qu'une interruption coupe, supprime aussi les variantes de
     l'essai avant de sortir.
 
-    Toute erreur est réessayée `MAX_RETRIES` fois. Une erreur de la conversion, au dernier essai,
-    fait passer l'image à « échec » par la même écriture conditionnelle ; une erreur de la base —
-    lecture de la ligne, écriture du résultat — n'écrit rien, et l'image reste « en attente »
-    (ADR 0015 : « échec » s'écrit « si la base est joignable »). L'erreur du dernier essai sort de
-    la tâche : le worker la journalise (Sentry la recevra avec #17). Aucun essai ne laisse de
-    fichier que la ligne ne nomme pas, sauf celui qu'une suppression refuse (`make_variants`,
-    `discard`).
+    Toute erreur est réessayée `MAX_RETRIES` fois. Réessais épuisés, quelle que soit l'origine de
+    l'erreur, l'image passe à « échec » par la même écriture conditionnelle, si la base est
+    joignable ; sinon elle reste « en attente » (ADR 0015 § Décision, « Échecs » ; `mark_failed`).
+    L'erreur du dernier essai sort de la tâche : le worker la journalise (Sentry la recevra avec
+    #17). Aucun essai ne laisse de fichier que la ligne ne nomme pas, sauf celui qu'une
+    suppression refuse (`make_variants`, `discard`).
 
     Args:
         self: la tâche, liée (`bind`) : son contexte d'exécution dit le numéro de l'essai.
@@ -56,17 +59,32 @@ def process_image(self: "Task[[int, str], None]", image_id: int, original_name: 
         original_name: le nom de stockage de l'original que la sauvegarde a enfilé.
 
     Raises:
-        Exception: l'erreur du dernier essai — « échec » écrit si elle vient de la conversion.
+        Exception: l'erreur du dernier essai, « échec » écrit si la base l'a permis.
     """
     image = GalleryImage.objects.filter(pk=image_id, original=original_name)
-    if not image.exists():
-        return
     try:
-        variants = make_variants(default_storage, original_name)
+        attempt(image, original_name)
     except Exception:
         if self.request.retries >= MAX_RETRIES:
-            image.update(state=ProcessingState.FAILED)
+            mark_failed(image)
         raise
+
+
+def attempt(image: "QuerySet[GalleryImage]", original_name: str) -> None:
+    """Un essai du traitement : rien si la ligne ne porte plus l'original ; sinon ses variantes,
+    puis « prêt » et leur liste, posés ensemble par une requête conditionnelle (décision 7).
+
+    Args:
+        image: la ligne de l'image, filtrée sur son identifiant et l'original traité.
+        original_name: le nom de stockage de cet original.
+
+    Raises:
+        Exception: une erreur de la conversion, du stockage ou de la base ; les variantes de
+            l'essai sont alors supprimées.
+    """
+    if not image.exists():
+        return
+    variants = make_variants(default_storage, original_name)
     try:
         written = image.update(state=ProcessingState.READY, variants=variants)
     except BaseException:
@@ -74,6 +92,19 @@ def process_image(self: "Task[[int, str], None]", image_id: int, original_name: 
         raise
     if not written:
         discard(variants)
+
+
+def mark_failed(image: "QuerySet[GalleryImage]") -> None:
+    """Pose l'état « échec » sur la ligne `image` — sans variante, la ligne étant « en attente » —,
+    si la base le permet : une écriture qui échoue à son tour laisse l'image « en attente », sans
+    masquer l'erreur d'origine, celle que le worker doit journaliser (ADR 0015 § Décision,
+    « Échecs »).
+
+    Args:
+        image: la ligne de l'image, filtrée sur son identifiant et l'original traité.
+    """
+    with suppress(Exception):
+        image.update(state=ProcessingState.FAILED)
 
 
 def discard(variants: list[Variant]) -> None:
