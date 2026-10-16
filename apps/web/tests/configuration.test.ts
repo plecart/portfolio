@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { major } from 'semver'
 import * as ts from 'typescript'
 import { beforeAll, expect, test } from 'vitest'
+import viteConfig from '../vite.config.ts'
 import {
   APP_ROOT,
   installedPackage,
@@ -126,4 +127,13 @@ test('la porte de lint échoue sur un simple avertissement', () => {
   // `react-hooks/exhaustive-deps`. Sans ce drapeau, `eslint` sort 0 devant elles et la porte
   // passe au vert en ayant vu le défaut. C'est une option qui fait la porte, pas une préférence.
   expect(manifest.scripts.lint).toContain('--max-warnings 0')
+})
+
+test("la compilation échoue sans l'origine de l'API, et passe avec", () => {
+  const build = { command: 'build', isSsrBuild: false, isPreview: false } as const
+
+  // Aucun fichier `.env.sans-api` : le mode n'apporte pas `VITE_API_URL`. Sans la garde, Vite
+  // remplacerait la variable par `undefined` et le site appellerait `undefined/api/projets`.
+  expect(() => viteConfig({ ...build, mode: 'sans-api' })).toThrow('VITE_API_URL')
+  expect(() => viteConfig({ ...build, mode: 'production' })).not.toThrow()
 })
