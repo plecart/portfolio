@@ -6,12 +6,12 @@ import { Table } from './table/Table.tsx'
 
 export default function App() {
   const table = useRef<HTMLElement>(null)
-  const { status, retry } = useProjects()
+  const { status, retry, retried } = useProjects()
 
   return (
     <>
       <SiteHeader />
-      <Table ref={table} status={status} onRetry={retry} />
+      <Table ref={table} status={status} onRetry={retry} retried={retried} />
       <AuthorLinks table={table} />
     </>
   )
