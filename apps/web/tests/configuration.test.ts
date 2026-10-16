@@ -134,12 +134,14 @@ test("la compilation échoue sans l'origine de l'API ou sur une adresse mal form
   const compile = (mode: string, value?: string) => {
     // `loadEnv` lit aussi l'environnement du processus, qui l'emporte sur les fichiers : fixée ici,
     // la variable ne dépend pas du poste. Absente du processus, elle vient du fichier du mode.
+    const saved = process.env.VITE_API_URL
     if (value === undefined) delete process.env.VITE_API_URL
     else process.env.VITE_API_URL = value
     try {
       viteConfig({ ...build, mode })
     } finally {
-      delete process.env.VITE_API_URL
+      if (saved === undefined) delete process.env.VITE_API_URL
+      else process.env.VITE_API_URL = saved
     }
   }
 
@@ -147,5 +149,6 @@ test("la compilation échoue sans l'origine de l'API ou sur une adresse mal form
   // remplacerait la variable par `undefined`, et l'adresse de la liste ne se construirait pas.
   expect(() => compile('sans-api')).toThrow('VITE_API_URL')
   expect(() => compile('sans-api', 'api.pacome.dev')).toThrow('VITE_API_URL')
+  expect(() => compile('sans-api', 'localhost:8000')).toThrow('VITE_API_URL')
   expect(() => compile('production')).not.toThrow()
 })
