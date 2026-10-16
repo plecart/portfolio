@@ -7,14 +7,19 @@
  * posé par le scénario l'emporte, Playwright jouant les routes dans l'ordre inverse de leur pose.
  * Les gestes visent le chemin de la liste sur toute origine.
  */
+import { join } from 'node:path'
 import { test as base, type Page, type Route } from '@playwright/test'
 import { loadEnv } from 'vite'
 import type { Project } from './projects.ts'
 
 export { expect } from '@playwright/test'
 
-/** L'origine de l'API dans la version compilée, lue dans la même source que la compilation. */
-export const API_ORIGIN = new URL(loadEnv('production', process.cwd()).VITE_API_URL).origin
+/**
+ * L'origine de l'API dans la version compilée, lue dans la même source que la compilation : les
+ * fichiers de mode de l'application, quel que soit le répertoire d'où les scénarios sont lancés.
+ */
+export const API_ORIGIN = new URL(loadEnv('production', join(import.meta.dirname, '..')).VITE_API_URL)
+  .origin
 
 /** La liste, sur toute origine. */
 const PROJECTS_PATH = '**/api/projets'

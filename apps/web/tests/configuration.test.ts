@@ -129,11 +129,23 @@ test('la porte de lint échoue sur un simple avertissement', () => {
   expect(manifest.scripts.lint).toContain('--max-warnings 0')
 })
 
-test("la compilation échoue sans l'origine de l'API, et passe avec", () => {
+test("la compilation échoue sans l'origine de l'API ou sur une adresse mal formée, et passe avec", () => {
   const build = { command: 'build', isSsrBuild: false, isPreview: false } as const
+  const compile = (mode: string, value?: string) => {
+    // `loadEnv` lit aussi l'environnement du processus, qui l'emporte sur les fichiers : fixée ici,
+    // la variable ne dépend pas du poste. Absente du processus, elle vient du fichier du mode.
+    if (value === undefined) delete process.env.VITE_API_URL
+    else process.env.VITE_API_URL = value
+    try {
+      viteConfig({ ...build, mode })
+    } finally {
+      delete process.env.VITE_API_URL
+    }
+  }
 
   // Aucun fichier `.env.sans-api` : le mode n'apporte pas `VITE_API_URL`. Sans la garde, Vite
-  // remplacerait la variable par `undefined` et le site appellerait `undefined/api/projets`.
-  expect(() => viteConfig({ ...build, mode: 'sans-api' })).toThrow('VITE_API_URL')
-  expect(() => viteConfig({ ...build, mode: 'production' })).not.toThrow()
+  // remplacerait la variable par `undefined`, et l'adresse de la liste ne se construirait pas.
+  expect(() => compile('sans-api')).toThrow('VITE_API_URL')
+  expect(() => compile('sans-api', 'api.pacome.dev')).toThrow('VITE_API_URL')
+  expect(() => compile('production')).not.toThrow()
 })
