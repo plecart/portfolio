@@ -10,7 +10,7 @@ Ordre de normativité : **en cas de contradiction, le rang le plus haut l'emport
 
 | Rang | Fichier | Portée | Où s'inscrit un amendement |
 |---|---|---|---|
-| 1 | `docs/cadrage-technique.md` | périmètre, phases, architecture, contraintes, registre des décisions D1-D58 (§7) | le § concerné + une ligne au registre §7 (une décision remplacée y reste, marquée « remplacée par ») |
+| 1 | `docs/cadrage-technique.md` | périmètre, phases, architecture, contraintes, registre des décisions D1-D59 (§7) | le § concerné + une ligne au registre §7 (une décision remplacée y reste, marquée « remplacée par ») |
 | 2 | `docs/specification-ux.md` | interface du site : direction (§1), jetons, écrans, composants, états, responsive, accessibilité, performance, contraintes de contenu (§2-§7, valeurs mesurées sur les prototypes retenus) | le § concerné, puis le prototype HTML correspondant (hors dépôt, `E:/Projets/Portfolio-prototypes/`, README de reprise) : les deux restent alignés |
 | 3 | `docs/adr/` (index et conventions : `docs/adr/README.md`) | le pourquoi d'une brique, options écartées | un nouvel ADR qui remplace l'ancien (statut MADR « remplacé par »), jamais l'édition d'un ADR accepté |
 | 4 | `docs/frontend-outillage.md` | inventaire installé et plan d'installation de `apps/web/` (le pourquoi de D44 est dans l'ADR 0008), provisoire | le § concerné |
@@ -27,7 +27,7 @@ Toute référence croisée cite un **§ ou un titre de section**, jamais un num�
 ## Stack
 - langages : Python 3.12 ; TypeScript (frontend, D44)
 - frameworks :
-  - phase 1 : Django + django-ninja (API, admin) ; Vite + React + TypeScript + Tailwind CSS + shadcn/ui (frontend, cadrage §5.2, D44)
+  - phase 1 : Django + django-ninja (API, admin) ; Celery, broker Redis (worker, ADR 0015) ; Vite + React + TypeScript + Tailwind CSS + shadcn/ui (frontend, cadrage §5.2, D44)
   - phase 2 : FastAPI + LangGraph / LangChain / LangSmith ; embeddings et reranking `bge-m3` + `bge-reranker-v2-m3` via `text-embeddings-inference`
   - phase 3 : SDK Python `mcp` (FastMCP)
 - infrastructure : Postgres 16 + pgvector, Redis 7, Docker Compose, Caddy, Cloudflare (DNS, CDN, WAF, Access, Tunnel, R2), GitHub Actions + GHCR
