@@ -23,7 +23,7 @@ et se trace ; vision `[V]`, elle attend le mainteneur, groupée ; contradiction 
 `init-projet` ; ne jamais deviner une commande.
 
 **Vague parallèle.** Si le prompt de démarrage de cette session vient d'une autre session — bloc
-`<cross-session-message>`, ou session parente lue dans `startedBy`
+`<cross-session-message>`, ou session parente nommée par le prompt système
 ([references/sessions-liees.md](references/sessions-liees.md), « Identité ») —, le **lead** de la
 vague (`pr-paralleles`) est la session que ce prompt désigne comme tel, à défaut l'émettrice :
 retenir son identifiant. Le lead intervient à un seul moment prévu — la vérification avant merge
