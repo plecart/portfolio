@@ -23,7 +23,8 @@ from celery import Celery
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
-# ponytail: aucune découverte des modules de tâches — il n'en existe aucun. `app.autodiscover_tasks()`
-# arrive avec la première tâche (#12, lot 3), sans quoi le worker ne la connaîtrait pas.
 app = Celery("config")
 app.config_from_object("django.conf:settings", namespace="CELERY")
+# Le module `tasks` de chaque application installée, importé quand le worker en a besoin : sans
+# lui, le worker ne connaîtrait pas `content.tasks.process_image`.
+app.autodiscover_tasks()

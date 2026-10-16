@@ -33,7 +33,7 @@ type ImageFactory = Callable[..., GalleryImage]
 # fasse rougir ce fichier.
 CAPTION_MAX_LENGTH = 50
 
-# Une variante telle que le worker de #12 la décrira (décision 5).
+# Une variante telle que le worker la décrit (décision 5).
 VARIANT = {"name": "images/abc/w640.webp", "width": 640, "height": 640}
 
 # Le nom de stockage d'un original (décision 7) : un identifiant aléatoire, puis l'extension du
@@ -335,7 +335,8 @@ def test_les_valeurs_de_l_etat_sont_celles_que_l_api_expose() -> None:
 
 @pytest.mark.django_db
 def test_une_image_nait_en_attente_sans_variante(portfolio: Project, image: ImageFactory) -> None:
-    """Rien ici ne la traite : le worker de #12 la fera passer à « prêt » ou à « échec »."""
+    """Sans transaction validée, rien ne la traite : le worker la fait passer à « prêt » ou à
+    « échec » (`test_tasks.py`)."""
     made = saved(image(portfolio))
 
     made.refresh_from_db()
@@ -558,7 +559,7 @@ class Rollback(Exception):
 
 def ready(made: GalleryImage) -> list[str]:
     """Enregistre `made` prête, avec une variante stockée à côté de son original, comme le worker
-    de #12 le fera ; rend les noms que le stockage tient pour elle."""
+    le fait ; rend les noms que le stockage tient pour elle."""
     saved(made)
     folder = (made.original.name or "").rsplit("/", 1)[0]
     variant = default_storage.save(f"{folder}/w640.webp", ContentFile(b"variante"))
@@ -571,6 +572,25 @@ def ready(made: GalleryImage) -> list[str]:
 def stored(names: list[str]) -> list[bool]:
     """Pour chacun de `names`, si le stockage le tient encore."""
     return [default_storage.exists(name) for name in names]
+
+
+def pending(made: GalleryImage) -> bool:
+    """Si la ligne de `made` est en attente, sans variante — ce qu'un remplacement écrit, lu avant
+    la validation de sa transaction : après, le worker l'a traitée."""
+    row = type(made).objects.get(pk=made.pk)
+    return (row.state, row.variants) == (ProcessingState.PENDING, [])
+
+
+def processed(made: GalleryImage) -> bool:
+    """Si la ligne de `made` est prête, ses variantes rangées dans le dossier de l'original
+    qu'elle référence — le worker est passé sur le nouveau fichier."""
+    row = type(made).objects.get(pk=made.pk)
+    folder = (row.original.name or "").rsplit("/", 1)[0]
+    return (
+        ProcessingState(row.state) is ProcessingState.READY
+        and bool(row.variants)
+        and all(variant["name"].startswith(f"{folder}/") for variant in row.variants)
+    )
 
 
 @pytest.mark.django_db
@@ -630,7 +650,8 @@ def test_remplacer_le_fichier_d_une_image_prete_la_remet_en_attente_et_supprime_
     django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
 ) -> None:
     """Les variantes de l'ancien original ne valent plus rien : vidées, et supprimées avec lui une
-    fois la transaction validée. Le worker de #12 repartira de l'état « en attente »."""
+    fois la transaction validée. Le worker repart de l'état « en attente » : la transaction
+    validée, il a traité le nouvel original (`test_tasks.py`)."""
     made = image(portfolio)
     names = ready(made)
     loaded = type(made).objects.get(pk=made.pk)
@@ -639,11 +660,11 @@ def test_remplacer_le_fichier_d_une_image_prete_la_remet_en_attente_et_supprime_
     with django_capture_on_commit_callbacks(execute=True):
         loaded.save()
         assert stored(names) == [True, True]
+        assert pending(loaded)
 
-    loaded.refresh_from_db()
-    assert (loaded.state, loaded.variants) == (ProcessingState.PENDING, [])
     assert stored(names) == [False, False]
     assert stored([loaded.original.name or ""]) == [True]
+    assert processed(loaded)
 
 
 @pytest.mark.django_db
@@ -685,12 +706,15 @@ def test_remplacer_l_original_par_son_enregistrement_direct_lit_le_nouveau_conte
 
     with django_capture_on_commit_callbacks(execute=True):
         loaded.original.save("photo.png", ContentFile(jpeg))
+        assert pending(loaded)
+        assert witness.opened == []
 
     loaded.refresh_from_db()
     assert (loaded.original.name or "").endswith("/original.jpg")
-    assert (loaded.state, loaded.variants) == (ProcessingState.PENDING, [])
     assert stored(names) == [False, False]
-    assert witness.opened == []
+    # La transaction validée, le worker lit le nouvel original, et lui seul.
+    assert witness.opened == [loaded.original.name]
+    assert processed(loaded)
 
 
 @pytest.mark.django_db
@@ -811,10 +835,10 @@ def test_un_televersement_remplace_meme_sur_une_instance_qui_n_a_pas_lu_son_orig
 
     with django_capture_on_commit_callbacks(execute=True):
         loaded.save()
+        assert pending(loaded)
 
-    row = type(made).objects.get(pk=made.pk)
-    assert (row.state, row.variants) == (ProcessingState.PENDING, [])
     assert stored(names) == [False, False]
+    assert processed(loaded)
 
 
 @pytest.mark.django_db
@@ -882,10 +906,10 @@ def test_un_original_ecarte_d_un_enregistrement_partiel_reste_a_remplacer(
     with django_capture_on_commit_callbacks(execute=True):
         loaded.save(update_fields=["caption"])
         loaded.save()
+        assert pending(loaded)
 
-    row = type(made).objects.get(pk=made.pk)
-    assert (row.state, row.variants) == (ProcessingState.PENDING, [])
     assert stored(names) == [False, False]
+    assert processed(loaded)
 
 
 @pytest.mark.django_db
@@ -942,10 +966,10 @@ def test_un_enregistrement_partiel_qui_remplace_l_original_remet_l_image_en_atte
 
     with django_capture_on_commit_callbacks(execute=True):
         loaded.save(update_fields=["original", "width", "height"])
+        assert pending(loaded)
 
-    row = type(made).objects.get(pk=made.pk)
-    assert (row.state, row.variants) == (ProcessingState.PENDING, [])
     assert stored(names) == [False, False]
+    assert processed(loaded)
 
 
 @pytest.mark.django_db

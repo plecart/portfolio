@@ -235,6 +235,25 @@ def test_la_commande_du_worker_trouve_l_application_et_ses_reglages(
     assert f"CELERY_BROKER_URL: {variables['REDIS_URL']!r}" in result.stdout
 
 
+# Les tâches que le worker connaît à son démarrage, dans un processus neuf : il importe
+# l'application comme `celery -A config worker`, puis ses modules par défaut, comme le worker
+# avant de consommer (`loader.import_default_modules`, qui déclenche `autodiscover_tasks`).
+WORKER_TASKS = """
+from config.celery import app
+app.loader.import_default_modules()
+print(sorted(name for name in app.tasks if not name.startswith('celery.')))
+"""
+
+
+def test_le_worker_connait_la_tache_des_images(variables: dict[str, str]) -> None:
+    """Sans la découverte des modules `tasks`, le worker rejetterait comme inconnu chaque message
+    que `api` enfile — et la suite, qui importe la tâche elle-même, ne le verrait pas."""
+    result = run_python(["-c", WORKER_TASKS], variables)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "['content.tasks.process_image']"
+
+
 @shared_task
 def doubled(value: int) -> int:
     """Une tâche de test : le double de `value`."""
