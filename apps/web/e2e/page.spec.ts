@@ -9,10 +9,11 @@
 // (`dist/index.d.ts`), et la forme par défaut n'est pas constructible sans `esModuleInterop`,
 // que le projet n'active pas.
 import { AxeBuilder } from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { API_ORIGIN, expect, test } from './api.ts'
 import { detachHeader } from './scroll.ts'
 
-/** L'origine que le site sert lui-même. Tout ce qui n'en vient pas est un tiers. */
+/** L'origine que le site sert lui-même. */
 function ownOrigin(page: Page): string {
   return new URL(page.url()).origin
 }
@@ -36,6 +37,9 @@ test("la page déclare le français comme langue du document", async ({ page }) 
  * `<img loading="lazy">` sous la ligne de flottaison (#20) ; `fetch` derrière une
  * interaction (#19) ; `preconnect` et `dns-prefetch`, qui joignent le tiers en DNS et TLS sans
  * jamais produire de requête HTTP.
+ *
+ * L'API n'est pas un tiers (spec §6.4) : son origine est admise, lue dans la même source que la
+ * compilation (brief de #19, décision 11). Tout le reste en est un.
  */
 test("la page ne fait aucune requête vers un tiers", async ({ page }) => {
   const requested: string[] = []
@@ -53,12 +57,13 @@ test("la page ne fait aucune requête vers un tiers", async ({ page }) => {
   // Les schémas `data:` et `blob:` n'ont pas d'origine et ne quittent jamais le document : les
   // compter comme tiers rendrait la mesure fausse. `ws:`/`wss:` en revanche partent bien chez un
   // tiers, et leur origine se compare après normalisation du schéma.
-  const own = ownOrigin(page)
+  const admitted = [ownOrigin(page), API_ORIGIN]
   const thirdParty = requested.filter((url) => {
     const { protocol, origin } = new URL(url)
     if (!['http:', 'https:', 'ws:', 'wss:'].includes(protocol)) return false
 
-    return origin.replace(/^wss?:/, (scheme) => (scheme === 'ws:' ? 'http:' : 'https:')) !== own
+    const httpOrigin = origin.replace(/^wss?:/, (scheme) => (scheme === 'ws:' ? 'http:' : 'https:'))
+    return !admitted.includes(httpOrigin)
   })
 
   expect(thirdParty).toEqual([])

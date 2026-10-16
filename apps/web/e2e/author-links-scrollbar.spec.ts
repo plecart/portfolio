@@ -7,7 +7,8 @@
  * `clientWidth` vaut `innerWidth` : aucun autre scénario ne voit cette voie. Ce fichier les rend
  * visibles ; mesuré le 2026-10-14 sur le poste : barre fine de 10 px, `clientWidth` 1190 à 1200 px.
  */
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { expect, test } from './api.ts'
 import { lengthenPage } from './scroll.ts'
 import { expectPlacement, placeCells } from './table.ts'
 

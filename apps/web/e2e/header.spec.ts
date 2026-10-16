@@ -5,7 +5,8 @@
  * La page est allongée par le scénario (`scroll.ts`). Les seuils exacts du défilement sont prouvés
  * en Vitest (`tests/header-scroll.test.ts`) ; ici, leur effet à l'écran.
  */
-import { expect, test, type Locator } from '@playwright/test'
+import type { Locator } from '@playwright/test'
+import { expect, test } from './api.ts'
 import { resolveAll } from './css.ts'
 import { lengthenPage, scrollThrough } from './scroll.ts'
 

@@ -5,7 +5,8 @@
  * (décision 10). La restauration au chargement, avant le premier rendu, est prouvée par
  * `tokens.spec.ts`.
  */
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { expect, test } from './api.ts'
 import { resolveAll } from './css.ts'
 import { detachHeader } from './scroll.ts'
 

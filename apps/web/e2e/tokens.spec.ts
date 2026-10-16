@@ -7,7 +7,8 @@
  * brute dépendrait du mode de compilation — `light-dark()` en développement, la couleur résolue
  * après la réécriture du build (docs/frontend-outillage.md §2.4).
  */
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
+import { expect, test } from './api.ts'
 import { resolveAll } from './css.ts'
 
 type Mode = 'light' | 'dark'
