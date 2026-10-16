@@ -12,6 +12,7 @@
     "lint": "eslint . --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest run",
+    "openapi": "node scripts/api-types.ts",
     "test:e2e": "playwright test",
     "lighthouse": "lhci autorun"
   },

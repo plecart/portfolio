@@ -143,11 +143,13 @@ sont pas identiques — les hooks voient les fichiers Python, la CI y ajoute les
 restent dans la boucle de développement et en CI, trop lents pour un hook.
 
 **Contrat de l'API publique.** Le schéma OpenAPI de `GET /api/projets` est versionné dans
-[apps/api/openapi.json](apps/api/openapi.json) : le front en dérive ses types. Après tout
-changement du contrat — `apps/api/content/schemas.py`, ou l'opération de `apps/api/content/api.py`,
-dont la docstring est la `description` du schéma —, régénérer le fichier par `make openapi` et le
-committer avec le changement — sinon le test de fraîcheur de `make test` rougit, en CI comme sur
-le poste.
+[apps/api/openapi.json](apps/api/openapi.json) : le front en dérive ses types,
+[apps/web/src/api/schema.ts](apps/web/src/api/schema.ts). Après tout changement du contrat —
+`apps/api/content/schemas.py`, ou l'opération de `apps/api/content/api.py`, dont la docstring est
+la `description` du schéma —, régénérer les deux fichiers, `make openapi` puis `make web-openapi`,
+et les committer avec le changement, dans la même PR — sinon les tests de fraîcheur rougissent,
+celui de `make test` pour le schéma, celui de `make web-test` pour les types, en CI comme sur le
+poste.
 
 **Audit des dépendances.** `make audit` (Python) et `make web-audit` (front) sont des portes de
 CI. Côté Python, tout avis de sécurité connu bloque la PR — `pip-audit` n'expose pas de

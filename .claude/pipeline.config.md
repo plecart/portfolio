@@ -128,6 +128,11 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 - test ciblé   : cd apps/web && npm test -- <motif>
 - test brut    : rtk proxy make web-test          # sortie du lanceur sans le résumeur RTK du poste ;
                                                   # vérifiée le 2026-09-25
+- openapi      : make web-openapi                 # écrit `apps/web/src/api/schema.ts`, les types de
+                                                  # l'API, depuis `apps/api/openapi.json` ; à lancer
+                                                  # après `make openapi` quand le contrat change,
+                                                  # que le test de fraîcheur de `make web-test`
+                                                  # exige ; vérifiée le 2026-10-16 (#19)
 - lint         : make web-lint                    # ESLint 9 + jsx-a11y, `--max-warnings 0`
 - format       : n/a                              # aucun formateur front installé — ESLint ne formate pas
 - format:check : n/a
