@@ -171,9 +171,11 @@ test('erreur : le message est centré entre l’entête et les liens de l’aute
   // En colonne, les liens flottent : l'espace va jusqu'au bas de la fenêtre ; en pied de page, il
   // s'arrête au-dessus d'eux.
   const bottom = isMobile ? footer.y : viewport.height
+  // L'espace commence sous l'entête fixe de 56 px (spec §3.3).
+  const top = 56
 
   expect(Math.round(message.x + message.width / 2)).toBe(viewport.width / 2)
-  expect(Math.abs(message.y + message.height / 2 - (56 + bottom) / 2)).toBeLessThanOrEqual(1)
+  expect(Math.abs(message.y + message.height / 2 - (top + bottom) / 2)).toBeLessThanOrEqual(1)
 })
 
 test('erreur : « Réessayer » relance la requête sans recharger la page — cadres, puis table', async ({
