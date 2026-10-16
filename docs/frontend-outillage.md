@@ -225,8 +225,8 @@ qu'ici l'outil n'écrit qu'un fichier, relu par `tsc` et par le test de fraîche
 rupture serait bruyante, jamais silencieuse. Mesuré avant l'installation, Node 24.3.0 : `npm ci`
 depuis le verrou dans un dossier neuf, génération des neuf schémas, sonde `tsc --strict` sur
 `ProjectOut`. Rien dans la table des refus ni dans `.github/dependabot.yml` : rien n'est refusé, la
-majeure suivante du générateur arrive en PR comme les autres ; si une version imprime le module
-autrement, le test de fraîcheur des types rougit dans sa PR, et `make web-openapi` s'y lance comme
+majeure suivante du générateur arrive en PR comme les autres ; si une version du générateur, ou de
+`typescript` dont il emprunte l'imprimeur, imprime le module autrement, le test de fraîcheur des types rougit dans sa PR, et `make web-openapi` s'y lance comme
 après un changement du contrat. L'override expire comme un refus —
 `tests/dependency-refusals.test.ts` lit dans le verrou la plage de pair d'`openapi-typescript` et
 rougit le jour où elle accepte la majeure installée : on retire alors l'override.
