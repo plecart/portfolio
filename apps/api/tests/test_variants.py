@@ -11,11 +11,15 @@ from content.models import Variant
 from content.variants import make_variants
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage, default_storage
-from PIL import Image
+from PIL import Image, ImageCms, UnidentifiedImageError
 
 # Orientation EXIF « pivoter de 90° dans le sens horaire pour afficher » (étiquette 0x0112).
 EXIF_ORIENTATION = 0x0112
 ROTATE_90_CLOCKWISE = 6
+
+# Un profil ICC valide, celui que Pillow sait créer ; `createProfile` n'est pas typé.
+SRGB = ImageCms.createProfile("sRGB")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+SRGB_PROFILE: bytes = ImageCms.ImageCmsProfile(SRGB).tobytes()  # pyright: ignore[reportUnknownArgumentType]
 
 # Les entrées nommées de la décision 6, écrites en littéraux : la taille de l'original, puis la
 # taille de chaque variante attendue, dans l'ordre de l'échelle.
@@ -94,19 +98,103 @@ def test_les_variantes_appliquent_l_orientation_exif_de_l_original() -> None:
     assert written(variants[-1]).size == (1200, 1600)
 
 
+def multi_frame_jpeg() -> bytes:
+    """Un JPEG à deux images, que Pillow nomme « MPO » — bien des photos de téléphone."""
+    first, second = Image.new("RGB", (300, 300)), Image.new("RGB", (300, 300))
+    return encoded(first, "MPO", save_all=True, append_images=[second])
+
+
+# Les formes d'un original que les trois décodeurs ouvrent (`DECODERS`), mesurées par sonde à la
+# relecture du lot 3a : seize, dont celles-ci, chacune avec le mode de sa variante — RGBA pour
+# toute transparence, palette ou couleur clé comprises, RGB pour tout le reste. Le PNG gris de
+# 16 bits a son test.
+MODES = [
+    ("PNG transparent", encoded(Image.new("RGBA", (300, 300))), "RGBA"),
+    ("PNG en palette transparente", encoded(Image.new("P", (300, 300)), transparency=0), "RGBA"),
+    ("PNG à couleur clé", encoded(Image.new("RGB", (300, 300)), transparency=(0, 0, 0)), "RGBA"),
+    ("PNG gris transparent", encoded(Image.new("LA", (300, 300))), "RGBA"),
+    ("WebP transparent", encoded(Image.new("RGBA", (300, 300)), "WEBP"), "RGBA"),
+    ("PNG opaque", encoded(Image.new("RGB", (300, 300))), "RGB"),
+    ("PNG en niveaux de gris", encoded(Image.new("L", (300, 300))), "RGB"),
+    ("JPEG", encoded(Image.new("RGB", (300, 300)), "JPEG"), "RGB"),
+    ("JPEG CMYK", encoded(Image.new("CMYK", (300, 300)), "JPEG"), "RGB"),
+    ("JPEG à plusieurs images", multi_frame_jpeg(), "RGB"),
+]
+
+
 @pytest.mark.parametrize(
-    ("mode", "image_format", "expected"),
-    [("RGBA", "PNG", "RGBA"), ("RGB", "PNG", "RGB"), ("L", "PNG", "RGB"), ("RGB", "JPEG", "RGB")],
-    ids=["PNG transparent", "PNG opaque", "PNG en niveaux de gris", "JPEG"],
+    ("content", "expected"),
+    [(content, expected) for _, content, expected in MODES],
+    ids=[form for form, _, _ in MODES],
 )
 def test_une_variante_garde_la_transparence_de_l_original_et_rien_d_autre(
-    mode: str, image_format: str, expected: str
+    content: bytes, expected: str
 ) -> None:
-    original = stored_original(encoded(Image.new(mode, (300, 300)), image_format))
+    """RGBA si l'original porte une transparence, sous quelque forme que ce soit ; RGB sinon
+    (décision 6)."""
+    (variant,) = make_variants(default_storage, stored_original(content))
+
+    assert written(variant).mode == expected
+
+
+def test_le_profil_de_couleur_d_un_original_rgb_suit_ses_variantes() -> None:
+    """Sans son profil ICC, une photo de téléphone en Display P3 serait lue en sRGB, ses couleurs
+    ternies : Pillow ne reprend pas le profil de lui-même à l'écriture d'un WebP."""
+    profile = SRGB_PROFILE
+    original = stored_original(encoded(Image.new("RGB", (300, 300)), "JPEG", icc_profile=profile))
 
     (variant,) = make_variants(default_storage, original)
 
-    assert written(variant).mode == expected
+    assert written(variant).info.get("icc_profile") == profile
+
+
+def test_le_profil_d_un_original_cmyk_ne_suit_pas_ses_variantes_rgb() -> None:
+    """Un profil CMYK décrirait mal une variante RGB : elle n'en porte aucun."""
+    profile = SRGB_PROFILE
+    original = stored_original(encoded(Image.new("CMYK", (300, 300)), "JPEG", icc_profile=profile))
+
+    (variant,) = make_variants(default_storage, original)
+
+    assert "icc_profile" not in written(variant).info
+
+
+def test_un_original_tres_allonge_garde_une_hauteur_d_un_pixel() -> None:
+    """5000 × 3 : la hauteur en proportion s'arrondit à zéro, que Pillow refuse ; elle vaut un
+    pixel au moins."""
+    original = stored_original(encoded(Image.new("RGB", (5000, 3))))
+
+    variants = make_variants(default_storage, original)
+
+    assert [(v["width"], v["height"]) for v in variants] == [
+        (320, 1),
+        (480, 1),
+        (720, 1),
+        (960, 1),
+        (1200, 1),
+    ]
+
+
+def test_un_original_d_un_autre_format_n_est_pas_decode() -> None:
+    """Seuls les trois décodeurs de l'original (`DECODERS`) l'ouvrent, comme au téléversement :
+    un GIF rangé sous un nom d'original n'est pas converti."""
+    original = stored_original(encoded(Image.new("RGB", (300, 300)), "GIF"))
+
+    with pytest.raises(UnidentifiedImageError):
+        make_variants(default_storage, original)
+
+
+def test_le_nom_d_une_variante_est_celui_que_le_stockage_retient() -> None:
+    """Un nom déjà pris — un essai précédent — n'est pas écrasé par le stockage sur disque : la
+    variante porte le nom qu'il a choisi, et l'ancien fichier reste ce qu'il était."""
+    original = stored_original(encoded(Image.new("RGB", (300, 300))))
+    taken = default_storage.save(f"{original.rsplit('/', 1)[0]}/300.webp", ContentFile(b"ancien"))
+
+    (variant,) = make_variants(default_storage, original)
+
+    assert variant["name"] != taken
+    assert (written(variant).format, written(variant).size) == ("WEBP", (300, 300))
+    with default_storage.open(taken) as file:
+        assert file.read() == b"ancien"
 
 
 def test_un_png_de_16_bits_garde_ses_niveaux_de_gris() -> None:
@@ -132,26 +220,83 @@ def test_l_original_est_identique_a_l_octet_apres_la_conversion() -> None:
         assert file.read() == content
 
 
-class FailingStorage(FileSystemStorage):
-    """Le stockage sur disque de Django, qui refuse d'enregistrer un fichier à partir du
-    `failing`-ième."""
+class Interrupted(BaseException):
+    """Une interruption qui n'est pas une `Exception` — l'arrêt du worker, par exemple."""
 
-    def __init__(self, location: str, failing: int) -> None:
+
+class FailingStorage(FileSystemStorage):
+    """Le stockage sur disque de Django, dont le `failing`-ième enregistrement échoue comme
+    `failure` le dit, et qui refuse de supprimer les noms de `undeletable`."""
+
+    def __init__(
+        self, location: str, failing: int, failure: str, undeletable: frozenset[str] = frozenset()
+    ) -> None:
         super().__init__(location)
         self.remaining = failing - 1
+        self.failure = failure
+        self.undeletable = undeletable
 
     def save(self, name: str | None, content: IO[Any], max_length: int | None = None) -> str:
-        if self.remaining == 0:
+        if self.remaining:
+            self.remaining -= 1
+            return super().save(name, content, max_length)
+        if self.failure == "avant l'écriture":
             raise OSError("stockage plein")
-        self.remaining -= 1
-        return super().save(name, content, max_length)
+        if self.failure == "interruption":
+            raise Interrupted
+        super().save(name, content, max_length)  # le fichier est écrit, son nom n'est pas rendu
+        raise OSError("stockage plein")
+
+    def delete(self, name: str) -> None:
+        if name in self.undeletable:
+            raise OSError("suppression refusée")
+        super().delete(name)
 
 
-def test_une_conversion_qui_echoue_supprime_les_variantes_deja_ecrites(
+# Les chemins par lesquels un essai qui échoue après avoir écrit pourrait laisser un fichier —
+# recensés à la relecture du lot 3a, avant le correctif : cinq, dont trois fuyaient (l'écriture
+# qui échoue après avoir créé son fichier, la suppression qui échoue pendant le nettoyage, une
+# interruption qui n'est pas une `Exception`). Le premier, une erreur avant toute écriture —
+# lecture, décodage —, n'écrit rien : `test_un_original_d_un_autre_format_n_est_pas_decode`.
+FAILURES = [
+    ("enregistrement refusé avant l'écriture", "avant l'écriture", frozenset[str](), OSError),
+    ("enregistrement qui échoue après l'écriture", "après l'écriture", frozenset[str](), OSError),
+    ("interruption", "interruption", frozenset[str](), Interrupted),
+]
+
+
+@pytest.mark.parametrize(
+    ("failure", "undeletable", "error"),
+    [(failure, undeletable, error) for _, failure, undeletable, error in FAILURES],
+    ids=[path for path, *_ in FAILURES],
+)
+def test_une_conversion_qui_echoue_ne_laisse_aucune_variante(
+    tmp_path: Path, failure: str, undeletable: frozenset[str], error: type[BaseException]
+) -> None:
+    """L'erreur sort telle quelle, et l'essai ne laisse aucun fichier : le suivant repart de rien.
+    La troisième variante échoue, les deux premières sont écrites."""
+    storage = FailingStorage(str(tmp_path), failing=4, failure=failure, undeletable=undeletable)
+    original = storage.save(
+        "images/abc/original.png", ContentFile(encoded(Image.new("RGB", (1300, 1300))))
+    )
+
+    with pytest.raises(error):
+        make_variants(storage, original)
+
+    assert storage.listdir("images/abc") == ([], ["original.png"])
+
+
+def test_une_suppression_qui_echoue_n_empeche_pas_les_autres_ni_ne_masque_l_erreur(
     tmp_path: Path,
 ) -> None:
-    """L'erreur sort telle quelle, et l'essai ne laisse aucun fichier : le suivant repart de rien."""
-    storage = FailingStorage(str(tmp_path), failing=3)
+    """Le nettoyage ne se laisse arrêter par aucune suppression : la variante qui résiste reste,
+    les autres sortent, et l'erreur qui sort est celle de la conversion."""
+    storage = FailingStorage(
+        str(tmp_path),
+        failing=4,
+        failure="avant l'écriture",
+        undeletable=frozenset({"images/abc/320.webp"}),
+    )
     original = storage.save(
         "images/abc/original.png", ContentFile(encoded(Image.new("RGB", (1300, 1300))))
     )
@@ -159,4 +304,4 @@ def test_une_conversion_qui_echoue_supprime_les_variantes_deja_ecrites(
     with pytest.raises(OSError, match="stockage plein"):
         make_variants(storage, original)
 
-    assert storage.listdir("images/abc") == ([], ["original.png"])
+    assert storage.listdir("images/abc") == ([], ["320.webp", "original.png"])
