@@ -14,6 +14,11 @@ décisions une par une.
   passage » — n'est pas lue : le lecteur répond à la dernière chose qui a demandé de l'effort, et
   une question secondaire n'est pas une question plus petite, c'est une question invisible. Si
   une décision reste en suspens, elle a droit à son propre tour, et à rien d'autre dans ce tour.
+  Ce n'est pas le contraire du groupement des `[V]` de la règle d'or (`contraintes.md`) : le
+  groupement porte sur le **moment** — un point d'arrêt, jamais le fil de l'eau —, cette règle sur
+  la **forme** — dans ce point d'arrêt, une question par tour, la plus lourde d'abord. Un arrêt
+  `[C]` ouvre seul, son pour et son contre déjà pesés ; les `[V]` suivent une fois la `[C]`
+  tranchée (obs 102).
 - **Chaque question s'accompagne de ta réponse recommandée** — interroger n'est pas se décharger de
   l'analyse sur l'utilisateur.
 - **Si une question peut être résolue en explorant le code, explore le code** plutôt que de
