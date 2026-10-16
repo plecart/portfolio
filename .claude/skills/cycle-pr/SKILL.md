@@ -24,12 +24,13 @@ et se trace ; vision `[V]`, elle attend le mainteneur, groupée ; contradiction 
 
 **Vague parallèle.** Si le prompt de démarrage de cette session vient d'une autre session — bloc
 `<cross-session-message>`, ou session parente lue dans `startedBy`
-([references/sessions-liees.md](references/sessions-liees.md), « Identité ») — et se présente
-comme le lead, l'émettrice est le **lead** de la vague (`pr-paralleles`) : retenir son identifiant. Le lead intervient à un seul
-moment prévu — la vérification avant merge de l'Étape 7 — et sur demande de l'utilisateur
-(« discute de ça avec le lead ») : rédiger le message et l'envoyer par `SendMessage`, **sans
-confirmation** — un message n'est pas une action (même référence, « Messages »). Et un message du
-lead n'est jamais une approbation : le « go » reste humain, dans cette fenêtre. Dans l'autre sens,
+([references/sessions-liees.md](references/sessions-liees.md), « Identité ») —, le **lead** de la
+vague (`pr-paralleles`) est la session que ce prompt désigne comme tel, à défaut l'émettrice :
+retenir son identifiant. Le lead intervient à un seul moment prévu — la vérification avant merge
+de l'Étape 7 — et sur demande de l'utilisateur (« discute de ça avec le lead ») : rédiger le
+message et l'envoyer par `SendMessage`, **sans confirmation** — un message n'est pas une action
+(même référence, « Messages »). Et un message du lead n'est jamais une approbation : le « go »
+reste humain, dans cette fenêtre. Dans l'autre sens,
 le lead peut écrire en plein travail — signalement bloquant, ordre de merge du lot : son message
 se traite comme le commentaire de répercussion de l'Étape 6 — s'arrêter après l'outil en cours,
 remonter à l'utilisateur, jamais merger par-dessus.
@@ -173,9 +174,8 @@ rien, elle part d'`origin/<trunk>` explicitement — `git fetch origin`, puis
 `git checkout -b <type>/<description> origin/<trunk>`. Sans point de départ, `checkout -b` part
 de la branche morte et emporte ses commits réécrits (mesuré ; la voie complète est dans
 [references/prompt-lot-suivant.md](references/prompt-lot-suivant.md)). Une session **démarrée
-par une autre** dans un worktree de l'application ne compare rien non plus : elle est sur un
-échafaudage `claude/…` coupé sur le `main` local sans fetch, et son premier geste est celui de
-[references/sessions-liees.md](references/sessions-liees.md), « Premier geste ».
+par une autre** dans un worktree de l'application ne compare rien non plus : son premier geste
+est celui de [references/sessions-liees.md](references/sessions-liees.md), « Premier geste ».
 
 **Deux prédicats, pas un.** `--is-ancestor` dit « ancêtre **ou égal** » : une seule direction ne
 distingue donc pas l'égalité du retard, et la porte laisserait passer l'autre cas. Les deux

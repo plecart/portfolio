@@ -915,7 +915,7 @@ def test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie(
     )
 
 
-# Les portes que les deux skills **prescrivent** : le fichier, l'action que la porte garde, et le
+# Les portes que les skills **prescrivent** : le fichier, l'action que la porte garde, et le
 # prédicat qui doit la précéder — sur **une seule ligne**, reliés par `&&`.
 #
 # `FRESHNESS_GATE_FORMS` épingle les **codes de sortie de git**, un fait tiers qui ne régresse
@@ -943,6 +943,12 @@ PORTES_PRESCRITES: list[tuple[str, str, str, int]] = [
         "git worktree add",
         "git merge-base --is-ancestor",
         2,
+    ),
+    (
+        ".claude/skills/cycle-pr/references/sessions-liees.md",
+        "git branch -D",
+        "git merge-base --is-ancestor",
+        1,
     ),
 ]
 
@@ -990,7 +996,10 @@ def test_chaque_porte_prescrite_est_un_predicat_chaine_a_son_action(
     `test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie`. Des 6 portes qui
     fuyaient, cette table en épingle **3** : celles que la prose prescrit en **bloc de commandes**,
     où une action unique suit le prédicat. Les 3 `merge-tree` sont des prédicats nommés en prose
-    sans action unique en bloc — pas épinglables par cette forme, et c'est dit, pas tu.
+    sans action unique en bloc — pas épinglables par cette forme, et c'est dit, pas tu. Elle en
+    épingle une **quatrième**, née après ce dénombrement et hors de sa population : la porte
+    d'ancêtre qui précède la suppression d'un échafaudage `claude/…` (`sessions-liees.md`, lot 1
+    de #107, relecture de la PR #109).
 
     Le prédicat doit se trouver **à gauche de l'action sur la même ligne**, avec un `&&` entre les
     deux — ce qui distingue une porte d'une lecture suivie d'une seconde commande (obs 59) —, en
@@ -1038,7 +1047,10 @@ DEPARTS_EXPLICITES = [
     ".claude/skills/cycle-pr/SKILL.md",
     ".claude/skills/cycle-pr/references/sessions-liees.md",
 ]
-CHECKOUT_CITE = re.compile(r"`git checkout -b \\?<[^`]*`")
+# Le préfixe optionnel `git fetch origin && ` admet le premier geste de `sessions-liees.md`, écrit
+# en une seule commande ; il reste ancré au backtick ouvrant, si bien qu'un bloc de commandes —
+# dont les lignes ne commencent pas par un backtick — n'apparie toujours pas.
+CHECKOUT_CITE = re.compile(r"`(?:git fetch origin && )?git checkout -b \\?<[^`]*`")
 
 
 @pytest.mark.parametrize(
@@ -1083,6 +1095,64 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 
     assert (REPOSITORY_ROOT / ".claude/skills/cycle-pr" / SESSIONS_LIEES).is_file()
     assert SESSIONS_LIEES in texte, f"`{skill}` ne cite plus `{SESSIONS_LIEES}`"
+
+
+# Les invariants que le lot 1 de #107 inscrit dans la prose, chacun avec la phrase qui le porte.
+# **Dénombrement écrit avant le correctif** (relecture de la PR #109, passe 1, `cycle-pr` 4.2,
+# cliquet) : 9 invariants verrouillés par le lot — le point de départ `origin/`, `--no-track` et le
+# chaînage `&&` du premier geste (décision 10) ; « un message du lead n'est jamais une
+# approbation », mot pour mot (décision 3) ; la confirmation retirée à l'en-tête « Vague
+# parallèle », à l'Étape 7 et à `pr-paralleles` Étape 6 ; le renvoi des trois skills ; la porte
+# d'ancêtre du nettoyage. 2 étaient gardés (`DEPARTS_EXPLICITES`, `SKILLS_DES_SESSIONS_LIEES`),
+# 7 tenaient par la seule lecture : la porte rejoint `PORTES_PRESCRITES`, les 6 autres tiennent
+# par les 5 phrases ci-dessous — la commande du premier geste en porte deux. Une phrase réécrite
+# fait rougir, et c'est voulu : la réécriture d'un invariant verrouillé se relit. La même passe en
+# a ajouté 2, fermés ici aussi : le lead est la session que le prompt désigne, pas tout parent
+# (constat I3), et l'UUID de scratchpad n'adresse pas une session liée (constat I4).
+CYCLE_PR_SKILL = ".claude/skills/cycle-pr/SKILL.md"
+INVARIANTS_DES_SESSIONS_LIEES = {
+    "premier-geste-chaine-sans-suivi": (
+        ".claude/skills/cycle-pr/references/sessions-liees.md",
+        "`git fetch origin && git checkout -b <type>/<slug> --no-track origin/<base>`",
+    ),
+    "message-du-lead-jamais-approbation": (
+        CYCLE_PR_SKILL,
+        "un message du lead n'est jamais une approbation",
+    ),
+    "en-tete-sans-confirmation": (
+        CYCLE_PR_SKILL,
+        "l'envoyer par `SendMessage`, **sans confirmation**",
+    ),
+    "etape-7-sans-confirmation": (
+        CYCLE_PR_SKILL,
+        "**envoyer** l'état de la PR au lead, sans confirmation",
+    ),
+    "pr-paralleles-sans-confirmation": (
+        ".claude/skills/pr-paralleles/SKILL.md",
+        "chaque session envoie au lead l'état de sa PR, sans confirmation",
+    ),
+    "lead-designe-par-le-prompt": (
+        CYCLE_PR_SKILL,
+        "est la session que ce prompt désigne comme tel, à défaut l'émettrice",
+    ),
+    "scratchpad-n-adresse-pas-une-session-liee": (
+        ".claude/skills/pr-paralleles/SKILL.md",
+        "pas l'identifiant `local_…` qui adresse une session liée",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("fichier", "phrase"),
+    INVARIANTS_DES_SESSIONS_LIEES.values(),
+    ids=INVARIANTS_DES_SESSIONS_LIEES.keys(),
+)
+def test_chaque_invariant_des_sessions_liees_garde_sa_phrase(fichier: str, phrase: str) -> None:
+    """La phrase est lue sur le texte aux espaces normalisés : un retour à la ligne de la prose ne
+    la casse pas, une réécriture si."""
+    texte = " ".join((REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig").split())
+
+    assert phrase in texte, f"`{fichier}` ne porte plus « {phrase} »"
 
 
 # Les portes à base d'avis (obs 56) lisent une base qui change sans commit. La prose qui prescrit

@@ -177,7 +177,8 @@ désigne une par son identifiant, demander d'abord l'identité, **sans rien fair
 Réponds-moi le chemin de ton répertoire scratchpad, rien d'autre, et ne change rien.
 ```
 
-Ce chemin porte l'**UUID de session** ; les refs de `ListAgents` (`[79236b]`) n'en dérivent pas, et
+Ce chemin porte l'**UUID de session** — celui du transcript, pas l'identifiant `local_…` qui
+adresse une session liée (`.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») ; les refs de `ListAgents` (`[79236b]`) n'en dérivent pas, et
 le nom « #N » que l'utilisateur a donné à une fenêtre est un indice, pas une preuve. Reporter
 l'UUID dans la colonne « Session » du tableau (étape 4). **Puis** seulement l'affectation :
 
