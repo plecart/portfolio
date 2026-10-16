@@ -192,6 +192,8 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
                                                   # 2 bloquants et 7 importants de la relecture
                                                   # à contexte vierge. Deux portes, deux
                                                   # populations — elle ne remplace rien.
+                                                  # Son rapport exigé comme seule sortie ne
+                                                  # termine pas le tour (`cycle-pr` 4.2, obs 94).
 - sécurité     : /security-review                 # même nature. Lancée par `cycle-pr` 4.2
                                                   # **seulement** si le diff touche une zone
                                                   # sensible ou une surface exposée (section
@@ -222,6 +224,8 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
                                                   # documentation : admin, téléversement,
                                                   # migration) : **zéro** constat, de lecture
                                                   # aussi, déroulée sans les sous-tâches.
+                                                  # Son rapport exigé comme seule sortie ne
+                                                  # termine pas le tour (`cycle-pr` 4.2, obs 98).
 
 ## Qualité
 - seuil de couverture : aucun (cadrage annexe A : « pragmatique ; évaluations RAG et E2E prioritaires »)
