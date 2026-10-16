@@ -34,9 +34,10 @@ test("la page déclare le français comme langue du document", async ({ page }) 
  *
  * **6 hors portée**, à couvrir par l'issue qui les introduira, jamais à supposer couvertes ici :
  * Service Worker (hors du contexte de page) ; requête différée au-delà de `networkidle` ;
- * `<img loading="lazy">` sous la ligne de flottaison (#20) ; `fetch` derrière une
- * interaction (#19) ; `preconnect` et `dns-prefetch`, qui joignent le tiers en DNS et TLS sans
- * jamais produire de requête HTTP.
+ * `<img loading="lazy">` sous la ligne de flottaison (#20) ; `fetch` derrière une interaction —
+ * le seul du site, « Réessayer » (#19), rejoue l'adresse de la requête de démarrage, vue ici, et
+ * `table-states.spec.ts` compte ses requêtes ; `preconnect` et `dns-prefetch`, qui joignent le
+ * tiers en DNS et TLS sans jamais produire de requête HTTP.
  *
  * L'API n'est pas un tiers (spec §6.4) : son origine est admise, lue dans la même source que la
  * compilation (brief de #19, décision 11). Tout le reste en est un.

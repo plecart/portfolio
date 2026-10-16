@@ -15,4 +15,7 @@ export const strings = {
   /** Liens de l'auteur, dans leur ordre (spec §3.4). */
   authorGitHub: 'GitHub de Pacôme Bernier',
   authorLinkedIn: 'LinkedIn de Pacôme Bernier',
+  /** Message d'erreur de la table, et le lien qui relance le chargement (spec §4.5). */
+  loadError: 'Les projets ne se chargent pas.',
+  retry: 'Réessayer',
 } as const
