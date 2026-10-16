@@ -3,7 +3,9 @@ téléverse —, sa validation, son nom de stockage et ses lectures, la légende
 et les variantes. La forme de la couverture, première image, est une règle de l'écran
 (`test_image_admin.py`)."""
 
+import logging
 import re
+import shutil
 from collections.abc import Callable, Generator
 
 import pytest
@@ -1005,6 +1007,23 @@ def test_supprimer_une_image_chargee_sans_ses_fichiers_supprime_ses_fichiers(
         type(made).objects.only("id").get(pk=made.pk).delete()
 
     assert stored(names) == [False, False]
+
+
+@pytest.mark.django_db
+def test_supprimer_une_image_dont_le_dossier_a_disparu_ne_journalise_aucune_erreur(
+    portfolio: Project,
+    caplog: pytest.LogCaptureFixture,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> None:
+    """Un dossier déjà absent n'a rien à supprimer : pas d'erreur journalisée, qui deviendrait une
+    alerte avec #17."""
+    made = saved(gallery_image(portfolio))
+    shutil.rmtree(default_storage.path((made.original.name or "").rsplit("/", 1)[0]))
+
+    with django_capture_on_commit_callbacks(execute=True):
+        made.delete()
+
+    assert [record.message for record in caplog.records if record.levelno >= logging.ERROR] == []
 
 
 @pytest.mark.django_db

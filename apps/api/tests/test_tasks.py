@@ -260,6 +260,32 @@ def test_une_ecriture_du_resultat_qui_echoue_ne_laisse_aucune_variante(
     assert variant_files(made) == named
 
 
+class Interrupted(BaseException):
+    """Une interruption qui n'est pas une `Exception` — l'arrêt du worker, par exemple."""
+
+
+@pytest.mark.django_db
+def test_une_interruption_a_l_ecriture_du_resultat_ne_laisse_aucune_variante(
+    portfolio: Project, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le worker arrêté au moment d'écrire « prêt » : l'interruption sort, et les variantes de
+    l'essai avec elle — l'image reste en attente, remplacer son fichier relance."""
+    made = saved(gallery_image(portfolio))
+    update: Callable[..., int] = QuerySet.update  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+    def interrupted(queryset: QuerySet[Any], **values: Any) -> int:
+        if values.get("state") == ProcessingState.READY:
+            raise Interrupted
+        return update(queryset, **values)
+
+    monkeypatch.setattr(QuerySet, "update", interrupted)
+
+    with pytest.raises(Interrupted):
+        process_image.delay(made.pk, made.original.name or "")
+
+    assert variant_files(made) == []
+
+
 @pytest.mark.django_db
 def test_un_nettoyage_qui_echoue_n_arrete_pas_les_autres_suppressions(
     portfolio: Project, monkeypatch: pytest.MonkeyPatch
