@@ -42,10 +42,9 @@ branche depuis le distant, en une commande : `git fetch origin`, puis
 
 `<base>` est la branche que visera sa PR — le trunk pour une issue. Le point de départ explicite
 remplace la porte de fraîcheur de `cycle-pr` Étape 1 : la fraîcheur vient du distant, pas d'un
-`main` local qu'on ne compare pas.
-Sans `--no-track`, la même commande règle l'upstream sur `origin/<base>` (mesuré le 2026-10-16) :
-la branche suivrait sa base au lieu d'elle-même. Le premier `git push -u origin <type>/<slug>`
-pose le bon.
+`main` local qu'on ne compare pas. Sans `--no-track`, la même commande règle l'upstream sur
+`origin/<base>` (mesuré le 2026-10-16) : la branche suivrait sa base au lieu d'elle-même. Le
+premier `git push -u origin <type>/<slug>` pose le bon.
 
 La branche `claude/…` reste un **échafaudage** : rien ne s'y commit, le nettoyage la supprime.
 
@@ -77,9 +76,9 @@ En vague, le même message part aussi au lead s'il n'est pas le parent.
 
 ## Passation — sur disque, remise par pointeur
 
-Le prompt du lot suivant et la variante relais (gabarit : [prompt-lot-suivant.md](prompt-lot-suivant.md))
-s'écrivent **hors dépôt**, dans `passations/`, à côté du journal d'observations (chemin dans
-`CLAUDE.md`, « Observation continue »), à chemin fixe :
+Le prompt du lot suivant et la variante relais (gabarit :
+[prompt-lot-suivant.md](prompt-lot-suivant.md)) s'écrivent **hors dépôt**, dans `passations/`, à
+côté du journal d'observations (chemin dans `CLAUDE.md`, « Observation continue »), à chemin fixe :
 
 - `passations/<date>-issue-<N>-lot-<k>-prompt.md` — lot `k` **terminé**, prompt du lot `k+1` ;
 - `passations/<date>-issue-<N>-lot-<k>-relais.md` — relais en cours du lot `k`.
@@ -94,7 +93,14 @@ La passation se remet par son chemin, dans le message de fin, jamais par son tex
 
 Archiver un enfant (`archive_session`, réversible) détache son HEAD et ne retire ni le worktree,
 ni le dossier, ni les branches (mesuré le 2026-10-16, relevé à 5 s et à 30 s), quoi qu'en dise la
-description de l'outil (« cleans up its worktree »). La session qui l'a
-démarré nettoie après lui : `git worktree remove <chemin>`, puis l'échafaudage derrière sa porte
-d'ancêtre — `git merge-base --is-ancestor claude/<slug>-<hex> origin/<trunk> && git branch -D claude/<slug>-<hex>`.
-Une branche de PR mergée suit `pr-paralleles` Étape 8.
+description de l'outil (« cleans up its worktree »). La session qui l'a démarré nettoie après
+lui : `git worktree remove <chemin>`, puis l'échafaudage derrière sa porte d'ancêtre :
+
+```
+git merge-base --is-ancestor claude/<slug>-<hex> origin/<trunk> && git branch -D claude/<slug>-<hex>
+```
+
+Un refus de la porte signale un commit sur l'échafaudage, ou un `main` local en avance sur le
+distant, sur lequel il a été coupé (`git status -sb` sur `main`) : le remonter au mainteneur,
+jamais `-D` sans la porte. Une branche
+de PR mergée suit `pr-paralleles` Étape 8.
