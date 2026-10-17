@@ -94,8 +94,11 @@ def pr_refusal(pr: dict[str, Any], sha: str, base: str) -> str | None:
         return f"la tête de la PR est {pr['headRefOid']}, pas le SHA vérifié {sha}"
     # ponytail: toutes les lignes du rollup, runs anciens compris — un rouge déjà rejoué par un
     # autre événement refuse encore ; ne garder que la dernière par nom si ce cas se présente.
+    # Au moins un `SUCCESS` : un rollup tout `SKIPPED` — l'amorce vide d'une draft, dont la garde
+    # `if:` saute chaque job — n'a rien vérifié.
     checks = pr["statusCheckRollup"]
-    if not checks or not all(is_green(check) for check in checks):
+    ran = any(check.get("conclusion") == "SUCCESS" for check in checks)
+    if not ran or not all(is_green(check) for check in checks):
         return "la CI n'est pas entièrement verte sur cette tête"
     if f"Verdict d'avant-go ({sha}) : rien à corriger" not in pr["body"]:
         return f"le body ne porte pas le verdict d'avant-go « rien à corriger » pour {sha}"
