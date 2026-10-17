@@ -48,8 +48,12 @@ PR_VIEW = (
     "gh", "pr", "view", "42", "--json",
     "baseRefName,headRefOid,isDraft,state,body,statusCheckRollup",
 )  # fmt: skip
-FETCH = ("git", "fetch", "origin", INTEGRATION, "pull/42/head")
+FETCH = (
+    "git", "fetch", "origin",
+    f"+refs/heads/{INTEGRATION}:refs/remotes/origin/{INTEGRATION}", "pull/42/head",
+)  # fmt: skip
 GATE = ("git", "merge-base", "--is-ancestor", f"origin/{INTEGRATION}", TETE)
+MERGES = ("git", "rev-list", "--merges", f"origin/{INTEGRATION}..{TETE}")
 MERGE = ("gh", "pr", "merge", "42", "--rebase", "--match-head-commit", TETE)
 
 
@@ -84,6 +88,7 @@ class Forge:
         trunk: str = "main",
         integration: Sequence[dict[str, Any]] = (PR_INTEGRATION,),
         code_de_la_porte: int = 0,
+        merges_du_lot: str = "",
     ) -> None:
         self.reponses: dict[tuple[str, ...], tuple[str, int]] = {
             REPO_VIEW: (trunk + "\n", 0),
@@ -91,6 +96,7 @@ class Forge:
             PR_VIEW: (json.dumps(pr), 0),
             FETCH: ("", 0),
             GATE: ("", code_de_la_porte),
+            MERGES: (merges_du_lot, 0),
             MERGE: ("", 0),
         }
         self.appels: list[tuple[str, ...]] = []
@@ -120,7 +126,7 @@ def test_une_pr_de_lot_verte_vers_sa_branche_d_integration_est_mergee() -> None:
     forge = Forge(pr_verte())
 
     assert lance(forge) == 0
-    assert forge.appels == [REPO_VIEW, PR_LIST, PR_VIEW, FETCH, GATE, MERGE]
+    assert forge.appels == [REPO_VIEW, PR_LIST, PR_VIEW, FETCH, GATE, MERGES, MERGE]
 
 
 # Un cas par condition du merge sans « go » (#107, décision 13 du brief) — chacun change une
@@ -203,8 +209,9 @@ REFUS: dict[str, tuple[dict[str, Any], dict[str, Any], tuple[str, ...], str]] = 
         (),
         "verdict",
     ),
-    "tete-qui-ne-contient-pas-la-base": ({}, {"code_de_la_porte": 1}, (), "remettre à jour"),
+    "tete-qui-ne-contient-pas-la-base": ({}, {"code_de_la_porte": 1}, (), "ne contient pas"),
     "porte-de-fraicheur-sans-reponse": ({}, {"code_de_la_porte": 128}, (), "sans réponse"),
+    "lot-avec-commit-de-merge": ({}, {"merges_du_lot": "e" * 40 + "\n"}, (), "commit de merge"),
 }
 
 
