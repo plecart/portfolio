@@ -1066,8 +1066,10 @@ python .claude/skills/cycle-pr/scripts/merge-lot.py <n> <SHA de tête vérifié>
 C'est la **seule** voie de merge que `.claude/settings.json` autorise sans invite ; `gh pr merge`
 reste en `ask`, épinglé par `apps/api/tests/test_agent_permissions.py`. Le script porte lui-même
 les portes de « Le go, puis le merge » — trunk refusé, base qui doit être la tête d'une PR
-d'intégration ouverte, tête comparée au SHA vérifié, référence de fusion relue, base éprouvée
-encore à jour — et merge en `--rebase --match-head-commit`. Ses refus, et ce qu'il ne prouve pas,
+d'intégration ouverte, tête comparée au SHA vérifié — et une plus stricte : la tête du lot doit
+**contenir** la tête actuelle de sa base. La CI de la tête a alors éprouvé l'arbre exact que le
+merge produira, sans lire la référence de fusion, que la forge recalcule à son rythme (obs 51) ; un
+lot en retard sur sa base se remet à jour avant de merger. Puis `--rebase --match-head-commit`. Ses refus, et ce qu'il ne prouve pas,
 sont dans sa docstring ; son contrat, dans `apps/api/tests/test_merge_lot.py`. Un refus sort en une
 ligne et se traite comme une porte qui ne part pas : rejouer « Rejouer les vérifications
 périmées », jamais le contourner par `gh pr merge`. Un refus « CI pas entièrement verte » alors que

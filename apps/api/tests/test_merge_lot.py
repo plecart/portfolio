@@ -7,6 +7,11 @@ tests remplacent par une forge témoin : les réponses de `gh` sont celles d'une
 relevées le 2026-10-17 sur la PR #109 par `gh pr view --json …`), et l'appel `gh pr merge` n'est
 jamais passé à la vraie forge. Le comportement du vrai `gh` est éprouvé une fois, sur une PR jetable
 mergée dans une branche d'intégration jetable — relevé daté dans la PR #117.
+
+La forge ne répond qu'à la **commande complète** attendue, arguments compris, et toute autre lève :
+la passe 1 de la relecture de la PR #117 a mesuré 7 mutations d'arguments restées VERTES quand elle
+répondait sur les deux ou trois premiers mots — un `--head` retiré qualifiait n'importe quelle base
+(mutations M1 à M9 de cette passe).
 """
 
 import json
@@ -22,12 +27,30 @@ merge_lot = load_script("cycle-pr", "merge-lot")
 
 TETE = "a" * 40
 AUTRE_TETE = "b" * 40
-REFERENCE_DE_FUSION = "c" * 40
-BASE_EPROUVEE = "d" * 40
 INTEGRATION = "feat/sessions-liees"
 VERDICT = f"Verdict d'avant-go ({TETE}) : rien à corriger"
+PR_INTEGRATION = {
+    "body": "En vol pour #107 (intégration, 4 lots)\n\nCloses #107",
+    "isCrossRepository": False,
+}
 
 Run = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
+
+# Les commandes que le script doit lancer pour `42 <TETE> <INTEGRATION>`, dans l'ordre — écrites en
+# littéraux, jamais dérivées du script (`cycle-pr` 3.1, « la table de cas est dérivée de
+# l'artefact sous test »).
+REPO_VIEW = ("gh", "repo", "view", "--json", "defaultBranchRef", "--jq", ".defaultBranchRef.name")
+PR_LIST = (
+    "gh", "pr", "list", "--base", "main", "--head", INTEGRATION, "--state", "open",
+    "--json", "body,isCrossRepository",
+)  # fmt: skip
+PR_VIEW = (
+    "gh", "pr", "view", "42", "--json",
+    "baseRefName,headRefOid,isDraft,state,body,statusCheckRollup",
+)  # fmt: skip
+FETCH = ("git", "fetch", "origin", INTEGRATION, "pull/42/head")
+GATE = ("git", "merge-base", "--is-ancestor", f"origin/{INTEGRATION}", TETE)
+MERGE = ("gh", "pr", "merge", "42", "--rebase", "--match-head-commit", TETE)
 
 
 def check(name: str, conclusion: str, status: str = "COMPLETED") -> dict[str, str]:
@@ -51,53 +74,38 @@ def pr_verte(**changes: Any) -> dict[str, Any]:
 
 
 class Forge:
-    """Une forge témoin : rend les sorties de `gh` et de `git` qu'un cas fixe, et note chaque
-    appel — le test lit ensuite si `gh pr merge` est parti, et avec quels arguments."""
+    """Une forge témoin : rend, pour chaque commande attendue, la sortie qu'un cas fixe, et note
+    chaque appel — le test lit ensuite la séquence, et si `gh pr merge` est parti."""
 
     def __init__(
         self,
         pr: dict[str, Any],
         *,
         trunk: str = "main",
-        parents: Sequence[str] = (BASE_EPROUVEE, TETE),
+        integration: Sequence[dict[str, Any]] = (PR_INTEGRATION,),
         code_de_la_porte: int = 0,
-        integration: Sequence[str] = ("En vol pour #107 (intégration, 4 lots)\n\nCloses #107",),
     ) -> None:
-        self.pr = pr
-        self.trunk = trunk
-        self.parents = parents
-        self.code_de_la_porte = code_de_la_porte
-        self.integration = integration
-        self.appels: list[list[str]] = []
+        self.reponses: dict[tuple[str, ...], tuple[str, int]] = {
+            REPO_VIEW: (trunk + "\n", 0),
+            PR_LIST: (json.dumps(list(integration)), 0),
+            PR_VIEW: (json.dumps(pr), 0),
+            FETCH: ("", 0),
+            GATE: ("", code_de_la_porte),
+            MERGE: ("", 0),
+        }
+        self.appels: list[tuple[str, ...]] = []
 
     def __call__(self, cmd: Sequence[str]) -> subprocess.CompletedProcess[str]:
-        cmd = list(cmd)
+        cmd = tuple(cmd)
         self.appels.append(cmd)
-        sortie, code = self.reponse(cmd)
-        return subprocess.CompletedProcess(cmd, code, stdout=sortie, stderr="")
-
-    def reponse(self, cmd: list[str]) -> tuple[str, int]:
-        if cmd[:3] == ["gh", "repo", "view"]:
-            return self.trunk + "\n", 0
-        if cmd[:3] == ["gh", "pr", "view"]:
-            return json.dumps(self.pr), 0
-        if cmd[:3] == ["gh", "pr", "list"]:
-            return json.dumps([{"body": body} for body in self.integration]), 0
-        if cmd[:2] == ["git", "fetch"]:
-            return "", 0
-        if cmd[:2] == ["gh", "api"] and cmd[2].endswith("/merge"):
-            return REFERENCE_DE_FUSION + "\n", 0
-        if cmd[:2] == ["gh", "api"] and cmd[2].endswith(f"/commits/{REFERENCE_DE_FUSION}"):
-            return "".join(f"{sha}\n" for sha in self.parents), 0
-        if cmd[:3] == ["git", "merge-base", "--is-ancestor"]:
-            return "", self.code_de_la_porte
-        if cmd[:3] == ["gh", "pr", "merge"]:
-            return "", 0
-        raise AssertionError(f"appel inattendu : {cmd}")
+        if cmd not in self.reponses:
+            raise AssertionError(f"commande inattendue : {cmd}")
+        sortie, code = self.reponses[cmd]
+        return subprocess.CompletedProcess(list(cmd), code, stdout=sortie, stderr="")
 
     @property
-    def merges(self) -> list[list[str]]:
-        return [cmd for cmd in self.appels if cmd[:3] == ["gh", "pr", "merge"]]
+    def merges(self) -> list[tuple[str, ...]]:
+        return [cmd for cmd in self.appels if cmd[:3] == ("gh", "pr", "merge")]
 
 
 def lance(forge: Run, *args: str) -> int:
@@ -106,12 +114,13 @@ def lance(forge: Run, *args: str) -> int:
 
 
 def test_une_pr_de_lot_verte_vers_sa_branche_d_integration_est_mergee() -> None:
-    """Le témoin positif : sans lui, chaque refus ci-dessous pourrait venir d'un script qui
-    refuse tout."""
+    """Le témoin positif, et l'ordre : la base et la tête sont récupérées **avant** la porte qui
+    les compare, la porte passe **avant** le merge. Sans lui, chaque refus ci-dessous pourrait
+    venir d'un script qui refuse tout."""
     forge = Forge(pr_verte())
 
     assert lance(forge) == 0
-    assert forge.merges == [["gh", "pr", "merge", "42", "--rebase", "--match-head-commit", TETE]]
+    assert forge.appels == [REPO_VIEW, PR_LIST, PR_VIEW, FETCH, GATE, MERGE]
 
 
 # Un cas par condition du merge sans « go » (#107, décision 13 du brief) — chacun change une
@@ -120,18 +129,50 @@ def test_une_pr_de_lot_verte_vers_sa_branche_d_integration_est_mergee() -> None:
 # « l'assertion ne distingue pas quelle branche a mordu »).
 REFUS: dict[str, tuple[dict[str, Any], dict[str, Any], tuple[str, ...], str]] = {
     "base-egale-au-trunk": ({"baseRefName": "main"}, {}, ("42", TETE, "main"), "trunk"),
+    "base-sans-pr-d-integration": ({}, {"integration": ()}, (), "PR d'intégration"),
+    "base-tete-d-une-pr-de-lot": (
+        {},
+        {"integration": ({"body": "En vol pour #107 (lot 2a/4)", "isCrossRepository": False},)},
+        (),
+        "PR d'intégration",
+    ),
+    "marque-d-integration-hors-de-la-premiere-ligne": (
+        {},
+        {
+            "integration": (
+                {
+                    "body": "Titre\nEn vol pour #107 (intégration, 4 lots)",
+                    "isCrossRepository": False,
+                },
+            )
+        },
+        (),
+        "PR d'intégration",
+    ),
+    "marque-d-integration-prefixee": (
+        {},
+        {
+            "integration": (
+                {
+                    "body": "Pas : En vol pour #107 (intégration, 4 lots)",
+                    "isCrossRepository": False,
+                },
+            )
+        },
+        (),
+        "PR d'intégration",
+    ),
+    "pr-d-integration-venue-d-un-fork": (
+        {},
+        {"integration": ({**PR_INTEGRATION, "isCrossRepository": True},)},
+        (),
+        "PR d'intégration",
+    ),
     "base-de-la-pr-autre-que-l-attendue": (
         {"baseRefName": "feat/autre"},
         {},
         (),
         "la base de la PR",
-    ),
-    "base-sans-pr-d-integration": ({}, {"integration": ()}, (), "PR d'intégration"),
-    "base-tete-d-une-pr-de-lot": (
-        {},
-        {"integration": ("En vol pour #107 (lot 2a/4)\n\nCorps",)},
-        (),
-        "PR d'intégration",
     ),
     "tete-differente-du-sha-verifie": ({"headRefOid": AUTRE_TETE}, {}, (), "tête"),
     "pr-encore-en-draft": ({"isDraft": True}, {}, (), "draft"),
@@ -143,7 +184,7 @@ REFUS: dict[str, tuple[dict[str, Any], dict[str, Any], tuple[str, ...], str]] = 
         "CI",
     ),
     "ci-en-cours": (
-        {"statusCheckRollup": [check("Back", "", status="IN_PROGRESS")]},
+        {"statusCheckRollup": [check("Back", "SUCCESS"), check("Infra", "", status="IN_PROGRESS")]},
         {},
         (),
         "CI",
@@ -162,18 +203,7 @@ REFUS: dict[str, tuple[dict[str, Any], dict[str, Any], tuple[str, ...], str]] = 
         (),
         "verdict",
     ),
-    "reference-de-fusion-sur-une-autre-tete": (
-        {},
-        {"parents": (BASE_EPROUVEE, AUTRE_TETE)},
-        (),
-        "référence de fusion",
-    ),
-    "base-avancee-depuis-le-dernier-run": (
-        {},
-        {"code_de_la_porte": 1},
-        (),
-        "avancé",
-    ),
+    "tete-qui-ne-contient-pas-la-base": ({}, {"code_de_la_porte": 1}, (), "remettre à jour"),
     "porte-de-fraicheur-sans-reponse": ({}, {"code_de_la_porte": 128}, (), "sans réponse"),
 }
 
@@ -208,8 +238,8 @@ def test_chaque_condition_manquante_refuse_le_merge_et_se_nomme(
     ids=["sans-argument", "base-manquante", "sha-abrege", "numero-non-entier", "chiffre-unicode"],
 )
 def test_un_appel_mal_forme_sort_en_2_sans_toucher_a_la_forge(args: tuple[str, ...]) -> None:
-    """Un SHA abrégé passerait `--match-head-commit` par préfixe : seul le SHA complet que la
-    vérification a vu est accepté."""
+    """Seul le SHA complet que la vérification a vu est accepté : `--match-head-commit` ne doit
+    jamais recevoir un préfixe."""
     forge = Forge(pr_verte())
 
     assert merge_lot.main(list(args), run=forge) == 2
@@ -240,11 +270,40 @@ def test_la_sortie_du_script_lance_en_tube_est_en_utf_8() -> None:
     assert "SHA de tête vérifié" in done.stdout.decode("utf-8")
 
 
-def test_un_appel_de_la_forge_en_echec_refuse_au_lieu_de_conclure() -> None:
-    """Une commande `gh` qui échoue (réseau, jeton) n'est pas une PR verte : sa sortie vide ne
-    doit pas être lue comme une réponse."""
+def test_le_lanceur_par_defaut_decode_la_sortie_en_utf_8() -> None:
+    """Le défaut réel du lanceur, que la forge témoin remplace partout ailleurs : décodée à
+    l'encodage de la console, la marque « intégration » ne s'apparierait plus, et chaque merge
+    serait refusé (mutation `cp1252` restée VERTE à la passe 1 de la relecture)."""
+    ecrit = "import sys; sys.stdout.buffer.write('intégration'.encode('utf-8'))"
+
+    assert merge_lot.default_run([sys.executable, "-c", ecrit]).stdout == "intégration"
+
+
+@pytest.mark.parametrize(
+    ("panne", "motif"),
+    [
+        (FileNotFoundError("gh introuvable"), "ne se lance pas"),
+        (subprocess.CompletedProcess([], 1, stdout="", stderr="HTTP 502"), "a échoué"),
+        (subprocess.CompletedProcess([], 0, stdout="<html>", stderr=""), "JSON"),
+    ],
+    ids=["gh-absent", "gh-en-echec", "reponse-non-json"],
+)
+def test_une_forge_en_panne_refuse_en_une_ligne_au_lieu_de_conclure(
+    panne: Exception | subprocess.CompletedProcess[str],
+    motif: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Une commande qui échoue, ne se lance pas ou rend autre chose que du JSON n'est pas une PR
+    verte : le contrat « 1 refusé, motif en une ligne » tient aussi sur ces chemins."""
 
     def forge_en_panne(cmd: Sequence[str]) -> subprocess.CompletedProcess[str]:
-        return subprocess.CompletedProcess(list(cmd), 1, stdout="", stderr="HTTP 502")
+        if cmd[:3] == ("gh", "repo", "view"):
+            return subprocess.CompletedProcess(list(cmd), 0, stdout="main\n", stderr="")
+        if isinstance(panne, Exception):
+            raise panne
+        return panne
 
     assert lance(forge_en_panne) == 1
+    sortie = capsys.readouterr().out.strip()
+    assert sortie.startswith("refus — "), sortie
+    assert motif in sortie, f"le refus ne nomme pas « {motif} » : {sortie}"

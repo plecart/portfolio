@@ -85,7 +85,7 @@ et ligne ouverts), **supposé** (à vérifier). Un chiffre sans « mesuré » ne
 Tu rends **un verdict structuré**, et rien d'autre — pas de récit, pas de résumé du diff :
 
 ```
-Verdict PR #<n> — issue #<N>, base <sha de origin/<trunk>>, tête <sha>
+Verdict PR #<n> — issue #<N>, base <sha de origin/<trunk>>, tête <SHA complet de tête>
 Critères   : <un par ligne, ✅/❌/⚠️, avec sa preuve>
 Base       : référence de fusion <sha>, parents <sha trunk> + <sha tête> — à jour / périmée
 Conflit    : aucun / <fichiers> (git merge-tree, code de sortie cité)
