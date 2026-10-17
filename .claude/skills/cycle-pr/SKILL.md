@@ -1074,12 +1074,14 @@ ne prouve pas, sont dans sa docstring ; son contrat, dans `apps/api/tests/test_m
 refus sort en une ligne et se traite comme une porte qui ne part pas : rejouer « Rejouer les
 vérifications périmées », jamais le contourner par `gh pr merge` — sauf un refus de contenance ou
 de commit de merge, que ces vérifications ne lèvent pas et qui suit la phrase suivante. **Un lot en
-retard sur sa base** — ce que des lots ouverts l'un après l'autre ne rencontrent pas — ne se remet
-pas à jour par `gh pr update-branch`, dont le commit de merge serait abandonné par le `--rebase` :
-c'est un rebase de branche ouverte, qui attend la demande explicite du mainteneur
-(`contraintes.md`). Un refus « CI pas entièrement verte » alors que le dernier run est vert vient
-d'un run plus ancien sur la même tête, que le script lit aussi : un commit réel ouvre un rollup
-neuf ; qu'un rerun du run rouge lui-même suffise n'est pas mesuré.
+retard sur sa base** — ce que des lots ouverts l'un après l'autre ne devraient pas rencontrer (non
+mesuré) — ne se remet pas à jour par `gh pr update-branch` : son commit de merge, que le script
+refuse, serait abandonné par le `--rebase` (relecture de la PR #117, non mesuré). C'est un rebase
+de branche ouverte, qui attend la demande explicite du mainteneur (`contraintes.md`). Un refus « CI
+pas entièrement verte » alors que le dernier run est vert vient d'un run plus ancien sur la même
+tête, que le script lit aussi (le rollup d'une tête porte un run par événement — cinq par job
+relevés sur la PR #109) : un commit réel en ouvre un neuf, sur sa propre tête ; qu'un rerun du run
+rouge lui-même suffise n'est pas mesuré.
 
 ## Étape 8 — Après le merge : clôture propre, puis répercussions
 
