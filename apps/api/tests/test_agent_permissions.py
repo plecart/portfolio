@@ -94,7 +94,8 @@ ALLOWED_MERGE = ("Bash", f"{MERGE_LOT} 118 {'a' * 40} feat/sessions-liees")
 
 # Ce que l'entrée du script ne doit pas autoriser en passant : un autre script du même dossier,
 # Python en général, et le script appelé par un autre chemin, que la règle n'apparie pas — il
-# retombe alors sur l'invite ordinaire, jamais sur une autorisation.
+# retombe alors sur le régime ordinaire (invite, ou classifieur en mode auto), jamais sur cette
+# autorisation.
 NOT_ALLOWED_BY_THE_MERGE_RULE = [
     ("Bash", "python .claude/skills/cycle-pr/scripts/mutation.py . m.json"),
     ("Bash", "python -c print(1)"),

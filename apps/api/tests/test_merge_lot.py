@@ -268,8 +268,8 @@ def test_la_ligne_de_verdict_que_cycle_pr_prescrit_est_celle_que_le_script_lit()
 def test_la_sortie_du_script_lance_en_tube_est_en_utf_8() -> None:
     """La session lit le motif par un tube. Sous Windows, Python y écrit en cp1252 : « tête »
     arrivait en `t\\xeate`, illisible (mesuré le 2026-10-17 sur la PR jetable #119). Rouge sur le
-    poste seulement — un runner Linux écrit en UTF-8 par défaut (`pipeline.config.md`,
-    « Qualité »)."""
+    poste (mutation jouée) ; sur un runner Linux, dont la locale est en UTF-8, supposé vert même
+    sans le correctif — non mesuré (`pipeline.config.md`, « Qualité »)."""
     script = REPOSITORY_ROOT / ".claude/skills/cycle-pr/scripts/merge-lot.py"
     done = subprocess.run([sys.executable, str(script)], capture_output=True, check=False)
 
