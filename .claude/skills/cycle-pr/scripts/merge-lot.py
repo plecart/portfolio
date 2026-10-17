@@ -6,7 +6,9 @@ C'est la seule voie de merge que `.claude/settings.json` autorise sans invite : 
 reste en `ask`, et ce script le lance lui-même, une fois chaque condition tenue (#107, décision 13
 du brief ; `cycle-pr` Étape 7, « Le go, puis le merge »). Il refuse, dans cet ordre :
 
-1. une base attendue égale au trunk — le merge dans le trunk attend toujours un go humain ;
+1. une base attendue égale au trunk — le merge dans le trunk attend toujours un go humain — ou
+   qui n'est la tête d'aucune PR d'intégration ouverte vers le trunk, au corps ouvert par « En vol
+   pour #N (intégration, n lots) » : une autre branche n'est pas une branche d'intégration ;
 2. une PR dont la base n'est pas la base attendue, qui n'est plus ouverte, ou encore en draft — le
    passage en ready suit la fermeture de la boucle du relecteur (`cycle-pr` Étapes 4 et 5) ;
 3. une tête autre que le SHA vérifié ;
@@ -38,6 +40,10 @@ from typing import Any
 Run = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
 
 FULL_SHA = re.compile(r"[0-9a-f]{40}")
+# `str.isdigit` accepte « ² » : le numéro se lit en chiffres ASCII seulement.
+PR_NUMBER = re.compile(r"[0-9]+")
+# La première ligne du corps d'une PR d'intégration (#107, brief, « Corps de PR »).
+INTEGRATION_MARK = re.compile(r"En vol pour #\d+ \(intégration, \d+ lots\)")
 # Une ligne de `statusCheckRollup` est verte sur l'une de ces conclusions. `SKIPPED` : les jobs de
 # publication et de déploiement, gardés par `if:`, le rendent sur chaque PR (relevé sur la PR #109).
 GREEN_CONCLUSIONS = {"SUCCESS", "SKIPPED", "NEUTRAL"}
@@ -109,6 +115,23 @@ def merge(number: str, sha: str, base: str, run: Run) -> None:
         raise Refusal(
             f"`{base}` est le trunk : son merge attend le go humain de `cycle-pr` Étape 7"
         )
+    listed = output(
+        run,
+        "gh",
+        "pr",
+        "list",
+        "--base",
+        trunk,
+        "--head",
+        base,
+        "--state",
+        "open",
+        "--json",
+        "body",
+    )
+    first_lines = [(pr["body"].splitlines() or [""])[0].strip() for pr in json.loads(listed)]
+    if not any(INTEGRATION_MARK.fullmatch(line) for line in first_lines):
+        raise Refusal(f"`{base}` n'est la tête d'aucune PR d'intégration ouverte vers `{trunk}`")
     fields = "baseRefName,headRefOid,isDraft,state,body,statusCheckRollup"
     pr = json.loads(output(run, "gh", "pr", "view", number, "--json", fields))
     if motif := pr_refusal(pr, sha, base):
@@ -130,15 +153,21 @@ def merge(number: str, sha: str, base: str, run: Run) -> None:
         raise Refusal(
             f"la référence de fusion {reference} ne combine pas la tête {sha} : relancer la CI"
         )
-    if run(["git", "merge-base", "--is-ancestor", f"origin/{base}", parents[0]]).returncode != 0:
+    # `--is-ancestor` sort en 1 pour « non », et au-delà (128) quand il ne peut pas répondre.
+    gate = run(["git", "merge-base", "--is-ancestor", f"origin/{base}", parents[0]])
+    if gate.returncode == 1:
         raise Refusal(f"`{base}` a avancé depuis la base éprouvée {parents[0]} : relancer la CI")
+    if gate.returncode != 0:
+        raise Refusal(
+            f"porte de fraîcheur sans réponse ({gate.returncode}) : {gate.stderr.strip()}"
+        )
 
     output(run, "gh", "pr", "merge", number, "--rebase", "--match-head-commit", sha)
 
 
 def main(argv: Sequence[str], run: Run = default_run) -> int:
     """Point d'entrée : `<PR> <SHA de tête vérifié> <base attendue>` ; voir le module."""
-    if len(argv) != 3 or not argv[0].isdigit() or not FULL_SHA.fullmatch(argv[1]):
+    if len(argv) != 3 or not PR_NUMBER.fullmatch(argv[0]) or not FULL_SHA.fullmatch(argv[1]):
         print(__doc__.split("\n\n")[1])
         return 2
     number, sha, base = argv
