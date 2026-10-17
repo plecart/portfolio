@@ -39,6 +39,7 @@
       "Bash(rtk gh pr *)",
       "Bash(rtk gh issue *)",
       "Bash(rtk gh run list *)",
+      "Bash(python .claude/skills/cycle-pr/scripts/merge-lot.py *)",
       "mcp__context7__resolve-library-id",
       "mcp__context7__query-docs"
     ],
