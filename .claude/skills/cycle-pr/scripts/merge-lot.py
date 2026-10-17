@@ -20,8 +20,9 @@ du brief ; `cycle-pr` Étape 7, « Le merge d'un lot »). Il refuse, dans cet or
    a éprouvé exactement ce que le `--rebase` rejouera, quelle que soit la base que la forge a
    combinée à son dernier run — sans lire la référence de fusion, que la forge recalcule à son
    rythme (obs 51). Un commit de merge, celui de `gh pr update-branch`, serait abandonné par le
-   `--rebase`, et sa résolution avec lui (passe 2 de la relecture de la PR #117). L'argument
-   suppose aussi que la base n'est jamais réécrite : « jamais de force-push » de `contraintes.md`.
+   `--rebase`, et sa résolution avec lui — supposé par la relecture de la PR #117 (passe 2), non
+   mesuré : le script le refuse avant d'avoir à le savoir. L'argument suppose aussi que la base
+   n'est jamais réécrite : « jamais de force-push » de `contraintes.md`.
 
 Puis `gh pr merge <PR> --rebase --match-head-commit <SHA>`, que la forge refuse si la tête a bougé
 entre-temps.
@@ -178,8 +179,10 @@ def merge(number: str, sha: str, base: str, run: Run) -> None:
         raise Refusal(motif)
 
     # La tête de la PR se récupère avec la base : `--is-ancestor` ne répond que sur deux objets
-    # locaux, et sort au-delà de 1 (128) quand il ne peut pas répondre. La réf de suivi est nommée
-    # en toutes lettres : un refspec configuré qui ne couvre pas la base la laisserait périmée.
+    # locaux, et sort sur un code non nul autre que 1 quand il ne peut pas répondre (doc de git ;
+    # la valeur exacte n'est pas mesurée). La réf de suivi est nommée en toutes lettres : un refspec
+    # configuré qui ne couvre pas la base pourrait la laisser périmée (relecture de la PR #117,
+    # non mesuré).
     output(
         run,
         "git",
@@ -222,7 +225,8 @@ def main(argv: Sequence[str], run: Run = default_run) -> int:
 
 
 if __name__ == "__main__":
-    # Un tube sous Windows s'écrit en cp1252 : le motif, accentué, arriverait illisible à la
-    # session qui le lit (mesuré le 2026-10-17, PR #119).
+    # Sur un poste dont la page de code est cp1252, Python écrit un tube dans cet encodage : le
+    # motif, accentué, arriverait illisible à la session qui le lit (mesuré le 2026-10-17, PR #119 ;
+    # commande dans `pipeline.config.md`, « Qualité »).
     sys.stdout.reconfigure(encoding="utf-8")
     sys.exit(main(sys.argv[1:]))
