@@ -1057,7 +1057,7 @@ le script lit :
 Verdict d'avant-go (<SHA complet de tête>) : rien à corriger
 ```
 
-Puis, après `git fetch origin`, une seule commande :
+Puis une seule commande, qui récupère elle-même la base :
 
 ```
 python .claude/skills/cycle-pr/scripts/merge-lot.py <n> <SHA de tête vérifié> <branche d'intégration>
@@ -1065,11 +1065,14 @@ python .claude/skills/cycle-pr/scripts/merge-lot.py <n> <SHA de tête vérifié>
 
 C'est la **seule** voie de merge que `.claude/settings.json` autorise sans invite ; `gh pr merge`
 reste en `ask`, épinglé par `apps/api/tests/test_agent_permissions.py`. Le script porte lui-même
-les portes de « Le go, puis le merge » — trunk refusé, tête comparée au SHA vérifié, référence de
-fusion relue, base éprouvée encore à jour — et merge en `--rebase --match-head-commit`. Ses refus,
-et ce qu'il ne prouve pas, sont dans sa docstring ; son contrat, dans
-`apps/api/tests/test_merge_lot.py`. Un refus sort en une ligne et se traite comme une porte qui ne
-part pas : rejouer « Rejouer les vérifications périmées », jamais le contourner par `gh pr merge`.
+les portes de « Le go, puis le merge » — trunk refusé, base qui doit être la tête d'une PR
+d'intégration ouverte, tête comparée au SHA vérifié, référence de fusion relue, base éprouvée
+encore à jour — et merge en `--rebase --match-head-commit`. Ses refus, et ce qu'il ne prouve pas,
+sont dans sa docstring ; son contrat, dans `apps/api/tests/test_merge_lot.py`. Un refus sort en une
+ligne et se traite comme une porte qui ne part pas : rejouer « Rejouer les vérifications
+périmées », jamais le contourner par `gh pr merge`. Un refus « CI pas entièrement verte » alors que
+le dernier run est vert vient d'un run plus ancien sur la même tête, que le script lit aussi :
+un commit réel ouvre un rollup neuf ; qu'un rerun du run rouge lui-même suffise n'est pas mesuré.
 
 ## Étape 8 — Après le merge : clôture propre, puis répercussions
 

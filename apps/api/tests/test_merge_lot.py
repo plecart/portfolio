@@ -59,12 +59,14 @@ class Forge:
         *,
         trunk: str = "main",
         parents: Sequence[str] = (BASE_EPROUVEE, TETE),
-        base_contient_l_eprouvee: bool = True,
+        code_de_la_porte: int = 0,
+        integration: Sequence[str] = ("En vol pour #107 (intégration, 4 lots)\n\nCloses #107",),
     ) -> None:
         self.pr = pr
         self.trunk = trunk
         self.parents = parents
-        self.base_contient_l_eprouvee = base_contient_l_eprouvee
+        self.code_de_la_porte = code_de_la_porte
+        self.integration = integration
         self.appels: list[list[str]] = []
 
     def __call__(self, cmd: Sequence[str]) -> subprocess.CompletedProcess[str]:
@@ -78,6 +80,8 @@ class Forge:
             return self.trunk + "\n", 0
         if cmd[:3] == ["gh", "pr", "view"]:
             return json.dumps(self.pr), 0
+        if cmd[:3] == ["gh", "pr", "list"]:
+            return json.dumps([{"body": body} for body in self.integration]), 0
         if cmd[:2] == ["git", "fetch"]:
             return "", 0
         if cmd[:2] == ["gh", "api"] and cmd[2].endswith("/merge"):
@@ -85,7 +89,7 @@ class Forge:
         if cmd[:2] == ["gh", "api"] and cmd[2].endswith(f"/commits/{REFERENCE_DE_FUSION}"):
             return "".join(f"{sha}\n" for sha in self.parents), 0
         if cmd[:3] == ["git", "merge-base", "--is-ancestor"]:
-            return "", 0 if self.base_contient_l_eprouvee else 1
+            return "", self.code_de_la_porte
         if cmd[:3] == ["gh", "pr", "merge"]:
             return "", 0
         raise AssertionError(f"appel inattendu : {cmd}")
@@ -119,7 +123,14 @@ REFUS: dict[str, tuple[dict[str, Any], dict[str, Any], tuple[str, ...], str]] = 
         {"baseRefName": "feat/autre"},
         {},
         (),
-        "base",
+        "la base de la PR",
+    ),
+    "base-sans-pr-d-integration": ({}, {"integration": ()}, (), "PR d'intégration"),
+    "base-tete-d-une-pr-de-lot": (
+        {},
+        {"integration": ("En vol pour #107 (lot 2a/4)\n\nCorps",)},
+        (),
+        "PR d'intégration",
     ),
     "tete-differente-du-sha-verifie": ({"headRefOid": AUTRE_TETE}, {}, (), "tête"),
     "pr-encore-en-draft": ({"isDraft": True}, {}, (), "draft"),
@@ -152,10 +163,11 @@ REFUS: dict[str, tuple[dict[str, Any], dict[str, Any], tuple[str, ...], str]] = 
     ),
     "base-avancee-depuis-le-dernier-run": (
         {},
-        {"base_contient_l_eprouvee": False},
+        {"code_de_la_porte": 1},
         (),
         "avancé",
     ),
+    "porte-de-fraicheur-sans-reponse": ({}, {"code_de_la_porte": 128}, (), "sans réponse"),
 }
 
 
@@ -179,8 +191,14 @@ def test_chaque_condition_manquante_refuse_le_merge_et_se_nomme(
 
 @pytest.mark.parametrize(
     "args",
-    [(), ("42", TETE), ("42", "abc", INTEGRATION), ("quarante-deux", TETE, INTEGRATION)],
-    ids=["sans-argument", "base-manquante", "sha-abrege", "numero-non-entier"],
+    [
+        (),
+        ("42", TETE),
+        ("42", "abc", INTEGRATION),
+        ("quarante-deux", TETE, INTEGRATION),
+        ("4²", TETE, INTEGRATION),
+    ],
+    ids=["sans-argument", "base-manquante", "sha-abrege", "numero-non-entier", "chiffre-unicode"],
 )
 def test_un_appel_mal_forme_sort_en_2_sans_toucher_a_la_forge(args: tuple[str, ...]) -> None:
     """Un SHA abrégé passerait `--match-head-commit` par préfixe : seul le SHA complet que la
