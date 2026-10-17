@@ -82,6 +82,23 @@ GATED_CALLS = [
     ("PowerShell", "gh pr update-branch 56 --rebase"),
 ]
 
+# La seule voie de merge sans invite : le script de merge d'un lot dans sa branche d'intégration,
+# qui refuse lui-même le trunk (`.claude/skills/cycle-pr/scripts/merge-lot.py`, #107 lot 2a). Une
+# règle `Bash(cmd *)` n'approuve pas `cmd && autre` : Claude Code apparie chaque sous-commande
+# séparément (doc « Configure permissions », § Compound commands, lue le 2026-10-17) — d'où une
+# seule forme simple ici, comme dans tout ce module.
+MERGE_LOT = "python .claude/skills/cycle-pr/scripts/merge-lot.py"
+ALLOWED_MERGE = ("Bash", f"{MERGE_LOT} 118 {'a' * 40} feat/sessions-liees")
+
+# Ce que l'entrée du script ne doit pas autoriser en passant : un autre script du même dossier,
+# Python en général, et le script appelé par un autre chemin, que la règle n'apparie pas — il
+# retombe alors sur l'invite ordinaire, jamais sur une autorisation.
+NOT_ALLOWED_BY_THE_MERGE_RULE = [
+    ("Bash", "python .claude/skills/cycle-pr/scripts/mutation.py . m.json"),
+    ("Bash", "python -c print(1)"),
+    ("Bash", f"python ./.claude/skills/cycle-pr/scripts/merge-lot.py 118 {'a' * 40} main"),
+]
+
 # Des commandes ordinaires, par outil, qu'aucun `deny` ni `ask` ne doit attraper.
 HARMLESS_CALLS = [
     ("Bash", "rtk read README.md"),
@@ -95,7 +112,7 @@ HARMLESS_CALLS = [
     ("PowerShell", "gh pr view 54"),
 ]
 
-Section = Literal["ask", "deny"]
+Section = Literal["allow", "ask", "deny"]
 RULE = re.compile(r"^(?P<tool>[A-Za-z]+)\((?P<pattern>.*)\)$")
 
 
@@ -103,7 +120,7 @@ def rule_patterns(section: Section, tool: str) -> list[re.Pattern[str]]:
     """Les règles d'un outil dans une section de `permissions`, traduites en expressions régulières.
 
     Args:
-        section: `deny` ou `ask` — absente du fichier, elle vaut la liste vide.
+        section: `allow`, `ask` ou `deny` — absente du fichier, elle vaut la liste vide.
         tool: le nom d'outil qui préfixe la règle (`Bash`, `PowerShell`…).
 
     Returns:
@@ -156,3 +173,24 @@ def test_une_commande_ordinaire_ne_tombe_ni_sur_un_deny_ni_sur_un_ask(
     """Le témoin : une garde qui attrape tout n'attrape rien de particulier."""
     assert not matches_a_rule(command, "deny", tool), f"« {command} » est arrêté par un `deny`"
     assert not matches_a_rule(command, "ask", tool), f"« {command} » déclenche un `ask`"
+
+
+def test_le_script_de_merge_d_un_lot_est_autorise_sans_invite() -> None:
+    """« Jamais d'auto-merge dans le trunk » : le merge d'un lot dans sa branche d'intégration
+    part sans go humain, par ce script seul — les formes de `GATED_CALLS` restent en `ask`."""
+    tool, command = ALLOWED_MERGE
+
+    assert matches_a_rule(command, "allow", tool), f"« {command} » n'est autorisé par aucun `allow`"
+    assert not matches_a_rule(command, "ask", tool), f"« {command} » déclenche un `ask`"
+    assert not matches_a_rule(command, "deny", tool), f"« {command} » est arrêté par un `deny`"
+
+
+@pytest.mark.parametrize(
+    ("tool", "command"),
+    NOT_ALLOWED_BY_THE_MERGE_RULE,
+    ids=[f"{t}: {c}" for t, c in NOT_ALLOWED_BY_THE_MERGE_RULE],
+)
+def test_l_autorisation_du_script_de_merge_ne_couvre_que_lui(tool: str, command: str) -> None:
+    """Une règle élargie à `python *` ou au dossier entier autoriserait sans invite tout ce que
+    Python peut lancer, `gh pr merge` compris."""
+    assert not matches_a_rule(command, "allow", tool), f"« {command} » est autorisé sans invite"
