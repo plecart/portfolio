@@ -15,10 +15,13 @@ du brief ; `cycle-pr` Étape 7, « Le merge d'un lot »). Il refuse, dans cet or
 3. une tête autre que le SHA vérifié ;
 4. une CI qui n'est pas entièrement verte sur cette tête, ou dont aucun job n'a tourné ;
 5. un body sans la ligne « Verdict d'avant-go (<SHA de tête>) : rien à corriger » ;
-6. une tête qui ne contient pas la tête actuelle de la base. Contenue, la base ne change rien à
-   l'arbre : la CI de la tête a éprouvé exactement ce que le merge produira, quelle que soit la
-   base que la forge a combinée à son dernier run — sans lire la référence de fusion, que la forge
-   recalcule à son rythme (obs 51).
+6. une tête qui ne contient pas la tête actuelle de la base, ou qui l'a rejointe par un commit de
+   merge. Contenue par un historique linéaire, la base ne change rien à l'arbre : la CI de la tête
+   a éprouvé exactement ce que le `--rebase` rejouera, quelle que soit la base que la forge a
+   combinée à son dernier run — sans lire la référence de fusion, que la forge recalcule à son
+   rythme (obs 51). Un commit de merge, celui de `gh pr update-branch`, serait abandonné par le
+   `--rebase`, et sa résolution avec lui (passe 2 de la relecture de la PR #117). L'argument
+   suppose aussi que la base n'est jamais réécrite : « jamais de force-push » de `contraintes.md`.
 
 Puis `gh pr merge <PR> --rebase --match-head-commit <SHA>`, que la forge refuse si la tête a bougé
 entre-temps.
@@ -175,16 +178,29 @@ def merge(number: str, sha: str, base: str, run: Run) -> None:
         raise Refusal(motif)
 
     # La tête de la PR se récupère avec la base : `--is-ancestor` ne répond que sur deux objets
-    # locaux, et sort au-delà de 1 (128) quand il ne peut pas répondre.
-    output(run, "git", "fetch", "origin", base, f"pull/{number}/head")
+    # locaux, et sort au-delà de 1 (128) quand il ne peut pas répondre. La réf de suivi est nommée
+    # en toutes lettres : un refspec configuré qui ne couvre pas la base la laisserait périmée.
+    output(
+        run,
+        "git",
+        "fetch",
+        "origin",
+        f"+refs/heads/{base}:refs/remotes/origin/{base}",
+        f"pull/{number}/head",
+    )
     gate = run(["git", "merge-base", "--is-ancestor", f"origin/{base}", sha])
     if gate.returncode == 1:
         raise Refusal(
-            f"la tête {sha} ne contient pas la tête actuelle de `{base}` : la remettre à jour"
+            f"la tête {sha} ne contient pas la tête actuelle de `{base}` : rebase à demander au "
+            "mainteneur (`cycle-pr` Étape 7, « Le merge d'un lot »)"
         )
     if gate.returncode != 0:
         raise Refusal(
             f"porte de fraîcheur sans réponse ({gate.returncode}) : {gate.stderr.strip()}"
+        )
+    if output(run, "git", "rev-list", "--merges", f"origin/{base}..{sha}"):
+        raise Refusal(
+            f"la tête {sha} rejoint `{base}` par un commit de merge, que `--rebase` abandonnerait"
         )
 
     output(run, "gh", "pr", "merge", number, "--rebase", "--match-head-commit", sha)

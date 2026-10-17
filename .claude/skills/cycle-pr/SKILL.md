@@ -1067,12 +1067,15 @@ C'est la **seule** voie de merge que `.claude/settings.json` autorise sans invit
 reste en `ask`, épinglé par `apps/api/tests/test_agent_permissions.py`. Le script porte lui-même
 les portes de « Le go, puis le merge » — trunk refusé, base qui doit être la tête d'une PR
 d'intégration ouverte, tête comparée au SHA vérifié — et une plus stricte : la tête du lot doit
-**contenir** la tête actuelle de sa base. La CI de la tête a alors éprouvé l'arbre exact que le
-merge produira, sans lire la référence de fusion, que la forge recalcule à son rythme (obs 51) ; un
-lot en retard sur sa base se remet à jour avant de merger. Puis `--rebase --match-head-commit`. Ses refus, et ce qu'il ne prouve pas,
-sont dans sa docstring ; son contrat, dans `apps/api/tests/test_merge_lot.py`. Un refus sort en une
-ligne et se traite comme une porte qui ne part pas : rejouer « Rejouer les vérifications
-périmées », jamais le contourner par `gh pr merge`. Un refus « CI pas entièrement verte » alors que
+**contenir** la tête actuelle de sa base, par un historique sans commit de merge. La CI de la tête
+a alors éprouvé l'arbre exact que le `--rebase` rejouera, sans lire la référence de fusion, que la
+forge recalcule à son rythme (obs 51). Puis `--rebase --match-head-commit`. Ses refus, et ce qu'il
+ne prouve pas, sont dans sa docstring ; son contrat, dans `apps/api/tests/test_merge_lot.py`. Un
+refus sort en une ligne et se traite comme une porte qui ne part pas : rejouer « Rejouer les
+vérifications périmées », jamais le contourner par `gh pr merge`. **Un lot en retard sur sa base**
+— ce que des lots ouverts l'un après l'autre ne rencontrent pas — ne se remet pas à jour par
+`gh pr update-branch`, dont le commit de merge serait abandonné par le `--rebase` : c'est un
+rebase de branche ouverte, qui attend la demande explicite du mainteneur (`contraintes.md`). Un refus « CI pas entièrement verte » alors que
 le dernier run est vert vient d'un run plus ancien sur la même tête, que le script lit aussi :
 un commit réel ouvre un rollup neuf ; qu'un rerun du run rouge lui-même suffise n'est pas mesuré.
 
