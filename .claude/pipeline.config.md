@@ -252,12 +252,14 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
     fait servir la version témoin, et le harnais rend VERT un test qui tient. Rouge **en CI
     seulement**, l'horodatage de fichier de NTFS étant plus fin que celui des runners ; mesuré
     le 2026-10-09 sur deux mutations de longueur identique
-  - **sortie d'un script Python lue par un tube** — sous Windows, Python écrit un tube en cp1252 :
-    un motif accentué arrive illisible à la session qui le lit (« tête » en `t\xeate`, mesuré le
-    2026-10-17 sur la PR jetable #119). Un script de skill dont la sortie est lue force
-    `sys.stdout.reconfigure(encoding="utf-8")` ; la garde (`test_merge_lot.py`) est **rouge sur le
-    poste seulement** — sur un runner Linux, locale en UTF-8, supposée verte sans le correctif,
-    non mesuré
+  - **sortie d'un script Python lue par un tube** — sur ce poste, dont la page de code est cp1252,
+    Python écrit un tube dans cet encodage : un motif accentué arrive illisible à la session qui le
+    lit (vu le 2026-10-17 sur la PR jetable #119 ; mesuré le même jour, `python -c
+    "import locale,sys; print(locale.getpreferredencoding(False), sys.stdout.encoding)" | cat`
+    rend `cp1252 cp1252`, et `print('tête')` en tube écrit les octets `t\xeate`). Un script de skill
+    dont la sortie est lue force `sys.stdout.reconfigure(encoding="utf-8")` ; la garde
+    (`test_merge_lot.py`) est **rouge sur le poste** sans lui (mutation jouée, mesuré le
+    2026-10-17) — sur un runner Linux, locale en UTF-8, supposée verte sans le correctif, non mesuré
 - gates bloquants en CI :
   - back : audit, lint, format:check, typecheck, test
   - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse, audit
