@@ -1257,6 +1257,52 @@ def test_chaque_invariant_des_sessions_liees_garde_sa_phrase(fichier: str, phras
     assert phrase in texte, f"`{fichier}` ne porte plus « {phrase} »"
 
 
+# « Jamais d'auto-merge » devient « jamais d'auto-merge **dans le trunk** » (#107, lot 2a) : une
+# PR de lot se merge sans go dans la branche d'intégration de son issue, par
+# `.claude/skills/cycle-pr/scripts/merge-lot.py`. Une mention restée nue dirait le contraire de la
+# règle — interdire ce que `cycle-pr` Étape 7 prescrit —, ou, réécrite ailleurs, la ferait lire
+# comme levée pour le trunk aussi.
+#
+# **Population**, recensée avant le premier correctif sur `7e94d11` : `grep -rn -i "auto-merge"
+# .claude/ CONTRIBUTING.md` rend **8 lignes**, toutes nues (le brief en annonçait 6 — journal de
+# spec de #107, 2026-10-17) : `contraintes.md`, `cycle-pr/SKILL.md` (en-tête, Étape 7),
+# `pr-paralleles/SKILL.md` (« Règles »), `verificateur.md`, `pipeline.config.md` (porte `ask`),
+# `prompt-lot-suivant.md` (renvoi au titre de la règle), `CONTRIBUTING.md`. La garde lit cette
+# prose entière, `CLAUDE.md` compris : une mention neuve y entre d'office.
+#
+# **Bornes.** `.github/` n'en est pas : sa seule mention, en commentaire de `dependabot.yml`, parle
+# des PR du bot, qui visent toujours le trunk — la forme nue y est vraie (relevé à la première
+# exécution de cette garde, 2026-10-17). Et la garde exige que chaque « auto-merge » soit suivi de
+# « dans le trunk », pas que la phrase qui suit dise vrai — « jamais d'auto-merge dans le trunk,
+# sauf vers `main` » passerait.
+AUTO_MERGE_NU = re.compile(r"auto-merge(?!\s+dans\s+le\s+trunk)", re.IGNORECASE)
+AUTO_MERGE_PROSE_GLOBS = [".claude/**/*.md", "CLAUDE.md", "CONTRIBUTING.md"]
+AUTO_MERGE_FORMES = {
+    "regle-nue": ("- **Jamais d'auto-merge.** Même avec CI verte", True),
+    "renvoi-nu-au-titre": ("`contraintes.md`, « Jamais d'auto-merge ».", True),
+    "borne-au-trunk": ("**Jamais d'auto-merge dans le trunk.** Même CI verte", False),
+    "borne-coupee-par-un-retour-a-la-ligne": ("jamais d'auto-merge dans le\n  trunk", False),
+}
+
+
+@pytest.mark.parametrize(("prose", "nue"), AUTO_MERGE_FORMES.values(), ids=AUTO_MERGE_FORMES.keys())
+def test_le_motif_de_l_auto_merge_ne_vise_que_la_forme_nue(prose: str, nue: bool) -> None:
+    """Le témoin des deux côtés : une forme nue appariée, une forme bornée laissée."""
+    assert bool(AUTO_MERGE_NU.search(prose)) is nue
+
+
+def test_chaque_mention_de_l_auto_merge_le_borne_au_trunk() -> None:
+    """La population entière, pas les trois sites que le critère du brief nomme."""
+    nues = [
+        f"{path.relative_to(REPOSITORY_ROOT).as_posix()} : {match.group(0)}"
+        for path, match in prose_citations(
+            REPOSITORY_ROOT, tracked_files(), AUTO_MERGE_PROSE_GLOBS, AUTO_MERGE_NU
+        )
+    ]
+
+    assert not nues, f"« auto-merge » sans « dans le trunk » : {nues}"
+
+
 # Les portes à base d'avis (obs 56) lisent une base qui change sans commit. La prose qui prescrit
 # un geste sur elles a fui deux fois à la relecture du lot 4b de #77, dans deux sens opposés :
 # vérifier un avis sur le trunk en **rejouant** un de ses runs relance les jobs qui en dépendent —

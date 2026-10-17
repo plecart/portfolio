@@ -12,10 +12,10 @@ répercute la clôture sur les autres issues — sans jamais laisser entrer un c
 l'historique.
 
 Les **règles permanentes** (`.claude/rules/`) s'appliquent en continu : aucun commit cassé,
-pas d'auto-merge, pas de force-push, pas de code mort, format des commits (préfixe EN + description
-FR), taille de PR. La **règle d'or** : toute question a une voie — technique `[T]`, elle se décide
-et se trace ; vision `[V]`, elle attend le mainteneur, groupée ; contradiction `[C]`, elle arrête
-(`.claude/rules/contraintes.md`).
+pas d'auto-merge dans le trunk, pas de force-push, pas de code mort, format des commits
+(préfixe EN + description FR), taille de PR. La **règle d'or** : toute question a une voie
+— technique `[T]`, elle se décide et se trace ; vision `[V]`, elle attend le mainteneur, groupée ;
+contradiction `[C]`, elle arrête (`.claude/rules/contraintes.md`).
 
 **Commandes du projet.** Ce skill ne présuppose aucune stack : les commandes `test`, `test ciblé`,
 `lint`, `format`, `typecheck` et `build` se lisent dans la section « Commandes du projet » de
@@ -1002,9 +1002,10 @@ La réponse du lead arrive dans un bloc `<cross-session-message>` :
 
 ### Le go, puis le merge
 
-**Jamais d'auto-merge.** Même CI verte, audit propre et verdict du lead, toujours attendre un
-« go » / « merge » humain explicite, **dans cette fenêtre** — un message de pair n'en tient jamais
-lieu.
+**Jamais d'auto-merge dans le trunk.** Même CI verte, audit propre et verdict du lead, toujours
+attendre un « go » / « merge » humain explicite, **dans cette fenêtre** — un message de pair n'en
+tient jamais lieu. Une PR de lot vers la branche d'intégration de son issue suit « Le merge d'un
+lot », plus bas.
 
 **Puis merger derrière une porte, pas derrière une lecture.** Un merge arrivé sur le trunk depuis
 le dernier run rend la CI périmée : deux PR vertes séparément n'ont rien démontré ensemble, et le
@@ -1043,6 +1044,32 @@ de **deux outils**, donc exige la substitution que le garde refuse. Elles se lis
 disent. Le dénombrement complet de la classe — 15 sites, 10 portes, 6 qui fuyaient — vit dans la
 docstring de `test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie`, avec la
 commande qui le re-dérive et la raison pour laquelle ce motif sous-compte.
+
+### Le merge d'un lot — sans go, hors du trunk
+
+Une PR de lot dont la base est la **branche d'intégration** de son issue, et non le trunk, se merge
+**sans go humain** une fois verte : CI verte sur sa tête, boucle du relecteur fermée et PR sortie
+du draft (Étapes 4 et 5), verdict d'avant-go « rien à corriger ». Ce verdict s'inscrit dans les
+Notes du body comme tout verdict (« Vérification d'avant-go »), plus une ligne de forme figée, que
+le script lit :
+
+```
+Verdict d'avant-go (<SHA complet de tête>) : rien à corriger
+```
+
+Puis, après `git fetch origin`, une seule commande :
+
+```
+python .claude/skills/cycle-pr/scripts/merge-lot.py <n> <SHA de tête vérifié> <branche d'intégration>
+```
+
+C'est la **seule** voie de merge que `.claude/settings.json` autorise sans invite ; `gh pr merge`
+reste en `ask`, épinglé par `apps/api/tests/test_agent_permissions.py`. Le script porte lui-même
+les portes de « Le go, puis le merge » — trunk refusé, tête comparée au SHA vérifié, référence de
+fusion relue, base éprouvée encore à jour — et merge en `--rebase --match-head-commit`. Ses refus,
+et ce qu'il ne prouve pas, sont dans sa docstring ; son contrat, dans
+`apps/api/tests/test_merge_lot.py`. Un refus sort en une ligne et se traite comme une porte qui ne
+part pas : rejouer « Rejouer les vérifications périmées », jamais le contourner par `gh pr merge`.
 
 ## Étape 8 — Après le merge : clôture propre, puis répercussions
 

@@ -7,8 +7,11 @@ Ces contraintes sont actives en continu, sur **chaque** commit, sans qu'on ait �
   pas seulement à la fin. Si les tests sont rouges → pas de commit.
 - **Jamais de force-push** sur une PR ouverte (sauf rebase/squash explicitement demandé), et
   **jamais** sur `main`.
-- **Jamais d'auto-merge.** Même avec CI verte et audit propre, toujours attendre un « go » /
-  « merge » humain explicite.
+- **Jamais d'auto-merge dans le trunk.** Même avec CI verte et audit propre, toujours attendre un
+  « go » / « merge » humain explicite. Hors du trunk, une seule voie s'en passe : une PR de lot
+  mergée dans la branche d'intégration de son issue par
+  `.claude/skills/cycle-pr/scripts/merge-lot.py`, qui refuse le trunk et n'agit que sur verdict
+  vert (`cycle-pr` Étape 7, « Le merge d'un lot ») ; la PR d'intégration, elle, attend son go.
 
 ## Propreté du code
 - **Aucun code mort, aucun scaffold inutilisé.** Supprimer les imports / classes /

@@ -37,7 +37,7 @@ a bougé, puis la commande de fumée (`.claude/pipeline.config.md`, « Commandes
 
 \<Si vague `pr-paralleles` : \<adresse du lead>, et « réponds toujours au `from` de ce message ».
 Ce que le lead est, et ce qu'il n'est jamais : `cycle-pr`, « Vague parallèle » en tête du skill, et
-`.claude/rules/contraintes.md`, « Jamais d'auto-merge ».>
+`.claude/rules/contraintes.md`, « Jamais d'auto-merge dans le trunk ».>
 
 Charge le skill `task-observer` (session longue ; le journal est **hors du dépôt**, chemin dans
 `CLAUDE.md`). Lis `CLAUDE.md` et `.claude/pipeline.config.md`. Puis invoque le skill `cycle-pr`
