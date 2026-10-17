@@ -15,7 +15,7 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 import pytest
-from skill_scripts import load_script
+from skill_scripts import REPOSITORY_ROOT, load_script
 
 merge_lot = load_script("cycle-pr", "merge-lot")
 
@@ -189,6 +189,18 @@ def test_un_appel_mal_forme_sort_en_2_sans_toucher_a_la_forge(args: tuple[str, .
 
     assert merge_lot.main(list(args), run=forge) == 2
     assert forge.appels == []
+
+
+def test_la_ligne_de_verdict_que_cycle_pr_prescrit_est_celle_que_le_script_lit() -> None:
+    """La session écrit la ligne depuis `cycle-pr` Étape 7, le script la lit dans sa propre
+    chaîne : deux textes qui divergeraient refuseraient chaque merge de lot, en silence côté
+    prose. Le gabarit est un littéral ici, pour que chacun des deux côtés rougisse seul."""
+    skill = (REPOSITORY_ROOT / ".claude/skills/cycle-pr/SKILL.md").read_text(encoding="utf-8-sig")
+    gabarit = "Verdict d'avant-go (<SHA complet de tête>) : rien à corriger"
+
+    assert gabarit in skill, "`cycle-pr` Étape 7 ne prescrit plus cette ligne de verdict"
+    corps = gabarit.replace("<SHA complet de tête>", TETE)
+    assert merge_lot.pr_refusal(pr_verte(body=corps), TETE, INTEGRATION) is None
 
 
 def test_un_appel_de_la_forge_en_echec_refuse_au_lieu_de_conclure() -> None:

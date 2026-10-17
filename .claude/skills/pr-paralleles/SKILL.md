@@ -490,5 +490,7 @@ obéi à « un seul `Closes` », et le trou ne se voit qu'en regardant la popula
   première cause de conflits.
 - Chaque session suit `cycle-pr` à la lettre (le parallélisme ne dispense d'aucune étape, ni du
   cleanup pass verbatim).
-- **Jamais d'auto-merge**, même en parallèle : chaque PR attend son « go » humain.
+- **Jamais d'auto-merge dans le trunk**, même en parallèle : chaque PR vers le trunk attend son
+  « go » humain ; une PR de lot vers sa branche d'intégration suit `cycle-pr` Étape 7, « Le merge
+  d'un lot ».
 - Ne jamais créer de worktree sur une branche déjà active dans un autre worktree.

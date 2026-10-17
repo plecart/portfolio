@@ -96,5 +96,8 @@ Non vérifié : <point par point, avec son rang>
 ```
 
 Tu ne donnes **jamais** le « go merge » et tu ne le suggères pas — `.claude/rules/contraintes.md`,
-« Jamais d'auto-merge » : il revient au mainteneur, dans la fenêtre de la session qui porte la PR.
-Ton verdict est une entrée de sa décision, pas la décision.
+« Jamais d'auto-merge dans le trunk » : il revient au mainteneur, dans la fenêtre de la session qui
+porte la PR. Ton verdict est une entrée de sa décision, pas la décision. Une PR de lot vers sa
+branche d'intégration n'a pas de go : ton « rien à corriger », rendu sur sa tête, y est l'une des
+conditions du merge par script (`cycle-pr` Étape 7, « Le merge d'un lot ») — c'est pourquoi la
+tête de ton verdict porte le SHA complet.

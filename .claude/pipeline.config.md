@@ -358,8 +358,12 @@ Un `ask` passe avant tout `allow`, y compris celui qu'un hook renvoie (doc permi
 matching ask rule still prompts even when the hook returned "allow" »), en mode auto compris
 (doc permission-modes, § auto mode : « Explicit ask rules still force a prompt ») :
 `permissions.ask` sur `gh pr merge` et sur `gh pr update-branch … --rebase` — forme d'origine,
-forme `rtk`, `rtk proxy`, outil PowerShell — est la porte de « jamais d'auto-merge » et du « rebase
-explicitement demandé » (`contraintes.md`), épinglée par `apps/api/tests/test_agent_permissions.py`.
+forme `rtk`, `rtk proxy`, outil PowerShell — est la porte de « jamais d'auto-merge dans le trunk »
+et du « rebase explicitement demandé » (`contraintes.md`), épinglée par
+`apps/api/tests/test_agent_permissions.py`. Seule exception, hors du trunk : le script
+`.claude/skills/cycle-pr/scripts/merge-lot.py`, autorisé en `allow`, qui lance lui-même
+`gh pr merge` vers une branche d'intégration et refuse le trunk (`cycle-pr` Étape 7, « Le merge
+d'un lot ») — un sous-processus, que les règles du harnais ne voient pas.
 Elle se déclenche aussi sur `gh pr merge` placé **après `&&`** dans une commande composée —
 mesuré le 2026-10-13 avec `git merge-base --is-ancestor HEAD HEAD && gh pr merge --help` :
 l'invite est apparue dans la fenêtre du mainteneur, et la commande n'a tourné qu'après. C'est ce
