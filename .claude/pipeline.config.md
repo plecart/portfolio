@@ -365,7 +365,11 @@ et du « rebase explicitement demandé » (`contraintes.md`), épinglée par
 `gh pr merge` vers une branche d'intégration et refuse le trunk (`cycle-pr` Étape 7, « Le merge
 d'un lot ») — un sous-processus, que les règles du harnais ne voient pas : « Bash rules match the
 whole command text » (doc permissions, lue le 2026-10-17), celui que l'agent lance, pas ce que le
-script lance à son tour. Mesuré le 2026-10-17 sur la PR jetable #120 (Notes de la PR #117).
+script lance à son tour. Mesuré le 2026-10-17 sur la PR jetable #120 (Notes de la PR #117). Le
+contenu du script est donc ce que l'`allow` autorise : son écriture est en `deny`
+(`Edit(/.claude/skills/cycle-pr/scripts/merge-lot.py)`, outils d'édition, `sed` et redirections
+compris — refus mesurés le 2026-10-17), et se fait par le mainteneur. Reste ouvert, comme pour
+`.env` : un sous-processus qui écrirait le fichier lui-même.
 Elle se déclenche aussi sur `gh pr merge` placé **après `&&`** dans une commande composée —
 mesuré le 2026-10-13 avec `git merge-base --is-ancestor HEAD HEAD && gh pr merge --help` :
 l'invite est apparue dans la fenêtre du mainteneur, et la commande n'a tourné qu'après. C'est ce

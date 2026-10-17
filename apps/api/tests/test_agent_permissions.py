@@ -187,6 +187,17 @@ def test_le_script_de_merge_d_un_lot_est_autorise_sans_invite() -> None:
     assert not matches_a_rule(command, "deny", tool), f"« {command} » est arrêté par un `deny`"
 
 
+def test_le_script_de_merge_d_un_lot_ne_s_edite_pas_sans_le_mainteneur() -> None:
+    """L'`allow` fait confiance au **contenu** du script : une session qui en retirerait le refus du
+    trunk, puis le lancerait, mergerait vers `main` sans invite (`/code-review` de la PR #117).
+    Un `deny` `Edit` ferme les outils d'édition, `sed` et les redirections en Bash (doc « Configure
+    permissions », lue le 2026-10-17) ; `/` ancre le chemin au dossier de travail principal. Il ne
+    ferme pas un sous-processus qui écrirait le fichier lui-même — même doc. Le témoin : un fichier
+    voisin du même dossier reste éditable."""
+    assert matches_a_rule(f"/{MERGE_LOT.removeprefix('python ')}", "deny", "Edit")
+    assert not matches_a_rule("/.claude/skills/cycle-pr/scripts/mutation.py", "deny", "Edit")
+
+
 @pytest.mark.parametrize(
     ("tool", "command"),
     NOT_ALLOWED_BY_THE_MERGE_RULE,
