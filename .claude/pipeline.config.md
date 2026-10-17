@@ -363,7 +363,9 @@ et du « rebase explicitement demandé » (`contraintes.md`), épinglée par
 `apps/api/tests/test_agent_permissions.py`. Seule exception, hors du trunk : le script
 `.claude/skills/cycle-pr/scripts/merge-lot.py`, autorisé en `allow`, qui lance lui-même
 `gh pr merge` vers une branche d'intégration et refuse le trunk (`cycle-pr` Étape 7, « Le merge
-d'un lot ») — un sous-processus, que les règles du harnais ne voient pas.
+d'un lot ») — un sous-processus, que les règles du harnais ne voient pas : « Bash rules match the
+whole command text » (doc permissions, lue le 2026-10-17), celui que l'agent lance, pas ce que le
+script lance à son tour. Mesuré le 2026-10-17 sur la PR jetable #120 (Notes de la PR #117).
 Elle se déclenche aussi sur `gh pr merge` placé **après `&&`** dans une commande composée —
 mesuré le 2026-10-13 avec `git merge-base --is-ancestor HEAD HEAD && gh pr merge --help` :
 l'invite est apparue dans la fenêtre du mainteneur, et la commande n'a tourné qu'après. C'est ce

@@ -86,7 +86,9 @@ GATED_CALLS = [
 # qui refuse lui-même le trunk (`.claude/skills/cycle-pr/scripts/merge-lot.py`, #107 lot 2a). Une
 # règle `Bash(cmd *)` n'approuve pas `cmd && autre` : Claude Code apparie chaque sous-commande
 # séparément (doc « Configure permissions », § Compound commands, lue le 2026-10-17) — d'où une
-# seule forme simple ici, comme dans tout ce module.
+# seule forme simple ici, comme dans tout ce module. Une redirection (`… > fichier`) n'est pas
+# couverte par la règle non plus : sa cible se contrôle contre les règles `Edit`, « A rule such as
+# `Bash(git commit *)` allows the command, not the target » (même doc, § Redirections, même date).
 MERGE_LOT = "python .claude/skills/cycle-pr/scripts/merge-lot.py"
 ALLOWED_MERGE = ("Bash", f"{MERGE_LOT} 118 {'a' * 40} feat/sessions-liees")
 
