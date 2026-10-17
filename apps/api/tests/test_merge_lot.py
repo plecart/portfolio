@@ -148,6 +148,12 @@ REFUS: dict[str, tuple[dict[str, Any], dict[str, Any], tuple[str, ...], str]] = 
         "CI",
     ),
     "ci-absente": ({"statusCheckRollup": []}, {}, (), "CI"),
+    "ci-toute-sautee": (
+        {"statusCheckRollup": [check("Back", "SKIPPED"), check("Publication", "SKIPPED")]},
+        {},
+        (),
+        "CI",
+    ),
     "verdict-absent": ({"body": "En vol pour #107 (lot 3/4)\n"}, {}, (), "verdict"),
     "verdict-pour-une-autre-tete": (
         {"body": f"Verdict d'avant-go ({AUTRE_TETE}) : rien à corriger"},
