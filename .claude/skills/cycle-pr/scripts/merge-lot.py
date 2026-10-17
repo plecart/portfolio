@@ -184,4 +184,7 @@ def main(argv: Sequence[str], run: Run = default_run) -> int:
 
 
 if __name__ == "__main__":
+    # Un tube sous Windows s'écrit en cp1252 : le motif, accentué, arriverait illisible à la
+    # session qui le lit (mesuré le 2026-10-17, PR #119).
+    sys.stdout.reconfigure(encoding="utf-8")
     sys.exit(main(sys.argv[1:]))

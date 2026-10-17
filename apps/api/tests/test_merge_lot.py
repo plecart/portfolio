@@ -11,6 +11,7 @@ mergée dans une branche d'intégration jetable — relevé daté dans la PR #11
 
 import json
 import subprocess
+import sys
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -225,6 +226,18 @@ def test_la_ligne_de_verdict_que_cycle_pr_prescrit_est_celle_que_le_script_lit()
     assert gabarit in skill, "`cycle-pr` Étape 7 ne prescrit plus cette ligne de verdict"
     corps = gabarit.replace("<SHA complet de tête>", TETE)
     assert merge_lot.pr_refusal(pr_verte(body=corps), TETE, INTEGRATION) is None
+
+
+def test_la_sortie_du_script_lance_en_tube_est_en_utf_8() -> None:
+    """La session lit le motif par un tube. Sous Windows, Python y écrit en cp1252 : « tête »
+    arrivait en `t\\xeate`, illisible (mesuré le 2026-10-17 sur la PR jetable #119). Rouge sur le
+    poste seulement — un runner Linux écrit en UTF-8 par défaut (`pipeline.config.md`,
+    « Qualité »)."""
+    script = REPOSITORY_ROOT / ".claude/skills/cycle-pr/scripts/merge-lot.py"
+    done = subprocess.run([sys.executable, str(script)], capture_output=True, check=False)
+
+    assert done.returncode == 2
+    assert "SHA de tête vérifié" in done.stdout.decode("utf-8")
 
 
 def test_un_appel_de_la_forge_en_echec_refuse_au_lieu_de_conclure() -> None:
