@@ -1131,7 +1131,7 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 # garde git, pas la prose qui l'emploie : celle-ci l'est ici).
 #
 # **Lot 3** (`pr-paralleles`) : une entrée par point du bloc « Lot 3/4 » qui écrit une règle, par
-# décision du brief qu'il fait écrire (8, 9, 15, 16) et pour l'obs 103 ; la mesure de `bind_pr`
+# décision du brief qu'il fait écrire (8, 9, 16) et pour l'obs 103 ; la mesure de `bind_pr`
 # (journal de spec, 2026-10-18) en ajoute une. Gardés ailleurs : les gestes que le lot retire
 # (`GESTES_RETIRES_DE_PR_PARALLELES`) et le premier geste d'un enfant (`DEPARTS_EXPLICITES`).
 SESSIONS_LIEES_REF = ".claude/skills/cycle-pr/references/sessions-liees.md"
@@ -1428,7 +1428,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         "chaque lot a sa session et son worktree neufs",
     ),
     # Lot 3 : `pr-paralleles` démarre, suit et nettoie ses sessions (bloc « Lot 3/4 », décisions
-    # 8, 9, 15, 16 du brief, obs 92, 93, 103, et la mesure de `bind_pr` du journal de spec du
+    # 8, 9, 16 du brief, obs 92, 93, 103, et la mesure de `bind_pr` du journal de spec du
     # 2026-10-18). Étape 3 : qui démarre, dans quel tour, avec quoi.
     "lead-demarre-une-session-par-issue": (
         PR_PARALLELES_SKILL,
@@ -1443,6 +1443,33 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         "`context: fresh`, worktree de l'application, `wake_when_done: true`, `name: issue-<N>`",
     ),
     "brief-de-l-etape-5": (PR_PARALLELES_SKILL, "`prompt` : le brief de l'étape 5"),
+    # Décision 8 : barème d'effort et plafond de l'arbre.
+    "effort-par-bareme": (
+        PR_PARALLELES_SKILL,
+        "L'effort de chaque session suit le barème de la coordinatrice",
+    ),
+    "plafond-demande-a-l-etape-2": (
+        PR_PARALLELES_SKILL,
+        "si la session lead est en dessous d'Opus 5.5, effort `max`, de l'y passer d'abord",
+    ),
+    # Relecture de la PR #130, passe 1 : m-2 (mutation VERTE sans cette entrée), I-6.
+    "brief-premier-geste-sans-suivi": (
+        PR_PARALLELES_SKILL,
+        "`git fetch origin && git checkout -b <type>/<slug> --no-track origin/main`",
+    ),
+    "brief-transmet-les-services": (
+        PR_PARALLELES_SKILL,
+        "Services à état recensés pour cette issue (étape 2) : <liste, ou « aucun »>.",
+    ),
+    # Obs 42 re-mesurée (2026-10-18) : l'archivage libère le dossier, dans le tour du message.
+    "archivage-libere-le-dossier": (
+        PR_PARALLELES_SKILL,
+        "C'est l'archivage qui libère le dossier.",
+    ),
+    "archivage-dans-le-tour-du-message": (
+        PR_PARALLELES_SKILL,
+        "deux archivages acceptés dans un tour ouvert par un message de session",
+    ),
     # `/code-review` de la PR #130 : omis, `use_worktree` donne le dossier du lead.
     "worktree-demande-en-clair": (
         PR_PARALLELES_SKILL,
@@ -1526,8 +1553,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
 # ne place plus de session, ne l'identifie plus par son scratchpad ni par `ListAgents`, et ne
 # tient plus son tableau dans le dépôt. **Population** : un cas par geste retiré du bloc
 # « Lot 3/4 » (Étapes 3, 5, 7, et le `.gitignore`), relevée sur `ded3567`, base du lot, où chaque
-# forme est présente — chaque cas y est rouge, ce qui prouve que le motif mord. **Borne** : la
-# garde lit des formes, pas un sens ; une paraphrase d'un geste retiré passerait.
+# forme est présente — chaque cas y est rouge, ce qui prouve que le motif mord ; plus la sortie
+# par `ExitWorktree` du message de clôture de `cycle-pr`, que l'archivage remplace (relecture de
+# la PR #130, m-7). **Borne** : la garde lit des formes, pas un sens ; une paraphrase d'un geste
+# retiré passerait.
 GESTES_RETIRES_DE_PR_PARALLELES = {
     "worktree-cree-par-le-lead": (PR_PARALLELES_SKILL, "git worktree add"),
     "worktree-frere-du-depot": (PR_PARALLELES_SKILL, "../<repo>--"),
@@ -1536,6 +1565,7 @@ GESTES_RETIRES_DE_PR_PARALLELES = {
     "identite-par-le-scratchpad": (PR_PARALLELES_SKILL, "répertoire scratchpad"),
     "noms-qui-tournent": (PR_PARALLELES_SKILL, "Les noms tournent"),
     "tableau-ignore-a-la-racine": (".gitignore", "/PR-PARALLELES.md"),
+    "sortie-par-exit-worktree": (CYCLE_PR_SKILL, "ExitWorktree"),
 }
 
 
@@ -1618,11 +1648,57 @@ ORDRE_DE_LA_COORDINATRICE = {
 )
 def test_la_coordinatrice_garde_l_ordre_de_son_protocole(avant: str, apres: str) -> None:
     """Les deux ancres présentes, et dans cet ordre — une ancre absente rougit aussi."""
-    texte = texte_normalise(COORDINATRICE_REF)
+    assert_dans_l_ordre(COORDINATRICE_REF, avant, apres)
 
-    assert avant in texte, f"`{COORDINATRICE_REF}` ne porte plus « {avant} »"
-    assert apres in texte, f"`{COORDINATRICE_REF}` ne porte plus « {apres} »"
-    assert texte.index(avant) < texte.index(apres), f"« {apres} » précède « {avant} »"
+
+def assert_dans_l_ordre(fichier: str, avant: str, apres: str) -> None:
+    """Échoue si l'une des deux ancres manque au texte normalisé, ou si une occurrence d'`apres`
+    précède une occurrence d'`avant` : la **dernière** d'`avant` se compare à la **première**
+    d'`apres`. Comparer les premières laissait passer une copie ajoutée plus loin — un geste
+    réécrit à l'étape suivante sans être retiré de la sienne (relecture de la PR #130, mutation
+    VERTE)."""
+    texte = texte_normalise(fichier)
+
+    assert avant in texte, f"`{fichier}` ne porte plus « {avant} »"
+    assert apres in texte, f"`{fichier}` ne porte plus « {apres} »"
+    assert texte.rindex(avant) < texte.index(apres), f"« {apres} » précède « {avant} »"
+
+
+# L'**ordre** de `pr-paralleles` que le lot 3 de #107 écrit : un geste dont une étape antérieure
+# doit préparer l'entrée. **Population** : les 4 sites d'ordre recensés à la passe 1 de la
+# relecture de la PR #130 (I-3, I-5 ; mutations M2 et M11 VERTES sur la table de phrases) — le
+# plafond demandé à la question qui ouvre le tour des démarrages, le relevé `get_session` avant
+# l'archivage qui le rend nécessaire, l'archivage avant le retrait du worktree (obs 42, re-mesurée
+# le 2026-10-18), le retrait avant l'échafaudage.
+ORDRE_DE_PR_PARALLELES = {
+    "plafond-avant-le-demarrage": (
+        "si la session lead est en dessous d'Opus 5.5",
+        # Le texte normalisé perd un `#` de tête : l'ancre ne porte pas les dièses du titre.
+        "3. Démarrer une session par issue",
+    ),
+    "releve-avant-l-archivage": (
+        "relever par `get_session` son `worktreePath`",
+        "**archiver la session d'abord**",
+    ),
+    "archivage-avant-le-retrait": (
+        "**archiver la session d'abord**",
+        "git worktree remove <worktreePath de la session>",
+    ),
+    "retrait-avant-l-echafaudage": (
+        "git worktree remove <worktreePath de la session>",
+        "Puis l'**échafaudage**",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("avant", "apres"),
+    ORDRE_DE_PR_PARALLELES.values(),
+    ids=ORDRE_DE_PR_PARALLELES.keys(),
+)
+def test_pr_paralleles_garde_l_ordre_de_ses_sessions(avant: str, apres: str) -> None:
+    """Une étape qui agit avant que l'agent sache ce qu'une étape suivante exige se rejoue mal."""
+    assert_dans_l_ordre(PR_PARALLELES_SKILL, avant, apres)
 
 
 # « Jamais d'auto-merge » devient « jamais d'auto-merge **dans le trunk** » (#107, lot 2a) : une
