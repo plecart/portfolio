@@ -1265,7 +1265,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # Au go du découpage (journal de spec, 2026-10-17 ; décisions 8, 12).
     "sessions-demarrees-au-go-du-decoupage": (
         COORDINATRICE_REF,
-        "démarre d'un coup les n sessions de lot",
+        "démarre d'un coup les sessions des lots non mergés",
     ),
     "start-session-d-un-lot": (
         COORDINATRICE_REF,
@@ -1308,20 +1308,12 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # Cité : un chemin de passation Windows perd ses antislashs dans le shell (`/code-review` de la
     # PR #122), et le fichier présent se lirait absent.
     "passation-testee-chemin-cite": (COORDINATRICE_REF, "`test -f '<chemin>'` sort en 0"),
-    # L'ordre et la condition du protocole (relecture de la PR #122, I1 : mutés, restaient verts).
-    # Dénombrés dans `coordinatrice.md` avant le correctif : **8** sites — ordre des gestes au go,
-    # attente des lots suivants, deux preuves avant « ouvre », dérive avant « ouvre », arrêt sur un
-    # code non nul, premier geste pas avant « ouvre », passation en dernier, ordre du relais — dont
-    # **2** gardés (deux preuves, passation) ; les 6 autres le sont ci-dessous.
-    "ordre-des-gestes-au-go": (COORDINATRICE_REF, "Dans ce tour, dans cet ordre :"),
-    "ordre-du-relais": (COORDINATRICE_REF, "pousse sa branche, détache sa tête"),
+    # La condition du protocole (relecture de la PR #122, I1 : mutés, restaient verts) ; son
+    # **ordre** l'est par `ORDRE_DE_LA_COORDINATRICE`, plus bas — une phrase présente ne dit rien de
+    # sa place (relance, N1 : deux mutations VERTES).
     "attente-des-lots-suivants": (
         COORDINATRICE_REF,
         "chaque autre lot reçoit « attends le message « ouvre le lot <k>/<n> — passation : <chemin> »",
-    ),
-    "ouvre-apres-la-derive": (
-        COORDINATRICE_REF,
-        "Puis seulement, par `SendMessage` à la session du lot k+1",
     ),
     "premier-geste-pas-avant-ouvre": (
         COORDINATRICE_REF,
@@ -1329,7 +1321,15 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "arret-sur-tout-code-non-nul": (
         COORDINATRICE_REF,
-        "Sur tout code autre que 0, elle s'arrête au premier conflit",
+        "sur tout autre code non nul, elle s'arrête et lui remonte la sortie",
+    ),
+    "liste-des-pr-de-lot-a-chaque-lot": (
+        COORDINATRICE_REF,
+        "elle ajoute la PR #<M> à la liste du body de la PR d'intégration — première ligne intacte",
+    ),
+    "archivage-sur-accord": (
+        SESSIONS_LIEES_REF,
+        "Archiver un enfant attend l'accord du mainteneur",
     ),
     "passation-a-la-coordinatrice-a-l-etape-8": (
         CYCLE_PR_SKILL,
@@ -1433,10 +1433,67 @@ def test_chaque_invariant_des_sessions_liees_garde_sa_phrase(fichier: str, phras
     """La phrase est lue sur le texte aux espaces normalisés, marges `# ` de tête de ligne retirées :
     un retour à la ligne de la prose, ou du commentaire en colonne de `pipeline.config.md`, ne la
     casse pas, une réécriture si."""
-    brut = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig")
-    texte = " ".join(re.sub(r"(?m)^[ \t]*#[ \t]?", "", brut).split())
+    texte = texte_normalise(fichier)
 
     assert phrase in texte, f"`{fichier}` ne porte plus « {phrase} »"
+
+
+def texte_normalise(fichier: str) -> str:
+    """Le texte du fichier, espaces normalisés et marges `# ` de tête de ligne retirées."""
+    brut = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig")
+    return " ".join(re.sub(r"(?m)^[ \t]*#[ \t]?", "", brut).split())
+
+
+# L'**ordre** du protocole de la coordinatrice : chaque couple d'ancres, la première avant la
+# seconde. Une phrase gardée seule dit qu'un geste existe, pas où il se place — et c'est sa place
+# qui le rend vrai : une branche d'intégration poussée après les sessions laisse le premier lot sans
+# base, une dérive lue après « ouvre » ne garde plus rien (relance de la PR #122, N1 : deux
+# mutations VERTES sur la table de phrases). **Population** : les 8 sites d'ordre ou de condition
+# recensés dans `coordinatrice.md` à la passe 1 ; 4 sont des conditions, gardées par la table de
+# phrases (attente des lots suivants, deux preuves, arrêt sur un code non nul, premier geste pas
+# avant « ouvre »), 4 des ordres, gardés ici — gestes au go, dérive avant « ouvre », relais,
+# passation avant le message de fin.
+ORDRE_DE_LA_COORDINATRICE = {
+    "branche-avant-la-pr-d-integration": (
+        "1. **La branche d'intégration**",
+        "2. **La PR d'intégration**",
+    ),
+    "pr-d-integration-avant-les-sessions": (
+        "2. **La PR d'intégration**",
+        "3. **Les sessions de lot**",
+    ),
+    "deux-preuves-avant-la-derive": (
+        "Elle ouvre le lot k+1 sur deux preuves",
+        "Puis la dérive, après chaque merge de lot",
+    ),
+    "derive-avant-ouvre": (
+        "Puis la dérive, après chaque merge de lot",
+        "Puis seulement, par `SendMessage` à la session du lot k+1",
+    ),
+    "relais-detache-avant-de-prevenir": (
+        "pousse sa branche, détache sa tête",
+        "envoie « relais demandé",
+    ),
+    "relais-passation-avant-de-prevenir": ("écrit la variante relais", "envoie « relais demandé"),
+    "passation-avant-le-message-de-fin": (
+        "à écrire sa passation",
+        "puis le message de fin à la coordinatrice",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("avant", "apres"),
+    ORDRE_DE_LA_COORDINATRICE.values(),
+    ids=ORDRE_DE_LA_COORDINATRICE.keys(),
+)
+def test_la_coordinatrice_garde_l_ordre_de_son_protocole(avant: str, apres: str) -> None:
+    """Les deux ancres présentes, et dans cet ordre — une ancre absente rougit aussi."""
+    texte = texte_normalise(COORDINATRICE_REF)
+
+    assert avant in texte, f"`{COORDINATRICE_REF}` ne porte plus « {avant} »"
+    assert apres in texte, f"`{COORDINATRICE_REF}` ne porte plus « {apres} »"
+    assert texte.index(avant) < texte.index(apres), f"« {apres} » précède « {avant} »"
 
 
 # « Jamais d'auto-merge » devient « jamais d'auto-merge **dans le trunk** » (#107, lot 2a) : une
