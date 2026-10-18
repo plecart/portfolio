@@ -1057,7 +1057,8 @@ quand le trunk a avancé, **0** sur deux références égales — table `FRESHNE
 **Et cinq contrôles de ce skill et de `pr-paralleles` restent des lectures, par construction.**
 Une porte n'a de sens que devant **une commande** : les deux auto-vérifications du `relecteur`
 (4.2) précèdent une **phase entière** de travail, il n'y a rien à quoi se chaîner ; la
-comparaison entre l'état de la forge et une référence locale avant `git branch -D` (`pr-paralleles` Étape 8) porte sur les valeurs
+comparaison entre l'état de la forge et une référence locale avant `git branch -D` (`pr-paralleles`
+Étape 8) porte sur les valeurs
 de **deux outils**, donc exige la substitution que le garde refuse ; et les deux contrôles que la
 coordinatrice lit avant d'ouvrir un lot — passation présente, `merge-tree` à 0 — précèdent un
 `SendMessage`, un outil et non une commande

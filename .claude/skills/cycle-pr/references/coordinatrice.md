@@ -34,7 +34,9 @@ question du go demande d'abord au mainteneur de la passer en Opus 5.5 (sélecteu
    merge d'un lot (`cycle-pr` Étape 7, « Le merge d'un lot »).
 3. **Les sessions de lot** : la coordinatrice démarre d'un coup les sessions des lots non mergés,
    une par `start_session` — `initiation: user_asked`, `context: fresh`, worktree de l'application,
-   `wake_when_done: true`, `name: <slug>-lot-<k>`. Effort par lot (#107, décision 8) : `high` par
+   `wake_when_done: true`, `use_worktree: true` (omis, l'outil peut donner à l'enfant le dossier
+   de la coordinatrice — `pr-paralleles` Étape 3), `name: <slug>-lot-<k>`. Effort par lot (#107,
+   décision 8) : `high` par
    défaut, `max` si le bloc du lot porte un ADR, une surface de sécurité ou un contrat entre piles,
    `medium` pour un lot de doc ou de config seule ; `model` omis quand la coordinatrice est en
    Opus 5.5, `claude-opus-5-5` si elle est au-dessus.
@@ -117,7 +119,8 @@ git 2.47.1, « is already used by worktree », sortie 128),
 écrit la variante relais de [prompt-lot-suivant.md](prompt-lot-suivant.md) et envoie « relais
 demandé — passation : <chemin> ». Réveillée par ce message, la coordinatrice ne peut pas démarrer
 la remplaçante elle-même : elle la propose par une **carte de proposition** (`start_session`,
-`initiation: own_initiative`, brief : la passation de relais), qu'un clic du mainteneur démarre
+`initiation: own_initiative`, `use_worktree: true`, brief : la passation de relais), qu'un clic du
+mainteneur démarre
 dans un worktree neuf ; la remplaçante y reprend la même branche par
 `git fetch origin && git switch <type>/<slug>-lot-<k>`. Non mesuré à ce jour.
 

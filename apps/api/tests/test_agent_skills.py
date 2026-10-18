@@ -1479,6 +1479,8 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         PR_PARALLELES_SKILL,
         "plus la branche du lead lui-même par `get_session` sur `self`",
     ),
+    # Passe 2, R-4 : la clause de pagination, mutée seule, restait verte.
+    "orphelines-sans-pagination": (PR_PARALLELES_SKILL, "rend 20 lignes par défaut"),
     "lead-ne-cree-ni-worktree-ni-branche": (
         PR_PARALLELES_SKILL,
         "Le lead ne crée ni worktree ni branche",
@@ -1547,6 +1549,44 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         "la porte vaut pour une branche créée sur `main`",
     ),
 }
+
+
+# `use_worktree` omis, `start_session` donne à l'enfant le dossier de son parent quand celui-ci
+# travaille dans un dossier simple (description de l'outil, lue le 2026-10-18) : deux sessions y
+# basculeraient tour à tour la même branche. **Dénombrement, écrit avant le correctif** (relecture
+# de la PR #130, passe 2, R-1) : `grep -rn start_session .claude CLAUDE.md CONTRIBUTING.md` rend
+# 5 sites qui démarrent une session devant avoir son worktree — `pr-paralleles` Étape 3 (fermé par
+# `ef0b3a8`), son repli d'Étape 8 (renvoi à l'Étape 3, fermé avec elle), sa carte de relais, et
+# dans `coordinatrice.md` les sessions de lot et la carte de relais : **3 fuyaient**. Un site
+# nouveau n'entre pas ici de lui-même : la garde lit des phrases, le grep re-dérive la population.
+USE_WORKTREE_EXPLICITE = {
+    "pr-paralleles-etape-3": (
+        PR_PARALLELES_SKILL,
+        "Le worktree se demande en clair, `use_worktree: true`",
+    ),
+    "pr-paralleles-carte-de-relais": (
+        PR_PARALLELES_SKILL,
+        "(`start_session`, `initiation: own_initiative`, `use_worktree: true`, brief : la passation)",
+    ),
+    "coordinatrice-sessions-de-lot": (
+        COORDINATRICE_REF,
+        "worktree de l'application, `wake_when_done: true`, `use_worktree: true`",
+    ),
+    "coordinatrice-carte-de-relais": (
+        COORDINATRICE_REF,
+        "(`start_session`, `initiation: own_initiative`, `use_worktree: true`, brief : la passation",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("fichier", "phrase"), USE_WORKTREE_EXPLICITE.values(), ids=USE_WORKTREE_EXPLICITE.keys()
+)
+def test_chaque_session_demarree_dans_un_worktree_le_demande_en_clair(
+    fichier: str, phrase: str
+) -> None:
+    """Le paramètre est écrit au site qui démarre la session, pas seulement dans un renvoi."""
+    assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
 
 
 # Les gestes que le lot 3 de #107 retire de `pr-paralleles` : le lead ne crée plus de worktree,
@@ -1652,16 +1692,39 @@ def test_la_coordinatrice_garde_l_ordre_de_son_protocole(avant: str, apres: str)
 
 
 def assert_dans_l_ordre(fichier: str, avant: str, apres: str) -> None:
-    """Échoue si l'une des deux ancres manque au texte normalisé, ou si une occurrence d'`apres`
-    précède une occurrence d'`avant` : la **dernière** d'`avant` se compare à la **première**
-    d'`apres`. Comparer les premières laissait passer une copie ajoutée plus loin — un geste
-    réécrit à l'étape suivante sans être retiré de la sienne (relecture de la PR #130, mutation
-    VERTE)."""
+    """Échoue si l'une des deux ancres manque au texte normalisé, ou si `ordre_respecte` le refuse."""
     texte = texte_normalise(fichier)
 
     assert avant in texte, f"`{fichier}` ne porte plus « {avant} »"
     assert apres in texte, f"`{fichier}` ne porte plus « {apres} »"
-    assert texte.rindex(avant) < texte.index(apres), f"« {apres} » précède « {avant} »"
+    assert ordre_respecte(texte, avant, apres), f"« {apres} » précède « {avant} »"
+
+
+def ordre_respecte(texte: str, avant: str, apres: str) -> bool:
+    """Vrai si toute occurrence d'`avant` précède toute occurrence d'`apres` : la **dernière**
+    d'`avant` se compare à la **première** d'`apres`, les deux ancres étant présentes.
+
+    Comparer les premières laissait passer une copie ajoutée plus loin — un geste réécrit à
+    l'étape suivante sans être retiré de la sienne (relecture de la PR #130, mutation VERTE).
+    **Borne** : une ancre `avant` ne se cite plus après son `apres`, rappel compris ; la rougeur
+    est voulue — reformuler le rappel, jamais l'ancre.
+    """
+    return texte.rindex(avant) < texte.index(apres)
+
+
+# Le comparateur sur des textes témoins, dans les deux sens : c'est lui qui distingue une copie
+# tardive d'un ordre juste, et revenir à `index` le laissait vert sur le dépôt (passe 2, N4).
+ORDRES_TEMOINS = {
+    "ordre-juste": ("A puis B", True),
+    "ordre-inverse": ("B puis A", False),
+    "copie-tardive": ("A puis B puis A", False),
+}
+
+
+@pytest.mark.parametrize(("texte", "attendu"), ORDRES_TEMOINS.values(), ids=ORDRES_TEMOINS.keys())
+def test_l_ordre_rougit_sur_une_copie_tardive(texte: str, attendu: bool) -> None:
+    """« A » doit précéder « B » partout, pas seulement à sa première occurrence."""
+    assert ordre_respecte(texte, "A", "B") is attendu
 
 
 # L'**ordre** de `pr-paralleles` que le lot 3 de #107 écrit : un geste dont une étape antérieure
