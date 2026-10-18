@@ -332,7 +332,9 @@ c'est le seul autre canal, et il passe par lui.
   d'`isolation` : un worktree par (PR, go) serait précisément le coût que son éphémérité évite.
 - Quand une PR passe en review puis est mergée, mettre à jour `PR-PARALLELES.md`.
 - Après chaque merge, la session concernée déroule la clôture de l'Étape 8 de `cycle-pr` —
-  label d'état retiré, critères d'acceptation cochés, puis la passe `repercussions`. **C'est le
+  label d'état retiré, critères d'acceptation cochés, puis la passe `repercussions` ; une session
+  de lot d'une coordinatrice la borne, et la passe attend le merge de la PR d'intégration
+  (`.claude/skills/cycle-pr/references/coordinatrice.md`). **C'est le
   moment le plus dangereux d'une vague parallèle** : les autres issues du
   lot sont en cours de développement, et leurs sessions ont déjà lu leur spec.
   - `repercussions` les détecte comme **« en vol »** (via les PR ouvertes et ce tableau de bord) :
@@ -467,10 +469,10 @@ Marquer la ligne `⚪ worktree nettoyé` dans le tableau. Quand tout le lot est 
 
 **Issue en plusieurs lots.** Avec une coordinatrice (étape 5, « Une session neuve par lot »), la
 branche mergée d'un lot n'est plus un point de départ, et ce qui suit ne vaut que sans elle, ou en
-repli. **Le worktree survit, la
-branche meurt.** Après le merge d'un lot qui ne ferme pas l'issue, rien de ce qui précède ne s'applique au worktree — il sert au lot suivant. Ce
-qui meurt, c'est la **branche** : sous un trunk fusionné par rebase ou squash, ses commits
-réécrits doubleraient dans la PR du lot suivant. Nommer explicitement les deux à chaque frontière,
+repli. **Le worktree survit, la branche meurt.** Après le merge d'un lot qui ne ferme pas
+l'issue, rien de ce qui précède ne s'applique au worktree — il sert au lot suivant. Ce qui meurt,
+c'est la **branche** : sous un trunk fusionné par rebase ou squash, ses commits réécrits
+doubleraient dans la PR du lot suivant. Nommer explicitement les deux à chaque frontière,
 sinon une session prolonge un artefact mort (obs 36). La voie normale est celle de l'étape 5 — la
 session sortante remet le prompt, la session neuve crée sa branche depuis `origin/main` et
 supprime la précédente, locale et distante. Dans les deux cas le point de départ est **explicite** :
@@ -485,7 +487,8 @@ réinstallation et fumée —, puis place une session neuve comme à l'étape 5.
 barreau de `contraintes.md` « Création d'issues en cours de cycle » qui a échoué — gabarit,
 catégorie et thème vérifiés. Une vague qui ouvre plus d'issues qu'elle n'en ferme est un signal à
 remonter au mainteneur, pas un résultat. Vérifier aussi que chaque issue réalisée en plusieurs
-lots affiche autant de PR liées que de lots (`cycle-pr` Étape 8, cas découpé) : chaque session a
+lots affiche autant de PR liées que de lots, plus la PR d'intégration avec une coordinatrice
+(`cycle-pr` Étape 8, cas découpé) : chaque session a
 obéi à « un seul `Closes` », et le trou ne se voit qu'en regardant la population.
 
 ## Règles

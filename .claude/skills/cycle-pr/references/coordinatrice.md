@@ -14,10 +14,12 @@ lots (obs 62).
 ## Au go du découpage — le seul tour où elle démarre des sessions
 
 `start_session` est refusé dans un tour ouvert par un message de session ou par un événement
-automatique ; seul un tour ouvert par le mainteneur le démarre, et seulement sur sa demande écrite
-(provoqué par le lead de la vague le 2026-10-16 — #107, journal de spec, 2026-10-17). Le go du découpage est ce tour : la question du go
-nomme donc les n sessions qu'il fera démarrer, avec l'accord pour le `verificateur` de chaque lot
-quand il n'y a pas de lead de vague (`cycle-pr` Étape 7, « Sans lead »). Dans ce tour, dans cet
+automatique (provoqué par le lead de la vague le 2026-10-16 — #107, journal de spec, 2026-10-17) ;
+seul un tour ouvert par le mainteneur le démarre, et seulement sur sa demande écrite (consignes de
+l'application à la session, lues le 2026-10-18 ; mesuré le même jour, PR #122). Le go du
+découpage est ce tour : la question du go nomme donc les n sessions qu'il fera démarrer, avec
+l'accord pour le `verificateur` de chaque lot quand il n'y a pas de lead de vague (`cycle-pr`
+Étape 7, « Sans lead »). Dans ce tour, dans cet
 ordre :
 
 1. **La branche d'intégration**, depuis le trunk :
@@ -79,8 +81,8 @@ Ce que le brief de la coordinatrice change au cycle de `cycle-pr` :
   donc son worktree neuf ; la branche mergée d'un lot n'est jamais un point de départ.
 - **La base de la PR** : partout où `cycle-pr` mesure contre le trunk ce que la PR apporte — gabarit
   (3.5), diff holistique (4.1), plage du relecteur (4.2), base de branche et verdict (Étape 7) —,
-  `origin/main` se lit `origin/<type>/<slug>`. Contre le trunk, chaque mesure compterait les lots
-  déjà mergés.
+  le trunk, `main` comme `origin/main`, se lit `origin/<type>/<slug>`. Contre le trunk, chaque
+  mesure compterait les lots déjà mergés.
 - **Le go du briefing est conditionnel** (#107, décision 5) : la session ne s'arrête à son Étape 1
   que si l'auto-challenge relève un écart avec le bloc du lot, ou s'il lui reste une `[V]` ; sinon
   elle écrit « plan confirmé, aucune `[V]` » dans le body de sa PR et enchaîne — le go du
@@ -98,7 +100,8 @@ Ce que le brief de la coordinatrice change au cycle de `cycle-pr` :
 ## Relais en cours de lot
 
 La session de lot dont le contexte se remplit pousse sa branche, détache sa tête
-(`git switch --detach` — une branche ne s'extrait que dans un seul worktree, doc `git worktree`),
+(`git switch --detach` — une branche ne s'extrait que dans un seul worktree : mesuré le 2026-10-18,
+git 2.47.1, « is already used by worktree », sortie 128),
 écrit la variante relais de [prompt-lot-suivant.md](prompt-lot-suivant.md) et envoie « relais
 demandé — passation : <chemin> ». Réveillée par ce message, la coordinatrice ne peut pas démarrer
 la remplaçante elle-même : elle la propose par une **carte de proposition** (`start_session`,

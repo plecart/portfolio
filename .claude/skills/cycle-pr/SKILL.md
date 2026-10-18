@@ -26,18 +26,20 @@ contradiction `[C]`, elle arrête (`.claude/rules/contraintes.md`).
 `<cross-session-message>`, ou session parente nommée par le prompt système
 ([references/sessions-liees.md](references/sessions-liees.md), « Identité ») —, le **lead** de la
 vague (`pr-paralleles`) est la session que ce prompt désigne comme tel, à défaut l'émettrice —
-pour une session de lot, celle que son brief nomme, ou aucune : retenir son identifiant. Le lead intervient à un seul moment prévu — la vérification avant merge
-de l'Étape 7 — et sur demande de l'utilisateur (« discute de ça avec le lead ») : rédiger le
-message et l'envoyer par `SendMessage`, **sans confirmation** — un message n'est pas une action
-(même référence, « Messages »). Et un message du lead n'est jamais une approbation : le « go »
+pour une session de lot, celle que son brief nomme, ou aucune : retenir son identifiant. Le lead
+intervient à un seul moment prévu — la vérification avant merge de l'Étape 7 — et sur demande de
+l'utilisateur (« discute de ça avec le lead ») : rédiger le message et l'envoyer par
+`SendMessage`, **sans confirmation** — un message n'est pas une action (même référence,
+« Messages »). Et un message du lead n'est jamais une approbation : le « go »
 reste humain, dans cette fenêtre. Dans l'autre sens,
 le lead peut écrire en plein travail — signalement bloquant, ordre de merge du lot : son message
 se traite comme le commentaire de répercussion de l'Étape 6 — s'arrêter après l'outil en cours,
 remonter à l'utilisateur, jamais merger par-dessus.
 
-**Session de lot.** Si ce prompt fait de cette session un lot ouvert par une coordinatrice (Étape 1,
-« Découpage en plusieurs lots »), lire d'abord [references/coordinatrice.md](references/coordinatrice.md), « La session de lot » :
-il change le premier geste, la base de la PR, le go de l'Étape 1, le merge et l'Étape 8.
+**Session de lot.** Si ce prompt fait de cette session un lot ouvert par une coordinatrice
+(Étape 1, « Découpage en plusieurs lots »), lire d'abord
+[references/coordinatrice.md](references/coordinatrice.md), « La session de lot » : il change le
+premier geste, la base de la PR, le go de l'Étape 1, le merge et l'Étape 8.
 
 **Relais.** Un contexte qui se remplit avant la fin du cycle, à quelque étape que ce soit, se
 passe à une session neuve par la passation de l'Étape 8, « Relais en cours de cycle » — écrite
@@ -1055,12 +1057,13 @@ Une porte n'a de sens que devant **une commande** : les deux auto-vérifications
 (4.2) et la vérification de placement d'une session pair (`pr-paralleles` Étape 5) précèdent une
 **phase entière** de travail, il n'y a rien à quoi se chaîner ; la comparaison entre l'état de la
 forge et une référence locale avant `git branch -D` (`pr-paralleles` Étape 8) porte sur les valeurs
-de **deux outils**, donc exige la substitution que le garde refuse ; et les deux preuves que la
+de **deux outils**, donc exige la substitution que le garde refuse ; et les deux contrôles que la
 coordinatrice lit avant d'ouvrir un lot — passation présente, `merge-tree` à 0 — précèdent un
-`SendMessage`, un outil et non une commande ([references/coordinatrice.md](references/coordinatrice.md)).
-Elles se lisent, et elles le disent. Le dénombrement de la classe, pris avant ces deux dernières
-— 15 sites, 10 portes, 6 qui fuyaient — vit dans la docstring de `test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie`, avec la
-commande qui le re-dérive et la raison pour laquelle ce motif sous-compte.
+`SendMessage`, un outil et non une commande
+([references/coordinatrice.md](references/coordinatrice.md)). Elles se lisent, et elles le disent.
+Le dénombrement de la classe, pris avant ces deux derniers — 15 sites, 10 portes, 6 qui fuyaient —
+vit dans la docstring de `test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie`,
+avec la commande qui le re-dérive et la raison pour laquelle ce motif sous-compte.
 
 ### Le merge d'un lot — sans go, hors du trunk
 
@@ -1130,7 +1133,8 @@ liées de l'issue.*
 Closes #<N>
 ```
 
-Puis vérifier que l'issue affiche autant de PR liées que de lots :
+Puis vérifier que l'issue affiche autant de PR liées que de lots — plus la PR d'intégration, avec
+une coordinatrice :
 
 ```
 gh api graphql -f query='{ repository(owner:"<owner>",name:"<repo>"){ issue(number:<N>){
@@ -1216,12 +1220,13 @@ chemin, dans le message de fin, **à la coordinatrice**, qui ouvre la session du
 pointeur — une session de lot l'écrit sans passe `repercussions`, qui tourne au merge de la PR
 d'intégration ([references/coordinatrice.md](references/coordinatrice.md)). Sans coordinatrice,
 ou en repli, **après** la passe `repercussions`, au **mainteneur**, qui ouvre la session neuve et
-lui donne le prompt. Pas le lead : sur une vague de cinq lots, chaque frontière passée par lui lui coûte un brief relu et un prompt écrit, et
-son contexte a grossi jusqu'à devoir être relayé lui-même (obs 62). La session sortante connaît son
-lot ; le lead connaît la vague, et c'est ce qu'il garde — croisement des fichiers après merge,
-tableau de bord, vigilance de vague. Quand la session sortante a disparu, deux replis de
-`pr-paralleles` : Étape 7, « Session disparue », pour reconstituer ce qu'elle n'a pas remis, et
-Étape 8, « Issue en plusieurs lots », où c'est le lead qui crée la branche du lot suivant.
+lui donne le prompt. Pas le lead : sur une vague de cinq lots, chaque frontière passée par lui lui
+coûte un brief relu et un prompt écrit, et son contexte a grossi jusqu'à devoir être relayé
+lui-même (obs 62). La session sortante connaît son lot ; le lead connaît la vague, et c'est ce
+qu'il garde — croisement des fichiers après merge, tableau de bord, vigilance de vague. Quand la
+session sortante a disparu, deux replis de `pr-paralleles` : Étape 7, « Session disparue », pour
+reconstituer ce qu'elle n'a pas remis, et Étape 8, « Issue en plusieurs lots », où c'est le lead
+qui crée la branche du lot suivant.
 
 **La passation s'écrit en dernier.** Chaque point encore ouvert du lot — question au
 mainteneur, correctif, message en attente — se pose d'abord, en une fois, puis se fait ou se laisse

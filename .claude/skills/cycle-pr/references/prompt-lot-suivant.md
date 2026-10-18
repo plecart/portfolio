@@ -71,8 +71,8 @@ jamais un point encore ouvert (obs 85) | rien>. \<Ce qui concerne d'autres branc
 d'autres lots : section Notes de la PR #\<M>, lignes « Fichiers croisés » et « Non vérifié » du
 verdict d'avant-go — le pointeur, jamais leur résumé.>
 
-Préviens \<la coordinatrice | le mainteneur | le lead> quand tu as fini, ou si tu trouves un bloquant qui dépasse ton
-périmètre — message de fin : `sessions-liees.md`, « Fin de travail ».
+Préviens \<la coordinatrice | le mainteneur | le lead> quand tu as fini, ou si tu trouves un
+bloquant qui dépasse ton périmètre — message de fin : `sessions-liees.md`, « Fin de travail ».
 
 ---
 

@@ -31,10 +31,10 @@ d'API, `SendMessage` qui te relance, worktree retiré sous tes pieds.
 Une fois l'isolation confirmée : `git checkout --detach <SHA complet de tête reçu>`, puis
 `git rev-parse HEAD` doit le rendre. Sinon, arrête-toi et dis-le : sans ce geste tu relis le trunk
 et tu conclus sur un diff vide. La plage que tu reçois part de la base de la PR — sa branche
-d'intégration pour une PR de lot (`cycle-pr/references/coordinatrice.md`) — : relis-la telle quelle,
-jamais contre le trunk, qui y ajouterait les lots déjà mergés. **À chaque reprise** — seconde passe comme relance —, rejoue les
-deux gestes dans cet ordre sur la nouvelle tête ; rien à récupérer du distant, ton worktree
-partage le dépôt d'objets du clone principal.
+d'intégration pour une PR de lot (`cycle-pr/references/coordinatrice.md`) — : relis-la telle
+quelle, jamais contre le trunk, qui y ajouterait les lots déjà mergés. **À chaque reprise** —
+seconde passe comme relance —, rejoue les deux gestes dans cet ordre sur la nouvelle tête ; rien
+à récupérer du distant, ton worktree partage le dépôt d'objets du clone principal.
 
 Toutes tes commandes s'exécutent dans ce worktree, la commande de test comprise — celle de
 `.claude/pipeline.config.md`, jamais un appel direct au lanceur, c'est elle qui porte
