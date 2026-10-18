@@ -900,7 +900,8 @@ def test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie(
     n'y a rien à quoi se chaîner ; la quatrième (`gh pr view --json state,headRefOid` avant
     `git branch -D`) compare les valeurs de **deux outils**, ce qui exige une substitution de
     commande — refusée par le garde d'une session isolée (obs 60). Ce qu'elle garde est une
-    suppression locale, récupérable par le reflog.
+    suppression locale, récupérable par le reflog. Le lot 3 de #107 retire la vérification de
+    placement avec son geste : le lead ne place plus de session, l'application le fait.
 
     Ce test n'éprouve pas du code du projet : il **établit** les affirmations que les deux skills
     font sur ces commandes. Il passe donc dès sa première exécution, et c'est attendu
@@ -931,19 +932,13 @@ def test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie(
 # pour les condamner. C'est le cas où `cleanup-verbatim.md` demande de **borner** plutôt que
 # d'élargir un motif qui imite un analyseur.
 # Le quatrième champ est le **nombre** de prédicats attendus : 2 là où la condition est l'égalité
-# (création de branche, de worktree — un par direction, parce que `--is-ancestor` dit « ancêtre ou
-# égal »), 1 au merge, où le trunk n'avance que vers l'avant. Sans ce champ, ramener la porte à un
+# (création de branche — un par direction, parce que `--is-ancestor` dit « ancêtre ou égal »), 1
+# au merge, où le trunk n'avance que vers l'avant. Sans ce champ, ramener la porte à un
 # seul prédicat — le bloquant de la passe 1, « `main` en avance passe » — restait VERT (mesuré,
 # passe 2) : la table exigeait qu'un prédicat existe, pas qu'il y en ait deux.
 PORTES_PRESCRITES: list[tuple[str, str, str, int]] = [
     (".claude/skills/cycle-pr/SKILL.md", "git checkout -b", "git merge-base --is-ancestor", 2),
     (".claude/skills/cycle-pr/SKILL.md", "gh pr merge", "git merge-base --is-ancestor", 1),
-    (
-        ".claude/skills/pr-paralleles/SKILL.md",
-        "git worktree add",
-        "git merge-base --is-ancestor",
-        2,
-    ),
     (
         ".claude/skills/cycle-pr/references/sessions-liees.md",
         "git branch -D",
@@ -994,12 +989,16 @@ def test_chaque_porte_prescrite_est_un_predicat_chaine_a_son_action(
     soit « épinglé dans l'artefact par un test paramétré, pas par une phrase de docstring ». Le
     dénombrement de la classe vit dans
     `test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie`. Des 6 portes qui
-    fuyaient, cette table en épingle **3** : celles que la prose prescrit en **bloc de commandes**,
-    où une action unique suit le prédicat. Les 3 `merge-tree` sont des prédicats nommés en prose
-    sans action unique en bloc — pas épinglables par cette forme, et c'est dit, pas tu. Elle en
-    épingle une **quatrième**, née après ce dénombrement et hors de sa population : la porte
-    d'ancêtre qui précède la suppression d'un échafaudage `claude/…` (`sessions-liees.md`, lot 1
-    de #107, relecture de la PR #109).
+    fuyaient, cette table en épinglait **3** : celles que la prose prescrit en **bloc de
+    commandes**, où une action unique suit le prédicat. Les 3 `merge-tree` sont des prédicats
+    nommés en prose sans action unique en bloc — pas épinglables par cette forme, et c'est dit, pas
+    tu. Elle en épinglait une **quatrième**, née après ce dénombrement et hors de sa population :
+    la porte d'ancêtre qui précède la suppression d'un échafaudage `claude/…` (`sessions-liees.md`,
+    lot 1 de #107, relecture de la PR #109). **Elle en épingle 3 depuis le lot 3 de #107**, qui
+    retire la création de worktree de `pr-paralleles` avec son geste : le lead ne crée plus de
+    worktree, l'application en donne un à chaque session, dont le premier geste part d'`origin/`
+    (`DEPARTS_EXPLICITES`) — la porte n'avait plus d'action à garder, et son absence est gardée
+    par `GESTES_RETIRES_DE_PR_PARALLELES`.
 
     Le prédicat doit se trouver **à gauche de l'action sur la même ligne**, avec un `&&` entre les
     deux — ce qui distingue une porte d'une lecture suivie d'une seconde commande (obs 59) —, en
@@ -1130,6 +1129,11 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 # ailleurs : les deux créations de branche (`DEPARTS_EXPLICITES`), le merge d'un lot
 # (`test_merge_lot.py`, lot 2a), le comportement de git sous `merge-tree` (`FRESHNESS_GATE_FORMS`
 # garde git, pas la prose qui l'emploie : celle-ci l'est ici).
+#
+# **Lot 3** (`pr-paralleles`) : une entrée par point du bloc « Lot 3/4 » qui écrit une règle, par
+# décision du brief qu'il fait écrire (8, 9, 15, 16) et pour l'obs 103 ; la mesure de `bind_pr`
+# (journal de spec, 2026-10-18) en ajoute une. Gardés ailleurs : les gestes que le lot retire
+# (`GESTES_RETIRES_DE_PR_PARALLELES`) et le premier geste d'un enfant (`DEPARTS_EXPLICITES`).
 SESSIONS_LIEES_REF = ".claude/skills/cycle-pr/references/sessions-liees.md"
 COORDINATRICE_REF = ".claude/skills/cycle-pr/references/coordinatrice.md"
 PROMPT_LOT_SUIVANT = ".claude/skills/cycle-pr/references/prompt-lot-suivant.md"
@@ -1156,9 +1160,11 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         SESSIONS_LIEES_REF,
         "git merge-base --is-ancestor claude/<slug>-<hex> <source> && git branch -D",
     ),
+    # Porté par `pr-paralleles` Étape 5 jusqu'au lot 3, qui retire l'identification par le
+    # scratchpad : la phrase de la référence garde le même invariant.
     "scratchpad-n-adresse-pas-une-session-liee": (
-        PR_PARALLELES_SKILL,
-        "pas l'identifiant `local_…` qui adresse une session liée",
+        SESSIONS_LIEES_REF,
+        "pas l'identifiant `local_…` de l'application",
     ),
     # Premier geste (décision 10).
     "premier-geste-chaine-sans-suivi": (
@@ -1421,7 +1427,121 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         PR_PARALLELES_SKILL,
         "chaque lot a sa session et son worktree neufs",
     ),
+    # Lot 3 : `pr-paralleles` démarre, suit et nettoie ses sessions (bloc « Lot 3/4 », décisions
+    # 8, 9, 15, 16 du brief, obs 92, 93, 103, et la mesure de `bind_pr` du journal de spec du
+    # 2026-10-18). Étape 3 : qui démarre, dans quel tour, avec quoi.
+    "lead-demarre-une-session-par-issue": (
+        PR_PARALLELES_SKILL,
+        "le lead démarre d'un coup une session par issue retenue, une par `start_session`",
+    ),
+    "demarrage-au-seul-tour-du-mainteneur": (
+        PR_PARALLELES_SKILL,
+        "Dans le tour où le mainteneur valide le lot (étape 2), et dans celui-là seulement",
+    ),
+    "start-session-d-une-issue": (
+        PR_PARALLELES_SKILL,
+        "`context: fresh`, worktree de l'application, `wake_when_done: true`, `name: issue-<N>`",
+    ),
+    "brief-de-l-etape-5": (PR_PARALLELES_SKILL, "`prompt` : le brief de l'étape 5"),
+    "lead-ne-cree-ni-worktree-ni-branche": (
+        PR_PARALLELES_SKILL,
+        "Le lead ne crée ni worktree ni branche",
+    ),
+    "provisionnement-par-la-session": (
+        PR_PARALLELES_SKILL,
+        "**Provisionner son worktree — la session le fait, juste après son premier geste.**",
+    ),
+    # Étape 4 : le tableau hors dépôt (décision 9), et qui le lit.
+    "tableau-hors-depot": (
+        PR_PARALLELES_SKILL,
+        "Maintenir un fichier `PR-PARALLELES.md` **hors du dépôt**",
+    ),
+    "repercussions-lit-le-tableau-hors-depot": (
+        ".claude/skills/repercussions/SKILL.md",
+        "hors dépôt, dans le dossier du projet qui porte `skill-observations/`",
+    ),
+    "colonne-session-par-identifiant": (
+        PR_PARALLELES_SKILL,
+        "le nom et le `local_…` que `start_session` a rendu",
+    ),
+    # Étape 5 : relais ; Étape 6 : le résumé au mainteneur (obs 103).
+    "relais-de-vague-par-carte": (
+        PR_PARALLELES_SKILL,
+        "le lead ne peut pas démarrer la remplaçante : il la propose par une carte de proposition",
+    ),
+    "resume-information-pas-question": (
+        PR_PARALLELES_SKILL,
+        "Ce résumé est une **information**, jamais une question",
+    ),
+    "boite-de-fin-de-tour-sans-question": (
+        PR_PARALLELES_SKILL,
+        "le lead rend le récapitulatif seul, sans question ni bouton",
+    ),
+    # Étape 7 : l'état et le récit d'une session silencieuse.
+    "session-disparue-par-list-sessions": (
+        PR_PARALLELES_SKILL,
+        'se lit par `list_sessions {"linked": true}`',
+    ),
+    "transcript-d-un-dossier-reutilise": (
+        PR_PARALLELES_SKILL,
+        "le bon transcript est celui dont la dernière écriture rejoint son `lastActivityAt`",
+    ),
+    # Étape 8 : archiver, puis worktree, branche de PR, échafaudage, orphelines (décision 16).
+    "archiver-avant-de-retirer": (PR_PARALLELES_SKILL, "**archiver la session d'abord**"),
+    "echafaudage-source-lue-par-get-session": (
+        SESSIONS_LIEES_REF,
+        "`get_session` le rend (`sourceBranch`",
+    ),
+    "orphelines-hors-sessions-vivantes": (
+        PR_PARALLELES_SKILL,
+        "qu'aucune session non archivée ne nomme (`list_sessions`, champ `branch`)",
+    ),
+    "bind-pr-en-repli": (
+        SESSIONS_LIEES_REF,
+        "`bind_pr` ne sert que si `get_status` ne la rapporte pas",
+    ),
+    # Docs mises à jour dans le même lot (bloc « Lot 3/4 », dernier point).
+    "contributing-une-session-par-issue": (
+        "CONTRIBUTING.md",
+        "la session lead démarre une session par issue, chacune dans un worktree de l'application",
+    ),
+    "claude-md-sessions-liees": ("CLAUDE.md", "**Sessions liées.**"),
+    "taille-pr-premier-geste": (
+        ".claude/rules/taille-pr.md",
+        "la porte vaut pour une branche créée sur `main`",
+    ),
 }
+
+
+# Les gestes que le lot 3 de #107 retire de `pr-paralleles` : le lead ne crée plus de worktree,
+# ne place plus de session, ne l'identifie plus par son scratchpad ni par `ListAgents`, et ne
+# tient plus son tableau dans le dépôt. **Population** : un cas par geste retiré du bloc
+# « Lot 3/4 » (Étapes 3, 5, 7, et le `.gitignore`), relevée sur `ded3567`, base du lot, où chaque
+# forme est présente — chaque cas y est rouge, ce qui prouve que le motif mord. **Borne** : la
+# garde lit des formes, pas un sens ; une paraphrase d'un geste retiré passerait.
+GESTES_RETIRES_DE_PR_PARALLELES = {
+    "worktree-cree-par-le-lead": (PR_PARALLELES_SKILL, "git worktree add"),
+    "worktree-frere-du-depot": (PR_PARALLELES_SKILL, "../<repo>--"),
+    "placement-par-enter-worktree": (PR_PARALLELES_SKILL, "EnterWorktree"),
+    "etat-par-list-agents": (PR_PARALLELES_SKILL, "ListAgents"),
+    "identite-par-le-scratchpad": (PR_PARALLELES_SKILL, "répertoire scratchpad"),
+    "noms-qui-tournent": (PR_PARALLELES_SKILL, "Les noms tournent"),
+    "tableau-ignore-a-la-racine": (".gitignore", "/PR-PARALLELES.md"),
+}
+
+
+@pytest.mark.parametrize(
+    ("fichier", "forme"),
+    GESTES_RETIRES_DE_PR_PARALLELES.values(),
+    ids=GESTES_RETIRES_DE_PR_PARALLELES.keys(),
+)
+def test_aucun_geste_retire_de_pr_paralleles_ne_reste_dans_sa_prose(
+    fichier: str, forme: str
+) -> None:
+    """Un geste retiré qui reste écrit se rejoue : la session suit le texte, pas l'intention."""
+    texte = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig")
+
+    assert forme not in texte, f"`{fichier}` porte encore « {forme} »"
 
 
 @pytest.mark.parametrize(

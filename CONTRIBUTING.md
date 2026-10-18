@@ -253,9 +253,9 @@ versions de correctif (3.12.x) le sont.
 3. **Implémenter** — `cycle-pr` : briefing pré-PR → **PR draft ouverte avant tout code** → TDD
    red-green-refactor → cycle `modif → test → cleanup → test → commit` (relecture à contexte vierge
    au socle) → cleanup holistique → relecture à contexte vierge finale → `gh pr ready` → CI → vérif de
-   fumée → merge. Plusieurs PR en parallèle : `pr-paralleles` (worktrees ;
-   la session lead démarre les autres et vérifie chaque PR avant le go, par messages
-   inter-sessions — le go lui-même reste humain, dans la fenêtre de la PR).
+   fumée → merge. Plusieurs PR en parallèle : `pr-paralleles` (la session lead démarre une
+   session par issue, chacune dans un worktree de l'application, et vérifie chaque PR avant le go,
+   par messages inter-sessions — le go lui-même reste humain, dans la fenêtre de la PR).
 3bis. **Amender** — `contradiction` dès qu'une décision de conversation contredit une source de
    vérité (section « Sources de vérité » de `.claude/pipeline.config.md`) : le document est amendé
    dans la session, ou la décision est abandonnée — ou son effet déplacé hors de ce que le document
