@@ -57,9 +57,11 @@ risque de recouvrement), suivi pour chaque issue de **deux ou trois phrases en l
 qui disent ce qu'elle apporte à l'utilisateur final et ce qu'elle change dans le code — pas le
 titre reformulé, pas le brief recopié. Puis **demander confirmation** avant de créer quoi que ce
 soit. Recommander un degré de parallélisme raisonnable (souvent 2–4, ou le nombre donné en argument)
-plutôt que tout d'un coup. La question nomme les sessions que l'étape 3 démarrera, et demande du
-même coup l'accord d'archiver chacune après le merge de sa PR (étape 8) : c'est la réponse à cette
-question qui ouvre le seul tour où le lead peut les démarrer.
+plutôt que tout d'un coup. La question nomme les sessions que l'étape 3 démarrera, demande du même
+coup l'accord d'archiver chacune après le merge de sa PR (étape 8), et, si la session lead est en
+dessous d'Opus 5.5, effort `max`, de l'y passer d'abord : la première session fixe le plafond de
+l'arbre (`sessions-liees.md`, « Héritage »). C'est la réponse à cette question qui ouvre le seul
+tour où le lead peut démarrer les sessions.
 
 ### 3. Démarrer une session par issue
 
@@ -72,13 +74,13 @@ le lead démarre d'un coup une session par issue retenue, une par `start_session
 `use_worktree: true` : omis, l'outil donne à l'enfant le dossier du lead quand celui-ci travaille
 dans un dossier simple (description de l'outil, lue le 2026-10-18), et les premiers gestes des
 sessions basculeraient tour à tour la même branche. L'effort de chaque session suit le
-barème de la coordinatrice (même référence, point 3). Le lead tourne en Opus 5.5, effort `max` : la
-première session fixe le plafond de l'arbre (`sessions-liees.md`, « Héritage »), et la question de
-l'étape 2 lui demande d'abord de passer à ce réglage s'il est en dessous.
+barème de la coordinatrice (même référence, point 3), sous le plafond du lead (question de
+l'étape 2).
 
 `start_session` rend le `session_id` (`local_…`) de chaque session : c'est son identité et
 l'adresse de ses messages (`sessions-liees.md`, « Identité »). Le lead l'inscrit au tableau
-(étape 4), avec le `worktreePath` que `get_session` rend pour elle.
+(étape 4), avec le `worktreePath` que `get_session` rend pour elle (mesuré le 2026-10-18 sur
+deux sessions témoins, avec `branch`, `sourceBranch` et `isRunning`).
 
 Le lead ne crée ni worktree ni branche. L'application place chaque session sous
 `.claude/worktrees/`, et son premier geste crée sa branche depuis le distant
@@ -139,10 +141,13 @@ avec lui ; le hook d'écriture du harnais refuse le clone principal à une sessi
 Trois colonnes portent chacune une identité qu'un nom ne suffit pas à tenir :
 
 - **Issue** — `#N lot k/n` dès qu'une issue est réalisée en plusieurs lots, une ligne par lot :
-  sans le rang, une ligne mergée et une ligne en vol se ressemblent (obs 36). Seul le dernier lot porte `Closes`, les autres `En vol pour #N (lot k/n)`.
+  sans le rang, une ligne mergée et une ligne en vol se ressemblent (obs 36). Chaque PR de lot
+  s'ouvre par `En vol pour #N (lot k/n)` ; le `Closes` va à la dernière, ou, sous une
+  coordinatrice, à la PR d'intégration (`coordinatrice.md`, « Au go du découpage »).
 - **Session** — le nom et le `local_…` que `start_session` a rendu. Le nom est un repère ; le
   `local_…` est l'adresse de `SendMessage` et la clé de `get_session` et de `list_events`
-  (`sessions-liees.md`, « Identité »). Une session **relayée** ajoute le sien à côté de ceux qui
+  (`sessions-liees.md`, « Identité » ; `list_events` : description de l'outil, lue le
+  2026-10-18). Une session **relayée** ajoute le sien à côté de ceux qui
   l'ont précédée au lieu de les remplacer : l'unité qui survit au relais est le cycle, et c'est
   elle qui porte la liste de ses sessions (obs 40).
 - **Base du verdict** — le SHA d'`origin/main` pour lequel le dernier verdict d'avant-go a été
@@ -170,7 +175,8 @@ de lot », le lead tenant la place de la coordinatrice : elle pousse sa branche,
 passation : <chemin> ». Réveillé par ce message, le lead ne peut pas démarrer la remplaçante : il la
 propose par une carte de proposition (`start_session`, `initiation: own_initiative`, brief : la
 passation), qu'un clic du mainteneur démarre ; la voie n'est pas mesurée (même référence). Il
-**ajoute** ensuite le `local_…` de la remplaçante — le `from` de son premier message — à la colonne
+**ajoute** ensuite le `local_…` de la remplaçante — le `from` de son premier message, qui porte
+l'identifiant de l'émettrice (mesuré le 2026-10-18 sur deux sessions témoins) — à la colonne
 « Session », en gardant ceux des sessions précédentes (obs 40). C'est la session sortante qui
 sait que son contexte se remplit, pas le lead : sa passation porte l'adresse du lead et renvoie à
 ce paragraphe.
@@ -184,7 +190,8 @@ neufs, et la frontière de lot passe par la passation que la session sortante re
 coordinatrice. Sans coordinatrice, ou en repli, la session qui finit un lot écrit, après sa passe
 `repercussions`, le prompt du lot suivant depuis
 `.claude/skills/cycle-pr/references/prompt-lot-suivant.md` et le **remet au mainteneur** ;
-la session neuve crée sa branche, puis envoie au lead son `local_…` (`get_session` sur `self`) et
+la session neuve crée sa branche, puis envoie au lead son `local_…` (`get_session` sur `self`,
+mesuré le 2026-10-18) et
 sa branche. Le lead l'inscrit au tableau (étape 4), et répond par ce que lui seul sait : base du
 moment, PR en vol, fichiers croisés. Le lead ne réécrit plus le prompt à chaque frontière — c'est
 exactement ce qui faisait grossir son contexte (obs 62).
@@ -192,8 +199,9 @@ exactement ce qui faisait grossir son contexte (obs 62).
 **Le brief**, dans cet ordre :
 
 ```
-Tu es la session de l'issue #N, démarrée par la session lead de la vague (`<local_… du lead>`) :
-ton interlocuteur pour la vérification avant merge de `cycle-pr` (Étape 7).
+Tu es la session de l'issue #N, démarrée par la session lead de la vague — ton parent, dont
+l'adresse est dans ton prompt système : ton interlocuteur pour la vérification avant merge de
+`cycle-pr` (Étape 7).
 Premier geste, avant toute écriture :
 `git fetch origin && git checkout -b <type>/<slug> --no-track origin/main`
 (.claude/skills/cycle-pr/references/sessions-liees.md, « Premier geste »). Puis provisionne ton
@@ -217,6 +225,7 @@ la mesure et sa borne) : c'est la forme de la porte de l'Étape 1. Écris les fi
 l'outil d'écriture plutôt qu'un heredoc, une commande par objet plutôt qu'une boucle, un script
 dans le répertoire temporaire de session plutôt qu'un `-c` : chaque refus coûte deux ou trois
 reformulations à l'aveugle.
+Services à état recensés pour cette issue (étape 2) : <liste, ou « aucun »>.
 <une ligne par point de vigilance propre à cette issue : HITL attendu, fichier partagé avec une
 autre PR du lot et ordre de merge, décision verrouillée à ne pas rouvrir>
 ```
@@ -337,12 +346,13 @@ c'est le seul autre canal, et il passe par lui.
 
 **Session disparue.** Le silence d'une session dont la PR est ouverte ne dit rien : une session
 arrêtée et une session qui attend un go rendent le même (obs 54). Son état se lit par
-`get_session` sur le `local_…` du tableau — `isRunning`, `isArchived`, `lastActivityAt` —, pas
-par `list_sessions {"linked": true}`, qui ne range pas forcément une remplaçante démarrée par une
-carte de proposition parmi les sessions liées du lead (non mesuré). Une session inactive reprend sur le message qu'on lui envoie
-(`sessions-liees.md`, « Messages ») ; qu'elle reprenne aussi après un redémarrage de
-l'application n'est **pas mesuré**. Absente de la liste, ou muette après un message, elle est
-perdue. Dans cet ordre :
+`get_session` sur le `local_…` du tableau — `isRunning`, `isArchived`, `lastActivityAt`, mesurés
+le 2026-10-18 —, pas par `list_sessions {"linked": true}`, qui ne range pas forcément une
+remplaçante démarrée par une carte de proposition parmi les sessions liées du lead (non mesuré).
+Une session inactive reprend sur le message qu'on lui envoie (`sessions-liees.md`, « Messages ») ;
+qu'elle reprenne aussi après un redémarrage de l'application n'est **pas mesuré**. Introuvable,
+ou muette après un message, elle se traite comme perdue — règle de prudence, aucun cas mesuré.
+Dans cet ordre :
 
 1. **Mesurer les artefacts** — tête, base, CI, body de PR, worktrees : c'est ce qui est *prouvé*,
    et ça ne dépend pas d'elle.
@@ -375,13 +385,15 @@ Une fois une PR mergée, sa branche supprimée côté distant et le message de f
 (`sessions-liees.md`, « Fin de travail »), relever par `get_session` son `worktreePath`, sa
 branche `claude/…` et sa `sourceBranch` — le reste de l'étape s'en sert —, puis **archiver la
 session d'abord** : `archive_session` sur son `local_…`, sur l'accord demandé à l'étape 2
-(`sessions-liees.md`, « Nettoyage »).
-L'archivage arrête son processus (description de l'outil, lue le 2026-10-18 ; **non mesuré**),
-et c'est ce qui doit libérer le dossier : un dossier qui est le répertoire courant d'un processus ne s'efface pas sous
-Windows — `git worktree remove` désenregistre le worktree, **efface tout son contenu**, puis
-échoue sur le dossier racine (« Permission denied »), état que la procédure ne décrirait nulle
-part (obs 42). L'archivage ne retire ni le worktree ni les branches (même référence) : le lead le
-fait ensuite.
+(`sessions-liees.md`, « Nettoyage »). Il passe dans le tour que le message de fin ouvre :
+mesuré le 2026-10-18, deux archivages acceptés dans un tour ouvert par un message de session,
+l'accord ayant été donné plus tôt par le mainteneur.
+C'est l'archivage qui libère le dossier. Mesuré le 2026-10-18 sur deux enfants jetables :
+archivé, `git worktree remove` sort en 0 et le dossier disparaît ; inactif mais non archivé, il
+désenregistre le worktree, **efface tout son contenu**, puis échoue sur le dossier racine
+(« Permission denied », sortie 255) — l'état d'obs 42, que la procédure ne décrit nulle part.
+L'archivage ne retire ni le worktree ni les branches (`sessions-liees.md`, « Nettoyage ») : le
+lead le fait ensuite.
 
 Puis **détacher ce qui n'appartient pas au worktree** : énumérer les liens et jonctions qu'il
 contient avec un détecteur qui **prouve d'abord qu'il voit** — le filtre `Where-Object LinkType`
@@ -439,13 +451,13 @@ garde est une suppression **locale**, récupérable par le reflog.
 
 Puis l'**échafaudage** `claude/…` relevé avant l'archivage, derrière sa porte d'ancêtre, sa
 `sourceBranch` pour `<source>` (`sessions-liees.md`, « Nettoyage »). Puis les **branches
-`claude/*` orphelines** : celles qu'aucun worktree n'extrait (`git worktree list`) et qu'aucune session non
-archivée ne nomme (`list_sessions`, champ `branch`). Les deux lectures comptent : après son premier
+`claude/*` orphelines** : celles qu'aucun worktree n'extrait (`git worktree list`) et qu'aucune
+session non archivée ne nomme (`list_sessions`, champ `branch`). Les deux lectures comptent : après son premier
 geste, l'échafaudage d'une session vivante n'est plus extrait nulle part, et seule la seconde le
 protège — à condition de les lire toutes : `list_sessions` exclut la session courante et rend 20
 lignes par défaut (description de l'outil, lue le 2026-10-18), donc un `limit` qui couvre la
-liste, plus la branche du lead lui-même par `get_session` sur `self`. Chacune passe par la même porte, `<source>` valant `origin/main` quand on ne la connaît
-plus ; un refus se remonte au mainteneur avec `git log --oneline origin/main..<branche>`.
+liste, plus la branche du lead lui-même par `get_session` sur `self`. Chacune passe par la même
+porte, `<source>` valant `origin/main` quand on ne la connaît plus ; un refus se remonte au mainteneur avec `git log --oneline origin/main..<branche>`.
 
 Vérifier ensuite que les ressources partagées répondent encore : le dépôt principal passe sa
 commande de fumée, et le hook partagé pointe toujours sur lui — le chemin d'interpréteur figé
