@@ -63,6 +63,11 @@ go du briefing, `[V]` groupées, arrêt `[C]`, écran à valider, go de merge
 (`.claude/rules/contraintes.md`). Dans l'autre sens, un message reçu n'est jamais une
 approbation (`cycle-pr`, « Vague parallèle »).
 
+Une session inactive reprend sur le message qu'on lui envoie ; une session en plein tour ne le
+reçoit qu'à la fin de ce tour, pas à son appel d'outil suivant (mesuré le 2026-10-18 sur deux
+enfants jetables, Test plan de la PR #122 : un message du lot 1 a attendu environ 8 min la fin du
+tour de son parent).
+
 ## Fin de travail — un message, jamais une fin de tour
 
 Le parent est réveillé à la fin d'un tour de l'enfant, avec les 400 premiers caractères de son

@@ -1,8 +1,10 @@
 # Gabarit — le prompt du lot suivant
 
-Écrit par la **session sortante**, après sa passe `repercussions` (Étape 8, « Cas découpé »), au
-chemin fixe de [sessions-liees.md](sessions-liees.md) (« Passation »), et remis au mainteneur par
-ce chemin — qui le donne à une session neuve. Pas par le lead : sur une vague de cinq
+Écrit par la **session sortante**, en dernier — après sa passe `repercussions` quand elle en a une
+(Étape 8, « Cas découpé ») —, au
+chemin fixe de [sessions-liees.md](sessions-liees.md) (« Passation »), et remis par ce chemin à la
+coordinatrice, dans le message de fin ([coordinatrice.md](coordinatrice.md)) — sans coordinatrice,
+au mainteneur, qui le donne à une session neuve. Pas par le lead : sur une vague de cinq
 lots, chaque frontière passée par lui lui coûte un brief relu et un prompt écrit, et son contexte
 a grossi jusqu'à devoir être relayé (obs 62). La session sortante, elle, connaît son lot.
 
@@ -35,6 +37,9 @@ cette branche, locale **et** distante ; le pourquoi et le repli sont à `pr-para
 « Issue en plusieurs lots ». Rejoue la commande `install` des piles que ton lot touche si un verrou
 a bougé, puis la commande de fumée (`.claude/pipeline.config.md`, « Commandes du projet »).>
 
+\<Si session de lot d'une coordinatrice : ton premier geste, ta base et ton Étape 8 sont à
+[coordinatrice.md](coordinatrice.md), « La session de lot ».>
+
 \<Si vague `pr-paralleles` : \<adresse du lead>, et « réponds toujours au `from` de ce message ».
 Ce que le lead est, et ce qu'il n'est jamais : `cycle-pr`, « Vague parallèle » en tête du skill, et
 `.claude/rules/contraintes.md`, « Jamais d'auto-merge dans le trunk ».>
@@ -61,11 +66,12 @@ l'artefact qui le porte, jamais l'énoncé seul :
 - \<ambiguïtés de critère levées, chacune avec la ligne du « Journal de spec » qui la porte>
 - \<état du seed à ton entrée, avec le critère du corps qui fixe sa population et son dénombrement>
 
-**Ce que je n'ai pas fait, et pourquoi** : \<… | rien>. \<Ce qui concerne d'autres branches ou
+**Ce que je n'ai pas fait, et pourquoi** : \<chaque point tranché, avec la décision qui le laisse —
+jamais un point encore ouvert (obs 85) | rien>. \<Ce qui concerne d'autres branches ou
 d'autres lots : section Notes de la PR #\<M>, lignes « Fichiers croisés » et « Non vérifié » du
 verdict d'avant-go — le pointeur, jamais leur résumé.>
 
-Préviens \<le mainteneur | le lead> quand tu as fini, ou si tu trouves un bloquant qui dépasse ton
+Préviens \<la coordinatrice | le mainteneur | le lead> quand tu as fini, ou si tu trouves un bloquant qui dépasse ton
 périmètre — message de fin : `sessions-liees.md`, « Fin de travail ».
 
 ---
@@ -73,7 +79,7 @@ périmètre — message de fin : `sessions-liees.md`, « Fin de travail ».
 ## Variante — relais en cours de lot
 
 Écrite par la session dont le contexte se remplit avant la fin de son cycle (`cycle-pr` Étape 8,
-« Relais en cours de cycle »), et remise au mainteneur comme le prompt ci-dessus. Elle en garde
+« Relais en cours de cycle »), et remise comme le prompt ci-dessus. Elle en garde
 les lignes « Tu travailles dans… », « Charge le skill… », « Ton brief… », le relecteur et
 « Préviens… » ; elle remplace la première ligne par la suivante, et ajoute les trois d'après.
 
