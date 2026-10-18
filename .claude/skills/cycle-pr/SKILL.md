@@ -987,9 +987,8 @@ c'est le lead qui lance le vérificateur (`pr-paralleles` Étape 6). Sans lead :
 lancer soi-même le rôle `verificateur` (`.claude/agents/verificateur.md`) avec ce qu'un lead lui donnerait, **sur l'accord du mainteneur
 demandé avec les `[V]` du go du briefing** (Étape 1) — demandé à la fin, il attend la prochaine
 présence : 6 h 37 d'absence au lot 4b de #77 sur cette seule question, à un moment où il ne restait
-rien d'indépendant à faire. Une session de lot écrit au lead que son brief nomme, jamais à sa
-coordinatrice ; sans lead, son accord est celui du go du découpage
-([references/coordinatrice.md](references/coordinatrice.md), « La session de lot »).
+rien d'indépendant à faire. Une session de lot : son destinataire et son accord sont à
+[references/coordinatrice.md](references/coordinatrice.md), « La session de lot ».
 
 **Le verdict s'inscrit dans les Notes du body avant le go**, relu après écriture
 (`contraintes.md`, « Écritures sur un artefact distant ») — au moins ses lignes « Fichiers

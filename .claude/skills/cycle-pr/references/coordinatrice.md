@@ -51,7 +51,8 @@ lot k+1 sur deux preuves :
 
 1. le message « lot <k>/<n> terminé — PR #<M> mergée dans <branche d'intégration> — passation :
    <chemin> », reçu de la session du lot k ;
-2. le fichier présent à ce chemin : `test -f <chemin>` sort en 0.
+2. le fichier présent à ce chemin : `test -f '<chemin>'` sort en 0 — cité, un chemin Windows
+   perdant ses antislashs dans le shell.
 
 Un message de fin sans fichier de passation n'ouvre pas le lot suivant : la coordinatrice répond
 « passation absente : <chemin> » à la session du lot k, et attend (mesuré le 2026-10-18 sur deux
@@ -68,8 +69,8 @@ passation : <chemin> ». Inactive depuis le go, elle reprend sur ce message (`se
 « Messages »). Dans l'autre sens, un message de lot arrivé pendant un tour de la coordinatrice
 attend la fin de ce tour : c'est une raison de plus pour qu'entre deux lots, elle reste inactive.
 
-Ces deux contrôles précèdent un `SendMessage`, pas une commande : rien ne s'y chaîne, ce sont des
-lectures par construction (`cycle-pr` Étape 7, « Le go, puis le merge »).
+Ces deux contrôles — `test -f` et `merge-tree` — précèdent un `SendMessage`, pas une commande :
+rien ne s'y chaîne, ce sont des lectures par construction (`cycle-pr` Étape 7, « Le go, puis le merge »).
 
 ## La session de lot
 

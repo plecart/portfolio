@@ -1302,6 +1302,9 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         COORDINATRICE_REF,
         "Un message de fin sans fichier de passation n'ouvre pas le lot suivant",
     ),
+    # Cité : un chemin de passation Windows perd ses antislashs dans le shell (`/code-review` de la
+    # PR #122), et le fichier présent se lirait absent.
+    "passation-testee-chemin-cite": (COORDINATRICE_REF, "`test -f '<chemin>'` sort en 0"),
     "derive-apres-chaque-lot": (
         COORDINATRICE_REF,
         "`git merge-tree --write-tree origin/<trunk> origin/<type>/<slug>`",
