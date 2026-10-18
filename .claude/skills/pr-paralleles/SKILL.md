@@ -68,7 +68,10 @@ Dans le tour où le mainteneur valide le lot (étape 2), et dans celui-là seule
 automatique (`.claude/skills/cycle-pr/references/coordinatrice.md`, « Au go du découpage ») —,
 le lead démarre d'un coup une session par issue retenue, une par `start_session` :
 `initiation: user_asked`, `context: fresh`, worktree de l'application, `wake_when_done: true`,
-`name: issue-<N>`, et pour `prompt` : le brief de l'étape 5. L'effort de chaque session suit le
+`name: issue-<N>`, et pour `prompt` : le brief de l'étape 5. Le worktree se demande en clair,
+`use_worktree: true` : omis, l'outil donne à l'enfant le dossier du lead quand celui-ci travaille
+dans un dossier simple (description de l'outil, lue le 2026-10-18), et les premiers gestes des
+sessions basculeraient tour à tour la même branche. L'effort de chaque session suit le
 barème de la coordinatrice (même référence, point 3). Le lead tourne en Opus 5.5, effort `max` : la
 première session fixe le plafond de l'arbre (`sessions-liees.md`, « Héritage »), et la question de
 l'étape 2 lui demande d'abord de passer à ce réglage s'il est en dessous.
@@ -92,7 +95,8 @@ jouer cinq gestes, dans l'ordre :
 
 1. **Copier depuis le clone principal** (première ligne de `git worktree list`) les fichiers
    locaux ignorés par git dont les commandes du projet dépendent — ex. un `.env` lu par le
-   fichier de commandes, `.claude/settings.local.json` (jetons MCP). Les repérer en croisant `.gitignore` et le fichier de commandes, pas de mémoire.
+   fichier de commandes, `.claude/settings.local.json` (jetons MCP). Un refus du garde de
+   permissions se signale au lead (« bloquant : … »), jamais contourné par une copie d'un modèle. Les repérer en croisant `.gitignore` et le fichier de commandes, pas de mémoire.
 2. **Recréer les artefacts d'outillage par l'outil qui les gère** — ex. le lien de SDK posé par le
    gestionnaire de version déclaré dans « runtime + version » de `.claude/pipeline.config.md`
    (FVM, mise, asdf…). **Jamais de lien fabriqué à la main** (`mklink`, `ln -s`) : l'outil qui
@@ -333,8 +337,9 @@ c'est le seul autre canal, et il passe par lui.
 
 **Session disparue.** Le silence d'une session dont la PR est ouverte ne dit rien : une session
 arrêtée et une session qui attend un go rendent le même (obs 54). Son état se lit par
-`list_sessions {"linked": true}`, sur la ligne de son `local_…` — `isRunning`, `isArchived`,
-`lastActivityAt`. Une session inactive reprend sur le message qu'on lui envoie
+`get_session` sur le `local_…` du tableau — `isRunning`, `isArchived`, `lastActivityAt` —, pas
+par `list_sessions {"linked": true}`, qui ne range pas forcément une remplaçante démarrée par une
+carte de proposition parmi les sessions liées du lead (non mesuré). Une session inactive reprend sur le message qu'on lui envoie
 (`sessions-liees.md`, « Messages ») ; qu'elle reprenne aussi après un redémarrage de
 l'application n'est **pas mesuré**. Absente de la liste, ou muette après un message, elle est
 perdue. Dans cet ordre :
@@ -371,8 +376,8 @@ Une fois une PR mergée, sa branche supprimée côté distant et le message de f
 branche `claude/…` et sa `sourceBranch` — le reste de l'étape s'en sert —, puis **archiver la
 session d'abord** : `archive_session` sur son `local_…`, sur l'accord demandé à l'étape 2
 (`sessions-liees.md`, « Nettoyage »).
-L'archivage arrête son processus (description de l'outil, lue le 2026-10-18), et c'est ce qui
-libère le dossier : un dossier qui est le répertoire courant d'un processus ne s'efface pas sous
+L'archivage arrête son processus (description de l'outil, lue le 2026-10-18 ; **non mesuré**),
+et c'est ce qui doit libérer le dossier : un dossier qui est le répertoire courant d'un processus ne s'efface pas sous
 Windows — `git worktree remove` désenregistre le worktree, **efface tout son contenu**, puis
 échoue sur le dossier racine (« Permission denied »), état que la procédure ne décrirait nulle
 part (obs 42). L'archivage ne retire ni le worktree ni les branches (même référence) : le lead le
@@ -437,7 +442,9 @@ Puis l'**échafaudage** `claude/…` relevé avant l'archivage, derrière sa por
 `claude/*` orphelines** : celles qu'aucun worktree n'extrait (`git worktree list`) et qu'aucune session non
 archivée ne nomme (`list_sessions`, champ `branch`). Les deux lectures comptent : après son premier
 geste, l'échafaudage d'une session vivante n'est plus extrait nulle part, et seule la seconde le
-protège. Chacune passe par la même porte, `<source>` valant `origin/main` quand on ne la connaît
+protège — à condition de les lire toutes : `list_sessions` exclut la session courante et rend 20
+lignes par défaut (description de l'outil, lue le 2026-10-18), donc un `limit` qui couvre la
+liste, plus la branche du lead lui-même par `get_session` sur `self`. Chacune passe par la même porte, `<source>` valant `origin/main` quand on ne la connaît
 plus ; un refus se remonte au mainteneur avec `git log --oneline origin/main..<branche>`.
 
 Vérifier ensuite que les ressources partagées répondent encore : le dépôt principal passe sa

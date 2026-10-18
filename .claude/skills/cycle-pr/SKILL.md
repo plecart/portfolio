@@ -1289,7 +1289,8 @@ Trois choses que le relais ne peut pas reconstituer, chacune payée :
 **Le message de clôture prend une forme figée**, chemin de la passation compris
 ([references/sessions-liees.md](references/sessions-liees.md), « Fin de travail ») : jamais une
 fin de tour. **En vague parallèle, il part au lead** : c'est sur lui que le lead archive la
-session, ce qui arrête son processus et libère son worktree, puis retire celui-ci — un dossier
+session, ce qui doit arrêter son processus et libérer son worktree (non mesuré), puis retire
+celui-ci — un dossier
 qui est le répertoire courant d'un processus ne s'efface pas (obs 42, `pr-paralleles` Étape 8).
 Une session sait qu'elle a fini avant que le lead ne le sache : c'est elle qui porte ces faits.
 
