@@ -1557,7 +1557,9 @@ INVARIANTS_DES_SESSIONS_LIEES = {
 # de la PR #130, passe 2, R-1) : `grep -rn start_session .claude CLAUDE.md CONTRIBUTING.md` rend
 # 5 sites qui démarrent une session devant avoir son worktree — `pr-paralleles` Étape 3 (fermé par
 # `ef0b3a8`), son repli d'Étape 8 (renvoi à l'Étape 3, fermé avec elle), sa carte de relais, et
-# dans `coordinatrice.md` les sessions de lot et la carte de relais : **3 fuyaient**. Un site
+# dans `coordinatrice.md` les sessions de lot et la carte de relais : **3 fuyaient**. La relance
+# en a trouvé un **6ᵉ**, qui fuyait aussi : la carte de proposition du même repli, seconde voie
+# du renvoi — 6 sites, 4 fuyaient. Un site
 # nouveau n'entre pas ici de lui-même : la garde lit des phrases, le grep re-dérive la population.
 USE_WORKTREE_EXPLICITE = {
     "pr-paralleles-etape-3": (
@@ -1567,6 +1569,10 @@ USE_WORKTREE_EXPLICITE = {
     "pr-paralleles-carte-de-relais": (
         PR_PARALLELES_SKILL,
         "(`start_session`, `initiation: own_initiative`, `use_worktree: true`, brief : la passation)",
+    ),
+    "pr-paralleles-repli-par-carte": (
+        PR_PARALLELES_SKILL,
+        "sinon par une carte de proposition (`initiation: own_initiative`, `use_worktree: true`)",
     ),
     "coordinatrice-sessions-de-lot": (
         COORDINATRICE_REF,
