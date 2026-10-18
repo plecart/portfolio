@@ -128,7 +128,8 @@ autant que les autres : c'est même leur seule raison d'exister ici.
 une PR découpée en lots ne porte `Closes` que sur son **dernier** lot, et ce marqueur est ce qui
 signale l'issue en vol pendant les lots précédents.
 
-Lire aussi le tableau de bord **`PR-PARALLELES.md`** s'il existe : toute ligne qui n'est pas
+Lire aussi le tableau de bord **`PR-PARALLELES.md`** s'il existe — hors dépôt, dans le dossier du
+projet qui porte `skill-observations/` (`pr-paralleles`, étape 4) : toute ligne qui n'est pas
 `⚪ worktree nettoyé` désigne une issue en vol. Il sert de filet si une session a sauté l'Étape 2.
 
 Classer chaque issue impactée **dormante** ou **en vol**. Le traitement diffère radicalement

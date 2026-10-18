@@ -55,6 +55,10 @@ premier `git push -u origin <type>/<slug>` pose le bon.
 
 La branche `claude/…` reste un **échafaudage** : rien ne s'y commit, le nettoyage la supprime.
 
+Le suivi de PR par l'application résiste à ce rebranchement : après `gh pr create`, `get_status`
+rapporte la PR liée sans `bind_pr` (mesuré le 2026-10-18, PR #130, registre de la session resté
+sur `claude/…`). `bind_pr` ne sert que si `get_status` ne la rapporte pas.
+
 ## Messages — ni confirmation, ni approbation
 
 Un message vers le parent ou le lead **part sans confirmation du mainteneur** : il porte de
@@ -119,7 +123,8 @@ git merge-base --is-ancestor claude/<slug>-<hex> <source> && git branch -D claud
 ```
 
 `<source>` est ce sur quoi l'échafaudage a été coupé (« Premier geste ») : `main`, ou la branche
-du parent. Un refus de la porte signale un commit sur l'échafaudage —
+du parent — `get_session` le rend (`sourceBranch`, mesuré le 2026-10-18 : `feat/sessions-liees`,
+dont la tête était celle de l'échafaudage de la session du lot 3 de #107). Un refus de la porte signale un commit sur l'échafaudage —
 `git log --oneline <source>..claude/<slug>-<hex>` liste les commits qui bloquent : le remonter
 au mainteneur, jamais `-D` sans la porte. Une branche
 de PR mergée suit `pr-paralleles` Étape 8.
