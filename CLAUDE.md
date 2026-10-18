@@ -112,6 +112,12 @@ de travail** : une tranche d'issue, une suite à faire passer au vert, une carto
 Un rôle ajouté ou modifié dans `.claude/agents/` n'est visible qu'à la session suivante (la liste
 des types est figée au démarrage — repli : `general-purpose` avec le modèle du rôle).
 
+**Sessions liées.** Les équipiers ci-dessus sont des sous-agents d'une session. Une session peut
+aussi en démarrer d'autres, complètes, dans l'application de bureau (`start_session`) : le lead
+d'une vague `pr-paralleles`, une par issue ; la coordinatrice d'une issue en lots, une par lot.
+Leur protocole — héritage, identité, premier geste, messages, fin de travail, passation,
+nettoyage — vit dans `.claude/skills/cycle-pr/references/sessions-liees.md`, seule source.
+
 ## Skills de la pipeline
 
 Chaque skill s'invoque par `/<nom>` (`/triage`, `/cycle-pr`, `/plan-qa`…) ou se déclenche

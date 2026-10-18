@@ -1052,10 +1052,9 @@ parce que le trunk n'avance que vers l'avant. Mesuré le 2026-10-13, témoin de 
 quand le trunk a avancé, **0** sur deux références égales — table `FRESHNESS_GATE_FORMS` de
 `apps/api/tests/test_agent_skills.py`.
 
-**Et six contrôles de ce skill et de `pr-paralleles` restent des lectures, par construction.**
+**Et cinq contrôles de ce skill et de `pr-paralleles` restent des lectures, par construction.**
 Une porte n'a de sens que devant **une commande** : les deux auto-vérifications du `relecteur`
-(4.2) et la vérification de placement d'une session pair (`pr-paralleles` Étape 5) précèdent une
-**phase entière** de travail, il n'y a rien à quoi se chaîner ; la comparaison entre l'état de la
+(4.2) précèdent une **phase entière** de travail, il n'y a rien à quoi se chaîner ; la comparaison entre l'état de la
 forge et une référence locale avant `git branch -D` (`pr-paralleles` Étape 8) porte sur les valeurs
 de **deux outils**, donc exige la substitution que le garde refuse ; et les deux contrôles que la
 coordinatrice lit avant d'ouvrir un lot — passation présente, `merge-tree` à 0 — précèdent un
@@ -1229,7 +1228,7 @@ lui-même (obs 62). La session sortante connaît son lot ; le lead connaît la v
 qu'il garde — croisement des fichiers après merge, tableau de bord, vigilance de vague. Quand la
 session sortante a disparu, deux replis de `pr-paralleles` : Étape 7, « Session disparue », pour
 reconstituer ce qu'elle n'a pas remis, et Étape 8, « Issue en plusieurs lots », où c'est le lead
-qui crée la branche du lot suivant.
+qui démarre la session du lot suivant.
 
 **La passation s'écrit en dernier.** Chaque point encore ouvert du lot — question au
 mainteneur, correctif, message en attente — se pose d'abord, en une fois, puis se fait ou se laisse
@@ -1283,17 +1282,16 @@ Trois choses que le relais ne peut pas reconstituer, chacune payée :
   de `CLAUDE.md` se compte par cycle, relais compris, et un relais qui ignore le compte le
   recommence : le lot 1 de #77, sur trois sessions, a versé sept entrées sous un plafond de
   trois par session (obs 75) ;
-- en vague, **l'adresse du lead**, à qui le relais se présente d'abord (`pr-paralleles` Étape 5,
-  « Session relayée ») : c'est la session sortante qui sait que son contexte se remplit, pas le
-  lead (obs 40).
+- en vague, **l'adresse du lead**, à qui la session sortante demande le relais et à qui le relais
+  envoie son état (`pr-paralleles` Étape 5, « Session relayée ») : c'est la session sortante qui
+  sait que son contexte se remplit, pas le lead (obs 40).
 
 **Le message de clôture prend une forme figée**, chemin de la passation compris
 ([references/sessions-liees.md](references/sessions-liees.md), « Fin de travail ») : jamais une
-fin de tour. **En vague parallèle, celui qui part au lead porte une ligne de plus** : « Je suis
-sortie du worktree (`ExitWorktree`) » — un dossier qui est le répertoire courant d'un processus ne
-s'efface pas, et sans cette sortie le `git worktree remove` du lead efface le contenu du worktree
-puis échoue sur son dossier racine (obs 42, `pr-paralleles` Étape 8). Une session sait qu'elle a
-fini avant que le lead ne le sache : c'est elle qui porte ces faits.
+fin de tour. **En vague parallèle, il part au lead** : c'est sur lui que le lead archive la
+session, ce qui arrête son processus et libère son worktree, puis retire celui-ci — un dossier
+qui est le répertoire courant d'un processus ne s'efface pas (obs 42, `pr-paralleles` Étape 8).
+Une session sait qu'elle a fini avant que le lead ne le sache : c'est elle qui porte ces faits.
 
 ## Les 5 idées à retenir
 

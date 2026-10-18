@@ -1,6 +1,6 @@
 ---
 name: pr-paralleles
-description: Orchestre plusieurs PR en parallèle via des git worktrees — sélectionne des issues ready-for-agent non bloquées et à faible recouvrement de fichiers, crée un worktree + une branche par issue, prépare une session par worktree, tient un tableau de bord, et nettoie après merge. Utiliser pour développer plusieurs issues en même temps, paralléliser la réalisation de PR, ou lancer une vague de travail AFK.
+description: Orchestre plusieurs PR en parallèle — sélectionne des issues ready-for-agent non bloquées et à faible recouvrement de fichiers, démarre une session par issue dans un worktree de l'application, tient un tableau de bord, et nettoie après merge. Utiliser pour développer plusieurs issues en même temps, paralléliser la réalisation de PR, ou lancer une vague de travail AFK.
 argument-hint: "[#issues | nombre de PR à lancer]"
 ---
 
@@ -9,7 +9,8 @@ argument-hint: "[#issues | nombre de PR à lancer]"
 Permet de travailler sur **plusieurs PR en même temps** sans qu'elles se marchent dessus, en
 isolant chaque unité de travail dans son propre **git worktree** (un dossier de travail + une
 branche distincts, partageant le même dépôt `.git`). Chaque worktree se développe dans **sa propre
-session Claude Code**, en suivant `cycle-pr`.
+session Claude Code**, en suivant `cycle-pr` : une session que le lead démarre lui-même, selon le
+protocole des sessions liées (`.claude/skills/cycle-pr/references/sessions-liees.md`).
 
 Prérequis : `.claude/pipeline.config.md` existe (sinon lancer `init-projet`).
 
@@ -56,44 +57,42 @@ risque de recouvrement), suivi pour chaque issue de **deux ou trois phrases en l
 qui disent ce qu'elle apporte à l'utilisateur final et ce qu'elle change dans le code — pas le
 titre reformulé, pas le brief recopié. Puis **demander confirmation** avant de créer quoi que ce
 soit. Recommander un degré de parallélisme raisonnable (souvent 2–4, ou le nombre donné en argument)
-plutôt que tout d'un coup.
+plutôt que tout d'un coup. La question nomme les sessions que l'étape 3 démarrera, et demande du
+même coup l'accord d'archiver chacune après le merge de sa PR (étape 8) : c'est la réponse à cette
+question qui ouvre le seul tour où le lead peut les démarrer.
 
-### 3. Créer un worktree + une branche par issue
+### 3. Démarrer une session par issue
 
-Pour chaque issue retenue, depuis `main` à jour — **les deux `main`** —, et derrière une **porte** :
-une commande dont le code de sortie porte la condition, enchaînée par `&&` à celle qu'elle garde
-(`cycle-pr` Étape 7, « Le go, puis le merge », pour la classe entière). Un affichage de deux SHA
-n'en est pas une.
+Dans le tour où le mainteneur valide le lot (étape 2), et dans celui-là seulement —
+`start_session` est refusé dans un tour ouvert par un message de session ou par un événement
+automatique (`.claude/skills/cycle-pr/references/coordinatrice.md`, « Au go du découpage ») —,
+le lead démarre d'un coup une session par issue retenue, une par `start_session` :
+`initiation: user_asked`, `context: fresh`, worktree de l'application, `wake_when_done: true`,
+`name: issue-<N>`, et pour `prompt` : le brief de l'étape 5. L'effort de chaque session suit le
+barème de la coordinatrice (même référence, point 3). Le lead tourne en Opus 5.5, effort `max` : la
+première session fixe le plafond de l'arbre (`sessions-liees.md`, « Héritage »), et la question de
+l'étape 2 lui demande d'abord de passer à ce réglage s'il est en dessous.
 
-```
-git fetch origin
-git merge-base --is-ancestor main origin/main && git merge-base --is-ancestor origin/main main && git worktree add ../<repo>--<numéro-issue> -b <type>/<slug> origin/main
-```
+`start_session` rend le `session_id` (`local_…`) de chaque session : c'est son identité et
+l'adresse de ses messages (`sessions-liees.md`, « Identité »). Le lead l'inscrit au tableau
+(étape 4), avec le `worktreePath` que `get_session` rend pour elle.
 
-**Deux prédicats**, parce que `--is-ancestor` dit « ancêtre ou égal » et qu'une seule direction
-laisse passer l'autre cas : les deux ensemble valent l'égalité. Les deux directions comptent ici —
-`origin/main` en avance prive chaque session de commits dont son brief dépend ; `main` local en
-avance ferait apparaître ses commits non poussés dans le diff de **chaque** PR du lot. Le
-raisonnement complet, le rôle de `&&` et la mesure du garde de permissions sont à `cycle-pr`
-Étape 1 ; ne pas les recopier ici.
-
-**Au blocage**, laquelle des deux a mordu se lit par `git status -sb` (`[ahead n]` / `[behind n]`),
-jamais par `git status --porcelain`, **vide** sur une branche en avance (mesuré). Rattrapages :
-`main` local en avance → s'arrêter et demander à l'utilisateur de pousser, ou l'autorisation de le
-faire, **avant le premier worktree** ; `origin/main` en avance → sur `main`, `git pull --ff-only`.
-Dans les deux cas, rejouer la porte.
+Le lead ne crée ni worktree ni branche. L'application place chaque session sous
+`.claude/worktrees/`, et son premier geste crée sa branche depuis le distant
+(`sessions-liees.md`, « Premier geste ») : la fraîcheur vient d'`origin/main`, sans porte à
+jouer sur un `main` local.
 
 - `<type>` = `feat` / `fix` / `chore` / `docs` / `refactor` selon la catégorie de l'issue.
 - `<slug>` = description courte en kebab-case.
-- Le dossier `../<repo>--<numéro-issue>` est un **frère** du dépôt, pour ne pas polluer l'arbre.
 
-**Provisionner chaque worktree — obligatoire avant de le confier à une session.** Un worktree est
-un checkout neuf, pas une copie de l'environnement de travail : tout ce que git ignore en est
-absent. Cinq gestes, dans l'ordre :
+**Provisionner son worktree — la session le fait, juste après son premier geste.** Le lead ne
+connaît pas le worktree avant le démarrage de la session. Un worktree est un checkout neuf, pas une
+copie de l'environnement de travail : tout ce que git ignore en est absent. Le brief (étape 5) fait
+jouer cinq gestes, dans l'ordre :
 
-1. **Copier depuis le dépôt principal** les fichiers locaux ignorés par git dont les commandes du
-   projet dépendent — ex. un `.env` lu par le fichier de commandes, `.claude/settings.local.json`
-   (jetons MCP). Les repérer en croisant `.gitignore` et le fichier de commandes, pas de mémoire.
+1. **Copier depuis le clone principal** (première ligne de `git worktree list`) les fichiers
+   locaux ignorés par git dont les commandes du projet dépendent — ex. un `.env` lu par le
+   fichier de commandes, `.claude/settings.local.json` (jetons MCP). Les repérer en croisant `.gitignore` et le fichier de commandes, pas de mémoire.
 2. **Recréer les artefacts d'outillage par l'outil qui les gère** — ex. le lien de SDK posé par le
    gestionnaire de version déclaré dans « runtime + version » de `.claude/pipeline.config.md`
    (FVM, mise, asdf…). **Jamais de lien fabriqué à la main** (`mklink`, `ln -s`) : l'outil qui
@@ -102,12 +101,11 @@ absent. Cinq gestes, dans l'ordre :
    plutôt que d'improviser.
 3. **Installer les dépendances des piles que l'issue touche**, par la commande `install` de
    chaque pile dans `.claude/pipeline.config.md` — une pile non touchée ne s'installe pas.
-4. **Commande de fumée** avant de remettre le prompt (la commande `lint` de la config) : un échec
-   « exécutable introuvable » signale un worktree non préparé, pas un défaut du code.
+4. **Commande de fumée** avant l'Étape 1 de `cycle-pr` (la commande `lint` de la config) : un
+   échec « exécutable introuvable » signale un worktree non préparé, pas un défaut du code.
 5. **Vérifier que chaque service à état recensé à l'étape 2 pour cette issue répond** — démon
    Docker par `docker info`, base ou broker par leur commande de santé : la fumée `lint` ne les
-   exerce pas, et un échec de suite au premier test coûterait un tour de session. Consigner
-   « provisionné ✅ » dans le tableau de bord.
+   exerce pas, et un échec de suite au premier test coûterait un tour de session.
 
 **Jamais d'installation des hooks depuis un worktree.** `.git/hooks/` vit dans le répertoire git
 commun, partagé par tous les worktrees et le clone principal, et le gabarit écrit par la commande
@@ -119,30 +117,30 @@ s'installent une fois, depuis le clone principal ; un worktree les trouve instal
 
 ### 4. Tenir le tableau de bord
 
-Maintenir un fichier `PR-PARALLELES.md` à la racine du dépôt (et le tenir à jour à chaque
-changement d'état) :
+Maintenir un fichier `PR-PARALLELES.md` **hors du dépôt**, dans le dossier du projet qui porte
+`skill-observations/` et `passations/` (chemin du journal dans `CLAUDE.md`, « Observation
+continue »), et le tenir à jour à chaque changement d'état. Écrit dans un worktree, il partirait
+avec lui ; le hook d'écriture du harnais refuse le clone principal à une session placée ailleurs
+(obs 93).
 
 ```markdown
 # PR en parallèle — <date>
 
 | Issue | PR | Branche | Worktree | Session | Base du verdict | État |
 |-------|----|---------|----------|---------|-----------------|------|
-| #51 lot 1/2 | #62 (draft) | feat/extraction-pdf | ../app--51 | app-40 · 7534fbb3 | — | 🟡 en cours |
-| #52 | #63 | fix/quota-upload | ../app--52 | app-73 · 2afdedb5, 9c1e0a4f (relais) | 863d606 | 🔵 en review |
+| #51 lot 1/2 | #62 (draft) | feat/extraction-pdf | .claude/worktrees/brave-turing-1a2b3c | issue-51 · local_7534fbb3… | — | 🟡 en cours |
+| #52 | #63 | fix/quota-upload | .claude/worktrees/calm-hopper-4d5e6f | issue-52 · local_2afdedb5…, local_9c1e0a4f… (relais) | 863d606 | 🔵 en review |
 ```
 
 Trois colonnes portent chacune une identité qu'un nom ne suffit pas à tenir :
 
-- **Issue** — `#N lot k/n` dès qu'une issue est réalisée en plusieurs lots. Le worktree survit au
-  merge d'un lot, la branche non : sans le rang, une ligne mergée et une ligne en vol se
-  ressemblent (obs 36). Seul le dernier lot porte `Closes`, les autres `En vol pour #N (lot k/n)`.
-- **Session** — le nom **et l'UUID**. Le nom est un repère qui tourne : une session passe de
-  `app-6b` à `app-ef` en cours de vie sans que rien ne le signale. L'UUID ne change pas, et c'est
-  lui qu'un ordre **durable** comme `EnterWorktree` doit viser (obs 34, étape 5). Une session
-  **relayée** ajoute son UUID à côté de ceux qui l'ont précédée au lieu de les remplacer :
-  l'unité qui survit au relais est le cycle, et c'est elle qui porte la liste de ses sessions
-  (obs 40) — c'est aussi cette liste que `cycle-pr` Étape 8 passe à son bilan, un transcript par
-  UUID.
+- **Issue** — `#N lot k/n` dès qu'une issue est réalisée en plusieurs lots, une ligne par lot :
+  sans le rang, une ligne mergée et une ligne en vol se ressemblent (obs 36). Seul le dernier lot porte `Closes`, les autres `En vol pour #N (lot k/n)`.
+- **Session** — le nom et le `local_…` que `start_session` a rendu. Le nom est un repère ; le
+  `local_…` est l'adresse de `SendMessage` et la clé de `get_session` et de `list_events`
+  (`sessions-liees.md`, « Identité »). Une session **relayée** ajoute le sien à côté de ceux qui
+  l'ont précédée au lieu de les remplacer : l'unité qui survit au relais est le cycle, et c'est
+  elle qui porte la liste de ses sessions (obs 40).
 - **Base du verdict** — le SHA d'`origin/main` pour lequel le dernier verdict d'avant-go a été
   rendu (étape 6). Un verdict ne vaut que pour sa base : si le trunk avance, il est périmé avec
   toutes les preuves de la PR. Sans ce SHA, on relit un verdict sans savoir de quel état il parle.
@@ -154,61 +152,27 @@ d'écrire la moindre ligne**. Le lead la lit sans rien demander aux sessions —
 `gh pr list --state open --json number,headRefName,isDraft` relie chaque branche à sa PR. C'est ce
 qui rend le lot lisible d'un coup d'œil — et détectable par `repercussions`.
 
-### 5. Démarrer chaque session par message inter-sessions
+### 5. Le brief de chaque session
 
-L'utilisateur **ouvre lui-même** ses sessions — application de bureau Claude Code ou extension
-VS Code, **n'importe où dans le dépôt** (la fenêtre principale suffit) — jamais par une commande
-`claude` dans un terminal. Le lead ne lui donne **rien à coller** ni à taper : il lui demande
-d'ouvrir N sessions — en précisant qu'il peut y taper `/i-have-adhd` s'il veut le mode court et
-que ce skill est installé —
-puis de revenir dire « ouvertes ». Inutile d'ouvrir une fenêtre par dossier de worktree : chaque
-session **se déplace elle-même** dans son worktree (ci-dessous). Tout le reste transite par
-`SendMessage`, que les sessions Claude Code d'une même machine partagent sans configuration — un
-message de pair suffit à donner son premier tour à une session vierge.
+Le brief est le `prompt` que l'étape 3 passe à `start_session` : la session reçoit son premier tour
+avec lui. Le mainteneur n'ouvre aucune fenêtre et n'a rien à coller ; le lead ne place personne —
+l'application a placé la session, et son premier geste crée sa branche.
 
-**Placement — l'identité d'abord, l'ordre ensuite.** `ListAgents` liste les pairs `interactive`,
-mais ni l'âge ni le nom ne **désignent** une session : l'utilisateur ouvre ses propres fenêtres
-pendant la vague, et deux sessions plus jeunes que la vague se ressemblent. Un `EnterWorktree`
-envoyé à la mauvaise déplace **durablement** une session qui travaillait dans le clone principal
-(obs 34). Dès qu'il y a **plus d'une** session plus jeune que la vague, ou que l'utilisateur en
-désigne une par son identifiant, demander d'abord l'identité, **sans rien faire changer** :
+**Session relayée.** Un cycle peut durer plus qu'un contexte. La session dont le contexte se
+remplit suit la voie de `.claude/skills/cycle-pr/references/coordinatrice.md`, « Relais en cours
+de lot », le lead tenant la place de la coordinatrice : elle pousse sa branche, détache sa tête,
+écrit la variante « relais » de `.claude/skills/cycle-pr/references/prompt-lot-suivant.md`
+(`cycle-pr` Étape 8, « Relais en cours de cycle ») et envoie au lead « relais demandé —
+passation : <chemin> ». Réveillé par ce message, le lead ne peut pas démarrer la remplaçante : il la
+propose par une carte de proposition (`start_session`, `initiation: own_initiative`, brief : la
+passation), qu'un clic du mainteneur démarre ; la voie n'est pas mesurée (même référence). Il
+**ajoute** ensuite le `local_…` de la remplaçante — le `from` de son premier message — à la colonne
+« Session », en gardant ceux des sessions précédentes (obs 40). C'est la session sortante qui
+sait que son contexte se remplit, pas le lead : sa passation porte l'adresse du lead et renvoie à
+ce paragraphe.
 
-```
-Réponds-moi le chemin de ton répertoire scratchpad, rien d'autre, et ne change rien.
-```
-
-Ce chemin porte l'**UUID de session** — celui du transcript, pas l'identifiant `local_…` qui
-adresse une session liée (`.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») ;
-les refs de `ListAgents` (`[79236b]`) n'en dérivent pas, et
-le nom « #N » que l'utilisateur a donné à une fenêtre est un indice, pas une preuve. Reporter
-l'UUID dans la colonne « Session » du tableau (étape 4). **Puis** seulement l'affectation :
-
-```
-Entre dans le worktree `<chemin absolu>` avec l'outil `EnterWorktree`, puis réponds-moi la
-sortie de `git rev-parse --show-toplevel`, rien d'autre.
-```
-
-`EnterWorktree` change le répertoire **de la session** (durable), pas seulement du shell — un
-simple `cd` ne suffirait pas. La réponse arrive dans un bloc
-`<cross-session-message from="…" from-name="…">` : `from-name` est la session, la sortie prouve
-son placement. **N'envoyer le prompt de démarrage qu'à une session dont la réponse nomme le bon
-worktree** — c'est la vérification qui empêche un prompt de partir vers une session restée sur
-`main` ou placée sur le worktree d'une autre issue. **Les noms tournent** : relancer `ListAgents`
-avant chaque envoi, jamais d'envoi à un nom noté plus tôt sans l'avoir revu dans la liste.
-
-Cette vérification est une **lecture**, pas une porte, et c'est structurel : elle franchit une
-frontière de session, où aucune commande du lead ne peut porter la condition de l'ordre suivant
-(`cycle-pr` Étape 7, « Le go, puis le merge », pour le dénombrement de la classe).
-
-**Session relayée.** Un cycle peut durer plus qu'un contexte : la session qui reprend un worktree
-envoie d'abord au lead son chemin de scratchpad et la sortie de `git rev-parse --show-toplevel`,
-et le lead **ajoute** son UUID à la colonne « Session » en gardant ceux des sessions précédentes,
-puis repose son abonnement idle — celui de la session remplie ne distingue plus rien (obs 40).
-C'est la session sortante qui sait que son contexte se remplit, pas le lead : sa passation suit la
-variante « relais » de `.claude/skills/cycle-pr/references/prompt-lot-suivant.md` (`cycle-pr`
-Étape 8, « Relais en cours de cycle »), qui porte l'adresse du lead et renvoie à ce paragraphe.
-
-**Une session neuve par lot, et ce n'est jamais le lead qui la fait démarrer.** Une issue
+**Une session neuve par lot, que le lead ne démarre qu'en repli** (étape 8, « Issue en plusieurs
+lots »). Une issue
 réalisée en plusieurs lots ne garde **pas** la même session d'un lot au suivant (`cycle-pr`
 Étape 8, « Une session neuve par lot »). Elle est pilotée par sa coordinatrice
 (`.claude/skills/cycle-pr/references/coordinatrice.md`) : chaque lot a sa session et son worktree
@@ -216,17 +180,20 @@ neufs, et la frontière de lot passe par la passation que la session sortante re
 coordinatrice. Sans coordinatrice, ou en repli, la session qui finit un lot écrit, après sa passe
 `repercussions`, le prompt du lot suivant depuis
 `.claude/skills/cycle-pr/references/prompt-lot-suivant.md` et le **remet au mainteneur** ;
-la session neuve entre dans le worktree, crée sa branche, puis envoie au lead son chemin de
-scratchpad, sa racine et sa branche. Le lead vérifie, inscrit l'UUID au tableau (étape 4), et
-répond par ce que lui seul sait : base du moment, PR en vol, fichiers croisés. Le lead ne réécrit
-plus le prompt à chaque frontière — c'est exactement ce qui faisait grossir son contexte (obs 62).
+la session neuve crée sa branche, puis envoie au lead son `local_…` (`get_session` sur `self`) et
+sa branche. Le lead l'inscrit au tableau (étape 4), et répond par ce que lui seul sait : base du
+moment, PR en vol, fichiers croisés. Le lead ne réécrit plus le prompt à chaque frontière — c'est
+exactement ce qui faisait grossir son contexte (obs 62).
 
-**Démarrage.** Envoyer ensuite à chaque session son prompt, dans cet ordre :
+**Le brief**, dans cet ordre :
 
 ```
-Tu travailles dans le worktree `<chemin absolu>` (branche `<branche>`), dédié à l'issue #N.
-Je suis la session lead de la vague : ton interlocuteur pour la vérification avant merge de
-`cycle-pr` (Étape 7) — réponds toujours au `from` de ce message.
+Tu es la session de l'issue #N, démarrée par la session lead de la vague (`<local_… du lead>`) :
+ton interlocuteur pour la vérification avant merge de `cycle-pr` (Étape 7).
+Premier geste, avant toute écriture :
+`git fetch origin && git checkout -b <type>/<slug> --no-track origin/main`
+(.claude/skills/cycle-pr/references/sessions-liees.md, « Premier geste »). Puis provisionne ton
+worktree : `pr-paralleles` Étape 3, « Provisionner son worktree ».
 Charge le skill `task-observer` s'il est installé (session longue ; le journal est hors du
 worktree, chemin dans CLAUDE.md). Lis CLAUDE.md, .claude/pipeline.config.md et ta mémoire de phase.
 
@@ -267,9 +234,7 @@ Les skills s'invoquent **par l'outil Skill, jamais par `/commande`** : un `/nom`
 de pair n'est pas une saisie de l'utilisateur, la session peut ne pas le déclencher. Ne jamais
 inscrire dans le prompt un skill marqué `disable-model-invocation` (frontmatter à vérifier avant
 d'écrire « invoque X ») : l'outil Skill le refuse — c'est le cas d'`i-have-adhd`, que seule une
-saisie `/i-have-adhd` de l'utilisateur active, d'où la consigne donnée à l'ouverture des
-fenêtres. La vérification de placement existe parce qu'un prompt envoyé à la mauvaise session
-travaillerait sur `main` ou sur le worktree d'une autre issue, sans rien signaler.
+saisie `/i-have-adhd` de l'utilisateur active, dans la fenêtre de la session.
 
 Chaque session est **indépendante** : elle déroule le briefing pré-PR, **ouvre sa PR draft**, puis
 le cycle de commit, les relectures, et sort du draft en fin de parcours. Ses questions à
@@ -312,8 +277,11 @@ mainteneur — un message n'est pas une action (`.claude/skills/cycle-pr/referen
    dans la fenêtre de la session. Ni `contraintes.md` ni le harness ne l'admettent — une session
    ne prend jamais un message de pair pour une approbation.
 3. **Résumer à l'utilisateur** dans la fenêtre du lead : les deux phrases de vulgarisation de
-   l'étape 2 de ce skill sur ce que fait la PR, le verdict, et où taper le go — « go merge dans
-   `<session>` ».
+   l'étape 2 de ce skill sur ce que fait la PR, le verdict, et la session où le go se donne. Ce
+   résumé est une **information**, jamais une question : la session pose déjà la question du go
+   dans sa fenêtre, et toute demande du lead la double (obs 103). Dans un harnais qui clôt le tour
+   par une boîte à question, le lead rend le récapitulatif seul, sans question ni bouton — de même
+   pour tout geste attendu dans une autre session, arrêt visuel ou go de briefing.
 
 Après corrections, la session renvoie l'état ; le lead refait la passe sur le delta.
 À tout moment, l'utilisateur peut aussi dire à une session « discute de ça avec le lead » —
@@ -322,8 +290,9 @@ c'est le seul autre canal, et il passe par lui.
 ### 7. Surveiller et faire converger
 
 - `git worktree list` montre tous les worktrees actifs — **deux familles, à ne pas confondre** :
-  un worktree **d'issue**, qui a sa ligne au tableau de bord, et un worktree **de relecture**
-  (`.claude/worktrees/agent-<id>`), qui n'en a jamais et vit tant que la boucle 4.2 d'une PR
+  un worktree **d'issue** — celui d'une session de la vague, sous
+  `.claude/worktrees/<slug>-<hex>` —, qui a sa ligne au tableau de bord, et un worktree **de
+  relecture** (`.claude/worktrees/agent-<id>`), qui n'en a jamais et vit tant que la boucle 4.2 d'une PR
   n'est pas fermée. C'est l'absence de ligne au tableau qui le distingue, jamais un verrou
   git : le verrou ne tient que pendant l'invocation initiale de l'agent (`cycle-pr` 4.2,
   « Retrait »). Le second n'est pas une dérive : le retirer termine le
@@ -362,30 +331,34 @@ c'est le seul autre canal, et il passe par lui.
   d'une branche poussée sans demande explicite (`contraintes.md`) ; un conflit se résout par un
   commit réel sur la branche.
 
-**Session disparue.** Une session absente de `ListAgents` alors que sa PR est ouverte est **morte,
-pas en attente** : l'abonnement idle ne les distingue pas — une session morte et une session qui
-attend un go rendent le même silence (obs 54). Dans cet ordre :
+**Session disparue.** Le silence d'une session dont la PR est ouverte ne dit rien : une session
+arrêtée et une session qui attend un go rendent le même (obs 54). Son état se lit par
+`list_sessions {"linked": true}`, sur la ligne de son `local_…` — `isRunning`, `isArchived`,
+`lastActivityAt`. Une session inactive reprend sur le message qu'on lui envoie
+(`sessions-liees.md`, « Messages ») ; qu'elle reprenne aussi après un redémarrage de
+l'application n'est **pas mesuré**. Absente de la liste, ou muette après un message, elle est
+perdue. Dans cet ordre :
 
 1. **Mesurer les artefacts** — tête, base, CI, body de PR, worktrees : c'est ce qui est *prouvé*,
    et ça ne dépend pas d'elle.
-2. **Lire la fin de son récit**, et celui de ses sous-agents :
+2. **Lire la fin de son récit** par `list_events` sur son `local_…`, puis le dernier texte de ses
+   sous-agents :
 
    ```
    python <répertoire de ce skill>/scripts/fin-transcript.py <transcript .jsonl> [<tours>]
    ```
 
-   Le transcript vit sous `~/.claude/projects/<id du répertoire de travail>/<uuid>.jsonl`, ses
-   sous-agents dans `<uuid>/subagents/`. L'uuid est celui du répertoire scratchpad de la session
-   (étape 5), et pour une session placée en worktree c'est le dossier **du worktree** qui porte le
-   projet, pas celui du clone principal. Le script rend les derniers tours, les messages du
-   mainteneur — débarrassés des blocs que le harnais injecte — et le dernier texte de chaque
-   sous-agent, « mort avant de rendre » compris.
+   Le transcript vit sous `~/.claude/projects/<worktreePath encodé>/<uuid>.jsonl`, ses sous-agents
+   dans `<uuid>/subagents/` — le dossier **du worktree** de l'application, pas celui du clone
+   principal. Ce dossier sert à plusieurs sessions successives : le bon transcript est celui dont
+   la dernière écriture rejoint son `lastActivityAt` (deux transcripts sous le dossier d'un même
+   worktree, relevé le 2026-10-18). Le script rend les derniers tours, les messages du mainteneur
+   — débarrassés des blocs que le harnais injecte — et le dernier texte de chaque sous-agent,
+   « mort avant de rendre » compris.
 3. **Écrire la passation en séparant prouvé et récit** : le point 1 donne le premier, le point 2 le
    second, et les mêler fait hériter la reprise d'un récit comme s'il était mesuré.
 4. **Proposer d'abord de rouvrir la même conversation** — son contexte est intact, elle coûte bien
-   moins qu'un relais neuf. Un relais neuf sinon, avec le prompt de l'étape 5.
-5. **Identifier la reprise par son scratchpad** (étape 5) : même UUID → un prompt court suffit ;
-   autre UUID → `EnterWorktree`, puis le prompt de relais.
+   moins qu'un relais neuf. Un relais neuf sinon (étape 5, « Session relayée »).
 
 Un **sous-agent de fond lancé avant l'arrêt est perdu** : le relancer sur la même plage. C'est ce
 qu'obs 54 a payé — une seconde passe de relecture partie six minutes avant l'arrêt, morte sans
@@ -393,15 +366,17 @@ rapport, et un body de PR rédigé dans le contexte sans avoir jamais été pos�
 
 ### 8. Nettoyer après merge
 
-Une fois une PR mergée et sa branche supprimée côté distant, **faire d'abord sortir du worktree
-toute session qu'on y a placée.** Un dossier qui est le répertoire courant d'un processus ne
-s'efface pas sous Windows : `git worktree remove` désenregistre le worktree, **efface tout son
-contenu**, puis échoue sur le dossier racine (« Permission denied ») — on découvre le verrou par
-l'erreur, avec un dossier à moitié supprimé et déjà désenregistré, état que la procédure ne décrit
-nulle part (obs 42). Demander donc à chaque session placée là un `ExitWorktree`, ou de se placer
-dans le clone principal, et **attendre sa réponse** : son message de clôture porte la ligne « je
-suis sortie du worktree » (`cycle-pr` Étape 8), parce qu'une session sait qu'elle a fini avant que
-le lead ne le sache.
+Une fois une PR mergée, sa branche supprimée côté distant et le message de fin de sa session reçu
+(`sessions-liees.md`, « Fin de travail »), relever par `get_session` son `worktreePath`, sa
+branche `claude/…` et sa `sourceBranch` — le reste de l'étape s'en sert —, puis **archiver la
+session d'abord** : `archive_session` sur son `local_…`, sur l'accord demandé à l'étape 2
+(`sessions-liees.md`, « Nettoyage »).
+L'archivage arrête son processus (description de l'outil, lue le 2026-10-18), et c'est ce qui
+libère le dossier : un dossier qui est le répertoire courant d'un processus ne s'efface pas sous
+Windows — `git worktree remove` désenregistre le worktree, **efface tout son contenu**, puis
+échoue sur le dossier racine (« Permission denied »), état que la procédure ne décrirait nulle
+part (obs 42). L'archivage ne retire ni le worktree ni les branches (même référence) : le lead le
+fait ensuite.
 
 Puis **détacher ce qui n'appartient pas au worktree** : énumérer les liens et jonctions qu'il
 contient avec un détecteur qui **prouve d'abord qu'il voit** — le filtre `Where-Object LinkType`
@@ -439,7 +414,7 @@ traverser une jonction et vider la ressource partagée qu'elle vise, sans aucun 
 Puis seulement :
 
 ```
-git worktree remove ../<repo>--<numéro-issue>
+git worktree remove <worktreePath de la session>
 gh pr view <n> --json state,headRefOid   # MERGED, et headRefOid égal à `git rev-parse <branche>`
 git branch -D <type>/<slug>
 ```
@@ -457,6 +432,14 @@ substitution — refusée par le garde d'une session isolée. Il n'est pas une p
 `cycle-pr` Étape 7 (« Le go, puis le merge »), où vit le dénombrement de la classe, et ce qu'il
 garde est une suppression **locale**, récupérable par le reflog.
 
+Puis l'**échafaudage** `claude/…` relevé avant l'archivage, derrière sa porte d'ancêtre, sa
+`sourceBranch` pour `<source>` (`sessions-liees.md`, « Nettoyage »). Puis les **branches
+`claude/*` orphelines** : celles qu'aucun worktree n'extrait (`git worktree list`) et qu'aucune session non
+archivée ne nomme (`list_sessions`, champ `branch`). Les deux lectures comptent : après son premier
+geste, l'échafaudage d'une session vivante n'est plus extrait nulle part, et seule la seconde le
+protège. Chacune passe par la même porte, `<source>` valant `origin/main` quand on ne la connaît
+plus ; un refus se remonte au mainteneur avec `git log --oneline origin/main..<branche>`.
+
 Vérifier ensuite que les ressources partagées répondent encore : le dépôt principal passe sa
 commande de fumée, et le hook partagé pointe toujours sur lui — le chemin d'interpréteur figé
 dans `.git/hooks/pre-commit` (`grep INSTALL_PYTHON .git/hooks/pre-commit` pour pre-commit) est
@@ -467,20 +450,17 @@ dépôt qu'elle servait.
 Marquer la ligne `⚪ worktree nettoyé` dans le tableau. Quand tout le lot est nettoyé, supprimer
 `PR-PARALLELES.md` (ou archiver le tableau dans les notes du projet).
 
-**Issue en plusieurs lots.** Avec une coordinatrice (étape 5, « Une session neuve par lot »), la
-branche mergée d'un lot n'est plus un point de départ, et ce qui suit ne vaut que sans elle, ou en
-repli. **Le worktree survit, la branche meurt.** Après le merge d'un lot qui ne ferme pas
-l'issue, rien de ce qui précède ne s'applique au worktree — il sert au lot suivant. Ce qui meurt,
-c'est la **branche** : sous un trunk fusionné par rebase ou squash, ses commits réécrits
-doubleraient dans la PR du lot suivant. Nommer explicitement les deux à chaque frontière,
-sinon une session prolonge un artefact mort (obs 36). La voie normale est celle de l'étape 5 — la
-session sortante remet le prompt, la session neuve crée sa branche depuis `origin/main` et
-supprime la précédente, locale et distante. Dans les deux cas le point de départ est **explicite** :
-une session dans ce worktree est sur la branche mergée, et `git checkout -b` sans point de départ
-en emporterait les commits réécrits (mesuré). **Repli**, si la session sortante a disparu : le lead
-fait les deux gestes à sa place — `git fetch origin`, puis
-`git checkout -b <type>/<slug> origin/main` dans le worktree, suppression de la branche mergée,
-réinstallation et fumée —, puis place une session neuve comme à l'étape 5.
+**Issue en plusieurs lots.** La **branche** mergée d'un lot meurt : sous un trunk fusionné par
+rebase ou squash, ses commits réécrits doubleraient dans la PR du lot suivant (obs 36). Une session
+démarrée par `start_session` — par une coordinatrice (étape 5, « Une session neuve par lot »), ou
+par le lead — a toujours un worktree neuf, et son premier geste part d'`origin/` : la branche morte
+ne l'atteint pas, et l'ancien worktree se nettoie comme ci-dessus. Seule une session ouverte par
+le mainteneur dans le worktree d'un lot mergé est **sur la branche morte** : `git checkout -b` sans
+point de départ en emporterait les commits réécrits (mesuré), d'où la forme explicite —
+`git fetch origin`, puis `git checkout -b <type>/<slug> origin/main` — puis la suppression de la
+branche mergée, locale et distante. **Repli**, si la session sortante a disparu : le lead
+reconstitue la passation (étape 7, « Session disparue »), puis démarre la session du lot suivant
+comme à l'étape 3 — dans un tour du mainteneur, sinon par une carte de proposition.
 
 **Bilan de vague.** Compter les issues ouvertes pendant la vague
 (`gh issue list --state all --search "created:>=<date de début>"`) et justifier chacune par le
@@ -492,11 +472,10 @@ obéi à « un seul `Closes` », et le trou ne se voit qu'en regardant la popula
 
 ## Règles
 
-- **Jamais deux worktrees sur des zones qui se recouvrent fortement** sans le signaler — c'est la
+- **Jamais deux sessions sur des zones qui se recouvrent fortement** sans le signaler — c'est la
   première cause de conflits.
 - Chaque session suit `cycle-pr` à la lettre (le parallélisme ne dispense d'aucune étape, ni du
   cleanup pass verbatim).
 - **Jamais d'auto-merge dans le trunk**, même en parallèle : chaque PR vers le trunk attend son
   « go » humain ; une PR de lot vers sa branche d'intégration suit `cycle-pr` Étape 7, « Le merge
   d'un lot ».
-- Ne jamais créer de worktree sur une branche déjà active dans un autre worktree.
