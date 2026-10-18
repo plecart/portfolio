@@ -98,7 +98,8 @@ jouer cinq gestes, dans l'ordre :
 1. **Copier depuis le clone principal** (première ligne de `git worktree list`) les fichiers
    locaux ignorés par git dont les commandes du projet dépendent — ex. un `.env` lu par le
    fichier de commandes, `.claude/settings.local.json` (jetons MCP). Un refus du garde de
-   permissions se signale au lead (« bloquant : … »), jamais contourné par une copie d'un modèle. Les repérer en croisant `.gitignore` et le fichier de commandes, pas de mémoire.
+   permissions se signale au lead (« bloquant : … »), jamais contourné par une copie d'un
+   modèle. Les repérer en croisant `.gitignore` et le fichier de commandes, pas de mémoire.
 2. **Recréer les artefacts d'outillage par l'outil qui les gère** — ex. le lien de SDK posé par le
    gestionnaire de version déclaré dans « runtime + version » de `.claude/pipeline.config.md`
    (FVM, mise, asdf…). **Jamais de lien fabriqué à la main** (`mklink`, `ln -s`) : l'outil qui
@@ -305,8 +306,8 @@ c'est le seul autre canal, et il passe par lui.
 - `git worktree list` montre tous les worktrees actifs — **deux familles, à ne pas confondre** :
   un worktree **d'issue** — celui d'une session de la vague, sous
   `.claude/worktrees/<slug>-<hex>` —, qui a sa ligne au tableau de bord, et un worktree **de
-  relecture** (`.claude/worktrees/agent-<id>`), qui n'en a jamais et vit tant que la boucle 4.2 d'une PR
-  n'est pas fermée. C'est l'absence de ligne au tableau qui le distingue, jamais un verrou
+  relecture** (`.claude/worktrees/agent-<id>`), qui n'en a jamais et vit tant que la boucle 4.2
+  d'une PR n'est pas fermée. C'est l'absence de ligne au tableau qui le distingue, jamais un verrou
   git : le verrou ne tient que pendant l'invocation initiale de l'agent (`cycle-pr` 4.2,
   « Retrait »). Le second n'est pas une dérive : le retirer termine le
   relecteur et ferme la voie de la relance (`cycle-pr` 4.2, « Retrait »). Seule la session qui l'a
@@ -452,12 +453,13 @@ garde est une suppression **locale**, récupérable par le reflog.
 Puis l'**échafaudage** `claude/…` relevé avant l'archivage, derrière sa porte d'ancêtre, sa
 `sourceBranch` pour `<source>` (`sessions-liees.md`, « Nettoyage »). Puis les **branches
 `claude/*` orphelines** : celles qu'aucun worktree n'extrait (`git worktree list`) et qu'aucune
-session non archivée ne nomme (`list_sessions`, champ `branch`). Les deux lectures comptent : après son premier
-geste, l'échafaudage d'une session vivante n'est plus extrait nulle part, et seule la seconde le
+session non archivée ne nomme (`list_sessions`, champ `branch`). Les deux lectures comptent :
+après son premier geste, l'échafaudage d'une session vivante n'est plus extrait nulle part, et seule la seconde le
 protège — à condition de les lire toutes : `list_sessions` exclut la session courante et rend 20
 lignes par défaut (description de l'outil, lue le 2026-10-18), donc un `limit` qui couvre la
 liste, plus la branche du lead lui-même par `get_session` sur `self`. Chacune passe par la même
-porte, `<source>` valant `origin/main` quand on ne la connaît plus ; un refus se remonte au mainteneur avec `git log --oneline origin/main..<branche>`.
+porte, `<source>` valant `origin/main` quand on ne la connaît plus ; un refus se remonte au
+mainteneur avec `git log --oneline origin/main..<branche>`.
 
 Vérifier ensuite que les ressources partagées répondent encore : le dépôt principal passe sa
 commande de fumée, et le hook partagé pointe toujours sur lui — le chemin d'interpréteur figé
@@ -473,8 +475,8 @@ Marquer la ligne `⚪ worktree nettoyé` dans le tableau. Quand tout le lot est 
 rebase ou squash, ses commits réécrits doubleraient dans la PR du lot suivant (obs 36). Une session
 démarrée par `start_session` — par une coordinatrice (étape 5, « Une session neuve par lot »), ou
 par le lead — a toujours un worktree neuf, et son premier geste part d'`origin/` : la branche morte
-ne l'atteint pas, et l'ancien worktree se nettoie comme ci-dessus. Seule une session ouverte par
-le mainteneur dans le worktree d'un lot mergé est **sur la branche morte** : `git checkout -b` sans
+ne l'atteint pas, et l'ancien worktree se nettoie comme ci-dessus. Une session que le mainteneur
+ouvre dans le worktree d'un lot mergé, elle, est **sur la branche morte** : `git checkout -b` sans
 point de départ en emporterait les commits réécrits (mesuré), d'où la forme explicite —
 `git fetch origin`, puis `git checkout -b <type>/<slug> origin/main` — puis la suppression de la
 branche mergée, locale et distante. **Repli**, si la session sortante a disparu : le lead
