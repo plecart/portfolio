@@ -37,7 +37,7 @@
 # Une « Atteinte : non » qui repose sur un comportement de l'outil — un défaut, une option
 # inactive, un protocole refusé — cite le test qui l'exerce sur l'image (`make image-test`) ; sans
 # test, elle s'écrit « non établie » et prend 30 jours. Mesuré sur CVE-2026-56853 : « `h2c`
-# inactif par défaut » était faux, Caddy servait HTTP/2 en clair.
+# inactif par défaut » était faux, Caddy 2.11.4 servait HTTP/2 en clair.
 #
 # `apps/api/tests/test_image_scan.py` refuse une entrée incomplète, expirée, ou datée au-delà de
 # 90 jours.
@@ -173,7 +173,7 @@ vulnerabilities:
       d'`apt-get upgrade` au build, qui ferait dépendre l'image de sa date de construction.
     expired_at: 2026-11-01
 
-  # --- Image `caddy` : le binaire `caddy` 2.11.4, compilé avec Go 1.26.3 ----------------------
+  # --- Image `caddy` : le binaire `caddy` 2.11.7, compilé avec Go 1.26.8 ----------------------
   #
   # Ce qui tourne : le Caddyfile de production (`infra/caddy/Caddyfile`) — un serveur de fichiers
   # statiques et un reverse proxy interne vers `api`, routés par nom d'hôte, en HTTP, sans TLS ni
@@ -182,181 +182,12 @@ vulnerabilities:
   # ni amont en HTTPS. L'atteinte est jugée sur cette configuration, pas sur un graphe d'appels :
   # `govulncheck` trouve tous les symboles vulnérables dans le binaire, qui embarque tous les
   # modules de Caddy.
-  # Évaluations relues avec ce Caddyfile (#16) : CVE-2026-39821, qui supposait un seul site, et
-  # CVE-2026-56853, qui supposait `h2c` inactif par défaut — faux, mesuré —, réévaluées.
+  # La version de Go est celle que Trivy lit dans le binaire (`stdlib v1.26.8`, scan du
+  # 2026-10-18, montée de #125) : la montée en 2.11.7 a retiré 16 des 19 exceptions de 2.11.4.
   #
-  # Alternatives, pour toutes : caddy 2.11.4 (2026-06-03) est la dernière version publiée ; la
+  # Alternatives, pour toutes : caddy 2.11.7 (2026-10-03) est la dernière version publiée ; la
   # suivante arrivera par Dependabot. Si elle tarde, compiler caddy dans un étage du projet
   # (ADR 0014, « Conditions de réexamen »).
-
-  - id: CVE-2026-56854
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : module `golang.org/x/crypto` du binaire `caddy`, raison d'être de l'image.
-      Atteinte : non — le défaut vise un serveur SSH (`x/crypto/ssh`), et Caddy n'en ouvre aucun.
-      Alternatives : corrigé par x/crypto 0.55.0, absent de caddy 2.11.4, dernière version
-      publiée.
-    expired_at: 2026-12-29
-
-  - id: CVE-2026-46600
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : analyseur DNS de Go (`x/net` et bibliothèque standard) du binaire `caddy`, raison
-      d'être de l'image. Atteinte : seulement par une réponse DNS forgée — Caddy ne résout que
-      le nom du service `api`, auprès du DNS interne de Docker, et ne demande aucun certificat
-      (D45). Alternatives : corrigé par Go 1.26.6 et x/net 0.56.0, absents de caddy 2.11.4,
-      dernière version publiée.
-    expired_at: 2026-12-29
-
-  - id: CVE-2026-56852
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : module `golang.org/x/text` du binaire `caddy`, raison d'être de l'image. Atteinte :
-      non établie — aucun appel de `norm.Iter` sur le chemin d'une requête n'a été cherché dans
-      les sources de Caddy ; au pire, un déni de service. Alternatives : corrigé par x/text
-      0.39.0, absent de caddy 2.11.4, dernière version publiée.
-    expired_at: 2026-10-30
-
-  - id: CVE-2026-84304
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : module gRPC du binaire `caddy`, raison d'être de l'image, embarqué par ses
-      dépendances. Atteinte : non — Caddy n'écoute en gRPC sur aucun port, et la seule directive
-      connue pour ouvrir une connexion gRPC, `tracing`, n'est pas configurée. Alternatives :
-      corrigé par grpc 1.83.1, absent de caddy 2.11.4, dernière version publiée.
-    expired_at: 2026-12-29
-
-  - id: CVE-2026-84445
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : module gRPC du binaire `caddy`, raison d'être de l'image, embarqué par ses
-      dépendances. Atteinte : non — le défaut vise un serveur gRPC xDS, et Caddy n'écoute en gRPC
-      sur aucun port. Alternatives : corrigé par grpc 1.82.2, absent de caddy 2.11.4, dernière
-      version publiée.
-    expired_at: 2026-12-29
-
-  - id: GHSA-hrxh-6v49-42gf
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : module gRPC du binaire `caddy`, raison d'être de l'image, embarqué par ses
-      dépendances. Atteinte : non — les défauts visent un serveur gRPC et ses règles xDS RBAC, et
-      Caddy n'écoute en gRPC sur aucun port. Alternatives : corrigé par grpc 1.82.1, absent de
-      caddy 2.11.4, dernière version publiée.
-    expired_at: 2026-12-29
-
-  - id: CVE-2026-27145
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : bibliothèque standard Go (`crypto/x509`) du binaire `caddy`, raison d'être de
-      l'image. Atteinte : non — le défaut se déclenche à la vérification d'un certificat, et
-      Caddy n'en vérifie aucun : ni TLS entrant, ni amont en HTTPS (D45). Alternatives : corrigé
-      par Go 1.26.4, absent de caddy 2.11.4, dernière version publiée.
-    expired_at: 2026-12-29
-
-  - id: CVE-2026-33818
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : bibliothèque standard Go (`encoding/asn1`) du binaire `caddy`, raison d'être de
-      l'image. Atteinte : non — l'ASN.1 que lit Caddy vient des certificats, et il n'en traite
-      aucun (D45). Alternatives : corrigé par Go 1.26.6, absent de caddy 2.11.4, dernière version
-      publiée.
-    expired_at: 2026-12-29
-
-  - id: CVE-2026-39821
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : bibliothèque standard Go (`idna`, dans `net/http`) du binaire `caddy`, raison
-      d'être de l'image. Atteinte : non — le défaut demande un contrôle d'accès fait sur un nom
-      d'hôte avant sa conversion en Unicode. Caddy route par nom d'hôte, entre le site et l'API,
-      deux hôtes publics : ce routage n'ouvre ni ne ferme aucun accès. L'accès à l'admin se
-      contrôle avant lui, par Cloudflare Access sur le nom d'hôte reçu par Cloudflare, et après
-      lui, par Django. Alternatives : corrigé par Go 1.26.6, absent de caddy 2.11.4, dernière
-      version publiée.
-    expired_at: 2026-12-31
-
-  - id: CVE-2026-39822
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : bibliothèque standard Go (`os.Root`) du binaire `caddy`, raison d'être de l'image.
-      Atteinte : non — le défaut demande un lien symbolique dans l'arborescence servie, et le
-      front compilé n'en contient aucun. Alternatives : corrigé par Go 1.26.5, absent de caddy
-      2.11.4, dernière version publiée.
-    expired_at: 2026-12-29
-
-  - id: CVE-2026-42504
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : bibliothèque standard Go (`mime`) du binaire `caddy`, raison d'être de l'image.
-      Atteinte : non établie — le défaut est dans le décodage des mots encodés d'un en-tête
-      MIME ; Caddy transmet en-têtes et corps sans les décoder, ce qui n'a pas été vérifié dans
-      ses sources ; au pire, un déni de service. Alternatives : corrigé par Go 1.26.4, absent de
-      caddy 2.11.4, dernière version publiée.
-    expired_at: 2026-10-30
-
-  - id: CVE-2026-56853
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : bibliothèque standard Go (`net/http`) du binaire `caddy`, raison d'être de l'image.
-      Atteinte : non — le défaut demande un serveur qui accepte HTTP/2 sans chiffrement (`h2c`).
-      Caddy 2.11.4 l'accepte par défaut sur un port HTTP (mesuré) ; `infra/caddy/Caddyfile`
-      restreint ses serveurs à HTTP/1.1 (`protocols h1`), et le test de fumée de l'image vérifie
-      que la préface `h2c` ne reçoit aucune réponse HTTP/2. Alternatives : corrigé par Go 1.26.6,
-      absent de caddy 2.11.4, dernière version publiée.
-    expired_at: 2026-12-31
-
-  - id: CVE-2026-56858
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : bibliothèque standard Go (`html/template`) du binaire `caddy`, raison d'être de
-      l'image. Atteinte : non — Caddy n'exécute de gabarit qu'avec les directives `templates` ou
-      `file_server browse`, et aucune n'est configurée. Alternatives : corrigé par Go 1.26.6,
-      absent de caddy 2.11.4, dernière version publiée.
-    expired_at: 2026-12-29
-
-  - id: CVE-2026-56859
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : bibliothèque standard Go (`encoding/xml`) du binaire `caddy`, raison d'être de
-      l'image. Atteinte : non établie — servir des fichiers et relayer vers `api` ne décode
-      aucun XML, ce qui n'a pas été vérifié dans les sources de Caddy ; au pire, un déni de
-      service. Alternatives : corrigé par Go 1.26.6, absent de caddy 2.11.4, dernière version
-      publiée.
-    expired_at: 2026-10-30
-
-  - id: CVE-2026-56860
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : bibliothèque standard Go (`net/url`) du binaire `caddy`, raison d'être de l'image.
-      Atteinte : non établie — aucun appel de la résolution de chemins relatifs depuis une
-      requête n'a été cherché dans les sources de Caddy ; au pire, un déni de service, borné par
-      la longueur d'URL que Cloudflare laisse passer. Alternatives : corrigé par Go 1.26.6,
-      absent de caddy 2.11.4, dernière version publiée.
-    expired_at: 2026-10-30
-
-  - id: CVE-2026-56862
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : bibliothèque standard Go (`crypto/tls`) du binaire `caddy`, raison d'être de
-      l'image. Atteinte : non — le défaut vise un serveur TLS, et Caddy n'en termine aucun :
-      Cloudflare le fait (D45). Alternatives : corrigé par Go 1.26.6, absent de caddy 2.11.4,
-      dernière version publiée.
-    expired_at: 2026-12-29
 
   - id: CVE-2026-78667
     paths:
@@ -369,9 +200,8 @@ vulnerabilities:
       (`request_header -Range`), et le test de fumée de l'image vérifie qu'un `Range` sur un
       fichier haché rend 200 et le corps entier, jamais 206. Les routes `reverse_proxy`
       transmettent l'en-tête sans le lire. Alternatives : corrigé par Go 1.26.9 et 1.27.2,
-      absents de caddy 2.11.4 ; la 2.11.7, publiée le 2026-10-03, précède ces avis et n'annonce
-      aucune montée de Go — non scannée, faute de moteur Docker au poste de l'évaluation.
-    expired_at: 2026-11-10
+      absents de caddy 2.11.7, dernière version publiée, compilée avec Go 1.26.8.
+    expired_at: 2027-01-16
 
   - id: CVE-2026-78669
     paths:
@@ -381,11 +211,10 @@ vulnerabilities:
       `caddy`, raison d'être de l'image. Atteinte : non — le défaut consomme le processeur d'un
       serveur **HTTP/2** par des changements répétés de fenêtre initiale ;
       `infra/caddy/Caddyfile` restreint ses serveurs à HTTP/1.1 (`protocols h1`), et le test de
-      fumée vérifie que la préface `h2c` ne reçoit aucune réponse HTTP/2 — la garde même de
-      CVE-2026-56853. Alternatives : corrigé par Go 1.26.9 et 1.27.2 et par x/net 0.60.0, absents
-      de caddy 2.11.4 ; la 2.11.7, publiée le 2026-10-03, précède ces avis et n'annonce aucune
-      montée de Go — non scannée, faute de moteur Docker au poste de l'évaluation.
-    expired_at: 2026-11-10
+      fumée vérifie que la préface `h2c` ne reçoit aucune réponse HTTP/2. Alternatives : corrigé
+      par Go 1.26.9 et 1.27.2 et par x/net 0.60.0, absents de caddy 2.11.7, dernière version
+      publiée, compilée avec Go 1.26.8 et x/net 0.59.0.
+    expired_at: 2027-01-16
 
   - id: CVE-2026-97031
     paths:
@@ -394,11 +223,10 @@ vulnerabilities:
       Place : bibliothèque standard Go (`crypto/tls`) du binaire `caddy`, raison d'être de
       l'image. Atteinte : non — le défaut vise un serveur TLS qui traite des références
       d'extension externe ECH dans un `ClientHello`, et Caddy n'en termine aucun : Cloudflare le
-      fait (D45), Caddy n'écoute qu'en HTTP derrière `cloudflared` — la garde même de
-      CVE-2026-56862. Alternatives : corrigé par Go 1.26.9 et 1.27.2, absents de caddy 2.11.4 ;
-      la 2.11.7, publiée le 2026-10-03, précède ces avis et n'annonce aucune montée de Go — non
-      scannée, faute de moteur Docker au poste de l'évaluation.
-    expired_at: 2026-11-10
+      fait (D45), Caddy n'écoute qu'en HTTP derrière `cloudflared`. Alternatives : corrigé par Go
+      1.26.9 et 1.27.2, absents de caddy 2.11.7, dernière version publiée, compilée avec Go
+      1.26.8.
+    expired_at: 2027-01-16
 
   # --- Image `backup` : les binaires Go `age`, `age-keygen` et `supercronic` ------------------
   #
