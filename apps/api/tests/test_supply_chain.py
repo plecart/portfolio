@@ -932,11 +932,11 @@ def test_chaque_dossier_surveille_contient_ce_que_dependabot_y_lit(
 def test_chaque_image_a_son_entree_dependabot() -> None:
     """Une entrée `docker` par dossier d'image : une PR de groupe ouverte pour une image suspend
     l'examen des seuls dossiers de son entrée (`location_findings`), donc d'aucune autre image."""
-    shared = [
+    watched = [
         [repository_id(path) for path in watched_directories(entry)]
         for entry in dependabot_entries("docker")
-        if len(watched_directories(entry)) != 1
     ]
+    shared = [directories for directories in watched if len(directories) != 1]
 
     assert not shared, f"entrées `docker` qui surveillent plusieurs images : {shared}"
 
