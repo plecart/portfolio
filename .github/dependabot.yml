@@ -3,7 +3,7 @@
 # même politique :
 #
 # - passage hebdomadaire ;
-# - versions mineures et correctifs groupés en une PR par écosystème ; chaque montée majeure a
+# - versions mineures et correctifs groupés en une PR par entrée ; chaque montée majeure a
 #   sa PR à elle — elle casse plus souvent, et mêlée au lot elle bloquerait tout le reste —,
 #   sauf celles qu'une entrée refuse (`ignore`, raison en commentaire) ;
 # - aucun libellé (`labels: []`) : sans cette ligne, Dependabot crée `dependencies`, `python`…,

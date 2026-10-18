@@ -78,6 +78,13 @@ ENTRY_KEYS = {"package-ecosystem", *UPDATE_POLICY}
 LOCATION_KEYS = {"directory", "directories"}
 ECOSYSTEM_EXTRA_KEYS = {"docker": {"ignore"}, "docker-compose": {"ignore"}, "npm": {"ignore"}}
 
+# Les écosystèmes surveillés par une entrée par dossier, jamais une entrée à plusieurs dossiers.
+# Dependabot diffère un groupe tant qu'une PR ouverte porte son nom et que ses dossiers sont inclus
+# dans ceux de l'entrée (`find_existing_group_pr`, `updater/lib/dependabot/updater/
+# group_update_creation.rb` de dependabot-core, lu le 2026-10-18) : une PR de groupe sur l'image
+# `api` a ainsi suspendu l'examen de `caddy` et de `backup` (brief de #125).
+ONE_DIRECTORY_PER_ENTRY = {"docker"}
+
 PYTHON_UPGRADES_IGNORED = {
     "dependency-name": "python",
     "update-types": ["version-update:semver-major", "version-update:semver-minor"],
@@ -781,10 +788,9 @@ def location_findings(updates: list[dict[str, Any]]) -> list[str]:
     """Les dossiers qu'un même écosystème surveille plus d'une fois.
 
     Deux surveillances du même couple (écosystème, dossier) feraient deux jeux de PR pour les mêmes
-    paquets. Le couple, et non l'écosystème : `docker` a une entrée par image, parce qu'une PR de
-    groupe ouverte suspend l'examen de tous les dossiers de son entrée — « Deferring creation of a
-    new pull request » aux journaux de Dependabot, cas `vu-group-multidir-all` de dependabot-core
-    (brief de #125). Le dossier se compare en chemin, `/infra/api` et `infra/api/` ne font qu'un.
+    paquets. Le couple, et non l'écosystème : `docker` a plusieurs entrées, une par image
+    (`ONE_DIRECTORY_PER_ENTRY`). Le dossier se compare en chemin, `/infra/api` et `infra/api/` ne
+    font qu'un.
     """
     locations = Counter(
         (entry.get("package-ecosystem"), path)
@@ -804,7 +810,7 @@ def policy_findings(entry: dict[str, Any]) -> list[str]:
     Chaque entrée porte sa copie de la politique, et chacune se compare à la constante, aucune aux
     autres : une copie qui dériverait seule rougit ici. Un écosystème inconnu, un dossier absent
     ou nommé deux fois, une clé hors de la politique et de ses écarts (`ECOSYSTEM_EXTRA_KEYS`) sont
-    signalés aussi.
+    signalés aussi, comme une entrée à plusieurs dossiers d'un écosystème qui en veut un seul.
     """
     ecosystem = entry.get("package-ecosystem")
     findings = [] if ecosystem in ECOSYSTEM_MANIFESTS else [f"écosystème inconnu : {ecosystem!r}"]
@@ -815,6 +821,8 @@ def policy_findings(entry: dict[str, Any]) -> list[str]:
     ]
     if len(set(entry) & LOCATION_KEYS) != 1:
         findings.append(f"{ecosystem} : `directory` ou `directories`, exactement un des deux")
+    if ecosystem in ONE_DIRECTORY_PER_ENTRY and len(watched_directories(entry)) > 1:
+        findings.append(f"{ecosystem} : une entrée par dossier, pas plusieurs")
     allowed = ENTRY_KEYS | LOCATION_KEYS | ECOSYSTEM_EXTRA_KEYS.get(str(ecosystem), set())
     findings += [
         f"{ecosystem} : clé hors politique `{key}`" for key in sorted(set(entry) - allowed)
@@ -857,6 +865,10 @@ DEPENDABOT_FORMS = {
             update_entry("docker", directory="/infra/api"),
             update_entry("docker", directories=["/infra/caddy", "/infra/api"]),
         ],
+        True,
+    ),
+    "une entrée docker à plusieurs images": (
+        [update_entry("docker", directories=["/infra/api", "/infra/caddy"])],
         True,
     ),
     "même dossier, deux fois dans une entrée": (
@@ -927,18 +939,6 @@ def test_chaque_dossier_surveille_contient_ce_que_dependabot_y_lit(
 
     assert directories, f"les entrées « {ecosystem} » ne surveillent aucun dossier"
     assert [path for path in directories if not (path / manifest).exists()] == []
-
-
-def test_chaque_image_a_son_entree_dependabot() -> None:
-    """Une entrée `docker` par dossier d'image : une PR de groupe ouverte pour une image suspend
-    l'examen des seuls dossiers de son entrée (`location_findings`), donc d'aucune autre image."""
-    watched = [
-        [repository_id(path) for path in watched_directories(entry)]
-        for entry in dependabot_entries("docker")
-    ]
-    shared = [directories for directories in watched if len(directories) != 1]
-
-    assert not shared, f"entrées `docker` qui surveillent plusieurs images : {shared}"
 
 
 def test_dependabot_ne_propose_jamais_de_nouvelle_version_de_python() -> None:

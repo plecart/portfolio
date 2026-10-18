@@ -284,8 +284,10 @@ gestionnaire de paquets déclaré, `docker` si un `Dockerfile` ou un `Containerf
 de son manifeste, puis retirer le bloc `{{ECOSYSTEMES_STACK}}`. Pour `docker`, une entrée **par
 dossier de Dockerfile**, jamais une entrée à `directories` : tant qu'une PR de groupe est
 ouverte, Dependabot n'examine plus aucun dossier de son entrée, et une image peut rester des
-semaines sans proposition (cas de test `vu-group-multidir-all` de dependabot-core). Le nom de
-branche d'un groupe porte son dossier : des entrées au même nom de groupe ne se heurtent pas.
+semaines sans proposition. Dependabot diffère un groupe quand une PR ouverte porte le même nom
+de groupe et que ses dossiers sont inclus dans ceux de l'entrée — une PR sans dossier enregistré
+compte comme incluse (`find_existing_group_pr`, `updater/lib/dependabot/updater/
+group_update_creation.rb` de dependabot-core, lu le 2026-10-18).
 Les valeurs de `package-ecosystem` se lisent dans la référence des options, pas de mémoire :
 https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference
 
