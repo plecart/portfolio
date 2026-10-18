@@ -1443,6 +1443,15 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         "`context: fresh`, worktree de l'application, `wake_when_done: true`, `name: issue-<N>`",
     ),
     "brief-de-l-etape-5": (PR_PARALLELES_SKILL, "`prompt` : le brief de l'étape 5"),
+    # `/code-review` de la PR #130 : omis, `use_worktree` donne le dossier du lead.
+    "worktree-demande-en-clair": (
+        PR_PARALLELES_SKILL,
+        "Le worktree se demande en clair, `use_worktree: true`",
+    ),
+    "orphelines-lues-en-entier": (
+        PR_PARALLELES_SKILL,
+        "plus la branche du lead lui-même par `get_session` sur `self`",
+    ),
     "lead-ne-cree-ni-worktree-ni-branche": (
         PR_PARALLELES_SKILL,
         "Le lead ne crée ni worktree ni branche",
@@ -1478,9 +1487,9 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         "le lead rend le récapitulatif seul, sans question ni bouton",
     ),
     # Étape 7 : l'état et le récit d'une session silencieuse.
-    "session-disparue-par-list-sessions": (
+    "session-disparue-par-get-session": (
         PR_PARALLELES_SKILL,
-        'se lit par `list_sessions {"linked": true}`',
+        "Son état se lit par `get_session` sur le `local_…` du tableau",
     ),
     "transcript-d-un-dossier-reutilise": (
         PR_PARALLELES_SKILL,
