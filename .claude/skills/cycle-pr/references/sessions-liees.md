@@ -64,9 +64,10 @@ go du briefing, `[V]` groupées, arrêt `[C]`, écran à valider, go de merge
 approbation (`cycle-pr`, « Vague parallèle »).
 
 Une session inactive reprend sur le message qu'on lui envoie ; une session en plein tour ne le
-reçoit qu'à la fin de ce tour, pas à son appel d'outil suivant (mesuré le 2026-10-18 sur deux
-enfants jetables, Test plan de la PR #122 : un message du lot 1 a attendu environ 8 min la fin du
-tour de son parent).
+reçoit qu'à la fin de ce tour, pas à son appel d'outil suivant. Mesuré le 2026-10-18 (Test plan de
+la PR #122) : deux enfants jetables inactifs ont repris chacun sur un message de leur parent, et le
+message d'un enfant au parent occupé a attendu la fin de son tour, de 14:42 à 14:50 UTC — un seul
+cas, côté parent.
 
 ## Fin de travail — un message, jamais une fin de tour
 
