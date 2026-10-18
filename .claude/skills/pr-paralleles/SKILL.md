@@ -487,8 +487,7 @@ réinstallation et fumée —, puis place une session neuve comme à l'étape 5.
 barreau de `contraintes.md` « Création d'issues en cours de cycle » qui a échoué — gabarit,
 catégorie et thème vérifiés. Une vague qui ouvre plus d'issues qu'elle n'en ferme est un signal à
 remonter au mainteneur, pas un résultat. Vérifier aussi que chaque issue réalisée en plusieurs
-lots affiche autant de PR liées que de lots, plus la PR d'intégration avec une coordinatrice
-(`cycle-pr` Étape 8, cas découpé) : chaque session a
+lots affiche autant de PR liées que `cycle-pr` Étape 8 en attend (cas découpé) : chaque session a
 obéi à « un seul `Closes` », et le trou ne se voit qu'en regardant la population.
 
 ## Règles

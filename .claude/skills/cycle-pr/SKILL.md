@@ -39,7 +39,8 @@ remonter à l'utilisateur, jamais merger par-dessus.
 **Session de lot.** Si ce prompt fait de cette session un lot ouvert par une coordinatrice
 (Étape 1, « Découpage en plusieurs lots »), lire d'abord
 [references/coordinatrice.md](references/coordinatrice.md), « La session de lot » : il change le
-premier geste, la base de la PR, le go de l'Étape 1, le merge et l'Étape 8.
+premier geste, la base de la PR, le go de l'Étape 1, le body de la PR, le destinataire de la
+vérification d'avant-go, le merge, le relais et l'Étape 8.
 
 **Relais.** Un contexte qui se remplit avant la fin du cycle, à quelque étape que ce soit, se
 passe à une session neuve par la passation de l'Étape 8, « Relais en cours de cycle » — écrite
@@ -1121,8 +1122,9 @@ l'amendait — la clôture est ce qui fige le brief.)
 **Cas découpé : reposer le lien des lots précédents.** GitHub ne lie une PR à une issue que par un
 mot-clé de fermeture, et seul le lot final en portait un (Étape 2) ; sans ce geste, l'issue
 n'affiche qu'une PR sur les k qu'elle a coûté. Une fois l'issue close, ajouter en fin de body de
-**chaque lot précédent** (`gh pr edit <n> --body-file`) — sur une issue close, le mot-clé ne
-change aucun état :
+**chaque lot précédent** mergé dans le trunk (`gh pr edit <n> --body-file`) — sur une issue close,
+le mot-clé ne change aucun état ; une PR de lot vers une branche d'intégration n'en reçoit pas, il
+y serait ignoré :
 
 ```markdown
 *Rattachement a posteriori (<date>) : lot k/n de #<N>. L'issue a bien été fermée par le lot
@@ -1132,8 +1134,10 @@ liées de l'issue.*
 Closes #<N>
 ```
 
-Puis vérifier que l'issue affiche autant de PR liées que de lots — plus la PR d'intégration, avec
-une coordinatrice :
+Puis vérifier que l'issue affiche autant de PR liées que de lots vers le trunk — avec une
+coordinatrice, plus la seule PR d'intégration : une PR de lot vise une autre branche, où GitHub
+ignore le mot-clé ([references/coordinatrice.md](references/coordinatrice.md), « Après le
+dernier lot ») :
 
 ```
 gh api graphql -f query='{ repository(owner:"<owner>",name:"<repo>"){ issue(number:<N>){
@@ -1261,8 +1265,10 @@ se donne à soi-même.
 remplir un contexte avant son Étape 8, et une session neuve reprend alors le même lot. La session
 sortante écrit sa passation depuis la variante « relais » de
 [references/prompt-lot-suivant.md](references/prompt-lot-suivant.md), au chemin fixe de
-[references/sessions-liees.md](references/sessions-liees.md) (« Passation »), et la remet au
-mainteneur par ce chemin.
+[references/sessions-liees.md](references/sessions-liees.md) (« Passation »), et la remet par ce
+chemin à la coordinatrice pour une session de lot
+([references/coordinatrice.md](references/coordinatrice.md), « Relais en cours de lot »), sinon au
+mainteneur.
 Trois choses que le relais ne peut pas reconstituer, chacune payée :
 
 - **son bilan, déposé avant de rendre la main** — `bilan-session.py` sur son propre transcript,
