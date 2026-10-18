@@ -106,7 +106,9 @@ La passation se remet par son chemin, dans le message de fin, jamais par son tex
 
 ## Nettoyage — archiver ne nettoie pas
 
-Archiver un enfant (`archive_session`, réversible) détache son HEAD et ne retire ni le worktree,
+Archiver un enfant attend l'accord du mainteneur — consignes de l'application à la session, lues
+le 2026-10-18 : « you may offer to archive them (only on the user's yes) ». Archiver un enfant
+(`archive_session`, réversible) détache son HEAD et ne retire ni le worktree,
 ni le dossier, ni les branches (mesuré le 2026-10-16, relevé à 5 s et à 30 s), quoi qu'en dise
 la description de l'outil, lue le même jour (« cleans up its worktree »). La session qui l'a
 démarré nettoie après lui : `git worktree remove <chemin>`, puis l'échafaudage derrière sa porte

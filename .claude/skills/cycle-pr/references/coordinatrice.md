@@ -22,7 +22,8 @@ l'accord pour le `verificateur` de chaque lot quand il n'y a pas de lead de vagu
 Étape 7, « Sans lead »). La coordinatrice y tourne en Opus 5.5, effort `max` (#107, décision 8) :
 un enfant n'étant ni plus fort ni d'effort plus haut que son parent (`sessions-liees.md`,
 « Héritage »), une coordinatrice en dessous ne pourrait pas démarrer un lot `max` — sinon, la
-question du go demande `/effort max` d'abord. Dans ce tour, dans cet ordre :
+question du go demande d'abord au mainteneur de la passer en Opus 5.5 (sélecteur de modèle) et
+`/effort max`. Dans ce tour, dans cet ordre :
 
 1. **La branche d'intégration**, depuis le trunk :
    `git fetch origin && git checkout -b <type>/<slug> --no-track origin/<trunk>`, puis une amorce
@@ -31,8 +32,8 @@ question du go demande `/effort max` d'abord. Dans ce tour, dans cet ordre :
    « En vol pour #<N> (intégration, <n> lots) », puis `Closes #<N>`, puis le découpage. C'est la
    seule PR de l'issue qui porte `Closes`, et la première ligne est celle que lit le script de
    merge d'un lot (`cycle-pr` Étape 7, « Le merge d'un lot »).
-3. **Les n sessions de lot** : la coordinatrice démarre d'un coup les n sessions de lot, une par
-   `start_session` — `initiation: user_asked`, `context: fresh`, worktree de l'application,
+3. **Les sessions de lot** : la coordinatrice démarre d'un coup les sessions des lots non mergés,
+   une par `start_session` — `initiation: user_asked`, `context: fresh`, worktree de l'application,
    `wake_when_done: true`, `name: <slug>-lot-<k>`. Effort par lot (#107, décision 8) : `high` par
    défaut, `max` si le bloc du lot porte un ADR, une surface de sécurité ou un contrat entre piles,
    `medium` pour un lot de doc ou de config seule ; `model` omis quand la coordinatrice est en
@@ -59,14 +60,16 @@ lot k+1 sur deux preuves :
 
 Un message de fin sans fichier de passation n'ouvre pas le lot suivant : la coordinatrice répond
 « passation absente : <chemin> » à la session du lot k, et attend (mesuré le 2026-10-18 sur deux
-lots jetables, Notes de la PR #122).
+lots jetables, Notes de la PR #122). Les deux preuves tenues, elle ajoute la PR #<M> à la liste
+du body de la PR d'intégration — première ligne intacte, que lit le script de merge d'un lot, et
+body relu après écriture (`contraintes.md`, « Écritures sur un artefact distant »).
 
 Puis la dérive, après chaque merge de lot : `git fetch origin`, puis
 `git merge-tree --write-tree origin/<trunk> origin/<type>/<slug>` — un prédicat, 0 sans conflit,
-1 avec (table `FRESHNESS_GATE_FORMS` de `apps/api/tests/test_agent_skills.py`). Sur tout code autre
-que 0, elle s'arrête au premier conflit et le remonte au mainteneur, chemins en conflit cités,
-sans ouvrir de lot : jamais de force-push sur la branche d'intégration, et la résolution n'est pas
-la sienne.
+1 avec (table `FRESHNESS_GATE_FORMS` de `apps/api/tests/test_agent_skills.py`). Sur 1, elle
+s'arrête au premier conflit et le remonte au mainteneur, chemins en conflit cités ; sur tout autre
+code non nul, elle s'arrête et lui remonte la sortie. Dans les deux cas, sans ouvrir de lot :
+jamais de force-push sur la branche d'intégration, et la résolution n'est pas la sienne.
 
 Puis seulement, par `SendMessage` à la session du lot k+1 : « ouvre le lot <k+1>/<n> —
 passation : <chemin> ». Inactive depuis le go, elle reprend sur ce message (`sessions-liees.md`,
@@ -127,14 +130,13 @@ seulement sur demande explicite. Puis l'Étape 8 entière : `repercussions` tour
 merge de la PR d'intégration. Le lien d'une PR de lot ne se repose pas : elle vise la branche
 d'intégration, et GitHub ignore un mot-clé de fermeture hors de la branche par défaut — « these
 keywords are ignored, no links are created » (doc « Linking a pull request to an issue », lue le
-2026-10-18). L'issue affiche la PR d'intégration, dont le body liste ses PR de lot : la
-coordinatrice y ajoute chacune à son message de fin.
+2026-10-18). L'issue affiche la PR d'intégration, dont le body liste ses PR de lot (« Ouvrir le
+lot suivant »).
 
 Le nettoyage des sessions de lot — archivage, worktree, échafaudage `claude/…` (`sessions-liees.md`,
 « Nettoyage »), branche de lot mergée par `--rebase` (`pr-paralleles` Étape 8), ancien worktree
-d'un relais — se fait une fois, après ce merge, sur un seul accord du mainteneur : l'application
-n'archive une session démarrée par une autre que sur son mot (consignes à la session, lues le
-2026-10-18).
+d'un relais — se fait une fois, après ce merge, sur un seul accord du mainteneur, que l'archivage
+demande (`sessions-liees.md`, « Nettoyage »).
 
 ## Repli — la passation manuelle
 
