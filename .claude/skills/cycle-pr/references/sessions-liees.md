@@ -41,8 +41,9 @@ de l'application ci-dessous porte sa date de mesure. Le relevé complet — enfa
 L'application place l'enfant sous `<repo>/.claude/worktrees/<slug>-<hex>`, sur une branche
 `claude/<slug>-<hex>` sans upstream, coupée **sans fetch** sur sa **source** : le `main` local
 quand le parent travaille dans le clone principal (mesuré le 2026-10-16 : 4 commits de retard sur
-`origin/main`), la tête du parent quand il travaille dans un worktree (même jour : `fee1e2a`, tête
-de la PR #109). Le registre de l'application garde ensuite ce nom de branche, même après le
+`origin/main`), la branche **de base** du parent quand il travaille dans un worktree — pas sa
+tête : mesuré le 2026-10-18, deux enfants coupés sur `feat/sessions-liees` (`ded3567`) quand le
+parent était à `ef0b3a8` (le relevé du 2026-10-16, `fee1e2a`, ne les distinguait pas). Le registre de l'application garde ensuite ce nom de branche, même après le
 premier geste (même mesure). Avant toute écriture, l'enfant crée sa branche depuis le distant,
 en une commande :
 `git fetch origin && git checkout -b <type>/<slug> --no-track origin/<base>`.
@@ -113,8 +114,10 @@ La passation se remet par son chemin, dans le message de fin, jamais par son tex
 Archiver un enfant attend l'accord du mainteneur — consignes de l'application à la session, lues
 le 2026-10-18 : « you may offer to archive them (only on the user's yes) ». Archiver un enfant
 (`archive_session`, réversible) détache son HEAD et ne retire ni le worktree,
-ni le dossier, ni les branches (mesuré le 2026-10-16, relevé à 5 s et à 30 s), quoi qu'en dise
-la description de l'outil, lue le même jour (« cleans up its worktree »). La session qui l'a
+ni le dossier, ni les branches (mesuré le 2026-10-16, relevé à 5 s et à 30 s, puis le 2026-10-18),
+quoi qu'en dise la description de l'outil, lue le même jour (« cleans up its worktree »). Il
+arrête en revanche ce qui tenait le dossier : archivé, l'enfant laisse `git worktree remove`
+aboutir ; non archivé, le retrait échoue sur la racine (mesuré le 2026-10-18, obs 42). La session qui l'a
 démarré nettoie après lui : `git worktree remove <chemin>`, puis l'échafaudage derrière sa porte
 d'ancêtre :
 
