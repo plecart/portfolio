@@ -819,8 +819,10 @@ def policy_findings(entry: dict[str, Any]) -> list[str]:
         for key, expected in UPDATE_POLICY.items()
         if entry.get(key) != expected
     ]
-    if len(set(entry) & LOCATION_KEYS) != 1:
-        findings.append(f"{ecosystem} : `directory` ou `directories`, exactement un des deux")
+    if LOCATION_KEYS <= set(entry):
+        findings.append(f"{ecosystem} : `directory` ou `directories`, pas les deux")
+    if not watched_directories(entry):
+        findings.append(f"{ecosystem} : aucun dossier")
     if ecosystem in ONE_DIRECTORY_PER_ENTRY and len(watched_directories(entry)) > 1:
         findings.append(f"{ecosystem} : une entrée par dossier, pas plusieurs")
     allowed = ENTRY_KEYS | LOCATION_KEYS | ECOSYSTEM_EXTRA_KEYS.get(str(ecosystem), set())
@@ -863,7 +865,7 @@ DEPENDABOT_FORMS = {
     "même dossier, deux entrées du même écosystème": (
         [
             update_entry("docker", directory="/infra/api"),
-            update_entry("docker", directories=["/infra/caddy", "/infra/api"]),
+            update_entry("docker", directory="infra/api/"),
         ],
         True,
     ),
@@ -871,10 +873,12 @@ DEPENDABOT_FORMS = {
         [update_entry("docker", directories=["/infra/api", "/infra/caddy"])],
         True,
     ),
+    # Hors de `ONE_DIRECTORY_PER_ENTRY`, pour que seul le doublon fasse rougir la forme.
     "même dossier, deux fois dans une entrée": (
-        [update_entry("docker", directories=["/infra/api", "infra/api/"])],
+        [update_entry("npm", directories=["/apps/web", "apps/web/"])],
         True,
     ),
+    "`directories` vide": ([update_entry("docker", directories=[])], True),
     "cadence mensuelle": (
         [update_entry("docker", directory="/infra/caddy", schedule={"interval": "monthly"})],
         True,
@@ -898,7 +902,7 @@ DEPENDABOT_FORMS = {
         True,
     ),
     "`directory` et `directories`": (
-        [update_entry("docker", directory="/a", directories=["/b"])],
+        [update_entry("npm", directory="/apps/web", directories=[])],
         True,
     ),
     "aucun dossier": ([update_entry("docker")], True),
