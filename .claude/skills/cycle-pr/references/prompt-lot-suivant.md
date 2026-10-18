@@ -27,10 +27,12 @@ remplir est une ligne qui manque à la passation, pas une ligne à supprimer : l
 Tu réalises le **lot \<k>/\<n>** de l'issue #\<N> — « \<titre du lot> ». Les lots \<…> sont
 mergés ; c'est ton tour.
 
-Tu travailles dans \<le clone principal `\<chemin>` | le worktree `\<chemin absolu>`>.
+Tu travailles dans \<le clone principal `\<chemin>` | le worktree `\<chemin absolu>` | rien, sous
+coordinatrice : le worktree de la session de lot naît à son démarrage>.
 `origin/\<trunk>` = `\<SHA complet>` (vérifié à l'instant).
 
-\<Si worktree : tu es sur la branche **mergée** du lot précédent. `git fetch origin`, puis
+\<Si worktree, sans coordinatrice : tu es sur la branche **mergée** du lot précédent.
+`git fetch origin`, puis
 `git checkout -b \<type>/\<slug> origin/\<trunk>` — le point de départ est **explicite** : sans lui,
 `checkout -b` part de la branche morte et emporte ses commits réécrits (mesuré). Supprime ensuite
 cette branche, locale **et** distante ; le pourquoi et le repli sont à `pr-paralleles` Étape 8,

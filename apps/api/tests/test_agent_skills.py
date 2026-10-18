@@ -1123,10 +1123,13 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 # relit.
 #
 # **Lot 2b** (la coordinatrice) : une entrée par point du bloc « Lot 2/4 » que 2a n'a pas livré, par
-# décision du brief que 2b fait écrire (4, 5, 8, 12, 14, 17), par entrée du journal de spec qu'il
-# applique (pré-démarrage, amorce de la PR d'intégration) et pour l'obs 85 qu'il ferme. Gardés
+# décision du brief que 2b fait écrire (4, 5, 8, 12, 14, 16, 17), par entrée du journal de spec
+# qu'il applique (pré-démarrage, amorce de la PR d'intégration) et pour l'obs 85 qu'il ferme, plus
+# l'**ordre** et la **condition** du protocole — que la relecture de la PR #122 a trouvés sans garde
+# (I1 : cinq mutations VERTES) — et un cas par constat important qu'elle a fait corriger. Gardés
 # ailleurs : les deux créations de branche (`DEPARTS_EXPLICITES`), le merge d'un lot
-# (`test_merge_lot.py`, lot 2a), les codes de sortie de `merge-tree` (`FRESHNESS_GATE_FORMS`).
+# (`test_merge_lot.py`, lot 2a), le comportement de git sous `merge-tree` (`FRESHNESS_GATE_FORMS`
+# garde git, pas la prose qui l'emploie : celle-ci l'est ici).
 SESSIONS_LIEES_REF = ".claude/skills/cycle-pr/references/sessions-liees.md"
 COORDINATRICE_REF = ".claude/skills/cycle-pr/references/coordinatrice.md"
 PROMPT_LOT_SUIVANT = ".claude/skills/cycle-pr/references/prompt-lot-suivant.md"
@@ -1305,6 +1308,33 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # Cité : un chemin de passation Windows perd ses antislashs dans le shell (`/code-review` de la
     # PR #122), et le fichier présent se lirait absent.
     "passation-testee-chemin-cite": (COORDINATRICE_REF, "`test -f '<chemin>'` sort en 0"),
+    # L'ordre et la condition du protocole (relecture de la PR #122, I1 : mutés, restaient verts).
+    # Dénombrés dans `coordinatrice.md` avant le correctif : **8** sites — ordre des gestes au go,
+    # attente des lots suivants, deux preuves avant « ouvre », dérive avant « ouvre », arrêt sur un
+    # code non nul, premier geste pas avant « ouvre », passation en dernier, ordre du relais — dont
+    # **2** gardés (deux preuves, passation) ; les 6 autres le sont ci-dessous.
+    "ordre-des-gestes-au-go": (COORDINATRICE_REF, "Dans ce tour, dans cet ordre :"),
+    "ordre-du-relais": (COORDINATRICE_REF, "pousse sa branche, détache sa tête"),
+    "attente-des-lots-suivants": (
+        COORDINATRICE_REF,
+        "chaque autre lot reçoit « attends le message « ouvre le lot <k>/<n> — passation : <chemin> »",
+    ),
+    "ouvre-apres-la-derive": (
+        COORDINATRICE_REF,
+        "Puis seulement, par `SendMessage` à la session du lot k+1",
+    ),
+    "premier-geste-pas-avant-ouvre": (
+        COORDINATRICE_REF,
+        "au message « ouvre » — à la lecture de son brief pour le premier lot non mergé — et pas avant",
+    ),
+    "arret-sur-tout-code-non-nul": (
+        COORDINATRICE_REF,
+        "Sur tout code autre que 0, elle s'arrête au premier conflit",
+    ),
+    "passation-a-la-coordinatrice-a-l-etape-8": (
+        CYCLE_PR_SKILL,
+        "dans le message de fin, **à la coordinatrice**, qui ouvre la session du lot suivant",
+    ),
     "derive-apres-chaque-lot": (
         COORDINATRICE_REF,
         "`git merge-tree --write-tree origin/<trunk> origin/<type>/<slug>`",
@@ -1323,6 +1353,35 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         "`repercussions` tourne une fois, au merge de la PR d'intégration",
     ),
     "relais-par-carte": (COORDINATRICE_REF, "par une **carte de proposition**"),
+    # Relecture de la PR #122 : I2 à I6, M4.
+    "gabarit-worktree-sans-coordinatrice": (
+        PROMPT_LOT_SUIVANT,
+        "Si worktree, sans coordinatrice : tu es sur la branche **mergée**",
+    ),
+    "relais-remis-a-la-coordinatrice": (
+        CYCLE_PR_SKILL,
+        "à la coordinatrice pour une session de lot",
+    ),
+    "coordinatrice-au-plafond": (
+        COORDINATRICE_REF,
+        "La coordinatrice y tourne en Opus 5.5, effort `max`",
+    ),
+    "nettoyage-des-sessions-de-lot": (
+        COORDINATRICE_REF,
+        "se fait une fois, après ce merge, sur un seul accord du mainteneur",
+    ),
+    "lien-d-une-pr-de-lot-non-repose": (
+        COORDINATRICE_REF,
+        "Le lien d'une PR de lot ne se repose pas",
+    ),
+    "pas-de-mot-cle-sur-une-pr-de-lot": (
+        CYCLE_PR_SKILL,
+        "une PR de lot vers une branche d'intégration n'en reçoit pas",
+    ),
+    "arret-de-lot-previent-la-coordinatrice": (
+        COORDINATRICE_REF,
+        "« bloquant : `[V]` en attente dans cette fenêtre »",
+    ),
     "repli-manuel": (COORDINATRICE_REF, "l'échec devient une observation du journal"),
     # La session de lot (décisions 5, 17).
     "en-tete-session-de-lot": (
