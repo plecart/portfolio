@@ -1,5 +1,6 @@
 # Mises à jour des dépendances par Dependabot (cadrage §6.6 « chaîne d'approvisionnement » ;
-# brief de #5). Une entrée par écosystème, toutes sur la même politique :
+# brief de #5). Une entrée par écosystème — par dossier d'image pour `docker` —, toutes sur la
+# même politique :
 #
 # - passage hebdomadaire ;
 # - versions mineures et correctifs groupés en une PR par écosystème ; chaque montée majeure a
@@ -82,12 +83,12 @@ updates:
   # chaque nouvelle version de correctif (Python 3.12.x, `uv`, Caddy, Alpine, `rclone`) arrive en
   # PR, étiquette et empreinte ensemble. La reconstruction d'une même étiquette peut ne pas être
   # proposée (expérience `docker_digest_only_update_suppression` de Dependabot) : le scan des images
-  # (#15) la couvre. Un dossier par image (ADR 0014) ; un test exige que chaque Dockerfile y figure.
+  # (#15) la couvre. Un dossier par image (ADR 0014), et une entrée par dossier : tant qu'une PR de
+  # groupe est ouverte, Dependabot n'examine plus aucun dossier de son entrée — une PR sur l'image
+  # `api` a caché Caddy 2.11.7, sur Docker Hub depuis le 2026-10-06 (#125). Un test exige que chaque
+  # Dockerfile ait la sienne, et que toutes suivent la politique commune.
   - package-ecosystem: docker
-    directories:
-      - /infra/api
-      - /infra/backup
-      - /infra/caddy
+    directory: /infra/api
     schedule:
       interval: weekly
     groups:
@@ -103,6 +104,30 @@ updates:
       # construction, chaque semaine. Les correctifs de la 3.12 passent.
       - dependency-name: python
         update-types: [version-update:semver-major, version-update:semver-minor]
+
+  - package-ecosystem: docker
+    directory: /infra/backup
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    labels: []
+    commit-message:
+      prefix: chore
+      include: scope
+
+  - package-ecosystem: docker
+    directory: /infra/caddy
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    labels: []
+    commit-message:
+      prefix: chore
+      include: scope
 
   # Les images tierces des fichiers Compose — Postgres, Redis, `cloudflared` —, épinglées comme les
   # images de base, et à la même épingle dans les deux fichiers (ADR 0012). Dependabot lit dans

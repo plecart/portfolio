@@ -13,12 +13,15 @@ pas prévues. Les gardes sont donc des fonctions sur du texte, appliquées aux f
 `DOCKERFILE_NAMES`, `COMPOSE_FORMS`, `COMPOSE_NAMES` :
 chaque forme recensée par les relectures de #5 y a son cas, avec le verdict attendu. Une forme
 nouvelle s'y ajoute ; celles jugées exotiques y figurent en `xfail` strict, qui signale le jour
-où elles cesseraient d'échapper.
+où elles cesseraient d'échapper. La configuration de Dependabot, elle, est lue une fois par
+l'analyseur YAML : sa garde prend les entrées déjà lues, et son recueil, `DEPENDABOT_FORMS`
+(#125), des entrées construites.
 """
 
 import json
 import re
 import subprocess
+from collections import Counter
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any, cast
@@ -740,45 +743,202 @@ def test_aucune_action_composite_n_echappe_a_dependabot() -> None:
 
 
 def dependabot_updates() -> list[dict[str, Any]]:
-    """Les entrées `updates` de `.github/dependabot.yml`, une par écosystème surveillé."""
+    """Les entrées `updates` de `.github/dependabot.yml`."""
     return yaml.safe_load(DEPENDABOT.read_text(encoding="utf-8"))["updates"]
 
 
-def dependabot_entry(ecosystem: str) -> dict[str, Any]:
-    """L'entrée Dependabot d'un écosystème ; le test échoue si elle manque."""
+def dependabot_entries(ecosystem: str) -> list[dict[str, Any]]:
+    """Les entrées Dependabot d'un écosystème ; le test échoue s'il n'en a aucune."""
     entries = [entry for entry in dependabot_updates() if entry["package-ecosystem"] == ecosystem]
     assert entries, f"aucune entrée Dependabot pour « {ecosystem} »"
+    return entries
+
+
+def dependabot_entry(ecosystem: str) -> dict[str, Any]:
+    """L'entrée Dependabot d'un écosystème qui n'en a qu'une ; le test échoue sinon."""
+    entries = dependabot_entries(ecosystem)
+    assert len(entries) == 1, (
+        f"{len(entries)} entrées Dependabot pour « {ecosystem} », une attendue"
+    )
     return entries[0]
 
 
 def watched_directories(entry: dict[str, Any]) -> list[Path]:
-    """Les dossiers qu'une entrée Dependabot surveille, qu'elle en nomme un ou plusieurs."""
-    names: list[str] = entry["directories"] if "directories" in entry else [entry["directory"]]
+    """Les dossiers qu'une entrée Dependabot surveille, par `directory`, `directories` ou les deux
+    — ce dernier cas, invalide, est signalé par `policy_findings`, pas masqué ici."""
+    names: list[str] = list(entry.get("directories", []))
+    if "directory" in entry:
+        names.append(entry["directory"])
     return [REPOSITORY_ROOT / name.lstrip("/") for name in names]
 
 
-def test_dependabot_surveille_chaque_ecosysteme_une_seule_fois() -> None:
-    """Une entrée en double ferait deux jeux de PR pour les mêmes paquets ; une en moins, aucun."""
-    ecosystems = sorted(entry["package-ecosystem"] for entry in dependabot_updates())
+def watched_by(ecosystem: str) -> list[Path]:
+    """Les dossiers que surveillent, ensemble, les entrées d'un écosystème."""
+    return [path for entry in dependabot_entries(ecosystem) for path in watched_directories(entry)]
 
-    assert ecosystems == sorted(ECOSYSTEM_MANIFESTS)
+
+def location_findings(updates: list[dict[str, Any]]) -> list[str]:
+    """Les dossiers qu'un même écosystème surveille plus d'une fois.
+
+    Deux surveillances du même couple (écosystème, dossier) feraient deux jeux de PR pour les mêmes
+    paquets. Le couple, et non l'écosystème : `docker` a une entrée par image, parce qu'une PR de
+    groupe ouverte suspend l'examen de tous les dossiers de son entrée — « Deferring creation of a
+    new pull request » aux journaux de Dependabot, cas `vu-group-multidir-all` de dependabot-core
+    (brief de #125). Le dossier se compare en chemin, `/infra/api` et `infra/api/` ne font qu'un.
+    """
+    locations = Counter(
+        (entry.get("package-ecosystem"), path)
+        for entry in updates
+        for path in watched_directories(entry)
+    )
+    return [
+        f"{ecosystem} : {repository_id(path)} surveillé {count} fois"
+        for (ecosystem, path), count in sorted(locations.items(), key=str)
+        if count > 1
+    ]
+
+
+def policy_findings(entry: dict[str, Any]) -> list[str]:
+    """Ce en quoi une entrée Dependabot s'écarte de la politique commune (`UPDATE_POLICY`).
+
+    Chaque entrée porte sa copie de la politique, et chacune se compare à la constante, aucune aux
+    autres : une copie qui dériverait seule rougit ici. Un écosystème inconnu, un dossier absent
+    ou nommé deux fois, une clé hors de la politique et de ses écarts (`ECOSYSTEM_EXTRA_KEYS`) sont
+    signalés aussi.
+    """
+    ecosystem = entry.get("package-ecosystem")
+    findings = [] if ecosystem in ECOSYSTEM_MANIFESTS else [f"écosystème inconnu : {ecosystem!r}"]
+    findings += [
+        f"{ecosystem} : `{key}` vaut {entry.get(key)!r}"
+        for key, expected in UPDATE_POLICY.items()
+        if entry.get(key) != expected
+    ]
+    if len(set(entry) & LOCATION_KEYS) != 1:
+        findings.append(f"{ecosystem} : `directory` ou `directories`, exactement un des deux")
+    allowed = ENTRY_KEYS | LOCATION_KEYS | ECOSYSTEM_EXTRA_KEYS.get(str(ecosystem), set())
+    findings += [
+        f"{ecosystem} : clé hors politique `{key}`" for key in sorted(set(entry) - allowed)
+    ]
+    return findings
+
+
+def dependabot_findings(updates: list[dict[str, Any]]) -> list[str]:
+    """Les écarts d'une configuration Dependabot : dossiers surveillés deux fois, entrées hors
+    politique."""
+    return location_findings(updates) + [
+        finding for entry in updates for finding in policy_findings(entry)
+    ]
+
+
+def update_entry(ecosystem: str, **keys: Any) -> dict[str, Any]:
+    """Une entrée Dependabot conforme à la politique, plus `keys` ; une clé à `None` est retirée."""
+    entry = {"package-ecosystem": ecosystem, **UPDATE_POLICY, **keys}
+    return {key: value for key, value in entry.items() if value is not None}
+
+
+DEPENDABOT_FORMS = {
+    "une entrée par image": (
+        [
+            update_entry("docker", directory="/infra/api"),
+            update_entry("docker", directory="/infra/caddy"),
+        ],
+        False,
+    ),
+    "même dossier, deux écosystèmes": (
+        [update_entry("uv", directory="/"), update_entry("github-actions", directory="/")],
+        False,
+    ),
+    "un `ignore` sur une entrée docker": (
+        [update_entry("docker", directory="/infra/api", ignore=[PYTHON_UPGRADES_IGNORED])],
+        False,
+    ),
+    "même dossier, deux entrées du même écosystème": (
+        [
+            update_entry("docker", directory="/infra/api"),
+            update_entry("docker", directories=["/infra/caddy", "/infra/api"]),
+        ],
+        True,
+    ),
+    "même dossier, deux fois dans une entrée": (
+        [update_entry("docker", directories=["/infra/api", "infra/api/"])],
+        True,
+    ),
+    "cadence mensuelle": (
+        [update_entry("docker", directory="/infra/caddy", schedule={"interval": "monthly"})],
+        True,
+    ),
+    "sans groupe": ([update_entry("docker", directory="/infra/caddy", groups=None)], True),
+    "libellés du bot": ([update_entry("docker", directory="/infra/caddy", labels=None)], True),
+    "préfixe de commit autre": (
+        [
+            update_entry(
+                "docker", directory="/infra/caddy", **{"commit-message": {"prefix": "deps"}}
+            )
+        ],
+        True,
+    ),
+    "clé hors politique": (
+        [update_entry("docker", directory="/infra/caddy", **{"open-pull-requests-limit": 0})],
+        True,
+    ),
+    "un `ignore` hors des écarts permis": (
+        [update_entry("uv", directory="/", ignore=[PYTHON_UPGRADES_IGNORED])],
+        True,
+    ),
+    "`directory` et `directories`": (
+        [update_entry("docker", directory="/a", directories=["/b"])],
+        True,
+    ),
+    "aucun dossier": ([update_entry("docker")], True),
+    "écosystème inconnu": ([update_entry("pip", directory="/")], True),
+}
+
+
+@pytest.mark.parametrize(
+    ("updates", "expected"), DEPENDABOT_FORMS.values(), ids=DEPENDABOT_FORMS.keys()
+)
+def test_la_garde_de_dependabot_rend_son_verdict_sur_chaque_forme(
+    updates: list[dict[str, Any]], expected: bool
+) -> None:
+    """Chaque forme recensée : signalée si un dossier est surveillé deux fois par un même
+    écosystème, ou si une entrée s'écarte de la politique commune."""
+    assert bool(dependabot_findings(updates)) is expected, dependabot_findings(updates)
+
+
+def test_chaque_entree_dependabot_suit_la_politique_de_mise_a_jour() -> None:
+    """Même politique partout, et aucun dossier surveillé deux fois par un même écosystème."""
+    assert dependabot_findings(dependabot_updates()) == []
+
+
+def test_dependabot_surveille_chaque_ecosysteme() -> None:
+    """Un écosystème sans entrée n'aurait aucune PR."""
+    ecosystems = {entry["package-ecosystem"] for entry in dependabot_updates()}
+
+    assert ecosystems == set(ECOSYSTEM_MANIFESTS)
 
 
 @pytest.mark.parametrize(("ecosystem", "manifest"), sorted(ECOSYSTEM_MANIFESTS.items()))
-def test_chaque_ecosysteme_suit_la_politique_de_mise_a_jour(ecosystem: str, manifest: str) -> None:
-    """Même politique partout, et un dossier qui contient bien ce que Dependabot doit y lire.
+def test_chaque_dossier_surveille_contient_ce_que_dependabot_y_lit(
+    ecosystem: str, manifest: str
+) -> None:
+    """Un dossier déplacé sans sa ligne de configuration ne fait échouer que la tâche Dependabot,
+    dans un onglet que personne ne lit : ce test le fait échouer ici."""
+    directories = watched_by(ecosystem)
 
-    Un dossier déplacé sans sa ligne de configuration ne fait échouer que la tâche Dependabot,
-    dans un onglet que personne ne lit : ce test le fait échouer ici.
-    """
-    entry = dependabot_entry(ecosystem)
-    directories = watched_directories(entry)
-
-    assert directories, f"l'entrée « {ecosystem} » ne surveille aucun dossier"
+    assert directories, f"les entrées « {ecosystem} » ne surveillent aucun dossier"
     assert [path for path in directories if not (path / manifest).exists()] == []
-    assert {key: entry.get(key) for key in UPDATE_POLICY} == UPDATE_POLICY
-    assert len(set(entry) & LOCATION_KEYS) == 1, "`directory` ou `directories`, pas les deux"
-    assert set(entry) - LOCATION_KEYS == ENTRY_KEYS | ECOSYSTEM_EXTRA_KEYS.get(ecosystem, set())
+
+
+def test_chaque_image_a_son_entree_dependabot() -> None:
+    """Une entrée `docker` par dossier d'image : une PR de groupe ouverte pour une image suspend
+    l'examen des seuls dossiers de son entrée (`location_findings`), donc d'aucune autre image."""
+    shared = [
+        [repository_id(path) for path in watched_directories(entry)]
+        for entry in dependabot_entries("docker")
+        if len(watched_directories(entry)) != 1
+    ]
+
+    assert not shared, f"entrées `docker` qui surveillent plusieurs images : {shared}"
 
 
 def test_dependabot_ne_propose_jamais_de_nouvelle_version_de_python() -> None:
@@ -786,11 +946,29 @@ def test_dependabot_ne_propose_jamais_de_nouvelle_version_de_python() -> None:
 
     `.python-version` l'épingle et l'image la suit sous test (`test_infra.py`) : une PR qui
     proposerait `3.13.x-slim-trixie` échouerait chaque semaine, par construction. Dependabot ne
-    propose donc, pour cette image, que les versions de correctif de la 3.12.
+    propose donc, pour l'image qui part de Python, que les versions de correctif de la 3.12 — et
+    pour elle seule : sur une autre image, le refus viserait un paquet qu'elle n'a pas, et
+    refuserait en silence le jour où elle en aurait un.
     """
-    ignored = dependabot_entry("docker").get("ignore", [])
+    refusals = {
+        repository_id(path): entry.get("ignore", [])
+        for entry in dependabot_entries("docker")
+        for path in watched_directories(entry)
+    }
+    expected = {
+        repository_id(dockerfile.parent): (
+            [PYTHON_UPGRADES_IGNORED]
+            if any(
+                image.startswith("python:")
+                for _, image in base_images(dockerfile.read_text(encoding="utf-8"))[0]
+            )
+            else []
+        )
+        for dockerfile in DOCKERFILES
+    }
 
-    assert ignored == [PYTHON_UPGRADES_IGNORED]
+    assert [PYTHON_UPGRADES_IGNORED] in expected.values(), "aucune image ne part de Python"
+    assert refusals == expected
 
 
 def test_dependabot_ne_propose_jamais_de_nouvelle_majeure_de_redis() -> None:
@@ -892,7 +1070,7 @@ def test_dependabot_surveille_chaque_dockerfile() -> None:
     dossier figure aussi dans `.github/dependabot.yml`, sans quoi l'épinglage figerait l'image au
     lieu de la tenir à jour.
     """
-    watched = watched_directories(dependabot_entry("docker"))
+    watched = watched_by("docker")
 
     unwatched = [repository_id(path) for path in DOCKERFILES if path.parent not in watched]
     assert not unwatched, (
