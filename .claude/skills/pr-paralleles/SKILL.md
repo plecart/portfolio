@@ -483,7 +483,8 @@ point de départ en emporterait les commits réécrits (mesuré), d'où la forme
 `git fetch origin`, puis `git checkout -b <type>/<slug> origin/main` — puis la suppression de la
 branche mergée, locale et distante. **Repli**, si la session sortante a disparu : le lead
 reconstitue la passation (étape 7, « Session disparue »), puis démarre la session du lot suivant
-comme à l'étape 3 — dans un tour du mainteneur, sinon par une carte de proposition.
+comme à l'étape 3 — dans un tour du mainteneur, sinon par une carte de proposition
+(`initiation: own_initiative`, `use_worktree: true`).
 
 **Bilan de vague.** Compter les issues ouvertes pendant la vague
 (`gh issue list --state all --search "created:>=<date de début>"`) et justifier chacune par le
