@@ -97,9 +97,9 @@ jouer cinq gestes, dans l'ordre :
 
 1. **Copier depuis le clone principal** (première ligne de `git worktree list`) les fichiers
    locaux ignorés par git dont les commandes du projet dépendent — ex. un `.env` lu par le
-   fichier de commandes, `.claude/settings.local.json` (jetons MCP). Un refus du garde de
-   permissions se signale au lead (« bloquant : … »), jamais contourné par une copie d'un
-   modèle. Les repérer en croisant `.gitignore` et le fichier de commandes, pas de mémoire.
+   fichier de commandes, `.claude/settings.local.json` (jetons MCP). Les repérer en croisant
+   `.gitignore` et le fichier de commandes, pas de mémoire. Un refus du garde de permissions se
+   signale au lead (« bloquant : … »), jamais contourné par une copie d'un modèle.
 2. **Recréer les artefacts d'outillage par l'outil qui les gère** — ex. le lien de SDK posé par le
    gestionnaire de version déclaré dans « runtime + version » de `.claude/pipeline.config.md`
    (FVM, mise, asdf…). **Jamais de lien fabriqué à la main** (`mklink`, `ln -s`) : l'outil qui
@@ -174,8 +174,9 @@ de lot », le lead tenant la place de la coordinatrice : elle pousse sa branche,
 écrit la variante « relais » de `.claude/skills/cycle-pr/references/prompt-lot-suivant.md`
 (`cycle-pr` Étape 8, « Relais en cours de cycle ») et envoie au lead « relais demandé —
 passation : <chemin> ». Réveillé par ce message, le lead ne peut pas démarrer la remplaçante : il la
-propose par une carte de proposition (`start_session`, `initiation: own_initiative`, brief : la
-passation), qu'un clic du mainteneur démarre ; la voie n'est pas mesurée (même référence). Il
+propose par une carte de proposition (`start_session`, `initiation: own_initiative`,
+`use_worktree: true`, brief : la passation), qu'un clic du mainteneur démarre ; la voie n'est pas
+mesurée (même référence). Il
 **ajoute** ensuite le `local_…` de la remplaçante — le `from` de son premier message, qui porte
 l'identifiant de l'émettrice (mesuré le 2026-10-18 sur deux sessions témoins) — à la colonne
 « Session », en gardant ceux des sessions précédentes (obs 40). C'est la session sortante qui
@@ -454,7 +455,8 @@ Puis l'**échafaudage** `claude/…` relevé avant l'archivage, derrière sa por
 `sourceBranch` pour `<source>` (`sessions-liees.md`, « Nettoyage »). Puis les **branches
 `claude/*` orphelines** : celles qu'aucun worktree n'extrait (`git worktree list`) et qu'aucune
 session non archivée ne nomme (`list_sessions`, champ `branch`). Les deux lectures comptent :
-après son premier geste, l'échafaudage d'une session vivante n'est plus extrait nulle part, et seule la seconde le
+après son premier geste, l'échafaudage d'une session vivante n'est plus extrait nulle part, et seule
+la seconde le
 protège — à condition de les lire toutes : `list_sessions` exclut la session courante et rend 20
 lignes par défaut (description de l'outil, lue le 2026-10-18), donc un `limit` qui couvre la
 liste, plus la branche du lead lui-même par `get_session` sur `self`. Chacune passe par la même

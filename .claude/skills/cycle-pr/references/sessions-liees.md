@@ -41,9 +41,10 @@ de l'application ci-dessous porte sa date de mesure. Le relevé complet — enfa
 L'application place l'enfant sous `<repo>/.claude/worktrees/<slug>-<hex>`, sur une branche
 `claude/<slug>-<hex>` sans upstream, coupée **sans fetch** sur sa **source** : le `main` local
 quand le parent travaille dans le clone principal (mesuré le 2026-10-16 : 4 commits de retard sur
-`origin/main`), la branche **de base** du parent quand il travaille dans un worktree — pas sa
-tête : mesuré le 2026-10-18, deux enfants coupés sur `feat/sessions-liees` (`ded3567`) quand le
-parent était à `ef0b3a8` (le relevé du 2026-10-16, `fee1e2a`, ne les distinguait pas). Le
+`origin/main`), une référence du parent quand il travaille dans un worktree, qui n'est pas
+toujours sa tête : sa tête le 2026-10-16 (`fee1e2a`, tête de la PR #109), sa `sourceBranch` le
+2026-10-18 (deux enfants coupés sur `feat/sessions-liees`, `ded3567`, parent à `ef0b3a8`). La
+règle n'est pas établie ; `get_session` rend la valeur (« Nettoyage »). Le
 registre de l'application garde ensuite ce nom de branche, même après le premier geste (mesuré le
 2026-10-16). Avant toute écriture, l'enfant crée sa branche depuis le distant,
 en une commande :
@@ -119,15 +120,17 @@ ni le dossier, ni les branches (mesuré le 2026-10-16, relevé à 5 s et à 30 s
 quoi qu'en dise la description de l'outil, lue le même jour (« cleans up its worktree »). Il
 arrête en revanche ce qui tenait le dossier : archivé, l'enfant laisse `git worktree remove`
 aboutir ; non archivé, le retrait échoue sur la racine (mesuré le 2026-10-18, obs 42). La session
-qui l'a démarré nettoie après lui : `git worktree remove <chemin>`, puis l'échafaudage derrière sa porte
+qui l'a démarré nettoie après lui : `git worktree remove <chemin>`, puis l'échafaudage derrière sa
+porte
 d'ancêtre :
 
 ```
 git merge-base --is-ancestor claude/<slug>-<hex> <source> && git branch -D claude/<slug>-<hex>
 ```
 
-`<source>` est ce sur quoi l'échafaudage a été coupé (« Premier geste ») : `main`, ou la branche
-du parent — `get_session` le rend (`sourceBranch`, mesuré le 2026-10-18 : `feat/sessions-liees`,
+`<source>` est ce sur quoi l'échafaudage a été coupé (« Premier geste ») : `main`, ou une
+référence du parent — `get_session` le rend (`sourceBranch`, mesuré le 2026-10-18 :
+`feat/sessions-liees`,
 dont la tête était celle de l'échafaudage de la session du lot 3 de #107). Un refus de la porte
 signale un commit sur l'échafaudage —
 `git log --oneline <source>..claude/<slug>-<hex>` liste les commits qui bloquent : le remonter
