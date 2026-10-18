@@ -281,16 +281,20 @@ empreintes du `ci.yml` n'avancent que si Dependabot les tient, et le modèle por
 l'écosystème `github-actions`. Ajouter une entrée par écosystème de la stack — celui du
 gestionnaire de paquets déclaré, `docker` si un `Dockerfile` ou un `Containerfile` existe,
 `docker-compose` pour les fichiers Compose —, copiée de l'entrée modèle avec le `directory`
-de son manifeste, puis retirer le bloc `{{ECOSYSTEMES_STACK}}`. Les valeurs de
-`package-ecosystem` se lisent dans la référence des options, pas de mémoire :
+de son manifeste, puis retirer le bloc `{{ECOSYSTEMES_STACK}}`. Pour `docker`, une entrée **par
+dossier de Dockerfile**, jamais une entrée à `directories` : tant qu'une PR de groupe est
+ouverte, Dependabot n'examine plus aucun dossier de son entrée, et une image peut rester des
+semaines sans proposition (Portfolio #125, cas `vu-group-multidir-all` de dependabot-core).
+Les valeurs de `package-ecosystem` se lisent dans la référence des options, pas de mémoire :
 https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference
 
 **Images de base** — le skill ne réécrit pas les `FROM`, il signale à l'utilisateur ceux qui
 ne suivent pas la forme `<image>:<étiquette la plus précise>@sha256:<empreinte>`
 (`python:3.12.14-slim@sha256:…`). Dependabot propose la plus haute version stable publiée,
 mineure comprise (`3.14` s'il y en a une) : si la version du runtime est épinglée ailleurs
-(`.python-version`, `.nvmrc`…), ajouter à l'entrée `docker` — ou `docker-compose`, pour une image
-citée dans un fichier Compose — un `ignore` des montées `version-update:semver-major` et
+(`.python-version`, `.nvmrc`…), ajouter à l'entrée `docker` de cette image — ou
+`docker-compose`, pour une image citée dans un fichier Compose — un `ignore` des montées
+`version-update:semver-major` et
 `version-update:semver-minor` de cette image : changer de runtime est une décision du projet, et
 la PR échouerait sur l'épingle. Chaque correctif (`3.12.15`) arrive alors en PR, étiquette et
 empreinte ensemble ; sous cet `ignore`, une étiquette sans correctif (`3.12`) n'avancerait que
