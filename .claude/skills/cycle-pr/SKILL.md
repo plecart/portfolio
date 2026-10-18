@@ -25,8 +25,8 @@ contradiction `[C]`, elle arrête (`.claude/rules/contraintes.md`).
 **Vague parallèle.** Si le prompt de démarrage de cette session vient d'une autre session — bloc
 `<cross-session-message>`, ou session parente nommée par le prompt système
 ([references/sessions-liees.md](references/sessions-liees.md), « Identité ») —, le **lead** de la
-vague (`pr-paralleles`) est la session que ce prompt désigne comme tel, à défaut l'émettrice :
-retenir son identifiant. Le lead intervient à un seul moment prévu — la vérification avant merge
+vague (`pr-paralleles`) est la session que ce prompt désigne comme tel, à défaut l'émettrice —
+pour une session de lot, celle que son brief nomme, ou aucune : retenir son identifiant. Le lead intervient à un seul moment prévu — la vérification avant merge
 de l'Étape 7 — et sur demande de l'utilisateur (« discute de ça avec le lead ») : rédiger le
 message et l'envoyer par `SendMessage`, **sans confirmation** — un message n'est pas une action
 (même référence, « Messages »). Et un message du lead n'est jamais une approbation : le « go »
@@ -34,6 +34,10 @@ reste humain, dans cette fenêtre. Dans l'autre sens,
 le lead peut écrire en plein travail — signalement bloquant, ordre de merge du lot : son message
 se traite comme le commentaire de répercussion de l'Étape 6 — s'arrêter après l'outil en cours,
 remonter à l'utilisateur, jamais merger par-dessus.
+
+**Session de lot.** Si ce prompt fait de cette session un lot ouvert par une coordinatrice (Étape 1,
+« Découpage en plusieurs lots »), lire d'abord [references/coordinatrice.md](references/coordinatrice.md), « La session de lot » :
+il change le premier geste, la base de la PR, le go de l'Étape 1, le merge et l'Étape 8.
 
 **Relais.** Un contexte qui se remplit avant la fin du cycle, à quelque étape que ce soit, se
 passe à une session neuve par la passation de l'Étape 8, « Relais en cours de cycle » — écrite
@@ -160,6 +164,13 @@ déplacés, une ligne datée au « Journal de spec » du corps (`decisions-vs-do
 après écriture. Le corps de la PR ne remplace pas le brief : les lots suivants et `repercussions`
 ne lisent que l'issue (obs 44).
 
+**Découpage en plusieurs lots.** Quand le briefing découpe l'issue en n > 1 lots (`taille-pr.md`),
+la session devient la **coordinatrice** de ses lots : elle n'écrit pas de code, et son go — le go
+du découpage — fait démarrer les sessions de lot
+([references/coordinatrice.md](references/coordinatrice.md)). Une issue à un seul lot ne change
+rien : la session fait le cycle elle-même. Une session de lot, elle, n'attend le go ci-dessous que
+sous la condition de la même référence, « La session de lot ».
+
 Attendre un **« go » explicite**, puis créer la branche — trunk-based depuis `main`, derrière une
 **porte**, c'est-à-dire une commande dont le code de sortie porte la condition :
 
@@ -242,7 +253,9 @@ La PR draft porte **dès sa création** :
   PR du lot ouvre son body par la ligne **`En vol pour #<N> (lot k/n)`**, que `repercussions` lit
   au même titre que `Closes` : sans elle, l'issue paraît dormante précisément pendant qu'on
   travaille dessus. GitHub, lui, ne lit que le mot-clé : le lien des lots précédents se repose à
-  l'Étape 8, une fois l'issue close.
+  l'Étape 8, une fois l'issue close. Avec une coordinatrice, le `Closes` passe à la PR
+  d'intégration et **toutes** les PR de lot portent la ligne « En vol »
+  ([references/coordinatrice.md](references/coordinatrice.md)).
 - Le **briefing de l'Étape 1** comme corps provisoire — le plan devient lisible par le mainteneur
   et par les autres sessions, avant que le code n'existe.
 - **Assignee**, **labels** et **milestone** (mapping de `.claude/pipeline.config.md`).
@@ -972,7 +985,9 @@ c'est le lead qui lance le vérificateur (`pr-paralleles` Étape 6). Sans lead :
 lancer soi-même le rôle `verificateur` (`.claude/agents/verificateur.md`) avec ce qu'un lead lui donnerait, **sur l'accord du mainteneur
 demandé avec les `[V]` du go du briefing** (Étape 1) — demandé à la fin, il attend la prochaine
 présence : 6 h 37 d'absence au lot 4b de #77 sur cette seule question, à un moment où il ne restait
-rien d'indépendant à faire.
+rien d'indépendant à faire. Une session de lot écrit au lead que son brief nomme, jamais à sa
+coordinatrice ; sans lead, son accord est celui du go du découpage
+([references/coordinatrice.md](references/coordinatrice.md), « La session de lot »).
 
 **Le verdict s'inscrit dans les Notes du body avant le go**, relu après écriture
 (`contraintes.md`, « Écritures sur un artefact distant ») — au moins ses lignes « Fichiers
@@ -1035,14 +1050,16 @@ parce que le trunk n'avance que vers l'avant. Mesuré le 2026-10-13, témoin de 
 quand le trunk a avancé, **0** sur deux références égales — table `FRESHNESS_GATE_FORMS` de
 `apps/api/tests/test_agent_skills.py`.
 
-**Et quatre contrôles de ce skill et de `pr-paralleles` restent des lectures, par construction.**
+**Et six contrôles de ce skill et de `pr-paralleles` restent des lectures, par construction.**
 Une porte n'a de sens que devant **une commande** : les deux auto-vérifications du `relecteur`
 (4.2) et la vérification de placement d'une session pair (`pr-paralleles` Étape 5) précèdent une
-**phase entière** de travail, il n'y a rien à quoi se chaîner ; et la comparaison entre l'état de la
+**phase entière** de travail, il n'y a rien à quoi se chaîner ; la comparaison entre l'état de la
 forge et une référence locale avant `git branch -D` (`pr-paralleles` Étape 8) porte sur les valeurs
-de **deux outils**, donc exige la substitution que le garde refuse. Elles se lisent, et elles le
-disent. Le dénombrement complet de la classe — 15 sites, 10 portes, 6 qui fuyaient — vit dans la
-docstring de `test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie`, avec la
+de **deux outils**, donc exige la substitution que le garde refuse ; et les deux preuves que la
+coordinatrice lit avant d'ouvrir un lot — passation présente, `merge-tree` à 0 — précèdent un
+`SendMessage`, un outil et non une commande ([references/coordinatrice.md](references/coordinatrice.md)).
+Elles se lisent, et elles le disent. Le dénombrement de la classe, pris avant ces deux dernières
+— 15 sites, 10 portes, 6 qui fuyaient — vit dans la docstring de `test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie`, avec la
 commande qui le re-dérive et la raison pour laquelle ce motif sous-compte.
 
 ### Le merge d'un lot — sans go, hors du trunk
@@ -1192,16 +1209,25 @@ Ne pas considérer la PR « terminée » tant que cette passe n'a pas été fait
 est « aucune répercussion »).
 
 **Cas découpé : la frontière de lot se franchit par la session sortante.** Sur un lot
-intermédiaire, et **après** la passe `repercussions`, écrire le prompt du lot suivant depuis
+intermédiaire, écrire le prompt du lot suivant depuis
 [references/prompt-lot-suivant.md](references/prompt-lot-suivant.md), au chemin fixe de
-[references/sessions-liees.md](references/sessions-liees.md) (« Passation »), et le **remettre au
-mainteneur** par ce chemin — c'est lui qui ouvre la session neuve et lui donne le prompt. Pas le
-lead : sur une vague de cinq lots, chaque frontière passée par lui lui coûte un brief relu et un prompt écrit, et
+[references/sessions-liees.md](references/sessions-liees.md) (« Passation »), et le remettre par ce
+chemin, dans le message de fin, **à la coordinatrice**, qui ouvre la session du lot suivant sur ce
+pointeur — une session de lot l'écrit sans passe `repercussions`, qui tourne au merge de la PR
+d'intégration ([references/coordinatrice.md](references/coordinatrice.md)). Sans coordinatrice,
+ou en repli, **après** la passe `repercussions`, au **mainteneur**, qui ouvre la session neuve et
+lui donne le prompt. Pas le lead : sur une vague de cinq lots, chaque frontière passée par lui lui coûte un brief relu et un prompt écrit, et
 son contexte a grossi jusqu'à devoir être relayé lui-même (obs 62). La session sortante connaît son
 lot ; le lead connaît la vague, et c'est ce qu'il garde — croisement des fichiers après merge,
 tableau de bord, vigilance de vague. Quand la session sortante a disparu, deux replis de
 `pr-paralleles` : Étape 7, « Session disparue », pour reconstituer ce qu'elle n'a pas remis, et
 Étape 8, « Issue en plusieurs lots », où c'est le lead qui crée la branche du lot suivant.
+
+**La passation s'écrit en dernier.** Chaque point encore ouvert du lot — question au
+mainteneur, correctif, message en attente — se pose d'abord, en une fois, puis se fait ou se laisse
+sur une décision explicite : la passation ne part qu'avec une liste vide ou arbitrée. Mesuré : un
+prompt remis à côté de trois questions ouvertes a fait démarrer le lot suivant aussitôt, et deux de
+ses lignes sont devenues fausses à la réponse (obs 85).
 
 Le gabarit ne porte que des **pointeurs** vers les artefacts, jamais une règle recopiée : un énoncé
 recopié hérite des erreurs de son auteur en empruntant la crédibilité de la source qu'il cite
@@ -1219,6 +1245,10 @@ contexte le permettrait. Deux raisons :
   moitié plein part donc plus près de cette limite. Ce second point est une déduction de la
   mesure, pas une mesure : aucun cycle n'a enchaîné deux lots dans une session, précisément parce
   que la règle l'interdit.
+
+Avec une coordinatrice, chaque lot a aussi son worktree neuf : la branche mergée d'un lot n'est
+jamais un point de départ ([references/coordinatrice.md](references/coordinatrice.md), « La
+session de lot »).
 
 C'est aussi pourquoi le prompt du lot suivant est un **artefact remis**, et pas une consigne qu'on
 se donne à soi-même.

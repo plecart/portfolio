@@ -208,12 +208,14 @@ C'est la session sortante qui sait que son contexte se remplit, pas le lead : sa
 variante « relais » de `.claude/skills/cycle-pr/references/prompt-lot-suivant.md` (`cycle-pr`
 Étape 8, « Relais en cours de cycle »), qui porte l'adresse du lead et renvoie à ce paragraphe.
 
-**Une session neuve par lot, et c'est la session sortante qui la fait démarrer.** Une issue
-réalisée en plusieurs lots ne garde **pas** la même session d'un lot au suivant : le contexte d'un
-lot porte les hypothèses qui l'ont produit, et une session qui enchaîne arrive au lot suivant à
-moitié pleine, donc se fait relayer en plein cycle (`cycle-pr` Étape 8, « Une session neuve par
-lot »). La session qui finit un lot écrit, après sa passe `repercussions`, le prompt du lot suivant
-depuis `.claude/skills/cycle-pr/references/prompt-lot-suivant.md` et le **remet au mainteneur** ;
+**Une session neuve par lot, et ce n'est jamais le lead qui la fait démarrer.** Une issue
+réalisée en plusieurs lots ne garde **pas** la même session d'un lot au suivant (`cycle-pr`
+Étape 8, « Une session neuve par lot »). Elle est pilotée par sa coordinatrice
+(`.claude/skills/cycle-pr/references/coordinatrice.md`) : chaque lot a sa session et son worktree
+neufs, et la frontière de lot passe par la passation que la session sortante remet à la
+coordinatrice. Sans coordinatrice, ou en repli, la session qui finit un lot écrit, après sa passe
+`repercussions`, le prompt du lot suivant depuis
+`.claude/skills/cycle-pr/references/prompt-lot-suivant.md` et le **remet au mainteneur** ;
 la session neuve entre dans le worktree, crée sa branche, puis envoie au lead son chemin de
 scratchpad, sa racine et sa branche. Le lead vérifie, inscrit l'UUID au tableau (étape 4), et
 répond par ce que lui seul sait : base du moment, PR en vol, fichiers croisés. Le lead ne réécrit
@@ -463,8 +465,10 @@ dépôt qu'elle servait.
 Marquer la ligne `⚪ worktree nettoyé` dans le tableau. Quand tout le lot est nettoyé, supprimer
 `PR-PARALLELES.md` (ou archiver le tableau dans les notes du projet).
 
-**Issue en plusieurs lots : le worktree survit, la branche meurt.** Après le merge d'un lot qui ne
-ferme pas l'issue, rien de ce qui précède ne s'applique au worktree — il sert au lot suivant. Ce
+**Issue en plusieurs lots.** Avec une coordinatrice (étape 5, « Une session neuve par lot »), la
+branche mergée d'un lot n'est plus un point de départ, et ce qui suit ne vaut que sans elle, ou en
+repli. **Le worktree survit, la
+branche meurt.** Après le merge d'un lot qui ne ferme pas l'issue, rien de ce qui précède ne s'applique au worktree — il sert au lot suivant. Ce
 qui meurt, c'est la **branche** : sous un trunk fusionné par rebase ou squash, ses commits
 réécrits doubleraient dans la PR du lot suivant. Nommer explicitement les deux à chaque frontière,
 sinon une session prolonge un artefact mort (obs 36). La voie normale est celle de l'étape 5 — la

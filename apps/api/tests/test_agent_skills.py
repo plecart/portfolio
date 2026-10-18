@@ -1036,7 +1036,8 @@ def test_chaque_porte_prescrite_est_un_predicat_chaine_a_son_action(
 # Population : les commandes entre backticks qui commencent par `git checkout -b <`, dans les
 # fichiers où une session peut être **ailleurs que sur `main`** — 4 depuis le lot 1 de #107, qui
 # ajoute le premier geste d'un enfant placé sur l'échafaudage `claude/…` d'un worktree de
-# l'application (`sessions-liees.md`). Deux formes nues existent à
+# l'application (`sessions-liees.md`), 5 depuis le lot 2b, qui ajoute la branche d'intégration et
+# celle d'un lot (`coordinatrice.md`). Deux formes nues existent à
 # dessein et n'entrent pas ici : `taille-pr.md`, qui nomme la convention de branche, et le bloc de
 # commandes de `cycle-pr` Étape 1, qui crée la branche **sur `main`**, derrière la porte à deux
 # prédicats — un bloc n'est pas entre backticks, donc le motif ne le voit pas. La prose qui
@@ -1046,6 +1047,7 @@ DEPARTS_EXPLICITES = [
     ".claude/skills/pr-paralleles/SKILL.md",
     ".claude/skills/cycle-pr/SKILL.md",
     ".claude/skills/cycle-pr/references/sessions-liees.md",
+    ".claude/skills/cycle-pr/references/coordinatrice.md",
 ]
 # Le préfixe optionnel `git fetch origin && ` admet le premier geste de `sessions-liees.md`, écrit
 # en une seule commande ; il reste ancré au backtick ouvrant, si bien qu'un bloc de commandes —
@@ -1119,7 +1121,15 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 # ailleurs — une confirmation rétablie à côté d'une phrase intacte reste verte (mesuré, passe 2).
 # Une phrase réécrite fait rougir, et c'est voulu : la réécriture d'un invariant verrouillé se
 # relit.
+#
+# **Lot 2b** (la coordinatrice) : une entrée par point du bloc « Lot 2/4 » que 2a n'a pas livré, par
+# décision du brief que 2b fait écrire (4, 5, 8, 12, 14, 17), par entrée du journal de spec qu'il
+# applique (pré-démarrage, amorce de la PR d'intégration) et pour l'obs 85 qu'il ferme. Gardés
+# ailleurs : les deux créations de branche (`DEPARTS_EXPLICITES`), le merge d'un lot
+# (`test_merge_lot.py`, lot 2a), les codes de sortie de `merge-tree` (`FRESHNESS_GATE_FORMS`).
 SESSIONS_LIEES_REF = ".claude/skills/cycle-pr/references/sessions-liees.md"
+COORDINATRICE_REF = ".claude/skills/cycle-pr/references/coordinatrice.md"
+PROMPT_LOT_SUIVANT = ".claude/skills/cycle-pr/references/prompt-lot-suivant.md"
 PR_PARALLELES_SKILL = ".claude/skills/pr-paralleles/SKILL.md"
 INTERROGE_MOI_SKILL = ".claude/skills/interroge-moi/SKILL.md"
 CYCLE_PR_SKILL = ".claude/skills/cycle-pr/SKILL.md"
@@ -1238,6 +1248,116 @@ INVARIANTS_DES_SESSIONS_LIEES = {
             "le groupement porte sur le **moment** — un point d'arrêt, jamais le fil de l'eau —, "
             "cette règle sur la **forme**"
         ),
+    ),
+    # Coordinatrice (#107, lot 2b) : le découpage et ce qu'il fait de la session.
+    "decoupage-fait-la-coordinatrice": (
+        CYCLE_PR_SKILL,
+        "la session devient la **coordinatrice** de ses lots",
+    ),
+    "issue-a-un-lot-inchangee": (
+        CYCLE_PR_SKILL,
+        "Une issue à un seul lot ne change rien : la session fait le cycle elle-même.",
+    ),
+    "coordinatrice-sans-code": (COORDINATRICE_REF, "La coordinatrice **n'écrit pas de code**"),
+    # Au go du découpage (journal de spec, 2026-10-17 ; décisions 8, 12).
+    "sessions-demarrees-au-go-du-decoupage": (
+        COORDINATRICE_REF,
+        "démarre d'un coup les n sessions de lot",
+    ),
+    "start-session-d-un-lot": (
+        COORDINATRICE_REF,
+        "`context: fresh`, worktree de l'application, `wake_when_done: true`",
+    ),
+    "effort-par-lot": (
+        COORDINATRICE_REF,
+        (
+            "`high` par défaut, `max` si le bloc du lot porte un ADR, une surface de sécurité ou "
+            "un contrat entre piles, `medium` pour un lot de doc ou de config seule"
+        ),
+    ),
+    "brief-nomme-le-lead-ou-aucun": (
+        COORDINATRICE_REF,
+        "nomme toujours son lead — celui de la vague, ou « aucun »",
+    ),
+    # Branche et PR d'intégration (décision 4 ; journal de spec, 2026-10-17).
+    "branche-d-integration-depuis-le-trunk": (
+        COORDINATRICE_REF,
+        "`git fetch origin && git checkout -b <type>/<slug> --no-track origin/<trunk>`",
+    ),
+    "amorce-de-la-pr-d-integration": (COORDINATRICE_REF, "GitHub refuse une PR sans commit"),
+    "pr-d-integration-marquee": (
+        COORDINATRICE_REF,
+        "« En vol pour #<N> (intégration, <n> lots) », puis `Closes #<N>`",
+    ),
+    "branche-de-lot-depuis-l-integration": (
+        COORDINATRICE_REF,
+        "`git fetch origin && git checkout -b <type>/<slug>-lot-<k> --no-track origin/<type>/<slug>`",
+    ),
+    "pr-de-lot-sans-closes": (
+        COORDINATRICE_REF,
+        "« En vol pour #<N> (lot <k>/<n>) », sans `Closes`",
+    ),
+    # Deux preuves, puis la dérive (décisions 12, 14 ; obs 85).
+    "message-sans-passation-n-ouvre-rien": (
+        COORDINATRICE_REF,
+        "Un message de fin sans fichier de passation n'ouvre pas le lot suivant",
+    ),
+    "derive-apres-chaque-lot": (
+        COORDINATRICE_REF,
+        "`git merge-tree --write-tree origin/<trunk> origin/<type>/<slug>`",
+    ),
+    "arret-au-premier-conflit": (
+        COORDINATRICE_REF,
+        "elle s'arrête au premier conflit et le remonte au mainteneur",
+    ),
+    "jamais-de-force-push-sur-l-integration": (
+        COORDINATRICE_REF,
+        "jamais de force-push sur la branche d'intégration",
+    ),
+    "merge-final-en-rebase": (COORDINATRICE_REF, "squash seulement sur demande explicite"),
+    "repercussions-une-fois": (
+        COORDINATRICE_REF,
+        "`repercussions` tourne une fois, au merge de la PR d'intégration",
+    ),
+    "relais-par-carte": (COORDINATRICE_REF, "par une **carte de proposition**"),
+    "repli-manuel": (COORDINATRICE_REF, "l'échec devient une observation du journal"),
+    # La session de lot (décisions 5, 17).
+    "en-tete-session-de-lot": (
+        CYCLE_PR_SKILL,
+        "lire d'abord [references/coordinatrice.md](references/coordinatrice.md), « La session de lot »",
+    ),
+    "lead-d-une-session-de-lot": (
+        CYCLE_PR_SKILL,
+        "pour une session de lot, celle que son brief nomme, ou aucune",
+    ),
+    "go-du-briefing-conditionnel": (COORDINATRICE_REF, "« plan confirmé, aucune `[V]` »"),
+    "base-de-la-pr-de-lot": (COORDINATRICE_REF, "se lit `origin/<type>/<slug>`"),
+    "verification-jamais-a-la-coordinatrice": (
+        COORDINATRICE_REF,
+        "au lead que son brief nomme, jamais à la coordinatrice",
+    ),
+    "etape-8-du-lot-bornee": (
+        COORDINATRICE_REF,
+        "Son Étape 8 se borne à cocher ses critères et à écrire sa passation",
+    ),
+    "relecteur-plage-depuis-la-base-de-la-pr": (
+        ".claude/agents/relecteur.md",
+        "La plage que tu reçois part de la base de la PR",
+    ),
+    "verificateur-base-d-une-pr-de-lot": (
+        ".claude/agents/verificateur.md",
+        "`<trunk>` se lit cette branche partout ci-dessous",
+    ),
+    # Passation (obs 85) et frontière de lot.
+    "passation-en-dernier": (CYCLE_PR_SKILL, "**La passation s'écrit en dernier.**"),
+    "passation-sans-point-ouvert": (PROMPT_LOT_SUIVANT, "jamais un point encore ouvert (obs 85)"),
+    "passation-remise-a-la-coordinatrice": (
+        PROMPT_LOT_SUIVANT,
+        "remis par ce chemin à la coordinatrice",
+    ),
+    "pr-paralleles-un-worktree-neuf-par-lot": (
+        PR_PARALLELES_SKILL,
+        "chaque lot a sa session et son worktree neufs",
     ),
 }
 

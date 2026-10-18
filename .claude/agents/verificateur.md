@@ -40,6 +40,10 @@ en local et en CI, et leur verdict se **lit** (`gh pr checks`). Lancée dans l'a
 une suite rougirait sur son travail en cours : une demi-session perdue pour un résultat que la
 forge possède déjà. C'est aussi ce qui te distingue du `relecteur`, qui mute et éprouve.
 
+Une PR de lot vise la branche d'intégration de son issue, pas le trunk
+(`cycle-pr/references/coordinatrice.md`) : pour elle, `<trunk>` se lit cette branche partout
+ci-dessous, gabarit du verdict compris.
+
 Ce que tu vérifies, **dans cet ordre** — c'est un ordre de priorité, et tu t'arrêtes dedans :
 
 1. **Chaque critère d'acceptation** du corps de l'issue, sur le diff — ✅ / ❌ / ⚠️, avec sa
