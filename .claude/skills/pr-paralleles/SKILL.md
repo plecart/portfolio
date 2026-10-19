@@ -566,8 +566,8 @@ neuve par lot »), ou par le lead, `use_worktree: true` écrit à chaque site �
 geste qui part d'`origin/` : la branche morte ne l'atteint pas, et l'ancien worktree se nettoie
 comme ci-dessus. Une session que le mainteneur ouvre dans le worktree d'un lot mergé, elle, est
 **sur la branche morte** : `git checkout -b` sans
-point de départ en emporterait les commits réécrits (mesuré à la passe 2 de la relecture de la
-PR #86 — `cycle-pr/references/prompt-lot-suivant.md`), d'où la forme explicite —
+point de départ en emporterait les commits réécrits (mesuré le 2026-10-13 à la passe 2 de la
+relecture de la PR #86, mergée le même jour — `cycle-pr/references/prompt-lot-suivant.md`), d'où la forme explicite —
 `git fetch origin`, puis `git checkout -b <type>/<slug> origin/main` — puis la suppression de la
 branche mergée, locale et distante. **Repli**, si la session sortante a disparu : le lead
 reconstitue la passation (étape 7, « Session disparue »), puis démarre la session du lot suivant
