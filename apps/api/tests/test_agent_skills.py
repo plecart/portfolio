@@ -1139,7 +1139,8 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 # **Lot 4** (l'étape 0 de `pr-paralleles`) : une entrée par point du bloc « Lot 4/4 » qui écrit
 # une règle, par décision du brief qu'il fait écrire (8, 15) et pour la forme de fin d'interrogatoire,
 # que l'étape 0 est la première à consommer — 12 ; plus 5 par correctif du `/code-review` de la
-# PR #133 et 12 par constat de sa relecture, passe 1 (I-1 à I-4, m-3 à m-5) — 29. Gardés ailleurs :
+# PR #133 et 12 par constat de sa relecture, passe 1 (I-1 à I-4, m-3 à m-5), plus 1 de sa
+# vérification d'avant-go (chaque message de fin attendu) — 30. Gardés ailleurs :
 # `use_worktree` écrit à chaque démarrage (`USE_WORKTREE_EXPLICITE`), l'ordre de l'étape
 # (`ORDRE_DE_PR_PARALLELES`), la limite de chaque `gh … list`
 # (`test_chaque_liste_gh_de_pr_paralleles_porte_sa_limite`).
@@ -1664,6 +1665,11 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         "Ne pas archiver une session sans worktree",
     ),
     "etape-0-message-puis-github": (PR_PARALLELES_SKILL, "il ne prouve rien seul"),
+    # Vérification d'avant-go de la PR #133, go 1 : l'attente de **chaque** message de fin.
+    "etape-0-chaque-message-attendu": (
+        PR_PARALLELES_SKILL,
+        "Chaque message reçu et vérifié, passer à l'étape 1",
+    ),
     "etape-0-etape-1-dans-la-meme-session": (
         PR_PARALLELES_SKILL,
         "passer à l'étape 1 **dans cette session**",
