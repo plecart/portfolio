@@ -1109,7 +1109,8 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 # premier geste porte trois invariants à elle seule (`origin/`, `--no-track`, `&&`). Gardés
 # ailleurs : les trois renvois (`SKILLS_DES_SESSIONS_LIEES`), le point de départ `origin/`
 # (`DEPARTS_EXPLICITES`), la porte du nettoyage (`PORTES_PRESCRITES`). Restent en lecture, à
-# dessein : les quatre formes du message de fin autres que celle d'un lot, que rien ne consomme.
+# dessein : les formes du message de fin autres que celle d'un lot — sauf celle de fin
+# d'interrogatoire, que l'étape 0 de `pr-paralleles` consomme depuis le lot 4 (gardée plus bas).
 #
 # **Recensée à la passe 2 de la relecture de la PR #109**, après qu'un premier dénombrement à
 # 9 invariants s'est révélé n'être que les échantillons de la passe 1 : 4 invariants verrouillés
@@ -1134,6 +1135,11 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 # décision du brief qu'il fait écrire (8, 9, 16) et pour l'obs 103 ; la mesure de `bind_pr`
 # (journal de spec, 2026-10-18) en ajoute une. Gardés ailleurs : les gestes que le lot retire
 # (`GESTES_RETIRES_DE_PR_PARALLELES`) et le premier geste d'un enfant (`DEPARTS_EXPLICITES`).
+#
+# **Lot 4** (l'étape 0 de `pr-paralleles`) : une entrée par point du bloc « Lot 4/4 » qui écrit
+# une règle, par décision du brief qu'il fait écrire (8, 15) et pour la forme de fin d'interrogatoire,
+# que l'étape 0 est la première à consommer. Gardés ailleurs : `use_worktree` écrit à chaque
+# démarrage (`USE_WORKTREE_EXPLICITE`), l'ordre de l'étape (`ORDRE_DE_PR_PARALLELES`).
 SESSIONS_LIEES_REF = ".claude/skills/cycle-pr/references/sessions-liees.md"
 COORDINATRICE_REF = ".claude/skills/cycle-pr/references/coordinatrice.md"
 PROMPT_LOT_SUIVANT = ".claude/skills/cycle-pr/references/prompt-lot-suivant.md"
@@ -1548,6 +1554,44 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         ".claude/rules/taille-pr.md",
         "la porte vaut pour une branche créée sur `main`",
     ),
+    # Lot 4 : l'étape 0 de `pr-paralleles` — entrée, crible, proposition, sessions, fin.
+    "etape-0-entree": (
+        PR_PARALLELES_SKILL,
+        "aucune, moins que le `n` donné, ou une seule sans argument",
+    ),
+    "etape-0-premier-geste-du-lead": (
+        PR_PARALLELES_SKILL,
+        "`git fetch origin && git merge --ff-only origin/main`",
+    ),
+    "etape-0-bloqueurs-lus-dans-github": (
+        PR_PARALLELES_SKILL,
+        "chaque numéro de « Bloquée par » lu dans GitHub",
+    ),
+    "etape-0-recouvrement-par-le-crible-de-l-etape-2": (
+        PR_PARALLELES_SKILL,
+        "le crible de l'étape 2, lu par domaines",
+    ),
+    "etape-0-proposition-motivee": (
+        PR_PARALLELES_SKILL,
+        "issue, état de triage, domaine, chemin critique, HITL attendu",
+    ),
+    "etape-0-rien-avant-l-accord": (PR_PARALLELES_SKILL, "Rien ne s'ouvre avant l'accord"),
+    "etape-0-modele-et-effort-herites": (PR_PARALLELES_SKILL, "`model` et `effort` omis"),
+    "etape-0-brief-par-l-outil-skill": (
+        PR_PARALLELES_SKILL,
+        "Invoque le skill `triage` (outil Skill) avec #N",
+    ),
+    "etape-0-sessions-non-archivees": (PR_PARALLELES_SKILL, "Ne pas les archiver"),
+    "etape-0-message-puis-github": (PR_PARALLELES_SKILL, "il ne prouve rien seul"),
+    "etape-0-etape-1-dans-la-meme-session": (
+        PR_PARALLELES_SKILL,
+        "passer à l'étape 1 **dans cette session**",
+    ),
+    # La forme que l'étape 0 consomme : elle n'est plus « en lecture, à dessein ».
+    "fin-d-interrogatoire": (
+        SESSIONS_LIEES_REF,
+        "« interrogatoire #\\<N> terminé — ready-for-agent proposé »",
+    ),
 }
 
 
@@ -1559,9 +1603,20 @@ INVARIANTS_DES_SESSIONS_LIEES = {
 # `ef0b3a8`), son repli d'Étape 8 (renvoi à l'Étape 3, fermé avec elle), sa carte de relais, et
 # dans `coordinatrice.md` les sessions de lot et la carte de relais : **3 fuyaient**. La relance
 # en a trouvé un **6ᵉ**, qui fuyait aussi : la carte de proposition du même repli, seconde voie
-# du renvoi — 6 sites, 4 fuyaient. Un site
+# du renvoi — 6 sites, 4 fuyaient. Le lot 4 en ajoute **2** à l'étape 0 de `pr-paralleles`, écrits
+# en clair dès leur création : les sessions de préparation, **sans** worktree (`false` : omis, un
+# lead placé dans un worktree leur en donnerait un — description de l'outil, lue le 2026-10-19), et
+# la reproduction d'un bug, avec le sien — 8 sites. Un site
 # nouveau n'entre pas ici de lui-même : la garde lit des phrases, le grep re-dérive la population.
 USE_WORKTREE_EXPLICITE = {
+    "pr-paralleles-etape-0-sans-worktree": (
+        PR_PARALLELES_SKILL,
+        "`context: fresh`, `use_worktree: false` écrit en clair",
+    ),
+    "pr-paralleles-etape-0-reproduction": (
+        PR_PARALLELES_SKILL,
+        "reçoit au contraire son propre worktree, `use_worktree: true`",
+    ),
     "pr-paralleles-etape-3": (
         PR_PARALLELES_SKILL,
         "Le worktree se demande en clair, `use_worktree: true`",
@@ -1738,8 +1793,22 @@ def test_l_ordre_rougit_sur_une_copie_tardive(texte: str, attendu: bool) -> None
 # relecture de la PR #130 (I-3, I-5 ; mutations M2 et M11 VERTES sur la table de phrases) — le
 # plafond demandé à la question qui ouvre le tour des démarrages, le relevé `get_session` avant
 # l'archivage qui le rend nécessaire, l'archivage avant le retrait du worktree (obs 42, re-mesurée
-# le 2026-10-18), le retrait avant l'échafaudage.
+# le 2026-10-18), le retrait avant l'échafaudage. Le lot 4 ajoute les 3 de l'étape 0 : l'accord
+# avant le premier démarrage, le démarrage avant la vérification dans GitHub, qui précède le
+# passage à l'étape 1.
 ORDRE_DE_PR_PARALLELES = {
+    "etape-0-accord-avant-le-demarrage": (
+        "Rien ne s'ouvre avant l'accord",
+        "`context: fresh`, `use_worktree: false` écrit en clair",
+    ),
+    "etape-0-demarrage-avant-la-verification": (
+        "`context: fresh`, `use_worktree: false` écrit en clair",
+        "il ne prouve rien seul",
+    ),
+    "etape-0-verification-avant-l-etape-1": (
+        "il ne prouve rien seul",
+        "passer à l'étape 1 **dans cette session**",
+    ),
     "plafond-avant-le-demarrage": (
         "si la session lead est en dessous d'Opus 5.5",
         # Le texte normalisé perd un `#` de tête : l'ancre ne porte pas les dièses du titre.

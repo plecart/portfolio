@@ -114,7 +114,8 @@ des types est figée au démarrage — repli : `general-purpose` avec le modèle
 
 **Sessions liées.** Les équipiers ci-dessus sont des sous-agents d'une session. Une session peut
 aussi en démarrer d'autres, complètes, dans l'application de bureau (`start_session`) : le lead
-d'une vague `pr-paralleles`, une par issue ; la coordinatrice d'une issue en lots, une par lot.
+d'une vague `pr-paralleles`, une par issue — à son étape 0 pour la trier et l'interroger, puis
+pour la développer ; la coordinatrice d'une issue en lots, une par lot.
 Leur protocole — héritage, identité, premier geste, messages, fin de travail, passation,
 nettoyage — vit dans `.claude/skills/cycle-pr/references/sessions-liees.md`, seule source.
 
@@ -133,7 +134,7 @@ automatiquement sur sa description.
 | `/cycle-pr` | Cycle complet d'une PR (TDD → merge) |
 | `/contradiction` | Une décision contredit la doc → amende le document, puis propage |
 | `/repercussions` | Impact d'un merge sur les sources de vérité (→ `contradiction`), puis sur les issues ouvertes |
-| `/pr-paralleles` | Plusieurs PR en parallèle (worktrees) |
+| `/pr-paralleles` | Plusieurs PR en parallèle (worktrees), vague préparée si trop peu d'issues sont prêtes |
 | `/plan-qa` | Écrire un plan de QA |
 | `/execution-qa` | Dérouler le plan de QA |
 | `/bug-vers-issue` | Consigner un bug en issue |
