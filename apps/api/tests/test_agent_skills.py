@@ -1138,8 +1138,11 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 #
 # **Lot 4** (l'étape 0 de `pr-paralleles`) : une entrée par point du bloc « Lot 4/4 » qui écrit
 # une règle, par décision du brief qu'il fait écrire (8, 15) et pour la forme de fin d'interrogatoire,
-# que l'étape 0 est la première à consommer. Gardés ailleurs : `use_worktree` écrit à chaque
-# démarrage (`USE_WORKTREE_EXPLICITE`), l'ordre de l'étape (`ORDRE_DE_PR_PARALLELES`).
+# que l'étape 0 est la première à consommer — 12 ; plus 5 par correctif du `/code-review` de la
+# PR #133 et 12 par constat de sa relecture, passe 1 (I-1 à I-4, m-3 à m-5) — 29. Gardés ailleurs :
+# `use_worktree` écrit à chaque démarrage (`USE_WORKTREE_EXPLICITE`), l'ordre de l'étape
+# (`ORDRE_DE_PR_PARALLELES`), la limite de chaque `gh … list`
+# (`test_chaque_liste_gh_de_pr_paralleles_porte_sa_limite`).
 SESSIONS_LIEES_REF = ".claude/skills/cycle-pr/references/sessions-liees.md"
 COORDINATRICE_REF = ".claude/skills/cycle-pr/references/coordinatrice.md"
 PROMPT_LOT_SUIVANT = ".claude/skills/cycle-pr/references/prompt-lot-suivant.md"
@@ -1581,9 +1584,62 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         PR_PARALLELES_SKILL,
         "une session muette suit l'étape 7, « Session disparue »",
     ),
+    # Relecture de la PR #133, passe 1 : I-1 (tête en avance), I-2 (message après la
+    # transition), I-3 (session d'un bug), I-4 (écriture exigée), m-3 à m-5.
     "etape-0-premier-geste-du-lead": (
         PR_PARALLELES_SKILL,
-        "`git fetch origin && git merge --ff-only origin/main`",
+        (
+            "`git fetch origin && git merge-base --is-ancestor HEAD origin/main && git merge"
+            " --ff-only origin/main`"
+        ),
+    ),
+    "etape-0-tete-en-avance-refusee": (
+        PR_PARALLELES_SKILL,
+        "Le prédicat refuse une tête en avance ou divergente",
+    ),
+    "etape-0-message-apres-la-transition": (
+        PR_PARALLELES_SKILL,
+        (
+            "Le message ne part qu'une fois la transition appliquée, y compris celui que demande"
+            " `interroge-moi` à sa fin"
+        ),
+    ),
+    "etape-0-forme-de-fin-consommee": (
+        PR_PARALLELES_SKILL,
+        "« interrogatoire #N terminé — ready-for-agent proposé »",
+    ),
+    "etape-0-bug-sans-branche": (
+        PR_PARALLELES_SKILL,
+        "`git fetch origin && git switch --detach origin/main` — aucune branche à créer",
+    ),
+    "etape-0-bug-provisionne": (
+        PR_PARALLELES_SKILL,
+        "puis les gestes 1 à 5 de `pr-paralleles` étape 3, « Provisionner son worktree »",
+    ),
+    "etape-0-bug-seul-archive": (
+        PR_PARALLELES_SKILL,
+        "C'est la seule session de l'étape qui s'archive, sur l'accord de la proposition",
+    ),
+    "etape-0-accord-d-archiver-le-bug": (
+        PR_PARALLELES_SKILL,
+        "demande l'accord d'archiver, une fois vérifiée, la session d'une issue `bug`",
+    ),
+    "etape-0-ecriture-exigee-bloquante": (
+        PR_PARALLELES_SKILL,
+        "ne se fait pas ici : « bloquant : <…> » à ton parent",
+    ),
+    "etape-0-etats-sans-session": (PR_PARALLELES_SKILL, "hors `needs-info` et `ready-for-human`"),
+    "etape-0-issues-pretes-sans-session": (
+        PR_PARALLELES_SKILL,
+        "Les issues déjà prêtes y entrent sans session",
+    ),
+    "etape-0-bloqueur-ouvert-non-propose": (
+        PR_PARALLELES_SKILL,
+        "une issue dont un bloqueur est ouvert n'est pas proposée",
+    ),
+    "etape-0-brief-d-agent-verifie": (
+        PR_PARALLELES_SKILL,
+        "`gh issue view <N> --comments` un `## Brief d'agent`",
     ),
     "etape-0-bloqueurs-lus-dans-github": (
         PR_PARALLELES_SKILL,
@@ -1603,7 +1659,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         PR_PARALLELES_SKILL,
         "Invoque le skill `triage` (outil Skill) avec #N",
     ),
-    "etape-0-sessions-non-archivees": (PR_PARALLELES_SKILL, "Ne pas les archiver"),
+    "etape-0-sessions-non-archivees": (
+        PR_PARALLELES_SKILL,
+        "Ne pas archiver une session sans worktree",
+    ),
     "etape-0-message-puis-github": (PR_PARALLELES_SKILL, "il ne prouve rien seul"),
     "etape-0-etape-1-dans-la-meme-session": (
         PR_PARALLELES_SKILL,
@@ -1720,6 +1779,24 @@ def test_chaque_invariant_des_sessions_liees_garde_sa_phrase(fichier: str, phras
     assert phrase in texte, f"`{fichier}` ne porte plus « {phrase} »"
 
 
+LISTE_GH = re.compile(r"gh (?:issue|pr) list[^`\n]*")
+
+
+def test_chaque_liste_gh_de_pr_paralleles_porte_sa_limite() -> None:
+    """Sans `--limit`, `gh issue list` et `gh pr list` s'arrêtent à 30 (`gh issue list --help`) :
+    un crible tronqué en silence ne propose pas l'issue qu'il n'a pas lue.
+
+    **Dénombrement, écrit avant le correctif** (relecture de la PR #133, passe 1, m-2) : 4 sites
+    dans `pr-paralleles` — crible de l'étape 0, étape 1, tableau de l'étape 4, bilan de vague —,
+    dont 1 borné par `fd6678f`. **Borne** : ce fichier seul ; les autres skills en ont d'autres,
+    hors du lot (Notes de la PR #133).
+    """
+    sites = LISTE_GH.findall((REPOSITORY_ROOT / PR_PARALLELES_SKILL).read_text(encoding="utf-8"))
+
+    assert len(sites) == 4, f"population changée, re-dénombrer : {sites}"
+    assert all("--limit" in site for site in sites), [s for s in sites if "--limit" not in s]
+
+
 def texte_normalise(fichier: str) -> str:
     """Le texte du fichier, espaces normalisés et marges `# ` de tête de ligne retirées."""
     brut = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig")
@@ -1815,9 +1892,9 @@ def test_l_ordre_rougit_sur_une_copie_tardive(texte: str, attendu: bool) -> None
 # relecture de la PR #130 (I-3, I-5 ; mutations M2 et M11 VERTES sur la table de phrases) — le
 # plafond demandé à la question qui ouvre le tour des démarrages, le relevé `get_session` avant
 # l'archivage qui le rend nécessaire, l'archivage avant le retrait du worktree (obs 42, re-mesurée
-# le 2026-10-18), le retrait avant l'échafaudage. Le lot 4 ajoute les 3 de l'étape 0 : l'accord
+# le 2026-10-18), le retrait avant l'échafaudage. Le lot 4 ajoute les 4 de l'étape 0 : l'accord
 # avant le premier démarrage, le démarrage avant la vérification dans GitHub, qui précède le
-# passage à l'étape 1.
+# passage à l'étape 1, et dans le brief la transition avant le message (relecture, I-2).
 ORDRE_DE_PR_PARALLELES = {
     "etape-0-accord-avant-le-demarrage": (
         "Rien ne s'ouvre avant l'accord",
@@ -1826,6 +1903,11 @@ ORDRE_DE_PR_PARALLELES = {
     "etape-0-demarrage-avant-la-verification": (
         "`context: fresh`, `use_worktree: false` écrit en clair",
         "il ne prouve rien seul",
+    ),
+    # Relecture de la PR #133, passe 1, I-2 : le message part après la transition, pas avant.
+    "etape-0-transition-avant-le-message": (
+        "applique-la par `triage`",
+        "puis envoie à ton parent « interrogatoire #N terminé",
     ),
     "etape-0-verification-avant-l-etape-1": (
         "il ne prouve rien seul",
