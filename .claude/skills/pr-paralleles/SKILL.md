@@ -34,15 +34,16 @@ sessions de cette étape n'ont pas de worktree et y lisent le code, qui doit êt
 décision 15) :
 `git fetch origin && git merge-base --is-ancestor HEAD origin/main && git merge --ff-only origin/main`.
 Le prédicat refuse une tête en avance ou divergente — `--ff-only` seul laisse passer la première,
-« Already up to date. » et sortie 0 (mesuré le 2026-10-19 sur la tête de la PR #133). Un refus se
-remonte au mainteneur.
+« Already up to date. » et sortie 0 (mesuré le 2026-10-19 sur `fd6678f`, tête de la PR #133). Un
+refus se remonte au mainteneur.
 
 **Crible**, en lecture seule :
 
 1. `gh issue list --state open --limit 200 --json number,title,labels,author,body` — sans
-   `--limit`, `gh` s'arrête à 30 (`gh issue list --help`, gh 2.94.0) ; hors issues d'un bot (`author.is_bot`), hors label de nature
-   `prd`, hors `needs-info` et `ready-for-human`, qu'aucune session ne fait avancer (`triage`,
-   « Rôles »), et retirées celles en vol, comme à l'entrée.
+   `--limit`, `gh` s'arrête à 30 (`gh issue list --help`, gh 2.94.0) ; hors issues d'un bot
+   (`author.is_bot`), hors label de nature `prd`, hors `needs-info` et `ready-for-human`,
+   qu'aucune session ne fait avancer (`triage`, « Rôles »), et retirées celles en vol, comme à
+   l'entrée.
 2. Les bloqueurs : chaque numéro de « Bloquée par » lu dans GitHub (`triage`, « Trier une issue
    spécifique », étape 4) ; une issue dont un bloqueur est ouvert n'est pas proposée.
 3. Le recouvrement : le crible de l'étape 2, lu par domaines (section « Périmètre » de
@@ -60,8 +61,8 @@ d'archiver, une fois vérifiée, la session d'une issue `bug` (ci-dessous).
 
 **Démarrer les sessions**, dans le tour de l'accord et dans celui-là seulement (étape 3, même
 raison) : une par issue à préparer — une issue `bug` à part, voir plus bas —, `start_session`
-avec `initiation: user_asked`, `context: fresh`, `use_worktree: false` écrit en clair, `wake_when_done: true`,
-`name: triage-<N>`, `model` et `effort` omis — hérités du lead (#107, décision 8). La session
+avec `initiation: user_asked`, `context: fresh`, `use_worktree: false` écrit en clair,
+`wake_when_done: true`, `name: triage-<N>`, `model` et `effort` omis — hérités du lead (#107, décision 8). La session
 n'écrit que dans GitHub et lit le code dans le dossier du lead — qui, tant que ses sessions
 lisent, n'y écrit rien et n'y change pas de branche ; omis, `use_worktree` lui donne un worktree à
 elle dès que le lead travaille dans un worktree (description de l'outil, lue le 2026-10-19). Le
@@ -82,21 +83,23 @@ terminé — ready-for-agent proposé » — ou « terminé — #N en <état> »
 qu'une fois la transition appliquée, y compris celui que demande `interroge-moi` à sa fin.
 ```
 
-**Une issue `bug`** reçoit au contraire son propre worktree, `use_worktree: true` : la
-reproduction de `triage` (étape 3) lance des commandes du projet, que le dossier du lead ne porte
-pas. Son brief remplace « ni fichier, ni branche, ni commande du projet hors lecture » par : « ni
-branche ni commit, dans ton propre worktree. Premier geste :
+**Une issue `bug`** — étiquetée `bug`, ou que son rapport décrit comme telle — reçoit au contraire
+son propre worktree, `use_worktree: true`, les autres paramètres inchangés : la reproduction de
+`triage` (étape 3) lance des commandes du projet, que le dossier du lead ne porte pas. Son brief
+remplace « Tu n'écris que dans GitHub : ni fichier, ni branche, ni commande du projet hors
+lecture. » par : « Ni branche ni commit, dans ton propre worktree. Premier geste :
 `git fetch origin && git switch --detach origin/main` — aucune branche à créer —, puis les gestes 1
 à 5 de `pr-paralleles` étape 3, « Provisionner son worktree » ; la reproduction de `triage`
 (étape 3) se joue ici. » Le geste détache la tête sur le trunk sans créer de branche (mesuré le
 2026-10-19 sur un worktree jetable, git 2.47.1 : sortie 0, `HEAD` égal à `origin/main`,
 `git symbolic-ref -q HEAD` en 1). C'est la seule session de l'étape qui s'archive, sur l'accord de
-la proposition, puis se nettoie comme à l'étape 8 (worktree, échafaudage).
+la proposition, puis se nettoie comme à l'étape 8 (liens, worktree, échafaudage).
 
 **Fin — un message, puis GitHub.** Le message réveille le lead ; il ne prouve rien seul (#107,
 bloc « Lot 4/4 »). Pour chaque issue, `gh issue view <N> --json labels` porte `ready-for-agent` et
 `gh issue view <N> --comments` un `## Brief d'agent` ; une issue qui n'y est pas sort de la vague,
-dite au mainteneur ; une session muette suit l'étape 7, « Session disparue ». Ne pas archiver une
+dite au mainteneur, comme celle dont la session envoie un « bloquant » ; une session muette suit
+l'étape 7, « Session disparue ». Ne pas archiver une
 session sans worktree : l'archivage détache la tête du dossier de la session (`sessions-liees.md`,
 « Nettoyage ») — ici celui du lead, non mesuré sur une session sans worktree. Chaque message reçu et
 vérifié, passer à l'étape 1 **dans cette session**, qui devient le lead de la vague, sans que le
