@@ -1559,6 +1559,28 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         PR_PARALLELES_SKILL,
         "aucune, moins que le `n` donné, ou une seule sans argument",
     ),
+    # `/code-review` de la PR #133 : argument mêlé, troncature de `gh`, issues en vol au crible,
+    # dossier partagé, session muette.
+    "etape-0-argument-mele": (
+        PR_PARALLELES_SKILL,
+        "ou si une issue nommée en argument n'est pas prête",
+    ),
+    "etape-0-crible-sans-troncature": (
+        PR_PARALLELES_SKILL,
+        "`gh issue list --state open --limit 200 --json number,title,labels,author,body`",
+    ),
+    "etape-0-crible-sans-issue-en-vol": (
+        PR_PARALLELES_SKILL,
+        "et retirées celles en vol, comme à l'entrée",
+    ),
+    "etape-0-dossier-du-lead-fige": (
+        PR_PARALLELES_SKILL,
+        "tant que ses sessions lisent, n'y écrit rien et n'y change pas de branche",
+    ),
+    "etape-0-session-muette": (
+        PR_PARALLELES_SKILL,
+        "une session muette suit l'étape 7, « Session disparue »",
+    ),
     "etape-0-premier-geste-du-lead": (
         PR_PARALLELES_SKILL,
         "`git fetch origin && git merge --ff-only origin/main`",
