@@ -1779,7 +1779,8 @@ def test_chaque_invariant_des_sessions_liees_garde_sa_phrase(fichier: str, phras
     assert phrase in texte, f"`{fichier}` ne porte plus « {phrase} »"
 
 
-LISTE_GH = re.compile(r"gh (?:issue|pr) list[^`\n]*")
+# `gh … list --help` cite la doc de l'outil, il ne liste rien : hors population.
+LISTE_GH = re.compile(r"gh (?:issue|pr) list(?! --help)[^`\n]*")
 
 
 def test_chaque_liste_gh_de_pr_paralleles_porte_sa_limite() -> None:

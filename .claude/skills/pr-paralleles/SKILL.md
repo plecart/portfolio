@@ -40,7 +40,7 @@ remonte au mainteneur.
 **Crible**, en lecture seule :
 
 1. `gh issue list --state open --limit 200 --json number,title,labels,author,body` — sans
-   `--limit`, `gh` s'arrête à 30 ; hors issues d'un bot (`author.is_bot`), hors label de nature
+   `--limit`, `gh` s'arrête à 30 (`gh issue list --help`, gh 2.94.0) ; hors issues d'un bot (`author.is_bot`), hors label de nature
    `prd`, hors `needs-info` et `ready-for-human`, qu'aucune session ne fait avancer (`triage`,
    « Rôles »), et retirées celles en vol, comme à l'entrée.
 2. Les bloqueurs : chaque numéro de « Bloquée par » lu dans GitHub (`triage`, « Trier une issue
@@ -59,8 +59,8 @@ s'ouvre avant l'accord : la question nomme les sessions que l'accord démarrera,
 d'archiver, une fois vérifiée, la session d'une issue `bug` (ci-dessous).
 
 **Démarrer les sessions**, dans le tour de l'accord et dans celui-là seulement (étape 3, même
-raison) : une par issue à préparer — une issue `bug` à part, voir plus bas —, `start_session` avec `initiation: user_asked`,
-`context: fresh`, `use_worktree: false` écrit en clair, `wake_when_done: true`,
+raison) : une par issue à préparer — une issue `bug` à part, voir plus bas —, `start_session`
+avec `initiation: user_asked`, `context: fresh`, `use_worktree: false` écrit en clair, `wake_when_done: true`,
 `name: triage-<N>`, `model` et `effort` omis — hérités du lead (#107, décision 8). La session
 n'écrit que dans GitHub et lit le code dans le dossier du lead — qui, tant que ses sessions
 lisent, n'y écrit rien et n'y change pas de branche ; omis, `use_worktree` lui donne un worktree à
@@ -84,13 +84,14 @@ qu'une fois la transition appliquée, y compris celui que demande `interroge-moi
 
 **Une issue `bug`** reçoit au contraire son propre worktree, `use_worktree: true` : la
 reproduction de `triage` (étape 3) lance des commandes du projet, que le dossier du lead ne porte
-pas. Son brief remplace « ni commande du projet hors lecture » par : « Premier geste :
+pas. Son brief remplace « ni fichier, ni branche, ni commande du projet hors lecture » par : « ni
+branche ni commit, dans ton propre worktree. Premier geste :
 `git fetch origin && git switch --detach origin/main` — aucune branche à créer —, puis les gestes 1
 à 5 de `pr-paralleles` étape 3, « Provisionner son worktree » ; la reproduction de `triage`
 (étape 3) se joue ici. » Le geste détache la tête sur le trunk sans créer de branche (mesuré le
 2026-10-19 sur un worktree jetable, git 2.47.1 : sortie 0, `HEAD` égal à `origin/main`,
-`git symbolic-ref -q HEAD` en 1). C'est la seule session de l'étape qui s'archive, sur l'accord de la
-proposition, puis se nettoie comme à l'étape 8 (worktree, échafaudage).
+`git symbolic-ref -q HEAD` en 1). C'est la seule session de l'étape qui s'archive, sur l'accord de
+la proposition, puis se nettoie comme à l'étape 8 (worktree, échafaudage).
 
 **Fin — un message, puis GitHub.** Le message réveille le lead ; il ne prouve rien seul (#107,
 bloc « Lot 4/4 »). Pour chaque issue, `gh issue view <N> --json labels` porte `ready-for-agent` et
