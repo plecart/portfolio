@@ -255,7 +255,9 @@ versions de correctif (3.12.x) le sont.
    au socle) → cleanup holistique → relecture à contexte vierge finale → `gh pr ready` → CI → vérif de
    fumée → merge. Plusieurs PR en parallèle : `pr-paralleles` (la session lead démarre une
    session par issue, chacune dans un worktree de l'application, et vérifie chaque PR avant le go,
-   par messages inter-sessions — le go lui-même reste humain, dans la fenêtre de la PR).
+   par messages inter-sessions — le go lui-même reste humain, dans la fenêtre de la PR). Trop peu
+   d'issues prêtes : son étape 0 ouvre d'abord une session de triage et d'interrogatoire par issue,
+   puis la même session enchaîne sur la vague.
 3bis. **Amender** — `contradiction` dès qu'une décision de conversation contredit une source de
    vérité (section « Sources de vérité » de `.claude/pipeline.config.md`) : le document est amendé
    dans la session, ou la décision est abandonnée — ou son effet déplacé hors de ce que le document
