@@ -26,8 +26,8 @@ Prérequis : `.claude/pipeline.config.md` existe (sinon lancer `init-projet`).
 
 **Entrée.** Lister les issues prêtes comme à l'étape 1, argument compris, et en retirer celles qui
 sont **en vol** (`repercussions`, « Marquer les issues « en vol » »). Si ce qui reste ne suffit pas
-à une vague — aucune, moins que le `n` donné, ou une seule sans argument —, l'étape 0 la prépare ;
-sinon, passer à l'étape 1.
+à une vague — aucune, moins que le `n` donné, ou une seule sans argument —, ou si une issue nommée
+en argument n'est pas prête, l'étape 0 la prépare ; sinon, passer à l'étape 1.
 
 **Premier geste du lead**, l'étape ouverte, avant le crible :
 `git fetch origin && git merge --ff-only origin/main` dans son dossier. Les sessions de cette étape
@@ -36,8 +36,9 @@ décision 15). Un refus de `--ff-only` se remonte au mainteneur.
 
 **Crible**, en lecture seule :
 
-1. `gh issue list --state open --json number,title,labels,author,body` — hors issues d'un bot
-   (`author.is_bot`) et hors label de nature `prd` (`triage`, « Rôles »).
+1. `gh issue list --state open --limit 200 --json number,title,labels,author,body` — sans
+   `--limit`, `gh` s'arrête à 30 ; hors issues d'un bot (`author.is_bot`), hors label de nature
+   `prd` (`triage`, « Rôles »), et retirées celles en vol, comme à l'entrée.
 2. Les bloqueurs : chaque numéro de « Bloquée par » lu dans GitHub (`triage`, « Trier une issue
    spécifique », étape 4) ; une issue dont un bloqueur est ouvert n'est pas proposée.
 3. Le recouvrement : le crible de l'étape 2, lu par domaines (section « Périmètre » de
@@ -56,7 +57,8 @@ s'ouvre avant l'accord : la question nomme les sessions que l'accord démarrera.
 raison) : une par issue à préparer, `start_session` avec `initiation: user_asked`,
 `context: fresh`, `use_worktree: false` écrit en clair, `wake_when_done: true`,
 `name: triage-<N>`, `model` et `effort` omis — hérités du lead (#107, décision 8). La session
-n'écrit que dans GitHub et lit le code dans le dossier du lead ; omis, `use_worktree` lui donne un
+n'écrit que dans GitHub et lit le code dans le dossier du lead — qui, tant que ses sessions lisent, n'y
+écrit rien et n'y change pas de branche ; omis, `use_worktree` lui donne un
 worktree à elle dès que le lead travaille dans un worktree (description de l'outil, lue le
 2026-10-19). Une issue `bug` dont la reproduction (`triage`, étape 3) lance des commandes du
 projet reçoit au contraire son propre worktree, `use_worktree: true`, provisionné comme à l'étape 3
@@ -78,7 +80,8 @@ terminé — ready-for-agent proposé » — ou « terminé — #N en <état> »
 **Fin — un message, puis GitHub.** Le message réveille le lead ; il ne prouve rien seul
 (`sessions-liees.md`, « Fin de travail »). Pour chaque issue, `gh issue view <N> --json labels`
 porte `ready-for-agent` et `gh issue view <N> --comments` un `## Brief d'agent` ; une issue qui
-n'y est pas sort de la vague, dite au mainteneur. Ne pas les archiver : l'archivage détache la tête
+n'y est pas sort de la vague, dite au mainteneur ; une session muette suit l'étape 7, « Session
+disparue ». Ne pas les archiver : l'archivage détache la tête
 du dossier de la session (`sessions-liees.md`, « Nettoyage ») — ici celui du lead, non mesuré sur
 une session sans worktree. Chaque message reçu et vérifié, passer à l'étape 1 **dans cette
 session**, qui devient le lead de la vague, sans que le mainteneur redise le prompt : l'argument
