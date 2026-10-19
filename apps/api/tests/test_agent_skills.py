@@ -1789,8 +1789,9 @@ def test_chaque_liste_gh_de_pr_paralleles_porte_sa_limite() -> None:
 
     **Dénombrement, écrit avant le correctif** (relecture de la PR #133, passe 1, m-2) : 4 sites
     dans `pr-paralleles` — crible de l'étape 0, étape 1, tableau de l'étape 4, bilan de vague —,
-    dont 1 borné par `fd6678f`. **Borne** : ce fichier seul ; les autres skills en ont d'autres,
-    hors du lot (Notes de la PR #133).
+    dont 1 borné par `fd6678f`. **Bornes** : ce fichier seul ; les autres skills en ont d'autres,
+    hors du lot (Notes de la PR #133). Un site s'écrit sur une ligne : une commande coupée par `\\`
+    avant son `--limit` rougit à tort (relecture, passe 2, R-1).
     """
     sites = LISTE_GH.findall((REPOSITORY_ROOT / PR_PARALLELES_SKILL).read_text(encoding="utf-8"))
 
@@ -1893,9 +1894,10 @@ def test_l_ordre_rougit_sur_une_copie_tardive(texte: str, attendu: bool) -> None
 # relecture de la PR #130 (I-3, I-5 ; mutations M2 et M11 VERTES sur la table de phrases) — le
 # plafond demandé à la question qui ouvre le tour des démarrages, le relevé `get_session` avant
 # l'archivage qui le rend nécessaire, l'archivage avant le retrait du worktree (obs 42, re-mesurée
-# le 2026-10-18), le retrait avant l'échafaudage. Le lot 4 ajoute les 4 de l'étape 0 : l'accord
-# avant le premier démarrage, le démarrage avant la vérification dans GitHub, qui précède le
-# passage à l'étape 1, et dans le brief la transition avant le message (relecture, I-2).
+# le 2026-10-18), le retrait avant l'échafaudage. Le lot 4 ajoute les 5 de l'étape 0 : l'accord
+# avant chacun des deux démarrages (sans worktree, et la session d'un bug), le démarrage avant la
+# vérification dans GitHub, qui précède le passage à l'étape 1, et dans le brief la transition
+# avant le message (relecture, I-2).
 ORDRE_DE_PR_PARALLELES = {
     "etape-0-accord-avant-le-demarrage": (
         "Rien ne s'ouvre avant l'accord",
@@ -1904,6 +1906,11 @@ ORDRE_DE_PR_PARALLELES = {
     "etape-0-demarrage-avant-la-verification": (
         "`context: fresh`, `use_worktree: false` écrit en clair",
         "il ne prouve rien seul",
+    ),
+    # Relecture de la PR #133, passe 2, m-1 : la session d'un bug aussi attend l'accord.
+    "etape-0-accord-avant-le-bug": (
+        "Rien ne s'ouvre avant l'accord",
+        "son propre worktree, `use_worktree: true`, les autres paramètres inchangés",
     ),
     # Relecture de la PR #133, passe 1, I-2 : le message part après la transition, pas avant.
     "etape-0-transition-avant-le-message": (
