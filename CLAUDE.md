@@ -20,8 +20,8 @@ fichier : skill `init-projet`.
 Les **sources de vérité** (documents de référence, puis les issues ouvertes) y sont classées par
 **rang de normativité**. C'est cette table que lisent la règle `decisions-vs-doc` et le skill
 `contradiction` : une décision qui contredit un rang s'arrête, et soit elle est abandonnée — ou
-son effet déplacé hors de ce que le document affirme —, soit le document est amendé dans la même
-session.
+son effet déplacé hors de ce que le document affirme —, soit le document est amendé par la session
+de dialogue qui a décidé (`decisions-vs-doc.md`, « Deux sorties »).
 
 Les **domaines** servent aussi de thèmes (milestones GitHub). Les **surfaces visibles par un
 utilisateur** déclenchent la vérif de fumée avant merge et la proposition de campagne QA en fin de

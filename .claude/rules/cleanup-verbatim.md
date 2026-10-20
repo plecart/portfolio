@@ -9,7 +9,10 @@ refactor TDD, relecture indépendante) qu'une **demande directe et informelle** 
 Il n'y a pas de relecture « informelle » qui échapperait à ce prompt : s'il s'agit de repasser sur
 du code, c'est ce prompt qui s'applique. Seule exception : le commit d'une tranche entièrement
 spécifiée par l'`executant` (`.claude/agents/executant.md`, « Ton commit »), que le cleanup
-holistique de `cycle-pr` 4.1 relit.
+holistique de `cycle-pr` 4.1 relit. Qui l'exécute : au commit, le `developpeur` qui a écrit le bloc
+(`cycle-pr` 3.3) ; le cleanup holistique, un `developpeur` neuf sur le diff complet de la branche,
+qui ne rend que des commits (`cycle-pr` 4.1) ; une demande directe, la session à qui elle est
+faite.
 
 **Relire un document normatif** (spec UX/UI, cadrage, PRD) n'est **pas** ce prompt : c'est le
 skill `audit-spec-ui` — passes mécaniques (jetons, tables, arithmétique, contraste, cohérence)
@@ -31,7 +34,8 @@ avant tout jugement, chaque finding cité par §.
   les findings concrets : magic numbers, duplication, naming douteux, fonction trop longue,
   responsabilité mal séparée, code mort.
 - **Rapporter à voix haute** sous un titre `## 🧹 Cleanup pass`, pour que le relecteur vérifie
-  d'un coup d'œil que l'étape n'a pas été sautée.
+  d'un coup d'œil que l'étape n'a pas été sautée. Un `developpeur` le rend dans son rapport final
+  — son transcript meurt avec lui —, et la session PR le relaie aux Notes de la PR.
 - **Même rigueur sur les deltas triviaux.** Si « rien à corriger », dire ce qui a été repassé —
   fichiers, points contrôlés, dénombrement — en quelques lignes, pas ligne par ligne : la preuve
   est dans ce qui a été vérifié, pas dans la longueur du compte rendu.
@@ -63,7 +67,9 @@ avant tout jugement, chaque finding cité par §.
   premier correctif** et épinglé dans l'artefact par un test paramétré, pas par une phrase de
   docstring : la preuve que le chemin connu est fermé se lit spontanément comme la preuve qu'il
   n'y en avait qu'un. Écrit après, le dénombrement se fait par morceaux, un correctif par
-  relecture.
+  relecture. Il est à qui reçoit le constat : la session PR pour un constat de relecture, qu'elle
+  porte avec sa classe dans le brief du `developpeur` de correction (`cycle-pr` 4.2, « Le
+  cliquet ») ; le `developpeur` pour ce que son propre cleanup trouve.
 - **Passe « affirmations » — ce que le delta dit de lui-même.** Le prompt ci-dessus fait relire le
   **code** : duplication, naming, responsabilités. Il ne fait jamais relire les **affirmations
   attachées au code**, et c'est là que l'angle mort de l'auteur est maximal — une affirmation est

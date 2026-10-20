@@ -74,8 +74,9 @@ l'écran : c'est la session PR qui prend l'arrêt humain, **une fois par PR**, �
 
 ## Ton rapport
 
-Les commits (SHA et titre), les `[T]` tranchées et leur source, les `[V]` avec l'hypothèse
-retenue, ce qui reste du bloc s'il en reste.
+Les commits (SHA et titre), le compte rendu de chaque cleanup pass (`## 🧹 Cleanup pass`,
+`.claude/rules/cleanup-verbatim.md`), les `[T]` tranchées et leur source, les `[V]` avec
+l'hypothèse retenue, ce qui reste du bloc s'il en reste.
 
 ## Effort
 
