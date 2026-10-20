@@ -1585,7 +1585,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "coordinatrice-au-plafond": (
         COORDINATRICE_REF,
-        "La coordinatrice y tourne en Opus 5.5, effort `max`",
+        "La coordinatrice y tourne en Opus 5.5, effort `high`",
     ),
     "nettoyage-des-sessions-de-lot": (
         COORDINATRICE_REF,
@@ -1632,7 +1632,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         "`<trunk>` se lit cette branche partout ci-dessous",
     ),
     # Passation (obs 85) et frontière de lot.
-    "passation-en-dernier": (CYCLE_PR_SKILL, "**La passation s'écrit en dernier.**"),
+    "passation-en-dernier": (
+        CYCLE_PR_SKILL,
+        "**La passation s'écrit en dernier, depuis les artefacts**",
+    ),
     "passation-sans-point-ouvert": (PROMPT_LOT_SUIVANT, "jamais un point encore ouvert (obs 85)"),
     "passation-remise-a-la-coordinatrice": (
         PROMPT_LOT_SUIVANT,

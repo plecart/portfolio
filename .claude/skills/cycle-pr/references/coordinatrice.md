@@ -8,8 +8,8 @@ héritage, identité, premier geste, fin de travail, passation, nettoyage — es
 La coordinatrice **n'écrit pas de code**. Elle ouvre la branche et la PR d'intégration, démarre les
 sessions de lot, ouvre chaque lot sur deux preuves, guette la dérive avec le trunk, puis porte la PR
 d'intégration jusqu'à son go. Entre deux lots, elle attend : son contexte ne grossit que des
-pointeurs qu'elle lit — la session d'un lot connaît son lot, la coordinatrice connaît la suite des
-lots (obs 62).
+pointeurs qu'elle lit — la session d'un lot tient les artefacts de son lot, la coordinatrice
+connaît la suite des lots (obs 62).
 
 ## Au go du découpage — le seul tour où elle démarre des sessions
 
@@ -19,11 +19,11 @@ seul un tour ouvert par le mainteneur le démarre, et seulement sur sa demande �
 l'application à la session, lues le 2026-10-18 ; mesuré le même jour, PR #122). Le go du
 découpage est ce tour : la question du go nomme donc les n sessions qu'il fera démarrer, avec
 l'accord pour le `verificateur` de chaque lot quand il n'y a pas de lead de vague (`cycle-pr`
-Étape 7, « Sans lead »). La coordinatrice y tourne en Opus 5.5, effort `max` (#107, décision 8) :
-un enfant n'étant ni plus fort ni d'effort plus haut que son parent (`sessions-liees.md`,
-« Héritage »), une coordinatrice en dessous ne pourrait pas démarrer un lot `max` — sinon, la
-question du go demande d'abord au mainteneur de la passer en Opus 5.5 (sélecteur de modèle) et
-`/effort max`. Dans ce tour, dans cet ordre :
+Étape 7, « Sans lead »). La coordinatrice y tourne en Opus 5.5, effort `high` (#134, décision 4,
+qui remplace sur ce point #107 décision 8) : un enfant n'étant ni plus fort ni d'effort plus haut
+que son parent (`sessions-liees.md`, « Héritage »), la question du go ne demande au mainteneur
+`/effort max` — et Opus 5.5 au sélecteur de modèle — que si le découpage contient un lot que le
+barème du point 3 met à `max`, le geste tombant avant tout enfant. Dans ce tour, dans cet ordre :
 
 1. **La branche d'intégration**, depuis le trunk :
    `git fetch origin && git checkout -b <type>/<slug> --no-track origin/<trunk>`, puis une amorce
@@ -35,14 +35,16 @@ question du go demande d'abord au mainteneur de la passer en Opus 5.5 (sélecteu
 3. **Les sessions de lot** : la coordinatrice démarre d'un coup les sessions des lots non mergés,
    une par `start_session` — `initiation: user_asked`, `context: fresh`, worktree de l'application,
    `wake_when_done: true`, `use_worktree: true` (omis, l'outil peut donner à l'enfant le dossier
-   de la coordinatrice — `pr-paralleles` Étape 3), `name: <slug>-lot-<k>`. Effort par lot (#107,
-   décision 8) : `high` par
-   défaut, `max` si le bloc du lot porte un ADR, une surface de sécurité ou un contrat entre piles,
-   `medium` pour un lot de doc ou de config seule ; `model` omis quand la coordinatrice est en
-   Opus 5.5, `claude-opus-5-5` si elle est au-dessus.
+   de la coordinatrice — `pr-paralleles` Étape 3), `name: <slug>-lot-<k>`. Effort par lot, fixé
+   au démarrage par ce brief et jamais changé en cours de session (#134, D-15 ; l'effet d'un
+   `/effort` en cours de session sur le cache n'est pas mesuré) : `high` par défaut, `max` si le
+   bloc du lot porte un ADR, une surface de sécurité ou un contrat entre piles, `medium` pour un
+   lot de doc ou de config seule ; `model` omis quand la coordinatrice est en Opus 5.5,
+   `claude-opus-5-5` si elle est au-dessus.
 
 Le brief d'une session de lot porte : le bloc du lot dans le corps de l'issue, l'effort retenu, la
-branche d'intégration, et son lead. Il nomme toujours son lead — celui de la vague, ou « aucun » :
+branche d'intégration, son lead, et la consigne « porte le cycle complet et délègue le code »
+(`cycle-pr` 3.1). Il nomme toujours son lead — celui de la vague, ou « aucun » :
 sans ce nom, la règle « à défaut l'émettrice » de `cycle-pr` (« Vague parallèle ») ferait de la
 coordinatrice le lead. Le premier lot non mergé — le lot 1, ou celui où reprend une issue déjà
 entamée — reçoit l'ordre d'ouvrir dans ce brief même ; chaque autre lot reçoit « attends le message
