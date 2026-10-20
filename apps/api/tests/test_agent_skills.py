@@ -2207,9 +2207,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     # **Une épingle par élément dénombré** : un commentaire qui compte N éléments sans une ancre
     # chacun dénombre ce qu'il ne garde pas (relecture de la PR #140, passe 2, I-1 : 10 sondes sur
-    # 10 VERTES). Dénombrement écrit avant le correctif, sur `e9d7231` : **26** éléments dans les
-    # deux blocs ci-dessous — 11 rôles et conditions dans 5 lignes de `pipeline.config.md`, 15
-    # exécutants dans les 7 maillons de `CONTRIBUTING.md` —, **9** épinglés, **17** non.
+    # 10 VERTES). Dénombrement écrit avant le correctif, sur `e9d7231` : **27** éléments dans les
+    # deux blocs ci-dessous — 11 rôles et conditions dans 5 lignes de `pipeline.config.md`, 16
+    # exécutants dans les 7 maillons de `CONTRIBUTING.md` —, **9** épinglés, **18** non (le 18ᵉ,
+    # « lancé par » du 3bis, trouvé à la relance).
     #
     # `pipeline.config.md` : 5 lignes, 4 commandes (« test brut » back et front, « validation »,
     # « relecture », « sécurité ») qui disaient « lancée par `cycle-pr` », chacune avec son rôle,
@@ -2245,13 +2246,18 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         ),
     ),
     # `CONTRIBUTING.md`, « Le flux en une page » : 7 maillons (0, 1, 2, 3, 3bis, 4, 5), chacun
-    # nomme qui l'exécute — 3bis par `renvoi-deux-sorties-contributing`, ci-dessus.
+    # nomme qui l'exécute — le 3bis deux fois : qui lance, et qui amende
+    # (`renvoi-deux-sorties-contributing`, ci-dessus).
     "contributing-configurer": ("CONTRIBUTING.md", "`init-projet`, dans une session de dialogue"),
     "contributing-planifier": (
         "CONTRIBUTING.md",
         "chacun dans une session de dialogue avec le mainteneur",
     ),
     "contributing-interroger": ("CONTRIBUTING.md", "**obligatoire**, dans une session de dialogue"),
+    "contributing-amender-lance-par-la-session": (
+        "CONTRIBUTING.md",
+        "`contradiction`, lancé par la session de dialogue dès qu'une de ses décisions",
+    ),
     "contributing-implementer": (
         "CONTRIBUTING.md",
         (
