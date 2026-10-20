@@ -245,31 +245,41 @@ versions de correctif (3.12.x) le sont.
 
 ## Le flux en une page
 
-0. **Configurer** — `init-projet` écrit `.claude/pipeline.config.md` (dépôt, sources de vérité,
-   labels, stack, commandes, domaines, surfaces). À relancer dès qu'une de ces valeurs change.
+Chaque maillon nomme qui l'exécute ; la répartition des rôles est dans `CLAUDE.md`,
+« Orchestration ».
+
+0. **Configurer** — `init-projet`, dans une session de dialogue, écrit `.claude/pipeline.config.md`
+   (dépôt, sources de vérité, labels, stack, commandes, domaines, surfaces). À relancer dès qu'une
+   de ces valeurs change.
 1. **Planifier** — `vers-prd` (conversation → PRD) → `vers-issues` (PRD → petites issues) →
-   `triage` (machine à états, rattachement au thème, « agent brief »).
-2. **Interroger** — `interroge-moi`, **obligatoire** : `ready-for-agent` et `ready-for-human` ne
-   s'atteignent que via l'état `needs-interrogation`. Les décisions tranchées sont écrites dans
-   l'issue, pas laissées dans une conversation.
-3. **Implémenter** — `cycle-pr` : briefing pré-PR → **PR draft ouverte avant tout code** → TDD
-   red-green-refactor → cycle `modif → test → cleanup → test → commit` (relecture à contexte vierge
-   au socle) → cleanup holistique → relecture à contexte vierge finale → `gh pr ready` → CI → vérif de
-   fumée → merge. Plusieurs PR en parallèle : `pr-paralleles` (la session lead démarre une
-   session par issue, chacune dans un worktree de l'application, et vérifie chaque PR avant le go,
-   par messages inter-sessions — le go lui-même reste humain, dans la fenêtre de la PR). Trop peu
-   d'issues prêtes : son étape 0 ouvre d'abord une session de triage et d'interrogatoire par issue,
-   puis la même session enchaîne sur la vague.
-3bis. **Amender** — `contradiction` dès qu'une décision de conversation contredit une source de
-   vérité (section « Sources de vérité » de `.claude/pipeline.config.md`) : le document est amendé
+   `triage` (machine à états, rattachement au thème, « agent brief »), chacun dans une session de
+   dialogue avec le mainteneur.
+2. **Interroger** — `interroge-moi`, **obligatoire**, dans une session de dialogue :
+   `ready-for-agent` et `ready-for-human` ne s'atteignent que via l'état `needs-interrogation`. Les
+   décisions tranchées sont écrites dans l'issue, pas laissées dans une conversation.
+3. **Implémenter** — `cycle-pr`, porté par la session PR, qui orchestre et délègue : briefing
+   pré-PR (relevés au `releveur`, cartographie à l'`executant`) → **PR draft ouverte avant tout
+   code** → un `developpeur` neuf par bloc : TDD red-green-refactor, cycle
+   `modif → test → cleanup → test → commit` (relecture à contexte vierge au socle, par le
+   `relecteur`) → cleanup holistique par un `developpeur` neuf → relecture à contexte vierge
+   finale → `gh pr ready` → CI → vérif de fumée → vérification d'avant-go par le `verificateur`,
+   que la session PR lance → merge. Plusieurs PR en parallèle : `pr-paralleles` (la session lead
+   démarre une session par issue, chacune dans un worktree de l'application, et tient le tableau
+   de bord — le go reste humain, dans la fenêtre de la PR). Trop peu d'issues prêtes : son étape 0
+   ouvre d'abord une session de triage et d'interrogatoire par issue, puis la même session
+   enchaîne sur la vague.
+3bis. **Amender** — `contradiction`, lancé par la session de dialogue dès qu'une de ses décisions
+   contredit une source de vérité (section « Sources de vérité » de `.claude/pipeline.config.md`) : le document est amendé
    par la session de dialogue qui a décidé, ou la décision est abandonnée — ou son effet déplacé
    hors de ce que le document affirme. Déclenché par la règle `decisions-vs-doc`, à n'importe quel
    moment.
 4. **Répercuter** — `repercussions` après chaque merge : confronte d'abord le delta aux sources de
    vérité (un § falsifié → `contradiction`), puis corrige la spec — corps et brief d'agent —
-   des issues dont la planification est devenue fausse. Lancé automatiquement en fin de `cycle-pr`.
-5. **Valider** — `plan-qa` → `execution-qa` → `bug-vers-issue`, proposé quand un **thème se vide**
-   de ses issues ouvertes. La QA ne re-teste jamais ce que la CI couvre déjà.
+   des issues dont la planification est devenue fausse. Porté par la session PR en fin de
+   `cycle-pr` — collecte au `releveur`, go d'édition au mainteneur dans sa fenêtre ; pour une issue
+   en lots, par la coordinatrice au merge de la PR d'intégration.
+5. **Valider** — `plan-qa` → `execution-qa` → `bug-vers-issue`, chacun dans une session de
+   dialogue, proposé quand un **thème se vide** de ses issues ouvertes. La QA ne re-teste jamais ce que la CI couvre déjà.
 
 ## Les règles qui ne se négocient pas
 
