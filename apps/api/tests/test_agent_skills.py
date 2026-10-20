@@ -659,6 +659,134 @@ def test_un_role_dit_en_tete_s_il_tranche_et_son_modele_le_suit(path: Path) -> N
     )
 
 
+# Un rôle n'existe que là où une étape le nomme (D5 de #134, obs 119) : `executant`, né à
+# l'amorçage, n'avait jamais été lancé — 0 sur 89 sous-agents relevés le 2026-10-19 —, et
+# `developpeur` n'avait aucun déclencheur écrit. La table « Orchestration » gardée ci-dessus décrit
+# une intention ; ces deux tests gardent le branchement. `init-projet` est hors population : sa ligne
+# qui cite `.claude/agents/` est une liste de fichiers à copier, pas une délégation.
+SKILL_PROSE = ".claude/skills/**/*.md"
+NOT_A_DELEGATION = "init-projet"
+ROLE_NAMES = [path.stem for path in AGENTS]
+
+# Les treize skills maison (`.claude/pipeline.config.md`, « Skills du projet »), en littéral.
+HOUSE_SKILLS = (
+    "init-projet",
+    "vers-prd",
+    "vers-issues",
+    "triage",
+    "interroge-moi",
+    "cycle-pr",
+    "contradiction",
+    "repercussions",
+    "pr-paralleles",
+    "plan-qa",
+    "execution-qa",
+    "bug-vers-issue",
+    "audit-spec-ui",
+)
+
+# Les skills maison qui ne délèguent encore à personne, chacun avec le lot de #134 qui l'en sort :
+# au 2026-10-20 sur `e70e279`, dix ne nomment ni rôle ni script, et `init-projet` nomme les cinq
+# rôles dans sa seule liste de fichiers. La liste se vide lot par lot ; #134 l'exige vide.
+EXECUTOR_WAITING_LIST = {
+    "triage": "6a",
+    "interroge-moi": "6a",
+    "vers-prd": "6a",
+    "vers-issues": "6a",
+    "bug-vers-issue": "6b",
+    "contradiction": "6b",
+    "repercussions": "6b",
+    "plan-qa": "7a",
+    "execution-qa": "7b",
+    "audit-spec-ui": "8",
+    "init-projet": "8",
+}
+
+
+def cites_role(text: str, role: str) -> bool:
+    """Vrai si `text` nomme `role` entre accents graves, sous son nom exact (`` `releveur` ``)."""
+    return f"`{role}`" in text
+
+
+def cites_an_executor(text: str, roles: Iterable[str]) -> bool:
+    """Vrai si `text` nomme l'un des `roles` entre accents graves ou renvoie à un script de skill.
+
+    Le renvoi de script se lit par `SCRIPT_REFERENCE`, le motif de la porte des scripts cités.
+    """
+    return any(cites_role(text, role) for role in roles) or bool(SCRIPT_REFERENCE.search(text))
+
+
+def skills_citing(role: str) -> list[str]:
+    """Les fichiers de skill, hors `init-projet`, qui nomment `role` — chemins depuis la racine."""
+    citing: list[str] = []
+    for path in sorted(REPOSITORY_ROOT.glob(SKILL_PROSE)):
+        relative = path.relative_to(REPOSITORY_ROOT)
+        if NOT_A_DELEGATION not in relative.parts and cites_role(
+            path.read_text(encoding="utf-8"), role
+        ):
+            citing.append(relative.as_posix())
+    return citing
+
+
+def skill_prose(skill: str) -> str:
+    """Le `SKILL.md` d'un skill et ses références, mis bout à bout."""
+    files = sorted((REPOSITORY_ROOT / ".claude/skills" / skill).glob("**/*.md"))
+    assert files, f"`{skill}` n'a aucun fichier Markdown — le nom est-il juste ?"
+    return "\n".join(path.read_text(encoding="utf-8") for path in files)
+
+
+@pytest.mark.parametrize("path", AGENTS, ids=[label(path) for path in AGENTS])
+def test_chaque_role_est_nomme_par_un_skill(path: Path) -> None:
+    """D5 : chaque rôle de `.claude/agents/` est nommé par au moins un fichier de skill.
+
+    Dénombrement au 2026-10-20 sur `e70e279` (avant le lot 2a) : 5 rôles, 3 nommés (`relecteur`,
+    `verificateur` et `executant`, ce dernier par la seule ligne des mineurs de `cycle-pr` 4.2),
+    2 jamais (`developpeur`, `releveur`). Le témoin d'un rôle fictif est le test suivant.
+    """
+    assert skills_citing(path.stem), (
+        f"`{path.stem}` n'est nommé par aucun skill hors `{NOT_A_DELEGATION}` : "
+        "aucune étape ne le lance"
+    )
+
+
+def test_un_role_qu_aucun_skill_ne_nomme_n_a_aucune_citation() -> None:
+    """Témoin du précédent : un rôle fictif, lu contre la prose réelle, ne trouve aucun fichier."""
+    assert skills_citing("fantome") == []
+
+
+# Le recueil de `cites_an_executor`, des deux côtés.
+EXECUTOR_CITATION_FORMS = {
+    "rôle entre accents graves": ("lancer un `releveur` par porte", True),
+    "rôle fictif": ("lancer un `fantome` par porte", False),
+    "nom nu": ("lancer un releveur par porte", False),
+    "nom d'un fichier de rôle": ("lire `releveur.md` d'abord", False),
+    "renvoi de script": ("python <répertoire de ce skill>/scripts/merge-lot.py <n>", True),
+}
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    EXECUTOR_CITATION_FORMS.values(),
+    ids=EXECUTOR_CITATION_FORMS.keys(),
+)
+def test_une_citation_d_executant_se_reconnait(text: str, expected: bool) -> None:
+    assert cites_an_executor(text, ROLE_NAMES) is expected
+
+
+@pytest.mark.parametrize(
+    "skill", [skill for skill in HOUSE_SKILLS if skill not in EXECUTOR_WAITING_LIST]
+)
+def test_chaque_skill_maison_nomme_ses_executants(skill: str) -> None:
+    """Second paramétrage de D5 : un skill maison hors liste d'attente nomme un rôle ou un script.
+
+    Au 2026-10-20 sur `e70e279`, deux sur treize (`cycle-pr`, `pr-paralleles`) ; les onze autres
+    sont dans `EXECUTOR_WAITING_LIST` avec le lot qui les en sort.
+    """
+    assert cites_an_executor(skill_prose(skill), ROLE_NAMES), (
+        f"`{skill}` ne nomme aucun rôle ni aucun script, et n'est pas en liste d'attente"
+    )
+
+
 # `git diff A..B` compare deux **arbres** ; ce n'est pas une plage de commits. Entre le trunk et la
 # tête, il compte donc en sens inverse tout ce que le trunk a reçu depuis le point de fork — le
 # gabarit d'une PR franchit alors ses seuils à tort dès que `main` avance. La forme qui mesure la
