@@ -101,8 +101,8 @@ Quelle que soit la voie :
   (résidu de relecture, « ce que cette PR ne couvre pas », vide relevé par `repercussions`,
   échappatoire de `decisions-vs-doc`) ; chacune est raisonnable seule, leur somme ne l'est pas.
   La borne vit ici, au-dessus des skills. Elle est portée par la session PR, hors cycle par la
-  session de dialogue qui relève le vide ; un sous-agent le remonte dans son rapport, sans issue ni
-  brouillon.
+  session de dialogue qui relève le vide ; un sous-agent n'ouvre ni issue ni brouillon, le
+  `developpeur` remonte le vide dans son rapport.
 - Tout vide, résidu ou hors-périmètre relevé en cours de cycle suit cet ordre et s'arrête au
   **premier barreau qui tient** :
   1. **il tient dans la PR courante en moins d'un commit** → le faire ;
