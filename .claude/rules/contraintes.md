@@ -59,11 +59,13 @@ lettre en tête de la question ou de la décision : `[T]`, `[V]` ou `[C]`.
   de produit**. Elle attend le mainteneur, mais **groupée** — au go du briefing, à l'arrêt visuel
   ou avant le go du merge —, jamais seule au fil de l'eau. En attendant, l'agent avance sur ce qui
   n'en dépend pas, en notant sous la question l'hypothèse réversible qu'il retient d'ici là ; il
-  ne rend la main que si tout ce qui reste dépend de la réponse. Un sous-agent ne la pose pas : il
-  note son hypothèse et rend la `[V]` dans son rapport, et la session de dialogue les groupe.
+  ne rend la main que si tout ce qui reste dépend de la réponse. Un `developpeur` ne la pose pas :
+  il note son hypothèse et rend la `[V]` dans son rapport, et la session de dialogue les groupe ;
+  `executant` et `releveur` ne classent aucune question, ils remontent tout choix à leur appelant
+  (leur rôle, « Ce que tu n'appliques pas »).
 - **Voie C — contradiction.** La décision contredit une source de vérité : arrêt immédiat, deux
-  citations, `.claude/rules/decisions-vs-doc.md`. Rien ne change. Un sous-agent s'arrête et remonte
-  les deux citations ; la session de dialogue présente l'arrêt.
+  citations, `.claude/rules/decisions-vs-doc.md`. Rien ne change. Un `developpeur` s'arrête et
+  remonte les deux citations ; la session de dialogue présente l'arrêt.
 
 Dans le doute sur la voie, c'est la voie V — et ce doute doit rester rare : une question de voie
 T posée au mainteneur lui fait payer un aller-retour pour une réponse qu'il donne toujours.
@@ -72,7 +74,7 @@ Quelle que soit la voie :
 
 - Si la réponse se trouve dans le code, **explorer le code plutôt que demander** — par un
   `releveur` pour un relevé, l'`executant` pour une cartographie (`cycle-pr` Étape 1), la
-  conclusion restant à la session ; un sous-agent explore lui-même dans son mandat. Pour
+  conclusion restant à la session ; un `developpeur` explore lui-même dans son bloc. Pour
   un grilling approfondi, utiliser `interroge-moi`. L'exploration ne s'arrête pas au dépôt : pour
   un comportement d'outil **non documenté**, les logs applicatifs, l'arborescence de données
   locale et les horodatages sont des sources de premier ordre — la documentation décrit

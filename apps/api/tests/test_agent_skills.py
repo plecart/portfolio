@@ -2071,11 +2071,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # (`grep` sur le texte aux blancs normalisés), la règle comprise ; le rapport du `developpeur`.
     "porteur-voie-v": (
         ".claude/rules/contraintes.md",
-        "Un sous-agent ne la pose pas : il note son hypothèse et rend la `[V]` dans son rapport",
+        "Un `developpeur` ne la pose pas : il note son hypothèse et rend la `[V]` dans son rapport",
     ),
     "porteur-voie-c": (
         ".claude/rules/contraintes.md",
-        "Un sous-agent s'arrête et remonte les deux citations",
+        "Un `developpeur` s'arrête et remonte les deux citations",
     ),
     "porteur-explorer-plutot-que-demander": (
         ".claude/rules/contraintes.md",
@@ -2114,7 +2114,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         ".claude/rules/decisions-vs-doc.md",
         (
             "par la session de dialogue qui a décidé (session PR ; `triage`, `interroge-moi` ou"
-            " `vers-issues` hors cycle), seule à lancer `/contradiction`"
+            " `vers-issues` hors cycle ; lead d'une vague, coordinatrice d'une issue en lots"
         ),
     ),
     "porteur-niveau-ponytail": ("CLAUDE.md", "le niveau voyage dans le brief"),
