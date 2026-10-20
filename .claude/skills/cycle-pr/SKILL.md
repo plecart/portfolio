@@ -847,7 +847,8 @@ anciens ne comptent plus. Sa conclusion :
 
 - `success` → sortir du draft ;
 - `in_progress` ou `queued`, conclusion `null` → le run tourne : attendre ;
-- `cancelled` → un run plus récent l'a remplacé : relire ;
+- `cancelled` → relire le SHA de tête (`gh pr view <numéro> --json headRefOid`) : s'il a changé,
+  lire le run du nouveau ; sinon, annulé sans remplaçant, « Si aucun run n'apparaît », ci-dessous ;
 - `skipped` → l'ouverture d'une draft jamais repoussée depuis, que le garde du job `api` saute
   (mesuré le 2026-10-20 sur l'amorce de la PR #137) : « Si aucun run n'apparaît », ci-dessous ;
 - aucune ligne → aucun run pour cette tête, un push émis pendant une panne d'Actions : même
@@ -860,9 +861,9 @@ merge sur le trunk ni au passage en ready : il peut combiner la tête à un trun
 merges — mesuré, 8 des 30 commits de `main` (obs 51). Ce qu'il prouve de l'état combiné se lit
 dans les parents de cette référence, à l'Étape 7.
 
-**Si aucun run n'apparaît** pour le SHA de tête — `skipped` ou aucune ligne —, consulter d'abord
-`https://www.githubstatus.com/api/v2/components.json`, sauf pour une draft jamais repoussée, qui
-se reconnaît à son seul run `skipped` : un événement émis pendant une panne d'Actions n'est **pas
+**Si aucun run n'apparaît** pour le SHA de tête — `skipped`, `cancelled` sans run plus récent, ou
+aucune ligne —, consulter d'abord `https://www.githubstatus.com/api/v2/components.json`, sauf
+pour une draft jamais repoussée, qui se reconnaît à son seul run `skipped` : un événement émis pendant une panne d'Actions n'est **pas
 rejoué** au rétablissement. Le re-déclenchement propre est `gh pr close` puis `gh pr reopen`
 (`reopened` est dans les types du workflow), action visible donc sur accord du mainteneur —
 jamais de commit vide ni de force-push. Puis relire le run du SHA de tête, comme ci-dessus : sa
