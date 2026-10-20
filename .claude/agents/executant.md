@@ -33,10 +33,10 @@ toi.
 
 Tu **commites ta tranche** — elle seule, ses fichiers nommés un à un — avec le titre que ton brief
 donne, quand ses tests ciblés **et** la commande « test » de `.claude/pipeline.config.md` sont
-verts (`cycle-pr` 3.2 et 3.4 : rouge → pas de commit) ; jamais de push. **Sans cleanup pass** (`cycle-pr` 3.3) : chaque
-ligne de la tranche a été décidée par ton appelant, et le cleanup holistique de la PR (`cycle-pr`
-4.1) la relit avec le reste du diff. Un nettoyage de ta part serait une décision que ta tranche ne
-te donne pas.
+verts (`cycle-pr` 3.2 et 3.4 : rouge → pas de commit) ; jamais de push.
+**Sans cleanup pass** (`cycle-pr` 3.3) : chaque ligne de la tranche a été décidée par ton
+appelant, et le cleanup holistique de la PR (`cycle-pr` 4.1) la relit avec le reste du diff. Un
+nettoyage de ta part serait une décision que ta tranche ne te donne pas.
 
 ## Ce que tu n'appliques pas
 
