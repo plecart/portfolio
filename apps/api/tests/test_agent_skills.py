@@ -662,13 +662,18 @@ def test_un_role_dit_en_tete_s_il_tranche_et_son_modele_le_suit(path: Path) -> N
 # Un rôle n'existe que là où une étape le nomme (D5 de #134, obs 119) : `executant`, né à
 # l'amorçage, n'avait jamais été lancé — 0 sur 89 sous-agents relevés le 2026-10-19 —, et
 # `developpeur` n'avait aucun déclencheur écrit. La table « Orchestration » gardée ci-dessus décrit
-# une intention ; ces deux tests gardent le branchement. `init-projet` est hors population : sa ligne
-# qui cite `.claude/agents/` est une liste de fichiers à copier, pas une délégation.
+# une intention ; les tests qui suivent gardent le branchement.
 SKILL_PROSE = ".claude/skills/**/*.md"
-NOT_A_DELEGATION = "init-projet"
 ROLE_NAMES = [path.stem for path in AGENTS]
 
-# Les treize skills maison (`.claude/pipeline.config.md`, « Skills du projet »), en littéral.
+# La seule mention de rôles qui n'est pas une délégation : l'entrée `.claude/agents/` de la liste
+# des fichiers qu'`init-projet` copie. Elle se retire du texte lu, et nulle part ailleurs.
+ROLE_FILE_LIST = re.compile(r"^- `\.claude/agents/` \([^)]*\)", re.MULTILINE)
+
+# Le paragraphe « Maison » de `.claude/pipeline.config.md`, « Skills du projet ».
+HOUSE_SKILLS_PARAGRAPH = re.compile(r"^\*\*Maison\*\*.*?\n\n", re.MULTILINE | re.DOTALL)
+
+# Les treize skills maison, en littéral ; un test garde l'égalité avec la config.
 HOUSE_SKILLS = (
     "init-projet",
     "vers-prd",
@@ -686,8 +691,8 @@ HOUSE_SKILLS = (
 )
 
 # Les skills maison qui ne délèguent encore à personne, chacun avec le lot de #134 qui l'en sort :
-# au 2026-10-20 sur `e70e279`, dix ne nomment ni rôle ni script, et `init-projet` nomme les cinq
-# rôles dans sa seule liste de fichiers. La liste se vide lot par lot ; #134 l'exige vide.
+# au 2026-10-20 sur `e70e279`, onze, dont `init-projet`, qui ne nomme les cinq rôles que dans sa
+# liste de fichiers. La liste se vide lot par lot ; #134 l'exige vide.
 EXECUTOR_WAITING_LIST = {
     "triage": "6a",
     "interroge-moi": "6a",
@@ -721,23 +726,25 @@ def cites_an_executor(text: str, roles: Iterable[str]) -> bool:
     )
 
 
+def delegating_text(path: Path) -> str:
+    """Le texte d'un fichier de skill, la liste de fichiers d'`init-projet` retirée."""
+    return ROLE_FILE_LIST.sub("", path.read_text(encoding="utf-8"))
+
+
 def skills_citing(role: str) -> list[str]:
-    """Les fichiers de skill, hors `init-projet`, qui nomment `role` — chemins depuis la racine."""
-    citing: list[str] = []
-    for path in sorted(REPOSITORY_ROOT.glob(SKILL_PROSE)):
-        relative = path.relative_to(REPOSITORY_ROOT)
-        if NOT_A_DELEGATION not in relative.parts and cites_role(
-            path.read_text(encoding="utf-8"), role
-        ):
-            citing.append(relative.as_posix())
-    return citing
+    """Les fichiers de skill qui nomment `role` hors liste de fichiers — chemins depuis la racine."""
+    return [
+        path.relative_to(REPOSITORY_ROOT).as_posix()
+        for path in sorted(REPOSITORY_ROOT.glob(SKILL_PROSE))
+        if cites_role(delegating_text(path), role)
+    ]
 
 
 def skill_prose(skill: str) -> str:
-    """Le `SKILL.md` d'un skill et ses références, mis bout à bout."""
+    """Le `SKILL.md` d'un skill et ses références, mis bout à bout, liste de fichiers retirée."""
     files = sorted((REPOSITORY_ROOT / ".claude/skills" / skill).glob("**/*.md"))
     assert files, f"`{skill}` n'a aucun fichier Markdown — le nom est-il juste ?"
-    return "\n".join(path.read_text(encoding="utf-8") for path in files)
+    return "\n".join(delegating_text(path) for path in files)
 
 
 @pytest.mark.parametrize("path", AGENTS, ids=[label(path) for path in AGENTS])
@@ -748,17 +755,20 @@ def test_chaque_role_est_nomme_par_un_skill(path: Path) -> None:
     `verificateur` et `executant`, ce dernier par la seule ligne des mineurs de `cycle-pr` 4.2),
     2 jamais (`developpeur`, `releveur`). Le témoin d'un rôle fictif est le test suivant.
     """
-    assert skills_citing(path.stem), (
-        f"`{path.stem}` n'est nommé par aucun skill hors `{NOT_A_DELEGATION}` : "
-        "aucune étape ne le lance"
-    )
+    assert skills_citing(path.stem), f"`{path.stem}` n'est nommé par aucun skill : rien ne le lance"
 
 
 def test_ni_un_role_fictif_ni_la_liste_d_init_projet_ne_comptent_pour_une_citation() -> None:
     """Témoins du précédent, sur la prose réelle : un rôle fictif ne trouve aucun fichier, et la
     liste de fichiers d'`init-projet`, qui nomme tous les rôles, n'est jamais comptée."""
     assert skills_citing("fantome") == []
-    assert not [path for path in skills_citing("releveur") if NOT_A_DELEGATION in path]
+    init_projet = (REPOSITORY_ROOT / ".claude/skills/init-projet/SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert ROLE_FILE_LIST.search(init_projet), (
+        "la liste de fichiers d'`init-projet` a changé de forme : `ROLE_FILE_LIST` ne la voit plus"
+    )
+    assert not cites_an_executor(skill_prose("init-projet"), ROLE_NAMES)
 
 
 # Le recueil de `cites_an_executor`, des deux côtés.
@@ -781,6 +791,15 @@ def test_une_citation_d_executant_se_reconnait(text: str, expected: bool) -> Non
     assert cites_an_executor(text, ROLE_NAMES) is expected
 
 
+def test_les_skills_maison_du_test_sont_ceux_de_la_config() -> None:
+    """Un skill maison ajouté à la config sans l'être ici échapperait au second paramétrage."""
+    config = (REPOSITORY_ROOT / ".claude/pipeline.config.md").read_text(encoding="utf-8")
+    paragraph = HOUSE_SKILLS_PARAGRAPH.search(config)
+    assert paragraph, "le paragraphe « Maison » de `pipeline.config.md` a changé de forme"
+
+    assert set(re.findall(r"`([a-z-]+)`", paragraph.group(0))) == set(HOUSE_SKILLS)
+
+
 @pytest.mark.parametrize(
     "skill", [skill for skill in HOUSE_SKILLS if skill not in EXECUTOR_WAITING_LIST]
 )
@@ -792,6 +811,16 @@ def test_chaque_skill_maison_nomme_ses_executants(skill: str) -> None:
     """
     assert cites_an_executor(skill_prose(skill), ROLE_NAMES), (
         f"`{skill}` ne nomme aucun rôle ni aucun script, et n'est pas en liste d'attente"
+    )
+
+
+@pytest.mark.parametrize("skill", EXECUTOR_WAITING_LIST, ids=EXECUTOR_WAITING_LIST.keys())
+def test_un_skill_en_liste_d_attente_ne_nomme_encore_aucun_executant(skill: str) -> None:
+    """Le cliquet : un skill qui se met à déléguer sort de la liste d'attente dans le même commit,
+    sinon son entrée l'exempterait en silence du test précédent."""
+    assert not cites_an_executor(skill_prose(skill), ROLE_NAMES), (
+        f"`{skill}` nomme un exécutant : retire-le d'`EXECUTOR_WAITING_LIST` "
+        f"(lot {EXECUTOR_WAITING_LIST[skill]} de #134)"
     )
 
 
