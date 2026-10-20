@@ -145,7 +145,8 @@ soit. Recommander un degré de parallélisme raisonnable (souvent 2–4, ou le n
 plutôt que tout d'un coup. La question nomme les sessions que l'étape 3 démarrera, demande du même
 coup l'accord d'archiver chacune après le merge de sa PR (étape 8) et celui que chacune lance son
 `verificateur` d'avant-go (étape 6), et, si la session lead est en
-dessous d'Opus 5.5, effort `max`, de l'y passer d'abord : la première session fixe le plafond de
+dessous d'Opus 5.5, effort `max`, de l'y passer d'abord quand une issue du lot est au barème `max`
+— le lead tourne sinon à `high` (#134, décision 4) : la première session fixe le plafond de
 l'arbre (`sessions-liees.md`, « Héritage »). C'est la réponse à cette question qui ouvre le seul
 tour où le lead peut démarrer les sessions.
 
@@ -161,7 +162,7 @@ le lead démarre d'un coup une session par issue retenue, une par `start_session
 dans un dossier simple (description de l'outil, lue le 2026-10-18), et les premiers gestes des
 sessions basculeraient tour à tour la même branche. L'effort de chaque session suit le
 barème de la coordinatrice (même référence, point 3), sous le plafond du lead (question de
-l'étape 2).
+l'étape 2), fixé au démarrage et jamais changé en cours de session (#134, D-15).
 
 `start_session` rend le `session_id` (`local_…`) de chaque session : c'est son identité et
 l'adresse de ses messages (`sessions-liees.md`, « Identité »). Le lead l'inscrit au tableau
@@ -294,11 +295,12 @@ Premier geste, avant toute écriture :
 `git fetch origin && git checkout -b <type>/<slug> --no-track origin/main`
 (.claude/skills/cycle-pr/references/sessions-liees.md, « Premier geste »). Puis provisionne ton
 worktree : `pr-paralleles` Étape 3, « Provisionner son worktree ».
-Charge le skill `task-observer` s'il est installé (session longue ; le journal est hors du
+Charge le skill `task-observer` s'il est installé (session PR ; le journal est hors du
 worktree, chemin dans CLAUDE.md). Lis CLAUDE.md, .claude/pipeline.config.md et ta mémoire de phase.
 
-Réalise le cycle complet de l'issue #N en invoquant le skill `cycle-pr` (outil Skill) avec N —
-brief : commentaire de l'issue.
+Porte le cycle complet de l'issue #N et délègue le code (`cycle-pr` 3.1), en invoquant le skill
+`cycle-pr` (outil Skill) avec N — brief : commentaire de l'issue. Tu lances toi-même ton
+`verificateur` d'avant-go (`cycle-pr` Étape 7).
 Tu es autorisé à lancer l'équipier `relecteur` de l'Étape 4.2 : **un seul pour toute la PR**, à
 qui reviennent la seconde passe et la relance par `SendMessage`. Cette
 invocation de `cycle-pr` vaut demande de l'utilisateur.
