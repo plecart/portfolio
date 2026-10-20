@@ -76,7 +76,10 @@ l'écran : c'est la session PR qui prend l'arrêt humain, **une fois par PR**, �
 
 Les commits (SHA et titre), le compte rendu de chaque cleanup pass (`## 🧹 Cleanup pass`,
 `.claude/rules/cleanup-verbatim.md`), les `[T]` tranchées et leur source, les `[V]` avec
-l'hypothèse retenue, ce qui reste du bloc s'il en reste.
+l'hypothèse retenue, le chiffre de `git diff --stat <base>...HEAD` après chaque commit
+(`cycle-pr` 3.5), les vides ou hors-périmètre relevés — sans issue ni brouillon
+(`.claude/rules/contraintes.md`, « Création d'issues en cours de cycle ») —, ce qui reste du bloc
+s'il en reste.
 
 ## Effort
 

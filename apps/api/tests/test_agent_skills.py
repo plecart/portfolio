@@ -2031,8 +2031,30 @@ def texte_normalise(fichier: str) -> str:
 # « Une tâche par session » (#134, lot 2b) : ce que `CLAUDE.md` « Orchestration » et
 # « Observation continue » disent de la délégation — un énoncé par point du critère 2b qui les
 # nomme, et la phrase de `cycle-pr` 4.2 qui en dépend.
+#
+# **Une épingle garde aussi la moitié restrictive de son énoncé** — « jamais », « seule »,
+# « seulement », « ne … pas », « reste à » : épingler la moitié qui fait laisse retirer en vert la
+# moitié qui interdit (relecture de la PR #140, passe 1, I-2 : 5 sondes sur 5 VERTES). Dénombrement
+# écrit avant le correctif, sur `b82a8fe` : **24** moitiés restrictives dans les énoncés de ce delta,
+# **7** épinglées, **17** non — 15 gardées par une ancre allongée ou neuve ci-dessous, 2 (« contexte
+# complet », « cleanup pass, review avant merge ») par le test d'absence qui suit la table.
 INVARIANTS_DU_CONTEXTE_COURT = {
     "une-tache-par-session": ("CLAUDE.md", "**Une tâche par session.**"),
+    "le-reste-part-dans-un-contexte-neuf": (
+        "CLAUDE.md",
+        "Le reste part dans un contexte neuf qui meurt avec sa tâche",
+    ),
+    "effort-d-une-session-pr-fixe-au-demarrage": (
+        "CLAUDE.md",
+        (
+            "L'effort d'une session PR se fixe à son démarrage — le brief de `start_session`, ou"
+            " `/effort` avant le briefing — et ne change plus en cours de session"
+        ),
+    ),
+    "effort-max-au-go-seulement": (
+        "CLAUDE.md",
+        "la coordinatrice et le lead ne reçoivent `/effort max` qu'au go, avant tout enfant",
+    ),
     "la-session-de-dialogue-garde-merge-et-cloture": (
         "CLAUDE.md",
         "arbitrages `decisions-vs-doc`, dialogue avec l'utilisateur, merge et clôture",
@@ -2044,12 +2066,28 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "task-observer-reste-aux-sessions": ("CLAUDE.md", "`task-observer` reste aux sessions"),
     "reprise-par-message": ("CLAUDE.md", "**Un sous-agent arrêté se reprend par message**"),
+    "reprise-jamais-un-equipier-neuf": (
+        "CLAUDE.md",
+        "jamais un équipier neuf pour une retouche de la même tranche",
+    ),
     "lire-borne": ("CLAUDE.md", "puis lire la plage (`Read` avec `offset` et `limit`)"),
+    "lire-borne-jamais-un-fichier-entier": (
+        "CLAUDE.md",
+        "jamais un fichier entier pour une fonction, une section ou une ligne",
+    ),
     "role-visible-a-une-session-neuve": ("CLAUDE.md", "n'est visible qu'à une session **neuve**"),
+    "role-visible-la-reprise-garde-la-liste": (
+        "CLAUDE.md",
+        "la reprise d'une conversation garde la liste de son démarrage",
+    ),
     "repli-general-purpose-borne": ("CLAUDE.md", "pour un rôle **sans** liste `tools:` seulement"),
     "cycle-pr-repli-borne": (
         CYCLE_PR_SKILL,
         "un rôle à outils réduits se lance depuis une session neuve (`CLAUDE.md`, « Orchestration »)",
+    ),
+    "cycle-pr-repli-hors-tour-humain": (
+        CYCLE_PR_SKILL,
+        "que la session PR ne démarre pas hors d'un tour humain",
     ),
     "sessions-liees-une-par-sous-lot": (
         "CLAUDE.md",
@@ -2073,34 +2111,54 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         ".claude/rules/contraintes.md",
         "Un `developpeur` ne la pose pas : il note son hypothèse et rend la `[V]` dans son rapport",
     ),
+    "porteur-voie-v-executant-et-releveur": (
+        ".claude/rules/contraintes.md",
+        "`executant` et `releveur` ne classent aucune question, ils remontent tout choix",
+    ),
     "porteur-voie-c": (
         ".claude/rules/contraintes.md",
         "Un `developpeur` s'arrête et remonte les deux citations",
     ),
     "porteur-explorer-plutot-que-demander": (
         ".claude/rules/contraintes.md",
-        "par un `releveur` pour un relevé, l'`executant` pour une cartographie",
+        (
+            "par un `releveur` pour un relevé, l'`executant` pour une cartographie (`cycle-pr`"
+            " Étape 1), la conclusion restant à la session"
+        ),
     ),
     "porteur-creation-d-issues": (
         ".claude/rules/contraintes.md",
-        "un sous-agent le remonte dans son rapport, sans issue ni brouillon",
+        "un sous-agent n'ouvre ni issue ni brouillon, le `developpeur` remonte le vide dans son rapport",
     ),
     "porteur-ecritures-distantes": (".claude/rules/contraintes.md", "La relecture est à qui écrit"),
     "porteur-maintenance-continue": (
         ".claude/rules/contraintes.md",
         "l'auteur du commit — le `developpeur` pour la doc descriptive de son bloc",
     ),
+    "porteur-maintenance-amendement-reste-a-la-session": (
+        ".claude/rules/contraintes.md",
+        "l'amendement d'une source de vérité reste à la session de dialogue",
+    ),
     "porteur-points-d-arret-humains": (
         ".claude/rules/contraintes.md",
-        "elle coupe le bloc du `developpeur` au commit qui assemble l'écran",
+        (
+            "C'est la session PR qui prend l'arrêt : elle coupe le bloc du `developpeur` au commit"
+            " qui assemble l'écran"
+        ),
     ),
     "porteur-cleanup-holistique": (
         ".claude/rules/cleanup-verbatim.md",
-        "le cleanup holistique, un `developpeur` neuf sur le diff complet de la branche",
+        (
+            "le cleanup holistique, un `developpeur` neuf sur le diff complet de la branche, qui ne"
+            " rend que des commits"
+        ),
     ),
     "porteur-rapporter-a-voix-haute": (
         ".claude/rules/cleanup-verbatim.md",
-        "Un `developpeur` le rend dans son rapport final",
+        (
+            "Un `developpeur` le rend dans son rapport final — son contexte meurt avec lui —, et la"
+            " session PR le relaie aux Notes de la PR"
+        ),
     ),
     "porteur-denombrement-avant-correctif": (
         ".claude/rules/cleanup-verbatim.md",
@@ -2108,7 +2166,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "porteur-gabarit-a-chaque-commit": (
         ".claude/rules/taille-pr.md",
-        "Le `developpeur` rend le chiffre avec chaque commit",
+        "Le `developpeur` rend le chiffre avec chaque commit et s'arrête au seuil que porte son brief",
     ),
     "porteur-deux-sorties": (
         ".claude/rules/decisions-vs-doc.md",
@@ -2117,9 +2175,20 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " `vers-issues` hors cycle ; lead d'une vague, coordinatrice d'une issue en lots"
         ),
     ),
+    "porteur-deux-sorties-seule-a-lancer": (
+        ".claude/rules/decisions-vs-doc.md",
+        (
+            "seule à lancer `/contradiction` (qui propage aux rangs inférieurs et aux issues) ; les"
+            " sous-agents remontent les deux citations"
+        ),
+    ),
     "porteur-niveau-ponytail": ("CLAUDE.md", "le niveau voyage dans le brief"),
     "porteur-glossaire": ("CLAUDE.md", "Les noms de tests sont à qui les écrit"),
     "porteur-context7": ("CLAUDE.md", "parmi les rôles, ceux dont la liste `tools:` le porte"),
+    "porteur-context7-un-role-sans-remonte": (
+        "CLAUDE.md",
+        "un rôle qui ne l'a pas remonte la question à son appelant",
+    ),
     "renvoi-deux-sorties-claude-md": (
         "CLAUDE.md",
         "amendé par la session de dialogue qui a décidé",
@@ -2131,6 +2200,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "renvoi-rapporter-a-voix-haute": (
         ".claude/agents/developpeur.md",
         "le compte rendu de chaque cleanup pass",
+    ),
+    "renvoi-gabarit-et-vides-au-rapport": (
+        ".claude/agents/developpeur.md",
+        "le chiffre de `git diff --stat <base>...HEAD` après chaque commit",
     ),
     # Les lignes de `pipeline.config.md` qui disaient « lancée par `cycle-pr` » : 4 commandes
     # (« test brut », front compris, « validation », « relecture », « sécurité »), chacune son rôle.
@@ -2174,6 +2247,17 @@ INVARIANTS_DU_CONTEXTE_COURT = {
 def test_chaque_invariant_du_contexte_court_garde_sa_phrase(fichier: str, phrase: str) -> None:
     """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
     assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
+
+
+# Ce que la session de dialogue ne garde plus, et ce qu'un équipier ne reçoit plus (critère 2b :
+# « = 0 » sur `CLAUDE.md`, 2 au 2026-10-20 sur `81ae8c3`).
+RETIRES_DE_L_ORCHESTRATION = ["cleanup pass, review avant merge", "contexte complet"]
+
+
+@pytest.mark.parametrize("phrase", RETIRES_DE_L_ORCHESTRATION)
+def test_l_orchestration_ne_rend_pas_ce_qu_elle_a_retire(phrase: str) -> None:
+    """Vu rouge sur `81ae8c3`, où chacune est présente une fois."""
+    assert phrase not in texte_normalise("CLAUDE.md"), f"`CLAUDE.md` porte encore « {phrase} »"
 
 
 # L'**ordre** du protocole de la coordinatrice : chaque couple d'ancres, la première avant la
