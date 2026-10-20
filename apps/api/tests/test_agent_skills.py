@@ -484,6 +484,11 @@ ROLE_FRONTMATTER_CLAIMS: list[tuple[str, str, str | None]] = [
     ("verificateur", "isolation", None),
     # « Tu n'as pas `Write` : la sortie y va par redirection » (`releveur.md`).
     ("releveur", "tools", "Write"),
+    # « Tes outils sont `Bash, Read, Grep, Glob, Edit, Write` : ni `Skill` ni `playwright` »
+    # (`developpeur.md`) — sans liste, il recevrait tous les outils, `playwright` compris.
+    ("developpeur", "tools", "playwright"),
+    # Même phrase : `ponytail` se lit par `Read`, la liste des skills ne pèse pas sur son plancher.
+    ("developpeur", "tools", "Skill"),
 ]
 
 
@@ -494,7 +499,7 @@ ROLE_FRONTMATTER_CLAIMS: list[tuple[str, str, str | None]] = [
 @pytest.mark.parametrize(
     ("role", "field", "forbidden"),
     ROLE_FRONTMATTER_CLAIMS,
-    ids=[f"{role}-{field}" for role, field, _ in ROLE_FRONTMATTER_CLAIMS],
+    ids=[f"{role}-{field}-{forbidden}" for role, field, forbidden in ROLE_FRONTMATTER_CLAIMS],
 )
 def test_le_frontmatter_d_un_role_tient_ce_que_sa_prose_affirme(
     role: str, field: str, forbidden: str | None
