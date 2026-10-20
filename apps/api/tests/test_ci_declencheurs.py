@@ -413,14 +413,13 @@ READY_EVENT = "ready_for_review"
 
 
 def pipeline_prose() -> list[str]:
-    """Les fichiers de prose de la pipeline : le Markdown de `.claude/`, `CONTRIBUTING.md` et
-    `CLAUDE.md`, tels que le prochain commit peut les contenir — un worktree sous `.claude/`,
-    ignoré par git, n'en fait pas partie."""
+    """Les fichiers de la pipeline : tout `.claude/` — skills, règles, rôles, scripts, réglages —,
+    `CONTRIBUTING.md` et `CLAUDE.md`, tels que le prochain commit peut les contenir — un worktree
+    sous `.claude/`, ignoré par git, n'en fait pas partie."""
     return [
         name
         for name in repository_files()
-        if (name.startswith(".claude/") and name.endswith(".md"))
-        or name in {"CONTRIBUTING.md", "CLAUDE.md"}
+        if name.startswith(".claude/") or name in {"CONTRIBUTING.md", "CLAUDE.md"}
     ]
 
 
@@ -430,7 +429,7 @@ def test_aucune_prose_ne_promet_un_run_au_passage_en_ready() -> None:
     citing = [
         name
         for name in pipeline_prose()
-        if READY_EVENT in (REPOSITORY_ROOT / name).read_text(encoding="utf-8")
+        if READY_EVENT.encode() in (REPOSITORY_ROOT / name).read_bytes()
     ]
     assert citing == []
 
@@ -442,3 +441,30 @@ def test_cycle_pr_lit_le_run_du_sha_de_tete_avant_de_sortir_du_draft() -> None:
     step = text[text.index("## Étape 5 ") : text.index("## Étape 6 ")]
     assert "actions/runs?head_sha=" in step
     assert step.index("actions/runs?head_sha=") < step.index("gh pr ready <numéro>")
+
+
+# Chaque issue de la lecture du run du SHA de tête, et le mot que l'Étape 5 doit porter pour elle
+# avant `gh pr ready`. Dénombré le 2026-10-20 (relecture de la PR #137, passe 2) : une lecture qui
+# ne rendait que la conclusion traitait 4 issues sur 6 — une réouverture laisse deux runs sur la
+# même tête, `skipped` puis `success`, et la ligne `skipped` relançait une réouverture en boucle ;
+# `cancelled` n'avait pas de voie.
+RUN_READINGS = {
+    "plusieurs runs : le plus récent décide": "**première ligne**",
+    "statut lu avec la conclusion": r'"\(.created_at) \(.status) \(.conclusion)"',
+    "vert": "- `success` →",
+    "en cours": "- `in_progress` ou `queued`",
+    "remplacé": "- `cancelled` →",
+    "draft jamais repoussée": "- `skipped` →",
+    "aucun run": "- aucune ligne →",
+    "rouge": "- toute autre conclusion",
+}
+
+
+@pytest.mark.parametrize("anchor", RUN_READINGS.values(), ids=RUN_READINGS.keys())
+def test_l_etape_5_traite_chaque_issue_de_la_lecture_du_run(anchor: str) -> None:
+    """Chaque issue a sa voie, écrite avant `gh pr ready` : un agent qui suit le skill dans l'ordre
+    la connaît au moment de lire le run (obs 30)."""
+    text = CYCLE_PR.read_text(encoding="utf-8")
+    step = text[text.index("## Étape 5 ") : text.index("## Étape 6 ")]
+    assert anchor in step
+    assert step.index(anchor) < step.index("gh pr ready <numéro>")
