@@ -30,14 +30,18 @@ thème — si ce champ est vide, ces deux propositions ne se déclenchent jamais
 ## Vocabulaire
 
 Utiliser le glossaire de domaine du projet (`UBIQUITOUS_LANGUAGE.md` s'il existe) dans les
-noms de tests, les titres d'issues et de PR. Respecter les ADR de la zone touchée.
+noms de tests, les titres d'issues et de PR. Respecter les ADR de la zone touchée. Les noms de tests
+sont à qui les écrit — le `developpeur`, ou la session dans la tranche qu'elle spécifie à
+l'`executant` ; les titres d'issues et de PR, à la session de dialogue.
 
 ## Documentation des bibliothèques
 
 Pour toute question sur une lib/framework de la stack (API, config, migration de version),
 **utiliser en priorité le serveur MCP `context7`** plutôt que la mémoire ou une recherche web :
 il renvoie la doc à jour de la lib demandée, ce qui économise des tokens et évite les réponses
-périmées. Installé par `init-projet` (`claude mcp list` pour vérifier).
+périmées. Installé par `init-projet` (`claude mcp list` pour vérifier). La session l'a ; parmi les
+rôles, ceux dont la liste `tools:` le porte — `developpeur`, `relecteur` ; un rôle qui ne l'a pas
+remonte la question à son appelant.
 
 ## Minimalisme (`ponytail`)
 
@@ -47,8 +51,11 @@ fiable : c'est cette ligne qui l'active. Aligné sur la doctrine KISS/DRY/YAGNI 
 `.claude/rules/contraintes.md`.
 
 Niveau par défaut : `full`. Se change par `/ponytail lite|full|ultra` et persiste jusqu'à la fin
-de la session. Ponctuellement : `/ponytail-review` (relecture anti-sur-ingénierie d'un diff),
-`/ponytail-audit` (dépôt entier), `/ponytail-debt` (raccourcis marqués `ponytail:` à reprendre).
+de la session. Un sous-agent ne le charge pas par l'outil Skill : le `developpeur` le lit (`Read`)
+au niveau que nomme son brief — le niveau voyage dans le brief —, et la tranche d'un `executant`
+arrive déjà minimale de la session qui l'a spécifiée. Ponctuellement : `/ponytail-review`
+(relecture anti-sur-ingénierie d'un diff), `/ponytail-audit` (dépôt entier), `/ponytail-debt`
+(raccourcis marqués `ponytail:` à reprendre).
 
 **Ce qu'il ne simplifie jamais** : validation aux frontières de confiance, gestion d'erreurs qui
 évite une perte de données, sécurité, accessibilité, et tout ce qui est explicitement demandé.
@@ -62,6 +69,8 @@ en amont de l'écriture, le prompt de relecture après. L'un ne dispense pas de 
 
 Invoquer le skill `task-observer` au début d'une session **longue ou structurée** — un cycle de PR,
 un audit, une passe de spec. Pas pour une question, une commande isolée ou un correctif court.
+**Seule une session** l'invoque et tient le plafond ci-dessous ; un sous-agent remonte ses
+observations candidates dans son rapport, et la session qui l'a lancé décide de les consigner.
 
 **Seuil de consignation — haut.** Ne consigner que ce qui changerait le comportement d'un skill :
 une règle violée de façon répétée, une correction de l'utilisateur qui se généralise, un manque
@@ -75,18 +84,23 @@ que si l'utilisateur le demande explicitement.
 
 Au chargement de **n'importe quel skill**, consulter le journal d'observations pour les entrées
 OPEN rattachées à ce skill et en appliquer les enseignements au travail en cours — même si le
-fichier du skill n'a pas encore été mis à jour.
+fichier du skill n'a pas encore été mis à jour. Un sous-agent ne lit pas le journal (92 116 octets
+le 2026-10-20 à 16 h UTC, population vivante) : la session qui le lance met dans son brief les
+entrées OPEN qui touchent son bloc.
 
 **Emplacement du journal, à ne pas laisser deviner :** `C:\Users\pacom\.claude\projects\e--Projets-Portfolio\skill-observations\log.md`. C'est un
 chemin **stable**, hors du dépôt. Ne jamais l'ancrer sur le répertoire courant : `pr-paralleles`
 travaille dans des **git worktrees** éphémères, et un journal écrit là disparaît avec le worktree.
 
-## Orchestration — équipiers par rôle
+## Orchestration — une tâche par session, des équipiers par rôle
 
-La session principale est le **lead**. Elle garde ce qui demande le plus de jugement : briefing,
-planification, arbitrages `decisions-vs-doc`, cleanup pass, review avant merge, dialogue avec
-l'utilisateur. Le reste se délègue à des équipiers définis dans `.claude/agents/` — **le modèle
-n'est pas choisi par tâche, il est choisi par rôle** au moment de créer l'équipier :
+**Une tâche par session.** La session de dialogue — la session PR dans un cycle ; hors cycle,
+celle de `triage`, d'`interroge-moi` ou de `vers-issues` ; le lead d'une vague, la coordinatrice
+d'une issue en lots — garde ce qui demande le plus de jugement : briefing, planification,
+arbitrages `decisions-vs-doc`, dialogue avec l'utilisateur, merge et clôture. Le reste part dans
+un contexte neuf qui meurt avec sa tâche : un équipier défini dans `.claude/agents/`, une session
+liée, ou un script quand le geste revient à l'identique d'un cycle à l'autre. **Le modèle n'est
+pas choisi par tâche, il est choisi par rôle** au moment de créer l'équipier :
 
 | Rôle | Modèle | Confier |
 |---|---|---|
@@ -96,27 +110,51 @@ n'est pas choisi par tâche, il est choisi par rôle** au moment de créer l'éq
 | `releveur` | Haiku, effort `medium` | relevés sans décision : tests, lint, format, croisements, édits verbatim, écritures distantes verbatim |
 | `verificateur` | Opus, effort `medium` | la vérification d'avant-go d'une PR (`cycle-pr` Étape 7), **éphémère, un par (PR, go)**, sans worktree et sans lancer de commande du projet |
 
-**Ce qui rend un rôle éligible au modèle le moins cher : un mandat sans aucune décision** — pas
-une tâche qui paraît facile. Le mandat (ce que le rôle peut trancher) et l'effort (la profondeur
-de réflexion) sont deux axes : un rôle sans décision peut porter un effort élevé, qui paie alors
-de la vérification et non de l'architecture. Déléguer à un tel rôle suppose que le lead ait écrit
-la tranche entièrement — fichiers, signatures, tests attendus, comportement — avant l'envoi : si
-la spécifier demande encore de réfléchir, c'est le travail du lead. Chaque rôle dit en tête de
-son fichier s'il tranche.
+**Trois axes par rôle, chacun dans son frontmatter.** Le **mandat** — ce que le rôle peut
+trancher — choisit le modèle : **ce qui rend un rôle éligible au modèle le moins cher, c'est un
+mandat sans aucune décision**, pas une tâche qui paraît facile. Chaque rôle dit en tête de son
+fichier s'il tranche. L'**effort** (`effort`) est la profondeur de réflexion : un rôle sans
+décision peut en porter un élevé, qui paie alors de la vérification et non de l'architecture. La
+**liste `tools:`** fixe le plancher : 26 à 31 K de contexte au premier appel pour les quatre rôles
+mesurés — `releveur`, `executant`, `developpeur`, `relecteur`, le 2026-10-20 (journal de spec de
+l'issue #134, lot 2a) —, contre 74,5 K pour `general-purpose` sans liste, sur Haiku (étude du
+2026-10-19, dossier `etudes/` voisin du journal d'observations, §15.2). Déléguer à un rôle sans
+décision suppose que la session ait écrit la tranche entièrement — fichiers, signatures, tests
+attendus, comportement — avant l'envoi : si la spécifier demande encore de réfléchir, c'est son
+travail. L'effort de la session se fixe par `/effort`.
 
-L'effort d'un rôle se fixe dans son frontmatter (`effort`) ; celui de la session, par `/effort`.
+**Le brief porte ce que l'équipier ne charge pas.** Un sous-agent ne voit jamais la conversation
+de sa session (même étude, §15.2) : son brief porte le bloc, le niveau `ponytail` (« Minimalisme »)
+et les entrées OPEN du journal qui le touchent (« Observation continue ») ; `task-observer` reste
+aux sessions.
 
-**Une commande ponctuelle se lance soi-même.** Un équipier démarre avec un contexte complet ; le
-déléguer coûte plus qu'un `git status` ou un test isolé. La délégation ne paie que pour un **bloc
-de travail** : une tranche d'issue, une suite à faire passer au vert, une cartographie.
+**Un sous-agent arrêté se reprend par message** — `SendMessage`, avec la réponse, dans son propre
+contexte (mesuré le 2026-10-20 sur un `developpeur`, Notes de la PR #139) : jamais un équipier
+neuf pour une retouche de la même tranche, un neuf au bloc suivant.
 
-Un rôle ajouté ou modifié dans `.claude/agents/` n'est visible qu'à la session suivante (la liste
-des types est figée au démarrage — repli : `general-purpose` avec le modèle du rôle).
+**Une commande ponctuelle se lance soi-même.** Un équipier démarre à son plancher ; le déléguer
+coûte plus qu'un `git status` ou un test isolé. La délégation ne paie que pour un **bloc de
+travail** — une tranche d'issue, une suite à faire passer au vert, une cartographie : à partir de
+2 appels pour Haiku ou Sonnet, de 4 pour Opus (calculé, même étude, §15.7 ; non mesuré en
+situation).
+
+**Lire borné.** Session ou sous-agent, localiser d'abord (`grep -n`), puis lire la plage (`Read`
+avec `offset` et `limit`) : jamais un fichier entier pour une fonction, une section ou une ligne.
+Ce qui est lu reste dans le contexte, relu à chaque appel suivant.
+
+Un rôle ajouté ou modifié dans `.claude/agents/` n'est visible qu'à une session **neuve** : la
+reprise d'une conversation garde la liste de son démarrage (mesuré le 2026-10-20, obs 121), et une
+session que l'application démarre dans un de ses worktrees lit les rôles de la copie principale
+(mesuré le même jour, obs 123). Repli : `general-purpose` avec le modèle du rôle, pour un rôle
+**sans** liste `tools:` seulement — il rendrait à un rôle à outils réduits tous les outils et le
+plancher de 74,5 K ; celui-là se lance depuis une session neuve.
 
 **Sessions liées.** Les équipiers ci-dessus sont des sous-agents d'une session. Une session peut
 aussi en démarrer d'autres, complètes, dans l'application de bureau (`start_session`) : le lead
 d'une vague `pr-paralleles`, une par issue — à son étape 0 pour la trier et l'interroger, puis
-pour la développer ; la coordinatrice d'une issue en lots, une par lot.
+pour la développer ; la coordinatrice d'une issue en lots, une par lot et une par sous-lot — **un
+sous-lot est un lot** ; la session PR, une session de relecture par PR (lot 3 de #134 ; d'ici là,
+le sous-agent `relecteur` de `cycle-pr` 4.2).
 Leur protocole — héritage, identité, premier geste, messages, fin de travail, passation,
 nettoyage — vit dans `.claude/skills/cycle-pr/references/sessions-liees.md`, seule source.
 
