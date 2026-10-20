@@ -19,7 +19,8 @@ Règles, par motif `fnmatch` — où `*` traverse `/` :
   générés du front sont à jour (`WEB`) ;
 - `infra` : un chemin hors du harnais (`HARNESS`). Liste d'exclusion, jamais d'inclusion : un
   fichier inconnu fait tourner le job. Les images copient `apps/api` et `apps/web/dist`
-  (`infra/api/Dockerfile`, `infra/caddy/Dockerfile`), et les tests du back tournent dans `api` ;
+  (`infra/api/Dockerfile`, `infra/caddy/Dockerfile`), et les tests du back tournent dans `api` —
+  sauf les modules d'appui que `make image-test` charge aussi (`IMAGE_TESTS`), qui le font tourner ;
 - les deux : un chemin de `ALL`, qui décide des jobs eux-mêmes, ou un chemin que `git` a mis
   entre guillemets (`QUOTED`) — il le fait pour tout chemin non ASCII, que plus aucun motif
   n'apparie ; un job sauté à tort cacherait un rouge, un job lancé pour rien ne coûte que des
@@ -41,6 +42,16 @@ HARNESS = (
     "apps/api/tests/*",
     ".github/dependabot.yml",
     ".github/workflows/restore.yml",
+)
+# Les modules de `apps/api/tests/` que `make image-test` (job `infra`) charge : son greffon
+# `process_environment` et ce que `infra/tests/` importe, directement ou non. Recalculés par
+# `test_ci_declencheurs.py`, qui rougit sur un import ajouté sans eux.
+IMAGE_TESTS = (
+    "apps/api/tests/call_witness.py",
+    "apps/api/tests/process_environment.py",
+    "apps/api/tests/test_env.py",
+    "apps/api/tests/test_infra.py",
+    "apps/api/tests/test_supply_chain.py",
 )
 # Ce qui décide des jobs eux-mêmes.
 ALL = ("Makefile", ".github/workflows/ci.yml", "infra/ci/changed_jobs.py")
@@ -71,7 +82,7 @@ def jobs_for(paths: Iterable[str]) -> dict[str, bool]:
     delta = [path for path in paths if path]
     return {
         "web": any(matches(path, (*WEB, *ALL, QUOTED)) for path in delta),
-        "infra": any(not matches(path, HARNESS) for path in delta),
+        "infra": any(path in IMAGE_TESTS or not matches(path, HARNESS) for path in delta),
     }
 
 
