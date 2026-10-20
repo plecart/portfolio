@@ -1175,9 +1175,9 @@ Puis **cocher les critères d'acceptation soldés**, dans le **corps** de l'issu
 commentaire de **brief** (`- [ ]` → `- [x]`) : ils ont été vérifiés à l'Étape 7, il ne reste qu'à
 l'enregistrer là où un lecteur le cherche. Le corps par
 `ecriture-relue.py checkbox patch <N> --case <ancre> …`, puis le brief par
-`ecriture-relue.py brief patch <N> --case <ancre> …`, une ancre par critère : un extrait de sa
-ligne qu'aucune autre case ne porte. Une ancre introuvable ou ambiguë refuse l'appel entier sans
-rien écrire ; une case déjà cochée se dit. Un critère atteint sous une forme **amendée** se coche
+`ecriture-relue.py brief patch <N> --case <ancre> …`, une ancre par critère : un extrait de son
+texte, sans le marqueur `- [ ]`, qu'aucune autre case ne porte. Une ancre introuvable ou ambiguë
+refuse l'appel entier sans rien écrire ; une case déjà cochée se dit. Un critère atteint sous une forme **amendée** se coche
 quand même — l'amendement est tracé au journal de spec du corps. Le brief d'une issue **close** est
 un artefact daté : on coche ses cases, on ne réécrit pas son texte. (Tant que l'issue était
 ouverte, c'était l'inverse : une réconciliation `repercussions` qui falsifiait une de ses lignes
