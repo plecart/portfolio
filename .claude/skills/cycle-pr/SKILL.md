@@ -572,13 +572,12 @@ sous-agent `relecteur` en est le repli écrit (même référence, « Repli »). 
 dans `.claude/agents/` pendant cette session n'existe pas encore pour l'outil Agent : le repli
 `general-purpose` ne vaut que pour un rôle sans liste `tools:`, et `relecteur` en a une — un rôle à
 outils réduits se lance depuis une session neuve (`CLAUDE.md`, « Orchestration »), que la session PR
-ne démarre pas hors d'un tour humain : d'ici là, c'est le cas « le harness ne permet pas » ci-dessous.
+ne démarre pas hors d'un tour humain : d'ici là, la relecture passe au relecteur humain,
+ci-dessous.
 L'invocation de `cycle-pr` — `/cycle-pr` tapé par l'utilisateur, ou prompt de démarrage d'une vague
-`pr-paralleles` — **vaut demande** pour cet agent : une consigne de session « pas de sous-agent
-sans demande de l'utilisateur » est déjà satisfaite. Si le harness ne permet réellement pas de
-lancer un sous-agent : rendre la main au relecteur humain avec le diff et le prompt de relecture
-verbatim, et le noter dans la section « Relecture indépendante » du body de PR — jamais de saut
-silencieux.
+`pr-paralleles` — **vaut demande** pour ce sous-agent : une consigne de session « pas de
+sous-agent sans demande de l'utilisateur » est déjà satisfaite. S'il ne peut pas même être lancé,
+la relecture passe au relecteur humain (même référence, « Repli »).
 
 **Les portes bon marché d'abord.** Un relecteur coûte un contexte entier ; ce qu'une commande
 trouve en dix secondes ne se paie pas en jetons. Avant chaque appel, dans cet ordre :
@@ -764,7 +763,8 @@ précédente voyait ? ». Elle revient à la **session de relecture de la PR**, 
 code neuf écrit sous pression de conclure — c'est la partie la moins éprouvée de la PR, pas la plus
 sûre. Après la relance : un bloquant qu'elle trouve se corrige et rouvre une relance ; un important
 se corrige, se prouve par un test vu rouge (3.1), et n'est pas relu par un tiers ; un mineur suit la
-règle ci-dessus. La boucle s'arrête là, et le body le dit. Les constats écartés sont notés avec leur raison dans le body (Étape 5).
+règle ci-dessus. La boucle s'arrête là, et le body le dit. Les constats écartés sont notés avec
+leur raison dans le body (Étape 5).
 
 C'est **cette fermeture** — et elle seule — qui autorise le nettoyage de la session de relecture
 (Étape 8) ou le retrait du worktree du sous-agent de repli : tant que la boucle peut rouvrir une
@@ -848,8 +848,8 @@ anciens ne comptent plus. Sa conclusion :
 
 - `success` → sortir du draft ;
 - `in_progress` ou `queued`, conclusion `null` → le run tourne : fin de tour, le moniteur de PR
-  de l'application réveillant la session à sa conclusion — jamais une attente en tour ni une sonde
-  planifiée ;
+  de l'application réveillant la session à sa conclusion (consignes de l'application à la session,
+  lues le 2026-10-20) — jamais une attente en tour ni une sonde planifiée ;
 - `cancelled` → relire le SHA de tête (`gh pr view <numéro> --json headRefOid`) : s'il a changé,
   lire le run du nouveau ; sinon, annulé sans remplaçant, « Si aucun run n'apparaît », ci-dessous ;
 - `skipped` → l'ouverture d'une draft jamais repoussée depuis, que le garde du job `api` saute
