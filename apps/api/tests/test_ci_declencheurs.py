@@ -63,9 +63,12 @@ API_OUTPUTS = {job: f"${{{{ steps.jobs.outputs.{job} }}}}" for job in GATED_JOBS
 # L'étape `jobs`, sans son nom : le delta de la PR contre sa base — le checkout d'une PR est son
 # commit de fusion, `HEAD^1` la base qu'il combine —, passé au script. `shell: bash` lance
 # `bash -eo pipefail` (doc GitHub « Workflow syntax », `jobs.<job_id>.steps[*].shell`) : sans lui,
-# un `git diff` en échec rendrait `false` pour les deux jobs, en silence.
+# un `git diff` en échec rendrait `false` pour les deux jobs, en silence. `--no-renames` : sans lui,
+# un renommage ne s'écrit que sous son nouveau chemin (mesuré le 2026-10-20 : `apps/web/a.tsx`
+# déplacé vers `docs/` ne rend que `docs/a.tsx`).
 CHANGED_JOBS_COMMAND = (
-    'git diff --name-only HEAD^1 HEAD | python3 infra/ci/changed_jobs.py >> "$GITHUB_OUTPUT"'
+    "git diff --name-only --no-renames HEAD^1 HEAD"
+    ' | python3 infra/ci/changed_jobs.py >> "$GITHUB_OUTPUT"'
 )
 JOBS_STEP = {"id": "jobs", "shell": "bash", "run": CHANGED_JOBS_COMMAND}
 
@@ -188,6 +191,7 @@ FORMS: dict[str, tuple[Guard, str, str, bool]] = {
     ),
     "étape jobs sans shell bash": (gating_findings, "        shell: bash\n", "", True),
     "commande sans GITHUB_OUTPUT": (gating_findings, ' >> "$GITHUB_OUTPUT"', "", True),
+    "commande qui suit les renommages": (gating_findings, " --no-renames", "", True),
     "web sans needs": (gating_findings, "  web:\n    needs: api\n", "  web:\n", True),
     "infra sans needs": (gating_findings, "  infra:\n    needs: api\n", "  infra:\n", True),
     # Sur `main`, `publish` perdrait l'artefact `dist` du job `web`.
@@ -229,7 +233,7 @@ def test_chaque_garde_rend_son_verdict_sur_chaque_forme(
     assert bool(findings) is expected, findings
 
 
-@pytest.mark.parametrize("guard", [concurrency_findings, gating_findings])
+@pytest.mark.parametrize("guard", dict.fromkeys(guard for guard, *_ in FORMS.values()))
 def test_le_workflow_de_ci_est_conforme(guard: Guard) -> None:
     """Le `ci.yml` du dépôt passe chaque garde."""
     assert guard(CI_WORKFLOW.read_text(encoding="utf-8")) == []

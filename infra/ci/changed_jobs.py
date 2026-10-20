@@ -2,12 +2,16 @@
 
 Lancé par la première étape du job `api` de `.github/workflows/ci.yml`, sur le delta de la PR :
 
-    git diff --name-only HEAD^1 HEAD | python3 infra/ci/changed_jobs.py >> "$GITHUB_OUTPUT"
+    git diff --name-only --no-renames HEAD^1 HEAD | python3 infra/ci/changed_jobs.py >> "$GITHUB_OUTPUT"
+
+`--no-renames` : un renommage y figure sous ses deux chemins, l'ancien et le nouveau — un fichier
+déplacé du front vers `docs/` fait donc tourner `web`.
 
 Lit sur l'entrée standard les chemins du delta, un par ligne, lignes vides ignorées, et écrit
 `web=true|false` puis `infra=true|false`. Sur une PR, les jobs `web` et `infra` ne tournent que si
 leur réponse vaut `true` ; sur un push vers `main`, le workflow ne la lit pas et tout tourne
-(ADR 0017). Le job `api` tourne toujours : la suite du back porte aussi les tests de la pipeline.
+(ADR 0017). Le job `api` tourne sur chaque push : la suite du back porte aussi les tests de la
+pipeline.
 
 Règles, par motif `fnmatch` — où `*` traverse `/` :
 
@@ -55,7 +59,7 @@ def jobs_for(paths: Iterable[str]) -> dict[str, bool]:
 
     Args:
         paths: les chemins du delta, relatifs à la racine du dépôt, tels que `git diff --name-only`
-            les écrit ; une chaîne vide est ignorée.
+            les écrit sous `--no-renames` ; une chaîne vide est ignorée.
 
     Returns:
         `{"web": …, "infra": …}`, dans cet ordre ; `False` pour les deux sur un delta vide.
