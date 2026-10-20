@@ -283,17 +283,18 @@ Chaque maillon nomme qui l'exécute ; la répartition des rôles est dans `CLAUD
    ouvre d'abord une session de triage et d'interrogatoire par issue, puis la même session
    enchaîne sur la vague.
 3bis. **Amender** — `contradiction`, lancé par la session de dialogue dès qu'une de ses décisions
-   contredit une source de vérité (section « Sources de vérité » de `.claude/pipeline.config.md`) : le document est amendé
-   par la session de dialogue qui a décidé, ou la décision est abandonnée — ou son effet déplacé
-   hors de ce que le document affirme. Déclenché par la règle `decisions-vs-doc`, à n'importe quel
-   moment.
+   contredit une source de vérité (section « Sources de vérité » de
+   `.claude/pipeline.config.md`) : le document est amendé par la session de dialogue qui a décidé,
+   ou la décision est abandonnée — ou son effet déplacé hors de ce que le document affirme.
+   Déclenché par la règle `decisions-vs-doc`, à n'importe quel moment.
 4. **Répercuter** — `repercussions` après chaque merge : confronte d'abord le delta aux sources de
    vérité (un § falsifié → `contradiction`), puis corrige la spec — corps et brief d'agent —
    des issues dont la planification est devenue fausse. Porté par la session PR en fin de
    `cycle-pr` — collecte au `releveur`, go d'édition au mainteneur dans sa fenêtre ; pour une issue
    en lots, par la coordinatrice au merge de la PR d'intégration.
 5. **Valider** — `plan-qa` → `execution-qa` → `bug-vers-issue`, chacun dans une session de
-   dialogue, proposé quand un **thème se vide** de ses issues ouvertes. La QA ne re-teste jamais ce que la CI couvre déjà.
+   dialogue, proposé quand un **thème se vide** de ses issues ouvertes. La QA ne re-teste jamais
+   ce que la CI couvre déjà.
 
 ## Les règles qui ne se négocient pas
 
