@@ -78,6 +78,9 @@ passation : <chemin> ». Inactive depuis le go, elle reprend sur ce message (`se
 « Messages »). Dans l'autre sens, un message de lot arrivé pendant un tour de la coordinatrice
 attend la fin de ce tour : c'est une raison de plus pour qu'entre deux lots, elle reste inactive.
 Les sessions des lots mergés restent en place jusqu'au nettoyage final (« Après le dernier lot »).
+Un sous-lot b, qu'il soit fixé dans l'issue ou né d'un re-découpage (`cycle-pr` 3.5), s'ouvre comme
+un lot k+1 ; né en cours de lot, sa session n'existe pas encore et se démarre au tour suivant du
+mainteneur (« Au go du découpage », premier paragraphe).
 
 Ces deux contrôles — `test -f` et `merge-tree` — précèdent un `SendMessage`, pas une commande :
 rien ne s'y chaîne, ce sont des lectures par construction (`cycle-pr` Étape 7, « Le go, puis le

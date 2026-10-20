@@ -515,13 +515,24 @@ git commit -m "type(scope): description"
 Pas de corps, pas de footer, pas de `Co-Authored-By`, pas de numéro de PR. Breaking change : `!`
 dans le titre.
 
-**Puis relire le gabarit**, le chiffre étant sous la main : `git diff --stat main...HEAD` contre
-les deux seuils de `taille-pr.md` — l'absolu, et le double de l'estimation du briefing. Franchi,
-le re-découpage se rouvre maintenant, pas à l'Étape 5 (obs 70).
+**Puis relire le gabarit** : le `developpeur` rend avec chaque commit le chiffre de
+`git diff --stat <base>...HEAD`, la base de son brief, et s'arrête au seuil que ce brief porte ; la
+session PR le relit contre les deux seuils de `taille-pr.md` — l'absolu, et le double de
+l'estimation du briefing. Franchi, le re-découpage se rouvre maintenant, pas à l'Étape 5 (obs 70).
 
-Puis enchaîner sur le commit suivant (retour 3.1) — ou, si ce commit vient de poser
-le socle, lancer d'abord la première passe de relecture (4.2). Si ce commit assemble un écran
-d'une zone sensible, c'est maintenant que se prend le point d'arrêt humain — cadence et forme
+**Un sous-lot est un lot** (D-9, #134). Les PR qu'un re-découpage fait naître suivent « Une session
+neuve par lot » (Étape 8) : la session courante finit son sous-lot et écrit la passation depuis
+les artefacts ; le sous-lot suivant reçoit sa session neuve, ouverte par la coordinatrice s'il y
+en a une ([references/coordinatrice.md](references/coordinatrice.md), « Ouvrir le lot suivant »),
+sinon proposée au mainteneur par une carte (`start_session`, `initiation: own_initiative`) — aucune
+session n'en démarre une autre hors d'un tour humain. Un re-découpage qui sépare un commit de ses
+correctifs rejoue d'abord la passe « affirmations » de `cleanup-verbatim.md` sur le premier
+morceau **seul** : chaque docstring s'y lit contre le code de ce morceau, pas contre l'état final,
+et les limites que le morceau suivant lève s'y nomment (obs 109).
+
+Puis la session PR pousse et enchaîne sur le bloc suivant (retour 3.1) — ou, si ce commit vient de
+poser le socle, lance d'abord la première passe de relecture (4.2). Si ce commit assemble un écran
+d'une zone sensible, c'est maintenant qu'elle prend le point d'arrêt humain — cadence et forme
 dans `.claude/rules/contraintes.md`, « Points d'arrêt humains », source unique.
 
 ## Étape 4 — Relecture indépendante (avant `git push`)
@@ -1278,7 +1289,9 @@ recopié hérite des erreurs de son auteur en empruntant la crédibilité de la 
 (obs 52).
 
 **Une session neuve par lot.** Le lot suivant ne se déroule pas dans cette session, même si son
-contexte le permettrait. Deux raisons :
+contexte le permettrait — un sous-lot né d'un re-découpage non plus (3.5, D-9) : #12 lot 2 a livré
+ses deux sous-lots dans une même session, le cycle le plus cher relevé (107 M de jetons relus,
+étude du 2026-10-19, §2.2). Deux raisons :
 
 - le contexte d'un lot porte les **hypothèses** qui l'ont produit, et les relire au lot suivant,
   c'est se priver du seul regard neuf gratuit du cycle — le même argument qui fonde la relecture à
