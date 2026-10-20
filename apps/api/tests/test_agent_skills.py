@@ -2969,7 +2969,8 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         CYCLE_PR_SKILL,
         (
             "le run tourne : fin de tour, le moniteur de PR de l'application réveillant la session à"
-            " sa conclusion — jamais une attente en tour ni une sonde planifiée"
+            " sa conclusion (consignes de l'application à la session, lues le 2026-10-20) — jamais"
+            " une attente en tour ni une sonde planifiée"
         ),
     ),
     "cycle-pr-nettoyage-a-l-etape-8": (
