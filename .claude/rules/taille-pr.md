@@ -9,8 +9,9 @@
   à la fin. Le `developpeur` rend le chiffre avec chaque commit et s'arrête au seuil que porte son
   brief ; la session PR le relit contre les deux seuils. Deux seuils, deux effets : l'**absolu**
   ci-dessus mesure la relisabilité et **découpe** ; le **double de l'estimation du briefing**
-  mesure que le plan était faux et **rouvre** le découpage — un lot de plus, ou une ligne qui nomme ce qui, dans le bon choix
-  technique, impose le dépassement ; jamais la seule déclaration du chiffre.
+  mesure que le plan était faux et **rouvre** le découpage — un lot de plus, ou une ligne qui
+  nomme ce qui, dans le bon choix technique, impose le dépassement ; jamais la seule déclaration
+  du chiffre.
 - **Un découpage déjà décidé borne le périmètre d'un lot, pas son volume** : « un lot = une PR »
   n'autorise pas un lot à doubler son estimation — il se re-découpe comme une PR, en sous-lots.
 - **Le seuil relatif vaut ce que vaut l'estimation** : elle se compte en épingles, pas en lignes
