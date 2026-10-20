@@ -90,7 +90,7 @@ n'est pas choisi par tâche, il est choisi par rôle** au moment de créer l'éq
 
 | Rôle | Modèle | Confier |
 |---|---|---|
-| `developpeur` | Opus | l'implémentation TDD d'un brief borné, la correction de tests rouges |
+| `developpeur` | Opus, effort `high` | l'implémentation TDD d'un bloc borné et sa doc descriptive (`xhigh` à l'appel quand il écrit des tests), la correction de tests rouges |
 | `relecteur` | Opus, effort `medium` | la relecture à contexte vierge d'un diff (`cycle-pr` 4.2), seul, dans son propre worktree |
 | `executant` | Sonnet, effort `high` | codage et commit d'une tranche entièrement spécifiée (`xhigh` à l'appel quand elle écrit des tests), cartographie du code, passes mécaniques, mise en place d'`init-projet` |
 | `releveur` | Haiku, effort `medium` | relevés sans décision : tests, lint, format, croisements, édits verbatim, écritures distantes verbatim |
