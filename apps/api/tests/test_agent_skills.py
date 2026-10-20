@@ -2132,6 +2132,37 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         ".claude/agents/developpeur.md",
         "le compte rendu de chaque cleanup pass",
     ),
+    # Les lignes de `pipeline.config.md` qui disaient « lancée par `cycle-pr` » : 4 commandes
+    # (« test brut », front compris, « validation », « relecture », « sécurité »), chacune son rôle.
+    "config-test-brut": (
+        ".claude/pipeline.config.md",
+        "le verdict se lit ici, par le `developpeur` avant commit (cycle-pr 3.2)",
+    ),
+    "config-validation": (
+        ".claude/pipeline.config.md",
+        "Jouée par un `releveur` que la session PR lance avant tout push",
+    ),
+    "config-relecture": (
+        ".claude/pipeline.config.md",
+        "Lancée par la session PR avant chaque appel du relecteur",
+    ),
+    "config-securite": (
+        ".claude/pipeline.config.md",
+        "même nature. Lancée par la session PR (`cycle-pr` 4.2 ;",
+    ),
+    # `CONTRIBUTING.md`, « Le flux en une page » : 7 maillons, chacun nomme qui l'exécute.
+    "contributing-implementer": (
+        "CONTRIBUTING.md",
+        "`cycle-pr`, porté par la session PR, qui orchestre et délègue",
+    ),
+    "contributing-verificateur": (
+        "CONTRIBUTING.md",
+        "vérification d'avant-go par le `verificateur`, que la session PR lance",
+    ),
+    "contributing-repercuter": (
+        "CONTRIBUTING.md",
+        "Porté par la session PR en fin de `cycle-pr` — collecte au `releveur`",
+    ),
 }
 
 

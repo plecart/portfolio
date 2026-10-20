@@ -56,7 +56,9 @@ pour qu'un rouge de l'une ne masque pas un rouge d'une autre.
                                                   # vérifiée le 2026-09-26
 - test ciblé   : uv run pytest <chemin|motif>     # une seule cible, pour la boucle TDD
 - test brut    : rtk proxy make test              # sortie du lanceur sans le résumeur RTK du poste :
-                                                  # le verdict se lit ici (cycle-pr 3.2) ; vérifiée le 2026-09-25
+                                                  # le verdict se lit ici, par le `developpeur`
+                                                  # avant commit (cycle-pr 3.2) et le `releveur`
+                                                  # des portes (4.2) ; vérifiée le 2026-09-25
 - lint         : make lint                        # ruff check
 - format       : make format                      # ruff format — écrit
 - format:check : make format-check                # vérifie sans écrire
@@ -126,8 +128,10 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 - navigateurs  : make web-browsers                # Chromium pour Playwright ; long, étape distincte en CI
 - test         : make web-test                    # Vitest
 - test ciblé   : cd apps/web && npm test -- <motif>
-- test brut    : rtk proxy make web-test          # sortie du lanceur sans le résumeur RTK du poste ;
-                                                  # vérifiée le 2026-09-25
+- test brut    : rtk proxy make web-test          # sortie du lanceur sans le résumeur RTK du poste,
+                                                  # lue comme celle du back (`developpeur` avant
+                                                  # commit, `releveur` des portes) ; vérifiée le
+                                                  # 2026-09-25
 - openapi      : make web-openapi                 # écrit `apps/web/src/api/schema.ts`, les types de
                                                   # l'API, depuis `apps/api/openapi.json` ; à lancer
                                                   # après `make openapi` quand le contrat change,
@@ -160,8 +164,8 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 
 **Harnais (`.claude/`, `CLAUDE.md`)** — vérifiée le 2026-10-09 depuis la racine, avec témoins.
 Sans cible `make` : le binaire n'est pas installé dans le runner de CI, et une cible que la CI ne
-peut pas appeler ferait croire à une porte qui n'existe pas là-bas. Lancée par `cycle-pr` à
-l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
+peut pas appeler ferait croire à une porte qui n'existe pas là-bas. Jouée par un `releveur` que la
+session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycle-pr` 3.2).
 - validation   : claude plugin validate . --strict  # `--strict` est ce qui la rend bloquante :
                                                   # sans lui un avertissement sort en 0. Couvre
                                                   # `.claude/{skills,agents,commands}` (doc :
@@ -178,8 +182,10 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
                                                   # shim cassé ailleurs.
 - relecture    : /code-review <niveau>            # commande **intégrée au binaire**, pas un
                                                   # skill du dépôt : rien dans `.claude/` ne la
-                                                  # porte. Lancée par `cycle-pr` 4.2 avant
-                                                  # chaque appel du relecteur, **additive** au
+                                                  # porte. Lancée par la session PR avant
+                                                  # chaque appel du relecteur (`cycle-pr` 4.2 ;
+                                                  # par la session de relecture au lot 3 de
+                                                  # #134), **additive** au
                                                   # prompt de `cleanup-verbatim.md` (D27). Ce
                                                   # qu'elle couvre, mesuré le 2026-10-12 sur le
                                                   # delta de #85 (672 lignes, niveau `medium`) :
@@ -194,7 +200,9 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
                                                   # populations — elle ne remplace rien.
                                                   # Son rapport exigé comme seule sortie ne
                                                   # termine pas le tour (`cycle-pr` 4.2, obs 94).
-- sécurité     : /security-review                 # même nature. Lancée par `cycle-pr` 4.2
+- sécurité     : /security-review                 # même nature. Lancée par la session PR
+                                                  # (`cycle-pr` 4.2 ; par la session de relecture
+                                                  # au lot 3 de #134, condition comprise)
                                                   # **seulement** si le diff touche une zone
                                                   # sensible ou une surface exposée (section
                                                   # « Périmètre »). Mesure le
