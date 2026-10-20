@@ -42,6 +42,16 @@ on:
   push:
     branches: [main]
 
+# Un run par PR, le plus récent : un push qui en suit un autre annule le run encore en cours de la
+# même PR, qui ne vérifiait plus la tête. Mesuré du 2026-10-04 au 2026-10-17 : 70 runs de PR suivis
+# d'un autre run de la même branche en moins de 5 minutes (#124). Sur un push vers `main`,
+# `github.event.pull_request` est vide : le groupe se replie sur le SHA, propre à chaque commit, et
+# rien ne s'annule — ce run publie et déploie. Les groupes des jobs `publish` et `deploy`
+# s'ajoutent à celui-ci. `apps/api/tests/test_ci_declencheurs.py` tient ces réglages.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   api:
     name: Back — audit, lint, format, types, tests
