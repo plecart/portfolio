@@ -27,13 +27,17 @@ une forme réduite, longueur ou ancre, ne voit pas une conversion qui la préser
 Il refuse, sans rien écrire : une ancre introuvable ou ambiguë — toutes sont validées avant la
 première écriture —, zéro ou plusieurs commentaires de brief, un fichier illisible, non UTF-8 ou
 sans ligne non vide, une lecture `gh` qui échoue ou ne rend pas du JSON. Une case déjà cochée, un
-label déjà absent : rien à écrire, et la sortie le dit.
+label déjà absent, un fichier qui termine déjà le corps : rien à écrire, et la sortie le dit — un
+rejeu après une relecture tombée n'écrit donc pas une seconde fois.
 
 **Ce qu'il ne prouve pas.** Il ne choisit pas les cases : la session PR les nomme. Il ne
 verrouille rien : une édition faite par un tiers entre sa lecture et son écriture est écrasée, et
-la relecture ne la voit pas — elle compare à ce que le script a écrit. Une relecture conforme
-atteste ce que l'API rend, pas ce que l'interface web affiche. Le chemin d'un label encodé et
-l'écriture du corps d'une PR par l'endpoint `issues` ne sont pas mesurés sur la vraie forge.
+la relecture ne la voit pas — elle compare à ce que le script a écrit. Le fichier se reconnaît en
+fin de corps à l'identique, fins de ligne comprises : sur une forge qui le stocke transformé —
+relecture non conforme dès le premier appel —, un rejeu l'ajoute une seconde fois. Une relecture
+conforme atteste ce que l'API rend, pas ce que l'interface web affiche. Le chemin d'un label
+encodé et l'écriture du corps d'une PR par l'endpoint `issues` ne sont pas mesurés sur la vraie
+forge.
 
 Sortie : 0 écrit et relu conforme, ou rien à écrire ; 1 refus (« refus — »), ou écriture lancée et
 relecture non conforme ou impossible (« relecture non conforme — ») — motif en une ligne sur la
@@ -260,8 +264,8 @@ def label_remove(run: Run, args: argparse.Namespace) -> str:
 
 
 def issue_append(run: Run, args: argparse.Namespace) -> str:
-    """`issue edit --append` : ajoute le fichier en fin de corps ; l'ancre de la relecture est sa
-    première ligne non vide. Le fichier est lu avant tout appel à la forge."""
+    """`issue edit --append` : ajoute le fichier en fin de corps, sauf s'il le termine déjà ; l'ancre
+    de la relecture est sa première ligne non vide. Le fichier est lu avant tout appel à la forge."""
     try:
         addition = args.file.read_bytes().decode("utf-8")
     except OSError as error:
@@ -272,6 +276,8 @@ def issue_append(run: Run, args: argparse.Namespace) -> str:
     if anchor is None:
         raise Refusal(f"rien à ajouter : {args.file} n'a aucune ligne non vide")
     text = issue_body(run, args.number)
+    if text.body.endswith(addition):
+        return f"rien à écrire — {text.name} : {args.file} déjà en fin de corps"
     write_body(run, text, f"{text.body}\n\n{addition}", [anchor])
     return f"écrit et relu — {text.name} : {args.file} ajouté"
 
