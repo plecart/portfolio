@@ -474,8 +474,9 @@ def role_frontmatter(role: str) -> dict[str, object]:
 # y est un défaut au même titre qu'un champ faux : mesuré, la première rédaction attribuait au
 # `verificateur` une phrase (« Tu ne travailles pas dans un worktree ») qui n'existait nulle part.
 ROLE_FRONTMATTER_CLAIMS: list[tuple[str, str, str | None]] = [
-    # « Tu n'as pas de `Write` » (`relecteur.md`) — et `Edit` reste : une mutation modifie un
-    # fichier existant, elle n'en crée pas.
+    # « Le sous-agent n'a pas de `Write` » (`relecteur.md`) — et `Edit` reste : une mutation
+    # modifie un fichier existant, elle n'en crée pas. La session de relecture a `Write` : elle
+    # n'écrit aucun fichier du dépôt, tenue par son texte.
     ("relecteur", "tools", "Write"),
     # « tu n'écris rien » (`verificateur.md`) : le mandat est un verdict, pas un correctif.
     ("verificateur", "tools", "Write"),
@@ -1159,6 +1160,12 @@ PORTES_PRESCRITES: list[tuple[str, str, str, int]] = [
         "git merge-base --is-ancestor",
         1,
     ),
+    (
+        ".claude/skills/cycle-pr/references/session-relecture.md",
+        "git branch -D",
+        "git merge-base --is-ancestor",
+        1,
+    ),
 ]
 
 
@@ -1189,7 +1196,8 @@ def predicats_a_gauche(ligne: str, action: str, predicat: str) -> list[list[str]
     ("skill", "action", "predicat", "attendus"),
     PORTES_PRESCRITES,
     ids=[
-        f"{Path(skill).parent.name}-{action.replace(' ', '-')}"
+        f"{Path(skill).parent.name if Path(skill).stem == 'SKILL' else Path(skill).stem}"
+        f"-{action.replace(' ', '-')}"
         for skill, action, _, _ in PORTES_PRESCRITES
     ],
 )
@@ -1212,7 +1220,10 @@ def test_chaque_porte_prescrite_est_un_predicat_chaine_a_son_action(
     retire la création de worktree de `pr-paralleles` avec son geste : le lead ne crée plus de
     worktree, l'application en donne un à chaque session, dont le premier geste part d'`origin/`
     (`DEPARTS_EXPLICITES`) — la porte n'avait plus d'action à garder, et son absence est gardée
-    par `GESTES_RETIRES_DE_PR_PARALLELES`.
+    par `GESTES_RETIRES_DE_PR_PARALLELES`. **4 depuis le lot 3 de #134** : le retrait de la
+    branche du sous-agent `relecteur`, en repli, passe de `git branch -d` — qui compare à `HEAD`
+    et refuse dès que le trunk a avancé (obs 86) — à la porte d'ancêtre contre `origin/<trunk>`
+    (`session-relecture.md`, « Repli »).
 
     Le prédicat doit se trouver **à gauche de l'action sur la même ligne**, avec un `&&` entre les
     deux — ce qui distingue une porte d'une lecture suivie d'une seconde commande (obs 59) —, en
@@ -2095,7 +2106,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "sessions-liees-une-session-de-relecture-par-pr": (
         "CLAUDE.md",
-        "une session de relecture par PR",
+        "la session PR, une session de relecture par PR, au go de son briefing",
     ),
     "observation-une-session-seulement": ("CLAUDE.md", "**Seule une session** l'invoque"),
     "observation-un-sous-agent-ne-lit-pas-le-journal": (
@@ -2614,4 +2625,194 @@ def test_chaque_renvoi_au_go_du_briefing_a_sa_question_dans_le_recueil() -> None
         f"{hors_etape_1} renvoi(s) au go du briefing hors Étape 1 pour {len(QUESTIONS_DU_GO)} "
         "question(s) au recueil : une question renvoyée au go s'inscrit à QUESTIONS_DU_GO et se "
         "nomme à l'Étape 1 ; une mention qui n'est pas une question se reformule"
+    )
+
+
+# --- La session de relecture, une par PR (#134, lot 3) -------------------------------------------
+
+SESSION_RELECTURE_REF = ".claude/skills/cycle-pr/references/session-relecture.md"
+RELECTEUR_ROLE = ".claude/agents/relecteur.md"
+
+# Le protocole de la session de relecture et celui qu'elle suit — un énoncé par geste, chacun
+# épinglé sur sa moitié restrictive autant que sur celle qui fait (critère en tête de
+# `INVARIANTS_DU_CONTEXTE_COURT`, obs 126). **Population** : les énoncés de `session-relecture.md`
+# et les phrases de `relecteur.md` que ce lot réécrit — 33 énoncés, 33 épinglés, chacun vu rouge en
+# retirant sa moitié restrictive (mutations jouées à l'écriture, Notes de la PR #141) ; l'ordre du
+# réveil est gardé à part (`ORDRE_DU_REVEIL`), et la porte d'ancêtre du repli par
+# `PORTES_PRESCRITES`.
+INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
+    "source-unique": (SESSION_RELECTURE_REF, "y renvoient sans le recopier"),
+    "demarrage-tour-du-mainteneur": (
+        SESSION_RELECTURE_REF,
+        "`start_session` ne part que dans un tour ouvert par le mainteneur",
+    ),
+    "demarrage-par-la-session-pr": (
+        SESSION_RELECTURE_REF,
+        "La session PR la démarre **elle-même** et en est le **parent**",
+    ),
+    "jamais-le-lead-ni-la-coordinatrice": (
+        SESSION_RELECTURE_REF,
+        "Jamais le lead ni la coordinatrice",
+    ),
+    "parametres-de-demarrage": (
+        SESSION_RELECTURE_REF,
+        "`initiation: user_asked`, `context: fresh`, `use_worktree: true`",
+    ),
+    "effort-high": (SESSION_RELECTURE_REF, "`effort: high`, `model` omis"),
+    "premier-geste-sans-branche": (SESSION_RELECTURE_REF, "— aucune branche à créer —"),
+    "observations-tenues-par-la-session-pr": (
+        SESSION_RELECTURE_REF,
+        "elle n'écrit aucune entrée, ses candidates partent dans ses messages de constats",
+    ),
+    "pousser-avant-le-reveil": (SESSION_RELECTURE_REF, "La session PR **pousse**, puis envoie"),
+    "forme-du-reveil": (
+        SESSION_RELECTURE_REF,
+        "relis <SHA>, passe <k> — plage <début>..<fin>",
+    ),
+    "plage-et-sha-a-chaque-reveil": (
+        SESSION_RELECTURE_REF,
+        "Plage et SHA arrivent à chaque réveil, jamais au lancement",
+    ),
+    "securite-sous-condition": (
+        SESSION_RELECTURE_REF,
+        "`/security-review`, **seulement** si le diff touche une zone sensible ou une surface exposée",
+    ),
+    "reprise-apres-une-fin-de-tour": (SESSION_RELECTURE_REF, "répond « reprends la passe <k> »"),
+    "note-jamais-un-constat": (
+        SESSION_RELECTURE_REF,
+        "La note de fin de tour n'est jamais un constat",
+    ),
+    "aucune-session-ni-sous-tache": (
+        SESSION_RELECTURE_REF,
+        (
+            "ne démarre aucune session et ne lance d'autre sous-tâche que celles que"
+            " `/security-review` prescrit"
+        ),
+    ),
+    "ne-commit-ne-pousse-ne-merge": (
+        SESSION_RELECTURE_REF,
+        "Elle ne commit pas, ne pousse pas, ne merge pas",
+    ),
+    "tour-du-mainteneur-ne-reveille-pas": (
+        SESSION_RELECTURE_REF,
+        "un tour qu'il y pilote ne réveille pas la session PR",
+    ),
+    "nettoyage-jamais-avant-la-boucle": (
+        SESSION_RELECTURE_REF,
+        "et jamais avant : tant qu'une relance peut s'ouvrir",
+    ),
+    "nettoyage-sur-l-accord-du-go": (SESSION_RELECTURE_REF, "L'archivage sur l'accord donné au go"),
+    "echafaudage-avant-la-branche-de-pr": (
+        SESSION_RELECTURE_REF,
+        "avant que celle-ci ne soit supprimée",
+    ),
+    "repli-commandes-jouees-par-la-session-pr": (
+        SESSION_RELECTURE_REF,
+        "joue elle-même les deux commandes intégrées avant lui",
+    ),
+    "repli-agent-neuf-seulement-injoignable": (
+        SESSION_RELECTURE_REF,
+        "un agent neuf seulement s'il n'est plus joignable",
+    ),
+    "repli-pas-sur-la-tete": (SESSION_RELECTURE_REF, "pas sur la tête de la PR"),
+    "repli-jamais-restaurer-avant-les-verifications": (
+        SESSION_RELECTURE_REF,
+        "ne demande jamais de restaurer une mutation avant elles",
+    ),
+    "repli-verrou-ne-dit-rien": (
+        SESSION_RELECTURE_REF,
+        "son absence ne dit rien de la vitalité de l'agent",
+    ),
+    "repli-retrait-termine": (SESSION_RELECTURE_REF, "Retirer le worktree **termine** l'agent"),
+    "repli-humain-jamais-silencieux": (SESSION_RELECTURE_REF, "jamais de saut silencieux"),
+    "relecteur-au-lancement-rien-que-la-pr": (
+        RELECTEUR_ROLE,
+        "Au lancement, tu ne reçois que la PR, son issue et sa base",
+    ),
+    "relecteur-plage-a-chaque-reveil": (
+        RELECTEUR_ROLE,
+        "jamais tu ne relis celle du lancement",
+    ),
+    "relecteur-pas-le-worktree-de-la-session-pr": (
+        RELECTEUR_ROLE,
+        "jamais celui de la session PR, qui vit aussi là",
+    ),
+    "relecteur-n-ecrit-rien-du-depot": (RELECTEUR_ROLE, "Tu n'écris aucun fichier du dépôt"),
+    "relecteur-seule-sous-tache": (
+        RELECTEUR_ROLE,
+        (
+            "aucune session démarrée : la seule sous-tâche admise est celle que `/security-review`"
+            " prescrit"
+        ),
+    ),
+    "relecteur-ne-merge-pas": (
+        RELECTEUR_ROLE,
+        "Tu ne commits pas, tu ne pousses pas, tu ne merges pas, tu ne corriges pas",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("fichier", "phrase"),
+    INVARIANTS_DE_LA_SESSION_DE_RELECTURE.values(),
+    ids=INVARIANTS_DE_LA_SESSION_DE_RELECTURE.keys(),
+)
+def test_chaque_invariant_de_la_session_de_relecture_garde_sa_phrase(
+    fichier: str, phrase: str
+) -> None:
+    """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
+    assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
+
+
+# L'ordre d'un réveil : les commandes avant le protocole du `relecteur`, qui n'a plus à chercher ce
+# qu'une commande a trouvé (`cycle-pr` 4.2, « Les portes bon marché d'abord »), et le message de
+# constats en dernier — c'est lui qui réveille la session PR. **Population** : les 5 étapes
+# numérotées du réveil, 4 couples consécutifs.
+ORDRE_DU_REVEIL = {
+    "verifications-avant-code-review": (
+        "1. Les deux vérifications de `relecteur.md`",
+        "2. `/code-review medium <n> --comment`",
+    ),
+    "code-review-avant-security-review": (
+        "2. `/code-review medium <n> --comment`",
+        "3. `/security-review`, **seulement**",
+    ),
+    "security-review-avant-le-protocole": (
+        "3. `/security-review`, **seulement**",
+        "4. Le protocole de `relecteur.md` sur la plage",
+    ),
+    "protocole-avant-le-message": (
+        "4. Le protocole de `relecteur.md` sur la plage",
+        "5. Le message de constats au parent",
+    ),
+}
+
+
+@pytest.mark.parametrize(("avant", "apres"), ORDRE_DU_REVEIL.values(), ids=ORDRE_DU_REVEIL.keys())
+def test_la_session_de_relecture_garde_l_ordre_de_son_reveil(avant: str, apres: str) -> None:
+    """Les deux ancres présentes, et dans cet ordre — une ancre absente rougit aussi."""
+    assert_dans_l_ordre(SESSION_RELECTURE_REF, avant, apres)
+
+
+# Ce que le lot 3 retire, et qui ne doit pas revenir. Chaque forme a été vue présente sur
+# `c92fcf5`, la base du lot, où chaque cas rougit.
+RETIRES_PAR_LA_SESSION_DE_RELECTURE = {
+    # `/security-review` prescrit des sous-tâches (critère 4 du bloc : 1 occurrence au 2026-10-20).
+    "relecteur-pas-de-sous-agent": (RELECTEUR_ROLE, "pas de sous-agent"),
+}
+
+
+@pytest.mark.parametrize(
+    ("fichier", "forme"),
+    RETIRES_PAR_LA_SESSION_DE_RELECTURE.values(),
+    ids=RETIRES_PAR_LA_SESSION_DE_RELECTURE.keys(),
+)
+def test_rien_de_ce_que_retire_la_session_de_relecture_ne_reste(fichier: str, forme: str) -> None:
+    """Une phrase retirée qui reste écrite se rejoue : la session suit le texte, pas l'intention.
+
+    Lue sans la casse : en tête de phrase, la forme revient avec une majuscule (mutation VERTE,
+    passe d'écriture du lot 3).
+    """
+    assert forme.lower() not in texte_normalise(fichier).lower(), (
+        f"`{fichier}` porte encore « {forme} »"
     )
