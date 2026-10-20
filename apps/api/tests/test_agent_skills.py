@@ -540,6 +540,9 @@ ROLE_REQUIRED_TOOLS: list[tuple[str, str]] = [
     # « par `context7` ou les sources du paquet » (`developpeur.md`, « Frontières tierces »).
     ("developpeur", "mcp__context7__resolve-library-id"),
     ("developpeur", "mcp__context7__query-docs"),
+    # « lu dans sa documentation à jour (`context7`) » (`relecteur.md`, point 3).
+    ("relecteur", "mcp__context7__resolve-library-id"),
+    ("relecteur", "mcp__context7__query-docs"),
 ]
 
 
@@ -555,6 +558,11 @@ def test_la_liste_d_outils_d_un_role_nomme_ceux_que_sa_prose_emploie(role: str, 
     le savoir. Relevé à la passe 2 de la PR #136 : la liste posée au `developpeur` pour borner son
     plancher lui retirait `context7`, que `CLAUDE.md` met en priorité pour toute question de
     bibliothèque — aucune porte ne le voyait.
+
+    Dénombré le 2026-10-20 sur les cinq rôles (`grep` de `^tools:` puis des outils nommés par la
+    prose) : deux rôles se font prescrire un outil absent de leur liste, `developpeur` et
+    `relecteur`, tous deux pour `context7` — 2 fuyaient sur 2. Un rôle neuf qui en prescrit un
+    s'ajoute à `ROLE_REQUIRED_TOOLS`.
     """
     declared = role_frontmatter(role).get("tools")
     assert isinstance(declared, str), f"`tools` absent ou non textuel chez `{role}` : {declared!r}"
