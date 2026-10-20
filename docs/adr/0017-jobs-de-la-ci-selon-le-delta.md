@@ -49,8 +49,10 @@ le gaspillage vient de **quand** les jobs tournent.
 - **Sur une PR, `web` et `infra` ne tournent que sur leurs fichiers.** La première étape du job
   `api` passe `git diff --name-only --no-renames HEAD^1 HEAD` — le delta de la PR contre sa base,
   le checkout d'une PR étant son commit de fusion, un renommage sous ses deux chemins — à
-  `infra/ci/changed_jobs.py`, qui rend `web` et `infra`. `web` : le front, ou le schéma de l'API dont ses types sont générés. `infra` : tout chemin hors
-  du harnais — liste d'exclusion, un fichier inconnu fait tourner le job. `web` et `infra` partent
+  `infra/ci/changed_jobs.py`, qui rend `web` et `infra`. `web` : le front, ou le schéma de l'API
+  dont ses types sont générés. `infra` : tout chemin hors du harnais — liste d'exclusion, un
+  fichier inconnu fait tourner le job —, ou l'un des modules d'appui des tests du back que
+  `make image-test` charge aussi. `web` et `infra` partent
   après `api`, même rouge (`!cancelled()`). Sur un push vers `main`, tout tourne. Le job `api`
   tourne sur chaque push — la suite du back porte aussi les tests de la pipeline ; seule
   l'ouverture d'une draft le saute, et avec lui `web` et `infra`.
@@ -95,5 +97,6 @@ harnais, et sur chaque push vers `main` ; avant chaque publication, inchangé.
 
 - Le quota cesse d'être une contrainte (offre changée, dépôt public) : le gain ne paie plus
   l'attente de `web` et `infra`.
-- Un fichier du harnais entre dans une image : il sort de `HARNESS`.
+- Un fichier du harnais entre dans une image, ou dans ce que le job `infra` exécute : il sort de
+  `HARNESS`. Les modules d'appui des tests des images sont recalculés par un test, pas à la main.
 - Un job vide cesse de coûter une minute : l'option (a) ne coûte plus rien.
