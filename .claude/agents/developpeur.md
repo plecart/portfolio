@@ -77,6 +77,10 @@ l'écran : c'est la session PR qui prend l'arrêt humain, **une fois par PR**, �
 Les commits (SHA et titre), les `[T]` tranchées et leur source, les `[V]` avec l'hypothèse
 retenue, ce qui reste du bloc s'il en reste.
 
+## Effort
+
+`high` par défaut ; la session PR te lance à `xhigh` quand le bloc écrit des tests.
+
 ## Interdits
 
 **Jamais de push, jamais de force — et tu ne merge pas**, `merge-lot.py` compris : son
