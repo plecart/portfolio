@@ -71,10 +71,16 @@ go du briefing, `[V]` groupées, arrêt `[C]`, écran à valider, go de merge
 approbation (`cycle-pr`, « Vague parallèle »).
 
 Une session inactive reprend sur le message qu'on lui envoie ; une session en plein tour ne le
-reçoit qu'à la fin de ce tour, pas à son appel d'outil suivant. Mesuré le 2026-10-18 (Notes de
-la PR #122) : deux enfants jetables inactifs ont repris chacun sur un message de leur parent, et le
-message d'un enfant au parent occupé a attendu la fin de son tour, de 14:42 à 14:50 UTC — un seul
-cas, côté parent.
+reçoit qu'à la fin de ce tour, comme un tour neuf — jamais à son appel d'outil suivant. Un message
+n'interrompt donc jamais un tour en cours. Mesuré deux fois, de chaque côté : le 2026-10-18 (Notes
+de la PR #122), deux enfants jetables inactifs ont repris chacun sur un message de leur parent, et
+le message d'un enfant au parent occupé a attendu la fin de son tour, de 14:42 à 14:50 UTC ; le
+2026-10-20 (Notes de la PR #141), une sonde du parent envoyée à 17:53:12 UTC à sa session de
+relecture occupée a traversé cinq de ses appels d'outils sans lui parvenir, puis lui est arrivée à
+17:54:02, sa fin de tour passée — horodatages de son transcript : fin de tour, mise en file, tour
+neuf. La description de `SendMessage` dit le contraire (« drain at the receiver's next tool
+round », lue le même jour) ; son résultat, pour une session de l'application, dit vrai : « holding
+it (a turn is in progress there…) and runs it when that clears ».
 
 ## Fin de travail — un message, jamais une fin de tour
 
