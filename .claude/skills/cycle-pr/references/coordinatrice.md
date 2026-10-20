@@ -18,8 +18,7 @@ automatique (provoqué par le lead de la vague le 2026-10-16 — #107, journal d
 seul un tour ouvert par le mainteneur le démarre, et seulement sur sa demande écrite (consignes de
 l'application à la session, lues le 2026-10-18 ; mesuré le même jour, PR #122). Le go du
 découpage est ce tour : la question du go nomme donc les n sessions qu'il fera démarrer, avec
-l'accord pour le `verificateur` de chaque lot quand il n'y a pas de lead de vague (`cycle-pr`
-Étape 7, « Sans lead »). La coordinatrice y tourne en Opus 5.5, effort `high` (#134, décision 4,
+l'accord pour le `verificateur` de chaque lot (`cycle-pr` Étape 7, « Vérification d'avant-go »). La coordinatrice y tourne en Opus 5.5, effort `high` (#134, décision 4,
 qui remplace sur ce point #107 décision 8) : un enfant n'étant ni plus fort ni d'effort plus haut
 que son parent (`sessions-liees.md`, « Héritage »), la question du go ne demande au mainteneur
 `/effort max` — et Opus 5.5 au sélecteur de modèle — que si le découpage contient un lot que le
@@ -108,8 +107,8 @@ Ce que le brief de la coordinatrice change au cycle de `cycle-pr` :
   attente dans cette fenêtre » —, sa note de fin de tour n'étant pas un signal.
 - **Sa PR** vise la branche d'intégration ; son body s'ouvre par
   « En vol pour #<N> (lot <k>/<n>) », sans `Closes`.
-- **La vérification d'avant-go** part au lead que son brief nomme, jamais à la coordinatrice ;
-  « lead : aucun » → la session lance elle-même son `verificateur`, sur l'accord du go du découpage.
+- **La vérification d'avant-go** : la session lance elle-même son `verificateur` (`cycle-pr`
+  Étape 7), jamais la coordinatrice ni le lead, sur l'accord du go du découpage.
 - **Le merge** suit `cycle-pr` Étape 7, « Le merge d'un lot » : sans go, par le script.
 - **Son Étape 8 se borne à cocher ses critères et à écrire sa passation** — en dernier, liste
   vide ou arbitrée (`cycle-pr` Étape 8, « Cas découpé ») —, puis le message de fin à la

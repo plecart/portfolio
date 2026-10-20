@@ -174,7 +174,8 @@ ne lisent que l'issue (obs 44).
 la session devient la **coordinatrice** de ses lots : elle n'écrit pas de code, et son go — le go
 du découpage — fait démarrer les sessions de lot
 ([references/coordinatrice.md](references/coordinatrice.md)). Une issue à un seul lot ne change
-rien : la session fait le cycle elle-même. Une session de lot, elle, n'attend le go ci-dessous que
+rien : la session porte le cycle elle-même et délègue le code (3.1). Une session de lot, elle,
+n'attend le go ci-dessous que
 sous la condition de la même référence, « La session de lot ».
 
 Attendre un **« go » explicite**, puis créer la branche — trunk-based depuis `main`, derrière une
@@ -309,7 +310,8 @@ comportement, son estimation en épingles (Étape 1), la base et le seuil du gab
 niveau `ponytail` ; le `developpeur` part à `xhigh` quand le bloc écrit des tests. Il fait le TDD
 de cette étape, le cycle 3.2 à 3.5, la doc descriptive et le commit — jamais le push, que la
 session PR fait après chaque remise, derrière la ligne « validation » quand le delta la demande
-(3.2). Arrêté sur une `[C]` ou sur une question dont dépend tout le bloc, il est **repris par `SendMessage`** avec la réponse — `[T]` tranchée par la session PR, ou
+(3.2). Arrêté sur une `[C]` ou sur une question dont dépend tout le bloc, il est **repris par
+`SendMessage`** avec la réponse — `[T]` tranchée par la session PR, ou
 question portée au mainteneur —, jamais remplacé (mesuré le 2026-10-20 sur une `[C]` fabriquée,
 Notes de la PR #139) ; ses `[V]` rejoignent « Questions en attente ». Un `developpeur` neuf
 seulement au bloc suivant, jamais pour une retouche du même bloc.
@@ -462,7 +464,8 @@ complémentaires :
   — ligne « validation » de `.claude/pipeline.config.md`, que joue un `releveur` avant chaque push.
   C'est la porte la plus large de ce que Claude Code charge : un frontmatter de skill absent, une
   `description` non textuelle, un manifeste, une entrée MCP. **Avec `--strict`**, sans quoi un
-  avertissement sort en 0. Elle ne dispense pas de la suite : mesuré le 2026-10-09 (v2.1.295), elle est **muette** sur un
+  avertissement sort en 0. Elle ne dispense pas de la suite : mesuré le 2026-10-09 (v2.1.295),
+  elle est **muette** sur un
   frontmatter de rôle absent ou illisible — un ` : ` non cité dans une `description` fait charger
   le rôle sans aucun champ, en silence —, et ce sont les tests de frontmatter du projet qui
   gardent cette classe. Deux portes, deux populations : ni l'une ni l'autre ne couvre tout.
@@ -610,7 +613,7 @@ et marqueur de provenance.
 **Un seul relecteur pour la PR — les deux passes et la relance.** Pas de relecteur par
 préoccupation, pas de contre-vérificateur par constat, pas de workflow : chaque agent de plus
 repaye le contexte entier et rend ses constats à la même distance du code. Un constat bloquant se
-re-mesure par la session PR, dans son arbre, en une commande, avant d'éditer sur sa base — jamais par
+re-mesure par la session PR, dans son arbre, en une commande, avant d'en écrire le brief — jamais par
 un agent de plus.
 
 **La seconde passe revient au relecteur de la première, par `SendMessage`** — pas à un agent
@@ -1054,8 +1057,9 @@ En vague, l'accord est celui du lot validé (`pr-paralleles` Étape 2) ; une ses
 accord est à [references/coordinatrice.md](references/coordinatrice.md), « La session de lot ».
 
 **Le verdict s'inscrit dans les Notes du body avant le go**, relu après écriture
-(`contraintes.md`, « Écritures sur un artefact distant ») — au moins ses lignes « Fichiers
-croisés » et « Non vérifié », qui parlent d'**autres** branches et d'autres lots. Rendu seulement à
+(`contraintes.md`, « Écritures sur un artefact distant ») — au moins sa ligne d'en-tête (base,
+tête) et ses lignes « Fichiers croisés » et « Non vérifié », qui parlent d'**autres** branches et
+d'autres lots. Rendu seulement à
 la session qui l'a commandé, il ne survit que par sa mémoire, et la passation suivante le relaie
 comme un énoncé sans source : deux lots de suite, le prompt du lot suivant a cité un verdict que ni
 le corps ni les commentaires de la PR ne portaient (obs 81).
@@ -1254,7 +1258,8 @@ La PR et la conversation qui l'a résolue ont pu acter des décisions, déplacer
 hypothèse caduque ailleurs. **Immédiatement après le merge**, la session PR lance le skill
 `repercussions` — elle tient le brief, les Notes et les constats de la PR, c'est le moment où
 l'analyse est la plus riche. La collecte (delta, issues du thème, briefs pré-filtrés par ancre)
-part à un `releveur` ; le go d'édition se demande au mainteneur dans la fenêtre de la session PR. Même pour une **demande directe** sans issue liée, faire la passe : le delta mergé
+part à un `releveur` ; le go d'édition se demande au mainteneur dans la fenêtre de la session PR.
+Même pour une **demande directe** sans issue liée, faire la passe : le delta mergé
 peut impacter des issues ouvertes.
 
 Il confronte le **delta réel** de la PR aux issues du **même thème** et à celles qui **mentionnent
@@ -1279,7 +1284,8 @@ d'intégration ([references/coordinatrice.md](references/coordinatrice.md)). San
 ou en repli, **après** la passe `repercussions`, au **mainteneur**, qui ouvre la session neuve et
 lui donne le prompt. Pas le lead : sur une vague de cinq lots, chaque frontière passée par lui lui
 coûte un brief relu et un prompt écrit, et son contexte a grossi jusqu'à devoir être relayé
-lui-même (obs 62). La session sortante tient les artefacts de son lot ; le lead connaît la vague, et c'est ce
+lui-même (obs 62). La session sortante tient les artefacts de son lot ; le lead connaît la vague,
+et c'est ce
 qu'il garde — croisement des fichiers après merge, tableau de bord, vigilance de vague. Quand la
 session sortante a disparu, deux replis de `pr-paralleles` : Étape 7, « Session disparue », pour
 reconstituer ce qu'elle n'a pas remis, et Étape 8, « Issue en plusieurs lots », où c'est le lead
