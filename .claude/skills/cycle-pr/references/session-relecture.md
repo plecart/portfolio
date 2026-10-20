@@ -116,8 +116,8 @@ joignable. Son worktree a trois gestes :
   d'abord s'il refuse —, puis
   `git merge-base --is-ancestor worktree-agent-<id> origin/<trunk> && git branch -D worktree-agent-<id>` :
   la branche naît sur le trunk et ne commite jamais, et `-d` refuse dès que le trunk a avancé
-  (obs 86). Retirer le worktree **termine** l'agent (« This agent cannot be resumed »), d'où le
-  moment.
+  (obs 86). Retirer le worktree **termine** l'agent (« This agent cannot be resumed », mesuré au
+  lot 1b de #77), d'où le moment.
 
 Si le harness ne permet pas même le sous-agent : la main passe au relecteur humain, avec le diff et
 le prompt de `cleanup-verbatim.md` verbatim, noté dans « Relecture indépendante » du body — jamais
