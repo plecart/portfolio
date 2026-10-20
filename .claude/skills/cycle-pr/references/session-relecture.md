@@ -56,7 +56,8 @@ chaque réveil, jamais au lancement : la tête bouge entre deux passes.
 2. `/code-review medium <n> --comment` — `medium`, le seul niveau mesuré (`pipeline.config.md`,
    ligne « relecture ») ; le niveau qu'elle applique se lit dans l'en-tête de son prompt rendu et
    se rapporte dans le message de constats, la commande ne garantissant pas celui qu'on lui
-   passe. Ses commentaires se relisent sur la PR après écriture (`contraintes.md`, « Écritures sur
+   passe ; aux réveils suivants, le skill n'est pas rendu à nouveau (« already loaded above ») et
+   le niveau reste celui du premier rendu (mesuré le 2026-10-20, PR #141). Ses commentaires se relisent sur la PR après écriture (`contraintes.md`, « Écritures sur
    un artefact distant »). Ce qu'elle rapporte à nouveau à la passe 2, sur une PR qu'elle a déjà
    commentée : non mesuré.
 3. `/security-review`, **seulement** si le diff touche une zone sensible ou une surface exposée
@@ -78,13 +79,15 @@ Mesuré le 2026-10-20 sur la PR #141 : la seconde l'a clos, la première non.
 C'est sans coût ici : la session PR, réveillée par la fin de tour sans message de constats,
 répond « reprends la passe <k> », et la session de relecture reprend à l'étape suivante, son
 contexte intact. La note de fin de tour n'est jamais un constat (`sessions-liees.md`, « Fin de
-travail »).
+travail »). Un relais de la session PR, qui n'est pas le parent, ne reçoit pas cette note : il
+envoie chaque réveil avec `notify_when_idle: true` et répond « reprends la passe <k> » à l'avis
+d'inactivité arrivé sans constats (option de `SendMessage`, lue le 2026-10-20 ; non mesuré).
 
 La session de relecture ne démarre aucune session et ne lance d'autre sous-tâche que celles que
 `/security-review` prescrit. Elle ne commit pas, ne pousse pas, ne merge pas : un constat se
 rapporte. Le mainteneur peut lui parler dans sa fenêtre ; un tour qu'il y pilote ne réveille pas
-la session PR (`sessions-liees.md`, « Fin de travail ») : ce qui s'y décide part au parent par
-message.
+la session PR (`sessions-liees.md`, « Fin de travail ») : ce qui s'y décide part par message à
+l'émetteur du dernier réveil.
 
 ## Nettoyage — par la session PR, à son Étape 8
 

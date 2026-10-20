@@ -1481,7 +1481,11 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "config-relecture-fin-de-tour-sans-cout": (
         ".claude/pipeline.config.md",
-        "clôt le tour de la session de relecture, sans coût (`cycle-pr` 4.2, obs 94).",
+        (
+            "Son outil de rapport peut clore le tour de la session de relecture, sans coût"
+            " (`cycle-pr` 4.2, obs 94) — il ne l'a clos à aucune des deux passes du 2026-10-20"
+            " (PR #141)"
+        ),
     ),
     "config-securite-fin-de-tour-sans-cout": (
         ".claude/pipeline.config.md",
@@ -2661,16 +2665,15 @@ RELECTEUR_ROLE = ".claude/agents/relecteur.md"
 
 # Le protocole de la session de relecture et celui qu'elle suit — un énoncé par geste, chacun
 # épinglé sur sa moitié restrictive autant que sur celle qui fait (critère en tête de
-# `INVARIANTS_DU_CONTEXTE_COURT`, obs 126). **Population**, comptée avant le correctif de la
-# passe 1 (relecture de la PR #141, I3 : les 33 premières ancres étaient un échantillon, cinq
-# mutations VERTES) — le texte normalisé de `session-relecture.md` découpé en phrases (`[.;:]`
-# suivi d'un blanc) : 55 morceaux sur `a64717d`, 26 qui tenaient une ancre, 29 nus ; des 29, 12
-# sont un intitulé, un numéro de liste, un relevé daté ou un « non mesuré », 17 prescrivent et
-# reçoivent ici leur ancre ; 4 phrases ancrées laissaient 6 éléments nus (`source_branch`,
-# `name`, `--detach`, les piles, « un seul sous-agent », `unlock` d'abord), ancrés aussi. Dans
-# `relecteur.md`, les 13 phrases que ce lot réécrit. Chaque ancre vue rouge en retirant sa moitié
-# restrictive ou son élément (Notes de la PR #141) ; l'ordre du réveil est gardé à part
-# (`ORDRE_DU_REVEIL`), la porte d'ancêtre du repli par `PORTES_PRESCRITES`.
+# `INVARIANTS_DU_CONTEXTE_COURT`, obs 126). **Population** : les morceaux de `session-relecture.md`
+# — `morceaux_du_texte`, qui découpe le texte normalisé après `.`, `;` ou `:` hors du code en
+# ligne — et les 13 phrases que ce lot réécrit dans `relecteur.md`. Le dénombrement n'est pas écrit
+# ici : il sort de `test_chaque_morceau_du_protocole_tient_une_ancre`, qui exige que chaque morceau
+# tienne une ancre ou figure dans `MORCEAUX_SANS_PRESCRIPTION`. Relecture de la PR #141 : un
+# « 55 morceaux » écrit en commentaire ne se reproduisait pas par sa propre règle (92), et deux
+# passes ont trouvé chacune des énoncés nus — la classe d'obs 107, 124 et 126. Chaque ancre vue
+# rouge en retirant sa moitié restrictive ou son élément (Notes de la PR #141) ; l'ordre du réveil
+# est gardé à part (`ORDRE_DU_REVEIL`), la porte d'ancêtre du repli par `PORTES_PRESCRITES`.
 INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
     "source-unique": (SESSION_RELECTURE_REF, "y renvoient sans le recopier"),
     "demarrage-tour-du-mainteneur": (
@@ -2936,6 +2939,132 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         RELECTEUR_ROLE,
         "Il ne contient pas celle de corriger, qui revient à la session PR",
     ),
+    # Passe 2 de la relecture de la PR #141 — I4 : en relais, rien ne réveille l'émetteur.
+    "relais-notify-when-idle": (
+        SESSION_RELECTURE_REF,
+        (
+            "il envoie chaque réveil avec `notify_when_idle: true` et répond « reprends la passe <k> »"
+            " à l'avis d'inactivité arrivé sans constats"
+        ),
+    ),
+    "relais-ne-recoit-pas-la-note": (
+        SESSION_RELECTURE_REF,
+        "Un relais de la session PR, qui n'est pas le parent, ne reçoit pas cette note",
+    ),
+    "prompt-lot-suivant-relais-notify-when-idle": (
+        PROMPT_LOT_SUIVANT,
+        "envoie chaque réveil avec `notify_when_idle: true`",
+    ),
+    # m1, m3, m4.
+    "code-review-pas-rendu-a-nouveau": (
+        SESSION_RELECTURE_REF,
+        (
+            "aux réveils suivants, le skill n'est pas rendu à nouveau (« already loaded above ») et le"
+            " niveau reste celui du premier rendu"
+        ),
+    ),
+    "decision-du-mainteneur-a-l-emetteur": (
+        SESSION_RELECTURE_REF,
+        "ce qui s'y décide part par message à l'émetteur du dernier réveil",
+    ),
+    "config-securite-deux-prerequis": (
+        ".claude/pipeline.config.md",
+        (
+            "Deux prérequis. Le répertoire courant = un worktree détaché sur la tête de la PR, que la"
+            " session de relecture tient par construction"
+        ),
+    ),
+    # I3, seconde passe : les morceaux prescriptifs que la première population laissait nus.
+    "lue-par-la-session-pr": (
+        SESSION_RELECTURE_REF,
+        "Lue par la session PR à son go (`cycle-pr` Étape 1), à chaque passe de 4.2 et à son Étape 8",
+    ),
+    "ce-qu-elle-verifie-dans-relecteur": (
+        SESSION_RELECTURE_REF,
+        "Ce que la session vérifie et ce qu'elle rend sont dans `.claude/agents/relecteur.md`",
+    ),
+    "protocole-commun-dans-sessions-liees": (
+        SESSION_RELECTURE_REF,
+        (
+            "ce qu'elle partage avec toute session liée — héritage, identité, messages, nettoyage — dans"
+            " [sessions-liees.md](sessions-liees.md)"
+        ),
+    ),
+    "go-du-briefing-en-lots-comme-hors-vague": (
+        SESSION_RELECTURE_REF,
+        (
+            "le go du briefing est ce tour, en vague, en lots comme hors vague, et sa question nomme"
+            " l'accord de démarrer la session et celui de l'archiver (`cycle-pr` Étape 1)"
+        ),
+    ),
+    "le-parent-recoit-et-nettoie": (
+        SESSION_RELECTURE_REF,
+        "elle reçoit ses notes de fin de tour et ses messages, et la nettoie",
+    ),
+    "charge-task-observer": (SESSION_RELECTURE_REF, "Elle charge `task-observer`"),
+    "plafond-de-la-pr": (
+        SESSION_RELECTURE_REF,
+        "le plafond de 3 entrées est celui de la PR, tenu par la session PR",
+    ),
+    "en-attente-et-fin-de-tour": (SESSION_RELECTURE_REF, "Puis « en attente », et fin de tour."),
+    "code-review-medium-seul-mesure": (
+        SESSION_RELECTURE_REF,
+        (
+            "`/code-review medium <n> --comment` — `medium`, le seul niveau mesuré"
+            " (`pipeline.config.md`, ligne « relecture »)"
+        ),
+    ),
+    "securite-sinon-une-ligne": (SESSION_RELECTURE_REF, "sinon une ligne le dit"),
+    "securite-diffe-le-trunk": (
+        SESSION_RELECTURE_REF,
+        "Elle diffe `origin/HEAD...`, donc le trunk",
+    ),
+    "mainteneur-peut-parler": (
+        SESSION_RELECTURE_REF,
+        "Le mainteneur peut lui parler dans sa fenêtre",
+    ),
+    "nettoyage-apres-la-fermeture": (
+        SESSION_RELECTURE_REF,
+        (
+            "Après la fermeture de la boucle — relance faite, ou dernier constat traité s'il n'y en a"
+            " pas —, et jamais avant"
+        ),
+    ),
+    "relance-destinataire": (
+        SESSION_RELECTURE_REF,
+        "tant qu'une relance peut s'ouvrir, la session de relecture en est le destinataire",
+    ),
+    "branch-d-hors-jeu": (
+        SESSION_RELECTURE_REF,
+        "`git branch -d`, qui compare à `HEAD`, n'est plus en jeu (obs 86)",
+    ),
+    "repli-enchaine-dans-le-meme-tour": (
+        SESSION_RELECTURE_REF,
+        "leur fin de tour est alors la sienne, et elle enchaîne dans le même tour (obs 94, 98)",
+    ),
+    "repli-detache-isolation-d-abord": (
+        SESSION_RELECTURE_REF,
+        "le sous-agent s'y détache sur le SHA complet reçu, isolation vérifiée d'abord",
+    ),
+    "repli-reutilisation": (
+        SESSION_RELECTURE_REF,
+        "**Réutilisation.** Le même worktree sert aux deux passes et à la relance",
+    ),
+    "repli-verrou-initial-seulement": (
+        SESSION_RELECTURE_REF,
+        "Le verrou (`.git/worktrees/<id>/locked`) ne tient que pendant l'invocation initiale",
+    ),
+    "repli-branche-jamais-commitee": (
+        SESSION_RELECTURE_REF,
+        (
+            "la branche naît sur le trunk et ne commite jamais, et `-d` refuse dès que le trunk a avancé"
+            " (obs 86)"
+        ),
+    ),
+    "repli-humain-si-pas-de-sous-agent": (
+        SESSION_RELECTURE_REF,
+        "Si le harness ne permet pas même le sous-agent",
+    ),
     # Les renvois : chaque texte qui fait démarrer, réveiller ou nettoyer la session de relecture.
     "cycle-pr-question-du-go": (
         CYCLE_PR_SKILL,
@@ -3091,6 +3220,102 @@ ORDRE_DU_REVEIL = {
 def test_la_session_de_relecture_garde_l_ordre_de_son_reveil(avant: str, apres: str) -> None:
     """Les deux ancres présentes, et dans cet ordre — une ancre absente rougit aussi."""
     assert_dans_l_ordre(SESSION_RELECTURE_REF, avant, apres)
+
+
+def morceaux_du_texte(texte: str) -> list[str]:
+    """Le texte découpé après chaque `.`, `;` ou `:` suivi d'un blanc, hors du code en ligne.
+
+    Un passage entre accents graves n'est jamais coupé : `name: relecture-pr-<n>` reste un seul
+    morceau. Les morceaux vides sont retirés.
+    """
+    morceaux: list[str] = []
+    courant = ""
+    for rang, bout in enumerate(re.split(r"(`[^`]*`)", texte)):
+        if rang % 2:
+            courant += bout
+            continue
+        parties = re.split(r"(?<=[.;:])\s+", bout)
+        courant += parties[0]
+        for partie in parties[1:]:
+            morceaux.append(courant)
+            courant = partie
+    morceaux.append(courant)
+    return [morceau.strip() for morceau in morceaux if morceau.strip()]
+
+
+# Les morceaux du protocole qui ne prescrivent rien, par catégorie, en littéraux : un intitulé, un
+# motif, un relevé daté. Tout autre morceau tient une ancre.
+MORCEAUX_SANS_PRESCRIPTION: dict[str, list[str]] = {
+    "intitulé": [
+        "**Premier geste de la session de relecture** :",
+        "La plage :",
+        "Paramètres de `start_session` :",
+        "À chaque réveil, dans cet ordre :",
+    ],
+    "motif": [
+        "Une session, et non un sous-agent, pour trois raisons :",
+        "le mainteneur la **joint** dans sa fenêtre ;",
+        (
+            "ses commandes intégrées, `/code-review` et `/security-review`, closent **son** tour et non"
+            " celui de la session PR (obs 94, 98, 115) ;"
+        ),
+        "son contexte tient les deux passes et la relance.",
+        "un autre parent serait réveillé à chaque fin de tour de la session de relecture pour rien.",
+        "la tête bouge entre deux passes.",
+        "C'est sans coût ici :",
+        "un constat se rapporte.",
+        "un agent repris peut reprendre dans l'arbre vivant de la session PR.",
+    ],
+    "relevé daté": [
+        "Mesuré le 2026-10-20 sur la PR #141 :",
+        (
+            "`get_session` rend un worktree sous `.claude/worktrees/<slug>`, la branche"
+            " `claude/<slug>`, la `sourceBranch` demandée et le parent."
+        ),
+        "la seconde l'a clos, la première non.",
+        "Ce qu'elle rapporte à nouveau à la passe 2, sur une PR qu'elle a déjà commentée :",
+        "non mesuré.",
+        "non mesuré).",
+    ],
+}
+
+
+def test_chaque_morceau_du_protocole_tient_une_ancre() -> None:
+    """Le dénombrement de la population sort d'ici, jamais d'un commentaire.
+
+    Un morceau tient une ancre quand une phrase de `INVARIANTS_DE_LA_SESSION_DE_RELECTURE` sur ce
+    fichier, ou de `ORDRE_DU_REVEIL`, le contient, ou qu'il la contient. Les morceaux nus doivent être exactement
+    ceux de `MORCEAUX_SANS_PRESCRIPTION` : un énoncé ajouté sans ancre rougit, une exemption
+    périmée aussi. **Borne** : un morceau qui contient une ancre plus courte que lui n'est gardé
+    que sur elle ; le reste du morceau peut changer en vert. C'est pourquoi les ancres ajoutées
+    pour fermer la classe prennent le morceau entier.
+    """
+    ancres = [
+        phrase
+        for fichier, phrase in INVARIANTS_DE_LA_SESSION_DE_RELECTURE.values()
+        if fichier == SESSION_RELECTURE_REF
+    ]
+    ancres += [ancre for couple in ORDRE_DU_REVEIL.values() for ancre in couple]
+    nus = {
+        morceau
+        for morceau in morceaux_du_texte(texte_normalise(SESSION_RELECTURE_REF))
+        if not any(ancre in morceau or morceau in ancre for ancre in ancres)
+    }
+    exemptes = {morceau for liste in MORCEAUX_SANS_PRESCRIPTION.values() for morceau in liste}
+
+    assert nus == exemptes, (
+        f"sans ancre ni exemption : {sorted(nus - exemptes)} ; exemptions périmées :"
+        f" {sorted(exemptes - nus)}"
+    )
+
+
+def test_le_decoupage_ne_coupe_pas_le_code_en_ligne() -> None:
+    """Témoin du découpage : un `:` dans le code reste dans son morceau, un `;` de prose coupe."""
+    assert morceaux_du_texte("Paramètres : `name: x` ; puis la suite.") == [
+        "Paramètres :",
+        "`name: x` ;",
+        "puis la suite.",
+    ]
 
 
 # Ce que le lot 3 retire, et qui ne doit pas revenir. Chaque forme a été vue présente sur
