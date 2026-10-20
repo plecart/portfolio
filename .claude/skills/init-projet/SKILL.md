@@ -259,12 +259,13 @@ encore, le `ci.yml` et le `dependabot.yml` attendent sa première PR de code (é
   prend la main sur le dépôt de l'action ; une empreinte non (GitHub, « Secure use reference »).
 - **Conserver `permissions: contents: read`** en tête : le jeton par défaut d'un dépôt peut être
   bien plus large. Un job qui doit écrire élève ses droits à son niveau, jamais le workflow.
-- **Conserver le garde `if:` et le type `ready_for_review`.** Le garde ne saute que l'ouverture
-  d'une draft — l'amorce vide que `cycle-pr` pousse avant tout code (Étape 2) — et laisse tourner
-  la CI sur chaque push suivant, draft comprise, pour qu'un rouge de plateforme se voie pendant la
-  relecture et non après le passage en ready. Le type `ready_for_review` garantit un run à ce
-  passage, même si le dernier push date. Élargir le garde à toute draft renverrait chaque rouge de
-  plateforme après le ready, où il coûte un run complet et le rejeu des vérifications manuelles.
+- **Conserver le garde `if:`.** Le garde ne saute que l'ouverture d'une draft — l'amorce vide
+  que `cycle-pr` pousse avant tout code (Étape 2) — et laisse tourner la CI sur chaque push
+  suivant, draft comprise, pour qu'un rouge de plateforme se voie pendant la relecture et non
+  après le passage en ready. Élargir le garde à toute draft renverrait chaque rouge de plateforme
+  après le ready, où il coûte un run complet et le rejeu des vérifications manuelles. Le passage
+  en ready, lui, ne lance pas de run : `cycle-pr` (Étape 5) lit le run du SHA de tête avant
+  `gh pr ready`.
 - **Donner une horloge aux portes qui lisent une base d'avis** — audit des dépendances, scan
   d'images : leur verdict change sans commit, quand un avis se publie. Ajouter au `on:` un
   déclencheur `schedule` quotidien et `workflow_dispatch`, réservés à ces portes : toute étape ou

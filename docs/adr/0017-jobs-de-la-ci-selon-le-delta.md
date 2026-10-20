@@ -44,7 +44,7 @@ le gaspillage vient de **quand** les jobs tournent.
 
 ## Décision
 
-**Option b**, avec un réglage voisin, pris dans le même mouvement (#124) :
+**Option b**, avec deux réglages voisins, pris dans le même mouvement (#124) :
 
 - **Sur une PR, `web` et `infra` ne tournent que sur leurs fichiers.** La première étape du job
   `api` passe `git diff --name-only --no-renames HEAD^1 HEAD` — le delta de la PR contre sa base,
@@ -56,6 +56,9 @@ le gaspillage vient de **quand** les jobs tournent.
   l'ouverture d'une draft le saute, et avec lui `web` et `infra`.
 - **Un push annule le run encore en cours de la même PR** (`concurrency` du workflow, groupe par
   numéro de PR) ; jamais sur `main`, où le groupe se replie sur le SHA.
+- **Le passage en ready ne déclenche plus de run** : il rejouait un SHA déjà couvert, sur la
+  référence de fusion existante, que GitHub ne recalcule pas (obs 51). `cycle-pr` (Étape 5)
+  lit à la place le run du SHA de tête, et son verdict, avant `gh pr ready`.
 
 Le point de l'ADR 0014 remplacé : le scan Trivy tourne sur chaque PR qui touche un fichier hors du
 harnais, et sur chaque push vers `main` ; avant chaque publication, inchangé.

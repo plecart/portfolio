@@ -37,10 +37,12 @@ permissions:
 
 on:
   pull_request:
-    # `ready_for_review` garantit un run au passage draft → ready, même quand le dernier push
-    # date : c'est ce run que `cycle-pr` attend à son Étape 5. Le garde `if:` des jobs, lui, ne
-    # saute que l'ouverture d'une draft — son amorce vide n'a rien à vérifier.
-    types: [opened, synchronize, reopened, ready_for_review]
+    # Pas de run au passage draft → ready : il rejouait un SHA déjà couvert, sur la référence de
+    # fusion existante, que GitHub ne recalcule pas — 54 runs sur 14 jours (#124). `cycle-pr` lit à
+    # la place, avant `gh pr ready`, le run du SHA de tête (Étape 5) ; `reopened` relance une PR
+    # dont l'événement s'est perdu. Le garde `if:` du job `api`, lui, ne saute que l'ouverture
+    # d'une draft — son amorce vide n'a rien à vérifier.
+    types: [opened, synchronize, reopened]
   push:
     branches: [main]
 
