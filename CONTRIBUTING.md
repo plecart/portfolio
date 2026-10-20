@@ -160,16 +160,18 @@ tête du fichier ; la date passée, l'audit rebloque. `npm audit` n'a pas de fic
 son arbre se nettoie par les `overrides` du manifeste
 ([docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4).
 
-**Tests des images.** `make image-test`, porte de CI sur chaque PR, démarre les images que
-`make build` a chargées et les interroge ([infra/tests/](infra/tests/)) : le test de fumée du
-Caddyfile de production, la chaîne de sauvegarde de l'image `backup`, jouée dans le Compose de
+**Tests des images.** `make image-test`, porte de CI sur chaque PR qui touche un fichier hors du
+harnais de la pipeline et sur chaque push vers `main`
+([ADR 0017](docs/adr/0017-jobs-de-la-ci-selon-le-delta.md)), démarre les images que `make build` a
+chargées et les interroge ([infra/tests/](infra/tests/)) : le test de fumée du Caddyfile de
+production, la chaîne de sauvegarde de l'image `backup`, jouée dans le Compose de
 production contre un témoin S3 et un témoin de ping, et la restauration de ses sauvegardes par
 [infra/restore.sh](infra/restore.sh), `api` compris. Il ne fait pas partie de `make test` : il lui
 faut les images construites, donc le front compilé. Sur le poste, `make build` d'abord. Chaque test
 démarre sa pile sous son propre nom de projet Compose — sans port publié, ou sur un port hôte que
 Docker attribue — et la supprime en partant, volumes compris.
 
-**Scan des images.** `make scan`, porte de CI sur chaque PR, scanne avec Trivy chaque image que
+**Scan des images.** `make scan`, porte de CI aux mêmes moments, scanne avec Trivy chaque image que
 `make build` a construite : toute vulnérabilité HIGH ou CRITICAL bloque, corrigeable ou non, comme
 une image de base en fin de vie
 ([ADR 0014](docs/adr/0014-ci-cd-github-actions-et-ghcr.md)). Une vulnérabilité sans correctif

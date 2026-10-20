@@ -203,7 +203,7 @@ Lues par `cycle-pr`, `execution-qa` et la génération de CI. `n/a` = étape abs
 avant `gh pr ready` si elles dévient. Toute PR qui n'est pas l'œuvre d'un bot porte :
 - **assignee** : son auteur ;
 - **un** label de catégorie : celui de l'issue qu'elle ferme ; sans issue, dérivé du type
-  conventional commit — `feat` / `chore` / `refactor` → `enhancement`, `fix` → `bug`,
+  conventional commit — `feat` / `chore` / `refactor` / `ci` → `enhancement`, `fix` → `bug`,
   `docs` → `documentation` ;
 - **le milestone** du domaine de ses fichiers (section « Périmètre »).
 

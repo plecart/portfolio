@@ -10,7 +10,7 @@ Ordre de normativité : **en cas de contradiction, le rang le plus haut l'emport
 
 | Rang | Fichier | Portée | Où s'inscrit un amendement |
 |---|---|---|---|
-| 1 | `docs/cadrage-technique.md` | périmètre, phases, architecture, contraintes, registre des décisions D1-D60 (§7) | le § concerné + une ligne au registre §7 (une décision remplacée y reste, marquée « remplacée par ») |
+| 1 | `docs/cadrage-technique.md` | périmètre, phases, architecture, contraintes, registre des décisions D1-D61 (§7) | le § concerné + une ligne au registre §7 (une décision remplacée y reste, marquée « remplacée par ») |
 | 2 | `docs/specification-ux.md` | interface du site : direction (§1), jetons, écrans, composants, états, responsive, accessibilité, performance, contraintes de contenu (§2-§7, valeurs mesurées sur les prototypes retenus) | le § concerné, puis le prototype HTML correspondant (hors dépôt, `E:/Projets/Portfolio-prototypes/`, README de reprise) : les deux restent alignés |
 | 3 | `docs/adr/` (index et conventions : `docs/adr/README.md`) | le pourquoi d'une brique, options écartées | un nouvel ADR qui remplace l'ancien (statut MADR « remplacé par »), jamais l'édition d'un ADR accepté |
 | 4 | `docs/frontend-outillage.md` | inventaire installé et plan d'installation de `apps/web/` (le pourquoi de D44 est dans l'ADR 0008), provisoire | le § concerné |
@@ -260,11 +260,11 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
     dont la sortie est lue force `sys.stdout.reconfigure(encoding="utf-8")` ; la garde
     (`test_merge_lot.py`) est **rouge sur le poste** sans lui (mutation jouée, mesuré le
     2026-10-17) — sur un runner Linux, locale en UTF-8, supposée verte sans le correctif, non mesuré
-- gates bloquants en CI :
+- gates bloquants en CI — sur une PR, `web` et `infra` ne tournent que si le delta touche leurs fichiers (règle dans `infra/ci/changed_jobs.py`, lue par la première étape du job `api`), `api` toujours ; sur un push vers `main`, les trois (ADR 0017) :
   - back : audit, lint, format:check, typecheck, test
   - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse, audit
   - infra : compose (résolution de `infra/compose.dev.yml` et `infra/compose.yml`), build des images `api`, `backup` et `caddy` sans publication, tests des images (`make image-test`), scan (Trivy : HIGH et CRITICAL, corrigeables ou non, et fin de vie ; exceptions datées de `.trivyignore.yaml`)
-- portes à base d'avis (`make audit`, `make web-audit`, `make scan`) **sans horloge** : le `ci.yml` du projet n'a pas de `schedule`, par décision du mainteneur (#77, journal de spec, entrée du 2026-10-13 « lot 4, briefing ») — la règle de génération d'`init-projet` le prévoit, ce projet s'en écarte. Un avis neuf se voit au premier run venu — une PR, ou un push vers `main` : `cycle-pr` Étape 6, « rouge d'avis »
+- portes à base d'avis (`make audit`, `make web-audit`, `make scan`) **sans horloge** : le `ci.yml` du projet n'a pas de `schedule`, par décision du mainteneur (#77, journal de spec, entrée du 2026-10-13 « lot 4, briefing ») — la règle de génération d'`init-projet` le prévoit, ce projet s'en écarte. Un avis neuf se voit au premier run de sa porte — pour `make audit`, toute PR ; pour `make web-audit` et `make scan`, une PR qui touche le front ou les images, ou un push vers `main` (ADR 0017) : `cycle-pr` Étape 6, « rouge d'avis »
 - publication (job `publish`, push vers `main` seulement, après les trois jobs verts ; pas une gate de PR) : front compilé repris du job `web`, images reconstruites depuis le cache sans attestation, scannées par `make scan`, poussées sur GHCR (`ghcr.io/plecart/portfolio-<service>`, SHA complet et `latest`) par `make push`, trois versions par paquet gardées par `make prune`
 - déploiement (job `deploy`, après `publish`, push vers `main` seulement, sauté tant que la variable de dépôt `DEPLOY_ENABLED` ne vaut pas `true` ; pas une gate de PR) : seule la tête de `main` se déploie ; par SSH (clé dédiée, empreinte de l'hôte épinglée, secrets de l'environnement `production`, restreint à `main`), le job dépose `infra/compose.yml` dans `/srv/portfolio`, y fixe `IMAGE_TAG` au SHA du commit, puis `docker compose pull` et `up -d --wait` — rouge si un service ne devient pas sain, chacun ayant sa sonde ; procédures dans `infra/RUNBOOK.md`
 - test de restauration mensuel (workflow `restore.yml`, le 1ᵉʳ du mois à 04:00 UTC et `workflow_dispatch`, sauté tant que `DEPLOY_ENABLED` ne vaut pas `true` ; pas une gate de PR) : `infra/restore.sh derniere` dans la pile de production lancée sur le runner, images `latest` tirées de GHCR par le jeton du workflow, secrets et variables de l'environnement `production` ; son échec est l'alerte ; forme et scripts tenus par `apps/api/tests/test_restore_workflow.py` ; procédures dans `infra/RUNBOOK.md`, « Le test mensuel »
@@ -308,7 +308,7 @@ l'Étape 3 avant tout push d'un delta sur `.claude/` ou `CLAUDE.md`.
 avant `gh pr ready` si elles dévient. Toute PR qui n'est pas l'œuvre d'un bot porte :
 - **assignee** : son auteur ;
 - **un** label de catégorie : celui de l'issue qu'elle ferme ; sans issue, dérivé du type
-  conventional commit — `feat` / `chore` / `refactor` → `enhancement`, `fix` → `bug`,
+  conventional commit — `feat` / `chore` / `refactor` / `ci` → `enhancement`, `fix` → `bug`,
   `docs` → `documentation` ;
 - **le milestone** du domaine de ses fichiers (section « Périmètre »).
 
