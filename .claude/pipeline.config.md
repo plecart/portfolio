@@ -199,9 +199,11 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
                                                   # 2 bloquants et 7 importants de la relecture
                                                   # à contexte vierge. Deux portes, deux
                                                   # populations — elle ne remplace rien.
-                                                  # Son rapport exigé comme seule sortie clôt
-                                                  # le tour de la session de relecture, sans
-                                                  # coût (`cycle-pr` 4.2, obs 94). Le niveau
+                                                  # Son outil de rapport peut clore le tour de
+                                                  # la session de relecture, sans coût
+                                                  # (`cycle-pr` 4.2, obs 94) — il ne l'a clos à
+                                                  # aucune des deux passes du 2026-10-20 (PR
+                                                  # #141). Le niveau
                                                   # passé n'est pas garanti : `medium` a tourné
                                                   # en `high` le 2026-10-20 (PR #141, cause non
                                                   # vérifiée) — la session de relecture rapporte
@@ -227,7 +229,11 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
                                                   # Son prompt prescrit des sous-tâches (une de
                                                   # recherche, une de filtre par constat) ; la
                                                   # session l'a déroulée sans elles.
-                                                  # Prérequis : `origin/HEAD`, qu'elle diffe
+                                                  # Deux prérequis. Le répertoire courant = un
+                                                  # worktree détaché sur la tête de la PR, que la
+                                                  # session de relecture tient par construction
+                                                  # (mesuré le 2026-10-20, PR #141 ; obs 84). Et
+                                                  # `origin/HEAD`, qu'elle diffe
                                                   # (`git diff origin/HEAD...`) — absent, elle
                                                   # échoue avant toute analyse ; `git remote
                                                   # set-head origin main` le pose (mesuré et
@@ -237,10 +243,9 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
                                                   # 35 commits et 28 fichiers pour une plage
                                                   # de 2 commits et 4 fichiers, mesuré le
                                                   # 2026-10-20 dans la session de relecture de
-                                                  # la PR #141, répertoire courant = son
-                                                  # worktree détaché sur la tête, `origin/HEAD`
-                                                  # vers `origin/main` : ses constats hors de la
-                                                  # plage s'écartent. Autre
+                                                  # la PR #141, `origin/HEAD` vers `origin/main` :
+                                                  # ses constats hors de la plage s'écartent.
+                                                  # Autre
                                                   # mesure, même jour, au commit `b5b0b2a` de
                                                   # la PR #75 (17 fichiers, dont 7 hors tests et
                                                   # documentation : admin, téléversement,
