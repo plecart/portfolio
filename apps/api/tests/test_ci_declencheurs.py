@@ -18,14 +18,16 @@ Comme dans `test_publication.py`, chaque garde est une fonction sur du texte, ap
 une porte de CI (obs 53).
 """
 
+import ast
 import subprocess
 import sys
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
 import yaml
-from changed_jobs import jobs_for
+from changed_jobs import IMAGE_TESTS, jobs_for
 from test_agent_skills import CYCLE_PR
 from test_infra import CI_WORKFLOW, REPOSITORY_ROOT
 from test_restore_workflow import triggers
@@ -314,6 +316,10 @@ JOBS_WITNESSES: dict[str, tuple[list[str], bool, bool]] = {
     "le script lui-même": (["infra/ci/changed_jobs.py"], True, True),
     "verrou Python": (["uv.lock"], False, True),
     "tests des images": (["infra/tests/test_caddy_image.py"], False, True),
+    "module d'appui des tests des images": (["apps/api/tests/test_infra.py"], False, True),
+    # `fnmatchcase` : les chemins de git sont sensibles à la casse. Rouge sous Windows seulement
+    # si `fnmatch` revenait : sous Linux, les deux coïncident.
+    "casse distincte du front": (["APPS/WEB/a.tsx"], False, True),
     "chemin non ASCII, mis entre guillemets par git": ([r'"docs/caf\303\251.md"'], True, True),
 }
 
@@ -344,6 +350,58 @@ def test_le_script_ecrit_sa_reponse_au_format_github_output(
         check=True,
     )
     assert completed.stdout == f"web={str(web).lower()}\ninfra={str(infra).lower()}\n"
+
+
+# Les dossiers où `pytest` résout un import de module d'appui : son `pythonpath`, et les dossiers
+# de tests eux-mêmes (`rootdir` et mode d'import par défaut).
+SUPPORT_DIRS = ("apps/api/tests", "infra/tests")
+
+
+def image_test_modules() -> set[str]:
+    """Les fichiers de `apps/api/tests/` que `make image-test` charge : le greffon de `addopts`,
+    `process_environment`, et tout module d'appui que `infra/tests/` importe, directement ou non.
+
+    Lue par l'analyseur de Python (`ast`), jamais par un motif : un `import` dans une fonction
+    compte comme un `import` en tête. Dénombré le 2026-10-20 (relecture de la PR #137, passe 1) :
+    5 fichiers — `call_witness`, `process_environment`, `test_env`, `test_infra`,
+    `test_supply_chain` —, que le motif `apps/api/tests/*` sortait tous du job `infra`.
+    """
+    todo = [*(REPOSITORY_ROOT / "infra" / "tests").glob("*.py")]
+    todo.append(REPOSITORY_ROOT / "apps" / "api" / "tests" / "process_environment.py")
+    seen: set[Path] = set()
+    while todo:
+        module = todo.pop()
+        if module in seen:
+            continue
+        seen.add(module)
+        for node in ast.walk(ast.parse(module.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+                names = [node.module]
+            else:
+                continue
+            todo += [
+                REPOSITORY_ROOT / folder / f"{name.split('.')[0]}.py"
+                for name in names
+                for folder in SUPPORT_DIRS
+                if (REPOSITORY_ROOT / folder / f"{name.split('.')[0]}.py").is_file()
+            ]
+    return {
+        module.relative_to(REPOSITORY_ROOT).as_posix()
+        for module in seen
+        if module.is_relative_to(REPOSITORY_ROOT / "apps")
+    }
+
+
+def test_chaque_module_que_charge_image_test_fait_tourner_infra() -> None:
+    """Un module d'appui des tests des images, changé seul, fait tourner `infra` : sans lui, une PR
+    qui ne touche que lui sauterait les tests des images, et le rouge n'apparaîtrait qu'au push
+    vers `main`, où il bloquerait `publish`. L'égalité garde aussi l'autre sens : un module qui
+    cesse d'être chargé sort de la liste."""
+    modules = image_test_modules()
+    assert modules == set(IMAGE_TESTS)
+    assert all(jobs_for([module])["infra"] for module in modules)
 
 
 # --- La prose de la pipeline : plus de run au passage en ready ---------------------------------
