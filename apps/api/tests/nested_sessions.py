@@ -48,6 +48,12 @@ def run_nested_session(tests: Sequence[str], workdir: Path, **environment: str) 
     options pytest du shell (`PYTEST_ADDOPTS`) sont écartées : un `-x` hérité arrêterait la
     session au premier échec.
 
+    La sortie s'échange en UTF-8 des deux côtés, posé à l'enfant et lu par le parent : décodée
+    selon la page de code du poste, elle dépendait de l'environnement hérité. Mesuré le
+    2026-10-20 : `PYTHONIOENCODING=utf-8` dans le shell — la forme que le rôle `releveur` pose
+    devant toute commande Python — rendait `test_sans_reglages_chaque_test_echoue` rouge à tort,
+    son message accentué relu en cp1252 ; seul rouge de `make test` sous cette variable.
+
     Args:
         tests: les identifiants des tests à lancer, relatifs à la racine, un par test.
         workdir: où écrire le rapport JUnit — le `tmp_path` du test appelant.
@@ -65,9 +71,14 @@ def run_nested_session(tests: Sequence[str], workdir: Path, **environment: str) 
     process = subprocess.run(
         [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", f"--junit-xml={junit}", *tests],
         cwd=REPOSITORY_ROOT,
-        env={**_inherited_environment(), **environment, NESTED_SESSION: "1"},
+        env={
+            **_inherited_environment(),
+            **environment,
+            "PYTHONIOENCODING": "utf-8",
+            NESTED_SESSION: "1",
+        },
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         check=False,
     )
     return NestedSession(process.returncode, _outcomes(junit), process.stdout)
