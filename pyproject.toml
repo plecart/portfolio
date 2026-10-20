@@ -47,7 +47,8 @@ testpaths = ["apps"]
 # Le greffon `process_environment` pose l'environnement de test — réglages Django compris — avant
 # que pytest-django ne les charge, ce qu'aucun `conftest.py` ne peut faire : pytest les importe
 # après. `pythonpath` le rend importable — pytest l'applique avant de charger les greffons `-p`.
-pythonpath = ["apps/api/tests"]
+# `infra/ci` : les scripts de la CI, dont les tests importent les fonctions pures.
+pythonpath = ["apps/api/tests", "infra/ci"]
 addopts = ["-p", "process_environment"]
 
 # Même largeur que la prose du dépôt (règles, ADR, docstrings) : sans ça, le code se replie à
@@ -85,4 +86,4 @@ typeCheckingMode = "strict"
 # erreur de type délibérée y passait sans diagnostic.
 include = ["apps", "infra"]
 # Le `pythonpath` de pytest, vu de pyright : les modules d'appui des tests s'importent par leur nom.
-extraPaths = ["apps/api/tests"]
+extraPaths = ["apps/api/tests", "infra/ci"]

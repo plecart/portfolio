@@ -1,0 +1,81 @@
+"""Les jobs de la CI qu'un delta de PR concerne — `web` et `infra` —, au format `$GITHUB_OUTPUT`.
+
+Lancé par la première étape du job `api` de `.github/workflows/ci.yml`, sur le delta de la PR :
+
+    git diff --name-only HEAD^1 HEAD | python3 infra/ci/changed_jobs.py >> "$GITHUB_OUTPUT"
+
+Lit sur l'entrée standard les chemins du delta, un par ligne, lignes vides ignorées, et écrit
+`web=true|false` puis `infra=true|false`. Sur une PR, les jobs `web` et `infra` ne tournent que si
+leur réponse vaut `true` ; sur un push vers `main`, le workflow ne la lit pas et tout tourne
+(ADR 0017). Le job `api` tourne toujours : la suite du back porte aussi les tests de la pipeline.
+
+Règles, par motif `fnmatch` — où `*` traverse `/` :
+
+- `web` : un chemin du front, ou le schéma de l'API, dont `make web-test` vérifie que les types
+  générés du front sont à jour (`WEB`) ;
+- `infra` : un chemin hors du harnais (`HARNESS`). Liste d'exclusion, jamais d'inclusion : un
+  fichier inconnu fait tourner le job. Les images copient `apps/api` et `apps/web/dist`
+  (`infra/api/Dockerfile`, `infra/caddy/Dockerfile`), et les tests du back tournent dans `api` ;
+- les deux : un chemin de `ALL`, qui décide des jobs eux-mêmes, ou un chemin que `git` a mis
+  entre guillemets (`QUOTED`) — il le fait pour tout chemin non ASCII, que plus aucun motif
+  n'apparie ; un job sauté à tort cacherait un rouge, un job lancé pour rien ne coûte que des
+  minutes. Ces chemins sont hors du harnais : `infra` les prend déjà, `web` les ajoute.
+
+Liste vide : aucun des deux. Code de sortie 0 ; l'étape qui le lance tourne sous `pipefail`, et un
+`git diff` en échec y fait rougir le job `api` au lieu de rendre `false` en silence.
+"""
+
+import sys
+from collections.abc import Iterable
+from fnmatch import fnmatchcase
+
+WEB = ("apps/web/*", "apps/api/openapi.json")
+HARNESS = (
+    ".claude/*",
+    "docs/*",
+    "*.md",
+    "apps/api/tests/*",
+    ".github/dependabot.yml",
+    ".github/workflows/restore.yml",
+)
+# Ce qui décide des jobs eux-mêmes.
+ALL = ("Makefile", ".github/workflows/ci.yml", "infra/ci/changed_jobs.py")
+# Un chemin que `git` a mis entre guillemets : non ASCII, aucun autre motif ne l'apparie plus.
+QUOTED = '"*'
+
+
+def matches(path: str, patterns: Iterable[str]) -> bool:
+    """Vrai si `path` apparie l'un des `patterns`, à la casse près (`fnmatchcase`) : les chemins de
+    `git` sont sensibles à la casse, quel que soit le système qui lance le script."""
+    return any(fnmatchcase(path, pattern) for pattern in patterns)
+
+
+def jobs_for(paths: Iterable[str]) -> dict[str, bool]:
+    """Les jobs que le delta `paths` concerne.
+
+    Args:
+        paths: les chemins du delta, relatifs à la racine du dépôt, tels que `git diff --name-only`
+            les écrit ; une chaîne vide est ignorée.
+
+    Returns:
+        `{"web": …, "infra": …}`, dans cet ordre ; `False` pour les deux sur un delta vide.
+
+    Example:
+        >>> jobs_for(["apps/api/content/models.py"])
+        {'web': False, 'infra': True}
+    """
+    delta = [path for path in paths if path]
+    return {
+        "web": any(matches(path, (*WEB, *ALL, QUOTED)) for path in delta),
+        "infra": any(not matches(path, HARNESS) for path in delta),
+    }
+
+
+def main() -> None:
+    """Lit le delta sur l'entrée standard et écrit la réponse de chaque job sur la sortie."""
+    for job, runs in jobs_for(sys.stdin.read().splitlines()).items():
+        print(f"{job}={'true' if runs else 'false'}")
+
+
+if __name__ == "__main__":
+    main()
