@@ -1483,7 +1483,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "issue-a-un-lot-inchangee": (
         CYCLE_PR_SKILL,
-        "Une issue à un seul lot ne change rien : la session porte le cycle elle-même",
+        "Une issue à un seul lot ne change rien : la session porte le cycle elle-même et délègue le code (3.1)",
     ),
     "coordinatrice-sans-code": (COORDINATRICE_REF, "La coordinatrice **n'écrit pas de code**"),
     # Au go du découpage (journal de spec, 2026-10-17 ; décisions 8, 12).
