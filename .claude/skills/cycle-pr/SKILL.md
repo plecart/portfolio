@@ -837,19 +837,26 @@ périmées ») **avant `gh pr ready`**.
 **Avant de sortir du draft, lire le run du SHA de tête.** `gh pr ready` ne déclenche aucun run
 (ADR 0017) : la preuve d'une PR prête est le run de son dernier push (Étape 4). Le lire, verdict
 compris, sur le SHA complet de tête — une ligne par run, la plus récente en premier (mesuré le
-2026-10-20) :
+2026-10-20), son identifiant en dernier :
 
 ```
-gh api "repos/<owner>/<repo>/actions/runs?head_sha=<sha complet>&event=pull_request" --jq '.workflow_runs[] | select(.name == "CI") | "\(.created_at) \(.status) \(.conclusion)"'
+gh api "repos/<owner>/<repo>/actions/runs?head_sha=<sha complet>&event=pull_request" --jq '.workflow_runs[] | select(.name == "CI") | "\(.created_at) \(.status) \(.conclusion) \(.id)"'
 ```
 
 Seule la **première ligne** décide : une réouverture ajoute un run sur la même tête, et les plus
 anciens ne comptent plus. Sa conclusion :
 
 - `success` → sortir du draft ;
-- `in_progress` ou `queued`, conclusion `null` → le run tourne : fin de tour, le moniteur de PR
-  de l'application réveillant la session à sa conclusion (consignes de l'application à la session,
-  lues le 2026-10-20) — jamais une attente en tour ni une sonde planifiée ;
+- `in_progress` ou `queued`, conclusion `null` → le run tourne : **l'attendre** avant de passer à
+  la suite, par une commande lancée en fond, dont la fin réveille la session —
+  `timeout 1800 gh run watch <id> --exit-status -i 30`, `<id>` étant le dernier champ de la
+  première ligne —, puis relire le run comme ci-dessus ; sortie 124, délai dépassé : Étape 6, « CI
+  qui ne démarre pas ». Jamais une fin de tour nue : le moniteur de PR de l'application ne réveille
+  que sur un échec, un conflit ou un commentaire (description de `set_monitor`, lue le
+  2026-10-20), jamais sur un succès — mesuré le même jour, PR #141 : run vert à 19:21:01Z, aucun
+  réveil en 14 min. C'est la seule surveillance de la CI que la session lance elle-même, le
+  moniteur ne couvrant pas le succès ; jamais une sonde planifiée. Le lot 4b de l'issue #134 la
+  remplace par `attente-ci.py` ;
 - `cancelled` → relire le SHA de tête (`gh pr view <numéro> --json headRefOid`) : s'il a changé,
   lire le run du nouveau ; sinon, annulé sans remplaçant, « Si aucun run n'apparaît », ci-dessous ;
 - `skipped` → l'ouverture d'une draft jamais repoussée depuis, que le garde du job `api` saute
