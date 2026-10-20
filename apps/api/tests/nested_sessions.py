@@ -52,7 +52,8 @@ def run_nested_session(tests: Sequence[str], workdir: Path, **environment: str) 
     selon la page de code du poste, elle dépendait de l'environnement hérité. Mesuré le
     2026-10-20 : `PYTHONIOENCODING=utf-8` dans le shell — la forme que le rôle `releveur` pose
     devant toute commande Python — rendait `test_sans_reglages_chaque_test_echoue` rouge à tort,
-    son message accentué relu en cp1252 ; seul rouge de `make test` sous cette variable.
+    son message accentué relu en cp1252 ; seul rouge de `make test` sous cette variable. La
+    valeur est imposée, même si l'appelant la passe dans `environment`.
 
     Args:
         tests: les identifiants des tests à lancer, relatifs à la racine, un par test.
