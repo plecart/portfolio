@@ -272,7 +272,7 @@ travail reste visible du reste de la pipeline.
 
 > **La CI tourne sur chaque push de la branche, draft comprise** — sauf à l'ouverture de la draft
 > elle-même, dont l'amorce vide n'a rien à vérifier (garde `if:` du `ci.yml` du template). Le
-> premier run arrive donc au premier push de code (Étape 4), et c'est là que se voit un rouge de la
+> premier run arrive donc au premier push de code (3.5), et c'est là que se voit un rouge de la
 > famille « sensible à la plateforme » (3.2) — au cycle courant, pas après le passage en ready, où
 > chaque constat coûte un run complet et le rejeu des vérifications manuelles. **Une draft sans
 > push de code n'a aucun run : ce n'est pas une CI cassée.**
@@ -308,8 +308,8 @@ Le brief d'un bloc porte ses fichiers, ses signatures, ses tests attendus et leu
 comportement, son estimation en épingles (Étape 1), la base et le seuil du gabarit (3.5) et le
 niveau `ponytail` ; le `developpeur` part à `xhigh` quand le bloc écrit des tests. Il fait le TDD
 de cette étape, le cycle 3.2 à 3.5, la doc descriptive et le commit — jamais le push, que la
-session PR fait après chaque remise. Arrêté sur une `[C]` ou sur une question dont dépend tout le
-bloc, il est **repris par `SendMessage`** avec la réponse — `[T]` tranchée par la session PR, ou
+session PR fait après chaque remise, derrière la ligne « validation » quand le delta la demande
+(3.2). Arrêté sur une `[C]` ou sur une question dont dépend tout le bloc, il est **repris par `SendMessage`** avec la réponse — `[T]` tranchée par la session PR, ou
 question portée au mainteneur —, jamais remplacé (mesuré le 2026-10-20 sur une `[C]` fabriquée,
 Notes de la PR #139) ; ses `[V]` rejoignent « Questions en attente ». Un `developpeur` neuf
 seulement au bloc suivant, jamais pour une retouche du même bloc.
@@ -459,10 +459,10 @@ complémentaires :
   chaque pourcentage par la durée totale, absences comprises — 2 % affichés là où le critère
   demandait la part hors absences, 13 % (obs 72).
 - **Un delta sur `.claude/` ou `CLAUDE.md` passe par le validateur du harnais avant tout push**
-  — ligne « validation » de `.claude/pipeline.config.md`, que joue le `releveur` des portes de 4.2.
+  — ligne « validation » de `.claude/pipeline.config.md`, que joue un `releveur` avant chaque push.
   C'est la porte la plus large de ce que Claude Code charge : un frontmatter de skill absent, une
-  `description` non textuelle, un manifeste, une entrée MCP. **Avec `--strict`**, sans quoi un avertissement sort en 0. Elle ne
-  dispense pas de la suite : mesuré le 2026-10-09 (v2.1.295), elle est **muette** sur un
+  `description` non textuelle, un manifeste, une entrée MCP. **Avec `--strict`**, sans quoi un
+  avertissement sort en 0. Elle ne dispense pas de la suite : mesuré le 2026-10-09 (v2.1.295), elle est **muette** sur un
   frontmatter de rôle absent ou illisible — un ` : ` non cité dans une `description` fait charger
   le rôle sans aucun champ, en silence —, et ce sont les tests de frontmatter du projet qui
   gardent cette classe. Deux portes, deux populations : ni l'une ni l'autre ne couvre tout.
@@ -538,7 +538,7 @@ poser le socle, lance d'abord la première passe de relecture (4.2). Si ce commi
 d'une zone sensible, c'est maintenant qu'elle prend le point d'arrêt humain — cadence et forme
 dans `.claude/rules/contraintes.md`, « Points d'arrêt humains », source unique.
 
-## Étape 4 — Relecture indépendante (avant `git push`)
+## Étape 4 — Relecture indépendante
 
 Deux relectures. Le cleanup pass holistique (4.1) quand tous les commits sont faits. La relecture
 à contexte vierge (4.2) **en deux temps** : une première fois dès que le socle est posé, en plein
