@@ -6,7 +6,8 @@ chemin fixe de [sessions-liees.md](sessions-liees.md) (« Passation »), et remi
 coordinatrice, dans le message de fin ([coordinatrice.md](coordinatrice.md)) — sans coordinatrice,
 au mainteneur, qui le donne à une session neuve. Pas par le lead : sur une vague de cinq
 lots, chaque frontière passée par lui lui coûte un brief relu et un prompt écrit, et son contexte
-a grossi jusqu'à devoir être relayé (obs 62). La session sortante, elle, connaît son lot.
+a grossi jusqu'à devoir être relayé (obs 62). La session sortante, elle, tient les artefacts de
+son lot.
 
 **Ce gabarit ne porte que des pointeurs et des commandes à taper telles quelles.** Jamais une règle
 recopiée. Une consigne tirée d'une mémoire de phase, d'une passation ou d'un tableau de bord hérite
@@ -46,9 +47,11 @@ a bougé, puis la commande de fumée (`.claude/pipeline.config.md`, « Commandes
 Ce que le lead est, et ce qu'il n'est jamais : `cycle-pr`, « Vague parallèle » en tête du skill, et
 `.claude/rules/contraintes.md`, « Jamais d'auto-merge dans le trunk ».>
 
-Charge le skill `task-observer` (session longue ; le journal est **hors du dépôt**, chemin dans
+Charge le skill `task-observer` (session PR ; le journal est **hors du dépôt**, chemin dans
 `CLAUDE.md`). Lis `CLAUDE.md` et `.claude/pipeline.config.md`. Puis invoque le skill `cycle-pr`
-(outil Skill) avec \<N>.
+(outil Skill) avec \<N> : tu portes le cycle complet et délègues le code (`cycle-pr` 3.1), et tu
+lances toi-même ton `verificateur` d'avant-go (Étape 7). Ton effort est celui de ton démarrage :
+ne le change pas en cours de session (barème de `coordinatrice.md`, « Au go du découpage »).
 
 **Ton brief est le bloc « \<titre du lot> » du corps de #\<N>**, plus le brief d'agent en
 commentaire (`gh issue view \<N> --comments`). Lequel l'emporte quand ils divergent : `cycle-pr`

@@ -1251,9 +1251,10 @@ contacts humains et des pairs. Re-mesurer le cycle précédent avec le script co
 transcripts existent encore, ou le dire sur la ligne de comparaison.
 
 La PR et la conversation qui l'a résolue ont pu acter des décisions, déplacer un contrat d'interface, déjà faire une partie d'un autre lot, ou rendre une
-hypothèse caduque ailleurs. **Immédiatement après le merge**, lancer le skill `repercussions` — la
-conversation qui a résolu l'issue est **encore en contexte**, c'est le moment où l'analyse est la
-plus riche. Même pour une **demande directe** sans issue liée, faire la passe : le delta mergé
+hypothèse caduque ailleurs. **Immédiatement après le merge**, la session PR lance le skill
+`repercussions` — elle tient le brief, les Notes et les constats de la PR, c'est le moment où
+l'analyse est la plus riche. La collecte (delta, issues du thème, briefs pré-filtrés par ancre)
+part à un `releveur` ; le go d'édition se demande au mainteneur dans la fenêtre de la session PR. Même pour une **demande directe** sans issue liée, faire la passe : le delta mergé
 peut impacter des issues ouvertes.
 
 Il confronte le **delta réel** de la PR aux issues du **même thème** et à celles qui **mentionnent
@@ -1278,13 +1279,14 @@ d'intégration ([references/coordinatrice.md](references/coordinatrice.md)). San
 ou en repli, **après** la passe `repercussions`, au **mainteneur**, qui ouvre la session neuve et
 lui donne le prompt. Pas le lead : sur une vague de cinq lots, chaque frontière passée par lui lui
 coûte un brief relu et un prompt écrit, et son contexte a grossi jusqu'à devoir être relayé
-lui-même (obs 62). La session sortante connaît son lot ; le lead connaît la vague, et c'est ce
+lui-même (obs 62). La session sortante tient les artefacts de son lot ; le lead connaît la vague, et c'est ce
 qu'il garde — croisement des fichiers après merge, tableau de bord, vigilance de vague. Quand la
 session sortante a disparu, deux replis de `pr-paralleles` : Étape 7, « Session disparue », pour
 reconstituer ce qu'elle n'a pas remis, et Étape 8, « Issue en plusieurs lots », où c'est le lead
 qui démarre la session du lot suivant.
 
-**La passation s'écrit en dernier.** Chaque point encore ouvert du lot — question au
+**La passation s'écrit en dernier, depuis les artefacts** — SHA, PR, brief, constats —, jamais de
+mémoire de code. Chaque point encore ouvert du lot — question au
 mainteneur, correctif, message en attente — se pose d'abord, en une fois, puis se fait ou se laisse
 sur une décision explicite : la passation ne part qu'avec une liste vide ou arbitrée. Mesuré : un
 prompt remis à côté de trois questions ouvertes a fait démarrer le lot suivant aussitôt, et deux de
@@ -1317,8 +1319,9 @@ C'est aussi pourquoi le prompt du lot suivant est un **artefact remis**, et pas 
 se donne à soi-même.
 
 **Relais en cours de cycle — la session sortante passe ce qu'elle seule possède.** Un cycle peut
-remplir un contexte avant son Étape 8, et une session neuve reprend alors le même lot. La session
-sortante écrit sa passation depuis la variante « relais » de
+remplir un contexte avant son Étape 8, et une session neuve reprend alors le même lot — la roue de
+secours depuis que la session PR délègue son code (#134, A1). La session sortante écrit sa
+passation, depuis les artefacts, dans la variante « relais » de
 [references/prompt-lot-suivant.md](references/prompt-lot-suivant.md), au chemin fixe de
 [references/sessions-liees.md](references/sessions-liees.md) (« Passation »), et la remet par ce
 chemin à la coordinatrice pour une session de lot
@@ -1365,4 +1368,4 @@ Une session sait qu'elle a fini avant que le lead ne le sache : c'est elle qui p
    relance qui lui revient. Son worktree ne se retire qu'à la fermeture de la boucle : le
    retirer plus tôt termine l'agent.
 5. La PR n'est **terminée qu'après la passe `repercussions`** : une clôture peut bouleverser les
-   autres issues — on le vérifie pendant que la conversation est encore en contexte.
+   autres issues — la session PR le vérifie tant qu'elle tient le brief, les Notes et les constats.
