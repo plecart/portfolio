@@ -58,8 +58,10 @@ Es-tu sûr du changement ?
    parce qu'on raisonne sur la décision, pas sur sa portée. Quand une seule des deux sorties (le
    document gagne, la décision gagne) est présentable, c'est le signe que la branche adverse a été
    résumée, pas explorée.
-2. **La décision gagne** — le document est **amendé maintenant**, dans cette session, via
-   `/contradiction` (qui propage aux rangs inférieurs et aux issues).
+2. **La décision gagne** — le document est **amendé maintenant**, par la session de dialogue qui a
+   décidé (session PR ; `triage`, `interroge-moi` ou `vers-issues` hors cycle), seule à lancer
+   `/contradiction` (qui propage aux rangs inférieurs et aux issues) ; les sous-agents remontent
+   les deux citations.
 
 Si l'amendement est trop gros pour maintenant, l'échappatoire n'est pas « plus tard » : c'est un
 **critère ou une issue ouverts sur-le-champ**, portant les deux citations, par la règle

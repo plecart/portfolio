@@ -59,16 +59,20 @@ lettre en tête de la question ou de la décision : `[T]`, `[V]` ou `[C]`.
   de produit**. Elle attend le mainteneur, mais **groupée** — au go du briefing, à l'arrêt visuel
   ou avant le go du merge —, jamais seule au fil de l'eau. En attendant, l'agent avance sur ce qui
   n'en dépend pas, en notant sous la question l'hypothèse réversible qu'il retient d'ici là ; il
-  ne rend la main que si tout ce qui reste dépend de la réponse.
+  ne rend la main que si tout ce qui reste dépend de la réponse. Un sous-agent ne la pose pas : il
+  note son hypothèse et rend la `[V]` dans son rapport, et la session de dialogue les groupe.
 - **Voie C — contradiction.** La décision contredit une source de vérité : arrêt immédiat, deux
-  citations, `.claude/rules/decisions-vs-doc.md`. Rien ne change.
+  citations, `.claude/rules/decisions-vs-doc.md`. Rien ne change. Un sous-agent s'arrête et remonte
+  les deux citations ; la session de dialogue présente l'arrêt.
 
 Dans le doute sur la voie, c'est la voie V — et ce doute doit rester rare : une question de voie
 T posée au mainteneur lui fait payer un aller-retour pour une réponse qu'il donne toujours.
 
 Quelle que soit la voie :
 
-- Si la réponse se trouve dans le code, **explorer le code plutôt que demander**. Pour
+- Si la réponse se trouve dans le code, **explorer le code plutôt que demander** — par un
+  `releveur` pour un relevé, l'`executant` pour une cartographie (`cycle-pr` Étape 1), la
+  conclusion restant à la session ; un sous-agent explore lui-même dans son mandat. Pour
   un grilling approfondi, utiliser `interroge-moi`. L'exploration ne s'arrête pas au dépôt : pour
   un comportement d'outil **non documenté**, les logs applicatifs, l'arborescence de données
   locale et les horodatages sont des sources de premier ordre — la documentation décrit
@@ -94,7 +98,9 @@ Quelle que soit la voie :
 - **Un cycle n'ouvre jamais d'issue seul.** Chaque skill a sa porte de sortie « nouvelle issue »
   (résidu de relecture, « ce que cette PR ne couvre pas », vide relevé par `repercussions`,
   échappatoire de `decisions-vs-doc`) ; chacune est raisonnable seule, leur somme ne l'est pas.
-  La borne vit ici, au-dessus des skills.
+  La borne vit ici, au-dessus des skills. Elle est portée par la session PR, hors cycle par la
+  session de dialogue qui relève le vide ; un sous-agent le remonte dans son rapport, sans issue ni
+  brouillon.
 - Tout vide, résidu ou hors-périmètre relevé en cours de cycle suit cet ordre et s'arrête au
   **premier barreau qui tient** :
   1. **il tient dans la PR courante en moins d'un commit** → le faire ;
@@ -115,7 +121,9 @@ Quelle que soit la voie :
   **et** pour un texte que la **longueur** est plausible. Le code de retour atteste que la
   requête a abouti, jamais que le contenu écrit est celui qu'on voulait : une forme destructrice
   (un chemin pris pour un contenu, un `-f` tapé pour `-F`) rend exactement le même succès qu'une
-  édition — et un brief entier remplacé par son chemin ne se voit qu'à la relecture.
+  édition — et un brief entier remplacé par son chemin ne se voit qu'à la relecture. La relecture
+  est à qui écrit : la session, ou le `releveur` à qui elle confie une écriture verbatim et qui rend
+  ce qu'il a relu.
 
 ## Maintenance continue
 - Tenir à jour, sans qu'on le redemande, les supports d'exécution du projet : fichier de commandes
@@ -127,6 +135,10 @@ Quelle que soit la voie :
   commit change un comportement, une commande, une interface ou l'architecture, la doc
   correspondante est mise à jour *dans ce commit* — jamais « plus tard ». Une doc fausse est pire
   qu'une doc absente.
+- **Porteur** : l'auteur du commit — le `developpeur` pour la doc descriptive de son bloc
+  (`.claude/agents/developpeur.md`, « La doc »), la session pour ce qu'elle spécifie à
+  l'`executant` ; l'amendement d'une source de vérité reste à la session de dialogue
+  (`decisions-vs-doc.md`, « Deux sorties »).
 
 ## Points d'arrêt humains
 - Seule zone sensible par défaut : l'**UI à valider visuellement**. Un projet peut en déclarer
@@ -140,6 +152,8 @@ Quelle que soit la voie :
   qu'il sert. Mais attendre la fin de la PR coûte autant : les attentes du mainteneur arrivent
   alors après la dernière relecture, et chacune rouvre un cycle. Si une passe de relecture
   indépendante part au même commit (`cycle-pr` 4.2), la lancer d'abord, puis montrer l'écran : les deux attentes se
-  recouvrent, et la seconde passe absorbe ce que le mainteneur demande.
+  recouvrent, et la seconde passe absorbe ce que le mainteneur demande. C'est la session PR qui
+  prend l'arrêt : elle coupe le bloc du `developpeur` au commit qui assemble l'écran, et le
+  `developpeur` le lui signale.
 - Une zone sensible **ajoutée** par le projet suit la même cadence, sauf si sa ligne dans
   `.claude/pipeline.config.md` en déclare une autre.
