@@ -8,11 +8,11 @@ Usage :
 
 La règle « Écritures sur un artefact distant » de `contraintes.md` veut que toute écriture sur la
 forge se relise ; ce script tient cette relecture pour les gestes de `cycle-pr` Étape 8 (#134,
-lot 4a). Chaque sous-commande lit le texte par `gh api` — octets décodés en UTF-8, jamais le mode
-texte, qui traduit les fins de ligne, ni la page de code de la console (obs 87, 106, 108, 116) —,
-le modifie en mémoire, l'écrit par `gh api -X PATCH <chemin> --input -` avec la charge JSON sur
-l'entrée standard, puis le relit par le même canal et compare le **texte entier** à l'attendu :
-une forme réduite, longueur ou ancre, ne voit pas une conversion qui la préserve (obs 106).
+lot 4a). Chaque sous-commande lit par `gh api` — octets décodés en UTF-8, jamais le mode texte,
+qui traduit les fins de ligne, ni la page de code de la console (obs 87, 106, 108, 116) —, écrit,
+puis relit par le même canal. Un texte s'écrit par `gh api -X PATCH <chemin> --input -`, la charge
+JSON sur l'entrée standard, et sa relecture compare le **texte entier** à l'attendu : une forme
+réduite, longueur ou ancre, ne voit pas une conversion qui la préserve (obs 106).
 `{owner}/{repo}` sont remplis par `gh` depuis le dépôt courant.
 
 - `label` retire un label de l'issue ou de la PR `<N>`, puis relit ses labels ;
@@ -22,8 +22,9 @@ une forme réduite, longueur ou ancre, ne voit pas une conversion qui la préser
   compris), indentation permise ; cocher ne change pas ce texte, et le rejeu rend le verdict du
   premier appel ;
 - `issue edit --append` ajoute un fichier UTF-8, lu en octets, en fin de corps de `<N>`, séparé
-  de son dernier contenu par une seule ligne vide — aucune sur un corps vide. Le corps d'une PR
-  passe par le même chemin : pour l'API REST, une PR est une issue.
+  de son dernier contenu par une ligne vide au moins — celles qui terminent déjà le corps
+  restent —, aucune sur un corps vide. Le corps d'une PR passe par le même chemin : pour l'API
+  REST, une PR est une issue.
 
 Il refuse, sans rien écrire : une ancre introuvable ou ambiguë — toutes sont validées avant la
 première écriture —, zéro ou plusieurs commentaires de brief, un fichier illisible, non UTF-8 ou
@@ -105,8 +106,8 @@ def gh_api(run: Run, *args: str, stdin: bytes | None = None) -> bytes:
 
 def read_json(run: Run, parse: Callable[[Any], Any], *args: str) -> Any:
     """Ce que `parse` tire de la réponse JSON de `gh api <args>`, décodée en UTF-8 explicitement
-    (obs 108). La présence et le type des champs s'y gardent pour les 6 sites qui lisent un
-    document de la forge, lecture et relecture — dénombrés par
+    (obs 108). La présence et le type des champs s'y gardent pour chaque site qui lit un document
+    de la forge, lecture et relecture — dénombrés par
     `test_une_reponse_d_une_autre_forme_sort_en_1_en_une_ligne`.
 
     Args:
@@ -161,7 +162,7 @@ def body_of(document: Any) -> str:
 
 
 def measure(text: str) -> str:
-    """Les deux grandeurs qu'une conversion de fins de ligne change : octets UTF-8 et `\\r`."""
+    """Octets UTF-8 et `\\r` : ce que change la conversion de toutes les fins de ligne LF ↔ CRLF."""
     carriage_returns = text.count("\r")
     return f"{len(text.encode())} octets et {carriage_returns} \\r"
 
@@ -334,9 +335,10 @@ def label_remove(run: Run, args: argparse.Namespace) -> str:
 
 
 def appended(body: str, addition: str) -> str:
-    """`addition` à la suite de `body`, séparée de son dernier contenu par une ligne vide et une
-    seule : les fins de ligne — `\\n` ou `\\r\\n` — qui terminent déjà `body` comptent. Un corps
-    vide n'a pas de séparateur ; `body` n'est jamais réécrit, seulement prolongé."""
+    """`addition` à la suite de `body`, séparée de son dernier contenu par une ligne vide au
+    moins : les fins de ligne — `\\n` ou `\\r\\n` — qui terminent déjà `body` comptent, et des
+    `\\n` les complètent jusqu'à deux. Un corps vide n'a pas de séparateur ; `body` n'est jamais
+    réécrit, seulement prolongé — plusieurs lignes vides qui le terminent restent."""
     if not body:
         return addition
     line_ends = body[len(body.rstrip("\r\n")) :].count("\n")
@@ -344,8 +346,9 @@ def appended(body: str, addition: str) -> str:
 
 
 def issue_append(run: Run, args: argparse.Namespace) -> str:
-    """`issue edit --append` : ajoute le fichier en fin de corps, sauf s'il le termine déjà ; l'ancre
-    de la relecture est sa première ligne non vide. Le fichier est lu avant tout appel à la forge."""
+    """`issue edit --append` : ajoute le fichier en fin de corps, sauf s'il le termine déjà ;
+    l'ancre de la relecture est sa première ligne non vide. Le fichier est lu avant tout appel à
+    la forge."""
     try:
         addition = args.file.read_bytes().decode("utf-8")
     except OSError as error:
@@ -377,7 +380,7 @@ def one_line(value: str) -> str:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Les quatre sous-commandes du module ; chacune pose son `handler`."""
+    """Les sous-commandes du module ; chacune pose son `handler`."""
     parser = argparse.ArgumentParser(
         prog="ecriture-relue.py",
         description=__doc__,

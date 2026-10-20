@@ -125,7 +125,7 @@ def probe_clean(run: Run) -> None:
     )
 
 
-def require_push(run: Run) -> None:
+def probe_push(run: Run) -> None:
     """Exige que le compte de `gh` puisse pousser sur le dépôt courant.
 
     Raises:
@@ -180,7 +180,7 @@ def probes(fmt: Sequence[str] | None, test: Sequence[str] | None) -> list[tuple[
     return [
         ("arbre propre", probe_clean),
         ("gh auth status", lambda run: launch(run, AUTH)),
-        ("droit de push", require_push),
+        ("droit de push", probe_push),
         ("commit de sonde", probe_commit),
         ("format", (lambda run: probe_format(run, fmt)) if fmt else None),
         ("test", (lambda run: launch(run, test)) if test else None),
