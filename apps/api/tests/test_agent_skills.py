@@ -2028,6 +2028,55 @@ def texte_normalise(fichier: str) -> str:
     return " ".join(re.sub(r"(?m)^[ \t]*#[ \t]?", "", brut).split())
 
 
+# « Une tâche par session » (#134, lot 2b) : ce que `CLAUDE.md` « Orchestration » et
+# « Observation continue » disent de la délégation — un énoncé par point du critère 2b qui les
+# nomme, et la phrase de `cycle-pr` 4.2 qui en dépend.
+INVARIANTS_DU_CONTEXTE_COURT = {
+    "une-tache-par-session": ("CLAUDE.md", "**Une tâche par session.**"),
+    "la-session-de-dialogue-garde-merge-et-cloture": (
+        "CLAUDE.md",
+        "arbitrages `decisions-vs-doc`, dialogue avec l'utilisateur, merge et clôture",
+    ),
+    "liste-tools-troisieme-axe": ("CLAUDE.md", "La **liste `tools:`** fixe le plancher"),
+    "le-brief-porte-le-niveau-ponytail": (
+        "CLAUDE.md",
+        "son brief porte le bloc, le niveau `ponytail` (« Minimalisme »)",
+    ),
+    "task-observer-reste-aux-sessions": ("CLAUDE.md", "`task-observer` reste aux sessions"),
+    "reprise-par-message": ("CLAUDE.md", "**Un sous-agent arrêté se reprend par message**"),
+    "lire-borne": ("CLAUDE.md", "puis lire la plage (`Read` avec `offset` et `limit`)"),
+    "role-visible-a-une-session-neuve": ("CLAUDE.md", "n'est visible qu'à une session **neuve**"),
+    "repli-general-purpose-borne": ("CLAUDE.md", "pour un rôle **sans** liste `tools:` seulement"),
+    "cycle-pr-repli-borne": (
+        CYCLE_PR_SKILL,
+        "un rôle à outils réduits se lance depuis une session neuve (`CLAUDE.md`, « Orchestration »)",
+    ),
+    "sessions-liees-une-par-sous-lot": (
+        "CLAUDE.md",
+        "une par lot et une par sous-lot — **un sous-lot est un lot**",
+    ),
+    "sessions-liees-une-session-de-relecture-par-pr": (
+        "CLAUDE.md",
+        "une session de relecture par PR",
+    ),
+    "observation-une-session-seulement": ("CLAUDE.md", "**Seule une session** l'invoque"),
+    "observation-un-sous-agent-ne-lit-pas-le-journal": (
+        "CLAUDE.md",
+        "Un sous-agent ne lit pas le journal",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("fichier", "phrase"),
+    INVARIANTS_DU_CONTEXTE_COURT.values(),
+    ids=INVARIANTS_DU_CONTEXTE_COURT.keys(),
+)
+def test_chaque_invariant_du_contexte_court_garde_sa_phrase(fichier: str, phrase: str) -> None:
+    """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
+    assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
+
+
 # L'**ordre** du protocole de la coordinatrice : chaque couple d'ancres, la première avant la
 # seconde. Une phrase gardée seule dit qu'un geste existe, pas où il se place — et c'est sa place
 # qui le rend vrai : une branche d'intégration poussée après les sessions laisse le premier lot sans
