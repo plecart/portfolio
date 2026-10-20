@@ -4,7 +4,7 @@ description: "Relecteur à contexte vierge d'un diff de PR (cycle-pr, Étape 4.2
 model: opus
 effort: medium
 isolation: worktree
-tools: Bash, Read, Grep, Glob, Edit
+tools: Bash, Read, Grep, Glob, Edit, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---
 
 **Ton mandat contient des décisions** — classer un constat, juger qu'une preuve tient : c'est
