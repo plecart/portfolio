@@ -49,18 +49,29 @@ passe à une session neuve par la passation de l'Étape 8, « Relais en cours de
 ## Étape 1 — Briefing pré-PR (avant la première ligne de code)
 
 **Éprouver les outils d'abord.** Un skill présuppose des outils ; tant qu'ils n'ont pas été
-éprouvés, son plan est une hypothèse. Avant d'écrire une ligne du briefing, lancer la commande la
-plus anodine de chaque outil dont le cycle dépend — `git status`, `gh auth status`, la commande
-`test` de `.claude/pipeline.config.md` (sauf si elle y porte le marqueur `# non vérifiée` : voir
-plus bas) — et exiger une **sortie plausible**, pas seulement un code de retour. Puis **au moins
-une écriture** : `git commit --allow-empty -m "chore: sonde outillage"` suivi de
-`git reset --soft HEAD~1`. Un outil branché sur un hook, un verrou ou un jeton ne se révèle qu'à
-l'opération qui le déclenche ; une commande de lecture prouve que le binaire répond, jamais que
-l'opération passera — `git status` ne déclenche aucun hook, le premier commit les déclenche tous.
-Même exigence pour `gh` — `gh api repos/<owner>/<repo> --jq .permissions.push` doit rendre
-`true` — et pour la commande de format, qui écrit (même exception). Le tout sur un arbre et un
-index propres (`git status` vide) : la sonde de commit emporte ce qui est stagé, et la commande de
-format réécrit ce qui ne l'est pas.
+éprouvés, son plan est une hypothèse. Un outil branché sur un hook, un verrou ou un jeton ne se
+révèle qu'à l'opération qui le déclenche ; une commande de lecture prouve que le binaire répond,
+jamais que l'opération passera — `git status` ne déclenche aucun hook, le premier commit les
+déclenche tous. Avant d'écrire une ligne du briefing, lancer donc la sonde d'outillage, Python 3
+sans dépendance, depuis la racine du dépôt. `<format>` et `<test>` sont des lignes de « Commandes
+du projet » de `.claude/pipeline.config.md`, la pile au choix de la session ; une ligne `n/a`, ou
+marquée `# non vérifiée` (voir plus bas), se passe en **omettant** son option, et la sonde sort
+`SAUTÉE` :
+
+```
+python <répertoire de ce skill>/scripts/sonde-outillage.py --format "<format>" --test "<test>"
+```
+
+Six sondes, de la moins chère à la plus chère, arrêt au premier KO : un arbre et un index propres
+(`git status` vide, fichiers non suivis compris) — la sonde de commit emporte ce qui est stagé, et
+la commande de format réécrit ce qui ne l'est pas ; `gh auth status` en 0 ;
+`gh api repos/{owner}/{repo} --jq .permissions.push` à `true` ; **une écriture**,
+`git commit --allow-empty -m "chore: sonde outillage"` puis `git reset --soft HEAD~1`, la tête
+revenue au SHA d'avant ; la commande de format, qui écrit, sans qu'elle réécrive l'arbre ; la
+commande de test. Sortie 0 : tout OK ou sauté ; 1 : premier KO, avec la fin de la sortie
+fautive ; 2 : appel mal formé. **Ce qu'elle ne couvre pas** : un dépôt sans commit, où elle rend
+KO avant d'écrire ; le premier push et la CI ; la ligne « validation » ; les hooks côté serveur ;
+le choix des commandes, qui reste à la session.
 
 Un échec ici se remonte à l'utilisateur **avant** le briefing, avec les cibles de correction
 possibles et leur portée (session, projet, machine) : c'est un arbitrage de configuration, jamais
