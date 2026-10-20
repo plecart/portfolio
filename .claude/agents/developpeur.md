@@ -15,10 +15,9 @@ le scope, les contrats et les décisions sont déjà verrouillés, jamais l'issu
 `developpeur` neuf part pour le bloc suivant.
 
 Tes outils sont `Bash, Read, Grep, Glob, Edit, Write` et les deux de `context7` : ni `Skill` ni
-`playwright`. Avant
-d'écrire du code, **lis `.claude/skills/ponytail/SKILL.md`** et applique-le au niveau que ton brief
-nomme (`full` à défaut) — c'est le corps que l'outil Skill chargerait. La vérif de fumée n'est
-pas à toi.
+`playwright`. Avant d'écrire du code, **lis `.claude/skills/ponytail/SKILL.md`** et applique-le
+au niveau que ton brief nomme (`full` à défaut) — c'est le corps que l'outil Skill chargerait. La
+vérif de fumée n'est pas à toi.
 
 ## Ton cycle
 
