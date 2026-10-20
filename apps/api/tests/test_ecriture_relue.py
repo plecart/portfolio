@@ -196,6 +196,11 @@ def test_une_case_deja_cochee_ne_fait_rien_ecrire_et_le_dit(
     assert f"déjà cochée : {ancre}" in capsys.readouterr().out
 
 
+def crlf(corps: str) -> str:
+    """Une forge qui stocke le texte reçu avec ses fins de ligne converties LF → CRLF."""
+    return corps.replace("\n", "\r\n")
+
+
 # Ce que la forge garde d'un corps reçu, quand ce n'est pas ce qu'on lui a envoyé : (corps lu,
 # corps gardé après qu'on y a coché « Critère A », sortie **exacte**). Chaque forme doit faire
 # sortir en 1 — la relecture compare le texte entier, jamais une forme réduite (obs 106) — et la
@@ -210,7 +215,7 @@ RELECTURES_NON_CONFORMES: dict[str, tuple[str, Callable[[str], str | None], str]
     # Le bon texte, converti LF → CRLF : ancres intactes, mais pas les octets ni les `\r`.
     "lf-converti-en-crlf": (
         "- [ ] Critère A\n- [ ] Critère B\n",
-        lambda corps: corps.replace("\n", "\r\n"),
+        crlf,
         "attendu 34 octets et 0 \\r, relu 36 octets et 2 \\r",
     ),
     # Les fins de ligne permutées : même longueur en caractères comme en octets, même nombre de
@@ -420,11 +425,6 @@ def test_issue_edit_sort_en_1_sur_une_relecture_tronquee(
     assert "ancre absente : *Rattachement a posteriori.*" in sortie, sortie
 
 
-def crlf(corps: str) -> str:
-    """Une forge qui stocke le texte reçu avec ses fins de ligne converties LF → CRLF."""
-    return corps.replace("\n", "\r\n")
-
-
 RETIRE_LABEL = ("label", "42", "--remove", "ready-for-agent")
 COCHE_CORPS = ("checkbox", "patch", "42", "--case", "Critère A")
 COCHE_BRIEF = ("brief", "patch", "42", "--case", "Critère A")
@@ -561,12 +561,7 @@ def test_une_forge_en_panne_a_la_lecture_refuse_en_une_ligne(
 
 
 @pytest.mark.parametrize(
-    ("args", "methode"),
-    [
-        (("checkbox", "patch", "42", "--case", "Critère A"), "PATCH"),
-        (("label", "42", "--remove", "ready-for-agent"), "DELETE"),
-    ],
-    ids=["patch", "delete"],
+    ("args", "methode"), [(COCHE_CORPS, "PATCH"), (RETIRE_LABEL, "DELETE")], ids=["patch", "delete"]
 )
 def test_une_ecriture_en_panne_sort_en_1_sans_se_dire_refus(
     args: tuple[str, ...], methode: str, capsys: pytest.CaptureFixture[str]
