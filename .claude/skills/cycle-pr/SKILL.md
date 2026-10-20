@@ -833,6 +833,32 @@ Sur une zone sensible, il a été pris au commit qui assemble l'écran (3.5). Si
 depuis, rejouer la vérification sur ce qui a changé (Étape 7, « Rejouer les vérifications
 périmées ») **avant `gh pr ready`**.
 
+**Avant de sortir du draft, lire le run du SHA de tête.** `gh pr ready` ne déclenche aucun run
+(ADR 0017) : la preuve d'une PR prête est le run de son dernier push (Étape 4). Le lire, verdict
+compris, sur le SHA complet de tête :
+
+```
+gh api "repos/<owner>/<repo>/actions/runs?head_sha=<sha complet>&event=pull_request" --jq '.workflow_runs[] | select(.name == "CI") | .conclusion'
+```
+
+`success` → sortir du draft ; `failure` → Étape 6, « Trier un rouge » ; une ligne vide → le run
+tourne, sa conclusion reste nulle jusqu'à sa fin (mesuré le 2026-10-20) : attendre. `skipped`, ou
+aucune ligne du tout, se traite par « Si aucun run n'apparaît », ci-dessous. `skipped` est l'ouverture d'une draft jamais repoussée
+depuis, que le garde du job `api` saute (mesuré le 2026-10-20 sur l'amorce de la PR #137). Aucune
+ligne : un push émis pendant une panne d'Actions. Ce run a tourné sur la référence de fusion
+calculée à son push, que GitHub ne recalcule ni à chaque merge sur le trunk ni au passage en
+ready : il peut combiner la tête à un trunk vieux de plusieurs merges — mesuré, 8 des 30 commits
+de `main` (obs 51). Ce qu'il prouve de l'état combiné se lit dans les parents de cette référence, à
+l'Étape 7.
+
+**Si aucun run n'apparaît** pour le SHA de tête — `skipped`, ou aucune ligne —, une draft
+jamais repoussée depuis son ouverture se reconnaît à son seul run `skipped` ; sinon, consulter
+`https://www.githubstatus.com/api/v2/components.json` **avant** tout autre diagnostic — un
+événement émis pendant une panne d'Actions n'est **pas rejoué** au rétablissement. Le
+re-déclenchement propre est `gh pr close` puis `gh pr reopen` (`reopened` est dans les types du
+workflow), action visible donc sur accord du mainteneur — jamais de commit vide ni de force-push.
+Puis relire le run du SHA de tête, comme ci-dessus.
+
 Puis seulement, sortir du draft :
 
 ```
@@ -841,21 +867,6 @@ gh pr ready <numéro>
 
 Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur qui distingue
 « travail en cours » de « prêt à être relu ».
-
-`gh pr ready` déclenche **un run de plus** (événement `ready_for_review`), après ceux que chaque
-push a déjà produits (Étape 4) : c'est lui qui garantit qu'une PR prête a un run, même si son
-dernier push date. Attendre son résultat avant l'Étape 6. Il tourne sur la référence de fusion
-**existante**, que GitHub ne recalcule pas au passage en ready : il peut combiner la tête à un
-trunk vieux de plusieurs merges — mesuré, 8 des 30 commits de `main` (obs 51). Ce qu'il prouve
-de l'état combiné se lit dans les parents de cette référence, à l'Étape 7.
-
-**Si aucun run n'apparaît**, deux causes possibles, à départager dans cet ordre : (1) un run
-existe-t-il pour le SHA de tête (`gh api repos/<owner>/<repo>/actions/runs?head_sha=<sha>`) ?
-(2) sinon, consulter `https://www.githubstatus.com/api/v2/components.json` **avant** tout autre
-diagnostic — un événement émis pendant une panne d'Actions n'est **pas rejoué** au
-rétablissement. Le re-déclenchement propre est `gh pr close` puis `gh pr reopen` (`reopened` est
-dans les types du workflow), action visible donc sur accord du mainteneur — jamais de commit vide
-ni de force-push.
 
 ## Étape 6 — Review + CI
 

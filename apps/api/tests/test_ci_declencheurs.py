@@ -26,7 +26,10 @@ from typing import Any, cast
 import pytest
 import yaml
 from changed_jobs import jobs_for
+from test_agent_skills import CYCLE_PR
 from test_infra import CI_WORKFLOW, REPOSITORY_ROOT
+from test_restore_workflow import triggers
+from test_supply_chain import repository_files
 
 # Un run par PR, le plus récent : le groupe est le numéro de la PR. Sur un push vers `main`,
 # `github.event.pull_request` est vide (doc GitHub « Contexts ») : le groupe se replie sur le SHA,
@@ -125,7 +128,34 @@ def gating_findings(workflow: str) -> list[str]:
     return findings
 
 
+# Les déclencheurs du workflow. Pas de `ready_for_review` : le passage en ready rejouait un SHA déjà
+# couvert, sur la référence de fusion existante, que GitHub ne recalcule pas (obs 51) ; `cycle-pr`
+# (Étape 5) lit à la place le run du SHA de tête. `reopened` reste : c'est la voie de relance d'une
+# PR dont un événement s'est perdu pendant une panne d'Actions (même Étape).
+TRIGGERS = {
+    "pull_request": {"types": ["opened", "synchronize", "reopened"]},
+    "push": {"branches": ["main"]},
+}
+
+
+def trigger_findings(workflow: str) -> list[str]:
+    """Ce qui, dans un workflow, écarte ses déclencheurs de `TRIGGERS`.
+
+    Returns:
+        Un constat si les déclencheurs diffèrent de `TRIGGERS` — un type, une branche ou un
+        déclencheur de plus ou de moins ; liste vide sinon.
+    """
+    found = triggers(yaml.safe_load(workflow))
+    return (
+        [] if found == TRIGGERS else [f"le workflow se déclenche sur {found}, attendu {TRIGGERS}"]
+    )
+
+
 # --- Le recueil des formes : chaque cas recensé, avec son verdict attendu ---------------------
+
+TYPES_LINE = "    types: [opened, synchronize, reopened]\n"
+BRANCHES_LINE = "    branches: [main]\n"
+TRIGGERS_BLOCK = f"on:\n  pull_request:\n{TYPES_LINE}  push:\n{BRANCHES_LINE}"
 
 # Les lignes de la concurrence conforme, telles que le workflow les écrit.
 GROUP_LINE = f"  group: {CONCURRENCY['group']}\n"
@@ -144,7 +174,7 @@ GATED_LINES = "".join(
     f"  {name}:\n    needs: api\n    if: {gated_if(name)}\n    steps: []\n" for name in GATED_JOBS
 )
 CONFORMING_WORKFLOW = (
-    f"{CONCURRENCY_BLOCK}jobs:\n  api:\n{API_IF_LINE}{OUTPUTS_LINES}    steps:\n"
+    f"{TRIGGERS_BLOCK}{CONCURRENCY_BLOCK}jobs:\n  api:\n{API_IF_LINE}{OUTPUTS_LINES}    steps:\n"
     f"      - uses: actions/checkout@v0\n{DEPTH_LINES}{JOBS_STEP_LINES}{INSTALL_LINES}{GATED_LINES}"
 )
 
@@ -220,6 +250,19 @@ FORMS: dict[str, tuple[Guard, str, str, bool]] = {
         "needs.api.outputs.web",
         True,
     ),
+    "déclencheurs conformes": (trigger_findings, "", "", False),
+    "avec ready_for_review": (
+        trigger_findings,
+        TYPES_LINE,
+        "    types: [opened, synchronize, reopened, ready_for_review]\n",
+        True,
+    ),
+    "sans reopened": (trigger_findings, TYPES_LINE, "    types: [opened, synchronize]\n", True),
+    # Sans `types`, GitHub prend `opened`, `synchronize` et `reopened` (doc « Events that trigger
+    # workflows », relue le 2026-10-20) : la forme est équivalente aujourd'hui, mais un défaut qui
+    # changerait rouvrirait le run au ready sans qu'aucune ligne du dépôt ne bouge.
+    "sans types": (trigger_findings, "  pull_request:\n" + TYPES_LINE, "  pull_request:\n", True),
+    "push sur toute branche": (trigger_findings, "  push:\n" + BRANCHES_LINE, "  push:\n", True),
 }
 
 
@@ -301,3 +344,43 @@ def test_le_script_ecrit_sa_reponse_au_format_github_output(
         check=True,
     )
     assert completed.stdout == f"web={str(web).lower()}\ninfra={str(infra).lower()}\n"
+
+
+# --- La prose de la pipeline : plus de run au passage en ready ---------------------------------
+
+# Ce qui cite un run au passage en ready : la prose que les sessions suivent. Population au
+# 2026-10-18, `grep -rln ready_for_review .claude CONTRIBUTING.md CLAUDE.md` : 2 fichiers,
+# `cycle-pr` et `init-projet` ; re-dénombrée le 2026-10-20 contre la base du lot, inchangée.
+READY_EVENT = "ready_for_review"
+
+
+def pipeline_prose() -> list[str]:
+    """Les fichiers de prose de la pipeline : le Markdown de `.claude/`, `CONTRIBUTING.md` et
+    `CLAUDE.md`, tels que le prochain commit peut les contenir — un worktree sous `.claude/`,
+    ignoré par git, n'en fait pas partie."""
+    return [
+        name
+        for name in repository_files()
+        if (name.startswith(".claude/") and name.endswith(".md"))
+        or name in {"CONTRIBUTING.md", "CLAUDE.md"}
+    ]
+
+
+def test_aucune_prose_ne_promet_un_run_au_passage_en_ready() -> None:
+    """Le workflow n'écoute plus `ready_for_review` : une prose qui le cite ferait attendre un run
+    qui ne vient jamais."""
+    citing = [
+        name
+        for name in pipeline_prose()
+        if READY_EVENT in (REPOSITORY_ROOT / name).read_text(encoding="utf-8")
+    ]
+    assert citing == []
+
+
+def test_cycle_pr_lit_le_run_du_sha_de_tete_avant_de_sortir_du_draft() -> None:
+    """À l'Étape 5, la lecture du run du SHA de tête précède `gh pr ready` : un agent qui suit le
+    skill dans l'ordre la fait avant de sortir du draft, pas après (obs 30)."""
+    text = CYCLE_PR.read_text(encoding="utf-8")
+    step = text[text.index("## Étape 5 ") : text.index("## Étape 6 ")]
+    assert "actions/runs?head_sha=" in step
+    assert step.index("actions/runs?head_sha=") < step.index("gh pr ready <numéro>")
