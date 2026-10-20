@@ -262,8 +262,9 @@ versions de correctif (3.12.x) le sont.
    puis la même session enchaîne sur la vague.
 3bis. **Amender** — `contradiction` dès qu'une décision de conversation contredit une source de
    vérité (section « Sources de vérité » de `.claude/pipeline.config.md`) : le document est amendé
-   dans la session, ou la décision est abandonnée — ou son effet déplacé hors de ce que le document
-   affirme. Déclenché par la règle `decisions-vs-doc`, à n'importe quel moment.
+   par la session de dialogue qui a décidé, ou la décision est abandonnée — ou son effet déplacé
+   hors de ce que le document affirme. Déclenché par la règle `decisions-vs-doc`, à n'importe quel
+   moment.
 4. **Répercuter** — `repercussions` après chaque merge : confronte d'abord le delta aux sources de
    vérité (un § falsifié → `contradiction`), puis corrige la spec — corps et brief d'agent —
    des issues dont la planification est devenue fausse. Lancé automatiquement en fin de `cycle-pr`.

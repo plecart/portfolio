@@ -2064,6 +2064,74 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         "CLAUDE.md",
         "Un sous-agent ne lit pas le journal",
     ),
+    # Les règles de fond sans porteur nommé : **15** sur 40 (étude du 2026-10-19, §19.6, lu le
+    # 2026-10-20), chacune nommant le sien là où elle vit — 7 dans `contraintes.md`, 3 dans
+    # `cleanup-verbatim.md`, 1 dans `taille-pr.md`, 1 dans `decisions-vs-doc.md`, 3 dans
+    # `CLAUDE.md`. Puis leurs renvois entrants : « amendé dans la session », 3 sites sur `81ae8c3`
+    # (`grep` sur le texte aux blancs normalisés), la règle comprise ; le rapport du `developpeur`.
+    "porteur-voie-v": (
+        ".claude/rules/contraintes.md",
+        "Un sous-agent ne la pose pas : il note son hypothèse et rend la `[V]` dans son rapport",
+    ),
+    "porteur-voie-c": (
+        ".claude/rules/contraintes.md",
+        "Un sous-agent s'arrête et remonte les deux citations",
+    ),
+    "porteur-explorer-plutot-que-demander": (
+        ".claude/rules/contraintes.md",
+        "par un `releveur` pour un relevé, l'`executant` pour une cartographie",
+    ),
+    "porteur-creation-d-issues": (
+        ".claude/rules/contraintes.md",
+        "un sous-agent le remonte dans son rapport, sans issue ni brouillon",
+    ),
+    "porteur-ecritures-distantes": (".claude/rules/contraintes.md", "La relecture est à qui écrit"),
+    "porteur-maintenance-continue": (
+        ".claude/rules/contraintes.md",
+        "l'auteur du commit — le `developpeur` pour la doc descriptive de son bloc",
+    ),
+    "porteur-points-d-arret-humains": (
+        ".claude/rules/contraintes.md",
+        "elle coupe le bloc du `developpeur` au commit qui assemble l'écran",
+    ),
+    "porteur-cleanup-holistique": (
+        ".claude/rules/cleanup-verbatim.md",
+        "le cleanup holistique, un `developpeur` neuf sur le diff complet de la branche",
+    ),
+    "porteur-rapporter-a-voix-haute": (
+        ".claude/rules/cleanup-verbatim.md",
+        "Un `developpeur` le rend dans son rapport final",
+    ),
+    "porteur-denombrement-avant-correctif": (
+        ".claude/rules/cleanup-verbatim.md",
+        "la session PR pour un constat de relecture",
+    ),
+    "porteur-gabarit-a-chaque-commit": (
+        ".claude/rules/taille-pr.md",
+        "Le `developpeur` rend le chiffre avec chaque commit",
+    ),
+    "porteur-deux-sorties": (
+        ".claude/rules/decisions-vs-doc.md",
+        (
+            "par la session de dialogue qui a décidé (session PR ; `triage`, `interroge-moi` ou"
+            " `vers-issues` hors cycle), seule à lancer `/contradiction`"
+        ),
+    ),
+    "porteur-niveau-ponytail": ("CLAUDE.md", "le niveau voyage dans le brief"),
+    "porteur-glossaire": ("CLAUDE.md", "Les noms de tests sont à qui les écrit"),
+    "porteur-context7": ("CLAUDE.md", "parmi les rôles, ceux dont la liste `tools:` le porte"),
+    "renvoi-deux-sorties-claude-md": (
+        "CLAUDE.md",
+        "amendé par la session de dialogue qui a décidé",
+    ),
+    "renvoi-deux-sorties-contributing": (
+        "CONTRIBUTING.md",
+        "amendé par la session de dialogue qui a décidé",
+    ),
+    "renvoi-rapporter-a-voix-haute": (
+        ".claude/agents/developpeur.md",
+        "le compte rendu de chaque cleanup pass",
+    ),
 }
 
 
