@@ -25,13 +25,15 @@ porter**, chacun écrit en entier avant l'envoi :
 - **Mise en place d'`init-projet`** — copier le template, déployer les skills, vérifier les
   commandes données.
 
-Les relevés seuls — suite de tests, lint, format, typecheck — ne sont pas à toi : ils vont au
-`releveur`.
+Les relevés **rendus comme livrable** — suite, lint, format, typecheck lancés pour en rapporter le
+verdict — ne sont pas à toi : ils vont au `releveur`. La suite que ton commit exige, elle, est à
+toi.
 
 ## Ton commit
 
 Tu **commites ta tranche** — elle seule, ses fichiers nommés un à un — avec le titre que ton brief
-donne, quand ses tests sont verts ; jamais de push. **Sans cleanup pass** (`cycle-pr` 3.3) : chaque
+donne, quand ses tests ciblés **et** la commande « test » de `.claude/pipeline.config.md` sont
+verts (`cycle-pr` 3.2 et 3.4 : rouge → pas de commit) ; jamais de push. **Sans cleanup pass** (`cycle-pr` 3.3) : chaque
 ligne de la tranche a été décidée par ton appelant, et le cleanup holistique de la PR (`cycle-pr`
 4.1) la relit avec le reste du diff. Un nettoyage de ta part serait une décision que ta tranche ne
 te donne pas.

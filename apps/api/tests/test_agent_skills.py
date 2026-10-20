@@ -484,8 +484,9 @@ ROLE_FRONTMATTER_CLAIMS: list[tuple[str, str, str | None]] = [
     ("verificateur", "isolation", None),
     # « Tu n'as pas `Write` : la sortie y va par redirection » (`releveur.md`).
     ("releveur", "tools", "Write"),
-    # « Tes outils sont `Bash, Read, Grep, Glob, Edit, Write` : ni `Skill` ni `playwright` »
-    # (`developpeur.md`) — sans liste, il recevrait tous les outils, `playwright` compris.
+    # « Tes outils sont `Bash, Read, Grep, Glob, Edit, Write` et les deux de `context7` : ni `Skill`
+    # ni `playwright` » (`developpeur.md`) — sans liste, il recevrait tous les outils, `playwright`
+    # compris.
     ("developpeur", "tools", "playwright"),
     # Même phrase : `ponytail` se lit par `Read`, la liste des skills ne pèse pas sur son plancher.
     ("developpeur", "tools", "Skill"),
@@ -530,6 +531,36 @@ def test_le_frontmatter_d_un_role_tient_ce_que_sa_prose_affirme(
     )
     assert forbidden not in declared, (
         f"`{role}` déclare `{field}: {declared}` — son texte dit à son lecteur le contraire"
+    )
+
+
+# L'autre sens : un outil que la prose d'un rôle lui fait employer, et que sa liste `tools:` doit
+# donc nommer. Même provenance que la table précédente, citation verbatim du fichier nommé.
+ROLE_REQUIRED_TOOLS: list[tuple[str, str]] = [
+    # « par `context7` ou les sources du paquet » (`developpeur.md`, « Frontières tierces »).
+    ("developpeur", "mcp__context7__resolve-library-id"),
+    ("developpeur", "mcp__context7__query-docs"),
+]
+
+
+@pytest.mark.parametrize(
+    ("role", "tool"),
+    ROLE_REQUIRED_TOOLS,
+    ids=[f"{role}-{tool}" for role, tool in ROLE_REQUIRED_TOOLS],
+)
+def test_la_liste_d_outils_d_un_role_nomme_ceux_que_sa_prose_emploie(role: str, tool: str) -> None:
+    """Une liste `tools:` fermée retire **en silence** tout outil qu'elle ne nomme pas.
+
+    Le rôle lit alors une consigne qu'il ne peut plus suivre, et se rabat sur une autre voie sans
+    le savoir. Relevé à la passe 2 de la PR #136 : la liste posée au `developpeur` pour borner son
+    plancher lui retirait `context7`, que `CLAUDE.md` met en priorité pour toute question de
+    bibliothèque — aucune porte ne le voyait.
+    """
+    declared = role_frontmatter(role).get("tools")
+    assert isinstance(declared, str), f"`tools` absent ou non textuel chez `{role}` : {declared!r}"
+
+    assert tool in [name.strip() for name in declared.split(",")], (
+        f"`{role}` ne déclare pas `{tool}` — sa prose le lui fait employer"
     )
 
 

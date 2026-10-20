@@ -7,7 +7,9 @@ Cela couvre aussi bien les étapes de la pipeline (cycle de commit, cleanup holi
 refactor TDD, relecture indépendante) qu'une **demande directe et informelle** de l'utilisateur — « relis ça »,
 « nettoie ce fichier », « améliore ce code », « tu peux revoir ce que tu viens d'écrire ? ».
 Il n'y a pas de relecture « informelle » qui échapperait à ce prompt : s'il s'agit de repasser sur
-du code, c'est ce prompt qui s'applique.
+du code, c'est ce prompt qui s'applique. Seule exception : le commit d'une tranche entièrement
+spécifiée par l'`executant` (`.claude/agents/executant.md`, « Ton commit »), que le cleanup
+holistique de `cycle-pr` 4.1 relit.
 
 **Relire un document normatif** (spec UX/UI, cadrage, PRD) n'est **pas** ce prompt : c'est le
 skill `audit-spec-ui` — passes mécaniques (jetons, tables, arithmétique, contraste, cohérence)
