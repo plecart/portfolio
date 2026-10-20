@@ -2205,11 +2205,25 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         ".claude/agents/developpeur.md",
         "le chiffre de `git diff --stat <base>...HEAD` après chaque commit",
     ),
-    # Les lignes de `pipeline.config.md` qui disaient « lancée par `cycle-pr` » : 4 commandes
-    # (« test brut », front compris, « validation », « relecture », « sécurité »), chacune son rôle.
+    # **Une épingle par élément dénombré** : un commentaire qui compte N éléments sans une ancre
+    # chacun dénombre ce qu'il ne garde pas (relecture de la PR #140, passe 2, I-1 : 10 sondes sur
+    # 10 VERTES). Dénombrement écrit avant le correctif, sur `e9d7231` : **26** éléments dans les
+    # deux blocs ci-dessous — 11 rôles et conditions dans 5 lignes de `pipeline.config.md`, 15
+    # exécutants dans les 7 maillons de `CONTRIBUTING.md` —, **9** épinglés, **17** non.
+    #
+    # `pipeline.config.md` : 5 lignes, 4 commandes (« test brut » back et front, « validation »,
+    # « relecture », « sécurité ») qui disaient « lancée par `cycle-pr` », chacune avec son rôle,
+    # son intérim et, pour « sécurité », sa condition.
     "config-test-brut": (
         ".claude/pipeline.config.md",
-        "le verdict se lit ici, par le `developpeur` avant commit (cycle-pr 3.2)",
+        (
+            "le verdict se lit ici, par le `developpeur` avant commit (cycle-pr 3.2) et le"
+            " `releveur` des portes (4.2)"
+        ),
+    ),
+    "config-test-brut-front": (
+        ".claude/pipeline.config.md",
+        "lue comme celle du back (`developpeur` avant commit, `releveur` des portes)",
     ),
     "config-validation": (
         ".claude/pipeline.config.md",
@@ -2217,24 +2231,61 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "config-relecture": (
         ".claude/pipeline.config.md",
-        "Lancée par la session PR avant chaque appel du relecteur",
+        (
+            "Lancée par la session PR avant chaque appel du relecteur (`cycle-pr` 4.2 ; par la"
+            " session de relecture au lot 3 de #134)"
+        ),
     ),
     "config-securite": (
         ".claude/pipeline.config.md",
-        "même nature. Lancée par la session PR (`cycle-pr` 4.2 ;",
+        (
+            "Lancée par la session PR (`cycle-pr` 4.2 ; par la session de relecture au lot 3 de"
+            " #134, condition comprise) **seulement** si le diff touche une zone sensible ou une"
+            " surface exposée"
+        ),
     ),
-    # `CONTRIBUTING.md`, « Le flux en une page » : 7 maillons, chacun nomme qui l'exécute.
+    # `CONTRIBUTING.md`, « Le flux en une page » : 7 maillons (0, 1, 2, 3, 3bis, 4, 5), chacun
+    # nomme qui l'exécute — 3bis par `renvoi-deux-sorties-contributing`, ci-dessus.
+    "contributing-configurer": ("CONTRIBUTING.md", "`init-projet`, dans une session de dialogue"),
+    "contributing-planifier": (
+        "CONTRIBUTING.md",
+        "chacun dans une session de dialogue avec le mainteneur",
+    ),
+    "contributing-interroger": ("CONTRIBUTING.md", "**obligatoire**, dans une session de dialogue"),
     "contributing-implementer": (
         "CONTRIBUTING.md",
-        "`cycle-pr`, porté par la session PR, qui orchestre et délègue",
+        (
+            "`cycle-pr`, porté par la session PR, qui orchestre et délègue : briefing pré-PR"
+            " (relevés au `releveur`, cartographie à l'`executant`)"
+        ),
+    ),
+    "contributing-developpeur-relecteur-cleanup": (
+        "CONTRIBUTING.md",
+        (
+            "un `developpeur` neuf par bloc : TDD red-green-refactor, cycle `modif → test → cleanup"
+            " → test → commit` (relecture à contexte vierge au socle, par le `relecteur`) → cleanup"
+            " holistique par un `developpeur` neuf"
+        ),
     ),
     "contributing-verificateur": (
         "CONTRIBUTING.md",
         "vérification d'avant-go par le `verificateur`, que la session PR lance",
     ),
+    "contributing-lead-tient-le-tableau": (
+        "CONTRIBUTING.md",
+        "chacune dans un worktree de l'application, et tient le tableau de bord",
+    ),
     "contributing-repercuter": (
         "CONTRIBUTING.md",
-        "Porté par la session PR en fin de `cycle-pr` — collecte au `releveur`",
+        (
+            "Porté par la session PR en fin de `cycle-pr` — collecte au `releveur`, go d'édition au"
+            " mainteneur dans sa fenêtre ; pour une issue en lots, par la coordinatrice au merge de"
+            " la PR d'intégration"
+        ),
+    ),
+    "contributing-valider": (
+        "CONTRIBUTING.md",
+        "`bug-vers-issue`, chacun dans une session de dialogue",
     ),
 }
 
