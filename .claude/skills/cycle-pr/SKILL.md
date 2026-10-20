@@ -102,9 +102,10 @@ l'issue dès les outils éprouvés :
 
 - **Issue interrogée** (passée par `needs-interrogation`, décisions consignées dans le brief
   d'agent) → relire ces décisions, et vérifier qu'elles tiennent encore (auto-challenge ci-dessous).
-- **Brief portant `⚠️ Non interrogée au triage`**, ou aucune trace d'interrogatoire → **lancer
-  `interroge-moi` immédiatement**, avant la première ligne de code, et reporter les décisions
-  tranchées dans les « Décisions verrouillées » du briefing.
+- **Brief portant `⚠️ Non interrogée au triage`**, ou aucune trace d'interrogatoire → **s'arrêter
+  et proposer une session d'interrogatoire** (`interroge-moi`, numéro de l'issue en argument), avant
+  la première ligne de code, puis reporter ses décisions, écrites dans l'issue, dans les
+  « Décisions verrouillées » du briefing.
 - **Demande directe sans issue** → l'interrogatoire s'applique aussi ; il n'y a pas de raccourci
   parce que le travail n'a pas de ticket.
 
@@ -116,7 +117,9 @@ autre session que celle-ci.
 
 Avant de présenter le briefing comme acté, **se challenger explicitement** : le plan a pu être
 écrit (issue, agent brief, conversation) *avant* que d'autres PR ne soient mergées. Le terrain a
-peut-être bougé. Confronter le plan à la réalité **actuelle** du code :
+peut-être bougé. Confronter le plan à la réalité **actuelle** du code — les relevés (`git log`,
+`grep` des ancres, dénombrements) à un `releveur`, la cartographie de la zone touchée (fichiers,
+interfaces, appelants) à l'`executant`, le jugement à la session PR :
 
 - **Relire l'état réel** de la zone touchée (`git log` récent sur `main`, fichiers concernés) — pas
   l'état supposé au moment où l'issue a été écrite.
