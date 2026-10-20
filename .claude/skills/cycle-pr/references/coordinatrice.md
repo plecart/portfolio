@@ -18,7 +18,9 @@ automatique (provoqué par le lead de la vague le 2026-10-16 — #107, journal d
 seul un tour ouvert par le mainteneur le démarre, et seulement sur sa demande écrite (consignes de
 l'application à la session, lues le 2026-10-18 ; mesuré le même jour, PR #122). Le go du
 découpage est ce tour : la question du go nomme donc les n sessions qu'il fera démarrer, avec
-l'accord pour le `verificateur` de chaque lot (`cycle-pr` Étape 7, « Vérification d'avant-go »).
+l'accord pour le `verificateur` de chaque lot (`cycle-pr` Étape 7, « Vérification d'avant-go »), et
+annonce un go par lot, dans sa fenêtre : chaque session de lot y démarre sa session de relecture
+(« La session de lot »).
 La coordinatrice y tourne en Opus 5.5, effort `high` (#134, décision 4,
 qui remplace sur ce point #107 décision 8) : un enfant n'étant ni plus fort ni d'effort plus haut
 que son parent (`sessions-liees.md`, « Héritage »), la question du go ne demande au mainteneur
@@ -101,20 +103,25 @@ Ce que le brief de la coordinatrice change au cycle de `cycle-pr` :
   (3.5), diff holistique (4.1), plage du relecteur (4.2), base de branche et verdict (Étape 7) —,
   le trunk, `main` comme `origin/main`, se lit `origin/<type>/<slug>`. Contre le trunk, chaque
   mesure compterait les lots déjà mergés.
-- **Le go du briefing est conditionnel** (#107, décision 5) : la session ne s'arrête à son Étape 1
-  que si l'auto-challenge relève un écart avec le bloc du lot, ou s'il lui reste une `[V]` ; sinon
-  elle écrit « plan confirmé, aucune `[V]` » dans le body de sa PR et enchaîne — le go du
-  découpage vaut pour le lot. Un arrêt prévient aussi la coordinatrice — « bloquant : `[V]` en
-  attente dans cette fenêtre » —, sa note de fin de tour n'étant pas un signal.
+- **Le go du briefing est humain, dans la fenêtre de la session de lot** : elle y démarre sa
+  session de relecture, et `start_session` ne part que dans un tour du mainteneur (« Au go du
+  découpage », premier paragraphe). Elle s'arrête donc toujours à son Étape 1 — une `[V]` ou un
+  écart avec le bloc du lot se posent au même go — et prévient la coordinatrice : « bloquant :
+  go humain requis dans cette fenêtre — session de relecture à démarrer », sa note de fin de tour
+  n'étant pas un signal. Le go conditionnel de #107 (décision 5) a pris fin avec la session de
+  relecture (#134, lot 3).
+- **Sa session de relecture** : la session de lot la démarre à son go, en est le parent et la
+  nettoie à son Étape 8 ([session-relecture.md](session-relecture.md)) — jamais la coordinatrice,
+  qui serait réveillée à chaque fin de tour de la session de relecture pour rien.
 - **Sa PR** vise la branche d'intégration ; son body s'ouvre par
   « En vol pour #<N> (lot <k>/<n>) », sans `Closes`.
 - **La vérification d'avant-go** : la session lance elle-même son `verificateur` (`cycle-pr`
   Étape 7), jamais la coordinatrice ni le lead, sur l'accord du go du découpage.
 - **Le merge** suit `cycle-pr` Étape 7, « Le merge d'un lot » : sans go, par le script.
-- **Son Étape 8 se borne à cocher ses critères et à écrire sa passation** — en dernier, liste
-  vide ou arbitrée (`cycle-pr` Étape 8, « Cas découpé ») —, puis le message de fin à la
-  coordinatrice. L'issue reste ouverte : aucun label d'état ne tombe, et `repercussions` ne tourne
-  pas ici.
+- **Son Étape 8 se borne à cocher ses critères, nettoyer sa session de relecture et écrire sa
+  passation** — en dernier, liste vide ou arbitrée (`cycle-pr` Étape 8, « Cas découpé ») —, puis
+  le message de fin à la coordinatrice. L'issue reste ouverte : aucun label d'état ne tombe, et
+  `repercussions` ne tourne pas ici.
 
 ## Relais en cours de lot
 

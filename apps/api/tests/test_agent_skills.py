@@ -1466,18 +1466,26 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         SESSIONS_LIEES_REF,
         "Archiver un enfant (`archive_session`, réversible) détache son HEAD et ne retire ni",
     ),
-    # Commandes intégrées (obs 94, 98).
-    "commandes-integrees-sans-fin-de-tour": (
+    # Commandes intégrées (obs 94, 98, 115) : elles closent le tour de la session de relecture,
+    # sans coût ; la session PR ne les joue qu'en repli, et y enchaîne dans le même tour.
+    "commandes-integrees-closent-le-tour-de-la-relecture": (
         CYCLE_PR_SKILL,
-        "**Ces deux commandes ne terminent pas le tour.**",
+        "**Ces deux commandes closent un tour — celui de la session de relecture.**",
     ),
-    "config-relecture-sans-fin-de-tour": (
-        ".claude/pipeline.config.md",
-        "termine pas le tour (`cycle-pr` 4.2, obs 94).",
+    "commandes-integrees-en-repli-seulement": (
+        CYCLE_PR_SKILL,
+        (
+            "En repli seulement, la session PR les joue : la consigne vaut alors pour la forme du"
+            " rapport, pas pour l'arrêt du cycle, et elle enchaîne dans le même tour."
+        ),
     ),
-    "config-securite-sans-fin-de-tour": (
+    "config-relecture-fin-de-tour-sans-cout": (
         ".claude/pipeline.config.md",
-        "termine pas le tour (`cycle-pr` 4.2, obs 98).",
+        "clôt le tour de la session de relecture, sans coût (`cycle-pr` 4.2, obs 94).",
+    ),
+    "config-securite-fin-de-tour-sans-cout": (
+        ".claude/pipeline.config.md",
+        "clôt le tour de la session de relecture, sans coût (`cycle-pr` 4.2, obs 98, 115).",
     ),
     # Question à la fois et groupement des `[V]` (obs 102).
     "interroge-moi-moment-et-forme": (
@@ -1615,7 +1623,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "arret-de-lot-previent-la-coordinatrice": (
         COORDINATRICE_REF,
-        "« bloquant : `[V]` en attente dans cette fenêtre »",
+        "« bloquant : go humain requis dans cette fenêtre — session de relecture à démarrer »",
     ),
     "repli-manuel": (COORDINATRICE_REF, "l'échec devient une observation du journal"),
     # La session de lot (décisions 5, 17).
@@ -1627,7 +1635,18 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         CYCLE_PR_SKILL,
         "pour une session de lot, celle que son brief nomme, ou aucune",
     ),
-    "go-du-briefing-conditionnel": (COORDINATRICE_REF, "« plan confirmé, aucune `[V]` »"),
+    "go-du-briefing-humain": (
+        COORDINATRICE_REF,
+        "**Le go du briefing est humain, dans la fenêtre de la session de lot**",
+    ),
+    "go-du-briefing-toujours-un-arret": (
+        COORDINATRICE_REF,
+        "Elle s'arrête donc toujours à son Étape 1",
+    ),
+    "go-du-decoupage-annonce-un-go-par-lot": (
+        COORDINATRICE_REF,
+        "annonce un go par lot, dans sa fenêtre",
+    ),
     "base-de-la-pr-de-lot": (COORDINATRICE_REF, "se lit `origin/<type>/<slug>`"),
     "verification-jamais-a-la-coordinatrice": (
         COORDINATRICE_REF,
@@ -1635,7 +1654,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "etape-8-du-lot-bornee": (
         COORDINATRICE_REF,
-        "Son Étape 8 se borne à cocher ses critères et à écrire sa passation",
+        (
+            "Son Étape 8 se borne à cocher ses critères, nettoyer sa session de relecture et écrire"
+            " sa passation"
+        ),
     ),
     "relecteur-plage-depuis-la-base-de-la-pr": (
         ".claude/agents/relecteur.md",
@@ -2244,16 +2266,15 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "config-relecture": (
         ".claude/pipeline.config.md",
         (
-            "Lancée par la session PR avant chaque appel du relecteur (`cycle-pr` 4.2 ; par la"
-            " session de relecture au lot 3 de #134)"
+            "Lancée par la session de relecture à chaque réveil, avant le protocole du `relecteur`"
+            " (`session-relecture.md` de `cycle-pr`) — par la session PR seulement en repli —"
         ),
     ),
     "config-securite": (
         ".claude/pipeline.config.md",
         (
-            "Lancée par la session PR (`cycle-pr` 4.2 ; par la session de relecture au lot 3 de"
-            " #134, condition comprise) **seulement** si le diff touche une zone sensible ou une"
-            " surface exposée"
+            "Lancée par la session de relecture (par la session PR seulement en repli),"
+            " **seulement** si le diff touche une zone sensible ou une surface exposée"
         ),
     ),
     # `CONTRIBUTING.md`, « Le flux en une page » : 7 maillons (0, 1, 2, 3, 3bis, 4, 5), chacun
@@ -2280,8 +2301,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         "CONTRIBUTING.md",
         (
             "un `developpeur` neuf par bloc : TDD red-green-refactor, cycle `modif → test → cleanup"
-            " → test → commit` (relecture à contexte vierge au socle, par le `relecteur`) → cleanup"
-            " holistique par un `developpeur` neuf"
+            " → test → commit` (relecture à contexte vierge au socle, par la session de relecture que"
+            " la session PR démarre à son go) → cleanup holistique par un `developpeur` neuf →"
+            " relecture à contexte vierge finale, par la même session"
         ),
     ),
     "contributing-verificateur": (
@@ -2360,7 +2382,7 @@ ORDRE_DE_LA_COORDINATRICE = {
     ),
     "relais-passation-avant-de-prevenir": ("écrit la variante relais", "envoie « relais demandé"),
     "passation-avant-le-message-de-fin": (
-        "à écrire sa passation",
+        "et écrire sa passation",
         "puis le message de fin à la coordinatrice",
     ),
 }
@@ -2599,7 +2621,10 @@ CYCLE_PR = REPOSITORY_ROOT / ".claude/skills/cycle-pr/SKILL.md"
 # 2026-10-14 avant le correctif, relecture de la PR #89, passe 2 : `go du briefing` apparaît
 # 2 fois dans `cycle-pr`, l'une à l'Étape 1 (la règle des `[V]` groupées), l'autre à l'Étape 7
 # (l'accord pour le vérificateur hors vague) — 1 renvoi hors de l'Étape 1, 1 fuyait.
-QUESTIONS_DU_GO = {"accord pour le vérificateur hors vague": "l'accord pour lancer soi-même"}
+QUESTIONS_DU_GO = {
+    "accord pour le vérificateur hors vague": "l'accord pour lancer soi-même",
+    "accord pour la session de relecture": "l'accord pour démarrer sa session de relecture",
+}
 
 
 def etape_1() -> str:
@@ -2749,6 +2774,77 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         RELECTEUR_ROLE,
         "Tu ne commits pas, tu ne pousses pas, tu ne merges pas, tu ne corriges pas",
     ),
+    # Les renvois : chaque texte qui fait démarrer, réveiller ou nettoyer la session de relecture.
+    "cycle-pr-question-du-go": (
+        CYCLE_PR_SKILL,
+        (
+            "l'accord pour démarrer sa session de relecture et l'archiver à l'Étape 8 en fait partie,"
+            " puisque `start_session` ne part que dans ce tour"
+        ),
+    ),
+    "cycle-pr-go-d-une-session-de-lot": (
+        CYCLE_PR_SKILL,
+        "Une session de lot attend le go ci-dessous dans sa fenêtre comme toute session PR",
+    ),
+    "cycle-pr-echec-de-porte-jamais-silencieux": (
+        CYCLE_PR_SKILL,
+        "se dit dans « Relecture indépendante » du body, jamais en saut silencieux (obs 84)",
+    ),
+    "cycle-pr-passe-1-ne-lit-que-le-brief": (
+        CYCLE_PR_SKILL,
+        "À la première passe, celle-ci ne lit **que** le corps de l'issue",
+    ),
+    "cycle-pr-seconde-passe-a-la-meme-session": (
+        CYCLE_PR_SKILL,
+        "jamais à une session ni à un agent neufs",
+    ),
+    "cycle-pr-jamais-l-arbre-de-la-session-pr": (
+        CYCLE_PR_SKILL,
+        "**Un worktree de relecture par PR, jamais l'arbre de la session PR.**",
+    ),
+    "cycle-pr-pousser-avant-chaque-reveil": (CYCLE_PR_SKILL, "**Pousser avant chaque réveil**"),
+    "cycle-pr-attente-de-la-ci-en-fin-de-tour": (
+        CYCLE_PR_SKILL,
+        (
+            "le run tourne : fin de tour, le moniteur de PR de l'application réveillant la session à"
+            " sa conclusion — jamais une attente en tour ni une sonde planifiée"
+        ),
+    ),
+    "cycle-pr-nettoyage-a-l-etape-8": (
+        CYCLE_PR_SKILL,
+        "Puis **nettoyer la session de relecture**",
+    ),
+    "coordinatrice-jamais-parente-de-la-relecture": (
+        COORDINATRICE_REF,
+        (
+            "jamais la coordinatrice, qui serait réveillée à chaque fin de tour de la session de"
+            " relecture pour rien"
+        ),
+    ),
+    "pr-paralleles-le-lead-ne-demarre-aucune-relecture": (
+        PR_PARALLELES_SKILL,
+        "Le lead ne démarre aucune session de relecture : chaque session PR démarre la sienne",
+    ),
+    "pr-paralleles-brief-relecture-a-la-session": (
+        PR_PARALLELES_SKILL,
+        "c'est toi qui la démarres, la réveilles et la nettoies",
+    ),
+    "pr-paralleles-retrait-par-la-session-pr-seule": (
+        PR_PARALLELES_SKILL,
+        "Seule la session PR qui l'a démarré ou lancé le retire",
+    ),
+    "prompt-lot-suivant-relecture-a-la-session": (
+        PROMPT_LOT_SUIVANT,
+        "c'est toi qui la démarres, la réveilles et la nettoies",
+    ),
+    "prompt-lot-suivant-relais-et-relecture": (
+        PROMPT_LOT_SUIVANT,
+        "tu la réveilles par message, et elle répond à l'émetteur du réveil",
+    ),
+    "sessions-liees-forme-des-constats": (
+        SESSIONS_LIEES_REF,
+        "Une session de relecture rend ses constats sous la forme de",
+    ),
 }
 
 
@@ -2816,3 +2912,32 @@ def test_rien_de_ce_que_retire_la_session_de_relecture_ne_reste(fichier: str, fo
     assert forme.lower() not in texte_normalise(fichier).lower(), (
         f"`{fichier}` porte encore « {forme} »"
     )
+
+
+# Les trois textes qui font démarrer, réveiller ou nettoyer la session de relecture la citent au
+# lieu de la recopier (critère 2 du bloc « Lot 3 » de #134).
+RENVOIS_A_LA_SESSION_DE_RELECTURE = [CYCLE_PR_SKILL, PR_PARALLELES_SKILL, COORDINATRICE_REF]
+
+
+@pytest.mark.parametrize("fichier", RENVOIS_A_LA_SESSION_DE_RELECTURE)
+def test_chaque_texte_qui_demarre_la_relecture_cite_son_protocole(fichier: str) -> None:
+    """Un texte qui la démarre sans la citer en recopie le protocole, ou en invente un."""
+    assert "session-relecture.md" in texte_normalise(fichier), (
+        f"`{fichier}` ne cite plus `session-relecture.md`"
+    )
+
+
+def test_la_forme_du_reveil_n_est_normative_qu_une_fois() -> None:
+    """« relis <SHA> » ne s'écrit qu'au protocole ; ailleurs, on y renvoie (critère 2 du bloc).
+
+    **Population** : la prose du harnais (`HARNESS_PROSE_GLOBS`) — `.claude/`, `CLAUDE.md`,
+    `CONTRIBUTING.md`, `.github/`. Vu rouge sur une copie de la forme dans `cycle-pr/SKILL.md`.
+    """
+    sites = [
+        path.relative_to(REPOSITORY_ROOT).as_posix()
+        for path, _ in prose_citations(
+            REPOSITORY_ROOT, tracked_files(), HARNESS_PROSE_GLOBS, re.compile(r"relis <SHA>")
+        )
+    ]
+
+    assert sites == [SESSION_RELECTURE_REF], sites

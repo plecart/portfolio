@@ -162,7 +162,10 @@ le lead démarre d'un coup une session par issue retenue, une par `start_session
 dans un dossier simple (description de l'outil, lue le 2026-10-18), et les premiers gestes des
 sessions basculeraient tour à tour la même branche. L'effort de chaque session suit le
 barème de la coordinatrice (même référence, point 3), sous le plafond du lead (question de
-l'étape 2), fixé au démarrage et jamais changé en cours de session (#134, D-15).
+l'étape 2), fixé au démarrage et jamais changé en cours de session (#134, D-15). Le lead ne
+démarre aucune session de relecture : chaque session PR démarre la sienne au go de son briefing,
+dans sa fenêtre, en est le parent et la nettoie
+(`.claude/skills/cycle-pr/references/session-relecture.md`).
 
 `start_session` rend le `session_id` (`local_…`) de chaque session : c'est son identité et
 l'adresse de ses messages (`sessions-liees.md`, « Identité »). Le lead l'inscrit au tableau
@@ -302,9 +305,10 @@ worktree, chemin dans CLAUDE.md). Lis CLAUDE.md, .claude/pipeline.config.md et t
 Porte le cycle complet de l'issue #N et délègue le code (`cycle-pr` 3.1), en invoquant le skill
 `cycle-pr` (outil Skill) avec N — brief : commentaire de l'issue. Tu lances toi-même ton
 `verificateur` d'avant-go (`cycle-pr` Étape 7).
-Tu es autorisé à lancer l'équipier `relecteur` de l'Étape 4.2 : **un seul pour toute la PR**, à
-qui reviennent la seconde passe et la relance par `SendMessage`. Cette
-invocation de `cycle-pr` vaut demande de l'utilisateur.
+Ta session de relecture se démarre à ton go, dans ta fenêtre : c'est toi qui la démarres, la
+réveilles et la nettoies (`.claude/skills/cycle-pr/references/session-relecture.md`) ; le
+sous-agent `relecteur` n'en est que le repli. Cette invocation de `cycle-pr` vaut demande de
+l'utilisateur pour tes sous-agents.
 Ne lance pas la commande `hooks` de la config ici : les hooks sont partagés entre worktrees et
 déjà installés depuis le clone principal.
 Le garde de permissions de ta session refuse les commandes qu'il ne sait pas vérifier, sans
@@ -376,12 +380,14 @@ c'est le seul autre canal, et il passe par lui.
 - `git worktree list` montre tous les worktrees actifs — **deux familles, à ne pas confondre** :
   un worktree **d'issue** — celui d'une session de la vague, sous
   `.claude/worktrees/<slug>-<hex>` —, qui a sa ligne au tableau de bord, et un worktree **de
-  relecture** (`.claude/worktrees/agent-<id>`), qui n'en a jamais et vit tant que la boucle 4.2
-  d'une PR n'est pas fermée. C'est l'absence de ligne au tableau qui le distingue, jamais un verrou
-  git : le verrou ne tient que pendant l'invocation initiale de l'agent (`cycle-pr` 4.2,
-  « Retrait »). Le second n'est pas une dérive : le retirer termine le
-  relecteur et ferme la voie de la relance (`cycle-pr` 4.2, « Retrait »). Seule la session qui l'a
-  lancé le retire. Le `verificateur` de l'étape 6, lui, n'en crée **aucun** — il n'a pas
+  relecture** — celui de la session de relecture d'une PR, sous le même motif, que
+  `list_sessions {"linked": true}` montre démarrée par la session de l'issue (`startedBy`), ou
+  celui d'un sous-agent `relecteur` de repli, `.claude/worktrees/agent-<id>` —, qui n'en a jamais
+  et vit tant que la boucle 4.2 de sa PR n'est pas fermée. C'est l'absence de ligne au tableau qui
+  le distingue, jamais un verrou git : le verrou ne tient que pendant l'invocation initiale d'un
+  agent (`cycle-pr/references/session-relecture.md`, « Repli »). Le second n'est pas une dérive :
+  le retirer termine la relecture et ferme la voie de la relance. Seule la session PR qui l'a
+  démarré ou lancé le retire. Le `verificateur` de l'étape 6, lui, n'en crée **aucun** — il n'a pas
   d'`isolation` : un worktree par (PR, go) serait précisément le coût que son éphémérité évite.
 - Quand une PR passe en review puis est mergée, mettre à jour `PR-PARALLELES.md`.
 - Après chaque merge, la session concernée déroule la clôture de l'Étape 8 de `cycle-pr` —
