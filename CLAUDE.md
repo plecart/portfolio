@@ -84,9 +84,8 @@ que si l'utilisateur le demande explicitement.
 
 Au chargement de **n'importe quel skill**, consulter le journal d'observations pour les entrées
 OPEN rattachées à ce skill et en appliquer les enseignements au travail en cours — même si le
-fichier du skill n'a pas encore été mis à jour. Un sous-agent ne lit pas le journal (92 116 octets
-le 2026-10-20 à 16 h UTC, population vivante) : la session qui le lance met dans son brief les
-entrées OPEN qui touchent son bloc.
+fichier du skill n'a pas encore été mis à jour. Un sous-agent ne lit pas le journal : la session qui
+le lance met dans son brief les entrées OPEN qui touchent son bloc.
 
 **Emplacement du journal, à ne pas laisser deviner :** `C:\Users\pacom\.claude\projects\e--Projets-Portfolio\skill-observations\log.md`. C'est un
 chemin **stable**, hors du dépôt. Ne jamais l'ancrer sur le répertoire courant : `pr-paralleles`
@@ -121,7 +120,8 @@ l'issue #134, lot 2a) —, contre 74,5 K pour `general-purpose` sans liste, sur 
 2026-10-19, dossier `etudes/` voisin du journal d'observations, §15.2). Déléguer à un rôle sans
 décision suppose que la session ait écrit la tranche entièrement — fichiers, signatures, tests
 attendus, comportement — avant l'envoi : si la spécifier demande encore de réfléchir, c'est son
-travail. L'effort de la session se fixe par `/effort`.
+travail. L'effort de la session se fixe à son démarrage — `/effort`, ou le brief de
+`start_session` — et ne change plus en cours de session (issue #134, D-15).
 
 **Le brief porte ce que l'équipier ne charge pas.** Un sous-agent ne voit jamais la conversation
 de sa session (même étude, §15.2) : son brief porte le bloc, le niveau `ponytail` (« Minimalisme »)

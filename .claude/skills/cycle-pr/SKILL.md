@@ -566,7 +566,9 @@ relu par un lecteur qui ne les a pas : l'équipier **`relecteur`** (`.claude/age
 qui porte sa consigne complète — ce qu'il reçoit, ce qu'il vérifie, ce qu'il rend. Un rôle ajouté
 dans `.claude/agents/` pendant cette session n'existe pas encore pour l'outil Agent : le repli
 `general-purpose` ne vaut que pour un rôle sans liste `tools:`, et `relecteur` en a une — un rôle à
-outils réduits se lance depuis une session neuve (`CLAUDE.md`, « Orchestration »). L'invocation de
+outils réduits se lance depuis une session neuve (`CLAUDE.md`, « Orchestration »), que la session PR
+ne démarre pas hors d'un tour humain : d'ici là, c'est le cas « le harness ne permet pas » ci-dessous.
+L'invocation de
 `cycle-pr` — `/cycle-pr` tapé par l'utilisateur, ou prompt de démarrage d'une vague
 `pr-paralleles` — **vaut demande** pour cet agent : une consigne de session « pas de sous-agent
 sans demande de l'utilisateur » est déjà satisfaite. Si le harness ne permet réellement pas de
