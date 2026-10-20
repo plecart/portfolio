@@ -762,6 +762,9 @@ def test_ni_un_role_fictif_ni_la_liste_d_init_projet_ne_comptent_pour_une_citati
     """Témoins du précédent, sur la prose réelle : un rôle fictif ne trouve aucun fichier, et la
     liste de fichiers d'`init-projet`, qui nomme tous les rôles, n'est jamais comptée."""
     assert skills_citing("fantome") == []
+    assert not [
+        role for role in ROLE_NAMES if ".claude/skills/init-projet/SKILL.md" in skills_citing(role)
+    ]
     init_projet = (REPOSITORY_ROOT / ".claude/skills/init-projet/SKILL.md").read_text(
         encoding="utf-8"
     )
@@ -1480,7 +1483,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "issue-a-un-lot-inchangee": (
         CYCLE_PR_SKILL,
-        "Une issue à un seul lot ne change rien : la session fait le cycle elle-même.",
+        "Une issue à un seul lot ne change rien : la session porte le cycle elle-même",
     ),
     "coordinatrice-sans-code": (COORDINATRICE_REF, "La coordinatrice **n'écrit pas de code**"),
     # Au go du découpage (journal de spec, 2026-10-17 ; décisions 8, 12).
@@ -1617,7 +1620,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "base-de-la-pr-de-lot": (COORDINATRICE_REF, "se lit `origin/<type>/<slug>`"),
     "verification-jamais-a-la-coordinatrice": (
         COORDINATRICE_REF,
-        "au lead que son brief nomme, jamais à la coordinatrice",
+        "lance elle-même son `verificateur` (`cycle-pr` Étape 7), jamais la coordinatrice",
     ),
     "etape-8-du-lot-bornee": (
         COORDINATRICE_REF,
@@ -1635,6 +1638,12 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "passation-en-dernier": (
         CYCLE_PR_SKILL,
         "**La passation s'écrit en dernier, depuis les artefacts**",
+    ),
+    # Relecture de la PR #139, passe 2, I-6 : `pr-paralleles` 6 fait lire la base du verdict dans
+    # les Notes ; sans sa ligne d'en-tête, la colonne « Base du verdict » n'a plus de source.
+    "verdict-en-tete-dans-les-notes": (
+        CYCLE_PR_SKILL,
+        "au moins sa ligne d'en-tête (base, tête) et ses lignes « Fichiers croisés »",
     ),
     "passation-sans-point-ouvert": (PROMPT_LOT_SUIVANT, "jamais un point encore ouvert (obs 85)"),
     "passation-remise-a-la-coordinatrice": (

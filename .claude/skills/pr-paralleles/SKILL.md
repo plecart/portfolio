@@ -273,7 +273,8 @@ ce paragraphe.
 **Une session neuve par lot, que le lead ne démarre qu'en repli** (étape 8, « Issue en plusieurs
 lots »). Une issue
 réalisée en plusieurs lots ne garde **pas** la même session d'un lot au suivant, ni d'un sous-lot
-au suivant (`cycle-pr` 3.5 et Étape 8, « Une session neuve par lot »). Elle est pilotée par sa coordinatrice
+au suivant (`cycle-pr` 3.5 et Étape 8, « Une session neuve par lot »). Elle est pilotée par sa
+coordinatrice
 (`.claude/skills/cycle-pr/references/coordinatrice.md`) : chaque lot a sa session et son worktree
 neufs, et la frontière de lot passe par la passation que la session sortante remet à la
 coordinatrice. Sans coordinatrice, ou en repli, la session qui finit un lot écrit, après sa passe
@@ -366,7 +367,8 @@ contexte ne grossit plus d'un verdict par PR et par go (obs 62). Ce qu'il garde 
    pour tout geste attendu dans une autre session, arrêt visuel ou go de briefing.
 
 Après corrections, la session relance un `verificateur` neuf et réécrit ses Notes ; le lead en
-relit la base. À tout moment, l'utilisateur peut aussi dire à une session « discute de ça avec le lead » —
+relit la base. À tout moment, l'utilisateur peut aussi dire à une session « discute de ça avec le
+lead » —
 c'est le seul autre canal, et il passe par lui.
 
 ### 7. Surveiller et faire converger
@@ -426,7 +428,8 @@ Dans cet ordre :
 1. **Mesurer les artefacts** — tête, base, CI, body de PR, worktrees : c'est ce qui est *prouvé*,
    et ça ne dépend pas d'elle. Le relevé part à un `releveur`, qui rend chaque valeur avec sa
    commande.
-2. **Lire la fin de son récit** par `list_events` sur son `local_…` — un outil de session, au lead —,
+2. **Lire la fin de son récit** par `list_events` sur son `local_…` — un outil de session, au
+   lead —,
    puis le dernier texte de ses sous-agents, que le même `releveur` extrait :
 
    ```
