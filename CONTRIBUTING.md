@@ -260,11 +260,12 @@ Chaque maillon nomme qui l'exécute ; la répartition des rôles est dans `CLAUD
 3. **Implémenter** — `cycle-pr`, porté par la session PR, qui orchestre et délègue : briefing
    pré-PR (relevés au `releveur`, cartographie à l'`executant`) → **PR draft ouverte avant tout
    code** → un `developpeur` neuf par bloc : TDD red-green-refactor, cycle
-   `modif → test → cleanup → test → commit` (relecture à contexte vierge au socle, par le
-   `relecteur`) → cleanup holistique par un `developpeur` neuf → relecture à contexte vierge
-   finale → `gh pr ready` → CI → vérif de fumée → vérification d'avant-go par le `verificateur`,
-   que la session PR lance → merge. Plusieurs PR en parallèle : `pr-paralleles` (la session lead
-   démarre une session par issue, chacune dans un worktree de l'application, et tient le tableau
+   `modif → test → cleanup → test → commit` (relecture à contexte vierge au socle, par la session
+   de relecture que la session PR démarre à son go) → cleanup holistique par un `developpeur`
+   neuf → relecture à contexte vierge finale, par la même session → `gh pr ready` → CI → vérif
+   de fumée → vérification d'avant-go par le `verificateur`, que la session PR lance → merge.
+   Plusieurs PR en parallèle : `pr-paralleles` (la session lead démarre une session par issue,
+   chacune dans un worktree de l'application, et tient le tableau
    de bord — le go reste humain, dans la fenêtre de la PR). Trop peu d'issues prêtes : son étape 0
    ouvre d'abord une session de triage et d'interrogatoire par issue, puis la même session
    enchaîne sur la vague.
