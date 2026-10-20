@@ -3128,13 +3128,40 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         "**Un worktree de relecture par PR, jamais l'arbre de la session PR.**",
     ),
     "cycle-pr-pousser-avant-chaque-reveil": (CYCLE_PR_SKILL, "**Pousser avant chaque réveil**"),
-    "cycle-pr-attente-de-la-ci-en-fin-de-tour": (
+    # Attente de la CI (décision du mainteneur, 2026-10-20) : le moniteur ne réveille pas sur un
+    # succès, mesuré — attendre, borné, par une commande de fond dont la fin réveille la session.
+    "cycle-pr-attendre-la-ci": (
         CYCLE_PR_SKILL,
         (
-            "le run tourne : fin de tour, le moniteur de PR de l'application réveillant la session à"
-            " sa conclusion (consignes de l'application à la session, lues le 2026-10-20) — jamais"
-            " une attente en tour ni une sonde planifiée"
+            "le run tourne : **l'attendre** avant de passer à la suite, par une commande lancée en"
+            " fond, dont la fin réveille la session"
         ),
+    ),
+    "cycle-pr-attente-bornee": (
+        CYCLE_PR_SKILL,
+        "`timeout 1800 gh run watch <id> --exit-status -i 30`",
+    ),
+    "cycle-pr-delai-depasse": (
+        CYCLE_PR_SKILL,
+        "sortie 124, délai dépassé : Étape 6, « CI qui ne démarre pas »",
+    ),
+    "cycle-pr-jamais-une-fin-de-tour-nue": (
+        CYCLE_PR_SKILL,
+        (
+            "Jamais une fin de tour nue : le moniteur de PR de l'application ne réveille que sur un"
+            " échec, un conflit ou un commentaire"
+        ),
+    ),
+    "cycle-pr-seule-surveillance-de-la-ci": (
+        CYCLE_PR_SKILL,
+        (
+            "C'est la seule surveillance de la CI que la session lance elle-même, le moniteur ne"
+            " couvrant pas le succès ; jamais une sonde planifiée"
+        ),
+    ),
+    "cycle-pr-dette-attente-ci-au-lot-4b": (
+        CYCLE_PR_SKILL,
+        "Le lot 4b de l'issue #134 la remplace par `attente-ci.py`",
     ),
     "cycle-pr-nettoyage-a-l-etape-8": (
         CYCLE_PR_SKILL,

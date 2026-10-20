@@ -450,7 +450,9 @@ def test_cycle_pr_lit_le_run_du_sha_de_tete_avant_de_sortir_du_draft() -> None:
 # `cancelled` n'avait pas de voie.
 RUN_READINGS = {
     "plusieurs runs : le plus récent décide": "**première ligne**",
-    "statut lu avec la conclusion": r'"\(.created_at) \(.status) \(.conclusion)"',
+    "statut lu avec la conclusion et l'identifiant": (
+        r'"\(.created_at) \(.status) \(.conclusion) \(.id)"'
+    ),
     "vert": "- `success` →",
     "en cours": "- `in_progress` ou `queued`",
     "remplacé": "- `cancelled` →",
