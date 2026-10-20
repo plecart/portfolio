@@ -270,8 +270,8 @@ ce paragraphe.
 
 **Une session neuve par lot, que le lead ne démarre qu'en repli** (étape 8, « Issue en plusieurs
 lots »). Une issue
-réalisée en plusieurs lots ne garde **pas** la même session d'un lot au suivant (`cycle-pr`
-Étape 8, « Une session neuve par lot »). Elle est pilotée par sa coordinatrice
+réalisée en plusieurs lots ne garde **pas** la même session d'un lot au suivant, ni d'un sous-lot
+au suivant (`cycle-pr` 3.5 et Étape 8, « Une session neuve par lot »). Elle est pilotée par sa coordinatrice
 (`.claude/skills/cycle-pr/references/coordinatrice.md`) : chaque lot a sa session et son worktree
 neufs, et la frontière de lot passe par la passation que la session sortante remet à la
 coordinatrice. Sans coordinatrice, ou en repli, la session qui finit un lot écrit, après sa passe
