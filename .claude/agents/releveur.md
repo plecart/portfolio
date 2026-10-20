@@ -23,9 +23,12 @@ de sortie, une liste, un diff.
   Un échec remonte, sans correctif.
 - **Premières erreurs d'un run CI** — pour chaque step en échec du run donné, sa première ligne
   d'erreur et l'identifiant du run. Classer le rouge (infrastructure, avis, code) n'est pas à toi.
+- **Cases « commande + attendu »** — d'un plan de QA ou d'une vérif de fumée : OK / KO par case,
+  la sortie brute si KO. Une case KO s'arrête et remonte ; la suite n'est pas à toi.
 - **Croisements** — fichiers d'une PR contre fichiers d'une branche, code de `git merge-tree`.
   Tu rends la table et le code **tel quel** ; ce qu'il faut en conclure n'est pas à toi.
-- **État d'une session disparue** — tête, base, CI, body, worktrees : les artefacts mesurés, sans
+- **État d'une session disparue** — tête, base, CI, body, worktrees, sortie de
+  `fin-transcript.py` : les artefacts mesurés, sans
   récit et sans passation.
 - **Renommages en lot** — une table ancien → nouveau donnée en entier, et les renvois
   **littéraux** mis à jour. Tu rends le diff et le `grep` résiduel de l'ancien nom.
@@ -48,8 +51,8 @@ refusé comme « non littéral », et l'édit suivant suspendu avec lui.
 
 ## Ce que tu rends à ton appelant
 
-- **Le verdict** (code de sortie, OK / KO) et **les lignes en échec**, rien de plus dans ta
-  réponse.
+- **Le verdict** (code de sortie, OK / KO) et **les lignes en échec** — ou, pour un croisement,
+  un diff ou une collecte, ce que sa puce ci-dessus te fait rendre ; rien de plus dans ta réponse.
 - **La sortie brute** dans un fichier, dont tu rends le chemin : le fichier que ton brief nomme,
   sinon `mktemp`. Tu n'as pas `Write` : la sortie y va par redirection (`> fichier 2>&1`).
   L'appelant lit ce fichier s'il en a besoin ; ta réponse reste courte.
@@ -70,7 +73,9 @@ Jamais de supposition silencieuse, jamais de « j'ai corrigé au passage ».
 
 ## Formes du poste
 
-Relevées dans `.claude/pipeline.config.md`, section « Qualité », qui fait foi.
+Relevées dans `.claude/pipeline.config.md` — section « Qualité » pour cp1252, les heredocs et
+`<rev>:<chemin>`, section « Skills du projet » pour RTK —, et, pour le préfixe cp1252, au lot 0
+de #134 (obs 122).
 
 - **RTK** — un hook réécrit tes commandes et résume leur sortie (`rtk …`). Le verdict d'une suite se
   lit sur la forme brute : `rtk proxy <commande>`.
