@@ -30,10 +30,9 @@ premier geste ci-dessous et renvoie à ce fichier. Mesuré le 2026-10-20 sur la 
 **Premier geste de la session de relecture** :
 `git fetch origin && git switch --detach origin/<branche de la PR>` — aucune branche à créer —,
 puis les gestes de `pr-paralleles` étape 3, « Provisionner son worktree », pour les piles que le
-delta touche, `hooks` exceptée. Elle charge
-`task-observer` ; le plafond de 3 entrées est celui de la PR, tenu par la session PR : elle n'écrit
-aucune entrée, ses candidates partent dans ses messages de constats. Puis « en attente », et fin de
-tour.
+brief nomme, `hooks` exceptée. Elle charge `task-observer` ; le plafond de 3 entrées est celui de
+la PR, tenu par la session PR : elle n'écrit aucune entrée, ses candidates partent dans ses
+messages de constats. Puis « en attente », et fin de tour.
 
 ## Réveil — un message par passe
 
@@ -54,21 +53,28 @@ chaque réveil, jamais au lancement : la tête bouge entre deux passes.
 À chaque réveil, dans cet ordre :
 
 1. Les deux vérifications de `relecteur.md` — où suis-je, puis détachement sur le SHA reçu.
-2. `/code-review medium <n> --comment` — niveau mesuré (`pipeline.config.md`, ligne
-   « relecture ») ; ses commentaires se relisent sur la PR après écriture (`contraintes.md`,
-   « Écritures sur un artefact distant »). Ce qu'elle rapporte à nouveau à la passe 2, sur une PR
-   qu'elle a déjà commentée : non mesuré.
+2. `/code-review medium <n> --comment` — `medium`, le seul niveau mesuré (`pipeline.config.md`,
+   ligne « relecture ») ; le niveau qu'elle applique se lit dans l'en-tête de son prompt rendu et
+   se rapporte dans le message de constats, la commande ne garantissant pas celui qu'on lui
+   passe. Ses commentaires se relisent sur la PR après écriture (`contraintes.md`, « Écritures sur
+   un artefact distant »). Ce qu'elle rapporte à nouveau à la passe 2, sur une PR qu'elle a déjà
+   commentée : non mesuré.
 3. `/security-review`, **seulement** si le diff touche une zone sensible ou une surface exposée
-   (ligne « sécurité » de la config, qui porte ses préconditions) ; sinon une ligne le dit.
+   (ligne « sécurité » de la config, qui porte ses préconditions) ; sinon une ligne le dit. Elle
+   diffe `origin/HEAD...`, donc le trunk : sur une PR dont la base n'est pas le trunk — une PR de
+   lot —, elle relit aussi ce que la branche d'intégration a déjà reçu, et ses constats hors de la
+   plage s'écartent.
 4. Le protocole de `relecteur.md` sur la plage — ce qu'une commande vient de trouver n'y est plus
    à chercher.
-5. Le message de constats au parent, par `SendMessage` :
+5. Le message de constats à l'émetteur du réveil — la session PR, ou son relais —, par
+   `SendMessage` :
    `constats passe <k> (<SHA court>) — <b> bloquants, <i> importants, <m> mineurs`, puis le
    rapport que `relecteur.md` ordonne, les constats de chaque commande intégrée et les
    observations candidates.
 
 **Une commande intégrée peut clore le tour** — `/code-review` par son outil de rapport,
 `/security-review` par « Your final reply must contain the markdown report and nothing else ».
+Mesuré le 2026-10-20 sur la PR #141 : la seconde l'a clos, la première non.
 C'est sans coût ici : la session PR, réveillée par la fin de tour sans message de constats,
 répond « reprends la passe <k> », et la session de relecture reprend à l'étape suivante, son
 contexte intact. La note de fin de tour n'est jamais un constat (`sessions-liees.md`, « Fin de
