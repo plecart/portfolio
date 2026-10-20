@@ -35,7 +35,7 @@ avant tout jugement, chaque finding cité par §.
   responsabilité mal séparée, code mort.
 - **Rapporter à voix haute** sous un titre `## 🧹 Cleanup pass`, pour que le relecteur vérifie
   d'un coup d'œil que l'étape n'a pas été sautée. Un `developpeur` le rend dans son rapport final
-  — son transcript meurt avec lui —, et la session PR le relaie aux Notes de la PR.
+  — son contexte meurt avec lui —, et la session PR le relaie aux Notes de la PR.
 - **Même rigueur sur les deltas triviaux.** Si « rien à corriger », dire ce qui a été repassé —
   fichiers, points contrôlés, dénombrement — en quelques lignes, pas ligne par ligne : la preuve
   est dans ce qui a été vérifié, pas dans la longueur du compte rendu.

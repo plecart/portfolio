@@ -120,8 +120,10 @@ l'issue #134, lot 2a) —, contre 74,5 K pour `general-purpose` sans liste, sur 
 2026-10-19, dossier `etudes/` voisin du journal d'observations, §15.2). Déléguer à un rôle sans
 décision suppose que la session ait écrit la tranche entièrement — fichiers, signatures, tests
 attendus, comportement — avant l'envoi : si la spécifier demande encore de réfléchir, c'est son
-travail. L'effort de la session se fixe à son démarrage — `/effort`, ou le brief de
-`start_session` — et ne change plus en cours de session (issue #134, D-15).
+travail. L'effort d'une session PR se fixe à son démarrage — le brief de `start_session`, ou
+`/effort` avant le briefing — et ne change plus en cours de session (issue #134, D-15) ; la
+coordinatrice et le lead ne reçoivent `/effort max` qu'au go, avant tout enfant, quand le barème
+le demande (`cycle-pr/references/coordinatrice.md`, « Au go du découpage »).
 
 **Le brief porte ce que l'équipier ne charge pas.** Un sous-agent ne voit jamais la conversation
 de sa session (même étude, §15.2) : son brief porte le bloc, le niveau `ponytail` (« Minimalisme »)
@@ -146,8 +148,8 @@ Un rôle ajouté ou modifié dans `.claude/agents/` n'est visible qu'à une sess
 reprise d'une conversation garde la liste de son démarrage (mesuré le 2026-10-20, obs 121), et une
 session que l'application démarre dans un de ses worktrees lit les rôles de la copie principale
 (mesuré le même jour, obs 123). Repli : `general-purpose` avec le modèle du rôle, pour un rôle
-**sans** liste `tools:` seulement — il rendrait à un rôle à outils réduits tous les outils et le
-plancher de 74,5 K ; celui-là se lance depuis une session neuve.
+**sans** liste `tools:` seulement — il rendrait à un rôle à outils réduits tous les outils et un
+plancher de 74,5 K sur Haiku ; celui-là se lance depuis une session neuve.
 
 **Sessions liées.** Les équipiers ci-dessus sont des sous-agents d'une session. Une session peut
 aussi en démarrer d'autres, complètes, dans l'application de bureau (`start_session`) : le lead
