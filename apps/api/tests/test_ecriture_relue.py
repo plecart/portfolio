@@ -43,6 +43,7 @@ class Forge:
         pages: les commentaires de l'issue 42, page par page, tels que
             `gh api --paginate --slurp` les rend ; chacun est aussi un document sous son chemin
             `issues/comments/<id>`, le même objet — une écriture se voit donc dans la liste.
+        garde_les_labels: le retrait d'un label répond sans l'ôter de l'issue.
     """
 
     def __init__(
@@ -363,17 +364,18 @@ def test_label_remove_sort_en_1_si_la_relecture_porte_encore_le_label(
         ("Corps de la PR", "Corps de la PR\n\n"),
         ("Corps de la PR\n", "Corps de la PR\n\n"),
         ("Corps de la PR\r\n\r\n", "Corps de la PR\r\n\r\n"),
+        ("Corps de la PR\n\n\n", "Corps de la PR\n\n\n"),
         (None, ""),
     ],
-    ids=["sans-fin-de-ligne", "fin-de-ligne", "ligne-vide-deja-la-crlf", "null"],
+    ids=["sans-fin-de-ligne", "fin-de-ligne", "ligne-vide-deja-la-crlf", "vides-gardees", "null"],
 )
 def test_issue_edit_ajoute_le_fichier_en_fin_de_corps_octet_pour_octet(
     corps: str | None, avant_l_ajout: str, tmp_path: Path
 ) -> None:
     """Le fichier est lu en octets : ses CRLF partent tels quels — `read_text` les aurait
-    traduits en LF (obs 87). Une ligne vide, une seule, le sépare du dernier contenu du corps :
-    les fins de ligne qui terminent déjà le corps comptent, CRLF compris. Un corps `null` vaut le
-    texte vide — ni « None », ni séparateur."""
+    traduits en LF (obs 87). Une ligne vide au moins le sépare du dernier contenu du corps : les
+    fins de ligne qui terminent déjà le corps comptent, CRLF compris, et aucune n'est retirée. Un
+    corps `null` vaut le texte vide — ni « None », ni séparateur."""
     ajout = tmp_path / "rattachement.md"
     ajout.write_bytes(b"*Rattachement a posteriori : lot 1/3.*\r\n\r\nCloses #7\r\n")
     forge = Forge({CORPS_42: {"body": corps}})
