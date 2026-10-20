@@ -482,6 +482,8 @@ ROLE_FRONTMATTER_CLAIMS: list[tuple[str, str, str | None]] = [
     # « Tu n'as **pas** de worktree » (`verificateur.md`) : c'est ce qui le garde bon marché, et un
     # `isolation` déclaré en ferait créer un à chaque (PR, go).
     ("verificateur", "isolation", None),
+    # « Tu n'as pas `Write` : la sortie y va par redirection » (`releveur.md`).
+    ("releveur", "tools", "Write"),
 ]
 
 
