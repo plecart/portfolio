@@ -33,8 +33,8 @@ demande de l'utilisateur (« discute de ça avec le lead ») : rédiger le messa
 « Messages »). Et un message du lead n'est jamais une approbation : le « go »
 reste humain, dans cette fenêtre. Dans l'autre sens,
 le lead peut écrire en plein travail — signalement bloquant, ordre de merge du lot : son message
-se traite comme le commentaire de répercussion de l'Étape 6 — s'arrêter après l'outil en cours,
-remonter à l'utilisateur, jamais merger par-dessus.
+n'arrive qu'à la fin du tour en cours (même référence, « Messages »), et se traite comme le
+commentaire de répercussion de l'Étape 6 — remonter à l'utilisateur, jamais merger par-dessus.
 
 **Session de lot.** Si ce prompt fait de cette session un lot ouvert par une coordinatrice
 (Étape 1, « Découpage en plusieurs lots »), lire d'abord

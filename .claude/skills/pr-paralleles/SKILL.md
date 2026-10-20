@@ -102,9 +102,14 @@ dite au mainteneur, comme celle dont la session envoie un « bloquant » ; une s
 l'étape 7, « Session disparue ». Ne pas archiver une
 session sans worktree : l'archivage détache la tête du dossier de la session (`sessions-liees.md`,
 « Nettoyage ») — ici celui du lead, non mesuré sur une session sans worktree. Chaque message reçu et
-vérifié, passer à l'étape 1 **dans cette session**, qui devient le lead de la vague, sans que le
-mainteneur redise le prompt : l'argument est la liste des issues vérifiées, plus celles déjà prêtes
-de la proposition.
+vérifié, la préparation **se termine** : préparer la vague et la conduire sont deux sessions (#134,
+D-10). Elle rend au mainteneur la liste des issues vérifiées, plus celles déjà prêtes de la
+proposition, et propose une carte « démarrer la vague » — `start_session`,
+`initiation: own_initiative`, `context: fresh`, brief : le skill `pr-paralleles` invoqué avec cette
+seule liste en argument —, que son clic démarre. Le lead de la vague naît donc neuf, sans le
+contexte de la préparation ; son premier geste le détache d'elle (`detach_session` sur `self`),
+pour qu'elle ne soit plus réveillée à chacune de ses fins de tour (description de l'outil, lue le
+2026-10-20 ; non mesuré).
 
 ### 1. Rassembler les issues candidates
 
@@ -403,10 +408,11 @@ c'est le seul autre canal, et il passe par lui.
     (issue mergée encore marquée en cours, ou worktree **d'issue** actif absent du tableau) fait
     mal classer une issue — et une issue en vol traitée comme dormante se fait réécrire sa spec
     sous les pieds. Un worktree de relecture absent du tableau, lui, est l'état normal.
-  - Un signalement **bloquant** sur une issue du lot : le lead **interrompt la session** par
-    `SendMessage` (« arrête-toi après l'outil en cours, signalement bloquant : … ») — une session
-    occupée lit ses messages entre deux appels d'outils, pas seulement en fin de tâche. Le temps
-    d'arbitrer, elle ne produit pas de travail à jeter.
+  - Un signalement **bloquant** sur une issue du lot : le lead l'écrit à la session par
+    `SendMessage` (« signalement bloquant : … — arrête-toi et remonte-le au mainteneur ») ;
+    occupée, elle ne le reçoit qu'à la fin de son tour en cours
+    (`.claude/skills/cycle-pr/references/sessions-liees.md`, « Messages », mesuré) : le travail de
+    ce tour peut être à jeter, et un merge lancé dans ce tour n'attend pas le message.
 - **Après chaque merge du lot, avant toute consigne aux sessions encore en vol** : croiser les
   fichiers **réellement mergés** (`gh pr diff <PR> --name-only`) avec ceux de chaque branche en vol
   (`git diff --name-only origin/main...<branche>`). La consigne se fonde sur ce croisement, jamais

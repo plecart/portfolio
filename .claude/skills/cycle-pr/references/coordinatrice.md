@@ -80,7 +80,8 @@ jamais de force-push sur la branche d'intégration, et la résolution n'est pas 
 Puis seulement, par `SendMessage` à la session du lot k+1 : « ouvre le lot <k+1>/<n> —
 passation : <chemin> ». Inactive depuis le go, elle reprend sur ce message (`sessions-liees.md`,
 « Messages »). Dans l'autre sens, un message de lot arrivé pendant un tour de la coordinatrice
-attend la fin de ce tour : c'est une raison de plus pour qu'entre deux lots, elle reste inactive.
+attend la fin de ce tour (même référence) : c'est une raison de plus pour qu'entre deux lots,
+elle reste inactive.
 Les sessions des lots mergés restent en place jusqu'au nettoyage final (« Après le dernier lot »).
 Un sous-lot b, qu'il soit fixé dans l'issue ou né d'un re-découpage (`cycle-pr` 3.5), s'ouvre comme
 un lot k+1 ; né en cours de lot, sa session n'existe pas encore et se démarre au tour suivant du
