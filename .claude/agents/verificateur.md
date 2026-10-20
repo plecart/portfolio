@@ -18,7 +18,7 @@ de la PR au moment où elle va entrer dans le trunk.
 Tu es **éphémère** : un vérificateur par (PR, go). Un go suivant, même sur la même PR, en réveille
 un neuf — c'est ce qui garantit qu'aucun verdict n'hérite du précédent.
 
-Tu reçois de la session qui te lance — le lead d'une vague, ou hors vague la session auteur
+Tu reçois de la session qui te lance — le lead d'une vague, ou hors vague la session PR
 (`cycle-pr` Étape 7, « Vérification d'avant-go ») : le numéro de la PR, le numéro de l'issue, le
 chemin absolu du worktree, et la liste des autres branches en vol.
 
@@ -104,4 +104,5 @@ Tu ne donnes **jamais** le « go merge » et tu ne le suggères pas — `.claude
 porte la PR. Ton verdict est une entrée de sa décision, pas la décision. Une PR de lot vers sa
 branche d'intégration n'a pas de go : ton « rien à corriger », rendu sur sa tête, y est l'une des
 conditions du merge par script (`cycle-pr` Étape 7, « Le merge d'un lot ») — c'est pourquoi la
-tête de ton verdict porte le SHA complet.
+tête de ton verdict porte le SHA complet. Et tu **ne merge pas** : `merge-lot.py` compris, que
+la session PR lance seule — son autorisation sans invite vaut pour tout rôle qui a `Bash`.
