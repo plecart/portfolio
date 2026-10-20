@@ -104,7 +104,7 @@ pas choisi par tâche, il est choisi par rôle** au moment de créer l'équipier
 | Rôle | Modèle | Confier |
 |---|---|---|
 | `developpeur` | Opus, effort `high` | l'implémentation TDD d'un bloc borné et sa doc descriptive (`xhigh` à l'appel quand il écrit des tests), la correction de tests rouges |
-| `relecteur` | Opus, effort `medium` | la relecture à contexte vierge d'un diff (`cycle-pr` 4.2), seul, dans son propre worktree |
+| `relecteur` | Opus, effort `high` | le protocole de relecture à contexte vierge d'un diff (`cycle-pr` 4.2), suivi par la session de relecture de la PR dans son propre worktree — sous-agent en repli |
 | `executant` | Sonnet, effort `high` | codage et commit d'une tranche entièrement spécifiée (`xhigh` à l'appel quand elle écrit des tests), cartographie du code, passes mécaniques, mise en place d'`init-projet` |
 | `releveur` | Haiku, effort `medium` | relevés sans décision : tests, lint, format, croisements, édits verbatim, écritures distantes verbatim |
 | `verificateur` | Opus, effort `medium` | la vérification d'avant-go d'une PR (`cycle-pr` Étape 7), **éphémère, un par (PR, go)**, sans worktree et sans lancer de commande du projet |
@@ -155,8 +155,8 @@ plancher de 74,5 K sur Haiku ; celui-là se lance depuis une session neuve.
 aussi en démarrer d'autres, complètes, dans l'application de bureau (`start_session`) : le lead
 d'une vague `pr-paralleles`, une par issue — à son étape 0 pour la trier et l'interroger, puis
 pour la développer ; la coordinatrice d'une issue en lots, une par lot et une par sous-lot — **un
-sous-lot est un lot** ; la session PR, une session de relecture par PR (lot 3 de #134 ; d'ici là,
-le sous-agent `relecteur` de `cycle-pr` 4.2).
+sous-lot est un lot** ; la session PR, une session de relecture par PR, au go de son briefing
+(`.claude/skills/cycle-pr/references/session-relecture.md`).
 Leur protocole — héritage, identité, premier geste, messages, fin de travail, passation,
 nettoyage — vit dans `.claude/skills/cycle-pr/references/sessions-liees.md`, seule source.
 
