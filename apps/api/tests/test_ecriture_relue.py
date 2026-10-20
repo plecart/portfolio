@@ -27,6 +27,7 @@ CORPS_42 = "repos/{owner}/{repo}/issues/42"
 # Les seuls retraits de label auxquels la forge répond : chemin encodé → nom du label.
 RETRAITS = {
     "repos/{owner}/{repo}/issues/42/labels/ready-for-agent": "ready-for-agent",
+    "repos/{owner}/{repo}/issues/42/labels/Ready-for-agent": "Ready-for-agent",
     "repos/{owner}/{repo}/issues/42/labels/en%20attente": "en attente",
     "repos/{owner}/{repo}/issues/42/labels/zone%2Fapi": "zone/api",
 }
@@ -160,6 +161,11 @@ REFUS_D_ANCRE = {
         "case ambiguë : ritère B (3 lignes)",
     ),
     "ancre-hors-de-toute-case": (("--case", "Intro"), "case introuvable : Intro"),
+    # Cherchée après le marqueur : au rejeu, la case cochée ne porterait plus `- [ ] `.
+    "ancre-qui-inclut-le-marqueur": (
+        ("--case", "- [ ] Critère A"),
+        "case introuvable : - [ ] Critère A",
+    ),
     "deux-ancres-en-defaut-toutes-deux-nommees": (
         ("--case", "Critère inconnu", "--case", "ritère B"),
         "case introuvable : Critère inconnu ; case ambiguë : ritère B (3 lignes)",
@@ -307,6 +313,27 @@ def test_label_remove_retire_le_label_puis_le_relit_absent(label: str) -> None:
     assert forge.documents[CORPS_42]["labels"] == [{"name": "enhancement"}]
 
 
+@pytest.mark.parametrize(
+    ("portes", "retire"),
+    [
+        (("ready-for-agent", "enhancement"), "ready-for-agent"),
+        (("ready-for-agent", "Ready-for-agent"), "Ready-for-agent"),
+    ],
+    ids=["casse-differente", "nom-exact-d-abord"],
+)
+def test_label_remove_apparie_sans_la_casse_et_retire_le_nom_que_l_issue_porte(
+    portes: tuple[str, ...], retire: str
+) -> None:
+    """`--remove Ready-for-agent` désigne le `ready-for-agent` que l'issue porte, et le `DELETE`
+    part sous ce nom-là : rien ne dit la forge insensible à la casse. Un label du nom exact passe
+    avant un homonyme de casse — le `DELETE` attendu se compare chemin compris."""
+    forge = Forge({CORPS_42: etiquetee(*portes)})
+
+    assert lance(forge, "label", "42", "--remove", "Ready-for-agent") == 0
+    assert ecritures(forge) == [("gh", "api", "-X", "DELETE", f"{CORPS_42}/labels/{retire}")]
+    assert {"name": retire} not in forge.documents[CORPS_42]["labels"]
+
+
 def test_label_remove_ne_retire_rien_d_un_label_deja_absent(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -317,33 +344,43 @@ def test_label_remove_ne_retire_rien_d_un_label_deja_absent(
     assert "rien à écrire" in capsys.readouterr().out
 
 
+@pytest.mark.parametrize("argument", ["ready-for-agent", "Ready-for-agent"], ids=["exact", "casse"])
 def test_label_remove_sort_en_1_si_la_relecture_porte_encore_le_label(
-    capsys: pytest.CaptureFixture[str],
+    argument: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """La relecture cherche le nom que l'issue porte, pas celui de l'argument."""
     forge = Forge({CORPS_42: etiquetee("ready-for-agent")}, garde_les_labels=True)
 
-    assert lance(forge, "label", "42", "--remove", "ready-for-agent") == 1
+    assert lance(forge, "label", "42", "--remove", argument) == 1
     assert "le label ready-for-agent est encore sur #42" in sortie_d_echec(
         capsys, "relecture non conforme"
     )
 
 
 @pytest.mark.parametrize(
-    ("corps", "debut"), [("Corps de la PR", "Corps de la PR"), (None, "")], ids=["corps", "null"]
+    ("corps", "avant_l_ajout"),
+    [
+        ("Corps de la PR", "Corps de la PR\n\n"),
+        ("Corps de la PR\n", "Corps de la PR\n\n"),
+        ("Corps de la PR\r\n\r\n", "Corps de la PR\r\n\r\n"),
+        (None, ""),
+    ],
+    ids=["sans-fin-de-ligne", "fin-de-ligne", "ligne-vide-deja-la-crlf", "null"],
 )
 def test_issue_edit_ajoute_le_fichier_en_fin_de_corps_octet_pour_octet(
-    corps: str | None, debut: str, tmp_path: Path
+    corps: str | None, avant_l_ajout: str, tmp_path: Path
 ) -> None:
     """Le fichier est lu en octets : ses CRLF partent tels quels — `read_text` les aurait
-    traduits en LF (obs 87). Une ligne vide le sépare du corps, qui n'a pas de fin de ligne ; un
-    corps `null` vaut le texte vide, jamais « None »."""
+    traduits en LF (obs 87). Une ligne vide, une seule, le sépare du dernier contenu du corps :
+    les fins de ligne qui terminent déjà le corps comptent, CRLF compris. Un corps `null` vaut le
+    texte vide — ni « None », ni séparateur."""
     ajout = tmp_path / "rattachement.md"
     ajout.write_bytes(b"*Rattachement a posteriori : lot 1/3.*\r\n\r\nCloses #7\r\n")
     forge = Forge({CORPS_42: {"body": corps}})
 
     assert lance(forge, "issue", "edit", "42", "--append", str(ajout)) == 0
     assert [json.loads(charge)["body"] for charge in forge.charges] == [
-        f"{debut}\n\n*Rattachement a posteriori : lot 1/3.*\r\n\r\nCloses #7\r\n"
+        f"{avant_l_ajout}*Rattachement a posteriori : lot 1/3.*\r\n\r\nCloses #7\r\n"
     ]
 
 
@@ -546,6 +583,59 @@ def test_une_ecriture_en_panne_sort_en_1_sans_se_dire_refus(
 
     assert ecriture_relue.main(list(args), run=forge_qui_tombe_a_l_ecriture) == 1
     assert "a échoué (1) : HTTP 502" in sortie_d_echec(capsys, "relecture non conforme")
+
+
+# (appel, réponse JSON valide mais d'une autre forme, rendue après l'écriture — sinon à la lecture)
+REPONSES_D_UNE_AUTRE_FORME = {
+    "corps-lu-sans-body": (COCHE_CORPS, {"message": "Not Found"}, False),
+    "corps-lu-non-textuel": (COCHE_CORPS, {"body": 5}, False),
+    "commentaires-hors-pages": (COCHE_BRIEF, {"message": "Not Found"}, False),
+    "commentaire-sans-body": (COCHE_BRIEF, [[{"id": 12}]], False),
+    "brief-sans-id": (COCHE_BRIEF, [[{"body": BRIEF}]], False),
+    "brief-id-non-entier": (COCHE_BRIEF, [[{"id": "13/reactions", "body": BRIEF}]], False),
+    "labels-lus-absents": (RETIRE_LABEL, {"body": ""}, False),
+    "nom-de-label-non-textuel": (RETIRE_LABEL, {"labels": [{"name": 5}]}, False),
+    "corps-relu-sans-body": (COCHE_CORPS, {"message": "Not Found"}, True),
+    "labels-relus-absents": (RETIRE_LABEL, {"message": "Not Found"}, True),
+}
+
+
+@pytest.mark.parametrize(
+    ("args", "document", "apres_ecriture"),
+    REPONSES_D_UNE_AUTRE_FORME.values(),
+    ids=REPONSES_D_UNE_AUTRE_FORME.keys(),
+)
+def test_une_reponse_d_une_autre_forme_sort_en_1_en_une_ligne(
+    args: tuple[str, ...],
+    document: Any,
+    apres_ecriture: bool,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Un JSON valide sans le champ attendu, ou d'un autre type, n'est pas une trace Python : à la
+    lecture, un refus sans écriture ; à la relecture, l'écriture est partie, relecture non
+    conforme. Dénombré avant le correctif : 6 sites lisent un champ de la forge — le corps lu
+    (`checkbox patch`, `issue edit`), les commentaires lus page par page, l'`id` du brief, qui
+    entre dans un chemin d'API, les labels lus, le corps relu, les labels relus —, et les 6 étaient
+    sans garde, le `null` d'un corps seul étant couvert : une trace remontait (`KeyError`,
+    `TypeError`, `AttributeError`), et un `id` non entier faisait partir le `PATCH` vers un autre
+    chemin. Chaque site a sa ligne ; les quatre de lecture en ont une seconde, de forme ou de type
+    — les deux relectures passent par les mêmes lecteurs que la lecture."""
+    forge = Forge(
+        {CORPS_42: {"body": "- [ ] Critère A\n", "labels": [{"name": "ready-for-agent"}]}},
+        pages=[[{"id": 13, "body": BRIEF}]],
+    )
+
+    def forge_d_une_autre_forme(
+        cmd: Sequence[str], stdin: bytes | None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if "-X" not in cmd and bool(ecritures(forge)) == apres_ecriture:
+            return reponse(document)
+        return forge(cmd, stdin)
+
+    assert ecriture_relue.main(list(args), run=forge_d_une_autre_forme) == 1
+    assert len(ecritures(forge)) == int(apres_ecriture)
+    issue = "relecture non conforme" if apres_ecriture else "refus"
+    assert "ne rend pas la forme attendue" in sortie_d_echec(capsys, issue)
 
 
 def test_le_lanceur_par_defaut_passe_l_entree_et_rend_les_octets_tels_quels() -> None:

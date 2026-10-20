@@ -3443,3 +3443,24 @@ def test_la_forme_du_reveil_n_est_normative_qu_une_fois() -> None:
     ]
 
     assert sites == [SESSION_RELECTURE_REF], sites
+
+
+def test_un_controle_de_proprete_par_git_status_voit_les_fichiers_non_suivis() -> None:
+    """Un contrôle de propreté attend un `git status --porcelain` vide : sans
+    `--untracked-files=normal`, une configuration `status.showUntrackedFiles=no` y cache un
+    fichier non suivi (mesuré le 2026-10-21, git 2.47.1, bloc B du lot 4a de #134).
+
+    **Population** : la prose du harnais (`HARNESS_PROSE_GLOBS`). Recensé le 2026-10-21 :
+    2 mentions sans l'option, dont 1 contrôle — `relecteur.md`, corrigé ; l'autre, à l'Étape 1 de
+    `cycle-pr`, écarte la commande pour lire l'avance d'une branche. Vu rouge sur `relecteur.md`
+    avant correction.
+    """
+    sans_l_option = re.compile(r"git status --porcelain(?! --untracked-files=normal)")
+    sites = [
+        path.relative_to(REPOSITORY_ROOT).as_posix()
+        for path, _ in prose_citations(
+            REPOSITORY_ROOT, tracked_files(), HARNESS_PROSE_GLOBS, sans_l_option
+        )
+    ]
+
+    assert sites == [CYCLE_PR_SKILL], sites

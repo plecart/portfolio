@@ -18,17 +18,19 @@ une forme réduite, longueur ou ancre, ne voit pas une conversion qui la préser
 - `label` retire un label de l'issue ou de la PR `<N>`, puis relit ses labels ;
 - `checkbox patch` coche des cases du corps de `<N>`, `brief patch` celles de son commentaire de
   brief — le seul qui s'ouvre par `## Brief d'agent` (`triage/brief-agent.md`). Une ancre est un
-  extrait de texte d'une seule ligne de case, `- [ ] …` ou `- [x] …` (`[X]` compris), indentation
-  permise ;
+  extrait du texte qui suit le marqueur d'une seule ligne de case, `- [ ] …` ou `- [x] …` (`[X]`
+  compris), indentation permise ; cocher ne change pas ce texte, et le rejeu rend le verdict du
+  premier appel ;
 - `issue edit --append` ajoute un fichier UTF-8, lu en octets, en fin de corps de `<N>`, séparé
-  par une ligne vide. Le corps d'une PR passe par le même chemin : pour l'API REST, une PR est une
-  issue.
+  de son dernier contenu par une seule ligne vide — aucune sur un corps vide. Le corps d'une PR
+  passe par le même chemin : pour l'API REST, une PR est une issue.
 
 Il refuse, sans rien écrire : une ancre introuvable ou ambiguë — toutes sont validées avant la
 première écriture —, zéro ou plusieurs commentaires de brief, un fichier illisible, non UTF-8 ou
-sans ligne non vide, une lecture `gh` qui échoue ou ne rend pas du JSON. Une case déjà cochée, un
-label déjà absent, un fichier qui termine déjà le corps : rien à écrire, et la sortie le dit — un
-rejeu après une relecture tombée n'écrit donc pas une seconde fois.
+sans ligne non vide, une lecture `gh` qui échoue, ne rend pas du JSON, ou rend un JSON sans un
+champ attendu ou d'un autre type — à la relecture, c'est une relecture non conforme. Une case déjà
+cochée, un label déjà absent, un fichier qui termine déjà le corps : rien à écrire, et la sortie le
+dit — un rejeu après une relecture tombée n'écrit donc pas une seconde fois.
 
 **Ce qu'il ne prouve pas.** Il ne choisit pas les cases : la session PR les nomme. Il ne
 verrouille rien : une édition faite par un tiers entre sa lecture et son écriture est écrasée, et
@@ -101,30 +103,61 @@ def gh_api(run: Run, *args: str, stdin: bytes | None = None) -> bytes:
     return done.stdout
 
 
-def read_json(run: Run, *args: str) -> Any:
-    """La réponse JSON de `gh api <args>`, décodée en UTF-8 explicitement (obs 108).
+def read_json(run: Run, parse: Callable[[Any], Any], *args: str) -> Any:
+    """Ce que `parse` tire de la réponse JSON de `gh api <args>`, décodée en UTF-8 explicitement
+    (obs 108). La présence et le type des champs s'y gardent pour les 6 sites qui lisent un
+    document de la forge, lecture et relecture — dénombrés par
+    `test_une_reponse_d_une_autre_forme_sort_en_1_en_une_ligne`.
+
+    Args:
+        parse: tire du document les champs attendus ; un champ absent ou d'un autre type y lève
+            `KeyError` ou `TypeError`.
 
     Raises:
-        Refusal: la commande échoue, ou ne rend pas du JSON en UTF-8.
+        Refusal: la commande échoue, ne rend pas du JSON en UTF-8, ou pas la forme que `parse`
+            attend.
     """
     try:
-        return json.loads(gh_api(run, *args).decode("utf-8"))
+        document = json.loads(gh_api(run, *args).decode("utf-8"))
     except ValueError as error:
         raise Refusal(f"`gh api {' '.join(args)}` ne rend pas du JSON UTF-8 : {error}") from error
+    try:
+        return parse(document)
+    except (KeyError, TypeError) as error:
+        raise Refusal(
+            f"`gh api {' '.join(args)}` ne rend pas la forme attendue : "
+            f"{type(error).__name__} {error}"
+        ) from error
 
 
-def write_then_reread(run: Run, write: Sequence[str], stdin: bytes | None, path: str) -> Any:
-    """Lance l'écriture `gh api <write>`, puis rend le document relu sous `path`.
+def write_then_reread(
+    run: Run, write: Sequence[str], stdin: bytes | None, path: str, parse: Callable[[Any], Any]
+) -> Any:
+    """Lance l'écriture `gh api <write>`, puis rend ce que `parse` tire du document relu sous
+    `path`.
 
     Raises:
-        Divergence: l'une des deux commandes échoue — l'écriture a pu partir, ce qu'un refus
-            ferait croire impossible.
+        Divergence: l'une des deux commandes échoue, ou le document relu n'a pas la forme
+            attendue — l'écriture a pu partir, ce qu'un refus ferait croire impossible.
     """
     try:
         gh_api(run, *write, stdin=stdin)
-        return read_json(run, path)
+        return read_json(run, parse, path)
     except Refusal as error:
         raise Divergence(str(error)) from error
+
+
+def body_of(document: Any) -> str:
+    """Le champ `body` d'un document de la forge ; `null` vaut le texte vide.
+
+    Raises:
+        KeyError, TypeError: pas de champ `body`, ou ni texte ni `null` — `read_json` en fait le
+            motif.
+    """
+    body = document["body"]
+    if not isinstance(body, str | None):
+        raise TypeError(f"`body` de type {type(body).__name__}")
+    return body or ""
 
 
 def measure(text: str) -> str:
@@ -147,7 +180,7 @@ def write_body(run: Run, text: Text, expected: str, anchors: Sequence[str]) -> N
     # une requête conditionnelle si la forge en accepte une.
     payload = json.dumps({"body": expected}, ensure_ascii=False).encode("utf-8")
     write = ("-X", "PATCH", text.path, "--input", "-")
-    reread = write_then_reread(run, write, payload, text.path)["body"] or ""
+    reread = write_then_reread(run, write, payload, text.path, body_of)
     if reread != expected:
         missing = [f"ancre absente : {anchor}" for anchor in anchors if anchor not in reread]
         raise Divergence(
@@ -159,7 +192,7 @@ def resolve_anchors(candidates: Mapping[int, str], anchors: Sequence[str]) -> di
     """L'indice de la seule ligne candidate qui porte chaque ancre.
 
     Args:
-        candidates: indice → ligne, pour les seules lignes de case du texte.
+        candidates: indice → texte cherché, pour les seules lignes de case du texte.
 
     Raises:
         Refusal: une ancre n'apparaît dans aucune ligne de case, ou dans plusieurs — chaque ancre
@@ -184,7 +217,8 @@ def check_boxes(body: str, anchors: Sequence[str]) -> tuple[str, list[str], list
     """Coche, dans `body`, la ligne de case que désigne chaque ancre — toutes, ou aucune.
 
     Une ligne est un segment entre deux `\\n` : un `\\r` final reste sur sa ligne, les fins de
-    ligne ressortent telles qu'elles sont entrées.
+    ligne ressortent telles qu'elles sont entrées. L'ancre se cherche dans le texte qui suit le
+    marqueur `- [ ] `, que cocher ne change pas : le rejeu rend le verdict du premier appel.
 
     Returns:
         Le corps coché, les lignes cochées (sans indentation ni `\\r`, ancres de la relecture),
@@ -195,7 +229,7 @@ def check_boxes(body: str, anchors: Sequence[str]) -> tuple[str, list[str], list
     """
     lines = body.split("\n")
     boxes = {i: box for i, line in enumerate(lines) if (box := CHECKBOX.match(line))}
-    targets = resolve_anchors({i: lines[i] for i in boxes}, anchors)
+    targets = resolve_anchors({i: lines[i][box.end() :] for i, box in boxes.items()}, anchors)
     already = [anchor for anchor, i in targets.items() if boxes[i].group(1) != " "]
     checked: list[str] = []
     for i in sorted({i for i in targets.values() if boxes[i].group(1) == " "}):
@@ -213,7 +247,26 @@ def issue_path(number: str) -> str:
 def issue_body(run: Run, number: str) -> Text:
     """Le corps de l'issue ou de la PR `number` ; `null` vaut le texte vide."""
     path = issue_path(number)
-    return Text(path, read_json(run, path)["body"] or "", f"corps de #{number}")
+    return Text(path, read_json(run, body_of, path), f"corps de #{number}")
+
+
+def brief_comments(pages: Any) -> list[tuple[int, str]]:
+    """L'`id` et le corps de chaque commentaire ouvert par `## Brief d'agent`, sur les pages que
+    `gh api --paginate --slurp` rend.
+
+    Raises:
+        KeyError, TypeError: des pages qui ne sont pas des listes de commentaires, un commentaire
+            sans corps, ou un brief sans `id` entier — il entre dans un chemin d'API.
+    """
+    briefs = [
+        (comment["id"], body)
+        for page in pages
+        for comment in page
+        if (body := body_of(comment)).startswith(BRIEF_MARK)
+    ]
+    if not all(isinstance(comment_id, int) for comment_id, _ in briefs):
+        raise TypeError("`id` de brief non entier")
+    return briefs
 
 
 def brief_comment(run: Run, number: str) -> Text:
@@ -222,14 +275,14 @@ def brief_comment(run: Run, number: str) -> Text:
     Raises:
         Refusal: aucun commentaire ne s'ouvre par `## Brief d'agent`, ou plusieurs.
     """
-    pages = read_json(run, "--paginate", "--slurp", f"{issue_path(number)}/comments")
-    briefs = [c for page in pages for c in page if (c["body"] or "").startswith(BRIEF_MARK)]
+    path = f"{issue_path(number)}/comments"
+    briefs = read_json(run, brief_comments, "--paginate", "--slurp", path)
     if len(briefs) != 1:
         raise Refusal(
             f"il faut un seul commentaire de brief sur #{number}, il y en a {len(briefs)}"
         )
-    brief = briefs[0]
-    return Text(f"{REPO}/issues/comments/{brief['id']}", brief["body"], f"brief de #{number}")
+    comment_id, body = briefs[0]
+    return Text(f"{REPO}/issues/comments/{comment_id}", body, f"brief de #{number}")
 
 
 def patch_boxes(run: Run, args: argparse.Namespace) -> str:
@@ -247,20 +300,47 @@ def patch_boxes(run: Run, args: argparse.Namespace) -> str:
 
 
 def label_names(document: Any) -> list[str]:
-    """Les noms des labels d'une issue, telle que l'API REST la rend."""
-    return [label["name"] for label in document["labels"]]
+    """Les noms des labels d'une issue, telle que l'API REST la rend.
+
+    Raises:
+        KeyError, TypeError: pas de liste `labels`, ou un label sans nom textuel.
+    """
+    names = [label["name"] for label in document["labels"]]
+    if not all(isinstance(name, str) for name in names):
+        raise TypeError("nom de label non textuel")
+    return names
+
+
+def carried_label(names: Sequence[str], wanted: str) -> str | None:
+    """Le nom sous lequel l'issue porte le label `wanted` : `wanted` lui-même s'il y est, sinon
+    le premier qui lui est égal sans la casse ; `None` si aucun."""
+    if wanted in names:
+        return wanted
+    return next((name for name in names if name.casefold() == wanted.casefold()), None)
 
 
 def label_remove(run: Run, args: argparse.Namespace) -> str:
-    """`label --remove` : retire le label s'il est posé — son nom encodé en un seul segment de
-    chemin —, puis relit les labels de l'issue."""
+    """`label --remove` : retire le label s'il est posé, casse ignorée, puis relit les labels de
+    l'issue. Le retrait et la relecture visent le nom que l'issue porte, encodé en un seul segment
+    de chemin : rien ne dit la forge insensible à la casse."""
     path = issue_path(args.number)
-    if args.label not in label_names(read_json(run, path)):
+    name = carried_label(read_json(run, label_names, path), args.label)
+    if name is None:
         return f"rien à écrire — label {args.label} absent de #{args.number}"
-    delete = ("-X", "DELETE", f"{path}/labels/{quote(args.label, safe='')}")
-    if args.label in label_names(write_then_reread(run, delete, None, path)):
-        raise Divergence(f"le label {args.label} est encore sur #{args.number}")
-    return f"retiré et relu — label {args.label} de #{args.number}"
+    delete = ("-X", "DELETE", f"{path}/labels/{quote(name, safe='')}")
+    if name in write_then_reread(run, delete, None, path, label_names):
+        raise Divergence(f"le label {name} est encore sur #{args.number}")
+    return f"retiré et relu — label {name} de #{args.number}"
+
+
+def appended(body: str, addition: str) -> str:
+    """`addition` à la suite de `body`, séparée de son dernier contenu par une ligne vide et une
+    seule : les fins de ligne — `\\n` ou `\\r\\n` — qui terminent déjà `body` comptent. Un corps
+    vide n'a pas de séparateur ; `body` n'est jamais réécrit, seulement prolongé."""
+    if not body:
+        return addition
+    line_ends = body[len(body.rstrip("\r\n")) :].count("\n")
+    return body + "\n" * max(0, 2 - line_ends) + addition
 
 
 def issue_append(run: Run, args: argparse.Namespace) -> str:
@@ -278,7 +358,7 @@ def issue_append(run: Run, args: argparse.Namespace) -> str:
     text = issue_body(run, args.number)
     if text.body.endswith(addition):
         return f"rien à écrire — {text.name} : {args.file} déjà en fin de corps"
-    write_body(run, text, f"{text.body}\n\n{addition}", [anchor])
+    write_body(run, text, appended(text.body, addition), [anchor])
     return f"écrit et relu — {text.name} : {args.file} ajouté"
 
 
