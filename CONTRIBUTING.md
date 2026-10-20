@@ -267,8 +267,9 @@ Chaque maillon nomme qui l'exécute ; la répartition des rôles est dans `CLAUD
    Plusieurs PR en parallèle : `pr-paralleles` (la session lead démarre une session par issue,
    chacune dans un worktree de l'application, et tient le tableau
    de bord — le go reste humain, dans la fenêtre de la PR). Trop peu d'issues prêtes : son étape 0
-   ouvre d'abord une session de triage et d'interrogatoire par issue, puis la même session
-   enchaîne sur la vague.
+   ouvre d'abord une session de triage et d'interrogatoire par issue, puis se termine sur la liste
+   des issues prêtes et une carte « démarrer la vague » : un lead neuf la conduit — préparer et
+   conduire sont deux sessions.
 3bis. **Amender** — `contradiction`, lancé par la session de dialogue dès qu'une de ses décisions
    contredit une source de vérité (section « Sources de vérité » de
    `.claude/pipeline.config.md`) : le document est amendé par la session de dialogue qui a décidé,

@@ -1918,11 +1918,12 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # Vérification d'avant-go de la PR #133, go 1 : l'attente de **chaque** message de fin.
     "etape-0-chaque-message-attendu": (
         PR_PARALLELES_SKILL,
-        "Chaque message reçu et vérifié, passer à l'étape 1",
+        "Chaque message reçu et vérifié, la préparation **se termine**",
     ),
-    "etape-0-etape-1-dans-la-meme-session": (
+    # D-10 (#134, lot 3) : la vague se conduit dans une session neuve, plus dans celle-ci.
+    "etape-0-vague-dans-une-session-neuve": (
         PR_PARALLELES_SKILL,
-        "passer à l'étape 1 **dans cette session**",
+        "Le lead de la vague naît donc neuf, sans le contexte de la préparation",
     ),
     # La forme que l'étape 0 consomme : elle n'est plus « en lecture, à dessein ».
     "fin-d-interrogatoire": (
@@ -2462,9 +2463,9 @@ ORDRE_DE_PR_PARALLELES = {
         "applique-la par `triage`",
         "puis envoie à ton parent « interrogatoire #N terminé",
     ),
-    "etape-0-verification-avant-l-etape-1": (
+    "etape-0-verification-avant-la-carte-de-la-vague": (
         "il ne prouve rien seul",
-        "passer à l'étape 1 **dans cette session**",
+        "propose une carte « démarrer la vague »",
     ),
     "plafond-avant-le-demarrage": (
         "si la session lead est en dessous d'Opus 5.5",
@@ -3006,6 +3007,46 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         SESSIONS_LIEES_REF,
         "Une session de relecture rend ses constats sous la forme de",
     ),
+    # D-10 : préparer la vague et la conduire sont deux sessions.
+    "pr-paralleles-preparation-se-termine": (
+        PR_PARALLELES_SKILL,
+        "la préparation **se termine** : préparer la vague et la conduire sont deux sessions",
+    ),
+    "pr-paralleles-lead-neuf-avec-la-seule-liste": (
+        PR_PARALLELES_SKILL,
+        "brief : le skill `pr-paralleles` invoqué avec cette seule liste en argument",
+    ),
+    "pr-paralleles-lead-detache-de-la-preparation": (
+        PR_PARALLELES_SKILL,
+        "son premier geste le détache d'elle (`detach_session` sur `self`)",
+    ),
+    "contributing-deux-sessions": (
+        "CONTRIBUTING.md",
+        "un lead neuf la conduit — préparer et conduire sont deux sessions",
+    ),
+    # E7 : la mesure, une fois, dans la source ; les trois autres textes y renvoient.
+    "sessions-liees-reception-en-fin-de-tour": (
+        SESSIONS_LIEES_REF,
+        (
+            "ne le reçoit qu'à la fin de ce tour, comme un tour neuf — jamais à son appel d'outil"
+            " suivant. Un message n'interrompt donc jamais un tour en cours."
+        ),
+    ),
+    "cycle-pr-message-du-lead-en-fin-de-tour": (
+        CYCLE_PR_SKILL,
+        "son message n'arrive qu'à la fin du tour en cours (même référence, « Messages »)",
+    ),
+    "pr-paralleles-signalement-en-fin-de-tour": (
+        PR_PARALLELES_SKILL,
+        (
+            "elle ne le reçoit qu'à la fin de son tour en cours"
+            " (`.claude/skills/cycle-pr/references/sessions-liees.md`, « Messages », mesuré)"
+        ),
+    ),
+    "coordinatrice-message-de-lot-en-fin-de-tour": (
+        COORDINATRICE_REF,
+        "attend la fin de ce tour (même référence)",
+    ),
 }
 
 
@@ -3056,6 +3097,17 @@ def test_la_session_de_relecture_garde_l_ordre_de_son_reveil(avant: str, apres: 
 RETIRES_PAR_LA_SESSION_DE_RELECTURE = {
     # `/security-review` prescrit des sous-tâches (critère 4 du bloc : 1 occurrence au 2026-10-20).
     "relecteur-pas-de-sous-agent": (RELECTEUR_ROLE, "pas de sous-agent"),
+    # D-10 (critère 1 du bloc : 2 lignes au 2026-10-20, une par fichier).
+    "preparation-devient-le-lead": (PR_PARALLELES_SKILL, "devient le lead"),
+    "contributing-meme-session-sur-la-vague": ("CONTRIBUTING.md", "enchaîne sur la vague"),
+    # E7 (critère 6 du bloc : 5 lignes dans 4 fichiers au 2026-10-20 ; les deux de `fin de ce
+    # tour`, dans `sessions-liees.md` et `coordinatrice.md`, disent vrai et restent).
+    "cycle-pr-arret-apres-l-outil-en-cours": (CYCLE_PR_SKILL, "après l'outil en cours"),
+    "pr-paralleles-arret-apres-l-outil-en-cours": (PR_PARALLELES_SKILL, "après l'outil en cours"),
+    "pr-paralleles-messages-entre-deux-appels": (
+        PR_PARALLELES_SKILL,
+        "entre deux appels d'outils",
+    ),
 }
 
 
