@@ -94,7 +94,9 @@ L'enfant envoie au parent, par `SendMessage`, un message explicite sous l'une de
 - « terminé — \<livrable> », pour toute autre tâche
 - « bloquant : \<…> »
 
-En vague, le même message part aussi au lead s'il n'est pas le parent.
+Une session de relecture rend ses constats sous la forme de
+[session-relecture.md](session-relecture.md), « Réveil ». En vague, le même message part aussi au
+lead s'il n'est pas le parent.
 
 ## Passation — sur disque, remise par pointeur
 

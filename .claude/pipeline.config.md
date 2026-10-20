@@ -182,10 +182,11 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
                                                   # shim cassé ailleurs.
 - relecture    : /code-review <niveau>            # commande **intégrée au binaire**, pas un
                                                   # skill du dépôt : rien dans `.claude/` ne la
-                                                  # porte. Lancée par la session PR avant
-                                                  # chaque appel du relecteur (`cycle-pr` 4.2 ;
-                                                  # par la session de relecture au lot 3 de
-                                                  # #134), **additive** au
+                                                  # porte. Lancée par la session de relecture
+                                                  # à chaque réveil, avant le protocole du
+                                                  # `relecteur` (`session-relecture.md` de
+                                                  # `cycle-pr`) — par la session PR seulement
+                                                  # en repli —, **additive** au
                                                   # prompt de `cleanup-verbatim.md` (D27). Ce
                                                   # qu'elle couvre, mesuré le 2026-10-12 sur le
                                                   # delta de #85 (672 lignes, niveau `medium`) :
@@ -198,14 +199,14 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
                                                   # 2 bloquants et 7 importants de la relecture
                                                   # à contexte vierge. Deux portes, deux
                                                   # populations — elle ne remplace rien.
-                                                  # Son rapport exigé comme seule sortie ne
-                                                  # termine pas le tour (`cycle-pr` 4.2, obs 94).
-- sécurité     : /security-review                 # même nature. Lancée par la session PR
-                                                  # (`cycle-pr` 4.2 ; par la session de relecture
-                                                  # au lot 3 de #134, condition comprise)
-                                                  # **seulement** si le diff touche une zone
-                                                  # sensible ou une surface exposée (section
-                                                  # « Périmètre »). Mesure le
+                                                  # Son rapport exigé comme seule sortie clôt
+                                                  # le tour de la session de relecture, sans
+                                                  # coût (`cycle-pr` 4.2, obs 94).
+- sécurité     : /security-review                 # même nature. Lancée par la session de
+                                                  # relecture (par la session PR seulement en
+                                                  # repli), **seulement** si le diff touche
+                                                  # une zone sensible ou une surface exposée
+                                                  # (section « Périmètre »). Mesure le
                                                   # 2026-10-14, commit 1 de la PR #92 (rôle
                                                   # Postgres de `backup`, 5 fichiers, +204/−63,
                                                   # surface « persistance Postgres ») : **zéro**
@@ -232,8 +233,9 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
                                                   # documentation : admin, téléversement,
                                                   # migration) : **zéro** constat, de lecture
                                                   # aussi, déroulée sans les sous-tâches.
-                                                  # Son rapport exigé comme seule sortie ne
-                                                  # termine pas le tour (`cycle-pr` 4.2, obs 98).
+                                                  # Son rapport exigé comme seule sortie clôt
+                                                  # le tour de la session de relecture, sans
+                                                  # coût (`cycle-pr` 4.2, obs 98, 115).
 
 ## Qualité
 - seuil de couverture : aucun (cadrage annexe A : « pragmatique ; évaluations RAG et E2E prioritaires »)
