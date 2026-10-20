@@ -52,10 +52,10 @@ le gaspillage vient de **quand** les jobs tournent.
   `infra/ci/changed_jobs.py`, qui rend `web` et `infra`. `web` : le front, ou le schéma de l'API
   dont ses types sont générés. `infra` : tout chemin hors du harnais — liste d'exclusion, un
   fichier inconnu fait tourner le job —, ou l'un des modules d'appui des tests du back que
-  `make image-test` charge aussi. `web` et `infra` partent
-  après `api`, même rouge (`!cancelled()`). Sur un push vers `main`, tout tourne. Le job `api`
-  tourne sur chaque push — la suite du back porte aussi les tests de la pipeline ; seule
-  l'ouverture d'une draft le saute, et avec lui `web` et `infra`.
+  `make image-test` charge aussi. `web` et `infra` partent après `api`, même rouge
+  (`!cancelled()`). Sur un push vers `main`, tout tourne. Le job `api` tourne sur chaque push — la
+  suite du back porte aussi les tests de la pipeline ; seule l'ouverture d'une draft le saute, et
+  avec lui `web` et `infra`.
 - **Un push annule le run encore en cours de la même PR** (`concurrency` du workflow, groupe par
   numéro de PR) ; jamais sur `main`, où le groupe se replie sur le SHA.
 - **Le passage en ready ne déclenche plus de run** : il rejouait un SHA déjà couvert, sur la
