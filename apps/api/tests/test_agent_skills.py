@@ -2939,12 +2939,45 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         RELECTEUR_ROLE,
         "Il ne contient pas celle de corriger, qui revient à la session PR",
     ),
+    # Relance de la PR #141, m6 : morceaux tenus en partie dont une mutation restait VERTE.
+    "reprise-a-l-etape-suivante": (
+        SESSION_RELECTURE_REF,
+        (
+            "la session PR, réveillée par la fin de tour sans message de constats, répond"
+            " « reprends la passe <k> », et la session de relecture reprend à l'étape suivante, son"
+            " contexte intact."
+        ),
+    ),
+    "commandes-qui-closent-le-tour": (
+        SESSION_RELECTURE_REF,
+        (
+            "**Une commande intégrée peut clore le tour** — `/code-review` par son outil de rapport,"
+            " `/security-review` par « Your final reply must contain the markdown report and nothing"
+            " else »."
+        ),
+    ),
+    "repli-humain-avec-le-diff": (
+        SESSION_RELECTURE_REF,
+        (
+            "la main passe au relecteur humain, avec le diff et le prompt de `cleanup-verbatim.md`"
+            " verbatim, noté dans « Relecture indépendante » du body — jamais de saut silencieux."
+        ),
+    ),
     # Passe 2 de la relecture de la PR #141 — I4 : en relais, rien ne réveille l'émetteur.
     "relais-notify-when-idle": (
         SESSION_RELECTURE_REF,
         (
-            "il envoie chaque réveil avec `notify_when_idle: true` et répond « reprends la passe <k> »"
-            " à l'avis d'inactivité arrivé sans constats"
+            "il envoie chaque réveil, et chaque « reprends », avec `notify_when_idle: true` — un avis"
+            " par abonnement — et répond « reprends la passe <k> » à l'avis d'inactivité arrivé sans"
+            " constats"
+        ),
+    ),
+    # Relance de la PR #141, I5 : la sortante d'un relais ne relance plus.
+    "relais-la-sortante-ne-relance-plus": (
+        SESSION_RELECTURE_REF,
+        (
+            "La session sortante, elle, ne répond plus aux notes de la session de relecture dès sa"
+            " passation remise : seul le relais relance, sinon une étape se rejouerait deux fois."
         ),
     ),
     "relais-ne-recoit-pas-la-note": (
@@ -2959,8 +2992,9 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
     "code-review-pas-rendu-a-nouveau": (
         SESSION_RELECTURE_REF,
         (
-            "aux réveils suivants, le skill n'est pas rendu à nouveau (« already loaded above ») et le"
-            " niveau reste celui du premier rendu"
+            "aux réveils suivants, le skill n'est pas rendu à nouveau (« already loaded above »,"
+            " mesuré le 2026-10-20, PR #141), donc le niveau ne se lit plus : se rapporte celui du"
+            " premier rendu."
         ),
     ),
     "decision-du-mainteneur-a-l-emetteur": (
@@ -3286,9 +3320,11 @@ def test_chaque_morceau_du_protocole_tient_une_ancre() -> None:
     Un morceau tient une ancre quand une phrase de `INVARIANTS_DE_LA_SESSION_DE_RELECTURE` sur ce
     fichier, ou de `ORDRE_DU_REVEIL`, le contient, ou qu'il la contient. Les morceaux nus doivent être exactement
     ceux de `MORCEAUX_SANS_PRESCRIPTION` : un énoncé ajouté sans ancre rougit, une exemption
-    périmée aussi. **Borne** : un morceau qui contient une ancre plus courte que lui n'est gardé
-    que sur elle ; le reste du morceau peut changer en vert. C'est pourquoi les ancres ajoutées
-    pour fermer la classe prennent le morceau entier.
+    périmée aussi. **Borne** : un morceau tenu en partie — il contient une ancre plus courte que
+    lui — n'est gardé que sur elle, le reste peut changer en vert ; c'est le cas de la plupart, dont
+    beaucoup ne perdent que leur ponctuation. Les prescriptions qu'une mutation partielle a laissées
+    vertes (relance de la PR #141 : reprise à l'étape suivante, outil de rapport de `/code-review`,
+    repli humain avec le diff) sont ancrées en entier, comme toute ancre qui ferme la classe.
     """
     ancres = [
         phrase
