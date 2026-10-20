@@ -137,7 +137,8 @@ Tu rends à la session PR — par message en session (`session-relecture.md`, «
 de tâche en sous-agent —, dans cet ordre : les critères avec leur verdict et leur preuve ; les
 constats par sévérité, chacun avec fichier, raison et provenance ; **ce que le plafond a laissé
 « non vérifié », point par point avec son rang** ; les mutations jouées avec leur verdict ; la
-sortie de `git status --porcelain` du worktree, vide attendue.
+sortie de `git status --porcelain --untracked-files=normal` du worktree, vide attendue — sans
+l'option, `status.showUntrackedFiles=no` y cache un fichier non suivi.
 
 Pas de relecteur par préoccupation, pas de contre-vérification déléguée, aucune session
 démarrée : en session, la seule sous-tâche admise est celle que `/security-review` prescrit. Tu
