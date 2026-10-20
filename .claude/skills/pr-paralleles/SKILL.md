@@ -422,9 +422,10 @@ ou muette après un message, elle se traite comme perdue — règle de prudence,
 Dans cet ordre :
 
 1. **Mesurer les artefacts** — tête, base, CI, body de PR, worktrees : c'est ce qui est *prouvé*,
-   et ça ne dépend pas d'elle.
-2. **Lire la fin de son récit** par `list_events` sur son `local_…`, puis le dernier texte de ses
-   sous-agents :
+   et ça ne dépend pas d'elle. Le relevé part à un `releveur`, qui rend chaque valeur avec sa
+   commande.
+2. **Lire la fin de son récit** par `list_events` sur son `local_…` — un outil de session, au lead —,
+   puis le dernier texte de ses sous-agents, que le même `releveur` extrait :
 
    ```
    python <répertoire de ce skill>/scripts/fin-transcript.py <transcript .jsonl> [<tours>]
