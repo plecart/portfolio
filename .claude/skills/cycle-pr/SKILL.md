@@ -300,6 +300,17 @@ groupée au prochain arrêt. Ailleurs, s'arrêter est une remise de main que per
 
 ### 3.1 Modification — en TDD (tracer bullet vertical)
 
+**La session PR écrit le bloc ; un `developpeur` neuf le code** (`.claude/agents/developpeur.md`).
+Le brief d'un bloc porte ses fichiers, ses signatures, ses tests attendus et leur rouge, son
+comportement, son estimation en épingles (Étape 1), la base et le seuil du gabarit (3.5) et le
+niveau `ponytail` ; le `developpeur` part à `xhigh` quand le bloc écrit des tests. Il fait le TDD
+de cette étape, le cycle 3.2 à 3.5, la doc descriptive et le commit — jamais le push, que la
+session PR fait après chaque remise. Arrêté sur une `[C]` ou sur une question dont dépend tout le
+bloc, il est **repris par `SendMessage`** avec la réponse — `[T]` tranchée par la session PR, ou
+question portée au mainteneur —, jamais remplacé (mesuré le 2026-10-20 sur une `[C]` fabriquée,
+Notes de la PR #139) ; ses `[V]` rejoignent « Questions en attente ». Un `developpeur` neuf
+seulement au bloc suivant, jamais pour une retouche du même bloc.
+
 **Frontières tierces : on vérifie, on ne suppose pas.** Avant d'appuyer un comportement sur une
 bibliothèque ou un framework tiers à une frontière (réseau, encodage, secrets, fusion avec un
 thème ou une config par défaut, cycle de vie de ressources), lire ce que fait réellement l'API —
@@ -404,7 +415,8 @@ le même commit** — voir `.claude/rules/contraintes.md`. La doc ne se met jama
 
 ### 3.2 Premier passage de tests
 
-Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Contrôles complémentaires :
+Le `developpeur` lance la suite rapide. **Si rouge → pas de commit.** Il répare. Contrôles
+complémentaires :
 
 - **Échec d'outillage ≠ échec de code.** Un échec « exécutable introuvable », « fichier utilisé
   par un autre processus » ou un compilateur qui sort brutalement après une commande tuée n'est
@@ -444,9 +456,9 @@ Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Contrôles c
   chaque pourcentage par la durée totale, absences comprises — 2 % affichés là où le critère
   demandait la part hors absences, 13 % (obs 72).
 - **Un delta sur `.claude/` ou `CLAUDE.md` passe par le validateur du harnais avant tout push**
-  — ligne « validation » de `.claude/pipeline.config.md`. C'est la porte la plus large de ce que
-  Claude Code charge : un frontmatter de skill absent, une `description` non textuelle, un
-  manifeste, une entrée MCP. **Avec `--strict`**, sans quoi un avertissement sort en 0. Elle ne
+  — ligne « validation » de `.claude/pipeline.config.md`, que joue le `releveur` des portes de 4.2.
+  C'est la porte la plus large de ce que Claude Code charge : un frontmatter de skill absent, une
+  `description` non textuelle, un manifeste, une entrée MCP. **Avec `--strict`**, sans quoi un avertissement sort en 0. Elle ne
   dispense pas de la suite : mesuré le 2026-10-09 (v2.1.295), elle est **muette** sur un
   frontmatter de rôle absent ou illisible — un ` : ` non cité dans une `description` fait charger
   le rôle sans aucun champ, en silence —, et ce sont les tests de frontmatter du projet qui
@@ -468,8 +480,8 @@ Lancer la suite rapide. **Si rouge → pas de commit.** On répare. Contrôles c
 
 ### 3.3 Le « cleanup pass » — relecture distincte du delta
 
-Une fois le delta fonctionnel et vert, faire une **relecture distincte** (pas du nettoyage au fil
-de l'eau).
+Une fois le delta fonctionnel et vert, le `developpeur` en fait une **relecture distincte** (pas
+du nettoyage au fil de l'eau).
 
 **Le prompt à exécuter et la façon de l'appliquer vivent dans `.claude/rules/cleanup-verbatim.md`**
 — règle permanente, donc déjà chargée. Le prompt s'exécute **mot pour mot** depuis ce fichier ; ne
@@ -489,8 +501,8 @@ Spécifique à cette étape :
 
 ### 3.4 Second passage de tests
 
-Le cleanup a pu casser quelque chose. Relancer les tests, et la commande du projet que 3.2 a fait
-exécuter si le delta la touche ; rouge → pas de commit.
+Le cleanup a pu casser quelque chose. Le `developpeur` relance les tests, et la commande du projet
+que 3.2 a fait exécuter si le delta la touche ; rouge → pas de commit.
 
 ### 3.5 Commit
 
@@ -548,8 +560,9 @@ Chaque commande se lit dans « Commandes du projet » de `.claude/pipeline.confi
 qu'elle couvre et ce qu'elle ne voit pas — jamais de mémoire :
 
 1. **`lint`, `typecheck` et la suite** verts, et la ligne **validation** si le delta touche
-   `.claude/` ou `CLAUDE.md`.
-2. La ligne **relecture**, en balayage mécanique du diff. C'est la session qui l'invoque
+   `.claude/` ou `CLAUDE.md` — un `releveur` lancé par la session PR, qui rend le verdict et les
+   lignes en échec ; sur zéro test collecté, la sortie brute du lanceur (3.2).
+2. La ligne **relecture**, en balayage mécanique du diff. C'est la session PR qui l'invoque
    elle-même — à la différence de `/code-review ultra`, qui demande un geste du mainteneur et
    reste hors pipeline.
 3. La ligne **sécurité**, quand le diff touche une zone sensible ou une surface exposée
