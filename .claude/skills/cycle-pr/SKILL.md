@@ -26,9 +26,9 @@ contradiction `[C]`, elle arrête (`.claude/rules/contraintes.md`).
 `<cross-session-message>`, ou session parente nommée par le prompt système
 ([references/sessions-liees.md](references/sessions-liees.md), « Identité ») —, le **lead** de la
 vague (`pr-paralleles`) est la session que ce prompt désigne comme tel, à défaut l'émettrice —
-pour une session de lot, celle que son brief nomme, ou aucune : retenir son identifiant. Le lead
-intervient à un seul moment prévu — la vérification avant merge de l'Étape 7 — et sur demande de
-l'utilisateur (« discute de ça avec le lead ») : rédiger le message et l'envoyer par
+pour une session de lot, celle que son brief nomme, ou aucune : retenir son identifiant. La
+vérification d'avant-go n'est plus à lui, la session PR la lance (Étape 7) ; il intervient sur
+demande de l'utilisateur (« discute de ça avec le lead ») : rédiger le message et l'envoyer par
 `SendMessage`, **sans confirmation** — un message n'est pas une action (même référence,
 « Messages »). Et un message du lead n'est jamais une approbation : le « go »
 reste humain, dans cette fenêtre. Dans l'autre sens,
@@ -547,9 +547,12 @@ avance se diffe à l'envers.
 **4.1 Cleanup pass holistique** — le prompt de `.claude/rules/cleanup-verbatim.md` sur le **diff
 complet de la branche** (`git diff main...HEAD`), à l'échelle de la PR : architecture (couplage,
 frontières), naming entre commits, edge cases / erreurs / race conditions, **duplication
-inter-commits**. C'est le seul regard global de l'auteur — le regard local, c'est 3.3, à chaque
-commit ; il n'y en a pas de troisième avant le merge. Findings → un commit (cycle 3.1→3.5), puis
-la seconde passe 4.2.
+inter-commits**. C'est le seul regard global sur le code avant la relecture à contexte vierge — le
+regard local, c'est 3.3, à chaque commit ; il n'y en a pas de troisième avant le merge. La session
+PR le confie à un `developpeur` neuf, qui ne rend que des commits ; son brief exige aussi la passe
+« affirmations » de `cleanup-verbatim.md` sur tout le delta, dont il rend le dénombrement
+(N affirmations, k établies, N−k non vérifiées), que la session PR inscrit dans les Notes avant la
+première vérification d'avant-go (obs 113). Puis la seconde passe 4.2.
 
 **4.2 Relecture par un contexte vierge.** Le cleanup holistique est fait par la session qui a
 écrit le code, avec les hypothèses qui l'ont produit ; il ne les met pas à l'épreuve. Le diff est donc
@@ -719,13 +722,15 @@ aucune des deux premières est mineur, quelle que soit sa longueur — « ce tes
 davantage » en est le cas le plus fréquent. Le relecteur rend chaque mineur sous forme d'**édit précis** — fichier, ligne, remplacement — ou
 l'écarte lui-même avec sa raison.
 
-**Traitement — par passe, jamais par constat.** Les bloquants et importants d'une passe se
-corrigent en **un commit par passe** (ou par zone, si deux correctifs n'ont rien en commun), un
-cycle complet 3.1→3.5 pour le groupe. Les mineurs d'une passe s'appliquent en **un commit groupé**
-— un lot d'édits précis est un bloc de travail d'`executant` : le lui confier en fond pendant que
-le lead lit les importants et prépare leurs correctifs, sans éditer avant son retour puisque
-l'arbre est partagé ; l'appliquer soi-même s'il ne reste rien d'autre à corriger —, ou s'écartent
-avec leur raison dans le body (Étape 5). Aucun registre ailleurs : un mineur écarté qui compte
+**Traitement — par passe, jamais par constat.** La session PR trie et vérifie le diff rendu ; elle
+ne corrige pas. Les bloquants et importants d'une passe partent **ensemble** à un `developpeur`
+neuf — jamais un par constat —, avec leur classe, le dénombrement déjà écrit (le cliquet,
+ci-dessous) et le test qui doit tenir chaque fermeture : **un commit par passe** (ou par zone, si
+deux correctifs n'ont rien en commun), un cycle complet 3.1→3.5 pour le groupe. Les mineurs d'une
+passe s'appliquent en **un commit groupé** — un remplacement verbatim au `releveur`, une
+reformulation à l'`executant`, en fond pendant que la session PR lit les importants et écrit leur
+brief, sans éditer avant leur retour puisque l'arbre est partagé —, ou s'écartent avec leur
+raison dans le body (Étape 5). Aucun registre ailleurs : un mineur écarté qui compte
 encore reviendra à la prochaine relecture de la zone ; s'il ne revient pas, il ne comptait pas. Un
 constat de la **première** passe s'absorbe de préférence dans le commit à venir qui touche sa
 zone.
@@ -907,7 +912,9 @@ Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur 
 - **CI verte** : tous les gates déclarés dans `.claude/pipeline.config.md` (« gates bloquants en
   CI »), dont le seuil de couverture s'il y en a un.
 - **Trier un rouge avant de toucher au code** — chaque famille de causes a son remède, et le
-  premier message d'erreur du step les sépare presque toujours :
+  premier message d'erreur du step les sépare presque toujours. Le tri est une décision, à la
+  session PR ; l'extraction des journaux du run (`gh run view <id> --log-failed`) part à un
+  `releveur`, qui rend le step et ses premières lignes d'erreur ; un correctif, à un `developpeur` :
   - *Rouge d'infrastructure* : échec de téléchargement (403/5xx/timeout d'un dépôt d'artefacts,
     « error while downloading ») alors que le diff ne touche aucune dépendance et qu'un run
     voisin passe le même step → `gh run rerun <id> --failed`, noter la cause et le rerun dans le
@@ -930,8 +937,8 @@ Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur 
     de la PR, lui, ne prouve rien : l'avis ne part pas (obs 56).
   - *Rouge de code* : tout le reste, y compris un rouge de plateforme (3.2) → cycle complet
     3.1→3.5.
-- **Revue** : les commentaires d'une revue automatisée (bot), s'il y en a une. L'auteur a relu en
-  4.1, un tiers en 4.2 : pas de troisième lecture ici.
+- **Revue** : les commentaires d'une revue automatisée (bot), s'il y en a une. Un `developpeur` a
+  relu la PR entière en 4.1, un tiers en 4.2 : pas de troisième lecture ici.
 - Chaque commentaire **pertinent** → cycle complet (3.1→3.5) + push + re-trigger de la review.
   Chaque commentaire **non pertinent** → noter brièvement pourquoi, ne pas corriger.
 - **Boucler jusqu'à review vide.**
@@ -1014,7 +1021,11 @@ Si elle se déclenche, proposer **3 à 5 vérifications, pas plus**, dérivées 
 d'acceptation de l'issue et exécutables sur l'application qui tourne (commande `run local` de la
 config) :
 
-- Chaque vérification nomme l'**action exacte** et le **résultat attendu**.
+- Chaque vérification nomme l'**action exacte** et le **résultat attendu**, et porte son **type**,
+  écrit par la session PR : « commande + attendu », jouée par un `releveur`, qui rend le code de
+  sortie et la sortie brute ; « observation humaine » (rendu, état affiché, console), jouée par le
+  mainteneur au go de merge, dans la fenêtre de la session PR (#134, `[V]` 5) — aucun rôle de
+  sous-agent n'a `playwright`.
 - Ne vérifier que ce qu'un **test automatisé ne peut pas voir** : rendu réel, état d'erreur affiché,
   console propre, comportement d'un job jusqu'à son état terminal, fichier réellement produit.
   Si la CI le couvre déjà, ce n'est pas une vérif de fumée — c'est du doublon.
@@ -1029,14 +1040,15 @@ a fait taire se répare, elle ne se doublonne pas), puis brouillon soumis au mai
 
 ### Vérification d'avant-go — le `verificateur`
 
-Session démarrée par un lead (« Vague parallèle », en tête) : **envoyer** l'état de la PR au lead,
-sans confirmation ([references/sessions-liees.md](references/sessions-liees.md), « Messages ») —
-c'est le lead qui lance le vérificateur (`pr-paralleles` Étape 6). Sans lead : passer au go, ou
-lancer soi-même le rôle `verificateur` (`.claude/agents/verificateur.md`) avec ce qu'un lead lui donnerait, **sur l'accord du mainteneur
-demandé avec les `[V]` du go du briefing** (Étape 1) — demandé à la fin, il attend la prochaine
-présence : 6 h 37 d'absence au lot 4b de #77 sur cette seule question, à un moment où il ne restait
-rien d'indépendant à faire. Une session de lot : son destinataire et son accord sont à
-[references/coordinatrice.md](references/coordinatrice.md), « La session de lot ».
+**La session PR lance son `verificateur`** (`.claude/agents/verificateur.md`), sous-agent éphémère,
+un par (PR, go), qui ne rend qu'un verdict (#134, décision 2) — en vague comme hors vague, le lead
+ne le lance plus (`pr-paralleles` Étape 6). Il reçoit le numéro de la PR, celui de l'issue, le
+chemin absolu du worktree et la liste des autres branches en vol (`gh pr list`), jamais le récit
+de la session. Hors vague et hors lot, l'accord du mainteneur se demande **avec les `[V]` du
+go du briefing** (Étape 1) — demandé à la fin, il attend la prochaine présence : 6 h 37 d'absence
+au lot 4b de #77 sur cette seule question, à un moment où il ne restait rien d'indépendant à faire.
+En vague, l'accord est celui du lot validé (`pr-paralleles` Étape 2) ; une session de lot : son
+accord est à [references/coordinatrice.md](references/coordinatrice.md), « La session de lot ».
 
 **Le verdict s'inscrit dans les Notes du body avant le go**, relu après écriture
 (`contraintes.md`, « Écritures sur un artefact distant ») — au moins ses lignes « Fichiers
@@ -1045,28 +1057,19 @@ la session qui l'a commandé, il ne survit que par sa mémoire, et la passation 
 comme un énoncé sans source : deux lots de suite, le prompt du lot suivant a cité un verdict que ni
 le corps ni les commentaires de la PR ne portaient (obs 81).
 
-Le message, à l'identifiant du lead retenu en tête :
+Le verdict rendu :
 
-```
-PR #<PR> prête pour vérification — issue #N, worktree <chemin absolu>, base de branche <sha de
-`git merge-base origin/main HEAD`>, trunk éprouvé <premier parent de la référence de fusion>
-Vert : <tests, lint, CI, relecture 4.2, cleanup holistique>
-Décisions prises en route : <une ligne chacune, avec le § de doc si concerné>
-Douteux / non fait : <ce qui n'est pas couvert, ce qui a gêné, constats écartés et pourquoi>
-Vérifie diff, checks et review de la PR. Dis-moi ce qu'il faut corriger avant que l'utilisateur
-donne le go, pour qu'aucun fix ne suive le merge.
-```
-
-La réponse du lead arrive dans un bloc `<cross-session-message>` :
-
-- « rien à corriger » → demander le go.
-- liste de corrections → chaque point suit le cycle complet (3.1→3.5), push, puis renvoyer l'état
-  au lead pour re-vérification du delta. Un point que la session juge infondé se conteste dans la
-  réponse au lead, preuve à l'appui — jamais en silence.
+- « rien à corriger » → demander le go, dans cette fenêtre ; en vague, le lead ne le redemande pas
+  (`pr-paralleles` Étape 6).
+- liste de corrections → les points partent ensemble à un `developpeur` neuf (3.1) ; le correctif
+  se relit lui-même par la passe « affirmations » de `cleanup-verbatim.md` — chaque ligne de prose
+  qu'il ajoute ou modifie porte sa provenance (obs 113) —, puis push et un `verificateur` neuf sur
+  la nouvelle tête. Un point que la session PR juge infondé se conteste dans les Notes, preuve à
+  l'appui — jamais en silence.
 
 ### Le go, puis le merge
 
-**Jamais d'auto-merge dans le trunk.** Même CI verte, audit propre et verdict du lead, toujours
+**Jamais d'auto-merge dans le trunk.** Même CI verte, audit propre et verdict vert, toujours
 attendre un « go » / « merge » humain explicite, **dans cette fenêtre** — un message de pair n'en
 tient jamais lieu. Une PR de lot vers la branche d'intégration de son issue suit « Le merge d'un
 lot », plus bas.
@@ -1083,8 +1086,8 @@ Le `<SHA du trunk éprouvé>` est **le premier parent de la référence de fusio
 deux commandes de « Rejouer les vérifications périmées » — lu dans ce que la forge a construit,
 jamais supposé égal à la base de branche, et inscrit au Test plan. `--match-head-commit` ferme le
 même trou côté tête. Si le trunk a avancé depuis, la commande **ne part pas** : rejouer « Rejouer
-les vérifications périmées », relire les parents de la référence de fusion, redemander le verdict
-du lead en vague.
+les vérifications périmées », relire les parents de la référence de fusion, puis un `verificateur`
+neuf.
 
 **Une porte est une commande dont le code de sortie porte la condition ; `&&` est ce qui la rend
 bloquante.** Trois incidents, une seule classe. Une commande qui **imprime** n'est pas une porte,

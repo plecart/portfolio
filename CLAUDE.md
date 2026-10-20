@@ -94,7 +94,7 @@ n'est pas choisi par tâche, il est choisi par rôle** au moment de créer l'éq
 | `relecteur` | Opus, effort `medium` | la relecture à contexte vierge d'un diff (`cycle-pr` 4.2), seul, dans son propre worktree |
 | `executant` | Sonnet, effort `high` | codage et commit d'une tranche entièrement spécifiée (`xhigh` à l'appel quand elle écrit des tests), cartographie du code, passes mécaniques, mise en place d'`init-projet` |
 | `releveur` | Haiku, effort `medium` | relevés sans décision : tests, lint, format, croisements, édits verbatim, écritures distantes verbatim |
-| `verificateur` | Opus, effort `medium` | la vérification d'avant-go d'une PR (`pr-paralleles` Étape 6), **éphémère, un par (PR, go)**, sans worktree et sans lancer de commande du projet |
+| `verificateur` | Opus, effort `medium` | la vérification d'avant-go d'une PR (`cycle-pr` Étape 7), **éphémère, un par (PR, go)**, sans worktree et sans lancer de commande du projet |
 
 **Ce qui rend un rôle éligible au modèle le moins cher : un mandat sans aucune décision** — pas
 une tâche qui paraît facile. Le mandat (ce que le rôle peut trancher) et l'effort (la profondeur
