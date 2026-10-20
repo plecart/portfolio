@@ -1137,15 +1137,36 @@ rouge lui-même suffise n'est pas mesuré.
 
 ## Étape 8 — Après le merge : clôture propre, puis répercussions
 
+**Les écritures de la clôture passent par la famille « écriture distante relue »** — un script à
+sous-commandes, Python 3 sans dépendance, lancé depuis le dépôt :
+
+```
+python <répertoire de ce skill>/scripts/ecriture-relue.py <sous-commande> …
+```
+
+Il lit le texte de la forge en octets, l'écrit, puis le relit et compare le texte **entier** à
+l'attendu : une relecture qui ne compare qu'une ancre ou une longueur laisse passer une conversion
+des fins de ligne qui les préserve (obs 106). Sortie 0 : écrit et relu, ou rien à écrire ;
+1 : refus sans rien écrire, ou relecture non conforme — motif en une ligne ; 2 : appel mal formé.
+**Ce qu'il ne couvre pas** : il ne choisit pas les cases, la session PR les nomme ; il ne compte
+pas les PR liées, la requête GraphQL du cas découpé reste ; publier un commentaire, poser un
+milestone, créer une issue viennent avec les lots suivants de #134 (4b, 6 à 8). Toute écriture
+qu'il ne fait pas reste sous la règle « Écritures sur un artefact distant » de
+`.claude/rules/contraintes.md`, relue à la main.
+
 Le merge **clôt l'issue liée** (via `Closes #N`). **Retirer aussitôt son label d'état** —
 `ready-for-agent` ou `ready-for-human`, selon le mapping de `.claude/pipeline.config.md` :
-`gh issue edit <N> --remove-label <label>`. Une issue fermée ne porte **aucun** rôle d'état ; le
-laisser fait apparaître des issues closes dans les files de `triage` et de `pr-paralleles`.
+`ecriture-relue.py label <N> --remove <label>`. Une issue fermée ne porte **aucun** rôle d'état ;
+le laisser fait apparaître des issues closes dans les files de `triage` et de `pr-paralleles`.
 Le label de catégorie (`bug` / `enhancement`) et le thème restent.
 
 Puis **cocher les critères d'acceptation soldés**, dans le **corps** de l'issue *et* dans le
 commentaire de **brief** (`- [ ]` → `- [x]`) : ils ont été vérifiés à l'Étape 7, il ne reste qu'à
-l'enregistrer là où un lecteur le cherche. Un critère atteint sous une forme **amendée** se coche
+l'enregistrer là où un lecteur le cherche. Le corps par
+`ecriture-relue.py checkbox patch <N> --case <ancre> …`, puis le brief par
+`ecriture-relue.py brief patch <N> --case <ancre> …`, une ancre par critère : un extrait de sa
+ligne qu'aucune autre case ne porte. Une ancre introuvable ou ambiguë refuse l'appel entier sans
+rien écrire ; une case déjà cochée se dit. Un critère atteint sous une forme **amendée** se coche
 quand même — l'amendement est tracé au journal de spec du corps. Le brief d'une issue **close** est
 un artefact daté : on coche ses cases, on ne réécrit pas son texte. (Tant que l'issue était
 ouverte, c'était l'inverse : une réconciliation `repercussions` qui falsifiait une de ses lignes
@@ -1158,9 +1179,10 @@ Puis **nettoyer la session de relecture** — archivage sur l'accord donné au g
 **Cas découpé : reposer le lien des lots précédents.** GitHub ne lie une PR à une issue que par un
 mot-clé de fermeture, et seul le lot final en portait un (Étape 2) ; sans ce geste, l'issue
 n'affiche qu'une PR sur les k qu'elle a coûté. Une fois l'issue close, ajouter en fin de body de
-**chaque lot précédent** mergé dans le trunk (`gh pr edit <n> --body-file`) — sur une issue close,
-le mot-clé ne change aucun état ; une PR de lot vers une branche d'intégration n'en reçoit pas, il
-y serait ignoré :
+**chaque lot précédent** mergé dans le trunk le bloc ci-dessous, écrit dans un fichier :
+`ecriture-relue.py issue edit <n> --append <fichier>`, qui le sépare du body par une ligne vide —
+le body d'une PR s'écrit par l'endpoint des issues. Sur une issue close, le mot-clé ne change aucun
+état ; une PR de lot vers une branche d'intégration n'en reçoit pas, il y serait ignoré :
 
 ```markdown
 *Rattachement a posteriori (<date>) : lot k/n de #<N>. L'issue a bien été fermée par le lot
