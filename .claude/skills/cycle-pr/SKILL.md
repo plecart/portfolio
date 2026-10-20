@@ -557,8 +557,8 @@ PR le confie à un `developpeur` neuf, qui ne rend que des commits ; son brief e
 (N affirmations, k établies, N−k non vérifiées), que la session PR inscrit dans les Notes avant la
 première vérification d'avant-go (obs 113). Puis la seconde passe 4.2.
 
-**4.2 Relecture par un contexte vierge.** Le cleanup holistique est fait par la session qui a
-écrit le code, avec les hypothèses qui l'ont produit ; il ne les met pas à l'épreuve. Le diff est donc
+**4.2 Relecture par un contexte vierge.** Le cleanup holistique est fait sous le brief de la
+session PR, avec les hypothèses qui ont produit le code ; il ne les met pas à l'épreuve. Le diff est donc
 relu par un lecteur qui ne les a pas : l'équipier **`relecteur`** (`.claude/agents/relecteur.md`),
 qui porte sa consigne complète — ce qu'il reçoit, ce qu'il vérifie, ce qu'il rend. Un rôle ajouté
 dans `.claude/agents/` pendant cette session n'existe pas encore pour l'outil Agent → repli
@@ -610,7 +610,7 @@ et marqueur de provenance.
 **Un seul relecteur pour la PR — les deux passes et la relance.** Pas de relecteur par
 préoccupation, pas de contre-vérificateur par constat, pas de workflow : chaque agent de plus
 repaye le contexte entier et rend ses constats à la même distance du code. Un constat bloquant se
-re-mesure par l'auteur, dans son arbre, en une commande, avant d'éditer sur sa base — jamais par
+re-mesure par la session PR, dans son arbre, en une commande, avant d'éditer sur sa base — jamais par
 un agent de plus.
 
 **La seconde passe revient au relecteur de la première, par `SendMessage`** — pas à un agent
