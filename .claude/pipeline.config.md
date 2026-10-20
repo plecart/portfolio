@@ -201,7 +201,11 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
                                                   # populations — elle ne remplace rien.
                                                   # Son rapport exigé comme seule sortie clôt
                                                   # le tour de la session de relecture, sans
-                                                  # coût (`cycle-pr` 4.2, obs 94).
+                                                  # coût (`cycle-pr` 4.2, obs 94). Le niveau
+                                                  # passé n'est pas garanti : `medium` a tourné
+                                                  # en `high` le 2026-10-20 (PR #141, cause non
+                                                  # vérifiée) — la session de relecture rapporte
+                                                  # celui de l'en-tête rendu.
 - sécurité     : /security-review                 # même nature. Lancée par la session de
                                                   # relecture (par la session PR seulement en
                                                   # repli), **seulement** si le diff touche
@@ -227,7 +231,16 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
                                                   # (`git diff origin/HEAD...`) — absent, elle
                                                   # échoue avant toute analyse ; `git remote
                                                   # set-head origin main` le pose (mesuré et
-                                                  # posé dans ce dépôt le 2026-10-14). Autre
+                                                  # posé dans ce dépôt le 2026-10-14). Elle
+                                                  # diffe donc le trunk : sur une PR de lot,
+                                                  # toute la branche d'intégration depuis lui —
+                                                  # 35 commits et 28 fichiers pour une plage
+                                                  # de 2 commits et 4 fichiers, mesuré le
+                                                  # 2026-10-20 dans la session de relecture de
+                                                  # la PR #141, répertoire courant = son
+                                                  # worktree détaché sur la tête, `origin/HEAD`
+                                                  # vers `origin/main` : ses constats hors de la
+                                                  # plage s'écartent. Autre
                                                   # mesure, même jour, au commit `b5b0b2a` de
                                                   # la PR #75 (17 fichiers, dont 7 hors tests et
                                                   # documentation : admin, téléversement,

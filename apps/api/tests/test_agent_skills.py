@@ -2660,11 +2660,16 @@ RELECTEUR_ROLE = ".claude/agents/relecteur.md"
 
 # Le protocole de la session de relecture et celui qu'elle suit — un énoncé par geste, chacun
 # épinglé sur sa moitié restrictive autant que sur celle qui fait (critère en tête de
-# `INVARIANTS_DU_CONTEXTE_COURT`, obs 126). **Population** : les énoncés de `session-relecture.md`
-# et les phrases de `relecteur.md` que ce lot réécrit — 33 énoncés, 33 épinglés, chacun vu rouge en
-# retirant sa moitié restrictive (mutations jouées à l'écriture, Notes de la PR #141) ; l'ordre du
-# réveil est gardé à part (`ORDRE_DU_REVEIL`), et la porte d'ancêtre du repli par
-# `PORTES_PRESCRITES`.
+# `INVARIANTS_DU_CONTEXTE_COURT`, obs 126). **Population**, comptée avant le correctif de la
+# passe 1 (relecture de la PR #141, I3 : les 33 premières ancres étaient un échantillon, cinq
+# mutations VERTES) — le texte normalisé de `session-relecture.md` découpé en phrases (`[.;:]`
+# suivi d'un blanc) : 55 morceaux sur `a64717d`, 26 qui tenaient une ancre, 29 nus ; des 29, 12
+# sont un intitulé, un numéro de liste, un relevé daté ou un « non mesuré », 17 prescrivent et
+# reçoivent ici leur ancre ; 4 phrases ancrées laissaient 6 éléments nus (`source_branch`,
+# `name`, `--detach`, les piles, « un seul sous-agent », `unlock` d'abord), ancrés aussi. Dans
+# `relecteur.md`, les 13 phrases que ce lot réécrit. Chaque ancre vue rouge en retirant sa moitié
+# restrictive ou son élément (Notes de la PR #141) ; l'ordre du réveil est gardé à part
+# (`ORDRE_DU_REVEIL`), la porte d'ancêtre du repli par `PORTES_PRESCRITES`.
 INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
     "source-unique": (SESSION_RELECTURE_REF, "y renvoient sans le recopier"),
     "demarrage-tour-du-mainteneur": (
@@ -2762,17 +2767,173 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         RELECTEUR_ROLE,
         "jamais celui de la session PR, qui vit aussi là",
     ),
-    "relecteur-n-ecrit-rien-du-depot": (RELECTEUR_ROLE, "Tu n'écris aucun fichier du dépôt"),
+    "relecteur-n-ecrit-rien-du-depot": (
+        RELECTEUR_ROLE,
+        "Tu n'écris aucun fichier du dépôt hors d'une mutation restaurée",
+    ),
     "relecteur-seule-sous-tache": (
         RELECTEUR_ROLE,
         (
-            "aucune session démarrée : la seule sous-tâche admise est celle que `/security-review`"
-            " prescrit"
+            "aucune session démarrée : en session, la seule sous-tâche admise est celle que"
+            " `/security-review` prescrit"
         ),
     ),
     "relecteur-ne-merge-pas": (
         RELECTEUR_ROLE,
         "Tu ne commits pas, tu ne pousses pas, tu ne merges pas, tu ne corriges pas",
+    ),
+    # Passe 1 de la relecture de la PR #141 — I1 : `origin/HEAD` n'est pas la base d'une PR de lot.
+    "securite-constats-hors-plage-ecartes": (
+        SESSION_RELECTURE_REF,
+        (
+            "elle relit aussi ce que la branche d'intégration a déjà reçu, et ses constats hors de la"
+            " plage s'écartent"
+        ),
+    ),
+    "config-securite-constats-hors-plage-ecartes": (
+        ".claude/pipeline.config.md",
+        "vers `origin/main` : ses constats hors de la plage s'écartent",
+    ),
+    # I2 : le niveau passé à `/code-review` n'est pas garanti.
+    "code-review-niveau-lu-dans-l-en-tete": (
+        SESSION_RELECTURE_REF,
+        (
+            "le niveau qu'elle applique se lit dans l'en-tête de son prompt rendu et se rapporte dans le"
+            " message de constats, la commande ne garantissant pas celui qu'on lui passe"
+        ),
+    ),
+    "config-relecture-niveau-non-garanti": (
+        ".claude/pipeline.config.md",
+        "Le niveau passé n'est pas garanti",
+    ),
+    # I3 : la population entière (comptage en tête de cette table).
+    "lue-a-chaque-reveil-dans-son-worktree": (
+        SESSION_RELECTURE_REF,
+        "par la session de relecture à chaque réveil, dans son worktree",
+    ),
+    "seule-source": (SESSION_RELECTURE_REF, "C'est la **seule** source de ce protocole"),
+    "source-branch-de-la-pr": (
+        SESSION_RELECTURE_REF,
+        "`source_branch` = la branche de la PR, déjà poussée",
+    ),
+    "nom-de-la-session": (SESSION_RELECTURE_REF, "`name: relecture-pr-<n>`"),
+    "contenu-du-brief": (
+        SESSION_RELECTURE_REF,
+        (
+            "Le brief nomme la PR, l'issue et sa base, donne le premier geste ci-dessous et renvoie à ce"
+            " fichier"
+        ),
+    ),
+    "premier-geste-detache": (
+        SESSION_RELECTURE_REF,
+        "`git fetch origin && git switch --detach origin/<branche de la PR>`",
+    ),
+    "piles-du-brief": (
+        SESSION_RELECTURE_REF,
+        "pour les piles que le brief nomme, `hooks` exceptée",
+    ),
+    "valeurs-de-k": (SESSION_RELECTURE_REF, "`<k>` vaut `1`, `2` ou `relance`"),
+    "plage-de-la-passe-1": (
+        SESSION_RELECTURE_REF,
+        "`<base>..<SHA>` à la passe 1, `<base>` étant `git merge-base origin/<base de la PR> HEAD`",
+    ),
+    "plage-de-la-passe-2": (
+        SESSION_RELECTURE_REF,
+        "`<SHA de fin de la passe 1>..<SHA>` à la passe 2",
+    ),
+    "plage-de-la-relance": (
+        SESSION_RELECTURE_REF,
+        "`<sha avant>..<sha après>` des commits de correction à la relance",
+    ),
+    "constats-precedents-dans-le-reveil": (
+        SESSION_RELECTURE_REF,
+        (
+            "À partir de la passe 2, le message porte aussi les constats précédents, corrigés (commit,"
+            " test qui tient la fermeture) ou écartés (raison)"
+        ),
+    ),
+    "deux-verifications-dans-l-ordre": (
+        SESSION_RELECTURE_REF,
+        "Les deux vérifications de `relecteur.md` — où suis-je, puis détachement sur le SHA reçu",
+    ),
+    "commentaires-relus": (
+        SESSION_RELECTURE_REF,
+        "Ses commentaires se relisent sur la PR après écriture",
+    ),
+    "protocole-sans-redite-des-commandes": (
+        SESSION_RELECTURE_REF,
+        "ce qu'une commande vient de trouver n'y est plus à chercher",
+    ),
+    "constats-a-l-emetteur-du-reveil": (
+        SESSION_RELECTURE_REF,
+        (
+            "Le message de constats à l'émetteur du réveil — la session PR, ou son relais —, par"
+            " `SendMessage`"
+        ),
+    ),
+    "forme-des-constats": (
+        SESSION_RELECTURE_REF,
+        (
+            "`constats passe <k> (<SHA court>) — <b> bloquants, <i> importants, <m> mineurs`, puis le"
+            " rapport que `relecteur.md` ordonne, les constats de chaque commande intégrée et les"
+            " observations candidates"
+        ),
+    ),
+    "commande-integree-peut-clore": (
+        SESSION_RELECTURE_REF,
+        "**Une commande intégrée peut clore le tour**",
+    ),
+    "branche-jamais-commitee-ancetre": (
+        SESSION_RELECTURE_REF,
+        "Une branche née de la PR et jamais commitée en est ancêtre quel que soit le trunk",
+    ),
+    "repli-un-seul-sous-agent": (
+        SESSION_RELECTURE_REF,
+        (
+            "Un seul sous-agent pour la PR : la seconde passe et la relance lui reviennent par"
+            " `SendMessage`, contexte intact"
+        ),
+    ),
+    "repli-trois-gestes": (SESSION_RELECTURE_REF, "Son worktree a trois gestes"),
+    "repli-retrait-par-qui-l-a-lance": (
+        SESSION_RELECTURE_REF,
+        "**Retrait — à la fermeture de la boucle**, par la session qui l'a lancé",
+    ),
+    "repli-unlock-d-abord": (SESSION_RELECTURE_REF, "`git worktree unlock` d'abord s'il refuse"),
+    "relecteur-protocole-de-session": (
+        RELECTEUR_ROLE,
+        (
+            "Tu suis ce protocole en **session de relecture**, démarrée par la session PR dans un"
+            " worktree de l'application"
+        ),
+    ),
+    "relecteur-plage-recue-au-reveil": (
+        RELECTEUR_ROLE,
+        (
+            "**À chaque réveil** — passe 1, passe 2, relance — tu reçois de la session PR la plage de"
+            " commits à relire"
+        ),
+    ),
+    "relecteur-ne-nait-pas-sur-le-sha": (
+        RELECTEUR_ROLE,
+        "Ton worktree ne naît pas sur le SHA à relire",
+    ),
+    "relecteur-rejoue-a-chaque-reveil": (
+        RELECTEUR_ROLE,
+        (
+            "**À chaque réveil** — seconde passe comme relance —, rejoue les deux gestes dans cet ordre"
+            " sur le SHA reçu"
+        ),
+    ),
+    "relecteur-sous-agent-sans-write": (RELECTEUR_ROLE, "Le sous-agent n'a pas de `Write`"),
+    "relecteur-retire-par-la-session-pr": (RELECTEUR_ROLE, "C'est la session PR qui le retire"),
+    "relecteur-rend-a-la-session-pr": (
+        RELECTEUR_ROLE,
+        "Tu rends à la session PR — par message en session",
+    ),
+    "relecteur-corriger-revient-a-la-session-pr": (
+        RELECTEUR_ROLE,
+        "Il ne contient pas celle de corriger, qui revient à la session PR",
     ),
     # Les renvois : chaque texte qui fait démarrer, réveiller ou nettoyer la session de relecture.
     "cycle-pr-question-du-go": (
@@ -2879,7 +3040,7 @@ ORDRE_DU_REVEIL = {
     ),
     "protocole-avant-le-message": (
         "4. Le protocole de `relecteur.md` sur la plage",
-        "5. Le message de constats au parent",
+        "5. Le message de constats à l'émetteur du réveil",
     ),
 }
 
