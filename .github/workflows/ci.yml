@@ -9,9 +9,11 @@
 # finirait par diverger du premier.
 #
 # Trois jobs, un par pile. Ils n'ont pas les mêmes prérequis — `uv`, Node, Docker — et les
-# séparer évite qu'un rouge de l'une masque un rouge d'une autre. Le job `infra` installe aussi
-# Node : les images copient le front compilé, qu'il compile lui-même plutôt que d'attendre le job
-# `web` (ADR 0014) ; et `uv`, pour les tests des images qu'il vient de construire. Un quatrième,
+# séparer évite qu'un rouge de l'une masque un rouge d'une autre. Sur une PR, `web` et `infra` ne
+# tournent que si le delta touche leurs fichiers : la première étape du job `api` le lit, et ils
+# partent à sa fin, même rouge (ADR 0017). Le job `infra` installe aussi Node : les images copient
+# le front compilé, qu'il compile lui-même plutôt que d'attendre le job `web` (ADR 0014) ; et `uv`,
+# pour les tests des images qu'il vient de construire. Un quatrième,
 # `publish`, ne tourne qu'après un push sur `main`, une fois les trois autres verts : il publie les
 # images sur GHCR. Un cinquième, `deploy`, les déploie ensuite sur le VPS, une fois celui-ci prêt.
 #
@@ -65,11 +67,30 @@ jobs:
     # dépendances, une branche déjà écrite — tourne dès l'ouverture.
     #
     # La condition sur `event_name` est nécessaire : sur un push vers `main`, l'objet
-    # `pull_request` n'existe pas.
+    # `pull_request` n'existe pas. Les jobs `web` et `infra` ne portent pas ce garde : ils
+    # attendent ce job, et ses sorties vides — job sauté — les sautent sur une PR.
     if: github.event_name != 'pull_request' || github.event.action != 'opened' || github.event.pull_request.draft == false
 
+    # Les jobs que le delta de la PR concerne, lus par `web` et `infra`.
+    outputs:
+      web: ${{ steps.jobs.outputs.web }}
+      infra: ${{ steps.jobs.outputs.infra }}
+
     steps:
+      # Profondeur 2 : sur une PR, le checkout est le commit de fusion, et `HEAD^1` la base qu'il
+      # combine — `HEAD^1..HEAD` est le delta de la PR. Sur un push vers `main`, ce ne serait que
+      # le dernier commit : `web` et `infra` n'y lisent pas la réponse.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      # Avant toute installation : un `uv sync` rouge ne cache pas le delta aux autres jobs.
+      # `shell: bash` lance `bash -eo pipefail` : sans lui, un `git diff` en échec rendrait `false`
+      # pour les deux jobs, en silence. La règle vit dans le script (ADR 0017).
+      - name: Jobs à lancer
+        id: jobs
+        shell: bash
+        run: git diff --name-only HEAD^1 HEAD | python3 infra/ci/changed_jobs.py >> "$GITHUB_OUTPUT"
 
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
 
@@ -104,8 +125,12 @@ jobs:
     name: Front — lint, types, tests, build, e2e, lighthouse, audit
     runs-on: ubuntu-latest
 
-    # Même garde que le job back : voir le commentaire ci-dessus.
-    if: github.event_name != 'pull_request' || github.event.action != 'opened' || github.event.pull_request.draft == false
+    # Après le job `api`, qui a lu le delta. Sur une PR, seulement si le delta touche ses fichiers
+    # (`infra/ci/changed_jobs.py`) ; sur un push vers `main`, toujours. `!cancelled()` : le job
+    # part même quand `api` rougit — un rouge du back ne masque pas celui-ci —, mais pas quand un
+    # push suivant a annulé le run. `apps/api/tests/test_ci_declencheurs.py` tient ces réglages.
+    needs: api
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.api.outputs.web == 'true') }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -159,8 +184,9 @@ jobs:
     name: Infra — configuration Compose, images, tests des images, scan
     runs-on: ubuntu-latest
 
-    # Même garde que les deux autres jobs : voir le commentaire du job back.
-    if: github.event_name != 'pull_request' || github.event.action != 'opened' || github.event.pull_request.draft == false
+    # Même conditionnement que le job `web` : voir son commentaire.
+    needs: api
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.api.outputs.infra == 'true') }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -178,7 +204,7 @@ jobs:
         run: make compose-config
 
       # Le front compilé entre dans les images (ADR 0014) : `make build` le compile s'il manque.
-      # Deux compilations par run, ici et dans `web`, mais aucun job n'attend un autre.
+      # Deux compilations par run, ici et dans `web`, mais ce job n'attend pas `web`.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: apps/web/.nvmrc
