@@ -88,8 +88,10 @@ Produire un briefing écrit AVANT de créer la branche :
 - **Questions résiduelles** — découpage, format des données, transitions d'état, comportements,
   edge cases — **chacune avec sa voie** (`contraintes.md`, règle d'or) : une `[T]` se tranche
   ici même, avec sa source, et rejoint les décisions verrouillées ; les `[V]` se posent toutes
-  ensemble, au go du briefing — hors vague, l'accord pour lancer soi-même le `verificateur`
-  d'avant-go (Étape 7) en fait partie ; une `[C]` arrête.
+  ensemble, au go du briefing — l'accord pour démarrer sa session de relecture et l'archiver à
+  l'Étape 8 en fait partie, puisque `start_session` ne part que dans ce tour
+  ([references/session-relecture.md](references/session-relecture.md)), et hors vague
+  l'accord pour lancer soi-même le `verificateur` d'avant-go (Étape 7) ; une `[C]` arrête.
 
 Lever les incertitudes **maintenant** : une `[V]` découverte après cinq commits coûte une
 demi-journée d'attente ; une `[T]` ne se pose jamais, elle se décide — la plupart appellent la
@@ -174,9 +176,9 @@ ne lisent que l'issue (obs 44).
 la session devient la **coordinatrice** de ses lots : elle n'écrit pas de code, et son go — le go
 du découpage — fait démarrer les sessions de lot
 ([references/coordinatrice.md](references/coordinatrice.md)). Une issue à un seul lot ne change
-rien : la session porte le cycle elle-même et délègue le code (3.1). Une session de lot, elle,
-n'attend le go ci-dessous que
-sous la condition de la même référence, « La session de lot ».
+rien : la session porte le cycle elle-même et délègue le code (3.1). Une session de lot attend
+le go ci-dessous dans sa fenêtre comme toute session PR : elle y démarre sa session de relecture
+(même référence, « La session de lot »).
 
 Attendre un **« go » explicite**, puis créer la branche — trunk-based depuis `main`, derrière une
 **porte**, c'est-à-dire une commande dont le code de sortie porte la condition :
@@ -562,8 +564,11 @@ première vérification d'avant-go (obs 113). Puis la seconde passe 4.2.
 
 **4.2 Relecture par un contexte vierge.** Le cleanup holistique est fait sous le brief de la
 session PR, avec les hypothèses qui ont produit le code ; il ne les met pas à l'épreuve. Le diff est donc
-relu par un lecteur qui ne les a pas : l'équipier **`relecteur`** (`.claude/agents/relecteur.md`),
-qui porte sa consigne complète — ce qu'il reçoit, ce qu'il vérifie, ce qu'il rend. Un rôle ajouté
+relu par un lecteur qui ne les a pas : la **session de relecture** de la PR, que la session PR
+démarre au go du briefing, réveille par message et nettoie — protocole dans
+[references/session-relecture.md](references/session-relecture.md) —, et qui suit
+`.claude/agents/relecteur.md` : ce qu'elle reçoit, ce qu'elle vérifie, ce qu'elle rend. Le
+sous-agent `relecteur` en est le repli écrit (même référence, « Repli »). Un rôle ajouté
 dans `.claude/agents/` pendant cette session n'existe pas encore pour l'outil Agent : le repli
 `general-purpose` ne vaut que pour un rôle sans liste `tools:`, et `relecteur` en a une — un rôle à
 outils réduits se lance depuis une session neuve (`CLAUDE.md`, « Orchestration »), que la session PR
@@ -584,54 +589,53 @@ qu'elle couvre et ce qu'elle ne voit pas — jamais de mémoire :
 1. **`lint`, `typecheck` et la suite** verts, et la ligne **validation** si le delta touche
    `.claude/` ou `CLAUDE.md` — un `releveur` lancé par la session PR, qui rend le verdict et les
    lignes en échec ; sur zéro test collecté, la sortie brute du lanceur (3.2).
-2. La ligne **relecture**, en balayage mécanique du diff. C'est la session PR qui l'invoque
-   elle-même — à la différence de `/code-review ultra`, qui demande un geste du mainteneur et
-   reste hors pipeline.
+2. La ligne **relecture**, en balayage mécanique du diff. C'est la session de relecture qui
+   l'invoque, à chaque réveil — à la différence de `/code-review ultra`, qui demande un geste du
+   mainteneur et reste hors pipeline.
 3. La ligne **sécurité**, quand le diff touche une zone sensible ou une surface exposée
-   (section « Périmètre » de la config). Sinon, le dire en une ligne et passer.
+   (section « Périmètre » de la config), jouée par la session de relecture. Sinon, le dire en une
+   ligne et passer. Un échec d'outillage de la porte — précondition absente, commande qui échoue
+   avant toute analyse — se dit dans « Relecture indépendante » du body, jamais en saut
+   silencieux (obs 84).
 
-**Ces deux commandes ne terminent pas le tour.** Leur prompt exige une réponse finale faite de
-leur seul rapport — `/security-review` : « Your final reply must contain the markdown report and
-nothing else » ; `/code-review` : son outil de rapport, seule sortie. Sous `cycle-pr`, la consigne
-vaut pour la forme du rapport, pas pour l'arrêt du cycle : la session en tire ses constats et
-enchaîne dans le même tour ; les arrêts légitimes restent ceux de l'Étape 3 (obs 94, 98).
+**Ces deux commandes closent un tour — celui de la session de relecture.** Leur prompt exige
+une réponse finale faite de leur seul rapport — `/security-review` : « Your final reply must
+contain the markdown report and nothing else » ; `/code-review` : son outil de rapport, seule
+sortie. Jouées par la session PR, elles ont arrêté son cycle trois fois, la dernière après qu'une
+phrase les avait bornées (obs 94, 98, 115) ; dans la session de relecture, l'arrêt ne coûte rien
+(`session-relecture.md`, « Réveil »). En repli seulement, la session PR les joue : la consigne vaut
+alors pour la forme du rapport, pas pour l'arrêt du cycle, et elle enchaîne dans le même tour.
 
 Ces portes sont **additives**. Aucune ne remplace le prompt de
 `.claude/rules/cleanup-verbatim.md`, que la règle exige mot pour mot, ni la relecture à contexte
 vierge : elles retirent du plateau du relecteur ce qu'un outil sait trouver, pour qu'il dépense
-son contexte sur ce qu'aucun outil ne voit — les hypothèses de l'auteur et les affirmations
-attachées au code. Mesuré sur le delta de cette PR : la relecture mécanique a rendu **un** défaut
-de correction que les deux passes à contexte vierge n'avaient pas vu, et **zéro** constat sur la
-prose de protocole, où vivaient leurs neuf constats. Une porte neuve s'inscrit dans la config avec
-ses deux populations — ce qu'elle couvre, ce qu'elle rate — avant d'être rendue obligatoire.
+son contexte sur ce qu'aucun outil ne voit — les hypothèses qui ont produit le code et les
+affirmations attachées au code. Mesuré sur le delta de cette PR : la relecture mécanique a rendu
+**un** défaut de correction que les deux passes à contexte vierge n'avaient pas vu, et **zéro**
+constat sur la prose de protocole, où vivaient leurs neuf constats. Une porte neuve s'inscrit dans
+la config avec ses deux populations — ce qu'elle couvre, ce qu'elle rate — avant d'être rendue
+obligatoire.
 
-À la première passe, le relecteur reçoit **uniquement** le corps de l'issue et son brief d'agent
-(ou le briefing de l'Étape 1), la plage `<base>..HEAD` et le SHA complet de tête. À la seconde, il
-a déjà tout cela : il ne reçoit que la plage `<sha de fin de la première passe>..HEAD` et les
-constats de la première, corrigés ou écartés. Il rend chaque critère d'acceptation ✅ / ❌ / ⚠️
-avec preuve, puis ses constats classés bloquant / important / mineur, chacun avec fichier, raison
-et marqueur de provenance.
+La session PR **pousse**, puis réveille la session de relecture par le message de
+`session-relecture.md` (« Réveil »), qui porte la plage et le SHA. À la première passe, celle-ci
+ne lit **que** le corps de l'issue et son brief d'agent (ou le briefing de l'Étape 1), la plage
+`<base>..HEAD` et le SHA complet de tête. À la seconde, elle a déjà tout cela : elle ne reçoit que
+la plage `<sha de fin de la première passe>..HEAD` et les constats de la première, corrigés ou
+écartés. Elle rend chaque critère d'acceptation ✅ / ❌ / ⚠️ avec preuve, puis ses constats
+classés bloquant / important / mineur, chacun avec fichier, raison et marqueur de provenance.
 
-**Un seul relecteur pour la PR — les deux passes et la relance.** Pas de relecteur par
-préoccupation, pas de contre-vérificateur par constat, pas de workflow : chaque agent de plus
+**Une seule session de relecture pour la PR — les deux passes et la relance.** Pas de relecteur
+par préoccupation, pas de contre-vérificateur par constat, pas de workflow : chaque agent de plus
 repaye le contexte entier et rend ses constats à la même distance du code. Un constat bloquant se
 re-mesure par la session PR, dans son arbre, en une commande, avant d'en écrire le brief — jamais par
 un agent de plus.
 
-**La seconde passe revient au relecteur de la première, par `SendMessage`** — pas à un agent
-neuf. Son contexte est intact : il a déjà lu le brief, les critères et le socle, et son worktree
-est en place ; il ne reçoit donc que la nouvelle plage et les constats de la première passe,
-corrigés ou écartés. C'est le même argument que l'Étape 4.2 tient déjà pour la relance, et il
-vaut autant pour la passe : au lot 1b de #77, la passe 2 confiée à un agent neuf a repayé **un
-contexte entier** pour un diff que le relecteur de la passe 1 connaissait déjà. Le coût se
-compare **par contact** — passe, reprise, relance —, tel que `bilan-session.py` le lit dans le
-transcript du relecteur : la notification de fin de son lancement ne porte que le contexte en
-fin de premier contact, pas une consommation.
-
-Repli vers un **agent neuf** dans un seul cas : le relecteur n'est plus joignable (worktree
-disparu, session perdue, agent terminé). Il part alors avec la vérification d'isolation
-ci-dessous en tête de son prompt, parce qu'un agent repris hérite d'un répertoire courant qui
-n'est pas forcément le sien.
+**La seconde passe revient à la session de la première, réveillée par message** — jamais à une
+session ni à un agent neufs. Son contexte est intact : elle a déjà lu le brief, les critères et le
+socle, et son worktree est en place. Au lot 1b de #77, la passe 2 confiée à un agent neuf a
+repayé **un contexte entier** pour un diff que le relecteur de la passe 1 connaissait déjà. Le
+coût se compare **par contact** — passe, reprise, relance —, tel que `bilan-session.py` le lit
+dans son transcript.
 
 **En deux temps, jamais par commit.** Une première passe dès qu'un commit pose un **invariant que
 les commits suivants supposeront vrai** — par exemple le contrat d'infrastructure : image, point
@@ -644,55 +648,14 @@ constante et deux dépendances, et les invariants non gardés arrivent plus tard
 passe se fond dans un commit qui restait à écrire ; un constat qui arrive après le passage en
 ready coûte un run de CI complet et le rejeu des vérifications manuelles (Étape 7).
 
-**Un worktree de relecture par PR, jamais l'arbre de cette session.** Éprouver un test
+**Un worktree de relecture par PR, jamais l'arbre de la session PR.** Éprouver un test
 sérieusement, c'est casser la garde qu'il protège et la voir rougir — donc **modifier le code de
-production**, puis le restaurer ; dans l'arbre partagé, cela gèlerait l'auteur pendant toute la
-passe, sur un arbre qui bouge. L'auteur continue ici pendant ce temps, sans rien attendre. Un
-relecteur qui commit ou pousse depuis ce worktree a dépassé son rôle.
-
-Trois gestes, et le dernier a un moment :
-
-- **Naissance.** Le harnais crée le worktree à l'appel (`isolation: worktree` du rôle), mais
-  depuis `origin/<trunk>` — `worktree.baseRef` par défaut, mesuré — et non sur la tête de la PR.
-  La session transmet donc le **SHA complet** de tête, et le relecteur s'y détache ; son rôle
-  ordonne les deux gestes, isolation d'abord, détachement ensuite, parce que `git checkout` est
-  lui-même une écriture. Un relecteur qui ne se détache pas relit le trunk et conclut sur un
-  diff vide.
-- **Réutilisation.** Le même worktree sert aux **deux passes** et à la relance, puisque c'est le
-  même relecteur : à chaque reprise, il rejoue les deux gestes sur la nouvelle tête. Rien à
-  récupérer du distant, le worktree partage le dépôt d'objets du clone principal.
-- **Retrait — à la fermeture de la boucle.** **La session qui a lancé le relecteur** le retire,
-  lui et sa branche — jamais « celui qui a créé le worktree », qui est le harnais et ne lance
-  aucune commande, ni « le lead », qui sous `pr-paralleles` est une autre session que celle qui
-  appelle. Le harnais verrouille ce worktree (`.git/worktrees/<id>/locked`, avec le pid) pendant
-  l'**invocation initiale** de l'agent, et pas ensuite : mesuré deux fois sur le même worktree —
-  verrou présent pendant la première passe, **absent pendant une passe reprise, agent vivant et
-  en train d'exécuter des commandes**. **L'absence de verrou ne dit donc rien de la vitalité de
-  l'agent** : ne jamais la lire comme « l'agent est parti, le retrait est sans risque », c'est le
-  raisonnement qu'obs 74 a payé. Le retrait doit tenir les deux états :
-  `git worktree remove <chemin>`, et s'il refuse pour cause de verrou,
-  `git worktree unlock <chemin>` puis `remove`. Puis
-  `git branch -d worktree-agent-<id>` : mesuré sur un retrait réel, `-d` suffit — la branche
-  rend « was <sha du trunk> », donc elle n'a jamais divergé, le relecteur ne commitant pas. Et
-  ce même relevé est la troisième mesure du point « Naissance » : la branche pointe sur le
-  trunk, pas sur la tête de la PR.
-
-  Le moment : **après la relance, ou après le dernier constat traité s'il n'y en a pas** — jamais
-  à la lecture d'un rapport. Le retirer **termine** l'agent : « This agent cannot be resumed: its
-  worktree no longer exists », et la relance, qui doit lui revenir, n'a plus d'interlocuteur.
-  Mesuré au lot 1b de #77 : le retrait fait par hygiène dès le rapport lu a coûté un contexte
-  entier repayé. **Non vérifié** : si le nettoyage automatique du harnais (« retiré s'il revient
-  inchangé ») se déclenche sur un relecteur correctement placé. Le seul échantillon disponible
-  portait trois causes de « modifié » à la fois — HEAD détaché, branche locale créée, worktree
-  verrouillé —, donc aucune n'est établie. Le geste de retrait explicite ne dépend pas de la
-  réponse ; ne pas le remplacer par une attente de ce nettoyage.
-
-**Un relecteur repris a pu perdre son isolation.** Le message de reprise lui rappelle les deux
-vérifications que porte son rôle, **dans leur ordre** — `git rev-parse --show-toplevel` sous
-`.claude/worktrees/` d'abord, `git rev-parse HEAD` sur le SHA attendu ensuite — et ne lui demande
-**jamais** de restaurer une mutation, ni de se déplacer, avant elles : un agent relancé peut
-reprendre dans l'arbre vivant de l'auteur, mutations de l'auteur comprises, et « restaure octet
-pour octet » y détruirait son travail en cours.
+production**, puis le restaurer ; dans l'arbre partagé, cela gèlerait la session PR et ses
+équipiers pendant toute la passe, sur un arbre qui bouge. Ils continuent ici pendant ce temps,
+sans rien attendre. Une session de relecture qui commit ou pousse depuis ce worktree a dépassé
+son rôle. Son worktree est celui de l'application, né à son démarrage et nettoyé par la session
+PR à son Étape 8 ; celui du sous-agent de repli a ses trois gestes — naissance, réutilisation,
+retrait — au même fichier, « Repli ».
 
 **La mutation s'appelle, elle ne se décrit pas.** Le harnais existe et il est versionné :
 
@@ -727,8 +690,8 @@ production, une faille, une perte de données possible. *Important* : une régre
 verrait pas et qu'un changement plausible du code déclencherait. *Mineur* : tout le reste —
 lisibilité, nommage, doc, et « ce test pourrait tenir davantage ». Un constat qui n'entre dans
 aucune des deux premières est mineur, quelle que soit sa longueur — « ce test pourrait tenir
-davantage » en est le cas le plus fréquent. Le relecteur rend chaque mineur sous forme d'**édit précis** — fichier, ligne, remplacement — ou
-l'écarte lui-même avec sa raison.
+davantage » en est le cas le plus fréquent. La session de relecture rend chaque mineur sous
+forme d'**édit précis** — fichier, ligne, remplacement — ou l'écarte elle-même avec sa raison.
 
 **Traitement — par passe, jamais par constat.** La session PR trie et vérifie le diff rendu ; elle
 ne corrige pas. Les bloquants et importants d'une passe partent **ensemble** à un `developpeur`
@@ -779,9 +742,9 @@ détection de la seule occurrence réelle, et seul ce rejeu l'a vu (obs 76).
 « à l'écran » l'est sur le parcours où il a été conçu ; ses défauts vivent sur les autres. La
 lentille est un **script de navigateur rejouable** — la commande `e2e ciblé` de
 `.claude/pipeline.config.md`, cache HTTP désactivé, données jetables —, jamais une démonstration
-regardée : un parcours joué à la main ne se rejoue pas au commit suivant, et c'est le relecteur
-qui le lance, dans son worktree, parce que l'auteur l'a déjà vérifié sur le chemin qu'il a
-choisi. Matrice minimale, quatre points :
+regardée : un parcours joué à la main ne se rejoue pas au commit suivant, et c'est la session de
+relecture qui le lance, dans son worktree, parce que la session PR l'a déjà fait vérifier sur le
+chemin qu'elle a choisi. Matrice minimale, quatre points :
 
 1. chaque geste sur l'écran **renvoyé en erreur par le serveur** ;
 2. chaque geste **combiné aux gestionnaires que le framework pose sur les mêmes éléments** ;
@@ -796,21 +759,22 @@ correctif de lot précédent s'était déclaré clos sur le geste nominal.
 commits de correction**, ciblée par un diff explicite (`<sha avant>..<sha après>`) et par la liste
 de ce que chaque commit prétend régler et du test qui épingle chacun, avec la question
 obligatoire : « qu'est-ce que ce correctif a cassé, ou fait rougir à tort, que la version
-précédente voyait ? ». Elle revient au
-**relecteur de la PR**, par `SendMessage` — son contexte est intact, il n'a rien à relire —,
-jamais à un agent neuf. Un correctif est du code neuf écrit sous pression de conclure — c'est la
-partie la moins éprouvée de la PR, pas la plus sûre. Après la relance : un bloquant qu'elle
-trouve se corrige et rouvre une relance ; un important se corrige, se prouve par un test vu rouge
-(3.1), et n'est pas relu par un tiers ; un mineur suit la règle ci-dessus. La boucle s'arrête là,
-et le body le dit. Les constats écartés sont notés avec leur raison dans le body (Étape 5).
+précédente voyait ? ». Elle revient à la **session de relecture de la PR**, réveillée par message
+— son contexte est intact, elle n'a rien à relire —, jamais à un agent neuf. Un correctif est du
+code neuf écrit sous pression de conclure — c'est la partie la moins éprouvée de la PR, pas la plus
+sûre. Après la relance : un bloquant qu'elle trouve se corrige et rouvre une relance ; un important
+se corrige, se prouve par un test vu rouge (3.1), et n'est pas relu par un tiers ; un mineur suit la
+règle ci-dessus. La boucle s'arrête là, et le body le dit. Les constats écartés sont notés avec leur raison dans le body (Étape 5).
 
-C'est **cette fermeture** — et elle seule — qui autorise le retrait du worktree de relecture.
-Tant que la boucle peut rouvrir une relance, le worktree est ce qui maintient le relecteur
-joignable : le retirer n'est pas un nettoyage, c'est une terminaison.
+C'est **cette fermeture** — et elle seule — qui autorise le nettoyage de la session de relecture
+(Étape 8) ou le retrait du worktree du sous-agent de repli : tant que la boucle peut rouvrir une
+relance, ils en sont le destinataire, et les retirer n'est pas un nettoyage, c'est une
+terminaison.
 
-**Pousser après chaque passe** — première passe corrigée, seconde passe corrigée, relance —, jamais
-en force : la CI éprouve la plateforme cible pendant que la relecture suivante tourne, et un rouge
-de plateforme (3.2) se corrige dans le commit groupé de la passe en cours.
+**Pousser avant chaque réveil** — première passe, seconde passe, relance —, jamais en force :
+`/code-review --comment` commente la tête poussée, et la CI éprouve la plateforme cible pendant
+que la relecture tourne ; un rouge de plateforme (3.2) se corrige dans le commit groupé de la
+passe en cours.
 
 ## Étape 5 — Finalisation de la PR (passage en ready for review)
 
@@ -883,7 +847,9 @@ Seule la **première ligne** décide : une réouverture ajoute un run sur la mê
 anciens ne comptent plus. Sa conclusion :
 
 - `success` → sortir du draft ;
-- `in_progress` ou `queued`, conclusion `null` → le run tourne : attendre ;
+- `in_progress` ou `queued`, conclusion `null` → le run tourne : fin de tour, le moniteur de PR
+  de l'application réveillant la session à sa conclusion — jamais une attente en tour ni une sonde
+  planifiée ;
 - `cancelled` → relire le SHA de tête (`gh pr view <numéro> --json headRefOid`) : s'il a changé,
   lire le run du nouveau ; sinon, annulé sans remplaçant, « Si aucun run n'apparaît », ci-dessous ;
 - `skipped` → l'ouverture d'une draft jamais repoussée depuis, que le garde du job `api` saute
@@ -1127,7 +1093,7 @@ avec la commande qui le re-dérive et la raison pour laquelle ce motif sous-comp
 ### Le merge d'un lot — sans go, hors du trunk
 
 Une PR de lot dont la base est la **branche d'intégration** de son issue, et non le trunk, se merge
-**sans go humain** une fois verte : CI verte sur sa tête, boucle du relecteur fermée et PR sortie
+**sans go humain** une fois verte : CI verte sur sa tête, boucle de relecture fermée et PR sortie
 du draft (Étapes 4 et 5), verdict d'avant-go « rien à corriger ». Ce verdict s'inscrit dans les
 Notes du body comme tout verdict (« Vérification d'avant-go »), plus une ligne de forme figée, que
 le script lit :
@@ -1177,6 +1143,10 @@ quand même — l'amendement est tracé au journal de spec du corps. Le brief d'
 un artefact daté : on coche ses cases, on ne réécrit pas son texte. (Tant que l'issue était
 ouverte, c'était l'inverse : une réconciliation `repercussions` qui falsifiait une de ses lignes
 l'amendait — la clôture est ce qui fige le brief.)
+
+Puis **nettoyer la session de relecture** — archivage sur l'accord donné au go, worktree,
+échafaudage —, la boucle de 4.2 étant fermée
+([references/session-relecture.md](references/session-relecture.md), « Nettoyage »).
 
 **Cas découpé : reposer le lien des lots précédents.** GitHub ne lie une PR à une issue que par un
 mot-clé de fermeture, et seul le lot final en portait un (Étape 2) ; sans ce geste, l'issue
@@ -1371,9 +1341,9 @@ Une session sait qu'elle a fini avant que le lead ne le sache : c'est elle qui p
    compris.
 4. **Deux filets de cleanup** : un par commit (regard local), un sur la PR entière avant la
    seconde relecture (4.1, regard global, inter-commits) — et une relecture à contexte vierge
-   **en deux temps**, au socle et à la fin, jamais par commit, **un seul relecteur pour toute la
-   PR** dans un worktree qui lui survit d'une passe à l'autre, plafonnée à deux passes et une
-   relance qui lui revient. Son worktree ne se retire qu'à la fermeture de la boucle : le
-   retirer plus tôt termine l'agent.
+   **en deux temps**, au socle et à la fin, jamais par commit, par **une seule session de
+   relecture pour toute la PR**, démarrée au go et réveillée par message, dans son propre
+   worktree, plafonnée à deux passes et une relance qui lui reviennent. Elle ne se nettoie qu'à
+   la fermeture de la boucle : plus tôt, la relance n'a plus de destinataire.
 5. La PR n'est **terminée qu'après la passe `repercussions`** : une clôture peut bouleverser les
    autres issues — la session PR le vérifie tant qu'elle tient le brief, les Notes et les constats.

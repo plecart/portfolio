@@ -58,8 +58,9 @@ commentaire (`gh issue view \<N> --comments`). Lequel l'emporte quand ils diverg
 Étape 1, « Auto-challenge du plan ». \<Si lot intermédiaire : la forme du corps de PR d'un lot qui
 ne ferme pas l'issue est à `cycle-pr` Étape 2, « Cas découpé ».>
 
-Tu es autorisé à lancer l'équipier `relecteur` de l'Étape 4.2 ; combien, et à qui reviennent la
-seconde passe et la relance : `cycle-pr` 4.2, « Un seul relecteur pour la PR ».
+Ta session de relecture se démarre à ton go, dans ta fenêtre : c'est toi qui la démarres, la
+réveilles et la nettoies (`cycle-pr/references/session-relecture.md`) ; le sous-agent `relecteur`
+n'en est que le repli.
 
 **Ce que mon lot a payé et que le tien n'a pas à re-dériver** — un point par ligne, chacun avec
 l'artefact qui le porte, jamais l'énoncé seul :
@@ -85,8 +86,8 @@ bloquant qui dépasse ton périmètre — message de fin : `sessions-liees.md`, 
 
 Écrite par la session dont le contexte se remplit avant la fin de son cycle (`cycle-pr` Étape 8,
 « Relais en cours de cycle »), et remise comme le prompt ci-dessus. Elle en garde
-les lignes « Tu travailles dans… », « Charge le skill… », « Ton brief… », le relecteur et
-« Préviens… » ; elle remplace la première ligne par la suivante, et ajoute les trois d'après.
+les lignes « Tu travailles dans… », « Charge le skill… », « Ton brief… » et « Préviens… » ;
+elle remplace la première ligne par la suivante, et ajoute les quatre d'après.
 
 Tu **reprends** le lot \<k>/\<n> de l'issue #\<N> en relais de la session `\<uuid>`, dont le
 contexte s'est rempli à l'Étape \<x> de `cycle-pr`. La PR #\<M> est ouverte (\<draft | ready>),
@@ -98,6 +99,10 @@ Bilan de la session sortante, déposé hors du dépôt :
 
 Entrées du journal d'observations déjà écrites pour ce cycle : \<numéros | aucune> — plafond :
 `CLAUDE.md`, « Observation continue ».
+
+Ta session de relecture : `\<local_…>`, démarrée par la session sortante — tu la réveilles par
+message, et elle répond à l'émetteur du réveil (`session-relecture.md`, « Réveil ») ; ses notes de
+fin de tour vont à son parent, la session sortante.
 
 \<Si vague `pr-paralleles` : \<adresse du lead> ; ton premier message au lead : `pr-paralleles`
 Étape 5, « Session relayée ».>
