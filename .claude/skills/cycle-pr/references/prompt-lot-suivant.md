@@ -101,8 +101,9 @@ Entrées du journal d'observations déjà écrites pour ce cycle : \<numéros | 
 `CLAUDE.md`, « Observation continue ».
 
 Ta session de relecture : `\<local_…>`, démarrée par la session sortante — tu la réveilles par
-message, et elle répond à l'émetteur du réveil (`session-relecture.md`, « Réveil ») ; ses notes de
-fin de tour vont à son parent, la session sortante.
+message, et elle répond à l'émetteur du réveil ; ses notes de fin de tour vont à son parent, la
+session sortante : envoie chaque réveil avec `notify_when_idle: true` (`session-relecture.md`,
+« Réveil »).
 
 \<Si vague `pr-paralleles` : \<adresse du lead> ; ton premier message au lead : `pr-paralleles`
 Étape 5, « Session relayée ».>
