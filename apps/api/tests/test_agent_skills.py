@@ -1381,21 +1381,15 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         CYCLE_PR_SKILL,
         "l'envoyer par `SendMessage`, **sans confirmation**",
     ),
-    "etape-7-sans-confirmation": (
+    # #134 lot 2a, décision 2 : la vérification d'avant-go passe du lead à la session PR ; les
+    # quatre phrases de l'état envoyé au lead, épinglées ici depuis #107, sont retirées avec lui.
+    "verificateur-lance-par-la-session-pr": (
         CYCLE_PR_SKILL,
-        "**envoyer** l'état de la PR au lead, sans confirmation",
+        "**La session PR lance son `verificateur`**",
     ),
-    "etape-7-renvoi-sans-confirmation": (
-        CYCLE_PR_SKILL,
-        "push, puis renvoyer l'état au lead pour re-vérification du delta",
-    ),
-    "pr-paralleles-sans-confirmation": (
+    "pr-paralleles-le-lead-ne-verifie-plus": (
         PR_PARALLELES_SKILL,
-        "chaque session envoie au lead l'état de sa PR, sans confirmation",
-    ),
-    "pr-paralleles-renvoi-sans-confirmation": (
-        PR_PARALLELES_SKILL,
-        "Après corrections, la session renvoie l'état ; le lead refait la passe sur le delta.",
+        "le lead ne reçoit plus d'état à vérifier et ne lance aucun `verificateur`",
     ),
     # Fin de travail (décision 11, obs 85, 94, 98).
     "fin-de-tour-jamais-un-signal": (

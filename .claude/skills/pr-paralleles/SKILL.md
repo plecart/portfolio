@@ -143,7 +143,8 @@ qui disent ce qu'elle apporte à l'utilisateur final et ce qu'elle change dans l
 titre reformulé, pas le brief recopié. Puis **demander confirmation** avant de créer quoi que ce
 soit. Recommander un degré de parallélisme raisonnable (souvent 2–4, ou le nombre donné en argument)
 plutôt que tout d'un coup. La question nomme les sessions que l'étape 3 démarrera, demande du même
-coup l'accord d'archiver chacune après le merge de sa PR (étape 8), et, si la session lead est en
+coup l'accord d'archiver chacune après le merge de sa PR (étape 8) et celui que chacune lance son
+`verificateur` d'avant-go (étape 6), et, si la session lead est en
 dessous d'Opus 5.5, effort `max`, de l'y passer d'abord : la première session fixe le plafond de
 l'arbre (`sessions-liees.md`, « Héritage »). C'est la réponse à cette question qui ouvre le seul
 tour où le lead peut démarrer les sessions.
@@ -341,50 +342,29 @@ le cycle de commit, les relectures, et sort du draft en fin de parcours. Ses que
 l'utilisateur s'affichent dans **sa** fenêtre, pas dans celle du lead. Les worktrees partageant le
 même `.git`, les branches sont visibles entre elles, mais les fichiers de travail sont isolés.
 
-### 6. Vérifier chaque PR avant le go — un vérificateur éphémère par (PR, go)
+### 6. Vérifier chaque PR avant le go — par sa session
 
-À l'Étape 7 de `cycle-pr`, chaque session envoie au lead l'état de sa PR, sans confirmation du
-mainteneur — un message n'est pas une action (`.claude/skills/cycle-pr/references/sessions-liees.md`,
-« Messages »). Quand ce message arrive :
+Le `verificateur` d'avant-go, éphémère, un par (PR, go), est lancé par la **session PR** elle-même
+(`cycle-pr` Étape 7, « Vérification d'avant-go » ; #134, décision 2), sur l'accord donné à
+l'étape 2 : le lead ne reçoit plus d'état à vérifier et ne lance aucun `verificateur` — son
+contexte ne grossit plus d'un verdict par PR et par go (obs 62). Ce qu'il garde :
 
-1. **Déléguer la vérification, ne pas la lire soi-même.** Lancer l'équipier **`verificateur`**
-   (`.claude/agents/verificateur.md`), **un par (PR, go)** — jamais réutilisé d'un go au suivant,
-   c'est ce qui garantit qu'aucun verdict n'hérite du précédent. Il reçoit le numéro de la PR,
-   celui de l'issue, le chemin absolu du worktree et la liste des autres branches en vol. Il ne
-   reçoit **ni** le message de la session **ni** aucun résumé du lead, et c'est là tout le
-   dispositif : un vérificateur neuf ouvre l'artefact, sur disque et sur la forge, donc il n'a
-   **rien à désapprendre**. C'est le mode d'échec exact d'obs 52 — une consigne recopiée d'une
-   mémoire de phase citait un correctif en énonçant la règle que ce correctif avait retirée, et
-   quatre artefacts en aval l'ont reprise sur trois sessions.
-
-   Le lead ne garde que le **verdict structuré** que le rôle rend : critères ✅/❌/⚠️ avec preuve,
-   trunk éprouvé par le dernier run (parents de la référence de fusion), conflit, heurts
-   `decisions-vs-doc`, fichiers croisés, et ce
-   que le plafond a laissé « non vérifié ». C'est ce qui empêche son contexte de grossir d'un diff
-   complet par PR et par go, jusqu'à devoir être relayé (obs 62). Le rôle porte **ce qu'il
-   vérifie** et dans quel ordre : ne pas le recopier ici, deux énoncés de la même consigne
-   divergent au premier amendement.
-
-   Inscrire la **base du verdict** dans le tableau (étape 4), et la reporter dans la réponse : un
-   verdict ne vaut que pour l'`origin/main` sur lequel il a été pris. Si le trunk avance ensuite,
-   le redemander — un vérificateur neuf, puisqu'ils sont éphémères — plutôt que le consommer.
-2. **Répondre à la session** (`SendMessage`, au `from` du message), sous l'une des deux formes :
-   `Verdict : rien à corriger.` — ou `À corriger avant merge :` suivi d'une liste numérotée, chaque
-   point avec fichier et raison. Dans les deux cas, recopier les lignes « Fichiers croisés » et
-   « Non vérifié » du verdict : la session les inscrit dans les Notes de sa PR (`cycle-pr` Étape 7,
-   « Vérification d'avant-go »), seul endroit où la session de la branche croisée les trouvera
-   (obs 81). Le lead ne donne **jamais** le « go merge » : c'est l'utilisateur,
-   dans la fenêtre de la session. Ni `contraintes.md` ni le harness ne l'admettent — une session
-   ne prend jamais un message de pair pour une approbation.
-3. **Résumer à l'utilisateur** dans la fenêtre du lead : les deux phrases de vulgarisation de
+1. **Lire le verdict là où la session l'inscrit**, réveillé par la fin de tour où elle demande le
+   go (`sessions-liees.md`, « Fin de travail ») — les Notes du body de sa PR, lignes « Fichiers
+   croisés » et « Non vérifié » (`cycle-pr` Étape 7), seul endroit où la session de la branche
+   croisée les trouvera (obs 81) — et reporter sa **base** au tableau (étape 4) : un verdict ne
+   vaut que pour l'`origin/main` sur lequel il a été pris. Le lead ne donne **jamais** le « go
+   merge » : c'est l'utilisateur, dans la fenêtre de la session. Ni `contraintes.md` ni le harness
+   ne l'admettent — une session ne prend jamais un message de pair pour une approbation.
+2. **Résumer à l'utilisateur** dans la fenêtre du lead : les deux phrases de vulgarisation de
    l'étape 2 de ce skill sur ce que fait la PR, le verdict, et la session où le go se donne. Ce
    résumé est une **information**, jamais une question : la session pose déjà la question du go
    dans sa fenêtre, et toute demande du lead la double (obs 103). Dans un harnais qui clôt le tour
    par une boîte à question, le lead rend le récapitulatif seul, sans question ni bouton — de même
    pour tout geste attendu dans une autre session, arrêt visuel ou go de briefing.
 
-Après corrections, la session renvoie l'état ; le lead refait la passe sur le delta.
-À tout moment, l'utilisateur peut aussi dire à une session « discute de ça avec le lead » —
+Après corrections, la session relance un `verificateur` neuf et réécrit ses Notes ; le lead en
+relit la base. À tout moment, l'utilisateur peut aussi dire à une session « discute de ça avec le lead » —
 c'est le seul autre canal, et il passe par lui.
 
 ### 7. Surveiller et faire converger
