@@ -711,9 +711,14 @@ def cites_role(text: str, role: str) -> bool:
 def cites_an_executor(text: str, roles: Iterable[str]) -> bool:
     """Vrai si `text` nomme l'un des `roles` entre accents graves ou renvoie à un script de skill.
 
-    Le renvoi de script se lit par `SCRIPT_REFERENCE`, le motif de la porte des scripts cités.
+    Le renvoi de script se lit par `SCRIPT_REFERENCE` et se résout par `script_target`, comme dans
+    la porte des scripts cités : un préfixe qui ne nomme aucun skill (`infra/scripts/x.py`) ne
+    désigne pas un script de skill, donc pas un exécutant.
     """
-    return any(cites_role(text, role) for role in roles) or bool(SCRIPT_REFERENCE.search(text))
+    return any(cites_role(text, role) for role in roles) or any(
+        script_target(REPOSITORY_ROOT, REPOSITORY_ROOT, reference) is not None
+        for reference in SCRIPT_REFERENCE.finditer(text)
+    )
 
 
 def skills_citing(role: str) -> list[str]:
@@ -749,9 +754,11 @@ def test_chaque_role_est_nomme_par_un_skill(path: Path) -> None:
     )
 
 
-def test_un_role_qu_aucun_skill_ne_nomme_n_a_aucune_citation() -> None:
-    """Témoin du précédent : un rôle fictif, lu contre la prose réelle, ne trouve aucun fichier."""
+def test_ni_un_role_fictif_ni_la_liste_d_init_projet_ne_comptent_pour_une_citation() -> None:
+    """Témoins du précédent, sur la prose réelle : un rôle fictif ne trouve aucun fichier, et la
+    liste de fichiers d'`init-projet`, qui nomme tous les rôles, n'est jamais comptée."""
     assert skills_citing("fantome") == []
+    assert not [path for path in skills_citing("releveur") if NOT_A_DELEGATION in path]
 
 
 # Le recueil de `cites_an_executor`, des deux côtés.
@@ -761,6 +768,7 @@ EXECUTOR_CITATION_FORMS = {
     "nom nu": ("lancer un releveur par porte", False),
     "nom d'un fichier de rôle": ("lire `releveur.md` d'abord", False),
     "renvoi de script": ("python <répertoire de ce skill>/scripts/merge-lot.py <n>", True),
+    "script étranger aux skills": ("voir infra/scripts/deploy.py pour le détail", False),
 }
 
 
