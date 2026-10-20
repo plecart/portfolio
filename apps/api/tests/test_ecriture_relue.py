@@ -286,9 +286,9 @@ def etiquetee(*noms: str) -> dict[str, Any]:
     return {"body": "", "labels": [{"name": nom} for nom in noms]}
 
 
-def retraits(forge: Forge) -> list[tuple[str, ...]]:
-    """Les appels `DELETE` que la forge a reçus — un par retrait de label tenté."""
-    return [appel for appel in forge.appels if appel[2:4] == ("-X", "DELETE")]
+def ecritures(forge: Forge) -> list[tuple[str, ...]]:
+    """Les écritures que la forge a reçues — `PATCH` ou `DELETE`, tout appel `-X`."""
+    return [appel for appel in forge.appels if "-X" in appel]
 
 
 @pytest.mark.parametrize(
@@ -302,7 +302,7 @@ def test_label_remove_retire_le_label_puis_le_relit_absent(label: str) -> None:
     forge = Forge({CORPS_42: etiquetee(label, "enhancement")})
 
     assert lance(forge, "label", "42", "--remove", label) == 0
-    assert len(retraits(forge)) == 1
+    assert len(ecritures(forge)) == 1
     assert forge.appels[-1] == ("gh", "api", CORPS_42), "le retrait n'est pas relu"
     assert forge.documents[CORPS_42]["labels"] == [{"name": "enhancement"}]
 
@@ -313,7 +313,7 @@ def test_label_remove_ne_retire_rien_d_un_label_deja_absent(
     forge = Forge({CORPS_42: etiquetee("enhancement")})
 
     assert lance(forge, "label", "42", "--remove", "ready-for-agent") == 0
-    assert retraits(forge) == []
+    assert ecritures(forge) == []
     assert "rien à écrire" in capsys.readouterr().out
 
 
@@ -379,6 +379,79 @@ def test_issue_edit_sort_en_1_sur_une_relecture_tronquee(
     assert lance(forge, "issue", "edit", "42", "--append", str(ajout)) == 1
     sortie = sortie_d_echec(capsys, "relecture non conforme")
     assert "ancre absente : *Rattachement a posteriori.*" in sortie, sortie
+
+
+def crlf(corps: str) -> str:
+    """Une forge qui stocke le texte reçu avec ses fins de ligne converties LF → CRLF."""
+    return corps.replace("\n", "\r\n")
+
+
+RETIRE_LABEL = ("label", "42", "--remove", "ready-for-agent")
+COCHE_CORPS = ("checkbox", "patch", "42", "--case", "Critère A")
+COCHE_BRIEF = ("brief", "patch", "42", "--case", "Critère A")
+AJOUTE_FICHIER = ("issue", "edit", "42", "--append", "ajout.md")
+# (appel, ce que la forge fait du texte reçu — `None` le garde tel quel —, sortie du premier appel)
+REJEUX = [
+    pytest.param(RETIRE_LABEL, None, 0, id="label-remove"),
+    pytest.param(COCHE_CORPS, None, 0, id="checkbox-patch"),
+    pytest.param(COCHE_BRIEF, None, 0, id="brief-patch"),
+    pytest.param(AJOUTE_FICHIER, None, 0, id="issue-edit-append"),
+    pytest.param(COCHE_CORPS, crlf, 1, id="checkbox-patch-forge-crlf"),
+    pytest.param(COCHE_BRIEF, crlf, 1, id="brief-patch-forge-crlf"),
+    pytest.param(
+        AJOUTE_FICHIER,
+        crlf,
+        1,
+        id="issue-edit-append-forge-crlf",
+        marks=pytest.mark.xfail(strict=True, reason="fin de corps comparée à l'identique"),
+    ),
+]
+
+
+@pytest.mark.parametrize(("args", "stocke", "premier"), REJEUX)
+def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
+    args: tuple[str, ...],
+    stocke: Callable[[str], str] | None,
+    premier: int,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Cliquet de la classe « une sous-commande rejouée à l'identique écrit une seconde fois »
+    (`cycle-pr` 4.2, « Le cliquet »), dénombré avant le correctif. Un rejeu suit une relecture
+    tombée — `PATCH` accepté, `GET` en 502, sortie 1 — ou une Étape 8 rejouée après une
+    passation ; dans les deux cas, la forge porte déjà ce que le premier appel a écrit. Le premier
+    appel écrit une fois ; le second sort en 0 sans **aucune** écriture, ni `PATCH` ni `DELETE`.
+
+    Population : les 4 sous-commandes, sur une forge qui garde le texte reçu ; puis, cherchée hors
+    de cette liste, une forge qui le garde transformé (LF → CRLF : le premier appel sort alors en
+    1, relecture non conforme) — pour les trois qui écrivent un texte, un `DELETE` n'en a pas.
+    7 formes recensées, 2 fuyaient :
+
+    - `issue-edit-append` — le bloc s'ajoutait une seconde fois ; corrigé : un corps qui finit
+      déjà par le fichier n'est pas réécrit ;
+    - `issue-edit-append-forge-crlf` — fuit encore, `xfail` strict : la fin du corps se compare
+      au fichier à l'identique, fins de ligne comprises ; une comparaison modulo les fins de ligne
+      serait une forme réduite, celle qu'obs 106 écarte de la relecture. Le premier appel y a déjà
+      rendu la sortie 1, octets et `\\r` relus à l'appui.
+
+    Les cases se relisent cochées et le label absent : les 5 autres n'écrivent rien au rejeu.
+    """
+    monkeypatch.chdir(tmp_path)
+    Path("ajout.md").write_bytes(b"*Rattachement.*\n")
+    forge = Forge(
+        {CORPS_42: {"body": "Corps\n- [ ] Critère A\n", "labels": [{"name": "ready-for-agent"}]}},
+        stocke=stocke or (lambda corps: corps),
+        pages=[[{"id": 13, "body": BRIEF}]],
+    )
+
+    assert lance(forge, *args) == premier
+    assert len(ecritures(forge)) == 1, "le premier appel n'a pas écrit une seule fois"
+    capsys.readouterr()
+
+    assert lance(forge, *args) == 0
+    assert len(ecritures(forge)) == 1, "le rejeu a écrit une seconde fois"
+    assert "rien à écrire" in capsys.readouterr().out
 
 
 # Chaque champ que l'appelant saisit, balayé en une passe pour la présence et la forme : le numéro
