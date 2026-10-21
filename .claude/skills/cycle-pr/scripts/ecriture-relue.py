@@ -5,14 +5,16 @@ Usage :
     python ecriture-relue.py checkbox patch <N> --case <ancre> [--case <ancre> …]
     python ecriture-relue.py brief patch <N> --case <ancre> [--case <ancre> …]
     python ecriture-relue.py issue edit <N> --append <fichier>
+    python ecriture-relue.py comment <N> --body-file <fichier>
 
 La règle « Écritures sur un artefact distant » de `contraintes.md` veut que toute écriture sur la
-forge se relise ; ce script tient cette relecture pour les gestes de `cycle-pr` Étape 8 (#134,
-lot 4a). Chaque sous-commande lit par `gh api` — octets décodés en UTF-8, jamais le mode texte,
-qui traduit les fins de ligne, ni la page de code de la console (obs 87, 106, 108, 116) —, écrit,
-puis relit par le même canal. Un texte s'écrit par `gh api -X PATCH <chemin> --input -`, la charge
-JSON sur l'entrée standard, et sa relecture compare le **texte entier** à l'attendu : une forme
-réduite, longueur ou ancre, ne voit pas une conversion qui la préserve (obs 106).
+forge se relise ; ce script tient cette relecture pour les gestes de `cycle-pr` Étape 8 et le
+commentaire de répercussion de son Étape 6 (#134, lots 4a et 4b). Chaque sous-commande lit par
+`gh api` — octets décodés en UTF-8, jamais le mode texte, qui traduit les fins de ligne, ni la
+page de code de la console (obs 87, 106, 108, 116) —, écrit, puis relit par le même canal. Un
+texte s'écrit par `gh api -X PATCH <chemin> --input -` — `-X POST` pour publier un commentaire —,
+la charge JSON sur l'entrée standard, et sa relecture compare le **texte entier** à l'attendu :
+une forme réduite, longueur ou ancre, ne voit pas une conversion qui la préserve (obs 106).
 `{owner}/{repo}` sont remplis par `gh` depuis le dépôt courant.
 
 - `label` retire un label de l'issue ou de la PR `<N>`, puis relit ses labels ;
@@ -24,23 +26,29 @@ réduite, longueur ou ancre, ne voit pas une conversion qui la préserve (obs 10
 - `issue edit --append` ajoute un fichier UTF-8, lu en octets, en fin de corps de `<N>`, séparé
   de son dernier contenu par une ligne vide au moins — celles qui terminent déjà le corps
   restent —, aucune sur un corps vide. Le corps d'une PR passe par le même chemin : pour l'API
-  REST, une PR est une issue.
+  REST, une PR est une issue ;
+- `comment` publie un fichier UTF-8, lu en octets, en commentaire de `<N>`, puis relit le
+  commentaire sous l'`id` que la publication rend. Une PR se commente par le même chemin.
 
 Il refuse, sans rien écrire : une ancre introuvable ou ambiguë — toutes sont validées avant la
 première écriture —, zéro ou plusieurs commentaires de brief, un fichier illisible, non UTF-8 ou
-sans ligne non vide, une lecture `gh` qui échoue, ne rend pas du JSON, ou rend un JSON sans un
-champ attendu ou d'un autre type — à la relecture, c'est une relecture non conforme. Une case déjà
-cochée, un label déjà absent, un fichier qui termine déjà le corps : rien à écrire, et la sortie le
-dit — un rejeu après une relecture tombée n'écrit donc pas une seconde fois.
+sans ligne non vide — lu avant tout appel à la forge —, une lecture `gh` qui échoue, ne rend pas
+du JSON, ou rend un JSON sans un champ attendu ou d'un autre type. Après l'écriture — sa réponse
+comprise, dont un commentaire publié tire son `id` —, c'est une relecture non conforme : le texte
+a pu partir. Une case déjà cochée, un label déjà absent, un fichier qui termine déjà le corps, un
+commentaire de `<N>` qui porte déjà le fichier pour corps : rien à écrire, et la sortie le dit — un
+rejeu après une relecture tombée n'écrit donc pas une seconde fois.
 
 **Ce qu'il ne prouve pas.** Il ne choisit pas les cases : la session PR les nomme. Il ne
 verrouille rien : une édition faite par un tiers entre sa lecture et son écriture est écrasée, et
-la relecture ne la voit pas — elle compare à ce que le script a écrit. Le fichier se reconnaît en
-fin de corps à l'identique, fins de ligne comprises : sur une forge qui le stocke transformé —
-relecture non conforme dès le premier appel —, un rejeu l'ajoute une seconde fois. Une relecture
-conforme atteste ce que l'API rend, pas ce que l'interface web affiche. Le chemin d'un label
-encodé et l'écriture du corps d'une PR par l'endpoint `issues` ne sont pas mesurés sur la vraie
-forge.
+la relecture ne la voit pas — elle compare à ce que le script a écrit ; un même commentaire publié
+entre la lecture des commentaires et la publication fait un doublon. Le commentaire déjà publié se
+reconnaît à son corps seul, **quel qu'en soit l'auteur**. Le fichier se reconnaît à l'identique,
+fins de ligne comprises, en fin de corps comme en corps de commentaire : sur une forge qui le
+stocke transformé — relecture non conforme dès le premier appel —, un rejeu l'ajoute ou le publie
+une seconde fois. Une relecture conforme atteste ce que l'API rend, pas ce que l'interface web
+affiche. Le chemin d'un label encodé, l'écriture du corps d'une PR et la publication d'un
+commentaire sur une PR par l'endpoint `issues` ne sont pas mesurés sur la vraie forge.
 
 Sortie : 0 écrit et relu conforme, ou rien à écrire ; 1 refus (« refus — »), ou écriture lancée et
 relecture non conforme ou impossible (« relecture non conforme — ») — motif en une ligne sur la
@@ -53,7 +61,8 @@ import json
 import re
 import subprocess
 import sys
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, NamedTuple
 from urllib.parse import quote
@@ -104,22 +113,23 @@ def gh_api(run: Run, *args: str, stdin: bytes | None = None) -> bytes:
     return done.stdout
 
 
-def read_json(run: Run, parse: Callable[[Any], Any], *args: str) -> Any:
+def read_json(run: Run, parse: Callable[[Any], Any], *args: str, stdin: bytes | None = None) -> Any:
     """Ce que `parse` tire de la réponse JSON de `gh api <args>`, décodée en UTF-8 explicitement
     (obs 108). La présence et le type des champs s'y gardent pour chaque site qui lit un document
-    de la forge, lecture et relecture — dénombrés par
+    de la forge — lecture, réponse d'une écriture, relecture —, dénombrés par
     `test_une_reponse_d_une_autre_forme_sort_en_1_en_une_ligne`.
 
     Args:
         parse: tire du document les champs attendus ; un champ absent ou d'un autre type y lève
             `KeyError` ou `TypeError`.
+        stdin: la charge d'une écriture, que `gh` lit sur son entrée standard.
 
     Raises:
         Refusal: la commande échoue, ne rend pas du JSON en UTF-8, ou pas la forme que `parse`
             attend.
     """
     try:
-        document = json.loads(gh_api(run, *args).decode("utf-8"))
+        document = json.loads(gh_api(run, *args, stdin=stdin).decode("utf-8"))
     except ValueError as error:
         raise Refusal(f"`gh api {' '.join(args)}` ne rend pas du JSON UTF-8 : {error}") from error
     try:
@@ -131,21 +141,28 @@ def read_json(run: Run, parse: Callable[[Any], Any], *args: str) -> Any:
         ) from error
 
 
+@contextmanager
+def writing() -> Generator[None, None, None]:
+    """Le bloc qui lance une écriture puis la relit : un refus y devient une divergence.
+
+    Raises:
+        Divergence: une commande du bloc échoue, ou un document lu n'a pas la forme attendue —
+            l'écriture a pu partir, ce qu'un refus ferait croire impossible.
+    """
+    try:
+        yield
+    except Refusal as error:
+        raise Divergence(str(error)) from error
+
+
 def write_then_reread(
     run: Run, write: Sequence[str], stdin: bytes | None, path: str, parse: Callable[[Any], Any]
 ) -> Any:
     """Lance l'écriture `gh api <write>`, puis rend ce que `parse` tire du document relu sous
-    `path`.
-
-    Raises:
-        Divergence: l'une des deux commandes échoue, ou le document relu n'a pas la forme
-            attendue — l'écriture a pu partir, ce qu'un refus ferait croire impossible.
-    """
-    try:
+    `path` ; un échec est une divergence (`writing`)."""
+    with writing():
         gh_api(run, *write, stdin=stdin)
         return read_json(run, parse, path)
-    except Refusal as error:
-        raise Divergence(str(error)) from error
 
 
 def body_of(document: Any) -> str:
@@ -161,32 +178,60 @@ def body_of(document: Any) -> str:
     return body or ""
 
 
+def comment_id(comment: Any) -> int:
+    """L'`id` d'un commentaire de la forge, entier : il entre dans un chemin d'API.
+
+    Raises:
+        KeyError, TypeError: pas d'`id`, ou d'un autre type — un booléen JSON compris, que
+            Python tient pour un entier.
+    """
+    value = comment["id"]
+    if type(value) is not int:
+        raise TypeError(f"`id` de commentaire de type {type(value).__name__}")
+    return value
+
+
 def measure(text: str) -> str:
     """Octets UTF-8 et `\\r` : ce que change la conversion de toutes les fins de ligne LF ↔ CRLF."""
     carriage_returns = text.count("\r")
     return f"{len(text.encode())} octets et {carriage_returns} \\r"
 
 
-def write_body(run: Run, text: Text, expected: str, anchors: Sequence[str]) -> None:
-    """Écrit `expected` comme corps de `text`, le relit, et compare le texte entier.
+def body_payload(body: str) -> bytes:
+    """La charge `{"body": …}` d'une écriture de texte, en JSON UTF-8 brut, pour `--input -`."""
+    return json.dumps({"body": body}, ensure_ascii=False).encode("utf-8")
+
+
+def check_reread(expected: str, reread: str, anchors: Sequence[str]) -> None:
+    """Compare le texte relu à l'attendu, **entier** : une forme réduite, longueur ou ancre, ne
+    voit pas une conversion qui la préserve (obs 106).
 
     Args:
         anchors: ce que la relecture doit contenir — nommé dans le motif s'il manque.
 
     Raises:
-        Divergence: écriture ou relecture en échec, ou texte relu autre que `expected` ; le
-            motif nomme chaque ancre absente, puis les octets et les `\\r` attendus et relus.
+        Divergence: `reread` n'est pas `expected` ; le motif nomme chaque ancre absente, puis les
+            octets et les `\\r` attendus et relus.
     """
-    # ponytail: pas de verrou — une édition concurrente entre lecture et écriture est écrasée ;
-    # une requête conditionnelle si la forge en accepte une.
-    payload = json.dumps({"body": expected}, ensure_ascii=False).encode("utf-8")
-    write = ("-X", "PATCH", text.path, "--input", "-")
-    reread = write_then_reread(run, write, payload, text.path, body_of)
     if reread != expected:
         missing = [f"ancre absente : {anchor}" for anchor in anchors if anchor not in reread]
         raise Divergence(
             " ; ".join([*missing, f"attendu {measure(expected)}, relu {measure(reread)}"])
         )
+
+
+def write_body(run: Run, text: Text, expected: str, anchors: Sequence[str]) -> None:
+    """Écrit `expected` comme corps de `text`, le relit, et compare le texte entier.
+
+    Raises:
+        Divergence: écriture ou relecture en échec, ou texte relu autre que `expected` — voir
+            `check_reread`.
+    """
+    # ponytail: pas de verrou — une édition concurrente entre lecture et écriture est écrasée ;
+    # une requête conditionnelle si la forge en accepte une.
+    write = ("-X", "PATCH", text.path, "--input", "-")
+    reread = write_then_reread(run, write, body_payload(expected), text.path, body_of)
+    check_reread(expected, reread, anchors)
 
 
 def resolve_anchors(candidates: Mapping[int, str], anchors: Sequence[str]) -> dict[str, int]:
@@ -251,23 +296,37 @@ def issue_body(run: Run, number: str) -> Text:
     return Text(path, read_json(run, body_of, path), f"corps de #{number}")
 
 
-def brief_comments(pages: Any) -> list[tuple[int, str]]:
-    """L'`id` et le corps de chaque commentaire ouvert par `## Brief d'agent`, sur les pages que
+def comments_path(number: str) -> str:
+    """Le chemin `gh api` des commentaires de l'issue ou de la PR `number`."""
+    return f"{issue_path(number)}/comments"
+
+
+def comment_path(identifier: int) -> str:
+    """Le chemin `gh api` du commentaire `identifier`, d'une issue ou d'une PR."""
+    return f"{REPO}/issues/comments/{identifier}"
+
+
+def kept_comments(pages: Any, keep: Callable[[str], bool]) -> list[tuple[int, str]]:
+    """L'`id` et le corps de chaque commentaire dont le corps satisfait `keep`, sur les pages que
     `gh api --paginate --slurp` rend.
 
     Raises:
         KeyError, TypeError: des pages qui ne sont pas des listes de commentaires, un commentaire
-            sans corps, ou un brief sans `id` entier — il entre dans un chemin d'API.
+            sans corps, ou un commentaire retenu sans `id` entier (`comment_id`).
     """
-    briefs = [
-        (comment["id"], body)
+    return [
+        (comment_id(comment), body)
         for page in pages
         for comment in page
-        if (body := body_of(comment)).startswith(BRIEF_MARK)
+        if keep(body := body_of(comment))
     ]
-    if not all(isinstance(comment_id, int) for comment_id, _ in briefs):
-        raise TypeError("`id` de brief non entier")
-    return briefs
+
+
+def issue_comments(run: Run, number: str, keep: Callable[[str], bool]) -> list[tuple[int, str]]:
+    """Les commentaires de l'issue ou de la PR `number` que `keep` retient, lus sur toutes les
+    pages (`kept_comments`)."""
+    path = comments_path(number)
+    return read_json(run, lambda pages: kept_comments(pages, keep), "--paginate", "--slurp", path)
 
 
 def brief_comment(run: Run, number: str) -> Text:
@@ -276,14 +335,13 @@ def brief_comment(run: Run, number: str) -> Text:
     Raises:
         Refusal: aucun commentaire ne s'ouvre par `## Brief d'agent`, ou plusieurs.
     """
-    path = f"{issue_path(number)}/comments"
-    briefs = read_json(run, brief_comments, "--paginate", "--slurp", path)
+    briefs = issue_comments(run, number, lambda body: body.startswith(BRIEF_MARK))
     if len(briefs) != 1:
         raise Refusal(
             f"il faut un seul commentaire de brief sur #{number}, il y en a {len(briefs)}"
         )
-    comment_id, body = briefs[0]
-    return Text(f"{REPO}/issues/comments/{comment_id}", body, f"brief de #{number}")
+    identifier, body = briefs[0]
+    return Text(comment_path(identifier), body, f"brief de #{number}")
 
 
 def patch_boxes(run: Run, args: argparse.Namespace) -> str:
@@ -345,24 +403,53 @@ def appended(body: str, addition: str) -> str:
     return body + "\n" * max(0, 2 - line_ends) + addition
 
 
-def issue_append(run: Run, args: argparse.Namespace) -> str:
-    """`issue edit --append` : ajoute le fichier en fin de corps, sauf s'il le termine déjà ;
-    l'ancre de la relecture est sa première ligne non vide. Le fichier est lu avant tout appel à
-    la forge."""
+def read_text_file(path: Path) -> tuple[str, str]:
+    """Le texte d'un fichier UTF-8, lu en octets — ses fins de ligne restent (obs 87) —, et sa
+    première ligne non vide, ancre de la relecture.
+
+    Raises:
+        Refusal: fichier illisible, non UTF-8, ou sans ligne non vide.
+    """
     try:
-        addition = args.file.read_bytes().decode("utf-8")
+        text = path.read_bytes().decode("utf-8")
     except OSError as error:
         raise Refusal(f"fichier illisible : {error}") from error
     except UnicodeDecodeError as error:
-        raise Refusal(f"{args.file} n'est pas en UTF-8 : {error}") from error
-    anchor = next((line.strip() for line in addition.splitlines() if line.strip()), None)
+        raise Refusal(f"{path} n'est pas en UTF-8 : {error}") from error
+    anchor = next((line.strip() for line in text.splitlines() if line.strip()), None)
     if anchor is None:
-        raise Refusal(f"rien à ajouter : {args.file} n'a aucune ligne non vide")
+        raise Refusal(f"rien à ajouter : {path} n'a aucune ligne non vide")
+    return text, anchor
+
+
+def issue_append(run: Run, args: argparse.Namespace) -> str:
+    """`issue edit --append` : ajoute le fichier en fin de corps, sauf s'il le termine déjà. Le
+    fichier est lu avant tout appel à la forge."""
+    addition, anchor = read_text_file(args.file)
     text = issue_body(run, args.number)
     if text.body.endswith(addition):
         return f"rien à écrire — {text.name} : {args.file} déjà en fin de corps"
     write_body(run, text, appended(text.body, addition), [anchor])
     return f"écrit et relu — {text.name} : {args.file} ajouté"
+
+
+def comment_publish(run: Run, args: argparse.Namespace) -> str:
+    """`comment` : publie le fichier en commentaire, sauf si un commentaire porte déjà ce texte
+    exactement, puis relit le commentaire sous l'`id` que rend la publication. Le fichier est lu
+    avant tout appel à la forge."""
+    expected, anchor = read_text_file(args.file)
+    # ponytail: pas de verrou — un même texte publié entre la lecture et la publication fait un
+    # doublon ; relire les commentaires après la publication si un doublon se constate.
+    same = issue_comments(run, args.number, lambda body: body == expected)
+    if same:
+        identifier, _ = same[0]
+        return f"rien à écrire — #{args.number} porte déjà ce commentaire ({identifier})"
+    publish = ("-X", "POST", comments_path(args.number), "--input", "-")
+    with writing():
+        identifier = read_json(run, comment_id, *publish, stdin=body_payload(expected))
+        reread = read_json(run, body_of, comment_path(identifier))
+    check_reread(expected, reread, [anchor])
+    return f"publié et relu — commentaire {identifier} sur #{args.number}"
 
 
 def issue_number(value: str) -> str:
@@ -402,6 +489,10 @@ def build_parser() -> argparse.ArgumentParser:
     edit.add_argument("number", type=issue_number)
     edit.add_argument("--append", dest="file", type=Path, required=True)
     edit.set_defaults(handler=issue_append)
+    comment = commands.add_parser("comment")
+    comment.add_argument("number", type=issue_number)
+    comment.add_argument("--body-file", dest="file", type=Path, required=True)
+    comment.set_defaults(handler=comment_publish)
     return parser
 
 

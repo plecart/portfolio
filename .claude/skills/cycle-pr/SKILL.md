@@ -937,9 +937,11 @@ Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur 
 
 > **Commentaire de répercussion.** Un merge survenu ailleurs pendant que cette PR était ouverte a
 > pu rendre sa spec fausse ; `repercussions` le signale ici même (le corps de l'issue n'est
-> volontairement pas modifié tant que la PR est ouverte). Un signalement **bloquant** se traite
-> comme tel : intégrer la correction dans cette PR, ou remonter au mainteneur si cela déplace le
-> périmètre — ne jamais merger par-dessus.
+> volontairement pas modifié tant que la PR est ouverte), par un commentaire que
+> `python <répertoire de ce skill>/scripts/ecriture-relue.py comment <n> --body-file <fichier>`
+> publie puis relit en entier (Étape 8). Un signalement **bloquant** se traite comme tel :
+> intégrer la correction dans cette PR, ou remonter au mainteneur si cela déplace le périmètre —
+> ne jamais merger par-dessus.
 
 ## Étape 7 — Avant le merge
 
@@ -1161,10 +1163,9 @@ longueur laisse passer une conversion des fins de ligne qui les préserve (obs 1
 écrit et relu, ou rien à écrire ; 1 : refus sans rien écrire, ou relecture non conforme — motif
 en une ligne ; 2 : appel mal formé.
 **Ce qu'il ne couvre pas** : il ne choisit pas les cases, la session PR les nomme ; il ne compte
-pas les PR liées, la requête GraphQL du cas découpé reste ; publier un commentaire, poser un
-milestone, créer une issue viennent avec les lots suivants de #134 (4b, 6 à 8). Toute écriture
-qu'il ne fait pas reste sous la règle « Écritures sur un artefact distant » de
-`.claude/rules/contraintes.md`, relue à la main.
+pas les PR liées, la requête GraphQL du cas découpé reste ; poser un milestone, créer une issue
+viennent avec les lots 6 à 8 de #134. Toute écriture qu'il ne fait pas reste sous la règle
+« Écritures sur un artefact distant » de `.claude/rules/contraintes.md`, relue à la main.
 
 Le merge **clôt l'issue liée** (via `Closes #N`). **Retirer aussitôt son label d'état** —
 `ready-for-agent` ou `ready-for-human`, selon le mapping de `.claude/pipeline.config.md` :
