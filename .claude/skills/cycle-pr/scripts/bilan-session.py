@@ -7,9 +7,9 @@ Un cycle qui a rempli un contexte a **plusieurs** transcripts : le script en acc
 qu'on lui en donne, les fusionne dans l'ordre du temps et rend l'heure de chaque relais (obs 40).
 Les positionnels sont la session et ses relais. La session de relecture, quand la PR en a une,
 passe par `--relecture` : ses jetons, ses sous-agents et son profil se rendent, sans entrer dans
-la chronologie ni les attentes. Son transcript vit sous le dossier de projet de son propre
-worktree ; le script lit les sous-agents rangés sous le dossier de chaque transcript
-(`subagents`).
+la chronologie, les attentes ni le temps des sous-agents. Son transcript vit sous le dossier de
+projet de son propre worktree ; le script lit les sous-agents rangés sous le dossier de chaque
+transcript (`subagents`).
 
 Rend, sans double compte : la durée de la session ; l'attente — du mainteneur ou d'un pair,
 jusqu'au dernier message qui rouvre le tour de l'agent — **scindée** en réactivité (moins d'une
@@ -402,9 +402,14 @@ def subagents(paths: Sequence[Path]) -> list[Subagent]:
                     contacts=contacts(transcript),
                 )
             )
-    # L'ordre du temps, pas celui des noms de fichier, qui sont des identifiants aléatoires.
-    # Un transcript sans enregistrement daté n'a pas de contact : il passe en tête.
-    return sorted(found, key=lambda agent: [contact.window[0] for contact in agent.contacts[:1]])
+    return sorted(found, key=first_contact)
+
+
+def first_contact(agent: Subagent) -> list[datetime]:
+    """La clé de l'ordre du temps des sous-agents — pas celui des noms de fichier, qui sont des
+    identifiants aléatoires. Un transcript sans enregistrement daté n'a pas de contact : il passe
+    en tête."""
+    return [contact.window[0] for contact in agent.contacts[:1]]
 
 
 def delivered_notification(record: Mapping[str, Any]) -> str | None:
@@ -759,7 +764,11 @@ class Measures:
 
 
 def measure(events: Sequence[Event], agents: Sequence[Subagent] = ()) -> Measures:
-    """Mesure une session à partir de ses événements, sans rien mettre en forme."""
+    """Mesure une session à partir de ses événements, sans rien mettre en forme.
+
+    `agents` sont les sous-agents de la session et de ses relais, seuls : ceux d'une autre
+    session retireraient leur temps de ses attentes.
+    """
     if not events:
         raise ValueError("aucun événement à mesurer — transcripts vides ou illisibles")
     calls = tool_calls(events)
@@ -1101,11 +1110,15 @@ def report(
     agents: Sequence[Subagent],
     profiles: Sequence[Profile] = (),
     review: Usage | None = None,
+    review_agents: Sequence[Subagent] = (),
 ) -> str:
     """Le bilan, prêt à être recopié dans une rétrospective.
 
     `session` et `review` sont les jetons de la session — relais compris — et ceux de sa session
-    de relecture, chacun sur sa ligne ; sans `review`, aucune ligne de relecture.
+    de relecture, chacun sur sa ligne ; sans `review`, aucune ligne de relecture. De même pour
+    les sous-agents, `agents` et `review_agents` : tous se rendent un à un et dans les jetons des
+    sous-agents, qui disent la part de la relecture ; seuls les premiers entrent dans la mesure
+    de la session (`measure`).
 
     L'ordre des lignes est celui de leur lecture : l'attente **hors absences** d'abord, parce
     que c'est la seule que la pipeline peut réduire ; l'agrégat brut ensuite, pour mémoire.
@@ -1126,7 +1139,11 @@ def report(
     """
     m = measure(events, agents)
     humans = m.kinds["human"]
-    used = consumed(agents)
+    listed = sorted([*agents, *review_agents], key=first_contact)
+    used = consumed(listed)
+    review_share = (
+        f", dont {len(review_agents)} de la session de relecture" if review_agents else ""
+    )
     relayed = ", ".join(f"relais à {local(moment)}" for moment in m.relayed)
 
     def row(label: str, duration: timedelta, basis: timedelta, note: str = "") -> str:
@@ -1169,7 +1186,7 @@ def report(
         *([f"jetons de la session de relecture {tokens(review)}"] if review is not None else []),
         (
             f"jetons des sous-agents       {cached(used)} · sortie non mesurée"
-            f"   ({used.transcripts} transcripts)"
+            f"   ({used.transcripts} transcripts{review_share})"
         ),
         (
             f"points de contact humains    {humans + m.questions:>9}   "
@@ -1178,10 +1195,10 @@ def report(
         ),
         *(
             ["par agent — consommation lue dans ses transcripts, contact par contact :"]
-            if agents
+            if listed
             else []
         ),
-        *(line for agent in agents for line in agent_lines(agent)),
+        *(line for agent in listed for line in agent_lines(agent)),
         *(["absences, une à une :"] if m.absences else []),
         *(f"  {local(start)} → {local(end)}   {hm(end - start)}" for start, end in m.absences),
         "appels d'outils : "
@@ -1233,7 +1250,7 @@ def main(argv: Sequence[str]) -> int:
     """Point d'entrée : la session et ses relais en positionnels, chacun lu avec les sous-agents
     rangés sous son dossier (`subagents`) et rendu avec son profil de contexte. La session de
     relecture passe par `--relecture` : fusionnée aux positionnels, elle en fermerait les
-    attentes (`waits`).
+    attentes (`waits`), et ses sous-agents en retireraient leur temps (`measure`).
 
     Un transcript absent, positionnel ou de relecture, se **dit**, il ne fait ni planter le
     script ni rendre en silence un bilan sur la moitié du cycle : le harnais a le droit de
@@ -1255,10 +1272,10 @@ def main(argv: Sequence[str]) -> int:
     if not events:
         say("transcripts vides ou illisibles")
         return 1
-    present = session + review
-    profiles = [context_profile(path) for path in present]
+    profiles = [context_profile(path) for path in session + review]
     reviewed = token_usage(review) if review else None
-    say(report(events, token_usage(session), subagents(present), profiles, reviewed))
+    ours, theirs = subagents(session), subagents(review)
+    say(report(events, token_usage(session), ours, profiles, reviewed, theirs))
     return 0
 
 

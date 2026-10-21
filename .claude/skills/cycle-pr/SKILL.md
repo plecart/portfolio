@@ -1263,8 +1263,9 @@ plan compris ; pas sa sortie, que ce transcript sous-compte —, les points de c
 les appels d'outils ; puis le **profil de contexte** de chaque session : cache lu par quart des
 appels, première porte de relecture et part du cache lu après elle, composition en caractères.
 **La session de relecture, quand la PR en a une, se donne par `--relecture`**, ses relais
-compris : ses jetons, ses sous-agents et son profil se rendent, sans entrer dans la durée ni les
-attentes — fusionnée avec la session PR, elle en fermerait les attentes (docstring de `waits`).
+compris : ses jetons, ses sous-agents et son profil se rendent, sans entrer dans la durée, les
+attentes ni le temps des sous-agents — fusionnée avec la session PR, elle en fermerait les
+attentes (docstring de `waits`).
 Son transcript vit sous le dossier de projet de son propre worktree, et le script lit les
 sous-agents rangés sous le dossier de chaque transcript (`subagents`).
 
