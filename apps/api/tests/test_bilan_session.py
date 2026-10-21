@@ -1676,8 +1676,10 @@ def test_la_composition_compte_chaque_bloc_dans_sa_categorie(tmp_path: Path) -> 
     charge que dans le rôle `user` : l'agent qui cite la phrase écrit du texte. Un retour dont le
     transcript ne porte pas l'appel se range sous « ? ». Une image dans un retour d'outil, une
     pièce jointe, une copie de requête et un message de sous-agent ne comptent pas — la copie de
-    requête, `api-request-blob`, porte un `message` `user` ou `system` (forme relevée sur la
-    session PR du lot 4a de #134)."""
+    requête, `api-request-blob`, porte un `message` `user`, `system` ou `assistant`, sans `usage`
+    ni horodatage : c'est le type de l'enregistrement qui l'écarte, pas le rôle de son message.
+    Relevé le 2026-10-21 à 21 h sur les mêmes transcripts : 15, 132 et 10 dans la session PR, 8, 75
+    et 7 dans la session de relecture."""
     session = write_transcript(
         tmp_path / "session.jsonl",
         [
