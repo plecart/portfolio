@@ -22,7 +22,7 @@ import json
 import re
 import subprocess
 from collections import Counter
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 from typing import Any, cast
 
@@ -1177,21 +1177,25 @@ def test_toute_image_copiee_passe_par_un_etage_nomme(dockerfile: Path) -> None:
 
 @pytest.mark.parametrize("dockerfile", DOCKERFILES, ids=repository_id)
 def test_chaque_telechargement_d_une_image_est_verifie_par_sa_somme(dockerfile: Path) -> None:
-    """Un binaire sans image officielle entre par le fichier de sa release (`age`, `supercronic` :
-    brief de #23, décision 1), que Dependabot ne suit pas : sa somme épinglée est la seule chose
-    qui l'empêche de changer en silence, chez l'éditeur ou en chemin. Un binaire Go compilé par le
-    projet entre par son module, à version exacte, sous la base de sommes de Go (brief de #147,
-    décision 7). Un `RUN curl` ou `wget` n'a ni l'une ni l'autre : tout téléchargement passe par
+    """Un binaire sans image officielle entre par le fichier de sa release (`supercronic` : brief
+    de #23, décision 1), que Dependabot ne suit pas : sa somme épinglée est la seule chose qui
+    l'empêche de changer en silence, chez l'éditeur ou en chemin. Un binaire Go compilé par le
+    projet (`age`, `rclone`) entre par son module, à version exacte, sous la base de sommes de Go
+    (ADR 0017). Un `RUN curl` ou `wget` n'a ni l'une ni l'autre : tout téléchargement passe par
     `ADD --checksum` ou par un module Go à version exacte."""
     findings = download_findings(dockerfile.read_text(encoding="utf-8"))
 
     assert not findings, f"téléchargements sans somme : {findings}"
 
 
-def test_la_garde_des_telechargements_lit_ceux_du_depot() -> None:
-    """Une garde qui ne lit aucun téléchargement passe à vide : l'image `backup` en porte."""
-    assert any(downloads(path.read_text(encoding="utf-8")) for path in DOCKERFILES), (
-        "aucun `ADD` d'une adresse lu — le motif a-t-il cessé de mordre ?"
+@pytest.mark.parametrize("read", [downloads, go_modules], ids=["ADD d'une adresse", "module Go"])
+def test_la_garde_des_telechargements_lit_ceux_du_depot(
+    read: Callable[[str], list[tuple[str, str]]],
+) -> None:
+    """Une garde qui ne lit aucun téléchargement passe à vide : l'image `backup` porte un `ADD`
+    d'une adresse (`supercronic`) et des modules Go (`age`, `rclone`)."""
+    assert any(read(path.read_text(encoding="utf-8")) for path in DOCKERFILES), (
+        "aucun téléchargement lu — le motif a-t-il cessé de mordre ?"
     )
 
 

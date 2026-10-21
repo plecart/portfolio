@@ -192,20 +192,25 @@ cosign verify ghcr.io/aquasecurity/trivy:<x.y.z> \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
-`age` et `supercronic` entrent dans l'image `backup` par les fichiers `linux-amd64` de leur
-release, à la somme SHA-256 épinglée dans [infra/backup/Dockerfile](infra/backup/Dockerfile)
-(`ADD --checksum`, que BuildKit vérifie) : Dependabot ne les suit pas, le scan les ouvre. Pour
-monter une épingle : relever la somme que GitHub publie pour le fichier de la nouvelle version,
+`supercronic` entre dans l'image `backup` par le fichier `linux-amd64` de sa release, à la somme
+SHA-256 épinglée dans [infra/backup/Dockerfile](infra/backup/Dockerfile) (`ADD --checksum`, que
+BuildKit vérifie) : Dependabot ne le suit pas, le scan l'ouvre. Pour monter son épingle : relever
+la somme que GitHub publie pour le fichier de la nouvelle version,
 
 ```
-gh api repos/FiloSottile/age/releases/tags/v<x.y.z> --jq '.assets[] | select(.name | endswith("linux-amd64.tar.gz")) | .digest'
 gh api repos/aptible/supercronic/releases/tags/v<x.y.z> --jq '.assets[] | select(.name == "supercronic-linux-amd64") | .digest'
 ```
 
-puis la recouper par ce que chaque projet publie — pour `age`, sa preuve Sigsum (`sigsum-verify`
-sur l'archive et son `.proof`, procédure dans le `SIGSUM.md` de son dépôt) ; pour `supercronic`, la
-somme SHA-1 de ses notes de release —, et changer adresse et somme ensemble. Enfin
-`make build-backup scan-backup`, puis `make build image-test`.
+puis la recouper par la somme SHA-1 de ses notes de release, et changer adresse et somme ensemble.
+Enfin `make build-backup scan-backup`, puis `make build image-test`.
+
+`age` — avec `age-keygen` — et `rclone` sont compilés par le projet, dans l'étage `go` du même
+Dockerfile, avec le Go de l'image `golang` épinglée et à la version exacte de leur release
+([ADR 0017](docs/adr/0017-binaires-go-compiles-par-le-projet.md)). Dependabot monte l'image
+`golang`, et sa PR les recompile ; leurs versions se montent à la main : changer la version du
+`go install` — pour `age`, celle de ses deux commandes ensemble —, en relisant la forme de la
+release, ses drapeaux pouvant changer d'une version à l'autre. Puis `make build-backup scan-backup`,
+puis `make build image-test`, qui exige de chacun qu'il annonce une version de release.
 
 **Publication des images.** Rien à faire à la main : à chaque push sur `main`, une fois la CI
 verte, le job `publish` reconstruit les images, les scanne comme sur une PR, puis les pousse sur
