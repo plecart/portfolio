@@ -10,13 +10,13 @@ autres ; les jobs sont réduits aux champs que le script lit, noms et conclusion
 s'écrivent en littéraux, jamais dérivés des constantes du script (`cycle-pr` 3.1).
 """
 
-import json
 import subprocess
 import sys
 from collections.abc import Sequence
 from typing import Any
 
 import pytest
+from command_doubles import ABSENT, Reply, altered, failure, json_success, stdout_lines, success
 from skill_scripts import load_script, run_in_pipe
 
 erreurs_ci = load_script("cycle-pr", "erreurs-ci")
@@ -27,23 +27,6 @@ BACK = "Back — audit, lint, format, types, tests"
 INFRA = "Infra — configuration Compose, images, tests des images, scan"
 PUBLICATION = "Publication — images sur GHCR"
 DEPLOIEMENT = "Déploiement — production par SSH"
-
-Reponse = subprocess.CompletedProcess[bytes] | OSError
-
-
-def sortie(octets: bytes) -> subprocess.CompletedProcess[bytes]:
-    """Une commande `gh` qui réussit et écrit `octets` sur sa sortie standard."""
-    return subprocess.CompletedProcess([], 0, stdout=octets, stderr=b"")
-
-
-def document(contenu: Any) -> subprocess.CompletedProcess[bytes]:
-    """La sortie de `gh run view --json` : le JSON brut, en UTF-8 — accents compris."""
-    return sortie(json.dumps(contenu, ensure_ascii=False).encode())
-
-
-def panne(stderr: bytes) -> subprocess.CompletedProcess[bytes]:
-    """Une commande `gh` qui sort en 1 sans rien écrire sur sa sortie standard."""
-    return subprocess.CompletedProcess([], 1, stdout=b"", stderr=stderr)
 
 
 def job(nom: str, conclusion: str, *steps: tuple[str, str]) -> dict[str, Any]:
@@ -71,8 +54,8 @@ class Gh:
     introuvable —, et lève sur toute autre commande. `log` à `None` lève aussi : le journal ne doit
     pas être lu."""
 
-    def __init__(self, jobs: Reponse, log: Reponse | None = None, run: str = RUN) -> None:
-        self.reponses: dict[tuple[str, ...], Reponse | None] = {
+    def __init__(self, jobs: Reply, log: Reply | None = None, run: str = RUN) -> None:
+        self.reponses: dict[tuple[str, ...], Reply | None] = {
             ("gh", "run", "view", run, "--json", "status,conclusion,jobs"): jobs,
             ("gh", "run", "view", run, "--log-failed"): log,
         }
@@ -92,11 +75,6 @@ class Gh:
 def lance(gh: Gh, *args: str) -> int:
     """Le script tel que la session l'appelle."""
     return erreurs_ci.main(list(args), run=gh)
-
-
-def lignes(capsys: pytest.CaptureFixture[str]) -> list[str]:
-    """Ce que le script a écrit sur sa sortie standard, ligne par ligne."""
-    return capsys.readouterr().out.splitlines()
 
 
 # 39521079941, Front › Audit (npm audit) : le journal entier, ses 43 lignes — le BOM de la
@@ -307,7 +285,7 @@ RUNS_ROUGES_REELS = {
             job(PUBLICATION, "skipped"),
             job(DEPLOIEMENT, "skipped"),
         ),
-        sortie(JOURNAL_39521079941.encode()),
+        success(JOURNAL_39521079941.encode()),
         [f"{FRONT} › Audit : 6 vulnerabilities (5 moderate, 1 high)"],
     ),
     "39562241493-trivy-et-pip-audit": (
@@ -319,7 +297,7 @@ RUNS_ROUGES_REELS = {
             job(PUBLICATION, "skipped"),
             job(DEPLOIEMENT, "skipped"),
         ),
-        sortie(JOURNAL_39562241493.encode()),
+        success(JOURNAL_39562241493.encode()),
         [
             f"{INFRA} › Scan : Total: 7 (HIGH: 6, CRITICAL: 1)",
             f"{BACK} › Audit : Found 9 known vulnerabilities in 2 packages",
@@ -334,7 +312,7 @@ RUNS_ROUGES_REELS = {
             job(PUBLICATION, "skipped"),
             job(DEPLOIEMENT, "skipped"),
         ),
-        sortie(JOURNAL_38936444116.encode()),
+        success(JOURNAL_38936444116.encode()),
         [
             (
                 f"{BACK} › Tests : E       AssertionError: assert ([], ['origin..., '320.webp'])"
@@ -358,7 +336,7 @@ RUNS_ROUGES_REELS = {
             job(DEPLOIEMENT, "skipped"),
             job(PUBLICATION, "skipped"),
         ),
-        sortie(JOURNAL_39146227001.encode()),
+        success(JOURNAL_39146227001.encode()),
         [
             (
                 f"{INFRA} › Scan : Total: 1 (HIGH: 1, CRITICAL: 0)"
@@ -376,7 +354,7 @@ RUNS_ROUGES_REELS = {
             job(PUBLICATION, "skipped"),
             job(DEPLOIEMENT, "skipped"),
         ),
-        panne(b"log not found: 117120678982\n"),
+        failure(b"log not found: 117120678982\n"),
         [
             f"{INFRA} : aucun step en échec — conclusion failure",
             f"{BACK} : aucun step en échec — conclusion failure",
@@ -404,8 +382,8 @@ def test_un_run_rouge_reel_rend_une_ligne_par_step_en_echec(
     39146227001, le journal entier du job se lit par segment : lu d'un bloc, il rendrait le bilan
     de `npm ci` du step réussi `make web-install`, `5 moderate severity vulnerabilities` (vu rouge
     par mutation)."""
-    assert lance(Gh(document(jobs), log, run), run) == 0
-    assert lignes(capsys) == attendu
+    assert lance(Gh(json_success(jobs), log, run), run) == 0
+    assert stdout_lines(capsys) == attendu
 
 
 def test_deux_steps_en_echec_d_un_meme_job_rendent_deux_lignes(
@@ -416,8 +394,8 @@ def test_deux_steps_en_echec_d_un_meme_job_rendent_deux_lignes(
         BACK, "Tests", "FAILED test_forms.py::test_fails - assert 1 == 2"
     )
 
-    assert lance(Gh(document(jobs), sortie(log.encode())), RUN) == 0
-    assert lignes(capsys) == [
+    assert lance(Gh(json_success(jobs), success(log.encode())), RUN) == 0
+    assert stdout_lines(capsys) == [
         f"{BACK} › Lint : fatal: ruff introuvable",
         f"{BACK} › Tests : FAILED test_forms.py::test_fails - assert 1 == 2",
     ]
@@ -456,8 +434,8 @@ def test_seules_les_conclusions_d_echec_rendent_une_ligne(
     )
     log = journal(BACK, "Audit", "Found 1 known vulnerability in 1 package")
 
-    assert lance(Gh(document(jobs), sortie(log.encode())), RUN) == 0
-    assert lignes(capsys) == [
+    assert lance(Gh(json_success(jobs), success(log.encode())), RUN) == 0
+    assert stdout_lines(capsys) == [
         "Tests : aucun step en échec — conclusion failure",
         "E2E : aucun step en échec — conclusion timed_out",
         "Déploiement : aucun step en échec — conclusion action_required",
@@ -472,14 +450,14 @@ UN_STEP_EN_ECHEC = termine(job(BACK, "failure", ("Tests", "failure")))
 CHEMINS = {
     "1-section-propre": (
         UN_STEP_EN_ECHEC,
-        sortie(journal(BACK, "Tests", "Error: boom").encode()),
+        success(journal(BACK, "Tests", "Error: boom").encode()),
         [f"{BACK} › Tests : Error: boom"],
     ),
     "2-repli-segments-en-echec-dans-l-ordre": (
         termine(
             job(BACK, "failure", ("Install", "success"), ("Lint", "failure"), ("Tests", "failure"))
         ),
-        sortie(
+        success(
             journal(
                 BACK,
                 "UNKNOWN STEP",
@@ -508,7 +486,7 @@ CHEMINS = {
     ),
     "2-repli-sans-segment-en-echec": (
         termine(job(INFRA, "failure", ("Front", "success"), ("Scan", "failure"))),
-        sortie(
+        success(
             journal(
                 INFRA,
                 "UNKNOWN STEP",
@@ -522,7 +500,7 @@ CHEMINS = {
     ),
     "3-journal-illisible-gh-en-echec": (
         UN_STEP_EN_ECHEC,
-        panne(b"log not found: 117120678982\n"),
+        failure(b"log not found: 117120678982\n"),
         [
             (
                 f"{BACK} › Tests : journal indisponible — `gh run view 4242 --log-failed` a échoué"
@@ -532,7 +510,7 @@ CHEMINS = {
     ),
     "3-journal-illisible-ligne-sans-ses-trois-champs": (
         UN_STEP_EN_ECHEC,
-        sortie(f"{BACK}\tTests\tError: boom\n{BACK} Tests sans tabulation\n".encode()),
+        success(f"{BACK}\tTests\tError: boom\n{BACK} Tests sans tabulation\n".encode()),
         [
             (
                 f"{BACK} › Tests : journal indisponible — la ligne 2 du journal n'a pas la forme"
@@ -542,7 +520,7 @@ CHEMINS = {
     ),
     "4-section-hors-repli-inconnue-du-json": (
         UN_STEP_EN_ECHEC,
-        sortie(
+        success(
             (
                 journal(BACK, "Tests", "Error: boom")
                 + journal(BACK, "UNKNOWN STEP", "##[error]The operation was canceled.")
@@ -555,7 +533,7 @@ CHEMINS = {
     ),
     "5-journal-sans-section-du-step": (
         UN_STEP_EN_ECHEC,
-        sortie(b""),
+        success(b""),
         [f"{BACK} › Tests : journal indisponible — aucune section du journal à son nom"],
     ),
 }
@@ -586,8 +564,8 @@ def test_chaque_chemin_vers_la_ligne_d_un_step_en_echec_ne_rend_que_ce_step(
     l'ordre les segments `##[group]Run` qui portent une ligne `##[error]`, et un step sans un tel
     segment le dit — jamais la ligne d'un autre step, ni la section rendue à part. Un chemin
     ajouté au script ajoute son cas ici."""
-    assert lance(Gh(document(jobs), log), RUN) == 0
-    assert lignes(capsys) == attendu
+    assert lance(Gh(json_success(jobs), log), RUN) == 0
+    assert stdout_lines(capsys) == attendu
 
 
 def test_un_octet_hors_utf_8_ne_rend_pas_le_journal_illisible(
@@ -598,8 +576,8 @@ def test_un_octet_hors_utf_8_ne_rend_pas_le_journal_illisible(
     jobs = termine(job(BACK, "failure", ("Tests", "failure")))
     log = f"{BACK}\tTests\t".encode() + "Error: café\n".encode("cp1252")
 
-    assert lance(Gh(document(jobs), sortie(log)), RUN) == 0
-    assert lignes(capsys) == [f"{BACK} › Tests : Error: caf\ufffd"]
+    assert lance(Gh(json_success(jobs), success(log)), RUN) == 0
+    assert stdout_lines(capsys) == [f"{BACK} › Tests : Error: caf\ufffd"]
 
 
 # Les lignes `test_forms.py` sont la sortie de pytest 9.1.1 en `-v --tb=no` sur le poste, le
@@ -687,8 +665,8 @@ def test_la_premiere_ligne_d_erreur_suit_l_ordre_des_regles(
     jobs = termine(job(BACK, "failure", ("Tests", "failure")))
     log = journal(BACK, "Tests", *textes)
 
-    assert lance(Gh(document(jobs), sortie(log.encode())), RUN) == 0
-    assert lignes(capsys) == [f"{BACK} › Tests : {attendu}"]
+    assert lance(Gh(json_success(jobs), success(log.encode())), RUN) == 0
+    assert stdout_lines(capsys) == [f"{BACK} › Tests : {attendu}"]
 
 
 def test_le_bilan_npm_audit_a_une_seule_severite_porte_le_marqueur(
@@ -715,26 +693,28 @@ def test_le_bilan_npm_audit_a_une_seule_severite_porte_le_marqueur(
         "##[error]Process completed with exit code 2.",
     )
 
-    assert lance(Gh(document(jobs), sortie(log.encode())), RUN) == 0
-    assert lignes(capsys) == [f"{FRONT} › Audit : 1 high severity vulnerability"]
+    assert lance(Gh(json_success(jobs), success(log.encode())), RUN) == 0
+    assert stdout_lines(capsys) == [f"{FRONT} › Audit : 1 high severity vulnerability"]
 
 
 # (réponse de `gh run view 4242 --json status,conclusion,jobs`, motif attendu)
 REFUS = {
     "run-en-cours": (
-        document({"status": "in_progress", "conclusion": "", "jobs": []}),
+        json_success({"status": "in_progress", "conclusion": "", "jobs": []}),
         "run 4242 pas terminé (status in_progress) : l'attendre par `attente-ci.py`",
     ),
     "aucun-job-en-echec": (
-        document(termine(job(FRONT, "success"), job(PUBLICATION, "skipped"), conclusion="success")),
+        json_success(
+            termine(job(FRONT, "success"), job(PUBLICATION, "skipped"), conclusion="success")
+        ),
         "aucun job en échec dans le run 4242 (conclusion success)",
     ),
     "run-vert-sans-job": (
-        document(termine(conclusion="success")),
+        json_success(termine(conclusion="success")),
         "aucun job en échec dans le run 4242 (conclusion success)",
     ),
     "lecture-des-jobs-en-panne": (
-        panne(b"HTTP 404: Not Found\n(https://api.github.com/...)\n"),
+        failure(b"HTTP 404: Not Found\n(https://api.github.com/...)\n"),
         (
             "`gh run view 4242 --json status,conclusion,jobs` a échoué (1) : HTTP 404: Not Found"
             " (https://api.github.com/...)"
@@ -742,7 +722,7 @@ REFUS = {
     ),
     "gh-absent": (FileNotFoundError("gh introuvable"), "`gh` ne se lance pas : gh introuvable"),
     "reponse-non-json": (
-        sortie(b"<html>"),
+        success(b"<html>"),
         "`gh run view 4242 --json status,conclusion,jobs` ne rend pas du JSON UTF-8",
     ),
 }
@@ -750,12 +730,12 @@ REFUS = {
 
 @pytest.mark.parametrize(("jobs", "motif"), REFUS.values(), ids=REFUS.keys())
 def test_un_refus_sort_en_1_en_une_ligne_sans_lire_le_journal(
-    jobs: Reponse, motif: str, capsys: pytest.CaptureFixture[str]
+    jobs: Reply, motif: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
     gh = Gh(jobs)
 
     assert lance(gh, RUN) == 1
-    (ligne,) = lignes(capsys)
+    (ligne,) = stdout_lines(capsys)
     assert ligne.startswith(f"refus — {motif}"), ligne
     assert gh.appels == [("gh", "run", "view", RUN, "--json", "status,conclusion,jobs")]
 
@@ -766,11 +746,9 @@ def test_un_run_en_echec_sans_aucun_job_rend_sa_ligne(capsys: pytest.CaptureFixt
     s'il l'est. Non mesuré sur un run réel."""
     jobs = termine(conclusion="startup_failure")
 
-    assert lance(Gh(document(jobs)), RUN) == 0
-    assert lignes(capsys) == ["run 4242 : aucun job — conclusion startup_failure"]
+    assert lance(Gh(json_success(jobs)), RUN) == 0
+    assert stdout_lines(capsys) == ["run 4242 : aucun job — conclusion startup_failure"]
 
-
-ABSENT = object()
 
 # Chaque champ que le script lit, absent puis d'un autre type : (chemin du champ, valeur qui le
 # remplace — `ABSENT` le retire). Dénombré avant le code : 8 champs — `status`, `conclusion` et
@@ -801,31 +779,15 @@ FORMES: dict[str, tuple[tuple[str | int, ...], Any]] = {
 }
 
 
-def altere(contenu: Any, chemin: tuple[str | int, ...], valeur: Any) -> Any:
-    """`contenu` dont le champ au bout de `chemin` vaut `valeur` — retiré pour `ABSENT` ; un
-    chemin vide remplace le document entier."""
-    if not chemin:
-        return valeur
-    *parents, cle = chemin
-    cible = contenu
-    for etape in parents:
-        cible = cible[etape]
-    if valeur is ABSENT:
-        del cible[cle]
-    else:
-        cible[cle] = valeur
-    return contenu
-
-
 @pytest.mark.parametrize(("chemin", "valeur"), FORMES.values(), ids=FORMES.keys())
 def test_des_jobs_d_une_autre_forme_sortent_en_1_en_une_ligne_sans_lire_le_journal(
     chemin: tuple[str | int, ...], valeur: Any, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    jobs = altere(termine(job(BACK, "failure", ("Tests", "failure"))), chemin, valeur)
-    gh = Gh(document(jobs))
+    jobs = altered(termine(job(BACK, "failure", ("Tests", "failure"))), chemin, valeur)
+    gh = Gh(json_success(jobs))
 
     assert lance(gh, RUN) == 1
-    (ligne,) = lignes(capsys)
+    (ligne,) = stdout_lines(capsys)
     assert ligne.startswith(
         "refus — `gh run view 4242 --json status,conclusion,jobs` ne rend pas la forme attendue"
     ), ligne
@@ -839,7 +801,7 @@ APPELS_MAL_FORMES = {"lettres": ("abc",), "chiffre-unicode": ("²",), "argument-
 def test_un_appel_mal_forme_sort_en_2_sans_appeler_gh(
     args: tuple[str, ...], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    gh = Gh(document(termine()))
+    gh = Gh(json_success(termine()))
 
     assert lance(gh, *args) == 2
     assert gh.appels == []

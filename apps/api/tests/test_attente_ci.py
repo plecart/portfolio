@@ -11,13 +11,13 @@ script lit. Les cas s'écrivent en littéraux, jamais dérivés des constantes d
 3.1).
 """
 
-import json
 import subprocess
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, NamedTuple
 
 import pytest
+from command_doubles import ABSENT, Reply, altered, failure, json_success, stdout_lines, success
 from skill_scripts import load_script, run_in_pipe
 
 attente_ci = load_script("cycle-pr", "attente-ci")
@@ -29,23 +29,6 @@ RUNS_DU_SHA = "repos/{owner}/{repo}/actions/runs?head_sha="
 EVENEMENT = "&event=pull_request"
 # Au-delà, la forge témoin tient le script pour une boucle serrée : il la relit sans attendre.
 LIMITE_D_APPELS = 500
-
-Reponse = subprocess.CompletedProcess[bytes] | OSError
-
-
-def sortie(octets: bytes) -> subprocess.CompletedProcess[bytes]:
-    """Une commande `gh` qui réussit et écrit `octets` sur sa sortie standard."""
-    return subprocess.CompletedProcess([], 0, stdout=octets, stderr=b"")
-
-
-def document(contenu: Any) -> subprocess.CompletedProcess[bytes]:
-    """La sortie de `gh … --json` ou de `gh api` : le JSON brut, en UTF-8 — accents compris."""
-    return sortie(json.dumps(contenu, ensure_ascii=False).encode())
-
-
-def panne(stderr: bytes) -> subprocess.CompletedProcess[bytes]:
-    """Une commande `gh` qui sort en 1 sans rien écrire sur sa sortie standard."""
-    return subprocess.CompletedProcess([], 1, stdout=b"", stderr=stderr)
 
 
 class Horloge:
@@ -111,7 +94,7 @@ class Forge:
         cout: float = 0.0,
         code_watch: int | None = None,
         watch_immediat: bool = False,
-        remplace: Mapping[str, Reponse] | None = None,
+        remplace: Mapping[str, Reply] | None = None,
         retouche: Mapping[str, Callable[[Any], Any]] | None = None,
     ) -> None:
         self.horloge = Horloge()
@@ -141,7 +124,7 @@ class Forge:
             return self.watch(cmd, timeout)
         contenu = self.contenu(genre, cmd)
         self.horloge.maintenant += self.cout
-        return document(self.retouche.get(genre, lambda brut: brut)(contenu))
+        return json_success(self.retouche.get(genre, lambda brut: brut)(contenu))
 
     def genre(self, cmd: tuple[str, ...]) -> str:
         """Le genre d'une commande attendue ; toute autre lève."""
@@ -200,7 +183,7 @@ class Forge:
     ) -> subprocess.CompletedProcess[bytes]:
         """`gh run watch` : la fin du run, ou `TimeoutExpired` au bout du `timeout` reçu."""
         if self.watch_immediat:
-            return panne(b"HTTP 502: Bad Gateway\n")
+            return failure(b"HTTP 502: Bad Gateway\n")
         assert timeout is not None, "`gh run watch` sans timeout"
         run = self.run(cmd[3])
         if run.fin is None or run.fin > self.horloge() + timeout:
@@ -227,16 +210,11 @@ def lance(forge: Forge, *args: str) -> int:
     return attente_ci.main(list(args), run=forge, clock=forge.horloge, sleep=forge.horloge.dort)
 
 
-def lignes(capsys: pytest.CaptureFixture[str]) -> list[str]:
-    """Ce que le script a écrit sur sa sortie standard, ligne par ligne."""
-    return capsys.readouterr().out.splitlines()
-
-
 def test_un_run_vert_rend_vert_en_sortie_0(capsys: pytest.CaptureFixture[str]) -> None:
     forge = Forge(RunCi(39565701629))
 
     assert lance(forge, PR) == 0
-    assert lignes(capsys) == [
+    assert stdout_lines(capsys) == [
         "vert — run 39565701629 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"
     ]
 
@@ -264,7 +242,7 @@ def test_un_run_rouge_nomme_ses_jobs_en_echec_et_renvoie_a_erreurs_ci(
     forge = Forge(RunCi(4242, conclusion="failure", jobs=JOBS_DU_ROUGE))
 
     assert lance(forge, PR) == 1
-    assert lignes(capsys) == [
+    assert stdout_lines(capsys) == [
         (
             "rouge — run 4242 sur 9fb8d6a, conclusion failure, jobs en échec :"
             " Back — audit, lint, format, types, tests (failure),"
@@ -287,7 +265,7 @@ def test_toute_conclusion_autre_que_vert_saute_ou_annule_est_un_rouge(
     forge = Forge(RunCi(4242, conclusion=conclusion))
 
     assert lance(forge, PR) == 1
-    assert lignes(capsys) == [
+    assert stdout_lines(capsys) == [
         (
             f"rouge — run 4242 sur 9fb8d6a, conclusion {conclusion}, jobs en échec : aucun"
             " → erreurs-ci.py 4242, puis cycle-pr Étape 6, « Trier un rouge »"
@@ -301,7 +279,7 @@ def test_un_run_saute_rend_saute_en_sortie_3(capsys: pytest.CaptureFixture[str])
     forge = Forge(RunCi(39565701629, conclusion="skipped"))
 
     assert lance(forge, PR) == 3
-    assert lignes(capsys) == [
+    assert stdout_lines(capsys) == [
         "sauté — run 39565701629 sur 9fb8d6a → cycle-pr Étape 5, « Si aucun run n'apparaît »"
     ]
 
@@ -312,7 +290,7 @@ def test_un_run_annule_sans_nouvelle_tete_rend_annule_sans_remplacant(
     forge = Forge(RunCi(4242, conclusion="cancelled"))
 
     assert lance(forge, PR) == 3
-    assert lignes(capsys) == [
+    assert stdout_lines(capsys) == [
         (
             "annulé sans remplaçant — run 4242 sur 9fb8d6a"
             " → cycle-pr Étape 5, « Si aucun run n'apparaît »"
@@ -334,7 +312,9 @@ def test_un_run_annule_par_un_nouveau_push_fait_suivre_la_nouvelle_tete(
     )
 
     assert lance(forge, PR) == 0
-    assert lignes(capsys) == ["vert — run 4343 sur c7a23ca → sortir du draft, cycle-pr Étape 5"]
+    assert stdout_lines(capsys) == [
+        "vert — run 4343 sur c7a23ca → sortir du draft, cycle-pr Étape 5"
+    ]
 
 
 def test_aucun_run_jusqu_au_delai_rend_aucun_run_en_sortie_3(
@@ -346,7 +326,7 @@ def test_aucun_run_jusqu_au_delai_rend_aucun_run_en_sortie_3(
     forge = Forge()
 
     assert lance(forge, PR, "--delai", "75") == 3
-    assert lignes(capsys) == [
+    assert stdout_lines(capsys) == [
         (
             "aucun run — aucun run CI sur 9fb8d6a en 75 s"
             " → cycle-pr Étape 5, « Si aucun run n'apparaît »"
@@ -363,7 +343,9 @@ def test_un_run_qui_apparait_puis_tourne_est_attendu_jusqu_a_son_verdict(
     forge = Forge(RunCi(4242, apparait=25.0, fin=100.0), intervalle="10")
 
     assert lance(forge, PR, "--intervalle", "10") == 0
-    assert lignes(capsys) == ["vert — run 4242 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"]
+    assert stdout_lines(capsys) == [
+        "vert — run 4242 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"
+    ]
     assert forge.horloge.attentes == [10.0, 10.0, 10.0]
     assert forge.appels_de("watch") == [
         Appel(30.0, ("gh", "run", "watch", "4242", "--exit-status", "-i", "10"), 1770.0)
@@ -377,7 +359,7 @@ def test_un_run_qui_tourne_jusqu_au_delai_sort_en_124(capsys: pytest.CaptureFixt
     forge = Forge(RunCi(4242, fin=None), cout=2.0)
 
     assert lance(forge, PR, "--delai", "600") == 124
-    assert lignes(capsys) == [
+    assert stdout_lines(capsys) == [
         (
             "délai dépassé — run 4242 sur 9fb8d6a encore in_progress après 600 s"
             " → cycle-pr Étape 6, « CI qui ne démarre pas »"
@@ -395,7 +377,9 @@ def test_le_code_de_sortie_de_watch_ne_decide_pas_du_verdict(
     forge = Forge(RunCi(4242, fin=50.0), code_watch=1)
 
     assert lance(forge, PR) == 0
-    assert lignes(capsys) == ["vert — run 4242 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"]
+    assert stdout_lines(capsys) == [
+        "vert — run 4242 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"
+    ]
 
 
 def test_un_watch_qui_rend_la_main_tout_de_suite_ne_fait_pas_relire_sans_attendre(
@@ -408,7 +392,7 @@ def test_un_watch_qui_rend_la_main_tout_de_suite_ne_fait_pas_relire_sans_attendr
 
     assert lance(forge, PR, "--delai", "75") == 124
     assert forge.instants("runs") == [0.0, 30.0, 60.0, 75.0]
-    assert lignes(capsys) == [
+    assert stdout_lines(capsys) == [
         (
             "délai dépassé — run 4242 sur 9fb8d6a encore in_progress après 75 s"
             " → cycle-pr Étape 6, « CI qui ne démarre pas »"
@@ -431,7 +415,9 @@ def test_le_run_le_plus_recent_par_created_at_decide_quel_que_soit_l_ordre_de_l_
     runs: tuple[RunCi, ...], capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert lance(Forge(*runs), PR) == 0
-    assert lignes(capsys) == ["vert — run 4242 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"]
+    assert stdout_lines(capsys) == [
+        "vert — run 4242 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"
+    ]
 
 
 # `created_at` est à la seconde : deux runs créés dans la même seconde se départagent par
@@ -451,7 +437,9 @@ def test_deux_runs_crees_a_la_meme_seconde_sont_departages_par_l_identifiant(
     runs: tuple[RunCi, ...], capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert lance(Forge(*runs), PR) == 0
-    assert lignes(capsys) == ["vert — run 4343 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"]
+    assert stdout_lines(capsys) == [
+        "vert — run 4343 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"
+    ]
 
 
 def test_un_run_d_un_autre_workflow_est_ignore(capsys: pytest.CaptureFixture[str]) -> None:
@@ -461,7 +449,9 @@ def test_un_run_d_un_autre_workflow_est_ignore(capsys: pytest.CaptureFixture[str
     )
 
     assert lance(forge, PR) == 0
-    assert lignes(capsys) == ["vert — run 4242 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"]
+    assert stdout_lines(capsys) == [
+        "vert — run 4242 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"
+    ]
 
 
 def test_sans_option_le_delai_vaut_1800_s_et_l_intervalle_30_s(
@@ -472,7 +462,7 @@ def test_sans_option_le_delai_vaut_1800_s_et_l_intervalle_30_s(
     forge = Forge()
 
     assert lance(forge, PR) == 3
-    assert lignes(capsys) == [
+    assert stdout_lines(capsys) == [
         (
             "aucun run — aucun run CI sur 9fb8d6a en 1800 s"
             " → cycle-pr Étape 5, « Si aucun run n'apparaît »"
@@ -482,9 +472,9 @@ def test_sans_option_le_delai_vaut_1800_s_et_l_intervalle_30_s(
 
 
 # (réponses remplacées par genre de commande, runs de la forge, motif attendu)
-REFUS: dict[str, tuple[dict[str, Reponse], tuple[RunCi, ...], str]] = {
+REFUS: dict[str, tuple[dict[str, Reply], tuple[RunCi, ...], str]] = {
     "tete-en-panne": (
-        {"tete": panne(b"GraphQL: Could not resolve to a PullRequest with the number of 144.\n")},
+        {"tete": failure(b"GraphQL: Could not resolve to a PullRequest with the number of 144.\n")},
         (),
         (
             "`gh pr view 144 --json headRefOid` a échoué (1) :"
@@ -492,7 +482,7 @@ REFUS: dict[str, tuple[dict[str, Reponse], tuple[RunCi, ...], str]] = {
         ),
     ),
     "runs-en-panne": (
-        {"runs": panne(b"HTTP 502: Bad Gateway\n(https://api.github.com/...)\n")},
+        {"runs": failure(b"HTTP 502: Bad Gateway\n(https://api.github.com/...)\n")},
         (),
         (
             "`gh api repos/{owner}/{repo}/actions/runs"
@@ -501,7 +491,7 @@ REFUS: dict[str, tuple[dict[str, Reponse], tuple[RunCi, ...], str]] = {
         ),
     ),
     "jobs-en-panne": (
-        {"jobs": panne(b"HTTP 404: Not Found\n")},
+        {"jobs": failure(b"HTTP 404: Not Found\n")},
         (RunCi(4242, conclusion="failure"),),
         "`gh run view 4242 --json jobs` a échoué (1) : HTTP 404: Not Found",
     ),
@@ -516,14 +506,14 @@ REFUS: dict[str, tuple[dict[str, Reponse], tuple[RunCi, ...], str]] = {
         "`gh` ne se lance pas : gh introuvable",
     ),
     "reponse-non-json": (
-        {"tete": sortie(b"<html>")},
+        {"tete": success(b"<html>")},
         (),
         "`gh pr view 144 --json headRefOid` ne rend pas du JSON UTF-8",
     ),
     # Un JSON valide, mais en cp1252 : décodé par la page de code du poste, il passerait (obs 108).
     "reponse-hors-utf-8": (
         {
-            "jobs": sortie(
+            "jobs": success(
                 '{"jobs": [{"name": "Déploiement", "conclusion": "failure"}]}'.encode("cp1252")
             )
         },
@@ -535,17 +525,15 @@ REFUS: dict[str, tuple[dict[str, Reponse], tuple[RunCi, ...], str]] = {
 
 @pytest.mark.parametrize(("remplace", "runs", "motif"), REFUS.values(), ids=REFUS.keys())
 def test_une_lecture_gh_en_echec_sort_en_1_en_une_ligne(
-    remplace: dict[str, Reponse],
+    remplace: dict[str, Reply],
     runs: tuple[RunCi, ...],
     motif: str,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert lance(Forge(*runs, remplace=remplace), PR) == 1
-    (ligne,) = lignes(capsys)
+    (ligne,) = stdout_lines(capsys)
     assert ligne.startswith(f"refus — {motif}"), ligne
 
-
-ABSENT = object()
 
 # Chaque champ que le script lit, absent puis d'un autre type : (genre de la lecture, chemin du
 # champ, valeur qui le remplace — `ABSENT` le retire). Dénombré avant le code : 10 champs —
@@ -599,22 +587,6 @@ COMMANDES = {
 }
 
 
-def altere(contenu: Any, chemin: tuple[str | int, ...], valeur: Any) -> Any:
-    """`contenu` dont le champ au bout de `chemin` vaut `valeur` — retiré pour `ABSENT` ; un
-    chemin vide remplace le document entier."""
-    if not chemin:
-        return valeur
-    *parents, cle = chemin
-    cible = contenu
-    for etape in parents:
-        cible = cible[etape]
-    if valeur is ABSENT:
-        del cible[cle]
-    else:
-        cible[cle] = valeur
-    return contenu
-
-
 @pytest.mark.parametrize(("genre", "chemin", "valeur"), FORMES.values(), ids=FORMES.keys())
 def test_une_reponse_d_une_autre_forme_sort_en_1_en_une_ligne(
     genre: str, chemin: tuple[str | int, ...], valeur: Any, capsys: pytest.CaptureFixture[str]
@@ -625,11 +597,11 @@ def test_une_reponse_d_une_autre_forme_sort_en_1_en_une_ligne(
             conclusion="failure" if genre == "jobs" else "success",
             jobs=(("Back", "failure"),),
         ),
-        retouche={genre: lambda contenu: altere(contenu, chemin, valeur)},
+        retouche={genre: lambda contenu: altered(contenu, chemin, valeur)},
     )
 
     assert lance(forge, PR) == 1
-    (ligne,) = lignes(capsys)
+    (ligne,) = stdout_lines(capsys)
     assert ligne.startswith(f"refus — `{COMMANDES[genre]}` ne rend pas la forme attendue"), ligne
 
 
