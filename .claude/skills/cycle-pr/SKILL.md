@@ -1244,7 +1244,7 @@ l'Étape 5 : `git push origin --delete captures/pr-<n>`.
 dépendance :
 
 ```
-python <répertoire de ce skill>/scripts/bilan-session.py <transcript .jsonl> [<relais ou session de relecture .jsonl> …]
+python <répertoire de ce skill>/scripts/bilan-session.py <transcript .jsonl> [<relais .jsonl> …] [--relecture <transcript de la session de relecture .jsonl> …]
 ```
 
 Les transcripts vivent sous `~/.claude/projects/<projet>/<uuid de session>.jsonl` — l'uuid est
@@ -1262,11 +1262,11 @@ contact** — lu dans son propre transcript, sous `<uuid>/subagents/`, reprises 
 plan compris ; pas sa sortie, que ce transcript sous-compte —, les points de contact humains et
 les appels d'outils ; puis le **profil de contexte** de chaque session : cache lu par quart des
 appels, première porte de relecture et part du cache lu après elle, composition en caractères.
-**La session de relecture, quand la PR en a une, se donne avec la session PR** : son transcript
-vit sous le dossier de projet de son propre worktree, et le script lit les sous-agents rangés
-sous le dossier de chaque transcript (`subagents`). Les lignes d'attente se relèvent alors d'un
-second passage, sur les transcripts de la session PR seuls, relais compris : une session en
-parallèle ferme les attentes de l'autre (docstring de `waits`).
+**La session de relecture, quand la PR en a une, se donne par `--relecture`**, ses relais
+compris : ses jetons, ses sous-agents et son profil se rendent, sans entrer dans la durée ni les
+attentes — fusionnée avec la session PR, elle en fermerait les attentes (docstring de `waits`).
+Son transcript vit sous le dossier de projet de son propre worktree, et le script lit les
+sous-agents rangés sous le dossier de chaque transcript (`subagents`).
 
 Écrire ces lignes, plus trois à la main — commits prévus contre commits de correction, constats
 par passe, correctifs qui ont cassé quelque chose — dans `retrospectives/<date>-<issue>.md`,
