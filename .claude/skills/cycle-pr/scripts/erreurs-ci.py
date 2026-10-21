@@ -26,12 +26,17 @@ Il rend, dans l'ordre des jobs puis des steps du JSON, une ligne par step en éc
 
 **Le journal entier d'un job.** Quand `gh` ne sait pas associer le journal en zip à un job, il lit
 le journal du job par l'API et le range entier sous le step `UNKNOWN STEP` (`gh run view --help`,
-gh 2.94.0). Un step en échec sans section propre lit alors cette section par segments, chacun
-ouvert par une ligne `##[group]Run <commande>` — 39146227001, Infra : 2 076 lignes, douze
-segments, un seul `##[error]`. Les steps en échec du job prennent dans l'ordre les segments qui
-portent une ligne `##[error]`, et leur ligne nomme le sien : `<erreur> — segment « Run make scan »
-du journal du job`. Un step sans tel segment le dit, sans jamais rendre la ligne d'un autre step,
-et la section qu'il a lue ne se rend pas à part.
+gh 2.94.0). Il en décide job par job, quand aucun step du job n'a de journal dans le zip (même
+fichier de cli/cli, `stepLogAvailable`) ; mais une ligne du zip peut aussi n'être associée à
+aucun step, et se range sous le même nom (même aide). La section `UNKNOWN STEP` d'un job ne se
+lit donc comme son journal entier que si aucun step du job n'a de section propre et qu'elle
+porte au moins une ligne `##[group]Run <commande>` ; sinon elle se rend à part, comme toute
+autre section. Lue comme journal entier, elle se coupe en segments, chacun ouvert par une de ces
+lignes — 39146227001, Infra : 2 076 lignes, douze segments, un seul `##[error]`. Les steps en
+échec du job prennent dans l'ordre les segments qui portent une ligne `##[error]`, et leur ligne
+nomme le sien : `<erreur> — segment « Run make scan » du journal du job`. Un step sans tel
+segment le dit, sans jamais rendre la ligne d'un autre step, et la section qu'il a lue ne se rend
+pas à part.
 
 Toute autre section du journal qu'aucun step en échec ne nomme rend sa ligne à la suite, sous son
 nom : aucune section ne se perd en silence. Un journal illisible ne fait pas refuser : chaque step
@@ -73,11 +78,14 @@ session PR. Un outil dont l'erreur ne porte aucun marqueur : il retombe sur (b) 
 annotations des jobs, non lues. Un run relancé : seule sa dernière tentative est lue — sans
 `--attempt`, `gh run view 39559119382`, relancé une fois, rend les jobs de la tentative 2 et son
 journal, octet pour octet (mesuré le 2026-10-21, gh 2.94.0). Deux steps en échec d'un même job
-sous un même nom partagent une section. Dans le journal entier d'un job, la coupe repose sur les
-en-têtes `##[group]Run ` du runner, mesurés sur 39146227001 : un step qui écrirait lui-même une
-ligne `##[group]Run …` serait mal coupé, un step réussi qui écrirait une ligne `##[error]`
-prendrait le segment d'un step en échec, et les lignes des steps `Post`, sans en-tête, restent au
-segment qui les précède.
+sous un même nom partagent une section. Une section `UNKNOWN STEP` partielle qui porterait une
+ligne `##[group]Run `, dans un job dont aucun step en échec n'a de section propre, se lirait comme
+le journal entier — jamais observée : les 7 runs de repli réels relevés par la passe 2 de
+relecture du lot 4b de #134 rendaient tous le journal entier. Dans le journal entier d'un job, la
+coupe repose sur les en-têtes `##[group]Run ` du runner, mesurés sur 39146227001 : un step qui
+écrirait lui-même une ligne `##[group]Run …` serait mal coupé, un step réussi qui écrirait une
+ligne `##[error]` prendrait le segment d'un step en échec, et les lignes des steps `Post`, sans
+en-tête, restent au segment qui les précède.
 
 Sortie : 0 lignes rendues, sur la sortie standard ; 1 refus (« refus — »), motif en une ligne, sans
 lire le journal — `gh` ne se lance pas, la lecture des jobs échoue ou ne rend pas la forme
@@ -305,13 +313,26 @@ def first_error(texts: Sequence[str]) -> str:
     return next((line for rule in RULES for line in lines if rule(line)), lines[-1])
 
 
+def opens_segment(text: str) -> bool:
+    """Vrai si la ligne, nettoyée, commence par `##[group]Run ` : l'en-tête d'un segment."""
+    return cleaned(text).startswith(SEGMENT_HEADER)
+
+
+def whole_job(job: Job, found: Sections) -> bool:
+    """Vrai si la section `UNKNOWN STEP` du job est son journal entier (voir le module) : aucun
+    step du job n'a de section propre, et elle porte au moins un en-tête `##[group]Run `."""
+    if any((job.name, step.name) in found for step in job.steps):
+        return False
+    return any(opens_segment(text) for text in found.get((job.name, WHOLE_JOB), []))
+
+
 def failed_segments(texts: Sequence[str]) -> list[list[str]]:
     """Les segments du journal entier d'un job qui portent une ligne `##[error]`, dans l'ordre.
-    Un segment s'ouvre à une ligne qui, nettoyée, commence par `##[group]Run ` ; les lignes qui
-    précèdent la première n'en forment aucun."""
+    Un segment s'ouvre à son en-tête (`opens_segment`) ; les lignes qui précèdent le premier n'en
+    forment aucun."""
     segments: list[list[str]] = []
     for text in texts:
-        if cleaned(text).startswith(SEGMENT_HEADER):
+        if opens_segment(text):
             segments.append([])
         if segments:
             segments[-1].append(text)
@@ -339,12 +360,13 @@ def job_lines(job: Job, found: Sections, missing: str) -> tuple[list[str], set[K
     """Les lignes d'un job en échec, et les sections du journal qu'elles ont lues.
 
     Un step en échec lit sa section propre, sinon le segment en échec suivant du journal entier
-    de son job s'il y est (voir le module), sinon rend `missing`.
+    de son job quand `gh` l'a rendu (`whole_job`), sinon rend `missing`.
     """
     steps = [step for step in job.steps if step.conclusion and failed(step.conclusion)]
     if not steps:
         return [f"{job.name} : aucun step en échec — conclusion {job.conclusion}"], set()
     whole = (job.name, WHOLE_JOB)
+    whole_log = whole_job(job, found)
     segments = iter(failed_segments(found.get(whole, [])))
     lines: list[str] = []
     read: set[Key] = set()
@@ -353,7 +375,7 @@ def job_lines(job: Job, found: Sections, missing: str) -> tuple[list[str], set[K
         if own in found:
             read.add(own)
             error = first_error(found[own])
-        elif whole in found:
+        elif whole_log:
             read.add(whole)
             error = segment_error(next(segments, None))
         else:

@@ -536,6 +536,36 @@ CHEMINS = {
         success(b""),
         [f"{BACK} › Tests : journal indisponible — aucune section du journal à son nom"],
     ),
+    "6-section-unknown-step-sans-en-tete": (
+        UN_STEP_EN_ECHEC,
+        success(journal(BACK, "UNKNOWN STEP", "##[error]The operation was canceled.").encode()),
+        [
+            f"{BACK} › Tests : journal indisponible — aucune section du journal à son nom",
+            f"{BACK} › UNKNOWN STEP : ##[error]The operation was canceled.",
+        ],
+    ),
+    "7-job-mixte-section-propre-et-unknown-step": (
+        termine(job(BACK, "failure", ("Lint", "failure"), ("Tests", "failure"))),
+        success(
+            (
+                journal(BACK, "Lint", "fatal: ruff introuvable")
+                + journal(
+                    BACK,
+                    "UNKNOWN STEP",
+                    "##[group]Run make lint",
+                    "##[error]Process completed with exit code 2.",
+                    "##[group]Run make test",
+                    "FAILED test_forms.py::test_fails - assert 1 == 2",
+                    "##[error]Process completed with exit code 2.",
+                )
+            ).encode()
+        ),
+        [
+            f"{BACK} › Lint : fatal: ruff introuvable",
+            f"{BACK} › Tests : journal indisponible — aucune section du journal à son nom",
+            f"{BACK} › UNKNOWN STEP : FAILED test_forms.py::test_fails - assert 1 == 2",
+        ],
+    ),
 }
 
 
@@ -560,10 +590,21 @@ def test_chaque_chemin_vers_la_ligne_d_un_step_en_echec_ne_rend_que_ce_step(
     5. un journal lisible sans section au nom du step ni section `UNKNOWN STEP` de son job —
        tenu ; relevé au recensement, absent de la liste de la relecture.
 
-    5 chemins recensés, 1 fuyait. Le chemin 2 a deux cas : les steps en échec prennent dans
-    l'ordre les segments `##[group]Run` qui portent une ligne `##[error]`, et un step sans un tel
-    segment le dit — jamais la ligne d'un autre step, ni la section rendue à part. Un chemin
-    ajouté au script ajoute son cas ici."""
+    Recensés à la passe 2, depuis le correctif du chemin 2 (`4498e8f`), qui prenait toute section
+    `UNKNOWN STEP` pour le journal entier du job ; or `gh` décide le repli job par job (cli/cli,
+    `pkg/cmd/run/view/logs.go`, `stepLogAvailable`), et une ligne du zip peut n'être associée à
+    aucun step (`gh run view --help`, gh 2.94.0) :
+
+    6. une section `UNKNOWN STEP` sans en-tête `##[group]Run `, pour un step sans section
+       propre — **fuyait** : sa ligne `##[error]` était perdue, rendue à `c7a23ca` ;
+    7. un job mixte, une section propre et une section `UNKNOWN STEP` à segments — **fuyait** :
+       le step sans section rendait la ligne d'un autre step.
+
+    7 chemins recensés, 3 fuyaient, dont 2 depuis `4498e8f`. Le chemin 2 a deux cas : les steps en
+    échec prennent dans l'ordre les segments `##[group]Run` qui portent une ligne `##[error]`, et
+    un step sans un tel segment le dit — jamais la ligne d'un autre step, ni la section rendue à
+    part. Hors du chemin 2, une section `UNKNOWN STEP` se rend sous son nom (6 et 7, vus rouges
+    par mutation). Un chemin ajouté au script ajoute son cas ici."""
     assert lance(Gh(json_success(jobs), log), RUN) == 0
     assert stdout_lines(capsys) == attendu
 
