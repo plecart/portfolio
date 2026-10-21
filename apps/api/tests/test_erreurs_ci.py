@@ -535,6 +535,34 @@ def test_la_premiere_ligne_d_erreur_suit_l_ordre_des_regles(
     assert lignes(capsys) == [f"{BACK} › Tests : {attendu}"]
 
 
+def test_le_bilan_npm_audit_a_une_seule_severite_porte_le_marqueur(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """`npm-audit-report` 7.0.0 (livré avec npm 11.8.0 au poste), `lib/reporters/install.js`, lu
+    le 2026-10-21 : un bilan à plusieurs sévérités s'écrit `<n> vulnerabilities (<détail>)` — la
+    forme de 39521079941 —, un bilan à une seule `<n> <sévérité> severity vulnerabilit(y|ies)`.
+    Cette seconde forme n'est pas mesurée sur un run : sans son marqueur, le step rendrait
+    l'annotation générique, qui ne dit rien."""
+    jobs = termine(job(FRONT, "failure", ("Audit", "failure")))
+    log = journal(
+        FRONT,
+        "Audit",
+        "# npm audit report",
+        "vite  8.3.0 - 8.3.2",
+        "Severity: high",
+        "fix available via `npm audit fix`",
+        "node_modules/vite",
+        "1 high severity vulnerability",
+        "To address all issues, run:",
+        "  npm audit fix",
+        "make: *** [Makefile:315: web-audit] Error 1",
+        "##[error]Process completed with exit code 2.",
+    )
+
+    assert lance(Gh(document(jobs), sortie(log.encode())), RUN) == 0
+    assert lignes(capsys) == [f"{FRONT} › Audit : 1 high severity vulnerability"]
+
+
 # (réponse de `gh run view 4242 --json status,conclusion,jobs`, motif attendu)
 REFUS = {
     "run-en-cours": (
