@@ -1264,8 +1264,9 @@ les appels d'outils ; puis le **profil de contexte** de chaque session : cache l
 appels, première porte de relecture et part du cache lu après elle, composition en caractères.
 **La session de relecture, quand la PR en a une, se donne avec la session PR** : son transcript
 vit sous le dossier de projet de son propre worktree, et le script lit les sous-agents rangés
-sous le dossier de chaque transcript (`subagents`). L'attente se lit sur la session PR seule,
-relais compris, parce qu'une session en parallèle ferme ses attentes (docstring de `waits`).
+sous le dossier de chaque transcript (`subagents`). Les lignes d'attente se relèvent alors d'un
+second passage, sur les transcripts de la session PR seuls, relais compris : une session en
+parallèle ferme les attentes de l'autre (docstring de `waits`).
 
 Écrire ces lignes, plus trois à la main — commits prévus contre commits de correction, constats
 par passe, correctifs qui ont cassé quelque chose — dans `retrospectives/<date>-<issue>.md`,
