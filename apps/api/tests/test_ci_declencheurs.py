@@ -435,30 +435,30 @@ def test_aucune_prose_ne_promet_un_run_au_passage_en_ready() -> None:
 
 
 def test_cycle_pr_lit_le_run_du_sha_de_tete_avant_de_sortir_du_draft() -> None:
-    """À l'Étape 5, la lecture du run du SHA de tête précède `gh pr ready` : un agent qui suit le
-    skill dans l'ordre la fait avant de sortir du draft, pas après (obs 30)."""
+    """À l'Étape 5, la lecture du run du SHA de tête — l'appel d'`attente-ci.py` — précède
+    `gh pr ready` : un agent qui suit le skill dans l'ordre la fait avant de sortir du draft, pas
+    après (obs 30)."""
     text = CYCLE_PR.read_text(encoding="utf-8")
     step = text[text.index("## Étape 5 ") : text.index("## Étape 6 ")]
-    assert "actions/runs?head_sha=" in step
-    assert step.index("actions/runs?head_sha=") < step.index("gh pr ready <numéro>")
+    assert "scripts/attente-ci.py <numéro>" in step
+    assert step.index("scripts/attente-ci.py <numéro>") < step.index("gh pr ready <numéro>")
 
 
 # Chaque issue de la lecture du run du SHA de tête, et le mot que l'Étape 5 doit porter pour elle
 # avant `gh pr ready`. Dénombré le 2026-10-20 (relecture de la PR #137, passe 2) : une lecture qui
 # ne rendait que la conclusion traitait 4 issues sur 6 — une réouverture laisse deux runs sur la
 # même tête, `skipped` puis `success`, et la ligne `skipped` relançait une réouverture en boucle ;
-# `cancelled` n'avait pas de voie.
+# `cancelled` n'avait pas de voie. Depuis le lot 4b de #134, `attente-ci.py` tranche le plus
+# récent, le run en cours et la tête remplacée — un cas chacun dans `test_attente_ci.py` — et rend
+# une sortie par issue : ce sont elles que la prose porte.
 RUN_READINGS = {
-    "plusieurs runs : le plus récent décide": "**première ligne**",
-    "statut lu avec la conclusion et l'identifiant": (
-        r'"\(.created_at) \(.status) \(.conclusion) \(.id)"'
-    ),
-    "vert": "- `success` →",
-    "en cours": "- `in_progress` ou `queued`",
-    "remplacé": "- `cancelled` →",
-    "draft jamais repoussée": "- `skipped` →",
-    "aucun run": "- aucune ligne →",
-    "rouge": "- toute autre conclusion",
+    "vert": "- sortie 0, vert (`success`) →",
+    "rouge": "- sortie 1, rouge — toute autre conclusion",
+    "refus": "« refus — » sort aussi en 1",
+    "draft jamais repoussée": "- sortie 3 → « Si aucun run n'apparaît », ci-dessous : `skipped`",
+    "annulé sans remplaçant": "`cancelled` sans nouvelle tête, annulé sans remplaçant",
+    "aucun run": "aucun run au délai",
+    "délai dépassé": "- sortie 124, délai dépassé",
 }
 
 

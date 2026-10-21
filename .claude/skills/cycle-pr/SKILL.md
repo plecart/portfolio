@@ -846,49 +846,50 @@ depuis, rejouer la vérification sur ce qui a changé (Étape 7, « Rejouer les 
 périmées ») **avant `gh pr ready`**.
 
 **Avant de sortir du draft, lire le run du SHA de tête.** `gh pr ready` ne déclenche aucun run
-(ADR 0017) : la preuve d'une PR prête est le run de son dernier push (Étape 4). Le lire, verdict
-compris, sur le SHA complet de tête — une ligne par run, la plus récente en premier (mesuré le
-2026-10-20), son identifiant en dernier :
+(ADR 0017) : la preuve d'une PR prête est le run de son dernier push (Étape 4). La session PR
+**l'attend** avant de passer à la suite, par une commande lancée en fond, dont la fin réveille la
+session, bornée : 1800 s par défaut, `--delai <secondes>` pour une autre borne.
 
 ```
-gh api "repos/<owner>/<repo>/actions/runs?head_sha=<sha complet>&event=pull_request" --jq '.workflow_runs[] | select(.name == "CI") | "\(.created_at) \(.status) \(.conclusion) \(.id)"'
+python <répertoire de ce skill>/scripts/attente-ci.py <numéro>
 ```
 
-Seule la **première ligne** décide : une réouverture ajoute un run sur la même tête, et les plus
-anciens ne comptent plus. Sa conclusion :
+Le script relit à chaque tour la tête de la PR et les runs `CI` de son SHA, dont le plus récent
+par `created_at` décide : une réouverture ajoute un run sur la même tête, et les plus anciens ne
+comptent plus. Il attend un run qui tourne, suit la nouvelle tête quand un push annule le run, et
+rend une ligne — le verdict, le run, le SHA court et le paragraphe à suivre. Ses sorties :
 
-- `success` → sortir du draft ;
-- `in_progress` ou `queued`, conclusion `null` → le run tourne : **l'attendre** avant de passer à
-  la suite, par une commande lancée en fond, dont la fin réveille la session —
-  `timeout 1800 gh run watch <id> --exit-status -i 30`, `<id>` étant le dernier champ de la
-  première ligne —, puis relire le run comme ci-dessus ; sortie 124, délai dépassé : Étape 6, « CI
-  qui ne démarre pas ». Jamais une fin de tour nue : le moniteur de PR de l'application ne réveille
-  que sur un échec, un conflit ou un commentaire (description de `set_monitor`, lue le
-  2026-10-20), jamais sur un succès — mesuré le même jour, PR #141 : run vert à 19:21:01Z, aucun
-  réveil en 14 min. C'est la seule surveillance de la CI que la session lance elle-même, le
-  moniteur ne couvrant pas le succès ; jamais une sonde planifiée. Le lot 4b de l'issue #134 la
-  remplace par `attente-ci.py` ;
-- `cancelled` → relire le SHA de tête (`gh pr view <numéro> --json headRefOid`) : s'il a changé,
-  lire le run du nouveau ; sinon, annulé sans remplaçant, « Si aucun run n'apparaît », ci-dessous ;
-- `skipped` → l'ouverture d'une draft jamais repoussée depuis, que le garde du job `api` saute
-  (mesuré le 2026-10-20 sur l'amorce de la PR #137) : « Si aucun run n'apparaît », ci-dessous ;
-- aucune ligne → aucun run pour cette tête, un push émis pendant une panne d'Actions : même
-  paragraphe ;
-- toute autre conclusion (`failure`, `timed_out`, `startup_failure`…) → Étape 6, « Trier un
-  rouge ».
+- sortie 0, vert (`success`) → sortir du draft ;
+- sortie 1, rouge — toute autre conclusion (`failure`, `timed_out`, `startup_failure`…), ses jobs
+  en échec nommés → `erreurs-ci.py <id>`, puis Étape 6, « Trier un rouge ». Une ligne ouverte par
+  « refus — » sort aussi en 1 : une lecture `gh` en échec ou d'une autre forme, son motif en une
+  ligne, et aucun verdict ;
+- sortie 3 → « Si aucun run n'apparaît », ci-dessous : `skipped`, l'ouverture d'une draft jamais
+  repoussée depuis, que le garde du job `api` saute (mesuré le 2026-10-20 sur l'amorce de la PR
+  #137) ; `cancelled` sans nouvelle tête, annulé sans remplaçant ; aucun run au délai, un push
+  émis pendant une panne d'Actions ;
+- sortie 124, délai dépassé : Étape 6, « CI qui ne démarre pas ».
+
+Jamais une fin de tour nue : le moniteur de PR de l'application ne réveille que sur un échec, un
+conflit ou un commentaire (description de `set_monitor`, lue le 2026-10-20), jamais sur un succès
+— mesuré le même jour, PR #141 : run vert à 19:21:01Z, aucun réveil en 14 min. C'est la seule
+surveillance de la CI que la session lance elle-même, le moniteur ne couvrant pas le succès ;
+jamais une sonde planifiée. Le script ne couvre ni les autres workflows et événements, ni ce que le
+run a combiné (paragraphe suivant), ni la page d'état et la réouverture, qui restent à la session
+et au mainteneur (« Si aucun run n'apparaît »).
 
 Ce run a tourné sur la référence de fusion calculée à son push, que GitHub ne recalcule ni à chaque
 merge sur le trunk ni au passage en ready : il peut combiner la tête à un trunk vieux de plusieurs
 merges — mesuré, 8 des 30 commits de `main` (obs 51). Ce qu'il prouve de l'état combiné se lit
 dans les parents de cette référence, à l'Étape 7.
 
-**Si aucun run n'apparaît** pour le SHA de tête — `skipped`, `cancelled` sans run plus récent, ou
-aucune ligne —, consulter d'abord `https://www.githubstatus.com/api/v2/components.json`, sauf
+**Si aucun run n'apparaît** pour le SHA de tête — sortie 3 : sauté, annulé sans remplaçant ou
+aucun run —, consulter d'abord `https://www.githubstatus.com/api/v2/components.json`, sauf
 pour une draft jamais repoussée, qui se reconnaît à son seul run `skipped` : un événement émis pendant une panne d'Actions n'est **pas
 rejoué** au rétablissement. Le re-déclenchement propre est `gh pr close` puis `gh pr reopen`
 (`reopened` est dans les types du workflow), action visible donc sur accord du mainteneur —
-jamais de commit vide ni de force-push. Puis relire le run du SHA de tête, comme ci-dessus : sa
-première ligne est celle de la réouverture.
+jamais de commit vide ni de force-push. Puis relancer le script, comme ci-dessus : le run de la
+réouverture est le plus récent.
 
 Puis seulement, sortir du draft :
 

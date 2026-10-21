@@ -3129,17 +3129,20 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
     ),
     "cycle-pr-pousser-avant-chaque-reveil": (CYCLE_PR_SKILL, "**Pousser avant chaque réveil**"),
     # Attente de la CI (décision du mainteneur, 2026-10-20) : le moniteur ne réveille pas sur un
-    # succès, mesuré — attendre, borné, par une commande de fond dont la fin réveille la session.
+    # succès, mesuré — attendre, borné, par une commande de fond dont la fin réveille la session ;
+    # cette commande est `attente-ci.py` depuis le lot 4b de #134, son délai par défaut celui de
+    # l'intérim, que `test_attente_ci.py` épingle côté script.
     "cycle-pr-attendre-la-ci": (
         CYCLE_PR_SKILL,
         (
-            "le run tourne : **l'attendre** avant de passer à la suite, par une commande lancée en"
-            " fond, dont la fin réveille la session"
+            "**l'attend** avant de passer à la suite, par une commande lancée en fond, dont la fin"
+            " réveille la session"
         ),
     ),
-    "cycle-pr-attente-bornee": (
+    "cycle-pr-attente-bornee": (CYCLE_PR_SKILL, "bornée : 1800 s par défaut"),
+    "cycle-pr-appel-d-attente-ci": (
         CYCLE_PR_SKILL,
-        "`timeout 1800 gh run watch <id> --exit-status -i 30`",
+        "python <répertoire de ce skill>/scripts/attente-ci.py <numéro>",
     ),
     "cycle-pr-delai-depasse": (
         CYCLE_PR_SKILL,
@@ -3158,10 +3161,6 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
             "C'est la seule surveillance de la CI que la session lance elle-même, le moniteur ne"
             " couvrant pas le succès ; jamais une sonde planifiée"
         ),
-    ),
-    "cycle-pr-dette-attente-ci-au-lot-4b": (
-        CYCLE_PR_SKILL,
-        "Le lot 4b de l'issue #134 la remplace par `attente-ci.py`",
     ),
     "cycle-pr-nettoyage-a-l-etape-8": (
         CYCLE_PR_SKILL,
