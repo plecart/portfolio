@@ -159,6 +159,11 @@ def read(tmp_path: Path) -> list[Any]:
     )
 
 
+def ligne(sortie: str, debut: str) -> str:
+    """La première ligne du rapport qui commence par `debut`."""
+    return next(line for line in sortie.splitlines() if line.startswith(debut))
+
+
 def kinds(events: list[Any]) -> dict[str, int]:
     """Le dénombrement par classe, pour épingler chaque classement d'un coup."""
     counted: dict[str, int] = {}
@@ -267,8 +272,8 @@ def test_la_reactivite_se_rapporte_au_temps_actif_et_les_absences_a_la_session(
     assert measures.active < measures.span, "le montage doit porter une absence"
 
     report = bilan.report(read(tmp_path), bilan.Usage(), [])
-    reactivite = next(l for l in report.splitlines() if l.startswith("réactivité"))
-    absences = next(l for l in report.splitlines() if l.startswith("absences"))
+    reactivite = ligne(report, "réactivité")
+    absences = ligne(report, "absences")
     part_active = bilan.total(measures.reactivity) / measures.active
     part_session = bilan.total(measures.reactivity) / measures.span
 
@@ -768,7 +773,6 @@ def test_les_chiffres_du_rapport_sont_epingles_un_a_un(tmp_path: Path) -> None:
     assert m.span == timedelta(hours=2, minutes=40)
     assert m.sessions == 2
     assert m.relayed == [datetime.fromisoformat(at("12:30:00"))]
-    assert m.parallel == []
     assert bilan.total(m.reactivity) == timedelta(minutes=15)
     assert bilan.total(m.absences) == timedelta(hours=1, minutes=54, seconds=30)
     assert bilan.total(m.blocked) == timedelta(hours=2, minutes=9, seconds=30)
@@ -803,119 +807,8 @@ def test_le_relais_se_date_par_le_temps_pas_par_l_ordre_des_arguments(tmp_path: 
     )
 
     attendu = [datetime.fromisoformat(at("12:30:00"))]
-    assert bilan.starts(chronologique)[0] == attendu
-    assert bilan.starts(inverse)[0] == attendu
-    assert bilan.starts(chronologique)[1] == [], "un relais n'est pas lu en parallèle"
-
-
-PARALLELE: list[dict[str, Any]] = [said("11:00:00", "relis"), assistant("11:10:00")]
-
-
-def test_une_session_qui_chevauche_l_autre_est_en_parallele_pas_un_relais(tmp_path: Path) -> None:
-    """Une session de relecture lue avec sa session PR tourne **en même temps** qu'elle : son
-    premier instant n'est pas une heure de relais. La mesure du lot 4a, qui a révélé le défaut,
-    est dans la docstring de `starts`. Ici elle démarre à 11:00, dans les deux heures de
-    `TIMELINE` — et le rapport l'annonce « en parallèle », pas en relais.
-    """
-    paths = [
-        write_transcript(tmp_path / "session.jsonl", TIMELINE),
-        write_transcript(tmp_path / "relecture.jsonl", PARALLELE),
-    ]
-    events = bilan.read_events(paths)
-
-    assert bilan.starts(events) == ([], [datetime.fromisoformat(at("11:00:00"))])
-
-    report = bilan.report(events, bilan.token_usage(paths), [])
-    assert "en parallèle dès" in report
-    assert "relais à" not in report
-
-
-def test_l_en_tete_annonce_les_relais_avant_les_sessions_en_parallele(tmp_path: Path) -> None:
-    """`PARALLELE` démarre à 11:00, pendant `TIMELINE` ; `RELAY` à 12:30, après sa fin. L'en-tête
-    rend les relais, puis les parallèles — pas l'ordre du temps."""
-    paths = [
-        write_transcript(tmp_path / "session.jsonl", TIMELINE),
-        write_transcript(tmp_path / "relecture.jsonl", PARALLELE),
-        write_transcript(tmp_path / "relais.jsonl", RELAY),
-    ]
-    relais = bilan.local(datetime.fromisoformat(at("12:30:00")))
-    parallele = bilan.local(datetime.fromisoformat(at("11:00:00")))
-
-    report = bilan.report(bilan.read_events(paths), bilan.token_usage(paths), [])
-
-    assert f"(sessions : 3, relais à {relais}, en parallèle dès {parallele})" in report
-
-
-# Chaque cas est écrit en littéraux : les transcripts par leur premier et leur dernier instant,
-# puis les heures de relais et de session en parallèle que la règle de `starts` en tire.
-RELAIS_ET_PARALLELES: dict[str, tuple[list[tuple[str, str]], list[str], list[str]]] = {
-    "relais-sequentiel": (
-        [("10:00:00", "11:00:00"), ("11:30:00", "12:00:00")],
-        ["11:30:00"],
-        [],
-    ),
-    "parallele-simple": (
-        [("10:00:00", "11:00:00"), ("10:30:00", "10:45:00")],
-        [],
-        ["10:30:00"],
-    ),
-    # Le troisième commence après la fin du premier, mais avant celle du second.
-    "chevauche-le-second-pas-le-premier": (
-        [("10:00:00", "11:00:00"), ("10:30:00", "12:00:00"), ("11:30:00", "12:30:00")],
-        [],
-        ["10:30:00", "11:30:00"],
-    ),
-    # Le troisième commence pile au dernier instant du second : la borne est `>=`.
-    "relais-apres-deux-paralleles": (
-        [("10:00:00", "11:00:00"), ("10:30:00", "12:00:00"), ("12:00:00", "12:30:00")],
-        ["12:00:00"],
-        ["10:30:00"],
-    ),
-    # Le troisième commence après la fin du second, mais avant celle du premier : la fin qui
-    # compte est la plus tardive des précédents, pas celle du dernier commencé.
-    "fin-la-plus-tardive-pas-la-derniere": (
-        [("10:00:00", "12:00:00"), ("10:30:00", "10:45:00"), ("11:00:00", "13:00:00")],
-        [],
-        ["10:30:00", "11:00:00"],
-    ),
-    # Le cas `relais-sequentiel`, les transcripts donnés dans l'ordre inverse du temps.
-    "arguments-a-l-envers": (
-        [("11:30:00", "12:00:00"), ("10:00:00", "11:00:00")],
-        ["11:30:00"],
-        [],
-    ),
-}
-
-
-@pytest.mark.parametrize(
-    ("transcripts", "relais", "paralleles"),
-    RELAIS_ET_PARALLELES.values(),
-    ids=RELAIS_ET_PARALLELES.keys(),
-)
-def test_relais_et_parallele_se_departagent_sur_tous_les_transcripts_precedents(
-    tmp_path: Path, transcripts: list[tuple[str, str]], relais: list[str], paralleles: list[str]
-) -> None:
-    """Un transcript est un relais s'il commence au plus tôt au dernier instant de **tous** ceux
-    commencés avant lui ; sinon il est en parallèle.
-
-    Args:
-        transcripts: chaque transcript, par son premier et son dernier instant.
-        relais: les heures de relais attendues.
-        paralleles: les heures de session en parallèle attendues.
-    """
-    events = bilan.read_events(
-        [
-            write_transcript(
-                tmp_path / f"transcript-{rang}.jsonl", [said(debut, "…"), assistant(fin)]
-            )
-            for rang, (debut, fin) in enumerate(transcripts)
-        ]
-    )
-
-    assert bilan.starts(events) == (
-        [datetime.fromisoformat(at(clock)) for clock in relais],
-        [datetime.fromisoformat(at(clock)) for clock in paralleles],
-    )
+    assert bilan.relays(chronologique) == attendu
+    assert bilan.relays(inverse) == attendu
 
 
 def test_mesurer_une_session_vide_leve_au_lieu_de_rendre_des_zeros(tmp_path: Path) -> None:
@@ -1763,12 +1656,13 @@ def test_un_profil_sans_cache_lu_ni_retour_d_outil_non_vide_se_rend_sans_part(
     ]
 
 
-def test_main_rend_la_session_de_relecture_avec_la_session_pr_depuis_deux_dossiers(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """La session de relecture tourne dans son propre worktree : son transcript et ses
-    sous-agents vivent sous un autre dossier de projet que ceux de la session PR. Donnée avec
-    elle, elle rend ses sous-agents, ses jetons et sa section de profil."""
+# --- La session de relecture, désignée par `--relecture` (#134, lot 5) --------------------------
+
+
+def deux_dossiers(tmp_path: Path) -> tuple[Path, Path]:
+    """Une session PR et sa session de relecture, chacune avec un sous-agent. La session de
+    relecture tourne dans son propre worktree : son transcript et ses sous-agents vivent sous un
+    autre dossier de projet que ceux de la session PR."""
     pr, relecture = "1444a1a8-0389-4e7a-a299-a2ebe3a8e56c", "f6942c91-c0c7-4230-91c5-23af96ea3e16"
     (tmp_path / "dossier-pr").mkdir()
     (tmp_path / "dossier-relecture").mkdir()
@@ -1776,8 +1670,8 @@ def test_main_rend_la_session_de_relecture_avec_la_session_pr_depuis_deux_dossie
         tmp_path / "dossier-pr" / f"{pr}.jsonl",
         [
             said("10:00:00", "démarre le lot"),
-            api_call("10:00:30", "msg_pr1", 1_000, 2_000, 300),
-            api_call("10:05:00", "msg_pr2", 3_000, 500, 200),
+            api_call("10:00:30", "msg_pr1", 1_000_000, 2_000_000, 30_000),
+            api_call("10:05:00", "msg_pr2", 3_000_000, 500_000, 20_000),
         ],
     )
     write_subagent(
@@ -1788,19 +1682,151 @@ def test_main_rend_la_session_de_relecture_avec_la_session_pr_depuis_deux_dossie
     )
     session_relecture = write_transcript(
         tmp_path / "dossier-relecture" / f"{relecture}.jsonl",
-        [said("10:10:00", "relis la PR"), api_call("10:10:30", "msg_rv1", 4_000, 1_000, 100)],
+        [
+            said("10:10:00", "relis la PR"),
+            api_call("10:10:30", "msg_rv1", 4_000_000, 1_000_000, 10_000),
+        ],
     )
     write_subagent(session_relecture, "agent-b1", RELECTEUR, RELECTEUR_META)
+    return session_pr, session_relecture
 
-    code, sortie = run_main([str(session_pr), str(session_relecture)], monkeypatch)
+
+def test_main_rend_la_session_de_relecture_avec_la_session_pr_depuis_deux_dossiers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Désignée par `--relecture`, la session de relecture rend ses sous-agents et sa section de
+    profil, lus sous son propre dossier."""
+    session_pr, session_relecture = deux_dossiers(tmp_path)
+
+    code, sortie = run_main([str(session_pr), "--relecture", str(session_relecture)], monkeypatch)
 
     assert code == 0
     for agent in ("developpeur « Bloc A » — 1 contact", "relecteur « Relecture 4.2, passe 1 »"):
         assert f"  {agent}" in sortie, agent
-    deux = bilan.Usage(
-        output=300 + 200 + 100, cache_read=1_000 + 3_000 + 4_000, cache_write=2_000 + 500 + 1_000
-    )
-    assert f"jetons de la session         {bilan.tokens(deux)}" in sortie
-    for session in (pr, relecture):
-        assert f"profil de contexte — {session[:8]}" in sortie, session
+    for session in (session_pr, session_relecture):
+        assert f"profil de contexte — {session.stem[:8]}" in sortie, session
     assert sortie.count("  composition (caractères) : ") == 2
+
+
+def test_la_session_de_relecture_rend_ses_jetons_sur_sa_propre_ligne(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Les jetons de la session ne portent que la session et ses relais ; ceux de la relecture
+    ont leur ligne, juste après, et seulement quand elle est désignée."""
+    session_pr, session_relecture = deux_dossiers(tmp_path)
+
+    _, avec = run_main([str(session_pr), "--relecture", str(session_relecture)], monkeypatch)
+    _, sans = run_main([str(session_pr)], monkeypatch)
+
+    lignes = avec.splitlines()
+    pr = bilan.Usage(
+        output=30_000 + 20_000, cache_read=1_000_000 + 3_000_000, cache_write=2_000_000 + 500_000
+    )
+    relecture = bilan.Usage(output=10_000, cache_read=4_000_000, cache_write=1_000_000)
+    session = lignes.index(f"jetons de la session         {bilan.tokens(pr)}")
+    assert lignes[session + 1] == f"jetons de la session de relecture {bilan.tokens(relecture)}"
+    assert "session de relecture" not in sans
+
+
+def test_un_transcript_de_relecture_absent_se_dit_avec_les_autres(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    present = write_transcript(tmp_path / "session.jsonl", TIMELINE)
+    absent = tmp_path / "relecture.jsonl"
+
+    code, sortie = run_main([str(present), "--relecture", str(absent)], monkeypatch)
+
+    assert code == 0
+    assert f"transcripts demandés 2, lus 1 — absents : {absent}" in sortie
+    assert "jetons de la session de relecture" not in sortie, "une ligne à zéro se lirait mesurée"
+
+
+def test_sans_transcript_le_script_rend_son_usage(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as sortie:
+        bilan.main([])
+
+    assert sortie.value.code == 2
+    assert "usage:" in capsys.readouterr().err
+
+
+# Une session de relecture qui tourne pendant `TIMELINE`.
+PARALLELE: list[dict[str, Any]] = [said("11:00:00", "relis"), assistant("11:10:00")]
+
+# Chaque forme, en littéraux : les transcripts positionnels — la session et ses relais —, celui de
+# la session de relecture qui les chevauche, et les heures de relais attendues.
+INFERENCES: dict[str, tuple[list[list[dict[str, Any]]], list[dict[str, Any]], list[str]]] = {
+    "forme-1-parallele-lue-en-relais": ([TIMELINE], PARALLELE, []),
+    "forme-2-relais-chevauche-par-la-relecture": (
+        [TIMELINE, RELAY],
+        [
+            said("10:40:00", "relis la PR"),
+            assistant("10:50:00"),
+            said("12:35:00", "passe 2"),
+            assistant("12:36:00"),
+        ],
+        ["12:30:00"],
+    ),
+    "forme-3-evenement-tardif-apres-le-relais": (
+        [
+            [said("10:00:00", "go"), assistant("10:10:00"), said("10:40:00", PEER_MESSAGE)],
+            [
+                said("10:30:00", "je relaie"),
+                assistant("10:35:00"),
+                said("10:50:00", "continue"),
+                assistant("10:55:00"),
+            ],
+        ],
+        [
+            said("10:20:00", "relis"),
+            assistant("10:25:00"),
+            said("10:45:00", "passe 2"),
+            assistant("10:46:00"),
+        ],
+        ["10:30:00"],
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("positionnels", "relecture", "relais"), INFERENCES.values(), ids=INFERENCES.keys()
+)
+def test_la_session_de_relecture_designee_n_entre_ni_dans_les_relais_ni_dans_les_attentes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    positionnels: list[list[dict[str, Any]]],
+    relecture: list[dict[str, Any]],
+    relais: list[str],
+) -> None:
+    """Le bilan devinait d'après les heures si un transcript était un relais ou une session en
+    parallèle. Dénombrement, écrit avant le correctif : 3 formes recensées, 3 fuient ou ont fui.
+
+    1. Une session parallèle lue comme un relais : « relais à 23:33 » pour la session de
+       relecture du lot 4a, mesuré le 2026-10-21.
+    2. Le relais d'une session PR lu « en parallèle » quand la session de relecture est donnée
+       avec elle : la relecture tourne du go jusqu'à la fin du cycle, donc elle chevauche tout
+       relais (`/code-review` de la passe 2).
+    3. Un vrai relais lu « en parallèle » quand la session sortante reçoit encore un événement
+       après le premier de la remplaçante — notification de fond, message de la coordinatrice,
+       moniteur de PR (`relecteur`, constat m-1, supposé sur une session réelle).
+
+    Rejoué le 2026-10-21 sur ces montages avec les deux règles d'avant : celle d'origine lit la
+    forme 1 en relais, celle de la tranche B les formes 2 et 3 « en parallèle » — la forme 3
+    même sans session de relecture. Aucun motif sur les heures ne ferme les trois : l'appelant
+    désigne la session de relecture (`--relecture`), et chaque transcript positionnel est un
+    relais. L'en-tête — durée comprise — rend donc les positionnels seuls, et la réactivité est
+    celle de la session et de ses relais lus sans elle.
+    """
+    session = [
+        write_transcript(tmp_path / f"session-{rang}.jsonl", records)
+        for rang, records in enumerate(positionnels)
+    ]
+    chemins = [str(path) for path in session]
+    revue = write_transcript(tmp_path / "relecture.jsonl", relecture)
+
+    _, avec = run_main([*chemins, "--relecture", str(revue)], monkeypatch)
+    _, sans = run_main(chemins, monkeypatch)
+
+    heures = "".join(f", relais à {bilan.local(datetime.fromisoformat(at(c)))}" for c in relais)
+    assert ligne(avec, "session ").endswith(f"(sessions : {len(positionnels)}{heures})")
+    for debut in ("session ", "réactivité"):
+        assert ligne(avec, debut) == ligne(sans, debut)
