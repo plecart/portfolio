@@ -153,10 +153,12 @@ REVIEW_GATES = (
 # L'outil qui démarre une session liée, et les deux adresses que son retour porte — forme relevée
 # sur la session PR du lot 4a de #134 : `Started session "…" (session_id: local_<uuid>, name: …)`.
 # Elles se lisent dans la **dernière** parenthèse de cette forme : le titre, libre, la précède.
+# L'identifiant y est obligatoire, le nom optionnel et lu jusqu'à la parenthèse fermante : un nom
+# absent, vide ou hors de `[\w-]` ne fait pas perdre l'identifiant.
 # `SendMessage` accepte l'une ou l'autre, le nom suivi de ` [<ref>]` quand il est ambigu (doc de
 # l'outil : « worker [3fa9c1] ») : le destinataire se compare débarrassé de ce suffixe.
 START_SESSION_TOOL = "mcp__ccd_session__start_session"
-SESSION_ADDRESS = re.compile(r"\(session_id: ([\w-]+), name: ([\w-]+)\)")
+SESSION_ADDRESS = re.compile(r"\(session_id: ([\w-]+)(?:, name: ([^)]*))?\)")
 REF_SUFFIX = re.compile(r" \[[^\]]+\]$")
 
 # Les outils dont les arguments portent une édition de fichier : leur part des arguments d'outils
@@ -970,8 +972,8 @@ def gate_label(block: Mapping[str, Any], started: set[str]) -> str | None:
     Args:
         block: un bloc `tool_use` — son `input`, écrit par le modèle, peut être mal formé : un
             destinataire qui n'est pas une chaîne ne mord pas.
-        started: les adresses — identifiant et nom — des sessions que le transcript a démarrées
-            jusqu'ici (`SESSION_ADDRESS`).
+        started: les adresses — identifiant, et nom s'il en a un — des sessions que le
+            transcript a démarrées jusqu'ici (`SESSION_ADDRESS`).
 
     Returns:
         « outil valeur » pour la première forme de `REVIEW_GATES` satisfaite.
@@ -1011,7 +1013,7 @@ def review_gate(
             # Seul un `tool_result` porte un `tool_use_id`.
             if tools.get(str(block.get("tool_use_id"))) == START_SESSION_TOOL:
                 for found in list(SESSION_ADDRESS.finditer(result_text(block)))[-1:]:
-                    started.update(found.groups())
+                    started.update(address for address in found.groups() if address)
     return None
 
 
