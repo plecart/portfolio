@@ -8,23 +8,43 @@
 # `curl` par les paquets d'Alpine, que suit sa base de sécurité ; les binaires Go hors de la base de
 # paquets, où Trivy les analyse — il n'ouvre pas un binaire Go installé par `apk` (mesuré le
 # 2026-10-03 : 0 au scan, 31 HIGH dans les mêmes binaires copiés hors de la base de paquets).
+# `age`, `age-keygen` et `rclone` sont compilés par le projet, avec le Go de l'image `golang`
+# épinglée ci-dessous : leurs releases embarquent un Go en retard sur ses correctifs (ADR 0017).
+# `supercronic` entre par le fichier de sa release.
+#
+# Qui suit quoi : Dependabot (`.github/dependabot.yml`) propose chaque nouvelle version d'`alpine`
+# et de `golang` — une montée de Go recompile `age` et `rclone` ; les versions d'`age`, `rclone` et
+# `supercronic` se montent à la main (`CONTRIBUTING.md`).
 
-# Épinglées étiquette x.y.z et empreinte, `FROM` en colonne 0 : Dependabot
-# (`.github/dependabot.yml`) propose chaque nouvelle version, étiquette et empreinte ensemble.
+# Épinglées étiquette x.y.z et empreinte, `FROM` en colonne 0 : Dependabot propose chaque nouvelle
+# version, étiquette et empreinte ensemble.
 FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS base
 
-# `rclone` depuis son image officielle, dans un étage à lui : Dependabot ne lit que les `FROM`.
-FROM rclone/rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5 AS rclone
+# Le compilateur. Chaque binaire est compilé par `go install <module>@<version>` sous la forme de
+# sa release officielle, sans cgo ; ses modules restent aux versions que fixe cette release : on
+# change le compilateur, jamais le graphe de dépendances (ADR 0017). Le téléchargement est vérifié
+# par la base de sommes de Go, active par défaut, à une version exacte — ce que
+# `apps/api/tests/test_supply_chain.py` exige. `GOTOOLCHAIN=local`, défaut de l'image : un module
+# qui exigerait un Go plus récent fait échouer le build au lieu d'en télécharger un autre. Les
+# caches de Go — modules et objets de compilation — sont montés hors du layer, qui garde les
+# binaires sans eux : le cache de la CI (`mode=max`) n'en grossit pas. Une instruction par outil :
+# monter l'un ne recompile pas l'autre.
+FROM golang:1.27.3-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS go
+ENV CGO_ENABLED=0
 
-# `age` et `supercronic` n'ont pas d'image officielle : les fichiers de leur release, à la somme
-# SHA-256 épinglée, que BuildKit vérifie avant de les copier. Dependabot ne les suit pas : la
-# procédure de montée est dans `CONTRIBUTING.md`. `linux/amd64` seulement, l'architecture du VPS,
-# de la CI et du poste.
-FROM base AS age
-ADD --checksum=sha256:cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10 \
-    https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-amd64.tar.gz \
-    /tmp/age.tar.gz
-RUN tar -xzf /tmp/age.tar.gz -C /tmp
+# `age`, comme son workflow de release (`.github/workflows/build.yml`) : `-trimpath`, sans
+# `-ldflags`. Ses deux commandes seulement — `cmd/...` installerait aussi `age-inspect` et
+# `age-plugin-batchpass`, que l'image ne demande pas.
+RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod \
+    go install -trimpath filippo.io/age/cmd/age@v1.3.2 filippo.io/age/cmd/age-keygen@v1.3.2
+
+# `rclone`, comme son image officielle, que la cible par défaut de son `Makefile` compile : `-s`,
+# sans étiquette, et la version de la source — le suffixe vidé, `fs.Version` vaut `fs.VersionTag`,
+# et `rclone version` n'annonce pas de `-DEV`. `-trimpath`, comme ses archives de release
+# (`bin/cross-compile.go`).
+RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod \
+    go install -trimpath -ldflags "-s -X github.com/rclone/rclone/fs.VersionSuffix=" \
+    github.com/rclone/rclone@v1.75.2
 
 
 FROM base
@@ -36,12 +56,15 @@ FROM base
 # qui est installé.
 RUN apk add --no-cache postgresql16-client curl
 
-COPY --from=rclone /usr/local/bin/rclone /usr/local/bin/rclone
 # `age-keygen` sert aux tests, qui engendrent une paire à chaque lancement ; celle de la production
 # s'engendre hors du VPS, où la clé privée ne vient jamais (ADR 0007, point 2).
-COPY --from=age /tmp/age/age /tmp/age/age-keygen /usr/local/bin/
-ADD --checksum=sha256:a53ae236602c7338aba3fbaff40bda6300eae3b9fedb8261eb06cfe3724430c1 --chmod=755 \
-    https://github.com/aptible/supercronic/releases/download/v0.2.49/supercronic-linux-amd64 \
+COPY --from=go /go/bin/age /go/bin/age-keygen /go/bin/rclone /usr/local/bin/
+
+# `supercronic` n'a pas d'image officielle : le fichier de sa release, à la somme SHA-256
+# épinglée, que BuildKit vérifie avant de le copier (ADR 0017). `linux/amd64` seulement,
+# l'architecture du VPS, de la CI et du poste.
+ADD --checksum=sha256:cc232108374e8e2b537045f2d5eaa1229f619db314c3ba6a14d38b35dc0aa123 --chmod=755 \
+    https://github.com/aptible/supercronic/releases/download/v0.2.51/supercronic-linux-amd64 \
     /usr/local/bin/supercronic
 
 COPY --chmod=755 infra/backup/backup.sh infra/backup/retention.sh /usr/local/bin/

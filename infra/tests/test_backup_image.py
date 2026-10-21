@@ -1,5 +1,6 @@
 """Tests de l'image `backup` : sa chaîne de sauvegarde et sa purge, sa sonde, la majeure de ses
-clients Postgres, son rôle Postgres (brief de #23, décisions 2 à 7, 10 et 11).
+clients Postgres, son rôle Postgres (brief de #23, décisions 2 à 7, 10 et 11), la version que ses
+binaires compilés annoncent (ADR 0017).
 
 Lancé par `make image-test`, jamais par `make test` : il lui faut les images que `make build` a
 chargées — `backup`, `caddy` pour le témoin de ping, et `api`, que la pile déclare pour la
@@ -297,12 +298,18 @@ def compose_command(*arguments: str) -> list[str]:
     ]
 
 
+def image_output(image: str, *command: str) -> str:
+    """La sortie standard de `command`, lancée dans un conteneur jetable de l'image, hors de la
+    pile."""
+    return subprocess.run(
+        ["docker", "run", "--rm", image, *command], capture_output=True, text=True, check=True
+    ).stdout
+
+
 def age_key_pair(image: str) -> tuple[str, str]:
     """Une paire `age` neuve, engendrée par l'image : sa clé publique, sa clé privée. Jamais
     commitée, perdue à la fin du lancement."""
-    printed = subprocess.run(
-        ["docker", "run", "--rm", image, "age-keygen"], capture_output=True, text=True, check=True
-    ).stdout
+    printed = image_output(image, "age-keygen")
     public = re.search(r"^# public key: (age1\w+)$", printed, re.MULTILINE)
     private = re.search(r"^AGE-SECRET-KEY-1\w+$", printed, re.MULTILINE)
     assert public and private, printed
@@ -393,6 +400,28 @@ def test_les_clients_de_la_chaine_sont_de_la_majeure_du_postgres_de_production(
     server = stack.output("exec", "-T", "postgres", "postgres", "--version")
 
     assert major_version(printed) == major_version(server)
+
+
+# Les binaires que le projet compile (ADR 0017) : la commande qui fait dire sa version à chacun, et
+# ce que la première ligne de sa réponse porte devant elle.
+COMPILED_BINARIES = {
+    "age": (("age", "--version"), ""),
+    "rclone": (("rclone", "version"), "rclone "),
+}
+
+
+@pytest.mark.parametrize(
+    ("command", "prefix"), COMPILED_BINARIES.values(), ids=COMPILED_BINARIES.keys()
+)
+def test_chaque_binaire_compile_annonce_sa_version_de_release(
+    command: tuple[str, ...], prefix: str
+) -> None:
+    """Un binaire compilé hors de la forme de sa release le dit par sa version : `rclone` sans son
+    drapeau de liaison répond `v1.75.2-DEV` (brief de #147, décision 4, mesuré). La première ligne
+    est donc exactement une version de release, `v<x.y.z>` — ni suffixe, ni `unknown`."""
+    first_line = image_output(loaded_image("backup"), *command).partition("\n")[0]
+
+    assert re.fullmatch(rf"{re.escape(prefix)}v\d+\.\d+\.\d+", first_line), first_line
 
 
 @pytest.mark.parametrize(("password", "healthy"), [(None, True), ("mot-de-passe-faux", False)])

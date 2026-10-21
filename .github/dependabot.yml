@@ -80,7 +80,7 @@ updates:
       include: scope
 
   # Les images de base des images du dépôt, épinglées par étiquette précise et par empreinte :
-  # chaque nouvelle version de correctif (Python 3.12.x, `uv`, Caddy, Alpine, `rclone`) arrive en
+  # chaque nouvelle version de correctif (Python 3.12.x, `uv`, Caddy, Alpine, Go) arrive en
   # PR, étiquette et empreinte ensemble. La reconstruction d'une même étiquette peut ne pas être
   # proposée (expérience `docker_digest_only_update_suppression` de Dependabot) : le scan des images
   # (#15) la couvre. Un dossier par image (ADR 0014), et une entrée par dossier : tant qu'une PR de
