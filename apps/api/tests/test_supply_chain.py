@@ -138,12 +138,34 @@ REMOTE_SOURCE = re.compile(r"(?:^|[\s\[\",])https?://", re.IGNORECASE)
 CHECKSUM_OPTION = re.compile(r"(?:^|\s)--checksum=sha256:[0-9a-f]{64}(?:\s|$)")
 
 # Un téléchargement par un `RUN` — `curl` ou `wget` vers une adresse HTTP(S) écrite en clair —,
-# que rien ne vérifie : tout téléchargement passe par `ADD --checksum`. Le nom de l'outil est un mot
-# entier, tiret compris : `curl-cffi` n'est pas `curl`. Les formes que ce motif ne lit pas —
-# `git clone`, adresse tenue par un `ARG`, autre langage, `ADD git@` — figurent au recueil, en
-# `xfail`.
+# que rien ne vérifie : tout téléchargement passe par `ADD --checksum` ou par un module Go
+# (ci-dessous). Le nom de l'outil est un mot entier, tiret compris : `curl-cffi` n'est pas `curl`.
+# Les formes que ce motif ne lit pas — `git clone`, adresse tenue par un `ARG`, autre langage,
+# `ADD git@` — figurent au recueil, en `xfail`.
 RUN_DOWNLOAD = re.compile(
     r"^\s*RUN\b.*(?<![\w-])(?:curl|wget)(?![\w-])[^&;|]*https?://", re.IGNORECASE
+)
+
+# Un module Go téléchargé : `go install`, `go get` ou `go run` d'un argument
+# `<chemin>@<référence>`, ou l'exigence `go mod edit -require=<chemin>@<référence>` — la forme de
+# la release de Caddy (brief de #147, décision 4). Les arguments s'arrêtent au premier opérateur du
+# shell : le `<paquet>@<dépôt>` d'un `apk add` qui suit n'en est pas (`apk-world(5)`). La base de
+# sommes de Go, `sum.golang.org`, active par défaut dans l'image `golang`, vérifie chaque module
+# téléchargé — à deux conditions (brief de #147, décision 7). La référence est une version exacte
+# `vX.Y.Z` : une requête (`@latest`, `@upgrade`) ou une branche suit l'amont sans que le Dockerfile
+# change, une variable dépend du build, et un commit, une pseudo-version ou une préversion
+# désignent un code que l'amont n'a pas publié en release. Et rien ne coupe la base : `GOSUMDB`
+# (`off`, ou une autre base), `GONOSUMDB` et `GOPRIVATE`, posés par `ENV` — y compris sous la
+# forme ancienne `ENV <clé> <valeur>` —, `ARG`, une affectation du shell ou `go env -w`.
+# `GOINSECURE` n'en est pas : « GOINSECURE does not disable checksum database validation.
+# GOPRIVATE or GONOSUMDB may be used to achieve that » (`go help environment`, Go 1.27.3, lu le
+# 2026-10-21). Les formes que ces motifs ne lisent pas — `go get` sans version, `go get -u` —
+# figurent au recueil, en `xfail`.
+GO_DOWNLOAD = re.compile(r"\bgo\s+(?:install|get|run|mod\s+edit)\b(?P<arguments>[^&;|]*)")
+EXACT_VERSION = re.compile(r"v\d+\.\d+\.\d+")
+CHECKSUM_DATABASE_SWITCHES = "GOSUMDB|GONOSUMDB|GOPRIVATE"
+CHECKSUM_DATABASE_BYPASS = re.compile(
+    rf"\b(?:{CHECKSUM_DATABASE_SWITCHES})=|^\s*(?i:ENV)\s+(?:{CHECKSUM_DATABASE_SWITCHES})\s"
 )
 
 # `image:<version x.y.z>[-variante]@sha256:<empreinte>` — même règle que pour les actions : la
@@ -380,10 +402,30 @@ def downloads(text: str) -> list[tuple[str, str]]:
     ]
 
 
+def go_modules(text: str) -> list[tuple[str, str]]:
+    """Les modules Go qu'un Dockerfile télécharge (`GO_DOWNLOAD`) : pour chacun, sa référence — ce
+    qui suit le dernier `@`, guillemet fermant ôté — et l'instruction entière, continuations
+    jointes."""
+    return [
+        (argument.rpartition("@")[2].rstrip("\"'"), instruction)
+        for _, instruction in dockerfile_instructions(text)
+        for command in GO_DOWNLOAD.finditer(instruction)
+        for argument in command["arguments"].split()
+        if "@" in argument
+    ]
+
+
 def download_findings(text: str) -> list[str]:
-    """Les téléchargements d'un Dockerfile que BuildKit ne vérifie pas : les `ADD` d'une adresse
-    HTTP(S) dont les options ne portent pas de somme SHA-256 complète, et les `RUN` qui
-    téléchargent par `curl` ou `wget`."""
+    """Les téléchargements d'un Dockerfile que rien ne vérifie.
+
+    Deux formes sont vérifiées : un `ADD` d'une adresse HTTP(S) dont les options portent une somme
+    SHA-256 complète, que BuildKit contrôle avant de copier le fichier ; un module Go à version
+    exacte, que contrôle la base de sommes de Go tant que rien ne la coupe. Sont donc signalés les
+    `ADD` d'une adresse sans somme, les `RUN` qui téléchargent par `curl` ou `wget`, les modules Go
+    sans version exacte, et toute instruction qui coupe la base de sommes. Ce que la garde ne lit
+    pas figure au recueil, en `xfail` : `git clone`, adresse tenue par un `ARG`, téléchargement
+    par un autre langage, `ADD git@`, `go get` sans version ou avec `-u`.
+    """
     unchecked = [
         instruction
         for options, instruction in downloads(text)
@@ -394,7 +436,17 @@ def download_findings(text: str) -> list[str]:
         for _, instruction in dockerfile_instructions(text)
         if RUN_DOWNLOAD.match(instruction)
     ]
-    return unchecked + fetched
+    loose = [
+        instruction
+        for reference, instruction in go_modules(text)
+        if not EXACT_VERSION.fullmatch(reference)
+    ]
+    unverified = [
+        instruction
+        for _, instruction in dockerfile_instructions(text)
+        if CHECKSUM_DATABASE_BYPASS.search(instruction)
+    ]
+    return unchecked + fetched + loose + unverified
 
 
 def compose_services(text: str) -> dict[str, object]:
@@ -602,6 +654,79 @@ DOWNLOAD_FORMS = {
     "ADD d'un dépôt git": pytest.param(
         BASE + "ADD git@exemple.org:outil.git /outil\n", True, marks=EXOTIC
     ),
+    "module Go à version exacte": (BASE + "RUN go install filippo.io/age/cmd/age@v1.3.2\n", False),
+    "deux paquets d'un module, ligne continuée": (
+        BASE
+        + "RUN go install filippo.io/age/cmd/age@v1.3.2 \\\n"
+        + "    filippo.io/age/cmd/age-keygen@v1.3.2\n",
+        False,
+    ),
+    "module Go ajouté à un module principal": (
+        BASE
+        + "RUN go mod init caddy && go get github.com/caddyserver/caddy/v2@v2.11.7 && go build\n",
+        False,
+    ),
+    "exigence posée par go mod edit": (
+        BASE
+        + "RUN go mod init caddy"
+        + " && go mod edit -require=github.com/caddyserver/caddy/v2@v2.11.7 && go mod tidy\n",
+        False,
+    ),
+    "module Go, caches montés et drapeaux de liaison": (
+        BASE
+        + "RUN --mount=type=cache,target=/go/pkg/mod CGO_ENABLED=0 go install -trimpath \\\n"
+        + '    -ldflags "-s -X exemple.org/outil/fs.VersionSuffix=" exemple.org/outil@v1.2.3\n',
+        False,
+    ),
+    "module Go entre guillemets": (BASE + "RUN go install 'exemple.org/outil@v1.2.3'\n", False),
+    "paquet Alpine d'un dépôt nommé, après le module": (
+        BASE + "RUN go install exemple.org/outil@v1.2.3 && apk add --no-cache outil@communaute\n",
+        False,
+    ),
+    "compilation sans module nommé": (BASE + "RUN go build ./...\n", False),
+    "GOINSECURE": (BASE + "ENV GOINSECURE=*\n", False),
+    "module Go à @latest": (BASE + "RUN go install exemple.org/outil@latest\n", True),
+    "module Go sur une branche": (BASE + "RUN go install exemple.org/outil@master\n", True),
+    "module Go à un commit": (BASE + "RUN go install exemple.org/outil@abcdef1\n", True),
+    "module Go à une pseudo-version": (
+        BASE + "RUN go install exemple.org/outil@v0.0.0-20261001000000-abcdefabcdef\n",
+        True,
+    ),
+    "module Go à une préversion": (BASE + "RUN go install exemple.org/outil@v1.2.3-rc.1\n", True),
+    "module Go à une variable entre accolades": (
+        BASE + "ARG VERSION=v1.2.3\nRUN go install exemple.org/outil@${VERSION}\n",
+        True,
+    ),
+    "module Go à une variable": (BASE + "RUN go run exemple.org/outil@$VERSION\n", True),
+    "module Go à @upgrade par go get": (
+        BASE + "RUN go mod init m && go get exemple.org/outil@upgrade\n",
+        True,
+    ),
+    "second module sans version exacte": (
+        BASE + "RUN go install exemple.org/outil@v1.2.3 exemple.org/autre@latest\n",
+        True,
+    ),
+    "exigence à une pseudo-version": (
+        BASE + "RUN go mod edit -require=exemple.org/outil@v0.0.0-20261001000000-abcdefabcdef\n",
+        True,
+    ),
+    "GOSUMDB=off": (BASE + "ENV GOSUMDB=off\n", True),
+    "GOSUMDB off, forme ancienne": (BASE + "ENV GOSUMDB off\n", True),
+    "GOSUMDB off, forme ancienne en minuscules": (BASE + "env GOSUMDB off\n", True),
+    "GOSUMDB vers une autre base": (BASE + "ENV GOSUMDB=sum.exemple.org\n", True),
+    "GONOSUMDB": (BASE + "ENV GONOSUMDB=exemple.org\n", True),
+    "GOPRIVATE par un ARG": (BASE + "ARG GOPRIVATE=exemple.org\n", True),
+    "GOPRIVATE devant la commande": (
+        BASE + "RUN GOPRIVATE=* go install exemple.org/outil@v1.2.3\n",
+        True,
+    ),
+    "go env -w GOSUMDB=off": (BASE + "RUN go env -w GOSUMDB=off\n", True),
+    "go get sans version": pytest.param(
+        BASE + "RUN go mod init m && go get exemple.org/outil\n", True, marks=EXOTIC
+    ),
+    "go get -u": pytest.param(
+        BASE + "RUN go mod init m && go get -u exemple.org/outil@v1.2.3\n", True, marks=EXOTIC
+    ),
 }
 
 DOCKERFILE_NAMES = {
@@ -676,7 +801,8 @@ def test_la_garde_des_sources_rend_son_verdict_sur_chaque_forme(text: str, expec
 def test_la_garde_des_telechargements_rend_son_verdict_sur_chaque_forme(
     text: str, expected: bool
 ) -> None:
-    """Chaque forme d'`ADD` recensée : signalée si, et seulement si, elle télécharge sans somme."""
+    """Chaque forme de téléchargement recensée : signalée si, et seulement si, ni BuildKit ni la
+    base de sommes de Go ne la vérifie."""
     assert bool(download_findings(text)) is expected, download_findings(text)
 
 
@@ -1053,8 +1179,10 @@ def test_toute_image_copiee_passe_par_un_etage_nomme(dockerfile: Path) -> None:
 def test_chaque_telechargement_d_une_image_est_verifie_par_sa_somme(dockerfile: Path) -> None:
     """Un binaire sans image officielle entre par le fichier de sa release (`age`, `supercronic` :
     brief de #23, décision 1), que Dependabot ne suit pas : sa somme épinglée est la seule chose
-    qui l'empêche de changer en silence, chez l'éditeur ou en chemin. Un `RUN curl` ou `wget`
-    n'en a aucune : tout téléchargement passe par `ADD --checksum`."""
+    qui l'empêche de changer en silence, chez l'éditeur ou en chemin. Un binaire Go compilé par le
+    projet entre par son module, à version exacte, sous la base de sommes de Go (brief de #147,
+    décision 7). Un `RUN curl` ou `wget` n'a ni l'une ni l'autre : tout téléchargement passe par
+    `ADD --checksum` ou par un module Go à version exacte."""
     findings = download_findings(dockerfile.read_text(encoding="utf-8"))
 
     assert not findings, f"téléchargements sans somme : {findings}"
