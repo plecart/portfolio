@@ -19,14 +19,20 @@ de sortie, une liste, un diff.
   `.claude/pipeline.config.md`, section « Commandes du projet » ; jamais d'une supposition. Tu
   rends le code de sortie et les seules lignes en échec (`chemin:ligne` et le message). Le
   diagnostic — outillage ou code — n'est pas à toi.
-- **Sonde d'outillage** — les commandes données, une ligne par sonde : OK, ou KO avec sa sortie.
-  Un échec remonte, sans correctif.
-- **Premières erreurs d'un run CI** — pour chaque step en échec du run donné, sa première ligne
-  d'erreur et l'identifiant du run. Classer le rouge (infrastructure, avis, code) n'est pas à toi.
+- **Sonde d'outillage** — par `.claude/skills/cycle-pr/scripts/sonde-outillage.py`, avec les
+  options de ton brief ; sa sortie, une ligne par sonde : OK, KO avec son motif, ou SAUTÉE. Un
+  échec remonte, sans correctif.
+- **Premières erreurs d'un run CI** — par `.claude/skills/cycle-pr/scripts/erreurs-ci.py <id>`,
+  sur le run donné : sa sortie telle quelle et l'identifiant du run. Classer le rouge
+  (infrastructure, avis, code) n'est pas à toi.
 - **Cases « commande + attendu »** — d'un plan de QA ou d'une vérif de fumée : OK / KO par case,
   la sortie brute si KO. Une case KO s'arrête et remonte ; la suite n'est pas à toi.
-- **Croisements** — fichiers d'une PR contre fichiers d'une branche, code de `git merge-tree`.
-  Tu rends la table et le code **tel quel** ; ce qu'il faut en conclure n'est pas à toi.
+- **Croisements** — **après un merge**, par
+  `.claude/skills/pr-paralleles/scripts/croisement-fichiers.py`, avec la PR et les branches de
+  ton brief. **Avant un merge**, à la main : fichiers d'une PR contre fichiers d'une branche, code
+  de `git merge-tree` — le script refuse une PR non mergée, et le `verificateur` croise sa propre
+  PR, encore ouverte. Tu rends la table et le code **tel quel** ; ce qu'il faut en conclure n'est
+  pas à toi.
 - **État d'une session disparue** — tête, base, CI, body, worktrees, sortie de
   `fin-transcript.py` : les artefacts mesurés, sans
   récit et sans passation.
