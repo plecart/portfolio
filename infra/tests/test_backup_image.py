@@ -31,7 +31,7 @@ from pathlib import Path
 import pytest
 import yaml
 from test_env import declared_variables
-from test_infra import loaded_image
+from test_infra import image_output, loaded_image
 
 INFRA = Path(__file__).parents[1]
 BOOTSTRAP = INFRA / "bootstrap.sh"
@@ -296,14 +296,6 @@ def compose_command(*arguments: str) -> list[str]:
         STACK.as_posix(),
         *arguments,
     ]
-
-
-def image_output(image: str, *command: str) -> str:
-    """La sortie standard de `command`, lancée dans un conteneur jetable de l'image, hors de la
-    pile."""
-    return subprocess.run(
-        ["docker", "run", "--rm", image, *command], capture_output=True, text=True, check=True
-    ).stdout
 
 
 def age_key_pair(image: str) -> tuple[str, str]:

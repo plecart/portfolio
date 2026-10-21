@@ -1,5 +1,5 @@
 """Test de fumée de l'image `caddy` : son Caddyfile de production, servi par l'image que
-`make build` a chargée (brief de #16, décision 9).
+`make build` a chargée (brief de #16, décision 9), et la version de son binaire compilé (ADR 0017).
 
 Lancé par `make image-test`, jamais par `make test` : il lui faut l'image construite, donc le front
 compilé. Le job `infra` de la CI le lance après son build ; sur un poste, `make build` d'abord.
@@ -25,7 +25,7 @@ from typing import Any
 
 import pytest
 import yaml
-from test_infra import loaded_image
+from test_infra import image_output, loaded_image
 
 STACK = Path(__file__).with_name("caddy.yml")
 # Le Compose de production, dont la sonde de `caddy` s'exécute ici dans l'image.
@@ -191,6 +191,19 @@ def stack() -> Iterator[Stack]:
         yield started
     finally:
         compose("down", environment=environment)
+
+
+def test_le_binaire_compile_est_de_la_version_de_l_image_de_base() -> None:
+    """Deux épingles d'une même version (ADR 0017) : l'étiquette de l'image de base, que Dependabot
+    monte, et l'exigence de l'étage qui compile `caddy`. `CADDY_VERSION`, que l'image de base pose,
+    est celle de son étiquette ; le premier mot de `caddy version`, celle que le binaire compilé
+    annonce — `unknown` s'il n'est pas compilé sous la forme de sa release, comme dépendance d'un
+    module principal (mesuré)."""
+    image = loaded_image("caddy")
+
+    compiled = image_output(image, "caddy", "version").split()[0]
+
+    assert compiled == image_output(image, "printenv", "CADDY_VERSION").strip()
 
 
 def test_l_accueil_est_servi_sans_cache(stack: Stack) -> None:
@@ -367,11 +380,11 @@ SETTINGS_FRAME_TYPE = 0x04
 
 
 def test_caddy_ne_sert_aucun_telechargement_partiel(stack: Stack) -> None:
-    """`Range` est retiré des requêtes de l'hôte du site, et c'est la configuration que vise
-    CVE-2026-78667 (`.trivyignore.yaml`) : l'absence de borne sur la taille d'un `Range` analysé
-    par un serveur. Le seul analyseur de l'image est `file_server` ; sans cette garde il rendrait
-    206 et une tranche. Rien ici n'a besoin de téléchargement partiel — le front compilé est
-    servi entier, les médias vivent sur R2."""
+    """`Range` est retiré des requêtes de l'hôte du site, et c'est la configuration que visait
+    CVE-2026-78667, corrigée depuis dans le Go qui compile `caddy` (ADR 0017) : l'absence de borne
+    sur la taille d'un `Range` analysé par un serveur. Le seul analyseur de l'image est
+    `file_server` ; sans cette garde il rendrait 206 et une tranche. Rien ici n'a besoin de
+    téléchargement partiel — le front compilé est servi entier, les médias vivent sur R2."""
     chemin = hashed_script(stack)
     entier = stack.get(SITE, chemin)
 
