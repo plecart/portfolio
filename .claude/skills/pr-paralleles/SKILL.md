@@ -403,8 +403,11 @@ c'est le seul autre canal, et il passe par lui.
   lot sont en cours de développement, et leurs sessions ont déjà lu leur spec.
   - `repercussions` les détecte comme **« en vol »** (via les PR ouvertes et ce tableau de bord) :
     il **n'édite pas** leur corps et **ne change pas** leurs labels, il dépose un commentaire sur
-    **leur PR ouverte**, que `cycle-pr` traite à son Étape 6 — publié et relu après écriture par
-    `.claude/skills/cycle-pr/scripts/ecriture-relue.py comment <PR> --body-file <fichier>`.
+    **leur PR ouverte**, que `cycle-pr` traite à son Étape 6. L'instrument qui publie ce
+    commentaire et le relit après écriture est
+    `.claude/skills/cycle-pr/scripts/ecriture-relue.py comment <PR> --body-file <fichier>` ;
+    `repercussions` le prescrit au lot 6b de #134 — d'ici là, son étape 5, « Issues en vol », ne
+    nomme aucune commande.
   - **Tenir `PR-PARALLELES.md` à jour est donc fonctionnel, pas décoratif** : une ligne périmée
     (issue mergée encore marquée en cours, ou worktree **d'issue** actif absent du tableau) fait
     mal classer une issue — et une issue en vol traitée comme dormante se fait réécrire sa spec
