@@ -909,7 +909,9 @@ Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur 
   `python <répertoire de ce skill>/scripts/erreurs-ci.py <id>`, une commande à la sortie courte :
   une ligne par step en échec — job, step et première ligne d'erreur du journal, suivie du segment
   `Run …` d'où elle vient quand `gh` n'a rendu que le journal entier du job (`UNKNOWN STEP`) —, ou
-  le job en échec sans step, ou le run en échec sans job. Le script ne classe rien et ne lit pas
+  le job en échec sans step, ou le run en échec sans job ; une section du journal qu'aucun step
+  en échec ne nomme se rend sous son nom, et un step en échec sans section à lui le dit (« journal
+  indisponible »). Le script ne classe rien et ne lit pas
   les annotations des jobs ; une erreur sans marqueur d'outil retombe sur la première ligne qui
   nomme une erreur, sinon sur l'annotation de fin du step (`##[error]Process completed…`), qui ne
   dit rien : ce step-là se relit au journal.
