@@ -27,7 +27,7 @@ SONDE = "c" * 40
 
 # Les commandes que le script doit lancer pour `OPTIONS`, dans l'ordre.
 STATUS = ("git", "status", "--porcelain", "--untracked-files=normal")
-AUTH = ("gh", "auth", "status")
+AUTH = ("gh", "auth", "status", "--active")
 PUSH = ("gh", "api", "repos/{owner}/{repo}", "--jq", ".permissions.push")
 HEAD = ("git", "rev-parse", "HEAD")
 COMMIT = ("git", "commit", "--allow-empty", "-m", "chore: sonde outillage")
@@ -57,6 +57,7 @@ class Poste:
         sale: ce que `git status --porcelain` rend avant le format.
         apres_format: ce qu'il rend une fois le format passé.
         reset_sans_effet: le reset rend 0 sans ramener la tête.
+        tete_illisible_apres_le_commit: la tête ne se lit plus une fois le commit de sonde en place.
         pannes: commande → la réponse qui remplace la nominale, sans effet sur le dépôt ; une
             exception y est levée, comme un programme introuvable.
     """
@@ -67,12 +68,14 @@ class Poste:
         sale: str = "",
         apres_format: str = "",
         reset_sans_effet: bool = False,
+        tete_illisible_apres_le_commit: bool = False,
         pannes: dict[tuple[str, ...], Reponse] | None = None,
     ) -> None:
         self.tete = TETE
         self.arbre = sale
         self.apres_format = apres_format
         self.reset_sans_effet = reset_sans_effet
+        self.tete_illisible_apres_le_commit = tete_illisible_apres_le_commit
         self.pannes = pannes or {}
         self.appels: list[tuple[str, ...]] = []
 
@@ -87,6 +90,8 @@ class Poste:
         if cmd == STATUS:
             return fini(out=self.arbre)
         if cmd == HEAD:
+            if self.tete_illisible_apres_le_commit and self.tete == SONDE:
+                return fini(128, err="fatal: bad revision 'HEAD'\n")
             return fini(out=f"{self.tete}\n")
         if cmd == COMMIT:
             self.tete = SONDE
@@ -132,9 +137,11 @@ KO: dict[str, tuple[dict[str, Any], int, int, tuple[str, ...]]] = {
         {"pannes": {AUTH: fini(1, err="You are not logged into any GitHub hosts.\n")}},
         1,
         2,
-        ("`gh auth status` a échoué (1)", "You are not logged into any GitHub hosts."),
+        ("`gh auth status --active` a échoué (1)", "You are not logged into any GitHub hosts."),
     ),
     "push-refuse": ({"pannes": {PUSH: fini(out="false\n")}}, 2, 3, ("rend 'false'",)),
+    # `gh api --jq` rend `null` quand le champ manque : seul `true` passe, pas tout sauf `false`.
+    "push-absent": ({"pannes": {PUSH: fini(out="null\n")}}, 2, 3, ("rend 'null', pas 'true'",)),
     # Un dépôt sans commit : la tête ne se lit pas, et rien n'est écrit.
     "tete-illisible": (
         {"pannes": {HEAD: fini(128, err="fatal: ambiguous argument 'HEAD'\n")}},
@@ -147,6 +154,20 @@ KO: dict[str, tuple[dict[str, Any], int, int, tuple[str, ...]]] = {
         3,
         5,
         ("a échoué (1)", "commit-msg : type conventionnel manquant"),
+    ),
+    # Le commit a réussi, la tête ne se relit pas : le reset n'est pas lancé, et le commit de sonde
+    # reste peut-être en tête — le motif le dit.
+    "tete-illisible-apres-le-commit": (
+        {"tete_illisible_apres_le_commit": True},
+        3,
+        6,
+        (
+            "`git rev-parse HEAD` a échoué (128)",
+            "bad revision 'HEAD'",
+            "la tête porte peut-être encore le commit de sonde",
+            "rien n'a été annulé",
+            f"tête d'avant : {TETE}",
+        ),
     ),
     "reset-en-echec": (
         {"pannes": {RESET: fini(128, err="fatal: Unable to create '.git/index.lock'\n")}},
@@ -255,6 +276,8 @@ APPELS_MAL_FORMES = {
     "option-sans-valeur": ("--format",),
     "option-inconnue": ("--lint", "make lint"),
     "argument-positionnel": ("make test",),
+    # `shlex.split` POSIX mange l'antislash : `apps\api` deviendrait `appsapi`.
+    "chemin-a-antislash": ("--test", "uv run pytest apps\\api\\tests\\test_x.py"),
 }
 
 
@@ -267,6 +290,13 @@ def test_un_appel_mal_forme_sort_en_2_sans_rien_lancer(
     assert lance(poste, *args) == 2
     assert poste.appels == []
     assert "usage" in capsys.readouterr().err
+
+
+def test_un_antislash_se_refuse_en_disant_d_ecrire_les_chemins_avec_des_barres_obliques(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert lance(Poste(), *APPELS_MAL_FORMES["chemin-a-antislash"]) == 2
+    assert "écrire les chemins avec `/`" in capsys.readouterr().err
 
 
 @pytest.fixture
