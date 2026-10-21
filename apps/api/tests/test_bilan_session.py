@@ -13,6 +13,7 @@ import io
 import json
 import sys
 import time
+from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -1307,3 +1308,329 @@ def test_aucun_transcript_lisible_ne_rend_pas_de_bilan(
     assert code == 1
     assert f"absents : {absent}" in sortie
     assert "bilan partiel" not in sortie, "aucun bilan n'est rendu (relevé par `/code-review`)"
+
+
+# --- Le profil de contexte de chaque transcript de session (#134, lot 5) ------------------------
+
+
+def test_le_profil_compte_les_appels_le_contexte_initial_et_le_cache_lu_par_quart(
+    tmp_path: Path,
+) -> None:
+    """Huit appels, dont un message diffusé sur deux lignes au même `id` — un seul appel, à sa
+    place de première apparition — et un appel de sous-agent resté dans le transcript de session
+    (`isSidechain`), écarté comme dans `read_events`. Les quarts tombent juste : 8 appels, 2 par
+    quart."""
+    lus = [100_000, 300_000, 500_000, 700_000, 900_000, 1_100_000, 2_000_000, 4_000_000]
+    appels = [api_call(f"10:0{i}:00", f"msg_{i}", lu, 1_000, 10) for i, lu in enumerate(lus)]
+    sous_agent = {**api_call("10:03:30", "msg_side", 9_000_000, 0, 10), "isSidechain": True}
+    session = write_transcript(
+        tmp_path / "session.jsonl",
+        [said("09:59:00", "démarre"), *appels[:4], appels[3], sous_agent, *appels[4:]],
+    )
+
+    profil = bilan.context_profile(session)
+
+    assert profil.calls == 8, "msg_3 compte une fois, l'appel du sous-agent pas du tout"
+    assert profil.context == 2 + 100_000 + 1_000
+    assert profil.quarters == [200_000, 600_000, 1_000_000, 3_000_000]
+
+
+def carrying(record: dict[str, Any], *blocks: dict[str, Any]) -> dict[str, Any]:
+    """`record` — un appel d'API ou un message `user` —, porteur de ces blocs de contenu."""
+    record["message"]["content"] = list(blocks)
+    return record
+
+
+def uses(
+    clock: str, message: str, read: int, tool: str, given: dict[str, Any], uid: str
+) -> dict[str, Any]:
+    """Un appel d'API qui lance un outil : `api_call` porteur d'un bloc `tool_use`."""
+    return carrying(
+        api_call(clock, message, read, 0, 10),
+        {"type": "tool_use", "id": uid, "name": tool, "input": given},
+    )
+
+
+def returned(clock: str, uid: str, content: str | list[dict[str, Any]]) -> dict[str, Any]:
+    """Le retour d'un outil dans le rôle `user` — un texte, ou une liste de blocs."""
+    return {
+        "type": "user",
+        "timestamp": at(clock),
+        "message": {"content": [{"type": "tool_result", "tool_use_id": uid, "content": content}]},
+    }
+
+
+# La session de relecture que la session PR démarre, et le retour réel de `start_session` —
+# relevé sur le transcript de la session PR du lot 4a de #134 : une liste d'un bloc `text`.
+SESSION_DE_RELECTURE = "local_f6942c91-c0c7-4230-91c5-23af96ea3e16"
+DEMARRAGE = (
+    'Started session "Relecture de la PR #142 (#134 lot 4a)" '
+    f"(session_id: {SESSION_DE_RELECTURE}, name: relecture-pr-142). It runs on its own; …"
+)
+
+# Chaque forme de porte, en littéraux, sous son libellé rendu : la ligne de `REVIEW_GATES` qu'elle
+# éprouve — outil, champ de son `input`, valeur —, et l'`input` du `tool_use` qui la porte.
+PORTES: dict[str, tuple[tuple[str, str, str], dict[str, Any]]] = {
+    "Skill code-review": (("Skill", "skill", "code-review"), {"skill": "code-review"}),
+    "Skill security-review": (("Skill", "skill", "security-review"), {"skill": "security-review"}),
+    "Agent relecteur": (
+        ("Agent", "subagent_type", "relecteur"),
+        {"subagent_type": "relecteur", "prompt": "relis"},
+    ),
+    "SendMessage → session de relecture": (
+        ("SendMessage", "to", "→ session de relecture"),
+        {"to": SESSION_DE_RELECTURE, "message": "passe 1"},
+    ),
+}
+
+# Ce qui ne doit pas mordre : un autre skill, un autre rôle, et un message à une session que ce
+# transcript n'a pas démarrée — la coordinatrice du lot 4a, au même relevé.
+TEMOINS: dict[str, tuple[str, dict[str, Any]]] = {
+    "Skill ponytail": ("Skill", {"skill": "ponytail"}),
+    "Agent developpeur": ("Agent", {"subagent_type": "developpeur"}),
+    "SendMessage → session non démarrée ici": (
+        "SendMessage",
+        {"to": "local_d82a6420-3661-48a5-b7e5-11dacbbe2053"},
+    ),
+    # L'entrée d'un outil est écrite par le modèle : un destinataire mal formé reste dans le
+    # transcript, et ne doit ni mordre ni faire tomber le bilan.
+    "SendMessage → destinataire qui n'est pas une chaîne": (
+        "SendMessage",
+        {"to": [SESSION_DE_RELECTURE]},
+    ),
+}
+
+
+def gated(tmp_path: Path, tool: str, given: dict[str, Any]) -> Any:
+    """Le profil d'une session qui démarre sa session de relecture à l'appel 2, puis lance
+    `tool` à l'appel 4 — cinquième enregistrement, après le retour du démarrage."""
+    start = "toolu_start000000000000001"
+    return bilan.context_profile(
+        write_transcript(
+            tmp_path / "session.jsonl",
+            [
+                api_call("10:00:00", "msg_1", 100, 0, 10),
+                uses("10:01:00", "msg_2", 100, "mcp__ccd_session__start_session", {}, start),
+                returned("10:01:05", start, [{"type": "text", "text": DEMARRAGE}]),
+                api_call("10:02:00", "msg_3", 100, 0, 10),
+                uses("10:03:00", "msg_4", 100, tool, given, "toolu_candidat000000000002"),
+                api_call("10:04:00", "msg_5", 100, 0, 10),
+            ],
+        )
+    )
+
+
+@pytest.mark.parametrize(("label", "case"), PORTES.items(), ids=PORTES.keys())
+def test_chaque_forme_de_porte_de_relecture_se_trouve_a_son_appel(
+    tmp_path: Path, label: str, case: tuple[tuple[str, str, str], dict[str, Any]]
+) -> None:
+    """L'indice est le rang de l'appel qui porte le bloc, pas celui de l'enregistrement."""
+    (tool, _, _), given = case
+
+    assert gated(tmp_path, tool, given).gate == (4, label)
+
+
+@pytest.mark.parametrize(("tool", "given"), TEMOINS.values(), ids=TEMOINS.keys())
+def test_un_outil_qui_n_est_pas_une_porte_de_relecture_ne_mord_pas(
+    tmp_path: Path, tool: str, given: dict[str, Any]
+) -> None:
+    assert gated(tmp_path, tool, given).gate is None
+
+
+def test_la_table_des_portes_du_script_est_celle_des_cas() -> None:
+    """L'autre sens (`cycle-pr` 3.1, dernier cas) : une forme ajoutée au script sans son cas."""
+    assert set(bilan.REVIEW_GATES) == {forme for forme, _ in PORTES.values()}
+
+
+def test_un_message_a_une_session_avant_son_demarrage_ne_mord_pas(tmp_path: Path) -> None:
+    """La session doit avoir été démarrée **plus haut** : un message qui précède le retour de
+    son démarrage ne s'adresse pas encore à la session de relecture de ce transcript."""
+    start = "toolu_start000000000000001"
+    session = write_transcript(
+        tmp_path / "session.jsonl",
+        [
+            uses(
+                "10:00:00", "msg_1", 100, "SendMessage", {"to": SESSION_DE_RELECTURE}, "toolu_tot"
+            ),
+            uses("10:01:00", "msg_2", 100, "mcp__ccd_session__start_session", {}, start),
+            returned("10:01:05", start, [{"type": "text", "text": DEMARRAGE}]),
+        ],
+    )
+
+    assert bilan.context_profile(session).gate is None
+
+
+def around(tmp_path: Path, second: dict[str, Any]) -> Any:
+    """Le profil de quatre appels — 100 000, 50 000, 150 000 et 300 000 lus —, dont le deuxième
+    est `second`."""
+    return bilan.context_profile(
+        write_transcript(
+            tmp_path / "session.jsonl",
+            [
+                api_call("10:00:00", "msg_1", 100_000, 0, 10),
+                second,
+                api_call("10:02:00", "msg_3", 150_000, 0, 10),
+                api_call("10:03:00", "msg_4", 300_000, 0, 10),
+            ],
+        )
+    )
+
+
+def test_la_part_du_cache_lu_apres_la_porte_exclut_l_appel_de_la_porte(tmp_path: Path) -> None:
+    porte = uses("10:01:00", "msg_2", 50_000, "Skill", {"skill": "code-review"}, "toolu_cr")
+
+    assert around(tmp_path, porte).after_gate == (150_000 + 300_000) / 600_000
+
+
+def test_une_session_sans_porte_de_relecture_le_dit_sans_part(tmp_path: Path) -> None:
+    profil = around(tmp_path, api_call("10:01:00", "msg_2", 50_000, 0, 10))
+
+    assert profil.after_gate is None
+    assert "  première porte de relecture : aucune" in bilan.profile_lines(profil)
+
+
+def test_la_section_de_profil_rend_ses_grandeurs_ligne_a_ligne(tmp_path: Path) -> None:
+    """La mise en page, une fois : quarts en milliers arrondis, contexte groupé par milliers,
+    part en pourcentage entier."""
+    porte = uses("10:01:00", "msg_2", 50_000, "Skill", {"skill": "code-review"}, "toolu_cr")
+
+    assert bilan.profile_lines(around(tmp_path, porte)) == [
+        "profil de contexte — session",
+        (
+            f"  appels 4 · contexte au 1er appel {bilan.thousands(100_002)}"
+            " · cache lu moyen par quart 100 → 50 → 150 → 300 K"
+        ),
+        "  première porte de relecture : appel 2 (Skill code-review) · cache lu après elle 75 %",
+        (
+            "  composition (caractères) : résultats d'outils 0 K · réflexion 0 K"
+            " · arguments d'outils 0 K dont édition 0 K · skills chargés 0 K · texte 0 K"
+        ),
+    ]
+
+
+def test_la_composition_compte_chaque_bloc_dans_sa_categorie(tmp_path: Path) -> None:
+    """Chaque ligne porte ses propres blocs — deux messages diffusés sur plusieurs lignes au même
+    `id` comptent tous leurs blocs. Relevé le 2026-10-21 à 20 h sur les transcripts de la session
+    PR et de la session de relecture du lot 4a de #134, population vivante : 154 messages sur 229
+    diffusés sur plusieurs lignes, aucun des 430 blocs répété dans son message — compter chaque
+    ligne ne compte donc rien deux fois. Les arguments d'outils se comptent sans échappement ASCII :
+    `{"old_string": "é", "new_string": "è"}` fait 38 caractères, 48 échappés. Un skill ne se
+    charge que dans le rôle `user` : l'agent qui cite la phrase écrit du texte. Une image dans un
+    retour d'outil, une pièce jointe, une copie de requête et un message de sous-agent ne
+    comptent pas — la copie de requête, `api-request-blob`, porte un `message` `user` ou
+    `system` (forme relevée sur la session PR du lot 4a de #134)."""
+    session = write_transcript(
+        tmp_path / "session.jsonl",
+        [
+            carrying(
+                api_call("10:00:00", "msg_1", 0, 0, 10),
+                {"type": "thinking", "thinking": "abc", "signature": "sig12"},
+            ),
+            carrying(
+                api_call("10:00:01", "msg_1", 0, 0, 10),
+                {"type": "redacted_thinking", "data": "xxxxxx"},
+                {"type": "text", "text": "bonjour"},
+                {"type": "text", "text": "Base directory for this skill: cité"},
+            ),
+            uses("10:01:00", "msg_2", 0, "Read", {"file_path": "a.py"}, "toolu_read"),
+            uses(
+                "10:01:01", "msg_2", 0, "Edit", {"old_string": "é", "new_string": "è"}, "toolu_edit"
+            ),
+            uses("10:01:02", "msg_2", 0, "Bash", {"command": "ls"}, "toolu_bash"),
+            returned("10:01:10", "toolu_read", "x" * 40),
+            returned(
+                "10:01:11",
+                "toolu_edit",
+                [
+                    {"type": "text", "text": "ok"},
+                    {"type": "image", "source": {"type": "base64", "data": "iVBORw0KGgo"}},
+                    {"type": "text", "text": "fini"},
+                ],
+            ),
+            returned("10:01:12", "toolu_bash", "y" * 20),
+            said("10:02:00", "Base directory for this skill: x"),
+            said("10:03:00", "ok go"),
+            {"type": "attachment", "timestamp": at("10:03:01"), "attachment": {"prompt": "z" * 99}},
+            {
+                "type": "api-request-blob",
+                "message": {"role": "user", "content": [{"type": "text", "text": "z" * 99}]},
+            },
+            {**said("10:03:02", "z" * 99), "isSidechain": True},
+        ],
+    )
+
+    assert bilan.context_profile(session).composition == bilan.Composition(
+        thinking=3 + 5 + 6,
+        tool_input=21 + 38 + 17,
+        editing=38,
+        skills=32,
+        text=len("bonjour") + len("Base directory for this skill: cité") + len("ok go"),
+        results=Counter({"Read": 40, "Bash": 20, "Edit": 6}),
+    )
+
+
+def test_un_profil_sans_cache_lu_ni_retour_d_outil_non_vide_se_rend_sans_part(
+    tmp_path: Path,
+) -> None:
+    """Les deux parts du profil ont un dénominateur qui peut être nul — le cache lu de toute la
+    session, la somme des retours d'outils : la section se rend alors sans part, au lieu de
+    lever `ZeroDivisionError`. Sous quatre appels, les quarts se rendent d'un tiret."""
+    session = write_transcript(
+        tmp_path / "session.jsonl",
+        [
+            uses("10:00:00", "msg_1", 0, "Skill", {"skill": "code-review"}, "toolu_cr"),
+            returned("10:00:05", "toolu_cr", ""),
+        ],
+    )
+
+    assert bilan.profile_lines(bilan.context_profile(session))[1:] == [
+        "  appels 1 · contexte au 1er appel 2 · cache lu moyen par quart —",
+        "  première porte de relecture : appel 1 (Skill code-review)",
+        (
+            "  composition (caractères) : résultats d'outils 0 K · réflexion 0 K"
+            " · arguments d'outils 0 K dont édition 0 K · skills chargés 0 K · texte 0 K"
+        ),
+    ]
+
+
+def test_main_rend_la_session_de_relecture_avec_la_session_pr_depuis_deux_dossiers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """La session de relecture tourne dans son propre worktree : son transcript et ses
+    sous-agents vivent sous un autre dossier de projet que ceux de la session PR. Donnée avec
+    elle, elle rend ses sous-agents, ses jetons et sa section de profil."""
+    pr, relecture = "1444a1a8-0389-4e7a-a299-a2ebe3a8e56c", "f6942c91-c0c7-4230-91c5-23af96ea3e16"
+    (tmp_path / "dossier-pr").mkdir()
+    (tmp_path / "dossier-relecture").mkdir()
+    session_pr = write_transcript(
+        tmp_path / "dossier-pr" / f"{pr}.jsonl",
+        [
+            said("10:00:00", "démarre le lot"),
+            api_call("10:00:30", "msg_pr1", 1_000, 2_000, 300),
+            api_call("10:05:00", "msg_pr2", 3_000, 500, 200),
+        ],
+    )
+    write_subagent(
+        session_pr,
+        "agent-a1",
+        [said("10:01:00", "Bloc A"), api_call("10:02:00", "msg_dev", 0, 9_000, 50)],
+        {"agentType": "developpeur", "description": "Bloc A"},
+    )
+    session_relecture = write_transcript(
+        tmp_path / "dossier-relecture" / f"{relecture}.jsonl",
+        [said("10:10:00", "relis la PR"), api_call("10:10:30", "msg_rv1", 4_000, 1_000, 100)],
+    )
+    write_subagent(session_relecture, "agent-b1", RELECTEUR, RELECTEUR_META)
+
+    code, sortie = run_main([str(session_pr), str(session_relecture)], monkeypatch)
+
+    assert code == 0
+    for agent in ("developpeur « Bloc A » — 1 contact", "relecteur « Relecture 4.2, passe 1 »"):
+        assert f"  {agent}" in sortie, agent
+    deux = bilan.Usage(
+        output=300 + 200 + 100, cache_read=1_000 + 3_000 + 4_000, cache_write=2_000 + 500 + 1_000
+    )
+    assert f"jetons de la session         {bilan.tokens(deux)}" in sortie
+    for session in (pr, relecture):
+        assert f"profil de contexte — {session[:8]}" in sortie, session
+    assert sortie.count("  composition (caractères) : ") == 2
