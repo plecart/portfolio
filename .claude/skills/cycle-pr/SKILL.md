@@ -1260,7 +1260,10 @@ l'attente **scindée** en réactivité et absences — celle du mainteneur comme
 workflows, le temps d'agent seul, le cache que chaque sous-agent a lu et écrit **contact par
 contact** — lu dans son propre transcript, sous `<uuid>/subagents/`, reprises et agents au premier
 plan compris ; pas sa sortie, que ce transcript sous-compte —, les points de contact humains et
-les appels d'outils.
+les appels d'outils ; puis le **profil de contexte** de chaque session : cache lu par quart des
+appels, première porte de relecture et part du cache lu après elle, composition en caractères.
+**La session de relecture se donne avec la session PR** : son transcript vit sous le dossier de
+projet de son propre worktree, ses sous-agents à côté de lui.
 
 Écrire ces lignes, plus trois à la main — commits prévus contre commits de correction, constats
 par passe, correctifs qui ont cassé quelque chose — dans `retrospectives/<date>-<issue>.md`,

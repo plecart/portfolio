@@ -4,6 +4,8 @@ Usage : python bilan-session.py <transcript.jsonl> [<relais.jsonl> …]
 
 Un cycle qui a rempli un contexte a **plusieurs** transcripts : le script en accepte autant
 qu'on lui en donne, les fusionne dans l'ordre du temps et rend l'heure de chaque relais (obs 40).
+La session de relecture se donne avec la session PR : son transcript vit sous le dossier de
+projet de son propre worktree, ses sous-agents à côté de lui.
 
 Rend, sans double compte : la durée de la session ; l'attente — du mainteneur ou d'un pair,
 jusqu'au dernier message qui rouvre le tour de l'agent — **scindée** en réactivité (moins d'une
@@ -17,6 +19,16 @@ ne porte que le contexte en fin de premier contact, et un agent au premier plan 
 aucune ; sa sortie, que ce transcript ne porte pas de façon fiable, n'est pas rendue ; les points
 de contact humains et les appels d'outils.
 
+Puis le **profil de contexte** de chaque transcript de session donné — pas de ses sous-agents :
+ses appels d'API, un par message ; le contexte du premier ; le cache lu moyen de chaque quart
+des appels ; sa première porte de relecture — un `Skill` `code-review` ou `security-review`, un
+`Agent` `relecteur`, ou un `SendMessage` à une session que le même transcript a démarrée plus
+haut (`REVIEW_GATES`) — et la part du cache lu après elle ; la composition de ses blocs de
+contenu en caractères — retours d'outils par outil, réflexion, arguments d'outils et leur part
+d'édition, skills chargés, texte. N'y comptent pas : les pièces jointes (`attachment`), les
+copies de requête (`api-request-blob`), un bloc non textuel d'un retour d'outil (image,
+référence d'outil).
+
 Python 3.11 ou plus, bibliothèque standard seule.
 """
 
@@ -28,8 +40,8 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from statistics import median
-from typing import Any, cast
+from statistics import fmean, median
+from typing import Any, NamedTuple, cast
 
 # Une attente d'une heure ou plus n'est pas de la réactivité : c'est une absence, que la pipeline
 # ne peut pas réduire. Les mêler fait attribuer au processus ce qui revient au calendrier.
@@ -104,12 +116,40 @@ BLOCK = re.compile(_BLOCK, re.DOTALL)
 # Et les formes injectées qui ne sont **pas** des balises — à énumérer, elles. `Caveat: The
 # messages below were generated` y figurait et n'a jamais mordu : la forme réelle est
 # `<local-command-caveat>Caveat: …`, donc une balise. Dénombrement : `FORMES_REELLES`.
+# La première est le corps d'un skill chargé, que la composition d'un profil compte à part.
+SKILL_BODY = "Base directory for this skill:"
 INJECTED = (
-    "Base directory for this skill:",
+    SKILL_BODY,
     "[Request interrupted",
     "# Workflow authoring reference",
     "This session is being continued from a previous conversation",
 )
+
+# Les formes d'une **porte de relecture** : (outil, champ de son `input`, valeur). Le premier
+# `tool_use` d'un transcript de session qui en satisfait une est sa première porte (`Profile`) ;
+# une forme de plus s'ajoute par une ligne. `STARTED_SESSION` tient lieu de toute session que le
+# même transcript a démarrée **plus haut** par `START_SESSION_TOOL` — la session de relecture que
+# la session PR démarre au go de son briefing —, et c'est aussi ce que le libellé en rend.
+# Population : `PORTES` dans la suite, tenue égale à cette table.
+STARTED_SESSION = "→ session de relecture"
+REVIEW_GATES = (
+    ("Skill", "skill", "code-review"),
+    ("Skill", "skill", "security-review"),
+    ("Agent", "subagent_type", "relecteur"),
+    ("SendMessage", "to", STARTED_SESSION),
+)
+
+# L'outil qui démarre une session liée, et l'identifiant que son retour porte — forme relevée sur
+# la session PR du lot 4a de #134 : `Started session "…" (session_id: local_<uuid>, name: …)`.
+START_SESSION_TOOL = "mcp__ccd_session__start_session"
+SESSION_ID = re.compile(r"session_id: ([\w-]+)")
+
+# Les outils dont les arguments portent une édition de fichier : leur part des arguments d'outils
+# se rend à part dans la composition d'un profil.
+EDIT_TOOLS = frozenset({"Edit", "Write", "NotebookEdit"})
+
+# Les blocs de réflexion, et les champs dont la longueur compte pour chacun.
+THINKING_FIELDS = {"thinking": ("thinking", "signature"), "redacted_thinking": ("data",)}
 
 Interval = tuple[datetime, datetime]
 
@@ -178,6 +218,11 @@ class Usage:
 
 # Ce qu'un appel d'API a eu en contexte : son entrée hors cache, et le cache qu'il a lu ou écrit.
 CONTEXT_KEYS = ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+
+
+def context_of(counts: Mapping[str, int]) -> int:
+    """Le contexte d'un appel d'API, d'après son `usage` (`CONTEXT_KEYS`)."""
+    return sum(counts.get(key) or 0 for key in CONTEXT_KEYS)
 
 
 @dataclass
@@ -297,8 +342,7 @@ def measure_contact(segment: Sequence[Mapping[str, Any]]) -> Contact:
     for counts in calls.values():
         contact.used.add(counts)
     if calls:
-        last = list(calls.values())[-1]
-        contact.context = sum(last.get(key) or 0 for key in CONTEXT_KEYS)
+        contact.context = context_of(list(calls.values())[-1])
     return contact
 
 
@@ -732,6 +776,231 @@ def measure(events: Sequence[Event], agents: Sequence[Subagent] = ()) -> Measure
     )
 
 
+def chars(block: Mapping[str, Any], *keys: str) -> int:
+    """La longueur cumulée de ces champs d'un bloc de contenu, un champ absent comptant vide."""
+    return sum(len(str(block.get(key) or "")) for key in keys)
+
+
+@dataclass
+class Composition:
+    """Ce que pèsent, en caractères, les blocs de contenu des messages d'une session.
+
+    Attributes:
+        thinking: la réflexion — les champs `THINKING_FIELDS` de ses blocs.
+        tool_input: les arguments d'outils, sérialisés en JSON sans échappement ASCII.
+        editing: la part de `tool_input` qui revient aux outils d'édition (`EDIT_TOOLS`).
+        skills: les corps de skills chargés — un bloc `text` du rôle `user` qui commence par
+            `SKILL_BODY`.
+        text: tous les autres blocs `text`, `user` comme `assistant`.
+        results: le texte des retours d'outils (`result_text`), par outil — « ? » pour un retour
+            dont le transcript ne porte pas l'appel.
+    """
+
+    thinking: int = 0
+    tool_input: int = 0
+    editing: int = 0
+    skills: int = 0
+    text: int = 0
+    results: Counter[str] = field(default_factory=Counter[str])
+
+    @classmethod
+    def of(cls, kept: Sequence[Mapping[str, Any]], tools: Mapping[str, str]) -> "Composition":
+        """La composition de ces messages : chaque bloc de chaque ligne une fois — un message
+        diffusé sur plusieurs lignes y porte des blocs différents (relevé : la docstring de
+        `test_la_composition_compte_chaque_bloc_dans_sa_categorie`).
+
+        Args:
+            kept: les messages de la session (`session_records`).
+            tools: le nom de l'outil de chaque appel d'outil (`tool_names`).
+        """
+        found = cls()
+        for record in kept:
+            for block in content_blocks(record):
+                found.add(str(record.get("type")), block, tools)
+        return found
+
+    def add(self, role: str, block: Mapping[str, Any], tools: Mapping[str, str]) -> None:
+        """Ajoute un bloc de contenu d'un message `user` ou `assistant`.
+
+        Args:
+            role: le rôle du message qui porte le bloc.
+            block: le bloc ; une autre nature que les cinq comptées (image…) ne compte pas.
+            tools: le nom de l'outil de chaque appel d'outil (`tool_names`).
+        """
+        kind = str(block.get("type"))
+        if kind in THINKING_FIELDS:
+            self.thinking += chars(block, *THINKING_FIELDS[kind])
+        elif kind == "tool_use":
+            size = len(json.dumps(block.get("input", {}), ensure_ascii=False))
+            self.tool_input += size
+            if block.get("name") in EDIT_TOOLS:
+                self.editing += size
+        elif kind == "tool_result":
+            self.results[tools.get(str(block.get("tool_use_id")), "?")] += len(result_text(block))
+        elif kind == "text":
+            size = chars(block, "text")
+            if role == "user" and str(block.get("text")).startswith(SKILL_BODY):
+                self.skills += size
+            else:
+                self.text += size
+
+
+class Gate(NamedTuple):
+    """La première porte de relecture d'une session : le rang, à partir de 1, de l'appel d'API
+    qui porte son `tool_use`, et son libellé — l'outil et la valeur qui ont mordu."""
+
+    call: int
+    label: str
+
+
+@dataclass(frozen=True)
+class Profile:
+    """Le profil de contexte d'un transcript de session — mesuré, sans mise en page.
+
+    Attributes:
+        name: le nom du transcript, sans suffixe.
+        reads: le cache lu par chaque appel d'API, dans l'ordre de première apparition de son
+            message — un message diffusé sur plusieurs lignes compte une fois.
+        context: le contexte du premier appel (`CONTEXT_KEYS`), 0 sans appel.
+        gate: sa première porte de relecture (`REVIEW_GATES`), `None` sans porte.
+        composition: ce que pèsent ses blocs de contenu, en caractères.
+    """
+
+    name: str
+    reads: list[int]
+    context: int
+    gate: Gate | None
+    composition: Composition
+
+    @property
+    def calls(self) -> int:
+        """Le nombre d'appels d'API de la session."""
+        return len(self.reads)
+
+    @property
+    def quarters(self) -> list[float]:
+        """Le cache lu moyen de chaque quart des appels, `[n*k//4 : n*(k+1)//4]` pour k = 0..3.
+
+        Vide sous quatre appels : un quart y serait vide, et sa moyenne n'existe pas.
+        """
+        n = len(self.reads)
+        if n < 4:
+            return []
+        return [fmean(self.reads[n * k // 4 : n * (k + 1) // 4]) for k in range(4)]
+
+    @property
+    def after_gate(self) -> float | None:
+        """La part du cache lu par les appels **strictement après** celui de la porte — `None`
+        sans porte, ou sans cache lu à rapporter."""
+        read = sum(self.reads)
+        if self.gate is None or not read:
+            return None
+        return sum(self.reads[self.gate.call :]) / read
+
+
+def session_records(path: Path) -> list[dict[str, Any]]:
+    """Les messages `user` et `assistant` d'un transcript de session, sous-agents écartés.
+
+    Un enregistrement `isSidechain` est un message de sous-agent resté dans le transcript de
+    session : il est écarté comme dans `read_events`.
+    """
+    return [
+        record
+        for record in records(path)
+        if record.get("type") in ("user", "assistant") and not record.get("isSidechain")
+    ]
+
+
+def tool_names(kept: Sequence[Mapping[str, Any]]) -> dict[str, str]:
+    """Le nom de l'outil de chaque `tool_use` de ces messages, par identifiant d'appel."""
+    return {
+        str(block.get("id")): str(block.get("name"))
+        for record in kept
+        for block in content_blocks(record)
+        if block.get("type") == "tool_use"
+    }
+
+
+def result_text(block: Mapping[str, Any]) -> str:
+    """Le texte d'un `tool_result` : son contenu s'il est une chaîne, le `text` de ses blocs
+    joints sinon — une image ou une référence d'outil n'en porte pas."""
+    content = block.get("content")
+    if isinstance(content, str):
+        return content
+    return "".join(str(part.get("text") or "") for part in cast(list[Any], content or []))
+
+
+def gate_label(block: Mapping[str, Any], started: set[str]) -> str | None:
+    """Le libellé de la porte de relecture qu'ouvre ce `tool_use`, ou `None`.
+
+    Args:
+        block: un bloc `tool_use` — son `input`, écrit par le modèle, peut être mal formé : un
+            destinataire qui n'est pas une chaîne ne mord pas.
+        started: les sessions que le transcript a démarrées jusqu'ici.
+
+    Returns:
+        « outil valeur » pour la première forme de `REVIEW_GATES` satisfaite.
+    """
+    given = cast(dict[str, Any], block.get("input") or {})
+    for tool, key, value in REVIEW_GATES:
+        found = given.get(key)
+        to_started = value == STARTED_SESSION and isinstance(found, str) and found in started
+        if block.get("name") == tool and (found == value or to_started):
+            return f"{tool} {value}"
+    return None
+
+
+def review_gate(
+    kept: Sequence[Mapping[str, Any]], ranks: Mapping[str, int], tools: Mapping[str, str]
+) -> Gate | None:
+    """La première porte de relecture d'un transcript, dans son ordre, ou `None`.
+
+    Une session ne compte pour la forme `STARTED_SESSION` qu'à partir du retour de son
+    démarrage : un message qui la précède dans le transcript ne mord pas.
+
+    Args:
+        kept: les messages de la session (`session_records`), dans l'ordre du transcript.
+        ranks: le rang de chaque appel d'API, par identifiant de message.
+        tools: le nom de l'outil de chaque appel d'outil (`tool_names`).
+    """
+    started: set[str] = set()
+    for record in kept:
+        call = api_call(record)
+        for block in content_blocks(record):
+            if call and block.get("type") == "tool_use" and (label := gate_label(block, started)):
+                return Gate(ranks[call[0]], label)
+            # Seul un `tool_result` porte un `tool_use_id`.
+            if tools.get(str(block.get("tool_use_id"))) == START_SESSION_TOOL:
+                started.update(SESSION_ID.findall(result_text(block)))
+    return None
+
+
+def context_profile(path: Path) -> Profile:
+    """Le profil de contexte d'un transcript de session.
+
+    Args:
+        path: le transcript JSONL d'une session — pas d'un sous-agent.
+
+    Returns:
+        Ses appels d'API, le cache que chacun a lu, le contexte du premier, sa première
+        porte de relecture et la composition de ses messages.
+    """
+    kept = session_records(path)
+    calls: dict[str, Mapping[str, int]] = dict(
+        call for record in kept if (call := api_call(record))
+    )
+    usages = list(calls.values())
+    ranks = {key: rank for rank, key in enumerate(calls, start=1)}
+    tools = tool_names(kept)
+    return Profile(
+        name=path.stem,
+        reads=[usage.get("cache_read_input_tokens") or 0 for usage in usages],
+        context=context_of(usages[0]) if usages else 0,
+        gate=review_gate(kept, ranks, tools),
+        composition=Composition.of(kept, tools),
+    )
+
+
 def contact_line(contact: Contact) -> str:
     """Une ligne de contact : sa fenêtre, ses appels, son contexte final et le cache consommé —
     pas la sortie, que le transcript d'un sous-agent ne porte pas de façon fiable (`consumed`)."""
@@ -751,7 +1020,58 @@ def agent_lines(agent: Subagent) -> list[str]:
     return [title, *(contact_line(contact) for contact in agent.contacts)]
 
 
-def report(events: Sequence[Event], session: Usage, agents: Sequence[Subagent]) -> str:
+def kilo(count: float) -> str:
+    """Une grandeur en milliers arrondis — l'unité est à l'appelant."""
+    return f"{count / 1e3:.0f}"
+
+
+def percent(share: float) -> str:
+    """Une part en pourcentage entier, l'espace avant le signe."""
+    return f"{share:.0%}".replace("%", " %")
+
+
+def composition_line(weights: Composition) -> str:
+    """La ligne de composition, en milliers de caractères : les retours d'outils et la part des
+    trois outils les plus lourds — aucune quand ces retours sont vides —, puis la réflexion, les
+    arguments d'outils et leur part d'édition, les skills chargés et le texte."""
+    results = weights.results.total()
+    heaviest = ", ".join(
+        f"{tool} {percent(size / results)}"
+        for tool, size in (weights.results.most_common(3) if results else [])
+    )
+    return (
+        f"  composition (caractères) : résultats d'outils {kilo(results)} K"
+        + (f" ({heaviest})" if heaviest else "")
+        + f" · réflexion {kilo(weights.thinking)} K"
+        f" · arguments d'outils {kilo(weights.tool_input)} K dont édition {kilo(weights.editing)} K"
+        f" · skills chargés {kilo(weights.skills)} K · texte {kilo(weights.text)} K"
+    )
+
+
+def profile_lines(profile: Profile) -> list[str]:
+    """La section d'un profil de contexte : son titre, ses appels, sa première porte et sa
+    composition — un tiret pour les quarts d'une session de moins de quatre appels."""
+    quarters = " → ".join(kilo(quarter) for quarter in profile.quarters)
+    gate, after = profile.gate, profile.after_gate
+    where = f"appel {gate.call} ({gate.label})" if gate else "aucune"
+    return [
+        f"profil de contexte — {profile.name[:8]}",
+        (
+            f"  appels {profile.calls} · contexte au 1er appel {thousands(profile.context)}"
+            f" · cache lu moyen par quart {quarters + ' K' if quarters else '—'}"
+        ),
+        f"  première porte de relecture : {where}"
+        + (f" · cache lu après elle {percent(after)}" if after is not None else ""),
+        composition_line(profile.composition),
+    ]
+
+
+def report(
+    events: Sequence[Event],
+    session: Usage,
+    agents: Sequence[Subagent],
+    profiles: Sequence[Profile] = (),
+) -> str:
     """Le bilan, prêt à être recopié dans une rétrospective.
 
     L'ordre des lignes est celui de leur lecture : l'attente **hors absences** d'abord, parce
@@ -766,6 +1086,10 @@ def report(events: Sequence[Event], session: Usage, agents: Sequence[Subagent]) 
 
     Chaque sous-agent se rend **contact par contact**, consommation comprise : c'est la seule
     grandeur que deux lots peuvent comparer, un total dépendant de la taille du delta relu.
+
+    Puis une section par profil de contexte (`profile_lines`) : le cache que la session a lu,
+    quart par quart de ses appels, la place de sa première relecture dans cette courbe, et ce
+    que pèsent ses blocs de contenu.
     """
     m = measure(events, agents)
     humans = m.kinds["human"]
@@ -830,6 +1154,7 @@ def report(events: Sequence[Event], session: Usage, agents: Sequence[Subagent]) 
         + ", ".join(
             f"{name} {count}" for name, count in Counter(c.name for c in m.calls).most_common(8)
         ),
+        *(line for profile in profiles for line in profile_lines(profile)),
     ]
     return "\n".join(lines)
 
@@ -848,7 +1173,9 @@ def say(text: str) -> None:
 
 
 def main(argv: Sequence[str]) -> int:
-    """Point d'entrée : un ou plusieurs transcripts de la **même** session, relais compris.
+    """Point d'entrée : un ou plusieurs transcripts d'un même cycle — relais compris, et la
+    session de relecture avec la session PR, chacune lue avec les sous-agents rangés à côté
+    d'elle, dans son propre dossier de projet. Chaque transcript rend son profil de contexte.
 
     Un transcript absent se **dit**, il ne fait ni planter le script ni rendre en silence un
     bilan sur la moitié du cycle : le harnais a le droit de supprimer un transcript entre deux
@@ -870,7 +1197,8 @@ def main(argv: Sequence[str]) -> int:
     if not events:
         say("transcripts vides ou illisibles")
         return 1
-    say(report(events, token_usage(present), subagents(present)))
+    profiles = [context_profile(path) for path in present]
+    say(report(events, token_usage(present), subagents(present), profiles))
     return 0
 
 
