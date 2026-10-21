@@ -12,9 +12,11 @@ la plus chère, et s'arrête au premier KO :
    commit emporterait ce qui est stagé, le format réécrirait ce qui ne l'est pas. Sans
    `--untracked-files=normal`, une configuration `status.showUntrackedFiles=no` cache un fichier
    non suivi (mesuré le 2026-10-21, git 2.47.1) ;
-2. `gh auth status --active` — rend 0 : seul le compte actif compte, car sans `--active` `gh` rend
-   1 dès qu'un compte connu, sur n'importe quel hôte, a un problème d'authentification (manuel de
-   `gh auth status` ; `--active` mesuré le 2026-10-21, gh 2.94.0) ;
+2. `gh auth status --active` — rend 0 : seul le compte actif de chaque hôte connu compte (manuel
+   de `gh auth status` : « on each known GitHub host » ; un hôte GHES en défaut rend donc encore
+   1) ; sans `--active`, `gh` rend 1 dès qu'un compte, actif ou non, a un problème
+   d'authentification (`--active` mesuré le 2026-10-21, gh 2.94.0 ; un `gh` antérieur à ce
+   drapeau le rejetterait, non mesuré) ;
 3. `droit de push` — `gh api repos/{owner}/{repo} --jq .permissions.push` rend exactement `true` ;
    `{owner}/{repo}` sont remplis par `gh` depuis le dépôt courant ;
 4. `commit de sonde` — `git commit --allow-empty -m "chore: sonde outillage"`, qui déclenche les
