@@ -1244,7 +1244,7 @@ l'Étape 5 : `git push origin --delete captures/pr-<n>`.
 dépendance :
 
 ```
-python <répertoire de ce skill>/scripts/bilan-session.py <transcript .jsonl> [<relais .jsonl> …]
+python <répertoire de ce skill>/scripts/bilan-session.py <transcript .jsonl> [<relais ou session de relecture .jsonl> …]
 ```
 
 Les transcripts vivent sous `~/.claude/projects/<projet>/<uuid de session>.jsonl` — l'uuid est
@@ -1262,10 +1262,10 @@ contact** — lu dans son propre transcript, sous `<uuid>/subagents/`, reprises 
 plan compris ; pas sa sortie, que ce transcript sous-compte —, les points de contact humains et
 les appels d'outils ; puis le **profil de contexte** de chaque session : cache lu par quart des
 appels, première porte de relecture et part du cache lu après elle, composition en caractères.
-**La session de relecture se donne avec la session PR** : son transcript vit sous le dossier de
-projet de son propre worktree, ses sous-agents à côté de lui. L'attente se lit sur la session PR
-seule, relais compris, parce qu'une session en parallèle ferme ses attentes (docstring de
-`waits`).
+**La session de relecture, quand la PR en a une, se donne avec la session PR** : son transcript
+vit sous le dossier de projet de son propre worktree, et le script lit les sous-agents rangés
+sous le dossier de chaque transcript (`subagents`). L'attente se lit sur la session PR seule,
+relais compris, parce qu'une session en parallèle ferme ses attentes (docstring de `waits`).
 
 Écrire ces lignes, plus trois à la main — commits prévus contre commits de correction, constats
 par passe, correctifs qui ont cassé quelque chose — dans `retrospectives/<date>-<issue>.md`,
