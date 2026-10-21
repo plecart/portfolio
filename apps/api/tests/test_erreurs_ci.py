@@ -244,6 +244,56 @@ JOURNAL_38936444116 = journal(
     "2026-10-16T17:04:13.9990331Z ##[error]Process completed with exit code 2.",
 )
 
+# 39146227001, Infra : `gh` n'a pas su associer le journal en zip et a lu le journal entier du
+# job, rangé sous `UNKNOWN STEP` (`gh run view --help`, gh 2.94.0) — une section de 2 076 lignes,
+# dont : les lignes 1-2, avant le premier segment ; les en-têtes `##[group]Run` de ses douze
+# segments ; le bilan de `npm ci` du step réussi `make web-install`, lignes 158-162, 168, 173,
+# 175-176 et 178 ; le segment en échec `make scan`, lignes 1090-1091, 1096, 1227-1229, 1830-1832
+# et 2032-2033 ; la première ligne `Post job cleanup.`, 2034.
+JOURNAL_39146227001 = journal(
+    INFRA,
+    "UNKNOWN STEP",
+    "\ufeff2026-10-18T16:42:32.4940439Z Current runner version: '2.337.0'",
+    "2026-10-18T16:42:32.4970133Z ##[group]Runner Image Provisioner",
+    "2026-10-18T16:42:34.3993840Z ##[group]Run actions/checkout@"
+    "3d3c42e5aac5ba805825da76410c181273ba90b1",
+    "2026-10-18T16:42:35.2949583Z ##[group]Run cp .env.example .env",
+    "2026-10-18T16:42:35.3277445Z ##[group]Run make compose-config",
+    "2026-10-18T16:42:35.6592331Z ##[group]Run actions/setup-node@"
+    "820762786026740c76f36085b0efc47a31fe5020",
+    "2026-10-18T16:42:38.0422117Z ##[group]Run make web-install",
+    "2026-10-18T16:42:38.0422410Z ^[[36;1mmake web-install^[[0m",
+    "2026-10-18T16:42:38.0518423Z shell: /usr/bin/bash -e {0}",
+    "2026-10-18T16:42:38.0518681Z ##[endgroup]",
+    "2026-10-18T16:42:38.0623629Z cd apps/web && npm ci",
+    "2026-10-18T16:42:45.1967450Z added 609 packages, and audited 610 packages in 7s",
+    "2026-10-18T16:42:45.2019232Z 5 moderate severity vulnerabilities",
+    "2026-10-18T16:42:45.2020505Z To address all issues (including breaking changes), run:",
+    "2026-10-18T16:42:45.2038688Z   npm audit fix --force",
+    "2026-10-18T16:42:45.2069399Z Run `npm audit` for details.",
+    "2026-10-18T16:42:45.5001697Z ##[group]Run docker/setup-buildx-action@"
+    "f87e5991a6d7451dcb8d9637bfbc97413f497069",
+    "2026-10-18T16:42:58.6451307Z ##[group]Run actions/cache@"
+    "55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+    "2026-10-18T16:43:08.5959697Z ##[group]Run make build",
+    "2026-10-18T16:44:14.1171029Z ##[group]Run astral-sh/setup-uv@"
+    "c18668ad3cf93ea998bef934396af7bb5c839dc7",
+    "2026-10-18T16:44:18.9432176Z ##[group]Run make install",
+    "2026-10-18T16:44:20.4656747Z ##[group]Run make image-test",
+    "2026-10-18T16:48:29.9655206Z ##[group]Run make scan",
+    "2026-10-18T16:48:29.9655541Z ^[[36;1mmake scan^[[0m",
+    "2026-10-18T16:48:29.9740536Z ##[endgroup]",
+    "2026-10-18T16:49:02.8088971Z portfolio-api (debian 13.7)",
+    "2026-10-18T16:49:02.8089529Z ===========================",
+    "2026-10-18T16:49:02.8090122Z Total: 0 (HIGH: 0, CRITICAL: 0)",
+    "2026-10-18T16:49:10.3086568Z usr/bin/caddy (gobinary)",
+    "2026-10-18T16:49:10.3086872Z ========================",
+    "2026-10-18T16:49:10.3087217Z Total: 1 (HIGH: 1, CRITICAL: 0)",
+    "2026-10-18T16:49:10.4111440Z make: *** [Makefile:181: scan-caddy] Error 1",
+    "2026-10-18T16:49:10.4162011Z ##[error]Process completed with exit code 2.",
+    "2026-10-18T16:49:10.4280748Z Post job cleanup.",
+)
+
 # (run, jobs réduits, sortie de `gh run view <run> --log-failed`, lignes attendues)
 RUNS_ROUGES_REELS = {
     "39521079941-npm-audit": (
@@ -292,6 +342,30 @@ RUNS_ROUGES_REELS = {
             )
         ],
     ),
+    "39146227001-repli-sur-le-journal-du-job": (
+        "39146227001",
+        termine(
+            job(BACK, "success", ("Audit", "success")),
+            job(
+                INFRA,
+                "failure",
+                ("Front", "success"),
+                ("Tests des images", "success"),
+                ("Scan", "failure"),
+                ("Post Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9", "skipped"),
+            ),
+            job(FRONT, "success", ("Audit", "success")),
+            job(DEPLOIEMENT, "skipped"),
+            job(PUBLICATION, "skipped"),
+        ),
+        sortie(JOURNAL_39146227001.encode()),
+        [
+            (
+                f"{INFRA} › Scan : Total: 1 (HIGH: 1, CRITICAL: 0)"
+                " — segment « Run make scan » du journal du job"
+            )
+        ],
+    ),
     # Trois jobs en échec sans aucun step : `gh` ne trouve pas leur journal et sort en 1.
     "38944674078-aucun-step": (
         "38944674078",
@@ -326,7 +400,10 @@ def test_un_run_rouge_reel_rend_une_ligne_par_step_en_echec(
 ) -> None:
     """Chaque step en échec rend sa première ligne d'erreur, dans l'ordre des jobs puis des steps
     du JSON. Sur 38936444116, le marqueur de pytest passe avant le mot d'erreur : sans lui, la
-    ligne 86 du code source affiché, `failure = …`, serait rendue (vu rouge par mutation)."""
+    ligne 86 du code source affiché, `failure = …`, serait rendue (vu rouge par mutation). Sur
+    39146227001, le journal entier du job se lit par segment : lu d'un bloc, il rendrait le bilan
+    de `npm ci` du step réussi `make web-install`, `5 moderate severity vulnerabilities` (vu rouge
+    par mutation)."""
     assert lance(Gh(document(jobs), log, run), run) == 0
     assert lignes(capsys) == attendu
 
@@ -346,33 +423,19 @@ def test_deux_steps_en_echec_d_un_meme_job_rendent_deux_lignes(
     ]
 
 
-def test_une_section_du_journal_qu_aucun_step_en_echec_ne_nomme_rend_sa_ligne(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """`gh run view --help` (gh 2.94.0) : une ligne de journal que `gh` ne rattache à aucun step
-    porte le nom de step `UNKNOWN STEP`. Elle ne se perd pas en silence : sa section rend sa
-    ligne après celles des steps du JSON."""
-    jobs = termine(job(BACK, "failure", ("Tests", "failure")))
-    log = journal(BACK, "Tests", "Error: boom") + journal(
-        BACK, "UNKNOWN STEP", "##[error]The operation was canceled."
-    )
-
-    assert lance(Gh(document(jobs), sortie(log.encode())), RUN) == 0
-    assert lignes(capsys) == [
-        f"{BACK} › Tests : Error: boom",
-        f"{BACK} › UNKNOWN STEP : ##[error]The operation was canceled.",
-    ]
-
-
 def test_seules_les_conclusions_d_echec_rendent_une_ligne(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """L'API REST (« Workflow jobs », schéma `job`) énumère `success`, `failure`, `neutral`,
     `cancelled`, `skipped`, `timed_out` et `action_required` ; les quatre qui ne sont pas un échec
     ne rendent rien, ni pour un job ni pour un step, et une conclusion hors de l'énumération —
-    `startup_failure`, celle d'une CI qui ne démarre pas (`cycle-pr` Étape 6) — compte en échec."""
+    `startup_failure`, celle d'une CI qui ne démarre pas (`cycle-pr` Étape 6) — compte en échec.
+    Seul un job en échec a ses steps lus, comme `gh run view --log-failed` ne lit que le journal
+    de ceux-là : le step en échec d'un job vert — un `continue-on-error` — ne rend rien. Un step
+    sans conclusion, `""`, ne rend rien non plus (vu rouge par mutation, l'un et l'autre)."""
     jobs = termine(
         job("Lint", "success"),
+        job(FRONT, "success", ("Install", "success"), ("Audit", "failure")),
         job("Publication", "skipped"),
         job("Build", "cancelled"),
         job("Docs", "neutral"),
@@ -388,6 +451,7 @@ def test_seules_les_conclusions_d_echec_rendent_une_ligne(
             ("Format check", "cancelled"),
             ("Typecheck", "neutral"),
             ("Audit", "failure"),
+            ("Tests", ""),
         ),
     )
     log = journal(BACK, "Audit", "Found 1 known vulnerability in 1 package")
@@ -402,36 +466,128 @@ def test_seules_les_conclusions_d_echec_rendent_une_ligne(
     ]
 
 
-# (sortie de `gh run view 4242 --log-failed`, ce que rend le step en échec qui n'y a pas de section)
-JOURNAUX_INDISPONIBLES = {
-    "gh-en-echec": (
-        panne(b"log not found: 117120678982\n"),
-        (
-            "journal indisponible — `gh run view 4242 --log-failed` a échoué (1) :"
-            " log not found: 117120678982"
-        ),
+UN_STEP_EN_ECHEC = termine(job(BACK, "failure", ("Tests", "failure")))
+
+# (jobs du run 4242, sortie de `gh run view 4242 --log-failed`, lignes attendues)
+CHEMINS = {
+    "1-section-propre": (
+        UN_STEP_EN_ECHEC,
+        sortie(journal(BACK, "Tests", "Error: boom").encode()),
+        [f"{BACK} › Tests : Error: boom"],
     ),
-    "section-absente": (sortie(b""), "journal indisponible — aucune section du journal à son nom"),
-    "ligne-sans-ses-trois-champs": (
+    "2-repli-segments-en-echec-dans-l-ordre": (
+        termine(
+            job(BACK, "failure", ("Install", "success"), ("Lint", "failure"), ("Tests", "failure"))
+        ),
+        sortie(
+            journal(
+                BACK,
+                "UNKNOWN STEP",
+                "Current runner version: '2.337.0'",
+                "##[group]Run make install",
+                "error: download failed, retrying (1/3)",
+                "##[group]Run make lint",
+                "fatal: ruff introuvable",
+                "##[error]Process completed with exit code 2.",
+                "##[group]Run make test",
+                "FAILED test_forms.py::test_fails - assert 1 == 2",
+                "##[error]Process completed with exit code 2.",
+                "Post job cleanup.",
+            ).encode()
+        ),
+        [
+            (
+                f"{BACK} › Lint : fatal: ruff introuvable"
+                " — segment « Run make lint » du journal du job"
+            ),
+            (
+                f"{BACK} › Tests : FAILED test_forms.py::test_fails - assert 1 == 2"
+                " — segment « Run make test » du journal du job"
+            ),
+        ],
+    ),
+    "2-repli-sans-segment-en-echec": (
+        termine(job(INFRA, "failure", ("Front", "success"), ("Scan", "failure"))),
+        sortie(
+            journal(
+                INFRA,
+                "UNKNOWN STEP",
+                "##[group]Run make web-install",
+                "5 moderate severity vulnerabilities",
+                "##[group]Run make scan",
+                "Total: 1 (HIGH: 1, CRITICAL: 0)",
+            ).encode()
+        ),
+        [f"{INFRA} › Scan : journal du job présent, sans segment en échec repérable"],
+    ),
+    "3-journal-illisible-gh-en-echec": (
+        UN_STEP_EN_ECHEC,
+        panne(b"log not found: 117120678982\n"),
+        [
+            (
+                f"{BACK} › Tests : journal indisponible — `gh run view 4242 --log-failed` a échoué"
+                " (1) : log not found: 117120678982"
+            )
+        ],
+    ),
+    "3-journal-illisible-ligne-sans-ses-trois-champs": (
+        UN_STEP_EN_ECHEC,
         sortie(f"{BACK}\tTests\tError: boom\n{BACK} Tests sans tabulation\n".encode()),
-        "journal indisponible — la ligne 2 du journal n'a pas la forme `<job>\\t<step>\\t<texte>`",
+        [
+            (
+                f"{BACK} › Tests : journal indisponible — la ligne 2 du journal n'a pas la forme"
+                " `<job>\\t<step>\\t<texte>`"
+            )
+        ],
+    ),
+    "4-section-hors-repli-inconnue-du-json": (
+        UN_STEP_EN_ECHEC,
+        sortie(
+            (
+                journal(BACK, "Tests", "Error: boom")
+                + journal(BACK, "UNKNOWN STEP", "##[error]The operation was canceled.")
+            ).encode()
+        ),
+        [
+            f"{BACK} › Tests : Error: boom",
+            f"{BACK} › UNKNOWN STEP : ##[error]The operation was canceled.",
+        ],
+    ),
+    "5-journal-sans-section-du-step": (
+        UN_STEP_EN_ECHEC,
+        sortie(b""),
+        [f"{BACK} › Tests : journal indisponible — aucune section du journal à son nom"],
     ),
 }
 
 
-@pytest.mark.parametrize(
-    ("log", "rendu"), JOURNAUX_INDISPONIBLES.values(), ids=JOURNAUX_INDISPONIBLES.keys()
-)
-def test_un_journal_illisible_ne_fait_pas_refuser_et_chaque_step_garde_sa_ligne(
-    log: subprocess.CompletedProcess[bytes], rendu: str, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(("jobs", "log", "attendu"), CHEMINS.values(), ids=CHEMINS.keys())
+def test_chaque_chemin_vers_la_ligne_d_un_step_en_echec_ne_rend_que_ce_step(
+    jobs: dict[str, Any],
+    log: subprocess.CompletedProcess[bytes],
+    attendu: list[str],
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    jobs = termine(job(BACK, "failure", ("Tests", "failure")), job(FRONT, "failure"))
+    """Les chemins par lesquels la ligne d'un step en échec est choisie, recensés avant le
+    correctif du repli de `gh` (passe 1 de relecture du lot 4b de #134) :
 
+    1. la section propre du step, journal en zip — tenu ;
+    2. la section `UNKNOWN STEP` de son job, le journal entier du job que `gh` lit quand il ne
+       sait pas associer le zip (`gh run view --help`, gh 2.94.0) — **fuyait** : lue d'un bloc,
+       elle rendait la ligne d'un autre step (39146227001, `RUNS_ROUGES_REELS`) ;
+    3. un journal illisible — `gh` en échec (« log not found »), ou une ligne sans ses trois
+       champs — tenu ;
+    4. une section sous un nom que le JSON ne connaît pas, hors repli — tenu, rendue sous son
+       nom ;
+    5. un journal lisible sans section au nom du step ni section `UNKNOWN STEP` de son job —
+       tenu ; relevé au recensement, absent de la liste de la relecture.
+
+    5 chemins recensés, 1 fuyait. Le chemin 2 a deux cas : les steps en échec prennent dans
+    l'ordre les segments `##[group]Run` qui portent une ligne `##[error]`, et un step sans un tel
+    segment le dit — jamais la ligne d'un autre step, ni la section rendue à part. Un chemin
+    ajouté au script ajoute son cas ici."""
     assert lance(Gh(document(jobs), log), RUN) == 0
-    assert lignes(capsys) == [
-        f"{BACK} › Tests : {rendu}",
-        f"{FRONT} : aucun step en échec — conclusion failure",
-    ]
+    assert lignes(capsys) == attendu
 
 
 def test_un_octet_hors_utf_8_ne_rend_pas_le_journal_illisible(
@@ -573,6 +729,10 @@ REFUS = {
         document(termine(job(FRONT, "success"), job(PUBLICATION, "skipped"), conclusion="success")),
         "aucun job en échec dans le run 4242 (conclusion success)",
     ),
+    "run-vert-sans-job": (
+        document(termine(conclusion="success")),
+        "aucun job en échec dans le run 4242 (conclusion success)",
+    ),
     "lecture-des-jobs-en-panne": (
         panne(b"HTTP 404: Not Found\n(https://api.github.com/...)\n"),
         (
@@ -598,6 +758,16 @@ def test_un_refus_sort_en_1_en_une_ligne_sans_lire_le_journal(
     (ligne,) = lignes(capsys)
     assert ligne.startswith(f"refus — {motif}"), ligne
     assert gh.appels == [("gh", "run", "view", RUN, "--json", "status,conclusion,jobs")]
+
+
+def test_un_run_en_echec_sans_aucun_job_rend_sa_ligne(capsys: pytest.CaptureFixture[str]) -> None:
+    """Un workflow qui ne démarre pas termine son run sans aucun job : le run rend sa propre ligne
+    au lieu d'un refus, et le journal, qui n'a rien à rendre, n'est pas lu — le `gh` témoin lève
+    s'il l'est. Non mesuré sur un run réel."""
+    jobs = termine(conclusion="startup_failure")
+
+    assert lance(Gh(document(jobs)), RUN) == 0
+    assert lignes(capsys) == ["run 4242 : aucun job — conclusion startup_failure"]
 
 
 ABSENT = object()
