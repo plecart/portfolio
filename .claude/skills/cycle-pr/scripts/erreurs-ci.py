@@ -93,7 +93,7 @@ import re
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
-from typing import Any, NamedTuple, cast
+from typing import Any, NamedTuple
 
 Run = Callable[[Sequence[str]], subprocess.CompletedProcess[bytes]]
 Key = tuple[str, str]
@@ -179,29 +179,17 @@ def gh(run: Run, *args: str) -> bytes:
     return done.stdout
 
 
-def string_field(document: Any, name: str) -> str:
-    """Le champ textuel `name` de `document`.
+def field(document: Any, name: str, kind: type[object]) -> Any:
+    """Le champ `name` de `document`, exactement de type `kind`.
 
     Raises:
-        KeyError, TypeError: `document` n'est pas un objet, n'a pas le champ, ou le champ n'est
-            pas un texte.
+        KeyError, TypeError: `document` n'est pas un objet, n'a pas le champ, ou le champ est
+            d'un autre type.
     """
     value = document[name]
-    if not isinstance(value, str):
+    if type(value) is not kind:
         raise TypeError(f"`{name}` de type {type(value).__name__}")
     return value
-
-
-def list_field(document: Any, name: str) -> list[Any]:
-    """Le champ liste `name` de `document`.
-
-    Raises:
-        KeyError, TypeError: comme `string_field`, pour une liste.
-    """
-    value = document[name]
-    if not isinstance(value, list):
-        raise TypeError(f"`{name}` de type {type(value).__name__}")
-    return cast(list[Any], value)
 
 
 def run_state(document: Any) -> RunState:
@@ -212,18 +200,18 @@ def run_state(document: Any) -> RunState:
         KeyError, TypeError: un champ absent ou d'un autre type.
     """
     return RunState(
-        string_field(document, "status"),
-        string_field(document, "conclusion"),
+        field(document, "status", str),
+        field(document, "conclusion", str),
         [
             Job(
-                string_field(job, "name"),
-                string_field(job, "conclusion"),
+                field(job, "name", str),
+                field(job, "conclusion", str),
                 [
-                    Step(string_field(step, "name"), string_field(step, "conclusion"))
-                    for step in list_field(job, "steps")
+                    Step(field(step, "name", str), field(step, "conclusion", str))
+                    for step in field(job, "steps", list)
                 ],
             )
-            for job in list_field(document, "jobs")
+            for job in field(document, "jobs", list)
         ],
     )
 
