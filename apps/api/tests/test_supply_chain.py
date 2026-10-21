@@ -146,7 +146,7 @@ RUN_DOWNLOAD = re.compile(
     r"^\s*RUN\b.*(?<![\w-])(?:curl|wget)(?![\w-])[^&;|]*https?://", re.IGNORECASE
 )
 
-# Un module Go téléchargé : `go install`, `go get` ou `go run` d'un argument
+# Un module Go téléchargé : `go install`, `go get`, `go run` ou `go mod download` d'un argument
 # `<chemin>@<référence>`, ou l'exigence `go mod edit -require=<chemin>@<référence>` — la forme de
 # la release de Caddy (brief de #147, décision 4) —, avec ou sans `go -C <dossier>` devant la
 # sous-commande. Les arguments s'arrêtent au premier opérateur du shell : le `<paquet>@<dépôt>`
@@ -165,7 +165,7 @@ RUN_DOWNLOAD = re.compile(
 # `go mod tidy`, qui résout à la dernière version un import qu'aucune exigence ne couvre —
 # figurent au recueil, en `xfail`.
 GO_DOWNLOAD = re.compile(
-    r"\bgo\s+(?:-C\s+\S+\s+)?(?:install|get|run|mod\s+edit)\b(?P<arguments>[^&;|]*)"
+    r"\bgo\s+(?:-C\s+\S+\s+)?(?:install|get|run|mod\s+edit|mod\s+download)\b(?P<arguments>[^&;|]*)"
 )
 EXACT_VERSION = re.compile(r"v\d+\.\d+\.\d+")
 CHECKSUM_DATABASE_SWITCHES = "GOSUMDB|GONOSUMDB|GOPRIVATE"
@@ -500,6 +500,10 @@ DOCKERFILES = sorted(
     if is_dockerfile(path.name) and path.is_file()
 )
 
+COMPILING_DOCKERFILES = [
+    path for path in DOCKERFILES if "FROM golang:" in path.read_text(encoding="utf-8")
+]
+
 COMPOSE_FILES = sorted(
     path
     for path in (REPOSITORY_ROOT / name for name in repository_files())
@@ -679,6 +683,12 @@ DOWNLOAD_FORMS = {
         + " && go mod edit -require=github.com/caddyserver/caddy/v2@v2.11.7 && go mod tidy\n",
         False,
     ),
+    "go mod download sans version": (
+        BASE
+        + "RUN go mod init m && go mod edit -require=exemple.org/outil@v1.2.3"
+        + " && go mod download exemple.org/outil\n",
+        False,
+    ),
     "module Go, caches montés et drapeaux de liaison": (
         BASE
         + "RUN --mount=type=cache,target=/go/pkg/mod CGO_ENABLED=0 go install -trimpath \\\n"
@@ -708,6 +718,10 @@ DOWNLOAD_FORMS = {
     "module Go à une variable": (BASE + "RUN go run exemple.org/outil@$VERSION\n", True),
     "module Go à @upgrade par go get": (
         BASE + "RUN go mod init m && go get exemple.org/outil@upgrade\n",
+        True,
+    ),
+    "module Go à @latest par go mod download": (
+        BASE + "RUN go mod download exemple.org/outil@latest\n",
         True,
     ),
     "second module sans version exacte": (
@@ -1192,9 +1206,9 @@ def test_chaque_telechargement_d_une_image_est_verifie_par_sa_somme(dockerfile: 
     """Un binaire sans image officielle entre par le fichier de sa release (`supercronic` : brief
     de #23, décision 1), que Dependabot ne suit pas : sa somme épinglée est la seule chose qui
     l'empêche de changer en silence, chez l'éditeur ou en chemin. Un binaire Go compilé par le
-    projet (`age`, `rclone`) entre par son module, à version exacte, sous la base de sommes de Go
-    (ADR 0018). Un `RUN curl` ou `wget` n'a ni l'une ni l'autre : tout téléchargement passe par
-    `ADD --checksum` ou par un module Go à version exacte."""
+    projet (`age`, `rclone`, `caddy`) entre par son module, à version exacte, sous la base de
+    sommes de Go (ADR 0018). Un `RUN curl` ou `wget` n'a ni l'une ni l'autre : tout téléchargement
+    passe par `ADD --checksum` ou par un module Go à version exacte."""
     findings = download_findings(dockerfile.read_text(encoding="utf-8"))
 
     assert not findings, f"téléchargements sans somme : {findings}"
@@ -1205,10 +1219,22 @@ def test_la_garde_des_telechargements_lit_ceux_du_depot(
     read: Callable[[str], list[tuple[str, str]]],
 ) -> None:
     """Une garde qui ne lit aucun téléchargement passe à vide : l'image `backup` porte un `ADD`
-    d'une adresse (`supercronic`) et des modules Go (`age`, `rclone`)."""
+    d'une adresse (`supercronic`) et des modules Go (`age`, `rclone`), et l'image `caddy` le sien
+    (`caddy`)."""
     assert any(read(path.read_text(encoding="utf-8")) for path in DOCKERFILES), (
         "aucun téléchargement lu — le motif a-t-il cessé de mordre ?"
     )
+    assert COMPILING_DOCKERFILES, (
+        "aucun Dockerfile ne compile de Go — le filtre a-t-il cessé de mordre ?"
+    )
+
+
+@pytest.mark.parametrize("dockerfile", COMPILING_DOCKERFILES, ids=repository_id)
+def test_la_garde_lit_les_modules_go_de_chaque_dockerfile_qui_compile(dockerfile: Path) -> None:
+    """Chaque Dockerfile qui compile du Go télécharge au moins un module que la garde lit : sans
+    cela, une forme que `GO_DOWNLOAD` ne lit plus passerait, couverte par le module d'un autre
+    Dockerfile (seconde relecture de la PR #148)."""
+    assert go_modules(dockerfile.read_text(encoding="utf-8"))
 
 
 def test_dependabot_surveille_chaque_dockerfile() -> None:
