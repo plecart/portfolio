@@ -148,24 +148,30 @@ RUN_DOWNLOAD = re.compile(
 
 # Un module Go téléchargé : `go install`, `go get` ou `go run` d'un argument
 # `<chemin>@<référence>`, ou l'exigence `go mod edit -require=<chemin>@<référence>` — la forme de
-# la release de Caddy (brief de #147, décision 4). Les arguments s'arrêtent au premier opérateur du
-# shell : le `<paquet>@<dépôt>` d'un `apk add` qui suit n'en est pas (`apk-world(5)`). La base de
-# sommes de Go, `sum.golang.org`, active par défaut dans l'image `golang`, vérifie chaque module
-# téléchargé — à deux conditions (brief de #147, décision 7). La référence est une version exacte
-# `vX.Y.Z` : une requête (`@latest`, `@upgrade`) ou une branche suit l'amont sans que le Dockerfile
-# change, une variable dépend du build, et un commit, une pseudo-version ou une préversion
-# désignent un code que l'amont n'a pas publié en release. Et rien ne coupe la base : `GOSUMDB`
+# la release de Caddy (brief de #147, décision 4) —, avec ou sans `go -C <dossier>` devant la
+# sous-commande. Les arguments s'arrêtent au premier opérateur du shell : le `<paquet>@<dépôt>`
+# d'un `apk add` qui suit n'en est pas (`apk-world(5)`). La base de sommes de Go, `sum.golang.org`,
+# active par défaut dans l'image `golang`, vérifie chaque module téléchargé — à deux conditions
+# (brief de #147, décision 7). La référence est une version exacte `vX.Y.Z` : une requête
+# (`@latest`, `@upgrade`) ou une branche suit l'amont sans que le Dockerfile change, une variable
+# dépend du build, et un commit, une pseudo-version ou une préversion désignent un code que
+# l'amont n'a pas publié en release. Et rien ne coupe la base : `GOSUMDB`
 # (`off`, ou une autre base), `GONOSUMDB` et `GOPRIVATE`, posés par `ENV` — y compris sous la
-# forme ancienne `ENV <clé> <valeur>` —, `ARG`, une affectation du shell ou `go env -w`.
+# forme ancienne `ENV <clé> <valeur>` —, par `ARG` — avec ou sans valeur : un `--build-arg` de la
+# CI couperait la base sans que le Dockerfile le montre —, une affectation du shell ou `go env -w`.
 # `GOINSECURE` n'en est pas : « GOINSECURE does not disable checksum database validation.
 # GOPRIVATE or GONOSUMDB may be used to achieve that » (`go help environment`, Go 1.27.3, lu le
-# 2026-10-21). Les formes que ces motifs ne lisent pas — `go get` sans version, `go get -u` —
+# 2026-10-21). Les formes que ces motifs ne lisent pas — `go get` sans version, `go get -u`,
+# `go mod tidy`, qui résout à la dernière version un import qu'aucune exigence ne couvre —
 # figurent au recueil, en `xfail`.
-GO_DOWNLOAD = re.compile(r"\bgo\s+(?:install|get|run|mod\s+edit)\b(?P<arguments>[^&;|]*)")
+GO_DOWNLOAD = re.compile(
+    r"\bgo\s+(?:-C\s+\S+\s+)?(?:install|get|run|mod\s+edit)\b(?P<arguments>[^&;|]*)"
+)
 EXACT_VERSION = re.compile(r"v\d+\.\d+\.\d+")
 CHECKSUM_DATABASE_SWITCHES = "GOSUMDB|GONOSUMDB|GOPRIVATE"
 CHECKSUM_DATABASE_BYPASS = re.compile(
-    rf"\b(?:{CHECKSUM_DATABASE_SWITCHES})=|^\s*(?i:ENV)\s+(?:{CHECKSUM_DATABASE_SWITCHES})\s"
+    rf"\b(?:{CHECKSUM_DATABASE_SWITCHES})="
+    rf"|^\s*(?i:ENV|ARG)\s+(?:{CHECKSUM_DATABASE_SWITCHES})(?:\s|$)"
 )
 
 # `image:<version x.y.z>[-variante]@sha256:<empreinte>` — même règle que pour les actions : la
@@ -424,7 +430,8 @@ def download_findings(text: str) -> list[str]:
     `ADD` d'une adresse sans somme, les `RUN` qui téléchargent par `curl` ou `wget`, les modules Go
     sans version exacte, et toute instruction qui coupe la base de sommes. Ce que la garde ne lit
     pas figure au recueil, en `xfail` : `git clone`, adresse tenue par un `ARG`, téléchargement
-    par un autre langage, `ADD git@`, `go get` sans version ou avec `-u`.
+    par un autre langage, `ADD git@`, `go get` sans version ou avec `-u`, `go mod tidy` — qui
+    résout à la dernière version un import qu'aucune exigence ne couvre.
     """
     unchecked = [
         instruction
@@ -686,6 +693,7 @@ DOWNLOAD_FORMS = {
     "compilation sans module nommé": (BASE + "RUN go build ./...\n", False),
     "GOINSECURE": (BASE + "ENV GOINSECURE=*\n", False),
     "module Go à @latest": (BASE + "RUN go install exemple.org/outil@latest\n", True),
+    "module Go par go -C": (BASE + "RUN go -C /src install exemple.org/outil@latest\n", True),
     "module Go sur une branche": (BASE + "RUN go install exemple.org/outil@master\n", True),
     "module Go à un commit": (BASE + "RUN go install exemple.org/outil@abcdef1\n", True),
     "module Go à une pseudo-version": (
@@ -716,6 +724,7 @@ DOWNLOAD_FORMS = {
     "GOSUMDB vers une autre base": (BASE + "ENV GOSUMDB=sum.exemple.org\n", True),
     "GONOSUMDB": (BASE + "ENV GONOSUMDB=exemple.org\n", True),
     "GOPRIVATE par un ARG": (BASE + "ARG GOPRIVATE=exemple.org\n", True),
+    "GOSUMDB déclaré sans valeur": (BASE + "ARG GOSUMDB\n", True),
     "GOPRIVATE devant la commande": (
         BASE + "RUN GOPRIVATE=* go install exemple.org/outil@v1.2.3\n",
         True,
@@ -726,6 +735,9 @@ DOWNLOAD_FORMS = {
     ),
     "go get -u": pytest.param(
         BASE + "RUN go mod init m && go get -u exemple.org/outil@v1.2.3\n", True, marks=EXOTIC
+    ),
+    "go mod tidy sur un import non requis": pytest.param(
+        BASE + "RUN go mod init m && go mod tidy\n", True, marks=EXOTIC
     ),
 }
 

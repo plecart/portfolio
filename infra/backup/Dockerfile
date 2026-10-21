@@ -27,14 +27,15 @@ FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4c
 # `apps/api/tests/test_supply_chain.py` exige. `GOTOOLCHAIN=local`, défaut de l'image : un module
 # qui exigerait un Go plus récent fait échouer le build au lieu d'en télécharger un autre. Les
 # caches de Go — modules et objets de compilation — sont montés hors du layer, qui garde les
-# binaires sans eux : le cache de la CI (`mode=max`) n'en grossit pas. Une instruction par outil :
-# monter l'un ne recompile pas l'autre.
+# binaires sans eux : le cache de la CI (`mode=max`) n'en grossit pas. Un étage par outil : monter
+# l'un ne recompile pas l'autre, et BuildKit compile les deux en parallèle.
 FROM golang:1.27.3-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS go
 ENV CGO_ENABLED=0
 
 # `age`, comme son workflow de release (`.github/workflows/build.yml`) : `-trimpath`, sans
 # `-ldflags`. Ses deux commandes seulement — `cmd/...` installerait aussi `age-inspect` et
 # `age-plugin-batchpass`, que l'image ne demande pas.
+FROM go AS age
 RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod \
     go install -trimpath filippo.io/age/cmd/age@v1.3.2 filippo.io/age/cmd/age-keygen@v1.3.2
 
@@ -42,6 +43,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/g
 # sans étiquette, et la version de la source — le suffixe vidé, `fs.Version` vaut `fs.VersionTag`,
 # et `rclone version` n'annonce pas de `-DEV`. `-trimpath`, comme ses archives de release
 # (`bin/cross-compile.go`).
+FROM go AS rclone
 RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod \
     go install -trimpath -ldflags "-s -X github.com/rclone/rclone/fs.VersionSuffix=" \
     github.com/rclone/rclone@v1.75.2
@@ -58,7 +60,8 @@ RUN apk add --no-cache postgresql16-client curl
 
 # `age-keygen` sert aux tests, qui engendrent une paire à chaque lancement ; celle de la production
 # s'engendre hors du VPS, où la clé privée ne vient jamais (ADR 0007, point 2).
-COPY --from=go /go/bin/age /go/bin/age-keygen /go/bin/rclone /usr/local/bin/
+COPY --from=age /go/bin/age /go/bin/age-keygen /usr/local/bin/
+COPY --from=rclone /go/bin/rclone /usr/local/bin/
 
 # `supercronic` n'a pas d'image officielle : le fichier de sa release, à la somme SHA-256
 # épinglée, que BuildKit vérifie avant de le copier (ADR 0018). `linux/amd64` seulement,
