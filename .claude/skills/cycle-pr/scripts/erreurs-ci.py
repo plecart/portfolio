@@ -37,7 +37,10 @@ brute `\\x1b[` est ôtée aussi. Dans cet ordre :
     - pytest, résumé court `(FAILED|ERROR) \\S` — `FAILED` à la ligne 165 du même ; `ERROR` sur
       pytest 9.1.1 au poste, le 2026-10-21 ;
     - pip-audit `Found \\d+ known vulnerabilit` — 39562241493, Back › Audit, ligne 587 ;
-    - npm audit `\\d+ vulnerabilit(y|ies) \\(` — 39521079941, Front › Audit, ligne 35 ;
+    - npm audit `\\d+ (\\w+ severity )?vulnerabilit(y|ies)\\b`, ses deux formes de bilan, lues
+      dans `npm-audit-report` 7.0.0, `lib/reporters/install.js` : à plusieurs sévérités,
+      `6 vulnerabilities (5 moderate, 1 high)` — 39521079941, Front › Audit, ligne 35 ; à une
+      seule, `1 high severity vulnerability` — non mesuré sur un run ;
     - trivy `Total: [1-9]\\d* \\(` — 39562241493, Infra › Scan, ligne 536 ; le
       `Total: 0 (HIGH: 0, CRITICAL: 0)` d'une cible propre, ligne 141, ne le porte pas ;
 (b) sinon la première qui contient `error`, `errors`, `failed`, `failure` ou `fatal` en mot
@@ -87,7 +90,7 @@ TOOL_MARKERS = (
     re.compile(r"E\s{2,}\S"),
     re.compile(r"(FAILED|ERROR) \S"),
     re.compile(r"Found \d+ known vulnerabilit"),
-    re.compile(r"\d+ vulnerabilit(y|ies) \("),
+    re.compile(r"\d+ (\w+ severity )?vulnerabilit(y|ies)\b"),
     re.compile(r"Total: [1-9]\d* \("),
 )
 ERROR_WORD = re.compile(r"\b(error|errors|failed|failure|fatal)\b", re.IGNORECASE)
