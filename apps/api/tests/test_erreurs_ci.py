@@ -17,7 +17,7 @@ from collections.abc import Sequence
 from typing import Any
 
 import pytest
-from skill_scripts import REPOSITORY_ROOT, load_script
+from skill_scripts import load_script, run_in_pipe
 
 erreurs_ci = load_script("cycle-pr", "erreurs-ci")
 
@@ -866,12 +866,10 @@ def test_le_lanceur_par_defaut_rend_les_octets_tels_quels() -> None:
 def test_la_sortie_du_script_lance_en_tube_est_en_utf_8(
     args: list[str], code: int, flux: str, texte: str
 ) -> None:
-    """La session lit le script par un tube. Sur ce poste, dont la page de code est cp1252, Python
-    y écrit dans cet encodage (`pipeline.config.md`, « Qualité ») — l'erreur d'argparse comprise,
-    qui part sur la sortie d'erreur. Sur un runner Linux, locale en UTF-8, supposé vert même sans
-    le correctif — non mesuré."""
-    script = REPOSITORY_ROOT / ".claude/skills/cycle-pr/scripts/erreurs-ci.py"
-    done = subprocess.run([sys.executable, str(script), *args], capture_output=True, check=False)
+    """La session lit le script par un tube, où Python écrit dans la page de code du poste,
+    cp1252, que `run_in_pipe` impose (`pipeline.config.md`, « Qualité ») — l'erreur
+    d'argparse comprise, qui part sur la sortie d'erreur."""
+    done = run_in_pipe("cycle-pr", "erreurs-ci", *args)
 
     assert done.returncode == code
     assert texte in getattr(done, flux).decode("utf-8")

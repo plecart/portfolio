@@ -285,9 +285,12 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
     lit (vu le 2026-10-17 sur la PR jetable #119 ; mesuré le même jour, `python -c
     "import locale,sys; print(locale.getpreferredencoding(False), sys.stdout.encoding)" | cat`
     rend `cp1252 cp1252`, et `print('tête')` en tube écrit les octets `t\xeate`). Un script de skill
-    dont la sortie est lue force `sys.stdout.reconfigure(encoding="utf-8")` ; la garde
-    (`test_merge_lot.py`) est **rouge sur le poste** sans lui (mutation jouée, mesuré le
-    2026-10-17) — sur un runner Linux, locale en UTF-8, supposée verte sans le correctif, non mesuré
+    dont la sortie est lue force `sys.stdout.reconfigure(encoding="utf-8")` ; sa garde le lance par
+    `run_in_pipe` (`apps/api/tests/skill_scripts.py`), qui impose cp1252 à l'enfant, et rougit
+    sans lui (mutation jouée, mesuré le 2026-10-17) quel que soit l'environnement hérité —
+    `PYTHONIOENCODING=utf-8` ou `PYTHONUTF8=1` au parent la laissaient verte avant cette
+    imposition (mesuré le 2026-10-21) ; sur un runner Linux, rouge par la même imposition, non
+    mesuré
 - gates bloquants en CI — sur une PR, `web` et `infra` ne tournent que si le delta touche leurs fichiers (règle dans `infra/ci/changed_jobs.py`, lue par la première étape du job `api`), `api` toujours ; sur un push vers `main`, les trois (ADR 0017) :
   - back : audit, lint, format:check, typecheck, test
   - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse, audit
