@@ -1424,6 +1424,21 @@ def test_le_profil_compte_les_appels_le_contexte_initial_et_le_cache_lu_par_quar
     assert profil.quarters == [200_000, 600_000, 1_000_000, 3_000_000]
 
 
+def test_les_bornes_des_quarts_s_arrondissent_par_le_bas() -> None:
+    """Cinq appels ne se divisent pas par quatre : chaque borne `n·k//4` s'arrondit vers le bas,
+    et le dernier quart prend le reste. Relevé par la passe 1 de relecture de la PR #146 : avec
+    les seuls montages à 8 et 4 appels, l'arrondi supérieur restait VERT."""
+    profil = bilan.Profile(
+        name="session",
+        reads=[100, 200, 300, 400, 500],
+        context=0,
+        gate=None,
+        composition=bilan.Composition(),
+    )
+
+    assert profil.quarters == [100, 200, 300, 450]
+
+
 def carrying(record: dict[str, Any], *blocks: dict[str, Any]) -> dict[str, Any]:
     """`record` — un appel d'API ou un message `user` —, porteur de ces blocs de contenu."""
     record["message"]["content"] = list(blocks)
@@ -1466,20 +1481,26 @@ PORTES: dict[str, tuple[tuple[str, str, str], dict[str, Any]]] = {
         ("Agent", "subagent_type", "relecteur"),
         {"subagent_type": "relecteur", "prompt": "relis"},
     ),
-    "SendMessage → session de relecture": (
-        ("SendMessage", "to", "→ session de relecture"),
+    "SendMessage → session démarrée": (
+        ("SendMessage", "to", "→ session démarrée"),
         {"to": SESSION_DE_RELECTURE, "message": "passe 1"},
     ),
 }
 
 # Ce qui ne doit pas mordre : un autre skill, un autre rôle, et un message à une session que ce
-# transcript n'a pas démarrée — la coordinatrice du lot 4a, au même relevé.
+# transcript n'a pas démarrée — par son identifiant, celui de la coordinatrice du lot 4a au même
+# relevé, par un nom, ou par ce nom suivi d'une référence.
 TEMOINS: dict[str, tuple[str, dict[str, Any]]] = {
     "Skill ponytail": ("Skill", {"skill": "ponytail"}),
     "Agent developpeur": ("Agent", {"subagent_type": "developpeur"}),
     "SendMessage → session non démarrée ici": (
         "SendMessage",
         {"to": "local_d82a6420-3661-48a5-b7e5-11dacbbe2053"},
+    ),
+    "SendMessage → nom d'une session non démarrée ici": ("SendMessage", {"to": "coordinatrice"}),
+    "SendMessage → même nom suivi d'une référence": (
+        "SendMessage",
+        {"to": "coordinatrice [3fa9c1]"},
     ),
     # L'entrée d'un outil est écrite par le modèle : un destinataire mal formé reste dans le
     # transcript, et ne doit ni mordre ni faire tomber le bilan.
@@ -1517,6 +1538,29 @@ def test_chaque_forme_de_porte_de_relecture_se_trouve_a_son_appel(
     (tool, _, _), given = case
 
     assert gated(tmp_path, tool, given).gate == (4, label)
+
+
+# Les formes d'adresse de la session que `gated` démarre, en littéraux.
+ADRESSES: dict[str, str] = {
+    "identifiant": "local_f6942c91-c0c7-4230-91c5-23af96ea3e16",
+    "nom": "relecture-pr-142",
+    "nom-et-reference": "relecture-pr-142 [3fa9c1]",
+}
+
+
+@pytest.mark.parametrize("adresse", ADRESSES.values(), ids=ADRESSES.keys())
+def test_une_session_demarree_mord_sous_chacune_de_ses_formes_d_adresse(
+    tmp_path: Path, adresse: str
+) -> None:
+    """`SendMessage` adresse une session par son identifiant, par son nom, ou par son nom suivi
+    de ` [<ref>]` quand il est ambigu — doc de l'outil : « Teammate by name », « worker
+    [3fa9c1] » —, et le retour de `start_session` porte l'identifiant et le nom (`DEMARRAGE`).
+    Dénombrement, écrit avant le correctif : 3 formes recensées, 2 fuyaient — le nom, et le nom
+    suivi de sa référence."""
+    assert gated(tmp_path, "SendMessage", {"to": adresse}).gate == (
+        4,
+        "SendMessage → session démarrée",
+    )
 
 
 @pytest.mark.parametrize(("tool", "given"), TEMOINS.values(), ids=TEMOINS.keys())
@@ -1604,10 +1648,11 @@ def test_la_composition_compte_chaque_bloc_dans_sa_categorie(tmp_path: Path) -> 
     diffusés sur plusieurs lignes, aucun des 430 blocs répété dans son message — compter chaque
     ligne ne compte donc rien deux fois. Les arguments d'outils se comptent sans échappement ASCII :
     `{"old_string": "é", "new_string": "è"}` fait 38 caractères, 48 échappés. Un skill ne se
-    charge que dans le rôle `user` : l'agent qui cite la phrase écrit du texte. Une image dans un
-    retour d'outil, une pièce jointe, une copie de requête et un message de sous-agent ne
-    comptent pas — la copie de requête, `api-request-blob`, porte un `message` `user` ou
-    `system` (forme relevée sur la session PR du lot 4a de #134)."""
+    charge que dans le rôle `user` : l'agent qui cite la phrase écrit du texte. Un retour dont le
+    transcript ne porte pas l'appel se range sous « ? ». Une image dans un retour d'outil, une
+    pièce jointe, une copie de requête et un message de sous-agent ne comptent pas — la copie de
+    requête, `api-request-blob`, porte un `message` `user` ou `system` (forme relevée sur la
+    session PR du lot 4a de #134)."""
     session = write_transcript(
         tmp_path / "session.jsonl",
         [
@@ -1637,6 +1682,7 @@ def test_la_composition_compte_chaque_bloc_dans_sa_categorie(tmp_path: Path) -> 
                 ],
             ),
             returned("10:01:12", "toolu_bash", "y" * 20),
+            returned("10:01:13", "toolu_absent", "abc"),
             said("10:02:00", "Base directory for this skill: x"),
             said("10:03:00", "ok go"),
             {"type": "attachment", "timestamp": at("10:03:01"), "attachment": {"prompt": "z" * 99}},
@@ -1648,13 +1694,21 @@ def test_la_composition_compte_chaque_bloc_dans_sa_categorie(tmp_path: Path) -> 
         ],
     )
 
-    assert bilan.context_profile(session).composition == bilan.Composition(
+    composition = bilan.context_profile(session).composition
+
+    assert composition == bilan.Composition(
         thinking=3 + 5 + 6,
         tool_input=21 + 38 + 17,
         editing=38,
         skills=32,
         text=len("bonjour") + len("Base directory for this skill: cité") + len("ok go"),
-        results=Counter({"Read": 40, "Bash": 20, "Edit": 6}),
+        results=Counter({"Read": 40, "Bash": 20, "Edit": 6, "?": 3}),
+    )
+    # 40, 20 et 6 caractères sur 69 : les trois outils les plus lourds, « ? » quatrième.
+    assert bilan.composition_line(composition) == (
+        "  composition (caractères) : résultats d'outils 0 K (Read 58 %, Bash 29 %, Edit 9 %)"
+        " · réflexion 0 K · arguments d'outils 0 K dont édition 0 K"
+        " · skills chargés 0 K · texte 0 K"
     )
 
 
