@@ -30,6 +30,10 @@ d'édition, skills chargés, texte. N'y comptent pas : les pièces jointes (`att
 copies de requête (`api-request-blob`), un bloc non textuel d'un retour d'outil (image,
 référence d'outil).
 
+Le profil se lit sur une session PR ou une session de relecture : un transcript qui démarre
+d'autres sessions que sa relecture — une coordinatrice, par exemple — voit sa « première porte »
+au premier message vers l'une d'elles.
+
 Python 3.11 ou plus, bibliothèque standard seule.
 """
 
@@ -130,10 +134,12 @@ INJECTED = (
 # Les formes d'une **porte de relecture** : (outil, champ de son `input`, valeur). Le premier
 # `tool_use` d'un transcript de session qui en satisfait une est sa première porte (`Profile`) ;
 # une forme de plus s'ajoute par une ligne. `STARTED_SESSION` tient lieu de toute session que le
-# même transcript a démarrée **plus haut** par `START_SESSION_TOOL` — la session de relecture que
-# la session PR démarre au go de son briefing —, et c'est aussi ce que le libellé en rend.
+# même transcript a démarrée **plus haut** par `START_SESSION_TOOL`, et c'est aussi ce que le
+# libellé en rend. Pour une session PR, c'est la session de relecture qu'elle démarre au go de son
+# briefing ; un transcript qui démarre d'autres sessions — une coordinatrice — voit sa « première
+# porte » au premier message vers l'une d'elles.
 # Population : `PORTES` dans la suite, tenue égale à cette table.
-STARTED_SESSION = "→ session de relecture"
+STARTED_SESSION = "→ session démarrée"
 REVIEW_GATES = (
     ("Skill", "skill", "code-review"),
     ("Skill", "skill", "security-review"),
@@ -141,10 +147,13 @@ REVIEW_GATES = (
     ("SendMessage", "to", STARTED_SESSION),
 )
 
-# L'outil qui démarre une session liée, et l'identifiant que son retour porte — forme relevée sur
-# la session PR du lot 4a de #134 : `Started session "…" (session_id: local_<uuid>, name: …)`.
+# L'outil qui démarre une session liée, et les deux adresses que son retour porte — forme relevée
+# sur la session PR du lot 4a de #134 : `Started session "…" (session_id: local_<uuid>, name: …)`.
+# `SendMessage` accepte l'une ou l'autre, le nom suivi de ` [<ref>]` quand il est ambigu (doc de
+# l'outil : « worker [3fa9c1] ») : le destinataire se compare débarrassé de ce suffixe.
 START_SESSION_TOOL = "mcp__ccd_session__start_session"
-SESSION_ID = re.compile(r"session_id: ([\w-]+)")
+SESSION_ADDRESS = re.compile(r"\b(?:session_id|name): ([\w-]+)")
+REF_SUFFIX = re.compile(r" \[[^\]]+\]$")
 
 # Les outils dont les arguments portent une édition de fichier : leur part des arguments d'outils
 # se rend à part dans la composition d'un profil.
@@ -971,7 +980,8 @@ def gate_label(block: Mapping[str, Any], started: set[str]) -> str | None:
     Args:
         block: un bloc `tool_use` — son `input`, écrit par le modèle, peut être mal formé : un
             destinataire qui n'est pas une chaîne ne mord pas.
-        started: les sessions que le transcript a démarrées jusqu'ici.
+        started: les adresses — identifiant et nom — des sessions que le transcript a démarrées
+            jusqu'ici (`SESSION_ADDRESS`).
 
     Returns:
         « outil valeur » pour la première forme de `REVIEW_GATES` satisfaite.
@@ -979,7 +989,11 @@ def gate_label(block: Mapping[str, Any], started: set[str]) -> str | None:
     given = cast(dict[str, Any], block.get("input") or {})
     for tool, key, value in REVIEW_GATES:
         found = given.get(key)
-        to_started = value == STARTED_SESSION and isinstance(found, str) and found in started
+        to_started = (
+            value == STARTED_SESSION
+            and isinstance(found, str)
+            and REF_SUFFIX.sub("", found) in started
+        )
         if block.get("name") == tool and (found == value or to_started):
             return f"{tool} {value}"
     return None
@@ -1006,7 +1020,7 @@ def review_gate(
                 return Gate(ranks[call[0]], label)
             # Seul un `tool_result` porte un `tool_use_id`.
             if tools.get(str(block.get("tool_use_id"))) == START_SESSION_TOOL:
-                started.update(SESSION_ID.findall(result_text(block)))
+                started.update(SESSION_ADDRESS.findall(result_text(block)))
     return None
 
 
