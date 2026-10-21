@@ -417,15 +417,25 @@ c'est le seul autre canal, et il passe par lui.
     occupée, elle ne le reçoit qu'à la fin de son tour en cours
     (`.claude/skills/cycle-pr/references/sessions-liees.md`, « Messages », mesuré) : le travail de
     ce tour peut être à jeter, et un merge lancé dans ce tour n'attend pas le message.
-- **Après chaque merge du lot, avant toute consigne aux sessions encore en vol** : croiser les
-  fichiers **réellement mergés** (`gh pr diff <PR> --name-only`) avec ceux de chaque branche en vol
-  (`git diff --name-only origin/main...<branche>`). La consigne se fonde sur ce croisement, jamais
-  sur la carte de recouvrement de l'étape 2 : elle décrit des issues entières, un merge livre un
-  lot. Une branche qui recouvre vérifie d'abord l'absence de conflit — `git merge-tree
-  --write-tree origin/main <branche>`, **prédicat** : 0 sans conflit, 1 avec, mesuré le 2026-10-13
-  avec un témoin de chaque côté (table `FRESHNESS_GATE_FORMS` de
-  `apps/api/tests/test_agent_skills.py`) — et relance sa CI, qui tourne sur la
-  référence de fusion ; ce que le run prouve se lit dans les parents de cette référence, que
+- **Après chaque merge du lot, avant toute consigne aux sessions encore en vol** : `git fetch
+  origin`, puis croiser les fichiers **réellement mergés** avec ceux de chaque branche en vol :
+
+  ```
+  python <répertoire de ce skill>/scripts/croisement-fichiers.py <PR> <branche> [<branche> …]
+  ```
+
+  Le script rend une ligne `<fichier> → <branches>` par fichier mergé que touche au moins une
+  branche, puis, pour chaque branche, le code de `git merge-tree --write-tree` contre
+  `origin/main`, **prédicat** : 0 sans conflit, 1 avec, les fichiers en conflit cités. Ce 1 ne
+  prouve un conflit que parce que le script valide d'abord chaque référence : `merge-tree` sort en
+  1 aussi sur une référence inconnue — mesuré les 2026-10-13 et 2026-10-21, un témoin de chaque
+  côté (table `FRESHNESS_GATE_FORMS` de `apps/api/tests/test_agent_skills.py`). Il refuse une PR
+  non mergée, et une base qui ne contient pas son merge : `git fetch origin` d'abord, qu'il ne
+  fait pas. Il ne voit ni un renommage, ni un fichier qu'une branche touche hors du merge, ni un
+  conflit de sens sans conflit de texte. La consigne se fonde sur ce croisement, jamais sur la
+  carte de recouvrement de l'étape 2 : elle décrit des issues entières, un merge livre un lot. Le
+  script ne l'envoie pas, et ne relance rien : une branche qui recouvre relance sa CI, qui tourne
+  sur la référence de fusion ; ce que le run prouve se lit dans les parents de cette référence, que
   GitHub ne recalcule pas d'office (`cycle-pr` Étape 7, « Rejouer les vérifications périmées »,
   obs 51) — pas de commit de fusion sur un trunk fusionné par rebase, ni de rebase
   d'une branche poussée sans demande explicite (`contraintes.md`) ; un conflit se résout par un
