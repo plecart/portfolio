@@ -1181,7 +1181,7 @@ def test_chaque_telechargement_d_une_image_est_verifie_par_sa_somme(dockerfile: 
     de #23, décision 1), que Dependabot ne suit pas : sa somme épinglée est la seule chose qui
     l'empêche de changer en silence, chez l'éditeur ou en chemin. Un binaire Go compilé par le
     projet (`age`, `rclone`) entre par son module, à version exacte, sous la base de sommes de Go
-    (ADR 0017). Un `RUN curl` ou `wget` n'a ni l'une ni l'autre : tout téléchargement passe par
+    (ADR 0018). Un `RUN curl` ou `wget` n'a ni l'une ni l'autre : tout téléchargement passe par
     `ADD --checksum` ou par un module Go à version exacte."""
     findings = download_findings(dockerfile.read_text(encoding="utf-8"))
 

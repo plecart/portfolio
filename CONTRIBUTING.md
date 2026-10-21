@@ -206,7 +206,7 @@ Enfin `make build-backup scan-backup`, puis `make build image-test`.
 
 `age` — avec `age-keygen` — et `rclone` sont compilés par le projet, dans l'étage `go` du même
 Dockerfile, avec le Go de l'image `golang` épinglée et à la version exacte de leur release
-([ADR 0017](docs/adr/0017-binaires-go-compiles-par-le-projet.md)). Dependabot monte l'image
+([ADR 0018](docs/adr/0018-binaires-go-compiles-par-le-projet.md)). Dependabot monte l'image
 `golang`, et sa PR les recompile ; leurs versions se montent à la main : changer la version du
 `go install` — pour `age`, celle de ses deux commandes ensemble —, en relisant la forme de la
 release, ses drapeaux pouvant changer d'une version à l'autre. Puis `make build-backup scan-backup`,

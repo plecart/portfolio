@@ -185,7 +185,7 @@ vulnerabilities:
   # modules de Caddy.
   # Les versions sont celles que Trivy 0.74.0 lit dans le binaire au scan du 2026-10-21 : `caddy`
   # v2.11.7, `stdlib` v1.27.3, `golang.org/x/net` v0.59.0. Le projet compile caddy avec le Go de
-  # l'image `golang` épinglée, ses modules aux versions que fixe sa release (ADR 0017) : la
+  # l'image `golang` épinglée, ses modules aux versions que fixe sa release (ADR 0018) : la
   # bibliothèque standard n'y porte plus d'exception, seuls ses modules en gardent.
 
   - id: CVE-2026-78669
@@ -198,5 +198,5 @@ vulnerabilities:
       `infra/caddy/Caddyfile` restreint ses serveurs à HTTP/1.1 (`protocols h1`), et le test de
       fumée vérifie que la préface `h2c` ne reçoit aucune réponse HTTP/2. Alternatives : corrigé
       par x/net 0.60.0, absent de caddy 2.11.7, dernière version publiée ; le projet ne monte pas
-      un module au-delà de ce que fixe la release (ADR 0017).
+      un module au-delà de ce que fixe la release (ADR 0018).
     expired_at: 2027-01-19
