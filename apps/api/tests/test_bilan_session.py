@@ -1380,20 +1380,19 @@ def returned(clock: str, uid: str, content: str | list[dict[str, Any]]) -> dict[
     }
 
 
-# La session de relecture que la session PR démarre, et le titre qu'elle lui donne.
+# La session de relecture que la session PR démarre, le titre qu'elle lui donne, et la
+# parenthèse des adresses que porte le retour de son démarrage.
 SESSION_DE_RELECTURE = "local_f6942c91-c0c7-4230-91c5-23af96ea3e16"
 TITRE = "Relecture de la PR #142 (#134 lot 4a)"
+PARENTHESE = f"(session_id: {SESSION_DE_RELECTURE}, name: relecture-pr-142)"
 
 
-def demarrage(titre: str) -> list[dict[str, Any]]:
+def demarrage(titre: str, parenthese: str = PARENTHESE) -> list[dict[str, Any]]:
     """L'appel 2 d'une session, qui démarre sa session de relecture sous `titre`, puis le retour
     de ce démarrage — sa forme réelle, relevée sur le transcript de la session PR du lot 4a de
-    #134 : une liste d'un bloc `text`, le titre entre guillemets puis la parenthèse des
+    #134 : une liste d'un bloc `text`, le titre entre guillemets puis la `parenthese` des
     adresses, la dernière du retour — sa suite, « It runs on its own; … », n'en porte pas."""
-    texte = (
-        f'Started session "{titre}" '
-        f"(session_id: {SESSION_DE_RELECTURE}, name: relecture-pr-142). It runs on its own; …"
-    )
+    texte = f'Started session "{titre}" {parenthese}. It runs on its own; …'
     return [
         uses("10:01:00", "msg_2", 100, "mcp__ccd_session__start_session", {}, "toolu_start"),
         returned("10:01:05", "toolu_start", [{"type": "text", "text": texte}]),
@@ -1439,7 +1438,13 @@ TEMOINS: dict[str, tuple[str, dict[str, Any]]] = {
 }
 
 
-def gated(tmp_path: Path, tool: str, given: dict[str, Any], titre: str = TITRE) -> Any:
+def gated(
+    tmp_path: Path,
+    tool: str,
+    given: dict[str, Any],
+    titre: str = TITRE,
+    parenthese: str = PARENTHESE,
+) -> Any:
     """Le profil d'une session qui démarre sa session de relecture sous `titre` à l'appel 2, puis
     lance `tool` à l'appel 4 — cinquième enregistrement, après le retour du démarrage."""
     return bilan.context_profile(
@@ -1447,7 +1452,7 @@ def gated(tmp_path: Path, tool: str, given: dict[str, Any], titre: str = TITRE) 
             tmp_path / "session.jsonl",
             [
                 api_call("10:00:00", "msg_1", 100, 0, 10),
-                *demarrage(titre),
+                *demarrage(titre, parenthese),
                 api_call("10:02:00", "msg_3", 100, 0, 10),
                 uses("10:03:00", "msg_4", 100, tool, given, "toolu_candidat000000000002"),
                 api_call("10:04:00", "msg_5", 100, 0, 10),
@@ -1494,6 +1499,8 @@ TITRES_PIEGES: dict[str, str] = {
     "mot-name": "Relecture name: slug",
     "mot-session-id": "Relecture session_id: slug",
     "parenthese-entiere": "Relecture (session_id: slug, name: slug)",
+    # Une parenthèse d'adresses depuis que le nom y est optionnel : la dernière l'emporte.
+    "parenthese-sans-nom": "Relecture (session_id: slug)",
 }
 
 
@@ -1507,6 +1514,33 @@ def test_un_titre_de_session_ne_fait_pas_d_adresse(tmp_path: Path, titre: str) -
     assert gated(tmp_path, "SendMessage", {"to": "slug"}, titre).gate is None
     for adresse in (ADRESSES["identifiant"], ADRESSES["nom"]):
         porte = gated(tmp_path, "SendMessage", {"to": adresse}, titre).gate
+        assert porte == (4, "SendMessage → session démarrée"), adresse
+
+
+# La parenthèse des adresses sous chaque forme de nom, en littéraux, et les adresses qui doivent
+# y mordre — l'identifiant toujours.
+NOMS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "sans-nom": ("(session_id: local_a)", ("local_a",)),
+    "nom-a-point": (
+        "(session_id: local_a, name: relecture.pr.142)",
+        ("local_a", "relecture.pr.142"),
+    ),
+    "nom-a-espace": ("(session_id: local_a, name: relecture pr)", ("local_a",)),
+    "nom-vide": ("(session_id: local_a, name: )", ("local_a",)),
+}
+
+
+@pytest.mark.parametrize(("parenthese", "adresses"), NOMS.values(), ids=NOMS.keys())
+def test_une_session_demarree_mord_par_son_identifiant_quel_que_soit_son_nom(
+    tmp_path: Path, parenthese: str, adresses: tuple[str, ...]
+) -> None:
+    """La forme de `bedb2b9` exigeait un nom de lettres, chiffres, soulignés et tirets : sans nom,
+    ou avec tout autre caractère, la parenthèse ne rendait rien, et la porte adressée par
+    l'identifiant ne mordait plus. Dénombrement, écrit avant le correctif : 4 formes recensées —
+    sans nom, nom à point, nom à espace, nom vide —, 4 fuyaient. L'identifiant est obligatoire,
+    le nom optionnel et lu jusqu'à la parenthèse fermante."""
+    for adresse in adresses:
+        porte = gated(tmp_path, "SendMessage", {"to": adresse}, parenthese=parenthese).gate
         assert porte == (4, "SendMessage → session démarrée"), adresse
 
 
