@@ -418,7 +418,7 @@ def read_text_file(path: Path) -> tuple[str, str]:
         raise Refusal(f"{path} n'est pas en UTF-8 : {error}") from error
     anchor = next((line.strip() for line in text.splitlines() if line.strip()), None)
     if anchor is None:
-        raise Refusal(f"rien à ajouter : {path} n'a aucune ligne non vide")
+        raise Refusal(f"{path} n'a aucune ligne non vide")
     return text, anchor
 
 

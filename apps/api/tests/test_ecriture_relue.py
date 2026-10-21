@@ -414,8 +414,8 @@ def test_issue_edit_ajoute_le_fichier_en_fin_de_corps_octet_pour_octet(
 @pytest.mark.parametrize(
     ("contenu", "motif"),
     [
-        ("été".encode("cp1252"), "n'est pas en UTF-8"),
-        (b"\n  \r\n", "rien à ajouter"),
+        ("été".encode("cp1252"), "{fichier} n'est pas en UTF-8"),
+        (b"\n  \r\n", "{fichier} n'a aucune ligne non vide"),
         (None, "fichier illisible"),
     ],
     ids=["non-utf-8", "sans-ligne-non-vide", "fichier-absent"],
@@ -427,6 +427,9 @@ def test_un_fichier_inutilisable_est_refuse_avant_tout_appel(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """Le motif ouvre la ligne de refus. Les deux sous-commandes partagent la lecture du fichier :
+    son motif ne nomme l'action d'aucune — « rien à ajouter » était faux pour `comment` (vu rouge
+    par mutation)."""
     ajout = tmp_path / "ajout.md"
     if contenu is not None:
         ajout.write_bytes(contenu)
@@ -434,7 +437,7 @@ def test_un_fichier_inutilisable_est_refuse_avant_tout_appel(
 
     assert lance(forge, *appel, str(ajout)) == 1
     assert forge.appels == []
-    assert motif in sortie_d_echec(capsys, "refus")
+    assert sortie_d_echec(capsys, "refus").startswith(f"refus — {motif.format(fichier=ajout)}")
 
 
 def test_issue_edit_sort_en_1_sur_une_relecture_tronquee(
