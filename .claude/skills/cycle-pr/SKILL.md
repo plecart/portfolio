@@ -943,10 +943,12 @@ Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur 
 - **Boucler jusqu'à review vide.**
 
 > **Commentaire de répercussion.** Un merge survenu ailleurs pendant que cette PR était ouverte a
-> pu rendre sa spec fausse ; `repercussions` le signale ici même (le corps de l'issue n'est
-> volontairement pas modifié tant que la PR est ouverte), par un commentaire que
+> pu rendre sa spec fausse ; `repercussions` le signale ici même, par un commentaire sur la PR (le
+> corps de l'issue n'est volontairement pas modifié tant que la PR est ouverte). L'instrument qui
+> publie un tel commentaire puis le relit en entier est
 > `python <répertoire de ce skill>/scripts/ecriture-relue.py comment <n> --body-file <fichier>`
-> publie puis relit en entier (Étape 8). Un signalement **bloquant** se traite comme tel :
+> (Étape 8) ; `repercussions` le prescrit au lot 6b de #134 — d'ici là, son étape 5, « Issues en
+> vol », ne nomme aucune commande. Un signalement **bloquant** se traite comme tel :
 > intégrer la correction dans cette PR, ou remonter au mainteneur si cela déplace le périmètre —
 > ne jamais merger par-dessus.
 
