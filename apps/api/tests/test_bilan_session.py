@@ -1827,6 +1827,21 @@ def test_sans_transcript_le_script_rend_son_usage(capsys: pytest.CaptureFixture[
     assert "usage:" in capsys.readouterr().err
 
 
+def test_un_relais_donne_apres_la_relecture_reste_un_relais(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`--relecture` prend un transcript par option : un positionnel qui le suit reste un relais
+    de la session, au lieu d'être lu, sans rien dire, comme un relais de la relecture."""
+    session = write_transcript(tmp_path / "session.jsonl", TIMELINE)
+    relais = write_transcript(tmp_path / "relais.jsonl", RELAY)
+    revue = write_transcript(tmp_path / "relecture.jsonl", PARALLELE)
+
+    _, sortie = run_main([str(session), "--relecture", str(revue), str(relais)], monkeypatch)
+
+    heure = bilan.local(datetime.fromisoformat(at("12:30:00")))
+    assert ligne(sortie, "session ").endswith(f"(sessions : 2, relais à {heure})")
+
+
 # Une session de relecture qui tourne pendant `TIMELINE`.
 PARALLELE: list[dict[str, Any]] = [said("11:00:00", "relis"), assistant("11:10:00")]
 

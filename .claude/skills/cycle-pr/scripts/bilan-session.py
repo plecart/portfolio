@@ -1,15 +1,15 @@
 """Bilan chiffré d'une session Claude Code, lu dans ses transcripts JSONL.
 
 Usage : python bilan-session.py <transcript.jsonl> [<relais.jsonl> …]
-                                [--relecture <transcript.jsonl> …]
+                                [--relecture <transcript.jsonl>] …
 
 Un cycle qui a rempli un contexte a **plusieurs** transcripts : le script en accepte autant
 qu'on lui en donne, les fusionne dans l'ordre du temps et rend l'heure de chaque relais (obs 40).
 Les positionnels sont la session et ses relais. La session de relecture, quand la PR en a une,
-passe par `--relecture` : ses jetons, ses sous-agents et son profil se rendent, sans entrer dans
-la chronologie, les attentes ni le temps des sous-agents. Son transcript vit sous le dossier de
-projet de son propre worktree ; le script lit les sous-agents rangés sous le dossier de chaque
-transcript (`subagents`).
+passe par `--relecture`, une option par transcript, relais compris : ses jetons, ses sous-agents
+et son profil se rendent, sans entrer dans la chronologie, les attentes ni le temps des
+sous-agents. Son transcript vit sous le dossier de projet de son propre worktree ; le script lit
+les sous-agents rangés sous le dossier de chaque transcript (`subagents`).
 
 Rend, sans double compte : la durée de la session ; l'attente — du mainteneur ou d'un pair,
 jusqu'au dernier message qui rouvre le tour de l'agent — **scindée** en réactivité (moins d'une
@@ -1227,7 +1227,9 @@ def say(text: str) -> None:
 
 def arguments(argv: Sequence[str]) -> tuple[list[Path], list[Path]]:
     """Les transcripts demandés : la session et ses relais, puis sa session de relecture et ses
-    relais (`--relecture`). Sans transcript positionnel, `argparse` rend l'usage et sort en 2."""
+    relais (`--relecture`, une option par transcript). Les positionnels peuvent suivre une
+    option : `parse_intermixed_args` les garde positionnels, là où `parse_args` refuse ceux qui
+    suivent `--relecture`. Sans transcript positionnel, `argparse` rend l'usage et sort en 2."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "transcripts",
@@ -1238,13 +1240,13 @@ def arguments(argv: Sequence[str]) -> tuple[list[Path], list[Path]]:
     )
     parser.add_argument(
         "--relecture",
-        nargs="+",
+        action="append",
         type=Path,
         default=[],
         metavar="transcript.jsonl",
-        help="la session de relecture et ses relais",
+        help="la session de relecture, puis chacun de ses relais : une option par transcript",
     )
-    given = parser.parse_args(argv)
+    given = parser.parse_intermixed_args(argv)
     return given.transcripts, given.relecture
 
 
