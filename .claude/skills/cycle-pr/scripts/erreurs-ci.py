@@ -113,7 +113,8 @@ NO_FAILED_SEGMENT = "journal du job présent, sans segment en échec repérable"
 TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z ?")
 ANSI = re.compile(r"(?:\x1b|\^\[)\[[0-9;]*[A-Za-z]")
 GROUP = re.compile(r"##\[(?:end)?group\]")
-# Les marqueurs d'outil de la règle (a), chacun cité au module avec le run qui l'a mesuré.
+# Les marqueurs d'outil de la règle (a), chacun cité au module avec ce qui le fonde : un run, le
+# poste, ou la source de l'outil.
 TOOL_MARKERS = (
     re.compile(r"E\s{2,}\S"),
     re.compile(r"(FAILED|ERROR) \S"),
