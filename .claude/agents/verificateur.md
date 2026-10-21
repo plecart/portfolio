@@ -64,8 +64,10 @@ Ce que tu vérifies, **dans cet ordre** — c'est un ordre de priorité, et tu t
    `git merge-tree --write-tree origin/<trunk> <branche>` sort en **0** sans conflit et en **1**
    avec — mesuré le 2026-10-13, témoin de chaque côté, table `FRESHNESS_GATE_FORMS` de
    `apps/api/tests/test_agent_skills.py` ; il imprime aussi les chemins en conflit, mais c'est son
-   code de sortie qui porte la condition. L'état `MERGEABLE` de la forge, lui, se met à jour en
-   différé et ne prouve rien.
+   code de sortie qui porte la condition. Il sort en **1** aussi sur une référence inconnue — une
+   `<branche>` absente de ce clone —, sortie standard vide (même table ; sortie mesurée le
+   2026-10-21, git 2.47.1) : ce 1-là se rapporte comme une référence introuvable, jamais comme un
+   conflit. L'état `MERGEABLE` de la forge, lui, se met à jour en différé et ne prouve rien.
 3. **Les heurts `decisions-vs-doc`.** Les décisions que la PR rapporte dans ses Notes se
    confrontent aux sources de vérité de `.claude/pipeline.config.md`, section « Sources de
    vérité », par leur rang. Le seuil de l'arrêt et ses deux citations sont ceux de

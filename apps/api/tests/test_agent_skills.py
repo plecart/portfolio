@@ -1140,6 +1140,53 @@ def test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie(
     )
 
 
+# Chaque site qui lit le code de `git merge-tree` comme un prédicat sur une référence qui peut
+# manquer, et la phrase qui y borne le 1 — le cas `merge-tree-rend-1-sur-une-reference-inconnue`.
+MERGE_TREE_SUR_UNE_REFERENCE_INCONNUE = {
+    "pr-paralleles-croisement": (
+        ".claude/skills/pr-paralleles/SKILL.md",
+        "`merge-tree` sort en 1 aussi sur une référence inconnue",
+    ),
+    "script-de-croisement": (
+        ".claude/skills/pr-paralleles/scripts/croisement-fichiers.py",
+        "`git merge-tree`, qui sort en 1 sur une référence inconnue comme sur un conflit",
+    ),
+    "coordinatrice-derive": (
+        ".claude/skills/cycle-pr/references/coordinatrice.md",
+        "mais 1 aussi sur une référence inconnue, sortie standard vide",
+    ),
+    "verificateur-conflit": (
+        ".claude/agents/verificateur.md",
+        "Il sort en **1** aussi sur une référence inconnue",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("fichier", "phrase"),
+    MERGE_TREE_SUR_UNE_REFERENCE_INCONNUE.values(),
+    ids=MERGE_TREE_SUR_UNE_REFERENCE_INCONNUE.keys(),
+)
+def test_un_1_de_merge_tree_n_est_un_conflit_que_sur_des_references_qui_existent(
+    fichier: str, phrase: str
+) -> None:
+    """**Dénombrement de la classe « `merge-tree` lu comme 0 sans conflit, 1 avec », pris avant
+    le premier correctif** (cleanup holistique du lot 4b de #134, sur `37e0846`) :
+
+        git grep -n "merge-tree" 37e0846 -- .claude/ CLAUDE.md CONTRIBUTING.md .github/
+
+    rend 19 lignes, toutes sous `.claude/`. **5 sites**, en 8 lignes, y lisent le code comme un
+    prédicat ; **4** sont bornés ci-dessus — `pr-paralleles` §7 et la docstring du script de
+    croisement au bloc D, la dérive de la coordinatrice et le §4 du `verificateur` à ce cleanup —
+    et **1** est laissé : `cycle-pr` Étape 7 compare `origin/<trunk>` et `HEAD`, deux références
+    que tout clone porte après le `git fetch origin` qui précède, et son `&&` bloque sur tout 1.
+    Les 11 autres lignes ne lisent pas le 1 : le code rendu tel quel du `releveur`, le gabarit du
+    verdict du `verificateur`, le `merge-tree` à 0 que `cycle-pr` Étape 7 prête à la
+    coordinatrice, ses deux contrôles « lus », et le code et la sortie du script.
+    """
+    assert phrase in texte_normalise(fichier), f"`{fichier}` ne borne plus le 1 de `merge-tree`"
+
+
 # Les portes que les skills **prescrivent** : le fichier, l'action que la porte garde, et le
 # prédicat qui doit la précéder — sur **une seule ligne**, reliés par `&&`.
 #
