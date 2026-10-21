@@ -72,10 +72,13 @@ body relu après écriture (`contraintes.md`, « Écritures sur un artefact dist
 
 Puis la dérive, après chaque merge de lot : `git fetch origin`, puis
 `git merge-tree --write-tree origin/<trunk> origin/<type>/<slug>` — un prédicat, 0 sans conflit,
-1 avec (table `FRESHNESS_GATE_FORMS` de `apps/api/tests/test_agent_skills.py`). Sur 1, elle
-s'arrête au premier conflit et le remonte au mainteneur, chemins en conflit cités ; sur tout autre
-code non nul, elle s'arrête et lui remonte la sortie. Dans les deux cas, sans ouvrir de lot :
-jamais de force-push sur la branche d'intégration, et la résolution n'est pas la sienne.
+1 avec, mais 1 aussi sur une référence inconnue, sortie standard vide (table
+`FRESHNESS_GATE_FORMS` de `apps/api/tests/test_agent_skills.py` ; sortie mesurée le 2026-10-21,
+git 2.47.1). Sur 1, elle s'arrête au premier conflit et le remonte au mainteneur, chemins en
+conflit cités — sur une sortie standard vide, c'est une référence mal nommée, et elle remonte la
+sortie d'erreur ; sur tout autre code non nul, elle s'arrête et lui remonte la sortie. Dans les
+deux cas, sans ouvrir de lot : jamais de force-push sur la branche d'intégration, et la résolution
+n'est pas la sienne.
 
 Puis seulement, par `SendMessage` à la session du lot k+1 : « ouvre le lot <k+1>/<n> —
 passation : <chemin> ». Inactive depuis le go, elle reprend sur ce message (`sessions-liees.md`,
