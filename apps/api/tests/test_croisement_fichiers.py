@@ -22,7 +22,7 @@ from skill_scripts import REPOSITORY_ROOT, load_script
 croisement = load_script("pr-paralleles", "croisement-fichiers")
 
 PR = "127"
-VUE = ("gh", "pr", "view", "127", "--json", "state,mergeCommit")
+VUE = ("gh", "pr", "view", "127", "--json", "state,mergeCommit,baseRefName")
 DIFF = ("gh", "pr", "diff", "127", "--name-only")
 # Le commit de merge réel de la PR 142, pour les cas qui refusent avant de le chercher.
 MERGE_142 = "5767944848b8adbc8657377998e00f4483c6e976"
@@ -45,9 +45,10 @@ def document(contenu: Any) -> subprocess.CompletedProcess[bytes]:
     return sortie(json.dumps(contenu, ensure_ascii=False).encode())
 
 
-def mergee(oid: str) -> dict[str, Any]:
-    """Ce que rend `gh pr view --json state,mergeCommit` pour une PR mergée sur `oid`."""
-    return {"mergeCommit": {"oid": oid}, "state": "MERGED"}
+def mergee(oid: str, base: str = "main") -> dict[str, Any]:
+    """Ce que rend `gh pr view --json state,mergeCommit,baseRefName` pour une PR mergée sur `oid`
+    dans la branche `base`, nom nu (mesuré le 2026-10-21 sur les PR 127 et 142)."""
+    return {"baseRefName": base, "mergeCommit": {"oid": oid}, "state": "MERGED"}
 
 
 # Les fichiers que la PR 127 a mergés, tels que `gh pr diff --name-only` les rend.
@@ -243,7 +244,7 @@ def test_une_pr_non_mergee_est_refusee(etat: str, capsys: pytest.CaptureFixture[
     """Le croisement suit un merge : une PR ouverte ou fermée sans merge n'a rien livré, et
     `gh` rend alors `mergeCommit` nul (mesuré le 2026-10-21 sur la PR 144, ouverte, et la 138,
     fermée)."""
-    forge = Forge({"mergeCommit": None, "state": etat})
+    forge = Forge({"baseRefName": "main", "mergeCommit": None, "state": etat})
 
     assert lance(forge, PR, "propre") == 1
     assert lignes(capsys) == [
@@ -264,8 +265,8 @@ def test_une_base_qui_ne_contient_pas_le_merge_renvoie_a_git_fetch(
     assert lance(forge, PR, "propre") == 1
     assert lignes(capsys) == [
         (
-            f"refus — `origin/main` ne contient pas le merge de #127 ({depot.ailleurs[:7]}) :"
-            " `git fetch origin` d'abord"
+            f"refus — `origin/main` ne contient pas le merge de #127 ({depot.ailleurs[:7]}),"
+            " mergée dans `main` : `git fetch origin`, ou `--base origin/main`"
         )
     ]
 
@@ -277,7 +278,26 @@ def test_un_merge_absent_du_depot_renvoie_a_git_fetch(capsys: pytest.CaptureFixt
 
     assert lance(forge, PR, "propre") == 1
     assert lignes(capsys) == [
-        "refus — `origin/main` ne contient pas le merge de #127 (0123456) : `git fetch origin` d'abord"
+        (
+            "refus — `origin/main` ne contient pas le merge de #127 (0123456), mergée dans `main` :"
+            " `git fetch origin`, ou `--base origin/main`"
+        )
+    ]
+
+
+def test_une_pr_mergee_dans_une_autre_base_nomme_cette_base_en_remede(
+    depot: Depot, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Le cas de la PR 142, mergée dans `feat/contexte-court` et croisée sans `--base` (mesuré le
+    2026-10-21) : `git fetch origin` seul ne la ferait jamais entrer dans `origin/main`."""
+    forge = Forge(mergee(depot.ailleurs, base="feat/x"))
+
+    assert lance(forge, PR, "propre") == 1
+    assert lignes(capsys) == [
+        (
+            f"refus — `origin/main` ne contient pas le merge de #127 ({depot.ailleurs[:7]}),"
+            " mergée dans `feat/x` : `git fetch origin`, ou `--base origin/feat/x`"
+        )
     ]
 
 
@@ -287,7 +307,7 @@ REFUS: dict[str, tuple[Reponse | None, Reponse | None, str]] = {
     "vue-en-panne": (
         panne(b"HTTP 502: Bad Gateway (https://api.github.com/graphql)\n"),
         None,
-        "`gh pr view 127 --json state,mergeCommit` a échoué (1) : HTTP 502: Bad Gateway",
+        "`gh pr view 127 --json state,mergeCommit,baseRefName` a échoué (1) : HTTP 502: Bad Gateway",
     ),
     "gh-absent": (
         FileNotFoundError("gh introuvable"),
@@ -297,13 +317,13 @@ REFUS: dict[str, tuple[Reponse | None, Reponse | None, str]] = {
     "vue-non-json": (
         sortie(b"<html>"),
         None,
-        "`gh pr view 127 --json state,mergeCommit` ne rend pas du JSON",
+        "`gh pr view 127 --json state,mergeCommit,baseRefName` ne rend pas du JSON",
     ),
     # Un JSON valide, mais en cp1252 : décodé par la page de code du poste, il passerait (obs 108).
     "vue-hors-utf-8": (
         sortie('{"state": "MERGED", "titre": "Déploiement"}'.encode("cp1252")),
         None,
-        "`gh pr view 127 --json state,mergeCommit` ne rend pas de l'UTF-8",
+        "`gh pr view 127 --json state,mergeCommit,baseRefName` ne rend pas de l'UTF-8",
     ),
     "diff-en-panne": (
         None,
@@ -334,19 +354,31 @@ def test_une_lecture_gh_en_echec_est_refusee_en_une_ligne(
 
 
 # Chaque champ que le script lit de `gh pr view`, absent puis d'un autre type. Dénombré avant le
-# code : 3 champs — `state`, `mergeCommit` et son `oid` —, plus le document et `mergeCommit` qui ne
-# sont pas des objets, un `mergeCommit` nul sur une PR mergée, et un `oid` du bon type hors de sa
-# forme : une référence que git résoudrait, et qui passerait donc pour un commit de merge.
+# code : 4 champs — `state`, `baseRefName`, `mergeCommit` et son `oid` —, plus le document et
+# `mergeCommit` qui ne sont pas des objets, un `mergeCommit` nul sur une PR mergée, et un `oid` du
+# bon type hors de sa forme : une référence que git résoudrait, et qui passerait donc pour un
+# commit de merge. Chaque document porte les autres champs dans leur forme juste : le cas ne
+# rougit que sur le sien.
 FORMES: dict[str, Any] = {
     "vue-hors-objet": ["MERGED"],
-    "state-absent": {"mergeCommit": {"oid": MERGE_142}},
-    "state-non-textuel": {"mergeCommit": {"oid": MERGE_142}, "state": None},
-    "mergeCommit-absent": {"state": "MERGED"},
-    "mergeCommit-nul": {"mergeCommit": None, "state": "MERGED"},
-    "mergeCommit-hors-objet": {"mergeCommit": MERGE_142, "state": "MERGED"},
-    "oid-absent": {"mergeCommit": {}, "state": "MERGED"},
-    "oid-non-textuel": {"mergeCommit": {"oid": 5767944}, "state": "MERGED"},
-    "oid-hors-sha": {"mergeCommit": {"oid": "origin/main"}, "state": "MERGED"},
+    "state-absent": {"baseRefName": "main", "mergeCommit": {"oid": MERGE_142}},
+    "state-non-textuel": {"baseRefName": "main", "mergeCommit": {"oid": MERGE_142}, "state": None},
+    "baseRefName-absent": {"mergeCommit": {"oid": MERGE_142}, "state": "MERGED"},
+    "baseRefName-non-textuel": {
+        "baseRefName": None,
+        "mergeCommit": {"oid": MERGE_142},
+        "state": "MERGED",
+    },
+    "mergeCommit-absent": {"baseRefName": "main", "state": "MERGED"},
+    "mergeCommit-nul": {"baseRefName": "main", "mergeCommit": None, "state": "MERGED"},
+    "mergeCommit-hors-objet": {"baseRefName": "main", "mergeCommit": MERGE_142, "state": "MERGED"},
+    "oid-absent": {"baseRefName": "main", "mergeCommit": {}, "state": "MERGED"},
+    "oid-non-textuel": {"baseRefName": "main", "mergeCommit": {"oid": 5767944}, "state": "MERGED"},
+    "oid-hors-sha": {
+        "baseRefName": "main",
+        "mergeCommit": {"oid": "origin/main"},
+        "state": "MERGED",
+    },
 }
 
 
@@ -359,7 +391,7 @@ def test_une_vue_d_une_autre_forme_est_refusee_en_une_ligne(
     assert lance(forge, PR, "propre") == 1
     (ligne,) = lignes(capsys)
     assert ligne.startswith(
-        "refus — `gh pr view 127 --json state,mergeCommit` ne rend pas la forme attendue"
+        "refus — `gh pr view 127 --json state,mergeCommit,baseRefName` ne rend pas la forme attendue"
     ), ligne
 
 

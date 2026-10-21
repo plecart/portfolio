@@ -12,11 +12,15 @@ de tête. Dans cet ordre :
    <ref>^{commit}` —, sinon refus qui nomme la référence, avant toute lecture de la forge et tout
    `git merge-tree`, qui sort en 1 sur une référence inconnue comme sur un conflit (mesuré le
    2026-10-21, git 2.47.1 : un nom absent comme un arbre qui n'est pas un commit) ;
-2. la PR est mergée — `gh pr view <PR> --json state,mergeCommit` —, sinon refus : le croisement
-   suit un merge ; son commit de merge, `mergeCommit.oid`, est gardé en 40 hexadécimaux ;
+2. la PR est mergée — `gh pr view <PR> --json state,mergeCommit,baseRefName` —, sinon refus : le
+   croisement suit un merge ; son commit de merge, `mergeCommit.oid`, est gardé en 40
+   hexadécimaux, et la branche où elle a été mergée, `baseRefName`, en texte ;
 3. la base contient ce commit — `git merge-base --is-ancestor <oid> <base>` —, sinon refus qui
-   renvoie à `git fetch origin` ; un commit absent du dépôt local ne s'y trouve pas non plus, là
-   où `--is-ancestor` sortirait en 128 (mesuré le même jour) ;
+   nomme les deux remèdes : `git fetch origin`, ou `--base origin/<baseRefName>` pour une PR
+   mergée ailleurs — la PR 142, mergée dans `feat/contexte-court` et croisée contre
+   `origin/main`, n'y entrerait par aucun fetch (mesuré le 2026-10-21). Un commit absent du dépôt
+   local ne s'y trouve pas non plus, là où `--is-ancestor` sortirait en 128 (mesuré le même
+   jour) ;
 4. les fichiers mergés, M, sont ceux de `gh pr diff <PR> --name-only` ;
 5. pour chaque branche, ses fichiers — `git diff --name-only <base>...<branche>` — et le code de
    `git merge-tree --write-tree --name-only <base> <branche>` : 0 sans conflit, 1 avec, les
@@ -50,7 +54,7 @@ import subprocess
 import sys
 from collections.abc import Callable, Container, Mapping, Sequence
 from itertools import takewhile
-from typing import Any
+from typing import Any, NamedTuple
 
 Run = Callable[[Sequence[str]], subprocess.CompletedProcess[bytes]]
 
@@ -58,11 +62,20 @@ Run = Callable[[Sequence[str]], subprocess.CompletedProcess[bytes]]
 NUMBER = re.compile(r"[0-9]+")
 # Le commit de merge entre dans des commandes git : un SHA complet, rien d'autre.
 SHA = re.compile(r"[0-9a-f]{40}")
-PR_FIELDS = "state,mergeCommit"
+PR_FIELDS = "state,mergeCommit,baseRefName"
 
 
 class Refusal(Exception):
     """Un croisement impossible ; le message est le motif, en une ligne."""
+
+
+class Merge(NamedTuple):
+    """Ce que le script lit de la PR : son état, la branche où elle vise ou a été mergée — nom nu,
+    sans `origin/` —, et son commit de merge, `None` tant qu'elle n'est pas mergée."""
+
+    state: str
+    target: str
+    oid: str | None
 
 
 def default_run(cmd: Sequence[str]) -> subprocess.CompletedProcess[bytes]:
@@ -131,20 +144,21 @@ def field(document: Any, name: str, kind: type[object]) -> Any:
     return value
 
 
-def merge_commit(document: Any) -> tuple[str, str | None]:
-    """L'état que rend `gh pr view --json state,mergeCommit` et, PR mergée, son commit de merge —
-    `None` sinon, `mergeCommit` n'étant alors pas lu.
+def merge_of(document: Any) -> Merge:
+    """La PR que rend `gh pr view --json state,mergeCommit,baseRefName` ; `mergeCommit` n'est lu
+    que sur une PR mergée — `gh` le rend nul sinon (mesuré le 2026-10-21, PR 144 et 138).
 
     Raises:
         KeyError, TypeError, ValueError: comme `field`, ou un commit qui n'est pas un SHA.
     """
     state = field(document, "state", str)
+    target = field(document, "baseRefName", str)
     if state != "MERGED":
-        return state, None
+        return Merge(state, target, None)
     oid = field(field(document, "mergeCommit", dict), "oid", str)
     if not SHA.fullmatch(oid):
         raise ValueError(f"`mergeCommit.oid` n'est pas un SHA : {oid!r}")
-    return state, oid
+    return Merge(state, target, oid)
 
 
 def names(run: Run, *cmd: str) -> list[str]:
@@ -205,7 +219,7 @@ def cross(run: Run, pr: str, branches: Sequence[str], base: str) -> list[str]:
     for ref in (*branches, base):
         if not resolves(run, ref):
             raise Refusal(f"référence introuvable : `{ref}`")
-    state, oid = read_json(run, merge_commit, "gh", "pr", "view", pr, "--json", PR_FIELDS)
+    state, target, oid = read_json(run, merge_of, "gh", "pr", "view", pr, "--json", PR_FIELDS)
     if oid is None:
         raise Refusal(
             f"la PR #{pr} n'est pas mergée ({state}) : le croisement suit un merge,"
@@ -213,7 +227,8 @@ def cross(run: Run, pr: str, branches: Sequence[str], base: str) -> list[str]:
         )
     if not contains(run, base, oid):
         raise Refusal(
-            f"`{base}` ne contient pas le merge de #{pr} ({oid[:7]}) : `git fetch origin` d'abord"
+            f"`{base}` ne contient pas le merge de #{pr} ({oid[:7]}), mergée dans `{target}` :"
+            f" `git fetch origin`, ou `--base origin/{target}`"
         )
     merged = names(run, "gh", "pr", "diff", pr, "--name-only")
     touched: dict[str, set[str]] = {}
