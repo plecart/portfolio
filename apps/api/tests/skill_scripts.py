@@ -1,4 +1,4 @@
-"""Charge un script d'un skill de `.claude/` pour le tester.
+"""Charge un script d'un skill de `.claude/` pour le tester, ou le lance comme la session le lit.
 
 Les scripts des skills vivent sous `.claude/skills/<skill>/scripts/` : un dossier caché, donc
 hors de tout paquet importable — et hors de `pyright`, qui exclut les dossiers cachés sans que
@@ -9,11 +9,30 @@ charge par chemin.
 """
 
 import importlib.util
+import os
+import subprocess
+import sys
 from pathlib import Path
 from types import ModuleType
 
 # `skill_scripts.py` → `tests` → `api` → `apps` → racine du dépôt.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+
+# L'encodage qu'un tube reçoit d'un Python sans réglage sur ce poste, dont la page de code est
+# cp1252 (`pipeline.config.md`, « Qualité »).
+CONSOLE_ENCODING = "cp1252"
+
+
+def script_path(skill: str, name: str) -> Path:
+    """Le chemin de `.claude/skills/<skill>/scripts/<name>.py`.
+
+    Raises:
+        AssertionError: le script n'existe pas — un test qui le chargerait ou le lancerait
+            passerait pour une raison étrangère à lui.
+    """
+    path = REPOSITORY_ROOT / ".claude" / "skills" / skill / "scripts" / f"{name}.py"
+    assert path.is_file(), f"script introuvable : {path}"
+    return path
 
 
 def load_script(skill: str, name: str) -> ModuleType:
@@ -30,10 +49,38 @@ def load_script(skill: str, name: str) -> ModuleType:
         AssertionError: le script n'existe pas, ou Python refuse d'en faire un module — les
             deux états où un test de ce script passerait pour une raison étrangère à lui.
     """
-    path = REPOSITORY_ROOT / ".claude" / "skills" / skill / "scripts" / f"{name}.py"
-    assert path.is_file(), f"script introuvable : {path}"
+    path = script_path(skill, name)
     spec = importlib.util.spec_from_file_location(name, path)
     assert spec and spec.loader, f"{path} n'est pas chargeable comme module"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def pipe_environment() -> dict[str, str]:
+    """L'environnement de ce processus, l'encodage des flux standard de l'enfant imposé en
+    cp1252 — celui que reçoit un tube sur ce poste.
+
+    Hérité, `PYTHONIOENCODING=utf-8` — que le rôle `releveur` pose devant toute commande Python —
+    met l'enfant en UTF-8 sans le correctif qu'un test de tube éprouve, et `PYTHONUTF8=1` de
+    même : la mutation qui retire ce correctif y restait VERTE (dénombrement dans
+    `test_l_enfant_d_un_tube_ecrit_en_cp1252_quel_que_soit_l_environnement_herite`). Imposée,
+    `PYTHONIOENCODING` passe avant le mode UTF-8 et la locale, tube compris sous Windows
+    (CPython, `Doc/using/cmdline.rst` et `Doc/library/os.rst`, « UTF-8 Mode », lus le
+    2026-10-21) : ôter `PYTHONUTF8` n'y changerait rien, et ce test le mesure.
+    """
+    return {**os.environ, "PYTHONIOENCODING": CONSOLE_ENCODING}
+
+
+def run_in_pipe(skill: str, name: str, *args: str) -> subprocess.CompletedProcess[bytes]:
+    """Lance `python <script> <args>` comme la session le lit : par un tube, sorties capturées en
+    octets, flux standard de l'enfant en cp1252 (`pipe_environment`) quel que soit le shell. Un
+    script qui ne reconfigure pas ses flux en UTF-8 y écrit donc illisible, sur ce poste comme
+    sur un runner Linux — par la même documentation, non mesuré sur un runner. Pas de `-I` : il
+    implique `-E`, qui ignore la variable qui fait le cas."""
+    return subprocess.run(
+        [sys.executable, str(script_path(skill, name)), *args],
+        capture_output=True,
+        env=pipe_environment(),
+        check=False,
+    )

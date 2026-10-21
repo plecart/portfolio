@@ -11,17 +11,13 @@ sous-agent sans dire qu'il est mort avant d'avoir rien rendu.
 """
 
 import json
-import os
-import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
-from skill_scripts import REPOSITORY_ROOT, load_script
+from skill_scripts import load_script, run_in_pipe
 
 fin = load_script("pr-paralleles", "fin-transcript")
-SCRIPT = REPOSITORY_ROOT / ".claude" / "skills" / "pr-paralleles" / "scripts" / "fin-transcript.py"
 
 HORODATAGE = "2026-10-13T10:00:00.000Z"
 
@@ -307,18 +303,12 @@ def test_la_sortie_standard_est_en_utf_8_quelle_que_soit_la_console(tmp_path: Pa
     `UnicodeEncodeError`, rc 1, rien d'imprimé — l'outil d'incident mort à l'incident. Les
     transcripts sont pleins de flèches et d'emojis, et l'outil ne sert que sur ce poste.
 
-    Joué en sous-processus avec `PYTHONIOENCODING=cp1252` forcé, pour reproduire la console du
-    poste même sur la CI Linux, dont la sortie est en UTF-8 par défaut. Pas de `-I` ici : il
-    implique `-E`, qui ignore précisément la variable qui fait le cas.
+    Joué en sous-processus par `run_in_pipe`, qui impose cp1252, pour reproduire la console du
+    poste même sur la CI Linux, dont la sortie est en UTF-8 par défaut.
     """
     transcript = ecrire(tmp_path / "s.jsonl", [tour("assistant", "a → b")])
 
-    done = subprocess.run(
-        [sys.executable, str(SCRIPT), str(transcript), "3"],
-        capture_output=True,
-        env={**os.environ, "PYTHONIOENCODING": "cp1252"},
-        check=False,
-    )
+    done = run_in_pipe("pr-paralleles", "fin-transcript", str(transcript), "3")
 
     assert done.returncode == 0, done.stderr.decode("utf-8", "replace")
     assert "a → b" in done.stdout.decode("utf-8")

@@ -21,7 +21,7 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 import pytest
-from skill_scripts import REPOSITORY_ROOT, load_script
+from skill_scripts import REPOSITORY_ROOT, load_script, run_in_pipe
 
 merge_lot = load_script("cycle-pr", "merge-lot")
 
@@ -268,11 +268,9 @@ def test_la_ligne_de_verdict_que_cycle_pr_prescrit_est_celle_que_le_script_lit()
 def test_la_sortie_du_script_lance_en_tube_est_en_utf_8() -> None:
     """La session lit le motif par un tube. Sur ce poste, dont la page de code est cp1252, Python
     y écrit dans cet encodage : « tête » arrivait en `t\\xeate`, illisible (mesuré le 2026-10-17
-    sur la PR jetable #119 ; `pipeline.config.md`, « Qualité », porte la commande). Rouge sur le
-    poste (mutation jouée) ; sur un runner Linux, dont la locale est en UTF-8, supposé vert même
-    sans le correctif — non mesuré (`pipeline.config.md`, « Qualité »)."""
-    script = REPOSITORY_ROOT / ".claude/skills/cycle-pr/scripts/merge-lot.py"
-    done = subprocess.run([sys.executable, str(script)], capture_output=True, check=False)
+    sur la PR jetable #119 ; `pipeline.config.md`, « Qualité », porte la commande) — l'encodage
+    que `run_in_pipe` impose."""
+    done = run_in_pipe("cycle-pr", "merge-lot")
 
     assert done.returncode == 2
     assert "SHA de tête vérifié" in done.stdout.decode("utf-8")

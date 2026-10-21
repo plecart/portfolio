@@ -12,12 +12,11 @@ Les cas s'écrivent en littéraux, jamais dérivés des constantes du script (`c
 
 import json
 import subprocess
-import sys
 from pathlib import Path
 from typing import Any, NamedTuple
 
 import pytest
-from skill_scripts import REPOSITORY_ROOT, load_script
+from skill_scripts import load_script, run_in_pipe
 
 croisement = load_script("pr-paralleles", "croisement-fichiers")
 
@@ -445,12 +444,10 @@ def test_un_appel_mal_forme_sort_en_2_sans_rien_lancer(
 def test_la_sortie_du_script_lance_en_tube_est_en_utf_8(
     args: list[str], code: int, flux: str, texte: str
 ) -> None:
-    """Le lead lit le script par un tube. Sur ce poste, dont la page de code est cp1252, Python y
-    écrit dans cet encodage (`pipeline.config.md`, « Qualité ») — l'erreur d'argparse comprise,
-    qui part sur la sortie d'erreur. Sur un runner Linux, locale en UTF-8, supposé vert même sans
-    le correctif — non mesuré."""
-    script = REPOSITORY_ROOT / ".claude/skills/pr-paralleles/scripts/croisement-fichiers.py"
-    done = subprocess.run([sys.executable, str(script), *args], capture_output=True, check=False)
+    """Le lead lit le script par un tube, où Python écrit dans la page de code du poste, cp1252,
+    que `run_in_pipe` impose (`pipeline.config.md`, « Qualité ») — l'erreur d'argparse
+    comprise, qui part sur la sortie d'erreur."""
+    done = run_in_pipe("pr-paralleles", "croisement-fichiers", *args)
 
     assert done.returncode == code
     assert texte in getattr(done, flux).decode("utf-8")
