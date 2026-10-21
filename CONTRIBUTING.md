@@ -204,13 +204,14 @@ gh api repos/aptible/supercronic/releases/tags/v<x.y.z> --jq '.assets[] | select
 puis la recouper par la somme SHA-1 de ses notes de release, et changer adresse et somme ensemble.
 Enfin `make build-backup scan-backup`, puis `make build image-test`.
 
-`age` — avec `age-keygen` — et `rclone` sont compilés par le projet, dans l'étage `go` du même
-Dockerfile, avec le Go de l'image `golang` épinglée et à la version exacte de leur release
+`age` — avec `age-keygen` — et `rclone` sont compilés par le projet, dans les étages `age` et
+`rclone` du même Dockerfile, issus de l'étage `go`, avec le Go de l'image `golang` épinglée et à
+la version exacte de leur release
 ([ADR 0018](docs/adr/0018-binaires-go-compiles-par-le-projet.md)). Dependabot monte l'image
 `golang`, et sa PR les recompile ; leurs versions se montent à la main : changer la version du
 `go install` — pour `age`, celle de ses deux commandes ensemble —, en relisant la forme de la
 release, ses drapeaux pouvant changer d'une version à l'autre. Puis `make build-backup scan-backup`,
-puis `make build image-test`, qui exige de chacun qu'il annonce une version de release.
+puis `make build image-test`, qui exige de chacun qu'il annonce la version épinglée.
 
 `caddy` est compilé de même, dans l'étage `go` de [infra/caddy/Dockerfile](infra/caddy/Dockerfile),
 comme dépendance d'un module principal, la forme de sa release ; l'image reste construite sur
