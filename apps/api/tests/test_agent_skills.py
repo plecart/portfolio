@@ -1000,6 +1000,11 @@ def gate_repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
 # pourquoi les skills chaînent **deux** prédicats, un par direction, partout où l'égalité est la
 # condition (création de branche, création de worktree) — et un seul là où le trunk n'avance que
 # vers l'avant (le merge, obs 60).
+#
+# Le cas « référence inconnue » est la borne du prédicat `merge-tree` : il sort en 1 comme sur un
+# conflit, là où sa documentation promet un autre code à toute erreur. Un 1 ne prouve donc un
+# conflit que sur des références validées d'abord — ce que fait le script de croisement de
+# `pr-paralleles` §7 (mesuré le 2026-10-21, git 2.47.1, lot 4b de #134).
 FRESHNESS_GATE_FORMS = {
     "is-ancestor-rend-0-sur-deux-refs-egales": (
         ("merge-base", "--is-ancestor", "trunk", "trunk"),
@@ -1015,6 +1020,10 @@ FRESHNESS_GATE_FORMS = {
     ),
     "merge-tree-rend-0-sans-conflit": (("merge-tree", "--write-tree", "base", "trunk"), 0),
     "merge-tree-rend-1-avec-conflit": (("merge-tree", "--write-tree", "trunk", "lateral"), 1),
+    "merge-tree-rend-1-sur-une-reference-inconnue": (
+        ("merge-tree", "--write-tree", "trunk", "nope"),
+        1,
+    ),
     "rev-parse-rend-0-sur-deux-SHA-differents": (("rev-parse", "base", "trunk"), 0),
 }
 
