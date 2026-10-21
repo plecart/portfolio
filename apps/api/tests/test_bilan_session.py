@@ -1495,6 +1495,12 @@ DEMARRAGE = (
     f"(session_id: {SESSION_DE_RELECTURE}, name: relecture-pr-142). It runs on its own; …"
 )
 
+# L'appel 2 d'une session, qui démarre sa session de relecture, puis le retour de ce démarrage.
+DEMARRE_LA_RELECTURE: list[dict[str, Any]] = [
+    uses("10:01:00", "msg_2", 100, "mcp__ccd_session__start_session", {}, "toolu_start"),
+    returned("10:01:05", "toolu_start", [{"type": "text", "text": DEMARRAGE}]),
+]
+
 # Chaque forme de porte, en littéraux, sous son libellé rendu : la ligne de `REVIEW_GATES` qu'elle
 # éprouve — outil, champ de son `input`, valeur —, et l'`input` du `tool_use` qui la porte.
 PORTES: dict[str, tuple[tuple[str, str, str], dict[str, Any]]] = {
@@ -1537,14 +1543,12 @@ TEMOINS: dict[str, tuple[str, dict[str, Any]]] = {
 def gated(tmp_path: Path, tool: str, given: dict[str, Any]) -> Any:
     """Le profil d'une session qui démarre sa session de relecture à l'appel 2, puis lance
     `tool` à l'appel 4 — cinquième enregistrement, après le retour du démarrage."""
-    start = "toolu_start000000000000001"
     return bilan.context_profile(
         write_transcript(
             tmp_path / "session.jsonl",
             [
                 api_call("10:00:00", "msg_1", 100, 0, 10),
-                uses("10:01:00", "msg_2", 100, "mcp__ccd_session__start_session", {}, start),
-                returned("10:01:05", start, [{"type": "text", "text": DEMARRAGE}]),
+                *DEMARRE_LA_RELECTURE,
                 api_call("10:02:00", "msg_3", 100, 0, 10),
                 uses("10:03:00", "msg_4", 100, tool, given, "toolu_candidat000000000002"),
                 api_call("10:04:00", "msg_5", 100, 0, 10),
@@ -1601,15 +1605,13 @@ def test_la_table_des_portes_du_script_est_celle_des_cas() -> None:
 def test_un_message_a_une_session_avant_son_demarrage_ne_mord_pas(tmp_path: Path) -> None:
     """La session doit avoir été démarrée **plus haut** : un message qui précède le retour de
     son démarrage ne s'adresse pas encore à la session de relecture de ce transcript."""
-    start = "toolu_start000000000000001"
     session = write_transcript(
         tmp_path / "session.jsonl",
         [
             uses(
                 "10:00:00", "msg_1", 100, "SendMessage", {"to": SESSION_DE_RELECTURE}, "toolu_tot"
             ),
-            uses("10:01:00", "msg_2", 100, "mcp__ccd_session__start_session", {}, start),
-            returned("10:01:05", start, [{"type": "text", "text": DEMARRAGE}]),
+            *DEMARRE_LA_RELECTURE,
         ],
     )
 

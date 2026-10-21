@@ -42,7 +42,7 @@ import json
 import re
 import sys
 from collections import Counter
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from itertools import accumulate
@@ -137,8 +137,8 @@ INJECTED = (
 # une forme de plus s'ajoute par une ligne. `STARTED_SESSION` tient lieu de toute session que le
 # même transcript a démarrée **plus haut** par `START_SESSION_TOOL`, et c'est aussi ce que le
 # libellé en rend. Pour une session PR, c'est la session de relecture qu'elle démarre au go de son
-# briefing ; un transcript qui démarre d'autres sessions — une coordinatrice — voit sa « première
-# porte » au premier message vers l'une d'elles.
+# briefing ; la limite qu'en tire un transcript qui en démarre d'autres est dans la docstring du
+# module.
 # Population : `PORTES` dans la suite, tenue égale à cette table.
 STARTED_SESSION = "→ session démarrée"
 REVIEW_GATES = (
@@ -305,12 +305,18 @@ def api_call(record: Mapping[str, Any]) -> tuple[str, Mapping[str, int]] | None:
     return None
 
 
+def api_calls(kept: Iterable[Mapping[str, Any]]) -> dict[str, Mapping[str, int]]:
+    """L'`usage` de chaque appel d'API de ces enregistrements, par identifiant de message
+    (`api_call`), dans l'ordre de première apparition — un message diffusé sur plusieurs lignes
+    compte une fois."""
+    return dict(call for record in kept if (call := api_call(record)))
+
+
 def token_usage(paths: Sequence[Path]) -> Usage:
     """Somme l'`usage` de chaque message assistant de ces transcripts, une fois par message."""
     usage = Usage(transcripts=len(paths))
     for path in paths:
-        calls = dict(call for record in records(path) if (call := api_call(record)))
-        for counts in calls.values():
+        for counts in api_calls(records(path)).values():
             usage.add(counts)
     return usage
 
@@ -1029,9 +1035,7 @@ def context_profile(path: Path) -> Profile:
         porte de relecture et la composition de ses messages.
     """
     kept = session_records(path)
-    calls: dict[str, Mapping[str, int]] = dict(
-        call for record in kept if (call := api_call(record))
-    )
+    calls = api_calls(kept)
     usages = list(calls.values())
     ranks = {key: rank for rank, key in enumerate(calls, start=1)}
     tools = tool_names(kept)
