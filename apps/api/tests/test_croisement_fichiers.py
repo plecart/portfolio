@@ -10,12 +10,12 @@ PR du lot 4b de #134 a mesurée (gh 2.94.0, le 2026-10-21), réduites aux champs
 Les cas s'écrivent en littéraux, jamais dérivés des constantes du script (`cycle-pr` 3.1).
 """
 
-import json
 import subprocess
 from pathlib import Path
 from typing import Any, NamedTuple
 
 import pytest
+from command_doubles import Reply, failure, json_success, stdout_lines, success
 from skill_scripts import load_script, run_in_pipe
 
 croisement = load_script("pr-paralleles", "croisement-fichiers")
@@ -26,23 +26,6 @@ DIFF = ("gh", "pr", "diff", "127", "--name-only")
 # Le commit de merge réel de la PR 142, pour les cas qui refusent avant de le chercher.
 MERGE_142 = "5767944848b8adbc8657377998e00f4483c6e976"
 
-Reponse = subprocess.CompletedProcess[bytes] | OSError
-
-
-def sortie(octets: bytes) -> subprocess.CompletedProcess[bytes]:
-    """Une commande `gh` qui réussit et écrit `octets` sur sa sortie standard."""
-    return subprocess.CompletedProcess([], 0, stdout=octets, stderr=b"")
-
-
-def panne(stderr: bytes) -> subprocess.CompletedProcess[bytes]:
-    """Une commande `gh` qui sort en 1 sans rien écrire sur sa sortie standard."""
-    return subprocess.CompletedProcess([], 1, stdout=b"", stderr=stderr)
-
-
-def document(contenu: Any) -> subprocess.CompletedProcess[bytes]:
-    """La sortie de `gh … --json` : le JSON brut, en UTF-8."""
-    return sortie(json.dumps(contenu, ensure_ascii=False).encode())
-
 
 def mergee(oid: str, base: str = "main") -> dict[str, Any]:
     """Ce que rend `gh pr view --json state,mergeCommit,baseRefName` pour une PR mergée sur `oid`
@@ -51,7 +34,7 @@ def mergee(oid: str, base: str = "main") -> dict[str, Any]:
 
 
 # Les fichiers que la PR 127 a mergés, tels que `gh pr diff --name-only` les rend.
-FICHIERS_MERGES = sortie(b"f.txt\ng.txt\n")
+FICHIERS_MERGES = success(b"f.txt\ng.txt\n")
 
 
 class Depot(NamedTuple):
@@ -118,8 +101,8 @@ class Forge:
     levée comme un `gh` introuvable —, passe `git` au lanceur par défaut du script, et garde
     chaque commande reçue."""
 
-    def __init__(self, vue: Reponse | dict[str, Any], diff: Reponse = FICHIERS_MERGES) -> None:
-        self.reponses = {VUE: document(vue) if isinstance(vue, dict) else vue, DIFF: diff}
+    def __init__(self, vue: Reply | dict[str, Any], diff: Reply = FICHIERS_MERGES) -> None:
+        self.reponses = {VUE: json_success(vue) if isinstance(vue, dict) else vue, DIFF: diff}
         self.appels: list[tuple[str, ...]] = []
 
     def __call__(self, cmd: Any) -> subprocess.CompletedProcess[bytes]:
@@ -139,17 +122,12 @@ def lance(forge: Forge, *args: str) -> int:
     return croisement.main(list(args), forge)
 
 
-def lignes(capsys: pytest.CaptureFixture[str]) -> list[str]:
-    """Les lignes que le script a écrites sur la sortie standard."""
-    return capsys.readouterr().out.splitlines()
-
-
 def test_un_conflit_fabrique_rend_merge_tree_1_et_nomme_ses_fichiers(
     depot: Depot, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Le critère 2 du bloc : `conflit` réécrit les lignes que le merge a réécrites."""
     assert lance(Forge(mergee(depot.merge)), PR, "conflit") == 0
-    assert lignes(capsys) == [
+    assert stdout_lines(capsys) == [
         "f.txt → conflit",
         "g.txt → conflit",
         "conflit : merge-tree 1 — conflit : f.txt, g.txt",
@@ -160,7 +138,7 @@ def test_une_branche_sans_conflit_qui_touche_un_fichier_merge_entre_dans_la_tabl
     depot: Depot, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert lance(Forge(mergee(depot.merge)), PR, "propre") == 0
-    assert lignes(capsys) == ["g.txt → propre", "propre : merge-tree 0 — sans conflit"]
+    assert stdout_lines(capsys) == ["g.txt → propre", "propre : merge-tree 0 — sans conflit"]
 
 
 @pytest.mark.parametrize(
@@ -191,7 +169,7 @@ def test_une_branche_qui_ne_touche_rien_du_merge_est_absente_de_la_table_mais_ga
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert lance(Forge(mergee(depot.merge)), PR, *branches) == 0
-    assert lignes(capsys) == attendu
+    assert stdout_lines(capsys) == attendu
 
 
 def test_la_table_nomme_chaque_branche_qui_touche_chaque_fichier_merge(
@@ -200,7 +178,7 @@ def test_la_table_nomme_chaque_branche_qui_touche_chaque_fichier_merge(
     """La ligne de `g.txt` porte deux branches, celle de `f.txt` une seule : retirer une branche à
     la fois du filtre, ou de la jonction, rougit."""
     assert lance(Forge(mergee(depot.merge)), PR, "conflit", "propre", "ailleurs") == 0
-    assert lignes(capsys) == [
+    assert stdout_lines(capsys) == [
         "f.txt → conflit",
         "g.txt → conflit, propre",
         "conflit : merge-tree 1 — conflit : f.txt, g.txt",
@@ -235,7 +213,7 @@ def test_une_reference_inconnue_est_refusee_avant_tout_merge_tree(
 
     assert {cmd[:2] for cmd in forge.appels} == {("git", "rev-parse")}, forge.appels
     assert code == 1
-    assert lignes(capsys) == [f"refus — référence introuvable : `{reference}`"]
+    assert stdout_lines(capsys) == [f"refus — référence introuvable : `{reference}`"]
 
 
 @pytest.mark.parametrize("etat", ["OPEN", "CLOSED"])
@@ -246,7 +224,7 @@ def test_une_pr_non_mergee_est_refusee(etat: str, capsys: pytest.CaptureFixture[
     forge = Forge({"baseRefName": "main", "mergeCommit": None, "state": etat})
 
     assert lance(forge, PR, "propre") == 1
-    assert lignes(capsys) == [
+    assert stdout_lines(capsys) == [
         (
             f"refus — la PR #127 n'est pas mergée ({etat}) : le croisement suit un merge,"
             " `pr-paralleles` §7"
@@ -262,7 +240,7 @@ def test_une_base_qui_ne_contient_pas_le_merge_renvoie_a_git_fetch(
     forge = Forge(mergee(depot.ailleurs))
 
     assert lance(forge, PR, "propre") == 1
-    assert lignes(capsys) == [
+    assert stdout_lines(capsys) == [
         (
             f"refus — `origin/main` ne contient pas le merge de #127 ({depot.ailleurs[:7]}),"
             " mergée dans `main` : `git fetch origin`, ou `--base origin/main`"
@@ -276,7 +254,7 @@ def test_un_merge_absent_du_depot_renvoie_a_git_fetch(capsys: pytest.CaptureFixt
     forge = Forge(mergee("0123456789abcdef0123456789abcdef01234567"))
 
     assert lance(forge, PR, "propre") == 1
-    assert lignes(capsys) == [
+    assert stdout_lines(capsys) == [
         (
             "refus — `origin/main` ne contient pas le merge de #127 (0123456), mergée dans `main` :"
             " `git fetch origin`, ou `--base origin/main`"
@@ -292,7 +270,7 @@ def test_une_pr_mergee_dans_une_autre_base_nomme_cette_base_en_remede(
     forge = Forge(mergee(depot.ailleurs, base="feat/x"))
 
     assert lance(forge, PR, "propre") == 1
-    assert lignes(capsys) == [
+    assert stdout_lines(capsys) == [
         (
             f"refus — `origin/main` ne contient pas le merge de #127 ({depot.ailleurs[:7]}),"
             " mergée dans `feat/x` : `git fetch origin`, ou `--base origin/feat/x`"
@@ -302,9 +280,9 @@ def test_une_pr_mergee_dans_une_autre_base_nomme_cette_base_en_remede(
 
 # Chaque lecture de `gh` qui ne rend pas de réponse : (vue, diff, début du motif) — `None` garde
 # la réponse nominale.
-REFUS: dict[str, tuple[Reponse | None, Reponse | None, str]] = {
+REFUS: dict[str, tuple[Reply | None, Reply | None, str]] = {
     "vue-en-panne": (
-        panne(b"HTTP 502: Bad Gateway (https://api.github.com/graphql)\n"),
+        failure(b"HTTP 502: Bad Gateway (https://api.github.com/graphql)\n"),
         None,
         "`gh pr view 127 --json state,mergeCommit,baseRefName` a échoué (1) : HTTP 502: Bad Gateway",
     ),
@@ -314,24 +292,24 @@ REFUS: dict[str, tuple[Reponse | None, Reponse | None, str]] = {
         "`gh` ne se lance pas : gh introuvable",
     ),
     "vue-non-json": (
-        sortie(b"<html>"),
+        success(b"<html>"),
         None,
         "`gh pr view 127 --json state,mergeCommit,baseRefName` ne rend pas du JSON",
     ),
     # Un JSON valide, mais en cp1252 : décodé par la page de code du poste, il passerait (obs 108).
     "vue-hors-utf-8": (
-        sortie('{"state": "MERGED", "titre": "Déploiement"}'.encode("cp1252")),
+        success('{"state": "MERGED", "titre": "Déploiement"}'.encode("cp1252")),
         None,
         "`gh pr view 127 --json state,mergeCommit,baseRefName` ne rend pas de l'UTF-8",
     ),
     "diff-en-panne": (
         None,
-        panne(b"HTTP 404: Not Found\n"),
+        failure(b"HTTP 404: Not Found\n"),
         "`gh pr diff 127 --name-only` a échoué (1) : HTTP 404: Not Found",
     ),
     "diff-hors-utf-8": (
         None,
-        sortie("déploiement.txt\n".encode("cp1252")),
+        success("déploiement.txt\n".encode("cp1252")),
         "`gh pr diff 127 --name-only` ne rend pas de l'UTF-8",
     ),
 }
@@ -340,15 +318,15 @@ REFUS: dict[str, tuple[Reponse | None, Reponse | None, str]] = {
 @pytest.mark.parametrize(("vue", "diff", "motif"), REFUS.values(), ids=REFUS.keys())
 def test_une_lecture_gh_en_echec_est_refusee_en_une_ligne(
     depot: Depot,
-    vue: Reponse | None,
-    diff: Reponse | None,
+    vue: Reply | None,
+    diff: Reply | None,
     motif: str,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     forge = Forge(vue or mergee(depot.merge), diff or FICHIERS_MERGES)
 
     assert lance(forge, PR, "propre") == 1
-    (ligne,) = lignes(capsys)
+    (ligne,) = stdout_lines(capsys)
     assert ligne.startswith(f"refus — {motif}"), ligne
 
 
@@ -385,10 +363,10 @@ FORMES: dict[str, Any] = {
 def test_une_vue_d_une_autre_forme_est_refusee_en_une_ligne(
     vue: Any, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    forge = Forge(document(vue))
+    forge = Forge(json_success(vue))
 
     assert lance(forge, PR, "propre") == 1
-    (ligne,) = lignes(capsys)
+    (ligne,) = stdout_lines(capsys)
     assert ligne.startswith(
         "refus — `gh pr view 127 --json state,mergeCommit,baseRefName` ne rend pas la forme attendue"
     ), ligne
@@ -401,7 +379,7 @@ def test_un_git_qui_ne_repond_ni_0_ni_1_est_refuse(
     monkeypatch.setenv("GIT_DIR", str(tmp_path / "aucun-depot"))
 
     assert lance(Forge(mergee(MERGE_142)), PR, "propre") == 1
-    (ligne,) = lignes(capsys)
+    (ligne,) = stdout_lines(capsys)
     assert ligne.startswith(
         "refus — `git rev-parse --verify --quiet propre^{commit}` a échoué (128) : fatal:"
     ), ligne

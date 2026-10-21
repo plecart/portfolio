@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from command_doubles import json_success
 from skill_scripts import load_script, run_in_pipe
 
 ecriture_relue = load_script("cycle-pr", "ecriture-relue")
@@ -79,15 +80,15 @@ class Forge:
         self.appels.append(cmd)
         match cmd:
             case ("gh", "api", chemin) if chemin in self.documents and stdin is None:
-                return reponse(self.documents[chemin])
+                return json_success(self.documents[chemin])
             case ("gh", "api", "-X", "PATCH", chemin, "--input", "-") if (
                 chemin in self.documents and stdin is not None
             ):
                 self.charges.append(stdin)
                 self.documents[chemin]["body"] = self.stocke(json.loads(stdin)["body"])
-                return reponse(self.documents[chemin])
+                return json_success(self.documents[chemin])
             case ("gh", "api", "--paginate", "--slurp", chemin) if chemin == COMMENTAIRES_42:
-                return reponse(self.pages)
+                return json_success(self.pages)
             case ("gh", "api", "-X", "POST", chemin, "--input", "-") if (
                 chemin == COMMENTAIRES_42 and stdin is not None
             ):
@@ -96,21 +97,14 @@ class Forge:
                 commentaire = {"id": 900 + len(self.charges), "body": corps}
                 self.pages.append([commentaire])
                 self.indexe(commentaire)
-                return reponse(commentaire)
+                return json_success(commentaire)
             case ("gh", "api", "-X", "DELETE", chemin) if chemin in RETRAITS and stdin is None:
                 labels = self.documents[CORPS_42]["labels"]
                 if not self.garde_les_labels:
                     labels[:] = [label for label in labels if label["name"] != RETRAITS[chemin]]
-                return reponse(labels)
+                return json_success(labels)
             case _:
                 raise AssertionError(f"commande inattendue : {cmd}")
-
-
-def reponse(document: Any) -> subprocess.CompletedProcess[bytes]:
-    """La sortie de `gh api` : le JSON brut, en UTF-8 — accents compris, comme l'API les rend."""
-    return subprocess.CompletedProcess(
-        [], 0, stdout=json.dumps(document, ensure_ascii=False).encode()
-    )
 
 
 def lance(forge: Forge, *args: str) -> int:
@@ -752,7 +746,7 @@ def test_une_reponse_d_une_autre_forme_sort_en_1_en_une_ligne(
     ) -> subprocess.CompletedProcess[bytes]:
         moment = "écriture" if "-X" in cmd else "relecture" if ecritures(forge) else "lecture"
         rendu = forge(cmd, stdin)
-        return reponse(document) if moment == site else rendu
+        return json_success(document) if moment == site else rendu
 
     assert ecriture_relue.main(list(args), run=forge_d_une_autre_forme) == 1
     assert len(ecritures(forge)) == int(site != "lecture")
