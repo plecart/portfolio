@@ -907,10 +907,12 @@ Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur 
 - **Trier un rouge avant de toucher au code** — chaque famille de causes a son remède, et le
   premier message d'erreur du step les sépare presque toujours. La session PR lance elle-même
   `python <répertoire de ce skill>/scripts/erreurs-ci.py <id>`, une commande à la sortie courte :
-  une ligne par step en échec — job, step et première ligne d'erreur du journal —, ou le job en
-  échec sans step. Le script ne classe rien et ne lit pas les annotations ; une erreur sans
-  marqueur d'outil retombe sur la première ligne qui nomme une erreur, sinon sur l'annotation de
-  fin du step (`##[error]Process completed…`), qui ne dit rien : ce step-là se relit au journal.
+  une ligne par step en échec — job, step et première ligne d'erreur du journal, suivie du segment
+  `Run …` d'où elle vient quand `gh` n'a rendu que le journal entier du job (`UNKNOWN STEP`) —, ou
+  le job en échec sans step, ou le run en échec sans job. Le script ne classe rien et ne lit pas
+  les annotations des jobs ; une erreur sans marqueur d'outil retombe sur la première ligne qui
+  nomme une erreur, sinon sur l'annotation de fin du step (`##[error]Process completed…`), qui ne
+  dit rien : ce step-là se relit au journal.
   Le tri est une décision, à la session PR ; un correctif, à un `developpeur` :
   - *Rouge d'infrastructure* : échec de téléchargement (403/5xx/timeout d'un dépôt d'artefacts,
     « error while downloading ») alors que le diff ne touche aucune dépendance et qu'un run

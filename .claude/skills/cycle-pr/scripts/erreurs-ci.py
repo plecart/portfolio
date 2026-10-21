@@ -14,17 +14,31 @@ Un job ou un step est **en échec** quand sa conclusion n'est ni `success`, ni `
 `cancelled`, ni `neutral`. L'API REST (« Workflow jobs », schéma `job`) énumère pour un job
 `success`, `failure`, `neutral`, `cancelled`, `skipped`, `timed_out` et `action_required`, et rien
 pour un step : une conclusion hors de cette liste — `startup_failure`, celle d'une CI qui ne démarre
-pas (`cycle-pr` Étape 6) — compte en échec, jamais en silence.
+pas (`cycle-pr` Étape 6) — compte en échec, jamais en silence. Seuls les steps d'un job en échec
+sont lus, comme `gh run view --log-failed` ne lit que le journal de ceux-là (cli/cli,
+`pkg/cmd/run/view/logs.go`, `populateLogSegments`, branche `trunk` lue le 2026-10-21) ; un step
+sans conclusion, `""`, ne compte pas.
 
 Il rend, dans l'ordre des jobs puis des steps du JSON, une ligne par step en échec,
 `<job> › <step> : <première ligne d'erreur>` ; un job en échec sans step en échec — démarrage raté
-— rend `<job> : aucun step en échec — conclusion <c>`. Une section du journal qu'aucun step en échec
-ne nomme rend sa ligne à la suite — `gh` range sous `UNKNOWN STEP` une ligne qu'il ne rattache à
-aucun step (`gh run view --help`, gh 2.94.0) : aucune section ne se perd en silence. Un journal
-illisible ne fait pas refuser : chaque step en échec garde sa ligne, qui dit « journal
-indisponible » et le motif — `gh` en échec (`log not found: <job>` sur 38944674078, dont les jobs
-n'ont aucun step), une ligne sans ses trois champs, ou aucune section au nom du step. Un octet
-hors UTF-8 n'en fait pas un journal illisible : il y devient `\\ufffd`.
+— rend `<job> : aucun step en échec — conclusion <c>`, et un run en échec sans aucun job
+`run <id> : aucun job — conclusion <c>`, sans lire le journal.
+
+**Le journal entier d'un job.** Quand `gh` ne sait pas associer le journal en zip à un job, il lit
+le journal du job par l'API et le range entier sous le step `UNKNOWN STEP` (`gh run view --help`,
+gh 2.94.0). Un step en échec sans section propre lit alors cette section par segments, chacun
+ouvert par une ligne `##[group]Run <commande>` — 39146227001, Infra : 2 076 lignes, douze
+segments, un seul `##[error]`. Les steps en échec du job prennent dans l'ordre les segments qui
+portent une ligne `##[error]`, et leur ligne nomme le sien : `<erreur> — segment « Run make scan »
+du journal du job`. Un step sans tel segment le dit, sans jamais rendre la ligne d'un autre step,
+et la section qu'il a lue ne se rend pas à part.
+
+Toute autre section du journal qu'aucun step en échec ne nomme rend sa ligne à la suite, sous son
+nom : aucune section ne se perd en silence. Un journal illisible ne fait pas refuser : chaque step
+en échec garde sa ligne, qui dit « journal indisponible » et le motif — `gh` en échec
+(`log not found: <job>` sur 38944674078, dont les jobs n'ont aucun step), une ligne sans ses trois
+champs, ou aucune section au nom du step. Un octet hors UTF-8 n'en fait pas un journal illisible :
+il y devient `\\ufffd`.
 
 **La première ligne d'erreur** d'un step se cherche sur ses lignes, BOM, horodatage et séquences
 ANSI ôtés, lignes vides et `##[group]` / `##[endgroup]` sautées. Dans un tube, `gh` écrit
@@ -40,7 +54,10 @@ brute `\\x1b[` est ôtée aussi. Dans cet ordre :
     - npm audit `\\d+ (\\w+ severity )?vulnerabilit(y|ies)\\b`, ses deux formes de bilan, lues
       dans `npm-audit-report` 7.0.0, `lib/reporters/install.js` : à plusieurs sévérités,
       `6 vulnerabilities (5 moderate, 1 high)` — 39521079941, Front › Audit, ligne 35 ; à une
-      seule, `1 high severity vulnerability` — non mesuré sur un run ;
+      seule, `1 high severity vulnerability` — non mesuré sur un run. C'est le même bilan que
+      `npm ci` imprime après une installation (`npm-audit-report` 7.0.0, `lib/reporters/detail.js`
+      ligne 7, réutilise `install.summary`) : seul, il ne dit pas qu'un audit a rougi ; dans le
+      journal entier d'un job, la coupe le restreint au segment en échec ;
     - trivy `Total: [1-9]\\d* \\(` — 39562241493, Infra › Scan, ligne 536 ; le
       `Total: 0 (HIGH: 0, CRITICAL: 0)` d'une cible propre, ligne 141, ne le porte pas ;
 (b) sinon la première qui contient `error`, `errors`, `failed`, `failure` ou `fatal` en mot
@@ -56,11 +73,16 @@ session PR. Un outil dont l'erreur ne porte aucun marqueur : il retombe sur (b) 
 annotations des jobs, non lues. Un run relancé : seule sa dernière tentative est lue — sans
 `--attempt`, `gh run view 39559119382`, relancé une fois, rend les jobs de la tentative 2 et son
 journal, octet pour octet (mesuré le 2026-10-21, gh 2.94.0). Deux steps en échec d'un même job
-sous un même nom partagent une section.
+sous un même nom partagent une section. Dans le journal entier d'un job, la coupe repose sur les
+en-têtes `##[group]Run ` du runner, mesurés sur 39146227001 : un step qui écrirait lui-même une
+ligne `##[group]Run …` serait mal coupé, un step réussi qui écrirait une ligne `##[error]`
+prendrait le segment d'un step en échec, et les lignes des steps `Post`, sans en-tête, restent au
+segment qui les précède.
 
 Sortie : 0 lignes rendues, sur la sortie standard ; 1 refus (« refus — »), motif en une ligne, sans
 lire le journal — `gh` ne se lance pas, la lecture des jobs échoue ou ne rend pas la forme
-attendue, le run n'est pas terminé, ou aucun job n'est en échec ; 2 appel mal formé, usage sur la
+attendue, le run n'est pas terminé, ou aucun job n'est en échec — un run vert sans job compris,
+le run en échec sans job rendant sa ligne ; 2 appel mal formé, usage sur la
 sortie d'erreur. Python 3.11 ou plus, bibliothèque standard seule ; `gh` authentifié, lancé depuis
 le dépôt.
 """
@@ -74,13 +96,19 @@ from collections.abc import Callable, Sequence
 from typing import Any, NamedTuple, cast
 
 Run = Callable[[Sequence[str]], subprocess.CompletedProcess[bytes]]
-Sections = dict[tuple[str, str], list[str]]
+Key = tuple[str, str]
+Sections = dict[Key, list[str]]
 
 JOBS_FIELDS = "status,conclusion,jobs"
 # `str.isdigit` accepte « ² » : l'identifiant, qui entre dans une commande, se lit en ASCII.
 RUN_ID = re.compile(r"[0-9]+")
 NOT_FAILED = frozenset({"success", "skipped", "cancelled", "neutral"})
 UNAVAILABLE = "journal indisponible"
+# Le step sous lequel `gh` range le journal entier d'un job (voir le module).
+WHOLE_JOB = "UNKNOWN STEP"
+GROUP_OPEN = "##[group]"
+SEGMENT_HEADER = f"{GROUP_OPEN}Run "
+NO_FAILED_SEGMENT = "journal du job présent, sans segment en échec repérable"
 
 TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z ?")
 ANSI = re.compile(r"(?:\x1b|\^\[)\[[0-9;]*[A-Za-z]")
@@ -288,33 +316,82 @@ def first_error(texts: Sequence[str]) -> str:
     return next((line for rule in RULES for line in lines if rule(line)), lines[-1])
 
 
+def failed_segments(texts: Sequence[str]) -> list[list[str]]:
+    """Les segments du journal entier d'un job qui portent une ligne `##[error]`, dans l'ordre.
+    Un segment s'ouvre à une ligne qui, nettoyée, commence par `##[group]Run ` ; les lignes qui
+    précèdent la première n'en forment aucun."""
+    segments: list[list[str]] = []
+    for text in texts:
+        if cleaned(text).startswith(SEGMENT_HEADER):
+            segments.append([])
+        if segments:
+            segments[-1].append(text)
+    return [
+        segment
+        for segment in segments
+        if any(cleaned(text).startswith(ERROR_ANNOTATION) for text in segment)
+    ]
+
+
+def segment_error(segment: Sequence[str] | None) -> str:
+    """La première ligne d'erreur d'un segment, qui nomme son en-tête ; sans segment, le dit."""
+    if segment is None:
+        return NO_FAILED_SEGMENT
+    header = cleaned(segment[0]).removeprefix(GROUP_OPEN)
+    return f"{first_error(segment)} — segment « {header} » du journal du job"
+
+
 def step_line(job: str, step: str, error: str) -> str:
     """La ligne d'un step : `<job> › <step> : <erreur>`."""
     return f"{job} › {step} : {error}"
 
 
+def job_lines(job: Job, found: Sections, missing: str) -> tuple[list[str], set[Key]]:
+    """Les lignes d'un job en échec, et les sections du journal qu'elles ont lues.
+
+    Un step en échec lit sa section propre, sinon le segment en échec suivant du journal entier
+    de son job s'il y est (voir le module), sinon rend `missing`.
+    """
+    steps = [step for step in job.steps if step.conclusion and failed(step.conclusion)]
+    if not steps:
+        return [f"{job.name} : aucun step en échec — conclusion {job.conclusion}"], set()
+    whole = (job.name, WHOLE_JOB)
+    segments = iter(failed_segments(found.get(whole, [])))
+    lines: list[str] = []
+    read: set[Key] = set()
+    for step in steps:
+        own = (job.name, step.name)
+        if own in found:
+            read.add(own)
+            error = first_error(found[own])
+        elif whole in found:
+            read.add(whole)
+            error = segment_error(next(segments, None))
+        else:
+            error = missing
+        lines.append(step_line(job.name, step.name, error))
+    return lines, read
+
+
 def report(jobs: Sequence[Job], found: Sections, missing: str) -> list[str]:
-    """Les lignes rendues, dans l'ordre des jobs puis des steps, puis les sections du journal
-    qu'aucun step en échec ne nomme.
+    """Les lignes rendues, dans l'ordre des jobs en échec puis de leurs steps, puis les sections
+    du journal qu'aucune n'a lues.
 
     Args:
         found: les sections du journal (`sections`).
         missing: ce que rend un step en échec sans section.
     """
     lines: list[str] = []
-    named: set[tuple[str, str]] = set()
+    read: set[Key] = set()
     for job in jobs:
-        steps = [step for step in job.steps if failed(step.conclusion)]
-        for step in steps:
-            named.add((job.name, step.name))
-            texts = found.get((job.name, step.name))
-            lines.append(step_line(job.name, step.name, first_error(texts) if texts else missing))
-        if failed(job.conclusion) and not steps:
-            lines.append(f"{job.name} : aucun step en échec — conclusion {job.conclusion}")
+        if failed(job.conclusion):
+            job_rendered, job_read = job_lines(job, found, missing)
+            lines += job_rendered
+            read |= job_read
     lines += [
         step_line(job, step, first_error(texts))
         for (job, step), texts in found.items()
-        if (job, step) not in named
+        if (job, step) not in read
     ]
     return lines
 
@@ -324,13 +401,15 @@ def errors(run: Run, run_id: str) -> list[str]:
 
     Raises:
         Refusal: les jobs ne se lisent pas, le run n'est pas terminé, ou aucun job n'est en
-            échec — le journal n'est alors pas lu.
+            échec hors d'un run en échec sans job — le journal n'est alors pas lu.
     """
     state = read_run(run, run_id)
     if state.status != "completed":
         raise Refusal(
             f"run {run_id} pas terminé (status {state.status}) : l'attendre par `attente-ci.py`"
         )
+    if not state.jobs and failed(state.conclusion):
+        return [f"run {run_id} : aucun job — conclusion {state.conclusion}"]
     if not any(failed(job.conclusion) for job in state.jobs):
         raise Refusal(f"aucun job en échec dans le run {run_id} (conclusion {state.conclusion})")
     found, missing = read_log(run, run_id)
