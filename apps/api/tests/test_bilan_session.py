@@ -768,6 +768,7 @@ def test_les_chiffres_du_rapport_sont_epingles_un_a_un(tmp_path: Path) -> None:
     assert m.span == timedelta(hours=2, minutes=40)
     assert m.sessions == 2
     assert m.relayed == [datetime.fromisoformat(at("12:30:00"))]
+    assert m.parallel == []
     assert bilan.total(m.reactivity) == timedelta(minutes=15)
     assert bilan.total(m.absences) == timedelta(hours=1, minutes=54, seconds=30)
     assert bilan.total(m.blocked) == timedelta(hours=2, minutes=9, seconds=30)
@@ -804,6 +805,94 @@ def test_le_relais_se_date_par_le_temps_pas_par_l_ordre_des_arguments(tmp_path: 
     attendu = [datetime.fromisoformat(at("12:30:00"))]
     assert bilan.relays(chronologique) == attendu
     assert bilan.relays(inverse) == attendu
+    assert bilan.starts(chronologique)[1] == [], "un relais n'est pas lu en parallèle"
+
+
+PARALLELE: list[dict[str, Any]] = [said("11:00:00", "relis"), assistant("11:10:00")]
+
+
+def test_une_session_qui_chevauche_l_autre_est_en_parallele_pas_un_relais(tmp_path: Path) -> None:
+    """Une session de relecture lue avec sa session PR tourne **en même temps** qu'elle : son
+    premier instant n'est pas une heure de relais. La mesure du lot 4a, qui a révélé le défaut,
+    est dans la docstring de `starts`. Ici elle démarre à 11:00, dans les deux heures de
+    `TIMELINE` — et le rapport l'annonce « en parallèle », pas en relais.
+    """
+    paths = [
+        write_transcript(tmp_path / "session.jsonl", TIMELINE),
+        write_transcript(tmp_path / "relecture.jsonl", PARALLELE),
+    ]
+    events = bilan.read_events(paths)
+
+    assert bilan.starts(events) == ([], [datetime.fromisoformat(at("11:00:00"))])
+
+    report = bilan.report(events, bilan.token_usage(paths), [])
+    assert "en parallèle dès" in report
+    assert "relais à" not in report
+
+
+# Chaque cas est écrit en littéraux : les transcripts par leur premier et leur dernier instant,
+# puis les heures de relais et de session en parallèle que la règle de `starts` en tire.
+RELAIS_ET_PARALLELES: dict[str, tuple[list[tuple[str, str]], list[str], list[str]]] = {
+    "relais-sequentiel": (
+        [("10:00:00", "11:00:00"), ("11:30:00", "12:00:00")],
+        ["11:30:00"],
+        [],
+    ),
+    "parallele-simple": (
+        [("10:00:00", "11:00:00"), ("10:30:00", "10:45:00")],
+        [],
+        ["10:30:00"],
+    ),
+    # Le troisième commence après la fin du premier, mais avant celle du second.
+    "chevauche-le-second-pas-le-premier": (
+        [("10:00:00", "11:00:00"), ("10:30:00", "12:00:00"), ("11:30:00", "12:30:00")],
+        [],
+        ["10:30:00", "11:30:00"],
+    ),
+    # Le troisième commence pile au dernier instant du second : la borne est `>=`.
+    "relais-apres-deux-paralleles": (
+        [("10:00:00", "11:00:00"), ("10:30:00", "12:00:00"), ("12:00:00", "12:30:00")],
+        ["12:00:00"],
+        ["10:30:00"],
+    ),
+    # Le cas `relais-sequentiel`, les transcripts donnés dans l'ordre inverse du temps.
+    "arguments-a-l-envers": (
+        [("11:30:00", "12:00:00"), ("10:00:00", "11:00:00")],
+        ["11:30:00"],
+        [],
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("transcripts", "relais", "paralleles"),
+    RELAIS_ET_PARALLELES.values(),
+    ids=RELAIS_ET_PARALLELES.keys(),
+)
+def test_relais_et_parallele_se_departagent_sur_tous_les_transcripts_precedents(
+    tmp_path: Path, transcripts: list[tuple[str, str]], relais: list[str], paralleles: list[str]
+) -> None:
+    """Un transcript est un relais s'il commence au plus tôt au dernier instant de **tous** ceux
+    commencés avant lui ; sinon il est en parallèle.
+
+    Args:
+        transcripts: chaque transcript, par son premier et son dernier instant.
+        relais: les heures de relais attendues.
+        paralleles: les heures de session en parallèle attendues.
+    """
+    events = bilan.read_events(
+        [
+            write_transcript(
+                tmp_path / f"transcript-{rang}.jsonl", [said(debut, "…"), assistant(fin)]
+            )
+            for rang, (debut, fin) in enumerate(transcripts)
+        ]
+    )
+
+    assert bilan.starts(events) == (
+        [datetime.fromisoformat(at(clock)) for clock in relais],
+        [datetime.fromisoformat(at(clock)) for clock in paralleles],
+    )
 
 
 def test_mesurer_une_session_vide_leve_au_lieu_de_rendre_des_zeros(tmp_path: Path) -> None:

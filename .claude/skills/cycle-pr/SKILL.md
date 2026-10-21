@@ -1263,7 +1263,9 @@ plan compris ; pas sa sortie, que ce transcript sous-compte —, les points de c
 les appels d'outils ; puis le **profil de contexte** de chaque session : cache lu par quart des
 appels, première porte de relecture et part du cache lu après elle, composition en caractères.
 **La session de relecture se donne avec la session PR** : son transcript vit sous le dossier de
-projet de son propre worktree, ses sous-agents à côté de lui.
+projet de son propre worktree, ses sous-agents à côté de lui. L'attente se lit sur la session PR
+seule, relais compris, parce qu'une session en parallèle ferme ses attentes (docstring de
+`waits`).
 
 Écrire ces lignes, plus trois à la main — commits prévus contre commits de correction, constats
 par passe, correctifs qui ont cassé quelque chose — dans `retrospectives/<date>-<issue>.md`,

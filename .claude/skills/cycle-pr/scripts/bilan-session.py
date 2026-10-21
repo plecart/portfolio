@@ -4,6 +4,7 @@ Usage : python bilan-session.py <transcript.jsonl> [<relais.jsonl> …]
 
 Un cycle qui a rempli un contexte a **plusieurs** transcripts : le script en accepte autant
 qu'on lui en donne, les fusionne dans l'ordre du temps et rend l'heure de chaque relais (obs 40).
+Un transcript qui commence avant la fin d'un autre est annoncé « en parallèle », pas en relais.
 La session de relecture se donne avec la session PR : son transcript vit sous le dossier de
 projet de son propre worktree, ses sous-agents à côté de lui.
 
@@ -39,6 +40,7 @@ from collections import Counter
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from itertools import accumulate
 from pathlib import Path
 from statistics import fmean, median
 from typing import Any, NamedTuple, cast
@@ -586,6 +588,11 @@ def waits(events: Sequence[Event], calls: Sequence[ToolCall]) -> list[Interval]:
     Brutes : le temps des sous-agents s'en retire dans `measure`, **après** leur classement —
     le retrait est le cœur d'obs 41, sans lui une session à relectures parallèles facture au
     mainteneur le temps de ses sous-agents.
+
+    **Limite** : les événements de tous les transcripts sont fusionnés. Un transcript en
+    parallèle ferme donc les attentes de l'autre, comme s'il était l'agent. Mesuré sur le lot 4a :
+    la réactivité de la session PR seule est de 0 h 07, et de 0 h 02 lue avec sa session de
+    relecture. L'attente d'une session se lit sur ses seuls transcripts, relais compris.
     """
     reopened: dict[datetime, datetime] = {}
     idle_since: datetime | None = None
@@ -670,15 +677,40 @@ def tokens(usage: Usage) -> str:
     return f"sortie {usage.output / 1e3:6.0f} k · {cached(usage)}"
 
 
-def relays(events: Sequence[Event]) -> list[datetime]:
-    """Le premier instant de chaque transcript après le premier : les heures de relais."""
-    first: dict[int, datetime] = {}
+def starts(events: Sequence[Event]) -> tuple[list[datetime], list[datetime]]:
+    """Les heures de relais et les heures de session en parallèle, chacune dans l'ordre du temps.
+
+    Un transcript est un **relais** s'il commence au plus tôt au dernier instant de **tous** ceux
+    commencés avant lui (`>=`) : les précédents avaient fini. Sinon il est **en parallèle** — une
+    session de relecture lue avec sa session PR tourne en même temps qu'elle. Le premier
+    transcript n'est ni l'un ni l'autre ; chacun des N − 1 suivants est l'un des deux.
+
+    Mesuré sur le lot 4a (session PR `1444a1a8`, session de relecture `709cdf9b`) : l'en-tête du
+    rapport annonçait `(sessions : 2, relais à 23:33)`, et 23:33 est le démarrage de la session de
+    relecture, qui tournait en même temps que la session PR.
+    """
+    moments: dict[int, list[datetime]] = {}
     for event in events:
-        first.setdefault(event.source, event.when)
+        moments.setdefault(event.source, []).append(event.when)
     # Dans l'ordre du **temps**, pas dans celui des arguments : le skill autorise à donner
     # les transcripts dans n'importe quel ordre, et classer par index d'argument annonçait
     # alors le début de la session comme heure de relais. Mesuré le 2026-10-09.
-    return sorted(first.values())[1:]
+    spans = sorted((min(whens), max(whens)) for whens in moments.values())
+    # Pour chaque transcript après le premier : la fin la plus tardive de ceux qui le précèdent.
+    latest_end = accumulate((last for _, last in spans), max)
+    relayed: list[datetime] = []
+    parallel: list[datetime] = []
+    for (first, _), ended in zip(spans[1:], latest_end):
+        (relayed if first >= ended else parallel).append(first)
+    return relayed, parallel
+
+
+def relays(events: Sequence[Event]) -> list[datetime]:
+    """Le premier instant de chaque transcript après le premier : les heures de relais.
+
+    Un transcript en parallèle d'un autre n'en est pas un (`starts`).
+    """
+    return starts(events)[0]
 
 
 @dataclass(frozen=True)
@@ -694,6 +726,7 @@ class Measures:
     span: timedelta
     sessions: int
     relayed: list[datetime]
+    parallel: list[datetime]
     blocked: list[Interval]
     reactivity: list[Interval]
     absences: list[Interval]
@@ -757,12 +790,14 @@ def measure(events: Sequence[Event], agents: Sequence[Subagent] = ()) -> Measure
     blocked = union(reactivity + absences)
     start, end = events[0].when, events[-1].when
     span = end - start
+    relayed, parallel = starts(events)
     return Measures(
         start=start,
         end=end,
         span=span,
         sessions=max((event.source for event in events), default=0) + 1,
-        relayed=relays(events),
+        relayed=relayed,
+        parallel=parallel,
         blocked=blocked,
         reactivity=reactivity,
         absences=absences,
@@ -1094,7 +1129,10 @@ def report(
     m = measure(events, agents)
     humans = m.kinds["human"]
     used = consumed(agents)
-    relayed = ", ".join(f"relais à {local(moment)}" for moment in m.relayed)
+    later = ", ".join(
+        [f"relais à {local(moment)}" for moment in m.relayed]
+        + [f"en parallèle dès {local(moment)}" for moment in m.parallel]
+    )
 
     def row(label: str, duration: timedelta, basis: timedelta, note: str = "") -> str:
         """Une ligne « libellé · durée · part de son dénominateur »."""
@@ -1107,7 +1145,7 @@ def report(
     lines = [
         (
             f"session          {local(m.start)} → {local(m.end)}   {hm(m.span)}   "
-            f"(sessions : {m.sessions}{', ' + relayed if relayed else ''})"
+            f"(sessions : {m.sessions}{', ' + later if later else ''})"
         ),
         f"actif (hors absences)        {hm(m.active):>9}   — dénominateur des trois lignes qui suivent",
         row(
