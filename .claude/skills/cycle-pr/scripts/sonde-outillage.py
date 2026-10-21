@@ -12,8 +12,9 @@ la plus chère, et s'arrête au premier KO :
    commit emporterait ce qui est stagé, le format réécrirait ce qui ne l'est pas. Sans
    `--untracked-files=normal`, une configuration `status.showUntrackedFiles=no` cache un fichier
    non suivi (mesuré le 2026-10-21, git 2.47.1) ;
-2. `gh auth status` — rend 0 ; `gh` rend 1 dès qu'un compte connu, sur n'importe quel hôte, a un
-   problème d'authentification (manuel de `gh auth status`) ;
+2. `gh auth status --active` — rend 0 : seul le compte actif compte, car sans `--active` `gh` rend
+   1 dès qu'un compte connu, sur n'importe quel hôte, a un problème d'authentification (manuel de
+   `gh auth status` ; `--active` mesuré le 2026-10-21, gh 2.94.0) ;
 3. `droit de push` — `gh api repos/{owner}/{repo} --jq .permissions.push` rend exactement `true` ;
    `{owner}/{repo}` sont remplis par `gh` depuis le dépôt courant ;
 4. `commit de sonde` — `git commit --allow-empty -m "chore: sonde outillage"`, qui déclenche les
@@ -28,9 +29,9 @@ la plus chère, et s'arrête au premier KO :
 `--format` et `--test` sont des lignes de « Commandes du projet » (`.claude/pipeline.config.md`),
 que la session choisit et passe : une option omise saute sa sonde, et la sortie le dit
 (`SAUTÉE`) — c'est la forme d'une ligne `n/a` ou marquée `# non vérifiée`. Chacune est découpée
-comme par un shell POSIX (`shlex.split`) et lancée sans shell : ni tube, ni redirection, ni `&&` ;
-sous Windows, un programme `.cmd` comme `npm` ne se trouve pas, un `make` si (mesuré le
-2026-10-21).
+comme par un shell POSIX (`shlex.split`) et lancée sans shell : ni tube, ni redirection, ni `&&`,
+ni `\\` — `shlex` le mange (mesuré le 2026-10-21), les chemins s'écrivent avec `/` ; sous Windows,
+un programme `.cmd` comme `npm` ne se trouve pas, un `make` si (mesuré le 2026-10-21).
 
 Il ne corrige rien : il ne répare pas ce qu'une sonde trouve et ne touche à aucune configuration —
 un KO se remonte à l'utilisateur, à qui revient l'arbitrage (`cycle-pr` Étape 1).
@@ -56,7 +57,7 @@ Run = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
 Probe = Callable[[Run], object]
 
 STATUS = ("git", "status", "--porcelain", "--untracked-files=normal")
-AUTH = ("gh", "auth", "status")
+AUTH = ("gh", "auth", "status", "--active")
 PUSH = ("gh", "api", "repos/{owner}/{repo}", "--jq", ".permissions.push")
 HEAD = ("git", "rev-parse", "HEAD")
 COMMIT = ("git", "commit", "--allow-empty", "-m", "chore: sonde outillage")
@@ -146,20 +147,25 @@ def probe_commit(run: Run) -> None:
     qu'aucune lecture ne déclenche.
 
     Raises:
-        Ko: la tête ne se lit pas (rien n'est écrit) ; le commit est refusé (la tête n'a pas
-            bougé) ; le reset échoue — le motif nomme le commit de sonde resté en tête et la tête
+        Ko: la tête ne se lit pas avant le commit (rien n'est écrit) ; le commit est refusé (la
+            tête n'a pas bougé) ; la tête ne se lit pas après le commit — le motif dit qu'elle
+            porte peut-être encore le commit de sonde, que rien n'a été annulé, et la tête
+            d'avant ; le reset échoue — le motif nomme le commit de sonde resté en tête et la tête
             d'avant ; ou la tête, après le reset, n'est pas celle d'avant.
     """
     before = head(run)
     launch(run, COMMIT)
-    probe = head(run)
+    probe = None
     try:
+        probe = head(run)
         launch(run, RESET)
     except Ko as ko:
-        raise Ko(
-            f"{ko} : le commit de sonde {probe} est encore en tête (tête d'avant : {before})",
-            ko.output,
-        ) from ko
+        left = (
+            "la tête porte peut-être encore le commit de sonde, rien n'a été annulé"
+            if probe is None
+            else f"le commit de sonde {probe} est encore en tête"
+        )
+        raise Ko(f"{ko} : {left} (tête d'avant : {before})", ko.output) from ko
     if (after := head(run)) != before:
         raise Ko(f"la tête est {after} après la sonde, pas {before} (commit de sonde : {probe})")
 
@@ -188,7 +194,12 @@ def probes(fmt: Sequence[str] | None, test: Sequence[str] | None) -> list[tuple[
 
 
 def command(value: str) -> list[str]:
-    """Type argparse : une commande découpée comme par un shell POSIX, au moins un mot."""
+    """Type argparse : une commande découpée comme par un shell POSIX, au moins un mot, sans
+    antislash — le découpage POSIX le mange."""
+    if "\\" in value:
+        raise argparse.ArgumentTypeError(
+            f"antislash dans {value!r} : écrire les chemins avec `/`, le découpage POSIX mange `\\`"
+        )
     try:
         parts = shlex.split(value)
     except ValueError as error:

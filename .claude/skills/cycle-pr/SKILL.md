@@ -64,7 +64,7 @@ python <répertoire de ce skill>/scripts/sonde-outillage.py --format "<format>" 
 
 Six sondes, de la moins chère à la plus chère, arrêt au premier KO : un arbre et un index propres
 (`git status` vide, fichiers non suivis compris) — la sonde de commit emporte ce qui est stagé, et
-la commande de format réécrit ce qui ne l'est pas ; `gh auth status` en 0 ;
+la commande de format réécrit ce qui ne l'est pas ; `gh auth status --active` en 0 ;
 `gh api repos/{owner}/{repo} --jq .permissions.push` à `true` ; **une écriture**,
 `git commit --allow-empty -m "chore: sonde outillage"` puis `git reset --soft HEAD~1`, la tête
 revenue au SHA d'avant ; la commande de format, qui écrit, sans qu'elle réécrive l'arbre ; la
