@@ -1797,9 +1797,13 @@ def test_sans_transcript_le_script_rend_son_usage(capsys: pytest.CaptureFixture[
 PARALLELE: list[dict[str, Any]] = [said("11:00:00", "relis"), assistant("11:10:00")]
 
 # Chaque forme, en littéraux : les transcripts positionnels — la session et ses relais —, celui de
-# la session de relecture qui les chevauche, et les heures de relais attendues.
-INFERENCES: dict[str, tuple[list[list[dict[str, Any]]], list[dict[str, Any]], list[str]]] = {
-    "forme-1-parallele-lue-en-relais": ([TIMELINE], PARALLELE, []),
+# la session de relecture qui les chevauche, les heures de relais attendues, et le transcript d'un
+# sous-agent de la session de relecture, vide quand elle n'en a pas.
+INFERENCES: dict[
+    str,
+    tuple[list[list[dict[str, Any]]], list[dict[str, Any]], list[str], list[dict[str, Any]]],
+] = {
+    "forme-1-parallele-lue-en-relais": ([TIMELINE], PARALLELE, [], []),
     "forme-2-relais-chevauche-par-la-relecture": (
         [TIMELINE, RELAY],
         [
@@ -1809,6 +1813,7 @@ INFERENCES: dict[str, tuple[list[list[dict[str, Any]]], list[dict[str, Any]], li
             assistant("12:36:00"),
         ],
         ["12:30:00"],
+        [],
     ),
     "forme-3-evenement-tardif-apres-le-relais": (
         [
@@ -1827,12 +1832,28 @@ INFERENCES: dict[str, tuple[list[list[dict[str, Any]]], list[dict[str, Any]], li
             assistant("10:46:00"),
         ],
         ["10:30:00"],
+        [],
+    ),
+    "forme-4-sous-agent-de-la-relecture-pendant-une-attente": (
+        [
+            [
+                said("10:00:00", "go"),
+                assistant("10:01:00"),
+                said("10:40:00", "continue"),
+                assistant("10:45:00"),
+            ]
+        ],
+        [said("10:05:00", "relis"), assistant("10:06:00")],
+        [],
+        [said("10:10:00", "passe 1"), api_call("10:30:00", "msg_r1", 0, 1_000, 10)],
     ),
 }
 
 
 @pytest.mark.parametrize(
-    ("positionnels", "relecture", "relais"), INFERENCES.values(), ids=INFERENCES.keys()
+    ("positionnels", "relecture", "relais", "sous_agent"),
+    INFERENCES.values(),
+    ids=INFERENCES.keys(),
 )
 def test_la_session_de_relecture_designee_n_entre_ni_dans_les_relais_ni_dans_les_attentes(
     tmp_path: Path,
@@ -1840,6 +1861,7 @@ def test_la_session_de_relecture_designee_n_entre_ni_dans_les_relais_ni_dans_les
     positionnels: list[list[dict[str, Any]]],
     relecture: list[dict[str, Any]],
     relais: list[str],
+    sous_agent: list[dict[str, Any]],
 ) -> None:
     """Le bilan devinait d'après les heures si un transcript était un relais ou une session en
     parallèle. Dénombrement, écrit avant le correctif : 3 formes recensées, 3 fuient ou ont fui.
@@ -1859,6 +1881,32 @@ def test_la_session_de_relecture_designee_n_entre_ni_dans_les_relais_ni_dans_les
     désigne la session de relecture (`--relecture`), et chaque transcript positionnel est un
     relais. L'en-tête — durée comprise — rend donc les positionnels seuls, et la réactivité est
     celle de la session et de ses relais lus sans elle.
+
+    La forme 4 relève d'une autre classe, recensée plus bas : un sous-agent de la session de
+    relecture dont le contact chevauche une attente de la session PR — réactivité 0 h 19 au lieu
+    de 0 h 39, et « sous-agents en cours 0 h 20 (0 lancés) » (`relecteur`, relance de la PR
+    #146 ; rejoué sur ce montage le 2026-10-21).
+
+    Les chemins par lesquels la session de relecture entre dans la mesure de la session PR, lus
+    dans `main`, `report` et `measure`. Dénombrement, écrit avant le correctif de la forme 4 :
+    8 recensés, 2 fuyaient, 1 entrait sans effet.
+    - Ses événements (`read_events`) : positionnels seuls depuis `51e6acc` — formes 1 à 3.
+    - Ses jetons (`token_usage`) : sur leur ligne —
+      `test_la_session_de_relecture_rend_ses_jetons_sur_sa_propre_ligne`.
+    - Les fenêtres de ses sous-agents (`measure`) : retirées des attentes, comptées en
+      « sous-agents en cours », retranchées d'« agent seul » hors des attentes — fuyaient,
+      forme 4.
+    - Leurs lancements (`launched_subagents`) : lus dans les événements — indemnes, forme 4.
+    - `dangling` : leurs lanceurs entraient dans `seen`, qui ne retranche qu'un lancement de la
+      session PR au même identifiant d'appel, propre à une session — sans effet, fermé avec
+      les fenêtres.
+    - Le compte de transcripts des jetons des sous-agents (`consumed`) : sommait les deux sans
+      le dire — fuyait, `test_les_jetons_des_sous_agents_disent_la_part_de_la_relecture`.
+    - Son profil (`context_profile`) : sa propre section, titrée de son identifiant — indemne.
+    - La ligne des absents : compte ses transcripts, ce qu'elle doit dire — indemne.
+
+    Comparée : la mesure de la session, tout ce qui précède ses jetons — la population des
+    lignes où un chemin fuirait.
     """
     session = [
         write_transcript(tmp_path / f"session-{rang}.jsonl", records)
@@ -1866,11 +1914,28 @@ def test_la_session_de_relecture_designee_n_entre_ni_dans_les_relais_ni_dans_les
     ]
     chemins = [str(path) for path in session]
     revue = write_transcript(tmp_path / "relecture.jsonl", relecture)
+    if sous_agent:
+        write_subagent(revue, "agent-r1", sous_agent, {"agentType": "relecteur"})
 
     _, avec = run_main([*chemins, "--relecture", str(revue)], monkeypatch)
     _, sans = run_main(chemins, monkeypatch)
 
     heures = "".join(f", relais à {bilan.local(datetime.fromisoformat(at(c)))}" for c in relais)
     assert ligne(avec, "session ").endswith(f"(sessions : {len(positionnels)}{heures})")
-    for debut in ("session ", "réactivité"):
-        assert ligne(avec, debut) == ligne(sans, debut)
+    assert avec.split("\njetons ")[0] == sans.split("\njetons ")[0]
+
+
+def test_les_jetons_des_sous_agents_disent_la_part_de_la_relecture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Les sous-agents de la session de relecture se somment à ceux de la session PR dans la
+    ligne de leurs jetons, qui le dit — et ne dit rien quand la relecture n'en a lancé aucun."""
+    session_pr, session_relecture = deux_dossiers(tmp_path)
+    sans_sous_agent = write_transcript(tmp_path / "relecture-seule.jsonl", PARALLELE)
+
+    _, avec = run_main([str(session_pr), "--relecture", str(session_relecture)], monkeypatch)
+    _, seule = run_main([str(session_pr), "--relecture", str(sans_sous_agent)], monkeypatch)
+
+    debut = "jetons des sous-agents"
+    assert ligne(avec, debut).endswith("(2 transcripts, dont 1 de la session de relecture)")
+    assert ligne(seule, debut).endswith("(1 transcripts)")
