@@ -239,18 +239,28 @@ def watch(run: Run, ci: WorkflowRun, interval: int, timeout: float) -> None:
         pass
 
 
+def short(sha: str) -> str:
+    """Le SHA court, ses sept premiers caractères, comme `git log --oneline` sur ce dépôt."""
+    return sha[:7]
+
+
+def subject(ci: WorkflowRun, sha: str) -> str:
+    """Le sujet d'une ligne de verdict : `run <id> sur <SHA court>`."""
+    return f"run {ci.id} sur {short(sha)}"
+
+
 def verdict(run: Run, ci: WorkflowRun, sha: str) -> Verdict:
     """Le verdict d'un run terminé sur le SHA `sha`."""
-    subject = f"run {ci.id} sur {sha[:7]}"
+    about = subject(ci, sha)
     if ci.conclusion == "success":
-        return Verdict(f"vert — {subject} → sortir du draft, cycle-pr Étape 5", 0)
+        return Verdict(f"vert — {about} → sortir du draft, cycle-pr Étape 5", 0)
     if ci.conclusion == "skipped":
-        return Verdict(f"sauté — {subject} → {NO_RUN}", 3)
+        return Verdict(f"sauté — {about} → {NO_RUN}", 3)
     if ci.conclusion == "cancelled":
-        return Verdict(f"annulé sans remplaçant — {subject} → {NO_RUN}", 3)
+        return Verdict(f"annulé sans remplaçant — {about} → {NO_RUN}", 3)
     failed: list[str] = read_json(run, failed_jobs, "run", "view", str(ci.id), "--json", "jobs")
     return Verdict(
-        f"rouge — {subject}, conclusion {ci.conclusion}, jobs en échec :"
+        f"rouge — {about}, conclusion {ci.conclusion}, jobs en échec :"
         f" {', '.join(failed) or 'aucun'}"
         f" → erreurs-ci.py {ci.id}, puis cycle-pr Étape 6, « Trier un rouge »",
         1,
@@ -266,12 +276,14 @@ def wait(run: Run, pr: str, delay: int, interval: int, clock: Clock, sleep: Slee
         remaining = deadline - clock()
         if ci is None:
             if remaining <= 0:
-                return Verdict(f"aucun run — aucun run CI sur {sha[:7]} en {delay} s → {NO_RUN}", 3)
+                return Verdict(
+                    f"aucun run — aucun run CI sur {short(sha)} en {delay} s → {NO_RUN}", 3
+                )
             sleep(min(interval, remaining))
         elif ci.status != "completed":
             if remaining <= 0:
                 return Verdict(
-                    f"délai dépassé — run {ci.id} sur {sha[:7]} encore {ci.status} après {delay} s"
+                    f"délai dépassé — {subject(ci, sha)} encore {ci.status} après {delay} s"
                     " → cycle-pr Étape 6, « CI qui ne démarre pas »",
                     124,
                 )

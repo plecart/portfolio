@@ -162,9 +162,11 @@ class Forge:
                 raise AssertionError(f"commande inattendue : {cmd}")
 
     def tete(self) -> str:
+        """Le dernier SHA de `tetes` dont l'instant est passé."""
         return [sha for instant, sha in self.tetes if instant <= self.horloge()][-1]
 
     def run(self, identifiant: str) -> RunCi:
+        """Le run de la forge qui porte cet identifiant."""
         return next(run for run in self.runs if str(run.id) == identifiant)
 
     def etat(self, run: RunCi) -> dict[str, Any]:
@@ -179,6 +181,7 @@ class Forge:
         }
 
     def contenu(self, genre: str, cmd: tuple[str, ...]) -> Any:
+        """Le document qu'une lecture rend à cet instant, avant toute retouche."""
         if genre == "tete":
             return {"headRefOid": self.tete()}
         if genre == "runs":
@@ -195,6 +198,7 @@ class Forge:
     def watch(
         self, cmd: tuple[str, ...], timeout: float | None
     ) -> subprocess.CompletedProcess[bytes]:
+        """`gh run watch` : la fin du run, ou `TimeoutExpired` au bout du `timeout` reçu."""
         if self.watch_immediat:
             return panne(b"HTTP 502: Bad Gateway\n")
         assert timeout is not None, "`gh run watch` sans timeout"
