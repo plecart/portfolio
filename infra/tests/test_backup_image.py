@@ -36,6 +36,7 @@ from test_infra import image_output, loaded_image
 INFRA = Path(__file__).parents[1]
 BOOTSTRAP = INFRA / "bootstrap.sh"
 COMPOSE_PROD = INFRA / "compose.yml"
+DOCKERFILE = INFRA / "backup" / "Dockerfile"
 PROD_ENV_EXAMPLE = INFRA / "prod.env.example"
 STACK = Path(__file__).with_name("backup.yml")
 # Un nom par lancement : deux lancements simultanés sur le même moteur ne se partagent ni
@@ -394,26 +395,33 @@ def test_les_clients_de_la_chaine_sont_de_la_majeure_du_postgres_de_production(
     assert major_version(printed) == major_version(server)
 
 
-# Les binaires que le projet compile (ADR 0018) : la commande qui fait dire sa version à chacun, et
-# ce que la première ligne de sa réponse porte devant elle.
+# Les binaires que le projet compile (ADR 0018) : le module que le Dockerfile épingle en
+# `<module>@v<x.y.z>`, la commande qui fait dire sa version au binaire, et ce que la première ligne
+# de sa réponse porte devant elle.
 COMPILED_BINARIES = {
-    "age": (("age", "--version"), ""),
-    "rclone": (("rclone", "version"), "rclone "),
+    "age": ("filippo.io/age/cmd/age", ("age", "--version"), ""),
+    "age-keygen": ("filippo.io/age/cmd/age-keygen", ("age-keygen", "--version"), ""),
+    "rclone": ("github.com/rclone/rclone", ("rclone", "version"), "rclone "),
 }
 
 
 @pytest.mark.parametrize(
-    ("command", "prefix"), COMPILED_BINARIES.values(), ids=COMPILED_BINARIES.keys()
+    ("module", "command", "prefix"), COMPILED_BINARIES.values(), ids=COMPILED_BINARIES.keys()
 )
 def test_chaque_binaire_compile_annonce_sa_version_de_release(
-    command: tuple[str, ...], prefix: str
+    module: str, command: tuple[str, ...], prefix: str
 ) -> None:
     """Un binaire compilé hors de la forme de sa release le dit par sa version : `rclone` sans son
     drapeau de liaison répond `v1.75.2-DEV` (brief de #147, décision 4, mesuré). La première ligne
-    est donc exactement une version de release, `v<x.y.z>` — ni suffixe, ni `unknown`."""
+    est donc exactement la version que le Dockerfile épingle — pas seulement une forme de release :
+    `rclone` tire sa version de `fs.VersionTag` de la source, plus du Dockerfile, et un écart
+    passerait sinon."""
+    pinned = re.search(rf"{re.escape(module)}@(v\S+)", DOCKERFILE.read_text(encoding="utf-8"))
+    assert pinned, f"{module} n'est pas épinglé dans {DOCKERFILE}"
+
     first_line = image_output(loaded_image("backup"), *command).partition("\n")[0]
 
-    assert re.fullmatch(rf"{re.escape(prefix)}v\d+\.\d+\.\d+", first_line), first_line
+    assert first_line == f"{prefix}{pinned[1]}", first_line
 
 
 @pytest.mark.parametrize(("password", "healthy"), [(None, True), ("mot-de-passe-faux", False)])

@@ -56,9 +56,9 @@ aucun certificat, et Caddy ne termine aucun TLS (D45).
 - **Un étage `golang:<x.y.z>-alpine`**, épinglé étiquette et empreinte, `FROM` en colonne 0, dans
   chaque Dockerfile qui compile : Dependabot le lit comme toute image de base, et une montée de Go
   arrive en une PR par Dockerfile — Dependabot a une entrée par dossier (ADR 0014,
-  `.github/dependabot.yml`) —, qui recompile ses binaires. `GOTOOLCHAIN=local`, défaut de l'image : un module qui
-  exigerait un Go plus récent fait échouer le build au lieu d'en télécharger un autre, et le Go de
-  l'image est celui de chaque binaire. Sans cgo, comme les releases.
+  `.github/dependabot.yml`) —, qui recompile ses binaires. `GOTOOLCHAIN=local`, défaut de l'image :
+  un module qui exigerait un Go plus récent fait échouer le build au lieu d'en télécharger un
+  autre, et le Go de l'image est celui de chaque binaire. Sans cgo, comme les releases.
 - **On change le compilateur, jamais le graphe de dépendances.** Chaque binaire se compile avec les
   versions de modules que fixe sa release : aucun module n'est monté, même corrigé. Une
   vulnérabilité d'un module — `golang.org/x/net` dans Caddy — reste une exception évaluée en trois
