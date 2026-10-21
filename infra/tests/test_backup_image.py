@@ -1,6 +1,6 @@
 """Tests de l'image `backup` : sa chaîne de sauvegarde et sa purge, sa sonde, la majeure de ses
 clients Postgres, son rôle Postgres (brief de #23, décisions 2 à 7, 10 et 11), la version que ses
-binaires compilés annoncent (ADR 0017).
+binaires compilés annoncent (ADR 0018).
 
 Lancé par `make image-test`, jamais par `make test` : il lui faut les images que `make build` a
 chargées — `backup`, `caddy` pour le témoin de ping, et `api`, que la pile déclare pour la
@@ -394,7 +394,7 @@ def test_les_clients_de_la_chaine_sont_de_la_majeure_du_postgres_de_production(
     assert major_version(printed) == major_version(server)
 
 
-# Les binaires que le projet compile (ADR 0017) : la commande qui fait dire sa version à chacun, et
+# Les binaires que le projet compile (ADR 0018) : la commande qui fait dire sa version à chacun, et
 # ce que la première ligne de sa réponse porte devant elle.
 COMPILED_BINARIES = {
     "age": (("age", "--version"), ""),

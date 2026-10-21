@@ -9,7 +9,7 @@
 # paquets, où Trivy les analyse — il n'ouvre pas un binaire Go installé par `apk` (mesuré le
 # 2026-10-03 : 0 au scan, 31 HIGH dans les mêmes binaires copiés hors de la base de paquets).
 # `age`, `age-keygen` et `rclone` sont compilés par le projet, avec le Go de l'image `golang`
-# épinglée ci-dessous : leurs releases embarquent un Go en retard sur ses correctifs (ADR 0017).
+# épinglée ci-dessous : leurs releases embarquent un Go en retard sur ses correctifs (ADR 0018).
 # `supercronic` entre par le fichier de sa release.
 #
 # Qui suit quoi : Dependabot (`.github/dependabot.yml`) propose chaque nouvelle version d'`alpine`
@@ -22,7 +22,7 @@ FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4c
 
 # Le compilateur. Chaque binaire est compilé par `go install <module>@<version>` sous la forme de
 # sa release officielle, sans cgo ; ses modules restent aux versions que fixe cette release : on
-# change le compilateur, jamais le graphe de dépendances (ADR 0017). Le téléchargement est vérifié
+# change le compilateur, jamais le graphe de dépendances (ADR 0018). Le téléchargement est vérifié
 # par la base de sommes de Go, active par défaut, à une version exacte — ce que
 # `apps/api/tests/test_supply_chain.py` exige. `GOTOOLCHAIN=local`, défaut de l'image : un module
 # qui exigerait un Go plus récent fait échouer le build au lieu d'en télécharger un autre. Les
@@ -61,7 +61,7 @@ RUN apk add --no-cache postgresql16-client curl
 COPY --from=go /go/bin/age /go/bin/age-keygen /go/bin/rclone /usr/local/bin/
 
 # `supercronic` n'a pas d'image officielle : le fichier de sa release, à la somme SHA-256
-# épinglée, que BuildKit vérifie avant de le copier (ADR 0017). `linux/amd64` seulement,
+# épinglée, que BuildKit vérifie avant de le copier (ADR 0018). `linux/amd64` seulement,
 # l'architecture du VPS, de la CI et du poste.
 ADD --checksum=sha256:cc232108374e8e2b537045f2d5eaa1229f619db314c3ba6a14d38b35dc0aa123 --chmod=755 \
     https://github.com/aptible/supercronic/releases/download/v0.2.51/supercronic-linux-amd64 \

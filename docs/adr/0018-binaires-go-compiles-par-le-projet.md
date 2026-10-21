@@ -1,8 +1,8 @@
-# 0017 — Binaires Go compilés par le projet
+# 0018 — Binaires Go compilés par le projet
 
 - **Statut** : accepté
 - **Date** : 2026-10-21
-- **Décisions du cadrage** : D61 (`docs/cadrage-technique.md` §7) ; complète l'ADR 0014, dont il
+- **Décisions du cadrage** : D62 (`docs/cadrage-technique.md` §7) ; complète l'ADR 0014, dont il
   exerce une condition de réexamen (§ Conditions de réexamen, « `caddy` publie durablement avec une
   bibliothèque Go en retard »), sans le remplacer ; décisions de l'interrogatoire de #147
   (2026-10-21)
@@ -55,7 +55,8 @@ aucun certificat, et Caddy ne termine aucun TLS (D45).
 
 - **Un étage `golang:<x.y.z>-alpine`**, épinglé étiquette et empreinte, `FROM` en colonne 0, dans
   chaque Dockerfile qui compile : Dependabot le lit comme toute image de base, et une montée de Go
-  est une PR qui recompile tous les binaires. `GOTOOLCHAIN=local`, défaut de l'image : un module qui
+  arrive en une PR par Dockerfile — Dependabot a une entrée par dossier (ADR 0014,
+  `.github/dependabot.yml`) —, qui recompile ses binaires. `GOTOOLCHAIN=local`, défaut de l'image : un module qui
   exigerait un Go plus récent fait échouer le build au lieu d'en télécharger un autre, et le Go de
   l'image est celui de chaque binaire. Sans cgo, comme les releases.
 - **On change le compilateur, jamais le graphe de dépendances.** Chaque binaire se compile avec les
@@ -78,9 +79,13 @@ aucun certificat, et Caddy ne termine aucun TLS (D45).
     `main.go` de `cmd/caddy`, `go mod edit -require=github.com/caddyserver/caddy/v2@<tag>` puis
     `go mod tidy` ; `-trimpath -mod=readonly`, `-ldflags "-s -w"`, étiquettes
     `nobadger nomysql nopgx`. Compilé en module principal par `go install`, il répond `unknown` à
-    `caddy version` (mesuré).
+    `caddy version` (mesuré). Le projet télécharge ce module (`go mod download`) et en copie le
+    `main.go` de `cmd/caddy` depuis le cache de modules, là où la release le prend dans son dépôt :
+    la version ne s'écrit qu'une fois. Mesuré le 2026-10-21 : même `go.mod`, même `go.sum`, binaire
+    identique octet pour octet à la forme `go get`, et les 147 dépendances de `go version -m` aux
+    versions du binaire officiel.
 
-  Un test d'image exige de chacun qu'il annonce une version de release exacte.
+  Un test d'image exige de chacun qu'il annonce la version épinglée.
 - **L'image `caddy` reste construite sur `caddy:<x.y.z>-alpine`**, dont seul le binaire est
   remplacé : configuration, chemins, variables et utilisateur sont ceux de l'image officielle, et
   Dependabot continue de proposer chaque version de Caddy. La version compilée et l'étiquette de
@@ -105,8 +110,8 @@ aucun certificat, et Caddy ne termine aucun TLS (D45).
 
 **Positives**
 
-- Une montée de Go est une PR Dependabot de l'image `golang`, qui recompile tous les binaires :
-  leur bibliothèque standard suit le Go épinglé, sans attendre l'amont.
+- Une montée de Go est une PR Dependabot de l'image `golang` par Dockerfile, qui recompile ses
+  binaires : leur bibliothèque standard suit le Go épinglé, sans attendre l'amont.
 - Les exceptions sur la bibliothèque standard Go se retirent ; ne restent que celles des modules,
   évaluées comme toute autre — à l'essai du 2026-10-21, sans exception, CVE-2026-78669 sur
   `golang.org/x/net` 0.59.0 dans Caddy, et rien dans `age`, `age-keygen` ni `rclone`.
@@ -122,6 +127,9 @@ aucun certificat, et Caddy ne termine aucun TLS (D45).
   monte rougit sur le test d'égalité tant que la version compilée ne l'a pas suivie, et se complète
   à la main.
 - Dependabot ne voit plus les releases de `rclone`, dont l'image officielle n'est plus un `FROM`.
+- L'image `caddy` garde, masqué dans la couche de son image de base, le binaire officiel qu'elle
+  remplace : environ 51 Mo de plus (mesuré le 2026-10-21) ; Trivy ne lit que le système de
+  fichiers final, une seule cible `gobinary`.
 
 ## Comparaison des options
 
@@ -129,7 +137,7 @@ aucun certificat, et Caddy ne termine aucun TLS (D45).
 |---|---|---|---|
 | Scan du trunk | vert si le code n'est pas atteint | rouge jusqu'aux releases, sans date | vert |
 | Code atteint (`rclone`) | exception refusée par la politique | rouge | corrigé |
-| Travail récurrent | une évaluation par avis et par binaire, tous les 30 jours | aucun, trunk bloqué | une PR Dependabot par version de Go |
+| Travail récurrent | une évaluation par avis et par binaire, tous les 30 jours | aucun, trunk bloqué | une PR Dependabot par image et par version de Go |
 | Binaire livré | celui de l'amont | celui de l'amont | les modules et les drapeaux de l'amont, le Go du projet |
 | Suivi par Dependabot | — | — | Go oui ; versions de `age` et `rclone` non |
 | Coût de build | nul | nul | une compilation à chaque changement de l'étage |

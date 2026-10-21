@@ -35,7 +35,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0014](0014-ci-cd-github-actions-et-ghcr.md) | CI/CD : GitHub Actions et GHCR | D56 (confirme D43) | accepté |
 | [0015](0015-moteur-du-worker-celery.md) | Moteur du worker : Celery ; variantes par Pillow seul | D59 (remplace le point « `django-imagekit` » de 0001 et 0004, et la règle « outbox » de 0006 pour le worker d'images ; rôle 2 « broker » de 0006 avancé en phase 1) | accepté |
 | [0016](0016-le-worker-dans-les-deux-fichiers-compose.md) | Le worker dans les deux fichiers Compose | D60 (remplace « le worker » parmi ce que la production porte en propre dans 0012 et D54) | accepté |
-| [0017](0017-binaires-go-compiles-par-le-projet.md) | Binaires Go compilés par le projet | D61 (exerce une condition de réexamen de 0014, sans le remplacer) | accepté |
+| [0018](0018-binaires-go-compiles-par-le-projet.md) | Binaires Go compilés par le projet | D62 (exerce une condition de réexamen de 0014, sans le remplacer) | accepté |
 
 ## À écrire à leur phase
 

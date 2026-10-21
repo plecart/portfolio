@@ -1,7 +1,7 @@
 # Image `caddy` : le front compilé, servi en statique (ADR 0008), son Caddyfile de production, et
 # son image de base (ADR 0014), dont seul le binaire `caddy` est remplacé : le projet le compile
 # avec le Go de l'image `golang` épinglée ci-dessous, sa release embarquant un Go en retard sur ses
-# correctifs (ADR 0017).
+# correctifs (ADR 0018).
 #
 # Contexte de build : la racine du dépôt, comme pour `api`. Le `.dockerignore` n'y laisse entrer
 # du front que sa compilation, `apps/web/dist`, que `make build` produit s'il manque.
@@ -27,7 +27,7 @@ WORKDIR /src
 # `unknown` à `caddy version` (mesuré). Ce `main.go` est copié du module, téléchargé à la version
 # de l'exigence et dont `go list` lit le dossier : la version ne s'écrit qu'une fois. `go mod tidy`
 # résout les modules que fixe la release : on change le compilateur, jamais le graphe de
-# dépendances (ADR 0017). Le téléchargement est vérifié par la base de sommes de Go, active par
+# dépendances (ADR 0018). Le téléchargement est vérifié par la base de sommes de Go, active par
 # défaut, à une version exacte — ce que `apps/api/tests/test_supply_chain.py` exige. Les caches de
 # Go sont montés hors du layer, qui ne garde que le binaire et son module principal.
 RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod \
