@@ -1768,6 +1768,23 @@ def test_un_transcript_de_relecture_absent_se_dit_avec_les_autres(
     assert "jetons de la session de relecture" not in sortie, "une ligne à zéro se lirait mesurée"
 
 
+def test_une_session_de_relecture_lue_seule_ne_rend_pas_de_bilan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sans positionnel lu, pas de chronologie, donc pas de bilan : la ligne des absents ne
+    promet pas de bilan partiel parce qu'un transcript de relecture, lui, est là."""
+    absent = tmp_path / "libere.jsonl"
+    relecture = write_transcript(
+        tmp_path / "relecture.jsonl", [said("10:10:00", "relis"), assistant("10:20:00")]
+    )
+
+    code, sortie = run_main([str(absent), "--relecture", str(relecture)], monkeypatch)
+
+    assert code == 1
+    assert f"transcripts demandés 2, lus 1 — absents : {absent}" in sortie
+    assert "bilan partiel" not in sortie
+
+
 def test_sans_transcript_le_script_rend_son_usage(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as sortie:
         bilan.main([])
