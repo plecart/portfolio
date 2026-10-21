@@ -803,8 +803,8 @@ def test_le_relais_se_date_par_le_temps_pas_par_l_ordre_des_arguments(tmp_path: 
     )
 
     attendu = [datetime.fromisoformat(at("12:30:00"))]
-    assert bilan.relays(chronologique) == attendu
-    assert bilan.relays(inverse) == attendu
+    assert bilan.starts(chronologique)[0] == attendu
+    assert bilan.starts(inverse)[0] == attendu
     assert bilan.starts(chronologique)[1] == [], "un relais n'est pas lu en parallèle"
 
 
@@ -828,6 +828,22 @@ def test_une_session_qui_chevauche_l_autre_est_en_parallele_pas_un_relais(tmp_pa
     report = bilan.report(events, bilan.token_usage(paths), [])
     assert "en parallèle dès" in report
     assert "relais à" not in report
+
+
+def test_l_en_tete_annonce_les_relais_avant_les_sessions_en_parallele(tmp_path: Path) -> None:
+    """`PARALLELE` démarre à 11:00, pendant `TIMELINE` ; `RELAY` à 12:30, après sa fin. L'en-tête
+    rend les relais, puis les parallèles — pas l'ordre du temps."""
+    paths = [
+        write_transcript(tmp_path / "session.jsonl", TIMELINE),
+        write_transcript(tmp_path / "relecture.jsonl", PARALLELE),
+        write_transcript(tmp_path / "relais.jsonl", RELAY),
+    ]
+    relais = bilan.local(datetime.fromisoformat(at("12:30:00")))
+    parallele = bilan.local(datetime.fromisoformat(at("11:00:00")))
+
+    report = bilan.report(bilan.read_events(paths), bilan.token_usage(paths), [])
+
+    assert f"(sessions : 3, relais à {relais}, en parallèle dès {parallele})" in report
 
 
 # Chaque cas est écrit en littéraux : les transcripts par leur premier et leur dernier instant,
@@ -854,6 +870,13 @@ RELAIS_ET_PARALLELES: dict[str, tuple[list[tuple[str, str]], list[str], list[str
         [("10:00:00", "11:00:00"), ("10:30:00", "12:00:00"), ("12:00:00", "12:30:00")],
         ["12:00:00"],
         ["10:30:00"],
+    ),
+    # Le troisième commence après la fin du second, mais avant celle du premier : la fin qui
+    # compte est la plus tardive des précédents, pas celle du dernier commencé.
+    "fin-la-plus-tardive-pas-la-derniere": (
+        [("10:00:00", "12:00:00"), ("10:30:00", "10:45:00"), ("11:00:00", "13:00:00")],
+        [],
+        ["10:30:00", "11:00:00"],
     ),
     # Le cas `relais-sequentiel`, les transcripts donnés dans l'ordre inverse du temps.
     "arguments-a-l-envers": (

@@ -1,12 +1,13 @@
 """Bilan chiffré d'une session Claude Code, lu dans ses transcripts JSONL.
 
-Usage : python bilan-session.py <transcript.jsonl> [<relais.jsonl> …]
+Usage : python bilan-session.py <transcript.jsonl> [<relais ou session de relecture .jsonl> …]
 
 Un cycle qui a rempli un contexte a **plusieurs** transcripts : le script en accepte autant
 qu'on lui en donne, les fusionne dans l'ordre du temps et rend l'heure de chaque relais (obs 40).
 Un transcript qui commence avant la fin d'un autre est annoncé « en parallèle », pas en relais.
-La session de relecture se donne avec la session PR : son transcript vit sous le dossier de
-projet de son propre worktree, ses sous-agents à côté de lui.
+La session de relecture, quand la PR en a une, se donne avec la session PR : son transcript vit
+sous le dossier de projet de son propre worktree. Le script lit les sous-agents rangés sous le
+dossier de chaque transcript (`subagents`).
 
 Rend, sans double compte : la durée de la session ; l'attente — du mainteneur ou d'un pair,
 jusqu'au dernier message qui rouvre le tour de l'agent — **scindée** en réactivité (moins d'une
@@ -599,9 +600,10 @@ def waits(events: Sequence[Event], calls: Sequence[ToolCall]) -> list[Interval]:
     mainteneur le temps de ses sous-agents.
 
     **Limite** : les événements de tous les transcripts sont fusionnés. Un transcript en
-    parallèle ferme donc les attentes de l'autre, comme s'il était l'agent. Mesuré sur le lot 4a :
-    la réactivité de la session PR seule est de 0 h 07, et de 0 h 02 lue avec sa session de
-    relecture. L'attente d'une session se lit sur ses seuls transcripts, relais compris.
+    parallèle ferme donc les attentes de l'autre, comme s'il était l'agent. Mesuré le 2026-10-21
+    sur le lot 4a : la réactivité de la session PR seule est de 0 h 07, et de 0 h 02 lue avec sa
+    session de relecture. L'attente d'une session se lit sur ses seuls transcripts, relais
+    compris.
     """
     reopened: dict[datetime, datetime] = {}
     idle_since: datetime | None = None
@@ -694,9 +696,9 @@ def starts(events: Sequence[Event]) -> tuple[list[datetime], list[datetime]]:
     session de relecture lue avec sa session PR tourne en même temps qu'elle. Le premier
     transcript n'est ni l'un ni l'autre ; chacun des N − 1 suivants est l'un des deux.
 
-    Mesuré sur le lot 4a (session PR `1444a1a8`, session de relecture `709cdf9b`) : l'en-tête du
-    rapport annonçait `(sessions : 2, relais à 23:33)`, et 23:33 est le démarrage de la session de
-    relecture, qui tournait en même temps que la session PR.
+    Mesuré le 2026-10-21 sur le lot 4a (session PR `1444a1a8`, session de relecture `709cdf9b`) :
+    l'en-tête du rapport annonçait `(sessions : 2, relais à 23:33)`, et 23:33 est le démarrage de
+    la session de relecture, qui tournait en même temps que la session PR.
     """
     moments: dict[int, list[datetime]] = {}
     for event in events:
@@ -712,14 +714,6 @@ def starts(events: Sequence[Event]) -> tuple[list[datetime], list[datetime]]:
     for (first, _), ended in zip(spans[1:], latest_end):
         (relayed if first >= ended else parallel).append(first)
     return relayed, parallel
-
-
-def relays(events: Sequence[Event]) -> list[datetime]:
-    """Le premier instant de chaque transcript après le premier : les heures de relais.
-
-    Un transcript en parallèle d'un autre n'en est pas un (`starts`).
-    """
-    return starts(events)[0]
 
 
 @dataclass(frozen=True)
@@ -1226,8 +1220,9 @@ def say(text: str) -> None:
 
 def main(argv: Sequence[str]) -> int:
     """Point d'entrée : un ou plusieurs transcripts d'un même cycle — relais compris, et la
-    session de relecture avec la session PR, chacune lue avec les sous-agents rangés à côté
-    d'elle, dans son propre dossier de projet. Chaque transcript rend son profil de contexte.
+    session de relecture avec la session PR quand la PR en a une —, chacun lu avec les
+    sous-agents rangés sous son dossier (`subagents`). Chaque transcript rend son profil de
+    contexte.
 
     Un transcript absent se **dit**, il ne fait ni planter le script ni rendre en silence un
     bilan sur la moitié du cycle : le harnais a le droit de supprimer un transcript entre deux
