@@ -1380,19 +1380,25 @@ def returned(clock: str, uid: str, content: str | list[dict[str, Any]]) -> dict[
     }
 
 
-# La session de relecture que la session PR démarre, et le retour réel de `start_session` —
-# relevé sur le transcript de la session PR du lot 4a de #134 : une liste d'un bloc `text`.
+# La session de relecture que la session PR démarre, et le titre qu'elle lui donne.
 SESSION_DE_RELECTURE = "local_f6942c91-c0c7-4230-91c5-23af96ea3e16"
-DEMARRAGE = (
-    'Started session "Relecture de la PR #142 (#134 lot 4a)" '
-    f"(session_id: {SESSION_DE_RELECTURE}, name: relecture-pr-142). It runs on its own; …"
-)
+TITRE = "Relecture de la PR #142 (#134 lot 4a)"
 
-# L'appel 2 d'une session, qui démarre sa session de relecture, puis le retour de ce démarrage.
-DEMARRE_LA_RELECTURE: list[dict[str, Any]] = [
-    uses("10:01:00", "msg_2", 100, "mcp__ccd_session__start_session", {}, "toolu_start"),
-    returned("10:01:05", "toolu_start", [{"type": "text", "text": DEMARRAGE}]),
-]
+
+def demarrage(titre: str) -> list[dict[str, Any]]:
+    """L'appel 2 d'une session, qui démarre sa session de relecture sous `titre`, puis le retour
+    de ce démarrage — sa forme réelle, relevée sur le transcript de la session PR du lot 4a de
+    #134 : une liste d'un bloc `text`, le titre entre guillemets puis la parenthèse des
+    adresses, la dernière du retour — sa suite, « It runs on its own; … », n'en porte pas."""
+    texte = (
+        f'Started session "{titre}" '
+        f"(session_id: {SESSION_DE_RELECTURE}, name: relecture-pr-142). It runs on its own; …"
+    )
+    return [
+        uses("10:01:00", "msg_2", 100, "mcp__ccd_session__start_session", {}, "toolu_start"),
+        returned("10:01:05", "toolu_start", [{"type": "text", "text": texte}]),
+    ]
+
 
 # Chaque forme de porte, en littéraux, sous son libellé rendu : la ligne de `REVIEW_GATES` qu'elle
 # éprouve — outil, champ de son `input`, valeur —, et l'`input` du `tool_use` qui la porte.
@@ -1433,15 +1439,15 @@ TEMOINS: dict[str, tuple[str, dict[str, Any]]] = {
 }
 
 
-def gated(tmp_path: Path, tool: str, given: dict[str, Any]) -> Any:
-    """Le profil d'une session qui démarre sa session de relecture à l'appel 2, puis lance
-    `tool` à l'appel 4 — cinquième enregistrement, après le retour du démarrage."""
+def gated(tmp_path: Path, tool: str, given: dict[str, Any], titre: str = TITRE) -> Any:
+    """Le profil d'une session qui démarre sa session de relecture sous `titre` à l'appel 2, puis
+    lance `tool` à l'appel 4 — cinquième enregistrement, après le retour du démarrage."""
     return bilan.context_profile(
         write_transcript(
             tmp_path / "session.jsonl",
             [
                 api_call("10:00:00", "msg_1", 100, 0, 10),
-                *DEMARRE_LA_RELECTURE,
+                *demarrage(titre),
                 api_call("10:02:00", "msg_3", 100, 0, 10),
                 uses("10:03:00", "msg_4", 100, tool, given, "toolu_candidat000000000002"),
                 api_call("10:04:00", "msg_5", 100, 0, 10),
@@ -1474,13 +1480,34 @@ def test_une_session_demarree_mord_sous_chacune_de_ses_formes_d_adresse(
 ) -> None:
     """`SendMessage` adresse une session par son identifiant, par son nom, ou par son nom suivi
     de ` [<ref>]` quand il est ambigu — doc de l'outil : « Teammate by name », « worker
-    [3fa9c1] » —, et le retour de `start_session` porte l'identifiant et le nom (`DEMARRAGE`).
+    [3fa9c1] » —, et le retour de `start_session` porte l'identifiant et le nom (`demarrage`).
     Dénombrement, écrit avant le correctif : 3 formes recensées, 2 fuyaient — le nom, et le nom
     suivi de sa référence."""
     assert gated(tmp_path, "SendMessage", {"to": adresse}).gate == (
         4,
         "SendMessage → session démarrée",
     )
+
+
+# Un titre est libre : ce qu'il porte n'est pas une adresse. Chaque forme, en littéraux.
+TITRES_PIEGES: dict[str, str] = {
+    "mot-name": "Relecture name: slug",
+    "mot-session-id": "Relecture session_id: slug",
+    "parenthese-entiere": "Relecture (session_id: slug, name: slug)",
+}
+
+
+@pytest.mark.parametrize("titre", TITRES_PIEGES.values(), ids=TITRES_PIEGES.keys())
+def test_un_titre_de_session_ne_fait_pas_d_adresse(tmp_path: Path, titre: str) -> None:
+    """`SESSION_ADDRESS` cherchait `name: ` et `session_id: ` dans tout le retour de
+    `start_session`, titre entre guillemets compris : un titre « … name: slug » ajoutait
+    l'adresse `slug`. Dénombrement, écrit avant le correctif : 3 formes de titre recensées — le
+    mot `name: `, le mot `session_id: `, la parenthèse entière —, 3 fuyaient. Les adresses se
+    lisent dans la dernière parenthèse du retour, que le titre précède (`demarrage`)."""
+    assert gated(tmp_path, "SendMessage", {"to": "slug"}, titre).gate is None
+    for adresse in (ADRESSES["identifiant"], ADRESSES["nom"]):
+        porte = gated(tmp_path, "SendMessage", {"to": adresse}, titre).gate
+        assert porte == (4, "SendMessage → session démarrée"), adresse
 
 
 @pytest.mark.parametrize(("tool", "given"), TEMOINS.values(), ids=TEMOINS.keys())
@@ -1504,7 +1531,7 @@ def test_un_message_a_une_session_avant_son_demarrage_ne_mord_pas(tmp_path: Path
             uses(
                 "10:00:00", "msg_1", 100, "SendMessage", {"to": SESSION_DE_RELECTURE}, "toolu_tot"
             ),
-            *DEMARRE_LA_RELECTURE,
+            *demarrage(TITRE),
         ],
     )
 
