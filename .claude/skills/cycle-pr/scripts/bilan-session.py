@@ -1,13 +1,15 @@
 """Bilan chiffré d'une session Claude Code, lu dans ses transcripts JSONL.
 
-Usage : python bilan-session.py <transcript.jsonl> [<relais ou session de relecture .jsonl> …]
+Usage : python bilan-session.py <transcript.jsonl> [<relais.jsonl> …]
+                                [--relecture <transcript.jsonl> …]
 
 Un cycle qui a rempli un contexte a **plusieurs** transcripts : le script en accepte autant
 qu'on lui en donne, les fusionne dans l'ordre du temps et rend l'heure de chaque relais (obs 40).
-Un transcript qui commence avant la fin d'un autre est annoncé « en parallèle », pas en relais.
-La session de relecture, quand la PR en a une, se donne avec la session PR : son transcript vit
-sous le dossier de projet de son propre worktree. Le script lit les sous-agents rangés sous le
-dossier de chaque transcript (`subagents`).
+Les positionnels sont la session et ses relais. La session de relecture, quand la PR en a une,
+passe par `--relecture` : ses jetons, ses sous-agents et son profil se rendent, sans entrer dans
+la chronologie ni les attentes. Son transcript vit sous le dossier de projet de son propre
+worktree ; le script lit les sous-agents rangés sous le dossier de chaque transcript
+(`subagents`).
 
 Rend, sans double compte : la durée de la session ; l'attente — du mainteneur ou d'un pair,
 jusqu'au dernier message qui rouvre le tour de l'agent — **scindée** en réactivité (moins d'une
@@ -38,6 +40,7 @@ au premier message vers l'une d'elles.
 Python 3.11 ou plus, bibliothèque standard seule.
 """
 
+import argparse
 import json
 import re
 import sys
@@ -45,7 +48,6 @@ from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from itertools import accumulate
 from pathlib import Path
 from statistics import fmean, median
 from typing import Any, NamedTuple, cast
@@ -605,11 +607,9 @@ def waits(events: Sequence[Event], calls: Sequence[ToolCall]) -> list[Interval]:
     le retrait est le cœur d'obs 41, sans lui une session à relectures parallèles facture au
     mainteneur le temps de ses sous-agents.
 
-    **Limite** : les événements de tous les transcripts sont fusionnés. Un transcript en
-    parallèle ferme donc les attentes de l'autre, comme s'il était l'agent. Mesuré le 2026-10-21
-    sur le lot 4a : la réactivité de la session PR seule est de 0 h 07, et de 0 h 02 lue avec sa
-    session de relecture. L'attente d'une session se lit sur ses seuls transcripts, relais
-    compris.
+    Les événements des transcripts positionnels sont fusionnés. Une session lue en parallèle
+    fermerait donc les attentes de l'autre, d'où `--relecture`. Mesuré le 2026-10-21 sur le
+    lot 4a : réactivité de la session PR seule 0 h 07, 0 h 02 quand sa relecture était fusionnée.
     """
     reopened: dict[datetime, datetime] = {}
     idle_since: datetime | None = None
@@ -694,32 +694,15 @@ def tokens(usage: Usage) -> str:
     return f"sortie {usage.output / 1e3:6.0f} k · {cached(usage)}"
 
 
-def starts(events: Sequence[Event]) -> tuple[list[datetime], list[datetime]]:
-    """Les heures de relais et les heures de session en parallèle, chacune dans l'ordre du temps.
-
-    Un transcript est un **relais** s'il commence au plus tôt au dernier instant de **tous** ceux
-    commencés avant lui (`>=`) : les précédents avaient fini. Sinon il est **en parallèle** — une
-    session de relecture lue avec sa session PR tourne en même temps qu'elle. Le premier
-    transcript n'est ni l'un ni l'autre ; chacun des N − 1 suivants est l'un des deux.
-
-    Mesuré le 2026-10-21 sur le lot 4a (session PR `1444a1a8`, session de relecture `709cdf9b`) :
-    l'en-tête du rapport annonçait `(sessions : 2, relais à 23:33)`, et 23:33 est le démarrage de
-    la session de relecture, qui tournait en même temps que la session PR.
-    """
-    moments: dict[int, list[datetime]] = {}
+def relays(events: Sequence[Event]) -> list[datetime]:
+    """Le premier instant de chaque transcript après le premier : les heures de relais."""
+    first: dict[int, datetime] = {}
     for event in events:
-        moments.setdefault(event.source, []).append(event.when)
+        first.setdefault(event.source, event.when)
     # Dans l'ordre du **temps**, pas dans celui des arguments : le skill autorise à donner
     # les transcripts dans n'importe quel ordre, et classer par index d'argument annonçait
     # alors le début de la session comme heure de relais. Mesuré le 2026-10-09.
-    spans = sorted((min(whens), max(whens)) for whens in moments.values())
-    # Pour chaque transcript après le premier : la fin la plus tardive de ceux qui le précèdent.
-    latest_end = accumulate((last for _, last in spans), max)
-    relayed: list[datetime] = []
-    parallel: list[datetime] = []
-    for (first, _), ended in zip(spans[1:], latest_end):
-        (relayed if first >= ended else parallel).append(first)
-    return relayed, parallel
+    return sorted(first.values())[1:]
 
 
 @dataclass(frozen=True)
@@ -735,7 +718,6 @@ class Measures:
     span: timedelta
     sessions: int
     relayed: list[datetime]
-    parallel: list[datetime]
     blocked: list[Interval]
     reactivity: list[Interval]
     absences: list[Interval]
@@ -799,14 +781,12 @@ def measure(events: Sequence[Event], agents: Sequence[Subagent] = ()) -> Measure
     blocked = union(reactivity + absences)
     start, end = events[0].when, events[-1].when
     span = end - start
-    relayed, parallel = starts(events)
     return Measures(
         start=start,
         end=end,
         span=span,
         sessions=max((event.source for event in events), default=0) + 1,
-        relayed=relayed,
-        parallel=parallel,
+        relayed=relays(events),
         blocked=blocked,
         reactivity=reactivity,
         absences=absences,
@@ -1118,8 +1098,12 @@ def report(
     session: Usage,
     agents: Sequence[Subagent],
     profiles: Sequence[Profile] = (),
+    review: Usage | None = None,
 ) -> str:
     """Le bilan, prêt à être recopié dans une rétrospective.
+
+    `session` et `review` sont les jetons de la session — relais compris — et ceux de sa session
+    de relecture, chacun sur sa ligne ; sans `review`, aucune ligne de relecture.
 
     L'ordre des lignes est celui de leur lecture : l'attente **hors absences** d'abord, parce
     que c'est la seule que la pipeline peut réduire ; l'agrégat brut ensuite, pour mémoire.
@@ -1141,10 +1125,7 @@ def report(
     m = measure(events, agents)
     humans = m.kinds["human"]
     used = consumed(agents)
-    later = ", ".join(
-        [f"relais à {local(moment)}" for moment in m.relayed]
-        + [f"en parallèle dès {local(moment)}" for moment in m.parallel]
-    )
+    relayed = ", ".join(f"relais à {local(moment)}" for moment in m.relayed)
 
     def row(label: str, duration: timedelta, basis: timedelta, note: str = "") -> str:
         """Une ligne « libellé · durée · part de son dénominateur »."""
@@ -1157,7 +1138,7 @@ def report(
     lines = [
         (
             f"session          {local(m.start)} → {local(m.end)}   {hm(m.span)}   "
-            f"(sessions : {m.sessions}{', ' + later if later else ''})"
+            f"(sessions : {m.sessions}{', ' + relayed if relayed else ''})"
         ),
         f"actif (hors absences)        {hm(m.active):>9}   — dénominateur des trois lignes qui suivent",
         row(
@@ -1183,6 +1164,7 @@ def report(
             else []
         ),
         f"jetons de la session         {tokens(session)}",
+        *([f"jetons de la session de relecture {tokens(review)}"] if review is not None else []),
         (
             f"jetons des sous-agents       {cached(used)} · sortie non mesurée"
             f"   ({used.transcripts} transcripts)"
@@ -1222,34 +1204,59 @@ def say(text: str) -> None:
     sys.stdout.buffer.flush()
 
 
-def main(argv: Sequence[str]) -> int:
-    """Point d'entrée : un ou plusieurs transcripts d'un même cycle — relais compris, et la
-    session de relecture avec la session PR quand la PR en a une —, chacun lu avec les
-    sous-agents rangés sous son dossier (`subagents`). Chaque transcript rend son profil de
-    contexte.
+def arguments(argv: Sequence[str]) -> tuple[list[Path], list[Path]]:
+    """Les transcripts demandés : la session et ses relais, puis sa session de relecture et ses
+    relais (`--relecture`). Sans transcript positionnel, `argparse` rend l'usage et sort en 2."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "transcripts",
+        nargs="+",
+        type=Path,
+        metavar="transcript.jsonl",
+        help="la session et ses relais",
+    )
+    parser.add_argument(
+        "--relecture",
+        nargs="+",
+        type=Path,
+        default=[],
+        metavar="transcript.jsonl",
+        help="la session de relecture et ses relais",
+    )
+    given = parser.parse_args(argv)
+    return given.transcripts, given.relecture
 
-    Un transcript absent se **dit**, il ne fait ni planter le script ni rendre en silence un
-    bilan sur la moitié du cycle : le harnais a le droit de supprimer un transcript entre deux
-    sessions (obs 73), et le relevé que la session sortante a déposé s'additionne alors à la main.
+
+def main(argv: Sequence[str]) -> int:
+    """Point d'entrée : la session et ses relais en positionnels, chacun lu avec les sous-agents
+    rangés sous son dossier (`subagents`) et rendu avec son profil de contexte. La session de
+    relecture passe par `--relecture` : fusionnée aux positionnels, elle en fermerait les
+    attentes (`waits`).
+
+    Un transcript absent, positionnel ou de relecture, se **dit**, il ne fait ni planter le
+    script ni rendre en silence un bilan sur la moitié du cycle : le harnais a le droit de
+    supprimer un transcript entre deux sessions (obs 73), et le relevé que la session sortante a
+    déposé s'additionne alors à la main.
     """
-    if not argv:
-        say(str(__doc__))
-        return 2
-    paths = [Path(argument) for argument in argv]
-    present = [path for path in paths if path.is_file()]
-    absent = ", ".join(str(path) for path in paths if not path.is_file())
+    asked_session, asked_review = arguments(argv)
+    session = [path for path in asked_session if path.is_file()]
+    review = [path for path in asked_review if path.is_file()]
+    asked = [*asked_session, *asked_review]
+    absent = ", ".join(str(path) for path in asked if not path.is_file())
     if absent:
         partial = " (bilan partiel : additionner le relevé déposé par chaque session absente)"
         say(
-            f"transcripts demandés {len(paths)}, lus {len(present)} — absents : {absent}"
-            + (partial if present else "")
+            f"transcripts demandés {len(asked)}, lus {len(session) + len(review)}"
+            f" — absents : {absent}" + (partial if session else "")
         )
-    events = read_events(present)
+    events = read_events(session)
     if not events:
         say("transcripts vides ou illisibles")
         return 1
+    present = session + review
     profiles = [context_profile(path) for path in present]
-    say(report(events, token_usage(present), subagents(present), profiles))
+    reviewed = token_usage(review) if review else None
+    say(report(events, token_usage(session), subagents(present), profiles, reviewed))
     return 0
 
 
