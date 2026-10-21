@@ -174,7 +174,7 @@ vulnerabilities:
       d'`apt-get upgrade` au build, qui ferait dépendre l'image de sa date de construction.
     expired_at: 2026-11-01
 
-  # --- Image `caddy` : le binaire `caddy` 2.11.7, compilé avec Go 1.26.8 ----------------------
+  # --- Image `caddy` : le binaire `caddy` 2.11.7, compilé par le projet avec Go 1.27.3 ---------
   #
   # Ce qui tourne : le Caddyfile de production (`infra/caddy/Caddyfile`) — un serveur de fichiers
   # statiques et un reverse proxy interne vers `api`, routés par nom d'hôte, en HTTP, sans TLS ni
@@ -183,48 +183,20 @@ vulnerabilities:
   # ni amont en HTTPS. L'atteinte est jugée sur cette configuration, pas sur un graphe d'appels :
   # `govulncheck` trouve tous les symboles vulnérables dans le binaire, qui embarque tous les
   # modules de Caddy.
-  # La version de Go est celle que Trivy lit dans le binaire (`stdlib v1.26.8`, scan du
-  # 2026-10-18, montée de #125) : la montée en 2.11.7 a retiré 16 des 19 exceptions de 2.11.4.
-  #
-  # Alternatives, pour toutes : caddy 2.11.7 (2026-10-03) est la dernière version publiée ; la
-  # suivante arrivera par Dependabot. Si elle tarde, compiler caddy dans un étage du projet
-  # (ADR 0014, « Conditions de réexamen »).
-
-  - id: CVE-2026-78667
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : bibliothèque standard Go (`net/http`) du binaire `caddy`, raison d'être de l'image.
-      Atteinte : non — le défaut est l'absence de borne sur la taille d'un `Range` analysé par un
-      serveur, et le seul analyseur de l'image est `file_server` (`net/http.ServeContent`) ;
-      `infra/caddy/Caddyfile` retire `Range` des requêtes de l'hôte du site
-      (`request_header -Range`), et le test de fumée de l'image vérifie qu'un `Range` sur un
-      fichier haché rend 200 et le corps entier, jamais 206. Les routes `reverse_proxy`
-      transmettent l'en-tête sans le lire. Alternatives : corrigé par Go 1.26.9 et 1.27.2,
-      absents de caddy 2.11.7, dernière version publiée, compilée avec Go 1.26.8.
-    expired_at: 2027-01-16
+  # Les versions sont celles que Trivy 0.74.0 lit dans le binaire au scan du 2026-10-21 : `caddy`
+  # v2.11.7, `stdlib` v1.27.3, `golang.org/x/net` v0.59.0. Le projet compile caddy avec le Go de
+  # l'image `golang` épinglée, ses modules aux versions que fixe sa release (ADR 0017) : la
+  # bibliothèque standard n'y porte plus d'exception, seuls ses modules en gardent.
 
   - id: CVE-2026-78669
     paths:
       - usr/bin/caddy
     statement: >-
-      Place : bibliothèque standard Go (`net/http`) et module `golang.org/x/net` du binaire
-      `caddy`, raison d'être de l'image. Atteinte : non — le défaut consomme le processeur d'un
-      serveur **HTTP/2** par des changements répétés de fenêtre initiale ;
+      Place : module `golang.org/x/net` v0.59.0 du binaire `caddy`, raison d'être de l'image, à
+      la version que fixe la release de caddy 2.11.7. Atteinte : non — le défaut consomme le
+      processeur d'un serveur **HTTP/2** par des changements répétés de fenêtre initiale ;
       `infra/caddy/Caddyfile` restreint ses serveurs à HTTP/1.1 (`protocols h1`), et le test de
       fumée vérifie que la préface `h2c` ne reçoit aucune réponse HTTP/2. Alternatives : corrigé
-      par Go 1.26.9 et 1.27.2 et par x/net 0.60.0, absents de caddy 2.11.7, dernière version
-      publiée, compilée avec Go 1.26.8 et x/net 0.59.0.
-    expired_at: 2027-01-16
-
-  - id: CVE-2026-97031
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : bibliothèque standard Go (`crypto/tls`) du binaire `caddy`, raison d'être de
-      l'image. Atteinte : non — le défaut vise un serveur TLS qui traite des références
-      d'extension externe ECH dans un `ClientHello`, et Caddy n'en termine aucun : Cloudflare le
-      fait (D45), Caddy n'écoute qu'en HTTP derrière `cloudflared`. Alternatives : corrigé par Go
-      1.26.9 et 1.27.2, absents de caddy 2.11.7, dernière version publiée, compilée avec Go
-      1.26.8.
-    expired_at: 2027-01-16
+      par x/net 0.60.0, absent de caddy 2.11.7, dernière version publiée ; le projet ne monte pas
+      un module au-delà de ce que fixe la release (ADR 0017).
+    expired_at: 2027-01-19

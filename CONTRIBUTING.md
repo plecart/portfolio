@@ -212,6 +212,14 @@ Dockerfile, avec le Go de l'image `golang` épinglée et à la version exacte de
 release, ses drapeaux pouvant changer d'une version à l'autre. Puis `make build-backup scan-backup`,
 puis `make build image-test`, qui exige de chacun qu'il annonce une version de release.
 
+`caddy` est compilé de même, dans l'étage `go` de [infra/caddy/Dockerfile](infra/caddy/Dockerfile),
+comme dépendance d'un module principal, la forme de sa release ; l'image reste construite sur
+`caddy:<x.y.z>-alpine`, dont seul le binaire est remplacé. Dependabot propose chaque nouvelle
+étiquette de cette image, et chaque nouvelle image `golang` de ce Dockerfile, qui recompile `caddy`.
+Le test d'égalité de `make image-test` rougit tant que la version du
+`go mod edit -require=github.com/caddyserver/caddy/v2@v<x.y.z>` ne suit pas l'étiquette : la changer
+dans la même PR, puis `make build-caddy scan-caddy`, puis `make build image-test`.
+
 **Publication des images.** Rien à faire à la main : à chaque push sur `main`, une fois la CI
 verte, le job `publish` reconstruit les images, les scanne comme sur une PR, puis les pousse sur
 GHCR — `ghcr.io/plecart/portfolio-<service>`, paquets privés — sous le SHA complet du commit et

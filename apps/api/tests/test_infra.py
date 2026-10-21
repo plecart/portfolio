@@ -290,6 +290,14 @@ def loaded_image(service: str) -> str:
     return built_images(make_dry_run("build", environment=prefix))[f"infra/{service}/Dockerfile"]
 
 
+def image_output(image: str, *command: str) -> str:
+    """La sortie standard de `command`, lancée dans un conteneur jetable de l'image, hors de toute
+    pile."""
+    return subprocess.run(
+        ["docker", "run", "--rm", image, *command], capture_output=True, text=True, check=True
+    ).stdout
+
+
 def build_context(root: Path) -> set[str]:
     """Les fichiers que Docker enverrait au build depuis `root`, selon son `.dockerignore`.
 
