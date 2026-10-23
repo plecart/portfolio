@@ -24,6 +24,8 @@ from skill_scripts import load_script, run_in_pipe
 
 ecriture_relue = load_script("cycle-pr", "ecriture-relue")
 
+ISSUES = "repos/{owner}/{repo}/issues"
+LABELS_DU_DEPOT = "repos/{owner}/{repo}/labels"
 CORPS_42 = "repos/{owner}/{repo}/issues/42"
 COMMENTAIRES_42 = "repos/{owner}/{repo}/issues/42/comments"
 # Les seuls retraits de label auxquels la forge répond : chemin encodé → nom du label.
@@ -47,6 +49,10 @@ class Forge:
             `issues/comments/<id>`, le même objet — une écriture se voit donc dans la liste. Un
             commentaire publié par `POST` y entre sur une page de plus, gardé par `stocke`, sous
             l'`id` 900 + n pour le n-ième texte que la forge reçoit.
+        issues: les issues ouvertes du dépôt, page par page, de même. Une issue créée par `POST`
+            y entre sur une page de plus, son corps gardé par `stocke`, sous le numéro 900 + n, et
+            se lit sous son chemin `issues/<numéro>`.
+        labels_du_depot: les noms des labels du dépôt, page par page.
         garde_les_labels: le retrait d'un label répond sans l'ôter de l'issue.
     """
 
@@ -56,6 +62,8 @@ class Forge:
         *,
         stocke: Callable[[str], str | None] = lambda corps: corps,
         pages: list[list[dict[str, Any]]] | None = None,
+        issues: list[list[dict[str, Any]]] | None = None,
+        labels_du_depot: list[list[str]] | None = None,
         garde_les_labels: bool = False,
     ) -> None:
         self.documents = documents
@@ -65,6 +73,13 @@ class Forge:
         for page in self.pages:
             for commentaire in page:
                 self.indexe(commentaire)
+        self.issues = issues or []
+        # Chaque liste que `gh api --paginate --slurp` lit, sous son chemin.
+        self.listes = {
+            COMMENTAIRES_42: self.pages,
+            ISSUES: self.issues,
+            LABELS_DU_DEPOT: [[{"name": nom} for nom in page] for page in labels_du_depot or []],
+        }
         self.appels: list[tuple[str, ...]] = []
         self.charges: list[bytes] = []
 
@@ -87,8 +102,22 @@ class Forge:
                 self.charges.append(stdin)
                 self.documents[chemin]["body"] = self.stocke(json.loads(stdin)["body"])
                 return json_success(self.documents[chemin])
-            case ("gh", "api", "--paginate", "--slurp", chemin) if chemin == COMMENTAIRES_42:
-                return json_success(self.pages)
+            case ("gh", "api", "--paginate", "--slurp", chemin) if chemin in self.listes:
+                return json_success(self.listes[chemin])
+            case ("gh", "api", "-X", "POST", chemin, "--input", "-") if (
+                chemin == ISSUES and stdin is not None
+            ):
+                self.charges.append(stdin)
+                charge = json.loads(stdin)
+                issue = {
+                    "number": 900 + len(self.charges),
+                    "title": charge["title"],
+                    "body": self.stocke(charge["body"]),
+                    "labels": [{"name": nom} for nom in charge["labels"]],
+                }
+                self.issues.append([issue])
+                self.documents[f"{ISSUES}/{issue['number']}"] = issue
+                return json_success(issue)
             case ("gh", "api", "-X", "POST", chemin, "--input", "-") if (
                 chemin == COMMENTAIRES_42 and stdin is not None
             ):
@@ -402,8 +431,12 @@ def test_issue_edit_ajoute_le_fichier_en_fin_de_corps_octet_pour_octet(
 
 @pytest.mark.parametrize(
     "appel",
-    [("issue", "edit", "42", "--append"), ("comment", "42", "--body-file")],
-    ids=["issue-edit-append", "comment"],
+    [
+        ("issue", "edit", "42", "--append"),
+        ("comment", "42", "--body-file"),
+        ("issue", "create", "--title", "Titre", "--body-file"),
+    ],
+    ids=["issue-edit-append", "comment", "issue-create"],
 )
 @pytest.mark.parametrize(
     ("contenu", "motif"),
@@ -500,6 +533,152 @@ def test_comment_sort_en_1_si_le_commentaire_relu_n_est_pas_le_fichier(
     assert capsys.readouterr().out == f"relecture non conforme — {ecart}\n"
 
 
+PROBLEME = "## Problème\r\n\r\nLa file déborde.\r\n"
+
+
+def creation(tmp_path: Path, *labels: str, titre: str = "Titre") -> list[str]:
+    """L'appel `issue create` titré `titre`, un `--label` par label, d'un corps `PROBLEME` écrit
+    en octets — CRLF et accents."""
+    corps = tmp_path / "prd.md"
+    corps.write_bytes(PROBLEME.encode())
+    options = [option for label in labels for option in ("--label", label)]
+    return ["issue", "create", "--title", titre, "--body-file", str(corps), *options]
+
+
+def test_issue_create_cree_l_issue_et_ses_labels_en_une_requete_puis_la_relit(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Le témoin positif, et l'ordre : lire les labels du dépôt et les issues ouvertes, créer,
+    relire l'issue sous le numéro que rend la création. Titre, corps et labels partent dans la
+    **même** requête — un PRD n'existe jamais sans son label —, le fichier tel qu'il est lu en
+    octets ; le numéro se lit sur la ligne de sortie."""
+    forge = Forge({}, labels_du_depot=[["prd", "enhancement", "bug"]])
+
+    assert lance(forge, *creation(tmp_path, "prd", "enhancement", titre="Réécrire la file")) == 0
+    assert [json.loads(charge) for charge in forge.charges] == [
+        {
+            "title": "Réécrire la file",
+            "body": PROBLEME,
+            "labels": ["prd", "enhancement"],
+        }
+    ]
+    assert forge.appels == [
+        ("gh", "api", "--paginate", "--slurp", LABELS_DU_DEPOT),
+        ("gh", "api", "--paginate", "--slurp", ISSUES),
+        ("gh", "api", "-X", "POST", ISSUES, "--input", "-"),
+        ("gh", "api", "repos/{owner}/{repo}/issues/901"),
+    ]
+    assert capsys.readouterr().out == "créé et relu — issue #901\n"
+
+
+def test_issue_create_apparie_les_labels_sans_la_casse_sur_toutes_les_pages(
+    tmp_path: Path,
+) -> None:
+    """`--label PRD` désigne le `prd` que le dépôt porte sur sa seconde page, et la création part
+    sous ce nom-là, comme le retrait d'un label (`label --remove`)."""
+    forge = Forge({}, labels_du_depot=[["enhancement"], ["prd", "Bug"]])
+
+    assert lance(forge, *creation(tmp_path, "PRD", "bug")) == 0
+    assert json.loads(forge.charges[0])["labels"] == ["prd", "Bug"]
+
+
+def test_issue_create_refuse_un_label_inconnu_du_depot_sans_rien_ecrire(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Chaque label inconnu est nommé, et rien ne part : `CLAUDE.md` interdit de deviner un
+    label, et rien ne garantit qu'un `POST` le refuserait plutôt que de le créer."""
+    forge = Forge({}, labels_du_depot=[["prd"]])
+
+    assert lance(forge, *creation(tmp_path, "prd", "bogue", "zone/api")) == 1
+    assert ecritures(forge) == []
+    assert "label inconnu du dépôt : bogue ; label inconnu du dépôt : zone/api" in sortie_d_echec(
+        capsys, "refus"
+    )
+
+
+def test_issue_create_ne_cree_rien_quand_une_issue_ouverte_porte_deja_ce_titre_et_ce_corps(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """L'issue identique, sur la seconde page, est nommée sur la ligne de sortie. Sans `--label`,
+    les labels du dépôt ne se lisent pas : la lecture des issues ouvertes est le seul appel."""
+    forge = Forge(
+        {},
+        issues=[
+            [{"number": 5, "title": "Autre titre", "body": PROBLEME}],
+            [{"number": 7, "title": "Titre", "body": PROBLEME}],
+        ],
+    )
+
+    assert lance(forge, *creation(tmp_path)) == 0
+    assert forge.appels == [("gh", "api", "--paginate", "--slurp", ISSUES)]
+    assert capsys.readouterr().out == "rien à écrire — #7 existe déjà\n"
+
+
+@pytest.mark.parametrize(
+    "ouverte",
+    [
+        {"number": 7, "title": "Titre", "body": PROBLEME, "pull_request": {"url": "…/pulls/7"}},
+        {"number": 7, "title": "Titre", "body": "## Problème\n\nLa file déborde.\n"},
+        {"number": 7, "title": "Titre voisin", "body": PROBLEME},
+    ],
+    ids=["pr-identique", "meme-titre-autre-corps", "meme-corps-autre-titre"],
+)
+def test_issue_create_ne_tient_pour_existante_qu_une_issue_de_meme_titre_et_meme_corps(
+    ouverte: dict[str, Any], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Pour l'API REST une PR est une issue — son champ `pull_request` l'en distingue ; titre et
+    corps se comparent à l'identique, fins de ligne comprises."""
+    forge = Forge({}, issues=[[ouverte]])
+
+    assert lance(forge, *creation(tmp_path)) == 0
+    assert capsys.readouterr().out == "créé et relu — issue #901\n"
+
+
+# Ce que la relecture rend de l'issue créée, quand ce n'est pas ce qui est parti : (retouche du
+# document relu, écart **exact** que la sortie en dit). Une retouche par champ écrit.
+ISSUES_RELUES_NON_CONFORMES: dict[str, tuple[Callable[[dict[str, Any]], dict[str, Any]], str]] = {
+    "corps-tronque": (
+        lambda issue: {**issue, "body": issue["body"][:9]},
+        "ancre absente : ## Problème ; attendu 35 octets et 3 \\r, relu 10 octets et 0 \\r",
+    ),
+    "titre-retouche": (
+        lambda issue: {**issue, "title": "Titre (copie)"},
+        "titre attendu 'Titre', relu 'Titre (copie)'",
+    ),
+    # Sans droit d'écriture sur le dépôt, l'API ignore les labels d'une création en silence.
+    "labels-ignores": (
+        lambda issue: {**issue, "labels": []},
+        "labels attendus ['prd'], relus []",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("retouche", "ecart"),
+    ISSUES_RELUES_NON_CONFORMES.values(),
+    ids=ISSUES_RELUES_NON_CONFORMES.keys(),
+)
+def test_issue_create_sort_en_1_si_l_issue_relue_n_est_pas_celle_creee(
+    retouche: Callable[[dict[str, Any]], dict[str, Any]],
+    ecart: str,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    forge = Forge({}, labels_du_depot=[["prd"]])
+
+    def forge_qui_relit_autre_chose(
+        cmd: Sequence[str], stdin: bytes | None
+    ) -> subprocess.CompletedProcess[bytes]:
+        rendu = forge(cmd, stdin)
+        if tuple(cmd) == ("gh", "api", f"{ISSUES}/901"):
+            return json_success(retouche(json.loads(rendu.stdout)))
+        return rendu
+
+    args = creation(tmp_path, "prd")
+    assert ecriture_relue.main(args, run=forge_qui_relit_autre_chose) == 1
+    assert capsys.readouterr().out == f"relecture non conforme — {ecart}\n"
+
+
 @pytest.fixture
 def ajout_md(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Le fichier `ajout.md` que citent les appels nommés ci-dessous, dans un répertoire courant
@@ -513,6 +692,8 @@ COCHE_CORPS = ("checkbox", "patch", "42", "--case", "Critère A")
 COCHE_BRIEF = ("brief", "patch", "42", "--case", "Critère A")
 AJOUTE_FICHIER = ("issue", "edit", "42", "--append", "ajout.md")
 PUBLIE_COMMENTAIRE = ("comment", "42", "--body-file", "ajout.md")
+CREE_ISSUE = ("issue", "create", "--title", "Titre", "--body-file", "ajout.md")
+CREE_ISSUE_ETIQUETEE = (*CREE_ISSUE, "--label", "prd")
 # (appel, ce que la forge fait du texte reçu — `None` le garde tel quel —, sortie du premier appel)
 REJEUX = [
     pytest.param(RETIRE_LABEL, None, 0, id="label-remove"),
@@ -520,6 +701,7 @@ REJEUX = [
     pytest.param(COCHE_BRIEF, None, 0, id="brief-patch"),
     pytest.param(AJOUTE_FICHIER, None, 0, id="issue-edit-append"),
     pytest.param(PUBLIE_COMMENTAIRE, None, 0, id="comment"),
+    pytest.param(CREE_ISSUE, None, 0, id="issue-create"),
     pytest.param(COCHE_CORPS, crlf, 1, id="checkbox-patch-forge-crlf"),
     pytest.param(COCHE_BRIEF, crlf, 1, id="brief-patch-forge-crlf"),
     pytest.param(
@@ -534,6 +716,13 @@ REJEUX = [
         crlf,
         1,
         id="comment-forge-crlf",
+        marks=pytest.mark.xfail(strict=True, reason="corps comparé à l'identique"),
+    ),
+    pytest.param(
+        CREE_ISSUE,
+        crlf,
+        1,
+        id="issue-create-forge-crlf",
         marks=pytest.mark.xfail(strict=True, reason="corps comparé à l'identique"),
     ),
 ]
@@ -554,10 +743,10 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     appel écrit une fois ; le second sort en 0 sans **aucune** écriture, ni `PATCH`, ni `DELETE`,
     ni `POST`.
 
-    Population : les 5 sous-commandes, sur une forge qui garde le texte reçu ; puis, cherchée hors
+    Population : les 6 sous-commandes, sur une forge qui garde le texte reçu ; puis, cherchée hors
     de cette liste, une forge qui le garde transformé (LF → CRLF : le premier appel sort alors en
-    1, relecture non conforme) — pour les quatre qui écrivent un texte, un `DELETE` n'en a pas.
-    9 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
+    1, relecture non conforme) — pour les cinq qui écrivent un texte, un `DELETE` n'en a pas.
+    11 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
 
     - `issue-edit-append` — le bloc s'ajoutait une seconde fois ; corrigé : un corps qui finit
       déjà par le fichier n'est pas réécrit ;
@@ -570,8 +759,12 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     vue rouge garde retirée ; `comment-forge-crlf` fuit, `xfail` strict, pour la même raison
     qu'`issue-edit-append-forge-crlf` : le corps se compare au fichier à l'identique.
 
-    Les cases se relisent cochées, le label absent, le commentaire publié : les 7 autres
-    n'écrivent rien au rejeu.
+    Au lot 6a1, `issue create` naît avec sa garde — une issue ouverte de même titre et de même
+    corps en tient lieu —, vue rouge garde retirée ; `issue-create-forge-crlf` fuit, `xfail`
+    strict, pour la même raison, et la fuite y est une seconde issue.
+
+    Les cases se relisent cochées, le label absent, le commentaire publié, l'issue créée : les 8
+    autres n'écrivent rien au rejeu.
     """
     forge = Forge(
         {CORPS_42: {"body": "Corps\n- [ ] Critère A\n", "labels": [{"name": "ready-for-agent"}]}},
@@ -610,6 +803,20 @@ APPELS_MAL_FORMES = {
     "issue-numero-non-entier": ("issue", "edit", "4 2", "--append", "x.md"),
     "commentaire-sans-fichier": ("comment", "42"),
     "commentaire-numero-non-ascii": ("comment", "４２", "--body-file", "x.md"),
+    "creation-sans-titre": ("issue", "create", "--body-file", "x.md"),
+    "creation-titre-vide": ("issue", "create", "--title", " ", "--body-file", "x.md"),
+    "creation-titre-sur-deux-lignes": ("issue", "create", "--title", "A\nB", "--body-file", "x.md"),
+    "creation-sans-fichier": ("issue", "create", "--title", "Titre"),
+    "creation-label-vide": (
+        "issue",
+        "create",
+        "--title",
+        "T",
+        "--body-file",
+        "x.md",
+        "--label",
+        "",
+    ),
 }
 
 
@@ -640,7 +847,9 @@ def test_un_appel_mal_forme_sort_en_2_sans_toucher_a_la_forge(
     ids=["gh-absent", "gh-en-echec", "reponse-non-json"],
 )
 @pytest.mark.parametrize(
-    "args", [COCHE_CORPS, PUBLIE_COMMENTAIRE], ids=["checkbox-patch", "comment"]
+    "args",
+    [COCHE_CORPS, PUBLIE_COMMENTAIRE, CREE_ISSUE, CREE_ISSUE_ETIQUETEE],
+    ids=["checkbox-patch", "comment", "issue-create", "issue-create-label"],
 )
 @pytest.mark.usefixtures("ajout_md")
 def test_une_forge_en_panne_a_la_lecture_refuse_en_une_ligne(
@@ -664,8 +873,13 @@ def test_une_forge_en_panne_a_la_lecture_refuse_en_une_ligne(
 
 @pytest.mark.parametrize(
     ("args", "methode"),
-    [(COCHE_CORPS, "PATCH"), (RETIRE_LABEL, "DELETE"), (PUBLIE_COMMENTAIRE, "POST")],
-    ids=["patch", "delete", "post"],
+    [
+        (COCHE_CORPS, "PATCH"),
+        (RETIRE_LABEL, "DELETE"),
+        (PUBLIE_COMMENTAIRE, "POST"),
+        (CREE_ISSUE, "POST"),
+    ],
+    ids=["patch", "delete", "post", "post-issue"],
 )
 @pytest.mark.usefixtures("ajout_md")
 def test_une_ecriture_en_panne_sort_en_1_sans_se_dire_refus(
@@ -689,7 +903,7 @@ def test_une_ecriture_en_panne_sort_en_1_sans_se_dire_refus(
 
 # (appel, réponse JSON valide mais d'une autre forme, site qui la rend : « lecture » avant toute
 # écriture, « écriture » en réponse à l'écriture, « relecture » après elle)
-REPONSES_D_UNE_AUTRE_FORME = {
+REPONSES_D_UNE_AUTRE_FORME: dict[str, tuple[tuple[str, ...], Any, str]] = {
     "corps-lu-sans-body": (COCHE_CORPS, {"message": "Not Found"}, "lecture"),
     "corps-lu-non-textuel": (COCHE_CORPS, {"body": 5}, "lecture"),
     "commentaires-hors-pages": (COCHE_BRIEF, {"message": "Not Found"}, "lecture"),
@@ -706,9 +920,29 @@ REPONSES_D_UNE_AUTRE_FORME = {
     ),
     "commentaire-publie-sans-id": (PUBLIE_COMMENTAIRE, {"body": "*Rattachement.*\n"}, "écriture"),
     "commentaire-publie-id-booleen": (PUBLIE_COMMENTAIRE, {"id": True}, "écriture"),
+    "labels-du-depot-hors-pages": (CREE_ISSUE_ETIQUETEE, {"message": "Not Found"}, "lecture"),
+    "label-du-depot-non-textuel": (CREE_ISSUE_ETIQUETEE, [[{"name": 5}]], "lecture"),
+    "issues-ouvertes-hors-pages": (CREE_ISSUE, {"message": "Not Found"}, "lecture"),
+    "issue-ouverte-sans-titre": (
+        CREE_ISSUE,
+        [[{"number": 7, "body": "*Rattachement.*\n"}]],
+        "lecture",
+    ),
+    "issue-identique-numero-non-entier": (
+        CREE_ISSUE,
+        [[{"number": "7", "title": "Titre", "body": "*Rattachement.*\n"}]],
+        "lecture",
+    ),
+    "issue-creee-sans-numero": (CREE_ISSUE, {"title": "Titre"}, "écriture"),
+    "issue-creee-numero-booleen": (CREE_ISSUE, {"number": True}, "écriture"),
     "corps-relu-sans-body": (COCHE_CORPS, {"message": "Not Found"}, "relecture"),
     "labels-relus-absents": (RETIRE_LABEL, {"message": "Not Found"}, "relecture"),
     "commentaire-relu-sans-body": (PUBLIE_COMMENTAIRE, {"message": "Not Found"}, "relecture"),
+    "issue-relue-sans-titre": (
+        CREE_ISSUE,
+        {"number": 901, "body": "*Rattachement.*\n", "labels": []},
+        "relecture",
+    ),
 }
 
 
@@ -733,9 +967,13 @@ def test_une_reponse_d_une_autre_forme_sort_en_1_en_une_ligne(
     trace remontait (`KeyError`, `TypeError`, `AttributeError`), et un `id` non entier faisait
     partir le `PATCH` vers un autre chemin. Le lot 4b en ajoute 3, ceux de `comment`, gardés dès
     l'écriture : les commentaires lus, la réponse de la publication, dont l'`id` entre dans le
-    chemin de la relecture, le commentaire relu — 9 sites. Chaque site a sa ligne ; ceux de lecture
-    et la réponse de la publication en ont une seconde, de forme ou de type — les relectures
-    passent par les mêmes lecteurs que la lecture."""
+    chemin de la relecture, le commentaire relu — 9 sites. Le lot 6a1 en ajoute 4, ceux
+    d'`issue create`, gardés dès l'écriture : les labels du dépôt, les issues ouvertes, dont le
+    numéro de l'issue identique entre dans la ligne de sortie, la réponse de la création, dont le
+    numéro entre dans le chemin de la relecture, l'issue relue — 13 sites. Chaque site a sa ligne ;
+    ceux de lecture et la réponse d'une création en ont une seconde, de forme ou de type, les
+    issues ouvertes une troisième, le numéro de l'issue identique — les relectures passent par les
+    mêmes lecteurs que la lecture."""
     forge = Forge(
         {CORPS_42: {"body": "- [ ] Critère A\n", "labels": [{"name": "ready-for-agent"}]}},
         pages=[[{"id": 13, "body": BRIEF}]],
