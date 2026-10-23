@@ -37,7 +37,10 @@ Le reste change de main :
   démarrée (`use_worktree: false`) — la contre-épreuve à fabriquer, un de ses « Artefacts
   jetables » : le composant présenté sous une forme que l'outil analyse ; toute écriture de dépôt
   qu'un interrogatoire exige — l'amendement d'un document par `decisions-vs-doc` (« Deux
-  sorties ») ou `/contradiction` —, qui part par une PR ;
+  sorties ») ou `/contradiction` —, qui part par une PR que la session ouvre, relit et merge au
+  go du mainteneur, au déroulé de `triage/hors-scope.md` (« Quand écrire », étapes 5 et 6) ; la
+  ligne de « Décisions » qui l'exige ne s'écrit qu'une fois la PR mergée — sans go, le point
+  reste une question ouverte ;
 - **script** — les décisions écrites dans le corps de l'issue (`issue edit`), les notes de triage
   (`comment`), par `python .claude/skills/cycle-pr/scripts/ecriture-relue.py <sous-commande> …`,
   qui relit ce qu'il écrit ;
@@ -151,7 +154,7 @@ que le verrou s'écrive ; le verdict reste à la session, et l'ancre vérifiée 
 décision (« §1.2 muet », « §1.2 conforme ») ; une décision sans ancre porte `⚠️ non confrontée`.
 Le verrou est un point d'écriture au sens de `decisions-vs-doc` : une contradiction qui le
 traverse ne se découvre qu'au briefing d'une session ultérieure, en arrêt de chantier.
-L'amendement qu'un arrêt décide part par une PR (« Délégation »).
+L'amendement qu'un arrêt décide part par une PR, et la décision attend son merge (« Délégation »).
 
 Puis, si la session partait d'une issue en `needs-interrogation`, dire au mainteneur que l'issue
 peut passer à `ready-for-agent` (ou `ready-for-human`) — la transition et le brief appartiennent à
