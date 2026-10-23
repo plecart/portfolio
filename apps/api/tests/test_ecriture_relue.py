@@ -435,8 +435,9 @@ def test_issue_edit_ajoute_le_fichier_en_fin_de_corps_octet_pour_octet(
         ("issue", "edit", "42", "--append"),
         ("comment", "42", "--body-file"),
         ("issue", "create", "--title", "Titre", "--body-file"),
+        ("issue", "edit", "42", "--body-file"),
     ],
-    ids=["issue-edit-append", "comment", "issue-create"],
+    ids=["issue-edit-append", "comment", "issue-create", "issue-edit-body-file"],
 )
 @pytest.mark.parametrize(
     ("contenu", "motif"),
@@ -467,16 +468,34 @@ def test_un_fichier_inutilisable_est_refuse_avant_tout_appel(
     assert sortie_d_echec(capsys, "refus").startswith(f"refus — {motif.format(fichier=ajout)}")
 
 
+@pytest.mark.parametrize("option", ["--append", "--body-file"])
 def test_issue_edit_sort_en_1_sur_une_relecture_tronquee(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    option: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     ajout = tmp_path / "rattachement.md"
     ajout.write_bytes(b"\n*Rattachement a posteriori.*\n\nCloses #7\n")
     forge = Forge({CORPS_42: {"body": "Corps"}}, stocke=lambda corps: corps[:8])
 
-    assert lance(forge, "issue", "edit", "42", "--append", str(ajout)) == 1
+    assert lance(forge, "issue", "edit", "42", option, str(ajout)) == 1
     sortie = sortie_d_echec(capsys, "relecture non conforme")
     assert "ancre absente : *Rattachement a posteriori.*" in sortie, sortie
+
+
+def test_issue_edit_body_file_remplace_le_corps_entier_octet_pour_octet(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Lire, écrire, relire : le fichier devient le corps entier, CRLF et accents compris."""
+    corps = tmp_path / "corps.md"
+    corps.write_bytes("## Brief révisé\r\n\r\n- [ ] Critère A\r\n".encode())
+    forge = Forge({CORPS_42: {"body": "Ancien corps\n- [x] Critère A\n"}})
+
+    assert lance(forge, "issue", "edit", "42", "--body-file", str(corps)) == 0
+    assert [json.loads(charge)["body"] for charge in forge.charges] == [
+        "## Brief révisé\r\n\r\n- [ ] Critère A\r\n"
+    ]
+    patch = ("gh", "api", "-X", "PATCH", CORPS_42, "--input", "-")
+    assert forge.appels == [("gh", "api", CORPS_42), patch, ("gh", "api", CORPS_42)]
+    assert capsys.readouterr().out == f"écrit et relu — corps de #42 : remplacé par {corps}\n"
 
 
 def test_comment_publie_le_fichier_octet_pour_octet_puis_relit_le_commentaire_publie(
@@ -692,6 +711,7 @@ COCHE_CORPS = ("checkbox", "patch", "42", "--case", "Critère A")
 COCHE_BRIEF = ("brief", "patch", "42", "--case", "Critère A")
 AJOUTE_FICHIER = ("issue", "edit", "42", "--append", "ajout.md")
 PUBLIE_COMMENTAIRE = ("comment", "42", "--body-file", "ajout.md")
+REMPLACE_CORPS = ("issue", "edit", "42", "--body-file", "ajout.md")
 CREE_ISSUE = ("issue", "create", "--title", "Titre", "--body-file", "ajout.md")
 CREE_ISSUE_ETIQUETEE = (*CREE_ISSUE, "--label", "prd")
 # (appel, ce que la forge fait du texte reçu — `None` le garde tel quel —, sortie du premier appel)
@@ -702,6 +722,7 @@ REJEUX = [
     pytest.param(AJOUTE_FICHIER, None, 0, id="issue-edit-append"),
     pytest.param(PUBLIE_COMMENTAIRE, None, 0, id="comment"),
     pytest.param(CREE_ISSUE, None, 0, id="issue-create"),
+    pytest.param(REMPLACE_CORPS, None, 0, id="issue-edit-body-file"),
     pytest.param(COCHE_CORPS, crlf, 1, id="checkbox-patch-forge-crlf"),
     pytest.param(COCHE_BRIEF, crlf, 1, id="brief-patch-forge-crlf"),
     pytest.param(
@@ -725,6 +746,13 @@ REJEUX = [
         id="issue-create-forge-crlf",
         marks=pytest.mark.xfail(strict=True, reason="corps comparé à l'identique"),
     ),
+    pytest.param(
+        REMPLACE_CORPS,
+        crlf,
+        1,
+        id="issue-edit-body-file-forge-crlf",
+        marks=pytest.mark.xfail(strict=True, reason="corps comparé à l'identique"),
+    ),
 ]
 
 
@@ -743,10 +771,10 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     appel écrit une fois ; le second sort en 0 sans **aucune** écriture, ni `PATCH`, ni `DELETE`,
     ni `POST`.
 
-    Population : les 6 sous-commandes, sur une forge qui garde le texte reçu ; puis, cherchée hors
+    Population : les 7 sous-commandes, sur une forge qui garde le texte reçu ; puis, cherchée hors
     de cette liste, une forge qui le garde transformé (LF → CRLF : le premier appel sort alors en
-    1, relecture non conforme) — pour les cinq qui écrivent un texte, un `DELETE` n'en a pas.
-    11 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
+    1, relecture non conforme) — pour les six qui écrivent un texte, un `DELETE` n'en a pas.
+    13 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
 
     - `issue-edit-append` — le bloc s'ajoutait une seconde fois ; corrigé : un corps qui finit
       déjà par le fichier n'est pas réécrit ;
@@ -761,10 +789,11 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
 
     Au lot 6a1, `issue create` naît avec sa garde — une issue ouverte de même titre et de même
     corps en tient lieu —, vue rouge garde retirée ; `issue-create-forge-crlf` fuit, `xfail`
-    strict, pour la même raison, et la fuite y est une seconde issue.
+    strict, pour la même raison, et la fuite y est une seconde issue ; de même pour
+    `issue edit --body-file`, où elle réécrit le même corps.
 
-    Les cases se relisent cochées, le label absent, le commentaire publié, l'issue créée : les 8
-    autres n'écrivent rien au rejeu.
+    Les cases se relisent cochées, le label absent, le commentaire publié, l'issue créée, le
+    corps remplacé : les 9 autres n'écrivent rien au rejeu.
     """
     forge = Forge(
         {CORPS_42: {"body": "Corps\n- [ ] Critère A\n", "labels": [{"name": "ready-for-agent"}]}},
@@ -801,6 +830,7 @@ APPELS_MAL_FORMES = {
     "label-numero-non-entier": ("label", "#42", "--remove", "ready-for-agent"),
     "fichier-manquant": ("issue", "edit", "42"),
     "issue-numero-non-entier": ("issue", "edit", "4 2", "--append", "x.md"),
+    "ajout-et-remplacement": ("issue", "edit", "42", "--append", "x.md", "--body-file", "x.md"),
     "commentaire-sans-fichier": ("comment", "42"),
     "commentaire-numero-non-ascii": ("comment", "４２", "--body-file", "x.md"),
     "creation-sans-titre": ("issue", "create", "--body-file", "x.md"),
