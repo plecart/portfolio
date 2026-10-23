@@ -84,7 +84,7 @@ ouverte par une `contradiction` née d'une décision, sans issue fermée à l'or
 est l'amendement. Les étapes 2 à 6 s'appliquent ; l'étape 7 est sans objet, aucun thème ne s'étant
 vidé ; la ligne de journal cite l'amendement, pas une issue fermée (« Réconciliée avec
 l'amendement du cadrage §9.3, PR #<m>, du 26 août 2026 »). En mode amendement, `#<fermée>`,
-`<issue fermée>` et « la clôture de #<n> » se lisent « l'amendement, PR #<m> » : la clé
+`<issue fermée>` et le `#47` des exemples se lisent « l'amendement, PR #<m> » : la clé
 d'idempotence de l'étape 2 est alors la ligne qui cite cette PR.
 
 Écrire un résumé court de **ce que cette clôture a réellement changé** — pas ce que l'issue
@@ -117,7 +117,8 @@ C'est un `grep` des ancres sur les fichiers des rangs supérieurs, rien de plus 
 passe et rend les passages autour des ancres ; le verdict reste à la session. Même seuil que pour
 les issues : **deux citations ou rien** — la ligne exacte du §, et le fait du delta qui la
 falsifie. Un document **muet** sur le point (le cadrage décrit le serveur, le delta touche le poste
-de dev) n'est pas contredit.
+de dev) n'est pas contredit. Une contradiction déjà portée par une issue ouverte — l'échappatoire
+de `decisions-vs-doc` — est déjà tracée : ne pas la signaler une seconde fois.
 
 Une contradiction avérée → **s'arrêter avant l'étape 2** et présenter l'arrêt de
 `.claude/rules/decisions-vs-doc.md` (bloc `## ⚠️ Contradiction`). Dans le tour où le mainteneur
@@ -128,9 +129,7 @@ carte de proposition (`initiation: own_initiative`, `context: fresh`, `use_workt
 même nom et même prompt). Elle amende le § par une PR ; à son merge, elle redémarre
 `repercussions` sur `#<N>`, dont la passe reprend contre la doc amendée — l'étape 1 n'y trouve plus
 la contradiction, les étapes 2 à 7 suivent, QA comprise. Démarrée par une autre, cette session-ci
-prévient alors son parent (étape 6). Ce skill **n'amende jamais un document lui-même**. Une
-contradiction déjà portée par une issue ouverte — l'échappatoire de `decisions-vs-doc` — est déjà
-tracée : ne pas la signaler une seconde fois.
+prévient alors son parent (étape 6). Ce skill **n'amende jamais un document lui-même**.
 
 ### 2. Sélectionner les issues à examiner
 
@@ -271,15 +270,15 @@ jamais profiter de l'édition pour reformuler autre chose.
 concurrent : même lecture en octets, du commentaire qui s'ouvre par `## Brief d'agent`, relu par
 `gh api --paginate repos/{owner}/{repo}/issues/<n>/comments --jq '.[] | select(.body | startswith("## Brief d'"'"'agent")) | .body'`,
 sans le LF final que `--jq` ajoute (mesuré sous Git Bash le 2026-10-23 sur #134, une page :
-octet pour octet le `.body` de son brief lu seul) — sans `--paginate`, la première page seule,
-30 commentaires. Le journal de spec vit dans le corps, mais le contrat que `cycle-pr`
-exécute est le brief : un correctif appliqué au seul corps laisse le contrat faux.
+octet pour octet le `.body` de son brief lu seul) — sans `--paginate`, la première page seule. Le
+journal de spec vit dans le corps, mais le contrat que `cycle-pr` exécute est le brief : un
+correctif appliqué au seul corps laisse le contrat faux.
 
-**Vérification avant de clore la passe** sur une issue portant un brief : avant l'appel, chercher
-dans le fichier chaque « citation issue » marquée `brief` — **zéro occurrence attendue** — et
-l'ancre du contenu voulu — **présente** : un fichier vidé passe le contrôle des citations haut la
-main. Le script relit ensuite la forge en entier contre ce fichier. Une citation encore présente
-signale un support oublié, pas une passe terminée.
+**Vérification avant l'appel**, sur une issue portant un brief : chercher dans le fichier chaque
+« citation issue » marquée `brief` — **zéro occurrence attendue** — et l'ancre du contenu voulu —
+**présente** : un fichier vidé passe le contrôle des citations haut la main. Le script relit
+ensuite la forge en entier contre ce fichier. Une citation encore présente signale un support
+oublié, pas une passe terminée.
 
 **Relire le corps — et le brief — juste avant d'écrire** : c'est la lecture en octets ci-dessus,
 faite au moment d'écrire. S'ils ont changé depuis la présentation du diff — une autre passe de
@@ -380,16 +379,16 @@ Conditions pour proposer :
 - le milestone est vide d'issues ouvertes ;
 - **et** au moins une de ses issues touchait une surface visible du projet (surfaces déclarées dans
   `.claude/pipeline.config.md`). Un thème purement interne — refacto, outillage, dette — n'a rien à
-  faire recetter à la main : ne rien proposer.
+  faire recetter à la main : ne rien proposer ;
+- **et** une seule fois par thème : si le milestone porte déjà une issue `qa-plan`, se taire. Une
+  proposition qu'on décline neuf fois sur dix devient un bruit qu'on apprend à ignorer — c'est
+  précisément ce qu'on cherche à éviter en ne la déclenchant qu'ici.
 
 **Proposer, puis démarrer sur accord.** La proposition reste une question au mainteneur ; sur son
 accord, dans ce tour, démarrer la session : `start_session`, `initiation: user_asked`,
 `context: fresh`, `use_worktree: true`, `name: plan-qa-<slug du thème>`, prompt
 `/plan-qa "<thème>"` — `start_session` borne un nom à `[a-z0-9-]` et 24 caractères (description
-de l'outil, lue le 2026-10-23). Et
-ne proposer qu'une fois par thème : si le milestone porte déjà une issue `qa-plan`, se taire. Une
-proposition qu'on décline neuf fois sur dix devient un bruit qu'on apprend à ignorer — c'est
-précisément ce qu'on cherche à éviter en ne la déclenchant qu'ici.
+de l'outil, lue le 2026-10-23).
 
 ## Ce que ce skill ne fait pas
 
