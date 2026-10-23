@@ -28,6 +28,8 @@ ISSUES = "repos/{owner}/{repo}/issues"
 LABELS_DU_DEPOT = "repos/{owner}/{repo}/labels"
 CORPS_42 = "repos/{owner}/{repo}/issues/42"
 COMMENTAIRES_42 = "repos/{owner}/{repo}/issues/42/comments"
+MILESTONES = "repos/{owner}/{repo}/milestones"
+THEMES = "repos/{owner}/{repo}/milestones?state=all&per_page=100"
 # Les seuls retraits de label auxquels la forge répond : chemin encodé → nom du label.
 RETRAITS = {
     "repos/{owner}/{repo}/issues/42/labels/ready-for-agent": "ready-for-agent",
@@ -56,6 +58,9 @@ class Forge:
             se lit sous son chemin `issues/<numéro>`.
         labels_du_depot: les noms des labels du dépôt, page par page. Un label posé par `POST`
             s'ajoute à ceux de l'issue 42.
+        milestones: les milestones du dépôt, page par page, de même, chacun aussi sous son chemin
+            `milestones/<numéro>` ; un milestone créé par `POST` y entre sous le numéro 900 + n, et
+            un `PATCH` `{"milestone": <numéro>}` pose sur l'issue le milestone de ce numéro.
         garde_les_labels: le retrait d'un label répond sans l'ôter de l'issue.
     """
 
@@ -67,6 +72,7 @@ class Forge:
         pages: list[list[dict[str, Any]]] | None = None,
         issues: list[list[dict[str, Any]]] | None = None,
         labels_du_depot: list[list[str]] | None = None,
+        milestones: list[list[dict[str, Any]]] | None = None,
         garde_les_labels: bool = False,
     ) -> None:
         self.documents = documents
@@ -77,11 +83,16 @@ class Forge:
             for commentaire in page:
                 self.indexe(commentaire)
         self.issues = issues or []
+        self.milestones = milestones or []
+        for page in self.milestones:
+            for milestone in page:
+                self.documents[f"{MILESTONES}/{milestone['number']}"] = milestone
         # Chaque liste que `gh api --paginate --slurp` lit, sous son chemin.
         self.listes = {
             COMMENTAIRES_42: self.pages,
             ISSUES: self.issues,
             LABELS_DU_DEPOT: [[{"name": nom} for nom in page] for page in labels_du_depot or []],
+            THEMES: self.milestones,
         }
         self.appels: list[tuple[str, ...]] = []
         self.charges: list[bytes] = []
@@ -107,6 +118,9 @@ class Forge:
                 self.documents[chemin].update(charge)
                 if "body" in charge:
                     self.documents[chemin]["body"] = self.stocke(charge["body"])
+                if "milestone" in charge:
+                    milestone = self.documents[f"{MILESTONES}/{charge['milestone']}"]
+                    self.documents[chemin]["milestone"] = milestone
                 return json_success(self.documents[chemin])
             case ("gh", "api", "--paginate", "--slurp", chemin) if chemin in self.listes:
                 return json_success(self.listes[chemin])
@@ -140,6 +154,18 @@ class Forge:
                 labels = self.documents[CORPS_42]["labels"]
                 labels.extend({"name": nom} for nom in json.loads(stdin)["labels"])
                 return json_success(labels)
+            case ("gh", "api", "-X", "POST", chemin, "--input", "-") if (
+                chemin == MILESTONES and stdin is not None
+            ):
+                self.charges.append(stdin)
+                milestone = {
+                    "number": 900 + len(self.charges),
+                    **json.loads(stdin),
+                    "open_issues": 0,
+                }
+                self.milestones.append([milestone])
+                self.documents[f"{MILESTONES}/{milestone['number']}"] = milestone
+                return json_success(milestone)
             case ("gh", "api", "-X", "DELETE", chemin) if chemin in RETRAITS and stdin is None:
                 labels = self.documents[CORPS_42]["labels"]
                 if not self.garde_les_labels:
@@ -910,6 +936,104 @@ def test_issue_close_ne_reecrit_pas_une_fermeture_d_une_autre_raison(
     assert "#42 déjà fermée (not_planned), pas en completed" in sortie_d_echec(capsys, "refus")
 
 
+def theme(numero: int, titre: str, etat: str = "open", ouvertes: int = 0) -> dict[str, Any]:
+    """Un milestone, sous la forme que l'API REST le liste."""
+    return {"number": numero, "title": titre, "state": etat, "open_issues": ouvertes}
+
+
+def test_milestone_attach_rattache_au_theme_de_ce_titre_exact_et_nomme_l_ancien(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Le titre se compare à l'identique, sur toutes les pages des milestones ouverts et fermés ;
+    le rattachement remplace l'ancien — la fusion de thèmes de `triage/themes-milestones.md` —, et
+    la sortie le nomme."""
+    forge = Forge(
+        {CORPS_42: {"milestone": theme(1, "Ancien")}},
+        milestones=[[theme(2, "authentification")], [theme(3, "Authentification")]],
+    )
+
+    assert lance(forge, "milestone", "attach", "42", "--title", "Authentification") == 0
+    assert [json.loads(charge) for charge in forge.charges] == [{"milestone": 3}]
+    assert forge.appels == [
+        ("gh", "api", CORPS_42),
+        ("gh", "api", "--paginate", "--slurp", THEMES),
+        ("gh", "api", "-X", "PATCH", CORPS_42, "--input", "-"),
+        ("gh", "api", CORPS_42),
+    ]
+    assert capsys.readouterr().out == (
+        "écrit et relu — #42 rattachée à Authentification, à la place de Ancien\n"
+    )
+
+
+def test_milestone_attach_cree_le_theme_absent_avec_sa_description_puis_rattache(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    forge = Forge({CORPS_42: {"milestone": None}})
+
+    args = ("milestone", "attach", "42", "--title", "Facturation", "--description", "Paiements")
+    assert lance(forge, *args) == 0
+    assert [json.loads(charge) for charge in forge.charges] == [
+        {"title": "Facturation", "description": "Paiements", "state": "open"},
+        {"milestone": 901},
+    ]
+    assert forge.appels[-1] == ("gh", "api", CORPS_42), "le rattachement n'est pas relu"
+    assert capsys.readouterr().out == (
+        "écrit et relu — milestone Facturation créé (901) ; #42 rattachée à Facturation\n"
+    )
+
+
+def test_milestone_close_ferme_le_theme_vide_puis_relit_son_etat(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    forge = Forge({}, milestones=[[theme(3, "Archives", ouvertes=0)]])
+
+    assert lance(forge, "milestone", "close", "--title", "Archives") == 0
+    assert [json.loads(charge) for charge in forge.charges] == [{"state": "closed"}]
+    assert forge.appels[-1] == ("gh", "api", f"{MILESTONES}/3"), "la fermeture n'est pas relue"
+    assert capsys.readouterr().out == "fermé et relu — milestone Archives\n"
+
+
+# Chaque refus de `milestone`, avant toute écriture : (appel, milestones du dépôt, motif).
+REFUS_DE_THEME: dict[str, tuple[tuple[str, ...], list[list[dict[str, Any]]], str]] = {
+    "attach-theme-ferme": (
+        ("milestone", "attach", "42", "--title", "Archives", "--description", "Vieux"),
+        [[theme(3, "Archives", "closed")]],
+        "le milestone Archives est fermé",
+    ),
+    "attach-absent-sans-description": (
+        ("milestone", "attach", "42", "--title", "Archives"),
+        [[theme(3, "archives")]],
+        "aucun milestone Archives, et pas de --description pour le créer",
+    ),
+    "close-absent": (
+        ("milestone", "close", "--title", "Archives"),
+        [[theme(3, "Archives (2025)")]],
+        "aucun milestone Archives",
+    ),
+    "close-non-vide": (
+        ("milestone", "close", "--title", "Archives"),
+        [[theme(3, "Archives", ouvertes=2)]],
+        "le milestone Archives porte encore 2 issue(s) ouverte(s)",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("args", "pages", "motif"), REFUS_DE_THEME.values(), ids=REFUS_DE_THEME.keys()
+)
+def test_milestone_refuse_sans_rien_ecrire(
+    args: tuple[str, ...],
+    pages: list[list[dict[str, Any]]],
+    motif: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    forge = Forge({CORPS_42: {"milestone": None}}, milestones=pages)
+
+    assert lance(forge, *args) == 1
+    assert ecritures(forge) == []
+    assert motif in sortie_d_echec(capsys, "refus")
+
+
 @pytest.fixture
 def ajout_md(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Les fichiers `ajout.md` et `brief.md` que citent les appels nommés ci-dessous, dans un
@@ -921,7 +1045,7 @@ def ajout_md(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 def forge_temoin(**options: Any) -> Forge:
     """La forge des tables partagées : l'issue 42 — ouverte, un corps à une case, le label
-    `ready-for-agent` —, son brief, et les labels du dépôt."""
+    `ready-for-agent`, sans milestone —, son brief, les labels du dépôt et deux thèmes vides."""
     return Forge(
         {
             CORPS_42: {
@@ -929,10 +1053,12 @@ def forge_temoin(**options: Any) -> Forge:
                 "labels": [{"name": "ready-for-agent"}],
                 "state": "open",
                 "state_reason": None,
+                "milestone": None,
             }
         },
         pages=[[{"id": 13, "body": BRIEF}]],
         labels_du_depot=[["ready-for-agent", "needs-info", "needs-interrogation"]],
+        milestones=[[theme(3, "Authentification"), theme(4, "Archives")]],
         **options,
     )
 
@@ -940,6 +1066,9 @@ def forge_temoin(**options: Any) -> Forge:
 RETIRE_LABEL = ("label", "42", "--remove", "ready-for-agent")
 AJOUTE_LABEL = ("label", "42", "--add", "needs-info")
 FERME_ISSUE = ("issue", "close", "42")
+RATTACHE_THEME = ("milestone", "attach", "42", "--title", "Authentification")
+CREE_THEME = ("milestone", "attach", "42", "--title", "Facturation", "--description", "Paiements")
+FERME_THEME = ("milestone", "close", "--title", "Archives")
 COCHE_CORPS = ("checkbox", "patch", "42", "--case", "Critère A")
 COCHE_BRIEF = ("brief", "patch", "42", "--case", "Critère A")
 AJOUTE_FICHIER = ("issue", "edit", "42", "--append", "ajout.md")
@@ -953,6 +1082,8 @@ REJEUX = [
     pytest.param(RETIRE_LABEL, None, 0, id="label-remove"),
     pytest.param(AJOUTE_LABEL, None, 0, id="label-add"),
     pytest.param(FERME_ISSUE, None, 0, id="issue-close"),
+    pytest.param(RATTACHE_THEME, None, 0, id="milestone-attach"),
+    pytest.param(FERME_THEME, None, 0, id="milestone-close"),
     pytest.param(COCHE_CORPS, None, 0, id="checkbox-patch"),
     pytest.param(COCHE_BRIEF, None, 0, id="brief-patch"),
     pytest.param(AJOUTE_FICHIER, None, 0, id="issue-edit-append"),
@@ -1015,10 +1146,10 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     appel écrit une fois ; le second sort en 0 sans **aucune** écriture, ni `PATCH`, ni `DELETE`,
     ni `POST`.
 
-    Population : les 10 sous-commandes, sur une forge qui garde le texte reçu ; puis, cherchée hors
+    Population : les 12 sous-commandes, sur une forge qui garde le texte reçu ; puis, cherchée hors
     de cette liste, une forge qui le garde transformé (LF → CRLF : le premier appel sort alors en
     1, relecture non conforme) — pour les sept qui écrivent un texte, un label ou un état n'en a
-    pas. 17 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
+    pas. 19 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
 
     - `issue-edit-append` — le bloc s'ajoutait une seconde fois ; corrigé : un corps qui finit
       déjà par le fichier n'est pas réécrit ;
@@ -1037,11 +1168,14 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     `issue edit --body-file` et `brief write`, où elle réécrit le même texte. Le rejeu de
     `brief write` part d'un brief à éditer : après une publication, il rejoint le même cas — un
     brief, égal au fichier. `label --add` naît avec sa garde — un label déjà posé ne se repose
-    pas —, `issue close` aussi — une issue déjà fermée avec cette raison ne se referme pas —,
-    chacune vue rouge garde retirée.
+    pas —, `issue close` aussi — une issue déjà fermée avec cette raison ne se referme pas —, et
+    `milestone attach` et `close` — une issue déjà rattachée, un thème déjà fermé —, chacune vue
+    rouge garde retirée ; le rejeu d'une création de thème a son propre test, sa première passe
+    écrivant deux fois.
 
-    Les cases se relisent cochées, le label absent ou posé, l'issue fermée, le commentaire publié,
-    l'issue créée, le corps remplacé, le brief écrit : les 12 autres n'écrivent rien au rejeu.
+    Les cases se relisent cochées, le label absent ou posé, l'issue fermée, rattachée, le thème
+    fermé, le commentaire publié, l'issue créée, le corps remplacé, le brief écrit : les 14 autres
+    n'écrivent rien au rejeu.
     """
     forge = forge_temoin(stocke=stocke or (lambda corps: corps))
 
@@ -1054,13 +1188,27 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     assert "rien à écrire" in capsys.readouterr().out
 
 
+def test_milestone_attach_rejoue_apres_creation_du_theme_n_ecrit_rien(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    forge = forge_temoin()
+
+    assert lance(forge, *CREE_THEME) == 0
+    capsys.readouterr()
+    assert lance(forge, *CREE_THEME) == 0
+    assert len(ecritures(forge)) == 2, "le rejeu a écrit une seconde fois"
+    assert "rien à écrire" in capsys.readouterr().out
+
+
 # Cliquet de la classe « l'identité de rejeu omet un champ que la sous-commande écrit » : un rejeu
 # ne dit « rien à écrire » qu'une fois **chaque** champ qu'il écrirait relu égal à l'attendu. Une
 # forme par champ écrit, seul resté à écrire : (appel, champs retouchés de la forge témoin, chemin
 # par chemin, sortie — 0 écrit, 1 refusé). Dénombré au lot 6a1 : `label` écrit les labels posés
 # et les labels retirés — 2 champs, épinglés après son code, chacun vu rouge par mutation de sa
-# garde ; `issue close`, l'état et la raison — 2 champs, épinglés avant son code. Une issue fermée
-# sous une autre raison est un refus, jamais « rien à écrire ».
+# garde ; `issue close`, l'état et la raison — 2 champs ; `milestone attach`, le milestone de
+# l'issue, que son titre désigne — le thème créé n'est écrit qu'à la création — ; `milestone
+# close`, l'état du thème — 1 champ chacun. Ces 4 épinglés avant leur code : 6 champs, 0 omis. Une
+# issue fermée sous une autre raison est un refus, jamais « rien à écrire ».
 CHAMPS_RESTES_A_ECRIRE: dict[str, tuple[tuple[str, ...], dict[str, dict[str, Any]], int]] = {
     "label-pose": (TRANSITION, {CORPS_42: {"labels": []}}, 0),
     "label-retrait": (TRANSITION, {CORPS_42: etiquetee("needs-interrogation", "needs-triage")}, 0),
@@ -1074,6 +1222,8 @@ CHAMPS_RESTES_A_ECRIRE: dict[str, tuple[tuple[str, ...], dict[str, dict[str, Any
         {CORPS_42: {"state": "closed", "state_reason": "not_planned"}},
         1,
     ),
+    "milestone-attach": (RATTACHE_THEME, {CORPS_42: {"milestone": theme(4, "Archives")}}, 0),
+    "milestone-close": (FERME_THEME, {f"{MILESTONES}/4": {"state": "open"}}, 0),
 }
 
 
@@ -1117,6 +1267,46 @@ ETATS_RELUS_NON_CONFORMES: dict[str, tuple[tuple[str, ...], str, Callable[[Any],
         CORPS_42,
         lambda issue: {**issue, "state_reason": None},
         "#42 relue closed (None), attendue closed (completed)",
+    ),
+    # Sans droit d'écriture, l'API ignore en silence un changement de milestone.
+    "milestone-attach-ignore": (
+        RATTACHE_THEME,
+        CORPS_42,
+        lambda issue: {**issue, "milestone": None},
+        "#42 relue dans le milestone None, attendue dans Authentification",
+    ),
+    "milestone-cree-titre": (
+        CREE_THEME,
+        f"{MILESTONES}/901",
+        lambda theme: {**theme, "title": "facturation"},
+        (
+            "milestone 901 relu ('facturation', 'Paiements', 'open'), "
+            "attendu ('Facturation', 'Paiements', 'open')"
+        ),
+    ),
+    "milestone-cree-description": (
+        CREE_THEME,
+        f"{MILESTONES}/901",
+        lambda theme: {**theme, "description": None},
+        (
+            "milestone 901 relu ('Facturation', None, 'open'), "
+            "attendu ('Facturation', 'Paiements', 'open')"
+        ),
+    ),
+    "milestone-cree-etat": (
+        CREE_THEME,
+        f"{MILESTONES}/901",
+        lambda theme: {**theme, "state": "closed"},
+        (
+            "milestone 901 relu ('Facturation', 'Paiements', 'closed'), "
+            "attendu ('Facturation', 'Paiements', 'open')"
+        ),
+    ),
+    "milestone-close-etat": (
+        FERME_THEME,
+        f"{MILESTONES}/4",
+        lambda theme: {**theme, "state": "open"},
+        "milestone Archives relu open, attendu closed",
     ),
 }
 
@@ -1172,6 +1362,11 @@ APPELS_MAL_FORMES = {
     "creation-sans-fichier": ("issue", "create", "--title", "Titre"),
     "fermeture-sans-numero": ("issue", "close"),
     "fermeture-raison-inconnue": ("issue", "close", "42", "--reason", "duplicate"),
+    "theme-action-inconnue": ("milestone", "rename", "--title", "A"),
+    "theme-sans-titre": ("milestone", "attach", "42"),
+    "theme-sans-numero": ("milestone", "attach", "--title", "A"),
+    "theme-titre-vide": ("milestone", "close", "--title", " "),
+    "theme-description-sur-deux-lignes": (*RATTACHE_THEME, "--description", "a\nb"),
     "creation-label-vide": (
         "issue",
         "create",
@@ -1196,6 +1391,19 @@ def test_un_appel_mal_forme_sort_en_2_sans_toucher_a_la_forge(
     assert "usage" in capsys.readouterr().err
 
 
+# Les appels que la forge fait tomber dès leur première lecture, chacun sous son identifiant.
+PREMIERES_LECTURES = {
+    "checkbox-patch": COCHE_CORPS,
+    "comment": PUBLIE_COMMENTAIRE,
+    "issue-create": CREE_ISSUE,
+    "issue-create-label": CREE_ISSUE_ETIQUETEE,
+    "label-add": AJOUTE_LABEL,
+    "close": FERME_ISSUE,
+    "attach": RATTACHE_THEME,
+    "milestone-close": FERME_THEME,
+}
+
+
 @pytest.mark.parametrize(
     ("panne", "motif"),
     [
@@ -1211,11 +1419,7 @@ def test_un_appel_mal_forme_sort_en_2_sans_toucher_a_la_forge(
     ],
     ids=["gh-absent", "gh-en-echec", "reponse-non-json"],
 )
-@pytest.mark.parametrize(
-    "args",
-    [COCHE_CORPS, PUBLIE_COMMENTAIRE, CREE_ISSUE, CREE_ISSUE_ETIQUETEE, AJOUTE_LABEL, FERME_ISSUE],
-    ids=["checkbox-patch", "comment", "issue-create", "issue-create-label", "label-add", "close"],
-)
+@pytest.mark.parametrize("args", PREMIERES_LECTURES.values(), ids=PREMIERES_LECTURES.keys())
 @pytest.mark.usefixtures("ajout_md")
 def test_une_forge_en_panne_a_la_lecture_refuse_en_une_ligne(
     args: tuple[str, ...],
@@ -1236,17 +1440,22 @@ def test_une_forge_en_panne_a_la_lecture_refuse_en_une_ligne(
     assert motif in sortie_d_echec(capsys, "refus")
 
 
+# Les appels dont l'écriture tombe, chacun avec la méthode de cette écriture, sous son identifiant.
+ECRITURES_EN_PANNE = {
+    "patch": (COCHE_CORPS, "PATCH"),
+    "delete": (RETIRE_LABEL, "DELETE"),
+    "post": (PUBLIE_COMMENTAIRE, "POST"),
+    "post-issue": (CREE_ISSUE, "POST"),
+    "post-label": (AJOUTE_LABEL, "POST"),
+    "patch-fermeture": (FERME_ISSUE, "PATCH"),
+    "patch-rattachement": (RATTACHE_THEME, "PATCH"),
+    "post-theme": (CREE_THEME, "POST"),
+    "patch-theme": (FERME_THEME, "PATCH"),
+}
+
+
 @pytest.mark.parametrize(
-    ("args", "methode"),
-    [
-        (COCHE_CORPS, "PATCH"),
-        (RETIRE_LABEL, "DELETE"),
-        (PUBLIE_COMMENTAIRE, "POST"),
-        (CREE_ISSUE, "POST"),
-        (AJOUTE_LABEL, "POST"),
-        (FERME_ISSUE, "PATCH"),
-    ],
-    ids=["patch", "delete", "post", "post-issue", "post-label", "patch-fermeture"],
+    ("args", "methode"), ECRITURES_EN_PANNE.values(), ids=ECRITURES_EN_PANNE.keys()
 )
 @pytest.mark.usefixtures("ajout_md")
 def test_une_ecriture_en_panne_sort_en_1_sans_se_dire_refus(
@@ -1302,10 +1511,27 @@ REPONSES_D_UNE_AUTRE_FORME: dict[str, tuple[tuple[str, ...], Any, str]] = {
     "issue-creee-numero-booleen": (CREE_ISSUE, {"number": True}, "écriture"),
     "etat-lu-absent": (FERME_ISSUE, {"body": ""}, "lecture"),
     "raison-lue-non-textuelle": (FERME_ISSUE, {"state": "closed", "state_reason": 5}, "lecture"),
+    "milestone-de-l-issue-absent": (RATTACHE_THEME, {"body": ""}, "lecture"),
+    "milestone-de-l-issue-non-objet": (RATTACHE_THEME, {"milestone": 5}, "lecture"),
+    "themes-hors-pages": (FERME_THEME, {"message": "Not Found"}, "lecture"),
+    "theme-numero-non-entier": (
+        FERME_THEME,
+        [[{"title": "Archives", "number": "4", "state": "open", "open_issues": 0}]],
+        "lecture",
+    ),
+    "theme-cree-sans-numero": (CREE_THEME, {"title": "Facturation"}, "écriture"),
+    "theme-cree-numero-booleen": (CREE_THEME, {"number": True}, "écriture"),
     "corps-relu-sans-body": (COCHE_CORPS, {"message": "Not Found"}, "relecture"),
     "labels-relus-absents": (RETIRE_LABEL, {"message": "Not Found"}, "relecture"),
     "commentaire-relu-sans-body": (PUBLIE_COMMENTAIRE, {"message": "Not Found"}, "relecture"),
     "etat-relu-absent": (FERME_ISSUE, {"message": "Not Found"}, "relecture"),
+    "theme-cree-relu-sans-titre": (CREE_THEME, {"message": "Not Found"}, "relecture"),
+    "rattachement-relu-titre-non-textuel": (
+        RATTACHE_THEME,
+        {"milestone": {"title": 5}},
+        "relecture",
+    ),
+    "theme-ferme-relu-sans-etat": (FERME_THEME, {"message": "Not Found"}, "relecture"),
     "issue-relue-sans-titre": (
         CREE_ISSUE,
         {"number": 901, "body": "*Rattachement.*\n", "labels": []},
@@ -1340,7 +1566,10 @@ def test_une_reponse_d_une_autre_forme_sort_en_1_en_une_ligne(
     numéro de l'issue identique entre dans la ligne de sortie, la réponse de la création, dont le
     numéro entre dans le chemin de la relecture, l'issue relue — 13 sites ; puis 2, ceux
     d'`issue close`, gardés dès l'écriture : l'état et la raison lus, puis relus — 15 sites, la
-    réponse de la fermeture n'étant pas lue. Chaque site a sa ligne ;
+    réponse de la fermeture n'étant pas lue ; puis 6, ceux de `milestone` : le milestone de
+    l'issue, les thèmes du dépôt, dont le numéro entre dans un chemin, la réponse de la création
+    d'un thème, de même, le thème créé relu, le rattachement relu, le thème fermé relu — 21 sites.
+    Chaque site a sa ligne ;
     ceux de lecture et la réponse d'une création en ont une seconde, de forme ou de type, les
     issues ouvertes une troisième, le numéro de l'issue identique — les relectures passent par les
     mêmes lecteurs que la lecture."""
