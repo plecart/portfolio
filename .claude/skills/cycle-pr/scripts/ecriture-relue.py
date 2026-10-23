@@ -5,15 +5,17 @@ Usage :
     python ecriture-relue.py checkbox patch <N> --case <ancre> [--case <ancre> …]
     python ecriture-relue.py brief patch <N> --case <ancre> [--case <ancre> …]
     python ecriture-relue.py issue edit <N> --append <fichier>
+    python ecriture-relue.py issue create --title <titre> --body-file <fichier> [--label <label> …]
     python ecriture-relue.py comment <N> --body-file <fichier>
 
 La règle « Écritures sur un artefact distant » de `contraintes.md` veut que toute écriture sur la
-forge se relise ; ce script tient cette relecture pour les gestes de `cycle-pr` Étape 8 et le
-commentaire de répercussion de son Étape 6 (#134, lots 4a et 4b). Chaque sous-commande lit par
-`gh api` — octets décodés en UTF-8, jamais le mode texte, qui traduit les fins de ligne, ni la
-page de code de la console (obs 87, 106, 108, 116) —, écrit, puis relit par le même canal. Un
-texte s'écrit par `gh api -X PATCH <chemin> --input -` — `-X POST` pour publier un commentaire —,
-la charge JSON sur l'entrée standard, et sa relecture compare le **texte entier** à l'attendu :
+forge se relise ; ce script tient cette relecture pour les gestes de `cycle-pr` Étape 8, le
+commentaire de répercussion de son Étape 6 et la création d'une issue (#134, lots 4a, 4b et 6a1).
+Chaque sous-commande lit par `gh api` — octets décodés en UTF-8, jamais le mode texte, qui traduit
+les fins de ligne, ni la page de code de la console (obs 87, 106, 108, 116) —, écrit, puis relit
+par le même canal. Un texte s'écrit par `gh api -X PATCH <chemin> --input -` — `-X POST` pour
+publier un commentaire ou créer une issue —, la charge JSON sur l'entrée standard, et sa
+relecture compare le **texte entier** à l'attendu :
 une forme réduite, longueur ou ancre, ne voit pas une conversion qui la préserve (obs 106).
 `{owner}/{repo}` sont remplis par `gh` depuis le dépôt courant.
 
@@ -27,28 +29,41 @@ une forme réduite, longueur ou ancre, ne voit pas une conversion qui la préser
   de son dernier contenu par une ligne vide au moins — celles qui terminent déjà le corps
   restent —, aucune sur un corps vide. Le corps d'une PR passe par le même chemin : pour l'API
   REST, une PR est une issue ;
+- `issue create` crée une issue de titre `--title` et de corps le fichier `--body-file`, UTF-8 lu
+  en octets, avec ses labels `--label` dans la **même** requête : une issue n'existe jamais sans
+  ses labels, même un instant. Chaque label doit exister dans le dépôt — apparié sans la casse,
+  il part sous le nom que le dépôt lui donne —, lu sur toutes ses pages. La relecture compare le
+  corps entier, le titre exact et l'ensemble des labels — sans droit d'écriture sur le dépôt,
+  l'API REST ignore en silence les labels d'une création (« Create an issue ») ; la ligne de
+  sortie porte le numéro de l'issue, créée ou déjà là ;
 - `comment` publie un fichier UTF-8, lu en octets, en commentaire de `<N>`, puis relit le
   commentaire sous l'`id` que la publication rend. Une PR se commente par le même chemin.
 
 Il refuse, sans rien écrire : une ancre introuvable ou ambiguë — toutes sont validées avant la
-première écriture —, zéro ou plusieurs commentaires de brief, un fichier illisible, non UTF-8 ou
-sans ligne non vide — lu avant tout appel à la forge —, une lecture `gh` qui échoue, ne rend pas
-du JSON, ou rend un JSON sans un champ attendu ou d'un autre type. Après l'écriture — sa réponse
-comprise, dont un commentaire publié tire son `id` —, c'est une relecture non conforme : le texte
-a pu partir. Une case déjà cochée, un label déjà absent, un fichier qui termine déjà le corps, un
-commentaire de `<N>` qui porte déjà le fichier pour corps : rien à écrire, et la sortie le dit — un
-rejeu après une relecture tombée n'écrit donc pas une seconde fois.
+première écriture —, zéro ou plusieurs commentaires de brief, un label inconnu du dépôt — chacun
+nommé ; `CLAUDE.md` interdit de deviner un label, et la référence REST de « Create an issue » ne
+dit pas ce qu'elle fait d'un label inconnu —, un fichier illisible, non UTF-8 ou sans ligne non
+vide — lu avant tout appel à la forge —, une lecture `gh` qui échoue, ne rend pas du JSON, ou rend
+un JSON sans un champ attendu ou d'un autre type. Après l'écriture — sa réponse comprise, dont un
+commentaire publié tire son `id` et une issue créée son numéro —, c'est une relecture non
+conforme : le texte a pu partir. Une case déjà cochée, un label déjà absent, un fichier qui
+termine déjà le corps, un commentaire de `<N>` qui porte déjà le fichier pour corps, une issue
+ouverte — pas une PR — qui porte déjà ce titre et ce corps : rien à écrire, et la sortie le dit —
+un rejeu après une relecture tombée n'écrit donc pas une seconde fois.
 
 **Ce qu'il ne prouve pas.** Il ne choisit pas les cases : la session PR les nomme. Il ne
 verrouille rien : une édition faite par un tiers entre sa lecture et son écriture est écrasée, et
 la relecture ne la voit pas — elle compare à ce que le script a écrit ; un même commentaire publié
-entre la lecture des commentaires et la publication fait un doublon. Le commentaire déjà publié se
-reconnaît à son corps seul, **quel qu'en soit l'auteur**. Le fichier se reconnaît à l'identique,
-fins de ligne comprises, en fin de corps comme en corps de commentaire : sur une forge qui le
-stocke transformé — relecture non conforme dès le premier appel —, un rejeu l'ajoute ou le publie
-une seconde fois. Une relecture conforme atteste ce que l'API rend, pas ce que l'interface web
-affiche. Le chemin d'un label encodé, l'écriture du corps d'une PR et la publication d'un
-commentaire sur une PR par l'endpoint `issues` ne sont pas mesurés sur la vraie forge.
+entre la lecture des commentaires et la publication fait un doublon, une même issue créée entre la
+lecture des issues ouvertes et la création aussi. Le commentaire déjà publié se reconnaît à son
+corps seul, l'issue déjà créée à son titre et à son corps — ses labels n'y comptent pas, et une
+issue fermée n'est pas vue —, **quel qu'en soit l'auteur**. Le fichier se reconnaît à l'identique, fins de ligne
+comprises, en fin de corps comme en corps de commentaire ou d'issue : sur une forge qui le stocke
+transformé — relecture non conforme dès le premier appel —, un rejeu l'ajoute, le publie ou crée
+l'issue une seconde fois. Une relecture conforme atteste ce que l'API rend, pas ce que l'interface
+web affiche. Le chemin d'un label encodé, l'écriture du corps d'une PR, la publication d'un
+commentaire sur une PR par l'endpoint `issues` et la création d'une issue ne sont pas mesurés sur
+la vraie forge.
 
 Sortie : 0 écrit et relu conforme, ou rien à écrire ; 1 refus (« refus — »), ou écriture lancée et
 relecture non conforme ou impossible (« relecture non conforme — ») — motif en une ligne sur la
@@ -64,12 +79,15 @@ import sys
 from collections.abc import Callable, Generator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, TypeVar
 from urllib.parse import quote
 
 Run = Callable[[Sequence[str], bytes | None], subprocess.CompletedProcess[bytes]]
+T = TypeVar("T")
 
 REPO = "repos/{owner}/{repo}"
+# Les issues du dépôt, et ses PR : pour l'API REST, une PR est une issue.
+ISSUES = f"{REPO}/issues"
 BRIEF_MARK = "## Brief d'agent"
 # Une ligne de case Markdown ; le groupe est l'état de la case. `[X]` vaut coché pour GitHub.
 CHECKBOX = re.compile(r"[ \t]*- \[([ xX])\] ")
@@ -178,17 +196,27 @@ def body_of(document: Any) -> str:
     return body or ""
 
 
+# `def typed[T]` demande Python 3.12 ; le script tient 3.11 (docstring du module).
+def typed(document: Any, field: str, kind: type[T]) -> T:  # noqa: UP047
+    """Le champ `field` d'un document de la forge, exactement du type `kind`.
+
+    Raises:
+        KeyError, TypeError: pas de champ `field`, ou d'un autre type — un booléen JSON compris,
+            que Python tient pour un entier.
+    """
+    value = document[field]
+    if type(value) is not kind:
+        raise TypeError(f"`{field}` de type {type(value).__name__}")
+    return value
+
+
 def comment_id(comment: Any) -> int:
     """L'`id` d'un commentaire de la forge, entier : il entre dans un chemin d'API.
 
     Raises:
-        KeyError, TypeError: pas d'`id`, ou d'un autre type — un booléen JSON compris, que
-            Python tient pour un entier.
+        KeyError, TypeError: voir `typed`.
     """
-    value = comment["id"]
-    if type(value) is not int:
-        raise TypeError(f"`id` de commentaire de type {type(value).__name__}")
-    return value
+    return typed(comment, "id", int)
 
 
 def measure(text: str) -> str:
@@ -197,9 +225,10 @@ def measure(text: str) -> str:
     return f"{len(text.encode())} octets et {carriage_returns} \\r"
 
 
-def body_payload(body: str) -> bytes:
-    """La charge `{"body": …}` d'une écriture de texte, en JSON UTF-8 brut, pour `--input -`."""
-    return json.dumps({"body": body}, ensure_ascii=False).encode("utf-8")
+def json_payload(**fields: Any) -> bytes:
+    """La charge d'une écriture — `{"body": …}` pour un texte —, en JSON UTF-8 brut, pour
+    `--input -`."""
+    return json.dumps(fields, ensure_ascii=False).encode("utf-8")
 
 
 def check_reread(expected: str, reread: str, anchors: Sequence[str]) -> None:
@@ -230,7 +259,7 @@ def write_body(run: Run, text: Text, expected: str, anchors: Sequence[str]) -> N
     # ponytail: pas de verrou — une édition concurrente entre lecture et écriture est écrasée ;
     # une requête conditionnelle si la forge en accepte une.
     write = ("-X", "PATCH", text.path, "--input", "-")
-    reread = write_then_reread(run, write, body_payload(expected), text.path, body_of)
+    reread = write_then_reread(run, write, json_payload(body=expected), text.path, body_of)
     check_reread(expected, reread, anchors)
 
 
@@ -287,7 +316,7 @@ def check_boxes(body: str, anchors: Sequence[str]) -> tuple[str, list[str], list
 def issue_path(number: str) -> str:
     """Le chemin `gh api` de l'issue `number` — d'une PR aussi : pour l'API REST, une PR est une
     issue."""
-    return f"{REPO}/issues/{number}"
+    return f"{ISSUES}/{number}"
 
 
 def issue_body(run: Run, number: str) -> Text:
@@ -303,7 +332,7 @@ def comments_path(number: str) -> str:
 
 def comment_path(identifier: int) -> str:
     """Le chemin `gh api` du commentaire `identifier`, d'une issue ou d'une PR."""
-    return f"{REPO}/issues/comments/{identifier}"
+    return f"{ISSUES}/comments/{identifier}"
 
 
 def kept_comments(pages: Any, keep: Callable[[str], bool]) -> list[tuple[int, str]]:
@@ -358,21 +387,28 @@ def patch_boxes(run: Run, args: argparse.Namespace) -> str:
     return "\n".join(report)
 
 
+def names_of(labels: Any) -> list[str]:
+    """Les noms d'une liste de labels — d'une issue ou du dépôt —, telle que l'API REST la rend.
+
+    Raises:
+        KeyError, TypeError: pas une liste de labels, ou un label sans nom textuel (`typed`).
+    """
+    return [typed(label, "name", str) for label in labels]
+
+
 def label_names(document: Any) -> list[str]:
     """Les noms des labels d'une issue, telle que l'API REST la rend.
 
     Raises:
         KeyError, TypeError: pas de liste `labels`, ou un label sans nom textuel.
     """
-    names = [label["name"] for label in document["labels"]]
-    if not all(isinstance(name, str) for name in names):
-        raise TypeError("nom de label non textuel")
-    return names
+    return names_of(document["labels"])
 
 
 def carried_label(names: Sequence[str], wanted: str) -> str | None:
-    """Le nom sous lequel l'issue porte le label `wanted` : `wanted` lui-même s'il y est, sinon
-    le premier qui lui est égal sans la casse ; `None` si aucun."""
+    """Le nom sous lequel `names` — les labels d'une issue ou du dépôt — porte le label `wanted` :
+    `wanted` lui-même s'il y est, sinon le premier qui lui est égal sans la casse ; `None` si
+    aucun."""
     if wanted in names:
         return wanted
     return next((name for name in names if name.casefold() == wanted.casefold()), None)
@@ -446,10 +482,91 @@ def comment_publish(run: Run, args: argparse.Namespace) -> str:
         return f"rien à écrire — #{args.number} porte déjà ce commentaire ({identifier})"
     publish = ("-X", "POST", comments_path(args.number), "--input", "-")
     with writing():
-        identifier = read_json(run, comment_id, *publish, stdin=body_payload(expected))
+        identifier = read_json(run, comment_id, *publish, stdin=json_payload(body=expected))
         reread = read_json(run, body_of, comment_path(identifier))
     check_reread(expected, reread, [anchor])
     return f"publié et relu — commentaire {identifier} sur #{args.number}"
+
+
+def repo_labels(run: Run, wanted: Sequence[str]) -> list[str]:
+    """Le nom que le dépôt donne à chaque label de `wanted`, apparié comme `carried_label`, sur
+    toutes les pages de ses labels.
+
+    Raises:
+        Refusal: un label de `wanted` n'existe pas dans le dépôt — chacun est nommé.
+    """
+    if not wanted:
+        return []
+    known = read_json(
+        run,
+        lambda pages: [name for page in pages for name in names_of(page)],
+        "--paginate",
+        "--slurp",
+        f"{REPO}/labels",
+    )
+    found = {label: carried_label(known, label) for label in wanted}
+    missing = [f"label inconnu du dépôt : {label}" for label, name in found.items() if name is None]
+    if missing:
+        raise Refusal(" ; ".join(missing))
+    return [name for name in found.values() if name is not None]
+
+
+def same_issue(pages: Any, title: str, body: str) -> int | None:
+    """Le numéro de la première issue — pas une PR, que son champ `pull_request` distingue — qui
+    porte exactement `title` et `body`, sur les pages que `gh api --paginate --slurp` rend.
+
+    Raises:
+        KeyError, TypeError: une issue sans titre textuel ou sans corps textuel ni `null`, ou
+            l'issue retenue sans numéro entier (`typed`).
+    """
+    return next(
+        (
+            typed(issue, "number", int)
+            for page in pages
+            for issue in page
+            if "pull_request" not in issue
+            and typed(issue, "title", str) == title
+            and body_of(issue) == body
+        ),
+        None,
+    )
+
+
+def issue_create(run: Run, args: argparse.Namespace) -> str:
+    """`issue create` : crée l'issue — titre, corps et labels en une seule requête —, sauf si une
+    issue ouverte porte déjà ce titre et ce corps — la liste des issues de l'API REST ne rend
+    que les ouvertes par défaut —, puis la relit sous le numéro que rend la création. Le fichier
+    est lu, et les labels validés, avant toute écriture.
+
+    Raises:
+        Refusal: fichier inutilisable (`read_text_file`) ou label inconnu (`repo_labels`).
+        Divergence: création ou relecture en échec, ou issue relue autre que celle écrite —
+            corps entier (`check_reread`), titre exact, ensemble des labels.
+    """
+    body, anchor = read_text_file(args.file)
+    labels = repo_labels(run, args.labels)
+    same = read_json(
+        run, lambda pages: same_issue(pages, args.title, body), "--paginate", "--slurp", ISSUES
+    )
+    if same is not None:
+        return f"rien à écrire — #{same} existe déjà"
+    # ponytail: pas de verrou — une même issue créée entre la lecture et la création fait un
+    # doublon ; relire les issues ouvertes après la création si un doublon se constate.
+    create = ("-X", "POST", ISSUES, "--input", "-")
+    payload = json_payload(title=args.title, body=body, labels=labels)
+    with writing():
+        number = read_json(run, lambda issue: typed(issue, "number", int), *create, stdin=payload)
+        title, reread, carried = read_json(
+            run,
+            lambda issue: (typed(issue, "title", str), body_of(issue), label_names(issue)),
+            issue_path(str(number)),
+        )
+    check_reread(body, reread, [anchor])
+    if title != args.title:
+        raise Divergence(f"titre attendu {args.title!r}, relu {title!r}")
+    if set(carried) != set(labels):
+        raise Divergence(f"labels attendus {sorted(labels)}, relus {sorted(carried)}")
+    return f"créé et relu — issue #{number}"
 
 
 def issue_number(value: str) -> str:
@@ -485,6 +602,11 @@ def build_parser() -> argparse.ArgumentParser:
         boxes.add_argument("--case", dest="anchors", type=one_line, action="append", required=True)
         boxes.set_defaults(handler=patch_boxes, locate=locate)
     actions = commands.add_parser("issue").add_subparsers(dest="action", required=True)
+    create = actions.add_parser("create")
+    create.add_argument("--title", type=one_line, required=True)
+    create.add_argument("--body-file", dest="file", type=Path, required=True)
+    create.add_argument("--label", dest="labels", type=one_line, action="append", default=[])
+    create.set_defaults(handler=issue_create)
     edit = actions.add_parser("edit")
     edit.add_argument("number", type=issue_number)
     edit.add_argument("--append", dest="file", type=Path, required=True)
