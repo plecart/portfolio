@@ -40,8 +40,8 @@ Pour toute question sur une lib/framework de la stack (API, config, migration de
 **utiliser en priorité le serveur MCP `context7`** plutôt que la mémoire ou une recherche web :
 il renvoie la doc à jour de la lib demandée, ce qui économise des tokens et évite les réponses
 périmées. Installé par `init-projet` (`claude mcp list` pour vérifier). La session l'a ; parmi les
-rôles, ceux dont la liste `tools:` le porte — `developpeur`, `relecteur` ; un rôle qui ne l'a pas
-remonte la question à son appelant.
+rôles, ceux dont la liste `tools:` le porte — `developpeur`, `relecteur`, `releveur` ; un rôle qui
+ne l'a pas remonte la question à son appelant.
 
 ## Minimalisme (`ponytail`)
 

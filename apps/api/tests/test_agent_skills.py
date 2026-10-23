@@ -544,6 +544,10 @@ ROLE_REQUIRED_TOOLS: list[tuple[str, str]] = [
     # « lu dans sa documentation à jour (`context7`) » (`relecteur.md`, point 3).
     ("relecteur", "mcp__context7__resolve-library-id"),
     ("relecteur", "mcp__context7__query-docs"),
+    # « une question sur une bibliothèque, écrite par ton appelant, posée à `context7` »
+    # (`releveur.md`, « Ce que tu fais »).
+    ("releveur", "mcp__context7__resolve-library-id"),
+    ("releveur", "mcp__context7__query-docs"),
 ]
 
 
@@ -563,7 +567,8 @@ def test_la_liste_d_outils_d_un_role_nomme_ceux_que_sa_prose_emploie(role: str, 
     Dénombré le 2026-10-20 sur les cinq rôles (`grep` de `^tools:` puis des outils nommés par la
     prose) : deux rôles se font prescrire un outil absent de leur liste, `developpeur` et
     `relecteur`, tous deux pour `context7` — 2 fuyaient sur 2. Un rôle neuf qui en prescrit un
-    s'ajoute à `ROLE_REQUIRED_TOOLS`.
+    s'ajoute à `ROLE_REQUIRED_TOOLS` : le `releveur`, à qui `triage` délègue une question de
+    bibliothèque depuis le lot 6a2 de #134 (2026-10-23) — 3 rôles, 6 couples.
     """
     declared = role_frontmatter(role).get("tools")
     assert isinstance(declared, str), f"`tools` absent ou non textuel chez `{role}` : {declared!r}"
@@ -2386,6 +2391,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "contributing-valider": (
         "CONTRIBUTING.md",
         "`bug-vers-issue`, chacun dans une session de dialogue",
+    ),
+    # Lot 6a2 de #134 : les skills de cadrage et de tri nomment leur exécutant (`triage` d'abord).
+    "6a-releveur-cite-sans-conclure": (
+        ".claude/agents/releveur.md",
+        "le passage qui répond, cité mot pour mot",
     ),
 }
 
