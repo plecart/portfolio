@@ -3,12 +3,12 @@
 
 Le script écrit sur la forge puis relit en entier ce qu'il y a écrit : chaque cas éprouve l'une
 des deux moitiés — ce qui part (la charge du `PATCH` ou du `POST`, lue sur l'entrée standard de
-`gh`), ou ce que la relecture voit. Il parle à `gh` par une seule fonction, `run`, que ces tests remplacent par une
-forge témoin : elle garde les documents en mémoire, applique chaque écriture par la fonction
-`stocke` — l'identité, ou la transformation qu'un cas veut lui faire subir — et ne répond qu'aux
-**commandes complètes** attendues, arguments compris ; toute autre lève. La vraie forge n'est
-jamais appelée. Les cas s'écrivent en littéraux, jamais dérivés des constantes du script
-(`cycle-pr` 3.1, « la table de cas est dérivée de l'artefact sous test »).
+`gh`), ou ce que la relecture voit. Il parle à `gh` par une seule fonction, `run`, que ces tests
+remplacent par une forge témoin : elle garde les documents en mémoire, applique chaque écriture
+par la fonction `stocke` — l'identité, ou la transformation qu'un cas veut lui faire subir — et
+ne répond qu'aux **commandes complètes** attendues, arguments compris ; toute autre lève. La vraie
+forge n'est jamais appelée. Les cas s'écrivent en littéraux, jamais dérivés des constantes du
+script (`cycle-pr` 3.1, « la table de cas est dérivée de l'artefact sous test »).
 """
 
 import json
@@ -1202,14 +1202,13 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     Au lot 6a1, `issue create` naît avec sa garde — une issue ouverte de même titre et de même
     corps en tient lieu, ses labels comparés depuis la relecture de la PR #150 —, vue rouge garde
     retirée ; `issue-create-forge-crlf` fuit, `xfail` strict, pour la même raison, et la fuite y
-    est une seconde issue ; de même pour
-    `issue edit --body-file` et `brief write`, où elle réécrit le même texte. Le rejeu de
-    `brief write` part d'un brief à éditer : après une publication, il rejoint le même cas — un
-    brief, égal au fichier. `label --add` naît avec sa garde — un label déjà posé ne se repose
-    pas —, `issue close` aussi — une issue déjà fermée avec cette raison ne se referme pas —, et
-    `milestone attach` et `close` — une issue déjà rattachée, un thème déjà fermé —, chacune vue
-    rouge garde retirée ; le rejeu d'une création de thème a son propre test, sa première passe
-    écrivant deux fois.
+    est une seconde issue ; de même pour `issue edit --body-file` et `brief write`, où elle
+    réécrit le même texte. Le rejeu de `brief write` part d'un brief à éditer : après une
+    publication, il rejoint le même cas — un brief, égal au fichier. `label --add` naît avec sa
+    garde — un label déjà posé ne se repose pas —, `issue close` aussi — une issue déjà fermée
+    avec cette raison ne se referme pas —, et `milestone attach` et `close` — une issue déjà
+    rattachée, un thème déjà fermé —, chacune vue rouge garde retirée ; le rejeu d'une création
+    de thème a son propre test, sa première passe écrivant deux fois.
 
     Les cases se relisent cochées, le label absent ou posé, l'issue fermée, rattachée, le thème
     fermé, le commentaire publié, l'issue créée, le corps remplacé, le brief écrit : les 14 autres
@@ -1665,10 +1664,10 @@ def test_une_reponse_d_une_autre_forme_sort_en_1_en_une_ligne(
     réponse de la fermeture n'étant pas lue ; puis 6, ceux de `milestone` : le milestone de
     l'issue, les thèmes du dépôt, dont le numéro entre dans un chemin, la réponse de la création
     d'un thème, de même, le thème créé relu, le rattachement relu, le thème fermé relu — 21 sites.
-    Chaque site a sa ligne ;
-    ceux de lecture et la réponse d'une création en ont une seconde, de forme ou de type, les
-    issues ouvertes une troisième et une quatrième, le numéro et les labels de l'issue identique —
-    les relectures passent par les mêmes lecteurs que la lecture."""
+    Chaque site a sa ligne ; ceux de lecture et la réponse d'une création en ont une seconde, de
+    forme ou de type, les issues ouvertes une troisième et une quatrième, le numéro et les labels
+    de l'issue identique — 36 lignes ; les relectures passent par les mêmes lecteurs que la
+    lecture."""
     forge = forge_temoin()
 
     def forge_d_une_autre_forme(
