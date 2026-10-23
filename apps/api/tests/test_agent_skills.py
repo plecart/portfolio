@@ -2899,6 +2899,20 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         REPERCUSSIONS_SKILL,
         "Ce skill **n'amende jamais un document lui-même**",
     ),
+    # Cleanup holistique de la PR #153 : sans issue impactée, l'étape 4 s'arrêtait et sautait
+    # l'étape 6 — récapitulatif et message de fin d'une session démarrée par une autre — et
+    # l'étape 7, la QA d'un thème vidé, qui ne dépend pas des issues impactées. Dénombrement écrit
+    # avant le correctif (classe : une sortie anticipée qui saute une étape due ensuite ; par la
+    # forme du geste, obs 139 — « s'arrêter », « se taire », « on se tait »), dans
+    # `repercussions/SKILL.md` le 2026-10-23 : **4** sites ; **2** fuyaient — l'étape 4, fermée
+    # ici, et l'étape 1, « s'arrêter avant l'étape 2 », dont la passe redémarrée reprend les
+    # étapes 2 à 7 mais dont la session saute encore le message de fin de l'étape 6 ; **2**
+    # indemnes — « On se tait », sur une issue sans édition formulable, la passe continuant sur
+    # les autres, et le « se taire » de l'étape 7, la dernière, sur une QA déjà proposée.
+    "6b-repercussions-sans-impact-passe-a-l-etape-6": (
+        REPERCUSSIONS_SKILL,
+        "— et passer à l'étape 6, l'étape 7 restant due",
+    ),
     "6b-repercussions-corps-relu-en-octets": (
         REPERCUSSIONS_SKILL,
         (
