@@ -2154,9 +2154,8 @@ INVARIANTS_DES_SESSIONS_LIEES = {
 # dès leur création : la session `contradiction` de l'étape 1 et sa carte de proposition, la
 # session `plan-qa` de l'étape 7, les sessions de brouillon — `bug-vers-issue` ou `vers-issues`, une
 # phrase pour les deux — de « Ce que ce skill ne fait pas » ; `grep -n start_session` dans ses deux
-# fichiers rend 4 lignes, trois de ces sites et la raison du worktree que sa « Délégation » écrit
-# une fois, la carte de proposition n'ayant pas le mot — 18 sites. Un site nouveau n'entre pas ici
-# de lui-même : la garde lit des phrases, le grep re-dérive la population.
+# fichiers en retrouve trois, la carte de proposition n'ayant pas le mot — 18 sites. Un site
+# nouveau n'entre pas ici de lui-même : la garde lit des phrases, le grep re-dérive la population.
 USE_WORKTREE_EXPLICITE = {
     "pr-paralleles-etape-0-sans-worktree": (
         PR_PARALLELES_SKILL,
@@ -2796,14 +2795,15 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     # Lot 6b de #134, bloc 1 (2026-10-23) : `repercussions` nomme ses exécutants. Une entrée par
     # point du brief du bloc qui écrit une règle, et la moitié restrictive de chaque énoncé qui en
-    # porte une (obs 126), plus les deux dettes que le lot 6a2 laissait à 6b. Dénombrement, au
-    # cleanup du bloc : **21** moitiés restrictives dans les énoncés neufs de `repercussions`,
-    # **18** épinglées au premier jet, **3** non — la carte de proposition de la « Délégation », la
-    # première page seule sans `--paginate`, le brouillon démarré dans le tour du mainteneur —,
-    # épinglées depuis ; « n'amende jamais », gardé tel quel, l'est aussi. Gardés ailleurs : la
-    # sortie de liste d'attente (`EXECUTOR_WAITING_LIST`), l'absence d'écriture `gh` directe et le
-    # renvoi au script (`SKILLS_SANS_ECRITURE_GH_DIRECTE`), le renvoi aux sessions liées
-    # (`SKILLS_DES_SESSIONS_LIEES`), `use_worktree` à chaque démarrage (`USE_WORKTREE_EXPLICITE`).
+    # porte une (obs 126), plus les dettes que le lot 6a2 laissait à 6b dans `cycle-pr` et
+    # `pr-paralleles`. Dénombrement, au cleanup du bloc : **21** moitiés restrictives dans les
+    # énoncés neufs de `repercussions`, **18** épinglées au premier jet, **3** non — la carte de
+    # proposition de la « Délégation », la première page seule sans `--paginate`, le brouillon
+    # démarré dans le tour du mainteneur —, épinglées depuis ; « n'amende jamais », gardé tel quel,
+    # l'est aussi. Gardés ailleurs : la sortie de liste d'attente (`EXECUTOR_WAITING_LIST`),
+    # l'absence d'écriture `gh` directe et le renvoi au script (`SKILLS_SANS_ECRITURE_GH_DIRECTE`),
+    # le renvoi aux sessions liées (`SKILLS_DES_SESSIONS_LIEES`), `use_worktree` à chaque démarrage
+    # (`USE_WORKTREE_EXPLICITE`).
     "6b-repercussions-releveur-sans-conclure": (
         REPERCUSSIONS_SKILL,
         "Ce qui compte reste à la session",
@@ -2866,7 +2866,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b-repercussions-l-issue-fermee-en-mode-amendement": (
         REPERCUSSIONS_SKILL,
         (
-            "En mode amendement, `#<fermée>`, `<issue fermée>` et « la clôture de #<n> » se lisent"
+            "En mode amendement, `#<fermée>`, `<issue fermée>` et le `#47` des exemples se lisent"
             " « l'amendement, PR #<m> » : la clé d'idempotence de l'étape 2 est alors la ligne qui"
             " cite cette PR"
         ),
@@ -2992,8 +2992,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     # Cleanup holistique de la PR #153 : le message de fin partait « le récapitulatif fait », avant
     # l'étape 7 que doit la passe redémarrée par `contradiction` (« QA comprise »), et jamais à
-    # l'arrêt de l'étape 1. Sites d'un message de fin dans `repercussions/SKILL.md`, le
-    # 2026-10-23 : **1**, l'étape 6 ; il fuyait aux deux bouts.
+    # l'arrêt de l'étape 1. Sites qui font partir ce message dans `repercussions/SKILL.md`, le
+    # 2026-10-23 : **1**, l'étape 6, la « Délégation » n'en disant que le contenu ; il fuyait.
     "6b-repercussions-fin-de-travail": (
         REPERCUSSIONS_SKILL,
         (
@@ -3010,9 +3010,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         ),
     ),
     # Relecture de la PR #153, passe 1, CR2. Dénombrement (noms de session dérivés d'un texte
-    # libre), `grep -rno "name: [a-z-]*<[^>]*>" .claude/skills` : **12** sites au 2026-10-23 sur
-    # `7dab581`, **1** fuyait (`plan-qa-<thème>`) ; les autres prennent un numéro,
-    # `coordinatrice.md` un `<slug>`.
+    # libre), `grep -rno "name: [a-z-]*<[^>]*>" .claude/skills` : **12** sites au 2026-10-23,
+    # **1** fuyait (`plan-qa-<thème>`) ; les autres prennent un numéro, `coordinatrice.md` un
+    # `<slug>`.
     "6b-repercussions-session-plan-qa": (
         REPERCUSSIONS_SKILL,
         (
@@ -3071,24 +3071,24 @@ def test_chaque_invariant_du_contexte_court_garde_sa_phrase(fichier: str, phrase
 # `grep -rn "issue close" .claude/skills --include=*.md` : **4** sites — `triage/SKILL.md` ×2
 # (`wontfix` bug et enhancement : `label --add wontfix --remove <état>`), `triage/hors-scope.md`
 # étape 8 (idem), `repercussions/SKILL.md` (doublon) ; **1** fuyait (`repercussions`). La forme du
-# geste, `issue close <n>` (obs 139), en rend 3 au 2026-10-23 sur `1eb58d8` : le `wontfix`
-# d'enhancement de `triage` renvoie au déroulé de `hors-scope.md`, étape 8, qui porte la commande.
+# geste, `issue close <n>` (obs 139), en rend 3 au 2026-10-23 : le `wontfix` d'enhancement de
+# `triage` renvoie au déroulé de `hors-scope.md`, étape 8, qui porte la commande.
 FERMETURES_D_ISSUE = {
     "triage-wontfix-bug": TRIAGE_SKILL,
     "triage-wontfix-enhancement-par-son-deroule": HORS_SCOPE_REF,
     "repercussions-doublon": REPERCUSSIONS_SKILL,
 }
-FERMETURE_D_ISSUE = re.compile(r"issue close <\w+>")
+COMMANDE_ISSUE_CLOSE = re.compile(r"issue close <\w+>")
 # La coupure entre deux blocs de prose : une ligne vide, ou le début d'un élément de liste (`- `,
 # `* ` ou `<n>. `).
 COUPURE_DE_BLOC = re.compile(r"\n[ \t]*\n|\n(?=[ \t]*(?:[-*]|\d+\.) )")
 
 
-def fermetures_d_issue(path: Path) -> list[str]:
+def blocs_de_fermeture(path: Path) -> list[str]:
     """Les paragraphes et éléments de liste du fichier qui ferment une issue, espaces normalisés."""
     texte = path.read_text(encoding="utf-8-sig")
     blocs = (" ".join(bloc.split()) for bloc in COUPURE_DE_BLOC.split(texte))
-    return [bloc for bloc in blocs if FERMETURE_D_ISSUE.search(bloc)]
+    return [bloc for bloc in blocs if COMMANDE_ISSUE_CLOSE.search(bloc)]
 
 
 def test_les_fermetures_d_issue_sont_celles_de_la_table() -> None:
@@ -3096,7 +3096,7 @@ def test_les_fermetures_d_issue_sont_celles_de_la_table() -> None:
     sites = sorted(
         path.relative_to(REPOSITORY_ROOT).as_posix()
         for path in REPOSITORY_ROOT.glob(SKILL_PROSE)
-        for _ in fermetures_d_issue(path)
+        for _ in blocs_de_fermeture(path)
     )
 
     assert sites == sorted(FERMETURES_D_ISSUE.values())
@@ -3105,7 +3105,7 @@ def test_les_fermetures_d_issue_sont_celles_de_la_table() -> None:
 @pytest.mark.parametrize("fichier", FERMETURES_D_ISSUE.values(), ids=FERMETURES_D_ISSUE.keys())
 def test_chaque_fermeture_d_issue_retire_son_etat(fichier: str) -> None:
     """Le bloc qui ferme l'issue porte `--remove <état>`."""
-    fermetures = fermetures_d_issue(REPOSITORY_ROOT / fichier)
+    fermetures = blocs_de_fermeture(REPOSITORY_ROOT / fichier)
     sans_retrait = [bloc for bloc in fermetures if "--remove <état>" not in bloc]
 
     assert not sans_retrait, f"`{fichier}` ferme une issue sans retirer son état : {sans_retrait}"
