@@ -1,7 +1,7 @@
 ---
 name: vers-issues
-description: Découpe un plan, une spec ou un PRD en issues indépendamment récupérables sur GitHub (via `gh`) en utilisant des tranches verticales tracer-bullet. À utiliser quand l'utilisateur veut convertir un plan en issues, créer des tickets d'implémentation, ou découper le travail en issues.
-argument-hint: "[#issue-prd | chemin/vers/plan.md | description]"
+description: Découpe un PRD ou un plan publié, passé en argument, en issues indépendamment récupérables sur GitHub en utilisant des tranches verticales tracer-bullet. À utiliser quand l'utilisateur veut convertir un plan en issues, créer des tickets d'implémentation, ou découper le travail en issues.
+argument-hint: "[#issue-prd | chemin/vers/plan.md]"
 ---
 
 # Vers Issues
@@ -10,15 +10,24 @@ Découpe un plan en issues indépendamment récupérables en utilisant des tranc
 
 Le dépôt GitHub et le mapping de labels sont dans `.claude/pipeline.config.md` — sinon lancer `init-projet`.
 
+## Délégation
+
+La session garde le découpage, le dialogue de l'étape 4 et la rédaction des corps. Le reste change de main :
+
+- **`releveur`** — la lecture de la source (corps complet et résumé des commentaires), l'exploration bornée du code, les dénombrements par commande donnée, et la publication en série (étape 5) ; la vérification à la source d'une capacité de fournisseur reste à la session, le `releveur` n'ayant pas d'accès web ;
+- **script** — `issue create`, `issue edit`, `milestone attach`, par `python .claude/skills/cycle-pr/scripts/ecriture-relue.py <sous-commande> …`, qui relit ce qu'il écrit.
+
+Une session démarrée par une autre — par `vers-prd` — suit le protocole commun de `.claude/skills/cycle-pr/references/sessions-liees.md`, message de fin « terminé — \<livrable> » compris.
+
 ## Processus
 
 ### 1. Rassembler le contexte
 
-Travaille à partir de ce qui est déjà présent dans le contexte de la conversation. Si l'utilisateur passe une référence d'issue (numéro d'issue, URL ou chemin) en argument, récupère-la depuis GitHub (via `gh`) et lis son corps complet et ses commentaires.
+Le découpage part d'une source écrite : la source se passe en argument — `#issue-prd` ou son URL, dont un `releveur` rend le corps complet et le résumé des commentaires, ou le chemin d'un plan écrit, que la session lit. Sans argument, la session s'arrête et demande la référence.
 
 ### 2. Explorer la base de code (optionnel)
 
-Si tu n'as pas encore exploré la base de code, fais-le pour comprendre l'état actuel du code. Les titres et descriptions d'issues doivent utiliser le vocabulaire du glossaire métier du projet, et respecter les ADR de la zone que tu touches.
+Si la base de code n'a pas encore été explorée, un `releveur` l'explore sur les ancres que la session lui donne, pour l'état actuel du code. Les titres et descriptions d'issues doivent utiliser le vocabulaire du glossaire métier du projet, et respecter les ADR de la zone que tu touches.
 
 ### 3. Esquisser les tranches verticales
 
@@ -33,7 +42,9 @@ Les tranches peuvent être 'HITL' ou 'AFK'. Les tranches HITL nécessitent une i
 - Chaque élément visible qu'une tranche ajoute à un écran nomme le comportement — de cette tranche ou d'une tranche déjà livrée — qui le fait changer ; un élément dont le seul comportement arrive avec une autre tranche va dans celle-ci, en critère, et la tranche courante n'en pose que la donnée (obs 65)
 </vertical-slice-rules>
 
-**Ne jamais découper une tranche pour la seule taille de PR** quand ses morceaux se valident ensemble — même écran, même point d'arrêt visuel, même ADR : les séparer fait valider deux fois le même écran, ou un demi-écran. La règle de taille (`taille-pr.md`) est une règle de PR, pas de découpage fonctionnel : la tranche reste **une** issue, et si elle dépasse la taille de référence, `cycle-pr` la livre en plusieurs PR (son « cas découpé », Étape 2).
+**Ne jamais découper une tranche pour la seule taille de PR** quand ses morceaux se valident ensemble — même écran, même point d'arrêt visuel, même ADR : les séparer fait valider deux fois le même écran, ou un demi-écran. La règle de taille (`taille-pr.md`) est une règle de PR, pas de découpage fonctionnel : la tranche reste **une** issue, et si elle dépasse la taille de référence, `cycle-pr` la livre en plusieurs PR (son « cas découpé », Étape 2) — les lots d'une même issue, ci-dessous.
+
+**Un dépassement prévisible se découpe dès la création** (obs 120). Quand une tranche dépasse de façon prévisible le gabarit de `taille-pr.md` — fichiers et lignes estimables par critère (`cycle-pr` Étape 1, « Estimation ») —, l'issue porte ses lots dès sa création, un bloc chacun, et un lot qui dépasse lui-même le gabarit porte ses sous-lots de même : un sous-lot est un lot (`cycle-pr` 3.5). Le re-découpage au briefing reste la voie d'un dépassement découvert, jamais d'un dépassement prévisible.
 
 ### 4. Interroger l'utilisateur
 
@@ -55,15 +66,23 @@ Itère jusqu'à ce que l'utilisateur approuve le découpage.
 
 ### 5. Publier les issues sur GitHub
 
-Pour chaque tranche approuvée, publie une nouvelle issue sur GitHub (via `gh`). Utilise le template de corps d'issue ci-dessous. Applique le label de triage `needs-triage` pour que chaque issue entre dans le flux de triage normal.
+Pour chaque tranche approuvée, la session écrit le corps de l'issue dans un fichier, d'après le template ci-dessous, marqueurs `{{T<k>}}` compris. Chaque issue entre dans le flux de triage normal sous le label `needs-triage` du mapping.
 
-**Rattache chaque issue à son thème** quand le domaine est évident : le découpage vient d'un plan, tu sais donc de quel domaine relève chaque tranche. Utilise les **domaines** de `.claude/pipeline.config.md` et le milestone homonyme (`gh issue edit <n> --milestone "<Domaine>"`) — voir `triage/themes-milestones.md`. Si aucun domaine ne couvre une tranche, laisse le thème vide et signale-le : c'est soit du hors-périmètre, soit un domaine manquant dans la config. Rattacher ici évite à `triage` de le refaire issue par issue.
+**Rattache chaque issue à son thème** quand le domaine est évident : le découpage vient d'un plan, tu sais donc de quel domaine relève chaque tranche. Utilise les **domaines** de `.claude/pipeline.config.md` et le milestone homonyme, décrit par le périmètre du domaine — voir `triage/themes-milestones.md`. Si aucun domaine ne couvre une tranche, laisse le thème vide et signale-le : c'est soit du hors-périmètre, soit un domaine manquant dans la config. Rattacher ici évite à `triage` de le refaire issue par issue.
 
-Publie les issues dans l'ordre des dépendances (bloqueurs d'abord) afin de pouvoir référencer les identifiants d'issues réels dans le champ « Bloquée par ».
+Les issues se publient dans l'ordre des dépendances (bloqueurs d'abord) afin de pouvoir référencer les identifiants d'issues réels dans le champ « Bloquée par ».
 
-**Cet ordre ne résout pas les références croisées hors « Bloquée par ».** Les corps se citent aussi entre eux (« le contrat est fixé avec la tranche X », « s'applique aussi à Y »), dans les deux sens : un ordre topologique sur les seuls bloqueurs laisse forcément des références « en avant » sans numéro. Protocole en deux passes : (1) rédiger tous les corps avec des **marqueurs symboliques** (`{{T3}}`) et publier dans l'ordre des bloqueurs en substituant les marqueurs déjà connus ; (2) une fois tous les numéros attribués, **rééditer** les issues qui portaient un marqueur non résolu, puis **vérifier mécaniquement** (recherche de `{{`) qu'aucun marqueur ne subsiste dans aucun corps publié — l'ordre de création seul donne une fausse impression de complétude.
+**Cet ordre ne résout pas les références croisées hors « Bloquée par ».** Les corps se citent aussi entre eux (« le contrat est fixé avec la tranche X », « s'applique aussi à Y »), dans les deux sens : un ordre topologique sur les seuls bloqueurs laisse forcément des références « en avant » sans numéro. D'où les **marqueurs symboliques** (`{{T3}}`) des corps, et une publication en deux passes suivie d'une **vérification mécanique** — l'ordre de création seul donne une fausse impression de complétude.
 
-**Critères reposant sur un service tiers.** Quand un critère d'acceptation suppose une capacité d'un fournisseur (restriction d'usage, plafond, quota, révocation, rotation), ne jamais la recopier d'un document du projet sans l'avoir vérifiée : ajouter la ligne « vérifié à la source le <date> : <doc du fournisseur> », ou marquer le critère « ⛔ à vérifier avant engagement ». Une contre-mesure copiée sans vérification survit à tous les rangs de doc et n'éclate qu'au moment le plus coûteux — la console ouverte.
+**La publication en série part à un `releveur`.** Il reçoit la table ordonnée — fichier, titre, label `needs-triage` du mapping, thème et description du domaine — et, par l'écriture relue (« Délégation ») :
+
+1. publie dans l'ordre des bloqueurs par `issue create --title <titre> --body-file <fichier> --label <label>`, dont la sortie porte le numéro, substitue dans les fichiers suivants les marqueurs dont le numéro est connu, et rattache chaque issue qui a un thème par `milestone attach <N> --title <Domaine> --description <périmètre>` ;
+2. seconde passe, une fois tous les numéros attribués : `issue edit <N> --body-file <fichier>` sur chaque issue dont un marqueur restait ;
+3. relit chaque corps publié et compte les `{{` — 0 attendu.
+
+Il rend la table marqueur → numéro et ce décompte.
+
+**Critères reposant sur un service tiers.** Quand un critère d'acceptation suppose une capacité d'un fournisseur (restriction d'usage, plafond, quota, révocation, rotation), ne jamais la recopier d'un document du projet sans l'avoir vérifiée à la source — par la session elle-même (« Délégation ») : ajouter la ligne « vérifié à la source le <date> : <doc du fournisseur> », ou marquer le critère « ⛔ à vérifier avant engagement ». Une contre-mesure copiée sans vérification survit à tous les rangs de doc et n'éclate qu'au moment le plus coûteux — la console ouverte.
 
 **Une issue qui pose une infrastructure de test porte sa barre.** Un harnais (conteneurs jetables, greffon de réglages, fabriques) attire les tests de ses propres tests : sans barre écrite, le harnais grossit plus vite que la fonctionnalité qu'il sert. La barre par défaut, à inscrire dans ses critères : (1) sans le service, la suite échoue en disant pourquoi, en une ligne ; (2) réglages et image viennent du dépôt, jamais du shell, tenus par un seul garde ; (3) un test de fumée démarre le service et exécute une requête. Tout le reste — sessions de test imbriquées, épinglage par empreinte sans incident, tests des gardes — est hors barre tant qu'un défaut réel ne l'a pas demandé. Et un socle de test est une tranche à part, jamais fondue dans la première fonctionnalité qui en a besoin.
 

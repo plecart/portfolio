@@ -698,12 +698,10 @@ HOUSE_SKILLS = (
 
 # Les skills maison qui ne délèguent encore à personne, chacun avec le lot de #134 qui l'en sort :
 # au 2026-10-20 sur `e70e279`, onze, dont `init-projet`, qui ne nomme les cinq rôles que dans sa
-# liste de fichiers ; dix depuis le lot 6a2 (2026-10-23, base `aba63e1`), qui en sort `triage`. La
+# liste de fichiers ; dix au 2026-10-23 sur `34604c7` (lot 6a2, bloc 1), qui en sort `triage` ;
+# sept au commit suivant (bloc 2), qui en sort `interroge-moi`, `vers-prd` et `vers-issues`. La
 # liste se vide lot par lot ; #134 l'exige vide.
 EXECUTOR_WAITING_LIST = {
-    "interroge-moi": "6a",
-    "vers-prd": "6a",
-    "vers-issues": "6a",
     "bug-vers-issue": "6b",
     "contradiction": "6b",
     "repercussions": "6b",
@@ -816,8 +814,9 @@ def test_chaque_skill_maison_nomme_ses_executants(skill: str) -> None:
     """Second paramétrage de D5 : un skill maison hors liste d'attente nomme un rôle ou un script.
 
     Au 2026-10-20 sur `e70e279`, deux sur treize (`cycle-pr`, `pr-paralleles`) ; trois au
-    2026-10-23 avec `triage` (lot 6a2) ; les dix autres sont dans `EXECUTOR_WAITING_LIST` avec le
-    lot qui les en sort.
+    2026-10-23 sur `34604c7` avec `triage` (lot 6a2, bloc 1), six au commit suivant avec
+    `interroge-moi`, `vers-prd` et `vers-issues` (bloc 2) ; les sept autres sont dans
+    `EXECUTOR_WAITING_LIST` avec le lot qui les en sort.
     """
     assert cites_an_executor(skill_prose(skill), ROLE_NAMES), (
         f"`{skill}` ne nomme aucun rôle ni aucun script, et n'est pas en liste d'attente"
@@ -835,9 +834,9 @@ def test_un_skill_en_liste_d_attente_ne_nomme_encore_aucun_executant(skill: str)
 
 
 # Les skills dont la prose n'écrit plus sur la forge que par l'écriture distante relue (#134,
-# lot 4) : chaque lot de #134 y ajoute les siens — le bloc 2 du lot 6a2 `interroge-moi`, `vers-prd`
+# lot 4) : chaque lot de #134 y ajoute les siens — le lot 6a2 `triage`, `interroge-moi`, `vers-prd`
 # et `vers-issues`, les lots 6b à 8 les leurs.
-SKILLS_SANS_ECRITURE_GH_DIRECTE = ("triage",)
+SKILLS_SANS_ECRITURE_GH_DIRECTE = ("triage", "interroge-moi", "vers-prd", "vers-issues")
 ECRITURE_RELUE = ".claude/skills/cycle-pr/scripts/ecriture-relue.py"
 
 # Une commande `gh` citée, jusqu'à son accent grave fermant ou sa fin de ligne.
@@ -911,8 +910,9 @@ def test_une_ecriture_gh_se_reconnait(text: str, expected: bool) -> None:
 @pytest.mark.parametrize("skill", SKILLS_SANS_ECRITURE_GH_DIRECTE)
 def test_un_skill_sans_ecriture_gh_directe_n_en_cite_aucune(skill: str) -> None:
     """Une écriture `gh` directe n'est pas relue (`contraintes.md`, « Écritures sur un artefact
-    distant ») : `triage` en portait quatre au 2026-10-23 sur `aba63e1`, toutes dans
-    `themes-milestones.md`.
+    distant ») : au 2026-10-23 sur `aba63e1`, `triage` en portait quatre, toutes dans
+    `themes-milestones.md`, `vers-issues` une (`gh issue edit <n> --milestone`), `interroge-moi`
+    et `vers-prd` aucune — leurs écritures n'y étaient décrites qu'en prose.
 
     **Population** : `SKILLS_SANS_ECRITURE_GH_DIRECTE`, le `SKILL.md` et les références de chacun.
     **Ce que le détecteur ne voit pas** : une écriture décrite sans commande (« publie un
@@ -1474,6 +1474,8 @@ SKILLS_DES_SESSIONS_LIEES = [
     ".claude/skills/pr-paralleles/SKILL.md",
     ".claude/skills/interroge-moi/SKILL.md",
     ".claude/skills/triage/SKILL.md",
+    ".claude/skills/vers-prd/SKILL.md",
+    ".claude/skills/vers-issues/SKILL.md",
 ]
 
 
@@ -1497,9 +1499,9 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 # sur l'enfant jetable (l'enfant lit son parent dans son prompt, la porte du nettoyage compare
 # l'échafaudage à sa source — journal de spec de #107, 2026-10-16). La commande du
 # premier geste porte trois invariants à elle seule (`origin/`, `--no-track`, `&&`). Gardés
-# ailleurs : les trois renvois (`SKILLS_DES_SESSIONS_LIEES`), le point de départ `origin/`
-# (`DEPARTS_EXPLICITES`), la porte du nettoyage (`PORTES_PRESCRITES`). Restent en lecture, à
-# dessein : les formes du message de fin autres que celle d'un lot — sauf celle de fin
+# ailleurs : les renvois (`SKILLS_DES_SESSIONS_LIEES`, six au 2026-10-23), le point de départ
+# `origin/` (`DEPARTS_EXPLICITES`), la porte du nettoyage (`PORTES_PRESCRITES`). Restent en
+# lecture, à dessein : les formes du message de fin autres que celle d'un lot — sauf celle de fin
 # d'interrogatoire, que l'étape 0 de `pr-paralleles` consomme depuis le lot 4 (gardée plus bas).
 #
 # **Recensée à la passe 2 de la relecture de la PR #109**, après qu'un premier dénombrement à
@@ -2524,6 +2526,46 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6a-brief-reprend-les-decisions": (
         ".claude/skills/triage/brief-agent.md",
         "reprennent la section « Décisions » du corps de l'issue",
+    ),
+    "6a-interroge-moi-decisions-dans-le-corps": (
+        INTERROGE_MOI_SKILL,
+        "dans la section « Décisions » du corps de l'issue, chaque ligne datée",
+    ),
+    "6a-interroge-moi-jamais-dans-la-session-pr": (
+        INTERROGE_MOI_SKILL,
+        "jamais dans la session PR",
+    ),
+    "6a-interroge-moi-jamais-dans-le-dossier-partage": (
+        INTERROGE_MOI_SKILL,
+        "jamais dans le dossier partagé",
+    ),
+    "6a-vers-prd-archive-par-une-pr": (
+        ".claude/skills/vers-prd/SKILL.md",
+        "le fichier d'archive s'écrit par une PR",
+    ),
+    "6a-vers-prd-archive-jamais-sur-le-trunk": (
+        ".claude/skills/vers-prd/SKILL.md",
+        "son merge attend le go du mainteneur ; jamais un commit direct sur le trunk",
+    ),
+    "6a-vers-prd-vers-issues-dans-sa-session": (
+        ".claude/skills/vers-prd/SKILL.md",
+        "`vers-issues` part du PRD publié, dans sa propre session",
+    ),
+    "6a-vers-issues-source-en-argument": (
+        ".claude/skills/vers-issues/SKILL.md",
+        "la source se passe en argument",
+    ),
+    "6a-vers-issues-sans-argument-s-arrete": (
+        ".claude/skills/vers-issues/SKILL.md",
+        "Sans argument, la session s'arrête et demande la référence",
+    ),
+    "6a-vers-issues-lots-des-la-creation": (
+        ".claude/skills/vers-issues/SKILL.md",
+        "porte ses lots dès sa création",
+    ),
+    "6a-vers-issues-re-decoupage-jamais-pour-un-depassement-prevu": (
+        ".claude/skills/vers-issues/SKILL.md",
+        "reste la voie d'un dépassement découvert, jamais d'un dépassement prévisible",
     ),
 }
 
