@@ -81,8 +81,8 @@ ouverte par une `contradiction` née d'une décision, sans issue fermée à l'or
 est l'amendement. Les étapes 2 à 6 s'appliquent ; l'étape 7 est sans objet, aucun thème ne s'étant
 vidé ; la ligne de journal cite l'amendement, pas une issue fermée (« Réconciliée avec
 l'amendement du cadrage §9.3, PR #<m>, du 26 août 2026 »). En mode amendement, `#<fermée>`,
-`<issue fermée>` et le `#47` des exemples se lisent « l'amendement, PR #<m> » : la clé
-d'idempotence de l'étape 2 est alors la ligne qui cite cette PR.
+`<issue fermée>` et le `#47` des exemples se lisent « l'amendement, PR #<m> » — `pr-<m>` dans un
+chemin : la clé d'idempotence de l'étape 2 est alors la ligne qui cite cette PR.
 
 Écrire un résumé court de **ce que cette clôture a réellement changé** — pas ce que l'issue
 promettait, ce qui a été *fait*. Sources, qu'un `releveur` rend : le **diff mergé**
