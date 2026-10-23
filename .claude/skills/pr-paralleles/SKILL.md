@@ -406,8 +406,7 @@ c'est le seul autre canal, et il passe par lui.
     **leur PR ouverte**, que `cycle-pr` traite à son Étape 6. L'instrument qui publie ce
     commentaire et le relit après écriture est
     `.claude/skills/cycle-pr/scripts/ecriture-relue.py comment <PR> --body-file <fichier>` ;
-    `repercussions` le prescrit au lot 6b de #134 — d'ici là, son étape 5, « Issues en vol », ne
-    nomme aucune commande.
+    `repercussions` le prescrit à son étape 5, « Issues en vol ».
   - **Tenir `PR-PARALLELES.md` à jour est donc fonctionnel, pas décoratif** : une ligne périmée
     (issue mergée encore marquée en cours, ou worktree **d'issue** actif absent du tableau) fait
     mal classer une issue — et une issue en vol traitée comme dormante se fait réécrire sa spec

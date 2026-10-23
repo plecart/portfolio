@@ -703,12 +703,12 @@ HOUSE_SKILLS = (
 # Les skills maison qui ne délèguent encore à personne, chacun avec le lot de #134 qui l'en sort :
 # au 2026-10-20 sur `e70e279`, onze, dont `init-projet`, qui ne nomme les cinq rôles que dans sa
 # liste de fichiers ; dix au 2026-10-23 sur `34604c7` (lot 6a2, bloc 1), qui en sort `triage` ;
-# sept au commit suivant (bloc 2), qui en sort `interroge-moi`, `vers-prd` et `vers-issues`. La
-# liste se vide lot par lot ; #134 l'exige vide.
+# sept au commit suivant (bloc 2), qui en sort `interroge-moi`, `vers-prd` et `vers-issues` ; six
+# au 2026-10-23 (lot 6b, bloc 1), qui en sort `repercussions`. La liste se vide lot par lot ; #134
+# l'exige vide.
 EXECUTOR_WAITING_LIST = {
     "bug-vers-issue": "6b",
     "contradiction": "6b",
-    "repercussions": "6b",
     "plan-qa": "7a",
     "execution-qa": "7b",
     "audit-spec-ui": "8",
@@ -819,8 +819,9 @@ def test_chaque_skill_maison_nomme_ses_executants(skill: str) -> None:
 
     Au 2026-10-20 sur `e70e279`, deux sur treize (`cycle-pr`, `pr-paralleles`) ; trois au
     2026-10-23 sur `34604c7` avec `triage` (lot 6a2, bloc 1), six au commit suivant avec
-    `interroge-moi`, `vers-prd` et `vers-issues` (bloc 2) ; les sept autres sont dans
-    `EXECUTOR_WAITING_LIST` avec le lot qui les en sort.
+    `interroge-moi`, `vers-prd` et `vers-issues` (bloc 2), sept le 2026-10-23 avec `repercussions`
+    (lot 6b, bloc 1) ; les six autres sont dans `EXECUTOR_WAITING_LIST` avec le lot qui les en
+    sort.
     """
     assert cites_an_executor(skill_prose(skill), ROLE_NAMES), (
         f"`{skill}` ne nomme aucun rôle ni aucun script, et n'est pas en liste d'attente"
@@ -839,8 +840,15 @@ def test_un_skill_en_liste_d_attente_ne_nomme_encore_aucun_executant(skill: str)
 
 # Les skills dont la prose n'écrit plus sur la forge que par l'écriture distante relue (#134,
 # lot 4) : chaque lot de #134 y ajoute les siens — le lot 6a2 `triage`, `interroge-moi`, `vers-prd`
-# et `vers-issues`, les lots 6b à 8 les leurs.
-SKILLS_SANS_ECRITURE_GH_DIRECTE = ("triage", "interroge-moi", "vers-prd", "vers-issues")
+# et `vers-issues` ; le lot 6b `repercussions` (bloc 1), puis ses autres skills ; les lots 7a à 8
+# les leurs.
+SKILLS_SANS_ECRITURE_GH_DIRECTE = (
+    "triage",
+    "interroge-moi",
+    "vers-prd",
+    "vers-issues",
+    "repercussions",
+)
 ECRITURE_RELUE = ".claude/skills/cycle-pr/scripts/ecriture-relue.py"
 
 # Une commande `gh` citée, jusqu'à son accent grave fermant ou sa fin de ligne.
@@ -923,7 +931,8 @@ def test_un_skill_sans_ecriture_gh_directe_n_en_cite_aucune(skill: str) -> None:
     """Une écriture `gh` directe n'est pas relue (`contraintes.md`, « Écritures sur un artefact
     distant ») : au 2026-10-23 sur `aba63e1`, `triage` en portait quatre, toutes dans
     `themes-milestones.md`, `vers-issues` une (`gh issue edit <n> --milestone`), `interroge-moi`
-    et `vers-prd` aucune — leurs écritures n'y étaient décrites qu'en prose.
+    et `vers-prd` aucune — leurs écritures n'y étaient décrites qu'en prose. Le 2026-10-23 (lot 6b,
+    bloc 1), `repercussions` une : le `gh api -X PATCH` de son brief.
 
     **Population** : `SKILLS_SANS_ECRITURE_GH_DIRECTE`, le `SKILL.md` et les références de chacun.
     **Ce que le détecteur ne voit pas** : une écriture décrite sans commande (« publie un
@@ -1487,6 +1496,7 @@ SKILLS_DES_SESSIONS_LIEES = [
     ".claude/skills/triage/SKILL.md",
     ".claude/skills/vers-prd/SKILL.md",
     ".claude/skills/vers-issues/SKILL.md",
+    ".claude/skills/repercussions/SKILL.md",
 ]
 
 
@@ -1510,7 +1520,7 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 # sur l'enfant jetable (l'enfant lit son parent dans son prompt, la porte du nettoyage compare
 # l'échafaudage à sa source — journal de spec de #107, 2026-10-16). La commande du
 # premier geste porte trois invariants à elle seule (`origin/`, `--no-track`, `&&`). Gardés
-# ailleurs : les renvois (`SKILLS_DES_SESSIONS_LIEES`, six au 2026-10-23), le point de départ
+# ailleurs : les renvois (`SKILLS_DES_SESSIONS_LIEES`, sept au 2026-10-23), le point de départ
 # `origin/` (`DEPARTS_EXPLICITES`), la porte du nettoyage (`PORTES_PRESCRITES`). Restent en
 # lecture, à dessein : les formes du message de fin autres que celle d'un lot — sauf celle de fin
 # d'interrogatoire, que l'étape 0 de `pr-paralleles` consomme depuis le lot 4 (gardée plus bas).
@@ -1558,6 +1568,7 @@ HORS_SCOPE_REF = ".claude/skills/triage/hors-scope.md"
 RELEVEUR_ROLE = ".claude/agents/releveur.md"
 VERS_PRD_SKILL = ".claude/skills/vers-prd/SKILL.md"
 VERS_ISSUES_SKILL = ".claude/skills/vers-issues/SKILL.md"
+REPERCUSSIONS_SKILL = ".claude/skills/repercussions/SKILL.md"
 THEMES_MILESTONES_REF = ".claude/skills/triage/themes-milestones.md"
 BRIEF_AGENT_REF = ".claude/skills/triage/brief-agent.md"
 INVARIANTS_DES_SESSIONS_LIEES = {
@@ -1944,7 +1955,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         "Maintenir un fichier `PR-PARALLELES.md` **hors du dépôt**",
     ),
     "repercussions-lit-le-tableau-hors-depot": (
-        ".claude/skills/repercussions/SKILL.md",
+        REPERCUSSIONS_SKILL,
         "hors dépôt, dans le dossier du projet qui porte `skill-observations/`",
     ),
     "colonne-session-par-identifiant": (
@@ -2139,8 +2150,13 @@ INVARIANTS_DES_SESSIONS_LIEES = {
 # `themes-milestones.md` propose sans le mot : la session de tri du relevé et celle d'une issue
 # `bug`, l'interrogatoire, la session de tri du brief, `vers-issues`, `init-projet` — **3**
 # fuyaient (les deux du relevé, par renvoi à `pr-paralleles` ; `init-projet`, sans paramètre) —,
-# 14 sites. Un site nouveau n'entre pas ici de lui-même : la garde lit des phrases, le grep
-# re-dérive la population.
+# 14 sites. Le lot 6b en ajoute **4** dans `repercussions` (2026-10-23, bloc 1), écrits en clair
+# dès leur création : la session `contradiction` de l'étape 1 et sa carte de proposition, la
+# session `plan-qa` de l'étape 7, les sessions de brouillon — `bug-vers-issue` ou `vers-issues`, une
+# phrase pour les deux — de « Ce que ce skill ne fait pas » ; `grep -n start_session` dans ses deux
+# fichiers rend 4 lignes, trois de ces sites et la raison du worktree que sa « Délégation » écrit
+# une fois, la carte de proposition n'ayant pas le mot — 18 sites. Un site nouveau n'entre pas ici
+# de lui-même : la garde lit des phrases, le grep re-dérive la population.
 USE_WORKTREE_EXPLICITE = {
     "pr-paralleles-etape-0-sans-worktree": (
         PR_PARALLELES_SKILL,
@@ -2193,6 +2209,25 @@ USE_WORKTREE_EXPLICITE = {
     "themes-milestones-vers-init-projet": (
         THEMES_MILESTONES_REF,
         "démarrée avec `use_worktree: true` : elle écrit sur une branche",
+    ),
+    "repercussions-vers-contradiction": (
+        REPERCUSSIONS_SKILL,
+        "`use_worktree: true`, `name: contradiction-<N>`",
+    ),
+    "repercussions-vers-contradiction-par-carte": (
+        REPERCUSSIONS_SKILL,
+        (
+            "hors d'un tour du mainteneur, une carte de proposition (`initiation: own_initiative`,"
+            " `use_worktree: true`)"
+        ),
+    ),
+    "repercussions-vers-plan-qa": (
+        REPERCUSSIONS_SKILL,
+        "`use_worktree: true`, `name: plan-qa-<thème>`",
+    ),
+    "repercussions-vers-les-brouillons": (
+        REPERCUSSIONS_SKILL,
+        "`context: fresh`, `use_worktree: true` : pour un défaut, `bug-vers-issue`",
     ),
 }
 
@@ -2758,6 +2793,172 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6a-interroge-moi-arret-attend-le-merge": (
         INTERROGE_MOI_SKILL,
         "L'amendement qu'un arrêt décide part par une PR, et la décision attend son merge",
+    ),
+    # Lot 6b de #134, bloc 1 (2026-10-23) : `repercussions` nomme ses exécutants. Une entrée par
+    # point du brief du bloc qui écrit une règle, et la moitié restrictive de chaque énoncé qui en
+    # porte une (obs 126), plus les deux dettes que le lot 6a2 laissait à 6b. Dénombrement, au
+    # cleanup du bloc : **21** moitiés restrictives dans les énoncés neufs de `repercussions`,
+    # **18** épinglées au premier jet, **3** non — la carte de proposition de la « Délégation », la
+    # première page seule sans `--paginate`, le brouillon démarré dans le tour du mainteneur —,
+    # épinglées depuis ; « n'amende jamais », gardé tel quel, l'est aussi. Gardés ailleurs : la
+    # sortie de liste d'attente (`EXECUTOR_WAITING_LIST`), l'absence d'écriture `gh` directe et le
+    # renvoi au script (`SKILLS_SANS_ECRITURE_GH_DIRECTE`), le renvoi aux sessions liées
+    # (`SKILLS_DES_SESSIONS_LIEES`), `use_worktree` à chaque démarrage (`USE_WORKTREE_EXPLICITE`).
+    "6b-repercussions-releveur-sans-conclure": (
+        REPERCUSSIONS_SKILL,
+        "Ce qui compte reste à la session",
+    ),
+    "6b-repercussions-script-par-la-session": (
+        REPERCUSSIONS_SKILL,
+        "appelée par la session elle-même : un geste isolé coûte plus délégué",
+    ),
+    "6b-repercussions-sessions-au-tour-du-mainteneur": (
+        REPERCUSSIONS_SKILL,
+        (
+            "chacune démarrée dans le tour du mainteneur qui l'accepte, hors de ce tour par une"
+            " carte de proposition"
+        ),
+    ),
+    "6b-repercussions-worktree-de-ses-sessions": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Une session que celle-ci démarre reçoit son propre worktree, `use_worktree: true` :"
+            " `repercussions` tourne dans la session PR, dont le worktree est retiré après le"
+            " merge, et une session démarrée dans ce dossier y vivrait et serait archivée avec"
+            " elle (description de `start_session`, lue le 2026-10-23)"
+        ),
+    ),
+    "6b-repercussions-pr-d-amendement": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Avec une PR d'amendement — une PR mergée qui amende une source de vérité sans fermer"
+            " d'issue, ouverte par `contradiction` —, le delta réel est l'amendement"
+        ),
+    ),
+    "6b-repercussions-amendement-sans-qa": (REPERCUSSIONS_SKILL, "l'étape 7 est sans objet"),
+    "6b-repercussions-journal-de-l-amendement": (
+        REPERCUSSIONS_SKILL,
+        "la ligne de journal cite l'amendement, pas une issue fermée",
+    ),
+    "6b-repercussions-grep-des-sources-au-releveur": (
+        REPERCUSSIONS_SKILL,
+        "un `releveur` le passe et rend les passages autour des ancres ; le verdict reste à la session",
+    ),
+    "6b-repercussions-contradiction-au-tour-du-mainteneur": (
+        REPERCUSSIONS_SKILL,
+        "Dans le tour où le mainteneur l'accepte, démarrer la session `contradiction`",
+    ),
+    "6b-repercussions-session-contradiction": (
+        REPERCUSSIONS_SKILL,
+        (
+            "`start_session`, `initiation: user_asked`, `context: fresh`, `use_worktree: true`,"
+            " `name: contradiction-<N>`, prompt `/contradiction` suivi du bloc d'arrêt — ses deux"
+            " citations"
+        ),
+    ),
+    "6b-repercussions-n-amende-jamais": (
+        REPERCUSSIONS_SKILL,
+        "Ce skill **n'amende jamais un document lui-même**",
+    ),
+    "6b-repercussions-corps-relu-en-octets": (
+        REPERCUSSIONS_SKILL,
+        (
+            "le corps courant relu en octets (`gh api repos/{owner}/{repo}/issues/<n> --jq .body`,"
+            " sans le LF final que `--jq` ajoute)"
+        ),
+    ),
+    "6b-repercussions-remplacements-ancres": (
+        REPERCUSSIONS_SKILL,
+        "appliqué **par remplacements ancrés en mémoire** sur ce texte",
+    ),
+    "6b-repercussions-fins-de-ligne-gardees": (
+        REPERCUSSIONS_SKILL,
+        "ses fins de ligne gardées : le script relit contre ce fichier et ne voit pas une conversion",
+    ),
+    "6b-repercussions-appel-apres-les-controles": (
+        REPERCUSSIONS_SKILL,
+        "l'appel attend les deux contrôles ci-dessous",
+    ),
+    "6b-repercussions-brief-write": (
+        REPERCUSSIONS_SKILL,
+        (
+            "`brief write <n> --body-file <fichier>`, qui édite en place le seul brief, jamais un"
+            " second brief concurrent"
+        ),
+    ),
+    "6b-repercussions-brief-sur-toutes-les-pages": (
+        REPERCUSSIONS_SKILL,
+        (
+            "`gh api --paginate repos/{owner}/{repo}/issues/<n>/comments` — sans `--paginate`, la"
+            " première page seule"
+        ),
+    ),
+    "6b-repercussions-verification-dans-le-fichier": (
+        REPERCUSSIONS_SKILL,
+        (
+            "chercher dans le fichier chaque « citation issue » marquée `brief` — **zéro occurrence"
+            " attendue** — et l'ancre du contenu voulu — **présente**"
+        ),
+    ),
+    "6b-repercussions-comment-pr": (
+        REPERCUSSIONS_SKILL,
+        "`comment <PR> --body-file <fichier>`, que le script relit en entier",
+    ),
+    "6b-repercussions-retour-par-label": (
+        REPERCUSSIONS_SKILL,
+        "`label <n> --add needs-interrogation --remove <ready-for-agent | ready-for-human>`",
+    ),
+    "6b-repercussions-fermee-en-doublon": (
+        REPERCUSSIONS_SKILL,
+        (
+            "« Fermée en doublon de #<M> après #<fermée> », dans le corps (`issue edit --body-file`)"
+            " — le skill ne commente jamais une issue —, puis `issue close <n> --reason not_planned`"
+        ),
+    ),
+    "6b-repercussions-fin-de-travail": (
+        REPERCUSSIONS_SKILL,
+        (
+            "prévenir le parent par le message de fin de la même référence (« Fin de travail ») —"
+            " la fin du tour ne le prévient pas"
+        ),
+    ),
+    "6b-repercussions-proposer-puis-demarrer": (
+        REPERCUSSIONS_SKILL,
+        (
+            "**Proposer, puis démarrer sur accord.** La proposition reste une question au"
+            " mainteneur ; sur son accord, dans ce tour, démarrer la session"
+        ),
+    ),
+    "6b-repercussions-session-plan-qa": (
+        REPERCUSSIONS_SKILL,
+        (
+            "`start_session`, `initiation: user_asked`, `context: fresh`, `use_worktree: true`,"
+            ' `name: plan-qa-<thème>`, prompt `/plan-qa "<thème>"`'
+        ),
+    ),
+    "6b-repercussions-brouillon-au-tour-du-mainteneur": (
+        REPERCUSSIONS_SKILL,
+        "un brouillon dans sa propre session, démarrée dans le tour où le mainteneur l'accepte",
+    ),
+    "6b-repercussions-plan-hors-depot": (
+        REPERCUSSIONS_SKILL,
+        "un fichier de plan que la session écrit hors du dépôt",
+    ),
+    "6b-repercussions-pourquoi-hors-depot": (
+        REPERCUSSIONS_SKILL,
+        "un fichier non suivi dans le worktree de la session PR salirait son arbre",
+    ),
+    "6b-repercussions-brouillon-montre-au-mainteneur": (
+        REPERCUSSIONS_SKILL,
+        "La session de brouillon le montre au mainteneur, qui décide",
+    ),
+    "6b-cycle-pr-repercussions-prescrit-le-commentaire": (
+        CYCLE_PR_SKILL,
+        "`repercussions` le prescrit à son étape 5, « Issues en vol »",
+    ),
+    "6b-pr-paralleles-repercussions-prescrit-le-commentaire": (
+        PR_PARALLELES_SKILL,
+        "`repercussions` le prescrit à son étape 5, « Issues en vol »",
     ),
 }
 
