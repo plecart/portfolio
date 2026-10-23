@@ -48,11 +48,11 @@ pas une conversion qui la préserve (obs 106).
 - `issue create` crée une issue de titre `--title` et de corps le fichier `--body-file`, UTF-8 lu
   en octets, avec ses labels `--label` dans la **même** requête : une issue n'existe jamais sans
   ses labels, même un instant. Chaque label doit exister dans le dépôt — apparié sans la casse,
-  il part sous le nom que le dépôt lui donne —, lu sur toutes ses pages. La relecture compare le
-  corps entier, le titre exact et l'ensemble des labels — sans droit d'écriture sur le dépôt,
-  l'API REST ignore en silence les labels d'une création (« Create an issue ») —, et un écart de
-  labels nomme l'appel de `label` qui le répare ; la ligne de sortie porte le numéro de l'issue,
-  créée ou déjà là ;
+  il part sous le nom que le dépôt lui donne, une seule fois —, lu sur toutes ses pages. La
+  relecture compare le corps entier, le titre exact et l'ensemble des labels — sans droit
+  d'écriture sur le dépôt, l'API REST ignore en silence les labels d'une création (« Create an
+  issue ») —, et un écart de labels nomme l'appel de `label` qui le répare ; la ligne de sortie
+  porte le numéro de l'issue, créée ou déjà là ;
 - `issue close` ferme l'issue `<N>` avec la raison `--reason` — `completed` par défaut,
   `not_planned` pour une issue écartée —, puis relit son état et sa raison ;
 - `milestone attach` rattache l'issue `<N>` au milestone de titre `--title` à l'identique, lu sur
@@ -197,6 +197,18 @@ def read_json(run: Run, parse: Callable[[Any], Any], *args: str, stdin: bytes | 
             f"`gh api {' '.join(args)}` ne rend pas la forme attendue : "
             f"{type(error).__name__} {error}"
         ) from error
+
+
+def read_pages(run: Run, parse: Callable[[Any], Any], path: str) -> Any:
+    """Ce que `parse` tire de la liste `path`, lue sur toutes ses pages par
+    `gh api --paginate --slurp` — une liste par page —, 100 par page : le maximum de l'API REST,
+    contre 30 par défaut ; `gh` suit l'en-tête `Link`, qui garde `per_page`.
+
+    Raises:
+        Refusal: voir `read_json`.
+    """
+    separator = "&" if "?" in path else "?"
+    return read_json(run, parse, "--paginate", "--slurp", f"{path}{separator}per_page=100")
 
 
 @contextmanager
@@ -383,7 +395,7 @@ def comment_path(identifier: int) -> str:
 
 def kept_comments(pages: Any, keep: Callable[[str], bool]) -> list[tuple[int, str]]:
     """L'`id` et le corps de chaque commentaire dont le corps satisfait `keep`, sur les pages que
-    `gh api --paginate --slurp` rend.
+    `read_pages` rend.
 
     Raises:
         KeyError, TypeError: des pages qui ne sont pas des listes de commentaires, un commentaire
@@ -400,8 +412,7 @@ def kept_comments(pages: Any, keep: Callable[[str], bool]) -> list[tuple[int, st
 def issue_comments(run: Run, number: str, keep: Callable[[str], bool]) -> list[tuple[int, str]]:
     """Les commentaires de l'issue ou de la PR `number` que `keep` retient, lus sur toutes les
     pages (`kept_comments`)."""
-    path = comments_path(number)
-    return read_json(run, lambda pages: kept_comments(pages, keep), "--paginate", "--slurp", path)
+    return read_pages(run, lambda pages: kept_comments(pages, keep), comments_path(number))
 
 
 def is_brief(body: str) -> bool:
@@ -652,31 +663,27 @@ def brief_write(run: Run, args: argparse.Namespace) -> str:
 
 def repo_labels(run: Run, wanted: Sequence[str]) -> list[str]:
     """Le nom que le dépôt donne à chaque label de `wanted`, apparié comme `carried_label`, sur
-    toutes les pages de ses labels.
+    toutes les pages de ses labels ; un label nommé deux fois, casse ignorée, n'y est qu'une
+    fois, à sa première place.
 
     Raises:
         Refusal: un label de `wanted` n'existe pas dans le dépôt — chacun est nommé.
     """
     if not wanted:
         return []
-    known = read_json(
-        run,
-        lambda pages: [name for page in pages for name in names_of(page)],
-        "--paginate",
-        "--slurp",
-        f"{REPO}/labels",
+    known = read_pages(
+        run, lambda pages: [name for page in pages for name in names_of(page)], f"{REPO}/labels"
     )
     found = {label: carried_label(known, label) for label in wanted}
     missing = [f"label inconnu du dépôt : {label}" for label, name in found.items() if name is None]
     if missing:
         raise Refusal(" ; ".join(missing))
-    return [name for name in found.values() if name is not None]
+    return list(dict.fromkeys(name for name in found.values() if name is not None))
 
 
 def same_issue(pages: Any, title: str, body: str) -> tuple[int, list[str]] | None:
     """Le numéro et les labels de la première issue — pas une PR, que son champ `pull_request`
-    distingue — qui porte exactement `title` et `body`, sur les pages que
-    `gh api --paginate --slurp` rend.
+    distingue — qui porte exactement `title` et `body`, sur les pages que `read_pages` rend.
 
     Raises:
         KeyError, TypeError: une issue sans titre textuel ou sans corps textuel ni `null`, ou
@@ -724,9 +731,7 @@ def issue_create(run: Run, args: argparse.Namespace) -> str:
     """
     body, anchor = read_text_file(args.file)
     labels = repo_labels(run, args.labels)
-    same = read_json(
-        run, lambda pages: same_issue(pages, args.title, body), "--paginate", "--slurp", ISSUES
-    )
+    same = read_pages(run, lambda pages: same_issue(pages, args.title, body), ISSUES)
     if same is not None:
         number, carried = same
         if gap := labels_gap(number, labels, carried):
@@ -792,8 +797,7 @@ class Milestone(NamedTuple):
 
 
 def same_milestone(pages: Any, title: str) -> Milestone | None:
-    """Le premier milestone de titre `title` à l'identique, sur les pages que
-    `gh api --paginate --slurp` rend.
+    """Le premier milestone de titre `title` à l'identique, sur les pages que `read_pages` rend.
 
     Raises:
         KeyError, TypeError: un milestone sans titre textuel, ou celui retenu sans numéro, état ou
@@ -812,12 +816,9 @@ def same_milestone(pages: Any, title: str) -> Milestone | None:
 
 def milestone_titled(run: Run, title: str) -> Milestone | None:
     """Le milestone de titre `title` à l'identique — un thème porte le nom exact de son domaine
-    (`triage/themes-milestones.md`) —, ouvert ou fermé, lu sur toutes les pages, 100 par page ;
-    `None` s'il n'y en a pas (`same_milestone`)."""
-    themes = f"{MILESTONES}?state=all&per_page=100"
-    return read_json(
-        run, lambda pages: same_milestone(pages, title), "--paginate", "--slurp", themes
-    )
+    (`triage/themes-milestones.md`) —, ouvert ou fermé, lu sur toutes les pages ; `None` s'il n'y
+    en a pas (`same_milestone`)."""
+    return read_pages(run, lambda pages: same_milestone(pages, title), f"{MILESTONES}?state=all")
 
 
 def milestone_title(issue: Any) -> str | None:

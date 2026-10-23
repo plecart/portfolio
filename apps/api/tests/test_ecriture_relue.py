@@ -25,12 +25,15 @@ from skill_scripts import load_script, run_in_pipe
 ecriture_relue = load_script("cycle-pr", "ecriture-relue")
 
 ISSUES = "repos/{owner}/{repo}/issues"
-LABELS_DU_DEPOT = "repos/{owner}/{repo}/labels"
 CORPS_42 = "repos/{owner}/{repo}/issues/42"
 COMMENTAIRES_42 = "repos/{owner}/{repo}/issues/42/comments"
 # Le commentaire 13, brief de l'issue 42 dans chaque forge qui en porte un.
 BRIEF_DE_42 = "repos/{owner}/{repo}/issues/comments/13"
 MILESTONES = "repos/{owner}/{repo}/milestones"
+# Les listes que `gh api --paginate --slurp` lit, 100 par page — le maximum de l'API REST.
+ISSUES_OUVERTES = "repos/{owner}/{repo}/issues?per_page=100"
+LISTE_COMMENTAIRES_42 = "repos/{owner}/{repo}/issues/42/comments?per_page=100"
+LABELS_DU_DEPOT = "repos/{owner}/{repo}/labels?per_page=100"
 THEMES = "repos/{owner}/{repo}/milestones?state=all&per_page=100"
 # Les seuls retraits de label auxquels la forge répond : chemin encodé → nom du label.
 RETRAITS = {
@@ -92,8 +95,8 @@ class Forge:
                     self.documents[f"{chemin}/{document['number']}"] = document
         # Chaque liste que `gh api --paginate --slurp` lit, sous son chemin.
         self.listes = {
-            COMMENTAIRES_42: self.pages,
-            ISSUES: self.issues,
+            LISTE_COMMENTAIRES_42: self.pages,
+            ISSUES_OUVERTES: self.issues,
             LABELS_DU_DEPOT: [[{"name": nom} for nom in page] for page in labels_du_depot or []],
             THEMES: self.milestones,
         }
@@ -731,7 +734,7 @@ def test_comment_publie_le_fichier_octet_pour_octet_puis_relit_le_commentaire_pu
         "> *Généré par IA — répercussion.*\r\n\r\n**Bloquant**\r\n"
     ]
     assert forge.appels == [
-        ("gh", "api", "--paginate", "--slurp", COMMENTAIRES_42),
+        ("gh", "api", "--paginate", "--slurp", LISTE_COMMENTAIRES_42),
         ("gh", "api", "-X", "POST", COMMENTAIRES_42, "--input", "-"),
         ("gh", "api", "repos/{owner}/{repo}/issues/comments/901"),
     ]
@@ -801,7 +804,7 @@ def test_issue_create_cree_l_issue_et_ses_labels_en_une_requete_puis_la_relit(
     ]
     assert forge.appels == [
         ("gh", "api", "--paginate", "--slurp", LABELS_DU_DEPOT),
-        ("gh", "api", "--paginate", "--slurp", ISSUES),
+        ("gh", "api", "--paginate", "--slurp", ISSUES_OUVERTES),
         ("gh", "api", "-X", "POST", ISSUES, "--input", "-"),
         ("gh", "api", "repos/{owner}/{repo}/issues/901"),
     ]
@@ -812,10 +815,11 @@ def test_issue_create_apparie_les_labels_sans_la_casse_sur_toutes_les_pages(
     tmp_path: Path,
 ) -> None:
     """`--label PRD` désigne le `prd` que le dépôt porte sur sa seconde page, et la création part
-    sous ce nom-là, comme le retrait d'un label (`label --remove`)."""
+    sous ce nom-là, comme le retrait d'un label (`label --remove`) ; nommé deux fois, il ne part
+    qu'une, à sa première place."""
     forge = Forge({}, labels_du_depot=[["enhancement"], ["prd", "Bug"]])
 
-    assert lance(forge, *creation(tmp_path, "PRD", "bug")) == 0
+    assert lance(forge, *creation(tmp_path, "PRD", "bug", "prd")) == 0
     assert json.loads(forge.charges[0])["labels"] == ["prd", "Bug"]
 
 
@@ -847,7 +851,7 @@ def test_issue_create_ne_cree_rien_quand_une_issue_ouverte_porte_deja_ce_titre_e
     )
 
     assert lance(forge, *creation(tmp_path)) == 0
-    assert forge.appels == [("gh", "api", "--paginate", "--slurp", ISSUES)]
+    assert forge.appels == [("gh", "api", "--paginate", "--slurp", ISSUES_OUVERTES)]
     assert capsys.readouterr().out == "rien à écrire — #7 existe déjà\n"
 
 
