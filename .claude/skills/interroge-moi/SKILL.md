@@ -22,19 +22,21 @@ décisions une par une.
 - **Chaque question s'accompagne de ta réponse recommandée** — interroger n'est pas se décharger de
   l'analyse sur l'utilisateur.
 - **Si une question peut être résolue en explorant le code, fais explorer le code** plutôt que de
-  demander : un `releveur` rend les passages qui répondent, cités ; la réponse reste à la session.
+  demander : un `releveur` rend le code autour des ancres que la session lui donne ; la réponse
+  reste à la session.
 
 ## Délégation
 
 La session garde les questions, ses recommandations et les décisions prises avec le mainteneur.
 Le reste change de main :
 
-- **`releveur`** — l'exploration du code qui répond à une question, la mesure d'une porte
-  (« Avant de verrouiller »), le `grep` des sources de vérité sur les ancres de toutes les
-  décisions, en un lot (« Consigner les décisions ») ;
+- **`releveur`** — ses « Lectures bornées » : le code autour des ancres d'une question, et le
+  `grep` des sources de vérité sur les ancres de toutes les décisions, en un lot (« Consigner les
+  décisions ») ; la mesure d'une porte (« Avant de verrouiller ») ;
 - **`executant`**, dans son propre worktree, jamais dans le dossier partagé où la session a été
-  démarrée (`use_worktree: false`) — la contre-épreuve à fabriquer : le composant présenté sous
-  une forme que l'outil analyse ; toute écriture de dépôt qu'un interrogatoire exige —
+  démarrée (`use_worktree: false`) — la contre-épreuve à fabriquer, un de ses « Artefacts
+  jetables » : le composant présenté sous une forme que l'outil analyse ; toute écriture de dépôt
+  qu'un interrogatoire exige —
   l'amendement d'un document par `decisions-vs-doc` (« Deux sorties ») ou `/contradiction` —,
   qui part par une PR ;
 - **script** — les décisions écrites dans le corps de l'issue (`issue edit`), les notes de triage
