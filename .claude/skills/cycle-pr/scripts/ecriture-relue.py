@@ -4,6 +4,7 @@ Usage :
     python ecriture-relue.py label <N> --remove <label>
     python ecriture-relue.py checkbox patch <N> --case <ancre> [--case <ancre> …]
     python ecriture-relue.py brief patch <N> --case <ancre> [--case <ancre> …]
+    python ecriture-relue.py brief write <N> --body-file <fichier>
     python ecriture-relue.py issue edit <N> (--append | --body-file) <fichier>
     python ecriture-relue.py issue create --title <titre> --body-file <fichier> [--label <label> …]
     python ecriture-relue.py comment <N> --body-file <fichier>
@@ -25,6 +26,10 @@ pas une conversion qui la préserve (obs 106).
   extrait du texte qui suit le marqueur d'une seule ligne de case, `- [ ] …` ou `- [x] …` (`[X]`
   compris), indentation permise ; cocher ne change pas ce texte, et le rejeu rend le verdict du
   premier appel ;
+- `brief write` publie un fichier UTF-8, lu en octets, en commentaire de brief de `<N>`, ou édite
+  en place le seul qui existe — jamais un second brief concurrent. Un fichier qui ne s'ouvre pas
+  par `## Brief d'agent`, dès son premier caractère, est refusé avant tout appel : `brief patch`
+  ne le reconnaîtrait plus ;
 - `issue edit --append` ajoute un fichier UTF-8, lu en octets, en fin de corps de `<N>`, séparé
   de son dernier contenu par une ligne vide au moins — celles qui terminent déjà le corps
   restent —, aucune sur un corps vide. Le corps d'une PR passe par le même chemin : pour l'API
@@ -42,7 +47,7 @@ pas une conversion qui la préserve (obs 106).
   commentaire sous l'`id` que la publication rend. Une PR se commente par le même chemin.
 
 Il refuse, sans rien écrire : une ancre introuvable ou ambiguë — toutes sont validées avant la
-première écriture —, zéro ou plusieurs commentaires de brief, un label inconnu du dépôt — chacun
+première écriture —, zéro brief à cocher, plusieurs briefs, un label inconnu du dépôt — chacun
 nommé ; `CLAUDE.md` interdit de deviner un label, et la référence REST de « Create an issue » ne
 dit pas ce qu'elle fait d'un label inconnu —, un fichier illisible, non UTF-8 ou sans ligne non
 vide — lu avant tout appel à la forge —, une lecture `gh` qui échoue, ne rend pas du JSON, ou rend
@@ -361,19 +366,32 @@ def issue_comments(run: Run, number: str, keep: Callable[[str], bool]) -> list[t
     return read_json(run, lambda pages: kept_comments(pages, keep), "--paginate", "--slurp", path)
 
 
+def is_brief(body: str) -> bool:
+    """Un brief d'agent s'ouvre par `## Brief d'agent`, dès son premier caractère."""
+    return body.startswith(BRIEF_MARK)
+
+
+def brief_comments(run: Run, number: str) -> list[Text]:
+    """Les commentaires de brief de l'issue `number` (`is_brief`), cherchés sur toutes les
+    pages."""
+    return [
+        Text(comment_path(identifier), body, f"brief de #{number}")
+        for identifier, body in issue_comments(run, number, is_brief)
+    ]
+
+
 def brief_comment(run: Run, number: str) -> Text:
-    """Le commentaire de brief de l'issue `number`, cherché sur toutes les pages.
+    """Le seul commentaire de brief de l'issue `number` (`brief_comments`).
 
     Raises:
         Refusal: aucun commentaire ne s'ouvre par `## Brief d'agent`, ou plusieurs.
     """
-    briefs = issue_comments(run, number, lambda body: body.startswith(BRIEF_MARK))
+    briefs = brief_comments(run, number)
     if len(briefs) != 1:
         raise Refusal(
             f"il faut un seul commentaire de brief sur #{number}, il y en a {len(briefs)}"
         )
-    identifier, body = briefs[0]
-    return Text(comment_path(identifier), body, f"brief de #{number}")
+    return briefs[0]
 
 
 def patch_boxes(run: Run, args: argparse.Namespace) -> str:
@@ -491,6 +509,22 @@ def issue_edit(run: Run, args: argparse.Namespace) -> str:
     return replace_text(run, issue_body(run, args.number), body, anchor, args.body_file)
 
 
+def publish_comment(run: Run, number: str, expected: str, anchor: str) -> int:
+    """Publie `expected` en commentaire de `number`, puis le relit sous l'`id` que rend la
+    publication, et rend cet `id`.
+
+    Raises:
+        Divergence: publication ou relecture en échec, ou commentaire relu autre que `expected`
+            (`check_reread`, ancre `anchor`).
+    """
+    publish = ("-X", "POST", comments_path(number), "--input", "-")
+    with writing():
+        identifier = read_json(run, comment_id, *publish, stdin=json_payload(body=expected))
+        reread = read_json(run, body_of, comment_path(identifier))
+    check_reread(expected, reread, [anchor])
+    return identifier
+
+
 def comment_publish(run: Run, args: argparse.Namespace) -> str:
     """`comment` : publie le fichier en commentaire, sauf si un commentaire porte déjà ce texte
     exactement, puis relit le commentaire sous l'`id` que rend la publication. Le fichier est lu
@@ -502,12 +536,31 @@ def comment_publish(run: Run, args: argparse.Namespace) -> str:
     if same:
         identifier, _ = same[0]
         return f"rien à écrire — #{args.number} porte déjà ce commentaire ({identifier})"
-    publish = ("-X", "POST", comments_path(args.number), "--input", "-")
-    with writing():
-        identifier = read_json(run, comment_id, *publish, stdin=json_payload(body=expected))
-        reread = read_json(run, body_of, comment_path(identifier))
-    check_reread(expected, reread, [anchor])
+    identifier = publish_comment(run, args.number, expected, anchor)
     return f"publié et relu — commentaire {identifier} sur #{args.number}"
+
+
+def brief_write(run: Run, args: argparse.Namespace) -> str:
+    """`brief write` : publie le fichier en commentaire de brief de `<N>` (`publish_comment`), ou
+    édite en place le seul qui existe (`replace_text`) — « jamais un second brief concurrent »
+    (`triage/brief-agent.md`). Le fichier est lu, et sa marque vérifiée, avant tout appel.
+
+    Raises:
+        Refusal: fichier inutilisable, fichier qui ne s'ouvre pas par `## Brief d'agent` —
+            `brief patch` ne le reconnaîtrait plus (`is_brief`) —, ou plusieurs briefs.
+    """
+    body, anchor = read_text_file(args.file)
+    if not is_brief(body):
+        raise Refusal(f"{args.file} ne s'ouvre pas par {BRIEF_MARK}")
+    briefs = brief_comments(run, args.number)
+    if len(briefs) > 1:
+        raise Refusal(
+            f"{len(briefs)} commentaires de brief sur #{args.number} : aucun ne s'édite en place"
+        )
+    if briefs:
+        return replace_text(run, briefs[0], body, anchor, args.file)
+    identifier = publish_comment(run, args.number, body, anchor)
+    return f"publié et relu — brief de #{args.number} : commentaire {identifier}"
 
 
 def repo_labels(run: Run, wanted: Sequence[str]) -> list[str]:
@@ -617,12 +670,17 @@ def build_parser() -> argparse.ArgumentParser:
     label.add_argument("number", type=issue_number)
     label.add_argument("--remove", dest="label", type=one_line, required=True)
     label.set_defaults(handler=label_remove)
-    for name, locate in (("checkbox", issue_body), ("brief", brief_comment)):
-        actions = commands.add_parser(name).add_subparsers(dest="action", required=True)
+    checkbox = commands.add_parser("checkbox").add_subparsers(dest="action", required=True)
+    brief = commands.add_parser("brief").add_subparsers(dest="action", required=True)
+    for actions, locate in ((checkbox, issue_body), (brief, brief_comment)):
         boxes = actions.add_parser("patch")
         boxes.add_argument("number", type=issue_number)
         boxes.add_argument("--case", dest="anchors", type=one_line, action="append", required=True)
         boxes.set_defaults(handler=patch_boxes, locate=locate)
+    write = brief.add_parser("write")
+    write.add_argument("number", type=issue_number)
+    write.add_argument("--body-file", dest="file", type=Path, required=True)
+    write.set_defaults(handler=brief_write)
     actions = commands.add_parser("issue").add_subparsers(dest="action", required=True)
     create = actions.add_parser("create")
     create.add_argument("--title", type=one_line, required=True)
