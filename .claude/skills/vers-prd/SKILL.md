@@ -12,14 +12,14 @@ Le dépôt GitHub et le mapping de labels doivent être dans `.claude/pipeline.c
 
 La session garde la synthèse, la rédaction du PRD et la validation unique de l'étape 2. Le reste change de main :
 
-- **`releveur`** — l'exploration du dépôt (modules, glossaire, ADR de la zone) et toute question de bibliothèque par `context7`, rendue en passage cité : l'étape 2 cite ce qui a été vérifié ;
-- **`executant`** — le fichier d'archive non normatif (« Règle de rédaction ») ;
+- **`releveur`** — la lecture du dépôt (étape 1, « Lectures bornées ») et toute question de bibliothèque par `context7`, rendue en passage cité : l'étape 2 cite ce qui a été vérifié ;
+- **`executant`**, en isolation `worktree` — le fichier d'archive non normatif (« Règle de rédaction ») ;
 - **script** — la publication, par `python .claude/skills/cycle-pr/scripts/ecriture-relue.py <sous-commande> …` (`issue create`), qui relit ce qu'il écrit ;
 - **session distincte** — `vers-issues` (étape 4) ; protocole commun : `.claude/skills/cycle-pr/references/sessions-liees.md`.
 
 ## Process
 
-1. Un `releveur` explore le dépôt pour rendre l'état actuel du codebase, si ce n'est pas déjà fait. Utilise le vocabulaire du glossaire métier du projet tout au long du PRD, et respecte les ADR existants dans la zone que tu modifies.
+1. Si ce n'est pas déjà fait, un `releveur` rend les modules, le glossaire et les ADR de la zone, sur les ancres que la session lui donne ; la session en tire l'état actuel du codebase. Utilise le vocabulaire du glossaire métier du projet tout au long du PRD, et respecte les ADR existants dans la zone que tu modifies.
 
 2. Esquisse les principaux modules que tu devras construire ou modifier pour mener à bien l'implémentation. Cherche activement les opportunités d'extraire des modules profonds (deep modules) qui peuvent être testés de manière isolée.
 

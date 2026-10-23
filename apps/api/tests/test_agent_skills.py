@@ -485,6 +485,10 @@ ROLE_FRONTMATTER_CLAIMS: list[tuple[str, str, str | None]] = [
     ("verificateur", "isolation", None),
     # « Tu n'as pas `Write` : la sortie y va par redirection » (`releveur.md`).
     ("releveur", "tools", "Write"),
+    # « Tu n'as pas d'accès web » (`releveur.md`, « Lectures bornées ») : une page arbitraire est
+    # une entrée non fiable pour un rôle qui a `Bash` et `Edit` (relecture de la PR #151, I4).
+    ("releveur", "tools", "WebFetch"),
+    ("releveur", "tools", "WebSearch"),
     # « Tes outils sont `Bash, Read, Grep, Glob, Edit, Write` et les deux de `context7` : ni `Skill`
     # ni `playwright` » (`developpeur.md`) — sans liste, il recevrait tous les outils, `playwright`
     # compris.
@@ -850,10 +854,15 @@ GH_API_METHOD = re.compile(r"(?:-X|--method)[\s=]*(?P<method>[A-Za-z]+)")
 # (`apiRun`, cli/cli `pkg/cmd/api/api.go`, lu par `context7` le 2026-10-23 ; `gh api --help`,
 # gh 2.94.0). Une requête GraphQL passe en POST de même : elle n'écrit que par une `mutation`.
 GH_API_PAYLOAD = re.compile(r"(?<![\w-])(?:-[fF]|--raw-field|--field|--input)(?![\w-])")
+# Un merge n'écrit pas de contenu à relire : `--match-head-commit` fait vérifier la tête par la
+# forge avant d'agir (`gh pr merge --help`, gh 2.94.0), la garde de `cycle-pr` Étape 7.
+GH_GUARDED_MERGE = re.compile(r"^\s*merge\b.*--match-head-commit\b")
 
 
 def gh_command_writes(group: str, args: str) -> bool:
-    """Vrai si la commande `gh <group><args>` écrit sur la forge."""
+    """Vrai si la commande `gh <group><args>` écrit sur la forge sans garde."""
+    if group == "pr" and GH_GUARDED_MERGE.search(args):
+        return False
     if group != "api":
         return next(iter(args.split()), "") not in GH_READ_VERBS
     if "graphql" in args.split():
@@ -883,6 +892,8 @@ GH_COMMAND_FORMS = {
     "label edit": ("`gh label edit bug --color f00`", True),
     "pr comment": ("`gh pr comment <n> --body-file notes.md`", True),
     "pr edit": ("`gh pr edit <n> --add-label bug`", True),
+    "pr merge sans garde": ("`gh pr merge <n> --rebase`", True),
+    "pr merge garde": ("`gh pr merge <n> --rebase --match-head-commit <SHA relu>`", False),
     "api avec champ": ('gh api "repos/{owner}/{repo}/milestones" -f title="A"', True),
     "api avec methode": ("`gh api -X PATCH repos/{owner}/{repo}/issues/<n>`", True),
     "api avec corps": ("`gh api repos/{owner}/{repo}/issues/<n> --input -`", True),
@@ -1542,6 +1553,9 @@ PROMPT_LOT_SUIVANT = ".claude/skills/cycle-pr/references/prompt-lot-suivant.md"
 PR_PARALLELES_SKILL = ".claude/skills/pr-paralleles/SKILL.md"
 INTERROGE_MOI_SKILL = ".claude/skills/interroge-moi/SKILL.md"
 CYCLE_PR_SKILL = ".claude/skills/cycle-pr/SKILL.md"
+TRIAGE_SKILL = ".claude/skills/triage/SKILL.md"
+HORS_SCOPE_REF = ".claude/skills/triage/hors-scope.md"
+RELEVEUR_ROLE = ".claude/agents/releveur.md"
 INVARIANTS_DES_SESSIONS_LIEES = {
     # Héritage (décision 7).
     "heritage-sans-permission-mode": (
@@ -2115,8 +2129,14 @@ INVARIANTS_DES_SESSIONS_LIEES = {
 # du renvoi — 6 sites, 4 fuyaient. Le lot 4 en ajoute **2** à l'étape 0 de `pr-paralleles`, écrits
 # en clair dès leur création : les sessions de préparation, **sans** worktree (`false` : omis, un
 # lead placé dans un worktree leur en donnerait un — description de l'outil, lue le 2026-10-19), et
-# la reproduction d'un bug, avec le sien — 8 sites. Un site
-# nouveau n'entre pas ici de lui-même : la garde lit des phrases, le grep re-dérive la population.
+# la reproduction d'un bug, avec le sien — 8 sites. Le lot 6a2 en ajoute **6** (relecture de la
+# PR #151, passe 1), recensés avant le correctif par `grep -n start_session` dans les sept fichiers
+# de `triage`, `interroge-moi`, `vers-prd` et `vers-issues`, plus la session `init-projet` que
+# `themes-milestones.md` propose sans le mot : la session de tri du relevé et celle d'une issue
+# `bug`, l'interrogatoire, la session de tri du brief, `vers-issues`, `init-projet` — **3**
+# fuyaient (les deux du relevé, par renvoi à `pr-paralleles` ; `init-projet`, sans paramètre) —,
+# 14 sites. Un site nouveau n'entre pas ici de lui-même : la garde lit des phrases, le grep
+# re-dérive la population.
 USE_WORKTREE_EXPLICITE = {
     "pr-paralleles-etape-0-sans-worktree": (
         PR_PARALLELES_SKILL,
@@ -2145,6 +2165,30 @@ USE_WORKTREE_EXPLICITE = {
     "coordinatrice-carte-de-relais": (
         COORDINATRICE_REF,
         "(`start_session`, `initiation: own_initiative`, `use_worktree: true`, brief : la passation",
+    ),
+    "triage-releve-vers-le-tri": (
+        TRIAGE_SKILL,
+        "`context: fresh`, `use_worktree: false` écrit en clair",
+    ),
+    "triage-releve-vers-le-tri-d-un-bug": (
+        TRIAGE_SKILL,
+        "Une issue `bug` reçoit au contraire son propre worktree, `use_worktree: true`",
+    ),
+    "triage-tri-vers-l-interrogatoire": (
+        TRIAGE_SKILL,
+        "`use_worktree: false` — elle lit le code et n'écrit que dans GitHub —, `name: interroge-<N>`",
+    ),
+    "interroge-moi-vers-le-tri-du-brief": (
+        INTERROGE_MOI_SKILL,
+        "`use_worktree: false`, `name: triage-<N>`",
+    ),
+    "vers-prd-vers-vers-issues": (
+        ".claude/skills/vers-prd/SKILL.md",
+        "`use_worktree: false`, `name: vers-issues-<n>`",
+    ),
+    "themes-milestones-vers-init-projet": (
+        ".claude/skills/triage/themes-milestones.md",
+        "démarrée avec `use_worktree: true` : elle écrit sur une branche",
     ),
 }
 
@@ -2566,6 +2610,74 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6a-vers-issues-re-decoupage-jamais-pour-un-depassement-prevu": (
         ".claude/skills/vers-issues/SKILL.md",
         "reste la voie d'un dépassement découvert, jamais d'un dépassement prévisible",
+    ),
+    # Relecture de la PR #151, passe 1, I1 : une issue interrogée avant D-13 n'a pas de section
+    # « Décisions ». **Dénombrement, écrit avant le correctif** — population vivante, relevée le
+    # 2026-10-23 à 14 h UTC : `gh issue list --label needs-interrogation` rend 2 issues, corps puis
+    # commentaires lus ; #6 est interrogée, ses décisions en commentaire, son corps sans la
+    # section : 1 sur 2 fuyait. Sites qui reconnaissent l'issue interrogée : 5 (`triage` étapes 4
+    # et 5, « Changement d'état rapide » ; `brief-agent.md`, prose et modèle), 5 fuyaient ; les 6
+    # autres mentions de la section (écrite, ou lue sitôt écrite) et la porte de `cycle-pr`
+    # Étape 1 (« décisions consignées dans le brief d'agent »), vérifiées indemnes.
+    "6a-triage-interrogee-avant-d-13": (
+        TRIAGE_SKILL,
+        "interrogée avant D-13 (2026-10-23), ses décisions consignées en commentaire",
+    ),
+    "6a-triage-prete-si-deja-interrogee": (
+        TRIAGE_SKILL,
+        "ne se posent que sur une issue déjà interrogée (étape 4)",
+    ),
+    "6a-triage-rapide-deja-interrogee": (TRIAGE_SKILL, "L'issue est déjà interrogée (étape 4)"),
+    "6a-brief-decisions-d-avant-d-13": (
+        ".claude/skills/triage/brief-agent.md",
+        "pour une issue interrogée avant D-13 (2026-10-23), ses décisions consignées en commentaire",
+    ),
+    # I3 : l'issue `wontfix` se fermait dès l'ouverture de sa PR `.out-of-scope/`, que personne ne
+    # merge. **Dénombrement, écrit avant le correctif** — une issue fermée citant un artefact de
+    # dépôt pas encore mergé, dans les sept fichiers des quatre skills (`grep` de « ferm »,
+    # « close », « par une PR ») : 11 sites, **3** fuyaient — `triage` étape 5, `wontfix`
+    # d'enhancement ; `hors-scope.md`, « Confirmer » et « Quand écrire ». Indemnes : le `wontfix`
+    # d'un bug (aucun artefact), « Changement d'état rapide » (renvoi à l'étape 5), « Reconsidérer »
+    # et la suppression, le domaine d'`init-projet`, l'archive de `vers-prd`, l'amendement
+    # d'`interroge-moi` (aucune issue fermée), l'exemple de brief d'enhancement (pas un geste).
+    "6a-triage-jamais-fermee-avant-le-merge": (
+        TRIAGE_SKILL,
+        "l'issue ne se ferme jamais sur un fichier absent du trunk",
+    ),
+    "6a-hors-scope-sans-go-reste-ouverte": (
+        HORS_SCOPE_REF,
+        "Puis seulement, la PR mergée — sans go, l'issue reste ouverte dans son état —",
+    ),
+    "6a-hors-scope-ferme-apres-merge": (HORS_SCOPE_REF, "puis fermée une fois cette PR mergée"),
+    # I4 : `triage` confiait au `releveur` des lectures que « Ce que tu fais » ne couvrait pas, et
+    # une lecture web qu'il ne peut pas faire. **Dénombrement, écrit avant le correctif** — chaque
+    # délégation au `releveur` et à l'`executant` des sept fichiers, confrontée à « Ce que tu
+    # fais » et aux `tools:` du rôle : **24** recensées, **16** hors mandat. Au `releveur`, 18 dont
+    # 13 : lecture de l'issue, de `.out-of-scope/` et des domaines, des thèmes, du code sur ancres
+    # (`triage`, `interroge-moi`, `vers-prd`, `vers-issues`), des sources de vérité (aucune puce de
+    # lecture) ; relevé des cinq catégories (issues fermées) et dénombrements (« Collectes » ne
+    # rend ni l'un ni l'autre) ; reproduction (« Cases » : QA et fumée) ; capacités d'un
+    # fournisseur (ni WebFetch ni WebSearch) ; « résumé des commentaires » de `vers-issues` (résumer,
+    # c'est dire ce qui compte). À l'`executant`, 6 dont 3 : scratch et contre-épreuve (aucune
+    # puce hors commit), création d'un `.out-of-scope/` (nom et raison laissés à son choix).
+    "6a-releveur-lectures-bornees": (
+        RELEVEUR_ROLE,
+        "le texte ou les lignes rendus tels quels, sans dire ce qui compte",
+    ),
+    "6a-releveur-collectes-compte": (RELEVEUR_ROLE, "tout compte d'une commande donnée"),
+    "6a-releveur-cases-reproduction": (RELEVEUR_ROLE, "ou d'une reproduction de bug"),
+    "6a-triage-fournisseur-a-la-session": (
+        TRIAGE_SKILL,
+        "la vérification à la source d'une capacité de fournisseur reste à la session",
+    ),
+    "6a-executant-artefacts-jetables": (
+        ".claude/agents/executant.md",
+        "**sans commit** ; ce qu'il faut en conclure n'est pas à toi",
+    ),
+    "6a-hors-scope-nom-et-texte-donnes": (HORS_SCOPE_REF, "nom et texte rédigés par la session"),
+    "6a-vers-issues-commentaires-tels-quels": (
+        ".claude/skills/vers-issues/SKILL.md",
+        "dont un `releveur` rend le corps et les commentaires tels quels (« Lectures bornées »)",
     ),
 }
 

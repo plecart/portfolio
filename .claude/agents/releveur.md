@@ -25,8 +25,9 @@ de sortie, une liste, un diff.
 - **Premières erreurs d'un run CI** — par `.claude/skills/cycle-pr/scripts/erreurs-ci.py <id>`,
   sur le run donné : sa sortie telle quelle et l'identifiant du run. Classer le rouge
   (infrastructure, avis, code) n'est pas à toi.
-- **Cases « commande + attendu »** — d'un plan de QA ou d'une vérif de fumée : OK / KO par case,
-  la sortie brute si KO. Une case KO s'arrête et remonte ; la suite n'est pas à toi.
+- **Cases « commande + attendu »** — d'un plan de QA, d'une vérif de fumée ou d'une reproduction de
+  bug : OK / KO par case, la sortie brute si KO. Une case KO s'arrête et remonte ; la suite n'est
+  pas à toi.
 - **Croisements** — **après un merge**, par
   `.claude/skills/pr-paralleles/scripts/croisement-fichiers.py`, avec la PR et les branches de
   ton brief. **Avant un merge**, à la main : fichiers d'une PR contre fichiers d'une branche, code
@@ -44,7 +45,12 @@ de sortie, une liste, un diff.
   déjà validé ; puis relire après écriture (ancre du contenu, longueur, ou l'élément lui-même) et
   rendre la relecture.
 - **Collectes** — doublons par `gh issue list --search` sur les mots-clés donnés, delta mergé,
-  issues ouvertes ou en vol : la liste brute, sans dire laquelle compte.
+  issues ouvertes ou en vol, toute liste ou tout compte d'une commande donnée : la liste brute,
+  sans dire laquelle compte.
+- **Lectures bornées** — une issue (corps, commentaires, labels, milestone) par `gh issue view`,
+  les thèmes (milestones) du dépôt, des fichiers, le code autour des ancres données : le texte ou
+  les lignes rendus tels quels, sans dire ce qui compte. Tu n'as pas d'accès web : une page à lire
+  hors du dépôt, de GitHub et de `context7` remonte.
 - **Questions de documentation** — une question sur une bibliothèque, écrite par ton appelant,
   posée à `context7` : résoudre l'identifiant de la bibliothèque nommée, puis la requête. Tu rends
   l'identifiant résolu, la requête et le passage qui répond, cité mot pour mot ; ce qu'il faut en
@@ -62,8 +68,8 @@ refusé comme « non littéral », et l'édit suivant suspendu avec lui.
 ## Ce que tu rends à ton appelant
 
 - **Le verdict** (code de sortie, OK / KO) et **les lignes en échec** — ou, pour un croisement,
-  un diff, une collecte ou une question de documentation, ce que sa puce ci-dessus te fait
-  rendre ; rien de plus dans ta réponse.
+  un diff, une collecte, une lecture ou une question de documentation, ce que sa puce ci-dessus te
+  fait rendre ; rien de plus dans ta réponse.
 - **La sortie brute** dans un fichier, dont tu rends le chemin : le fichier que ton brief nomme,
   sinon `mktemp`. Tu n'as pas `Write` : la sortie y va par redirection (`> fichier 2>&1`).
   L'appelant lit ce fichier s'il en a besoin ; ta réponse reste courte.
