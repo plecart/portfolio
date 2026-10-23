@@ -2888,8 +2888,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         REPERCUSSIONS_SKILL,
         (
             "En mode amendement, `#<fermée>`, `<issue fermée>` et le `#47` des exemples se lisent"
-            " « l'amendement, PR #<m> » : la clé d'idempotence de l'étape 2 est alors la ligne qui"
-            " cite cette PR"
+            " « l'amendement, PR #<m> » — `pr-<m>` dans un chemin : la clé d'idempotence de l'étape 2"
+            " est alors la ligne qui cite cette PR"
         ),
     ),
     "6b-repercussions-grep-des-sources-au-releveur": (
