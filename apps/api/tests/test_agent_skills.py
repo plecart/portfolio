@@ -2593,7 +2593,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6a-vers-prd-archive-jamais-sur-le-trunk": (
         VERS_PRD_SKILL,
-        "son merge attend le go du mainteneur ; jamais un commit direct sur le trunk",
+        (
+            "rien n'attend ce merge, pas même la publication du PRD ; jamais un commit direct sur"
+            " le trunk"
+        ),
     ),
     "6a-vers-prd-vers-issues-dans-sa-session": (
         VERS_PRD_SKILL,
@@ -2616,16 +2619,29 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         "reste la voie d'un dépassement découvert, jamais d'un dépassement prévisible",
     ),
     # Relecture de la PR #151, passe 1, I1 : une issue interrogée avant D-13 n'a pas de section
-    # « Décisions ». **Dénombrement, écrit avant le correctif** — population vivante, relevée le
-    # 2026-10-23 à 14 h UTC : `gh issue list --label needs-interrogation` rend 2 issues, corps puis
-    # commentaires lus ; #6 est interrogée, ses décisions en commentaire, son corps sans la
-    # section : 1 sur 2 fuyait. Sites qui reconnaissent l'issue interrogée : 5 (`triage` étapes 4
-    # et 5, « Changement d'état rapide » ; `brief-agent.md`, prose et modèle), 5 fuyaient ; les 6
-    # autres mentions de la section (écrite, ou lue sitôt écrite) et la porte de `cycle-pr`
-    # Étape 1 (« décisions consignées dans le brief d'agent »), vérifiées indemnes.
+    # « Décisions ». Passe 2, B1 : la forme d'avant D-13 acceptait des notes de triage, que l'étape
+    # 5 poste à toute issue mise en `needs-interrogation`. **Dénombrement, écrit avant le
+    # correctif, sur toute la population de l'état** — population vivante, relevée le 2026-10-23 à
+    # 16 h 27 UTC : `gh issue list --label needs-interrogation` rend 2 issues, `gh issue view <n>
+    # --json body,comments` lu pour chacune, aucun corps avec la section. #6 porte en commentaire
+    # un brief d'agent, « Décisions verrouillées (interrogatoire du 2026-09-23) » : interrogée ;
+    # #11 n'a qu'un commentaire, « Notes de triage » : non interrogée. Règle de la passe 1 : 2
+    # reconnues sur 2, dont 1 faux positif (#11) ; règle corrigée : 1 sur 2, ni faux positif ni
+    # faux négatif. Sites qui reconnaissent l'issue interrogée, par la forme du geste : 7 ; 5
+    # fuyaient — la définition (`triage` étape 4) et la paraphrase de `brief-agent.md`, corrigées,
+    # et trois renvois qui en héritent (`triage` étape 5, « Changement d'état rapide », modèle de
+    # `brief-agent.md`) ; indemnes, la porte de `cycle-pr` Étape 1 (« décisions consignées dans le
+    # brief d'agent ») et sa reprise dans `interroge-moi`.
     "6a-triage-interrogee-avant-d-13": (
         TRIAGE_SKILL,
-        "interrogée avant D-13 de #134, ses décisions consignées en commentaire",
+        (
+            "interrogée avant D-13 de #134, ses « Décisions verrouillées » consignées en commentaire"
+            " — d'un brief d'agent ou d'un interrogatoire —"
+        ),
+    ),
+    "6a-triage-notes-de-triage-jamais-interrogatoire": (
+        TRIAGE_SKILL,
+        "Des notes de triage seules ne valent jamais interrogatoire",
     ),
     "6a-triage-prete-si-deja-interrogee": (
         TRIAGE_SKILL,
@@ -2634,7 +2650,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6a-triage-rapide-deja-interrogee": (TRIAGE_SKILL, "L'issue est déjà interrogée (étape 4)"),
     "6a-brief-decisions-d-avant-d-13": (
         BRIEF_AGENT_REF,
-        "pour une issue interrogée avant D-13, ses décisions consignées en commentaire",
+        (
+            "pour une issue interrogée avant D-13, ses « Décisions verrouillées » consignées en"
+            " commentaire, jamais des notes de triage"
+        ),
     ),
     # I3 : l'issue `wontfix` se fermait dès l'ouverture de sa PR `.out-of-scope/`, que personne ne
     # merge. **Dénombrement, écrit avant le correctif** — une issue fermée citant un artefact de
@@ -2694,6 +2713,51 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6a-vers-issues-commentaires-tels-quels": (
         VERS_ISSUES_SKILL,
         "rend le corps et les commentaires tels quels, filtrés par les critères que la session donne",
+    ),
+    # Passe 2, I5 et I6 : une PR de dépôt qu'ouvre une session de `triage`, `interroge-moi` ou
+    # `vers-prd` (D-12) n'avait de déroulé — qui ouvre, relit, merge au go — que dans
+    # `hors-scope.md`. **Dénombrement, écrit avant le correctif**, par la forme du geste — la
+    # session fait ouvrir une PR (`grep` de « par une PR », « ouvre la PR », « PR de » dans les
+    # sept fichiers, puis lecture) : 11 sites, le déroulé source compris (`hors-scope.md`, « Quand
+    # écrire », étapes 5 et 6). **5** sans déroulé : « Reconsidérer » (`hors-scope.md`), l'archive
+    # de `vers-prd` (ouverte, ni relue ni mergée par personne), la « Délégation » d'`interroge-moi`
+    # et ses deux renvois (rang supérieur, arrêt) ; **1** renvoi au déroulé entier, dont les étapes
+    # 7 et 8 (`wontfix`, fermeture) ne valent pas pour une suppression ; **4** indemnes : l'étape 5
+    # de `triage`, « Confirmer », et les délégations à l'`executant` de `triage` et de `vers-prd`,
+    # dont l'étape qui agit renvoie. Hors classe : `themes-milestones.md`, deux fois, renvoie à une
+    # session `init-projet`.
+    "6a-hors-scope-reconsiderer-au-deroule": (
+        HORS_SCOPE_REF,
+        "supprimé ou mis à jour par une PR, au déroulé de « Quand écrire » (étapes 5 et 6)",
+    ),
+    "6a-hors-scope-supprimer-aux-etapes-5-et-6": (
+        HORS_SCOPE_REF,
+        "par une PR, aux étapes 5 et 6 du déroulé ci-dessus",
+    ),
+    "6a-vers-prd-archive-au-deroule-hors-scope": (
+        VERS_PRD_SKILL,
+        (
+            "la session ouvre la PR, la relit et la merge au go du mainteneur, au déroulé de"
+            " `triage/hors-scope.md` (« Quand écrire », étapes 5 et 6)"
+        ),
+    ),
+    "6a-interroge-moi-pr-au-deroule-hors-scope": (
+        INTERROGE_MOI_SKILL,
+        (
+            "qui part par une PR que la session ouvre, relit et merge au go du mainteneur, au"
+            " déroulé de `triage/hors-scope.md` (« Quand écrire », étapes 5 et 6)"
+        ),
+    ),
+    "6a-interroge-moi-decision-apres-le-merge": (
+        INTERROGE_MOI_SKILL,
+        (
+            "la ligne de « Décisions » qui l'exige ne s'écrit qu'une fois la PR mergée — sans go, le"
+            " point reste une question ouverte"
+        ),
+    ),
+    "6a-interroge-moi-arret-attend-le-merge": (
+        INTERROGE_MOI_SKILL,
+        "L'amendement qu'un arrêt décide part par une PR, et la décision attend son merge",
     ),
 }
 

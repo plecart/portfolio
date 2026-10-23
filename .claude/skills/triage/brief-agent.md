@@ -74,8 +74,9 @@ la décision avec sa preuve (« compile et mesuré à X »), jamais « se résou
 
 Les « Décisions verrouillées » du brief reprennent la section « Décisions » du corps de l'issue,
 qu'y écrit la session d'interrogatoire (`interroge-moi`, « Consigner les décisions » ; D-13 de
-#134) — ou, pour une issue interrogée avant D-13, ses décisions consignées en commentaire
-(`triage`, étape 4, « Déjà interrogée »). Des règles de rédaction :
+#134) — ou, pour une issue interrogée avant D-13, ses « Décisions verrouillées » consignées en
+commentaire, jamais des notes de triage (`triage`, étape 4, « Déjà interrogée »). Des règles de
+rédaction :
 
 - **Une décision négative nomme ce qui survit au rejet.** Quand l'option rejetée est une
   *combinaison*, « écarté : X seul » est ambigu — écrire « écarté : X **sans** Y ; X reste
