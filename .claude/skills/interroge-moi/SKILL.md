@@ -126,7 +126,7 @@ avec le mainteneur.
 
 - **Les points tranchés** → si la session part d'une issue, dans la section « Décisions » du corps
   de l'issue, chaque ligne datée, par `issue edit <N> --body-file` : le corps courant relu en
-  octets (`gh api repos/{owner}/{repo}/issues/<N> --jq .body`), la section ajoutée ou complétée
+  octets (`gh api repos/{owner}/{repo}/issues/<N> --jq .body`), la section ajoutée ou complétée, sans le LF final que `--jq` ajoute,
   dans un fichier qui garde les fins de ligne lues — le script relit contre ce fichier et ne voit
   pas une conversion (obs 106) —, le corps entier réécrit, que le script relit en entier ; dans
   le briefing pré-PR sinon. Le brief d'agent les reprendra : la session de tri le rédige
