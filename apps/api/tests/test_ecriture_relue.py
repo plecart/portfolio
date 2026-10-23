@@ -1219,7 +1219,7 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     fermé, le commentaire publié, l'issue créée, le corps remplacé, le brief écrit : les 14 autres
     n'écrivent rien au rejeu.
     """
-    forge = forge_temoin(stocke=stocke or (lambda corps: corps))
+    forge = forge_temoin() if stocke is None else forge_temoin(stocke=stocke)
 
     assert lance(forge, *args) == premier
     assert len(ecritures(forge)) == 1, "le premier appel n'a pas écrit une seule fois"
