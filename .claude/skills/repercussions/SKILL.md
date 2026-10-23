@@ -248,7 +248,8 @@ Montrer les **lignes** avant/après, pas une prose qui décrit le changement : u
 deux secondes, un paragraphe demande de raisonner.
 
 Si aucune issue n'est impactée, le dire en une ligne — « Aucune répercussion : la clôture de #47 ne
-rend fausse la planification d'aucune issue examinée. » — et s'arrêter là.
+rend fausse la planification d'aucune issue examinée. » — et passer à l'étape 6, l'étape 7 restant
+due : la QA d'un thème vidé ne dépend pas des issues impactées.
 
 ### 5. Appliquer — sur « go » explicite
 
