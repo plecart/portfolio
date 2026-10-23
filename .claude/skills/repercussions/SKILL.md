@@ -51,7 +51,7 @@ citations, les diffs présentés, le go demandé au mainteneur. Le reste change 
   isolé coûte plus délégué (`CLAUDE.md`, « Orchestration ») — le corps
   (`issue edit <n> --body-file`), le brief (`brief write <n> --body-file`), le signalement sur une
   PR en vol (`comment <PR> --body-file`), le retour en `needs-interrogation` (`label`), la
-  fermeture en doublon (`issue close`) ;
+  fermeture en doublon (`issue close`, puis `label`) ;
 - **sessions distinctes** — `contradiction` (étape 1), `plan-qa` (étape 7), `bug-vers-issue` ou
   `vers-issues` pour un brouillon (« Ce que ce skill ne fait pas »), chacune démarrée dans le tour
   du mainteneur qui l'accepte, hors de ce tour par une carte de proposition ; `<N>`, dans leur nom,
@@ -59,7 +59,12 @@ citations, les diffs présentés, le go demandé au mainteneur. Le reste change 
   `.claude/skills/cycle-pr/references/sessions-liees.md`. Une session que celle-ci démarre reçoit
   son propre worktree, `use_worktree: true` : `repercussions` tourne dans la session PR, dont le
   worktree est retiré après le merge, et une session démarrée dans ce dossier y vivrait et serait
-  archivée avec elle (description de `start_session`, lue le 2026-10-23).
+  archivée avec elle (description de `start_session`, lue le 2026-10-23). Ces sessions sont les
+  enfants de la session qui les démarre, qui les nettoie à leur message « terminé »
+  (`sessions-liees.md`, « Nettoyage ») ; tant qu'un enfant travaille, le message de clôture de
+  cette session le nomme par son identifiant `local_…`, et la session qui l'archive — lead,
+  coordinatrice ou mainteneur — nettoie à sa place : le message « terminé » d'un enfant à un parent
+  archivé est supposé perdu, non mesuré.
 
 ## Document de référence
 
@@ -75,7 +80,8 @@ Sans argument, l'issue est la dernière fermée par un merge sur la branche trun
 `gh pr list --state merged --base <trunk> --limit 30 --json number,mergedAt,closingIssuesReferences --jq 'map(select(.closingIssuesReferences != [])) | sort_by(.mergedAt) | last'`.
 
 Avec une PR d'amendement — une PR mergée qui amende une source de vérité sans fermer d'issue,
-ouverte par `contradiction` —, le delta réel est l'amendement. Les étapes 2 à 6 s'appliquent ;
+ouverte par une `contradiction` née d'une décision, sans issue fermée à l'origine —, le delta réel
+est l'amendement. Les étapes 2 à 6 s'appliquent ;
 l'étape 7 est sans objet, aucun thème ne s'étant vidé ; la ligne de journal cite l'amendement, pas
 une issue fermée (« Réconciliée avec l'amendement du cadrage §9.3, PR #<m>, du 26 août 2026 »).
 
@@ -115,10 +121,11 @@ Une contradiction avérée → **s'arrêter avant l'étape 2** et présenter l'a
 `.claude/rules/decisions-vs-doc.md` (bloc `## ⚠️ Contradiction`). Dans le tour où le mainteneur
 l'accepte, démarrer la session `contradiction` : `start_session`, `initiation: user_asked`,
 `context: fresh`, `use_worktree: true`, `name: contradiction-<N>`, prompt `/contradiction` suivi
-du bloc d'arrêt — ses deux citations ; hors d'un tour du mainteneur, une carte de proposition
-(`initiation: own_initiative`, `use_worktree: true`). C'est elle qui amende le § par une PR, puis
-démarre `repercussions` sur cette PR une fois mergée (« PR d'amendement », ci-dessus). Ce skill
-**n'amende jamais un document lui-même**. Une contradiction déjà portée par une issue ouverte —
+du bloc d'arrêt — ses deux citations — et de `origine : #<N>` ; hors d'un tour du mainteneur, une
+carte de proposition (`initiation: own_initiative`, `use_worktree: true`). Elle amende le § par une
+PR ; à son merge, elle redémarre `repercussions` sur `#<N>`, dont la passe reprend contre la doc
+amendée — l'étape 1 n'y trouve plus la contradiction, les étapes 2 à 7 suivent, QA comprise. Ce
+skill **n'amende jamais un document lui-même**. Une contradiction déjà portée par une issue ouverte —
 l'échappatoire de `decisions-vs-doc` — est déjà tracée : ne pas la signaler une seconde fois.
 
 ### 2. Sélectionner les issues à examiner
@@ -324,7 +331,9 @@ arrière.
 non ambigu**, et un **« go » nommément sur cette issue** (un « go » global ne suffit pas à fermer).
 D'abord la ligne de journal « Fermée en doublon de #<M> après #<fermée> », dans le corps
 (`issue edit --body-file`) — le skill ne commente jamais une issue —, puis
-`issue close <n> --reason not_planned`. Recouvrement partiel → on réduit le périmètre dans le
+`issue close <n> --reason not_planned`, puis `label <n> --remove <état>` — l'état que l'issue
+porte, lu sur elle, sous son label réel (mapping de `.claude/pipeline.config.md`) : une issue
+fermée n'en porte aucun (`triage`, « Rôles »). Recouvrement partiel → on réduit le périmètre dans le
 corps, on ne ferme pas.
 
 Au moindre cas ambigu — re-découpage non trivial, conflit de conception, fermeture incertaine —
@@ -395,9 +404,9 @@ précisément ce qu'on cherche à éviter en ne la déclenchant qu'ici.
   barreau 3). Hors du dépôt, parce que `vers-issues` exige une source écrite en argument et qu'un
   fichier non suivi dans le worktree de la session PR salirait son arbre. Le vide relevé par une
   clôture a presque toujours un propriétaire ouvert.
-- **Il ne re-trie pas.** La seule transition d'état qu'il applique est le retour en
-  `needs-interrogation` décrit ci-dessus, par `label` (« Délégation ») ; tout autre changement
-  d'état passe par `triage`.
+- **Il ne re-trie pas.** Les seules transitions d'état qu'il applique sont le retour en
+  `needs-interrogation` décrit ci-dessus et le retrait de l'état d'une issue qu'il ferme en
+  doublon, par `label` (« Délégation ») ; tout autre changement d'état passe par `triage`.
 - **Il ne relit pas le code.** Il confronte des specs à un delta, il n'audite pas la codebase.
 - **Il n'amende aucun document de référence.** Il détecte qu'un § est falsifié (étape 1) et passe
   la main à `contradiction`, seul à écrire dans les documents de référence.

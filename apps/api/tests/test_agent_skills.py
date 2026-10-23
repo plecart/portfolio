@@ -2828,11 +2828,34 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " elle (description de `start_session`, lue le 2026-10-23)"
         ),
     ),
+    # Relecture de la PR #153, passe 1, I3 : personne n'était chargé de nettoyer les sessions que
+    # `repercussions` démarre. Dénombrement (classe : une session démarrée dont le nettoyage n'a
+    # pas de porteur nommé), sites de démarrage de `repercussions/SKILL.md` : **4**
+    # (`contradiction` et sa carte, `plan-qa`, brouillons) ; **4** fuyaient ; une phrase les couvre.
+    "6b-repercussions-nettoyage-de-ses-sessions": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Ces sessions sont les enfants de la session qui les démarre, qui les nettoie à leur"
+            " message « terminé » (`sessions-liees.md`, « Nettoyage ») ; tant qu'un enfant"
+            " travaille, le message de clôture de cette session le nomme par son identifiant"
+            " `local_…`, et la session qui l'archive — lead, coordinatrice ou mainteneur — nettoie"
+            " à sa place : le message « terminé » d'un enfant à un parent archivé est supposé perdu,"
+            " non mesuré"
+        ),
+    ),
+    # Relecture de la PR #153, passe 1, I1 : après un arrêt `contradiction`, la passe de l'issue
+    # fermée n'était jamais reprise — tenu par cette entrée, `6b-repercussions-session-contradiction`
+    # et `6b-repercussions-reprise-sur-l-issue-fermee`. Dénombrement (classe : une passe qui s'arrête
+    # pour une autre session sans que rien ne la reprenne), recensé dans `repercussions/SKILL.md` :
+    # **1** site d'arrêt qui passe la main (étape 1, `contradiction`) ; **1** fuyait. Hors classe :
+    # l'étape 5 « le poser au mainteneur et laisser l'issue intacte » (la passe continue sur les
+    # autres issues).
     "6b-repercussions-pr-d-amendement": (
         REPERCUSSIONS_SKILL,
         (
             "Avec une PR d'amendement — une PR mergée qui amende une source de vérité sans fermer"
-            " d'issue, ouverte par `contradiction` —, le delta réel est l'amendement"
+            " d'issue, ouverte par une `contradiction` née d'une décision, sans issue fermée à"
+            " l'origine —, le delta réel est l'amendement"
         ),
     ),
     "6b-repercussions-amendement-sans-qa": (REPERCUSSIONS_SKILL, "l'étape 7 est sans objet"),
@@ -2853,7 +2876,15 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         (
             "`start_session`, `initiation: user_asked`, `context: fresh`, `use_worktree: true`,"
             " `name: contradiction-<N>`, prompt `/contradiction` suivi du bloc d'arrêt — ses deux"
-            " citations"
+            " citations — et de `origine : #<N>`"
+        ),
+    ),
+    "6b-repercussions-reprise-sur-l-issue-fermee": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Elle amende le § par une PR ; à son merge, elle redémarre `repercussions` sur `#<N>`,"
+            " dont la passe reprend contre la doc amendée — l'étape 1 n'y trouve plus la"
+            " contradiction, les étapes 2 à 7 suivent, QA comprise"
         ),
     ),
     "6b-repercussions-n-amende-jamais": (
@@ -2908,11 +2939,26 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         REPERCUSSIONS_SKILL,
         "`label <n> --add needs-interrogation --remove <ready-for-agent | ready-for-human>`",
     ),
+    # Relecture de la PR #153, passe 1, I2 : la fermeture en doublon laissait le label d'état sur
+    # une issue fermée. Tenu aussi par `test_chaque_fermeture_d_issue_retire_son_etat`, dont la
+    # table, `FERMETURES_D_ISSUE`, porte le dénombrement.
     "6b-repercussions-fermee-en-doublon": (
         REPERCUSSIONS_SKILL,
         (
             "« Fermée en doublon de #<M> après #<fermée> », dans le corps (`issue edit --body-file`)"
-            " — le skill ne commente jamais une issue —, puis `issue close <n> --reason not_planned`"
+            " — le skill ne commente jamais une issue —, puis `issue close <n> --reason not_planned`,"
+            " puis `label <n> --remove <état>` — l'état que l'issue porte, lu sur elle, sous son"
+            " label réel (mapping de `.claude/pipeline.config.md`) : une issue fermée n'en porte"
+            " aucun (`triage`, « Rôles »)"
+        ),
+    ),
+    "6b-repercussions-seules-transitions-d-etat": (
+        REPERCUSSIONS_SKILL,
+        (
+            "**Il ne re-trie pas.** Les seules transitions d'état qu'il applique sont le retour en"
+            " `needs-interrogation` décrit ci-dessus et le retrait de l'état d'une issue qu'il ferme"
+            " en doublon, par `label` (« Délégation ») ; tout autre changement d'état passe par"
+            " `triage`"
         ),
     ),
     "6b-repercussions-fin-de-travail": (
@@ -2971,6 +3017,52 @@ INVARIANTS_DU_CONTEXTE_COURT = {
 def test_chaque_invariant_du_contexte_court_garde_sa_phrase(fichier: str, phrase: str) -> None:
     """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
     assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
+
+
+# Une fermeture d'issue prescrite retire aussi son état : une issue **fermée** n'en porte aucun, et
+# une fermeture manuelle laisse ce geste à faire (`triage`, « Rôles »). Dénombrement (relecture de
+# la PR #153, passe 1, I2 ; classe : une fermeture d'issue sans retrait de son état),
+# `grep -rn "issue close" .claude/skills --include=*.md` : **4** sites — `triage/SKILL.md` ×2
+# (`wontfix` bug et enhancement : `label --add wontfix --remove <état>`), `triage/hors-scope.md`
+# étape 8 (idem), `repercussions/SKILL.md` (doublon) ; **1** fuyait (`repercussions`). La forme du
+# geste, `issue close <n>` (obs 139), en rend 3 au 2026-10-23 sur `1eb58d8` : le `wontfix`
+# d'enhancement de `triage` renvoie au déroulé de `hors-scope.md`, étape 8, qui porte la commande.
+FERMETURES_D_ISSUE = {
+    "triage-wontfix-bug": TRIAGE_SKILL,
+    "triage-wontfix-enhancement-par-son-deroule": HORS_SCOPE_REF,
+    "repercussions-doublon": REPERCUSSIONS_SKILL,
+}
+FERMETURE_D_ISSUE = re.compile(r"issue close <\w+>")
+# La coupure entre deux blocs de prose : une ligne vide, ou le début d'un élément de liste (`- `,
+# `* ` ou `<n>. `).
+COUPURE_DE_BLOC = re.compile(r"\n[ \t]*\n|\n(?=[ \t]*(?:[-*]|\d+\.) )")
+
+
+def fermetures_d_issue(path: Path) -> list[str]:
+    """Les paragraphes et éléments de liste du fichier qui ferment une issue, espaces normalisés."""
+    texte = path.read_text(encoding="utf-8-sig")
+    blocs = (" ".join(bloc.split()) for bloc in COUPURE_DE_BLOC.split(texte))
+    return [bloc for bloc in blocs if FERMETURE_D_ISSUE.search(bloc)]
+
+
+def test_les_fermetures_d_issue_sont_celles_de_la_table() -> None:
+    """Un site neuf, ou retiré, rougit ici : la table se re-dénombre avant de changer."""
+    sites = sorted(
+        path.relative_to(REPOSITORY_ROOT).as_posix()
+        for path in REPOSITORY_ROOT.glob(SKILL_PROSE)
+        for _ in fermetures_d_issue(path)
+    )
+
+    assert sites == sorted(FERMETURES_D_ISSUE.values())
+
+
+@pytest.mark.parametrize("fichier", FERMETURES_D_ISSUE.values(), ids=FERMETURES_D_ISSUE.keys())
+def test_chaque_fermeture_d_issue_retire_son_etat(fichier: str) -> None:
+    """Le bloc qui ferme l'issue porte `--remove <état>`."""
+    fermetures = fermetures_d_issue(REPOSITORY_ROOT / fichier)
+    sans_retrait = [bloc for bloc in fermetures if "--remove <état>" not in bloc]
+
+    assert not sans_retrait, f"`{fichier}` ferme une issue sans retirer son état : {sans_retrait}"
 
 
 # Ce que la session de dialogue ne garde plus, et ce qu'un équipier ne reçoit plus (critère 2b :
