@@ -21,8 +21,27 @@ décisions une par une.
   tranchée (obs 102).
 - **Chaque question s'accompagne de ta réponse recommandée** — interroger n'est pas se décharger de
   l'analyse sur l'utilisateur.
-- **Si une question peut être résolue en explorant le code, explore le code** plutôt que de
-  demander.
+- **Si une question peut être résolue en explorant le code, fais explorer le code** plutôt que de
+  demander : un `releveur` rend les passages qui répondent, cités ; la réponse reste à la session.
+
+## Délégation
+
+La session garde les questions, ses recommandations et les décisions prises avec le mainteneur.
+Le reste change de main :
+
+- **`releveur`** — l'exploration du code qui répond à une question, la mesure d'une porte
+  (« Avant de verrouiller »), le `grep` des sources de vérité sur les ancres de toutes les
+  décisions, en un lot (« Consigner les décisions ») ;
+- **`executant`**, dans son propre worktree, jamais dans le dossier partagé où la session a été
+  démarrée (`use_worktree: false`) — la contre-épreuve à fabriquer : le composant présenté sous
+  une forme que l'outil analyse ; toute écriture de dépôt qu'un interrogatoire exige —
+  l'amendement d'un document par `decisions-vs-doc` (« Deux sorties ») ou `/contradiction` —,
+  qui part par une PR ;
+- **script** — les décisions écrites dans le corps de l'issue (`issue edit`), les notes de triage
+  (`comment`), par `python .claude/skills/cycle-pr/scripts/ecriture-relue.py <sous-commande> …`,
+  qui relit ce qu'il écrit ;
+- **sessions distinctes** — la session de tri qui rédige le brief (« Consigner les décisions »),
+  puis la session PR ; protocole commun : `.claude/skills/cycle-pr/references/sessions-liees.md`.
 
 ## Réponse « quelles sont les bonnes pratiques ? »
 
@@ -56,15 +75,16 @@ n'est qu'un acquiescement à son autorité.
 ## Avant de verrouiller — mesurer la porte, montrer l'écran
 
 **Une décision qui verrouille une porte bloquante se mesure avant d'être posée** — scanner,
-audit, seuil de qualité, règle de lint : lancer l'outil sur l'état actuel du dépôt, et écrire dans
-la décision le résultat chiffré et daté **avec l'inventaire de l'outil** — types de cibles et
-nombre de composants analysés. Un résultat non nul est un coût à présenter au mainteneur pendant
-l'interrogatoire — exceptions, alternatives, découpage —, pas une surprise de l'Étape 1 de
-`cycle-pr` : une politique de scan verrouillée avec un fichier d'exceptions « créé vide » a
-rencontré 37 vulnérabilités sans correctif au premier passage (obs 45). Un zéro sur un composant
-absent de l'inventaire n'est pas une mesure : le contre-éprouver en présentant le même composant
-sous une forme que l'outil analyse, et comparer — un « 0 vulnérabilité » cachait 31 HIGH dans des
-binaires que le scanner n'avait pas ouverts, ce que son journal disait d'une ligne (obs 61).
+audit, seuil de qualité, règle de lint : un `releveur` lance l'outil sur l'état actuel du dépôt et
+rend le résultat chiffré **avec l'inventaire de l'outil** — types de cibles et nombre de
+composants analysés —, que la session écrit dans la décision, daté. Un résultat non nul est un
+coût à présenter au mainteneur pendant l'interrogatoire — exceptions, alternatives, découpage —,
+pas une surprise de l'Étape 1 de `cycle-pr` : une politique de scan verrouillée avec un fichier
+d'exceptions « créé vide » a rencontré 37 vulnérabilités sans correctif au premier passage
+(obs 45). Un zéro sur un composant absent de l'inventaire n'est pas une mesure : le
+contre-éprouver — un `executant` présente le même composant sous une forme que l'outil analyse,
+le `releveur` y relance l'outil, la session compare. Un « 0 vulnérabilité » cachait 31 HIGH dans
+des binaires que le scanner n'avait pas ouverts, ce que son journal disait d'une ligne (obs 61).
 
 **Une tranche qui façonne un écran (HITL) montre l'écran avant de le verrouiller.** Lister les
 décisions héritées des rangs 1-2 (« Sources de vérité » de `.claude/pipeline.config.md`) qui
@@ -85,45 +105,60 @@ Ce skill n'est pas seulement un outil à la demande : c'est le **garde-fou oblig
 développement.
 
 - `triage` y passe toute issue destinée à `ready-for-agent` ou `ready-for-human` — l'issue porte
-  l'état `needs-interrogation` tant que la session n'a pas eu lieu.
-- `cycle-pr` le rattrape à son Étape 1 si le travail n'y est jamais passé (issue non interrogée,
-  brief marqué `⚠️ Non interrogée au triage`, ou demande directe sans issue).
+  l'état `needs-interrogation` tant que la session n'a pas eu lieu — et démarre cette session sur
+  le seul numéro (`/interroge-moi <N>`).
+- Une session PR qui trouve son issue non interrogée — aucune trace d'interrogatoire, ou brief
+  marqué `⚠️ Non interrogée au triage` — s'arrête à son Étape 1 et propose une session
+  d'interrogatoire sur le numéro, jamais dans la session PR. Une demande directe sans issue n'y
+  échappe pas : ses décisions vont dans le briefing pré-PR.
 
 ## Consigner les décisions — l'étape qui n'est pas optionnelle
 
 **Une interrogation dont les conclusions ne sont pas écrites n'a pas eu lieu.** Ce qui est tranché
-ici sera relu des jours plus tard, par une autre session, sans aucun accès à cette conversation.
+ici sera relu des jours plus tard, par une autre session, sans aucun accès à cette conversation
+avec le mainteneur.
 
-À la fin de la session, écrire :
+À la fin de la session, écrire, chaque écriture par sa sous-commande (« Délégation ») :
 
-- **Les points tranchés** → dans les « Décisions verrouillées » du brief d'agent de l'issue si la
-  session part d'une issue ; dans le briefing pré-PR sinon.
-- **Les questions restées ouvertes** → en notes de triage sur l'issue, pour que la prochaine
-  session sache ce qui manque encore.
+- **Les points tranchés** → si la session part d'une issue, dans la section « Décisions » du corps
+  de l'issue, chaque ligne datée, par `issue edit <N> --body-file` : le corps courant relu, la
+  section ajoutée ou complétée, le corps entier réécrit, que le script relit en entier ; dans le
+  briefing pré-PR sinon. Le brief d'agent les reprendra : la session de tri le rédige
+  (`triage/brief-agent.md`).
+- **Les questions restées ouvertes** → en notes de triage sur l'issue, par `comment`, pour que la
+  prochaine session sache ce qui manque encore.
 
 **Chaque décision nomme son propriétaire avant d'être écrite** — le bon endroit est celui que lira
 la session qui *réalisera* le point, pas celle qui l'a discuté :
 
 1. **L'issue interrogée**, si c'est elle qui réalise le point.
-2. **Une autre issue ouverte**, si c'est elle qui le réalisera → amender **son corps**, pas
-   seulement le brief courant.
-3. **Aucune issue n'existe encore** → la story du PRD (ou le document de rang supérieur) reçoit un
-   rappel daté, que `vers-issues` retrouvera.
+2. **Une autre issue ouverte**, si c'est elle qui le réalisera → amender **son corps**, par
+   `issue edit <M> --body-file`, pas seulement la section « Décisions » de l'issue interrogée.
+3. **Aucune issue n'existe encore** → la story du PRD reçoit un rappel daté, par
+   `issue edit <PRD> --body-file`, que `vers-issues` retrouvera ; à défaut de PRD, le document de
+   rang supérieur, par une PR (« Délégation »).
 
-Dans les deux derniers cas, le brief courant garde une ligne « porté par #N » pour la traçabilité.
-Une décision consignée au mauvais endroit est perdue au même titre qu'une décision non écrite.
+Dans les deux derniers cas, la section « Décisions » garde une ligne « porté par #N » pour la
+traçabilité. Une décision consignée au mauvais endroit est perdue au même titre qu'une décision
+non écrite.
 
 **Chaque décision qui affirme un fait sur l'existant est confrontée aux sources avant d'être
-écrite.** Une valeur, une composition, un comportement de spec : `grep` des sources de vérité
-(`.claude/pipeline.config.md`, « Sources de vérité ») sur deux ou trois ancres **avant** d'écrire
-le verrou, et l'ancre vérifiée notée dans la décision (« §1.2 muet », « §1.2 conforme ») ; une
-décision sans ancre porte `⚠️ non confrontée`. Le verrou est un point d'écriture au sens de
-`decisions-vs-doc` : une contradiction qui le traverse ne se découvre qu'au briefing d'une session
-ultérieure, en arrêt de chantier.
+écrite.** Une valeur, une composition, un comportement de spec : un `releveur` passe le `grep`
+des sources de vérité (`.claude/pipeline.config.md`, « Sources de vérité ») sur deux ou trois
+ancres par décision — toutes les décisions en un lot, ancres données, lignes rendues — **avant**
+que le verrou s'écrive ; le verdict reste à la session, et l'ancre vérifiée est notée dans la
+décision (« §1.2 muet », « §1.2 conforme ») ; une décision sans ancre porte `⚠️ non confrontée`.
+Le verrou est un point d'écriture au sens de `decisions-vs-doc` : une contradiction qui le
+traverse ne se découvre qu'au briefing d'une session ultérieure, en arrêt de chantier.
+L'amendement qu'un arrêt décide part par une PR (« Délégation »).
 
-Puis, si la session partait d'une issue en `needs-interrogation`, dire à l'utilisateur que l'issue
-peut passer à `ready-for-agent` (ou `ready-for-human`) — la transition elle-même appartient à
-`triage`.
+Puis, si la session partait d'une issue en `needs-interrogation`, dire au mainteneur que l'issue
+peut passer à `ready-for-agent` (ou `ready-for-human`) — la transition et le brief appartiennent à
+`triage`. Dans le tour où il l'accepte, démarrer la **session de tri qui rédige le brief** :
+`start_session`, `initiation: user_asked`, `context: fresh`, `use_worktree: false`,
+`name: triage-<N>`, prompt `/triage <N>` et rien d'autre — elle trouve la section « Décisions » :
+cas « rédiger le brief » de `triage`, étape 5. Une session dont le brief enchaîne elle-même
+interrogatoire et tri — la préparation de vague, `pr-paralleles` Étape 0 — suit son brief.
 
 **Session démarrée par une autre** (son prompt système nomme le parent,
 `.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») : une fois les décisions
