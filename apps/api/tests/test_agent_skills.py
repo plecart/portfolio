@@ -698,9 +698,9 @@ HOUSE_SKILLS = (
 
 # Les skills maison qui ne délèguent encore à personne, chacun avec le lot de #134 qui l'en sort :
 # au 2026-10-20 sur `e70e279`, onze, dont `init-projet`, qui ne nomme les cinq rôles que dans sa
-# liste de fichiers. La liste se vide lot par lot ; #134 l'exige vide.
+# liste de fichiers ; dix depuis le lot 6a2 (2026-10-23, base `aba63e1`), qui en sort `triage`. La
+# liste se vide lot par lot ; #134 l'exige vide.
 EXECUTOR_WAITING_LIST = {
-    "triage": "6a",
     "interroge-moi": "6a",
     "vers-prd": "6a",
     "vers-issues": "6a",
@@ -815,8 +815,9 @@ def test_les_skills_maison_du_test_sont_ceux_de_la_config() -> None:
 def test_chaque_skill_maison_nomme_ses_executants(skill: str) -> None:
     """Second paramétrage de D5 : un skill maison hors liste d'attente nomme un rôle ou un script.
 
-    Au 2026-10-20 sur `e70e279`, deux sur treize (`cycle-pr`, `pr-paralleles`) ; les onze autres
-    sont dans `EXECUTOR_WAITING_LIST` avec le lot qui les en sort.
+    Au 2026-10-20 sur `e70e279`, deux sur treize (`cycle-pr`, `pr-paralleles`) ; trois au
+    2026-10-23 avec `triage` (lot 6a2) ; les dix autres sont dans `EXECUTOR_WAITING_LIST` avec le
+    lot qui les en sort.
     """
     assert cites_an_executor(skill_prose(skill), ROLE_NAMES), (
         f"`{skill}` ne nomme aucun rôle ni aucun script, et n'est pas en liste d'attente"
@@ -831,6 +832,108 @@ def test_un_skill_en_liste_d_attente_ne_nomme_encore_aucun_executant(skill: str)
         f"`{skill}` nomme un exécutant : retire-le d'`EXECUTOR_WAITING_LIST` "
         f"(lot {EXECUTOR_WAITING_LIST[skill]} de #134)"
     )
+
+
+# Les skills dont la prose n'écrit plus sur la forge que par l'écriture distante relue (#134,
+# lot 4) : chaque lot de #134 y ajoute les siens — le bloc 2 du lot 6a2 `interroge-moi`, `vers-prd`
+# et `vers-issues`, les lots 6b à 8 les leurs.
+SKILLS_SANS_ECRITURE_GH_DIRECTE = ("triage",)
+ECRITURE_RELUE = ".claude/skills/cycle-pr/scripts/ecriture-relue.py"
+
+# Une commande `gh` citée, jusqu'à son accent grave fermant ou sa fin de ligne.
+GH_COMMAND = re.compile(r"(?<![\w-])gh\s+(?P<group>[a-z][\w-]*)(?P<args>[^`\n]*)")
+# Les verbes tenus pour une lecture ; tout autre verbe d'un groupe de `gh` est tenu pour une
+# écriture : un faux positif rougit, une écriture manquée se tairait.
+GH_READ_VERBS = frozenset({"view", "list"})
+GH_API_METHOD = re.compile(r"(?:-X|--method)[\s=]*(?P<method>[A-Za-z]+)")
+# Ce qui fait passer `gh api` en POST sans `--method` : un champ ou un corps — « if
+# !opts.RequestMethodPassed && (len(params) > 0 || opts.RequestInputFile != "") { method = "POST" »
+# (`apiRun`, cli/cli `pkg/cmd/api/api.go`, lu par `context7` le 2026-10-23 ; `gh api --help`,
+# gh 2.94.0). Une requête GraphQL passe en POST de même : elle n'écrit que par une `mutation`.
+GH_API_PAYLOAD = re.compile(r"(?<![\w-])(?:-[fF]|--raw-field|--field|--input)(?![\w-])")
+
+
+def gh_command_writes(group: str, args: str) -> bool:
+    """Vrai si la commande `gh <group><args>` écrit sur la forge."""
+    if group != "api":
+        return next(iter(args.split()), "") not in GH_READ_VERBS
+    if "graphql" in args.split():
+        return "mutation" in args
+    if method := GH_API_METHOD.search(args):
+        return method["method"].upper() != "GET"
+    return GH_API_PAYLOAD.search(args) is not None
+
+
+def gh_writes(text: str) -> list[str]:
+    """Les commandes `gh` d'écriture que `text` cite, une ligne continuée par `\\` rejointe."""
+    return [
+        command.group(0).strip()
+        for command in GH_COMMAND.finditer(text.replace("\\\n", " "))
+        if gh_command_writes(command["group"], command["args"])
+    ]
+
+
+# Le recueil de `gh_writes`, des deux côtés.
+GH_COMMAND_FORMS = {
+    "issue create": ("`gh issue create --title A --body-file corps.md`", True),
+    "issue edit": ('`gh issue edit <n> --milestone "A"`', True),
+    "issue close": ("`gh issue close <n>`", True),
+    "issue comment": ("`gh issue comment <n> --body-file notes.md`", True),
+    "issue reopen": ("`gh issue reopen <n>`", True),
+    "label create": ("`gh label create needs-triage`", True),
+    "label edit": ("`gh label edit bug --color f00`", True),
+    "pr comment": ("`gh pr comment <n> --body-file notes.md`", True),
+    "pr edit": ("`gh pr edit <n> --add-label bug`", True),
+    "api avec champ": ('gh api "repos/{owner}/{repo}/milestones" -f title="A"', True),
+    "api avec methode": ("`gh api -X PATCH repos/{owner}/{repo}/issues/<n>`", True),
+    "api avec corps": ("`gh api repos/{owner}/{repo}/issues/<n> --input -`", True),
+    "api mutation": ("`gh api graphql -f query='mutation { addComment }'`", True),
+    "ligne continuee": ('gh api "repos/{owner}/{repo}/issues/<n>" \\\n  -X PATCH', True),
+    "issue view": ("`gh issue view <n> --json state`", False),
+    "issue list": ("`gh issue list --label needs-triage`", False),
+    "api lecture": ("`gh api \"repos/{owner}/{repo}/milestones\" --jq '.[]'`", False),
+    "api graphql lecture": ("`gh api graphql -f query='{ repository { … } }'`", False),
+    "api GET avec champ": ("`gh api -X GET search/issues -f q=x`", False),
+    "pr list": ("`gh pr list`", False),
+    "pr view": ("`gh pr view`", False),
+    "gh nu": ("publié par `gh`", False),
+    "mot en gh": ("les ghosts du dépôt", False),
+}
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"), GH_COMMAND_FORMS.values(), ids=GH_COMMAND_FORMS.keys()
+)
+def test_une_ecriture_gh_se_reconnait(text: str, expected: bool) -> None:
+    assert bool(gh_writes(text)) is expected
+
+
+@pytest.mark.parametrize("skill", SKILLS_SANS_ECRITURE_GH_DIRECTE)
+def test_un_skill_sans_ecriture_gh_directe_n_en_cite_aucune(skill: str) -> None:
+    """Une écriture `gh` directe n'est pas relue (`contraintes.md`, « Écritures sur un artefact
+    distant ») : `triage` en portait quatre au 2026-10-23 sur `aba63e1`, toutes dans
+    `themes-milestones.md`.
+
+    **Population** : `SKILLS_SANS_ECRITURE_GH_DIRECTE`, le `SKILL.md` et les références de chacun.
+    **Ce que le détecteur ne voit pas** : une écriture décrite sans commande (« publie un
+    commentaire ») — le dénombrement de la PR la couvre, une entrée par geste prescrit — et une
+    commande dont ce qui écrit, drapeau ou `mutation`, tient sur une ligne suivante sans `\\` final.
+    """
+    writes = gh_writes(skill_prose(skill))
+
+    assert not writes, f"`{skill}` écrit par `gh` : {writes}"
+
+
+@pytest.mark.parametrize("skill", SKILLS_SANS_ECRITURE_GH_DIRECTE)
+def test_un_skill_sans_ecriture_gh_directe_cite_l_ecriture_relue(skill: str) -> None:
+    """Le revers du précédent : ses écritures nomment le script qui les relit."""
+    citing = REPOSITORY_ROOT / ".claude/skills" / skill / "SKILL.md"
+    cited = {
+        script_target(REPOSITORY_ROOT, citing, reference)
+        for reference in SCRIPT_REFERENCE.finditer(skill_prose(skill))
+    }
+
+    assert ECRITURE_RELUE in cited, f"`{skill}` ne cite pas `{ECRITURE_RELUE}`"
 
 
 # `git diff A..B` compare deux **arbres** ; ce n'est pas une plage de commits. Entre le trunk et la
@@ -1370,6 +1473,7 @@ SKILLS_DES_SESSIONS_LIEES = [
     ".claude/skills/cycle-pr/SKILL.md",
     ".claude/skills/pr-paralleles/SKILL.md",
     ".claude/skills/interroge-moi/SKILL.md",
+    ".claude/skills/triage/SKILL.md",
 ]
 
 
@@ -2395,7 +2499,31 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # Lot 6a2 de #134 : les skills de cadrage et de tri nomment leur exécutant (`triage` d'abord).
     "6a-releveur-cite-sans-conclure": (
         ".claude/agents/releveur.md",
-        "le passage qui répond, cité mot pour mot",
+        "le passage qui répond, cité mot pour mot ; ce qu'il faut en conclure n'est pas à toi",
+    ),
+    "6a-triage-une-session-par-issue": (
+        ".claude/skills/triage/SKILL.md",
+        "une session de tri par issue, qui ne reçoit que le numéro",
+    ),
+    "6a-triage-jamais-l-interrogatoire-dans-le-tri": (
+        ".claude/skills/triage/SKILL.md",
+        "jamais l'interrogatoire dans la session de tri",
+    ),
+    "6a-triage-out-of-scope-par-une-pr": (
+        ".claude/skills/triage/SKILL.md",
+        "`.out-of-scope/` s'écrit par une PR",
+    ),
+    "6a-hors-scope-jamais-sur-le-trunk": (
+        ".claude/skills/triage/hors-scope.md",
+        "par une PR, jamais par un commit direct sur le trunk",
+    ),
+    "6a-themes-domaines-par-une-pr": (
+        ".claude/skills/triage/themes-milestones.md",
+        "les domaines de `.claude/pipeline.config.md` s'amendent par une PR",
+    ),
+    "6a-brief-reprend-les-decisions": (
+        ".claude/skills/triage/brief-agent.md",
+        "reprennent la section « Décisions » du corps de l'issue",
     ),
 }
 

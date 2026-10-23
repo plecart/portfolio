@@ -69,7 +69,7 @@ La raison doit être durable. Évite de faire référence à des circonstances t
 
 ## Quand consulter `.out-of-scope/`
 
-Pendant le triage (Étape 1 : Rassembler le contexte), lis tous les fichiers de `.out-of-scope/`. Lors de l'évaluation d'une nouvelle issue :
+Pendant le triage (Étape 1 : Rassembler le contexte), un `releveur` rend tous les fichiers de `.out-of-scope/`, chaque concept avec sa raison ; le rapprochement reste à la session. Lors de l'évaluation d'une nouvelle issue :
 
 - Vérifie si la demande correspond à un concept hors périmètre existant
 - La correspondance se fait par similarité de concept, pas par mot-clé — « night theme » correspond à `dark-mode.md`
@@ -77,25 +77,26 @@ Pendant le triage (Étape 1 : Rassembler le contexte), lis tous les fichiers de 
 
 Le mainteneur peut :
 
-- **Confirmer** — la nouvelle issue est ajoutée à la liste « Demandes antérieures » du fichier existant, puis fermée
-- **Reconsidérer** — le fichier hors périmètre est supprimé ou mis à jour, et l'issue suit le triage normal
+- **Confirmer** — la nouvelle issue est ajoutée à la liste « Demandes antérieures » du fichier existant, par une PR, puis fermée (« Quand écrire »)
+- **Reconsidérer** — le fichier hors périmètre est supprimé ou mis à jour par une PR, et l'issue suit le triage normal
 - **Être en désaccord** — les issues sont liées mais distinctes, on poursuit avec le triage normal
 
 ## Quand écrire dans `.out-of-scope/`
 
-Uniquement lorsqu'un **enhancement** (pas un bug) est rejeté en `wontfix`. Le déroulé :
+Uniquement lorsqu'un **enhancement** (pas un bug) est rejeté en `wontfix`. Le fichier change par une PR, jamais par un commit direct sur le trunk (D-12 de #134). Le déroulé :
 
 1. Le mainteneur décide qu'une demande de fonctionnalité est hors périmètre
 2. Vérifier si un fichier `.out-of-scope/` correspondant existe déjà
-3. Si oui : ajouter la nouvelle issue à la liste « Demandes antérieures »
-4. Si non : créer un nouveau fichier avec le nom du concept, la décision, la raison et la première demande antérieure
-5. Publier un commentaire sur l'issue expliquant la décision et mentionnant le fichier `.out-of-scope/`
-6. Fermer l'issue avec le label `wontfix`
+3. Si oui : un `executant` ajoute la nouvelle issue à la liste « Demandes antérieures »
+4. Si non : un `executant` crée un nouveau fichier avec le nom du concept, la décision, la raison et la première demande antérieure
+5. Il commite sur une branche partie de `origin/main`, lancé en isolation `worktree` comme le `relecteur` — le dossier de la session, que d'autres sessions de tri peuvent lire, ne change pas de branche ; la session de tri pousse la branche, ouvre la PR, et son merge attend le go du mainteneur
+6. Publier sur l'issue un commentaire expliquant la décision et citant le fichier et la PR (`comment` de `.claude/skills/cycle-pr/scripts/ecriture-relue.py`)
+7. Poser `wontfix` (`label <N> --add wontfix --remove <état>`), puis fermer l'issue (`issue close <N> --reason not_planned`)
 
 ## Mettre à jour ou supprimer des fichiers hors périmètre
 
 Si le mainteneur change d'avis sur un concept précédemment rejeté :
 
-- Supprime le fichier `.out-of-scope/`
+- Supprime le fichier `.out-of-scope/`, par une PR, comme au déroulé ci-dessus
 - Le skill n'a pas besoin de rouvrir les anciennes issues — ce sont des traces historiques
 - La nouvelle issue qui a déclenché la reconsidération suit le triage normal
