@@ -111,6 +111,8 @@ commentaire (`triage`, étape 4, « Déjà interrogée »). Des règles de réda
 ```markdown
 ## Brief d'agent
 
+> *Généré par IA pendant le triage.*
+
 **Catégorie :** bug / enhancement
 **Résumé :** description en une ligne de ce qui doit se passer
 
@@ -147,6 +149,8 @@ Sois précis sur les cas limites et les conditions d'erreur.
 ```markdown
 ## Brief d'agent
 
+> *Généré par IA pendant le triage.*
+
 **Catégorie :** bug
 **Résumé :** La troncature de description de skill coupe en plein mot, produisant une sortie cassée
 
@@ -181,6 +185,8 @@ et ajouter « ... » pour indiquer la troncature.
 
 ```markdown
 ## Brief d'agent
+
+> *Généré par IA pendant le triage.*
 
 **Catégorie :** enhancement
 **Résumé :** Ajouter la prise en charge du répertoire `.out-of-scope/` pour suivre les demandes de fonctionnalités rejetées
