@@ -1,6 +1,6 @@
 # Rédiger des briefs d'agent
 
-Un brief d'agent est un commentaire structuré publié sur une issue GitHub lorsqu'elle passe à `ready-for-agent`. C'est la spécification de référence à partir de laquelle un agent AFK travaillera. Le corps de l'issue original et la discussion constituent le contexte — le brief d'agent est le contrat.
+Un brief d'agent est un commentaire structuré publié sur une issue GitHub, par `brief write` de `.claude/skills/cycle-pr/scripts/ecriture-relue.py`, lorsqu'elle passe à `ready-for-agent`. C'est la spécification de référence à partir de laquelle un agent AFK travaillera. Le corps de l'issue original et la discussion constituent le contexte — le brief d'agent est le contrat.
 
 ## Principes
 
@@ -19,8 +19,8 @@ L'issue peut rester en `ready-for-agent` pendant des jours ou des semaines. Le c
 Le brief est le contrat que `cycle-pr` exécute — le corps de l'issue et sa discussion ne sont que
 le contexte. Quand une réconciliation post-merge (`repercussions`), un amendement de spec ou une
 décision falsifie une ligne du brief, le brief est **amendé dans le même geste** : édition en place
-du commentaire existant, jamais un second brief concurrent, jamais un correctif qui ne toucherait
-que le corps de l'issue. Une entrée de journal qui dit « pas celui cité dans le brief » sans que le
+du commentaire existant par `brief write`, jamais un second brief concurrent, jamais un correctif
+qui ne toucherait que le corps de l'issue. Une entrée de journal qui dit « pas celui cité dans le brief » sans que le
 brief change laisse deux specs en contradiction — et c'est la fausse qu'on exécute.
 
 ### Comportemental, pas procédural
@@ -71,7 +71,9 @@ la décision avec sa preuve (« compile et mesuré à X »), jamais « se résou
 
 ### Rédiger les décisions verrouillées
 
-Des règles de rédaction :
+Les « Décisions verrouillées » du brief reprennent la section « Décisions » du corps de l'issue,
+qu'y écrit la session d'interrogatoire (`interroge-moi`, « Consigner les décisions » ; D-13 de
+#134). Des règles de rédaction :
 
 - **Une décision négative nomme ce qui survit au rejet.** Quand l'option rejetée est une
   *combinaison*, « écarté : X seul » est ambigu — écrire « écarté : X **sans** Y ; X reste
@@ -123,6 +125,9 @@ Sois précis sur les cas limites et les conditions d'erreur.
 - `NomDuType` — ce qui doit changer et pourquoi
 - type de retour de `nomDeFonction()` — ce qu'elle retourne actuellement vs ce qu'elle devrait retourner
 - forme de la config — toute nouvelle option de configuration nécessaire
+
+**Décisions verrouillées :**
+- Décision 1, reprise de la section « Décisions » du corps de l'issue
 
 **Critères d'acceptation :**
 - [ ] Critère 1 précis et testable
