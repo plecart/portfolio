@@ -8,7 +8,7 @@ argument-hint: "[#issue | vide pour ce qui requiert ton attention]"
 
 Faire progresser les issues sur GitHub (via `gh`) à travers une petite machine à états composée de rôles de triage.
 
-Chaque commentaire ou issue publié sur GitHub pendant le triage (`comment`, `issue create`) **doit** commencer par ce disclaimer — le brief d'agent, qui s'ouvre par `## Brief d'agent` sans quoi `brief write` le refuse, le porte à la ligne qui suit ce titre :
+Chaque commentaire ou issue publié sur GitHub pendant le triage (`comment`, `issue create`) **doit** commencer par ce disclaimer — le brief d'agent, qui s'ouvre par `## Brief d'agent` sans quoi `brief write` le refuse, le porte sous ce titre, après une ligne vide ([brief-agent.md](brief-agent.md), « Modèle ») :
 
 ```
 > *Généré par IA pendant le triage.*
@@ -136,12 +136,12 @@ C'est la tâche de la session de tri de l'issue (« Invocation »).
    - `ready-for-human` — son brief a la même structure qu'un brief d'agent, mais précise pourquoi cela ne peut pas être délégué (jugements à porter, accès externe, décisions de conception, tests manuels). Pour une issue « comptes et services tiers » : lister les capacités du fournisseur que les critères supposent, et **vérifier chacune à la source** — la session elle-même (« Délégation ») — avant de rendre la main (voir [brief-agent.md](brief-agent.md), « décisions verrouillées »).
    - `needs-info` — notes de triage (modèle ci-dessous) par `comment`, puis `label`.
    - `wontfix` (bug) — explication polie par `comment`, puis `label <N> --add wontfix --remove <état>` et `issue close <N> --reason not_planned`.
-   - `wontfix` (enhancement) — `.out-of-scope/` s'écrit par une PR : un `executant` écrit le fichier sur une branche, la session ouvre la PR et la présente ([hors-scope.md](hors-scope.md)) ; au go du mainteneur, dans sa fenêtre, elle la merge (`gh pr merge <n> --rebase --match-head-commit <SHA relu>`), puis seulement `comment` citant le fichier et la PR, `label`, `issue close <N> --reason not_planned` — l'issue ne se ferme jamais sur un fichier absent du trunk.
+   - `wontfix` (enhancement) — `.out-of-scope/` s'écrit par une PR : un `executant` écrit le fichier sur une branche, la session ouvre la PR, la relit — `gh pr view <n> --json title,body,headRefName,headRefOid`, `ecriture-relue.py` n'ayant pas de `pr create` — et la présente ([hors-scope.md](hors-scope.md)) ; au go du mainteneur, dans sa fenêtre, elle la merge (`gh pr merge <n> --rebase --match-head-commit <SHA relu>`, le `headRefOid` relu), puis seulement `comment` citant le fichier et la PR, `label`, `issue close <N> --reason not_planned` — l'issue ne se ferme jamais sur un fichier absent du trunk.
    - `needs-triage` — `label`. Commentaire optionnel (`comment`) s'il y a un avancement partiel.
 
 ## Changement d'état rapide
 
-Si le mainteneur dit « passe l'issue #42 en ready-for-agent », fais-lui confiance sur le **fond**. Confirme ce que tu t'apprêtes à faire (changements de rôle, commentaire, fermeture), puis agis. Dans la session de relevé, une transition sans brief ni fichier — `needs-triage`, `needs-info`, `wontfix` d'un bug — s'applique sur place, par `label`, `comment` et `issue close` comme à l'étape 5 de « Trier une issue spécifique » ; une transition vers `ready-for-agent` ou `ready-for-human`, ou un `wontfix` d'enhancement, part à la session de tri de l'issue (« Montrer ce qui requiert l'attention »).
+Si le mainteneur dit « passe l'issue #42 en ready-for-agent », fais-lui confiance sur le **fond**. Confirme ce que tu t'apprêtes à faire (changements de rôle, commentaire, fermeture), puis agis. Dans la session de relevé, une transition sans brief ni fichier — `needs-triage`, `needs-info`, `wontfix` d'un bug — s'applique sur place, par `label`, `comment` et `issue close` comme à l'étape 5 de « Trier une issue spécifique » ; une transition vers `needs-interrogation`, `ready-for-agent` ou `ready-for-human`, ou un `wontfix` d'enhancement, part à la session de tri de l'issue (« Montrer ce qui requiert l'attention »).
 
 **L'interrogatoire reste dû**, même en mode rapide. Trois cas :
 

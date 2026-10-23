@@ -116,7 +116,8 @@ fichier s'il tranche. L'**effort** (`effort`) est la profondeur de réflexion : 
 décision peut en porter un élevé, qui paie alors de la vérification et non de l'architecture. La
 **liste `tools:`** fixe le plancher : 26 à 31 K de contexte au premier appel pour les quatre rôles
 mesurés — `releveur`, `executant`, `developpeur`, `relecteur`, le 2026-10-20 (journal de spec de
-l'issue #134, lot 2a) —, contre 74,5 K pour `general-purpose` sans liste, sur Haiku (étude du
+l'issue #134, lot 2a), avant que le `releveur` reçoive ses deux outils `context7` (lot 6a2), non
+re-mesuré depuis —, contre 74,5 K pour `general-purpose` sans liste, sur Haiku (étude du
 2026-10-19, dossier `etudes/` voisin du journal d'observations, §15.2). Déléguer à un rôle sans
 décision suppose que la session ait écrit la tranche entièrement — fichiers, signatures, tests
 attendus, comportement — avant l'envoi : si la spécifier demande encore de réfléchir, c'est son
@@ -168,7 +169,7 @@ automatiquement sur sa description.
 | Commande | Rôle |
 |---|---|
 | `/init-projet` | Setup et reconfiguration de la pipeline |
-| `/vers-prd` | Conversation → PRD |
+| `/vers-prd` | Dialogue → PRD |
 | `/vers-issues` | PRD/plan → issues |
 | `/triage` | Machine à états + thèmes + brief d'agent |
 | `/interroge-moi` | Lever les ambiguïtés d'un plan |
