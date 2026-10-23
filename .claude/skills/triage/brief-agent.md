@@ -20,8 +20,9 @@ Le brief est le contrat que `cycle-pr` exécute — le corps de l'issue et sa di
 le contexte. Quand une réconciliation post-merge (`repercussions`), un amendement de spec ou une
 décision falsifie une ligne du brief, le brief est **amendé dans le même geste** : édition en place
 du commentaire existant par `brief write`, jamais un second brief concurrent, jamais un correctif
-qui ne toucherait que le corps de l'issue. Une entrée de journal qui dit « pas celui cité dans le brief » sans que le
-brief change laisse deux specs en contradiction — et c'est la fausse qu'on exécute.
+qui ne toucherait que le corps de l'issue. Une entrée de journal qui dit « pas celui cité dans le
+brief » sans que le brief change laisse deux specs en contradiction — et c'est la fausse qu'on
+exécute.
 
 ### Comportemental, pas procédural
 
@@ -73,8 +74,8 @@ la décision avec sa preuve (« compile et mesuré à X »), jamais « se résou
 
 Les « Décisions verrouillées » du brief reprennent la section « Décisions » du corps de l'issue,
 qu'y écrit la session d'interrogatoire (`interroge-moi`, « Consigner les décisions » ; D-13 de
-#134) — ou, pour une issue interrogée avant D-13 (2026-10-23), ses décisions consignées en
-commentaire (`triage`, étape 4, « Déjà interrogée »). Des règles de rédaction :
+#134) — ou, pour une issue interrogée avant D-13, ses décisions consignées en commentaire
+(`triage`, étape 4, « Déjà interrogée »). Des règles de rédaction :
 
 - **Une décision négative nomme ce qui survit au rejet.** Quand l'option rejetée est une
   *combinaison*, « écarté : X seul » est ambigu — écrire « écarté : X **sans** Y ; X reste

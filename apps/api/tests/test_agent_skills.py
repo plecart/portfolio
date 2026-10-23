@@ -1556,6 +1556,10 @@ CYCLE_PR_SKILL = ".claude/skills/cycle-pr/SKILL.md"
 TRIAGE_SKILL = ".claude/skills/triage/SKILL.md"
 HORS_SCOPE_REF = ".claude/skills/triage/hors-scope.md"
 RELEVEUR_ROLE = ".claude/agents/releveur.md"
+VERS_PRD_SKILL = ".claude/skills/vers-prd/SKILL.md"
+VERS_ISSUES_SKILL = ".claude/skills/vers-issues/SKILL.md"
+THEMES_MILESTONES_REF = ".claude/skills/triage/themes-milestones.md"
+BRIEF_AGENT_REF = ".claude/skills/triage/brief-agent.md"
 INVARIANTS_DES_SESSIONS_LIEES = {
     # Héritage (décision 7).
     "heritage-sans-permission-mode": (
@@ -2183,11 +2187,11 @@ USE_WORKTREE_EXPLICITE = {
         "`use_worktree: false`, `name: triage-<N>`",
     ),
     "vers-prd-vers-vers-issues": (
-        ".claude/skills/vers-prd/SKILL.md",
+        VERS_PRD_SKILL,
         "`use_worktree: false`, `name: vers-issues-<n>`",
     ),
     "themes-milestones-vers-init-projet": (
-        ".claude/skills/triage/themes-milestones.md",
+        THEMES_MILESTONES_REF,
         "démarrée avec `use_worktree: true` : elle écrit sur une branche",
     ),
 }
@@ -2544,31 +2548,31 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     # Lot 6a2 de #134 : les skills de cadrage et de tri nomment leur exécutant (`triage` d'abord).
     "6a-releveur-cite-sans-conclure": (
-        ".claude/agents/releveur.md",
+        RELEVEUR_ROLE,
         "le passage qui répond, cité mot pour mot ; ce qu'il faut en conclure n'est pas à toi",
     ),
     "6a-triage-une-session-par-issue": (
-        ".claude/skills/triage/SKILL.md",
+        TRIAGE_SKILL,
         "une session de tri par issue, qui ne reçoit que le numéro",
     ),
     "6a-triage-jamais-l-interrogatoire-dans-le-tri": (
-        ".claude/skills/triage/SKILL.md",
+        TRIAGE_SKILL,
         "jamais l'interrogatoire dans la session de tri",
     ),
     "6a-triage-out-of-scope-par-une-pr": (
-        ".claude/skills/triage/SKILL.md",
+        TRIAGE_SKILL,
         "`.out-of-scope/` s'écrit par une PR",
     ),
     "6a-hors-scope-jamais-sur-le-trunk": (
-        ".claude/skills/triage/hors-scope.md",
+        HORS_SCOPE_REF,
         "par une PR, jamais par un commit direct sur le trunk",
     ),
     "6a-themes-domaines-par-une-pr": (
-        ".claude/skills/triage/themes-milestones.md",
+        THEMES_MILESTONES_REF,
         "les domaines de `.claude/pipeline.config.md` s'amendent par une PR",
     ),
     "6a-brief-reprend-les-decisions": (
-        ".claude/skills/triage/brief-agent.md",
+        BRIEF_AGENT_REF,
         "reprennent la section « Décisions » du corps de l'issue",
     ),
     "6a-interroge-moi-decisions-dans-le-corps": (
@@ -2584,31 +2588,31 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         "jamais dans le dossier partagé",
     ),
     "6a-vers-prd-archive-par-une-pr": (
-        ".claude/skills/vers-prd/SKILL.md",
+        VERS_PRD_SKILL,
         "le fichier d'archive s'écrit par une PR",
     ),
     "6a-vers-prd-archive-jamais-sur-le-trunk": (
-        ".claude/skills/vers-prd/SKILL.md",
+        VERS_PRD_SKILL,
         "son merge attend le go du mainteneur ; jamais un commit direct sur le trunk",
     ),
     "6a-vers-prd-vers-issues-dans-sa-session": (
-        ".claude/skills/vers-prd/SKILL.md",
+        VERS_PRD_SKILL,
         "`vers-issues` part du PRD publié, dans sa propre session",
     ),
     "6a-vers-issues-source-en-argument": (
-        ".claude/skills/vers-issues/SKILL.md",
+        VERS_ISSUES_SKILL,
         "la source se passe en argument",
     ),
     "6a-vers-issues-sans-argument-s-arrete": (
-        ".claude/skills/vers-issues/SKILL.md",
+        VERS_ISSUES_SKILL,
         "Sans argument, la session s'arrête et demande la référence",
     ),
     "6a-vers-issues-lots-des-la-creation": (
-        ".claude/skills/vers-issues/SKILL.md",
+        VERS_ISSUES_SKILL,
         "porte ses lots dès sa création",
     ),
     "6a-vers-issues-re-decoupage-jamais-pour-un-depassement-prevu": (
-        ".claude/skills/vers-issues/SKILL.md",
+        VERS_ISSUES_SKILL,
         "reste la voie d'un dépassement découvert, jamais d'un dépassement prévisible",
     ),
     # Relecture de la PR #151, passe 1, I1 : une issue interrogée avant D-13 n'a pas de section
@@ -2621,7 +2625,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # Étape 1 (« décisions consignées dans le brief d'agent »), vérifiées indemnes.
     "6a-triage-interrogee-avant-d-13": (
         TRIAGE_SKILL,
-        "interrogée avant D-13 (2026-10-23), ses décisions consignées en commentaire",
+        "interrogée avant D-13 de #134, ses décisions consignées en commentaire",
     ),
     "6a-triage-prete-si-deja-interrogee": (
         TRIAGE_SKILL,
@@ -2629,8 +2633,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6a-triage-rapide-deja-interrogee": (TRIAGE_SKILL, "L'issue est déjà interrogée (étape 4)"),
     "6a-brief-decisions-d-avant-d-13": (
-        ".claude/skills/triage/brief-agent.md",
-        "pour une issue interrogée avant D-13 (2026-10-23), ses décisions consignées en commentaire",
+        BRIEF_AGENT_REF,
+        "pour une issue interrogée avant D-13, ses décisions consignées en commentaire",
     ),
     # I3 : l'issue `wontfix` se fermait dès l'ouverture de sa PR `.out-of-scope/`, que personne ne
     # merge. **Dénombrement, écrit avant le correctif** — une issue fermée citant un artefact de
@@ -2679,7 +2683,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         "ou plusieurs candidates, remonte à la session, qui la lit à la source",
     ),
     "6a-vers-issues-fournisseur-par-context7": (
-        ".claude/skills/vers-issues/SKILL.md",
+        VERS_ISSUES_SKILL,
         "ou plusieurs candidates, remonte à la session, qui la lit à la source",
     ),
     "6a-executant-artefacts-jetables": (
@@ -2688,7 +2692,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6a-hors-scope-nom-et-texte-donnes": (HORS_SCOPE_REF, "nom et texte rédigés par la session"),
     "6a-vers-issues-commentaires-tels-quels": (
-        ".claude/skills/vers-issues/SKILL.md",
+        VERS_ISSUES_SKILL,
         "rend le corps et les commentaires tels quels, filtrés par les critères que la session donne",
     ),
 }

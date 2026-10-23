@@ -14,7 +14,7 @@ Le dépôt GitHub et le mapping de labels sont dans `.claude/pipeline.config.md`
 
 La session garde le découpage, le dialogue de l'étape 4 et la rédaction des corps. Le reste change de main :
 
-- **`releveur`** — la lecture de la source (corps, et commentaires filtrés par les critères que la session donne) et du code autour des ancres données (« Lectures bornées »), les dénombrements par commande donnée (« Collectes »), la publication en série (étape 5), et la vérification d'une capacité de fournisseur quand sa doc officielle est indexée dans `context7` — identifiant résolu, requête et passage cité mot pour mot ; une doc absente de l'index, ou plusieurs candidates, remonte à la session, qui la lit à la source, le `releveur` n'ayant pas d'accès web ;
+- **`releveur`** — la lecture de la source (corps, et commentaires filtrés par les critères que la session donne) et du code autour des ancres données (« Lectures bornées »), les dénombrements par commande donnée (« Collectes »), la publication en série (étape 5), et une capacité de fournisseur par `context7` (« Questions de documentation ») ; une doc absente de l'index, ou plusieurs candidates, remonte à la session, qui la lit à la source ;
 - **script** — `issue create`, `issue edit`, `milestone attach`, par `python .claude/skills/cycle-pr/scripts/ecriture-relue.py <sous-commande> …`, qui relit ce qu'il écrit.
 
 Une session démarrée par une autre — par `vers-prd` — suit le protocole commun de `.claude/skills/cycle-pr/references/sessions-liees.md`, message de fin « terminé — \<livrable> » compris.
