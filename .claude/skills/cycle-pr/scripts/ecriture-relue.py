@@ -4,7 +4,7 @@ Usage :
     python ecriture-relue.py label <N> --remove <label>
     python ecriture-relue.py checkbox patch <N> --case <ancre> [--case <ancre> …]
     python ecriture-relue.py brief patch <N> --case <ancre> [--case <ancre> …]
-    python ecriture-relue.py issue edit <N> --append <fichier>
+    python ecriture-relue.py issue edit <N> (--append | --body-file) <fichier>
     python ecriture-relue.py issue create --title <titre> --body-file <fichier> [--label <label> …]
     python ecriture-relue.py comment <N> --body-file <fichier>
 
@@ -15,8 +15,8 @@ Chaque sous-commande lit par `gh api` — octets décodés en UTF-8, jamais le m
 les fins de ligne, ni la page de code de la console (obs 87, 106, 108, 116) —, écrit, puis relit
 par le même canal. Un texte s'écrit par `gh api -X PATCH <chemin> --input -` — `-X POST` pour
 publier un commentaire ou créer une issue —, la charge JSON sur l'entrée standard, et sa
-relecture compare le **texte entier** à l'attendu :
-une forme réduite, longueur ou ancre, ne voit pas une conversion qui la préserve (obs 106).
+relecture compare le **texte entier** à l'attendu : une forme réduite, longueur ou ancre, ne voit
+pas une conversion qui la préserve (obs 106).
 `{owner}/{repo}` sont remplis par `gh` depuis le dépôt courant.
 
 - `label` retire un label de l'issue ou de la PR `<N>`, puis relit ses labels ;
@@ -29,6 +29,8 @@ une forme réduite, longueur ou ancre, ne voit pas une conversion qui la préser
   de son dernier contenu par une ligne vide au moins — celles qui terminent déjà le corps
   restent —, aucune sur un corps vide. Le corps d'une PR passe par le même chemin : pour l'API
   REST, une PR est une issue ;
+- `issue edit --body-file` substitue un fichier UTF-8, lu en octets, au corps entier de `<N>` ;
+  `--append` et `--body-file` s'excluent, et l'un des deux est requis ;
 - `issue create` crée une issue de titre `--title` et de corps le fichier `--body-file`, UTF-8 lu
   en octets, avec ses labels `--label` dans la **même** requête : une issue n'existe jamais sans
   ses labels, même un instant. Chaque label doit exister dans le dépôt — apparié sans la casse,
@@ -47,9 +49,10 @@ vide — lu avant tout appel à la forge —, une lecture `gh` qui échoue, ne r
 un JSON sans un champ attendu ou d'un autre type. Après l'écriture — sa réponse comprise, dont un
 commentaire publié tire son `id` et une issue créée son numéro —, c'est une relecture non
 conforme : le texte a pu partir. Une case déjà cochée, un label déjà absent, un fichier qui
-termine déjà le corps, un commentaire de `<N>` qui porte déjà le fichier pour corps, une issue
-ouverte — pas une PR — qui porte déjà ce titre et ce corps : rien à écrire, et la sortie le dit —
-un rejeu après une relecture tombée n'écrit donc pas une seconde fois.
+termine déjà le corps ou qui l'est déjà tout entier, un commentaire de `<N>` qui porte déjà le
+fichier pour corps, une issue ouverte — pas une PR — qui porte déjà ce titre et ce corps : rien à
+écrire, et la sortie le dit — un rejeu après une relecture tombée n'écrit donc pas une seconde
+fois.
 
 **Ce qu'il ne prouve pas.** Il ne choisit pas les cases : la session PR les nomme. Il ne
 verrouille rien : une édition faite par un tiers entre sa lecture et son écriture est écrasée, et
@@ -57,13 +60,13 @@ la relecture ne la voit pas — elle compare à ce que le script a écrit ; un m
 entre la lecture des commentaires et la publication fait un doublon, une même issue créée entre la
 lecture des issues ouvertes et la création aussi. Le commentaire déjà publié se reconnaît à son
 corps seul, l'issue déjà créée à son titre et à son corps — ses labels n'y comptent pas, et une
-issue fermée n'est pas vue —, **quel qu'en soit l'auteur**. Le fichier se reconnaît à l'identique, fins de ligne
-comprises, en fin de corps comme en corps de commentaire ou d'issue : sur une forge qui le stocke
-transformé — relecture non conforme dès le premier appel —, un rejeu l'ajoute, le publie ou crée
-l'issue une seconde fois. Une relecture conforme atteste ce que l'API rend, pas ce que l'interface
-web affiche. Le chemin d'un label encodé, l'écriture du corps d'une PR, la publication d'un
-commentaire sur une PR par l'endpoint `issues` et la création d'une issue ne sont pas mesurés sur
-la vraie forge.
+issue fermée n'est pas vue —, **quel qu'en soit l'auteur**. Le fichier se reconnaît à
+l'identique, fins de ligne comprises, en fin de corps comme en corps de commentaire ou d'issue :
+sur une forge qui le stocke transformé — relecture non conforme dès le premier appel —, un rejeu
+l'ajoute, le réécrit, le publie ou crée l'issue une seconde fois. Une relecture conforme atteste
+ce que l'API rend, pas ce que l'interface web affiche. Le chemin d'un label encodé, l'écriture
+du corps d'une PR, la publication d'un commentaire sur une PR par l'endpoint `issues` et la
+création d'une issue ne sont pas mesurés sur la vraie forge.
 
 Sortie : 0 écrit et relu conforme, ou rien à écrire ; 1 refus (« refus — »), ou écriture lancée et
 relecture non conforme ou impossible (« relecture non conforme — ») — motif en une ligne sur la
@@ -461,12 +464,31 @@ def read_text_file(path: Path) -> tuple[str, str]:
 def issue_append(run: Run, args: argparse.Namespace) -> str:
     """`issue edit --append` : ajoute le fichier en fin de corps, sauf s'il le termine déjà. Le
     fichier est lu avant tout appel à la forge."""
-    addition, anchor = read_text_file(args.file)
+    addition, anchor = read_text_file(args.append)
     text = issue_body(run, args.number)
     if text.body.endswith(addition):
-        return f"rien à écrire — {text.name} : {args.file} déjà en fin de corps"
+        return f"rien à écrire — {text.name} : {args.append} déjà en fin de corps"
     write_body(run, text, appended(text.body, addition), [anchor])
-    return f"écrit et relu — {text.name} : {args.file} ajouté"
+    return f"écrit et relu — {text.name} : {args.append} ajouté"
+
+
+def replace_text(run: Run, text: Text, body: str, anchor: str, file: Path) -> str:
+    """Substitue `body`, le texte du fichier `file`, au texte entier de `text`, sauf s'il l'est
+    déjà ; `anchor` est l'ancre de la relecture (`write_body`)."""
+    if text.body == body:
+        return f"rien à écrire — {text.name} : déjà {file}"
+    write_body(run, text, body, [anchor])
+    return f"écrit et relu — {text.name} : remplacé par {file}"
+
+
+def issue_edit(run: Run, args: argparse.Namespace) -> str:
+    """`issue edit` : `--append` ajoute le fichier en fin de corps (`issue_append`),
+    `--body-file` le substitue au corps entier (`replace_text`). Le fichier est lu avant tout
+    appel à la forge."""
+    if args.append:
+        return issue_append(run, args)
+    body, anchor = read_text_file(args.body_file)
+    return replace_text(run, issue_body(run, args.number), body, anchor, args.body_file)
 
 
 def comment_publish(run: Run, args: argparse.Namespace) -> str:
@@ -609,8 +631,10 @@ def build_parser() -> argparse.ArgumentParser:
     create.set_defaults(handler=issue_create)
     edit = actions.add_parser("edit")
     edit.add_argument("number", type=issue_number)
-    edit.add_argument("--append", dest="file", type=Path, required=True)
-    edit.set_defaults(handler=issue_append)
+    source = edit.add_mutually_exclusive_group(required=True)
+    source.add_argument("--append", type=Path)
+    source.add_argument("--body-file", type=Path)
+    edit.set_defaults(handler=issue_edit)
     comment = commands.add_parser("comment")
     comment.add_argument("number", type=issue_number)
     comment.add_argument("--body-file", dest="file", type=Path, required=True)
