@@ -2,9 +2,9 @@
 
 Une session en démarre une autre par `start_session` (application de bureau) ; l'enfant connaît
 son parent et lui écrit par `SendMessage`. Ce fichier fixe ce que `cycle-pr`, `pr-paralleles`,
-`triage`, `interroge-moi`, `vers-prd` et `vers-issues` en font. Il est la **seule** source de ces
-règles : les skills y renvoient, ils ne les recopient pas — un énoncé recopié hérite des erreurs
-de son auteur (obs 52).
+`triage`, `interroge-moi`, `vers-prd`, `vers-issues` et `repercussions` en font. Il est la
+**seule** source de ces règles : les skills y renvoient, ils ne les recopient pas — un énoncé
+recopié hérite des erreurs de son auteur (obs 52).
 
 Les sessions liées ne sont **pas documentées officiellement** au 2026-10-16 : chaque comportement
 de l'application ci-dessous porte sa date de mesure. Le relevé complet — enfant jetable, commandes
