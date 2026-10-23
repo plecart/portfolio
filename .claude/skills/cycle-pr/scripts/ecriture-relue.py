@@ -8,12 +8,14 @@ Usage :
     python ecriture-relue.py issue edit <N> (--append | --body-file) <fichier>
     python ecriture-relue.py issue create --title <titre> --body-file <fichier> [--label <label> …]
     python ecriture-relue.py issue close <N> [--reason completed|not_planned]
+    python ecriture-relue.py milestone attach <N> --title <titre> [--description <texte>]
+    python ecriture-relue.py milestone close --title <titre>
     python ecriture-relue.py comment <N> --body-file <fichier>
 
 La règle « Écritures sur un artefact distant » de `contraintes.md` veut que toute écriture sur la
 forge se relise ; ce script tient cette relecture pour les gestes de `cycle-pr` Étape 8, le
-commentaire de répercussion de son Étape 6, la création d'une issue, la transition de ses labels
-et sa fermeture (#134, lots 4a, 4b et 6a1).
+commentaire de répercussion de son Étape 6, la création d'une issue, la transition de ses labels,
+sa fermeture et son thème (#134, lots 4a, 4b et 6a1).
 Chaque sous-commande lit par `gh api` — octets décodés en UTF-8, jamais le mode texte, qui traduit
 les fins de ligne, ni la page de code de la console (obs 87, 106, 108, 116) —, écrit, puis relit
 par le même canal. Un texte s'écrit par `gh api -X PATCH <chemin> --input -` — `-X POST` pour
@@ -52,6 +54,14 @@ pas une conversion qui la préserve (obs 106).
   sortie porte le numéro de l'issue, créée ou déjà là ;
 - `issue close` ferme l'issue `<N>` avec la raison `--reason` — `completed` par défaut,
   `not_planned` pour une issue écartée —, puis relit son état et sa raison ;
+- `milestone attach` rattache l'issue `<N>` au milestone de titre `--title` à l'identique, lu sur
+  toutes les pages des milestones ouverts et fermés ; absent, il le crée ouvert, décrit par
+  `--description`, et relit son titre, sa description et son état. Un rattachement à un autre
+  milestone est remplacé, et la sortie le nomme — la fusion de thèmes de
+  `triage/themes-milestones.md`. Le milestone de l'issue se relit : sans droit d'écriture,
+  l'API REST ignore en silence un changement de milestone (« Update an issue ») ;
+- `milestone close` ferme le milestone de titre `--title`, vidé — sans issue ouverte —, puis relit
+  son état ;
 - `comment` publie un fichier UTF-8, lu en octets, en commentaire de `<N>`, puis relit le
   commentaire sous l'`id` que la publication rend. Une PR se commente par le même chemin.
 
@@ -61,28 +71,35 @@ nommé ; `CLAUDE.md` interdit de deviner un label, et les références REST de �
 et d'« Add labels to an issue » ne disent pas ce qu'elles font d'un label inconnu —, un fichier
 illisible, non UTF-8 ou sans ligne non vide — lu avant tout appel à la forge —, une issue déjà
 fermée sous une autre raison — une fermeture ne se réécrit pas, et l'API REST ignore
-`state_reason` quand `state` ne change pas (« Update an issue ») —, une lecture `gh` qui échoue,
-ne rend pas du JSON, ou rend un JSON sans un champ attendu ou d'un autre type. Après l'écriture —
-sa réponse comprise, dont un commentaire publié tire son `id` et une issue créée son numéro —,
-c'est une relecture non conforme : l'écriture a pu partir. Une case déjà cochée, des labels tous
-déjà posés ou déjà absents, une issue déjà fermée sous cette raison, un fichier qui termine déjà
-le corps ou qui l'est déjà tout entier, un commentaire de `<N>` qui porte déjà le fichier pour
-corps, une issue ouverte — pas une PR — qui porte déjà ce titre et ce corps : rien à écrire, et la
-sortie le dit — un rejeu après une relecture tombée n'écrit donc pas une seconde fois.
+`state_reason` quand `state` ne change pas (« Update an issue ») —, un milestone à rattacher fermé
+ou absent sans `--description` — un thème ne se crée pas sans son périmètre —, un milestone à
+fermer absent ou pas vidé, une lecture `gh` qui échoue, ne rend pas du JSON, ou rend un JSON sans
+un champ attendu ou d'un autre type. Après l'écriture — sa réponse comprise, dont un commentaire
+publié tire son `id`, une issue ou un milestone créé son numéro —, c'est une relecture non
+conforme : l'écriture a pu partir. Une case déjà cochée, des labels tous déjà posés ou déjà
+absents, une issue déjà fermée sous cette raison ou déjà dans ce milestone, un milestone déjà
+fermé, un fichier qui termine déjà le corps ou qui l'est déjà tout entier, un commentaire de `<N>`
+qui porte déjà le fichier pour corps, une issue ouverte — pas une PR — qui porte déjà ce titre et
+ce corps : rien à écrire, et la sortie le dit — un rejeu après une relecture tombée n'écrit donc
+pas une seconde fois.
 
 **Ce qu'il ne prouve pas.** Il ne choisit pas les cases : la session PR les nomme. Il ne
 verrouille rien : une édition faite par un tiers entre sa lecture et son écriture est écrasée, et
 la relecture ne la voit pas — elle compare à ce que le script a écrit ; un même commentaire publié
 entre la lecture des commentaires et la publication fait un doublon, une même issue créée entre la
-lecture des issues ouvertes et la création aussi. Le commentaire déjà publié se reconnaît à son
-corps seul, l'issue déjà créée à son titre et à son corps — ses labels n'y comptent pas, et une
-issue fermée n'est pas vue —, **quel qu'en soit l'auteur**. Le fichier se reconnaît à
-l'identique, fins de ligne comprises, en fin de corps comme en corps de commentaire ou d'issue :
+lecture des issues ouvertes et la création aussi, un même milestone créé entre la lecture des
+milestones et la création aussi — ou un refus de la seconde création, si la forge refuse un titre
+pris : non mesuré —, et `milestone` retient alors le premier listé. Le commentaire déjà publié se
+reconnaît à son corps seul, l'issue déjà créée à son titre et à son corps — ses labels n'y
+comptent pas, et une issue fermée n'est pas vue —, **quel qu'en soit l'auteur**. Le fichier se
+reconnaît à l'identique, fins de ligne comprises, en fin de corps comme en corps de commentaire ou
+d'issue :
 sur une forge qui le stocke transformé — relecture non conforme dès le premier appel —, un rejeu
 l'ajoute, le réécrit, le publie ou crée l'issue une seconde fois. Une relecture conforme atteste
 ce que l'API rend, pas ce que l'interface web affiche. Le chemin d'un label encodé, la pose d'un
 label, l'écriture du corps d'une PR, la publication d'un commentaire sur une PR par l'endpoint
-`issues`, la création et la fermeture d'une issue ne sont pas mesurés sur la vraie forge.
+`issues`, la création et la fermeture d'une issue, la création, le rattachement et la fermeture
+d'un milestone ne sont pas mesurés sur la vraie forge.
 
 Sortie : 0 écrit et relu conforme, ou rien à écrire ; 1 refus (« refus — »), ou écriture lancée et
 relecture non conforme ou impossible (« relecture non conforme — ») — motif en une ligne sur la
@@ -107,6 +124,7 @@ T = TypeVar("T")
 REPO = "repos/{owner}/{repo}"
 # Les issues du dépôt, et ses PR : pour l'API REST, une PR est une issue.
 ISSUES = f"{REPO}/issues"
+MILESTONES = f"{REPO}/milestones"
 BRIEF_MARK = "## Brief d'agent"
 # Une ligne de case Markdown ; le groupe est l'état de la case. `[X]` vaut coché pour GitHub.
 CHECKBOX = re.compile(r"[ \t]*- \[([ xX])\] ")
@@ -192,13 +210,11 @@ def writing() -> Generator[None, None, None]:
         raise Divergence(str(error)) from error
 
 
-def write_then_reread(
-    run: Run, write: Sequence[str], stdin: bytes | None, path: str, parse: Callable[[Any], Any]
-) -> Any:
-    """Lance l'écriture `gh api <write>`, puis rend ce que `parse` tire du document relu sous
-    `path` ; un échec est une divergence (`writing`)."""
+def patch_then_reread(run: Run, path: str, payload: bytes, parse: Callable[[Any], Any]) -> Any:
+    """Écrit `payload` sur le document `path` par `gh api -X PATCH`, puis rend ce que `parse` tire
+    du document relu sous le même chemin ; un échec est une divergence (`writing`)."""
     with writing():
-        gh_api(run, *write, stdin=stdin)
+        gh_api(run, "-X", "PATCH", path, "--input", "-", stdin=payload)
         return read_json(run, parse, path)
 
 
@@ -286,8 +302,7 @@ def write_body(run: Run, text: Text, expected: str, anchors: Sequence[str]) -> N
     """
     # ponytail: pas de verrou — une édition concurrente entre lecture et écriture est écrasée ;
     # une requête conditionnelle si la forge en accepte une.
-    write = ("-X", "PATCH", text.path, "--input", "-")
-    reread = write_then_reread(run, write, json_payload(body=expected), text.path, body_of)
+    reread = patch_then_reread(run, text.path, json_payload(body=expected), body_of)
     check_reread(expected, reread, anchors)
 
 
@@ -738,12 +753,151 @@ def issue_close(run: Run, args: argparse.Namespace) -> str:
         return f"rien à écrire — {issue} déjà fermée ({reason})"
     if state == "closed":
         raise Refusal(f"{issue} déjà fermée ({reason}), pas en {args.reason}")
-    patch = ("-X", "PATCH", path, "--input", "-")
     payload = json_payload(state="closed", state_reason=args.reason)
-    state, reason = write_then_reread(run, patch, payload, path, closure)
+    state, reason = patch_then_reread(run, path, payload, closure)
     if (state, reason) != wanted:
         raise Divergence(f"{issue} relue {state} ({reason}), attendue closed ({args.reason})")
     return f"fermée et relue — {issue} ({args.reason})"
+
+
+class Milestone(NamedTuple):
+    """Ce que `milestone` lit d'un milestone du dépôt."""
+
+    number: int
+    state: str
+    open_issues: int
+
+
+def same_milestone(pages: Any, title: str) -> Milestone | None:
+    """Le premier milestone de titre `title` à l'identique, sur les pages que
+    `gh api --paginate --slurp` rend.
+
+    Raises:
+        KeyError, TypeError: un milestone sans titre textuel, ou celui retenu sans numéro, état ou
+            nombre d'issues ouvertes de leur type (`typed`).
+    """
+    return next(
+        (
+            Milestone(typed(m, "number", int), typed(m, "state", str), typed(m, "open_issues", int))
+            for page in pages
+            for m in page
+            if typed(m, "title", str) == title
+        ),
+        None,
+    )
+
+
+def milestone_titled(run: Run, title: str) -> Milestone | None:
+    """Le milestone de titre `title` à l'identique — un thème porte le nom exact de son domaine
+    (`triage/themes-milestones.md`) —, ouvert ou fermé, lu sur toutes les pages, 100 par page ;
+    `None` s'il n'y en a pas (`same_milestone`)."""
+    themes = f"{MILESTONES}?state=all&per_page=100"
+    return read_json(
+        run, lambda pages: same_milestone(pages, title), "--paginate", "--slurp", themes
+    )
+
+
+def milestone_title(issue: Any) -> str | None:
+    """Le titre du milestone d'une issue, `None` sans milestone.
+
+    Raises:
+        KeyError, TypeError: pas de champ `milestone`, ou ni `null` ni un milestone titré.
+    """
+    milestone = issue["milestone"]
+    return None if milestone is None else typed(milestone, "title", str)
+
+
+def create_milestone(run: Run, title: str, description: str) -> int:
+    """Crée le milestone ouvert `title`, décrit par `description`, le relit sous le numéro que rend
+    la création, et rend ce numéro.
+
+    Raises:
+        Divergence: création ou relecture en échec, ou titre, description ou état relus autres
+            que ceux écrits.
+    """
+    post = ("-X", "POST", MILESTONES, "--input", "-")
+    written = (title, description, "open")
+    with writing():
+        number = read_json(
+            run,
+            lambda theme: typed(theme, "number", int),
+            *post,
+            stdin=json_payload(title=title, description=description, state="open"),
+        )
+        reread = read_json(
+            run,
+            lambda theme: (
+                typed(theme, "title", str),
+                text_or_null(theme, "description"),
+                typed(theme, "state", str),
+            ),
+            f"{MILESTONES}/{number}",
+        )
+    if reread != written:
+        raise Divergence(f"milestone {number} relu {reread}, attendu {written}")
+    return number
+
+
+def milestone_attach(run: Run, args: argparse.Namespace) -> str:
+    """`milestone attach` : rattache l'issue au milestone `--title`, sauf si elle l'est déjà, en le
+    créant ouvert avec `--description` s'il n'existe pas, puis relit le milestone de l'issue. Un
+    rattachement à un autre milestone est remplacé, et la sortie le nomme : c'est la fusion de
+    thèmes de `triage/themes-milestones.md`.
+
+    Raises:
+        Refusal: le milestone est fermé, ou absent sans `--description` — un thème ne se crée pas
+            sans son périmètre.
+        Divergence: écriture ou relecture en échec, ou issue relue dans un autre milestone — sans
+            droit d'écriture, l'API REST ignore en silence un changement de milestone (« Update an
+            issue »).
+    """
+    path, issue = issue_path(args.number), f"#{args.number}"
+    former = read_json(run, milestone_title, path)
+    if former == args.title:
+        return f"rien à écrire — {issue} déjà dans le milestone {args.title}"
+    milestone = milestone_titled(run, args.title)
+    if milestone is None and args.description is None:
+        raise Refusal(f"aucun milestone {args.title}, et pas de --description pour le créer")
+    if milestone is not None and milestone.state != "open":
+        raise Refusal(f"le milestone {args.title} est fermé")
+    report: list[str] = []
+    if milestone is None:
+        number = create_milestone(run, args.title, args.description)
+        report.append(f"milestone {args.title} créé ({number})")
+    else:
+        number = milestone.number
+    reread = patch_then_reread(run, path, json_payload(milestone=number), milestone_title)
+    if reread != args.title:
+        raise Divergence(f"{issue} relue dans le milestone {reread}, attendue dans {args.title}")
+    replaced = "" if former is None else f", à la place de {former}"
+    report.append(f"{issue} rattachée à {args.title}{replaced}")
+    return f"écrit et relu — {' ; '.join(report)}"
+
+
+def milestone_close(run: Run, args: argparse.Namespace) -> str:
+    """`milestone close` : ferme le milestone `--title`, vidé, sauf s'il l'est déjà, puis relit son
+    état.
+
+    Raises:
+        Refusal: aucun milestone de ce titre, ou il compte encore des issues ouvertes —
+            `triage/themes-milestones.md` ne ferme qu'un milestone vidé.
+        Divergence: écriture ou relecture en échec, ou état relu autre que `closed`.
+    """
+    milestone = milestone_titled(run, args.title)
+    if milestone is None:
+        raise Refusal(f"aucun milestone {args.title}")
+    if milestone.state == "closed":
+        return f"rien à écrire — milestone {args.title} déjà fermé"
+    if milestone.open_issues:
+        raise Refusal(
+            f"le milestone {args.title} porte encore {milestone.open_issues} issue(s) ouverte(s)"
+        )
+    path = f"{MILESTONES}/{milestone.number}"
+    payload = json_payload(state="closed")
+    state = patch_then_reread(run, path, payload, lambda theme: typed(theme, "state", str))
+    if state != "closed":
+        raise Divergence(f"milestone {args.title} relu {state}, attendu closed")
+    return f"fermé et relu — milestone {args.title}"
 
 
 def issue_number(value: str) -> str:
@@ -794,6 +948,15 @@ def build_parser() -> argparse.ArgumentParser:
     close.add_argument("number", type=issue_number)
     close.add_argument("--reason", choices=("completed", "not_planned"), default="completed")
     close.set_defaults(handler=issue_close)
+    themes = commands.add_parser("milestone").add_subparsers(dest="action", required=True)
+    attach = themes.add_parser("attach")
+    attach.add_argument("number", type=issue_number)
+    attach.add_argument("--title", type=one_line, required=True)
+    attach.add_argument("--description", type=one_line)
+    attach.set_defaults(handler=milestone_attach)
+    close_theme = themes.add_parser("close")
+    close_theme.add_argument("--title", type=one_line, required=True)
+    close_theme.set_defaults(handler=milestone_close)
     edit = actions.add_parser("edit")
     edit.add_argument("number", type=issue_number)
     source = edit.add_mutually_exclusive_group(required=True)
