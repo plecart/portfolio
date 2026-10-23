@@ -103,7 +103,8 @@ L'enfant envoie au parent, par `SendMessage`, un message explicite sous l'une de
 
 Toute forme admet un suffixe, « — enfants au travail : `local_…`, … », que porte le message d'une
 session qui a démarré des enfants encore au travail : un identifiant par enfant (« Identité »),
-pour la session qui l'archivera (« Nettoyage »).
+pour la session qui l'archivera (« Nettoyage »). Le suffixe suit le dernier champ : un `<chemin>`
+s'arrête avant « — enfants au travail ».
 
 Une session de relecture rend ses constats sous la forme de
 [session-relecture.md](session-relecture.md), « Réveil ». En vague, le même message part aussi au
@@ -153,4 +154,5 @@ de PR mergée suit `pr-paralleles` Étape 8.
 La session qui archive un parent nettoie, à la place du parent, les enfants que son message de fin
 nomme, chacun une fois son travail fini — son dernier message, lu par `list_events` (non mesuré),
 est une forme de « Fin de travail » —, jamais avant : le message de fin d'un enfant à un parent
-archivé est supposé perdu, non mesuré.
+archivé est supposé perdu, non mesuré. Une session sans parent nomme ses enfants au travail au
+mainteneur, dans son dernier tour, sous la même forme ; c'est lui qui l'archive.
