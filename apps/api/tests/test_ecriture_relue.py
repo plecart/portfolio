@@ -331,6 +331,94 @@ def test_brief_patch_refuse_sans_un_seul_commentaire_de_brief(
     assert motif in sortie_d_echec(capsys, "refus")
 
 
+def ecrit_brief(forge: Forge, tmp_path: Path, contenu: str) -> int:
+    """`brief write 42` d'un fichier de ce contenu, écrit en octets UTF-8."""
+    brief = tmp_path / "brief.md"
+    brief.write_bytes(contenu.encode())
+    return lance(forge, "brief", "write", "42", "--body-file", str(brief))
+
+
+NOUVEAU_BRIEF = "## Brief d'agent\r\n\r\n- [ ] Critère révisé\r\n"
+
+
+@pytest.mark.parametrize(
+    ("pages", "ecriture", "sortie"),
+    [
+        (
+            [[CITATION]],
+            ("POST", COMMENTAIRES_42),
+            "publié et relu — brief de #42 : commentaire 901",
+        ),
+        (
+            [[CITATION], [{"id": 13, "body": BRIEF}]],
+            ("PATCH", "repos/{owner}/{repo}/issues/comments/13"),
+            "écrit et relu — brief de #42 : remplacé par {fichier}",
+        ),
+    ],
+    ids=["publie-le-premier", "edite-en-place"],
+)
+def test_brief_write_publie_le_brief_ou_edite_en_place_celui_qui_existe(
+    pages: list[list[dict[str, Any]]],
+    ecriture: tuple[str, str],
+    sortie: str,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Sans brief, il est publié puis relu sous l'`id` rendu ; avec un, il est édité en place —
+    jamais un second brief concurrent. Une citation qui le nomme plus loin n'en est pas un."""
+    forge = Forge({}, pages=pages)
+
+    assert ecrit_brief(forge, tmp_path, NOUVEAU_BRIEF) == 0
+    assert [json.loads(charge)["body"] for charge in forge.charges] == [NOUVEAU_BRIEF]
+    assert ecritures(forge) == [("gh", "api", "-X", *ecriture, "--input", "-")]
+    sortie = sortie.format(fichier=tmp_path / "brief.md")
+    assert capsys.readouterr().out == f"{sortie}\n"
+
+
+@pytest.mark.parametrize(
+    ("contenu", "pages", "lectures", "motif"),
+    [
+        ("Brief d'agent\n", [], 0, "{fichier} ne s'ouvre pas par ## Brief d'agent"),
+        ("\n## Brief d'agent\n", [], 0, "{fichier} ne s'ouvre pas par ## Brief d'agent"),
+        (
+            "## Brief d'agent\n",
+            [[{"id": 13, "body": BRIEF}], [{"id": 14, "body": BRIEF}]],
+            1,
+            "2 commentaires de brief sur #42 : aucun ne s'édite en place",
+        ),
+    ],
+    ids=["sans-marque", "marque-apres-une-ligne-vide", "deux-briefs"],
+)
+def test_brief_write_refuse_sans_rien_ecrire(
+    contenu: str,
+    pages: list[list[dict[str, Any]]],
+    lectures: int,
+    motif: str,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Un fichier qui ne s'ouvre pas par la marque, même après une ligne vide, ne serait plus
+    reconnu par `brief patch` : refusé avant tout appel. Plusieurs briefs : `brief-agent.md` veut
+    l'édition en place, « jamais un second brief concurrent »."""
+    forge = Forge({}, pages=pages)
+
+    assert ecrit_brief(forge, tmp_path, contenu) == 1
+    assert len(forge.appels) == lectures
+    assert ecritures(forge) == []
+    assert motif.format(fichier=tmp_path / "brief.md") in sortie_d_echec(capsys, "refus")
+
+
+@pytest.mark.parametrize("pages", [[], [[{"id": 13, "body": BRIEF}]]], ids=["publie", "edite"])
+def test_brief_write_sort_en_1_si_le_brief_relu_n_est_pas_le_fichier(
+    pages: list[list[dict[str, Any]]], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    forge = Forge({}, pages=pages, stocke=crlf)
+
+    assert ecrit_brief(forge, tmp_path, "## Brief d'agent\n\nCritère.\n") == 1
+    ecart = "attendu 28 octets et 0 \\r, relu 31 octets et 3 \\r"
+    assert capsys.readouterr().out == f"relecture non conforme — {ecart}\n"
+
+
 def etiquetee(*noms: str) -> dict[str, Any]:
     """Une issue qui porte ces labels, sous la forme que l'API REST les rend."""
     return {"body": "", "labels": [{"name": nom} for nom in noms]}
@@ -436,8 +524,9 @@ def test_issue_edit_ajoute_le_fichier_en_fin_de_corps_octet_pour_octet(
         ("comment", "42", "--body-file"),
         ("issue", "create", "--title", "Titre", "--body-file"),
         ("issue", "edit", "42", "--body-file"),
+        ("brief", "write", "42", "--body-file"),
     ],
-    ids=["issue-edit-append", "comment", "issue-create", "issue-edit-body-file"],
+    ids=["issue-edit-append", "comment", "issue-create", "issue-edit-body-file", "brief-write"],
 )
 @pytest.mark.parametrize(
     ("contenu", "motif"),
@@ -700,10 +789,11 @@ def test_issue_create_sort_en_1_si_l_issue_relue_n_est_pas_celle_creee(
 
 @pytest.fixture
 def ajout_md(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Le fichier `ajout.md` que citent les appels nommés ci-dessous, dans un répertoire courant
-    neuf."""
+    """Les fichiers `ajout.md` et `brief.md` que citent les appels nommés ci-dessous, dans un
+    répertoire courant neuf."""
     monkeypatch.chdir(tmp_path)
     Path("ajout.md").write_bytes(b"*Rattachement.*\n")
+    Path("brief.md").write_bytes("## Brief d'agent\n\n- [ ] Critère révisé\n".encode())
 
 
 RETIRE_LABEL = ("label", "42", "--remove", "ready-for-agent")
@@ -712,6 +802,7 @@ COCHE_BRIEF = ("brief", "patch", "42", "--case", "Critère A")
 AJOUTE_FICHIER = ("issue", "edit", "42", "--append", "ajout.md")
 PUBLIE_COMMENTAIRE = ("comment", "42", "--body-file", "ajout.md")
 REMPLACE_CORPS = ("issue", "edit", "42", "--body-file", "ajout.md")
+ECRIT_BRIEF = ("brief", "write", "42", "--body-file", "brief.md")
 CREE_ISSUE = ("issue", "create", "--title", "Titre", "--body-file", "ajout.md")
 CREE_ISSUE_ETIQUETEE = (*CREE_ISSUE, "--label", "prd")
 # (appel, ce que la forge fait du texte reçu — `None` le garde tel quel —, sortie du premier appel)
@@ -723,6 +814,7 @@ REJEUX = [
     pytest.param(PUBLIE_COMMENTAIRE, None, 0, id="comment"),
     pytest.param(CREE_ISSUE, None, 0, id="issue-create"),
     pytest.param(REMPLACE_CORPS, None, 0, id="issue-edit-body-file"),
+    pytest.param(ECRIT_BRIEF, None, 0, id="brief-write"),
     pytest.param(COCHE_CORPS, crlf, 1, id="checkbox-patch-forge-crlf"),
     pytest.param(COCHE_BRIEF, crlf, 1, id="brief-patch-forge-crlf"),
     pytest.param(
@@ -753,6 +845,13 @@ REJEUX = [
         id="issue-edit-body-file-forge-crlf",
         marks=pytest.mark.xfail(strict=True, reason="corps comparé à l'identique"),
     ),
+    pytest.param(
+        ECRIT_BRIEF,
+        crlf,
+        1,
+        id="brief-write-forge-crlf",
+        marks=pytest.mark.xfail(strict=True, reason="corps comparé à l'identique"),
+    ),
 ]
 
 
@@ -771,10 +870,10 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     appel écrit une fois ; le second sort en 0 sans **aucune** écriture, ni `PATCH`, ni `DELETE`,
     ni `POST`.
 
-    Population : les 7 sous-commandes, sur une forge qui garde le texte reçu ; puis, cherchée hors
+    Population : les 8 sous-commandes, sur une forge qui garde le texte reçu ; puis, cherchée hors
     de cette liste, une forge qui le garde transformé (LF → CRLF : le premier appel sort alors en
-    1, relecture non conforme) — pour les six qui écrivent un texte, un `DELETE` n'en a pas.
-    13 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
+    1, relecture non conforme) — pour les sept qui écrivent un texte, un `DELETE` n'en a pas.
+    15 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
 
     - `issue-edit-append` — le bloc s'ajoutait une seconde fois ; corrigé : un corps qui finit
       déjà par le fichier n'est pas réécrit ;
@@ -790,10 +889,12 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     Au lot 6a1, `issue create` naît avec sa garde — une issue ouverte de même titre et de même
     corps en tient lieu —, vue rouge garde retirée ; `issue-create-forge-crlf` fuit, `xfail`
     strict, pour la même raison, et la fuite y est une seconde issue ; de même pour
-    `issue edit --body-file`, où elle réécrit le même corps.
+    `issue edit --body-file` et `brief write`, où elle réécrit le même texte. Le rejeu de
+    `brief write` part d'un brief à éditer : après une publication, il rejoint le même cas — un
+    brief, égal au fichier.
 
     Les cases se relisent cochées, le label absent, le commentaire publié, l'issue créée, le
-    corps remplacé : les 9 autres n'écrivent rien au rejeu.
+    corps remplacé, le brief écrit : les 10 autres n'écrivent rien au rejeu.
     """
     forge = Forge(
         {CORPS_42: {"body": "Corps\n- [ ] Critère A\n", "labels": [{"name": "ready-for-agent"}]}},
@@ -831,6 +932,7 @@ APPELS_MAL_FORMES = {
     "fichier-manquant": ("issue", "edit", "42"),
     "issue-numero-non-entier": ("issue", "edit", "4 2", "--append", "x.md"),
     "ajout-et-remplacement": ("issue", "edit", "42", "--append", "x.md", "--body-file", "x.md"),
+    "brief-sans-fichier": ("brief", "write", "42"),
     "commentaire-sans-fichier": ("comment", "42"),
     "commentaire-numero-non-ascii": ("comment", "４２", "--body-file", "x.md"),
     "creation-sans-titre": ("issue", "create", "--body-file", "x.md"),
