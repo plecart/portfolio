@@ -7,12 +7,13 @@ Usage :
     python ecriture-relue.py brief write <N> --body-file <fichier>
     python ecriture-relue.py issue edit <N> (--append | --body-file) <fichier>
     python ecriture-relue.py issue create --title <titre> --body-file <fichier> [--label <label> …]
+    python ecriture-relue.py issue close <N> [--reason completed|not_planned]
     python ecriture-relue.py comment <N> --body-file <fichier>
 
 La règle « Écritures sur un artefact distant » de `contraintes.md` veut que toute écriture sur la
 forge se relise ; ce script tient cette relecture pour les gestes de `cycle-pr` Étape 8, le
-commentaire de répercussion de son Étape 6, la création d'une issue et la transition de ses labels
-(#134, lots 4a, 4b et 6a1).
+commentaire de répercussion de son Étape 6, la création d'une issue, la transition de ses labels
+et sa fermeture (#134, lots 4a, 4b et 6a1).
 Chaque sous-commande lit par `gh api` — octets décodés en UTF-8, jamais le mode texte, qui traduit
 les fins de ligne, ni la page de code de la console (obs 87, 106, 108, 116) —, écrit, puis relit
 par le même canal. Un texte s'écrit par `gh api -X PATCH <chemin> --input -` — `-X POST` pour
@@ -49,6 +50,8 @@ pas une conversion qui la préserve (obs 106).
   corps entier, le titre exact et l'ensemble des labels — sans droit d'écriture sur le dépôt,
   l'API REST ignore en silence les labels d'une création (« Create an issue ») ; la ligne de
   sortie porte le numéro de l'issue, créée ou déjà là ;
+- `issue close` ferme l'issue `<N>` avec la raison `--reason` — `completed` par défaut,
+  `not_planned` pour une issue écartée —, puis relit son état et sa raison ;
 - `comment` publie un fichier UTF-8, lu en octets, en commentaire de `<N>`, puis relit le
   commentaire sous l'`id` que la publication rend. Une PR se commente par le même chemin.
 
@@ -56,14 +59,16 @@ Il refuse, sans rien écrire : une ancre introuvable ou ambiguë — toutes sont
 première écriture —, zéro brief à cocher, plusieurs briefs, un label inconnu du dépôt — chacun
 nommé ; `CLAUDE.md` interdit de deviner un label, et les références REST de « Create an issue »
 et d'« Add labels to an issue » ne disent pas ce qu'elles font d'un label inconnu —, un fichier
-illisible, non UTF-8 ou sans ligne non vide — lu avant tout appel à la forge —, une lecture `gh`
-qui échoue, ne rend pas du JSON, ou rend un JSON sans un champ attendu ou d'un autre type. Après
-l'écriture — sa réponse comprise, dont un commentaire publié tire son `id` et une issue créée son
-numéro —, c'est une relecture non conforme : le texte a pu partir. Une case déjà cochée, des
-labels tous déjà posés ou déjà absents, un fichier qui termine déjà le corps ou qui l'est déjà
-tout entier, un commentaire de `<N>` qui porte déjà le fichier pour corps, une issue ouverte — pas
-une PR — qui porte déjà ce titre et ce corps : rien à écrire, et la sortie le dit — un rejeu après
-une relecture tombée n'écrit donc pas une seconde fois.
+illisible, non UTF-8 ou sans ligne non vide — lu avant tout appel à la forge —, une issue déjà
+fermée sous une autre raison — une fermeture ne se réécrit pas, et l'API REST ignore
+`state_reason` quand `state` ne change pas (« Update an issue ») —, une lecture `gh` qui échoue,
+ne rend pas du JSON, ou rend un JSON sans un champ attendu ou d'un autre type. Après l'écriture —
+sa réponse comprise, dont un commentaire publié tire son `id` et une issue créée son numéro —,
+c'est une relecture non conforme : l'écriture a pu partir. Une case déjà cochée, des labels tous
+déjà posés ou déjà absents, une issue déjà fermée sous cette raison, un fichier qui termine déjà
+le corps ou qui l'est déjà tout entier, un commentaire de `<N>` qui porte déjà le fichier pour
+corps, une issue ouverte — pas une PR — qui porte déjà ce titre et ce corps : rien à écrire, et la
+sortie le dit — un rejeu après une relecture tombée n'écrit donc pas une seconde fois.
 
 **Ce qu'il ne prouve pas.** Il ne choisit pas les cases : la session PR les nomme. Il ne
 verrouille rien : une édition faite par un tiers entre sa lecture et son écriture est écrasée, et
@@ -77,7 +82,7 @@ sur une forge qui le stocke transformé — relecture non conforme dès le premi
 l'ajoute, le réécrit, le publie ou crée l'issue une seconde fois. Une relecture conforme atteste
 ce que l'API rend, pas ce que l'interface web affiche. Le chemin d'un label encodé, la pose d'un
 label, l'écriture du corps d'une PR, la publication d'un commentaire sur une PR par l'endpoint
-`issues` et la création d'une issue ne sont pas mesurés sur la vraie forge.
+`issues`, la création et la fermeture d'une issue ne sont pas mesurés sur la vraie forge.
 
 Sortie : 0 écrit et relu conforme, ou rien à écrire ; 1 refus (« refus — »), ou écriture lancée et
 relecture non conforme ou impossible (« relecture non conforme — ») — motif en une ligne sur la
@@ -197,17 +202,26 @@ def write_then_reread(
         return read_json(run, parse, path)
 
 
+def text_or_null(document: Any, field: str) -> str | None:
+    """Le champ `field` d'un document de la forge : un texte, ou `None` pour `null`.
+
+    Raises:
+        KeyError, TypeError: pas de champ `field`, ou ni texte ni `null` — `read_json` en fait le
+            motif.
+    """
+    value = document[field]
+    if not isinstance(value, str | None):
+        raise TypeError(f"`{field}` de type {type(value).__name__}")
+    return value
+
+
 def body_of(document: Any) -> str:
     """Le champ `body` d'un document de la forge ; `null` vaut le texte vide.
 
     Raises:
-        KeyError, TypeError: pas de champ `body`, ou ni texte ni `null` — `read_json` en fait le
-            motif.
+        KeyError, TypeError: voir `text_or_null`.
     """
-    body = document["body"]
-    if not isinstance(body, str | None):
-        raise TypeError(f"`body` de type {type(body).__name__}")
-    return body or ""
+    return text_or_null(document, "body") or ""
 
 
 # `def typed[T]` demande Python 3.12 ; le script tient 3.11 (docstring du module).
@@ -699,6 +713,39 @@ def issue_create(run: Run, args: argparse.Namespace) -> str:
     return f"créé et relu — issue #{number}"
 
 
+def closure(issue: Any) -> tuple[str, str | None]:
+    """L'état d'une issue, `open` ou `closed`, et sa raison — `null` sur une issue jamais fermée.
+
+    Raises:
+        KeyError, TypeError: voir `typed` et `text_or_null`.
+    """
+    return typed(issue, "state", str), text_or_null(issue, "state_reason")
+
+
+def issue_close(run: Run, args: argparse.Namespace) -> str:
+    """`issue close` : ferme l'issue avec la raison `--reason`, sauf si elle l'est déjà avec cette
+    raison, puis relit son état et sa raison.
+
+    Raises:
+        Refusal: l'issue est déjà fermée avec une autre raison — une fermeture ne se réécrit pas,
+            et l'API REST ignore `state_reason` quand `state` ne change pas (« Update an issue »).
+        Divergence: écriture ou relecture en échec, ou état et raison relus autres que l'attendu.
+    """
+    path, issue = issue_path(args.number), f"#{args.number}"
+    wanted = ("closed", args.reason)
+    state, reason = read_json(run, closure, path)
+    if (state, reason) == wanted:
+        return f"rien à écrire — {issue} déjà fermée ({reason})"
+    if state == "closed":
+        raise Refusal(f"{issue} déjà fermée ({reason}), pas en {args.reason}")
+    patch = ("-X", "PATCH", path, "--input", "-")
+    payload = json_payload(state="closed", state_reason=args.reason)
+    state, reason = write_then_reread(run, patch, payload, path, closure)
+    if (state, reason) != wanted:
+        raise Divergence(f"{issue} relue {state} ({reason}), attendue closed ({args.reason})")
+    return f"fermée et relue — {issue} ({args.reason})"
+
+
 def issue_number(value: str) -> str:
     """Type argparse : un numéro d'issue ou de PR, chiffres ASCII seulement."""
     if not NUMBER.fullmatch(value):
@@ -743,6 +790,10 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--body-file", dest="file", type=Path, required=True)
     create.add_argument("--label", dest="labels", type=one_line, action="append", default=[])
     create.set_defaults(handler=issue_create)
+    close = actions.add_parser("close")
+    close.add_argument("number", type=issue_number)
+    close.add_argument("--reason", choices=("completed", "not_planned"), default="completed")
+    close.set_defaults(handler=issue_close)
     edit = actions.add_parser("edit")
     edit.add_argument("number", type=issue_number)
     source = edit.add_mutually_exclusive_group(required=True)
