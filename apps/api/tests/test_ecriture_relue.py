@@ -1,9 +1,9 @@
 """Tests de la famille « écriture distante relue »
 (`.claude/skills/cycle-pr/scripts/ecriture-relue.py`).
 
-Le script écrit un texte de la forge puis le relit en entier : chaque cas éprouve l'une des deux
-moitiés — ce qui part (la charge du `PATCH`, lue sur l'entrée standard de `gh`), ou ce que la
-relecture voit. Il parle à `gh` par une seule fonction, `run`, que ces tests remplacent par une
+Le script écrit sur la forge puis relit en entier ce qu'il y a écrit : chaque cas éprouve l'une
+des deux moitiés — ce qui part (la charge du `PATCH` ou du `POST`, lue sur l'entrée standard de
+`gh`), ou ce que la relecture voit. Il parle à `gh` par une seule fonction, `run`, que ces tests remplacent par une
 forge témoin : elle garde les documents en mémoire, applique chaque écriture par la fonction
 `stocke` — l'identité, ou la transformation qu'un cas veut lui faire subir — et ne répond qu'aux
 **commandes complètes** attendues, arguments compris ; toute autre lève. La vraie forge n'est
@@ -676,9 +676,9 @@ def test_un_fichier_inutilisable_est_refuse_avant_tout_appel(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Le motif ouvre la ligne de refus. Les deux sous-commandes partagent la lecture du fichier :
-    son motif ne nomme l'action d'aucune — « rien à ajouter » était faux pour `comment` (vu rouge
-    par mutation)."""
+    """Le motif ouvre la ligne de refus. Les sous-commandes qui lisent un fichier en partagent la
+    lecture : son motif ne nomme l'action d'aucune — « rien à ajouter » était faux pour `comment`
+    (vu rouge par mutation)."""
     ajout = tmp_path / "ajout.md"
     if contenu is not None:
         ajout.write_bytes(contenu)
@@ -808,7 +808,7 @@ def test_issue_create_cree_l_issue_et_ses_labels_en_une_requete_puis_la_relit(
         ("gh", "api", "-X", "POST", ISSUES, "--input", "-"),
         ("gh", "api", "repos/{owner}/{repo}/issues/901"),
     ]
-    assert capsys.readouterr().out == "créé et relu — issue #901\n"
+    assert capsys.readouterr().out == "créée et relue — issue #901\n"
 
 
 def test_issue_create_apparie_les_labels_sans_la_casse_sur_toutes_les_pages(
@@ -901,7 +901,7 @@ def test_issue_create_ne_tient_pour_existante_qu_une_issue_de_meme_titre_et_meme
     forge = Forge({}, issues=[[ouverte]])
 
     assert lance(forge, *creation(tmp_path)) == 0
-    assert capsys.readouterr().out == "créé et relu — issue #901\n"
+    assert capsys.readouterr().out == "créée et relue — issue #901\n"
 
 
 # Ce que la relecture rend de l'issue créée, quand ce n'est pas ce qui est parti : (retouche du
@@ -1489,8 +1489,8 @@ PREMIERES_LECTURES = {
     "issue-create": CREE_ISSUE,
     "issue-create-label": CREE_ISSUE_ETIQUETEE,
     "label-add": AJOUTE_LABEL,
-    "close": FERME_ISSUE,
-    "attach": RATTACHE_THEME,
+    "issue-close": FERME_ISSUE,
+    "milestone-attach": RATTACHE_THEME,
     "milestone-close": FERME_THEME,
 }
 
