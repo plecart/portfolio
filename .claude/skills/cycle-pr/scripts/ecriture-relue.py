@@ -1,4 +1,4 @@
-"""Écriture distante relue : écrit un texte de la forge, puis le relit en entier.
+"""Écriture distante relue : écrit sur la forge, puis relit en entier ce qu'il y a écrit.
 
 Usage :
     python ecriture-relue.py label <N> [--add <label> …] [--remove <label> …]
@@ -19,9 +19,9 @@ sa fermeture et son thème (#134, lots 4a, 4b et 6a1).
 Chaque sous-commande lit par `gh api` — octets décodés en UTF-8, jamais le mode texte, qui traduit
 les fins de ligne, ni la page de code de la console (obs 87, 106, 108, 116) —, écrit, puis relit
 par le même canal. Un texte s'écrit par `gh api -X PATCH <chemin> --input -` — `-X POST` pour
-publier un commentaire ou créer une issue —, la charge JSON sur l'entrée standard, et sa
-relecture compare le **texte entier** à l'attendu : une forme réduite, longueur ou ancre, ne voit
-pas une conversion qui la préserve (obs 106).
+publier un commentaire, créer une issue ou un milestone —, la charge JSON sur l'entrée standard,
+et sa relecture compare le **texte entier** à l'attendu : une forme réduite, longueur ou ancre,
+ne voit pas une conversion qui la préserve (obs 106).
 `{owner}/{repo}` sont remplis par `gh` depuis le dépôt courant.
 
 - `label` pose les labels `--add` sur l'issue ou la PR `<N>`, puis lui retire les labels
@@ -67,24 +67,24 @@ pas une conversion qui la préserve (obs 106).
   commentaire sous l'`id` que la publication rend. Une PR se commente par le même chemin.
 
 Il refuse, sans rien écrire : une ancre introuvable ou ambiguë — toutes sont validées avant la
-première écriture —, zéro brief à cocher, plusieurs briefs, un label inconnu du dépôt — chacun
-nommé ; `CLAUDE.md` interdit de deviner un label, et les références REST de « Create an issue »
-et d'« Add labels to an issue » ne disent pas ce qu'elles font d'un label inconnu —, un fichier
-illisible, non UTF-8 ou sans ligne non vide — lu avant tout appel à la forge —, une issue
-ouverte de ce titre et de ce corps sous d'autres labels — le rejeu d'une création dont la forge
-a ignoré les labels ; il nomme l'appel de `label` qui les répare —, une issue déjà fermée sous
-une autre raison — une fermeture ne se réécrit pas, et l'API REST ignore `state_reason` quand
-`state` ne change pas (« Update an issue ») —, un milestone à rattacher fermé ou absent sans
-`--description` — un thème ne se crée pas sans son périmètre —, un milestone à fermer absent ou
-pas vidé, une lecture `gh` qui échoue, ne rend pas du JSON, ou rend un JSON sans un champ attendu
-ou d'un autre type. Après l'écriture — sa réponse comprise, dont un commentaire publié tire son
-`id`, une issue ou un milestone créé son numéro —, c'est une relecture non conforme : l'écriture
-a pu partir. Une case déjà cochée, des labels tous déjà posés ou déjà absents, une issue déjà
-fermée sous cette raison ou déjà dans ce milestone, un milestone déjà fermé, un fichier qui
-termine déjà le corps ou qui l'est déjà tout entier, un commentaire de `<N>` qui porte déjà le
-fichier pour corps, une issue ouverte — pas une PR — qui porte déjà ce titre, ce corps et ces
-labels : rien à écrire, et la sortie le dit — un rejeu après une relecture tombée n'écrit donc
-pas une seconde fois.
+première écriture —, zéro brief à cocher, plusieurs briefs, un fichier de brief qui ne s'ouvre
+pas par sa marque, un label inconnu du dépôt — chacun nommé ; `CLAUDE.md` interdit de deviner un
+label, et les références REST de « Create an issue » et d'« Add labels to an issue » ne disent
+pas ce qu'elles font d'un label inconnu —, un fichier illisible, non UTF-8 ou sans ligne non vide
+— lu avant tout appel à la forge —, une issue ouverte de ce titre et de ce corps sous d'autres
+labels — le rejeu d'une création dont la forge a ignoré les labels ; il nomme l'appel de `label`
+qui les répare —, une issue déjà fermée sous une autre raison — une fermeture ne se réécrit pas,
+et l'API REST ignore `state_reason` quand `state` ne change pas (« Update an issue ») —, un
+milestone à rattacher fermé ou absent sans `--description` — un thème ne se crée pas sans son
+périmètre —, un milestone à fermer absent ou pas vidé, une lecture `gh` qui échoue, ne rend pas
+du JSON, ou rend un JSON sans un champ attendu ou d'un autre type. Après l'écriture — sa réponse
+comprise, dont un commentaire publié tire son `id`, une issue ou un milestone créé son numéro —,
+c'est une relecture non conforme : l'écriture a pu partir. Une case déjà cochée, des labels tous
+déjà posés ou déjà absents, une issue déjà fermée sous cette raison ou déjà dans ce milestone, un
+milestone déjà fermé, un fichier qui termine déjà le corps ou qui l'est déjà tout entier, un
+commentaire de `<N>` qui porte déjà le fichier pour corps, une issue ouverte — pas une PR — qui
+porte déjà ce titre, ce corps et ces labels : rien à écrire, et la sortie le dit — un rejeu après
+une relecture tombée n'écrit donc pas une seconde fois.
 
 **Ce qu'il ne prouve pas.** Il ne choisit pas les cases : la session PR les nomme. Il ne
 verrouille rien : une édition faite par un tiers entre sa lecture et son écriture est écrasée, et
@@ -97,11 +97,14 @@ reconnaît à son corps seul, l'issue déjà créée à son titre et à son corp
 comparent, et une issue fermée n'est pas vue —, **quel qu'en soit l'auteur**. Le fichier se
 reconnaît à l'identique, fins de ligne comprises, en fin de corps comme en corps de commentaire ou
 d'issue : sur une forge qui le stocke transformé — relecture non conforme dès le premier appel —,
-un rejeu l'ajoute, le réécrit, le publie ou crée l'issue une seconde fois. Une relecture conforme
-atteste ce que l'API rend, pas ce que l'interface web affiche. Le chemin d'un label encodé, la
-pose d'un label, l'écriture du corps d'une PR, la publication d'un commentaire sur une PR par
-l'endpoint `issues`, la création et la fermeture d'une issue, la création, le rattachement et la
-fermeture d'un milestone ne sont pas mesurés sur la vraie forge.
+un rejeu l'ajoute, le réécrit, le publie ou crée l'issue une seconde fois. Après une création de
+thème relue non conforme, le rejeu de `milestone attach` ne relit pas le thème qu'il trouve :
+gardé sous une autre description, il y rattache l'issue et sort en 0 ; sous un autre titre, il ne
+le reconnaît pas et en crée un second ; fermé, il refuse. Une relecture conforme atteste ce que
+l'API rend, pas ce que l'interface web affiche. Le chemin d'un label encodé, la pose d'un label,
+l'écriture du corps d'une PR, la publication d'un commentaire sur une PR par l'endpoint `issues`,
+la création et la fermeture d'une issue, la création, le rattachement et la fermeture d'un
+milestone ne sont pas mesurés sur la vraie forge.
 
 Sortie : 0 écrit et relu conforme, ou rien à écrire ; 1 refus (« refus — »), ou écriture lancée et
 relecture non conforme ou impossible (« relecture non conforme — ») — motif en une ligne sur la
@@ -233,6 +236,25 @@ def patch_then_reread(run: Run, path: str, payload: bytes, parse: Callable[[Any]
         return read_json(run, parse, path)
 
 
+def post_then_reread(
+    run: Run,
+    path: str,
+    payload: bytes,
+    key: str,
+    located: Callable[[int], str],
+    parse: Callable[[Any], Any],
+) -> tuple[int, Any]:
+    """Crée `payload` sous la liste `path` par `gh api -X POST`, puis rend le champ `key` que rend
+    la création — l'`id` d'un commentaire, le numéro d'une issue ou d'un milestone, entier : il
+    entre dans un chemin d'API (`typed`) — et ce que `parse` tire du document relu sous
+    `located(<key>)` ; un échec est une divergence (`writing`)."""
+    with writing():
+        created = read_json(
+            run, lambda doc: typed(doc, key, int), "-X", "POST", path, "--input", "-", stdin=payload
+        )
+        return created, read_json(run, parse, located(created))
+
+
 def text_or_null(document: Any, field: str) -> str | None:
     """Le champ `field` d'un document de la forge : un texte, ou `None` pour `null`.
 
@@ -267,15 +289,6 @@ def typed(document: Any, field: str, kind: type[T]) -> T:  # noqa: UP047
     if type(value) is not kind:
         raise TypeError(f"`{field}` de type {type(value).__name__}")
     return value
-
-
-def comment_id(comment: Any) -> int:
-    """L'`id` d'un commentaire de la forge, entier : il entre dans un chemin d'API.
-
-    Raises:
-        KeyError, TypeError: voir `typed`.
-    """
-    return typed(comment, "id", int)
 
 
 def measure(text: str) -> str:
@@ -371,7 +384,7 @@ def check_boxes(body: str, anchors: Sequence[str]) -> tuple[str, list[str], list
     return "\n".join(lines), checked, already
 
 
-def issue_path(number: str) -> str:
+def issue_path(number: int | str) -> str:
     """Le chemin `gh api` de l'issue `number` — d'une PR aussi : pour l'API REST, une PR est une
     issue."""
     return f"{ISSUES}/{number}"
@@ -399,10 +412,11 @@ def kept_comments(pages: Any, keep: Callable[[str], bool]) -> list[tuple[int, st
 
     Raises:
         KeyError, TypeError: des pages qui ne sont pas des listes de commentaires, un commentaire
-            sans corps, ou un commentaire retenu sans `id` entier (`comment_id`).
+            sans corps, ou un commentaire retenu sans `id` entier — il entre dans un chemin d'API
+            (`typed`).
     """
     return [
-        (comment_id(comment), body)
+        (typed(comment, "id", int), body)
         for page in pages
         for comment in page
         if keep(body := body_of(comment))
@@ -615,10 +629,10 @@ def publish_comment(run: Run, number: str, expected: str, anchor: str) -> int:
         Divergence: publication ou relecture en échec, ou commentaire relu autre que `expected`
             (`check_reread`, ancre `anchor`).
     """
-    publish = ("-X", "POST", comments_path(number), "--input", "-")
-    with writing():
-        identifier = read_json(run, comment_id, *publish, stdin=json_payload(body=expected))
-        reread = read_json(run, body_of, comment_path(identifier))
+    payload = json_payload(body=expected)
+    identifier, reread = post_then_reread(
+        run, comments_path(number), payload, "id", comment_path, body_of
+    )
     check_reread(expected, reread, [anchor])
     return identifier
 
@@ -739,21 +753,20 @@ def issue_create(run: Run, args: argparse.Namespace) -> str:
         return f"rien à écrire — #{number} existe déjà"
     # ponytail: pas de verrou — une même issue créée entre la lecture et la création fait un
     # doublon ; relire les issues ouvertes après la création si un doublon se constate.
-    create = ("-X", "POST", ISSUES, "--input", "-")
-    payload = json_payload(title=args.title, body=body, labels=labels)
-    with writing():
-        number = read_json(run, lambda issue: typed(issue, "number", int), *create, stdin=payload)
-        title, reread, carried = read_json(
-            run,
-            lambda issue: (typed(issue, "title", str), body_of(issue), label_names(issue)),
-            issue_path(str(number)),
-        )
+    number, (title, reread, carried) = post_then_reread(
+        run,
+        ISSUES,
+        json_payload(title=args.title, body=body, labels=labels),
+        "number",
+        issue_path,
+        lambda issue: (typed(issue, "title", str), body_of(issue), label_names(issue)),
+    )
     check_reread(body, reread, [anchor])
     if title != args.title:
         raise Divergence(f"titre attendu {args.title!r}, relu {title!r}")
     if gap := labels_gap(number, labels, carried):
         raise Divergence(gap)
-    return f"créé et relu — issue #{number}"
+    return f"créée et relue — issue #{number}"
 
 
 def closure(issue: Any) -> tuple[str, str | None]:
@@ -821,7 +834,7 @@ def milestone_titled(run: Run, title: str) -> Milestone | None:
     return read_pages(run, lambda pages: same_milestone(pages, title), f"{MILESTONES}?state=all")
 
 
-def milestone_title(issue: Any) -> str | None:
+def milestone_of(issue: Any) -> str | None:
     """Le titre du milestone d'une issue, `None` sans milestone.
 
     Raises:
@@ -829,6 +842,11 @@ def milestone_title(issue: Any) -> str | None:
     """
     milestone = issue["milestone"]
     return None if milestone is None else typed(milestone, "title", str)
+
+
+def milestone_path(number: int) -> str:
+    """Le chemin `gh api` du milestone `number`."""
+    return f"{MILESTONES}/{number}"
 
 
 def create_milestone(run: Run, title: str, description: str) -> int:
@@ -839,24 +857,19 @@ def create_milestone(run: Run, title: str, description: str) -> int:
         Divergence: création ou relecture en échec, ou titre, description ou état relus autres
             que ceux écrits.
     """
-    post = ("-X", "POST", MILESTONES, "--input", "-")
     written = (title, description, "open")
-    with writing():
-        number = read_json(
-            run,
-            lambda theme: typed(theme, "number", int),
-            *post,
-            stdin=json_payload(title=title, description=description, state="open"),
-        )
-        reread = read_json(
-            run,
-            lambda theme: (
-                typed(theme, "title", str),
-                text_or_null(theme, "description"),
-                typed(theme, "state", str),
-            ),
-            f"{MILESTONES}/{number}",
-        )
+    number, reread = post_then_reread(
+        run,
+        MILESTONES,
+        json_payload(title=title, description=description, state="open"),
+        "number",
+        milestone_path,
+        lambda theme: (
+            typed(theme, "title", str),
+            text_or_null(theme, "description"),
+            typed(theme, "state", str),
+        ),
+    )
     if reread != written:
         raise Divergence(f"milestone {number} relu {reread}, attendu {written}")
     return number
@@ -876,7 +889,7 @@ def milestone_attach(run: Run, args: argparse.Namespace) -> str:
             issue »).
     """
     path, issue = issue_path(args.number), f"#{args.number}"
-    former = read_json(run, milestone_title, path)
+    former = read_json(run, milestone_of, path)
     if former == args.title:
         return f"rien à écrire — {issue} déjà dans le milestone {args.title}"
     milestone = milestone_titled(run, args.title)
@@ -890,7 +903,7 @@ def milestone_attach(run: Run, args: argparse.Namespace) -> str:
         report.append(f"milestone {args.title} créé ({number})")
     else:
         number = milestone.number
-    reread = patch_then_reread(run, path, json_payload(milestone=number), milestone_title)
+    reread = patch_then_reread(run, path, json_payload(milestone=number), milestone_of)
     if reread != args.title:
         raise Divergence(f"{issue} relue dans le milestone {reread}, attendue dans {args.title}")
     replaced = "" if former is None else f", à la place de {former}"
@@ -916,8 +929,7 @@ def milestone_close(run: Run, args: argparse.Namespace) -> str:
         raise Refusal(
             f"le milestone {args.title} porte encore {milestone.open_issues} issue(s) ouverte(s)"
         )
-    path = f"{MILESTONES}/{milestone.number}"
-    payload = json_payload(state="closed")
+    path, payload = milestone_path(milestone.number), json_payload(state="closed")
     state = patch_then_reread(run, path, payload, lambda theme: typed(theme, "state", str))
     if state != "closed":
         raise Divergence(f"milestone {args.title} relu {state}, attendu closed")
@@ -962,13 +974,19 @@ def build_parser() -> argparse.ArgumentParser:
     write.add_argument("number", type=issue_number)
     write.add_argument("--body-file", dest="file", type=Path, required=True)
     write.set_defaults(handler=brief_write)
-    actions = commands.add_parser("issue").add_subparsers(dest="action", required=True)
-    create = actions.add_parser("create")
+    issues = commands.add_parser("issue").add_subparsers(dest="action", required=True)
+    edit = issues.add_parser("edit")
+    edit.add_argument("number", type=issue_number)
+    source = edit.add_mutually_exclusive_group(required=True)
+    source.add_argument("--append", type=Path)
+    source.add_argument("--body-file", type=Path)
+    edit.set_defaults(handler=issue_edit)
+    create = issues.add_parser("create")
     create.add_argument("--title", type=one_line, required=True)
     create.add_argument("--body-file", dest="file", type=Path, required=True)
     create.add_argument("--label", dest="labels", type=one_line, action="append", default=[])
     create.set_defaults(handler=issue_create)
-    close = actions.add_parser("close")
+    close = issues.add_parser("close")
     close.add_argument("number", type=issue_number)
     close.add_argument("--reason", choices=("completed", "not_planned"), default="completed")
     close.set_defaults(handler=issue_close)
@@ -981,12 +999,6 @@ def build_parser() -> argparse.ArgumentParser:
     close_theme = themes.add_parser("close")
     close_theme.add_argument("--title", type=one_line, required=True)
     close_theme.set_defaults(handler=milestone_close)
-    edit = actions.add_parser("edit")
-    edit.add_argument("number", type=issue_number)
-    source = edit.add_mutually_exclusive_group(required=True)
-    source.add_argument("--append", type=Path)
-    source.add_argument("--body-file", type=Path)
-    edit.set_defaults(handler=issue_edit)
     comment = commands.add_parser("comment")
     comment.add_argument("number", type=issue_number)
     comment.add_argument("--body-file", dest="file", type=Path, required=True)
