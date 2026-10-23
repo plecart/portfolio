@@ -125,9 +125,11 @@ avec le mainteneur.
 À la fin de la session, écrire, chaque écriture par sa sous-commande (« Délégation ») :
 
 - **Les points tranchés** → si la session part d'une issue, dans la section « Décisions » du corps
-  de l'issue, chaque ligne datée, par `issue edit <N> --body-file` : le corps courant relu, la
-  section ajoutée ou complétée, le corps entier réécrit, que le script relit en entier ; dans le
-  briefing pré-PR sinon. Le brief d'agent les reprendra : la session de tri le rédige
+  de l'issue, chaque ligne datée, par `issue edit <N> --body-file` : le corps courant relu en
+  octets (`gh api repos/{owner}/{repo}/issues/<N> --jq .body`), la section ajoutée ou complétée
+  dans un fichier qui garde les fins de ligne lues — le script relit contre ce fichier et ne voit
+  pas une conversion (obs 106) —, le corps entier réécrit, que le script relit en entier ; dans
+  le briefing pré-PR sinon. Le brief d'agent les reprendra : la session de tri le rédige
   (`triage/brief-agent.md`).
 - **Les questions restées ouvertes** → en notes de triage sur l'issue, par `comment`, pour que la
   prochaine session sache ce qui manque encore.
