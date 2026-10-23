@@ -51,8 +51,8 @@ ne voit pas une conversion qui la préserve (obs 106).
   il part sous le nom que le dépôt lui donne, une seule fois —, lu sur toutes ses pages. La
   relecture compare le corps entier, le titre exact et l'ensemble des labels — sans droit
   d'écriture sur le dépôt, l'API REST ignore en silence les labels d'une création (« Create an
-  issue ») —, et un écart de labels nomme l'appel de `label` qui le répare ; la ligne de sortie
-  porte le numéro de l'issue, créée ou déjà là ;
+  issue ») —, et un label manquant nomme l'appel de `label` qui le pose, un label en plus est
+  nommé sans réparation ; la ligne de sortie porte le numéro de l'issue, créée ou déjà là ;
 - `issue close` ferme l'issue `<N>` avec la raison `--reason` — `completed` par défaut,
   `not_planned` pour une issue écartée —, puis relit son état et sa raison ;
 - `milestone attach` rattache l'issue `<N>` au milestone de titre `--title` à l'identique, lu sur
@@ -73,7 +73,8 @@ label, et les références REST de « Create an issue » et d'« Add labels to a
 pas ce qu'elles font d'un label inconnu —, un fichier illisible, non UTF-8 ou sans ligne non vide
 — lu avant tout appel à la forge —, une issue ouverte de ce titre et de ce corps sous d'autres
 labels — le rejeu d'une création dont la forge a ignoré les labels ; il nomme l'appel de `label`
-qui les répare —, une issue déjà fermée sous une autre raison — une fermeture ne se réécrit pas,
+qui pose les manquants, et ceux en plus sans réparation : l'issue a pu être triée depuis sa
+création —, une issue déjà fermée sous une autre raison — une fermeture ne se réécrit pas,
 et l'API REST ignore `state_reason` quand `state` ne change pas (« Update an issue ») —, un
 milestone à rattacher fermé ou absent sans `--description` — un thème ne se crée pas sans son
 périmètre —, un milestone à fermer absent ou pas vidé, une lecture `gh` qui échoue, ne rend pas
@@ -99,12 +100,13 @@ reconnaît à l'identique, fins de ligne comprises, en fin de corps comme en cor
 d'issue : sur une forge qui le stocke transformé — relecture non conforme dès le premier appel —,
 un rejeu l'ajoute, le réécrit, le publie ou crée l'issue une seconde fois. Après une création de
 thème relue non conforme, le rejeu de `milestone attach` ne relit pas le thème qu'il trouve :
-gardé sous une autre description, il y rattache l'issue et sort en 0 ; sous un autre titre, il ne
-le reconnaît pas et en crée un second ; fermé, il refuse. Une relecture conforme atteste ce que
-l'API rend, pas ce que l'interface web affiche. Le chemin d'un label encodé, la pose d'un label,
-l'écriture du corps d'une PR, la publication d'un commentaire sur une PR par l'endpoint `issues`,
-la création et la fermeture d'une issue, la création, le rattachement et la fermeture d'un
-milestone ne sont pas mesurés sur la vraie forge.
+gardé sous une autre description, il y rattache l'issue et sort en 0 — fuite assumée, `xfail`
+strict de la forme `milestone-attach-creation-description` (`test_ecriture_relue.py`) ; sous
+un autre titre, il ne le reconnaît pas et en crée un second ; fermé, il refuse. Une relecture
+conforme atteste ce que l'API rend, pas ce que l'interface web affiche. Le chemin d'un label
+encodé, la pose d'un label, l'écriture du corps d'une PR, la publication d'un commentaire sur
+une PR par l'endpoint `issues`, la création et la fermeture d'une issue, la création, le
+rattachement et la fermeture d'un milestone ne sont pas mesurés sur la vraie forge.
 
 Sortie : 0 écrit et relu conforme, ou rien à écrire ; 1 refus (« refus — »), ou écriture lancée et
 relecture non conforme ou impossible (« relecture non conforme — ») — motif en une ligne sur la
@@ -718,17 +720,22 @@ def same_issue(pages: Any, title: str, body: str) -> tuple[int, list[str]] | Non
 
 
 def labels_gap(number: int, expected: Sequence[str], carried: Sequence[str]) -> str | None:
-    """L'écart entre les labels `carried` de l'issue `number` et l'ensemble `expected`, et l'appel
-    de `label` qui le répare, noms cités pour le shell ; `None` à ensembles égaux."""
-    if set(carried) == set(expected):
+    """L'écart entre les labels `carried` de l'issue `number` et l'ensemble `expected` ; `None` à
+    ensembles égaux. Un manque se nomme avec l'appel de `label` qui le pose, noms cités pour le
+    shell : c'est l'effet des labels qu'ignore une création sans droit d'écriture. Un label en
+    plus se nomme sans réparation : l'issue a pu être triée depuis, et le retirer défairait le
+    tri."""
+    missing = [name for name in expected if name not in carried]
+    extra = sorted(name for name in carried if name not in expected)
+    if not missing and not extra:
         return None
-    repair = [str(number)]
-    repair += [part for name in expected if name not in carried for part in ("--add", name)]
-    repair += [part for name in carried if name not in expected for part in ("--remove", name)]
-    return (
-        f"labels attendus {sorted(expected)}, relus {sorted(carried)} — "
-        f"à réparer par `{shlex.join(['label', *repair])}`"
-    )
+    parts: list[str] = []
+    if missing:
+        repair = [part for name in missing for part in ("--add", name)]
+        parts.append(f"à réparer par `{shlex.join(['label', str(number), *repair])}`")
+    if extra:
+        parts.append(f"#{number} porte en plus {extra} : l'issue a pu vivre depuis sa création")
+    return f"labels attendus {sorted(expected)}, relus {sorted(carried)} — {' ; '.join(parts)}"
 
 
 def issue_create(run: Run, args: argparse.Namespace) -> str:
@@ -740,7 +747,7 @@ def issue_create(run: Run, args: argparse.Namespace) -> str:
     Raises:
         Refusal: fichier inutilisable (`read_text_file`), label inconnu (`repo_labels`), ou
             issue ouverte de ce titre et de ce corps sous d'autres labels — un rejeu après des
-            labels ignorés ; l'écart et sa réparation sont nommés (`labels_gap`).
+            labels ignorés ; l'écart est nommé, et la pose des manquants (`labels_gap`).
         Divergence: création ou relecture en échec, ou issue relue autre que celle écrite —
             corps entier (`check_reread`), titre exact, ensemble des labels (`labels_gap`).
     """

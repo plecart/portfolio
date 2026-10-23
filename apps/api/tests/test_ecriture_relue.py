@@ -868,11 +868,19 @@ def test_issue_create_ne_cree_rien_quand_une_issue_ouverte_porte_deja_ce_titre_e
             ("prd", "en attente"),
             (
                 "labels attendus ['prd'], relus ['en attente', 'prd'] — "
-                "à réparer par `label 7 --remove 'en attente'`"
+                "#7 porte en plus ['en attente'] : l'issue a pu vivre depuis sa création"
+            ),
+        ),
+        (
+            ("en attente",),
+            (
+                "labels attendus ['prd'], relus ['en attente'] — "
+                "à réparer par `label 7 --add prd` ; "
+                "#7 porte en plus ['en attente'] : l'issue a pu vivre depuis sa création"
             ),
         ),
     ],
-    ids=["labels-ignores", "label-en-trop"],
+    ids=["labels-ignores", "label-en-trop", "label-manquant-et-label-en-trop"],
 )
 def test_issue_create_rejouee_sur_l_issue_sous_d_autres_labels_refuse_et_nomme_la_reparation(
     portes: tuple[str, ...], ecart: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
@@ -880,7 +888,9 @@ def test_issue_create_rejouee_sur_l_issue_sous_d_autres_labels_refuse_et_nomme_l
     """Au rejeu, l'issue de même titre et de même corps se compare comme une relecture, labels
     compris. Sans droit d'écriture, la forge a ignoré les labels de la création, et le premier
     appel est sorti en 1 : le rejeu ne les pose pas, il nomme l'écart et l'appel de `label` qui
-    le répare — nom cité pour le shell —, sans rien écrire."""
+    pose les manquants — nom cité pour le shell —, sans rien écrire. Un label en plus n'a pas
+    cette cause : l'issue a pu être triée depuis, et le retirer défairait le tri ; il est nommé
+    sans réparation."""
     ouverte = {**etiquetee(*portes), "number": 7, "title": "Titre", "body": PROBLEME}
     forge = Forge({}, issues=[[ouverte]], labels_du_depot=[["prd", "en attente"]])
 
@@ -910,7 +920,8 @@ def test_issue_create_ne_tient_pour_existante_qu_une_issue_de_meme_titre_et_meme
 
 
 # Ce que la relecture rend de l'issue créée, quand ce n'est pas ce qui est parti : (retouche du
-# document relu, écart **exact** que la sortie en dit). Une retouche par champ écrit.
+# document relu, écart **exact** que la sortie en dit). Une retouche par champ écrit, les labels
+# dans les deux sens : manquants, et en plus.
 ISSUES_RELUES_NON_CONFORMES: dict[str, tuple[Callable[[dict[str, Any]], dict[str, Any]], str]] = {
     "corps-tronque": (
         lambda issue: {**issue, "body": issue["body"][:9]},
@@ -924,6 +935,14 @@ ISSUES_RELUES_NON_CONFORMES: dict[str, tuple[Callable[[dict[str, Any]], dict[str
     "labels-ignores": (
         lambda issue: {**issue, "labels": []},
         "labels attendus ['prd'], relus [] — à réparer par `label 901 --add prd`",
+    ),
+    # Un label posé par un tiers entre la création et la relecture ne se retire pas d'office.
+    "label-en-plus": (
+        lambda issue: {**issue, "labels": [*issue["labels"], {"name": "needs-triage"}]},
+        (
+            "labels attendus ['prd'], relus ['needs-triage', 'prd'] — "
+            "#901 porte en plus ['needs-triage'] : l'issue a pu vivre depuis sa création"
+        ),
     ),
 }
 
@@ -1243,6 +1262,8 @@ def test_milestone_attach_rejoue_apres_creation_du_theme_n_ecrit_rien(
 
 
 ISSUE_7 = "repos/{owner}/{repo}/issues/7"
+# Le thème que crée `CREE_THEME`, champ par champ.
+THEME_CREE = {"title": "Facturation", "description": "Paiements", "state": "open"}
 # Une forme par champ écrit, seul resté à écrire : (appel, champs retouchés de la forge témoin,
 # chemin par chemin, sortie — 0 écrit, 1 refusé). Un texte resté à écrire est un voisin de
 # l'attendu, que tiendrait pour égal une garde réduite — contenu, début ou fin au lieu du texte
@@ -1295,14 +1316,37 @@ CHAMPS_RESTES_A_ECRIRE: dict[str, tuple[tuple[str, ...], dict[str, dict[str, Any
         1,
     ),
     "milestone-attach": (RATTACHE_THEME, {CORPS_42: {"milestone": theme(4, "Archives")}}, 0),
+    # Le thème 4 tient lieu du thème créé, sauf un champ.
+    "milestone-attach-creation-titre": (
+        CREE_THEME,
+        {f"{MILESTONES}/4": {**THEME_CREE, "title": "facturation"}},
+        0,
+    ),
+    "milestone-attach-creation-etat": (
+        CREE_THEME,
+        {f"{MILESTONES}/4": {**THEME_CREE, "state": "closed"}},
+        1,
+    ),
     "milestone-close": (FERME_THEME, {f"{MILESTONES}/4": {"state": "open"}}, 0),
+}
+# Les fuites assumées de la classe, `xfail` strict : chacune rougit le jour où sa garde naît.
+FUITES_ASSUMEES = {
+    "milestone-attach-creation-description": pytest.param(
+        CREE_THEME,
+        {f"{MILESTONES}/4": {**THEME_CREE, "description": "Autre"}},
+        1,
+        marks=pytest.mark.xfail(
+            strict=True,
+            reason="la description d'un thème trouvé ne se relit pas : elle a pu évoluer",
+        ),
+    ),
 }
 
 
 @pytest.mark.parametrize(
     ("args", "etat", "sortie"),
-    CHAMPS_RESTES_A_ECRIRE.values(),
-    ids=CHAMPS_RESTES_A_ECRIRE.keys(),
+    [*CHAMPS_RESTES_A_ECRIRE.values(), *FUITES_ASSUMEES.values()],
+    ids=[*CHAMPS_RESTES_A_ECRIRE, *FUITES_ASSUMEES],
 )
 @pytest.mark.usefixtures("ajout_md")
 def test_un_rejeu_ne_dit_rien_a_ecrire_tant_qu_un_champ_ecrit_differe(
@@ -1311,28 +1355,36 @@ def test_un_rejeu_ne_dit_rien_a_ecrire_tant_qu_un_champ_ecrit_differe(
     sortie: int,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Cliquet de la classe « l'identité de rejeu omet un champ que la sous-commande écrit »
-    (`cycle-pr` 4.2, « Le cliquet ») : un rejeu ne dit « rien à écrire » qu'une fois **chaque**
-    champ qu'il écrirait relu égal à l'attendu. Une issue fermée sous une autre raison est un
-    refus, jamais « rien à écrire » ; une issue de même titre et de même corps, sous d'autres
-    labels, aussi.
+    """Cliquet de la classe « l'identité de rejeu d'une sous-commande omet un champ qu'elle
+    écrit » (`cycle-pr` 4.2, « Le cliquet ») : un rejeu ne tient un champ pour écrit qu'une fois
+    relu égal à l'attendu — il l'écrit, ou refuse ; jamais « rien à écrire », ni une sortie 0 qui
+    le laisse autre. Une issue fermée sous une autre raison est un refus ; une issue de même titre
+    et de même corps, sous d'autres labels, aussi.
 
-    Dénombré au lot 6a1, au bloc 2, sur ses 4 sous-commandes : `label --add` et `--remove`
-    écrivent les labels posés et les labels retirés — 2 champs, épinglés après leur code, chacun
-    vu rouge par mutation de sa garde ; `issue close`, l'état et la raison ; `milestone attach`,
-    le milestone de l'issue, que son titre désigne — le thème créé n'est écrit qu'à la création
-    — ; `milestone close`, l'état du thème — ces 4 derniers épinglés avant leur code : 6 champs,
-    0 omis.
+    Dénombré par **requête d'écriture**, pas par geste nommé, à la passe 2 de relecture de la PR
+    #150 : 12 sous-commandes, 14 requêtes, 18 champs, une forme chacun. `label --add` : le `POST`
+    des labels posés ; `label --remove` : un `DELETE` par label retiré ; `checkbox patch` et
+    `brief patch` : le `PATCH` des cases nommées ; `issue edit --append` : celui de la fin du
+    corps ; `issue edit --body-file` : celui du corps ; `brief write` : le corps du brief, par le
+    `POST` qui le publie ou le `PATCH` qui l'édite — 2 requêtes, 1 champ ; `comment` : le `POST`
+    du corps ; `issue create` : le `POST` du titre, du corps et des labels ; `issue close` : le
+    `PATCH` de l'état et de la raison ; `milestone attach` : le `POST` du thème absent — titre,
+    description, état —, puis le `PATCH` du milestone de l'issue ; `milestone close` : le `PATCH`
+    de l'état du thème.
 
-    Puis, à la relecture de la PR #150, sur les 8 d'avant — `label --remove` y est déjà compté :
-    `checkbox patch` et `brief patch` écrivent les cases nommées ; `issue edit --append`, la fin
-    du corps ; `issue edit --body-file` et `brief write`, le corps entier ; `comment`, le corps
-    du commentaire ; `issue create`, le titre, le corps et les labels — 9 champs, dont 1 omis :
-    les labels d'`issue create`, que le rejeu ne comparait pas — « #N existe déjà », sortie 0,
-    sur une issue restée sans eux. Les 9 formes épinglées avant le correctif, chacune vue rouge
-    par mutation de sa garde — 7 mutations, dont l'ancien rejeu d'`issue create` remis.
+    2 sous-commandes fuyaient, 1 champ chacune — 2 omis sur 18 :
 
-    Total : 12 sous-commandes, 1 fuyait — 15 champs, 1 omis."""
+    - les labels d'`issue create`, que le rejeu ne comparait pas — « #N existe déjà », sortie 0,
+      sur une issue restée sans eux ; corrigé à la passe 1 ;
+    - la description du thème que crée `milestone attach` — fuit encore, assumée, `xfail` strict
+      (`milestone-attach-creation-description`) : le rejeu qui trouve le thème y rattache l'issue
+      et sort en 0 sans relire sa description. Il ne se distingue pas d'un premier rattachement
+      à un thème déjà là, dont la description a pu évoluer : la comparer refuserait celui-là.
+
+    Chaque forme vue rouge : les 15 premières au lot 6a1 et à la passe 1, avant leur code ou par
+    mutation de leur garde — l'ancien rejeu d'`issue create` remis compris ; le titre et l'état du
+    thème créé à la passe 2, par mutation. Le dénombrement d'avant — 15 champs, 1 fuite — tenait
+    le thème créé hors de `milestone attach`."""
     forge = forge_temoin()
     for chemin, champs in etat.items():
         forge.documents[chemin].update(champs)
