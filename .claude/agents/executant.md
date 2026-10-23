@@ -24,6 +24,10 @@ porter**, chacun écrit en entier avant l'envoi :
   écarts relevés ; les constats de goût et le choix de la correction restent à ton appelant.
 - **Mise en place d'`init-projet`** — copier le template, déployer les skills, vérifier les
   commandes données.
+- **Artefacts jetables** — un fichier ou une forme entièrement donnés, produits pour une mesure
+  dans le worktree isolé où ton appelant te lance — un scratch qui importe un paquet et se compile,
+  un composant présenté sous une forme qu'un outil analyse : tu rends le chemin et la sortie de la
+  commande donnée, **sans commit** ; ce qu'il faut en conclure n'est pas à toi.
 
 Les relevés **rendus comme livrable** — suite, lint, format, typecheck lancés pour en rapporter le
 verdict — ne sont pas à toi : ils vont au `releveur`. La suite que ton commit exige, elle, est à

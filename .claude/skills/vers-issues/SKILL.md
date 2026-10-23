@@ -14,7 +14,7 @@ Le dépôt GitHub et le mapping de labels sont dans `.claude/pipeline.config.md`
 
 La session garde le découpage, le dialogue de l'étape 4 et la rédaction des corps. Le reste change de main :
 
-- **`releveur`** — la lecture de la source (corps complet et résumé des commentaires), l'exploration bornée du code, les dénombrements par commande donnée, et la publication en série (étape 5) ; la vérification à la source d'une capacité de fournisseur reste à la session, le `releveur` n'ayant pas d'accès web ;
+- **`releveur`** — la lecture de la source (corps et commentaires) et du code autour des ancres données (« Lectures bornées »), les dénombrements par commande donnée (« Collectes »), et la publication en série (étape 5) ; la vérification à la source d'une capacité de fournisseur reste à la session, le `releveur` n'ayant pas d'accès web ;
 - **script** — `issue create`, `issue edit`, `milestone attach`, par `python .claude/skills/cycle-pr/scripts/ecriture-relue.py <sous-commande> …`, qui relit ce qu'il écrit.
 
 Une session démarrée par une autre — par `vers-prd` — suit le protocole commun de `.claude/skills/cycle-pr/references/sessions-liees.md`, message de fin « terminé — \<livrable> » compris.
@@ -23,7 +23,7 @@ Une session démarrée par une autre — par `vers-prd` — suit le protocole co
 
 ### 1. Rassembler le contexte
 
-Le découpage part d'une source écrite : la source se passe en argument — `#issue-prd` ou son URL, dont un `releveur` rend le corps complet et le résumé des commentaires, ou le chemin d'un plan écrit, que la session lit. Sans argument, la session s'arrête et demande la référence.
+Le découpage part d'une source écrite : la source se passe en argument — `#issue-prd` ou son URL, dont un `releveur` rend le corps et les commentaires tels quels (« Lectures bornées »), ou le chemin d'un plan écrit, que la session lit. Sans argument, la session s'arrête et demande la référence.
 
 ### 2. Explorer la base de code (optionnel)
 

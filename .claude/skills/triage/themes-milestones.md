@@ -45,8 +45,9 @@ Autrement dit : le domaine se déclare une fois, le thème se crée à la demand
      [hors-scope.md](hors-scope.md)) ;
    - la **liste de domaines est incomplète** → proposer une **session `init-projet` distincte**,
      en mode reconfiguration, qui ajoute le domaine : les domaines de
-     `.claude/pipeline.config.md` s'amendent par une PR (D-12 de #134). Le thème se crée au tri
-     suivant.
+     `.claude/pipeline.config.md` s'amendent par une PR (D-12 de #134). Elle est démarrée avec
+     `use_worktree: true` : elle écrit sur une branche, jamais dans le dossier que partagent les
+     sessions de tri. Le thème se crée au tri suivant.
 
 Cette boucle est ce qui garde les deux listes alignées dans le temps : un thème ne peut pas
 apparaître sans que le domaine correspondant existe.
