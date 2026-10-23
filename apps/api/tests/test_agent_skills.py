@@ -2856,6 +2856,15 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " message d'une session qui a démarré des enfants encore au travail"
         ),
     ),
+    # Relecture de la PR #153, relance, m8 : sans borne, une forme qui finit par `<chemin>` faisait
+    # lire le suffixe comme une partie du chemin.
+    "6b-sessions-liees-le-suffixe-suit-le-dernier-champ": (
+        SESSIONS_LIEES_REF,
+        (
+            "Le suffixe suit le dernier champ : un `<chemin>` s'arrête avant « — enfants au"
+            " travail »."
+        ),
+    ),
     # Relecture de la PR #153, relance, I5 : le suffixe ne nomme que des enfants encore au travail,
     # et l'archiveur les nettoyait sans attendre leur fin. Dénombrement écrit avant le correctif
     # (classe : un geste de nettoyage qui ne nomme pas sa condition de fin), « Nettoyage » de
@@ -2879,6 +2888,15 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         (
             "—, jamais avant : le message de fin d'un enfant à un parent archivé est supposé perdu,"
             " non mesuré."
+        ),
+    ),
+    # Relecture de la PR #153, relance, m9 : une session sans parent n'avait personne à qui nommer
+    # ses enfants au travail.
+    "6b-sessions-liees-sans-parent-le-mainteneur-archive": (
+        SESSIONS_LIEES_REF,
+        (
+            "Une session sans parent nomme ses enfants au travail au mainteneur, dans son dernier"
+            " tour, sous la même forme ; c'est lui qui l'archive."
         ),
     ),
     # Relecture de la PR #153, passe 1, I1 : après un arrêt `contradiction`, la passe de l'issue
