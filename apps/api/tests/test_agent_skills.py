@@ -2666,9 +2666,21 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6a-releveur-collectes-compte": (RELEVEUR_ROLE, "tout compte d'une commande donnée"),
     "6a-releveur-cases-reproduction": (RELEVEUR_ROLE, "ou d'une reproduction de bug"),
-    "6a-triage-fournisseur-a-la-session": (
+    # Décision du mainteneur, 2026-10-23, sur l'arrêt `decisions-vs-doc` de la passe 1 : le
+    # `releveur` vérifie une capacité de fournisseur par `context7` quand la doc y est indexée, la
+    # session sinon ; il rend les commentaires tels quels, filtrés par les critères de l'appelant.
+    "6a-releveur-fournisseur-par-context7": (RELEVEUR_ROLE, "une doc absente de l'index remonte"),
+    "6a-releveur-commentaires-filtres": (
+        RELEVEUR_ROLE,
+        "ses commentaires tels quels, tous ou filtrés par les critères que donne ton appelant",
+    ),
+    "6a-triage-fournisseur-par-context7": (
         TRIAGE_SKILL,
-        "la vérification à la source d'une capacité de fournisseur reste à la session",
+        "ou plusieurs candidates, remonte à la session, qui la lit à la source",
+    ),
+    "6a-vers-issues-fournisseur-par-context7": (
+        ".claude/skills/vers-issues/SKILL.md",
+        "ou plusieurs candidates, remonte à la session, qui la lit à la source",
     ),
     "6a-executant-artefacts-jetables": (
         ".claude/agents/executant.md",
@@ -2677,7 +2689,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6a-hors-scope-nom-et-texte-donnes": (HORS_SCOPE_REF, "nom et texte rédigés par la session"),
     "6a-vers-issues-commentaires-tels-quels": (
         ".claude/skills/vers-issues/SKILL.md",
-        "dont un `releveur` rend le corps et les commentaires tels quels (« Lectures bornées »)",
+        "rend le corps et les commentaires tels quels, filtrés par les critères que la session donne",
     ),
 }
 

@@ -14,7 +14,7 @@ Le dépôt GitHub et le mapping de labels sont dans `.claude/pipeline.config.md`
 
 La session garde le découpage, le dialogue de l'étape 4 et la rédaction des corps. Le reste change de main :
 
-- **`releveur`** — la lecture de la source (corps et commentaires) et du code autour des ancres données (« Lectures bornées »), les dénombrements par commande donnée (« Collectes »), et la publication en série (étape 5) ; la vérification à la source d'une capacité de fournisseur reste à la session, le `releveur` n'ayant pas d'accès web ;
+- **`releveur`** — la lecture de la source (corps, et commentaires filtrés par les critères que la session donne) et du code autour des ancres données (« Lectures bornées »), les dénombrements par commande donnée (« Collectes »), la publication en série (étape 5), et la vérification d'une capacité de fournisseur quand sa doc officielle est indexée dans `context7` — identifiant résolu, requête et passage cité mot pour mot ; une doc absente de l'index, ou plusieurs candidates, remonte à la session, qui la lit à la source, le `releveur` n'ayant pas d'accès web ;
 - **script** — `issue create`, `issue edit`, `milestone attach`, par `python .claude/skills/cycle-pr/scripts/ecriture-relue.py <sous-commande> …`, qui relit ce qu'il écrit.
 
 Une session démarrée par une autre — par `vers-prd` — suit le protocole commun de `.claude/skills/cycle-pr/references/sessions-liees.md`, message de fin « terminé — \<livrable> » compris.
@@ -23,7 +23,7 @@ Une session démarrée par une autre — par `vers-prd` — suit le protocole co
 
 ### 1. Rassembler le contexte
 
-Le découpage part d'une source écrite : la source se passe en argument — `#issue-prd` ou son URL, dont un `releveur` rend le corps et les commentaires tels quels (« Lectures bornées »), ou le chemin d'un plan écrit, que la session lit. Un résidu de cycle sans PRD (`contraintes.md`, « Création d'issues en cours de cycle », barreau 3) s'écrit d'abord dans un fichier de plan, passé par son chemin. Sans argument, la session s'arrête et demande la référence.
+Le découpage part d'une source écrite : la source se passe en argument — `#issue-prd` ou son URL, dont un `releveur` rend le corps et les commentaires tels quels, filtrés par les critères que la session donne (« Lectures bornées »), ou le chemin d'un plan écrit, que la session lit. Un résidu de cycle sans PRD (`contraintes.md`, « Création d'issues en cours de cycle », barreau 3) s'écrit d'abord dans un fichier de plan, passé par son chemin. Sans argument, la session s'arrête et demande la référence.
 
 ### 2. Explorer la base de code (optionnel)
 
@@ -82,7 +82,7 @@ Les issues se publient dans l'ordre des dépendances (bloqueurs d'abord) afin de
 
 Il rend la table marqueur → numéro et ce décompte.
 
-**Critères reposant sur un service tiers.** Quand un critère d'acceptation suppose une capacité d'un fournisseur (restriction d'usage, plafond, quota, révocation, rotation), ne jamais la recopier d'un document du projet sans l'avoir vérifiée à la source — par la session elle-même (« Délégation ») : ajouter la ligne « vérifié à la source le <date> : <doc du fournisseur> », ou marquer le critère « ⛔ à vérifier avant engagement ». Une contre-mesure copiée sans vérification survit à tous les rangs de doc et n'éclate qu'au moment le plus coûteux — la console ouverte.
+**Critères reposant sur un service tiers.** Quand un critère d'acceptation suppose une capacité d'un fournisseur (restriction d'usage, plafond, quota, révocation, rotation), ne jamais la recopier d'un document du projet sans l'avoir vérifiée à la source — un `releveur` par `context7`, la session à défaut (« Délégation ») : ajouter la ligne « vérifié à la source le <date> : <doc du fournisseur> », ou marquer le critère « ⛔ à vérifier avant engagement ». Une contre-mesure copiée sans vérification survit à tous les rangs de doc et n'éclate qu'au moment le plus coûteux — la console ouverte.
 
 **Une issue qui pose une infrastructure de test porte sa barre.** Un harnais (conteneurs jetables, greffon de réglages, fabriques) attire les tests de ses propres tests : sans barre écrite, le harnais grossit plus vite que la fonctionnalité qu'il sert. La barre par défaut, à inscrire dans ses critères : (1) sans le service, la suite échoue en disant pourquoi, en une ligne ; (2) réglages et image viennent du dépôt, jamais du shell, tenus par un seul garde ; (3) un test de fumée démarre le service et exécute une requête. Tout le reste — sessions de test imbriquées, épinglage par empreinte sans incident, tests des gardes — est hors barre tant qu'un défaut réel ne l'a pas demandé. Et un socle de test est une tranche à part, jamais fondue dans la première fonctionnalité qui en a besoin.
 
