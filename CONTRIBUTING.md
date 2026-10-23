@@ -265,12 +265,14 @@ Chaque maillon nomme qui l'exécute ; la répartition des rôles est dans `CLAUD
 0. **Configurer** — `init-projet`, dans une session de dialogue, écrit `.claude/pipeline.config.md`
    (dépôt, sources de vérité, labels, stack, commandes, domaines, surfaces). À relancer dès qu'une
    de ces valeurs change.
-1. **Planifier** — `vers-prd` (conversation → PRD) → `vers-issues` (PRD → petites issues) →
-   `triage` (machine à états, rattachement au thème, « agent brief »), chacun dans une session de
-   dialogue avec le mainteneur.
-2. **Interroger** — `interroge-moi`, **obligatoire**, dans une session de dialogue :
-   `ready-for-agent` et `ready-for-human` ne s'atteignent que via l'état `needs-interrogation`. Les
-   décisions tranchées sont écrites dans l'issue, pas laissées dans une conversation.
+1. **Planifier** — `vers-prd` (dialogue avec le mainteneur → PRD) → `vers-issues` (dans sa
+   propre session, `#issue-prd` en argument → petites issues) → `triage` (relevé, puis une session
+   de tri par issue, numéro en argument : machine à états, rattachement au thème, « agent brief »),
+   chacun dans une session de dialogue avec le mainteneur.
+2. **Interroger** — `interroge-moi`, **obligatoire**, dans une session de dialogue — la sienne,
+   numéro de l'issue en argument : `ready-for-agent` et `ready-for-human` ne s'atteignent que via
+   l'état `needs-interrogation`. Les décisions tranchées sont écrites dans le corps de l'issue,
+   section « Décisions », que le brief reprend — pas laissées dans une conversation.
 3. **Implémenter** — `cycle-pr`, porté par la session PR, qui orchestre et délègue : briefing
    pré-PR (relevés au `releveur`, cartographie à l'`executant`) → **PR draft ouverte avant tout
    code** → un `developpeur` neuf par bloc : TDD red-green-refactor, cycle
