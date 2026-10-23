@@ -28,6 +28,8 @@ ISSUES = "repos/{owner}/{repo}/issues"
 LABELS_DU_DEPOT = "repos/{owner}/{repo}/labels"
 CORPS_42 = "repos/{owner}/{repo}/issues/42"
 COMMENTAIRES_42 = "repos/{owner}/{repo}/issues/42/comments"
+# Le commentaire 13, brief de l'issue 42 dans chaque forge qui en porte un.
+BRIEF_DE_42 = "repos/{owner}/{repo}/issues/comments/13"
 MILESTONES = "repos/{owner}/{repo}/milestones"
 THEMES = "repos/{owner}/{repo}/milestones?state=all&per_page=100"
 # Les seuls retraits de label auxquels la forge répond : chemin encodé → nom du label.
@@ -53,9 +55,9 @@ class Forge:
             `issues/comments/<id>`, le même objet — une écriture se voit donc dans la liste. Un
             commentaire publié par `POST` y entre sur une page de plus, gardé par `stocke`, sous
             l'`id` 900 + n pour le n-ième texte que la forge reçoit.
-        issues: les issues ouvertes du dépôt, page par page, de même. Une issue créée par `POST`
-            y entre sur une page de plus, son corps gardé par `stocke`, sous le numéro 900 + n, et
-            se lit sous son chemin `issues/<numéro>`.
+        issues: les issues ouvertes du dépôt, page par page, de même, chacune aussi sous son
+            chemin `issues/<numéro>`. Une issue créée par `POST` y entre sur une page de plus, son
+            corps gardé par `stocke`, sous le numéro 900 + n.
         labels_du_depot: les noms des labels du dépôt, page par page. Un label posé par `POST`
             s'ajoute à ceux de l'issue 42.
         milestones: les milestones du dépôt, page par page, de même, chacun aussi sous son chemin
@@ -84,9 +86,10 @@ class Forge:
                 self.indexe(commentaire)
         self.issues = issues or []
         self.milestones = milestones or []
-        for page in self.milestones:
-            for milestone in page:
-                self.documents[f"{MILESTONES}/{milestone['number']}"] = milestone
+        for chemin, liste in ((ISSUES, self.issues), (MILESTONES, self.milestones)):
+            for page in liste:
+                for document in page:
+                    self.documents[f"{chemin}/{document['number']}"] = document
         # Chaque liste que `gh api --paginate --slurp` lit, sous son chemin.
         self.listes = {
             COMMENTAIRES_42: self.pages,
@@ -345,8 +348,7 @@ def test_brief_patch_coche_le_commentaire_de_brief_trouve_sur_une_autre_page() -
     assert [json.loads(charge)["body"] for charge in forge.charges] == [
         "## Brief d'agent\n\n**Critères d'acceptation :**\n- [x] Critère A\n- [ ] Critère B\n"
     ]
-    brief = "repos/{owner}/{repo}/issues/comments/13"
-    assert ("gh", "api", "-X", "PATCH", brief, "--input", "-") in forge.appels
+    assert ("gh", "api", "-X", "PATCH", BRIEF_DE_42, "--input", "-") in forge.appels
 
 
 @pytest.mark.parametrize(
@@ -390,7 +392,7 @@ NOUVEAU_BRIEF = "## Brief d'agent\r\n\r\n- [ ] Critère révisé\r\n"
         ),
         (
             [[CITATION], [{"id": 13, "body": BRIEF}]],
-            ("PATCH", "repos/{owner}/{repo}/issues/comments/13"),
+            ("PATCH", BRIEF_DE_42),
             "écrit et relu — brief de #42 : remplacé par {fichier}",
         ),
     ],
@@ -839,14 +841,43 @@ def test_issue_create_ne_cree_rien_quand_une_issue_ouverte_porte_deja_ce_titre_e
     forge = Forge(
         {},
         issues=[
-            [{"number": 5, "title": "Autre titre", "body": PROBLEME}],
-            [{"number": 7, "title": "Titre", "body": PROBLEME}],
+            [{"number": 5, "title": "Autre titre", "body": PROBLEME, "labels": []}],
+            [{"number": 7, "title": "Titre", "body": PROBLEME, "labels": []}],
         ],
     )
 
     assert lance(forge, *creation(tmp_path)) == 0
     assert forge.appels == [("gh", "api", "--paginate", "--slurp", ISSUES)]
     assert capsys.readouterr().out == "rien à écrire — #7 existe déjà\n"
+
+
+@pytest.mark.parametrize(
+    ("portes", "ecart"),
+    [
+        ((), "labels attendus ['prd'], relus [] — à réparer par `label 7 --add prd`"),
+        (
+            ("prd", "en attente"),
+            (
+                "labels attendus ['prd'], relus ['en attente', 'prd'] — "
+                "à réparer par `label 7 --remove 'en attente'`"
+            ),
+        ),
+    ],
+    ids=["labels-ignores", "label-en-trop"],
+)
+def test_issue_create_rejouee_sur_l_issue_sous_d_autres_labels_refuse_et_nomme_la_reparation(
+    portes: tuple[str, ...], ecart: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Au rejeu, l'issue de même titre et de même corps se compare comme une relecture, labels
+    compris. Sans droit d'écriture, la forge a ignoré les labels de la création, et le premier
+    appel est sorti en 1 : le rejeu ne les pose pas, il nomme l'écart et l'appel de `label` qui
+    le répare — nom cité pour le shell —, sans rien écrire."""
+    ouverte = {**etiquetee(*portes), "number": 7, "title": "Titre", "body": PROBLEME}
+    forge = Forge({}, issues=[[ouverte]], labels_du_depot=[["prd", "en attente"]])
+
+    assert lance(forge, *creation(tmp_path, "PRD")) == 1
+    assert ecritures(forge) == []
+    assert capsys.readouterr().out == f"refus — #7 existe déjà ; {ecart}\n"
 
 
 @pytest.mark.parametrize(
@@ -883,7 +914,7 @@ ISSUES_RELUES_NON_CONFORMES: dict[str, tuple[Callable[[dict[str, Any]], dict[str
     # Sans droit d'écriture sur le dépôt, l'API ignore les labels d'une création en silence.
     "labels-ignores": (
         lambda issue: {**issue, "labels": []},
-        "labels attendus ['prd'], relus []",
+        "labels attendus ['prd'], relus [] — à réparer par `label 901 --add prd`",
     ),
 }
 
@@ -1045,7 +1076,8 @@ def ajout_md(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 def forge_temoin(**options: Any) -> Forge:
     """La forge des tables partagées : l'issue 42 — ouverte, un corps à une case, le label
-    `ready-for-agent`, sans milestone —, son brief, les labels du dépôt et deux thèmes vides."""
+    `ready-for-agent`, sans milestone —, son brief, une autre issue ouverte, les labels du dépôt
+    et deux thèmes vides."""
     return Forge(
         {
             CORPS_42: {
@@ -1057,7 +1089,8 @@ def forge_temoin(**options: Any) -> Forge:
             }
         },
         pages=[[{"id": 13, "body": BRIEF}]],
-        labels_du_depot=[["ready-for-agent", "needs-info", "needs-interrogation"]],
+        issues=[[{"number": 7, "title": "Autre titre", "body": "Autre corps\n", "labels": []}]],
+        labels_du_depot=[["ready-for-agent", "needs-info", "needs-interrogation", "prd"]],
         milestones=[[theme(3, "Authentification"), theme(4, "Archives")]],
         **options,
     )
@@ -1088,7 +1121,7 @@ REJEUX = [
     pytest.param(COCHE_BRIEF, None, 0, id="brief-patch"),
     pytest.param(AJOUTE_FICHIER, None, 0, id="issue-edit-append"),
     pytest.param(PUBLIE_COMMENTAIRE, None, 0, id="comment"),
-    pytest.param(CREE_ISSUE, None, 0, id="issue-create"),
+    pytest.param(CREE_ISSUE_ETIQUETEE, None, 0, id="issue-create"),
     pytest.param(REMPLACE_CORPS, None, 0, id="issue-edit-body-file"),
     pytest.param(ECRIT_BRIEF, None, 0, id="brief-write"),
     pytest.param(COCHE_CORPS, crlf, 1, id="checkbox-patch-forge-crlf"),
@@ -1163,8 +1196,9 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     qu'`issue-edit-append-forge-crlf` : le corps se compare au fichier à l'identique.
 
     Au lot 6a1, `issue create` naît avec sa garde — une issue ouverte de même titre et de même
-    corps en tient lieu —, vue rouge garde retirée ; `issue-create-forge-crlf` fuit, `xfail`
-    strict, pour la même raison, et la fuite y est une seconde issue ; de même pour
+    corps en tient lieu, ses labels comparés depuis la relecture de la PR #150 —, vue rouge garde
+    retirée ; `issue-create-forge-crlf` fuit, `xfail` strict, pour la même raison, et la fuite y
+    est une seconde issue ; de même pour
     `issue edit --body-file` et `brief write`, où elle réécrit le même texte. Le rejeu de
     `brief write` part d'un brief à éditer : après une publication, il rejoint le même cas — un
     brief, égal au fichier. `label --add` naît avec sa garde — un label déjà posé ne se repose
@@ -1200,18 +1234,48 @@ def test_milestone_attach_rejoue_apres_creation_du_theme_n_ecrit_rien(
     assert "rien à écrire" in capsys.readouterr().out
 
 
-# Cliquet de la classe « l'identité de rejeu omet un champ que la sous-commande écrit » : un rejeu
-# ne dit « rien à écrire » qu'une fois **chaque** champ qu'il écrirait relu égal à l'attendu. Une
-# forme par champ écrit, seul resté à écrire : (appel, champs retouchés de la forge témoin, chemin
-# par chemin, sortie — 0 écrit, 1 refusé). Dénombré au lot 6a1 : `label` écrit les labels posés
-# et les labels retirés — 2 champs, épinglés après son code, chacun vu rouge par mutation de sa
-# garde ; `issue close`, l'état et la raison — 2 champs ; `milestone attach`, le milestone de
-# l'issue, que son titre désigne — le thème créé n'est écrit qu'à la création — ; `milestone
-# close`, l'état du thème — 1 champ chacun. Ces 4 épinglés avant leur code : 6 champs, 0 omis. Une
-# issue fermée sous une autre raison est un refus, jamais « rien à écrire ».
+ISSUE_7 = "repos/{owner}/{repo}/issues/7"
+# Une forme par champ écrit, seul resté à écrire : (appel, champs retouchés de la forge témoin,
+# chemin par chemin, sortie — 0 écrit, 1 refusé). Un texte resté à écrire est un voisin de
+# l'attendu, que tiendrait pour égal une garde réduite — contenu, début ou fin au lieu du texte
+# entier, une case nommée sur deux.
 CHAMPS_RESTES_A_ECRIRE: dict[str, tuple[tuple[str, ...], dict[str, dict[str, Any]], int]] = {
     "label-pose": (TRANSITION, {CORPS_42: {"labels": []}}, 0),
     "label-retrait": (TRANSITION, {CORPS_42: etiquetee("needs-interrogation", "needs-triage")}, 0),
+    "checkbox-patch-case": (
+        (*COCHE_CORPS, "--case", "Critère B"),
+        {CORPS_42: {"body": "Corps\n- [x] Critère A\n- [ ] Critère B\n"}},
+        0,
+    ),
+    "brief-patch-case": (
+        (*COCHE_BRIEF, "--case", "Critère B"),
+        {BRIEF_DE_42: {"body": BRIEF.replace("- [ ] Critère A", "- [x] Critère A")}},
+        0,
+    ),
+    "issue-edit-append-fin-de-corps": (
+        AJOUTE_FICHIER,
+        {CORPS_42: {"body": "*Rattachement.*\n\nSuite\n"}},
+        0,
+    ),
+    "issue-edit-body-file-corps": (
+        REMPLACE_CORPS,
+        {CORPS_42: {"body": "Avant\n*Rattachement.*\n"}},
+        0,
+    ),
+    "comment-corps": (PUBLIE_COMMENTAIRE, {BRIEF_DE_42: {"body": "Avant\n*Rattachement.*\n"}}, 0),
+    "brief-write-corps": (
+        ECRIT_BRIEF,
+        {BRIEF_DE_42: {"body": "## Brief d'agent\n\n- [ ] Critère révisé\n\nSuite\n"}},
+        0,
+    ),
+    "issue-create-titre": (CREE_ISSUE, {ISSUE_7: {"body": "*Rattachement.*\n"}}, 0),
+    "issue-create-corps": (CREE_ISSUE, {ISSUE_7: {"title": "Titre"}}, 0),
+    # Sans droit d'écriture sur le dépôt, l'API ignore les labels d'une création en silence.
+    "issue-create-labels-ignores": (
+        CREE_ISSUE_ETIQUETEE,
+        {ISSUE_7: {"title": "Titre", "body": "*Rattachement.*\n"}},
+        1,
+    ),
     "issue-close-etat": (
         FERME_ISSUE,
         {CORPS_42: {"state": "open", "state_reason": "completed"}},
@@ -1232,12 +1296,35 @@ CHAMPS_RESTES_A_ECRIRE: dict[str, tuple[tuple[str, ...], dict[str, dict[str, Any
     CHAMPS_RESTES_A_ECRIRE.values(),
     ids=CHAMPS_RESTES_A_ECRIRE.keys(),
 )
+@pytest.mark.usefixtures("ajout_md")
 def test_un_rejeu_ne_dit_rien_a_ecrire_tant_qu_un_champ_ecrit_differe(
     args: tuple[str, ...],
     etat: dict[str, dict[str, Any]],
     sortie: int,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """Cliquet de la classe « l'identité de rejeu omet un champ que la sous-commande écrit »
+    (`cycle-pr` 4.2, « Le cliquet ») : un rejeu ne dit « rien à écrire » qu'une fois **chaque**
+    champ qu'il écrirait relu égal à l'attendu. Une issue fermée sous une autre raison est un
+    refus, jamais « rien à écrire » ; une issue de même titre et de même corps, sous d'autres
+    labels, aussi.
+
+    Dénombré au lot 6a1, au bloc 2, sur ses 4 sous-commandes : `label --add` et `--remove`
+    écrivent les labels posés et les labels retirés — 2 champs, épinglés après leur code, chacun
+    vu rouge par mutation de sa garde ; `issue close`, l'état et la raison ; `milestone attach`,
+    le milestone de l'issue, que son titre désigne — le thème créé n'est écrit qu'à la création
+    — ; `milestone close`, l'état du thème — ces 4 derniers épinglés avant leur code : 6 champs,
+    0 omis.
+
+    Puis, à la relecture de la PR #150, sur les 8 d'avant — `label --remove` y est déjà compté :
+    `checkbox patch` et `brief patch` écrivent les cases nommées ; `issue edit --append`, la fin
+    du corps ; `issue edit --body-file` et `brief write`, le corps entier ; `comment`, le corps
+    du commentaire ; `issue create`, le titre, le corps et les labels — 9 champs, dont 1 omis :
+    les labels d'`issue create`, que le rejeu ne comparait pas — « #N existe déjà », sortie 0,
+    sur une issue restée sans eux. Les 9 formes épinglées avant le correctif, chacune vue rouge
+    par mutation de sa garde — 7 mutations, dont l'ancien rejeu d'`issue create` remis.
+
+    Total : 12 sous-commandes, 1 fuyait — 15 champs, 1 omis."""
     forge = forge_temoin()
     for chemin, champs in etat.items():
         forge.documents[chemin].update(champs)
@@ -1504,7 +1591,12 @@ REPONSES_D_UNE_AUTRE_FORME: dict[str, tuple[tuple[str, ...], Any, str]] = {
     ),
     "issue-identique-numero-non-entier": (
         CREE_ISSUE,
-        [[{"number": "7", "title": "Titre", "body": "*Rattachement.*\n"}]],
+        [[{"number": "7", "title": "Titre", "body": "*Rattachement.*\n", "labels": []}]],
+        "lecture",
+    ),
+    "issue-identique-sans-labels": (
+        CREE_ISSUE,
+        [[{"number": 7, "title": "Titre", "body": "*Rattachement.*\n"}]],
         "lecture",
     ),
     "issue-creee-sans-numero": (CREE_ISSUE, {"title": "Titre"}, "écriture"),
@@ -1571,8 +1663,8 @@ def test_une_reponse_d_une_autre_forme_sort_en_1_en_une_ligne(
     d'un thème, de même, le thème créé relu, le rattachement relu, le thème fermé relu — 21 sites.
     Chaque site a sa ligne ;
     ceux de lecture et la réponse d'une création en ont une seconde, de forme ou de type, les
-    issues ouvertes une troisième, le numéro de l'issue identique — les relectures passent par les
-    mêmes lecteurs que la lecture."""
+    issues ouvertes une troisième et une quatrième, le numéro et les labels de l'issue identique —
+    les relectures passent par les mêmes lecteurs que la lecture."""
     forge = forge_temoin()
 
     def forge_d_une_autre_forme(
