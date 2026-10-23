@@ -101,6 +101,10 @@ L'enfant envoie au parent, par `SendMessage`, un message explicite sous l'une de
 - « terminé — \<livrable> », pour toute autre tâche
 - « bloquant : \<…> »
 
+Toute forme admet un suffixe, « — enfants au travail : `local_…`, … », que porte le message d'une
+session qui a démarré des enfants encore au travail : un identifiant par enfant (« Identité »),
+pour la session qui l'archivera (« Nettoyage »).
+
 Une session de relecture rend ses constats sous la forme de
 [session-relecture.md](session-relecture.md), « Réveil ». En vague, le même message part aussi au
 lead s'il n'est pas le parent.
@@ -145,3 +149,7 @@ signale un commit sur l'échafaudage —
 `git log --oneline <source>..claude/<slug>-<hex>` liste les commits qui bloquent : le remonter
 au mainteneur, jamais `-D` sans la porte. Une branche
 de PR mergée suit `pr-paralleles` Étape 8.
+
+La session qui archive un parent nettoie les enfants que son message de fin nomme (« Fin de
+travail »), à la place du parent : le message de fin d'un enfant à un parent archivé est supposé
+perdu, non mesuré.
