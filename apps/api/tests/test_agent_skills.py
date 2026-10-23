@@ -2218,12 +2218,12 @@ USE_WORKTREE_EXPLICITE = {
         REPERCUSSIONS_SKILL,
         (
             "hors d'un tour du mainteneur, une carte de proposition (`initiation: own_initiative`,"
-            " `use_worktree: true`)"
+            " `context: fresh`, `use_worktree: true`, même nom et même prompt)"
         ),
     ),
     "repercussions-vers-plan-qa": (
         REPERCUSSIONS_SKILL,
-        "`use_worktree: true`, `name: plan-qa-<thème>`",
+        "`use_worktree: true`, `name: plan-qa-<slug du thème>`",
     ),
     "repercussions-vers-les-brouillons": (
         REPERCUSSIONS_SKILL,
@@ -2863,6 +2863,14 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         REPERCUSSIONS_SKILL,
         "la ligne de journal cite l'amendement, pas une issue fermée",
     ),
+    "6b-repercussions-l-issue-fermee-en-mode-amendement": (
+        REPERCUSSIONS_SKILL,
+        (
+            "En mode amendement, `#<fermée>`, `<issue fermée>` et « la clôture de #<n> » se lisent"
+            " « l'amendement, PR #<m> » : la clé d'idempotence de l'étape 2 est alors la ligne qui"
+            " cite cette PR"
+        ),
+    ),
     "6b-repercussions-grep-des-sources-au-releveur": (
         REPERCUSSIONS_SKILL,
         "un `releveur` le passe et rend les passages autour des ancres ; le verdict reste à la session",
@@ -2920,8 +2928,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b-repercussions-brief-sur-toutes-les-pages": (
         REPERCUSSIONS_SKILL,
         (
-            "`gh api --paginate repos/{owner}/{repo}/issues/<n>/comments` — sans `--paginate`, la"
-            " première page seule"
+            "`gh api --paginate repos/{owner}/{repo}/issues/<n>/comments --jq '.[] | select(.body |"
+            " startswith(\"## Brief d'\"'\"'agent\")) | .body'`, sans le LF final que `--jq` ajoute"
+            " (mesuré sous Git Bash le 2026-10-23 sur #134, une page : octet pour octet le `.body`"
+            " de son brief lu seul) — sans `--paginate`, la première page seule"
         ),
     ),
     "6b-repercussions-verification-dans-le-fichier": (
@@ -2975,11 +2985,16 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " mainteneur ; sur son accord, dans ce tour, démarrer la session"
         ),
     ),
+    # Relecture de la PR #153, passe 1, CR2. Dénombrement (noms de session dérivés d'un texte
+    # libre), `grep -rno "name: [a-z-]*<[^>]*>" .claude/skills` : **12** sites au 2026-10-23 sur
+    # `7dab581`, **1** fuyait (`plan-qa-<thème>`) ; les autres prennent un numéro,
+    # `coordinatrice.md` un `<slug>`.
     "6b-repercussions-session-plan-qa": (
         REPERCUSSIONS_SKILL,
         (
             "`start_session`, `initiation: user_asked`, `context: fresh`, `use_worktree: true`,"
-            ' `name: plan-qa-<thème>`, prompt `/plan-qa "<thème>"`'
+            ' `name: plan-qa-<slug du thème>`, prompt `/plan-qa "<thème>"` — `start_session` borne'
+            " un nom à `[a-z0-9-]` et 24 caractères (description de l'outil, lue le 2026-10-23)"
         ),
     ),
     "6b-repercussions-brouillon-au-tour-du-mainteneur": (
@@ -2997,6 +3012,13 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b-repercussions-brouillon-montre-au-mainteneur": (
         REPERCUSSIONS_SKILL,
         "La session de brouillon le montre au mainteneur, qui décide",
+    ),
+    "6b-cycle-pr-repercussions-nomme-la-famille": (
+        CYCLE_PR_SKILL,
+        (
+            "`triage`, `interroge-moi`, `vers-prd`, `vers-issues` et `repercussions` les nomment ;"
+            " les autres skills des lots 6b à 8 de #134 les nommeront"
+        ),
     ),
     "6b-cycle-pr-repercussions-prescrit-le-commentaire": (
         CYCLE_PR_SKILL,

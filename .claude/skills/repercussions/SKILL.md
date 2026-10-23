@@ -1,6 +1,6 @@
 ---
 name: repercussions
-description: À la clôture d'une issue (PR mergée), corrige la planification des autres issues ouvertes que cette clôture a rendues fausses — hypothèses caduques, contrats déplacés, périmètres déjà couverts, ordres de dépendance. Le livrable est une édition de la spec des issues impactées — corps et brief d'agent — jamais un commentaire. À utiliser juste après un merge qui ferme une issue, ou « vérifie l'impact de cette issue sur les autres ».
+description: À la clôture d'une issue (PR mergée), corrige la planification des autres issues ouvertes que cette clôture a rendues fausses — hypothèses caduques, contrats déplacés, périmètres déjà couverts, ordres de dépendance. Le livrable est une édition de la spec des issues impactées — corps et brief d'agent — jamais un commentaire. À utiliser juste après un merge qui ferme une issue, ou « vérifie l'impact de cette issue sur les autres ». Aussi au merge d'une PR d'amendement ouverte par `contradiction`.
 argument-hint: "[#issue fermée | #PR d'amendement]"
 ---
 
@@ -81,9 +81,11 @@ Sans argument, l'issue est la dernière fermée par un merge sur la branche trun
 
 Avec une PR d'amendement — une PR mergée qui amende une source de vérité sans fermer d'issue,
 ouverte par une `contradiction` née d'une décision, sans issue fermée à l'origine —, le delta réel
-est l'amendement. Les étapes 2 à 6 s'appliquent ;
-l'étape 7 est sans objet, aucun thème ne s'étant vidé ; la ligne de journal cite l'amendement, pas
-une issue fermée (« Réconciliée avec l'amendement du cadrage §9.3, PR #<m>, du 26 août 2026 »).
+est l'amendement. Les étapes 2 à 6 s'appliquent ; l'étape 7 est sans objet, aucun thème ne s'étant
+vidé ; la ligne de journal cite l'amendement, pas une issue fermée (« Réconciliée avec
+l'amendement du cadrage §9.3, PR #<m>, du 26 août 2026 »). En mode amendement, `#<fermée>`,
+`<issue fermée>` et « la clôture de #<n> » se lisent « l'amendement, PR #<m> » : la clé
+d'idempotence de l'étape 2 est alors la ligne qui cite cette PR.
 
 Écrire un résumé court de **ce que cette clôture a réellement changé** — pas ce que l'issue
 promettait, ce qui a été *fait*. Sources, qu'un `releveur` rend : le **diff mergé**
@@ -122,8 +124,9 @@ Une contradiction avérée → **s'arrêter avant l'étape 2** et présenter l'a
 l'accepte, démarrer la session `contradiction` : `start_session`, `initiation: user_asked`,
 `context: fresh`, `use_worktree: true`, `name: contradiction-<N>`, prompt `/contradiction` suivi
 du bloc d'arrêt — ses deux citations — et de `origine : #<N>` ; hors d'un tour du mainteneur, une
-carte de proposition (`initiation: own_initiative`, `use_worktree: true`). Elle amende le § par une
-PR ; à son merge, elle redémarre `repercussions` sur `#<N>`, dont la passe reprend contre la doc
+carte de proposition (`initiation: own_initiative`, `context: fresh`, `use_worktree: true`,
+même nom et même prompt). Elle amende le § par une PR ; à son merge, elle redémarre
+`repercussions` sur `#<N>`, dont la passe reprend contre la doc
 amendée — l'étape 1 n'y trouve plus la contradiction, les étapes 2 à 7 suivent, QA comprise. Ce
 skill **n'amende jamais un document lui-même**. Une contradiction déjà portée par une issue ouverte —
 l'échappatoire de `decisions-vs-doc` — est déjà tracée : ne pas la signaler une seconde fois.
@@ -264,8 +267,10 @@ jamais profiter de l'édition pour reformuler autre chose.
 **Amender le brief d'agent dans le même geste** quand la ligne fausse y figure aussi, par
 `brief write <n> --body-file <fichier>`, qui édite en place le seul brief, jamais un second brief
 concurrent : même lecture en octets, du commentaire qui s'ouvre par `## Brief d'agent`, relu par
-`gh api --paginate repos/{owner}/{repo}/issues/<n>/comments` — sans `--paginate`, la première page
-seule, 30 commentaires. Le journal de spec vit dans le corps, mais le contrat que `cycle-pr`
+`gh api --paginate repos/{owner}/{repo}/issues/<n>/comments --jq '.[] | select(.body | startswith("## Brief d'"'"'agent")) | .body'`,
+sans le LF final que `--jq` ajoute (mesuré sous Git Bash le 2026-10-23 sur #134, une page :
+octet pour octet le `.body` de son brief lu seul) — sans `--paginate`, la première page seule,
+30 commentaires. Le journal de spec vit dans le corps, mais le contrat que `cycle-pr`
 exécute est le brief : un correctif appliqué au seul corps laisse le contrat faux.
 
 **Vérification avant de clore la passe** sur une issue portant un brief : avant l'appel, chercher
@@ -377,7 +382,9 @@ Conditions pour proposer :
 
 **Proposer, puis démarrer sur accord.** La proposition reste une question au mainteneur ; sur son
 accord, dans ce tour, démarrer la session : `start_session`, `initiation: user_asked`,
-`context: fresh`, `use_worktree: true`, `name: plan-qa-<thème>`, prompt `/plan-qa "<thème>"`. Et
+`context: fresh`, `use_worktree: true`, `name: plan-qa-<slug du thème>`, prompt
+`/plan-qa "<thème>"` — `start_session` borne un nom à `[a-z0-9-]` et 24 caractères (description
+de l'outil, lue le 2026-10-23). Et
 ne proposer qu'une fois par thème : si le milestone porte déjà une issue `qa-plan`, se taire. Une
 proposition qu'on décline neuf fois sur dix devient un bruit qu'on apprend à ignorer — c'est
 précisément ce qu'on cherche à éviter en ne la déclenchant qu'ici.
