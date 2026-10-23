@@ -126,10 +126,11 @@ l'accepte, démarrer la session `contradiction` : `start_session`, `initiation: 
 du bloc d'arrêt — ses deux citations — et de `origine : #<N>` ; hors d'un tour du mainteneur, une
 carte de proposition (`initiation: own_initiative`, `context: fresh`, `use_worktree: true`,
 même nom et même prompt). Elle amende le § par une PR ; à son merge, elle redémarre
-`repercussions` sur `#<N>`, dont la passe reprend contre la doc
-amendée — l'étape 1 n'y trouve plus la contradiction, les étapes 2 à 7 suivent, QA comprise. Ce
-skill **n'amende jamais un document lui-même**. Une contradiction déjà portée par une issue ouverte —
-l'échappatoire de `decisions-vs-doc` — est déjà tracée : ne pas la signaler une seconde fois.
+`repercussions` sur `#<N>`, dont la passe reprend contre la doc amendée — l'étape 1 n'y trouve plus
+la contradiction, les étapes 2 à 7 suivent, QA comprise. Démarrée par une autre, cette session-ci
+prévient alors son parent (étape 6). Ce skill **n'amende jamais un document lui-même**. Une
+contradiction déjà portée par une issue ouverte — l'échappatoire de `decisions-vs-doc` — est déjà
+tracée : ne pas la signaler une seconde fois.
 
 ### 2. Sélectionner les issues à examiner
 
@@ -355,9 +356,9 @@ Puis : ce qui a été édité, ce qui est repassé en `needs-interrogation`, ce 
 points laissés à l'arbitrage, et le nombre d'issues non examinées.
 
 **Session démarrée par une autre** — une session `contradiction` (son prompt système nomme le
-parent, `.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») : le récapitulatif
-fait, prévenir le parent par le message de fin de la même référence (« Fin de travail ») — la fin
-du tour ne le prévient pas.
+parent, `.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») : la passe finie —
+après l'étape 7, ou à l'arrêt de l'étape 1 —, prévenir le parent par le message de fin de la même
+référence (« Fin de travail ») — la fin du tour ne le prévient pas.
 
 ### 7. Le thème est-il terminé ? — proposer la campagne de QA
 

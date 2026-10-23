@@ -2895,6 +2895,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " contradiction, les étapes 2 à 7 suivent, QA comprise"
         ),
     ),
+    "6b-repercussions-arret-previent-le-parent": (
+        REPERCUSSIONS_SKILL,
+        "Démarrée par une autre, cette session-ci prévient alors son parent (étape 6)",
+    ),
     "6b-repercussions-n-amende-jamais": (
         REPERCUSSIONS_SKILL,
         "Ce skill **n'amende jamais un document lui-même**",
@@ -2906,9 +2910,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # forme du geste, obs 139 — « s'arrêter », « se taire », « on se tait »), dans
     # `repercussions/SKILL.md` le 2026-10-23 : **4** sites ; **2** fuyaient — l'étape 4, fermée
     # ici, et l'étape 1, « s'arrêter avant l'étape 2 », dont la passe redémarrée reprend les
-    # étapes 2 à 7 mais dont la session saute encore le message de fin de l'étape 6 ; **2**
-    # indemnes — « On se tait », sur une issue sans édition formulable, la passe continuant sur
-    # les autres, et le « se taire » de l'étape 7, la dernière, sur une QA déjà proposée.
+    # étapes 2 à 7 mais dont la session sautait le message de fin de l'étape 6, fermée par
+    # `6b-repercussions-arret-previent-le-parent` ; **2** indemnes — « On se tait », sur une issue
+    # sans édition formulable, la passe continuant sur les autres, et le « se taire » de l'étape 7,
+    # la dernière, sur une QA déjà proposée.
     "6b-repercussions-sans-impact-passe-a-l-etape-6": (
         REPERCUSSIONS_SKILL,
         "— et passer à l'étape 6, l'étape 7 restant due",
@@ -2985,11 +2990,16 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " `triage`"
         ),
     ),
+    # Cleanup holistique de la PR #153 : le message de fin partait « le récapitulatif fait », avant
+    # l'étape 7 que doit la passe redémarrée par `contradiction` (« QA comprise »), et jamais à
+    # l'arrêt de l'étape 1. Sites d'un message de fin dans `repercussions/SKILL.md`, le
+    # 2026-10-23 : **1**, l'étape 6 ; il fuyait aux deux bouts.
     "6b-repercussions-fin-de-travail": (
         REPERCUSSIONS_SKILL,
         (
-            "prévenir le parent par le message de fin de la même référence (« Fin de travail ») —"
-            " la fin du tour ne le prévient pas"
+            "la passe finie — après l'étape 7, ou à l'arrêt de l'étape 1 —, prévenir le parent par"
+            " le message de fin de la même référence (« Fin de travail ») — la fin du tour ne le"
+            " prévient pas"
         ),
     ),
     "6b-repercussions-proposer-puis-demarrer": (
