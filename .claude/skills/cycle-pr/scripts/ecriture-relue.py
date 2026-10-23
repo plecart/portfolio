@@ -1,7 +1,7 @@
 """Écriture distante relue : écrit un texte de la forge, puis le relit en entier.
 
 Usage :
-    python ecriture-relue.py label <N> --remove <label>
+    python ecriture-relue.py label <N> [--add <label> …] [--remove <label> …]
     python ecriture-relue.py checkbox patch <N> --case <ancre> [--case <ancre> …]
     python ecriture-relue.py brief patch <N> --case <ancre> [--case <ancre> …]
     python ecriture-relue.py brief write <N> --body-file <fichier>
@@ -11,7 +11,8 @@ Usage :
 
 La règle « Écritures sur un artefact distant » de `contraintes.md` veut que toute écriture sur la
 forge se relise ; ce script tient cette relecture pour les gestes de `cycle-pr` Étape 8, le
-commentaire de répercussion de son Étape 6 et la création d'une issue (#134, lots 4a, 4b et 6a1).
+commentaire de répercussion de son Étape 6, la création d'une issue et la transition de ses labels
+(#134, lots 4a, 4b et 6a1).
 Chaque sous-commande lit par `gh api` — octets décodés en UTF-8, jamais le mode texte, qui traduit
 les fins de ligne, ni la page de code de la console (obs 87, 106, 108, 116) —, écrit, puis relit
 par le même canal. Un texte s'écrit par `gh api -X PATCH <chemin> --input -` — `-X POST` pour
@@ -20,7 +21,12 @@ relecture compare le **texte entier** à l'attendu : une forme réduite, longueu
 pas une conversion qui la préserve (obs 106).
 `{owner}/{repo}` sont remplis par `gh` depuis le dépôt courant.
 
-- `label` retire un label de l'issue ou de la PR `<N>`, puis relit ses labels ;
+- `label` pose les labels `--add` sur l'issue ou la PR `<N>`, puis lui retire les labels
+  `--remove`, et relit ses labels. Chaque option se répète, l'une au moins est requise, et aucun
+  label ne se nomme deux fois, casse ignorée. La pose précède le retrait : une transition d'état,
+  `--remove needs-triage --add needs-interrogation`, ne laisse jamais l'issue sans label d'état,
+  et une transition tombée entre les deux laisse les deux labels, que le rejeu achève. Un label
+  à poser doit exister dans le dépôt, comme pour `issue create` ;
 - `checkbox patch` coche des cases du corps de `<N>`, `brief patch` celles de son commentaire de
   brief — le seul qui s'ouvre par `## Brief d'agent` (`triage/brief-agent.md`). Une ancre est un
   extrait du texte qui suit le marqueur d'une seule ligne de case, `- [ ] …` ou `- [x] …` (`[X]`
@@ -48,16 +54,16 @@ pas une conversion qui la préserve (obs 106).
 
 Il refuse, sans rien écrire : une ancre introuvable ou ambiguë — toutes sont validées avant la
 première écriture —, zéro brief à cocher, plusieurs briefs, un label inconnu du dépôt — chacun
-nommé ; `CLAUDE.md` interdit de deviner un label, et la référence REST de « Create an issue » ne
-dit pas ce qu'elle fait d'un label inconnu —, un fichier illisible, non UTF-8 ou sans ligne non
-vide — lu avant tout appel à la forge —, une lecture `gh` qui échoue, ne rend pas du JSON, ou rend
-un JSON sans un champ attendu ou d'un autre type. Après l'écriture — sa réponse comprise, dont un
-commentaire publié tire son `id` et une issue créée son numéro —, c'est une relecture non
-conforme : le texte a pu partir. Une case déjà cochée, un label déjà absent, un fichier qui
-termine déjà le corps ou qui l'est déjà tout entier, un commentaire de `<N>` qui porte déjà le
-fichier pour corps, une issue ouverte — pas une PR — qui porte déjà ce titre et ce corps : rien à
-écrire, et la sortie le dit — un rejeu après une relecture tombée n'écrit donc pas une seconde
-fois.
+nommé ; `CLAUDE.md` interdit de deviner un label, et les références REST de « Create an issue »
+et d'« Add labels to an issue » ne disent pas ce qu'elles font d'un label inconnu —, un fichier
+illisible, non UTF-8 ou sans ligne non vide — lu avant tout appel à la forge —, une lecture `gh`
+qui échoue, ne rend pas du JSON, ou rend un JSON sans un champ attendu ou d'un autre type. Après
+l'écriture — sa réponse comprise, dont un commentaire publié tire son `id` et une issue créée son
+numéro —, c'est une relecture non conforme : le texte a pu partir. Une case déjà cochée, des
+labels tous déjà posés ou déjà absents, un fichier qui termine déjà le corps ou qui l'est déjà
+tout entier, un commentaire de `<N>` qui porte déjà le fichier pour corps, une issue ouverte — pas
+une PR — qui porte déjà ce titre et ce corps : rien à écrire, et la sortie le dit — un rejeu après
+une relecture tombée n'écrit donc pas une seconde fois.
 
 **Ce qu'il ne prouve pas.** Il ne choisit pas les cases : la session PR les nomme. Il ne
 verrouille rien : une édition faite par un tiers entre sa lecture et son écriture est écrasée, et
@@ -69,9 +75,9 @@ issue fermée n'est pas vue —, **quel qu'en soit l'auteur**. Le fichier se rec
 l'identique, fins de ligne comprises, en fin de corps comme en corps de commentaire ou d'issue :
 sur une forge qui le stocke transformé — relecture non conforme dès le premier appel —, un rejeu
 l'ajoute, le réécrit, le publie ou crée l'issue une seconde fois. Une relecture conforme atteste
-ce que l'API rend, pas ce que l'interface web affiche. Le chemin d'un label encodé, l'écriture
-du corps d'une PR, la publication d'un commentaire sur une PR par l'endpoint `issues` et la
-création d'une issue ne sont pas mesurés sur la vraie forge.
+ce que l'API rend, pas ce que l'interface web affiche. Le chemin d'un label encodé, la pose d'un
+label, l'écriture du corps d'une PR, la publication d'un commentaire sur une PR par l'endpoint
+`issues` et la création d'une issue ne sont pas mesurés sur la vraie forge.
 
 Sortie : 0 écrit et relu conforme, ou rien à écrire ; 1 refus (« refus — »), ou écriture lancée et
 relecture non conforme ou impossible (« relecture non conforme — ») — motif en une ligne sur la
@@ -435,18 +441,67 @@ def carried_label(names: Sequence[str], wanted: str) -> str | None:
     return next((name for name in names if name.casefold() == wanted.casefold()), None)
 
 
-def label_remove(run: Run, args: argparse.Namespace) -> str:
-    """`label --remove` : retire le label s'il est posé, casse ignorée, puis relit les labels de
-    l'issue. Le retrait et la relecture visent le nom que l'issue porte, encodé en un seul segment
-    de chemin : rien ne dit la forge insensible à la casse."""
+def label_plan(
+    carried: Sequence[str], wanted: Sequence[str], unwanted: Sequence[str]
+) -> tuple[list[str], list[str], list[str]]:
+    """Ce que `label` écrit sur une issue qui porte `carried` : les labels de `wanted` qu'elle ne
+    porte pas, ceux de `unwanted` qu'elle porte — sous le nom qu'elle leur donne, apparié comme
+    `carried_label` —, et ce qui est déjà en place, en clair. Rien à poser ni à retirer : chaque
+    label est déjà là où on le veut, et le rejeu n'écrit rien.
+
+    Returns:
+        Les labels à poser, les labels à retirer, et les labels déjà en place.
+    """
+    added = [name for name in wanted if carried_label(carried, name) is None]
+    found = {label: carried_label(carried, label) for label in unwanted}
+    removed = [name for name in found.values() if name is not None]
+    done = [f"{name} déjà posé" for name in wanted if name not in added]
+    done += [f"{label} déjà absent" for label, name in found.items() if name is None]
+    return added, removed, done
+
+
+def label_edit(run: Run, args: argparse.Namespace) -> str:
+    """`label` : pose les labels `--add` absents de l'issue, puis retire les `--remove` qu'elle
+    porte (`label_plan`), puis relit ses labels — la pose d'abord : une transition d'état ne laisse
+    jamais l'issue sans label d'état, même un instant. Un label à poser part sous le nom que le
+    dépôt lui donne (`repo_labels`) ; un retrait vise le nom que l'issue porte, encodé en un seul
+    segment de chemin : rien ne dit la forge insensible à la casse.
+
+    Raises:
+        Refusal: un label à poser est inconnu du dépôt — rien n'est écrit, pas même un retrait.
+        Divergence: écriture ou relecture en échec, label posé absent ou retiré encore là.
+    """
+    wanted = repo_labels(run, args.add)
     path = issue_path(args.number)
-    name = carried_label(read_json(run, label_names, path), args.label)
-    if name is None:
-        return f"rien à écrire — label {args.label} absent de #{args.number}"
-    delete = ("-X", "DELETE", f"{path}/labels/{quote(name, safe='')}")
-    if name in write_then_reread(run, delete, None, path, label_names):
-        raise Divergence(f"le label {name} est encore sur #{args.number}")
-    return f"retiré et relu — label {name} de #{args.number}"
+    added, removed, done = label_plan(read_json(run, label_names, path), wanted, args.remove)
+    issue = f"#{args.number}"
+    if not added and not removed:
+        return f"rien à écrire — labels de {issue} : {' ; '.join(done)}"
+    with writing():
+        if added:
+            post = ("-X", "POST", f"{path}/labels", "--input", "-")
+            gh_api(run, *post, stdin=json_payload(labels=added))
+        for name in removed:
+            gh_api(run, "-X", "DELETE", f"{path}/labels/{quote(name, safe='')}")
+        reread = read_json(run, label_names, path)
+    missing = [f"le label {name} n'est pas sur {issue}" for name in added if name not in reread]
+    left = [f"le label {name} est encore sur {issue}" for name in removed if name in reread]
+    if missing or left:
+        raise Divergence(" ; ".join([*missing, *left]))
+    written = [f"ajouté {name}" for name in added] + [f"retiré {name}" for name in removed]
+    return f"écrit et relu — labels de {issue} : {' ; '.join([*written, *done])}"
+
+
+def label_misuse(args: argparse.Namespace) -> str | None:
+    """Ce qu'argparse ne sait pas exiger de `label` : `--add` ou `--remove`, l'un au moins, et
+    aucun label nommé deux fois, casse ignorée — posé et retiré, l'état de l'issue dépendrait de
+    l'ordre des requêtes ; retiré deux fois, le second retrait viserait un label déjà ôté."""
+    names = [*args.add, *args.remove]
+    if not names:
+        return "label : --add ou --remove, l'un au moins"
+    folded = [name.casefold() for name in names]
+    twice = sorted({name for name in names if folded.count(name.casefold()) > 1})
+    return f"label : nommé deux fois, casse ignorée : {', '.join(twice)}" if twice else None
 
 
 def appended(body: str, addition: str) -> str:
@@ -668,8 +723,9 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
     label = commands.add_parser("label")
     label.add_argument("number", type=issue_number)
-    label.add_argument("--remove", dest="label", type=one_line, required=True)
-    label.set_defaults(handler=label_remove)
+    for option in ("--add", "--remove"):
+        label.add_argument(option, type=one_line, action="append", default=[])
+    label.set_defaults(handler=label_edit)
     checkbox = commands.add_parser("checkbox").add_subparsers(dest="action", required=True)
     brief = commands.add_parser("brief").add_subparsers(dest="action", required=True)
     for actions, locate in ((checkbox, issue_body), (brief, brief_comment)):
@@ -702,8 +758,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str], run: Run = default_run) -> int:
     """Point d'entrée ; voir le module pour les sous-commandes et les sorties."""
+    parser = build_parser()
     try:
-        args = build_parser().parse_args(argv)
+        args = parser.parse_args(argv)
+        if args.command == "label" and (misuse := label_misuse(args)):
+            parser.error(misuse)
     except SystemExit as stop:
         return stop.code if isinstance(stop.code, int) else 2
     try:

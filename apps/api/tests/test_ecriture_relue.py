@@ -34,6 +34,7 @@ RETRAITS = {
     "repos/{owner}/{repo}/issues/42/labels/Ready-for-agent": "Ready-for-agent",
     "repos/{owner}/{repo}/issues/42/labels/en%20attente": "en attente",
     "repos/{owner}/{repo}/issues/42/labels/zone%2Fapi": "zone/api",
+    "repos/{owner}/{repo}/issues/42/labels/needs-triage": "needs-triage",
 }
 
 
@@ -52,7 +53,8 @@ class Forge:
         issues: les issues ouvertes du dépôt, page par page, de même. Une issue créée par `POST`
             y entre sur une page de plus, son corps gardé par `stocke`, sous le numéro 900 + n, et
             se lit sous son chemin `issues/<numéro>`.
-        labels_du_depot: les noms des labels du dépôt, page par page.
+        labels_du_depot: les noms des labels du dépôt, page par page. Un label posé par `POST`
+            s'ajoute à ceux de l'issue 42.
         garde_les_labels: le retrait d'un label répond sans l'ôter de l'issue.
     """
 
@@ -127,6 +129,13 @@ class Forge:
                 self.pages.append([commentaire])
                 self.indexe(commentaire)
                 return json_success(commentaire)
+            case ("gh", "api", "-X", "POST", chemin, "--input", "-") if (
+                chemin == f"{CORPS_42}/labels" and stdin is not None
+            ):
+                self.charges.append(stdin)
+                labels = self.documents[CORPS_42]["labels"]
+                labels.extend({"name": nom} for nom in json.loads(stdin)["labels"])
+                return json_success(labels)
             case ("gh", "api", "-X", "DELETE", chemin) if chemin in RETRAITS and stdin is None:
                 labels = self.documents[CORPS_42]["labels"]
                 if not self.garde_les_labels:
@@ -429,6 +438,23 @@ def ecritures(forge: Forge) -> list[tuple[str, ...]]:
     return [appel for appel in forge.appels if "-X" in appel]
 
 
+def relue_autrement(
+    forge: Forge, chemin: str, retouche: Callable[[Any], Any]
+) -> Callable[[Sequence[str], bytes | None], subprocess.CompletedProcess[bytes]]:
+    """La forge, sauf la lecture de `chemin` après une écriture — la relecture —, que `retouche`
+    transforme : la forge ne garde pas ce qu'on lui a écrit."""
+
+    def forge_qui_relit_autre_chose(
+        cmd: Sequence[str], stdin: bytes | None
+    ) -> subprocess.CompletedProcess[bytes]:
+        rendu = forge(cmd, stdin)
+        if ecritures(forge) and tuple(cmd) == ("gh", "api", chemin):
+            return json_success(retouche(json.loads(rendu.stdout)))
+        return rendu
+
+    return forge_qui_relit_autre_chose
+
+
 @pytest.mark.parametrize(
     "label",
     ["ready-for-agent", "en attente", "zone/api"],
@@ -486,6 +512,77 @@ def test_label_remove_sort_en_1_si_la_relecture_porte_encore_le_label(
     assert lance(forge, "label", "42", "--remove", argument) == 1
     assert "le label ready-for-agent est encore sur #42" in sortie_d_echec(
         capsys, "relecture non conforme"
+    )
+
+
+TRANSITION = ("label", "42", "--remove", "needs-triage", "--add", "needs-interrogation")
+
+
+def test_label_fait_une_transition_d_etat_en_un_appel_puis_relit_les_labels(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Le témoin positif, et l'ordre : le label à poser se valide contre le dépôt, se pose
+    **avant** le retrait — l'issue ne reste jamais sans label d'état, même un instant —, puis les
+    labels de l'issue se relisent une fois."""
+    forge = Forge(
+        {CORPS_42: etiquetee("needs-triage", "enhancement")},
+        labels_du_depot=[["needs-triage", "needs-interrogation"]],
+    )
+
+    assert lance(forge, *TRANSITION) == 0
+    assert forge.appels == [
+        ("gh", "api", "--paginate", "--slurp", LABELS_DU_DEPOT),
+        ("gh", "api", CORPS_42),
+        ("gh", "api", "-X", "POST", f"{CORPS_42}/labels", "--input", "-"),
+        ("gh", "api", "-X", "DELETE", f"{CORPS_42}/labels/needs-triage"),
+        ("gh", "api", CORPS_42),
+    ]
+    assert [json.loads(charge) for charge in forge.charges] == [{"labels": ["needs-interrogation"]}]
+    assert forge.documents[CORPS_42]["labels"] == [
+        {"name": "enhancement"},
+        {"name": "needs-interrogation"},
+    ]
+    assert capsys.readouterr().out == (
+        "écrit et relu — labels de #42 : ajouté needs-interrogation ; retiré needs-triage\n"
+    )
+
+
+def test_label_add_pose_le_nom_que_le_depot_donne_au_label() -> None:
+    """`--add Needs-Info` désigne le `needs-info` que le dépôt porte sur sa seconde page, comme le
+    `--label` d'`issue create`."""
+    forge = Forge({CORPS_42: etiquetee()}, labels_du_depot=[["bug"], ["needs-info"]])
+
+    assert lance(forge, "label", "42", "--add", "Needs-Info") == 0
+    assert [json.loads(charge) for charge in forge.charges] == [{"labels": ["needs-info"]}]
+
+
+def test_label_add_refuse_un_label_inconnu_du_depot_sans_rien_ecrire(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Chaque label inconnu est nommé, et rien ne part — pas même le retrait demandé dans le même
+    appel."""
+    forge = Forge({CORPS_42: etiquetee("needs-triage")}, labels_du_depot=[["needs-triage"]])
+
+    args = ("label", "42", "--remove", "needs-triage", "--add", "bogue", "--add", "zone/api")
+    assert lance(forge, *args) == 1
+    assert ecritures(forge) == []
+    assert "label inconnu du dépôt : bogue ; label inconnu du dépôt : zone/api" in sortie_d_echec(
+        capsys, "refus"
+    )
+
+
+def test_label_n_ecrit_rien_quand_la_transition_est_deja_faite(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    forge = Forge(
+        {CORPS_42: etiquetee("needs-interrogation")},
+        labels_du_depot=[["needs-triage", "needs-interrogation"]],
+    )
+
+    assert lance(forge, *TRANSITION) == 0
+    assert ecritures(forge) == []
+    assert capsys.readouterr().out == (
+        "rien à écrire — labels de #42 : needs-interrogation déjà posé ; needs-triage déjà absent\n"
     )
 
 
@@ -774,16 +871,8 @@ def test_issue_create_sort_en_1_si_l_issue_relue_n_est_pas_celle_creee(
 ) -> None:
     forge = Forge({}, labels_du_depot=[["prd"]])
 
-    def forge_qui_relit_autre_chose(
-        cmd: Sequence[str], stdin: bytes | None
-    ) -> subprocess.CompletedProcess[bytes]:
-        rendu = forge(cmd, stdin)
-        if tuple(cmd) == ("gh", "api", f"{ISSUES}/901"):
-            return json_success(retouche(json.loads(rendu.stdout)))
-        return rendu
-
     args = creation(tmp_path, "prd")
-    assert ecriture_relue.main(args, run=forge_qui_relit_autre_chose) == 1
+    assert ecriture_relue.main(args, run=relue_autrement(forge, f"{ISSUES}/901", retouche)) == 1
     assert capsys.readouterr().out == f"relecture non conforme — {ecart}\n"
 
 
@@ -796,7 +885,19 @@ def ajout_md(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     Path("brief.md").write_bytes("## Brief d'agent\n\n- [ ] Critère révisé\n".encode())
 
 
+def forge_temoin(**options: Any) -> Forge:
+    """La forge des tables partagées : l'issue 42 — un corps à une case, le label
+    `ready-for-agent` —, son brief, et les labels du dépôt."""
+    return Forge(
+        {CORPS_42: {"body": "Corps\n- [ ] Critère A\n", "labels": [{"name": "ready-for-agent"}]}},
+        pages=[[{"id": 13, "body": BRIEF}]],
+        labels_du_depot=[["ready-for-agent", "needs-info", "needs-interrogation"]],
+        **options,
+    )
+
+
 RETIRE_LABEL = ("label", "42", "--remove", "ready-for-agent")
+AJOUTE_LABEL = ("label", "42", "--add", "needs-info")
 COCHE_CORPS = ("checkbox", "patch", "42", "--case", "Critère A")
 COCHE_BRIEF = ("brief", "patch", "42", "--case", "Critère A")
 AJOUTE_FICHIER = ("issue", "edit", "42", "--append", "ajout.md")
@@ -808,6 +909,7 @@ CREE_ISSUE_ETIQUETEE = (*CREE_ISSUE, "--label", "prd")
 # (appel, ce que la forge fait du texte reçu — `None` le garde tel quel —, sortie du premier appel)
 REJEUX = [
     pytest.param(RETIRE_LABEL, None, 0, id="label-remove"),
+    pytest.param(AJOUTE_LABEL, None, 0, id="label-add"),
     pytest.param(COCHE_CORPS, None, 0, id="checkbox-patch"),
     pytest.param(COCHE_BRIEF, None, 0, id="brief-patch"),
     pytest.param(AJOUTE_FICHIER, None, 0, id="issue-edit-append"),
@@ -870,10 +972,10 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     appel écrit une fois ; le second sort en 0 sans **aucune** écriture, ni `PATCH`, ni `DELETE`,
     ni `POST`.
 
-    Population : les 8 sous-commandes, sur une forge qui garde le texte reçu ; puis, cherchée hors
+    Population : les 9 sous-commandes, sur une forge qui garde le texte reçu ; puis, cherchée hors
     de cette liste, une forge qui le garde transformé (LF → CRLF : le premier appel sort alors en
-    1, relecture non conforme) — pour les sept qui écrivent un texte, un `DELETE` n'en a pas.
-    15 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
+    1, relecture non conforme) — pour les sept qui écrivent un texte, un label n'en a pas.
+    16 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
 
     - `issue-edit-append` — le bloc s'ajoutait une seconde fois ; corrigé : un corps qui finit
       déjà par le fichier n'est pas réécrit ;
@@ -891,16 +993,13 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     strict, pour la même raison, et la fuite y est une seconde issue ; de même pour
     `issue edit --body-file` et `brief write`, où elle réécrit le même texte. Le rejeu de
     `brief write` part d'un brief à éditer : après une publication, il rejoint le même cas — un
-    brief, égal au fichier.
+    brief, égal au fichier. `label --add` naît avec sa garde — un label déjà posé ne se repose
+    pas —, vue rouge garde retirée.
 
-    Les cases se relisent cochées, le label absent, le commentaire publié, l'issue créée, le
-    corps remplacé, le brief écrit : les 10 autres n'écrivent rien au rejeu.
+    Les cases se relisent cochées, le label absent ou posé, le commentaire publié, l'issue créée,
+    le corps remplacé, le brief écrit : les 11 autres n'écrivent rien au rejeu.
     """
-    forge = Forge(
-        {CORPS_42: {"body": "Corps\n- [ ] Critère A\n", "labels": [{"name": "ready-for-agent"}]}},
-        stocke=stocke or (lambda corps: corps),
-        pages=[[{"id": 13, "body": BRIEF}]],
-    )
+    forge = forge_temoin(stocke=stocke or (lambda corps: corps))
 
     assert lance(forge, *args) == premier
     assert len(ecritures(forge)) == 1, "le premier appel n'a pas écrit une seule fois"
@@ -909,6 +1008,62 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     assert lance(forge, *args) == 0
     assert len(ecritures(forge)) == 1, "le rejeu a écrit une seconde fois"
     assert "rien à écrire" in capsys.readouterr().out
+
+
+# Cliquet de la classe « l'identité de rejeu omet un champ que la sous-commande écrit » : un rejeu
+# ne dit « rien à écrire » qu'une fois **chaque** champ qu'il écrirait relu égal à l'attendu. Une
+# forme par champ écrit, seul resté à écrire : (appel, champs retouchés de la forge témoin, chemin
+# par chemin). Dénombré au lot 6a1 : `label` écrit les labels posés et les labels retirés — 2
+# champs, épinglés après son code, chacun vu rouge par mutation de sa garde.
+CHAMPS_RESTES_A_ECRIRE: dict[str, tuple[tuple[str, ...], dict[str, dict[str, Any]]]] = {
+    "label-pose": (TRANSITION, {CORPS_42: {"labels": []}}),
+    "label-retrait": (TRANSITION, {CORPS_42: etiquetee("needs-interrogation", "needs-triage")}),
+}
+
+
+@pytest.mark.parametrize(
+    ("args", "etat"), CHAMPS_RESTES_A_ECRIRE.values(), ids=CHAMPS_RESTES_A_ECRIRE.keys()
+)
+def test_un_rejeu_ne_dit_rien_a_ecrire_tant_qu_un_champ_ecrit_differe(
+    args: tuple[str, ...], etat: dict[str, dict[str, Any]], capsys: pytest.CaptureFixture[str]
+) -> None:
+    forge = forge_temoin()
+    for chemin, champs in etat.items():
+        forge.documents[chemin].update(champs)
+
+    lance(forge, *args)
+    assert "rien à écrire" not in capsys.readouterr().out
+
+
+# Ce que la relecture rend d'un état écrit, quand ce n'est pas ce qui est parti : (appel, chemin
+# relu, retouche du document relu, écart **exact** que la sortie en dit). Une retouche par champ
+# écrit.
+ETATS_RELUS_NON_CONFORMES: dict[str, tuple[tuple[str, ...], str, Callable[[Any], Any], str]] = {
+    "label-ajoute-absent": (
+        AJOUTE_LABEL,
+        CORPS_42,
+        lambda issue: {**issue, "labels": []},
+        "le label needs-info n'est pas sur #42",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("args", "chemin", "retouche", "ecart"),
+    ETATS_RELUS_NON_CONFORMES.values(),
+    ids=ETATS_RELUS_NON_CONFORMES.keys(),
+)
+def test_un_etat_relu_autre_que_l_etat_ecrit_sort_en_1_et_dit_l_ecart(
+    args: tuple[str, ...],
+    chemin: str,
+    retouche: Callable[[Any], Any],
+    ecart: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    run = relue_autrement(forge_temoin(), chemin, retouche)
+
+    assert ecriture_relue.main(list(args), run=run) == 1
+    assert capsys.readouterr().out == f"relecture non conforme — {ecart}\n"
 
 
 # Chaque champ que l'appelant saisit, balayé en une passe pour la présence et la forme : le numéro
@@ -928,6 +1083,9 @@ APPELS_MAL_FORMES = {
     "ancre-a-retour-chariot": ("checkbox", "patch", "42", "--case", "A\rB"),
     "label-manquant": ("label", "42"),
     "label-vide": ("label", "42", "--remove", ""),
+    "label-a-poser-vide": ("label", "42", "--add", " "),
+    "label-pose-et-retire": ("label", "42", "--add", "bug", "--remove", "Bug"),
+    "label-retire-deux-fois": ("label", "42", "--remove", "bug", "--remove", "bug"),
     "label-numero-non-entier": ("label", "#42", "--remove", "ready-for-agent"),
     "fichier-manquant": ("issue", "edit", "42"),
     "issue-numero-non-entier": ("issue", "edit", "4 2", "--append", "x.md"),
@@ -980,8 +1138,8 @@ def test_un_appel_mal_forme_sort_en_2_sans_toucher_a_la_forge(
 )
 @pytest.mark.parametrize(
     "args",
-    [COCHE_CORPS, PUBLIE_COMMENTAIRE, CREE_ISSUE, CREE_ISSUE_ETIQUETEE],
-    ids=["checkbox-patch", "comment", "issue-create", "issue-create-label"],
+    [COCHE_CORPS, PUBLIE_COMMENTAIRE, CREE_ISSUE, CREE_ISSUE_ETIQUETEE, AJOUTE_LABEL],
+    ids=["checkbox-patch", "comment", "issue-create", "issue-create-label", "label-add"],
 )
 @pytest.mark.usefixtures("ajout_md")
 def test_une_forge_en_panne_a_la_lecture_refuse_en_une_ligne(
@@ -1010,17 +1168,16 @@ def test_une_forge_en_panne_a_la_lecture_refuse_en_une_ligne(
         (RETIRE_LABEL, "DELETE"),
         (PUBLIE_COMMENTAIRE, "POST"),
         (CREE_ISSUE, "POST"),
+        (AJOUTE_LABEL, "POST"),
     ],
-    ids=["patch", "delete", "post", "post-issue"],
+    ids=["patch", "delete", "post", "post-issue", "post-label"],
 )
 @pytest.mark.usefixtures("ajout_md")
 def test_une_ecriture_en_panne_sort_en_1_sans_se_dire_refus(
     args: tuple[str, ...], methode: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """L'écriture a pu partir avant l'échec : « refus » ferait croire que rien n'est écrit."""
-    forge = Forge(
-        {CORPS_42: {"body": "- [ ] Critère A\n", "labels": [{"name": "ready-for-agent"}]}}
-    )
+    forge = forge_temoin()
 
     def forge_qui_tombe_a_l_ecriture(
         cmd: Sequence[str], stdin: bytes | None
@@ -1106,10 +1263,7 @@ def test_une_reponse_d_une_autre_forme_sort_en_1_en_une_ligne(
     ceux de lecture et la réponse d'une création en ont une seconde, de forme ou de type, les
     issues ouvertes une troisième, le numéro de l'issue identique — les relectures passent par les
     mêmes lecteurs que la lecture."""
-    forge = Forge(
-        {CORPS_42: {"body": "- [ ] Critère A\n", "labels": [{"name": "ready-for-agent"}]}},
-        pages=[[{"id": 13, "body": BRIEF}]],
-    )
+    forge = forge_temoin()
 
     def forge_d_une_autre_forme(
         cmd: Sequence[str], stdin: bytes | None
