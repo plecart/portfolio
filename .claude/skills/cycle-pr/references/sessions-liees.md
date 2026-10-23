@@ -150,6 +150,7 @@ signale un commit sur l'échafaudage —
 au mainteneur, jamais `-D` sans la porte. Une branche
 de PR mergée suit `pr-paralleles` Étape 8.
 
-La session qui archive un parent nettoie les enfants que son message de fin nomme (« Fin de
-travail »), à la place du parent : le message de fin d'un enfant à un parent archivé est supposé
-perdu, non mesuré.
+La session qui archive un parent nettoie, à la place du parent, les enfants que son message de fin
+nomme, chacun une fois son travail fini — son dernier message, lu par `list_events` (non mesuré),
+est une forme de « Fin de travail » —, jamais avant : le message de fin d'un enfant à un parent
+archivé est supposé perdu, non mesuré.

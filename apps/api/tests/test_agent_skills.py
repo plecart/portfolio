@@ -2856,12 +2856,29 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " message d'une session qui a démarré des enfants encore au travail"
         ),
     ),
+    # Relecture de la PR #153, relance, I5 : le suffixe ne nomme que des enfants encore au travail,
+    # et l'archiveur les nettoyait sans attendre leur fin. Dénombrement écrit avant le correctif
+    # (classe : un geste de nettoyage qui ne nomme pas sa condition de fin), « Nettoyage » de
+    # `sessions-liees.md` et ses renvois, `grep -rn "Nettoyage" .claude/skills` le 2026-10-23 :
+    # 13 lignes, **7** gestes ; **1** fuyait, l'archiveur ; **6** indemnes — `coordinatrice.md`
+    # (après le merge de la PR d'intégration), `session-relecture.md` et `cycle-pr` Étape 8 (boucle
+    # fermée), `pr-paralleles` Étape 8 (message de fin reçu), `repercussions` (par « Fin de
+    # travail ») et le parent de « Nettoyage », dont ces cinq renvois portent le quand. Hors classe :
+    # `pr-paralleles` 0 (n'archive pas), `get_session` de « Premier geste » (lecture), le suffixe
+    # (renvoi à l'archiveur).
     "6b-sessions-liees-l-archiveur-nettoie-les-enfants-nommes": (
         SESSIONS_LIEES_REF,
         (
-            "La session qui archive un parent nettoie les enfants que son message de fin nomme"
-            " (« Fin de travail »), à la place du parent : le message de fin d'un enfant à un parent"
-            " archivé est supposé perdu, non mesuré."
+            "La session qui archive un parent nettoie, à la place du parent, les enfants que son"
+            " message de fin nomme, chacun une fois son travail fini — son dernier message, lu par"
+            " `list_events` (non mesuré), est une forme de « Fin de travail »"
+        ),
+    ),
+    "6b-sessions-liees-l-archiveur-jamais-avant": (
+        SESSIONS_LIEES_REF,
+        (
+            "—, jamais avant : le message de fin d'un enfant à un parent archivé est supposé perdu,"
+            " non mesuré."
         ),
     ),
     # Relecture de la PR #153, passe 1, I1 : après un arrêt `contradiction`, la passe de l'issue
