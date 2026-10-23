@@ -42,7 +42,8 @@ class Forge:
     """Une forge témoin : des documents en mémoire, chacun sous son chemin `gh api`.
 
     Args:
-        documents: chemin → document JSON, tel que l'API REST le rend.
+        documents: chemin → document JSON, tel que l'API REST le rend ; un `PATCH` y écrit chaque
+            champ de sa charge.
         stocke: ce que la forge fait d'un corps reçu par `PATCH` avant de le garder — l'identité
             par défaut ; `None` vaut un corps effacé, que l'API rend `null`.
         pages: les commentaires de l'issue 42, page par page, tels que
@@ -102,7 +103,10 @@ class Forge:
                 chemin in self.documents and stdin is not None
             ):
                 self.charges.append(stdin)
-                self.documents[chemin]["body"] = self.stocke(json.loads(stdin)["body"])
+                charge = json.loads(stdin)
+                self.documents[chemin].update(charge)
+                if "body" in charge:
+                    self.documents[chemin]["body"] = self.stocke(charge["body"])
                 return json_success(self.documents[chemin])
             case ("gh", "api", "--paginate", "--slurp", chemin) if chemin in self.listes:
                 return json_success(self.listes[chemin])
@@ -876,6 +880,36 @@ def test_issue_create_sort_en_1_si_l_issue_relue_n_est_pas_celle_creee(
     assert capsys.readouterr().out == f"relecture non conforme — {ecart}\n"
 
 
+@pytest.mark.parametrize(
+    ("options", "raison"),
+    [((), "completed"), (("--reason", "not_planned"), "not_planned")],
+    ids=["completed-par-defaut", "not-planned"],
+)
+def test_issue_close_ferme_l_issue_avec_sa_raison_puis_relit_l_une_et_l_autre(
+    options: tuple[str, ...], raison: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    forge = Forge({CORPS_42: {"state": "open", "state_reason": None}})
+
+    assert lance(forge, "issue", "close", "42", *options) == 0
+    assert [json.loads(charge) for charge in forge.charges] == [
+        {"state": "closed", "state_reason": raison}
+    ]
+    assert forge.appels[-1] == ("gh", "api", CORPS_42), "la fermeture n'est pas relue"
+    assert capsys.readouterr().out == f"fermée et relue — #42 ({raison})\n"
+
+
+def test_issue_close_ne_reecrit_pas_une_fermeture_d_une_autre_raison(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """L'API REST ignore `state_reason` quand `state` ne change pas (« Update an issue ») : une
+    issue déjà fermée ne se referme pas sous une autre raison."""
+    forge = Forge({CORPS_42: {"state": "closed", "state_reason": "not_planned"}})
+
+    assert lance(forge, "issue", "close", "42") == 1
+    assert ecritures(forge) == []
+    assert "#42 déjà fermée (not_planned), pas en completed" in sortie_d_echec(capsys, "refus")
+
+
 @pytest.fixture
 def ajout_md(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Les fichiers `ajout.md` et `brief.md` que citent les appels nommés ci-dessous, dans un
@@ -886,10 +920,17 @@ def ajout_md(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def forge_temoin(**options: Any) -> Forge:
-    """La forge des tables partagées : l'issue 42 — un corps à une case, le label
+    """La forge des tables partagées : l'issue 42 — ouverte, un corps à une case, le label
     `ready-for-agent` —, son brief, et les labels du dépôt."""
     return Forge(
-        {CORPS_42: {"body": "Corps\n- [ ] Critère A\n", "labels": [{"name": "ready-for-agent"}]}},
+        {
+            CORPS_42: {
+                "body": "Corps\n- [ ] Critère A\n",
+                "labels": [{"name": "ready-for-agent"}],
+                "state": "open",
+                "state_reason": None,
+            }
+        },
         pages=[[{"id": 13, "body": BRIEF}]],
         labels_du_depot=[["ready-for-agent", "needs-info", "needs-interrogation"]],
         **options,
@@ -898,6 +939,7 @@ def forge_temoin(**options: Any) -> Forge:
 
 RETIRE_LABEL = ("label", "42", "--remove", "ready-for-agent")
 AJOUTE_LABEL = ("label", "42", "--add", "needs-info")
+FERME_ISSUE = ("issue", "close", "42")
 COCHE_CORPS = ("checkbox", "patch", "42", "--case", "Critère A")
 COCHE_BRIEF = ("brief", "patch", "42", "--case", "Critère A")
 AJOUTE_FICHIER = ("issue", "edit", "42", "--append", "ajout.md")
@@ -910,6 +952,7 @@ CREE_ISSUE_ETIQUETEE = (*CREE_ISSUE, "--label", "prd")
 REJEUX = [
     pytest.param(RETIRE_LABEL, None, 0, id="label-remove"),
     pytest.param(AJOUTE_LABEL, None, 0, id="label-add"),
+    pytest.param(FERME_ISSUE, None, 0, id="issue-close"),
     pytest.param(COCHE_CORPS, None, 0, id="checkbox-patch"),
     pytest.param(COCHE_BRIEF, None, 0, id="brief-patch"),
     pytest.param(AJOUTE_FICHIER, None, 0, id="issue-edit-append"),
@@ -972,10 +1015,10 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     appel écrit une fois ; le second sort en 0 sans **aucune** écriture, ni `PATCH`, ni `DELETE`,
     ni `POST`.
 
-    Population : les 9 sous-commandes, sur une forge qui garde le texte reçu ; puis, cherchée hors
+    Population : les 10 sous-commandes, sur une forge qui garde le texte reçu ; puis, cherchée hors
     de cette liste, une forge qui le garde transformé (LF → CRLF : le premier appel sort alors en
-    1, relecture non conforme) — pour les sept qui écrivent un texte, un label n'en a pas.
-    16 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
+    1, relecture non conforme) — pour les sept qui écrivent un texte, un label ou un état n'en a
+    pas. 17 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
 
     - `issue-edit-append` — le bloc s'ajoutait une seconde fois ; corrigé : un corps qui finit
       déjà par le fichier n'est pas réécrit ;
@@ -994,10 +1037,11 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     `issue edit --body-file` et `brief write`, où elle réécrit le même texte. Le rejeu de
     `brief write` part d'un brief à éditer : après une publication, il rejoint le même cas — un
     brief, égal au fichier. `label --add` naît avec sa garde — un label déjà posé ne se repose
-    pas —, vue rouge garde retirée.
+    pas —, `issue close` aussi — une issue déjà fermée avec cette raison ne se referme pas —,
+    chacune vue rouge garde retirée.
 
-    Les cases se relisent cochées, le label absent ou posé, le commentaire publié, l'issue créée,
-    le corps remplacé, le brief écrit : les 11 autres n'écrivent rien au rejeu.
+    Les cases se relisent cochées, le label absent ou posé, l'issue fermée, le commentaire publié,
+    l'issue créée, le corps remplacé, le brief écrit : les 12 autres n'écrivent rien au rejeu.
     """
     forge = forge_temoin(stocke=stocke or (lambda corps: corps))
 
@@ -1013,25 +1057,42 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
 # Cliquet de la classe « l'identité de rejeu omet un champ que la sous-commande écrit » : un rejeu
 # ne dit « rien à écrire » qu'une fois **chaque** champ qu'il écrirait relu égal à l'attendu. Une
 # forme par champ écrit, seul resté à écrire : (appel, champs retouchés de la forge témoin, chemin
-# par chemin). Dénombré au lot 6a1 : `label` écrit les labels posés et les labels retirés — 2
-# champs, épinglés après son code, chacun vu rouge par mutation de sa garde.
-CHAMPS_RESTES_A_ECRIRE: dict[str, tuple[tuple[str, ...], dict[str, dict[str, Any]]]] = {
-    "label-pose": (TRANSITION, {CORPS_42: {"labels": []}}),
-    "label-retrait": (TRANSITION, {CORPS_42: etiquetee("needs-interrogation", "needs-triage")}),
+# par chemin, sortie — 0 écrit, 1 refusé). Dénombré au lot 6a1 : `label` écrit les labels posés
+# et les labels retirés — 2 champs, épinglés après son code, chacun vu rouge par mutation de sa
+# garde ; `issue close`, l'état et la raison — 2 champs, épinglés avant son code. Une issue fermée
+# sous une autre raison est un refus, jamais « rien à écrire ».
+CHAMPS_RESTES_A_ECRIRE: dict[str, tuple[tuple[str, ...], dict[str, dict[str, Any]], int]] = {
+    "label-pose": (TRANSITION, {CORPS_42: {"labels": []}}, 0),
+    "label-retrait": (TRANSITION, {CORPS_42: etiquetee("needs-interrogation", "needs-triage")}, 0),
+    "issue-close-etat": (
+        FERME_ISSUE,
+        {CORPS_42: {"state": "open", "state_reason": "completed"}},
+        0,
+    ),
+    "issue-close-raison": (
+        FERME_ISSUE,
+        {CORPS_42: {"state": "closed", "state_reason": "not_planned"}},
+        1,
+    ),
 }
 
 
 @pytest.mark.parametrize(
-    ("args", "etat"), CHAMPS_RESTES_A_ECRIRE.values(), ids=CHAMPS_RESTES_A_ECRIRE.keys()
+    ("args", "etat", "sortie"),
+    CHAMPS_RESTES_A_ECRIRE.values(),
+    ids=CHAMPS_RESTES_A_ECRIRE.keys(),
 )
 def test_un_rejeu_ne_dit_rien_a_ecrire_tant_qu_un_champ_ecrit_differe(
-    args: tuple[str, ...], etat: dict[str, dict[str, Any]], capsys: pytest.CaptureFixture[str]
+    args: tuple[str, ...],
+    etat: dict[str, dict[str, Any]],
+    sortie: int,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     forge = forge_temoin()
     for chemin, champs in etat.items():
         forge.documents[chemin].update(champs)
 
-    lance(forge, *args)
+    assert lance(forge, *args) == sortie
     assert "rien à écrire" not in capsys.readouterr().out
 
 
@@ -1044,6 +1105,18 @@ ETATS_RELUS_NON_CONFORMES: dict[str, tuple[tuple[str, ...], str, Callable[[Any],
         CORPS_42,
         lambda issue: {**issue, "labels": []},
         "le label needs-info n'est pas sur #42",
+    ),
+    "issue-close-etat": (
+        FERME_ISSUE,
+        CORPS_42,
+        lambda issue: {**issue, "state": "open"},
+        "#42 relue open (completed), attendue closed (completed)",
+    ),
+    "issue-close-raison": (
+        FERME_ISSUE,
+        CORPS_42,
+        lambda issue: {**issue, "state_reason": None},
+        "#42 relue closed (None), attendue closed (completed)",
     ),
 }
 
@@ -1097,6 +1170,8 @@ APPELS_MAL_FORMES = {
     "creation-titre-vide": ("issue", "create", "--title", " ", "--body-file", "x.md"),
     "creation-titre-sur-deux-lignes": ("issue", "create", "--title", "A\nB", "--body-file", "x.md"),
     "creation-sans-fichier": ("issue", "create", "--title", "Titre"),
+    "fermeture-sans-numero": ("issue", "close"),
+    "fermeture-raison-inconnue": ("issue", "close", "42", "--reason", "duplicate"),
     "creation-label-vide": (
         "issue",
         "create",
@@ -1138,8 +1213,8 @@ def test_un_appel_mal_forme_sort_en_2_sans_toucher_a_la_forge(
 )
 @pytest.mark.parametrize(
     "args",
-    [COCHE_CORPS, PUBLIE_COMMENTAIRE, CREE_ISSUE, CREE_ISSUE_ETIQUETEE, AJOUTE_LABEL],
-    ids=["checkbox-patch", "comment", "issue-create", "issue-create-label", "label-add"],
+    [COCHE_CORPS, PUBLIE_COMMENTAIRE, CREE_ISSUE, CREE_ISSUE_ETIQUETEE, AJOUTE_LABEL, FERME_ISSUE],
+    ids=["checkbox-patch", "comment", "issue-create", "issue-create-label", "label-add", "close"],
 )
 @pytest.mark.usefixtures("ajout_md")
 def test_une_forge_en_panne_a_la_lecture_refuse_en_une_ligne(
@@ -1169,8 +1244,9 @@ def test_une_forge_en_panne_a_la_lecture_refuse_en_une_ligne(
         (PUBLIE_COMMENTAIRE, "POST"),
         (CREE_ISSUE, "POST"),
         (AJOUTE_LABEL, "POST"),
+        (FERME_ISSUE, "PATCH"),
     ],
-    ids=["patch", "delete", "post", "post-issue", "post-label"],
+    ids=["patch", "delete", "post", "post-issue", "post-label", "patch-fermeture"],
 )
 @pytest.mark.usefixtures("ajout_md")
 def test_une_ecriture_en_panne_sort_en_1_sans_se_dire_refus(
@@ -1224,9 +1300,12 @@ REPONSES_D_UNE_AUTRE_FORME: dict[str, tuple[tuple[str, ...], Any, str]] = {
     ),
     "issue-creee-sans-numero": (CREE_ISSUE, {"title": "Titre"}, "écriture"),
     "issue-creee-numero-booleen": (CREE_ISSUE, {"number": True}, "écriture"),
+    "etat-lu-absent": (FERME_ISSUE, {"body": ""}, "lecture"),
+    "raison-lue-non-textuelle": (FERME_ISSUE, {"state": "closed", "state_reason": 5}, "lecture"),
     "corps-relu-sans-body": (COCHE_CORPS, {"message": "Not Found"}, "relecture"),
     "labels-relus-absents": (RETIRE_LABEL, {"message": "Not Found"}, "relecture"),
     "commentaire-relu-sans-body": (PUBLIE_COMMENTAIRE, {"message": "Not Found"}, "relecture"),
+    "etat-relu-absent": (FERME_ISSUE, {"message": "Not Found"}, "relecture"),
     "issue-relue-sans-titre": (
         CREE_ISSUE,
         {"number": 901, "body": "*Rattachement.*\n", "labels": []},
@@ -1259,7 +1338,9 @@ def test_une_reponse_d_une_autre_forme_sort_en_1_en_une_ligne(
     chemin de la relecture, le commentaire relu — 9 sites. Le lot 6a1 en ajoute 4, ceux
     d'`issue create`, gardés dès l'écriture : les labels du dépôt, les issues ouvertes, dont le
     numéro de l'issue identique entre dans la ligne de sortie, la réponse de la création, dont le
-    numéro entre dans le chemin de la relecture, l'issue relue — 13 sites. Chaque site a sa ligne ;
+    numéro entre dans le chemin de la relecture, l'issue relue — 13 sites ; puis 2, ceux
+    d'`issue close`, gardés dès l'écriture : l'état et la raison lus, puis relus — 15 sites, la
+    réponse de la fermeture n'étant pas lue. Chaque site a sa ligne ;
     ceux de lecture et la réponse d'une création en ont une seconde, de forme ou de type, les
     issues ouvertes une troisième, le numéro de l'issue identique — les relectures passent par les
     mêmes lecteurs que la lecture."""
