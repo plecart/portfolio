@@ -1159,35 +1159,45 @@ REJEUX = [
         crlf,
         1,
         id="issue-edit-append-forge-crlf",
-        marks=pytest.mark.xfail(strict=True, reason="fin de corps comparée à l'identique"),
+        marks=pytest.mark.xfail(
+            strict=True, raises=AssertionError, reason="fin de corps comparée à l'identique"
+        ),
     ),
     pytest.param(
         PUBLIE_COMMENTAIRE,
         crlf,
         1,
         id="comment-forge-crlf",
-        marks=pytest.mark.xfail(strict=True, reason="corps comparé à l'identique"),
+        marks=pytest.mark.xfail(
+            strict=True, raises=AssertionError, reason="corps comparé à l'identique"
+        ),
     ),
     pytest.param(
         CREE_ISSUE,
         crlf,
         1,
         id="issue-create-forge-crlf",
-        marks=pytest.mark.xfail(strict=True, reason="corps comparé à l'identique"),
+        marks=pytest.mark.xfail(
+            strict=True, raises=AssertionError, reason="corps comparé à l'identique"
+        ),
     ),
     pytest.param(
         REMPLACE_CORPS,
         crlf,
         1,
         id="issue-edit-body-file-forge-crlf",
-        marks=pytest.mark.xfail(strict=True, reason="corps comparé à l'identique"),
+        marks=pytest.mark.xfail(
+            strict=True, raises=AssertionError, reason="corps comparé à l'identique"
+        ),
     ),
     pytest.param(
         ECRIT_BRIEF,
         crlf,
         1,
         id="brief-write-forge-crlf",
-        marks=pytest.mark.xfail(strict=True, reason="corps comparé à l'identique"),
+        marks=pytest.mark.xfail(
+            strict=True, raises=AssertionError, reason="corps comparé à l'identique"
+        ),
     ),
 ]
 
@@ -1337,6 +1347,7 @@ FUITES_ASSUMEES = {
         1,
         marks=pytest.mark.xfail(
             strict=True,
+            raises=AssertionError,
             reason="la description d'un thème trouvé ne se relit pas : elle a pu évoluer",
         ),
     ),
