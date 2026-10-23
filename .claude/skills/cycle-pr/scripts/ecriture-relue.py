@@ -696,8 +696,9 @@ def repo_labels(run: Run, wanted: Sequence[str]) -> list[str]:
 
 
 def same_issue(pages: Any, title: str, body: str) -> tuple[int, list[str]] | None:
-    """Le numéro et les labels de la première issue — pas une PR, que son champ `pull_request`
-    distingue — qui porte exactement `title` et `body`, sur les pages que `read_pages` rend.
+    """Le numéro et les labels de la première issue — pas une PR, que sa clé `pull_request`
+    distingue (« List repository issues ») ; une clé `null` n'en fait pas une — qui porte
+    exactement `title` et `body`, sur les pages que `read_pages` rend.
 
     Raises:
         KeyError, TypeError: une issue sans titre textuel ou sans corps textuel ni `null`, ou
@@ -708,7 +709,7 @@ def same_issue(pages: Any, title: str, body: str) -> tuple[int, list[str]] | Non
             (typed(issue, "number", int), label_names(issue))
             for page in pages
             for issue in page
-            if "pull_request" not in issue
+            if ("pull_request" not in issue or issue["pull_request"] is None)
             and typed(issue, "title", str) == title
             and body_of(issue) == body
         ),

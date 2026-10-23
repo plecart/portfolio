@@ -837,16 +837,21 @@ def test_issue_create_refuse_un_label_inconnu_du_depot_sans_rien_ecrire(
     )
 
 
+@pytest.mark.parametrize(
+    "pr", [{}, {"pull_request": None}], ids=["sans-pull-request", "pull-request-nul"]
+)
 def test_issue_create_ne_cree_rien_quand_une_issue_ouverte_porte_deja_ce_titre_et_ce_corps(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    pr: dict[str, Any], tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """L'issue identique, sur la seconde page, est nommée sur la ligne de sortie. Sans `--label`,
-    les labels du dépôt ne se lisent pas : la lecture des issues ouvertes est le seul appel."""
+    les labels du dépôt ne se lisent pas : la lecture des issues ouvertes est le seul appel. Une
+    issue se distingue d'une PR par l'absence de sa clé `pull_request` (« List repository
+    issues ») ; une clé `null` n'en fait pas une PR."""
     forge = Forge(
         {},
         issues=[
             [{"number": 5, "title": "Autre titre", "body": PROBLEME, "labels": []}],
-            [{"number": 7, "title": "Titre", "body": PROBLEME, "labels": []}],
+            [{"number": 7, "title": "Titre", "body": PROBLEME, "labels": [], **pr}],
         ],
     )
 
