@@ -949,10 +949,9 @@ Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur 
 > corps de l'issue n'est volontairement pas modifié tant que la PR est ouverte). L'instrument qui
 > publie un tel commentaire puis le relit en entier est
 > `python <répertoire de ce skill>/scripts/ecriture-relue.py comment <n> --body-file <fichier>`
-> (Étape 8) ; `repercussions` le prescrit au lot 6b de #134 — d'ici là, son étape 5, « Issues en
-> vol », ne nomme aucune commande. Un signalement **bloquant** se traite comme tel :
-> intégrer la correction dans cette PR, ou remonter au mainteneur si cela déplace le périmètre —
-> ne jamais merger par-dessus.
+> (Étape 8) ; `repercussions` le prescrit à son étape 5, « Issues en vol ». Un signalement
+> **bloquant** se traite comme tel : intégrer la correction dans cette PR, ou remonter au
+> mainteneur si cela déplace le périmètre — ne jamais merger par-dessus.
 
 ## Étape 7 — Avant le merge
 

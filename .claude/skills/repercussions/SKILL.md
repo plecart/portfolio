@@ -1,7 +1,7 @@
 ---
 name: repercussions
 description: À la clôture d'une issue (PR mergée), corrige la planification des autres issues ouvertes que cette clôture a rendues fausses — hypothèses caduques, contrats déplacés, périmètres déjà couverts, ordres de dépendance. Le livrable est une édition de la spec des issues impactées — corps et brief d'agent — jamais un commentaire. À utiliser juste après un merge qui ferme une issue, ou « vérifie l'impact de cette issue sur les autres ».
-argument-hint: "[#issue fermée]"
+argument-hint: "[#issue fermée | #PR d'amendement]"
 ---
 
 # Répercussions
@@ -24,7 +24,7 @@ C'est la règle qui structure tout le reste.
   corps en laissant le brief intact a le même effet : le contrat qu'on exécute reste faux.
 - **Ce skill ne commente jamais une issue.** La trace du *pourquoi* tient en une ligne dans le
   « Journal de spec » du corps ; l'historique d'édition GitHub garde le détail ; le récapitulatif
-  complet reste dans la conversation, pour le mainteneur.
+  complet va au mainteneur, à l'étape 6.
 - **Pas d'édition formulable = pas de répercussion.** S'il n'y a rien à corriger dans le corps
   d'une issue, il n'y a rien à signaler à son sujet. On se tait. Il n'existe **pas** de catégorie
   « pour information ».
@@ -34,6 +34,32 @@ C'est la règle qui structure tout le reste.
 
 **Règle d'or** : ce skill **propose**, il n'écrit jamais en silence. Aucune édition sans **« go »
 explicite** du mainteneur.
+
+## Délégation
+
+La session garde le jugement : le delta réel et ses ancres, la confrontation et ses deux
+citations, les diffs présentés, le go demandé au mainteneur. Le reste change de main :
+
+- **`releveur`** — la collecte (« Collectes ») : la PR mergée et ses fichiers, `git log`, les
+  issues du thème, les matchs d'ancre, les PR ouvertes, le compte d'issues ouvertes d'un
+  milestone ; les lectures bornées (« Lectures bornées ») : le corps des issues examinées et leurs
+  commentaires filtrés par les ancres données, le brief en entier, `PR-PARALLELES.md`, l'état
+  d'avant (`git show <base>:<fichier>`), les passages des sources de vérité autour des ancres. Ce
+  qui compte reste à la session ;
+- **script** — toute écriture sur une issue ou une PR, par sa sous-commande de
+  `.claude/skills/cycle-pr/scripts/ecriture-relue.py`, appelée par la session elle-même : un geste
+  isolé coûte plus délégué (`CLAUDE.md`, « Orchestration ») — le corps
+  (`issue edit <n> --body-file`), le brief (`brief write <n> --body-file`), le signalement sur une
+  PR en vol (`comment <PR> --body-file`), le retour en `needs-interrogation` (`label`), la
+  fermeture en doublon (`issue close`) ;
+- **sessions distinctes** — `contradiction` (étape 1), `plan-qa` (étape 7), `bug-vers-issue` ou
+  `vers-issues` pour un brouillon (« Ce que ce skill ne fait pas »), chacune démarrée dans le tour
+  du mainteneur qui l'accepte, hors de ce tour par une carte de proposition ; `<N>`, dans leur nom,
+  est l'issue fermée ou la PR d'amendement ; protocole commun :
+  `.claude/skills/cycle-pr/references/sessions-liees.md`. Une session que celle-ci démarre reçoit
+  son propre worktree, `use_worktree: true` : `repercussions` tourne dans la session PR, dont le
+  worktree est retiré après le merge, et une session démarrée dans ce dossier y vivrait et serait
+  archivée avec elle (description de `start_session`, lue le 2026-10-23).
 
 ## Document de référence
 
@@ -48,11 +74,16 @@ Sans argument, l'issue est la dernière fermée par un merge sur la branche trun
 `.claude/pipeline.config.md`) — `gh` trie les PR par date de création, d'où le tri explicite :
 `gh pr list --state merged --base <trunk> --limit 30 --json number,mergedAt,closingIssuesReferences --jq 'map(select(.closingIssuesReferences != [])) | sort_by(.mergedAt) | last'`.
 
+Avec une PR d'amendement — une PR mergée qui amende une source de vérité sans fermer d'issue,
+ouverte par `contradiction` —, le delta réel est l'amendement. Les étapes 2 à 6 s'appliquent ;
+l'étape 7 est sans objet, aucun thème ne s'étant vidé ; la ligne de journal cite l'amendement, pas
+une issue fermée (« Réconciliée avec l'amendement du cadrage §9.3, PR #<m>, du 26 août 2026 »).
+
 Écrire un résumé court de **ce que cette clôture a réellement changé** — pas ce que l'issue
-promettait, ce qui a été *fait*. Sources : le **diff mergé**
-(`gh pr view <n> --json files,title,body`, `git log`), les **décisions actées** pendant le
-développement (scope resserré ou élargi, hypothèse tranchée, format figé, edge case décidé), et les
-**follow-ups différés** notés dans la PR.
+promettait, ce qui a été *fait*. Sources, qu'un `releveur` rend : le **diff mergé**
+(`gh pr view <n> --json files,title,body`, `git log`), puis, dans le body de la PR, les
+**décisions actées** pendant le développement (scope resserré ou élargi, hypothèse tranchée,
+format figé, edge case décidé) et les **follow-ups différés**.
 
 Restituer sous `## 📦 Delta réel` : des faits courts et vérifiables.
 
@@ -74,27 +105,35 @@ Les issues sont le **dernier rang** de la table « Sources de vérité » de
 **§ d'un document de référence** — sinon on aligne les issues sur une doc qui est elle-même à
 amender, et la cascade se fait dans le mauvais sens.
 
-C'est un `grep` des ancres sur les fichiers des rangs supérieurs, rien de plus. Même seuil que pour les
-issues : **deux citations ou rien** — la ligne exacte du §, et le fait du delta qui la falsifie. Un
-document **muet** sur le point (le cadrage décrit le serveur, le delta touche le poste de dev) n'est
-pas contredit.
+C'est un `grep` des ancres sur les fichiers des rangs supérieurs, rien de plus : un `releveur` le
+passe et rend les passages autour des ancres ; le verdict reste à la session. Même seuil que pour
+les issues : **deux citations ou rien** — la ligne exacte du §, et le fait du delta qui la
+falsifie. Un document **muet** sur le point (le cadrage décrit le serveur, le delta touche le poste
+de dev) n'est pas contredit.
 
-Une contradiction avérée → **s'arrêter avant l'étape 2** et invoquer `contradiction` : c'est lui
-qui amende le §, puis rappelle `repercussions` avec l'amendement comme delta. Ce skill **n'amende
-jamais un document lui-même**. Une contradiction déjà portée par une issue ouverte — l'échappatoire
-de `decisions-vs-doc` — est déjà tracée : ne pas la signaler une seconde fois.
+Une contradiction avérée → **s'arrêter avant l'étape 2** et présenter l'arrêt de
+`.claude/rules/decisions-vs-doc.md` (bloc `## ⚠️ Contradiction`). Dans le tour où le mainteneur
+l'accepte, démarrer la session `contradiction` : `start_session`, `initiation: user_asked`,
+`context: fresh`, `use_worktree: true`, `name: contradiction-<N>`, prompt `/contradiction` suivi
+du bloc d'arrêt — ses deux citations ; hors d'un tour du mainteneur, une carte de proposition
+(`initiation: own_initiative`, `use_worktree: true`). C'est elle qui amende le § par une PR, puis
+démarre `repercussions` sur cette PR une fois mergée (« PR d'amendement », ci-dessus). Ce skill
+**n'amende jamais un document lui-même**. Une contradiction déjà portée par une issue ouverte —
+l'échappatoire de `decisions-vs-doc` — est déjà tracée : ne pas la signaler une seconde fois.
 
 ### 2. Sélectionner les issues à examiner
 
-Sur le dépôt de `.claude/pipeline.config.md` :
+Sur le dépôt de `.claude/pipeline.config.md`, un `releveur` rend les trois sélections
+(« Collectes », « Lectures bornées ») :
 
 1. **Même thème** — `gh issue list --state open --milestone "<thème de l'issue fermée>"`.
 2. **Match d'ancre** — pour chaque ancre : `gh issue list --state open --search "<ancre>"`.
 3. **Match d'ancre dans les briefs** — la recherche GitHub ne fouille que le corps ; le brief
    d'agent est un **commentaire**, invisible pour elle. Pour chaque issue ouverte qui porte un brief
-   (au minimum les `ready-for-agent`), récupérer les commentaires
-   (`gh issue view <n> --json comments --jq '.comments[].body'`) et y chercher les mêmes ancres —
-   une réconciliation qui ne vit que dans un brief conclurait sinon « aucune » à tort.
+   (au minimum les `ready-for-agent`), le `releveur` rend ses commentaires
+   (`gh issue view <n> --json comments --jq '.comments[].body'`) filtrés par les mêmes ancres, le
+   brief en entier — une réconciliation qui ne vit que dans un brief conclurait sinon « aucune » à
+   tort.
 
 L'union des trois constitue le périmètre d'examen. **Le reste du backlog n'est pas examiné.**
 
@@ -112,7 +151,7 @@ risque. Une issue **en vol** est en cours de développement : une session a **d�
 son briefing pré-PR et ne le relira pas. Réécrire sa spec sous elle ne la préviendrait de rien —
 c'est le pire des cas, elle continuerait sur une spec périmée en croyant être à jour.
 
-Repérer les issues en vol avant toute chose :
+Repérer les issues en vol avant toute chose — un `releveur` rend la liste :
 
 ```bash
 # PR ouvertes, drafts comprises, et ce qu'elles ferment ("Closes #N" / "Fixes #N" / "Resolves #N")
@@ -128,9 +167,10 @@ autant que les autres : c'est même leur seule raison d'exister ici.
 une PR découpée en lots ne porte `Closes` que sur son **dernier** lot, et ce marqueur est ce qui
 signale l'issue en vol pendant les lots précédents.
 
-Lire aussi le tableau de bord **`PR-PARALLELES.md`** s'il existe — hors dépôt, dans le dossier du
-projet qui porte `skill-observations/` (`pr-paralleles`, étape 4) : toute ligne qui n'est pas
-`⚪ worktree nettoyé` désigne une issue en vol. Il sert de filet si une session a sauté l'Étape 2.
+Le `releveur` rend aussi le tableau de bord **`PR-PARALLELES.md`** s'il existe — hors dépôt, dans
+le dossier du projet qui porte `skill-observations/` (`pr-paralleles`, étape 4) : toute ligne qui
+n'est pas `⚪ worktree nettoyé` désigne une issue en vol. Il sert de filet si une session a sauté
+l'Étape 2.
 
 Classer chaque issue impactée **dormante** ou **en vol**. Le traitement diffère radicalement
 (étape 5) — dans le doute, considérer l'issue en vol : prévenir à tort coûte un commentaire, éditer
@@ -138,9 +178,10 @@ Classer chaque issue impactée **dormante** ou **en vol**. Le traitement diffèr
 
 ### 3. Confronter — deux citations obligatoires
 
-Pour chaque issue examinée, lire corps + brief d'agent, et chercher ce qui est devenu **faux**. La
-confrontation porte sur les **deux supports** : une ligne fausse du brief est une répercussion au
-même titre qu'une ligne fausse du corps — et la même affirmation fausse vit souvent dans les deux.
+Pour chaque issue examinée, lire corps + brief d'agent, que le `releveur` rend, et chercher ce qui
+est devenu **faux**. La confrontation porte sur les **deux supports** : une ligne fausse du brief
+est une répercussion au même titre qu'une ligne fausse du corps — et la même affirmation fausse
+vit souvent dans les deux.
 
 Une répercussion n'est retenue que si l'on peut produire **les deux citations**, la première
 nommant son support :
@@ -155,11 +196,12 @@ Citation delta : « <le fait exact du delta réel qui la falsifie> »
 exactement ce qui noie le rapport et rend indécidable ce qui est vrai.
 
 **Troisième condition — la causalité.** La ligne citée de l'issue doit avoir été **vraie juste
-avant le merge** : relire l'état d'avant (`git show <base>:<fichier>`, corps de la PR) et vérifier
-que c'est bien **ce** delta qui la falsifie. « X est faux » et « ce changement a rendu X faux »
-sont deux affirmations différentes, et seule la seconde est une répercussion. Une tension
-préexistante appartient à la clôture qui l'a introduite, ou à personne — l'attribuer au merge
-courant fait perdre au mainteneur le seul repère qui rend le rapport actionnable.
+avant le merge** : relire l'état d'avant, que le `releveur` rend (`git show <base>:<fichier>`,
+corps de la PR), et vérifier que c'est bien **ce** delta qui la falsifie. « X est faux » et « ce
+changement a rendu X faux » sont deux affirmations différentes, et seule la seconde est une
+répercussion. Une tension préexistante appartient à la clôture qui l'a introduite, ou à personne —
+l'attribuer au merge courant fait perdre au mainteneur le seul repère qui rend le rapport
+actionnable.
 
 Deux niveaux, et deux seulement :
 
@@ -204,28 +246,32 @@ Après le « go » (global, ou issue par issue si le mainteneur préfère trier)
 
 #### Issues dormantes → éditer la spec, sur ses deux supports
 
-**Éditer le corps** de chaque issue retenue, en appliquant exactement le diff présenté. Ne jamais
-profiter de l'édition pour reformuler autre chose.
+**Éditer le corps** de chaque issue retenue par `issue edit <n> --body-file <fichier>` : le corps
+courant relu en octets (`gh api repos/{owner}/{repo}/issues/<n> --jq .body`, sans le LF final que
+`--jq` ajoute), exactement le diff présenté appliqué **par remplacements ancrés en mémoire** sur ce
+texte, puis le tout écrit tel quel dans le fichier — ses fins de ligne gardées : le script relit
+contre ce fichier et ne voit pas une conversion (obs 87, 106). La ligne de journal (« Transitions
+et fermetures ») part dans le même fichier, et l'appel attend les deux contrôles ci-dessous. Ne
+jamais profiter de l'édition pour reformuler autre chose.
 
-**Amender le brief d'agent dans le même geste** quand la ligne fausse y figure aussi : édition en
-place du commentaire de brief (`gh api -X PATCH repos/<owner>/<repo>/issues/comments/<id>
---field body=@fichier` — l'id vient de `gh api repos/<owner>/<repo>/issues/<n>/comments`), jamais
-un second commentaire qui laisserait deux briefs concurrents. Écrire le drapeau **en forme longue** :
-son raccourci `-F` a un jumeau `-f` qui prend la valeur pour une chaîne littérale — la forme
-destructrice que `contraintes.md`, « Écritures sur un artefact distant », décrit. Le journal de
-spec vit dans le corps, mais le contrat que `cycle-pr` exécute est le brief : un correctif appliqué
-au seul corps laisse le contrat faux.
+**Amender le brief d'agent dans le même geste** quand la ligne fausse y figure aussi, par
+`brief write <n> --body-file <fichier>`, qui édite en place le seul brief, jamais un second brief
+concurrent : même lecture en octets, du commentaire qui s'ouvre par `## Brief d'agent`, relu par
+`gh api --paginate repos/{owner}/{repo}/issues/<n>/comments` — sans `--paginate`, la première page
+seule, 30 commentaires. Le journal de spec vit dans le corps, mais le contrat que `cycle-pr`
+exécute est le brief : un correctif appliqué au seul corps laisse le contrat faux.
 
-**Vérification avant de clore la passe** sur une issue portant un brief : re-télécharger le brief
-republié et y chercher chaque « citation issue » marquée `brief` — **zéro occurrence attendue** —
-puis la relecture après écriture de `contraintes.md` (ancre du contenu voulu présente, longueur
-plausible) : un brief vidé passe le contrôle des citations haut la main. Une citation encore
-présente signale un support oublié, pas une passe terminée.
+**Vérification avant de clore la passe** sur une issue portant un brief : avant l'appel, chercher
+dans le fichier chaque « citation issue » marquée `brief` — **zéro occurrence attendue** — et
+l'ancre du contenu voulu — **présente** : un fichier vidé passe le contrôle des citations haut la
+main. Le script relit ensuite la forge en entier contre ce fichier. Une citation encore présente
+signale un support oublié, pas une passe terminée.
 
-**Relire le corps — et le brief — juste avant d'écrire.** S'ils ont changé depuis la présentation
-du diff — une autre passe de répercussions a pu passer entre-temps, ou le mainteneur a édité — ne
-pas écrire par-dessus : re-présenter le diff recalculé. Deux merges rapprochés font tourner deux
-passes qui peuvent viser la même issue.
+**Relire le corps — et le brief — juste avant d'écrire** : c'est la lecture en octets ci-dessus,
+faite au moment d'écrire. S'ils ont changé depuis la présentation du diff — une autre passe de
+répercussions a pu passer entre-temps, ou le mainteneur a édité — ne pas écrire par-dessus :
+re-présenter le diff recalculé. Deux merges rapprochés font tourner deux passes qui peuvent viser
+la même issue.
 
 #### Issues en vol → signaler sur la PR, ne rien éditer
 
@@ -233,9 +279,10 @@ Pour une issue en vol, **le corps et le brief restent intacts** et **aucun label
 session qui la développe les a déjà lus ; les modifier ne l'atteindrait pas, et la repasser en
 `needs-interrogation` alors qu'une PR est ouverte n'a pas de sens.
 
-Le signalement va **en commentaire sur la PR ouverte** — c'est la seule sortie GitHub commentée de
-ce skill, et elle est justifiée : `cycle-pr` traite déjà les commentaires de PR à son Étape 6, en
-bouclant jusqu'à review vide. Le message atterrit donc exactement là où la session le lira.
+Le signalement va **en commentaire sur la PR ouverte**, par `comment <PR> --body-file <fichier>`,
+que le script relit en entier — c'est la seule sortie GitHub commentée de ce skill, et elle est
+justifiée : `cycle-pr` traite déjà les commentaires de PR à son Étape 6, en bouclant jusqu'à
+review vide. Le message atterrit donc exactement là où la session le lira.
 
 ```markdown
 > *Généré par IA — répercussion de la clôture de #47.*
@@ -267,18 +314,23 @@ Une ligne par issue fermée réconciliée. C'est la **clé d'idempotence** de l'
 cinq lignes, compacter les plus anciennes en une seule (« Réconciliée avec #12, #19, #23 »).
 
 **Repasser en `needs-interrogation`** toute issue `ready-for-agent` ou `ready-for-human` dont
-l'édition touche le **périmètre** ou une **décision verrouillée** : son interrogatoire portait sur
-une spec qui n'existe plus, il doit être refait. Une simple mise à jour de référence ne déclenche
-pas ce retour en arrière.
+l'édition touche le **périmètre** ou une **décision verrouillée**, par
+`label <n> --add needs-interrogation --remove <ready-for-agent | ready-for-human>` (labels réels :
+mapping de `.claude/pipeline.config.md`) : son interrogatoire portait sur une spec qui n'existe
+plus, il doit être refait. Une simple mise à jour de référence ne déclenche pas ce retour en
+arrière.
 
 **Fermer en doublon** — seul cas où ce skill ferme quelque chose. Exige un recouvrement **total et
 non ambigu**, et un **« go » nommément sur cette issue** (un « go » global ne suffit pas à fermer).
-Recouvrement partiel → on réduit le périmètre dans le corps, on ne ferme pas.
+D'abord la ligne de journal « Fermée en doublon de #<M> après #<fermée> », dans le corps
+(`issue edit --body-file`) — le skill ne commente jamais une issue —, puis
+`issue close <n> --reason not_planned`. Recouvrement partiel → on réduit le périmètre dans le
+corps, on ne ferme pas.
 
 Au moindre cas ambigu — re-découpage non trivial, conflit de conception, fermeture incertaine —
 **ne pas trancher seul** : le poser au mainteneur et laisser l'issue intacte.
 
-### 6. Récapituler dans la conversation
+### 6. Récapituler au mainteneur
 
 **En tête : les signalements bloquants sur issues en vol** — sessions qui développent contre une
 spec devenue fausse, avec la recommandation (poursuivre en intégrant la correction, ou mettre en
@@ -287,9 +339,15 @@ pause). C'est la seule information de ce rapport qui est urgente.
 Puis : ce qui a été édité, ce qui est repassé en `needs-interrogation`, ce qui a été fermé, les
 points laissés à l'arbitrage, et le nombre d'issues non examinées.
 
+**Session démarrée par une autre** — une session `contradiction` (son prompt système nomme le
+parent, `.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») : le récapitulatif
+fait, prévenir le parent par le message de fin de la même référence (« Fin de travail ») — la fin
+du tour ne le prévient pas.
+
 ### 7. Le thème est-il terminé ? — proposer la campagne de QA
 
-L'issue fermée appartenait à un **thème** (milestone). Vérifier s'il en reste des issues ouvertes :
+L'issue fermée appartenait à un **thème** (milestone). Vérifier s'il en reste des issues ouvertes —
+un `releveur` rend la liste :
 
 ```bash
 gh issue list --state open --milestone "<thème de l'issue fermée>" --json number
@@ -308,9 +366,12 @@ Conditions pour proposer :
   `.claude/pipeline.config.md`). Un thème purement interne — refacto, outillage, dette — n'a rien à
   faire recetter à la main : ne rien proposer.
 
-**Proposer, jamais lancer.** Et ne proposer qu'une fois par thème : si le milestone porte déjà une
-issue `qa-plan`, se taire. Une proposition qu'on décline neuf fois sur dix devient un bruit qu'on
-apprend à ignorer — c'est précisément ce qu'on cherche à éviter en ne la déclenchant qu'ici.
+**Proposer, puis démarrer sur accord.** La proposition reste une question au mainteneur ; sur son
+accord, dans ce tour, démarrer la session : `start_session`, `initiation: user_asked`,
+`context: fresh`, `use_worktree: true`, `name: plan-qa-<thème>`, prompt `/plan-qa "<thème>"`. Et
+ne proposer qu'une fois par thème : si le milestone porte déjà une issue `qa-plan`, se taire. Une
+proposition qu'on décline neuf fois sur dix devient un bruit qu'on apprend à ignorer — c'est
+précisément ce qu'on cherche à éviter en ne la déclenchant qu'ici.
 
 ## Ce que ce skill ne fait pas
 
@@ -321,11 +382,22 @@ apprend à ignorer — c'est précisément ce qu'on cherche à éviter en ne la 
   répercussion, c'est du travail neuf — et il suit `.claude/rules/contraintes.md`,
   « Création d'issues en cours de cycle ». Si une issue ouverte possède le sujet, ce skill y
   **ajoute le critère dans la même passe** — bloc marqué `[complétion]` à l'étape 4, appliqué sur
-  le même « go », ligne de journal « Complétée après #<fermée> — <le vide, d'où il vient> ».
-  Sinon, brouillon `vers-issues` / `bug-vers-issue` soumis au mainteneur. Le vide relevé par une
+  le même « go » par `issue edit --body-file` (et `brief write` si le brief porte les critères),
+  ligne de journal « Complétée après #<fermée> — <le vide, d'où il vient> ». Sinon, un brouillon
+  dans sa propre session, démarrée dans le tour où le mainteneur l'accepte — `start_session`,
+  `initiation: user_asked`, `context: fresh`, `use_worktree: true` : pour un défaut,
+  `bug-vers-issue` avec la description en argument (`name: bug-<N>`, prompt
+  `/bug-vers-issue <description>`) ; pour du travail neuf, `vers-issues` sur un fichier de plan
+  que la session écrit hors du dépôt, `plans/<date>-<issue fermée>.md` dans le dossier voisin du
+  journal d'observations (chemin dans `CLAUDE.md`), les deux citations du vide dedans
+  (`name: vers-issues-<N>`, prompt `/vers-issues <chemin>`). La session de brouillon le montre au
+  mainteneur, qui décide (`.claude/rules/contraintes.md`, « Création d'issues en cours de cycle »,
+  barreau 3). Hors du dépôt, parce que `vers-issues` exige une source écrite en argument et qu'un
+  fichier non suivi dans le worktree de la session PR salirait son arbre. Le vide relevé par une
   clôture a presque toujours un propriétaire ouvert.
 - **Il ne re-trie pas.** La seule transition d'état qu'il applique est le retour en
-  `needs-interrogation` décrit ci-dessus ; tout autre changement d'état passe par `triage`.
+  `needs-interrogation` décrit ci-dessus, par `label` (« Délégation ») ; tout autre changement
+  d'état passe par `triage`.
 - **Il ne relit pas le code.** Il confronte des specs à un delta, il n'audite pas la codebase.
 - **Il n'amende aucun document de référence.** Il détecte qu'un § est falsifié (étape 1) et passe
   la main à `contradiction`, seul à écrire dans les documents de référence.
