@@ -60,11 +60,8 @@ citations, les diffs présentés, le go demandé au mainteneur. Le reste change 
   son propre worktree, `use_worktree: true` : `repercussions` tourne dans la session PR, dont le
   worktree est retiré après le merge, et une session démarrée dans ce dossier y vivrait et serait
   archivée avec elle (description de `start_session`, lue le 2026-10-23). Ces sessions sont les
-  enfants de la session qui les démarre, qui les nettoie à leur message « terminé »
-  (`sessions-liees.md`, « Nettoyage ») ; tant qu'un enfant travaille, le message de clôture de
-  cette session le nomme par son identifiant `local_…`, et la session qui l'archive — lead,
-  coordinatrice ou mainteneur — nettoie à sa place : le message « terminé » d'un enfant à un parent
-  archivé est supposé perdu, non mesuré.
+  enfants de la session qui les démarre, nettoyées au protocole de `sessions-liees.md`
+  (« Nettoyage », « Fin de travail »).
 
 ## Document de référence
 

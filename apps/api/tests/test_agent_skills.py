@@ -2832,15 +2832,36 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # `repercussions` démarre. Dénombrement (classe : une session démarrée dont le nettoyage n'a
     # pas de porteur nommé), sites de démarrage de `repercussions/SKILL.md` : **4**
     # (`contradiction` et sa carte, `plan-qa`, brouillons) ; **4** fuyaient ; une phrase les couvre.
+    # Passe 2, I4 : cette phrase écrivait le protocole des sessions liées hors de sa source unique ;
+    # il passe à `sessions-liees.md`, où `repercussions` renvoie désormais. Dénombrement (classe : une
+    # règle de ce protocole écrite dans un skill au lieu de `sessions-liees.md`), énoncés des lignes
+    # ajoutées à `repercussions/SKILL.md` par la PR qui prescrivent un geste de session : **13** —
+    # démarrages 8 (« Délégation » : tour du mainteneur ou carte, `<N>` du nom, `use_worktree` ;
+    # étape 1 : `contradiction`, sa carte, `repercussions` redémarré ; étape 7 : `plan-qa` ;
+    # brouillons), messages 3 (étape 1 renvoie à l'étape 6 ; étape 6, même renvoi
+    # qu'`interroge-moi` ; message de clôture qui nomme les enfants), nettoyages 2 (« à leur message
+    # « terminé » » ; la session qui archive) ; **3** fuyaient, les trois derniers. Les démarrages
+    # n'écrivent que leurs paramètres au site.
     "6b-repercussions-nettoyage-de-ses-sessions": (
         REPERCUSSIONS_SKILL,
         (
-            "Ces sessions sont les enfants de la session qui les démarre, qui les nettoie à leur"
-            " message « terminé » (`sessions-liees.md`, « Nettoyage ») ; tant qu'un enfant"
-            " travaille, le message de clôture de cette session le nomme par son identifiant"
-            " `local_…`, et la session qui l'archive — lead, coordinatrice ou mainteneur — nettoie"
-            " à sa place : le message « terminé » d'un enfant à un parent archivé est supposé perdu,"
-            " non mesuré"
+            "Ces sessions sont les enfants de la session qui les démarre, nettoyées au protocole de"
+            " `sessions-liees.md` (« Nettoyage », « Fin de travail »)."
+        ),
+    ),
+    "6b-sessions-liees-suffixe-des-enfants-au-travail": (
+        SESSIONS_LIEES_REF,
+        (
+            "Toute forme admet un suffixe, « — enfants au travail : `local_…`, … », que porte le"
+            " message d'une session qui a démarré des enfants encore au travail"
+        ),
+    ),
+    "6b-sessions-liees-l-archiveur-nettoie-les-enfants-nommes": (
+        SESSIONS_LIEES_REF,
+        (
+            "La session qui archive un parent nettoie les enfants que son message de fin nomme"
+            " (« Fin de travail »), à la place du parent : le message de fin d'un enfant à un parent"
+            " archivé est supposé perdu, non mesuré."
         ),
     ),
     # Relecture de la PR #153, passe 1, I1 : après un arrêt `contradiction`, la passe de l'issue
