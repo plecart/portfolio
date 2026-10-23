@@ -50,8 +50,9 @@ pas une conversion qui la préserve (obs 106).
   ses labels, même un instant. Chaque label doit exister dans le dépôt — apparié sans la casse,
   il part sous le nom que le dépôt lui donne —, lu sur toutes ses pages. La relecture compare le
   corps entier, le titre exact et l'ensemble des labels — sans droit d'écriture sur le dépôt,
-  l'API REST ignore en silence les labels d'une création (« Create an issue ») ; la ligne de
-  sortie porte le numéro de l'issue, créée ou déjà là ;
+  l'API REST ignore en silence les labels d'une création (« Create an issue ») —, et un écart de
+  labels nomme l'appel de `label` qui le répare ; la ligne de sortie porte le numéro de l'issue,
+  créée ou déjà là ;
 - `issue close` ferme l'issue `<N>` avec la raison `--reason` — `completed` par défaut,
   `not_planned` pour une issue écartée —, puis relit son état et sa raison ;
 - `milestone attach` rattache l'issue `<N>` au milestone de titre `--title` à l'identique, lu sur
@@ -69,18 +70,20 @@ Il refuse, sans rien écrire : une ancre introuvable ou ambiguë — toutes sont
 première écriture —, zéro brief à cocher, plusieurs briefs, un label inconnu du dépôt — chacun
 nommé ; `CLAUDE.md` interdit de deviner un label, et les références REST de « Create an issue »
 et d'« Add labels to an issue » ne disent pas ce qu'elles font d'un label inconnu —, un fichier
-illisible, non UTF-8 ou sans ligne non vide — lu avant tout appel à la forge —, une issue déjà
-fermée sous une autre raison — une fermeture ne se réécrit pas, et l'API REST ignore
-`state_reason` quand `state` ne change pas (« Update an issue ») —, un milestone à rattacher fermé
-ou absent sans `--description` — un thème ne se crée pas sans son périmètre —, un milestone à
-fermer absent ou pas vidé, une lecture `gh` qui échoue, ne rend pas du JSON, ou rend un JSON sans
-un champ attendu ou d'un autre type. Après l'écriture — sa réponse comprise, dont un commentaire
-publié tire son `id`, une issue ou un milestone créé son numéro —, c'est une relecture non
-conforme : l'écriture a pu partir. Une case déjà cochée, des labels tous déjà posés ou déjà
-absents, une issue déjà fermée sous cette raison ou déjà dans ce milestone, un milestone déjà
-fermé, un fichier qui termine déjà le corps ou qui l'est déjà tout entier, un commentaire de `<N>`
-qui porte déjà le fichier pour corps, une issue ouverte — pas une PR — qui porte déjà ce titre et
-ce corps : rien à écrire, et la sortie le dit — un rejeu après une relecture tombée n'écrit donc
+illisible, non UTF-8 ou sans ligne non vide — lu avant tout appel à la forge —, une issue
+ouverte de ce titre et de ce corps sous d'autres labels — le rejeu d'une création dont la forge
+a ignoré les labels ; il nomme l'appel de `label` qui les répare —, une issue déjà fermée sous
+une autre raison — une fermeture ne se réécrit pas, et l'API REST ignore `state_reason` quand
+`state` ne change pas (« Update an issue ») —, un milestone à rattacher fermé ou absent sans
+`--description` — un thème ne se crée pas sans son périmètre —, un milestone à fermer absent ou
+pas vidé, une lecture `gh` qui échoue, ne rend pas du JSON, ou rend un JSON sans un champ attendu
+ou d'un autre type. Après l'écriture — sa réponse comprise, dont un commentaire publié tire son
+`id`, une issue ou un milestone créé son numéro —, c'est une relecture non conforme : l'écriture
+a pu partir. Une case déjà cochée, des labels tous déjà posés ou déjà absents, une issue déjà
+fermée sous cette raison ou déjà dans ce milestone, un milestone déjà fermé, un fichier qui
+termine déjà le corps ou qui l'est déjà tout entier, un commentaire de `<N>` qui porte déjà le
+fichier pour corps, une issue ouverte — pas une PR — qui porte déjà ce titre, ce corps et ces
+labels : rien à écrire, et la sortie le dit — un rejeu après une relecture tombée n'écrit donc
 pas une seconde fois.
 
 **Ce qu'il ne prouve pas.** Il ne choisit pas les cases : la session PR les nomme. Il ne
@@ -90,16 +93,15 @@ entre la lecture des commentaires et la publication fait un doublon, une même i
 lecture des issues ouvertes et la création aussi, un même milestone créé entre la lecture des
 milestones et la création aussi — ou un refus de la seconde création, si la forge refuse un titre
 pris : non mesuré —, et `milestone` retient alors le premier listé. Le commentaire déjà publié se
-reconnaît à son corps seul, l'issue déjà créée à son titre et à son corps — ses labels n'y
-comptent pas, et une issue fermée n'est pas vue —, **quel qu'en soit l'auteur**. Le fichier se
+reconnaît à son corps seul, l'issue déjà créée à son titre et à son corps — puis ses labels se
+comparent, et une issue fermée n'est pas vue —, **quel qu'en soit l'auteur**. Le fichier se
 reconnaît à l'identique, fins de ligne comprises, en fin de corps comme en corps de commentaire ou
-d'issue :
-sur une forge qui le stocke transformé — relecture non conforme dès le premier appel —, un rejeu
-l'ajoute, le réécrit, le publie ou crée l'issue une seconde fois. Une relecture conforme atteste
-ce que l'API rend, pas ce que l'interface web affiche. Le chemin d'un label encodé, la pose d'un
-label, l'écriture du corps d'une PR, la publication d'un commentaire sur une PR par l'endpoint
-`issues`, la création et la fermeture d'une issue, la création, le rattachement et la fermeture
-d'un milestone ne sont pas mesurés sur la vraie forge.
+d'issue : sur une forge qui le stocke transformé — relecture non conforme dès le premier appel —,
+un rejeu l'ajoute, le réécrit, le publie ou crée l'issue une seconde fois. Une relecture conforme
+atteste ce que l'API rend, pas ce que l'interface web affiche. Le chemin d'un label encodé, la
+pose d'un label, l'écriture du corps d'une PR, la publication d'un commentaire sur une PR par
+l'endpoint `issues`, la création et la fermeture d'une issue, la création, le rattachement et la
+fermeture d'un milestone ne sont pas mesurés sur la vraie forge.
 
 Sortie : 0 écrit et relu conforme, ou rien à écrire ; 1 refus (« refus — »), ou écriture lancée et
 relecture non conforme ou impossible (« relecture non conforme — ») — motif en une ligne sur la
@@ -110,6 +112,7 @@ bibliothèque standard seule ; `gh` authentifié, lancé depuis le dépôt.
 import argparse
 import json
 import re
+import shlex
 import subprocess
 import sys
 from collections.abc import Callable, Generator, Mapping, Sequence
@@ -670,17 +673,18 @@ def repo_labels(run: Run, wanted: Sequence[str]) -> list[str]:
     return [name for name in found.values() if name is not None]
 
 
-def same_issue(pages: Any, title: str, body: str) -> int | None:
-    """Le numéro de la première issue — pas une PR, que son champ `pull_request` distingue — qui
-    porte exactement `title` et `body`, sur les pages que `gh api --paginate --slurp` rend.
+def same_issue(pages: Any, title: str, body: str) -> tuple[int, list[str]] | None:
+    """Le numéro et les labels de la première issue — pas une PR, que son champ `pull_request`
+    distingue — qui porte exactement `title` et `body`, sur les pages que
+    `gh api --paginate --slurp` rend.
 
     Raises:
         KeyError, TypeError: une issue sans titre textuel ou sans corps textuel ni `null`, ou
-            l'issue retenue sans numéro entier (`typed`).
+            l'issue retenue sans numéro entier ou sans labels nommés (`typed`).
     """
     return next(
         (
-            typed(issue, "number", int)
+            (typed(issue, "number", int), label_names(issue))
             for page in pages
             for issue in page
             if "pull_request" not in issue
@@ -691,16 +695,32 @@ def same_issue(pages: Any, title: str, body: str) -> int | None:
     )
 
 
+def labels_gap(number: int, expected: Sequence[str], carried: Sequence[str]) -> str | None:
+    """L'écart entre les labels `carried` de l'issue `number` et l'ensemble `expected`, et l'appel
+    de `label` qui le répare, noms cités pour le shell ; `None` à ensembles égaux."""
+    if set(carried) == set(expected):
+        return None
+    repair = [str(number)]
+    repair += [part for name in expected if name not in carried for part in ("--add", name)]
+    repair += [part for name in carried if name not in expected for part in ("--remove", name)]
+    return (
+        f"labels attendus {sorted(expected)}, relus {sorted(carried)} — "
+        f"à réparer par `{shlex.join(['label', *repair])}`"
+    )
+
+
 def issue_create(run: Run, args: argparse.Namespace) -> str:
     """`issue create` : crée l'issue — titre, corps et labels en une seule requête —, sauf si une
-    issue ouverte porte déjà ce titre et ce corps — la liste des issues de l'API REST ne rend
-    que les ouvertes par défaut —, puis la relit sous le numéro que rend la création. Le fichier
-    est lu, et les labels validés, avant toute écriture.
+    issue ouverte porte déjà ce titre, ce corps et ces labels — la liste des issues de l'API REST
+    ne rend que les ouvertes par défaut —, puis la relit sous le numéro que rend la création. Le
+    fichier est lu, et les labels validés, avant toute écriture.
 
     Raises:
-        Refusal: fichier inutilisable (`read_text_file`) ou label inconnu (`repo_labels`).
+        Refusal: fichier inutilisable (`read_text_file`), label inconnu (`repo_labels`), ou
+            issue ouverte de ce titre et de ce corps sous d'autres labels — un rejeu après des
+            labels ignorés ; l'écart et sa réparation sont nommés (`labels_gap`).
         Divergence: création ou relecture en échec, ou issue relue autre que celle écrite —
-            corps entier (`check_reread`), titre exact, ensemble des labels.
+            corps entier (`check_reread`), titre exact, ensemble des labels (`labels_gap`).
     """
     body, anchor = read_text_file(args.file)
     labels = repo_labels(run, args.labels)
@@ -708,7 +728,10 @@ def issue_create(run: Run, args: argparse.Namespace) -> str:
         run, lambda pages: same_issue(pages, args.title, body), "--paginate", "--slurp", ISSUES
     )
     if same is not None:
-        return f"rien à écrire — #{same} existe déjà"
+        number, carried = same
+        if gap := labels_gap(number, labels, carried):
+            raise Refusal(f"#{number} existe déjà ; {gap}")
+        return f"rien à écrire — #{number} existe déjà"
     # ponytail: pas de verrou — une même issue créée entre la lecture et la création fait un
     # doublon ; relire les issues ouvertes après la création si un doublon se constate.
     create = ("-X", "POST", ISSUES, "--input", "-")
@@ -723,8 +746,8 @@ def issue_create(run: Run, args: argparse.Namespace) -> str:
     check_reread(body, reread, [anchor])
     if title != args.title:
         raise Divergence(f"titre attendu {args.title!r}, relu {title!r}")
-    if set(carried) != set(labels):
-        raise Divergence(f"labels attendus {sorted(labels)}, relus {sorted(carried)}")
+    if gap := labels_gap(number, labels, carried):
+        raise Divergence(gap)
     return f"créé et relu — issue #{number}"
 
 
