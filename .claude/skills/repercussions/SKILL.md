@@ -77,13 +77,14 @@ Sans argument, l'issue est la dernière fermée par un merge sur la branche trun
 `.claude/pipeline.config.md`) — `gh` trie les PR par date de création, d'où le tri explicite :
 `gh pr list --state merged --base <trunk> --limit 30 --json number,mergedAt,closingIssuesReferences --jq 'map(select(.closingIssuesReferences != [])) | sort_by(.mergedAt) | last'`.
 
-Avec une PR d'amendement — une PR mergée qui amende une source de vérité sans fermer d'issue,
-ouverte par une `contradiction` née d'une décision, sans issue fermée à l'origine —, le delta réel
-est l'amendement. Les étapes 2 à 6 s'appliquent ; l'étape 7 est sans objet, aucun thème ne s'étant
-vidé ; la ligne de journal cite l'amendement, pas une issue fermée (« Réconciliée avec
-l'amendement du cadrage §9.3, PR #<m>, du 26 août 2026 »). En mode amendement, `#<fermée>`,
-`<issue fermée>` et le `#47` des exemples se lisent « l'amendement, PR #<m> » — `pr-<m>` dans un
-chemin : la clé d'idempotence de l'étape 2 est alors la ligne qui cite cette PR.
+Avec une PR d'amendement — une PR mergée par une `contradiction` née d'une décision, sans issue
+fermée à l'origine, qui amende une source de vérité ou déplace l'effet d'une décision hors de ce
+qu'elle affirme, sans fermer d'issue —, le delta réel est cette PR. Les étapes 2 à 6
+s'appliquent ; l'étape 7 est sans objet, aucun thème ne s'étant vidé ; la ligne de journal cite
+l'amendement, pas une issue fermée (« Réconciliée avec l'amendement du cadrage §9.3, PR #<m>, du
+26 août 2026 »). En mode amendement, `#<fermée>`, `<issue fermée>` et le `#47` des exemples se
+lisent « l'amendement, PR #<m> » — `pr-<m>` dans un chemin : la clé d'idempotence de l'étape 2 est
+alors la ligne qui cite cette PR.
 
 Écrire un résumé court de **ce que cette clôture a réellement changé** — pas ce que l'issue
 promettait, ce qui a été *fait*. Sources, qu'un `releveur` rend : le **diff mergé**

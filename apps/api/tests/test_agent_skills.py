@@ -2965,9 +2965,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b-repercussions-pr-d-amendement": (
         REPERCUSSIONS_SKILL,
         (
-            "Avec une PR d'amendement — une PR mergée qui amende une source de vérité sans fermer"
-            " d'issue, ouverte par une `contradiction` née d'une décision, sans issue fermée à"
-            " l'origine —, le delta réel est l'amendement"
+            "Avec une PR d'amendement — une PR mergée par une `contradiction` née d'une décision,"
+            " sans issue fermée à l'origine, qui amende une source de vérité ou déplace l'effet"
+            " d'une décision hors de ce qu'elle affirme, sans fermer d'issue —, le delta réel est"
+            " cette PR"
         ),
     ),
     "6b-repercussions-amendement-sans-qa": (REPERCUSSIONS_SKILL, "l'étape 7 est sans objet"),
@@ -3009,7 +3010,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     # Relecture de la PR #155, passe 2, I1 : la session redémarrée par `contradiction` ne relève
     # pas l'arrêt soldé, et trace l'effet mergé que le document gagnant laisse en place. Les
-    # consignes par sortie : `SORTIES_D_UNE_CONTRADICTION_D_ORIGINE`.
+    # consignes par sortie : `SORTIES_DE_CONTRADICTION`.
     "6b2-repercussions-arret-solde-ne-se-releve-pas": (
         REPERCUSSIONS_SKILL,
         (
@@ -3327,6 +3328,16 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         CONTRADICTION_SKILL,
         "la session pousse la branche, ouvre la PR, la relit et la merge au go du mainteneur",
     ),
+    # Relecture de la PR #155, passe 2 : la PR de l'effet déplacé dans le dépôt (sortie 1b) n'avait
+    # pas de table des édits décrite.
+    "6b2-contradiction-table-des-edits-du-deplacement": (
+        CONTRADICTION_SKILL,
+        (
+            "Quand le mainteneur retient à l'étape 3 l'effet déplacé dans le dépôt (sortie 1b de"
+            " `decisions-vs-doc`), la table des édits porte ce déplacement, et non un amendement,"
+            " par le même déroulé de PR"
+        ),
+    ),
     "6b2-contradiction-quatre-gestes-un-commit": (
         CONTRADICTION_SKILL,
         "La table des édits porte, dans le même commit, ces quatre gestes",
@@ -3340,7 +3351,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6b2-contradiction-mode-sans-copie": (
         CONTRADICTION_SKILL,
-        "« PR d'amendement ») : ce skill ne le recopie pas",
+        (
+            "Le mode qui confronte aux issues une PR mergée par ce skill vit dans `repercussions`,"
+            " étape 1 (« PR d'amendement ») : ce skill ne le recopie pas"
+        ),
     ),
     "6b2-contradiction-rien-a-demarrer-en-session-pr": (
         CONTRADICTION_SKILL,
@@ -3350,7 +3364,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         ),
     ),
     # Relecture de la PR #155, passe 2, I1 : la relance part à la sortie, plus au seul merge d'un
-    # amendement. La relance avec origine et sa table : `SORTIES_D_UNE_CONTRADICTION_D_ORIGINE`.
+    # amendement. Les deux relances et leur table : `SORTIES_DE_CONTRADICTION`.
     "6b2-contradiction-repercussions-au-tour-de-la-sortie": (
         CONTRADICTION_SKILL,
         (
@@ -3358,17 +3372,12 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " `repercussions`"
         ),
     ),
-    "6b2-contradiction-repercussions-sans-origine": (
-        CONTRADICTION_SKILL,
-        (
-            "**sans origine** : à la seule sortie qui amende, au merge de sa PR,"
-            " `name: repercussions-<m>`, prompt `/repercussions #<m>`, où `<m>` est le numéro de la"
-            " PR d'amendement"
-        ),
-    ),
     "6b2-contradiction-rend-la-passe-quelle-que-soit-la-sortie": (
         CONTRADICTION_SKILL,
-        "et, démarré par une passe `repercussions`, la fait reprendre quelle que soit la sortie",
+        (
+            "il **délègue à `repercussions`** une fois sa PR mergée, et, démarré par une passe"
+            " `repercussions`, la fait reprendre quelle que soit la sortie"
+        ),
     ),
     "6b2-contradiction-se-taire-ne-dispense-pas-de-la-relance": (
         CONTRADICTION_SKILL,
@@ -3794,17 +3803,24 @@ def test_la_conversation_est_gardee_dans_chaque_fichier_des_deux_skills() -> Non
     assert gardes == dossiers
 
 
-# --- Chaque sortie d'une `contradiction` d'origine fait reprendre sa passe (#134, lot 6b2) -------
+# --- Chaque sortie d'une `contradiction` relance ce qu'elle doit (#134, lot 6b2) -----------------
 
-# La relance que `contradiction` étape 5 doit à chaque sortie quand `repercussions` l'a démarrée,
-# puis le cas sans origine, qui suit la table des sorties dans le texte.
+# Les deux relances de `contradiction` étape 5, que la table des sorties suit dans le texte : à
+# chaque sortie quand `repercussions` l'a démarrée, et sans origine à chaque sortie qui merge une
+# PR, seule à laisser un delta à propager.
 RELANCE_AVEC_ORIGINE = (
     "**avec `origine : #<N>`** reçue à l'étape 1, à **chaque** sortie, pas seulement à celle qui"
     " amende — la passe de `#<N>` s'est arrêtée avant son étape 2 et rien d'autre ne la reprend :"
     " `name: repercussions-<N>`, prompt `/repercussions #<N>` suivi du bloc d'arrêt reçu et de la"
     " ligne `contradiction soldée : <sortie>` de la table"
 )
-RELANCE_SANS_ORIGINE = "**sans origine**"
+RELANCE_SANS_ORIGINE = (
+    "**sans origine** : à chaque sortie qui merge une PR, et à elle seule, au merge de cette PR,"
+    " `name: repercussions-<m>`, prompt `/repercussions #<m>`, où `<m>` est son numéro (mode « PR"
+    " d'amendement ») — les autres sorties n'ont aucun delta mergé, rien à démarrer"
+)
+# La carte de proposition, qui suit la table des sorties.
+CARTE_DE_LA_RELANCE = "Hors d'un tour du mainteneur, une carte de proposition"
 # L'arrêt de `repercussions` étape 1 : la consigne d'une ligne `contradiction soldée` se lit avant
 # lui, sinon la session redémarrée relève l'arrêt soldé avant de la lire (obs 30).
 ARRET_DE_REPERCUSSIONS = "Une contradiction avérée → **s'arrêter avant l'étape 2**"
@@ -3816,42 +3832,45 @@ REPRISE_APRES_TRACE = (
 )
 REPRISE_DIRECTE = "Avec `amendement PR #<m>` ou `écartée — <raison>`, elles suivent directement"
 # Une entrée par sortie, en littéraux (obs 80) : sa ligne de la table de `contradiction` étape 5 —
-# tour de la relance, ligne `contradiction soldée`, message de fin —, puis sa consigne de reprise.
-# Une table plutôt que des épingles groupées : chaque sortie y garde son texte entier sous son id,
-# et l'autre sens — une ligne de la table du skill sans entrée ici — se compte contre elle.
-SORTIES_D_UNE_CONTRADICTION_D_ORIGINE = {
+# tour de la relance, relance sans origine, ligne `contradiction soldée`, message de fin —, puis sa
+# consigne de reprise. Une table plutôt que des épingles groupées : chaque sortie y garde son texte
+# entier sous son id, et l'autre sens — une ligne de la table du skill sans entrée ici — se compte
+# contre elle.
+SORTIES_DE_CONTRADICTION = {
     "1-amendement-merge": (
         (
-            "| amendement mergé | son merge | `contradiction soldée : amendement PR #<m>` |"
-            " « terminé — amendement PR #<m> mergé » |"
+            "| amendement mergé | son merge | `/repercussions #<m>` | `contradiction soldée :"
+            " amendement PR #<m>` | « terminé — amendement PR #<m> mergé » |"
         ),
         REPRISE_DIRECTE,
     ),
     "2-document-gagne-effet-abandonne": (
         (
-            "| document gagne, effet abandonné | la décision de l'étape 3 | `contradiction soldée :"
-            " document gagne` | « terminé — aucune PR, le document gagne » |"
+            "| document gagne, effet abandonné | la décision de l'étape 3 | rien, aucun delta mergé |"
+            " `contradiction soldée : document gagne` | « terminé — aucune PR, le document gagne » |"
         ),
         REPRISE_APRES_TRACE,
     ),
     "3-document-gagne-effet-deplace-par-une-pr": (
         (
-            "| document gagne, effet déplacé dans le dépôt par une PR | son merge | `contradiction"
-            " soldée : document gagne — PR #<m>` | « terminé — PR #<m> mergée, le document gagne » |"
+            "| document gagne, effet déplacé dans le dépôt par une PR | son merge |"
+            " `/repercussions #<m>` | `contradiction soldée : document gagne — PR #<m>` | « terminé —"
+            " PR #<m> mergée, le document gagne » |"
         ),
         REPRISE_APRES_TRACE,
     ),
     "4-document-gagne-effet-deplace-hors-du-depot": (
         (
-            "| document gagne, effet déplacé hors du dépôt | la décision de l'étape 3 |"
-            " `contradiction soldée : document gagne` | « terminé — aucune PR, le document gagne » |"
+            "| document gagne, effet déplacé hors du dépôt | la décision de l'étape 3 | rien, aucun"
+            " delta mergé | `contradiction soldée : document gagne` | « terminé — aucune PR, le"
+            " document gagne » |"
         ),
         REPRISE_APRES_TRACE,
     ),
     "5-contradiction-ecartee": (
         (
-            "| pas de contradiction | son constat | `contradiction soldée : écartée — <raison>` |"
-            " « terminé — contradiction écartée » |"
+            "| pas de contradiction | son constat | rien, aucun delta mergé | `contradiction soldée :"
+            " écartée — <raison>` | « terminé — contradiction écartée » |"
         ),
         REPRISE_DIRECTE,
     ),
@@ -3860,12 +3879,10 @@ SORTIES_D_UNE_CONTRADICTION_D_ORIGINE = {
 
 @pytest.mark.parametrize(
     ("ligne", "reprise"),
-    SORTIES_D_UNE_CONTRADICTION_D_ORIGINE.values(),
-    ids=SORTIES_D_UNE_CONTRADICTION_D_ORIGINE.keys(),
+    SORTIES_DE_CONTRADICTION.values(),
+    ids=SORTIES_DE_CONTRADICTION.keys(),
 )
-def test_chaque_sortie_d_une_contradiction_d_origine_fait_reprendre_sa_passe(
-    ligne: str, reprise: str
-) -> None:
+def test_chaque_sortie_de_contradiction_relance_ce_qu_elle_doit(ligne: str, reprise: str) -> None:
     """Relecture de la PR #155, passe 2, I1. Classe : une sortie de `contradiction` démarrée avec
     `origine : #<N>` qui ne fait pas reprendre la passe de `#<N>`, arrêtée par `repercussions`
     « avant l'étape 2 ». Dénombrées par la session PR sur `02c513b`, avant le correctif : **5**
@@ -3878,17 +3895,22 @@ def test_chaque_sortie_d_une_contradiction_d_origine_fait_reprendre_sa_passe(
     4. Le document gagne, effet déplacé hors du dépôt (1b) — fuyait.
     5. Pas de contradiction après vérification, « On se tait » — fuyait.
 
-    Chaque sortie a sa ligne dans la table de l'étape 5, sous la relance `repercussions-<N>` et
-    avant le cas sans origine, et sa consigne dans `repercussions` étape 1, avant l'arrêt.
+    Sans origine (même passe, hors-périmètre du `developpeur` ; classe : une PR mergée par
+    `contradiction` que rien ne propage), sur `189a13f` : **2** sorties mergent une PR, 1 et 3 ;
+    **1** fuyait, la 3. Les sorties 2, 4 et 5 ne mergent rien : aucun delta à propager.
+
+    Chaque sortie a sa ligne dans la table de l'étape 5, après les deux relances et avant la carte
+    de proposition, et sa consigne dans `repercussions` étape 1, avant l'arrêt.
     """
     assert_dans_l_ordre(CONTRADICTION_SKILL, RELANCE_AVEC_ORIGINE, ligne)
-    assert_dans_l_ordre(CONTRADICTION_SKILL, ligne, RELANCE_SANS_ORIGINE)
+    assert_dans_l_ordre(CONTRADICTION_SKILL, RELANCE_SANS_ORIGINE, ligne)
+    assert_dans_l_ordre(CONTRADICTION_SKILL, ligne, CARTE_DE_LA_RELANCE)
     assert_dans_l_ordre(REPERCUSSIONS_SKILL, reprise, ARRET_DE_REPERCUSSIONS)
 
 
 def test_la_table_des_sorties_de_contradiction_est_celle_du_test() -> None:
     """L'autre sens (obs 138) : une ligne ajoutée à la table de l'étape 5 rougit ici tant que
-    `SORTIES_D_UNE_CONTRADICTION_D_ORIGINE` ne la porte pas, avec sa consigne de reprise."""
+    `SORTIES_DE_CONTRADICTION` ne la porte pas, avec sa consigne de reprise."""
     texte = (REPOSITORY_ROOT / CONTRADICTION_SKILL).read_text(encoding="utf-8")
     lignes = [
         " ".join(ligne.split())
@@ -3896,15 +3918,18 @@ def test_la_table_des_sorties_de_contradiction_est_celle_du_test() -> None:
         if "| `contradiction soldée :" in ligne
     ]
 
-    assert sorted(lignes) == sorted(
-        ligne for ligne, _ in SORTIES_D_UNE_CONTRADICTION_D_ORIGINE.values()
-    )
+    assert sorted(lignes) == sorted(ligne for ligne, _ in SORTIES_DE_CONTRADICTION.values())
 
 
 # Ce que la passe 2 retire : la relance au seul merge d'un amendement, la reprise annoncée « contre
 # la doc amendée » à toute sortie, et la forme de fin qui confondait la PR d'un document gagnant
-# avec l'absence de PR. Chacune présente sur `02c513b`.
+# avec l'absence de PR — chacune présente sur `02c513b` —, puis la relance sans origine bornée à
+# l'amendement, présente sur `189a13f`.
 RETIRES_DES_SORTIES_DE_CONTRADICTION = {
+    "contradiction-relance-sans-origine-a-l-amendement-seul": (
+        CONTRADICTION_SKILL,
+        "à la seule sortie qui amende",
+    ),
     "contradiction-relance-au-seul-merge": (
         CONTRADICTION_SKILL,
         "au merge de la PR d'amendement, dans le tour du go du mainteneur",
