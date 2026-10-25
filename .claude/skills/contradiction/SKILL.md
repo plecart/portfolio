@@ -150,6 +150,12 @@ plus longtemps.
 
 ### 4. Appliquer — sur « go » explicite, par une PR
 
+Quand le mainteneur retient à l'étape 3 que la décision gagne mais que l'amendement est trop gros
+pour maintenant, aucune PR ne part : l'échappatoire de `.claude/rules/decisions-vs-doc.md`
+(« Deux sorties ») ouvre sur-le-champ un critère ou une issue `#<k>` portant les deux citations,
+par « Création d'issues en cours de cycle » (`.claude/rules/contraintes.md`), barreau 2 ou 3, le
+brouillon en session distincte — ce skill n'ouvre rien lui-même.
+
 Sur « go », l'amendement part par une PR, jamais par un commit direct sur le trunk (D-12 de
 #134) :
 
@@ -202,6 +208,7 @@ Le mode qui confronte aux issues une PR mergée par ce skill vit dans `repercuss
   | Sortie | Tour de la relance | Sans origine | Avec origine : ligne du prompt | Message de fin |
   |---|---|---|---|---|
   | amendement mergé | son merge | `/repercussions #<m>` | `contradiction soldée : amendement PR #<m>` | « terminé — amendement PR #<m> mergé » |
+  | décision gagne, amendement reporté | l'ouverture de `#<k>` | rien, aucun delta mergé | `contradiction soldée : amendement reporté — #<k>` | « terminé — amendement reporté à #<k> » |
   | document gagne, effet déplacé dans le dépôt par une PR | son merge | `/repercussions #<m>` | `contradiction soldée : document gagne — PR #<m>` | « terminé — PR #<m> mergée, le document gagne » |
   | document gagne, effet abandonné | la décision de l'étape 3 | rien, aucun delta mergé | `contradiction soldée : document gagne` | « terminé — aucune PR, le document gagne » |
   | document gagne, effet déplacé hors du dépôt | la décision de l'étape 3 | rien, aucun delta mergé | `contradiction soldée : document gagne` | « terminé — aucune PR, le document gagne » |
