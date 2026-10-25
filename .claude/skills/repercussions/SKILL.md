@@ -43,9 +43,10 @@ citations, les diffs présentés, le go demandé au mainteneur. Le reste change 
 - **`releveur`** — la collecte (« Collectes ») : la PR mergée et ses fichiers, `git log`, les
   issues du thème, les matchs d'ancre, les PR ouvertes, le compte d'issues ouvertes d'un
   milestone ; les lectures bornées (« Lectures bornées ») : le corps des issues examinées et leurs
-  commentaires filtrés par les ancres données, le brief en entier, `PR-PARALLELES.md`, l'état
-  d'avant (`git show <base>:<fichier>`), les passages des sources de vérité autour des ancres. Ce
-  qui compte reste à la session ;
+  commentaires filtrés par les ancres données, le brief en entier — contexte des étapes 2 et 3, pas
+  le corps ni le brief que l'étape 5 réécrit —, `PR-PARALLELES.md`, l'état d'avant
+  (`git show <base>:<fichier>`), les passages des sources de vérité autour des ancres. Ce qui
+  compte reste à la session ;
 - **script** — toute écriture sur une issue ou une PR, par sa sous-commande de
   `.claude/skills/cycle-pr/scripts/ecriture-relue.py`, appelée par la session elle-même : un geste
   isolé coûte plus délégué (`CLAUDE.md`, « Orchestration ») — le corps
@@ -255,8 +256,10 @@ Après le « go » (global, ou issue par issue si le mainteneur préfère trier)
 #### Issues dormantes → éditer la spec, sur ses deux supports
 
 **Éditer le corps** de chaque issue retenue par `issue edit <n> --body-file <fichier>` : le corps
-courant relu en octets (`gh api repos/{owner}/{repo}/issues/<n> --jq .body`, sans le LF final que
-`--jq` ajoute), exactement le diff présenté appliqué **par remplacements ancrés en mémoire** sur ce
+courant, lu par la session elle-même juste avant d'écrire, dans ce même `<fichier>`
+(`gh api repos/{owner}/{repo}/issues/<n> --jq .body`, sans le LF final que `--jq` ajoute) — il ne
+passe par le rapport d'aucun équipier, qui pourrait en convertir les fins de ligne ou les
+espaces —, exactement le diff présenté appliqué **par remplacements ancrés en mémoire** sur ce
 texte, puis le tout écrit tel quel dans le fichier — ses fins de ligne gardées : le script relit
 contre ce fichier et ne voit pas une conversion (obs 87, 106). La ligne de journal (« Transitions
 et fermetures ») part dans le même fichier, et l'appel attend les deux contrôles ci-dessous. Ne
@@ -264,7 +267,8 @@ jamais profiter de l'édition pour reformuler autre chose.
 
 **Amender le brief d'agent dans le même geste** quand la ligne fausse y figure aussi, par
 `brief write <n> --body-file <fichier>`, qui édite en place le seul brief, jamais un second brief
-concurrent : même lecture en octets, du commentaire qui s'ouvre par `## Brief d'agent`, relu par
+concurrent : même lecture, par la session elle-même, du commentaire qui s'ouvre par
+`## Brief d'agent`, relu par
 `gh api --paginate repos/{owner}/{repo}/issues/<n>/comments --jq '.[] | select(.body | startswith("## Brief d'"'"'agent")) | .body'`,
 sans le LF final que `--jq` ajoute (mesuré sous Git Bash le 2026-10-23 sur #134, une page :
 octet pour octet le `.body` de son brief lu seul) — sans `--paginate`, la première page seule. Le
@@ -277,11 +281,11 @@ correctif appliqué au seul corps laisse le contrat faux.
 ensuite la forge en entier contre ce fichier. Une citation encore présente signale un support
 oublié, pas une passe terminée.
 
-**Relire le corps — et le brief — juste avant d'écrire** : c'est la lecture en octets ci-dessus,
-faite au moment d'écrire. S'ils ont changé depuis la présentation du diff — une autre passe de
-répercussions a pu passer entre-temps, ou le mainteneur a édité — ne pas écrire par-dessus :
-re-présenter le diff recalculé. Deux merges rapprochés font tourner deux passes qui peuvent viser
-la même issue.
+**Relire le corps — et le brief — juste avant d'écrire** : c'est la lecture de la session
+ci-dessus, faite au moment d'écrire. S'ils ont changé depuis la présentation du diff — une autre
+passe de répercussions a pu passer entre-temps, ou le mainteneur a édité — ne pas écrire
+par-dessus : re-présenter le diff recalculé. Deux merges rapprochés font tourner deux passes qui
+peuvent viser la même issue.
 
 #### Issues en vol → signaler sur la PR, ne rien éditer
 
@@ -333,11 +337,11 @@ arrière.
 **Fermer en doublon** — seul cas où ce skill ferme quelque chose. Exige un recouvrement **total et
 non ambigu**, et un **« go » nommément sur cette issue** (un « go » global ne suffit pas à fermer).
 D'abord la ligne de journal « Fermée en doublon de #<M> après #<fermée> », dans le corps
-(`issue edit --body-file`) — le skill ne commente jamais une issue —, puis
-`issue close <n> --reason not_planned`, puis `label <n> --remove <état>` — l'état que l'issue
-porte, lu sur elle, sous son label réel (mapping de `.claude/pipeline.config.md`) : une issue
-fermée n'en porte aucun (`triage`, « Rôles »). Recouvrement partiel → on réduit le périmètre dans le
-corps, on ne ferme pas.
+(`issue edit --body-file`, lu par la session elle-même comme à « Éditer le corps ») — le skill ne
+commente jamais une issue —, puis `issue close <n> --reason not_planned`, puis
+`label <n> --remove <état>` — l'état que l'issue porte, lu sur elle, sous son label réel
+(mapping de `.claude/pipeline.config.md`) : une issue fermée n'en porte aucun (`triage`,
+« Rôles »). Recouvrement partiel → on réduit le périmètre dans le corps, on ne ferme pas.
 
 Au moindre cas ambigu — re-découpage non trivial, conflit de conception, fermeture incertaine —
 **ne pas trancher seul** : le poser au mainteneur et laisser l'issue intacte.
@@ -397,7 +401,8 @@ de l'outil, lue le 2026-10-23).
   « Création d'issues en cours de cycle ». Si une issue ouverte possède le sujet, ce skill y
   **ajoute le critère dans la même passe** — bloc marqué `[complétion]` à l'étape 4, appliqué sur
   le même « go » par `issue edit --body-file` (et `brief write` si le brief porte les critères),
-  ligne de journal « Complétée après #<fermée> — <le vide, d'où il vient> ». Sinon, un brouillon
+  corps et brief lus par la session elle-même comme à l'étape 5 (« Éditer le corps »), ligne de
+  journal « Complétée après #<fermée> — <le vide, d'où il vient> ». Sinon, un brouillon
   dans sa propre session, démarrée dans le tour où le mainteneur l'accepte — `start_session`,
   `initiation: user_asked`, `context: fresh`, `use_worktree: true` : pour un défaut,
   `bug-vers-issue` avec la description en argument (`name: bug-<N>`, prompt
