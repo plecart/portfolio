@@ -3239,6 +3239,15 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         CONTRADICTION_SKILL,
         "**dans une session PR**, il entre dans sa PR, par un commit de son `developpeur`",
     ),
+    # Relecture de la PR #155, passe 1, M4 : les sessions de dialogue hors PR, nommées comme
+    # `.claude/rules/decisions-vs-doc.md`, « Deux sorties » — le lead et la coordinatrice compris.
+    "6b2-contradiction-hors-pr-sessions-de-dialogue": (
+        CONTRADICTION_SKILL,
+        (
+            "**hors PR** — une session de tri, d'interrogatoire ou de `vers-issues`, le lead d'une"
+            " vague, la coordinatrice d'une issue en lots, ou celle que `repercussions` démarre —"
+        ),
+    ),
     "6b2-contradiction-pr-d-amendement-au-deroule-hors-scope": (
         CONTRADICTION_SKILL,
         (
@@ -3300,9 +3309,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b2-contradiction-fin-de-travail": (
         CONTRADICTION_SKILL,
         (
-            "prévenir le parent par le message de fin de la même référence (« Fin de travail »),"
-            " dont le suffixe « — enfants au travail : `local_…` » nomme la session `repercussions`"
-            " qu'elle a démarrée — la fin du tour ne le prévient pas"
+            "prévenir le parent par le message de fin de `sessions-liees.md` (« Fin de travail »),"
+            " sous la forme « terminé — amendement PR #<m> mergé », suivie, si elle a démarré la"
+            " session `repercussions`, du suffixe « — enfants au travail : `local_…` » — la fin du"
+            " tour ne le prévient pas"
         ),
     ),
     "6b2-contradiction-l-archiveur-nettoie": (
@@ -3444,6 +3454,15 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b2-bug-vers-issue-ligne-introuvable-arrete": (
         BUG_VERS_ISSUE_SKILL,
         "chaque ancienne ligne trouvée une seule fois, sinon s'arrêter et le dire au mainteneur",
+    ),
+    # Relecture de la PR #155, passe 1, M2 : l'entrée d'Index est un ajout, ancré comme un
+    # remplacement.
+    "6b2-bug-vers-issue-index-ancre-sur-son-titre": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "l'entrée s'insère après la dernière ligne de l'Index des constats, ancrée sur sa ligne"
+            " de titre, trouvée de même une seule fois"
+        ),
     ),
     "6b2-bug-vers-issue-patch-regles-de-correspondance-seules": (
         BUG_VERS_ISSUE_SKILL,
