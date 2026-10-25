@@ -200,3 +200,17 @@ vulnerabilities:
       par x/net 0.60.0, absent de caddy 2.11.7, dernière version publiée ; le projet ne monte pas
       un module au-delà de ce que fixe la release (ADR 0018).
     expired_at: 2027-01-19
+
+  # Paquets Alpine 3.23 de l'image de base `caddy:2.11.7-alpine` (épinglée par digest).
+  - id: CVE-2026-111497
+    paths:
+      - "**/portfolio-caddy (alpine 3.23.*)"
+    statement: >-
+      Place : `brotli-libs` 1.2.0-r0, requis par `libcurl`, lui-même requis par `curl`, paquets de
+      l'image officielle `caddy:2.11.7-alpine`. Atteinte : non — le binaire `caddy` du projet est
+      compilé en Go statique (`CGO_ENABLED=0`) et ne charge aucune bibliothèque ; le healthcheck
+      du service appelle `wget` (busybox), pas `curl`, et `infra/caddy/Caddyfile` n'encode rien.
+      Alternatives : corrigé par `brotli-libs` 1.2.1-r0, présent dans Alpine 3.23 mais absent de
+      la dernière `caddy:2.11.7-alpine` publiée (relevé le 2026-10-25) ; la reconstruction de
+      l'image sous la même étiquette lèvera l'exception.
+    expired_at: 2026-11-24
