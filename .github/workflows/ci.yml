@@ -186,7 +186,11 @@ jobs:
 
       # Cache des couches entre deux runs. La clé suit les fichiers que les couches de
       # dépendances consomment : elle ne change donc que quand ces couches changent réellement —
-      # ce qui évite aussi que le cache soit réécrit, et grossisse, à chaque run.
+      # ce qui évite aussi que le cache soit réécrit, et grossisse, à chaque run. Les paquets du
+      # système, eux, suivent les dépôts de la distribution et non un fichier : l'étage
+      # `paquets` qui les installe se reconstruit à chaque build (`--no-cache-filter`, ci-dessous
+      # et dans `publish`), sans quoi le cache garderait la couche de son premier build et des
+      # paquets corrigés depuis — mesuré le 2026-10-24, `backup` rouge au scan (run 40103586324).
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/buildx-cache
@@ -210,6 +214,7 @@ jobs:
         env:
           DOCKER_BUILD_FLAGS: >-
             --load
+            --no-cache-filter paquets
             --cache-from type=local,src=/tmp/buildx-cache,tag=$*
             --cache-to type=local,dest=/tmp/buildx-cache,tag=$*,mode=max
 
@@ -297,6 +302,7 @@ jobs:
         env:
           DOCKER_BUILD_FLAGS: >-
             --load
+            --no-cache-filter paquets
             --cache-from type=local,src=/tmp/buildx-cache,tag=$*
             --provenance=false
             --sbom=false
