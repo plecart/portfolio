@@ -2,11 +2,13 @@
 
 Ce que `bug-vers-issue` doit rassembler avant de rédiger le corps d'une issue. Saute une source si elle est réellement indisponible ; sinon, vérifie-la.
 
-## 1. Contexte de la conversation
+Les commandes de ce fichier sont des lectures, lancées par un `releveur` (SKILL.md, « Délégation ») ; ce qui compte reste à la session.
 
-- La description la plus récente du bug par l'utilisateur, avec ses propres mots.
-- Tout bloc d'**intake d'échec** capturé produit par `execution-qa` — c'est l'entrée de la plus haute qualité. Utilise les champs tels quels ; ne les paraphrase pas.
-- Toute clarification que l'utilisateur a déjà donnée dans ce tour ou les ~10 derniers tours.
+## 1. L'argument et l'intake écrit
+
+- La description du bug passée en argument (mode libre), avec les mots du mainteneur.
+- L'**intake d'échec** écrit, passé en argument (mode piloté par un plan) — c'est l'entrée de la plus haute qualité. Utilise les champs tels quels ; ne les paraphrase pas.
+- Les réponses du mainteneur à l'étape 1 de cette session.
 
 ## 2. Lien vers le plan QA (mode piloté par un plan)
 
