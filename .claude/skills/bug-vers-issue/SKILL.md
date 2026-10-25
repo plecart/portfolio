@@ -6,7 +6,7 @@ argument-hint: "[description du bug | #<plan-qa> <ancre de la case> <chemin ou U
 
 # Bug vers issue
 
-Capturer un bug — découvert soit pendant l'exécution d'un plan QA, soit lors de tests libres — et le consigner comme une issue GitHub durable et centrée sur l'utilisateur, avec des liens explicites vers le plan QA (s'il y en a un), les issues d'implémentation, le PRD et les commits à l'origine. Montre toujours un brouillon à l'utilisateur et confirme avant de publier.
+Capturer un bug — découvert soit pendant l'exécution d'un plan QA, soit lors de tests libres — et le consigner comme une issue GitHub durable et centrée sur l'utilisateur, avec des liens explicites vers le plan QA (s'il y en a un), les issues d'implémentation, le PRD et les commits à l'origine. Montre toujours un brouillon au mainteneur et confirme avant de publier.
 
 ## Principe fondamental
 
@@ -17,7 +17,7 @@ L'issue de bug doit être **durable** (encore lisible après des refactos majeur
 La session garde le jugement : les questions de clarification, le choix des issues et des commits coupables, le propriétaire du sujet, issue unique ou découpage, la rédaction, le go. Le reste change de main :
 
 - **`releveur`** — les collectes (« Collectes ») : doublons et propriétaire du sujet par `gh issue list --search` sur les mots-clés que donne la session, issues récemment fermées touchant la zone, `git log` ; les lectures bornées (« Lectures bornées ») : l'intake d'échec écrit, le corps du plan QA autour de la case, l'issue d'implémentation et son PRD, le glossaire et `CLAUDE.md`, les fichiers d'automatisation qui pourraient posséder le sujet. Ce qui compte reste à la session ;
-- **script** — toute écriture sur la forge, par sa sous-commande de `.claude/skills/cycle-pr/scripts/ecriture-relue.py`, appelée par la session elle-même : un geste isolé coûte plus délégué (`CLAUDE.md`, « Orchestration ») — la création (`issue create`, étape 6), le patch du plan QA (`issue edit --body-file`, étape 7), le commentaire sur une issue existante (`comment`, étape 3) ;
+- **script** — toute écriture sur la forge, par sa sous-commande de `.claude/skills/cycle-pr/scripts/ecriture-relue.py`, appelée par la session elle-même : un geste isolé coûte plus délégué (`CLAUDE.md`, « Orchestration ») — le commentaire sur une issue existante (`comment`, étape 3), la création (`issue create`, étape 6), le patch du plan QA (`issue edit --body-file`, étape 7) ;
 - **sessions distinctes** — cette session peut être démarrée par une autre : la session de QA (`execution-qa`), qui reprend la QA dans sa propre session, `repercussions` pour un brouillon, ou une session qui applique « Création d'issues en cours de cycle » (`.claude/rules/contraintes.md`) ; protocole commun : `.claude/skills/cycle-pr/references/sessions-liees.md`.
 
 ## Deux points d'entrée
@@ -99,7 +99,7 @@ Règles pour le corps :
 
 ### 6. Montrer le brouillon, confirmer, puis publier
 
-Montre toujours à l'utilisateur le brouillon complet (titre + corps + labels) et demande : **« On le publie tel quel, on l'édite, ou on annule ? »**
+Montre toujours au mainteneur le brouillon complet (titre + corps + labels) et demande : **« On le publie tel quel, on l'édite, ou on annule ? »**
 
 Après approbation, publie :
 
@@ -114,7 +114,10 @@ En cas de découpage : le parent d'abord, puis les enfants un par un, dans l'ord
 ### 7. Après la publication
 
 - Affiche l'URL de chaque issue créée.
-- Si piloté par un plan, patche le corps de l'issue du plan QA — `🔴 needs-issue` → `🔴 BUG #<nouveau-numéro>` sur la case qui échoue, et une entrée à l'**Index des constats** en bas du corps — par `issue edit <plan> --body-file <fichier>` : le corps courant relu en octets par le `releveur` (`gh api repos/{owner}/{repo}/issues/<plan> --jq .body`, sans le LF final que `--jq` ajoute) ; les remplacements se font en mémoire, par correspondance exacte de ligne complète, chaque ancienne ligne trouvée une seule fois, sinon s'arrêter et le dire au mainteneur (`execution-qa/references/patch-checkbox-gh.md`, « Construire le patch en mémoire » — sa règle seule : sa lecture et son push sont ceux de cette étape) ; le résultat est écrit tel quel dans le fichier, ses fins de ligne gardées : le script relit contre ce fichier et ne voit pas une conversion (obs 87).
+- Si piloté par un plan, patche le corps de l'issue du plan QA — `🔴 needs-issue` → `🔴 BUG #<nouveau-numéro>` sur la case qui échoue, et une entrée à l'**Index des constats** en bas du corps — par `issue edit <plan> --body-file <fichier>` :
+  - le corps courant relu en octets par le `releveur` (`gh api repos/{owner}/{repo}/issues/<plan> --jq .body`, sans le LF final que `--jq` ajoute) ;
+  - les remplacements se font en mémoire, par correspondance exacte de ligne complète, chaque ancienne ligne trouvée une seule fois, sinon s'arrêter et le dire au mainteneur (`execution-qa/references/patch-checkbox-gh.md`, « Construire le patch en mémoire » et « Détecter les éditions concurrentes » — leurs règles de correspondance seules : sa lecture et son push sont ceux de cette étape) ;
+  - le résultat est écrit tel quel dans le fichier, ses fins de ligne gardées : le script relit contre ce fichier et ne voit pas une conversion (obs 87).
 - Dis au mainteneur que le bug est consigné et que le plan a été mis à jour.
 
 **Session démarrée par une autre** (son prompt système nomme le parent, `.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») : la consignation faite — issue publiée ou commentée, plan patché en mode piloté —, prévenir le parent par le message de fin de la même référence (« Fin de travail »), sous la forme « terminé — BUG #<N> consigné » — la fin du tour ne le prévient pas. Quand le parent est la session de QA, la QA reprend dans sa session, sur ce message.
@@ -124,14 +127,14 @@ En cas de découpage : le parent d'abord, puis les enfants un par un, dans l'ord
 - **Pas de chemins de fichiers ni de numéros de ligne.**
 - **Langage métier uniquement.**
 - **Des comportements, pas du code** — « l'envoi de connaissance accepte un fichier de 30 Mo alors qu'il devrait le rejeter » et non « uploadHandler.ts validateSize() renvoie true à la ligne 42 ».
-- **Étapes de reproduction obligatoires.** Si tu ne peux pas les déterminer, demande à l'utilisateur avant de rédiger.
+- **Étapes de reproduction obligatoires.** Si tu ne peux pas les déterminer, demande au mainteneur avant de rédiger.
 - **Concis.** Un développeur le lit en 30 secondes et le reproduit en 2 minutes.
 - **Gravité indiquée** avec une justification d'une ligne.
 
 ## Labels
 
-- Toujours les rôles `qa-finding` et `needs-triage`. Les labels réels se lisent dans le mapping de `.claude/pipeline.config.md` : `qa-finding` y figure, et `init-projet` le pose.
-- N'applique jamais d'autres labels en silence. Si l'utilisateur veut `priority/high` ou similaire, il peut l'ajouter pendant le tri.
+- Toujours les rôles `qa-finding` et `needs-triage`. Les labels réels se lisent dans le mapping de `.claude/pipeline.config.md` : `qa-finding` y figure.
+- N'applique jamais d'autres labels en silence. Si le mainteneur veut `priority/high` ou similaire, il peut l'ajouter pendant le tri.
 
 Si l'un d'eux manque au dépôt, `issue create` refuse en le nommant : s'arrêter et le dire au mainteneur ; `init-projet`, en reconfiguration, le pose (étape 6, « Créer les labels manquants dans GitHub »).
 

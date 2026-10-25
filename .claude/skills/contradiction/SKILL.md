@@ -149,9 +149,8 @@ plus longtemps.
 Sur « go », l'amendement part par une PR, jamais par un commit direct sur le trunk (D-12 de
 #134) :
 
-- **dans une session PR**, il entre dans sa PR, par un commit de son `developpeur`
-  (`.claude/skills/cycle-pr/SKILL.md`, 3.1) ou de son `executant` (`.claude/agents/executant.md`,
-  « Ton commit ») ;
+- **dans une session PR**, il entre dans sa PR, par un commit de son `developpeur` (`cycle-pr`
+  3.1) ou de son `executant` (`.claude/agents/executant.md`, « Ton commit ») ;
 - **hors PR** — une session de tri, d'interrogatoire ou de `vers-issues`, ou celle que
   `repercussions` démarre —, une PR d'amendement, au déroulé de `.claude/skills/triage/hors-scope.md`
   (« Quand écrire », étapes 5 et 6) : un `executant` en isolation `worktree`, jamais dans le
