@@ -151,12 +151,12 @@ Sur « go », l'amendement part par une PR, jamais par un commit direct sur le t
 
 - **dans une session PR**, il entre dans sa PR, par un commit de son `developpeur` (`cycle-pr`
   3.1) ou de son `executant` (`.claude/agents/executant.md`, « Ton commit ») ;
-- **hors PR** — une session de tri, d'interrogatoire ou de `vers-issues`, ou celle que
-  `repercussions` démarre —, une PR d'amendement, au déroulé de `.claude/skills/triage/hors-scope.md`
-  (« Quand écrire », étapes 5 et 6) : un `executant` en isolation `worktree`, jamais dans le
-  dossier partagé, applique la table des édits et commite sur une branche partie de
-  `origin/<trunk>` ; la session pousse la branche, ouvre la PR, la relit et la merge au go du
-  mainteneur.
+- **hors PR** — une session de tri, d'interrogatoire ou de `vers-issues`, le lead d'une vague, la
+  coordinatrice d'une issue en lots, ou celle que `repercussions` démarre —, une PR d'amendement,
+  au déroulé de `.claude/skills/triage/hors-scope.md` (« Quand écrire », étapes 5 et 6) : un
+  `executant` en isolation `worktree`, jamais dans le dossier partagé, applique la table des édits
+  et commite sur une branche partie de `origin/<trunk>` ; la session pousse la branche, ouvre la
+  PR, la relit et la merge au go du mainteneur.
 
 La table des édits porte, dans le même commit, ces quatre gestes, dans l'ordre, sans en sauter :
 
@@ -201,9 +201,10 @@ invisible.
 
 **Session démarrée par une autre** — par `repercussions` (son prompt système nomme le parent,
 `.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») : le récapitulatif fait,
-prévenir le parent par le message de fin de la même référence (« Fin de travail »), dont le
-suffixe « — enfants au travail : `local_…` » nomme la session `repercussions` qu'elle a démarrée —
-la fin du tour ne le prévient pas. La session qui l'archive nettoie cette enfant (« Nettoyage »).
+prévenir le parent par le message de fin de `sessions-liees.md` (« Fin de travail »), sous la
+forme « terminé — amendement PR #<m> mergé », suivie, si elle a démarré la session
+`repercussions`, du suffixe « — enfants au travail : `local_…` » — la fin du tour ne le prévient
+pas. La session qui l'archive nettoie cette enfant (« Nettoyage »).
 
 ## Ce que ce skill ne fait pas
 
