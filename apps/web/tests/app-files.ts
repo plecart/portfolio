@@ -76,7 +76,11 @@ export function readAppJson<T>(fileName: string): T {
 }
 
 /** Ce que les tests lisent d'une entrée du verrou npm. */
-export type LockedPackage = { version: string; peerDependencies?: Record<string, string> }
+export type LockedPackage = {
+  version: string
+  dependencies?: Record<string, string>
+  peerDependencies?: Record<string, string>
+}
 
 /** Le verrou npm, format 3 : les paquets installés, indexés par chemin, racine `""` exclue. */
 export type Lockfile = { packages: Record<`node_modules/${string}`, LockedPackage> }
@@ -87,7 +91,7 @@ export type Lockfile = { packages: Record<`node_modules/${string}`, LockedPackag
  * @param lockfile Le verrou, par exemple `readAppJson<Lockfile>('package-lock.json')`.
  * @param name Paquet, par exemple `@types/node` ; une dépendance directe est toujours à la racine,
  *   `node_modules/<nom>`.
- * @returns L'entrée : version installée, pairs déclarés.
+ * @returns L'entrée : version installée, dépendances et pairs déclarés.
  * @throws Si le paquet n'est plus installé : un test qui lirait une entrée absente ne mesurerait
  *   rien.
  */
