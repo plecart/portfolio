@@ -1604,6 +1604,7 @@ GABARIT_BUG_REF = ".claude/skills/bug-vers-issue/references/gabarit-issue-bug.md
 GABARIT_DECOUPAGE_REF = ".claude/skills/bug-vers-issue/references/gabarit-issue-decoupage.md"
 THEMES_MILESTONES_REF = ".claude/skills/triage/themes-milestones.md"
 BRIEF_AGENT_REF = ".claude/skills/triage/brief-agent.md"
+PATCH_CHECKBOX_REF = ".claude/skills/execution-qa/references/patch-checkbox-gh.md"
 INVARIANTS_DES_SESSIONS_LIEES = {
     # Héritage (décision 7).
     "heritage-sans-permission-mode": (
@@ -3029,12 +3030,50 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         REPERCUSSIONS_SKILL,
         "— et passer à l'étape 6, l'étape 7 restant due",
     ),
-    "6b-repercussions-corps-relu-en-octets": (
+    # Relecture de la PR #155, passe 1, I2, hors de `bug-vers-issue` : le corps et le brief que
+    # `repercussions` réécrit sont lus par la session, jamais repris d'un rapport. Dénombrement de
+    # la classe : `REECRITURES_DE_CORPS` ; anciennes formes : `RETIRES_DU_CONTEXTE_VIVANT`.
+    "6b2-repercussions-releveur-pas-ce-que-l-etape-5-reecrit": (
         REPERCUSSIONS_SKILL,
         (
-            "le corps courant relu en octets (`gh api repos/{owner}/{repo}/issues/<n> --jq .body`,"
-            " sans le LF final que `--jq` ajoute)"
+            "le corps des issues examinées et leurs commentaires filtrés par les ancres données, le"
+            " brief en entier — contexte des étapes 2 et 3, pas le corps ni le brief que l'étape 5"
+            " réécrit —"
         ),
+    ),
+    "6b2-repercussions-corps-lu-par-la-session": (
+        REPERCUSSIONS_SKILL,
+        (
+            "le corps courant, lu par la session elle-même juste avant d'écrire, dans ce même"
+            " `<fichier>` (`gh api repos/{owner}/{repo}/issues/<n> --jq .body`, sans le LF final"
+            " que `--jq` ajoute)"
+        ),
+    ),
+    "6b2-repercussions-corps-par-aucun-rapport": (
+        REPERCUSSIONS_SKILL,
+        (
+            "il ne passe par le rapport d'aucun équipier, qui pourrait en convertir les fins de"
+            " ligne ou les espaces"
+        ),
+    ),
+    "6b2-repercussions-brief-lu-par-la-session": (
+        REPERCUSSIONS_SKILL,
+        "même lecture, par la session elle-même, du commentaire qui s'ouvre par `## Brief d'agent`",
+    ),
+    "6b2-repercussions-relire-c-est-la-lecture-de-la-session": (
+        REPERCUSSIONS_SKILL,
+        "c'est la lecture de la session ci-dessus, faite au moment d'écrire",
+    ),
+    "6b2-repercussions-doublon-lu-par-la-session": (
+        REPERCUSSIONS_SKILL,
+        (
+            "« Fermée en doublon de #<M> après #<fermée> », dans le corps (`issue edit --body-file`,"
+            " lu par la session elle-même comme à « Éditer le corps »)"
+        ),
+    ),
+    "6b2-repercussions-completion-lue-par-la-session": (
+        REPERCUSSIONS_SKILL,
+        "corps et brief lus par la session elle-même comme à l'étape 5 (« Éditer le corps »)",
     ),
     "6b-repercussions-remplacements-ancres": (
         REPERCUSSIONS_SKILL,
@@ -3085,8 +3124,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b-repercussions-fermee-en-doublon": (
         REPERCUSSIONS_SKILL,
         (
-            "« Fermée en doublon de #<M> après #<fermée> », dans le corps (`issue edit --body-file`)"
-            " — le skill ne commente jamais une issue —, puis `issue close <n> --reason not_planned`,"
+            "— le skill ne commente jamais une issue —, puis `issue close <n> --reason not_planned`,"
             " puis `label <n> --remove <état>` — l'état que l'issue porte, lu sur elle, sous son"
             " label réel (mapping de `.claude/pipeline.config.md`) : une issue fermée n'en porte"
             " aucun (`triage`, « Rôles »)"
@@ -3313,6 +3351,17 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " sous la forme « terminé — amendement PR #<m> mergé », suivie, si elle a démarré la"
             " session `repercussions`, du suffixe « — enfants au travail : `local_…` » — la fin du"
             " tour ne le prévient pas"
+        ),
+    ),
+    # Relecture de la PR #155, passe 1, M1 bis : la sortie où le document gagne sans PR
+    # (`decisions-vs-doc`, « Deux sorties », 1a, ou 1b hors du dépôt — une écriture de dépôt part
+    # par une PR, D-12) finit sans amendement, donc sans « PR #<m> » à nommer.
+    "6b2-contradiction-fin-sans-amendement": (
+        CONTRADICTION_SKILL,
+        (
+            "Quand le mainteneur retient à l'étape 3 la sortie où le document gagne sans qu'aucune"
+            " PR ne parte — l'effet abandonné, ou déplacé hors du dépôt —, la forme est « terminé —"
+            " aucun amendement, le document gagne »"
         ),
     ),
     "6b2-contradiction-l-archiveur-nettoie": (
@@ -3552,31 +3601,88 @@ COMMANDE_ISSUE_CLOSE = re.compile(r"issue close <\w+>")
 COUPURE_DE_BLOC = re.compile(r"\n[ \t]*\n|\n(?=[ \t]*(?:[-*]|\d+\.) )")
 
 
-def blocs_de_fermeture(path: Path) -> list[str]:
-    """Les paragraphes et éléments de liste du fichier qui ferment une issue, espaces normalisés."""
+def blocs_du_geste(path: Path, geste: re.Pattern[str]) -> list[str]:
+    """Les paragraphes et éléments de liste du fichier qui portent le geste, espaces normalisés."""
     texte = path.read_text(encoding="utf-8-sig")
     blocs = (" ".join(bloc.split()) for bloc in COUPURE_DE_BLOC.split(texte))
-    return [bloc for bloc in blocs if COMMANDE_ISSUE_CLOSE.search(bloc)]
+    return [bloc for bloc in blocs if geste.search(bloc)]
+
+
+def sites_du_geste(geste: re.Pattern[str]) -> list[str]:
+    """Le fichier de chaque bloc de prose des skills qui porte le geste, trié."""
+    return sorted(
+        path.relative_to(REPOSITORY_ROOT).as_posix()
+        for path in REPOSITORY_ROOT.glob(SKILL_PROSE)
+        for _ in blocs_du_geste(path, geste)
+    )
 
 
 def test_les_fermetures_d_issue_sont_celles_de_la_table() -> None:
     """Un site neuf, ou retiré, rougit ici : la table se re-dénombre avant de changer."""
-    sites = sorted(
-        path.relative_to(REPOSITORY_ROOT).as_posix()
-        for path in REPOSITORY_ROOT.glob(SKILL_PROSE)
-        for _ in blocs_de_fermeture(path)
-    )
-
-    assert sites == sorted(FERMETURES_D_ISSUE.values())
+    assert sites_du_geste(COMMANDE_ISSUE_CLOSE) == sorted(FERMETURES_D_ISSUE.values())
 
 
 @pytest.mark.parametrize("fichier", FERMETURES_D_ISSUE.values(), ids=FERMETURES_D_ISSUE.keys())
 def test_chaque_fermeture_d_issue_retire_son_etat(fichier: str) -> None:
     """Le bloc qui ferme l'issue porte `--remove <état>`."""
-    fermetures = blocs_de_fermeture(REPOSITORY_ROOT / fichier)
+    fermetures = blocs_du_geste(REPOSITORY_ROOT / fichier, COMMANDE_ISSUE_CLOSE)
     sans_retrait = [bloc for bloc in fermetures if "--remove <état>" not in bloc]
 
     assert not sans_retrait, f"`{fichier}` ferme une issue sans retirer son état : {sans_retrait}"
+
+
+# Une réécriture de corps distant — corps d'issue par `issue edit --body-file`, brief par
+# `brief write` — part d'un texte que **la session lit elle-même**, au moment d'écrire, jamais du
+# rapport d'un équipier : un rapport peut en convertir les fins de ligne ou les espaces, et
+# `ecriture-relue.py`, qui relit contre le fichier écrit, ne le voit pas (obs 87, 106). Classe
+# (relecture de la PR #155, passe 1, I2) : une lecture préalable confiée au `releveur`, ou que la
+# « Délégation » du skill laisse lire comme confiée à lui. **Population**, par la forme du geste
+# (obs 139), `grep -rn -E "issue edit|brief write" .claude/skills --include=*.md` lu par bloc sur
+# `a485d0a` : **23** blocs, dont **11** réécrivent un corps ou un brief déjà publié —
+# `bug-vers-issue` étape 7, fermé par `4873d92` ; `repercussions` ×4 (corps et brief de l'étape 5,
+# doublon, complétion), qui **fuyaient** : leur lecture ne nommait pas son lecteur, et la
+# « Délégation » rendait au `releveur` « le corps des issues examinées » et « le brief en entier »
+# sans borne ; `interroge-moi` ×3 (« Décisions », l'autre issue, le PRD), indemnes : sa
+# « Délégation » ne donne au `releveur` aucun corps d'issue ; la seconde passe de `vers-issues`,
+# hors classe : le texte vient du fichier local de la session ; `issue edit --append` de
+# `cycle-pr`, dont le script lit lui-même le corps (`issue_append`), et `patch-checkbox-gh.md`
+# (lot 7b), hors périmètre. Les **12** autres renvoient à un site ou le nomment — dont
+# l'amendement en place de `brief-agent.md`, sans lecture propre : il s'exécute à l'étape 5 de
+# `repercussions` —, ou publient un brief neuf (`triage`, `brief-agent.md`). Le renvoi « Relire le
+# corps — et le brief — juste avant d'écrire » de `repercussions`, sans le geste, nommait la
+# lecture fautive : épinglé avec elle (`INVARIANTS_DU_CONTEXTE_COURT`).
+REECRITURES_DE_CORPS = {
+    "bug-vers-issue-delegation-renvoi": BUG_VERS_ISSUE_SKILL,
+    "bug-vers-issue-etape-7-lu-par-la-session": BUG_VERS_ISSUE_SKILL,
+    "bug-vers-issue-erreurs-courantes-renvoi": BUG_VERS_ISSUE_SKILL,
+    "cycle-pr-append-lu-par-le-script-hors-perimetre": CYCLE_PR_SKILL,
+    "patch-checkbox-push-hors-perimetre-lot-7b": PATCH_CHECKBOX_REF,
+    "patch-checkbox-etag-mention": PATCH_CHECKBOX_REF,
+    "interroge-moi-delegation-renvoi": INTERROGE_MOI_SKILL,
+    "interroge-moi-decisions-indemne": INTERROGE_MOI_SKILL,
+    "interroge-moi-autre-issue-indemne": INTERROGE_MOI_SKILL,
+    "interroge-moi-prd-indemne": INTERROGE_MOI_SKILL,
+    "repercussions-delegation-renvoi": REPERCUSSIONS_SKILL,
+    "repercussions-corps-lu-par-la-session": REPERCUSSIONS_SKILL,
+    "repercussions-brief-lu-par-la-session": REPERCUSSIONS_SKILL,
+    "repercussions-doublon-lu-par-la-session": REPERCUSSIONS_SKILL,
+    "repercussions-completion-lue-par-la-session": REPERCUSSIONS_SKILL,
+    "brief-agent-publication-texte-neuf": BRIEF_AGENT_REF,
+    "brief-agent-amendement-en-place-renvoi": BRIEF_AGENT_REF,
+    "triage-disclaimer-mention": TRIAGE_SKILL,
+    "triage-decisions-renvoi-interroge-moi": TRIAGE_SKILL,
+    "triage-brief-texte-neuf": TRIAGE_SKILL,
+    "triage-brief-non-interroge-texte-neuf": TRIAGE_SKILL,
+    "vers-issues-delegation-renvoi": VERS_ISSUES_SKILL,
+    "vers-issues-seconde-passe-fichier-local": VERS_ISSUES_SKILL,
+}
+GESTE_DE_REECRITURE = re.compile(r"issue edit|brief write")
+
+
+def test_les_reecritures_de_corps_sont_celles_de_la_table() -> None:
+    """Un bloc neuf, ou retiré, rougit ici : la table se re-dénombre avant de changer. Le classement
+    que portent les clés est celui du dénombrement, lu bloc par bloc ; ce test ne le vérifie pas."""
+    assert sites_du_geste(GESTE_DE_REECRITURE) == sorted(REECRITURES_DE_CORPS.values())
 
 
 # Ce que la session de dialogue ne garde plus, et ce qu'un équipier ne reçoit plus (critère 2b :
@@ -3593,8 +3699,9 @@ def test_l_orchestration_ne_rend_pas_ce_qu_elle_a_retire(phrase: str) -> None:
 # Le contexte vivant que le lot 6b2 de #134 retire de `contradiction` et de `bug-vers-issue`
 # (2026-10-25) : une source lue dans la conversation — la conversation, ses derniers tours,
 # l'intake d'échec qui y est « capturé » —, la réouverture d'une issue, que `ecriture-relue.py`
-# n'a pas, et la lecture par le `releveur` du corps que l'étape 7 de `bug-vers-issue` patche
-# (relecture de la PR #155, passe 1, I2). `gh label create` est tenu par
+# n'a pas, et la lecture sans lecteur nommé, ou par le `releveur`, d'un corps que l'étape 7 de
+# `bug-vers-issue` ou l'étape 5 de `repercussions` réécrit (relecture de la PR #155, passe 1, I2 ;
+# dénombrement : `REECRITURES_DE_CORPS`). `gh label create` est tenu par
 # `SKILLS_SANS_ECRITURE_GH_DIRECTE`.
 #
 # **Population** de « conversation » et « derniers tours », par la forme, sur `ecae185`, base du
@@ -3609,7 +3716,8 @@ def test_l_orchestration_ne_rend_pas_ce_qu_elle_a_retire(phrase: str) -> None:
 # entre dans une exemption nommée ici. Les autres formes, sur `ecae185` : « capturé » à 4 lignes
 # (`bug-vers-issue` 3, `collecte-contexte.md` 1), « rouvrir » à 1. Chaque cas est rouge sur
 # `ecae185`, sauf les gabarits, à 0, et l'ancienne phrase d'I2, entrée au commit `57c049b` :
-# ceux-là sont vus rouges par mutation inverse.
+# ceux-là sont vus rouges par mutation inverse. Les trois formes de `repercussions` sont rouges sur
+# `a485d0a`.
 RETIRES_DU_CONTEXTE_VIVANT = {
     "contradiction-conversation": (CONTRADICTION_SKILL, "conversation"),
     "bug-vers-issue-conversation": (BUG_VERS_ISSUE_SKILL, "conversation"),
@@ -3624,6 +3732,12 @@ RETIRES_DU_CONTEXTE_VIVANT = {
         BUG_VERS_ISSUE_SKILL,
         "relu en octets par le `releveur`",
     ),
+    "repercussions-corps-relu-sans-lecteur": (
+        REPERCUSSIONS_SKILL,
+        "le corps courant relu en octets",
+    ),
+    "repercussions-brief-relu-sans-lecteur": (REPERCUSSIONS_SKILL, "même lecture en octets"),
+    "repercussions-relire-sans-lecteur": (REPERCUSSIONS_SKILL, "la lecture en octets ci-dessus"),
 }
 
 
