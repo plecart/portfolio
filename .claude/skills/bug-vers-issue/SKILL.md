@@ -16,7 +16,7 @@ L'issue de bug doit être **durable** (encore lisible après des refactos majeur
 
 La session garde le jugement : les questions de clarification, le choix des issues et des commits coupables, le propriétaire du sujet, issue unique ou découpage, la rédaction, le go. Le reste change de main :
 
-- **`releveur`** — les collectes (« Collectes ») : doublons et propriétaire du sujet par `gh issue list --search` sur les mots-clés que donne la session, issues récemment fermées touchant la zone, `git log` ; les lectures bornées (« Lectures bornées ») : l'intake d'échec écrit, le corps du plan QA autour de la case, l'issue d'implémentation et son PRD, le glossaire et `CLAUDE.md`, les fichiers d'automatisation qui pourraient posséder le sujet. Ce qui compte reste à la session ;
+- **`releveur`** — les collectes (« Collectes ») : doublons et propriétaire du sujet par `gh issue list --search` sur les mots-clés que donne la session, issues récemment fermées touchant la zone, `git log` ; les lectures bornées (« Lectures bornées ») : l'intake d'échec écrit, le corps du plan QA autour de la case — contexte des étapes 2 et 3, pas le corps que l'étape 7 patche —, l'issue d'implémentation et son PRD, le glossaire et `CLAUDE.md`, les fichiers d'automatisation qui pourraient posséder le sujet. Ce qui compte reste à la session ;
 - **script** — toute écriture sur la forge, par sa sous-commande de `.claude/skills/cycle-pr/scripts/ecriture-relue.py`, appelée par la session elle-même : un geste isolé coûte plus délégué (`CLAUDE.md`, « Orchestration ») — le commentaire sur une issue existante (`comment`, étape 3), la création (`issue create`, étape 6), le patch du plan QA (`issue edit --body-file`, étape 7) ;
 - **sessions distinctes** — cette session peut être démarrée par une autre : la session de QA (`execution-qa`), qui reprend la QA dans sa propre session, `repercussions` pour un brouillon, ou une session qui applique « Création d'issues en cours de cycle » (`.claude/rules/contraintes.md`) ; protocole commun : `.claude/skills/cycle-pr/references/sessions-liees.md`.
 
@@ -115,7 +115,7 @@ En cas de découpage : le parent d'abord, puis les enfants un par un, dans l'ord
 
 - Affiche l'URL de chaque issue créée.
 - Si piloté par un plan, patche le corps de l'issue du plan QA — `🔴 needs-issue` → `🔴 BUG #<nouveau-numéro>` sur la case qui échoue, et une entrée à l'**Index des constats** en bas du corps — par `issue edit <plan> --body-file <fichier>` :
-  - le corps courant relu en octets par le `releveur` (`gh api repos/{owner}/{repo}/issues/<plan> --jq .body`, sans le LF final que `--jq` ajoute) ;
+  - la session lit elle-même le corps courant, juste avant le patch, dans ce même `<fichier>` (`gh api repos/{owner}/{repo}/issues/<plan> --jq .body`, sans le LF final que `--jq` ajoute) ; il ne passe par le rapport d'aucun équipier, qui pourrait en convertir les fins de ligne ou les espaces (obs 87, 106) ;
   - les remplacements se font en mémoire, par correspondance exacte de ligne complète, chaque ancienne ligne trouvée une seule fois, sinon s'arrêter et le dire au mainteneur (`execution-qa/references/patch-checkbox-gh.md`, « Construire le patch en mémoire » et « Détecter les éditions concurrentes » — leurs règles de correspondance seules : sa lecture et son push sont ceux de cette étape) ;
   - le résultat est écrit tel quel dans le fichier, ses fins de ligne gardées : le script relit contre ce fichier et ne voit pas une conversion (obs 87).
 - Dis au mainteneur que le bug est consigné et que le plan a été mis à jour.

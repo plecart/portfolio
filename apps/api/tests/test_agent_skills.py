@@ -1600,6 +1600,7 @@ REPERCUSSIONS_SKILL = ".claude/skills/repercussions/SKILL.md"
 CONTRADICTION_SKILL = ".claude/skills/contradiction/SKILL.md"
 BUG_VERS_ISSUE_SKILL = ".claude/skills/bug-vers-issue/SKILL.md"
 COLLECTE_CONTEXTE_REF = ".claude/skills/bug-vers-issue/references/collecte-contexte.md"
+GABARIT_BUG_REF = ".claude/skills/bug-vers-issue/references/gabarit-issue-bug.md"
 GABARIT_DECOUPAGE_REF = ".claude/skills/bug-vers-issue/references/gabarit-issue-decoupage.md"
 THEMES_MILESTONES_REF = ".claude/skills/triage/themes-milestones.md"
 BRIEF_AGENT_REF = ".claude/skills/triage/brief-agent.md"
@@ -3407,11 +3408,33 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         BUG_VERS_ISSUE_SKILL,
         "par `issue edit <plan> --body-file <fichier>`",
     ),
-    "6b2-bug-vers-issue-corps-relu-en-octets": (
+    # Relecture de la PR #155, passe 1, I2 : le corps qui se patche ne transite par aucun rapport
+    # (obs 87, 106). Classe : une lecture de corps distant, destinée à une réécriture, confiée hors
+    # de la session. Dénombrement par la forme du geste (obs 139), `grep -rn "issue edit"
+    # .claude/skills/contradiction .claude/skills/bug-vers-issue` : 3 lignes, **1** réécriture —
+    # l'étape 7 ; la « Délégation » et « Erreurs courantes » y renvoient. Les autres lectures du
+    # plan sont du contexte (étapes 2 et 3), bornées dans la « Délégation ». L'ancienne phrase est
+    # tenue absente par `RETIRES_DU_CONTEXTE_VIVANT`.
+    "6b2-bug-vers-issue-corps-lu-par-la-session": (
         BUG_VERS_ISSUE_SKILL,
         (
-            "le corps courant relu en octets par le `releveur` (`gh api"
-            " repos/{owner}/{repo}/issues/<plan> --jq .body`, sans le LF final que `--jq` ajoute)"
+            "la session lit elle-même le corps courant, juste avant le patch, dans ce même"
+            " `<fichier>` (`gh api repos/{owner}/{repo}/issues/<plan> --jq .body`, sans le LF final"
+            " que `--jq` ajoute)"
+        ),
+    ),
+    "6b2-bug-vers-issue-corps-par-aucun-rapport": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "il ne passe par le rapport d'aucun équipier, qui pourrait en convertir les fins de"
+            " ligne ou les espaces"
+        ),
+    ),
+    "6b2-bug-vers-issue-releveur-pas-le-corps-patche": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "le corps du plan QA autour de la case — contexte des étapes 2 et 3, pas le corps que"
+            " l'étape 7 patche —"
         ),
     ),
     "6b2-bug-vers-issue-remplacements-en-memoire": (
@@ -3550,19 +3573,38 @@ def test_l_orchestration_ne_rend_pas_ce_qu_elle_a_retire(phrase: str) -> None:
 
 # Le contexte vivant que le lot 6b2 de #134 retire de `contradiction` et de `bug-vers-issue`
 # (2026-10-25) : une source lue dans la conversation — la conversation, ses derniers tours,
-# l'intake d'échec qui y est « capturé » —, et la réouverture d'une issue, que `ecriture-relue.py`
-# n'a pas. **Population**, par la forme, relevée sur `ecae185`, base du lot : « conversation » à
-# 7 lignes (`contradiction` 4, `bug-vers-issue` 2, `collecte-contexte.md` 1), « derniers tours »
-# à 1, « capturé » à 4 (`bug-vers-issue` 3, `collecte-contexte.md` 1), « rouvrir » à 1 — chaque
-# cas y est rouge. `gh label create` est tenu par `SKILLS_SANS_ECRITURE_GH_DIRECTE`.
+# l'intake d'échec qui y est « capturé » —, la réouverture d'une issue, que `ecriture-relue.py`
+# n'a pas, et la lecture par le `releveur` du corps que l'étape 7 de `bug-vers-issue` patche
+# (relecture de la PR #155, passe 1, I2). `gh label create` est tenu par
+# `SKILLS_SANS_ECRITURE_GH_DIRECTE`.
+#
+# **Population** de « conversation » et « derniers tours », par la forme, sur `ecae185`, base du
+# lot — `git show ecae185:<fichier> | grep -n -i -E "conversation|derniers tours"` sur les cinq
+# fichiers des deux skills : **8** formes, `contradiction` 4, `bug-vers-issue` 2,
+# `collecte-contexte.md` 2 (titre §1, « ~10 derniers tours »), les deux gabarits 0. Au commit
+# `57c049b`, la table en gardait 3, par leur phrase, et 5 fuyaient (relecture de la PR #155,
+# passe 1, I1 ; classe : un échantillon déclaré inventaire, obs 127). « conversation » est donc
+# gardé dans chacun des cinq fichiers, liste littérale (obs 80) tenue égale aux dossiers des deux
+# skills. Le critère « 6a, 6b » du brief de #134 tolère une mention de dialogue avec le
+# mainteneur ; il n'y en a aucune aujourd'hui, d'où le zéro : une mention ajoutée se reformule, ou
+# entre dans une exemption nommée ici. Les autres formes, sur `ecae185` : « capturé » à 4 lignes
+# (`bug-vers-issue` 3, `collecte-contexte.md` 1), « rouvrir » à 1. Chaque cas est rouge sur
+# `ecae185`, sauf les gabarits, à 0, et l'ancienne phrase d'I2, entrée au commit `57c049b` :
+# ceux-là sont vus rouges par mutation inverse.
 RETIRES_DU_CONTEXTE_VIVANT = {
     "contradiction-conversation": (CONTRADICTION_SKILL, "conversation"),
     "bug-vers-issue-conversation": (BUG_VERS_ISSUE_SKILL, "conversation"),
     "collecte-contexte-conversation": (COLLECTE_CONTEXTE_REF, "conversation"),
+    "gabarit-issue-bug-conversation": (GABARIT_BUG_REF, "conversation"),
+    "gabarit-issue-decoupage-conversation": (GABARIT_DECOUPAGE_REF, "conversation"),
     "collecte-contexte-derniers-tours": (COLLECTE_CONTEXTE_REF, "derniers tours"),
     "bug-vers-issue-intake-capture": (BUG_VERS_ISSUE_SKILL, "capturé"),
     "collecte-contexte-intake-capture": (COLLECTE_CONTEXTE_REF, "capturé"),
     "bug-vers-issue-rouvrir": (BUG_VERS_ISSUE_SKILL, "rouvrir"),
+    "bug-vers-issue-corps-patche-lu-par-le-releveur": (
+        BUG_VERS_ISSUE_SKILL,
+        "relu en octets par le `releveur`",
+    ),
 }
 
 
@@ -3574,6 +3616,22 @@ RETIRES_DU_CONTEXTE_VIVANT = {
 def test_le_contexte_vivant_retire_ne_revient_pas(fichier: str, forme: str) -> None:
     """Une forme retirée qui reste écrite se rejoue : la session suit le texte, pas l'intention."""
     assert not porte_la_forme(fichier, forme), f"`{fichier}` porte encore « {forme} »"
+
+
+def test_la_conversation_est_gardee_dans_chaque_fichier_des_deux_skills() -> None:
+    """Un fichier ajouté à `contradiction` ou à `bug-vers-issue` rougit ici tant que la table ne
+    garde pas le mot chez lui : le critère « 6a, 6b » lit le dossier entier."""
+    gardes = {
+        fichier for fichier, forme in RETIRES_DU_CONTEXTE_VIVANT.values() if forme == "conversation"
+    }
+    dossiers = {
+        path.relative_to(REPOSITORY_ROOT).as_posix()
+        for skill in ("contradiction", "bug-vers-issue")
+        for path in (REPOSITORY_ROOT / ".claude/skills" / skill).rglob("*")
+        if path.is_file()
+    }
+
+    assert gardes == dossiers
 
 
 # L'**ordre** du protocole de la coordinatrice : chaque couple d'ancres, la première avant la
