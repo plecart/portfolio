@@ -49,7 +49,9 @@ RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/g
     github.com/rclone/rclone@v1.75.2
 
 
-FROM base
+# `paquets` : l'étage que la CI reconstruit à chaque build, sans son cache (`ci.yml`) — les paquets
+# d'Alpine suivent ses dépôts, pas un fichier du dépôt qu'une clé de cache suivrait.
+FROM base AS paquets
 
 # `pg_dump` de la majeure du serveur, 16 (décision 2) : une archive écrite par un `pg_dump` plus
 # récent n'est pas garantie lisible par un serveur plus ancien — un test tient l'égalité. Les

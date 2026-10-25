@@ -28,6 +28,7 @@ import yaml
 from call_witness import recording, witnessed
 from config.env import Env
 from test_supply_chain import (
+    DOCKER_FROM,
     dockerfile_instructions,
     prose_citations,
     repository_files,
@@ -526,6 +527,50 @@ def test_la_ci_donne_a_chaque_image_son_entree_de_cache(job: str, entries: int) 
 
     services = [path.parent.name for path in IMAGE_DOCKERFILES]
     assert tags == {service: [service] * entries for service in services}
+
+
+# L'étage qui installe des paquets du système, et que la CI reconstruit à chaque build : leur
+# version suit les dépôts de la distribution, qu'aucune clé de cache ne suit.
+PACKAGE_STAGE = "paquets"
+PACKAGE_INSTALL = re.compile(r"^RUN\b.*\b(?:apk add|apt-get install|apt install)\b", re.IGNORECASE)
+
+
+def package_install_stages(text: str) -> list[str | None]:
+    """L'étage de chaque `RUN` du Dockerfile qui installe des paquets du système — `None` pour un
+    étage sans nom."""
+    stage, stages = None, list[str | None]()
+    for _, whole in dockerfile_instructions(text):
+        if declaration := DOCKER_FROM.match(whole):
+            stage = declaration["stage"]
+        elif PACKAGE_INSTALL.match(whole.lstrip()):
+            stages.append(stage)
+    return stages
+
+
+def test_les_paquets_du_systeme_s_installent_dans_l_etage_paquets() -> None:
+    """Hors de l'étage `paquets`, une installation resterait en cache : la couche garderait des
+    paquets corrigés depuis, que le scan trouve vulnérables — mesuré le 2026-10-24 (run
+    40103586324) : `apk add` restauré du cache, `brotli-libs` 1.2.0-r1 HIGH dans `backup` ;
+    reconstruit à froid le lendemain (run 40222600252), 0 au scan."""
+    stages = [
+        stage
+        for dockerfile in IMAGE_DOCKERFILES
+        for stage in package_install_stages(dockerfile.read_text(encoding="utf-8"))
+    ]
+
+    assert stages, "aucune installation de paquets lue — sa forme a-t-elle changé ?"
+    assert set(stages) == {PACKAGE_STAGE}
+
+
+@pytest.mark.parametrize("job", CACHED_BUILDS)
+def test_la_ci_reconstruit_l_etage_paquets_a_chaque_build(job: str) -> None:
+    """`infra` et `publish` reconstruisent l'étage `paquets` sans le cache. `publish` aussi : quand
+    la clé d'`infra` existait déjà, `infra` ne réécrit pas l'entrée, et `publish` restaurerait
+    l'ancienne couche."""
+    flags = ci_build_flags(job)
+    assert flags, f"aucune étape du job `{job}` ne passe `DOCKER_BUILD_FLAGS`"
+
+    assert f"--no-cache-filter {PACKAGE_STAGE}" in " ".join(flags.split())
 
 
 @pytest.mark.parametrize(

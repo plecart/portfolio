@@ -96,10 +96,12 @@ PUBLISH_PUSH = f'make push IMAGE_PREFIX={PUBLISH_PREFIX} IMAGE_TAG="$GITHUB_SHA"
 PUBLISH_PRUNE = f"make prune IMAGE_PREFIX={PUBLISH_PREFIX}"
 
 # Les drapeaux du build, seule variable de son étape : l'image chargée dans le moteur, où Trivy la
-# lit, sans attestation (décision 7), depuis le cache d'`infra`. Mot pour mot : un drapeau de plus
-# (`--push`, `--output type=registry`) enverrait l'image au registre avant son scan.
+# lit, sans attestation (décision 7), depuis le cache d'`infra` sauf l'étage `paquets`. Mot pour
+# mot : un drapeau de plus (`--push`, `--output type=registry`) enverrait l'image au registre
+# avant son scan.
 PUBLISH_BUILD_FLAGS = (
-    "--load --cache-from type=local,src=/tmp/buildx-cache,tag=$* --provenance=false --sbom=false"
+    "--load --no-cache-filter paquets --cache-from type=local,src=/tmp/buildx-cache,tag=$*"
+    " --provenance=false --sbom=false"
 )
 # L'environnement des étapes qui parlent au registre : le jeton du job, rien d'autre.
 WORKFLOW_TOKEN_ENV = {"GH_TOKEN": "${{ github.token }}"}
