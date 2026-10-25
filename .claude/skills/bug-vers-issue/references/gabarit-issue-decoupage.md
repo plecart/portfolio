@@ -2,7 +2,7 @@
 
 À utiliser uniquement lorsque l'utilisateur rapporte des symptômes avec des **causes racines clairement séparables** que différentes personnes pourraient corriger en parallèle. Sinon, consigne une seule issue.
 
-Crée les issues dans l'**ordre des dépendances** : le parent d'abord, puis les enfants sans bloqueurs, puis les enfants bloqués par des enfants précédents. Ainsi chaque champ « Bloqué par » peut référencer de vrais numéros d'issue.
+Crée les issues dans l'**ordre des dépendances**, une `issue create` à la fois (SKILL.md, étape 6) : le parent d'abord, puis les enfants sans bloqueurs, puis les enfants bloqués par des enfants précédents. Ainsi chaque champ « Bloqué par » peut référencer de vrais numéros d'issue.
 
 ## Issue parente (de suivi)
 

@@ -1,7 +1,7 @@
 ---
 name: contradiction
-description: Réconcilie une décision prise en conversation avec les sources de vérité qu'elle contredit — amende le § du document concerné, archive le raisonnement, puis propage aux rangs inférieurs et aux issues ouvertes. À utiliser quand la règle decisions-vs-doc a levé un arrêt, ou « cette décision contredit la doc », « répercute cette décision dans la doc ».
-argument-hint: "[la décision, ou le § contredit]"
+description: Réconcilie une décision arrêtée avec le mainteneur et les sources de vérité qu'elle contredit — amende le § du document concerné par une PR, archive le raisonnement, puis propage aux rangs inférieurs et aux issues ouvertes. À utiliser quand la règle decisions-vs-doc a levé un arrêt, ou « cette décision contredit la doc », « répercute cette décision dans la doc ».
+argument-hint: "[le bloc d'arrêt de decisions-vs-doc : fichier §, rang, Avant, Après] [origine : #<N>]"
 ---
 
 # Contradiction
@@ -10,13 +10,13 @@ Mouvement **amont** de la pipeline, symétrique de `repercussions`.
 
 | | `contradiction` | `repercussions` |
 |---|---|---|
-| Déclencheur | une **décision de conversation**, ou un § falsifié par un merge que `repercussions` lui remonte | un **merge** |
+| Déclencheur | une décision arrêtée avec le mainteneur (l'arrêt `decisions-vs-doc`), ou un § falsifié par un merge que `repercussions` lui remonte | un **merge** |
 | Ce qui falsifie | la décision qui vient d'être prise | le diff mergé |
 | Ce qui devient faux | un **§ de document**, puis les issues | des **corps d'issues** |
 
 Les deux partagent la même discipline : **deux citations ou rien**, un diff avant/après, et aucune
 écriture sans « go ». Ce skill ne la réimplémente pas côté issues — il **délègue à
-`repercussions`** une fois le document amendé.
+`repercussions`** une fois l'amendement mergé (étape 5).
 
 ## Le livrable est un § amendé
 
@@ -25,24 +25,51 @@ Les deux partagent la même discipline : **deux citations ou rien**, un diff ava
 - **Le raisonnement ne va pas dans le document normatif.** Les documents des rangs supérieurs ne
   portent que l'**état courant**. Le pourquoi, les options écartées et la date vont dans
   l'emplacement **Non normatif** déclaré par la table « Sources de vérité » de
-  `.claude/pipeline.config.md` — s'il n'en déclare aucun, le raisonnement reste dans la conversation
-  et dans le body de la PR.
+  `.claude/pipeline.config.md` — s'il n'en déclare aucun, le raisonnement va dans le body de la PR
+  qui porte l'amendement.
 - **Pas d'amendement formulable = pas de contradiction.** On se tait.
 
 **Règle d'or** : ce skill **propose**, il n'écrit jamais en silence. Aucune édition sans « go »
-explicite.
+explicite, et toute écriture de dépôt de ce skill part par une PR (D-12 de #134 ; étape 4).
+
+## Délégation
+
+La session garde le jugement : vérifier la contradiction et son rang, mener la recherche « par
+affirmation », présenter les amendements et la reco, demander le go. Le reste change de main :
+
+- **`releveur`** — les lectures bornées (« Lectures bornées ») : la table « Sources de vérité »,
+  les passages des documents autour des ancres données, la carte des miroirs et des renvois ; les
+  collectes de la cascade (« Collectes ») : par ancre lexicale et par dénombrement, sur les termes
+  que donne la session (étape 2) ; la vérification `context7` d'une reco (« Questions de
+  documentation », étape 3). Reconnaître une même affirmation sous d'autres mots — la recherche
+  « par affirmation » — reste à la session, sur les passages rendus ;
+- **`executant`** — l'amendement de l'étape 4 : la table des édits (§§, journal, archive,
+  répercussions hors documents), appliquée exactement et commitée ;
+- **session distincte** — `repercussions` (étape 5) ; protocole commun :
+  `.claude/skills/cycle-pr/references/sessions-liees.md`.
 
 ## Process
 
 ### 1. Établir la contradiction et son rang
 
-Sans argument, la contradiction est celle du **dernier** arrêt `decisions-vs-doc` de la
-conversation ; avec un argument — une décision ou un § —, c'est lui qu'on confronte : sans arrêt qui
-l'ait établi, dérouler d'abord `decisions-vs-doc` — deux citations, sinon on se tait.
+L'entrée est l'arrêt écrit : le bloc `## ⚠️ Contradiction` de `.claude/rules/decisions-vs-doc.md`
+(fichier §, rang, Avant, Après), passé en argument — par la session qui l'a levé, qui le recopie en
+invoquant le skill, ou par le prompt de la session que `repercussions` démarre, qui y ajoute
+`origine : #<N>`. Sans argument, la session s'arrête et demande les deux citations. Une décision ou
+un § passé sans arrêt qui l'ait établi : dérouler d'abord `decisions-vs-doc` — deux citations,
+sinon on se tait.
 
-Reprendre les deux citations de l'arrêt (`.claude/rules/decisions-vs-doc.md`) et les **vérifier
-dans le fichier** — pas de mémoire, on relit la ligne. Puis lire la table « Sources de vérité » de
-`.claude/pipeline.config.md` pour situer le **rang** touché.
+**Démarrée par une autre**, cette session vit dans son propre worktree, coupé sans fetch sur sa
+source (`.claude/skills/cycle-pr/references/sessions-liees.md`, « Premier geste ») : son premier
+geste lit les documents sur le trunk à jour,
+`git fetch origin && git switch --detach origin/<trunk>` (`<trunk>` :
+`.claude/pipeline.config.md`). Aucune branche à créer : l'amendement part du worktree isolé de
+l'`executant` (étape 4).
+
+Reprendre les deux citations de l'arrêt et les **vérifier dans le fichier** — pas de mémoire, on
+relit la ligne. Cette relecture reste à la session : c'est une lecture, un geste isolé
+(`CLAUDE.md`, « Orchestration »). Puis situer le **rang** touché dans la table « Sources de
+vérité » de `.claude/pipeline.config.md`, qu'un `releveur` rend.
 
 Si la contradiction porte sur plusieurs documents, **le rang le plus haut commande** : on amende
 là, et les rangs inférieurs suivent en cascade. Amender la spec UX sans toucher le cadrage qu'elle
@@ -50,7 +77,9 @@ spécifie produit deux documents divergents — soit une contradiction de plus.
 
 ### 2. Mesurer la cascade
 
-Chercher les §§ qui **dépendent** de celui qu'on amende, par **trois recherches distinctes** :
+Chercher les §§ qui **dépendent** de celui qu'on amende, par **trois recherches distinctes** — la
+première et la troisième partent au `releveur`, avec les termes que donne la session ; la deuxième
+reste à la session, sur les passages qu'il rend :
 
 1. **Par ancre lexicale** — noms de symboles, routes, champs, valeurs : `grep` dans tous les
    fichiers de rang égal ou inférieur, plus les renvois explicites (« voir §x », « cadrage §x »).
@@ -108,14 +137,29 @@ cascade est large. Une section close ne se rouvre pas parce que c'était plus ra
 
 **Une reco qui oppose deux mécanismes techniques se vérifie avant d'être présentée.** Quand
 l'argument est « l'outil fait X » — un rendu qui insère de l'HTML, un client qui rejoue, une
-fusion par défaut —, lire ce que fait réellement la bibliothèque dans sa documentation à jour
-(`context7`) et citer dans la ligne de reco ce qui a été vérifié (« vérifié : X n'insère pas
-d'HTML »). Une reco fondée sur la sécurité n'y échappe pas : c'est celle qu'on conteste le moins,
-donc celle qui trompe le plus longtemps.
+fusion par défaut —, un `releveur` pose la question à la documentation à jour de la bibliothèque
+(`context7`) et rend le passage cité mot pour mot ; la conclusion reste à la session, qui cite dans
+la ligne de reco ce qui a été vérifié (« vérifié : X n'insère pas d'HTML »). Une doc absente de
+l'index, ou plusieurs candidates, remonte à la session, qui la lit à la source. Une reco fondée
+sur la sécurité n'y échappe pas : c'est celle qu'on conteste le moins, donc celle qui trompe le
+plus longtemps.
 
-### 4. Appliquer — sur « go » explicite
+### 4. Appliquer — sur « go » explicite, par une PR
 
-Dans l'ordre, sans en sauter :
+Sur « go », l'amendement part par une PR, jamais par un commit direct sur le trunk (D-12 de
+#134) :
+
+- **dans une session PR**, il entre dans sa PR, par un commit de son `developpeur`
+  (`.claude/skills/cycle-pr/SKILL.md`, 3.1) ou de son `executant` (`.claude/agents/executant.md`,
+  « Ton commit ») ;
+- **hors PR** — une session de tri, d'interrogatoire ou de `vers-issues`, ou celle que
+  `repercussions` démarre —, une PR d'amendement, au déroulé de `.claude/skills/triage/hors-scope.md`
+  (« Quand écrire », étapes 5 et 6) : un `executant` en isolation `worktree`, jamais dans le
+  dossier partagé, applique la table des édits et commite sur une branche partie de
+  `origin/<trunk>` ; la session pousse la branche, ouvre la PR, la relit et la merge au go du
+  mainteneur.
+
+La table des édits porte, dans le même commit, ces quatre gestes, dans l'ordre, sans en sauter :
 
 1. **Amender chaque §** exactement comme présenté. Ne jamais profiter de l'édition pour reformuler
    autre chose. Dans les §§ alignés, **écrire la même formulation partout** : deux énoncés
@@ -129,24 +173,38 @@ Dans l'ordre, sans en sauter :
 4. **Répercuter hors documents** ce que l'étape 2 a listé (`pipeline.config.md`, `CLAUDE.md`),
    **dans le même commit** que l'amendement — `.claude/rules/contraintes.md` l'exige.
 
-### 5. Propager aux issues — invoquer `repercussions`
+### 5. Propager aux issues — la session `repercussions`
 
-Ne pas réimplémenter. Invoquer `repercussions` en lui donnant l'**amendement comme delta réel**, à
-la place d'un diff mergé : ses étapes 2 à 6 s'appliquent telles quelles — ancres, périmètre
-thème + match, deux citations, classement dormante / en vol, édition sur « go ».
+Le mode qui confronte un amendement aux issues vit dans `repercussions`, étape 1 (« PR
+d'amendement ») : ce skill ne le recopie pas.
 
-Deux ajustements, à annoncer en le lançant :
+- **Dans une session PR**, l'amendement fait partie du delta de sa PR : la passe `repercussions`
+  de `cycle-pr` Étape 8 le confronte aux issues — rien à démarrer ici.
+- **Hors PR**, au merge de la PR d'amendement, dans le tour du go du mainteneur, démarrer la
+  session `repercussions` : `start_session`, `initiation: user_asked`, `context: fresh`,
+  `use_worktree: true`, et
+  - **avec `origine : #<N>`** reçue à l'étape 1 : `name: repercussions-<N>`, prompt
+    `/repercussions #<N>` — la passe reprend sur l'issue fermée, contre la doc amendée ;
+  - **sans origine** : `name: repercussions-<m>`, prompt `/repercussions #<m>`, où `<m>` est le
+    numéro de la PR d'amendement (mode « PR d'amendement »).
 
-- **Son étape 7 ne s'applique pas** : aucun thème ne s'est vidé, il n'y a pas de campagne de QA à
-  proposer.
-- **La ligne de Journal de spec** référence l'amendement (« Réconciliée avec l'amendement du
-  cadrage §9.3 du 26 août 2026 »), pas un numéro d'issue fermée.
+  Hors d'un tour du mainteneur, une carte de proposition (`initiation: own_initiative`,
+  `context: fresh`, `use_worktree: true`, même nom et même prompt). Le worktree propre a la raison
+  que la « Délégation » de `repercussions` donne aux sessions qu'elle démarre.
 
 ### 6. Récapituler
 
-Les §§ amendés, l'entrée d'archive créée, ce qui a été répercuté hors documents, ce que
-`repercussions` a fait des issues, et **ce qui reste ouvert**. Une cascade laissée à moitié est
-pire que la contradiction de départ : elle est invisible.
+Au mainteneur : le numéro de la PR qui porte l'amendement, les §§ amendés, l'entrée d'archive
+créée, ce qui a été répercuté hors documents, la propagation aux issues — la session
+`repercussions` démarrée, ou la passe de `cycle-pr` Étape 8 dans une session PR —, et **ce qui
+reste ouvert**. Une cascade laissée à moitié est pire que la contradiction de départ : elle est
+invisible.
+
+**Session démarrée par une autre** — par `repercussions` (son prompt système nomme le parent,
+`.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») : le récapitulatif fait,
+prévenir le parent par le message de fin de la même référence (« Fin de travail »), dont le
+suffixe « — enfants au travail : `local_…` » nomme la session `repercussions` qu'elle a démarrée —
+la fin du tour ne le prévient pas. La session qui l'archive nettoie cette enfant (« Nettoyage »).
 
 ## Ce que ce skill ne fait pas
 
@@ -154,9 +212,10 @@ pire que la contradiction de départ : elle est invisible.
   active. Ce skill part d'une contradiction déjà établie.
 - **Il ne tranche pas.** Il présente l'amendement et la cascade ; le mainteneur décide si la
   décision vaut son prix. Une cascade large est un argument **contre** la décision, pas pour.
-- **Il n'édite aucune issue lui-même.** C'est `repercussions`, étape 5.
-- **Il ne touche pas au code.** Une décision qui périme du code déjà écrit produit une issue, pas
-  une édition sauvage.
+- **Il n'édite aucune issue lui-même.** C'est `repercussions`, à l'étape 5 — sa propre session, ou
+  la passe de `cycle-pr` Étape 8 dans une session PR.
+- **Il ne touche pas au code.** Une décision qui périme du code déjà écrit suit « Création
+  d'issues en cours de cycle » (`.claude/rules/contraintes.md`), pas une édition sauvage.
 
 ## Les 3 idées à retenir
 
