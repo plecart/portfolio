@@ -704,11 +704,9 @@ HOUSE_SKILLS = (
 # au 2026-10-20 sur `e70e279`, onze, dont `init-projet`, qui ne nomme les cinq rôles que dans sa
 # liste de fichiers ; dix au 2026-10-23 sur `34604c7` (lot 6a2, bloc 1), qui en sort `triage` ;
 # sept au commit suivant (bloc 2), qui en sort `interroge-moi`, `vers-prd` et `vers-issues` ; six
-# au 2026-10-23 (lot 6b, bloc 1), qui en sort `repercussions`. La liste se vide lot par lot ; #134
-# l'exige vide.
+# au 2026-10-23 (lot 6b, bloc 1), qui en sort `repercussions` ; quatre au 2026-10-25 (lot 6b2),
+# qui en sort `bug-vers-issue` et `contradiction`. La liste se vide lot par lot ; #134 l'exige vide.
 EXECUTOR_WAITING_LIST = {
-    "bug-vers-issue": "6b",
-    "contradiction": "6b",
     "plan-qa": "7a",
     "execution-qa": "7b",
     "audit-spec-ui": "8",
@@ -820,8 +818,9 @@ def test_chaque_skill_maison_nomme_ses_executants(skill: str) -> None:
     Au 2026-10-20 sur `e70e279`, deux sur treize (`cycle-pr`, `pr-paralleles`) ; trois au
     2026-10-23 sur `34604c7` avec `triage` (lot 6a2, bloc 1), six au commit suivant avec
     `interroge-moi`, `vers-prd` et `vers-issues` (bloc 2), sept le 2026-10-23 avec `repercussions`
-    (lot 6b, bloc 1) ; les six autres sont dans `EXECUTOR_WAITING_LIST` avec le lot qui les en
-    sort.
+    (lot 6b, bloc 1), neuf le 2026-10-25 avec `bug-vers-issue` et `contradiction` (lot 6b2) ; les
+    quatre autres — `plan-qa`, `execution-qa`, `audit-spec-ui`, `init-projet` — sont dans
+    `EXECUTOR_WAITING_LIST` avec le lot qui les en sort.
     """
     assert cites_an_executor(skill_prose(skill), ROLE_NAMES), (
         f"`{skill}` ne nomme aucun rôle ni aucun script, et n'est pas en liste d'attente"
@@ -840,16 +839,26 @@ def test_un_skill_en_liste_d_attente_ne_nomme_encore_aucun_executant(skill: str)
 
 # Les skills dont la prose n'écrit plus sur la forge que par l'écriture distante relue (#134,
 # lot 4) : chaque lot de #134 y ajoute les siens — le lot 6a2 `triage`, `interroge-moi`, `vers-prd`
-# et `vers-issues` ; le lot 6b `repercussions` (bloc 1), puis ses autres skills ; les lots 7a à 8
-# les leurs.
+# et `vers-issues` ; le lot 6b `repercussions` (bloc 1) ; le lot 6b2 `bug-vers-issue` et
+# `contradiction` ; les lots 7a à 8 les leurs.
 SKILLS_SANS_ECRITURE_GH_DIRECTE = (
     "triage",
     "interroge-moi",
     "vers-prd",
     "vers-issues",
     "repercussions",
+    "bug-vers-issue",
+    "contradiction",
 )
 ECRITURE_RELUE = ".claude/skills/cycle-pr/scripts/ecriture-relue.py"
+# Les skills de la table précédente qui n'écrivent sur aucune issue, chacun avec sa raison : le
+# renvoi au script y serait sans objet (lot 6b2 de #134, 2026-10-25).
+ECRITURE_RELUE_SANS_OBJET = {
+    "contradiction": (
+        "n'écrit sur aucune issue : ses PR d'amendement suivent le déroulé de"
+        " `triage/hors-scope.md`, et la propagation aux issues passe par la session `repercussions`"
+    ),
+}
 
 # Une commande `gh` citée, jusqu'à son accent grave fermant ou sa fin de ligne.
 GH_COMMAND = re.compile(r"(?<![\w-])gh\s+(?P<group>[a-z][\w-]*)(?P<args>[^`\n]*)")
@@ -932,7 +941,8 @@ def test_un_skill_sans_ecriture_gh_directe_n_en_cite_aucune(skill: str) -> None:
     distant ») : au 2026-10-23 sur `aba63e1`, `triage` en portait quatre, toutes dans
     `themes-milestones.md`, `vers-issues` une (`gh issue edit <n> --milestone`), `interroge-moi`
     et `vers-prd` aucune — leurs écritures n'y étaient décrites qu'en prose. Le 2026-10-23 (lot 6b,
-    bloc 1), `repercussions` une : le `gh api -X PATCH` de son brief.
+    bloc 1), `repercussions` une : le `gh api -X PATCH` de son brief. Le 2026-10-25 (lot 6b2),
+    `bug-vers-issue` deux (`gh issue create`, `gh label create`), `contradiction` aucune.
 
     **Population** : `SKILLS_SANS_ECRITURE_GH_DIRECTE`, le `SKILL.md` et les références de chacun.
     **Ce que le détecteur ne voit pas** : une écriture décrite sans commande (« publie un
@@ -944,16 +954,32 @@ def test_un_skill_sans_ecriture_gh_directe_n_en_cite_aucune(skill: str) -> None:
     assert not writes, f"`{skill}` écrit par `gh` : {writes}"
 
 
-@pytest.mark.parametrize("skill", SKILLS_SANS_ECRITURE_GH_DIRECTE)
-def test_un_skill_sans_ecriture_gh_directe_cite_l_ecriture_relue(skill: str) -> None:
-    """Le revers du précédent : ses écritures nomment le script qui les relit."""
+def cites_ecriture_relue(skill: str) -> bool:
+    """Vrai si la prose de `skill` cite `ECRITURE_RELUE`, résolu depuis son `SKILL.md`."""
     citing = REPOSITORY_ROOT / ".claude/skills" / skill / "SKILL.md"
-    cited = {
+    return ECRITURE_RELUE in {
         script_target(REPOSITORY_ROOT, citing, reference)
         for reference in SCRIPT_REFERENCE.finditer(skill_prose(skill))
     }
 
-    assert ECRITURE_RELUE in cited, f"`{skill}` ne cite pas `{ECRITURE_RELUE}`"
+
+@pytest.mark.parametrize(
+    "skill",
+    [skill for skill in SKILLS_SANS_ECRITURE_GH_DIRECTE if skill not in ECRITURE_RELUE_SANS_OBJET],
+)
+def test_un_skill_sans_ecriture_gh_directe_cite_l_ecriture_relue(skill: str) -> None:
+    """Le revers du précédent : ses écritures nomment le script qui les relit."""
+    assert cites_ecriture_relue(skill), f"`{skill}` ne cite pas `{ECRITURE_RELUE}`"
+
+
+@pytest.mark.parametrize("skill", ECRITURE_RELUE_SANS_OBJET)
+def test_une_exemption_du_renvoi_a_l_ecriture_relue_reste_sans_objet(skill: str) -> None:
+    """Le cliquet de l'exemption : elle ne vaut que pour un skill de la table, qui ne cite pas le
+    script — le jour où il le cite, l'exemption tombe."""
+    assert skill in SKILLS_SANS_ECRITURE_GH_DIRECTE, f"`{skill}` est exempté hors de la table"
+    assert not cites_ecriture_relue(skill), (
+        f"`{skill}` cite `{ECRITURE_RELUE}` : retire-le d'`ECRITURE_RELUE_SANS_OBJET`"
+    )
 
 
 # `git diff A..B` compare deux **arbres** ; ce n'est pas une plage de commits. Entre le trunk et la
@@ -1497,6 +1523,8 @@ SKILLS_DES_SESSIONS_LIEES = [
     ".claude/skills/vers-prd/SKILL.md",
     ".claude/skills/vers-issues/SKILL.md",
     ".claude/skills/repercussions/SKILL.md",
+    ".claude/skills/contradiction/SKILL.md",
+    ".claude/skills/bug-vers-issue/SKILL.md",
 ]
 
 
@@ -1520,7 +1548,7 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 # sur l'enfant jetable (l'enfant lit son parent dans son prompt, la porte du nettoyage compare
 # l'échafaudage à sa source — journal de spec de #107, 2026-10-16). La commande du
 # premier geste porte trois invariants à elle seule (`origin/`, `--no-track`, `&&`). Gardés
-# ailleurs : les renvois (`SKILLS_DES_SESSIONS_LIEES`, sept au 2026-10-23), le point de départ
+# ailleurs : les renvois (`SKILLS_DES_SESSIONS_LIEES`, neuf au 2026-10-25), le point de départ
 # `origin/` (`DEPARTS_EXPLICITES`), la porte du nettoyage (`PORTES_PRESCRITES`). Restent en
 # lecture, à dessein : les formes du message de fin autres que celle d'un lot — sauf celle de fin
 # d'interrogatoire, que l'étape 0 de `pr-paralleles` consomme depuis le lot 4 (gardée plus bas).
@@ -1569,6 +1597,10 @@ RELEVEUR_ROLE = ".claude/agents/releveur.md"
 VERS_PRD_SKILL = ".claude/skills/vers-prd/SKILL.md"
 VERS_ISSUES_SKILL = ".claude/skills/vers-issues/SKILL.md"
 REPERCUSSIONS_SKILL = ".claude/skills/repercussions/SKILL.md"
+CONTRADICTION_SKILL = ".claude/skills/contradiction/SKILL.md"
+BUG_VERS_ISSUE_SKILL = ".claude/skills/bug-vers-issue/SKILL.md"
+COLLECTE_CONTEXTE_REF = ".claude/skills/bug-vers-issue/references/collecte-contexte.md"
+GABARIT_DECOUPAGE_REF = ".claude/skills/bug-vers-issue/references/gabarit-issue-decoupage.md"
 THEMES_MILESTONES_REF = ".claude/skills/triage/themes-milestones.md"
 BRIEF_AGENT_REF = ".claude/skills/triage/brief-agent.md"
 INVARIANTS_DES_SESSIONS_LIEES = {
@@ -2154,8 +2186,12 @@ INVARIANTS_DES_SESSIONS_LIEES = {
 # dès leur création : la session `contradiction` de l'étape 1 et sa carte de proposition, la
 # session `plan-qa` de l'étape 7, les sessions de brouillon — `bug-vers-issue` ou `vers-issues`, une
 # phrase pour les deux — de « Ce que ce skill ne fait pas » ; `grep -n start_session` dans ses deux
-# fichiers en retrouve trois, la carte de proposition n'ayant pas le mot — 18 sites. Un site
-# nouveau n'entre pas ici de lui-même : la garde lit des phrases, le grep re-dérive la population.
+# fichiers en retrouve trois, la carte de proposition n'ayant pas le mot — 18 sites. Le lot 6b2 en
+# ajoute **2** dans `contradiction` (2026-10-25), écrits en clair dès leur création : la session
+# `repercussions` de l'étape 5 et sa carte de proposition ; `grep -n start_session` dans les
+# fichiers de `contradiction` et de `bug-vers-issue` en retrouve un, le démarrage — la carte n'a pas
+# le mot, et `bug-vers-issue` ne démarre aucune session — 20 sites. Un site nouveau n'entre pas ici
+# de lui-même : la garde lit des phrases, le grep re-dérive la population.
 USE_WORKTREE_EXPLICITE = {
     "pr-paralleles-etape-0-sans-worktree": (
         PR_PARALLELES_SKILL,
@@ -2227,6 +2263,20 @@ USE_WORKTREE_EXPLICITE = {
     "repercussions-vers-les-brouillons": (
         REPERCUSSIONS_SKILL,
         "`context: fresh`, `use_worktree: true` : pour un défaut, `bug-vers-issue`",
+    ),
+    "contradiction-vers-repercussions": (
+        CONTRADICTION_SKILL,
+        (
+            "démarrer la session `repercussions` : `start_session`, `initiation: user_asked`,"
+            " `context: fresh`, `use_worktree: true`"
+        ),
+    ),
+    "contradiction-vers-repercussions-par-carte": (
+        CONTRADICTION_SKILL,
+        (
+            "Hors d'un tour du mainteneur, une carte de proposition (`initiation: own_initiative`,"
+            " `context: fresh`, `use_worktree: true`, même nom et même prompt)"
+        ),
     ),
 }
 
@@ -3093,13 +3143,6 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         REPERCUSSIONS_SKILL,
         "La session de brouillon le montre au mainteneur, qui décide",
     ),
-    "6b-cycle-pr-repercussions-nomme-la-famille": (
-        CYCLE_PR_SKILL,
-        (
-            "`triage`, `interroge-moi`, `vers-prd`, `vers-issues` et `repercussions` les nomment ;"
-            " les autres skills des lots 6b à 8 de #134 les nommeront"
-        ),
-    ),
     "6b-cycle-pr-repercussions-prescrit-le-commentaire": (
         CYCLE_PR_SKILL,
         "`repercussions` le prescrit à son étape 5, « Issues en vol »",
@@ -3107,6 +3150,320 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b-pr-paralleles-repercussions-prescrit-le-commentaire": (
         PR_PARALLELES_SKILL,
         "`repercussions` le prescrit à son étape 5, « Issues en vol »",
+    ),
+    # Lot 6b2 de #134 (2026-10-25) : `contradiction` et `bug-vers-issue` nomment leurs exécutants.
+    # Une entrée par point du brief du lot qui écrit une règle, et la moitié restrictive de chaque
+    # énoncé qui en porte une (obs 126), plus la dette de `cycle-pr` Étape 8 et le déroulé de
+    # `hors-scope.md`, qui nomme `contradiction`. Gardés ailleurs : la sortie de liste d'attente
+    # (`EXECUTOR_WAITING_LIST`), l'absence d'écriture `gh` directe, le renvoi au script et son
+    # exemption (`SKILLS_SANS_ECRITURE_GH_DIRECTE`, `ECRITURE_RELUE_SANS_OBJET`), le renvoi aux
+    # sessions liées (`SKILLS_DES_SESSIONS_LIEES`), `use_worktree` à chaque démarrage
+    # (`USE_WORKTREE_EXPLICITE`), le contexte vivant retiré (`RETIRES_DU_CONTEXTE_VIVANT`).
+    "6b2-contradiction-ecriture-de-depot-par-une-pr": (
+        CONTRADICTION_SKILL,
+        "toute écriture de dépôt de ce skill part par une PR (D-12 de #134",
+    ),
+    "6b2-contradiction-raisonnement-dans-le-body": (
+        CONTRADICTION_SKILL,
+        "le raisonnement va dans le body de la PR qui porte l'amendement",
+    ),
+    "6b2-contradiction-affirmation-reste-a-la-session": (
+        CONTRADICTION_SKILL,
+        "la recherche « par affirmation » — reste à la session, sur les passages rendus",
+    ),
+    "6b2-contradiction-entree-arret-ecrit": (CONTRADICTION_SKILL, "L'entrée est l'arrêt écrit"),
+    "6b2-contradiction-entree-par-ses-deux-voies": (
+        CONTRADICTION_SKILL,
+        (
+            "par la session qui l'a levé, qui le recopie en invoquant le skill, ou par le prompt de"
+            " la session que `repercussions` démarre, qui y ajoute `origine : #<N>`"
+        ),
+    ),
+    "6b2-contradiction-sans-argument": (
+        CONTRADICTION_SKILL,
+        "Sans argument, la session s'arrête et demande les deux citations",
+    ),
+    "6b2-contradiction-sans-arret-decisions-vs-doc-d-abord": (
+        CONTRADICTION_SKILL,
+        "un § passé sans arrêt qui l'ait établi : dérouler d'abord `decisions-vs-doc`",
+    ),
+    "6b2-contradiction-premier-geste": (
+        CONTRADICTION_SKILL,
+        (
+            "son premier geste lit les documents sur le trunk à jour,"
+            " `git fetch origin && git switch --detach origin/<trunk>`"
+        ),
+    ),
+    "6b2-contradiction-aucune-branche": (
+        CONTRADICTION_SKILL,
+        "Aucune branche à créer : l'amendement part du worktree isolé de l'`executant` (étape 4)",
+    ),
+    "6b2-contradiction-relecture-des-citations-a-la-session": (
+        CONTRADICTION_SKILL,
+        "Cette relecture reste à la session",
+    ),
+    "6b2-contradiction-cascade-au-releveur": (
+        CONTRADICTION_SKILL,
+        (
+            "la première et la troisième partent au `releveur`, avec les termes que donne la"
+            " session ; la deuxième reste à la session, sur les passages qu'il rend"
+        ),
+    ),
+    "6b2-contradiction-context7-au-releveur": (
+        CONTRADICTION_SKILL,
+        (
+            "un `releveur` pose la question à la documentation à jour de la bibliothèque"
+            " (`context7`) et rend le passage cité mot pour mot ; la conclusion reste à la session"
+        ),
+    ),
+    "6b2-contradiction-doc-hors-index-a-la-session": (
+        CONTRADICTION_SKILL,
+        "ou plusieurs candidates, remonte à la session, qui la lit à la source",
+    ),
+    "6b2-contradiction-par-une-pr": (
+        CONTRADICTION_SKILL,
+        "l'amendement part par une PR, jamais par un commit direct sur le trunk",
+    ),
+    "6b2-contradiction-dans-la-pr-de-la-session": (
+        CONTRADICTION_SKILL,
+        "**dans une session PR**, il entre dans sa PR, par un commit de son `developpeur`",
+    ),
+    "6b2-contradiction-pr-d-amendement-au-deroule-hors-scope": (
+        CONTRADICTION_SKILL,
+        (
+            "une PR d'amendement, au déroulé de `.claude/skills/triage/hors-scope.md` (« Quand"
+            " écrire », étapes 5 et 6)"
+        ),
+    ),
+    "6b2-contradiction-executant-isole": (
+        CONTRADICTION_SKILL,
+        "un `executant` en isolation `worktree`, jamais dans le dossier partagé",
+    ),
+    "6b2-contradiction-merge-au-go": (
+        CONTRADICTION_SKILL,
+        "la session pousse la branche, ouvre la PR, la relit et la merge au go du mainteneur",
+    ),
+    "6b2-contradiction-quatre-gestes-un-commit": (
+        CONTRADICTION_SKILL,
+        "La table des édits porte, dans le même commit, ces quatre gestes",
+    ),
+    "6b2-hors-scope-nomme-contradiction": (
+        HORS_SCOPE_REF,
+        (
+            "ses étapes 5 et 6 valent pour toute PR qu'ouvre une session de `triage`,"
+            " `interroge-moi`, `vers-prd` ou `contradiction`, qui y renvoient"
+        ),
+    ),
+    "6b2-contradiction-mode-sans-copie": (
+        CONTRADICTION_SKILL,
+        "« PR d'amendement ») : ce skill ne le recopie pas",
+    ),
+    "6b2-contradiction-rien-a-demarrer-en-session-pr": (
+        CONTRADICTION_SKILL,
+        (
+            "la passe `repercussions` de `cycle-pr` Étape 8 le confronte aux issues — rien à"
+            " démarrer ici"
+        ),
+    ),
+    "6b2-contradiction-repercussions-au-tour-du-go": (
+        CONTRADICTION_SKILL,
+        (
+            "au merge de la PR d'amendement, dans le tour du go du mainteneur, démarrer la session"
+            " `repercussions`"
+        ),
+    ),
+    "6b2-contradiction-repercussions-avec-origine": (
+        CONTRADICTION_SKILL,
+        (
+            "`name: repercussions-<N>`, prompt `/repercussions #<N>` — la passe reprend sur l'issue"
+            " fermée, contre la doc amendée"
+        ),
+    ),
+    "6b2-contradiction-repercussions-sans-origine": (
+        CONTRADICTION_SKILL,
+        (
+            "`name: repercussions-<m>`, prompt `/repercussions #<m>`, où `<m>` est le numéro de la"
+            " PR d'amendement"
+        ),
+    ),
+    "6b2-contradiction-fin-de-travail": (
+        CONTRADICTION_SKILL,
+        (
+            "prévenir le parent par le message de fin de la même référence (« Fin de travail »),"
+            " dont le suffixe « — enfants au travail : `local_…` » nomme la session `repercussions`"
+            " qu'elle a démarrée — la fin du tour ne le prévient pas"
+        ),
+    ),
+    "6b2-contradiction-l-archiveur-nettoie": (
+        CONTRADICTION_SKILL,
+        "La session qui l'archive nettoie cette enfant (« Nettoyage »)",
+    ),
+    "6b2-contradiction-n-edite-aucune-issue": (
+        CONTRADICTION_SKILL,
+        "**Il n'édite aucune issue lui-même.** C'est `repercussions`, à l'étape 5",
+    ),
+    "6b2-contradiction-code-perime-par-creation-d-issues": (
+        CONTRADICTION_SKILL,
+        (
+            "Une décision qui périme du code déjà écrit suit « Création d'issues en cours de"
+            " cycle » (`.claude/rules/contraintes.md`), pas une édition sauvage"
+        ),
+    ),
+    "6b2-bug-vers-issue-releveur-sans-conclure": (
+        BUG_VERS_ISSUE_SKILL,
+        "Ce qui compte reste à la session",
+    ),
+    "6b2-bug-vers-issue-script-par-la-session": (
+        BUG_VERS_ISSUE_SKILL,
+        "appelée par la session elle-même : un geste isolé coûte plus délégué",
+    ),
+    "6b2-bug-vers-issue-demarree-par-une-autre": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "cette session peut être démarrée par une autre : la session de QA (`execution-qa`),"
+            " qui reprend la QA dans sa propre session"
+        ),
+    ),
+    "6b2-bug-vers-issue-mode-dans-l-argument": (
+        BUG_VERS_ISSUE_SKILL,
+        "Le mode se lit dans l'argument",
+    ),
+    "6b2-bug-vers-issue-mode-pilote": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "un numéro d'issue `qa-plan`, suivi de l'ancre de la case qui échoue et de l'intake"
+            " d'échec écrit : un chemin de fichier, ou l'URL d'un commentaire de l'issue du plan"
+        ),
+    ),
+    "6b2-bug-vers-issue-sans-argument": (
+        BUG_VERS_ISSUE_SKILL,
+        "Sans argument, la session s'arrête et demande la description ou la case.",
+    ),
+    "6b2-bug-vers-issue-intake-sans-question": (
+        BUG_VERS_ISSUE_SKILL,
+        "l'intake écrit est la source : aucune question, sauf pour un champ manquant",
+    ),
+    "6b2-bug-vers-issue-questions-dans-cette-session": (
+        BUG_VERS_ISSUE_SKILL,
+        "au plus 2 ou 3 courtes questions au mainteneur, dans cette session",
+    ),
+    "6b2-bug-vers-issue-coupables-a-la-session": (
+        BUG_VERS_ISSUE_SKILL,
+        "le choix du ou des coupables reste à la session",
+    ),
+    "6b2-bug-vers-issue-argument-et-intake": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "**L'argument et l'intake écrit** — la description passée en argument, ou l'intake que"
+            " le `releveur` rend tel quel"
+        ),
+    ),
+    "6b2-bug-vers-issue-proprietaire-a-la-session": (
+        BUG_VERS_ISSUE_SKILL,
+        "la conclusion — qui possède le sujet — reste à la session",
+    ),
+    "6b2-bug-vers-issue-ouverte-commentee": (
+        BUG_VERS_ISSUE_SKILL,
+        "**ouverte** : la commenter (`comment <N> --body-file <fichier>`), sur son accord",
+    ),
+    "6b2-bug-vers-issue-fermee-issue-soeur": (
+        BUG_VERS_ISSUE_SKILL,
+        "elle est **fermée** : créer une issue sœur qui la cite (`issue create`, étape 6)",
+    ),
+    "6b2-bug-vers-issue-jamais-rouverte": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "une issue fermée ne porte aucun rôle d'état (`triage`, « Rôles ») ; rouverte, elle"
+            " serait hors de toute file de tri, et `ecriture-relue.py` n'a pas de réouverture"
+        ),
+    ),
+    "6b2-bug-vers-issue-pas-en-silence": (BUG_VERS_ISSUE_SKILL, "ne consigne pas en silence"),
+    "6b2-bug-vers-issue-creation-relue": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            'ecriture-relue.py issue create --title "<titre>" --body-file <brouillon>'
+            " --label <qa-finding> --label <needs-triage>"
+        ),
+    ),
+    "6b2-bug-vers-issue-labels-du-mapping": (
+        BUG_VERS_ISSUE_SKILL,
+        "`<qa-finding>` et `<needs-triage>` sont les labels réels du mapping",
+    ),
+    "6b2-bug-vers-issue-decoupage-une-creation-a-la-fois": (
+        BUG_VERS_ISSUE_SKILL,
+        "puis les enfants un par un, dans l'ordre des dépendances, chacun par son `issue create`",
+    ),
+    "6b2-bug-vers-issue-patch-du-plan": (
+        BUG_VERS_ISSUE_SKILL,
+        "par `issue edit <plan> --body-file <fichier>`",
+    ),
+    "6b2-bug-vers-issue-corps-relu-en-octets": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "le corps courant relu en octets par le `releveur` (`gh api"
+            " repos/{owner}/{repo}/issues/<plan> --jq .body`, sans le LF final que `--jq` ajoute)"
+        ),
+    ),
+    "6b2-bug-vers-issue-remplacements-en-memoire": (
+        BUG_VERS_ISSUE_SKILL,
+        "les remplacements se font en mémoire, par correspondance exacte de ligne complète",
+    ),
+    "6b2-bug-vers-issue-ligne-introuvable-arrete": (
+        BUG_VERS_ISSUE_SKILL,
+        "chaque ancienne ligne trouvée une seule fois, sinon s'arrêter et le dire au mainteneur",
+    ),
+    "6b2-bug-vers-issue-patch-sa-regle-seule": (
+        BUG_VERS_ISSUE_SKILL,
+        "sa règle seule : sa lecture et son push sont ceux de cette étape",
+    ),
+    "6b2-bug-vers-issue-fins-de-ligne-gardees": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "le résultat est écrit tel quel dans le fichier, ses fins de ligne gardées : le script"
+            " relit contre ce fichier et ne voit pas une conversion"
+        ),
+    ),
+    "6b2-bug-vers-issue-fin-de-travail": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "prévenir le parent par le message de fin de la même référence (« Fin de travail »),"
+            " sous la forme « terminé — BUG #<N> consigné » — la fin du tour ne le prévient pas"
+        ),
+    ),
+    "6b2-bug-vers-issue-la-qa-reprend": (BUG_VERS_ISSUE_SKILL, "la QA reprend dans sa session"),
+    "6b2-bug-vers-issue-labels-reels": (
+        BUG_VERS_ISSUE_SKILL,
+        "Les labels réels se lisent dans le mapping de `.claude/pipeline.config.md`",
+    ),
+    "6b2-bug-vers-issue-label-absent-arrete": (
+        BUG_VERS_ISSUE_SKILL,
+        "`issue create` refuse en le nommant : s'arrêter et le dire au mainteneur",
+    ),
+    "6b2-bug-vers-issue-erreur-intake-ecrit": (
+        BUG_VERS_ISSUE_SKILL,
+        "Rédiger sans relire l'intake d'échec écrit",
+    ),
+    "6b2-collecte-contexte-lectures-au-releveur": (
+        COLLECTE_CONTEXTE_REF,
+        (
+            "Les commandes de ce fichier sont des lectures, lancées par un `releveur` (SKILL.md,"
+            " « Délégation ») ; ce qui compte reste à la session"
+        ),
+    ),
+    "6b2-collecte-contexte-argument-et-intake": (
+        COLLECTE_CONTEXTE_REF,
+        "1. L'argument et l'intake écrit",
+    ),
+    "6b2-gabarit-decoupage-une-creation-a-la-fois": (
+        GABARIT_DECOUPAGE_REF,
+        "une `issue create` à la fois (SKILL.md, étape 6)",
+    ),
+    "6b2-cycle-pr-bug-vers-issue-nomme-la-famille": (
+        CYCLE_PR_SKILL,
+        (
+            "`triage`, `interroge-moi`, `vers-prd`, `vers-issues`, `repercussions` et"
+            " `bug-vers-issue` les nomment ; les skills des lots 7a à 8 de #134 les nommeront"
+        ),
     ),
 }
 
@@ -3176,6 +3533,35 @@ RETIRES_DE_L_ORCHESTRATION = ["cleanup pass, review avant merge", "contexte comp
 def test_l_orchestration_ne_rend_pas_ce_qu_elle_a_retire(phrase: str) -> None:
     """Vu rouge sur `81ae8c3`, où chacune est présente une fois."""
     assert phrase not in texte_normalise("CLAUDE.md"), f"`CLAUDE.md` porte encore « {phrase} »"
+
+
+# Le contexte vivant que le lot 6b2 de #134 retire de `contradiction` et de `bug-vers-issue`
+# (2026-10-25) : une source lue dans la conversation, et deux écritures sans sous-commande relue —
+# rouvrir une issue, créer un label. **Population** : les phrases que le brief du lot fait retirer,
+# sous leur forme sur `ecae185`, base du lot, où chacune est présente — chaque cas y est rouge.
+RETIRES_DU_CONTEXTE_VIVANT = {
+    "contradiction-dernier-arret-de-la-conversation": (
+        CONTRADICTION_SKILL,
+        "**dernier** arrêt `decisions-vs-doc` de la conversation",
+    ),
+    "bug-vers-issue-invocation-recente": (
+        BUG_VERS_ISSUE_SKILL,
+        "une invocation récente de `execution-qa` dans la conversation",
+    ),
+    "collecte-contexte-derniers-tours": (COLLECTE_CONTEXTE_REF, "les ~10 derniers tours"),
+    "bug-vers-issue-rouvrir": (BUG_VERS_ISSUE_SKILL, "rouvrir / commenter"),
+    "bug-vers-issue-label-create": (BUG_VERS_ISSUE_SKILL, "gh label create"),
+}
+
+
+@pytest.mark.parametrize(
+    ("fichier", "phrase"),
+    RETIRES_DU_CONTEXTE_VIVANT.values(),
+    ids=RETIRES_DU_CONTEXTE_VIVANT.keys(),
+)
+def test_le_contexte_vivant_retire_ne_revient_pas(fichier: str, phrase: str) -> None:
+    """Une phrase retirée qui reste écrite se rejoue : la session suit le texte, pas l'intention."""
+    assert phrase not in texte_normalise(fichier), f"`{fichier}` porte encore « {phrase} »"
 
 
 # L'**ordre** du protocole de la coordinatrice : chaque couple d'ancres, la première avant la

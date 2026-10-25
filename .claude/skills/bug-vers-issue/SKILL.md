@@ -1,7 +1,7 @@
 ---
 name: bug-vers-issue
 description: "À utiliser lorsqu'un bug fait surface et doit être consigné comme une issue GitHub avec le contexte QA / implémentation / PRD attaché. Déclencheurs : « ouvre une issue pour ce bug », « consigne ça comme un bug », « c'est cassé, logue-le », tout échec surfacé par execution-qa que l'utilisateur veut capturer, et les rapports libres de bug en dehors d'un plan QA actif (« ce truc est faux, logue-le »). Montre toujours un brouillon et demande confirmation avant de publier."
-argument-hint: "[description du bug | #case du plan de QA]"
+argument-hint: "[description du bug | #<plan-qa> <ancre de la case> <chemin ou URL de l'intake>]"
 ---
 
 # Bug vers issue
@@ -12,30 +12,40 @@ Capturer un bug — découvert soit pendant l'exécution d'un plan QA, soit lors
 
 L'issue de bug doit être **durable** (encore lisible après des refactos majeures), **centrée sur l'utilisateur** (décrit un comportement, pas du code), **traçable** (renvoie vers le plan / le PRD / le commit) et **sans doublon** (ne consigne pas à nouveau pour une case déjà liée à un `🔴 BUG #N`). Toujours pré-publier, ne jamais publier en silence.
 
+## Délégation
+
+La session garde le jugement : les questions de clarification, le choix des issues et des commits coupables, le propriétaire du sujet, issue unique ou découpage, la rédaction, le go. Le reste change de main :
+
+- **`releveur`** — les collectes (« Collectes ») : doublons et propriétaire du sujet par `gh issue list --search` sur les mots-clés que donne la session, issues récemment fermées touchant la zone, `git log` ; les lectures bornées (« Lectures bornées ») : l'intake d'échec écrit, le corps du plan QA autour de la case, l'issue d'implémentation et son PRD, le glossaire et `CLAUDE.md`, les fichiers d'automatisation qui pourraient posséder le sujet. Ce qui compte reste à la session ;
+- **script** — toute écriture sur la forge, par sa sous-commande de `.claude/skills/cycle-pr/scripts/ecriture-relue.py`, appelée par la session elle-même : un geste isolé coûte plus délégué (`CLAUDE.md`, « Orchestration ») — la création (`issue create`, étape 6), le patch du plan QA (`issue edit --body-file`, étape 7), le commentaire sur une issue existante (`comment`, étape 3) ;
+- **sessions distinctes** — cette session peut être démarrée par une autre : la session de QA (`execution-qa`), qui reprend la QA dans sa propre session, `repercussions` pour un brouillon, ou une session qui applique « Création d'issues en cours de cycle » (`.claude/rules/contraintes.md`) ; protocole commun : `.claude/skills/cycle-pr/references/sessions-liees.md`.
+
 ## Deux points d'entrée
 
-1. **Piloté par un plan** — invoqué par `execution-qa` (option (a) « consigner maintenant ») ou par l'utilisateur pendant le parcours d'un plan QA actif. L'issue du plan QA est connue ; la case qui échoue est connue.
-2. **Libre** — invoqué en dehors d'un plan actif. L'utilisateur décrit un bug rencontré en utilisant l'application. Aucun plan QA à lier.
+Le mode se lit dans l'argument :
 
-Le skill détecte le mode dans lequel il se trouve en cherchant : une invocation récente de `execution-qa` dans la conversation, une issue `qa-plan` ouverte avec un marqueur `🔴 needs-issue`, ou la formulation de l'utilisateur.
+1. **Piloté par un plan** — un numéro d'issue `qa-plan`, suivi de l'ancre de la case qui échoue et de l'intake d'échec écrit : un chemin de fichier, ou l'URL d'un commentaire de l'issue du plan. La session de QA démarre ce mode ; c'est le lot 7b de #134 qui fait produire l'intake écrit à `execution-qa`.
+2. **Libre** — une description du bug, rencontré en utilisant l'application. Aucun plan QA à lier.
+
+Sans argument, la session s'arrête et demande la description ou la case.
 
 ## Procédure
 
-### 1. Écouter et clarifier légèrement
+### 1. Lire l'entrée, clarifier légèrement
 
-Laisse l'utilisateur décrire le problème avec ses propres mots. Pose **au plus 2 ou 3 courtes questions de clarification** centrées sur :
+- **Piloté par un plan** — l'intake écrit est la source : aucune question, sauf pour un champ manquant.
+- **Libre** — la description de l'argument, et au plus 2 ou 3 courtes questions au mainteneur, dans cette session, centrées sur :
+  - ce qu'il attendait vs ce qui s'est réellement passé ;
+  - les étapes pour reproduire, si elles ne sont pas évidentes ;
+  - si c'est systématique ou intermittent.
 
-- Ce qu'il attendait vs ce qui s'est réellement passé.
-- Les étapes pour reproduire, si elles ne sont pas évidentes.
-- Si c'est systématique ou intermittent.
-
-Ne sur-interroge pas. Si la description est assez claire pour consigner, passe à la suite. En mode piloté par un plan, l'essentiel se trouve déjà dans l'intake d'échec capturé — le redemander est pénible.
+Ne sur-interroge pas. Si la description est assez claire pour consigner, passe à la suite.
 
 ### 2. Rassembler le contexte environnant
 
-Utilise `references/collecte-contexte.md` comme liste de contrôle. En résumé :
+Utilise `references/collecte-contexte.md` comme liste de contrôle. Ses lectures et ses `git log` partent au `releveur` (« Délégation ») ; le choix du ou des coupables reste à la session. En résumé :
 
-- **Contexte de la conversation** — les échanges récents qui cadrent le bug, y compris un bloc d'intake d'échec capturé si `execution-qa` en a produit un.
+- **L'argument et l'intake écrit** — la description passée en argument, ou l'intake que le `releveur` rend tel quel (fichier, ou commentaire par son URL), plus les réponses du mainteneur à l'étape 1.
 - **Lien vers le plan QA** (mode piloté par un plan) — numéro de l'issue, texte exact de la case qui échoue, nom de la phase / du bloc par issue.
 - **Issue(s) d'implémentation** — la ou les issues qui ont introduit le comportement défaillant. En mode piloté par un plan, dérive-les du bloc par issue. En mode libre, cherche les issues récemment fusionnées touchant la zone concernée.
 - **PRD** — récupère-le s'il est connu depuis l'issue d'implémentation ou le plan QA.
@@ -48,10 +58,13 @@ Avant de rédiger, chercher **qui possède déjà ce sujet** : une automatisatio
 dépendances, workflow planifié, hook), une issue ouverte dont c'est le critère, une PR fermée qui
 le portait. Si un mécanisme existe, la question devient « pourquoi n'a-t-il pas agi ? » — souvent
 parce qu'on l'a fait taire — et c'est *ça* qu'on corrige. Un ticket est la façon de confier un
-problème à un humain ; vérifier d'abord qu'il n'est pas déjà confié à une machine. Puis :
+problème à un humain ; vérifier d'abord qu'il n'est pas déjà confié à une machine. La recherche est
+une collecte du `releveur` ; la conclusion — qui possède le sujet — reste à la session. Puis :
 
-- Si piloté par un plan, parcours le corps du plan QA à la recherche de marqueurs `🔴 BUG #<N>` près de la case qui échoue. Si un tel marqueur existe déjà pour cette case précise, signale-le à l'utilisateur et demande s'il faut consigner une nouvelle issue sœur ou rouvrir / commenter celle qui existe. Ne consigne pas en silence.
-- Cherche dans les issues récentes : `gh issue list --search "<termes clés>" --state all --limit 10`. Montre à l'utilisateur les correspondances proches avant de rédiger.
+- Si piloté par un plan, cherche dans le corps du plan QA un marqueur `🔴 BUG #<N>` près de la case qui échoue. S'il en existe un pour cette case précise, signale-le au mainteneur — ne consigne pas en silence :
+  - l'issue liée est **ouverte** : la commenter (`comment <N> --body-file <fichier>`), sur son accord ;
+  - elle est **fermée** : créer une issue sœur qui la cite (`issue create`, étape 6) — une issue fermée ne porte aucun rôle d'état (`triage`, « Rôles ») ; rouverte, elle serait hors de toute file de tri, et `ecriture-relue.py` n'a pas de réouverture.
+- Cherche dans les issues récentes : `gh issue list --search "<termes clés>" --state all --limit 10`. Montre au mainteneur les correspondances proches avant de rédiger.
 
 ### 4. Décider : issue unique vs découpage
 
@@ -91,19 +104,20 @@ Montre toujours à l'utilisateur le brouillon complet (titre + corps + labels) e
 Après approbation, publie :
 
 ```bash
-gh issue create \
-  --title "<titre>" \
-  --label qa-finding --label needs-triage \
-  --body-file <brouillon>
+python .claude/skills/cycle-pr/scripts/ecriture-relue.py issue create --title "<titre>" --body-file <brouillon> --label <qa-finding> --label <needs-triage>
 ```
 
-En cas de découpage, crée d'abord le parent, puis les enfants dans l'ordre des dépendances, en renseignant `Bloqué par : #<parent>` au fur et à mesure.
+`<qa-finding>` et `<needs-triage>` sont les labels réels du mapping (« Labels ») ; la sortie porte le numéro créé.
+
+En cas de découpage : le parent d'abord, puis les enfants un par un, dans l'ordre des dépendances, chacun par son `issue create` — le corps de chaque enfant porte son parent (`## Parent`) et ses bloqueurs (`## Bloqué par`) sous les numéros que les créations précédentes ont rendus (`references/gabarit-issue-decoupage.md`).
 
 ### 7. Après la publication
 
 - Affiche l'URL de chaque issue créée.
-- Si piloté par un plan, édite le corps de l'issue du plan QA : remplace `🔴 needs-issue` sur la case qui échoue par `🔴 BUG #<nouveau-numéro>`. Ajoute une entrée à l'**Index des constats** en bas du corps du plan. Utilise la procédure de patch décrite dans `execution-qa/references/patch-checkbox-gh.md`.
-- Dis à l'utilisateur que le bug est consigné, que le plan a été mis à jour, et que la QA peut reprendre.
+- Si piloté par un plan, patche le corps de l'issue du plan QA — `🔴 needs-issue` → `🔴 BUG #<nouveau-numéro>` sur la case qui échoue, et une entrée à l'**Index des constats** en bas du corps — par `issue edit <plan> --body-file <fichier>` : le corps courant relu en octets par le `releveur` (`gh api repos/{owner}/{repo}/issues/<plan> --jq .body`, sans le LF final que `--jq` ajoute) ; les remplacements se font en mémoire, par correspondance exacte de ligne complète, chaque ancienne ligne trouvée une seule fois, sinon s'arrêter et le dire au mainteneur (`execution-qa/references/patch-checkbox-gh.md`, « Construire le patch en mémoire » — sa règle seule : sa lecture et son push sont ceux de cette étape) ; le résultat est écrit tel quel dans le fichier, ses fins de ligne gardées : le script relit contre ce fichier et ne voit pas une conversion (obs 87).
+- Dis au mainteneur que le bug est consigné et que le plan a été mis à jour.
+
+**Session démarrée par une autre** (son prompt système nomme le parent, `.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») : la consignation faite — issue publiée ou commentée, plan patché en mode piloté —, prévenir le parent par le message de fin de la même référence (« Fin de travail »), sous la forme « terminé — BUG #<N> consigné » — la fin du tour ne le prévient pas. Quand le parent est la session de QA, la QA reprend dans sa session, sur ce message.
 
 ## Règles du corps d'issue (tous les modes)
 
@@ -116,10 +130,10 @@ En cas de découpage, crée d'abord le parent, puis les enfants dans l'ordre des
 
 ## Labels
 
-- Toujours : `qa-finding`, `needs-triage`.
+- Toujours les rôles `qa-finding` et `needs-triage`. Les labels réels se lisent dans le mapping de `.claude/pipeline.config.md` : `qa-finding` y figure, et `init-projet` le pose.
 - N'applique jamais d'autres labels en silence. Si l'utilisateur veut `priority/high` ou similaire, il peut l'ajouter pendant le tri.
 
-Si `qa-finding` n'existe pas, crée-le : `gh label create qa-finding --description "Bug découvert pendant la QA" --color "B60205"`.
+Si l'un d'eux manque au dépôt, `issue create` refuse en le nommant : s'arrêter et le dire au mainteneur ; `init-projet`, en reconfiguration, le pose (étape 6, « Créer les labels manquants dans GitHub »).
 
 ## Erreurs courantes
 
@@ -128,8 +142,8 @@ Si `qa-finding` n'existe pas, crée-le : `gh label create qa-finding --descripti
 | Consigner sans montrer le brouillon | Toujours montrer + demander « on le publie ? ». Aucune exception. |
 | Consigner un doublon pour une case déjà liée | Parcours d'abord le corps du plan pour repérer `🔴 BUG #N` près de la case. |
 | Inclure des chemins de fichiers et des numéros de ligne dans le corps | Ils deviennent obsolètes. Utilise le langage métier et les comportements. |
-| Oublier de mettre à jour le plan QA après avoir consigné | Remplace `🔴 needs-issue` par `🔴 BUG #N` et ajoute à l'Index des constats. |
+| Oublier de mettre à jour le plan QA après avoir consigné | Remplace `🔴 needs-issue` par `🔴 BUG #N` et ajoute à l'Index des constats, par `issue edit --body-file` (étape 7). |
 | Découper alors qu'une seule issue suffirait | Privilégie l'unique. Découpe uniquement pour des causes racines séparables. |
 | Sauter les liens vers l'issue d'implémentation / le PRD / le commit | Ce sont la trace durable. Inclus-les toujours quand ils sont connus. |
 | Appliquer automatiquement de nombreux labels | Seulement `qa-finding` + `needs-triage`. Le tri ajoute le reste. |
-| Rédiger sans relire l'intake d'échec capturé par execution-qa | Le bloc d'intake est l'entrée de la plus haute qualité dont tu disposes. Utilise-le tel quel. |
+| Rédiger sans relire l'intake d'échec écrit | Le bloc d'intake est l'entrée de la plus haute qualité dont tu disposes. Utilise-le tel quel. |
