@@ -81,16 +81,19 @@ Avec une PR d'amendement — une PR mergée par une `contradiction` née d'une d
 fermée à l'origine, qui amende une source de vérité ou déplace l'effet d'une décision hors de ce
 qu'elle affirme, sans fermer d'issue —, le delta réel est cette PR. Les étapes 2 à 6
 s'appliquent ; l'étape 7 est sans objet, aucun thème ne s'étant vidé ; la ligne de journal cite
-l'amendement, pas une issue fermée (« Réconciliée avec l'amendement du cadrage §9.3, PR #<m>, du
-26 août 2026 »). En mode amendement, `#<fermée>`, `<issue fermée>` et le `#47` des exemples se
-lisent « l'amendement, PR #<m> » — `pr-<m>` dans un chemin : la clé d'idempotence de l'étape 2 est
-alors la ligne qui cite cette PR.
+cette PR, pas une issue fermée (« Réconciliée avec la PR #<m> (amendement du cadrage §9.3 |
+déplacement de …), du 26 août 2026 »). En mode amendement, `#<fermée>`, `<issue fermée>` et le
+`#47` des exemples se lisent « l'amendement, PR #<m> » — `pr-<m>` dans un chemin : la clé
+d'idempotence de l'étape 2 est alors la ligne qui cite cette PR.
 
 Écrire un résumé court de **ce que cette clôture a réellement changé** — pas ce que l'issue
 promettait, ce qui a été *fait*. Sources, qu'un `releveur` rend : le **diff mergé**
 (`gh pr view <n> --json files,title,body`, `git log`), puis, dans le body de la PR, les
 **décisions actées** pendant le développement (scope resserré ou élargi, hypothèse tranchée,
 format figé, edge case décidé) et les **follow-ups différés**.
+Démarrée avec `contradiction soldée : amendement PR #<m>` ou `document gagne — PR #<m>`, le diff
+de la PR #<m> s'ajoute à ces sources : sans lui, les §§ amendés en cascade et le bloc déplacé ne
+se confronteraient qu'aux ancres de `#<N>`.
 
 Restituer sous `## 📦 Delta réel` : des faits courts et vérifiables.
 
@@ -126,7 +129,8 @@ document est un **vide à tracer** (`.claude/rules/contraintes.md`, « Création
 cycle ») — la complétion `[complétion]` d'une issue ouverte qui possède le sujet, sinon un
 brouillon, par le chemin de « Ce que ce skill ne fait pas » —, sauf si une issue ouverte le porte
 déjà (« Une contradiction déjà portée par une issue ouverte », ci-dessus) ; puis les étapes 2 à 7
-suivent. Avec `amendement PR #<m>` ou `écartée — <raison>`, elles suivent directement.
+suivent. Avec `amendement PR #<m>`, `amendement reporté — #<k>`, que `#<k>` porte déjà, ou
+`écartée — <raison>`, elles suivent directement.
 
 Une contradiction avérée → **s'arrêter avant l'étape 2** et présenter l'arrêt de
 `.claude/rules/decisions-vs-doc.md` (bloc `## ⚠️ Contradiction`). Dans le tour où le mainteneur

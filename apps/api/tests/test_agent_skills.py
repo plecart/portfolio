@@ -2974,7 +2974,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b-repercussions-amendement-sans-qa": (REPERCUSSIONS_SKILL, "l'étape 7 est sans objet"),
     "6b-repercussions-journal-de-l-amendement": (
         REPERCUSSIONS_SKILL,
-        "la ligne de journal cite l'amendement, pas une issue fermée",
+        (
+            "la ligne de journal cite cette PR, pas une issue fermée (« Réconciliée avec la PR #<m>"
+            " (amendement du cadrage §9.3 | déplacement de …), du 26 août 2026 »)"
+        ),
     ),
     "6b-repercussions-l-issue-fermee-en-mode-amendement": (
         REPERCUSSIONS_SKILL,
@@ -3830,7 +3833,10 @@ REPRISE_APRES_TRACE = (
     "Avec `document gagne`, suivi ou non de `— PR #<m>`, l'effet mergé qui contredit le document"
     " est un **vide à tracer**"
 )
-REPRISE_DIRECTE = "Avec `amendement PR #<m>` ou `écartée — <raison>`, elles suivent directement"
+REPRISE_DIRECTE = (
+    "Avec `amendement PR #<m>`, `amendement reporté — #<k>`, que `#<k>` porte déjà, ou `écartée —"
+    " <raison>`, elles suivent directement"
+)
 # Une entrée par sortie, en littéraux (obs 80) : sa ligne de la table de `contradiction` étape 5 —
 # tour de la relance, relance sans origine, ligne `contradiction soldée`, message de fin —, puis sa
 # consigne de reprise. Une table plutôt que des épingles groupées : chaque sortie y garde son texte
@@ -3874,6 +3880,14 @@ SORTIES_DE_CONTRADICTION = {
         ),
         REPRISE_DIRECTE,
     ),
+    "6-amendement-reporte": (
+        (
+            "| décision gagne, amendement reporté | l'ouverture de `#<k>` | rien, aucun delta mergé |"
+            " `contradiction soldée : amendement reporté — #<k>` | « terminé — amendement reporté à"
+            " #<k> » |"
+        ),
+        REPRISE_DIRECTE,
+    ),
 }
 
 
@@ -3885,8 +3899,9 @@ SORTIES_DE_CONTRADICTION = {
 def test_chaque_sortie_de_contradiction_relance_ce_qu_elle_doit(ligne: str, reprise: str) -> None:
     """Relecture de la PR #155, passe 2, I1. Classe : une sortie de `contradiction` démarrée avec
     `origine : #<N>` qui ne fait pas reprendre la passe de `#<N>`, arrêtée par `repercussions`
-    « avant l'étape 2 ». Dénombrées par la session PR sur `02c513b`, avant le correctif : **5**
-    sorties, **4** fuyaient.
+    « avant l'étape 2 ». **6** sorties : 5 dans le texte du skill, dénombrées par la session PR sur
+    `02c513b`, et 1 dans la règle qui régit ses sorties, `decisions-vs-doc.md`, « Deux sorties »,
+    relevée à la relance qui suit `37b0021`. Sur `02c513b`, **5** fuyaient ; à `37b0021`, **1**.
 
     1. Amendement mergé — redémarrait la passe.
     2. Le document gagne, effet abandonné (`decisions-vs-doc`, sortie 1a) — fuyait.
@@ -3894,6 +3909,8 @@ def test_chaque_sortie_de_contradiction_relance_ce_qu_elle_doit(ligne: str, repr
        PR d'amendement, et « terminé — amendement PR #<m> mergé » l'aurait nommée à tort.
     4. Le document gagne, effet déplacé hors du dépôt (1b) — fuyait.
     5. Pas de contradiction après vérification, « On se tait » — fuyait.
+    6. La décision gagne, amendement trop gros pour maintenant : un critère ou une issue ouverts
+       sur-le-champ (`decisions-vs-doc`, « Deux sorties ») — fuyait jusqu'à `37b0021` compris.
 
     Sans origine (même passe, hors-périmètre du `developpeur` ; classe : une PR mergée par
     `contradiction` que rien ne propage), sur `189a13f` : **2** sorties mergent une PR, 1 et 3 ;
@@ -3952,6 +3969,46 @@ RETIRES_DES_SORTIES_DE_CONTRADICTION = {
 def test_une_sortie_de_contradiction_retiree_ne_revient_pas(fichier: str, forme: str) -> None:
     """Une condition ou une forme retirée qui reste écrite se rejoue."""
     assert not porte_la_forme(fichier, forme), f"`{fichier}` porte encore « {forme} »"
+
+
+# Deux exceptions de la relance, chacune avant le geste qu'elle suspend ou complète (obs 30) : le
+# report de l'amendement, avant la PR de l'étape 4 ; le diff d'une PR soldée, avant la capture du
+# delta réel de `repercussions`, où il serait lu trop tard au paragraphe soldé.
+EXCEPTIONS_DE_LA_RELANCE = {
+    "contradiction-report-avant-la-pr": (
+        CONTRADICTION_SKILL,
+        (
+            "Quand le mainteneur retient à l'étape 3 que la décision gagne mais que l'amendement est"
+            " trop gros pour maintenant, aucune PR ne part : l'échappatoire de"
+            " `.claude/rules/decisions-vs-doc.md` (« Deux sorties ») ouvre sur-le-champ un critère"
+            " ou une issue `#<k>` portant les deux citations, par « Création d'issues en cours de"
+            " cycle » (`.claude/rules/contraintes.md`), barreau 2 ou 3, le brouillon en session"
+            " distincte — ce skill n'ouvre rien lui-même"
+        ),
+        "Sur « go », l'amendement part par une PR",
+    ),
+    "repercussions-pr-soldee-avant-le-delta": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Démarrée avec `contradiction soldée : amendement PR #<m>` ou `document gagne — PR #<m>`,"
+            " le diff de la PR #<m> s'ajoute à ces sources : sans lui, les §§ amendés en cascade et"
+            " le bloc déplacé ne se confronteraient qu'aux ancres de `#<N>`"
+        ),
+        "Restituer sous `## 📦 Delta réel`",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("fichier", "exception", "geste"),
+    EXCEPTIONS_DE_LA_RELANCE.values(),
+    ids=EXCEPTIONS_DE_LA_RELANCE.keys(),
+)
+def test_une_exception_de_la_relance_se_lit_avant_son_geste(
+    fichier: str, exception: str, geste: str
+) -> None:
+    """L'exception présente, et lue avant le geste : placée après, elle n'est jamais appliquée."""
+    assert_dans_l_ordre(fichier, exception, geste)
 
 
 # L'**ordre** du protocole de la coordinatrice : chaque couple d'ancres, la première avant la
