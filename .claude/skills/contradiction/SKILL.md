@@ -204,7 +204,9 @@ invisible.
 prévenir le parent par le message de fin de `sessions-liees.md` (« Fin de travail »), sous la
 forme « terminé — amendement PR #<m> mergé », suivie, si elle a démarré la session
 `repercussions`, du suffixe « — enfants au travail : `local_…` » — la fin du tour ne le prévient
-pas. La session qui l'archive nettoie cette enfant (« Nettoyage »).
+pas. La session qui l'archive nettoie cette enfant (« Nettoyage »). Quand le mainteneur retient à
+l'étape 3 la sortie où le document gagne sans qu'aucune PR ne parte — l'effet abandonné, ou
+déplacé hors du dépôt —, la forme est « terminé — aucun amendement, le document gagne ».
 
 ## Ce que ce skill ne fait pas
 
