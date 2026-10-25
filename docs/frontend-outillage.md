@@ -152,16 +152,19 @@ quatre seuils de la spec §1.16. Trois points mesurés, non évidents :
   déclarée `data:,` dans l'`index.html` (sans elle, le 404 sur `/favicon.ico` fait tomber l'audit
   « erreurs dans la console » et les bonnes pratiques à 96).
 
-**`overrides` du manifeste — quatre avis de sécurité écartés à la racine.** `@lhci/cli` 0.15.1
+**`overrides` du manifeste — cinq avis de sécurité écartés à la racine.** `@lhci/cli` 0.15.1
 traînait 10 avis (`npm audit`, arbre complet), dont 7 `high`, sur trois racines (2026-09-25). Un
 avis publié le 2026-10-01 en a ajouté une quatrième, `basic-ftp`, que l'audit compte 9 fois en
-`high` — le paquet et les huit qui le tirent (#64). Quatre racines, quatre issues différentes :
+`high` — le paquet et les huit qui le tirent (#64). L'audit du 2026-10-25 en a ajouté une
+cinquième, `zod`, comptée 6 fois en `high` — le paquet et les cinq qui le tirent jusqu'à
+`@lhci/cli` (#156). Cinq racines, cinq issues différentes :
 
 | Racine | Résolution | Pourquoi |
 |---|---|---|
 | `tmp` (2 × high) | `^0.2.7` | Les versions tirées (0.0.33 via `external-editor`, 0.1.0 en direct) sont vulnérables ; 0.2.7 est corrigée et expose les deux seules API appelées, `tmpNameSync` et `fileSync` (vérifié) |
 | `uuid` (moderate) | `^11.1.1` | `lhci` n'appelle que `uuid.v4()`, présent en CJS en v11 (vérifié) |
 | `extract-zip` (2 × high, CVSS 8.1) | `@puppeteer/browsers` → `^3.2.3` | **Aucune version d'`extract-zip` n'est corrigée** : les avis portent sur `<= 2.0.1`, et 2.0.1 est la dernière publiée (2023-03-04, paquet abandonné). La sortie n'est pas de le corriger mais de cesser d'en dépendre : `@puppeteer/browsers` 3.x l'a remplacé par `modern-tar`. C'est la correction que portent aussi Puppeteer 25.7 et les projets qui ont rencontré le même mur |
+| `zod` (high, GHSA-mrhx-c7xc-m3w5) | `chromium-bidi` → `zod` `^4.6.6` | Seule la 4.6.6 est corrigée, et `chromium-bidi` 14, que fige `puppeteer-core` 24.43.1 sous Lighthouse 12.6.1, demande `zod ^3.24.1` ; ses versions suivantes passent à `zod ^4` (158.0.8124-0 demande `^4.6.5`). Saut de majeure sans risque à l'exécution : `chromium-bidi` ne sert qu'au protocole WebDriver BiDi, que `puppeteer-core` charge paresseusement (`BrowserLauncher.js`, `BrowserConnector.js`), et Lighthouse se connecte en CDP (`puppeteer.connect({browserURL})`) — importer `lighthouse` puis `puppeteer-core` ne résout aucun module de `chromium-bidi` ni de `zod`, et le témoin qui importe `bidi.js` en résout 73 (mesuré le 2026-10-25, hook `registerHooks` de Node). La résolution se retire quand la chaîne de Lighthouse atteint un `chromium-bidi` qui demande la 4 — un test rougit ce jour-là (`tests/dependency-refusals.test.ts`) |
 | `basic-ftp` (high, GHSA-c475-qrg2-pj4r) | `^6.2.1` | Seule la 6.2.1 est corrigée, et aucun parent n'a cessé d'en dépendre : `get-uri` demande `basic-ftp ^5.3.1` jusqu'à sa dernière version (8.0.1 au 2026-10-02), et `@lhci/cli` fige sa chaîne sur `get-uri` 6 (`proxy-agent` 6 → `pac-proxy-agent` 7). La correction amont prend la même voie (TooTallNate/proxy-agents#500, ouverte au 2026-10-02) ; la résolution se retire quand la chaîne de `@lhci/cli` atteint un `get-uri` qui demande la 6.2.1 |
 
 Résultat mesuré : `npm audit` sur l'arbre **complet** rend `found 0 vulnerabilities`,
