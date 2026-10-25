@@ -855,8 +855,8 @@ ECRITURE_RELUE = ".claude/skills/cycle-pr/scripts/ecriture-relue.py"
 # renvoi au script y serait sans objet (lot 6b2 de #134, 2026-10-25).
 ECRITURE_RELUE_SANS_OBJET = {
     "contradiction": (
-        "n'écrit sur aucune issue : ses PR d'amendement suivent le déroulé de"
-        " `triage/hors-scope.md`, et la propagation aux issues passe par la session `repercussions`"
+        "n'écrit sur aucune issue : ses PR d'amendement suivent les étapes 5 et 6 de"
+        " `triage/hors-scope.md`, et la propagation aux issues passe par `repercussions`"
     ),
 }
 
@@ -2320,9 +2320,7 @@ def test_aucun_geste_retire_de_pr_paralleles_ne_reste_dans_sa_prose(
     fichier: str, forme: str
 ) -> None:
     """Un geste retiré qui reste écrit se rejoue : la session suit le texte, pas l'intention."""
-    texte = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig")
-
-    assert forme not in texte, f"`{fichier}` porte encore « {forme} »"
+    assert not porte_la_forme(fichier, forme), f"`{fichier}` porte encore « {forme} »"
 
 
 @pytest.mark.parametrize(
@@ -2363,6 +2361,12 @@ def texte_normalise(fichier: str) -> str:
     """Le texte du fichier, espaces normalisés et marges `# ` de tête de ligne retirées."""
     brut = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig")
     return " ".join(re.sub(r"(?m)^[ \t]*#[ \t]?", "", brut).split())
+
+
+def porte_la_forme(fichier: str, forme: str) -> bool:
+    """Vrai si le texte normalisé du fichier porte la forme, lue sans la casse : en tête de phrase,
+    une forme retirée revient avec une majuscule (mutation VERTE, passe d'écriture du lot 3)."""
+    return forme.lower() in texte_normalise(fichier).lower()
 
 
 # « Une tâche par session » (#134, lot 2b) : ce que `CLAUDE.md` « Orchestration » et
@@ -3152,9 +3156,15 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         "`repercussions` le prescrit à son étape 5, « Issues en vol »",
     ),
     # Lot 6b2 de #134 (2026-10-25) : `contradiction` et `bug-vers-issue` nomment leurs exécutants.
-    # Une entrée par point du brief du lot qui écrit une règle, et la moitié restrictive de chaque
-    # énoncé qui en porte une (obs 126), plus la dette de `cycle-pr` Étape 8 et le déroulé de
-    # `hors-scope.md`, qui nomme `contradiction`. Gardés ailleurs : la sortie de liste d'attente
+    # Une entrée par point du brief du lot qui écrit une règle dans le corps — le frontmatter et le
+    # tableau d'ouverture de `contradiction` la résument, sans entrée —, et la moitié restrictive de
+    # chaque énoncé qui en porte une (obs 126), plus la dette de `cycle-pr` Étape 8 et le déroulé de
+    # `hors-scope.md`, qui nomme `contradiction`. Dénombrement, au cleanup holistique, par la forme,
+    # sur les morceaux (`morceaux_du_texte`) des six fichiers de prose absents de `ecae185` :
+    # **18** moitiés restrictives — 8 « reste à », 6 « ne … pas », 2 « jamais », 2 « seule » —, plus
+    # **9** sous une forme voisine — 2 « Sans argument », 3 « aucun », « sans le LF final », « rien
+    # à démarrer », « remonte à la session », « elle-même » — : **27**, toutes épinglées, 23 au
+    # premier jet, 4 au cleanup du bloc, vues rouges. Gardés ailleurs : la sortie de liste d'attente
     # (`EXECUTOR_WAITING_LIST`), l'absence d'écriture `gh` directe, le renvoi au script et son
     # exemption (`SKILLS_SANS_ECRITURE_GH_DIRECTE`, `ECRITURE_RELUE_SANS_OBJET`), le renvoi aux
     # sessions liées (`SKILLS_DES_SESSIONS_LIEES`), `use_worktree` à chaque démarrage
@@ -3412,9 +3422,12 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         BUG_VERS_ISSUE_SKILL,
         "chaque ancienne ligne trouvée une seule fois, sinon s'arrêter et le dire au mainteneur",
     ),
-    "6b2-bug-vers-issue-patch-sa-regle-seule": (
+    "6b2-bug-vers-issue-patch-regles-de-correspondance-seules": (
         BUG_VERS_ISSUE_SKILL,
-        "sa règle seule : sa lecture et son push sont ceux de cette étape",
+        (
+            "« Construire le patch en mémoire » et « Détecter les éditions concurrentes » — leurs"
+            " règles de correspondance seules : sa lecture et son push sont ceux de cette étape"
+        ),
     ),
     "6b2-bug-vers-issue-fins-de-ligne-gardees": (
         BUG_VERS_ISSUE_SKILL,
@@ -3532,36 +3545,35 @@ RETIRES_DE_L_ORCHESTRATION = ["cleanup pass, review avant merge", "contexte comp
 @pytest.mark.parametrize("phrase", RETIRES_DE_L_ORCHESTRATION)
 def test_l_orchestration_ne_rend_pas_ce_qu_elle_a_retire(phrase: str) -> None:
     """Vu rouge sur `81ae8c3`, où chacune est présente une fois."""
-    assert phrase not in texte_normalise("CLAUDE.md"), f"`CLAUDE.md` porte encore « {phrase} »"
+    assert not porte_la_forme("CLAUDE.md", phrase), f"`CLAUDE.md` porte encore « {phrase} »"
 
 
 # Le contexte vivant que le lot 6b2 de #134 retire de `contradiction` et de `bug-vers-issue`
-# (2026-10-25) : une source lue dans la conversation, et deux écritures sans sous-commande relue —
-# rouvrir une issue, créer un label. **Population** : les phrases que le brief du lot fait retirer,
-# sous leur forme sur `ecae185`, base du lot, où chacune est présente — chaque cas y est rouge.
+# (2026-10-25) : une source lue dans la conversation — la conversation, ses derniers tours,
+# l'intake d'échec qui y est « capturé » —, et la réouverture d'une issue, que `ecriture-relue.py`
+# n'a pas. **Population**, par la forme, relevée sur `ecae185`, base du lot : « conversation » à
+# 7 lignes (`contradiction` 4, `bug-vers-issue` 2, `collecte-contexte.md` 1), « derniers tours »
+# à 1, « capturé » à 4 (`bug-vers-issue` 3, `collecte-contexte.md` 1), « rouvrir » à 1 — chaque
+# cas y est rouge. `gh label create` est tenu par `SKILLS_SANS_ECRITURE_GH_DIRECTE`.
 RETIRES_DU_CONTEXTE_VIVANT = {
-    "contradiction-dernier-arret-de-la-conversation": (
-        CONTRADICTION_SKILL,
-        "**dernier** arrêt `decisions-vs-doc` de la conversation",
-    ),
-    "bug-vers-issue-invocation-recente": (
-        BUG_VERS_ISSUE_SKILL,
-        "une invocation récente de `execution-qa` dans la conversation",
-    ),
-    "collecte-contexte-derniers-tours": (COLLECTE_CONTEXTE_REF, "les ~10 derniers tours"),
-    "bug-vers-issue-rouvrir": (BUG_VERS_ISSUE_SKILL, "rouvrir / commenter"),
-    "bug-vers-issue-label-create": (BUG_VERS_ISSUE_SKILL, "gh label create"),
+    "contradiction-conversation": (CONTRADICTION_SKILL, "conversation"),
+    "bug-vers-issue-conversation": (BUG_VERS_ISSUE_SKILL, "conversation"),
+    "collecte-contexte-conversation": (COLLECTE_CONTEXTE_REF, "conversation"),
+    "collecte-contexte-derniers-tours": (COLLECTE_CONTEXTE_REF, "derniers tours"),
+    "bug-vers-issue-intake-capture": (BUG_VERS_ISSUE_SKILL, "capturé"),
+    "collecte-contexte-intake-capture": (COLLECTE_CONTEXTE_REF, "capturé"),
+    "bug-vers-issue-rouvrir": (BUG_VERS_ISSUE_SKILL, "rouvrir"),
 }
 
 
 @pytest.mark.parametrize(
-    ("fichier", "phrase"),
+    ("fichier", "forme"),
     RETIRES_DU_CONTEXTE_VIVANT.values(),
     ids=RETIRES_DU_CONTEXTE_VIVANT.keys(),
 )
-def test_le_contexte_vivant_retire_ne_revient_pas(fichier: str, phrase: str) -> None:
-    """Une phrase retirée qui reste écrite se rejoue : la session suit le texte, pas l'intention."""
-    assert phrase not in texte_normalise(fichier), f"`{fichier}` porte encore « {phrase} »"
+def test_le_contexte_vivant_retire_ne_revient_pas(fichier: str, forme: str) -> None:
+    """Une forme retirée qui reste écrite se rejoue : la session suit le texte, pas l'intention."""
+    assert not porte_la_forme(fichier, forme), f"`{fichier}` porte encore « {forme} »"
 
 
 # L'**ordre** du protocole de la coordinatrice : chaque couple d'ancres, la première avant la
@@ -4614,14 +4626,8 @@ RETIRES_PAR_LA_SESSION_DE_RELECTURE = {
     ids=RETIRES_PAR_LA_SESSION_DE_RELECTURE.keys(),
 )
 def test_rien_de_ce_que_retire_la_session_de_relecture_ne_reste(fichier: str, forme: str) -> None:
-    """Une phrase retirée qui reste écrite se rejoue : la session suit le texte, pas l'intention.
-
-    Lue sans la casse : en tête de phrase, la forme revient avec une majuscule (mutation VERTE,
-    passe d'écriture du lot 3).
-    """
-    assert forme.lower() not in texte_normalise(fichier).lower(), (
-        f"`{fichier}` porte encore « {forme} »"
-    )
+    """Une phrase retirée qui reste écrite se rejoue : la session suit le texte, pas l'intention."""
+    assert not porte_la_forme(fichier, forme), f"`{fichier}` porte encore « {forme} »"
 
 
 # Les trois textes qui font démarrer, réveiller ou nettoyer la session de relecture la citent au
