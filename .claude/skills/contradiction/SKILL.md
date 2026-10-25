@@ -16,7 +16,8 @@ Mouvement **amont** de la pipeline, symétrique de `repercussions`.
 
 Les deux partagent la même discipline : **deux citations ou rien**, un diff avant/après, et aucune
 écriture sans « go ». Ce skill ne la réimplémente pas côté issues — il **délègue à
-`repercussions`** une fois l'amendement mergé (étape 5).
+`repercussions`** une fois l'amendement mergé, et, démarré par une passe `repercussions`, la fait
+reprendre quelle que soit la sortie (étape 5).
 
 ## Le livrable est un § amendé
 
@@ -27,7 +28,8 @@ Les deux partagent la même discipline : **deux citations ou rien**, un diff ava
   l'emplacement **Non normatif** déclaré par la table « Sources de vérité » de
   `.claude/pipeline.config.md` — s'il n'en déclare aucun, le raisonnement va dans le body de la PR
   qui porte l'amendement.
-- **Pas d'amendement formulable = pas de contradiction.** On se tait.
+- **Pas d'amendement formulable = pas de contradiction.** On se tait ; avec `origine : #<N>`, se
+  taire ne dispense pas de la relance de l'étape 5.
 
 **Règle d'or** : ce skill **propose**, il n'écrit jamais en silence. Aucune édition sans « go »
 explicite, et toute écriture de dépôt de ce skill part par une PR (D-12 de #134 ; étape 4).
@@ -68,8 +70,10 @@ l'`executant` (étape 4).
 
 Reprendre les deux citations de l'arrêt et les **vérifier dans le fichier** — pas de mémoire, on
 relit la ligne. Cette relecture reste à la session : c'est une lecture, un geste isolé
-(`CLAUDE.md`, « Orchestration »). Puis situer le **rang** touché dans la table « Sources de
-vérité » de `.claude/pipeline.config.md`, qu'un `releveur` rend.
+(`CLAUDE.md`, « Orchestration »). Une citation qui ne s'y retrouve pas : pas de contradiction
+(« Le livrable »), et, avec `origine : #<N>`, la session passe aux étapes 5 et 6. Puis situer le
+**rang** touché dans la table « Sources de vérité » de `.claude/pipeline.config.md`, qu'un
+`releveur` rend.
 
 Si la contradiction porte sur plusieurs documents, **le rang le plus haut commande** : on amende
 là, et les rangs inférieurs suivent en cascade. Amender la spec UX sans toucher le cadrage qu'elle
@@ -179,13 +183,26 @@ d'amendement ») : ce skill ne le recopie pas.
 
 - **Dans une session PR**, l'amendement fait partie du delta de sa PR : la passe `repercussions`
   de `cycle-pr` Étape 8 le confronte aux issues — rien à démarrer ici.
-- **Hors PR**, au merge de la PR d'amendement, dans le tour du go du mainteneur, démarrer la
-  session `repercussions` : `start_session`, `initiation: user_asked`, `context: fresh`,
+- **Hors PR**, dans le tour du mainteneur où la sortie est connue, démarrer la session
+  `repercussions` : `start_session`, `initiation: user_asked`, `context: fresh`,
   `use_worktree: true`, et
-  - **avec `origine : #<N>`** reçue à l'étape 1 : `name: repercussions-<N>`, prompt
-    `/repercussions #<N>` — la passe reprend sur l'issue fermée, contre la doc amendée ;
-  - **sans origine** : `name: repercussions-<m>`, prompt `/repercussions #<m>`, où `<m>` est le
-    numéro de la PR d'amendement (mode « PR d'amendement »).
+  - **avec `origine : #<N>`** reçue à l'étape 1, à **chaque** sortie, pas seulement à celle qui
+    amende — la passe de `#<N>` s'est arrêtée avant son étape 2 et rien d'autre ne la reprend :
+    `name: repercussions-<N>`, prompt `/repercussions #<N>` suivi du bloc d'arrêt reçu et de la
+    ligne `contradiction soldée : <sortie>` de la table, qui donne aussi le message de fin de
+    l'étape 6 :
+
+    | Sortie | Tour de la relance | Ligne du prompt | Message de fin |
+    |---|---|---|---|
+    | amendement mergé | son merge | `contradiction soldée : amendement PR #<m>` | « terminé — amendement PR #<m> mergé » |
+    | document gagne, effet déplacé dans le dépôt par une PR | son merge | `contradiction soldée : document gagne — PR #<m>` | « terminé — PR #<m> mergée, le document gagne » |
+    | document gagne, effet abandonné | la décision de l'étape 3 | `contradiction soldée : document gagne` | « terminé — aucune PR, le document gagne » |
+    | document gagne, effet déplacé hors du dépôt | la décision de l'étape 3 | `contradiction soldée : document gagne` | « terminé — aucune PR, le document gagne » |
+    | pas de contradiction | son constat | `contradiction soldée : écartée — <raison>` | « terminé — contradiction écartée » |
+
+  - **sans origine** : à la seule sortie qui amende, au merge de sa PR,
+    `name: repercussions-<m>`, prompt `/repercussions #<m>`, où `<m>` est le numéro de la PR
+    d'amendement (mode « PR d'amendement »).
 
   Hors d'un tour du mainteneur, une carte de proposition (`initiation: own_initiative`,
   `context: fresh`, `use_worktree: true`, même nom et même prompt). Le worktree propre a la raison
@@ -202,11 +219,10 @@ invisible.
 **Session démarrée par une autre** — par `repercussions` (son prompt système nomme le parent,
 `.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») : le récapitulatif fait,
 prévenir le parent par le message de fin de `sessions-liees.md` (« Fin de travail »), sous la
-forme « terminé — amendement PR #<m> mergé », suivie, si elle a démarré la session
-`repercussions`, du suffixe « — enfants au travail : `local_…` » — la fin du tour ne le prévient
-pas. La session qui l'archive nettoie cette enfant (« Nettoyage »). Quand le mainteneur retient à
-l'étape 3 la sortie où le document gagne sans qu'aucune PR ne parte — l'effet abandonné, ou
-déplacé hors du dépôt —, la forme est « terminé — aucun amendement, le document gagne ».
+forme que la table de l'étape 5 donne à sa sortie, suivie du suffixe « — enfants au travail :
+`local_…` » qui nomme la session `repercussions` démarrée, absent quand la relance est restée une
+carte de proposition — la fin du tour ne le prévient pas. La session qui l'archive nettoie cette
+enfant (« Nettoyage »).
 
 ## Ce que ce skill ne fait pas
 

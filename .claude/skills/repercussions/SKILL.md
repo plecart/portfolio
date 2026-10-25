@@ -1,7 +1,7 @@
 ---
 name: repercussions
 description: À la clôture d'une issue (PR mergée), corrige la planification des autres issues ouvertes que cette clôture a rendues fausses — hypothèses caduques, contrats déplacés, périmètres déjà couverts, ordres de dépendance. Le livrable est une édition de la spec des issues impactées — corps et brief d'agent — jamais un commentaire. À utiliser juste après un merge qui ferme une issue, ou « vérifie l'impact de cette issue sur les autres ». Aussi au merge d'une PR d'amendement ouverte par `contradiction`.
-argument-hint: "[#issue fermée | #PR d'amendement]"
+argument-hint: "[#issue fermée | #PR d'amendement] [bloc d'arrêt et contradiction soldée : <sortie>]"
 ---
 
 # Répercussions
@@ -118,16 +118,26 @@ falsifie. Un document **muet** sur le point (le cadrage décrit le serveur, le d
 de dev) n'est pas contredit. Une contradiction déjà portée par une issue ouverte — l'échappatoire
 de `decisions-vs-doc` — est déjà tracée : ne pas la signaler une seconde fois.
 
+**Démarrée avec une ligne `contradiction soldée : <sortie>`** — celle que `contradiction` ajoute au
+bloc d'arrêt à son étape 5 —, la session tient cet arrêt pour soldé : il ne se lève pas une
+seconde fois. Avec `document gagne`, suivi ou non de `— PR #<m>`, l'effet mergé qui contredit le
+document est un **vide à tracer** (`.claude/rules/contraintes.md`, « Création d'issues en cours de
+cycle ») — la complétion `[complétion]` d'une issue ouverte qui possède le sujet, sinon un
+brouillon, par le chemin de « Ce que ce skill ne fait pas » —, sauf si une issue ouverte le porte
+déjà (« Une contradiction déjà portée par une issue ouverte », ci-dessus) ; puis les étapes 2 à 7
+suivent. Avec `amendement PR #<m>` ou `écartée — <raison>`, elles suivent directement.
+
 Une contradiction avérée → **s'arrêter avant l'étape 2** et présenter l'arrêt de
 `.claude/rules/decisions-vs-doc.md` (bloc `## ⚠️ Contradiction`). Dans le tour où le mainteneur
 l'accepte, démarrer la session `contradiction` : `start_session`, `initiation: user_asked`,
 `context: fresh`, `use_worktree: true`, `name: contradiction-<N>`, prompt `/contradiction` suivi
 du bloc d'arrêt — ses deux citations — et de `origine : #<N>` ; hors d'un tour du mainteneur, une
 carte de proposition (`initiation: own_initiative`, `context: fresh`, `use_worktree: true`,
-même nom et même prompt). Elle amende le § par une PR ; à son merge, elle redémarre
-`repercussions` sur `#<N>`, dont la passe reprend contre la doc amendée — l'étape 1 n'y trouve plus
-la contradiction, les étapes 2 à 7 suivent, QA comprise. Démarrée par une autre, cette session-ci
-prévient alors son parent (étape 6). Ce skill **n'amende jamais un document lui-même**.
+même nom et même prompt). Quelle que soit sa sortie — amendement, document gagnant ou arrêt
+écarté —, elle redémarre `repercussions` sur `#<N>` avec la ligne `contradiction soldée` qui la
+nomme (`contradiction`, étape 5) : la passe reprend, les étapes 2 à 7 suivent, QA comprise.
+Démarrée par une autre, cette session-ci prévient alors son parent (étape 6). Ce skill **n'amende
+jamais un document lui-même**.
 
 ### 2. Sélectionner les issues à examiner
 
@@ -434,4 +444,5 @@ de l'outil, lue le 2026-10-23).
 4. **Périmètre mécanique** (thème + ancres) et **idempotence** (journal de spec) : le skill se
    relance après chaque merge sans re-brasser le backlog.
 5. **Les documents avant les issues.** Un delta qui falsifie un § de référence passe par
-   `contradiction` d'abord ; les issues se corrigent contre la doc amendée, jamais l'inverse.
+   `contradiction` d'abord ; les issues se corrigent contre la doc, amendée ou non, jamais
+   l'inverse.
