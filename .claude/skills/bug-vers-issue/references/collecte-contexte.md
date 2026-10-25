@@ -26,7 +26,7 @@ En **mode piloté par un plan** : le bloc par issue dans le plan nomme la ou les
 En **mode libre** : essaie, dans l'ordre :
 - Cherche les issues récemment fusionnées touchant la zone concernée : `gh issue list --search "<termes clés> is:merged" --limit 10` (puis remonte des PR aux issues).
 - `git log -- <chemins pertinents> --oneline -20` et repère les messages de commit qui référencent des numéros d'issue.
-- Si ni l'un ni l'autre ne donne de réponse claire, liste les candidats les plus proches et laisse l'utilisateur trancher.
+- Si ni l'un ni l'autre ne donne de réponse claire, liste les candidats les plus proches et laisse le mainteneur trancher.
 
 ## 4. PRD
 
@@ -57,7 +57,7 @@ Avant de rédiger :
 
 - Corps du plan : `grep -n "🔴 BUG #" <corps-du-plan>` et vérifie si l'un d'eux se trouve sur ou près de la case en échec.
 - Outil de suivi : `gh issue list --search "<3-4 termes clés>" --state all --limit 10`.
-- Montre les candidats à l'utilisateur et demande avant de consigner une nouvelle issue.
+- Montre les candidats au mainteneur et demande avant de consigner une nouvelle issue.
 
 ## Ce qu'il NE FAUT PAS inclure
 
