@@ -117,6 +117,7 @@ En cas de découpage : le parent d'abord, puis les enfants un par un, dans l'ord
 - Si piloté par un plan, patche le corps de l'issue du plan QA — `🔴 needs-issue` → `🔴 BUG #<nouveau-numéro>` sur la case qui échoue, et une entrée à l'**Index des constats** en bas du corps — par `issue edit <plan> --body-file <fichier>` :
   - la session lit elle-même le corps courant, juste avant le patch, dans ce même `<fichier>` (`gh api repos/{owner}/{repo}/issues/<plan> --jq .body`, sans le LF final que `--jq` ajoute) ; il ne passe par le rapport d'aucun équipier, qui pourrait en convertir les fins de ligne ou les espaces (obs 87, 106) ;
   - les remplacements se font en mémoire, par correspondance exacte de ligne complète, chaque ancienne ligne trouvée une seule fois, sinon s'arrêter et le dire au mainteneur (`execution-qa/references/patch-checkbox-gh.md`, « Construire le patch en mémoire » et « Détecter les éditions concurrentes » — leurs règles de correspondance seules : sa lecture et son push sont ceux de cette étape) ;
+  - l'entrée s'insère après la dernière ligne de l'Index des constats, ancrée sur sa ligne de titre, trouvée de même une seule fois ;
   - le résultat est écrit tel quel dans le fichier, ses fins de ligne gardées : le script relit contre ce fichier et ne voit pas une conversion (obs 87).
 - Dis au mainteneur que le bug est consigné et que le plan a été mis à jour.
 
