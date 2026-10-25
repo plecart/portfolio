@@ -16,7 +16,7 @@ Mouvement **amont** de la pipeline, symétrique de `repercussions`.
 
 Les deux partagent la même discipline : **deux citations ou rien**, un diff avant/après, et aucune
 écriture sans « go ». Ce skill ne la réimplémente pas côté issues — il **délègue à
-`repercussions`** une fois l'amendement mergé, et, démarré par une passe `repercussions`, la fait
+`repercussions`** une fois sa PR mergée, et, démarré par une passe `repercussions`, la fait
 reprendre quelle que soit la sortie (étape 5).
 
 ## Le livrable est un § amendé
@@ -162,6 +162,10 @@ Sur « go », l'amendement part par une PR, jamais par un commit direct sur le t
   et commite sur une branche partie de `origin/<trunk>` ; la session pousse la branche, ouvre la
   PR, la relit et la merge au go du mainteneur.
 
+Quand le mainteneur retient à l'étape 3 l'effet déplacé dans le dépôt (sortie 1b de
+`decisions-vs-doc`), la table des édits porte ce déplacement, et non un amendement, par le même
+déroulé de PR ; les quatre gestes ci-dessous sont ceux d'un amendement.
+
 La table des édits porte, dans le même commit, ces quatre gestes, dans l'ordre, sans en sauter :
 
 1. **Amender chaque §** exactement comme présenté. Ne jamais profiter de l'édition pour reformuler
@@ -178,11 +182,11 @@ La table des édits porte, dans le même commit, ces quatre gestes, dans l'ordre
 
 ### 5. Propager aux issues — la session `repercussions`
 
-Le mode qui confronte un amendement aux issues vit dans `repercussions`, étape 1 (« PR
-d'amendement ») : ce skill ne le recopie pas.
+Le mode qui confronte aux issues une PR mergée par ce skill vit dans `repercussions`, étape 1
+(« PR d'amendement ») : ce skill ne le recopie pas.
 
-- **Dans une session PR**, l'amendement fait partie du delta de sa PR : la passe `repercussions`
-  de `cycle-pr` Étape 8 le confronte aux issues — rien à démarrer ici.
+- **Dans une session PR**, l'amendement ou le déplacement fait partie du delta de sa PR : la passe
+  `repercussions` de `cycle-pr` Étape 8 le confronte aux issues — rien à démarrer ici.
 - **Hors PR**, dans le tour du mainteneur où la sortie est connue, démarrer la session
   `repercussions` : `start_session`, `initiation: user_asked`, `context: fresh`,
   `use_worktree: true`, et
@@ -190,19 +194,18 @@ d'amendement ») : ce skill ne le recopie pas.
     amende — la passe de `#<N>` s'est arrêtée avant son étape 2 et rien d'autre ne la reprend :
     `name: repercussions-<N>`, prompt `/repercussions #<N>` suivi du bloc d'arrêt reçu et de la
     ligne `contradiction soldée : <sortie>` de la table, qui donne aussi le message de fin de
-    l'étape 6 :
+    l'étape 6 ;
+  - **sans origine** : à chaque sortie qui merge une PR, et à elle seule, au merge de cette PR,
+    `name: repercussions-<m>`, prompt `/repercussions #<m>`, où `<m>` est son numéro (mode « PR
+    d'amendement ») — les autres sorties n'ont aucun delta mergé, rien à démarrer.
 
-    | Sortie | Tour de la relance | Ligne du prompt | Message de fin |
-    |---|---|---|---|
-    | amendement mergé | son merge | `contradiction soldée : amendement PR #<m>` | « terminé — amendement PR #<m> mergé » |
-    | document gagne, effet déplacé dans le dépôt par une PR | son merge | `contradiction soldée : document gagne — PR #<m>` | « terminé — PR #<m> mergée, le document gagne » |
-    | document gagne, effet abandonné | la décision de l'étape 3 | `contradiction soldée : document gagne` | « terminé — aucune PR, le document gagne » |
-    | document gagne, effet déplacé hors du dépôt | la décision de l'étape 3 | `contradiction soldée : document gagne` | « terminé — aucune PR, le document gagne » |
-    | pas de contradiction | son constat | `contradiction soldée : écartée — <raison>` | « terminé — contradiction écartée » |
-
-  - **sans origine** : à la seule sortie qui amende, au merge de sa PR,
-    `name: repercussions-<m>`, prompt `/repercussions #<m>`, où `<m>` est le numéro de la PR
-    d'amendement (mode « PR d'amendement »).
+  | Sortie | Tour de la relance | Sans origine | Avec origine : ligne du prompt | Message de fin |
+  |---|---|---|---|---|
+  | amendement mergé | son merge | `/repercussions #<m>` | `contradiction soldée : amendement PR #<m>` | « terminé — amendement PR #<m> mergé » |
+  | document gagne, effet déplacé dans le dépôt par une PR | son merge | `/repercussions #<m>` | `contradiction soldée : document gagne — PR #<m>` | « terminé — PR #<m> mergée, le document gagne » |
+  | document gagne, effet abandonné | la décision de l'étape 3 | rien, aucun delta mergé | `contradiction soldée : document gagne` | « terminé — aucune PR, le document gagne » |
+  | document gagne, effet déplacé hors du dépôt | la décision de l'étape 3 | rien, aucun delta mergé | `contradiction soldée : document gagne` | « terminé — aucune PR, le document gagne » |
+  | pas de contradiction | son constat | rien, aucun delta mergé | `contradiction soldée : écartée — <raison>` | « terminé — contradiction écartée » |
 
   Hors d'un tour du mainteneur, une carte de proposition (`initiation: own_initiative`,
   `context: fresh`, `use_worktree: true`, même nom et même prompt). Le worktree propre a la raison
@@ -210,10 +213,10 @@ d'amendement ») : ce skill ne le recopie pas.
 
 ### 6. Récapituler
 
-Au mainteneur : le numéro de la PR qui porte l'amendement, les §§ amendés, l'entrée d'archive
-créée, ce qui a été répercuté hors documents, la propagation aux issues — la session
-`repercussions` démarrée, ou la passe de `cycle-pr` Étape 8 dans une session PR —, et **ce qui
-reste ouvert**. Une cascade laissée à moitié est pire que la contradiction de départ : elle est
+Au mainteneur : le numéro de la PR qui porte l'amendement ou le déplacement, les §§ amendés,
+l'entrée d'archive créée, ce qui a été répercuté hors documents, la propagation aux issues — la
+session `repercussions` démarrée, ou la passe de `cycle-pr` Étape 8 dans une session PR —, et
+**ce qui reste ouvert**. Une cascade laissée à moitié est pire que la contradiction de départ : elle est
 invisible.
 
 **Session démarrée par une autre** — par `repercussions` (son prompt système nomme le parent,
