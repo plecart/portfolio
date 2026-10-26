@@ -23,6 +23,7 @@ from typing import cast
 
 import pytest
 import yaml
+from skill_scripts import load_script
 from test_supply_chain import prose_citations, tracked_files
 
 # `test_agent_skills.py` → `tests` → `api` → `apps` → racine du dépôt.
@@ -709,9 +710,9 @@ HOUSE_SKILLS = (
 # sept au commit suivant (bloc 2), qui en sort `interroge-moi`, `vers-prd` et `vers-issues` ; six
 # au 2026-10-23 (lot 6b, bloc 1), qui en sort `repercussions` ; quatre au 2026-10-25 (lot 6b2),
 # qui en sort `bug-vers-issue` et `contradiction` ; trois au 2026-10-26 (lot 7a), qui en sort
-# `plan-qa`. La liste se vide lot par lot ; #134 l'exige vide.
+# `plan-qa` ; deux le même jour (lot 7b2), qui en sort `execution-qa`. La liste se vide lot par
+# lot ; #134 l'exige vide.
 EXECUTOR_WAITING_LIST = {
-    "execution-qa": "7b",
     "audit-spec-ui": "8",
     "init-projet": "8",
 }
@@ -822,8 +823,9 @@ def test_chaque_skill_maison_nomme_ses_executants(skill: str) -> None:
     2026-10-23 sur `34604c7` avec `triage` (lot 6a2, bloc 1), six au commit suivant avec
     `interroge-moi`, `vers-prd` et `vers-issues` (bloc 2), sept le 2026-10-23 avec `repercussions`
     (lot 6b, bloc 1), neuf le 2026-10-25 avec `bug-vers-issue` et `contradiction` (lot 6b2), dix
-    le 2026-10-26 avec `plan-qa` (lot 7a) ; les trois autres — `execution-qa`, `audit-spec-ui`,
-    `init-projet` — sont dans `EXECUTOR_WAITING_LIST` avec le lot qui les en sort.
+    le 2026-10-26 avec `plan-qa` (lot 7a), onze le même jour avec `execution-qa` (lot 7b2) ; les
+    deux autres — `audit-spec-ui`, `init-projet` — sont dans `EXECUTOR_WAITING_LIST` avec le lot
+    qui les en sort.
     """
     assert cites_an_executor(skill_prose(skill), ROLE_NAMES), (
         f"`{skill}` ne nomme aucun rôle ni aucun script, et n'est pas en liste d'attente"
@@ -843,7 +845,7 @@ def test_un_skill_en_liste_d_attente_ne_nomme_encore_aucun_executant(skill: str)
 # Les skills dont la prose n'écrit plus sur la forge que par l'écriture distante relue (#134,
 # lot 4) : chaque lot de #134 y ajoute les siens — le lot 6a2 `triage`, `interroge-moi`, `vers-prd`
 # et `vers-issues` ; le lot 6b `repercussions` (bloc 1) ; le lot 6b2 `bug-vers-issue` et
-# `contradiction` ; le lot 7a `plan-qa` ; les lots 7b et 8 les leurs.
+# `contradiction` ; le lot 7a `plan-qa` ; le lot 7b2 `execution-qa` ; le lot 8 les siens.
 SKILLS_SANS_ECRITURE_GH_DIRECTE = (
     "triage",
     "interroge-moi",
@@ -853,6 +855,7 @@ SKILLS_SANS_ECRITURE_GH_DIRECTE = (
     "bug-vers-issue",
     "contradiction",
     "plan-qa",
+    "execution-qa",
 )
 ECRITURE_RELUE = ".claude/skills/cycle-pr/scripts/ecriture-relue.py"
 # Les skills de la table précédente qui n'écrivent sur aucune issue, chacun avec sa raison : le
@@ -947,7 +950,10 @@ def test_un_skill_sans_ecriture_gh_directe_n_en_cite_aucune(skill: str) -> None:
     et `vers-prd` aucune — leurs écritures n'y étaient décrites qu'en prose. Le 2026-10-23 (lot 6b,
     bloc 1), `repercussions` une : le `gh api -X PATCH` de son brief. Le 2026-10-25 (lot 6b2),
     `bug-vers-issue` deux (`gh issue create`, `gh label create`), `contradiction` aucune. Le
-    2026-10-26 (lot 7a), `plan-qa` trois (`gh issue create` ×2, `gh label create`).
+    2026-10-26 (lot 7a), `plan-qa` trois (`gh issue create` ×2, `gh label create`) ; le même jour
+    (lot 7b2), `execution-qa` trois sur `ffbe52e` — `gh issue comment` de
+    `gabarit-commentaire-phase.md`, `gh issue edit --body-file` et la mention `gh issue edit` de
+    `patch-checkbox-gh.md` —, rendus par `gh_writes` sur les cinq fichiers à ce commit.
 
     **Population** : `SKILLS_SANS_ECRITURE_GH_DIRECTE`, le `SKILL.md` et les références de chacun.
     **Ce que le détecteur ne voit pas** : une écriture décrite sans commande (« publie un
@@ -1531,6 +1537,7 @@ SKILLS_DES_SESSIONS_LIEES = [
     ".claude/skills/contradiction/SKILL.md",
     ".claude/skills/bug-vers-issue/SKILL.md",
     ".claude/skills/plan-qa/SKILL.md",
+    ".claude/skills/execution-qa/SKILL.md",
 ]
 
 
@@ -1554,7 +1561,7 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 # sur l'enfant jetable (l'enfant lit son parent dans son prompt, la porte du nettoyage compare
 # l'échafaudage à sa source — journal de spec de #107, 2026-10-16). La commande du
 # premier geste porte trois invariants à elle seule (`origin/`, `--no-track`, `&&`). Gardés
-# ailleurs : les renvois (`SKILLS_DES_SESSIONS_LIEES`, dix au 2026-10-26), le point de départ
+# ailleurs : les renvois (`SKILLS_DES_SESSIONS_LIEES`, onze au 2026-10-26), le point de départ
 # `origin/` (`DEPARTS_EXPLICITES`), la porte du nettoyage (`PORTES_PRESCRITES`). Restent en
 # lecture, à dessein : les formes du message de fin autres que celle d'un lot — sauf celle de fin
 # d'interrogatoire, que l'étape 0 de `pr-paralleles` consomme depuis le lot 4 (gardée plus bas).
@@ -1611,6 +1618,10 @@ GABARIT_DECOUPAGE_REF = ".claude/skills/bug-vers-issue/references/gabarit-issue-
 THEMES_MILESTONES_REF = ".claude/skills/triage/themes-milestones.md"
 BRIEF_AGENT_REF = ".claude/skills/triage/brief-agent.md"
 PATCH_CHECKBOX_REF = ".claude/skills/execution-qa/references/patch-checkbox-gh.md"
+EXECUTION_QA_SKILL = ".claude/skills/execution-qa/SKILL.md"
+INTAKE_ECHEC_REF = ".claude/skills/execution-qa/references/gabarit-intake-echec.md"
+COMMENTAIRE_PHASE_REF = ".claude/skills/execution-qa/references/gabarit-commentaire-phase.md"
+CORRECTION_BUG_REF = ".claude/skills/execution-qa/references/standard-correction-bug.md"
 PLAN_QA_SKILL = ".claude/skills/plan-qa/SKILL.md"
 GABARIT_PLAN_QA_REF = ".claude/skills/plan-qa/references/gabarit-plan-qa.md"
 EXEMPLE_BLOC_ISSUE_REF = ".claude/skills/plan-qa/references/exemple-bloc-issue.md"
@@ -2202,8 +2213,12 @@ INVARIANTS_DES_SESSIONS_LIEES = {
 # ajoute **2** dans `contradiction` (2026-10-25), écrits en clair dès leur création : la session
 # `repercussions` de l'étape 5 et sa carte de proposition ; `grep -n start_session` dans les
 # fichiers de `contradiction` et de `bug-vers-issue` en retrouve un, le démarrage — la carte n'a pas
-# le mot, et `bug-vers-issue` ne démarre aucune session — 20 sites. Un site nouveau n'entre pas ici
-# de lui-même : la garde lit des phrases, le grep re-dérive la population.
+# le mot, et `bug-vers-issue` ne démarre aucune session — 20 sites. Le lot 7b2 en ajoute **2** dans
+# `execution-qa` (2026-10-26), écrits en clair dès leur création : la session `bug-vers-issue` de
+# l'option (a) de son §4 et sa carte de proposition, toutes deux **sans** worktree — elle lit le
+# code de la campagne et n'écrit que dans GitHub ; `grep -rn start_session` dans ses cinq fichiers
+# en retrouve un, le démarrage — 22 sites. Un site nouveau n'entre pas ici de lui-même : la garde
+# lit des phrases, le grep re-dérive la population.
 USE_WORKTREE_EXPLICITE = {
     "pr-paralleles-etape-0-sans-worktree": (
         PR_PARALLELES_SKILL,
@@ -2288,6 +2303,20 @@ USE_WORKTREE_EXPLICITE = {
         (
             "Hors d'un tour du mainteneur, une carte de proposition (`initiation: own_initiative`,"
             " `context: fresh`, `use_worktree: true`, même nom et même prompt)"
+        ),
+    ),
+    "execution-qa-vers-bug-vers-issue": (
+        EXECUTION_QA_SKILL,
+        (
+            "`start_session`, `initiation: user_asked`, `context: fresh`, `use_worktree: false` —"
+            " elle lit le code de la campagne et n'écrit que dans GitHub —, `name: bug-<plan>`"
+        ),
+    ),
+    "execution-qa-vers-bug-vers-issue-par-carte": (
+        EXECUTION_QA_SKILL,
+        (
+            "Hors d'un tour du mainteneur, une carte de proposition (`initiation: own_initiative`,"
+            " `context: fresh`, `use_worktree: false`, même nom et même prompt)"
         ),
     ),
 }
@@ -3565,8 +3594,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b2-bug-vers-issue-patch-regles-de-correspondance-seules": (
         BUG_VERS_ISSUE_SKILL,
         (
-            "« Construire le patch en mémoire » et « Détecter les éditions concurrentes » — leurs"
-            " règles de correspondance seules : sa lecture et son push sont ceux de cette étape"
+            "« Correspondance par ligne complète » et « Détecter les éditions concurrentes » —"
+            " leurs règles de correspondance seules : sa lecture et son push sont ceux de cette"
+            " étape"
         ),
     ),
     "6b2-bug-vers-issue-fins-de-ligne-gardees": (
@@ -3889,8 +3919,449 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         CYCLE_PR_SKILL,
         (
             "`triage`, `interroge-moi`, `vers-prd`, `vers-issues`, `repercussions`,"
-            " `bug-vers-issue` et `plan-qa` les nomment ; les skills des lots 7b et 8 de #134 les"
-            " nommeront"
+            " `bug-vers-issue`, `plan-qa` et `execution-qa` les nomment ; le skill du lot 8 de #134"
+            " les nommera. Toute écriture qu'il ne fait pas reste sous la règle « Écritures sur un"
+            " artefact distant »"
+        ),
+    ),
+    # Lot 7b2 de #134 (2026-10-26) : `execution-qa` délègue, son état est la forge, son échec
+    # s'écrit et se consigne dans une session distincte. Une entrée par point du brief du bloc qui
+    # écrit une règle — « Délégation », §1 à §4, §6, « Décisions de politique », « Passe finale »,
+    # « Erreurs courantes » ; les quatre références ; la dette de `bug-vers-issue` et la ligne
+    # d'Index du gabarit de `plan-qa` —, et par moitié restrictive (obs 126). Dénombrement par la
+    # forme, sur les lignes ajoutées des fichiers de prose
+    # (`git diff -U0 origin/feat/contexte-court -- .claude/skills/`) : **60** moitiés restrictives
+    # — 10 « jamais », 12 « ne … pas », « ne … rien », « ne … plus » ou « ne … ni », 6 « pas »
+    # elliptique, 7 « elle-même », 5 « la session » ou « cette session » sans « elle-même » ni
+    # « reste à », 5 « seul », 4 « aucun », 3 « s'arrêter », 3 « sans », 2 « hors », « ni … ni »,
+    # « n'… que », « reste à » — et 2 de plus sur la ligne réécrite de l'étape 7 de
+    # `bug-vers-issue` (« une seule fois », « s'arrêter »), déjà gardées par
+    # `6b2-bug-vers-issue-ligne-introuvable-arrete` ; toutes épinglées, vues rouges sur `ffbe52e`
+    # sauf deux phrases inchangées sur une ligne réécrite (`7b2-execution-qa-travail-preserve`,
+    # `7b2-execution-qa-pas-de-preuve-inutile`), vues rouges par `mutation.py`. Gardés ailleurs :
+    # la sortie de liste d'attente (`EXECUTOR_WAITING_LIST`), l'absence d'écriture `gh` directe et
+    # le renvoi au script (`SKILLS_SANS_ECRITURE_GH_DIRECTE`), le renvoi aux sessions liées
+    # (`SKILLS_DES_SESSIONS_LIEES`), `use_worktree` et « n'écrit que dans GitHub » au démarrage de
+    # la consignation (`USE_WORKTREE_EXPLICITE`), le contexte vivant retiré
+    # (`RETIRES_DU_CONTEXTE_VIVANT`), l'annotation de chaque marque réglée
+    # (`ANNOTATIONS_QUI_REGLENT_UNE_CASE`).
+    "7b2-bug-vers-issue-intake-ecrit-par-la-qa": (
+        BUG_VERS_ISSUE_SKILL,
+        "La session de QA démarre ce mode, avec l'intake qu'elle a écrit (`execution-qa`, §4).",
+    ),
+    "7b2-gabarit-plan-qa-index-par-bug-vers-issue": (
+        GABARIT_PLAN_QA_REF,
+        (
+            "La session `bug-vers-issue` ajoute les liens ici à mesure qu'elle consigne les bugs de"
+            " la campagne — son étape 7."
+        ),
+    ),
+    "7b2-execution-qa-principe": (
+        EXECUTION_QA_SKILL,
+        (
+            "Chaque échec offre à l'utilisateur trois options explicites (consigner, reporter, faire"
+            " corriger). Ne jamais auto-invoquer `bug-vers-issue`. **Ne jamais fusionner deux"
+            " surfaces en un seul verdict** quand une seule a été réellement testée — « le service"
+            " répond » ne dit rien de ce que l'utilisateur voit."
+        ),
+    ),
+    "7b2-execution-qa-jugement-a-la-session": (
+        EXECUTION_QA_SKILL,
+        (
+            "La session garde le jugement : le dialogue avec le mainteneur — les cases"
+            " **Observation** —, le verdict de chaque case, les décisions de politique, le choix"
+            " entre les options d'un échec, la rédaction de l'intake et du commentaire de phase, le"
+            " démarrage des sessions."
+        ),
+    ),
+    "7b2-execution-qa-releveur-commande-telle-qu-ecrite": (
+        EXECUTION_QA_SKILL,
+        (
+            "les cases **Commande** : la commande exacte et l'attendu du plan, tapés tels qu'écrits,"
+            " la sortie lue brute, sans résumeur — la forme « test brut » de"
+            " `.claude/pipeline.config.md` quand le poste en a une (obs 144)"
+        ),
+    ),
+    "7b2-execution-qa-releveur-premier-ko": (
+        EXECUTION_QA_SKILL,
+        (
+            "Il rend OK ou KO par case, le code de sortie, la sortie brute si KO, et s'arrête au"
+            " premier KO, qui remonte ; plusieurs cases d'un bloc partent dans un seul brief"
+        ),
+    ),
+    "7b2-execution-qa-releveur-releves": (
+        EXECUTION_QA_SKILL,
+        (
+            "Lui reviennent aussi l'état de l'arbre et les fichiers que les cases du bloc nomment"
+            " (§2), l'état des issues des cases `🔴 BUG #N` à la reprise (§2), le recoupement BD /"
+            " logs (« Patrons par surface »), les commandes finales (§6) et la preuve lourde,"
+            " rassemblée dans un fichier (§3, étape 6). Le verdict de la case reste à la session"
+        ),
+    ),
+    "7b2-execution-qa-script-par-la-session": (
+        EXECUTION_QA_SKILL,
+        (
+            "**script** — la prochaine case (`checkbox next`, §2), le patch des cases (`checkbox"
+            " patch --paires`, §3, étape 5), le commentaire de phase et l'intake (`comment`, §3,"
+            " étape 6, et §4), par `python .claude/skills/cycle-pr/scripts/ecriture-relue.py`,"
+            " appelé par la session elle-même : un geste isolé coûte plus délégué"
+        ),
+    ),
+    "7b2-execution-qa-sessions-distinctes": (
+        EXECUTION_QA_SKILL,
+        (
+            "**sessions distinctes** — la consignation d'un échec (`bug-vers-issue`, §4, option"
+            " (a)), sa correction (`cycle-pr`, option (c)), et la reprise de la case corrigée : une"
+            " session de QA — neuve, ou celle de la campagne réveillée par message —, jamais la"
+            " suite du contexte qui a corrigé"
+        ),
+    ),
+    "7b2-execution-qa-etat-a-la-forge": (
+        EXECUTION_QA_SKILL,
+        (
+            "L'état du plan est la forge : aucune copie locale du corps. La prochaine case se lit"
+            " par le script, le bloc courant dans le corps (§2), et chaque mise à jour est un"
+            " fichier de paires que le script applique au corps courant, puis relit"
+        ),
+    ),
+    "7b2-execution-qa-repli-markdown": (
+        EXECUTION_QA_SKILL,
+        "En mode de repli markdown, le fichier du plan est l'état, lu et édité en place",
+    ),
+    "7b2-execution-qa-prochaine-case": (
+        EXECUTION_QA_SKILL,
+        (
+            "`python .claude/skills/cycle-pr/scripts/ecriture-relue.py checkbox next <plan>` rend le"
+            " titre de son bloc, puis sa ligne : la première case `- [ ]` qui ne porte ni `🔴`, ni"
+            " ` — BLOQUÉ`, ni ` — accepté` (§3, étape 4, et §4). Sans case en attente, passer au"
+            " §6."
+        ),
+    ),
+    "7b2-execution-qa-bloc-lu-par-la-session": (
+        EXECUTION_QA_SKILL,
+        (
+            "la session le lit elle-même dans le corps, une fois par bloc, borné : ses titres par"
+            ' `gh issue view <plan> --json body -q .body | grep -n "^## "`, puis sa plage par'
+            ' `gh issue view <plan> --json body -q .body | sed -n "<début>,<fin>p"`. Elle y lit'
+            " chaque case, son type — **Commande** ou **Observation**, écrit dans le plan"
+            " (`plan-qa/references/gabarit-plan-qa.md`, « Types de case ») — et son état."
+        ),
+    ),
+    "7b2-execution-qa-arbre-au-releveur": (
+        EXECUTION_QA_SKILL,
+        (
+            "au `releveur` (« Délégation »), une fois par bloc, pas une fois par case :"
+            " `git status --short`, `git log -10 --oneline`, et les fichiers que les cases du bloc"
+            " nomment"
+        ),
+    ),
+    "7b2-execution-qa-travail-preserve": (
+        EXECUTION_QA_SKILL,
+        "Préserver les changements de l'utilisateur ; ne jamais annuler du travail sans rapport.",
+    ),
+    "7b2-execution-qa-reprise": (
+        EXECUTION_QA_SKILL,
+        (
+            "les cases `🔴 BUG #N` dont l'issue est fermée se rejouent (§4, option (c)). La session"
+            ' les trouve dans le corps (`gh issue view <plan> --json body -q .body | grep -n "BUG #"`)'
+            " ; l'état de chaque issue, et la PR qui l'a fermée, sont un relevé du `releveur`"
+            " (`gh issue view <N> --json state,closedByPullRequestsReferences`)."
+        ),
+    ),
+    "7b2-execution-qa-commande-au-releveur": (
+        EXECUTION_QA_SKILL,
+        (
+            "**Commande** — au `releveur` (« Délégation ») : les cases Commande qui se suivent dans"
+            " le bloc partent dans un seul brief."
+        ),
+    ),
+    "7b2-execution-qa-observation-en-dialogue": (
+        EXECUTION_QA_SKILL,
+        (
+            "**Observation** — le dialogue avec le mainteneur : les clics UI ou l'action exacts,"
+            " l'attendu énoncé avant qu'il ne les exécute"
+        ),
+    ),
+    "7b2-execution-qa-resultats-selon-le-type": (
+        EXECUTION_QA_SKILL,
+        (
+            "**Examiner les résultats observés** — le relevé du `releveur`, ou ce que rapporte le"
+            " mainteneur."
+        ),
+    ),
+    "7b2-execution-qa-pas-de-preuve-inutile": (
+        EXECUTION_QA_SKILL,
+        "Ne pas demander de preuve qui ne change pas la décision.",
+    ),
+    "7b2-execution-qa-verdict-en-paire": (
+        EXECUTION_QA_SKILL,
+        "**Décider de la case** — chaque verdict s'écrit en paire dans le fichier du bloc (étape 5)",
+    ),
+    "7b2-execution-qa-accepte": (
+        EXECUTION_QA_SKILL,
+        (
+            "**Accepté** → un écart observé que le mainteneur accepte : laisser `- [ ]`, ajouter"
+            " ` — accepté : <décision>, <date>`. La case ne passe pas, elle est réglée :"
+            " `checkbox next` ne la rend plus."
+        ),
+    ),
+    "7b2-execution-qa-patch-par-paires": (
+        EXECUTION_QA_SKILL,
+        (
+            "une paire par case décidée, dans un fichier, appliquée par"
+            " `python .claude/skills/cycle-pr/scripts/ecriture-relue.py checkbox patch <plan>"
+            " --paires <fichier>`"
+        ),
+    ),
+    "7b2-execution-qa-refus-arrete": (
+        EXECUTION_QA_SKILL,
+        (
+            "Un refus sur une ancienne ligne introuvable ou en double est une édition concurrente :"
+            " rien n'est écrit — s'arrêter et le dire au mainteneur, avec la ligne la plus proche"
+            " que le script nomme."
+        ),
+    ),
+    "7b2-execution-qa-commentaire-par-la-session": (
+        EXECUTION_QA_SKILL,
+        (
+            "rassemblée dans un fichier par le `releveur` : la session le rédige"
+            " (`references/gabarit-commentaire-phase.md`) et le publie elle-même par"
+            " `python .claude/skills/cycle-pr/scripts/ecriture-relue.py comment <plan> --body-file"
+            " <fichier>`"
+        ),
+    ),
+    "7b2-execution-qa-echec-annote-et-intake-ecrit": (
+        EXECUTION_QA_SKILL,
+        (
+            "Annoter la ligne ` 🔴 needs-issue — <résumé sur une ligne>`, par une paire appliquée"
+            " tout de suite (§3, étape 5), pour que l'échec soit visible sur l'issue. 2. **Écrire**"
+            " l'intake de l'échec avec `references/gabarit-intake-echec.md` — les champs sans"
+            " contenu supprimés, pas laissés vides — et le publier en commentaire de l'issue du"
+            " plan : `python .claude/skills/cycle-pr/scripts/ecriture-relue.py comment <plan>"
+            " --body-file <intake>`. Son URL se compose de l'`id` que rend la sortie :"
+            " `https://github.com/<owner>/<repo>/issues/<plan>#issuecomment-<id>`. En mode de"
+            " repli markdown, l'intake est un fichier hors de tout worktree éphémère, et son chemin"
+            " tient lieu d'URL."
+        ),
+    ),
+    "7b2-execution-qa-consigner-dans-une-session-distincte": (
+        EXECUTION_QA_SKILL,
+        (
+            "**(a) Consigner maintenant** — dans une session `bug-vers-issue` distincte, que cette"
+            " session démarre dans le tour où le mainteneur choisit (a)"
+        ),
+    ),
+    "7b2-execution-qa-prompt-de-consignation": (
+        EXECUTION_QA_SKILL,
+        (
+            "prompt `/bug-vers-issue #<plan> <ancre de la case> <URL de l'intake>`, la forme de son"
+            " `argument-hint`"
+        ),
+    ),
+    "7b2-execution-qa-un-seul-auteur": (
+        EXECUTION_QA_SKILL,
+        (
+            "Le marqueur `🔴 BUG #N` et l'Index des constats, la session `bug-vers-issue` les patche"
+            " elle-même (son étape 7) : cette session ne les écrit pas, un seul auteur. La QA"
+            " reprend dans cette session sur son message « terminé — BUG #N consigné »"
+            " (`sessions-liees.md`, « Fin de travail »), jamais sur sa fin de tour."
+        ),
+    ),
+    "7b2-execution-qa-reporter": (
+        EXECUTION_QA_SKILL,
+        "**(b) Reporter** — laisser `🔴 needs-issue`, continuer la QA, consigner plus tard en lot.",
+    ),
+    "7b2-execution-qa-correction-hors-de-la-qa": (
+        EXECUTION_QA_SKILL,
+        (
+            "**(c) Faire corriger** — la correction n'a jamais lieu dans cette session : consigner"
+            " d'abord (a) ; elle passe ensuite par `cycle-pr`, dans sa propre session, sur l'issue"
+            " consignée (`references/standard-correction-bug.md`) ; la case se rejoue à la reprise"
+            " (§2), jamais dans la suite du contexte qui a corrigé."
+        ),
+    ),
+    "7b2-execution-qa-termine-accepte": (
+        EXECUTION_QA_SKILL,
+        (
+            "est `[x]` (ou explicitement ` — N/A : <raison>`), ou laissée `[ ]` avec ` — accepté :"
+            " <décision>, <date>`. - Vérifier que chaque constat bloquant a un lien `🔴 BUG #N`"
+            " (consigné) ou une annotation ` — accepté : <décision>, <date>`. - Faire relancer par"
+            " le `releveur` les commandes finales listées dans le plan, après toute correction"
+            " mergée. - Appliquer le dernier patch (§3, étape 5) : aucune décision ne reste hors de"
+            " l'issue."
+        ),
+    ),
+    "7b2-execution-qa-decision-ou-accepte": (
+        EXECUTION_QA_SKILL,
+        (
+            "` — Décision : <politique choisie>, <date>` si la case passe, ` — accepté : <décision>,"
+            " <date>` si l'écart est accepté sans qu'elle passe (§3, étape 4)."
+        ),
+    ),
+    "7b2-execution-qa-code-jamais-dans-cette-session": (
+        EXECUTION_QA_SKILL,
+        (
+            "Un changement de code qu'exige la politique choisie ne se fait jamais dans cette"
+            " session : c'est une tâche séparée — consignée (§4, option (a)), corrigée par"
+            " `cycle-pr` —, pas une partie du cochage de la case."
+        ),
+    ),
+    "7b2-execution-qa-passe-finale": (
+        EXECUTION_QA_SKILL,
+        (
+            "porte une annotation explicite de non-passage (` — N/A`, ` — BLOQUÉ`, `🔴`,"
+            " ` — accepté`)."
+        ),
+    ),
+    "7b2-execution-qa-passe-finale-preuve-patch-index": (
+        EXECUTION_QA_SKILL,
+        (
+            "rassemblée par le `releveur`, est dans un commentaire de synthèse de phase publié par"
+            " `comment`, pas entassée en ligne. - [ ] Chaque échec a un lien `🔴 BUG #N` OU une"
+            " annotation reporté / accepté. - [ ] Le patch du bloc est appliqué et relu par le"
+            " script ; aucune paire ne reste à appliquer. - [ ] L'Index des constats, qu'écrivent"
+            " les sessions `bug-vers-issue`, porte chaque bug consigné dans cette phase."
+        ),
+    ),
+    "7b2-execution-qa-erreur-consigner-par-defaut": (
+        EXECUTION_QA_SKILL,
+        (
+            "| Auto-invoquer bug-vers-issue sur un échec | Toujours proposer les trois options"
+            " d'abord. Mise en avant par défaut = (a) consigner. |"
+        ),
+    ),
+    "7b2-execution-qa-erreur-patch-a-la-main": (
+        EXECUTION_QA_SKILL,
+        (
+            "| Patcher le corps à la main, ou depuis une copie locale | Une paire par case,"
+            " appliquée au corps courant par `checkbox patch --paires` — voir"
+            " `references/patch-checkbox-gh.md`. | | Écrire `🔴 BUG #N` ou l'Index des constats"
+            " depuis cette session | La session `bug-vers-issue` les écrit, seule (§4, option (a)). |"
+        ),
+    ),
+    "7b2-execution-qa-erreur-jamais-corriger": (
+        EXECUTION_QA_SKILL,
+        (
+            "| Corriger un bug dans la session de QA | Jamais : consigner (a) ; la correction passe"
+            " par `cycle-pr`, dans sa propre session (c). |"
+        ),
+    ),
+    "7b2-commentaire-phase-publie-par-la-session": (
+        COMMENTAIRE_PHASE_REF,
+        (
+            "La session le rédige et le publie elle-même : `python"
+            " .claude/skills/cycle-pr/scripts/ecriture-relue.py comment <plan> --body-file"
+            " <commentaire.md>`, relu sous l'`id` publié. La preuve lourde — commandes, lignes BD,"
+            " logs — vient du fichier où le `releveur` l'a rassemblée"
+        ),
+    ),
+    "7b2-intake-ecrit-et-consomme-en-argument": (
+        INTAKE_ECHEC_REF,
+        (
+            "L'intake s'**écrit** : en commentaire de l'issue du plan, publié par `comment <plan>"
+            " --body-file` (`SKILL.md` §4, étape 2), ou, en mode de repli markdown, dans un fichier"
+            " hors de tout worktree éphémère. La session `bug-vers-issue` distincte qui le consomme"
+            " le reçoit en argument — son URL ou son chemin — quand l'utilisateur choisit l'option"
+            " (a) « consigner maintenant » : elle ne lit rien d'autre de la session de QA."
+        ),
+    ),
+    "7b2-patch-checkbox-etat-a-la-forge": (
+        PATCH_CHECKBOX_REF,
+        (
+            "L'état du plan est la forge : ni copie locale du corps, ni paire gardée hors d'un"
+            " fichier — chaque mise à jour est un fichier de paires que `ecriture-relue.py` applique"
+            " au corps courant, puis relit."
+        ),
+    ),
+    "7b2-patch-checkbox-regle-fondamentale": (
+        PATCH_CHECKBOX_REF,
+        (
+            "**Faire correspondre par texte de ligne exact, pas par index. Faire remonter un"
+            " avertissement si la ligne que tu comptais mettre à jour a changé.** Le script lit le"
+            " corps courant au moment d'écrire : aucune lecture à refaire avant le patch."
+        ),
+    ),
+    "7b2-patch-checkbox-fichier-de-paires": (
+        PATCH_CHECKBOX_REF,
+        (
+            "une paire `(ancienne_ligne, nouvelle_ligne)` : une ligne `< <ancienne>`, puis une ligne"
+            " `> <nouvelle>`, dans un fichier UTF-8"
+        ),
+    ),
+    "7b2-patch-checkbox-ancienne-lue-par-la-session": (
+        PATCH_CHECKBOX_REF,
+        (
+            "L'ancienne ligne se copie de la lecture du bloc que la session a faite elle-même"
+            " (`SKILL.md` §2). Le format exact, ses refus et son rejeu sont le contrat du script —"
+            " `python .claude/skills/cycle-pr/scripts/ecriture-relue.py --help` —, qu'on ne recopie"
+            " pas ici."
+        ),
+    ),
+    "7b2-patch-checkbox-titres-cites-par-bug-vers-issue": (
+        PATCH_CHECKBOX_REF,
+        (
+            "2. Correspondance par ligne complète Appliquer la substitution par **correspondance"
+            " exacte de ligne complète**."
+        ),
+    ),
+    "7b2-patch-checkbox-editions-concurrentes": (
+        PATCH_CHECKBOX_REF,
+        "3. Détecter les éditions concurrentes Pour chaque paire, dans le corps courant :",
+    ),
+    "7b2-patch-checkbox-le-script-tient-les-regles": (
+        PATCH_CHECKBOX_REF,
+        (
+            "Le script tient ces règles : il valide toutes les paires avant la première écriture, et"
+            " refuse sans rien écrire en nommant la ligne la plus proche, ou le double."
+        ),
+    ),
+    "7b2-patch-checkbox-applique-par-la-session": (
+        PATCH_CHECKBOX_REF,
+        (
+            "Appelé par la session elle-même. Un refus (§3) ou une relecture non conforme :"
+            " s'arrêter et le dire au mainteneur."
+        ),
+    ),
+    "7b2-patch-checkbox-cadence": (
+        PATCH_CHECKBOX_REF,
+        (
+            "Patcher à la fin d'une phase ou d'un bloc par issue (ou à la fin d'un sous-groupe"
+            " significatif au sein d'un bloc long). Ne pas patcher après chaque bascule de case —"
+            " cela gonfle l'historique de l'issue et augmente la surface de risque d'édition"
+            " concurrente. Pour un bloc de longue durée, patcher périodiquement de toute façon"
+        ),
+    ),
+    "7b2-patch-checkbox-repli-sans-script": (
+        PATCH_CHECKBOX_REF,
+        (
+            "Utiliser l'outil `Edit` avec la même règle de correspondance exacte de ligne (§2 et"
+            " §3). - Pas de script : le fichier est local."
+        ),
+    ),
+    "7b2-patch-checkbox-ce-qu-il-ne-prouve-pas": (
+        PATCH_CHECKBOX_REF,
+        (
+            "il ne verrouille rien : une édition faite par un tiers entre sa lecture et son écriture"
+            " est écrasée — est écrit dans sa docstring, « Ce qu'il ne prouve pas » (`--help`),"
+            " seule source."
+        ),
+    ),
+    "7b2-correction-jamais-dans-la-qa": (
+        CORRECTION_BUG_REF,
+        (
+            "La session de QA ne corrige jamais : un échec se consigne (`SKILL.md` §4, option (a)),"
+            " et sa correction passe par `cycle-pr`, dans sa propre session, sur l'issue consignée"
+            " (option (c)). Ce standard vaut pour cette session `cycle-pr` quand elle corrige un bug"
+            " trouvé en QA."
+        ),
+    ),
+    "7b2-correction-reprise-dans-une-session-de-qa": (
+        CORRECTION_BUG_REF,
+        (
+            "La case ne se rejoue pas dans la session qui a corrigé : elle se rejoue dans une"
+            " session de QA — neuve, ou celle de la campagne réveillée par message —, une fois la"
+            " correction mergée et l'issue fermée (`SKILL.md` §2, « La reprise »). Passée, elle"
+            " bascule en `- [x]` avec ` — corrigé par #<PR>, <date>`."
         ),
     ),
 }
@@ -3975,13 +4446,17 @@ def test_chaque_fermeture_d_issue_retire_son_etat(fichier: str) -> None:
 # `repercussions` —, ou publient un brief neuf (`triage`, `brief-agent.md`). Le renvoi « Relire le
 # corps — et le brief — juste avant d'écrire » de `repercussions`, sans le geste, nommait la
 # lecture fautive : épinglé avec elle (`INVARIANTS_DU_CONTEXTE_COURT`).
+#
+# Le lot 7b2 (2026-10-26) retire les deux blocs de `patch-checkbox-gh.md` — son push par
+# `gh issue edit --body-file`, l'une des 11, et sa mention ETag, l'un des 12 — : `execution-qa`
+# patche par `checkbox patch --paires`, dont le script lit lui-même le corps courant, hors classe
+# comme `issue_append`, et que le geste ne compte pas. Même commande après sa prose : **21** blocs,
+# 10 réécritures et 11 autres.
 REECRITURES_DE_CORPS = {
     "bug-vers-issue-delegation-renvoi": BUG_VERS_ISSUE_SKILL,
     "bug-vers-issue-etape-7-lu-par-la-session": BUG_VERS_ISSUE_SKILL,
     "bug-vers-issue-erreurs-courantes-renvoi": BUG_VERS_ISSUE_SKILL,
     "cycle-pr-append-lu-par-le-script-hors-perimetre": CYCLE_PR_SKILL,
-    "patch-checkbox-push-hors-perimetre-lot-7b": PATCH_CHECKBOX_REF,
-    "patch-checkbox-etag-mention": PATCH_CHECKBOX_REF,
     "interroge-moi-delegation-renvoi": INTERROGE_MOI_SKILL,
     "interroge-moi-decisions-indemne": INTERROGE_MOI_SKILL,
     "interroge-moi-autre-issue-indemne": INTERROGE_MOI_SKILL,
@@ -4051,6 +4526,21 @@ def test_l_orchestration_ne_rend_pas_ce_qu_elle_a_retire(phrase: str) -> None:
 # phrase, les trois autres vus rouges par mutation inverse. S'y ajoute la création du label qui
 # manque, que `ecriture-relue.py` n'a pas, écrite en prose à l'étape 2 et dans « Sortie » — seule
 # la commande de « Sortie » tombe sous `gh_writes` —, rouge sur `e4e05db`.
+#
+# Le lot 7b2 (2026-10-26) y ajoute `execution-qa`, par les critères « 7b » et « 7a, 7b » du même
+# brief : l'intake « capturé dans la conversation », la copie de travail locale et la paire gardée
+# « en mémoire » remplacés par un support écrit, la correction « en session » retirée.
+# **Population** par la forme (obs 139) sur `ffbe52e`, base du lot —
+# `git show ffbe52e:<fichier> | grep -n -i -F -e <forme> …` sur ses cinq fichiers, en lignes :
+# « conversation » 2, `SKILL.md` §4 et `gabarit-intake-echec.md`, deux sources, aucun dialogue —
+# les trois autres fichiers à 0 ; « capturer » 2, les mêmes ; « capturé » 1, `SKILL.md` (l'intake
+# « capturée » de l'option (a)) — « captures d'écran », 2 lignes, est une preuve, pas la forme ;
+# « /tmp/qa-plan » 4 (`SKILL.md` 1, `patch-checkbox-gh.md` 3) ; « copie de travail » 10 (8, 2) ;
+# « re-récupér » 5 (2, 3) ; « pousser » 10 (5, 5) ; « repouss » 6, `SKILL.md` ; « push » 2 (1, 1) ;
+# « en mémoire » 2, `patch-checkbox-gh.md` ; « en session » 7 (`SKILL.md` 3,
+# `standard-correction-bug.md` 4). Une entrée par forme et par fichier qui la porte, plus
+# « conversation » dans chacun des cinq fichiers : 22 entrées, toutes rouges sur `ffbe52e` sauf
+# les trois « conversation » des fichiers à 0, vues rouges par mutation inverse.
 RETIRES_DU_CONTEXTE_VIVANT = {
     "contradiction-conversation": (CONTRADICTION_SKILL, "conversation"),
     "bug-vers-issue-conversation": (BUG_VERS_ISSUE_SKILL, "conversation"),
@@ -4076,6 +4566,28 @@ RETIRES_DU_CONTEXTE_VIVANT = {
     ),
     "repercussions-brief-relu-sans-lecteur": (REPERCUSSIONS_SKILL, "même lecture en octets"),
     "repercussions-relire-sans-lecteur": (REPERCUSSIONS_SKILL, "la lecture en octets ci-dessus"),
+    "execution-qa-conversation": (EXECUTION_QA_SKILL, "conversation"),
+    "gabarit-intake-echec-conversation": (INTAKE_ECHEC_REF, "conversation"),
+    "gabarit-commentaire-phase-conversation": (COMMENTAIRE_PHASE_REF, "conversation"),
+    "patch-checkbox-conversation": (PATCH_CHECKBOX_REF, "conversation"),
+    "standard-correction-bug-conversation": (CORRECTION_BUG_REF, "conversation"),
+    "execution-qa-intake-a-capturer": (EXECUTION_QA_SKILL, "capturer"),
+    "gabarit-intake-echec-a-capturer": (INTAKE_ECHEC_REF, "capturer"),
+    "execution-qa-intake-capture": (EXECUTION_QA_SKILL, "capturé"),
+    "execution-qa-copie-dans-tmp": (EXECUTION_QA_SKILL, "/tmp/qa-plan"),
+    "patch-checkbox-copie-dans-tmp": (PATCH_CHECKBOX_REF, "/tmp/qa-plan"),
+    "execution-qa-copie-de-travail": (EXECUTION_QA_SKILL, "copie de travail"),
+    "patch-checkbox-copie-de-travail": (PATCH_CHECKBOX_REF, "copie de travail"),
+    "execution-qa-re-recuperer": (EXECUTION_QA_SKILL, "re-récupér"),
+    "patch-checkbox-re-recuperer": (PATCH_CHECKBOX_REF, "re-récupér"),
+    "execution-qa-pousser": (EXECUTION_QA_SKILL, "pousser"),
+    "patch-checkbox-pousser": (PATCH_CHECKBOX_REF, "pousser"),
+    "execution-qa-repousser": (EXECUTION_QA_SKILL, "repouss"),
+    "execution-qa-push": (EXECUTION_QA_SKILL, "push"),
+    "patch-checkbox-push": (PATCH_CHECKBOX_REF, "push"),
+    "patch-checkbox-paire-en-memoire": (PATCH_CHECKBOX_REF, "en mémoire"),
+    "execution-qa-correction-en-session": (EXECUTION_QA_SKILL, "en session"),
+    "standard-correction-bug-en-session": (CORRECTION_BUG_REF, "en session"),
 }
 
 
@@ -4090,20 +4602,58 @@ def test_le_contexte_vivant_retire_ne_revient_pas(fichier: str, forme: str) -> N
 
 
 def test_la_conversation_est_gardee_dans_chaque_fichier_des_skills_du_contexte_vivant() -> None:
-    """Un fichier ajouté à `contradiction`, à `bug-vers-issue` ou à `plan-qa` rougit ici tant que
-    la table ne garde pas le mot chez lui : les critères « 6a, 6b » et « 7a, 7b » lisent le dossier
-    entier."""
+    """Un fichier ajouté à `contradiction`, à `bug-vers-issue`, à `plan-qa` ou à `execution-qa`
+    rougit ici tant que la table ne garde pas le mot chez lui : les critères « 6a, 6b » et
+    « 7a, 7b » lisent le dossier entier."""
     gardes = {
         fichier for fichier, forme in RETIRES_DU_CONTEXTE_VIVANT.values() if forme == "conversation"
     }
     dossiers = {
         path.relative_to(REPOSITORY_ROOT).as_posix()
-        for skill in ("contradiction", "bug-vers-issue", "plan-qa")
+        for skill in ("contradiction", "bug-vers-issue", "plan-qa", "execution-qa")
         for path in (REPOSITORY_ROOT / ".claude/skills" / skill).rglob("*")
         if path.is_file()
     }
 
     assert gardes == dossiers
+
+
+# --- Les marques qui règlent une case de plan de QA (#134, lot 7b2) -----------------------------
+
+# Chaque marque de `SETTLED_MARKS` (`ecriture-relue.py`) — une case laissée `[ ]` qui la porte,
+# `checkbox next` ne la rend plus — avec l'annotation qu'`execution-qa/SKILL.md` prescrit pour elle
+# (§3, étape 4, et §4), en littéraux : une marque réglée qu'aucune étape n'écrit laisse la case en
+# attente pour toujours. Contrainte V1 du lot 7b1 : rouge sur `ffbe52e` pour ` — accepté`, que
+# `SKILL.md` n'y écrivait qu'au §6 et dans la « Passe finale », sans tiret ni date.
+ANNOTATIONS_QUI_REGLENT_UNE_CASE = {
+    "needs-issue": ("🔴", "` 🔴 needs-issue — <résumé sur une ligne>`"),
+    "bloque": (" — BLOQUÉ", "` — BLOQUÉ : <raison>`"),
+    "accepte": (" — accepté", "` — accepté : <décision>, <date>`"),
+}
+
+
+def test_les_marques_qui_reglent_une_case_sont_celles_du_script() -> None:
+    """Une marque ajoutée au script, ou retirée, rougit ici : sa prescription se relit avec elle."""
+    ecriture_relue = load_script("cycle-pr", "ecriture-relue")
+
+    assert set(ecriture_relue.SETTLED_MARKS) == {
+        marque for marque, _ in ANNOTATIONS_QUI_REGLENT_UNE_CASE.values()
+    }
+
+
+@pytest.mark.parametrize(
+    ("marque", "annotation"),
+    ANNOTATIONS_QUI_REGLENT_UNE_CASE.values(),
+    ids=ANNOTATIONS_QUI_REGLENT_UNE_CASE.keys(),
+)
+def test_chaque_marque_qui_regle_une_case_est_prescrite_par_execution_qa(
+    marque: str, annotation: str
+) -> None:
+    """L'annotation porte sa marque, et `execution-qa` la prescrit telle quelle."""
+    assert marque in annotation, f"« {annotation} » ne porte pas la marque « {marque} »"
+    assert annotation in texte_normalise(EXECUTION_QA_SKILL), (
+        f"`{EXECUTION_QA_SKILL}` ne prescrit plus « {annotation} »"
+    )
 
 
 # --- Le type de chaque case d'un plan de QA (#134, lot 7a) ---------------------------------------
