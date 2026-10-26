@@ -53,11 +53,11 @@ Pour chaque phase ou chaque bloc par issue, répéter :
 
 3. **Examiner les résultats observés** — le relevé du `releveur`, ou ce que rapporte le mainteneur. Comparer à l'attendu. Si quelque chose manque qui changerait la décision, le demander (code de statut, extrait de corps, ligne de console, nombre de lignes en BD). Ne pas demander de preuve qui ne change pas la décision.
 
-4. **Décider de la case** — chaque verdict s'écrit en paire dans un fichier que le script n'a pas encore appliqué (étape 5) :
+4. **Décider de la case** — chaque verdict s'écrit en paire dans un fichier que le script n'a pas encore appliqué (étape 5), sauf l'échec, dont la paire part seule (§4, étape 1) :
    - **Passe** → basculer `- [ ]` en `- [x]` et ajouter une courte annotation en ligne : ` — <résumé de preuve sur une ligne, date ISO>`. Exemple : `- [x] L'utilisateur A liste ses propres ressources — 200, 3 lignes, 2026-05-08`.
    - **Passe avec décision** → basculer en `- [x]` et ajouter ` — Décision : <politique choisie>, <date>`. Enregistrer le choix de l'utilisateur ; s'il nécessite un changement de code, c'est une tâche séparée.
    - **Accepté** → un écart observé que le mainteneur accepte : laisser `- [ ]`, ajouter ` — accepté : <décision>, <date>`. La case ne passe pas, elle est réglée : `checkbox next` ne la rend plus.
-   - **Échec** → voir l'étape 4 ci-dessous (gestion des échecs).
+   - **Échec** → voir le §4 ci-dessous (gestion des échecs).
    - **N/A** → basculer en `- [x]` et ajouter ` — N/A : <raison>`.
    - **Bloqué** → laisser `- [ ]`, ajouter ` — BLOQUÉ : <raison>`. Dire à l'utilisateur ce qui le débloque.
 
