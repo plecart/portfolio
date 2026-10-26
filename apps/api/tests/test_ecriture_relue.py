@@ -78,7 +78,8 @@ class Forge:
         garde_les_labels: le retrait d'un label répond sans l'ôter de l'issue.
         remotes: les remotes du dépôt git local, nom → URL. `gh repo create <dépôt>` crée le dépôt
             sous son chemin `repos/<dépôt>` et son remote `origin`, comme `gh` (`FormatRemoteURL`).
-        hors_depot: le répertoire courant n'est dans aucun dépôt git.
+        repertoire: où se tient le répertoire courant — `arbre`, l'arbre de travail d'un dépôt
+            git ; `dans-git-dir`, le dossier `.git` d'un dépôt ; `hors-depot`, aucun dépôt git.
     """
 
     def __init__(
@@ -92,13 +93,13 @@ class Forge:
         milestones: list[list[dict[str, Any]]] | None = None,
         garde_les_labels: bool = False,
         remotes: dict[str, str] | None = None,
-        hors_depot: bool = False,
+        repertoire: str = "arbre",
     ) -> None:
         self.documents = documents
         self.stocke = stocke
         self.garde_les_labels = garde_les_labels
         self.remotes = remotes or {}
-        self.hors_depot = hors_depot
+        self.repertoire = repertoire
         self.pages = pages or []
         for page in self.pages:
             for commentaire in page:
@@ -205,7 +206,7 @@ class Forge:
                 self.labels.append([label])
                 return json_success(label)
             case ("gh", "repo", "create", depot, visibilite, "--source=.", "--remote=origin") if (
-                not self.hors_depot and "origin" not in self.remotes
+                self.repertoire == "arbre" and "origin" not in self.remotes
             ):
                 self.documents[f"repos/{depot}"] = {
                     "full_name": depot,
@@ -223,11 +224,11 @@ class Forge:
     def git(self, *args: str) -> subprocess.CompletedProcess[bytes]:
         """Ce que `git <args>` rend dans le dépôt local — code de sortie et sortie standard du vrai
         `git`, que `test_la_forge_temoin_repond_a_git_comme_git` confronte à ce double."""
-        if self.hors_depot:
+        if self.repertoire == "hors-depot":
             return subprocess.CompletedProcess([], 128, b"", b"fatal: not a git repository")
         match args:
             case ("rev-parse", "--is-inside-work-tree"):
-                return success(b"true\n")
+                return success(b"true\n" if self.repertoire == "arbre" else b"false\n")
             case ("remote", "get-url", nom) if nom in self.remotes:
                 return success(f"{self.remotes[nom]}\n".encode())
             case ("remote", "get-url", nom):
@@ -1804,13 +1805,14 @@ def test_depot_create_reconnait_le_depot_sous_ses_formes_equivalentes(
 @pytest.mark.parametrize(
     ("options", "motif"),
     [
-        ({"hors_depot": True}, "hors d'un dépôt git"),
+        ({"repertoire": "hors-depot"}, "hors d'un dépôt git"),
+        ({"repertoire": "dans-git-dir"}, "hors d'un dépôt git"),
         (
             {"remotes": {"origin": "https://github.com/plecart/ancien.git"}},
             "le remote origin existe déjà : https://github.com/plecart/ancien.git",
         ),
     ],
-    ids=["hors-depot-git", "origin-existant"],
+    ids=["hors-depot-git", "dans-git-dir", "origin-existant"],
 )
 def test_depot_create_refuse_sans_rien_ecrire(
     options: dict[str, Any], motif: str, capsys: pytest.CaptureFixture[str]
@@ -1893,23 +1895,28 @@ def test_depot_create_sort_en_1_si_le_depot_relu_n_est_pas_celui_cree(
     assert capsys.readouterr().out == f"relecture non conforme — {ecart}\n"
 
 
-@pytest.mark.parametrize("etat", ["hors-depot", "sans-origin", "avec-origin"])
+@pytest.mark.parametrize(
+    ("repertoire", "origin"),
+    [("hors-depot", None), ("dans-git-dir", None), ("arbre", None), ("arbre", VITRINE)],
+    ids=["hors-depot", "dans-git-dir", "sans-origin", "avec-origin"],
+)
 def test_la_forge_temoin_repond_a_git_comme_git(
-    etat: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    repertoire: str, origin: str | None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Le double de `git` que joue la forge témoin — les deux lectures de `depot create` —,
     confronté au vrai `git` dans un répertoire jetable que `GIT_CEILING_DIRECTORIES` isole de tout
     dépôt parent : même code de sortie, même sortie standard. `git remote` sort en 2 sur un remote
-    introuvable (git-remote(1), « EXIT STATUS »), en 128 hors d'un dépôt (mesuré le 2026-10-26,
-    git 2.47.1)."""
+    introuvable (git-remote(1), « EXIT STATUS »), en 128 hors d'un dépôt ; dans `.git`,
+    `git rev-parse --is-inside-work-tree` rend `false` (mesuré le 2026-10-26, git 2.47.1)."""
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
-    forge = Forge({}, hors_depot=etat == "hors-depot")
-    if etat != "hors-depot":
+    if repertoire != "hors-depot":
         subprocess.run(["git", "init", "--quiet"], check=True)
-    if etat == "avec-origin":
-        subprocess.run(["git", "remote", "add", "origin", VITRINE], check=True)
-        forge.remotes["origin"] = VITRINE
+    if origin is not None:
+        subprocess.run(["git", "remote", "add", "origin", origin], check=True)
+    if repertoire == "dans-git-dir":
+        monkeypatch.chdir(tmp_path / ".git")
+    forge = Forge({}, repertoire=repertoire, remotes=None if origin is None else {"origin": origin})
 
     for commande in (
         ("git", "rev-parse", "--is-inside-work-tree"),
@@ -2414,6 +2421,7 @@ APPELS_MAL_FORMES = {
     "depot-sans-proprietaire": ("depot", "create", "vitrine", "--private"),
     "depot-a-trois-segments": ("depot", "create", "plecart/vitrine/x", "--private"),
     "depot-remontant": ("depot", "create", "plecart/..", "--private"),
+    "depot-point": ("depot", "create", "plecart/.", "--private"),
     "depot-avec-espace": ("depot", "create", "plecart/ma vitrine", "--private"),
     "depot-proprietaire-en-option": ("depot", "create", "--private", "--", "-R/vitrine"),
     "depot-action-inconnue": ("depot", "delete", "plecart/vitrine"),
