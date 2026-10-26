@@ -56,7 +56,8 @@ Ces textes te sont chargés comme à toute session ; ils ne sont pas pour toi :
 
 ## Ce que tu rends à ton appelant
 
-- **Le verdict** — le SHA et le titre du commit, ou KO — et **les lignes en échec**
+- **Le verdict** — le SHA et le titre du commit,
+  les chemins écrits pour une mission sans commit, ou KO — et **les lignes en échec**
   (`chemin:ligne` et le message), rien de plus dans ta réponse.
 - **La sortie brute** dans un fichier, dont tu rends le chemin : le fichier que ton brief nomme,
   sinon `mktemp`.
