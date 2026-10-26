@@ -770,6 +770,8 @@ def test_ni_un_role_fictif_ni_la_liste_d_init_projet_ne_comptent_pour_une_citati
     liste de fichiers d'`init-projet`, qui nomme tous les rôles, n'est jamais comptée — l'entrée
     entière, jusqu'à l'entrée suivante, ne cite plus aucun exécutant une fois retirée."""
     assert skills_citing("fantome") == []
+    # `init-projet` ne nomme `verificateur` que dans sa liste de fichiers.
+    assert INIT_PROJET_SKILL not in skills_citing("verificateur")
     init_projet = (REPOSITORY_ROOT / ".claude/skills/init-projet/SKILL.md").read_text(
         encoding="utf-8"
     )
@@ -2393,7 +2395,10 @@ USE_WORKTREE_EXPLICITE = {
     ),
     "init-projet-vers-la-planification": (
         INIT_PROJET_SKILL,
-        "Elles démarrent avec `use_worktree: false` : elles n'écrivent que dans GitHub.",
+        (
+            "Elles démarrent avec `use_worktree: false` : leur seule écriture de dépôt, l'archive"
+            " de `vers-prd`, passe par son `executant` en isolation `worktree`."
+        ),
     ),
     "init-projet-note-amorcage-sans-worktree": (
         INIT_PROJET_SKILL,
@@ -4637,7 +4642,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "8b-init-projet-copie-non-rejouee": (
         INIT_PROJET_SKILL,
         (
-            "La copie du template (étape 7) ne se rejoue pas : `copie` refuse dès qu'une cible"
+            "La copie de l'étape 7 ne se rejoue pas : `copie` refuse dès qu'une cible"
             " diffère de sa source — `settings.json` fusionné, `CLAUDE.md` finalisé."
         ),
     ),
@@ -4717,6 +4722,12 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "8b-init-projet-mapping-en-fichier": (
         INIT_PROJET_SKILL,
         "Le mapping validé s'écrit dans un fichier JSON pour l'étape 6",
+    ),
+    # Passe 1 de la PR #162, m3 : des 4 fichiers de travail de l'amorçage, seul le mapping n'avait
+    # pas de lieu — inspection et verdicts du `releveur` à `mktemp`, copie de `valide` en tempfile.
+    "8b-init-projet-mapping-hors-de-l-arbre": (
+        INIT_PROJET_SKILL,
+        "Ce fichier vit **hors de l'arbre du projet**, dans un dossier temporaire",
     ),
     "8b-init-projet-config-par-l-executant": (
         INIT_PROJET_SKILL,
@@ -4877,7 +4888,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         "Une cible hors dépôt ne se commite pas, ni ce que ta mission dit **sans commit**.",
     ),
     # Le même lot y renvoie aussi les cinq autres skills qui lançaient `init-projet` sans
-    # configuration (`RETIRES_LANCER_INIT_PROJET`) : une entrée par phrase neuve, « s'arrêter »
+    # configuration (`LANCER_INIT_PROJET`) : une entrée par phrase neuve, « s'arrêter »
     # compris, et pour `cycle-pr` sa moitié « ne jamais deviner », sur une ligne réécrite.
     "8b-cycle-pr-sans-config-propose-init-projet": (
         CYCLE_PR_SKILL,
@@ -5167,29 +5178,43 @@ def test_la_conversation_est_gardee_dans_chaque_fichier_des_skills_du_contexte_v
 
 # Lot 8b de #134 (2026-10-26) : un skill sans configuration ne lance plus `init-projet` dans sa
 # propre session, il s'arrête et propose une session distincte (`init-projet`, « Note pour les
-# autres skills »). **Population** sur `0c408db`, base du lot, par la forme, sur le texte aux
-# espaces normalisés des `.md` de `.claude/`, de `CLAUDE.md` et de `CONTRIBUTING.md` —
-# `\w*lancer\b[^.;`]{0,25}`init-projet``, sans la casse : **7**, dont « relancer `init-projet` »
-# (`init-projet` étape 9, qui rejoue le même skill), hors classe — **6**, une entrée par fichier.
-# La forme s'ouvre sur une espace pour ne pas apparier « relancer » ; toutes rouges sur `0c408db`.
-RETIRES_LANCER_INIT_PROJET = {
-    "cycle-pr": (CYCLE_PR_SKILL, " lancer `init-projet`"),
-    "pr-paralleles": (PR_PARALLELES_SKILL, " lancer `init-projet`"),
-    "triage": (TRIAGE_SKILL, " lancer `init-projet`"),
-    "vers-issues": (VERS_ISSUES_SKILL, " lancer `init-projet`"),
-    "vers-prd": (VERS_PRD_SKILL, " lancer le skill `init-projet`"),
-    "init-projet": (INIT_PROJET_SKILL, " lancer `init-projet`"),
+# autres skills ») ; « relancer », qui rejoue le même skill (`init-projet` étape 9), est hors
+# classe. Une table de phrases ne voyait que la forme d'origine de chaque fichier (passe 1 de la
+# PR #162, m2) : la forme se lit sur toute la population.
+LANCER_INIT_PROJET = re.compile(r"(?<![\w-])lancer\b[^.;`]{0,25}`init-projet`", re.IGNORECASE)
+LANCER_INIT_PROJET_FORMES = {
+    "entre-parentheses": ("(lancer `init-projet`)", True),
+    "majuscule-et-mots-intercales": ("Lancer le skill `init-projet`", True),
+    "relancer-hors-classe": ("relancer `init-projet`", False),
 }
 
 
 @pytest.mark.parametrize(
-    ("fichier", "forme"),
-    RETIRES_LANCER_INIT_PROJET.values(),
-    ids=RETIRES_LANCER_INIT_PROJET.keys(),
+    ("texte", "lance"), LANCER_INIT_PROJET_FORMES.values(), ids=LANCER_INIT_PROJET_FORMES.keys()
 )
-def test_un_skill_sans_configuration_ne_lance_plus_init_projet(fichier: str, forme: str) -> None:
-    """Une forme retirée qui reste écrite se rejoue : la session suit le texte, pas l'intention."""
-    assert not porte_la_forme(fichier, forme), f"`{fichier}` porte encore « {forme} »"
+def test_la_forme_lancer_init_projet_se_reconnait(texte: str, lance: bool) -> None:
+    """Le témoin des deux côtés : une forme qui lance appariée, « relancer » laissé."""
+    assert bool(LANCER_INIT_PROJET.search(texte)) is lance
+
+
+def test_aucun_texte_du_harnais_ne_lance_init_projet() -> None:
+    """**Population** : la prose suivie du harnais (`HARNESS_PROSE_GLOBS`), texte aux espaces
+    normalisés (`texte_normalise`, obs 124). Sur `0c408db`, base du lot : **6** — `cycle-pr`,
+    `init-projet` (« Note »), `pr-paralleles`, `triage`, `vers-issues`, `vers-prd` (« lancer le
+    skill ») ; un `git grep -P` du motif, ligne par ligne, n'en rend que 5 : celle de `cycle-pr`
+    y est coupée en fin de ligne. **0** sur la tête. Commande : ce test, sur une copie de travail
+    de `0c408db` — rouge sur ces 6, mesuré le 2026-10-26.
+    """
+    suivis = set(tracked_files())
+    sites = [
+        f"{fichier} : {forme.group(0)}"
+        for glob in HARNESS_PROSE_GLOBS
+        for path in sorted(REPOSITORY_ROOT.glob(glob))
+        if (fichier := path.relative_to(REPOSITORY_ROOT).as_posix()) in suivis
+        for forme in LANCER_INIT_PROJET.finditer(texte_normalise(fichier))
+    ]
+
+    assert not sites, f"un texte lance encore `init-projet` au lieu de le proposer : {sites}"
 
 
 # --- Les marques qui règlent une case de plan de QA (#134, lot 7b2) -----------------------------
