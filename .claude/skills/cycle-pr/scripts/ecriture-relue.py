@@ -2,8 +2,8 @@
 
 Usage :
     python ecriture-relue.py label <N> [--add <label> …] [--remove <label> …]
-    python ecriture-relue.py checkbox patch <N> --case <ancre> [--case <ancre> …]
-    python ecriture-relue.py brief patch <N> --case <ancre> [--case <ancre> …]
+    python ecriture-relue.py checkbox patch <N> (--case <ancre> … | --paires <fichier>)
+    python ecriture-relue.py brief patch <N> (--case <ancre> … | --paires <fichier>)
     python ecriture-relue.py brief write <N> --body-file <fichier>
     python ecriture-relue.py issue edit <N> (--append | --body-file) <fichier>
     python ecriture-relue.py issue create --title <titre> --body-file <fichier> [--label <label> …]
@@ -15,7 +15,7 @@ Usage :
 La règle « Écritures sur un artefact distant » de `contraintes.md` veut que toute écriture sur la
 forge se relise ; ce script tient cette relecture pour les gestes de `cycle-pr` Étape 8, le
 commentaire de répercussion de son Étape 6, la création d'une issue, la transition de ses labels,
-sa fermeture et son thème (#134, lots 4a, 4b et 6a1).
+sa fermeture et son thème, et la copie de travail d'`execution-qa` (#134, lots 4a, 4b, 6a1 et 7).
 Chaque sous-commande lit par `gh api` — octets décodés en UTF-8, jamais le mode texte, qui traduit
 les fins de ligne, ni la page de code de la console (obs 87, 106, 108, 116) —, écrit, puis relit
 par le même canal. Un texte s'écrit par `gh api -X PATCH <chemin> --input -` — `-X POST` pour
@@ -35,6 +35,15 @@ ne voit pas une conversion qui la préserve (obs 106).
   extrait du texte qui suit le marqueur d'une seule ligne de case, `- [ ] …` ou `- [x] …` (`[X]`
   compris), indentation permise ; cocher ne change pas ce texte, et le rejeu rend le verdict du
   premier appel ;
+- `checkbox patch --paires` et `brief patch --paires` remplacent des lignes entières du même
+  texte — la paire `(ancienne_ligne, nouvelle_ligne)` de `patch-checkbox-gh.md` (`execution-qa`)
+  —, lues dans un fichier UTF-8, lu en octets : une ligne `< <ancienne>` suivie d'une ligne
+  `> <nouvelle>` par paire, sans échappement, les lignes vides ou de blancs ignorées ; `--case` et
+  `--paires` s'excluent, et l'un des deux est requis. Une ligne du texte se compare sans son
+  retour chariot final, gardé à l'écriture. Une ligne, une paire : une ancienne ou une nouvelle
+  nommée deux fois, ou la nouvelle d'une paire ancienne d'une autre, est refusée — les paires
+  chaînées casseraient le rejeu. Une paire dont l'ancienne ligne manque et dont la nouvelle est
+  seule dans le texte est déjà appliquée ;
 - `brief write` publie un fichier UTF-8, lu en octets, en commentaire de brief de `<N>`, ou édite
   en place le seul qui existe — jamais un second brief concurrent. Un fichier qui ne s'ouvre pas
   par `## Brief d'agent`, dès son premier caractère, est refusé avant tout appel : `brief patch`
@@ -67,27 +76,31 @@ ne voit pas une conversion qui la préserve (obs 106).
   commentaire sous l'`id` que la publication rend. Une PR se commente par le même chemin.
 
 Il refuse, sans rien écrire : une ancre introuvable ou ambiguë — toutes sont validées avant la
-première écriture —, zéro brief à cocher, plusieurs briefs, un fichier de brief qui ne s'ouvre
-pas par sa marque, un label inconnu du dépôt — chacun nommé ; `CLAUDE.md` interdit de deviner un
-label, et les références REST de « Create an issue » et d'« Add labels to an issue » ne disent
-pas ce qu'elles font d'un label inconnu —, un fichier illisible, non UTF-8 ou sans ligne non vide
-— lu avant tout appel à la forge —, une issue ouverte de ce titre et de ce corps sous d'autres
-labels — le rejeu d'une création dont la forge a ignoré les labels ; il nomme l'appel de `label`
-qui pose les manquants, et ceux en plus sans réparation : l'issue a pu être triée depuis sa
-création —, une issue déjà fermée sous une autre raison — une fermeture ne se réécrit pas,
-et l'API REST ignore `state_reason` quand `state` ne change pas (« Update an issue ») —, un
-milestone à rattacher fermé ou absent sans `--description` — un thème ne se crée pas sans son
-périmètre —, un milestone à fermer absent ou pas vidé, une lecture `gh` qui échoue, ne rend pas
-du JSON, ou rend un JSON sans un champ attendu ou d'un autre type. Après l'écriture — sa réponse
-comprise, dont un commentaire publié tire son `id`, une issue ou un milestone créé son numéro —,
-c'est une relecture non conforme : l'écriture a pu partir. Une case déjà cochée, des labels tous
-déjà posés ou déjà absents, une issue déjà fermée sous cette raison ou déjà dans ce milestone, un
-milestone déjà fermé, un fichier qui termine déjà le corps ou qui l'est déjà tout entier, un
-commentaire de `<N>` qui porte déjà le fichier pour corps, une issue ouverte — pas une PR — qui
-porte déjà ce titre, ce corps et ces labels : rien à écrire, et la sortie le dit — un rejeu après
-une relecture tombée n'écrit donc pas une seconde fois.
+première écriture —, un fichier de paires mal formé — chaque défaut nommé avec le numéro de sa
+ligne, lu avant tout appel à la forge —, une paire dont l'ancienne ligne est en double dans le
+texte, ou absente quand la nouvelle y est absente aussi — la plus proche nommée — ou en double —
+toutes les paires sont validées avant la première écriture —, zéro brief à cocher, plusieurs
+briefs, un fichier de brief qui ne s'ouvre pas par sa marque, un label inconnu du dépôt — chacun
+nommé ; `CLAUDE.md` interdit de deviner un label, et les références REST de « Create an issue » et
+d'« Add labels to an issue » ne disent pas ce qu'elles font d'un label inconnu —, un fichier
+illisible, non UTF-8 ou sans ligne non vide — lu avant tout appel à la forge —, une issue ouverte
+de ce titre et de ce corps sous d'autres labels — le rejeu d'une création dont la forge a ignoré
+les labels ; il nomme l'appel de `label` qui pose les manquants, et ceux en plus sans réparation :
+l'issue a pu être triée depuis sa création —, une issue déjà fermée sous une autre raison — une
+fermeture ne se réécrit pas, et l'API REST ignore `state_reason` quand `state` ne change pas
+(« Update an issue ») —, un milestone à rattacher fermé ou absent sans `--description` — un thème
+ne se crée pas sans son périmètre —, un milestone à fermer absent ou pas vidé, une lecture `gh`
+qui échoue, ne rend pas du JSON, ou rend un JSON sans un champ attendu ou d'un autre type. Après
+l'écriture — sa réponse comprise, dont un commentaire publié tire son `id`, une issue ou un
+milestone créé son numéro —, c'est une relecture non conforme : l'écriture a pu partir. Une case
+déjà cochée, des paires toutes déjà appliquées, des labels tous déjà posés ou déjà absents, une
+issue déjà fermée sous cette raison ou déjà dans ce milestone, un milestone déjà fermé, un fichier
+qui termine déjà le corps ou qui l'est déjà tout entier, un commentaire de `<N>` qui porte déjà le
+fichier pour corps, une issue ouverte — pas une PR — qui porte déjà ce titre, ce corps et ces
+labels : rien à écrire, et la sortie le dit — un rejeu après une relecture tombée n'écrit donc pas
+une seconde fois.
 
-**Ce qu'il ne prouve pas.** Il ne choisit pas les cases : la session PR les nomme. Il ne
+**Ce qu'il ne prouve pas.** Il ne choisit ni les cases ni les lignes : la session les nomme. Il ne
 verrouille rien : une édition faite par un tiers entre sa lecture et son écriture est écrasée, et
 la relecture ne la voit pas — elle compare à ce que le script a écrit ; un même commentaire publié
 entre la lecture des commentaires et la publication fait un doublon, une même issue créée entre la
@@ -115,6 +128,7 @@ bibliothèque standard seule ; `gh` authentifié, lancé depuis le dépôt.
 """
 
 import argparse
+import difflib
 import json
 import re
 import shlex
@@ -136,6 +150,8 @@ MILESTONES = f"{REPO}/milestones"
 BRIEF_MARK = "## Brief d'agent"
 # Une ligne de case Markdown ; le groupe est l'état de la case. `[X]` vaut coché pour GitHub.
 CHECKBOX = re.compile(r"[ \t]*- \[([ xX])\] ")
+# Les marques d'une paire dans un fichier `--paires` : la ligne de l'ancienne, puis de la nouvelle.
+OLD_MARK, NEW_MARK = "< ", "> "
 # `str.isdigit` accepte « ² » : le numéro, qui entre dans un chemin d'API, se lit en ASCII.
 NUMBER = re.compile(r"[0-9]+")
 
@@ -459,9 +475,180 @@ def brief_comment(run: Run, number: str) -> Text:
     return briefs[0]
 
 
+class Pair(NamedTuple):
+    """Une paire d'un fichier `--paires` : l'ancienne ligne, la nouvelle, et le numéro (base 1) de
+    la ligne du fichier qui porte chacune."""
+
+    old_number: int
+    old: str
+    new_number: int
+    new: str
+
+
+def stray(line: str) -> str:
+    """Le défaut d'une ligne non vide d'un fichier `--paires` qui n'entre dans aucune paire."""
+    if line.startswith(OLD_MARK):
+        return "« < » sans « > » qui le suit"
+    if line.startswith(NEW_MARK):
+        return "« > » sans « < » qui le précède"
+    return "ni vide, ni « < … », ni « > … »"
+
+
+def split_pairs(text: str) -> tuple[list[Pair], list[tuple[int, str]]]:
+    """Les paires du texte d'un fichier `--paires`, et les lignes qui n'entrent dans aucune.
+
+    Une ligne est un segment entre deux `\\n`, sans son `\\r` final ; une ligne vide ou de blancs
+    s'ignore. Une ligne ouverte par `< ` porte l'ancienne ligne, et la ligne suivante non ignorée,
+    ouverte par `> `, la nouvelle — ce qui suit chaque marque, sans échappement.
+
+    Returns:
+        Les paires, et le numéro (base 1) et le défaut (`stray`) de chaque ligne hors d'une paire.
+    """
+    kept = [
+        (number, line)
+        for number, raw in enumerate(text.split("\n"), 1)
+        if (line := raw.removesuffix("\r")).strip()
+    ]
+    pairs: list[Pair] = []
+    strays: list[tuple[int, str]] = []
+    i = 0
+    while i < len(kept):
+        number, line = kept[i]
+        next_number, next_line = kept[i + 1] if i + 1 < len(kept) else (0, "")
+        if line.startswith(OLD_MARK) and next_line.startswith(NEW_MARK):
+            old, new = line.removeprefix(OLD_MARK), next_line.removeprefix(NEW_MARK)
+            pairs.append(Pair(number, old, next_number, new))
+            i += 2
+        else:
+            strays.append((number, stray(line)))
+            i += 1
+    return pairs, strays
+
+
+def pair_defects(pairs: Sequence[Pair]) -> list[tuple[int, str]]:
+    """Les défauts du contenu des paires, chacun sous le numéro de sa ligne dans le fichier : une
+    ligne vide ou de blancs, une paire sans changement, et — une ligne, une paire — une ancienne ou
+    une nouvelle ligne nommée deux fois, ou la nouvelle d'une paire ancienne d'une autre : les
+    paires chaînées casseraient le rejeu."""
+    defects: list[tuple[int, str]] = []
+    # Texte → numéro de sa première ligne, pour les paires déjà lues ; un numéro, en base 1, n'est
+    # jamais nul.
+    olds: dict[str, int] = {}
+    news: dict[str, int] = {}
+    for pair in pairs:
+        if not pair.old.strip():
+            defects.append((pair.old_number, "ancienne ligne vide"))
+        if not pair.new.strip():
+            defects.append((pair.new_number, "nouvelle ligne vide"))
+        if pair.old == pair.new:
+            defects.append((pair.old_number, "ancienne et nouvelle lignes égales"))
+        if first := olds.get(pair.old):
+            defects.append((pair.old_number, f"ancienne ligne déjà nommée ligne {first}"))
+        if first := news.get(pair.new):
+            defects.append((pair.new_number, f"nouvelle ligne déjà nommée ligne {first}"))
+        if first := news.get(pair.old):
+            defects.append(
+                (pair.old_number, f"ancienne ligne qui est la nouvelle de la ligne {first}")
+            )
+        if first := olds.get(pair.new):
+            defects.append(
+                (pair.new_number, f"nouvelle ligne qui est l'ancienne de la ligne {first}")
+            )
+        olds.setdefault(pair.old, pair.old_number)
+        news.setdefault(pair.new, pair.new_number)
+    return defects
+
+
+def read_pairs(path: Path) -> list[Pair]:
+    """Les paires du fichier `--paires` `path`, UTF-8 lu en octets (`split_pairs`).
+
+    Raises:
+        Refusal: fichier illisible ou non UTF-8 (`read_utf8`), ou mal formé — chaque défaut
+            nommé avec le numéro de sa ligne, dans l'ordre du fichier (`split_pairs`,
+            `pair_defects`), puis l'absence de toute paire.
+    """
+    pairs, strays = split_pairs(read_utf8(path))
+    defects = sorted([*strays, *pair_defects(pairs)])
+    motifs = [f"ligne {number} : {defect}" for number, defect in defects]
+    if not pairs:
+        motifs.append("aucun couple dans le fichier")
+    if motifs:
+        raise Refusal(f"{path} : {' ; '.join(motifs)}")
+    return pairs
+
+
+def closest(line: str, candidates: Sequence[str]) -> str:
+    """Le complément du motif d'une ligne introuvable : la ligne de `candidates` la plus proche de
+    `line` (`difflib.get_close_matches`, au seuil de similarité par défaut, 0,6), ou « aucune ligne
+    proche »."""
+    close = difflib.get_close_matches(line, candidates, n=1)
+    return f"la plus proche : {close[0]}" if close else "aucune ligne proche"
+
+
+def replace_lines(body: str, pairs: Sequence[Pair]) -> tuple[str, list[str], list[str]]:
+    """Remplace, dans `body`, l'ancienne ligne de chaque paire par sa nouvelle — toutes, ou aucune.
+
+    Une ligne est un segment entre deux `\\n`, comparée sans son `\\r` final, qui reste à
+    l'écriture : les fins de ligne ressortent telles qu'elles sont entrées. Une paire dont
+    l'ancienne ligne manque et dont la nouvelle est seule dans `body` est déjà appliquée : le rejeu
+    d'un fichier déjà poussé n'écrit rien.
+
+    Returns:
+        Le texte remplacé, les nouvelles lignes écrites (ancres de la relecture), et l'ancienne
+        ligne de chaque paire déjà appliquée.
+
+    Raises:
+        Refusal: une ancienne ligne en double ; ou absente, quand la nouvelle l'est aussi — la
+            plus proche nommée (`closest`) — ou est en double. Chaque paire en défaut est nommée,
+            et rien n'est remplacé.
+    """
+    lines = body.split("\n")
+    keys = [line.removesuffix("\r") for line in lines]
+    replaced: list[str] = []
+    already: list[str] = []
+    motifs: list[str] = []
+    for pair in pairs:
+        olds = [i for i, key in enumerate(keys) if key == pair.old]
+        news = keys.count(pair.new)
+        if len(olds) == 1:
+            lines[olds[0]] = pair.new + lines[olds[0]].removeprefix(pair.old)
+            replaced.append(pair.new)
+        elif olds:
+            motifs.append(f"ligne en double ({len(olds)}) : {pair.old}")
+        elif news == 1:
+            already.append(pair.old)
+        elif news:
+            motifs.append(f"ligne en double ({news}) : {pair.new}")
+        else:
+            motifs.append(f"ligne introuvable : {pair.old} ({closest(pair.old, keys)})")
+    if motifs:
+        raise Refusal(" ; ".join(motifs))
+    return "\n".join(lines), replaced, already
+
+
+def patch_text(run: Run, args: argparse.Namespace) -> str:
+    """`checkbox patch` et `brief patch` : `--case` coche des cases (`patch_boxes`), `--paires`
+    remplace des lignes (`patch_lines`), dans le texte que `args.locate` désigne."""
+    return patch_lines(run, args) if args.pairs else patch_boxes(run, args)
+
+
+def patch_lines(run: Run, args: argparse.Namespace) -> str:
+    """`--paires` : remplace les lignes du fichier de paires (`replace_lines`), et n'écrit que si
+    une ligne change. Le fichier est lu avant tout appel à la forge."""
+    pairs = read_pairs(args.pairs)
+    text = args.locate(run, args.number)
+    expected, replaced, already = replace_lines(text.body, pairs)
+    report = [f"déjà appliquée : {old}" for old in already]
+    if replaced:
+        write_body(run, text, expected, replaced)
+        report.append(f"écrit et relu — {text.name} : {len(replaced)} ligne(s) remplacée(s)")
+    else:
+        report.append(f"rien à écrire — {text.name} : toutes les paires déjà appliquées")
+    return "\n".join(report)
+
+
 def patch_boxes(run: Run, args: argparse.Namespace) -> str:
-    """`checkbox patch` et `brief patch` : coche les ancres dans le texte que `args.locate`
-    désigne, et n'écrit que si une case change."""
+    """`--case` : coche les ancres (`check_boxes`), et n'écrit que si une case change."""
     text = args.locate(run, args.number)
     expected, checked, already = check_boxes(text.body, args.anchors)
     report = [f"déjà cochée : {anchor}" for anchor in already]
@@ -574,19 +761,28 @@ def appended(body: str, addition: str) -> str:
     return body + "\n" * max(0, 2 - line_ends) + addition
 
 
-def read_text_file(path: Path) -> tuple[str, str]:
-    """Le texte d'un fichier UTF-8, lu en octets — ses fins de ligne restent (obs 87) —, et sa
-    première ligne non vide, ancre de la relecture.
+def read_utf8(path: Path) -> str:
+    """Le texte d'un fichier UTF-8, lu en octets : ses fins de ligne restent (obs 87).
 
     Raises:
-        Refusal: fichier illisible, non UTF-8, ou sans ligne non vide.
+        Refusal: fichier illisible ou non UTF-8.
     """
     try:
-        text = path.read_bytes().decode("utf-8")
+        return path.read_bytes().decode("utf-8")
     except OSError as error:
         raise Refusal(f"fichier illisible : {error}") from error
     except UnicodeDecodeError as error:
         raise Refusal(f"{path} n'est pas en UTF-8 : {error}") from error
+
+
+def read_text_file(path: Path) -> tuple[str, str]:
+    """Le texte d'un fichier UTF-8 (`read_utf8`), et sa première ligne non vide, ancre de la
+    relecture.
+
+    Raises:
+        Refusal: fichier illisible, non UTF-8, ou sans ligne non vide.
+    """
+    text = read_utf8(path)
     anchor = next((line.strip() for line in text.splitlines() if line.strip()), None)
     if anchor is None:
         raise Refusal(f"{path} n'a aucune ligne non vide")
@@ -976,8 +1172,10 @@ def build_parser() -> argparse.ArgumentParser:
     for actions, locate in ((checkbox, issue_body), (brief, brief_comment)):
         boxes = actions.add_parser("patch")
         boxes.add_argument("number", type=issue_number)
-        boxes.add_argument("--case", dest="anchors", type=one_line, action="append", required=True)
-        boxes.set_defaults(handler=patch_boxes, locate=locate)
+        edits = boxes.add_mutually_exclusive_group(required=True)
+        edits.add_argument("--case", dest="anchors", type=one_line, action="append")
+        edits.add_argument("--paires", dest="pairs", type=Path)
+        boxes.set_defaults(handler=patch_text, locate=locate)
     write = brief.add_parser("write")
     write.add_argument("number", type=issue_number)
     write.add_argument("--body-file", dest="file", type=Path, required=True)
