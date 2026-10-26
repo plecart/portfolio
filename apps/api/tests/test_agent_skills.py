@@ -4951,8 +4951,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # forme, sur les mots ajoutés de `bug-vers-issue` (`git diff -U0 --word-diff=plain`), 17 —
     # « aucune » ×3, « jamais », « ne … pas », « n'… que », « seul » ×2, « sans décision »,
     # « dans le doute » ×2, « avant toute », « s'arrête », « elle-même » ×2, « telle qu'écrite »
-    # ×2 —, toutes épinglées, vues rouges par `mutation.py`. Gardés ailleurs : les renvois
-    # numérotés aux barreaux (`RENVOIS_AUX_BARREAUX`), le worktree de la petite PR
+    # ×2 —, toutes épinglées, chaque épingle vue rouge par `mutation.py`. Gardés ailleurs : les
+    # renvois numérotés aux barreaux (`RENVOIS_AUX_BARREAUX`), le worktree de la petite PR
     # (`USE_WORKTREE_EXPLICITE`).
     "7c-contraintes-barreau-du-correctif-evident": (
         CONTRAINTES_RULE,
