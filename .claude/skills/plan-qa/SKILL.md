@@ -37,34 +37,42 @@ N'inclure que les surfaces existantes. Ne jamais générer une section pour une 
 
 Si la config ne permet pas de trancher, **demander** plutôt que supposer.
 
+## Délégation
+
+La session garde le jugement : le périmètre — le mode, et la question au mainteneur du mode 4 —, les surfaces lues dans la config, le choix des phases et des cases et leur type, les « Décision QA », la rédaction, le go de publication. Le reste change de main :
+
+- **`releveur`** — les relevés de l'entrée (« Entrées ») : les issues du périmètre — numéros, titres, corps, critères — par `gh issue list` ou `gh issue view` (modes 1 à 3), le PRD, les thèmes clos sans issue `qa-plan` (mode 4) ; `git log --grep="#<numéro-issue>"` par issue, et les chemins modifiés ; la carte des surfaces de l'étape 1 — routes, commandes, URLs, composants, tables, fixtures, variables d'environnement —, chaque nom vérifié contre les migrations ou les modèles, chaque endpoint ou chemin incertain vérifié localement (étapes 1 et 5). Il rend les relevés dans un fichier ; ce qui compte reste à la session ;
+- **`executant`** — la passe comptable de la « Passe finale avant publication », sur le brouillon : il rend « conforme » ou les lignes en échec, et ne corrige rien ; une case sans type refuse la publication ;
+- **script** — la publication, par `python .claude/skills/cycle-pr/scripts/ecriture-relue.py issue create …` (étape 7), appelée par la session elle-même : un geste isolé coûte plus délégué (`CLAUDE.md`, « Orchestration ») ;
+- **sessions distinctes** — cette session peut être démarrée par `repercussions`, à son étape 7, qui lui passe le thème ; la QA se déroule dans une session `execution-qa` distincte, qui reçoit le numéro du plan publié, jamais dans le contexte de celle-ci (protocole commun : `.claude/skills/cycle-pr/references/sessions-liees.md`). `plan-qa` ne la démarre pas : il rend le numéro.
+
 ## Entrées (un mode parmi quatre)
 
-Mode 1 — **Référence PRD** : `/plan-qa #42` où `#42` est une issue PRD. Récupère le corps du PRD, puis `gh issue list --search "parent #42" --state all` (ou recherche les issues qui mentionnent `#42`) pour rassembler toutes les issues d'implémentation qui en découlent.
+Mode 1 — **Référence PRD** : `/plan-qa #42` où `#42` est une issue PRD. Le `releveur` (« Délégation ») relève le corps du PRD, puis les issues d'implémentation qui en découlent : `gh issue list --search "parent #42" --state all` (ou les issues qui mentionnent `#42`).
 
-Mode 2 — **Liste explicite d'issues** : `/plan-qa #51 #52 #53`. Récupère le corps et les critères d'acceptation de chaque issue.
+Mode 2 — **Liste explicite d'issues** : `/plan-qa #51 #52 #53`. Le `releveur` relève le corps et les critères d'acceptation de chaque issue.
 
-Mode 3 — **Thème terminé** : `/plan-qa "Facturation"` où l'argument est un thème (milestone). C'est le mode le plus courant, proposé automatiquement par `repercussions` quand le dernier ticket d'un thème se ferme. Récupère les issues du milestone : `gh issue list --milestone "<thème>" --state all --json number,title,body`.
+Mode 3 — **Thème terminé** : `/plan-qa "Facturation"` où l'argument est un thème (milestone). C'est le mode le plus courant, proposé automatiquement par `repercussions` quand le dernier ticket d'un thème se ferme. Le `releveur` relève les issues du milestone : `gh issue list --milestone "<thème>" --state all --json number,title,body`.
 
-Mode 4 — **Aucun argument** : liste les thèmes dont toutes les issues sont fermées et qui n'ont pas encore d'issue `qa-plan`, et demande lequel recetter. S'il n'y en a aucun, demande à l'utilisateur quelles issues sont dans le périmètre — **ne jamais deviner un périmètre de QA**, un plan mal cadré est un plan qu'on ne déroule pas.
+Mode 4 — **Aucun argument** : le `releveur` relève les thèmes dont toutes les issues sont fermées et qui n'ont pas encore d'issue `qa-plan`, et la session demande au mainteneur lequel recetter. S'il n'y en a aucun, elle lui demande quelles issues sont dans le périmètre — **ne jamais deviner un périmètre de QA**, un plan mal cadré est un plan qu'on ne déroule pas.
 
-Dans tous les modes :
-- Récupère le PRD s'il est connu. Sers-t'en pour la section « Vue d'ensemble ».
-- Récupère le corps et les critères d'acceptation de chaque issue dans le périmètre.
-- Lance `git log --grep="#<numéro-issue>"` pour chaque issue dans le périmètre afin de trouver les commits de livraison.
-- Lis les diffs de ces commits (ou au moins les chemins de fichiers modifiés) pour que le plan s'ancre aux **vraies** routes, composants, tables, fichiers, variables d'environnement.
+Dans tous les modes, le `releveur` (« Délégation ») rend aussi :
+- le PRD s'il est connu, dont la session tire la section « Vue d'ensemble » ;
+- le corps et les critères d'acceptation de chaque issue dans le périmètre ;
+- les commits de livraison de chaque issue, par `git log --grep="#<numéro-issue>"` ;
+- les chemins de fichiers que ces commits modifient, pour que le plan s'ancre aux **vraies** routes, composants, tables, fichiers, variables d'environnement (étape 1).
 
 ## Processus
 
 ### 1. Inspecte le dépôt
 
-- Lis `.claude/pipeline.config.md` (stack, commandes, domaines, surfaces), `CLAUDE.md`, `UBIQUITOUS_LANGUAGE.md` (ou glossaire équivalent), `docs/`, `README`, le fichier de commandes du projet, puis les points d'entrée réels de **chaque surface déclarée** — selon le projet : routeur/contrôleurs, définition des commandes CLI, routes d'interface, schéma/migrations, définition des jobs. Plus tout fixture touché par les commits dans le périmètre.
-- Utilise `rg`/`rg --files` d'abord ; vérifie localement tout endpoint, commande ou chemin incertain avant de l'inclure comme instruction.
-- Identifie le langage métier du projet. Le plan doit employer ces termes.
+- La session lit elle-même `.claude/pipeline.config.md` (stack, commandes, domaines, surfaces), `CLAUDE.md` et le glossaire du domaine (`UBIQUITOUS_LANGUAGE.md` ou équivalent), dont le plan emploie les termes.
+- L'inspection part au `releveur` (« Délégation »), à qui la session donne la liste des surfaces de la config et des fichiers touchés par les commits du périmètre : `docs/`, `README`, le fichier de commandes du projet, puis les points d'entrée réels de **chaque surface déclarée** — selon le projet : routeur/contrôleurs, définition des commandes CLI, routes d'interface, schéma/migrations, définition des jobs —, plus tout fixture que ces commits touchent. Il cherche par `rg`/`rg --files` d'abord, et rend la carte des surfaces : chaque nom vérifié contre les migrations ou les modèles, chaque endpoint, commande ou chemin incertain vérifié localement — la session n'inclut comme instruction que ce que la carte a vérifié.
 
 ### 2. Décide où vit le plan
 
 Essaie GitHub d'abord :
-- Si `gh` est installé et que le cwd est un dépôt avec un remote GitHub, le plan est une **issue GitHub** portant le label `qa-plan` (crée le label s'il manque).
+- Si `gh` est installé et que le cwd est un dépôt avec un remote GitHub, le plan est une **issue GitHub** portant le label `qa-plan` — le label réel est celui du mapping de `.claude/pipeline.config.md`. S'il manque au dépôt, `issue create` refuse en le nommant : s'arrêter et le dire au mainteneur ; `init-projet`, en reconfiguration, le pose (étape 6, « Créer les labels manquants dans GitHub »).
 - Sinon, replie-toi sur un fichier markdown à `docs/qa/qa-plan-<slug>.md` (slug à partir du titre du PRD ou d'une courte étiquette de périmètre).
 
 Indique à l'utilisateur quel mode tu utilises avant de rédiger.
@@ -115,14 +123,14 @@ Pour le plan dans son ensemble :
 ### 5. Ancre chaque commande à une réalité vérifiée
 
 - Utilise des variables d'environnement pour la répétabilité : `$QA_RUN`, `$TOKEN_A`, `$TOKEN_B`, `$CLIENT_ID`, etc.
-- Requêtes sur la persistance : uniquement après avoir vérifié les noms réels contre les migrations ou les modèles.
+- Requêtes sur la persistance : uniquement sur les noms réels que le relevé du `releveur` a vérifiés contre les migrations ou les modèles (étape 1).
 - Logs : toujours **bornés** (`--tail=200`), jamais un `--follow` non borné. Une preuve QA doit être petite et copiable-collable.
 - Instructions d'interface : inclus l'URL ou la commande, le compte, l'état de départ (session vierge / préservée) et où lire les erreurs.
 - Codes de sortie, statuts, états terminaux et volumes attendus font partie des « résultats attendus », pas des arrière-pensées.
 
 ### 6. Marque explicitement les décisions de politique
 
-Quand un comportement dépend du produit ou est ambigu, marque la case avec `Décision QA :` et indique :
+Quand un comportement dépend du produit ou est ambigu, marque la case avec `Décision QA :`, **après** sa marque de type — le plus souvent `**Observation** — Décision QA : …` : une case de décision reste une case typée, sinon la passe comptable la refuse comme case sans type. Indique :
 - Comportement actuel (d'après le code)
 - Risque
 - Politique recommandée
@@ -132,37 +140,48 @@ Le compagnon d'exécution enregistre le choix de l'utilisateur lorsqu'il y parvi
 
 ### 7. Montre le brouillon à l'utilisateur, puis publie
 
+- La « Passe finale avant publication » d'abord, rejouée après chaque révision : le go du mainteneur porte sur le texte qui part.
 - Affiche le corps complet du brouillon (ou un résumé plus le corps complet dans un bloc replié) et demande : « Publier ceci comme issue GitHub avec le label `qa-plan`, ou réviser ? »
 - À l'approbation, publie :
-  - GitHub : `gh issue create --label qa-plan --title "Plan QA: <périmètre>" --body-file <brouillon>`
+  - GitHub : `python .claude/skills/cycle-pr/scripts/ecriture-relue.py issue create --title "Plan QA: <périmètre>" --body-file <brouillon> --label <qa-plan>`, `<qa-plan>` étant le label réel du mapping (étape 2) ; le script relit corps, titre et labels, et sa ligne de sortie porte le numéro ;
   - Repli markdown : écris le fichier, affiche le chemin.
-- Affiche l'URL de l'issue ou le chemin du fichier. Indique à l'utilisateur que c'est ce qu'il passe à `execution-qa` (ou que le compagnon découvrira automatiquement l'issue `qa-plan` la plus récente).
+- Rends le numéro de l'issue, ou le chemin du fichier : c'est ce que reçoit la session `execution-qa`.
 
 ## Sortie : titre et labels de l'issue GitHub
 
 - Titre : `Plan QA: <court périmètre>` — ex. `Plan QA: PRD #42 (base de connaissances v2)` ou `Plan QA: issues #51 #52 #53`.
-- Labels : `qa-plan`. Crée le label s'il manque (`gh label create qa-plan --description "Checklist QA active" --color "0E8A16"`).
+- Labels : `qa-plan`, sous son label réel (étape 2).
 - Ne ferme AUCUNE issue source. Ne modifie PAS le PRD.
 
 ## Passe finale avant publication
 
-Avant d'envoyer le corps à `gh issue create`, vérifie :
+Deux passes, dans cet ordre, avant de montrer le brouillon (étape 7).
+
+### 1. Passe comptable — `executant`
+
+La session lui passe le chemin du brouillon et celui du relevé des issues du périmètre (numéros et critères). Il joue les vérifications ci-dessous, chacune écrite en commande, et rend « conforme » ou chaque ligne en échec ; il ne corrige rien. Tout échec refuse la publication : la session corrige le brouillon et relance la passe.
+
+- **Cases sans type** — toute ligne sortie est une case sans type (gabarit, « Types de case ») :
+
+  ```bash
+  grep -nE '^[[:blank:]]*- \[[ xX]\] ' <brouillon> | grep -vE '^[[:digit:]]+:[[:blank:]]*- \[[ xX]\] (\*\*Commande\*\* — `[^`]+` → |\*\*Observation\*\* — )'
+  ```
+
+- **Critères → cases** — `grep -nE '^## |^- \*\*C[[:digit:]]+\*\* — |^[[:blank:]]*- \[[ xX]\] .*\(C[[:digit:]]+(, C[[:digit:]]+)*\)' <brouillon>` : chaque issue du relevé a son titre `## Bloc de fonctionnalité : Issue #<N>` ; sous chacun, avant le titre suivant, autant de lignes `- **C<k>** —` que l'issue a de critères, et chaque `C<k>` cité par au moins une case.
+- **Marqueurs** — `grep -nE 'TODO|FIXME|à compléter|<[^<>[:space:]][^<>]*>' <brouillon>` : toute ligne sortie porte un marqueur ou un espace réservé du gabarit ; une valeur d'exécution s'écrit en variable (`$DOC_ID`, étape 5).
+- **Structure** — `grep -nE "^## |^\*\*Règle d'arrêt\*\*" <brouillon>` : « Vue d'ensemble », « Types de case » et « Saisie d'échec » présents, « Paliers de sévérité » une fois, avant la première phase ; chaque `## Phase` — sauf la Phase Finale, qui clôt le plan — et chaque `## Bloc de fonctionnalité` suivi de sa ligne `**Règle d'arrêt**` avant le titre suivant.
+
+### 2. Relecture de jugement — la session
 
 - [ ] La section **Vue d'ensemble** nomme le PRD, les issues dans le périmètre, les comportements dans le périmètre, les éléments hors périmètre.
-- [ ] Chaque issue dans le périmètre a son propre bloc par issue.
-- [ ] Chaque critère d'acceptation de chaque issue dans le périmètre apparaît comme au moins une case à cocher.
 - [ ] **Aucune case ne re-teste ce que la CI couvre déjà** (suite de tests, lint, typecheck, build).
 - [ ] **Aucune section ne porte sur une surface que le projet n'a pas** (déduite de `.claude/pipeline.config.md`).
-- [ ] Aucune case n'utilise une route, table, fichier, variable d'environnement ou fixture non vérifié contre le dépôt.
+- [ ] Chaque route, table, fichier, variable d'environnement ou fixture d'une case vient du relevé du `releveur`, vérifié contre le dépôt.
 - [ ] *S'il y a des traitements asynchrones* : chacun a des vérifications d'état terminal (succès ET échec).
 - [ ] *S'il y a des fichiers entrants ou produits* : chacun a des vérifications d'artefact (chemin, taille, format) et de persistance.
 - [ ] Chaque échec d'action utilisateur a une vérification de visibilité de l'erreur UI attendue.
-- [ ] Chaque phase transversale a une règle d'arrêt.
-- [ ] Les paliers de sévérité (bloquant / majeur / mineur) sont définis une fois en haut.
-- [ ] Le gabarit de saisie d'échec (depuis `execution-qa/references/gabarit-intake-echec.md` ou en ligne) est inclus pour usage pendant l'exécution.
 - [ ] La Définition du Terminé est binaire (`phases requises vertes, bloquants corrigés ou acceptés, ...`).
 - [ ] Français, vocabulaire du domaine, pas de fuite de jargon interne.
-- [ ] Aucun marqueur de remplissage (`TODO`, `<à compléter>`, etc.) ne subsiste.
 
 ## Erreurs fréquentes
 
@@ -170,6 +189,7 @@ Avant d'envoyer le corps à `gh issue create`, vérifie :
 |---|---|
 | **Cases qui refont le travail de la CI** (« les tests passent », « le lint est vert ») | Les supprimer. Le plan ne contient que ce qu'un test ne peut pas voir. |
 | **Sections pour des surfaces inexistantes** (frontend sur une CLI, BDD sur une lib) | Déduire les surfaces de `.claude/pipeline.config.md`. Une surface absente ne produit aucune section, pas même un « N/A ». |
+| **Case sans type** | `**Commande** —` ou `**Observation** —` en tête (gabarit, « Types de case ») ; la passe comptable la refuse. |
 | Le plan couvre des zones qu'aucune issue récente n'a touchées | Recadrer. Uniquement les phases de couche A pour le transversal, les blocs de couche B liés aux issues dans le périmètre. |
 | Vérifications génériques (« l'API marche », « l'UI s'affiche ») | Ancrer à des routes/composants/états/codes de statut attendus spécifiques. |
 | Jobs asynchrones sans vérifications d'état terminal | Ajouter les chemins explicites succès ET échec, avec l'état persisté attendu pour chacun. |

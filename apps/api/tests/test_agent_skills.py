@@ -705,9 +705,9 @@ HOUSE_SKILLS = (
 # liste de fichiers ; dix au 2026-10-23 sur `34604c7` (lot 6a2, bloc 1), qui en sort `triage` ;
 # sept au commit suivant (bloc 2), qui en sort `interroge-moi`, `vers-prd` et `vers-issues` ; six
 # au 2026-10-23 (lot 6b, bloc 1), qui en sort `repercussions` ; quatre au 2026-10-25 (lot 6b2),
-# qui en sort `bug-vers-issue` et `contradiction`. La liste se vide lot par lot ; #134 l'exige vide.
+# qui en sort `bug-vers-issue` et `contradiction` ; trois au 2026-10-26 (lot 7a), qui en sort
+# `plan-qa`. La liste se vide lot par lot ; #134 l'exige vide.
 EXECUTOR_WAITING_LIST = {
-    "plan-qa": "7a",
     "execution-qa": "7b",
     "audit-spec-ui": "8",
     "init-projet": "8",
@@ -818,9 +818,9 @@ def test_chaque_skill_maison_nomme_ses_executants(skill: str) -> None:
     Au 2026-10-20 sur `e70e279`, deux sur treize (`cycle-pr`, `pr-paralleles`) ; trois au
     2026-10-23 sur `34604c7` avec `triage` (lot 6a2, bloc 1), six au commit suivant avec
     `interroge-moi`, `vers-prd` et `vers-issues` (bloc 2), sept le 2026-10-23 avec `repercussions`
-    (lot 6b, bloc 1), neuf le 2026-10-25 avec `bug-vers-issue` et `contradiction` (lot 6b2) ; les
-    quatre autres — `plan-qa`, `execution-qa`, `audit-spec-ui`, `init-projet` — sont dans
-    `EXECUTOR_WAITING_LIST` avec le lot qui les en sort.
+    (lot 6b, bloc 1), neuf le 2026-10-25 avec `bug-vers-issue` et `contradiction` (lot 6b2), dix
+    le 2026-10-26 avec `plan-qa` (lot 7a) ; les trois autres — `execution-qa`, `audit-spec-ui`,
+    `init-projet` — sont dans `EXECUTOR_WAITING_LIST` avec le lot qui les en sort.
     """
     assert cites_an_executor(skill_prose(skill), ROLE_NAMES), (
         f"`{skill}` ne nomme aucun rôle ni aucun script, et n'est pas en liste d'attente"
@@ -840,7 +840,7 @@ def test_un_skill_en_liste_d_attente_ne_nomme_encore_aucun_executant(skill: str)
 # Les skills dont la prose n'écrit plus sur la forge que par l'écriture distante relue (#134,
 # lot 4) : chaque lot de #134 y ajoute les siens — le lot 6a2 `triage`, `interroge-moi`, `vers-prd`
 # et `vers-issues` ; le lot 6b `repercussions` (bloc 1) ; le lot 6b2 `bug-vers-issue` et
-# `contradiction` ; les lots 7a à 8 les leurs.
+# `contradiction` ; le lot 7a `plan-qa` ; les lots 7b et 8 les leurs.
 SKILLS_SANS_ECRITURE_GH_DIRECTE = (
     "triage",
     "interroge-moi",
@@ -849,6 +849,7 @@ SKILLS_SANS_ECRITURE_GH_DIRECTE = (
     "repercussions",
     "bug-vers-issue",
     "contradiction",
+    "plan-qa",
 )
 ECRITURE_RELUE = ".claude/skills/cycle-pr/scripts/ecriture-relue.py"
 # Les skills de la table précédente qui n'écrivent sur aucune issue, chacun avec sa raison : le
@@ -942,7 +943,8 @@ def test_un_skill_sans_ecriture_gh_directe_n_en_cite_aucune(skill: str) -> None:
     `themes-milestones.md`, `vers-issues` une (`gh issue edit <n> --milestone`), `interroge-moi`
     et `vers-prd` aucune — leurs écritures n'y étaient décrites qu'en prose. Le 2026-10-23 (lot 6b,
     bloc 1), `repercussions` une : le `gh api -X PATCH` de son brief. Le 2026-10-25 (lot 6b2),
-    `bug-vers-issue` deux (`gh issue create`, `gh label create`), `contradiction` aucune.
+    `bug-vers-issue` deux (`gh issue create`, `gh label create`), `contradiction` aucune. Le
+    2026-10-26 (lot 7a), `plan-qa` trois (`gh issue create` ×2, `gh label create`).
 
     **Population** : `SKILLS_SANS_ECRITURE_GH_DIRECTE`, le `SKILL.md` et les références de chacun.
     **Ce que le détecteur ne voit pas** : une écriture décrite sans commande (« publie un
@@ -1525,6 +1527,7 @@ SKILLS_DES_SESSIONS_LIEES = [
     ".claude/skills/repercussions/SKILL.md",
     ".claude/skills/contradiction/SKILL.md",
     ".claude/skills/bug-vers-issue/SKILL.md",
+    ".claude/skills/plan-qa/SKILL.md",
 ]
 
 
@@ -1548,7 +1551,7 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 # sur l'enfant jetable (l'enfant lit son parent dans son prompt, la porte du nettoyage compare
 # l'échafaudage à sa source — journal de spec de #107, 2026-10-16). La commande du
 # premier geste porte trois invariants à elle seule (`origin/`, `--no-track`, `&&`). Gardés
-# ailleurs : les renvois (`SKILLS_DES_SESSIONS_LIEES`, neuf au 2026-10-25), le point de départ
+# ailleurs : les renvois (`SKILLS_DES_SESSIONS_LIEES`, dix au 2026-10-26), le point de départ
 # `origin/` (`DEPARTS_EXPLICITES`), la porte du nettoyage (`PORTES_PRESCRITES`). Restent en
 # lecture, à dessein : les formes du message de fin autres que celle d'un lot — sauf celle de fin
 # d'interrogatoire, que l'étape 0 de `pr-paralleles` consomme depuis le lot 4 (gardée plus bas).
@@ -1605,6 +1608,10 @@ GABARIT_DECOUPAGE_REF = ".claude/skills/bug-vers-issue/references/gabarit-issue-
 THEMES_MILESTONES_REF = ".claude/skills/triage/themes-milestones.md"
 BRIEF_AGENT_REF = ".claude/skills/triage/brief-agent.md"
 PATCH_CHECKBOX_REF = ".claude/skills/execution-qa/references/patch-checkbox-gh.md"
+PLAN_QA_SKILL = ".claude/skills/plan-qa/SKILL.md"
+GABARIT_PLAN_QA_REF = ".claude/skills/plan-qa/references/gabarit-plan-qa.md"
+EXEMPLE_BLOC_ISSUE_REF = ".claude/skills/plan-qa/references/exemple-bloc-issue.md"
+TAXONOMIE_COUVERTURE_REF = ".claude/skills/plan-qa/references/taxonomie-couverture.md"
 INVARIANTS_DES_SESSIONS_LIEES = {
     # Héritage (décision 7).
     "heritage-sans-permission-mode": (
@@ -3601,11 +3608,266 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         GABARIT_DECOUPAGE_REF,
         "une `issue create` à la fois (SKILL.md, étape 6)",
     ),
-    "6b2-cycle-pr-bug-vers-issue-nomme-la-famille": (
+    # Lot 7a de #134 (2026-10-26) : `plan-qa` nomme ses exécutants et publie par l'écriture relue.
+    # Une entrée par point du brief du bloc 2 qui écrit une règle — « Délégation », « Entrées »,
+    # étapes 1, 2, 5, 6 et 7, « Passe finale avant publication » scindée, « Erreurs fréquentes » ;
+    # dans le gabarit, sa règle 3, « Saisie d'échec » et l'Index des constats — et par moitié
+    # restrictive (obs 126), plus la dette de `cycle-pr` Étape 8. Dénombrement, au cleanup du bloc, par la forme, sur les lignes ajoutées
+    # des fichiers de prose (`git diff -U0 -- .claude/skills/`) : **24** moitiés restrictives —
+    # 6 « refuse », 4 « ne … pas » ou « ne … rien », 4 « la session » sans « reste à », 3 « jamais »,
+    # 2 « reste à » ou « garde », 2 « elle-même », « uniquement », « n'… que », « sauf » — :
+    # toutes épinglées, 21 au premier jet, 3 au cleanup, vues rouges par `mutation.py`. Gardés
+    # ailleurs : la sortie de liste d'attente (`EXECUTOR_WAITING_LIST`), l'absence d'écriture `gh`
+    # directe et le renvoi au script (`SKILLS_SANS_ECRITURE_GH_DIRECTE`), le renvoi aux sessions
+    # liées (`SKILLS_DES_SESSIONS_LIEES`), le contexte vivant et la création de label retirés
+    # (`RETIRES_DU_CONTEXTE_VIVANT`), le type de chaque case du gabarit et de l'exemple
+    # (`test_chaque_case_d_un_plan_de_qa_porte_son_type`). **Ce qui n'est pas gardé** : l'accord
+    # entre la commande « cases sans type » épinglée ici et `PLAN_QA_CASE_TYPEE` — l'une change
+    # sans que l'autre rougisse.
+    "7a-plan-qa-jugement-a-la-session": (
+        PLAN_QA_SKILL,
+        (
+            "La session garde le jugement : le périmètre — le mode, et la question au mainteneur"
+            " du mode 4 —, les surfaces lues dans la config, le choix des phases et des cases et"
+            " leur type, les « Décision QA », la rédaction, le go de publication."
+        ),
+    ),
+    "7a-plan-qa-releveur-noms-verifies": (
+        PLAN_QA_SKILL,
+        (
+            "chaque nom vérifié contre les migrations ou les modèles, chaque endpoint ou chemin"
+            " incertain vérifié localement (étapes 1 et 5)"
+        ),
+    ),
+    "7a-plan-qa-releveur-sans-conclure": (
+        PLAN_QA_SKILL,
+        "Il rend les relevés dans un fichier ; ce qui compte reste à la session",
+    ),
+    "7a-plan-qa-executant-ne-corrige-rien": (
+        PLAN_QA_SKILL,
+        (
+            "il rend « conforme » ou les lignes en échec, et ne corrige rien ; une case sans type"
+            " refuse la publication"
+        ),
+    ),
+    "7a-plan-qa-script-par-la-session": (
+        PLAN_QA_SKILL,
+        "appelée par la session elle-même : un geste isolé coûte plus délégué",
+    ),
+    "7a-plan-qa-demarree-par-repercussions": (
+        PLAN_QA_SKILL,
+        (
+            "cette session peut être démarrée par `repercussions`, à son étape 7, qui lui passe"
+            " le thème"
+        ),
+    ),
+    "7a-plan-qa-qa-hors-de-ce-contexte": (
+        PLAN_QA_SKILL,
+        (
+            "la QA se déroule dans une session `execution-qa` distincte, qui reçoit le numéro du"
+            " plan publié, jamais dans le contexte de celle-ci"
+        ),
+    ),
+    "7a-plan-qa-ne-demarre-pas-execution-qa": (
+        PLAN_QA_SKILL,
+        "`plan-qa` ne la démarre pas : il rend le numéro",
+    ),
+    "7a-plan-qa-mode-1-au-releveur": (
+        PLAN_QA_SKILL,
+        "Le `releveur` (« Délégation ») relève le corps du PRD, puis les issues d'implémentation",
+    ),
+    "7a-plan-qa-mode-2-au-releveur": (
+        PLAN_QA_SKILL,
+        "Le `releveur` relève le corps et les critères d'acceptation de chaque issue.",
+    ),
+    "7a-plan-qa-mode-3-au-releveur": (
+        PLAN_QA_SKILL,
+        "Le `releveur` relève les issues du milestone",
+    ),
+    "7a-plan-qa-mode-4-question-a-la-session": (
+        PLAN_QA_SKILL,
+        (
+            "le `releveur` relève les thèmes dont toutes les issues sont fermées et qui n'ont pas"
+            " encore d'issue `qa-plan`, et la session demande au mainteneur lequel recetter. S'il"
+            " n'y en a aucun, elle lui demande quelles issues sont dans le périmètre — **ne jamais"
+            " deviner un périmètre de QA**"
+        ),
+    ),
+    "7a-plan-qa-tous-les-modes-au-releveur": (
+        PLAN_QA_SKILL,
+        (
+            "Dans tous les modes, le `releveur` (« Délégation ») rend aussi : - le PRD s'il est"
+            " connu, dont la session tire la section « Vue d'ensemble »"
+        ),
+    ),
+    "7a-plan-qa-config-et-glossaire-par-la-session": (
+        PLAN_QA_SKILL,
+        (
+            "La session lit elle-même `.claude/pipeline.config.md` (stack, commandes, domaines,"
+            " surfaces), `CLAUDE.md` et le glossaire du domaine"
+        ),
+    ),
+    "7a-plan-qa-inspection-au-releveur": (
+        PLAN_QA_SKILL,
+        (
+            "L'inspection part au `releveur` (« Délégation »), à qui la session donne la liste des"
+            " surfaces de la config et des fichiers touchés par les commits du périmètre"
+        ),
+    ),
+    "7a-plan-qa-instruction-verifiee-seule": (
+        PLAN_QA_SKILL,
+        "la session n'inclut comme instruction que ce que la carte a vérifié",
+    ),
+    "7a-plan-qa-label-du-mapping": (
+        PLAN_QA_SKILL,
+        (
+            "portant le label `qa-plan` — le label réel est celui du mapping de"
+            " `.claude/pipeline.config.md`"
+        ),
+    ),
+    "7a-plan-qa-label-absent-arrete": (
+        PLAN_QA_SKILL,
+        (
+            "S'il manque au dépôt, `issue create` refuse en le nommant : s'arrêter et le dire"
+            " au mainteneur"
+        ),
+    ),
+    "7a-plan-qa-persistance-par-le-releve": (
+        PLAN_QA_SKILL,
+        (
+            "uniquement sur les noms réels que le relevé du `releveur` a vérifiés contre les"
+            " migrations"
+        ),
+    ),
+    "7a-plan-qa-decision-apres-le-type": (
+        PLAN_QA_SKILL,
+        (
+            "marque la case avec `Décision QA :`, **après** sa marque de type — le plus souvent"
+            " `**Observation** — Décision QA : …` : une case de décision reste une case typée,"
+            " sinon la passe comptable la refuse comme case sans type"
+        ),
+    ),
+    "7a-plan-qa-passe-finale-avant-le-go": (
+        PLAN_QA_SKILL,
+        (
+            "La « Passe finale avant publication » d'abord, rejouée après chaque révision : le go"
+            " du mainteneur porte sur le texte qui part"
+        ),
+    ),
+    "7a-plan-qa-publication-relue": (
+        PLAN_QA_SKILL,
+        (
+            "python .claude/skills/cycle-pr/scripts/ecriture-relue.py issue create --title"
+            ' "Plan QA: <périmètre>" --body-file <brouillon> --label <qa-plan>'
+        ),
+    ),
+    "7a-plan-qa-label-reel-et-numero": (
+        PLAN_QA_SKILL,
+        (
+            "`<qa-plan>` étant le label réel du mapping (étape 2) ; le script relit corps, titre et"
+            " labels, et sa ligne de sortie porte le numéro"
+        ),
+    ),
+    "7a-plan-qa-rend-le-numero": (
+        PLAN_QA_SKILL,
+        (
+            "Rends le numéro de l'issue, ou le chemin du fichier : c'est ce que reçoit la"
+            " session `execution-qa`"
+        ),
+    ),
+    "7a-plan-qa-passe-comptable-ses-entrees": (
+        PLAN_QA_SKILL,
+        (
+            "1. Passe comptable — `executant` La session lui passe le chemin du brouillon et"
+            " celui du relevé des issues du périmètre (numéros et critères)"
+        ),
+    ),
+    "7a-plan-qa-passe-comptable-refuse": (
+        PLAN_QA_SKILL,
+        (
+            "rend « conforme » ou chaque ligne en échec ; il ne corrige rien. Tout échec refuse la"
+            " publication : la session corrige le brouillon et relance la passe."
+        ),
+    ),
+    "7a-plan-qa-cases-sans-type-commande": (
+        PLAN_QA_SKILL,
+        (
+            r"grep -nE '^[[:blank:]]*- \[[ xX]\] ' <brouillon> | grep -vE"
+            r" '^[[:digit:]]+:[[:blank:]]*- \[[ xX]\] (\*\*Commande\*\* — `[^`]+` →"
+            r" |\*\*Observation\*\*"
+            r" — )'"
+        ),
+    ),
+    "7a-plan-qa-criteres-vers-cases": (
+        PLAN_QA_SKILL,
+        (
+            r"`grep -nE '^## |^- \*\*C[[:digit:]]+\*\* — |^[[:blank:]]*- \[[ xX]\]"
+            r" .*\(C[[:digit:]]+(, C[[:digit:]]+)*\)' <brouillon>` : chaque issue du relevé a son"
+            " titre `## Bloc de"
+            " fonctionnalité : Issue #<N>` ; sous chacun, avant le titre suivant, autant de lignes"
+            " `- **C<k>** —` que l'issue a de critères, et chaque `C<k>` cité par au moins une case"
+        ),
+    ),
+    "7a-plan-qa-marqueurs": (
+        PLAN_QA_SKILL,
+        (
+            "`grep -nE 'TODO|FIXME|à compléter|<[^<>[:space:]][^<>]*>' <brouillon>` : toute ligne"
+            " sortie porte un marqueur ou un espace réservé du gabarit"
+        ),
+    ),
+    "7a-plan-qa-structure": (
+        PLAN_QA_SKILL,
+        (
+            "« Paliers de sévérité » une fois, avant la première phase ; chaque `## Phase` — sauf"
+            " la Phase Finale, qui clôt le plan — et chaque `## Bloc de fonctionnalité` suivi de sa"
+            " ligne `**Règle d'arrêt**` avant le titre suivant"
+        ),
+    ),
+    "7a-plan-qa-relecture-de-jugement": (PLAN_QA_SKILL, "2. Relecture de jugement — la session"),
+    "7a-plan-qa-noms-du-releve": (
+        PLAN_QA_SKILL,
+        (
+            "Chaque route, table, fichier, variable d'environnement ou fixture d'une case vient du"
+            " relevé du `releveur`, vérifié contre le dépôt."
+        ),
+    ),
+    "7a-plan-qa-erreur-case-sans-type": (
+        PLAN_QA_SKILL,
+        (
+            "`**Commande** —` ou `**Observation** —` en tête (gabarit, « Types de case ») ; la"
+            " passe comptable la refuse"
+        ),
+    ),
+    "7a-gabarit-plan-qa-passe-comptable-refuse": (
+        GABARIT_PLAN_QA_REF,
+        "Une case sans type n'est pas publiable : la passe comptable la refuse",
+    ),
+    "7a-gabarit-plan-qa-intake-ecrit": (
+        GABARIT_PLAN_QA_REF,
+        (
+            "l'intake de `execution-qa/references/gabarit-intake-echec.md` s'écrit — dans un"
+            " fichier, ou en commentaire de l'issue du plan —, ses champs sans contenu supprimés,"
+            " jamais laissés vides"
+        ),
+    ),
+    "7a-gabarit-plan-qa-intake-en-argument": (
+        GABARIT_PLAN_QA_REF,
+        (
+            "La session de consignation `bug-vers-issue` le reçoit en argument, dans son mode"
+            " piloté par un plan : le numéro du plan, l'ancre de la case, le chemin ou l'URL de"
+            " l'intake."
+        ),
+    ),
+    "7a-gabarit-plan-qa-index-modele-non-recopie": (
+        GABARIT_PLAN_QA_REF,
+        "ne se recopie pas dans le plan publié",
+    ),
+    "7a-cycle-pr-plan-qa-nomme-la-famille": (
         CYCLE_PR_SKILL,
         (
-            "`triage`, `interroge-moi`, `vers-prd`, `vers-issues`, `repercussions` et"
-            " `bug-vers-issue` les nomment ; les skills des lots 7a à 8 de #134 les nommeront"
+            "`triage`, `interroge-moi`, `vers-prd`, `vers-issues`, `repercussions`,"
+            " `bug-vers-issue` et `plan-qa` les nomment ; les skills des lots 7b et 8 de #134 les"
+            " nommeront"
         ),
     ),
 }
@@ -3757,12 +4019,26 @@ def test_l_orchestration_ne_rend_pas_ce_qu_elle_a_retire(phrase: str) -> None:
 # `ecae185`, sauf les gabarits, à 0, et l'ancienne phrase d'I2, entrée au commit `57c049b` :
 # ceux-là sont vus rouges par mutation inverse. Les trois formes de `repercussions` sont rouges sur
 # `a485d0a`.
+#
+# Le lot 7a (2026-10-26) y ajoute `plan-qa`, par le critère « 7a, 7b » du brief de #134 — « chaque
+# occurrence restante est un dialogue ». **Population** sur `4b51a71`, base du lot, par la même
+# commande sur ses quatre fichiers : **1** forme, `gabarit-plan-qa.md` (« Saisie d'échec », l'intake
+# « capturé dans la conversation ») — une source, pas un dialogue ; les trois autres fichiers à 0.
+# Même garde, un fichier par entrée : le gabarit rouge sur `e4e05db`, qui n'en touche pas la
+# phrase, les trois autres vus rouges par mutation inverse. S'y ajoute la création du label qui
+# manque, que `ecriture-relue.py` n'a pas, écrite en prose à l'étape 2 et dans « Sortie » — seule
+# la commande de « Sortie » tombe sous `gh_writes` —, rouge sur `e4e05db`.
 RETIRES_DU_CONTEXTE_VIVANT = {
     "contradiction-conversation": (CONTRADICTION_SKILL, "conversation"),
     "bug-vers-issue-conversation": (BUG_VERS_ISSUE_SKILL, "conversation"),
     "collecte-contexte-conversation": (COLLECTE_CONTEXTE_REF, "conversation"),
     "gabarit-issue-bug-conversation": (GABARIT_BUG_REF, "conversation"),
     "gabarit-issue-decoupage-conversation": (GABARIT_DECOUPAGE_REF, "conversation"),
+    "plan-qa-conversation": (PLAN_QA_SKILL, "conversation"),
+    "gabarit-plan-qa-conversation": (GABARIT_PLAN_QA_REF, "conversation"),
+    "exemple-bloc-issue-conversation": (EXEMPLE_BLOC_ISSUE_REF, "conversation"),
+    "taxonomie-couverture-conversation": (TAXONOMIE_COUVERTURE_REF, "conversation"),
+    "plan-qa-label-cree-s-il-manque": (PLAN_QA_SKILL, "le label s'il manque"),
     "collecte-contexte-derniers-tours": (COLLECTE_CONTEXTE_REF, "derniers tours"),
     "bug-vers-issue-intake-capture": (BUG_VERS_ISSUE_SKILL, "capturé"),
     "collecte-contexte-intake-capture": (COLLECTE_CONTEXTE_REF, "capturé"),
@@ -3790,15 +4066,16 @@ def test_le_contexte_vivant_retire_ne_revient_pas(fichier: str, forme: str) -> N
     assert not porte_la_forme(fichier, forme), f"`{fichier}` porte encore « {forme} »"
 
 
-def test_la_conversation_est_gardee_dans_chaque_fichier_des_deux_skills() -> None:
-    """Un fichier ajouté à `contradiction` ou à `bug-vers-issue` rougit ici tant que la table ne
-    garde pas le mot chez lui : le critère « 6a, 6b » lit le dossier entier."""
+def test_la_conversation_est_gardee_dans_chaque_fichier_des_skills_du_contexte_vivant() -> None:
+    """Un fichier ajouté à `contradiction`, à `bug-vers-issue` ou à `plan-qa` rougit ici tant que
+    la table ne garde pas le mot chez lui : les critères « 6a, 6b » et « 7a, 7b » lisent le dossier
+    entier."""
     gardes = {
         fichier for fichier, forme in RETIRES_DU_CONTEXTE_VIVANT.values() if forme == "conversation"
     }
     dossiers = {
         path.relative_to(REPOSITORY_ROOT).as_posix()
-        for skill in ("contradiction", "bug-vers-issue")
+        for skill in ("contradiction", "bug-vers-issue", "plan-qa")
         for path in (REPOSITORY_ROOT / ".claude/skills" / skill).rglob("*")
         if path.is_file()
     }
@@ -3817,10 +4094,7 @@ PLAN_QA_CASE_TYPEE = re.compile(
     PLAN_QA_CASE.pattern + r"(?:\*\*Commande\*\* — `[^`]+` → |\*\*Observation\*\* — )"
 )
 # Les fichiers de `plan-qa` qui portent des cases de plan.
-PLAN_QA_PLANS = (
-    ".claude/skills/plan-qa/references/gabarit-plan-qa.md",
-    ".claude/skills/plan-qa/references/exemple-bloc-issue.md",
-)
+PLAN_QA_PLANS = (GABARIT_PLAN_QA_REF, EXEMPLE_BLOC_ISSUE_REF)
 
 
 def cases(texte: str) -> list[str]:

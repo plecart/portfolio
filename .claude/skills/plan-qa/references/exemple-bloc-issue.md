@@ -35,7 +35,7 @@ L'exemple porte sur une issue hypothétique `#127 — L'upload de document de co
 - [ ] **Commande** — `docker compose logs --tail=200 api | grep -c 'POST /api/clients/.*/knowledge.* 500'` → affiche `0` : aucun 500 sur les échecs de validation.
 
 **Vérifications Frontend** :
-- [ ] **Observation** — ouvrir `https://app.local/clients/<client-a>/knowledge` en utilisateur A, session vierge → la page de connaissances du client A s'affiche.
+- [ ] **Observation** — ouvrir `https://app.local/clients/$CLIENT_A_ID/knowledge` en utilisateur A, session vierge → la page de connaissances du client A s'affiche.
 - [ ] **Observation** — l'état vide, l'utilisateur A sans aucun document → le CTA « Uploadez votre premier document » est affiché.
 - [ ] **Observation** — pendant l'upload → le bouton d'upload est désactivé et un spinner est visible.
 - [ ] **Observation** — l'upload valide → la ligne du document apparaît avec `status: pending_extraction`, puis passe à `ready` une fois le polling terminé (C1).
