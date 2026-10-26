@@ -16,6 +16,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 from collections.abc import Iterable
 from pathlib import Path
 from typing import cast
@@ -4299,22 +4300,46 @@ def test_une_commande_de_la_passe_comptable_n_a_aucune_barre_oblique_inverse(nom
     assert "\\" not in commandes_de_la_passe_comptable()[nom]
 
 
+@pytest.fixture(scope="module")
+def bash_de_ce_systeme() -> str:
+    """Le `bash` du `PATH`, par `shutil.which` (doc `subprocess`, avertissement de `Popen`), s'il lit
+    les chemins de ce système ; sinon, le test qui le prend est sauté.
+
+    Sous Windows, le test ne prend qu'un `bash` MSYS, dont `uname -s` commence par `MINGW` ou
+    `MSYS` (les deux mesurés sous Git Bash, selon `MSYSTEM`). Celui de WSL — le lanceur de
+    `System32` comme l'alias de `WindowsApps`, tous deux sur le poste — rend `Linux`, et la commande
+    y échoue : mesuré le 2026-10-26, 37 cas sur 37 sur « unexpected EOF while looking for
+    matching » avec un `PATH` de shell Windows où `shutil.which` le trouve d'abord. Un `"bash"` nu,
+    résolu par `CreateProcess`, le trouve même sous Git Bash. Ailleurs — en CI Linux, le test
+    tourne — le `bash` du `PATH` sert tel quel.
+    """
+    bash = shutil.which("bash")
+    if bash is not None and sys.platform == "win32":
+        uname = subprocess.run(
+            [bash, "-c", "uname -s"], capture_output=True, text=True, check=False
+        )
+        if not uname.stdout.startswith(("MINGW", "MSYS")):
+            bash = None
+    if bash is None:
+        pytest.skip(
+            "pas de `bash` POSIX (absent, ou celui de WSL) : la commande de la passe comptable ne"
+            " se joue pas ici"
+        )
+    return bash
+
+
 @pytest.mark.parametrize(
     ("ligne", "sans_type"),
     [(ligne, sans_type) for ligne, _, sans_type in PLAN_QA_CASE_FORMS.values()],
     ids=PLAN_QA_CASE_FORMS.keys(),
 )
 def test_la_commande_des_cases_sans_type_s_accorde_au_recueil(
-    ligne: str, sans_type: bool, tmp_path: Path
+    ligne: str, sans_type: bool, bash_de_ce_systeme: str, tmp_path: Path
 ) -> None:
     """La commande « Cases sans type » de la passe comptable sort une ligne du recueil si et
     seulement si `cases_sans_type` la refuse (I2 de la passe 2 de relecture de la PR #157 : l'une
-    changeait sans que l'autre rougisse).
-
-    `bash` est celui du `PATH`, par `shutil.which` (doc `subprocess`, avertissement de `Popen`) : un
-    `"bash"` nu est résolu sous Windows par `CreateProcess` — mesuré le 2026-10-26 sur le poste, le
-    `bash` de WSL. Une sortie d'erreur rougit : une commande cassée ne sort rien, comme sur une case
-    typée.
+    changeait sans que l'autre rougisse). Une sortie d'erreur rougit : une commande cassée ne sort
+    rien, comme sur une case typée.
 
     **Ce que ce test ne voit pas** : le hook RTK n'existe que sur le poste, pas en CI — la commande
     tourne ici sous `subprocess`, sans lui, et reste verte avec une barre oblique inverse remise.
@@ -4322,9 +4347,6 @@ def test_la_commande_des_cases_sans_type_s_accorde_au_recueil(
     deux témoins qui le mesure. L'accord de « Critères → cases » avec `PLAN_QA_CASE` n'est pas
     gardé.
     """
-    bash = shutil.which("bash")
-    if bash is None:
-        pytest.skip("pas de `bash` : la commande de la passe comptable ne se joue pas ici")
     brouillon = tmp_path / "brouillon.md"
     brouillon.write_text(f"{ligne}\n", encoding="utf-8", newline="\n")
     commande = commandes_de_la_passe_comptable()["Cases sans type"].replace(
@@ -4332,7 +4354,11 @@ def test_la_commande_des_cases_sans_type_s_accorde_au_recueil(
     )
 
     resultat = subprocess.run(
-        [bash, "-c", commande], capture_output=True, text=True, encoding="utf-8", check=False
+        [bash_de_ce_systeme, "-c", commande],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
     )
 
     assert (bool(resultat.stdout), resultat.stderr) == (sans_type, "")
