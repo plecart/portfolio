@@ -3612,19 +3612,21 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # Une entrée par point du brief du bloc 2 qui écrit une règle — « Délégation », « Entrées »,
     # étapes 1, 2, 5, 6 et 7, « Passe finale avant publication » scindée, « Erreurs fréquentes » ;
     # dans le gabarit, sa règle 3, « Saisie d'échec » et l'Index des constats — et par moitié
-    # restrictive (obs 126), plus la dette de `cycle-pr` Étape 8. Dénombrement, au cleanup du bloc, par la forme, sur les lignes ajoutées
-    # des fichiers de prose (`git diff -U0 -- .claude/skills/`) : **24** moitiés restrictives —
-    # 6 « refuse », 4 « ne … pas » ou « ne … rien », 4 « la session » sans « reste à », 3 « jamais »,
-    # 2 « reste à » ou « garde », 2 « elle-même », « uniquement », « n'… que », « sauf » — :
-    # toutes épinglées, 21 au premier jet, 3 au cleanup, vues rouges par `mutation.py` ; le
-    # correctif de la passe 1 de relecture en ajoute une, l'attendu de l'Observation. Gardés
-    # ailleurs : la sortie de liste d'attente (`EXECUTOR_WAITING_LIST`), l'absence d'écriture `gh`
-    # directe et le renvoi au script (`SKILLS_SANS_ECRITURE_GH_DIRECTE`), le renvoi aux sessions
-    # liées (`SKILLS_DES_SESSIONS_LIEES`), le contexte vivant et la création de label retirés
+    # restrictive (obs 126), plus la dette de `cycle-pr` Étape 8. Dénombrement, au cleanup du
+    # bloc, par la forme, sur les lignes ajoutées des fichiers de prose
+    # (`git diff -U0 -- .claude/skills/`) : **24** moitiés restrictives — 6 « refuse », 4 « ne …
+    # pas » ou « ne … rien », 4 « la session » sans « reste à », 3 « jamais », 2 « reste à » ou
+    # « garde », 2 « elle-même », « uniquement », « n'… que », « sauf » — : toutes épinglées, 21 au
+    # premier jet, 3 au cleanup, vues rouges par `mutation.py` ; le correctif de la passe 1 de
+    # relecture en ajoute une, l'attendu de l'Observation. Gardés ailleurs : la sortie de liste
+    # d'attente (`EXECUTOR_WAITING_LIST`), l'absence d'écriture `gh` directe et le renvoi au
+    # script (`SKILLS_SANS_ECRITURE_GH_DIRECTE`), le renvoi aux sessions liées
+    # (`SKILLS_DES_SESSIONS_LIEES`), le contexte vivant et la création de label retirés
     # (`RETIRES_DU_CONTEXTE_VIVANT`), le type de chaque case du gabarit et de l'exemple
     # (`test_chaque_case_d_un_plan_de_qa_porte_son_type`). **Ce qui n'est pas gardé** : l'accord
-    # entre la commande « cases sans type » épinglée ici et `PLAN_QA_CASE_TYPEE` — l'une change
-    # sans que l'autre rougisse.
+    # entre les deux commandes épinglées ici qui reconnaissent une case — « cases sans type »,
+    # « critères → cases » — et `PLAN_QA_CASE` / `PLAN_QA_CASE_TYPEE` : l'une change sans que
+    # l'autre rougisse ; rejoué à la main au correctif de la passe 1, sans écart sur le recueil.
     "7a-plan-qa-jugement-a-la-session": (
         PLAN_QA_SKILL,
         (
@@ -4103,7 +4105,8 @@ PLAN_QA_CASE = re.compile(r"^(?:[ \t>]*(?:[-*+]|\d+[.)])[ \t]+)+\[[ \txX]\][ \t]
 PLAN_QA_CASE_TYPEE = re.compile(
     PLAN_QA_CASE.pattern + r"(?:\*\*Commande\*\* — `[^`]+`|\*\*Observation\*\* — .+) → \S"
 )
-# Les fichiers de `plan-qa` qui portent des cases de plan.
+# Les fichiers de `plan-qa` qui portent des cases de plan ; celles de `SKILL.md` sont la relecture
+# de jugement de la session, pas un plan.
 PLAN_QA_PLANS = (GABARIT_PLAN_QA_REF, EXEMPLE_BLOC_ISSUE_REF)
 
 
