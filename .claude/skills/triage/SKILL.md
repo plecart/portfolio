@@ -52,7 +52,7 @@ deux, dans cet ordre.
 
 Chaque issue **ouverte** triée doit porter exactement un rôle de catégorie et un rôle d'état ; une issue **fermée** n'en porte aucun — `cycle-pr` retire l'état à la clôture (Étape 8), une fermeture manuelle laisse ce geste à faire (`label <N> --remove <état>`), et `wontfix` est le seul rôle qui survit à une fermeture. Si les rôles d'état entrent en conflit, signale-le et demande au mainteneur avant de faire quoi que ce soit d'autre.
 
-Ce sont les noms de rôles canoniques ; le mapping vers les vrais labels GitHub est dans `.claude/pipeline.config.md` — sinon lancer `init-projet`.
+Ce sont les noms de rôles canoniques ; le mapping vers les vrais labels GitHub est dans `.claude/pipeline.config.md` — sinon s'arrêter et proposer une session `init-projet` distincte (`init-projet`, « Note pour les autres skills »).
 
 **Les issues portant un label de nature `prd` sont hors machine à états** : ne pas les lister dans « requiert l'attention », ne jamais leur appliquer rôle d'état ni thème. Ce sont des documents parents que `vers-issues` découpe ; leurs états terminaux n'auraient aucun sens.
 
