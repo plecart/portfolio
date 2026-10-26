@@ -45,15 +45,18 @@ l'attendu : une forme réduite, longueur ou ancre, ne voit pas une conversion qu
   retour chariot final, gardé à l'écriture. Une ligne, une paire : une ancienne ou une nouvelle
   nommée deux fois, ou la nouvelle d'une paire ancienne d'une autre, est refusée — les paires
   chaînées casseraient le rejeu. Une paire dont l'ancienne ligne manque et dont la nouvelle est
-  seule dans le texte est déjà appliquée ;
+  seule dans le texte est déjà appliquée. Borne : une paire dont la nouvelle ligne est déjà
+  ailleurs dans le texte s'applique, mais son rejeu y trouve la nouvelle en double et refuse
+  (`ligne en double (<n>)`) au lieu de la dire déjà appliquée ;
 - `checkbox next` lit la prochaine case en attente du corps de `<N>`, un plan de QA, sans rien
   écrire — la seule lecture de la famille, où le lot 7 de #134 range la prochaine case
   d'`execution-qa` avec sa copie de travail ; les dix autres sous-commandes écrivent chacune au
   premier appel, dénombrées par `REJEUX` (`test_ecriture_relue.py`). Une case est une ligne de
   case GFM, `PLAN_QA_CASE` de `test_agent_skills.py` ; elle attend quand un blanc la laisse non
-  cochée et que sa ligne ne porte ni `🔴` ni ` — BLOQUÉ` (`execution-qa/SKILL.md` §3, §4). La
-  sortie est le dernier titre au-dessus d'elle, sans ses `#`, ou `(sans titre)`, puis sa ligne ;
-  sans case en attente, elle le dit ;
+  cochée et que sa ligne ne porte ni `🔴`, ni ` — BLOQUÉ`, ni ` — accepté`
+  (`execution-qa/SKILL.md` §3, §4, §6 et « Passe finale »). La sortie est le dernier titre
+  au-dessus d'elle, sans ses `#`, ou `(sans titre)`, puis sa ligne ; sans case en attente, elle le
+  dit ;
 - `brief write` publie un fichier UTF-8, lu en octets, en commentaire de brief de `<N>`, ou édite
   en place le seul qui existe — jamais un second brief concurrent. Un fichier qui ne s'ouvre pas
   par `## Brief d'agent`, dès son premier caractère, est refusé avant tout appel : `brief patch`
@@ -167,9 +170,10 @@ OLD_MARK, NEW_MARK = "< ", "> "
 # et d'un blanc ; le groupe `state` est l'état de la case. C'est `PLAN_QA_CASE` de
 # `test_agent_skills.py` (lot 7a), dont `test_ecriture_relue.py` tient le recueil d'accord.
 PLAN_CASE = re.compile(r"^(?:[ \t>]*(?:[-*+]|\d+[.)])[ \t]+)+\[(?P<state>[ \txX])\][ \t]+")
-# Ce que porte une case laissée `[ ]` qui n'attend plus (`execution-qa/SKILL.md` §3, §4) : un
-# échec, consigné ou non, ou un blocage.
-SETTLED_MARKS = ("🔴", " — BLOQUÉ")
+# Ce que porte une case laissée `[ ]` qui n'attend plus (`execution-qa/SKILL.md` §3, §4, §6 et
+# « Passe finale ») : un échec, consigné ou non, un blocage ou une acceptation — une annotation de
+# §3, étape 4, s'écrit ` — <marque>`.
+SETTLED_MARKS = ("🔴", " — BLOQUÉ", " — accepté")
 # `str.isdigit` accepte « ² » : le numéro, qui entre dans un chemin d'API, se lit en ASCII.
 NUMBER = re.compile(r"[0-9]+")
 
@@ -609,7 +613,8 @@ def replace_lines(body: str, pairs: Sequence[Pair]) -> tuple[str, list[str], lis
     Une ligne est un segment entre deux `\\n`, comparée sans son `\\r` final, qui reste à
     l'écriture : les fins de ligne ressortent telles qu'elles sont entrées. Une paire dont
     l'ancienne ligne manque et dont la nouvelle est seule dans `body` est déjà appliquée : le rejeu
-    d'un fichier déjà poussé n'écrit rien.
+    d'un fichier déjà poussé n'écrit rien. Borne : la nouvelle ligne déjà ailleurs dans `body`, la
+    paire s'applique, mais le rejeu trouve la nouvelle en double et refuse.
 
     Returns:
         Le texte remplacé, les nouvelles lignes écrites (ancres de la relecture), et l'ancienne
