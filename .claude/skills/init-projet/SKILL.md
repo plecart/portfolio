@@ -34,7 +34,7 @@ lancer, quels labels utiliser et quels sont les domaines du projet.
   silence une valeur déjà renseignée. Ses écritures de dépôt partent **par une PR**, portée par la
   session qui a décidé, jamais par un commit direct sur le trunk (D-12 de #134) : la session
   l'ouvre, la relit et la merge au go du mainteneur, au déroulé de `triage/hors-scope.md`
-  (« Quand écrire », étapes 5 et 6). La copie du template (étape 7) ne se rejoue pas : `copie`
+  (« Quand écrire », étapes 5 et 6). La copie de l'étape 7 ne se rejoue pas : `copie`
   refuse dès qu'une cible diffère de sa source — `settings.json` fusionné, `CLAUDE.md` finalisé.
 
 ## Délégation
@@ -149,7 +149,8 @@ Les skills raisonnent en **rôles canoniques**. Le dépôt utilise des **chaîne
 Demander à l'utilisateur s'il veut des chaînes différentes (ex. labels existants du projet). Le
 mapping validé s'écrit dans un fichier JSON pour l'étape 6 : une liste d'objets
 `{"nom", "couleur", "description"}`, la description portant le rôle, au format de `label create`
-(son `--help`).
+(son `--help`). Ce fichier vit **hors de l'arbre du projet**, dans un dossier temporaire :
+`commit` (étape 12) fait `git add -A` et l'emporterait.
 
 ### 5. Écrire `.claude/pipeline.config.md`
 
@@ -512,7 +513,8 @@ et Dependabot générés — ou reportés à la première PR de code, projet san
 skills maison déployés, skills publics installés, context7 disponible, et les prochaines
 étapes : `vers-prd` ou `vers-issues` pour démarrer la planification, que la session **propose**
 en sessions distinctes (« Délégation »), jamais enchaînées dans celle-ci. Elles démarrent avec
-`use_worktree: false` : elles n'écrivent que dans GitHub.
+`use_worktree: false` : leur seule écriture de dépôt, l'archive de `vers-prd`, passe par son
+`executant` en isolation `worktree`.
 
 ## Checklist finale
 
