@@ -640,6 +640,26 @@ def test_une_paire_qui_ne_s_applique_pas_refuse_tout_l_appel_sans_rien_ecrire(
     assert sortie_d_echec(capsys, "refus") == f"refus — {motif}"
 
 
+def test_une_paire_dont_la_nouvelle_ligne_existe_deja_s_applique_puis_son_rejeu_refuse(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Borne du contrat de `--paires` : la nouvelle ligne déjà ailleurs dans le corps, la paire
+    s'applique — l'ancienne est seule —, mais le rejeu y trouve la nouvelle en double et refuse
+    au lieu de la dire déjà appliquée ; il n'écrit pas une seconde fois."""
+    forge = Forge({CORPS_42: {"body": "- [ ] Critère A\n- [x] Critère A\n"}})
+    paires = "< - [ ] Critère A\n> - [x] Critère A\n"
+
+    assert remplace(forge, tmp_path, paires) == 0
+    assert [json.loads(charge)["body"] for charge in forge.charges] == [
+        "- [x] Critère A\n- [x] Critère A\n"
+    ]
+    capsys.readouterr()
+
+    assert remplace(forge, tmp_path, paires) == 1
+    assert len(forge.charges) == 1, "le rejeu a écrit une seconde fois"
+    assert sortie_d_echec(capsys, "refus") == "refus — ligne en double (2) : - [x] Critère A"
+
+
 def test_brief_patch_paires_remplace_dans_le_commentaire_de_brief(tmp_path: Path) -> None:
     """Le brief est le seul commentaire ouvert par `## Brief d'agent` : ni la citation qui le
     nomme, ni le corps de l'issue ne sont touchés."""
@@ -670,10 +690,11 @@ def test_checkbox_patch_paires_sort_en_1_si_la_ligne_ecrite_manque_a_la_relectur
     assert capsys.readouterr().out == f"relecture non conforme — {ecart}\n"
 
 
-# Les états d'une ligne de case de plan de QA (`execution-qa/SKILL.md` §3 et §4), population
-# entière, faux positif compris (obs 138) : (ligne, en attente). Une case laissée `[ ]` n'attend
-# plus quand sa ligne porte un échec (`🔴`) ou un blocage (` — BLOQUÉ`) ; « bloqué » dans le texte
-# d'une case n'est pas un blocage.
+# Les états d'une ligne de case de plan de QA (`execution-qa/SKILL.md` §3, §4, §6 et « Passe
+# finale »), population entière, faux positifs compris (obs 138) : (ligne, en attente). Une case
+# laissée `[ ]` n'attend plus quand sa ligne porte un échec (`🔴`), un blocage (` — BLOQUÉ`) ou une
+# acceptation (` — accepté`) — une annotation de §3, étape 4, s'écrit ` — <marque>` ; « bloqué »
+# ou « accepté » dans le texte d'une case n'en est pas une.
 ETATS_DE_CASE = {
     "nue": ("- [ ] Le service répond", True),
     "passee": ("- [x] Le service répond — 200, 2026-10-26", False),
@@ -685,6 +706,8 @@ ETATS_DE_CASE = {
     "en-echec": ("- [ ] L'envoi 🔴 needs-issue — 500 au POST", False),
     "bug-depose": ("- [ ] L'envoi 🔴 BUG #12", False),
     "bloque-dans-le-texte": ("- [ ] Le bouton est bloqué pendant l'envoi", True),
+    "acceptee": ("- [ ] La purge — accepté : purge manuelle, 2026-10-26", False),
+    "accepte-dans-le-texte": ("- [ ] **Commande** — `curl -X POST $API/jobs` → 201 accepté", True),
     # Un blanc entre les crochets, une tabulation comprise, vaut non coché (GFM §5.3).
     "tabulation-entre-crochets": ("- [\t] Le service répond", True),
 }
