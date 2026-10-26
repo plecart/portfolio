@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from command_doubles import json_success, success
+from command_doubles import json_success, sortie_d_echec, success
 from skill_scripts import load_script, run_in_pipe
 from test_agent_skills import PLAN_QA_CASE_FORMS
 
@@ -40,9 +40,11 @@ LABELS_DU_DEPOT = "repos/{owner}/{repo}/labels?per_page=100"
 THEMES = "repos/{owner}/{repo}/milestones?state=all&per_page=100"
 # Le chemin où se crée un label du dépôt.
 NOUVEAU_LABEL = "repos/{owner}/{repo}/labels"
-# Le dépôt que crée `depot create plecart/vitrine`, et l'URL que `gh` en donne à `origin`.
+# Le dépôt que crée `depot create plecart/vitrine`, son URL HTTPS — celle que la forge témoin donne
+# à `origin` — et son URL SSH.
 DEPOT = "repos/plecart/vitrine"
 VITRINE = "https://github.com/plecart/vitrine.git"
+VITRINE_SSH = "git@github.com:plecart/vitrine.git"
 # Les seuls retraits de label auxquels la forge répond : chemin encodé → nom du label.
 RETRAITS = {
     "repos/{owner}/{repo}/issues/42/labels/ready-for-agent": "ready-for-agent",
@@ -247,15 +249,6 @@ def label_du_depot(
 def lance(forge: Forge, *args: str) -> int:
     """Le script tel que la session l'appelle."""
     return ecriture_relue.main(list(args), run=forge)
-
-
-def sortie_d_echec(capsys: pytest.CaptureFixture[str], issue: str) -> str:
-    """La sortie d'un échec : une seule ligne, ouverte par son issue — « refus » quand rien n'est
-    écrit, « relecture non conforme » quand l'écriture est lancée."""
-    sortie = capsys.readouterr().out.strip()
-    assert sortie.startswith(f"{issue} — "), sortie
-    assert "\n" not in sortie, f"la sortie tient en plus d'une ligne : {sortie!r}"
-    return sortie
 
 
 def test_checkbox_patch_coche_les_cases_nommees_et_relit_le_corps_entier() -> None:
@@ -1778,8 +1771,8 @@ DEPOTS_RELUS_EQUIVALENTS: dict[str, tuple[Callable[[Forge], None], str]] = {
         f"créé et relu — dépôt plecart/Vitrine (private), origin {VITRINE}",
     ),
     "origin-en-ssh": (
-        lambda forge: forge.remotes.update(origin="git@github.com:plecart/vitrine.git"),
-        "créé et relu — dépôt plecart/vitrine (private), origin git@github.com:plecart/vitrine.git",
+        lambda forge: forge.remotes.update(origin=VITRINE_SSH),
+        f"créé et relu — dépôt plecart/vitrine (private), origin {VITRINE_SSH}",
     ),
 }
 
@@ -1869,14 +1862,11 @@ DEPOTS_RELUS_NON_CONFORMES: dict[str, tuple[Callable[[Forge], None], str]] = {
     ),
     "origin-sur-un-autre-depot": (
         lambda forge: forge.remotes.update(origin="https://github.com/plecart/autre.git"),
-        (
-            "origin relu https://github.com/plecart/autre.git, attendu"
-            f" {VITRINE} ou git@github.com:plecart/vitrine.git"
-        ),
+        f"origin relu https://github.com/plecart/autre.git, attendu {VITRINE} ou {VITRINE_SSH}",
     ),
     "origin-absent": (
         lambda forge: forge.remotes.clear(),
-        f"origin relu None, attendu {VITRINE} ou git@github.com:plecart/vitrine.git",
+        f"origin relu None, attendu {VITRINE} ou {VITRINE_SSH}",
     ),
 }
 

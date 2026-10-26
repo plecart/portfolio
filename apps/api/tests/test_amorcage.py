@@ -16,7 +16,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import pytest
-from command_doubles import Reply, failure, success
+from command_doubles import Reply, failure, sortie_d_echec, success
 from skill_scripts import load_script, run_in_pipe
 
 amorcage = load_script("init-projet", "amorcage")
@@ -64,15 +64,6 @@ def git(*args: str) -> str:
 def lance(*args: str, run: Run | None = None) -> int:
     """Le script tel que la session l'appelle — avec le lanceur réel, sauf `run`."""
     return amorcage.main(list(args), run=run or amorcage.default_run)
-
-
-def sortie_d_echec(capsys: pytest.CaptureFixture[str], issue: str) -> str:
-    """La sortie d'un échec : une seule ligne, ouverte par son issue — « refus » quand rien n'est
-    écrit, « relecture non conforme » quand le geste est lancé."""
-    sortie = capsys.readouterr().out.strip()
-    assert sortie.startswith(f"{issue} — "), sortie
-    assert "\n" not in sortie, f"la sortie tient en plus d'une ligne : {sortie!r}"
-    return sortie
 
 
 def test_depot_init_cree_le_depot_sur_main_puis_le_relit(
