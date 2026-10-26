@@ -119,9 +119,10 @@ d'« Add labels to an issue » ne disent pas ce qu'elles font d'un label inconnu
 illisible, non UTF-8 ou sans ligne non vide — lu avant tout appel à la forge —, un fichier
 `--mapping` mal formé — chaque défaut nommé avec le rang de son label, tous en une passe, lu avant
 tout appel —, hors de l'arbre de travail d'un dépôt git — dans son `.git` compris —, un remote
-`origin` déjà là — son URL nommée —, une issue ouverte de ce titre et de ce corps sous d'autres labels — le rejeu d'une création dont la forge a ignoré
-les labels ; il nomme l'appel de `label` qui pose les manquants, et ceux en plus sans réparation :
-l'issue a pu être triée depuis sa création —, une issue déjà fermée sous une autre raison — une
+`origin` déjà là — son URL nommée —, une issue ouverte de ce titre et de ce corps sous d'autres
+labels — le rejeu d'une création dont la forge a ignoré les labels ; il nomme l'appel de `label`
+qui pose les manquants, et ceux en plus sans réparation : l'issue a pu être triée depuis sa
+création —, une issue déjà fermée sous une autre raison — une
 fermeture ne se réécrit pas, et l'API REST ignore `state_reason` quand `state` ne change pas
 (« Update an issue ») —, un milestone à rattacher fermé ou absent sans `--description` — un thème
 ne se crée pas sans son périmètre —, un milestone à fermer absent ou pas vidé, une lecture `gh`
