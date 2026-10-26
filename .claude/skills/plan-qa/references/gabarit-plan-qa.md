@@ -178,7 +178,7 @@ parcours **manuels** : la non-régression automatisée est le travail de la CI.
 
 ## Index des constats
 
-*(`execution-qa` ajoute les liens ici à mesure que les bugs sont déposés via `bug-vers-issue`.)*
+*(La session `bug-vers-issue` ajoute les liens ici à mesure qu'elle consigne les bugs de la campagne — son étape 7.)*
 
 - 🔴 #<numéro-issue-bug> — <titre court> — phase / bloc : `<emplacement>`
 ````

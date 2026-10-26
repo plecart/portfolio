@@ -1176,8 +1176,8 @@ relecture non conforme — motif en une ligne ; 2 : appel mal formé.
 pas les PR liées, la requête GraphQL du cas découpé reste. La famille sait aussi créer une
 issue, remplacer un corps, publier un brief, poser un label, fermer une issue, rattacher une
 issue à un milestone ou fermer un milestone ; son `--help` en porte le contrat. `triage`,
-`interroge-moi`, `vers-prd`, `vers-issues`, `repercussions`, `bug-vers-issue` et `plan-qa` les
-nomment ; les skills des lots 7b et 8 de #134 les nommeront. Toute écriture qu'il ne fait pas
+`interroge-moi`, `vers-prd`, `vers-issues`, `repercussions`, `bug-vers-issue`, `plan-qa` et
+`execution-qa` les nomment ; le skill du lot 8 de #134 les nommera. Toute écriture qu'il ne fait pas
 reste sous la règle « Écritures sur un artefact distant » de `.claude/rules/contraintes.md`, relue
 à la main.
 

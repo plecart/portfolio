@@ -4,7 +4,7 @@ Utiliser ceci pour publier un dépôt de preuve plus lourde en commentaire GitHu
 
 Sauter le commentaire pour les blocs verts triviaux (une Phase 0 de préflight qui a juste passé chaque garde-fou, par exemple) — les annotations en ligne sur chaque case en disent déjà assez.
 
-Publier avec : `gh issue comment <issue-plan> --body-file <commentaire.md>`.
+La session le rédige et le publie elle-même : `python .claude/skills/cycle-pr/scripts/ecriture-relue.py comment <plan> --body-file <commentaire.md>`, relu sous l'`id` publié. La preuve lourde — commandes, lignes BD, logs — vient du fichier où le `releveur` l'a rassemblée (`SKILL.md`, « Délégation »).
 
 ```markdown
 ## Phase / bloc : <nom>
@@ -17,7 +17,7 @@ Ne jamais lister une surface que le projet n'a pas, ni en déclarer une qui n'a 
 ### Commandes exécutées
 
 ```bash
-<copier-coller des commandes réelles que l'utilisateur a exécutées pendant ce bloc>
+<les commandes réellement exécutées pendant ce bloc, tirées du fichier du `releveur`>
 ```
 
 ### Preuve
@@ -44,7 +44,7 @@ Ne jamais lister une surface que le projet n'a pas, ni en déclarer une qui n'a 
 
 - <une puce par décision de politique prise par l'utilisateur, avec comportement choisi + date>
 
-### Constats déposés pendant ce bloc
+### Constats consignés pendant ce bloc
 
 - 🔴 #<issue-bug> — <titre>
 - 🔴 #<issue-bug> — <titre>

@@ -24,7 +24,7 @@ La session garde le jugement : les questions de clarification, le choix des issu
 
 Le mode se lit dans l'argument :
 
-1. **Piloté par un plan** — un numéro d'issue `qa-plan`, suivi de l'ancre de la case qui échoue et de l'intake d'échec écrit : un chemin de fichier, ou l'URL d'un commentaire de l'issue du plan. La session de QA démarre ce mode ; c'est le lot 7b de #134 qui fait produire l'intake écrit à `execution-qa`.
+1. **Piloté par un plan** — un numéro d'issue `qa-plan`, suivi de l'ancre de la case qui échoue et de l'intake d'échec écrit : un chemin de fichier, ou l'URL d'un commentaire de l'issue du plan. La session de QA démarre ce mode, avec l'intake qu'elle a écrit (`execution-qa`, §4).
 2. **Libre** — une description du bug, rencontré en utilisant l'application. Aucun plan QA à lier.
 
 Sans argument, la session s'arrête et demande la description ou la case.
@@ -116,7 +116,7 @@ En cas de découpage : le parent d'abord, puis les enfants un par un, dans l'ord
 - Affiche l'URL de chaque issue créée.
 - Si piloté par un plan, patche le corps de l'issue du plan QA — `🔴 needs-issue` → `🔴 BUG #<nouveau-numéro>` sur la case qui échoue, et une entrée à l'**Index des constats** en bas du corps — par `issue edit <plan> --body-file <fichier>` :
   - la session lit elle-même le corps courant, juste avant le patch, dans ce même `<fichier>` (`gh api repos/{owner}/{repo}/issues/<plan> --jq .body`, sans le LF final que `--jq` ajoute) ; il ne passe par le rapport d'aucun équipier, qui pourrait en convertir les fins de ligne ou les espaces (obs 87, 106) ;
-  - les remplacements se font en mémoire, par correspondance exacte de ligne complète, chaque ancienne ligne trouvée une seule fois, sinon s'arrêter et le dire au mainteneur (`execution-qa/references/patch-checkbox-gh.md`, « Construire le patch en mémoire » et « Détecter les éditions concurrentes » — leurs règles de correspondance seules : sa lecture et son push sont ceux de cette étape) ;
+  - les remplacements se font en mémoire, par correspondance exacte de ligne complète, chaque ancienne ligne trouvée une seule fois, sinon s'arrêter et le dire au mainteneur (`execution-qa/references/patch-checkbox-gh.md`, « Correspondance par ligne complète » et « Détecter les éditions concurrentes » — leurs règles de correspondance seules : sa lecture et son push sont ceux de cette étape) ;
   - l'entrée s'insère après la dernière ligne de l'Index des constats, ancrée sur sa ligne de titre, trouvée de même une seule fois ;
   - le résultat est écrit tel quel dans le fichier, ses fins de ligne gardées : le script relit contre ce fichier et ne voit pas une conversion (obs 87).
 - Dis au mainteneur que le bug est consigné et que le plan a été mis à jour.
