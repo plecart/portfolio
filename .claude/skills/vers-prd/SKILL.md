@@ -6,7 +6,7 @@ argument-hint: "[périmètre du PRD — vide pour tout le contexte courant]"
 
 Ce skill prend le contexte de la conversation actuelle — le dialogue avec le mainteneur dans cette session — ainsi que la compréhension de la base de code et produit un PRD — sur le périmètre passé en argument, ou sur tout le contexte courant sans argument. Ne pas interroger l'utilisateur sur le **contenu produit** — c'est une synthèse de ce qui est déjà su. Le **seul** point de validation est celui de l'étape 2 (liste des modules et périmètre de tests), présenté **en une fois**, avec une recommandation par question. Si le contexte est un corpus documentaire clos, les interprétations posées (là où deux documents semblent diverger) font partie de cette validation unique.
 
-Le dépôt GitHub et le mapping de labels doivent être dans `.claude/pipeline.config.md` — sinon lancer le skill `init-projet`.
+Le dépôt GitHub et le mapping de labels doivent être dans `.claude/pipeline.config.md` — sinon s'arrêter et proposer une session `init-projet` distincte (`init-projet`, « Note pour les autres skills »).
 
 ## Délégation
 

@@ -19,8 +19,9 @@ contradiction `[C]`, elle arrête (`.claude/rules/contraintes.md`).
 
 **Commandes du projet.** Ce skill ne présuppose aucune stack : les commandes `test`, `test ciblé`,
 `lint`, `format`, `typecheck` et `build` se lisent dans la section « Commandes du projet » de
-`.claude/pipeline.config.md`. Une étape marquée `n/a` s'ignore. Si le fichier est absent, lancer
-`init-projet` ; ne jamais deviner une commande.
+`.claude/pipeline.config.md`. Une étape marquée `n/a` s'ignore. Si le fichier est absent,
+s'arrêter et proposer une session `init-projet` distincte (`init-projet`, « Note pour les autres
+skills ») ; ne jamais deviner une commande.
 
 **Vague parallèle.** Si le prompt de démarrage de cette session vient d'une autre session — bloc
 `<cross-session-message>`, ou session parente nommée par le prompt système
@@ -1177,10 +1178,10 @@ pas les PR liées, la requête GraphQL du cas découpé reste. La famille sait a
 issue, remplacer un corps, publier un brief, poser un label, fermer une issue, rattacher une
 issue à un milestone, fermer un milestone, créer les labels d'un dépôt ou créer le dépôt ; son
 `--help` en porte le contrat. `triage`,
-`interroge-moi`, `vers-prd`, `vers-issues`, `repercussions`, `bug-vers-issue`, `plan-qa` et
-`execution-qa` les nomment ; le skill du lot 8 de #134 les nommera. Toute écriture qu'il ne fait pas
-reste sous la règle « Écritures sur un artefact distant » de `.claude/rules/contraintes.md`, relue
-à la main.
+`interroge-moi`, `vers-prd`, `vers-issues`, `repercussions`, `bug-vers-issue`, `plan-qa`,
+`execution-qa` et `init-projet` (`depot create`, `label create`) les nomment. Toute écriture qu'il
+ne fait pas reste sous la règle « Écritures sur un artefact distant » de
+`.claude/rules/contraintes.md`, relue à la main.
 
 Le merge **clôt l'issue liée** (via `Closes #N`). **Retirer aussitôt son label d'état** —
 `ready-for-agent` ou `ready-for-human`, selon le mapping de `.claude/pipeline.config.md` :

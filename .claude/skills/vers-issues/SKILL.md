@@ -8,7 +8,7 @@ argument-hint: "[#issue-prd | chemin/vers/plan.md]"
 
 Découpe un plan en issues indépendamment récupérables en utilisant des tranches verticales (tracer bullets).
 
-Le dépôt GitHub et le mapping de labels sont dans `.claude/pipeline.config.md` — sinon lancer `init-projet`.
+Le dépôt GitHub et le mapping de labels sont dans `.claude/pipeline.config.md` — sinon s'arrêter et proposer une session `init-projet` distincte (`init-projet`, « Note pour les autres skills »).
 
 ## Délégation
 

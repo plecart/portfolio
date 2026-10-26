@@ -12,7 +12,8 @@ branche distincts, partageant le même dépôt `.git`). Chaque worktree se déve
 session Claude Code**, en suivant `cycle-pr` : une session que le lead démarre lui-même, selon le
 protocole des sessions liées (`.claude/skills/cycle-pr/references/sessions-liees.md`).
 
-Prérequis : `.claude/pipeline.config.md` existe (sinon lancer `init-projet`).
+Prérequis : `.claude/pipeline.config.md` existe — sinon s'arrêter et proposer une session
+`init-projet` distincte (`init-projet`, « Note pour les autres skills »).
 
 ## Quand l'utiliser
 
