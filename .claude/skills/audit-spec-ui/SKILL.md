@@ -105,9 +105,7 @@ N−k vérifiées indemnes » — jamais « les findings sont corrigés ».
 
 ## Avant de livrer — vérification obligatoire
 
-Le livrable de l'audit est le rapport : la session le présente au mainteneur et s'arrête jusqu'à
-son go — aucune correction avant (« Appliquer les corrections »). Relire cette liste et confronter
-le livrable à chaque point :
+Relire cette liste et confronter le livrable à chaque point :
 
 - [ ] Périmètre et autorité annoncés en tête (étape 0.3).
 - [ ] Les six passes mécaniques exécutées — ou marquées « sans objet » avec la raison, une ligne
