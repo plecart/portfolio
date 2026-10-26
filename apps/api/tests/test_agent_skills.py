@@ -4220,9 +4220,10 @@ def test_chaque_case_d_un_plan_de_qa_porte_son_type(fichier: str) -> None:
 
     **Population** : les cases des deux fichiers de `PLAN_QA_PLANS` ; sur `4b51a71`, **34** et
     **26**, **0** typée — vu rouge là. Au lot 7a, les critères d'acceptation d'un bloc sortent des
-    cases (`- **C<k>** — …`) : **32** et **22**, toutes typées. **Ce que la garde ne voit pas** :
-    une commande fausse mais bien formée, un attendu vague — la marque dit qui joue la case, pas
-    que la case est juste.
+    cases (`- **C<k>** — …`) : **32** et **22**, toutes typées ; **23** dans l'exemple quand sa
+    première case garde le corps de l'upload pour les suivantes. **Ce que la garde ne voit
+    pas** : une commande fausse mais bien formée, un attendu vague — la marque dit qui joue la
+    case, pas que la case est juste.
     """
     texte = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8")
 
