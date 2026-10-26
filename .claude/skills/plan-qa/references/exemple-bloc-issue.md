@@ -27,12 +27,13 @@ L'exemple porte sur une issue hypothétique `#127 — L'upload de document de co
 - **C4** — L'utilisateur B ne peut pas voir le document uploadé par l'utilisateur A.
 
 **Vérifications Backend / API** :
-- [ ] **Commande** — `curl -s -w '\n%{http_code}\n' -H "Authorization: Bearer $TOKEN_A" -F file=@fixtures/valid-1mb.pdf https://app.local/api/clients/$CLIENT_A_ID/knowledge` → le corps a `id` (à garder en `$DOC_ID`), `original_filename`, `status: "pending_extraction"`, puis `201` (C1).
+- [ ] **Commande** — `curl -s -o $QA_RUN/upload.json -w '%{http_code}' -H "Authorization: Bearer $TOKEN_A" -F file=@fixtures/valid-1mb.pdf https://app.local/api/clients/$CLIENT_A_ID/knowledge` → `201`, le corps écrit dans `$QA_RUN/upload.json` (C1).
+- [ ] **Commande** — `jq -c '{id, original_filename, status}' $QA_RUN/upload.json` → `id` renseigné, `original_filename` à `valid-1mb.pdf`, `status` à `pending_extraction` ; les cases suivantes relisent cet `id` dans ce fichier (C1).
 - [ ] **Commande** — `curl -s -w '\n%{http_code}\n' -H "Authorization: Bearer $TOKEN_A" -F file=@fixtures/oversized-30mb.pdf https://app.local/api/clients/$CLIENT_A_ID/knowledge` → le corps a `error: "FILE_TOO_LARGE"`, `max_bytes: 26214400`, puis `413` (C2).
 - [ ] **Commande** — `curl -s -w '\n%{http_code}\n' -H "Authorization: Bearer $TOKEN_A" -F file=@fixtures/png-renamed-as-pdf.pdf https://app.local/api/clients/$CLIENT_A_ID/knowledge` → le corps a `error: "INVALID_MAGIC_BYTES"`, puis `422` (C3).
 - [ ] **Commande** — `curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN_B" https://app.local/api/clients/$CLIENT_A_ID/knowledge` → `403`, inter-locataires (C4).
-- [ ] **Commande** — `curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN_B" https://app.local/api/clients/$CLIENT_A_ID/knowledge/$DOC_ID` → `404`, politique anti-énumération (décision projet : 404 plutôt que 403) (C4).
-- [ ] **Commande** — `docker compose logs --tail=200 api | grep -c 'POST /api/clients/.*/knowledge.* 500'` → affiche `0` : aucun 500 sur les échecs de validation.
+- [ ] **Commande** — `curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN_B" https://app.local/api/clients/$CLIENT_A_ID/knowledge/$(jq -r .id $QA_RUN/upload.json)` → `404`, politique anti-énumération (décision projet : 404 plutôt que 403) (C4).
+- [ ] **Commande** — `docker compose logs --tail=200 api | grep -c 'POST /api/clients/.*/knowledge.* 500'` → affiche `0` (code `1` : `grep` sans correspondance) : aucun 500 sur les échecs de validation.
 
 **Vérifications Frontend** :
 - [ ] **Observation** — ouvrir `https://app.local/clients/$CLIENT_A_ID/knowledge` en utilisateur A, session vierge → la page de connaissances du client A s'affiche.
@@ -48,13 +49,13 @@ L'exemple porte sur une issue hypothétique `#127 — L'upload de document de co
 **Vérifications BDD / stockage** :
 - [ ] **Commande** — `docker compose exec db psql -U app -c "select id, client_id, status, error, finished_at from knowledge_documents where client_id = '$CLIENT_A_ID'"` → une ligne, `status` à `ready` (ou transitoirement `pending_extraction` pendant le polling), `error` vide (C1).
 - [ ] **Commande** — `docker compose exec db psql -U app -c "select count(*) from knowledge_documents where original_filename like '%oversized%' or original_filename like '%png-renamed%'"` → `0` : aucune ligne pour les tentatives rejetées (C2, C3).
-- [ ] **Commande** — `cmp storage/clients/$CLIENT_A_ID/knowledge/$DOC_ID/original.pdf fixtures/valid-1mb.pdf` → aucune sortie, code `0` : l'original est préservé octet pour octet (C1).
-- [ ] **Commande** — `ls storage/clients/$CLIENT_A_ID/knowledge/` → `$DOC_ID` seul : aucun objet de stockage pour les tentatives rejetées (C2, C3).
+- [ ] **Commande** — `cmp storage/clients/$CLIENT_A_ID/knowledge/$(jq -r .id $QA_RUN/upload.json)/original.pdf fixtures/valid-1mb.pdf` → aucune sortie, code `0` : l'original est préservé octet pour octet (C1).
+- [ ] **Commande** — `ls storage/clients/$CLIENT_A_ID/knowledge/` → un seul dossier, l'`id` du document valide : aucun objet de stockage pour les tentatives rejetées (C2, C3).
 
 **Vérifications Worker / logs** :
 - [ ] **Commande** — `docker compose logs --tail=200 api | grep -E 'knowledge_upload_rejected|Traceback'` → deux lignes `knowledge_upload_rejected`, une pour la taille, une pour les magic bytes, et aucune `Traceback` (C2, C3).
-- [ ] **Commande** — `docker compose logs --tail=200 worker | grep $DOC_ID` → le job d'extraction du PDF valide passe de `started` à `completed` (C1).
-- [ ] **Commande** — `docker compose logs --tail=200 api worker | grep -c 'Unhandled exception'` → affiche `0`.
+- [ ] **Commande** — `docker compose logs --tail=200 worker | grep "$(jq -r .id $QA_RUN/upload.json)"` → le job d'extraction du PDF valide passe de `started` à `completed` (C1).
+- [ ] **Commande** — `docker compose logs --tail=200 api worker | grep -c 'Unhandled exception'` → affiche `0` (code `1` : `grep` sans correspondance).
 
 **Règle d'arrêt** : Un 500 sur tout upload rejeté, ou une ligne créée pour un upload rejeté, est **bloquant** — déposer via `bug-vers-issue` et ne pas continuer les blocs de fonctionnalité qui dépendent de la bonne isolation des documents de connaissance.
 

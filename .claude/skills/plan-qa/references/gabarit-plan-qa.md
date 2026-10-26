@@ -92,8 +92,8 @@ utilisateur. Sinon, elle n'apparaît pas dans le plan.)*
 - [ ] **Observation** — une session à l'authentification invalide, puis expirée → refus attendu,
       session vidée côté client.
 - [ ] **Commande** — `<liste des ressources avec le jeton du compte A>` → volume attendu.
-- [ ] **Commande** — `<liste, lecture, modification, export du compte A, jeton du compte B>` → code
-      conforme à la politique anti-énumération du projet.
+- [ ] **Commande** — `<un geste — liste, lecture, modification ou export — sur le compte A, jeton du compte B>` → code
+      conforme à la politique anti-énumération du projet, une case par geste.
 - [ ] **Commande** — `<journaux du serveur, queue bornée>` → aucune erreur serveur sur les refus.
 - [ ] **Commande** — `<requête sur les ressources du compte A>` → aucune donnée croisée persistée
       pendant les actions rejetées.
