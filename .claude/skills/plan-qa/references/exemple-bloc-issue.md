@@ -72,7 +72,7 @@ L'exemple porte sur une issue hypothétique `#127 — L'upload de document de co
 
 - Chaque critère d'acceptation de l'issue est mappé à au moins une vérification explicite.
 - Chaque case porte son type et son attendu : **Commande**, une commande copiable telle quelle, ou **Observation**, ce qui se juge avec le mainteneur ; elle cite en fin de texte les critères `C<k>` qu'elle couvre.
-- Chaque vérification backend épingle la route et le code de statut, et un champ de corps spécifique quand la réponse en porte un.
+- Chaque appel d'API épingle la route et le code de statut, et un champ de corps spécifique quand la réponse en porte un — affiché, ou relu dans le fichier où la case l'écrit.
 - Les vérifications frontend couvrent les états vide, chargement, succès, erreur — plus le comportement de polling — et s'ancrent à une vraie URL.
 - Les vérifications BDD et stockage incluent la vraie table et la vraie disposition des chemins (vérifiée contre le diff).
 - Les vérifications worker / logs bornent la queue de logs et nomment la ligne de log attendue.
