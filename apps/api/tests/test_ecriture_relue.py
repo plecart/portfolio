@@ -444,7 +444,7 @@ PAIRES_REFUSEES = {
         "<- [ ] Critère A\n>- [x] Critère A\n",
         (
             "ligne 1 : ni vide, ni « < … », ni « > … » ; ligne 2 : ni vide, ni « < … », ni « > … »"
-            " ; aucun couple dans le fichier"
+            " ; aucune paire dans le fichier"
         ),
     ),
     "ancienne-suivie-d-une-ancienne": (
@@ -483,8 +483,8 @@ PAIRES_REFUSEES = {
         "< - [x] Critère A\n> - [x] Critère A — passé\n< - [ ] Critère A\n> - [x] Critère A\n",
         "ligne 4 : nouvelle ligne qui est l'ancienne de la ligne 1",
     ),
-    "fichier-vide": ("", "aucun couple dans le fichier"),
-    "lignes-de-blancs-seules": ("\n  \r\n", "aucun couple dans le fichier"),
+    "fichier-vide": ("", "aucune paire dans le fichier"),
+    "lignes-de-blancs-seules": ("\n  \r\n", "aucune paire dans le fichier"),
     "tous-nommes-dans-l-ordre-du-fichier": (
         "note libre\n< - [ ] Critère A\n> - [ ] Critère A\n> - [x] Critère B\n",
         (
