@@ -6,7 +6,7 @@ argument-hint: "[\"Thème\" | #issues couvertes par la QA]"
 
 # Rédacteur de plan de QA
 
-Construis un plan de QA exhaustif et exécutable, cadré sur un lot de travaux précis, et publie-le sous forme d'issue GitHub avec un corps à cases à cocher. Le plan est ensuite exécuté par `execution-qa`, et les bugs trouvés pendant l'exécution sont déposés par `bug-vers-issue`.
+Construis un plan de QA exhaustif et exécutable, cadré sur un lot de travaux précis, et publie-le sous forme d'issue GitHub avec un corps à cases à cocher. Le plan est ensuite exécuté par `execution-qa`, et les échecs trouvés pendant l'exécution sont qualifiés par `bug-vers-issue`, qui ne consigne en issue que le défaut à étudier.
 
 ## Principe fondamental
 

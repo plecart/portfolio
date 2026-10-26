@@ -121,7 +121,9 @@ l'issue dès les outils éprouvés :
   la première ligne de code, puis reporter ses décisions, écrites dans l'issue, dans les
   « Décisions verrouillées » du briefing.
 - **Demande directe sans issue** → l'interrogatoire s'applique aussi ; il n'y a pas de raccourci
-  parce que le travail n'a pas de ticket.
+  parce que le travail n'a pas de ticket. Un correctif évident — visible à la lecture, sans
+  décision de comportement (`contraintes.md`, barreau 3) — n'a rien à interroger : sa
+  qualification, écrite dans le body de la draft avec sa preuve, en tient lieu.
 
 Le point n'est pas de cocher une case : c'est que **les décisions tranchées soient écrites**, dans
 l'issue — brief amendé s'il est contredit — et dans le briefing. Elles seront relues par une
@@ -284,7 +286,11 @@ La PR draft porte **dès sa création** :
 - Le marqueur **draft**, qui dit « en cours, ne pas reviewer » et interdit le merge accidentel.
 
 Pour une **demande directe sans issue**, ouvrir quand même la draft : sans `Closes`, mais le
-travail reste visible du reste de la pipeline.
+travail reste visible du reste de la pipeline. Née d'un échec de QA (case
+` 🔴 correctif évident — …`), la draft ouverte, la session remplace ce marqueur par ` 🔴 PR #<M>`
+sur la case, par une paire
+(`python .claude/skills/cycle-pr/scripts/ecriture-relue.py checkbox patch <plan> --paires <fichier>`,
+`execution-qa/references/patch-checkbox-gh.md`) : c'est ce que lit la reprise de la QA.
 
 > **La CI tourne sur chaque push de la branche, draft comprise** — sauf à l'ouverture de la draft
 > elle-même, dont l'amorce vide n'a rien à vérifier (garde `if:` du `ci.yml` du template). Le
