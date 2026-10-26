@@ -1156,6 +1156,15 @@ def test_label_create_lit_les_labels_du_depot_sur_toutes_les_pages(
     assert capsys.readouterr().out == "rien à écrire — labels du dépôt : qa-plan présent\n"
 
 
+def test_label_create_accepte_une_description_de_100_caracteres(tmp_path: Path) -> None:
+    """La borne est comprise : une description « must be 100 characters or fewer » (« Create a
+    label », API REST) ; 101 est refusé (`description-trop-longue`)."""
+    forge = Forge({})
+
+    assert lance(forge, *cree_labels(tmp_path, ("qa-plan", "0e8a16", "x" * 100))) == 0
+    assert [json.loads(charge)["description"] for charge in forge.charges] == ["x" * 100]
+
+
 UN_LABEL = {"nom": "bug", "couleur": "d73a4a", "description": "catégorie"}
 # Chaque défaut d'un fichier `--mapping`, un champ et un type à la fois : (contenu — octets tels
 # quels, document écrit en JSON, ou `None` sans fichier —, motif).
