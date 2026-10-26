@@ -596,7 +596,7 @@ def read_pairs(path: Path) -> list[Pair]:
     defects = sorted([*strays, *pair_defects(pairs)])
     motifs = [f"ligne {number} : {defect}" for number, defect in defects]
     if not pairs:
-        motifs.append("aucun couple dans le fichier")
+        motifs.append("aucune paire dans le fichier")
     if motifs:
         raise Refusal(f"{path} : {' ; '.join(motifs)}")
     return pairs
