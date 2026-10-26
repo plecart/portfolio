@@ -13,7 +13,7 @@ La session de QA ne corrige jamais : un échec se consigne (`SKILL.md` §4, opti
 
 ## La reprise de la case
 
-La case ne se rejoue pas dans la session qui a corrigé : elle se rejoue dans une session de QA — neuve, ou celle de la campagne réveillée par message —, une fois la correction mergée et l'issue fermée (`SKILL.md` §2, « La reprise »). Passée, elle bascule en `- [x]` avec ` — corrigé par #<PR>, <date>`.
+La case ne se rejoue pas dans la session qui a corrigé : elle se rejoue dans une session de QA neuve, démarrée sur le numéro du plan une fois la correction mergée, dont le §2 trouve la case (`SKILL.md` §2, « La reprise »). Passée, la ligne entière devient `- [x] <texte de la case> — corrigé par #<PR>, <date>`, **sans** `🔴 BUG #N`.
 
 ## Inacceptable
 

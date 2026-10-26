@@ -16,7 +16,7 @@ Usage :
 La règle « Écritures sur un artefact distant » de `contraintes.md` veut que toute écriture sur la
 forge se relise ; ce script tient cette relecture pour les gestes de `cycle-pr` Étape 8, le
 commentaire de répercussion de son Étape 6, la création d'une issue, la transition de ses labels,
-sa fermeture et son thème, et la copie de travail d'`execution-qa` (#134, lots 4a, 4b, 6a1 et 7).
+sa fermeture et son thème, et le plan de QA d'`execution-qa` (#134, lots 4a, 4b, 6a1 et 7).
 Chaque sous-commande lit par `gh api` — octets décodés en UTF-8, jamais le mode texte, qui traduit
 les fins de ligne, ni la page de code de la console (obs 87, 106, 108, 116) —, écrit, puis relit
 par le même canal ; `checkbox next` lit seulement. Un texte s'écrit par
@@ -50,7 +50,7 @@ l'attendu : une forme réduite, longueur ou ancre, ne voit pas une conversion qu
   (`ligne en double (<n>)`) au lieu de la dire déjà appliquée ;
 - `checkbox next` lit la prochaine case en attente du corps de `<N>`, un plan de QA, sans rien
   écrire — la seule lecture de la famille, où le lot 7 de #134 range la prochaine case
-  d'`execution-qa` avec sa copie de travail ; les dix autres sous-commandes écrivent chacune au
+  d'`execution-qa` avec le patch de ses cases ; les dix autres sous-commandes écrivent chacune au
   premier appel, dénombrées par `REJEUX` (`test_ecriture_relue.py`). Une case est une ligne de
   case GFM, `PLAN_QA_CASE` de `test_agent_skills.py` ; elle attend quand un blanc la laisse non
   cochée et que sa ligne ne porte ni `🔴`, ni ` — BLOQUÉ`, ni ` — accepté`

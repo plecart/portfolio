@@ -170,8 +170,8 @@ parcours **manuels** : la non-régression automatisée est le travail de la CI.
 - [ ] **Observation** — chaque bloc de fonctionnalité → entièrement traité.
 - [ ] **Observation** — chaque constat bloquant → corrigé, ou explicitement accepté avec la
       décision consignée.
-- [ ] **Observation** — chaque constat majeur → un lien `🔴 BUG #N` ou une décision `reporté`
-      explicite.
+- [ ] **Observation** — chaque constat majeur → un lien vers son issue de bug consignée ou une
+      décision `reporté` explicite.
 - [ ] **Observation** — les actions en échec → rejouées après correction.
 
 ---

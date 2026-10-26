@@ -4012,8 +4012,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         (
             "**sessions distinctes** — la consignation d'un échec (`bug-vers-issue`, §4, option"
             " (a)), sa correction (`cycle-pr`, option (c)), et la reprise de la case corrigée : une"
-            " session de QA — neuve, ou celle de la campagne réveillée par message —, jamais la"
-            " suite du contexte qui a corrigé"
+            " session de QA neuve, démarrée sur le numéro du plan une fois la correction mergée,"
+            " dont le §2 trouve la case — jamais la suite du contexte qui a corrigé"
         ),
     ),
     "7b2-execution-qa-etat-a-la-forge": (
@@ -4033,8 +4033,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         (
             "`python .claude/skills/cycle-pr/scripts/ecriture-relue.py checkbox next <plan>` rend le"
             " titre de son bloc, puis sa ligne : la première case `- [ ]` qui ne porte ni `🔴`, ni"
-            " ` — BLOQUÉ`, ni ` — accepté` (§3, étape 4, et §4). Sans case en attente, passer au"
-            " §6."
+            " ` — BLOQUÉ`, ni ` — accepté` (§3, étape 4, et §4). En mode de repli markdown, la"
+            " première case `- [ ]` du fichier qui ne porte aucune de ces marques, lue par `Read`."
+            " Sans case en attente, passer au §6."
         ),
     ),
     "7b2-execution-qa-bloc-lu-par-la-session": (
@@ -4062,10 +4063,14 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7b2-execution-qa-reprise": (
         EXECUTION_QA_SKILL,
         (
-            "les cases `🔴 BUG #N` dont l'issue est fermée se rejouent (§4, option (c)). La session"
-            ' les trouve dans le corps (`gh issue view <plan> --json body -q .body | grep -n "BUG #"`)'
-            " ; l'état de chaque issue, et la PR qui l'a fermée, sont un relevé du `releveur`"
-            " (`gh issue view <N> --json state,closedByPullRequestsReferences`)."
+            "les cases `🔴 BUG #N` dont l'issue est fermée par une PR"
+            " (`closedByPullRequestsReferences` non vide) se rejouent (§4, option (c)) ; une issue"
+            " fermée sans PR — wontfix, doublon — ne se rejoue pas. La session les trouve dans le"
+            ' corps (`gh issue view <plan> --json body -q .body | grep -n "BUG #"`) ; l\'état de'
+            " chaque issue, et la PR qui l'a fermée, sont un relevé du `releveur`"
+            " (`gh issue view <N> --json state,closedByPullRequestsReferences`). Passée, la ligne"
+            " entière devient `- [x] <texte de la case> — corrigé par #<PR>, <date>`, **sans**"
+            " `🔴 BUG #N`."
         ),
     ),
     "7b2-execution-qa-commande-au-releveur": (
@@ -4095,7 +4100,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "7b2-execution-qa-verdict-en-paire": (
         EXECUTION_QA_SKILL,
-        "**Décider de la case** — chaque verdict s'écrit en paire dans le fichier du bloc (étape 5)",
+        (
+            "**Décider de la case** — chaque verdict s'écrit en paire dans un fichier que le script"
+            " n'a pas encore appliqué (étape 5)"
+        ),
     ),
     "7b2-execution-qa-accepte": (
         EXECUTION_QA_SKILL,
@@ -4134,14 +4142,17 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         EXECUTION_QA_SKILL,
         (
             "Annoter la ligne ` 🔴 needs-issue — <résumé sur une ligne>`, par une paire appliquée"
-            " tout de suite (§3, étape 5), pour que l'échec soit visible sur l'issue. 2. **Écrire**"
-            " l'intake de l'échec avec `references/gabarit-intake-echec.md` — les champs sans"
-            " contenu supprimés, pas laissés vides — et le publier en commentaire de l'issue du"
-            " plan : `python .claude/skills/cycle-pr/scripts/ecriture-relue.py comment <plan>"
-            " --body-file <intake>`. Son URL se compose de l'`id` que rend la sortie :"
+            " tout de suite, seule dans son propre fichier — celui des autres verdicts attend la"
+            " fin du bloc (§3, étape 5) —, pour que l'échec soit visible sur l'issue."
+            " 2. **Écrire** l'intake de l'échec avec `references/gabarit-intake-echec.md` — les"
+            " champs sans contenu supprimés, pas laissés vides —, dans un fichier du scratchpad de"
+            " la session, jamais dans l'arbre de la campagne (§3, étape 6), et le publier en"
+            " commentaire de l'issue du plan : `python"
+            " .claude/skills/cycle-pr/scripts/ecriture-relue.py comment <plan> --body-file"
+            " <intake>`. Son URL se compose de l'`id` que rend la sortie :"
             " `https://github.com/<owner>/<repo>/issues/<plan>#issuecomment-<id>`. En mode de"
-            " repli markdown, l'intake est un fichier hors de tout worktree éphémère, et son chemin"
-            " tient lieu d'URL."
+            " repli markdown, l'intake est un fichier hors de l'arbre de la campagne et de tout"
+            " worktree éphémère, et son chemin tient lieu d'URL."
         ),
     ),
     "7b2-execution-qa-consigner-dans-une-session-distincte": (
@@ -4187,8 +4198,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " <décision>, <date>`. - Vérifier que chaque constat bloquant a un lien `🔴 BUG #N`"
             " (consigné) ou une annotation ` — accepté : <décision>, <date>`. - Faire relancer par"
             " le `releveur` les commandes finales listées dans le plan, après toute correction"
-            " mergée. - Appliquer le dernier patch (§3, étape 5) : aucune décision ne reste hors de"
-            " l'issue."
+            " mergée. - Appliquer les dernières paires, dans un fichier neuf (§3, étape 5) : aucune"
+            " décision ne reste hors de l'issue."
         ),
     ),
     "7b2-execution-qa-decision-ou-accepte": (
@@ -4259,10 +4270,12 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         INTAKE_ECHEC_REF,
         (
             "L'intake s'**écrit** : en commentaire de l'issue du plan, publié par `comment <plan>"
-            " --body-file` (`SKILL.md` §4, étape 2), ou, en mode de repli markdown, dans un fichier"
-            " hors de tout worktree éphémère. La session `bug-vers-issue` distincte qui le consomme"
-            " le reçoit en argument — son URL ou son chemin — quand l'utilisateur choisit l'option"
-            " (a) « consigner maintenant » : elle ne lit rien d'autre de la session de QA."
+            " --body-file` depuis un fichier du scratchpad de la session, jamais de l'arbre de la"
+            " campagne (`SKILL.md` §4, étape 2), ou, en mode de repli markdown, dans un fichier hors"
+            " de l'arbre de la campagne et de tout worktree éphémère. La session `bug-vers-issue`"
+            " distincte qui le consomme le reçoit en argument — son URL ou son chemin — quand"
+            " l'utilisateur choisit l'option (a) « consigner maintenant » : elle ne lit rien"
+            " d'autre de la session de QA."
         ),
     ),
     "7b2-patch-checkbox-etat-a-la-forge": (
@@ -4285,7 +4298,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         PATCH_CHECKBOX_REF,
         (
             "une paire `(ancienne_ligne, nouvelle_ligne)` : une ligne `< <ancienne>`, puis une ligne"
-            " `> <nouvelle>`, dans un fichier UTF-8"
+            " `> <nouvelle>`, dans un fichier UTF-8 du scratchpad de la session, jamais dans"
+            " l'arbre de la campagne, dont `SKILL.md` §2 préserve le `git status`."
         ),
     ),
     "7b2-patch-checkbox-ancienne-lue-par-la-session": (
@@ -4328,7 +4342,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             "Patcher à la fin d'une phase ou d'un bloc par issue (ou à la fin d'un sous-groupe"
             " significatif au sein d'un bloc long). Ne pas patcher après chaque bascule de case —"
             " cela gonfle l'historique de l'issue et augmente la surface de risque d'édition"
-            " concurrente. Pour un bloc de longue durée, patcher périodiquement de toute façon"
+            " concurrente. Exception : la paire d'un échec, appliquée tout de suite, seule dans son"
+            " propre fichier (`SKILL.md` §4, étape 1). Pour un bloc de longue durée, patcher"
+            " périodiquement de toute façon"
         ),
     ),
     "7b2-patch-checkbox-repli-sans-script": (
@@ -4359,9 +4375,74 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         CORRECTION_BUG_REF,
         (
             "La case ne se rejoue pas dans la session qui a corrigé : elle se rejoue dans une"
-            " session de QA — neuve, ou celle de la campagne réveillée par message —, une fois la"
-            " correction mergée et l'issue fermée (`SKILL.md` §2, « La reprise »). Passée, elle"
-            " bascule en `- [x]` avec ` — corrigé par #<PR>, <date>`."
+            " session de QA neuve, démarrée sur le numéro du plan une fois la correction mergée,"
+            " dont le §2 trouve la case (`SKILL.md` §2, « La reprise »). Passée, la ligne entière"
+            " devient `- [x] <texte de la case> — corrigé par #<PR>, <date>`, **sans**"
+            " `🔴 BUG #N`."
+        ),
+    ),
+    # Passe 1 de relecture de la PR #159 (2026-10-26) : **15** moitiés restrictives ajoutées à la
+    # prose, par la forme (`git diff -U0 --word-diff=plain d99e9a8 -- .claude/skills/execution-qa
+    # .claude/skills/plan-qa`), toutes épinglées — ci-dessous, ou dans l'entrée du lot qu'elle met
+    # à jour. I1 : un fichier de paires rejoué après que la session `bug-vers-issue` a réécrit
+    # `🔴 needs-issue` en `🔴 BUG #N` est refusé en entier, ses paires valides comprises, sur une
+    # « ligne la plus proche » qui nomme une autre case quand celle-ci ressemble plus — mesuré le
+    # 2026-10-26 par `replace_lines` sur un bloc de trois cases. Classe : un site d'`execution-qa`
+    # qui applique un fichier de paires. Dénombrement par la forme du geste (obs 139), écrit avant
+    # le correctif, sur `d99e9a8` — `checkbox patch`, « paire », « patch » dans ses cinq fichiers,
+    # plus la reprise que le brief de la passe nomme : **16** sites. **6** exposés au rejeu, une
+    # épingle chacun, qui prescrit le fichier neuf — `SKILL.md` §3, étape 4 (« le fichier du
+    # bloc », `7b2-execution-qa-verdict-en-paire`), étape 5 (muette sur le réemploi,
+    # `7b2-execution-qa-un-fichier-par-application`), §4, étape 1 (la paire d'échec, appliquée par
+    # l'étape 5, donc dans le fichier du bloc, `7b2-execution-qa-echec-annote-et-intake-ecrit`), §6
+    # (« le dernier patch », `7b2-execution-qa-termine-accepte`) ; `patch-checkbox-gh.md` §1 (muet,
+    # `7b2-patch-checkbox-un-fichier-par-application`), §5 (la cadence par bloc, sans l'exception
+    # du §4, `7b2-patch-checkbox-cadence`). **2** exposés par renvoi seulement, sans épingle
+    # propre — la reprise, `SKILL.md` §2 et `standard-correction-bug.md`, quand elle revenait à la
+    # session de la campagne réveillée, son fichier de bloc en main : fermée par l'étape 5 et par
+    # la session neuve (m3). **8** indemnes : `SKILL.md` « Délégation » (nomme l'outil), §1 et
+    # l'en-tête de `patch-checkbox-gh.md` (« chaque mise à jour est un fichier »), « Passe finale »
+    # (vérifie, n'applique rien), « Erreurs courantes » (l'outil contre le patch à la main) ;
+    # `patch-checkbox-gh.md` §3 (le refus, qui est le symptôme), §4 (applique le fichier que §1
+    # écrit), « Mode de repli markdown » (`Edit` relit le fichier à chaque geste).
+    "7b2-execution-qa-un-fichier-par-application": (
+        EXECUTION_QA_SKILL,
+        (
+            "(`references/patch-checkbox-gh.md`). Un fichier par application : une paire appliquée"
+            " ne se rejoue pas, et les verdicts suivants vont dans un fichier neuf."
+        ),
+    ),
+    "7b2-patch-checkbox-un-fichier-par-application": (
+        PATCH_CHECKBOX_REF,
+        (
+            "Un fichier par application : une paire appliquée ne se rejoue pas, et les verdicts"
+            " suivants vont dans un fichier neuf. Entre deux applications, une ligne écrite peut"
+            " changer — la session `bug-vers-issue` réécrit `🔴 needs-issue` en `🔴 BUG #N` — et le"
+            " rejeu d'une paire qui la porte fait refuser le fichier entier, sur une « ligne la plus"
+            " proche » qui peut nommer une autre case."
+        ),
+    ),
+    # Même passe, m4 : un fichier qu'écrit la campagne dans son arbre salit le `git status` que
+    # `SKILL.md` §2 fait préserver. Population, quatre fichiers : les paires, la preuve lourde du
+    # `releveur`, le commentaire de phase, l'intake. La précision est là où chacun s'écrit —
+    # `patch-checkbox-gh.md` §1 (`7b2-patch-checkbox-fichier-de-paires`), `SKILL.md` §3, étape 6,
+    # pour la preuve et le commentaire (ci-dessous), §4, étape 2, et `gabarit-intake-echec.md` pour
+    # l'intake (`7b2-execution-qa-echec-annote-et-intake-ecrit`,
+    # `7b2-intake-ecrit-et-consomme-en-argument`) ; l'intake du mode de repli, que consomme une
+    # session ultérieure, reste hors de tout worktree éphémère, et sort de l'arbre de la campagne.
+    "7b2-execution-qa-fichiers-hors-de-l-arbre": (
+        EXECUTION_QA_SKILL,
+        (
+            "Ces deux fichiers, la preuve et le commentaire, s'écrivent dans le scratchpad de la"
+            " session, jamais dans l'arbre de la campagne : le §2 en préserve le `git status`."
+        ),
+    ),
+    # Même passe, constat 4 de la passe mécanique : le script n'a pas de forçage.
+    "7b2-patch-checkbox-introuvable-en-paire-neuve": (
+        PATCH_CHECKBOX_REF,
+        (
+            "Demander s'il faut sauter cette mise à jour, l'écrire en une paire neuve sur la ligne"
+            " actuelle, ou abandonner."
         ),
     ),
 }
@@ -4621,10 +4702,12 @@ def test_la_conversation_est_gardee_dans_chaque_fichier_des_skills_du_contexte_v
 # --- Les marques qui règlent une case de plan de QA (#134, lot 7b2) -----------------------------
 
 # Chaque marque de `SETTLED_MARKS` (`ecriture-relue.py`) — une case laissée `[ ]` qui la porte,
-# `checkbox next` ne la rend plus — avec l'annotation qu'`execution-qa/SKILL.md` prescrit pour elle
-# (§3, étape 4, et §4), en littéraux : une marque réglée qu'aucune étape n'écrit laisse la case en
-# attente pour toujours. Contrainte V1 du lot 7b1 : rouge sur `ffbe52e` pour ` — accepté`, que
-# `SKILL.md` n'y écrivait qu'au §6 et dans la « Passe finale », sans tiret ni date.
+# `checkbox next` ne la rend plus — avec l'annotation qu'`execution-qa/SKILL.md` prescrit pour
+# elle, en littéraux, lue dans tout le fichier — l'étape qui l'écrit est épinglée à part
+# (`7b2-execution-qa-accepte`, `7b2-execution-qa-echec-annote-et-intake-ecrit`) : une marque réglée
+# qu'aucune étape n'écrit laisse la case en attente pour toujours. Contrainte V1 du lot 7b1 : rouge
+# sur `ffbe52e` pour ` — accepté`, que `SKILL.md` n'y écrivait qu'au §6 et dans la « Passe
+# finale », sans tiret ni date.
 ANNOTATIONS_QUI_REGLENT_UNE_CASE = {
     "needs-issue": ("🔴", "` 🔴 needs-issue — <résumé sur une ligne>`"),
     "bloque": (" — BLOQUÉ", "` — BLOQUÉ : <raison>`"),
@@ -4795,6 +4878,25 @@ def test_chaque_case_d_un_plan_de_qa_porte_son_type(fichier: str) -> None:
 
     assert cases(texte), f"`{fichier}` n'a aucune case : `PLAN_QA_CASE` ne la voit plus"
     assert cases_sans_type(texte) == []
+
+
+@pytest.mark.parametrize("fichier", PLAN_QA_PLANS)
+def test_aucune_case_d_un_plan_de_qa_ne_porte_de_marque_reglee(fichier: str) -> None:
+    """Le texte d'une case du gabarit ou de l'exemple ne porte aucune marque réglée — celles de
+    `SETTLED_MARKS`, lues dans le script — ni « BUG # » : `checkbox next` sauterait la case, la
+    campagne finirait avec elle `[ ]`, et le `grep "BUG #"` de la reprise (`execution-qa` §2) la
+    ramasserait (I2 de la passe 1 de relecture de la PR #159).
+
+    **Dénombrement**, écrit avant le correctif, sur `d99e9a8` : **32** lignes de case dans
+    `gabarit-plan-qa.md`, **23** dans `exemple-bloc-issue.md` ; **1** portait une marque, la case
+    « chaque constat majeur → un lien `🔴 BUG #N` » de la Définition du Terminé du gabarit (`🔴` et
+    « BUG # »), rouge là. Deux autres cases du même bloc nomment « BLOQUÉ » et « accepté » sans
+    « — » devant : indemnes, ce ne sont pas des marques.
+    """
+    marques = (*load_script("cycle-pr", "ecriture-relue").SETTLED_MARKS, "BUG #")
+    texte = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8")
+
+    assert [ligne for ligne in cases(texte) if any(m in ligne for m in marques)] == []
 
 
 # Les commandes de la passe comptable (`plan-qa`, « Passe finale avant publication »), chacune sous
