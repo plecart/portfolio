@@ -41,7 +41,8 @@ le répertoire courant. Chaque sous-commande qui écrit fait son geste puis le r
   règles d'ignore excluent — un `.gitignore` n'agit pas sur ce qui est déjà suivi —, et les nomme
   tous ; sans rien à commiter, rien à faire ; sinon `git add -A` et `git commit -m "chore:
   amorçage pipeline de dev"`. La relecture veut ce titre pour sujet du dernier commit, et un
-  `git status --porcelain` vide.
+  `git status --porcelain` vide. Ces deux lectures neutralisent les quatre clés de configuration
+  git recensées qui en changeaient la conclusion (`STATUS`, `SUBJECT`).
 
 **Ce qu'il ne prouve pas.** `depot init` lit le dépôt qui contient le répertoire courant, sans
 vérifier qu'il en est la racine ; une `HEAD` détachée y est refusée par l'échec de
@@ -86,6 +87,13 @@ REPORTED_LINES = 5
 # Le code de `git check-ignore` sur un chemin non ignoré (git-check-ignore(1), « EXIT STATUS »).
 NOT_IGNORED = 1
 BOOTSTRAP_TITLE = "chore: amorçage pipeline de dev"
+# Les deux lectures de `commit`, avec les options qui neutralisent les quatre clés de
+# configuration git recensées qui en changeaient la conclusion (mesuré le 2026-10-26,
+# git 2.47.1) : sans elles, `status.showUntrackedFiles=no` cache les fichiers non suivis et
+# `diff.ignoreSubmodules=all` le pointeur avancé d'un dépôt imbriqué ; `i18n.logOutputEncoding`
+# réencode le sujet et `log.showSignature` le fait précéder d'une ligne de vérification.
+STATUS = ("git", "status", "--porcelain", "--untracked-files=normal", "--ignore-submodules=none")
+SUBJECT = ("git", "log", "-1", "--format=%s", "--encoding=UTF-8", "--no-show-signature")
 
 
 class Refusal(Exception):
@@ -321,8 +329,9 @@ def mcp_add(run: Run, args: argparse.Namespace) -> str:
 
 
 def changes(run: Run) -> list[str]:
-    """Les lignes de `git status --porcelain` : ce qui reste à commiter, non suivi compris."""
-    return output_of(run, ("git", "status", "--porcelain")).splitlines()
+    """Les lignes de `git status --porcelain` (`STATUS`) : ce qui reste à commiter, fichiers non
+    suivis et pointeurs de dépôts imbriqués compris."""
+    return output_of(run, STATUS).splitlines()
 
 
 def commit_bootstrap(run: Run, _args: argparse.Namespace) -> str:
@@ -346,7 +355,7 @@ def commit_bootstrap(run: Run, _args: argparse.Namespace) -> str:
     with writing():
         output_of(run, ("git", "add", "-A"))
         output_of(run, ("git", "commit", "-m", BOOTSTRAP_TITLE))
-        subject = output_of(run, ("git", "log", "-1", "--format=%s")).strip()
+        subject = output_of(run, SUBJECT).strip()
         left = changes(run)
     gaps: list[str] = []
     if subject != BOOTSTRAP_TITLE:
