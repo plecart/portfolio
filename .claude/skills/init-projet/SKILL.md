@@ -510,7 +510,8 @@ Afficher : dépôt GitHub, profil du projet retenu (stack + commandes + domaines
 et Dependabot générés — ou reportés à la première PR de code, projet sans code (étape 11) —,
 skills maison déployés, skills publics installés, context7 disponible, et les prochaines
 étapes : `vers-prd` ou `vers-issues` pour démarrer la planification, que la session **propose**
-en sessions distinctes (« Délégation »), jamais enchaînées dans celle-ci.
+en sessions distinctes (« Délégation »), jamais enchaînées dans celle-ci. Elles démarrent avec
+`use_worktree: false` : elles n'écrivent que dans GitHub.
 
 ## Checklist finale
 
@@ -544,4 +545,6 @@ jusqu'à la première PR de code, qui les coche (étape 11).
 Quand un skill a besoin du dépôt, du vocabulaire de labels, des commandes ou des domaines, il lit
 `.claude/pipeline.config.md`. S'il est absent ou incomplet, le skill **s'arrête** et propose une
 session `init-projet` distincte (protocole : `.claude/skills/cycle-pr/references/sessions-liees.md`)
-— il ne l'enchaîne pas dans sa propre session.
+— il ne l'enchaîne pas dans sa propre session. Absent, c'est un amorçage, `use_worktree: false` :
+il écrit à la racine du projet, qui n'est peut-être pas encore un dépôt git ; incomplet, une
+reconfiguration, `use_worktree: true` : elle écrit sur une branche, par une PR.

@@ -2262,10 +2262,16 @@ INVARIANTS_DES_SESSIONS_LIEES = {
 # `execution-qa` (2026-10-26), écrits en clair dès leur création : la session `bug-vers-issue` de
 # l'option (a) de son §4 et sa carte de proposition, toutes deux **sans** worktree — elle lit le
 # code de la campagne et n'écrit que dans GitHub ; `grep -rn start_session` dans ses cinq fichiers
-# en retrouve un, le démarrage — 22 sites. Le lot 8b en ajoute **1** dans `coordinatrice.md`
-# (2026-10-26), écrit en clair dès sa création, **sans** worktree : la session de lot démarrée à son
-# ouverture, dans le worktree frère que prépare la coordinatrice — 23 sites. Un site nouveau
-# n'entre pas ici de lui-même : la garde lit des phrases, le grep re-dérive la population.
+# en retrouve un, le démarrage — 22 sites. Le lot 8b en ajoute **3** (2026-10-26) : dans
+# `coordinatrice.md`, écrite en clair dès sa création, **sans** worktree, la session de lot
+# démarrée à son ouverture dans le worktree frère que prépare la coordinatrice ; dans `init-projet`,
+# sans le mot, les sessions `vers-prd` ou `vers-issues` de l'étape 13 — une phrase pour les deux —
+# et la session `init-projet` que fait proposer la « Note », où renvoient cinq skills — **2**
+# fuyaient, recensés au cleanup holistique par la forme du geste sur les lignes ajoutées
+# (`propos…`, `démarr…`, `start_session`, `ouvre`, `naît`, dans la phrase de « session ») : 21
+# phrases — 3 sites, 13 renvois à l'un d'eux ou à `session-relecture.md`, 5 hors classe (une PR
+# qu'on ouvre, un titre, les outils d'une session) —, 25 sites. Un site nouveau n'entre pas ici de
+# lui-même : la garde lit des phrases, le grep re-dérive la population.
 USE_WORKTREE_EXPLICITE = {
     "pr-paralleles-etape-0-sans-worktree": (
         PR_PARALLELES_SKILL,
@@ -2368,6 +2374,24 @@ USE_WORKTREE_EXPLICITE = {
         (
             "Hors d'un tour du mainteneur, une carte de proposition (`initiation: own_initiative`,"
             " `context: fresh`, `use_worktree: false`, même nom et même prompt)"
+        ),
+    ),
+    "init-projet-vers-la-planification": (
+        INIT_PROJET_SKILL,
+        "Elles démarrent avec `use_worktree: false` : elles n'écrivent que dans GitHub.",
+    ),
+    "init-projet-note-amorcage-sans-worktree": (
+        INIT_PROJET_SKILL,
+        (
+            "Absent, c'est un amorçage, `use_worktree: false` : il écrit à la racine du projet, qui"
+            " n'est peut-être pas encore un dépôt git"
+        ),
+    ),
+    "init-projet-note-reconfiguration-avec-worktree": (
+        INIT_PROJET_SKILL,
+        (
+            "incomplet, une reconfiguration, `use_worktree: true` : elle écrit sur une branche,"
+            " par une PR."
         ),
     ),
 }
@@ -4584,7 +4608,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # rouges). La liste de `hors-scope.md` reçoit `init-projet`
     # (`6b2-hors-scope-nomme-contradiction`). Gardés ailleurs : la délégation (D5),
     # `SKILLS_SANS_ECRITURE_GH_DIRECTE` — les deux `gh pr ready` devenus la sortie du draft —, le
-    # renvoi au script (`cites_ecriture_relue`, forme du skill voisin de `SCRIPT_REFERENCE`).
+    # renvoi au script (`cites_ecriture_relue`, forme du skill voisin de `SCRIPT_REFERENCE`),
+    # `use_worktree` à chaque session proposée (`USE_WORKTREE_EXPLICITE`).
     "8b-init-projet-reconfiguration-par-une-pr": (
         INIT_PROJET_SKILL,
         (
