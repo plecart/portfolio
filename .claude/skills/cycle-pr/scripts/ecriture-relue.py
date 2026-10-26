@@ -149,6 +149,7 @@ import subprocess
 import sys
 from collections.abc import Callable, Generator, Mapping, Sequence
 from contextlib import contextmanager
+from functools import partial
 from pathlib import Path
 from typing import Any, NamedTuple, TypeVar
 from urllib.parse import quote
@@ -497,6 +498,12 @@ def brief_comment(run: Run, number: str) -> Text:
     return briefs[0]
 
 
+def bare_lines(text: str) -> list[str]:
+    """Les lignes de `text`, segments entre deux `\\n`, chacune sans son `\\r` final : la forme
+    qui se compare, les fins de ligne restant à qui écrit (obs 87, 106)."""
+    return [line.removesuffix("\r") for line in text.split("\n")]
+
+
 class Pair(NamedTuple):
     """Une paire d'un fichier `--paires` : l'ancienne ligne, la nouvelle, et le numéro (base 1) de
     la ligne du fichier qui porte chacune."""
@@ -519,18 +526,14 @@ def stray(line: str) -> str:
 def split_pairs(text: str) -> tuple[list[Pair], list[tuple[int, str]]]:
     """Les paires du texte d'un fichier `--paires`, et les lignes qui n'entrent dans aucune.
 
-    Une ligne est un segment entre deux `\\n`, sans son `\\r` final ; une ligne vide ou de blancs
-    s'ignore. Une ligne ouverte par `< ` porte l'ancienne ligne, et la ligne suivante non ignorée,
-    ouverte par `> `, la nouvelle — ce qui suit chaque marque, sans échappement.
+    Les lignes sont celles de `bare_lines` ; une ligne vide ou de blancs s'ignore. Une ligne
+    ouverte par `< ` porte l'ancienne ligne, et la ligne suivante non ignorée, ouverte par `> `, la
+    nouvelle — ce qui suit chaque marque, sans échappement.
 
     Returns:
         Les paires, et le numéro (base 1) et le défaut (`stray`) de chaque ligne hors d'une paire.
     """
-    kept = [
-        (number, line)
-        for number, raw in enumerate(text.split("\n"), 1)
-        if (line := raw.removesuffix("\r")).strip()
-    ]
+    kept = [(number, line) for number, line in enumerate(bare_lines(text), 1) if line.strip()]
     pairs: list[Pair] = []
     strays: list[tuple[int, str]] = []
     i = 0
@@ -610,8 +613,8 @@ def closest(line: str, candidates: Sequence[str]) -> str:
 def replace_lines(body: str, pairs: Sequence[Pair]) -> tuple[str, list[str], list[str]]:
     """Remplace, dans `body`, l'ancienne ligne de chaque paire par sa nouvelle — toutes, ou aucune.
 
-    Une ligne est un segment entre deux `\\n`, comparée sans son `\\r` final, qui reste à
-    l'écriture : les fins de ligne ressortent telles qu'elles sont entrées. Une paire dont
+    Une ligne se compare sous sa forme `bare_lines` ; son `\\r` final reste à l'écriture : les fins
+    de ligne ressortent telles qu'elles sont entrées. Une paire dont
     l'ancienne ligne manque et dont la nouvelle est seule dans `body` est déjà appliquée : le rejeu
     d'un fichier déjà poussé n'écrit rien. Borne : la nouvelle ligne déjà ailleurs dans `body`, la
     paire s'applique, mais le rejeu trouve la nouvelle en double et refuse.
@@ -626,7 +629,7 @@ def replace_lines(body: str, pairs: Sequence[Pair]) -> tuple[str, list[str], lis
             et rien n'est remplacé.
     """
     lines = body.split("\n")
-    keys = [line.removesuffix("\r") for line in lines]
+    keys = bare_lines(body)
     replaced: list[str] = []
     already: list[str] = []
     motifs: list[str] = []
@@ -650,54 +653,61 @@ def replace_lines(body: str, pairs: Sequence[Pair]) -> tuple[str, list[str], lis
 
 
 def patch_text(run: Run, args: argparse.Namespace) -> str:
-    """`checkbox patch` et `brief patch` : `--case` coche des cases (`patch_boxes`), `--paires`
-    remplace des lignes (`patch_lines`), dans le texte que `args.locate` désigne."""
-    return patch_lines(run, args) if args.pairs else patch_boxes(run, args)
-
-
-def patch_lines(run: Run, args: argparse.Namespace) -> str:
-    """`--paires` : remplace les lignes du fichier de paires (`replace_lines`), et n'écrit que si
-    une ligne change. Le fichier est lu avant tout appel à la forge."""
-    pairs = read_pairs(args.pairs)
-    text = args.locate(run, args.number)
-    expected, replaced, already = replace_lines(text.body, pairs)
-    report = [f"déjà appliquée : {old}" for old in already]
-    if replaced:
-        write_body(run, text, expected, replaced)
-        report.append(f"écrit et relu — {text.name} : {len(replaced)} ligne(s) remplacée(s)")
+    """`checkbox patch` et `brief patch` : `--case` coche des cases (`check_boxes`), `--paires`
+    remplace des lignes (`replace_lines`) — le fichier lu avant tout appel à la forge —, dans le
+    texte que `args.locate` désigne (`edit_text`)."""
+    if args.pairs:
+        edit = partial(replace_lines, pairs=read_pairs(args.pairs))
+        words = ("déjà appliquée", "ligne(s) remplacée(s)", "toutes les paires déjà appliquées")
     else:
-        report.append(f"rien à écrire — {text.name} : toutes les paires déjà appliquées")
-    return "\n".join(report)
+        edit = partial(check_boxes, anchors=args.anchors)
+        words = ("déjà cochée", "case(s) cochée(s)", "aucune case à cocher")
+    return edit_text(run, args, edit, *words)
 
 
-def patch_boxes(run: Run, args: argparse.Namespace) -> str:
-    """`--case` : coche les ancres (`check_boxes`), et n'écrit que si une case change."""
+def edit_text(
+    run: Run,
+    args: argparse.Namespace,
+    edit: Callable[[str], tuple[str, list[str], list[str]]],
+    already: str,
+    written: str,
+    unchanged: str,
+) -> str:
+    """Édite par `edit` le texte que `args.locate` désigne, et ne l'écrit que si une ligne change.
+
+    Args:
+        edit: texte lu → texte édité, lignes écrites (ancres de la relecture), et ce qui l'était
+            déjà, chacun rapporté sous `already`.
+        already, written, unchanged: les mots du rapport — d'un élément déjà fait, du compte des
+            lignes écrites, et d'un appel sans rien à écrire.
+    """
     text = args.locate(run, args.number)
-    expected, checked, already = check_boxes(text.body, args.anchors)
-    report = [f"déjà cochée : {anchor}" for anchor in already]
-    if checked:
-        write_body(run, text, expected, checked)
-        report.append(f"écrit et relu — {text.name} : {len(checked)} case(s) cochée(s)")
+    expected, lines, done = edit(text.body)
+    report = [f"{already} : {item}" for item in done]
+    if lines:
+        write_body(run, text, expected, lines)
+        report.append(f"écrit et relu — {text.name} : {len(lines)} {written}")
     else:
-        report.append(f"rien à écrire — {text.name} : aucune case à cocher")
+        report.append(f"rien à écrire — {text.name} : {unchanged}")
     return "\n".join(report)
 
 
 def pending_box(body: str) -> tuple[str, str] | None:
     """La prochaine case en attente de `body`, un plan de QA, et le dernier titre au-dessus d'elle.
 
-    Une ligne est un segment entre deux `\\n`, sans son `\\r` final. Une case (`PLAN_CASE`) est en
-    attente quand un blanc la laisse non cochée (GFM §5.3) et que sa ligne ne porte aucune marque
-    de `SETTLED_MARKS`. Un titre est une ligne ouverte par `#`, rendu sans ses `#` ni ses blancs.
+    Les lignes sont celles de `bare_lines`. Une case (`PLAN_CASE`) est en attente quand un blanc
+    la laisse non cochée (GFM §5.3) et que sa ligne ne porte aucune marque de `SETTLED_MARKS`. Un
+    titre est une ligne ouverte par `#`, rendu sans ses `#` ni ses blancs.
 
     Returns:
         Le titre — `(sans titre)` s'il n'y en a pas au-dessus — et la ligne de case ; `None` sans
         case en attente.
     """
     title = "(sans titre)"
-    # ponytail: les blocs de code clôturés ne sont pas suivis — un `#` ou une case qui y figure
-    # compte ; suivre les clôtures ``` le jour où un plan en porte au-dessus de ses cases.
-    for line in (raw.removesuffix("\r") for raw in body.split("\n")):
+    # ponytail: Markdown lu à la ligne — les blocs de code clôturés ne sont pas suivis, un `#` ou
+    # une case qui y figure compte, et un `#` de tête fait un titre sans le blanc que GFM (§4.2)
+    # lui demande ; un analyseur GFM le jour où un plan en porte au-dessus de ses cases.
+    for line in bare_lines(body):
         if line.startswith("#"):
             title = line.lstrip("#").strip()
         elif (
