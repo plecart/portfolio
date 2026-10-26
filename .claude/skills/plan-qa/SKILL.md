@@ -83,10 +83,11 @@ Utilise `references/gabarit-plan-qa.md` comme squelette. Le plan a deux couches 
 
 - Référence de l'issue (`#N — Titre`, lien)
 - Référence au PRD source (le cas échéant)
-- Critères d'acceptation (reformulés en cases `- [ ]`, copiés/normalisés depuis l'issue)
+- Critères d'acceptation, copiés/normalisés depuis l'issue en liste numérotée `- **C1** — …`, `- **C2** — …` : ce ne sont pas des cases, chaque case qui en couvre un le cite en fin de texte (`(C1)`)
 - **Une section par surface que le projet possède réellement**, chacune ancrée à du vérifié :
   API/CLI (vraies routes ou commandes, vrais codes de sortie), interface (vraies URLs, composants, états), persistance (vraies tables ou chemins), traitements asynchrones (vrais services et flux de logs), artefacts produits (vrais fichiers, formats)
 - Commandes exactes ou actions utilisateur
+- Le type de chaque case, comme partout dans le plan : **Commande** ou **Observation** (`references/gabarit-plan-qa.md`, « Types de case »)
 - Résultats attendus avant chaque action
 - Règle d'arrêt
 - Indices de sévérité pour les défaillances probables
@@ -98,7 +99,7 @@ Utilise `references/taxonomie-couverture.md` comme feuille d'indices de couvertu
 ### 4. Rends-le exhaustif dans le détail et la vue d'ensemble
 
 Pour chaque bloc par issue, demande-toi :
-- Ai-je couvert chaque critère d'acceptation par au moins une case ?
+- Ai-je couvert chaque critère d'acceptation par au moins une case qui le cite (`(C<k>)`) ?
 - **Chaque case survit-elle à la question « un test automatisé aurait-il pu attraper ça ? »** Si la réponse est oui, la case sort du plan.
 - Chaque surface **que ce projet possède** est-elle considérée ? (Les surfaces absentes ne produisent rien ; une surface présente mais non couverte doit être signalée.)
 - S'il y a une interface : les états d'erreur, vides, de chargement et de succès sont-ils tous listés ?

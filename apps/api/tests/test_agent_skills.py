@@ -3806,6 +3806,98 @@ def test_la_conversation_est_gardee_dans_chaque_fichier_des_deux_skills() -> Non
     assert gardes == dossiers
 
 
+# --- Le type de chaque case d'un plan de QA (#134, lot 7a) ---------------------------------------
+
+# Une ligne de case de plan de QA, cochée ou non, indentée ou non.
+PLAN_QA_CASE = re.compile(r"^[ \t]*- \[[ xX]\] ")
+# La même ligne, la marque de type juste après la case (`gabarit-plan-qa.md`, « Types de case ») :
+# une commande en un seul segment entre accents graves, suivie de ` → ` et de son attendu, ou une
+# observation.
+PLAN_QA_CASE_TYPEE = re.compile(
+    PLAN_QA_CASE.pattern + r"(?:\*\*Commande\*\* — `[^`]+` → |\*\*Observation\*\* — )"
+)
+# Les fichiers de `plan-qa` qui portent des cases de plan.
+PLAN_QA_PLANS = (
+    ".claude/skills/plan-qa/references/gabarit-plan-qa.md",
+    ".claude/skills/plan-qa/references/exemple-bloc-issue.md",
+)
+
+
+def cases(texte: str) -> list[str]:
+    """Les lignes de case de `texte` ; une puce de critère (`- **C1** — …`) n'en est pas une."""
+    return [ligne for ligne in texte.splitlines() if PLAN_QA_CASE.match(ligne)]
+
+
+def cases_sans_type(texte: str) -> list[str]:
+    """Les lignes de case de `texte` sans marque de type valide juste après la case.
+
+    La marque se lit en tête de case : les annotations qu'`execution-qa` ajoute en fin de ligne et
+    la bascule `[ ]` → `[x]` ne la touchent pas.
+    """
+    return [ligne for ligne in cases(texte) if not PLAN_QA_CASE_TYPEE.match(ligne)]
+
+
+# Le recueil de `cases` et de `cases_sans_type`, des deux côtés (obs 138), en littéraux (obs 80) :
+# chaque ligne, puis ce que les deux en disent — est-ce une case, est-elle sans type.
+PLAN_QA_CASE_FORMS = {
+    "commande complete": (
+        "- [ ] **Commande** — `curl -s -o /dev/null -w '%{http_code}' $API/health` → `200`",
+        True,
+        False,
+    ),
+    "observation": (
+        "- [ ] **Observation** — l'état vide de la liste → le CTA visible (C1)",
+        True,
+        False,
+    ),
+    "cochee et annotee": (
+        "- [x] **Commande** — `docker compose ps api` → `running` (C2) — running, 2026-10-26",
+        True,
+        False,
+    ),
+    "cochee en majuscule": ("- [X] **Observation** — la console → aucune erreur", True, False),
+    "indentee": ("  - [ ] **Observation** — le bouton pendant l'envoi → désactivé", True, False),
+    "sans type": ("- [ ] L'application démarre.", True, True),
+    "commande sans fleche": (
+        "- [ ] **Commande** — `docker compose ps api` montre `running`",
+        True,
+        True,
+    ),
+    "commande sans segment": ("- [ ] **Commande** — docker compose ps api → `running`", True, True),
+    "commande sans gras": ("- [ ] Commande — `docker compose ps api` → `running`", True, True),
+    "type inconnu": ("- [ ] **Manuel** — ouvrir la page → rendu correct", True, True),
+    "puce de critere": ("- **C1** — un PDF valide de 1 Mo est accepté", False, False),
+}
+
+
+@pytest.mark.parametrize(
+    ("ligne", "est_une_case", "sans_type"),
+    PLAN_QA_CASE_FORMS.values(),
+    ids=PLAN_QA_CASE_FORMS.keys(),
+)
+def test_le_type_d_une_case_de_plan_de_qa_se_reconnait(
+    ligne: str, est_une_case: bool, sans_type: bool
+) -> None:
+    assert (bool(cases(ligne)), bool(cases_sans_type(ligne))) == (est_une_case, sans_type)
+
+
+@pytest.mark.parametrize("fichier", PLAN_QA_PLANS)
+def test_chaque_case_d_un_plan_de_qa_porte_son_type(fichier: str) -> None:
+    """Critère « 7a » du brief de #134 : le type de chaque case est écrit dans le plan, pour que
+    l'exécutant se lise sans décision.
+
+    **Population** : les cases des deux fichiers de `PLAN_QA_PLANS` ; sur `4b51a71`, **34** et
+    **26**, **0** typée — vu rouge là. Au lot 7a, les critères d'acceptation d'un bloc sortent des
+    cases (`- **C<k>** — …`) : **32** et **22**, toutes typées. **Ce que la garde ne voit pas** :
+    une commande fausse mais bien formée, un attendu vague — la marque dit qui joue la case, pas
+    que la case est juste.
+    """
+    texte = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8")
+
+    assert cases(texte), f"`{fichier}` n'a aucune case : `PLAN_QA_CASE` ne la voit plus"
+    assert cases_sans_type(texte) == []
+
+
 # --- Chaque sortie d'une `contradiction` relance ce qu'elle doit (#134, lot 6b2) -----------------
 
 # Les deux relances de `contradiction` étape 5, que la table des sorties suit dans le texte : à
