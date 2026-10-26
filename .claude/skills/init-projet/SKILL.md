@@ -31,7 +31,35 @@ lancer, quels labels utiliser et quels sont les domaines du projet.
 - **Amorçage** — `.claude/pipeline.config.md` absent : dérouler tout le process.
 - **Reconfiguration** — le fichier existe : le lire, afficher l'état actuel, demander ce qu'il faut
   changer, puis ne rejouer que les étapes concernées (typiquement 3 → 7). Ne jamais écraser en
-  silence une valeur déjà renseignée.
+  silence une valeur déjà renseignée. Ses écritures de dépôt partent **par une PR**, portée par la
+  session qui a décidé, jamais par un commit direct sur le trunk (D-12 de #134) : la session
+  l'ouvre, la relit et la merge au go du mainteneur, au déroulé de `triage/hors-scope.md`
+  (« Quand écrire », étapes 5 et 6). La copie du template (étape 7) ne se rejoue pas : `copie`
+  refuse dès qu'une cible diffère de sa source — `settings.json` fusionné, `CLAUDE.md` finalisé.
+
+## Délégation
+
+La session garde le dialogue avec le mainteneur — chemin du boilerplate, public ou privé, profil
+validé valeur par valeur, mapping de labels, skills publics à cocher —, le choix des valeurs et le
+récapitulatif. Le reste change de main :
+
+- **`releveur`** — l'inspection de l'étape 3, rendue en tableau pré-rempli dans un fichier ; à
+  l'étape 7, l'empreinte et l'étiquette la plus précise de chaque action (`git ls-remote`), les
+  valeurs de `package-ecosystem` lues dans la référence Dependabot, passage cité (`context7`), la
+  vérification du runtime épinglé ; à l'étape 11, le verdict de chaque commande — code de sortie
+  et sortie brute, dans un fichier. Il ne décide rien : ce qui compte reste à la session ;
+- **`executant`** — la génération de chaque fichier, en tranche entièrement spécifiée par la
+  session (valeurs validées, gabarit, empreintes relevées) : `.claude/pipeline.config.md`
+  (étape 5), `ci.yml`, `dependabot.yml` et `.gitignore` (étape 7), `CLAUDE.md` finalisé (étape 9) ;
+- **scripts** — les gestes de dépôt, appelés par la session elle-même : un geste isolé coûte plus
+  délégué (`CLAUDE.md`, « Orchestration »). En amorçage, les skills ne sont pas encore dans le
+  projet : `amorcage.py` se lance par `python <répertoire de ce skill>/scripts/amorcage.py` —
+  `depot init` (étape 2), `copie` (7), `valide` (7), `ignore` (7), `mcp` (10), `commit` (12) —,
+  `ecriture-relue.py` par `python <répertoire de ce skill>/../cycle-pr/scripts/ecriture-relue.py`
+  — `depot create` (2), `label create --mapping` (6). Le contrat de chacun est son `--help` ;
+- **sessions distinctes** — la première PR de code d'un projet sans code, une session `cycle-pr`
+  (étape 11) ; `vers-prd` ou `vers-issues`, des sessions que l'étape 13 propose, jamais enchaînées
+  dans celle-ci ; protocole commun : `.claude/skills/cycle-pr/references/sessions-liees.md`.
 
 ## Process
 
@@ -42,16 +70,18 @@ Déterminer le chemin du dépôt `boilerplate` (le demander si nécessaire). On 
 
 ### 2. Initialiser git + le dépôt GitHub
 
-- Si le projet n'est pas un dépôt git : `git init` + premier commit.
+- Si le projet n'est pas un dépôt git : `amorcage.py depot init` (« Délégation ») ; le premier
+  commit est celui d'amorçage (étape 12).
 - Lire `git remote -v`. Si un remote GitHub existe, le proposer comme dépôt cible (`owner/repo`).
-- Sinon, proposer de le créer : `gh repo create <owner>/<repo> --private --source=. --remote=origin`
-  (demander public/privé).
+- Sinon, demander public ou privé, puis créer le dépôt et son remote `origin` :
+  `ecriture-relue.py depot create <owner>/<repo> --private|--public` (« Délégation »).
 - Brancher trunk-based sur `main`.
 
 ### 3. Profil du projet — détecter, puis faire confirmer
 
-**Ne rien inventer en silence.** Inspecter le repo, proposer des valeurs pré-remplies, et faire
-corriger par l'utilisateur. Ce qui reste ambigu après inspection se **demande**.
+**Ne rien inventer en silence.** Le `releveur` inspecte le repo (« Délégation ») et rend des
+valeurs pré-remplies, que la session fait corriger par l'utilisateur. Ce qui reste ambigu après
+inspection se **demande**.
 
 **Signaux à inspecter** (liste non exhaustive — s'adapter à ce qu'on trouve) :
 
@@ -115,11 +145,15 @@ Les skills raisonnent en **rôles canoniques**. Le dépôt utilise des **chaîne
 | qa-plan | suivi | `qa-plan` | `0e8a16` |
 | qa-finding | suivi | `qa-finding` | `b60205` |
 
-Demander à l'utilisateur s'il veut des chaînes différentes (ex. labels existants du projet).
+Demander à l'utilisateur s'il veut des chaînes différentes (ex. labels existants du projet). Le
+mapping validé s'écrit dans un fichier JSON pour l'étape 6 : une liste d'objets
+`{"nom", "couleur", "description"}`, la description portant le rôle, au format de `label create`
+(son `--help`).
 
 ### 5. Écrire `.claude/pipeline.config.md`
 
-Utiliser ce gabarit, puis confirmer à l'utilisateur :
+L'`executant` (« Délégation ») le génère depuis ce gabarit et les valeurs validées ; la session le
+confirme à l'utilisateur :
 
 <gabarit-config>
 # Configuration pipeline
@@ -200,7 +234,7 @@ Lues par `cycle-pr`, `execution-qa` et la génération de CI. `n/a` = étape abs
 - documentation → `documentation`   # label de nature (PR `docs(…)` sans issue liée) — hors machine à états
 
 **Métadonnées d'une PR** — posées à l'Étape 2 de `cycle-pr`, vérifiées à l'Étape 5, corrigées
-avant `gh pr ready` si elles dévient. Toute PR qui n'est pas l'œuvre d'un bot porte :
+avant la sortie du draft si elles dévient. Toute PR qui n'est pas l'œuvre d'un bot porte :
 - **assignee** : son auteur ;
 - **un** label de catégorie : celui de l'issue qu'elle ferme ; sans issue, dérivé du type
   conventional commit — `feat` / `chore` / `refactor` / `ci` → `enhancement`, `fix` → `bug`,
@@ -214,12 +248,14 @@ avant `gh pr ready` si elles dévient. Toute PR qui n'est pas l'œuvre d'un bot 
 
 ### 6. Créer les labels manquants dans GitHub
 
-Pour chaque label du mapping absent du dépôt :
-`gh label create <nom> --description "<rôle>" --color <couleur>`. Confirmer ce qui a été créé.
+`ecriture-relue.py label create --mapping <fichier>` (« Délégation »), sur le fichier de l'étape
+4, crée les labels absents du dépôt ; sa sortie dit ce qui a été créé, et nomme un label présent
+sous une autre couleur sans le modifier. Confirmer à l'utilisateur ce qui a été créé.
 
 ### 7. Copier le template + générer la CI et Dependabot
 
-Copier depuis `boilerplate/template/` vers la racine du projet :
+`amorcage.py copie <boilerplate>` (« Délégation ») copie `template/`, hors `.github/`, à la racine
+du projet — et `skills/` sous `.claude/skills/` (étape 8) :
 
 - `CLAUDE.md` (renvoie aux règles de `.claude/rules/`, chargées automatiquement)
 - `.claude/rules/` (contraintes, cleanup-verbatim, taille-pr, decisions-vs-doc)
@@ -229,11 +265,15 @@ Copier depuis `boilerplate/template/` vers la racine du projet :
 - `.claude/settings.json` (permissions de base ; fusionner s'il en existe déjà un)
 - `CONTRIBUTING.md` (pointeur vers `cycle-pr`)
 
+**L'ordre est copie, puis fusion** : un `settings.json` déjà présent sous un autre contenu fait
+refuser la copie entière — le mettre de côté, copier, puis le fusionner à la main. Après la
+fusion, `copie` ne repasse plus : il refuserait sur ce fichier.
+
 `CLAUDE.md` est copié **tel quel** ici : ses sections conditionnelles (commentaires
 `<!-- init-projet : section à retirer si … -->`) et son placeholder `{{CHEMIN_JOURNAL_OBSERVATIONS}}`
 se traitent à l'étape 9, une fois les skills publics choisis.
 
-Puis, **si le projet a déjà du code**, générer `.github/workflows/ci.yml` à partir de
+Puis, **si le projet a déjà du code**, l'`executant` génère `.github/workflows/ci.yml` à partir de
 `template/.github/workflows/ci.yml`, qui est un modèle à trous — pour un projet sans code
 encore, le `ci.yml` et le `dependabot.yml` attendent sa première PR de code (étape 11) :
 
@@ -257,6 +297,7 @@ encore, le `ci.yml` et le `dependabot.yml` attendent sa première PR de code (é
   précise** de ce commit (`v7.0.1`, pas `v7`) : Dependabot ne réécrit qu'un commentaire dont
   l'étiquette pointe encore sur le commit épinglé. Une étiquette peut être déplacée par qui
   prend la main sur le dépôt de l'action ; une empreinte non (GitHub, « Secure use reference »).
+  Empreintes et étiquettes sont relevées par le `releveur` (« Délégation »).
 - **Conserver `permissions: contents: read`** en tête : le jeton par défaut d'un dépôt peut être
   bien plus large. Un job qui doit écrire élève ses droits à son niveau, jamais le workflow.
 - **Conserver le garde `if:`.** Le garde ne saute que l'ouverture d'une draft — l'amorce vide
@@ -265,7 +306,7 @@ encore, le `ci.yml` et le `dependabot.yml` attendent sa première PR de code (é
   après le passage en ready. Élargir le garde à toute draft renverrait chaque rouge de plateforme
   après le ready, où il coûte un run complet et le rejeu des vérifications manuelles. Le passage
   en ready, lui, ne lance pas de run : `cycle-pr` (Étape 5) lit le run du SHA de tête avant
-  `gh pr ready`.
+  de sortir la PR du draft.
 - **Donner une horloge aux portes qui lisent une base d'avis** — audit des dépendances, scan
   d'images : leur verdict change sans commit, quand un avis se publie. Ajouter au `on:` un
   déclencheur `schedule` quotidien et `workflow_dispatch`, réservés à ces portes : toute étape ou
@@ -278,7 +319,7 @@ encore, le `ci.yml` et le `dependabot.yml` attendent sa première PR de code (é
   (doc GitHub Actions : « Troubleshooting workflows », « Disabling and enabling a workflow »).
   Sans porte d'avis dans la config, rien à ajouter.
 
-Puis générer `.github/dependabot.yml` depuis `template/.github/dependabot.yml` : les
+Puis l'`executant` génère `.github/dependabot.yml` depuis `template/.github/dependabot.yml` : les
 empreintes du `ci.yml` n'avancent que si Dependabot les tient, et le modèle porte déjà
 l'écosystème `github-actions`. Ajouter une entrée par écosystème de la stack — celui du
 gestionnaire de paquets déclaré, `docker` si un `Dockerfile` ou un `Containerfile` existe,
@@ -290,7 +331,8 @@ semaines sans proposition. Dependabot diffère un groupe quand une PR ouverte po
 de groupe et que ses dossiers sont inclus dans ceux de l'entrée — une PR sans dossier enregistré
 compte comme incluse (`find_existing_group_pr`, `updater/lib/dependabot/updater/
 group_update_creation.rb` de dependabot-core, lu le 2026-10-18).
-Les valeurs de `package-ecosystem` se lisent dans la référence des options, pas de mémoire :
+Les valeurs de `package-ecosystem` se lisent dans la référence des options, pas de mémoire — le
+`releveur` en cite le passage :
 https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference
 
 **Images de base** — le skill ne réécrit pas les `FROM`, il signale à l'utilisateur ceux qui
@@ -316,26 +358,26 @@ version (FVM, pyenv, nvm, asdf, mise…), séparer *quelle version* de *qui la f
 - La CI **surcharge la variable** et provisionne le runtime avec l'action qui lit le **même**
   fichier d'épinglage — jamais un canal indépendant (`channel: stable` flottant) : deux mécanismes
   de provisionnement pour la même version divergent silencieusement.
-- À la génération, vérifier qu'aucune recette n'invoque le binaire nu d'un runtime épinglé, et
-  simuler la résolution des deux environnements.
+- À la génération, le `releveur` vérifie qu'aucune recette n'invoque le binaire nu d'un runtime
+  épinglé, et simule la résolution des deux environnements.
 
-**Valider les deux fichiers** contre leur schéma sur une copie temporaire qui garde l'extension
-`.yml` (sans elle, l'outil lit du JSON) — `check-jsonschema --builtin-schema
-vendor.github-workflows` pour le `ci.yml`, `--builtin-schema vendor.dependabot` pour le
-`dependabot.yml`, par `uvx` ou, sans `uv`, `pipx run` —, les montrer à l'utilisateur, et ne
-les écrire qu'ensuite.
+**Valider les deux fichiers** contre leur schéma — `amorcage.py valide <fichier> --schema
+vendor.github-workflows` pour le `ci.yml`, `--schema vendor.dependabot` pour le `dependabot.yml`,
+le script validant une copie temporaire en `.yml` —, puis les montrer à l'utilisateur.
 
-**`.gitignore` — généré depuis le profil, puis testé.** Générer le fichier à partir des **chemins
+**`.gitignore` — généré depuis le profil, puis testé.** L'`executant` le génère depuis les **chemins
 déclarés** (une section par langage présent, motifs indépendants de la profondeur `**/` dès qu'un
 paquet vit hors racine), jamais d'un gabarit mono-paquet dont les motifs sont ancrés à la racine.
-Puis **tester mécaniquement** avec `git check-ignore` sur une liste de chemins fabriqués depuis le
-profil : ceux qui doivent être exclus, et les lockfiles/sources qui doivent rester suivis. Un
-fichier de motifs ne se relit pas, il se teste.
+Puis **tester mécaniquement** avec `amorcage.py ignore --exclus <chemin> … --suivis <chemin> …`
+sur une liste de chemins fabriqués depuis le profil : ceux qui doivent être exclus, et les
+lockfiles/sources qui doivent rester suivis ; **un dossier absent se nomme avec sa barre finale**
+(`node_modules/`) ou par un chemin qu'il contient. Un fichier de motifs ne se relit pas, il se
+teste.
 
 ### 8. Déployer les skills MAISON
 
-Copier les skills de la pipeline depuis `boilerplate/skills/` vers **`.claude/skills/`** du
-projet :
+`copie` (étape 7) a copié les skills de la pipeline de `boilerplate/skills/` vers
+**`.claude/skills/`** du projet :
 
 `init-projet`, `vers-prd`, `vers-issues`, `triage`, `interroge-moi`, `cycle-pr`, `contradiction`,
 `repercussions`, `pr-paralleles`, `plan-qa`, `execution-qa`, `bug-vers-issue`, `audit-spec-ui`.
@@ -387,7 +429,8 @@ l'annuaire des plugins et **continuer sans lui** plutôt que de bloquer l'amorç
 5. **Enregistrer** la sélection dans la section « Skills du projet » de
    `.claude/pipeline.config.md` — **et les candidats écartés avec leur raison**, sinon la passe
    suivante les repropose.
-6. **Finaliser `CLAUDE.md`** — retirer chaque section précédée d'un commentaire
+6. **Finaliser `CLAUDE.md`** — l'`executant` (« Délégation »), sur les sections et le chemin que
+   la session lui donne : retirer chaque section précédée d'un commentaire
    `<!-- init-projet : section à retirer si … -->` dont le skill n'a pas été retenu, puis supprimer
    ces commentaires. Remplacer `{{CHEMIN_JOURNAL_OBSERVATIONS}}` par un chemin **stable hors du
    dépôt** — `~/.claude/projects/<projet>/skill-observations/log.md` — jamais relatif au répertoire
@@ -402,15 +445,18 @@ context7 qui, lui, est installé dans tous les cas.
 deviner de mémoire ou de la chercher sur le web — c'est un **gain de tokens** direct, d'autant plus
 utile que la stack s'appuie sur des libs qui évoluent vite.
 
-1. Vérifier s'il est déjà présent : `claude mcp list` (idempotent — ne pas réinstaller si listé).
-2. Sinon, l'ajouter (transport HTTP distant, portée utilisateur, sans clé — suffisant, débit
-   limité) :
+1. `amorcage.py mcp context7 https://mcp.context7.com/mcp` (« Délégation ») : rien à faire si
+   `claude mcp list` le liste déjà ; sinon il l'ajoute — transport HTTP distant, portée
+   utilisateur, sans clé : suffisant, débit limité —, puis relit la liste.
+2. Pour référence, la commande qu'il lance, puis celles qui restent au mainteneur :
 
    ```
    claude mcp add --scope user --transport http context7 https://mcp.context7.com/mcp
    ```
 
-   Pour un débit plus élevé, une clé (gratuite sur `context7.com/dashboard`) se passe par en-tête.
+   Pour un débit plus élevé, une clé (gratuite sur `context7.com/dashboard`) se passe par en-tête :
+   **ce geste reste au mainteneur, qui tape lui-même la commande** (`contraintes.md`, « Jamais
+   d'information dérivée d'un secret »).
    **Ne jamais la committer** : la garder en portée `user` (config locale hors dépôt), ou via
    variable d'environnement si on préfère `--scope project` (`.mcp.json` versionné) :
 
@@ -425,8 +471,9 @@ utile que la stack s'appuie sur des libs qui évoluent vite.
 
 ### 11. Vérifier que les commandes déclarées fonctionnent
 
-Avant de committer, lancer réellement `test` et chaque commande des « gates bloquants en CI » de
-la config.
+Avant de committer, le `releveur` (« Délégation ») lance réellement `test` et chaque commande des
+« gates bloquants en CI » de la config, et rend le verdict de chacune — code de sortie et sortie
+brute — dans un fichier.
 Une commande déclarée mais fausse est pire qu'absente : elle casse `cycle-pr` et la CI au premier
 usage. Corriger la config si l'une échoue pour cause d'erreur de saisie.
 
@@ -436,7 +483,8 @@ committé avant le code qu'il vérifie est rouge dès son premier run (`uv sync`
 contre la règle « aucun commit cassé ». Le marqueur est
 l'engagement : `cycle-pr` le lit à son Étape 1, et la première PR de code rejoue la génération
 CI et Dependabot de l'étape 7 — paragraphe « Runtime épinglé » compris — et cette
-vérification, puis retire les marqueurs.
+vérification, puis retire les marqueurs. Cette première PR de code est une **session `cycle-pr`
+distincte** (« Délégation ») : celle-ci ne la mène pas.
 
 Deux pièges de diagnostic à cette étape :
 
@@ -451,48 +499,49 @@ Deux pièges de diagnostic à cette étape :
 
 ### 12. Commit d'amorçage
 
-D'abord vérifier qu'aucun fichier suivi ne viole les règles d'ignore — `.gitignore` n'agit pas
-rétroactivement sur des fichiers déjà stagés :
-
-```
-git ls-files -i -c --exclude-standard   # doit sortir vide ; sinon git rm --cached les fichiers listés
-git add -A && git commit -m "chore: amorçage pipeline de dev"
-```
+`amorcage.py commit` (« Délégation ») refuse tant qu'un fichier suivi viole les règles d'ignore —
+`.gitignore` n'agit pas rétroactivement sur des fichiers déjà stagés — et les nomme tous : les
+sortir de l'index (`git rm --cached`), puis le relancer. Sinon il commite
+`chore: amorçage pipeline de dev`, puis relit.
 
 ### 13. Récapituler
 
 Afficher : dépôt GitHub, profil du projet retenu (stack + commandes + domaines), labels créés, CI
 et Dependabot générés — ou reportés à la première PR de code, projet sans code (étape 11) —,
 skills maison déployés, skills publics installés, context7 disponible, et les prochaines
-étapes (`vers-prd` ou `vers-issues` pour démarrer la planification).
+étapes : `vers-prd` ou `vers-issues` pour démarrer la planification, que la session **propose**
+en sessions distinctes (« Délégation »), jamais enchaînées dans celle-ci.
 
 ## Checklist finale
 
 Projet sans code encore : les cases de la CI, de Dependabot et des commandes restent ouvertes
 jusqu'à la première PR de code, qui les coche (étape 11).
 
-- [ ] git + remote GitHub en place, branche `main`
+- [ ] git + remote GitHub en place, branche `main` (`depot init`, `depot create`)
 - [ ] profil du projet confirmé par l'utilisateur (aucune valeur devinée en silence)
 - [ ] `.claude/pipeline.config.md` écrit, sans placeholder résiduel
 - [ ] projet sans code seulement : chaque commande de la config marquée `# non vérifiée` (étape 11)
-- [ ] labels manquants créés dans GitHub
-- [ ] `CLAUDE.md` + `.claude/rules/` + `.claude/agents/` + `settings.json` + `CONTRIBUTING.md` copiés
+- [ ] labels manquants créés dans GitHub (`label create --mapping`)
+- [ ] `CLAUDE.md` + `.claude/rules/` + `.claude/agents/` + `settings.json` + `CONTRIBUTING.md`
+      copiés (`copie`)
 - [ ] `CLAUDE.md` finalisé (étape 9) : sans section de skill non installé ni `{{CHEMIN_JOURNAL_OBSERVATIONS}}` résiduel
 - [ ] section « Sources de vérité » renseignée (au minimum : les issues ouvertes)
 - [ ] `ci.yml` généré depuis les commandes réelles, sans `{{PLACEHOLDER}}` ni étape `n/a`
 - [ ] chaque `uses:` du `ci.yml` épinglé par empreinte + `# <étiquette la plus précise>` ; `permissions: contents: read` en tête
 - [ ] portes à base d'avis (audit, scan) : `schedule` quotidien et `workflow_dispatch`, réservés à elles et à ce dont elles dépendent
 - [ ] `.github/dependabot.yml` généré (`github-actions` + écosystèmes de la stack)
-- [ ] `ci.yml` et `dependabot.yml` validés contre leur schéma
-- [ ] skills maison déployés dans `.claude/skills/`
+- [ ] `ci.yml` et `dependabot.yml` validés contre leur schéma (`valide`)
+- [ ] skills maison déployés dans `.claude/skills/` (`copie`)
 - [ ] aucun fichier dans `.claude/commands/` au nom d'un skill déployé (il serait ignoré), ni d'un
       skill maison retiré (il s'exécuterait)
 - [ ] skills publics cochés installés (choisis d'après la stack, pas d'un set en dur)
-- [ ] serveur MCP context7 disponible (`claude mcp list`)
+- [ ] serveur MCP context7 disponible (`mcp`)
 - [ ] `test` et commandes des gates bloquants en CI vérifiées en local
-- [ ] commit d'amorçage fait
+- [ ] commit d'amorçage fait (`commit`)
 
 ## Note pour les autres skills
 
 Quand un skill a besoin du dépôt, du vocabulaire de labels, des commandes ou des domaines, il lit
-`.claude/pipeline.config.md`. S'il est absent ou incomplet, lancer `init-projet`.
+`.claude/pipeline.config.md`. S'il est absent ou incomplet, le skill **s'arrête** et propose une
+session `init-projet` distincte (protocole : `.claude/skills/cycle-pr/references/sessions-liees.md`)
+— il ne l'enchaîne pas dans sa propre session.

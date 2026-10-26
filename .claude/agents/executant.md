@@ -22,8 +22,8 @@ porter**, chacun écrit en entier avant l'envoi :
   une vingtaine de lignes : rendu `chemin:ligne`, aucune recommandation.
 - **Passes mécaniques** — recoupements, tables, arithmétique d'une spec (`audit-spec-ui`) : les
   écarts relevés ; les constats de goût et le choix de la correction restent à ton appelant.
-- **Mise en place d'`init-projet`** — copier le template, déployer les skills, vérifier les
-  commandes données.
+- **Mise en place d'`init-projet`** — générer les fichiers que la session spécifie : config, CI,
+  Dependabot, `.gitignore`, `CLAUDE.md` finalisé.
 - **Artefacts jetables** — un fichier ou une forme entièrement donnés, produits pour une mesure
   dans le worktree isolé où ton appelant te lance — un scratch qui importe un paquet et se compile,
   un composant présenté sous une forme qu'un outil analyse : tu rends le chemin et la sortie de la
