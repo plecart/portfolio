@@ -189,8 +189,9 @@ la session devient la **coordinatrice** de ses lots : elle n'écrit pas de code,
 du découpage — fait démarrer les sessions de lot, ou chacune à son ouverture
 ([references/coordinatrice.md](references/coordinatrice.md)). Une issue à un seul lot ne change
 rien : la session porte le cycle elle-même et délègue le code (3.1). Une session de lot attend
-le go ci-dessous dans sa fenêtre comme toute session PR : elle y démarre sa session de relecture
-— sauf go délégué à la coordinatrice (même référence, « La session de lot »).
+le go ci-dessous dans sa fenêtre comme toute session PR, et y démarre sa session de relecture
+— sauf go délégué à la coordinatrice, qui lève l'attente et passe la relecture au repli
+`relecteur` (même référence, « La session de lot »).
 
 Attendre un **« go » explicite**, puis créer la branche — trunk-based depuis `main`, derrière une
 **porte**, c'est-à-dire une commande dont le code de sortie porte la condition :
