@@ -1170,8 +1170,8 @@ python <répertoire de ce skill>/scripts/ecriture-relue.py <sous-commande> …
 Il lit la forge en octets, écrit, puis relit : un label retiré doit s'y relire absent, un texte
 écrit s'y compare **entier** à l'attendu — une relecture qui ne compare qu'une ancre ou une
 longueur laisse passer une conversion des fins de ligne qui les préserve (obs 106). Sortie 0 :
-écrit et relu, ou rien à écrire ; 1 : refus sans rien écrire, ou relecture non conforme — motif
-en une ligne ; 2 : appel mal formé.
+écrit et relu, rien à écrire, ou lu (`checkbox next`) ; 1 : refus sans rien écrire, ou
+relecture non conforme — motif en une ligne ; 2 : appel mal formé.
 **Ce qu'il ne couvre pas** : il ne choisit pas les cases, la session PR les nomme ; il ne compte
 pas les PR liées, la requête GraphQL du cas découpé reste. La famille sait aussi créer une
 issue, remplacer un corps, publier un brief, poser un label, fermer une issue, rattacher une

@@ -691,9 +691,10 @@ def test_checkbox_patch_paires_sort_en_1_si_la_ligne_ecrite_manque_a_la_relectur
 
 
 # Les états d'une ligne de case de plan de QA (`execution-qa/SKILL.md` §3, §4, §6 et « Passe
-# finale »), population entière, faux positifs compris (obs 138) : (ligne, en attente). Une case
-# laissée `[ ]` n'attend plus quand sa ligne porte un échec (`🔴`), un blocage (` — BLOQUÉ`) ou une
-# acceptation (` — accepté`) — une annotation de §3, étape 4, s'écrit ` — <marque>` ; « bloqué »
+# finale », et `execution-qa/references/standard-correction-bug.md`, étape 10), population
+# entière, faux positifs compris (obs 138) : (ligne, en attente). Une case laissée `[ ]` n'attend
+# plus quand sa ligne porte un échec (`🔴`), un blocage (` — BLOQUÉ`) ou une acceptation
+# (` — accepté`) — une annotation de §3, étape 4, s'écrit ` — <marque>` ; « bloqué », « BLOQUÉ »
 # ou « accepté » dans le texte d'une case n'en est pas une.
 ETATS_DE_CASE = {
     "nue": ("- [ ] Le service répond", True),
@@ -706,6 +707,7 @@ ETATS_DE_CASE = {
     "en-echec": ("- [ ] L'envoi 🔴 needs-issue — 500 au POST", False),
     "bug-depose": ("- [ ] L'envoi 🔴 BUG #12", False),
     "bloque-dans-le-texte": ("- [ ] Le bouton est bloqué pendant l'envoi", True),
+    "bloque-en-majuscules-dans-le-texte": ("- [ ] Le badge BLOQUÉ s'affiche", True),
     "acceptee": ("- [ ] La purge — accepté : purge manuelle, 2026-10-26", False),
     "accepte-dans-le-texte": ("- [ ] **Commande** — `curl -X POST $API/jobs` → 201 accepté", True),
     # Un blanc entre les crochets, une tabulation comprise, vaut non coché (GFM §5.3).
