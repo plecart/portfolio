@@ -118,8 +118,8 @@ nommé ; `CLAUDE.md` interdit de deviner un label, et les références REST de �
 d'« Add labels to an issue » ne disent pas ce qu'elles font d'un label inconnu —, un fichier
 illisible, non UTF-8 ou sans ligne non vide — lu avant tout appel à la forge —, un fichier
 `--mapping` mal formé — chaque défaut nommé avec le rang de son label, tous en une passe, lu avant
-tout appel —, hors d'un dépôt git, un remote `origin` déjà là — son URL nommée —, une issue ouverte
-de ce titre et de ce corps sous d'autres labels — le rejeu d'une création dont la forge a ignoré
+tout appel —, hors de l'arbre de travail d'un dépôt git — dans son `.git` compris —, un remote
+`origin` déjà là — son URL nommée —, une issue ouverte de ce titre et de ce corps sous d'autres labels — le rejeu d'une création dont la forge a ignoré
 les labels ; il nomme l'appel de `label` qui pose les manquants, et ceux en plus sans réparation :
 l'issue a pu être triée depuis sa création —, une issue déjà fermée sous une autre raison — une
 fermeture ne se réécrit pas, et l'API REST ignore `state_reason` quand `state` ne change pas
@@ -1512,7 +1512,8 @@ def repository_gaps(
     if repository.visibility != visibility:
         gaps.append(f"dépôt {wanted} relu {repository.visibility}, attendu {visibility}")
     if origin not in repository.urls:
-        gaps.append(f"origin relu {origin}, attendu {' ou '.join(repository.urls)}")
+        read = "absent" if origin is None else f"relu {origin}"
+        gaps.append(f"origin {read}, attendu {' ou '.join(repository.urls)}")
     return gaps
 
 
@@ -1528,7 +1529,7 @@ def depot_create(run: Run, args: argparse.Namespace) -> str:
     """
     # Hors d'un dépôt, `git` échoue sans rien écrire sur sa sortie ; dans `.git`, il rend `false`.
     if launch(run, INSIDE_WORK_TREE).stdout.strip() != b"true":
-        raise Refusal("hors d'un dépôt git")
+        raise Refusal("hors de l'arbre de travail d'un dépôt git")
     if (origin := origin_url(run)) is not None:
         raise Refusal(f"le remote origin existe déjà : {origin}")
     wanted, visibility = args.repository, args.visibility
