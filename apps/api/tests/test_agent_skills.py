@@ -161,7 +161,9 @@ SCRIPTS_DIRECTORY = "scripts"
 #
 # 1. **relative** (`<répertoire de ce skill>/scripts/x.py`, ou `scripts/x.py` nu) — la forme des
 #    fichiers d'un skill, qui est recopié dans le seed où son chemin absolu diffère ; elle se
-#    résout contre le dossier du skill qui porte le fichier citant ;
+#    résout contre le dossier du skill qui porte le fichier citant, ou du skill voisin qu'elle
+#    nomme (`<répertoire de ce skill>/../<skill>/scripts/x.py`) : l'amorçage d'`init-projet`
+#    tourne avant que les skills soient copiés dans le projet ;
 # 2. **depuis la racine** (`.claude/skills/<skill>/scripts/x.py`) — la forme d'un rôle ou d'une
 #    règle, qui vit hors de l'arborescence des skills et n'a donc pas de dossier de référence ;
 # 3. **préfixée par un nom de skill** (`cycle-pr/scripts/x.py`) — relative à `.claude/skills/`
@@ -180,7 +182,9 @@ SCRIPTS_DIRECTORY = "scripts"
 # détecté.
 SCRIPT_REFERENCE = re.compile(
     r"(?<![\w-])"
-    r"(?:\.claude/skills/(?P<skill>[\w-]+)/|<répertoire de ce skill>/|(?P<prefix>[\w.-]+)/)?"
+    r"(?:\.claude/skills/(?P<skill>[\w-]+)/"
+    r"|<répertoire de ce skill>/(?:\.\./(?P<sibling>[\w-]+)/)?"
+    r"|(?P<prefix>[\w.-]+)/)?"
     rf"{SCRIPTS_DIRECTORY}/(?P<script>[\w.-]+\.py)"
 )
 
@@ -221,7 +225,7 @@ def script_target(root: Path, citing: Path, reference: re.Match[str]) -> str | N
     # dépôt **et** sur des témoins en répertoire temporaire, et une base figée sur le dépôt rend
     # les branches relatives muettes chez le témoin — les seules qui les éprouvent.
     skills = root / ".claude" / "skills"
-    if skill := reference.group("skill"):
+    if skill := reference.group("skill") or reference.group("sibling"):
         return f".claude/skills/{skill}/{SCRIPTS_DIRECTORY}/{script}"
     if prefix := reference.group("prefix"):
         if not (skills / prefix).is_dir():
@@ -263,7 +267,8 @@ def test_chaque_script_cite_par_la_prose_du_harnais_existe() -> None:
     résout les 2 **canoniques** et laisse la 3ᵉ introuvable :
 
     1. **relative**, dans les fichiers d'un skill (`<répertoire de ce skill>/scripts/x.py`, ou
-       `scripts/x.py` nu) — résolue contre le dossier du skill qui porte le fichier citant ;
+       `scripts/x.py` nu) — résolue contre le dossier du skill qui porte le fichier citant, ou
+       du skill voisin qu'elle nomme (`<répertoire de ce skill>/../<skill>/scripts/x.py`) ;
     2. **depuis la racine** (`.claude/skills/<skill>/scripts/x.py`) — la forme d'un rôle ou
        d'une règle, qui vit hors de l'arborescence des skills ;
     3. **orpheline** : une forme relative portée par un fichier qui n'est pas sous un skill —
@@ -341,6 +346,11 @@ SCRIPT_REFERENCE_WITNESSES = {
         "python <répertoire de ce skill>/scripts/x.py",
         ".claude/skills/cycle-pr/scripts/x.py",
     ),
+    "forme-1-vers-un-skill-voisin": (
+        ".claude/skills/init-projet/SKILL.md",
+        "python <répertoire de ce skill>/../cycle-pr/scripts/v.py",
+        ".claude/skills/cycle-pr/scripts/v.py",
+    ),
     "forme-2-depuis-la-racine-dans-un-role": (
         ".claude/agents/relecteur.md",
         "lance .claude/skills/cycle-pr/scripts/y.py",
@@ -392,7 +402,7 @@ SCRIPT_REFERENCE_WITNESSES = {
 def test_chaque_forme_de_renvoi_vers_un_script_se_resout(
     tmp_path: Path, citing: str, prose: str, expected: str
 ) -> None:
-    """**Dénombrement de la classe** : 3 formes en 5 orthographes, 4 globs, 9 témoins.
+    """**Dénombrement de la classe** : 3 formes en 6 orthographes, 4 globs, 10 témoins.
 
     Une porte qui n'apparie qu'une orthographe laisse les autres vertes par absence : c'est la
     classe d'obs 63 — une règle formulée dans le vocabulaire de son premier domaine ne se
@@ -704,18 +714,6 @@ HOUSE_SKILLS = (
     "audit-spec-ui",
 )
 
-# Les skills maison qui ne délèguent encore à personne, chacun avec le lot de #134 qui l'en sort :
-# au 2026-10-20 sur `e70e279`, onze, dont `init-projet`, qui ne nomme les cinq rôles que dans sa
-# liste de fichiers ; dix au 2026-10-23 sur `34604c7` (lot 6a2, bloc 1), qui en sort `triage` ;
-# sept au commit suivant (bloc 2), qui en sort `interroge-moi`, `vers-prd` et `vers-issues` ; six
-# au 2026-10-23 (lot 6b, bloc 1), qui en sort `repercussions` ; quatre au 2026-10-25 (lot 6b2),
-# qui en sort `bug-vers-issue` et `contradiction` ; trois au 2026-10-26 (lot 7a), qui en sort
-# `plan-qa` ; deux le même jour (lot 7b2), qui en sort `execution-qa` ; un le même jour (lot 8b),
-# qui en sort `audit-spec-ui`. La liste se vide lot par lot ; #134 l'exige vide.
-EXECUTOR_WAITING_LIST = {
-    "init-projet": "8",
-}
-
 
 def cites_role(text: str, role: str) -> bool:
     """Vrai si `text` nomme `role` entre accents graves, sous son nom exact (`` `releveur` ``)."""
@@ -767,20 +765,26 @@ def test_chaque_role_est_nomme_par_un_skill(path: Path) -> None:
     assert skills_citing(path.stem), f"`{path.stem}` n'est nommé par aucun skill : rien ne le lance"
 
 
-def test_ni_un_role_fictif_ni_la_liste_d_init_projet_ne_comptent_pour_une_citation() -> None:
+def test_ni_un_role_fictif_ni_la_liste_d_init_projet_ne_comptent_pour_une_citation(
+    tmp_path: Path,
+) -> None:
     """Témoins du précédent, sur la prose réelle : un rôle fictif ne trouve aucun fichier, et la
-    liste de fichiers d'`init-projet`, qui nomme tous les rôles, n'est jamais comptée."""
+    liste de fichiers d'`init-projet`, qui nomme tous les rôles, n'est jamais comptée — l'entrée
+    entière, jusqu'à l'entrée suivante, ne cite plus aucun exécutant une fois retirée."""
     assert skills_citing("fantome") == []
-    assert not [
-        role for role in ROLE_NAMES if ".claude/skills/init-projet/SKILL.md" in skills_citing(role)
-    ]
     init_projet = (REPOSITORY_ROOT / ".claude/skills/init-projet/SKILL.md").read_text(
         encoding="utf-8"
     )
-    assert ROLE_FILE_LIST.search(init_projet), (
+    liste = ROLE_FILE_LIST.search(init_projet)
+    assert liste, (
         "la liste de fichiers d'`init-projet` a changé de forme : `ROLE_FILE_LIST` ne la voit plus"
     )
-    assert not cites_an_executor(skill_prose("init-projet"), ROLE_NAMES)
+    assert all(cites_role(liste.group(0), role) for role in ROLE_NAMES)
+    entree = tmp_path / "SKILL.md"
+    entree.write_text(
+        init_projet[liste.start() : init_projet.index("\n- ", liste.start())], encoding="utf-8"
+    )
+    assert not cites_an_executor(delegating_text(entree), ROLE_NAMES)
 
 
 # Le recueil de `cites_an_executor`, des deux côtés.
@@ -812,40 +816,28 @@ def test_les_skills_maison_du_test_sont_ceux_de_la_config() -> None:
     assert set(re.findall(r"`([a-z-]+)`", paragraph.group(0))) == set(HOUSE_SKILLS)
 
 
-@pytest.mark.parametrize(
-    "skill", [skill for skill in HOUSE_SKILLS if skill not in EXECUTOR_WAITING_LIST]
-)
+@pytest.mark.parametrize("skill", HOUSE_SKILLS)
 def test_chaque_skill_maison_nomme_ses_executants(skill: str) -> None:
-    """Second paramétrage de D5 : un skill maison hors liste d'attente nomme un rôle ou un script.
+    """Second paramétrage de D5 : un skill maison nomme un rôle ou un script.
 
     Au 2026-10-20 sur `e70e279`, deux sur treize (`cycle-pr`, `pr-paralleles`) ; trois au
     2026-10-23 sur `34604c7` avec `triage` (lot 6a2, bloc 1), six au commit suivant avec
     `interroge-moi`, `vers-prd` et `vers-issues` (bloc 2), sept le 2026-10-23 avec `repercussions`
     (lot 6b, bloc 1), neuf le 2026-10-25 avec `bug-vers-issue` et `contradiction` (lot 6b2), dix
     le 2026-10-26 avec `plan-qa` (lot 7a), onze le même jour avec `execution-qa` (lot 7b2), douze
-    le même jour avec `audit-spec-ui` (lot 8b) ; le dernier, `init-projet`, est dans
-    `EXECUTOR_WAITING_LIST` avec le lot qui l'en sort.
+    le même jour avec `audit-spec-ui` (lot 8b), treize sur treize avec `init-projet` (lot 8b) : la
+    liste d'attente qui exemptait les autres, vide, est retirée avec son cliquet.
     """
     assert cites_an_executor(skill_prose(skill), ROLE_NAMES), (
-        f"`{skill}` ne nomme aucun rôle ni aucun script, et n'est pas en liste d'attente"
-    )
-
-
-@pytest.mark.parametrize("skill", EXECUTOR_WAITING_LIST, ids=EXECUTOR_WAITING_LIST.keys())
-def test_un_skill_en_liste_d_attente_ne_nomme_encore_aucun_executant(skill: str) -> None:
-    """Le cliquet : un skill qui se met à déléguer sort de la liste d'attente dans le même commit,
-    sinon son entrée l'exempterait en silence du test précédent."""
-    assert not cites_an_executor(skill_prose(skill), ROLE_NAMES), (
-        f"`{skill}` nomme un exécutant : retire-le d'`EXECUTOR_WAITING_LIST` "
-        f"(lot {EXECUTOR_WAITING_LIST[skill]} de #134)"
+        f"`{skill}` ne nomme aucun rôle ni aucun script"
     )
 
 
 # Les skills dont la prose n'écrit plus sur la forge que par l'écriture distante relue (#134,
 # lot 4) : chaque lot de #134 y ajoute les siens — le lot 6a2 `triage`, `interroge-moi`, `vers-prd`
 # et `vers-issues` ; le lot 6b `repercussions` (bloc 1) ; le lot 6b2 `bug-vers-issue` et
-# `contradiction` ; le lot 7a `plan-qa` ; le lot 7b2 `execution-qa` ; le lot 8b `audit-spec-ui` ;
-# le reste du lot 8 les siens.
+# `contradiction` ; le lot 7a `plan-qa` ; le lot 7b2 `execution-qa` ; le lot 8b `audit-spec-ui`
+# et `init-projet`.
 SKILLS_SANS_ECRITURE_GH_DIRECTE = (
     "triage",
     "interroge-moi",
@@ -857,6 +849,7 @@ SKILLS_SANS_ECRITURE_GH_DIRECTE = (
     "plan-qa",
     "execution-qa",
     "audit-spec-ui",
+    "init-projet",
 )
 ECRITURE_RELUE = ".claude/skills/cycle-pr/scripts/ecriture-relue.py"
 # Les skills de la table précédente qui n'écrivent sur aucune issue, chacun avec sa raison : le
@@ -956,7 +949,8 @@ def test_un_skill_sans_ecriture_gh_directe_n_en_cite_aucune(skill: str) -> None:
     (lot 7b2), `execution-qa` trois sur `ffbe52e` — `gh issue comment` de
     `gabarit-commentaire-phase.md`, `gh issue edit --body-file` et la mention `gh issue edit` de
     `patch-checkbox-gh.md` —, rendus par `gh_writes` sur les cinq fichiers à ce commit. Le même
-    jour (lot 8b), `audit-spec-ui` aucune sur `0c408db`.
+    jour (lot 8b), `audit-spec-ui` aucune sur `0c408db`, `init-projet` quatre — `gh repo create`,
+    `gh label create`, les deux `gh pr ready` —, rendues par `gh_writes`.
 
     **Population** : `SKILLS_SANS_ECRITURE_GH_DIRECTE`, le `SKILL.md` et les références de chacun.
     **Ce que le détecteur ne voit pas** : une écriture décrite sans commande (« publie un
@@ -1627,6 +1621,7 @@ COMMENTAIRE_PHASE_REF = ".claude/skills/execution-qa/references/gabarit-commenta
 CORRECTION_BUG_REF = ".claude/skills/execution-qa/references/standard-correction-bug.md"
 PLAN_QA_SKILL = ".claude/skills/plan-qa/SKILL.md"
 AUDIT_SPEC_UI_SKILL = ".claude/skills/audit-spec-ui/SKILL.md"
+INIT_PROJET_SKILL = ".claude/skills/init-projet/SKILL.md"
 GABARIT_PLAN_QA_REF = ".claude/skills/plan-qa/references/gabarit-plan-qa.md"
 EXEMPLE_BLOC_ISSUE_REF = ".claude/skills/plan-qa/references/exemple-bloc-issue.md"
 TAXONOMIE_COUVERTURE_REF = ".claude/skills/plan-qa/references/taxonomie-couverture.md"
@@ -2953,7 +2948,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # énoncés neufs de `repercussions`, **18** épinglées au premier jet, **3** non — la carte de
     # proposition de la « Délégation », la première page seule sans `--paginate`, le brouillon
     # démarré dans le tour du mainteneur —, épinglées depuis ; « n'amende jamais », gardé tel quel,
-    # l'est aussi. Gardés ailleurs : la sortie de liste d'attente (`EXECUTOR_WAITING_LIST`),
+    # l'est aussi. Gardés ailleurs : la délégation (D5),
     # l'absence d'écriture `gh` directe et le renvoi au script (`SKILLS_SANS_ECRITURE_GH_DIRECTE`),
     # le renvoi aux sessions liées (`SKILLS_DES_SESSIONS_LIEES`), `use_worktree` à chaque démarrage
     # (`USE_WORKTREE_EXPLICITE`).
@@ -3330,8 +3325,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # **18** moitiés restrictives — 8 « reste à », 6 « ne … pas », 2 « jamais », 2 « seule » —, plus
     # **9** sous une forme voisine — 2 « Sans argument », 3 « aucun », « sans le LF final », « rien
     # à démarrer », « remonte à la session », « elle-même » — : **27**, toutes épinglées, 23 au
-    # premier jet, 4 au cleanup du bloc, vues rouges. Gardés ailleurs : la sortie de liste d'attente
-    # (`EXECUTOR_WAITING_LIST`), l'absence d'écriture `gh` directe, le renvoi au script et son
+    # premier jet, 4 au cleanup du bloc, vues rouges. Gardés ailleurs : la délégation (D5),
+    # l'absence d'écriture `gh` directe, le renvoi au script et son
     # exemption (`SKILLS_SANS_ECRITURE_GH_DIRECTE`, `ECRITURE_RELUE_SANS_OBJET`), le renvoi aux
     # sessions liées (`SKILLS_DES_SESSIONS_LIEES`), `use_worktree` à chaque démarrage
     # (`USE_WORKTREE_EXPLICITE`), le contexte vivant retiré (`RETIRES_DU_CONTEXTE_VIVANT`).
@@ -3446,7 +3441,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         HORS_SCOPE_REF,
         (
             "ses étapes 5 et 6 valent pour toute PR qu'ouvre une session de `triage`,"
-            " `interroge-moi`, `vers-prd`, `contradiction` ou `audit-spec-ui`, qui y renvoient"
+            " `interroge-moi`, `vers-prd`, `contradiction`, `audit-spec-ui` ou `init-projet`, qui y"
+            " renvoient"
         ),
     ),
     "6b2-contradiction-mode-sans-copie": (
@@ -3711,7 +3707,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # premier jet, 3 au cleanup, vues rouges par `mutation.py` ; le correctif de la passe 1 de
     # relecture en ajoute une, l'attendu de l'Observation ; celui de la passe 2, trois : l'attendu
     # sur la ligne de la case — Commande, Observation, erreur « Case sans type ». Gardés ailleurs :
-    # la sortie de liste d'attente (`EXECUTOR_WAITING_LIST`), l'absence d'écriture `gh` directe et
+    # la délégation (D5), l'absence d'écriture `gh` directe et
     # le renvoi au script (`SKILLS_SANS_ECRITURE_GH_DIRECTE`), le renvoi aux sessions liées
     # (`SKILLS_DES_SESSIONS_LIEES`), le contexte vivant et la création de label retirés
     # (`RETIRES_DU_CONTEXTE_VIVANT`), le type de chaque case du gabarit et de l'exemple
@@ -3997,7 +3993,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # `6b2-bug-vers-issue-ligne-introuvable-arrete` ; toutes épinglées, vues rouges sur `ffbe52e`
     # sauf deux phrases inchangées sur une ligne réécrite (`7b2-execution-qa-travail-preserve`,
     # `7b2-execution-qa-pas-de-preuve-inutile`), vues rouges par `mutation.py`. Gardés ailleurs :
-    # la sortie de liste d'attente (`EXECUTOR_WAITING_LIST`), l'absence d'écriture `gh` directe et
+    # la délégation (D5), l'absence d'écriture `gh` directe et
     # le renvoi au script (`SKILLS_SANS_ECRITURE_GH_DIRECTE`), le renvoi aux sessions liées
     # (`SKILLS_DES_SESSIONS_LIEES`), `use_worktree` et « n'écrit que dans GitHub » au démarrage de
     # la consignation (`USE_WORKTREE_EXPLICITE`), le contexte vivant retiré
@@ -4514,7 +4510,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # les lignes ajoutées du skill, 10 — 4 « aucune », 2 « jamais », « ne … ni », « n'… que »,
     # « garde », « requis » — et 8 « la session » qui agit, toutes épinglées et vues rouges par
     # `mutation.py`. La liste de `hors-scope.md` reçoit `audit-spec-ui`
-    # (`6b2-hors-scope-nomme-contradiction`). Gardés ailleurs : `EXECUTOR_WAITING_LIST`,
+    # (`6b2-hors-scope-nomme-contradiction`). Gardés ailleurs : la délégation (D5),
     # `SKILLS_SANS_ECRITURE_GH_DIRECTE`, `ECRITURE_RELUE_SANS_OBJET`, `RETIRES_DU_CONTEXTE_VIVANT`.
     "8b-audit-spec-ui-argument": (AUDIT_SPEC_UI_SKILL, "[chemin du document à auditer — requis]"),
     "8b-audit-spec-ui-description": (
@@ -4578,6 +4574,249 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "8b-audit-spec-ui-case-de-l-arret": (
         AUDIT_SPEC_UI_SKILL,
         "aucune correction partie avant son go sur le rapport",
+    ),
+    # Lot 8b de #134 (2026-10-26) : `init-projet` nomme ses exécutants et fait ses gestes de dépôt
+    # par script. Une entrée par règle écrite — « Délégation », un paragraphe par main, D-12 en
+    # reconfiguration, copie non rejouée, ordre copie → fusion, barre finale, clé au mainteneur,
+    # sessions distinctes des étapes 11 et 13 et de la « Note » —, par geste qui nomme sa
+    # sous-commande (8) et par délégation à l'étape qui agit ; et par moitié restrictive (obs 126) :
+    # par la forme, sur les lignes ajoutées du skill, 32 — 10 « ne … pas | rien | plus »,
+    # 4 « jamais », 4 « refus… », 3 « sinon », 3 « sans », 2 « hors », « garde », « reste à »,
+    # « restent au », « aucune », « pas de », « tant que » —, dont 2 sans portée restrictive
+    # (`hors-scope.md`, « projet sans code »), toutes dans une phrase épinglée et vues rouges par
+    # `mutation.py` (65 mutations, 65 rouges). La liste de `hors-scope.md` reçoit
+    # `init-projet` (`6b2-hors-scope-nomme-contradiction`). Gardés ailleurs : la délégation (D5),
+    # `SKILLS_SANS_ECRITURE_GH_DIRECTE` — les deux `gh pr ready` devenus la sortie du draft —, le
+    # renvoi au script (`cites_ecriture_relue`, forme du skill voisin de `SCRIPT_REFERENCE`).
+    "8b-init-projet-reconfiguration-par-une-pr": (
+        INIT_PROJET_SKILL,
+        (
+            "Ses écritures de dépôt partent **par une PR**, portée par la session qui a décidé,"
+            " jamais par un commit direct sur le trunk (D-12 de #134) : la session l'ouvre, la"
+            " relit et la merge au go du mainteneur, au déroulé de `triage/hors-scope.md`"
+            " (« Quand écrire », étapes 5 et 6)."
+        ),
+    ),
+    "8b-init-projet-copie-non-rejouee": (
+        INIT_PROJET_SKILL,
+        (
+            "La copie du template (étape 7) ne se rejoue pas : `copie` refuse dès qu'une cible"
+            " diffère de sa source — `settings.json` fusionné, `CLAUDE.md` finalisé."
+        ),
+    ),
+    "8b-init-projet-dialogue-a-la-session": (
+        INIT_PROJET_SKILL,
+        (
+            "La session garde le dialogue avec le mainteneur — chemin du boilerplate, public ou"
+            " privé, profil validé valeur par valeur, mapping de labels, skills publics à cocher"
+            " —, le choix des valeurs et le récapitulatif. Le reste change de main :"
+        ),
+    ),
+    "8b-init-projet-delegation-releveur": (
+        INIT_PROJET_SKILL,
+        (
+            "**`releveur`** — l'inspection de l'étape 3, rendue en tableau pré-rempli dans un"
+            " fichier ; à l'étape 7, l'empreinte et l'étiquette la plus précise de chaque action"
+            " (`git ls-remote`), les valeurs de `package-ecosystem` lues dans la référence"
+            " Dependabot, passage cité (`context7`), la vérification du runtime épinglé ; à"
+            " l'étape 11, le verdict de chaque commande — code de sortie et sortie brute, dans un"
+            " fichier. Il ne décide rien : ce qui compte reste à la session ;"
+        ),
+    ),
+    "8b-init-projet-delegation-executant": (
+        INIT_PROJET_SKILL,
+        (
+            "**`executant`** — la génération de chaque fichier, en tranche entièrement spécifiée"
+            " par la session (valeurs validées, gabarit, empreintes relevées) :"
+            " `.claude/pipeline.config.md` (étape 5), `ci.yml`, `dependabot.yml` et `.gitignore`"
+            " (étape 7), `CLAUDE.md` finalisé (étape 9) ;"
+        ),
+    ),
+    "8b-init-projet-delegation-scripts": (
+        INIT_PROJET_SKILL,
+        (
+            "**scripts** — les gestes de dépôt, appelés par la session elle-même : un geste isolé"
+            " coûte plus délégué (`CLAUDE.md`, « Orchestration »). En amorçage, les skills ne"
+            " sont pas encore dans le projet : `amorcage.py` se lance par"
+            " `python <répertoire de ce skill>/scripts/amorcage.py` — `depot init` (étape 2),"
+            " `copie` (7), `valide` (7), `ignore` (7), `mcp` (10), `commit` (12) —,"
+            " `ecriture-relue.py` par"
+            " `python <répertoire de ce skill>/../cycle-pr/scripts/ecriture-relue.py` —"
+            " `depot create` (2), `label create --mapping` (6). Le contrat de chacun est son"
+            " `--help` ;"
+        ),
+    ),
+    "8b-init-projet-delegation-sessions": (
+        INIT_PROJET_SKILL,
+        (
+            "**sessions distinctes** — la première PR de code d'un projet sans code, une session"
+            " `cycle-pr` (étape 11) ; `vers-prd` ou `vers-issues`, des sessions que l'étape 13"
+            " propose, jamais enchaînées dans celle-ci ; protocole commun :"
+            " `.claude/skills/cycle-pr/references/sessions-liees.md`."
+        ),
+    ),
+    "8b-init-projet-depot-init": (
+        INIT_PROJET_SKILL,
+        (
+            "Si le projet n'est pas un dépôt git : `amorcage.py depot init` (« Délégation ») ; le"
+            " premier commit est celui d'amorçage (étape 12)."
+        ),
+    ),
+    "8b-init-projet-depot-create": (
+        INIT_PROJET_SKILL,
+        (
+            "Sinon, demander public ou privé, puis créer le dépôt et son remote `origin` :"
+            " `ecriture-relue.py depot create <owner>/<repo> --private|--public`"
+        ),
+    ),
+    "8b-init-projet-inspection-par-le-releveur": (
+        INIT_PROJET_SKILL,
+        (
+            "Le `releveur` inspecte le repo (« Délégation ») et rend des valeurs pré-remplies, que"
+            " la session fait corriger par l'utilisateur."
+        ),
+    ),
+    "8b-init-projet-mapping-en-fichier": (
+        INIT_PROJET_SKILL,
+        "Le mapping validé s'écrit dans un fichier JSON pour l'étape 6",
+    ),
+    "8b-init-projet-config-par-l-executant": (
+        INIT_PROJET_SKILL,
+        (
+            "L'`executant` (« Délégation ») le génère depuis ce gabarit et les valeurs validées ;"
+            " la session le confirme"
+        ),
+    ),
+    "8b-init-projet-gabarit-sortie-du-draft": (
+        INIT_PROJET_SKILL,
+        "corrigées avant la sortie du draft si elles dévient. Toute PR qui n'est pas l'œuvre",
+    ),
+    "8b-init-projet-label-create": (
+        INIT_PROJET_SKILL,
+        (
+            "`ecriture-relue.py label create --mapping <fichier>` (« Délégation »), sur le fichier"
+            " de l'étape 4, crée les labels absents du dépôt ; sa sortie dit ce qui a été créé, et"
+            " nomme un label présent sous une autre couleur sans le modifier."
+        ),
+    ),
+    "8b-init-projet-copie": (
+        INIT_PROJET_SKILL,
+        "`amorcage.py copie <boilerplate>` (« Délégation ») copie `template/`, hors `.github/`",
+    ),
+    "8b-init-projet-copie-puis-fusion": (
+        INIT_PROJET_SKILL,
+        (
+            "**L'ordre est copie, puis fusion** : un `settings.json` déjà présent sous un autre"
+            " contenu fait refuser la copie entière — le mettre de côté, copier, puis le fusionner"
+            " à la main. Après la fusion, `copie` ne repasse plus : il refuserait sur ce fichier."
+        ),
+    ),
+    "8b-init-projet-ci-par-l-executant": (
+        INIT_PROJET_SKILL,
+        "l'`executant` génère `.github/workflows/ci.yml`",
+    ),
+    "8b-init-projet-empreintes-par-le-releveur": (
+        INIT_PROJET_SKILL,
+        "Empreintes et étiquettes sont relevées par le `releveur`",
+    ),
+    "8b-init-projet-garde-sortie-du-draft": (
+        INIT_PROJET_SKILL,
+        "lit le run du SHA de tête avant de sortir la PR du draft",
+    ),
+    "8b-init-projet-dependabot-par-l-executant": (
+        INIT_PROJET_SKILL,
+        "Puis l'`executant` génère `.github/dependabot.yml`",
+    ),
+    "8b-init-projet-ecosysteme-cite-par-le-releveur": (
+        INIT_PROJET_SKILL,
+        "pas de mémoire — le `releveur` en cite le passage",
+    ),
+    "8b-init-projet-runtime-par-le-releveur": (
+        INIT_PROJET_SKILL,
+        "le `releveur` vérifie qu'aucune recette n'invoque le binaire nu d'un runtime épinglé",
+    ),
+    "8b-init-projet-valide": (
+        INIT_PROJET_SKILL,
+        "`amorcage.py valide <fichier> --schema vendor.github-workflows`",
+    ),
+    "8b-init-projet-gitignore-par-l-executant": (
+        INIT_PROJET_SKILL,
+        "L'`executant` le génère depuis les **chemins déclarés**",
+    ),
+    "8b-init-projet-ignore-et-barre-finale": (
+        INIT_PROJET_SKILL,
+        (
+            "`amorcage.py ignore --exclus <chemin> … --suivis <chemin> …` sur une liste de chemins"
+            " fabriqués depuis le profil : ceux qui doivent être exclus, et les lockfiles/sources"
+            " qui doivent rester suivis ; **un dossier absent se nomme avec sa barre finale**"
+            " (`node_modules/`) ou par un chemin qu'il contient. Un fichier de motifs ne se relit"
+            " pas, il se teste."
+        ),
+    ),
+    "8b-init-projet-skills-par-copie": (
+        INIT_PROJET_SKILL,
+        "`copie` (étape 7) a copié les skills de la pipeline",
+    ),
+    "8b-init-projet-claude-md-par-l-executant": (
+        INIT_PROJET_SKILL,
+        "l'`executant` (« Délégation »), sur les sections et le chemin que la session lui donne",
+    ),
+    "8b-init-projet-mcp": (
+        INIT_PROJET_SKILL,
+        (
+            "`amorcage.py mcp context7 https://mcp.context7.com/mcp` (« Délégation ») : rien à"
+            " faire si `claude mcp list` le liste déjà ; sinon il l'ajoute — transport HTTP"
+            " distant, portée utilisateur, sans clé : suffisant, débit limité —, puis relit la"
+            " liste. 2. Pour référence, la commande qu'il lance, puis celles qui restent au"
+            " mainteneur :"
+        ),
+    ),
+    "8b-init-projet-cle-au-mainteneur": (
+        INIT_PROJET_SKILL,
+        (
+            "**ce geste reste au mainteneur, qui tape lui-même la commande** (`contraintes.md`,"
+            " « Jamais d'information dérivée d'un secret »)."
+        ),
+    ),
+    "8b-init-projet-verdict-par-le-releveur": (
+        INIT_PROJET_SKILL,
+        (
+            "le `releveur` (« Délégation ») lance réellement `test` et chaque commande des"
+            " « gates bloquants en CI » de la config, et rend le verdict de chacune — code de"
+            " sortie et sortie brute — dans un fichier."
+        ),
+    ),
+    "8b-init-projet-premiere-pr-de-code-distincte": (
+        INIT_PROJET_SKILL,
+        (
+            "Cette première PR de code est une **session `cycle-pr` distincte** (« Délégation »)"
+            " : celle-ci ne la mène pas."
+        ),
+    ),
+    "8b-init-projet-commit": (
+        INIT_PROJET_SKILL,
+        (
+            "`amorcage.py commit` (« Délégation ») refuse tant qu'un fichier suivi viole les"
+            " règles d'ignore — `.gitignore` n'agit pas rétroactivement sur des fichiers déjà"
+            " stagés — et les nomme tous : les sortir de l'index (`git rm --cached`), puis le"
+            " relancer. Sinon il commite `chore: amorçage pipeline de dev`, puis relit."
+        ),
+    ),
+    "8b-init-projet-prochaines-etapes-proposees": (
+        INIT_PROJET_SKILL,
+        (
+            "que la session **propose** en sessions distinctes (« Délégation »), jamais"
+            " enchaînées dans celle-ci."
+        ),
+    ),
+    "8b-init-projet-note-s-arrete": (
+        INIT_PROJET_SKILL,
+        (
+            "S'il est absent ou incomplet, le skill **s'arrête** et propose une session"
+            " `init-projet` distincte (protocole :"
+            " `.claude/skills/cycle-pr/references/sessions-liees.md`) — il ne l'enchaîne pas dans"
+            " sa propre session."
+        ),
     ),
 }
 

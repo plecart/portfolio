@@ -83,7 +83,7 @@ Le mainteneur peut :
 
 ## Quand écrire dans `.out-of-scope/`
 
-Uniquement lorsqu'un **enhancement** (pas un bug) est rejeté en `wontfix`. Le fichier change par une PR, jamais par un commit direct sur le trunk (D-12 de #134). Le déroulé — ses étapes 5 et 6 valent pour toute PR qu'ouvre une session de `triage`, `interroge-moi`, `vers-prd`, `contradiction` ou `audit-spec-ui`, qui y renvoient :
+Uniquement lorsqu'un **enhancement** (pas un bug) est rejeté en `wontfix`. Le fichier change par une PR, jamais par un commit direct sur le trunk (D-12 de #134). Le déroulé — ses étapes 5 et 6 valent pour toute PR qu'ouvre une session de `triage`, `interroge-moi`, `vers-prd`, `contradiction`, `audit-spec-ui` ou `init-projet`, qui y renvoient :
 
 1. Le mainteneur décide qu'une demande de fonctionnalité est hors périmètre
 2. Vérifier si un fichier `.out-of-scope/` correspondant existe déjà
