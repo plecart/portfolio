@@ -130,7 +130,7 @@ Pour le plan dans son ensemble :
 
 ### 6. Marque explicitement les décisions de politique
 
-Quand un comportement dépend du produit ou est ambigu, marque la case avec `Décision QA :`, **après** sa marque de type — le plus souvent `**Observation** — Décision QA : …` : une case de décision reste une case typée, sinon la passe comptable la refuse comme case sans type. Indique :
+Quand un comportement dépend du produit ou est ambigu, marque la case avec `Décision QA :`, **après** sa marque de type — le plus souvent `**Observation** — Décision QA : … → <attendu>` : une case de décision reste une case typée, sinon la passe comptable la refuse comme case sans type. Indique :
 - Comportement actuel (d'après le code)
 - Risque
 - Politique recommandée
@@ -164,10 +164,10 @@ La session lui passe le chemin du brouillon et celui du relevé des issues du p�
 - **Cases sans type** — toute ligne sortie est une case sans type (gabarit, « Types de case ») :
 
   ```bash
-  grep -nE '^[[:blank:]]*- \[[ xX]\] ' <brouillon> | grep -vE '^[[:digit:]]+:[[:blank:]]*- \[[ xX]\] (\*\*Commande\*\* — `[^`]+` → |\*\*Observation\*\* — )'
+  grep -nE '^([[:blank:]>]*([-*+]|[[:digit:]]+[.)])[[:blank:]]+)+\[[[:blank:]xX]\][[:blank:]]+' <brouillon> | grep -vE '^[[:digit:]]+:([[:blank:]>]*([-*+]|[[:digit:]]+[.)])[[:blank:]]+)+\[[[:blank:]xX]\][[:blank:]]+(\*\*Commande\*\* — `[^`]+`|\*\*Observation\*\* — .+) → [^[:space:]]'
   ```
 
-- **Critères → cases** — `grep -nE '^## |^- \*\*C[[:digit:]]+\*\* — |^[[:blank:]]*- \[[ xX]\] .*\(C[[:digit:]]+(, C[[:digit:]]+)*\)' <brouillon>` : chaque issue du relevé a son titre `## Bloc de fonctionnalité : Issue #<N>` ; sous chacun, avant le titre suivant, autant de lignes `- **C<k>** —` que l'issue a de critères, et chaque `C<k>` cité par au moins une case.
+- **Critères → cases** — `grep -nE '^## |^- \*\*C[[:digit:]]+\*\* — |^([[:blank:]>]*([-*+]|[[:digit:]]+[.)])[[:blank:]]+)+\[[[:blank:]xX]\][[:blank:]]+.*\(C[[:digit:]]+(, C[[:digit:]]+)*\)' <brouillon>` : chaque issue du relevé a son titre `## Bloc de fonctionnalité : Issue #<N>` ; sous chacun, avant le titre suivant, autant de lignes `- **C<k>** —` que l'issue a de critères, et chaque `C<k>` cité par au moins une case.
 - **Marqueurs** — `grep -nE 'TODO|FIXME|à compléter|<[^<>[:space:]][^<>]*>' <brouillon>` : toute ligne sortie porte un marqueur ou un espace réservé du gabarit ; une valeur d'exécution s'écrit en variable (`$DOC_ID`, étape 5).
 - **Structure** — `grep -nE "^## |^\*\*Règle d'arrêt\*\*" <brouillon>` : « Vue d'ensemble », « Types de case » et « Saisie d'échec » présents, « Paliers de sévérité » une fois, avant la première phase ; chaque `## Phase` — sauf la Phase Finale, qui clôt le plan — et chaque `## Bloc de fonctionnalité` suivi de sa ligne `**Règle d'arrêt**` avant le titre suivant.
 
@@ -189,7 +189,7 @@ La session lui passe le chemin du brouillon et celui du relevé des issues du p�
 |---|---|
 | **Cases qui refont le travail de la CI** (« les tests passent », « le lint est vert ») | Les supprimer. Le plan ne contient que ce qu'un test ne peut pas voir. |
 | **Sections pour des surfaces inexistantes** (frontend sur une CLI, BDD sur une lib) | Déduire les surfaces de `.claude/pipeline.config.md`. Une surface absente ne produit aucune section, pas même un « N/A ». |
-| **Case sans type** | `**Commande** —` ou `**Observation** —` en tête (gabarit, « Types de case ») ; la passe comptable la refuse. |
+| **Case sans type** | `**Commande** —` ou `**Observation** —` en tête, puis ` → ` et l'attendu (gabarit, « Types de case ») ; la passe comptable la refuse. |
 | Le plan couvre des zones qu'aucune issue récente n'a touchées | Recadrer. Uniquement les phases de couche A pour le transversal, les blocs de couche B liés aux issues dans le périmètre. |
 | Vérifications génériques (« l'API marche », « l'UI s'affiche ») | Ancrer à des routes/composants/états/codes de statut attendus spécifiques. |
 | Jobs asynchrones sans vérifications d'état terminal | Ajouter les chemins explicites succès ET échec, avec l'état persisté attendu pour chacun. |

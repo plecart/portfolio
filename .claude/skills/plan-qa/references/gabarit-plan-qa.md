@@ -43,8 +43,9 @@ Squelette par défaut du corps d'issue GitHub pour un plan de QA. Remplace les e
 Chaque case porte son type juste après la case à cocher, pour se jouer sans décision. Une case
 **Commande** tient sa commande exacte dans un seul segment entre accents graves, puis ` → ` et son
 attendu : elle se déroule telle qu'écrite, comparée à son attendu. Une case **Observation** —
-rendu, état d'écran, console, ergonomie — se joue avec le mainteneur. Une case qui couvre un
-critère d'acceptation le cite en fin de texte, avant toute annotation : `(C1)` ou `(C1, C3)`.
+rendu, état d'écran, console, ergonomie — porte de même ` → ` et son attendu, et se joue avec le
+mainteneur. Une case qui couvre un critère d'acceptation le cite en fin de texte, avant toute
+annotation : `(C1)` ou `(C1, C3)`.
 
 ## Saisie d'échec
 
