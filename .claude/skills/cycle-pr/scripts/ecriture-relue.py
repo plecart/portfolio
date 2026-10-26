@@ -2,6 +2,8 @@
 
 Usage :
     python ecriture-relue.py label <N> [--add <label> …] [--remove <label> …]
+    python ecriture-relue.py label create --mapping <fichier>
+    python ecriture-relue.py depot create <propriétaire>/<nom> (--private | --public)
     python ecriture-relue.py checkbox patch <N> (--case <ancre> … | --paires <fichier>)
     python ecriture-relue.py checkbox next <N>
     python ecriture-relue.py brief patch <N> (--case <ancre> … | --paires <fichier>)
@@ -16,10 +18,12 @@ Usage :
 La règle « Écritures sur un artefact distant » de `contraintes.md` veut que toute écriture sur la
 forge se relise ; ce script tient cette relecture pour les gestes de `cycle-pr` Étape 8, le
 commentaire de répercussion de son Étape 6, la création d'une issue, la transition de ses labels,
-sa fermeture et son thème, et le plan de QA d'`execution-qa` (#134, lots 4a, 4b, 6a1 et 7).
+sa fermeture et son thème, le plan de QA d'`execution-qa`, et les gestes de dépôt d'`init-projet`
+— les labels du dépôt, le dépôt lui-même (#134, lots 4a, 4b, 6a1, 7 et 8a).
 Chaque sous-commande lit par `gh api` — octets décodés en UTF-8, jamais le mode texte, qui traduit
 les fins de ligne, ni la page de code de la console (obs 87, 106, 108, 116) —, écrit, puis relit
-par le même canal ; `checkbox next` lit seulement. Un texte s'écrit par
+par le même canal ; `checkbox next` lit seulement ; `depot create` écrit par `gh repo create`, et
+lit aussi le dépôt git courant par `git`. Un texte s'écrit par
 `gh api -X PATCH <chemin> --input -` — `-X POST` pour publier un commentaire, créer une issue ou un
 milestone —, la charge JSON sur l'entrée standard, et sa relecture compare le **texte entier** à
 l'attendu : une forme réduite, longueur ou ancre, ne voit pas une conversion qui la préserve
@@ -32,6 +36,21 @@ l'attendu : une forme réduite, longueur ou ancre, ne voit pas une conversion qu
   `--remove needs-triage --add needs-interrogation`, ne laisse jamais l'issue sans label d'état,
   et une transition tombée entre les deux laisse les deux labels, que le rejeu achève. Un label
   à poser doit exister dans le dépôt, comme pour `issue create` ;
+- `label create` crée les labels du fichier `--mapping` absents du dépôt, puis relit les labels du
+  dépôt, lus sur toutes leurs pages. Le fichier, UTF-8 lu en octets, est une liste JSON non vide
+  d'objets `{"nom": …, "couleur": …, "description": …}`, ces trois champs seuls, textuels : un nom
+  non vide sur une ligne, six chiffres hexadécimaux sans `#`, une description de 100 caractères au
+  plus (« Create a label »), aucun nom deux fois, casse ignorée. Un nom se compare sans la casse —
+  la forge rend `bug` sous `labels/BUG` —, une couleur aussi. Un label présent n'est jamais
+  modifié : sous une autre couleur, la sortie le dit (« présent, couleur <x> au lieu de <y>, non
+  modifié »), sans échec. La relecture veut chaque label du fichier dans le dépôt, et chaque label
+  créé sous sa couleur et sa description ;
+- `depot create` crée le dépôt `<propriétaire>/<nom>` — `--private` ou `--public`, l'un des deux
+  requis — et son remote `origin`, par `gh repo create <dépôt> --private|--public --source=.
+  --remote=origin`, depuis l'arbre de travail d'un dépôt git sans `origin`. La relecture lit le
+  dépôt par l'API REST (« Get a repository ») — son nom, sans la casse : la forge rend le nom
+  canonique ; sa visibilité —, puis `git remote get-url origin`, qui doit rendre l'URL HTTPS ou SSH
+  du dépôt : celle que `gh` donne au remote selon son `git_protocol` (`FormatRemoteURL`) ;
 - `checkbox patch` coche des cases du corps de `<N>`, `brief patch` celles de son commentaire de
   brief — le seul qui s'ouvre par `## Brief d'agent` (`triage/brief-agent.md`). Une ancre est un
   extrait du texte qui suit le marqueur d'une seule ligne de case, `- [ ] …` ou `- [x] …` (`[X]`
@@ -50,8 +69,9 @@ l'attendu : une forme réduite, longueur ou ancre, ne voit pas une conversion qu
   (`ligne en double (<n>)`) au lieu de la dire déjà appliquée ;
 - `checkbox next` lit la prochaine case en attente du corps de `<N>`, un plan de QA, sans rien
   écrire — la seule lecture de la famille, où le lot 7 de #134 range la prochaine case
-  d'`execution-qa` avec le patch de ses cases ; les dix autres sous-commandes écrivent chacune au
-  premier appel, dénombrées par `REJEUX` (`test_ecriture_relue.py`). Une case est une ligne de
+  d'`execution-qa` avec le patch de ses cases ; les douze autres sous-commandes écrivent chacune au
+  premier appel, onze dénombrées par `REJEUX` (`test_ecriture_relue.py`) — `depot create` en est
+  hors : son rejeu trouve `origin` et refuse. Une case est une ligne de
   case GFM, `PLAN_QA_CASE` de `test_agent_skills.py` ; elle attend quand un blanc la laisse non
   cochée et que sa ligne ne porte ni `🔴`, ni ` — BLOQUÉ`, ni ` — accepté`
   (`execution-qa/SKILL.md` §3, §4, §6 et « Passe finale »). La sortie est le dernier titre
@@ -96,7 +116,9 @@ toutes les paires sont validées avant la première écriture —, zéro brief �
 briefs, un fichier de brief qui ne s'ouvre pas par sa marque, un label inconnu du dépôt — chacun
 nommé ; `CLAUDE.md` interdit de deviner un label, et les références REST de « Create an issue » et
 d'« Add labels to an issue » ne disent pas ce qu'elles font d'un label inconnu —, un fichier
-illisible, non UTF-8 ou sans ligne non vide — lu avant tout appel à la forge —, une issue ouverte
+illisible, non UTF-8 ou sans ligne non vide — lu avant tout appel à la forge —, un fichier
+`--mapping` mal formé — chaque défaut nommé avec le rang de son label, tous en une passe, lu avant
+tout appel —, hors d'un dépôt git, un remote `origin` déjà là — son URL nommée —, une issue ouverte
 de ce titre et de ce corps sous d'autres labels — le rejeu d'une création dont la forge a ignoré
 les labels ; il nomme l'appel de `label` qui pose les manquants, et ceux en plus sans réparation :
 l'issue a pu être triée depuis sa création —, une issue déjà fermée sous une autre raison — une
@@ -110,8 +132,8 @@ déjà cochée, des paires toutes déjà appliquées, des labels tous déjà pos
 issue déjà fermée sous cette raison ou déjà dans ce milestone, un milestone déjà fermé, un fichier
 qui termine déjà le corps ou qui l'est déjà tout entier, un commentaire de `<N>` qui porte déjà le
 fichier pour corps, une issue ouverte — pas une PR — qui porte déjà ce titre, ce corps et ces
-labels : rien à écrire, et la sortie le dit — un rejeu après une relecture tombée n'écrit donc pas
-une seconde fois.
+labels, des labels du fichier `--mapping` tous dans le dépôt : rien à écrire, et la sortie le dit —
+un rejeu après une relecture tombée n'écrit donc pas une seconde fois.
 
 **Ce qu'il ne prouve pas.** Il ne choisit ni les cases ni les lignes : la session les nomme. Il ne
 verrouille rien : une édition faite par un tiers entre sa lecture et son écriture est écrasée, et
@@ -128,16 +150,20 @@ un rejeu l'ajoute, le réécrit, le publie ou crée l'issue une seconde fois. Ap
 thème relue non conforme, le rejeu de `milestone attach` ne relit pas le thème qu'il trouve :
 gardé sous une autre description, il y rattache l'issue et sort en 0 — fuite assumée, `xfail`
 strict de la forme `milestone-attach-creation-description` (`test_ecriture_relue.py`) ; sous
-un autre titre, il ne le reconnaît pas et en crée un second ; fermé, il refuse. Une relecture
-conforme atteste ce que l'API rend, pas ce que l'interface web affiche. Le chemin d'un label
-encodé, la pose d'un label, l'écriture du corps d'une PR, la publication d'un commentaire sur
-une PR par l'endpoint `issues`, la création et la fermeture d'une issue, la création, le
-rattachement et la fermeture d'un milestone ne sont pas mesurés sur la vraie forge.
+un autre titre, il ne le reconnaît pas et en crée un second ; fermé, il refuse. `label create` ne
+compare pas la description d'un label présent, et ne réécrit pas sa couleur : il la nomme. Après
+une relecture de `depot create` tombée, le rejeu trouve `origin` et refuse : le dépôt se relit à
+la main ; un `insteadOf` qui réécrit l'URL d'`origin` hors de ses formes HTTPS et SSH rend une
+relecture non conforme. Une relecture conforme atteste ce que l'API rend, pas ce que l'interface
+web affiche. Le chemin d'un label encodé, la pose d'un label, l'écriture du corps d'une PR, la
+publication d'un commentaire sur une PR par l'endpoint `issues`, la création et la fermeture
+d'une issue, la création, le rattachement et la fermeture d'un milestone, la création d'un label
+du dépôt et celle d'un dépôt ne sont pas mesurés sur la vraie forge.
 
 Sortie : 0 écrit et relu conforme, rien à écrire, ou lu (`checkbox next`) ; 1 refus (« refus — »),
 ou écriture lancée et relecture non conforme ou impossible (« relecture non conforme — ») — motif
 en une ligne sur la sortie standard ; 2 appel mal formé, usage sur la sortie d'erreur. Python 3.11 ou plus,
-bibliothèque standard seule ; `gh` authentifié, lancé depuis le dépôt.
+bibliothèque standard seule ; `gh` authentifié et `git`, lancé depuis le dépôt.
 """
 
 import argparse
@@ -151,7 +177,7 @@ from collections.abc import Callable, Generator, Mapping, Sequence
 from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
-from typing import Any, NamedTuple, TypeVar
+from typing import Any, NamedTuple, TypeVar, cast
 from urllib.parse import quote
 
 Run = Callable[[Sequence[str], bytes | None], subprocess.CompletedProcess[bytes]]
@@ -161,6 +187,11 @@ REPO = "repos/{owner}/{repo}"
 # Les issues du dépôt, et ses PR : pour l'API REST, une PR est une issue.
 ISSUES = f"{REPO}/issues"
 MILESTONES = f"{REPO}/milestones"
+LABELS = f"{REPO}/labels"
+# Une couleur de label : six chiffres hexadécimaux, sans `#` (« Create a label », API REST).
+HEX_COLOR = re.compile(r"[0-9A-Fa-f]{6}")
+# « Create a label » : une description « must be 100 characters or fewer ».
+DESCRIPTION_MAX = 100
 BRIEF_MARK = "## Brief d'agent"
 # Une ligne de case Markdown ; le groupe est l'état de la case. `[X]` vaut coché pour GitHub.
 CHECKBOX = re.compile(r"[ \t]*- \[([ xX])\] ")
@@ -177,6 +208,14 @@ PLAN_CASE = re.compile(r"^(?:[ \t>]*(?:[-*+]|\d+[.)])[ \t]+)+\[(?P<state>[ \txX]
 SETTLED_MARKS = ("🔴", " — BLOQUÉ", " — accepté")
 # `str.isdigit` accepte « ² » : le numéro, qui entre dans un chemin d'API, se lit en ASCII.
 NUMBER = re.compile(r"[0-9]+")
+# Un dépôt `<propriétaire>/<nom>`, qui entre dans un chemin d'API et dans `gh repo create` : un
+# propriétaire ne s'ouvre pas par `-`, la forme d'une option ; un nom n'est ni `.` ni `..`, segments
+# relatifs d'un chemin.
+REPOSITORY = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*/(?!\.\.?$)[A-Za-z0-9._-]+")
+INSIDE_WORK_TREE = ("git", "rev-parse", "--is-inside-work-tree")
+ORIGIN_URL = ("git", "remote", "get-url", "origin")
+# Le code de sortie de `git remote` sur un remote introuvable (git-remote(1), « EXIT STATUS »).
+NO_SUCH_REMOTE = 2
 
 
 class Refusal(Exception):
@@ -201,18 +240,38 @@ def default_run(cmd: Sequence[str], stdin: bytes | None) -> subprocess.Completed
     return subprocess.run(list(cmd), input=stdin, capture_output=True, check=False)
 
 
-def gh_api(run: Run, *args: str, stdin: bytes | None = None) -> bytes:
-    """La sortie de `gh api <args>`, ou un refus si la commande échoue ou ne se lance pas : une
-    sortie vide d'une commande en échec ne se lit jamais comme une réponse."""
-    cmd = ("gh", "api", *args)
+def launch(
+    run: Run, cmd: Sequence[str], stdin: bytes | None = None
+) -> subprocess.CompletedProcess[bytes]:
+    """`cmd` lancé par `run`, quel que soit son code de sortie.
+
+    Raises:
+        Refusal: la commande ne se lance pas — exécutable introuvable.
+    """
     try:
-        done = run(cmd, stdin)
+        return run(cmd, stdin)
     except OSError as error:
-        raise Refusal(f"`gh` ne se lance pas : {error}") from error
+        raise Refusal(f"`{cmd[0]}` ne se lance pas : {error}") from error
+
+
+def failed(cmd: Sequence[str], done: subprocess.CompletedProcess[bytes]) -> Refusal:
+    """Le refus de `cmd`, sortie en échec : son code, et sa sortie d'erreur en une ligne."""
+    motif = " ".join(done.stderr.decode("utf-8", "replace").split())
+    return Refusal(f"`{' '.join(cmd)}` a échoué ({done.returncode}) : {motif}")
+
+
+def stdout_of(run: Run, cmd: Sequence[str], stdin: bytes | None = None) -> bytes:
+    """La sortie de `cmd`, ou un refus si la commande échoue ou ne se lance pas (`launch`,
+    `failed`) : une sortie vide d'une commande en échec ne se lit jamais comme une réponse."""
+    done = launch(run, cmd, stdin)
     if done.returncode != 0:
-        motif = " ".join(done.stderr.decode("utf-8", "replace").split())
-        raise Refusal(f"`{' '.join(cmd)}` a échoué ({done.returncode}) : {motif}")
+        raise failed(cmd, done)
     return done.stdout
+
+
+def gh_api(run: Run, *args: str, stdin: bytes | None = None) -> bytes:
+    """La sortie de `gh api <args>` (`stdout_of`)."""
+    return stdout_of(run, ("gh", "api", *args), stdin)
 
 
 def read_json(run: Run, parse: Callable[[Any], Any], *args: str, stdin: bytes | None = None) -> Any:
@@ -816,16 +875,206 @@ def label_edit(run: Run, args: argparse.Namespace) -> str:
     return f"écrit et relu — labels de {issue} : {' ; '.join([*written, *done])}"
 
 
+def named_twice(names: Sequence[str]) -> list[str]:
+    """Les noms de `names` qui y figurent deux fois au moins, casse ignorée, triés."""
+    folded = [name.casefold() for name in names]
+    return sorted({name for name in names if folded.count(name.casefold()) > 1})
+
+
 def label_misuse(args: argparse.Namespace) -> str | None:
-    """Ce qu'argparse ne sait pas exiger de `label` : `--add` ou `--remove`, l'un au moins, et
-    aucun label nommé deux fois, casse ignorée — posé et retiré, l'état de l'issue dépendrait de
-    l'ordre des requêtes ; retiré deux fois, le second retrait viserait un label déjà ôté."""
+    """Ce qu'argparse ne sait pas exiger de `label` : `label create` prend `--mapping`, seul ;
+    `label <N>` prend `--add` ou `--remove`, l'un au moins, et aucun label nommé deux fois, casse
+    ignorée — posé et retiré, l'état de l'issue dépendrait de l'ordre des requêtes ; retiré deux
+    fois, le second retrait viserait un label déjà ôté."""
     names = [*args.add, *args.remove]
+    if args.number == "create":
+        return (
+            None
+            if args.mapping and not names
+            else "label create : --mapping, sans --add ni --remove"
+        )
+    if args.mapping:
+        return "label <N> : --mapping ne va qu'avec label create"
     if not names:
         return "label : --add ou --remove, l'un au moins"
-    folded = [name.casefold() for name in names]
-    twice = sorted({name for name in names if folded.count(name.casefold()) > 1})
+    twice = named_twice(names)
     return f"label : nommé deux fois, casse ignorée : {', '.join(twice)}" if twice else None
+
+
+class Label(NamedTuple):
+    """Un label du dépôt : son nom, sa couleur — six chiffres hexadécimaux, sans `#` — et sa
+    description."""
+
+    name: str
+    color: str
+    description: str
+
+
+# Chaque champ d'un label du fichier `--mapping`, et le défaut de sa valeur, un texte — `None` si
+# elle tient.
+MAPPING_FIELDS: dict[str, Callable[[str], str | None]] = {
+    "nom": lambda name: (
+        None if is_one_line(name) else f"nom vide ou sur plusieurs lignes : {name!r}"
+    ),
+    "couleur": lambda color: (
+        None
+        if HEX_COLOR.fullmatch(color)
+        else f"couleur {color!r} : six chiffres hexadécimaux, sans #"
+    ),
+    "description": lambda text: (
+        None
+        if len(text) <= DESCRIPTION_MAX
+        else f"description de {len(text)} caractères, {DESCRIPTION_MAX} au plus"
+    ),
+}
+
+
+def entry_defects(entry: Any) -> list[str]:
+    """Les défauts d'un label du fichier `--mapping`, tous en une passe : un objet, ses seuls
+    champs `MAPPING_FIELDS`, chacun présent et textuel, puis sa valeur."""
+    if not isinstance(entry, dict):
+        return [f"{type(entry).__name__} au lieu d'un objet"]
+    # Un objet JSON : des clés textuelles, des valeurs de tout type.
+    fields = cast(dict[str, Any], entry)
+    defects = [f"champ inconnu : {key}" for key in fields if key not in MAPPING_FIELDS]
+    for field, defect_of in MAPPING_FIELDS.items():
+        if field not in fields:
+            defects.append(f"champ {field} absent")
+        elif not isinstance(value := fields[field], str):
+            defects.append(f"champ {field} de type {type(value).__name__}")
+        elif defect := defect_of(value):
+            defects.append(defect)
+    return defects
+
+
+def entry_name(entry: Any) -> str | None:
+    """Le nom d'un label du fichier `--mapping`, `None` s'il n'en a pas de textuel."""
+    try:
+        return typed(entry, "nom", str)
+    except (KeyError, TypeError):
+        return None
+
+
+def read_mapping(path: Path) -> list[Label]:
+    """Les labels du fichier `--mapping` `path` : une liste JSON d'objets
+    `{"nom": …, "couleur": …, "description": …}`, UTF-8 lu en octets.
+
+    Raises:
+        Refusal: fichier illisible ou non UTF-8 (`read_utf8`), pas du JSON, pas une liste non
+            vide, ou mal formé — en une passe, chaque défaut nommé avec le rang de son label
+            (`entry_defects`), puis les noms en double, casse ignorée : GitHub les tient pour un
+            même label.
+    """
+    text = read_utf8(path)
+    try:
+        document = json.loads(text)
+    except ValueError as error:
+        raise Refusal(f"{path} n'est pas du JSON : {error}") from error
+    if not isinstance(document, list) or not document:
+        raise Refusal(f"{path} : une liste de labels attendue, non vide")
+    entries = cast(list[Any], document)
+    motifs = [
+        f"label {rank} : {defect}"
+        for rank, entry in enumerate(entries, 1)
+        for defect in entry_defects(entry)
+    ]
+    if twice := named_twice([name for entry in entries if (name := entry_name(entry))]):
+        motifs.append(f"nommé deux fois, casse ignorée : {', '.join(twice)}")
+    if motifs:
+        raise Refusal(f"{path} : {' ; '.join(motifs)}")
+    return [Label(entry["nom"], entry["couleur"], entry["description"]) for entry in entries]
+
+
+def repo_label(document: Any) -> Label:
+    """Un label du dépôt, tel que l'API REST le liste ; une description `null` vaut le texte vide.
+
+    Raises:
+        KeyError, TypeError: un nom ou une couleur absents ou non textuels, une description ni
+            textuelle ni `null` (`typed`, `text_or_null`).
+    """
+    name, color = typed(document, "name", str), typed(document, "color", str)
+    return Label(name, color, text_or_null(document, "description") or "")
+
+
+def repo_label_set(run: Run) -> dict[str, Label]:
+    """Les labels du dépôt sous leur nom, lus sur toutes les pages (`repo_label`)."""
+    return read_pages(
+        run,
+        lambda pages: {label.name: label for page in pages for label in map(repo_label, page)},
+        LABELS,
+    )
+
+
+def label_named(labels: Mapping[str, Label], name: str) -> Label | None:
+    """Le label de `labels` qui porte `name`, apparié comme `carried_label` ; `None` sans lui."""
+    found = carried_label(list(labels), name)
+    return None if found is None else labels[found]
+
+
+def label_state(found: Label | None, wanted: Label) -> str:
+    """Ce que `label create` dit du label `wanted` du fichier, `found` dans le dépôt : créé s'il en
+    est absent, présent sinon — une autre couleur, casse ignorée, nommée et jamais réécrite."""
+    if found is None:
+        return f"créé {wanted.name}"
+    if found.color.casefold() == wanted.color.casefold():
+        return f"{found.name} présent"
+    return f"{found.name} présent, couleur {found.color} au lieu de {wanted.color}, non modifié"
+
+
+def appearance(label: Label) -> tuple[str, str]:
+    """Ce qui se relit d'un label créé, outre son nom : sa couleur, casse ignorée — des chiffres
+    hexadécimaux —, et sa description."""
+    return label.color.casefold(), label.description
+
+
+def label_gaps(
+    reread: Mapping[str, Label], wanted: Sequence[Label], created: Sequence[Label]
+) -> list[str]:
+    """Les écarts des labels du dépôt relus : chaque label de `wanted` doit y être (`label_named`),
+    ceux de `created` sous leur couleur et leur description (`appearance`)."""
+    gaps: list[str] = []
+    for label in wanted:
+        found = label_named(reread, label.name)
+        if found is None:
+            gaps.append(f"label {label.name} absent du dépôt")
+        elif label in created and appearance(found) != appearance(label):
+            gaps.append(f"label {label.name} relu {appearance(found)}, attendu {appearance(label)}")
+    return gaps
+
+
+def label_create(run: Run, args: argparse.Namespace) -> str:
+    """`label create` : crée chaque label du fichier `--mapping` absent du dépôt — nom, couleur et
+    description —, puis relit les labels du dépôt. Un label présent, apparié comme
+    `carried_label`, n'est jamais modifié (`label_state`). Le fichier est lu, et validé en entier,
+    avant tout appel à la forge (`read_mapping`).
+
+    Raises:
+        Refusal: fichier inutilisable ou mal formé.
+        Divergence: création ou relecture en échec, ou relecture non conforme (`label_gaps`).
+    """
+    wanted = read_mapping(args.mapping)
+    present = repo_label_set(run)
+    found = {label: label_named(present, label.name) for label in wanted}
+    report = " ; ".join(label_state(there, label) for label, there in found.items())
+    absent = [label for label, there in found.items() if there is None]
+    if not absent:
+        return f"rien à écrire — labels du dépôt : {report}"
+    with writing():
+        for label in absent:
+            payload = json_payload(
+                name=label.name, color=label.color, description=label.description
+            )
+            gh_api(run, "-X", "POST", LABELS, "--input", "-", stdin=payload)
+        reread = repo_label_set(run)
+    if gaps := label_gaps(reread, wanted, absent):
+        raise Divergence(" ; ".join(gaps))
+    return f"écrit et relu — labels du dépôt : {report}"
+
+
+def label_command(run: Run, args: argparse.Namespace) -> str:
+    """`label create` crée les labels du dépôt (`label_create`) ; `label <N>` pose et retire ceux
+    de l'issue ou de la PR `<N>` (`label_edit`)."""
+    return label_create(run, args) if args.number == "create" else label_edit(run, args)
 
 
 def appended(body: str, addition: str) -> str:
@@ -962,7 +1211,7 @@ def repo_labels(run: Run, wanted: Sequence[str]) -> list[str]:
     if not wanted:
         return []
     known = read_pages(
-        run, lambda pages: [name for page in pages for name in names_of(page)], f"{REPO}/labels"
+        run, lambda pages: [name for page in pages for name in names_of(page)], LABELS
     )
     found = {label: carried_label(known, label) for label in wanted}
     missing = [f"label inconnu du dépôt : {label}" for label, name in found.items() if name is None]
@@ -1218,6 +1467,81 @@ def milestone_close(run: Run, args: argparse.Namespace) -> str:
     return f"fermé et relu — milestone {args.title}"
 
 
+def origin_url(run: Run) -> str | None:
+    """L'URL du remote `origin` du dépôt git courant, `None` s'il n'en a pas.
+
+    Raises:
+        Refusal: `git` ne se lance pas, ou échoue autrement qu'en remote introuvable.
+    """
+    done = launch(run, ORIGIN_URL)
+    if done.returncode == NO_SUCH_REMOTE:
+        return None
+    if done.returncode != 0:
+        raise failed(ORIGIN_URL, done)
+    return done.stdout.decode("utf-8", "replace").strip()
+
+
+class Repository(NamedTuple):
+    """Ce que `depot create` relit d'un dépôt de la forge : son nom complet, sa visibilité, et les
+    URL HTTPS et SSH que `gh` donne à son remote."""
+
+    name: str
+    visibility: str
+    urls: tuple[str, str]
+
+
+def repository_of(document: Any) -> Repository:
+    """Un dépôt, tel que l'API REST le rend (« Get a repository »).
+
+    Raises:
+        KeyError, TypeError: un champ absent ou non textuel (`typed`).
+    """
+    urls = (typed(document, "clone_url", str), typed(document, "ssh_url", str))
+    return Repository(typed(document, "full_name", str), typed(document, "visibility", str), urls)
+
+
+def repository_gaps(
+    repository: Repository, wanted: str, visibility: str, origin: str | None
+) -> list[str]:
+    """Les écarts du dépôt relu et d'`origin` relu au dépôt `wanted` de visibilité `visibility`.
+    Le nom se compare sans la casse : la forge rend le nom canonique. `origin` doit être l'une des
+    URL du dépôt — HTTPS ou SSH, selon le `git_protocol` de `gh` (`FormatRemoteURL`)."""
+    gaps: list[str] = []
+    if repository.name.casefold() != wanted.casefold():
+        gaps.append(f"dépôt relu {repository.name}, attendu {wanted}")
+    if repository.visibility != visibility:
+        gaps.append(f"dépôt {wanted} relu {repository.visibility}, attendu {visibility}")
+    if origin not in repository.urls:
+        gaps.append(f"origin relu {origin}, attendu {' ou '.join(repository.urls)}")
+    return gaps
+
+
+def depot_create(run: Run, args: argparse.Namespace) -> str:
+    """`depot create` : crée le dépôt `<propriétaire>/<nom>` sur la forge, privé ou public, et son
+    remote `origin` dans le dépôt git courant, par `gh repo create --source=. --remote=origin` ;
+    puis relit le dépôt — nom et visibilité — et `origin`.
+
+    Raises:
+        Refusal: hors de l'arbre de travail d'un dépôt git, ou `origin` déjà là — son URL nommée.
+        Divergence: création ou relecture en échec, ou relecture non conforme
+            (`repository_gaps`).
+    """
+    # Hors d'un dépôt, `git` échoue sans rien écrire sur sa sortie ; dans `.git`, il rend `false`.
+    if launch(run, INSIDE_WORK_TREE).stdout.strip() != b"true":
+        raise Refusal("hors d'un dépôt git")
+    if (origin := origin_url(run)) is not None:
+        raise Refusal(f"le remote origin existe déjà : {origin}")
+    wanted, visibility = args.repository, args.visibility
+    with writing():
+        options = (f"--{visibility}", "--source=.", "--remote=origin")
+        stdout_of(run, ("gh", "repo", "create", wanted, *options))
+        repository = read_json(run, repository_of, f"repos/{wanted}")
+        origin = origin_url(run)
+    if gaps := repository_gaps(repository, wanted, visibility, origin):
+        raise Divergence(" ; ".join(gaps))
+    return f"créé et relu — dépôt {repository.name} ({visibility}), origin {origin}"
+
+
 def issue_number(value: str) -> str:
     """Type argparse : un numéro d'issue ou de PR, chiffres ASCII seulement."""
     if not NUMBER.fullmatch(value):
@@ -1225,9 +1549,26 @@ def issue_number(value: str) -> str:
     return value
 
 
+def owner_repo(value: str) -> str:
+    """Type argparse : un dépôt `<propriétaire>/<nom>` (`REPOSITORY`)."""
+    if not REPOSITORY.fullmatch(value):
+        raise argparse.ArgumentTypeError(f"dépôt <propriétaire>/<nom> attendu, pas {value!r}")
+    return value
+
+
+def label_target(value: str) -> str:
+    """Type argparse : `create`, ou un numéro d'issue ou de PR (`issue_number`)."""
+    return value if value == "create" else issue_number(value)
+
+
+def is_one_line(value: str) -> bool:
+    """Un texte non vide sur une ligne — il ressort dans une ligne de motif."""
+    return bool(value.strip()) and "\n" not in value and "\r" not in value
+
+
 def one_line(value: str) -> str:
-    """Type argparse : un texte non vide sur une ligne — il ressort dans une ligne de motif."""
-    if not value.strip() or "\n" in value or "\r" in value:
+    """Type argparse : un texte non vide sur une ligne (`is_one_line`)."""
+    if not is_one_line(value):
         raise argparse.ArgumentTypeError(f"texte non vide sur une seule ligne attendu : {value!r}")
     return value
 
@@ -1241,10 +1582,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     commands = parser.add_subparsers(dest="command", required=True)
     label = commands.add_parser("label")
-    label.add_argument("number", type=issue_number)
+    label.add_argument("number", metavar="<N>|create", type=label_target)
     for option in ("--add", "--remove"):
         label.add_argument(option, type=one_line, action="append", default=[])
-    label.set_defaults(handler=label_edit)
+    label.add_argument("--mapping", type=Path)
+    label.set_defaults(handler=label_command)
     checkbox = commands.add_parser("checkbox").add_subparsers(dest="action", required=True)
     brief = commands.add_parser("brief").add_subparsers(dest="action", required=True)
     for actions, locate in ((checkbox, issue_body), (brief, brief_comment)):
@@ -1290,6 +1632,15 @@ def build_parser() -> argparse.ArgumentParser:
     comment.add_argument("number", type=issue_number)
     comment.add_argument("--body-file", dest="file", type=Path, required=True)
     comment.set_defaults(handler=comment_publish)
+    depots = commands.add_parser("depot").add_subparsers(dest="action", required=True)
+    new_repository = depots.add_parser("create")
+    new_repository.add_argument("repository", metavar="<propriétaire>/<nom>", type=owner_repo)
+    visibility = new_repository.add_mutually_exclusive_group(required=True)
+    for option in ("private", "public"):
+        visibility.add_argument(
+            f"--{option}", dest="visibility", action="store_const", const=option
+        )
+    new_repository.set_defaults(handler=depot_create)
     return parser
 
 
