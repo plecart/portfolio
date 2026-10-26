@@ -710,10 +710,9 @@ HOUSE_SKILLS = (
 # sept au commit suivant (bloc 2), qui en sort `interroge-moi`, `vers-prd` et `vers-issues` ; six
 # au 2026-10-23 (lot 6b, bloc 1), qui en sort `repercussions` ; quatre au 2026-10-25 (lot 6b2),
 # qui en sort `bug-vers-issue` et `contradiction` ; trois au 2026-10-26 (lot 7a), qui en sort
-# `plan-qa` ; deux le même jour (lot 7b2), qui en sort `execution-qa`. La liste se vide lot par
-# lot ; #134 l'exige vide.
+# `plan-qa` ; deux le même jour (lot 7b2), qui en sort `execution-qa` ; un le même jour (lot 8b),
+# qui en sort `audit-spec-ui`. La liste se vide lot par lot ; #134 l'exige vide.
 EXECUTOR_WAITING_LIST = {
-    "audit-spec-ui": "8",
     "init-projet": "8",
 }
 
@@ -823,9 +822,9 @@ def test_chaque_skill_maison_nomme_ses_executants(skill: str) -> None:
     2026-10-23 sur `34604c7` avec `triage` (lot 6a2, bloc 1), six au commit suivant avec
     `interroge-moi`, `vers-prd` et `vers-issues` (bloc 2), sept le 2026-10-23 avec `repercussions`
     (lot 6b, bloc 1), neuf le 2026-10-25 avec `bug-vers-issue` et `contradiction` (lot 6b2), dix
-    le 2026-10-26 avec `plan-qa` (lot 7a), onze le même jour avec `execution-qa` (lot 7b2) ; les
-    deux autres — `audit-spec-ui`, `init-projet` — sont dans `EXECUTOR_WAITING_LIST` avec le lot
-    qui les en sort.
+    le 2026-10-26 avec `plan-qa` (lot 7a), onze le même jour avec `execution-qa` (lot 7b2), douze
+    le même jour avec `audit-spec-ui` (lot 8b) ; le dernier, `init-projet`, est dans
+    `EXECUTOR_WAITING_LIST` avec le lot qui l'en sort.
     """
     assert cites_an_executor(skill_prose(skill), ROLE_NAMES), (
         f"`{skill}` ne nomme aucun rôle ni aucun script, et n'est pas en liste d'attente"
@@ -845,7 +844,8 @@ def test_un_skill_en_liste_d_attente_ne_nomme_encore_aucun_executant(skill: str)
 # Les skills dont la prose n'écrit plus sur la forge que par l'écriture distante relue (#134,
 # lot 4) : chaque lot de #134 y ajoute les siens — le lot 6a2 `triage`, `interroge-moi`, `vers-prd`
 # et `vers-issues` ; le lot 6b `repercussions` (bloc 1) ; le lot 6b2 `bug-vers-issue` et
-# `contradiction` ; le lot 7a `plan-qa` ; le lot 7b2 `execution-qa` ; le lot 8 les siens.
+# `contradiction` ; le lot 7a `plan-qa` ; le lot 7b2 `execution-qa` ; le lot 8b `audit-spec-ui` ;
+# le reste du lot 8 les siens.
 SKILLS_SANS_ECRITURE_GH_DIRECTE = (
     "triage",
     "interroge-moi",
@@ -856,15 +856,17 @@ SKILLS_SANS_ECRITURE_GH_DIRECTE = (
     "contradiction",
     "plan-qa",
     "execution-qa",
+    "audit-spec-ui",
 )
 ECRITURE_RELUE = ".claude/skills/cycle-pr/scripts/ecriture-relue.py"
 # Les skills de la table précédente qui n'écrivent sur aucune issue, chacun avec sa raison : le
-# renvoi au script y serait sans objet (lot 6b2 de #134, 2026-10-25).
+# renvoi au script y serait sans objet (lot 6b2 de #134, 2026-10-25 ; lot 8b, 2026-10-26).
 ECRITURE_RELUE_SANS_OBJET = {
     "contradiction": (
         "n'écrit sur aucune issue : ses PR d'amendement suivent les étapes 5 et 6 de"
         " `triage/hors-scope.md`, et la propagation aux issues passe par `repercussions`"
     ),
+    "audit-spec-ui": "n'écrit sur aucune issue : ses corrections partent par une PR (D-12)",
 }
 
 # Une commande `gh` citée, jusqu'à son accent grave fermant ou sa fin de ligne.
@@ -953,7 +955,8 @@ def test_un_skill_sans_ecriture_gh_directe_n_en_cite_aucune(skill: str) -> None:
     2026-10-26 (lot 7a), `plan-qa` trois (`gh issue create` ×2, `gh label create`) ; le même jour
     (lot 7b2), `execution-qa` trois sur `ffbe52e` — `gh issue comment` de
     `gabarit-commentaire-phase.md`, `gh issue edit --body-file` et la mention `gh issue edit` de
-    `patch-checkbox-gh.md` —, rendus par `gh_writes` sur les cinq fichiers à ce commit.
+    `patch-checkbox-gh.md` —, rendus par `gh_writes` sur les cinq fichiers à ce commit. Le même
+    jour (lot 8b), `audit-spec-ui` aucune sur `0c408db`.
 
     **Population** : `SKILLS_SANS_ECRITURE_GH_DIRECTE`, le `SKILL.md` et les références de chacun.
     **Ce que le détecteur ne voit pas** : une écriture décrite sans commande (« publie un
@@ -1623,6 +1626,7 @@ INTAKE_ECHEC_REF = ".claude/skills/execution-qa/references/gabarit-intake-echec.
 COMMENTAIRE_PHASE_REF = ".claude/skills/execution-qa/references/gabarit-commentaire-phase.md"
 CORRECTION_BUG_REF = ".claude/skills/execution-qa/references/standard-correction-bug.md"
 PLAN_QA_SKILL = ".claude/skills/plan-qa/SKILL.md"
+AUDIT_SPEC_UI_SKILL = ".claude/skills/audit-spec-ui/SKILL.md"
 GABARIT_PLAN_QA_REF = ".claude/skills/plan-qa/references/gabarit-plan-qa.md"
 EXEMPLE_BLOC_ISSUE_REF = ".claude/skills/plan-qa/references/exemple-bloc-issue.md"
 TAXONOMIE_COUVERTURE_REF = ".claude/skills/plan-qa/references/taxonomie-couverture.md"
@@ -3388,7 +3392,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         HORS_SCOPE_REF,
         (
             "ses étapes 5 et 6 valent pour toute PR qu'ouvre une session de `triage`,"
-            " `interroge-moi`, `vers-prd` ou `contradiction`, qui y renvoient"
+            " `interroge-moi`, `vers-prd`, `contradiction` ou `audit-spec-ui`, qui y renvoient"
         ),
     ),
     "6b2-contradiction-mode-sans-copie": (
@@ -4449,6 +4453,78 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " actuelle, ou abandonner."
         ),
     ),
+    # Lot 8b de #134 (2026-10-26) : `audit-spec-ui` prend son chemin en argument et nomme ses
+    # exécutants. Une entrée par règle écrite — argument, `description`, « Délégation » (jugement,
+    # chaque délégation, D-12), arrêt sans chemin, renvoi de l'étape qui agit, arrêt avant les
+    # corrections, son annonce et sa case — et par moitié restrictive (obs 126) : par la forme, sur
+    # les lignes ajoutées du skill, 10 — 4 « aucune », 2 « jamais », « ne … ni », « n'… que »,
+    # « garde », « requis » — et 8 « la session » qui agit, toutes épinglées et vues rouges par
+    # `mutation.py`. La liste de `hors-scope.md` reçoit `audit-spec-ui`
+    # (`6b2-hors-scope-nomme-contradiction`). Gardés ailleurs : `EXECUTOR_WAITING_LIST`,
+    # `SKILLS_SANS_ECRITURE_GH_DIRECTE`, `ECRITURE_RELUE_SANS_OBJET`, `RETIRES_DU_CONTEXTE_VIVANT`.
+    "8b-audit-spec-ui-argument": (AUDIT_SPEC_UI_SKILL, "[chemin du document à auditer — requis]"),
+    "8b-audit-spec-ui-description": (
+        AUDIT_SPEC_UI_SKILL,
+        "puis, après le go du mainteneur sur le rapport, appliquer les corrections",
+    ),
+    "8b-audit-spec-ui-jugement": (
+        AUDIT_SPEC_UI_SKILL,
+        (
+            "La session garde le jugement : la déclaration d'autorité et le périmètre (étapes 0.2"
+            " et 0.3), les constats de goût et de conception, le choix de chaque correction, le"
+            " rapport, l'arrêt avant les corrections."
+        ),
+    ),
+    "8b-audit-spec-ui-inventaire": (AUDIT_SPEC_UI_SKILL, "(étape 0.1), rendu dans un fichier"),
+    "8b-audit-spec-ui-propagation-et-residus": (
+        AUDIT_SPEC_UI_SKILL,
+        "la propagation — chaque valeur d'origine cherchée dans tout le corpus — et les résidus",
+    ),
+    "8b-audit-spec-ui-executant-passes": (
+        AUDIT_SPEC_UI_SKILL,
+        "**`executant`** — les six passes mécaniques, sur le chemin reçu et l'inventaire",
+    ),
+    "8b-audit-spec-ui-executant-edition": (
+        AUDIT_SPEC_UI_SKILL,
+        "et ne juge ni ne corrige ; puis l'édition des corrections que la session a choisies",
+    ),
+    "8b-audit-spec-ui-correction-par-une-pr": (
+        AUDIT_SPEC_UI_SKILL,
+        (
+            "une spec versionnée dans un dépôt se corrige par une PR, portée par la session qui a"
+            " décidé, jamais par un commit direct sur le trunk (D-12 de #134) : dans une session"
+            " PR, la correction entre dans sa PR ; hors PR, la session l'ouvre, la relit et la"
+            " merge au go du mainteneur, au déroulé de `triage/hors-scope.md` (« Quand écrire »,"
+            " étapes 5 et 6). Une spec hors dépôt se corrige sur place."
+        ),
+    ),
+    "8b-audit-spec-ui-arret-sans-chemin": (
+        AUDIT_SPEC_UI_SKILL,
+        "**Sans chemin, la session s'arrête et demande le chemin au mainteneur** — jamais une spec",
+    ),
+    "8b-audit-spec-ui-etape-0-1": (AUDIT_SPEC_UI_SKILL, "**Inventorier** — le `releveur`"),
+    "8b-audit-spec-ui-passes": (AUDIT_SPEC_UI_SKILL, "L'`executant` (« Délégation ») les déroule"),
+    "8b-audit-spec-ui-aucune-correction-avant-le-go": (
+        AUDIT_SPEC_UI_SKILL,
+        "**aucune correction ne part avant son go sur le rapport**",
+    ),
+    "8b-audit-spec-ui-go-partiel": (AUDIT_SPEC_UI_SKILL, "le go peut n'en retenir qu'une partie"),
+    "8b-audit-spec-ui-edition": (AUDIT_SPEC_UI_SKILL, "**Édition** — l'`executant` applique"),
+    "8b-audit-spec-ui-propagation": (AUDIT_SPEC_UI_SKILL, "le `releveur` cherche la valeur"),
+    "8b-audit-spec-ui-propagation-retenue": (
+        AUDIT_SPEC_UI_SKILL,
+        "celles que la session retient repartent à l'`executant`",
+    ),
+    "8b-audit-spec-ui-residus": (AUDIT_SPEC_UI_SKILL, "**Résidus** — le `releveur` re-cherche"),
+    "8b-audit-spec-ui-reste": (AUDIT_SPEC_UI_SKILL, "la session vérifie qu'il n'en reste aucune"),
+    "8b-audit-spec-ui-arret-annonce": (
+        AUDIT_SPEC_UI_SKILL,
+        "la session le présente au mainteneur et s'arrête jusqu'à son go — aucune correction",
+    ),
+    "8b-audit-spec-ui-case-de-l-arret": (
+        AUDIT_SPEC_UI_SKILL,
+        "aucune correction partie avant son go sur le rapport",
+    ),
 }
 
 
@@ -4626,6 +4702,13 @@ def test_l_orchestration_ne_rend_pas_ce_qu_elle_a_retire(phrase: str) -> None:
 # `standard-correction-bug.md` 4). Une entrée par forme et par fichier qui la porte, plus
 # « conversation » dans chacun des cinq fichiers : 22 entrées, toutes rouges sur `ffbe52e` sauf
 # les trois « conversation » des fichiers à 0, vues rouges par mutation inverse.
+#
+# Le lot 8b (2026-10-26) y ajoute `audit-spec-ui`, dont l'objet audité sans argument était « la
+# spécification en discussion dans la conversation » : il prend désormais un chemin, sans lequel
+# la session s'arrête. **Population** sur `0c408db`, base du lot, par la forme —
+# `git show 0c408db:<AUDIT_SPEC_UI_SKILL> | grep -n -i -E "conversation|en discussion"`, seul
+# fichier du dossier : **2** lignes, l'`argument-hint` (« en discussion ») et l'étape 0 (« en
+# discussion dans la conversation ») ; une entrée par forme, toutes deux rouges sur `0c408db`.
 RETIRES_DU_CONTEXTE_VIVANT = {
     "contradiction-conversation": (CONTRADICTION_SKILL, "conversation"),
     "bug-vers-issue-conversation": (BUG_VERS_ISSUE_SKILL, "conversation"),
@@ -4673,6 +4756,8 @@ RETIRES_DU_CONTEXTE_VIVANT = {
     "patch-checkbox-paire-en-memoire": (PATCH_CHECKBOX_REF, "en mémoire"),
     "execution-qa-correction-en-session": (EXECUTION_QA_SKILL, "en session"),
     "standard-correction-bug-en-session": (CORRECTION_BUG_REF, "en session"),
+    "audit-spec-ui-conversation": (AUDIT_SPEC_UI_SKILL, "conversation"),
+    "audit-spec-ui-en-discussion": (AUDIT_SPEC_UI_SKILL, "en discussion"),
 }
 
 
@@ -4687,15 +4772,15 @@ def test_le_contexte_vivant_retire_ne_revient_pas(fichier: str, forme: str) -> N
 
 
 def test_la_conversation_est_gardee_dans_chaque_fichier_des_skills_du_contexte_vivant() -> None:
-    """Un fichier ajouté à `contradiction`, à `bug-vers-issue`, à `plan-qa` ou à `execution-qa`
-    rougit ici tant que la table ne garde pas le mot chez lui : les critères « 6a, 6b » et
-    « 7a, 7b » lisent le dossier entier."""
+    """Un fichier ajouté à `contradiction`, à `bug-vers-issue`, à `plan-qa`, à `execution-qa` ou à
+    `audit-spec-ui` rougit ici tant que la table ne garde pas le mot chez lui : les critères
+    « 6a, 6b », « 7a, 7b » et « Lot 8 » lisent le dossier entier."""
     gardes = {
         fichier for fichier, forme in RETIRES_DU_CONTEXTE_VIVANT.values() if forme == "conversation"
     }
     dossiers = {
         path.relative_to(REPOSITORY_ROOT).as_posix()
-        for skill in ("contradiction", "bug-vers-issue", "plan-qa", "execution-qa")
+        for skill in ("contradiction", "bug-vers-issue", "plan-qa", "execution-qa", "audit-spec-ui")
         for path in (REPOSITORY_ROOT / ".claude/skills" / skill).rglob("*")
         if path.is_file()
     }
