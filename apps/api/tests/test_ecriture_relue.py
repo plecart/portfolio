@@ -21,6 +21,7 @@ from typing import Any
 import pytest
 from command_doubles import json_success
 from skill_scripts import load_script, run_in_pipe
+from test_agent_skills import PLAN_QA_CASE_FORMS
 
 ecriture_relue = load_script("cycle-pr", "ecriture-relue")
 
@@ -667,6 +668,72 @@ def test_checkbox_patch_paires_sort_en_1_si_la_ligne_ecrite_manque_a_la_relectur
         " relu 17 octets et 0 \\r"
     )
     assert capsys.readouterr().out == f"relecture non conforme — {ecart}\n"
+
+
+# Les états d'une ligne de case de plan de QA (`execution-qa/SKILL.md` §3 et §4), population
+# entière, faux positif compris (obs 138) : (ligne, en attente). Une case laissée `[ ]` n'attend
+# plus quand sa ligne porte un échec (`🔴`) ou un blocage (` — BLOQUÉ`) ; « bloqué » dans le texte
+# d'une case n'est pas un blocage.
+ETATS_DE_CASE = {
+    "nue": ("- [ ] Le service répond", True),
+    "passee": ("- [x] Le service répond — 200, 2026-10-26", False),
+    "cochee-en-majuscule": ("- [X] Le service répond", False),
+    "passee-avec-decision": ("- [x] Le tri — Décision : par date, 2026-10-26", False),
+    "non-applicable": ("- [x] L'export — N/A : hors périmètre", False),
+    "corrigee-en-session": ("- [x] L'envoi — corrigé en session, 9b3153f, 2026-10-26", False),
+    "bloquee": ("- [ ] La sauvegarde — BLOQUÉ : base absente", False),
+    "en-echec": ("- [ ] L'envoi 🔴 needs-issue — 500 au POST", False),
+    "bug-depose": ("- [ ] L'envoi 🔴 BUG #12", False),
+    "bloque-dans-le-texte": ("- [ ] Le bouton est bloqué pendant l'envoi", True),
+    # Un blanc entre les crochets, une tabulation comprise, vaut non coché (GFM §5.3).
+    "tabulation-entre-crochets": ("- [\t] Le service répond", True),
+}
+
+
+@pytest.mark.parametrize(("ligne", "en_attente"), ETATS_DE_CASE.values(), ids=ETATS_DE_CASE.keys())
+def test_checkbox_next_rend_la_case_en_attente_sans_rien_ecrire(
+    ligne: str, en_attente: bool, capsys: pytest.CaptureFixture[str]
+) -> None:
+    forge = Forge({CORPS_42: {"body": f"## Phase 1\n\n{ligne}\n"}})
+
+    assert lance(forge, "checkbox", "next", "42") == 0
+    assert forge.appels == [("gh", "api", CORPS_42)]
+    sortie = f"Phase 1\n{ligne}\n" if en_attente else "aucune case en attente — corps de #42\n"
+    assert capsys.readouterr().out == sortie
+
+
+@pytest.mark.parametrize(
+    ("corps", "sortie"),
+    [
+        (
+            "# Plan\n\n## Phase 0\n- [x] A — ok\n\n## Phase 1\n### Bloc #12 — envoi\n- [ ] B\n- [ ] C\n",
+            "Bloc #12 — envoi\n- [ ] B\n",
+        ),
+        ("Intro\n- [ ] B\n## Phase 2\n", "(sans titre)\n- [ ] B\n"),
+        ("## Phase 1\r\n\r\n  - [ ] B\r\n", "Phase 1\n  - [ ] B\n"),
+    ],
+    ids=["dernier-titre-au-dessus", "sans-titre-au-dessus", "corps-crlf"],
+)
+def test_checkbox_next_rend_le_dernier_titre_au_dessus_de_la_case(
+    corps: str, sortie: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """La première case en attente, sous le dernier titre qui la précède, rendu sans ses `#` ; un
+    titre plus bas ne compte pas, et aucun retour chariot ne ressort (obs 87, 106)."""
+    forge = Forge({CORPS_42: {"body": corps}})
+
+    assert lance(forge, "checkbox", "next", "42") == 0
+    assert capsys.readouterr().out == sortie
+
+
+@pytest.mark.parametrize(
+    ("ligne", "est_une_case"),
+    [(ligne, est_une_case) for ligne, est_une_case, _ in PLAN_QA_CASE_FORMS.values()],
+    ids=PLAN_QA_CASE_FORMS.keys(),
+)
+def test_checkbox_next_reconnait_les_cases_du_plan_de_qa(ligne: str, est_une_case: bool) -> None:
+    """D'accord avec `PLAN_QA_CASE` (`test_agent_skills.py`, lot 7a) sur son recueil, des deux
+    côtés : une case que `plan-qa` écrit est une case que `next` voit, et rien d'autre."""
+    assert bool(ecriture_relue.PLAN_CASE.match(ligne)) is est_une_case
 
 
 def ecrit_brief(forge: Forge, tmp_path: Path, contenu: str) -> int:
@@ -1804,6 +1871,8 @@ APPELS_MAL_FORMES = {
     "brief-ni-case-ni-paires": ("brief", "patch", "42"),
     "case-et-paires": ("checkbox", "patch", "42", "--case", "A", "--paires", "x.txt"),
     "paires-sans-fichier": ("brief", "patch", "42", "--paires"),
+    "next-sans-numero": ("checkbox", "next"),
+    "next-numero-non-entier": ("checkbox", "next", "#42"),
     "numero-manquant": ("checkbox", "patch", "--case", "A"),
     "numero-non-entier": ("checkbox", "patch", "quarante-deux", "--case", "A"),
     "chiffre-unicode": ("brief", "patch", "4²", "--case", "A"),
@@ -1861,6 +1930,7 @@ def test_un_appel_mal_forme_sort_en_2_sans_toucher_a_la_forge(
 # Les appels que la forge fait tomber dès leur première lecture, chacun sous son identifiant.
 PREMIERES_LECTURES = {
     "checkbox-patch": COCHE_CORPS,
+    "checkbox-next": ("checkbox", "next", "42"),
     "comment": PUBLIE_COMMENTAIRE,
     "issue-create": CREE_ISSUE,
     "issue-create-label": CREE_ISSUE_ETIQUETEE,
