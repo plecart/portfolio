@@ -3,12 +3,14 @@
 
 Le script écrit sur la forge puis relit en entier ce qu'il y a écrit : chaque cas éprouve l'une
 des deux moitiés — ce qui part (la charge du `PATCH` ou du `POST`, lue sur l'entrée standard de
-`gh`), ou ce que la relecture voit. Il parle à `gh` par une seule fonction, `run`, que ces tests
-remplacent par une forge témoin : elle garde les documents en mémoire, applique chaque écriture
-par la fonction `stocke` — l'identité, ou la transformation qu'un cas veut lui faire subir — et
-ne répond qu'aux **commandes complètes** attendues, arguments compris ; toute autre lève. La vraie
-forge n'est jamais appelée. Les cas s'écrivent en littéraux, jamais dérivés des constantes du
-script (`cycle-pr` 3.1, « la table de cas est dérivée de l'artefact sous test »).
+`gh`), ou ce que la relecture voit. Il parle à `gh` et à `git` par une seule fonction, `run`, que
+ces tests remplacent par une forge témoin : elle garde les documents en mémoire, applique chaque
+écriture par la fonction `stocke` — l'identité, ou la transformation qu'un cas veut lui faire
+subir —, joue le dépôt git local de `depot create` et ne répond qu'aux **commandes complètes**
+attendues, arguments compris ; toute autre lève. La vraie forge n'est jamais appelée ; le vrai
+`git` l'est par un seul test, qui confronte à lui le double que la forge en joue. Les cas
+s'écrivent en littéraux, jamais dérivés des constantes du script (`cycle-pr` 3.1, « la table de
+cas est dérivée de l'artefact sous test »).
 """
 
 import json
@@ -19,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from command_doubles import json_success
+from command_doubles import json_success, success
 from skill_scripts import load_script, run_in_pipe
 from test_agent_skills import PLAN_QA_CASE_FORMS
 
@@ -36,6 +38,11 @@ ISSUES_OUVERTES = "repos/{owner}/{repo}/issues?per_page=100"
 LISTE_COMMENTAIRES_42 = "repos/{owner}/{repo}/issues/42/comments?per_page=100"
 LABELS_DU_DEPOT = "repos/{owner}/{repo}/labels?per_page=100"
 THEMES = "repos/{owner}/{repo}/milestones?state=all&per_page=100"
+# Le chemin où se crée un label du dépôt.
+NOUVEAU_LABEL = "repos/{owner}/{repo}/labels"
+# Le dépôt que crée `depot create plecart/vitrine`, et l'URL que `gh` en donne à `origin`.
+DEPOT = "repos/plecart/vitrine"
+VITRINE = "https://github.com/plecart/vitrine.git"
 # Les seuls retraits de label auxquels la forge répond : chemin encodé → nom du label.
 RETRAITS = {
     "repos/{owner}/{repo}/issues/42/labels/ready-for-agent": "ready-for-agent",
@@ -62,12 +69,16 @@ class Forge:
         issues: les issues ouvertes du dépôt, page par page, de même, chacune aussi sous son
             chemin `issues/<numéro>`. Une issue créée par `POST` y entre sur une page de plus, son
             corps gardé par `stocke`, sous le numéro 900 + n.
-        labels_du_depot: les noms des labels du dépôt, page par page. Un label posé par `POST`
-            s'ajoute à ceux de l'issue 42.
+        labels_du_depot: les labels du dépôt, page par page — un nom vaut le label de ce nom, de
+            couleur `ededed`, sans description (`label_du_depot`). Un label posé par `POST` s'ajoute
+            à ceux de l'issue 42 ; un label créé par `POST` entre dans le dépôt sur une page de plus.
         milestones: les milestones du dépôt, page par page, de même, chacun aussi sous son chemin
             `milestones/<numéro>` ; un milestone créé par `POST` y entre sous le numéro 900 + n, et
             un `PATCH` `{"milestone": <numéro>}` pose sur l'issue le milestone de ce numéro.
         garde_les_labels: le retrait d'un label répond sans l'ôter de l'issue.
+        remotes: les remotes du dépôt git local, nom → URL. `gh repo create <dépôt>` crée le dépôt
+            sous son chemin `repos/<dépôt>` et son remote `origin`, comme `gh` (`FormatRemoteURL`).
+        hors_depot: le répertoire courant n'est dans aucun dépôt git.
     """
 
     def __init__(
@@ -77,13 +88,17 @@ class Forge:
         stocke: Callable[[str], str | None] = lambda corps: corps,
         pages: list[list[dict[str, Any]]] | None = None,
         issues: list[list[dict[str, Any]]] | None = None,
-        labels_du_depot: list[list[str]] | None = None,
+        labels_du_depot: list[list[str | dict[str, Any]]] | None = None,
         milestones: list[list[dict[str, Any]]] | None = None,
         garde_les_labels: bool = False,
+        remotes: dict[str, str] | None = None,
+        hors_depot: bool = False,
     ) -> None:
         self.documents = documents
         self.stocke = stocke
         self.garde_les_labels = garde_les_labels
+        self.remotes = remotes or {}
+        self.hors_depot = hors_depot
         self.pages = pages or []
         for page in self.pages:
             for commentaire in page:
@@ -94,11 +109,15 @@ class Forge:
             for page in liste:
                 for document in page:
                     self.documents[f"{chemin}/{document['number']}"] = document
+        self.labels = [
+            [label_du_depot(label) if isinstance(label, str) else label for label in page]
+            for page in labels_du_depot or []
+        ]
         # Chaque liste que `gh api --paginate --slurp` lit, sous son chemin.
         self.listes = {
             LISTE_COMMENTAIRES_42: self.pages,
             ISSUES_OUVERTES: self.issues,
-            LABELS_DU_DEPOT: [[{"name": nom} for nom in page] for page in labels_du_depot or []],
+            LABELS_DU_DEPOT: self.labels,
             THEMES: self.milestones,
         }
         self.appels: list[tuple[str, ...]] = []
@@ -178,8 +197,50 @@ class Forge:
                 if not self.garde_les_labels:
                     labels[:] = [label for label in labels if label["name"] != RETRAITS[chemin]]
                 return json_success(labels)
+            case ("gh", "api", "-X", "POST", chemin, "--input", "-") if (
+                chemin == NOUVEAU_LABEL and stdin is not None
+            ):
+                self.charges.append(stdin)
+                label = json.loads(stdin)
+                self.labels.append([label])
+                return json_success(label)
+            case ("gh", "repo", "create", depot, visibilite, "--source=.", "--remote=origin") if (
+                not self.hors_depot and "origin" not in self.remotes
+            ):
+                self.documents[f"repos/{depot}"] = {
+                    "full_name": depot,
+                    "visibility": visibilite.removeprefix("--"),
+                    "clone_url": f"https://github.com/{depot}.git",
+                    "ssh_url": f"git@github.com:{depot}.git",
+                }
+                self.remotes["origin"] = f"https://github.com/{depot}.git"
+                return success(b"")
+            case ("git", *args):
+                return self.git(*args)
             case _:
                 raise AssertionError(f"commande inattendue : {cmd}")
+
+    def git(self, *args: str) -> subprocess.CompletedProcess[bytes]:
+        """Ce que `git <args>` rend dans le dépôt local — code de sortie et sortie standard du vrai
+        `git`, que `test_la_forge_temoin_repond_a_git_comme_git` confronte à ce double."""
+        if self.hors_depot:
+            return subprocess.CompletedProcess([], 128, b"", b"fatal: not a git repository")
+        match args:
+            case ("rev-parse", "--is-inside-work-tree"):
+                return success(b"true\n")
+            case ("remote", "get-url", nom) if nom in self.remotes:
+                return success(f"{self.remotes[nom]}\n".encode())
+            case ("remote", "get-url", nom):
+                return subprocess.CompletedProcess([], 2, b"", f"No such remote '{nom}'".encode())
+            case _:
+                raise AssertionError(f"commande inattendue : git {args}")
+
+
+def label_du_depot(
+    nom: str, couleur: str = "ededed", description: str | None = None
+) -> dict[str, Any]:
+    """Un label du dépôt, sous la forme que l'API REST le liste."""
+    return {"name": nom, "color": couleur, "description": description}
 
 
 def lance(forge: Forge, *args: str) -> int:
@@ -855,21 +916,22 @@ def etiquetee(*noms: str) -> dict[str, Any]:
 
 
 def ecritures(forge: Forge) -> list[tuple[str, ...]]:
-    """Les écritures que la forge a reçues — `PATCH` ou `DELETE`, tout appel `-X`."""
-    return [appel for appel in forge.appels if "-X" in appel]
+    """Les écritures que la forge a reçues — `PATCH`, `POST` ou `DELETE`, tout appel `-X` —, et
+    `gh repo create`."""
+    return [appel for appel in forge.appels if "-X" in appel or appel[1:3] == ("repo", "create")]
 
 
 def relue_autrement(
     forge: Forge, chemin: str, retouche: Callable[[Any], Any]
 ) -> Callable[[Sequence[str], bytes | None], subprocess.CompletedProcess[bytes]]:
-    """La forge, sauf la lecture de `chemin` après une écriture — la relecture —, que `retouche`
-    transforme : la forge ne garde pas ce qu'on lui a écrit."""
+    """La forge, sauf la lecture de `chemin` après une écriture — la relecture, directe ou page
+    par page —, que `retouche` transforme : la forge ne garde pas ce qu'on lui a écrit."""
 
     def forge_qui_relit_autre_chose(
         cmd: Sequence[str], stdin: bytes | None
     ) -> subprocess.CompletedProcess[bytes]:
         rendu = forge(cmd, stdin)
-        if ecritures(forge) and tuple(cmd) == ("gh", "api", chemin):
+        if ecritures(forge) and cmd[-1] == chemin and "-X" not in cmd:
             return json_success(retouche(json.loads(rendu.stdout)))
         return rendu
 
@@ -1005,6 +1067,178 @@ def test_label_n_ecrit_rien_quand_la_transition_est_deja_faite(
     assert capsys.readouterr().out == (
         "rien à écrire — labels de #42 : needs-interrogation déjà posé ; needs-triage déjà absent\n"
     )
+
+
+def cree_labels(tmp_path: Path, *labels: tuple[str, str, str]) -> list[str]:
+    """L'appel `label create`, d'un fichier `--mapping` qui porte ces labels, chacun
+    `(nom, couleur, description)`."""
+    mapping = tmp_path / "labels.json"
+    entrees = [
+        {"nom": nom, "couleur": couleur, "description": texte} for nom, couleur, texte in labels
+    ]
+    mapping.write_bytes(json.dumps(entrees, ensure_ascii=False).encode())
+    return ["label", "create", "--mapping", str(mapping)]
+
+
+def test_label_create_cree_les_seuls_labels_absents_puis_les_relit(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Le témoin positif, et l'ordre : lire les labels du dépôt, créer chaque absent — nom,
+    couleur et description dans sa requête —, relire les labels du dépôt. La description d'un
+    label présent ne se compare pas."""
+    forge = Forge({}, labels_du_depot=[[label_du_depot("bug", "d73a4a")]])
+
+    args = cree_labels(tmp_path, ("bug", "d73a4a", "catégorie"), ("qa-plan", "0e8a16", "suivi"))
+    assert lance(forge, *args) == 0
+    assert [json.loads(charge) for charge in forge.charges] == [
+        {"name": "qa-plan", "color": "0e8a16", "description": "suivi"}
+    ]
+    assert forge.appels == [
+        ("gh", "api", "--paginate", "--slurp", LABELS_DU_DEPOT),
+        ("gh", "api", "-X", "POST", NOUVEAU_LABEL, "--input", "-"),
+        ("gh", "api", "--paginate", "--slurp", LABELS_DU_DEPOT),
+    ]
+    assert (
+        capsys.readouterr().out == "écrit et relu — labels du dépôt : bug présent ; créé qa-plan\n"
+    )
+
+
+@pytest.mark.parametrize(
+    ("present", "sortie"),
+    [
+        (label_du_depot("Bug", "d73a4a"), "Bug présent"),
+        (label_du_depot("bug", "D73A4A"), "bug présent"),
+        (
+            label_du_depot("bug", "ededed"),
+            "bug présent, couleur ededed au lieu de d73a4a, non modifié",
+        ),
+    ],
+    ids=["nom-d-une-autre-casse", "couleur-d-une-autre-casse", "couleur-autre"],
+)
+def test_label_create_n_ecrit_rien_quand_le_label_est_deja_dans_le_depot(
+    present: dict[str, Any], sortie: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Un nom se compare sans la casse : la forge rend `bug` à la lecture de `labels/BUG` (mesuré
+    le 2026-10-26 sur `plecart/portfolio`, gh 2.94.0). Une couleur aussi, des chiffres
+    hexadécimaux que la forge garde dans la casse reçue — `docker_compose` s'y lit `E5F2FC`, même
+    relevé. Un label présent n'est jamais modifié — une autre couleur se dit, sans échec —, et la
+    lecture des labels du dépôt est le seul appel."""
+    forge = Forge({}, labels_du_depot=[[present]])
+
+    assert lance(forge, *cree_labels(tmp_path, ("bug", "d73a4a", "catégorie"))) == 0
+    assert forge.appels == [("gh", "api", "--paginate", "--slurp", LABELS_DU_DEPOT)]
+    assert capsys.readouterr().out == f"rien à écrire — labels du dépôt : {sortie}\n"
+
+
+def test_label_create_relit_la_couleur_d_un_label_cree_sans_la_casse(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Une couleur écrite `0E8A16` et relue `0e8a16` est la même. La forge garde la casse qu'elle
+    a reçue — `docker_compose` s'y lit `E5F2FC` (mesuré le 2026-10-26 sur `plecart/portfolio`) —,
+    mais rien ne le lui demande."""
+    forge = Forge({})
+    run = relue_autrement(forge, LABELS_DU_DEPOT, label_retouche("qa-plan", color="0e8a16"))
+
+    args = cree_labels(tmp_path, ("qa-plan", "0E8A16", "suivi"))
+    assert ecriture_relue.main(args, run=run) == 0
+    assert capsys.readouterr().out == "écrit et relu — labels du dépôt : créé qa-plan\n"
+
+
+def test_label_create_lit_les_labels_du_depot_sur_toutes_les_pages(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Un dépôt de plus de 30 labels — la page par défaut de l'API REST — : celui de la seconde
+    page est présent, et ne se recrée pas."""
+    forge = Forge({}, labels_du_depot=[[f"zone-{n}" for n in range(100)], ["qa-plan"]])
+
+    assert lance(forge, *cree_labels(tmp_path, ("qa-plan", "ededed", "suivi"))) == 0
+    assert ecritures(forge) == []
+    assert capsys.readouterr().out == "rien à écrire — labels du dépôt : qa-plan présent\n"
+
+
+UN_LABEL = {"nom": "bug", "couleur": "d73a4a", "description": "catégorie"}
+# Chaque défaut d'un fichier `--mapping`, un champ et un type à la fois : (contenu — octets tels
+# quels, document écrit en JSON, ou `None` sans fichier —, motif).
+MAPPINGS_MAL_FORMES: dict[str, tuple[Any, str]] = {
+    "fichier-absent": (None, "fichier illisible"),
+    "non-utf-8": ('[{"nom": "été"}]'.encode("cp1252"), "n'est pas en UTF-8"),
+    "json-invalide": (b'[{"nom": "bug"', "n'est pas du JSON"),
+    "objet-au-lieu-d-une-liste": (UN_LABEL, "une liste de labels attendue, non vide"),
+    "liste-vide": ([], "une liste de labels attendue, non vide"),
+    "label-non-objet": (["bug"], "label 1 : str au lieu d'un objet"),
+    "nom-absent": ([{"couleur": "d73a4a", "description": ""}], "label 1 : champ nom absent"),
+    "couleur-absente": ([{"nom": "bug", "description": ""}], "label 1 : champ couleur absent"),
+    "description-absente": (
+        [{"nom": "bug", "couleur": "d73a4a"}],
+        "label 1 : champ description absent",
+    ),
+    "nom-non-textuel": ([{**UN_LABEL, "nom": 5}], "label 1 : champ nom de type int"),
+    "couleur-non-textuelle": (
+        [{**UN_LABEL, "couleur": 14105162}],
+        "label 1 : champ couleur de type int",
+    ),
+    "description-nulle": (
+        [{**UN_LABEL, "description": None}],
+        "label 1 : champ description de type NoneType",
+    ),
+    "champ-inconnu": ([{**UN_LABEL, "color": "d73a4a"}], "label 1 : champ inconnu : color"),
+    "nom-vide": ([{**UN_LABEL, "nom": " "}], "label 1 : nom vide ou sur plusieurs lignes : ' '"),
+    "nom-sur-deux-lignes": (
+        [{**UN_LABEL, "nom": "a\nb"}],
+        "label 1 : nom vide ou sur plusieurs lignes : 'a\\nb'",
+    ),
+    "couleur-a-diese": (
+        [{**UN_LABEL, "couleur": "#d73a4a"}],
+        "label 1 : couleur '#d73a4a' : six chiffres hexadécimaux, sans #",
+    ),
+    "couleur-courte": (
+        [{**UN_LABEL, "couleur": "d73a4"}],
+        "label 1 : couleur 'd73a4' : six chiffres hexadécimaux, sans #",
+    ),
+    "couleur-longue": (
+        [{**UN_LABEL, "couleur": "d73a4a0"}],
+        "label 1 : couleur 'd73a4a0' : six chiffres hexadécimaux, sans #",
+    ),
+    "couleur-non-hexadecimale": (
+        [{**UN_LABEL, "couleur": "g73a4a"}],
+        "label 1 : couleur 'g73a4a' : six chiffres hexadécimaux, sans #",
+    ),
+    "description-trop-longue": (
+        [{**UN_LABEL, "description": "x" * 101}],
+        "label 1 : description de 101 caractères, 100 au plus",
+    ),
+    "noms-en-double-sans-la-casse": (
+        [UN_LABEL, {**UN_LABEL, "nom": "Bug"}],
+        "nommé deux fois, casse ignorée : Bug, bug",
+    ),
+    "defauts-de-trois-labels-en-une-passe": (
+        [{**UN_LABEL, "nom": 5}, {**UN_LABEL, "couleur": "rouge"}, {**UN_LABEL, "nom": "BUG"}],
+        (
+            "label 1 : champ nom de type int ; label 2 : couleur 'rouge' : six chiffres"
+            " hexadécimaux, sans # ; nommé deux fois, casse ignorée : BUG, bug"
+        ),
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("contenu", "motif"), MAPPINGS_MAL_FORMES.values(), ids=MAPPINGS_MAL_FORMES.keys()
+)
+def test_un_fichier_de_labels_mal_forme_est_refuse_avant_tout_appel(
+    contenu: Any, motif: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Le fichier se valide en entier, chaque défaut nommé avec le rang de son label, avant tout
+    appel à la forge : aucun label ne se crée d'un fichier dont un autre est faux. Une description
+    se borne à 100 caractères (« Create a label », API REST)."""
+    mapping = tmp_path / "labels.json"
+    if contenu is not None:
+        octets = contenu if isinstance(contenu, bytes) else json.dumps(contenu).encode()
+        mapping.write_bytes(octets)
+    forge = Forge({}, labels_du_depot=[["bug"]])
+
+    assert lance(forge, "label", "create", "--mapping", str(mapping)) == 1
+    assert forge.appels == []
+    assert motif in sortie_d_echec(capsys, "refus")
 
 
 @pytest.mark.parametrize(
@@ -1479,14 +1713,216 @@ def test_milestone_refuse_sans_rien_ecrire(
     assert motif in sortie_d_echec(capsys, "refus")
 
 
+CREE_DEPOT = ("depot", "create", "plecart/vitrine", "--private")
+
+
+def retouchee_a_la_creation(
+    forge: Forge, retouche: Callable[[Forge], None]
+) -> Callable[[Sequence[str], bytes | None], subprocess.CompletedProcess[bytes]]:
+    """La forge, que `retouche` change sitôt le dépôt créé par `gh repo create`."""
+
+    def forge_retouchee(
+        cmd: Sequence[str], stdin: bytes | None
+    ) -> subprocess.CompletedProcess[bytes]:
+        rendu = forge(cmd, stdin)
+        if tuple(cmd[:3]) == ("gh", "repo", "create"):
+            retouche(forge)
+        return rendu
+
+    return forge_retouchee
+
+
+@pytest.mark.parametrize("visibilite", ["private", "public"])
+def test_depot_create_cree_le_depot_et_son_origin_puis_les_relit(
+    visibilite: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Le témoin positif, et l'ordre : vérifier l'arbre de travail et l'absence d'`origin`, créer
+    le dépôt et son `origin` en une commande, relire le dépôt, puis `origin`."""
+    forge = Forge({})
+
+    assert lance(forge, "depot", "create", "plecart/vitrine", f"--{visibilite}") == 0
+    assert forge.appels == [
+        ("git", "rev-parse", "--is-inside-work-tree"),
+        ("git", "remote", "get-url", "origin"),
+        (
+            "gh",
+            "repo",
+            "create",
+            "plecart/vitrine",
+            f"--{visibilite}",
+            "--source=.",
+            "--remote=origin",
+        ),
+        ("gh", "api", DEPOT),
+        ("git", "remote", "get-url", "origin"),
+    ]
+    assert capsys.readouterr().out == (
+        f"créé et relu — dépôt plecart/vitrine ({visibilite}), origin {VITRINE}\n"
+    )
+
+
+# Ce que la forge change sitôt le dépôt créé sans en faire un autre, et la sortie qui le dit.
+DEPOTS_RELUS_EQUIVALENTS: dict[str, tuple[Callable[[Forge], None], str]] = {
+    "nom-relu-d-une-autre-casse": (
+        lambda forge: forge.documents[DEPOT].update(full_name="plecart/Vitrine"),
+        f"créé et relu — dépôt plecart/Vitrine (private), origin {VITRINE}",
+    ),
+    "origin-en-ssh": (
+        lambda forge: forge.remotes.update(origin="git@github.com:plecart/vitrine.git"),
+        "créé et relu — dépôt plecart/vitrine (private), origin git@github.com:plecart/vitrine.git",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("retouche", "sortie"),
+    DEPOTS_RELUS_EQUIVALENTS.values(),
+    ids=DEPOTS_RELUS_EQUIVALENTS.keys(),
+)
+def test_depot_create_reconnait_le_depot_sous_ses_formes_equivalentes(
+    retouche: Callable[[Forge], None], sortie: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """La forge rend le nom canonique du dépôt — `PLECART/Portfolio` se relit
+    `plecart/portfolio` (mesuré le 2026-10-26, gh 2.94.0) — : il se compare sans la casse. `gh`
+    donne à `origin` l'URL HTTPS ou SSH du dépôt selon son `git_protocol` (`FormatRemoteURL`,
+    cli/cli `internal/ghrepo/repo.go`), et `git remote get-url` applique les `insteadOf`."""
+    run = retouchee_a_la_creation(Forge({}), retouche)
+
+    assert ecriture_relue.main(list(CREE_DEPOT), run=run) == 0
+    assert capsys.readouterr().out == f"{sortie}\n"
+
+
+@pytest.mark.parametrize(
+    ("options", "motif"),
+    [
+        ({"hors_depot": True}, "hors d'un dépôt git"),
+        (
+            {"remotes": {"origin": "https://github.com/plecart/ancien.git"}},
+            "le remote origin existe déjà : https://github.com/plecart/ancien.git",
+        ),
+    ],
+    ids=["hors-depot-git", "origin-existant"],
+)
+def test_depot_create_refuse_sans_rien_ecrire(
+    options: dict[str, Any], motif: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    forge = Forge({}, **options)
+
+    assert lance(forge, *CREE_DEPOT) == 1
+    assert ecritures(forge) == []
+    assert capsys.readouterr().out == f"refus — {motif}\n"
+
+
+@pytest.mark.parametrize(
+    ("panne", "motif"),
+    [
+        (FileNotFoundError("git introuvable"), "`git` ne se lance pas : git introuvable"),
+        (
+            subprocess.CompletedProcess([], 128, b"", b"fatal: bad config line 1\n"),
+            "`git remote get-url origin` a échoué (128) : fatal: bad config line 1",
+        ),
+    ],
+    ids=["git-absent", "lecture-d-origin-en-echec"],
+)
+def test_depot_create_refuse_quand_git_ne_dit_pas_si_origin_existe(
+    panne: Exception | subprocess.CompletedProcess[bytes],
+    motif: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Seul « remote introuvable » (sortie 2) vaut l'absence d'`origin` : un `git` qui ne se lance
+    pas, ou qui échoue autrement, ne la prouve pas, et rien ne se crée."""
+    forge = Forge({})
+
+    def git_en_panne(cmd: Sequence[str], stdin: bytes | None) -> subprocess.CompletedProcess[bytes]:
+        if tuple(cmd) == ("git", "remote", "get-url", "origin"):
+            if isinstance(panne, Exception):
+                raise panne
+            return panne
+        return forge(cmd, stdin)
+
+    assert ecriture_relue.main(list(CREE_DEPOT), run=git_en_panne) == 1
+    assert ecritures(forge) == []
+    assert capsys.readouterr().out == f"refus — {motif}\n"
+
+
+# Ce que la forge change sitôt le dépôt créé, et l'écart **exact** que la relecture en dit. Une
+# retouche par élément relu.
+DEPOTS_RELUS_NON_CONFORMES: dict[str, tuple[Callable[[Forge], None], str]] = {
+    "nom": (
+        lambda forge: forge.documents[DEPOT].update(full_name="plecart/autre"),
+        "dépôt relu plecart/autre, attendu plecart/vitrine",
+    ),
+    "visibilite": (
+        lambda forge: forge.documents[DEPOT].update(visibility="public"),
+        "dépôt plecart/vitrine relu public, attendu private",
+    ),
+    "origin-sur-un-autre-depot": (
+        lambda forge: forge.remotes.update(origin="https://github.com/plecart/autre.git"),
+        (
+            "origin relu https://github.com/plecart/autre.git, attendu"
+            f" {VITRINE} ou git@github.com:plecart/vitrine.git"
+        ),
+    ),
+    "origin-absent": (
+        lambda forge: forge.remotes.clear(),
+        f"origin relu None, attendu {VITRINE} ou git@github.com:plecart/vitrine.git",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("retouche", "ecart"),
+    DEPOTS_RELUS_NON_CONFORMES.values(),
+    ids=DEPOTS_RELUS_NON_CONFORMES.keys(),
+)
+def test_depot_create_sort_en_1_si_le_depot_relu_n_est_pas_celui_cree(
+    retouche: Callable[[Forge], None], ecart: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    run = retouchee_a_la_creation(Forge({}), retouche)
+
+    assert ecriture_relue.main(list(CREE_DEPOT), run=run) == 1
+    assert capsys.readouterr().out == f"relecture non conforme — {ecart}\n"
+
+
+@pytest.mark.parametrize("etat", ["hors-depot", "sans-origin", "avec-origin"])
+def test_la_forge_temoin_repond_a_git_comme_git(
+    etat: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le double de `git` que joue la forge témoin — les deux lectures de `depot create` —,
+    confronté au vrai `git` dans un répertoire jetable que `GIT_CEILING_DIRECTORIES` isole de tout
+    dépôt parent : même code de sortie, même sortie standard. `git remote` sort en 2 sur un remote
+    introuvable (git-remote(1), « EXIT STATUS »), en 128 hors d'un dépôt (mesuré le 2026-10-26,
+    git 2.47.1)."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
+    forge = Forge({}, hors_depot=etat == "hors-depot")
+    if etat != "hors-depot":
+        subprocess.run(["git", "init", "--quiet"], check=True)
+    if etat == "avec-origin":
+        subprocess.run(["git", "remote", "add", "origin", VITRINE], check=True)
+        forge.remotes["origin"] = VITRINE
+
+    for commande in (
+        ("git", "rev-parse", "--is-inside-work-tree"),
+        ("git", "remote", "get-url", "origin"),
+    ):
+        vrai, double = ecriture_relue.default_run(commande, None), forge(commande, None)
+        assert (double.returncode, double.stdout) == (vrai.returncode, vrai.stdout), commande
+
+
 @pytest.fixture
 def ajout_md(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Les fichiers `ajout.md`, `brief.md` et `paires.txt` que citent les appels nommés
-    ci-dessous, dans un répertoire courant neuf."""
+    """Les fichiers `ajout.md`, `brief.md`, `paires.txt` et `labels.json` que citent les appels
+    nommés ci-dessous, dans un répertoire courant neuf. `labels.json` porte un label présent dans
+    la forge témoin, sous une autre couleur, et un absent."""
     monkeypatch.chdir(tmp_path)
     Path("ajout.md").write_bytes(b"*Rattachement.*\n")
     Path("brief.md").write_bytes("## Brief d'agent\n\n- [ ] Critère révisé\n".encode())
     Path("paires.txt").write_bytes("< - [ ] Critère A\n> - [x] Critère A — passé\n".encode())
+    Path("labels.json").write_bytes(
+        '[{"nom": "needs-info", "couleur": "d4c5f9", "description": "état"},'
+        ' {"nom": "qa-plan", "couleur": "0e8a16", "description": "suivi"}]'.encode()
+    )
 
 
 def forge_temoin(**options: Any) -> Forge:
@@ -1527,10 +1963,12 @@ REMPLACE_CORPS = ("issue", "edit", "42", "--body-file", "ajout.md")
 ECRIT_BRIEF = ("brief", "write", "42", "--body-file", "brief.md")
 CREE_ISSUE = ("issue", "create", "--title", "Titre", "--body-file", "ajout.md")
 CREE_ISSUE_ETIQUETEE = (*CREE_ISSUE, "--label", "prd")
+CREE_LABELS = ("label", "create", "--mapping", "labels.json")
 # (appel, ce que la forge fait du texte reçu — `None` le garde tel quel —, sortie du premier appel)
 REJEUX = [
     pytest.param(RETIRE_LABEL, None, 0, id="label-remove"),
     pytest.param(AJOUTE_LABEL, None, 0, id="label-add"),
+    pytest.param(CREE_LABELS, None, 0, id="label-create"),
     pytest.param(FERME_ISSUE, None, 0, id="issue-close"),
     pytest.param(RATTACHE_THEME, None, 0, id="milestone-attach"),
     pytest.param(FERME_THEME, None, 0, id="milestone-close"),
@@ -1610,10 +2048,10 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     appel écrit une fois ; le second sort en 0 sans **aucune** écriture, ni `PATCH`, ni `DELETE`,
     ni `POST`.
 
-    Population : les 14 appels des 10 sous-commandes qui écrivent, sur une forge qui garde le texte
+    Population : les 15 appels des 11 sous-commandes qui écrivent, sur une forge qui garde le texte
     reçu ; puis, cherchée hors de cette liste, une forge qui le garde transformé (LF → CRLF : le
     premier appel sort alors en 1, relecture non conforme) — pour les neuf qui écrivent un texte,
-    un label ou un état n'en a pas. 23 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
+    un label ou un état n'en a pas. 24 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
 
     - `issue-edit-append` — le bloc s'ajoutait une seconde fois ; corrigé : un corps qui finit
       déjà par le fichier n'est pas réécrit ;
@@ -1642,9 +2080,13 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     appliquée —, vue rouge garde retirée, sur les deux forges : la ligne se compare sans son
     retour chariot final, et la forge qui convertit en CRLF n'y fuit pas.
 
+    Au lot 8a, `label create` naît avec sa garde — un label du fichier déjà dans le dépôt, casse
+    ignorée, ne se recrée pas —, vue rouge garde retirée. `depot create` reste hors de la
+    population : son rejeu trouve `origin` et refuse, sortie 1, sans écrire.
+
     Les cases se relisent cochées, les lignes remplacées, le label absent ou posé, l'issue fermée,
     rattachée, le thème fermé, le commentaire publié, l'issue créée, le corps remplacé, le brief
-    écrit : les 18 autres n'écrivent rien au rejeu.
+    écrit, les labels du dépôt créés : les 19 autres n'écrivent rien au rejeu.
     """
     forge = forge_temoin() if stocke is None else forge_temoin(stocke=stocke)
 
@@ -1793,13 +2235,30 @@ def test_un_rejeu_ne_dit_rien_a_ecrire_tant_qu_un_champ_ecrit_differe(
     Chaque forme vue rouge : les 15 premières au lot 6a1 et à la passe 1, avant leur code ou par
     mutation de leur garde — l'ancien rejeu d'`issue create` remis compris ; le titre et l'état du
     thème créé à la passe 2, par mutation. Le dénombrement d'avant — 15 champs, 1 fuite — tenait
-    le thème créé hors de `milestone attach`."""
+    le thème créé hors de `milestone attach`.
+
+    Hors de la table, au lot 8a : `label create`, dont un label déjà dans le dépôt n'est jamais
+    modifié, par contrat — sa couleur autre se nomme sur la ligne « rien à écrire »
+    (`test_label_create_n_ecrit_rien_quand_le_label_est_deja_dans_le_depot`), sa description ne
+    se compare pas — ; `depot create`, qui ne dit jamais « rien à écrire » : son rejeu refuse."""
     forge = forge_temoin()
     for chemin, champs in etat.items():
         forge.documents[chemin].update(champs)
 
     assert lance(forge, *args) == sortie
     assert "rien à écrire" not in capsys.readouterr().out
+
+
+def sans_label(nom: str) -> Callable[[Any], Any]:
+    """Les pages de labels du dépôt, moins le label `nom`."""
+    return lambda pages: [[label for label in page if label["name"] != nom] for page in pages]
+
+
+def label_retouche(nom: str, **champs: Any) -> Callable[[Any], Any]:
+    """Les pages de labels du dépôt, le label `nom` retouché de `champs`."""
+    return lambda pages: [
+        [{**label, **champs} if label["name"] == nom else label for label in page] for page in pages
+    ]
 
 
 # Ce que la relecture rend d'un état écrit, quand ce n'est pas ce qui est parti : (appel, chemin
@@ -1811,6 +2270,30 @@ ETATS_RELUS_NON_CONFORMES: dict[str, tuple[tuple[str, ...], str, Callable[[Any],
         CORPS_42,
         lambda issue: {**issue, "labels": []},
         "le label needs-info n'est pas sur #42",
+    ),
+    "label-cree-absent": (
+        CREE_LABELS,
+        LABELS_DU_DEPOT,
+        sans_label("qa-plan"),
+        "label qa-plan absent du dépôt",
+    ),
+    "label-present-absent": (
+        CREE_LABELS,
+        LABELS_DU_DEPOT,
+        sans_label("needs-info"),
+        "label needs-info absent du dépôt",
+    ),
+    "label-cree-couleur": (
+        CREE_LABELS,
+        LABELS_DU_DEPOT,
+        label_retouche("qa-plan", color="ffffff"),
+        "label qa-plan relu ('ffffff', 'suivi'), attendu ('0e8a16', 'suivi')",
+    ),
+    "label-cree-description": (
+        CREE_LABELS,
+        LABELS_DU_DEPOT,
+        label_retouche("qa-plan", description=None),
+        "label qa-plan relu ('0e8a16', ''), attendu ('0e8a16', 'suivi')",
     ),
     "issue-close-etat": (
         FERME_ISSUE,
@@ -1872,6 +2355,7 @@ ETATS_RELUS_NON_CONFORMES: dict[str, tuple[tuple[str, ...], str, Callable[[Any],
     ETATS_RELUS_NON_CONFORMES.values(),
     ids=ETATS_RELUS_NON_CONFORMES.keys(),
 )
+@pytest.mark.usefixtures("ajout_md")
 def test_un_etat_relu_autre_que_l_etat_ecrit_sort_en_1_et_dit_l_ecart(
     args: tuple[str, ...],
     chemin: str,
@@ -1886,7 +2370,8 @@ def test_un_etat_relu_autre_que_l_etat_ecrit_sort_en_1_et_dit_l_ecart(
 
 
 # Chaque champ que l'appelant saisit, balayé en une passe pour la présence et la forme : le numéro
-# entre dans un chemin d'API, l'ancre et le label dans une ligne de sortie.
+# entre dans un chemin d'API, le dépôt aussi et dans `gh repo create`, l'ancre et le label dans une
+# ligne de sortie.
 APPELS_MAL_FORMES = {
     "sans-argument": (),
     "sous-commande-inconnue": ("commente", "42"),
@@ -1911,6 +2396,18 @@ APPELS_MAL_FORMES = {
     "label-pose-et-retire": ("label", "42", "--add", "bug", "--remove", "Bug"),
     "label-retire-deux-fois": ("label", "42", "--remove", "bug", "--remove", "bug"),
     "label-numero-non-entier": ("label", "#42", "--remove", "ready-for-agent"),
+    "label-create-sans-mapping": ("label", "create"),
+    "label-create-et-add": ("label", "create", "--mapping", "l.json", "--add", "bug"),
+    "label-numero-et-mapping": ("label", "42", "--mapping", "l.json", "--add", "bug"),
+    "depot-sans-visibilite": ("depot", "create", "plecart/vitrine"),
+    "depot-prive-et-public": ("depot", "create", "plecart/vitrine", "--private", "--public"),
+    "depot-sans-nom": ("depot", "create", "--private"),
+    "depot-sans-proprietaire": ("depot", "create", "vitrine", "--private"),
+    "depot-a-trois-segments": ("depot", "create", "plecart/vitrine/x", "--private"),
+    "depot-remontant": ("depot", "create", "plecart/..", "--private"),
+    "depot-avec-espace": ("depot", "create", "plecart/ma vitrine", "--private"),
+    "depot-proprietaire-en-option": ("depot", "create", "--private", "--", "-R/vitrine"),
+    "depot-action-inconnue": ("depot", "delete", "plecart/vitrine"),
     "fichier-manquant": ("issue", "edit", "42"),
     "issue-numero-non-entier": ("issue", "edit", "4 2", "--append", "x.md"),
     "ajout-et-remplacement": ("issue", "edit", "42", "--append", "x.md", "--body-file", "x.md"),
@@ -1960,6 +2457,7 @@ PREMIERES_LECTURES = {
     "issue-create": CREE_ISSUE,
     "issue-create-label": CREE_ISSUE_ETIQUETEE,
     "label-add": AJOUTE_LABEL,
+    "label-create": CREE_LABELS,
     "issue-close": FERME_ISSUE,
     "milestone-attach": RATTACHE_THEME,
     "milestone-close": FERME_THEME,
@@ -2009,6 +2507,8 @@ ECRITURES_EN_PANNE = {
     "post": (PUBLIE_COMMENTAIRE, "POST"),
     "post-issue": (CREE_ISSUE, "POST"),
     "post-label": (AJOUTE_LABEL, "POST"),
+    "post-label-du-depot": (CREE_LABELS, "POST"),
+    "depot-create": (CREE_DEPOT, "create"),
     "patch-fermeture": (FERME_ISSUE, "PATCH"),
     "patch-rattachement": (RATTACHE_THEME, "PATCH"),
     "post-theme": (CREE_THEME, "POST"),
@@ -2104,6 +2604,10 @@ REPONSES_D_UNE_AUTRE_FORME: dict[str, tuple[tuple[str, ...], Any, str]] = {
         {"number": 901, "body": "*Rattachement.*\n", "labels": []},
         "relecture",
     ),
+    "labels-a-creer-hors-pages": (CREE_LABELS, {"message": "Not Found"}, "lecture"),
+    "label-du-depot-sans-couleur": (CREE_LABELS, [[{"name": "bug"}]], "lecture"),
+    "labels-crees-relus-hors-pages": (CREE_LABELS, {"message": "Not Found"}, "relecture"),
+    "depot-relu-sans-nom": (CREE_DEPOT, {"visibility": "private"}, "relecture"),
 }
 
 
@@ -2136,10 +2640,12 @@ def test_une_reponse_d_une_autre_forme_sort_en_1_en_une_ligne(
     réponse de la fermeture n'étant pas lue ; puis 6, ceux de `milestone` : le milestone de
     l'issue, les thèmes du dépôt, dont le numéro entre dans un chemin, la réponse de la création
     d'un thème, de même, le thème créé relu, le rattachement relu, le thème fermé relu — 21 sites.
-    Chaque site a sa ligne ; ceux de lecture et la réponse d'une création en ont une seconde, de
-    forme ou de type, les issues ouvertes une troisième et une quatrième, le numéro et les labels
-    de l'issue identique — 36 lignes ; les relectures passent par les mêmes lecteurs que la
-    lecture."""
+    Le lot 8a en ajoute 3, gardés dès l'écriture : les labels du dépôt que lit `label create`,
+    leur relecture, et le dépôt que relit `depot create` — 24 sites, la réponse d'une création de
+    label ou de dépôt n'étant pas lue. Chaque site a sa ligne ; ceux de lecture et la réponse
+    d'une création en ont une seconde, de forme ou de type, les issues ouvertes une troisième et
+    une quatrième, le numéro et les labels de l'issue identique — 40 lignes ; les relectures
+    passent par les mêmes lecteurs que la lecture."""
     forge = forge_temoin()
 
     def forge_d_une_autre_forme(
