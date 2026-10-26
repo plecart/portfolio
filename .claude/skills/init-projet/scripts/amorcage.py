@@ -42,7 +42,8 @@ le répertoire courant. Chaque sous-commande qui écrit fait son geste puis le r
   tous ; sans rien à commiter, rien à faire ; sinon `git add -A` et `git commit -m "chore:
   amorçage pipeline de dev"`. La relecture veut ce titre pour sujet du dernier commit, et un
   `git status --porcelain` vide. Ces deux lectures neutralisent les quatre clés de configuration
-  git recensées qui en changeaient la conclusion (`STATUS`, `SUBJECT`).
+  git recensées qui en changeaient la conclusion (`STATUS`, `SUBJECT`) ; d'un dépôt imbriqué,
+  seul compte son pointeur, que `git add -A` commite, jamais son contenu interne.
 
 **Ce qu'il ne prouve pas.** `depot init` lit le dépôt qui contient le répertoire courant, sans
 vérifier qu'il en est la racine ; une `HEAD` détachée y est refusée par l'échec de
@@ -92,7 +93,10 @@ BOOTSTRAP_TITLE = "chore: amorçage pipeline de dev"
 # git 2.47.1) : sans elles, `status.showUntrackedFiles=no` cache les fichiers non suivis et
 # `diff.ignoreSubmodules=all` le pointeur avancé d'un dépôt imbriqué ; `i18n.logOutputEncoding`
 # réencode le sujet et `log.showSignature` le fait précéder d'une ligne de vérification.
-STATUS = ("git", "status", "--porcelain", "--untracked-files=normal", "--ignore-submodules=none")
+# `--ignore-submodules=dirty` compte ce que `git add -A` peut commiter d'un dépôt imbriqué, son
+# pointeur, et tait son contenu interne, qu'il ne peut pas : avec `none`, un fichier non suivi
+# dans le dépôt imbriqué lançait un `git commit` sans rien à écrire (mesuré le même jour).
+STATUS = ("git", "status", "--porcelain", "--untracked-files=normal", "--ignore-submodules=dirty")
 SUBJECT = ("git", "log", "-1", "--format=%s", "--encoding=UTF-8", "--no-show-signature")
 
 
@@ -329,8 +333,8 @@ def mcp_add(run: Run, args: argparse.Namespace) -> str:
 
 
 def changes(run: Run) -> list[str]:
-    """Les lignes de `git status --porcelain` (`STATUS`) : ce qui reste à commiter, fichiers non
-    suivis et pointeurs de dépôts imbriqués compris."""
+    """Les lignes de `git status --porcelain` (`STATUS`) : ce que `git add -A` puis `git commit`
+    peuvent encore commiter, fichiers non suivis et pointeurs de dépôts imbriqués compris."""
     return output_of(run, STATUS).splitlines()
 
 

@@ -481,13 +481,18 @@ def signe_par_ssh(depot: Path) -> None:
     git("config", "commit.gpgsign", "true")
 
 
-def avance_un_depot_imbrique(_depot: Path) -> None:
-    """Tout est commité, sauf le pointeur d'un dépôt imbriqué, avancé d'un commit : la seule
-    chose que `git add -A` ait à commiter."""
+def commite_un_depot_imbrique() -> None:
+    """Tout le projet commité, dont le dépôt imbriqué `module`, à un commit."""
     git("init", "-b", "main", "module")
     git("-C", "module", "commit", "--allow-empty", "-m", "un")
     git("add", "-A")
     git("commit", "-m", "initial")
+
+
+def avance_un_depot_imbrique(_depot: Path) -> None:
+    """Tout est commité, sauf le pointeur d'un dépôt imbriqué, avancé d'un commit : la seule
+    chose que `git add -A` ait à commiter."""
+    commite_un_depot_imbrique()
     git("-C", "module", "commit", "--allow-empty", "-m", "deux")
 
 
@@ -517,7 +522,10 @@ def test_commit_commite_et_relit_quelle_que_soit_la_configuration_git(
       `status.showUntrackedFiles=no` cache les fichiers non suivis, `diff.ignoreSubmodules=all`
       le pointeur avancé d'un dépôt imbriqué que `git add -A` commite quand même : « rien à
       faire », sans commit. `--porcelain` fixe le format, pas le contenu ; `core.quotePath` ne
-      change que l'écriture d'un chemin dans le motif (lu).
+      change que l'écriture d'un chemin dans le motif (lu). `--ignore-submodules=dirty` l'emporte
+      sur la clé et est voulu, pas `none` : le contenu interne d'un dépôt imbriqué ne se commite
+      pas par `git add -A`, et l'option se choisit sur ce que le geste peut écrire, pas au plus
+      strict (mesuré).
     - `git log -1 --format=%s` (relecture de `commit`) : fuite, mesuré. `i18n.logOutputEncoding`
       réencode le sujet, `log.showSignature` le fait précéder d'une ligne de vérification sur un
       commit signé : relecture non conforme d'un commit conforme.
@@ -544,6 +552,21 @@ def test_commit_commite_et_relit_quelle_que_soit_la_configuration_git(
     assert (
         git("status", "--porcelain", "--untracked-files=normal", "--ignore-submodules=none") == ""
     )
+
+
+def test_commit_n_a_rien_a_faire_quand_seul_l_interieur_d_un_depot_imbrique_change(
+    depot_a_commiter: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Un fichier non suivi **dans** un dépôt imbriqué n'est pas à la portée de `git add -A`, qui
+    n'en commite que le pointeur : compté comme un changement, il lancerait un `git commit` qui
+    n'a rien à écrire, et sortirait en relecture non conforme (mesuré le 2026-10-26,
+    git 2.47.1)."""
+    commite_un_depot_imbrique()
+    (depot_a_commiter / "module" / "brouillon.txt").write_bytes(b"")
+
+    assert lance("commit") == 0
+    assert capsys.readouterr().out == "rien à faire — rien à commiter\n"
+    assert git("rev-list", "--count", "HEAD") == "1\n"
 
 
 @pytest.mark.parametrize(
