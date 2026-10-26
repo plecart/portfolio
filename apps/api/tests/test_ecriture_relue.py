@@ -1608,10 +1608,10 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     appel écrit une fois ; le second sort en 0 sans **aucune** écriture, ni `PATCH`, ni `DELETE`,
     ni `POST`.
 
-    Population : les 12 sous-commandes, sur une forge qui garde le texte reçu ; puis, cherchée hors
-    de cette liste, une forge qui le garde transformé (LF → CRLF : le premier appel sort alors en
-    1, relecture non conforme) — pour les sept qui écrivent un texte, un label ou un état n'en a
-    pas. 19 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
+    Population : les 14 appels des 10 sous-commandes qui écrivent, sur une forge qui garde le texte
+    reçu ; puis, cherchée hors de cette liste, une forge qui le garde transformé (LF → CRLF : le
+    premier appel sort alors en 1, relecture non conforme) — pour les neuf qui écrivent un texte,
+    un label ou un état n'en a pas. 23 formes recensées. Au lot 4a, sur les 7 d'alors, 2 fuyaient :
 
     - `issue-edit-append` — le bloc s'ajoutait une seconde fois ; corrigé : un corps qui finit
       déjà par le fichier n'est pas réécrit ;
@@ -1638,7 +1638,7 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     Au lot 7b, `checkbox patch --paires` et `brief patch --paires` naissent avec leur garde — une
     paire dont l'ancienne ligne manque et dont la nouvelle est seule dans le texte est déjà
     appliquée —, vue rouge garde retirée, sur les deux forges : la ligne se compare sans son
-    retour chariot final, et la forge qui convertit en CRLF n'y fuit pas. 23 formes.
+    retour chariot final, et la forge qui convertit en CRLF n'y fuit pas.
 
     Les cases se relisent cochées, les lignes remplacées, le label absent ou posé, l'issue fermée,
     rattachée, le thème fermé, le commentaire publié, l'issue créée, le corps remplacé, le brief
