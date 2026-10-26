@@ -13,6 +13,8 @@ hors CI). Même cause possible — un « seulement : » sans guillemets dans la 
 """
 
 import re
+import shlex
+import shutil
 import subprocess
 from collections.abc import Iterable
 from pathlib import Path
@@ -3623,10 +3625,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # script (`SKILLS_SANS_ECRITURE_GH_DIRECTE`), le renvoi aux sessions liées
     # (`SKILLS_DES_SESSIONS_LIEES`), le contexte vivant et la création de label retirés
     # (`RETIRES_DU_CONTEXTE_VIVANT`), le type de chaque case du gabarit et de l'exemple
-    # (`test_chaque_case_d_un_plan_de_qa_porte_son_type`). **Ce qui n'est pas gardé** : l'accord
-    # entre les deux commandes épinglées ici qui reconnaissent une case — « cases sans type »,
-    # « critères → cases » — et `PLAN_QA_CASE` / `PLAN_QA_CASE_TYPEE` : l'une change sans que
-    # l'autre rougisse ; rejoué à la main au correctif de la passe 1, sans écart sur le recueil.
+    # (`test_chaque_case_d_un_plan_de_qa_porte_son_type`), l'accord de la commande « cases sans
+    # type » avec `cases_sans_type` (`test_la_commande_des_cases_sans_type_s_accorde_au_recueil`),
+    # l'absence de `\` dans les commandes de la passe comptable
+    # (`test_une_commande_de_la_passe_comptable_n_a_aucune_barre_oblique_inverse`). **Ce qui n'est
+    # pas gardé** : l'accord de la commande « critères → cases » avec `PLAN_QA_CASE`.
     "7a-plan-qa-jugement-a-la-session": (
         PLAN_QA_SKILL,
         (
@@ -3795,18 +3798,18 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-plan-qa-cases-sans-type-commande": (
         PLAN_QA_SKILL,
         (
-            r"grep -nE '^([[:blank:]>]*([-*+]|[[:digit:]]+[.)])[[:blank:]]+)+\[[[:blank:]xX]\]"
-            r"[[:blank:]]+' <brouillon> | grep -vE '^[[:digit:]]+:([[:blank:]>]*([-*+]|"
-            r"[[:digit:]]+[.)])[[:blank:]]+)+\[[[:blank:]xX]\][[:blank:]]+(\*\*Commande\*\* —"
-            r" `[^`]+`|\*\*Observation\*\* — .+) → [^[:space:]]'"
+            "grep -nE '^([[:blank:]>]*([-*+]|[[:digit:]]+[.)])[[:blank:]]+)+[[][[:blank:]xX][]]"
+            "[[:blank:]]+' <brouillon> | grep -vE '^[[:digit:]]+:([[:blank:]>]*([-*+]|"
+            "[[:digit:]]+[.)])[[:blank:]]+)+[[][[:blank:]xX][]][[:blank:]]+([*][*]Commande[*][*] —"
+            " `[^`]+`|[*][*]Observation[*][*] — .+) → [^[:space:]]'"
         ),
     ),
     "7a-plan-qa-criteres-vers-cases": (
         PLAN_QA_SKILL,
         (
-            r"`grep -nE '^## |^- \*\*C[[:digit:]]+\*\* — |^([[:blank:]>]*([-*+]|[[:digit:]]+[.)])"
-            r"[[:blank:]]+)+\[[[:blank:]xX]\][[:blank:]]+.*\(C[[:digit:]]+(, C[[:digit:]]+)*\)'"
-            r" <brouillon>` : chaque issue du relevé a son"
+            "`grep -nE '^## |^- [*][*]C[[:digit:]]+[*][*] — |^([[:blank:]>]*([-*+]|[[:digit:]]+[.)])"
+            "[[:blank:]]+)+[[][[:blank:]xX][]][[:blank:]]+.*[(]C[[:digit:]]+(, C[[:digit:]]+)*[)]'"
+            " <brouillon>` : chaque issue du relevé a son"
             " titre `## Bloc de"
             " fonctionnalité : Issue #<N>` ; sous chacun, avant le titre suivant, autant de lignes"
             " `- **C<k>** —` que l'issue a de critères, et chaque `C<k>` cité par au moins une case"
@@ -4124,8 +4127,9 @@ def cases_sans_type(texte: str) -> list[str]:
     return [ligne for ligne in cases(texte) if not PLAN_QA_CASE_TYPEE.match(ligne)]
 
 
-# Le recueil de `cases` et de `cases_sans_type`, des deux côtés (obs 138), en littéraux (obs 80) :
-# chaque ligne, puis ce que les deux en disent — est-ce une case, est-elle sans type.
+# Le recueil de `cases`, de `cases_sans_type` et de la commande « Cases sans type » de la passe
+# comptable, des deux côtés (obs 138), en littéraux (obs 80) : chaque ligne, puis est-ce une case,
+# est-elle sans type.
 PLAN_QA_CASE_FORMS = {
     "commande complete": (
         "- [ ] **Commande** — `curl -s -o /dev/null -w '%{http_code}' $API/health` → `200`",
@@ -4232,6 +4236,98 @@ def test_chaque_case_d_un_plan_de_qa_porte_son_type(fichier: str) -> None:
 
     assert cases(texte), f"`{fichier}` n'a aucune case : `PLAN_QA_CASE` ne la voit plus"
     assert cases_sans_type(texte) == []
+
+
+# Les commandes de la passe comptable (`plan-qa`, « Passe finale avant publication »), chacune sous
+# sa puce `- **<nom>** — ` : un bloc clôturé `bash`, ou un segment `grep …` entre accents graves.
+PASSE_COMPTABLE = re.compile(r"^### 1\. Passe comptable.*?(?=^### )", re.MULTILINE | re.DOTALL)
+PUCE_DE_LA_PASSE = re.compile(r"^- \*\*", re.MULTILINE)
+COMMANDE_EN_BLOC = re.compile(r"```bash\n(.+?)\n")
+COMMANDE_EN_LIGNE = re.compile(r"`(grep [^`]+)`")
+# Leurs noms, en littéraux (obs 80) ; leur égalité avec le texte est un second test.
+COMMANDES_DE_LA_PASSE_COMPTABLE = ("Cases sans type", "Critères → cases", "Marqueurs", "Structure")
+
+
+def commandes_de_la_passe_comptable() -> dict[str, str]:
+    """Chaque commande de la passe comptable de `plan-qa`, par le nom de sa puce."""
+    section = PASSE_COMPTABLE.search((REPOSITORY_ROOT / PLAN_QA_SKILL).read_text(encoding="utf-8"))
+    assert section, f"`{PLAN_QA_SKILL}` n'a plus de « 1. Passe comptable »"
+    commandes: dict[str, str] = {}
+    for puce in PUCE_DE_LA_PASSE.split(section.group())[1:]:
+        nom, corps = puce.split("** — ", 1)
+        commande = COMMANDE_EN_BLOC.search(corps) or COMMANDE_EN_LIGNE.search(corps)
+        assert commande, f"la puce « {nom} » de la passe comptable n'a pas de commande"
+        commandes[nom] = commande.group(1).strip()
+    return commandes
+
+
+def test_la_passe_comptable_n_a_que_les_commandes_recensees() -> None:
+    """Une commande ajoutée à la passe comptable entre au recueil, donc sous l'épingle suivante."""
+    assert tuple(commandes_de_la_passe_comptable()) == COMMANDES_DE_LA_PASSE_COMPTABLE
+
+
+@pytest.mark.parametrize("nom", COMMANDES_DE_LA_PASSE_COMPTABLE)
+def test_une_commande_de_la_passe_comptable_n_a_aucune_barre_oblique_inverse(nom: str) -> None:
+    r"""Aucun motif de la passe comptable ne contient de `\` : sous le hook RTK du poste, un `grep`
+    en tête de commande devient `rtk grep`, et un argument **sans espace** y perd ses `\` — mesuré
+    le 2026-10-26, rtk 0.43.0 : `rtk grep -nE '^a+\[b\]'` sort `aab`, `rtk grep -nE 'x \[y'` sort
+    `x [y` (B1 de la passe 2 de relecture de la PR #157). Un `\` s'écrit en expression entre
+    crochets : `[[]`, `[]]`, `[*]`, `[(]`, `[)]`.
+
+    **Dénombrement** (classe par la forme du geste, obs 139 : un motif que la passe fait taper à
+    l'`executant` contient `\`), écrit avant le correctif, sur `1b5b758` : **5** motifs `grep` —
+    « Cases sans type » ×2 (la sélection, puis le filtre `grep -v`), « Critères → cases »,
+    « Marqueurs », « Structure » ; **4** contiennent `\`, tous sauf « Marqueurs » ; **1** est sans
+    espace, la sélection de « Cases sans type » ; **4** sont réécrits par le hook, le filtre après
+    `|` restant le `grep` natif (`rtk hook claude` rejoué sur la commande). **1** fuyait, cette
+    sélection : rien sur un plan qui a une case sans type, codes `1 1`. Les trois autres réécrits
+    sortaient juste — même sortie avec et sans le hook sur les deux témoins de la relecture. Le
+    correctif retire le `\` des quatre, même de ceux qui marchaient.
+
+    **Ce que ce test ne voit pas** : le hook lui-même, qui n'existe que sur le poste, pas en CI —
+    une autre réécriture que la perte des `\` ne se voit qu'au rejeu de la session sur ses deux
+    témoins.
+    """
+    assert "\\" not in commandes_de_la_passe_comptable()[nom]
+
+
+@pytest.mark.parametrize(
+    ("ligne", "sans_type"),
+    [(ligne, sans_type) for ligne, _, sans_type in PLAN_QA_CASE_FORMS.values()],
+    ids=PLAN_QA_CASE_FORMS.keys(),
+)
+def test_la_commande_des_cases_sans_type_s_accorde_au_recueil(
+    ligne: str, sans_type: bool, tmp_path: Path
+) -> None:
+    """La commande « Cases sans type » de la passe comptable sort une ligne du recueil si et
+    seulement si `cases_sans_type` la refuse (I2 de la passe 2 de relecture de la PR #157 : l'une
+    changeait sans que l'autre rougisse).
+
+    `bash` est celui du `PATH`, par `shutil.which` (doc `subprocess`, avertissement de `Popen`) : un
+    `"bash"` nu est résolu sous Windows par `CreateProcess` — mesuré le 2026-10-26 sur le poste, le
+    `bash` de WSL. Une sortie d'erreur rougit : une commande cassée ne sort rien, comme sur une case
+    typée.
+
+    **Ce que ce test ne voit pas** : le hook RTK n'existe que sur le poste, pas en CI — la commande
+    tourne ici sous `subprocess`, sans lui, et reste verte avec une barre oblique inverse remise.
+    C'est l'épingle « aucune barre oblique inverse » qui ferme B1, et le rejeu de la session sur ses
+    deux témoins qui le mesure. L'accord de « Critères → cases » avec `PLAN_QA_CASE` n'est pas
+    gardé.
+    """
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("pas de `bash` : la commande de la passe comptable ne se joue pas ici")
+    brouillon = tmp_path / "brouillon.md"
+    brouillon.write_text(f"{ligne}\n", encoding="utf-8", newline="\n")
+    commande = commandes_de_la_passe_comptable()["Cases sans type"].replace(
+        "<brouillon>", shlex.quote(brouillon.as_posix())
+    )
+
+    resultat = subprocess.run(
+        [bash, "-c", commande], capture_output=True, text=True, encoding="utf-8", check=False
+    )
+
+    assert (bool(resultat.stdout), resultat.stderr) == (sans_type, "")
 
 
 # --- Chaque sortie d'une `contradiction` relance ce qu'elle doit (#134, lot 6b2) -----------------

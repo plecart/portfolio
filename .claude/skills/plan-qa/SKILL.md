@@ -159,17 +159,17 @@ Deux passes, dans cet ordre, avant de montrer le brouillon (étape 7).
 
 ### 1. Passe comptable — `executant`
 
-La session lui passe le chemin du brouillon et celui du relevé des issues du périmètre (numéros et critères). Il joue les vérifications ci-dessous, chacune écrite en commande, et rend « conforme » ou chaque ligne en échec ; il ne corrige rien. Tout échec refuse la publication : la session corrige le brouillon et relance la passe.
+La session lui passe le chemin du brouillon et celui du relevé des issues du périmètre (numéros et critères). Il joue les vérifications ci-dessous, chacune écrite en commande, et rend « conforme » ou chaque ligne en échec ; il ne corrige rien. Tout échec refuse la publication : la session corrige le brouillon et relance la passe. Aucun motif n'y porte de `\` : un caractère spécial s'y écrit entre crochets — `[[]`, `[]]`, `[*]`, `[(]`, `[)]` —, le hook RTK du poste faisant perdre ses `\` à un argument sans espace.
 
 - **Cases sans type** — toute ligne sortie est une case sans type (gabarit, « Types de case ») :
 
   ```bash
-  grep -nE '^([[:blank:]>]*([-*+]|[[:digit:]]+[.)])[[:blank:]]+)+\[[[:blank:]xX]\][[:blank:]]+' <brouillon> | grep -vE '^[[:digit:]]+:([[:blank:]>]*([-*+]|[[:digit:]]+[.)])[[:blank:]]+)+\[[[:blank:]xX]\][[:blank:]]+(\*\*Commande\*\* — `[^`]+`|\*\*Observation\*\* — .+) → [^[:space:]]'
+  grep -nE '^([[:blank:]>]*([-*+]|[[:digit:]]+[.)])[[:blank:]]+)+[[][[:blank:]xX][]][[:blank:]]+' <brouillon> | grep -vE '^[[:digit:]]+:([[:blank:]>]*([-*+]|[[:digit:]]+[.)])[[:blank:]]+)+[[][[:blank:]xX][]][[:blank:]]+([*][*]Commande[*][*] — `[^`]+`|[*][*]Observation[*][*] — .+) → [^[:space:]]'
   ```
 
-- **Critères → cases** — `grep -nE '^## |^- \*\*C[[:digit:]]+\*\* — |^([[:blank:]>]*([-*+]|[[:digit:]]+[.)])[[:blank:]]+)+\[[[:blank:]xX]\][[:blank:]]+.*\(C[[:digit:]]+(, C[[:digit:]]+)*\)' <brouillon>` : chaque issue du relevé a son titre `## Bloc de fonctionnalité : Issue #<N>` ; sous chacun, avant le titre suivant, autant de lignes `- **C<k>** —` que l'issue a de critères, et chaque `C<k>` cité par au moins une case.
+- **Critères → cases** — `grep -nE '^## |^- [*][*]C[[:digit:]]+[*][*] — |^([[:blank:]>]*([-*+]|[[:digit:]]+[.)])[[:blank:]]+)+[[][[:blank:]xX][]][[:blank:]]+.*[(]C[[:digit:]]+(, C[[:digit:]]+)*[)]' <brouillon>` : chaque issue du relevé a son titre `## Bloc de fonctionnalité : Issue #<N>` ; sous chacun, avant le titre suivant, autant de lignes `- **C<k>** —` que l'issue a de critères, et chaque `C<k>` cité par au moins une case.
 - **Marqueurs** — `grep -nE 'TODO|FIXME|à compléter|<[^<>[:space:]][^<>]*>' <brouillon>` : toute ligne sortie porte un marqueur ou un espace réservé du gabarit ; une valeur d'exécution s'écrit en variable (`$CLIENT_A_ID`, étape 5) ou, produite par une case, se relit du fichier que cette case écrit (`$QA_RUN/upload.json`, `references/exemple-bloc-issue.md`).
-- **Structure** — `grep -nE "^## |^\*\*Règle d'arrêt\*\*" <brouillon>` : « Vue d'ensemble », « Types de case » et « Saisie d'échec » présents, « Paliers de sévérité » une fois, avant la première phase ; chaque `## Phase` — sauf la Phase Finale, qui clôt le plan — et chaque `## Bloc de fonctionnalité` suivi de sa ligne `**Règle d'arrêt**` avant le titre suivant.
+- **Structure** — `grep -nE "^## |^[*][*]Règle d'arrêt[*][*]" <brouillon>` : « Vue d'ensemble », « Types de case » et « Saisie d'échec » présents, « Paliers de sévérité » une fois, avant la première phase ; chaque `## Phase` — sauf la Phase Finale, qui clôt le plan — et chaque `## Bloc de fonctionnalité` suivi de sa ligne `**Règle d'arrêt**` avant le titre suivant.
 
 ### 2. Relecture de jugement — la session
 
