@@ -4114,9 +4114,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         EXECUTION_QA_SKILL,
         (
             "Lui reviennent aussi l'état de l'arbre et les fichiers que les cases du bloc nomment"
-            " (§2), l'état des issues des cases `🔴 BUG #N` à la reprise (§2), le recoupement BD /"
-            " logs (« Patrons par surface »), les commandes finales (§6) et la preuve lourde,"
-            " rassemblée dans un fichier (§3, étape 6). Le verdict de la case reste à la session"
+            " (§2), l'état des issues des cases `🔴 BUG #N` et des PR des cases `🔴 PR #<M>` à la"
+            " reprise (§2), le recoupement BD / logs (« Patrons par surface »), les commandes"
+            " finales (§6) et la preuve lourde, rassemblée dans un fichier (§3, étape 6). Le verdict"
+            " de la case reste à la session"
         ),
     ),
     "7b2-execution-qa-script-par-la-session": (
@@ -4186,12 +4187,14 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         (
             "les cases `🔴 BUG #N` dont l'issue est fermée par une PR"
             " (`closedByPullRequestsReferences` non vide) se rejouent (§4, option (c)) ; une issue"
-            " fermée sans PR — wontfix, doublon — ne se rejoue pas. La session les trouve dans le"
-            ' corps (`gh issue view <plan> --json body -q .body | grep -n "BUG #"`) ; l\'état de'
-            " chaque issue, et la PR qui l'a fermée, sont un relevé du `releveur`"
-            " (`gh issue view <N> --json state,closedByPullRequestsReferences`). Passée, la ligne"
+            " fermée sans PR — wontfix, doublon — ne se rejoue pas. Les cases `🔴 PR #<M>` — la"
+            " petite PR d'un correctif évident (§4) — se rejouent une fois leur PR mergée. La"
+            " session les trouve dans le corps (`gh issue view <plan> --json body -q .body | grep"
+            " -nE \"BUG #|PR #\"`) ; l'état de chaque issue, et la PR qui l'a fermée, sont un relevé"
+            " du `releveur` (`gh issue view <N> --json state,closedByPullRequestsReferences`), comme"
+            " l'état de chaque petite PR (`gh pr view <M> --json state,mergedAt`). Passée, la ligne"
             " entière devient `- [x] <texte de la case> — corrigé par #<PR>, <date>`, **sans**"
-            " `🔴 BUG #N`."
+            " `🔴 BUG #N` ni `🔴 PR #<M>`."
         ),
     ),
     "7b2-execution-qa-commande-au-releveur": (
@@ -4294,10 +4297,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7b2-execution-qa-un-seul-auteur": (
         EXECUTION_QA_SKILL,
         (
-            "Le marqueur `🔴 BUG #N` et l'Index des constats, la session `bug-vers-issue` les patche"
-            " elle-même (son étape 7) : cette session ne les écrit pas, un seul auteur. La QA"
-            " reprend dans cette session sur son message « terminé — BUG #N consigné »"
-            " (`sessions-liees.md`, « Fin de travail »), jamais sur sa fin de tour."
+            "Le marqueur `🔴 BUG #N` et l'Index des constats, ou la case que réécrit une autre"
+            " classe, la session `bug-vers-issue` les patche elle-même (ses étapes 1 et 7) : cette"
+            " session ne les écrit pas, un seul auteur. La QA reprend dans cette session sur son"
+            " message « terminé — <livrable> » (`sessions-liees.md`, « Fin de travail »), jamais sur"
+            " sa fin de tour."
         ),
     ),
     "7b2-execution-qa-reporter": (
@@ -4307,9 +4311,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7b2-execution-qa-correction-hors-de-la-qa": (
         EXECUTION_QA_SKILL,
         (
-            "**(c) Faire corriger** — la correction n'a jamais lieu dans cette session : consigner"
-            " d'abord (a) ; elle passe ensuite par `cycle-pr`, dans sa propre session, sur l'issue"
-            " consignée (`references/standard-correction-bug.md`) ; la case se rejoue à la reprise"
+            "**(c) Faire corriger** — la correction n'a jamais lieu dans cette session : (a)"
+            " d'abord, qui qualifie ; elle passe ensuite par `cycle-pr`, dans sa propre session —"
+            " une petite PR sans issue pour un correctif évident, l'issue consignée pour un défaut"
+            " à étudier (`references/standard-correction-bug.md`) ; la case se rejoue à la reprise"
             " (§2), jamais dans la suite du contexte qui a corrigé."
         ),
     ),
@@ -4318,7 +4323,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         (
             "est `[x]` (ou explicitement ` — N/A : <raison>`), ou laissée `[ ]` avec ` — accepté :"
             " <décision>, <date>`. - Vérifier que chaque constat bloquant a un lien `🔴 BUG #N`"
-            " (consigné), un ` — corrigé par #<PR>, <date>` (repris, §2) ou une annotation"
+            " (consigné) ou `🔴 PR #<M>` (petite PR), un ` — corrigé par #<PR>, <date>` (repris,"
+            " §2) ou une annotation"
             " ` — accepté : <décision>, <date>`. - Faire relancer par le `releveur` les commandes"
             " finales listées dans le plan, après toute correction"
             " mergée. - Appliquer les dernières paires, dans un fichier neuf (§3, étape 5) : aucune"
@@ -4351,8 +4357,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         EXECUTION_QA_SKILL,
         (
             "rassemblée par le `releveur`, est dans un commentaire de synthèse de phase publié par"
-            " `comment`, pas entassée en ligne. - [ ] Chaque échec a un lien `🔴 BUG #N`, un"
-            " ` — corrigé par #<PR>`, OU une annotation reporté / accepté. - [ ] Le patch du bloc"
+            " `comment`, pas entassée en ligne. - [ ] Chaque échec a un lien `🔴 BUG #N` ou"
+            " `🔴 PR #<M>`, un ` — corrigé par #<PR>`, OU une annotation reporté / accepté. - [ ] Le"
+            " patch du bloc"
             " est appliqué et relu par le"
             " script ; aucune paire ne reste à appliquer. - [ ] L'Index des constats, qu'écrivent"
             " les sessions `bug-vers-issue`, porte chaque bug consigné dans cette phase."
@@ -4377,8 +4384,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7b2-execution-qa-erreur-jamais-corriger": (
         EXECUTION_QA_SKILL,
         (
-            "| Corriger un bug dans la session de QA | Jamais : consigner (a) ; la correction passe"
-            " par `cycle-pr`, dans sa propre session (c). |"
+            "| Corriger un bug dans la session de QA | Jamais : (a) qualifie ; la correction passe"
+            " par `cycle-pr`, dans sa propre session, en petite PR ou sur l'issue consignée (c). |"
         ),
     ),
     "7b2-commentaire-phase-publie-par-la-session": (
@@ -4489,10 +4496,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7b2-correction-jamais-dans-la-qa": (
         CORRECTION_BUG_REF,
         (
-            "La session de QA ne corrige jamais : un échec se consigne (`SKILL.md` §4, option (a)),"
+            "La session de QA ne corrige jamais : un échec se qualifie (`SKILL.md` §4, option (a)),"
             " et sa correction passe par `cycle-pr`, dans sa propre session, sur l'issue consignée"
-            " (option (c)). Ce standard vaut pour cette session `cycle-pr` quand elle corrige un bug"
-            " trouvé en QA."
+            " ou, correctif évident, sur une petite PR sans issue (option (c)). Ce standard vaut"
+            " pour cette session `cycle-pr` quand elle corrige un bug trouvé en QA."
         ),
     ),
     "7b2-correction-reprise-dans-une-session-de-qa": (
@@ -4502,7 +4509,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " session de QA neuve, démarrée sur le numéro du plan une fois la correction mergée,"
             " dont le §2 trouve la case (`SKILL.md` §2, « La reprise »). Passée, la ligne entière"
             " devient `- [x] <texte de la case> — corrigé par #<PR>, <date>`, **sans**"
-            " `🔴 BUG #N`."
+            " `🔴 BUG #N` ni `🔴 PR #<M>`."
         ),
     ),
     # Passe 1 de relecture de la PR #159 (2026-10-26) : **15** moitiés restrictives ajoutées à la
@@ -5078,6 +5085,52 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         (
             "| Consigner sans qualifier l'échec | Une classe prouvée d'abord (étape 1) : seul le"
             " défaut à étudier devient une issue ; dans le doute, défaut à étudier. |"
+        ),
+    ),
+    # La petite PR en QA : `🔴 correctif évident — …`, puis `🔴 PR #<M>`, rejouée à la reprise.
+    # Classe : un site qui énumère les états d'une case en échec. Dénombrement par la forme
+    # (obs 139), écrit avant le correctif, `grep -n "BUG #"` des fichiers d'`execution-qa` et de
+    # `plan-qa` : **8** sites, **6** fuyaient — `SKILL.md` « Délégation », §2, §4 (a), §6, « Passe
+    # finale », `standard-correction-bug.md` —, mis à jour dans leurs entrées 7b2 ; indemnes,
+    # « Erreurs courantes » (l'auteur de `🔴 BUG #N`) et `patch-checkbox-gh.md` (un exemple de
+    # réécriture) ; plus la Phase Finale du gabarit, sans la forme, ci-dessous.
+    "7c-execution-qa-qualifie-d-abord": (
+        EXECUTION_QA_SKILL,
+        (
+            "Elle qualifie d'abord l'échec (son étape 1) : une issue ne part que pour un défaut à"
+            " étudier."
+        ),
+    ),
+    "7c-plan-qa-echecs-qualifies": (
+        PLAN_QA_SKILL,
+        (
+            "les échecs trouvés pendant l'exécution sont qualifiés par `bug-vers-issue`, qui ne"
+            " consigne en issue que le défaut à étudier."
+        ),
+    ),
+    "7c-gabarit-plan-qa-petite-pr": (
+        GABARIT_PLAN_QA_REF,
+        (
+            "chaque constat majeur → un lien vers son issue de bug consignée ou vers sa petite PR,"
+            " ou une décision `reporté` explicite."
+        ),
+    ),
+    "7c-cycle-pr-correctif-evident-sans-interrogatoire": (
+        CYCLE_PR_SKILL,
+        (
+            "Un correctif évident — visible à la lecture, sans décision de comportement"
+            " (`contraintes.md`, barreau 3) — n'a rien à interroger : sa qualification, écrite"
+            " dans le body de la draft avec sa preuve, en tient lieu."
+        ),
+    ),
+    "7c-cycle-pr-marqueur-de-la-petite-pr": (
+        CYCLE_PR_SKILL,
+        (
+            "Née d'un échec de QA (case ` 🔴 correctif évident — …`), la draft ouverte, la session"
+            " remplace ce marqueur par ` 🔴 PR #<M>` sur la case, par une paire"
+            " (`python .claude/skills/cycle-pr/scripts/ecriture-relue.py checkbox patch <plan>"
+            " --paires <fichier>`, `execution-qa/references/patch-checkbox-gh.md`) : c'est ce que"
+            " lit la reprise de la QA."
         ),
     ),
 }
@@ -7033,6 +7086,7 @@ RENVOIS_AUX_BARREAUX = {
     CONTRAINTES_RULE: [4],
     BUG_VERS_ISSUE_SKILL: [1],
     CONTRADICTION_SKILL: [2, 4],
+    CYCLE_PR_SKILL: [3],
     REPERCUSSIONS_SKILL: [4],
     VERS_ISSUES_SKILL: [4],
 }
