@@ -765,9 +765,7 @@ def test_chaque_role_est_nomme_par_un_skill(path: Path) -> None:
     assert skills_citing(path.stem), f"`{path.stem}` n'est nommé par aucun skill : rien ne le lance"
 
 
-def test_ni_un_role_fictif_ni_la_liste_d_init_projet_ne_comptent_pour_une_citation(
-    tmp_path: Path,
-) -> None:
+def test_ni_un_role_fictif_ni_la_liste_d_init_projet_ne_comptent_pour_une_citation() -> None:
     """Témoins du précédent, sur la prose réelle : un rôle fictif ne trouve aucun fichier, et la
     liste de fichiers d'`init-projet`, qui nomme tous les rôles, n'est jamais comptée — l'entrée
     entière, jusqu'à l'entrée suivante, ne cite plus aucun exécutant une fois retirée."""
@@ -780,11 +778,8 @@ def test_ni_un_role_fictif_ni_la_liste_d_init_projet_ne_comptent_pour_une_citati
         "la liste de fichiers d'`init-projet` a changé de forme : `ROLE_FILE_LIST` ne la voit plus"
     )
     assert all(cites_role(liste.group(0), role) for role in ROLE_NAMES)
-    entree = tmp_path / "SKILL.md"
-    entree.write_text(
-        init_projet[liste.start() : init_projet.index("\n- ", liste.start())], encoding="utf-8"
-    )
-    assert not cites_an_executor(delegating_text(entree), ROLE_NAMES)
+    entree = init_projet[liste.start() : init_projet.index("\n- ", liste.start())]
+    assert not cites_an_executor(ROLE_FILE_LIST.sub("", entree), ROLE_NAMES)
 
 
 # Le recueil de `cites_an_executor`, des deux côtés.
@@ -1909,7 +1904,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "go-delegue-question-au-mainteneur": (
         COORDINATRICE_REF,
-        "elle pose la question au mainteneur dans la fenêtre du lot et prévient la coordinatrice",
+        (
+            "Sur un go délégué hors de ce cas, elle pose la question au mainteneur dans la fenêtre"
+            " du lot et prévient la coordinatrice"
+        ),
     ),
     "bloquant-sur-go-delegue": (COORDINATRICE_REF, "bloquant : [V] en attente dans cette fenêtre"),
     "fin-de-tour-pas-un-signal": (COORDINATRICE_REF, "note de fin de tour n'est pas un signal"),
@@ -1940,9 +1938,9 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "repli-par-un-message-d-abord": (
         COORDINATRICE_REF,
         (
-            "`start_session` refusé ou aucun tour du mainteneur qui vienne, la coordinatrice lui"
-            " demande d'ouvrir un tour par un message, le seul geste humain, et seulement s'il ne"
-            " le peut pas"
+            "`start_session` refusé ou aucun tour du mainteneur qui vienne, la coordinatrice"
+            " demande au mainteneur d'ouvrir un tour par un message, le seul geste humain, et"
+            " seulement s'il ne le peut pas"
         ),
     ),
     "go-du-decoupage-annonce-un-go-par-lot": (
@@ -4506,10 +4504,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # Lot 8b de #134 (2026-10-26) : `audit-spec-ui` prend son chemin en argument et nomme ses
     # exécutants. Une entrée par règle écrite — argument, `description`, « Délégation » (jugement,
     # chaque délégation, D-12), arrêt sans chemin, renvoi de l'étape qui agit, arrêt avant les
-    # corrections, son annonce et sa case — et par moitié restrictive (obs 126) : par la forme, sur
-    # les lignes ajoutées du skill, 10 — 4 « aucune », 2 « jamais », « ne … ni », « n'… que »,
-    # « garde », « requis » — et 8 « la session » qui agit, toutes épinglées et vues rouges par
-    # `mutation.py`. La liste de `hors-scope.md` reçoit `audit-spec-ui`
+    # corrections et sa case — et par moitié restrictive (obs 126) : par la forme, sur les lignes
+    # ajoutées du skill, 9 — 3 « aucune », 2 « jamais », « ne … ni », « n'… que », « garde »,
+    # « requis » — et 7 « la session » qui agit, toutes épinglées et vues rouges par `mutation.py` ;
+    # l'annonce de l'arrêt en tête de « Avant de livrer », doublon de sa case, retirée au cleanup
+    # holistique. La liste de `hors-scope.md` reçoit `audit-spec-ui`
     # (`6b2-hors-scope-nomme-contradiction`). Gardés ailleurs : la délégation (D5),
     # `SKILLS_SANS_ECRITURE_GH_DIRECTE`, `ECRITURE_RELUE_SANS_OBJET`, `RETIRES_DU_CONTEXTE_VIVANT`.
     "8b-audit-spec-ui-argument": (AUDIT_SPEC_UI_SKILL, "[chemin du document à auditer — requis]"),
@@ -4567,10 +4566,6 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "8b-audit-spec-ui-residus": (AUDIT_SPEC_UI_SKILL, "**Résidus** — le `releveur` re-cherche"),
     "8b-audit-spec-ui-reste": (AUDIT_SPEC_UI_SKILL, "la session vérifie qu'il n'en reste aucune"),
-    "8b-audit-spec-ui-arret-annonce": (
-        AUDIT_SPEC_UI_SKILL,
-        "la session le présente au mainteneur et s'arrête jusqu'à son go — aucune correction",
-    ),
     "8b-audit-spec-ui-case-de-l-arret": (
         AUDIT_SPEC_UI_SKILL,
         "aucune correction partie avant son go sur le rapport",
@@ -4583,9 +4578,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # par la forme, sur les lignes ajoutées du skill, 32 — 10 « ne … pas | rien | plus »,
     # 4 « jamais », 4 « refus… », 3 « sinon », 3 « sans », 2 « hors », « garde », « reste à »,
     # « restent au », « aucune », « pas de », « tant que » —, dont 2 sans portée restrictive
-    # (`hors-scope.md`, « projet sans code »), toutes dans une phrase épinglée et vues rouges par
-    # `mutation.py` (65 mutations, 65 rouges). La liste de `hors-scope.md` reçoit
-    # `init-projet` (`6b2-hors-scope-nomme-contradiction`). Gardés ailleurs : la délégation (D5),
+    # (`hors-scope.md`, « projet sans code »), et 1 reprise d'une ligne réécrite (« Ne rien
+    # inventer en silence »), épinglée au cleanup holistique : toutes dans une phrase épinglée et
+    # vues rouges par `mutation.py` (65 mutations au premier jet, 2 au cleanup holistique, toutes
+    # rouges). La liste de `hors-scope.md` reçoit `init-projet`
+    # (`6b2-hors-scope-nomme-contradiction`). Gardés ailleurs : la délégation (D5),
     # `SKILLS_SANS_ECRITURE_GH_DIRECTE` — les deux `gh pr ready` devenus la sortie du draft —, le
     # renvoi au script (`cites_ecriture_relue`, forme du skill voisin de `SCRIPT_REFERENCE`).
     "8b-init-projet-reconfiguration-par-une-pr": (
@@ -4672,8 +4669,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "8b-init-projet-inspection-par-le-releveur": (
         INIT_PROJET_SKILL,
         (
-            "Le `releveur` inspecte le repo (« Délégation ») et rend des valeurs pré-remplies, que"
-            " la session fait corriger par l'utilisateur."
+            "**Ne rien inventer en silence.** Le `releveur` inspecte le repo (« Délégation ») et"
+            " rend des valeurs pré-remplies, que la session fait corriger par l'utilisateur. Ce"
+            " qui reste ambigu après inspection se **demande**."
         ),
     ),
     "8b-init-projet-mapping-en-fichier": (
@@ -4818,8 +4816,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " sa propre session."
         ),
     ),
-    # Le commit suivant du même lot y renvoie les cinq autres skills qui lançaient `init-projet`
-    # sans configuration (`RETIRES_LANCER_INIT_PROJET`) : une entrée par phrase neuve, « s'arrêter »
+    # Le même lot y renvoie aussi les cinq autres skills qui lançaient `init-projet` sans
+    # configuration (`RETIRES_LANCER_INIT_PROJET`) : une entrée par phrase neuve, « s'arrêter »
     # compris, et pour `cycle-pr` sa moitié « ne jamais deviner », sur une ligne réécrite.
     "8b-cycle-pr-sans-config-propose-init-projet": (
         CYCLE_PR_SKILL,

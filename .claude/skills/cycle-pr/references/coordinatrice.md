@@ -11,7 +11,7 @@ d'intégration jusqu'à son go. Entre deux lots, elle attend : son contexte ne g
 pointeurs qu'elle lit — la session d'un lot tient les artefacts de son lot, la coordinatrice
 connaît la suite des lots (obs 62).
 
-## Au go du découpage — le seul tour où elle démarre des sessions
+## Au go du découpage — démarrer des sessions dans un tour du mainteneur
 
 `start_session` est refusé dans un tour ouvert par un message de session ou par un événement
 automatique (provoqué par le lead de la vague le 2026-10-16 — #107, journal de spec, 2026-10-17) ;
@@ -127,12 +127,12 @@ Ce que le brief de la coordinatrice change au cycle de `cycle-pr` :
 - **Le go du briefing est humain, dans la fenêtre de la session de lot, ou délégué à la
   coordinatrice** quand le mainteneur le lui accorde, relayé par le fichier de démarrage et
   valable seulement pour un briefing sans `[V]`, sans écart au bloc du lot et sans `[C]`. Hors de
-  ce cas, la session s'arrête à son Étape 1. Sur un go délégué, elle pose la question au mainteneur
-  dans la fenêtre du lot et prévient la coordinatrice : « bloquant : [V] en attente dans cette
-  fenêtre ». Sur un go humain, une `[V]` ou un écart avec le bloc du lot se posent au même go, et
-  elle prévient la coordinatrice : « bloquant : go humain requis dans cette fenêtre — session de
-  relecture à démarrer ». Sa note de fin de tour n'est pas un signal. Le go conditionnel de #107
-  (décision 5) a pris fin avec la session de relecture (#134, lot 3).
+  ce cas, la session s'arrête à son Étape 1. Sur un go délégué hors de ce cas, elle pose la
+  question au mainteneur dans la fenêtre du lot et prévient la coordinatrice : « bloquant : [V] en
+  attente dans cette fenêtre ». Sur un go humain, une `[V]` ou un écart avec le bloc du lot se
+  posent au même go, et elle prévient la coordinatrice : « bloquant : go humain requis dans cette
+  fenêtre — session de relecture à démarrer ». Sa note de fin de tour n'est pas un signal. Le go
+  conditionnel de #107 (décision 5) a pris fin avec la session de relecture (#134, lot 3).
 - **Sa session de relecture** : la session de lot la démarre à son go humain, en est le parent et la
   nettoie à son Étape 8 ([session-relecture.md](session-relecture.md)) — jamais la coordinatrice,
   qui serait réveillée à chaque fin de tour de la session de relecture pour rien. Au go délégué,
@@ -182,8 +182,9 @@ demande (`sessions-liees.md`, « Nettoyage »).
 ## Repli — la passation manuelle
 
 Pour une session démarrée à son ouverture (« La session de lot »), `start_session` refusé ou
-aucun tour du mainteneur qui vienne, la coordinatrice lui demande d'ouvrir un tour par un message,
-le seul geste humain, et seulement s'il ne le peut pas, la voie manuelle ci-dessous reprend.
+aucun tour du mainteneur qui vienne, la coordinatrice demande au mainteneur d'ouvrir un tour par un
+message, le seul geste humain, et seulement s'il ne le peut pas, la voie manuelle ci-dessous
+reprend.
 
 Si la coordinatrice ne peut pas ouvrir un lot — `start_session` refusé au go, session de lot
 disparue de `list_sessions`, message qui n'arrive pas —, la frontière reprend la voie manuelle :
