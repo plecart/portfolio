@@ -3616,7 +3616,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # des fichiers de prose (`git diff -U0 -- .claude/skills/`) : **24** moitiés restrictives —
     # 6 « refuse », 4 « ne … pas » ou « ne … rien », 4 « la session » sans « reste à », 3 « jamais »,
     # 2 « reste à » ou « garde », 2 « elle-même », « uniquement », « n'… que », « sauf » — :
-    # toutes épinglées, 21 au premier jet, 3 au cleanup, vues rouges par `mutation.py`. Gardés
+    # toutes épinglées, 21 au premier jet, 3 au cleanup, vues rouges par `mutation.py` ; le
+    # correctif de la passe 1 de relecture en ajoute une, l'attendu de l'Observation. Gardés
     # ailleurs : la sortie de liste d'attente (`EXECUTOR_WAITING_LIST`), l'absence d'écriture `gh`
     # directe et le renvoi au script (`SKILLS_SANS_ECRITURE_GH_DIRECTE`), le renvoi aux sessions
     # liées (`SKILLS_DES_SESSIONS_LIEES`), le contexte vivant et la création de label retirés
@@ -3743,8 +3744,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         PLAN_QA_SKILL,
         (
             "marque la case avec `Décision QA :`, **après** sa marque de type — le plus souvent"
-            " `**Observation** — Décision QA : …` : une case de décision reste une case typée,"
-            " sinon la passe comptable la refuse comme case sans type"
+            " `**Observation** — Décision QA : … → <attendu>` : une case de décision reste une case"
+            " typée, sinon la passe comptable la refuse comme case sans type"
         ),
     ),
     "7a-plan-qa-passe-finale-avant-le-go": (
@@ -3792,17 +3793,18 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-plan-qa-cases-sans-type-commande": (
         PLAN_QA_SKILL,
         (
-            r"grep -nE '^[[:blank:]]*- \[[ xX]\] ' <brouillon> | grep -vE"
-            r" '^[[:digit:]]+:[[:blank:]]*- \[[ xX]\] (\*\*Commande\*\* — `[^`]+` →"
-            r" |\*\*Observation\*\*"
-            r" — )'"
+            r"grep -nE '^([[:blank:]>]*([-*+]|[[:digit:]]+[.)])[[:blank:]]+)+\[[[:blank:]xX]\]"
+            r"[[:blank:]]+' <brouillon> | grep -vE '^[[:digit:]]+:([[:blank:]>]*([-*+]|"
+            r"[[:digit:]]+[.)])[[:blank:]]+)+\[[[:blank:]xX]\][[:blank:]]+(\*\*Commande\*\* —"
+            r" `[^`]+`|\*\*Observation\*\* — .+) → [^[:space:]]'"
         ),
     ),
     "7a-plan-qa-criteres-vers-cases": (
         PLAN_QA_SKILL,
         (
-            r"`grep -nE '^## |^- \*\*C[[:digit:]]+\*\* — |^[[:blank:]]*- \[[ xX]\]"
-            r" .*\(C[[:digit:]]+(, C[[:digit:]]+)*\)' <brouillon>` : chaque issue du relevé a son"
+            r"`grep -nE '^## |^- \*\*C[[:digit:]]+\*\* — |^([[:blank:]>]*([-*+]|[[:digit:]]+[.)])"
+            r"[[:blank:]]+)+\[[[:blank:]xX]\][[:blank:]]+.*\(C[[:digit:]]+(, C[[:digit:]]+)*\)'"
+            r" <brouillon>` : chaque issue du relevé a son"
             " titre `## Bloc de"
             " fonctionnalité : Issue #<N>` ; sous chacun, avant le titre suivant, autant de lignes"
             " `- **C<k>** —` que l'issue a de critères, et chaque `C<k>` cité par au moins une case"
@@ -3834,13 +3836,20 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-plan-qa-erreur-case-sans-type": (
         PLAN_QA_SKILL,
         (
-            "`**Commande** —` ou `**Observation** —` en tête (gabarit, « Types de case ») ; la"
-            " passe comptable la refuse"
+            "`**Commande** —` ou `**Observation** —` en tête, puis ` → ` et l'attendu (gabarit,"
+            " « Types de case ») ; la passe comptable la refuse"
         ),
     ),
     "7a-gabarit-plan-qa-passe-comptable-refuse": (
         GABARIT_PLAN_QA_REF,
         "Une case sans type n'est pas publiable : la passe comptable la refuse",
+    ),
+    "7a-gabarit-plan-qa-observation-porte-son-attendu": (
+        GABARIT_PLAN_QA_REF,
+        (
+            "Une case **Observation** — rendu, état d'écran, console, ergonomie — porte de même"
+            " ` → ` et son attendu"
+        ),
     ),
     "7a-gabarit-plan-qa-intake-ecrit": (
         GABARIT_PLAN_QA_REF,
@@ -4085,13 +4094,14 @@ def test_la_conversation_est_gardee_dans_chaque_fichier_des_skills_du_contexte_v
 
 # --- Le type de chaque case d'un plan de QA (#134, lot 7a) ---------------------------------------
 
-# Une ligne de case de plan de QA, cochée ou non, indentée ou non.
-PLAN_QA_CASE = re.compile(r"^[ \t]*- \[[ xX]\] ")
+# Une ligne de case de plan de QA : un ou plusieurs éléments de liste ouverts sur la ligne, chacun
+# derrière ses blancs ou ses citations `>`, le dernier suivi d'une case à cocher et de blancs.
+PLAN_QA_CASE = re.compile(r"^(?:[ \t>]*(?:[-*+]|\d+[.)])[ \t]+)+\[[ \txX]\][ \t]+")
 # La même ligne, la marque de type juste après la case (`gabarit-plan-qa.md`, « Types de case ») :
-# une commande en un seul segment entre accents graves, suivie de ` → ` et de son attendu, ou une
-# observation.
+# une commande en un seul segment entre accents graves ou une observation, chacune suivie de ` → `
+# et de son attendu.
 PLAN_QA_CASE_TYPEE = re.compile(
-    PLAN_QA_CASE.pattern + r"(?:\*\*Commande\*\* — `[^`]+` → |\*\*Observation\*\* — )"
+    PLAN_QA_CASE.pattern + r"(?:\*\*Commande\*\* — `[^`]+`|\*\*Observation\*\* — .+) → \S"
 )
 # Les fichiers de `plan-qa` qui portent des cases de plan.
 PLAN_QA_PLANS = (GABARIT_PLAN_QA_REF, EXEMPLE_BLOC_ISSUE_REF)
@@ -4141,6 +4151,32 @@ PLAN_QA_CASE_FORMS = {
     "commande sans gras": ("- [ ] Commande — `docker compose ps api` → `running`", True, True),
     "type inconnu": ("- [ ] **Manuel** — ouvrir la page → rendu correct", True, True),
     "puce de critere": ("- **C1** — un PDF valide de 1 Mo est accepté", False, False),
+    "puce etoile": ("* [ ] L'application démarre.", True, True),
+    "puce plus": ("+ [ ] L'application démarre.", True, True),
+    "liste ordonnee point": ("1. [ ] L'application démarre.", True, True),
+    "liste ordonnee parenthese": ("12) [x] L'application démarre.", True, True),
+    "deux espaces": ("-  [ ] L'application démarre.", True, True),
+    "tabulation": ("-\t[ ] L'application démarre.", True, True),
+    "tabulation entre crochets": ("- [\t] L'application démarre.", True, True),
+    "deux blancs apres la case": ("- [ ]  **Observation** — la console → propre", True, False),
+    "tabulation apres la case": ("- [ ]\t**Observation** — la console → propre", True, False),
+    "citation": ("> - [ ] L'application démarre.", True, True),
+    "puce dans une puce": ("- * [ ] L'application démarre.", True, True),
+    "citation dans une puce": ("- > 1. [ ] L'application démarre.", True, True),
+    "commande segment vide": ("- [ ] **Commande** — `` → `running`", True, True),
+    "commande attendu vide": ("- [ ] **Commande** — `ls` → ", True, True),
+    "observation sans gras": ("- [ ] Observation — la console → aucune erreur", True, True),
+    "observation vide": ("- [ ] **Observation** — ", True, True),
+    "observation sans action": ("- [ ] **Observation** —  → aucune erreur", True, True),
+    "observation sans attendu": ("- [ ] **Observation** — regarder la page", True, True),
+    "observation attendu vide": ("- [ ] **Observation** — la console → ", True, True),
+    "puce ordinaire": ("- Issues dans le périmètre : #127", False, False),
+    "crochets hors liste": ("[ ] L'application démarre.", False, False),
+    "prose qui cite une case": ("`- [ ] **Commande** — …` est la forme d'une case.", False, False),
+    "marqueur colle": ("-[ ] L'application démarre.", False, False),
+    "case collee": ("- [ ]L'application démarre.", False, False),
+    "citation sans puce": ("> [ ] L'application démarre.", False, False),
+    "puce puis citation sans puce": ("- > [ ] L'application démarre.", False, False),
 }
 
 
@@ -4152,6 +4188,28 @@ PLAN_QA_CASE_FORMS = {
 def test_le_type_d_une_case_de_plan_de_qa_se_reconnait(
     ligne: str, est_une_case: bool, sans_type: bool
 ) -> None:
+    """Une case est un élément de liste GFM qui s'ouvre sur une case à cocher puis un blanc (spec
+    GFM §5.2 « List items », §5.3 « Task list items ») ; son type, la marque qui suit.
+
+    **Dénombrement** (passe 1 de la relecture de la PR #157, constats I1 et (2)), écrit avant le
+    correctif, par axe — *N formes, k vues sur `e4e05db`* ; une forme par entrée au recueil :
+    - marqueur de liste : `-`, `*`, `+`, `<n>.`, `<n>)` — 5, 1 vue ;
+    - blanc entre marqueur et case : un espace, plusieurs, une tabulation — 3, 1 vue ;
+    - état : espace, tabulation (« un blanc », §5.3), `x`, `X` — 4, 3 vues ;
+    - blanc entre case et type : un espace, plusieurs, une tabulation — 3, 1 vue ;
+    - conteneur sur la ligne : indentation, citation `>`, puce dans une puce, citation dans une
+      puce — 4, 1 vue ;
+    - Commande : gras, segment entre accents graves, segment non vide, ` → ` juste après, attendu
+      non vide — 5, 3 vues ; Observation : gras, texte non vide, ` → `, attendu non vide, et
+      l'Observation vide — 5, 0 vue ; aucun type, type inconnu — 2, 2 vues ;
+    - vrais négatifs : puce de critère, puce ordinaire, crochets hors liste, prose qui cite une
+      case, marqueur collé, case collée, citation sans puce, puce puis citation sans puce — 8,
+      1 vu.
+
+    **Ce que le motif lit de plus que GFM** : une ligne de code — bloc clôturé, ou cinq blancs
+    après le marqueur — compte comme case. Un refus de trop, jamais une fuite ; et le gabarit garde
+    ses cases dans un bloc clôturé, que le motif doit lire.
+    """
     assert (bool(cases(ligne)), bool(cases_sans_type(ligne))) == (est_une_case, sans_type)
 
 
