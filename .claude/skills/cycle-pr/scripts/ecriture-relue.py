@@ -3,6 +3,7 @@
 Usage :
     python ecriture-relue.py label <N> [--add <label> …] [--remove <label> …]
     python ecriture-relue.py checkbox patch <N> (--case <ancre> … | --paires <fichier>)
+    python ecriture-relue.py checkbox next <N>
     python ecriture-relue.py brief patch <N> (--case <ancre> … | --paires <fichier>)
     python ecriture-relue.py brief write <N> --body-file <fichier>
     python ecriture-relue.py issue edit <N> (--append | --body-file) <fichier>
@@ -18,10 +19,11 @@ commentaire de répercussion de son Étape 6, la création d'une issue, la trans
 sa fermeture et son thème, et la copie de travail d'`execution-qa` (#134, lots 4a, 4b, 6a1 et 7).
 Chaque sous-commande lit par `gh api` — octets décodés en UTF-8, jamais le mode texte, qui traduit
 les fins de ligne, ni la page de code de la console (obs 87, 106, 108, 116) —, écrit, puis relit
-par le même canal. Un texte s'écrit par `gh api -X PATCH <chemin> --input -` — `-X POST` pour
-publier un commentaire, créer une issue ou un milestone —, la charge JSON sur l'entrée standard,
-et sa relecture compare le **texte entier** à l'attendu : une forme réduite, longueur ou ancre,
-ne voit pas une conversion qui la préserve (obs 106).
+par le même canal ; `checkbox next` lit seulement. Un texte s'écrit par
+`gh api -X PATCH <chemin> --input -` — `-X POST` pour publier un commentaire, créer une issue ou un
+milestone —, la charge JSON sur l'entrée standard, et sa relecture compare le **texte entier** à
+l'attendu : une forme réduite, longueur ou ancre, ne voit pas une conversion qui la préserve
+(obs 106).
 `{owner}/{repo}` sont remplis par `gh` depuis le dépôt courant.
 
 - `label` pose les labels `--add` sur l'issue ou la PR `<N>`, puis lui retire les labels
@@ -44,6 +46,14 @@ ne voit pas une conversion qui la préserve (obs 106).
   nommée deux fois, ou la nouvelle d'une paire ancienne d'une autre, est refusée — les paires
   chaînées casseraient le rejeu. Une paire dont l'ancienne ligne manque et dont la nouvelle est
   seule dans le texte est déjà appliquée ;
+- `checkbox next` lit la prochaine case en attente du corps de `<N>`, un plan de QA, sans rien
+  écrire — la seule lecture de la famille, où le lot 7 de #134 range la prochaine case
+  d'`execution-qa` avec sa copie de travail ; les dix autres sous-commandes écrivent chacune au
+  premier appel, dénombrées par `REJEUX` (`test_ecriture_relue.py`). Une case est une ligne de
+  case GFM, `PLAN_QA_CASE` de `test_agent_skills.py` ; elle attend quand un blanc la laisse non
+  cochée et que sa ligne ne porte ni `🔴` ni ` — BLOQUÉ` (`execution-qa/SKILL.md` §3, §4). La
+  sortie est le dernier titre au-dessus d'elle, sans ses `#`, ou `(sans titre)`, puis sa ligne ;
+  sans case en attente, elle le dit ;
 - `brief write` publie un fichier UTF-8, lu en octets, en commentaire de brief de `<N>`, ou édite
   en place le seul qui existe — jamais un second brief concurrent. Un fichier qui ne s'ouvre pas
   par `## Brief d'agent`, dès son premier caractère, est refusé avant tout appel : `brief patch`
@@ -121,9 +131,9 @@ encodé, la pose d'un label, l'écriture du corps d'une PR, la publication d'un 
 une PR par l'endpoint `issues`, la création et la fermeture d'une issue, la création, le
 rattachement et la fermeture d'un milestone ne sont pas mesurés sur la vraie forge.
 
-Sortie : 0 écrit et relu conforme, ou rien à écrire ; 1 refus (« refus — »), ou écriture lancée et
-relecture non conforme ou impossible (« relecture non conforme — ») — motif en une ligne sur la
-sortie standard ; 2 appel mal formé, usage sur la sortie d'erreur. Python 3.11 ou plus,
+Sortie : 0 écrit et relu conforme, rien à écrire, ou lu (`checkbox next`) ; 1 refus (« refus — »),
+ou écriture lancée et relecture non conforme ou impossible (« relecture non conforme — ») — motif
+en une ligne sur la sortie standard ; 2 appel mal formé, usage sur la sortie d'erreur. Python 3.11 ou plus,
 bibliothèque standard seule ; `gh` authentifié, lancé depuis le dépôt.
 """
 
@@ -152,6 +162,14 @@ BRIEF_MARK = "## Brief d'agent"
 CHECKBOX = re.compile(r"[ \t]*- \[([ xX])\] ")
 # Les marques d'une paire dans un fichier `--paires` : la ligne de l'ancienne, puis de la nouvelle.
 OLD_MARK, NEW_MARK = "< ", "> "
+# Une ligne de case de plan de QA, en GFM (spec §5.2, §5.3) : un ou plusieurs éléments de liste
+# ouverts sur la ligne, chacun derrière ses blancs ou ses citations `>`, le dernier suivi d'une case
+# et d'un blanc ; le groupe `state` est l'état de la case. C'est `PLAN_QA_CASE` de
+# `test_agent_skills.py` (lot 7a), dont `test_ecriture_relue.py` tient le recueil d'accord.
+PLAN_CASE = re.compile(r"^(?:[ \t>]*(?:[-*+]|\d+[.)])[ \t]+)+\[(?P<state>[ \txX])\][ \t]+")
+# Ce que porte une case laissée `[ ]` qui n'attend plus (`execution-qa/SKILL.md` §3, §4) : un
+# échec, consigné ou non, ou un blocage.
+SETTLED_MARKS = ("🔴", " — BLOQUÉ")
 # `str.isdigit` accepte « ² » : le numéro, qui entre dans un chemin d'API, se lit en ASCII.
 NUMBER = re.compile(r"[0-9]+")
 
@@ -658,6 +676,40 @@ def patch_boxes(run: Run, args: argparse.Namespace) -> str:
     else:
         report.append(f"rien à écrire — {text.name} : aucune case à cocher")
     return "\n".join(report)
+
+
+def pending_box(body: str) -> tuple[str, str] | None:
+    """La prochaine case en attente de `body`, un plan de QA, et le dernier titre au-dessus d'elle.
+
+    Une ligne est un segment entre deux `\\n`, sans son `\\r` final. Une case (`PLAN_CASE`) est en
+    attente quand un blanc la laisse non cochée (GFM §5.3) et que sa ligne ne porte aucune marque
+    de `SETTLED_MARKS`. Un titre est une ligne ouverte par `#`, rendu sans ses `#` ni ses blancs.
+
+    Returns:
+        Le titre — `(sans titre)` s'il n'y en a pas au-dessus — et la ligne de case ; `None` sans
+        case en attente.
+    """
+    title = "(sans titre)"
+    # ponytail: les blocs de code clôturés ne sont pas suivis — un `#` ou une case qui y figure
+    # compte ; suivre les clôtures ``` le jour où un plan en porte au-dessus de ses cases.
+    for line in (raw.removesuffix("\r") for raw in body.split("\n")):
+        if line.startswith("#"):
+            title = line.lstrip("#").strip()
+        elif (
+            (box := PLAN_CASE.match(line))
+            and box["state"].isspace()
+            and not any(mark in line for mark in SETTLED_MARKS)
+        ):
+            return title, line
+    return None
+
+
+def next_box(run: Run, args: argparse.Namespace) -> str:
+    """`checkbox next` : la prochaine case en attente du corps de `<N>` (`pending_box`), lue sans
+    rien écrire."""
+    text = issue_body(run, args.number)
+    found = pending_box(text.body)
+    return "\n".join(found) if found else f"aucune case en attente — {text.name}"
 
 
 def names_of(labels: Any) -> list[str]:
@@ -1176,6 +1228,9 @@ def build_parser() -> argparse.ArgumentParser:
         edits.add_argument("--case", dest="anchors", type=one_line, action="append")
         edits.add_argument("--paires", dest="pairs", type=Path)
         boxes.set_defaults(handler=patch_text, locate=locate)
+    pending = checkbox.add_parser("next")
+    pending.add_argument("number", type=issue_number)
+    pending.set_defaults(handler=next_box)
     write = brief.add_parser("write")
     write.add_argument("number", type=issue_number)
     write.add_argument("--body-file", dest="file", type=Path, required=True)
