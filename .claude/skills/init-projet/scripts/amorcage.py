@@ -45,18 +45,19 @@ le répertoire courant. Chaque sous-commande qui écrit fait son geste puis le r
 
 **Ce qu'il ne prouve pas.** `depot init` lit le dépôt qui contient le répertoire courant, sans
 vérifier qu'il en est la racine ; une `HEAD` détachée y est refusée par l'échec de
-`git symbolic-ref`. `copie` ne lit que les fichiers du boilerplate : un fichier du projet qu'il n'a
-pas n'est ni lu ni retiré, et rien n'est verrouillé entre la comparaison et la copie. `valide` ne
-prouve que le schéma : un `{{…}}` resté dans une chaîne, ou un `uses:` sans empreinte, lui est
-valide (mesuré le 2026-10-26). `ignore` éprouve les motifs, pas ce qui est déjà suivi : c'est le
-refus de `commit`. `mcp` ne compare ni l'URL ni la portée d'un serveur déjà listé, et ne dit pas
-qu'il répond. Un hook qui refuse le commit laisse l'index tel que `git add -A` l'a fait :
-relecture non conforme. Une erreur du système de fichiers — `<fichier>` ou une source absents, une
-cible non inscriptible — sort en trace Python, code 1 (mesuré le 2026-10-26 sur un `<fichier>`
-absent). Sous Windows, le `claude` qu'installe npm est un `claude.cmd`, que `cmd.exe` lance en
-relisant ses arguments sans échappement (CPython, `Doc/library/subprocess.rst`, « Security
-Considerations ») : une URL qui porte `&`, `|` ou `%` y est interprétée (mesuré le 2026-10-26 sur
-un `.cmd` témoin).
+`git symbolic-ref`. Lancé dans le `.git` d'un dépôt, il n'y voit pas d'arbre de travail et y
+initialise un dépôt imbriqué (mesuré le 2026-10-26, git 2.47.1). `copie` ne lit que les fichiers
+du boilerplate : un fichier du projet qu'il n'a pas n'est ni lu ni retiré, et rien n'est verrouillé
+entre la comparaison et la copie. `valide` ne prouve que le schéma : un `{{…}}` resté dans une
+chaîne, ou un `uses:` sans empreinte, lui est valide (mesuré le 2026-10-26). `ignore` éprouve les
+motifs, pas ce qui est déjà suivi : c'est le refus de `commit`. `mcp` ne compare ni l'URL ni la
+portée d'un serveur déjà listé, et ne dit pas qu'il répond. Un hook qui refuse le commit laisse
+l'index tel que `git add -A` l'a fait : relecture non conforme. Une erreur du système de fichiers
+— `<fichier>` ou une source absents, une cible non inscriptible — sort en trace Python, code 1
+(mesuré le 2026-10-26 sur un `<fichier>` absent). Sous Windows, le `claude` qu'installe npm est
+un `claude.cmd`, que `cmd.exe` lance en relisant ses arguments sans échappement (CPython,
+`Doc/library/subprocess.rst`, « Security Considerations ») : une URL qui porte `&`, `|` ou `%` y
+est interprétée (mesuré le 2026-10-26 sur un `.cmd` témoin).
 
 Sortie : 0 fait et relu, rien à faire, ou conforme ; 1 refus (« refus — »), rien n'étant écrit, ou
 geste lancé et relecture non conforme ou impossible (« relecture non conforme — ») — motif en une

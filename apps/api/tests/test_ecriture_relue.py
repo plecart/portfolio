@@ -72,8 +72,9 @@ class Forge:
             chemin `issues/<numéro>`. Une issue créée par `POST` y entre sur une page de plus, son
             corps gardé par `stocke`, sous le numéro 900 + n.
         labels_du_depot: les labels du dépôt, page par page — un nom vaut le label de ce nom, de
-            couleur `ededed`, sans description (`label_du_depot`). Un label posé par `POST` s'ajoute
-            à ceux de l'issue 42 ; un label créé par `POST` entre dans le dépôt sur une page de plus.
+            couleur `ededed`, sans description (`label_du_depot`). Un label posé par `POST`
+            s'ajoute à ceux de l'issue 42 ; un label créé par `POST` entre dans le dépôt sur une
+            page de plus.
         milestones: les milestones du dépôt, page par page, de même, chacun aussi sous son chemin
             `milestones/<numéro>` ; un milestone créé par `POST` y entre sous le numéro 900 + n, et
             un `PATCH` `{"milestone": <numéro>}` pose sur l'issue le milestone de ce numéro.
