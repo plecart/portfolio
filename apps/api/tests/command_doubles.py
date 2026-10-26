@@ -52,3 +52,12 @@ def altered(content: Any, path: tuple[str | int, ...], value: Any) -> Any:
 def stdout_lines(capsys: pytest.CaptureFixture[str]) -> list[str]:
     """Ce que le script a écrit sur sa sortie standard, ligne par ligne."""
     return capsys.readouterr().out.splitlines()
+
+
+def sortie_d_echec(capsys: pytest.CaptureFixture[str], issue: str) -> str:
+    """La sortie d'un échec : une seule ligne, ouverte par son issue — « refus » quand rien n'est
+    écrit, « relecture non conforme » quand le geste est lancé."""
+    sortie = capsys.readouterr().out.strip()
+    assert sortie.startswith(f"{issue} — "), sortie
+    assert "\n" not in sortie, f"la sortie tient en plus d'une ligne : {sortie!r}"
+    return sortie
