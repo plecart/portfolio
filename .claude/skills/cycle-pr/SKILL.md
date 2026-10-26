@@ -1041,8 +1041,8 @@ config) :
 Un écart constaté → le traiter comme un finding de l'Étape 7 (corriger, re-tester, push). S'il
 sort du périmètre de la PR, appliquer « Création d'issues en cours de cycle »
 (`.claude/rules/contraintes.md`) — PR courante, puis propriétaire ouvert (une automatisation qu'on
-a fait taire se répare, elle ne se doublonne pas), puis brouillon soumis au mainteneur. Jamais un
-`gh issue create` de la session.
+a fait taire se répare, elle ne se doublonne pas), puis petite PR pour un correctif évident, puis
+brouillon soumis au mainteneur. Jamais un `gh issue create` de la session.
 
 ### Vérification d'avant-go — le `verificateur`
 

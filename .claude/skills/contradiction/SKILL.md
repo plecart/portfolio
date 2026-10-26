@@ -153,7 +153,7 @@ plus longtemps.
 Quand le mainteneur retient à l'étape 3 que la décision gagne mais que l'amendement est trop gros
 pour maintenant, aucune PR ne part : l'échappatoire de `.claude/rules/decisions-vs-doc.md`
 (« Deux sorties ») ouvre sur-le-champ un critère ou une issue `#<k>` portant les deux citations,
-par « Création d'issues en cours de cycle » (`.claude/rules/contraintes.md`), barreau 2 ou 3, le
+par « Création d'issues en cours de cycle » (`.claude/rules/contraintes.md`), barreau 2 ou 4, le
 brouillon en session distincte — ce skill n'ouvre rien lui-même.
 
 Sur « go », l'amendement part par une PR, jamais par un commit direct sur le trunk (D-12 de

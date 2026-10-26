@@ -17,7 +17,7 @@ import shlex
 import shutil
 import subprocess
 import sys
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import cast
 
@@ -1605,6 +1605,7 @@ VERS_PRD_SKILL = ".claude/skills/vers-prd/SKILL.md"
 VERS_ISSUES_SKILL = ".claude/skills/vers-issues/SKILL.md"
 REPERCUSSIONS_SKILL = ".claude/skills/repercussions/SKILL.md"
 CONTRADICTION_SKILL = ".claude/skills/contradiction/SKILL.md"
+CONTRAINTES_RULE = ".claude/rules/contraintes.md"
 BUG_VERS_ISSUE_SKILL = ".claude/skills/bug-vers-issue/SKILL.md"
 COLLECTE_CONTEXTE_REF = ".claude/skills/bug-vers-issue/references/collecte-contexte.md"
 GABARIT_BUG_REF = ".claude/skills/bug-vers-issue/references/gabarit-issue-bug.md"
@@ -2497,6 +2498,16 @@ def texte_normalise(fichier: str) -> str:
     """Le texte du fichier, espaces normalisés et marges `# ` de tête de ligne retirées."""
     brut = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig")
     return " ".join(re.sub(r"(?m)^[ \t]*#[ \t]?", "", brut).split())
+
+
+def prose_du_harnais() -> Iterator[tuple[str, str]]:
+    """Chaque fichier suivi de la prose du harnais (`HARNESS_PROSE_GLOBS`), avec son texte
+    normalisé : une forme coupée en fin de ligne s'y lit d'un tenant (obs 124)."""
+    suivis = set(tracked_files())
+    for glob in HARNESS_PROSE_GLOBS:
+        for path in sorted(REPOSITORY_ROOT.glob(glob)):
+            if (fichier := path.relative_to(REPOSITORY_ROOT).as_posix()) in suivis:
+                yield fichier, texte_normalise(fichier)
 
 
 def porte_la_forme(fichier: str, forme: str) -> bool:
@@ -4913,6 +4924,26 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         VERS_PRD_SKILL,
         "sinon s'arrêter et proposer une session `init-projet` distincte",
     ),
+    # Lot 7c de #134 (2026-10-26) : un échec se qualifie avant de se consigner, et un correctif
+    # évident part en petite PR, sans issue — le barreau 3 de « Création d'issues en cours de
+    # cycle ». Une entrée par phrase neuve, qui garde ses moitiés restrictives (obs 126). Gardés
+    # ailleurs : les renvois numérotés aux barreaux (`RENVOIS_AUX_BARREAUX`).
+    "7c-contraintes-barreau-du-correctif-evident": (
+        CONTRAINTES_RULE,
+        (
+            "3. **un correctif évident** — visible à la lecture des lignes, sans décision de"
+            " comportement — hors du périmètre de la PR courante → une **petite PR** par"
+            " `cycle-pr` (« Demande directe sans issue »), sans issue ;"
+        ),
+    ),
+    "7c-cycle-pr-fumee-petite-pr-avant-le-brouillon": (
+        CYCLE_PR_SKILL,
+        (
+            "puis propriétaire ouvert (une automatisation qu'on a fait taire se répare, elle ne se"
+            " doublonne pas), puis petite PR pour un correctif évident, puis brouillon soumis au"
+            " mainteneur"
+        ),
+    ),
 }
 
 
@@ -5205,13 +5236,10 @@ def test_aucun_texte_du_harnais_ne_lance_init_projet() -> None:
     y est coupée en fin de ligne. **0** sur la tête. Commande : ce test, sur une copie de travail
     de `0c408db` — rouge sur ces 6, mesuré le 2026-10-26.
     """
-    suivis = set(tracked_files())
     sites = [
         f"{fichier} : {forme.group(0)}"
-        for glob in HARNESS_PROSE_GLOBS
-        for path in sorted(REPOSITORY_ROOT.glob(glob))
-        if (fichier := path.relative_to(REPOSITORY_ROOT).as_posix()) in suivis
-        for forme in LANCER_INIT_PROJET.finditer(texte_normalise(fichier))
+        for fichier, texte in prose_du_harnais()
+        for forme in LANCER_INIT_PROJET.finditer(texte)
     ]
 
     assert not sites, f"un texte lance encore `init-projet` au lieu de le proposer : {sites}"
@@ -5710,7 +5738,7 @@ EXCEPTIONS_DE_LA_RELANCE = {
             " trop gros pour maintenant, aucune PR ne part : l'échappatoire de"
             " `.claude/rules/decisions-vs-doc.md` (« Deux sorties ») ouvre sur-le-champ un critère"
             " ou une issue `#<k>` portant les deux citations, par « Création d'issues en cours de"
-            " cycle » (`.claude/rules/contraintes.md`), barreau 2 ou 3, le brouillon en session"
+            " cycle » (`.claude/rules/contraintes.md`), barreau 2 ou 4, le brouillon en session"
             " distincte — ce skill n'ouvre rien lui-même"
         ),
         "Sur « go », l'amendement part par une PR",
@@ -6848,3 +6876,93 @@ def test_un_controle_de_proprete_par_git_status_voit_les_fichiers_non_suivis() -
     ]
 
     assert sites == [CYCLE_PR_SKILL], sites
+
+
+# --- Les renvois aux barreaux de « Création d'issues en cours de cycle » (#134, lot 7c) ----------
+
+SECTION_DES_BARREAUX = "## Création d'issues en cours de cycle"
+RENVOI_DE_BARREAU = re.compile(r"\bbarreaux? \d+(?:(?:, | ou | et )\d+)*")
+# Le recueil du motif, des deux côtés (obs 138), en littéraux (obs 80) : le texte, puis les numéros
+# qu'il cite.
+RENVOI_DE_BARREAU_FORMES: dict[str, tuple[str, list[int]]] = {
+    "un-numero": ("par le barreau 4 porte", [4]),
+    "deux-numeros": ("barreau 2 ou 4, le brouillon", [2, 4]),
+    "enumeration": ("les barreaux 1, 2 et 4", [1, 2, 4]),
+    "premier-barreau-hors-classe": ("au **premier barreau qui tient**", []),
+    "barreau-par-barreau-hors-classe": ("appliquer la règle barreau par barreau", []),
+}
+# Chaque fichier de la prose du harnais qui cite un barreau par son numéro, et les numéros cités,
+# dans l'ordre du texte.
+RENVOIS_AUX_BARREAUX = {
+    CONTRAINTES_RULE: [4],
+    CONTRADICTION_SKILL: [2, 4],
+    REPERCUSSIONS_SKILL: [4],
+    VERS_ISSUES_SKILL: [4],
+}
+
+
+def barreaux_cites(texte: str) -> list[int]:
+    """Les numéros de barreau que `texte` cite, dans l'ordre."""
+    return [
+        int(numero)
+        for renvoi in RENVOI_DE_BARREAU.findall(texte)
+        for numero in re.findall(r"\d+", renvoi)
+    ]
+
+
+def barreaux_existants() -> list[int]:
+    """Les numéros de la liste ordonnée de « Création d'issues en cours de cycle »."""
+    texte = (REPOSITORY_ROOT / CONTRAINTES_RULE).read_text(encoding="utf-8")
+    section = texte.split(SECTION_DES_BARREAUX, 1)[1].split("\n## ", 1)[0]
+    return [int(numero) for numero in re.findall(r"(?m)^[ \t]*(\d+)\. ", section)]
+
+
+@pytest.mark.parametrize(
+    ("texte", "numeros"),
+    RENVOI_DE_BARREAU_FORMES.values(),
+    ids=RENVOI_DE_BARREAU_FORMES.keys(),
+)
+def test_un_renvoi_de_barreau_se_lit_par_ses_numeros(texte: str, numeros: list[int]) -> None:
+    """Chaque numéro d'un renvoi est lu ; « premier barreau », sans numéro, n'en est pas un."""
+    assert barreaux_cites(texte) == numeros
+
+
+def test_les_renvois_aux_barreaux_sont_ceux_de_la_table() -> None:
+    """Un renvoi « barreau <n> » ajouté à la prose du harnais rougit ici tant que la table ne le
+    porte pas : il se relit alors contre la liste, au test suivant.
+
+    **Population** : la prose suivie du harnais (`HARNESS_PROSE_GLOBS`), texte aux espaces
+    normalisés (`texte_normalise`, obs 124), `contraintes.md` compris — son renvoi interne est de
+    la même forme (obs 139).
+
+    **Dénombrement, écrit avant le correctif** (lot 7c de #134, qui insère le barreau « correctif
+    évident » en 3) : sur `beb6190`, **4** sites — `contraintes.md` (« Une issue ouverte par le
+    barreau 3 »), `contradiction` (« barreau 2 ou 3 »), `repercussions` et `vers-issues`
+    (« barreau 3 ») —, **5** numéros cités, **4** fuyaient : chaque « 3 », le brouillon, devenu le
+    barreau 4 ; le « 2 » de `contradiction` reste juste. Commande : ce test, sur une copie de
+    travail de `beb6190` ; `git grep -nE "barreaux? [0-9]" beb6190 -- .claude CLAUDE.md
+    CONTRIBUTING.md .github` rend les mêmes 4 sites, aucun coupé en fin de ligne.
+
+    Hors de cette forme (obs 139), les renvois sans numéro : « Création d'issues en cours de
+    cycle » cherché sur le même texte normalisé rend, hors de la règle, **13** renvois, dont ces 3
+    numérotés et **10** sans numéro ; **1** fuyait, la vérif de fumée de `cycle-pr` Étape 7, qui
+    énumère les barreaux — épinglée à part. Les 9 autres renvoient à la règle sans l'énumérer, ou
+    pour une décision, jamais un correctif évident.
+    """
+    renvois = {
+        fichier: numeros
+        for fichier, texte in prose_du_harnais()
+        if (numeros := barreaux_cites(texte))
+    }
+
+    assert renvois == RENVOIS_AUX_BARREAUX
+
+
+@pytest.mark.parametrize(
+    ("fichier", "numeros"), RENVOIS_AUX_BARREAUX.items(), ids=RENVOIS_AUX_BARREAUX.keys()
+)
+def test_chaque_barreau_cite_existe(fichier: str, numeros: list[int]) -> None:
+    """Un renvoi au-delà du dernier barreau, ou une liste renumérotée sous ses renvois, rougit."""
+    existants = barreaux_existants()
+
+    assert set(numeros) <= set(existants), f"`{fichier}` cite {numeros}, la liste a {existants}"

@@ -23,7 +23,7 @@ Une session démarrée par une autre — par `vers-prd` — suit le protocole co
 
 ### 1. Rassembler le contexte
 
-Le découpage part d'une source écrite : la source se passe en argument — `#issue-prd` ou son URL, dont un `releveur` rend le corps et les commentaires tels quels, filtrés par les critères que la session donne (« Lectures bornées »), ou le chemin d'un plan écrit, que la session lit. Un résidu de cycle sans PRD (`contraintes.md`, « Création d'issues en cours de cycle », barreau 3) s'écrit d'abord dans un fichier de plan, passé par son chemin. Sans argument, la session s'arrête et demande la référence.
+Le découpage part d'une source écrite : la source se passe en argument — `#issue-prd` ou son URL, dont un `releveur` rend le corps et les commentaires tels quels, filtrés par les critères que la session donne (« Lectures bornées »), ou le chemin d'un plan écrit, que la session lit. Un résidu de cycle sans PRD (`contraintes.md`, « Création d'issues en cours de cycle », barreau 4) s'écrit d'abord dans un fichier de plan, passé par son chemin. Sans argument, la session s'arrête et demande la référence.
 
 ### 2. Explorer la base de code (optionnel)
 
