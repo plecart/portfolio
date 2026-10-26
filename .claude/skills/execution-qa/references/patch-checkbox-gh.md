@@ -10,7 +10,7 @@ Comment `execution-qa` met à jour l'issue du plan de QA sans perdre les éditio
 
 ### 1. Écrire le fichier de paires
 
-Pour chaque case à mettre à jour, une paire `(ancienne_ligne, nouvelle_ligne)` : une ligne `< <ancienne>`, puis une ligne `> <nouvelle>`, dans un fichier UTF-8. Exemple :
+Pour chaque case à mettre à jour, une paire `(ancienne_ligne, nouvelle_ligne)` : une ligne `< <ancienne>`, puis une ligne `> <nouvelle>`, dans un fichier UTF-8 du scratchpad de la session, jamais dans l'arbre de la campagne, dont `SKILL.md` §2 préserve le `git status`. Exemple :
 
 ```text
 < - [ ] L'utilisateur A liste ses propres ressources
@@ -18,6 +18,8 @@ Pour chaque case à mettre à jour, une paire `(ancienne_ligne, nouvelle_ligne)`
 ```
 
 L'ancienne ligne se copie de la lecture du bloc que la session a faite elle-même (`SKILL.md` §2). Le format exact, ses refus et son rejeu sont le contrat du script — `python .claude/skills/cycle-pr/scripts/ecriture-relue.py --help` —, qu'on ne recopie pas ici.
+
+Un fichier par application : une paire appliquée ne se rejoue pas, et les verdicts suivants vont dans un fichier neuf. Entre deux applications, une ligne écrite peut changer — la session `bug-vers-issue` réécrit `🔴 needs-issue` en `🔴 BUG #N` — et le rejeu d'une paire qui la porte fait refuser le fichier entier, sur une « ligne la plus proche » qui peut nommer une autre case.
 
 ### 2. Correspondance par ligne complète
 
@@ -28,7 +30,7 @@ Appliquer la substitution par **correspondance exacte de ligne complète**. Ne j
 Pour chaque paire, dans le corps courant :
 
 - Si l'`ancienne_ligne` est trouvée exactement une fois → appliquer.
-- Si trouvée zéro fois → l'utilisateur (ou un autre agent) a édité cette ligne. **S'arrêter et faire remonter un avertissement** à l'utilisateur avec l'`ancienne_ligne` originale et la ligne la plus ressemblante actuellement dans le corps. Demander s'il faut sauter cette mise à jour, forcer une version au mieux, ou abandonner.
+- Si trouvée zéro fois → l'utilisateur (ou un autre agent) a édité cette ligne. **S'arrêter et faire remonter un avertissement** à l'utilisateur avec l'`ancienne_ligne` originale et la ligne la plus ressemblante actuellement dans le corps. Demander s'il faut sauter cette mise à jour, l'écrire en une paire neuve sur la ligne actuelle, ou abandonner.
 - Si trouvée plus d'une fois → le corps a des lignes de case en double (ce que le gabarit de plan devrait empêcher, mais défends-toi quand même). S'arrêter et faire remonter un avertissement. Demander à l'utilisateur de désambiguïser avant de continuer.
 
 Le script tient ces règles : il valide toutes les paires avant la première écriture, et refuse sans rien écrire en nommant la ligne la plus proche, ou le double.
@@ -43,7 +45,7 @@ Appelé par la session elle-même. Un refus (§3) ou une relecture non conforme 
 
 ### 5. Cadence
 
-Patcher à la fin d'une phase ou d'un bloc par issue (ou à la fin d'un sous-groupe significatif au sein d'un bloc long). Ne pas patcher après chaque bascule de case — cela gonfle l'historique de l'issue et augmente la surface de risque d'édition concurrente.
+Patcher à la fin d'une phase ou d'un bloc par issue (ou à la fin d'un sous-groupe significatif au sein d'un bloc long). Ne pas patcher après chaque bascule de case — cela gonfle l'historique de l'issue et augmente la surface de risque d'édition concurrente. Exception : la paire d'un échec, appliquée tout de suite, seule dans son propre fichier (`SKILL.md` §4, étape 1).
 
 Pour un bloc de longue durée, patcher périodiquement de toute façon (toutes les ~5-10 minutes d'activité), afin que si la session est interrompue, la progression de l'utilisateur soit reflétée sur l'issue.
 
