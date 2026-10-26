@@ -3,11 +3,12 @@
 
 `depot init`, `ignore` et `commit` tournent contre le vrai `git`, `copie` sur le vrai système de
 fichiers, dans le dossier jetable d'un projet que `GIT_CEILING_DIRECTORIES` isole de tout dépôt
-parent. Une relecture non conforme s'y provoque en remplaçant une commande du geste par une autre
-(`substitue`) — pour `copie`, sa copie par une copie vide — : le geste ne fait pas ce qu'il dit,
-et la relecture doit le voir. `claude`, `uvx` et `pipx` sont joués par un lanceur simulé
-(`Lanceur`) : le vrai `claude mcp add` écrirait dans `~/.claude.json` du poste. Les cas s'écrivent
-en littéraux.
+parent, et `GIT_CONFIG_GLOBAL` et `GIT_CONFIG_NOSYSTEM` des configurations git globale et
+système du poste. Une relecture non conforme s'y provoque en remplaçant une commande du geste par
+une autre (`substitue`) — pour `copie`, sa copie par une copie vide — : le geste ne fait pas ce
+qu'il dit, et la relecture doit le voir. `claude`, `uvx` et `pipx` sont joués par un lanceur
+simulé (`Lanceur`) : le vrai `claude mcp add` écrirait dans `~/.claude.json` du poste ;
+`ssh-keygen`, réel, signe les commits d'un cas. Les cas s'écrivent en littéraux.
 """
 
 import os
@@ -45,12 +46,17 @@ class Lanceur:
 @pytest.fixture
 def projet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Le dossier du projet, répertoire courant, hors de tout dépôt : `git` ne remonte pas
-    au-dessus de `tmp_path`. L'identité de l'auteur passe par l'environnement : elle ne dépend
-    ni de la configuration git du poste ni de celle de la CI."""
+    au-dessus de `tmp_path`, et ne lit ni la configuration globale ni celle du système : un
+    `commit.gpgsign` du poste sans clé y ferait échouer chaque commit (mesuré le 2026-10-26,
+    git 2.47.1) ; un cas qui éprouve une clé la pose en configuration locale. L'identité de
+    l'auteur passe par l'environnement : elle ne dépend ni de la configuration git du poste ni de
+    celle de la CI."""
     dossier = tmp_path / "projet"
     dossier.mkdir()
     monkeypatch.chdir(dossier)
     monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     for role in ("AUTHOR", "COMMITTER"):
         monkeypatch.setenv(f"GIT_{role}_NAME", "Amorce")
         monkeypatch.setenv(f"GIT_{role}_EMAIL", "amorce@example.invalid")
@@ -462,6 +468,81 @@ def test_commit_refuse_un_fichier_suivi_que_les_regles_d_ignore_excluent(
     assert capsys.readouterr().out == (
         "refus — fichiers suivis que les règles d'ignore excluent, à retirer par"
         " `git rm --cached` : brouillon-été.log\n"
+    )
+
+
+def signe_par_ssh(depot: Path) -> None:
+    """Chaque commit signé par une clé SSH jetable, sans phrase de passe, rangée hors du dépôt ;
+    `ssh-keygen` doit être sur le `PATH`."""
+    cle = depot.parent / "cle"
+    subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(cle)], check=True)
+    git("config", "gpg.format", "ssh")
+    git("config", "user.signingKey", str(cle))
+    git("config", "commit.gpgsign", "true")
+
+
+def avance_un_depot_imbrique(_depot: Path) -> None:
+    """Tout est commité, sauf le pointeur d'un dépôt imbriqué, avancé d'un commit : la seule
+    chose que `git add -A` ait à commiter."""
+    git("init", "-b", "main", "module")
+    git("-C", "module", "commit", "--allow-empty", "-m", "un")
+    git("add", "-A")
+    git("commit", "-m", "initial")
+    git("-C", "module", "commit", "--allow-empty", "-m", "deux")
+
+
+# Chaque clé éprouvée — l'id de son cas —, sa valeur, et ce qui prépare le dépôt pour qu'elle
+# y ait prise.
+CONFIGURATIONS: dict[str, tuple[str, Callable[[Path], None] | None]] = {
+    "status.showUntrackedFiles": ("no", None),
+    "diff.ignoreSubmodules": ("all", avance_un_depot_imbrique),
+    "i18n.logOutputEncoding": ("ISO-8859-1", None),
+    "log.showSignature": ("true", signe_par_ssh),
+}
+
+
+@pytest.mark.parametrize("cle", CONFIGURATIONS)
+def test_commit_commite_et_relit_quelle_que_soit_la_configuration_git(
+    cle: str, depot_a_commiter: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Une clé de configuration git, posée en configuration locale, ne change pas ce que les
+    lectures de `commit` concluent.
+
+    Dénombré avant le correctif, sur les deux scripts du lot — `amorcage.py`, et ce que le lot
+    ajoute à `ecriture-relue.py` : 11 appels `git`, 8 lectures et 3 gestes ; 2 lectures fuyaient,
+    par 4 clés, une par cas. Provenance : « mesuré » par sonde le 2026-10-26, git 2.47.1 ; « lu »
+    dans la page de manuel de la commande ; sinon « non vérifié ».
+
+    - `git status --porcelain` (`commit`, avant le geste et à sa relecture) : fuite, mesuré.
+      `status.showUntrackedFiles=no` cache les fichiers non suivis, `diff.ignoreSubmodules=all`
+      le pointeur avancé d'un dépôt imbriqué que `git add -A` commite quand même : « rien à
+      faire », sans commit. `--porcelain` fixe le format, pas le contenu ; `core.quotePath` ne
+      change que l'écriture d'un chemin dans le motif (lu).
+    - `git log -1 --format=%s` (relecture de `commit`) : fuite, mesuré. `i18n.logOutputEncoding`
+      réencode le sujet, `log.showSignature` le fait précéder d'une ligne de vérification sur un
+      commit signé : relecture non conforme d'un commit conforme.
+    - `git ls-files -i -c --exclude-standard -z` (`commit`), `git check-ignore --no-index -q`
+      (`ignore`) : `core.excludesFile` et `core.ignoreCase` y changent la réponse (mesuré), et
+      c'est l'intention — les règles d'ignore de ce poste valent ; `core.quotePath` est tenu par
+      `-z`, et `-q` n'écrit rien (lu).
+    - `git rev-parse --is-inside-work-tree` (`depot init`, `depot create`), `git symbolic-ref
+      --short HEAD` (`depot init`) : aucune clé recensée qui change leur réponse (non vérifié).
+    - `git remote get-url origin` (`depot create`) : `url.<base>.insteadOf` y est appliqué (lu) ;
+      tenu entre les formes HTTPS et SSH, toutes deux comparées (non vérifié).
+    - Les gestes `git init -b main`, `git add -A`, `git commit -m` : `init.defaultBranch` est tenu
+      par `-b` (lu) ; un `commit.gpgsign` sans clé fait échouer le commit, `i18n.commitEncoding`
+      étiquette son message sans le réencoder, que `git log` relit mal en UTF-8 (mesuré), un
+      hook peut le refuser ou changer son sujet (lu) — la relecture le dit.
+    """
+    valeur, prepare = CONFIGURATIONS[cle]
+    if prepare:
+        prepare(depot_a_commiter)
+    git("config", cle, valeur)
+
+    assert lance("commit") == 0
+    assert capsys.readouterr().out == f"commité et relu — {TITRE}\n"
+    assert (
+        git("status", "--porcelain", "--untracked-files=normal", "--ignore-submodules=none") == ""
     )
 
 
