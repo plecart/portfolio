@@ -1176,9 +1176,10 @@ en une ligne ; 2 : appel mal formé.
 pas les PR liées, la requête GraphQL du cas découpé reste. La famille sait aussi créer une
 issue, remplacer un corps, publier un brief, poser un label, fermer une issue, rattacher une
 issue à un milestone ou fermer un milestone ; son `--help` en porte le contrat. `triage`,
-`interroge-moi`, `vers-prd`, `vers-issues`, `repercussions` et `bug-vers-issue` les nomment ; les
-skills des lots 7a à 8 de #134 les nommeront. Toute écriture qu'il ne fait pas reste sous la règle
-« Écritures sur un artefact distant » de `.claude/rules/contraintes.md`, relue à la main.
+`interroge-moi`, `vers-prd`, `vers-issues`, `repercussions`, `bug-vers-issue` et `plan-qa` les
+nomment ; les skills des lots 7b et 8 de #134 les nommeront. Toute écriture qu'il ne fait pas
+reste sous la règle « Écritures sur un artefact distant » de `.claude/rules/contraintes.md`, relue
+à la main.
 
 Le merge **clôt l'issue liée** (via `Closes #N`). **Retirer aussitôt son label d'état** —
 `ready-for-agent` ou `ready-for-human`, selon le mapping de `.claude/pipeline.config.md` :

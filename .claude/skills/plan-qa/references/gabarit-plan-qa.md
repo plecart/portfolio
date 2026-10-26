@@ -13,7 +13,8 @@ Squelette par défaut du corps d'issue GitHub pour un plan de QA. Remplace les e
 3. **Chaque case porte son type**, juste après la case à cocher :
    ``- [ ] **Commande** — `<commande exacte>` → <attendu>`` ou
    ``- [ ] **Observation** — <action ou endroit à regarder> → <attendu>`` (« Types de case »
-   ci-dessous). Une case sans type n'est pas publiable : la passe finale la refuse.
+   ci-dessous). Une case sans type n'est pas publiable : la passe comptable la refuse (SKILL.md,
+   « Passe finale avant publication »).
 
 ````markdown
 # Plan QA : <court périmètre>
@@ -47,9 +48,10 @@ critère d'acceptation le cite en fin de texte, avant toute annotation : `(C1)` 
 
 ## Saisie d'échec
 
-Quand une case échoue, capturer le bloc de
-`execution-qa/references/gabarit-intake-echec.md` dans la conversation. `bug-vers-issue` le
-consomme tel quel. Les champs sans contenu sont supprimés, jamais laissés vides.
+Quand une case échoue, l'intake de `execution-qa/references/gabarit-intake-echec.md` s'écrit —
+dans un fichier, ou en commentaire de l'issue du plan —, ses champs sans contenu supprimés, jamais
+laissés vides. La session de consignation `bug-vers-issue` le reçoit en argument, dans son mode
+piloté par un plan : le numéro du plan, l'ancre de la case, le chemin ou l'URL de l'intake.
 
 ## Données de test
 
@@ -162,8 +164,8 @@ parcours **manuels** : la non-régression automatisée est le travail de la CI.
 
 ## Phase Finale — Définition du Terminé
 
-- [ ] **Observation** — chaque case des phases incluses → `[x]`, ou une annotation explicite
-      (`N/A : <raison>`, `BLOQUÉ`, `accepté : <décision>`).
+- [ ] **Observation** — chaque case des phases incluses → `[x]`, ou annotée `N/A` ou `BLOQUÉ`
+      avec sa raison, ou `accepté` avec sa décision.
 - [ ] **Observation** — chaque bloc de fonctionnalité → entièrement traité.
 - [ ] **Observation** — chaque constat bloquant → corrigé, ou explicitement accepté avec la
       décision consignée.
@@ -179,3 +181,7 @@ parcours **manuels** : la non-régression automatisée est le travail de la CI.
 
 - 🔴 #<numéro-issue-bug> — <titre court> — phase / bloc : `<emplacement>`
 ````
+
+La dernière ligne, modèle d'une entrée de l'Index des constats, ne se recopie pas dans le plan
+publié : la passe comptable refuserait ses espaces réservés (SKILL.md, « Passe finale avant
+publication », « Marqueurs »).
