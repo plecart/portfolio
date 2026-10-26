@@ -2,7 +2,7 @@
 
 Squelette par défaut du corps d'issue GitHub pour un plan de QA. Remplace les espaces réservés.
 
-**Deux règles héritées du SKILL, qui priment sur ce gabarit :**
+**Trois règles héritées du SKILL, qui priment sur ce gabarit :**
 
 1. **Une surface que le projet n'a pas ne produit aucune section** — pas même une section marquée
    « N/A ». Les surfaces se déduisent de `.claude/pipeline.config.md`. Les sections ci-dessous sont
@@ -10,6 +10,10 @@ Squelette par défaut du corps d'issue GitHub pour un plan de QA. Remplace les e
 2. **Aucune case ne re-teste ce que la CI couvre déjà.** Pas de « les tests passent », pas de « le
    lint est vert », pas de « le build réussit » : `cycle-pr` et la CI l'ont déjà prouvé. Ce plan ne
    contient que ce qu'un test automatisé ne peut pas voir.
+3. **Chaque case porte son type**, juste après la case à cocher :
+   ``- [ ] **Commande** — `<commande exacte>` → <attendu>`` ou
+   ``- [ ] **Observation** — <action ou endroit à regarder> → <attendu>`` (« Types de case »
+   ci-dessous). Une case sans type n'est pas publiable : la passe finale la refuse.
 
 ````markdown
 # Plan QA : <court périmètre>
@@ -33,6 +37,14 @@ Squelette par défaut du corps d'issue GitHub pour un plan de QA. Remplace les e
 - **Mineur** : formulation, finition visuelle, état vide non bloquant, message peu clair mais
   récupérable.
 
+## Types de case
+
+Chaque case porte son type juste après la case à cocher, pour se jouer sans décision. Une case
+**Commande** tient sa commande exacte dans un seul segment entre accents graves, puis ` → ` et son
+attendu : elle se déroule telle qu'écrite, comparée à son attendu. Une case **Observation** —
+rendu, état d'écran, console, ergonomie — se joue avec le mainteneur. Une case qui couvre un
+critère d'acceptation le cite en fin de texte, avant toute annotation : `(C1)` ou `(C1, C3)`.
+
 ## Saisie d'échec
 
 Quand une case échoue, capturer le bloc de
@@ -54,11 +66,11 @@ La CI prouve que le code compile et que les tests passent ; elle ne prouve pas q
 Ne rien recetter d'autre si cette phase est rouge.
 
 **Checklist** :
-- [ ] Les fichiers d'environnement existent et correspondent à l'exemple versionné.
-- [ ] L'application démarre — `<commande "run local" de la config>`.
-- [ ] Les services dont elle dépend sont montés et joignables.
-- [ ] Chaque surface exposée répond — `<url, commande ou point d'entrée par surface>`.
-- [ ] La configuration façon production refuse les valeurs par défaut non sûres.
+- [ ] **Commande** — `<clés d'environnement comparées à l'exemple versionné>` → aucune manquante.
+- [ ] **Commande** — `<commande "run local" de la config>` → l'application démarre.
+- [ ] **Commande** — `<état des services dont elle dépend>` → chacun monté et joignable.
+- [ ] **Commande** — `<url, commande ou point d'entrée, par surface exposée>` → la surface répond.
+- [ ] **Commande** — `<démarrage façon production, une valeur par défaut non sûre>` → refusé.
 
 **Règle d'arrêt** : si l'application ne démarre pas, rien d'autre n'est recettable.
 
@@ -73,13 +85,15 @@ utilisateur. Sinon, elle n'apparaît pas dans le plan.)*
 
 **Préconditions** : deux comptes distincts existent, le premier possède au moins une ressource.
 
-- [ ] Authentification absente → refus attendu.
-- [ ] Authentification invalide / expirée → refus attendu, session vidée côté client.
-- [ ] Le compte A liste ses propres ressources → volume attendu.
-- [ ] Le compte B ne peut ni lister, ni lire, ni modifier, ni exporter les ressources du compte A
-      → code conforme à la politique anti-énumération du projet.
-- [ ] Aucun refus d'accès ne produit une erreur serveur.
-- [ ] Aucune donnée croisée n'est persistée pendant les actions rejetées.
+- [ ] **Commande** — `<appel d'une ressource protégée, sans authentification>` → refus attendu.
+- [ ] **Observation** — une session à l'authentification invalide, puis expirée → refus attendu,
+      session vidée côté client.
+- [ ] **Commande** — `<liste des ressources avec le jeton du compte A>` → volume attendu.
+- [ ] **Commande** — `<liste, lecture, modification, export du compte A, jeton du compte B>` → code
+      conforme à la politique anti-énumération du projet.
+- [ ] **Commande** — `<journaux du serveur, queue bornée>` → aucune erreur serveur sur les refus.
+- [ ] **Commande** — `<requête sur les ressources du compte A>` → aucune donnée croisée persistée
+      pendant les actions rejetées.
 
 **Règle d'arrêt** : toute donnée visible entre comptes est bloquante.
 
@@ -92,8 +106,8 @@ utilisateur. Sinon, elle n'apparaît pas dans le plan.)*
 **Objectif** : <le comportement visible par l'utilisateur, en une phrase>
 
 **Critères d'acceptation** (depuis #<N>) :
-- [ ] <critère 1>
-- [ ] <critère 2>
+- **C1** — <critère 1>
+- **C2** — <critère 2>
 
 <!--
   Une sous-section par surface QUE CE PROJET POSSÈDE. Supprimer celles qui ne s'appliquent pas —
@@ -101,27 +115,30 @@ utilisateur. Sinon, elle n'apparaît pas dans le plan.)*
 -->
 
 **Point d'entrée (API / CLI / commande)** :
-- [ ] `<appel>` avec entrée valide → `<résultat attendu, code, forme de sortie>`.
-- [ ] `<appel>` avec entrée invalide → `<erreur attendue, visible et exploitable>`.
+- [ ] **Commande** — `<appel avec entrée valide>` → `<résultat, code, forme de sortie>` (C1).
+- [ ] **Commande** — `<appel avec entrée invalide>` → `<erreur visible et exploitable>` (C2).
 
 **Interface** :
-- [ ] État vide / chargement / succès / erreur affichés pour `<surface>`.
-- [ ] Le détail de l'erreur réelle est visible, pas remplacé par un message générique.
-- [ ] Les contrôles sont neutralisés pendant une action en attente.
-- [ ] Console et réseau propres — aucune erreur inexpliquée.
+- [ ] **Observation** — `<surface>` vide, en chargement, en succès, en erreur → chaque état affiché.
+- [ ] **Observation** — une action en échec → le détail de l'erreur réelle est visible, pas
+      remplacé par un message générique.
+- [ ] **Observation** — une action en attente → les contrôles sont neutralisés.
+- [ ] **Observation** — la console et le réseau → propres, aucune erreur inexpliquée.
 
 **Persistance** :
-- [ ] L'enregistrement attendu existe, avec les champs et le rattachement au propriétaire.
-- [ ] Aucun enregistrement résiduel pour les tentatives rejetées.
+- [ ] **Commande** — `<requête sur l'enregistrement>` → il existe, avec les champs et le
+      rattachement au propriétaire.
+- [ ] **Commande** — `<requête sur les tentatives rejetées>` → aucun enregistrement résiduel.
 
 **Traitements asynchrones** :
-- [ ] Le traitement atteint son état terminal de **succès**.
-- [ ] Sur une variante d'échec, il atteint son état terminal d'**échec**, avec erreur exploitable.
-- [ ] Aucune exception non gérée dans les journaux (queue bornée).
+- [ ] **Commande** — `<état du traitement>` → état terminal de **succès**.
+- [ ] **Commande** — `<état du traitement, sur une variante d'échec>` → état terminal d'**échec**,
+      avec erreur exploitable.
+- [ ] **Commande** — `<journaux du service, queue bornée>` → aucune exception non gérée.
 
 **Artefacts produits** :
-- [ ] Le fichier / export attendu est produit, au bon emplacement, au bon format.
-- [ ] Les originaux sont préservés ; les entrées rejetées ne laissent rien.
+- [ ] **Commande** — `<inspection du fichier / export produit>` → au bon emplacement, au bon format.
+- [ ] **Commande** — `<listage du stockage>` → originaux préservés, rien pour les entrées rejetées.
 
 **Règle d'arrêt** : <quand s'arrêter et trier avant de continuer>
 
@@ -134,9 +151,10 @@ utilisateur. Sinon, elle n'apparaît pas dans le plan.)*
 **Objectif** : les parcours existants fonctionnent toujours après cette livraison. Uniquement des
 parcours **manuels** : la non-régression automatisée est le travail de la CI.
 
-- [ ] <parcours antérieur 1> fonctionne toujours de bout en bout — `<commande ou action>`.
-- [ ] <parcours antérieur 2> fonctionne toujours — `<commande ou action>`.
-- [ ] Aucun nouveau bruit de console / réseau / journaux sur les surfaces antérieures.
+- [ ] **Commande** — `<commande du parcours antérieur 1>` → il fonctionne toujours de bout en bout.
+- [ ] **Observation** — `<action du parcours antérieur 2>` → il fonctionne toujours.
+- [ ] **Observation** — la console, le réseau et les journaux des surfaces antérieures → aucun
+      nouveau bruit.
 
 **Règle d'arrêt** : une régression sur un comportement déjà livré est au moins majeure.
 
@@ -144,12 +162,14 @@ parcours **manuels** : la non-régression automatisée est le travail de la CI.
 
 ## Phase Finale — Définition du Terminé
 
-- [ ] Chaque case des phases incluses est `[x]`, ou porte une annotation explicite
+- [ ] **Observation** — chaque case des phases incluses → `[x]`, ou une annotation explicite
       (`N/A : <raison>`, `BLOQUÉ`, `accepté : <décision>`).
-- [ ] Chaque bloc de fonctionnalité est entièrement traité.
-- [ ] Chaque constat bloquant est corrigé, ou explicitement accepté avec la décision consignée.
-- [ ] Chaque constat majeur a un lien `🔴 BUG #N` ou une décision `reporté` explicite.
-- [ ] Les actions en échec ont été rejouées après correction.
+- [ ] **Observation** — chaque bloc de fonctionnalité → entièrement traité.
+- [ ] **Observation** — chaque constat bloquant → corrigé, ou explicitement accepté avec la
+      décision consignée.
+- [ ] **Observation** — chaque constat majeur → un lien `🔴 BUG #N` ou une décision `reporté`
+      explicite.
+- [ ] **Observation** — les actions en échec → rejouées après correction.
 
 ---
 

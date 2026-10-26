@@ -21,40 +21,40 @@ L'exemple porte sur une issue hypothétique `#127 — L'upload de document de co
 **Objectif** : Un utilisateur connecté peut uploader un PDF jusqu'à 25 Mo dans la base de connaissances de son client. Les fichiers de plus de 25 Mo ou dont les magic bytes ne correspondent pas sont rejetés avant qu'aucune ligne BDD ou objet de stockage ne soit créé.
 
 **Critères d'acceptation** (depuis #127) :
-- [ ] Uploader un PDF valide de 1 Mo en tant qu'utilisateur A → succès, le document apparaît dans la liste de connaissances.
-- [ ] Uploader un PDF de 30 Mo → rejet avec la taille dans le message d'erreur.
-- [ ] Uploader un fichier `.pdf` dont le contenu réel est un PNG → rejet avec une erreur de magic bytes.
-- [ ] L'utilisateur B ne peut pas voir le document uploadé par l'utilisateur A.
+- **C1** — Uploader un PDF valide de 1 Mo en tant qu'utilisateur A → succès, le document apparaît dans la liste de connaissances.
+- **C2** — Uploader un PDF de 30 Mo → rejet avec la taille dans le message d'erreur.
+- **C3** — Uploader un fichier `.pdf` dont le contenu réel est un PNG → rejet avec une erreur de magic bytes.
+- **C4** — L'utilisateur B ne peut pas voir le document uploadé par l'utilisateur A.
 
 **Vérifications Backend / API** :
-- [ ] `POST /api/clients/$CLIENT_A_ID/knowledge` avec `fixtures/valid-1mb.pdf` et `$TOKEN_A` → 201, le corps a `id`, `original_filename`, `status: "pending_extraction"`.
-- [ ] `POST /api/clients/$CLIENT_A_ID/knowledge` avec `fixtures/oversized-30mb.pdf` et `$TOKEN_A` → 413, le corps a `error: "FILE_TOO_LARGE"`, `max_bytes: 26214400`.
-- [ ] `POST /api/clients/$CLIENT_A_ID/knowledge` avec `fixtures/png-renamed-as-pdf.pdf` et `$TOKEN_A` → 422, le corps a `error: "INVALID_MAGIC_BYTES"`.
-- [ ] `GET /api/clients/$CLIENT_A_ID/knowledge` avec `$TOKEN_B` → 403 (inter-locataires).
-- [ ] `GET /api/clients/$CLIENT_A_ID/knowledge/<doc-id>` avec `$TOKEN_B` → 403 ou 404 selon la politique anti-énumération (décision projet : 404).
-- [ ] Aucun appel `POST /api/clients/<id>/knowledge` ne retourne 500 pour les cas d'échec de validation.
+- [ ] **Commande** — `curl -s -w '\n%{http_code}\n' -H "Authorization: Bearer $TOKEN_A" -F file=@fixtures/valid-1mb.pdf https://app.local/api/clients/$CLIENT_A_ID/knowledge` → le corps a `id` (à garder en `$DOC_ID`), `original_filename`, `status: "pending_extraction"`, puis `201` (C1).
+- [ ] **Commande** — `curl -s -w '\n%{http_code}\n' -H "Authorization: Bearer $TOKEN_A" -F file=@fixtures/oversized-30mb.pdf https://app.local/api/clients/$CLIENT_A_ID/knowledge` → le corps a `error: "FILE_TOO_LARGE"`, `max_bytes: 26214400`, puis `413` (C2).
+- [ ] **Commande** — `curl -s -w '\n%{http_code}\n' -H "Authorization: Bearer $TOKEN_A" -F file=@fixtures/png-renamed-as-pdf.pdf https://app.local/api/clients/$CLIENT_A_ID/knowledge` → le corps a `error: "INVALID_MAGIC_BYTES"`, puis `422` (C3).
+- [ ] **Commande** — `curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN_B" https://app.local/api/clients/$CLIENT_A_ID/knowledge` → `403`, inter-locataires (C4).
+- [ ] **Commande** — `curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN_B" https://app.local/api/clients/$CLIENT_A_ID/knowledge/$DOC_ID` → `404`, politique anti-énumération (décision projet : 404 plutôt que 403) (C4).
+- [ ] **Commande** — `docker compose logs --tail=200 api | grep -c 'POST /api/clients/.*/knowledge.* 500'` → affiche `0` : aucun 500 sur les échecs de validation.
 
 **Vérifications Frontend** :
-- [ ] URL : `https://app.local/clients/<client-a>/knowledge` depuis l'utilisateur A.
-- [ ] L'état vide de connaissances affiche le CTA « Uploadez votre premier document » lorsque l'utilisateur A n'a aucun document.
-- [ ] Pendant l'upload, le bouton d'upload est désactivé et un spinner est visible.
-- [ ] À l'upload valide, la ligne du document apparaît avec `status: pending_extraction`, puis passe à `ready` une fois le polling terminé.
-- [ ] À l'upload de 30 Mo, l'erreur visible affiche « Le fichier dépasse 25 Mo » (détail backend remonté, pas « Une erreur est survenue »).
-- [ ] À l'échec de magic bytes, l'erreur visible affiche « Le contenu du fichier ne correspond pas à son extension ».
-- [ ] Le polling s'arrête une fois le statut `ready` ou `failed` (aucun intervalle qui fuit après la terminalisation de la ligne).
-- [ ] La console du navigateur n'a aucune erreur inexpliquée pendant les trois tentatives d'upload.
-- [ ] Onglet Réseau : aucun 500, aucune requête émise après un statut terminal.
+- [ ] **Observation** — ouvrir `https://app.local/clients/<client-a>/knowledge` en utilisateur A, session vierge → la page de connaissances du client A s'affiche.
+- [ ] **Observation** — l'état vide, l'utilisateur A sans aucun document → le CTA « Uploadez votre premier document » est affiché.
+- [ ] **Observation** — pendant l'upload → le bouton d'upload est désactivé et un spinner est visible.
+- [ ] **Observation** — l'upload valide → la ligne du document apparaît avec `status: pending_extraction`, puis passe à `ready` une fois le polling terminé (C1).
+- [ ] **Observation** — l'upload de 30 Mo → l'erreur visible affiche « Le fichier dépasse 25 Mo » : détail backend remonté, pas « Une erreur est survenue » (C2).
+- [ ] **Observation** — l'échec de magic bytes → l'erreur visible affiche « Le contenu du fichier ne correspond pas à son extension » (C3).
+- [ ] **Observation** — le polling, une fois le statut `ready` ou `failed` → il s'arrête, aucun intervalle qui fuit après la terminalisation de la ligne.
+- [ ] **Observation** — la console du navigateur pendant les trois tentatives d'upload → aucune erreur inexpliquée.
+- [ ] **Observation** — l'onglet Réseau → aucun 500, aucune requête émise après un statut terminal.
 
 **Vérifications BDD / stockage** :
-- [ ] `select id, client_id, status, error, finished_at from knowledge_documents where client_id = '$CLIENT_A_ID'` montre une ligne avec `status='ready'` (ou transitoirement `pending_extraction` pendant le polling) et `error IS NULL`.
-- [ ] Aucune ligne n'existe pour la tentative rejetée de 30 Mo ni pour la tentative de magic bytes (`select count(*) ... where original_filename like '%oversized%' or '%png-renamed%'` → 0).
-- [ ] Le fichier original est présent à `storage/clients/$CLIENT_A_ID/knowledge/<doc-id>/original.pdf` avec la taille attendue.
-- [ ] Aucun objet de stockage n'existe sous `storage/clients/$CLIENT_A_ID/knowledge/` pour les tentatives rejetées.
+- [ ] **Commande** — `docker compose exec db psql -U app -c "select id, client_id, status, error, finished_at from knowledge_documents where client_id = '$CLIENT_A_ID'"` → une ligne, `status` à `ready` (ou transitoirement `pending_extraction` pendant le polling), `error` vide (C1).
+- [ ] **Commande** — `docker compose exec db psql -U app -c "select count(*) from knowledge_documents where original_filename like '%oversized%' or original_filename like '%png-renamed%'"` → `0` : aucune ligne pour les tentatives rejetées (C2, C3).
+- [ ] **Commande** — `cmp storage/clients/$CLIENT_A_ID/knowledge/$DOC_ID/original.pdf fixtures/valid-1mb.pdf` → aucune sortie, code `0` : l'original est préservé octet pour octet (C1).
+- [ ] **Commande** — `ls storage/clients/$CLIENT_A_ID/knowledge/` → `$DOC_ID` seul : aucun objet de stockage pour les tentatives rejetées (C2, C3).
 
 **Vérifications Worker / logs** :
-- [ ] `docker compose logs --tail=200 api` pour la fenêtre du run montre deux lignes de log `knowledge_upload_rejected` (une pour la taille, une pour les magic bytes), aucune trace d'exception.
-- [ ] `docker compose logs --tail=200 worker` montre le job d'extraction du PDF valide passant de `started → completed`.
-- [ ] Aucune ligne `Unhandled exception` dans l'un ou l'autre flux.
+- [ ] **Commande** — `docker compose logs --tail=200 api | grep -E 'knowledge_upload_rejected|Traceback'` → deux lignes `knowledge_upload_rejected`, une pour la taille, une pour les magic bytes, et aucune `Traceback` (C2, C3).
+- [ ] **Commande** — `docker compose logs --tail=200 worker | grep $DOC_ID` → le job d'extraction du PDF valide passe de `started` à `completed` (C1).
+- [ ] **Commande** — `docker compose logs --tail=200 api worker | grep -c 'Unhandled exception'` → affiche `0`.
 
 **Règle d'arrêt** : Un 500 sur tout upload rejeté, ou une ligne créée pour un upload rejeté, est **bloquant** — déposer via `bug-vers-issue` et ne pas continuer les blocs de fonctionnalité qui dépendent de la bonne isolation des documents de connaissance.
 
@@ -70,7 +70,8 @@ L'exemple porte sur une issue hypothétique `#127 — L'upload de document de co
 ## Ce que cet exemple illustre
 
 - Chaque critère d'acceptation de l'issue est mappé à au moins une vérification explicite.
-- Chaque vérification backend épingle la route, le code de statut et un champ de corps spécifique.
+- Chaque case porte son type : **Commande**, une commande copiable telle quelle et son attendu, ou **Observation**, ce qui se juge avec le mainteneur ; elle cite en fin de texte les critères `C<k>` qu'elle couvre.
+- Chaque vérification backend épingle la route et le code de statut, et un champ de corps spécifique quand la réponse en porte un.
 - Les vérifications frontend couvrent les états vide, chargement, succès, erreur — plus le comportement de polling — et s'ancrent à une vraie URL.
 - Les vérifications BDD et stockage incluent la vraie table et la vraie disposition des chemins (vérifiée contre le diff).
 - Les vérifications worker / logs bornent la queue de logs et nomment la ligne de log attendue.
