@@ -189,7 +189,7 @@ La session lui passe le chemin du brouillon et celui du relevé des issues du p�
 |---|---|
 | **Cases qui refont le travail de la CI** (« les tests passent », « le lint est vert ») | Les supprimer. Le plan ne contient que ce qu'un test ne peut pas voir. |
 | **Sections pour des surfaces inexistantes** (frontend sur une CLI, BDD sur une lib) | Déduire les surfaces de `.claude/pipeline.config.md`. Une surface absente ne produit aucune section, pas même un « N/A ». |
-| **Case sans type** | `**Commande** —` ou `**Observation** —` en tête, puis ` → ` et l'attendu (gabarit, « Types de case ») ; la passe comptable la refuse. |
+| **Case sans type** | `**Commande** —` ou `**Observation** —` en tête, puis ` → ` et l'attendu sur la ligne de la case (gabarit, « Types de case ») ; la passe comptable la refuse. |
 | Le plan couvre des zones qu'aucune issue récente n'a touchées | Recadrer. Uniquement les phases de couche A pour le transversal, les blocs de couche B liés aux issues dans le périmètre. |
 | Vérifications génériques (« l'API marche », « l'UI s'affiche ») | Ancrer à des routes/composants/états/codes de statut attendus spécifiques. |
 | Jobs asynchrones sans vérifications d'état terminal | Ajouter les chemins explicites succès ET échec, avec l'état persisté attendu pour chacun. |

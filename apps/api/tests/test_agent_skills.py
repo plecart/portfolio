@@ -3620,9 +3620,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # pas » ou « ne … rien », 4 « la session » sans « reste à », 3 « jamais », 2 « reste à » ou
     # « garde », 2 « elle-même », « uniquement », « n'… que », « sauf » — : toutes épinglées, 21 au
     # premier jet, 3 au cleanup, vues rouges par `mutation.py` ; le correctif de la passe 1 de
-    # relecture en ajoute une, l'attendu de l'Observation. Gardés ailleurs : la sortie de liste
-    # d'attente (`EXECUTOR_WAITING_LIST`), l'absence d'écriture `gh` directe et le renvoi au
-    # script (`SKILLS_SANS_ECRITURE_GH_DIRECTE`), le renvoi aux sessions liées
+    # relecture en ajoute une, l'attendu de l'Observation ; celui de la passe 2, trois : l'attendu
+    # sur la ligne de la case — Commande, Observation, erreur « Case sans type ». Gardés ailleurs :
+    # la sortie de liste d'attente (`EXECUTOR_WAITING_LIST`), l'absence d'écriture `gh` directe et
+    # le renvoi au script (`SKILLS_SANS_ECRITURE_GH_DIRECTE`), le renvoi aux sessions liées
     # (`SKILLS_DES_SESSIONS_LIEES`), le contexte vivant et la création de label retirés
     # (`RETIRES_DU_CONTEXTE_VIVANT`), le type de chaque case du gabarit et de l'exemple
     # (`test_chaque_case_d_un_plan_de_qa_porte_son_type`), l'accord de la commande « cases sans
@@ -3807,12 +3808,12 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-plan-qa-criteres-vers-cases": (
         PLAN_QA_SKILL,
         (
-            "`grep -nE '^## |^- [*][*]C[[:digit:]]+[*][*] — |^([[:blank:]>]*([-*+]|[[:digit:]]+[.)])"
-            "[[:blank:]]+)+[[][[:blank:]xX][]][[:blank:]]+.*[(]C[[:digit:]]+(, C[[:digit:]]+)*[)]'"
-            " <brouillon>` : chaque issue du relevé a son"
-            " titre `## Bloc de"
-            " fonctionnalité : Issue #<N>` ; sous chacun, avant le titre suivant, autant de lignes"
-            " `- **C<k>** —` que l'issue a de critères, et chaque `C<k>` cité par au moins une case"
+            "`grep -nE '^## |^- [*][*]C[[:digit:]]+[*][*] — |^([[:blank:]>]*([-*+]|[[:digit:]]+"
+            "[.)])[[:blank:]]+)+[[][[:blank:]xX][]][[:blank:]]+.*[(]C[[:digit:]]+(, C[[:digit:]]+)*"
+            "[)]' <brouillon>` : chaque issue du relevé a son titre"
+            " `## Bloc de fonctionnalité : Issue #<N>` ; sous chacun, avant le titre suivant,"
+            " autant de lignes `- **C<k>** —` que l'issue a de critères, et chaque `C<k>` cité par"
+            " au moins une case"
         ),
     ),
     "7a-plan-qa-marqueurs": (
@@ -3841,19 +3842,26 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-plan-qa-erreur-case-sans-type": (
         PLAN_QA_SKILL,
         (
-            "`**Commande** —` ou `**Observation** —` en tête, puis ` → ` et l'attendu (gabarit,"
-            " « Types de case ») ; la passe comptable la refuse"
+            "`**Commande** —` ou `**Observation** —` en tête, puis ` → ` et l'attendu sur la ligne"
+            " de la case (gabarit, « Types de case ») ; la passe comptable la refuse"
         ),
     ),
     "7a-gabarit-plan-qa-passe-comptable-refuse": (
         GABARIT_PLAN_QA_REF,
         "Une case sans type n'est pas publiable : la passe comptable la refuse",
     ),
+    "7a-gabarit-plan-qa-commande-attendu-sur-sa-ligne": (
+        GABARIT_PLAN_QA_REF,
+        (
+            "dans un seul segment entre accents graves, puis ` → ` et son attendu sur la ligne même"
+            " de la case"
+        ),
+    ),
     "7a-gabarit-plan-qa-observation-porte-son-attendu": (
         GABARIT_PLAN_QA_REF,
         (
             "Une case **Observation** — rendu, état d'écran, console, ergonomie — porte de même"
-            " ` → ` et son attendu"
+            " ` → ` et son attendu sur sa première ligne"
         ),
     ),
     "7a-gabarit-plan-qa-intake-ecrit": (
