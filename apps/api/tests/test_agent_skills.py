@@ -1894,13 +1894,61 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         CYCLE_PR_SKILL,
         "pour une session de lot, celle que son brief nomme, ou aucune",
     ),
-    "go-du-briefing-humain": (
+    # Lot 8b de #134 (2026-10-26) : le démarrage des lots par la coordinatrice, le go délégué et sa
+    # relecture (journal de spec de #134, 2026-10-21, relais de la coordinatrice ; obs 131) ; les
+    # paramètres du démarrage sont gardés par `USE_WORKTREE_EXPLICITE`. Par la forme, sur les lignes
+    # ajoutées : 10 moitiés restrictives — 4 « seul(ement) », 2 « sauf », 2 « ne … pas », « aucun »,
+    # « hors de ce cas » —, et 1 reprise d'une ligne repliée (« jamais un point de départ »), toutes
+    # épinglées et vues rouges par `mutation.py`.
+    "branche-mergee-jamais-un-depart": (COORDINATRICE_REF, "n'est jamais un point de départ"),
+    "go-du-briefing-humain-ou-delegue": (
         COORDINATRICE_REF,
-        "**Le go du briefing est humain, dans la fenêtre de la session de lot**",
+        "humain, dans la fenêtre de la session de lot, ou délégué à la coordinatrice**",
     ),
-    "go-du-briefing-toujours-un-arret": (
+    "go-delegue-seulement-sans-v-ecart-ni-c": (
         COORDINATRICE_REF,
-        "Elle s'arrête donc toujours à son Étape 1",
+        (
+            "valable seulement pour un briefing sans `[V]`, sans écart au bloc du lot et sans"
+            " `[C]`. Hors de ce cas, la session s'arrête à son Étape 1."
+        ),
+    ),
+    "go-delegue-question-au-mainteneur": (
+        COORDINATRICE_REF,
+        "elle pose la question au mainteneur dans la fenêtre du lot et prévient la coordinatrice",
+    ),
+    "bloquant-sur-go-delegue": (COORDINATRICE_REF, "bloquant : [V] en attente dans cette fenêtre"),
+    "fin-de-tour-pas-un-signal": (COORDINATRICE_REF, "note de fin de tour n'est pas un signal"),
+    "ouverture-par-la-coordinatrice": (COORDINATRICE_REF, "La coordinatrice prépare alors"),
+    "demarree-a-son-ouverture": (
+        COORDINATRICE_REF,
+        "**démarrée à son ouverture**, sur décision du mainteneur, elle naît après le merge",
+    ),
+    "demarree-dans-un-tour-du-mainteneur": (
+        COORDINATRICE_REF,
+        "dans le premier tour ouvert par un message du mainteneur, seul geste humain qui reste",
+    ),
+    "outils-d-une-session-pre-demarree": (
+        COORDINATRICE_REF,
+        (
+            "pré-démarrée, elle lit `git diff <SHA de son démarrage>..HEAD -- .claude/ CLAUDE.md`"
+            " et les sections touchées par `Read`, et passe un rôle modifié dans le brief de son"
+            " sous-agent"
+        ),
+    ),
+    "relecture-en-repli-sur-go-delegue": (
+        COORDINATRICE_REF,
+        (
+            "la relecture passe par le repli sous-agent `relecteur` (`session-relecture.md`,"
+            " « Repli »), sauf si un tour humain s'ouvre dans la fenêtre du lot avant la passe"
+        ),
+    ),
+    "repli-par-un-message-d-abord": (
+        COORDINATRICE_REF,
+        (
+            "`start_session` refusé ou aucun tour du mainteneur qui vienne, la coordinatrice lui"
+            " demande d'ouvrir un tour par un message, le seul geste humain, et seulement s'il ne"
+            " le peut pas"
+        ),
     ),
     "go-du-decoupage-annonce-un-go-par-lot": (
         COORDINATRICE_REF,
@@ -2221,8 +2269,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
 # `execution-qa` (2026-10-26), écrits en clair dès leur création : la session `bug-vers-issue` de
 # l'option (a) de son §4 et sa carte de proposition, toutes deux **sans** worktree — elle lit le
 # code de la campagne et n'écrit que dans GitHub ; `grep -rn start_session` dans ses cinq fichiers
-# en retrouve un, le démarrage — 22 sites. Un site nouveau n'entre pas ici de lui-même : la garde
-# lit des phrases, le grep re-dérive la population.
+# en retrouve un, le démarrage — 22 sites. Le lot 8b en ajoute **1** dans `coordinatrice.md`
+# (2026-10-26), écrit en clair dès sa création, **sans** worktree : la session de lot démarrée à son
+# ouverture, dans le worktree frère que prépare la coordinatrice — 23 sites. Un site nouveau
+# n'entre pas ici de lui-même : la garde lit des phrases, le grep re-dérive la population.
 USE_WORKTREE_EXPLICITE = {
     "pr-paralleles-etape-0-sans-worktree": (
         PR_PARALLELES_SKILL,
@@ -2247,6 +2297,10 @@ USE_WORKTREE_EXPLICITE = {
     "coordinatrice-sessions-de-lot": (
         COORDINATRICE_REF,
         "worktree de l'application, `wake_when_done: true`, `use_worktree: true`",
+    ),
+    "coordinatrice-lot-demarre-a-son-ouverture": (
+        COORDINATRICE_REF,
+        "`cwd` : ce dossier, `use_worktree: false`",
     ),
     "coordinatrice-carte-de-relais": (
         COORDINATRICE_REF,
@@ -6066,6 +6120,7 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         CYCLE_PR_SKILL,
         "Une session de lot attend le go ci-dessous dans sa fenêtre comme toute session PR",
     ),
+    "cycle-pr-sauf-go-delegue": (CYCLE_PR_SKILL, "— sauf go délégué à la coordinatrice"),
     "cycle-pr-echec-de-porte-jamais-silencieux": (
         CYCLE_PR_SKILL,
         "se dit dans « Relecture indépendante » du body, jamais en saut silencieux (obs 84)",
