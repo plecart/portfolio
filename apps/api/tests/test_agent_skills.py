@@ -2288,8 +2288,11 @@ INVARIANTS_DES_SESSIONS_LIEES = {
 # fuyaient, recensés au cleanup holistique par la forme du geste sur les lignes ajoutées
 # (`propos…`, `démarr…`, `start_session`, `ouvre`, `naît`, dans la phrase de « session ») : 21
 # phrases — 3 sites, 13 renvois à l'un d'eux ou à `session-relecture.md`, 5 hors classe (une PR
-# qu'on ouvre, un titre, les outils d'une session) —, 25 sites. Un site nouveau n'entre pas ici de
-# lui-même : la garde lit des phrases, le grep re-dérive la population.
+# qu'on ouvre, un titre, les outils d'une session) —, 25 sites. Le lot 7c en ajoute **1** dans
+# `bug-vers-issue` (2026-10-27), écrit en clair dès sa création, **avec** worktree : la session
+# `cycle-pr` de la petite PR d'un correctif évident, étape 1, démarrage et carte en une phrase —
+# 26 sites. Un site nouveau n'entre pas ici de lui-même : la garde lit des phrases, le grep
+# re-dérive la population.
 USE_WORKTREE_EXPLICITE = {
     "pr-paralleles-etape-0-sans-worktree": (
         PR_PARALLELES_SKILL,
@@ -2413,6 +2416,14 @@ USE_WORKTREE_EXPLICITE = {
         (
             "incomplet, une reconfiguration, `use_worktree: true` : elle écrit sur une branche,"
             " par une PR."
+        ),
+    ),
+    "bug-vers-issue-vers-la-petite-pr": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "`start_session`, `initiation: user_asked` dans un tour où le mainteneur la demande,"
+            " sinon une carte de proposition, `initiation: own_initiative` ; `context: fresh`,"
+            " `use_worktree: true`"
         ),
     ),
 }
@@ -3717,7 +3728,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         BUG_VERS_ISSUE_SKILL,
         (
             "prévenir le parent par le message de fin de la même référence (« Fin de travail »),"
-            " sous la forme « terminé — BUG #<N> consigné » — la fin du tour ne le prévient pas"
+            " « terminé — <livrable> », le livrable nommant la classe : « BUG #<N> consigné »,"
+            " « attendu faux, case réécrite », « environnement, case à rejouer », « correctif"
+            " évident, petite PR proposée » ou « correctif évident, rendu à ta PR : <correctif> »"
+            " — la fin du tour ne le prévient pas"
         ),
     ),
     "6b2-bug-vers-issue-la-qa-reprend": (BUG_VERS_ISSUE_SKILL, "la QA reprend dans sa session"),
@@ -4926,8 +4940,13 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     # Lot 7c de #134 (2026-10-26) : un échec se qualifie avant de se consigner, et un correctif
     # évident part en petite PR, sans issue — le barreau 3 de « Création d'issues en cours de
-    # cycle ». Une entrée par phrase neuve, qui garde ses moitiés restrictives (obs 126). Gardés
-    # ailleurs : les renvois numérotés aux barreaux (`RENVOIS_AUX_BARREAUX`).
+    # cycle ». Une entrée par phrase neuve, qui garde ses moitiés restrictives (obs 126) : par la
+    # forme, sur les mots ajoutés de `bug-vers-issue` (`git diff -U0 --word-diff=plain`), 17 —
+    # « aucune » ×3, « jamais », « ne … pas », « n'… que », « seul » ×2, « sans décision »,
+    # « dans le doute » ×2, « avant toute », « s'arrête », « elle-même » ×2, « telle qu'écrite »
+    # ×2 —, toutes épinglées, vues rouges par `mutation.py`. Gardés ailleurs : les renvois
+    # numérotés aux barreaux (`RENVOIS_AUX_BARREAUX`), le worktree de la petite PR
+    # (`USE_WORKTREE_EXPLICITE`).
     "7c-contraintes-barreau-du-correctif-evident": (
         CONTRAINTES_RULE,
         (
@@ -4942,6 +4961,123 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             "puis propriétaire ouvert (une automatisation qu'on a fait taire se répare, elle ne se"
             " doublonne pas), puis petite PR pour un correctif évident, puis brouillon soumis au"
             " mainteneur"
+        ),
+    ),
+    "7c-bug-vers-issue-description": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "Qualifie d'abord l'échec : attendu faux, environnement et correctif évident ne"
+            " deviennent pas une issue."
+        ),
+    ),
+    "7c-bug-vers-issue-consigne-le-seul-defaut-a-etudier": (
+        BUG_VERS_ISSUE_SKILL,
+        "le qualifier et, défaut à étudier, le consigner comme une issue GitHub",
+    ),
+    "7c-bug-vers-issue-principe": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "et elle n'existe que pour un défaut à étudier : l'échec se qualifie d'abord (étape 1)."
+            " Toujours pré-publier, ne jamais publier en silence."
+        ),
+    ),
+    "7c-bug-vers-issue-classe-a-la-session": (
+        BUG_VERS_ISSUE_SKILL,
+        "La session garde le jugement : la classe de l'échec,",
+    ),
+    "7c-bug-vers-issue-retest-au-releveur": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "le retest d'un échec d'environnement (étape 1), l'action rejouée telle qu'écrite,"
+            " rendue OK ou KO avec sa sortie brute. Ce qui compte reste à la session"
+        ),
+    ),
+    "7c-bug-vers-issue-case-par-le-script": (
+        BUG_VERS_ISSUE_SKILL,
+        "la réécriture d'une case ou de son marqueur (`checkbox patch --paires`, étape 1)",
+    ),
+    "7c-bug-vers-issue-demarre-la-petite-pr": (
+        BUG_VERS_ISSUE_SKILL,
+        "elle démarre la session `cycle-pr` de la petite PR d'un correctif évident (étape 1)",
+    ),
+    "7c-bug-vers-issue-qualifier-avant-toute-ecriture": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "**Qualifier.** La session elle-même, jamais un équipier, range l'échec dans **une**"
+            " classe, preuve à l'appui, et la montre au mainteneur avec ce qu'elle écrira, avant"
+            " toute écriture — même go qu'un brouillon."
+        ),
+    ),
+    "7c-bug-vers-issue-dans-le-doute": (
+        BUG_VERS_ISSUE_SKILL,
+        "**Dans le doute : défaut à étudier.**",
+    ),
+    "7c-bug-vers-issue-une-paire-lue-par-la-session": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "Piloté par un plan, une sortie qui touche la case s'écrit en une seule paire —"
+            " l'ancienne ligne lue par la session elle-même dans le corps courant, comme à"
+            " l'étape 7 —, appliquée par `python .claude/skills/cycle-pr/scripts/ecriture-relue.py"
+            " checkbox patch <plan> --paires <fichier>`."
+        ),
+    ),
+    "7c-bug-vers-issue-attendu-faux": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "**Attendu faux** — preuve : la source que la case cite (critère `C<k>`, spec, texte"
+            " même de la case) donne l'observé. Piloté par un plan : la ligne de la case réécrite"
+            " par une paire, attendu corrigé et ` 🔴 needs-issue — …` retiré ; la session de QA la"
+            " rejoue à sa reprise, où `checkbox next` la retrouve. Libre : dire au mainteneur"
+            " pourquoi l'observé est juste. Aucune issue."
+        ),
+    ),
+    "7c-bug-vers-issue-environnement": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "**Environnement** — preuve : l'intake ou un relevé nomme une cause hors du produit —"
+            " outil introuvable, service arrêté, fichier verrouillé, réseau (`cycle-pr` 3.2,"
+            " « Échec d'outillage ≠ échec de code »). La cause levée, par le mainteneur s'il le"
+            " faut, un `releveur` rejoue l'action de l'intake telle qu'écrite — le mainteneur, pour"
+            " une case **Observation**. Reproduit : défaut à étudier. Non reproduit : aucune"
+            " issue ; piloté par un plan, ` 🔴 needs-issue — …` retiré par une paire, et la case se"
+            " rejoue à la reprise."
+        ),
+    ),
+    "7c-bug-vers-issue-correctif-evident": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "**Correctif évident** — visible à la lecture des lignes, sans décision de"
+            " comportement : l'attendu est déjà écrit (critère, spec, case) et le code le contredit"
+            " lisiblement. Session démarrée par une session PR (« Création d'issues en cours de"
+            " cycle ») : le correctif retourne à sa PR, barreau 1, par le message de fin. Sinon,"
+            " une petite PR par `cycle-pr` (« Demande directe sans issue »), dans sa propre"
+            " session :"
+        ),
+    ),
+    "7c-bug-vers-issue-correctif-evident-sans-issue": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "le prompt décrivant le correctif et, piloté par un plan, le plan et l'ancre de la"
+            " case. Aucune issue ; piloté par un plan, ` 🔴 needs-issue — …` devient ` 🔴 correctif"
+            " évident — <résumé>` par une paire."
+        ),
+    ),
+    "7c-bug-vers-issue-defaut-a-etudier": (
+        BUG_VERS_ISSUE_SKILL,
+        "**Défaut à étudier** — tout le reste : les étapes 2 à 7, jusqu'à l'issue.",
+    ),
+    "7c-bug-vers-issue-sortie-sans-les-etapes-2-a-7": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "Hors défaut à étudier, la procédure s'arrête après cette sortie et, pour une session"
+            " démarrée par une autre, son message de fin (après l'étape 7)."
+        ),
+    ),
+    "7c-bug-vers-issue-erreur-consigner-sans-qualifier": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "| Consigner sans qualifier l'échec | Une classe prouvée d'abord (étape 1) : seul le"
+            " défaut à étudier devient une issue ; dans le doute, défaut à étudier. |"
         ),
     ),
 }
@@ -6895,6 +7031,7 @@ RENVOI_DE_BARREAU_FORMES: dict[str, tuple[str, list[int]]] = {
 # dans l'ordre du texte.
 RENVOIS_AUX_BARREAUX = {
     CONTRAINTES_RULE: [4],
+    BUG_VERS_ISSUE_SKILL: [1],
     CONTRADICTION_SKILL: [2, 4],
     REPERCUSSIONS_SKILL: [4],
     VERS_ISSUES_SKILL: [4],

@@ -1,24 +1,24 @@
 ---
 name: bug-vers-issue
-description: "À utiliser lorsqu'un bug fait surface et doit être consigné comme une issue GitHub avec le contexte QA / implémentation / PRD attaché. Déclencheurs : « ouvre une issue pour ce bug », « consigne ça comme un bug », « c'est cassé, logue-le », tout échec surfacé par execution-qa que l'utilisateur veut capturer, et les rapports libres de bug en dehors d'un plan QA actif (« ce truc est faux, logue-le »). Montre toujours un brouillon et demande confirmation avant de publier."
+description: "À utiliser lorsqu'un bug fait surface et doit être consigné comme une issue GitHub avec le contexte QA / implémentation / PRD attaché. Déclencheurs : « ouvre une issue pour ce bug », « consigne ça comme un bug », « c'est cassé, logue-le », tout échec surfacé par execution-qa que l'utilisateur veut capturer, et les rapports libres de bug en dehors d'un plan QA actif (« ce truc est faux, logue-le »). Qualifie d'abord l'échec : attendu faux, environnement et correctif évident ne deviennent pas une issue. Montre toujours un brouillon et demande confirmation avant de publier."
 argument-hint: "[description du bug | #<plan-qa> <ancre de la case> <chemin ou URL de l'intake>]"
 ---
 
 # Bug vers issue
 
-Capturer un bug — découvert soit pendant l'exécution d'un plan QA, soit lors de tests libres — et le consigner comme une issue GitHub durable et centrée sur l'utilisateur, avec des liens explicites vers le plan QA (s'il y en a un), les issues d'implémentation, le PRD et les commits à l'origine. Montre toujours un brouillon au mainteneur et confirme avant de publier.
+Capturer un bug — découvert soit pendant l'exécution d'un plan QA, soit lors de tests libres — le qualifier et, défaut à étudier, le consigner comme une issue GitHub durable et centrée sur l'utilisateur, avec des liens explicites vers le plan QA (s'il y en a un), les issues d'implémentation, le PRD et les commits à l'origine. Montre toujours un brouillon au mainteneur et confirme avant de publier.
 
 ## Principe fondamental
 
-L'issue de bug doit être **durable** (encore lisible après des refactos majeures), **centrée sur l'utilisateur** (décrit un comportement, pas du code), **traçable** (renvoie vers le plan / le PRD / le commit) et **sans doublon** (ne consigne pas à nouveau pour une case déjà liée à un `🔴 BUG #N`). Toujours pré-publier, ne jamais publier en silence.
+L'issue de bug doit être **durable** (encore lisible après des refactos majeures), **centrée sur l'utilisateur** (décrit un comportement, pas du code), **traçable** (renvoie vers le plan / le PRD / le commit) et **sans doublon** (ne consigne pas à nouveau pour une case déjà liée à un `🔴 BUG #N`) — et elle n'existe que pour un défaut à étudier : l'échec se qualifie d'abord (étape 1). Toujours pré-publier, ne jamais publier en silence.
 
 ## Délégation
 
-La session garde le jugement : les questions de clarification, le choix des issues et des commits coupables, le propriétaire du sujet, issue unique ou découpage, la rédaction, le go. Le reste change de main :
+La session garde le jugement : la classe de l'échec, les questions de clarification, le choix des issues et des commits coupables, le propriétaire du sujet, issue unique ou découpage, la rédaction, le go. Le reste change de main :
 
-- **`releveur`** — les collectes (« Collectes ») : doublons et propriétaire du sujet par `gh issue list --search` sur les mots-clés que donne la session, issues récemment fermées touchant la zone, `git log` ; les lectures bornées (« Lectures bornées ») : l'intake d'échec écrit, le corps du plan QA autour de la case — contexte des étapes 2 et 3, pas le corps que l'étape 7 patche —, l'issue d'implémentation et son PRD, le glossaire et `CLAUDE.md`, les fichiers d'automatisation qui pourraient posséder le sujet. Ce qui compte reste à la session ;
-- **script** — toute écriture sur la forge, par sa sous-commande de `.claude/skills/cycle-pr/scripts/ecriture-relue.py`, appelée par la session elle-même : un geste isolé coûte plus délégué (`CLAUDE.md`, « Orchestration ») — le commentaire sur une issue existante (`comment`, étape 3), la création (`issue create`, étape 6), le patch du plan QA (`issue edit --body-file`, étape 7) ;
-- **sessions distinctes** — cette session peut être démarrée par une autre : la session de QA (`execution-qa`), qui reprend la QA dans sa propre session, `repercussions` pour un brouillon, ou une session qui applique « Création d'issues en cours de cycle » (`.claude/rules/contraintes.md`) ; protocole commun : `.claude/skills/cycle-pr/references/sessions-liees.md`.
+- **`releveur`** — les collectes (« Collectes ») : doublons et propriétaire du sujet par `gh issue list --search` sur les mots-clés que donne la session, issues récemment fermées touchant la zone, `git log` ; les lectures bornées (« Lectures bornées ») : l'intake d'échec écrit, le corps du plan QA autour de la case — contexte des étapes 2 et 3, pas le corps que l'étape 7 patche —, l'issue d'implémentation et son PRD, le glossaire et `CLAUDE.md`, les fichiers d'automatisation qui pourraient posséder le sujet ; le retest d'un échec d'environnement (étape 1), l'action rejouée telle qu'écrite, rendue OK ou KO avec sa sortie brute. Ce qui compte reste à la session ;
+- **script** — toute écriture sur la forge, par sa sous-commande de `.claude/skills/cycle-pr/scripts/ecriture-relue.py`, appelée par la session elle-même : un geste isolé coûte plus délégué (`CLAUDE.md`, « Orchestration ») — le commentaire sur une issue existante (`comment`, étape 3), la création (`issue create`, étape 6), le patch du plan QA (`issue edit --body-file`, étape 7), la réécriture d'une case ou de son marqueur (`checkbox patch --paires`, étape 1) ;
+- **sessions distinctes** — cette session peut être démarrée par une autre : la session de QA (`execution-qa`), qui reprend la QA dans sa propre session, `repercussions` pour un brouillon, ou une session qui applique « Création d'issues en cours de cycle » (`.claude/rules/contraintes.md`) ; elle démarre la session `cycle-pr` de la petite PR d'un correctif évident (étape 1) ; protocole commun : `.claude/skills/cycle-pr/references/sessions-liees.md`.
 
 ## Deux points d'entrée
 
@@ -31,7 +31,7 @@ Sans argument, la session s'arrête et demande la description ou la case.
 
 ## Procédure
 
-### 1. Lire l'entrée, clarifier légèrement
+### 1. Lire l'entrée, qualifier l'échec
 
 - **Piloté par un plan** — l'intake écrit est la source : aucune question, sauf pour un champ manquant.
 - **Libre** — la description de l'argument, et au plus 2 ou 3 courtes questions au mainteneur, dans cette session, centrées sur :
@@ -39,7 +39,16 @@ Sans argument, la session s'arrête et demande la description ou la case.
   - les étapes pour reproduire, si elles ne sont pas évidentes ;
   - si c'est systématique ou intermittent.
 
-Ne sur-interroge pas. Si la description est assez claire pour consigner, passe à la suite.
+Ne sur-interroge pas. Si la description est assez claire pour qualifier, passe à la suite.
+
+**Qualifier.** La session elle-même, jamais un équipier, range l'échec dans **une** classe, preuve à l'appui, et la montre au mainteneur avec ce qu'elle écrira, avant toute écriture — même go qu'un brouillon. **Dans le doute : défaut à étudier.** Piloté par un plan, une sortie qui touche la case s'écrit en une seule paire — l'ancienne ligne lue par la session elle-même dans le corps courant, comme à l'étape 7 —, appliquée par `python .claude/skills/cycle-pr/scripts/ecriture-relue.py checkbox patch <plan> --paires <fichier>`.
+
+- **Attendu faux** — preuve : la source que la case cite (critère `C<k>`, spec, texte même de la case) donne l'observé. Piloté par un plan : la ligne de la case réécrite par une paire, attendu corrigé et ` 🔴 needs-issue — …` retiré ; la session de QA la rejoue à sa reprise, où `checkbox next` la retrouve. Libre : dire au mainteneur pourquoi l'observé est juste. Aucune issue.
+- **Environnement** — preuve : l'intake ou un relevé nomme une cause hors du produit — outil introuvable, service arrêté, fichier verrouillé, réseau (`cycle-pr` 3.2, « Échec d'outillage ≠ échec de code »). La cause levée, par le mainteneur s'il le faut, un `releveur` rejoue l'action de l'intake telle qu'écrite — le mainteneur, pour une case **Observation**. Reproduit : défaut à étudier. Non reproduit : aucune issue ; piloté par un plan, ` 🔴 needs-issue — …` retiré par une paire, et la case se rejoue à la reprise.
+- **Correctif évident** — visible à la lecture des lignes, sans décision de comportement : l'attendu est déjà écrit (critère, spec, case) et le code le contredit lisiblement. Session démarrée par une session PR (« Création d'issues en cours de cycle ») : le correctif retourne à sa PR, barreau 1, par le message de fin. Sinon, une petite PR par `cycle-pr` (« Demande directe sans issue »), dans sa propre session : `start_session`, `initiation: user_asked` dans un tour où le mainteneur la demande, sinon une carte de proposition, `initiation: own_initiative` ; `context: fresh`, `use_worktree: true`, le prompt décrivant le correctif et, piloté par un plan, le plan et l'ancre de la case. Aucune issue ; piloté par un plan, ` 🔴 needs-issue — …` devient ` 🔴 correctif évident — <résumé>` par une paire.
+- **Défaut à étudier** — tout le reste : les étapes 2 à 7, jusqu'à l'issue.
+
+Hors défaut à étudier, la procédure s'arrête après cette sortie et, pour une session démarrée par une autre, son message de fin (après l'étape 7).
 
 ### 2. Rassembler le contexte environnant
 
@@ -121,7 +130,7 @@ En cas de découpage : le parent d'abord, puis les enfants un par un, dans l'ord
   - le résultat est écrit tel quel dans le fichier, ses fins de ligne gardées : le script relit contre ce fichier et ne voit pas une conversion (obs 87).
 - Dis au mainteneur que le bug est consigné et que le plan a été mis à jour.
 
-**Session démarrée par une autre** (son prompt système nomme le parent, `.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») : la consignation faite — issue publiée ou commentée, plan patché en mode piloté —, prévenir le parent par le message de fin de la même référence (« Fin de travail »), sous la forme « terminé — BUG #<N> consigné » — la fin du tour ne le prévient pas. Quand le parent est la session de QA, la QA reprend dans sa session, sur ce message.
+**Session démarrée par une autre** (son prompt système nomme le parent, `.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») : la sortie de sa classe faite — issue publiée ou commentée et plan patché, case réécrite, marqueur retiré ou remplacé, petite PR proposée —, prévenir le parent par le message de fin de la même référence (« Fin de travail »), « terminé — <livrable> », le livrable nommant la classe : « BUG #<N> consigné », « attendu faux, case réécrite », « environnement, case à rejouer », « correctif évident, petite PR proposée » ou « correctif évident, rendu à ta PR : <correctif> » — la fin du tour ne le prévient pas. Quand le parent est la session de QA, la QA reprend dans sa session, sur ce message.
 
 ## Règles du corps d'issue (tous les modes)
 
@@ -143,6 +152,7 @@ Si l'un d'eux manque au dépôt, `issue create` refuse en le nommant : s'arrête
 
 | Erreur | Correctif |
 |---|---|
+| Consigner sans qualifier l'échec | Une classe prouvée d'abord (étape 1) : seul le défaut à étudier devient une issue ; dans le doute, défaut à étudier. |
 | Consigner sans montrer le brouillon | Toujours montrer + demander « on le publie ? ». Aucune exception. |
 | Consigner un doublon pour une case déjà liée | Parcours d'abord le corps du plan pour repérer `🔴 BUG #N` près de la case. |
 | Inclure des chemins de fichiers et des numéros de ligne dans le corps | Ils deviennent obsolètes. Utilise le langage métier et les comportements. |
