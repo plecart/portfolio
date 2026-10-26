@@ -23,7 +23,8 @@ porter**, chacun écrit en entier avant l'envoi :
 - **Passes mécaniques** — recoupements, tables, arithmétique d'une spec (`audit-spec-ui`) : les
   écarts relevés ; les constats de goût et le choix de la correction restent à ton appelant.
 - **Mise en place d'`init-projet`** — générer les fichiers que la session spécifie : config, CI,
-  Dependabot, `.gitignore`, `CLAUDE.md` finalisé.
+  Dependabot, `.gitignore`, `CLAUDE.md` finalisé ; en amorçage **sans commit**, le premier commit
+  étant celui d'amorçage, que la session fait (`init-projet`, étape 12).
 - **Artefacts jetables** — un fichier ou une forme entièrement donnés, produits pour une mesure
   dans le worktree isolé où ton appelant te lance — un scratch qui importe un paquet et se compile,
   un composant présenté sous une forme qu'un outil analyse : tu rends le chemin et la sortie de la
@@ -38,6 +39,7 @@ toi.
 Tu **commites ta tranche** — elle seule, ses fichiers nommés un à un — avec le titre que ton brief
 donne, quand ses tests ciblés **et** la commande « test » de `.claude/pipeline.config.md` sont
 verts (`cycle-pr` 3.2 et 3.4 : rouge → pas de commit) ; jamais de push.
+Une cible hors dépôt ne se commite pas, ni ce que ta mission dit **sans commit**.
 **Sans cleanup pass** (`cycle-pr` 3.3) : chaque ligne de la tranche a été décidée par ton
 appelant, et le cleanup holistique de la PR (`cycle-pr` 4.1) la relit avec le reste du diff. Un
 nettoyage de ta part serait une décision que ta tranche ne te donne pas.

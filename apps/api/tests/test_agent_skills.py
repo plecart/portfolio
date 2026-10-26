@@ -1943,6 +1943,21 @@ INVARIANTS_DES_SESSIONS_LIEES = {
             " seulement s'il ne le peut pas"
         ),
     ),
+    # Passe 1 de la PR #162, CR-1 et m5 — classe : une phrase de la session de lot écrite pour une
+    # seule de ses formes, ou pour le seul go humain. **Dénombrement, écrit avant le correctif** :
+    # les 8 puces de « La session de lot », **1** fuyait — le premier geste ; le go délégué, relayé
+    # par le fichier de démarrage, est propre à la forme démarrée à son ouverture par construction
+    # — ; ses 7 renvois entrants (`grep -rn` du titre dans `.claude/` : 9 lignes, moins le titre et
+    # une phrase du relais), **2** fuyaient — le go annoncé au go du découpage, et `cycle-pr` (m5,
+    # `cycle-pr-sauf-go-delegue`).
+    "premier-geste-de-la-forme-demarree-a-son-ouverture": (
+        COORDINATRICE_REF,
+        "et pas avant ; démarrée à son ouverture, à la lecture de son fichier de démarrage :",
+    ),
+    "go-du-decoupage-sauf-go-delegue": (
+        COORDINATRICE_REF,
+        "— sauf go délégué, où la relecture passe au repli `relecteur` (« La session de lot »)",
+    ),
     "go-du-decoupage-annonce-un-go-par-lot": (
         COORDINATRICE_REF,
         "annonce un go par lot, dans sa fenêtre",
@@ -4568,7 +4583,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " décidé, jamais par un commit direct sur le trunk (D-12 de #134) : dans une session"
             " PR, la correction entre dans sa PR ; hors PR, la session l'ouvre, la relit et la"
             " merge au go du mainteneur, au déroulé de `triage/hors-scope.md` (« Quand écrire »,"
-            " étapes 5 et 6). Une spec hors dépôt se corrige sur place."
+            " étapes 5 et 6). Une spec hors dépôt se corrige sur place, sans commit."
         ),
     ),
     "8b-audit-spec-ui-arret-sans-chemin": (
@@ -4840,6 +4855,26 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " `.claude/skills/cycle-pr/references/sessions-liees.md`) — il ne l'enchaîne pas dans"
             " sa propre session."
         ),
+    ),
+    # Passe 1 de la PR #162, I1 — classe : une tranche confiée à l'`executant` par le lot, dont la
+    # cible ne doit pas être commitée par lui. **Dénombrement, écrit avant le correctif**, par la
+    # forme du geste (obs 139 ; `grep -n executant` des deux skills sur `41910a2` : 11 lignes, dont
+    # la liste de fichiers de l'étape 7, hors classe) : **8** tranches, **7** fuyaient — les 5
+    # générations d'`init-projet` en amorçage (le premier commit est l'étape 12 ; en
+    # reconfiguration, la branche de la PR, D-12), l'édition et la propagation d'`audit-spec-ui`
+    # hors dépôt (`git add` y sort en 128, « is outside repository », git 2.47.1, 2026-10-26 ; dans
+    # un dépôt, la branche de la PR) ; indemnes, les six passes, qui ne rendent que des constats.
+    "8b-init-projet-executant-sans-commit-en-amorcage": (
+        INIT_PROJET_SKILL,
+        "en amorçage **sans commit**, le premier commit étant `commit` (étape 12) ;",
+    ),
+    "8b-executant-init-projet-sans-commit-en-amorcage": (
+        ".claude/agents/executant.md",
+        "en amorçage **sans commit**, le premier commit étant celui d'amorçage, que la session fait",
+    ),
+    "8b-executant-hors-depot-sans-commit": (
+        ".claude/agents/executant.md",
+        "Une cible hors dépôt ne se commite pas, ni ce que ta mission dit **sans commit**.",
     ),
     # Le même lot y renvoie aussi les cinq autres skills qui lançaient `init-projet` sans
     # configuration (`RETIRES_LANCER_INIT_PROJET`) : une entrée par phrase neuve, « s'arrêter »
@@ -6435,7 +6470,13 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         CYCLE_PR_SKILL,
         "Une session de lot attend le go ci-dessous dans sa fenêtre comme toute session PR",
     ),
-    "cycle-pr-sauf-go-delegue": (CYCLE_PR_SKILL, "— sauf go délégué à la coordinatrice"),
+    "cycle-pr-sauf-go-delegue": (
+        CYCLE_PR_SKILL,
+        (
+            "comme toute session PR, et y démarre sa session de relecture — sauf go délégué à la"
+            " coordinatrice, qui lève l'attente et passe la relecture au repli `relecteur`"
+        ),
+    ),
     "cycle-pr-echec-de-porte-jamais-silencieux": (
         CYCLE_PR_SKILL,
         "se dit dans « Relecture indépendante » du body, jamais en saut silencieux (obs 84)",

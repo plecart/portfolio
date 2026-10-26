@@ -20,7 +20,7 @@ l'application à la session, lues le 2026-10-18 ; mesuré le même jour, PR #122
 découpage est ce tour : la question du go nomme donc les n sessions qu'il fera démarrer, avec
 l'accord pour le `verificateur` de chaque lot (`cycle-pr` Étape 7, « Vérification d'avant-go »), et
 annonce un go par lot, dans sa fenêtre : chaque session de lot y démarre sa session de relecture
-(« La session de lot »).
+— sauf go délégué, où la relecture passe au repli `relecteur` (« La session de lot »).
 La coordinatrice y tourne en Opus 5.5, effort `high` (#134, décision 4,
 qui remplace sur ce point #107 décision 8) : un enfant n'étant ni plus fort ni d'effort plus haut
 que son parent (`sessions-liees.md`, « Héritage »), la question du go ne demande au mainteneur
@@ -112,7 +112,7 @@ paragraphe). Précédent mesuré : les lots 5 à 8 de #134 (journal de spec, 202
 Ce que le brief de la coordinatrice change au cycle de `cycle-pr` :
 
 - **Premier geste**, au message « ouvre » — à la lecture de son brief pour le premier lot non
-  mergé — et pas avant :
+  mergé — et pas avant ; démarrée à son ouverture, à la lecture de son fichier de démarrage :
   `git fetch origin && git checkout -b <type>/<slug>-lot-<k> --no-track origin/<type>/<slug>`
   (`sessions-liees.md`, « Premier geste », la base étant la branche d'intégration). Chaque lot a
   donc son worktree neuf ; la branche mergée d'un lot n'est jamais un point de départ. Puis ses

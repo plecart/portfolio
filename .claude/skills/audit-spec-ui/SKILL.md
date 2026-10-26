@@ -28,7 +28,7 @@ corrections. Le reste change de main :
   a décidé, jamais par un commit direct sur le trunk (D-12 de #134) : dans une session PR, la
   correction entre dans sa PR ; hors PR, la session l'ouvre, la relit et la merge au go du
   mainteneur, au déroulé de `triage/hors-scope.md` (« Quand écrire », étapes 5 et 6). Une spec
-  hors dépôt se corrige sur place.
+  hors dépôt se corrige sur place, sans commit.
 
 ## Étape 0 — Périmètre et autorité, avant toute lecture
 

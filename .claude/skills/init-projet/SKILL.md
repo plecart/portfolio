@@ -51,6 +51,7 @@ récapitulatif. Le reste change de main :
 - **`executant`** — la génération de chaque fichier, en tranche entièrement spécifiée par la
   session (valeurs validées, gabarit, empreintes relevées) : `.claude/pipeline.config.md`
   (étape 5), `ci.yml`, `dependabot.yml` et `.gitignore` (étape 7), `CLAUDE.md` finalisé (étape 9) ;
+  en amorçage **sans commit**, le premier commit étant `commit` (étape 12) ;
 - **scripts** — les gestes de dépôt, appelés par la session elle-même : un geste isolé coûte plus
   délégué (`CLAUDE.md`, « Orchestration »). En amorçage, les skills ne sont pas encore dans le
   projet : `amorcage.py` se lance par `python <répertoire de ce skill>/scripts/amorcage.py` —
