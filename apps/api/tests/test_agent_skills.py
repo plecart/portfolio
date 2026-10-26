@@ -3930,7 +3930,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # « Erreurs courantes » ; les quatre références ; la dette de `bug-vers-issue` et la ligne
     # d'Index du gabarit de `plan-qa` —, et par moitié restrictive (obs 126). Dénombrement par la
     # forme, sur les lignes ajoutées des fichiers de prose
-    # (`git diff -U0 origin/feat/contexte-court -- .claude/skills/`) : **60** moitiés restrictives
+    # (`git diff -U0 ffbe52e d99e9a8 -- .claude/skills/`) : **60** moitiés restrictives
     # — 10 « jamais », 12 « ne … pas », « ne … rien », « ne … plus » ou « ne … ni », 6 « pas »
     # elliptique, 7 « elle-même », 5 « la session » ou « cette session » sans « elle-même » ni
     # « reste à », 5 « seul », 4 « aucun », 3 « s'arrêter », 3 « sans », 2 « hors », « ni … ni »,
@@ -4102,7 +4102,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         EXECUTION_QA_SKILL,
         (
             "**Décider de la case** — chaque verdict s'écrit en paire dans un fichier que le script"
-            " n'a pas encore appliqué (étape 5)"
+            " n'a pas encore appliqué (étape 5), sauf l'échec, dont la paire part seule (§4,"
+            " étape 1)"
         ),
     ),
     "7b2-execution-qa-accepte": (
@@ -4382,8 +4383,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         ),
     ),
     # Passe 1 de relecture de la PR #159 (2026-10-26) : **15** moitiés restrictives ajoutées à la
-    # prose, par la forme (`git diff -U0 --word-diff=plain d99e9a8 -- .claude/skills/execution-qa
-    # .claude/skills/plan-qa`), toutes épinglées — ci-dessous, ou dans l'entrée du lot qu'elle met
+    # prose, par la forme (`git diff -U0 --word-diff=plain d99e9a8 60df616 --
+    # .claude/skills/execution-qa .claude/skills/plan-qa`), toutes épinglées — ci-dessous, ou dans l'entrée du lot qu'elle met
     # à jour. I1 : un fichier de paires rejoué après que la session `bug-vers-issue` a réécrit
     # `🔴 needs-issue` en `🔴 BUG #N` est refusé en entier, ses paires valides comprises, sur une
     # « ligne la plus proche » qui nomme une autre case quand celle-ci ressemble plus — mesuré le
@@ -4392,7 +4393,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # le correctif, sur `d99e9a8` — `checkbox patch`, « paire », « patch » dans ses cinq fichiers,
     # plus la reprise que le brief de la passe nomme : **16** sites. **6** exposés au rejeu, une
     # épingle chacun, qui prescrit le fichier neuf — `SKILL.md` §3, étape 4 (« le fichier du
-    # bloc », `7b2-execution-qa-verdict-en-paire`), étape 5 (muette sur le réemploi,
+    # bloc », où le cleanup holistique a trouvé la paire d'échec encore admise,
+    # `7b2-execution-qa-verdict-en-paire`), étape 5 (muette sur le réemploi,
     # `7b2-execution-qa-un-fichier-par-application`), §4, étape 1 (la paire d'échec, appliquée par
     # l'étape 5, donc dans le fichier du bloc, `7b2-execution-qa-echec-annote-et-intake-ecrit`), §6
     # (« le dernier patch », `7b2-execution-qa-termine-accepte`) ; `patch-checkbox-gh.md` §1 (muet,
