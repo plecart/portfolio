@@ -111,9 +111,12 @@ Quelle que soit la voie :
      journal, jamais un commentaire ; c'est la passe `repercussions` de l'Étape 8 qui le fait. Une
      automatisation qui possède le sujet (bot, workflow planifié) se répare, elle ne se doublonne
      pas ;
-  3. **sinon** → un **brouillon** par `bug-vers-issue` ou `vers-issues`, montré au mainteneur, qui
+  3. **un correctif évident** — visible à la lecture des lignes, sans décision de comportement —
+     hors du périmètre de la PR courante → une **petite PR** par `cycle-pr` (« Demande directe
+     sans issue »), sans issue ;
+  4. **sinon** → un **brouillon** par `bug-vers-issue` ou `vers-issues`, montré au mainteneur, qui
      décide. Jamais de `gh issue create` sans ce brouillon validé.
-- Une issue ouverte par le barreau 3 porte **dès sa création** son gabarit, sa catégorie et son
+- Une issue ouverte par le barreau 4 porte **dès sa création** son gabarit, sa catégorie et son
   thème.
 
 ## Écritures sur un artefact distant

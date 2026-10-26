@@ -426,7 +426,7 @@ de l'outil, lue le 2026-10-23).
   journal d'observations (chemin dans `CLAUDE.md`), les deux citations du vide dedans
   (`name: vers-issues-<N>`, prompt `/vers-issues <chemin>`). La session de brouillon le montre au
   mainteneur, qui décide (`.claude/rules/contraintes.md`, « Création d'issues en cours de cycle »,
-  barreau 3). Hors du dépôt, parce que `vers-issues` exige une source écrite en argument et qu'un
+  barreau 4). Hors du dépôt, parce que `vers-issues` exige une source écrite en argument et qu'un
   fichier non suivi dans le worktree de la session PR salirait son arbre. Le vide relevé par une
   clôture a presque toujours un propriétaire ouvert.
 - **Il ne re-trie pas.** Les seules transitions d'état qu'il applique sont le retour en
