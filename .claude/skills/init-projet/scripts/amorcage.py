@@ -8,8 +8,8 @@ Usage :
     python amorcage.py mcp <nom> <url>
     python amorcage.py commit
 
-Les étapes 2, 7, 10 et 12 d'`init-projet` (#134, lot 8a), dans le dossier du projet, qui est le
-répertoire courant. Chaque sous-commande qui écrit fait son geste puis le relit ; `valide` et
+Les étapes 2, 7, 8, 10 et 12 d'`init-projet` (#134, lot 8a), dans le dossier du projet, qui est
+le répertoire courant. Chaque sous-commande qui écrit fait son geste puis le relit ; `valide` et
 `ignore` vérifient seulement. Les sorties des commandes se lisent en octets, décodés en UTF-8
 (obs 108).
 
@@ -25,9 +25,9 @@ répertoire courant. Chaque sous-commande qui écrit fait son geste puis le reli
   sans `skills/` est refusé ;
 - `valide` : `uvx check-jsonschema --builtin-schema <schéma> <copie>` — `pipx run
   check-jsonschema …` si `uvx` ne se lance pas —, sur une copie de `<fichier>` dans un dossier
-  temporaire, sous son nom suivi de `.yml` : sans cette extension, l'outil lit du JSON (mesuré le
-  2026-10-26, check-jsonschema 0.38.2). Le dossier temporaire est retiré dans tous les cas.
-  Invalide, le refus porte les cinq premières lignes non vides de la sortie de l'outil ;
+  temporaire, sous son nom, extension remplacée par `.yml` : sans elle, l'outil lit du JSON
+  (mesuré le 2026-10-26, check-jsonschema 0.38.2). Le dossier temporaire est retiré dans tous les
+  cas. Invalide, le refus porte les cinq premières lignes non vides de la sortie de l'outil ;
 - `ignore` : chaque chemin `--exclus` doit être ignoré par git, chaque `--suivis` ne pas l'être,
   par `git check-ignore --no-index -q`, un appel par chemin ; le refus nomme chaque chemin en
   défaut. Sans `--no-index`, un fichier suivi n'est jamais dit ignoré : un `uv.lock` suivi
@@ -52,10 +52,11 @@ valide (mesuré le 2026-10-26). `ignore` éprouve les motifs, pas ce qui est dé
 refus de `commit`. `mcp` ne compare ni l'URL ni la portée d'un serveur déjà listé, et ne dit pas
 qu'il répond. Un hook qui refuse le commit laisse l'index tel que `git add -A` l'a fait :
 relecture non conforme. Une erreur du système de fichiers — `<fichier>` ou une source absents, une
-cible non inscriptible — sort en trace Python, code 1 (mesuré sur un `<fichier>` absent). Sous
-Windows, le `claude` qu'installe npm est un `claude.cmd`, que `cmd.exe` lance en relisant ses
-arguments sans échappement (CPython, `Doc/library/subprocess.rst`, « Security Considerations ») :
-une URL qui porte `&`, `|` ou `%` y est interprétée (mesuré le 2026-10-26 sur un `.cmd` témoin).
+cible non inscriptible — sort en trace Python, code 1 (mesuré le 2026-10-26 sur un `<fichier>`
+absent). Sous Windows, le `claude` qu'installe npm est un `claude.cmd`, que `cmd.exe` lance en
+relisant ses arguments sans échappement (CPython, `Doc/library/subprocess.rst`, « Security
+Considerations ») : une URL qui porte `&`, `|` ou `%` y est interprétée (mesuré le 2026-10-26 sur
+un `.cmd` témoin).
 
 Sortie : 0 fait et relu, rien à faire, ou conforme ; 1 refus (« refus — »), rien n'étant écrit, ou
 geste lancé et relecture non conforme ou impossible (« relecture non conforme — ») — motif en une

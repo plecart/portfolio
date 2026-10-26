@@ -1160,8 +1160,9 @@ def test_label_create_accepte_une_description_de_100_caracteres(tmp_path: Path) 
 
 
 UN_LABEL = {"nom": "bug", "couleur": "d73a4a", "description": "catégorie"}
-# Chaque défaut d'un fichier `--mapping`, un champ et un type à la fois : (contenu — octets tels
-# quels, document écrit en JSON, ou `None` sans fichier —, motif).
+# Chaque défaut d'un fichier `--mapping`, un champ et un type à la fois, puis leur cumul en une
+# passe, entre labels et dans un label : (contenu — octets tels quels, document écrit en JSON, ou
+# `None` sans fichier —, motif).
 MAPPINGS_MAL_FORMES: dict[str, tuple[Any, str]] = {
     "fichier-absent": (None, "fichier illisible"),
     "non-utf-8": ('[{"nom": "été"}]'.encode("cp1252"), "n'est pas en UTF-8"),
@@ -1219,6 +1220,13 @@ MAPPINGS_MAL_FORMES: dict[str, tuple[Any, str]] = {
         (
             "label 1 : champ nom de type int ; label 2 : couleur 'rouge' : six chiffres"
             " hexadécimaux, sans # ; nommé deux fois, casse ignorée : BUG, bug"
+        ),
+    ),
+    "defauts-d-un-label-en-une-passe": (
+        [{"nom": 5, "couleur": "rouge", "color": "d73a4a"}],
+        (
+            "label 1 : champ inconnu : color ; label 1 : champ nom de type int ; label 1 : couleur"
+            " 'rouge' : six chiffres hexadécimaux, sans # ; label 1 : champ description absent"
         ),
     ),
 }
@@ -1850,7 +1858,7 @@ def test_depot_create_refuse_quand_git_ne_dit_pas_si_origin_existe(
 
 
 # Ce que la forge change sitôt le dépôt créé, et l'écart **exact** que la relecture en dit. Une
-# retouche par élément relu.
+# retouche au moins par élément relu — nom, visibilité, `origin`, autre ou absent.
 DEPOTS_RELUS_NON_CONFORMES: dict[str, tuple[Callable[[Forge], None], str]] = {
     "nom": (
         lambda forge: forge.documents[DEPOT].update(full_name="plecart/autre"),
