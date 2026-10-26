@@ -42,10 +42,10 @@ Squelette par défaut du corps d'issue GitHub pour un plan de QA. Remplace les e
 
 Chaque case porte son type juste après la case à cocher, pour se jouer sans décision. Une case
 **Commande** tient sa commande exacte dans un seul segment entre accents graves, puis ` → ` et son
-attendu : elle se déroule telle qu'écrite, comparée à son attendu. Une case **Observation** —
-rendu, état d'écran, console, ergonomie — porte de même ` → ` et son attendu, et se joue avec le
-mainteneur. Une case qui couvre un critère d'acceptation le cite en fin de texte, avant toute
-annotation : `(C1)` ou `(C1, C3)`.
+attendu sur la ligne même de la case : elle se déroule telle qu'écrite, comparée à son attendu. Une
+case **Observation** — rendu, état d'écran, console, ergonomie — porte de même ` → ` et son attendu
+sur sa première ligne, et se joue avec le mainteneur. Une case qui couvre un critère d'acceptation
+le cite en fin de texte, avant toute annotation : `(C1)` ou `(C1, C3)`.
 
 ## Saisie d'échec
 
@@ -92,8 +92,8 @@ utilisateur. Sinon, elle n'apparaît pas dans le plan.)*
 - [ ] **Observation** — une session à l'authentification invalide, puis expirée → refus attendu,
       session vidée côté client.
 - [ ] **Commande** — `<liste des ressources avec le jeton du compte A>` → volume attendu.
-- [ ] **Commande** — `<un geste — liste, lecture, modification ou export — sur le compte A, jeton du compte B>` → code
-      conforme à la politique anti-énumération du projet, une case par geste.
+- [ ] **Commande** — `<un geste sur le compte A, jeton du compte B>` → code conforme à la politique
+      anti-énumération du projet, une case par geste — liste, lecture, modification ou export.
 - [ ] **Commande** — `<journaux du serveur, queue bornée>` → aucune erreur serveur sur les refus.
 - [ ] **Commande** — `<requête sur les ressources du compte A>` → aucune donnée croisée persistée
       pendant les actions rejetées.
