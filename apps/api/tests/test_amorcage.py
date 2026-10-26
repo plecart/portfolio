@@ -1,12 +1,13 @@
 """Tests des gestes de dépôt locaux d'`init-projet`
 (`.claude/skills/init-projet/scripts/amorcage.py`).
 
-`depot init`, `copie`, `ignore` et `commit` tournent contre le vrai `git`, dans le dossier jetable
-d'un projet que `GIT_CEILING_DIRECTORIES` isole de tout dépôt parent. Une relecture non conforme
-s'y provoque en remplaçant une commande du geste par une autre (`substitue`) : le geste ne fait
-pas ce qu'il dit, et la relecture doit le voir. `claude`, `uvx` et `pipx` sont joués par un
-lanceur simulé (`Lanceur`) : le vrai `claude mcp add` écrirait dans `~/.claude.json` du poste. Les
-cas s'écrivent en littéraux.
+`depot init`, `ignore` et `commit` tournent contre le vrai `git`, `copie` sur le vrai système de
+fichiers, dans le dossier jetable d'un projet que `GIT_CEILING_DIRECTORIES` isole de tout dépôt
+parent. Une relecture non conforme s'y provoque en remplaçant une commande du geste par une autre
+(`substitue`) — pour `copie`, sa copie par une copie vide — : le geste ne fait pas ce qu'il dit,
+et la relecture doit le voir. `claude`, `uvx` et `pipx` sont joués par un lanceur simulé
+(`Lanceur`) : le vrai `claude mcp add` écrirait dans `~/.claude.json` du poste. Les cas s'écrivent
+en littéraux.
 """
 
 import os
@@ -27,7 +28,7 @@ Run = Callable[[Sequence[str]], subprocess.CompletedProcess[bytes]]
 class Lanceur:
     """Un lanceur simulé : chaque programme rend, dans l'ordre, les réponses qu'on lui donne —
     une `OSError` se lève, comme un exécutable introuvable ; une commande de plus lève
-    `IndexError`. Il garde chaque commande reçue."""
+    `IndexError`, un programme sans réponses `KeyError`. Il garde chaque commande reçue."""
 
     def __init__(self, **reponses: list[Reply]) -> None:
         self.reponses = reponses
@@ -44,8 +45,8 @@ class Lanceur:
 @pytest.fixture
 def projet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Le dossier du projet, répertoire courant, hors de tout dépôt : `git` ne remonte pas
-    au-dessus de `tmp_path`. L'identité de l'auteur passe par l'environnement — la CI n'en a
-    pas."""
+    au-dessus de `tmp_path`. L'identité de l'auteur passe par l'environnement : elle ne dépend
+    ni de la configuration git du poste ni de celle de la CI."""
     dossier = tmp_path / "projet"
     dossier.mkdir()
     monkeypatch.chdir(dossier)
