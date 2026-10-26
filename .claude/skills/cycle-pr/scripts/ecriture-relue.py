@@ -614,10 +614,10 @@ def replace_lines(body: str, pairs: Sequence[Pair]) -> tuple[str, list[str], lis
     """Remplace, dans `body`, l'ancienne ligne de chaque paire par sa nouvelle — toutes, ou aucune.
 
     Une ligne se compare sous sa forme `bare_lines` ; son `\\r` final reste à l'écriture : les fins
-    de ligne ressortent telles qu'elles sont entrées. Une paire dont
-    l'ancienne ligne manque et dont la nouvelle est seule dans `body` est déjà appliquée : le rejeu
-    d'un fichier déjà poussé n'écrit rien. Borne : la nouvelle ligne déjà ailleurs dans `body`, la
-    paire s'applique, mais le rejeu trouve la nouvelle en double et refuse.
+    de ligne ressortent telles qu'elles sont entrées. Une paire dont l'ancienne ligne manque et
+    dont la nouvelle est seule dans `body` est déjà appliquée : le rejeu d'un fichier déjà poussé
+    n'écrit rien. Borne : la nouvelle ligne déjà ailleurs dans `body`, la paire s'applique, mais
+    le rejeu trouve la nouvelle en double et refuse.
 
     Returns:
         Le texte remplacé, les nouvelles lignes écrites (ancres de la relecture), et l'ancienne
@@ -657,18 +657,29 @@ def patch_text(run: Run, args: argparse.Namespace) -> str:
     remplace des lignes (`replace_lines`) — le fichier lu avant tout appel à la forge —, dans le
     texte que `args.locate` désigne (`edit_text`)."""
     if args.pairs:
-        edit = partial(replace_lines, pairs=read_pairs(args.pairs))
-        words = ("déjà appliquée", "ligne(s) remplacée(s)", "toutes les paires déjà appliquées")
-    else:
-        edit = partial(check_boxes, anchors=args.anchors)
-        words = ("déjà cochée", "case(s) cochée(s)", "aucune case à cocher")
-    return edit_text(run, args, edit, *words)
+        return edit_text(
+            run,
+            args,
+            partial(replace_lines, pairs=read_pairs(args.pairs)),
+            already="déjà appliquée",
+            written="ligne(s) remplacée(s)",
+            unchanged="toutes les paires déjà appliquées",
+        )
+    return edit_text(
+        run,
+        args,
+        partial(check_boxes, anchors=args.anchors),
+        already="déjà cochée",
+        written="case(s) cochée(s)",
+        unchanged="aucune case à cocher",
+    )
 
 
 def edit_text(
     run: Run,
     args: argparse.Namespace,
     edit: Callable[[str], tuple[str, list[str], list[str]]],
+    *,
     already: str,
     written: str,
     unchanged: str,
