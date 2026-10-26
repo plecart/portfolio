@@ -1,6 +1,6 @@
-# Standard de correction de bug
+# Standard de correction d'un bug de QA
 
-Utiliser ceci quand l'utilisateur a explicitement choisi l'option (c) « corriger en session » lors d'un échec de QA. Le flux par défaut est l'option (a) « déposer le bug via bug-vers-issue et continuer ». Ne pas se lancer dans des corrections en session par défaut.
+La session de QA ne corrige jamais : un échec se consigne (`SKILL.md` §4, option (a)), et sa correction passe par `cycle-pr`, dans sa propre session, sur l'issue consignée (option (c)). Ce standard vaut pour cette session `cycle-pr` quand elle corrige un bug trouvé en QA.
 
 ## Standard minimal
 
@@ -10,11 +10,10 @@ Utiliser ceci quand l'utilisateur a explicitement choisi l'option (c) « corrige
 4. Trouver la cause racine. Ne pas s'arrêter au symptôme.
 5. Ajouter ou mettre à jour un test ciblé qui échouerait avant la correction quand c'est faisable.
 6. Implémenter la plus petite correction architecturale propre — épouser la forme du module existant et la propriété.
-7. Exécuter les tests ciblés pour la correction.
-8. Exécuter les garde-fous pertinents — commandes `lint`, `typecheck`, `build` de
-   `.claude/pipeline.config.md`, en ignorant celles marquées `n/a`.
-9. Ré-exécuter l'action de QA exacte en échec. Confirmer le passage.
-10. Basculer la case du plan de QA et ajouter `— corrigé en session, <sha-commit>, <date>`.
+
+## La reprise de la case
+
+La case ne se rejoue pas dans la session qui a corrigé : elle se rejoue dans une session de QA — neuve, ou celle de la campagne réveillée par message —, une fois la correction mergée et l'issue fermée (`SKILL.md` §2, « La reprise »). Passée, elle bascule en `- [x]` avec ` — corrigé par #<PR>, <date>`.
 
 ## Inacceptable
 
@@ -32,14 +31,3 @@ Utiliser ceci quand l'utilisateur a explicitement choisi l'option (c) « corrige
 - Le comportement public existant est préservé sauf pour le bug.
 - Les erreurs restent exploitables pour les utilisateurs / opérateurs (pas d'avalement).
 - Les logs et l'état BD restent cohérents avec la réponse de l'API.
-
-## Quand s'arrêter et déposer à la place
-
-Arrêter la correction en session et revenir à `bug-vers-issue` si l'un de ces cas :
-
-- La correction touche plus d'un module architectural.
-- La correction nécessite une décision produit / de politique que l'utilisateur ne peut pas prendre en 30 secondes.
-- La correction nécessiterait une migration sur un état partagé / proche de la production.
-- La correction ferait déborder la campagne de QA au-delà d'une borne raisonnable.
-
-Dans ce cas, NE PAS laisser traîner des changements partiels en session. Soit les committer sur une branche de feature que l'utilisateur nomme, soit les annuler. Puis déposer via `bug-vers-issue` et continuer la QA.

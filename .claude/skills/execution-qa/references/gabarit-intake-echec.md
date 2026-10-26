@@ -1,6 +1,6 @@
 # Gabarit d'intake d'échec
 
-Utiliser ce gabarit dès qu'une case échoue. Le capturer dans la conversation. `bug-vers-issue` consomme la même structure quand l'utilisateur choisit l'option (a) « déposer maintenant ».
+Utiliser ce gabarit dès qu'une case échoue. L'intake s'**écrit** : en commentaire de l'issue du plan, publié par `comment <plan> --body-file` (`SKILL.md` §4, étape 2), ou, en mode de repli markdown, dans un fichier hors de tout worktree éphémère. La session `bug-vers-issue` distincte qui le consomme le reçoit en argument — son URL ou son chemin — quand l'utilisateur choisit l'option (a) « consigner maintenant » : elle ne lit rien d'autre de la session de QA.
 
 Les champs sans contenu pertinent sont supprimés, pas laissés vides. Ne jamais fabriquer une valeur.
 
