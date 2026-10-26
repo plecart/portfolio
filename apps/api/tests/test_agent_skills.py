@@ -4197,8 +4197,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         (
             "est `[x]` (ou explicitement ` — N/A : <raison>`), ou laissée `[ ]` avec ` — accepté :"
             " <décision>, <date>`. - Vérifier que chaque constat bloquant a un lien `🔴 BUG #N`"
-            " (consigné) ou une annotation ` — accepté : <décision>, <date>`. - Faire relancer par"
-            " le `releveur` les commandes finales listées dans le plan, après toute correction"
+            " (consigné), un ` — corrigé par #<PR>, <date>` (repris, §2) ou une annotation"
+            " ` — accepté : <décision>, <date>`. - Faire relancer par le `releveur` les commandes"
+            " finales listées dans le plan, après toute correction"
             " mergée. - Appliquer les dernières paires, dans un fichier neuf (§3, étape 5) : aucune"
             " décision ne reste hors de l'issue."
         ),
@@ -4229,8 +4230,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         EXECUTION_QA_SKILL,
         (
             "rassemblée par le `releveur`, est dans un commentaire de synthèse de phase publié par"
-            " `comment`, pas entassée en ligne. - [ ] Chaque échec a un lien `🔴 BUG #N` OU une"
-            " annotation reporté / accepté. - [ ] Le patch du bloc est appliqué et relu par le"
+            " `comment`, pas entassée en ligne. - [ ] Chaque échec a un lien `🔴 BUG #N`, un"
+            " ` — corrigé par #<PR>`, OU une annotation reporté / accepté. - [ ] Le patch du bloc"
+            " est appliqué et relu par le"
             " script ; aucune paire ne reste à appliquer. - [ ] L'Index des constats, qu'écrivent"
             " les sessions `bug-vers-issue`, porte chaque bug consigné dans cette phase."
         ),
