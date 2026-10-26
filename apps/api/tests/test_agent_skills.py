@@ -3973,9 +3973,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         CYCLE_PR_SKILL,
         (
             "`triage`, `interroge-moi`, `vers-prd`, `vers-issues`, `repercussions`,"
-            " `bug-vers-issue`, `plan-qa` et `execution-qa` les nomment ; le skill du lot 8 de #134"
-            " les nommera. Toute écriture qu'il ne fait pas reste sous la règle « Écritures sur un"
-            " artefact distant »"
+            " `bug-vers-issue`, `plan-qa`, `execution-qa` et `init-projet` (`depot create`,"
+            " `label create`) les nomment. Toute écriture qu'il ne fait pas reste sous la règle"
+            " « Écritures sur un artefact distant »"
         ),
     ),
     # Lot 7b2 de #134 (2026-10-26) : `execution-qa` délègue, son état est la forge, son échec
@@ -4818,6 +4818,32 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " sa propre session."
         ),
     ),
+    # Le commit suivant du même lot y renvoie les cinq autres skills qui lançaient `init-projet`
+    # sans configuration (`RETIRES_LANCER_INIT_PROJET`) : une entrée par phrase neuve, « s'arrêter »
+    # compris, et pour `cycle-pr` sa moitié « ne jamais deviner », sur une ligne réécrite.
+    "8b-cycle-pr-sans-config-propose-init-projet": (
+        CYCLE_PR_SKILL,
+        (
+            "Si le fichier est absent, s'arrêter et proposer une session `init-projet` distincte"
+            " (`init-projet`, « Note pour les autres skills ») ; ne jamais deviner une commande."
+        ),
+    ),
+    "8b-pr-paralleles-sans-config-propose-init-projet": (
+        PR_PARALLELES_SKILL,
+        "sinon s'arrêter et proposer une session `init-projet` distincte",
+    ),
+    "8b-triage-sans-config-propose-init-projet": (
+        TRIAGE_SKILL,
+        "sinon s'arrêter et proposer une session `init-projet` distincte",
+    ),
+    "8b-vers-issues-sans-config-propose-init-projet": (
+        VERS_ISSUES_SKILL,
+        "sinon s'arrêter et proposer une session `init-projet` distincte",
+    ),
+    "8b-vers-prd-sans-config-propose-init-projet": (
+        VERS_PRD_SKILL,
+        "sinon s'arrêter et proposer une session `init-projet` distincte",
+    ),
 }
 
 
@@ -5079,6 +5105,33 @@ def test_la_conversation_est_gardee_dans_chaque_fichier_des_skills_du_contexte_v
     }
 
     assert gardes == dossiers
+
+
+# Lot 8b de #134 (2026-10-26) : un skill sans configuration ne lance plus `init-projet` dans sa
+# propre session, il s'arrête et propose une session distincte (`init-projet`, « Note pour les
+# autres skills »). **Population** sur `0c408db`, base du lot, par la forme, sur le texte aux
+# espaces normalisés des `.md` de `.claude/`, de `CLAUDE.md` et de `CONTRIBUTING.md` —
+# `\w*lancer\b[^.;`]{0,25}`init-projet``, sans la casse : **7**, dont « relancer `init-projet` »
+# (`init-projet` étape 9, qui rejoue le même skill), hors classe — **6**, une entrée par fichier.
+# La forme s'ouvre sur une espace pour ne pas apparier « relancer » ; toutes rouges sur `0c408db`.
+RETIRES_LANCER_INIT_PROJET = {
+    "cycle-pr": (CYCLE_PR_SKILL, " lancer `init-projet`"),
+    "pr-paralleles": (PR_PARALLELES_SKILL, " lancer `init-projet`"),
+    "triage": (TRIAGE_SKILL, " lancer `init-projet`"),
+    "vers-issues": (VERS_ISSUES_SKILL, " lancer `init-projet`"),
+    "vers-prd": (VERS_PRD_SKILL, " lancer le skill `init-projet`"),
+    "init-projet": (INIT_PROJET_SKILL, " lancer `init-projet`"),
+}
+
+
+@pytest.mark.parametrize(
+    ("fichier", "forme"),
+    RETIRES_LANCER_INIT_PROJET.values(),
+    ids=RETIRES_LANCER_INIT_PROJET.keys(),
+)
+def test_un_skill_sans_configuration_ne_lance_plus_init_projet(fichier: str, forme: str) -> None:
+    """Une forme retirée qui reste écrite se rejoue : la session suit le texte, pas l'intention."""
+    assert not porte_la_forme(fichier, forme), f"`{fichier}` porte encore « {forme} »"
 
 
 # --- Les marques qui règlent une case de plan de QA (#134, lot 7b2) -----------------------------
