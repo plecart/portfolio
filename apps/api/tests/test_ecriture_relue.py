@@ -375,6 +375,300 @@ def test_brief_patch_refuse_sans_un_seul_commentaire_de_brief(
     assert motif in sortie_d_echec(capsys, "refus")
 
 
+def remplace(forge: Forge, tmp_path: Path, paires: str, texte: str = "checkbox") -> int:
+    """`<texte> patch 42 --paires` d'un fichier de paires de ce contenu, écrit en octets UTF-8."""
+    fichier = tmp_path / "paires.txt"
+    fichier.write_bytes(paires.encode())
+    return lance(forge, texte, "patch", "42", "--paires", str(fichier))
+
+
+# Un plan de QA : un titre, trois cases, dont une citée.
+PLAN = "## Phase 1\n\n- [ ] Critère A\n- [ ] Critère B\n> - [ ] Critère cité\n"
+
+# Le recueil du format d'un fichier de paires, côté valide (obs 138) : (fichier, corps écrit quand
+# on l'applique à `PLAN`). Une paire est une ligne ouverte par « < » puis une ligne ouverte par
+# « > », chacun suivi d'un espace, sans échappement ; une ligne vide ou de blancs s'ignore, et
+# chaque ligne du fichier perd son retour chariot final.
+PAIRES_VALIDES = {
+    "une-paire": (
+        "< - [ ] Critère A\n> - [x] Critère A — passé, 2026-10-26\n",
+        "## Phase 1\n\n- [x] Critère A — passé, 2026-10-26\n- [ ] Critère B\n> - [ ] Critère cité\n",
+    ),
+    "paires-separees-de-lignes-vides": (
+        (
+            "\n< - [ ] Critère A\n\n  \n> - [x] Critère A — N/A : hors périmètre\n\n"
+            "< - [ ] Critère B\n> - [ ] Critère B — BLOQUÉ : base absente\n\n"
+        ),
+        (
+            "## Phase 1\n\n- [x] Critère A — N/A : hors périmètre\n"
+            "- [ ] Critère B — BLOQUÉ : base absente\n> - [ ] Critère cité\n"
+        ),
+    ),
+    "fichier-crlf": (
+        "< - [ ] Critère B\r\n> - [x] Critère B — passé\r\n",
+        "## Phase 1\n\n- [ ] Critère A\n- [x] Critère B — passé\n> - [ ] Critère cité\n",
+    ),
+    "sans-fin-de-ligne-finale": (
+        "< - [ ] Critère A\n> - [x] Critère A",
+        "## Phase 1\n\n- [x] Critère A\n- [ ] Critère B\n> - [ ] Critère cité\n",
+    ),
+    "chevrons-sans-echappement": (
+        "< > - [ ] Critère cité\n> > - [x] Critère cité — 3 < 4\n",
+        "## Phase 1\n\n- [ ] Critère A\n- [ ] Critère B\n> - [x] Critère cité — 3 < 4\n",
+    ),
+}
+
+
+@pytest.mark.parametrize(("paires", "corps"), PAIRES_VALIDES.values(), ids=PAIRES_VALIDES.keys())
+def test_checkbox_patch_paires_remplace_chaque_ancienne_ligne_par_sa_nouvelle(
+    paires: str, corps: str, tmp_path: Path
+) -> None:
+    """Le témoin positif, et l'ordre : lire, écrire, relire le corps entier."""
+    forge = Forge({CORPS_42: {"body": PLAN}})
+
+    assert remplace(forge, tmp_path, paires) == 0
+    assert [json.loads(charge)["body"] for charge in forge.charges] == [corps]
+    patch = ("gh", "api", "-X", "PATCH", CORPS_42, "--input", "-")
+    assert forge.appels == [("gh", "api", CORPS_42), patch, ("gh", "api", CORPS_42)]
+
+
+# Le recueil, côté refusé : (fichier, motif qui suit « refus — <fichier> : »). Chaque défaut porte
+# le numéro de sa ligne dans le fichier, et tous sont nommés en une ligne.
+PAIRES_REFUSEES = {
+    "ligne-ni-vide-ni-paire": (
+        "< - [ ] Critère A\n> - [x] Critère A\nnote libre\n",
+        "ligne 3 : ni vide, ni « < … », ni « > … »",
+    ),
+    "chevrons-sans-espace": (
+        "<- [ ] Critère A\n>- [x] Critère A\n",
+        (
+            "ligne 1 : ni vide, ni « < … », ni « > … » ; ligne 2 : ni vide, ni « < … », ni « > … »"
+            " ; aucun couple dans le fichier"
+        ),
+    ),
+    "ancienne-suivie-d-une-ancienne": (
+        "< - [ ] Critère A\n< - [ ] Critère B\n> - [x] Critère B\n",
+        "ligne 1 : « < » sans « > » qui le suit",
+    ),
+    "ancienne-en-fin-de-fichier": (
+        "< - [ ] Critère A\n> - [x] Critère A\n< - [ ] Critère B\n",
+        "ligne 3 : « < » sans « > » qui le suit",
+    ),
+    "nouvelle-sans-ancienne": (
+        "< - [ ] Critère A\n> - [x] Critère A\n> - [x] Critère B\n",
+        "ligne 3 : « > » sans « < » qui le précède",
+    ),
+    "ancienne-vide": ("< \n> - [x] Critère A\n", "ligne 1 : ancienne ligne vide"),
+    "nouvelle-de-blancs": ("< - [ ] Critère A\n>    \n", "ligne 2 : nouvelle ligne vide"),
+    "paire-sans-changement": (
+        "< - [ ] Critère A\n> - [ ] Critère A\n",
+        "ligne 1 : ancienne et nouvelle lignes égales",
+    ),
+    "meme-ancienne-deux-fois": (
+        "< - [ ] Critère A\n> - [x] Critère A\n< - [ ] Critère A\n> - [x] Critère A — passé\n",
+        "ligne 3 : ancienne ligne déjà nommée ligne 1",
+    ),
+    "meme-nouvelle-deux-fois": (
+        "< - [ ] Critère A\n> - [x] Critère\n< - [ ] Critère B\n> - [x] Critère\n",
+        "ligne 4 : nouvelle ligne déjà nommée ligne 2",
+    ),
+    # Chaînées, les paires casseraient le rejeu : la nouvelle ligne de l'une y serait remplacée
+    # par l'autre.
+    "ancienne-qui-est-une-nouvelle-plus-haut": (
+        "< - [ ] Critère A\n> - [x] Critère A\n< - [x] Critère A\n> - [x] Critère A — passé\n",
+        "ligne 3 : ancienne ligne qui est la nouvelle de la ligne 2",
+    ),
+    "nouvelle-qui-est-une-ancienne-plus-haut": (
+        "< - [x] Critère A\n> - [x] Critère A — passé\n< - [ ] Critère A\n> - [x] Critère A\n",
+        "ligne 4 : nouvelle ligne qui est l'ancienne de la ligne 1",
+    ),
+    "fichier-vide": ("", "aucun couple dans le fichier"),
+    "lignes-de-blancs-seules": ("\n  \r\n", "aucun couple dans le fichier"),
+    "tous-nommes-dans-l-ordre-du-fichier": (
+        "note libre\n< - [ ] Critère A\n> - [ ] Critère A\n> - [x] Critère B\n",
+        (
+            "ligne 1 : ni vide, ni « < … », ni « > … » ; ligne 2 : ancienne et nouvelle lignes"
+            " égales ; ligne 4 : « > » sans « < » qui le précède"
+        ),
+    ),
+}
+
+
+@pytest.mark.parametrize(("paires", "motif"), PAIRES_REFUSEES.values(), ids=PAIRES_REFUSEES.keys())
+def test_un_fichier_de_paires_mal_forme_est_refuse_avant_tout_appel(
+    paires: str, motif: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    forge = Forge({CORPS_42: {"body": PLAN}})
+
+    assert remplace(forge, tmp_path, paires) == 1
+    assert forge.appels == []
+    assert sortie_d_echec(capsys, "refus") == f"refus — {tmp_path / 'paires.txt'} : {motif}"
+
+
+@pytest.mark.parametrize(
+    ("contenu", "motif"),
+    [("été".encode("cp1252"), "{fichier} n'est pas en UTF-8"), (None, "fichier illisible")],
+    ids=["non-utf-8", "fichier-absent"],
+)
+def test_un_fichier_de_paires_illisible_est_refuse_avant_tout_appel(
+    contenu: bytes | None, motif: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fichier = tmp_path / "paires.txt"
+    if contenu is not None:
+        fichier.write_bytes(contenu)
+    forge = Forge({CORPS_42: {"body": PLAN}})
+
+    assert lance(forge, "checkbox", "patch", "42", "--paires", str(fichier)) == 1
+    assert forge.appels == []
+    assert sortie_d_echec(capsys, "refus").startswith(f"refus — {motif.format(fichier=fichier)}")
+
+
+def test_checkbox_patch_paires_garde_le_retour_chariot_de_chaque_ligne_remplacee(
+    tmp_path: Path,
+) -> None:
+    """Une ligne du corps se compare sans son retour chariot final, qui reste à l'écriture : les
+    fins de ligne ressortent telles qu'elles sont entrées, ligne par ligne (obs 87, 106)."""
+    forge = Forge({CORPS_42: {"body": "Intro\r\n- [ ] Critère A\n- [ ] Critère B\r\n"}})
+    paires = "< - [ ] Critère A\n> - [x] Critère A — passé\n< - [ ] Critère B\n> - [x] Critère B\n"
+
+    assert remplace(forge, tmp_path, paires) == 0
+    assert [json.loads(charge)["body"] for charge in forge.charges] == [
+        "Intro\r\n- [x] Critère A — passé\n- [x] Critère B\r\n"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("corps", "ecrit", "sortie"),
+    [
+        (
+            "- [x] Critère A — passé\n- [ ] Critère B\n",
+            ["- [x] Critère A — passé\n- [x] Critère B — passé\n"],
+            (
+                "déjà appliquée : - [ ] Critère A\n"
+                "écrit et relu — corps de #42 : 1 ligne(s) remplacée(s)\n"
+            ),
+        ),
+        (
+            "- [x] Critère A — passé\n- [x] Critère B — passé\n",
+            [],
+            (
+                "déjà appliquée : - [ ] Critère A\ndéjà appliquée : - [ ] Critère B\n"
+                "rien à écrire — corps de #42 : toutes les paires déjà appliquées\n"
+            ),
+        ),
+    ],
+    ids=["une-neuve-une-deja-appliquee", "toutes-deja-appliquees"],
+)
+def test_une_paire_deja_appliquee_ne_se_reecrit_pas_et_le_dit(
+    corps: str, ecrit: list[str], sortie: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Le rejeu d'un fichier déjà poussé n'écrit rien : l'ancienne ligne absente et la nouvelle
+    seule dans le corps, la paire est déjà appliquée."""
+    forge = Forge({CORPS_42: {"body": corps}})
+    paires = (
+        "< - [ ] Critère A\n> - [x] Critère A — passé\n"
+        "< - [ ] Critère B\n> - [x] Critère B — passé\n"
+    )
+
+    assert remplace(forge, tmp_path, paires) == 0
+    assert [json.loads(charge)["body"] for charge in forge.charges] == ecrit
+    assert capsys.readouterr().out == sortie
+
+
+# Un plan où chaque refus d'application trouve sa ligne : une ligne proche de l'ancienne, une
+# ancienne en double, une nouvelle en double, et une case qu'une paire valide remplacerait.
+CORPS_EDITE = (
+    "## Phase 1\n\n"
+    "- [ ] L'utilisateur A liste ses ressources\n"
+    "- [ ] Le service répond\n"
+    "- [ ] Le service répond\n"
+    "- [x] La console reste propre\n"
+    "- [x] La console reste propre\n"
+    "- [ ] Le bouton se désactive\n"
+)
+
+# Une paire qui ne s'applique pas au corps lu : (fichier, motif exact). Tout ou rien — rien n'est
+# écrit, même quand d'autres paires s'appliquaient, et chaque paire en défaut est nommée.
+REFUS_D_APPLICATION = {
+    "ligne-introuvable-la-plus-proche-nommee": (
+        "< - [ ] L'utilisateur A liste ses propres ressources\n> - [x] Liste — 200\n",
+        (
+            "ligne introuvable : - [ ] L'utilisateur A liste ses propres ressources"
+            " (la plus proche : - [ ] L'utilisateur A liste ses ressources)"
+        ),
+    ),
+    "ligne-introuvable-sans-ligne-proche": (
+        "< Rien de commun, zzz\n> Rien\n",
+        "ligne introuvable : Rien de commun, zzz (aucune ligne proche)",
+    ),
+    "ancienne-en-double": (
+        "< - [ ] Le service répond\n> - [x] Le service répond\n",
+        "ligne en double (2) : - [ ] Le service répond",
+    ),
+    "nouvelle-en-double": (
+        "< - [ ] La console reste propre\n> - [x] La console reste propre\n",
+        "ligne en double (2) : - [x] La console reste propre",
+    ),
+    "un-refus-parmi-des-paires-valides": (
+        (
+            "< - [ ] Le bouton se désactive\n> - [x] Le bouton se désactive\n"
+            "< Rien de commun, zzz\n> Rien\n"
+        ),
+        "ligne introuvable : Rien de commun, zzz (aucune ligne proche)",
+    ),
+    "deux-refus-tous-deux-nommes": (
+        "< Rien de commun, zzz\n> Rien\n< - [ ] Le service répond\n> - [x] Le service répond\n",
+        (
+            "ligne introuvable : Rien de commun, zzz (aucune ligne proche)"
+            " ; ligne en double (2) : - [ ] Le service répond"
+        ),
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("paires", "motif"), REFUS_D_APPLICATION.values(), ids=REFUS_D_APPLICATION.keys()
+)
+def test_une_paire_qui_ne_s_applique_pas_refuse_tout_l_appel_sans_rien_ecrire(
+    paires: str, motif: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    forge = Forge({CORPS_42: {"body": CORPS_EDITE}})
+
+    assert remplace(forge, tmp_path, paires) == 1
+    assert forge.charges == [], "un PATCH est parti malgré le refus"
+    assert sortie_d_echec(capsys, "refus") == f"refus — {motif}"
+
+
+def test_brief_patch_paires_remplace_dans_le_commentaire_de_brief(tmp_path: Path) -> None:
+    """Le brief est le seul commentaire ouvert par `## Brief d'agent` : ni la citation qui le
+    nomme, ni le corps de l'issue ne sont touchés."""
+    pages = [[CITATION], [{"id": 13, "body": BRIEF}]]
+    forge = Forge({CORPS_42: {"body": "- [ ] Critère A\n"}}, pages=pages)
+
+    assert remplace(forge, tmp_path, "< - [ ] Critère A\n> - [x] Critère A — fait\n", "brief") == 0
+    assert [json.loads(charge)["body"] for charge in forge.charges] == [
+        "## Brief d'agent\n\n**Critères d'acceptation :**\n- [x] Critère A — fait\n- [ ] Critère B\n"
+    ]
+    assert ecritures(forge) == [("gh", "api", "-X", "PATCH", BRIEF_DE_42, "--input", "-")]
+
+
+def test_checkbox_patch_paires_sort_en_1_si_la_ligne_ecrite_manque_a_la_relecture(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """La relecture cherche chaque nouvelle ligne écrite, et compare le corps entier."""
+    forge = Forge(
+        {CORPS_42: {"body": "- [ ] Critère A\n- [ ] Critère B\n"}},
+        stocke=lambda corps: corps.replace("- [x] Critère A — passé\n", ""),
+    )
+
+    assert remplace(forge, tmp_path, "< - [ ] Critère A\n> - [x] Critère A — passé\n") == 1
+    ecart = (
+        "ancre absente : - [x] Critère A — passé ; attendu 45 octets et 0 \\r,"
+        " relu 17 octets et 0 \\r"
+    )
+    assert capsys.readouterr().out == f"relecture non conforme — {ecart}\n"
+
+
 def ecrit_brief(forge: Forge, tmp_path: Path, contenu: str) -> int:
     """`brief write 42` d'un fichier de ce contenu, écrit en octets UTF-8."""
     brief = tmp_path / "brief.md"
@@ -1095,11 +1389,12 @@ def test_milestone_refuse_sans_rien_ecrire(
 
 @pytest.fixture
 def ajout_md(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Les fichiers `ajout.md` et `brief.md` que citent les appels nommés ci-dessous, dans un
-    répertoire courant neuf."""
+    """Les fichiers `ajout.md`, `brief.md` et `paires.txt` que citent les appels nommés
+    ci-dessous, dans un répertoire courant neuf."""
     monkeypatch.chdir(tmp_path)
     Path("ajout.md").write_bytes(b"*Rattachement.*\n")
     Path("brief.md").write_bytes("## Brief d'agent\n\n- [ ] Critère révisé\n".encode())
+    Path("paires.txt").write_bytes("< - [ ] Critère A\n> - [x] Critère A — passé\n".encode())
 
 
 def forge_temoin(**options: Any) -> Forge:
@@ -1132,6 +1427,8 @@ CREE_THEME = ("milestone", "attach", "42", "--title", "Facturation", "--descript
 FERME_THEME = ("milestone", "close", "--title", "Archives")
 COCHE_CORPS = ("checkbox", "patch", "42", "--case", "Critère A")
 COCHE_BRIEF = ("brief", "patch", "42", "--case", "Critère A")
+ANNOTE_CORPS = ("checkbox", "patch", "42", "--paires", "paires.txt")
+ANNOTE_BRIEF = ("brief", "patch", "42", "--paires", "paires.txt")
 AJOUTE_FICHIER = ("issue", "edit", "42", "--append", "ajout.md")
 PUBLIE_COMMENTAIRE = ("comment", "42", "--body-file", "ajout.md")
 REMPLACE_CORPS = ("issue", "edit", "42", "--body-file", "ajout.md")
@@ -1147,6 +1444,8 @@ REJEUX = [
     pytest.param(FERME_THEME, None, 0, id="milestone-close"),
     pytest.param(COCHE_CORPS, None, 0, id="checkbox-patch"),
     pytest.param(COCHE_BRIEF, None, 0, id="brief-patch"),
+    pytest.param(ANNOTE_CORPS, None, 0, id="checkbox-patch-paires"),
+    pytest.param(ANNOTE_BRIEF, None, 0, id="brief-patch-paires"),
     pytest.param(AJOUTE_FICHIER, None, 0, id="issue-edit-append"),
     pytest.param(PUBLIE_COMMENTAIRE, None, 0, id="comment"),
     pytest.param(CREE_ISSUE_ETIQUETEE, None, 0, id="issue-create"),
@@ -1154,6 +1453,8 @@ REJEUX = [
     pytest.param(ECRIT_BRIEF, None, 0, id="brief-write"),
     pytest.param(COCHE_CORPS, crlf, 1, id="checkbox-patch-forge-crlf"),
     pytest.param(COCHE_BRIEF, crlf, 1, id="brief-patch-forge-crlf"),
+    pytest.param(ANNOTE_CORPS, crlf, 1, id="checkbox-patch-paires-forge-crlf"),
+    pytest.param(ANNOTE_BRIEF, crlf, 1, id="brief-patch-paires-forge-crlf"),
     pytest.param(
         AJOUTE_FICHIER,
         crlf,
@@ -1244,9 +1545,14 @@ def test_une_sous_commande_rejouee_a_l_identique_n_ecrit_rien_la_seconde_fois(
     rattachée, un thème déjà fermé —, chacune vue rouge garde retirée ; le rejeu d'une création
     de thème a son propre test, sa première passe écrivant deux fois.
 
-    Les cases se relisent cochées, le label absent ou posé, l'issue fermée, rattachée, le thème
-    fermé, le commentaire publié, l'issue créée, le corps remplacé, le brief écrit : les 14 autres
-    n'écrivent rien au rejeu.
+    Au lot 7b, `checkbox patch --paires` et `brief patch --paires` naissent avec leur garde — une
+    paire dont l'ancienne ligne manque et dont la nouvelle est seule dans le texte est déjà
+    appliquée —, vue rouge garde retirée, sur les deux forges : la ligne se compare sans son
+    retour chariot final, et la forge qui convertit en CRLF n'y fuit pas. 23 formes.
+
+    Les cases se relisent cochées, les lignes remplacées, le label absent ou posé, l'issue fermée,
+    rattachée, le thème fermé, le commentaire publié, l'issue créée, le corps remplacé, le brief
+    écrit : les 18 autres n'écrivent rien au rejeu.
     """
     forge = forge_temoin() if stocke is None else forge_temoin(stocke=stocke)
 
@@ -1495,6 +1801,9 @@ APPELS_MAL_FORMES = {
     "action-manquante": ("checkbox", "42", "--case", "A"),
     "action-inconnue": ("brief", "edit", "42", "--case", "A"),
     "case-manquante": ("checkbox", "patch", "42"),
+    "brief-ni-case-ni-paires": ("brief", "patch", "42"),
+    "case-et-paires": ("checkbox", "patch", "42", "--case", "A", "--paires", "x.txt"),
+    "paires-sans-fichier": ("brief", "patch", "42", "--paires"),
     "numero-manquant": ("checkbox", "patch", "--case", "A"),
     "numero-non-entier": ("checkbox", "patch", "quarante-deux", "--case", "A"),
     "chiffre-unicode": ("brief", "patch", "4²", "--case", "A"),
