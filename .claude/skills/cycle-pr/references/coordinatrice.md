@@ -42,7 +42,8 @@ barème du point 3 met à `max`, le geste tombant avant tout enfant. Dans ce tou
    `/effort` en cours de session sur le cache n'est pas mesuré) : `high` par défaut, `max` si le
    bloc du lot porte un ADR, une surface de sécurité ou un contrat entre piles, `medium` pour un
    lot de doc ou de config seule ; `model` omis quand la coordinatrice est en Opus 5.5,
-   `claude-opus-5-5` si elle est au-dessus.
+   `claude-opus-5-5` si elle est au-dessus. La forme démarrée à son ouverture remplace ce geste
+   (« La session de lot »).
 
 Le brief d'une session de lot porte : le bloc du lot dans le corps de l'issue, l'effort retenu, la
 branche d'intégration, son lead, et la consigne « porte le cycle complet et délègue le code »
@@ -81,7 +82,8 @@ deux cas, sans ouvrir de lot : jamais de force-push sur la branche d'intégratio
 n'est pas la sienne.
 
 Puis seulement, par `SendMessage` à la session du lot k+1 : « ouvre le lot <k+1>/<n> —
-passation : <chemin> ». Inactive depuis le go, elle reprend sur ce message (`sessions-liees.md`,
+passation : <chemin> » ; la forme démarrée à son ouverture remplace ce message (« La session de
+lot »). Inactive depuis le go, elle reprend sur ce message (`sessions-liees.md`,
 « Messages »). Dans l'autre sens, un message de lot arrivé pendant un tour de la coordinatrice
 attend la fin de ce tour (même référence) : c'est une raison de plus pour qu'entre deux lots,
 elle reste inactive.
@@ -96,27 +98,47 @@ merge »).
 
 ## La session de lot
 
+Elle démarre de deux façons : **pré-démarrée** au go du découpage (« Au go du découpage »,
+point 3), elle attend le message « ouvre » ; **démarrée à son ouverture**, sur décision du
+mainteneur, elle naît après le merge du lot précédent. La coordinatrice prépare alors le worktree
+git frère `<dossier du clone>--<N>-<k>` sur la tête à jour de la branche d'intégration, et le
+fichier de démarrage qui lui tient lieu de brief — identité, go, mesures, fin —,
+`passations/<date>-issue-<N>-lot-<k>-demarrage.md` au dossier de passation (`sessions-liees.md`,
+« Passation ») ; puis elle appelle `start_session` — `cwd` : ce dossier, `use_worktree: false`,
+effort du barème du point 3, `context: fresh`, `wake_when_done: true` — dans le premier tour
+ouvert par un message du mainteneur, seul geste humain qui reste (« Au go du découpage », premier
+paragraphe). Précédent mesuré : les lots 5 à 8 de #134 (journal de spec, 2026-10-21).
+
 Ce que le brief de la coordinatrice change au cycle de `cycle-pr` :
 
 - **Premier geste**, au message « ouvre » — à la lecture de son brief pour le premier lot non
   mergé — et pas avant :
   `git fetch origin && git checkout -b <type>/<slug>-lot-<k> --no-track origin/<type>/<slug>`
   (`sessions-liees.md`, « Premier geste », la base étant la branche d'intégration). Chaque lot a
-  donc son worktree neuf ; la branche mergée d'un lot n'est jamais un point de départ.
+  donc son worktree neuf ; la branche mergée d'un lot n'est jamais un point de départ. Puis ses
+  outils (obs 131) : l'outil Skill et la liste des rôles servent leur version du démarrage de la
+  session. Démarrée à son ouverture sur la tête à jour, elle les a à jour ; pré-démarrée, elle lit
+  `git diff <SHA de son démarrage>..HEAD -- .claude/ CLAUDE.md` et les sections touchées par
+  `Read`, et passe un rôle modifié dans le brief de son sous-agent.
 - **La base de la PR** : partout où `cycle-pr` mesure contre le trunk ce que la PR apporte — gabarit
   (3.5), diff holistique (4.1), plage du relecteur (4.2), base de branche et verdict (Étape 7) —,
   le trunk, `main` comme `origin/main`, se lit `origin/<type>/<slug>`. Contre le trunk, chaque
   mesure compterait les lots déjà mergés.
-- **Le go du briefing est humain, dans la fenêtre de la session de lot** : elle y démarre sa
-  session de relecture, et `start_session` ne part que dans un tour du mainteneur (« Au go du
-  découpage », premier paragraphe). Elle s'arrête donc toujours à son Étape 1 — une `[V]` ou un
-  écart avec le bloc du lot se posent au même go — et prévient la coordinatrice : « bloquant :
-  go humain requis dans cette fenêtre — session de relecture à démarrer », sa note de fin de tour
-  n'étant pas un signal. Le go conditionnel de #107 (décision 5) a pris fin avec la session de
-  relecture (#134, lot 3).
-- **Sa session de relecture** : la session de lot la démarre à son go, en est le parent et la
+- **Le go du briefing est humain, dans la fenêtre de la session de lot, ou délégué à la
+  coordinatrice** quand le mainteneur le lui accorde, relayé par le fichier de démarrage et
+  valable seulement pour un briefing sans `[V]`, sans écart au bloc du lot et sans `[C]`. Hors de
+  ce cas, la session s'arrête à son Étape 1. Sur un go délégué, elle pose la question au mainteneur
+  dans la fenêtre du lot et prévient la coordinatrice : « bloquant : [V] en attente dans cette
+  fenêtre ». Sur un go humain, une `[V]` ou un écart avec le bloc du lot se posent au même go, et
+  elle prévient la coordinatrice : « bloquant : go humain requis dans cette fenêtre — session de
+  relecture à démarrer ». Sa note de fin de tour n'est pas un signal. Le go conditionnel de #107
+  (décision 5) a pris fin avec la session de relecture (#134, lot 3).
+- **Sa session de relecture** : la session de lot la démarre à son go humain, en est le parent et la
   nettoie à son Étape 8 ([session-relecture.md](session-relecture.md)) — jamais la coordinatrice,
-  qui serait réveillée à chaque fin de tour de la session de relecture pour rien.
+  qui serait réveillée à chaque fin de tour de la session de relecture pour rien. Au go délégué,
+  sans tour du mainteneur, la relecture passe par le repli sous-agent `relecteur`
+  (`session-relecture.md`, « Repli »), sauf si un tour humain s'ouvre dans la fenêtre du lot avant
+  la passe : il démarre alors la session de relecture.
 - **Sa PR** vise la branche d'intégration ; son body s'ouvre par
   « En vol pour #<N> (lot <k>/<n>) », sans `Closes`.
 - **La vérification d'avant-go** : la session lance elle-même son `verificateur` (`cycle-pr`
@@ -158,6 +180,10 @@ d'un relais — se fait une fois, après ce merge, sur un seul accord du mainten
 demande (`sessions-liees.md`, « Nettoyage »).
 
 ## Repli — la passation manuelle
+
+Pour une session démarrée à son ouverture (« La session de lot »), `start_session` refusé ou
+aucun tour du mainteneur qui vienne, la coordinatrice lui demande d'ouvrir un tour par un message,
+le seul geste humain, et seulement s'il ne le peut pas, la voie manuelle ci-dessous reprend.
 
 Si la coordinatrice ne peut pas ouvrir un lot — `start_session` refusé au go, session de lot
 disparue de `list_sessions`, message qui n'arrive pas —, la frontière reprend la voie manuelle :
