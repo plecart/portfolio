@@ -1798,8 +1798,8 @@ def test_depot_create_reconnait_le_depot_sous_ses_formes_equivalentes(
 @pytest.mark.parametrize(
     ("options", "motif"),
     [
-        ({"repertoire": "hors-depot"}, "hors d'un dépôt git"),
-        ({"repertoire": "dans-git-dir"}, "hors d'un dépôt git"),
+        ({"repertoire": "hors-depot"}, "hors de l'arbre de travail d'un dépôt git"),
+        ({"repertoire": "dans-git-dir"}, "hors de l'arbre de travail d'un dépôt git"),
         (
             {"remotes": {"origin": "https://github.com/plecart/ancien.git"}},
             "le remote origin existe déjà : https://github.com/plecart/ancien.git",
@@ -1866,7 +1866,7 @@ DEPOTS_RELUS_NON_CONFORMES: dict[str, tuple[Callable[[Forge], None], str]] = {
     ),
     "origin-absent": (
         lambda forge: forge.remotes.clear(),
-        f"origin relu None, attendu {VITRINE} ou {VITRINE_SSH}",
+        f"origin absent, attendu {VITRINE} ou {VITRINE_SSH}",
     ),
 }
 
