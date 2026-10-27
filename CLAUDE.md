@@ -137,8 +137,8 @@ aux sessions.
 contexte (mesuré le 2026-10-20 sur un `developpeur`, Notes de la PR #139) : jamais un équipier
 neuf pour une retouche de la même tranche, un neuf au bloc suivant.
 
-**Une commande ponctuelle se lance soi-même, et sous 50 lignes de diff, la session code
-elle-même** (`cycle-pr` 3.1). Un équipier démarre à son plancher ; le déléguer
+**Une commande ponctuelle se lance soi-même, et sous 50 lignes de diff sans module ajouté, la
+session code elle-même** (`cycle-pr` 3.1). Un équipier démarre à son plancher ; le déléguer
 coûte plus qu'un `git status` ou un test isolé. La délégation ne paie que pour un **bloc de
 travail** — une tranche d'issue, une suite à faire passer au vert, une cartographie : à partir de
 2 appels pour Haiku ou Sonnet, de 4 pour Opus (calculé, même étude, §15.7 ; non mesuré en

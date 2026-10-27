@@ -2764,10 +2764,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "contributing-developpeur-relecteur-cleanup": (
         "CONTRIBUTING.md",
         (
-            "un `developpeur` neuf par bloc : TDD red-green-refactor, cycle `modif → test → cleanup"
-            " → test → commit` (relecture à contexte vierge au socle, par la session de relecture que"
-            " la session PR démarre à son go) → cleanup holistique par un `developpeur` neuf →"
-            " relecture à contexte vierge finale, par la même session"
+            "un `developpeur` neuf par bloc de plus de ~50 lignes : TDD red-green-refactor, cycle"
+            " `modif → test → cleanup → test → commit` (relecture à contexte vierge au socle, par la"
+            " session de relecture que la session PR démarre à son go) → cleanup holistique par un"
+            " `developpeur` neuf au-delà de 3 commits ou 150 lignes → relecture à contexte vierge"
+            " finale, par la même session"
         ),
     ),
     "contributing-verificateur": (
@@ -4968,9 +4969,19 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         CYCLE_PR_SKILL,
         (
             "Elle **remplace** les Étapes 1, 2, 5, 7 et 8 ; les Étapes 3 et 6 s'appliquent telles"
-            " quelles, la session codant elle-même (3.1), l'Étape 4 sous la forme du point 3."
+            " quelles — 3.2 et 3.4 réduits au `lint` et au test ciblé —, la session codant"
+            " elle-même (3.1), l'Étape 4 sous la forme du point 3."
         ),
     ),
+    "voie-courte-conditions-d-entree": (
+        CYCLE_PR_SKILL,
+        (
+            "dont le diff attendu tient en **≤ 50 lignes et ≤ 3 fichiers**, sans zone sensible ni"
+            " surface visible (`.claude/pipeline.config.md`, « Périmètre ») et sans toucher"
+            " `.claude/`, emprunte cette voie."
+        ),
+    ),
+    "voie-courte-go-humain": (CYCLE_PR_SKILL, "puis go humain, puis"),
     "7c-cycle-pr-fumee-petite-pr-avant-le-brouillon": (
         CYCLE_PR_SKILL,
         (
@@ -5141,7 +5152,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         (
             "Un correctif évident — visible à la lecture, sans décision de comportement"
             " (`contraintes.md`, barreau 3) — n'a rien à interroger : sa qualification, écrite"
-            " dans le body de la draft avec sa preuve, en tient lieu."
+            " dans le body de la PR — draft, ou PR de la voie courte — avec sa preuve, en tient lieu."
         ),
     ),
     "7c-cycle-pr-marqueur-de-la-petite-pr": (
@@ -7109,7 +7120,7 @@ RENVOIS_AUX_BARREAUX = {
     CONTRAINTES_RULE: [4],
     BUG_VERS_ISSUE_SKILL: [1, 3],
     CONTRADICTION_SKILL: [2, 4],
-    CYCLE_PR_SKILL: [3, 3],
+    CYCLE_PR_SKILL: [3, 2, 3, 2],
     "CONTRIBUTING.md": [3],
     REPERCUSSIONS_SKILL: [4],
     VERS_ISSUES_SKILL: [4],
