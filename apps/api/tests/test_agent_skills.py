@@ -7070,13 +7070,15 @@ def test_un_controle_de_proprete_par_git_status_voit_les_fichiers_non_suivis() -
 # --- Les renvois aux barreaux de « Création d'issues en cours de cycle » (#134, lot 7c) ----------
 
 SECTION_DES_BARREAUX = "## Création d'issues en cours de cycle"
-RENVOI_DE_BARREAU = re.compile(r"\bbarreaux? \d+(?:(?:, | ou | et )\d+)*")
+RENVOI_DE_BARREAU = re.compile(r"\bbarreaux? \d+(?:(?:, | ou | et | à )\d+)*", re.IGNORECASE)
 # Le recueil du motif, des deux côtés (obs 138), en littéraux (obs 80) : le texte, puis les numéros
 # qu'il cite.
 RENVOI_DE_BARREAU_FORMES: dict[str, tuple[str, list[int]]] = {
     "un-numero": ("par le barreau 4 porte", [4]),
     "deux-numeros": ("barreau 2 ou 4, le brouillon", [2, 4]),
     "enumeration": ("les barreaux 1, 2 et 4", [1, 2, 4]),
+    "plage": ("les barreaux 2 à 4", [2, 4]),
+    "majuscule": ("Barreau 3 :", [3]),
     "premier-barreau-hors-classe": ("au **premier barreau qui tient**", []),
     "barreau-par-barreau-hors-classe": ("appliquer la règle barreau par barreau", []),
 }
