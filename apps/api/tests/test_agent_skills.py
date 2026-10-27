@@ -3730,8 +3730,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             "prévenir le parent par le message de fin de la même référence (« Fin de travail »),"
             " « terminé — <livrable> », le livrable nommant la classe : « BUG #<N> consigné »,"
             " « attendu faux, case réécrite », « environnement, case à rejouer », « correctif"
-            " évident, petite PR proposée » ou « correctif évident, rendu à ta PR : <correctif> »"
-            " — la fin du tour ne le prévient pas"
+            " évident, petite PR proposée », « correctif évident, confié à #<K> » ou « correctif"
+            " évident, rendu à ta PR : <correctif> » — la fin du tour ne le prévient pas"
         ),
     ),
     "6b2-bug-vers-issue-la-qa-reprend": (BUG_VERS_ISSUE_SKILL, "la QA reprend dans sa session"),
@@ -5003,7 +5003,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "7c-bug-vers-issue-case-par-le-script": (
         BUG_VERS_ISSUE_SKILL,
-        "la réécriture d'une case ou de son marqueur (`checkbox patch --paires`, étape 1)",
+        (
+            "la réécriture d'une case ou de son marqueur (`checkbox patch --paires`, étape 1), le"
+            " critère confié à une issue ouverte (`issue edit <K> --body-file`, étape 1) ;"
+        ),
     ),
     "7c-bug-vers-issue-demarre-la-petite-pr": (
         BUG_VERS_ISSUE_SKILL,
@@ -5057,7 +5060,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # geste (« démarrée par », « parent », « née d' » sur les lignes ajoutées du delta, obs 139),
     # écrite avant le correctif : **5** branches, **1** fuyait, celle-ci ; indemnes, les 3 du message
     # de fin, dont le prédicat est l'identité (`sessions-liees.md`, « Fin de travail »), et la draft
-    # de `cycle-pr` Étape 2, conditionnée sur sa case.
+    # de `cycle-pr` Étape 2, conditionnée sur sa case. Passe 2, I3 : renvois « la forme que prévoit
+    # l'étape N » ou « comme à l'étape N » du delta, **2**, **1** fuyait, la forme du barreau 2.
     "7c-bug-vers-issue-correctif-evident": (
         BUG_VERS_ISSUE_SKILL,
         (
@@ -5066,10 +5070,15 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " lisiblement. La PR du parent encore ouverte, et le correctif y tient en moins d'un"
             " commit (« Création d'issues en cours de cycle », barreau 1) : il lui retourne, par le"
             " message de fin. Sinon, avant toute petite PR, la recherche du propriétaire de"
-            " l'étape 3, collecte du `releveur` : une issue ouverte ou une automatisation qui"
-            " possède le sujet reçoit le correctif, sous la forme que prévoit l'étape 3"
-            " (barreau 2). Sans propriétaire seulement, une petite PR par `cycle-pr` (« Demande"
-            " directe sans issue », barreau 3), dans sa propre session :"
+            " l'étape 3, collecte du `releveur`. Une issue ouverte #<K> qui possède le sujet reçoit"
+            " le correctif en critère (barreau 2) : son corps, lu par la session elle-même comme à"
+            " l'étape 7, édité avec sa ligne de journal — jamais un commentaire — par `python"
+            " .claude/skills/cycle-pr/scripts/ecriture-relue.py issue edit <K> --body-file"
+            " <fichier>`, qui le relit ; piloté par un plan, ` 🔴 needs-issue — …` devient"
+            " ` 🔴 BUG #<K>` par une paire, que la reprise rejoue à la fermeture de #<K> par une PR."
+            " Une issue fermée n'est pas un propriétaire ; une automatisation qui possède le sujet"
+            " se répare par la petite PR. Sans issue ouverte qui le possède, une petite PR par"
+            " `cycle-pr` (« Demande directe sans issue », barreau 3), dans sa propre session :"
         ),
     ),
     "7c-bug-vers-issue-correctif-evident-sans-issue": (
@@ -5232,8 +5241,9 @@ def test_chaque_fermeture_d_issue_retire_son_etat(fichier: str) -> None:
 # `gh issue edit --body-file`, l'une des 11, et sa mention ETag, l'un des 12 — : `execution-qa`
 # patche par `checkbox patch --paires`, dont le script lit lui-même le corps courant, hors classe
 # comme `issue_append`, et que le geste ne compte pas. Même commande après sa prose : **21** blocs,
-# 10 réécritures et 11 autres.
+# 10 réécritures et 11 autres. Lot 7c : +1, le critère confié à une issue ouverte — **22**.
 REECRITURES_DE_CORPS = {
+    "bug-vers-issue-correctif-evident-lu-par-la-session": BUG_VERS_ISSUE_SKILL,
     "bug-vers-issue-delegation-renvoi": BUG_VERS_ISSUE_SKILL,
     "bug-vers-issue-etape-7-lu-par-la-session": BUG_VERS_ISSUE_SKILL,
     "bug-vers-issue-erreurs-courantes-renvoi": BUG_VERS_ISSUE_SKILL,
