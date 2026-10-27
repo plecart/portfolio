@@ -1,6 +1,6 @@
 /**
  * Les cartes de la table, en logique pure : leur ordre (spec §1.9), les technologies qu'elles
- * montrent (§1.4) et leur pose (§1.3, §4.1).
+ * montrent (§1.4), leur pose (§1.3, §4.1) et l'empreinte qui la tire.
  */
 import { describe, expect, test } from 'vitest'
 import { buildProject, FILES_ORIGIN, PROJECT_SETS, type Project } from '../e2e/projects.ts'
@@ -223,6 +223,8 @@ describe('la pose de la carte', () => {
     })
   })
 
+  // Population figée : sur 1000 slugs projet-N, 32 paires de poses coïncident (mesuré le
+  // 2026-10-27) ; l'unicité n'est pas une propriété de la pose.
   test("varie d'un projet à l'autre", () => {
     const poses = new Set(SLUGS.map((slug) => JSON.stringify(cardPose(slug))))
     expect(poses.size).toBe(SLUGS.length)
