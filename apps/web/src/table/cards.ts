@@ -84,11 +84,14 @@ export function cardTechnologies(technologies: readonly Technology[]): Technolog
     .slice(0, CARD_TECHNOLOGY_COUNT)
 }
 
-/** L'empreinte FNV-1a sur 32 bits d'un texte, caractère par caractère, en entier non signé. */
+/**
+ * L'empreinte FNV-1a sur 32 bits d'un texte, par unité de code UTF-16 — l'octet lui-même pour un
+ * slug, ASCII —, en entier non signé.
+ */
 function fnv1a(text: string): number {
   let hash = FNV_OFFSET_BASIS
-  for (const char of text) {
-    hash ^= char.charCodeAt(0)
+  for (let index = 0; index < text.length; index++) {
+    hash ^= text.charCodeAt(index)
     hash = Math.imul(hash, FNV_PRIME)
   }
   return hash >>> 0
