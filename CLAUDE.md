@@ -67,8 +67,8 @@ en amont de l'écriture, le prompt de relecture après. L'un ne dispense pas de 
 
 ## Observation continue (`task-observer`)
 
-Invoquer le skill `task-observer` au début d'une session **longue ou structurée** — un cycle de PR,
-un audit, une passe de spec. Pas pour une question, une commande isolée ou un correctif court.
+Invoquer le skill `task-observer` **sur demande du mainteneur** — jamais d'office au début d'un
+cycle de PR, d'un audit ou d'une passe de spec ; son coût résident se paie à chaque tour.
 **Seule une session** l'invoque et tient le plafond ci-dessous ; un sous-agent remonte ses
 observations candidates dans son rapport, et la session qui l'a lancé décide de les consigner.
 
@@ -76,7 +76,9 @@ observations candidates dans son rapport, et la session qui l'a lancé décide d
 une règle violée de façon répétée, une correction de l'utilisateur qui se généralise, un manque
 rencontré sur plusieurs sessions. Une friction isolée ne se consigne pas. **Maximum 3 entrées par
 cycle** — une PR, relais compris, la passation de relais portant le compte déjà écrit ; hors PR,
-une session. Au-delà, ne garder que les plus fortes.
+une session. Au-delà, ne garder que les plus fortes. **Plafond de 10 entrées OPEN** dans le
+journal : au-delà, la prochaine entrée s'écrit après une revue qui en ferme au moins autant. Une
+revue se fait par thème — un skill —, jamais entrée par entrée.
 
 **Ne jamais interrompre pour le journal.** Pas de proposition de revue spontanée, pas de résumé
 d'observations en fin de session, pas de relance sur le retard de revue. Le journal ne se surface
@@ -135,7 +137,8 @@ aux sessions.
 contexte (mesuré le 2026-10-20 sur un `developpeur`, Notes de la PR #139) : jamais un équipier
 neuf pour une retouche de la même tranche, un neuf au bloc suivant.
 
-**Une commande ponctuelle se lance soi-même.** Un équipier démarre à son plancher ; le déléguer
+**Une commande ponctuelle se lance soi-même, et sous 50 lignes de diff, la session code
+elle-même** (`cycle-pr` 3.1). Un équipier démarre à son plancher ; le déléguer
 coûte plus qu'un `git status` ou un test isolé. La délégation ne paie que pour un **bloc de
 travail** — une tranche d'issue, une suite à faire passer au vert, une cartographie : à partir de
 2 appels pour Haiku ou Sonnet, de 4 pour Opus (calculé, même étude, §15.7 ; non mesuré en

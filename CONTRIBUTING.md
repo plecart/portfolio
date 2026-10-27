@@ -285,13 +285,15 @@ Chaque maillon nomme qui l'exécute ; la répartition des rôles est dans `CLAUD
    de bord — le go reste humain, dans la fenêtre de la PR). Trop peu d'issues prêtes : son étape 0
    ouvre d'abord une session de triage et d'interrogatoire par issue, puis se termine sur la liste
    des issues prêtes et une carte « démarrer la vague » : un lead neuf la conduit — préparer et
-   conduire sont deux sessions.
+   conduire sont deux sessions. Correctif évident (`contraintes.md`, barreau 3) : la **voie
+   courte** de `cycle-pr`, sans issue ni draft, une passe de relecture, un go.
 3bis. **Amender** — `contradiction`, lancé par la session de dialogue dès qu'une de ses décisions
    contredit une source de vérité (section « Sources de vérité » de
    `.claude/pipeline.config.md`) : le document est amendé par la session de dialogue qui a décidé,
    ou la décision est abandonnée — ou son effet déplacé hors de ce que le document affirme.
    Déclenché par la règle `decisions-vs-doc`, à n'importe quel moment.
-4. **Répercuter** — `repercussions` après chaque merge : confronte d'abord le delta aux sources de
+4. **Répercuter** — `repercussions` après chaque merge qui ferme une issue ou touche une source
+   de vérité : confronte d'abord le delta aux sources de
    vérité (un § falsifié → `contradiction`), puis corrige la spec — corps et brief d'agent —
    des issues dont la planification est devenue fausse. Porté par la session PR en fin de
    `cycle-pr` — collecte au `releveur`, go d'édition au mainteneur dans sa fenêtre ; pour une issue

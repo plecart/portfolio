@@ -112,8 +112,8 @@ Quelle que soit la voie :
      automatisation qui possède le sujet (bot, workflow planifié) se répare, elle ne se doublonne
      pas ;
   3. **un correctif évident** — visible à la lecture des lignes, sans décision de comportement —
-     hors du périmètre de la PR courante → une **petite PR** par `cycle-pr` (« Demande directe
-     sans issue »), sans issue ;
+     hors du périmètre de la PR courante → une **petite PR** par la **voie courte** de `cycle-pr`,
+     sans issue ;
   4. **sinon** → un **brouillon** par `bug-vers-issue` ou `vers-issues`, montré au mainteneur, qui
      décide. Jamais de `gh issue create` sans ce brouillon validé.
 - Une issue ouverte par le barreau 4 porte **dès sa création** son gabarit, sa catégorie et son
