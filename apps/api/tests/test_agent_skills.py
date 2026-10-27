@@ -772,9 +772,7 @@ def test_ni_un_role_fictif_ni_la_liste_d_init_projet_ne_comptent_pour_une_citati
     assert skills_citing("fantome") == []
     # `init-projet` ne nomme `verificateur` que dans sa liste de fichiers.
     assert INIT_PROJET_SKILL not in skills_citing("verificateur")
-    init_projet = (REPOSITORY_ROOT / ".claude/skills/init-projet/SKILL.md").read_text(
-        encoding="utf-8"
-    )
+    init_projet = (REPOSITORY_ROOT / INIT_PROJET_SKILL).read_text(encoding="utf-8")
     liste = ROLE_FILE_LIST.search(init_projet)
     assert liste, (
         "la liste de fichiers d'`init-projet` a changé de forme : `ROLE_FILE_LIST` ne la voit plus"
