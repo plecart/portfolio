@@ -1,8 +1,10 @@
-"""Tests du stockage des fichiers téléversés : le disque par défaut, R2 par `MEDIA_STORAGE`.
+"""Tests du stockage R2 des fichiers téléversés : ce que le domaine attend de `django-storages`.
 
-Sans aucun appel réseau : l'adresse du compte R2 vise `.invalid` (`R2_ENVIRONMENT`), et le client
-boto3 du stockage est remplacé par `Stubber` pour chaque opération que le test fait jouer — une
-opération non prévue lève, au lieu de partir sur le réseau.
+Le choix du stockage par `MEDIA_STORAGE`, et l'adresse d'un fichier sur chacun, s'éprouvent dans
+un processus neuf, comme `settings.py` les pose (`test_django_project.py`). Ici, sans aucun appel
+réseau : l'adresse du compte R2 vise `.invalid` (`R2_ENVIRONMENT`), et le client boto3 du stockage
+est remplacé par `Stubber` pour chaque opération que le test fait jouer — une opération non prévue
+lève, au lieu de partir sur le réseau.
 """
 
 import mimetypes
@@ -13,21 +15,14 @@ import pytest
 from botocore.client import BaseClient
 from botocore.response import StreamingBody
 from botocore.stub import ANY, Stubber
-from config.env import Env
 from config.storage import media_storage
 from content.variants import make_variants
-from django.core.files.storage import FileSystemStorage, Storage, storages
+from django.core.files.storage import Storage, storages
 from PIL import Image
-from storages.backends.s3 import S3Storage  # pyright: ignore[reportMissingTypeStubs]
 from test_env import R2_ENVIRONMENT, build_env, set_variables
 from test_variants import encoded
 
 BUCKET = R2_ENVIRONMENT["MEDIA_R2_BUCKET"]
-
-
-def created_storage(env: Env) -> Storage:
-    """Le stockage que Django crée pour l'entrée `default` que `env` désigne."""
-    return storages.create_storage(media_storage(env))
 
 
 def bucket_client(storage: Storage) -> BaseClient:
@@ -46,26 +41,9 @@ def guess_no_type(url: str, strict: bool = True) -> tuple[None, None]:
 
 @pytest.fixture
 def r2_storage(monkeypatch: pytest.MonkeyPatch) -> Storage:
-    """Le stockage d'un environnement R2 complet, aux valeurs factices."""
+    """Le stockage que Django crée pour un environnement R2 complet, aux valeurs factices."""
     set_variables(monkeypatch, R2_ENVIRONMENT)
-    return created_storage(build_env())
-
-
-def test_le_stockage_par_defaut_est_le_disque() -> None:
-    assert isinstance(created_storage(build_env()), FileSystemStorage)
-
-
-def test_le_stockage_r2_se_charge_sans_appel_reseau(r2_storage: Storage) -> None:
-    """`S3Storage` ne joint le bucket qu'au premier fichier : une connexion tentée échouerait sur
-    l'adresse `.invalid`."""
-    assert isinstance(r2_storage, S3Storage)
-
-
-def test_l_adresse_d_un_fichier_sur_r2_est_sur_l_hote_des_medias(r2_storage: Storage) -> None:
-    """Le CDN devant le bucket public : une adresse sans signature, que l'API reflète (#10)."""
-    assert r2_storage.url("images/abc/original.png") == (
-        "https://media.example/images/abc/original.png"
-    )
+    return storages.create_storage(media_storage(build_env()))
 
 
 def test_deux_fichiers_de_meme_nom_ne_s_ecrasent_pas_sur_r2(r2_storage: Storage) -> None:

@@ -29,15 +29,9 @@ R2_ENVIRONMENT = {
     "MEDIA_R2_SECRET_ACCESS_KEY": "cle-factice",
 }
 
-# Les variables que le stockage R2 exige, écrites ici et non lues sur `Env` : une variable que
-# `Env` cesserait d'exiger fait rougir son cas.
-R2_VARIABLES = [
-    "MEDIA_HOST",
-    "MEDIA_R2_ENDPOINT",
-    "MEDIA_R2_BUCKET",
-    "MEDIA_R2_ACCESS_KEY_ID",
-    "MEDIA_R2_SECRET_ACCESS_KEY",
-]
+# Les variables que le stockage R2 exige : chacune de celles qu'il porte, tirées d'ici et non lues
+# sur `Env` — une variable que `Env` cesserait d'exiger fait rougir son cas.
+R2_VARIABLES = [name for name in R2_ENVIRONMENT if name != "MEDIA_STORAGE"]
 
 # `test_env.py` → `tests` → `api` → `apps` → racine du dépôt. Calculé ici pour vérifier, depuis
 # un autre point de départ, l'arithmétique de chemin que fait `config/env.py`.

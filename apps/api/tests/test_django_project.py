@@ -226,7 +226,9 @@ def test_le_stockage_des_fichiers_est_celui_que_l_environnement_designe(
     variables: dict[str, str], storage_variables: dict[str, str], url: str
 ) -> None:
     """`settings.py` pose le stockage `default` depuis `MEDIA_STORAGE` (`config/storage.py`) : le
-    disque par défaut, R2 aux variables factices — sans appel réseau, son adresse vise `.invalid`."""
+    disque sous `disk`, servi sous `MEDIA_URL` ; R2 sous `r2`, aux variables factices, chargé sans
+    appel réseau — son compte vise `.invalid` — et dont l'adresse est sur l'hôte des médias, le CDN
+    devant le bucket public, sans signature."""
     result = run_python(["-c", DEFAULT_STORAGE_URL], variables | storage_variables)
 
     assert result.returncode == 0, result.stderr
