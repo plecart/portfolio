@@ -3,8 +3,14 @@
  * montrent (§1.4) et leur pose (§1.3, §4.1).
  */
 import { describe, expect, test } from 'vitest'
-import { buildProject, FILES_ORIGIN, type Project } from '../e2e/projects.ts'
-import { cardPose, cardTechnologies, orderProjects, type Technology } from '../src/table/cards.ts'
+import { buildProject, FILES_ORIGIN, PROJECT_SETS, type Project } from '../e2e/projects.ts'
+import {
+  cardPose,
+  cardTechnologies,
+  fnv1a,
+  orderProjects,
+  type Technology,
+} from '../src/table/cards.ts'
 
 /** Un projet en cours, commencé à `started_on` : sans date de fin, comme l'API le sert. */
 function ongoing(slug: string, started_on: string): Project {
@@ -97,6 +103,26 @@ describe("l'ordre des cartes", () => {
   test('rend une table vide pour une liste vide', () => {
     expect(orderProjects([])).toEqual([])
   })
+
+  test("range l'entrée A–F du brief en A, B, D, F, C, E, sans la modifier", () => {
+    const e = buildProject({
+      slug: 'e',
+      status: 'archived',
+      started_on: '2022-02-01',
+      finished_on: null,
+    })
+    // F, slug « ab », passe avant C à date de fin égale.
+    const projects = [
+      { ...ended('a', '2024-01-10'), showcase: true },
+      ongoing('b', '2026-01-05'),
+      ended('c', '2025-06-30'),
+      ongoing('d', '2025-03-01'),
+      e,
+      ended('ab', '2025-06-30'),
+    ]
+    expect(orderedSlugs(projects)).toEqual(['a', 'b', 'd', 'ab', 'c', 'e'])
+    expect(projects.map((project) => project.slug)).toEqual(['a', 'b', 'c', 'd', 'e', 'ab'])
+  })
 })
 
 /** Une technologie de ce type, nommée `name`. */
@@ -138,10 +164,43 @@ describe('les technologies de la carte', () => {
   test("ne montre rien quand le projet n'emploie que des outils", () => {
     expect(cardNames([technology('figma', 'tool')])).toEqual([])
   })
+
+  test('joue les trois exemples du brief', () => {
+    const figma = technology('Figma', 'tool')
+    const docker = technology('Docker', 'infrastructure')
+    const all = [
+      figma,
+      technology('TypeScript', 'language'),
+      technology('React', 'framework'),
+      technology('Django', 'framework'),
+      docker,
+    ]
+    expect(cardNames(all)).toEqual(['TypeScript', 'React', 'Django'])
+    expect(cardNames([figma, docker])).toEqual(['Docker'])
+    expect(cardNames([figma])).toEqual([])
+  })
+})
+
+describe("l'empreinte", () => {
+  test('rend les vecteurs de référence FNV-1a 32 bits', () => {
+    expect(fnv1a('')).toBe(0x811c9dc5)
+    expect(fnv1a('a')).toBe(0xe40c292c)
+  })
 })
 
 /** Les slugs d'une table de 200 projets. */
 const SLUGS = Array.from({ length: 200 }, (_, index) => `projet-${index}`)
+
+/** Les slugs des fixtures de l'e2e, chacun une fois. */
+const FIXTURE_SLUGS = [
+  ...new Set(Object.values(PROJECT_SETS).flatMap((set) => set.map((project) => project.slug))),
+]
+
+/** Les slugs dont la pose doit tenir ses bornes : ceux des fixtures, puis 1000 engendrés. */
+const BOUNDED_SLUGS = [
+  ...FIXTURE_SLUGS,
+  ...Array.from({ length: 1000 }, (_, index) => `engendre-${index}`),
+]
 
 /** Le plus grand écart à zéro parmi ces valeurs. */
 function largest(values: number[]): number {
@@ -169,12 +228,17 @@ describe('la pose de la carte', () => {
     expect(poses.size).toBe(SLUGS.length)
   })
 
+  test('tourne différemment au moins deux cartes des fixtures', () => {
+    const rotations = new Set(FIXTURE_SLUGS.map((slug) => cardPose(slug).rotation))
+    expect(rotations.size).toBeGreaterThanOrEqual(2)
+  })
+
   test("tourne de 3° au plus, dans un sens ou dans l'autre", () => {
-    expect(largest(SLUGS.map((slug) => cardPose(slug).rotation))).toBeLessThanOrEqual(3)
+    expect(largest(BOUNDED_SLUGS.map((slug) => cardPose(slug).rotation))).toBeLessThanOrEqual(3)
   })
 
   test('se décale de 6 px au plus sur chaque axe', () => {
-    const offsets = SLUGS.map(cardPose).flatMap(({ dx, dy }) => [dx, dy])
+    const offsets = BOUNDED_SLUGS.map(cardPose).flatMap(({ dx, dy }) => [dx, dy])
     expect(largest(offsets)).toBeLessThanOrEqual(6)
   })
 
