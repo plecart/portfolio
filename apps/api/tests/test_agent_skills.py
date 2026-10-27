@@ -5089,8 +5089,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " l'étape 3, collecte du `releveur` : si une issue ouverte possède le sujet, l'échec"
             " devient un défaut à étudier et suit les étapes 2 à 7, où l'étape 3 montre la"
             " correspondance au mainteneur. Une issue fermée n'est pas un propriétaire ; une automatisation qui possède le sujet"
-            " se répare par la petite PR. Sans issue ouverte qui le possède, une petite PR par"
-            " `cycle-pr` (« Demande directe sans issue », barreau 3), dans sa propre session :"
+            " se répare par la petite PR. Sans issue ouverte qui le possède, une petite PR par la"
+            " voie courte de `cycle-pr` (barreau 3), dans sa propre session :"
         ),
     ),
     "7c-bug-vers-issue-correctif-evident-sans-issue": (

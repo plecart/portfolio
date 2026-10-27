@@ -373,6 +373,8 @@ homonyme : un skill le masquerait) :
 | `no-ai-slop` | petergyang/no-ai-slop @ 000650b | Rédaction des fiches ; motifs écrits pour l'anglais, transfert partiel au français |
 | `improve-codebase-architecture` | mattpocock/skills @ c55ee46 | Audit d'architecture (modules profonds), s'appuie sur les ADR |
 
+`animate`, `animation-vocabulary`, `emil-design-eng`, `find-animation-opportunities`, `improve-animations`, `minimalist-skill`, `no-ai-slop`, `taste-skill`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, `ponytail-help` et `task-observer` portent `disable-model-invocation: true` — **modifié localement** (PR #166, audit du 2026-10-27 §5) : à réappliquer à chaque mise à jour.
+
 **Session** : `task-observer` (journal d'observations pour l'amélioration des skills — activé dans
 `CLAUDE.md`, section « Observation continue » ; **modifié localement**, PR #34, obs 21 : artefacts
 plutôt que gestes, pannes connues en tête de revue ; audit du 2026-09-30 : cadence et surfaçage

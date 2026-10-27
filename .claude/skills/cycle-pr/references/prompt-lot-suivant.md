@@ -47,8 +47,8 @@ a bougé, puis la commande de fumée (`.claude/pipeline.config.md`, « Commandes
 Ce que le lead est, et ce qu'il n'est jamais : `cycle-pr`, « Vague parallèle » en tête du skill, et
 `.claude/rules/contraintes.md`, « Jamais d'auto-merge dans le trunk ».>
 
-Charge le skill `task-observer` (session PR ; le journal est **hors du dépôt**, chemin dans
-`CLAUDE.md`). Lis `CLAUDE.md` et `.claude/pipeline.config.md`. Puis invoque le skill `cycle-pr`
+Ne charge `task-observer` que sur demande du mainteneur (`CLAUDE.md`, « Observation
+continue »). Lis `CLAUDE.md` et `.claude/pipeline.config.md`. Puis invoque le skill `cycle-pr`
 (outil Skill) avec \<N> : tu portes le cycle complet et délègues le code (`cycle-pr` 3.1), et tu
 lances toi-même ton `verificateur` d'avant-go (Étape 7). Ton effort est celui de ton démarrage :
 ne le change pas en cours de session (barème de `coordinatrice.md`, « Au go du découpage »).

@@ -9,10 +9,10 @@ refactor TDD, relecture indépendante) qu'une **demande directe et informelle** 
 Il n'y a pas de relecture « informelle » qui échapperait à ce prompt : s'il s'agit de repasser sur
 du code, c'est ce prompt qui s'applique. Seule exception : le commit d'une tranche entièrement
 spécifiée par l'`executant` (`.claude/agents/executant.md`, « Ton commit »), que le cleanup
-holistique de `cycle-pr` 4.1 relit. Qui l'exécute : au commit, le `developpeur` qui a écrit le bloc
-(`cycle-pr` 3.3) ; le cleanup holistique, un `developpeur` neuf sur le diff complet de la branche,
-qui ne rend que des commits (`cycle-pr` 4.1) ; une demande directe, la session à qui elle est
-faite.
+holistique de `cycle-pr` 4.1 relit. Qui l'exécute : au commit, qui a codé le bloc — `developpeur`, ou la
+session sous le seuil de `cycle-pr` 3.1 (`cycle-pr` 3.3) ; le cleanup holistique, un `developpeur`
+neuf sur le diff complet de la branche, qui ne rend que des commits, ou la session sous son seuil
+(`cycle-pr` 4.1) ; une demande directe, la session à qui elle est faite.
 
 **Relire un document normatif** (spec UX/UI, cadrage, PRD) n'est **pas** ce prompt : c'est le
 skill `audit-spec-ui` — passes mécaniques (jetons, tables, arithmétique, contraste, cohérence)
