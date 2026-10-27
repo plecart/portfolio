@@ -4945,7 +4945,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         VERS_PRD_SKILL,
         "sinon s'arrêter et proposer une session `init-projet` distincte",
     ),
-    # Lot 7c de #134 (2026-10-26) : un échec se qualifie avant de se consigner, et un correctif
+    # Lot 7c de #134 (2026-10-27) : un échec se qualifie avant de se consigner, et un correctif
     # évident part en petite PR, sans issue — le barreau 3 de « Création d'issues en cours de
     # cycle ». Une entrée par phrase neuve, qui garde ses moitiés restrictives (obs 126) : par la
     # forme, sur les mots ajoutés de `bug-vers-issue` (`git diff -U0 --word-diff=plain`), 17 —
@@ -7090,6 +7090,14 @@ RENVOIS_AUX_BARREAUX = {
     REPERCUSSIONS_SKILL: [4],
     VERS_ISSUES_SKILL: [4],
 }
+# Les barreaux, par leur tête en gras, dans l'ordre : un barreau inséré, retiré ou déplacé
+# renumérote ceux qui le suivent sous leurs renvois, qui se relisent avant que la liste change.
+TETES_DES_BARREAUX = [
+    "il tient dans la PR courante en moins d'un commit",
+    "une issue ouverte possède le sujet",
+    "un correctif évident",
+    "sinon",
+]
 
 
 def barreaux_cites(texte: str) -> list[int]:
@@ -7101,11 +7109,12 @@ def barreaux_cites(texte: str) -> list[int]:
     ]
 
 
-def barreaux_existants() -> list[int]:
-    """Les numéros de la liste ordonnée de « Création d'issues en cours de cycle »."""
+def barreaux_existants() -> list[tuple[int, str]]:
+    """Le numéro et la tête en gras de chaque barreau de « Création d'issues en cours de cycle »."""
     texte = (REPOSITORY_ROOT / CONTRAINTES_RULE).read_text(encoding="utf-8")
     section = texte.split(SECTION_DES_BARREAUX, 1)[1].split("\n## ", 1)[0]
-    return [int(numero) for numero in re.findall(r"(?m)^[ \t]*(\d+)\. ", section)]
+    barreaux = re.findall(r"(?m)^[ \t]*(\d+)\. \*\*(.+?)\*\*", section)
+    return [(int(numero), tete) for numero, tete in barreaux]
 
 
 @pytest.mark.parametrize(
@@ -7137,8 +7146,8 @@ def test_les_renvois_aux_barreaux_sont_ceux_de_la_table() -> None:
     Hors de cette forme (obs 139), les renvois sans numéro : « Création d'issues en cours de
     cycle » cherché sur le même texte normalisé rend, hors de la règle, **13** renvois, dont ces 3
     numérotés et **10** sans numéro ; **1** fuyait, la vérif de fumée de `cycle-pr` Étape 7, qui
-    énumère les barreaux — épinglée à part. Les 9 autres renvoient à la règle sans l'énumérer, ou
-    pour une décision, jamais un correctif évident.
+    énumère les barreaux — épinglée à part. Les 9 autres renvoient à la règle sans l'énumérer,
+    pour une décision, ou vers un brouillon `bug-vers-issue`, qui qualifie (`repercussions` ×2).
     """
     renvois = {
         fichier: numeros
@@ -7149,11 +7158,17 @@ def test_les_renvois_aux_barreaux_sont_ceux_de_la_table() -> None:
     assert renvois == RENVOIS_AUX_BARREAUX
 
 
+def test_la_liste_des_barreaux_est_celle_que_citent_les_renvois() -> None:
+    """Un barreau inséré, retiré ou déplacé rougit ici, avant de renuméroter ses renvois en
+    silence : sans ce test, un barreau inséré restait vert (mutation, 2026-10-27)."""
+    assert barreaux_existants() == list(enumerate(TETES_DES_BARREAUX, start=1))
+
+
 @pytest.mark.parametrize(
     ("fichier", "numeros"), RENVOIS_AUX_BARREAUX.items(), ids=RENVOIS_AUX_BARREAUX.keys()
 )
 def test_chaque_barreau_cite_existe(fichier: str, numeros: list[int]) -> None:
-    """Un renvoi au-delà du dernier barreau, ou une liste renumérotée sous ses renvois, rougit."""
-    existants = barreaux_existants()
+    """Un renvoi au-delà du dernier barreau rougit."""
+    existants = [numero for numero, _ in barreaux_existants()]
 
     assert set(numeros) <= set(existants), f"`{fichier}` cite {numeros}, la liste a {existants}"
