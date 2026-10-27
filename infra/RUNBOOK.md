@@ -50,9 +50,10 @@ n'est pas un secret.
 
 Prérequis : un VPS Ubuntu LTS en UE (ADR 0002), joignable en `root` par ta clé SSH ; dans le
 gestionnaire de mots de passe, le jeton du Tunnel, ceux du bucket des médias et du bucket des
-sauvegardes, et la paire `age` ; l'adresse de ping du contrôle healthchecks.io (#25). À la première connexion, `ssh` affiche
-l'empreinte de l'hôte : compare-la à celle que la console du fournisseur rend pour
-`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` — identiques, oui ou non ? Non : n'accepte pas.
+sauvegardes, et la paire `age` ; l'adresse de ping du contrôle healthchecks.io (#25). À la
+première connexion, `ssh` affiche l'empreinte de l'hôte : compare-la à celle que la console du
+fournisseur rend pour `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` — identiques, oui ou
+non ? Non : n'accepte pas.
 
 1. **La clé de déploiement**, sur le poste, dédiée et sans phrase de passe — la CI ne peut pas en
    saisir une :
@@ -82,9 +83,9 @@ l'empreinte de l'hôte : compare-la à celle que la console du fournisseur rend 
    SHA de l'étape 3), `TUNNEL_TOKEN`, les noms d'hôte — `SITE_HOST`, `API_HOST`,
    `MEDIA_HOST` (ADR 0003) —, ceux du bucket public des médias (ADR 0004) : l'adresse, le nom et
    le jeton, puis ceux de la sauvegarde : la clé publique `age`, l'adresse, le jeton et le nom du
-   bucket R2, l'adresse de ping. Il engendre le mot de passe du rôle Postgres
-   de `backup`, et crée ce rôle une fois la base saine, avant de démarrer le reste. Il finit par
-   `== Fait`, `docker compose ps` où chaque service est `healthy`, et la ligne de la clé de l'hôte.
+   bucket R2, l'adresse de ping. Il engendre le mot de passe du rôle Postgres de `backup`, et crée
+   ce rôle une fois la base saine, avant de démarrer le reste. Il finit par `== Fait`,
+   `docker compose ps` où chaque service est `healthy`, et la ligne de la clé de l'hôte.
    Il s'arrête sur la première erreur ; relancé, il reprend sans rien refaire de ce qui est en
    place. `cloudflared` ne devient sain qu'avec un Tunnel configuré (#25) : sinon `--wait`
    s'arrête sur « cloudflared is unhealthy ».
