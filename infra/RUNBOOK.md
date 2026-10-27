@@ -30,6 +30,7 @@ entrée (D45). L'utilisateur `deploy` possède le dossier et tire les images de 
 | Empreinte de l'hôte | secret `DEPLOY_KNOWN_HOSTS` de `production` | le mainteneur | à chaque VPS reconstruit |
 | Hôte et utilisateur | secrets `DEPLOY_HOST`, `DEPLOY_USER` (`deploy`) de `production` | le mainteneur | à chaque VPS reconstruit |
 | Mot de passe du rôle de sauvegarde (`BACKUP_POSTGRES_PASSWORD`) | `.env` du VPS et la base | `bootstrap.sh`, qui l'engendre et le pose dans la base | `bootstrap.sh BACKUP_POSTGRES_PASSWORD` |
+| Jeton du bucket des médias (`MEDIA_R2_ACCESS_KEY_ID`, `MEDIA_R2_SECRET_ACCESS_KEY`), borné à ce bucket, droit de lister compris | gestionnaire ; `.env` du VPS | `bootstrap.sh` | un nouveau jeton R2, `bootstrap.sh` avec les deux noms, puis l'ancien révoqué |
 | Jeton du bucket des sauvegardes (`BACKUP_R2_ACCESS_KEY_ID`, `BACKUP_R2_SECRET_ACCESS_KEY`) | gestionnaire ; `.env` du VPS | `bootstrap.sh` | un nouveau jeton R2, `bootstrap.sh` avec les deux noms, puis l'ancien révoqué |
 | Adresse de ping (`BACKUP_PING_URL`) | le contrôle healthchecks.io ; `.env` du VPS | `bootstrap.sh` | un nouveau contrôle, `bootstrap.sh BACKUP_PING_URL`, puis l'ancien supprimé |
 | Clé privée `age` des sauvegardes | gestionnaire ; secret `BACKUP_AGE_IDENTITY` de `production`, pour le test mensuel — ni le dépôt, ni une image (ADR 0007, point 2) ; jamais stockée sur le VPS : elle transite par `ssh` vers la mémoire d'un conteneur jetable, le temps d'une restauration | le mainteneur, sur le poste | une nouvelle paire, sa clé publique à `bootstrap.sh BACKUP_AGE_RECIPIENT`, sa clé privée à `BACKUP_AGE_IDENTITY` ; l'ancienne gardée |
@@ -48,8 +49,8 @@ n'est pas un secret.
 ## Amorcer un VPS neuf
 
 Prérequis : un VPS Ubuntu LTS en UE (ADR 0002), joignable en `root` par ta clé SSH ; dans le
-gestionnaire de mots de passe, le jeton du Tunnel, le jeton du bucket des sauvegardes et la paire
-`age` ; l'adresse de ping du contrôle healthchecks.io (#25). À la première connexion, `ssh` affiche
+gestionnaire de mots de passe, le jeton du Tunnel, ceux du bucket des médias et du bucket des
+sauvegardes, et la paire `age` ; l'adresse de ping du contrôle healthchecks.io (#25). À la première connexion, `ssh` affiche
 l'empreinte de l'hôte : compare-la à celle que la console du fournisseur rend pour
 `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` — identiques, oui ou non ? Non : n'accepte pas.
 
@@ -79,8 +80,9 @@ l'empreinte de l'hôte : compare-la à celle que la console du fournisseur rend 
    ```
    Il demande : la clé publique (le contenu de `deploy_key.pub`), le jeton GHCR, `IMAGE_TAG` (le
    SHA de l'étape 3), `TUNNEL_TOKEN`, les noms d'hôte — `SITE_HOST`, `API_HOST`,
-   `MEDIA_HOST` (ADR 0003) —, puis ceux de la sauvegarde : la clé publique `age`, l'adresse, le
-   jeton et le nom du bucket R2, l'adresse de ping. Il engendre le mot de passe du rôle Postgres
+   `MEDIA_HOST` (ADR 0003) —, ceux du bucket public des médias (ADR 0004) : l'adresse, le nom et
+   le jeton, puis ceux de la sauvegarde : la clé publique `age`, l'adresse, le jeton et le nom du
+   bucket R2, l'adresse de ping. Il engendre le mot de passe du rôle Postgres
    de `backup`, et crée ce rôle une fois la base saine, avant de démarrer le reste. Il finit par
    `== Fait`, `docker compose ps` où chaque service est `healthy`, et la ligne de la clé de l'hôte.
    Il s'arrête sur la première erreur ; relancé, il reprend sans rien refaire de ce qui est en
@@ -184,6 +186,9 @@ niveau ni tirer d'image déjà présente.
 - `BACKUP_POSTGRES_PASSWORD` — pile démarrée ou non : le script pose le nouveau dans la base une
   fois celle-ci saine, puis recrée `backup`. Pas autour de 03:00 UTC : entre les deux, le
   conteneur garde l'ancien, et une sauvegarde lancée là échoue, sans ping.
+- `MEDIA_R2_ACCESS_KEY_ID MEDIA_R2_SECRET_ACCESS_KEY`, ensemble — un nouveau jeton d'abord,
+  « Object Read & Write » borné au seul bucket des médias, puis l'ancien révoqué, une fois `api` et
+  `worker` recréés : les deux valent pendant la bascule.
 - `BACKUP_R2_ACCESS_KEY_ID BACKUP_R2_SECRET_ACCESS_KEY`, ensemble — un nouveau jeton d'abord,
   « Object Read & Write » borné au seul bucket des sauvegardes, puis l'ancien révoqué, une fois
   `backup` recréé : les deux valent pendant la bascule.
@@ -349,8 +354,8 @@ DNS.
    sauvegarde est arrivée »).
 6. **Reprendre le déploiement continu** (1 min) : `gh variable set DEPLOY_ENABLED --body true`.
 
-Les médias : sur R2 une fois #13 livrée, rien à restaurer ; d'ici là, ils vivent dans le volume
-`media` du VPS, qu'aucune sauvegarde ne couvre — ils sont perdus avec lui.
+Les médias : sur R2, rien à restaurer — un VPS reconstruit les retrouve dans leur bucket, par les
+variables `MEDIA_R2_*` que `bootstrap.sh` redemande.
 
 ### Le test mensuel
 

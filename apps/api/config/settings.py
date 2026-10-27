@@ -13,6 +13,7 @@ import django_stubs_ext
 
 from config.database import database_settings
 from config.env import REPOSITORY_ROOT, Env
+from config.storage import media_storage
 
 # Rend indexables à l'exécution les classes que django-stubs déclare génériques
 # (`admin.ModelAdmin[Technology]`, `models.CharField[str, str]`) : c'est ce que pyright strict
@@ -30,9 +31,9 @@ ALLOWED_HOSTS = env.ALLOWED_HOSTS
 
 DATABASES = {"default": database_settings(env.DATABASE_URL)}
 
-# Stockage disque en développement (ADR 0004) ; R2 arrive avec #13, par un backend de fichiers,
-# sans toucher aux modèles. Les fichiers sont servis sous `MEDIA_URL` — par Django lui-même en
-# développement seulement (`config/urls.py`).
+# Le stockage des fichiers téléversés, choisi par `MEDIA_STORAGE` (ADR 0004, `config/storage.py`) :
+# le disque, sous `MEDIA_ROOT`, et ses fichiers servis sous `MEDIA_URL` — par Django lui-même en
+# développement seulement (`config/urls.py`) ; ou R2, dont les adresses sont sur `MEDIA_HOST`.
 MEDIA_ROOT = env.MEDIA_ROOT
 MEDIA_URL = "media/"
 
@@ -115,10 +116,10 @@ STATIC_URL = "static/"
 # un dossier temporaire (ADR 0014). Le stockage ajoute à chaque nom l'empreinte de son contenu et
 # en garde une copie compressée : le navigateur conserve un fichier indéfiniment, et une nouvelle
 # version change de nom. Il refuse aussi de rendre une page qui cite un fichier absent de la
-# collecte. `default` reste celui de Django : les fichiers téléversés, sous `MEDIA_ROOT`.
+# collecte. `default` est celui des fichiers téléversés, ci-dessus.
 STATIC_ROOT = REPOSITORY_ROOT / "static"
 STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "default": media_storage(env),
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 

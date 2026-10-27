@@ -37,8 +37,8 @@ def absolute_url(context: dict[str, Any], url: str) -> str:
     """L'adresse absolue d'un fichier dont le stockage a rendu l'adresse `url`.
 
     Le stockage disque rend une adresse relative (`/media/…`), que la requête complète de son
-    schéma et de son hôte ; une adresse que le stockage rend déjà absolue (R2 après #13) reste
-    telle quelle — `build_absolute_uri` garde le schéma et l'hôte d'une adresse qui les porte, à
+    schéma et de son hôte ; une adresse que le stockage rend déjà absolue (R2) reste telle
+    quelle — `build_absolute_uri` garde le schéma et l'hôte d'une adresse qui les porte, à
     l'encodage IRI près, sans effet sur l'adresse déjà encodée que rend un stockage.
 
     Args:
