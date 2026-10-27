@@ -15,8 +15,10 @@ SVG_ROOT = "{http://www.w3.org/2000/svg}svg"
 def validate_svg(file: File[bytes]) -> None:
     """Refuse tout fichier qui n'est pas un document SVG : extension `.svg`, racine `svg`.
 
-    L'extension compte autant que le contenu : c'est d'elle que le serveur de fichiers tire le
-    type `image/svg+xml`, sans lequel le navigateur n'affiche pas l'icône. Le contenu est lu par
+    L'extension compte autant que le contenu : le serveur du disque en tire le type
+    `image/svg+xml`, sans lequel le navigateur n'affiche pas l'icône ; sur R2, `django-storages`
+    prend d'abord le type que le navigateur a déclaré au téléversement, l'extension en repli
+    (`S3Storage._get_write_parameters`, django-storages 1.14.6). Le contenu est lu par
     la bibliothèque standard (décision 11 du brief de #7) : son analyseur ne résout aucune entité
     externe, et l'expat de l'image, où l'admin tourne (2.8.3, mesuré le 2026-09-26), dépasse le
     seuil de 2.7.2 sous lequel la documentation Python le dit exposé aux expansions d'entités
