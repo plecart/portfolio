@@ -60,7 +60,7 @@ describe("l'ordre des cartes", () => {
     expect(orderedSlugs(projects)).toEqual(['fin-2026', 'archive-2025', 'fin-2024'])
   })
 
-  test('situe un projet sans date de fin par sa date de début', () => {
+  test('situe par sa date de début un projet archivé sans date de fin, que la base refuse', () => {
     const undated = buildProject({
       slug: 'debut-2025',
       status: 'archived',
@@ -130,7 +130,7 @@ describe('les technologies de la carte', () => {
     expect(cardNames(technologies)).toEqual(['react', 'typescript', 'docker'])
   })
 
-  test('montre toutes les technologies quand moins de trois sont éligibles', () => {
+  test('montre toutes les éligibles quand elles sont moins de trois', () => {
     const technologies = [technology('python', 'language'), technology('git', 'tool')]
     expect(cardNames(technologies)).toEqual(['python'])
   })
