@@ -75,7 +75,8 @@ l'adresse est dans ton prompt système. Tu n'écris que dans GitHub : ni fichier
 commande du projet hors lecture. Une écriture qu'un skill exige — ADR, amendement d'un document
 (`decisions-vs-doc`), `.out-of-scope/` (`triage`) — ne se fait pas ici : « bloquant : <…> » à
 ton parent.
-Charge le skill `task-observer` s'il est installé. Lis CLAUDE.md et .claude/pipeline.config.md.
+Ne charge `task-observer` que sur demande du mainteneur (CLAUDE.md, « Observation continue »).
+Lis CLAUDE.md et .claude/pipeline.config.md.
 Invoque le skill `triage` (outil Skill) avec #N, puis `interroge-moi` avec #N s'il ne l'a pas
 lancé ; tes questions se posent au mainteneur, dans ta fenêtre. La transition qu'il accepte,
 applique-la par `triage`, brief d'agent publié, puis envoie à ton parent « interrogatoire #N
@@ -305,8 +306,8 @@ Premier geste, avant toute écriture :
 `git fetch origin && git checkout -b <type>/<slug> --no-track origin/main`
 (.claude/skills/cycle-pr/references/sessions-liees.md, « Premier geste »). Puis provisionne ton
 worktree : `pr-paralleles` Étape 3, « Provisionner son worktree ».
-Charge le skill `task-observer` s'il est installé (session PR ; le journal est hors du
-worktree, chemin dans CLAUDE.md). Lis CLAUDE.md, .claude/pipeline.config.md et ta mémoire de phase.
+Ne charge `task-observer` que sur demande du mainteneur (CLAUDE.md, « Observation continue »).
+Lis CLAUDE.md, .claude/pipeline.config.md et ta mémoire de phase.
 
 Porte le cycle complet de l'issue #N et délègue le code (`cycle-pr` 3.1), en invoquant le skill
 `cycle-pr` (outil Skill) avec N — brief : commentaire de l'issue. Tu lances toi-même ton
