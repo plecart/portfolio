@@ -22,12 +22,20 @@ def validate_svg(file: File[bytes]) -> None:
     seuil de 2.7.2 sous lequel la documentation Python le dit exposé aux expansions d'entités
     (« XML security »).
 
+    Un fichier déjà stocké n'est pas relu : il a été validé à son arrivée, et sur R2 chaque lecture
+    serait un téléchargement — un objet absent du bucket refuserait une modification sans rapport.
+
     Args:
-        file: le fichier du champ, téléversé ou déjà enregistré.
+        file: le fichier du champ : validé s'il est téléversé, ignoré s'il est déjà stocké.
 
     Raises:
         ValidationError: code `icon_not_svg`, message du catalogue.
     """
+    # `_committed`, posé par `FieldFile` : vrai pour le fichier que le stockage tient déjà, faux
+    # pour un téléversement, absent d'un fichier hors de tout champ — le concept de
+    # `OriginalFile.stored` (`content/images.py`).
+    if getattr(file, "_committed", False):
+        return
     if PurePath(file.name or "").suffix.lower() != ".svg" or _root_tag(file) != SVG_ROOT:
         raise ValidationError(strings.ICON_NOT_SVG, code="icon_not_svg")
 
