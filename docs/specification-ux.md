@@ -263,7 +263,7 @@ Deux liens, GitHub puis LinkedIn, icônes au trait 22 px, libellés « GitHub de
 
 Hauteur = cadre + photo + bande ; la bande grandit si les rubans passent sur deux lignes (58 px mesurés sur une carte simple portant cinq rubans).
 
-- **Pose** : rotation dans ±2° et décalage dans ±6 px sur chaque axe, tirés d'une empreinte du slug (FNV-1a) : identiques à chaque visite (§1.3).
+- **Pose** : rotation dans ±3° et décalage dans ±6 px sur chaque axe, tirés d'une empreinte du slug (FNV-1a) : identiques à chaque visite (§1.3).
 - **Face** : `--paper`, rayon 2 px, `--shadow-rest`, marge intérieure cadre / cadre / 0.
 - **Post-it** (`<h2>`) : absolu, 8 px au-dessus du cadre et 14 px de son bord gauche, largeur maximale = carte − 28 px, marge intérieure 6 10 6 12, rayon 1 px, rotation −2° (pivot haut gauche), texte §2.2, deux lignes au plus (troncature `line-clamp`).
 - **Trombone** : absolu, 14 px au-dessus du cadre et 6 px de son bord gauche, 14 × 30 px, trait 1,6 px `--ink-2`, rotation −12°, décoratif.
