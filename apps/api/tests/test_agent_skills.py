@@ -6186,21 +6186,21 @@ def test_chaque_mention_de_l_auto_merge_le_borne_au_trunk() -> None:
 # Cas : (fichier, début du passage, fin du passage, ce qu'il ne cite pas, ce qu'il dit).
 ADVISORY_GATE_RULES = {
     "cycle-pr-rouge-d-avis": (
-        ".claude/skills/cycle-pr/SKILL.md",
+        CYCLE_PR_SKILL,
         "*Rouge d'avis*",
         "*Rouge de code*",
         ("gh run rerun", "rejou"),
         ("Jamais un rerun d'un run du trunk", "sous un nom propre au trunk"),
     ),
     "init-projet-horloge": (
-        ".claude/skills/init-projet/SKILL.md",
+        INIT_PROJET_SKILL,
         "**Donner une horloge",
         "Sans porte d'avis",
         ("build",),
         ("installation et construction",),
     ),
     "init-projet-checklist": (
-        ".claude/skills/init-projet/SKILL.md",
+        INIT_PROJET_SKILL,
         "- [ ] portes à base d'avis",
         "\n",
         (),
@@ -6234,7 +6234,7 @@ def test_une_regle_de_porte_d_avis_ne_relance_ni_ne_retire_ce_dont_elle_depend(
 
 # --- Ce que `cycle-pr` renvoie au go du briefing est annoncé à l'Étape 1 (#77, lot 4c) ----------
 
-CYCLE_PR = REPOSITORY_ROOT / ".claude/skills/cycle-pr/SKILL.md"
+CYCLE_PR = REPOSITORY_ROOT / CYCLE_PR_SKILL
 
 # Chaque question qu'une étape **ultérieure** dit « demandée au go du briefing », et le mot que
 # l'Étape 1 doit porter pour qu'un agent qui suit le skill dans l'ordre la pose à ce moment-là —
