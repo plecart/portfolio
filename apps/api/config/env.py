@@ -15,7 +15,7 @@ Une seule exception, ici même : `ENV_FILE`, qui désigne le fichier `.env` et n
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Self
+from typing import Literal, Self
 from urllib.parse import urlsplit
 
 from pydantic import (
@@ -40,9 +40,10 @@ class ConfigurationError(RuntimeError):
     de passe de la base, et une erreur de démarrage part sur stderr — journaux de conteneur,
     sortie de CI, collecteur d'erreurs.
 
-    **Cinq** mécanismes de refus ont été recensés : borne de longueur, URL mal formée,
+    **Six** mécanismes de refus ont été recensés : borne de longueur, URL mal formée,
     validateur de modèle qui reçoit l'environnement entier, validateur de champ qui reçoit la
-    liste entière des origines — les quatre fuyaient — et échec de lecture d'une *source*, qui
+    liste entière des origines — les quatre fuyaient —, valeur hors de sa liste, dont le message
+    énumère les valeurs admises et tait celle reçue, et échec de lecture d'une *source*, qui
     ne fuit pas mais lève un type d'exception distinct. `Env.load()`
     les reformule tous par ce type, et `INVALID_CONFIGURATIONS` (`tests/test_env.py`) en tient
     le dénombrement : c'est le test qui garde la classe close, pas cette phrase.
@@ -73,6 +74,15 @@ def _anchored_path(path: Path) -> Path:
     """
     return path if path.is_absolute() else REPOSITORY_ROOT / path
 
+
+# Les variables que le stockage R2 exige non vides (`MEDIA_STORAGE=r2`) ; le disque les ignore.
+R2_VARIABLES = (
+    "MEDIA_HOST",
+    "MEDIA_R2_ENDPOINT",
+    "MEDIA_R2_BUCKET",
+    "MEDIA_R2_ACCESS_KEY_ID",
+    "MEDIA_R2_SECRET_ACCESS_KEY",
+)
 
 # Le port que le navigateur tait dans `Origin`, par schéma — et les seuls schémas qu'il y écrit.
 DEFAULT_PORTS = {"http": 80, "https": 443}
@@ -166,6 +176,17 @@ class Env(BaseSettings):
         MEDIA_ROOT: dossier où atterrissent les fichiers téléversés (ADR 0004, « Développement :
             stockage disque par défaut de Django »). Le conteneur reçoit le chemin absolu de son
             volume ; sur le poste, un chemin relatif est ancré sur la racine du dépôt.
+        MEDIA_STORAGE: le stockage des fichiers téléversés (`config/storage.py`) : `disk`, par
+            défaut, sous `MEDIA_ROOT` ; ou `r2`, le bucket public des images sur Cloudflare R2
+            (ADR 0004), en production. Toute autre valeur est refusée. Avec `r2`, chacune des
+            cinq variables suivantes est exigée non vide (`R2_VARIABLES`) ; le disque les ignore.
+        MEDIA_HOST: l'hôte public des fichiers sous `r2`, le CDN devant le bucket : l'adresse
+            d'un fichier est `https://<MEDIA_HOST>/<chemin>`.
+        MEDIA_R2_ENDPOINT: l'adresse S3 du compte R2, `https://<compte>.r2.cloudflarestorage.com`.
+        MEDIA_R2_BUCKET: le nom du bucket public des images, distinct de celui des sauvegardes.
+        MEDIA_R2_ACCESS_KEY_ID: l'identifiant du jeton R2 borné à ce bucket, qui doit pouvoir
+            le lister — la suppression d'une image liste le dossier de son original.
+        MEDIA_R2_SECRET_ACCESS_KEY: le secret de ce jeton, `SecretStr` comme `SECRET_KEY`.
         CORS_ALLOWED_ORIGINS: les origines admises à appeler l'API publique — celle du site
             (ADR 0008, « CORS restreint à l'origine du site »), liste JSON comme `ALLOWED_HOSTS`.
             Une origine est un schéma et un hôte, rien d'autre ; au moins une, en `DEBUG` aussi :
@@ -180,6 +201,12 @@ class Env(BaseSettings):
     DATABASE_URL: PostgresDsn
     REDIS_URL: RedisDsn
     MEDIA_ROOT: Path = REPOSITORY_ROOT / "media"
+    MEDIA_STORAGE: Literal["disk", "r2"] = "disk"
+    MEDIA_HOST: str = ""
+    MEDIA_R2_ENDPOINT: str = ""
+    MEDIA_R2_BUCKET: str = ""
+    MEDIA_R2_ACCESS_KEY_ID: str = ""
+    MEDIA_R2_SECRET_ACCESS_KEY: SecretStr = SecretStr("")
     CORS_ALLOWED_ORIGINS: list[str] = Field(min_length=1)
 
     @field_validator("MEDIA_ROOT")
@@ -222,6 +249,18 @@ class Env(BaseSettings):
         """
         if not self.DEBUG and not self.ALLOWED_HOSTS:
             raise ValueError("ALLOWED_HOSTS est obligatoire quand DEBUG est faux")
+        return self
+
+    @model_validator(mode="after")
+    def _require_r2_variables(self) -> Self:
+        """Refuse de démarrer sur R2 sans chacune de ses variables, et nomme celles qui manquent.
+
+        `django-storages` ne joint le bucket qu'au premier fichier (`S3Storage.connection`, créée
+        à la demande) : sans ce refus, une variable vide ne se verrait qu'au premier téléversement.
+        """
+        missing = [name for name in R2_VARIABLES if not getattr(self, name)]
+        if self.MEDIA_STORAGE == "r2" and missing:
+            raise ValueError(f"MEDIA_STORAGE vaut r2, il manque : {', '.join(missing)}")
         return self
 
     @classmethod

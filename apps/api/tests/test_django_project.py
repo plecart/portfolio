@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 from celery import shared_task
 from process_environment import NO_ENV_FILE
+from test_env import R2_ENVIRONMENT
 
 API_ROOT = Path(__file__).resolve().parent.parent
 REPOSITORY_ROOT = API_ROOT.parent.parent
@@ -59,6 +60,16 @@ except Resolver404:
     print('absent')
 else:
     print('servi')
+"""
+
+# L'adresse que rend le stockage `default` pour un fichier. Dans un processus neuf, comme ci-dessus :
+# `STORAGES` est posé une fois, à l'import des réglages.
+DEFAULT_STORAGE_URL = """
+import os, django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
+from django.core.files.storage import default_storage
+print(default_storage.url('images/abc/original.png'))
 """
 
 
@@ -201,6 +212,25 @@ def test_les_medias_ne_sont_servis_par_django_qu_en_developpement(
 
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == outcome
+
+
+@pytest.mark.parametrize(
+    ("storage_variables", "url"),
+    [
+        ({}, "/media/images/abc/original.png"),
+        (R2_ENVIRONMENT, "https://media.example/images/abc/original.png"),
+    ],
+    ids=["disque", "r2"],
+)
+def test_le_stockage_des_fichiers_est_celui_que_l_environnement_designe(
+    variables: dict[str, str], storage_variables: dict[str, str], url: str
+) -> None:
+    """`settings.py` pose le stockage `default` depuis `MEDIA_STORAGE` (`config/storage.py`) : le
+    disque par défaut, R2 aux variables factices — sans appel réseau, son adresse vise `.invalid`."""
+    result = run_python(["-c", DEFAULT_STORAGE_URL], variables | storage_variables)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == url
 
 
 @pytest.mark.parametrize(

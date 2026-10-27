@@ -88,7 +88,15 @@ services:
       CORS_ALLOWED_ORIGINS: '["https://${SITE_HOST:?}"]'
       DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
       REDIS_URL: redis://redis:6379/0
-      # Le volume, en attendant R2 (#13).
+      # Les fichiers téléversés sur R2 (ADR 0004) : le bucket public des images, distinct de celui
+      # des sauvegardes, et leurs adresses sur l'hôte des médias, que le CDN sert.
+      MEDIA_STORAGE: r2
+      MEDIA_HOST: ${MEDIA_HOST:?}
+      MEDIA_R2_ENDPOINT: ${MEDIA_R2_ENDPOINT:?}
+      MEDIA_R2_BUCKET: ${MEDIA_R2_BUCKET:?}
+      MEDIA_R2_ACCESS_KEY_ID: ${MEDIA_R2_ACCESS_KEY_ID:?}
+      MEDIA_R2_SECRET_ACCESS_KEY: ${MEDIA_R2_SECRET_ACCESS_KEY:?}
+      # Le volume et son dossier, que R2 laisse sans usage, se retirent avec #25.
       MEDIA_ROOT: /app/media
     volumes: &app-volumes
       - media:/app/media
@@ -116,7 +124,8 @@ services:
     restart: unless-stopped
 
   # Le worker d'images (ADR 0015) : l'image d'`api`, à la même étiquette, et une autre commande ;
-  # mêmes variables, et le volume des médias, où il lit l'original et écrit les variantes.
+  # mêmes variables — le bucket des médias, où il lit l'original et écrit les variantes — et mêmes
+  # volumes.
   worker:
     image: ghcr.io/plecart/portfolio-api:${IMAGE_TAG:?}
     environment:

@@ -31,6 +31,11 @@ requires-python = ">=3.12"
 # Django le charge par `INSTALLED_APPS` et `MIDDLEWARE`, et les tests de CORS de `tests/test_api.py`
 # l'atteignent par la route.
 #
+# `django-storages[s3]` porte le stockage des fichiers téléversés sur Cloudflare R2, en production
+# (ADR 0004) ; l'extra installe `boto3`, qui parle l'API S3 de R2. Aucun module ne l'importe :
+# Django le charge par `STORAGES` (`config/storage.py`) quand `MEDIA_STORAGE` vaut `r2`, et
+# `tests/test_storage.py` l'atteint par `create_storage`.
+#
 # `celery[redis]` porte le worker d'images, broker Redis, sans backend de résultats (ADR 0015) ;
 # `config/celery.py` en construit l'application. L'extra installe le client `redis`, que kombu
 # charge seul, au premier usage du transport — un enfilement, même synchrone ; `STARTUP_IMPORTS`
@@ -40,6 +45,7 @@ dependencies = [
     "django>=6.0",
     "django-cors-headers>=4.9.0",
     "django-ninja>=1.7.1",
+    "django-storages[s3]>=1.14.6",
     "django-stubs-ext>=6.1.1",
     "gunicorn>=23",
     "markdown-it-py>=4.2.0",

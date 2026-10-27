@@ -40,6 +40,7 @@ dev = [
     "docker>=7.2.0",
     "jsonschema>=4.26.0",
     "celery-types>=0.26.0",
+    "botocore-stubs>=1.43.120",
 ]
 
 [tool.pytest.ini_options]

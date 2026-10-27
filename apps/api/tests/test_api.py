@@ -162,9 +162,9 @@ def test_la_liste_rend_un_projet_publie_dans_le_contrat(client: Client) -> None:
 
 @pytest.mark.django_db
 def test_une_adresse_que_le_stockage_rend_absolue_reste_telle_quelle(client: Client) -> None:
-    """R2 rendra des adresses absolues, sur l'hôte des médias (#13) : la liste les garde telles
-    quelles, jamais réécrites sur l'hôte de la requête (décision 5). Un `MEDIA_URL` absolu fait
-    rendre au stockage disque la même forme d'adresse."""
+    """R2 rend des adresses absolues, sur l'hôte des médias (`config/storage.py`) : la liste les
+    garde telles quelles, jamais réécrites sur l'hôte de la requête (décision 5). Un `MEDIA_URL`
+    absolu fait rendre au stockage disque la même forme d'adresse."""
     project_with_variant("medias")
 
     with override_settings(MEDIA_URL="https://media.test/"):

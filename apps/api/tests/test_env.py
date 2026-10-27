@@ -1,7 +1,7 @@
 """Tests de `Env`, la seule lecture de l'environnement du back."""
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -18,6 +18,27 @@ SERVICE_URLS = ["DATABASE_URL", "REDIS_URL"]
 # inscrit, sans quoi son ancrage n'est garanti par rien.
 PATH_VARIABLES = ["MEDIA_ROOT"]
 
+# Un stockage R2 complet, aux valeurs factices : l'adresse du compte vise `.invalid`, qui ne se
+# résout nulle part (RFC 2606), et l'hôte public est celui de `infra/prod.env.example`.
+R2_ENVIRONMENT = {
+    "MEDIA_STORAGE": "r2",
+    "MEDIA_HOST": "media.example",
+    "MEDIA_R2_ENDPOINT": "https://compte.r2.invalid",
+    "MEDIA_R2_BUCKET": "medias",
+    "MEDIA_R2_ACCESS_KEY_ID": "identifiant-factice",
+    "MEDIA_R2_SECRET_ACCESS_KEY": "cle-factice",
+}
+
+# Les variables que le stockage R2 exige, écrites ici et non lues sur `Env` : une variable que
+# `Env` cesserait d'exiger fait rougir son cas.
+R2_VARIABLES = [
+    "MEDIA_HOST",
+    "MEDIA_R2_ENDPOINT",
+    "MEDIA_R2_BUCKET",
+    "MEDIA_R2_ACCESS_KEY_ID",
+    "MEDIA_R2_SECRET_ACCESS_KEY",
+]
+
 # `test_env.py` → `tests` → `api` → `apps` → racine du dépôt. Calculé ici pour vérifier, depuis
 # un autre point de départ, l'arithmétique de chemin que fait `config/env.py`.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -31,25 +52,31 @@ ENV_EXAMPLE = REPOSITORY_ROOT / ".env.example"
 COMPOSE_ENV = REPOSITORY_ROOT / "infra" / "dev.env"
 
 # Toutes les façons dont `Env` peut rendre son contenu lisible : une trace, un journal, une
-# sérialisation. Le secret ne doit apparaître dans aucune. `get_secret_value()` est
-# volontairement absent — c'est l'accesseur, son travail est précisément de rendre la valeur.
-SECRET_TRAVEL_FORMS: list[tuple[str, Callable[[Env], str]]] = [
-    ("repr du modèle", repr),
-    ("str du modèle", str),
-    ("interpolation", lambda env: f"{env}"),
-    ("repr du champ", lambda env: repr(env.SECRET_KEY)),
-    ("str du champ", lambda env: str(env.SECRET_KEY)),
-    ("model_dump", lambda env: str(env.model_dump())),
-    ("model_dump_json", lambda env: env.model_dump_json()),
-    ("model_dump en mode json", lambda env: str(env.model_dump(mode="json"))),
+# sérialisation — du modèle entier, ou du champ secret nommé. Aucun secret ne doit apparaître dans
+# aucune. `get_secret_value()` est volontairement absent — c'est l'accesseur, son travail est
+# précisément de rendre la valeur.
+SECRET_TRAVEL_FORMS: list[tuple[str, Callable[[Env, str], str]]] = [
+    ("repr du modèle", lambda env, _: repr(env)),
+    ("str du modèle", lambda env, _: str(env)),
+    ("interpolation", lambda env, _: f"{env}"),
+    ("repr du champ", lambda env, secret: repr(getattr(env, secret))),
+    ("str du champ", lambda env, secret: str(getattr(env, secret))),
+    ("model_dump", lambda env, _: str(env.model_dump())),
+    ("model_dump_json", lambda env, _: env.model_dump_json()),
+    ("model_dump en mode json", lambda env, _: str(env.model_dump(mode="json"))),
 ]
 
-# Les façons de rendre la configuration invalide — **cinq mécanismes de refus distincts**,
+# Les secrets d'`Env`, écrits ici et non lus sur ses types : un champ qui cesserait d'être un
+# `SecretStr` fait rougir ses cas.
+SECRETS = ["SECRET_KEY", "MEDIA_R2_SECRET_ACCESS_KEY"]
+
+# Les façons de rendre la configuration invalide — **six mécanismes de refus distincts**,
 # et c'est le dénombrement qui compte : borne de longueur, URL mal formée (deux fois, car deux
-# champs la portent), validateur de modèle qui reçoit l'environnement **entier**, validateur de
-# champ qui reçoit la liste entière des origines, et échec de lecture d'une *source* avant même
-# la validation (deux fois, car deux champs sont des listes). Le dernier ne lève pas le même type
-# d'exception que les autres : c'est précisément pourquoi il doit figurer ici.
+# champs la portent), validateur de modèle qui reçoit l'environnement **entier** (deux fois, car
+# deux validateurs le sont), validateur de champ qui reçoit la liste entière des origines, valeur
+# hors de sa liste, et échec de lecture d'une *source* avant même la validation (deux fois, car
+# deux champs sont des listes). Le dernier ne lève pas le même type d'exception que les autres :
+# c'est précisément pourquoi il doit figurer ici.
 INVALID_CONFIGURATIONS = [
     ("clé trop courte", "SECRET_KEY", "TROP-COURTE-ET-SECRETE"),
     ("base mal formée", "DATABASE_URL", "postgres://admin:MOT-DE-PASSE-BASE@"),
@@ -61,7 +88,15 @@ INVALID_CONFIGURATIONS = [
     ("hôte nu", "CORS_ALLOWED_ORIGINS", '["SITE-SECRET.test"]'),
     ("aucune origine", "CORS_ALLOWED_ORIGINS", "[]"),
     ("liste d'origines mal formée", "CORS_ALLOWED_ORIGINS", "[oups"),
+    ("stockage hors de sa liste", "MEDIA_STORAGE", "STOCKAGE-SECRET"),
+    ("stockage r2 incomplet", "MEDIA_STORAGE", "r2"),
 ]
+
+# Les valeurs qu'admet `MEDIA_STORAGE` : des constantes du code, pas des données de
+# l'environnement. Le refus d'une valeur hors de la liste les énumère (« Input should be 'disk' or
+# 'r2' », pydantic), et les noms des variables du stockage R2 contiennent la seconde : leur
+# présence dans un refus ne trahit rien. Écrites ici, et non lues sur `Env`.
+LISTED_VALUES = {"disk", "r2"}
 
 # Ce qu'une origine CORS n'est pas. Une origine est ce qu'un navigateur envoie dans `Origin` :
 # `schéma://hôte[:port]`, hôte en minuscules, port absent s'il est celui du schéma — et
@@ -122,6 +157,12 @@ def build_env(env_file: Path | None = None) -> Env:
     les champs sans défaut sont résolus depuis l'environnement, pas depuis l'appel.
     """
     return Env(_env_file=env_file)  # pyright: ignore[reportCallIssue]
+
+
+def set_variables(monkeypatch: pytest.MonkeyPatch, variables: Mapping[str, str]) -> None:
+    """Pose `variables` dans l'environnement du processus, le temps du test."""
+    for name, value in variables.items():
+        monkeypatch.setenv(name, value)
 
 
 def test_le_demarrage_echoue_sans_cle_secrete(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -215,13 +256,17 @@ def test_le_demarrage_echoue_sans_origine_cors_meme_en_debug(
     [render for _, render in SECRET_TRAVEL_FORMS],
     ids=[name for name, _ in SECRET_TRAVEL_FORMS],
 )
-def test_la_cle_secrete_n_apparait_dans_aucune_forme(
-    variables: dict[str, str], render: Callable[[Env], str]
+@pytest.mark.parametrize("secret", SECRETS)
+def test_un_secret_n_apparait_dans_aucune_forme(
+    monkeypatch: pytest.MonkeyPatch,
+    variables: dict[str, str],
+    secret: str,
+    render: Callable[[Env, str], str],
 ) -> None:
-    """Le masquage se solde sur la classe : 8 formes recensées, 8 éprouvées ici."""
-    env = build_env()
+    """Le masquage se solde sur la classe : 8 formes recensées, 8 éprouvées ici par secret."""
+    set_variables(monkeypatch, R2_ENVIRONMENT)
 
-    assert variables["SECRET_KEY"] not in render(env)
+    assert (variables | R2_ENVIRONMENT)[secret] not in render(build_env(), secret)
 
 
 def test_une_cle_secrete_trop_courte_est_refusee(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -257,7 +302,7 @@ def test_aucune_valeur_ne_fuit_dans_l_erreur_de_demarrage(
     message = str(refusal.value)
     assert variable in message, "le refus doit dire quel champ est en cause"
     for value in [invalid_value, *variables.values()]:
-        for fragment in value_fragments(value):
+        for fragment in set(value_fragments(value)) - LISTED_VALUES:
             assert fragment not in message.lower()
 
 
@@ -358,3 +403,38 @@ def test_le_media_root_par_defaut_est_dans_le_depot(monkeypatch: pytest.MonkeyPa
     monkeypatch.delenv("MEDIA_ROOT")
 
     assert build_env().MEDIA_ROOT == REPOSITORY_ROOT / "media"
+
+
+def test_le_stockage_des_medias_est_le_disque_par_defaut(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Un clone qui n'a rien renseigné écrit sur son disque (ADR 0004), jamais sur R2."""
+    monkeypatch.delenv("MEDIA_STORAGE")
+
+    assert build_env().MEDIA_STORAGE == "disk"
+
+
+def test_un_stockage_des_medias_inconnu_est_refuse(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`disk` ou `r2`, rien d'autre : une faute de frappe ne retombe pas en silence sur le disque."""
+    monkeypatch.setenv("MEDIA_STORAGE", "s3")
+
+    with pytest.raises(ValidationError, match="MEDIA_STORAGE"):
+        build_env()
+
+
+def test_un_stockage_r2_complet_est_accepte(monkeypatch: pytest.MonkeyPatch) -> None:
+    set_variables(monkeypatch, R2_ENVIRONMENT)
+
+    assert build_env().MEDIA_STORAGE == "r2"
+
+
+@pytest.mark.parametrize("variable", R2_VARIABLES)
+def test_le_stockage_r2_refuse_de_demarrer_en_nommant_la_variable_qui_manque(
+    monkeypatch: pytest.MonkeyPatch, variable: str
+) -> None:
+    """`django-storages` ne joint le bucket qu'au premier fichier : sans ce refus, une variable
+    vide ne se verrait qu'au premier téléversement. Le refus nomme celle-là, et elle seule."""
+    set_variables(monkeypatch, R2_ENVIRONMENT | {variable: ""})
+
+    with pytest.raises(ConfigurationError) as refusal:
+        Env.load()
+
+    assert [named for named in R2_VARIABLES if named in str(refusal.value)] == [variable]
