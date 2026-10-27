@@ -33,6 +33,13 @@ VALID_ENVIRONMENT = {
     # Relatif à dessein : c'est la forme que `.env.example` propose, donc celle que la plupart
     # des clones porteront, et la seule qui éprouve l'ancrage sur la racine du dépôt.
     "MEDIA_ROOT": "fichiers-de-test",
+    # Le disque, comme sur le poste : les variables du stockage R2 y sont vides, et sans effet.
+    "MEDIA_STORAGE": "disk",
+    "MEDIA_HOST": "",
+    "MEDIA_R2_ENDPOINT": "",
+    "MEDIA_R2_BUCKET": "",
+    "MEDIA_R2_ACCESS_KEY_ID": "",
+    "MEDIA_R2_SECRET_ACCESS_KEY": "",
     # L'origine du site, telle que les tests de CORS l'envoient ; une autre, pour l'origine refusée.
     "CORS_ALLOWED_ORIGINS": '["https://site.test"]',
 }
