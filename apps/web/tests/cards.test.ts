@@ -156,6 +156,12 @@ describe('la pose de la carte', () => {
   test("tire la pose du prototype de l'empreinte FNV-1a du slug", () => {
     // Calculée hors de JavaScript, par une empreinte FNV-1a 32 bits de référence en Python.
     expect(cardPose('portfolio')).toEqual({ rotation: -0.738, dx: -3.2640000000000002, dy: -1.56 })
+    // Les trois empreintes de `projet-0` ont le bit de signe à 1 : l'empreinte reste non signée.
+    expect(cardPose('projet-0')).toEqual({
+      rotation: -0.9180000000000001,
+      dx: -0.04800000000000004,
+      dy: -1.7520000000000002,
+    })
   })
 
   test("varie d'un projet à l'autre", () => {

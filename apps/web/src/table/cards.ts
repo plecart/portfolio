@@ -19,7 +19,9 @@ const CARD_KINDS: readonly Technology['kind'][] = ['language', 'framework', 'inf
 /** Le nombre de technologies qu'une carte montre au plus (spec §1.4). */
 const CARD_TECHNOLOGY_COUNT = 3
 
-/** L'écart de rotation d'une carte au plus, en degrés, de part et d'autre de 0 (spec §4.1). */
+/**
+ * L'écart de rotation d'une carte au plus, en degrés, de part et d'autre de 0 (spec §1.3, §4.1).
+ */
 const MAX_ROTATION = 3
 
 /** Le décalage d'une carte au plus sur chaque axe, en px, de part et d'autre de 0 (spec §4.1). */
