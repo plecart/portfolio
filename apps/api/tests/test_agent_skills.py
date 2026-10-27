@@ -4190,7 +4190,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " fermée sans PR — wontfix, doublon — ne se rejoue pas. Les cases `🔴 PR #<M>` — la"
             " petite PR d'un correctif évident (§4) — se rejouent une fois leur PR mergée. La"
             " session les trouve dans le corps (`gh issue view <plan> --json body -q .body | grep"
-            " -nE \"BUG #|PR #\"`) ; l'état de chaque issue, et la PR qui l'a fermée, sont un relevé"
+            " -nE \"🔴 (BUG|PR) #\"`) ; l'état de chaque issue, et la PR qui l'a fermée, sont un relevé"
             " du `releveur` (`gh issue view <N> --json state,closedByPullRequestsReferences`), comme"
             " l'état de chaque petite PR (`gh pr view <M> --json state,mergedAt`). Passée, la ligne"
             " entière devient `- [x] <texte de la case> — corrigé par #<PR>, <date>`, **sans**"
@@ -4313,8 +4313,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         (
             "**(c) Faire corriger** — la correction n'a jamais lieu dans cette session : (a)"
             " d'abord, qui qualifie ; elle passe ensuite par `cycle-pr`, dans sa propre session —"
-            " une petite PR sans issue pour un correctif évident, l'issue consignée pour un défaut"
-            " à étudier (`references/standard-correction-bug.md`) ; la case se rejoue à la reprise"
+            " une petite PR sans issue pour un correctif évident — la case marquée ` 🔴 correctif"
+            " évident — …` par `bug-vers-issue`, puis ` 🔴 PR #<M>` par la session de la petite PR"
+            " à sa draft (`cycle-pr` Étape 2) —, l'issue consignée pour un défaut à étudier"
+            " (`references/standard-correction-bug.md`) ; la case se rejoue à la reprise"
             " (§2), jamais dans la suite du contexte qui a corrigé."
         ),
     ),
@@ -5135,8 +5137,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7c-cycle-pr-marqueur-de-la-petite-pr": (
         CYCLE_PR_SKILL,
         (
-            "Née d'un échec de QA (case ` 🔴 correctif évident — …`), la draft ouverte, la session"
-            " remplace ce marqueur par ` 🔴 PR #<M>` sur la case, par une paire"
+            "Pour une draft née d'un échec de QA (case ` 🔴 correctif évident — …`), la session,"
+            " une fois la draft ouverte, remplace ce marqueur par ` 🔴 PR #<M>` sur la case, par"
+            " une paire"
             " (`python .claude/skills/cycle-pr/scripts/ecriture-relue.py checkbox patch <plan>"
             " --paires <fichier>`, `execution-qa/references/patch-checkbox-gh.md`) : c'est ce que"
             " lit la reprise de la QA."

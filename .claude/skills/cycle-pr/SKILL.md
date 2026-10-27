@@ -286,9 +286,9 @@ La PR draft porte **dès sa création** :
 - Le marqueur **draft**, qui dit « en cours, ne pas reviewer » et interdit le merge accidentel.
 
 Pour une **demande directe sans issue**, ouvrir quand même la draft : sans `Closes`, mais le
-travail reste visible du reste de la pipeline. Née d'un échec de QA (case
-` 🔴 correctif évident — …`), la draft ouverte, la session remplace ce marqueur par ` 🔴 PR #<M>`
-sur la case, par une paire
+travail reste visible du reste de la pipeline. Pour une draft née d'un échec de QA (case
+` 🔴 correctif évident — …`), la session, une fois la draft ouverte, remplace ce marqueur par
+` 🔴 PR #<M>` sur la case, par une paire
 (`python .claude/skills/cycle-pr/scripts/ecriture-relue.py checkbox patch <plan> --paires <fichier>`,
 `execution-qa/references/patch-checkbox-gh.md`) : c'est ce que lit la reprise de la QA.
 
