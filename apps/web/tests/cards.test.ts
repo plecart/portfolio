@@ -1,10 +1,10 @@
 /**
- * Les cartes de la table, en logique pure : leur ordre (spec §1.9), les technologies qu'elles
- * montrent (§1.4) et leur pose (§1.3, §4.1).
+ * Les cartes de la table, en logique pure : leur ordre (spec §1.9) et les technologies qu'elles
+ * montrent (§1.4).
  */
 import { describe, expect, test } from 'vitest'
-import { buildProject, type Project } from '../e2e/projects.ts'
-import { orderProjects } from '../src/table/cards.ts'
+import { buildProject, FILES_ORIGIN, type Project } from '../e2e/projects.ts'
+import { cardTechnologies, orderProjects, type Technology } from '../src/table/cards.ts'
 
 /** Un projet en cours, commencé à `started_on` : sans date de fin, comme l'API le sert. */
 function ongoing(slug: string, started_on: string): Project {
@@ -96,5 +96,46 @@ describe("l'ordre des cartes", () => {
 
   test('rend une table vide pour une liste vide', () => {
     expect(orderProjects([])).toEqual([])
+  })
+})
+
+/** Une technologie de ce type, nommée `name`. */
+function technology(name: string, kind: Technology['kind']): Technology {
+  return { name, kind, icon: `${FILES_ORIGIN}/icones/${name}.svg` }
+}
+
+/** Les noms des technologies que la carte montre. */
+function cardNames(technologies: Technology[]): string[] {
+  return cardTechnologies(technologies).map((shown) => shown.name)
+}
+
+describe('les technologies de la carte', () => {
+  test("montre les trois premières dans l'ordre de l'admin", () => {
+    const technologies = [
+      technology('react', 'framework'),
+      technology('typescript', 'language'),
+      technology('docker', 'infrastructure'),
+      technology('django', 'framework'),
+    ]
+    expect(cardNames(technologies)).toEqual(['react', 'typescript', 'docker'])
+  })
+
+  test('saute un outil sans le compter', () => {
+    const technologies = [
+      technology('figma', 'tool'),
+      technology('react', 'framework'),
+      technology('typescript', 'language'),
+      technology('docker', 'infrastructure'),
+    ]
+    expect(cardNames(technologies)).toEqual(['react', 'typescript', 'docker'])
+  })
+
+  test('montre toutes les technologies quand moins de trois sont éligibles', () => {
+    const technologies = [technology('python', 'language'), technology('git', 'tool')]
+    expect(cardNames(technologies)).toEqual(['python'])
+  })
+
+  test("ne montre rien quand le projet n'emploie que des outils", () => {
+    expect(cardNames([technology('figma', 'tool')])).toEqual([])
   })
 })
