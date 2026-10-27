@@ -4958,8 +4958,17 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         CONTRAINTES_RULE,
         (
             "3. **un correctif évident** — visible à la lecture des lignes, sans décision de"
-            " comportement — hors du périmètre de la PR courante → une **petite PR** par"
-            " `cycle-pr` (« Demande directe sans issue »), sans issue ;"
+            " comportement — hors du périmètre de la PR courante → une **petite PR** par la"
+            " **voie courte** de `cycle-pr`, sans issue ;"
+        ),
+    ),
+    # Coupe prudente (audit du 2026-10-27, §5) : la voie courte remplace cinq étapes du cycle pour
+    # un correctif évident borné ; l'épingle garde la liste des étapes remplacées, pas la prose.
+    "voie-courte-remplace-cinq-etapes": (
+        CYCLE_PR_SKILL,
+        (
+            "Elle **remplace** les Étapes 1, 2, 5, 7 et 8 ; les Étapes 3 et 6 s'appliquent telles"
+            " quelles, la session codant elle-même (3.1), l'Étape 4 sous la forme du point 3."
         ),
     ),
     "7c-cycle-pr-fumee-petite-pr-avant-le-brouillon": (
@@ -6310,7 +6319,7 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
     "premier-geste-sans-branche": (SESSION_RELECTURE_REF, "— aucune branche à créer —"),
     "observations-tenues-par-la-session-pr": (
         SESSION_RELECTURE_REF,
-        "elle n'écrit aucune entrée, ses candidates partent dans ses messages de constats",
+        "ses candidates partent dans ses messages de constats",
     ),
     "pousser-avant-le-reveil": (SESSION_RELECTURE_REF, "La session PR **pousse**, puis envoie"),
     "forme-du-reveil": (
@@ -6649,10 +6658,9 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         SESSION_RELECTURE_REF,
         "elle reçoit ses notes de fin de tour et ses messages, et la nettoie",
     ),
-    "charge-task-observer": (SESSION_RELECTURE_REF, "Elle charge `task-observer`"),
-    "plafond-de-la-pr": (
+    "ne-charge-pas-task-observer": (
         SESSION_RELECTURE_REF,
-        "le plafond de 3 entrées est celui de la PR, tenu par la session PR",
+        "Elle ne charge pas `task-observer` et n'écrit aucune entrée au journal",
     ),
     "en-attente-et-fin-de-tour": (SESSION_RELECTURE_REF, "Puis « en attente », et fin de tour."),
     "code-review-medium-seul-mesure": (
@@ -7101,7 +7109,8 @@ RENVOIS_AUX_BARREAUX = {
     CONTRAINTES_RULE: [4],
     BUG_VERS_ISSUE_SKILL: [1, 3],
     CONTRADICTION_SKILL: [2, 4],
-    CYCLE_PR_SKILL: [3],
+    CYCLE_PR_SKILL: [3, 3],
+    "CONTRIBUTING.md": [3],
     REPERCUSSIONS_SKILL: [4],
     VERS_ISSUES_SKILL: [4],
 }
