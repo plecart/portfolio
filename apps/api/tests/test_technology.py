@@ -2,11 +2,12 @@
 
 import pytest
 from config import strings
-from content.models import TechnologyKind
+from content.models import Technology, TechnologyKind
 from content.validators import validate_svg
 from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
 from django.db import IntegrityError, transaction
-from factories import SVG, svg_icon, technology, url_of_length
+from factories import SVG, saved, svg_icon, technology, url_of_length
 from refusals import refusals
 
 # Les bornes techniques du nom et du site, décidées au lot 1 : écrites ici, et non lues sur le
@@ -133,6 +134,28 @@ def test_une_icone_validee_reste_prete_a_etre_lue_depuis_le_debut() -> None:
     validate_svg(icon)
 
     assert icon.tell() == 0
+
+
+@pytest.mark.django_db
+def test_une_icone_stockee_n_est_pas_relue_a_l_enregistrement() -> None:
+    """Validée à son arrivée, l'icône stockée ne se relit plus : sur R2, chaque lecture serait un
+    téléchargement, et un objet absent du bucket refuserait une modification sans rapport."""
+    stored = saved(technology())
+    default_storage.delete(stored.icon.name or "")
+
+    Technology.objects.get(pk=stored.pk).full_clean()
+
+
+@pytest.mark.django_db
+def test_l_icone_qui_remplace_celle_d_une_technologie_enregistree_reste_validee() -> None:
+    """Seule l'icône stockée échappe à la relecture : celle qui la remplace est un téléversement."""
+    stored = saved(technology())
+    stored.icon = svg_icon("icone.png")
+
+    with pytest.raises(ValidationError) as refusal:
+        stored.full_clean()
+
+    assert refusals(refusal.value, "icon") == [("icon_not_svg", strings.ICON_NOT_SVG)]
 
 
 @pytest.mark.django_db
