@@ -5050,15 +5050,24 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " rejoue à la reprise."
         ),
     ),
+    # Passe 1 de la PR #163, I1 et I2 : la branche suit le prédicat du barreau, pas l'identité du
+    # parent, et le propriétaire (barreau 2) précède la petite PR. Classe d'I1, par la forme du
+    # geste (« démarrée par », « parent », « née d' » sur les lignes ajoutées du delta, obs 139),
+    # écrite avant le correctif : **5** branches, **1** fuyait, celle-ci ; indemnes, les 3 du message
+    # de fin, dont le prédicat est l'identité (`sessions-liees.md`, « Fin de travail »), et la draft
+    # de `cycle-pr` Étape 2, conditionnée sur sa case.
     "7c-bug-vers-issue-correctif-evident": (
         BUG_VERS_ISSUE_SKILL,
         (
             "**Correctif évident** — visible à la lecture des lignes, sans décision de"
             " comportement : l'attendu est déjà écrit (critère, spec, case) et le code le contredit"
-            " lisiblement. Session démarrée par une session PR (« Création d'issues en cours de"
-            " cycle ») : le correctif retourne à sa PR, barreau 1, par le message de fin. Sinon,"
-            " une petite PR par `cycle-pr` (« Demande directe sans issue »), dans sa propre"
-            " session :"
+            " lisiblement. La PR du parent encore ouverte, et le correctif y tient en moins d'un"
+            " commit (« Création d'issues en cours de cycle », barreau 1) : il lui retourne, par le"
+            " message de fin. Sinon, avant toute petite PR, la recherche du propriétaire de"
+            " l'étape 3, collecte du `releveur` : une issue ouverte ou une automatisation qui"
+            " possède le sujet reçoit le correctif, sous la forme que prévoit l'étape 3"
+            " (barreau 2). Sans propriétaire seulement, une petite PR par `cycle-pr` (« Demande"
+            " directe sans issue », barreau 3), dans sa propre session :"
         ),
     ),
     "7c-bug-vers-issue-correctif-evident-sans-issue": (
@@ -7086,7 +7095,7 @@ RENVOI_DE_BARREAU_FORMES: dict[str, tuple[str, list[int]]] = {
 # dans l'ordre du texte.
 RENVOIS_AUX_BARREAUX = {
     CONTRAINTES_RULE: [4],
-    BUG_VERS_ISSUE_SKILL: [1],
+    BUG_VERS_ISSUE_SKILL: [1, 2, 3],
     CONTRADICTION_SKILL: [2, 4],
     CYCLE_PR_SKILL: [3],
     REPERCUSSIONS_SKILL: [4],
