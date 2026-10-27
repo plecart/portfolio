@@ -2607,39 +2607,39 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # `CLAUDE.md`. Puis leurs renvois entrants : « amendé dans la session », 3 sites sur `81ae8c3`
     # (`grep` sur le texte aux blancs normalisés), la règle comprise ; le rapport du `developpeur`.
     "porteur-voie-v": (
-        ".claude/rules/contraintes.md",
+        CONTRAINTES_RULE,
         "Un `developpeur` ne la pose pas : il note son hypothèse et rend la `[V]` dans son rapport",
     ),
     "porteur-voie-v-executant-et-releveur": (
-        ".claude/rules/contraintes.md",
+        CONTRAINTES_RULE,
         "`executant` et `releveur` ne classent aucune question, ils remontent tout choix",
     ),
     "porteur-voie-c": (
-        ".claude/rules/contraintes.md",
+        CONTRAINTES_RULE,
         "Un `developpeur` s'arrête et remonte les deux citations",
     ),
     "porteur-explorer-plutot-que-demander": (
-        ".claude/rules/contraintes.md",
+        CONTRAINTES_RULE,
         (
             "par un `releveur` pour un relevé, l'`executant` pour une cartographie (`cycle-pr`"
             " Étape 1), la conclusion restant à la session"
         ),
     ),
     "porteur-creation-d-issues": (
-        ".claude/rules/contraintes.md",
+        CONTRAINTES_RULE,
         "un sous-agent n'ouvre ni issue ni brouillon, le `developpeur` remonte le vide dans son rapport",
     ),
-    "porteur-ecritures-distantes": (".claude/rules/contraintes.md", "La relecture est à qui écrit"),
+    "porteur-ecritures-distantes": (CONTRAINTES_RULE, "La relecture est à qui écrit"),
     "porteur-maintenance-continue": (
-        ".claude/rules/contraintes.md",
+        CONTRAINTES_RULE,
         "l'auteur du commit — le `developpeur` pour la doc descriptive de son bloc",
     ),
     "porteur-maintenance-amendement-reste-a-la-session": (
-        ".claude/rules/contraintes.md",
+        CONTRAINTES_RULE,
         "l'amendement d'une source de vérité reste à la session de dialogue",
     ),
     "porteur-points-d-arret-humains": (
-        ".claude/rules/contraintes.md",
+        CONTRAINTES_RULE,
         (
             "C'est la session PR qui prend l'arrêt : elle coupe le bloc du `developpeur` au commit"
             " qui assemble l'écran"
