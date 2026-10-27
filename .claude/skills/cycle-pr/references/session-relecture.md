@@ -30,9 +30,8 @@ premier geste ci-dessous et renvoie à ce fichier. Mesuré le 2026-10-20 sur la 
 **Premier geste de la session de relecture** :
 `git fetch origin && git switch --detach origin/<branche de la PR>` — aucune branche à créer —,
 puis les gestes de `pr-paralleles` étape 3, « Provisionner son worktree », pour les piles que le
-brief nomme, `hooks` exceptée. Elle charge `task-observer` ; le plafond de 3 entrées est celui de
-la PR, tenu par la session PR : elle n'écrit aucune entrée, ses candidates partent dans ses
-messages de constats. Puis « en attente », et fin de tour.
+brief nomme, `hooks` exceptée. Elle ne charge pas `task-observer` et n'écrit aucune entrée au
+journal : ses candidates partent dans ses messages de constats. Puis « en attente », et fin de tour.
 
 ## Réveil — un message par passe
 
