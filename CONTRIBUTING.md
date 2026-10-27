@@ -275,11 +275,12 @@ Chaque maillon nomme qui l'exécute ; la répartition des rôles est dans `CLAUD
    section « Décisions », que le brief reprend — pas laissées dans une conversation.
 3. **Implémenter** — `cycle-pr`, porté par la session PR, qui orchestre et délègue : briefing
    pré-PR (relevés au `releveur`, cartographie à l'`executant`) → **PR draft ouverte avant tout
-   code** → un `developpeur` neuf par bloc : TDD red-green-refactor, cycle
+   code** → un `developpeur` neuf par bloc de plus de ~50 lignes : TDD red-green-refactor, cycle
    `modif → test → cleanup → test → commit` (relecture à contexte vierge au socle, par la session
    de relecture que la session PR démarre à son go) → cleanup holistique par un `developpeur`
-   neuf → relecture à contexte vierge finale, par la même session → `gh pr ready` → CI → vérif
-   de fumée → vérification d'avant-go par le `verificateur`, que la session PR lance → merge.
+   neuf au-delà de 3 commits ou 150 lignes → relecture à contexte vierge finale, par la même
+   session → `gh pr ready` → CI → vérif de fumée → vérification d'avant-go par le `verificateur`,
+   que la session PR lance quand la PR ferme une issue ou croise une branche en vol → merge.
    Plusieurs PR en parallèle : `pr-paralleles` (la session lead démarre une session par issue,
    chacune dans un worktree de l'application, et tient le tableau
    de bord — le go reste humain, dans la fenêtre de la PR). Trop peu d'issues prêtes : son étape 0
