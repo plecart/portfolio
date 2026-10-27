@@ -8,8 +8,8 @@ décision 1, ADR 0015 ; tenu par `tests/test_images.py`). L'original est lu, jam
 from contextlib import suppress
 from io import BytesIO
 
-from django.core.files.base import ContentFile
 from django.core.files.storage import Storage
+from django.core.files.uploadedfile import SimpleUploadedFile
 from PIL import Image, ImageOps
 
 from content.images import DECODERS
@@ -49,7 +49,9 @@ def make_variants(storage: Storage, original_name: str) -> list[Variant]:
 
     L'original est lu par `read_original`, puis réduit à chaque largeur de `variant_widths`,
     hauteur en proportion arrondie — un pixel au moins —, jamais recadré (spec §1.11), et encodé
-    par `encode_variant`. Chaque variante est rangée dans le dossier de l'original sous sa
+    par `encode_variant`. Chaque variante est enregistrée sous le type `image/webp`, donné au
+    stockage et non deviné de l'extension : R2 sert l'objet sous le type reçu, et la table
+    intégrée de Python 3.12 ignore `.webp`. Elle est rangée dans le dossier de l'original sous sa
     largeur, `images/<identifiant>/<largeur>.webp` (décision 6) ; son `name` est celui que le
     stockage a retenu (`get_available_name`), un autre si le nom est pris — sur le disque comme
     sur R2, réglé pour ne pas écraser (`config/storage.py`) : le nettoyage d'un échec ne vise
@@ -78,7 +80,11 @@ def make_variants(storage: Storage, original_name: str) -> list[Variant]:
             # Le nom réservé avant l'écriture : un enregistrement qui échoue après avoir créé son
             # fichier ne rend pas le nom qu'il a pris.
             attempted.append(storage.get_available_name(f"{folder}/{width}.webp"))
-            content = ContentFile(encode_variant(image, width, height, profile))
+            content = SimpleUploadedFile(
+                attempted[-1],
+                encode_variant(image, width, height, profile),
+                content_type="image/webp",
+            )
             name = storage.save(attempted[-1], content)
             variants.append({"name": name, "width": width, "height": height})
     except BaseException:

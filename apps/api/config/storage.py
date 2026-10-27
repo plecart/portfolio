@@ -37,7 +37,6 @@ def media_storage(env: Env) -> dict[str, Any]:
                     # La région d'un bucket R2 vue par l'API S3 (doc Cloudflare R2).
                     "region_name": "auto",
                     "custom_domain": env.MEDIA_HOST,
-                    "querystring_auth": False,
                     "file_overwrite": False,
                 },
             }
