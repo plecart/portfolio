@@ -1,6 +1,7 @@
 /**
- * Les cartes de la table, en logique pure : leur ordre (spec §1.9) et les technologies qu'elles
- * montrent (§1.4). Les projets entrent tels que l'API les sert, rien n'est lu ailleurs.
+ * Les cartes de la table, en logique pure : leur ordre (spec §1.9), les technologies qu'elles
+ * montrent (§1.4) et leur pose (§1.3, §4.1). Les projets entrent tels que l'API les sert, rien
+ * n'est lu ailleurs.
  *
  * Typé depuis le schéma, et non par `api/projects.ts` : ce module-là lit `import.meta.env`, que
  * les tests, compilés sans les types de Vite (`tsconfig.node.json`), ne connaissent pas.
@@ -17,6 +18,19 @@ const CARD_KINDS: readonly Technology['kind'][] = ['language', 'framework', 'inf
 
 /** Le nombre de technologies qu'une carte montre au plus (spec §1.4). */
 const CARD_TECHNOLOGY_COUNT = 3
+
+/** L'écart de rotation d'une carte au plus, en degrés, de part et d'autre de 0 (spec §4.1). */
+const MAX_ROTATION = 3
+
+/** Le décalage d'une carte au plus sur chaque axe, en px, de part et d'autre de 0 (spec §4.1). */
+const MAX_OFFSET = 6
+
+/** Le nombre de pas d'un écart, entre ses deux bornes comprises (prototype retenu). */
+const JITTER_STEPS = 1000
+
+/** Les deux constantes de FNV-1a sur 32 bits : la valeur de départ et le nombre premier. */
+const FNV_OFFSET_BASIS = 2166136261
+const FNV_PRIME = 16777619
 
 /** Compare deux chaînes par unités de code — dates ISO, slugs —, sans dépendre de la locale. */
 function compareText(a: string, b: string): number {
@@ -68,4 +82,33 @@ export function cardTechnologies(technologies: readonly Technology[]): Technolog
   return technologies
     .filter((technology) => CARD_KINDS.includes(technology.kind))
     .slice(0, CARD_TECHNOLOGY_COUNT)
+}
+
+/** L'empreinte FNV-1a sur 32 bits d'un texte, caractère par caractère, en entier non signé. */
+function fnv1a(text: string): number {
+  let hash = FNV_OFFSET_BASIS
+  for (const char of text) {
+    hash ^= char.charCodeAt(0)
+    hash = Math.imul(hash, FNV_PRIME)
+  }
+  return hash >>> 0
+}
+
+/** Un écart tiré de l'empreinte de `seed`, dans [−amplitude, +amplitude], bornes comprises. */
+function jitter(seed: string, amplitude: number): number {
+  return (((fnv1a(seed) % (JITTER_STEPS + 1)) / JITTER_STEPS) * 2 - 1) * amplitude
+}
+
+/**
+ * La pose d'une carte sur la table (spec §1.3, §4.1) : une rotation et un décalage tirés de
+ * l'empreinte de son slug, identiques à chaque visite. Valeurs brutes, sans arrondi.
+ *
+ * @returns La rotation en degrés, dans ±3 ; le décalage `dx`, `dy` en px, dans ±6 sur chaque axe.
+ */
+export function cardPose(slug: string): { rotation: number; dx: number; dy: number } {
+  return {
+    rotation: jitter(`${slug}:r`, MAX_ROTATION),
+    dx: jitter(`${slug}:x`, MAX_OFFSET),
+    dy: jitter(`${slug}:y`, MAX_OFFSET),
+  }
 }

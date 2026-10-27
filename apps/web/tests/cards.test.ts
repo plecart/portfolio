@@ -1,10 +1,10 @@
 /**
- * Les cartes de la table, en logique pure : leur ordre (spec §1.9) et les technologies qu'elles
- * montrent (§1.4).
+ * Les cartes de la table, en logique pure : leur ordre (spec §1.9), les technologies qu'elles
+ * montrent (§1.4) et leur pose (§1.3, §4.1).
  */
 import { describe, expect, test } from 'vitest'
 import { buildProject, FILES_ORIGIN, type Project } from '../e2e/projects.ts'
-import { cardTechnologies, orderProjects, type Technology } from '../src/table/cards.ts'
+import { cardPose, cardTechnologies, orderProjects, type Technology } from '../src/table/cards.ts'
 
 /** Un projet en cours, commencé à `started_on` : sans date de fin, comme l'API le sert. */
 function ongoing(slug: string, started_on: string): Project {
@@ -137,5 +137,48 @@ describe('les technologies de la carte', () => {
 
   test("ne montre rien quand le projet n'emploie que des outils", () => {
     expect(cardNames([technology('figma', 'tool')])).toEqual([])
+  })
+})
+
+/** Les slugs d'une table de 200 projets. */
+const SLUGS = Array.from({ length: 200 }, (_, index) => `projet-${index}`)
+
+/** Le plus grand écart à zéro parmi ces valeurs. */
+function largest(values: number[]): number {
+  return Math.max(...values.map(Math.abs))
+}
+
+describe('la pose de la carte', () => {
+  test("reste la même d'une visite à l'autre", () => {
+    expect(cardPose('portfolio')).toEqual(cardPose('portfolio'))
+  })
+
+  test("tire la pose du prototype de l'empreinte FNV-1a du slug", () => {
+    // Calculée hors de JavaScript, par une empreinte FNV-1a 32 bits de référence en Python.
+    expect(cardPose('portfolio')).toEqual({ rotation: -0.738, dx: -3.2640000000000002, dy: -1.56 })
+  })
+
+  test("varie d'un projet à l'autre", () => {
+    const poses = new Set(SLUGS.map((slug) => JSON.stringify(cardPose(slug))))
+    expect(poses.size).toBe(SLUGS.length)
+  })
+
+  test("tourne de 3° au plus, dans un sens ou dans l'autre", () => {
+    expect(largest(SLUGS.map((slug) => cardPose(slug).rotation))).toBeLessThanOrEqual(3)
+  })
+
+  test('se décale de 6 px au plus sur chaque axe', () => {
+    const offsets = SLUGS.map(cardPose).flatMap(({ dx, dy }) => [dx, dy])
+    expect(largest(offsets)).toBeLessThanOrEqual(6)
+  })
+
+  // Des slugs dont l'empreinte tombe sur une borne, trouvés par la même empreinte de référence.
+  test.each([
+    ['projet-217', 'rotation', 3],
+    ['projet-2360', 'rotation', -3],
+    ['projet-277', 'dx', 6],
+    ['projet-341', 'dx', -6],
+  ] as const)('atteint ses bornes : %s, %s = %d', (slug, axis, bound) => {
+    expect(cardPose(slug)[axis]).toBe(bound)
   })
 })
