@@ -206,6 +206,16 @@ def test_le_binaire_compile_est_de_la_version_de_l_image_de_base() -> None:
     assert compiled == image_output(image, "printenv", "CADDY_VERSION").strip()
 
 
+def test_l_image_ne_porte_pas_curl() -> None:
+    """Le Dockerfile retire `curl` de l'image de base, et `libcurl` avec lui — son commentaire dit
+    pourquoi : leurs avis ne concernent plus l'image (CVE-2026-92392). `busybox`, dont la sonde de
+    production appelle `wget`, est le témoin que la liste des paquets a bien été lue."""
+    installed = image_output(loaded_image("caddy"), "apk", "info").split()
+
+    assert "busybox" in installed
+    assert {"curl", "libcurl"}.isdisjoint(installed)
+
+
 def test_l_accueil_est_servi_sans_cache(stack: Stack) -> None:
     """`index.html` change à chaque compilation et cite les fichiers hachés du moment : servi en
     `no-cache`, il est revalidé à chaque visite, jamais servi périmé."""
