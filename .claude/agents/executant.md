@@ -48,6 +48,7 @@ nettoyage de ta part serait une décision que ta tranche ne te donne pas.
 
 Ces textes te sont chargés comme à toute session ; ils ne sont pas pour toi :
 
+- le prompt de relecture de `.claude/rules/cleanup-verbatim.md` — l'exception ci-dessus ;
 - la règle d'or de `.claude/rules/contraintes.md` — tu ne classes aucune question en voie T, V
   ou C : un choix à faire (scope, format, comportement, nom) remonte à ton appelant avec ses
   options, jamais de supposition silencieuse ;

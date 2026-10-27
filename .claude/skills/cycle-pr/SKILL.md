@@ -53,26 +53,34 @@ Un **correctif évident** au sens du barreau 3 de `.claude/rules/contraintes.md`
 lecture des lignes, sans décision de comportement — dont le diff attendu tient en **≤ 50 lignes et
 ≤ 3 fichiers**, sans zone sensible ni surface visible (`.claude/pipeline.config.md`, « Périmètre »)
 et sans toucher `.claude/`, emprunte cette voie. Elle **remplace** les Étapes 1, 2, 5, 7 et 8 ;
-les Étapes 3 et 6 s'appliquent telles quelles, la session codant elle-même (3.1), l'Étape 4 sous
-la forme du point 3. Dès qu'une
-condition tombe en cours de route — diff qui dépasse, décision à prendre, fichier de `.claude/` —,
-la PR rejoint le cycle complet à l'Étape 1, et le body le dit.
+les Étapes 3 et 6 s'appliquent telles quelles — 3.2 et 3.4 réduits au `lint` et au test ciblé —,
+la session codant elle-même (3.1), l'Étape 4 sous la forme du point 3. Dès qu'une condition tombe
+en cours de route — diff qui dépasse, décision à prendre, fichier de `.claude/` —, la PR repasse en
+draft (`gh pr ready --undo`), son body reçoit le briefing de l'Étape 1, et le cycle complet reprend
+à l'étape atteinte ; le body le dit.
 
 1. **Branche** derrière la porte de fraîcheur (Étape 1) ; pas de sonde d'outillage, le premier
    commit est la sonde.
-2. **Un commit TDD par la session** — le test vu rouge reste —, le prompt de
-   `.claude/rules/cleanup-verbatim.md` mot pour mot, `lint` et test ciblé verts ; push ;
-   `gh pr create` **direct, non draft**, body : Summary, Changes et une ligne « Relecture
-   indépendante ». La qualification de correctif évident s'y écrit avec sa preuve (Étape 1,
-   « Porte d'entrée obligatoire »).
+2. **Un commit TDD par la session**, par le cycle 3.1→3.5 — le test vu rouge reste, le prompt de
+   `.claude/rules/cleanup-verbatim.md` mot pour mot, `lint` et test ciblé verts — ; push ;
+   `gh pr create` **direct, non draft**, `--assignee @me`, label et milestone
+   (`.claude/pipeline.config.md`, « Métadonnées d'une PR »), body : Summary, Changes et une ligne
+   « Relecture indépendante ». La qualification de correctif évident s'y écrit avec sa preuve
+   (Étape 1, « Porte d'entrée obligatoire »). Née d'une case ` 🔴 correctif évident — …` d'un
+   plan de QA, la session la remplace par ` 🔴 PR #<M>` dès l'ouverture, par le geste de l'Étape 2.
 3. **Une passe** de relecture à contexte vierge : le sous-agent `relecteur`
    ([references/session-relecture.md](references/session-relecture.md), « Repli »), sans session
-   liée, et sans worktree si le diff n'ajoute ni ne modifie aucun test à muter ; puis
-   `/code-review low`. Mêmes sévérités et même traitement qu'en 4.2.
+   liée ; avant lui, la session joue `/code-review medium` et, si le diff touche une surface
+   exposée, `/security-review` (même référence, « Repli »). Mêmes sévérités et même traitement
+   qu'en 4.2.
 4. **CI verte**, lue dans `gh pr checks` — pas d'`attente-ci.py` en fond —, puis go humain, puis
-   le merge par la porte de « Le go, puis le merge » (Étape 7), inchangée.
-5. Ni `verificateur`, ni bilan chiffré, ni `repercussions` : sans issue, rien à répercuter — sauf
-   si le diff touche un fichier de la section « Sources de vérité », qui rend l'Étape 8.
+   le merge par la porte de « Le go, puis le merge » (Étape 7), le `<SHA du trunk éprouvé>` lu par
+   les deux commandes de « Rejouer les vérifications périmées » et noté dans le body ; trunk
+   avancé : rejouer, sans `verificateur`.
+5. Ni `verificateur`, ni bilan chiffré, ni `repercussions` — sauf si le diff touche un fichier de
+   la section « Sources de vérité », ou si un résidu a été rangé au barreau 2 en cours de cycle :
+   la passe `repercussions` de l'Étape 8 est alors due. Sinon, un `grep` des ancres du diff sur
+   `docs/` et sur les issues ouvertes (`gh issue list --search <ancre>`), une ligne dans le body.
 
 Les cinq invariants tiennent : commit vert, go humain, relecture indépendante, doc dans le commit,
 minimalisme (`ponytail`).
@@ -153,7 +161,8 @@ l'issue dès les outils éprouvés :
 - **Demande directe sans issue** → l'interrogatoire s'applique aussi ; il n'y a pas de raccourci
   parce que le travail n'a pas de ticket. Un correctif évident — visible à la lecture, sans
   décision de comportement (`contraintes.md`, barreau 3) — n'a rien à interroger : sa
-  qualification, écrite dans le body de la draft avec sa preuve, en tient lieu.
+  qualification, écrite dans le body de la PR — draft, ou PR de la voie courte — avec sa preuve,
+  en tient lieu.
 
 Le point n'est pas de cocher une case : c'est que **les décisions tranchées soient écrites**, dans
 l'issue — brief amendé s'il est contredit — et dans le briefing. Elles seront relues par une
@@ -596,7 +605,8 @@ dans `.claude/rules/contraintes.md`, « Points d'arrêt humains », source uniqu
 ## Étape 4 — Relecture indépendante
 
 Deux relectures. Le cleanup pass holistique (4.1) quand tous les commits sont faits. La relecture
-à contexte vierge (4.2) **en deux temps** : une première fois dès que le socle est posé, en plein
+à contexte vierge (4.2) **en deux temps** — une seule passe quand la PR tient en un commit de
+code — : une première fois dès que le socle est posé, en plein
 cycle de commit ; une seconde après 4.1, sur ce qui a été écrit depuis la première — ou sur toute
 la branche, `<base>..HEAD`, si aucun commit n'a posé de socle. `<base>` est le point de fork,
 `git merge-base origin/main HEAD`, jamais le nom du trunk : une plage adossée à un trunk qui
@@ -608,8 +618,9 @@ frontières), naming entre commits, edge cases / erreurs / race conditions, **du
 inter-commits**. C'est le seul regard global sur le code avant la relecture à contexte vierge — le
 regard local, c'est 3.3, à chaque commit ; il n'y en a pas de troisième avant le merge. La session
 PR le confie à un `developpeur` neuf, qui ne rend que des commits, **au-delà de 3 commits de code
-ou de 150 lignes de diff ; en dessous, elle l'exécute elle-même** ; son brief exige aussi la passe
-« affirmations » de `cleanup-verbatim.md` sur tout le delta, dont il rend le dénombrement
+ou de 150 lignes de diff ; en dessous, elle l'exécute elle-même** ; la passe « affirmations » de
+`cleanup-verbatim.md` s'y joue aussi sur tout le delta — exigée par le brief du `developpeur`, ou
+faite par la session —, avec son dénombrement
 (N affirmations, k établies, N−k non vérifiées), que la session PR inscrit dans les Notes avant la
 première vérification d'avant-go (obs 113). Puis la seconde passe 4.2.
 
@@ -751,9 +762,8 @@ deux correctifs n'ont rien en commun), un cycle complet 3.1→3.5 pour le groupe
 passe s'appliquent en **un commit groupé** — un remplacement verbatim au `releveur`, une
 reformulation à l'`executant`, en fond pendant que la session PR lit les importants et écrit leur
 brief, sans éditer avant leur retour puisque l'arbre est partagé —, ou s'écartent avec leur
-raison dans le body (Étape 5). **Les mineurs d'une passe ne rouvrent jamais de relance** : ils
-s'appliquent dans le commit suivant s'il y en a un, sinon s'écartent avec leur raison dans le body.
-Aucun registre ailleurs : un mineur écarté qui compte
+raison dans le body (Étape 5). **Les mineurs d'une passe ne rouvrent jamais de relance** : leur
+commit groupé n'est pas relu. Aucun registre ailleurs : un mineur écarté qui compte
 encore reviendra à la prochaine relecture de la zone ; s'il ne revient pas, il ne comptait pas. Un
 constat de la **première** passe s'absorbe de préférence dans le commit à venir qui touche sa
 zone.
@@ -1088,8 +1098,8 @@ brouillon soumis au mainteneur. Jamais un `gh issue create` de la session.
 
 **La session PR lance son `verificateur`** (`.claude/agents/verificateur.md`), sous-agent éphémère,
 un par (PR, go), qui ne rend qu'un verdict (#134, décision 2), **si la PR ferme une issue
-(`Closes`) ou si `gh pr list` montre une autre branche en vol touchant ses fichiers ; sinon la
-porte de merge suffit** — en vague comme hors vague, le lead ne le lance plus (`pr-paralleles`
+(`Closes`), porte des décisions verrouillées dans ses Notes, ou si `gh pr list` montre une autre
+branche en vol touchant ses fichiers ; sinon la porte de merge suffit** — en vague comme hors vague, le lead ne le lance plus (`pr-paralleles`
 Étape 6). Il reçoit le numéro de la PR, celui de l'issue, le chemin absolu du worktree et la liste des autres branches en vol (`gh pr list`), jamais le récit
 de la session. Hors vague et hors lot, l'accord du mainteneur se demande **avec les `[V]` du
 go du briefing** (Étape 1) — demandé à la fin, il attend la prochaine présence : 6 h 37 d'absence
@@ -1335,13 +1345,14 @@ contacts humains et des pairs. Re-mesurer le cycle précédent avec le script co
 transcripts existent encore, ou le dire sur la ligne de comparaison.
 
 La PR et la conversation qui l'a résolue ont pu acter des décisions, déplacer un contrat d'interface, déjà faire une partie d'un autre lot, ou rendre une
-hypothèse caduque ailleurs. **Immédiatement après le merge**, la session PR lance le skill
-`repercussions` — elle tient le brief, les Notes et les constats de la PR, c'est le moment où
-l'analyse est la plus riche. La collecte (delta, issues du thème, briefs pré-filtrés par ancre)
-part à un `releveur` ; le go d'édition se demande au mainteneur dans la fenêtre de la session PR.
-**La passe se fait si la PR porte `Closes #N` ou touche un fichier de la section « Sources de
-vérité »** ; sinon — demande directe sans issue —, un `grep` des ancres du diff sur `docs/` par la
-session, et une ligne dans le body.
+hypothèse caduque ailleurs. **La passe est due si la PR porte `Closes #N`, touche un fichier de la
+section « Sources de vérité », ou a rangé un résidu au barreau 2 en cours de cycle** ; sinon —
+demande directe sans issue —, un `grep` des ancres du diff sur `docs/` et sur les issues ouvertes
+(`gh issue list --search <ancre>`) par la session, et une ligne dans le body. Quand elle est due,
+**immédiatement après le merge**, la session PR lance le skill `repercussions` — elle tient le
+brief, les Notes et les constats de la PR, c'est le moment où l'analyse est la plus riche. La
+collecte (delta, issues du thème, briefs pré-filtrés par ancre) part à un `releveur` ; le go
+d'édition se demande au mainteneur dans la fenêtre de la session PR.
 
 Il confronte le **delta réel** de la PR aux issues du **même thème** et à celles qui **mentionnent
 une ancre** du delta (symbole, format, module, décision), puis **corrige le corps** de celles dont
@@ -1352,7 +1363,8 @@ Si une issue déjà `ready-for-agent` voit son **périmètre** ou une **décisio
 par cette passe, elle repasse en `needs-interrogation` : son interrogatoire portait sur une spec
 qui n'existe plus.
 
-Ne pas considérer la PR « terminée » tant que cette passe n'a pas été faite (même si la conclusion
+Quand elle est due, ne pas considérer la PR « terminée » tant que cette passe n'a pas été faite
+(même si la conclusion
 est « aucune répercussion »).
 
 **Cas découpé : la frontière de lot se franchit par la session sortante.** Sur un lot
@@ -1443,15 +1455,15 @@ Une session sait qu'elle a fini avant que le lead ne le sache : c'est elle qui p
 
 1. Tout l'effort de questions se fait **avant** de coder (briefing pré-PR + interrogatoire) — et
    une question technique ne se pose pas : elle se décide et se trace (`[T]`).
-2. **La PR draft s'ouvre avant la première ligne de code**, avec `Closes #N`. C'est ce qui rend le
+2. **La PR draft s'ouvre avant la première ligne de code** (hors voie courte), avec `Closes #N`. C'est ce qui rend le
    travail visible comme *en cours* : sans elle, une autre session réécrira la spec de cette issue
    en croyant que personne ne travaille dessus.
 3. Le cycle `modif → test → cleanup → test → commit` s'applique à chaque commit, triviaux
    compris.
 4. **Deux filets de cleanup** : un par commit (regard local), un sur la PR entière avant la
    seconde relecture (4.1, regard global, inter-commits) — et une relecture à contexte vierge
-   **en deux temps**, au socle et à la fin, jamais par commit, par **une seule session de
-   relecture pour toute la PR**, démarrée au go et réveillée par message, dans son propre
+   **en deux temps** (une passe pour une PR à un commit de code ; voie courte : un sous-agent), au
+   socle et à la fin, jamais par commit, par **une seule session de relecture pour toute la PR**, démarrée au go et réveillée par message, dans son propre
    worktree, plafonnée à deux passes et une relance qui lui reviennent. Elle ne se nettoie qu'à
    la fermeture de la boucle : plus tôt, la relance n'a plus de destinataire.
 5. La PR n'est **terminée qu'après la passe `repercussions`**, quand elle ferme une issue ou

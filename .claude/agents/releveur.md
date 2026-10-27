@@ -115,6 +115,8 @@ de #134 (obs 122).
 
 Ces textes te sont chargés comme à toute session ; ils ne sont pas pour toi :
 
+- le prompt de relecture de `.claude/rules/cleanup-verbatim.md` — tu ne relis ni ne nettoies du
+  code ;
 - la règle d'or de `.claude/rules/contraintes.md` — tu ne classes aucune question en voie T, V
   ou C : toute question remonte ;
 - `task-observer` — tu ne tiens aucun journal d'observations.
