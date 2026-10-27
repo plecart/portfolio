@@ -1,7 +1,7 @@
 # Image `caddy` : le front compilé, servi en statique (ADR 0008), son Caddyfile de production, et
-# son image de base (ADR 0014), dont seul le binaire `caddy` est remplacé : le projet le compile
-# avec le Go de l'image `golang` épinglée ci-dessous, sa release embarquant un Go en retard sur ses
-# correctifs (ADR 0018).
+# son image de base (ADR 0014), dont seul le binaire `caddy` est remplacé et `curl` retiré : le
+# projet compile `caddy` avec le Go de l'image `golang` épinglée ci-dessous, sa release embarquant un
+# Go en retard sur ses correctifs (ADR 0018).
 #
 # Contexte de build : la racine du dépôt, comme pour `api`. Le `.dockerignore` n'y laisse entrer
 # du front que sa compilation, `apps/web/dist`, que `make build` produit s'il manque.
