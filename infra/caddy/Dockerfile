@@ -42,6 +42,13 @@ RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/g
 
 FROM caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
 
+# `curl` vient de l'image de base et rien ne l'appelle : la sonde de production appelle `wget`
+# (busybox), et le binaire `caddy`, statique, ne charge aucune bibliothèque. Retiré avec ce qu'il
+# tire — `libcurl`, `brotli-libs`… —, il n'apporte plus ses avis au scan. `--no-network` : un
+# retrait n'a pas besoin des dépôts, dont `apk` laisserait sinon les index dans la couche (3 Mo,
+# mesuré) ; la couche ne dépend donc que de l'image de base, et son cache ne périme rien.
+RUN apk del --no-network curl
+
 # À la place de celui de l'image. Le sien porte `cap_net_bind_service=ep`, que la copie perd :
 # l'image tourne en root, qui ouvre le port 80 sans elle.
 COPY --from=go /go/bin/caddy /usr/bin/caddy
