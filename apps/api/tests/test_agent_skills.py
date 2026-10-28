@@ -7087,9 +7087,10 @@ def test_un_controle_de_proprete_par_git_status_voit_les_fichiers_non_suivis() -
     fichier non suivi (mesuré le 2026-10-21, git 2.47.1, bloc B du lot 4a de #134).
 
     **Population** : la prose du harnais (`HARNESS_PROSE_GLOBS`). Recensé le 2026-10-21 :
-    2 mentions sans l'option, dont 1 contrôle — `relecteur.md`, corrigé ; l'autre, dans
-    `cycle-pr/references/portes.md` (« Au blocage »), écarte la commande pour lire l'avance d'une branche. Vu rouge sur `relecteur.md`
-    avant correction.
+    2 mentions sans l'option, dont 1 contrôle — `relecteur.md`, corrigé ; l'autre, à l'Étape 1
+    de `cycle-pr`, déplacée par #177 dans `cycle-pr/references/portes.md` (« Au blocage »),
+    écarte la commande pour lire l'avance d'une branche. Vu rouge sur `relecteur.md` avant
+    correction.
     """
     sans_l_option = re.compile(r"git status --porcelain(?! --untracked-files=normal)")
     sites = [
@@ -7222,9 +7223,8 @@ RENVOI_DE_REFERENCE_FORMES: dict[str, tuple[str, list[tuple[str, str]]]] = {
     "lien-vers-un-autre-fichier-hors-classe": ("→ [references/a.md](references/b.md), « T ».", []),
     "lien-sans-fleche-hors-classe": ("[references/a.md](references/a.md), « T »", []),
 }
-RENVOIS_DE_CYCLE_PR = RENVOI_DE_REFERENCE.findall(
-    (REPOSITORY_ROOT / CYCLE_PR_SKILL).read_text(encoding="utf-8")
-)
+TEXTE_DE_CYCLE_PR = (REPOSITORY_ROOT / CYCLE_PR_SKILL).read_text(encoding="utf-8")
+RENVOIS_DE_CYCLE_PR = RENVOI_DE_REFERENCE.findall(TEXTE_DE_CYCLE_PR)
 
 
 @pytest.mark.parametrize(
@@ -7239,9 +7239,12 @@ def test_un_renvoi_de_reference_se_lit_par_son_fichier_et_son_titre(
     assert RENVOI_DE_REFERENCE.findall(texte) == renvois
 
 
-def test_cycle_pr_porte_des_renvois_de_reference() -> None:
-    """Le test suivant ne passe pas à vide : 34 renvois au commit qui l'introduit."""
+def test_chaque_fleche_de_cycle_pr_vers_une_reference_est_lue_par_le_motif() -> None:
+    """Le test suivant ne passe ni à vide ni à côté : 34 renvois au commit qui l'introduit, et
+    chaque `→ [references/` du skill en est un. Un renvoi mal formé — point final retiré, ligne
+    coupée — sortait sinon de la population en silence, et le test suivant restait vert."""
     assert RENVOIS_DE_CYCLE_PR
+    assert len(RENVOIS_DE_CYCLE_PR) == TEXTE_DE_CYCLE_PR.count("→ [references/")
 
 
 @pytest.mark.parametrize(
