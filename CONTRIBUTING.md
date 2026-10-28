@@ -126,6 +126,18 @@ mot de passe :
 docker compose --env-file infra/dev.env -f infra/compose.dev.yml logs api
 ```
 
+L'admin exige aussi un second facteur : sans lui, il ne sert que sa page de connexion. Le compte
+posé, enrôle-le une fois — une application TOTP et dix codes de secours à usage unique :
+
+```
+docker compose --env-file infra/dev.env -f infra/compose.dev.yml exec api python manage.py enroll_second_factor
+```
+
+La commande imprime une seule fois l'URI `otpauth://`, à ouvrir ou coller dans une application
+TOTP, puis les dix codes. La connexion se fait en deux envois : nom, mot de passe et jeton, puis
+l'appareil — l'application ou un code de secours — et son jeton. Relancée, la commande ré-enrôle :
+l'ancienne application et les anciens codes ne valent plus.
+
 La pile démarrée, ouvrir `http://127.0.0.1:8000/admin/`.
 
 Toutes les cibles disponibles : `Makefile`, repris dans la section « Commandes du projet » de

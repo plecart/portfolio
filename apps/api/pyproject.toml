@@ -27,6 +27,13 @@ requires-python = ">=3.12"
 # `django-ninja` porte l'API publique (ADR 0001) : `content/api.py` et `content/schemas.py` sont
 # les seuls modules qui l'importent, ce que `tests/test_api.py` tient.
 #
+# `django-otp` porte le second facteur de l'admin (#6) : `OTPAdminSite`, site par défaut
+# (`config/apps.py`), son middleware, et les deux appareils, TOTP et codes de secours. Sans l'extra
+# `qrcode` : l'URI `otpauth://` qu'imprime `enroll_second_factor` suffit à l'application TOTP. Le
+# paquet n'est pas typé — ni `py.typed` en 1.7.5, ni `types-django-otp` ou `django-otp-stubs` sur
+# PyPI (2026-10-28) : chacun de ses imports porte `# pyright: ignore[reportMissingTypeStubs]`,
+# plutôt qu'un réglage de `[tool.pyright]` qui éteindrait la règle pour tous.
+#
 # `django-cors-headers` restreint CORS à l'origine du site (ADR 0008). Aucun module ne l'importe :
 # Django le charge par `INSTALLED_APPS` et `MIDDLEWARE`, et les tests de CORS de `tests/test_api.py`
 # l'atteignent par la route.
@@ -45,6 +52,7 @@ dependencies = [
     "django>=6.0",
     "django-cors-headers>=4.9.0",
     "django-ninja>=1.7.1",
+    "django-otp>=1.7.5",
     "django-storages[s3]>=1.14.6",
     "django-stubs-ext>=6.1.1",
     "gunicorn>=23",

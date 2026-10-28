@@ -2,6 +2,7 @@
 
 from collections.abc import Generator
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from config.celery import app as celery_app
@@ -9,9 +10,14 @@ from config.database import database_settings
 from containers import postgres, running
 from django.conf import settings
 from django.core.management import call_command
-from django.test import override_settings
+from django.test import Client, override_settings
 from process_environment import VALID_ENVIRONMENT
 from pydantic import PostgresDsn, TypeAdapter
+
+# Ce module se charge aussi sans réglages (`test_sans_reglages_chaque_test_echoue`), et un modèle
+# ne s'importe qu'avec eux : les fixtures qui en demandent un l'importent elles-mêmes.
+if TYPE_CHECKING:
+    from django.contrib.auth.models import User
 
 UNCONFIGURED = (
     "Django n'est pas configuré pour les tests : le greffon `process_environment`, chargé par "
@@ -76,6 +82,31 @@ def synchronous_tasks() -> None:
     prouve rien du worker, que la fumée sur la pile complète éprouve (#26).
     """
     celery_app.conf.update(task_always_eager=True, task_eager_propagates=True)
+
+
+@pytest.fixture
+def admin_client(admin_user: "User") -> Client:
+    """Le client de pytest-django, connecté en superutilisateur et vérifié par un second facteur.
+
+    Remplace la fixture du même nom de pytest-django : l'admin (`OTPAdminSite`, `config/apps.py`)
+    ne sert aucune page à un compte qu'aucun appareil n'a vérifié. Un seul point pour tous les
+    tests de l'admin. La vérification est celle que `django_otp.login` pose dans la session à la
+    connexion — l'identifiant d'un appareil confirmé du compte —, sans passer par le formulaire,
+    que `test_admin_access.py` éprouve.
+    """
+    from django_otp import DEVICE_ID_SESSION_KEY  # pyright: ignore[reportMissingTypeStubs]
+    from django_otp.plugins.otp_totp.models import (  # pyright: ignore[reportMissingTypeStubs]
+        TOTPDevice,
+    )
+
+    client = Client()
+    client.force_login(admin_user)
+    device = TOTPDevice(user=admin_user, name="test")
+    device.save()
+    session = client.session
+    session[DEVICE_ID_SESSION_KEY] = device.persistent_id
+    session.save()
+    return client
 
 
 @pytest.fixture(scope="session")
