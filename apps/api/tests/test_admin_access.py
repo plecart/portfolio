@@ -25,7 +25,7 @@ from django_otp.plugins.otp_static.models import (  # pyright: ignore[reportMiss
 )
 from django_otp.plugins.otp_totp.models import TOTPDevice  # pyright: ignore[reportMissingTypeStubs]
 from factories import saved
-from test_security_headers import header_nonces, tag_nonces
+from test_security_headers import INLINE_CODE, header_nonces, tag_nonces
 
 USERNAME = "auteur-du-portfolio"
 PASSWORD = "phrase-de-passe-du-superutilisateur"
@@ -144,14 +144,14 @@ def test_l_admin_ne_propose_pas_l_ecran(admin_client: Client, model: type[Model]
 @pytest.mark.django_db
 @pytest.mark.parametrize("route", SCREENS)
 def test_chaque_ecran_s_ouvre_sous_la_csp(admin_client: Client, route: str) -> None:
-    """Il s'ouvre, et chacune de ses balises `<script>` et `<style>` porte le nonce que sa CSP
-    autorise : aucune n'est refusée au navigateur (ADR 0020)."""
+    """Il s'ouvre, chacune de ses balises `<script>` et `<style>` porte le nonce que sa CSP
+    autorise, et aucun attribut n'y porte de code en ligne : rien n'est refusé au navigateur
+    (ADR 0020)."""
     response = admin_client.get(reverse(route))
+    page = response.content.decode()
 
-    assert (response.status_code, tag_nonces(response.content.decode())) == (
-        200,
-        header_nonces(response),
-    )
+    assert (response.status_code, tag_nonces(page)) == (200, header_nonces(response))
+    assert INLINE_CODE.findall(page) == []
 
 
 @pytest.mark.parametrize("route", SCREENS)
