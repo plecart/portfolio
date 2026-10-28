@@ -308,8 +308,9 @@ def run_bounded(
     check: bool = True,
     timeout: float = DOCKER_DEADLINE,
 ) -> subprocess.CompletedProcess[bytes]:
-    """`command` jusqu'au bout, ou `TimeoutExpired` au bout de `timeout` secondes, toute sa
-    descendance tuée. `subprocess.run(timeout=…)` ne tue que l'enfant direct puis, sous Windows,
+    """`command` jusqu'au bout, ou `TimeoutExpired` au bout de `timeout` secondes sans attendre ses
+    tubes — sa descendance tuée sous Windows (`taskkill /T`), l'enfant direct seul ailleurs, où
+    rien n'attend les tubes. `subprocess.run(timeout=…)` ne tue que l'enfant direct puis, sous Windows,
     attend les tubes que tient sa descendance — `docker compose` et `docker buildx` sont des
     plugins que `docker` lance en enfant : 46 s pour un délai de 5 s sur un `buildx`, mesuré à la
     relecture de la PR #185. Tout lancement Docker d'un test passe par ici. Sauf `check=False`, un
@@ -871,9 +872,10 @@ def test_aucun_fichier_lu_par_un_conteneur_ne_porte_de_retour_windows() -> None:
 
 def docker_launches() -> dict[str, str]:
     """Les lancements Docker des tests du back et des images, par `fichier:ligne`, avec leur
-    lanceur : chaque `subprocess.run`, `subprocess.Popen` ou `run_bounded` dont la commande nomme
-    `docker` en littéral ou vient de `compose_command`, lu par l'analyseur de Python. Une commande
-    rangée dans une variable lui échappe."""
+    lanceur : chaque `subprocess.run`, `subprocess.Popen` ou `run_bounded` des tests des images —
+    tous lancent Docker, directement ou par un script (`restore.sh`) —, et ceux des tests du back
+    dont la commande nomme `docker` en littéral, lus par l'analyseur de Python. Dans les tests du
+    back, une commande rangée dans une variable leur échappe."""
     return {
         f"{module.relative_to(REPOSITORY_ROOT).as_posix()}:{node.lineno}": ast.unparse(node.func)
         for folder in ("apps/api/tests", "infra/tests")
@@ -882,17 +884,15 @@ def docker_launches() -> dict[str, str]:
         if isinstance(node, ast.Call)
         and ast.unparse(node.func) in {"subprocess.run", "subprocess.Popen", "run_bounded"}
         and node.args
-        and (
-            "'docker'" in ast.unparse(node.args[0])
-            or ast.unparse(node.args[0]).startswith("compose_command(")
-        )
+        and (folder == "infra/tests" or "'docker'" in ast.unparse(node.args[0]))
     }
 
 
 def test_chaque_lancement_docker_d_un_test_passe_par_run_bounded() -> None:
     """Un conteneur qui ne finit pas fait échouer son test par `TimeoutExpired`, au lieu de figer
     la suite : aucun `subprocess.run`, dont le délai attend la descendance sous Windows. Un `Popen`
-    garde le sien à son attente, `communicate(timeout=…)`, qui lève sans rien attendre."""
+    porte le sien à son attente, `communicate(timeout=…)`, qui lève sans rien attendre — un délai
+    que ce test ne garde pas."""
     launches = docker_launches()
 
     assert launches, "aucun lancement Docker lu — la commande a-t-elle quitté son littéral ?"
@@ -909,3 +909,13 @@ def test_run_bounded_rend_la_main_au_delai_quand_un_petit_fils_tient_les_tubes()
     with pytest.raises(subprocess.TimeoutExpired):
         run_bounded([sys.executable, "-c", grandchild], timeout=1)
     assert time.monotonic() - started < 15
+
+
+def test_run_bounded_fait_echouer_un_code_non_nul_sa_sortie_d_erreur_pour_message() -> None:
+    """Sans cette garde, une commande Docker en échec rendrait une sortie vide, et un test qui
+    affirme une absence — aucun conteneur survivant — passerait à vide."""
+    failing = [sys.executable, "-c", "import sys; sys.exit('panne de Docker')"]
+
+    with pytest.raises(AssertionError, match="panne de Docker"):
+        run_bounded(failing)
+    assert run_bounded(failing, check=False).returncode == 1
