@@ -180,7 +180,7 @@ vulnerabilities:
   # statiques et un reverse proxy interne vers `api`, routés par nom d'hôte, en HTTP, sans TLS ni
   # certificat : Cloudflare le termine, `cloudflared` est la seule entrée (cadrage §7, D45).
   # HTTP/1.1 seulement (`protocols h1`) ; ni `templates`, ni `file_server browse`, ni `tracing`,
-  # ni amont en HTTPS. L'atteinte est jugée sur cette configuration, pas sur un graphe d'appels :
+  # ni `acme_server`, ni amont en HTTPS. L'atteinte est jugée sur cette configuration, pas sur un graphe d'appels :
   # `govulncheck` trouve tous les symboles vulnérables dans le binaire, qui embarque tous les
   # modules de Caddy.
   # Les versions sont celles que Trivy 0.74.0 lit dans le binaire au scan du 2026-10-21 : `caddy`
@@ -200,3 +200,18 @@ vulnerabilities:
       par x/net 0.60.0, absent de caddy 2.11.7, dernière version publiée ; le projet ne monte pas
       un module au-delà de ce que fixe la release (ADR 0018).
     expired_at: 2027-01-19
+
+  - id: CVE-2026-116587
+    paths:
+      - usr/bin/caddy
+    statement: >-
+      Place : modules `github.com/go-jose/go-jose/v3` v3.0.5 et `/v4` v4.1.5 du binaire `caddy`,
+      aux versions que fixe la release de caddy 2.11.7, tirés par l'autorité de certification de
+      smallstep (`go.step.sm/crypto/jose`, `coreos/go-oidc`) qu'embarque `caddypki` (mesuré par
+      `go list -deps` sur le module du Dockerfile, 2026-10-28). Atteinte : non — le défaut épuise
+      le processeur à l'analyse d'une clé JWK RSA ; Caddy n'en analyse une venue du réseau que
+      dans son serveur ACME, monté par le handler `acme_server`, absent de `infra/caddy/Caddyfile`
+      — le test de fumée vérifie qu'il manque à la configuration adaptée. Alternatives : v4 corrigé
+      par 4.1.6, v3 sans correctif, ni l'un ni l'autre dans caddy 2.11.7, dernière version
+      publiée ; le projet ne monte pas un module au-delà de ce que fixe la release (ADR 0018).
+    expired_at: 2027-01-26

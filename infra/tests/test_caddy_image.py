@@ -490,18 +490,34 @@ def test_la_garde_de_confiance_rend_son_verdict_sur_chaque_forme(
     assert bool(trust_findings(servers)) is expected, trust_findings(servers)
 
 
-def test_caddy_ne_fait_confiance_qu_au_reseau_prive(stack: Stack) -> None:
-    """Un `X-Forwarded-*` venu d'ailleurs est forgé : seul le réseau privé, où vit `cloudflared`,
-    est cru. Lu dans la configuration que Caddy tire lui-même du Caddyfile (`caddy adapt`)."""
-    adapted = compose(
-        "exec",
-        "-T",
-        "caddy",
-        "caddy",
-        "adapt",
-        "--config",
-        "/etc/caddy/Caddyfile",
-        environment=stack.environment,
+def adapted_config(stack: Stack) -> dict[str, Any]:
+    """La configuration JSON que Caddy tire lui-même du Caddyfile (`caddy adapt`)."""
+    return json.loads(
+        compose(
+            "exec",
+            "-T",
+            "caddy",
+            "caddy",
+            "adapt",
+            "--config",
+            "/etc/caddy/Caddyfile",
+            environment=stack.environment,
+        )
     )
 
-    assert trust_findings(json.loads(adapted)["apps"]["http"]["servers"]) == []
+
+def test_caddy_ne_fait_confiance_qu_au_reseau_prive(stack: Stack) -> None:
+    """Un `X-Forwarded-*` venu d'ailleurs est forgé : seul le réseau privé, où vit `cloudflared`,
+    est cru. Lu dans la configuration adaptée."""
+    assert trust_findings(adapted_config(stack)["apps"]["http"]["servers"]) == []
+
+
+def test_caddy_ne_sert_pas_d_autorite_acme(stack: Stack) -> None:
+    """Caddy n'analyse une clé JWK venue du réseau que dans son serveur ACME — l'autorité de
+    smallstep, que monte le handler `acme_server` —, le code que vise CVE-2026-116587
+    (`.trivyignore.yaml`). Aucun dans la configuration adaptée ; l'app `http`, lue, est le témoin.
+    Vu rouge le 2026-10-28, `acme_server` ajouté au site."""
+    adapted = adapted_config(stack)
+
+    assert "http" in adapted["apps"]
+    assert '"acme_server"' not in json.dumps(adapted)
