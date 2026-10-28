@@ -136,8 +136,3 @@ travail existe, mais rien ne le sait.
 > famille « sensible à la plateforme » (3.2) — au cycle courant, pas après le passage en ready, où
 > chaque constat coûte un run complet et le rejeu des vérifications manuelles. **Une draft sans
 > push de code n'a aucun run : ce n'est pas une CI cassée.**
-
-En vague parallèle (`pr-paralleles`), le lead relève lui-même le numéro de PR (`gh pr list`) pour
-son tableau de bord : rien à lui envoyer. Une session démarrée par une autre lit ensuite
-`get_status` ; `bind_pr` n'y sert qu'en repli
-([references/sessions-liees.md](references/sessions-liees.md), « Premier geste »).
