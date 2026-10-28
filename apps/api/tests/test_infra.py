@@ -857,11 +857,15 @@ def docker_launches() -> dict[str, ast.Call]:
     }
 
 
-DOCKER_LAUNCHES = docker_launches()
-
-
-@pytest.mark.parametrize("launch", DOCKER_LAUNCHES.values(), ids=DOCKER_LAUNCHES.keys())
-def test_chaque_lancement_docker_d_un_test_a_un_delai(launch: ast.Call) -> None:
+def test_chaque_lancement_docker_d_un_test_a_un_delai() -> None:
     """Un conteneur qui ne finit pas fait échouer son test par `TimeoutExpired`, au lieu de figer
     la suite : chaque lancement porte un `timeout`."""
-    assert any(keyword.arg == "timeout" for keyword in launch.keywords), "lancement sans délai"
+    launches = docker_launches()
+
+    assert launches, "aucun lancement Docker lu — la commande a-t-elle quitté son littéral ?"
+    faulty = [
+        where
+        for where, call in launches.items()
+        if not any(keyword.arg == "timeout" for keyword in call.keywords)
+    ]
+    assert not faulty, f"{len(launches)} lancements repassés, sans délai : {faulty}"
