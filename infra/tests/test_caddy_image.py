@@ -515,9 +515,9 @@ def test_caddy_ne_fait_confiance_qu_au_reseau_prive(stack: Stack) -> None:
 def test_caddy_ne_sert_pas_d_autorite_acme(stack: Stack) -> None:
     """Caddy n'analyse une clé JWK venue du réseau que dans son serveur ACME — l'autorité de
     smallstep, que monte le handler `acme_server` —, le code que vise CVE-2026-116587
-    (`.trivyignore.yaml`). Aucun dans la configuration adaptée ; l'app `http`, lue, est le témoin.
-    Vu rouge le 2026-10-28, `acme_server` ajouté au site."""
-    adapted = adapted_config(stack)
+    (`.trivyignore.yaml`). Aucun dans la configuration adaptée ; `reverse_proxy`, présent sous la
+    même forme, est le témoin. Vu rouge le 2026-10-28, `acme_server` ajouté au site."""
+    adapted = json.dumps(adapted_config(stack))
 
-    assert "http" in adapted["apps"]
-    assert '"acme_server"' not in json.dumps(adapted)
+    assert '"reverse_proxy"' in adapted
+    assert '"acme_server"' not in adapted
