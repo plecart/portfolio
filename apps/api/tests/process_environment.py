@@ -42,6 +42,10 @@ VALID_ENVIRONMENT = {
     "MEDIA_R2_SECRET_ACCESS_KEY": "",
     # L'origine du site, telle que les tests de CORS l'envoient ; une autre, pour l'origine refusée.
     "CORS_ALLOWED_ORIGINS": '["https://site.test"]',
+    # Le compte de l'admin, exigé en production : un mot de passe vide se trouverait dans toute
+    # sortie, et le test de fuite des secrets ne prouverait rien.
+    "ADMIN_USERNAME": "admin-de-test",
+    "ADMIN_PASSWORD": "phrase-de-passe-de-test-sans-valeur-reelle",
 }
 
 # Un chemin qui n'existe pas : `pydantic-settings` n'y lit rien, sans bruit.

@@ -98,6 +98,10 @@ services:
       MEDIA_R2_SECRET_ACCESS_KEY: ${MEDIA_R2_SECRET_ACCESS_KEY:?}
       # Le volume et son dossier, que R2 laisse sans usage, se retirent avec #25.
       MEDIA_ROOT: /app/media
+      # Le compte unique de l'admin, que `ensure_superuser` pose au démarrage d'`api`
+      # (`infra/api/entrypoint.sh`) ; le `worker`, qui ne joue aucune étape, n'en fait rien.
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?}
     volumes: &app-volumes
       - media:/app/media
     # `api` joue les migrations à son démarrage (`infra/api/entrypoint.sh`) : la base doit répondre.

@@ -29,6 +29,26 @@ SECRET_KEY = env.SECRET_KEY.get_secret_value()
 DEBUG = env.DEBUG
 ALLOWED_HOSTS = env.ALLOWED_HOSTS
 
+# L'unique superutilisateur de l'admin, que pose `manage.py ensure_superuser` (`access`). Le mot de
+# passe reste un `SecretStr`, que seule la commande déballe : `manage.py diffsettings` l'affiche
+# `SecretStr('**********')` (mesuré le 2026-10-28).
+ADMIN_USERNAME = env.ADMIN_USERNAME
+ADMIN_PASSWORD = env.ADMIN_PASSWORD
+
+# Les quatre validateurs que `startproject` pose (`django/conf/project_template`) — le défaut de
+# Django est une liste vide, qui n'en fait tourner aucun : similarité au nom, longueur minimale,
+# mots de passe courants, entièrement numérique. La longueur passe des 8 de son défaut à 12 (PR
+# #181) : le « mot de passe fort » de l'admin (cadrage §6.2), qu'`ensure_superuser` y soumet.
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 12},
+    },
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
 DATABASES = {"default": database_settings(env.DATABASE_URL)}
 
 # Le stockage des fichiers téléversés, choisi par `MEDIA_STORAGE` (ADR 0004, `config/storage.py`) :
@@ -51,7 +71,8 @@ WSGI_APPLICATION = "config.wsgi.application"
 # (`config/apps.py`) écarte les fichiers de `ninja` de la collecte. `ninja` n'est installé que pour
 # sa commande `export_openapi_schema` (`make openapi`) : Django ne cherche les commandes de gestion
 # que dans les applications installées. `corsheaders` porte ses contrôles de réglages (`manage.py
-# check`). `content` porte le contenu du portfolio.
+# check`). `content` porte le contenu du portfolio ; `access`, l'accès à l'admin — sa commande
+# `ensure_superuser`.
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -63,6 +84,7 @@ INSTALLED_APPS = [
     "ninja",
     "corsheaders",
     "content",
+    "access",
 ]
 
 # WhiteNoise en tête : une requête de fichier statique s'arrête là, sans ouvrir de session. Le
