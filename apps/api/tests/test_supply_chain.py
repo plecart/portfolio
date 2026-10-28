@@ -47,6 +47,10 @@ COMPOSITE_ACTION_GLOB = ".github/actions/**/action.y*ml"
 USES = re.compile(r"^\s*(?:-\s+)?uses:\s*(?P<reference>\S+)(?P<comment>.*)$", re.MULTILINE)
 PINNED_REFERENCE = re.compile(r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}$")
 VERSION_COMMENT = re.compile(r"^ # v\d+\.\d+\.\d+$")
+# Un workflow réutilisable du dépôt, sans `@` : il est lu au commit même du workflow qui l'appelle
+# (doc GitHub « Reuse workflows », lue le 2026-10-29), épinglé par construction. Une action locale
+# (`./.github/actions/…`) n'en est pas une : ses propres `uses` échappent à Dependabot.
+LOCAL_WORKFLOW = re.compile(r"^\./\.github/workflows/[\w.-]+\.ya?ml$")
 
 # Les écosystèmes que Dependabot surveille (brief de #5), chacun avec un fichier qu'il doit trouver
 # dans le dossier configuré.
@@ -296,9 +300,10 @@ def workflow_findings(text: str) -> list[str]:
     """Ce qui, dans un workflow, n'est pas une action épinglée par empreinte.
 
     Returns:
-        Un constat par `uses` non épinglé ou mal commenté ; un constat si l'analyseur YAML et le
-        motif ne lisent pas les mêmes références — une forme que le motif ne sait pas vérifier.
-        Liste vide : tout est épinglé.
+        Un constat par `uses` non épinglé ou mal commenté — un workflow réutilisable du dépôt
+        (`LOCAL_WORKFLOW`), sans commentaire, l'est par construction ; un constat si l'analyseur
+        YAML et le motif ne lisent pas les mêmes références — une forme que le motif ne sait pas
+        vérifier. Liste vide : tout est épinglé.
     """
     matches = list(USES.finditer(text))
     read = {match["reference"] for match in matches}
@@ -310,6 +315,7 @@ def workflow_findings(text: str) -> list[str]:
         if not (
             PINNED_REFERENCE.match(match["reference"]) and VERSION_COMMENT.match(match["comment"])
         )
+        and not (LOCAL_WORKFLOW.match(match["reference"]) and not match["comment"])
     ]
 
 
@@ -562,6 +568,11 @@ WORKFLOW_FORMS = {
         "on: push\njobs:\n  a:\n    uses: org/repo/.github/workflows/x.yml@main\n",
         True,
     ),
+    "workflow réutilisable du dépôt": (
+        "on: push\njobs:\n  a:\n    uses: ./.github/workflows/x.yml\n",
+        False,
+    ),
+    "action locale": (workflow("      - uses: ./.github/actions/x\n"), True),
     "workflow vide": ("", False),
     "clé uses sous le with: d'une action": pytest.param(
         workflow(PINNED_STEP + "        with:\n          uses: autre-chose\n"),

@@ -2,9 +2,10 @@
 
 La CI ne dépense des minutes que là où un verdict peut changer (ADR 0017, ADR 0019) : une PR en
 draft ne tourne pas, son premier run vient du passage en ready, puis de chaque push ; le run encore
-en cours d'une PR s'annule au push suivant de la même PR, jamais sur `main` ; `web` et `infra`
-attendent un `api` vert et, sur une PR, ne tournent que si le delta touche leurs fichiers — règle
-de `infra/ci/changed_jobs.py`, lue par la première étape du job `api`.
+en cours d'une PR s'annule au push suivant de la même PR, jamais sur `main` ; `web`, `infra` et
+`avis` attendent un `api` vert et, sur une PR, ne tournent que si le delta touche leurs fichiers —
+règle de `infra/ci/changed_jobs.py`, lue par la première étape du job `api`. Le job `avis` appelle
+`.github/workflows/avis.yml`, qui joue aussi les portes d'avis chaque jour sur `main`.
 
 Mesure qui fonde ces réglages, relevée le 2026-10-18 sur les runs du 2026-10-04 au 2026-10-17 —
 `gh api --paginate "repos/plecart/portfolio/actions/runs?created=%3E%3D2026-10-04&per_page=100"`,
@@ -33,7 +34,7 @@ import pytest
 import yaml
 from changed_jobs import IMAGE_TESTS, jobs_for
 from test_agent_skills import CYCLE_PR, texte_normalise
-from test_infra import CI_WORKFLOW, REPOSITORY_ROOT
+from test_infra import AVIS_WORKFLOW, CI_WORKFLOW, REPOSITORY_ROOT
 from test_restore_workflow import triggers
 from test_supply_chain import repository_files
 
@@ -65,12 +66,19 @@ def concurrency_findings(workflow: str) -> list[str]:
 # vers `main`, où l'objet `pull_request` n'existe pas, tourne toujours.
 API_IF = "github.event_name != 'pull_request' || github.event.pull_request.draft == false"
 # Les jobs que le delta d'une PR conditionne, et la sortie du job `api` que chacun lit.
-GATED_JOBS = ("web", "infra")
+GATED_JOBS = ("web", "infra", "avis")
 API_OUTPUTS = {job: f"${{{{ steps.jobs.outputs.{job} }}}}" for job in GATED_JOBS}
+# Le job `avis` appelle le workflow des portes d'avis, du même commit que `ci.yml` (doc GitHub
+# « Reuse workflows », lue le 2026-10-29) : une seule définition de leurs cibles et de leur ordre,
+# pour le run planifié comme pour la CI (ADR 0019, décision 2). Les cibles de ces portes, aucun
+# job de pile ne les lance plus.
+AVIS_CALL = "./.github/workflows/avis.yml"
+ADVISORY_TARGETS = {"audit", "web-audit", "scan"}
+STACK_JOBS = ("api", "web", "infra")
 # L'étape `jobs`, sans son nom : le delta de la PR contre sa base — le checkout d'une PR est son
 # commit de fusion, `HEAD^1` la base qu'il combine —, passé au script. `shell: bash` lance
 # `bash -eo pipefail` (doc GitHub « Workflow syntax », `jobs.<job_id>.steps[*].shell`) : sans lui,
-# un `git diff` en échec rendrait `false` pour les deux jobs, en silence. `--no-renames` : sans lui,
+# un `git diff` en échec rendrait `false` pour chaque job, en silence. `--no-renames` : sans lui,
 # un renommage ne s'écrit que sous son nouveau chemin (mesuré le 2026-10-20 : `apps/web/a.tsx`
 # déplacé vers `docs/` ne rend que `docs/a.tsx`).
 CHANGED_JOBS_COMMAND = (
@@ -82,21 +90,21 @@ JOBS_STEP = {"id": "jobs", "shell": "bash", "run": CHANGED_JOBS_COMMAND}
 
 def gated_if(job: str) -> str:
     """Le `if` d'un job conditionné : sur une PR, la réponse du script pour ce job ; sur un push
-    vers `main`, toujours — `publish` y attend les trois jobs. Sans fonction d'état, GitHub y
+    vers `main`, toujours — `publish` y attend chacun d'eux. Sans fonction d'état, GitHub y
     applique `success()` (doc « Expressions », « Status check functions », lue le 2026-10-28) : un
     `api` rouge, sauté ou annulé saute ce job, sur une PR comme sur `main` (ADR 0019, décision 3)."""
     return f"${{{{ github.event_name != 'pull_request' || needs.api.outputs.{job} == 'true' }}}}"
 
 
 def gating_findings(workflow: str) -> list[str]:
-    """Ce qui, dans un workflow, écarte le conditionnement de `web` et `infra` des ADR 0017 et 0019.
+    """Ce qui, dans un workflow, écarte le conditionnement de `GATED_JOBS` des ADR 0017 et 0019.
 
     Returns:
         Un constat par propriété altérée : un job `changes` (un job de plus coûte une minute
         facturée par run), un `needs` sur `api`, son garde, ses `outputs`, son premier pas qui
         n'est pas un checkout à profondeur 2 — le commit de fusion et sa base —, son second pas qui
-        n'est pas l'étape `JOBS_STEP` ; puis, pour `web` et `infra`, un `needs` autre que `api` ou
-        un `if` autre que `gated_if`. Liste vide : le workflow est conforme.
+        n'est pas l'étape `JOBS_STEP` ; puis, pour chaque job de `GATED_JOBS`, un `needs` autre
+        que `api` ou un `if` autre que `gated_if`. Liste vide : le workflow est conforme.
     """
     jobs = cast(dict[str, dict[str, Any]], yaml.safe_load(workflow)["jobs"])
     findings = (
@@ -125,6 +133,29 @@ def gating_findings(workflow: str) -> list[str]:
             findings.append(f"`{name}` attend {job.get('needs')}, attendu `api`")
         if job.get("if") != gated_if(name):
             findings.append(f"`{name}` porte {job.get('if')!r}, attendu {gated_if(name)!r}")
+    return findings
+
+
+def advisory_findings(workflow: str) -> list[str]:
+    """Ce qui, dans un workflow, sort les portes d'avis de `avis.yml` (ADR 0019, décision 2).
+
+    Returns:
+        Un constat si le job `avis` n'appelle pas `AVIS_CALL`, et un par pas d'un job de
+        `STACK_JOBS` qui lance une cible de `ADVISORY_TARGETS`, seule ou parmi d'autres
+        (`make lint audit`). Liste vide : le workflow est conforme.
+    """
+    jobs = cast(dict[str, dict[str, Any]], yaml.safe_load(workflow)["jobs"])
+    findings: list[str] = []
+    if (jobs.get("avis") or {}).get("uses") != AVIS_CALL:
+        findings.append(f"`avis` n'appelle pas `{AVIS_CALL}`")
+    for name in STACK_JOBS:
+        steps = cast(list[dict[str, Any]], (jobs.get(name) or {}).get("steps") or [])
+        runs = [str(step.get("run", "")).split() for step in steps]
+        findings += [
+            f"`{name}` lance `{' '.join(run)}` : les portes d'avis vivent dans `avis.yml`"
+            for run in runs
+            if run[:1] == ["make"] and ADVISORY_TARGETS & set(run)
+        ]
     return findings
 
 
@@ -170,13 +201,26 @@ JOBS_STEP_LINES = (
     f"        run: {CHANGED_JOBS_COMMAND}\n"
 )
 INSTALL_LINES = "      - uses: astral-sh/setup-uv@v0\n      - run: make install\n"
+# Les jobs conditionnés : `web` et `infra` sans pas, `avis` qui appelle son workflow.
 GATED_LINES = "".join(
-    f"  {name}:\n    needs: api\n    if: {gated_if(name)}\n    steps: []\n" for name in GATED_JOBS
+    f"  {name}:\n    needs: api\n    if: {gated_if(name)}\n"
+    + (f"    uses: {AVIS_CALL}\n" if name == "avis" else "    steps: []\n")
+    for name in GATED_JOBS
 )
 CONFORMING_WORKFLOW = (
     f"{TRIGGERS_BLOCK}{CONCURRENCY_BLOCK}jobs:\n  api:\n{API_IF_LINE}{OUTPUTS_LINES}    steps:\n"
     f"      - uses: actions/checkout@v0\n{DEPTH_LINES}{JOBS_STEP_LINES}{INSTALL_LINES}{GATED_LINES}"
 )
+
+
+def stack_step(name: str, command: str) -> tuple[str, str]:
+    """Le couple (texte remplacé, remplacement) qui donne un pas `command` au job `name`, sans pas
+    dans `CONFORMING_WORKFLOW`."""
+    return (
+        f"{gated_if(name)}\n    steps: []\n",
+        f"{gated_if(name)}\n    steps:\n      - run: {command}\n",
+    )
+
 
 Guard = Callable[[str], list[str]]
 
@@ -272,6 +316,53 @@ FORMS: dict[str, tuple[Guard, str, str, bool]] = {
         "needs.api.outputs.web",
         True,
     ),
+    "api sans la sortie avis": (
+        gating_findings,
+        f"      avis: {API_OUTPUTS['avis']}\n",
+        "",
+        True,
+    ),
+    "avis sans needs": (gating_findings, "  avis:\n    needs: api\n", "  avis:\n", True),
+    # Sur `main`, `avis` ne tournerait qu'au commit qui touche une entrée, et `publish`, qui
+    # l'attend, sauterait à chaque autre.
+    "if d'avis qui ignore le push": (
+        gating_findings,
+        gated_if("avis"),
+        "${{ needs.api.outputs.avis == 'true' }}",
+        True,
+    ),
+    "if d'avis avec !cancelled()": (
+        gating_findings,
+        gated_if("avis"),
+        (
+            "${{ !cancelled() && (github.event_name != 'pull_request'"
+            " || needs.api.outputs.avis == 'true') }}"
+        ),
+        True,
+    ),
+    "portes d'avis à leur place": (advisory_findings, "", "", False),
+    # Le workflow de `main`, et non celui du commit : une PR qui change ses portes ne les verrait
+    # pas jouer.
+    "avis appelé depuis main": (
+        advisory_findings,
+        AVIS_CALL,
+        "plecart/portfolio/.github/workflows/avis.yml@main",
+        True,
+    ),
+    "api qui lance make audit": (
+        advisory_findings,
+        INSTALL_LINES,
+        INSTALL_LINES + "      - run: make audit\n",
+        True,
+    ),
+    "api qui lance l'audit parmi d'autres cibles": (
+        advisory_findings,
+        INSTALL_LINES,
+        INSTALL_LINES + "      - run: make lint audit\n",
+        True,
+    ),
+    "web qui lance make web-audit": (advisory_findings, *stack_step("web", "make web-audit"), True),
+    "infra qui lance make scan": (advisory_findings, *stack_step("infra", "make scan"), True),
     "déclencheurs conformes": (trigger_findings, "", "", False),
     # L'ancienne liste (ADR 0017) : une PR sortie du draft resterait sans run jusqu'à son prochain
     # push.
@@ -310,59 +401,210 @@ def test_le_workflow_de_ci_est_conforme(guard: Guard) -> None:
     assert guard(CI_WORKFLOW.read_text(encoding="utf-8")) == []
 
 
+# --- Le workflow des portes d'avis : `.github/workflows/avis.yml` ------------------------------
+
+# Ses déclencheurs (ADR 0019, décision 2) : chaque jour sur `main`, à une minute que le début
+# d'heure n'encombre pas — GitHub y retarde, voire abandonne, les runs planifiés en période de
+# charge (doc « Events that trigger workflows », `schedule`, lue le 2026-10-29) —, à la main, et
+# appelé par le job `avis` de `ci.yml`. Ses permissions : la lecture du dépôt, rien d'autre.
+AVIS_TRIGGERS = {
+    "schedule": [{"cron": "37 5 * * *"}],
+    "workflow_dispatch": None,
+    "workflow_call": None,
+}
+AVIS_PERMISSIONS = {"contents": "read"}
+# Les pas de son seul job, dans l'ordre — l'action sans son empreinte, ou la commande : l'audit
+# Python, l'audit npm, puis le build des images et leur scan, chaque porte après ce qu'elle lit.
+# Le cache des couches est celui du job `infra`, restauré et jamais réécrit, comme dans `publish`.
+AVIS_STEPS = [
+    "actions/checkout",
+    "astral-sh/setup-uv",
+    "make install",
+    "make audit",
+    "actions/setup-node",
+    "make web-install",
+    "make web-audit",
+    "docker/setup-buildx-action",
+    "actions/cache/restore",
+    "make build",
+    "make scan",
+]
+
+
+def avis_findings(text: str) -> list[str]:
+    """Ce qui, dans un workflow, écarte sa forme de celle des portes d'avis (ADR 0019).
+
+    Returns:
+        Un constat par propriété altérée — déclencheurs, `permissions` du workflow, un job autre
+        que `avis` seul, et des pas autres que `AVIS_STEPS`, dans cet ordre. Ce qui rendrait le
+        scan indicatif, `test_image_scan.py` le tient. Liste vide : le workflow est conforme.
+    """
+    workflow: dict[Any, Any] = yaml.safe_load(text)
+    findings: list[str] = []
+    if triggers(workflow) != AVIS_TRIGGERS:
+        findings.append(f"déclencheurs {triggers(workflow)}, attendu {AVIS_TRIGGERS}")
+    if workflow.get("permissions") != AVIS_PERMISSIONS:
+        findings.append(
+            f"`permissions` vaut {workflow.get('permissions')}, attendu {AVIS_PERMISSIONS}"
+        )
+    jobs: dict[str, Any] = workflow.get("jobs") or {}
+    if list(jobs) != ["avis"]:
+        return [*findings, f"jobs {list(jobs)}, attendu le seul job `avis`"]
+    steps = cast(list[dict[str, Any]], jobs["avis"].get("steps") or [])
+    launched = [step.get("run") or str(step.get("uses", "")).split("@")[0] for step in steps]
+    if launched != AVIS_STEPS:
+        findings.append(f"le job lance {launched}, attendu, dans cet ordre, {AVIS_STEPS}")
+    return findings
+
+
+# L'audit npm et ce dont il dépend, que la forme conforme place après l'audit Python.
+AVIS_NPM_LINES = (
+    "      - uses: actions/setup-node@v0\n"
+    "      - run: make web-install\n"
+    "      - run: make web-audit\n"
+)
+AVIS_CONFORMING = f"""\
+on:
+  schedule:
+    - cron: "37 5 * * *"
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  avis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v0
+      - uses: astral-sh/setup-uv@v0
+      - run: make install
+      - run: make audit
+{AVIS_NPM_LINES}\
+      - uses: docker/setup-buildx-action@v0
+      - uses: actions/cache/restore@v0
+      - run: make build
+      - run: make scan
+"""
+
+# Forme → (texte remplacé, remplacement, constat attendu). Le texte remplacé est pris dans
+# `AVIS_CONFORMING` : une forme qui ne le changerait pas resterait conforme, et son verdict attendu
+# la ferait rougir.
+AVIS_CHANGES = {
+    "conforme": ("", "", False),
+    "sans planning": ('  schedule:\n    - cron: "37 5 * * *"\n', "", True),
+    "chaque semaine": ('"37 5 * * *"', '"37 5 * * 1"', True),
+    "sans lancement à la main": ("  workflow_dispatch:\n", "", True),
+    # Le job `avis` de `ci.yml` ne pourrait plus l'appeler.
+    "sans appel par la CI": ("  workflow_call:\n", "", True),
+    "écriture sur le dépôt": ("  contents: read\n", "  contents: write\n", True),
+    "un second job": ("jobs:\n", "jobs:\n  autre:\n    steps: []\n", True),
+    "sans audit Python": ("      - run: make audit\n", "", True),
+    "sans audit npm": ("      - run: make web-audit\n", "", True),
+    "sans build": ("      - run: make build\n", "", True),
+    "sans scan": ("      - run: make scan\n", "", True),
+    "scan avant le build": (
+        "      - run: make build\n      - run: make scan\n",
+        "      - run: make scan\n      - run: make build\n",
+        True,
+    ),
+    "audit Python après l'audit npm": (
+        "      - run: make audit\n" + AVIS_NPM_LINES,
+        AVIS_NPM_LINES + "      - run: make audit\n",
+        True,
+    ),
+    "cache réécrit": ("actions/cache/restore@v0", "actions/cache@v0", True),
+}
+
+
+@pytest.mark.parametrize(("old", "new", "expected"), AVIS_CHANGES.values(), ids=AVIS_CHANGES.keys())
+def test_la_garde_du_workflow_des_portes_d_avis_rend_son_verdict_sur_chaque_forme(
+    old: str, new: str, expected: bool
+) -> None:
+    """Chaque forme recensée : signalée si, et seulement si, elle s'écarte de l'ADR 0019."""
+    assert old in AVIS_CONFORMING, f"forme absente de la forme conforme : {old!r}"
+    findings = avis_findings(AVIS_CONFORMING.replace(old, new, 1))
+    assert bool(findings) is expected, findings
+
+
+def test_le_workflow_des_portes_d_avis_est_conforme() -> None:
+    """L'`avis.yml` du dépôt : planifié, à la main et appelé par la CI, en lecture seule, ses
+    quatre cibles dans l'ordre."""
+    assert avis_findings(AVIS_WORKFLOW.read_text(encoding="utf-8")) == []
+
+
 # --- Le script qui lit le delta : `infra/ci/changed_jobs.py` -----------------------------------
 
 CHANGED_JOBS = REPOSITORY_ROOT / "infra" / "ci" / "changed_jobs.py"
 
-# Delta → (`web`, `infra`) attendus. En littéraux, jamais dérivés des motifs du script : une table
-# tirée de l'artefact sous test perdrait son cas avec le motif retiré (obs 80). Chaque motif du
-# script a au moins un témoin qui rougit s'il disparaît : `.claude/*` et `docs/*` ont le leur hors
-# Markdown, que `*.md` couvrirait seul. Les entrées témoins du corps de #124 y sont — il en annonce
-# 11, sa liste en compte 10 —, plus quatre : pipeline et documentation hors Markdown, Dependabot et
-# test mensuel, chemin non ASCII.
-JOBS_WITNESSES: dict[str, tuple[list[str], bool, bool]] = {
-    "delta vide": ([], False, False),
+# Delta → (`web`, `infra`, `avis`) attendus. En littéraux, jamais dérivés des motifs du script :
+# une table tirée de l'artefact sous test perdrait son cas avec le motif retiré (obs 80). Chaque
+# motif du script a au moins un témoin qui rougit s'il disparaît : `.claude/*` et `docs/*` ont le
+# leur hors Markdown, que `*.md` couvrirait seul. Les entrées témoins du corps de #124 y sont — il
+# en annonce 11, sa liste en compte 10 —, plus quatre : pipeline et documentation hors Markdown,
+# Dependabot et test mensuel, chemin non ASCII. Pour `avis`, une par entrée de l'ADR 0019,
+# décision 2 — onze, dont le `Makefile` et le verrou Python, déjà là —, une par chemin de `ALL` et
+# le chemin cité ; les autres sont hors entrées.
+JOBS_WITNESSES: dict[str, tuple[list[str], bool, bool, bool]] = {
+    "delta vide": ([], False, False, False),
     "harnais seul": (
         [".claude/skills/x/SKILL.md", "apps/api/tests/test_x.py", "docs/a.md", "CLAUDE.md"],
         False,
         False,
+        False,
     ),
-    "pipeline hors Markdown": ([".claude/settings.json"], False, False),
-    "documentation hors Markdown": (["docs/diagramme.svg"], False, False),
+    "pipeline hors Markdown": ([".claude/settings.json"], False, False, False),
+    "documentation hors Markdown": (["docs/diagramme.svg"], False, False, False),
     "Dependabot et test mensuel": (
         [".github/dependabot.yml", ".github/workflows/restore.yml"],
         False,
         False,
+        False,
     ),
-    "front": (["apps/web/src/a.tsx"], True, True),
-    "back": (["apps/api/content/models.py"], False, True),
-    "schéma de l'API": (["apps/api/openapi.json"], True, True),
-    "Makefile": (["Makefile"], True, True),
-    "workflow de CI": ([".github/workflows/ci.yml"], True, True),
-    "le script lui-même": (["infra/ci/changed_jobs.py"], True, True),
-    "verrou Python": (["uv.lock"], False, True),
-    "tests des images": (["infra/tests/test_caddy_image.py"], False, True),
-    "module d'appui des tests des images": (["apps/api/tests/test_infra.py"], False, True),
+    "front": (["apps/web/src/a.tsx"], True, True, False),
+    "back": (["apps/api/content/models.py"], False, True, False),
+    "schéma de l'API": (["apps/api/openapi.json"], True, True, False),
+    "Makefile": (["Makefile"], True, True, True),
+    "workflow de CI": ([".github/workflows/ci.yml"], True, True, True),
+    "le script lui-même": (["infra/ci/changed_jobs.py"], True, True, True),
+    "manifeste racine": (["pyproject.toml"], False, True, True),
+    "manifeste du back": (["apps/api/pyproject.toml"], False, True, True),
+    "verrou Python": (["uv.lock"], False, True, True),
+    "manifeste du front": (["apps/web/package.json"], True, True, True),
+    "verrou du front": (["apps/web/package-lock.json"], True, True, True),
+    "Dockerfile d'une image": (["infra/caddy/Dockerfile"], False, True, True),
+    "exceptions du scan": ([".trivyignore.yaml"], False, True, True),
+    "exceptions de l'audit Python": (["infra/ci/pip-audit-exceptions.toml"], False, True, True),
+    "porte de l'audit Python": (["infra/ci/pip_audit_gate.py"], False, True, True),
+    "workflow des portes d'avis": ([".github/workflows/avis.yml"], False, False, True),
+    "tests des images": (["infra/tests/test_caddy_image.py"], False, True, False),
+    "module d'appui des tests des images": (["apps/api/tests/test_infra.py"], False, True, False),
     # `fnmatchcase` : les chemins de git sont sensibles à la casse. Rouge sous Windows seulement
     # si `fnmatch` revenait : sous Linux, les deux coïncident.
-    "casse distincte du front": (["APPS/WEB/a.tsx"], False, True),
-    "chemin non ASCII, mis entre guillemets par git": ([r'"docs/caf\303\251.md"'], True, True),
+    "casse distincte du front": (["APPS/WEB/a.tsx"], False, True, False),
+    "chemin non ASCII, mis entre guillemets par git": (
+        [r'"docs/caf\303\251.md"'],
+        True,
+        True,
+        True,
+    ),
 }
 
 
 @pytest.mark.parametrize(
-    ("paths", "web", "infra"), JOBS_WITNESSES.values(), ids=JOBS_WITNESSES.keys()
+    ("paths", "web", "infra", "avis"), JOBS_WITNESSES.values(), ids=JOBS_WITNESSES.keys()
 )
-def test_le_delta_decide_des_jobs_web_et_infra(paths: list[str], web: bool, infra: bool) -> None:
-    """Chaque témoin : la réponse de `jobs_for`, `web` puis `infra`."""
-    assert jobs_for(paths) == {"web": web, "infra": infra}
+def test_le_delta_decide_des_jobs_web_infra_et_avis(
+    paths: list[str], web: bool, infra: bool, avis: bool
+) -> None:
+    """Chaque témoin : la réponse de `jobs_for`, `web`, `infra` puis `avis`."""
+    assert jobs_for(paths) == {"web": web, "infra": infra, "avis": avis}
 
 
 @pytest.mark.parametrize(
-    ("paths", "web", "infra"), JOBS_WITNESSES.values(), ids=JOBS_WITNESSES.keys()
+    ("paths", "web", "infra", "avis"), JOBS_WITNESSES.values(), ids=JOBS_WITNESSES.keys()
 )
 def test_le_script_ecrit_sa_reponse_au_format_github_output(
-    paths: list[str], web: bool, infra: bool
+    paths: list[str], web: bool, infra: bool, avis: bool
 ) -> None:
     """Le script tel que l'étape `jobs` le lance : les chemins sur l'entrée standard, une ligne
     vide en plus — `git diff` n'en écrit pas, la ligne vide est ignorée —, et la réponse sur la
@@ -375,7 +617,9 @@ def test_le_script_ecrit_sa_reponse_au_format_github_output(
         encoding="utf-8",
         check=True,
     )
-    assert completed.stdout == f"web={str(web).lower()}\ninfra={str(infra).lower()}\n"
+    assert completed.stdout == (
+        f"web={str(web).lower()}\ninfra={str(infra).lower()}\navis={str(avis).lower()}\n"
+    )
 
 
 # Les dossiers où `pytest` résout un import de module d'appui : son `pythonpath`, et les dossiers
@@ -510,6 +754,22 @@ READY_RUN = "`gh pr ready` déclenche le premier run de la PR"
 def test_l_etape_5_dit_que_gh_pr_ready_declenche_le_premier_run() -> None:
     """Sans elle, rien ne dit à un agent pourquoi il sort du draft avant d'attendre la CI."""
     assert READY_RUN in step_5()
+
+
+# Les deux autres textes qui présentent la CI d'une draft le disent aussi, lus en minuscules par
+# `pipeline_texts()` : l'encadré de l'Étape 2 de `cycle-pr`, et `CONTRIBUTING.md` pour qui arrive.
+READY_RUN_PROSE = {
+    ".claude/skills/cycle-pr/references/briefing.md": "le premier run vient du passage en ready",
+    "CONTRIBUTING.md": "le premier part quand elle sort du draft (`gh pr ready`)",
+}
+
+
+@pytest.mark.parametrize(("name", "phrase"), READY_RUN_PROSE.items(), ids=READY_RUN_PROSE.keys())
+def test_la_prose_qui_presente_la_ci_d_une_draft_dit_que_le_ready_lance_le_run(
+    name: str, phrase: str
+) -> None:
+    """Sans elle, une draft sans check se lirait comme une CI cassée."""
+    assert phrase in pipeline_texts()[name]
 
 
 def test_cycle_pr_sort_du_draft_avant_de_lire_le_run_du_sha_de_tete() -> None:

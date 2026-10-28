@@ -17,6 +17,7 @@ import pytest
 import yaml
 from test_image_scan import SCANNING_JOBS
 from test_infra import (
+    AVIS_WORKFLOW,
     BUILD_COMMAND,
     CI_WORKFLOW,
     PUBLISH_PREFIX,
@@ -77,18 +78,19 @@ RETENTION_CASES: dict[str, tuple[list[dict[str, object]], list[int]]] = {
     "une version": ([version(1, "01", "c1", "latest")], []),
 }
 
-# Ce que porte le job `publish` (brief de #15, décision 5) : il attend les trois autres jobs, pour
-# ne publier qu'un commit dont toute la CI est verte ; il ne tourne que sur un push vers `main` ;
+# Ce que porte le job `publish` (brief de #15, décision 5) : il attend les jobs de vérification —
+# `avis` compris, que tout push vers `main` joue (ADR 0019, § Facteurs de décision) —, pour ne
+# publier qu'un commit dont toute la CI est verte ; il ne tourne que sur un push vers `main` ;
 # seul à écrire dans le registre, il lit le dépôt sans y écrire, et le reste du workflow ne fait
 # que lire ; une publication attend la fin de la précédente, sans l'annuler.
-PUBLISH_NEEDS = {"api", "web", "infra"}
+PUBLISH_NEEDS = {"api", "web", "infra", "avis"}
 PUBLISH_IF = "github.event_name == 'push' && github.ref == 'refs/heads/main'"
 READ_ONLY = {"contents": "read"}
 PUBLISH_PERMISSIONS = {"contents": "read", "packages": "write"}
 
 # Les commandes du job, mot pour mot : le build et le scan de `SCANNING_JOBS`, la connexion au
 # registre, le push de ce qui vient d'être scanné, sous l'étiquette du commit, puis la rétention.
-PUBLISH_BUILD, PUBLISH_SCAN = SCANNING_JOBS["publish"]
+_, PUBLISH_BUILD, PUBLISH_SCAN = SCANNING_JOBS["publish"]
 PUBLISH_LOGIN = (
     'echo "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin'
 )
@@ -256,7 +258,7 @@ jobs:
   infra:
     steps: []
   publish:
-    needs: [api, web, infra]
+    needs: [api, web, infra, avis]
     if: {PUBLISH_IF}
     permissions:
       contents: read
@@ -279,8 +281,11 @@ jobs:
 PUBLISH_CHANGES = {
     "conforme": ("", "", False),
     "sans le job": ("  publish:", "  autre:", True),
-    "needs sans web": ("[api, web, infra]", "[api, infra]", True),
-    "needs d'un seul job": ("[api, web, infra]", "infra", True),
+    "needs sans web": ("[api, web, infra, avis]", "[api, infra, avis]", True),
+    # Un avis Python ou npm neuf sur `main` n'arrêterait plus la publication : `publish` ne rejoue
+    # que le scan.
+    "needs sans avis": ("[api, web, infra, avis]", "[api, web, infra]", True),
+    "needs d'un seul job": ("[api, web, infra, avis]", "infra", True),
     "sans if": (f"    if: {PUBLISH_IF}\n", "", True),
     "sur un push vers toute branche": (PUBLISH_IF, "github.event_name == 'push'", True),
     "sur tout événement": (PUBLISH_IF, "always()", True),
@@ -453,9 +458,9 @@ def test_la_garde_du_job_publish_rend_son_verdict_sur_chaque_forme(
 
 
 def test_le_job_publish_ne_publie_qu_un_commit_vert_de_main_une_fois_scanne() -> None:
-    """`needs` sur les trois autres jobs, push vers `main` seulement, `packages: write` sur ce
-    seul job, publications sans annulation ; build, scan, connexion, push puis rétention, et rien
-    n'atteint le registre avant le scan (brief de #15, décision 5).
+    """`needs` sur les quatre jobs de vérification, push vers `main` seulement, `packages: write`
+    sur ce seul job, publications sans annulation ; build, scan, connexion, push puis rétention, et
+    rien n'atteint le registre avant le scan (brief de #15, décision 5).
     Un `workflow_run` ou une publication depuis `infra` sont écartés : le premier publierait
     depuis le workflow de la branche par défaut, la seconde un commit dont `api` ou `web` a
     échoué (ADR 0014)."""
@@ -477,18 +482,23 @@ def test_la_publication_construit_sans_attestation() -> None:
     assert all({"--provenance=false", "--sbom=false"} <= set(build) for build in builds)
 
 
-def test_la_publication_reconstruit_depuis_le_cache_du_job_infra() -> None:
-    """`publish` restaure l'entrée de cache d'`infra` sous la même clé — celle qu'`infra` a
-    restaurée, ou écrite si la clé manquait —, et ne l'écrit pas. Deux clés qui dériveraient le
-    feraient reconstruire à froid, sans un signal."""
-    jobs = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"]
+def cache_inputs(workflow: Path, job: str, action: str) -> object:
+    """Les entrées de l'unique étape `action` du job `job` de `workflow`."""
+    steps = yaml.safe_load(workflow.read_text(encoding="utf-8"))["jobs"][job]["steps"]
+    found = [step for step in steps if str(step.get("uses", "")).startswith(f"{action}@")]
+    assert len(found) == 1, f"le job `{job}` a {len(found)} étape `{action}`"
+    return found[0]["with"]
 
-    def cache_inputs(job: str, action: str) -> object:
-        steps = jobs[job]["steps"]
-        found = [step for step in steps if str(step.get("uses", "")).startswith(f"{action}@")]
-        assert len(found) == 1, f"le job `{job}` a {len(found)} étape `{action}`"
-        return found[0]["with"]
 
-    assert cache_inputs("publish", "actions/cache/restore") == cache_inputs(
-        "infra", "actions/cache"
+@pytest.mark.parametrize(
+    ("workflow", "job"),
+    [(CI_WORKFLOW, "publish"), (AVIS_WORKFLOW, "avis")],
+    ids=["publish", "avis"],
+)
+def test_la_reconstruction_reprend_le_cache_du_job_infra(workflow: Path, job: str) -> None:
+    """`publish`, et `avis` qui construit pour scanner, restaurent l'entrée de cache d'`infra` sous
+    la même clé — celle qu'`infra` a restaurée, ou écrite si la clé manquait —, et ne l'écrivent
+    pas. Deux clés qui dériveraient feraient reconstruire à froid, sans un signal."""
+    assert cache_inputs(workflow, job, "actions/cache/restore") == cache_inputs(
+        CI_WORKFLOW, "infra", "actions/cache"
     )

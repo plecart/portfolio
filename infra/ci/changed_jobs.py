@@ -1,4 +1,4 @@
-"""Les jobs de la CI qu'un delta de PR concerne — `web` et `infra` —, au format `$GITHUB_OUTPUT`.
+"""Les jobs de la CI que concerne un delta de PR — `web`, `infra`, `avis` —, en `$GITHUB_OUTPUT`.
 
 Lancé par la première étape du job `api` de `.github/workflows/ci.yml`, sur le delta de la PR :
 
@@ -8,10 +8,10 @@ Lancé par la première étape du job `api` de `.github/workflows/ci.yml`, sur l
 déplacé du front vers `docs/` fait donc tourner `web`.
 
 Lit sur l'entrée standard les chemins du delta, un par ligne, lignes vides ignorées, et écrit
-`web=true|false` puis `infra=true|false`. Sur une PR, les jobs `web` et `infra` ne tournent que si
-leur réponse vaut `true` ; sur un push vers `main`, le workflow ne la lit pas et tout tourne
-(ADR 0017). Le job `api` tourne sur chaque push : la suite du back porte aussi les tests de la
-pipeline.
+`web=true|false`, `infra=true|false`, puis `avis=true|false`. Sur une PR, les jobs `web`, `infra`
+et `avis` ne tournent que si leur réponse vaut `true` ; sur un push vers `main`, le workflow ne la
+lit pas et tout tourne (ADR 0017, ADR 0019). Le job `api` tourne sur chaque push : la suite du back
+porte aussi les tests de la pipeline.
 
 Règles, par motif `fnmatch` — où `*` traverse `/` :
 
@@ -21,12 +21,15 @@ Règles, par motif `fnmatch` — où `*` traverse `/` :
   fichier inconnu fait tourner le job. Les images copient `apps/api` et `apps/web/dist`
   (`infra/api/Dockerfile`, `infra/caddy/Dockerfile`), et les tests du back tournent dans `api` —
   sauf les modules d'appui que `make image-test` charge aussi (`IMAGE_TESTS`), qui le font tourner ;
-- les deux : un chemin de `ALL`, qui décide des jobs eux-mêmes, ou un chemin que `git` a mis
+- `avis` : une entrée des portes d'avis — ce que lisent `make audit`, `make web-audit` et
+  `make scan`, et ce qui les définit (`AVIS`, ADR 0019, décision 2) ;
+- les trois : un chemin de `ALL`, qui décide des jobs eux-mêmes, ou un chemin que `git` a mis
   entre guillemets (`QUOTED`) — il le fait pour tout chemin non ASCII, que plus aucun motif
   n'apparie ; un job sauté à tort cacherait un rouge, un job lancé pour rien ne coûte que des
-  minutes. Ces chemins sont hors du harnais : `infra` les prend déjà, `web` les ajoute.
+  minutes. Ces chemins sont hors du harnais : `infra` les prend déjà, `web` et `avis` les
+  ajoutent.
 
-Liste vide : aucun des deux. Code de sortie 0 ; l'étape qui le lance tourne sous `pipefail`, et un
+Liste vide : aucun des trois. Code de sortie 0 ; l'étape qui le lance tourne sous `pipefail`, et un
 `git diff` en échec y fait rougir le job `api` au lieu de rendre `false` en silence.
 """
 
@@ -41,6 +44,7 @@ HARNESS = (
     "*.md",
     "apps/api/tests/*",
     ".github/dependabot.yml",
+    ".github/workflows/avis.yml",
     ".github/workflows/restore.yml",
 )
 # Les modules de `apps/api/tests/` que `make image-test` (job `infra`) charge : son greffon
@@ -52,6 +56,21 @@ IMAGE_TESTS = (
     "apps/api/tests/test_env.py",
     "apps/api/tests/test_infra.py",
     "apps/api/tests/test_supply_chain.py",
+)
+# Les entrées des portes d'avis : manifestes et verrous, Dockerfiles, exceptions datées, la porte
+# de `pip-audit` et le workflow qui les joue. Le `Makefile`, qui définit leurs cibles, en est une
+# aussi : `ALL` le porte déjà.
+AVIS = (
+    "pyproject.toml",
+    "apps/api/pyproject.toml",
+    "uv.lock",
+    "apps/web/package.json",
+    "apps/web/package-lock.json",
+    "infra/*/Dockerfile",
+    ".trivyignore.yaml",
+    "infra/ci/pip-audit-exceptions.toml",
+    "infra/ci/pip_audit_gate.py",
+    ".github/workflows/avis.yml",
 )
 # Ce qui décide des jobs eux-mêmes.
 ALL = ("Makefile", ".github/workflows/ci.yml", "infra/ci/changed_jobs.py")
@@ -73,16 +92,18 @@ def jobs_for(paths: Iterable[str]) -> dict[str, bool]:
             les écrit sous `--no-renames` ; une chaîne vide est ignorée.
 
     Returns:
-        `{"web": …, "infra": …}`, dans cet ordre ; `False` pour les deux sur un delta vide.
+        `{"web": …, "infra": …, "avis": …}`, dans cet ordre ; `False` pour les trois sur un delta
+        vide.
 
     Example:
         >>> jobs_for(["apps/api/content/models.py"])
-        {'web': False, 'infra': True}
+        {'web': False, 'infra': True, 'avis': False}
     """
     delta = [path for path in paths if path]
     return {
         "web": any(matches(path, (*WEB, *ALL, QUOTED)) for path in delta),
         "infra": any(path in IMAGE_TESTS or not matches(path, HARNESS) for path in delta),
+        "avis": any(matches(path, (*AVIS, *ALL, QUOTED)) for path in delta),
     }
 
 

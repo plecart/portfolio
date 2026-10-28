@@ -14,9 +14,13 @@
 # s'il touche leurs fichiers (ADR 0017) ; un `api` rouge appelle un push, et ce push les montrera
 # (ADR 0019). Le job `infra` installe aussi Node : les images copient le front compilé, qu'il
 # compile lui-même plutôt que d'attendre le job `web` (ADR 0014) ; et `uv`, pour les tests des
-# images qu'il vient de construire. Un quatrième,
-# `publish`, ne tourne qu'après un push sur `main`, une fois les trois autres verts : il publie les
-# images sur GHCR. Un cinquième, `deploy`, les déploie ensuite sur le VPS, une fois celui-ci prêt.
+# images qu'il vient de construire. Un quatrième, `avis`, joue les portes à base d'avis — audit
+# Python, audit npm, scan des images — en appelant `avis.yml`, qui les joue aussi chaque jour sur
+# `main` : leur verdict change sans commit, quand une base d'avis se publie. Il attend `api` comme
+# les deux autres, et sur une PR ne tourne que si le delta touche leurs entrées (ADR 0019,
+# décision 2). Un cinquième, `publish`, ne tourne qu'après un push sur `main`, une fois les
+# quatre autres verts : il publie les images sur GHCR. Un sixième, `deploy`, les déploie ensuite
+# sur le VPS, une fois celui-ci prêt.
 #
 # Chaque action est épinglée par **empreinte de commit**, sa version en commentaire : une
 # étiquette peut être déplacée par son propriétaire ou par un attaquant, et le déplacement
@@ -58,7 +62,7 @@ concurrency:
 
 jobs:
   api:
-    name: Back — audit, lint, format, types, tests
+    name: Back — lint, format, types, tests
     runs-on: ubuntu-latest
 
     # Aucune PR en draft ne tourne, quel que soit l'événement — ouverture, push, réouverture : une
@@ -68,26 +72,27 @@ jobs:
     # ouverte prête — un bot de dépendances, une branche déjà écrite — tourne dès l'ouverture.
     #
     # La condition sur `event_name` est nécessaire : sur un push vers `main`, l'objet
-    # `pull_request` n'existe pas. Les jobs `web` et `infra` ne portent pas ce garde : ils
+    # `pull_request` n'existe pas. Les jobs `web`, `infra` et `avis` ne portent pas ce garde : ils
     # attendent ce job, et un job sauté saute ceux qui l'attendent.
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
 
-    # Les jobs que le delta de la PR concerne, lus par `web` et `infra`.
+    # Les jobs que le delta de la PR concerne, lus par `web`, `infra` et `avis`.
     outputs:
       web: ${{ steps.jobs.outputs.web }}
       infra: ${{ steps.jobs.outputs.infra }}
+      avis: ${{ steps.jobs.outputs.avis }}
 
     steps:
       # Profondeur 2 : sur une PR, le checkout est le commit de fusion, et `HEAD^1` la base qu'il
       # combine — `HEAD^1..HEAD` est le delta de la PR. Sur un push vers `main`, ce ne serait que
-      # le dernier commit : `web` et `infra` n'y lisent pas la réponse.
+      # le dernier commit : `web`, `infra` et `avis` n'y lisent pas la réponse.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
 
       # Avant toute installation : un `uv sync` rouge ne cache pas le delta aux autres jobs.
       # `shell: bash` lance `bash -eo pipefail` : sans lui, un `git diff` en échec rendrait `false`
-      # pour les deux jobs, en silence. `--no-renames` : un renommage s'écrit sous ses deux chemins
+      # pour chaque job, en silence. `--no-renames` : un renommage s'écrit sous ses deux chemins
       # — sans lui, un fichier déplacé du front vers `docs/` ne laisserait que `docs/…`, et `web`
       # sauterait. La règle vit dans le script (ADR 0017).
       - name: Jobs à lancer
@@ -99,18 +104,6 @@ jobs:
 
       - name: Install
         run: make install
-
-      # Avant les portes de code, comme dans le job front : un avis de sécurité sur une
-      # dépendance n'a pas à attendre que la suite passe pour être signalé.
-      #
-      # Seuil : **toute** vulnérabilité connue bloque, là où `npm audit` s'arrête à `high`.
-      # `pip-audit` n'expose aucune sévérité — ni option, ni champ dans sa sortie (2.10.1,
-      # pypa/pip-audit#654) — et l'arbre Python, 59 paquets au verrou le 2026-09-25, n'a pas le
-      # bruit qui justifie `high` côté npm, où l'arbre en compte dix fois plus. Un avis qui ne
-      # s'applique pas ici passe par une exception datée de `infra/ci/pip-audit-exceptions.toml`,
-      # jamais par un seuil relevé.
-      - name: Audit
-        run: make audit
 
       - name: Lint
         run: make lint
@@ -125,7 +118,7 @@ jobs:
         run: make test
 
   web:
-    name: Front — lint, types, tests, build, e2e, lighthouse, audit
+    name: Front — lint, types, tests, build, e2e, lighthouse
     runs-on: ubuntu-latest
 
     # Après un job `api` vert, qui a lu le delta. Sur une PR, seulement si le delta touche ses
@@ -147,11 +140,6 @@ jobs:
 
       - name: Install
         run: make web-install
-
-      # Avant les portes de code : un avis de sécurité sur une dépendance livrée n'a pas à
-      # attendre que la suite passe pour être signalé.
-      - name: Audit
-        run: make web-audit
 
       - name: Lint
         run: make web-lint
@@ -185,7 +173,7 @@ jobs:
         run: make web-lighthouse
 
   infra:
-    name: Infra — configuration Compose, images, tests des images, scan
+    name: Infra — configuration Compose, images, tests des images
     runs-on: ubuntu-latest
 
     # Même conditionnement que le job `web` : voir son commentaire.
@@ -208,7 +196,7 @@ jobs:
         run: make compose-config
 
       # Le front compilé entre dans les images (ADR 0014) : `make build` le compile s'il manque.
-      # Deux compilations par run, ici et dans `web`, mais ce job n'attend pas `web`.
+      # Le front se compile donc ici, comme dans `web` et dans `avis` : ce job n'attend pas `web`.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: apps/web/.nvmrc
@@ -228,9 +216,10 @@ jobs:
       # dépendances consomment : elle ne change donc que quand ces couches changent réellement —
       # ce qui évite aussi que le cache soit réécrit, et grossisse, à chaque run. Les paquets du
       # système, eux, suivent les dépôts de la distribution et non un fichier : l'étage
-      # `paquets` qui les installe se reconstruit à chaque build (`--no-cache-filter`, ci-dessous
-      # et dans `publish`), sans quoi le cache garderait la couche de son premier build et des
-      # paquets corrigés depuis — mesuré le 2026-10-24, `backup` rouge au scan (run 40103586324).
+      # `paquets` qui les installe se reconstruit à chaque build (`--no-cache-filter`, ci-dessous,
+      # dans `publish` et dans `avis.yml`), sans quoi le cache garderait la couche de son premier
+      # build et des paquets corrigés depuis — mesuré le 2026-10-24, `backup` rouge au scan (run
+      # 40103586324).
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/buildx-cache
@@ -242,8 +231,8 @@ jobs:
       # `make build` et non un `docker build` propre à la CI : la commande reste celle du
       # `Makefile`, le cache et le chargement passent par des drapeaux. `--load` matérialise
       # vraiment les images — sans lui, le pilote conteneurisé construit et jette, et les
-      # étiquettes ne désigneraient rien : l'étape suivante les scanne. Le job `publish` reprend
-      # ce build pour publier.
+      # étiquettes ne désigneraient rien : les tests des images les démarrent. Le job `publish`
+      # reprend ce build pour publier, `avis.yml` pour scanner.
       #
       # `tag=$*` : une entrée de cache par image, dans le même dossier. `make` développe `$*` en
       # nom du service, dans la recette de `build-<service>` ; sans lui, chaque image exporterait
@@ -260,8 +249,7 @@ jobs:
 
       # Les tests des images que l'étape précédente a chargées — le test de fumée de `caddy`, la
       # chaîne de sauvegarde de `backup` —, écrits en pytest comme ceux du back : `uv` et
-      # l'environnement Python d'abord. Avant le scan, plus long : un Caddyfile ou une chaîne cassés
-      # se voient en quelques secondes.
+      # l'environnement Python d'abord. Leur scan est au job `avis`.
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
 
       - name: Environnement Python
@@ -270,23 +258,25 @@ jobs:
       - name: Tests des images
         run: make image-test
 
-      # Trivy, par `make scan` : la commande du poste, dans l'image officielle que le `Makefile`
-      # épingle — aucune action à installer (ADR 0014). Rouge sur toute vulnérabilité HIGH ou
-      # CRITICAL, corrigeable ou non, et sur une image de base en fin de vie ; seules passent les
-      # exceptions datées de `.trivyignore.yaml`. L'étape ne porte que sa commande — ni
-      # `continue-on-error`, ni `env:` : la politique vit dans le `Makefile`, et
-      # `apps/api/tests/test_image_scan.py` le tient.
-      - name: Scan
-        run: make scan
+  avis:
+    name: Avis — audit Python, audit npm, scan des images
+    # Même conditionnement que le job `web` : voir son commentaire. Sur une PR, seulement si le
+    # delta touche une entrée d'un avis — manifestes, verrous, Dockerfiles, exceptions datées,
+    # `Makefile`, `avis.yml` — ; sur un push vers `main`, toujours : `publish` l'attend, et aucune
+    # porte ne quitte le chemin vers la production (ADR 0019, § Facteurs de décision). Les étapes
+    # sont celles du workflow planifié, au commit même de ce run (doc GitHub « Reuse workflows »).
+    needs: api
+    if: ${{ github.event_name != 'pull_request' || needs.api.outputs.avis == 'true' }}
+    uses: ./.github/workflows/avis.yml
 
   publish:
     name: Publication — images sur GHCR
     runs-on: ubuntu-latest
 
-    # Après les trois autres jobs, sur un push vers `main` seulement : une image publiée vient d'un
-    # commit dont toute la CI est verte (ADR 0014). `apps/api/tests/test_publication.py` tient ces
-    # réglages.
-    needs: [api, web, infra]
+    # Après les quatre autres jobs, sur un push vers `main` seulement : une image publiée vient d'un
+    # commit dont toute la CI est verte, portes d'avis comprises (ADR 0014, ADR 0019).
+    # `apps/api/tests/test_publication.py` tient ces réglages.
+    needs: [api, web, infra, avis]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     # Le seul job qui écrit, et seulement dans le registre : pousser les images, supprimer leurs
@@ -349,8 +339,8 @@ jobs:
 
       # Le scan juste avant le push, sur les images mêmes qui partent. Nommées sans étiquette :
       # les exceptions de `.trivyignore.yaml` suivent la cible `…/portfolio-<service> (<système>
-      # <version>)` du rapport, qu'une étiquette changerait. Comme dans `infra`, l'étape ne porte
-      # que sa commande (`apps/api/tests/test_image_scan.py`).
+      # <version>)` du rapport, qu'une étiquette changerait. Comme dans `avis.yml`, l'étape ne
+      # porte que sa commande (`apps/api/tests/test_image_scan.py`).
       - name: Scan
         run: make scan IMAGE_PREFIX=ghcr.io/plecart/portfolio-
 
