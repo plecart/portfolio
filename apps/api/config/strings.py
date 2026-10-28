@@ -162,3 +162,7 @@ MARKDOWN_PREVIEW_FAILED = "Aperçu indisponible."
 # Lignes en ligne de l'admin : la colonne et la poignée qui les ordonnent par glisser-déposer
 ADMIN_ROW_ORDER = "ordre"
 ADMIN_ROW_MOVE = "Déplacer la ligne : la faire glisser, ou flèches haut et bas"
+
+# Second facteur : les deux appareils, entre lesquels choisit le formulaire de connexion de l'admin
+OTP_DEVICE_TOTP = "Application d’authentification"
+OTP_DEVICE_BACKUP_CODES = "Code de secours"

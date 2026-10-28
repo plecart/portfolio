@@ -13,7 +13,6 @@ from typing import Any
 import pytest
 from config import strings
 from content.preview import FIELD_CLASS, PREVIEW_CLASS, PREVIEW_ROUTE, render_markdown
-from django.contrib.auth.models import User
 from django.contrib.staticfiles import finders
 from django.templatetags.static import static
 from django.test import Client
@@ -200,12 +199,12 @@ def test_un_anonyme_est_renvoye_de_l_apercu_vers_la_connexion(client: Client) ->
 
 
 @pytest.mark.django_db
-def test_l_apercu_exige_le_jeton_csrf_du_formulaire(admin_user: User) -> None:
+def test_l_apercu_exige_le_jeton_csrf_du_formulaire(admin_client: Client) -> None:
     """Refusé sans jeton CSRF, rendu avec celui que le script lit dans le formulaire de l'écran et
     envoie en en-tête. Le client de test de Django saute ce contrôle ; celui-ci l'exige, comme un
-    navigateur."""
+    navigateur — sur la session d'`admin_client`, que le second facteur a vérifiée."""
     client = Client(enforce_csrf_checks=True)
-    client.force_login(admin_user)
+    client.cookies = admin_client.cookies
     page = client.get(reverse("admin:content_project_add")).content.decode()
     token = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', page)
     assert token is not None
