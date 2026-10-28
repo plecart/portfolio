@@ -119,7 +119,9 @@ de #134 (obs 122).
 ## Ce que tu n'appliques pas
 
 Ces textes ne te sont pas chargés — `omitClaudeMd: true` te démarre sans `CLAUDE.md` ni les
-règles de `.claude/rules/` ; si un brief les cite, ils ne sont pas pour toi :
+règles de `.claude/rules/` (seuls un `CLAUDE.md` de sous-répertoire et une règle à `paths:` se
+rechargeraient au contact de leurs fichiers ; le dépôt n'en a aucun) ; si un brief les cite, ils ne
+sont pas pour toi :
 
 - le prompt de relecture de `.claude/rules/cleanup-verbatim.md` — tu ne relis ni ne nettoies du
   code ;

@@ -596,17 +596,22 @@ def test_la_liste_d_outils_d_un_role_nomme_ceux_que_sa_prose_emploie(role: str, 
     )
 
 
-def test_le_releveur_demarre_sans_claude_md() -> None:
-    """« Ces textes ne te sont pas chargés » (`releveur.md`, « Ce que tu n'appliques pas »).
+def test_seul_le_releveur_demarre_sans_claude_md() -> None:
+    """« Ces textes ne te sont pas chargés » (`releveur.md`, « Ce que tu n'appliques pas ») et
+    « Le `releveur`, seul rôle à porter `omitClaudeMd: true` » (`CLAUDE.md`, « Orchestration »).
 
     `omitClaudeMd: true` retire au sous-agent `CLAUDE.md` et les règles inconditionnelles de
     `.claude/rules/` (code.claude.com/docs/en/sub-agents, lu le 2026-10-28) : son corps reprend ce
     qu'il en tirait (« Lire borné »). Le champ retiré, la phrase deviendrait fausse en silence et
-    `CLAUDE.md` et les règles reviendraient dans son contexte au premier appel (lot 3 de #177).
+    `CLAUDE.md` et les règles reviendraient dans son contexte au premier appel (lot 3 de #177) ;
+    posé sur un autre rôle, il lui retirerait des règles que son corps ne reprend pas. Un rôle qui
+    le reçoit à dessein s'ajoute à l'ensemble attendu.
     """
-    assert role_frontmatter("releveur").get("omitClaudeMd") is True, (
-        "`releveur` ne déclare plus `omitClaudeMd: true` — son corps dit qu'il démarre sans `CLAUDE.md`"
-    )
+    roles = sorted(path.stem for path in (REPOSITORY_ROOT / ".claude" / "agents").glob("*.md"))
+
+    assert {role for role in roles if role_frontmatter(role).get("omitClaudeMd") is True} == {
+        "releveur"
+    }
 
 
 # Le modèle et l'effort d'un rôle s'écrivent à trois endroits : son frontmatter, sa ligne de la
