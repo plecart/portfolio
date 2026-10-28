@@ -213,7 +213,7 @@ travail reste visible du reste de la pipeline. Pour une draft née d'un échec d
 (`python .claude/skills/cycle-pr/scripts/ecriture-relue.py checkbox patch <plan> --paires <fichier>`,
 `execution-qa/references/patch-checkbox-gh.md`) : c'est ce que lit la reprise de la QA.
 
-> **La CI tourne sur chaque push de la branche, draft comprise** → [references/briefing.md](references/briefing.md), « La CI tourne sur chaque push de la branche, draft comprise ».
+> **Une PR en draft n'a aucun run de CI** → [references/briefing.md](references/briefing.md), « Une PR en draft n'a aucun run de CI ».
 
 En vague parallèle (`pr-paralleles`), le lead relève lui-même le numéro de PR (`gh pr list`) pour
 son tableau de bord : rien à lui envoyer. Une session démarrée par une autre lit ensuite
@@ -512,9 +512,9 @@ relance, ils en sont le destinataire, et les retirer n'est pas un nettoyage, c'e
 terminaison.
 
 **Pousser avant chaque réveil** — première passe, seconde passe, relance —, jamais en force :
-`/code-review --comment` commente la tête poussée, et la CI éprouve la plateforme cible pendant
-que la relecture tourne ; un rouge de plateforme (3.2) se corrige dans le commit groupé de la
-passe en cours.
+`/code-review --comment` commente la tête poussée. Une draft n'a aucun run (Étape 2) : chaque
+passe relit un SHA sans verdict de CI, et un rouge de plateforme (3.2) se voit au passage en
+ready (Étape 5).
 
 ## Étape 5 — Finalisation de la PR (passage en ready for review)
 
@@ -567,29 +567,45 @@ Sur une zone sensible, il a été pris au commit qui assemble l'écran (3.5). Si
 depuis, rejouer la vérification sur ce qui a changé (Étape 7, « Rejouer les vérifications
 périmées ») **avant `gh pr ready`**.
 
-**Avant de sortir du draft, lire le run du SHA de tête.** `gh pr ready` ne déclenche aucun run
-(ADR 0017) : la preuve d'une PR prête est le run de son dernier push (Étape 4). La session PR
-**l'attend** avant de passer à la suite, par une commande lancée en fond, dont la fin réveille la
-session, bornée : 1800 s par défaut, `--delai <secondes>` pour une autre borne.
+**Sortir du draft, puis lire le run du SHA de tête.** Une PR en draft n'a aucun run (Étape 2) :
+`gh pr ready` déclenche le premier run de la PR (`ready_for_review`, ADR 0019), puis chaque push
+le sien. Les passes de relecture de 4.2, faites en draft, ont donc relu un SHA sans verdict de
+CI : c'est ce run qui le rend. Sortir du draft :
+
+```
+gh pr ready <numéro>
+```
+
+Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur qui distingue
+« travail en cours » de « prêt à être relu ».
+
+Puis lire ce run : la session PR **l'attend** avant de passer à la suite, par une commande lancée
+en fond, dont la fin réveille la session, bornée : 1800 s par défaut, `--delai <secondes>` pour
+une autre borne.
 
 ```
 python <répertoire de ce skill>/scripts/attente-ci.py <numéro>
 ```
 
-Le script relit à chaque tour la tête de la PR et les runs `CI` de son SHA, dont le plus récent
-par `created_at` décide : une réouverture ajoute un run sur la même tête, et les plus anciens ne
-comptent plus. Il attend un run qui tourne, suit la nouvelle tête quand un push annule le run, et
-rend une ligne — le verdict, le run, le SHA court et le paragraphe à suivre. Ses sorties :
+Le script relit à chaque tour la tête de la PR, son état draft et les runs `CI` de son SHA, dont
+le plus récent par `created_at` décide : une réouverture ajoute un run sur la même tête, et les
+plus anciens ne comptent plus. Sitôt `gh pr ready`, le plus récent est encore le run `skipped`
+d'un push en draft : le script le relit comme « aucun run » jusqu'à ce que celui du passage en
+ready apparaisse. Il attend un run qui tourne, suit la nouvelle tête quand un push annule le run,
+et rend une ligne — le verdict, le run, le SHA court et le paragraphe à suivre. Ses sorties :
 
-- sortie 0, vert (`success`) → sortir du draft ;
+- sortie 0, vert (`success`) → Étape 6 ;
 - sortie 1, rouge — toute autre conclusion (`failure`, `timed_out`, `startup_failure`…), ses jobs
   en échec nommés → `erreurs-ci.py <id>`, puis Étape 6, « Trier un rouge ». Une ligne ouverte par
   « refus — » sort aussi en 1 : une lecture `gh` en échec ou d'une autre forme, son motif en une
   ligne, et aucun verdict ;
-- sortie 3 → « Si aucun run n'apparaît », ci-dessous : `skipped`, l'ouverture d'une draft jamais
-  repoussée depuis, que le garde du job `api` saute (mesuré le 2026-10-20 sur l'amorce de la PR
-  #137) ; `cancelled` sans nouvelle tête, annulé sans remplaçant ; aucun run au délai, un push
-  émis pendant une panne d'Actions ;
+- sortie 3, draft — la PR est encore en draft, aucun run lu → `gh pr ready <numéro>` d'abord,
+  puis relancer le script ;
+- sortie 3 → « Si aucun run n'apparaît », ci-dessous : `skipped` resté le plus récent au délai,
+  la draft jamais repoussée — le run sauté d'un push en draft, que le garde du job `api` saute
+  (mesuré le 2026-10-20 sur l'amorce de la PR #137), sans run du passage en ready ; `cancelled`
+  sans nouvelle tête, annulé sans remplaçant ; aucun run au délai, un événement émis pendant une
+  panne d'Actions ;
 - sortie 124, délai dépassé : Étape 6, « CI qui ne démarre pas ».
 
 Jamais une fin de tour nue : le moniteur de PR de l'application ne réveille que sur un échec, un
@@ -600,32 +616,30 @@ jamais une sonde planifiée. Le script ne couvre ni les autres workflows et év�
 run a combiné (paragraphe suivant), ni la page d'état et la réouverture, qui restent à la session
 et au mainteneur (« Si aucun run n'apparaît »).
 
-Ce run a tourné sur la référence de fusion calculée à son push, que GitHub ne recalcule ni à chaque
-merge sur le trunk ni au passage en ready : il peut combiner la tête à un trunk vieux de plusieurs
-merges — mesuré, 8 des 30 commits de `main` (obs 51). Ce qu'il prouve de l'état combiné se lit
-dans les parents de cette référence, à l'Étape 7.
+Ce run a tourné sur la référence de fusion qu'il a trouvée à son déclenchement, que GitHub ne
+recalcule ni à chaque merge sur le trunk ni au passage en ready : il peut combiner la tête à un
+trunk vieux de plusieurs merges — mesuré, 8 des 30 commits de `main` (obs 51). Ce qu'il prouve de
+l'état combiné se lit dans les parents de cette référence, à l'Étape 7.
 
 **Si aucun run n'apparaît** pour le SHA de tête — sortie 3 : sauté, annulé sans remplaçant ou
-aucun run —, consulter d'abord `https://www.githubstatus.com/api/v2/components.json`, sauf
-pour une draft jamais repoussée, qui se reconnaît à son seul run `skipped` : un événement émis pendant une panne d'Actions n'est **pas
-rejoué** au rétablissement. Le re-déclenchement propre est `gh pr close` puis `gh pr reopen`
-(`reopened` est dans les types du workflow), action visible donc sur accord du mainteneur —
-jamais de commit vide ni de force-push. Puis relancer le script, comme ci-dessus : le run de la
-réouverture est le plus récent.
-
-Puis seulement, sortir du draft :
-
-```
-gh pr ready <numéro>
-```
-
-Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur qui distingue
-« travail en cours » de « prêt à être relu ».
+aucun run —, consulter d'abord `https://www.githubstatus.com/api/v2/components.json` : un
+événement émis pendant une panne d'Actions, le passage en ready compris, n'est **pas rejoué** au
+rétablissement. Le re-déclenchement propre est `gh pr close` puis `gh pr reopen` (`reopened` est
+dans les types du workflow), action visible donc sur accord du mainteneur — jamais de commit vide
+ni de force-push. Puis relancer le script, comme ci-dessus : le run de la réouverture est le plus
+récent.
 
 ## Étape 6 — Review + CI
 
 - **CI verte** : tous les gates déclarés dans `.claude/pipeline.config.md` (« gates bloquants en
   CI »), dont le seuil de couverture s'il y en a un.
+- **Jamais de push sur une tête rouge sans tri.** Après le passage en ready, chaque push lance un
+  run : pousser sur une tête rouge repaie un verdict déjà connu (ADR 0019). Le réveil du moniteur
+  de PR sur un échec est l'événement — en plein cycle de commit comme pendant l'attente de
+  l'Étape 5 — : le tri ci-dessous précède le prochain push. Même règle pour la PR d'un lot d'une
+  issue découpée, et pour sa PR d'intégration, qui reste en draft jusqu'au dernier lot et ne
+  tourne donc pas à chaque merge de lot
+  ([references/coordinatrice.md](references/coordinatrice.md), « Au go du découpage »).
 - **Trier un rouge avant de toucher au code** — chaque famille de causes a son remède, et le
   premier message d'erreur du step les sépare presque toujours. La session PR lance elle-même
   `python <répertoire de ce skill>/scripts/erreurs-ci.py <id>`, une commande à la sortie courte :

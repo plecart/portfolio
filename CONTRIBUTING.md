@@ -11,7 +11,8 @@ Chaque étape ci-dessous s'invoque par le nom de son skill (`/triage`, `/cycle-p
 
 Le dépôt porte trois piles, provisionnées séparément : le back (`uv`), le front (Node) et la pile
 de développement (Docker). Elles n'ont pas les mêmes prérequis, et la CI les tient dans trois jobs
-distincts, pour qu'un rouge de l'une ne masque pas un rouge d'une autre.
+distincts, pour qu'un rouge du front ne masque pas un rouge de l'infra, ni l'inverse ; les deux
+attendent un back vert.
 
 **Back (`apps/api`)** — Python 3.12, épinglé par `.python-version` et lu par `uv` :
 
@@ -352,5 +353,6 @@ Voir [.claude/rules/](.claude/rules/) (chargées automatiquement à chaque sessi
 - **La PR existe avant le code.** Elle est ouverte en draft dès le départ, avec `Closes #N`. C'est
   ce qui signale qu'une issue est en cours de développement — sans quoi une autre session pourrait
   réécrire sa spec en croyant que personne n'y travaille.
-- **La CI tourne sur chaque push, draft comprise**, sauf sur l'ouverture de la draft, dont
-  l'amorce est vide. Une draft sans push de code n'a donc aucun check : ce n'est pas une CI cassée.
+- **Une PR en draft n'a aucun run de CI.** Le premier part quand elle sort du draft
+  (`gh pr ready`), puis chaque push en lance un. Une draft sans check n'est donc pas une CI
+  cassée.

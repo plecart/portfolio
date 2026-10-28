@@ -3,15 +3,16 @@
 Usage :
     python attente-ci.py <PR> [--delai <secondes>] [--intervalle <secondes>]
 
-`cycle-pr` Étape 5, « Avant de sortir du draft, lire le run du SHA de tête » : `gh pr ready` ne
-déclenche aucun run (ADR 0017), la preuve d'une PR prête est le run de son dernier push. La
-session lance ce script en fond, et sa fin la réveille. `--delai` borne l'attente, 1800 s par
-défaut ; `--intervalle` espace les lectures, 30 s par défaut — les valeurs de l'intérim du lot 3
-de #134, `timeout 1800 gh run watch <id> --exit-status -i 30`, décidé par le mainteneur. Deux
-entiers positifs.
+`cycle-pr` Étape 5, « Sortir du draft, puis lire le run du SHA de tête » : une PR en draft n'a
+aucun run, `gh pr ready` déclenche le premier (`ready_for_review`, ADR 0019), puis chaque push le
+sien. La session lance ce script en fond après `gh pr ready`, et sa fin la réveille. `--delai`
+borne l'attente, 1800 s par défaut ; `--intervalle` espace les lectures, 30 s par défaut — les
+valeurs de l'intérim du lot 3 de #134, `timeout 1800 gh run watch <id> --exit-status -i 30`,
+décidé par le mainteneur. Deux entiers positifs.
 
-Jusqu'à un verdict ou au délai, chaque tour relit la tête (`gh pr view <PR> --json headRefOid`),
-puis les runs de ce SHA, `{owner}/{repo}` remplis par `gh` depuis le dépôt courant :
+Jusqu'à un verdict ou au délai, chaque tour relit la tête et l'état draft de la PR par le même
+appel (`gh pr view <PR> --json headRefOid,isDraft`), puis les runs de ce SHA, `{owner}/{repo}`
+remplis par `gh` depuis le dépôt courant :
 
     gh api "repos/{owner}/{repo}/actions/runs?head_sha=<sha>&event=pull_request"
 
@@ -20,8 +21,11 @@ réponse n'est pas lu —, l'identifiant départageant deux créations à la mê
 lecture décode ses octets en UTF-8 explicitement, jamais par la page de code de la console
 (obs 108). Puis :
 
-- aucun run : relire toutes les `intervalle` secondes — le run d'un push peut n'apparaître
-  qu'après la première lecture ; au délai, **aucun run** ;
+- PR encore en draft : **draft**, sans lire les runs — aucun ne viendra avant `gh pr ready` ;
+- aucun run, ou un run `skipped` : relire toutes les `intervalle` secondes — le run d'un push ou
+  du passage en ready peut n'apparaître qu'après la première lecture, et sitôt `gh pr ready` le
+  plus récent est encore le run sauté d'un push en draft ; au délai, **aucun run**, ou **sauté**
+  si ce run sauté est resté le plus récent ;
 - run pas terminé : `gh run watch <id> --exit-status -i <intervalle>`, tué au délai, sa sortie
   jetée et son code ignoré — il sort en 1 sur `failure` comme sur `skipped` (mesuré le
   2026-10-21, gh 2.94.0) —, puis relire ; au moins `intervalle` secondes entre deux lectures d'un
@@ -30,30 +34,30 @@ lecture décode ses octets en UTF-8 explicitement, jamais par la page de code de
 - `success` : **vert** ;
 - `cancelled` : relire la tête — `concurrency` annule le run d'une PR quand un push arrive. Changée,
   la boucle suit la nouvelle ; inchangée : **annulé sans remplaçant** ;
-- `skipped` : **sauté** — l'ouverture d'une draft, que le garde du job `api` saute ;
 - toute autre conclusion : **rouge**, avec ses jobs en échec, nom et conclusion
   (`gh run view <id> --json jobs`) — ni `success`, ni `skipped`, ni `cancelled`, ni `neutral`,
   la règle d'`erreurs-ci.py`, vers qui la ligne renvoie.
 
 Une seule ligne sur la sortie standard, `<verdict> — run <id> sur <SHA court>[, détail] →
-<suite>`, la suite nommant le paragraphe de `cycle-pr` à suivre : vert, sortir du draft (Étape 5) ;
-rouge, `erreurs-ci.py <id>` puis Étape 6, « Trier un rouge » ; aucun run, sauté, annulé sans
-remplaçant, Étape 5, « Si aucun run n'apparaît » ; délai dépassé, Étape 6, « CI qui ne démarre
-pas ».
+<suite>` — sans run à nommer, `draft` et `aucun run` disent la PR ou le SHA —, la suite nommant
+le paragraphe de `cycle-pr` à suivre : vert, Étape 6 ; draft, `gh pr ready <PR>` d'abord
+(Étape 5) ; rouge, `erreurs-ci.py <id>` puis Étape 6, « Trier un rouge » ; aucun run, sauté,
+annulé sans remplaçant, Étape 5, « Si aucun run n'apparaît » ; délai dépassé, Étape 6, « CI qui
+ne démarre pas ».
 
 **Ce qu'il ne couvre pas.** Les autres workflows et les autres événements que `pull_request`. Ce
-que le run a combiné : la référence de fusion, calculée à son push, se lit à l'Étape 7. La page
-d'état de GitHub et la réouverture de la PR, qui restent à la session et au mainteneur (Étape 5,
-« Si aucun run n'apparaît »). Un run relancé : l'API rend sa dernière tentative et garde son
-`created_at` — 39559119382, relancé une fois, y porte `run_attempt` 2 et le `run_started_at` de la
-tentative 2, dans la liste par `head_sha` comme seul (mesuré le 2026-10-21) ; relancé quand un run
-plus récent existe sur le même SHA, il ne décide pas.
+que le run a combiné : la référence de fusion qu'il a trouvée à son déclenchement se lit à
+l'Étape 7. La page d'état de GitHub et la réouverture de la PR, qui restent à la session et au
+mainteneur (Étape 5, « Si aucun run n'apparaît »). Un run relancé : l'API rend sa dernière
+tentative et garde son `created_at` — 39559119382, relancé une fois, y porte `run_attempt` 2 et le
+`run_started_at` de la tentative 2, dans la liste par `head_sha` comme seul (mesuré le
+2026-10-21) ; relancé quand un run plus récent existe sur le même SHA, il ne décide pas.
 
 Sortie : 0 vert ; 1 rouge, ou refus (« refus — ») — une lecture `gh` qui ne se lance pas, échoue,
 ne rend pas du JSON UTF-8 ou pas la forme attendue —, motif en une ligne ; 2 appel mal formé,
-usage sur la sortie d'erreur ; 3 aucun run, sauté, ou annulé sans remplaçant ; 124 délai dépassé,
-le code de `timeout`. Python 3.11 ou plus, bibliothèque standard seule ; `gh` authentifié, lancé
-depuis le dépôt.
+usage sur la sortie d'erreur ; 3 draft, aucun run, sauté, ou annulé sans remplaçant ; 124 délai
+dépassé, le code de `timeout`. Python 3.11 ou plus, bibliothèque standard seule ; `gh`
+authentifié, lancé depuis le dépôt.
 """
 
 import argparse
@@ -93,6 +97,13 @@ class WorkflowRun(NamedTuple):
     status: str
     conclusion: str | None
     created_at: str
+
+
+class PullRequest(NamedTuple):
+    """La tête d'une PR et son état draft, lus par le même appel."""
+
+    head: str
+    draft: bool
 
 
 class Verdict(NamedTuple):
@@ -164,8 +175,8 @@ def field(document: Any, name: str, kind: type[object]) -> Any:
     return value
 
 
-def head_of(document: Any) -> str:
-    """La tête que rend `gh pr view --json headRefOid`.
+def pull_request_of(document: Any) -> PullRequest:
+    """La tête et l'état draft que rend `gh pr view --json headRefOid,isDraft`.
 
     Raises:
         KeyError, TypeError, ValueError: comme `field`, ou une tête qui n'est pas un SHA.
@@ -173,7 +184,7 @@ def head_of(document: Any) -> str:
     sha = field(document, "headRefOid", str)
     if not SHA.fullmatch(sha):
         raise ValueError(f"`headRefOid` n'est pas un SHA : {sha!r}")
-    return sha
+    return PullRequest(sha, field(document, "isDraft", bool))
 
 
 def workflow_run(document: Any) -> WorkflowRun:
@@ -215,9 +226,9 @@ def failed_jobs(document: Any) -> list[str]:
     return [f"{name} ({conclusion})" for name, conclusion in named if conclusion not in NOT_FAILED]
 
 
-def head(run: Run, pr: str) -> str:
-    """Le SHA de tête de la PR `pr`."""
-    return read_json(run, head_of, "pr", "view", pr, "--json", "headRefOid")
+def pull_request(run: Run, pr: str) -> PullRequest:
+    """La tête de la PR `pr` et son état draft."""
+    return read_json(run, pull_request_of, "pr", "view", pr, "--json", "headRefOid,isDraft")
 
 
 def latest(run: Run, sha: str) -> WorkflowRun | None:
@@ -250,13 +261,21 @@ def subject(ci: WorkflowRun, sha: str) -> str:
     return f"run {ci.id} sur {short(sha)}"
 
 
+def absent_verdict(ci: WorkflowRun | None, sha: str, delay: int) -> Verdict:
+    """Le verdict au délai sans run qui compte sur le SHA `sha` : aucun run, ou `ci`, le run sauté
+    d'un push en draft resté le plus récent, sans run du passage en ready."""
+    if ci is None:
+        return Verdict(f"aucun run — aucun run CI sur {short(sha)} en {delay} s → {NO_RUN}", 3)
+    return Verdict(
+        f"sauté — {subject(ci, sha)}, aucun run du passage en ready en {delay} s → {NO_RUN}", 3
+    )
+
+
 def verdict(run: Run, ci: WorkflowRun, sha: str) -> Verdict:
-    """Le verdict d'un run terminé sur le SHA `sha`."""
+    """Le verdict d'un run terminé sur le SHA `sha`, sauté excepté (`absent_verdict`)."""
     about = subject(ci, sha)
     if ci.conclusion == "success":
-        return Verdict(f"vert — {about} → sortir du draft, cycle-pr Étape 5", 0)
-    if ci.conclusion == "skipped":
-        return Verdict(f"sauté — {about} → {NO_RUN}", 3)
+        return Verdict(f"vert — {about} → cycle-pr Étape 6", 0)
     if ci.conclusion == "cancelled":
         return Verdict(f"annulé sans remplaçant — {about} → {NO_RUN}", 3)
     failed: list[str] = read_json(run, failed_jobs, "run", "view", str(ci.id), "--json", "jobs")
@@ -272,14 +291,21 @@ def wait(run: Run, pr: str, delay: int, interval: int, clock: Clock, sleep: Slee
     """Attend un verdict sur la tête de la PR `pr`, au plus `delay` secondes (voir le module)."""
     deadline = clock() + delay
     while True:
-        sha = head(run, pr)
+        state = pull_request(run, pr)
+        sha = state.head
+        if state.draft:
+            return Verdict(
+                f"draft — PR {pr} encore en draft sur {short(sha)}"
+                f" → gh pr ready {pr} d'abord, cycle-pr Étape 5",
+                3,
+            )
         ci = latest(run, sha)
         remaining = deadline - clock()
-        if ci is None:
+        # Sitôt `gh pr ready`, le plus récent est encore le run sauté d'un push en draft : celui du
+        # passage en ready n'apparaît qu'après.
+        if ci is None or ci.conclusion == "skipped":
             if remaining <= 0:
-                return Verdict(
-                    f"aucun run — aucun run CI sur {short(sha)} en {delay} s → {NO_RUN}", 3
-                )
+                return absent_verdict(ci, sha, delay)
             sleep(min(interval, remaining))
         elif ci.status != "completed":
             if remaining <= 0:
@@ -293,7 +319,7 @@ def wait(run: Run, pr: str, delay: int, interval: int, clock: Clock, sleep: Slee
             pause = min(started + interval, deadline) - clock()
             if pause > 0:
                 sleep(pause)
-        elif ci.conclusion != "cancelled" or head(run, pr) == sha:
+        elif ci.conclusion != "cancelled" or pull_request(run, pr).head == sha:
             return verdict(run, ci, sha)
 
 
