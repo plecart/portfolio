@@ -46,6 +46,20 @@ def r2_storage(monkeypatch: pytest.MonkeyPatch) -> Storage:
     return storages.create_storage(media_storage(build_env()))
 
 
+def test_le_stockage_joint_le_compte_r2_de_l_environnement(r2_storage: Storage) -> None:
+    """`Stubber` répond avant l'adresse et la signature : sans ce test, un stockage qui perdrait
+    l'adresse du compte, sa région ou son jeton resterait vert jusqu'au premier envoi réel."""
+    s3: Any = r2_storage
+    client = bucket_client(r2_storage)
+
+    assert (client.meta.endpoint_url, client.meta.region_name, s3.access_key, s3.secret_key) == (
+        R2_ENVIRONMENT["MEDIA_R2_ENDPOINT"],
+        "auto",
+        R2_ENVIRONMENT["MEDIA_R2_ACCESS_KEY_ID"],
+        R2_ENVIRONMENT["MEDIA_R2_SECRET_ACCESS_KEY"],
+    )
+
+
 def test_deux_fichiers_de_meme_nom_ne_s_ecrasent_pas_sur_r2(r2_storage: Storage) -> None:
     """`django-storages` écrase par défaut (`file_overwrite`) : deux technologies dont l'icône
     s'appelle `logo.svg` partageraient un objet, et le nettoyage d'une conversion qui échoue
@@ -102,8 +116,8 @@ def test_une_variante_arrive_sur_r2_sous_le_type_webp(
                 "Bucket": BUCKET,
                 "Key": "images/abc/300.webp",
                 "Body": ANY,
-                # Ajouté par s3transfer (mesuré) ; hors du sujet de ce test.
-                "ChecksumAlgorithm": ANY,
+                # Aucune `ChecksumAlgorithm` : la somme que s3transfer ajoute par défaut, R2 ne la
+                # couvre pas (`config/storage.py`).
                 "ContentType": "image/webp",
             },
         )
