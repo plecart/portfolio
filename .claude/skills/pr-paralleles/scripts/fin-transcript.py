@@ -26,7 +26,7 @@ import sys
 from collections import deque
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 TOURS = 12
 EXTRAIT = 400
@@ -85,17 +85,15 @@ def enregistrements(chemin: Path) -> Iterator[dict[str, Any]]:
 
 def texte(enregistrement: dict[str, Any]) -> str:
     """Le texte d'un enregistrement, blocs concaténés, ou la chaîne vide s'il n'en porte pas."""
-    contenu = (enregistrement.get("message") or {}).get("content")
+    contenu = cast(dict[str, Any], enregistrement.get("message") or {}).get("content")
     if isinstance(contenu, str):
         return contenu
     if not isinstance(contenu, list):
         return ""
-    blocs: list[dict[str, Any]] = contenu
-    return "".join(
-        str(bloc.get("text", ""))
-        for bloc in blocs
-        if isinstance(bloc, dict) and bloc.get("type") == "text"
-    )
+    blocs = [
+        cast(dict[str, Any], bloc) for bloc in cast(list[object], contenu) if isinstance(bloc, dict)
+    ]
+    return "".join(str(bloc.get("text", "")) for bloc in blocs if bloc.get("type") == "text")
 
 
 def message_du_mainteneur(enregistrement: dict[str, Any]) -> str | None:

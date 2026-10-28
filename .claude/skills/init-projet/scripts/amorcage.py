@@ -68,6 +68,7 @@ bibliothèque standard seule ; `git`, et selon la sous-commande `uvx` ou `pipx`,
 """
 
 import argparse
+import io
 import shutil
 import subprocess
 import sys
@@ -421,5 +422,6 @@ if __name__ == "__main__":
     # Sur un poste dont la page de code est cp1252, Python écrit un tube dans cet encodage : un
     # motif accentué arriverait illisible à la session qui le lit (`pipeline.config.md`,
     # « Qualité »).
-    sys.stdout.reconfigure(encoding="utf-8")
+    if isinstance(stdout := sys.stdout, io.TextIOWrapper):
+        stdout.reconfigure(encoding="utf-8")
     sys.exit(main(sys.argv[1:]))
