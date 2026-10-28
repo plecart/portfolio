@@ -310,11 +310,12 @@ def run_bounded(
 ) -> subprocess.CompletedProcess[bytes]:
     """`command` jusqu'au bout, ou `TimeoutExpired` au bout de `timeout` secondes sans attendre ses
     tubes — sa descendance tuée sous Windows (`taskkill /T`), l'enfant direct seul ailleurs, où
-    rien n'attend les tubes. `subprocess.run(timeout=…)` ne tue que l'enfant direct puis, sous Windows,
-    attend les tubes que tient sa descendance — `docker compose` et `docker buildx` sont des
-    plugins que `docker` lance en enfant : 46 s pour un délai de 5 s sur un `buildx`, mesuré à la
-    relecture de la PR #185. Tout lancement Docker d'un test passe par ici. Sauf `check=False`, un
-    code de sortie non nul fait échouer, sa sortie d'erreur pour message."""
+    rien n'attend les tubes. `subprocess.run(timeout=…)` ne tue que l'enfant direct puis, sous
+    Windows, attend les tubes que tient sa descendance — `docker compose` et `docker buildx` sont
+    des plugins que `docker` lance en enfant : 46 s pour un délai de 5 s sur un `buildx`, mesuré à
+    la relecture de la PR #185. Tout lancement Docker d'un test passe par ici, sauf un `Popen` qui
+    porte son délai à son attente. Sauf `check=False`, un code de sortie non nul fait échouer, sa
+    sortie d'erreur pour message."""
     process = subprocess.Popen(
         command,
         stdin=None if stdin is None else subprocess.PIPE,
