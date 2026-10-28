@@ -19,7 +19,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 
 | ADR | Sujet | Décisions | Statut |
 |---|---|---|---|
-| [0001](0001-backend-django.md) | Backend Django : contenu, admin et API | D16, D17, D27 | accepté ; point « Rendu Markdown » remplacé par 0010 ; point « `django-imagekit` » remplacé par 0015 |
+| [0001](0001-backend-django.md) | Backend Django : contenu, admin et API | D16, D17, D27 | accepté ; point « Rendu Markdown » remplacé par 0010 ; point « `django-imagekit` » remplacé par 0015 ; point « `django-csp` » remplacé par 0020 |
 | [0002](0002-hebergement-vps-docker-compose.md) | Hébergement : VPS unique, Docker Compose, Caddy | D19 | accepté ; point « un seul fichier Compose » remplacé par 0012 |
 | [0003](0003-cloudflare-en-bordure.md) | Cloudflare en bordure et domaine `pacome.dev` | D23, D36, D37, D41 | accepté |
 | [0004](0004-fichiers-sur-cloudflare-r2.md) | Fichiers sur Cloudflare R2 | D25, D30 (remplace D21) | accepté ; point « `django-imagekit` » remplacé par 0015 |
@@ -38,6 +38,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0017](0017-jobs-de-la-ci-selon-le-delta.md) | Les jobs de la CI selon le delta d'une PR | D61 (remplace le point « Scan : Trivy, sur chaque PR » de 0014) | accepté ; points « Le passage en ready ne déclenche plus de run », « seule l'ouverture d'une draft le saute », « partent après `api`, même rouge » et « le scan Trivy tourne sur chaque PR qui touche un fichier hors du harnais » remplacés par 0019 |
 | [0018](0018-binaires-go-compiles-par-le-projet.md) | Binaires Go compilés par le projet | D62 (exerce une condition de réexamen de 0014, sans le remplacer) | accepté |
 | [0019](0019-runs-de-ci-au-ready-et-avis-planifies.md) | Runs de CI au passage en ready, portes d'avis planifiées | D63 (remplace quatre points de 0017, dont deux repris dans D61 ; renverse la décision « sans horloge » de #77) | accepté |
+| [0020](0020-csp-native-de-django.md) | CSP et en-têtes de sécurité par la brique native de Django | D65 (remplace le point « `django-csp` » de 0001) | accepté |
 
 ## À écrire à leur phase
 
