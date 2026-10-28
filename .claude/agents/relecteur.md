@@ -96,18 +96,9 @@ Ce que tu vérifies :
 python .claude/skills/cycle-pr/scripts/mutation.py <racine de ton worktree> <mutations.json>
 ```
 
-Son `--help` porte le contrat entier : le JSON `{targets, reporter, label, stack, mutations}`,
-les verdicts `ROUGE` / `VERT` / `PANNE`, le témoin joué une seule fois sur l'arbre propre avant
-toute mutation, la restauration octet pour octet. Lis-le, n'ouvre pas la source — et lis-le
-**seul** : il imprime son texte en sortant en 2, donc il tombe derrière un `&&`. Deux réglages
-décident du coût : `targets` reçoit le **fichier de test visé**, jamais la suite entière, et
-`file` est indépendant de `targets` — muter un fichier en lançant le test d'un autre te prouve
-un épinglage inter-fichiers sans cérémonie. Une ancre `old` se relit dans le fichier **formaté**,
-et se choisit dans le code, jamais dans la prose qui le cite — le harnais vérifie qu'elle est
-unique, pas qu'elle est du code. Prise dans un commentaire, elle mute le commentaire et rend
-`VERT` sans rien prouver ; seule une mutation qui ne change aucun octet est refusée en `PANNE`.
-Un `expect` qui nomme un test absent des `targets` rend « apparie 0 tests de la suite témoin » :
-mauvaise cible, pas faute de frappe.
+Son `--help` porte le contrat entier ; ses réglages de coût et ses pièges d'usage sont dans
+`.claude/skills/cycle-pr/references/relecture.md`, « Le contrat du harnais de mutation et ses
+pièges » — lis-les avant ta première mutation.
 
 Un `VERT` sur arbre propre doublé d'un `ROUGE` avec une sonde plantée est une **mesure**, pas une
 panne : l'invariant n'est pas gardé mais il est gardable — rapporte-le comme un constat.

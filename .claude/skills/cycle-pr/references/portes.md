@@ -28,6 +28,8 @@ La forme précédente, `git rev-parse main origin/main`, voyait les deux directi
 « Le go, puis le merge ». Une porte à **un** prédicat aurait fermé ce cas en rouvrant l'autre :
 c'est tout l'intérêt d'en mettre deux.
 
+## Au blocage
+
 **Au blocage**, laquelle des deux a mordu se lit par `git status -sb`, qui écrit `[ahead n]` /
 `[behind n]`. Pas `git status` nu, qui le dit en prose, et **surtout pas**
 `git status --porcelain`, **vide** sur une branche en avance (mesuré) — c'est pourquoi la sonde
