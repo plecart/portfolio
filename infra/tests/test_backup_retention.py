@@ -12,13 +12,12 @@ Que l'image porte ce script-là, c'est la purge dans la pile qui le montre (`tes
 `test_la_purge_supprime_du_bucket_exactement_ce_que_la_retention_ecarte`).
 """
 
-import subprocess
 from collections.abc import Callable, Iterable, Iterator
 from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
-from test_infra import loaded_image
+from test_infra import loaded_image, run_bounded
 
 SCRIPT = Path(__file__).parents[1] / "backup" / "retention.sh"
 # La base des noms de ces jeux : le script la reçoit en argument, comme `backup.sh` lui passe la
@@ -48,20 +47,16 @@ def expired() -> Iterator[Expired]:
     cas plutôt qu'un `docker run` : trois lancements de conteneur sur 159 se sont figés sur ce poste
     (mesuré le 2026-10-14), aucun des 93 `docker exec` qui ont suivi ; et un délai borne chaque
     appel, pour qu'un blocage échoue au lieu de suspendre la suite."""
-    started = subprocess.run(
-        ["docker", "run", "--detach", "--rm", loaded_image("backup"), "sleep", "3600"],
-        capture_output=True,
-        text=True,
-        check=True,
+    started = run_bounded(
+        ["docker", "run", "--detach", "--rm", loaded_image("backup"), "sleep", "3600"]
     )
-    container = started.stdout.strip()
+    container = started.stdout.decode().strip()
 
     def run(names: Iterable[str], timezone: str = "UTC") -> set[str]:
-        printed = subprocess.run(
+        printed = run_bounded(
             ["docker", "exec", "-i", "-e", f"TZ={timezone}", container, "sh", "-c"]
             + [SCRIPT.read_text(encoding="utf-8"), "retention.sh", BASE],
-            input="".join(f"{each}\n" for each in names).encode(),
-            capture_output=True,
+            stdin="".join(f"{each}\n" for each in names).encode(),
             check=False,
             timeout=RUN_DEADLINE,
         )
@@ -71,7 +66,7 @@ def expired() -> Iterator[Expired]:
     try:
         yield run
     finally:
-        subprocess.run(["docker", "rm", "--force", container], capture_output=True, check=False)
+        run_bounded(["docker", "rm", "--force", container], check=False)
 
 
 # Le régime établi : soixante-quinze nuits jusqu'au mercredi 14 octobre 2026, et ce qu'elles gardent.

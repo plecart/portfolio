@@ -12,7 +12,6 @@ attribue : le moteur est partagé avec d'autres piles. Les requêtes partent de 
 import json
 import os
 import socket
-import subprocess
 import time
 import uuid
 from collections.abc import Callable, Iterator, Mapping
@@ -25,7 +24,7 @@ from typing import Any
 
 import pytest
 import yaml
-from test_infra import image_output, loaded_image
+from test_infra import image_output, loaded_image, run_bounded
 
 STACK = Path(__file__).with_name("caddy.yml")
 # Le Compose de production, dont la sonde de `caddy` s'exécute ici dans l'image.
@@ -142,12 +141,10 @@ def compose(*arguments: str, environment: Mapping[str, str]) -> str:
     """Lance `docker compose` sur la pile du test, sous son nom de projet.
 
     Returns:
-        La sortie standard. Une erreur de Compose fait échouer le test ; sa sortie d'erreur, non
-        capturée ici, s'affiche avec l'échec — « No such image » si `make build` n'a pas tourné.
+        La sortie standard. Une erreur de Compose fait échouer le test, sa sortie d'erreur pour
+        message — « No such image » si `make build` n'a pas tourné.
     """
-    return subprocess.run(
-        compose_command(*arguments), env=environment, stdout=subprocess.PIPE, text=True, check=True
-    ).stdout
+    return run_bounded(compose_command(*arguments), environment=environment).stdout.decode()
 
 
 def wait_until_serving(stack: Stack) -> None:
@@ -323,17 +320,15 @@ def test_la_sonde_de_production_ne_dit_sain_que_le_site_servi(
     son nom. Le code ne suffit pas — à un hôte qu'aucun bloc ne sert, Caddy rend un 200 vide
     (mesuré à la relecture de la PR #71). Sous un `SITE_HOST` que le Caddyfile ne sert pas, la
     même sonde doit échouer."""
-    probed = subprocess.run(
+    probed = run_bounded(
         compose_command(
             "exec", "-T", "-e", f"SITE_HOST={site_host}", "caddy", "sh", "-c", production_probe()
         ),
-        env=stack.environment,
-        capture_output=True,
-        text=True,
+        environment=stack.environment,
         check=False,
     )
 
-    assert (probed.returncode == 0) is healthy, probed.stderr
+    assert (probed.returncode == 0) is healthy, probed.stderr.decode()
 
 
 # Ce que sert l'hôte du site, sous chacune de ses formes : la page, un fichier haché, une fiche

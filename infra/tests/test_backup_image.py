@@ -31,7 +31,7 @@ from pathlib import Path
 import pytest
 import yaml
 from test_env import declared_variables
-from test_infra import image_output, loaded_image
+from test_infra import image_output, loaded_image, run_bounded
 
 INFRA = Path(__file__).parents[1]
 BOOTSTRAP = INFRA / "bootstrap.sh"
@@ -96,12 +96,8 @@ class Stack:
         self, *arguments: str, stdin: bytes | None = None
     ) -> subprocess.CompletedProcess[bytes]:
         """Lance `docker compose` sur la pile, sans vérifier son code de sortie."""
-        return subprocess.run(
-            compose_command(*arguments),
-            env=self.environment,
-            input=stdin,
-            capture_output=True,
-            check=False,
+        return run_bounded(
+            compose_command(*arguments), stdin=stdin, environment=self.environment, check=False
         )
 
     def output(self, *arguments: str) -> str:

@@ -20,8 +20,10 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 import tarfile
-from collections.abc import Iterable, Mapping
+import time
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 
 import pytest
@@ -124,8 +126,9 @@ BASE_IMAGE_VERSION = re.compile(r"^FROM python:(\d+\.\d+)[.-]", re.MULTILINE)
 
 # Le temps laissé à un lancement Docker d'un test, en secondes, tirage d'image compris. Sans lui,
 # un conteneur qui ne finit pas fige la suite au lieu de la faire échouer : 3 h 40 sur le filtre
-# gojq de `test_publication.py` le 2026-10-28, sans échec affiché.
-DOCKER_DEADLINE = 120
+# gojq de `test_publication.py` le 2026-10-28, sans échec affiché. Au-dessus des 210 s qu'un
+# `up --wait` peut attendre une sonde de production (`x-probe-timing`, 2 min puis 3 × 30 s).
+DOCKER_DEADLINE = 300
 
 # Les variables que lit le back : un `ARG` qui en nommerait une la réclamerait au build, un `ENV`
 # la figerait dans l'image — sans égard à la casse, comme `pydantic-settings` les lit
@@ -297,16 +300,43 @@ def loaded_image(service: str) -> str:
     return built_images(make_dry_run("build", environment=prefix))[f"infra/{service}/Dockerfile"]
 
 
+def run_bounded(
+    command: Sequence[str | Path],
+    *,
+    stdin: bytes | None = None,
+    environment: Mapping[str, str] | None = None,
+    check: bool = True,
+    timeout: float = DOCKER_DEADLINE,
+) -> subprocess.CompletedProcess[bytes]:
+    """`command` jusqu'au bout, ou `TimeoutExpired` au bout de `timeout` secondes, toute sa
+    descendance tuée. `subprocess.run(timeout=…)` ne tue que l'enfant direct puis, sous Windows,
+    attend les tubes que tient sa descendance — `docker compose` et `docker buildx` sont des
+    plugins que `docker` lance en enfant : 46 s pour un délai de 5 s sur un `buildx`, mesuré à la
+    relecture de la PR #185. Tout lancement Docker d'un test passe par ici. Sauf `check=False`, un
+    code de sortie non nul fait échouer, sa sortie d'erreur pour message."""
+    process = subprocess.Popen(
+        command,
+        stdin=None if stdin is None else subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=environment,
+    )
+    try:
+        stdout, stderr = process.communicate(stdin, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        if os.name == "nt":
+            killer = ["taskkill", "/F", "/T", "/PID", str(process.pid)]
+            subprocess.run(killer, capture_output=True, check=False)
+        process.kill()
+        raise
+    assert not check or process.returncode == 0, stderr.decode(errors="replace")
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
 def image_output(image: str, *command: str) -> str:
     """La sortie standard de `command`, lancée dans un conteneur jetable de l'image, hors de toute
     pile."""
-    return subprocess.run(
-        ["docker", "run", "--rm", image, *command],
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=DOCKER_DEADLINE,
-    ).stdout
+    return run_bounded(["docker", "run", "--rm", image, *command]).stdout.decode()
 
 
 def build_context(root: Path) -> set[str]:
@@ -323,11 +353,8 @@ def build_context(root: Path) -> set[str]:
     """
     dockerfile = root.parent / "Dockerfile"
     dockerfile.write_text("FROM scratch\nCOPY . /\n", encoding="utf-8")
-    archive = subprocess.run(
-        ["docker", "buildx", "build", "-f", str(dockerfile), "--output", "type=tar,dest=-", root],
-        capture_output=True,
-        check=True,
-        timeout=DOCKER_DEADLINE,
+    archive = run_bounded(
+        ["docker", "buildx", "build", "-f", str(dockerfile), "--output", "type=tar,dest=-", root]
     ).stdout
     with tarfile.open(fileobj=io.BytesIO(archive)) as received:
         return {member.name.removeprefix("./") for member in received if member.isfile()}
@@ -840,29 +867,43 @@ def test_aucun_fichier_lu_par_un_conteneur_ne_porte_de_retour_windows() -> None:
     assert not faulty, f"{len(checked)} fichiers repassés, fins de ligne Windows dans {faulty}"
 
 
-def docker_launches() -> dict[str, ast.Call]:
-    """Les lancements Docker des tests du back, par `fichier:ligne` : chaque appel `subprocess.…`
-    dont la commande nomme `docker` en littéral, lu par l'analyseur de Python (3 le 2026-10-28)."""
+def docker_launches() -> dict[str, str]:
+    """Les lancements Docker des tests du back et des images, par `fichier:ligne`, avec leur
+    lanceur : chaque `subprocess.run`, `subprocess.Popen` ou `run_bounded` dont la commande nomme
+    `docker` en littéral ou vient de `compose_command`, lu par l'analyseur de Python. Une commande
+    rangée dans une variable lui échappe."""
     return {
-        f"{module.name}:{node.lineno}": node
-        for module in sorted(Path(__file__).parent.glob("*.py"))
+        f"{module.relative_to(REPOSITORY_ROOT).as_posix()}:{node.lineno}": ast.unparse(node.func)
+        for folder in ("apps/api/tests", "infra/tests")
+        for module in sorted((REPOSITORY_ROOT / folder).glob("*.py"))
         for node in ast.walk(ast.parse(module.read_text(encoding="utf-8")))
         if isinstance(node, ast.Call)
-        and ast.unparse(node.func).startswith("subprocess.")
+        and ast.unparse(node.func) in {"subprocess.run", "subprocess.Popen", "run_bounded"}
         and node.args
-        and "'docker'" in ast.unparse(node.args[0])
+        and (
+            "'docker'" in ast.unparse(node.args[0])
+            or ast.unparse(node.args[0]).startswith("compose_command(")
+        )
     }
 
 
-def test_chaque_lancement_docker_d_un_test_a_un_delai() -> None:
+def test_chaque_lancement_docker_d_un_test_passe_par_run_bounded() -> None:
     """Un conteneur qui ne finit pas fait échouer son test par `TimeoutExpired`, au lieu de figer
-    la suite : chaque lancement porte un `timeout`."""
+    la suite : aucun `subprocess.run`, dont le délai attend la descendance sous Windows. Un `Popen`
+    garde le sien à son attente, `communicate(timeout=…)`, qui lève sans rien attendre."""
     launches = docker_launches()
 
     assert launches, "aucun lancement Docker lu — la commande a-t-elle quitté son littéral ?"
-    faulty = [
-        where
-        for where, call in launches.items()
-        if not any(keyword.arg == "timeout" for keyword in call.keywords)
-    ]
-    assert not faulty, f"{len(launches)} lancements repassés, sans délai : {faulty}"
+    faulty = [where for where, launcher in launches.items() if launcher == "subprocess.run"]
+    assert not faulty, f"{len(launches)} lancements repassés, hors de `run_bounded` : {faulty}"
+
+
+def test_run_bounded_rend_la_main_au_delai_quand_un_petit_fils_tient_les_tubes() -> None:
+    """Le petit-fils hérite des tubes, comme un plugin de `docker` : `subprocess.run(timeout=…)`
+    l'attendrait jusqu'au bout, sous Windows."""
+    grandchild = "import subprocess, sys; subprocess.run([sys.executable, '-c', 'import time; time.sleep(30)'])"
+    started = time.monotonic()
+
+    with pytest.raises(subprocess.TimeoutExpired):
+        run_bounded([sys.executable, "-c", grandchild], timeout=1)
+    assert time.monotonic() - started < 15
