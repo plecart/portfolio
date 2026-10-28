@@ -21,7 +21,7 @@
 # Chaque action est épinglée par **empreinte de commit**, sa version en commentaire : une
 # étiquette peut être déplacée par son propriétaire ou par un attaquant, et le déplacement
 # s'exécuterait ici sans aucun signal ; une empreinte ne bouge pas. Dependabot
-# (`.github/dependabot.yml`) les met à jour chaque semaine, empreinte et commentaire ensemble. Le
+# (`.github/dependabot.yml`) les met à jour chaque mois, empreinte et commentaire ensemble. Le
 # commentaire porte l'étiquette la plus précise du commit (`v7.0.1`, pas `v7`) : Dependabot ne
 # réécrit qu'un commentaire dont l'étiquette pointe encore sur le commit épinglé, et une étiquette
 # majeure cesse d'y pointer dès qu'une version sort — précisément quand la mise à jour arrive.

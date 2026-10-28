@@ -2,7 +2,7 @@
 # brief de #5). Une entrée par écosystème — par dossier d'image pour `docker` —, toutes sur la
 # même politique :
 #
-# - passage hebdomadaire ;
+# - passage mensuel (ADR 0019, décision 4) ;
 # - versions mineures et correctifs groupés en une PR par entrée ; chaque montée majeure a
 #   sa PR à elle — elle casse plus souvent, et mêlée au lot elle bloquerait tout le reste —,
 #   sauf celles qu'une entrée refuse (`ignore`, raison en commentaire) ;
@@ -21,7 +21,7 @@ updates:
   - package-ecosystem: uv
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       minor-and-patch:
         update-types: [minor, patch]
@@ -33,7 +33,7 @@ updates:
   - package-ecosystem: npm
     directory: /apps/web
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       minor-and-patch:
         update-types: [minor, patch]
@@ -70,7 +70,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       minor-and-patch:
         update-types: [minor, patch]
@@ -90,7 +90,7 @@ updates:
   - package-ecosystem: docker
     directory: /infra/api
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       minor-and-patch:
         update-types: [minor, patch]
@@ -101,14 +101,14 @@ updates:
     ignore:
       # Changer de version de Python est une décision du projet (`.python-version`, que l'image
       # suit sous test), pas une mise à jour : une PR `3.13.x-slim-trixie` échouerait par
-      # construction, chaque semaine. Les correctifs de la 3.12 passent.
+      # construction, chaque mois. Les correctifs de la 3.12 passent.
       - dependency-name: python
         update-types: [version-update:semver-major, version-update:semver-minor]
 
   - package-ecosystem: docker
     directory: /infra/backup
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       minor-and-patch:
         update-types: [minor, patch]
@@ -120,7 +120,7 @@ updates:
   - package-ecosystem: docker
     directory: /infra/caddy
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       minor-and-patch:
         update-types: [minor, patch]
@@ -138,7 +138,7 @@ updates:
   - package-ecosystem: docker-compose
     directory: /infra
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       minor-and-patch:
         update-types: [minor, patch]

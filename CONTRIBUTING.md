@@ -277,13 +277,18 @@ Sauté lui aussi tant que `DEPLOY_ENABLED` ne vaut pas `true`. Ses secrets et so
 main : [infra/RUNBOOK.md](infra/RUNBOOK.md), « Le test mensuel ».
 
 **Mises à jour des dépendances.** Dependabot ([.github/dependabot.yml](.github/dependabot.yml))
-ouvre chaque semaine, par écosystème (`uv`, npm, actions GitHub, images Docker), une PR qui
+ouvre chaque mois, par écosystème (`uv`, npm, actions GitHub, images Docker), une PR qui
 groupe versions mineures et correctifs ; chaque montée majeure arrive seule, sauf les majeures npm
 que `.github/dependabot.yml` refuse — chacune avec sa raison et le test qui la tient
 ([docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4). Ses PR sont exemptées des
 métadonnées de PR et de la description en français
 (`chore(deps): bump …`, [.claude/rules/taille-pr.md](.claude/rules/taille-pr.md)), passent par la
 même CI et ne se mergent que sur un go humain.
+Les mises à jour de sécurité ne suivent pas ce mois : Dependabot ouvre sa PR dès qu'un avis
+paraît, pour `uv`, npm et les actions GitHub — alertes et mises à jour de sécurité activées sur le
+dépôt ([ADR 0019](docs/adr/0019-runs-de-ci-au-ready-et-avis-planifies.md), décision 4). Pas pour
+les images Docker, que GitHub ne couvre pas : un avis sur une image se voit au scan des images (`make scan`,
+ci-dessus) et se traite par une montée de version à la main.
 Actions et images sont épinglées par empreinte, derrière leur version la plus précise :
 Dependabot met l'une et l'autre à jour ensemble. Une nouvelle version mineure de Python (3.13)
 n'est jamais proposée — elle se change à la main, dans `.python-version` puis dans l'image ; ses
