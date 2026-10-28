@@ -320,8 +320,11 @@ def started_stack(project: str) -> Generator[Stack]:
     """
     image = loaded_image("backup")
     recipient, identity = age_key_pair(image)
+    # Du processus, rien de ce que le modèle déclare : `process_environment` pose les champs d'`Env`,
+    # vides pour R2, et Compose préfère l'environnement au fichier `--env-file` (mesuré : un
+    # `MEDIA_HOST` vide y arrêtait l'interpolation).
     environment = {
-        **os.environ,
+        **{name: value for name, value in os.environ.items() if name not in MODEL},
         **STACK_VALUES,
         "COMPOSE_PROJECT_NAME": project,
         "BACKUP_IMAGE": image,
