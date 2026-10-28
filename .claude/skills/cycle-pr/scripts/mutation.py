@@ -202,7 +202,7 @@ class Reporter:
 
     flags: str
     outcomes: Callable[[str], dict[str, str]]
-    env: Mapping[str, str] = field(default_factory=dict)
+    env: Mapping[str, str] = field(default_factory=dict[str, str])
 
 
 REPORTERS = {
@@ -412,7 +412,7 @@ def run_bounded(command: str, root: Path, environment: Mapping[str, str], timeou
         text=True,
         errors="replace",
         env=dict(environment),
-        **({} if os.name == "nt" else {"start_new_session": True}),
+        start_new_session=os.name != "nt",
     )
     try:
         _, errors = process.communicate(timeout=timeout)

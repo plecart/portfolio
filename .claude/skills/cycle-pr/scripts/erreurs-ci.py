@@ -96,6 +96,7 @@ le dépôt.
 """
 
 import argparse
+import io
 import json
 import re
 import subprocess
@@ -463,6 +464,7 @@ if __name__ == "__main__":
     # Sur un poste dont la page de code est cp1252, Python écrit un tube dans cet encodage : un
     # nom de job accentué arriverait illisible à la session qui le lit — l'erreur d'argparse, sur
     # la sortie d'erreur, comprise (`pipeline.config.md`, « Qualité »).
-    sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8")
     sys.exit(main(sys.argv[1:]))
