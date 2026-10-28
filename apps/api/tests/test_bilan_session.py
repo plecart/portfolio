@@ -30,8 +30,9 @@ AGENT_NAME = 'Agent "Relecture 4.2 passe 1 #5" finished'
 
 
 def at(clock: str) -> str:
-    """Un horodatage du transcript, en UTC, le jour de la mesure d'obs 41."""
-    return f"2026-09-27T{clock}.000Z"
+    """Un horodatage du transcript, en UTC, le jour de la mesure d'obs 41 — à la milliseconde,
+    sauf si `clock` porte sa propre fraction."""
+    return f"2026-09-27T{clock}{'' if '.' in clock else '.000'}Z"
 
 
 def assistant(clock: str, *uses: tuple[str, str]) -> dict[str, Any]:
@@ -280,6 +281,23 @@ def test_la_reactivite_se_rapporte_au_temps_actif_et_les_absences_a_la_session(
     assert f"{part_active:4.0%}" in reactivite
     assert f"{part_session:4.0%}" not in reactivite, "la réactivité est diluée par les absences"
     assert f"{bilan.total(measures.absences) / measures.span:4.0%}" in absences
+
+
+def test_la_mediane_de_reactivite_arrondit_la_demi_microseconde_au_pair(tmp_path: Path) -> None:
+    """Deux attentes de 59,999999 s et 60 s : la médiane vaut 59,9999995 s, que l'arrondi au pair
+    porte à 60 s, soit 0 h 01. Une médiane basse, ou un arrondi par troncature, la laisse sous la
+    minute — et `hm`, qui tronque à la minute, rend alors 0 h 00."""
+    timeline = [
+        assistant("10:00:00"),
+        said("10:00:59.999999", "ok"),
+        assistant("10:10:00"),
+        said("10:11:00", "ok"),
+    ]
+    events = bilan.read_events([write_transcript(tmp_path / "session.jsonl", timeline)])
+
+    report = bilan.report(events, bilan.Usage(), [])
+
+    assert "(2 attentes, médiane 0 h 01)" in ligne(report, "réactivité")
 
 
 def test_un_transcript_vide_ou_illisible_ne_rend_pas_un_bilan_faux(tmp_path: Path) -> None:
