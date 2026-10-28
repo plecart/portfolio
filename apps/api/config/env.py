@@ -191,6 +191,13 @@ class Env(BaseSettings):
             (ADR 0008, « CORS restreint à l'origine du site »), liste JSON comme `ALLOWED_HOSTS`.
             Une origine est un schéma et un hôte, rien d'autre ; au moins une, en `DEBUG` aussi :
             le site ne peut pas appeler l'API sans elle.
+        ADMIN_USERNAME: le nom de l'unique superutilisateur de l'admin, que la commande
+            `ensure_superuser` crée ou met à jour au démarrage d'`api` (`STARTUP_STEPS`,
+            `infra/api/entrypoint.sh`).
+        ADMIN_PASSWORD: son mot de passe, `SecretStr` comme `SECRET_KEY`. Vides par défaut, comme
+            les variables du stockage R2 : le `collectstatic` du build de l'image et `make openapi`
+            chargent `Env` sans avoir l'usage du compte. C'est la commande qui refuse un compte
+            vide, et Compose qui exige les deux en production.
     """
 
     model_config = SettingsConfigDict(env_file=ENV_FILE)
@@ -208,6 +215,8 @@ class Env(BaseSettings):
     MEDIA_R2_ACCESS_KEY_ID: str = ""
     MEDIA_R2_SECRET_ACCESS_KEY: SecretStr = SecretStr("")
     CORS_ALLOWED_ORIGINS: list[str] = Field(min_length=1)
+    ADMIN_USERNAME: str = ""
+    ADMIN_PASSWORD: SecretStr = SecretStr("")
 
     @field_validator("MEDIA_ROOT")
     @classmethod
