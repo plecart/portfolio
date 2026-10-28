@@ -12,6 +12,7 @@ dans `test_image_scan.py`, leur publication dans `test_publication.py`, et le co
 Compose dans `test_compose.py`.
 """
 
+import ast
 import io
 import itertools
 import os
@@ -120,6 +121,11 @@ MAKE_CONTROL = {"MAKEFLAGS", "GNUMAKEFLAGS", "MAKEFILES", "MAKELEVEL"}
 # capture toutes : un seul étage qui dériverait suffirait à faire tourner l'application sur une
 # version que le dépôt n'épingle nulle part.
 BASE_IMAGE_VERSION = re.compile(r"^FROM python:(\d+\.\d+)[.-]", re.MULTILINE)
+
+# Le temps laissé à un lancement Docker d'un test, en secondes, tirage d'image compris. Sans lui,
+# un conteneur qui ne finit pas fige la suite au lieu de la faire échouer : 3 h 40 sur le filtre
+# gojq de `test_publication.py` le 2026-10-28, sans échec affiché.
+DOCKER_DEADLINE = 120
 
 # Les variables que lit le back : un `ARG` qui en nommerait une la réclamerait au build, un `ENV`
 # la figerait dans l'image — sans égard à la casse, comme `pydantic-settings` les lit
@@ -295,7 +301,11 @@ def image_output(image: str, *command: str) -> str:
     """La sortie standard de `command`, lancée dans un conteneur jetable de l'image, hors de toute
     pile."""
     return subprocess.run(
-        ["docker", "run", "--rm", image, *command], capture_output=True, text=True, check=True
+        ["docker", "run", "--rm", image, *command],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=DOCKER_DEADLINE,
     ).stdout
 
 
@@ -313,8 +323,12 @@ def build_context(root: Path) -> set[str]:
     """
     dockerfile = root.parent / "Dockerfile"
     dockerfile.write_text("FROM scratch\nCOPY . /\n", encoding="utf-8")
-    export = ["docker", "buildx", "build", "-f", str(dockerfile), "--output", "type=tar,dest=-"]
-    archive = subprocess.run([*export, str(root)], capture_output=True, check=True).stdout
+    archive = subprocess.run(
+        ["docker", "buildx", "build", "-f", str(dockerfile), "--output", "type=tar,dest=-", root],
+        capture_output=True,
+        check=True,
+        timeout=DOCKER_DEADLINE,
+    ).stdout
     with tarfile.open(fileobj=io.BytesIO(archive)) as received:
         return {member.name.removeprefix("./") for member in received if member.isfile()}
 
@@ -826,3 +840,28 @@ def test_aucun_fichier_lu_par_un_conteneur_ne_porte_de_retour_windows() -> None:
     assert checked, "aucun fichier trouvé — les motifs ont-ils cessé de mordre ?"
     faulty = [path for path in checked if b"\r\n" in path.read_bytes()]
     assert not faulty, f"{len(checked)} fichiers repassés, fins de ligne Windows dans {faulty}"
+
+
+def docker_launches() -> dict[str, ast.Call]:
+    """Les lancements Docker des tests du back, par `fichier:ligne` : chaque appel `subprocess.…`
+    dont la commande nomme `docker` en littéral, lu par l'analyseur de Python. Dénombré le
+    2026-10-28 : 3 — le filtre gojq de `test_publication.py`, `image_output`, `build_context`."""
+    return {
+        f"{module.name}:{node.lineno}": node
+        for module in sorted(Path(__file__).parent.glob("*.py"))
+        for node in ast.walk(ast.parse(module.read_text(encoding="utf-8")))
+        if isinstance(node, ast.Call)
+        and ast.unparse(node.func).startswith("subprocess.")
+        and node.args
+        and "'docker'" in ast.unparse(node.args[0])
+    }
+
+
+DOCKER_LAUNCHES = docker_launches()
+
+
+@pytest.mark.parametrize("launch", DOCKER_LAUNCHES.values(), ids=DOCKER_LAUNCHES.keys())
+def test_chaque_lancement_docker_d_un_test_a_un_delai(launch: ast.Call) -> None:
+    """Un conteneur qui ne finit pas fait échouer son test par `TimeoutExpired`, au lieu de figer
+    la suite : chaque lancement porte un `timeout`."""
+    assert any(keyword.arg == "timeout" for keyword in launch.keywords), "lancement sans délai"
