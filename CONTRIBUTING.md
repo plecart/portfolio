@@ -136,7 +136,8 @@ docker compose --env-file infra/dev.env -f infra/compose.dev.yml run --rm -e STA
 ```
 
 puis `User.objects.filter(username='<ancien>').update(username='<ADMIN_USERNAME>')`, ou
-`.delete()` à la place d'`.update(…)`.
+`.delete()` à la place d'`.update(…)` — si un autre compte porte déjà `ADMIN_USERNAME`,
+`.update(…)` le refuse : supprime d'abord l'un des deux.
 
 L'admin exige aussi un second facteur : sans lui, il ne sert que sa page de connexion. Le compte
 posé, enrôle-le une fois — une application TOTP et dix codes de secours à usage unique :

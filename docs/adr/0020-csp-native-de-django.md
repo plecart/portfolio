@@ -61,6 +61,9 @@ en HSTS préchargé (ADR 0003), et Caddy ne pose pas non plus ce dernier.
 
 - Un script ou un style en ligne écrit à la main sans `{% csp_nonce_attr %}` est refusé : chaque
   écran neuf passe par les gabarits de l'admin, ou pose ce nonce.
+- Une image d'une autre origine que celle de l'admin et de l'hôte des médias — collée dans le
+  Markdown de l'auteur, par exemple — ne s'affiche pas dans l'aperçu en direct, et laisse une
+  violation de la CSP en console : aucune source tierce, voulu.
 
 ## Comparaison des options
 
