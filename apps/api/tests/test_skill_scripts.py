@@ -70,6 +70,13 @@ def test_make_typecheck_lance_pyright_sur_le_projet_des_scripts_des_skills() -> 
     assert any(commande[-3:] == ["pyright", "-p", ".claude/skills"] for commande in commandes)
 
 
+def test_le_projet_pyright_des_skills_est_en_mode_strict() -> None:
+    """Sans la clé, pyright analyserait les mêmes fichiers en mode basique, gardes vertes."""
+    config = json.loads((SKILLS / "pyrightconfig.json").read_text(encoding="utf-8"))
+
+    assert config["typeCheckingMode"] == "strict"
+
+
 def test_le_projet_pyright_des_skills_analyse_chacun_de_leurs_scripts() -> None:
     """Un projet mal réglé analyse moins qu'il ne prétend, et rend « 0 errors » quand même :
     `"include": ["*/scripts"]` y a été mesuré à 0 fichier analysé (#145)."""
