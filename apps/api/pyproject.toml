@@ -61,4 +61,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["config", "content"]
+packages = ["access", "config", "content"]

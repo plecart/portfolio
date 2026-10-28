@@ -67,6 +67,10 @@ POSTGRES_PROBE_HOST = "-h 127.0.0.1"
 # décision 9).
 BACKUP_FORBIDDEN = {"POSTGRES_PASSWORD", "SECRET_KEY", "TUNNEL_TOKEN"}
 
+# Le compte unique de l'admin : `api` le pose à son démarrage, et le `worker` le reçoit avec
+# l'environnement d'`api` (ADR 0016). Aucun autre service.
+ADMIN_VARIABLES = {"ADMIN_USERNAME", "ADMIN_PASSWORD"}
+
 # Ce par quoi un service reçoit des valeurs que son `environment` ne nomme pas : un fichier
 # d'environnement, un service étendu, un secret ou une configuration de Compose — chacun peut lui
 # apporter un secret de l'application (formes mesurées à la relecture de la PR #73). `backup` ne
@@ -659,6 +663,17 @@ def test_api_recoit_en_production_chaque_variable_du_back() -> None:
     environment = read_services(COMPOSE_PROD)["api"]["environment"]
 
     assert set(environment) == set(Env.model_fields) - {"DEBUG"}
+
+
+def test_seuls_api_et_le_worker_recoivent_le_compte_de_l_admin() -> None:
+    """`backup`, Caddy, le Tunnel et les services de données n'en ont pas l'usage : aucun ne le
+    reçoit, ni par son `environment`, ni par une interpolation."""
+    services = read_services(COMPOSE_PROD)
+
+    receiving = {
+        name for name, service in services.items() if received_variables(service) & ADMIN_VARIABLES
+    }
+    assert receiving == {"api", "worker"}
 
 
 @pytest.mark.parametrize(

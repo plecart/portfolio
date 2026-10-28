@@ -17,7 +17,7 @@ distincts, pour qu'un rouge de l'une ne masque pas un rouge d'une autre.
 
 ```
 uv sync                     # installe l'espace de travail : racine + apps/api
-cp .env.example .env        # puis renseigner SECRET_KEY
+cp .env.example .env        # puis renseigner SECRET_KEY, ADMIN_USERNAME et ADMIN_PASSWORD
 uv run pre-commit install   # branche les hooks — depuis ce clone, jamais depuis un worktree :
                             # .git/hooks est partagé et fige le chemin de l'interpréteur qui l'installe
 ```
@@ -112,15 +112,21 @@ fait que les variables de Compose ne sont pas des variables du back, et c'est
 [apps/api/tests/test_env.py](apps/api/tests/test_env.py) qui tient la frontière.
 
 Le code de `apps/api` est monté dans le conteneur : une modification sur le poste recharge `api`.
-Les migrations s'exécutent à chaque démarrage. Les tests et les outils de qualité restent sur
-l'hôte (`make test`, `make lint`) — le conteneur fait tourner l'application, il ne la vérifie pas.
+Les migrations, puis le compte de l'admin, s'exécutent à chaque démarrage. Les tests et les outils
+de qualité restent sur l'hôte (`make test`, `make lint`) — le conteneur fait tourner
+l'application, il ne la vérifie pas.
 
-**Regarder l'admin.** La pile démarrée, créer le compte d'administration dans le conteneur `api`
-— la commande de gestion de #6 prendra le relais —, puis ouvrir `http://127.0.0.1:8000/admin/` :
+**Regarder l'admin.** Le compte unique de l'admin vient de `ADMIN_USERNAME` et `ADMIN_PASSWORD`,
+dans `.env` : `api` le crée à son démarrage, et le met à jour si le mot de passe a changé
+(`manage.py ensure_superuser`). Vides, ou le mot de passe refusé par les validateurs de Django,
+le démarrage d'`api` échoue, comme sans `SECRET_KEY` ; son journal dit pourquoi, sans citer le
+mot de passe :
 
 ```
-docker compose --env-file infra/dev.env -f infra/compose.dev.yml exec api python manage.py createsuperuser
+docker compose --env-file infra/dev.env -f infra/compose.dev.yml logs api
 ```
+
+La pile démarrée, ouvrir `http://127.0.0.1:8000/admin/`.
 
 Toutes les cibles disponibles : `Makefile`, repris dans la section « Commandes du projet » de
 [.claude/pipeline.config.md](.claude/pipeline.config.md) — c'est cette section que lisent les

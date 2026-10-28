@@ -62,7 +62,7 @@ SECRET_TRAVEL_FORMS: list[tuple[str, Callable[[Env, str], str]]] = [
 
 # Les secrets d'`Env`, écrits ici et non lus sur ses types : un champ qui cesserait d'être un
 # `SecretStr` fait rougir ses cas.
-SECRETS = ["SECRET_KEY", "MEDIA_R2_SECRET_ACCESS_KEY"]
+SECRETS = ["SECRET_KEY", "MEDIA_R2_SECRET_ACCESS_KEY", "ADMIN_PASSWORD"]
 
 # Les façons de rendre la configuration invalide — **six mécanismes de refus distincts**,
 # et c'est le dénombrement qui compte : borne de longueur, URL mal formée (deux fois, car deux

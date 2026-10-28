@@ -25,6 +25,7 @@ entrée (D45). L'utilisateur `deploy` possède le dossier et tire les images de 
 | Jeton du Tunnel (`TUNNEL_TOKEN`) | gestionnaire de mots de passe ; `.env` du VPS | `bootstrap.sh` | Cloudflare, puis `bootstrap.sh TUNNEL_TOKEN` |
 | `SECRET_KEY` | `.env` du VPS seulement | `bootstrap.sh`, qui l'engendre | `bootstrap.sh SECRET_KEY` |
 | `POSTGRES_PASSWORD` | `.env` du VPS et la base | `bootstrap.sh`, qui l'engendre | `bootstrap.sh POSTGRES_PASSWORD`, pile démarrée |
+| Mot de passe de l'admin (`ADMIN_PASSWORD`) | gestionnaire ; `.env` du VPS ; son empreinte dans la base | `bootstrap.sh`, qui le saisit ; `api`, qui le pose dans la base (« Admin ») | `bootstrap.sh ADMIN_PASSWORD` : `api` recréé pose le nouveau |
 | Jeton GHCR (classic, `read:packages`) | gestionnaire ; configuration Docker de `deploy` | `bootstrap.sh` (`docker login`) | `bootstrap.sh GHCR_TOKEN` |
 | Clé privée de déploiement | secret `DEPLOY_SSH_KEY` de l'environnement `production` seulement | le mainteneur | nouvelle paire, `bootstrap.sh DEPLOY_KEY` |
 | Empreinte de l'hôte | secret `DEPLOY_KNOWN_HOSTS` de `production` | le mainteneur | à chaque VPS reconstruit |
@@ -50,7 +51,8 @@ n'est pas un secret.
 
 Prérequis : un VPS Ubuntu LTS en UE (ADR 0002), joignable en `root` par ta clé SSH ; dans le
 gestionnaire de mots de passe, le jeton du Tunnel, ceux du bucket des médias et du bucket des
-sauvegardes, et la paire `age` ; l'adresse de ping du contrôle healthchecks.io (#25). À la
+sauvegardes, la paire `age` et le compte de l'admin (« Admin ») ; l'adresse de ping du contrôle
+healthchecks.io (#25). À la
 première connexion, `ssh` affiche l'empreinte de l'hôte : compare-la à celle que la console du
 fournisseur rend pour `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` — identiques, oui ou
 non ? Non : n'accepte pas.
@@ -81,7 +83,8 @@ non ? Non : n'accepte pas.
    ```
    Il demande : la clé publique (le contenu de `deploy_key.pub`), le jeton GHCR, `IMAGE_TAG` (le
    SHA de l'étape 3), `TUNNEL_TOKEN`, les noms d'hôte — `SITE_HOST`, `API_HOST`,
-   `MEDIA_HOST` (ADR 0003) —, ceux du bucket public des médias (ADR 0004) : l'adresse, le nom et
+   `MEDIA_HOST` (ADR 0003) —, le compte de l'admin — `ADMIN_USERNAME`, puis `ADMIN_PASSWORD` sans
+   écho —, ceux du bucket public des médias (ADR 0004) : l'adresse, le nom et
    le jeton, puis ceux de la sauvegarde : la clé publique `age`, l'adresse, le jeton et le nom du
    bucket R2, l'adresse de ping. Il engendre le mot de passe du rôle Postgres de `backup`, et crée
    ce rôle une fois la base saine, avant de démarrer le reste. Il finit par `== Fait`,
@@ -230,8 +233,23 @@ puis `docker compose ps` en `deploy` — le démon redémarre, la pile revient s
 
 ## Admin
 
-La création du compte unique et l'enrôlement de la 2FA arrivent avec #6, qui écrit ici leur
-procédure de production.
+**Le compte unique** vient de `ADMIN_USERNAME` et `ADMIN_PASSWORD`, dans le `.env` du VPS :
+`bootstrap.sh` les saisit à l'amorçage — le nom en clair, le mot de passe sans écho —, et
+`compose.yml` les exige. À chaque démarrage, après les migrations, `api` pose le
+compte (`manage.py ensure_superuser`, [`api/entrypoint.sh`](api/entrypoint.sh)) : il le crée la
+première fois, puis remet le mot de passe s'il a changé ; son journal dit ce qu'il a écrit, jamais
+le mot de passe. Celui-ci vit dans le gestionnaire de mots de passe : 12 caractères au moins, ni
+courant, ni entièrement numérique, ni proche du nom (les validateurs de Django), et sans
+apostrophe, que `bootstrap.sh` refuse.
+
+`api` refuse de démarrer — `docker compose logs api` dit pourquoi — quand l'une des deux variables
+est vide, quand les validateurs refusent le mot de passe, ou quand la base porte déjà un
+superutilisateur d'un autre nom : l'admin n'en a qu'un. Ce dernier cas suit une restauration sur
+un VPS dont `ADMIN_USERNAME` diffère du compte de la sauvegarde, ou un `bootstrap.sh
+ADMIN_USERNAME` qui change le nom : remets le nom du compte existant par
+`sudo bash bootstrap.sh ADMIN_USERNAME` (« Tourner un secret »), qui recrée `api`.
+
+Le second facteur et son enrôlement arrivent avec la suite de #6, qui les écrit ici.
 
 ## Cloudflare — l'état attendu
 
@@ -327,7 +345,7 @@ Un échec écrit `échec à l'étape : <étape>` et sort en erreur. Ce qu'il veu
 | `restauration` | intacte — la restauration se fait en une transaction —, `api` et `worker` arrêtés | la sortie de `pg_restore` ou de `psql` le dit ; relance, ou `docker compose start api worker` pour revenir à la base d'avant |
 | `migrations` | restaurée, `api` et `worker` arrêtés | une migration a échoué, ou `migrate --check` en voit une non appliquée : la sortie de Django la nomme ; une fois réglé, `docker compose up -d --wait api worker` — `api` migre à son démarrage |
 | `contrôle` | restaurée et migrée, `api` et `worker` arrêtés | moins de projets publiés que le seuil : une sauvegarde trop ancienne, ou le mauvais seuil — relance avec une autre sauvegarde, ou `docker compose start api worker` si la base est la bonne |
-| `redémarrage` | restaurée, `api` ou `worker` ne devient pas sain | `docker compose logs api worker` |
+| `redémarrage` | restaurée, `api` ou `worker` ne devient pas sain | `docker compose logs api worker` — un superutilisateur d'un autre nom que `ADMIN_USERNAME` : « Admin » |
 
 Une sauvegarde **plus récente** que le code — des migrations appliquées que le code ne connaît pas —
 ne se détecte pas : Django ne les voit pas. Le commit déployé doit être au moins aussi récent que la

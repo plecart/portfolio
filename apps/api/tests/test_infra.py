@@ -677,13 +677,15 @@ def entrypoint_calls(tmp_path: Path, steps: str | None) -> list[list[str]]:
 
 
 MIGRATE = ["python", "manage.py", "migrate"]
+ENSURE_SUPERUSER = ["python", "manage.py", "ensure_superuser"]
 COMMAND = ["python", "commande"]
 
-# `STARTUP_STEPS` → les appels attendus. Vide, aucune étape : c'est ce qui permet au `worker` de
-# partager l'image d'`api` sans rejouer les migrations (brief de #12, décision 11) — la forme
-# `${VAR:=défaut}` traitait le vide comme l'absence, et migrait (mesuré à la clôture de #4).
+# `STARTUP_STEPS` → les appels attendus. Absente, les migrations puis le superutilisateur, qui en a
+# besoin (critère de #6). Vide, aucune étape : c'est ce qui permet au `worker` de partager l'image
+# d'`api` sans rejouer les migrations (brief de #12, décision 11) — la forme `${VAR:=défaut}`
+# traitait le vide comme l'absence, et migrait (mesuré à la clôture de #4).
 STARTUP_FORMS = {
-    "absente": (None, [MIGRATE, COMMAND]),
+    "absente": (None, [MIGRATE, ENSURE_SUPERUSER, COMMAND]),
     "vide": ("", [COMMAND]),
     "deux étapes": ("migrate check", [MIGRATE, ["python", "manage.py", "check"], COMMAND]),
 }
@@ -693,8 +695,8 @@ STARTUP_FORMS = {
 def test_le_point_d_entree_joue_les_etapes_demandees_puis_la_commande(
     tmp_path: Path, steps: str | None, expected: list[list[str]]
 ) -> None:
-    """Absente, `STARTUP_STEPS` migre : c'est la posture d'`api`. Vide, rien ne précède la
-    commande : celle du `worker`, qu'`api` a migré avant lui."""
+    """Absente, `STARTUP_STEPS` migre puis pose le superutilisateur : c'est la posture d'`api`.
+    Vide, rien ne précède la commande : celle du `worker`, qu'`api` a migré avant lui."""
     assert entrypoint_calls(tmp_path, steps) == expected
 
 
