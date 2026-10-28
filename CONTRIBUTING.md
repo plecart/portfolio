@@ -118,13 +118,25 @@ l'application, il ne la vérifie pas.
 
 **Regarder l'admin.** Le compte unique de l'admin vient de `ADMIN_USERNAME` et `ADMIN_PASSWORD`,
 dans `.env` : `api` le crée à son démarrage, et le met à jour si le mot de passe a changé
-(`manage.py ensure_superuser`). Vides, ou le mot de passe refusé par les validateurs de Django,
-le démarrage d'`api` échoue, comme sans `SECRET_KEY` ; son journal dit pourquoi, sans citer le
-mot de passe :
+(`manage.py ensure_superuser`). Vides, ou un mot de passe neuf refusé par les validateurs de
+Django, le démarrage d'`api` échoue, comme sans `SECRET_KEY` ; son journal dit pourquoi, sans
+citer le mot de passe :
 
 ```
 docker compose --env-file infra/dev.env -f infra/compose.dev.yml logs api
 ```
+
+Il échoue aussi sur une base qui porte un autre compte d'admin, superutilisateur ou staff — celui
+d'un ancien `createsuperuser`, sous un autre nom qu'`ADMIN_USERNAME` : l'admin n'en a qu'un. Mets
+`ADMIN_USERNAME` à son nom, ou renomme le compte, ou supprime-le, dans le shell d'un conteneur
+jetable d'`api` qui ne joue aucune étape de démarrage (`STARTUP_STEPS` vide) :
+
+```
+docker compose --env-file infra/dev.env -f infra/compose.dev.yml run --rm -e STARTUP_STEPS= api python manage.py shell
+```
+
+puis `User.objects.filter(username='<ancien>').update(username='<ADMIN_USERNAME>')`, ou
+`.delete()` à la place d'`.update(…)`.
 
 L'admin exige aussi un second facteur : sans lui, il ne sert que sa page de connexion. Le compte
 posé, enrôle-le une fois — une application TOTP et dix codes de secours à usage unique :
