@@ -607,11 +607,9 @@ def test_seul_le_releveur_demarre_sans_claude_md() -> None:
     posé sur un autre rôle, il lui retirerait des règles que son corps ne reprend pas. Un rôle qui
     le reçoit à dessein s'ajoute à l'ensemble attendu.
     """
-    roles = sorted(path.stem for path in (REPOSITORY_ROOT / ".claude" / "agents").glob("*.md"))
-
-    assert {role for role in roles if role_frontmatter(role).get("omitClaudeMd") is True} == {
-        "releveur"
-    }
+    assert {
+        path.stem for path in AGENTS if role_frontmatter(path.stem).get("omitClaudeMd") is True
+    } == {"releveur"}
 
 
 # Le modèle et l'effort d'un rôle s'écrivent à trois endroits : son frontmatter, sa ligne de la
