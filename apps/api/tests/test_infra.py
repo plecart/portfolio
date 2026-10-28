@@ -842,8 +842,7 @@ def test_aucun_fichier_lu_par_un_conteneur_ne_porte_de_retour_windows() -> None:
 
 def docker_launches() -> dict[str, ast.Call]:
     """Les lancements Docker des tests du back, par `fichier:ligne` : chaque appel `subprocess.…`
-    dont la commande nomme `docker` en littéral, lu par l'analyseur de Python. Dénombré le
-    2026-10-28 : 3 — le filtre gojq de `test_publication.py`, `image_output`, `build_context`."""
+    dont la commande nomme `docker` en littéral, lu par l'analyseur de Python (3 le 2026-10-28)."""
     return {
         f"{module.name}:{node.lineno}": node
         for module in sorted(Path(__file__).parent.glob("*.py"))
