@@ -4,16 +4,6 @@ Passages déplacés mot pour mot de `cycle-pr/SKILL.md` (issue #177), chacun sou
 cite son renvoi. Les liens `references/…` qu'ils portent se lisent depuis le dossier du skill,
 et leurs renvois de position (« ci-dessous », « plus bas ») depuis l'emplacement du renvoi.
 
-## Ces deux commandes closent un tour — celui de la session de relecture
-
-**Ces deux commandes closent un tour — celui de la session de relecture.** Leur prompt exige
-une réponse finale faite de leur seul rapport — `/security-review` : « Your final reply must
-contain the markdown report and nothing else » ; `/code-review` : son outil de rapport, seule
-sortie. Jouées par la session PR, elles ont arrêté son cycle trois fois, la dernière après qu'une
-phrase les avait bornées (obs 94, 98, 115) ; dans la session de relecture, l'arrêt ne coûte rien
-(`session-relecture.md`, « Réveil »). En repli seulement, la session PR les joue : la consigne vaut
-alors pour la forme du rapport, pas pour l'arrêt du cycle, et elle enchaîne dans le même tour.
-
 ## Ces portes sont additives
 
 Ces portes sont **additives**. Aucune ne remplace le prompt de

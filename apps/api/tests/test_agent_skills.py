@@ -1614,8 +1614,6 @@ INTERROGE_MOI_SKILL = ".claude/skills/interroge-moi/SKILL.md"
 CYCLE_PR_SKILL = ".claude/skills/cycle-pr/SKILL.md"
 BRIEFING_REF = ".claude/skills/cycle-pr/references/briefing.md"
 PORTES_REF = ".claude/skills/cycle-pr/references/portes.md"
-RELECTURE_REF = ".claude/skills/cycle-pr/references/relecture.md"
-FINALISATION_REF = ".claude/skills/cycle-pr/references/finalisation.md"
 CLOTURE_REF = ".claude/skills/cycle-pr/references/cloture.md"
 TRIAGE_SKILL = ".claude/skills/triage/SKILL.md"
 HORS_SCOPE_REF = ".claude/skills/triage/hors-scope.md"
@@ -1740,7 +1738,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         "**Ces deux commandes closent un tour — celui de la session de relecture.**",
     ),
     "commandes-integrees-en-repli-seulement": (
-        RELECTURE_REF,
+        CYCLE_PR_SKILL,
         (
             "En repli seulement, la session PR les joue : la consigne vaut alors pour la forme du"
             " rapport, pas pour l'arrêt du cycle, et elle enchaîne dans le même tour."
@@ -3393,7 +3391,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         "La session de brouillon le montre au mainteneur, qui décide",
     ),
     "6b-cycle-pr-repercussions-prescrit-le-commentaire": (
-        FINALISATION_REF,
+        CYCLE_PR_SKILL,
         "`repercussions` le prescrit à son étape 5, « Issues en vol »",
     ),
     "6b-pr-paralleles-repercussions-prescrit-le-commentaire": (
@@ -5169,7 +5167,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         ),
     ),
     "7c-cycle-pr-correctif-evident-sans-interrogatoire": (
-        BRIEFING_REF,
+        CYCLE_PR_SKILL,
         (
             "Un correctif évident — visible à la lecture, sans décision de comportement"
             " (`contraintes.md`, barreau 3) — n'a rien à interroger : sa qualification, écrite"
@@ -5177,7 +5175,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         ),
     ),
     "7c-cycle-pr-marqueur-de-la-petite-pr": (
-        BRIEFING_REF,
+        CYCLE_PR_SKILL,
         (
             "Pour une draft née d'un échec de QA (case ` 🔴 correctif évident — …`), la session,"
             " une fois la draft ouverte, remplace ce marqueur par ` 🔴 PR #<M>` sur la case, par"
@@ -6810,14 +6808,14 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         "sortie 124, délai dépassé : Étape 6, « CI qui ne démarre pas »",
     ),
     "cycle-pr-jamais-une-fin-de-tour-nue": (
-        FINALISATION_REF,
+        CYCLE_PR_SKILL,
         (
             "Jamais une fin de tour nue : le moniteur de PR de l'application ne réveille que sur un"
             " échec, un conflit ou un commentaire"
         ),
     ),
     "cycle-pr-seule-surveillance-de-la-ci": (
-        FINALISATION_REF,
+        CYCLE_PR_SKILL,
         (
             "C'est la seule surveillance de la CI que la session lance elle-même, le moniteur ne"
             " couvrant pas le succès ; jamais une sonde planifiée"
@@ -7105,8 +7103,8 @@ def test_un_controle_de_proprete_par_git_status_voit_les_fichiers_non_suivis() -
     fichier non suivi (mesuré le 2026-10-21, git 2.47.1, bloc B du lot 4a de #134).
 
     **Population** : la prose du harnais (`HARNESS_PROSE_GLOBS`). Recensé le 2026-10-21 :
-    2 mentions sans l'option, dont 1 contrôle — `relecteur.md`, corrigé ; l'autre, à l'Étape 1 de
-    `cycle-pr`, écarte la commande pour lire l'avance d'une branche. Vu rouge sur `relecteur.md`
+    2 mentions sans l'option, dont 1 contrôle — `relecteur.md`, corrigé ; l'autre, dans
+    `cycle-pr/references/portes.md` (« Au blocage »), écarte la commande pour lire l'avance d'une branche. Vu rouge sur `relecteur.md`
     avant correction.
     """
     sans_l_option = re.compile(r"git status --porcelain(?! --untracked-files=normal)")
@@ -7141,8 +7139,7 @@ RENVOIS_AUX_BARREAUX = {
     CONTRAINTES_RULE: [4],
     BUG_VERS_ISSUE_SKILL: [1, 3],
     CONTRADICTION_SKILL: [2, 4],
-    CYCLE_PR_SKILL: [3, 2, 2],
-    BRIEFING_REF: [3],
+    CYCLE_PR_SKILL: [3, 2, 3, 2],
     "CONTRIBUTING.md": [3],
     REPERCUSSIONS_SKILL: [4],
     VERS_ISSUES_SKILL: [4],
@@ -7229,3 +7226,49 @@ def test_chaque_barreau_cite_existe(fichier: str, numeros: list[int]) -> None:
     existants = [numero for numero, _ in barreaux_existants()]
 
     assert set(numeros) <= set(existants), f"`{fichier}` cite {numeros}, la liste a {existants}"
+
+
+# Le renvoi qui remplace un passage de `cycle-pr/SKILL.md` déplacé vers ses références (#177) :
+# `→ [references/<f>](references/<f>), « <titre> ».`, en fin de ligne, après une tête en gras ou non.
+RENVOI_DE_REFERENCE = re.compile(r"(?m)→ \[references/([^\]]+)\]\(references/\1\), « (.+) »\.$")
+# Le recueil du motif, des deux côtés : le texte, puis le fichier et le titre qu'il lit.
+RENVOI_DE_REFERENCE_FORMES: dict[str, tuple[str, list[tuple[str, str]]]] = {
+    "sans-tete": ("→ [references/a.md](references/a.md), « Un titre ».", [("a.md", "Un titre")]),
+    "avec-tete": ("**Tête.** → [references/b.md](references/b.md), « Tête ».", [("b.md", "Tête")]),
+    "lien-vers-un-autre-fichier-hors-classe": ("→ [references/a.md](references/b.md), « T ».", []),
+    "lien-sans-fleche-hors-classe": ("[references/a.md](references/a.md), « T »", []),
+}
+RENVOIS_DE_CYCLE_PR = RENVOI_DE_REFERENCE.findall(
+    (REPOSITORY_ROOT / CYCLE_PR_SKILL).read_text(encoding="utf-8")
+)
+
+
+@pytest.mark.parametrize(
+    ("texte", "renvois"),
+    RENVOI_DE_REFERENCE_FORMES.values(),
+    ids=RENVOI_DE_REFERENCE_FORMES.keys(),
+)
+def test_un_renvoi_de_reference_se_lit_par_son_fichier_et_son_titre(
+    texte: str, renvois: list[tuple[str, str]]
+) -> None:
+    """Le motif lit le renvoi, tête en gras ou non, et rien d'autre qu'un renvoi."""
+    assert RENVOI_DE_REFERENCE.findall(texte) == renvois
+
+
+def test_cycle_pr_porte_des_renvois_de_reference() -> None:
+    """Le test suivant ne passe pas à vide : 34 renvois au commit qui l'introduit."""
+    assert RENVOIS_DE_CYCLE_PR
+
+
+@pytest.mark.parametrize(
+    ("fichier", "titre"), RENVOIS_DE_CYCLE_PR, ids=[titre for _, titre in RENVOIS_DE_CYCLE_PR]
+)
+def test_chaque_renvoi_de_cycle_pr_mene_a_un_titre_de_sa_reference(
+    fichier: str, titre: str
+) -> None:
+    """Un renvoi dont la référence ne porte pas le titre `## <titre>` rougit : sans ce test, un
+    renvoi vers un titre absent restait vert (mutation M6, passe 1 de la PR #182)."""
+    reference = REPOSITORY_ROOT / ".claude/skills/cycle-pr/references" / fichier
+    titres = re.findall(r"(?m)^## (.+)$", reference.read_text(encoding="utf-8"))
+
+    assert titre in titres, f"`{fichier}` ne porte pas « {titre} »"

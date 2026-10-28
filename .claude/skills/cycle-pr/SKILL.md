@@ -83,6 +83,19 @@ python <répertoire de ce skill>/scripts/sonde-outillage.py --format "<format>" 
 
 → [references/briefing.md](references/briefing.md), « Six sondes, de la moins chère à la plus chère ».
 
+Un échec ici se remonte à l'utilisateur **avant** le briefing, avec les cibles de correction
+possibles et leur portée (session, projet, machine) : c'est un arbitrage de configuration, jamais
+une décision du skill — **un skill ne modifie pas la configuration de l'utilisateur pour se
+débloquer lui-même**. Un même message de refus quelle que soit la commande se lit comme un
+problème de permissions alors que c'est l'outillage ; éprouver coûte quelques commandes avant le
+briefing, et une demi-session après le « go ».
+
+**Une commande marquée `# non vérifiée`** dans `.claude/pipeline.config.md` signale un projet
+initialisé sans code. Si cette PR pose du code, elle porte aussi ce que `init-projet` a reporté —
+la génération CI et Dependabot de son étape 7, paragraphe « Runtime épinglé » compris, la
+vérification des commandes de son étape 11, puis le retrait des marqueurs. L'inscrire au
+briefing ; sans elle, le projet resterait sans CI.
+
 Produire un briefing écrit AVANT de créer la branche :
 
 - **Liste précise des fichiers** à créer/modifier — le chemin exact de chacun.
@@ -105,7 +118,21 @@ réponse que le mainteneur donne toujours.
 **Aucune PR ne démarre sans que le travail soit passé par `interroge-moi`.** Vérifier l'état de
 l'issue dès les outils éprouvés :
 
-→ [references/briefing.md](references/briefing.md), « Porte d'entrée obligatoire — l'interrogatoire ».
+- **Issue interrogée** (passée par `needs-interrogation`, décisions consignées dans le brief
+  d'agent) → relire ces décisions, et vérifier qu'elles tiennent encore (auto-challenge ci-dessous).
+- **Brief portant `⚠️ Non interrogée au triage`**, ou aucune trace d'interrogatoire → **s'arrêter
+  et proposer une session d'interrogatoire** (`interroge-moi`, numéro de l'issue en argument), avant
+  la première ligne de code, puis reporter ses décisions, écrites dans l'issue, dans les
+  « Décisions verrouillées » du briefing.
+- **Demande directe sans issue** → l'interrogatoire s'applique aussi ; il n'y a pas de raccourci
+  parce que le travail n'a pas de ticket. Un correctif évident — visible à la lecture, sans
+  décision de comportement (`contraintes.md`, barreau 3) — n'a rien à interroger : sa
+  qualification, écrite dans le body de la PR — draft, ou PR de la voie courte — avec sa preuve,
+  en tient lieu.
+
+Le point n'est pas de cocher une case : c'est que **les décisions tranchées soient écrites**, dans
+l'issue — brief amendé s'il est contredit — et dans le briefing. Elles seront relues par une
+autre session que celle-ci.
 
 ### Auto-challenge du plan — le plan est-il encore exact ?
 
@@ -138,6 +165,8 @@ est celui de [references/sessions-liees.md](references/sessions-liees.md), « Pr
 
 **Deux prédicats, pas un.** → [references/portes.md](references/portes.md), « Deux prédicats, pas un ».
 
+**Au blocage** → [references/portes.md](references/portes.md), « Au blocage ».
+
 ## Étape 2 — Ouvrir la PR en draft (toujours avant la première ligne de code)
 
 **La PR est le premier artefact produit, pas le dernier.** → [references/briefing.md](references/briefing.md), « La PR est le premier artefact produit, pas le dernier ».
@@ -162,13 +191,27 @@ EOF
 
 La PR draft porte **dès sa création** :
 
-- **`Closes #<N>`** dans le body → [references/briefing.md](references/briefing.md), « `Closes #<N>` dans le body ».
+- **`Closes #<N>`** dans le body. C'est **la** ligne qui rend l'issue détectable comme en vol.
+  Sans elle, `repercussions` la croira dormante et éditera sa spec en cours de développement.
+  **Cas découpé** (taille-pr impose plusieurs PR pour la même issue) : seule la **dernière** PR du
+  lot porte `Closes #<N>` — un `Closes` sur la première fermerait l'issue trop tôt. Chaque autre
+  PR du lot ouvre son body par la ligne **`En vol pour #<N> (lot k/n)`**, que `repercussions` lit
+  au même titre que `Closes` : sans elle, l'issue paraît dormante précisément pendant qu'on
+  travaille dessus. GitHub, lui, ne lit que le mot-clé : le lien des lots précédents se repose à
+  l'Étape 8, une fois l'issue close. Avec une coordinatrice, le `Closes` passe à la PR
+  d'intégration et **toutes** les PR de lot portent la ligne « En vol »
+  ([references/coordinatrice.md](references/coordinatrice.md)).
 - Le **briefing de l'Étape 1** comme corps provisoire — le plan devient lisible par le mainteneur
   et par les autres sessions, avant que le code n'existe.
 - **Assignee**, **labels** et **milestone** (mapping de `.claude/pipeline.config.md`).
 - Le marqueur **draft**, qui dit « en cours, ne pas reviewer » et interdit le merge accidentel.
 
-→ [references/briefing.md](references/briefing.md), « Pour une demande directe sans issue ».
+Pour une **demande directe sans issue**, ouvrir quand même la draft : sans `Closes`, mais le
+travail reste visible du reste de la pipeline. Pour une draft née d'un échec de QA (case
+` 🔴 correctif évident — …`), la session, une fois la draft ouverte, remplace ce marqueur par
+` 🔴 PR #<M>` sur la case, par une paire
+(`python .claude/skills/cycle-pr/scripts/ecriture-relue.py checkbox patch <plan> --paires <fichier>`,
+`execution-qa/references/patch-checkbox-gh.md`) : c'est ce que lit la reprise de la QA.
 
 > **La CI tourne sur chaque push de la branche, draft comprise** → [references/briefing.md](references/briefing.md), « La CI tourne sur chaque push de la branche, draft comprise ».
 
@@ -180,7 +223,16 @@ Chaque commit suit :
 1. modif (TDD)  →  2. test (vert)  →  3. cleanup pass  →  4. test (vert)  →  5. commit
 ```
 
-**La boucle s'enchaîne sans rendre la main.** → [references/commit.md](references/commit.md), « La boucle s'enchaîne sans rendre la main ».
+**La boucle s'enchaîne sans rendre la main.** Un cycle AFK va de 3.1 à 3.5 puis repart en 3.1
+jusqu'à l'Étape 4 — en lançant au passage la **première passe de relecture 4.2** dès que le
+commit qui vient d'être fait pose un invariant que les suivants supposeront vrai ; l'annonce de
+l'étape suivante (« Next : commit 2/3 ») est un **titre**, pas une demande d'autorisation. Les
+seuls arrêts légitimes du cycle : une question `[V]` dont dépend **tout** ce qui reste à faire, un
+arrêt `decisions-vs-doc` (`[C]`), le point d'arrêt humain (zone sensible, une fois par PR, au
+commit qui assemble l'écran — 3.5) et le « go » de l'Étape 7. Une `[V]` dont une partie du travail
+ne dépend pas s'inscrit dans le body de la PR draft, sous « Questions en attente », avec
+l'hypothèse réversible retenue d'ici là, et le cycle continue sur cette partie ; elle sera posée
+groupée au prochain arrêt. Ailleurs, s'arrêter est une remise de main que personne n'a demandée.
 
 ### 3.1 Modification — en TDD (tracer bullet vertical)
 
@@ -198,6 +250,10 @@ Notes de la PR #139) ; ses `[V]` rejoignent « Questions en attente ». Un `deve
 seulement au bloc suivant, jamais pour une retouche du même bloc.
 
 **Frontières tierces : on vérifie, on ne suppose pas.** → [references/tests.md](references/tests.md), « Frontières tierces : on vérifie, on ne suppose pas ».
+
+**Un zéro rendu par un outil de contrôle se lit avec son inventaire** → [references/tests.md](references/tests.md), « Un zéro rendu par un outil de contrôle se lit avec son inventaire ».
+
+**Un avis de sécurité sans correctif n'est pas une impasse.** → [references/tests.md](references/tests.md), « Un avis de sécurité sans correctif n'est pas une impasse ».
 
 Implémenter **un comportement à la fois** en red-green-refactor — pas tous les tests d'abord puis
 toute l'implémentation, le découpage horizontal produit de mauvais tests :
@@ -217,7 +273,13 @@ les tests futurs ; tester le comportement observable via l'interface publique.
 - Concevoir des interfaces testables : [references/design-interface.md](references/design-interface.md)
 - Viser des modules profonds : [references/modules-profonds.md](references/modules-profonds.md)
 
-**Documentation maximale** → [references/commit.md](references/commit.md), « Documentation maximale ».
+**Documentation maximale** : chaque fonction écrite est documentée à fond (intention, params,
+valeur de retour, erreurs, effets de bord, pré/postconditions, exemples, edge cases) au format
+idiomatique du langage. La doc explique le contrat, les tests prouvent le comportement.
+
+**Doc projet en sync** : si le delta change un comportement, une commande, une interface ou
+l'architecture, mettre à jour la doc concernée (`README`, `docs/`, `CLAUDE.md`, glossaire) **dans
+le même commit** — voir `.claude/rules/contraintes.md`. La doc ne se met jamais à jour « plus tard ».
 
 ### 3.2 Premier passage de tests
 
@@ -263,7 +325,20 @@ git commit -m "type(scope): description"
 Pas de corps, pas de footer, pas de `Co-Authored-By`, pas de numéro de PR. Breaking change : `!`
 dans le titre.
 
-**Puis relire le gabarit** → [references/commit.md](references/commit.md), « Puis relire le gabarit ».
+**Puis relire le gabarit** : le `developpeur` rend avec chaque commit le chiffre de
+`git diff --stat <base>...HEAD`, la base de son brief, et s'arrête au seuil que ce brief porte ; la
+session PR le relit contre les deux seuils de `taille-pr.md` — l'absolu, et le double de
+l'estimation du briefing. Franchi, le re-découpage se rouvre maintenant, pas à l'Étape 5 (obs 70).
+
+**Un sous-lot est un lot** (D-9, #134). Les PR qu'un re-découpage fait naître suivent « Une session
+neuve par lot » (Étape 8) : la session courante finit son sous-lot et écrit la passation depuis
+les artefacts ; le sous-lot suivant reçoit sa session neuve, ouverte par la coordinatrice s'il y
+en a une ([references/coordinatrice.md](references/coordinatrice.md), « Ouvrir le lot suivant »),
+sinon proposée au mainteneur par une carte (`start_session`, `initiation: own_initiative`) — aucune
+session n'en démarre une autre hors d'un tour humain. Un re-découpage qui sépare un commit de ses
+correctifs rejoue d'abord la passe « affirmations » de `cleanup-verbatim.md` sur le premier
+morceau **seul** : chaque docstring s'y lit contre le code de ce morceau, pas contre l'état final,
+et les limites que le morceau suivant lève s'y nomment (obs 109).
 
 Puis la session PR pousse et enchaîne sur le bloc suivant (retour 3.1) — ou, si ce commit vient de
 poser le socle, lance d'abord la première passe de relecture (4.2). Si ce commit assemble un écran
@@ -327,7 +402,13 @@ qu'elle couvre et ce qu'elle ne voit pas — jamais de mémoire :
    avant toute analyse — se dit dans « Relecture indépendante » du body, jamais en saut
    silencieux (obs 84).
 
-**Ces deux commandes closent un tour — celui de la session de relecture.** → [references/relecture.md](references/relecture.md), « Ces deux commandes closent un tour — celui de la session de relecture ».
+**Ces deux commandes closent un tour — celui de la session de relecture.** Leur prompt exige
+une réponse finale faite de leur seul rapport — `/security-review` : « Your final reply must
+contain the markdown report and nothing else » ; `/code-review` : son outil de rapport, seule
+sortie. Jouées par la session PR, elles ont arrêté son cycle trois fois, la dernière après qu'une
+phrase les avait bornées (obs 94, 98, 115) ; dans la session de relecture, l'arrêt ne coûte rien
+(`session-relecture.md`, « Réveil »). En repli seulement, la session PR les joue : la consigne vaut
+alors pour la forme du rapport, pas pour l'arrêt du cycle, et elle enchaîne dans le même tour.
 
 → [references/relecture.md](references/relecture.md), « Ces portes sont additives ».
 
@@ -506,7 +587,18 @@ rend une ligne — le verdict, le run, le SHA court et le paragraphe à suivre. 
   émis pendant une panne d'Actions ;
 - sortie 124, délai dépassé : Étape 6, « CI qui ne démarre pas ».
 
-→ [references/finalisation.md](references/finalisation.md), « Jamais une fin de tour nue ».
+Jamais une fin de tour nue : le moniteur de PR de l'application ne réveille que sur un échec, un
+conflit ou un commentaire (description de `set_monitor`, lue le 2026-10-20), jamais sur un succès
+— mesuré le même jour, PR #141 : run vert à 19:21:01Z, aucun réveil en 14 min. C'est la seule
+surveillance de la CI que la session lance elle-même, le moniteur ne couvrant pas le succès ;
+jamais une sonde planifiée. Le script ne couvre ni les autres workflows et événements, ni ce que le
+run a combiné (paragraphe suivant), ni la page d'état et la réouverture, qui restent à la session
+et au mainteneur (« Si aucun run n'apparaît »).
+
+Ce run a tourné sur la référence de fusion calculée à son push, que GitHub ne recalcule ni à chaque
+merge sur le trunk ni au passage en ready : il peut combiner la tête à un trunk vieux de plusieurs
+merges — mesuré, 8 des 30 commits de `main` (obs 51). Ce qu'il prouve de l'état combiné se lit
+dans les parents de cette référence, à l'Étape 7.
 
 **Si aucun run n'apparaît** pour le SHA de tête — sortie 3 : sauté, annulé sans remplaçant ou
 aucun run —, consulter d'abord `https://www.githubstatus.com/api/v2/components.json`, sauf
@@ -569,7 +661,14 @@ Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur 
   Chaque commentaire **non pertinent** → noter brièvement pourquoi, ne pas corriger.
 - **Boucler jusqu'à review vide.**
 
-> **Commentaire de répercussion.** → [references/finalisation.md](references/finalisation.md), « Commentaire de répercussion ».
+> **Commentaire de répercussion.** Un merge survenu ailleurs pendant que cette PR était ouverte a
+> pu rendre sa spec fausse ; `repercussions` le signale ici même, par un commentaire sur la PR (le
+> corps de l'issue n'est volontairement pas modifié tant que la PR est ouverte). L'instrument qui
+> publie un tel commentaire puis le relit en entier est
+> `python <répertoire de ce skill>/scripts/ecriture-relue.py comment <n> --body-file <fichier>`
+> (Étape 8) ; `repercussions` le prescrit à son étape 5, « Issues en vol ». Un signalement
+> **bloquant** se traite comme tel : intégrer la correction dans cette PR, ou remonter au
+> mainteneur si cela déplace le périmètre — ne jamais merger par-dessus.
 
 ## Étape 7 — Avant le merge
 
