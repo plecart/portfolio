@@ -47,9 +47,10 @@ APP_SHELL = '<div id="root"></div>'
 # Le cache d'un fichier haché par la compilation : un nom ne désigne jamais qu'un contenu.
 IMMUTABLE = "public, max-age=31536000, immutable"
 
-# Les en-têtes de sécurité de l'amont factice — ceux que Django poserait, `django-csp` compris. Ceux
-# du site doivent les remplacer sur `/projets/*`, ceux de l'hôte de l'API les laisser : chacun a une
-# autre valeur que celui du site, sauf `nosniff`, dont un doublon se verrait au décompte.
+# Les en-têtes de sécurité de l'amont factice — ceux que pose le site, dont Django pose aussi trois,
+# sa CSP native comprise (ADR 0020). Ceux du site doivent les remplacer sur `/projets/*`, ceux de
+# l'hôte de l'API les laisser : chacun a une autre valeur que celui du site, sauf `nosniff`, dont
+# un doublon se verrait au décompte.
 UPSTREAM_SECURITY_HEADERS = {
     "Content-Security-Policy": "default-src 'none'",
     "X-Frame-Options": "SAMEORIGIN",
@@ -361,8 +362,8 @@ def test_l_hote_du_site_pose_ses_en_tetes_de_securite(
 
 
 def test_l_hote_de_l_api_garde_les_en_tetes_de_django(stack: Stack) -> None:
-    """L'admin et l'API ont leur propre politique, posée par `django-csp` (#6) : celle du site, qui
-    n'admet ni leurs formulaires ni leurs scripts, n'y entre pas."""
+    """L'admin et l'API ont leur propre politique, la CSP native de Django (ADR 0020) : celle du
+    site, qui n'admet ni leurs formulaires ni leurs scripts, n'y entre pas."""
     reply = stack.get(API, "/admin/")
 
     assert {name: reply.headers.get_all(name) for name in UPSTREAM_SECURITY_HEADERS} == {
