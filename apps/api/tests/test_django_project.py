@@ -206,8 +206,8 @@ def test_les_reglages_django_viennent_de_l_environnement(variables: dict[str, st
     assert settings["TIME_ZONE"] == "Europe/Paris"
     assert "django.middleware.csrf.CsrfViewMiddleware" in settings["MIDDLEWARE"]
     assert settings["CORS_ALLOWED_ORIGINS"] == json.loads(variables["CORS_ALLOWED_ORIGINS"])
-    # `SETTINGS_DUMP` déballe le mot de passe par `get_secret_value()` : un réglage qui ne serait plus
-    # un `SecretStr` ferait échouer le sous-processus — déballé, il s'afficherait en clair dans
+    # `SETTINGS_DUMP` déballe le mot de passe par `get_secret_value()` : un réglage qui ne serait
+    # plus un `SecretStr` ferait échouer le sous-processus — déballé, il s'afficherait en clair dans
     # `manage.py diffsettings`.
     assert settings["ADMIN_USERNAME"] == variables["ADMIN_USERNAME"]
     assert settings["ADMIN_PASSWORD"] == variables["ADMIN_PASSWORD"]

@@ -52,9 +52,9 @@ WEAK_PASSWORDS = {
     "proche du nom": f"{USERNAME}!",
 }
 
-# Chaque issue de la commande — compte créé ; compte existant inchangé, droits rétablis, mot de passe
-# mis à jour, ou les deux ; trois refus, un par `CommandError` —, avec ce qui la précède en base et
-# les réglages qui la déclenchent : aucune ne doit citer un mot de passe.
+# Chaque issue de la commande — compte créé ; compte existant inchangé, droits rétablis, mot de
+# passe mis à jour, ou les deux ; trois refus, un par `CommandError` —, avec ce qui la précède en
+# base et les réglages qui la déclenchent : aucune ne doit citer un mot de passe.
 EXITS: dict[str, tuple[Callable[[], object], str, str]] = {
     "créé": (lambda: None, USERNAME, PASSWORD),
     "inchangé": (lambda: run(), USERNAME, PASSWORD),
