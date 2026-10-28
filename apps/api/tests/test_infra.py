@@ -47,6 +47,8 @@ MAKEFILE = REPOSITORY_ROOT / "Makefile"
 PYTHON_VERSION_FILE = REPOSITORY_ROOT / ".python-version"
 DOCKERIGNORE = REPOSITORY_ROOT / ".dockerignore"
 CI_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
+# Les portes d'avis : planifiées chaque jour, et appelées par le job `avis` de `CI_WORKFLOW`.
+AVIS_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "avis.yml"
 
 # Les Dockerfiles des images du dépôt, un par dossier `infra/<service>/` (ADR 0014).
 IMAGE_DOCKERFILES = sorted(REPOSITORY_ROOT.glob("infra/*/Dockerfile"))

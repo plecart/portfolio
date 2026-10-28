@@ -570,7 +570,12 @@ périmées ») **avant `gh pr ready`**.
 **Sortir du draft, puis lire le run du SHA de tête.** Une PR en draft n'a aucun run (Étape 2) :
 `gh pr ready` déclenche le premier run de la PR (`ready_for_review`, ADR 0019), puis chaque push
 le sien. Les passes de relecture de 4.2, faites en draft, ont donc relu un SHA sans verdict de
-CI : c'est ce run qui le rend. Sortir du draft :
+CI : c'est ce run qui le rend. **Jamais un push suivi aussitôt de `gh pr ready`** : la
+`concurrency` du `ci.yml` annule le run en cours d'une PR au run suivant, et un run `synchronize`
+créé après celui du passage en ready l'annulerait — tous ses jobs sautés, son événement étant un
+push en draft. Avant de sortir du draft, attendre que le run sauté du dernier push apparaisse sur
+le SHA de tête (`gh run list --commit <sha> --workflow CI`) — supposé, non mesuré. Sortir du
+draft :
 
 ```
 gh pr ready <numéro>
@@ -661,8 +666,13 @@ récent.
     le job n'a aucun step → allocation de runner (quota, incident fournisseur) — ne pas modifier
     le workflow, surveiller en fond et **rendre la main au mainteneur**. Les runs `skipped`
     (garde `if:`) se terminent sans runner et ne prouvent rien sur la disponibilité de la CI.
-  - *Rouge d'avis* : le step d'audit ou de scan rougit sur un paquet que le diff ne touche pas →
-    une base d'avis a changé sans commit. Vérifier que le trunk rougit aussi — son dernier run
+  - *Rouge d'avis* : le step d'audit ou de scan rougit — au run planifié du trunk, ou au job des
+    portes d'avis d'une PR sur un paquet que son diff ne touche pas (`.claude/pipeline.config.md`,
+    « Qualité ») → une base d'avis a changé sans commit. C'est une **procédure du trunk**, pas de
+    la PR (ADR 0019, décision 2) : l'avis porte sur l'état du monde, et se corrige sur le trunk par
+    la voie courte (« Voie courte — correctif évident ») — une montée de version ou une exception
+    datée —, jamais par d'autres pushes sur la PR, qui repaieraient le même verdict. Pour un rouge
+    de PR, vérifier d'abord que le trunk rougit aussi — son dernier run
     planifié ou un `workflow_dispatch` s'il en a, sinon la porte elle-même, sa commande du projet
     lancée sur `origin/<trunk>` dans un worktree jetable — et pour un scan d'images, précédée de
     leur construction depuis ce worktree sous un nom propre au trunk : le démon de conteneurs est
@@ -670,8 +680,9 @@ récent.
     s'agit de mettre hors de cause. Jamais un rerun d'un run du trunk :
     `--job` comme le run entier relancent les jobs qui en dépendent (REST : « Re-run a job and
     its dependent jobs »), publication et déploiement compris. Puis appliquer « Création
-    d'issues en cours de cycle » (`.claude/rules/contraintes.md`), barreau par barreau. Un rerun
-    de la PR, lui, ne prouve rien : l'avis ne part pas (obs 56).
+    d'issues en cours de cycle » (`.claude/rules/contraintes.md`), barreau par barreau ; la PR
+    attend le correctif sur le trunk, puis se met à jour sur lui. Un rerun de la PR, lui, ne
+    prouve rien : l'avis ne part pas (obs 56).
   - *Rouge de code* : tout le reste, y compris un rouge de plateforme (3.2) → cycle complet
     3.1→3.5.
 - **Revue** : les commentaires d'une revue automatisée (bot), s'il y en a une. Un `developpeur` a

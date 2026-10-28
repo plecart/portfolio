@@ -131,8 +131,9 @@ travail existe, mais rien ne le sait.
 ## Une PR en draft n'a aucun run de CI
 
 > **Une PR en draft n'a aucun run de CI** : le garde `if:` du `ci.yml` du template saute toute
-> draft, quel que soit l'événement — ouverture, push, réouverture. Le premier run vient du passage
-> en ready (`gh pr ready`, événement `ready_for_review`, Étape 5), puis chaque push lance le sien.
+> draft, quel que soit l'événement — ouverture, push, réouverture.
+> Le premier run vient du passage en ready (`gh pr ready`, événement `ready_for_review`, Étape 5),
+> puis chaque push lance le sien.
 > Les passes de relecture (4.2) relisent donc un SHA sans verdict de CI, et un rouge de la famille
 > « sensible à la plateforme » (3.2) se voit au passage en ready : c'est le prix d'une CI qui ne
 > paie un run que là où son verdict peut tenir (ADR 0019). **Une draft sans run n'est pas une CI
