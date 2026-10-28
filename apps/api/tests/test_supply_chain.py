@@ -58,12 +58,12 @@ ECOSYSTEM_MANIFESTS = {
     "docker-compose": "compose.dev.yml",
 }
 
-# La politique commune à tous les écosystèmes : passage hebdomadaire, mineures et correctifs
-# groupés — les majeures restent seules, chacune dans sa PR, sauf celles qu'un `ignore` refuse —,
-# aucun libellé hors du mapping de `.claude/pipeline.config.md`, commits au format conventional du
-# dépôt (brief de #5, briefing du 2026-09-25).
+# La politique commune à tous les écosystèmes : passage mensuel (ADR 0019, décision 4), mineures
+# et correctifs groupés — les majeures restent seules, chacune dans sa PR, sauf celles qu'un
+# `ignore` refuse —, aucun libellé hors du mapping de `.claude/pipeline.config.md`, commits au
+# format conventional du dépôt (brief de #5, briefing du 2026-09-25).
 UPDATE_POLICY: dict[str, Any] = {
-    "schedule": {"interval": "weekly"},
+    "schedule": {"interval": "monthly"},
     "groups": {"minor-and-patch": {"update-types": ["minor", "patch"]}},
     "labels": [],
     "commit-message": {"prefix": "chore", "include": "scope"},
@@ -1031,8 +1031,8 @@ DEPENDABOT_FORMS = {
         True,
     ),
     "`directories` vide": ([update_entry("docker", directories=[])], True),
-    "cadence mensuelle": (
-        [update_entry("docker", directory="/infra/caddy", schedule={"interval": "monthly"})],
+    "cadence hebdomadaire": (
+        [update_entry("docker", directory="/infra/caddy", schedule={"interval": "weekly"})],
         True,
     ),
     "sans groupe": ([update_entry("docker", directory="/infra/caddy", groups=None)], True),
