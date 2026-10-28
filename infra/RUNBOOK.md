@@ -54,10 +54,9 @@ n'est pas un secret.
 Prérequis : un VPS Ubuntu LTS en UE (ADR 0002), joignable en `root` par ta clé SSH ; dans le
 gestionnaire de mots de passe, le jeton du Tunnel, ceux du bucket des médias et du bucket des
 sauvegardes, la paire `age` et le compte de l'admin (« Admin ») ; l'adresse de ping du contrôle
-healthchecks.io (#25). À la
-première connexion, `ssh` affiche l'empreinte de l'hôte : compare-la à celle que la console du
-fournisseur rend pour `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` — identiques, oui ou
-non ? Non : n'accepte pas.
+healthchecks.io (#25). À la première connexion, `ssh` affiche l'empreinte de l'hôte : compare-la à
+celle que la console du fournisseur rend pour `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`
+— identiques, oui ou non ? Non : n'accepte pas.
 
 1. **La clé de déploiement**, sur le poste, dédiée et sans phrase de passe — la CI ne peut pas en
    saisir une :
@@ -84,13 +83,13 @@ non ? Non : n'accepte pas.
    ssh -t root@<ip> bash bootstrap.sh
    ```
    Il demande : la clé publique (le contenu de `deploy_key.pub`), le jeton GHCR, `IMAGE_TAG` (le
-   SHA de l'étape 3), `TUNNEL_TOKEN`, les noms d'hôte — `SITE_HOST`, `API_HOST`,
-   `MEDIA_HOST` (ADR 0003) —, le compte de l'admin — `ADMIN_USERNAME`, puis `ADMIN_PASSWORD` sans
-   écho —, ceux du bucket public des médias (ADR 0004) : l'adresse, le nom et
-   le jeton, puis ceux de la sauvegarde : la clé publique `age`, l'adresse, le jeton et le nom du
-   bucket R2, l'adresse de ping. Il engendre le mot de passe du rôle Postgres de `backup`, et crée
-   ce rôle une fois la base saine, avant de démarrer le reste. Il finit par `== Fait`,
-   `docker compose ps` où chaque service est `healthy`, et la ligne de la clé de l'hôte.
+   SHA de l'étape 3), `TUNNEL_TOKEN`, les noms d'hôte — `SITE_HOST`, `API_HOST`, `MEDIA_HOST`
+   (ADR 0003) —, le compte de l'admin — `ADMIN_USERNAME`, puis `ADMIN_PASSWORD` sans écho —, ceux
+   du bucket public des médias (ADR 0004) : l'adresse, le nom et le jeton, puis ceux de la
+   sauvegarde : la clé publique `age`, l'adresse, le jeton et le nom du bucket R2, l'adresse de
+   ping. Il engendre le mot de passe du rôle Postgres de `backup`, et crée ce rôle une fois la base
+   saine, avant de démarrer le reste. Il finit par `== Fait`, `docker compose ps` où chaque service
+   est `healthy`, et la ligne de la clé de l'hôte.
    Il s'arrête sur la première erreur ; relancé, il reprend sans rien refaire de ce qui est en
    place. `cloudflared` ne devient sain qu'avec un Tunnel configuré (#25) : sinon `--wait`
    s'arrête sur « cloudflared is unhealthy ».
@@ -237,12 +236,12 @@ puis `docker compose ps` en `deploy` — le démon redémarre, la pile revient s
 
 **Le compte unique** vient de `ADMIN_USERNAME` et `ADMIN_PASSWORD`, dans le `.env` du VPS :
 `bootstrap.sh` les saisit à l'amorçage — le nom en clair, le mot de passe sans écho —, et
-`compose.yml` les exige. À chaque démarrage, après les migrations, `api` pose le
-compte (`manage.py ensure_superuser`, [`api/entrypoint.sh`](api/entrypoint.sh)) : il le crée la
-première fois, puis remet le mot de passe s'il a changé ; son journal dit ce qu'il a écrit, jamais
-le mot de passe. Celui-ci vit dans le gestionnaire de mots de passe : 12 caractères au moins, ni
-courant, ni entièrement numérique, ni proche du nom (les validateurs de Django), et sans
-apostrophe, que `bootstrap.sh` refuse.
+`compose.yml` les exige. À chaque démarrage, après les migrations, `api` pose le compte
+(`manage.py ensure_superuser`, [`api/entrypoint.sh`](api/entrypoint.sh)) : il le crée la première
+fois, puis remet le mot de passe s'il a changé ; son journal dit ce qu'il a écrit, jamais le mot
+de passe. Celui-ci vit dans le gestionnaire de mots de passe : 12 caractères au moins, ni courant,
+ni entièrement numérique, ni proche du nom (les validateurs de Django), et sans apostrophe, que
+`bootstrap.sh` refuse.
 
 `api` refuse de démarrer — `docker compose logs api` dit pourquoi — quand l'une des deux variables
 est vide, quand les validateurs refusent un mot de passe neuf — à la création du compte, ou quand
