@@ -1614,6 +1614,8 @@ INTERROGE_MOI_SKILL = ".claude/skills/interroge-moi/SKILL.md"
 CYCLE_PR_SKILL = ".claude/skills/cycle-pr/SKILL.md"
 BRIEFING_REF = ".claude/skills/cycle-pr/references/briefing.md"
 PORTES_REF = ".claude/skills/cycle-pr/references/portes.md"
+RELECTURE_REF = ".claude/skills/cycle-pr/references/relecture.md"
+FINALISATION_REF = ".claude/skills/cycle-pr/references/finalisation.md"
 TRIAGE_SKILL = ".claude/skills/triage/SKILL.md"
 HORS_SCOPE_REF = ".claude/skills/triage/hors-scope.md"
 RELEVEUR_ROLE = ".claude/agents/releveur.md"
@@ -1737,7 +1739,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         "**Ces deux commandes closent un tour — celui de la session de relecture.**",
     ),
     "commandes-integrees-en-repli-seulement": (
-        CYCLE_PR_SKILL,
+        RELECTURE_REF,
         (
             "En repli seulement, la session PR les joue : la consigne vaut alors pour la forme du"
             " rapport, pas pour l'arrêt du cycle, et elle enchaîne dans le même tour."
@@ -3390,7 +3392,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         "La session de brouillon le montre au mainteneur, qui décide",
     ),
     "6b-cycle-pr-repercussions-prescrit-le-commentaire": (
-        CYCLE_PR_SKILL,
+        FINALISATION_REF,
         "`repercussions` le prescrit à son étape 5, « Issues en vol »",
     ),
     "6b-pr-paralleles-repercussions-prescrit-le-commentaire": (
@@ -6807,14 +6809,14 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         "sortie 124, délai dépassé : Étape 6, « CI qui ne démarre pas »",
     ),
     "cycle-pr-jamais-une-fin-de-tour-nue": (
-        CYCLE_PR_SKILL,
+        FINALISATION_REF,
         (
             "Jamais une fin de tour nue : le moniteur de PR de l'application ne réveille que sur un"
             " échec, un conflit ou un commentaire"
         ),
     ),
     "cycle-pr-seule-surveillance-de-la-ci": (
-        CYCLE_PR_SKILL,
+        FINALISATION_REF,
         (
             "C'est la seule surveillance de la CI que la session lance elle-même, le moniteur ne"
             " couvrant pas le succès ; jamais une sonde planifiée"
