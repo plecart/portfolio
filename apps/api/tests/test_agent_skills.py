@@ -596,6 +596,19 @@ def test_la_liste_d_outils_d_un_role_nomme_ceux_que_sa_prose_emploie(role: str, 
     )
 
 
+def test_le_releveur_demarre_sans_claude_md() -> None:
+    """« Ces textes ne te sont pas chargés » (`releveur.md`, « Ce que tu n'appliques pas »).
+
+    `omitClaudeMd: true` retire au sous-agent `CLAUDE.md` et les règles inconditionnelles de
+    `.claude/rules/` (code.claude.com/docs/en/sub-agents, lu le 2026-10-28) : son corps reprend ce
+    qu'il en tirait (« Lire borné »). Le champ retiré, la phrase deviendrait fausse en silence et
+    `CLAUDE.md` et les règles reviendraient dans son contexte au premier appel (lot 3 de #177).
+    """
+    assert role_frontmatter("releveur").get("omitClaudeMd") is True, (
+        "`releveur` ne déclare plus `omitClaudeMd: true` — son corps dit qu'il démarre sans `CLAUDE.md`"
+    )
+
+
 # Le modèle et l'effort d'un rôle s'écrivent à trois endroits : son frontmatter, sa ligne de la
 # table « Orchestration » de `CLAUDE.md`, et la première ligne de son corps, qui dit si son mandat
 # contient des décisions — le critère d'éligibilité au modèle le moins cher (obs 66). Aucune des
