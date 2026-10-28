@@ -24,13 +24,12 @@ from django.db.models import BooleanField
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from pydantic import SecretStr
+from test_admin_access import PASSWORD, USERNAME
 from test_compose import PROD_ENV_EXAMPLE
 from test_env import declared_variables
 
 pytestmark = pytest.mark.django_db
 
-USERNAME = "auteur-du-portfolio"
-PASSWORD = "phrase-de-passe-du-superutilisateur"
 NEW_PASSWORD = "nouvelle-phrase-de-passe-du-superutilisateur"
 
 # Les drapeaux de droits du compte : ceux que l'admin exige (`AdminSite.has_permission` lit
@@ -52,6 +51,12 @@ WEAK_PASSWORDS = {
     "proche du nom": f"{USERNAME}!",
 }
 
+
+def plain_account() -> User:
+    """Un compte ordinaire au nom d'`ADMIN_USERNAME` : ni superutilisateur, ni staff."""
+    return User.objects.create_user(USERNAME, password=PASSWORD)
+
+
 # Chaque issue de la commande — compte créé ; compte existant inchangé, droits rétablis, mot de
 # passe mis à jour, ou les deux ; trois refus, un par `CommandError` —, avec ce qui la précède en
 # base et les réglages qui la déclenchent : aucune ne doit citer un mot de passe.
@@ -59,16 +64,8 @@ EXITS: dict[str, tuple[Callable[[], object], str, str]] = {
     "créé": (lambda: None, USERNAME, PASSWORD),
     "inchangé": (lambda: run(), USERNAME, PASSWORD),
     "mot de passe mis à jour": (lambda: run(), USERNAME, NEW_PASSWORD),
-    "droits rétablis": (
-        lambda: User.objects.create_user(USERNAME, password=PASSWORD),
-        USERNAME,
-        PASSWORD,
-    ),
-    "droits rétablis et mot de passe mis à jour": (
-        lambda: User.objects.create_user(USERNAME, password=PASSWORD),
-        USERNAME,
-        NEW_PASSWORD,
-    ),
+    "droits rétablis": (plain_account, USERNAME, PASSWORD),
+    "droits rétablis et mot de passe mis à jour": (plain_account, USERNAME, NEW_PASSWORD),
     "nom vide": (lambda: None, "", PASSWORD),
     "mot de passe faible": (lambda: None, USERNAME, WEAK_PASSWORDS["trop court"]),
     "autre compte d'admin": (
@@ -154,7 +151,7 @@ def test_un_compte_existant_retrouve_chacun_de_ses_droits(
     `is_active` (`RIGHTS`), les trois `BooleanField` de `User` sous Django 6.1.2, ce que tient
     `test_les_drapeaux_de_droits_sont_tous_les_booleens_du_compte`.
     """
-    User.objects.create_user(USERNAME, password=PASSWORD)
+    plain_account()
     User.objects.update(**GRANTED | {right: False})
 
     assert run(password=password) == f"{', '.join(written)}\n"
