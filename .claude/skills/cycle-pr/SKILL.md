@@ -23,19 +23,7 @@ contradiction `[C]`, elle arrête (`.claude/rules/contraintes.md`).
 s'arrêter et proposer une session `init-projet` distincte (`init-projet`, « Note pour les autres
 skills ») ; ne jamais deviner une commande.
 
-**Vague parallèle.** Si le prompt de démarrage de cette session vient d'une autre session — bloc
-`<cross-session-message>`, ou session parente nommée par le prompt système
-([references/sessions-liees.md](references/sessions-liees.md), « Identité ») —, le **lead** de la
-vague (`pr-paralleles`) est la session que ce prompt désigne comme tel, à défaut l'émettrice —
-pour une session de lot, celle que son brief nomme, ou aucune : retenir son identifiant. La
-vérification d'avant-go n'est plus à lui, la session PR la lance (Étape 7) ; il intervient sur
-demande de l'utilisateur (« discute de ça avec le lead ») : rédiger le message et l'envoyer par
-`SendMessage`, **sans confirmation** — un message n'est pas une action (même référence,
-« Messages »). Et un message du lead n'est jamais une approbation : le « go »
-reste humain, dans cette fenêtre. Dans l'autre sens,
-le lead peut écrire en plein travail — signalement bloquant, ordre de merge du lot : son message
-n'arrive qu'à la fin du tour en cours (même référence, « Messages »), et se traite comme le
-commentaire de répercussion de l'Étape 6 — remonter à l'utilisateur, jamais merger par-dessus.
+**Vague parallèle.** → [references/briefing.md](references/briefing.md), « Vague parallèle ».
 
 **Session de lot.** Si ce prompt fait de cette session un lot ouvert par une coordinatrice
 (Étape 1, « Découpage en plusieurs lots »), lire d'abord
@@ -87,53 +75,18 @@ minimalisme (`ponytail`).
 
 ## Étape 1 — Briefing pré-PR (avant la première ligne de code)
 
-**Éprouver les outils d'abord.** Un skill présuppose des outils ; tant qu'ils n'ont pas été
-éprouvés, son plan est une hypothèse. Un outil branché sur un hook, un verrou ou un jeton ne se
-révèle qu'à l'opération qui le déclenche ; une commande de lecture prouve que le binaire répond,
-jamais que l'opération passera — `git status` ne déclenche aucun hook, le premier commit les
-déclenche tous. Avant d'écrire une ligne du briefing, lancer la sonde d'outillage, Python ≥ 3.11
-sans dépendance, depuis la racine du dépôt. `<format>` et `<test>` sont des lignes de « Commandes
-du projet » de `.claude/pipeline.config.md`, la pile au choix de la session ; une ligne `n/a`, ou
-marquée `# non vérifiée` (voir plus bas), se passe en **omettant** son option, et la sonde sort
-`SAUTÉE` :
+**Éprouver les outils d'abord.** → [references/briefing.md](references/briefing.md), « Éprouver les outils d'abord ».
 
 ```
 python <répertoire de ce skill>/scripts/sonde-outillage.py --format "<format>" --test "<test>"
 ```
 
-Six sondes, de la moins chère à la plus chère, arrêt au premier KO : un arbre et un index propres
-(`git status` vide, fichiers non suivis compris) — la sonde de commit emporte ce qui est stagé, et
-la commande de format réécrit ce qui ne l'est pas ; `gh auth status --active` en 0 ;
-`gh api repos/{owner}/{repo} --jq .permissions.push` à `true` ; **une écriture**,
-`git commit --allow-empty -m "chore: sonde outillage"` puis `git reset --soft HEAD~1`, la tête
-revenue au SHA d'avant ; la commande de format, qui écrit, sans qu'elle réécrive l'arbre ; la
-commande de test. Sortie 0 : tout OK ou sauté ; 1 : premier KO, avec la fin de la sortie
-fautive ; 2 : appel mal formé. **Ce qu'elle ne couvre pas** : un dépôt sans commit, où elle rend
-KO avant d'écrire ; le premier push et la CI ; la ligne « validation » ; les hooks côté serveur ;
-le choix des commandes, qui reste à la session.
-
-Un échec ici se remonte à l'utilisateur **avant** le briefing, avec les cibles de correction
-possibles et leur portée (session, projet, machine) : c'est un arbitrage de configuration, jamais
-une décision du skill — **un skill ne modifie pas la configuration de l'utilisateur pour se
-débloquer lui-même**. Un même message de refus quelle que soit la commande se lit comme un
-problème de permissions alors que c'est l'outillage ; éprouver coûte quelques commandes avant le
-briefing, et une demi-session après le « go ».
-
-**Une commande marquée `# non vérifiée`** dans `.claude/pipeline.config.md` signale un projet
-initialisé sans code. Si cette PR pose du code, elle porte aussi ce que `init-projet` a reporté —
-la génération CI et Dependabot de son étape 7, paragraphe « Runtime épinglé » compris, la
-vérification des commandes de son étape 11, puis le retrait des marqueurs. L'inscrire au
-briefing ; sans elle, le projet resterait sans CI.
+→ [references/briefing.md](references/briefing.md), « Six sondes, de la moins chère à la plus chère ».
 
 Produire un briefing écrit AVANT de créer la branche :
 
 - **Liste précise des fichiers** à créer/modifier — le chemin exact de chacun.
-- **Estimation** — comptée **par critère**, en artefacts que le critère doit laisser, jamais en
-  prose qui le décrit : une porte ou un invariant → un test paramétré à témoins des deux côtés
-  (~100-150 lignes) ; un script → le script et son fichier de test (~400) ; une règle de skill → sa
-  ligne, plus la docstring de dénombrement si elle ferme une classe. Calibration mesurée : les
-  lots 1, 2 et 3 de #77 ont dépassé la leur de 2 à 5×, tous du même côté — une estimation en
-  prose est un plancher. C'est elle que consomme le seuil relatif de `taille-pr.md` (obs 78).
+- **Estimation** → [references/briefing.md](references/briefing.md), « Estimation ».
 - **Décisions verrouillées** — choix d'architecture / scope / format actés.
 - **Questions résiduelles** — découpage, format des données, transitions d'état, comportements,
   edge cases — **chacune avec sa voie** (`contraintes.md`, règle d'or) : une `[T]` se tranche
@@ -152,87 +105,19 @@ réponse que le mainteneur donne toujours.
 **Aucune PR ne démarre sans que le travail soit passé par `interroge-moi`.** Vérifier l'état de
 l'issue dès les outils éprouvés :
 
-- **Issue interrogée** (passée par `needs-interrogation`, décisions consignées dans le brief
-  d'agent) → relire ces décisions, et vérifier qu'elles tiennent encore (auto-challenge ci-dessous).
-- **Brief portant `⚠️ Non interrogée au triage`**, ou aucune trace d'interrogatoire → **s'arrêter
-  et proposer une session d'interrogatoire** (`interroge-moi`, numéro de l'issue en argument), avant
-  la première ligne de code, puis reporter ses décisions, écrites dans l'issue, dans les
-  « Décisions verrouillées » du briefing.
-- **Demande directe sans issue** → l'interrogatoire s'applique aussi ; il n'y a pas de raccourci
-  parce que le travail n'a pas de ticket. Un correctif évident — visible à la lecture, sans
-  décision de comportement (`contraintes.md`, barreau 3) — n'a rien à interroger : sa
-  qualification, écrite dans le body de la PR — draft, ou PR de la voie courte — avec sa preuve,
-  en tient lieu.
-
-Le point n'est pas de cocher une case : c'est que **les décisions tranchées soient écrites**, dans
-l'issue — brief amendé s'il est contredit — et dans le briefing. Elles seront relues par une
-autre session que celle-ci.
+→ [references/briefing.md](references/briefing.md), « Porte d'entrée obligatoire — l'interrogatoire ».
 
 ### Auto-challenge du plan — le plan est-il encore exact ?
 
-Avant de présenter le briefing comme acté, **se challenger explicitement** : le plan a pu être
-écrit (issue, agent brief, conversation) *avant* que d'autres PR ne soient mergées. Le terrain a
-peut-être bougé. Confronter le plan à la réalité **actuelle** du code — les relevés (`git log`,
-`grep` des ancres, dénombrements) à un `releveur`, la cartographie de la zone touchée (fichiers,
-interfaces, appelants) à l'`executant`, le jugement à la session PR :
-
-- **Relire l'état réel** de la zone touchée (`git log` récent sur `main`, fichiers concernés) — pas
-  l'état supposé au moment où l'issue a été écrite.
-- **Pour chaque décision verrouillée et chaque fichier listé**, vérifier qu'elle tient toujours :
-  l'interface existe-t-elle encore sous cette forme ? une PR récente a-t-elle déjà fait une partie
-  du travail, déplacé un module, changé un contrat, rendu une hypothèse caduque ?
-- **Confronter le brief au « Journal de spec » du corps de l'issue** : toute entrée du journal
-  postérieure à la **dernière édition** du brief (date de modification du commentaire, pas sa date
-  de création) se lit comme un erratum potentiel — une réconciliation a pu ne pas atteindre le
-  brief. En cas d'écart entre les deux, le journal (adossé aux sources de vérité) l'emporte, et
-  l'écart se signale dans le briefing.
-- **Reproduire chaque chiffre de référence qu'un critère demande de retrouver**, par la commande
-  qui recense sa population (`triage/brief-agent.md`, « Critères d'acceptation complets »), avant
-  la première ligne de code. Un chiffre qui ne se reproduit pas fait amender le critère, avec sa
-  ligne au « Journal de spec » — **partout** où la phrase se répète, sinon chaque lot suivant hérite
-  d'une base fausse. Un critère muet sur sa population : prendre celle que son intention désigne et
-  l'écrire dans l'amendement, jamais chercher celle qui rend le chiffre annoncé (obs 68).
-- **Vérifier que la suite du dev tient** : ce que cette PR prépare pour les issues suivantes est-il
-  toujours cohérent, ou l'ordre / le découpage doit-il être revu ?
-- **Vérifier la faisabilité de l'ordre des commits** : pour chaque commit prévu, ce dont ses tests
-  ont besoin pour tourner en local (services, schéma, compose, fixtures) existe-t-il déjà, ou
-  est-il introduit par un commit ultérieur ? Si « ultérieur » → remonter ce commit. L'ordre de
-  livraison suit les **dépendances d'exécution**, pas la logique de présentation du plan — un
-  découpage peut être juste sur le contenu et infaisable sur l'ordre.
-- **Chercher le numéro de l'issue dans tout le dépôt** — `grep -rn "#<N>"` sur les sources, la
-  doc et la config, hors `.git/` et dépendances. Chaque occurrence est une **dette adressée à ce
-  lot par un lot précédent** (« le lot 3 de #N y branchera X », « viendra avec #N ») : à honorer
-  ou à amender dans ce lot. Le corps et le brief ne les connaissent pas, elles vivent dans le code.
-- **Les consignes reçues d'un lead de vague font partie de la population confrontée**, au même
-  titre que les décisions verrouillées : une consigne présentée comme un invariant se vérifie
-  contre l'artefact qui le garde — le test, sa docstring, le § de l'issue — jamais contre son
-  énoncé, une reformulation dérivant toujours vers le plus strict. Divergence → arrêt
-  `decisions-vs-doc` ordinaire, à remonter.
-- **Un ordre de gestes chez un tiers** (console, registrar, fournisseur de paiement) est une
-  hypothèse à re-vérifier en source officielle, comme une interface qui a pu bouger : aucune gate
-  ne rougit quand il devient faux.
-- **Énoncer à voix haute** sous un titre `## 🔍 Auto-challenge du plan` : ce qui reste valable, ce
-  qui a changé, et les ajustements proposés (fichiers en plus/en moins, décision à rouvrir, scope à
-  resserrer ou re-découper).
+→ [references/briefing.md](references/briefing.md), « Auto-challenge du plan — le plan est-il encore exact ? ».
 
 S'il y a un écart qui change le cours du dev, **s'arrêter et le remonter à l'utilisateur** avant le
 « go » — ne pas dérouler un plan périmé en silence. Si tout tient, le dire explicitement (« plan
 confirmé contre l'état actuel »).
 
-**Une réponse `[V]` du go qui contredit le brief l'amende avant la première ligne de code** —
-décision verrouillée, critère ou interface : décision réécrite avec son motif et sa date, critères
-déplacés, une ligne datée au « Journal de spec » du corps (`decisions-vs-doc`, sortie 2), relue
-après écriture. Le corps de la PR ne remplace pas le brief : les lots suivants et `repercussions`
-ne lisent que l'issue (obs 44).
+**Une réponse `[V]` du go qui contredit le brief l'amende avant la première ligne de code** → [references/briefing.md](references/briefing.md), « Une réponse `[V]` du go qui contredit le brief l'amende avant la première ligne de code ».
 
-**Découpage en plusieurs lots.** Quand le briefing découpe l'issue en n > 1 lots (`taille-pr.md`),
-la session devient la **coordinatrice** de ses lots : elle n'écrit pas de code, et son go — le go
-du découpage — fait démarrer les sessions de lot, ou chacune à son ouverture
-([references/coordinatrice.md](references/coordinatrice.md)). Une issue à un seul lot ne change
-rien : la session porte le cycle elle-même et délègue le code (3.1). Une session de lot attend
-le go ci-dessous dans sa fenêtre comme toute session PR, et y démarre sa session de relecture
-— sauf go délégué à la coordinatrice, qui lève l'attente et passe la relecture au repli
-`relecteur` (même référence, « La session de lot »).
+**Découpage en plusieurs lots.** → [references/briefing.md](references/briefing.md), « Découpage en plusieurs lots ».
 
 Attendre un **« go » explicite**, puis créer la branche — trunk-based depuis `main`, derrière une
 **porte**, c'est-à-dire une commande dont le code de sortie porte la condition :
@@ -251,43 +136,11 @@ de la branche morte et emporte ses commits réécrits (mesuré ; la voie complè
 par une autre** dans un worktree de l'application ne compare rien non plus : son premier geste
 est celui de [references/sessions-liees.md](references/sessions-liees.md), « Premier geste ».
 
-**Deux prédicats, pas un.** `--is-ancestor` dit « ancêtre **ou égal** » : une seule direction ne
-distingue donc pas l'égalité du retard, et la porte laisserait passer l'autre cas. Les deux
-ensemble valent l'égalité — `main` ancêtre d'`origin/<trunk>` **et** l'inverse ⇔ même commit.
-`git fetch` est **sa propre commande** et précède les deux : c'est lui qui rend `origin/<trunk>`
-significatif. Et c'est `&&` qui rend la porte bloquante — une chaîne de trois commandes passe le
-garde de permissions, **en worktree isolé compris** (mesuré le 2026-10-13 : ce que le garde refuse
-est la **substitution de commande**, pas la longueur de la chaîne — obs 60). **Non vérifié** :
-cette mesure a été prise avec une troisième commande **en lecture** ; la forme écrivante n'a pas
-été provoquée, parce qu'elle n'est pas inoffensive. Un refus à cet endroit se reconnaîtrait tout
-seul, et la sortie serait de jouer les deux prédicats en une commande chacun, puis l'action — en
-acceptant que la porte redevienne alors une lecture, et en le disant.
-
-Les deux directions, mesurées le 2026-10-13 sur un dépôt jetable avec un vrai distant : branche
-**en retard**, `--is-ancestor main origin/<trunk>` rend 0 et `--is-ancestor origin/<trunk> main`
-rend **1** ; branche **en avance**, c'est l'inverse. Chaque prédicat bloque donc exactement sa
-direction, et aucun des deux ne suffit seul.
-
-La forme précédente, `git rev-parse main origin/main`, voyait les deux directions mais
-**imprimait** au lieu de garder — c'est l'incident d'obs 69, et la classe entière vit à l'Étape 7,
-« Le go, puis le merge ». Une porte à **un** prédicat aurait fermé ce cas en rouvrant l'autre :
-c'est tout l'intérêt d'en mettre deux.
-
-**Au blocage**, laquelle des deux a mordu se lit par `git status -sb`, qui écrit `[ahead n]` /
-`[behind n]`. Pas `git status` nu, qui le dit en prose, et **surtout pas**
-`git status --porcelain`, **vide** sur une branche en avance (mesuré) — c'est pourquoi la sonde
-d'outillage ci-dessus, qui exige un `git status` vide, ne voit pas ce cas et ne peut pas servir de
-contrôle compensatoire. Rattrapages : `main` local en avance → demander à l'utilisateur de
-pousser, ou l'autorisation de le faire ; `origin/<trunk>` en avance → sur `main`,
-`git pull --ff-only`. Dans les deux cas, rejouer la porte.
+**Deux prédicats, pas un.** → [references/portes.md](references/portes.md), « Deux prédicats, pas un ».
 
 ## Étape 2 — Ouvrir la PR en draft (toujours avant la première ligne de code)
 
-**La PR est le premier artefact produit, pas le dernier.** C'est elle qui rend le travail
-*visible comme en cours* pour le reste de la pipeline : `repercussions` s'en sert pour savoir
-qu'une issue est « en vol » et ne pas réécrire sa spec sous les pieds de cette session, et
-`pr-paralleles` pour tenir son tableau de bord. **Une branche locale sans PR est invisible** — le
-travail existe, mais rien ne le sait.
+**La PR est le premier artefact produit, pas le dernier.** → [references/briefing.md](references/briefing.md), « La PR est le premier artefact produit, pas le dernier ».
 
 GitHub refuse une PR sans commit : amorcer avec un commit vide, pousser, ouvrir en draft. Le
 message d'amorce suit `taille-pr.md` comme tout autre commit — **pas de numéro d'issue dans le
@@ -309,39 +162,15 @@ EOF
 
 La PR draft porte **dès sa création** :
 
-- **`Closes #<N>`** dans le body. C'est **la** ligne qui rend l'issue détectable comme en vol.
-  Sans elle, `repercussions` la croira dormante et éditera sa spec en cours de développement.
-  **Cas découpé** (taille-pr impose plusieurs PR pour la même issue) : seule la **dernière** PR du
-  lot porte `Closes #<N>` — un `Closes` sur la première fermerait l'issue trop tôt. Chaque autre
-  PR du lot ouvre son body par la ligne **`En vol pour #<N> (lot k/n)`**, que `repercussions` lit
-  au même titre que `Closes` : sans elle, l'issue paraît dormante précisément pendant qu'on
-  travaille dessus. GitHub, lui, ne lit que le mot-clé : le lien des lots précédents se repose à
-  l'Étape 8, une fois l'issue close. Avec une coordinatrice, le `Closes` passe à la PR
-  d'intégration et **toutes** les PR de lot portent la ligne « En vol »
-  ([references/coordinatrice.md](references/coordinatrice.md)).
+- **`Closes #<N>`** dans le body → [references/briefing.md](references/briefing.md), « `Closes #<N>` dans le body ».
 - Le **briefing de l'Étape 1** comme corps provisoire — le plan devient lisible par le mainteneur
   et par les autres sessions, avant que le code n'existe.
 - **Assignee**, **labels** et **milestone** (mapping de `.claude/pipeline.config.md`).
 - Le marqueur **draft**, qui dit « en cours, ne pas reviewer » et interdit le merge accidentel.
 
-Pour une **demande directe sans issue**, ouvrir quand même la draft : sans `Closes`, mais le
-travail reste visible du reste de la pipeline. Pour une draft née d'un échec de QA (case
-` 🔴 correctif évident — …`), la session, une fois la draft ouverte, remplace ce marqueur par
-` 🔴 PR #<M>` sur la case, par une paire
-(`python .claude/skills/cycle-pr/scripts/ecriture-relue.py checkbox patch <plan> --paires <fichier>`,
-`execution-qa/references/patch-checkbox-gh.md`) : c'est ce que lit la reprise de la QA.
+→ [references/briefing.md](references/briefing.md), « Pour une demande directe sans issue ».
 
-> **La CI tourne sur chaque push de la branche, draft comprise** — sauf à l'ouverture de la draft
-> elle-même, dont l'amorce vide n'a rien à vérifier (garde `if:` du `ci.yml` du template). Le
-> premier run arrive donc au premier push de code (3.5), et c'est là que se voit un rouge de la
-> famille « sensible à la plateforme » (3.2) — au cycle courant, pas après le passage en ready, où
-> chaque constat coûte un run complet et le rejeu des vérifications manuelles. **Une draft sans
-> push de code n'a aucun run : ce n'est pas une CI cassée.**
-
-En vague parallèle (`pr-paralleles`), le lead relève lui-même le numéro de PR (`gh pr list`) pour
-son tableau de bord : rien à lui envoyer. Une session démarrée par une autre lit ensuite
-`get_status` ; `bind_pr` n'y sert qu'en repli
-([references/sessions-liees.md](references/sessions-liees.md), « Premier geste »).
+> **La CI tourne sur chaque push de la branche, draft comprise** → [references/briefing.md](references/briefing.md), « La CI tourne sur chaque push de la branche, draft comprise ».
 
 ## Étape 3 — Le cycle de commit
 
@@ -351,16 +180,7 @@ Chaque commit suit :
 1. modif (TDD)  →  2. test (vert)  →  3. cleanup pass  →  4. test (vert)  →  5. commit
 ```
 
-**La boucle s'enchaîne sans rendre la main.** Un cycle AFK va de 3.1 à 3.5 puis repart en 3.1
-jusqu'à l'Étape 4 — en lançant au passage la **première passe de relecture 4.2** dès que le
-commit qui vient d'être fait pose un invariant que les suivants supposeront vrai ; l'annonce de
-l'étape suivante (« Next : commit 2/3 ») est un **titre**, pas une demande d'autorisation. Les
-seuls arrêts légitimes du cycle : une question `[V]` dont dépend **tout** ce qui reste à faire, un
-arrêt `decisions-vs-doc` (`[C]`), le point d'arrêt humain (zone sensible, une fois par PR, au
-commit qui assemble l'écran — 3.5) et le « go » de l'Étape 7. Une `[V]` dont une partie du travail
-ne dépend pas s'inscrit dans le body de la PR draft, sous « Questions en attente », avec
-l'hypothèse réversible retenue d'ici là, et le cycle continue sur cette partie ; elle sera posée
-groupée au prochain arrêt. Ailleurs, s'arrêter est une remise de main que personne n'a demandée.
+**La boucle s'enchaîne sans rendre la main.** → [references/commit.md](references/commit.md), « La boucle s'enchaîne sans rendre la main ».
 
 ### 3.1 Modification — en TDD (tracer bullet vertical)
 
@@ -377,36 +197,7 @@ question portée au mainteneur —, jamais remplacé (mesuré le 2026-10-20 sur 
 Notes de la PR #139) ; ses `[V]` rejoignent « Questions en attente ». Un `developpeur` neuf
 seulement au bloc suivant, jamais pour une retouche du même bloc.
 
-**Frontières tierces : on vérifie, on ne suppose pas.** Avant d'appuyer un comportement sur une
-bibliothèque ou un framework tiers à une frontière (réseau, encodage, secrets, fusion avec un
-thème ou une config par défaut, cycle de vie de ressources), lire ce que fait réellement l'API —
-documentation via `context7` ou sources du paquet — et le noter dans les `Notes` de la PR avec sa
-référence. Les défauts les plus coûteux d'une PR « verte » sont des suppositions sur un paquet :
-un décodage par défaut, un retry silencieux, une fusion de valeurs, un `repr` qui affiche un secret.
-
-Deux cas de cette frontière se paient plus cher que les autres. **Un comportement par défaut
-invoqué pour écarter un risque de sécurité** — un protocole inactif, une option refusée — se
-mesure sur le **binaire livré**, jamais sur sa documentation ou sa réputation : une exception de
-scan adossée à « inactif par défaut » est tombée au premier test sur l'image (obs 57). **Une
-limite du geste** se pose avant l'intégration : quand une bibliothèque est retenue pour un
-comportement visible, dresser d'abord, depuis ses sources, la liste de ce qu'elle ne fait pas du
-geste demandé — cas non couverts, états refusés ; chaque entrée est une question `[V]`, posée
-avant la première ligne avec l'alternative chiffrée, jamais une note découverte après l'ADR
-(obs 38).
-
-**Un zéro rendu par un outil de contrôle se lit avec son inventaire** — types de cibles, nombre
-de composants analysés : un composant que l'outil n'a pas ouvert n'est pas mesuré, et se
-contre-éprouve sous une forme que l'outil lit (règle complète : `interroge-moi`, « Avant de
-verrouiller », obs 61).
-
-**Un avis de sécurité sans correctif n'est pas une impasse.** Une plage d'avis `*` — toutes les
-versions publiées affectées, paquet abandonné — ne clôt pas l'analyse, elle la déplace d'un
-étage : avant de conclure qu'un avis est irréductible, remonter la chaîne de dépendance et
-vérifier, pour **chaque** parent, s'il a cessé de dépendre du paquet fautif dans une version
-ultérieure — le correctif d'un paquet abandonné vient presque toujours de son consommateur. Puis
-regarder comment d'autres projets ont traité le même avis : un mur atteint par tout le monde a
-souvent une issue de sortie publiée. Et un `override` qui saute une majeure sous un consommateur
-non prévu pour elle **s'éprouve en exécutant réellement l'outil**, pas en relançant l'audit.
+**Frontières tierces : on vérifie, on ne suppose pas.** → [references/tests.md](references/tests.md), « Frontières tierces : on vérifie, on ne suppose pas ».
 
 Implémenter **un comportement à la fois** en red-green-refactor — pas tous les tests d'abord puis
 toute l'implémentation, le découpage horizontal produit de mauvais tests :
@@ -419,131 +210,21 @@ VERT  : écrire le minimum de code pour le faire passer → il passe
 Règles : un test à la fois ; juste assez de code pour passer le test courant ; ne pas anticiper
 les tests futurs ; tester le comportement observable via l'interface publique.
 
-**Le rouge se constate, il ne se suppose pas — un test qui n'a pas été vu rouge n'est pas un
-test.** Sept cas à traiter explicitement :
-
-- **Le test passe du premier coup, avant tout changement de production** → il mesure autre chose ;
-  ne jamais conclure « le défaut n'existe pas ». Cas fréquent : lire une configuration statique
-  alors que le défaut naît d'une fusion ou d'une résolution à l'exécution. Instrumenter d'abord
-  (sonde jetable qui imprime les valeurs au point où l'utilisateur les subit), corriger le point
-  de mesure, obtenir le rouge, puis écrire le correctif. Supprimer la sonde avant le commit.
-- **Le test dérive d'un critère d'acceptation ou d'un rapport de bug et passe avant le correctif**
-  → la prémisse a pu vieillir sous les dépendances : la vérifier contre les versions **réellement
-  épinglées** (changelog + exécution), re-spécifier le test sur le déclencheur qui échoue
-  vraiment, et signaler l'écart dans l'auto-challenge de l'Étape 1 — le correctif reste souvent
-  bon, c'est le critère qui est faux.
-- **La garde protège une ligne existante** (délégation, `override`, clause de `catch`) → la faire
-  rougir en **supprimant cette ligne**, pas en raisonnant. Si le test reste vert, son montage fait
-  converger le chemin nominal et le chemin fautif vers la même observation : trouver un point où
-  les deux divergent. Quand la ligne gardée est un **réglage de sécurité** — option d'un scanner,
-  épingle, permission, porte de CI —, on ne mute pas le dépôt : on écrit la garde en fonction sur
-  du texte, vue rouge sur un recueil de formes fautives construites en mémoire (modèle :
-  `WORKFLOW_FORMS` de `apps/api/tests/test_supply_chain.py`). Le classifieur du mode auto refuse de
-  lancer une suite sur une configuration de sécurité affaiblie, par quelque voie que ce soit
-  (obs 53). `mutation.py` refuse ce que ses motifs de chemin et de contenu
-  reconnaissent et renvoie à cette forme ; un réglage rangé ailleurs y ajoute son motif.
-- **Le test est dicté par un tiers** (relecteur, lead de vague, issue) → même règle que pour un
-  test écrit soi-même : mutation avant de le garder. L'autorité de la source ne remplace pas le
-  rouge observé.
-- **L'assertion est une absence** (`findsNothing`, `is None`, `not called`, « aucun X quel que
-  soit l'état ») → le test doit être vu rouge sur un état où la chose **est présente** : le code
-  inchangé, avant le correctif. Une recherche qui ne trouve rien et une recherche mal formée
-  rendent le même résultat (un sélecteur sur la classe de base ne voit pas la sous-classe) ; s'il
-  passe à ce moment-là, le défaut est dans le sélecteur, jamais dans le sujet. Un garde d'absence
-  jamais vu rouge n'est pas un garde, c'est un commentaire exécutable.
-- **L'assertion ne distingue pas quelle branche a mordu** — jointe par `or`, ou réduite à « ça
-  lève » (`assertRaises` sans vérifier le type ni le message, `assert a or b`, une appartenance à
-  un ensemble de valeurs acceptables) → elle reste verte quand la garde qu'elle croit éprouver
-  disparaît, parce que l'autre branche la satisfait. Le rouge se constate en **retirant une
-  branche à la fois** : si le test tient dans les deux cas, il n'éprouve aucune des deux. Trois
-  occurrences au lot 1 de #77, trouvées chaque fois par le harnais de mutation (une mutation
-  `VERT` sur une garde retirée), jamais par relecture — une assertion jointe se lit exactement
-  comme une assertion forte.
-- **La table de cas est dérivée de l'artefact sous test** (`for x in module.CONSTANTE`) → retirer
-  un élément de l'artefact retire son cas au lieu de le faire rougir : le test et le code ont la
-  même source, le test ne peut contredire le code sur rien. Les cas s'écrivent en **littéraux**,
-  dans l'orthographe réelle ; l'égalité entre la table et la constante est un **second** test, qui
-  garde l'autre sens. Mesuré au lot 3 de #77 : la mutation « préfixe retiré » est restée `VERT`
-  après un correctif qui construisait ses cas depuis le tuple du script (obs 80).
+**Le rouge se constate, il ne se suppose pas — un test qui n'a pas été vu rouge n'est pas un test.** → [references/tests.md](references/tests.md), « Le rouge se constate, il ne se suppose pas ».
 
 - Bons vs mauvais tests : [references/tests.md](references/tests.md)
 - Quand mocker (frontières du système uniquement) : [references/mocking.md](references/mocking.md)
 - Concevoir des interfaces testables : [references/design-interface.md](references/design-interface.md)
 - Viser des modules profonds : [references/modules-profonds.md](references/modules-profonds.md)
 
-**Documentation maximale** : chaque fonction écrite est documentée à fond (intention, params,
-valeur de retour, erreurs, effets de bord, pré/postconditions, exemples, edge cases) au format
-idiomatique du langage. La doc explique le contrat, les tests prouvent le comportement.
-
-**Doc projet en sync** : si le delta change un comportement, une commande, une interface ou
-l'architecture, mettre à jour la doc concernée (`README`, `docs/`, `CLAUDE.md`, glossaire) **dans
-le même commit** — voir `.claude/rules/contraintes.md`. La doc ne se met jamais à jour « plus tard ».
+**Documentation maximale** → [references/commit.md](references/commit.md), « Documentation maximale ».
 
 ### 3.2 Premier passage de tests
 
 Le `developpeur` lance la suite rapide. **Si rouge → pas de commit.** Il répare. Contrôles
 complémentaires :
 
-- **Échec d'outillage ≠ échec de code.** Un échec « exécutable introuvable », « fichier utilisé
-  par un autre processus » ou un compilateur qui sort brutalement après une commande tuée n'est
-  pas un test rouge : vérifier d'abord l'environnement — processus orphelins laissés par un run
-  interrompu (les lister **filtrés sur le chemin du worktree** avant de les tuer), worktree non
-  provisionné — et ne diagnostiquer le code que sur un environnement propre.
-- **Un résumeur n'est pas un verdict.** Quand la commande de test passe par un filtre ou un
-  résumeur — proxy de sortie, hook de réécriture —, tout bilan qui annonce **zéro test collecté**,
-  ou tout état autre que le rouge nommé à l'avance, se relit sur la **sortie brute du lanceur**
-  avant d'être interprété : la commande `test brut` de `.claude/pipeline.config.md`, ou à défaut
-  le contournement que le résumeur documente. Un résumeur peut rendre « aucun test collecté »
-  sur une suite qui a un rouge — un accent dans un message d'assertion suffit —, et ce rouge se
-  conclut alors « environnement cassé ». Tant qu'il n'a pas montré qu'il
-  distingue « zéro test » d'« un test rouge », son bilan n'est pas un verdict.
-- **Une porte verte ne vaut que pour la plateforme qui l'a rendue.** Quand le poste et la CI n'ont
-  pas le même OS, recenser une fois, au premier scaffold, les règles de qualité sensibles à la
-  plateforme — bit exécutable, fins de ligne, sensibilité à la casse des chemins, séparateur de
-  chemin, encodage par défaut — dans la section « Qualité » de `.claude/pipeline.config.md`, et
-  dire dans les `Notes` de la PR lesquelles ne sont vérifiées qu'en CI. Une règle de lint que
-  NTFS ne peut pas déclencher ne rougit qu'en CI ; l'inverse existe aussi, un fichier que
-  `.gitattributes` pinne en LF et qu'une copie de travail CRLF fait rougir sur le seul poste.
-- **Une commande du projet que la suite n'exécute pas est invisible à toutes les portes.** Si le
-  delta touche le fichier de commandes du projet (`Makefile`, `justfile`, scripts du manifeste)
-  ou la définition d'une commande listée dans `.claude/pipeline.config.md`, **exécuter cette
-  commande** — pas seulement la suite de tests : une cible qu'aucune porte n'appelle n'est
-  vérifiée par personne, et sa cohérence à la lecture est précisément ce qui rend le défaut
-  invisible (un `export` posé avant un `?=` vide la variable, et le fichier reste lisible). Une
-  cible qui ne peut pas tourner ici — Docker, jeton, réseau — se vérifie sur la commande **après
-  expansion** (`make --dry-run <cible>`, ou l'équivalent du lanceur du projet), jamais sur le
-  texte du fichier.
-- **Un exécutable livré se lance sur une entrée réelle.** Si le delta livre un exécutable —
-  script, commande, rapport —, le lancer au moins une fois sur une entrée **réelle**, pas
-  seulement sur les fixtures de ses tests, et lire sa sortie ligne à ligne contre les critères qui
-  la décrivent ; entrée et sortie vont au Test plan (Étape 5) avant `gh pr ready`. Un test écrit
-  par l'auteur assère ce que le code calcule ; seule l'exécution le confronte à ce que le critère
-  demandait. Mesuré : 38 tests verts autour d'un script dont la première sortie réelle divisait
-  chaque pourcentage par la durée totale, absences comprises — 2 % affichés là où le critère
-  demandait la part hors absences, 13 % (obs 72).
-- **Un delta sur `.claude/` ou `CLAUDE.md` passe par le validateur du harnais avant tout push**
-  — ligne « validation » de `.claude/pipeline.config.md`, que joue un `releveur` avant chaque push.
-  C'est la porte la plus large de ce que Claude Code charge : un frontmatter de skill absent, une
-  `description` non textuelle, un manifeste, une entrée MCP. **Avec `--strict`**, sans quoi un
-  avertissement sort en 0. Elle ne dispense pas de la suite : mesuré le 2026-10-09 (v2.1.295),
-  elle est **muette** sur un
-  frontmatter de rôle absent ou illisible — un ` : ` non cité dans une `description` fait charger
-  le rôle sans aucun champ, en silence —, et ce sont les tests de frontmatter du projet qui
-  gardent cette classe. Deux portes, deux populations : ni l'une ni l'autre ne couvre tout.
-- **Couverture par commit.** Lire le rapport de couverture du delta : une ligne non couverte est
-  d'abord une hypothèse de **code écrit trop tôt**, à déplacer vers le commit de son premier
-  appelant — avant d'être un test manquant. C'est le seul instrument qui rende opposable
-  l'interdiction du scaffold inutilisé.
-- **Atteignabilité.** Une suite verte ne prouve que ce qu'elle compile : un fichier ajouté que ni
-  la production ni les tests n'importent est invisible à toutes les gates à la fois (profil
-  typique d'une PR foundation qui pose jetons ou constantes). Exiger au moins un point d'appel
-  depuis les tests, et l'avoir vu rougir en cassant ce qu'il référence. Symétrique, côté porte :
-  un fichier ajouté dans un dossier que la PR crée, ou qu'aucune porte ne couvrait encore, se
-  prouve **lu** par chaque porte qui prétend le couvrir — lint, typecheck, format — en y injectant
-  une faute délibérée, vue rouge, puis restaurée. Les exclusions par défaut des outils (dossiers
-  cachés, `node_modules`, environnements virtuels) priment souvent sur l'`include` du projet :
-  pyright a rendu « 0 errors » sur un script de `.github/scripts/` qu'il n'avait pas analysé, et
-  y a trouvé 11 erreurs une fois le script déplacé (obs 27).
+→ [references/tests.md](references/tests.md), « Contrôles complémentaires de 3.2 ».
 
 ### 3.3 Le « cleanup pass » — relecture distincte du delta
 
@@ -582,20 +263,7 @@ git commit -m "type(scope): description"
 Pas de corps, pas de footer, pas de `Co-Authored-By`, pas de numéro de PR. Breaking change : `!`
 dans le titre.
 
-**Puis relire le gabarit** : le `developpeur` rend avec chaque commit le chiffre de
-`git diff --stat <base>...HEAD`, la base de son brief, et s'arrête au seuil que ce brief porte ; la
-session PR le relit contre les deux seuils de `taille-pr.md` — l'absolu, et le double de
-l'estimation du briefing. Franchi, le re-découpage se rouvre maintenant, pas à l'Étape 5 (obs 70).
-
-**Un sous-lot est un lot** (D-9, #134). Les PR qu'un re-découpage fait naître suivent « Une session
-neuve par lot » (Étape 8) : la session courante finit son sous-lot et écrit la passation depuis
-les artefacts ; le sous-lot suivant reçoit sa session neuve, ouverte par la coordinatrice s'il y
-en a une ([references/coordinatrice.md](references/coordinatrice.md), « Ouvrir le lot suivant »),
-sinon proposée au mainteneur par une carte (`start_session`, `initiation: own_initiative`) — aucune
-session n'en démarre une autre hors d'un tour humain. Un re-découpage qui sépare un commit de ses
-correctifs rejoue d'abord la passe « affirmations » de `cleanup-verbatim.md` sur le premier
-morceau **seul** : chaque docstring s'y lit contre le code de ce morceau, pas contre l'état final,
-et les limites que le morceau suivant lève s'y nomment (obs 109).
+**Puis relire le gabarit** → [references/commit.md](references/commit.md), « Puis relire le gabarit ».
 
 Puis la session PR pousse et enchaîne sur le bloc suivant (retour 3.1) — ou, si ce commit vient de
 poser le socle, lance d'abord la première passe de relecture (4.2). Si ce commit assemble un écran

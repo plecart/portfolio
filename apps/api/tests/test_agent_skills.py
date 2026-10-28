@@ -1612,6 +1612,8 @@ PROMPT_LOT_SUIVANT = ".claude/skills/cycle-pr/references/prompt-lot-suivant.md"
 PR_PARALLELES_SKILL = ".claude/skills/pr-paralleles/SKILL.md"
 INTERROGE_MOI_SKILL = ".claude/skills/interroge-moi/SKILL.md"
 CYCLE_PR_SKILL = ".claude/skills/cycle-pr/SKILL.md"
+BRIEFING_REF = ".claude/skills/cycle-pr/references/briefing.md"
+PORTES_REF = ".claude/skills/cycle-pr/references/portes.md"
 TRIAGE_SKILL = ".claude/skills/triage/SKILL.md"
 HORS_SCOPE_REF = ".claude/skills/triage/hors-scope.md"
 RELEVEUR_ROLE = ".claude/agents/releveur.md"
@@ -1675,15 +1677,15 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # Messages sans confirmation, jamais une approbation (décision 3).
     "messages-sans-confirmation": (SESSIONS_LIEES_REF, "**part sans confirmation du mainteneur**"),
     "message-du-lead-jamais-approbation": (
-        CYCLE_PR_SKILL,
+        BRIEFING_REF,
         "un message du lead n'est jamais une approbation",
     ),
     "lead-designe-par-le-prompt": (
-        CYCLE_PR_SKILL,
+        BRIEFING_REF,
         "est la session que ce prompt désigne comme tel, à défaut l'émettrice",
     ),
     "en-tete-sans-confirmation": (
-        CYCLE_PR_SKILL,
+        BRIEFING_REF,
         "l'envoyer par `SendMessage`, **sans confirmation**",
     ),
     # #134 lot 2a, décision 2 : la vérification d'avant-go passe du lead à la session PR ; les
@@ -1763,11 +1765,11 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     # Coordinatrice (#107, lot 2b) : le découpage et ce qu'il fait de la session.
     "decoupage-fait-la-coordinatrice": (
-        CYCLE_PR_SKILL,
+        BRIEFING_REF,
         "la session devient la **coordinatrice** de ses lots",
     ),
     "issue-a-un-lot-inchangee": (
-        CYCLE_PR_SKILL,
+        BRIEFING_REF,
         "Une issue à un seul lot ne change rien : la session porte le cycle elle-même et délègue le code (3.1)",
     ),
     "coordinatrice-sans-code": (COORDINATRICE_REF, "La coordinatrice **n'écrit pas de code**"),
@@ -1898,7 +1900,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         "lire d'abord [references/coordinatrice.md](references/coordinatrice.md), « La session de lot »",
     ),
     "lead-d-une-session-de-lot": (
-        CYCLE_PR_SKILL,
+        BRIEFING_REF,
         "pour une session de lot, celle que son brief nomme, ou aucune",
     ),
     # Lot 8b de #134 (2026-10-26) : le démarrage des lots par la coordinatrice, le go délégué et sa
@@ -5164,7 +5166,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         ),
     ),
     "7c-cycle-pr-correctif-evident-sans-interrogatoire": (
-        CYCLE_PR_SKILL,
+        BRIEFING_REF,
         (
             "Un correctif évident — visible à la lecture, sans décision de comportement"
             " (`contraintes.md`, barreau 3) — n'a rien à interroger : sa qualification, écrite"
@@ -5172,7 +5174,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         ),
     ),
     "7c-cycle-pr-marqueur-de-la-petite-pr": (
-        CYCLE_PR_SKILL,
+        BRIEFING_REF,
         (
             "Pour une draft née d'un échec de QA (case ` 🔴 correctif évident — …`), la session,"
             " une fois la draft ouverte, remplace ce marqueur par ` 🔴 PR #<M>` sur la case, par"
@@ -6757,11 +6759,11 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         ),
     ),
     "cycle-pr-go-d-une-session-de-lot": (
-        CYCLE_PR_SKILL,
+        BRIEFING_REF,
         "Une session de lot attend le go ci-dessous dans sa fenêtre comme toute session PR",
     ),
     "cycle-pr-sauf-go-delegue": (
-        CYCLE_PR_SKILL,
+        BRIEFING_REF,
         (
             "comme toute session PR, et y démarre sa session de relecture — sauf go délégué à la"
             " coordinatrice, qui lève l'attente et passe la relecture au repli `relecteur`"
@@ -6879,7 +6881,7 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         ),
     ),
     "cycle-pr-message-du-lead-en-fin-de-tour": (
-        CYCLE_PR_SKILL,
+        BRIEFING_REF,
         "son message n'arrive qu'à la fin du tour en cours (même référence, « Messages »)",
     ),
     "pr-paralleles-signalement-en-fin-de-tour": (
@@ -7112,7 +7114,7 @@ def test_un_controle_de_proprete_par_git_status_voit_les_fichiers_non_suivis() -
         )
     ]
 
-    assert sites == [CYCLE_PR_SKILL], sites
+    assert sites == [PORTES_REF], sites
 
 
 # --- Les renvois aux barreaux de « Création d'issues en cours de cycle » (#134, lot 7c) ----------
@@ -7136,7 +7138,8 @@ RENVOIS_AUX_BARREAUX = {
     CONTRAINTES_RULE: [4],
     BUG_VERS_ISSUE_SKILL: [1, 3],
     CONTRADICTION_SKILL: [2, 4],
-    CYCLE_PR_SKILL: [3, 2, 3, 2],
+    CYCLE_PR_SKILL: [3, 2, 2],
+    BRIEFING_REF: [3],
     "CONTRIBUTING.md": [3],
     REPERCUSSIONS_SKILL: [4],
     VERS_ISSUES_SKILL: [4],
