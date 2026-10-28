@@ -327,23 +327,9 @@ qu'elle couvre et ce qu'elle ne voit pas — jamais de mémoire :
    avant toute analyse — se dit dans « Relecture indépendante » du body, jamais en saut
    silencieux (obs 84).
 
-**Ces deux commandes closent un tour — celui de la session de relecture.** Leur prompt exige
-une réponse finale faite de leur seul rapport — `/security-review` : « Your final reply must
-contain the markdown report and nothing else » ; `/code-review` : son outil de rapport, seule
-sortie. Jouées par la session PR, elles ont arrêté son cycle trois fois, la dernière après qu'une
-phrase les avait bornées (obs 94, 98, 115) ; dans la session de relecture, l'arrêt ne coûte rien
-(`session-relecture.md`, « Réveil »). En repli seulement, la session PR les joue : la consigne vaut
-alors pour la forme du rapport, pas pour l'arrêt du cycle, et elle enchaîne dans le même tour.
+**Ces deux commandes closent un tour — celui de la session de relecture.** → [references/relecture.md](references/relecture.md), « Ces deux commandes closent un tour — celui de la session de relecture ».
 
-Ces portes sont **additives**. Aucune ne remplace le prompt de
-`.claude/rules/cleanup-verbatim.md`, que la règle exige mot pour mot, ni la relecture à contexte
-vierge : elles retirent du plateau du relecteur ce qu'un outil sait trouver, pour qu'il dépense
-son contexte sur ce qu'aucun outil ne voit — les hypothèses qui ont produit le code et les
-affirmations attachées au code. Mesuré sur le delta de cette PR : la relecture mécanique a rendu
-**un** défaut de correction que les deux passes à contexte vierge n'avaient pas vu, et **zéro**
-constat sur la prose de protocole, où vivaient leurs neuf constats. Une porte neuve s'inscrit dans
-la config avec ses deux populations — ce qu'elle couvre, ce qu'elle rate — avant d'être rendue
-obligatoire.
+→ [references/relecture.md](references/relecture.md), « Ces portes sont additives ».
 
 La session PR **pousse**, puis réveille la session de relecture par le message de
 `session-relecture.md` (« Réveil »), qui porte la plage et le SHA. À la première passe, celle-ci
@@ -377,14 +363,7 @@ constante et deux dépendances, et les invariants non gardés arrivent plus tard
 passe se fond dans un commit qui restait à écrire ; un constat qui arrive après le passage en
 ready coûte un run de CI complet et le rejeu des vérifications manuelles (Étape 7).
 
-**Un worktree de relecture par PR, jamais l'arbre de la session PR.** Éprouver un test
-sérieusement, c'est casser la garde qu'il protège et la voir rougir — donc **modifier le code de
-production**, puis le restaurer ; dans l'arbre partagé, cela gèlerait la session PR et ses
-équipiers pendant toute la passe, sur un arbre qui bouge. Ils continuent ici pendant ce temps,
-sans rien attendre. Une session de relecture qui commit ou pousse depuis ce worktree a dépassé
-son rôle. Son worktree est celui de l'application, né à son démarrage et nettoyé par la session
-PR à son Étape 8 ; celui du sous-agent de repli a ses trois gestes — naissance, réutilisation,
-retrait — au même fichier, « Repli ».
+**Un worktree de relecture par PR, jamais l'arbre de la session PR.** → [references/relecture.md](references/relecture.md), « Un worktree de relecture par PR, jamais l'arbre de la session PR ».
 
 **La mutation s'appelle, elle ne se décrit pas.** Le harnais existe et il est versionné :
 
@@ -392,27 +371,7 @@ retrait — au même fichier, « Repli ».
 python <répertoire de ce skill>/scripts/mutation.py <racine du dépôt> <mutations.json>
 ```
 
-Son `--help` porte le contrat complet — le JSON `{targets, reporter, label, stack, mutations}`,
-les trois verdicts `ROUGE` / `VERT` / `PANNE`, le témoin joué **une seule fois** sur l'arbre
-propre avant toute mutation, les fins de ligne du fichier muté appliquées à `old`, la
-restauration octet pour octet. Il l'imprime en **sortant en 2** : le lire seul, jamais enchaîné
-derrière un `&&`. Ni 4.2 ni `relecteur.md` ne le redécrivent : un harnais décrit est un harnais
-réécrit, et celui-ci l'a été **sept fois**, deux fois faux dans le sens qui mente.
-
-Deux réglages tiennent tout l'écart de coût : `targets` reçoit le **fichier de test visé**, pas
-la suite entière, et `file` est indépendant de `targets` — muter un fichier en lançant le test
-d'un autre ne demande donc aucune cérémonie, ce qui rend bon marché la preuve d'un épinglage
-inter-fichiers. Trois pièges d'usage, payés : une ancre `old` se relit dans le fichier
-**formaté** (une ancre tapée avant la commande de format rend `PANNE`) ; un `expect` qui nomme
-un test absent des `targets` rend « apparie 0 tests de la suite témoin » — ce n'est pas une faute
-de frappe, c'est une mauvaise cible ; et une ancre se choisit **dans le code**, jamais dans la
-prose qui le cite — le harnais vérifie qu'elle est unique, pas qu'elle est du code. Prise dans un
-commentaire, l'ancre mute le commentaire et rend `VERT` sans rien prouver — seul le cas où elle
-ne mute rien du tout est refusé en `PANNE` par le harnais (obs 77).
-
-Un couple **VERT sur arbre propre, ROUGE avec une sonde plantée** n'est pas un échec du harnais :
-c'est la mesure qu'un invariant *non gardé* est *gardable*, donc le signal qu'il faut écrire le
-test.
+→ [references/relecture.md](references/relecture.md), « Le contrat du harnais de mutation et ses pièges ».
 
 **Sévérité — trois définitions, pas trois nuances.** *Bloquant* : un défaut de comportement en
 production, une faille, une perte de données possible. *Important* : une régression que la CI ne
@@ -443,47 +402,11 @@ remise, qui doit rendre `ROUGE`. Une fermeture que la mutation inverse laisse `V
 lecture, et c'est le relecteur qui la paie à la passe suivante — deux fois au lot 3 de #77, un
 contact de relecture chacune (obs 79).
 
-**Le cliquet — dénombrer avant de corriger, pas après.** Un constat de relecture est un
-échantillon, jamais un inventaire : dès qu'un correctif ferme **un chemin** d'une classe (voir le
-déclencheur de `cleanup-verbatim.md`), le dénombrement des chemins de cette classe s'écrit
-**avant** le premier correctif, dans la **docstring du test paramétré** qui les éprouve — N
-recensés, k fuyaient —, et la relance reçoit ce dénombrement avec la consigne de chercher celui
-qui manque. Écrit après, il se fait par morceaux : trois correctifs de suite sur une même classe,
-chacun rouvert par la relecture suivante, et le dénombrement rendu à la quatrième — par le
-relecteur. Le cliquet est ce qui empêche la classe de se re-payer.
+**Le cliquet — dénombrer avant de corriger, pas après.** → [references/relecture.md](references/relecture.md), « Le cliquet — dénombrer avant de corriger, pas après ».
 
-**Quand une garde imite un analyseur, c'est l'analyseur qui la corrige.** Si une passe renvoie
-**plusieurs** formes qui échappent à une garde lisant un format structuré par motif — YAML, TOML,
-Dockerfile, HTML, prose —, ne pas élargir le motif : lire le fichier avec l'analyseur du format,
-ou avec la règle exacte de l'outil que la garde protège, et comparer les décomptes des deux
-lectures. Un élargissement par constat est un correctif de symptôme, et chacun introduit sa
-régression — mesuré : trois tours, une vingtaine de formes, des décomptes cassés par
-l'élargissement précédent. La classe n'est pas « le motif est trop étroit », c'est « le motif
-n'est pas l'analyseur ». Quand aucun analyseur ne s'applique, la sortie est le **retrait** de la
-garde, sa population explicitement bornée dans sa docstring, jamais un motif de plus.
-Le déclencheur est la **structure** du correctif, jamais sa direction : tout correctif qui
-**change la population appariée** par un motif — l'élargir comme la rétrécir — relève de ce
-paragraphe, et une mutation de **chaque** occurrence réelle de la classe doit rester `ROUGE`
-après lui. Le **rejeu des mutations déjà jouées** est la seule mesure qui distingue un correctif
-d'un défaut déplacé : au lot 2 de #77, un ancrage ajouté pour fermer un faux positif tuait la
-détection de la seule occurrence réelle, et seul ce rejeu l'a vu (obs 76).
+**Quand une garde imite un analyseur, c'est l'analyseur qui la corrige.** → [references/relecture.md](references/relecture.md), « Quand une garde imite un analyseur, c'est l'analyseur qui la corrige ».
 
-**Une lentille navigateur, dès qu'un script client entre dans le delta.** Un comportement vérifié
-« à l'écran » l'est sur le parcours où il a été conçu ; ses défauts vivent sur les autres. La
-lentille est un **script de navigateur rejouable** — la commande `e2e ciblé` de
-`.claude/pipeline.config.md`, cache HTTP désactivé, données jetables —, jamais une démonstration
-regardée : un parcours joué à la main ne se rejoue pas au commit suivant, et c'est la session de
-relecture qui le lance, dans son worktree, parce que la session PR l'a déjà fait vérifier sur le
-chemin qu'elle a choisi. Matrice minimale, quatre points :
-
-1. chaque geste sur l'écran **renvoyé en erreur par le serveur** ;
-2. chaque geste **combiné aux gestionnaires que le framework pose sur les mêmes éléments** ;
-3. les combinaisons de gestes qui atteignent le même état final **par des chemins différents** ;
-4. la **console**.
-
-Mesuré : quatre bloquants sortis de cette seule matrice, tous hors du parcours nominal, sur un
-script que l'auteur avait vérifié à l'écran et le mainteneur validé à l'arrêt visuel — et dont un
-correctif de lot précédent s'était déclaré clos sur le geste nominal.
+**Une lentille navigateur, dès qu'un script client entre dans le delta.** → [references/relecture.md](references/relecture.md), « Une lentille navigateur, dès qu'un script client entre dans le delta ».
 
 **Plafond — deux passes et une relance.** La relance n'est pas une passe : c'est une **revue des
 commits de correction**, ciblée par un diff explicite (`<sha avant>..<sha après>`) et par la liste
@@ -548,16 +471,9 @@ body définitif, puis de sortir du draft.
 
 Au-delà de **~10 fichiers** ou **~500 lignes** de diff, découper la PR.
 
-**Preuves visuelles exigées par un HITL** : ni l'API GitHub ni `gh` ne savent joindre une image à
-un body ou un commentaire. Le canal est une **branche orpheline `captures/pr-<n>`** poussée par
-plomberie git (zéro fichier dans la PR), référencée par liens `?raw=true` dans le body, supprimée
-à l'Étape 8.
+**Preuves visuelles exigées par un HITL** → [references/finalisation.md](references/finalisation.md), « Preuves visuelles exigées par un HITL ».
 
-**Un jeu de captures est jugé par comparaison, pas capture par capture.** Quand des captures
-s'ajoutent à un jeu déjà partiellement validé (reprise, autre session), **ouvrir une capture
-validée avant d'en produire une nouvelle** et aligner sur elle les paramètres de rendu : mode de
-compilation (le bandeau DEBUG), appareil et densité, résolution, thème, barre d'état. La consigne
-écrite n'énumère que ce que son auteur a pensé à fixer ; l'artefact validé est complet.
+**Un jeu de captures est jugé par comparaison, pas capture par capture.** → [references/finalisation.md](references/finalisation.md), « Un jeu de captures est jugé par comparaison, pas capture par capture ».
 
 ### Point d'arrêt humain
 
@@ -590,18 +506,7 @@ rend une ligne — le verdict, le run, le SHA court et le paragraphe à suivre. 
   émis pendant une panne d'Actions ;
 - sortie 124, délai dépassé : Étape 6, « CI qui ne démarre pas ».
 
-Jamais une fin de tour nue : le moniteur de PR de l'application ne réveille que sur un échec, un
-conflit ou un commentaire (description de `set_monitor`, lue le 2026-10-20), jamais sur un succès
-— mesuré le même jour, PR #141 : run vert à 19:21:01Z, aucun réveil en 14 min. C'est la seule
-surveillance de la CI que la session lance elle-même, le moniteur ne couvrant pas le succès ;
-jamais une sonde planifiée. Le script ne couvre ni les autres workflows et événements, ni ce que le
-run a combiné (paragraphe suivant), ni la page d'état et la réouverture, qui restent à la session
-et au mainteneur (« Si aucun run n'apparaît »).
-
-Ce run a tourné sur la référence de fusion calculée à son push, que GitHub ne recalcule ni à chaque
-merge sur le trunk ni au passage en ready : il peut combiner la tête à un trunk vieux de plusieurs
-merges — mesuré, 8 des 30 commits de `main` (obs 51). Ce qu'il prouve de l'état combiné se lit
-dans les parents de cette référence, à l'Étape 7.
+→ [references/finalisation.md](references/finalisation.md), « Jamais une fin de tour nue ».
 
 **Si aucun run n'apparaît** pour le SHA de tête — sortie 3 : sauté, annulé sans remplaçant ou
 aucun run —, consulter d'abord `https://www.githubstatus.com/api/v2/components.json`, sauf
@@ -664,14 +569,7 @@ Tant que la PR est en draft, elle n'est **pas** à reviewer : c'est ce marqueur 
   Chaque commentaire **non pertinent** → noter brièvement pourquoi, ne pas corriger.
 - **Boucler jusqu'à review vide.**
 
-> **Commentaire de répercussion.** Un merge survenu ailleurs pendant que cette PR était ouverte a
-> pu rendre sa spec fausse ; `repercussions` le signale ici même, par un commentaire sur la PR (le
-> corps de l'issue n'est volontairement pas modifié tant que la PR est ouverte). L'instrument qui
-> publie un tel commentaire puis le relit en entier est
-> `python <répertoire de ce skill>/scripts/ecriture-relue.py comment <n> --body-file <fichier>`
-> (Étape 8) ; `repercussions` le prescrit à son étape 5, « Issues en vol ». Un signalement
-> **bloquant** se traite comme tel : intégrer la correction dans cette PR, ou remonter au
-> mainteneur si cela déplace le périmètre — ne jamais merger par-dessus.
+> **Commentaire de répercussion.** → [references/finalisation.md](references/finalisation.md), « Commentaire de répercussion ».
 
 ## Étape 7 — Avant le merge
 
