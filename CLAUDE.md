@@ -122,8 +122,8 @@ l'issue #134, lot 2a), avant que le `releveur` reçoive ses deux outils `context
 re-mesuré à 32,3 K le 2026-10-28 (lot 3 de #177) —, contre 74,5 K pour `general-purpose` sans
 liste, sur Haiku (étude du 2026-10-19, dossier `etudes/` voisin du journal d'observations, §15.2).
 Le `releveur`, seul rôle à porter `omitClaudeMd: true`, démarre en outre sans `CLAUDE.md` ni les
-règles de `.claude/rules/` (doc des sous-agents, lue le 2026-10-28) ; son plancher après ce champ
-est relevé dans les Notes de la PR #183. Déléguer à un rôle sans
+règles de `.claude/rules/` (doc des sous-agents, lue le 2026-10-28) : 11,4 K au premier appel
+contre 32,1 K sans lui (même définition, sonde du 2026-10-28, PR #183). Déléguer à un rôle sans
 décision suppose que la session ait écrit la tranche entièrement — fichiers, signatures, tests
 attendus, comportement — avant l'envoi : si la spécifier demande encore de réfléchir, c'est son
 travail. L'effort d'une session PR se fixe à son démarrage — le brief de `start_session`, ou
