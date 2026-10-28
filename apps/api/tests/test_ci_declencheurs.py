@@ -1,17 +1,20 @@
 """Tests de ce qui déclenche les jobs de la CI (`.github/workflows/ci.yml`, issue #124).
 
-La CI ne dépense des minutes que là où un verdict peut changer (ADR 0017) : le run encore en cours
-d'une PR s'annule au push suivant de la même PR, jamais sur `main` ; sur une PR, `web` et `infra`
-ne tournent que si le delta touche leurs fichiers — règle de `infra/ci/changed_jobs.py`, lue par la
-première étape du job `api`.
+La CI ne dépense des minutes que là où un verdict peut changer (ADR 0017, ADR 0019) : une PR en
+draft ne tourne pas, son premier run vient du passage en ready, puis de chaque push ; le run encore
+en cours d'une PR s'annule au push suivant de la même PR, jamais sur `main` ; `web` et `infra`
+attendent un `api` vert et, sur une PR, ne tournent que si le delta touche leurs fichiers — règle
+de `infra/ci/changed_jobs.py`, lue par la première étape du job `api`.
 
 Mesure qui fonde ces réglages, relevée le 2026-10-18 sur les runs du 2026-10-04 au 2026-10-17 —
 `gh api --paginate "repos/plecart/portfolio/actions/runs?created=%3E%3D2026-10-04&per_page=100"`,
 puis `…/actions/runs/<id>/jobs` pour chaque run, chaque job arrondi à la minute supérieure : 370
 runs, 3 202 minutes facturées ; 70 runs de PR suivis d'un autre run de la même branche en moins de
-5 minutes ; ≈ 1 020 minutes de `web` et `infra` sur des PR qui ne touchaient que la pipeline.
-Population vivante : ces chiffres changent à chaque run. L'invariant sous test est la forme du
-workflow et la règle du script, jamais ces valeurs.
+5 minutes ; ≈ 1 020 minutes de `web` et `infra` sur des PR qui ne touchaient que la pipeline. Celle
+qui fonde l'ADR 0019, relevée le 2026-10-28 sur les 100 derniers runs, est dans son § Contexte :
+818 minutes en 3,85 jours, dont 112 de `web` et `infra` derrière un `api` déjà rouge. Population
+vivante : ces chiffres changent à chaque run. L'invariant sous test est la forme du workflow et la
+règle du script, jamais ces valeurs.
 
 Comme dans `test_publication.py`, chaque garde est une fonction sur du texte, appliquée au dépôt et
 à un recueil de formes construites en mémoire (`FORMS`) : le harnais de mutation refuse de muter
@@ -22,13 +25,14 @@ import ast
 import subprocess
 import sys
 from collections.abc import Callable
+from functools import cache
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
 import yaml
 from changed_jobs import IMAGE_TESTS, jobs_for
-from test_agent_skills import CYCLE_PR
+from test_agent_skills import CYCLE_PR, texte_normalise
 from test_infra import CI_WORKFLOW, REPOSITORY_ROOT
 from test_restore_workflow import triggers
 from test_supply_chain import repository_files
@@ -57,11 +61,9 @@ def concurrency_findings(workflow: str) -> list[str]:
     return []
 
 
-# Le garde du job `api` : il ne saute que l'ouverture d'une draft, dont l'amorce est vide.
-API_IF = (
-    "github.event_name != 'pull_request' || github.event.action != 'opened'"
-    " || github.event.pull_request.draft == false"
-)
+# Le garde du job `api` : il saute toute PR en draft, quel que soit l'événement (ADR 0019) ; un push
+# vers `main`, où l'objet `pull_request` n'existe pas, tourne toujours.
+API_IF = "github.event_name != 'pull_request' || github.event.pull_request.draft == false"
 # Les jobs que le delta d'une PR conditionne, et la sortie du job `api` que chacun lit.
 GATED_JOBS = ("web", "infra")
 API_OUTPUTS = {job: f"${{{{ steps.jobs.outputs.{job} }}}}" for job in GATED_JOBS}
@@ -80,18 +82,14 @@ JOBS_STEP = {"id": "jobs", "shell": "bash", "run": CHANGED_JOBS_COMMAND}
 
 def gated_if(job: str) -> str:
     """Le `if` d'un job conditionné : sur une PR, la réponse du script pour ce job ; sur un push
-    vers `main`, toujours — `publish` y attend les trois jobs. `!cancelled()` : le job part même
-    quand `api` rougit plus loin, un rouge du back ne masquant pas un rouge du front (ADR 0014),
-    mais pas quand le run est annulé par un push suivant. Mesuré le 2026-10-18 (run 39139043268,
-    corps de #124) : les `outputs` d'un job rouge sont lus par ses jobs aval en `!cancelled()`."""
-    return (
-        "${{ !cancelled() && (github.event_name != 'pull_request'"
-        f" || needs.api.outputs.{job} == 'true') }}}}"
-    )
+    vers `main`, toujours — `publish` y attend les trois jobs. Sans fonction d'état, GitHub y
+    applique `success()` (doc « Expressions », « Status check functions », lue le 2026-10-28) : un
+    `api` rouge, sauté ou annulé saute ce job, sur une PR comme sur `main` (ADR 0019, décision 3)."""
+    return f"${{{{ github.event_name != 'pull_request' || needs.api.outputs.{job} == 'true' }}}}"
 
 
 def gating_findings(workflow: str) -> list[str]:
-    """Ce qui, dans un workflow, écarte le conditionnement de `web` et `infra` de l'ADR 0017.
+    """Ce qui, dans un workflow, écarte le conditionnement de `web` et `infra` des ADR 0017 et 0019.
 
     Returns:
         Un constat par propriété altérée : un job `changes` (un job de plus coûte une minute
@@ -130,12 +128,12 @@ def gating_findings(workflow: str) -> list[str]:
     return findings
 
 
-# Les déclencheurs du workflow. Pas de `ready_for_review` : le passage en ready rejouait un SHA déjà
-# couvert, sur la référence de fusion existante, que GitHub ne recalcule pas (obs 51) ; `cycle-pr`
-# (Étape 5) lit à la place le run du SHA de tête. `reopened` reste : c'est la voie de relance d'une
-# PR dont un événement s'est perdu pendant une panne d'Actions (même Étape).
+# Les déclencheurs du workflow. `ready_for_review` lance le premier run d'une PR, aucune draft n'en
+# ayant (ADR 0019) : `cycle-pr` sort du draft, puis attend ce run (Étape 5). `reopened` reste :
+# c'est la voie de relance d'une PR dont un événement s'est perdu pendant une panne d'Actions (même
+# Étape).
 TRIGGERS = {
-    "pull_request": {"types": ["opened", "synchronize", "reopened"]},
+    "pull_request": {"types": ["opened", "synchronize", "reopened", "ready_for_review"]},
     "push": {"branches": ["main"]},
 }
 
@@ -155,7 +153,7 @@ def trigger_findings(workflow: str) -> list[str]:
 
 # --- Le recueil des formes : chaque cas recensé, avec son verdict attendu ---------------------
 
-TYPES_LINE = "    types: [opened, synchronize, reopened]\n"
+TYPES_LINE = "    types: [opened, synchronize, reopened, ready_for_review]\n"
 BRANCHES_LINE = "    branches: [main]\n"
 TRIGGERS_BLOCK = f"on:\n  pull_request:\n{TYPES_LINE}  push:\n{BRANCHES_LINE}"
 
@@ -213,6 +211,16 @@ FORMS: dict[str, tuple[Guard, str, str, bool]] = {
     "un job changes": (gating_findings, "jobs:\n", "jobs:\n  changes:\n    steps: []\n", True),
     "api avec needs": (gating_findings, "  api:\n", "  api:\n    needs: changes\n", True),
     "api sans garde draft": (gating_findings, API_IF_LINE, "", True),
+    # L'ancien garde (ADR 0017) : chaque push d'une draft payait un run.
+    "garde sur l'ouverture seule": (
+        gating_findings,
+        API_IF_LINE,
+        (
+            "    if: github.event_name != 'pull_request' || github.event.action != 'opened'"
+            " || github.event.pull_request.draft == false\n"
+        ),
+        True,
+    ),
     "api sans outputs": (gating_findings, OUTPUTS_LINES, "", True),
     "checkout sans fetch-depth": (gating_findings, DEPTH_LINES, "", True),
     "étape jobs après make install": (
@@ -230,14 +238,26 @@ FORMS: dict[str, tuple[Guard, str, str, bool]] = {
     "if de web qui ignore le push": (
         gating_findings,
         gated_if("web"),
-        "${{ !cancelled() && needs.api.outputs.web == 'true' }}",
+        "${{ needs.api.outputs.web == 'true' }}",
         True,
     ),
-    # Un rouge d'`api` masquerait celui de `web`.
-    "if de web sans !cancelled()": (
+    # L'ancien `if` (ADR 0017) : derrière un `api` rouge, un run payait `web` et `infra`.
+    "if de web avec !cancelled()": (
         gating_findings,
         gated_if("web"),
-        "${{ github.event_name != 'pull_request' || needs.api.outputs.web == 'true' }}",
+        (
+            "${{ !cancelled() && (github.event_name != 'pull_request'"
+            " || needs.api.outputs.web == 'true') }}"
+        ),
+        True,
+    ),
+    "if d'infra avec !cancelled()": (
+        gating_findings,
+        gated_if("infra"),
+        (
+            "${{ !cancelled() && (github.event_name != 'pull_request'"
+            " || needs.api.outputs.infra == 'true') }}"
+        ),
         True,
     ),
     "if de web inversé": (
@@ -253,16 +273,22 @@ FORMS: dict[str, tuple[Guard, str, str, bool]] = {
         True,
     ),
     "déclencheurs conformes": (trigger_findings, "", "", False),
-    "avec ready_for_review": (
+    # L'ancienne liste (ADR 0017) : une PR sortie du draft resterait sans run jusqu'à son prochain
+    # push.
+    "sans ready_for_review": (
         trigger_findings,
         TYPES_LINE,
-        "    types: [opened, synchronize, reopened, ready_for_review]\n",
+        "    types: [opened, synchronize, reopened]\n",
         True,
     ),
-    "sans reopened": (trigger_findings, TYPES_LINE, "    types: [opened, synchronize]\n", True),
+    "sans reopened": (
+        trigger_findings,
+        TYPES_LINE,
+        "    types: [opened, synchronize, ready_for_review]\n",
+        True,
+    ),
     # Sans `types`, GitHub prend `opened`, `synchronize` et `reopened` (doc « Events that trigger
-    # workflows », relue le 2026-10-20) : la forme est équivalente aujourd'hui, mais un défaut qui
-    # changerait rouvrirait le run au ready sans qu'aucune ligne du dépôt ne bouge.
+    # workflows », relue le 2026-10-28) : `ready_for_review` en sortirait.
     "sans types": (trigger_findings, "  pull_request:\n" + TYPES_LINE, "  pull_request:\n", True),
     "push sur toute branche": (trigger_findings, "  push:\n" + BRANCHES_LINE, "  push:\n", True),
 }
@@ -404,12 +430,7 @@ def test_chaque_module_que_charge_image_test_fait_tourner_infra() -> None:
     assert all(jobs_for([module])["infra"] for module in modules)
 
 
-# --- La prose de la pipeline : plus de run au passage en ready ---------------------------------
-
-# Ce qui cite un run au passage en ready : la prose que les sessions suivent. Population au
-# 2026-10-18, `grep -rln ready_for_review .claude CONTRIBUTING.md CLAUDE.md` : 2 fichiers,
-# `cycle-pr` et `init-projet` ; re-dénombrée le 2026-10-20 contre la base du lot, inchangée.
-READY_EVENT = "ready_for_review"
+# --- La prose de la pipeline : le premier run vient du passage en ready ------------------------
 
 
 def pipeline_prose() -> list[str]:
@@ -423,38 +444,96 @@ def pipeline_prose() -> list[str]:
     ]
 
 
-def test_aucune_prose_ne_promet_un_run_au_passage_en_ready() -> None:
-    """Le workflow n'écoute plus `ready_for_review` : une prose qui le cite ferait attendre un run
-    qui ne vient jamais."""
-    citing = [
-        name
-        for name in pipeline_prose()
-        if READY_EVENT.encode() in (REPOSITORY_ROOT / name).read_bytes()
-    ]
-    assert citing == []
+@cache
+def pipeline_texts() -> dict[str, str]:
+    """Chaque fichier de `pipeline_prose()` et son texte par `texte_normalise`, en minuscules : une
+    phrase coupée en fin de ligne, dans une marge `# ` ou ouverte par une majuscule s'y lit d'un
+    tenant."""
+    return {name: texte_normalise(name).lower() for name in pipeline_prose()}
 
 
-def test_cycle_pr_lit_le_run_du_sha_de_tete_avant_de_sortir_du_draft() -> None:
-    """À l'Étape 5, la lecture du run du SHA de tête — l'appel d'`attente-ci.py` — précède
-    `gh pr ready` : un agent qui suit le skill dans l'ordre la fait avant de sortir du draft, pas
-    après (obs 30)."""
+# Ce qui dit le contraire de l'ADR 0019 — une draft qui tourne, un passage en ready qui ne lance
+# rien, un run lu avant de sortir du draft —, en minuscules, chaque phrase assez longue pour ne
+# désigner que sa thèse : « l'ouverture d'une draft » seule dirait aussi un fait vrai. Dénombré
+# avant le correctif, le 2026-10-28 sur `5467349` (l'arbre de `155b355`), par `pipeline_texts()`
+# — 112 fichiers — : 18 phrases, 26 occurrences en 14 passages de 5 fichiers — `cycle-pr/SKILL.md`
+# 7 (encadré de l'Étape 2, « Pousser avant chaque réveil » de l'Étape 4, cinq à l'Étape 5),
+# `cycle-pr/references/briefing.md` 1 (la section de l'encadré), `cycle-pr/scripts/attente-ci.py`
+# 4 (docstring, verdict vert), `init-projet/SKILL.md` 1 (« Conserver le garde `if:` »),
+# `CONTRIBUTING.md` 1 (« Deux choses qui surprennent au début »). Hors de la table, parce que
+# vrai : GitHub ne recalcule la référence de fusion « ni au passage en ready » (obs 51), dans
+# `cycle-pr` et `verificateur.md` ; et le rollup tout `SKIPPED` de `cycle-pr/scripts/merge-lot.py`,
+# « l'amorce vide d'une draft », exemple étroit d'une tête poussée en draft, dont le garde saute
+# encore chaque job.
+CONTRARY_PROSE = {
+    "CI à chaque push d'une draft": "draft comprise",
+    "premier run au premier push de code": "au premier push de code",
+    "un push de code lance un run": "draft sans push de code",
+    "CI pendant la relecture": "éprouve la plateforme cible pendant que la relecture tourne",
+    "garde qui ne saute que l'ouverture": "ne saute que l'ouverture d'une draft",
+    "skipped pris pour l'ouverture": "`skipped`, l'ouverture d'une draft",
+    "sauté pris pour l'ouverture": "**sauté** — l'ouverture d'une draft",
+    "seule l'ouverture sautée": "sauf à l'ouverture de la draft",
+    "seule l'ouverture sautée, CONTRIBUTING": "sauf sur l'ouverture de la draft",
+    "garde sur toute draft écarté": "élargir le garde à toute draft",
+    "gh pr ready sans run": "`gh pr ready` ne déclenche aucun run",
+    "passage en ready sans run": "en ready, lui, ne lance pas de run",
+    "run lu avant le ready": "avant de sortir du draft, lire le run",
+    "run lu avant le ready, init-projet": "run du sha de tête avant de sortir la pr du draft",
+    "vert qui mène au ready": "→ sortir du draft",
+    "vert qui mène au ready, docstring": "vert, sortir du draft",
+    "ready après le run": "puis seulement, sortir du draft",
+    "draft sautée hors panne": "sauf pour une draft jamais repoussée",
+}
+
+
+@pytest.mark.parametrize("phrase", CONTRARY_PROSE.values(), ids=CONTRARY_PROSE.keys())
+def test_aucune_prose_ne_dit_qu_une_draft_tourne_ni_que_le_ready_ne_lance_rien(
+    phrase: str,
+) -> None:
+    """Une prose qui le dirait ferait attendre, en draft, un run qui ne vient pas, ou sortir du
+    draft sur la foi d'un verdict qui n'existe pas."""
+    assert [name for name, text in pipeline_texts().items() if phrase in text] == []
+
+
+def step_5() -> str:
+    """L'Étape 5 de `cycle-pr`, de son titre à celui de l'Étape 6, espaces normalisés : une ancre
+    coupée en fin de ligne s'y lit d'un tenant (obs 124)."""
     text = CYCLE_PR.read_text(encoding="utf-8")
-    step = text[text.index("## Étape 5 ") : text.index("## Étape 6 ")]
+    return " ".join(text[text.index("## Étape 5 ") : text.index("## Étape 6 ")].split())
+
+
+# Ce que l'Étape 5, qui sort du draft, doit dire : c'est ce geste qui lance le run attendu.
+READY_RUN = "`gh pr ready` déclenche le premier run de la PR"
+
+
+def test_l_etape_5_dit_que_gh_pr_ready_declenche_le_premier_run() -> None:
+    """Sans elle, rien ne dit à un agent pourquoi il sort du draft avant d'attendre la CI."""
+    assert READY_RUN in step_5()
+
+
+def test_cycle_pr_sort_du_draft_avant_de_lire_le_run_du_sha_de_tete() -> None:
+    """À l'Étape 5, `gh pr ready` précède l'appel d'`attente-ci.py` : le passage en ready lance le
+    run que le script attend, et un agent qui suit le skill dans l'ordre sort du draft d'abord
+    (obs 30)."""
+    step = step_5()
     assert "scripts/attente-ci.py <numéro>" in step
-    assert step.index("scripts/attente-ci.py <numéro>") < step.index("gh pr ready <numéro>")
+    assert step.index("gh pr ready <numéro>") < step.index("scripts/attente-ci.py <numéro>")
 
 
 # Chaque issue de la lecture du run du SHA de tête, et le mot que l'Étape 5 doit porter pour elle
-# avant `gh pr ready`. Dénombré le 2026-10-20 (relecture de la PR #137, passe 2) : une lecture qui
-# ne rendait que la conclusion traitait 4 issues sur 6 — une réouverture laisse deux runs sur la
-# même tête, `skipped` puis `success`, et la ligne `skipped` relançait une réouverture en boucle ;
-# `cancelled` n'avait pas de voie. Depuis le lot 4b de #134, `attente-ci.py` tranche le plus
-# récent, le run en cours et la tête remplacée — un cas chacun dans `test_attente_ci.py` — et rend
-# une sortie par issue : ce sont elles que la prose porte.
+# après l'appel d'`attente-ci.py`. Dénombré le 2026-10-20 (relecture de la PR #137, passe 2) : une
+# lecture qui ne rendait que la conclusion traitait 4 issues sur 6 — une réouverture laisse deux
+# runs sur la même tête, `skipped` puis `success`, et la ligne `skipped` relançait une réouverture
+# en boucle ; `cancelled` n'avait pas de voie. Depuis le lot 4b de #134, `attente-ci.py` tranche le
+# plus récent, le run en cours et la tête remplacée — un cas chacun dans `test_attente_ci.py` — et
+# rend une sortie par issue : ce sont elles que la prose porte. Depuis l'ADR 0019, une PR encore en
+# draft a la sienne : 8 issues.
 RUN_READINGS = {
     "vert": "- sortie 0, vert (`success`) →",
     "rouge": "- sortie 1, rouge — toute autre conclusion",
     "refus": "« refus — » sort aussi en 1",
+    "draft": "- sortie 3, draft",
     "draft jamais repoussée": "- sortie 3 → « Si aucun run n'apparaît », ci-dessous : `skipped`",
     "annulé sans remplaçant": "`cancelled` sans nouvelle tête, annulé sans remplaçant",
     "aucun run": "aucun run au délai",
@@ -464,9 +543,8 @@ RUN_READINGS = {
 
 @pytest.mark.parametrize("anchor", RUN_READINGS.values(), ids=RUN_READINGS.keys())
 def test_l_etape_5_traite_chaque_issue_de_la_lecture_du_run(anchor: str) -> None:
-    """Chaque issue a sa voie, écrite avant `gh pr ready` : un agent qui suit le skill dans l'ordre
-    la connaît au moment de lire le run (obs 30)."""
-    text = CYCLE_PR.read_text(encoding="utf-8")
-    step = text[text.index("## Étape 5 ") : text.index("## Étape 6 ")]
+    """Chaque issue a sa voie, écrite après l'appel d'`attente-ci.py` : un agent qui suit le skill
+    dans l'ordre la lit quand le script lui rend sa ligne (obs 30)."""
+    step = step_5()
     assert anchor in step
-    assert step.index(anchor) < step.index("gh pr ready <numéro>")
+    assert step.index(anchor) > step.index("scripts/attente-ci.py <numéro>")

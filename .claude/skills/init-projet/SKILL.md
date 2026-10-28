@@ -302,13 +302,13 @@ encore, le `ci.yml` et le `dependabot.yml` attendent sa première PR de code (é
   Empreintes et étiquettes sont relevées par le `releveur` (« Délégation »).
 - **Conserver `permissions: contents: read`** en tête : le jeton par défaut d'un dépôt peut être
   bien plus large. Un job qui doit écrire élève ses droits à son niveau, jamais le workflow.
-- **Conserver le garde `if:`.** Le garde ne saute que l'ouverture d'une draft — l'amorce vide
-  que `cycle-pr` pousse avant tout code (Étape 2) — et laisse tourner la CI sur chaque push
-  suivant, draft comprise, pour qu'un rouge de plateforme se voie pendant la relecture et non
-  après le passage en ready. Élargir le garde à toute draft renverrait chaque rouge de plateforme
-  après le ready, où il coûte un run complet et le rejeu des vérifications manuelles. Le passage
-  en ready, lui, ne lance pas de run : `cycle-pr` (Étape 5) lit le run du SHA de tête avant
-  de sortir la PR du draft.
+- **Conserver le garde `if:` et `ready_for_review`.** Le garde saute toute PR en draft, quel que
+  soit l'événement — ouverture, push, réouverture —, et `ready_for_review` figure dans les `types`
+  du `pull_request` : une draft n'a aucun run, le premier part au passage en ready (`cycle-pr`
+  Étape 5), puis chaque push en lance un. La forge tient la règle, aucune session n'a à se la
+  rappeler à chaque push ; un rouge de plateforme se voit au passage en ready, après la relecture
+  — le prix assumé. Sans `ready_for_review`, une PR sortie du draft resterait sans run jusqu'à son
+  prochain push.
 - **Donner une horloge aux portes qui lisent une base d'avis** — audit des dépendances, scan
   d'images : leur verdict change sans commit, quand un avis se publie. Ajouter au `on:` un
   déclencheur `schedule` quotidien et `workflow_dispatch`, réservés à ces portes : toute étape ou
