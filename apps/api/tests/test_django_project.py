@@ -74,6 +74,15 @@ from django.core.files.storage import default_storage
 print(default_storage.url('images/abc/original.png'))
 """
 
+# Les sources d'images de la CSP. Dans un processus neuf, comme ci-dessus : `SECURE_CSP` est posé
+# une fois, à l'import des réglages.
+CSP_IMAGE_SOURCES = """
+import json, os
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+from django.conf import settings
+print(json.dumps(settings.SECURE_CSP['img-src']))
+"""
+
 
 # Les dépendances que le conteneur exige au démarrage et qu'aucun code du dépôt n'importe
 # encore : le pilote que Django charge à sa première connexion — les migrations, au démarrage du
@@ -240,6 +249,26 @@ def test_le_stockage_des_fichiers_est_celui_que_l_environnement_designe(
 
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == url
+
+
+@pytest.mark.parametrize(
+    ("storage_variables", "sources"),
+    [
+        ({"MEDIA_HOST": "media.example"}, ["'self'"]),
+        (R2_ENVIRONMENT, ["'self'", "https://media.example"]),
+    ],
+    ids=["disque", "r2"],
+)
+def test_seul_l_hote_des_medias_de_r2_entre_dans_la_csp(
+    variables: dict[str, str], storage_variables: dict[str, str], sources: list[str]
+) -> None:
+    """Sous R2, les aperçus d'images de l'admin pointent vers l'hôte des médias, seule source tierce
+    de la CSP (ADR 0020) ; sous le disque, ils sont sur l'origine de l'admin (`MEDIA_URL`), et
+    l'hôte n'entre pas, même nommé dans l'environnement."""
+    result = run_python(["-c", CSP_IMAGE_SOURCES], variables | storage_variables)
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == sources
 
 
 @pytest.mark.parametrize(

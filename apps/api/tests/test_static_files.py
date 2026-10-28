@@ -27,19 +27,13 @@ GZIP_MAGIC = b"\x1f\x8b"
 
 
 def test_whitenoise_ouvre_la_chaine_des_middlewares() -> None:
-    """Juste après `SecurityMiddleware` s'il existe, sinon en tête (doc WhiteNoise, « Enable
-    WhiteNoise »).
+    """Juste après `SecurityMiddleware`, en tête (doc WhiteNoise, « Enable WhiteNoise »).
 
     `SecurityMiddleware` passe d'abord pour que ses en-têtes couvrent aussi les fichiers
     statiques ; WhiteNoise avant tous les autres, pour qu'une requête de fichier s'arrête là, sans
-    ouvrir de session ni lire l'utilisateur. `SecurityMiddleware` arrive avec #6 : ce test tient
-    l'ordre qu'il devra respecter.
+    ouvrir de session ni lire l'utilisateur.
     """
-    middleware = list(settings.MIDDLEWARE)
-
-    assert WHITENOISE in middleware
-    expected = middleware.index(SECURITY) + 1 if SECURITY in middleware else 0
-    assert middleware.index(WHITENOISE) == expected
+    assert settings.MIDDLEWARE[:2] == [SECURITY, WHITENOISE]
 
 
 def test_runserver_nostatic_precede_staticfiles() -> None:

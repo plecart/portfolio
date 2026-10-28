@@ -5,11 +5,11 @@ l'unique instance d'`Env` (`config/env.py`). Aucune valeur d'environnement en du
 ailleurs.
 
 Chaque réglage arrive avec la brique qui l'utilise, jamais « au cas où » (ADR 0001, « aucun
-résidu du squelette `startproject` »). Ce qui manque encore est délibéré : les en-têtes de
-sécurité et la CSP (#6), le cache Redis (#11).
+résidu du squelette `startproject` »). Ce qui manque encore est délibéré : le cache Redis (#11).
 """
 
 import django_stubs_ext
+from django.utils.csp import CSP
 
 from config.database import database_settings
 from config.env import REPOSITORY_ROOT, Env
@@ -28,6 +28,33 @@ env = Env.load()
 SECRET_KEY = env.SECRET_KEY.get_secret_value()
 DEBUG = env.DEBUG
 ALLOWED_HOSTS = env.ALLOWED_HOSTS
+
+# Cloudflare termine le TLS, `cloudflared` puis Caddy relaient en HTTP, et Caddy ne transmet
+# `X-Forwarded-Proto` que depuis le réseau privé (`infra/caddy/Caddyfile`) : Django y lit le schéma
+# du visiteur — sans quoi il voit `http`, et sa vérification d'origine du CSRF refuse les
+# formulaires de l'admin. Ni redirection vers HTTPS ni HSTS : `.dev`, en HSTS préchargé, impose
+# HTTPS dès le navigateur (ADR 0003). Les cookies de session et du jeton CSRF ne partent que sur
+# HTTPS, hors du poste de développement.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+# La CSP des réponses des vues, taillée pour l'admin (ADR 0020) : ses scripts et ses styles, ceux
+# du projet compris, viennent de l'origine ou portent le nonce de la requête, que ses gabarits
+# posent (`{% csp_nonce_attr %}`) ; aucun `unsafe-inline`, aucune source tierce, sauf l'hôte des
+# médias sous R2, où pointent ses aperçus d'images. La requête de l'aperçu Markdown (`connect-src`)
+# retombe sur `default-src`. Les quatre dernières directives sont posées à part : `base-uri`,
+# `form-action` et `frame-ancestors` n'y retombent pas, et `object-src` y vaudrait `'self'`.
+SECURE_CSP = {
+    "default-src": [CSP.SELF],
+    "script-src": [CSP.SELF, CSP.NONCE],
+    "style-src": [CSP.SELF, CSP.NONCE],
+    "img-src": [CSP.SELF, f"https://{env.MEDIA_HOST}"] if env.MEDIA_STORAGE == "r2" else [CSP.SELF],
+    "object-src": [CSP.NONE],
+    "base-uri": [CSP.SELF],
+    "form-action": [CSP.SELF],
+    "frame-ancestors": [CSP.NONE],
+}
 
 # L'unique superutilisateur de l'admin, que pose `manage.py ensure_superuser` (`access`). Le mot de
 # passe reste un `SecretStr`, que seule la commande déballe : `manage.py diffsettings` l'affiche
@@ -95,10 +122,12 @@ INSTALLED_APPS = [
     "access",
 ]
 
-# WhiteNoise en tête : une requête de fichier statique s'arrête là, sans ouvrir de session. Le
-# `SecurityMiddleware` de #6 viendra juste devant lui (doc WhiteNoise, « Enable WhiteNoise »).
-# Puis CORS, borné aux routes de l'API (`CORS_URLS_REGEX`) — après WhiteNoise, et non avant comme
-# le propose django-cors-headers : aucun fichier statique n'est servi sous `/api/`. Puis le `GET`
+# `SecurityMiddleware` en tête, juste devant WhiteNoise (doc WhiteNoise, « Enable WhiteNoise ») :
+# ses en-têtes — `nosniff`, `Referrer-Policy` et `Cross-Origin-Opener-Policy`, aux défauts de
+# Django — couvrent aussi les fichiers statiques. Puis WhiteNoise : une requête de fichier statique
+# s'arrête là, sans ouvrir de session. Puis CORS, borné aux routes de l'API (`CORS_URLS_REGEX`) —
+# après WhiteNoise, et non avant comme le propose django-cors-headers : aucun fichier statique
+# n'est servi sous `/api/`. Puis le `GET`
 # conditionnel : `ETag` d'empreinte du corps et `304` sur `If-None-Match` (cadrage §6.7), pour
 # toute réponse qui n'est pas `no-store` — l'admin, en `never_cache`, n'en reçoit pas ; **après**
 # CORS, parce que le `304` qu'il construit ne recopie pas `Access-Control-Allow-Origin`
@@ -107,8 +136,10 @@ INSTALLED_APPS = [
 # ses propres vues, le middleware étend la protection à toute autre vue. Celui de `django-otp`
 # juste après l'authentification, comme sa docstring l'exige (`django_otp/middleware.py`) : il lit
 # dans la session l'appareil qui a vérifié l'utilisateur — `request.user.is_verified()`, que le
-# site de l'admin consulte.
+# site de l'admin consulte. La CSP en dernier (`SECURE_CSP`) : elle pose le nonce de la requête
+# avant la vue, et un middleware qui le lirait se placerait après elle — aucun ne le lit.
 MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.http.ConditionalGetMiddleware",
@@ -117,6 +148,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django_otp.middleware.OTPMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.csp.ContentSecurityPolicyMiddleware",
 ]
 
 # CORS restreint à l'origine du site (ADR 0008), pour les seules routes de l'API publique : l'admin
@@ -127,7 +159,8 @@ CORS_URLS_REGEX = r"^/api/"
 
 # Les gabarits de l'admin vivent dans son application (`APP_DIRS`). Ses processeurs de contexte :
 # `auth` et `messages` sont exigés (`admin.E402`, `admin.E404`), `request` alimente sa barre de
-# navigation (`admin.W411`).
+# navigation (`admin.W411`), `csp` donne à ses balises le nonce de la requête
+# (`{% csp_nonce_attr %}`).
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -137,6 +170,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "django.template.context_processors.csp",
             ],
         },
     },

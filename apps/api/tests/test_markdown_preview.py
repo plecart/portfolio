@@ -341,10 +341,11 @@ def test_l_ecran_projet_charge_le_script_d_apercu_sans_code_dans_la_page(
     admin_client: Client,
 ) -> None:
     """Le script d'aperçu est un fichier servi par l'admin, et la page n'écrit aucun script en
-    ligne : la CSP stricte de #6 les refusera (brief de #8, critère)."""
+    ligne (brief de #8, critère) : la CSP de l'admin n'en admet que sous le nonce de la requête
+    (ADR 0020)."""
     page = admin_client.get(reverse("admin:content_project_add")).content.decode()
 
-    assert f'<script src="{static(PREVIEW_SCRIPT)}">' in page
+    assert f'<script src="{static(PREVIEW_SCRIPT)}"' in page
     assert re.findall(r"<script(?![^>]*\ssrc=)[^>]*>", page) == []
 
 
