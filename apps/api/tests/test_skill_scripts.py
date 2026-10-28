@@ -1,10 +1,18 @@
-"""Tests du lancement en tube des scripts de skills : l'encodage que l'enfant reçoit."""
+"""Tests des portes des scripts de skills : l'encodage qu'un enfant reçoit en tube, et leur
+couverture par `make typecheck`."""
 
+import json
+import shlex
 import subprocess
 import sys
 
 import pytest
-from skill_scripts import pipe_environment
+from skill_scripts import REPOSITORY_ROOT, pipe_environment
+from test_infra import make_dry_run
+
+# Le projet pyright des scripts des skills, que le projet racine ne voit pas (`Makefile`, cible
+# `typecheck`).
+SKILLS = REPOSITORY_ROOT / ".claude" / "skills"
 
 # Ce que le parent peut hériter du shell pour mettre l'enfant en UTF-8 sans son correctif ; une
 # variable absente d'un cas est ôtée du parent.
@@ -53,3 +61,25 @@ def test_l_enfant_d_un_tube_ecrit_en_cp1252_quel_que_soit_l_environnement_herite
     )
 
     assert done.stdout.decode("ascii").split() == ["cp1252", "cp1252"]
+
+
+def test_make_typecheck_lance_pyright_sur_le_projet_des_scripts_des_skills() -> None:
+    """Retirer cette invocation laissait toute la suite verte : c'est le défaut d'origine de #145."""
+    commandes = [shlex.split(ligne) for ligne in make_dry_run("typecheck").splitlines()]
+
+    assert any(commande[-3:] == ["pyright", "-p", ".claude/skills"] for commande in commandes)
+
+
+def test_le_projet_pyright_des_skills_analyse_chacun_de_leurs_scripts() -> None:
+    """Un projet mal réglé analyse moins qu'il ne prétend, et rend « 0 errors » quand même :
+    `"include": ["*/scripts"]` y a été mesuré à 0 fichier analysé (#145)."""
+    done = subprocess.run(
+        [sys.executable, "-m", "pyright", "--outputjson", "-p", str(SKILLS)],
+        capture_output=True,
+        cwd=REPOSITORY_ROOT,
+        check=False,
+    )
+
+    scripts = list(SKILLS.glob("*/scripts/*.py"))
+    assert scripts, f"aucun script sous {SKILLS}"
+    assert json.loads(done.stdout)["summary"]["filesAnalyzed"] == len(scripts), done.stderr
