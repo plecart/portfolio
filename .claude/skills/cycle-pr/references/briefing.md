@@ -128,11 +128,12 @@ qu'une issue est « en vol » et ne pas réécrire sa spec sous les pieds de cet
 `pr-paralleles` pour tenir son tableau de bord. **Une branche locale sans PR est invisible** — le
 travail existe, mais rien ne le sait.
 
-## La CI tourne sur chaque push de la branche, draft comprise
+## Une PR en draft n'a aucun run de CI
 
-> **La CI tourne sur chaque push de la branche, draft comprise** — sauf à l'ouverture de la draft
-> elle-même, dont l'amorce vide n'a rien à vérifier (garde `if:` du `ci.yml` du template). Le
-> premier run arrive donc au premier push de code (3.5), et c'est là que se voit un rouge de la
-> famille « sensible à la plateforme » (3.2) — au cycle courant, pas après le passage en ready, où
-> chaque constat coûte un run complet et le rejeu des vérifications manuelles. **Une draft sans
-> push de code n'a aucun run : ce n'est pas une CI cassée.**
+> **Une PR en draft n'a aucun run de CI** : le garde `if:` du `ci.yml` du template saute toute
+> draft, quel que soit l'événement — ouverture, push, réouverture. Le premier run vient du passage
+> en ready (`gh pr ready`, événement `ready_for_review`, Étape 5), puis chaque push lance le sien.
+> Les passes de relecture (4.2) relisent donc un SHA sans verdict de CI, et un rouge de la famille
+> « sensible à la plateforme » (3.2) se voit au passage en ready : c'est le prix d'une CI qui ne
+> paie un run que là où son verdict peut tenir (ADR 0019). **Une draft sans run n'est pas une CI
+> cassée.**

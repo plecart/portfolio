@@ -9,11 +9,12 @@
 # finirait par diverger du premier.
 #
 # Trois jobs, un par pile. Ils n'ont pas les mêmes prérequis — `uv`, Node, Docker — et les
-# séparer évite qu'un rouge de l'une masque un rouge d'une autre. Sur une PR, `web` et `infra` ne
-# tournent que si le delta touche leurs fichiers : la première étape du job `api` le lit, et ils
-# partent à sa fin, même rouge (ADR 0017). Le job `infra` installe aussi Node : les images copient
-# le front compilé, qu'il compile lui-même plutôt que d'attendre le job `web` (ADR 0014) ; et `uv`,
-# pour les tests des images qu'il vient de construire. Un quatrième,
+# séparer évite qu'un rouge du front masque un rouge de l'infra, ou l'inverse. `web` et `infra`
+# attendent un `api` vert, dont la première étape lit le delta : sur une PR, ils ne tournent que
+# s'il touche leurs fichiers (ADR 0017) ; un `api` rouge appelle un push, et ce push les montrera
+# (ADR 0019). Le job `infra` installe aussi Node : les images copient le front compilé, qu'il
+# compile lui-même plutôt que d'attendre le job `web` (ADR 0014) ; et `uv`, pour les tests des
+# images qu'il vient de construire. Un quatrième,
 # `publish`, ne tourne qu'après un push sur `main`, une fois les trois autres verts : il publie les
 # images sur GHCR. Un cinquième, `deploy`, les déploie ensuite sur le VPS, une fois celui-ci prêt.
 #
@@ -37,12 +38,11 @@ permissions:
 
 on:
   pull_request:
-    # Pas de run au passage draft → ready : il rejouait un SHA déjà couvert, sur la référence de
-    # fusion existante, que GitHub ne recalcule pas — 54 runs sur 14 jours (#124). `cycle-pr` lit à
-    # la place, avant `gh pr ready`, le run du SHA de tête (Étape 5) ; `reopened` relance une PR
-    # dont l'événement s'est perdu. Le garde `if:` du job `api`, lui, ne saute que l'ouverture
-    # d'une draft — son amorce vide n'a rien à vérifier.
-    types: [opened, synchronize, reopened]
+    # `ready_for_review` produit le premier run d'une PR : le garde `if:` du job `api` saute toute
+    # draft, et aucun run n'a donc couvert son SHA (ADR 0019). `cycle-pr` sort du draft, puis
+    # attend ce run (Étape 5) ; chaque push en lance un autre ; `reopened` relance une PR dont
+    # l'événement s'est perdu.
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 
@@ -61,17 +61,16 @@ jobs:
     name: Back — audit, lint, format, types, tests
     runs-on: ubuntu-latest
 
-    # La CI tourne sur chaque push d'une PR, draft comprise : un rouge propre à la plateforme
-    # cible se voit au cycle courant, pendant la relecture, pas après le passage en ready où il
-    # coûte un run complet et le rejeu des vérifications manuelles (`cycle-pr`, Étapes 2 et 4).
-    # Seule l'ouverture d'une draft est sautée : `cycle-pr` l'ouvre sur un commit vide, avant
-    # tout code (Étape 2), et ce run ne vérifierait que `main`. Une PR ouverte prête — un bot de
-    # dépendances, une branche déjà écrite — tourne dès l'ouverture.
+    # Aucune PR en draft ne tourne, quel que soit l'événement — ouverture, push, réouverture : une
+    # draft change à chaque commit, et la CI ne paie un run que là où son verdict peut tenir — au
+    # passage en ready, puis à chaque push (ADR 0019). Un rouge propre à la plateforme cible se voit
+    # donc au passage en ready, après la relecture (`cycle-pr`, Étape 4) : le prix assumé. Une PR
+    # ouverte prête — un bot de dépendances, une branche déjà écrite — tourne dès l'ouverture.
     #
     # La condition sur `event_name` est nécessaire : sur un push vers `main`, l'objet
     # `pull_request` n'existe pas. Les jobs `web` et `infra` ne portent pas ce garde : ils
-    # attendent ce job, et ses sorties vides — job sauté — les sautent sur une PR.
-    if: github.event_name != 'pull_request' || github.event.action != 'opened' || github.event.pull_request.draft == false
+    # attendent ce job, et un job sauté saute ceux qui l'attendent.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
 
     # Les jobs que le delta de la PR concerne, lus par `web` et `infra`.
     outputs:
@@ -129,12 +128,13 @@ jobs:
     name: Front — lint, types, tests, build, e2e, lighthouse, audit
     runs-on: ubuntu-latest
 
-    # Après le job `api`, qui a lu le delta. Sur une PR, seulement si le delta touche ses fichiers
-    # (`infra/ci/changed_jobs.py`) ; sur un push vers `main`, toujours. `!cancelled()` : le job
-    # part même quand `api` rougit — un rouge du back ne masque pas celui-ci —, mais pas quand un
-    # push suivant a annulé le run. `apps/api/tests/test_ci_declencheurs.py` tient ces réglages.
+    # Après un job `api` vert, qui a lu le delta. Sur une PR, seulement si le delta touche ses
+    # fichiers (`infra/ci/changed_jobs.py`) ; sur un push vers `main`, toujours. Sans fonction
+    # d'état, GitHub applique `success()` à ce `if` : un `api` rouge, sauté ou annulé saute ce
+    # job, sur une PR comme sur `main` ; ce rouge appelle un push, et ce push le montrera
+    # (ADR 0019). `apps/api/tests/test_ci_declencheurs.py` tient ces réglages.
     needs: api
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.api.outputs.web == 'true') }}
+    if: ${{ github.event_name != 'pull_request' || needs.api.outputs.web == 'true' }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -190,7 +190,7 @@ jobs:
 
     # Même conditionnement que le job `web` : voir son commentaire.
     needs: api
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.api.outputs.infra == 'true') }}
+    if: ${{ github.event_name != 'pull_request' || needs.api.outputs.infra == 'true' }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

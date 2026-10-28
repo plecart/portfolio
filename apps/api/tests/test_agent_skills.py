@@ -4822,7 +4822,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "8b-init-projet-garde-sortie-du-draft": (
         INIT_PROJET_SKILL,
-        "lit le run du SHA de tête avant de sortir la PR du draft",
+        (
+            "une draft n'a aucun run, le premier part au passage en ready (`cycle-pr` Étape 5),"
+            " puis chaque push en lance un"
+        ),
     ),
     "8b-init-projet-dependabot-par-l-executant": (
         INIT_PROJET_SKILL,

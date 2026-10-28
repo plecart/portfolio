@@ -2,13 +2,13 @@
 
 Le script lit la forge par une seule fonction, `run`, et le temps par deux, l'horloge monotone et
 l'attente : ces tests les remplacent par une forge et une horloge témoins, et ne dorment jamais.
-La forge rend l'état d'une PR à l'instant de son horloge — sa tête, les runs de chaque SHA,
-apparus, en cours ou terminés — et lève sur toute commande qu'elle n'attend pas. `gh run watch` y
-avance l'horloge jusqu'à la fin du run, ou jusqu'au `timeout` reçu qu'il lève alors, comme
-`subprocess.run` : le processus tué, puis `TimeoutExpired`. Les réponses ont la forme que la
-session PR du lot 4b de #134 a mesurée (gh 2.94.0, le 2026-10-21), réduites aux champs que le
-script lit. Les cas s'écrivent en littéraux, jamais dérivés des constantes du script (`cycle-pr`
-3.1).
+La forge rend l'état d'une PR à l'instant de son horloge — sa tête et son état draft, les runs de
+chaque SHA, apparus, en cours ou terminés — et lève sur toute commande qu'elle n'attend pas.
+`gh run watch` y avance l'horloge jusqu'à la fin du run, ou jusqu'au `timeout` reçu qu'il lève
+alors, comme `subprocess.run` : le processus tué, puis `TimeoutExpired`. Les réponses ont la forme
+que la session PR du lot 4b de #134 a mesurée (gh 2.94.0, le 2026-10-21), réduites aux champs que
+le script lit. Les cas s'écrivent en littéraux, jamais dérivés des constantes du script
+(`cycle-pr` 3.1).
 """
 
 import subprocess
@@ -72,12 +72,12 @@ class Appel(NamedTuple):
 class Forge:
     """Une forge témoin, lue à l'instant de son horloge.
 
-    Elle rend la tête de la PR 144 — le dernier SHA de `tetes` dont l'instant est passé —, les
-    runs visibles d'un SHA dans l'ordre de `runs`, et les jobs d'un run. Chaque lecture avance
-    l'horloge de `cout`. `gh run watch` attend la fin du run, ou lève `TimeoutExpired` au bout
-    du `timeout` ; il rend 0 sur `success` et 1 sinon, comme `--exit-status` — mesuré sur
-    `success`, `failure` et `skipped` —, sauf `code_watch`, et rend la main tout de suite en 1
-    avec `watch_immediat`.
+    Elle rend la tête de la PR 144 — le dernier SHA de `tetes` dont l'instant est passé — et son
+    état `draft`, les runs visibles d'un SHA dans l'ordre de `runs`, et les jobs d'un run. Chaque
+    lecture avance l'horloge de `cout`. `gh run watch` attend la fin du run, ou lève
+    `TimeoutExpired` au bout du `timeout` ; il rend 0 sur `success` et 1 sinon, comme
+    `--exit-status` — mesuré sur `success`, `failure` et `skipped` —, sauf `code_watch`, et rend
+    la main tout de suite en 1 avec `watch_immediat`.
 
     Args:
         intervalle: l'intervalle attendu dans `gh run watch -i`.
@@ -90,6 +90,7 @@ class Forge:
         self,
         *runs: RunCi,
         tetes: Sequence[tuple[float, str]] = ((0.0, SHA),),
+        draft: bool = False,
         intervalle: str = "30",
         cout: float = 0.0,
         code_watch: int | None = None,
@@ -100,6 +101,7 @@ class Forge:
         self.horloge = Horloge()
         self.runs = runs
         self.tetes = tetes
+        self.draft = draft
         self.intervalle = intervalle
         self.cout = cout
         self.code_watch = code_watch
@@ -129,7 +131,7 @@ class Forge:
     def genre(self, cmd: tuple[str, ...]) -> str:
         """Le genre d'une commande attendue ; toute autre lève."""
         match cmd:
-            case ("gh", "pr", "view", "144", "--json", "headRefOid"):
+            case ("gh", "pr", "view", "144", "--json", "headRefOid,isDraft"):
                 return "tete"
             case ("gh", "api", chemin) if chemin.startswith(RUNS_DU_SHA) and chemin.endswith(
                 EVENEMENT
@@ -166,7 +168,7 @@ class Forge:
     def contenu(self, genre: str, cmd: tuple[str, ...]) -> Any:
         """Le document qu'une lecture rend à cet instant, avant toute retouche."""
         if genre == "tete":
-            return {"headRefOid": self.tete()}
+            return {"headRefOid": self.tete(), "isDraft": self.draft}
         if genre == "runs":
             sha = cmd[2].removeprefix(RUNS_DU_SHA).removesuffix(EVENEMENT)
             visibles = [
@@ -214,9 +216,7 @@ def test_un_run_vert_rend_vert_en_sortie_0(capsys: pytest.CaptureFixture[str]) -
     forge = Forge(RunCi(39565701629))
 
     assert lance(forge, PR) == 0
-    assert stdout_lines(capsys) == [
-        "vert — run 39565701629 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"
-    ]
+    assert stdout_lines(capsys) == ["vert — run 39565701629 sur 9fb8d6a → cycle-pr Étape 6"]
 
 
 # Les jobs d'un run rouge, un par conclusion de l'API REST (« Workflow jobs », schéma `job`), plus
@@ -273,15 +273,54 @@ def test_toute_conclusion_autre_que_vert_saute_ou_annule_est_un_rouge(
     ]
 
 
-def test_un_run_saute_rend_saute_en_sortie_3(capsys: pytest.CaptureFixture[str]) -> None:
-    """L'ouverture d'une draft jamais repoussée, que le garde du job `api` saute : son run
-    `skipped` ne prouve rien, la session suit « Si aucun run n'apparaît »."""
-    forge = Forge(RunCi(39565701629, conclusion="skipped"))
+def test_une_pr_encore_en_draft_rend_draft_en_sortie_3_sans_lire_les_runs(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Une draft n'a aucun run (ADR 0019) : l'attendre jusqu'au délai ne servirait à rien, même
+    avec un run vert d'avant un retour en draft. L'appel qui lit la tête le dit, et le script
+    renvoie à `gh pr ready` sans lire les runs."""
+    forge = Forge(RunCi(4242), draft=True)
 
     assert lance(forge, PR) == 3
     assert stdout_lines(capsys) == [
-        "sauté — run 39565701629 sur 9fb8d6a → cycle-pr Étape 5, « Si aucun run n'apparaît »"
+        "draft — PR 144 encore en draft sur 9fb8d6a → gh pr ready 144 d'abord, cycle-pr Étape 5"
     ]
+    assert forge.appels_de("runs") == []
+
+
+def test_le_run_saute_d_un_push_en_draft_fait_attendre_celui_du_passage_en_ready(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """La course au passage en ready : sitôt `gh pr ready`, le run le plus récent du SHA est
+    encore le `skipped` d'un push en draft, et celui de `ready_for_review` n'apparaît qu'après.
+    Le script relit le saut comme « aucun run », puis attend le nouveau jusqu'à son verdict."""
+    forge = Forge(
+        RunCi(4242, created_at="2026-10-21T07:57:43Z", conclusion="skipped"),
+        RunCi(4343, created_at="2026-10-21T08:12:05Z", apparait=45.0, fin=100.0),
+    )
+
+    assert lance(forge, PR) == 0
+    assert stdout_lines(capsys) == ["vert — run 4343 sur 9fb8d6a → cycle-pr Étape 6"]
+    assert forge.instants("runs") == [0.0, 30.0, 60.0, 100.0]
+
+
+def test_un_run_saute_jusqu_au_delai_rend_saute_en_sortie_3(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """La draft jamais repoussée : la PR est sortie du draft, mais son seul run reste le `skipped`
+    d'un push en draft, sans run du passage en ready. Relu comme « aucun run » toutes les
+    `intervalle` secondes, il rend « sauté » au délai, et la session suit « Si aucun run
+    n'apparaît »."""
+    forge = Forge(RunCi(39565701629, conclusion="skipped"))
+
+    assert lance(forge, PR, "--delai", "75") == 3
+    assert stdout_lines(capsys) == [
+        (
+            "sauté — run 39565701629 sur 9fb8d6a, aucun run du passage en ready en 75 s"
+            " → cycle-pr Étape 5, « Si aucun run n'apparaît »"
+        )
+    ]
+    assert forge.instants("runs") == [0.0, 30.0, 60.0, 75.0]
 
 
 def test_un_run_annule_sans_nouvelle_tete_rend_annule_sans_remplacant(
@@ -312,17 +351,16 @@ def test_un_run_annule_par_un_nouveau_push_fait_suivre_la_nouvelle_tete(
     )
 
     assert lance(forge, PR) == 0
-    assert stdout_lines(capsys) == [
-        "vert — run 4343 sur c7a23ca → sortir du draft, cycle-pr Étape 5"
-    ]
+    assert stdout_lines(capsys) == ["vert — run 4343 sur c7a23ca → cycle-pr Étape 6"]
 
 
 def test_aucun_run_jusqu_au_delai_rend_aucun_run_en_sortie_3(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Un run apparaît quelques secondes après un push : sans run, le script relit toutes les
-    `intervalle` secondes, la dernière attente raccourcie pour tomber au délai, où il rend son
-    verdict — un push émis pendant une panne d'Actions n'est pas rejoué."""
+    """Un run apparaît quelques secondes après son événement, push ou passage en ready : sans run,
+    le script relit toutes les `intervalle` secondes, la dernière attente raccourcie pour tomber au
+    délai, où il rend son verdict — un événement émis pendant une panne d'Actions n'est pas
+    rejoué."""
     forge = Forge()
 
     assert lance(forge, PR, "--delai", "75") == 3
@@ -343,9 +381,7 @@ def test_un_run_qui_apparait_puis_tourne_est_attendu_jusqu_a_son_verdict(
     forge = Forge(RunCi(4242, apparait=25.0, fin=100.0), intervalle="10")
 
     assert lance(forge, PR, "--intervalle", "10") == 0
-    assert stdout_lines(capsys) == [
-        "vert — run 4242 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"
-    ]
+    assert stdout_lines(capsys) == ["vert — run 4242 sur 9fb8d6a → cycle-pr Étape 6"]
     assert forge.horloge.attentes == [10.0, 10.0, 10.0]
     assert forge.appels_de("watch") == [
         Appel(30.0, ("gh", "run", "watch", "4242", "--exit-status", "-i", "10"), 1770.0)
@@ -377,9 +413,7 @@ def test_le_code_de_sortie_de_watch_ne_decide_pas_du_verdict(
     forge = Forge(RunCi(4242, fin=50.0), code_watch=1)
 
     assert lance(forge, PR) == 0
-    assert stdout_lines(capsys) == [
-        "vert — run 4242 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"
-    ]
+    assert stdout_lines(capsys) == ["vert — run 4242 sur 9fb8d6a → cycle-pr Étape 6"]
 
 
 def test_un_watch_qui_rend_la_main_tout_de_suite_ne_fait_pas_relire_sans_attendre(
@@ -400,13 +434,14 @@ def test_un_watch_qui_rend_la_main_tout_de_suite_ne_fait_pas_relire_sans_attendr
     ]
 
 
-# Une réouverture ajoute un run sur la même tête : la draft ouverte sautée, puis le run vert de la
-# réouverture. L'identifiant du plus récent est ici le plus petit — c'est `created_at` qui décide.
-SAUTE_A_L_OUVERTURE = RunCi(4343, created_at="2026-10-21T07:57:43Z", conclusion="skipped")
-VERT_A_LA_REOUVERTURE = RunCi(4242, created_at="2026-10-21T08:12:05Z")
+# Le passage en ready ajoute un run sur la même tête : le run sauté d'un push en draft, puis le run
+# vert de `ready_for_review`. L'identifiant du plus récent est ici le plus petit — c'est
+# `created_at` qui décide.
+SAUTE_EN_DRAFT = RunCi(4343, created_at="2026-10-21T07:57:43Z", conclusion="skipped")
+VERT_AU_READY = RunCi(4242, created_at="2026-10-21T08:12:05Z")
 ORDRES_DE_L_API = {
-    "plus-recent-d-abord": (VERT_A_LA_REOUVERTURE, SAUTE_A_L_OUVERTURE),
-    "plus-ancien-d-abord": (SAUTE_A_L_OUVERTURE, VERT_A_LA_REOUVERTURE),
+    "plus-recent-d-abord": (VERT_AU_READY, SAUTE_EN_DRAFT),
+    "plus-ancien-d-abord": (SAUTE_EN_DRAFT, VERT_AU_READY),
 }
 
 
@@ -415,9 +450,7 @@ def test_le_run_le_plus_recent_par_created_at_decide_quel_que_soit_l_ordre_de_l_
     runs: tuple[RunCi, ...], capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert lance(Forge(*runs), PR) == 0
-    assert stdout_lines(capsys) == [
-        "vert — run 4242 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"
-    ]
+    assert stdout_lines(capsys) == ["vert — run 4242 sur 9fb8d6a → cycle-pr Étape 6"]
 
 
 # `created_at` est à la seconde : deux runs créés dans la même seconde se départagent par
@@ -437,9 +470,7 @@ def test_deux_runs_crees_a_la_meme_seconde_sont_departages_par_l_identifiant(
     runs: tuple[RunCi, ...], capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert lance(Forge(*runs), PR) == 0
-    assert stdout_lines(capsys) == [
-        "vert — run 4343 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"
-    ]
+    assert stdout_lines(capsys) == ["vert — run 4343 sur 9fb8d6a → cycle-pr Étape 6"]
 
 
 def test_un_run_d_un_autre_workflow_est_ignore(capsys: pytest.CaptureFixture[str]) -> None:
@@ -449,9 +480,7 @@ def test_un_run_d_un_autre_workflow_est_ignore(capsys: pytest.CaptureFixture[str
     )
 
     assert lance(forge, PR) == 0
-    assert stdout_lines(capsys) == [
-        "vert — run 4242 sur 9fb8d6a → sortir du draft, cycle-pr Étape 5"
-    ]
+    assert stdout_lines(capsys) == ["vert — run 4242 sur 9fb8d6a → cycle-pr Étape 6"]
 
 
 def test_sans_option_le_delai_vaut_1800_s_et_l_intervalle_30_s(
@@ -477,7 +506,7 @@ REFUS: dict[str, tuple[dict[str, Reply], tuple[RunCi, ...], str]] = {
         {"tete": failure(b"GraphQL: Could not resolve to a PullRequest with the number of 144.\n")},
         (),
         (
-            "`gh pr view 144 --json headRefOid` a échoué (1) :"
+            "`gh pr view 144 --json headRefOid,isDraft` a échoué (1) :"
             " GraphQL: Could not resolve to a PullRequest with the number of 144."
         ),
     ),
@@ -508,7 +537,7 @@ REFUS: dict[str, tuple[dict[str, Reply], tuple[RunCi, ...], str]] = {
     "reponse-non-json": (
         {"tete": success(b"<html>")},
         (),
-        "`gh pr view 144 --json headRefOid` ne rend pas du JSON UTF-8",
+        "`gh pr view 144 --json headRefOid,isDraft` ne rend pas du JSON UTF-8",
     ),
     # Un JSON valide, mais en cp1252 : décodé par la page de code du poste, il passerait (obs 108).
     "reponse-hors-utf-8": (
@@ -538,17 +567,20 @@ def test_une_lecture_gh_en_echec_sort_en_1_en_une_ligne(
 # Chaque champ que le script lit, absent puis d'un autre type : (genre de la lecture, chemin du
 # champ, valeur qui le remplace — `ABSENT` le retire). Dénombré avant le code : 10 champs —
 # `headRefOid` de la tête ; `workflow_runs`, puis `id`, `name`, `status`, `conclusion` et
-# `created_at` d'un run ; `jobs`, puis `name` et `conclusion` d'un job —, plus trois documents, un
-# run et un job qui ne sont pas des objets, et trois valeurs du bon type hors de leur forme : une
-# tête qui n'est pas un SHA — elle entre dans la requête —, un `created_at` qui ne se trie pas, un
-# run terminé sans conclusion. Une liste remplacée par un objet vide : un objet non vide ou un
-# texte donneraient, à l'itération, des éléments qui lèvent déjà — ils ne verraient jamais rouge
-# la garde de type.
+# `created_at` d'un run ; `jobs`, puis `name` et `conclusion` d'un job —, 11 depuis que l'appel
+# qui lit la tête lit aussi `isDraft` (ADR 0019) ; un texte `"false"` y serait vrai pour un
+# `bool(…)`, d'où sa forme non booléenne. Plus trois documents, un run et un job qui ne sont pas
+# des objets, et trois valeurs du bon type hors de leur forme : une tête qui n'est pas un SHA —
+# elle entre dans la requête —, un `created_at` qui ne se trie pas, un run terminé sans conclusion.
+# Une liste remplacée par un objet vide : un objet non vide ou un texte donneraient, à
+# l'itération, des éléments qui lèvent déjà — ils ne verraient jamais rouge la garde de type.
 FORMES: dict[str, tuple[str, tuple[str | int, ...], Any]] = {
     "tete-hors-objet": ("tete", (), [SHA]),
     "headRefOid-absent": ("tete", ("headRefOid",), ABSENT),
     "headRefOid-non-textuel": ("tete", ("headRefOid",), None),
     "headRefOid-hors-sha": ("tete", ("headRefOid",), "9fb8d6a&event=push"),
+    "isDraft-absent": ("tete", ("isDraft",), ABSENT),
+    "isDraft-non-booleen": ("tete", ("isDraft",), "false"),
     "runs-hors-objet": ("runs", (), []),
     "workflow_runs-absent": ("runs", ("workflow_runs",), ABSENT),
     "workflow_runs-hors-liste": ("runs", ("workflow_runs",), {}),
@@ -578,7 +610,7 @@ FORMES: dict[str, tuple[str, tuple[str | int, ...], Any]] = {
 
 # La commande que nomme le refus, par genre de lecture.
 COMMANDES = {
-    "tete": "gh pr view 144 --json headRefOid",
+    "tete": "gh pr view 144 --json headRefOid,isDraft",
     "runs": (
         "gh api repos/{owner}/{repo}/actions/runs"
         "?head_sha=9fb8d6a3cbaa52cea6ab0f36bd93891a3e6eb0ca&event=pull_request"
