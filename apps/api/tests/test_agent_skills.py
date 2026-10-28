@@ -5065,7 +5065,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         BUG_VERS_ISSUE_SKILL,
         (
             "**Environnement** — preuve : l'intake ou un relevé nomme une cause hors du produit —"
-            " outil introuvable, service arrêté, fichier verrouillé, réseau (`cycle-pr` 3.2,"
+            " outil introuvable, service arrêté, fichier verrouillé, réseau"
+            " (`cycle-pr/references/tests.md`,"
             " « Échec d'outillage ≠ échec de code »). La cause levée, par le mainteneur s'il le"
             " faut, un `releveur` rejoue l'action de l'intake telle qu'écrite — le mainteneur, pour"
             " une case **Observation**. Reproduit : défaut à étudier. Non reproduit : aucune"
