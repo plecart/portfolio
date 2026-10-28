@@ -45,6 +45,17 @@ def _validate(password: str, user: User) -> None:
         raise CommandError(WEAK_PASSWORD + " ".join(error.messages)) from error
 
 
+def _create(username: str, password: str) -> str:
+    """Crée le compte, son mot de passe passé d'abord aux validateurs.
+
+    Returns:
+        `CREATED`.
+    """
+    _validate(password, User(username=username))
+    User.objects.create_superuser(username, password=password)
+    return CREATED
+
+
 def _update(user: User, password: str) -> str:
     """Rend ses droits et son mot de passe à un compte existant, sans rien écrire s'il les a.
 
@@ -80,9 +91,4 @@ class Command(BaseCommand):
             raise CommandError(ANOTHER_ADMIN)
 
         user = User.objects.filter(username=username).first()
-        if user is None:
-            _validate(password, User(username=username))
-            User.objects.create_superuser(username, password=password)
-            self.stdout.write(CREATED)
-        else:
-            self.stdout.write(_update(user, password))
+        self.stdout.write(_create(username, password) if user is None else _update(user, password))
