@@ -123,6 +123,9 @@ def test_une_icone_qui_n_est_pas_un_document_svg_est_refusee(name: str, content:
         technology(icon=svg_icon(name, content)).clean_fields()
 
     assert refusals(refusal.value, "icon") == [("icon_not_svg", strings.ICON_NOT_SVG)]
+    # Hors de tout champ, le fichier n'est pas réputé stocké : il est lu, et refusé de même.
+    with pytest.raises(ValidationError):
+        validate_svg(svg_icon(name, content))
 
 
 def test_une_icone_validee_reste_prete_a_etre_lue_depuis_le_debut() -> None:

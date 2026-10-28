@@ -7,6 +7,8 @@ l'environnement : modèles et tâches ne connaissent que le stockage de Django.
 
 from typing import Any
 
+from botocore.config import Config
+
 from config.env import Env
 
 
@@ -38,5 +40,10 @@ def media_storage(env: Env) -> dict[str, Any]:
                     "region_name": "auto",
                     "custom_domain": env.MEDIA_HOST,
                     "file_overwrite": False,
+                    # boto3 envoie par défaut une somme CRC-32 en fin de corps découpé
+                    # (`aws-chunked`, mesuré à la relecture de #175), que la table de R2 ne
+                    # couvre pas — CRC-32 « COMPOSITE » seulement, fin de corps absente (« S3 API
+                    # compatibility », lu le 2026-10-28) : aucune somme que l'opération n'exige.
+                    "client_config": Config(request_checksum_calculation="when_required"),
                 },
             }

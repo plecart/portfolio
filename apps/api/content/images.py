@@ -121,10 +121,8 @@ class OriginalFile(ImageFieldFile):
         """Enregistre `content` sous un nom engendré : `images/<identifiant aléatoire>/original.
         <extension du format reconnu>` (décision 7).
 
-        Le nom de l'auteur, `name`, est ignoré : `django-storages` écrase par défaut un objet de
-        même nom, l'extension donne son type au fichier servi, et un nom neuf à chaque
-        téléversement donne une adresse dont le contenu ne change jamais, qui se met en cache sans
-        purge. Le worker range ses variantes dans le dossier de l'original (`content/variants.py`).
+        Le nom de l'auteur, `name`, est ignoré : un nom neuf à chaque téléversement donne une
+        adresse dont le contenu ne change jamais, qui se met en cache sans purge. Le worker range ses variantes dans le dossier de l'original (`content/variants.py`).
 
         Le format se lit dans `content`, le fichier qui s'enregistre — jamais dans l'original déjà
         stocké : c'est le chemin de l'enregistrement du modèle (`FileField.pre_save`) comme d'un
