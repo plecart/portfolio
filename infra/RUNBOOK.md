@@ -5,10 +5,11 @@ sans rien retrouver de mémoire (PRD, US 47 et 50). Les commandes sont celles du
 `deploy` de [`.github/workflows/ci.yml`](../.github/workflows/ci.yml),
 [`bootstrap.sh`](bootstrap.sh) et [`compose.yml`](compose.yml) font foi s'ils divergent d'ici.
 
-**Aucune étape ne demande d'afficher un secret, ni d'en recopier un extrait.** Un secret passe
-d'un fichier ou du gestionnaire de mots de passe à sa destination — `gh secret set` le lit sur son
-entrée, `bootstrap.sh` le saisit sans écho — et une vérification se lit oui / non. Ne colle jamais
-un secret dans une issue, une PR ou une conversation.
+**Aucune étape ne demande d'afficher un secret, ni d'en recopier un extrait** — sauf l'enrôlement
+du second facteur de l'admin, qui imprime une fois ce qu'il crée, pour le gestionnaire (« Admin »).
+Un secret passe d'un fichier ou du gestionnaire de mots de passe à sa destination — `gh secret
+set` le lit sur son entrée, `bootstrap.sh` le saisit sans écho — et une vérification se lit
+oui / non. Ne colle jamais un secret dans une issue, une PR ou une conversation.
 
 ## La pile
 
@@ -26,6 +27,7 @@ entrée (D45). L'utilisateur `deploy` possède le dossier et tire les images de 
 | `SECRET_KEY` | `.env` du VPS seulement | `bootstrap.sh`, qui l'engendre | `bootstrap.sh SECRET_KEY` |
 | `POSTGRES_PASSWORD` | `.env` du VPS et la base | `bootstrap.sh`, qui l'engendre | `bootstrap.sh POSTGRES_PASSWORD`, pile démarrée |
 | Mot de passe de l'admin (`ADMIN_PASSWORD`) | gestionnaire ; `.env` du VPS ; son empreinte dans la base | `bootstrap.sh`, qui le saisit ; `api`, qui le pose dans la base (« Admin ») | `bootstrap.sh ADMIN_PASSWORD` : `api` recréé pose le nouveau |
+| Second facteur de l'admin (URI `otpauth://`, dix codes de secours) | gestionnaire ; l'application TOTP ; la base | `manage.py enroll_second_factor`, à la main (« Admin ») | la même commande : l'ancien appareil et les anciens codes tombent |
 | Jeton GHCR (classic, `read:packages`) | gestionnaire ; configuration Docker de `deploy` | `bootstrap.sh` (`docker login`) | `bootstrap.sh GHCR_TOKEN` |
 | Clé privée de déploiement | secret `DEPLOY_SSH_KEY` de l'environnement `production` seulement | le mainteneur | nouvelle paire, `bootstrap.sh DEPLOY_KEY` |
 | Empreinte de l'hôte | secret `DEPLOY_KNOWN_HOSTS` de `production` | le mainteneur | à chaque VPS reconstruit |
@@ -249,7 +251,22 @@ un VPS dont `ADMIN_USERNAME` diffère du compte de la sauvegarde, ou un `bootstr
 ADMIN_USERNAME` qui change le nom : remets le nom du compte existant par
 `sudo bash bootstrap.sh ADMIN_USERNAME` (« Tourner un secret »), qui recrée `api`.
 
-Le second facteur et son enrôlement arrivent avec la suite de #6, qui les écrit ici.
+**Le second facteur** — une application TOTP, et dix codes de secours à usage unique — s'enrôle à
+la main, le compte posé, par une commande Compose (« Commandes sur le VPS ») :
+
+```
+docker compose exec api python manage.py enroll_second_factor
+```
+
+Elle imprime une seule fois l'URI `otpauth://` et les dix codes : range-les aussitôt dans le
+gestionnaire de mots de passe, et ouvre ou colle l'URI dans l'application TOTP ; rien ne les
+réaffiche. Sans second facteur, l'admin ne sert que sa page de connexion. La connexion se fait en
+deux envois : nom, mot de passe et jeton, puis l'appareil — l'application ou un code de secours —
+et son jeton.
+
+**Application perdue** : un code de secours ouvre l'admin, une seule fois. Relance ensuite la
+commande, qui ré-enrôle : l'ancienne application et les anciens codes ne valent plus. Elle ne
+demande aucune connexion à l'admin — sans code restant, la relancer sur le VPS suffit.
 
 ## Cloudflare — l'état attendu
 

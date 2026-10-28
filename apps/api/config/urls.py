@@ -17,7 +17,7 @@ from django.urls import URLPattern, URLResolver, path
 urlpatterns: list[URLPattern | URLResolver] = [
     # Avant les routes de l'admin, dont la dernière attrape toute adresse restante
     # (`AdminSite.catch_all_view`) ; `admin_view` applique à l'aperçu leurs règles : connexion,
-    # CSRF, jamais de cache.
+    # second facteur compris (`config/apps.py`), CSRF, jamais de cache.
     path("admin/markdown-preview/", admin.site.admin_view(preview), name=PREVIEW_ROUTE),
     path("admin/", admin.site.urls),
     path("api/", api.urls),
