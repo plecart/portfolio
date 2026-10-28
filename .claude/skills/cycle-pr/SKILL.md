@@ -215,6 +215,11 @@ travail reste visible du reste de la pipeline. Pour une draft née d'un échec d
 
 > **La CI tourne sur chaque push de la branche, draft comprise** → [references/briefing.md](references/briefing.md), « La CI tourne sur chaque push de la branche, draft comprise ».
 
+En vague parallèle (`pr-paralleles`), le lead relève lui-même le numéro de PR (`gh pr list`) pour
+son tableau de bord : rien à lui envoyer. Une session démarrée par une autre lit ensuite
+`get_status` ; `bind_pr` n'y sert qu'en repli
+([references/sessions-liees.md](references/sessions-liees.md), « Premier geste »).
+
 ## Étape 3 — Le cycle de commit
 
 Chaque commit suit :
