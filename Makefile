@@ -129,6 +129,8 @@ format-check:
 # Deux projets pyright. Le second, `.claude/skills/pyrightconfig.json`, porte les scripts des
 # skills : le projet racine ne les voit pas, son exclusion par défaut `**/.*` sautant tout dossier
 # caché quoi que dise `include` ; vu depuis `.claude/skills`, plus aucun dossier du chemin ne l'est.
+# Il vise Python 3.11, que ces scripts promettent : calé sur le venv (3.12), il laisserait passer
+# une syntaxe de 3.12. Les deux gardes de `test_skill_scripts.py` tiennent cette couverture.
 typecheck:
 	$(UV) run pyright
 	$(UV) run pyright -p .claude/skills
