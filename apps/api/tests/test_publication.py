@@ -19,6 +19,7 @@ from test_image_scan import SCANNING_JOBS
 from test_infra import (
     BUILD_COMMAND,
     CI_WORKFLOW,
+    DOCKER_DEADLINE,
     PUBLISH_PREFIX,
     built_images,
     ci_build_flags,
@@ -172,6 +173,7 @@ def stale_versions(versions: list[dict[str, object]]) -> list[int]:
         capture_output=True,
         text=True,
         check=True,
+        timeout=DOCKER_DEADLINE,
     )
     return [int(number) for number in evaluated.stdout.split()]
 
