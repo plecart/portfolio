@@ -183,13 +183,19 @@ et les committer avec le changement, dans la même PR — sinon les tests de fra
 celui de `make test` pour le schéma, celui de `make web-test` pour les types, en CI comme sur le
 poste.
 
-**Audit des dépendances.** `make audit` (Python) et `make web-audit` (front) sont des portes de
-CI. Côté Python, tout avis de sécurité connu bloque la PR — `pip-audit` n'expose pas de
-sévérité ; côté front, les avis `high` et `critical`. Un avis Python qui ne s'applique pas au
-projet — ou le temps qu'un correctif paraisse — se suspend par une entrée **datée** de
-[infra/ci/pip-audit-exceptions.toml](infra/ci/pip-audit-exceptions.toml), dont le format est en
-tête du fichier ; la date passée, l'audit rebloque. `npm audit` n'a pas de fichier d'exceptions :
-son arbre se nettoie par les `overrides` du manifeste
+**Audit des dépendances.** `make audit` (Python) et `make web-audit` (front) ne sont pas des portes
+de chaque PR : leur verdict change sans commit, quand un avis se publie. Le workflow
+[`avis.yml`](.github/workflows/avis.yml) les joue chaque jour sur `main`, et la CI les joue sur
+une PR qui touche leurs entrées — manifestes, verrous, Dockerfiles, exceptions datées, `Makefile` —
+et sur chaque push vers `main`, avant la publication
+([ADR 0019](docs/adr/0019-runs-de-ci-au-ready-et-avis-planifies.md), décision 2). Un rouge d'avis
+se corrige sur le trunk, par la voie courte — une montée de version ou une exception datée —,
+jamais par d'autres pushes sur une PR. Côté Python, tout avis de sécurité connu rougit l'audit —
+`pip-audit` n'expose pas de sévérité ; côté front, les avis `high` et `critical`. Un avis Python
+qui ne s'applique pas au projet — ou le temps qu'un correctif paraisse — se suspend par une
+entrée **datée** de [infra/ci/pip-audit-exceptions.toml](infra/ci/pip-audit-exceptions.toml),
+dont le format est en tête du fichier ; la date passée, l'audit rebloque. `npm audit` n'a pas de
+fichier d'exceptions : son arbre se nettoie par les `overrides` du manifeste
 ([docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4).
 
 **Tests des images.** `make image-test`, porte de CI sur chaque PR qui touche un fichier hors du
@@ -203,14 +209,15 @@ faut les images construites, donc le front compilé. Sur le poste, `make build` 
 démarre sa pile sous son propre nom de projet Compose — sans port publié, ou sur un port hôte que
 Docker attribue — et la supprime en partant, volumes compris.
 
-**Scan des images.** `make scan`, porte de CI aux mêmes moments, scanne avec Trivy chaque image que
-`make build` a construite : toute vulnérabilité HIGH ou CRITICAL bloque, corrigeable ou non, comme
-une image de base en fin de vie
-([ADR 0014](docs/adr/0014-ci-cd-github-actions-et-ghcr.md)). Une vulnérabilité sans correctif
-pour l'image s'évalue en trois points — la place du composant dans l'image, l'atteinte du code
-vulnérable par ce qui tourne, les alternatives — et se consigne en exception **datée**, à 90 jours
-au plus, bornée à son image, de [.trivyignore.yaml](.trivyignore.yaml), dont le format est en tête
-du fichier ; la date passée, le scan rebloque et l'évaluation se refait. Quand le correctif arrive
+**Scan des images.** `make scan` scanne avec Trivy chaque image que `make build` a construite :
+toute vulnérabilité HIGH ou CRITICAL bloque, corrigeable ou non, comme une image de base en fin
+de vie ([ADR 0014](docs/adr/0014-ci-cd-github-actions-et-ghcr.md)). Porte d'avis comme les
+audits, il tourne aux mêmes moments qu'eux, dans `avis.yml`, après son propre build des images —
+et avant chaque publication. Une vulnérabilité sans correctif pour l'image s'évalue en trois
+points — la place du composant dans l'image, l'atteinte du code vulnérable par ce qui tourne, les
+alternatives — et se consigne en exception **datée**, à 90 jours au plus, bornée à son image, de
+[.trivyignore.yaml](.trivyignore.yaml), dont le format est en tête du fichier ; la date passée, le
+scan rebloque et l'évaluation se refait. Quand le correctif arrive
 par une image de base reconstruite sous la même étiquette, Dependabot peut ne pas la proposer :
 son empreinte se monte à la main, lue sur la ligne « Digest » de
 `docker buildx imagetools inspect <image>:<étiquette>`.
@@ -256,7 +263,7 @@ Le test d'égalité de `make image-test` rougit tant que la version du
 dans la même PR, puis `make build-caddy scan-caddy`, puis `make build image-test`.
 
 **Publication des images.** Rien à faire à la main : à chaque push sur `main`, une fois la CI
-verte, le job `publish` reconstruit les images, les scanne comme sur une PR, puis les pousse sur
+verte, le job `publish` reconstruit les images, les scanne par `make scan`, puis les pousse sur
 GHCR — `ghcr.io/plecart/portfolio-<service>`, paquets privés — sous le SHA complet du commit et
 sous `latest` (`make push`) ; chaque paquet garde ses trois versions les plus récentes
 (`make prune`). Le jeton du workflow suffit, aucun secret n'est à créer

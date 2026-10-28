@@ -77,6 +77,8 @@ back vert (ADR 0019).
 - audit        : make audit                       # pip-audit, toute vulnérabilité bloque ;
                                                   # exceptions datées dans
                                                   # infra/ci/pip-audit-exceptions.toml ;
+                                                  # en CI dans `avis.yml`, pas dans le job `api`
+                                                  # (« Qualité », portes à base d'avis) ;
                                                   # vérifiée le 2026-09-25 (#5)
 - hooks        : uv run pre-commit install        # ruff seulement (check --fix, format)
 
@@ -95,6 +97,8 @@ le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node a
                                                   # chargée : HIGH et CRITICAL bloquent, corrigeables
                                                   # ou non, comme une image de base en fin de vie ;
                                                   # exceptions datées dans `.trivyignore.yaml` ;
+                                                  # en CI dans `avis.yml` et avant chaque
+                                                  # publication, pas dans le job `infra` ;
                                                   # vérifiée le 2026-09-30 (#15)
 - tests images : make image-test                  # pytest sur `infra/tests` : démarre les images que
                                                   # `make build` a chargées — test de fumée du
@@ -164,7 +168,9 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
                                                   # pas dans la suite — aucune porte ne le rejoue
 - lighthouse   : make web-lighthouse              # **CI seulement** : sous Windows, `chrome-launcher`
                                                   # échoue sur EPERM (docs/frontend-outillage.md §2.4)
-- audit        : make web-audit                   # npm audit, seuil high, arbre complet (dev compris)
+- audit        : make web-audit                   # npm audit, seuil high, arbre complet
+                                                  # (dev compris) ; en CI dans `avis.yml`, pas
+                                                  # dans le job `web`
 - run local    : cd apps/web && npm run dev
 
 **Harnais (`.claude/`, `CLAUDE.md`)** — vérifiée le 2026-10-09 depuis la racine, avec témoins.
@@ -296,12 +302,13 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
     `PYTHONIOENCODING=utf-8` ou `PYTHONUTF8=1` au parent la laissaient verte avant cette
     imposition (mesuré le 2026-10-21) ; sur un runner Linux, rouge par la même imposition, non
     mesuré
-- gates bloquants en CI — sur une PR, `web` et `infra` ne tournent que si le delta touche leurs fichiers (règle dans `infra/ci/changed_jobs.py`, lue par la première étape du job `api`), `api` toujours ; sur un push vers `main`, les trois (ADR 0017) :
-  - back : audit, lint, format:check, typecheck, test
-  - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse, audit
-  - infra : compose (résolution de `infra/compose.dev.yml` et `infra/compose.yml`), build des images `api`, `backup` et `caddy` sans publication, tests des images (`make image-test`), scan (Trivy : HIGH et CRITICAL, corrigeables ou non, et fin de vie ; exceptions datées de `.trivyignore.yaml`)
-- portes à base d'avis (`make audit`, `make web-audit`, `make scan`) **sans horloge** : le `ci.yml` du projet n'a pas de `schedule`, par décision du mainteneur (#77, journal de spec, entrée du 2026-10-13 « lot 4, briefing ») — la règle de génération d'`init-projet` le prévoit, ce projet s'en écarte. Un avis neuf se voit au premier run de sa porte — pour `make audit`, toute PR ; pour `make web-audit` et `make scan`, une PR qui touche le front ou les images, ou un push vers `main` (ADR 0017) : `cycle-pr` Étape 6, « rouge d'avis »
-- publication (job `publish`, push vers `main` seulement, après les trois jobs verts ; pas une gate de PR) : front compilé repris du job `web`, images reconstruites depuis le cache sans attestation, scannées par `make scan`, poussées sur GHCR (`ghcr.io/plecart/portfolio-<service>`, SHA complet et `latest`) par `make push`, trois versions par paquet gardées par `make prune`
+- gates bloquants en CI — sur une PR, `web`, `infra` et `avis` ne tournent que si le delta touche leurs fichiers (règle dans `infra/ci/changed_jobs.py`, lue par la première étape du job `api`), `api` toujours, et les trois attendent un `api` vert ; sur un push vers `main`, les quatre (ADR 0017, ADR 0019) :
+  - back : lint, format:check, typecheck, test
+  - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse
+  - infra : compose (résolution de `infra/compose.dev.yml` et `infra/compose.yml`), build des images `api`, `backup` et `caddy` sans publication, tests des images (`make image-test`)
+  - avis : audit Python (`make audit`), audit npm (`make web-audit`), build puis scan des images (Trivy : HIGH et CRITICAL, corrigeables ou non, et fin de vie ; exceptions datées de `.trivyignore.yaml`) — le job `avis` appelle le workflow `avis.yml` ; sur une PR, seulement si le delta touche une entrée d'un avis : manifestes et verrous, Dockerfiles, exceptions datées, porte de `pip-audit`, `Makefile`, `avis.yml`
+- portes à base d'avis (`make audit`, `make web-audit`, `make scan`) **planifiées** : le workflow `avis.yml` les joue chaque jour sur `main` (`schedule`, et `workflow_dispatch`), et le job `avis` de `ci.yml` l'appelle sur une PR qui touche leurs entrées et sur chaque push vers `main` (ADR 0019, décision 2, qui renverse la décision « sans horloge » du 2026-10-13, #77) — la règle de génération d'`init-projet` le prévoit dans `ci.yml`, ce projet le fait par un workflow à part. Un avis neuf se voit au run planifié du lendemain, ou sur la première PR qui touche ses entrées ; un rouge du run planifié ou du job `avis` d'une PR se corrige sur le trunk, par la voie courte : `cycle-pr` Étape 6, « rouge d'avis »
+- publication (job `publish`, push vers `main` seulement, après les quatre jobs verts ; pas une gate de PR) : front compilé repris du job `web`, images reconstruites depuis le cache sans attestation, scannées par `make scan`, poussées sur GHCR (`ghcr.io/plecart/portfolio-<service>`, SHA complet et `latest`) par `make push`, trois versions par paquet gardées par `make prune`
 - déploiement (job `deploy`, après `publish`, push vers `main` seulement, sauté tant que la variable de dépôt `DEPLOY_ENABLED` ne vaut pas `true` ; pas une gate de PR) : seule la tête de `main` se déploie ; par SSH (clé dédiée, empreinte de l'hôte épinglée, secrets de l'environnement `production`, restreint à `main`), le job dépose `infra/compose.yml` dans `/srv/portfolio`, y fixe `IMAGE_TAG` au SHA du commit, puis `docker compose pull` et `up -d --wait` — rouge si un service ne devient pas sain, chacun ayant sa sonde ; procédures dans `infra/RUNBOOK.md`
 - test de restauration mensuel (workflow `restore.yml`, le 1ᵉʳ du mois à 04:00 UTC et `workflow_dispatch`, sauté tant que `DEPLOY_ENABLED` ne vaut pas `true` ; pas une gate de PR) : `infra/restore.sh derniere` dans la pile de production lancée sur le runner, images `latest` tirées de GHCR par le jeton du workflow, secrets et variables de l'environnement `production` ; son échec est l'alerte ; forme et scripts tenus par `apps/api/tests/test_restore_workflow.py` ; procédures dans `infra/RUNBOOK.md`, « Le test mensuel »
 - services requis en CI : aucun déclaré — les tests de base démarrent eux-mêmes Postgres par testcontainers (cadrage §8.4), sur le Docker du runner ; Redis suivra avec #11

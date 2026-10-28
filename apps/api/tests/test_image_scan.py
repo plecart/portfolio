@@ -1,11 +1,11 @@
 """Tests du scan des images : la commande `make scan`, son étape en CI, ses exceptions datées.
 
-Le scan lui-même tourne ailleurs — sur le poste par `make scan`, en CI dans les jobs `infra` et
-`publish`. Ces tests gardent ce qui l'affaiblirait sans bruit : une option de Trivy retirée, une
-étape de CI devenue indicative, une exception sans date. Trivy n'exige d'une exception que son
-`id` — une entrée sans `expired_at` vaut pour toujours, une clé mal orthographiée est ignorée
-sans un mot —, et la règle du projet est plus stricte (ADR 0014) : chaque exception porte
-l'évaluation qui la fonde et la date où elle se refait.
+Le scan lui-même tourne ailleurs — sur le poste par `make scan`, en CI dans le job `avis` de
+`avis.yml` et dans le job `publish` de `ci.yml`. Ces tests gardent ce qui l'affaiblirait sans
+bruit : une option de Trivy retirée, une étape de CI devenue indicative, une exception sans date.
+Trivy n'exige d'une exception que son `id` — une entrée sans `expired_at` vaut pour toujours, une
+clé mal orthographiée est ignorée sans un mot —, et la règle du projet est plus stricte
+(ADR 0014) : chaque exception porte l'évaluation qui la fonde et la date où elle se refait.
 
 Comme dans `test_supply_chain.py`, chaque garde est une fonction sur du texte, appliquée au dépôt
 et à un recueil de formes — `SCAN_FORMS`, `CI_SCAN_FORMS`, `EXCEPTION_FORMS` —, chacune avec son
@@ -24,6 +24,7 @@ from typing import cast
 import pytest
 import yaml
 from test_infra import (
+    AVIS_WORKFLOW,
     CI_WORKFLOW,
     MAKEFILE,
     PUBLISH_PREFIX,
@@ -72,15 +73,17 @@ SCAN_MOUNTS = [
 ]
 TRIVY_REPOSITORY = "ghcr.io/aquasecurity/trivy:"
 
-# Les jobs de la CI qui construisent puis scannent les images, chacun avec ses deux commandes, mot
-# pour mot : `infra` sur chaque PR qui le lance (ADR 0017), sous le nom du poste ; `publish` avant
-# de pousser, sous le nom GHCR. L'image y est nommée sans étiquette : les exceptions des paquets du
-# système suivent la cible `…/portfolio-<service> (<système> <version>)` du rapport de Trivy,
-# qu'une étiquette changerait (mesuré à la PR #62). Mot pour mot, parce qu'une variable de plus sur
-# la ligne de commande (`SCAN_FLAGS=`) prime sur le `Makefile`.
+# Les jobs de la CI qui construisent puis scannent les images, chacun avec le workflow où il vit et
+# ses deux commandes, mot pour mot : `avis`, chaque jour sur `main`, sur une PR qui touche une
+# entrée d'un avis et sur chaque push vers `main` (ADR 0019, décision 2), sous le nom du poste ;
+# `publish` avant de pousser, sous le nom GHCR. L'image y est nommée sans étiquette : les
+# exceptions des paquets du système suivent la cible `…/portfolio-<service> (<système> <version>)`
+# du rapport de Trivy, qu'une étiquette changerait (mesuré à la PR #62). Mot pour mot, parce
+# qu'une variable de plus sur la ligne de commande (`SCAN_FLAGS=`) prime sur le `Makefile`.
 SCANNING_JOBS = {
-    "infra": ("make build", "make scan"),
+    "avis": (AVIS_WORKFLOW, "make build", "make scan"),
     "publish": (
+        CI_WORKFLOW,
         f"make build IMAGE_PREFIX={PUBLISH_PREFIX}",
         f"make scan IMAGE_PREFIX={PUBLISH_PREFIX}",
     ),
@@ -150,7 +153,8 @@ def ci_scan_findings(workflow: str, name: str) -> list[str]:
 
     Args:
         workflow: le texte du workflow.
-        name: le nom du job, clé de `SCANNING_JOBS`, qui donne ses deux commandes.
+        name: le nom du job, clé de `SCANNING_JOBS`, qui donne ses deux commandes — le workflow
+            où il vit ne sert qu'au test qui lit le dépôt.
 
     Returns:
         Un constat si le job manque, ou s'il ne lance pas ses deux commandes, le build puis le
@@ -159,7 +163,7 @@ def ci_scan_findings(workflow: str, name: str) -> list[str]:
         job ou le workflow, par lequel `MAKEFLAGS: -i` atteindrait `make`. Liste vide : le scan
         bloque.
     """
-    build, scan = SCANNING_JOBS[name]
+    _, build, scan = SCANNING_JOBS[name]
     document = yaml.safe_load(workflow)
     job = document["jobs"].get(name)
     if job is None:
@@ -355,7 +359,8 @@ def ci_scan_forms(name: str) -> dict[str, tuple[str, bool]]:
 
     Chaque forme est un workflow minimal où le job `name` porte les étapes de la forme.
     """
-    build_step, scan_step = (f"run: {command}" for command in SCANNING_JOBS[name])
+    _, build, scan = SCANNING_JOBS[name]
+    build_step, scan_step = f"run: {build}", f"run: {scan}"
 
     def job(*steps: str, job_options: str = "") -> str:
         """Un workflow minimal dont le job `name` porte `job_options`, puis les étapes données."""
@@ -560,16 +565,18 @@ def test_make_scan_echoue_quand_trivy_echoue() -> None:
 
 @pytest.mark.parametrize("name", SCANNING_JOBS)
 def test_la_ci_scanne_les_images_qu_elle_vient_de_construire(name: str) -> None:
-    """Le job `infra` scanne sur chaque PR qui le lance (ADR 0017), le job `publish` avant de
-    pousser — chacun après le build qui charge les images dans le moteur (`--load`) : avant lui,
-    Trivy ne trouverait rien à lire. Aucune image n'est publiée sans avoir été scannée (ADR 0014).
+    """Le job `avis` scanne chaque jour sur `main`, sur une PR qui touche une entrée d'un avis et
+    sur chaque push vers `main` (ADR 0019), le job `publish` avant de pousser — chacun après le
+    build qui charge les images dans le moteur (`--load`) : avant lui, Trivy ne trouverait rien à
+    lire. Aucune image n'est publiée sans avoir été scannée (ADR 0014).
 
     L'étape ne porte que son nom et sa commande. Un `continue-on-error` la rendrait indicative, un
     `if:` la ferait sauter, un `env:` pourrait régler `make` lui-même (`MAKEFLAGS: -i` ignore
     l'échec de Trivy) sans toucher au `Makefile` — sur l'étape, le job ou le workflow : la
     politique vit dans `make scan`, et nulle part ailleurs.
     """
-    assert ci_scan_findings(CI_WORKFLOW.read_text(encoding="utf-8"), name) == []
+    workflow, _, _ = SCANNING_JOBS[name]
+    assert ci_scan_findings(workflow.read_text(encoding="utf-8"), name) == []
 
 
 def test_chaque_exception_du_scan_est_complete_et_en_vigueur() -> None:

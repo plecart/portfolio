@@ -1,0 +1,103 @@
+# Les portes à base d'avis (ADR 0019, décision 2) : `make audit` (pip-audit), `make web-audit`
+# (npm audit), puis `make build` et `make scan` (Trivy). Leur verdict change sans commit, quand une
+# base d'avis se publie : ce workflow les joue chaque jour sur `main`, et le job `avis` de `ci.yml`
+# l'appelle sur une PR qui touche leurs entrées (`infra/ci/changed_jobs.py`) et sur chaque push
+# vers `main`, avant `publish`. Une seule définition des cibles et de leur ordre, pour les deux.
+#
+# Un rouge d'avis se corrige sur le trunk, par la voie courte — une montée de version ou une
+# exception datée —, jamais par d'autres pushes sur une PR (`cycle-pr` Étape 6, « Rouge d'avis »).
+# L'échec d'un run planifié est notifié à qui a créé le workflow, ou changé sa ligne `cron` en
+# dernier (doc GitHub « Notifications for workflow runs »).
+#
+# Chaque action est épinglée par empreinte, aux mêmes que dans `ci.yml`
+# (`apps/api/tests/test_supply_chain.py`). `apps/api/tests/test_ci_declencheurs.py` tient la forme
+# du workflow, `apps/api/tests/test_image_scan.py` son scan.
+
+name: Avis
+
+# La lecture du dépôt, rien d'autre. Appelé, il reçoit le jeton de la CI, que ses permissions ne
+# peuvent que restreindre (doc GitHub « Reusing workflow configurations »). Ni `env` — un
+# `MAKEFLAGS` y atteindrait `make` —, ni `concurrency` : appelé, il prend le contexte `github` de
+# son appelant, et `github.workflow` y vaut le nom de la CI (même doc).
+permissions:
+  contents: read
+
+on:
+  # Chaque jour à 05:37 UTC, avant la journée de travail, sur le dernier commit de `main`. Hors du
+  # début d'heure, où GitHub retarde, voire abandonne, les runs planifiés en période de charge (doc
+  # GitHub « Events that trigger workflows »).
+  schedule:
+    - cron: "37 5 * * *"
+  # À la main : vérifier qu'un correctif du trunk lève l'avis, sans attendre le lendemain.
+  workflow_dispatch:
+  # Par le job `avis` de `ci.yml`, au commit même du workflow qui l'appelle (doc GitHub « Reuse
+  # workflows »).
+  workflow_call:
+
+jobs:
+  avis:
+    name: Avis — audit Python, audit npm, scan des images
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+
+      - name: Install
+        run: make install
+
+      # Seuil : **toute** vulnérabilité connue bloque, là où `npm audit` s'arrête à `high`.
+      # `pip-audit` n'expose aucune sévérité — ni option, ni champ dans sa sortie (2.10.1,
+      # pypa/pip-audit#654) — et l'arbre Python, 59 paquets au verrou le 2026-09-25, n'a pas le
+      # bruit qui justifie `high` côté npm, où l'arbre en compte dix fois plus. Un avis qui ne
+      # s'applique pas ici passe par une exception datée de `infra/ci/pip-audit-exceptions.toml`,
+      # jamais par un seuil relevé.
+      - name: Audit Python
+        run: make audit
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: apps/web/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Front
+        run: make web-install
+
+      - name: Audit npm
+        run: make web-audit
+
+      # Le pilote `docker-container`, comme dans le job `infra` de `ci.yml`, pour lire son cache.
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # L'entrée du job `infra`, sous la même clé : restaurée ici, jamais réécrite, comme dans
+      # `publish`. Sur son propre runner, ce job n'a pas les images d'`infra` : il les reconstruit
+      # pour les scanner.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/buildx-cache
+          key: >-
+            buildx-images-${{ hashFiles('.python-version', 'pyproject.toml', 'uv.lock',
+            'apps/api/pyproject.toml', 'infra/*/Dockerfile') }}
+          restore-keys: buildx-images-
+
+      # Le build du job `infra`, front compilé s'il manque : chargé dans le moteur (`--load`), où
+      # Trivy le lit ; l'étage `paquets` reconstruit à chaque build, comme dans `infra` ; une
+      # entrée de cache par image (`tag=$*`). Aucun `--cache-to` : rien ne réécrit l'entrée.
+      - name: Images
+        run: make build
+        env:
+          DOCKER_BUILD_FLAGS: >-
+            --load
+            --no-cache-filter paquets
+            --cache-from type=local,src=/tmp/buildx-cache,tag=$*
+
+      # Trivy, par `make scan` : la commande du poste, dans l'image officielle que le `Makefile`
+      # épingle — aucune action à installer (ADR 0014). Rouge sur toute vulnérabilité HIGH ou
+      # CRITICAL, corrigeable ou non, et sur une image de base en fin de vie ; seules passent les
+      # exceptions datées de `.trivyignore.yaml`. L'étape ne porte que sa commande — ni
+      # `continue-on-error`, ni `env:` : la politique vit dans le `Makefile`, et
+      # `apps/api/tests/test_image_scan.py` le tient.
+      - name: Scan
+        run: make scan
