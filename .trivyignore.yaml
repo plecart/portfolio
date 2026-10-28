@@ -180,9 +180,9 @@ vulnerabilities:
   # statiques et un reverse proxy interne vers `api`, routés par nom d'hôte, en HTTP, sans TLS ni
   # certificat : Cloudflare le termine, `cloudflared` est la seule entrée (cadrage §7, D45).
   # HTTP/1.1 seulement (`protocols h1`) ; ni `templates`, ni `file_server browse`, ni `tracing`,
-  # ni `acme_server`, ni amont en HTTPS. L'atteinte est jugée sur cette configuration, pas sur un graphe d'appels :
-  # `govulncheck` trouve tous les symboles vulnérables dans le binaire, qui embarque tous les
-  # modules de Caddy.
+  # ni `acme_server`, ni amont en HTTPS. L'atteinte est jugée sur cette configuration, pas sur un
+  # graphe d'appels : `govulncheck` trouve tous les symboles vulnérables dans le binaire, qui
+  # embarque tous les modules de Caddy.
   # Les versions sont celles que Trivy 0.74.0 lit dans le binaire au scan du 2026-10-21 : `caddy`
   # v2.11.7, `stdlib` v1.27.3, `golang.org/x/net` v0.59.0. Le projet compile caddy avec le Go de
   # l'image `golang` épinglée, ses modules aux versions que fixe sa release (ADR 0018) : la
