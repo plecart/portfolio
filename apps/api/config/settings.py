@@ -94,14 +94,14 @@ WSGI_APPLICATION = "config.wsgi.application"
 # L'admin, seul back-office (ADR 0001) — par sa configuration (`config/apps.py`), qui en fait le
 # site à second facteur de `django-otp` (#6) —, et les applications qu'il impose : `auth`,
 # `contenttypes`, `sessions`, `messages`. `django_otp` porte le gabarit de la connexion à jeton, sa
-# feuille de style et ses traductions ; `otp_totp` et `otp_static`, les deux appareils du second facteur : l'application
-# TOTP et les codes de secours. `staticfiles` collecte ses fichiers statiques, que
-# WhiteNoise sert (ADR 0014) — en développement aussi : `runserver_nostatic`, placé avant lui,
-# retire ce service au `runserver` de Django ; sa configuration
-# (`config/apps.py`) écarte les fichiers de `ninja` de la collecte. `ninja` n'est installé que pour
-# sa commande `export_openapi_schema` (`make openapi`) : Django ne cherche les commandes de gestion
-# que dans les applications installées. `corsheaders` porte ses contrôles de réglages (`manage.py
-# check`). `content` porte le contenu du portfolio ; `access`, l'accès à l'admin — ses commandes
+# feuille de style et ses traductions ; `otp_totp` et `otp_static`, les deux appareils du second
+# facteur : l'application TOTP et les codes de secours. `staticfiles` collecte ses fichiers
+# statiques, que WhiteNoise sert (ADR 0014) — en développement aussi : `runserver_nostatic`, placé
+# avant lui, retire ce service au `runserver` de Django ; sa configuration (`config/apps.py`)
+# écarte les fichiers de `ninja` de la collecte. `ninja` n'est installé que pour sa commande
+# `export_openapi_schema` (`make openapi`) : Django ne cherche les commandes de gestion que dans les
+# applications installées. `corsheaders` porte ses contrôles de réglages (`manage.py check`).
+# `content` porte le contenu du portfolio ; `access`, l'accès à l'admin — ses commandes
 # `ensure_superuser` et `enroll_second_factor`, et le retrait des écrans de comptes et d'appareils,
 # qui la veut après `auth`, `otp_totp` et `otp_static` : l'autodécouverte des modules `admin` suit
 # cet ordre.
@@ -127,17 +127,17 @@ INSTALLED_APPS = [
 # Django — couvrent aussi les fichiers statiques. Puis WhiteNoise : une requête de fichier statique
 # s'arrête là, sans ouvrir de session. Puis CORS, borné aux routes de l'API (`CORS_URLS_REGEX`) —
 # après WhiteNoise, et non avant comme le propose django-cors-headers : aucun fichier statique
-# n'est servi sous `/api/`. Puis le `GET`
-# conditionnel : `ETag` d'empreinte du corps et `304` sur `If-None-Match` (cadrage §6.7), pour
-# toute réponse qui n'est pas `no-store` — l'admin, en `never_cache`, n'en reçoit pas ; **après**
-# CORS, parce que le `304` qu'il construit ne recopie pas `Access-Control-Allow-Origin`
-# (`get_conditional_response`, Django 6.1.1), et CORS doit le reposer. Puis les trois que l'admin
-# exige (contrôles `admin.E408` à `admin.E410`), plus CSRF (cadrage §6.6) : l'admin protège déjà
-# ses propres vues, le middleware étend la protection à toute autre vue. Celui de `django-otp`
-# juste après l'authentification, comme sa docstring l'exige (`django_otp/middleware.py`) : il lit
-# dans la session l'appareil qui a vérifié l'utilisateur — `request.user.is_verified()`, que le
-# site de l'admin consulte. La CSP en dernier (`SECURE_CSP`) : elle pose le nonce de la requête
-# avant la vue, et un middleware qui le lirait se placerait après elle — aucun ne le lit.
+# n'est servi sous `/api/`. Puis le `GET` conditionnel : `ETag` d'empreinte du corps et `304` sur
+# `If-None-Match` (cadrage §6.7), pour toute réponse qui n'est pas `no-store` — l'admin, en
+# `never_cache`, n'en reçoit pas ; **après** CORS, parce que le `304` qu'il construit ne recopie pas
+# `Access-Control-Allow-Origin` (`get_conditional_response`, Django 6.1.1), et CORS doit le
+# reposer. Puis les trois que l'admin exige (contrôles `admin.E408` à `admin.E410`), plus CSRF
+# (cadrage §6.6) : l'admin protège déjà ses propres vues, le middleware étend la protection à toute
+# autre vue. Celui de `django-otp` juste après l'authentification, que sa docstring exige avant lui
+# (`django_otp/middleware.py`) : il lit dans la session l'appareil qui a vérifié l'utilisateur —
+# `request.user.is_verified()`, que le site de l'admin consulte. La CSP en dernier (`SECURE_CSP`) :
+# elle pose le nonce de la requête avant la vue, et un middleware qui le lirait se placerait après
+# elle — aucun ne le lit.
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
