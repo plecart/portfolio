@@ -19,11 +19,11 @@ from test_image_scan import SCANNING_JOBS
 from test_infra import (
     BUILD_COMMAND,
     CI_WORKFLOW,
-    DOCKER_DEADLINE,
     PUBLISH_PREFIX,
     built_images,
     ci_build_flags,
     make_dry_run,
+    run_bounded,
     run_make,
 )
 
@@ -167,13 +167,9 @@ def stale_versions(versions: list[dict[str, object]]) -> list[int]:
     `make --dry-run` l'imprime, évalué par gojq comme `gh` l'évaluerait."""
     recipes = prune_recipes()
     assert recipes, "aucune recette de rétention lue — sa forme a-t-elle changé ?"
-    evaluated = subprocess.run(
+    evaluated = run_bounded(
         ["docker", "run", "--rm", "-i", GOJQ_IMAGE, recipes[0]["filter"]],
-        input=json.dumps(versions),
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=DOCKER_DEADLINE,
+        stdin=json.dumps(versions).encode(),
     )
     return [int(number) for number in evaluated.stdout.split()]
 

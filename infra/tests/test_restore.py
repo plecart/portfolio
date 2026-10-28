@@ -27,7 +27,7 @@ from test_backup_image import (
     started_stack,
     succeeded,
 )
-from test_infra import loaded_image
+from test_infra import loaded_image, run_bounded
 
 SCRIPT = Path(__file__).parents[1] / "restore.sh"
 PROJECT = f"portfolio-test-restore-{uuid.uuid4().hex[:8]}"
@@ -95,19 +95,21 @@ class Restoration:
     """Une exécution du script : son processus terminé, les appels de sa commande Compose, et les
     codes de sortie de l'écrivain du clair — un par étape « restauration » atteinte."""
 
-    process: subprocess.CompletedProcess[str]
+    process: subprocess.CompletedProcess[bytes]
     calls: list[list[str]]
     writer_exits: list[str]
 
     @property
     def log(self) -> str:
         """Ce que le script a écrit, sortie standard puis sortie d'erreur."""
-        return self.process.stdout + self.process.stderr
+        return (self.process.stdout + self.process.stderr).decode()
 
     @property
     def steps(self) -> list[str]:
         """Les étapes que le script a annoncées (`== <étape>`), dans l'ordre."""
-        return [line[3:] for line in self.process.stdout.splitlines() if line.startswith("== ")]
+        return [
+            line[3:] for line in self.process.stdout.decode().splitlines() if line.startswith("== ")
+        ]
 
     def index(self, *tail: str) -> int:
         """Le rang du premier appel de Compose qui finit par `tail`."""
@@ -199,10 +201,10 @@ def restore(
     host_tmp.mkdir()
     witness.write_text(recording(log) + COMPOSE_WITNESS, encoding="utf-8", newline="\n")
     key = identity or stack.identity
-    process = subprocess.run(
+    process = run_bounded(
         ["sh", SCRIPT.as_posix(), *arguments],
-        input=f"# created: 2026-10-15T00:00:00Z\r\n# public key: age1x\r\n{key}\r\n",
-        env={
+        stdin=f"# created: 2026-10-15T00:00:00Z\r\n# public key: age1x\r\n{key}\r\n".encode(),
+        environment={
             **stack.environment,
             "COMPOSE": " ".join(["sh", witness.as_posix(), *compose_command()]),
             "BACKUP_R2_BUCKET": bucket,
@@ -212,9 +214,6 @@ def restore(
             "TMPDIR": host_tmp.as_posix(),
             **(environment or {}),
         },
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
         check=False,
         timeout=600,
     )
@@ -233,14 +232,11 @@ def surviving_one_offs() -> list[str]:
     attente : un conteneur de déchiffrement qui survit garde la clé dans son `/tmp` — mesuré à la
     relecture de la PR #100, 18 minutes après un flux coupé, avant que le script ne lise le reste
     du flux."""
-    listed = subprocess.run(
+    listed = run_bounded(
         ["docker", "ps", "--all", "--quiet", "--filter", "label=com.docker.compose.oneoff=True"]
-        + ["--filter", f"label=com.docker.compose.project={PROJECT}"],
-        capture_output=True,
-        text=True,
-        check=True,
+        + ["--filter", f"label=com.docker.compose.project={PROJECT}"]
     )
-    return listed.stdout.split()
+    return listed.stdout.decode().split()
 
 
 @pytest.mark.parametrize("by_timestamp", [False, True], ids=["derniere", "horodatage"])
