@@ -62,7 +62,11 @@ pour qu'un rouge de l'une ne masque pas un rouge d'une autre.
 - lint         : make lint                        # ruff check
 - format       : make format                      # ruff format — écrit
 - format:check : make format-check                # vérifie sans écrire
-- typecheck    : make typecheck                   # pyright, mode strict (cadrage §8.4)
+- typecheck    : make typecheck                   # pyright, mode strict (cadrage §8.4) : le projet
+                                                  # racine, puis `.claude/skills/pyrightconfig.json`
+                                                  # pour les scripts des skills, qu'un dossier caché
+                                                  # soustrait au premier (#145) ; vérifiée le
+                                                  # 2026-10-28
 - openapi      : make openapi                     # écrit `apps/api/openapi.json`, le schéma de
                                                   # l'API publique (commande de django-ninja) ;
                                                   # à relancer après tout changement du contrat,
