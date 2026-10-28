@@ -90,10 +90,11 @@ def texte(enregistrement: dict[str, Any]) -> str:
         return contenu
     if not isinstance(contenu, list):
         return ""
-    blocs = [
-        cast(dict[str, Any], bloc) for bloc in cast(list[object], contenu) if isinstance(bloc, dict)
-    ]
-    return "".join(str(bloc.get("text", "")) for bloc in blocs if bloc.get("type") == "text")
+    return "".join(
+        str(cast(dict[str, Any], bloc).get("text", ""))
+        for bloc in cast(list[object], contenu)
+        if isinstance(bloc, dict) and cast(dict[str, Any], bloc).get("type") == "text"
+    )
 
 
 def message_du_mainteneur(enregistrement: dict[str, Any]) -> str | None:
