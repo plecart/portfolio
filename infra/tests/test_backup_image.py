@@ -55,10 +55,13 @@ S3_ROOT = "/tmp/s3"
 # Une table que la base porte avant la sauvegarde, et que l'archive doit contenir.
 WITNESS_TABLE = "temoin_de_sauvegarde"
 
-# Ce que le test donne à la pile, par-dessus le modèle : le rôle de sauvegarde et les adresses des
-# témoins. Les clés du témoin S3 sont tirées à chaque lancement, assez longues pour qu'il les
+# Ce que le test donne à la pile, par-dessus le modèle : la clé de signature, le rôle de sauvegarde
+# et les adresses des témoins. Les clés du témoin S3 sont tirées à chaque lancement, assez longues pour qu'il les
 # accepte — mesuré le 2026-10-03 : une paire trop courte y est refusée en 403.
 STACK_VALUES = {
+    # Les 50 caractères qu'`Env` exige, que la clé factice du modèle n'a pas : sans eux, `api`,
+    # que la restauration démarre, refuse sa configuration.
+    "SECRET_KEY": secrets.token_hex(32),
     "BACKUP_POSTGRES_USER": "sauvegarde",
     "BACKUP_POSTGRES_PASSWORD": secrets.token_hex(16),
     "BACKUP_R2_ENDPOINT": "http://s3:8080",
