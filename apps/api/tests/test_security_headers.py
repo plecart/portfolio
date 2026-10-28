@@ -22,7 +22,9 @@ NONCE_ATTRIBUTE = re.compile(r'nonce="([^"]+)"')
 SCRIPT_OR_STYLE = re.compile(r"<(?:script|style)\b[^>]*>")
 # Ce que la même CSP refuse sans nonce possible : un attribut `style=`, un gestionnaire `on…=`, une
 # adresse `javascript:`.
-INLINE_CODE = re.compile(r"""\s(?:style|on[a-z]+)\s*=|=\s*["']?\s*javascript:""", re.IGNORECASE)
+INLINE_CODE = re.compile(
+    r"""[\s"'/](?:style|on[a-z]+)\s*=|=\s*["']?\s*javascript:""", re.IGNORECASE
+)
 
 # La politique de l'admin, directive par directive, le nonce de la requête masqué : scripts et
 # styles du projet ou de la page, par nonce ; aucun `unsafe-inline`, aucune source tierce — sous le
