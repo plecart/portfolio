@@ -187,8 +187,8 @@ class Event:
 
     when: datetime
     kind: str
-    uses: list[tuple[str, str]] = field(default_factory=list)
-    results: list[str] = field(default_factory=list)
+    uses: list[tuple[str, str]] = field(default_factory=list[tuple[str, str]])
+    results: list[str] = field(default_factory=list[str])
     ends: str = ""
     source: int = 0
 
@@ -292,7 +292,7 @@ def records(path: Path | str) -> Iterator[dict[str, Any]]:
 
 def content_blocks(record: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Les blocs d'un message, qu'il porte une liste de blocs ou un texte nu."""
-    content = (record.get("message") or {}).get("content", [])
+    content = cast(dict[str, Any], record.get("message") or {}).get("content", [])
     if isinstance(content, list):
         return cast(list[dict[str, Any]], content)
     return [{"type": "text", "text": content}]
@@ -304,7 +304,7 @@ def api_call(record: Mapping[str, Any]) -> tuple[str, Mapping[str, int]] | None:
     Un message diffusé en plusieurs blocs occupe plusieurs lignes qui portent le même `id` et le
     même `usage` : c'est l'identifiant qui permet de n'en compter qu'une.
     """
-    message = record.get("message") or {}
+    message = cast(dict[str, Any], record.get("message") or {})
     if record.get("type") == "assistant" and message.get("usage"):
         return message.get("id") or record.get("uuid", ""), message["usage"]
     return None
@@ -395,7 +395,9 @@ def subagents(paths: Sequence[Path]) -> list[Subagent]:
     for path in paths:
         for transcript in sorted(path.with_suffix("").glob("subagents/**/agent-*.jsonl")):
             meta_path = transcript.with_name(transcript.stem + ".meta.json")
-            meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
+            meta: dict[str, Any] = (
+                json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
+            )
             found.append(
                 Subagent(
                     role=str(meta.get("agentType", "")),
@@ -426,7 +428,7 @@ def delivered_notification(record: Mapping[str, Any]) -> str | None:
         if attachment.get("commandMode") == NOTIFICATION_MODE:
             return str(attachment.get("prompt", ""))
         return None
-    content = (record.get("message") or {}).get("content")
+    content = cast(dict[str, Any], record.get("message") or {}).get("content")
     if (
         record.get("type") == "user"
         and isinstance(content, str)
@@ -1154,7 +1156,12 @@ def report(
         return f"{label:<28} {hm(duration):>9}   {share}{'   ' + note if note else ''}"
 
     def typical(windows: Sequence[Interval]) -> str:
-        return hm(median([end - start for start, end in windows])) if windows else "—"
+        # En microsecondes entières : `median` n'est typé que pour les nombres, et le constructeur
+        # de `timedelta` arrondit la demi-microseconde au pair, comme sa division par deux.
+        if not windows:
+            return "—"
+        micros = [(end - start) // timedelta.resolution for start, end in windows]
+        return hm(timedelta(microseconds=median(micros)))
 
     lines = [
         (
