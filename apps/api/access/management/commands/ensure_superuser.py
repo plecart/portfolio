@@ -5,8 +5,10 @@ Le point d'entrée du conteneur la joue après les migrations (`STARTUP_STEPS`,
 `ADMIN_USERNAME` et `ADMIN_PASSWORD` (`config/env.py`). Rejouée à chaque démarrage, elle crée le
 compte une fois, puis n'écrit que ce qui a changé.
 
-Elle refuse — sortie non nulle, donc conteneur arrêté — un nom ou un mot de passe vide, un mot de
-passe que `AUTH_PASSWORD_VALIDATORS` rejette, et tout autre superutilisateur : l'admin n'en a qu'un.
+Elle refuse — sortie non nulle, donc conteneur arrêté — un nom ou un mot de passe vide, tout autre
+compte d'admin, superutilisateur ou staff : l'admin n'en a qu'un ; et un mot de passe neuf, à la
+création ou quand il change, que `AUTH_PASSWORD_VALIDATORS` rejette. Un mot de passe inchangé
+n'est pas rejugé : une montée de Django qui durcit un validateur n'arrête pas `api`.
 Ni sa sortie ni ses refus ne citent le mot de passe : ils partent dans le journal du conteneur.
 """
 
@@ -16,6 +18,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Q
 
 CREATED = "superutilisateur créé"
 UNCHANGED = "superutilisateur inchangé"
@@ -23,14 +26,29 @@ RIGHTS_RESTORED = "droits de superutilisateur rétablis"
 PASSWORD_UPDATED = "mot de passe du superutilisateur mis à jour"
 
 MISSING = "ADMIN_USERNAME et ADMIN_PASSWORD sont exigés, non vides"
-ANOTHER_SUPERUSER = (
-    "un autre superutilisateur existe : l'admin n'en a qu'un, ADMIN_USERNAME le nomme"
+ANOTHER_ADMIN = (
+    "un autre compte d'admin existe, superutilisateur ou staff : l'admin n'en a qu'un, "
+    "ADMIN_USERNAME le nomme"
 )
 WEAK_PASSWORD = "ADMIN_PASSWORD refusé par les validateurs de Django : "
 
 
+def _validate(password: str, user: User) -> None:
+    """Soumet un mot de passe neuf aux validateurs de Django, `user` pour la similarité au nom.
+
+    Raises:
+        CommandError: leurs motifs, jamais le mot de passe.
+    """
+    try:
+        validate_password(password, user)
+    except ValidationError as error:
+        raise CommandError(WEAK_PASSWORD + " ".join(error.messages)) from error
+
+
 def _update(user: User, password: str) -> str:
     """Rend ses droits et son mot de passe à un compte existant, sans rien écrire s'il les a.
+
+    Seul un mot de passe qui change passe les validateurs : celui en place n'est pas rejugé.
 
     Returns:
         Ce qui a été écrit, `UNCHANGED` si rien ne l'a été.
@@ -40,6 +58,7 @@ def _update(user: User, password: str) -> str:
         user.is_superuser = user.is_staff = user.is_active = True
         written.append(RIGHTS_RESTORED)
     if not user.check_password(password):
+        _validate(password, user)
         user.set_password(password)
         written.append(PASSWORD_UPDATED)
     if written:
@@ -56,17 +75,13 @@ class Command(BaseCommand):
         password: str = settings.ADMIN_PASSWORD.get_secret_value()
         if not username or not password:
             raise CommandError(MISSING)
-        if User.objects.filter(is_superuser=True).exclude(username=username).exists():
-            raise CommandError(ANOTHER_SUPERUSER)
+        admins = User.objects.filter(Q(is_superuser=True) | Q(is_staff=True))
+        if admins.exclude(username=username).exists():
+            raise CommandError(ANOTHER_ADMIN)
 
         user = User.objects.filter(username=username).first()
-        try:
-            # L'utilisateur, même neuf, pour que la similarité au nom soit éprouvée.
-            validate_password(password, user or User(username=username))
-        except ValidationError as error:
-            raise CommandError(WEAK_PASSWORD + " ".join(error.messages)) from error
-
         if user is None:
+            _validate(password, User(username=username))
             User.objects.create_superuser(username, password=password)
             self.stdout.write(CREATED)
         else:

@@ -245,11 +245,24 @@ courant, ni entièrement numérique, ni proche du nom (les validateurs de Django
 apostrophe, que `bootstrap.sh` refuse.
 
 `api` refuse de démarrer — `docker compose logs api` dit pourquoi — quand l'une des deux variables
-est vide, quand les validateurs refusent le mot de passe, ou quand la base porte déjà un
-superutilisateur d'un autre nom : l'admin n'en a qu'un. Ce dernier cas suit une restauration sur
-un VPS dont `ADMIN_USERNAME` diffère du compte de la sauvegarde, ou un `bootstrap.sh
-ADMIN_USERNAME` qui change le nom : remets le nom du compte existant par
+est vide, quand les validateurs refusent un mot de passe neuf — à la création du compte, ou quand
+`ADMIN_PASSWORD` change —, ou quand la base porte déjà un autre compte d'admin, superutilisateur
+ou staff, d'un autre nom : l'admin n'en a qu'un. Un mot de passe inchangé n'est pas rejugé : une
+montée de Django qui durcit un validateur n'arrête pas `api`. Le cas de l'autre compte suit une
+restauration sur un VPS dont `ADMIN_USERNAME` diffère du compte de la sauvegarde, ou un
+`bootstrap.sh ADMIN_USERNAME` qui change le nom : remets le nom du compte existant par
 `sudo bash bootstrap.sh ADMIN_USERNAME` (« Tourner un secret »), qui recrée `api`.
+
+**Nom perdu, ou à changer** : le refus ne nomme pas le compte. Un conteneur jetable d'`api`, qui
+ne joue aucune étape de démarrage (`STARTUP_STEPS` vide), le lit même quand `api` refuse :
+
+```
+docker compose run --rm -e STARTUP_STEPS= api python manage.py shell -c "print(*User.objects.filter(is_superuser=True) | User.objects.filter(is_staff=True))"
+```
+
+Pour changer de nom à dessein, renomme d'abord le compte dans la base, par la même voie et
+`shell -c "User.objects.filter(username='<ancien>').update(username='<nouveau>')"`, puis
+`sudo bash bootstrap.sh ADMIN_USERNAME` avec le nouveau nom ; dans l'autre ordre, `api` refuse.
 
 **Le second facteur** — une application TOTP, et dix codes de secours à usage unique — s'enrôle à
 la main, le compte posé, par une commande Compose (« Commandes sur le VPS ») :
@@ -362,7 +375,7 @@ Un échec écrit `échec à l'étape : <étape>` et sort en erreur. Ce qu'il veu
 | `restauration` | intacte — la restauration se fait en une transaction —, `api` et `worker` arrêtés | la sortie de `pg_restore` ou de `psql` le dit ; relance, ou `docker compose start api worker` pour revenir à la base d'avant |
 | `migrations` | restaurée, `api` et `worker` arrêtés | une migration a échoué, ou `migrate --check` en voit une non appliquée : la sortie de Django la nomme ; une fois réglé, `docker compose up -d --wait api worker` — `api` migre à son démarrage |
 | `contrôle` | restaurée et migrée, `api` et `worker` arrêtés | moins de projets publiés que le seuil : une sauvegarde trop ancienne, ou le mauvais seuil — relance avec une autre sauvegarde, ou `docker compose start api worker` si la base est la bonne |
-| `redémarrage` | restaurée, `api` ou `worker` ne devient pas sain | `docker compose logs api worker` — un superutilisateur d'un autre nom que `ADMIN_USERNAME` : « Admin » |
+| `redémarrage` | restaurée, `api` ou `worker` ne devient pas sain | `docker compose logs api worker` — un compte d'admin d'un autre nom que `ADMIN_USERNAME` : « Admin » |
 
 Une sauvegarde **plus récente** que le code — des migrations appliquées que le code ne connaît pas —
 ne se détecte pas : Django ne les voit pas. Le commit déployé doit être au moins aussi récent que la
