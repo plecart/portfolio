@@ -96,9 +96,9 @@ Ce que tu vérifies :
 python .claude/skills/cycle-pr/scripts/mutation.py <racine de ton worktree> <mutations.json>
 ```
 
-Son `--help` porte le contrat entier ; ses réglages de coût et ses pièges d'usage sont dans
-`.claude/skills/cycle-pr/references/relecture.md`, « Le contrat du harnais de mutation et ses
-pièges » — lis-les avant ta première mutation.
+Son `--help` porte le contrat entier : lis-le, n'ouvre pas la source. Ses réglages de coût et ses
+pièges d'usage sont dans `.claude/skills/cycle-pr/references/relecture.md`, « Le contrat du
+harnais de mutation et ses pièges » — lis-les avant ta première mutation.
 
 Un `VERT` sur arbre propre doublé d'un `ROUGE` avec une sonde plantée est une **mesure**, pas une
 panne : l'invariant n'est pas gardé mais il est gardable — rapporte-le comme un constat.
