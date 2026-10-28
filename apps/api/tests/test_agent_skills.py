@@ -1600,6 +1600,7 @@ BRIEFING_REF = ".claude/skills/cycle-pr/references/briefing.md"
 PORTES_REF = ".claude/skills/cycle-pr/references/portes.md"
 RELECTURE_REF = ".claude/skills/cycle-pr/references/relecture.md"
 FINALISATION_REF = ".claude/skills/cycle-pr/references/finalisation.md"
+CLOTURE_REF = ".claude/skills/cycle-pr/references/cloture.md"
 TRIAGE_SKILL = ".claude/skills/triage/SKILL.md"
 HORS_SCOPE_REF = ".claude/skills/triage/hors-scope.md"
 RELEVEUR_ROLE = ".claude/agents/releveur.md"
@@ -1829,7 +1830,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         "Archiver un enfant attend l'accord du mainteneur",
     ),
     "passation-a-la-coordinatrice-a-l-etape-8": (
-        CYCLE_PR_SKILL,
+        CLOTURE_REF,
         "dans le message de fin, **à la coordinatrice**, qui ouvre la session du lot suivant",
     ),
     "derive-apres-chaque-lot": (
@@ -1856,7 +1857,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         "Si worktree, sans coordinatrice : tu es sur la branche **mergée**",
     ),
     "relais-remis-a-la-coordinatrice": (
-        CYCLE_PR_SKILL,
+        CLOTURE_REF,
         "à la coordinatrice pour une session de lot",
     ),
     "coordinatrice-au-plafond": (
@@ -4040,7 +4041,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         "ne se recopie pas dans le plan publié",
     ),
     "7a-cycle-pr-plan-qa-nomme-la-famille": (
-        CYCLE_PR_SKILL,
+        CLOTURE_REF,
         (
             "`triage`, `interroge-moi`, `vers-prd`, `vers-issues`, `repercussions`,"
             " `bug-vers-issue`, `plan-qa`, `execution-qa` et `init-projet` (`depot create`,"
