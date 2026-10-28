@@ -45,19 +45,6 @@ fautive ; 2 : appel mal formé. **Ce qu'elle ne couvre pas** : un dépôt sans c
 KO avant d'écrire ; le premier push et la CI ; la ligne « validation » ; les hooks côté serveur ;
 le choix des commandes, qui reste à la session.
 
-Un échec ici se remonte à l'utilisateur **avant** le briefing, avec les cibles de correction
-possibles et leur portée (session, projet, machine) : c'est un arbitrage de configuration, jamais
-une décision du skill — **un skill ne modifie pas la configuration de l'utilisateur pour se
-débloquer lui-même**. Un même message de refus quelle que soit la commande se lit comme un
-problème de permissions alors que c'est l'outillage ; éprouver coûte quelques commandes avant le
-briefing, et une demi-session après le « go ».
-
-**Une commande marquée `# non vérifiée`** dans `.claude/pipeline.config.md` signale un projet
-initialisé sans code. Si cette PR pose du code, elle porte aussi ce que `init-projet` a reporté —
-la génération CI et Dependabot de son étape 7, paragraphe « Runtime épinglé » compris, la
-vérification des commandes de son étape 11, puis le retrait des marqueurs. L'inscrire au
-briefing ; sans elle, le projet resterait sans CI.
-
 ## Estimation
 
 - **Estimation** — comptée **par critère**, en artefacts que le critère doit laisser, jamais en
@@ -66,24 +53,6 @@ briefing ; sans elle, le projet resterait sans CI.
   ligne, plus la docstring de dénombrement si elle ferme une classe. Calibration mesurée : les
   lots 1, 2 et 3 de #77 ont dépassé la leur de 2 à 5×, tous du même côté — une estimation en
   prose est un plancher. C'est elle que consomme le seuil relatif de `taille-pr.md` (obs 78).
-
-## Porte d'entrée obligatoire — l'interrogatoire
-
-- **Issue interrogée** (passée par `needs-interrogation`, décisions consignées dans le brief
-  d'agent) → relire ces décisions, et vérifier qu'elles tiennent encore (auto-challenge ci-dessous).
-- **Brief portant `⚠️ Non interrogée au triage`**, ou aucune trace d'interrogatoire → **s'arrêter
-  et proposer une session d'interrogatoire** (`interroge-moi`, numéro de l'issue en argument), avant
-  la première ligne de code, puis reporter ses décisions, écrites dans l'issue, dans les
-  « Décisions verrouillées » du briefing.
-- **Demande directe sans issue** → l'interrogatoire s'applique aussi ; il n'y a pas de raccourci
-  parce que le travail n'a pas de ticket. Un correctif évident — visible à la lecture, sans
-  décision de comportement (`contraintes.md`, barreau 3) — n'a rien à interroger : sa
-  qualification, écrite dans le body de la PR — draft, ou PR de la voie courte — avec sa preuve,
-  en tient lieu.
-
-Le point n'est pas de cocher une case : c'est que **les décisions tranchées soient écrites**, dans
-l'issue — brief amendé s'il est contredit — et dans le briefing. Elles seront relues par une
-autre session que celle-ci.
 
 ## Auto-challenge du plan — le plan est-il encore exact ?
 
@@ -158,28 +127,6 @@ le go ci-dessous dans sa fenêtre comme toute session PR, et y démarre sa sessi
 qu'une issue est « en vol » et ne pas réécrire sa spec sous les pieds de cette session, et
 `pr-paralleles` pour tenir son tableau de bord. **Une branche locale sans PR est invisible** — le
 travail existe, mais rien ne le sait.
-
-## `Closes #<N>` dans le body
-
-- **`Closes #<N>`** dans le body. C'est **la** ligne qui rend l'issue détectable comme en vol.
-  Sans elle, `repercussions` la croira dormante et éditera sa spec en cours de développement.
-  **Cas découpé** (taille-pr impose plusieurs PR pour la même issue) : seule la **dernière** PR du
-  lot porte `Closes #<N>` — un `Closes` sur la première fermerait l'issue trop tôt. Chaque autre
-  PR du lot ouvre son body par la ligne **`En vol pour #<N> (lot k/n)`**, que `repercussions` lit
-  au même titre que `Closes` : sans elle, l'issue paraît dormante précisément pendant qu'on
-  travaille dessus. GitHub, lui, ne lit que le mot-clé : le lien des lots précédents se repose à
-  l'Étape 8, une fois l'issue close. Avec une coordinatrice, le `Closes` passe à la PR
-  d'intégration et **toutes** les PR de lot portent la ligne « En vol »
-  ([references/coordinatrice.md](references/coordinatrice.md)).
-
-## Pour une demande directe sans issue
-
-Pour une **demande directe sans issue**, ouvrir quand même la draft : sans `Closes`, mais le
-travail reste visible du reste de la pipeline. Pour une draft née d'un échec de QA (case
-` 🔴 correctif évident — …`), la session, une fois la draft ouverte, remplace ce marqueur par
-` 🔴 PR #<M>` sur la case, par une paire
-(`python .claude/skills/cycle-pr/scripts/ecriture-relue.py checkbox patch <plan> --paires <fichier>`,
-`execution-qa/references/patch-checkbox-gh.md`) : c'est ce que lit la reprise de la QA.
 
 ## La CI tourne sur chaque push de la branche, draft comprise
 
