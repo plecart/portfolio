@@ -1,11 +1,11 @@
 """Charge un script d'un skill de `.claude/` pour le tester, ou le lance comme la session le lit.
 
 Les scripts des skills vivent sous `.claude/skills/<skill>/scripts/` : un dossier caché, donc
-hors de tout paquet importable — et hors de `pyright`, qui exclut les dossiers cachés sans que
-sa configuration puisse l'en empêcher (mesuré le 2026-10-09 : `filesAnalyzed` inchangé que
-`.claude` figure ou non dans `include`, même en nommant le fichier). `ruff` les lit, lui. La
-seule porte qui éprouve leur *comportement* est donc cette suite, et c'est pourquoi elle les
-charge par chemin.
+hors de tout paquet importable. `ruff` les lit ; `pyright` aussi, mais par un projet à part
+(`.claude/skills/pyrightconfig.json`, lancé par `make typecheck`), le projet racine excluant les
+dossiers cachés quoi que dise son `include` (mesuré le 2026-10-09). Ni l'un ni l'autre ne les
+exécute : la seule porte qui éprouve leur *comportement* est cette suite, et c'est pourquoi elle
+les charge par chemin.
 """
 
 import importlib.util

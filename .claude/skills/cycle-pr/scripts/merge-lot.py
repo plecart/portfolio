@@ -37,6 +37,7 @@ Python 3.11 ou plus, bibliothèque standard seule ; `gh` authentifié et `git`, 
 dépôt.
 """
 
+import io
 import json
 import re
 import subprocess
@@ -228,5 +229,6 @@ if __name__ == "__main__":
     # Sur un poste dont la page de code est cp1252, Python écrit un tube dans cet encodage : le
     # motif, accentué, arriverait illisible à la session qui le lit (mesuré le 2026-10-17, PR #119 ;
     # commande dans `pipeline.config.md`, « Qualité »).
-    sys.stdout.reconfigure(encoding="utf-8")
+    if isinstance(stdout := sys.stdout, io.TextIOWrapper):
+        stdout.reconfigure(encoding="utf-8")
     sys.exit(main(sys.argv[1:]))

@@ -3,7 +3,7 @@
 Le harnais est la preuve que les tests d'une PR *tiennent* : il casse ce qu'un test protège et
 exige de le voir rougir. Un harnais qui se trompe mente toujours dans le même sens — il rend vert
 un test jamais vu rouge (obs 37, deux défauts mesurés sur sept réécritures). D'où cette suite :
-c'est la seule porte qui éprouve son comportement, `pyright` n'atteignant pas les dossiers cachés.
+c'est la seule porte qui éprouve son comportement, `pyright` n'en vérifiant que les types.
 """
 
 import io

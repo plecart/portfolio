@@ -126,8 +126,12 @@ format:
 format-check:
 	$(UV) run ruff format --check .
 
+# Deux projets pyright. Le second, `.claude/skills/pyrightconfig.json`, porte les scripts des
+# skills : le projet racine ne les voit pas, son exclusion par défaut `**/.*` sautant tout dossier
+# caché quoi que dise `include` ; vu depuis `.claude/skills`, plus aucun dossier du chemin ne l'est.
 typecheck:
 	$(UV) run pyright
+	$(UV) run pyright -p .claude/skills
 
 # Le schéma OpenAPI de l'API publique, versionné : le front en dérive ses types (#19). À relancer
 # après tout changement du contrat — sinon le test de fraîcheur de `make test` rougit. La commande

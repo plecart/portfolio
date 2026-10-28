@@ -325,6 +325,22 @@ def test_une_ligne_illisible_ne_fait_pas_perdre_le_reste(tmp_path: Path) -> None
     assert any("avant" in ligne for ligne in lignes), lignes
 
 
+def test_un_bloc_qui_n_est_pas_un_objet_est_ignore_sans_perdre_le_reste(tmp_path: Path) -> None:
+    """Un bloc de contenu qui n'est pas un objet JSON ne porte pas de texte : il est sauté, et le
+    tour garde le texte de ses autres blocs au lieu de faire tomber le rapport entier."""
+    intrus = {
+        "type": "assistant",
+        "timestamp": HORODATAGE,
+        "message": {"content": ["intrus", {"type": "text", "text": "garde"}]},
+    }
+    transcript = ecrire(tmp_path / "s.jsonl", [intrus])
+
+    ligne = next(ligne for ligne in fin.rapport(transcript, 5) if "**assistant**" in ligne)
+
+    assert ligne.endswith("garde"), ligne
+    assert "intrus" not in ligne
+
+
 def test_une_session_sans_sous_agent_le_dit(tmp_path: Path) -> None:
     """Le cas normal : pas de dossier `subagents/`, et surtout pas d'erreur."""
     transcript = ecrire(tmp_path / "s.jsonl", [tour("assistant", "seule")])
