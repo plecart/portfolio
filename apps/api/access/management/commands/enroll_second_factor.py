@@ -19,7 +19,7 @@ from django_otp.plugins.otp_static.models import (  # pyright: ignore[reportMiss
 )
 from django_otp.plugins.otp_totp.models import TOTPDevice  # pyright: ignore[reportMissingTypeStubs]
 
-BACKUP_CODES = 10
+BACKUP_CODE_COUNT = 10
 
 URI_HEADER = "URI à ouvrir dans l'application d'authentification :"
 BACKUP_CODES_HEADER = "Codes de secours, chacun à usage unique :"
@@ -41,7 +41,7 @@ def _enroll(user: User) -> tuple[str, list[str]]:
     app.save()
     backup = StaticDevice(user=user, name=strings.OTP_DEVICE_BACKUP_CODES)
     backup.save()
-    codes = [StaticToken.random_token() for _ in range(BACKUP_CODES)]
+    codes = [StaticToken.random_token() for _ in range(BACKUP_CODE_COUNT)]
     StaticToken.objects.bulk_create(StaticToken(device=backup, token=code) for code in codes)
     return app.config_url, codes
 
