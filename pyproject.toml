@@ -84,7 +84,8 @@ extend-exclude = [".claude/worktrees"]
 typeCheckingMode = "strict"
 # `infra` : le code Python de la CI (`infra/ci`) est tenu au même mode strict. Pas sous `.github/` :
 # pyright y exclut tout dossier caché, et cette exclusion l'emporte sur `include` — mesuré, une
-# erreur de type délibérée y passait sans diagnostic.
+# erreur de type délibérée y passait sans diagnostic. Les scripts des skills, sous `.claude/`, ont
+# donc leur propre projet, `.claude/skills/pyrightconfig.json`, que `make typecheck` lance aussi.
 include = ["apps", "infra"]
 # Le `pythonpath` de pytest, vu de pyright : les modules d'appui des tests s'importent par leur nom.
 extraPaths = ["apps/api/tests", "infra/ci"]
