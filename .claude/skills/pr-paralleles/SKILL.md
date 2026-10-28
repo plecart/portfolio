@@ -322,9 +322,9 @@ Le garde de permissions de ta session refuse les commandes qu'il ne sait pas vé
 nommer le fragment fautif — substitution de commande dans une condition, heredoc suivi d'une
 commande, boucle `for`, gabarit `--format` ou `--jq` avec accolades, `sh -c` en ligne. Une chaîne
 de trois commandes `&&` n'est pas refusée en soi — mesuré en worktree isolé avec une troisième
-commande **en lecture**, la forme écrivante n'ayant pas été provoquée (`cycle-pr` Étape 1,
-« Deux prédicats, pas un », porte la mesure et sa borne) : c'est la forme de la porte de l'Étape 1.
-Écris les fichiers longs avec
+commande **en lecture**, la forme écrivante n'ayant pas été provoquée
+(`cycle-pr/references/portes.md`, « Deux prédicats, pas un », porte la mesure et sa borne) :
+c'est la forme de la porte de l'Étape 1. Écris les fichiers longs avec
 l'outil d'écriture plutôt qu'un heredoc, une commande par objet plutôt qu'une boucle, un script
 dans le répertoire temporaire de session plutôt qu'un `-c` : chaque refus coûte deux ou trois
 reformulations à l'aveugle.
