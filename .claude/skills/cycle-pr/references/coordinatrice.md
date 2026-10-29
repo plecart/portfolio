@@ -60,8 +60,8 @@ barème du point 3 met à `max`, le geste tombant avant tout enfant. Dans ce tou
    `/effort` en cours de session sur le cache n'est pas mesuré) : `high` par défaut, `max` si le
    bloc du lot porte un ADR, une surface de sécurité ou un contrat entre piles, `medium` pour un
    lot de doc ou de config seule ; `model` omis quand la coordinatrice est en Opus 5.5,
-   `claude-opus-5-5` si elle est au-dessus. La forme démarrée à son ouverture remplace ce geste
-   (« La session de lot »).
+   `claude-opus-5-5` si elle est au-dessus. La forme démarrée à son ouverture remplace ce
+   démarrage, pas le renommage (« La session de lot »).
 
 Le brief d'une session de lot porte : le bloc du lot dans le corps de l'issue, l'effort retenu, la
 branche d'intégration, son lead, et la consigne « porte le cycle complet et délègue le code »
