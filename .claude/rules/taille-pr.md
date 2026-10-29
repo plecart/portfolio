@@ -1,21 +1,39 @@
 # Règle — Taille et format des PR
 
 ## Découpage
-- **Une PR = une unité de travail cohérente et reviewable.**
-- Au-delà de **~10 fichiers** ou **~500 lignes de diff**, découper la PR.
-- **Ne jamais raboter la qualité pour tenir dans le gabarit.** Si le bon choix technique dépasse
-  ces bornes, découper en lots (`cycle-pr`, cas découpé) — pas rogner la solution.
-- **Le gabarit se re-mesure à chaque commit** (`git diff --stat main...HEAD`, `cycle-pr` 3.5), pas
-  à la fin. Le `developpeur` rend le chiffre avec chaque commit et s'arrête au seuil que porte son
-  brief ; la session PR le relit contre les deux seuils. Deux seuils, deux effets : l'**absolu**
-  ci-dessus mesure la relisabilité et **découpe** ; le **double de l'estimation du briefing**
-  mesure que le plan était faux et **rouvre** le découpage — un lot de plus, ou une ligne qui
-  nomme ce qui, dans le bon choix technique, impose le dépassement ; jamais la seule déclaration
-  du chiffre.
-- **Un découpage déjà décidé borne le périmètre d'un lot, pas son volume** : « un lot = une PR »
-  n'autorise pas un lot à doubler son estimation — il se re-découpe comme une PR, en sous-lots.
-- **Le seuil relatif vaut ce que vaut l'estimation** : elle se compte en épingles, pas en lignes
-  de prose (`cycle-pr` Étape 1, « Estimation »).
+Règle de l'étude du 2026-10-29 (`2026-10-29-etude-taille-pr.md` §8.5, dossier `etudes/` voisin du
+journal d'observations), qui en porte les mesures.
+
+1. **Un sujet = une issue = une PR, sans limite de lignes ni de fichiers.** Des morceaux forment
+   un seul sujet s'ils partagent une décision, ou s'ils ne se valident qu'ensemble, ou s'ils
+   changent le même contrat. Partager un fichier ne compte pas.
+2. **Plancher.** Un sujet estimé sous ~300 lignes entre comme critère dans l'issue voisine du même
+   domaine, si elle est prête en même temps, sous deux gardes : (a) il n'y apporte aucune décision
+   ouverte ; (b) il en ressort si l'hôte se bloque. Le correctif évident (voie courte de
+   `cycle-pr`) et l'urgence restent hors plancher. Il se décide à l'écriture de l'issue, par
+   `vers-issues` et `triage`.
+3. **Une seule règle pour découper**, en issues comme en lots. Le motif s'écrit au brief avec son
+   coût : ≈ 30 M de tokens et 5 à 8 contacts du mainteneur par PR de plus.
+   - Deux sujets → deux issues.
+   - Un sujet avec un motif → un lot léger. Les motifs : une dépendance de mise en service, une
+     relecture d'une autre nature ou un risque distinct, un parallélisme dont le gain est nommé.
+4. **Lot léger** : des PR successives vers `main`, sans coordinatrice ni branche d'intégration
+   (`cycle-pr` Étape 2, « Cas découpé »). Une coordinatrice seulement contre une surface visible à
+   moitié livrée, ou une règle de pipeline à moitié appliquée pendant une vague
+   (`cycle-pr/references/coordinatrice.md`).
+5. **La taille organise la PR, elle ne la découpe pas.**
+   - On estime en blocs : ≈ 650 lignes ou ≈ 350 K de contexte de `developpeur` chacun (`cycle-pr`
+     Étape 1, « Estimation »).
+   - Chaque bloc a sa passe de relecture, puis vient la passe finale. Une passe s'ajoute si la
+     dernière trouve encore un bloquant ou un important (`cycle-pr` Étape 4).
+   - Le `developpeur` rend le chiffre de `git diff --stat main...HEAD` avec chaque commit
+     (`cycle-pr` 3.5). Un dépassement tient en une ligne de Notes. Seul le **périmètre** rouvre le
+     découpage.
+6. **Au-delà de ~3 blocs estimés**, le briefing dit pourquoi c'est un seul sujet, avec le coût des
+   deux voies, et le mainteneur tranche au go.
+7. **À chaque frontière de bloc, la session lit sa fenêtre** — la part de son contexte déjà
+   consommée. Si un relais s'annonce, elle rejoue le test du point 1 : deux sujets, elle coupe en
+   lot léger ; un seul, elle relaie (`cycle-pr` Étape 8, « Relais en cours de cycle »).
 
 ## Format des messages
 - **Commits et titre de PR** au format conventional commit : `type(scope): description`.
