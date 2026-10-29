@@ -39,8 +39,9 @@ Tu ne charges pas `cycle-pr` ; ce qu'il te faut de lui :
   que le rouge attendu, se relit sur la sortie brute du lanceur : ligne « test brut » de
   `.claude/pipeline.config.md`. Un résumeur n'est pas un verdict.
 - **Gabarit** (`cycle-pr` 3.5) — après chaque commit, `git diff --stat <base>...HEAD`, la base
-  étant celle que ton brief nomme, contre le seuil que ton brief porte. Franchi, tu t'arrêtes et
-  tu rends la main : le re-découpage est à la session PR.
+  étant celle que ton brief nomme ; aucun chiffre ne t'arrête. Un bloc qui ne tient plus sans
+  toucher ce que ni ton brief ni les critères de l'issue ne portent, si : tu rends la main, le
+  re-découpage est à la session PR.
 - **Références** — `.claude/skills/cycle-pr/references/` : `tests.md` (bons et mauvais tests),
   `mocking.md` (frontières du système seulement), `design-interface.md`, `modules-profonds.md`,
   `refactoring.md`. Lis celle dont le bloc relève, avant d'écrire.

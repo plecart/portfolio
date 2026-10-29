@@ -245,7 +245,7 @@ groupée au prochain arrêt. Ailleurs, s'arrêter est une remise de main que per
 **dès que le bloc dépasse ~50 lignes de diff ou ajoute un module ; en dessous, la session code
 elle-même** — le brief coûterait plus que le code. Le brief d'un bloc porte ses fichiers, ses
 signatures, ses tests attendus et leur rouge, son comportement, son estimation en épingles
-(Étape 1), la base et le seuil du gabarit (3.5) et le niveau `ponytail` ; le `developpeur` part à `xhigh` quand le bloc écrit des tests. Il fait le TDD
+(Étape 1), la base du gabarit (3.5) et le niveau `ponytail` ; le `developpeur` part à `xhigh` quand le bloc écrit des tests. Il fait le TDD
 de cette étape, le cycle 3.2 à 3.5, la doc descriptive et le commit — jamais le push, que la
 session PR fait après chaque remise, derrière la ligne « validation » quand le delta la demande
 (3.2). Arrêté sur une `[C]` ou sur une question dont dépend tout le bloc, il est **repris par
@@ -330,10 +330,18 @@ git commit -m "type(scope): description"
 Pas de corps, pas de footer, pas de `Co-Authored-By`, pas de numéro de PR. Breaking change : `!`
 dans le titre.
 
-**Puis relire le gabarit** : le `developpeur` rend avec chaque commit le chiffre de
-`git diff --stat <base>...HEAD`, la base de son brief, et s'arrête au seuil que ce brief porte ; la
-session PR le relit contre les deux seuils de `taille-pr.md` — l'absolu, et le double de
-l'estimation du briefing. Franchi, le re-découpage se rouvre maintenant, pas à l'Étape 5 (obs 70).
+**Puis la frontière de bloc** (`taille-pr.md`, points 5 et 7). Le `developpeur` rend avec chaque
+commit le chiffre du gabarit, `git diff --stat <base>...HEAD`, la base de son brief ; seul un
+changement de périmètre l'arrête, jamais un chiffre. La remise d'un bloc — ou le commit de la
+session qui le code elle-même (3.1) — en est la frontière, où la session PR lit trois choses :
+
+- **les blocs** — le chiffre contre l'estimation en blocs du briefing (Étape 1, « Estimation ») ;
+  un dépassement tient en une ligne de Notes ;
+- **le périmètre** — un bloc qui a dû toucher ce que ni son brief ni les critères de l'issue ne
+  portent rouvre le découpage maintenant, pas à l'Étape 5 (obs 70) ;
+- **la fenêtre** — la part de son propre contexte déjà consommée ; si un relais s'annonce, elle
+  rejoue le test du sujet (`taille-pr.md`, point 1) : deux sujets, elle coupe en lot léger (Étape 2,
+  « Cas découpé ») ; un seul, elle relaie (Étape 8, « Relais en cours de cycle »).
 
 **Un sous-lot est un lot** (D-9, #134). Les PR qu'un re-découpage fait naître suivent « Une session
 neuve par lot » (Étape 8) : la session courante finit son sous-lot et écrit la passation depuis
@@ -554,8 +562,6 @@ body définitif, puis de sortir du draft.
 ## Notes
 <décisions, follow-ups différés, hors-scope, comportements tiers vérifiés (doc citée)>
 ```
-
-Au-delà de **~10 fichiers** ou **~500 lignes** de diff, découper la PR.
 
 **Preuves visuelles exigées par un HITL** → [references/finalisation.md](references/finalisation.md), « Preuves visuelles exigées par un HITL ».
 

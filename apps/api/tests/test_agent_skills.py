@@ -3048,7 +3048,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "porteur-gabarit-a-chaque-commit": (
         ".claude/rules/taille-pr.md",
-        "Le `developpeur` rend le chiffre avec chaque commit et s'arrête au seuil que porte son brief",
+        "Le `developpeur` rend le chiffre de `git diff --stat main...HEAD` avec chaque commit",
     ),
     "porteur-deux-sorties": (
         ".claude/rules/decisions-vs-doc.md",
@@ -7644,3 +7644,68 @@ def test_chaque_renvoi_de_cycle_pr_mene_a_un_titre_de_sa_reference(
     titres = re.findall(r"(?m)^## (.+)$", reference.read_text(encoding="utf-8"))
 
     assert titre in titres, f"`{fichier}` ne porte pas « {titre} »"
+
+
+# --- La règle du sujet : aucun seuil de taille ne fait plus découper (#195) ---------------------
+
+# `taille-pr.md` faisait découper une PR au-delà de « ~10 fichiers » ou de « ~500 lignes de diff », et
+# rouvrir le découpage au « double de l'estimation ». La règle du sujet (#195 ; étude du 2026-10-29,
+# §8.5) n'a plus de seuil de lignes, de fichiers ni d'estimation : seul le périmètre rouvre le
+# découpage. Un de ces seuils réécrit dans un texte qui découpe le rétablirait, la session suivant
+# le texte et non l'intention. Le motif lit chaque seuil sous ses variantes — tilde ou non, verbe
+# conjugué, apostrophe typographique, coupe de ligne — et laisse les nombres de la règle neuve.
+SEUIL_DE_TAILLE_RETIRE = re.compile(
+    r"(?<!\d)(?<!\d\s)~?\s?(?:10\s+fichiers|500\s+lignes)"
+    r"|doubl\w*\s+(?:de\s+)?(?:l['’]\s?|son\s+|leur\s+)estimation",
+    re.IGNORECASE,
+)
+SEUIL_DE_TAILLE_FORMES = {
+    "regle-d-origine": ("Au-delà de **~10 fichiers** ou **~500 lignes de diff**, découper.", True),
+    "gabarit-du-body": ("Au-delà de **~10 fichiers** ou **~500 lignes** de diff", True),
+    "sans-tilde": ("au-delà de 500 lignes de diff, découper la PR", True),
+    "tilde-et-espace": ("PR ≤ ~ 10 fichiers", True),
+    "double-de-l-estimation": ("le **double de l'estimation du briefing** rouvre", True),
+    "double-coupe-en-fin-de-ligne": ("l'absolu, et le double de\nl'estimation du briefing", True),
+    "doubler-son-estimation": ("n'autorise pas un lot à doubler son estimation", True),
+    "apostrophe-typographique": ("au double de l’estimation", True),
+    "plancher": ("Un sujet estimé sous ~300 lignes", False),
+    "bloc": ("≈ 650 lignes ou ≈ 350 K de contexte de `developpeur`", False),
+    "revue-de-fin-de-vague": ("moins de 3 PR de plus de 1 500 lignes", False),
+    "revue-espace-insecable": ("plus de 1\u202f500 lignes", False),
+    "nombre-colle": ("une PR de 1500 lignes", False),
+    "voie-courte": ("≤ 50 lignes et ≤ 3 fichiers", False),
+}
+# Les textes qui décident d'un découpage : la règle, `cycle-pr` et ses références, `vers-issues`.
+TEXTES_QUI_DECOUPENT = {
+    "regle-de-taille": ".claude/rules/taille-pr.md",
+    "cycle-pr": CYCLE_PR_SKILL,
+    "references-de-cycle-pr": ".claude/skills/cycle-pr/references/*.md",
+    "vers-issues": VERS_ISSUES_SKILL,
+}
+
+
+@pytest.mark.parametrize(
+    ("texte", "seuil"), SEUIL_DE_TAILLE_FORMES.values(), ids=SEUIL_DE_TAILLE_FORMES.keys()
+)
+def test_le_motif_des_seuils_de_taille_retires_ne_vise_qu_eux(texte: str, seuil: bool) -> None:
+    """Le témoin des deux côtés : chaque forme d'un seuil retiré appariée, chaque nombre de la règle
+    du sujet laissé."""
+    assert bool(SEUIL_DE_TAILLE_RETIRE.search(texte)) is seuil
+
+
+@pytest.mark.parametrize("motif", TEXTES_QUI_DECOUPENT.values(), ids=TEXTES_QUI_DECOUPENT.keys())
+def test_aucun_texte_qui_decoupe_ne_rend_un_seuil_de_taille_retire(motif: str) -> None:
+    """**Population**, texte aux espaces normalisés : sur `69f1dfe`, **7** seuils dans 2 fichiers —
+    `taille-pr.md` ×4 (« Découpage »), `cycle-pr/SKILL.md` ×3 (3.5 et gabarit du body de
+    l'Étape 5) ; **0** sur la tête. Commande : ce test sur une copie de travail de `69f1dfe`."""
+    fichiers = [
+        p.relative_to(REPOSITORY_ROOT).as_posix() for p in sorted(REPOSITORY_ROOT.glob(motif))
+    ]
+    sites = [
+        f"{fichier} : {seuil.group(0).strip()}"
+        for fichier in fichiers
+        for seuil in SEUIL_DE_TAILLE_RETIRE.finditer(texte_normalise(fichier))
+    ]
+
+    assert fichiers, f"`{motif}` ne désigne plus aucun fichier"
+    assert not sites, f"un seuil de taille retiré fait de nouveau découper : {sites}"
