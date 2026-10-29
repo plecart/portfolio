@@ -51,8 +51,8 @@ lettre en tête de la question ou de la décision : `[T]`, `[V]` ou `[C]`.
   > tout code dupliqué, inutile ou obsolète. Et surtout, rendez-le scalable, modulaire et
   > générique. Décomposez les fonctions et séparez les responsabilités en suivant les principes
   > KISS, DRY et YAGNI. L'objectif est d'obtenir un code propre, clair, concis et optimisé. Ne
-  > rabote pas la qualité pour tenir dans le gabarit de PR : si le bon choix dépasse, découpe en
-  > lots (`taille-pr.md`).
+  > rabote pas la qualité pour tenir dans un gabarit de PR :
+  > la taille ne découpe pas, seul un second sujet ou un motif écrit le fait (`taille-pr.md`).
 
 - **Voie V — vision.** Ce que l'utilisateur voit, le contenu, le ton, le périmètre, un compromis
   produit : tout choix qu'un autre expert technique ferait autrement **pour une raison de goût ou
