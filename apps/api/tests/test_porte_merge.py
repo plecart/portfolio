@@ -386,8 +386,8 @@ CONVERSATIONS: dict[str, tuple[dict[str, Any], int, str]] = {
         pr_94(RELEVE_APRES, revues=[revue("2026-10-14T18:01:07Z")]),
         1,
         (
-            "revue de plecart à 2026-10-14T18:01:07Z : sans texte — commentaires en ligne :"
-            " gh api --paginate repos/{owner}/{repo}/pulls/94/comments"
+            "revue de plecart à 2026-10-14T18:01:07Z : sans texte — ses commentaires en ligne,"
+            " s'il y en a : gh api --paginate repos/{owner}/{repo}/pulls/94/comments"
         ),
     ),
     "posterieur-d-une-fraction-de-seconde": (
