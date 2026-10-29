@@ -663,7 +663,7 @@ conflit ou un commentaire (description de `set_monitor`, lue le 2026-10-20), jam
 surveillance de la CI que la session lance elle-même, le moniteur ne couvrant pas le succès ;
 jamais une sonde planifiée. Le script ne couvre ni les autres workflows et événements, ni ce que le
 run a combiné (paragraphe suivant), ni la page d'état et la réouverture, qui restent à la session
-et au mainteneur (« Si aucun run n'apparaît »).
+(« Si aucun run n'apparaît »).
 
 Ce run a tourné sur la référence de fusion qu'il a trouvée à son déclenchement, que GitHub ne
 recalcule ni à chaque merge sur le trunk ni au passage en ready : il peut combiner la tête à un
