@@ -63,12 +63,12 @@ draft (`gh pr ready --undo`), son body reçoit le briefing de l'Étape 1, et le 
    qu'en 4.2.
 4. **CI verte**, lue dans `gh pr checks` — pas d'`attente-ci.py` en fond —, puis le relevé de
    conversation inscrit au body, sans `verificateur`, par
-   `python <répertoire de ce skill>/scripts/porte-merge.py conversation <n> --releve` (Étape 7,
-   « Vérification d'avant-go »), puis go humain, puis le merge par la porte de « Le go, puis le
-   merge » (Étape 7), le `<SHA du trunk éprouvé>` lu par
-   `porte-merge.py trunk <run> <trunk> <SHA de tête>` (« Rejouer les vérifications périmées ») et
-   noté dans le body avec le numéro du run ; trunk avancé : relancer et relire la trace, sans
-   `verificateur`.
+   `python <répertoire de ce skill>/scripts/porte-merge.py conversation <n> --releve`, puis lu
+   (Étape 7, « Vérification d'avant-go »), puis go humain, puis le merge par la porte de « Le
+   go, puis le merge » (Étape 7), le `<SHA du trunk éprouvé>` lu par
+   `porte-merge.py trunk <run> <trunk> <SHA de tête vérifié>` (« Rejouer les vérifications
+   périmées ») et noté dans le body avec le numéro du run ; trunk avancé : relancer et relire la
+   trace, sans `verificateur`.
 5. Ni `verificateur`, ni bilan chiffré, ni `repercussions` — sauf si le diff touche un fichier de
    la section « Sources de vérité », ou si un résidu a été rangé au barreau 2 en cours de cycle :
    la passe `repercussions` de l'Étape 8 est alors due. Sinon, un `grep` des ancres du diff sur
@@ -678,7 +678,8 @@ dans les types du workflow), une relance de CI de la PR, couverte d'avance et bo
 l'Étape 7 (« Rejouer les vérifications périmées ») — jamais de commit vide ni de force-push. Puis
 relancer le script, comme ci-dessus : le run de la réouverture est le plus récent. Ce run attendu,
 lire ce qu'il a extrait comme à l'Étape 7 : `git fetch origin`, seul, puis la trace de checkout de
-ses jobs, `python <répertoire de ce skill>/scripts/porte-merge.py trunk <run> <trunk> <SHA de tête>`.
+ses jobs,
+`python <répertoire de ce skill>/scripts/porte-merge.py trunk <run> <trunk> <SHA de tête vérifié>`.
 
 ## Étape 6 — Review + CI
 
@@ -795,11 +796,14 @@ run peut extraire une référence plus ancienne que celle que la forge porte (ob
 qu'`attente-ci.py` a rendu :
 
 ```
-python <répertoire de ce skill>/scripts/porte-merge.py trunk <run> <trunk> <SHA de tête>
+python <répertoire de ce skill>/scripts/porte-merge.py trunk <run> <trunk> <SHA de tête vérifié>
 ```
 
-Le script lit, sur chaque job qui a tourné, la ligne de checkout de sa trace (« HEAD is now at
-<court> Merge <tête> into <trunk> », `gh run view <run> --log`) : le **premier parent** du commit
+Le `<SHA de tête vérifié>` est celui que la porte de merge passera à `--match-head-commit` : le
+même SHA aux deux commandes, si bien que le run lu est celui de la tête qui sera mergée, et le
+script refuse un run d'une autre tête. Le script lit, sur chaque job qui a tourné, la ligne de
+checkout de sa trace (« HEAD is now at <court> Merge <tête> into <trunk> »,
+`gh run view <run> --log`) : le **premier parent** du commit
 extrait, le `<trunk>` du message, est le **trunk éprouvé** — ce que le run a réellement combiné à la
 tête —, et c'est **lui** que la porte de merge consomme, sous le nom `<SHA du trunk éprouvé>`,
 inscrit au Test plan avec le numéro du run. Le `<SHA du trunk éprouvé>` ne vaut qu'à la sortie
@@ -890,10 +894,14 @@ comme un énoncé sans source : deux lots de suite, le prompt du lot suivant a c
 le corps ni les commentaires de la PR ne portaient (obs 81).
 
 **Une PR sans `verificateur`** — hors des trois conditions ci-dessus — porte le même relevé, que la
-session inscrit aux Notes avant de demander le go, de la même façon, après avoir lu
-`gh pr view <n> --comments` : la ligne que rend
+session inscrit aux Notes avant de demander le go, de la même façon : la ligne que rend
 `python <répertoire de ce skill>/scripts/porte-merge.py conversation <n> --releve`, copiée telle
-quelle.
+quelle, puis la lecture de ce qu'il compte, `gh pr view <n> --comments` et les commentaires en
+ligne d'une revue, que cette commande ne rend pas :
+`gh api --paginate repos/{owner}/{repo}/pulls/<n>/comments`. Relever d'abord : lu avant, un
+élément arrivé entre la lecture et le relevé passerait la porte compté sans avoir été lu
+(`.claude/agents/verificateur.md`, point 1, qui suit le même ordre). Le relevé n'est pas une
+porte : il sort en 0 sans juger, et ne se chaîne jamais par `&&`.
 
 Le verdict rendu :
 
@@ -931,7 +939,8 @@ trunk a avancé depuis, la commande **ne part pas** : rejouer « Rejouer les vé
 périmées », relire la trace du nouveau run, puis un `verificateur` neuf. Si c'est la conversation
 qui a changé, elle ne part pas non plus : lire chaque élément que le prédicat nomme — un
 commentaire de répercussion se traite à l'Étape 6 —, puis un `verificateur` neuf, ou pour une PR
-qui n'en a pas, un relevé neuf aux Notes.
+qui n'en a pas, un relevé neuf aux Notes, pris puis lu comme plus haut (« Vérification
+d'avant-go »).
 
 **Une porte est une commande dont le code de sortie porte la condition ; `&&` est ce qui la rend bloquante.** → [references/merge.md](references/merge.md), « Une porte est une commande dont le code de sortie porte la condition ».
 

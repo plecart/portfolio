@@ -520,10 +520,10 @@ c'est le seul autre canal, et il passe par lui.
   carte de recouvrement de l'étape 2 : elle décrit des issues entières, un merge livre un lot. Le
   script ne l'envoie pas, et ne relance rien : une branche qui recouvre relance sa CI, qui tourne
   sur la référence de fusion ; ce que le run prouve se lit dans la trace de checkout de ses jobs,
-  par `.claude/skills/cycle-pr/scripts/porte-merge.py trunk <run> main <SHA de tête>`, jamais
-  dans la référence que porte la forge, que GitHub ne recalcule pas d'office et qu'un run peut
-  ne pas avoir extraite (`cycle-pr` Étape 7, « Rejouer les vérifications périmées », obs 51, 83,
-  110) — pas de commit de fusion sur un trunk fusionné par rebase, ni de rebase
+  par `.claude/skills/cycle-pr/scripts/porte-merge.py trunk <run> main <SHA de tête vérifié>`,
+  jamais dans la référence que porte la forge, que GitHub ne recalcule pas d'office et qu'un run
+  peut ne pas avoir extraite (`cycle-pr` Étape 7, « Rejouer les vérifications périmées », obs 51,
+  83, 110) — pas de commit de fusion sur un trunk fusionné par rebase, ni de rebase
   d'une branche poussée sans demande explicite (`contraintes.md`) ; un conflit se résout par un
   commit réel sur la branche.
 
