@@ -1845,7 +1845,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "passation-a-la-coordinatrice-a-l-etape-8": (
         CLOTURE_REF,
-        "dans le message de fin, **à la coordinatrice**, qui ouvre la session du lot suivant",
+        "Sous une coordinatrice, **à la coordinatrice**, qui ouvre la session du lot suivant",
     ),
     "derive-apres-chaque-lot": (
         COORDINATRICE_REF,
@@ -1872,7 +1872,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "relais-remis-a-la-coordinatrice": (
         CLOTURE_REF,
-        "à la coordinatrice pour une session de lot",
+        "à la coordinatrice pour une session de lot coordonné",
     ),
     "coordinatrice-au-plafond": (
         COORDINATRICE_REF,
@@ -3048,13 +3048,14 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "porteur-gabarit-a-chaque-commit": (
         ".claude/rules/taille-pr.md",
-        "Le `developpeur` rend le chiffre de `git diff --stat main...HEAD` avec chaque commit",
+        "Le `developpeur` rend le chiffre de `git diff --stat <base>...HEAD` avec chaque commit",
     ),
     "porteur-deux-sorties": (
         ".claude/rules/decisions-vs-doc.md",
         (
             "par la session de dialogue qui a décidé (session PR ; `triage`, `interroge-moi` ou"
             " `vers-issues` hors cycle ; lead d'une vague, coordinatrice d'une issue en lots"
+            " coordonnés"
         ),
     ),
     "porteur-deux-sorties-seule-a-lancer": (
@@ -3150,7 +3151,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         "CONTRIBUTING.md",
         (
             "un `developpeur` neuf par bloc de plus de ~50 lignes : TDD red-green-refactor, cycle"
-            " `modif → test → cleanup → test → commit` (relecture à contexte vierge au socle, par la"
+            " `modif → test → cleanup → test → commit` (relecture à contexte vierge à chaque bloc, par la"
             " session de relecture que la session PR démarre à son go) → cleanup holistique par un"
             " `developpeur` neuf au-delà de 3 commits ou 150 lignes → relecture à contexte vierge"
             " finale, par la même session"
@@ -3168,8 +3169,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         "CONTRIBUTING.md",
         (
             "Porté par la session PR en fin de `cycle-pr` — collecte au `releveur`, go d'édition au"
-            " mainteneur dans sa fenêtre ; pour une issue en lots, par la coordinatrice au merge de"
-            " la PR d'intégration"
+            " mainteneur dans sa fenêtre ; pour une issue en lots coordonnés, par la coordinatrice"
+            " au merge de la PR d'intégration"
         ),
     ),
     "contributing-valider": (
@@ -3244,9 +3245,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         VERS_ISSUES_SKILL,
         "porte ses lots dès sa création",
     ),
-    "6a-vers-issues-re-decoupage-jamais-pour-un-depassement-prevu": (
+    "6a-vers-issues-lots-sur-motif": (
         VERS_ISSUES_SKILL,
-        "reste la voie d'un dépassement découvert, jamais d'un dépassement prévisible",
+        "Une issue ne porte des lots que sur un motif écrit au corps avec son coût",
     ),
     # Relecture de la PR #151, passe 1, I1 : une issue interrogée avant D-13 n'a pas de section
     # « Décisions ». Passe 2, B1 : la forme d'avant D-13 acceptait des notes de triage, que l'étape
@@ -3851,7 +3852,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         CONTRADICTION_SKILL,
         (
             "**hors PR** — une session de tri, d'interrogatoire ou de `vers-issues`, le lead d'une"
-            " vague, la coordinatrice d'une issue en lots, ou celle que `repercussions` démarre —"
+            " vague, la coordinatrice d'une issue en lots coordonnés, ou celle que `repercussions`"
+            " démarre —"
         ),
     ),
     "6b2-contradiction-pr-d-amendement-au-deroule-hors-scope": (
@@ -6858,14 +6860,17 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         SESSION_RELECTURE_REF,
         "pour les piles que le brief nomme, `hooks` exceptée",
     ),
-    "valeurs-de-k": (SESSION_RELECTURE_REF, "`<k>` vaut `1`, `2` ou `relance`"),
+    "valeurs-de-k": (
+        SESSION_RELECTURE_REF,
+        "`<k>` vaut le rang de la passe — `1`, `2`, … — ou `relance`",
+    ),
     "plage-de-la-passe-1": (
         SESSION_RELECTURE_REF,
         "`<base>..<SHA>` à la passe 1, `<base>` étant `git merge-base origin/<base de la PR> HEAD`",
     ),
-    "plage-de-la-passe-2": (
+    "plage-des-passes-suivantes": (
         SESSION_RELECTURE_REF,
-        "`<SHA de fin de la passe 1>..<SHA>` à la passe 2",
+        "`<SHA de fin de la passe précédente>..<SHA>` aux suivantes",
     ),
     "plage-de-la-relance": (
         SESSION_RELECTURE_REF,
@@ -6916,7 +6921,7 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
     "repli-un-seul-sous-agent": (
         SESSION_RELECTURE_REF,
         (
-            "Un seul sous-agent pour la PR : la seconde passe et la relance lui reviennent par"
+            "Un seul sous-agent pour la PR : les passes suivantes et la relance lui reviennent par"
             " `SendMessage`, contexte intact"
         ),
     ),
@@ -7103,7 +7108,7 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
     ),
     "repli-reutilisation": (
         SESSION_RELECTURE_REF,
-        "**Réutilisation.** Le même worktree sert aux deux passes et à la relance",
+        "**Réutilisation.** Le même worktree sert à toutes les passes et à la relance",
     ),
     "repli-verrou-initial-seulement": (
         SESSION_RELECTURE_REF,
@@ -7130,7 +7135,7 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
     ),
     "cycle-pr-go-d-une-session-de-lot": (
         BRIEFING_REF,
-        "Une session de lot attend le go ci-dessous dans sa fenêtre comme toute session PR",
+        "Une session de lot coordonné attend le go ci-dessous dans sa fenêtre comme toute session PR",
     ),
     "cycle-pr-sauf-go-delegue": (
         BRIEFING_REF,
@@ -7347,7 +7352,7 @@ MORCEAUX_SANS_PRESCRIPTION: dict[str, list[str]] = {
             "ses commandes intégrées, `/code-review` et `/security-review`, closent **son** tour et non"
             " celui de la session PR (obs 94, 98, 115) ;"
         ),
-        "son contexte tient les deux passes et la relance.",
+        "son contexte tient toutes ses passes et la relance.",
         "un autre parent serait réveillé à chaque fin de tour de la session de relecture pour rien.",
         "la tête bouge entre deux passes.",
         "C'est sans coût ici :",
@@ -7653,10 +7658,12 @@ def test_chaque_renvoi_de_cycle_pr_mene_a_un_titre_de_sa_reference(
 # §8.5) n'a plus de seuil de lignes, de fichiers ni d'estimation : seul le périmètre rouvre le
 # découpage. Un de ces seuils réécrit dans un texte qui découpe le rétablirait, la session suivant
 # le texte et non l'intention. Le motif lit chaque seuil sous ses variantes — tilde ou non, verbe
-# conjugué, apostrophe typographique, coupe de ligne — et laisse les nombres de la règle neuve.
+# conjugué, « deux fois » ou « 2× » (relecture de la PR #199, passe 1, m1), apostrophe
+# typographique, coupe de ligne — et laisse les nombres de la règle neuve.
 SEUIL_DE_TAILLE_RETIRE = re.compile(
     r"(?<!\d)(?<!\d\s)~?\s?(?:10\s+fichiers|500\s+lignes)"
-    r"|doubl\w*\s+(?:de\s+)?(?:l['’]\s?|son\s+|leur\s+)estimation",
+    r"|(?:doubl\w*\s+(?:de\s+)?|deux\s+fois\s+|2\s?[×x]\s+)"
+    r"(?:l['’]\s?|son\s+|leur\s+)estimation",
     re.IGNORECASE,
 )
 SEUIL_DE_TAILLE_FORMES = {
@@ -7668,6 +7675,8 @@ SEUIL_DE_TAILLE_FORMES = {
     "double-coupe-en-fin-de-ligne": ("l'absolu, et le double de\nl'estimation du briefing", True),
     "doubler-son-estimation": ("n'autorise pas un lot à doubler son estimation", True),
     "apostrophe-typographique": ("au double de l’estimation", True),
+    "deux-fois-l-estimation": ("au-delà de deux fois l'estimation, rouvrir", True),
+    "fois-deux-en-symbole": ("un lot à 2× son estimation se re-découpe", True),
     "plancher": ("Un sujet estimé sous ~300 lignes", False),
     "bloc": ("≈ 650 lignes ou ≈ 350 K de contexte de `developpeur`", False),
     "revue-de-fin-de-vague": ("moins de 3 PR de plus de 1 500 lignes", False),
@@ -7675,12 +7684,24 @@ SEUIL_DE_TAILLE_FORMES = {
     "nombre-colle": ("une PR de 1500 lignes", False),
     "voie-courte": ("≤ 50 lignes et ≤ 3 fichiers", False),
 }
-# Les textes qui décident d'un découpage : la règle, `cycle-pr` et ses références, `vers-issues`.
+# Les textes qui décident d'un découpage — en issues, en lots, ou d'un regroupement sous le
+# plancher. **Dénombrement**, écrit avant le correctif (relecture de la PR #199, passe 1, I2 :
+# `triage`, que le point 2 de la règle nomme, manquait) : `git grep -c -i "découp" -- .claude`
+# sur `0a8b14a`, lu fichier par fichier — **8** groupes décident, 4 étaient lus. Ajoutés :
+# `triage` (le plancher ; `brief-agent.md`, un découpage en lots se valide par ses tests),
+# `bug-vers-issue` (issue unique ou découpage), `interroge-moi` (le découpage, coût présenté au
+# mainteneur), `repercussions` (re-découpage d'une issue ouverte). Hors classe, parce qu'ils le
+# citent sans le décider : `pr-paralleles` (une vague choisit des issues, elle n'en découpe
+# aucune), `CLAUDE.md`, `CONTRIBUTING.md`, `developpeur.md`.
 TEXTES_QUI_DECOUPENT = {
     "regle-de-taille": ".claude/rules/taille-pr.md",
     "cycle-pr": CYCLE_PR_SKILL,
     "references-de-cycle-pr": ".claude/skills/cycle-pr/references/*.md",
     "vers-issues": VERS_ISSUES_SKILL,
+    "triage": ".claude/skills/triage/*.md",
+    "bug-vers-issue": ".claude/skills/bug-vers-issue/**/*.md",
+    "interroge-moi": INTERROGE_MOI_SKILL,
+    "repercussions": ".claude/skills/repercussions/**/*.md",
 }
 
 
@@ -7709,3 +7730,76 @@ def test_aucun_texte_qui_decoupe_ne_rend_un_seuil_de_taille_retire(motif: str) -
 
     assert fichiers, f"`{motif}` ne désigne plus aucun fichier"
     assert not sites, f"un seuil de taille retiré fait de nouveau découper : {sites}"
+
+
+# Ce que la pipeline applique de la règle du sujet (#195) : une phrase par point de son alignement,
+# là où la session qui découpe, estime, relit ou fait le bilan le lit.
+INVARIANTS_DE_LA_REGLE_DU_SUJET = {
+    "cycle-pr-frontiere-de-bloc": (
+        CYCLE_PR_SKILL,
+        "seul un changement de périmètre l'arrête, jamais un chiffre",
+    ),
+    "cycle-pr-lecture-de-la-fenetre": (
+        CYCLE_PR_SKILL,
+        "**la fenêtre** — la part de son propre contexte déjà consommée",
+    ),
+    "cycle-pr-sous-lot-sous-coordinatrice": (
+        CYCLE_PR_SKILL,
+        "**Un sous-lot n'existe que sous une coordinatrice**",
+    ),
+    "cycle-pr-cas-decoupe-lot-leger": (
+        CYCLE_PR_SKILL,
+        "par défaut en **lot léger**, des PR successives vers `main`, chacune avec son go",
+    ),
+    "cycle-pr-une-passe-par-bloc": (CYCLE_PR_SKILL, "**Une passe par bloc, jamais par commit"),
+    "cycle-pr-passe-de-plus": (
+        CYCLE_PR_SKILL,
+        "**La boucle — une passe de plus tant que la dernière trouve un bloquant ou un important.**",
+    ),
+    "cycle-pr-ligne-echappements": (
+        CYCLE_PR_SKILL,
+        (
+            "**échappements** : chaque défaut trouvé pendant ce cycle dans du code déjà mergé par"
+            " une **autre** PR, avec le numéro de cette PR d'origine et sa taille en lignes"
+        ),
+    ),
+    "briefing-estimation-en-blocs": (BRIEFING_REF, "en **blocs** (`taille-pr.md`, point 5)"),
+    "briefing-pourquoi-un-seul-sujet": (
+        BRIEFING_REF,
+        "le briefing porte la ligne **« pourquoi un seul sujet »**",
+    ),
+    "briefing-motif-et-cout": (BRIEFING_REF, "que sur un **motif** écrit avec son **coût**"),
+    "coordinatrice-deux-cas": (
+        COORDINATRICE_REF,
+        (
+            "une **surface visible à moitié livrée**, ou une **règle de pipeline à moitié appliquée"
+            " pendant une vague**"
+        ),
+    ),
+    "vers-issues-test-du-sujet": (
+        VERS_ISSUES_SKILL,
+        "**Le découpage suit la règle du sujet, jamais la taille**",
+    ),
+    "vers-issues-plancher-et-ses-gardes": (
+        VERS_ISSUES_SKILL,
+        "(a) elle n'y apporte aucune décision ouverte ; (b) elle en ressort si l'hôte se bloque",
+    ),
+    "triage-plancher-et-ses-gardes": (
+        TRIAGE_SKILL,
+        "(a) elle n'y apporte aucune décision ouverte ; (b) elle en ressort si l'hôte se bloque",
+    ),
+    "pr-paralleles-revue-de-fin-de-vague-2": (
+        PR_PARALLELES_SKILL,
+        "tant que l'échantillon compte moins de 3 PR de plus de 1 500 lignes",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("fichier", "phrase"),
+    INVARIANTS_DE_LA_REGLE_DU_SUJET.values(),
+    ids=INVARIANTS_DE_LA_REGLE_DU_SUJET.keys(),
+)
+def test_chaque_invariant_de_la_regle_du_sujet_garde_sa_phrase(fichier: str, phrase: str) -> None:
+    """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
+    assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"

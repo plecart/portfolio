@@ -26,14 +26,17 @@ journal d'observations), qui en porte les mesures.
      Étape 1, « Estimation »).
    - Chaque bloc a sa passe de relecture, puis vient la passe finale. Une passe s'ajoute si la
      dernière trouve encore un bloquant ou un important (`cycle-pr` Étape 4).
-   - Le `developpeur` rend le chiffre de `git diff --stat main...HEAD` avec chaque commit
-     (`cycle-pr` 3.5). Un dépassement tient en une ligne de Notes. Seul le **périmètre** rouvre le
-     découpage.
+   - Le `developpeur` rend le chiffre de `git diff --stat <base>...HEAD` avec chaque commit, la base
+     de son brief (`cycle-pr` 3.5). Un dépassement tient en une ligne de Notes. Seul le
+     **périmètre** rouvre le découpage.
 6. **Au-delà de ~3 blocs estimés**, le briefing dit pourquoi c'est un seul sujet, avec le coût des
    deux voies, et le mainteneur tranche au go.
 7. **À chaque frontière de bloc, la session lit sa fenêtre** — la part de son contexte déjà
    consommée. Si un relais s'annonce, elle rejoue le test du point 1 : deux sujets, elle coupe en
    lot léger ; un seul, elle relaie (`cycle-pr` Étape 8, « Relais en cours de cycle »).
+8. **Réfutable.** Une ligne « échappements » entre au bilan de chaque cycle (`cycle-pr` Étape 8,
+   « Bilan chiffré du cycle »), et la règle se revoit au bilan de la vague 2 (`pr-paralleles`
+   Étape 8, « Bilan de vague »).
 
 ## Format des messages
 - **Commits et titre de PR** au format conventional commit : `type(scope): description`.

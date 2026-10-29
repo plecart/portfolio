@@ -47,12 +47,21 @@ le choix des commandes, qui reste à la session.
 
 ## Estimation
 
-- **Estimation** — comptée **par critère**, en artefacts que le critère doit laisser, jamais en
-  prose qui le décrit : une porte ou un invariant → un test paramétré à témoins des deux côtés
-  (~100-150 lignes) ; un script → le script et son fichier de test (~400) ; une règle de skill → sa
-  ligne, plus la docstring de dénombrement si elle ferme une classe. Calibration mesurée : les
-  lots 1, 2 et 3 de #77 ont dépassé la leur de 2 à 5×, tous du même côté — une estimation en
-  prose est un plancher. C'est elle que consomme le seuil relatif de `taille-pr.md` (obs 78).
+- **Estimation** — en **blocs** (`taille-pr.md`, point 5) : ≈ 650 lignes ou ≈ 350 K de contexte
+  de `developpeur` chacun (deux points mesurés, #13 et le commit 1 de #187 : étude du 2026-10-29,
+  §8.4 F10, dossier `etudes/` voisin du journal d'observations). Les lignes se comptent **par
+  critère**, en artefacts que le critère doit laisser, jamais en prose qui le décrit : une porte ou
+  un invariant → un test paramétré à témoins des deux côtés (~100-150 lignes) ; un script → le
+  script et son fichier de test (~400) ; une règle de skill → sa ligne, plus la docstring de
+  dénombrement si elle ferme une classe. Calibration mesurée : les lots 1, 2 et 3 de #77 ont
+  dépassé la leur de 2 à 5×, tous du même côté — une estimation en prose est un plancher.
+  L'estimation planifie les blocs, leurs frontières et leurs passes de relecture (`cycle-pr` 3.5
+  et Étape 4) ; elle ne découpe rien.
+- **Au-delà de ~3 blocs estimés**, le briefing porte la ligne **« pourquoi un seul sujet »** : ce
+  qui lie les morceaux au test du sujet (`taille-pr.md`, point 1), et le coût des deux voies — une
+  PR, ou une PR de plus par lot à ≈ 30 M de tokens et 5 à 8 contacts du mainteneur chacune, plus 13
+  à 44 M de coordination pour un lot coordonné (même étude, §8.5). Le mainteneur tranche au go
+  (point 6).
 
 ## Auto-challenge du plan — le plan est-il encore exact ?
 
@@ -111,14 +120,20 @@ ne lisent que l'issue (obs 44).
 
 ## Découpage en plusieurs lots
 
-**Découpage en plusieurs lots.** Quand le briefing découpe l'issue en n > 1 lots (`taille-pr.md`),
-la session devient la **coordinatrice** de ses lots : elle n'écrit pas de code, et son go — le go
-du découpage — fait démarrer les sessions de lot, ou chacune à son ouverture
-([references/coordinatrice.md](references/coordinatrice.md)). Une issue à un seul lot ne change
-rien : la session porte le cycle elle-même et délègue le code (3.1). Une session de lot attend
-le go ci-dessous dans sa fenêtre comme toute session PR, et y démarre sa session de relecture
-— sauf go délégué à la coordinatrice, qui lève l'attente et passe la relecture au repli
-`relecteur` (même référence, « La session de lot »).
+**Découpage en plusieurs lots.** Le briefing ne découpe l'issue en n > 1 lots que sur un **motif**
+écrit avec son **coût** (`taille-pr.md`, point 3) : une dépendance de mise en service, une relecture
+d'une autre nature ou un risque distinct, un parallélisme dont le gain est nommé ; ≈ 30 M de tokens
+et 5 à 8 contacts du mainteneur par PR de plus. Deux sujets ne font pas deux lots, ils font deux
+issues. Par défaut, les lots sont **légers** (point 4) : la session porte le premier comme toute
+session PR, et chaque lot suivant reçoit sa session neuve (`cycle-pr` Étape 2, « Cas découpé »,
+et 3.5). Contre une surface visible à moitié livrée ou une règle de pipeline à moitié appliquée
+pendant une vague, le briefing nomme ce cas, et la session devient la **coordinatrice** de ses
+lots : elle n'écrit pas de code, et son go — le go du découpage — fait démarrer les sessions de
+lot, ou chacune à son ouverture ([references/coordinatrice.md](references/coordinatrice.md)). Une
+issue à un seul lot ne change rien : la session porte le cycle elle-même et délègue le code (3.1).
+Une session de lot coordonné attend le go ci-dessous dans sa fenêtre comme toute session PR, et y
+démarre sa session de relecture — sauf go délégué à la coordinatrice, qui lève l'attente et passe
+la relecture au repli `relecteur` (même référence, « La session de lot »).
 
 ## La PR est le premier artefact produit, pas le dernier
 
