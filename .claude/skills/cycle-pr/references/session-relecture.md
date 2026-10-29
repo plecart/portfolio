@@ -71,9 +71,9 @@ chaque réveil, jamais au lancement : la tête bouge entre deux passes.
    à chercher.
 5. Le message de constats à l'émetteur du réveil — la session PR, ou son relais —, par
    `SendMessage` :
-   `constats passe <k> (<SHA court>) — <b> bloquants, <i> importants, <m> mineurs`, puis le
-   rapport que `relecteur.md` ordonne, les constats de chaque commande intégrée et les
-   observations candidates.
+   `constats passe <k> (<SHA court>) — <b> bloquants, <i> importants, <m> mineurs, <v> vides
+   relevés`, puis le rapport que `relecteur.md` ordonne, les constats de chaque commande intégrée
+   et les observations candidates.
 
 **Une commande intégrée peut clore le tour** — `/code-review` par son outil de rapport,
 `/security-review` par « Your final reply must contain the markdown report and nothing else ».
