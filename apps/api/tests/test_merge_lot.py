@@ -21,7 +21,7 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 import pytest
-from skill_scripts import REPOSITORY_ROOT, load_script, run_in_pipe
+from skill_scripts import REPOSITORY_ROOT, load_script, run_in_pipe, script_path
 
 merge_lot = load_script("cycle-pr", "merge-lot")
 
@@ -54,7 +54,13 @@ FETCH = (
 )  # fmt: skip
 GATE = ("git", "merge-base", "--is-ancestor", f"origin/{INTEGRATION}", TETE)
 MERGES = ("git", "rev-list", "--merges", f"origin/{INTEGRATION}..{TETE}")
+CONVERSATION = (sys.executable, str(script_path("cycle-pr", "porte-merge")), "conversation", "42")
 MERGE = ("gh", "pr", "merge", "42", "--rebase", "--match-head-commit", TETE)
+# La sortie de `porte-merge.py conversation 42` sur une conversation qui n'a pas bougé.
+CONVERSATION_INCHANGEE = (
+    "PR 42 : inchangée depuis « Conversation : 0 commentaires et revues, dernier aucun »"
+    " — actuel : 0 commentaires et revues, dernier aucun\n"
+)
 
 
 def check(name: str, conclusion: str, status: str = "COMPLETED") -> dict[str, str]:
@@ -89,6 +95,7 @@ class Forge:
         integration: Sequence[dict[str, Any]] = (PR_INTEGRATION,),
         code_de_la_porte: int = 0,
         merges_du_lot: str = "",
+        conversation: tuple[str, int] = (CONVERSATION_INCHANGEE, 0),
     ) -> None:
         self.reponses: dict[tuple[str, ...], tuple[str, int]] = {
             REPO_VIEW: (trunk + "\n", 0),
@@ -97,6 +104,7 @@ class Forge:
             FETCH: ("", 0),
             GATE: ("", code_de_la_porte),
             MERGES: (merges_du_lot, 0),
+            CONVERSATION: conversation,
             MERGE: ("", 0),
         }
         self.appels: list[tuple[str, ...]] = []
@@ -121,12 +129,12 @@ def lance(forge: Run, *args: str) -> int:
 
 def test_une_pr_de_lot_verte_vers_sa_branche_d_integration_est_mergee() -> None:
     """Le témoin positif, et l'ordre : la base et la tête sont récupérées **avant** la porte qui
-    les compare, la porte passe **avant** le merge. Sans lui, chaque refus ci-dessous pourrait
-    venir d'un script qui refuse tout."""
+    les compare, la porte puis la conversation passent **avant** le merge. Sans lui, chaque refus
+    ci-dessous pourrait venir d'un script qui refuse tout."""
     forge = Forge(pr_verte())
 
     assert lance(forge) == 0
-    assert forge.appels == [REPO_VIEW, PR_LIST, PR_VIEW, FETCH, GATE, MERGES, MERGE]
+    assert forge.appels == [REPO_VIEW, PR_LIST, PR_VIEW, FETCH, GATE, MERGES, CONVERSATION, MERGE]
 
 
 # Un cas par condition du merge sans « go » (#107, décision 13 du brief) — chacun change une
@@ -212,6 +220,36 @@ REFUS: dict[str, tuple[dict[str, Any], dict[str, Any], tuple[str, ...], str]] = 
     "tete-qui-ne-contient-pas-la-base": ({}, {"code_de_la_porte": 1}, (), "ne contient pas"),
     "porte-de-fraicheur-sans-reponse": ({}, {"code_de_la_porte": 128}, (), "sans réponse"),
     "lot-avec-commit-de-merge": ({}, {"merges_du_lot": "e" * 40 + "\n"}, (), "commit de merge"),
+    "conversation-changee-depuis-le-releve": (
+        {},
+        {
+            "conversation": (
+                (
+                    "commentaire de plecart à 2026-10-14T17:52:41Z : > *Généré par IA —"
+                    " répercussion*\nPR 42 : changée depuis « Conversation : 0 commentaires et"
+                    " revues, dernier aucun » — actuel : 1 commentaires et revues, dernier"
+                    " 2026-10-14T17:52:41Z\n"
+                ),
+                1,
+            )
+        },
+        (),
+        "conversation changée depuis le relevé : commentaire de plecart à 2026-10-14T17:52:41Z",
+    ),
+    "conversation-sans-releve": (
+        {},
+        {
+            "conversation": (
+                (
+                    "refus — le body ne porte aucune ligne « Conversation : … » : la relever par"
+                    " `porte-merge.py conversation <PR> --releve`\n"
+                ),
+                2,
+            )
+        },
+        (),
+        "porte de conversation sans réponse (2) : le body ne porte aucune ligne",
+    ),
 }
 
 
