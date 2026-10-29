@@ -55,8 +55,7 @@ citations, les diffs présentés, le go demandé au mainteneur. Le reste change 
   fermeture en doublon (`issue close`, puis `label`) ;
 - **sessions distinctes** — `contradiction` (étape 1), `plan-qa` (étape 7), `bug-vers-issue` ou
   `vers-issues` pour un brouillon (« Ce que ce skill ne fait pas »), chacune démarrée dans le tour
-  du mainteneur qui l'accepte, hors de ce tour par une carte de proposition ; `<N>`, dans leur nom,
-  est l'issue fermée ou la PR d'amendement ; protocole commun :
+  du mainteneur qui l'accepte, hors de ce tour par une carte de proposition ; protocole commun :
   `.claude/skills/cycle-pr/references/sessions-liees.md`. Une session que celle-ci démarre reçoit
   son propre worktree, `use_worktree: true` : `repercussions` tourne dans la session PR, dont le
   worktree est retiré après le merge, et une session démarrée dans ce dossier y vivrait et serait
@@ -135,10 +134,10 @@ suivent. Avec `amendement PR #<m>`, `amendement reporté — #<k>`, que `#<k>` p
 Une contradiction avérée → **s'arrêter avant l'étape 2** et présenter l'arrêt de
 `.claude/rules/decisions-vs-doc.md` (bloc `## ⚠️ Contradiction`). Dans le tour où le mainteneur
 l'accepte, démarrer la session `contradiction` : `start_session`, `initiation: user_asked`,
-`context: fresh`, `use_worktree: true`, `name: contradiction-<N>`, prompt `/contradiction` suivi
-du bloc d'arrêt — ses deux citations — et de `origine : #<N>` ; hors d'un tour du mainteneur, une
-carte de proposition (`initiation: own_initiative`, `context: fresh`, `use_worktree: true`,
-même nom et même prompt). Quelle que soit sa sortie — amendement, document gagnant ou arrêt
+`context: fresh`, `use_worktree: true`, `title: <préfixe> › contradiction` (`sessions-liees.md`,
+« Identité »), prompt `/contradiction` suivi du bloc d'arrêt — ses deux citations — et de
+`origine : #<N>` ; hors d'un tour du mainteneur, une carte de proposition
+(`initiation: own_initiative`, `context: fresh`, `use_worktree: true`, même titre et même prompt). Quelle que soit sa sortie — amendement, document gagnant ou arrêt
 écarté —, elle redémarre `repercussions` sur `#<N>` avec la ligne `contradiction soldée` qui la
 nomme (`contradiction`, étape 5) : la passe reprend, les étapes 2 à 7 suivent, QA comprise.
 Démarrée par une autre, cette session-ci prévient alors son parent (étape 6). Ce skill **n'amende
@@ -402,9 +401,8 @@ Conditions pour proposer :
 
 **Proposer, puis démarrer sur accord.** La proposition reste une question au mainteneur ; sur son
 accord, dans ce tour, démarrer la session : `start_session`, `initiation: user_asked`,
-`context: fresh`, `use_worktree: true`, `name: plan-qa-<slug du thème>`, prompt
-`/plan-qa "<thème>"` — `start_session` borne un nom à `[a-z0-9-]` et 24 caractères (description
-de l'outil, lue le 2026-10-23).
+`context: fresh`, `use_worktree: true`, `title: <préfixe> › plan-qa <thème>` (`sessions-liees.md`,
+« Identité »), prompt `/plan-qa "<thème>"`.
 
 ## Ce que ce skill ne fait pas
 
@@ -420,11 +418,12 @@ de l'outil, lue le 2026-10-23).
   journal « Complétée après #<fermée> — <le vide, d'où il vient> ». Sinon, un brouillon
   dans sa propre session, démarrée dans le tour où le mainteneur l'accepte — `start_session`,
   `initiation: user_asked`, `context: fresh`, `use_worktree: true` : pour un défaut,
-  `bug-vers-issue` avec la description en argument (`name: bug-<N>`, prompt
-  `/bug-vers-issue <description>`) ; pour du travail neuf, `vers-issues` sur un fichier de plan
+  `bug-vers-issue` avec la description en argument (`title: <préfixe> › bug` (`sessions-liees.md`,
+  « Identité »), prompt `/bug-vers-issue <description>`) ; pour du travail neuf, `vers-issues` sur un fichier de plan
   que la session écrit hors du dépôt, `plans/<date>-<issue fermée>.md` dans le dossier voisin du
   journal d'observations (chemin dans `CLAUDE.md`), les deux citations du vide dedans
-  (`name: vers-issues-<N>`, prompt `/vers-issues <chemin>`). La session de brouillon le montre au
+  (`title: <préfixe> › vers-issues` (`sessions-liees.md`, « Identité »), prompt
+  `/vers-issues <chemin>`). La session de brouillon le montre au
   mainteneur, qui décide (`.claude/rules/contraintes.md`, « Création d'issues en cours de cycle »,
   barreau 4). Hors du dépôt, parce que `vers-issues` exige une source écrite en argument et qu'un
   fichier non suivi dans le worktree de la session PR salirait son arbre. Le vide relevé par une

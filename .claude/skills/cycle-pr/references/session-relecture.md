@@ -22,8 +22,8 @@ autre parent serait réveillé à chaque fin de tour de la session de relecture 
 
 Paramètres de `start_session` : `initiation: user_asked`, `context: fresh`, `use_worktree: true`,
 `source_branch` = la branche de la PR, déjà poussée (son amorce suffit), `effort: high`, `model`
-omis (Opus, hérité), `name: relecture-pr-<n>`. Le brief nomme la PR, l'issue et sa base, donne le
-premier geste ci-dessous et renvoie à ce fichier. Mesuré le 2026-10-20 sur la PR #141 :
+omis (Opus, hérité), `title: <préfixe> › relecture` (`sessions-liees.md`, « Identité »). Le brief
+nomme la PR, l'issue et sa base, donne le premier geste ci-dessous et renvoie à ce fichier. Mesuré le 2026-10-20 sur la PR #141 :
 `get_session` rend un worktree sous `.claude/worktrees/<slug>`, la branche `claude/<slug>`, la
 `sourceBranch` demandée et le parent.
 

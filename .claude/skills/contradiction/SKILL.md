@@ -198,12 +198,13 @@ Le mode qui confronte aux issues une PR mergée par ce skill vit dans `repercuss
   `use_worktree: true`, et
   - **avec `origine : #<N>`** reçue à l'étape 1, à **chaque** sortie, pas seulement à celle qui
     amende — la passe de `#<N>` s'est arrêtée avant son étape 2 et rien d'autre ne la reprend :
-    `name: repercussions-<N>`, prompt `/repercussions #<N>` suivi du bloc d'arrêt reçu et de la
-    ligne `contradiction soldée : <sortie>` de la table, qui donne aussi le message de fin de
-    l'étape 6 ;
+    `title: <préfixe> › repercussions` (`sessions-liees.md`, « Identité »), prompt
+    `/repercussions #<N>` suivi du bloc d'arrêt reçu et de la ligne
+    `contradiction soldée : <sortie>` de la table, qui donne aussi le message de fin de l'étape 6 ;
   - **sans origine** : à chaque sortie qui merge une PR, et à elle seule, au merge de cette PR,
-    `name: repercussions-<m>`, prompt `/repercussions #<m>`, où `<m>` est son numéro (mode « PR
-    d'amendement ») — les autres sorties n'ont aucun delta mergé, rien à démarrer.
+    `title: <préfixe> › repercussions #<m>` (`sessions-liees.md`, « Identité »), prompt
+    `/repercussions #<m>`, où `<m>` est son numéro (mode « PR d'amendement ») — les autres
+    sorties n'ont aucun delta mergé, rien à démarrer.
 
   | Sortie | Tour de la relance | Sans origine | Avec origine : ligne du prompt | Message de fin |
   |---|---|---|---|---|
@@ -215,7 +216,7 @@ Le mode qui confronte aux issues une PR mergée par ce skill vit dans `repercuss
   | pas de contradiction | son constat | rien, aucun delta mergé | `contradiction soldée : écartée — <raison>` | « terminé — contradiction écartée » |
 
   Hors d'un tour du mainteneur, une carte de proposition (`initiation: own_initiative`,
-  `context: fresh`, `use_worktree: true`, même nom et même prompt). Le worktree propre a la raison
+  `context: fresh`, `use_worktree: true`, même titre et même prompt). Le worktree propre a la raison
   que la « Délégation » de `repercussions` donne aux sessions qu'elle démarre.
 
 ### 6. Récapituler
