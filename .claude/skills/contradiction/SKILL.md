@@ -198,11 +198,12 @@ Le mode qui confronte aux issues une PR mergée par ce skill vit dans `repercuss
   `use_worktree: true`, et
   - **avec `origine : #<N>`** reçue à l'étape 1, à **chaque** sortie, pas seulement à celle qui
     amende — la passe de `#<N>` s'est arrêtée avant son étape 2 et rien d'autre ne la reprend :
-    `title: <préfixe> › repercussions` (`sessions-liees.md`, « Identité »), prompt
-    `/repercussions #<N>` suivi du bloc d'arrêt reçu et de la ligne
+    `title: <préfixe> › repercussions` (`sessions-liees.md`, « Identité », une racine se nomme
+    d'abord), prompt `/repercussions #<N>` suivi du bloc d'arrêt reçu et de la ligne
     `contradiction soldée : <sortie>` de la table, qui donne aussi le message de fin de l'étape 6 ;
   - **sans origine** : à chaque sortie qui merge une PR, et à elle seule, au merge de cette PR,
-    `title: <préfixe> › repercussions #<m>` (`sessions-liees.md`, « Identité »), prompt
+    `title: <préfixe> › repercussions #<m>` (`sessions-liees.md`, « Identité », une racine se
+    nomme d'abord), prompt
     `/repercussions #<m>`, où `<m>` est son numéro (mode « PR d'amendement ») — les autres
     sorties n'ont aucun delta mergé, rien à démarrer.
 
