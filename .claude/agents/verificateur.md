@@ -70,7 +70,8 @@ Ce que tu vérifies, **dans cet ordre** — c'est un ordre de priorité, et tu t
    `gh run list --commit <SHA de tête vérifié> --workflow CI --json databaseId,createdAt` :
    `python .claude/skills/cycle-pr/scripts/porte-merge.py trunk <run> <trunk> <SHA de tête vérifié>`.
    Il sort en **0** si chaque job a combiné la tête à `origin/<trunk>`, en **1** sur un trunk
-   périmé, en **2** sur un refus, et sa dernière ligne fait la ligne « Base » du verdict. La
+   périmé, en **2** sur un refus ; sa dernière ligne donne les valeurs de la ligne « Base » du
+   verdict, qui garde la forme du gabarit. La
    référence de fusion que porte la forge (`gh api …/git/ref/pull/<n>/merge` et ses parents) ne
    prouve rien, relue avant ou après une relance : un run peut extraire une référence plus ancienne
    que celle qu'elle porte (PR #185, run 40769309165 ; `cycle-pr` Étape 7, « Rejouer les
