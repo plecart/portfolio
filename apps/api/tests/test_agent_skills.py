@@ -2455,14 +2455,18 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         PR_PARALLELES_SKILL,
         (
             "- aucune PR pour la branche → Étape 1 ; - PR draft sans autre commit que l'amorce →"
-            " Étape 2 ; - PR draft avec des commits → Étape 3 ; - PR draft portant des commentaires"
-            " de relecture (`/code-review --comment` de la session de relecture), ou dont la session"
-            ' de relecture est au travail (`isRunning` dans `list_sessions {"linked": true}`) : une'
-            " passe sans constat ne commente rien → Étape 4 ; - PR"
-            " draft dont le body porte `## Summary`, le body définitif de l'Étape 5 → Étape 5 ; -"
-            " PR sortie du draft → Étape 6 ; - Notes portant le verdict d'avant-go → Étape 7 ; - PR"
-            " mergée → 100 %."
+            " Étape 2 ; - PR draft avec des commits → Étape 3 ; - PR draft avec des commits, portant"
+            " des commentaires de relecture (`/code-review --comment` de la session de relecture) ou"
+            " dont la session de relecture est au travail (`isRunning` dans"
+            ' `list_sessions {"linked": true}`) : une passe sans constat ne commente rien → Étape 4'
+            " ; - PR draft dont le body porte `## Summary`, le body définitif de l'Étape 5 → Étape 5"
+            " ; - PR sortie du draft → Étape 6 ; - Notes portant le verdict d'avant-go → Étape 7 ;"
+            " - PR mergée → 100 %."
         ),
+    ),
+    "une-carte-ne-recule-pas": (
+        PR_PARALLELES_SKILL,
+        "L'étape retenue est la plus haute déjà lue : une carte ne recule pas quand un signal retombe",
     ),
     "message-recu-nuance-le-resume": (
         PR_PARALLELES_SKILL,
@@ -2505,6 +2509,18 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "lots-jamais-des-cartes": (
         COORDINATRICE_REF,
         "les lots en sont des `sessions`, `role` `lot <k>` ou `<k><x>`, jamais des cartes",
+    ),
+    "coordinatrice-memes-champs-sauf-sessions": (
+        COORDINATRICE_REF,
+        "Mêmes champs, `sessions` excepté",
+    ),
+    "coordinatrice-lit-ses-sessions-sans-colonne": (
+        COORDINATRICE_REF,
+        (
+            "N'ayant pas de colonne Session, elle lit ses `sessions` dans"
+            ' `list_sessions {"linked": true}` : celles qu\'elle a démarrées et leurs descendantes,'
+            " relectures comprises, plus les relais que « Relais en cours de lot » lui annonce"
+        ),
     ),
     "coordinatrice-dans-ses-sessions": (
         COORDINATRICE_REF,

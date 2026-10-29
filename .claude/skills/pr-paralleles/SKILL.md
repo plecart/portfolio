@@ -320,13 +320,16 @@ L'étape se lit sur des signaux que le lead observe déjà, sans nouveau message
 - aucune PR pour la branche → Étape 1 ;
 - PR draft sans autre commit que l'amorce → Étape 2 ;
 - PR draft avec des commits → Étape 3 ;
-- PR draft portant des commentaires de relecture (`/code-review --comment` de la session de
-  relecture), ou dont la session de relecture est au travail (`isRunning` dans
+- PR draft avec des commits, portant des commentaires de relecture (`/code-review --comment` de
+  la session de relecture) ou dont la session de relecture est au travail (`isRunning` dans
   `list_sessions {"linked": true}`) : une passe sans constat ne commente rien → Étape 4 ;
 - PR draft dont le body porte `## Summary`, le body définitif de l'Étape 5 → Étape 5 ;
 - PR sortie du draft → Étape 6 ;
 - Notes portant le verdict d'avant-go → Étape 7 ;
 - PR mergée → 100 %.
+
+L'étape retenue est la plus haute déjà lue : une carte ne recule pas quand un signal retombe — la
+session de relecture inactive entre deux passes.
 
 Un message reçu d'une session — fin de travail, blocage — peut faire avancer l'étape ou nuancer le
 `resume`.
