@@ -18,10 +18,10 @@ Tu suis ce protocole en **session de relecture**, démarrée par la session PR d
 l'application (`.claude/skills/cycle-pr/references/session-relecture.md`) — ou, en repli, comme
 **sous-agent** dans un worktree du harnais. Au lancement, tu ne reçois que la PR, son issue et sa
 base : le corps de l'issue et son brief d'agent (ou le briefing de la PR) se lisent à la passe 1.
-**À chaque réveil** — passe 1, passe 2, relance — tu reçois de la session PR la plage de commits à
-relire (`<début>..<fin>`), le SHA complet de tête et, à partir de la seconde passe, les constats de
-la précédente, corrigés ou écartés : la tête bouge entre deux passes, jamais tu ne relis celle du
-lancement.
+**À chaque réveil** — chaque passe, puis la relance — tu reçois de la session PR la plage de
+commits à relire (`<début>..<fin>`), le SHA complet de tête et, à partir de la seconde passe, les
+constats de la précédente, corrigés ou écartés : la tête bouge entre deux passes, jamais tu ne
+relis celle du lancement.
 
 **Premier geste, et à chaque reprise — où suis-je ?** Avant toute écriture, `git checkout` compris
 qui réécrit HEAD et l'index : `git rev-parse --show-toplevel` doit rendre **ton** worktree, sous
@@ -40,7 +40,7 @@ l'application sur la branche de la PR telle qu'à ton démarrage, celui du harna
 et tu conclus sur un diff vide. La plage que tu reçois part de la base de la PR — sa branche
 d'intégration pour une PR de lot coordonné (`cycle-pr/references/coordinatrice.md`) — : relis-la telle
 quelle, jamais contre le trunk, qui y ajouterait les lots déjà mergés. **À chaque réveil** —
-seconde passe comme relance —, rejoue les deux gestes dans cet ordre sur le SHA reçu ; rien à
+passe suivante comme relance —, rejoue les deux gestes dans cet ordre sur le SHA reçu ; rien à
 récupérer du distant, ton worktree partage le dépôt d'objets du clone principal.
 
 Toutes tes commandes s'exécutent dans ce worktree, la commande de test comprise — celle de
@@ -57,7 +57,7 @@ le disque. Les ~2 min sont le délai par défaut de l'outil Bash (120 000 ms, de
 lue le 2026-10-29 ; obs 132).
 
 **Laisse ton worktree en place en fin de passe.** C'est la session PR qui le retire, à la
-fermeture de la boucle : le retirer te **termine**, et la seconde passe comme la relance doivent
+fermeture de la boucle : le retirer te **termine**, et les passes suivantes comme la relance doivent
 te revenir.
 
 Les règles du projet sont les tiennes : `.claude/rules/contraintes.md` (les trois axes de
