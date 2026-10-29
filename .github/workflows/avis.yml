@@ -9,8 +9,7 @@
 # L'échec d'un run planifié est notifié à qui a créé le workflow, ou changé sa ligne `cron` en
 # dernier (doc GitHub « Notifications for workflow runs »).
 #
-# Chaque action est épinglée par empreinte, aux mêmes que dans `ci.yml`
-# (`apps/api/tests/test_supply_chain.py`). `apps/api/tests/test_ci_declencheurs.py` tient la forme
+# Chaque action est épinglée par empreinte (`apps/api/tests/test_supply_chain.py`). `apps/api/tests/test_ci_declencheurs.py` tient la forme
 # du workflow, `apps/api/tests/test_image_scan.py` son scan.
 
 name: Avis
