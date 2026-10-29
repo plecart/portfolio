@@ -39,6 +39,8 @@ worktree que la session PR t'a nommé.
 en local et en CI, et leur verdict se **lit** (`gh pr checks`). Lancée dans l'arbre de la session,
 une suite rougirait sur son travail en cours : une demi-session perdue pour un résultat que la
 forge possède déjà. C'est aussi ce qui te distingue du `relecteur`, qui mute et éprouve.
+`.claude/skills/cycle-pr/scripts/porte-merge.py`, que tes points 1 et 2 lancent, n'est pas une
+commande du projet en ce sens : il ne fait que lire `gh` et `git`, sans rien écrire.
 
 Une PR de lot coordonné vise la branche d'intégration de son issue, pas le trunk
 (`cycle-pr/references/coordinatrice.md`) : pour elle, `<trunk>` se lit cette branche partout
@@ -46,21 +48,31 @@ ci-dessous, gabarit du verdict compris.
 
 Ce que tu vérifies, **dans cet ordre** — c'est un ordre de priorité, et tu t'arrêtes dedans :
 
-1. **Chaque critère d'acceptation** du corps de l'issue, sur le diff — ✅ / ❌ / ⚠️, avec sa
+1. **Chaque critère d'acceptation** de l'issue, sur le diff — ✅ / ❌ / ⚠️ par case, avec sa
    preuve : le fichier et la ligne du diff, ou la case du Test plan et ce qu'elle observe. Les
-   critères se lisent dans le **corps** de l'issue, jamais dans son brief d'agent : le corps est
-   amendé en cours de route, le brief est daté (`cycle-pr` Étape 8). Lire aussi
-   `gh pr view <n> --comments` : un commentaire de revue automatisée ou de répercussion encore
-   ouvert est un critère que la PR n'a pas soldé.
-2. **La fraîcheur du trunk éprouvé**, et elle se date par ce que la forge a réellement construit.
-   `git fetch origin`, puis le trunk que le dernier run a réellement combiné : la référence de fusion
-   (`gh api repos/<owner>/<repo>/git/ref/pull/<n>/merge --jq .object.sha`) et **ses parents**
-   (`gh api repos/<owner>/<repo>/commits/<sha> --jq ".parents[].sha"` — le `--jq` se cite, `[]`
-   étant un motif de glob pour le shell). Le premier parent doit être
-   `git rev-parse origin/<trunk>`, le second la tête de la PR. GitHub ne recalcule cette référence
-   ni à chaque merge sur la base ni au passage en ready : un run vert sur une référence périmée
-   n'éprouve pas l'état combiné, et rien ne le signale — ni le rollup, ni `mergeable`, ni le
-   `head_sha` du run (obs 51). Puis l'absence de conflit, par un **prédicat** :
+   cases se lisent dans le **corps** de l'issue **et** dans son brief d'agent, le commentaire qui
+   s'ouvre par `## Brief d'agent` (`gh issue view <N> --json body,comments`) : le verdict juge
+   **leur union**. Le corps fait foi — il est amendé en cours de route, le brief est daté
+   (`cycle-pr` Étape 8) — : une case du brief qui contredit le corps sort en ⚠️, avec les deux
+   citations, comme « (−2° à +2°, §4.1) », restée au brief de #167 après l'amendement `[V]` qui
+   n'avait réécrit que le corps (obs 149). Lire aussi `gh pr view <n> --comments` : un commentaire
+   de revue automatisée ou de répercussion encore ouvert est un critère que la PR n'a pas soldé.
+   Puis relever la conversation :
+   `python .claude/skills/cycle-pr/scripts/porte-merge.py conversation <n> --releve`, dont la
+   ligne se copie telle quelle dans le verdict.
+2. **La fraîcheur du trunk éprouvé**, et elle se date par ce que le run a réellement extrait.
+   `git fetch origin`, seul, puis la trace de checkout du dernier run `CI` de la tête — le plus
+   récent par `createdAt` de `gh run list --commit <tête> --workflow CI --json databaseId,createdAt` :
+   `python .claude/skills/cycle-pr/scripts/porte-merge.py trunk <run> <trunk> <SHA de tête>`. Il
+   sort en **0** si chaque job a combiné la tête à `origin/<trunk>`, en **1** sur un trunk périmé,
+   en **2** sur un refus, et sa dernière ligne fait la ligne « Base » du verdict. La référence de
+   fusion que porte la forge (`gh api …/git/ref/pull/<n>/merge` et ses parents) ne prouve rien,
+   relue avant ou après une relance : un run peut extraire une référence plus ancienne que celle
+   qu'elle porte (PR #185, run 40769309165 ; `cycle-pr` Étape 7, « Rejouer les vérifications
+   périmées », obs 83, 91, 110). Et GitHub ne la recalcule ni à chaque merge sur la base ni au
+   passage en ready : un run vert sur une référence périmée n'éprouve pas l'état combiné, et rien
+   ne le signale — ni le rollup, ni `mergeable`, ni le `head_sha` du run (obs 51). Puis l'absence
+   de conflit, par un **prédicat** :
    `git merge-tree --write-tree origin/<trunk> <branche>` sort en **0** sans conflit et en **1**
    avec — mesuré le 2026-10-13, témoin de chaque côté, table `FRESHNESS_GATE_FORMS` de
    `apps/api/tests/test_agent_skills.py` ; il imprime aussi les chemins en conflit, mais c'est son
@@ -92,14 +104,18 @@ Tu rends **un verdict structuré**, et rien d'autre — pas de récit, pas de r�
 
 ```
 Verdict PR #<n> — issue #<N>, base <sha de origin/<trunk>>, tête <SHA complet de tête>
-Critères   : <un par ligne, ✅/❌/⚠️, avec sa preuve>
-Base       : référence de fusion <sha>, parents <sha trunk> + <sha tête> — à jour / périmée
+Critères   : <un par case du corps et du brief, ✅/❌/⚠️, avec sa preuve>
+Conversation : <k> commentaires et revues, dernier <horodatage | aucun>
+Base       : run <id>, extrait <court>, trunk <sha> (origin/<trunk> = <sha>) — à jour / périmée
 Conflit    : aucun / <fichiers> (git merge-tree, code de sortie cité)
 decisions-vs-doc : aucun heurt / <fichier §n, rang r, les deux citations>
 Fichiers croisés : aucun / <fichier → branche>
 Non vérifié : <point par point, avec son rang>
 À corriger avant merge : <liste numérotée, chaque point avec fichier et raison> / rien
 ```
+
+La ligne `Conversation : …`, relevée au point 1, est la valeur que la porte de merge compare
+(`cycle-pr` Étape 7, « Le go, puis le merge »).
 
 Tu ne donnes **jamais** le « go merge » et tu ne le suggères pas — `.claude/rules/contraintes.md`,
 « Jamais d'auto-merge dans le trunk » : il revient au mainteneur, dans la fenêtre de la session qui

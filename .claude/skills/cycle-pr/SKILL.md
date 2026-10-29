@@ -61,10 +61,14 @@ draft (`gh pr ready --undo`), son body reçoit le briefing de l'Étape 1, et le 
    liée ; avant lui, la session joue `/code-review medium` et, si le diff touche une surface
    exposée, `/security-review` (même référence, « Repli »). Mêmes sévérités et même traitement
    qu'en 4.2.
-4. **CI verte**, lue dans `gh pr checks` — pas d'`attente-ci.py` en fond —, puis go humain, puis
-   le merge par la porte de « Le go, puis le merge » (Étape 7), le `<SHA du trunk éprouvé>` lu par
-   les deux commandes de « Rejouer les vérifications périmées » et noté dans le body ; trunk
-   avancé : rejouer, sans `verificateur`.
+4. **CI verte**, lue dans `gh pr checks` — pas d'`attente-ci.py` en fond —, puis le relevé de
+   conversation inscrit au body, sans `verificateur`, par
+   `python <répertoire de ce skill>/scripts/porte-merge.py conversation <n> --releve` (Étape 7,
+   « Vérification d'avant-go »), puis go humain, puis le merge par la porte de « Le go, puis le
+   merge » (Étape 7), le `<SHA du trunk éprouvé>` lu par
+   `porte-merge.py trunk <run> <trunk> <SHA de tête>` (« Rejouer les vérifications périmées ») et
+   noté dans le body avec le numéro du run ; trunk avancé : relancer et relire la trace, sans
+   `verificateur`.
 5. Ni `verificateur`, ni bilan chiffré, ni `repercussions` — sauf si le diff touche un fichier de
    la section « Sources de vérité », ou si un résidu a été rangé au barreau 2 en cours de cycle :
    la passe `repercussions` de l'Étape 8 est alors due. Sinon, un `grep` des ancres du diff sur
@@ -107,13 +111,17 @@ Produire un briefing écrit AVANT de créer la branche :
   ensemble, au go du briefing — l'accord pour démarrer sa session de relecture et l'archiver à
   l'Étape 8 en fait partie, puisque `start_session` ne part que dans ce tour
   ([references/session-relecture.md](references/session-relecture.md)), et hors vague
-  l'accord pour lancer soi-même le `verificateur` d'avant-go (Étape 7) ; une `[C]` arrête.
+  l'accord pour lancer soi-même le `verificateur` d'avant-go (Étape 7).
+  Le go couvre aussi les relances de CI de la PR par fermeture-réouverture (Étapes 5 et 7),
+  bornées ; une `[C]` arrête.
   Une session liée prévient son parent avant de poser ses `[V]` : « attend le mainteneur :
   <question> » ([references/sessions-liees.md](references/sessions-liees.md), « Messages »).
 
 Lever les incertitudes **maintenant** : une `[V]` découverte après cinq commits coûte une
 demi-journée d'attente ; une `[T]` ne se pose jamais, elle se décide — la plupart appellent la
 réponse que le mainteneur donne toujours.
+
+**Ce que couvre le go du briefing.** → [references/briefing.md](references/briefing.md), « Ce que couvre le go du briefing ».
 
 ### Porte d'entrée obligatoire — l'interrogatoire
 
@@ -660,15 +668,17 @@ et au mainteneur (« Si aucun run n'apparaît »).
 Ce run a tourné sur la référence de fusion qu'il a trouvée à son déclenchement, que GitHub ne
 recalcule ni à chaque merge sur le trunk ni au passage en ready : il peut combiner la tête à un
 trunk vieux de plusieurs merges — mesuré, 8 des 30 commits de `main` (obs 51). Ce qu'il prouve de
-l'état combiné se lit dans les parents de cette référence, à l'Étape 7.
+l'état combiné se lit dans la trace de checkout de ses jobs, à l'Étape 7.
 
 **Si aucun run n'apparaît** pour le SHA de tête — sortie 3 : sauté, annulé sans remplaçant ou
 aucun run —, consulter d'abord `https://www.githubstatus.com/api/v2/components.json` : un
 événement émis pendant une panne d'Actions, le passage en ready compris, n'est **pas rejoué** au
 rétablissement. Le re-déclenchement propre est `gh pr close` puis `gh pr reopen` (`reopened` est
-dans les types du workflow), action visible donc sur accord du mainteneur — jamais de commit vide
-ni de force-push. Puis relancer le script, comme ci-dessus : le run de la réouverture est le plus
-récent.
+dans les types du workflow), une relance de CI de la PR, couverte d'avance et bornée comme à
+l'Étape 7 (« Rejouer les vérifications périmées ») — jamais de commit vide ni de force-push. Puis
+relancer le script, comme ci-dessus : le run de la réouverture est le plus récent. Ce run attendu,
+lire ce qu'il a extrait comme à l'Étape 7 : `git fetch origin`, seul, puis la trace de checkout de
+ses jobs, `python <répertoire de ce skill>/scripts/porte-merge.py trunk <run> <trunk> <SHA de tête>`.
 
 ## Étape 6 — Review + CI
 
@@ -717,8 +727,16 @@ récent.
     `--job` comme le run entier relancent les jobs qui en dépendent (REST : « Re-run a job and
     its dependent jobs »), publication et déploiement compris. Puis appliquer « Création
     d'issues en cours de cycle » (`.claude/rules/contraintes.md`), barreau par barreau ; la PR
-    attend le correctif sur le trunk, puis se met à jour sur lui. Un rerun de la PR, lui, ne
-    prouve rien : l'avis ne part pas (obs 56).
+    attend le correctif sur le trunk, puis, celui-ci mergé, suit le cas suivant. **Trunk déjà
+    vert sur cette porte** — correctif mergé depuis la base de branche : rien à corriger dans la
+    PR, qui ne fait tourner le job `avis` que parce que son delta touche une de ses entrées (ADR
+    0019, décision 2), le reste du tri étant celui du trunk. Sa CI se relance par le geste de
+    l'Étape 7, `gh pr close` puis `gh pr reopen`, et ce que le nouveau run a combiné se lit dans
+    la trace de son checkout. Ni commit de fusion — `gh pr update-branch` sans `--rebase` compris, qui passe
+    sous l'`allow` `Bash(gh pr *)` de `.claude/settings.json` —, ni rebase d'une branche poussée
+    sans demande explicite (`contraintes.md`), ici comme à l'Étape 7 : à la PR #75, faute d'un
+    geste à cette étape, deux sessions de suite ont planifié de fusionner `main` dans la branche
+    (obs 82). Un rerun de la PR, lui, ne prouve rien : l'avis ne part pas (obs 56).
   - *Rouge de code* : tout le reste, y compris un rouge de plateforme (3.2) → cycle complet
     3.1→3.5.
 - **Revue** : les commentaires d'une revue automatisée (bot), s'il y en a une. Un `developpeur` a
@@ -734,7 +752,11 @@ récent.
 > `python <répertoire de ce skill>/scripts/ecriture-relue.py comment <n> --body-file <fichier>`
 > (Étape 8) ; `repercussions` le prescrit à son étape 5, « Issues en vol ». Un signalement
 > **bloquant** se traite comme tel : intégrer la correction dans cette PR, ou remonter au
-> mainteneur si cela déplace le périmètre — ne jamais merger par-dessus.
+> mainteneur si cela déplace le périmètre — ne jamais merger par-dessus. Le prédicat de
+> conversation de la porte de merge le garantit (Étape 7, « Le go, puis le merge ») :
+> `porte-merge.py conversation <n>` sort en 1 sur tout commentaire ou revue postérieurs au relevé
+> du verdict, « à ajuster » compris ; antérieur, il a été lu avec le relevé (« Vérification
+> d'avant-go »).
 
 ## Étape 7 — Avant le merge
 
@@ -752,7 +774,7 @@ une spec périmée.
 fork) — et elle se périme quand **ce qu'elle observe** a changé, pas quand un identifiant a
 changé. « Base » désigne ici **cette** grandeur, et elle seule ; la grandeur voisine qui lui
 ressemble tant que le trunk n'a pas avancé — le **trunk éprouvé**, ce que la CI a réellement
-combiné — porte son propre nom, au paragraphe de la référence de fusion ci-dessous, parce qu'un
+combiné — porte son propre nom, au paragraphe de la trace de checkout ci-dessous, parce qu'un
 paramètre de porte dont le nom désigne deux valeurs se remplit un jour avec la mauvaise. Une vérification sans SHA, ou
 sans « observe : », se rejoue d'office. Quand la **tête** a bougé : `git diff --stat <sha de la
 vérification>..HEAD`, croisé avec ce que la vérification déclare observer (« observe : » du Test
@@ -764,27 +786,45 @@ puisse changer de résultat n'est pas une preuve, c'est un rituel, et un rituel 
 plus sûr moyen de faire abandonner l'étape.
 
 Quand c'est le **trunk** qui a bougé, les preuves locales sont périmées : prises sur un état qui
-n'atteindra jamais le trunk, et rien de local ne le signale. La CI d'une PR, elle, tourne sur la
-**référence de fusion** avec le trunk du moment : si le trunk a bougé **avant** le dernier run, ce
-run éprouve déjà l'état combiné — **à condition de le lire**, parce que GitHub ne recalcule cette
-référence ni à chaque merge sur le trunk ni au passage en ready (obs 51) :
+n'atteindra jamais le trunk, et rien de local ne le signale. La CI d'une PR, elle, tourne sur une
+**référence de fusion** de la tête avec le trunk : si le trunk a bougé **avant** le dernier run, ce
+run peut éprouver l'état combiné — **à condition de lire ce qu'il a extrait**, parce que GitHub ne
+recalcule cette référence ni à chaque merge sur le trunk ni au passage en ready (obs 51), et qu'un
+run peut extraire une référence plus ancienne que celle que la forge porte (obs 83, 91, 110).
+`git fetch origin` d'abord, **seul**, puis, pour le dernier run `CI` de la tête — celui
+qu'`attente-ci.py` a rendu :
 
 ```
-gh api repos/<owner>/<repo>/git/ref/pull/<n>/merge --jq .object.sha
-gh api repos/<owner>/<repo>/commits/<sha de la référence> --jq ".parents[].sha"
+python <répertoire de ce skill>/scripts/porte-merge.py trunk <run> <trunk> <SHA de tête>
 ```
 
-Le **premier parent** est le **trunk éprouvé** — ce que le dernier run a réellement combiné à la
-tête —, et c'est **lui** que la porte de merge consomme, sous le nom `<SHA du trunk éprouvé>`. Il
-doit valoir `git rev-parse origin/<trunk>` ; le second parent doit être la tête de la PR. Si le
-premier parent n'est pas la tête du trunk, le run ne prouve rien de l'état combiné : relancer par
-un commit réel, ou `close`/`reopen` sur accord, puis relire les parents. Le `--jq` se cite, `[]`
-étant un motif de glob pour le shell. Puis vérifier l'absence de conflit par
+Le script lit, sur chaque job qui a tourné, la ligne de checkout de sa trace (« HEAD is now at
+<court> Merge <tête> into <trunk> », `gh run view <run> --log`) : le **premier parent** du commit
+extrait, le `<trunk>` du message, est le **trunk éprouvé** — ce que le run a réellement combiné à la
+tête —, et c'est **lui** que la porte de merge consomme, sous le nom `<SHA du trunk éprouvé>`,
+inscrit au Test plan avec le numéro du run. Le `<SHA du trunk éprouvé>` ne vaut qu'à la sortie
+**0**, chaque job ayant combiné `origin/<trunk>` ; **1**, trunk périmé ; **2**, refus, son motif en
+une ligne (docstring du script). **La référence de fusion que porte la forge ne prouve rien**,
+relue avant ou après la relance : aux PR #73 (run 37209134824) et #185 (run 40769309165, référence
+relue sur `155b355`, extrait sur `3e24919`), elle portait déjà le trunk neuf quand le run avait
+extrait l'ancien ; aux PR #95 (runs 38646490017 et 38703579686) et #109 (runs 38960319135 et
+38967746705), deux réouvertures de suite ont extrait une référence ancienne, et le run 38980769989
+la bonne, le trunk n'ayant pas bougé (obs 83, 91, 110). Ni `gh api …/git/ref/pull/<n>/merge` ni
+les parents de `…/commits/<sha>` ne sont donc une preuve.
+
+**Trace périmée** : relancer par un commit réel, ou par `gh pr close` puis `gh pr reopen` — une
+relance de CI de la PR, couverte par le go du briefing (Étape 1), jamais un commit vide ni un
+force-push —, attendre le nouveau run (`attente-ci.py`, Étape 5), puis lire **sa** trace.
+**Jamais un `gh run rerun`** : il réutilise le commit enregistré au déclenchement (obs 83), et sa
+trace rendrait le même trunk. **Une seconde réouverture n'est pas un remède suffisant** : elle ne
+vaut que si le trunk n'a pas bougé entre les deux (obs 110), et seule la trace le dit. **Après 3
+relances de suite dont la trace donne un trunk périmé, la session redemande l'accord** du
+mainteneur avant la suivante. Puis vérifier l'absence de conflit par
 `git merge-tree --write-tree origin/<trunk> HEAD`, qui est un **prédicat** : il sort en 0 sans
 conflit et en 1 avec (mesuré le 2026-10-13, témoin de chaque côté), donc il s'enchaîne par `&&`,
 et ce qu'il imprime n'est qu'un détail de diagnostic. L'état `MERGEABLE` de la forge, lui, se met
 à jour en différé et ne prouve rien. Puis redater les preuves locales sur cette base. Si elle a bougé
-**après**, relancer la CI — un commit réel, ou `gh pr close` puis `reopen` sur accord. Sur un
+**après**, relancer la CI de même, puis relire la trace du nouveau run. Sur un
 trunk fusionné par rebase ou squash, jamais de commit de fusion : il ne respecte pas le format
 des messages et tombe au merge.
 
@@ -830,7 +870,7 @@ brouillon soumis au mainteneur. Jamais un `gh issue create` de la session.
 **La session PR lance son `verificateur`** (`.claude/agents/verificateur.md`), sous-agent éphémère,
 un par (PR, go), qui ne rend qu'un verdict (#134, décision 2), **si la PR ferme une issue
 (`Closes`), porte des décisions verrouillées dans ses Notes, ou si `gh pr list` montre une autre
-branche en vol touchant ses fichiers ; sinon la porte de merge suffit** — en vague comme hors vague, le lead ne le lance plus (`pr-paralleles`
+branche en vol touchant ses fichiers ; sinon la porte de merge suffit**, sur le relevé de conversation que la session inscrit elle-même (ci-dessous) — en vague comme hors vague, le lead ne le lance plus (`pr-paralleles`
 Étape 6). Il reçoit le numéro de la PR, celui de l'issue, le chemin absolu du worktree et la liste des autres branches en vol (`gh pr list`), jamais le récit
 de la session. Hors vague et hors lot coordonné, l'accord du mainteneur se demande **avec les
 `[V]` du go du briefing** (Étape 1) — demandé à la fin, il attend la prochaine présence : 6 h 37
@@ -842,10 +882,18 @@ session de lot coordonné : son accord est à [references/coordinatrice.md](refe
 **Le verdict s'inscrit dans les Notes du body avant le go**, relu après écriture
 (`contraintes.md`, « Écritures sur un artefact distant ») — au moins sa ligne d'en-tête (base,
 tête) et ses lignes « Fichiers croisés » et « Non vérifié », qui parlent d'**autres** branches et
-d'autres lots. Rendu seulement à
+d'autres lots, et sa ligne `Conversation : …`, copiée en début de ligne — jamais dans une puce
+`- `, jamais entre backticks : la porte de merge compare la dernière ligne de cette forme du body,
+et refuse sans elle. Rendu seulement à
 la session qui l'a commandé, il ne survit que par sa mémoire, et la passation suivante le relaie
 comme un énoncé sans source : deux lots de suite, le prompt du lot suivant a cité un verdict que ni
 le corps ni les commentaires de la PR ne portaient (obs 81).
+
+**Une PR sans `verificateur`** — hors des trois conditions ci-dessus — porte le même relevé, que la
+session inscrit aux Notes avant de demander le go, de la même façon, après avoir lu
+`gh pr view <n> --comments` : la ligne que rend
+`python <répertoire de ce skill>/scripts/porte-merge.py conversation <n> --releve`, copiée telle
+quelle.
 
 Le verdict rendu :
 
@@ -869,15 +917,21 @@ le dernier run rend la CI périmée : deux PR vertes séparément n'ont rien dé
 merge est le premier moment où leur somme existe. `git fetch origin` d'abord, **seul**, puis :
 
 ```
-git merge-base --is-ancestor origin/<trunk> <SHA du trunk éprouvé> && gh pr merge <n> --rebase --match-head-commit <SHA de tête vérifié>
+git merge-base --is-ancestor origin/<trunk> <SHA du trunk éprouvé> && python <répertoire de ce skill>/scripts/porte-merge.py conversation <n> && gh pr merge <n> --rebase --match-head-commit <SHA de tête vérifié>
 ```
 
-Le `<SHA du trunk éprouvé>` est **le premier parent de la référence de fusion**, obtenu par les
-deux commandes de « Rejouer les vérifications périmées » — lu dans ce que la forge a construit,
-jamais supposé égal à la base de branche, et inscrit au Test plan. `--match-head-commit` ferme le
-même trou côté tête. Si le trunk a avancé depuis, la commande **ne part pas** : rejouer « Rejouer
-les vérifications périmées », relire les parents de la référence de fusion, puis un `verificateur`
-neuf.
+Le `<SHA du trunk éprouvé>` est **le premier parent du commit que la trace de checkout du dernier
+run a extrait**, lu par `porte-merge.py trunk` à sa sortie 0 (« Rejouer les vérifications
+périmées ») — jamais supposé égal à la base de branche, jamais lu dans la référence que porte la
+forge, et inscrit au Test plan avec le numéro du run. `--match-head-commit` ferme le même trou côté
+tête, et `porte-merge.py conversation <n>` côté conversation : il compare les commentaires et revues
+soumises de la PR à la **dernière** ligne `Conversation : …` du body (« Vérification d'avant-go »),
+et sort en **1** sur tout élément postérieur, en **2** sur une ligne absente ou mal formée. Si le
+trunk a avancé depuis, la commande **ne part pas** : rejouer « Rejouer les vérifications
+périmées », relire la trace du nouveau run, puis un `verificateur` neuf. Si c'est la conversation
+qui a changé, elle ne part pas non plus : lire chaque élément que le prédicat nomme — un
+commentaire de répercussion se traite à l'Étape 6 —, puis un `verificateur` neuf, ou pour une PR
+qui n'en a pas, un relevé neuf aux Notes.
 
 **Une porte est une commande dont le code de sortie porte la condition ; `&&` est ce qui la rend bloquante.** → [references/merge.md](references/merge.md), « Une porte est une commande dont le code de sortie porte la condition ».
 
@@ -907,7 +961,10 @@ les portes de « Le go, puis le merge » — trunk refusé, base qui doit être 
 d'intégration ouverte, tête comparée au SHA vérifié — et une plus stricte : la tête du lot doit
 **contenir** la tête actuelle de sa base, par un historique sans commit de merge. La CI de la tête
 a alors éprouvé l'arbre exact que le `--rebase` rejouera, sans lire la référence de fusion, que la
-forge recalcule à son rythme (obs 51). Puis `--rebase --match-head-commit`. Ses refus, et ce qu'il
+forge recalcule à son rythme (obs 51). Puis `--rebase --match-head-commit`. Il refuse aussi une
+conversation changée depuis la ligne `Conversation : …` du verdict, ou sans relevé lisible, qu'il
+lit par `porte-merge.py conversation <n>` en dernier avant `gh pr merge`, refus qui se traite comme
+celui de la porte (« Le go, puis le merge »). Ses refus, et ce qu'il
 ne prouve pas, sont dans sa docstring ; son contrat, dans `apps/api/tests/test_merge_lot.py`. Un
 refus sort en une ligne et se traite comme une porte qui ne part pas : rejouer « Rejouer les
 vérifications périmées », jamais le contourner par `gh pr merge` — sauf un refus de contenance ou
@@ -939,7 +996,9 @@ le laisser fait apparaître des issues closes dans les files de `triage` et de `
 Le label de catégorie (`bug` / `enhancement`) et le thème restent.
 
 Puis **cocher les critères d'acceptation soldés**, dans le **corps** de l'issue *et* dans le
-commentaire de **brief** (`- [ ]` → `- [x]`) : ils ont été vérifiés à l'Étape 7, il ne reste qu'à
+commentaire de **brief** (`- [ ]` → `- [x]`) : ils ont été vérifiés à l'Étape 7 — le
+`verificateur` d'une PR qui ferme une issue juge l'union des cases du corps et du brief
+(`.claude/agents/verificateur.md`, point 1) —, il ne reste qu'à
 l'enregistrer là où un lecteur le cherche. Le corps par
 `ecriture-relue.py checkbox patch <N> --case <ancre> …`, puis le brief par
 `ecriture-relue.py brief patch <N> --case <ancre> …`, une ancre par critère : un extrait de son

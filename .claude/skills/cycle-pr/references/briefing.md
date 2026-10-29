@@ -1,8 +1,8 @@
 # Démarrage, briefing et PR draft — détail de `cycle-pr`
 
-Passages déplacés mot pour mot de `cycle-pr/SKILL.md` (issue #177), chacun sous le titre que
-cite son renvoi. Les liens `references/…` qu'ils portent se lisent depuis le dossier du skill,
-et leurs renvois de position (« ci-dessous », « plus bas ») depuis l'emplacement du renvoi.
+Passages déplacés mot pour mot de `cycle-pr/SKILL.md` (issue #177), plus « Ce que couvre le go
+du briefing » (#197), chacun sous le titre que cite son renvoi. Les liens `references/…` qu'ils
+portent se lisent depuis le dossier du skill, et leurs renvois de position (« ci-dessous », « plus bas ») depuis l'emplacement du renvoi.
 
 ## Vague parallèle
 
@@ -72,6 +72,16 @@ le choix des commandes, qui reste à la session.
   #134 visait les sous-agents, 22,5 % des tokens, et a livré 18 lots pour 9 annoncés (D-5 de
   #195).
 
+## Ce que couvre le go du briefing
+
+**Le go du briefing couvre les relances de CI de la PR**, par `gh pr close` puis `gh pr reopen`
+(`cycle-pr` Étapes 5 et 7) : la session ne redemande pas l'accord à chaque relance, et la trace de
+checkout du run garde la preuve (`<répertoire de ce skill>/scripts/porte-merge.py trunk`, Étape 7,
+« Rejouer les vérifications périmées »). **Après 3 relances de suite dont la trace donne un trunk
+périmé, la session redemande l'accord** avant la suivante. Ni commit vide ni force-push, inchangé.
+Il ne couvre **jamais** le go de merge, demandé à part (Étape 7, « Le go, puis le merge »). D-1 de
+#197 : à la vague 1, chaque relance de la PR #185 avait coûté un aller-retour d'accord.
+
 ## Auto-challenge du plan — le plan est-il encore exact ?
 
 Avant de présenter le briefing comme acté, **se challenger explicitement** : le plan a pu être
@@ -90,6 +100,12 @@ interfaces, appelants) à l'`executant`, le jugement à la session PR :
   de création) se lit comme un erratum potentiel — une réconciliation a pu ne pas atteindre le
   brief. En cas d'écart entre les deux, le journal (adossé aux sources de vérité) l'emporte, et
   l'écart se signale dans le briefing.
+- **Dénombrer les cases du corps et celles du brief** — les lignes `- [` du corps et du
+  commentaire `## Brief d'agent` (`gh issue view <N> --json body,comments`) : tout critère du
+  brief absent du corps rejoint la liste des critères du briefing, et le `verificateur` jugera
+  l'union des deux (`.claude/agents/verificateur.md`, point 1). Sur #167 : corps 2 cases, brief 7
+  dont « Les critères du corps de l'issue », soit 6 cases du brief hors du corps (relevé du
+  2026-10-29, obs 149).
 - **Reproduire chaque chiffre de référence qu'un critère demande de retrouver**, par la commande
   qui recense sa population (`triage/brief-agent.md`, « Critères d'acceptation complets »), avant
   la première ligne de code. Un chiffre qui ne se reproduit pas fait amender le critère, avec sa
