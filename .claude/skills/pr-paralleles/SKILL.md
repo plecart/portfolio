@@ -321,7 +321,8 @@ L'étape se lit sur des signaux que le lead observe déjà, sans nouveau message
 - PR draft sans autre commit que l'amorce → Étape 2 ;
 - PR draft avec des commits → Étape 3 ;
 - PR draft portant des commentaires de relecture (`/code-review --comment` de la session de
-  relecture) → Étape 4 ;
+  relecture), ou dont la session de relecture est au travail (`isRunning` dans
+  `list_sessions {"linked": true}`) : une passe sans constat ne commente rien → Étape 4 ;
 - PR draft dont le body porte `## Summary`, le body définitif de l'Étape 5 → Étape 5 ;
 - PR sortie du draft → Étape 6 ;
 - Notes portant le verdict d'avant-go → Étape 7 ;
@@ -647,7 +648,8 @@ Marquer la ligne `⚪ worktree nettoyé` dans le tableau, et sa carte `etat: net
 Quand tout le lot est nettoyé, retirer le tableau de `PR-PARALLELES.md` (ou l'archiver dans les
 notes du projet) et garder son en-tête : la vague suivante y lit son rang (étape 4). Puis
 `tableau_de_bord_retirer` (`mcp__tableau-de-bord-sessions__tableau_de_bord_retirer`) sur le
-`sujet` de chaque carte que le lead a nourrie, avec le même saut silencieux (étape 4).
+`sujet` de chaque carte que le lead a nourrie et qu'aucune coordinatrice n'a reprise, avec le même
+saut silencieux (étape 4).
 
 **Issue en plusieurs lots.** La **branche** mergée d'un lot meurt : sous un trunk fusionné par
 rebase ou squash, ses commits réécrits doubleraient dans la PR du lot suivant (obs 36). Une session

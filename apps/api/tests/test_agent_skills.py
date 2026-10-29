@@ -2456,7 +2456,9 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         (
             "- aucune PR pour la branche → Étape 1 ; - PR draft sans autre commit que l'amorce →"
             " Étape 2 ; - PR draft avec des commits → Étape 3 ; - PR draft portant des commentaires"
-            " de relecture (`/code-review --comment` de la session de relecture) → Étape 4 ; - PR"
+            " de relecture (`/code-review --comment` de la session de relecture), ou dont la session"
+            ' de relecture est au travail (`isRunning` dans `list_sessions {"linked": true}`) : une'
+            " passe sans constat ne commente rien → Étape 4 ; - PR"
             " draft dont le body porte `## Summary`, le body définitif de l'Étape 5 → Étape 5 ; -"
             " PR sortie du draft → Étape 6 ; - Notes portant le verdict d'avant-go → Étape 7 ; - PR"
             " mergée → 100 %."
@@ -2475,7 +2477,8 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         PR_PARALLELES_SKILL,
         (
             "`tableau_de_bord_retirer` (`mcp__tableau-de-bord-sessions__tableau_de_bord_retirer`)"
-            " sur le `sujet` de chaque carte que le lead a nourrie, avec le même saut silencieux"
+            " sur le `sujet` de chaque carte que le lead a nourrie et qu'aucune coordinatrice n'a"
+            " reprise, avec le même saut silencieux"
         ),
     ),
     "coordinatrice-seul-auteur-de-sa-carte": (
@@ -2826,13 +2829,17 @@ def test_chaque_session_demarree_recoit_son_suffixe_et_le_renvoi_a_l_identite(
 
 def test_aucune_session_demarree_n_est_nommee_a_plat() -> None:
     """`name` ne porte ni ` › ` ni `#` : rétabli, il rend la barre latérale à plat. Vu rouge sur
-    `d2e9b09`, où la forme rend les 15 appels de `TITRES_DES_SESSIONS_DEMARREES`. Trois formes
-    d'un `name` muni d'une valeur : `` `name: x` ``, `` `name` : `x` `` et `` name `x` `` (relecture
-    de la PR #188, passe 1, constat 2 : la seule première laissait la troisième VERTE)."""
+    `d2e9b09`, où la forme rend les 15 appels de `TITRES_DES_SESSIONS_DEMARREES`. Quatre formes
+    d'un `name` muni d'une valeur : `` `name: x` ``, `` `name` : `x` ``, `` name `x` `` et, sans
+    code, `name: x-<N>` — à gabarit `<…>`, comme tout nom de session, ce que ni un frontmatter ni
+    un exemple de code n'emploie (relecture de la PR #188 : passe 1, constat 2, la troisième restait
+    VERTE ; passe 2, constat 2, la quatrième)."""
     a_plat = [
         (fichier, nom)
         for fichier, texte in prose_du_harnais()
-        for nom in re.findall(r"`name: [^,`]+|`name`\s*:?\s*`[^`]+`|\bname `[^`]+`", texte)
+        for nom in re.findall(
+            r"`name: [^,`]+|`name`\s*:?\s*`[^`]+`|\bname `[^`]+`|\bname: [^,\s`]*<", texte
+        )
     ]
 
     assert not a_plat, f"`name` à plat : {a_plat}"
