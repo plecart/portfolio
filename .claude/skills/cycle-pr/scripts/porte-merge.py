@@ -103,11 +103,11 @@ entré dans `main`.
 compare à la référence de suivi que le dernier `git fetch origin` a laissée, à lancer d'abord
 (`cycle-pr` Étape 7). Un `gh run rerun` réutilise le commit enregistré au déclenchement (obs 83) :
 il ne change pas ce que le run extrait. La référence de fusion que porte la forge, relue avant ou
-après une relance, ne dit pas ce que le run a extrait — runs 37209134824, 38646490017,
-38703579686, 38960319135, 38967746705 et 40769309165 (#197, « Les incidents »). `conversation` ne
-juge pas ce que dit un commentaire — un écart renvoie à sa lecture —, ne lit d'un élément que sa
-date de création ou de soumission, si bien que l'édition d'un commentaire existant lui échappe, et
-ne prouve pas que le relevé a été pris à l'heure du verdict, seulement qu'il est inscrit.
+après une relance, ne dit pas ce que le run a extrait (`cycle-pr` Étape 7, « Rejouer les
+vérifications périmées », qui cite les runs mesurés). `conversation` ne juge pas ce que dit un
+commentaire — un écart renvoie à sa lecture —, ne lit d'un élément que sa date de création ou de
+soumission, si bien que l'édition d'un commentaire existant lui échappe, et ne prouve pas que le
+relevé a été pris à l'heure du verdict, seulement qu'il est inscrit.
 
 Python 3.11 ou plus, bibliothèque standard seule ; `gh` authentifié et `git`, lancé depuis le
 dépôt.
@@ -204,9 +204,11 @@ def json_output(run: Run, *cmd: str) -> Any:
         raise Refusal(f"`{' '.join(cmd)}` ne rend pas du JSON : {error}") from error
 
 
-def shape_refusal(cmd: str, error: Exception) -> Refusal:
+def shape_refusal(cmd: Sequence[str], error: Exception) -> Refusal:
     """Le refus d'une réponse JSON qui n'a pas la forme lue."""
-    return Refusal(f"`{cmd}` ne rend pas la forme attendue : {type(error).__name__} {error}")
+    return Refusal(
+        f"`{' '.join(cmd)}` ne rend pas la forme attendue : {type(error).__name__} {error}"
+    )
 
 
 def distinct(values: Iterable[str]) -> str:
@@ -226,7 +228,7 @@ def read_run(run: Run, run_id: str) -> tuple[str, str, list[str]]:
         ran = [job["name"] for job in document["jobs"] if job["conclusion"] != "skipped"]
         return document["status"], document["headSha"], ran
     except (KeyError, TypeError) as error:
-        raise shape_refusal(" ".join(cmd), error) from error
+        raise shape_refusal(cmd, error) from error
 
 
 def checkout_lines(log: str) -> dict[str, list[str]]:
@@ -332,7 +334,7 @@ def read_pr(run: Run, number: str) -> tuple[str, list[Element]]:
         if not isinstance(body, str):
             raise TypeError(f"body de type {type(body).__name__}")
     except (AttributeError, KeyError, TypeError, ValueError) as error:
-        raise shape_refusal(" ".join(cmd), error) from error
+        raise shape_refusal(cmd, error) from error
     return body, sorted(items, key=lambda item: item.at)
 
 

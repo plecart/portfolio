@@ -48,10 +48,11 @@ ne démarre pas ».
 **Ce qu'il ne couvre pas.** Les autres workflows et les autres événements que `pull_request`. Ce
 que le run a combiné : la référence de fusion qu'il a trouvée à son déclenchement se lit dans la
 trace de checkout de ses jobs, à l'Étape 7. La page d'état de GitHub et la réouverture de la PR,
-qui restent à la session et au mainteneur (Étape 5, « Si aucun run n'apparaît »). Un run relancé : l'API rend sa dernière
-tentative et garde son `created_at` — 39559119382, relancé une fois, y porte `run_attempt` 2 et le
-`run_started_at` de la tentative 2, dans la liste par `head_sha` comme seul (mesuré le
-2026-10-21) ; relancé quand un run plus récent existe sur le même SHA, il ne décide pas.
+qui restent à la session et au mainteneur (Étape 5, « Si aucun run n'apparaît »). Un run
+relancé : l'API rend sa dernière tentative et garde son `created_at` — 39559119382, relancé une
+fois, y porte `run_attempt` 2 et le `run_started_at` de la tentative 2, dans la liste par
+`head_sha` comme seul (mesuré le 2026-10-21) ; relancé quand un run plus récent existe sur le même
+SHA, il ne décide pas.
 
 Sortie : 0 vert ; 1 rouge, ou refus (« refus — ») — une lecture `gh` qui ne se lance pas, échoue,
 ne rend pas du JSON UTF-8 ou pas la forme attendue —, motif en une ligne ; 2 appel mal formé,
