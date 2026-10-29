@@ -86,8 +86,9 @@ rédaction :
   de la forme « les X qui viennent de Y ne bougent pas » est accompagnée de la liste exhaustive
   de ces X, obtenue en cherchant dans Y **au moment du triage** — jamais reprise d'une liste
   écrite dans un document tiers, jamais de mémoire.
-- **Un découpage en lots se valide par ses tests.** Avant d'écrire « si > N fichiers, découper :
-  (1) … ; (2) … », répondre pour chaque lot : « avec quoi ses tests tournent-ils ? ».
+- **Un découpage en lots se valide par ses tests.** Il naît d'un motif, jamais d'une taille
+  (`.claude/rules/taille-pr.md`, point 3) ; avant d'écrire « lots : (1) … ; (2) … », répondre
+  pour chaque lot : « avec quoi ses tests tournent-ils ? ».
   L'infrastructure qui fait tourner les tests (schéma, compose, fixtures) va dans le premier lot
   ou dans un lot antérieur à ses consommateurs.
 - **Un critère qui exige une preuve nomme son canal.** Pour des preuves visuelles (« captures en

@@ -38,13 +38,13 @@ Les tranches peuvent être 'HITL' ou 'AFK'. Les tranches HITL nécessitent une i
 <vertical-slice-rules>
 - Chaque tranche livre un chemin étroit mais COMPLET à travers chaque couche (schéma, API, UI, tests)
 - Une tranche terminée est démontrable ou vérifiable à elle seule
-- Préfère de nombreuses tranches fines à quelques tranches épaisses
+- Une tranche est un sujet : des morceaux qui partagent une décision, ne se valident qu'ensemble ou changent le même contrat restent dans la même tranche ; partager un fichier ne compte pas
 - Chaque élément visible qu'une tranche ajoute à un écran nomme le comportement — de cette tranche ou d'une tranche déjà livrée — qui le fait changer ; un élément dont le seul comportement arrive avec une autre tranche va dans celle-ci, en critère, et la tranche courante n'en pose que la donnée (obs 65)
 </vertical-slice-rules>
 
-**Ne jamais découper une tranche pour la seule taille de PR** quand ses morceaux se valident ensemble — même écran, même point d'arrêt visuel, même ADR : les séparer fait valider deux fois le même écran, ou un demi-écran. La règle de taille (`taille-pr.md`) est une règle de PR, pas de découpage fonctionnel : la tranche reste **une** issue, et si elle dépasse la taille de référence, `cycle-pr` la livre en plusieurs PR (son « cas découpé », Étape 2) — les lots d'une même issue, ci-dessous.
+**Le découpage suit la règle du sujet, jamais la taille** (`.claude/rules/taille-pr.md`, « Découpage »). Deux sujets → deux issues ; un sujet → une issue et une PR, sans limite de lignes ni de fichiers. Des morceaux qui se valident ensemble — même écran, même point d'arrêt visuel, même ADR — sont un seul sujet : les séparer fait valider deux fois le même écran, ou un demi-écran. Une issue ne porte des lots que sur un motif écrit au corps avec son coût — une dépendance de mise en service, une relecture d'une autre nature ou un risque distinct, un parallélisme dont le gain est nommé (point 3) ; elle porte ses lots dès sa création, légers par défaut (point 4), chacun estimé en blocs (`cycle-pr` Étape 1, « Estimation »).
 
-**Un dépassement prévisible se découpe dès la création** (obs 120). Quand une tranche dépasse de façon prévisible le gabarit de `taille-pr.md` — fichiers et lignes estimables par critère (`cycle-pr` Étape 1, « Estimation ») —, l'issue porte ses lots dès sa création, un bloc chacun, et un lot qui dépasse lui-même le gabarit porte ses sous-lots de même : un sous-lot est un lot (`cycle-pr` 3.5). Le re-découpage au briefing reste la voie d'un dépassement découvert, jamais d'un dépassement prévisible.
+**Plancher** (même règle, point 2). Une tranche estimée sous ~300 lignes ne fait pas une issue à elle seule : elle entre comme critère dans l'issue voisine du même domaine, si elle est prête en même temps, sous deux gardes — (a) elle n'y apporte aucune décision ouverte ; (b) elle en ressort si l'hôte se bloque. Le correctif évident (voie courte de `cycle-pr`) et l'urgence restent hors plancher. `triage` applique le même plancher aux issues qu'il trie.
 
 ### 4. Interroger l'utilisateur
 
@@ -57,7 +57,7 @@ Présente le découpage proposé sous forme de liste numérotée. Pour chaque tr
 
 Demande à l'utilisateur :
 
-- Quelles tranches ont été séparées pour la seule taille de PR, et se valident-elles ensemble ? (si oui, les refusionner)
+- Chaque tranche est-elle un seul sujet ? (deux tranches qui partagent une décision, ne se valident qu'ensemble ou changent le même contrat se refusionnent ; une tranche sous ~300 lignes rejoint son hôte, plancher compris)
 - Les relations de dépendance sont-elles correctes ?
 - Faut-il fusionner ou découper davantage certaines tranches ?
 - Les bonnes tranches sont-elles marquées comme HITL et AFK ?

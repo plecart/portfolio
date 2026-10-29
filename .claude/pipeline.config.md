@@ -249,8 +249,9 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
                                                   # échoue avant toute analyse ; `git remote
                                                   # set-head origin main` le pose (mesuré et
                                                   # posé dans ce dépôt le 2026-10-14). Elle
-                                                  # diffe donc le trunk : sur une PR de lot,
-                                                  # toute la branche d'intégration depuis lui —
+                                                  # diffe donc le trunk : sur une PR de lot
+                                                  # coordonné, toute la branche d'intégration
+                                                  # depuis lui —
                                                   # 35 commits et 28 fichiers pour une plage
                                                   # de 2 commits et 4 fichiers, mesuré le
                                                   # 2026-10-20 dans la session de relecture de

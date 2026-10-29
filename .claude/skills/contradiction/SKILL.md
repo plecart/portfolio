@@ -162,8 +162,8 @@ Sur « go », l'amendement part par une PR, jamais par un commit direct sur le t
 - **dans une session PR**, il entre dans sa PR, par un commit de son `developpeur` (`cycle-pr`
   3.1) ou de son `executant` (`.claude/agents/executant.md`, « Ton commit ») ;
 - **hors PR** — une session de tri, d'interrogatoire ou de `vers-issues`, le lead d'une vague, la
-  coordinatrice d'une issue en lots, ou celle que `repercussions` démarre —, une PR d'amendement,
-  au déroulé de `.claude/skills/triage/hors-scope.md` (« Quand écrire », étapes 5 et 6) : un
+  coordinatrice d'une issue en lots coordonnés, ou celle que `repercussions` démarre —, une PR
+  d'amendement, au déroulé de `.claude/skills/triage/hors-scope.md` (« Quand écrire », étapes 5 et 6) : un
   `executant` en isolation `worktree`, jamais dans le dossier partagé, applique la table des édits
   et commite sur une branche partie de `origin/<trunk>` ; la session pousse la branche, ouvre la
   PR, la relit et la merge au go du mainteneur.

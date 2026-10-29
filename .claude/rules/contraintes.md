@@ -157,7 +157,7 @@ Quelle que soit la voie :
   qu'il sert. Mais attendre la fin de la PR coûte autant : les attentes du mainteneur arrivent
   alors après la dernière relecture, et chacune rouvre un cycle. Si une passe de relecture
   indépendante part au même commit (`cycle-pr` 4.2), la lancer d'abord, puis montrer l'écran : les deux attentes se
-  recouvrent, et la seconde passe absorbe ce que le mainteneur demande. C'est la session PR qui
+  recouvrent, et la passe suivante absorbe ce que le mainteneur demande. C'est la session PR qui
   prend l'arrêt : elle coupe le bloc du `developpeur` au commit qui assemble l'écran, et le
   `developpeur` le lui signale.
 - Une zone sensible **ajoutée** par le projet suit la même cadence, sauf si sa ligne dans
