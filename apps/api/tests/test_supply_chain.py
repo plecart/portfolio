@@ -572,6 +572,11 @@ WORKFLOW_FORMS = {
         "on: push\njobs:\n  a:\n    uses: ./.github/workflows/x.yml\n",
         False,
     ),
+    # Lu au commit de l'appelant : un commentaire de version n'y désignerait rien.
+    "workflow réutilisable du dépôt avec commentaire de version": (
+        "on: push\njobs:\n  a:\n    uses: ./.github/workflows/x.yml # v1.0.0\n",
+        True,
+    ),
     "action locale": (workflow("      - uses: ./.github/actions/x\n"), True),
     "workflow vide": ("", False),
     "clé uses sous le with: d'une action": pytest.param(
