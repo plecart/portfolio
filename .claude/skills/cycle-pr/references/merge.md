@@ -17,7 +17,11 @@ commande — `test "$(git rev-parse origin/<trunk>)" = "<sha>" && …` — est *
 d'une session isolée en worktree ; `--is-ancestor` est la forme acceptée, et elle vaut l'égalité
 parce que le trunk n'avance que vers l'avant. Mesuré le 2026-10-13, témoin de chaque côté : **1**
 quand le trunk a avancé, **0** sur deux références égales — table `FRESHNESS_GATE_FORMS` de
-`apps/api/tests/test_agent_skills.py`.
+`apps/api/tests/test_agent_skills.py`. Depuis #197, la porte de merge vers le trunk chaîne **deux**
+prédicats, chacun par son `&&` : `--is-ancestor` pour le trunk éprouvé, puis
+`<répertoire de ce skill>/scripts/porte-merge.py conversation <n>` pour la conversation depuis le
+relevé du verdict (`cycle-pr` Étape 7, « Le go, puis le merge » ; table `PORTES_PRESCRITES` du
+même fichier).
 
 ## Et cinq contrôles restent des lectures, par construction
 
@@ -32,4 +36,7 @@ coordinatrice lit avant d'ouvrir un lot — passation présente, `merge-tree` à
 ([references/coordinatrice.md](references/coordinatrice.md)). Elles se lisent, et elles le disent.
 Le dénombrement de la classe, pris avant ces deux derniers — 15 sites, 10 portes, 6 qui fuyaient —
 vit dans la docstring de `test_la_porte_de_fraicheur_porte_sa_condition_dans_son_code_de_sortie`,
-avec la commande qui le re-dérive et la raison pour laquelle ce motif sous-compte.
+avec la commande qui le re-dérive et la raison pour laquelle ce motif sous-compte. Re-dérivée le
+2026-10-29, cette commande, à la révision `c459f04` qu'elle porte, rend les 17 lignes de la
+docstring en 3 fichiers — `relecteur.md` 2, `cycle-pr/SKILL.md` 8, `pr-paralleles/SKILL.md` 7 — :
+14 contrôles distincts, plus la porte de merge qu'aucun motif ne voyait, font les 15 sites.

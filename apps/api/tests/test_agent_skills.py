@@ -1379,10 +1379,14 @@ def test_un_1_de_merge_tree_n_est_un_conflit_que_sur_des_references_qui_existent
 # (création de branche — un par direction, parce que `--is-ancestor` dit « ancêtre ou égal »), 1
 # au merge, où le trunk n'avance que vers l'avant. Sans ce champ, ramener la porte à un
 # seul prédicat — le bloquant de la passe 1, « `main` en avance passe » — restait VERT (mesuré,
-# passe 2) : la table exigeait qu'un prédicat existe, pas qu'il y en ait deux.
+# passe 2) : la table exigeait qu'un prédicat existe, pas qu'il y en ait deux. Le prédicat de
+# conversation (#197) a sa ligne à lui : une porte qui en chaîne deux d'outils différents se lit
+# une fois par prédicat, chacun compté seul.
 PORTES_PRESCRITES: list[tuple[str, str, str, int]] = [
     (".claude/skills/cycle-pr/SKILL.md", "git checkout -b", "git merge-base --is-ancestor", 2),
     (".claude/skills/cycle-pr/SKILL.md", "gh pr merge", "git merge-base --is-ancestor", 1),
+    (".claude/skills/cycle-pr/SKILL.md", "gh pr merge", "porte-merge.py conversation", 1),
+    (".claude/skills/triage/hors-scope.md", "gh pr merge", "porte-merge.py conversation", 1),
     (
         ".claude/skills/cycle-pr/references/sessions-liees.md",
         "git branch -D",
@@ -1426,8 +1430,8 @@ def predicats_a_gauche(ligne: str, action: str, predicat: str) -> list[list[str]
     PORTES_PRESCRITES,
     ids=[
         f"{Path(skill).parent.name if Path(skill).stem == 'SKILL' else Path(skill).stem}"
-        f"-{action.replace(' ', '-')}"
-        for skill, action, _, _ in PORTES_PRESCRITES
+        f"-{action.replace(' ', '-')}-{predicat.split()[-1].lstrip('-')}"
+        for skill, action, predicat, _ in PORTES_PRESCRITES
     ],
 )
 def test_chaque_porte_prescrite_est_un_predicat_chaine_a_son_action(
@@ -1452,7 +1456,10 @@ def test_chaque_porte_prescrite_est_un_predicat_chaine_a_son_action(
     par `GESTES_RETIRES_DE_PR_PARALLELES`. **4 depuis le lot 3 de #134** : le retrait de la
     branche du sous-agent `relecteur`, en repli, passe de `git branch -d` — qui compare à `HEAD`
     et refuse dès que le trunk a avancé (obs 86) — à la porte d'ancêtre contre `origin/<trunk>`
-    (`session-relecture.md`, « Repli »).
+    (`session-relecture.md`, « Repli »). **5 portes en 6 lignes depuis #197**, qui chaîne le prédicat de
+    conversation (`porte-merge.py conversation`) devant `gh pr merge` : dans la porte de `cycle-pr`
+    Étape 7, à côté de celle d'ancêtre, et dans le déroulé de `triage/hors-scope.md`, étape 6,
+    qui n'en avait aucune.
 
     Le prédicat doit se trouver **à gauche de l'action sur la même ligne**, avec un `&&` entre les
     deux — ce qui distingue une porte d'une lecture suivie d'une seconde commande (obs 59) —, en
@@ -6645,6 +6652,11 @@ def test_chaque_mention_de_l_auto_merge_le_borne_au_trunk() -> None:
 # réintroduit chacun des trois sous une autre forme, et les trois sont restées vertes contre un
 # interdit qui n'en visait qu'une orthographe. D'où un interdit par racine (`rejou`, `build`) et une
 # exigence par phrase entière.
+#
+# Les trois énoncés restrictifs du sous-cas « trunk déjà vert » (#197, obs 82) — rien à corriger,
+# ni commit de fusion, ni rebase — se lisent ici et non dans une table du fichier entier : à la
+# PR #75, l'interdit du commit de fusion existait, en fin d'Étape 7, et deux sessions de suite ont
+# planifié la fusion à l'Étape 6, qui ne le portait pas. C'est leur place que l'épingle garde.
 # Cas : (fichier, début du passage, fin du passage, ce qu'il ne cite pas, ce qu'il dit).
 ADVISORY_GATE_RULES = {
     "cycle-pr-rouge-d-avis": (
@@ -6652,7 +6664,13 @@ ADVISORY_GATE_RULES = {
         "*Rouge d'avis*",
         "*Rouge de code*",
         ("gh run rerun", "rejou"),
-        ("Jamais un rerun d'un run du trunk", "sous un nom propre au trunk"),
+        (
+            "Jamais un rerun d'un run du trunk",
+            "sous un nom propre au trunk",
+            "rien à corriger dans la PR",
+            "Ni commit de fusion — `gh pr update-branch` sans `--rebase` compris",
+            "ni rebase d'une branche poussée",
+        ),
     ),
     "init-projet-horloge": (
         INIT_PROJET_SKILL,
@@ -6682,12 +6700,13 @@ def test_une_regle_de_porte_d_avis_ne_relance_ni_ne_retire_ce_dont_elle_depend(
     """Le passage qui prescrit un geste sur une porte d'avis ne rejoue aucun run du trunk, ne lit
     pas les images de la branche, et garde ce dont la porte dépend. Le début du passage doit
     apparaître **une** fois : un passage renommé fait rougir ici au lieu de rendre le test
-    vacant."""
+    vacant. Le passage se borne sur le texte brut — une fin peut être un saut de ligne —, puis se
+    lit aux espaces normalisés : une forme coupée en fin de ligne s'y lit d'un tenant (obs 124)."""
     texte = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig").replace("\r\n", "\n")
 
     assert texte.count(debut) == 1, f"`{debut}` apparaît {texte.count(debut)} fois dans `{fichier}`"
     passage = texte[texte.index(debut) :]
-    passage = passage[: passage.index(fin, len(debut))]
+    passage = " ".join(passage[: passage.index(fin, len(debut))].split())
     presents = [interdit for interdit in interdits if interdit in passage]
     absents = [exige for exige in exiges if exige not in passage]
     assert not presents, f"`{fichier}` prescrit encore {presents} : {passage!r}"
@@ -6707,6 +6726,8 @@ CYCLE_PR = REPOSITORY_ROOT / CYCLE_PR_SKILL
 QUESTIONS_DU_GO = {
     "accord pour le vérificateur hors vague": "l'accord pour lancer soi-même",
     "accord pour la session de relecture": "l'accord pour démarrer sa session de relecture",
+    # D-1 de #197 : les relances de CI de la PR, couvertes d'avance, que l'Étape 7 renvoie au go.
+    "relances de CI couvertes par le go": "Le go couvre aussi les relances de CI de la PR",
 }
 
 
@@ -7925,3 +7946,130 @@ def test_le_bloc_gh_pr_create_porte_label_et_milestone() -> None:
         '  --label "<label de catégorie>" --milestone "<thème des fichiers>" \\\n'
     )
     assert bloc in (REPOSITORY_ROOT / CYCLE_PR_SKILL).read_text(encoding="utf-8")
+
+
+# --- La porte de merge lit la trace du run, la conversation et le brief (#197) -----------------
+
+VERIFICATEUR_ROLE = ".claude/agents/verificateur.md"
+# La borne de D-1, dite là où la session relance (`cycle-pr` Étape 7) et là où le go la couvre
+# (`briefing.md`) : la même phrase aux deux sites.
+BORNE_DES_RELANCES = (
+    "**Après 3 relances de suite dont la trace donne un trunk périmé, la session redemande"
+    " l'accord**"
+)
+
+# Chaque énoncé restrictif que #197 ajoute, épinglé sur sa **moitié restrictive** (obs 126) : une
+# mutation qui la retire en laissant le reste de la phrase rougit ici. Ailleurs : les trois
+# énoncés de l'Étape 6, bornés à leur passage (`ADVISORY_GATE_RULES`), le prédicat de
+# conversation chaîné à `gh pr merge` (`PORTES_PRESCRITES`), la relance couverte par le go et
+# nommée à l'Étape 1 (`QUESTIONS_DU_GO`).
+INVARIANTS_DE_LA_PORTE_DE_MERGE = {
+    "cycle-pr-trunk-eprouve-seulement-a-0": (
+        CYCLE_PR_SKILL,
+        "Le `<SHA du trunk éprouvé>` ne vaut qu'à la sortie **0**",
+    ),
+    "cycle-pr-la-reference-de-la-forge-ne-prouve-rien": (
+        CYCLE_PR_SKILL,
+        "**La référence de fusion que porte la forge ne prouve rien**, relue avant ou après la",
+    ),
+    "cycle-pr-jamais-un-rerun": (
+        CYCLE_PR_SKILL,
+        "**Jamais un `gh run rerun`** : il réutilise le commit enregistré au déclenchement",
+    ),
+    "cycle-pr-ni-l-api-de-la-forge": (
+        CYCLE_PR_SKILL,
+        (
+            "Ni `gh api …/git/ref/pull/<n>/merge` ni les parents de `…/commits/<sha>` ne sont donc"
+            " une preuve"
+        ),
+    ),
+    "cycle-pr-relance-sans-commit-vide": (
+        CYCLE_PR_SKILL,
+        "couverte par le go du briefing (Étape 1), jamais un commit vide ni un force-push",
+    ),
+    "cycle-pr-seconde-reouverture-insuffisante": (
+        CYCLE_PR_SKILL,
+        (
+            "**Une seconde réouverture n'est pas un remède suffisant** : elle ne vaut que si le"
+            " trunk n'a pas bougé entre les deux (obs 110), et seule la trace le dit"
+        ),
+    ),
+    "cycle-pr-porte-jamais-sur-la-reference-de-la-forge": (
+        CYCLE_PR_SKILL,
+        "jamais lu dans la référence que porte la forge",
+    ),
+    "cycle-pr-borne-des-relances": (
+        CYCLE_PR_SKILL,
+        BORNE_DES_RELANCES,
+    ),
+    "cycle-pr-releve-sans-verificateur": (
+        CYCLE_PR_SKILL,
+        (
+            "**Une PR sans `verificateur`** — hors des trois conditions ci-dessus — porte le même"
+            " relevé, que la session inscrit aux Notes avant de demander le go"
+        ),
+    ),
+    "cycle-pr-releve-en-debut-de-ligne": (
+        CYCLE_PR_SKILL,
+        "en début de ligne — jamais dans une puce `- `, jamais entre backticks",
+    ),
+    "cycle-pr-conversation-changee": (
+        CYCLE_PR_SKILL,
+        "Si c'est la conversation qui a changé, elle ne part pas non plus",
+    ),
+    "briefing-borne-des-relances": (
+        BRIEFING_REF,
+        BORNE_DES_RELANCES,
+    ),
+    "briefing-pas-d-accord-a-chaque-relance": (
+        BRIEFING_REF,
+        "la session ne redemande pas l'accord à chaque relance",
+    ),
+    "briefing-ni-commit-vide-ni-force-push": (
+        BRIEFING_REF,
+        "Ni commit vide ni force-push, inchangé",
+    ),
+    "briefing-jamais-le-go-de-merge": (BRIEFING_REF, "Il ne couvre **jamais** le go de merge"),
+    "briefing-cases-du-brief-hors-du-corps": (
+        BRIEFING_REF,
+        "tout critère du brief absent du corps rejoint la liste des critères du briefing",
+    ),
+    "verificateur-le-script-de-la-porte-ne-fait-que-lire": (
+        VERIFICATEUR_ROLE,
+        "n'est pas une commande du projet en ce sens : il ne fait que lire `gh` et `git`, sans rien",
+    ),
+    "verificateur-union-du-corps-et-du-brief": (
+        VERIFICATEUR_ROLE,
+        "Les cases se lisent dans le **corps** de l'issue **et** dans son brief d'agent",
+    ),
+    "verificateur-case-contradictoire-en-avertissement": (
+        VERIFICATEUR_ROLE,
+        "une case du brief qui contredit le corps sort en ⚠️, avec les deux citations",
+    ),
+    "verificateur-la-reference-de-la-forge-ne-prouve-rien": (
+        VERIFICATEUR_ROLE,
+        "ne prouve rien, relue avant ou après une relance",
+    ),
+    "pr-paralleles-a-ajuster-bloque-la-porte": (
+        PR_PARALLELES_SKILL,
+        "un « à ajuster » la bloque comme un « bloquant »",
+    ),
+    "pr-paralleles-jamais-la-reference-de-la-forge": (
+        PR_PARALLELES_SKILL,
+        "jamais dans la référence que porte la forge",
+    ),
+    "hors-scope-releve-en-debut-de-ligne": (
+        HORS_SCOPE_REF,
+        "en début de ligne — jamais dans une puce ni entre backticks",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("fichier", "phrase"),
+    INVARIANTS_DE_LA_PORTE_DE_MERGE.values(),
+    ids=INVARIANTS_DE_LA_PORTE_DE_MERGE.keys(),
+)
+def test_chaque_invariant_de_la_porte_de_merge_garde_sa_phrase(fichier: str, phrase: str) -> None:
+    """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
+    assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"

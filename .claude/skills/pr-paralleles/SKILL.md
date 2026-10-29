@@ -496,7 +496,10 @@ c'est le seul autre canal, et il passe par lui.
     `SendMessage` (« signalement bloquant : … — arrête-toi et remonte-le au mainteneur ») ;
     occupée, elle ne le reçoit qu'à la fin de son tour en cours
     (`.claude/skills/cycle-pr/references/sessions-liees.md`, « Messages », mesuré) : le travail de
-    ce tour peut être à jeter, et un merge lancé dans ce tour n'attend pas le message.
+    ce tour peut être à jeter, et un merge lancé dans ce tour n'attend pas le message — mais la
+    porte de merge l'arrête : le commentaire que `repercussions` dépose sur la PR après le relevé
+    du verdict fait sortir en 1 son prédicat de conversation (`cycle-pr` Étape 7, « Le go, puis le
+    merge »), et un « à ajuster » la bloque comme un « bloquant ».
 - **Après chaque merge du lot, avant toute consigne aux sessions encore en vol** : `git fetch
   origin`, puis croiser les fichiers **réellement mergés** avec ceux de chaque branche en vol :
 
@@ -516,9 +519,11 @@ c'est le seul autre canal, et il passe par lui.
   conflit de sens sans conflit de texte. La consigne se fonde sur ce croisement, jamais sur la
   carte de recouvrement de l'étape 2 : elle décrit des issues entières, un merge livre un lot. Le
   script ne l'envoie pas, et ne relance rien : une branche qui recouvre relance sa CI, qui tourne
-  sur la référence de fusion ; ce que le run prouve se lit dans les parents de cette référence, que
-  GitHub ne recalcule pas d'office (`cycle-pr` Étape 7, « Rejouer les vérifications périmées »,
-  obs 51) — pas de commit de fusion sur un trunk fusionné par rebase, ni de rebase
+  sur la référence de fusion ; ce que le run prouve se lit dans la trace de checkout de ses jobs,
+  par `.claude/skills/cycle-pr/scripts/porte-merge.py trunk <run> main <SHA de tête>`, jamais
+  dans la référence que porte la forge, que GitHub ne recalcule pas d'office et qu'un run peut
+  ne pas avoir extraite (`cycle-pr` Étape 7, « Rejouer les vérifications périmées », obs 51, 83,
+  110) — pas de commit de fusion sur un trunk fusionné par rebase, ni de rebase
   d'une branche poussée sans demande explicite (`contraintes.md`) ; un conflit se résout par un
   commit réel sur la branche.
 
