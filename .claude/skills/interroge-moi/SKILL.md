@@ -162,7 +162,8 @@ Puis, si la session partait d'une issue en `needs-interrogation`, dire au mainte
 peut passer à `ready-for-agent` (ou `ready-for-human`) — la transition et le brief appartiennent à
 `triage`. Dans le tour où il l'accepte, démarrer la **session de tri qui rédige le brief** :
 `start_session`, `initiation: user_asked`, `context: fresh`, `use_worktree: false`,
-`name: triage-<N>`, prompt `/triage <N>` et rien d'autre — elle trouve la section « Décisions » :
+`title: <préfixe> › tri` (`sessions-liees.md`, « Identité »), prompt `/triage <N>` et rien
+d'autre — elle trouve la section « Décisions » :
 cas « rédiger le brief » de `triage`, étape 5. Une session dont le brief enchaîne elle-même
 interrogatoire et tri — la préparation de vague, `pr-paralleles` Étape 0 — suit son brief.
 

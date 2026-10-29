@@ -2027,7 +2027,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # 2026-10-18). Étape 3 : qui démarre, dans quel tour, avec quoi.
     "lead-demarre-une-session-par-issue": (
         PR_PARALLELES_SKILL,
-        "le lead démarre d'un coup une session par issue retenue, une par `start_session`",
+        (
+            "le lead se nomme d'abord `vague-<k>`, comme à l'étape 0, puis démarre d'un coup une"
+            " session par issue retenue, une par `start_session`"
+        ),
     ),
     "demarrage-au-seul-tour-du-mainteneur": (
         PR_PARALLELES_SKILL,
@@ -2035,7 +2038,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "start-session-d-une-issue": (
         PR_PARALLELES_SKILL,
-        "`context: fresh`, worktree de l'application, `wake_when_done: true`, `name: issue-<N>`",
+        (
+            "`context: fresh`, worktree de l'application, `wake_when_done: true`,"
+            " `title: <préfixe> › #<N>`"
+        ),
     ),
     "brief-de-l-etape-5": (PR_PARALLELES_SKILL, "`prompt` : le brief de l'étape 5"),
     # Décision 8 : barème d'effort et plafond de l'arbre.
@@ -2095,7 +2101,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "colonne-session-par-identifiant": (
         PR_PARALLELES_SKILL,
-        "le nom et le `local_…` que `start_session` a rendu",
+        "le titre passé à `start_session` et le `local_…` qu'il a rendu",
     ),
     # Étape 5 : relais ; Étape 6 : le résumé au mainteneur (obs 103).
     "relais-de-vague-par-carte": (
@@ -2265,6 +2271,119 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         SESSIONS_LIEES_REF,
         "« interrogatoire #\\<N> terminé — ready-for-agent proposé »",
     ),
+    # #186, volet 1 (D-1, D-2, D-7, D-8) : le titre par ascendance. Une entrée par règle de
+    # « Titre », sur la moitié qui restreint (obs 126), puis chaque geste qui nomme une session
+    # à l'étape qui agit. Les 15 appels sont gardés à part (`TITRES_DES_SESSIONS_DEMARREES`).
+    "titre-repere-modifiable": (
+        SESSIONS_LIEES_REF,
+        "Ni le titre d'une session, un repère que l'application ou le mainteneur peuvent changer",
+    ),
+    "titre-separateur": (
+        SESSIONS_LIEES_REF,
+        "`<préfixe> › <suffixe>`, le séparateur ` › ` étant espace, U+203A, espace",
+    ),
+    "appel-ne-donne-que-son-suffixe": (
+        SESSIONS_LIEES_REF,
+        "Chaque appel ne donne que son suffixe et renvoie ici.",
+    ),
+    "title-sous-60-caracteres-sans-name": (
+        SESSIONS_LIEES_REF,
+        (
+            "tout `start_session` passe `title: <préfixe> › <suffixe>`, sous 60 caractères, et"
+            " **pas de `name`**"
+        ),
+    ),
+    "name-sans-separateur-ni-diese": (SESSIONS_LIEES_REF, "ne peut donc porter ni ` › ` ni `#`"),
+    "titre-mesure-en-place": (
+        SESSIONS_LIEES_REF,
+        (
+            'est celui que `get_session {"session_id":"self"}` rend dans l\'enfant, toujours en place'
+            " plusieurs minutes après"
+        ),
+    ),
+    "prefixe-lu-sur-self-jamais-dans-list-sessions": (
+        SESSIONS_LIEES_REF,
+        'lu par `get_session {"session_id":"self"}` — jamais dans `list_sessions`, qui l\'exclut',
+    ),
+    "prefixe-sans-le-role": (
+        SESSIONS_LIEES_REF,
+        "**sans le rôle qui suit le sujet de son dernier segment**",
+    ),
+    "prefixe-garde-le-relais": (SESSIONS_LIEES_REF, "Le rang de relais, lui, reste."),
+    "suffixe-numerote-si-autre-sujet": (
+        SESSIONS_LIEES_REF,
+        "précédé de `#<N>` quand l'enfant porte une autre issue ou PR que son parent",
+    ),
+    "racines": (
+        SESSIONS_LIEES_REF,
+        (
+            "lead de vague `vague-<k>` (`<k>` : `pr-paralleles` Étape 4) ; session PR seule ou"
+            " session de tri `#<N>` ; campagne de QA `qa-<plan>` ; relevé `/triage` `triage` ;"
+            " toute autre, `#<N>` si elle porte une issue, sinon le nom de son skill"
+        ),
+    ),
+    "racine-se-nomme-avant-son-premier-start-session": (
+        SESSIONS_LIEES_REF,
+        'Elle se nomme par `set_session_title` sur `"self"` avant son premier `start_session`.',
+    ),
+    "coordinatrice-se-renomme": (
+        SESSIONS_LIEES_REF,
+        "la session qui devient coordinatrice se renomme `<son titre> coordinatrice`",
+    ),
+    "relais-soeur-pas-fille": (
+        SESSIONS_LIEES_REF,
+        (
+            "prend le titre de la précédente suivi de ` (relais <r>)` : sa sœur, pas sa fille, et"
+            " ses enfants prennent ce titre pour préfixe"
+        ),
+    ),
+    "homonymes-numerotes": (SESSIONS_LIEES_REF, "le second prend ` 2`, le suivant ` 3`"),
+    "renommer-demande-l-accord-du-mainteneur": (
+        SESSIONS_LIEES_REF,
+        "l'application demande l'accord du mainteneur si c'est lui qui a posé le titre",
+    ),
+    "un-exemple-par-forme": (
+        SESSIONS_LIEES_REF,
+        (
+            "| lead | `vague-3` | | issue | `vague-3 › #145` | | coordinatrice |"
+            " `vague-3 › #145 coordinatrice` | | lot | `vague-3 › #145 › lot 2` | | sous-lot |"
+            " `vague-3 › #145 › lot 2 › 2a` | | relecture | `vague-3 › #145 › relecture` | |"
+            " session relayée | `vague-3 › #145 (relais 2)` | | racines hors vague | `#<N>`,"
+            " `qa-<plan>`, `triage` |"
+        ),
+    ),
+    "lead-se-nomme-a-l-etape-0": (
+        PR_PARALLELES_SKILL,
+        (
+            'le lead se nomme d\'abord `vague-<k>` (`set_session_title` sur `"self"`, `<k>` lu'
+            " comme le dit l'étape 4), puis démarre une session par issue à préparer"
+        ),
+    ),
+    "en-tete-du-tableau": (PR_PARALLELES_SKILL, "Vague <k> — <date>"),
+    "rang-de-la-vague": (
+        PR_PARALLELES_SKILL,
+        (
+            "`<k>` est le rang de la vague : celui de l'en-tête que la vague précédente a laissé dans"
+            " `PR-PARALLELES.md` (étape 8), plus 1 — 1 sans fichier"
+        ),
+    ),
+    "titre-repere-local-adresse": (
+        PR_PARALLELES_SKILL,
+        "Le titre est un repère ; le `local_…` est l'adresse de `SendMessage`",
+    ),
+    "nettoyage-garde-l-en-tete": (
+        PR_PARALLELES_SKILL,
+        "et garder son en-tête : la vague suivante y lit son rang (étape 4)",
+    ),
+    "coordinatrice-se-renomme-avant-ses-sessions": (
+        COORDINATRICE_REF,
+        (
+            "la coordinatrice se renomme d'abord `<son titre> coordinatrice` (`set_session_title`"
+            ' sur `"self"` ; `sessions-liees.md`, « Identité »), puis démarre d\'un coup les'
+            " sessions des lots non mergés"
+        ),
+    ),
+    "suffixe-d-un-sous-lot": (COORDINATRICE_REF, "suffixe `lot <k> › <k><x>` pour un sous-lot"),
 }
 
 
@@ -2353,15 +2472,18 @@ USE_WORKTREE_EXPLICITE = {
     ),
     "triage-tri-vers-l-interrogatoire": (
         TRIAGE_SKILL,
-        "`use_worktree: false` — elle lit le code et n'écrit que dans GitHub —, `name: interroge-<N>`",
+        (
+            "`use_worktree: false` — elle lit le code et n'écrit que dans GitHub —,"
+            " `title: <préfixe> › interrogatoire`"
+        ),
     ),
     "interroge-moi-vers-le-tri-du-brief": (
         INTERROGE_MOI_SKILL,
-        "`use_worktree: false`, `name: triage-<N>`",
+        "`use_worktree: false`, `title: <préfixe> › tri`",
     ),
     "vers-prd-vers-vers-issues": (
         VERS_PRD_SKILL,
-        "`use_worktree: false`, `name: vers-issues-<n>`",
+        "`use_worktree: false`, `title: <préfixe> › vers-issues #<n>`",
     ),
     "themes-milestones-vers-init-projet": (
         THEMES_MILESTONES_REF,
@@ -2369,18 +2491,18 @@ USE_WORKTREE_EXPLICITE = {
     ),
     "repercussions-vers-contradiction": (
         REPERCUSSIONS_SKILL,
-        "`use_worktree: true`, `name: contradiction-<N>`",
+        "`use_worktree: true`, `title: <préfixe> › contradiction`",
     ),
     "repercussions-vers-contradiction-par-carte": (
         REPERCUSSIONS_SKILL,
         (
             "hors d'un tour du mainteneur, une carte de proposition (`initiation: own_initiative`,"
-            " `context: fresh`, `use_worktree: true`, même nom et même prompt)"
+            " `context: fresh`, `use_worktree: true`, même titre et même prompt)"
         ),
     ),
     "repercussions-vers-plan-qa": (
         REPERCUSSIONS_SKILL,
-        "`use_worktree: true`, `name: plan-qa-<slug du thème>`",
+        "`use_worktree: true`, `title: <préfixe> › plan-qa <thème>`",
     ),
     "repercussions-vers-les-brouillons": (
         REPERCUSSIONS_SKILL,
@@ -2397,21 +2519,21 @@ USE_WORKTREE_EXPLICITE = {
         CONTRADICTION_SKILL,
         (
             "Hors d'un tour du mainteneur, une carte de proposition (`initiation: own_initiative`,"
-            " `context: fresh`, `use_worktree: true`, même nom et même prompt)"
+            " `context: fresh`, `use_worktree: true`, même titre et même prompt)"
         ),
     ),
     "execution-qa-vers-bug-vers-issue": (
         EXECUTION_QA_SKILL,
         (
             "`start_session`, `initiation: user_asked`, `context: fresh`, `use_worktree: false` —"
-            " elle lit le code de la campagne et n'écrit que dans GitHub —, `name: bug-<plan>`"
+            " elle lit le code de la campagne et n'écrit que dans GitHub —, `title: <préfixe> › bug`"
         ),
     ),
     "execution-qa-vers-bug-vers-issue-par-carte": (
         EXECUTION_QA_SKILL,
         (
             "Hors d'un tour du mainteneur, une carte de proposition (`initiation: own_initiative`,"
-            " `context: fresh`, `use_worktree: false`, même nom et même prompt)"
+            " `context: fresh`, `use_worktree: false`, même titre et même prompt)"
         ),
     ),
     "init-projet-vers-la-planification": (
@@ -2500,6 +2622,51 @@ def test_chaque_invariant_des_sessions_liees_garde_sa_phrase(fichier: str, phras
     texte = texte_normalise(fichier)
 
     assert phrase in texte, f"`{fichier}` ne porte plus « {phrase} »"
+
+
+# #186, D-1 : chaque `start_session` qui nommait son enfant à plat lui donne son titre — le
+# suffixe seul, la règle dans « Identité ». **Population**, sur `d2e9b09` : la commande de D-1,
+# `grep -rnoE "\`?name: [^,\`]+" .claude/skills CLAUDE.md CONTRIBUTING.md`, frontmatter et
+# exemples de code retirés, rend 15 appels dans 9 fichiers — un cas chacun, en littéraux.
+TITRES_DES_SESSIONS_DEMARREES = [
+    (PR_PARALLELES_SKILL, "#<N> tri"),
+    (PR_PARALLELES_SKILL, "#<N>"),
+    (COORDINATRICE_REF, "lot <k>"),
+    (".claude/skills/cycle-pr/references/session-relecture.md", "relecture"),
+    (TRIAGE_SKILL, "#<N>"),
+    (TRIAGE_SKILL, "interrogatoire"),
+    (INTERROGE_MOI_SKILL, "tri"),
+    (EXECUTION_QA_SKILL, "bug"),
+    (REPERCUSSIONS_SKILL, "contradiction"),
+    (REPERCUSSIONS_SKILL, "plan-qa <thème>"),
+    (REPERCUSSIONS_SKILL, "bug"),
+    (REPERCUSSIONS_SKILL, "vers-issues"),
+    (VERS_PRD_SKILL, "vers-issues #<n>"),
+    (CONTRADICTION_SKILL, "repercussions"),
+    (CONTRADICTION_SKILL, "repercussions #<m>"),
+]
+
+
+@pytest.mark.parametrize(("fichier", "suffixe"), TITRES_DES_SESSIONS_DEMARREES)
+def test_chaque_session_demarree_recoit_son_suffixe_et_le_renvoi_a_l_identite(
+    fichier: str, suffixe: str
+) -> None:
+    """L'appel donne son suffixe et renvoie à la règle, sans la recopier (obs 52)."""
+    forme = f"`title: <préfixe> › {suffixe}` (`sessions-liees.md`, « Identité »)"
+
+    assert forme in texte_normalise(fichier), f"`{fichier}` ne porte plus « {forme} »"
+
+
+def test_aucune_session_demarree_n_est_nommee_a_plat() -> None:
+    """`name` ne porte ni ` › ` ni `#` : rétabli, il rend la barre latérale à plat. Vu rouge sur
+    `d2e9b09`, où la forme rend les 15 appels de `TITRES_DES_SESSIONS_DEMARREES`."""
+    a_plat = [
+        (fichier, nom)
+        for fichier, texte in prose_du_harnais()
+        for nom in re.findall(r"`name: [^,`]+", texte)
+    ]
+
+    assert not a_plat, f"`name` à plat : {a_plat}"
 
 
 # `gh … list --help` cite la doc de l'outil, il ne liste rien : hors population.
@@ -3173,8 +3340,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         REPERCUSSIONS_SKILL,
         (
             "`start_session`, `initiation: user_asked`, `context: fresh`, `use_worktree: true`,"
-            " `name: contradiction-<N>`, prompt `/contradiction` suivi du bloc d'arrêt — ses deux"
-            " citations — et de `origine : #<N>`"
+            " `title: <préfixe> › contradiction` (`sessions-liees.md`, « Identité »), prompt"
+            " `/contradiction` suivi du bloc d'arrêt — ses deux citations — et de `origine : #<N>`"
         ),
     ),
     "6b-repercussions-reprise-sur-l-issue-fermee": (
@@ -3362,16 +3529,14 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " mainteneur ; sur son accord, dans ce tour, démarrer la session"
         ),
     ),
-    # Relecture de la PR #153, passe 1, CR2. Dénombrement (noms de session dérivés d'un texte
-    # libre), `grep -rno "name: [a-z-]*<[^>]*>" .claude/skills` : **12** sites au 2026-10-23,
-    # **1** fuyait (`plan-qa-<thème>`) ; les autres prennent un numéro, `coordinatrice.md` un
-    # `<slug>`.
+    # Relecture de la PR #153, passe 1, CR2 : le `name` d'un texte libre sortait de `[a-z0-9-]`.
+    # Depuis #186 (D-1), le titre porte le thème tel quel, sous 60 caractères (« Identité »).
     "6b-repercussions-session-plan-qa": (
         REPERCUSSIONS_SKILL,
         (
             "`start_session`, `initiation: user_asked`, `context: fresh`, `use_worktree: true`,"
-            ' `name: plan-qa-<slug du thème>`, prompt `/plan-qa "<thème>"` — `start_session` borne'
-            " un nom à `[a-z0-9-]` et 24 caractères (description de l'outil, lue le 2026-10-23)"
+            " `title: <préfixe> › plan-qa <thème>` (`sessions-liees.md`, « Identité »), prompt"
+            ' `/plan-qa "<thème>"`.'
         ),
     ),
     "6b-repercussions-brouillon-au-tour-du-mainteneur": (
@@ -5812,13 +5977,15 @@ def test_la_commande_des_cases_sans_type_s_accorde_au_recueil(
 RELANCE_AVEC_ORIGINE = (
     "**avec `origine : #<N>`** reçue à l'étape 1, à **chaque** sortie, pas seulement à celle qui"
     " amende — la passe de `#<N>` s'est arrêtée avant son étape 2 et rien d'autre ne la reprend :"
-    " `name: repercussions-<N>`, prompt `/repercussions #<N>` suivi du bloc d'arrêt reçu et de la"
-    " ligne `contradiction soldée : <sortie>` de la table"
+    " `title: <préfixe> › repercussions` (`sessions-liees.md`, « Identité »), prompt"
+    " `/repercussions #<N>` suivi du bloc d'arrêt reçu et de la ligne `contradiction soldée :"
+    " <sortie>` de la table"
 )
 RELANCE_SANS_ORIGINE = (
     "**sans origine** : à chaque sortie qui merge une PR, et à elle seule, au merge de cette PR,"
-    " `name: repercussions-<m>`, prompt `/repercussions #<m>`, où `<m>` est son numéro (mode « PR"
-    " d'amendement ») — les autres sorties n'ont aucun delta mergé, rien à démarrer"
+    " `title: <préfixe> › repercussions #<m>` (`sessions-liees.md`, « Identité »), prompt"
+    " `/repercussions #<m>`, où `<m>` est son numéro (mode « PR d'amendement ») — les autres"
+    " sorties n'ont aucun delta mergé, rien à démarrer"
 )
 # La carte de proposition, qui suit la table des sorties.
 CARTE_DE_LA_RELANCE = "Hors d'un tour du mainteneur, une carte de proposition"
@@ -6474,7 +6641,10 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         SESSION_RELECTURE_REF,
         "`source_branch` = la branche de la PR, déjà poussée",
     ),
-    "nom-de-la-session": (SESSION_RELECTURE_REF, "`name: relecture-pr-<n>`"),
+    "titre-de-la-session": (
+        SESSION_RELECTURE_REF,
+        "`title: <préfixe> › relecture` (`sessions-liees.md`, « Identité »)",
+    ),
     "contenu-du-brief": (
         SESSION_RELECTURE_REF,
         (
