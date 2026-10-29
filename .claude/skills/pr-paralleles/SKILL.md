@@ -65,7 +65,8 @@ raison) : le lead se nomme d'abord `vague-<k>` (`set_session_title` sur `"self"`
 le dit l'étape 4), puis démarre une session par issue à préparer — une issue `bug` à part, voir
 plus bas —, `start_session` avec `initiation: user_asked`, `context: fresh`, `use_worktree: false`
 écrit en clair, `wake_when_done: true`, `title: <préfixe> › #<N> tri` (`sessions-liees.md`,
-« Identité »), `model` et `effort` omis — hérités du lead (#107, décision 8). La session
+« Identité », une racine se nomme d'abord), `model` et `effort` omis — hérités du lead (#107,
+décision 8). La session
 n'écrit que dans GitHub et lit le code dans le dossier du lead — qui, tant que ses sessions
 lisent, n'y écrit rien et n'y change pas de branche ; omis, `use_worktree` lui donne un worktree à
 elle dès que le lead travaille dans un worktree (description de l'outil, lue le 2026-10-19). Le
@@ -167,7 +168,8 @@ automatique (`.claude/skills/cycle-pr/references/coordinatrice.md`, « Au go du 
 le lead se nomme d'abord `vague-<k>`, comme à l'étape 0, puis démarre d'un coup une session par
 issue retenue, une par `start_session` : `initiation: user_asked`, `context: fresh`, worktree de
 l'application, `wake_when_done: true`, `title: <préfixe> › #<N>` (`sessions-liees.md`,
-« Identité »), et pour `prompt` : le brief de l'étape 5. Le worktree se demande en clair,
+« Identité », une racine se nomme d'abord), et pour `prompt` : le brief de l'étape 5. Le
+worktree se demande en clair,
 `use_worktree: true` : omis, l'outil donne à l'enfant le dossier du lead quand celui-ci travaille
 dans un dossier simple (description de l'outil, lue le 2026-10-18), et les premiers gestes des
 sessions basculeraient tour à tour la même branche. L'effort de chaque session suit le

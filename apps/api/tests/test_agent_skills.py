@@ -2797,14 +2797,20 @@ TITRES_DES_SESSIONS_DEMARREES = [
     (CONTRADICTION_SKILL, "repercussions"),
     (CONTRADICTION_SKILL, "repercussions #<m>"),
 ]
+# Relecture de la PR #188, passe 1 : une racine qui suit son skill démarrait son enfant sans
+# s'être nommée, et son titre généré devenait le préfixe. Sur `1a44985`, 3 des 15 appels
+# portaient le geste à l'étape qui agit (lead ×2, coordinatrice), 12 non. Sans `.`, `;` ni `:`
+# hors du code : `morceaux_du_texte` n'y coupe pas.
+RENVOI_A_L_IDENTITE = "(`sessions-liees.md`, « Identité », une racine se nomme d'abord)"
 
 
 @pytest.mark.parametrize(("fichier", "suffixe"), TITRES_DES_SESSIONS_DEMARREES)
 def test_chaque_session_demarree_recoit_son_suffixe_et_le_renvoi_a_l_identite(
     fichier: str, suffixe: str
 ) -> None:
-    """L'appel donne son suffixe et renvoie à la règle, sans la recopier (obs 52)."""
-    forme = f"`title: <préfixe> › {suffixe}` (`sessions-liees.md`, « Identité »)"
+    """L'appel donne son suffixe et renvoie à la règle, sans la recopier (obs 52) ; le renvoi
+    rappelle à une racine de se nommer avant, à l'étape qui agit."""
+    forme = f"`title: <préfixe> › {suffixe}` {RENVOI_A_L_IDENTITE}"
 
     assert forme in texte_normalise(fichier), f"`{fichier}` ne porte plus « {forme} »"
 
@@ -3492,7 +3498,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         REPERCUSSIONS_SKILL,
         (
             "`start_session`, `initiation: user_asked`, `context: fresh`, `use_worktree: true`,"
-            " `title: <préfixe> › contradiction` (`sessions-liees.md`, « Identité »), prompt"
+            f" `title: <préfixe> › contradiction` {RENVOI_A_L_IDENTITE}, prompt"
             " `/contradiction` suivi du bloc d'arrêt — ses deux citations — et de `origine : #<N>`"
         ),
     ),
@@ -3687,7 +3693,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         REPERCUSSIONS_SKILL,
         (
             "`start_session`, `initiation: user_asked`, `context: fresh`, `use_worktree: true`,"
-            " `title: <préfixe> › plan-qa <thème>` (`sessions-liees.md`, « Identité »), prompt"
+            f" `title: <préfixe> › plan-qa <thème>` {RENVOI_A_L_IDENTITE}, prompt"
             ' `/plan-qa "<thème>"`.'
         ),
     ),
@@ -6129,13 +6135,13 @@ def test_la_commande_des_cases_sans_type_s_accorde_au_recueil(
 RELANCE_AVEC_ORIGINE = (
     "**avec `origine : #<N>`** reçue à l'étape 1, à **chaque** sortie, pas seulement à celle qui"
     " amende — la passe de `#<N>` s'est arrêtée avant son étape 2 et rien d'autre ne la reprend :"
-    " `title: <préfixe> › repercussions` (`sessions-liees.md`, « Identité »), prompt"
+    f" `title: <préfixe> › repercussions` {RENVOI_A_L_IDENTITE}, prompt"
     " `/repercussions #<N>` suivi du bloc d'arrêt reçu et de la ligne `contradiction soldée :"
     " <sortie>` de la table"
 )
 RELANCE_SANS_ORIGINE = (
     "**sans origine** : à chaque sortie qui merge une PR, et à elle seule, au merge de cette PR,"
-    " `title: <préfixe> › repercussions #<m>` (`sessions-liees.md`, « Identité »), prompt"
+    f" `title: <préfixe> › repercussions #<m>` {RENVOI_A_L_IDENTITE}, prompt"
     " `/repercussions #<m>`, où `<m>` est son numéro (mode « PR d'amendement ») — les autres"
     " sorties n'ont aucun delta mergé, rien à démarrer"
 )
@@ -6795,7 +6801,7 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
     ),
     "titre-de-la-session": (
         SESSION_RELECTURE_REF,
-        "`title: <préfixe> › relecture` (`sessions-liees.md`, « Identité »)",
+        f"`title: <préfixe> › relecture` {RENVOI_A_L_IDENTITE}",
     ),
     "contenu-du-brief": (
         SESSION_RELECTURE_REF,
