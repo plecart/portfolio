@@ -6,7 +6,7 @@ import { headerAtTop, nextHeaderScroll } from './header-scroll.ts'
  *
  * Lit `scrollY` une fois par image au plus — écoute passive de `scroll`, calcul au prochain
  * `requestAnimationFrame` —, et une première fois au montage, la page pouvant s'ouvrir défilée
- * (rechargement, retour) — lecture qu'aucun scénario ne prouve avant #20 : la page est trop courte
+ * (rechargement, retour) — lecture qu'aucun scénario ne prouve avant #168 : la page est trop courte
  * pour s'ouvrir défilée. Le calcul est `nextHeaderScroll`, en logique pure.
  *
  * @returns `detached` (fond et filet) et `hidden` (sortie par le haut). Deux booléens, pour que
