@@ -179,6 +179,7 @@ titre**, le lien vit dans le `Closes #N` de la PR.
 git commit --allow-empty -m "chore: amorce <description courte>"
 git push -u origin <type>/<description>
 gh pr create --draft --assignee @me \
+  --label "<label de catégorie>" --milestone "<thème des fichiers>" \
   --title "<type>(<scope>): <description FR>" \
   --body "$(cat <<'EOF'
 Closes #<N>
@@ -206,7 +207,9 @@ La PR draft porte **dès sa création** :
   ([references/coordinatrice.md](references/coordinatrice.md)).
 - Le **briefing de l'Étape 1** comme corps provisoire — le plan devient lisible par le mainteneur
   et par les autres sessions, avant que le code n'existe.
-- **Assignee**, **labels** et **milestone** (mapping de `.claude/pipeline.config.md`).
+- **Assignee**, **label** de catégorie et **milestone**, posés par le bloc ci-dessus — leurs
+  valeurs : `.claude/pipeline.config.md`, « Métadonnées d'une PR » (la PR #123 est née sans l'un
+  ni l'autre, obs 114).
 - Le marqueur **draft**, qui dit « en cours, ne pas reviewer » et interdit le merge accidentel.
 
 Pour une **demande directe sans issue**, ouvrir quand même la draft : sans `Closes`, mais le
@@ -478,6 +481,13 @@ lisibilité, nommage, doc, et « ce test pourrait tenir davantage ». Un constat
 aucune des deux premières est mineur, quelle que soit sa longueur — « ce test pourrait tenir
 davantage » en est le cas le plus fréquent. La session de relecture rend chaque mineur sous
 forme d'**édit précis** — fichier, ligne, remplacement — ou l'écarte elle-même avec sa raison.
+Hors sévérité, le ***vide relevé*** : un constat qui demande un cas que ni le bloc ni les critères
+de l'issue ne portent. Il s'écrit aux Notes et à la passation, part au barreau 2 de « Création
+d'issues en cours de cycle » (`contraintes.md`), ne se corrige jamais dans la PR et ne déclenche
+jamais la passe de plus (« La boucle »). Seul un défaut de ce que la PR affirme livrer est
+bloquant ou important : sans cette frontière, la passe de plus relance la boucle mesurée sur la PR
+#155 — gabarit ×4 (1 301 lignes pour ~320 estimées), 6 `developpeur` à `xhigh`, ~5 % du quota
+hebdomadaire (obs 143).
 
 **Traitement — par passe, jamais par constat.** La session PR trie et vérifie le diff rendu ; elle
 ne corrige pas. Les bloquants et importants d'une passe partent **ensemble** à un `developpeur`
@@ -516,7 +526,8 @@ fait rougir à tort, que la version précédente voyait ? ». Elle revient à la
 de la PR**, réveillée par message — son contexte est intact, elle n'a rien à relire —, jamais à un
 agent neuf. Un correctif est du code neuf écrit sous pression de conclure — c'est la partie la
 moins éprouvée de la PR, pas la plus sûre. Une relance qui trouve encore un bloquant ou un
-important en rouvre une, après correction ; un mineur suit la règle ci-dessus. La boucle s'arrête
+important en rouvre une, après correction ; un mineur suit la règle ci-dessus, et un vide relevé
+ne rouvre rien (« Sévérité »). La boucle s'arrête
 sur une passe sans bloquant ni important, et le body le dit. Les constats écartés sont notés avec
 leur raison dans le body (Étape 5).
 
