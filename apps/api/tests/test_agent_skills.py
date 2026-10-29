@@ -2388,6 +2388,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         ),
     ),
     "suffixe-d-un-sous-lot": (COORDINATRICE_REF, "suffixe `lot <k> › <k><x>` pour un sous-lot"),
+    "ouverture-garde-le-renommage": (
+        COORDINATRICE_REF,
+        "La forme démarrée à son ouverture remplace ce démarrage, pas le renommage",
+    ),
     # #186, volet 2 (D-3, D-4, D-6, D-9) : le lead et la coordinatrice nourrissent le tableau de
     # bord des sessions. Une entrée par règle de `pr-paralleles` Étape 4 et de `coordinatrice.md`,
     # moitié qui restreint comprise (obs 126), et par appel placé à l'étape qui agit. Le barème est
@@ -2426,8 +2430,9 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "champ-sessions": (
         PR_PARALLELES_SKILL,
         (
-            "`sessions` : la session de l'issue et ses descendantes, lues dans"
-            ' `list_sessions {"linked": true}` par la chaîne de `startedBy`, chacune en'
+            "`sessions` : les sessions de la colonne Session de ses lignes — relais et lots compris,"
+            " des sœurs que la chaîne de `startedBy` ne relie pas (étape 5) — et leurs descendantes,"
+            ' lues dans `list_sessions {"linked": true}` par cette chaîne, chacune en'
             " `{ titre, local_id, role }`"
         ),
     ),
