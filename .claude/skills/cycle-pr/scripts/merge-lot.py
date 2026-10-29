@@ -22,7 +22,13 @@ du brief ; `cycle-pr` Étape 7, « Le merge d'un lot »). Il refuse, dans cet or
    rythme (obs 51). Un commit de merge, celui de `gh pr update-branch`, serait abandonné par le
    `--rebase`, et sa résolution avec lui — supposé par la relecture de la PR #117 (passe 2), non
    mesuré : le script le refuse avant d'avoir à le savoir. L'argument suppose aussi que la base
-   n'est jamais réécrite : « jamais de force-push » de `contraintes.md`.
+   n'est jamais réécrite : « jamais de force-push » de `contraintes.md` ;
+7. une conversation qui a bougé depuis le relevé inscrit aux Notes du body : une PR de lot porte
+   « En vol », et reçoit donc aussi les commentaires de `repercussions` (obs 88, 89). Le prédicat
+   est `porte-merge.py conversation <PR>`, à côté de ce script, lancé par le même `run`, jamais
+   recopié : sorti en 1, la conversation a changé ; sorti autrement qu'en 0, il n'a pas pu
+   répondre — relevé absent ou mal formé, `gh` en échec — et le merge est refusé aussi. Il passe
+   en dernier, au plus près du merge.
 
 Puis `gh pr merge <PR> --rebase --match-head-commit <SHA>`, que la forge refuse si la tête a bougé
 entre-temps.
@@ -43,6 +49,7 @@ import re
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import Any
 
 Run = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
@@ -57,6 +64,8 @@ INTEGRATION_MARK = re.compile(r"En vol pour #\d+ \(intégration, \d+ lots\)")
 # publication et de déploiement, gardés par `if:`, le rendent sur chaque PR (relevé sur la PR #109).
 GREEN_CONCLUSIONS = {"SUCCESS", "SKIPPED", "NEUTRAL"}
 PR_FIELDS = "baseRefName,headRefOid,isDraft,state,body,statusCheckRollup"
+# Le prédicat de conversation du refus 7, à côté de ce script.
+PORTE_MERGE = Path(__file__).with_name("porte-merge.py")
 
 
 class Refusal(Exception):
@@ -145,6 +154,24 @@ def pr_refusal(pr: dict[str, Any], sha: str, base: str) -> str | None:
     return None
 
 
+def conversation_refusal(run: Run, number: str) -> str | None:
+    """Le motif du refus 7, ou `None` : `porte-merge.py conversation <PR>` sorti en 0.
+
+    Sa première ligne fait le motif : sur 1, l'élément le plus ancien postérieur au relevé, ou le
+    bilan quand seul le compte a changé ; sinon son refus.
+    """
+    try:
+        done = run([sys.executable, str(PORTE_MERGE), "conversation", number])
+    except OSError as error:
+        return f"`porte-merge.py` ne se lance pas : {error}"
+    if done.returncode == 0:
+        return None
+    first = (done.stdout.strip() or done.stderr.strip()).split("\n")[0].removeprefix("refus — ")
+    if done.returncode == 1:
+        return f"conversation changée depuis le relevé : {first}"
+    return f"porte de conversation sans réponse ({done.returncode}) : {first}"
+
+
 def merge(number: str, sha: str, base: str, run: Run) -> None:
     """Vérifie chaque condition du module, dans l'ordre, puis merge.
 
@@ -206,6 +233,8 @@ def merge(number: str, sha: str, base: str, run: Run) -> None:
         raise Refusal(
             f"la tête {sha} rejoint `{base}` par un commit de merge, que `--rebase` abandonnerait"
         )
+    if motif := conversation_refusal(run, number):
+        raise Refusal(motif)
 
     output(run, "gh", "pr", "merge", number, "--rebase", "--match-head-commit", sha)
 
