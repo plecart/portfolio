@@ -22,6 +22,7 @@ import subprocess
 import tarfile
 from collections.abc import Iterable, Mapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -29,6 +30,7 @@ from call_witness import recording, witnessed
 from config.env import Env
 from test_supply_chain import (
     DOCKER_FROM,
+    WORKFLOW_GLOBS,
     dockerfile_instructions,
     prose_citations,
     repository_files,
@@ -475,23 +477,50 @@ def test_l_image_api_copie_ce_qu_elle_sert_apres_le_chown(copy: str) -> None:
     assert instructions.index(copy) > chown[-1]
 
 
-def ci_build_flags(job: str) -> str | None:
-    """Les drapeaux qu'une étape du job `job` de la CI passe au build par `DOCKER_BUILD_FLAGS`."""
-    steps = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"][job]["steps"]
-    return next(
-        (
-            step["env"]["DOCKER_BUILD_FLAGS"]
-            for step in steps
-            if "DOCKER_BUILD_FLAGS" in step.get("env", {})
-        ),
-        None,
-    )
+def job_steps(workflow: Path, job: str) -> list[dict[str, Any]]:
+    """Les étapes du job `job` du workflow `workflow`, dans l'ordre."""
+    return yaml.safe_load(workflow.read_text(encoding="utf-8"))["jobs"][job]["steps"]
 
 
-# Les jobs qui construisent les images avec le cache local, et les entrées que chaque image y
-# cite : `infra` le lit et l'écrit ; `publish` le lit seulement — il restaure l'entrée d'`infra`,
-# sous la même clé (ADR 0014).
-CACHED_BUILDS = {"infra": 2, "publish": 1}
+def build_flags(steps: list[dict[str, Any]]) -> list[str]:
+    """Les drapeaux que chaque étape de `steps` passe au build par `DOCKER_BUILD_FLAGS`."""
+    return [
+        step["env"]["DOCKER_BUILD_FLAGS"]
+        for step in steps
+        if "DOCKER_BUILD_FLAGS" in step.get("env", {})
+    ]
+
+
+# Les jobs qui construisent les images avec le cache local — tous : un test le tient —, le
+# workflow de chacun et s'il écrit le cache : `infra` le lit et l'écrit ; `publish` et `avis` le
+# lisent seulement — ils restaurent l'entrée d'`infra`, sous la même clé (ADR 0014, ADR 0019).
+CACHED_BUILDS = {
+    "infra": (CI_WORKFLOW, True),
+    "publish": (CI_WORKFLOW, False),
+    "avis": (AVIS_WORKFLOW, False),
+}
+
+
+def ci_build_flags(job: str) -> str:
+    """Les drapeaux que l'unique étape de build du job `job` de `CACHED_BUILDS` passe par
+    `DOCKER_BUILD_FLAGS`, lus dans son workflow."""
+    flags = build_flags(job_steps(CACHED_BUILDS[job][0], job))
+    assert len(flags) == 1, f"le job `{job}` a {len(flags)} étape qui passe `DOCKER_BUILD_FLAGS`"
+    return flags[0]
+
+
+def test_chaque_build_en_cache_de_la_ci_est_recense() -> None:
+    """Chaque job d'un workflow qui passe des drapeaux au build est dans `CACHED_BUILDS` : absent,
+    il échapperait aux tests de ses drapeaux — le job `avis` l'a fait, à son ajout (cleanup de la
+    PR #187)."""
+    workflows = [path for glob in WORKFLOW_GLOBS for path in REPOSITORY_ROOT.glob(glob)]
+    building = {
+        (workflow, job)
+        for workflow in workflows
+        for job, body in yaml.safe_load(workflow.read_text(encoding="utf-8"))["jobs"].items()
+        if build_flags(body.get("steps") or [])
+    }
+    assert building == {(workflow, job) for job, (workflow, _) in CACHED_BUILDS.items()}
 
 
 def test_le_job_infra_teste_les_images_qu_il_vient_de_construire() -> None:
@@ -500,7 +529,7 @@ def test_le_job_infra_teste_les_images_qu_il_vient_de_construire() -> None:
     la relecture de la PR #67, l'étape retirée laissait toute la suite verte. Son étape ne porte
     que son nom et sa commande : ni `if` qui la sauterait, ni `continue-on-error` qui tolérerait
     son échec."""
-    steps = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["infra"]["steps"]
+    steps = job_steps(CI_WORKFLOW, "infra")
     commands = [step.get("run") for step in steps]
 
     assert "make build" in commands and "make image-test" in commands, commands
@@ -509,18 +538,15 @@ def test_le_job_infra_teste_les_images_qu_il_vient_de_construire() -> None:
     assert set(steps[position]) == {"name", "run"}
 
 
-@pytest.mark.parametrize(("job", "entries"), CACHED_BUILDS.items())
-def test_la_ci_donne_a_chaque_image_son_entree_de_cache(job: str, entries: int) -> None:
+@pytest.mark.parametrize("job", CACHED_BUILDS)
+def test_la_ci_donne_a_chaque_image_son_entree_de_cache(job: str) -> None:
     """Les drapeaux du job, passés par l'environnement comme en CI puis développés par `make` :
-    chaque image lit — et, dans `infra`, écrit — son entrée du cache local, à son nom. Sous une
-    même étiquette — le défaut, `latest` —, la dernière image construite remplace l'entrée des
-    autres (doc Docker, « Local cache » ; mesuré à la relecture de la PR #53). Rouge aussi si le
+    chaque image lit — et, dans `infra` seulement, écrit — son entrée du cache local, à son nom.
+    Sous une même étiquette — le défaut, `latest` —, la dernière image construite remplace l'entrée
+    des autres (doc Docker, « Local cache » ; mesuré à la relecture de la PR #53). Rouge aussi si le
     `Makefile` cesse de prendre ces drapeaux dans l'environnement (`=` au lieu de `?=`)."""
+    _, writes = CACHED_BUILDS[job]
     flags = ci_build_flags(job)
-    assert flags, (
-        f"aucune étape du job `{job}` ne passe `DOCKER_BUILD_FLAGS` — sa forme a-t-elle changé ?"
-    )
-
     printed = make_dry_run("build", environment={"DOCKER_BUILD_FLAGS": flags})
     tags = {
         Path(match["dockerfile"]).parent.name: CACHE_TAG.findall(match.group())
@@ -528,7 +554,15 @@ def test_la_ci_donne_a_chaque_image_son_entree_de_cache(job: str, entries: int) 
     }
 
     services = [path.parent.name for path in IMAGE_DOCKERFILES]
-    assert tags == {service: [service] * entries for service in services}
+    assert tags == {service: [service] * (1 + writes) for service in services}
+    assert ("--cache-to" in flags) is writes
+
+
+@pytest.mark.parametrize("job", CACHED_BUILDS)
+def test_la_ci_charge_dans_le_moteur_les_images_qu_elle_construit(job: str) -> None:
+    """Sans `--load`, le pilote conteneurisé construit et jette : les tests des images d'`infra`,
+    le scan d'`avis` et celui de `publish` ne trouveraient rien à lire."""
+    assert "--load" in ci_build_flags(job).split()
 
 
 # L'étage qui installe des paquets du système, et que la CI reconstruit à chaque build : leur
@@ -566,13 +600,10 @@ def test_les_paquets_du_systeme_s_installent_dans_l_etage_paquets() -> None:
 
 @pytest.mark.parametrize("job", CACHED_BUILDS)
 def test_la_ci_reconstruit_l_etage_paquets_a_chaque_build(job: str) -> None:
-    """`infra` et `publish` reconstruisent l'étage `paquets` sans le cache. `publish` aussi : quand
-    la clé d'`infra` existait déjà, `infra` ne réécrit pas l'entrée, et `publish` restaurerait
-    l'ancienne couche."""
-    flags = ci_build_flags(job)
-    assert flags, f"aucune étape du job `{job}` ne passe `DOCKER_BUILD_FLAGS`"
-
-    assert f"--no-cache-filter {PACKAGE_STAGE}" in " ".join(flags.split())
+    """Chaque job reconstruit l'étage `paquets` sans le cache. `publish` et `avis` aussi : quand la
+    clé d'`infra` existait déjà, `infra` ne réécrit pas l'entrée, et ils restaureraient l'ancienne
+    couche."""
+    assert f"--no-cache-filter {PACKAGE_STAGE}" in " ".join(ci_build_flags(job).split())
 
 
 @pytest.mark.parametrize(
