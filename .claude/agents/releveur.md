@@ -115,6 +115,10 @@ de #134 (obs 122).
   heredoc.
 - **`<rev>:<chemin>`** — l'outil Bash réécrit cet argument : `git show main:<chemin>` rend zéro
   octet en sortant en 0. Une sortie vide n'est pas une preuve d'absence.
+- **Commande de fond bornée** — toute commande susceptible de dépasser ~2 min part en arrière-plan
+  avec un `timeout` ; une recherche se borne au dépôt (`git grep`, le worktree), jamais un `find`
+  sur le disque. Les ~2 min sont le délai par défaut de l'outil Bash (120 000 ms, description de
+  l'outil lue le 2026-10-29 ; obs 132).
 
 ## Ce que tu n'appliques pas
 

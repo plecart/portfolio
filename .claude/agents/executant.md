@@ -34,6 +34,11 @@ Les relevés **rendus comme livrable** — suite, lint, format, typecheck lancé
 verdict — ne sont pas à toi : ils vont au `releveur`. La suite que ton commit exige, elle, est à
 toi.
 
+**Commande de fond bornée** — toute commande susceptible de dépasser ~2 min part en arrière-plan
+avec un `timeout` ; une recherche se borne au dépôt (`git grep`, le worktree), jamais un `find` sur
+le disque. Les ~2 min sont le délai par défaut de l'outil Bash (120 000 ms, description de l'outil
+lue le 2026-10-29 ; obs 132).
+
 ## Ton commit
 
 Tu **commites ta tranche** — elle seule, ses fichiers nommés un à un — avec le titre que ton brief

@@ -51,6 +51,11 @@ dans ton scratchpad. Le sous-agent n'a pas de `Write`, et le garde d'isolation r
 heredoc : il l'écrit par
 `echo '<contenu sur une ligne>' > <chemin>`.
 
+**Commande de fond bornée** — toute commande susceptible de dépasser ~2 min part en arrière-plan
+avec un `timeout` ; une recherche se borne au dépôt (`git grep`, le worktree), jamais un `find` sur
+le disque. Les ~2 min sont le délai par défaut de l'outil Bash (120 000 ms, description de l'outil
+lue le 2026-10-29 ; obs 132).
+
 **Laisse ton worktree en place en fin de passe.** C'est la session PR qui le retire, à la
 fermeture de la boucle : le retirer te **termine**, et la seconde passe comme la relance doivent
 te revenir.
