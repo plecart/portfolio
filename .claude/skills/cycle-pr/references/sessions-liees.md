@@ -32,10 +32,55 @@ de l'application ci-dessous porte sa date de mesure. Le relevé complet — enfa
 - Le parent désigne l'enfant par le `session_id` (`local_…`) que `start_session` lui rend ; il le
   retrouve dans `list_sessions {"linked": true}`, où la ligne de l'enfant porte `startedBy` égal à
   l'identifiant du parent (même mesure). C'est l'adresse de `SendMessage`.
-- Ni le nom d'une session, qui tourne, ni le chemin de son scratchpad : l'UUID du scratchpad est
-  celui du transcript (`~/.claude/projects/<projet>/<uuid>.jsonl`), pas l'identifiant `local_…`
-  de l'application (mesuré le 2026-10-16 : la session du lot 1 de #107 a son scratchpad et son
+- Ni le titre d'une session, un repère que l'application ou le mainteneur peuvent changer
+  (« Titre » ci-dessous), ni le chemin de son scratchpad : l'UUID du scratchpad est celui du
+  transcript (`~/.claude/projects/<projet>/<uuid>.jsonl`), pas l'identifiant `local_…` de
+  l'application (mesuré le 2026-10-16 : la session du lot 1 de #107 a son scratchpad et son
   transcript sous `4efeea8f-…`, et l'identifiant `local_8b381acb-…`).
+
+### Titre — un repère par ascendance
+
+Le titre d'une session porte son ascendance, `<préfixe> › <suffixe>`, le séparateur ` › ` étant
+espace, U+203A, espace. Chaque appel ne donne que son suffixe et renvoie ici.
+
+- **Au démarrage**, tout `start_session` passe `title: <préfixe> › <suffixe>`, sous 60
+  caractères, et **pas de `name`** : ce handle, `[a-z0-9-]` et 24 caractères au plus, ne peut
+  donc porter ni ` › ` ni `#`, et l'outil le dérive du titre quand on l'omet (description de
+  l'outil, lue le 2026-10-28). Mesuré le 2026-10-28 : le titre que le lead a passé au
+  `start_session` de la session de #186 (`local_ab2f9164…`) est celui que
+  `get_session {"session_id":"self"}` rend dans l'enfant, toujours en place plusieurs minutes
+  après.
+- **Le préfixe** est le titre de la session qui démarre, lu par
+  `get_session {"session_id":"self"}` — jamais dans `list_sessions`, qui l'exclut (ci-dessus) —,
+  **sans le rôle qui suit le sujet de son dernier segment** : `vague-3 › #145 coordinatrice` et
+  `vague-3 › #145 tri` donnent `vague-3 › #145`. Le rang de relais, lui, reste.
+- **Le suffixe** nomme le rôle de l'enfant, précédé de `#<N>` quand l'enfant porte une autre
+  issue ou PR que son parent ; il peut contenir ` › ` (un sous-lot : `lot 2 › 2a`).
+- **Une racine**, session sans parent, compose son titre : lead de vague `vague-<k>` (`<k>` :
+  `pr-paralleles` Étape 4) ; session PR seule ou session de tri `#<N>` ; campagne de QA
+  `qa-<plan>` ; relevé `/triage` `triage` ; toute autre, `#<N>` si elle porte une issue, sinon le
+  nom de son skill. Elle se nomme par `set_session_title` sur `"self"` avant son premier
+  `start_session`.
+- **Un changement de rôle** se lit dans le titre : la session qui devient coordinatrice se
+  renomme `<son titre> coordinatrice`, par le même outil.
+- **Une session relayée** prend le titre de la précédente suivi de ` (relais <r>)` : sa sœur, pas
+  sa fille, et ses enfants prennent ce titre pour préfixe.
+- **Deux enfants d'un même parent** qui recevraient le même titre : le second prend ` 2`, le
+  suivant ` 3`.
+
+`set_session_title` renomme la session courante ; l'application demande l'accord du mainteneur
+si c'est lui qui a posé le titre (description de l'outil, lue le 2026-10-28 ; non mesuré).
+
+| Forme | Titre |
+|---|---|
+| lead | `vague-3` |
+| issue | `vague-3 › #145` |
+| coordinatrice | `vague-3 › #145 coordinatrice` |
+| lot | `vague-3 › #145 › lot 2` |
+| sous-lot | `vague-3 › #145 › lot 2 › 2a` |
+| relecture | `vague-3 › #145 › relecture` |
+| session relayée | `vague-3 › #145 (relais 2)` |
+| racines hors vague | `#<N>`, `qa-<plan>`, `triage` |
 
 ## Premier geste dans un worktree de l'application
 

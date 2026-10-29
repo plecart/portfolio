@@ -34,10 +34,13 @@ barème du point 3 met à `max`, le geste tombant avant tout enfant. Dans ce tou
    « En vol pour #<N> (intégration, <n> lots) », puis `Closes #<N>`, puis le découpage. C'est la
    seule PR de l'issue qui porte `Closes`, et la première ligne est celle que lit le script de
    merge d'un lot (`cycle-pr` Étape 7, « Le merge d'un lot »).
-3. **Les sessions de lot** : la coordinatrice démarre d'un coup les sessions des lots non mergés,
-   une par `start_session` — `initiation: user_asked`, `context: fresh`, worktree de l'application,
-   `wake_when_done: true`, `use_worktree: true` (omis, l'outil peut donner à l'enfant le dossier
-   de la coordinatrice — `pr-paralleles` Étape 3), `name: <slug>-lot-<k>`. Effort par lot, fixé
+3. **Les sessions de lot** : la coordinatrice se renomme d'abord `<son titre> coordinatrice`
+   (`set_session_title` sur `"self"` ; `sessions-liees.md`, « Identité »), puis démarre d'un coup
+   les sessions des lots non mergés, une par `start_session` — `initiation: user_asked`,
+   `context: fresh`, worktree de l'application, `wake_when_done: true`, `use_worktree: true`
+   (omis, l'outil peut donner à l'enfant le dossier de la coordinatrice — `pr-paralleles`
+   Étape 3), `title: <préfixe> › lot <k>` (`sessions-liees.md`, « Identité »), suffixe
+   `lot <k> › <k><x>` pour un sous-lot. Effort par lot, fixé
    au démarrage par ce brief et jamais changé en cours de session (#134, D-15 ; l'effet d'un
    `/effort` en cours de session sur le cache n'est pas mesuré) : `high` par défaut, `max` si le
    bloc du lot porte un ADR, une surface de sécurité ou un contrat entre piles, `medium` pour un

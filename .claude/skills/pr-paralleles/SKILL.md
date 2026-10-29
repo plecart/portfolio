@@ -61,9 +61,11 @@ s'ouvre avant l'accord : la question nomme les sessions que l'accord démarrera,
 d'archiver, une fois vérifiée, la session d'une issue `bug` (ci-dessous).
 
 **Démarrer les sessions**, dans le tour de l'accord et dans celui-là seulement (étape 3, même
-raison) : une par issue à préparer — une issue `bug` à part, voir plus bas —, `start_session`
-avec `initiation: user_asked`, `context: fresh`, `use_worktree: false` écrit en clair,
-`wake_when_done: true`, `name: triage-<N>`, `model` et `effort` omis — hérités du lead (#107, décision 8). La session
+raison) : le lead se nomme d'abord `vague-<k>` (`set_session_title` sur `"self"`, `<k>` lu comme
+le dit l'étape 4), puis démarre une session par issue à préparer — une issue `bug` à part, voir
+plus bas —, `start_session` avec `initiation: user_asked`, `context: fresh`, `use_worktree: false`
+écrit en clair, `wake_when_done: true`, `title: <préfixe> › #<N> tri` (`sessions-liees.md`,
+« Identité »), `model` et `effort` omis — hérités du lead (#107, décision 8). La session
 n'écrit que dans GitHub et lit le code dans le dossier du lead — qui, tant que ses sessions
 lisent, n'y écrit rien et n'y change pas de branche ; omis, `use_worktree` lui donne un worktree à
 elle dès que le lead travaille dans un worktree (description de l'outil, lue le 2026-10-19). Le
@@ -162,9 +164,10 @@ tour où le lead peut démarrer les sessions.
 Dans le tour où le mainteneur valide le lot (étape 2), et dans celui-là seulement —
 `start_session` est refusé dans un tour ouvert par un message de session ou par un événement
 automatique (`.claude/skills/cycle-pr/references/coordinatrice.md`, « Au go du découpage ») —,
-le lead démarre d'un coup une session par issue retenue, une par `start_session` :
-`initiation: user_asked`, `context: fresh`, worktree de l'application, `wake_when_done: true`,
-`name: issue-<N>`, et pour `prompt` : le brief de l'étape 5. Le worktree se demande en clair,
+le lead se nomme d'abord `vague-<k>`, comme à l'étape 0, puis démarre d'un coup une session par
+issue retenue, une par `start_session` : `initiation: user_asked`, `context: fresh`, worktree de
+l'application, `wake_when_done: true`, `title: <préfixe> › #<N>` (`sessions-liees.md`,
+« Identité »), et pour `prompt` : le brief de l'étape 5. Le worktree se demande en clair,
 `use_worktree: true` : omis, l'outil donne à l'enfant le dossier du lead quand celui-ci travaille
 dans un dossier simple (description de l'outil, lue le 2026-10-18), et les premiers gestes des
 sessions basculeraient tour à tour la même branche. L'effort de chaque session suit le
@@ -228,13 +231,17 @@ avec lui ; le hook d'écriture du harnais refuse le clone principal à une sessi
 (obs 93).
 
 ```markdown
-# PR en parallèle — <date>
+# Vague <k> — <date>
 
 | Issue | PR | Branche | Worktree | Session | Base du verdict | État |
 |-------|----|---------|----------|---------|-----------------|------|
-| #51 lot 1/2 | #62 (draft) | feat/extraction-pdf | .claude/worktrees/brave-turing-1a2b3c | issue-51 · local_7534fbb3… | — | 🟡 en cours |
-| #52 | #63 | fix/quota-upload | .claude/worktrees/calm-hopper-4d5e6f | issue-52 · local_2afdedb5…, local_9c1e0a4f… (relais) | 863d606 | 🔵 en review |
+| #51 lot 1/2 | #62 (draft) | feat/extraction-pdf | .claude/worktrees/brave-turing-1a2b3c | vague-1 › #51 › lot 1 · local_7534fbb3… | — | 🟡 en cours |
+| #52 | #63 | fix/quota-upload | .claude/worktrees/calm-hopper-4d5e6f | vague-1 › #52 · local_2afdedb5…, local_9c1e0a4f… (relais) | 863d606 | 🔵 en review |
 ```
+
+`<k>` est le rang de la vague : celui de l'en-tête que la vague précédente a laissé dans
+`PR-PARALLELES.md` (étape 8), plus 1 — 1 sans fichier. Le lead le lit avant de se nommer
+`vague-<k>` (étape 0 ou 3), puis l'écrit en tête du fichier.
 
 Trois colonnes portent chacune une identité qu'un nom ne suffit pas à tenir :
 
@@ -242,10 +249,10 @@ Trois colonnes portent chacune une identité qu'un nom ne suffit pas à tenir :
   sans le rang, une ligne mergée et une ligne en vol se ressemblent (obs 36). Chaque PR de lot
   s'ouvre par `En vol pour #N (lot k/n)` ; le `Closes` va à la dernière, ou, sous une
   coordinatrice, à la PR d'intégration (`coordinatrice.md`, « Au go du découpage »).
-- **Session** — le nom et le `local_…` que `start_session` a rendu. Le nom est un repère ; le
-  `local_…` est l'adresse de `SendMessage` et la clé de `get_session` et de `list_events`
-  (`sessions-liees.md`, « Identité » ; `list_events` : description de l'outil, lue le
-  2026-10-18). Une session **relayée** ajoute le sien à côté de ceux qui
+- **Session** — le titre passé à `start_session` et le `local_…` qu'il a rendu. Le titre est un
+  repère ; le `local_…` est l'adresse de `SendMessage` et la clé de `get_session` et de
+  `list_events` (`sessions-liees.md`, « Identité » ; `list_events` : description de l'outil, lue
+  le 2026-10-18). Une session **relayée** ajoute le sien à côté de ceux qui
   l'ont précédée au lieu de les remplacer : l'unité qui survit au relais est le cycle, et c'est
   elle qui porte la liste de ses sessions (obs 40).
 - **Base du verdict** — le SHA d'`origin/main` pour lequel le dernier verdict d'avant-go a été
@@ -571,8 +578,9 @@ sous le clone principal, sinon relancer la commande `hooks` de la config **depui
 Un worktree supprimé qui avait installé les hooks laisse ce chemin mort, et la vague sabote le
 dépôt qu'elle servait.
 
-Marquer la ligne `⚪ worktree nettoyé` dans le tableau. Quand tout le lot est nettoyé, supprimer
-`PR-PARALLELES.md` (ou archiver le tableau dans les notes du projet).
+Marquer la ligne `⚪ worktree nettoyé` dans le tableau. Quand tout le lot est nettoyé, retirer le
+tableau de `PR-PARALLELES.md` (ou l'archiver dans les notes du projet) et garder son en-tête : la
+vague suivante y lit son rang (étape 4).
 
 **Issue en plusieurs lots.** La **branche** mergée d'un lot meurt : sous un trunk fusionné par
 rebase ou squash, ses commits réécrits doubleraient dans la PR du lot suivant (obs 36). Une session
