@@ -1898,7 +1898,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "arret-de-lot-previent-la-coordinatrice": (
         COORDINATRICE_REF,
-        "« bloquant : go humain requis dans cette fenêtre — session de relecture à démarrer »",
+        "« attend le mainteneur : <[V] ou écart> — go humain, session de relecture à démarrer »",
     ),
     "repli-manuel": (COORDINATRICE_REF, "l'échec devient une observation du journal"),
     # La session de lot (décisions 5, 17).
@@ -6958,8 +6958,8 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
     "forme-des-constats": (
         SESSION_RELECTURE_REF,
         (
-            "`constats passe <k> (<SHA court>) — <b> bloquants, <i> importants, <m> mineurs`, puis le"
-            " rapport que `relecteur.md` ordonne, les constats de chaque commande intégrée et les"
+            "`constats passe <k> (<SHA court>) — <b> bloquants, <i> importants, <m> mineurs, <v> vides"
+            " relevés`, puis le rapport que `relecteur.md` ordonne, les constats de chaque commande intégrée et les"
             " observations candidates"
         ),
     ),
@@ -7743,12 +7743,15 @@ SEUIL_DE_TAILLE_FORMES = {
 # Les textes qui décident d'un découpage — en issues, en lots, ou d'un regroupement sous le
 # plancher. **Dénombrement**, écrit avant le correctif (relecture de la PR #199, passe 1, I2 :
 # `triage`, que le point 2 de la règle nomme, manquait) : `git grep -c -i "découp" -- .claude`
-# sur `0a8b14a`, lu fichier par fichier — **8** groupes décident, 4 étaient lus. Ajoutés :
+# sur `0a8b14a`, lu fichier par fichier — **9** groupes décident, 4 étaient lus. Ajoutés :
 # `triage` (le plancher ; `brief-agent.md`, un découpage en lots se valide par ses tests),
 # `bug-vers-issue` (issue unique ou découpage), `interroge-moi` (le découpage, coût présenté au
-# mainteneur), `repercussions` (re-découpage d'une issue ouverte). Hors classe, parce qu'ils le
-# citent sans le décider : `pr-paralleles` (une vague choisit des issues, elle n'en découpe
-# aucune), `CLAUDE.md`, `CONTRIBUTING.md`, `developpeur.md`.
+# mainteneur), `repercussions` (re-découpage d'une issue ouverte), `contraintes.md` (la réponse
+# type de la voie T, « découpe en lots » ; passe 2, m7). Hors classe, parce qu'ils le citent sans
+# le décider : `pr-paralleles` (une vague choisit des issues, elle n'en découpe aucune),
+# `CLAUDE.md`, `CONTRIBUTING.md`, `developpeur.md`, `pipeline.config.md` et `init-projet` (le rang
+# des issues dans la table des sources), `vers-prd` (le PRD que `vers-issues` découpe),
+# `cleanup-verbatim.md` (« découplées »).
 TEXTES_QUI_DECOUPENT = {
     "regle-de-taille": ".claude/rules/taille-pr.md",
     "cycle-pr": CYCLE_PR_SKILL,
@@ -7758,6 +7761,7 @@ TEXTES_QUI_DECOUPENT = {
     "bug-vers-issue": ".claude/skills/bug-vers-issue/**/*.md",
     "interroge-moi": INTERROGE_MOI_SKILL,
     "repercussions": ".claude/skills/repercussions/**/*.md",
+    "contraintes": CONTRAINTES_RULE,
 }
 
 
@@ -7812,6 +7816,10 @@ INVARIANTS_DE_LA_REGLE_DU_SUJET = {
         CYCLE_PR_SKILL,
         "**La boucle — une passe de plus tant que la dernière trouve un bloquant ou un important.**",
     ),
+    "cycle-pr-relance-rouvre": (
+        CYCLE_PR_SKILL,
+        "Une relance qui trouve encore un bloquant ou un important en rouvre une, après correction",
+    ),
     "cycle-pr-ligne-echappements": (
         CYCLE_PR_SKILL,
         (
@@ -7860,9 +7868,13 @@ INVARIANTS_DE_LA_REGLE_DU_SUJET = {
         RELECTEUR_ROLE,
         "un constat qui demande un cas que ni le bloc ni les critères de l'issue ne portent",
     ),
-    "cycle-pr-gh-pr-create-label-et-milestone": (
+    "cycle-pr-vide-releve-sans-passe-de-plus": (
         CYCLE_PR_SKILL,
-        '--label "<label de catégorie>" --milestone "<thème des fichiers>"',
+        "ne se corrige jamais dans la PR et ne déclenche jamais la passe de plus",
+    ),
+    "relecteur-vide-releve-jamais-bloquant": (
+        RELECTEUR_ROLE,
+        "Tu le rends à part, jamais comme bloquant ou important",
     ),
     "briefing-poste-dominant": (
         BRIEFING_REF,
@@ -7896,3 +7908,14 @@ INVARIANTS_DE_LA_REGLE_DU_SUJET = {
 def test_chaque_invariant_de_la_regle_du_sujet_garde_sa_phrase(fichier: str, phrase: str) -> None:
     """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
     assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
+
+
+def test_le_bloc_gh_pr_create_porte_label_et_milestone() -> None:
+    """Label et milestone dans le bloc que l'agent copie (obs 114 : la PR #123 est née sans l'un ni
+    l'autre). Texte brut, ligne qui suit l'appel : le texte normalisé retire les marges `# `, et une
+    option commentée y passerait (relecture de la PR #199, passe 2, m4)."""
+    bloc = (
+        "gh pr create --draft --assignee @me \\\n"
+        '  --label "<label de catégorie>" --milestone "<thème des fichiers>" \\\n'
+    )
+    assert bloc in (REPOSITORY_ROOT / CYCLE_PR_SKILL).read_text(encoding="utf-8")
