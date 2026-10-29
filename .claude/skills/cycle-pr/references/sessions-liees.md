@@ -69,7 +69,8 @@ espace, U+203A, espace. Chaque appel ne donne que son suffixe et renvoie ici.
   suivant ` 3`.
 
 `set_session_title` renomme la session courante ; l'application demande l'accord du mainteneur
-si c'est lui qui a posé le titre (description de l'outil, lue le 2026-10-28 ; non mesuré).
+si c'est lui qui a posé le titre, et refuse en session sans surveillance (description de l'outil,
+lue le 2026-10-29 ; non mesuré).
 
 | Forme | Titre |
 |---|---|
