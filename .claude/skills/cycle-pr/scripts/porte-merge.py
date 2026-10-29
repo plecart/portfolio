@@ -85,7 +85,7 @@ des deux côtés. Sans `--releve`, il lit la **dernière** ligne du body qui s'o
 : ` — des verdicts successifs s'y empilent —, et refuse si elle manque ou n'a pas cette forme. 1 si
 le compte actuel diffère de `<k>` ou si un élément est postérieur à `dernier`, chacun nommé, du plus
 ancien au plus récent, `commentaire|revue de <login> à <horodatage> : <première ligne>` — une revue
-de commentaires en ligne n'a pas de texte, et sa ligne renvoie alors à `gh api
+de commentaires en ligne n'a pas de texte, et sa ligne renvoie alors à `gh api --paginate
 repos/{owner}/{repo}/pulls/<n>/comments`, qui les porte (PR #199 : 10 revues sans texte, 10
 commentaires en ligne de 10 revues distinctes, relevé le 2026-10-29) ; 0 sinon. Puis `PR <n> :
 inchangée|changée depuis « <relevé> » — actuel : <k> commentaires et revues, dernier <horodatage |
@@ -381,7 +381,7 @@ def conversation(run: Run, args: argparse.Namespace) -> Verdict:
     # Une revue de commentaires en ligne n'a pas de texte : sa ligne renvoie à ceux qui la portent.
     inline = (
         "sans texte — commentaires en ligne : "
-        f"gh api repos/{{owner}}/{{repo}}/pulls/{args.pr}/comments"
+        f"gh api --paginate repos/{{owner}}/{{repo}}/pulls/{args.pr}/comments"
     )
     lines = [
         f"{item.kind} de {item.login} à {item.stamp} : {item.first_line or inline}"

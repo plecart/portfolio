@@ -387,7 +387,7 @@ CONVERSATIONS: dict[str, tuple[dict[str, Any], int, str]] = {
         1,
         (
             "revue de plecart à 2026-10-14T18:01:07Z : sans texte — commentaires en ligne :"
-            " gh api repos/{owner}/{repo}/pulls/94/comments"
+            " gh api --paginate repos/{owner}/{repo}/pulls/94/comments"
         ),
     ),
     "posterieur-d-une-fraction-de-seconde": (
@@ -397,6 +397,11 @@ CONVERSATIONS: dict[str, tuple[dict[str, Any], int, str]] = {
         ),
         1,
         "commentaire de plecart à 2026-10-14T17:52:41.5Z",
+    ),
+    "posterieurs-du-plus-ancien-au-plus-recent": (
+        pr_94(RELEVE_AU_VERDICT, revues=[revue("2026-10-14T17:40:00Z", "Plus ancienne.")]),
+        1,
+        "revue de plecart à 2026-10-14T17:40:00Z : Plus ancienne.",
     ),
 }
 
