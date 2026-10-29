@@ -262,7 +262,8 @@ jobs:
     name: Avis — audit Python, audit npm, scan des images
     # Même conditionnement que le job `web` : voir son commentaire. Sur une PR, seulement si le
     # delta touche une entrée d'un avis — manifestes, verrous, Dockerfiles, exceptions datées,
-    # `Makefile`, `avis.yml` — ; sur un push vers `main`, toujours : `publish` l'attend, et aucune
+    # porte de `pip-audit`, `avis.yml` — ou ce qui décide des jobs (`Makefile`, `ci.yml`,
+    # `changed_jobs.py`) ; sur un push vers `main`, toujours : `publish` l'attend, et aucune
     # porte ne quitte le chemin vers la production (ADR 0019, § Facteurs de décision). Les étapes
     # sont celles du workflow planifié, au commit même de ce run (doc GitHub « Reuse workflows »).
     needs: api

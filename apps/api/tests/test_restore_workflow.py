@@ -19,7 +19,7 @@ import pytest
 import yaml
 from call_witness import recording, witnessed
 from test_deployment import checkout_then_scripts_findings
-from test_infra import REPOSITORY_ROOT
+from test_infra import REPOSITORY_ROOT, job_steps
 from test_publication import WORKFLOW_TOKEN_ENV
 
 RESTORE_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "restore.yml"
@@ -245,8 +245,7 @@ def resolved(env: dict[str, str]) -> dict[str, str]:
 
 def workflow_steps() -> list[dict[str, Any]]:
     """Les étapes de script du job `restore`, dans l'ordre."""
-    job = yaml.safe_load(RESTORE_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["restore"]
-    return [step for step in job["steps"] if "run" in step]
+    return [step for step in job_steps(RESTORE_WORKFLOW, "restore") if "run" in step]
 
 
 def run_workflow(root: Path, failing: str | None = None) -> list[subprocess.CompletedProcess[str]]:

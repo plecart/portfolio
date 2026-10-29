@@ -186,8 +186,9 @@ poste.
 **Audit des dépendances.** `make audit` (Python) et `make web-audit` (front) ne sont pas des portes
 de chaque PR : leur verdict change sans commit, quand un avis se publie. Le workflow
 [`avis.yml`](.github/workflows/avis.yml) les joue chaque jour sur `main`, et la CI les joue sur
-une PR qui touche leurs entrées — manifestes, verrous, Dockerfiles, exceptions datées, `Makefile` —
-et sur chaque push vers `main`, avant la publication
+une PR qui touche leurs entrées — manifestes, verrous, Dockerfiles, exceptions datées, porte de
+`pip-audit`, `avis.yml` — ou ce qui décide des jobs (`Makefile`, `ci.yml`, `changed_jobs.py`), et
+sur chaque push vers `main`, avant la publication
 ([ADR 0019](docs/adr/0019-runs-de-ci-au-ready-et-avis-planifies.md), décision 2). Un rouge d'avis
 se corrige sur le trunk, par la voie courte — une montée de version ou une exception datée —,
 jamais par d'autres pushes sur une PR. Côté Python, tout avis de sécurité connu rougit l'audit —
@@ -291,11 +292,11 @@ que `.github/dependabot.yml` refuse — chacune avec sa raison et le test qui la
 métadonnées de PR et de la description en français
 (`chore(deps): bump …`, [.claude/rules/taille-pr.md](.claude/rules/taille-pr.md)), passent par la
 même CI et ne se mergent que sur un go humain.
-Les mises à jour de sécurité ne suivent pas ce mois : Dependabot ouvre sa PR dès qu'un avis
+Les mises à jour de sécurité ne suivent pas cette cadence : Dependabot ouvre sa PR dès qu'un avis
 paraît, pour `uv`, npm et les actions GitHub — alertes et mises à jour de sécurité activées sur le
 dépôt ([ADR 0019](docs/adr/0019-runs-de-ci-au-ready-et-avis-planifies.md), décision 4). Pas pour
-les images Docker, que GitHub ne couvre pas : un avis sur une image se voit au scan des images (`make scan`,
-ci-dessus) et se traite par une montée de version à la main.
+les images Docker, que GitHub ne couvre pas : un avis sur une image se voit au scan des images
+(`make scan`, ci-dessus) et se traite par une montée de version à la main.
 Actions et images sont épinglées par empreinte, derrière leur version la plus précise :
 Dependabot met l'une et l'autre à jour ensemble. Une nouvelle version mineure de Python (3.13)
 n'est jamais proposée — elle se change à la main, dans `.python-version` puis dans l'image ; ses
