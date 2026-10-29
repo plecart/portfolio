@@ -733,11 +733,12 @@ ses jobs,
     PR, qui ne fait tourner le job `avis` que parce que son delta touche une de ses entrées (ADR
     0019, décision 2), le reste du tri étant celui du trunk. Sa CI se relance par le geste de
     l'Étape 7, `gh pr close` puis `gh pr reopen`, et ce que le nouveau run a combiné se lit dans
-    la trace de son checkout. Ni commit de fusion — `gh pr update-branch` sans `--rebase` compris, qui passe
-    sous l'`allow` `Bash(gh pr *)` de `.claude/settings.json` —, ni rebase d'une branche poussée
-    sans demande explicite (`contraintes.md`), ici comme à l'Étape 7 : à la PR #75, faute d'un
-    geste à cette étape, deux sessions de suite ont planifié de fusionner `main` dans la branche
-    (obs 82). Un rerun de la PR, lui, ne prouve rien : l'avis ne part pas (obs 56).
+    la trace de son checkout. Ni commit de fusion — `gh pr update-branch` sans `--rebase`
+    compris, qui passe sous l'`allow` `Bash(gh pr *)` de `.claude/settings.json` —, ni rebase
+    d'une branche poussée sans demande explicite (`contraintes.md`), ici comme à l'Étape 7 : à la
+    PR #75, faute d'un geste à cette étape, deux sessions de suite ont planifié de fusionner
+    `main` dans la branche (obs 82). Un rerun de la PR, lui, ne prouve rien : l'avis ne part pas
+    (obs 56).
   - *Rouge de code* : tout le reste, y compris un rouge de plateforme (3.2) → cycle complet
     3.1→3.5.
 - **Revue** : les commentaires d'une revue automatisée (bot), s'il y en a une. Un `developpeur` a
@@ -934,13 +935,13 @@ périmées ») — jamais supposé égal à la base de branche, jamais lu dans l
 forge, et inscrit au Test plan avec le numéro du run. `--match-head-commit` ferme le même trou côté
 tête, et `porte-merge.py conversation <n>` côté conversation : il compare les commentaires et revues
 soumises de la PR à la **dernière** ligne `Conversation : …` du body (« Vérification d'avant-go »),
-et sort en **1** sur tout élément postérieur, en **2** sur une ligne absente ou mal formée. Si le
-trunk a avancé depuis, la commande **ne part pas** : rejouer « Rejouer les vérifications
-périmées », relire la trace du nouveau run, puis un `verificateur` neuf. Si c'est la conversation
-qui a changé, elle ne part pas non plus : lire chaque élément que le prédicat nomme — un
-commentaire de répercussion se traite à l'Étape 6 —, puis un `verificateur` neuf, ou pour une PR
-qui n'en a pas, un relevé neuf aux Notes, pris puis lu comme plus haut (« Vérification
-d'avant-go »).
+et sort en **1** sur tout élément postérieur ou sur un compte qui a changé, en **2** sur une ligne
+absente ou mal formée. Si le trunk a avancé depuis, la commande **ne part pas** : rejouer
+« Rejouer les vérifications périmées », relire la trace du nouveau run, puis un `verificateur`
+neuf. Si c'est la conversation qui a changé, elle ne part pas non plus : lire chaque élément que
+le prédicat nomme — un commentaire de répercussion se traite à l'Étape 6 —, puis un
+`verificateur` neuf, ou pour une PR qui n'en a pas, un relevé neuf aux Notes, pris puis lu comme
+plus haut (« Vérification d'avant-go »).
 
 **Une porte est une commande dont le code de sortie porte la condition ; `&&` est ce qui la rend bloquante.** → [references/merge.md](references/merge.md), « Une porte est une commande dont le code de sortie porte la condition ».
 

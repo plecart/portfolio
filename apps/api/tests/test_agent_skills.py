@@ -1456,10 +1456,10 @@ def test_chaque_porte_prescrite_est_un_predicat_chaine_a_son_action(
     par `GESTES_RETIRES_DE_PR_PARALLELES`. **4 depuis le lot 3 de #134** : le retrait de la
     branche du sous-agent `relecteur`, en repli, passe de `git branch -d` — qui compare à `HEAD`
     et refuse dès que le trunk a avancé (obs 86) — à la porte d'ancêtre contre `origin/<trunk>`
-    (`session-relecture.md`, « Repli »). **5 portes en 6 lignes depuis #197**, qui chaîne le prédicat de
-    conversation (`porte-merge.py conversation`) devant `gh pr merge` : dans la porte de `cycle-pr`
-    Étape 7, à côté de celle d'ancêtre, et dans le déroulé de `triage/hors-scope.md`, étape 6,
-    qui n'en avait aucune.
+    (`session-relecture.md`, « Repli »). **5 portes en 6 lignes depuis #197**, qui chaîne le
+    prédicat de conversation (`porte-merge.py conversation`) devant `gh pr merge` : dans la porte
+    de `cycle-pr` Étape 7, à côté de celle d'ancêtre, et dans le déroulé de
+    `triage/hors-scope.md`, étape 6, qui n'en avait aucune.
 
     Le prédicat doit se trouver **à gauche de l'action sur la même ligne**, avec un `&&` entre les
     deux — ce qui distingue une porte d'une lecture suivie d'une seconde commande (obs 59) —, en
@@ -8169,7 +8169,11 @@ def test_chaque_lecture_des_commentaires_d_une_pr_suit_le_releve_et_lit_les_comm
 # La tête que `porte-merge.py trunk` lie au run est celle que la porte passe à
 # `--match-head-commit` : un seul nom aux deux commandes, sans quoi deux valeurs peuvent les
 # remplir (correctif du script après la passe 2 de relecture de la PR #200). Dénombré sur
-# `f165555` : 5 appels de `trunk` dans la prose — voie courte, Étapes 5 et 7 de `cycle-pr`,
+# `f165555` :
+#
+#     git grep -n "porte-merge.py trunk <run>" f165555 -- "*.md"
+#
+# rend 5 appels de `trunk` dans la prose — voie courte, Étapes 5 et 7 de `cycle-pr`,
 # `verificateur.md`, `pr-paralleles` —, tous sous `<SHA de tête>`, la porte sous
 # `<SHA de tête vérifié>`.
 APPEL_DE_TRUNK = re.compile(r"porte-merge\.py trunk <run> (?:<[^<>]+>|\S+) <([^<>]+)>")

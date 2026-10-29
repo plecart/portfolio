@@ -2,7 +2,8 @@
 
 Passages déplacés mot pour mot de `cycle-pr/SKILL.md` (issue #177), plus « Ce que couvre le go
 du briefing » (#197), chacun sous le titre que cite son renvoi. Les liens `references/…` qu'ils
-portent se lisent depuis le dossier du skill, et leurs renvois de position (« ci-dessous », « plus bas ») depuis l'emplacement du renvoi.
+portent se lisent depuis le dossier du skill, et leurs renvois de position (« ci-dessous »,
+« plus bas ») depuis l'emplacement du renvoi.
 
 ## Vague parallèle
 
