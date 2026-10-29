@@ -9,7 +9,7 @@ messages, nettoyage — dans [sessions-liees.md](sessions-liees.md).
 
 Une session, et non un sous-agent, pour trois raisons : le mainteneur la **joint** dans sa
 fenêtre ; ses commandes intégrées, `/code-review` et `/security-review`, closent **son** tour et
-non celui de la session PR (obs 94, 98, 115) ; son contexte tient les deux passes et la relance.
+non celui de la session PR (obs 94, 98, 115) ; son contexte tient toutes ses passes et la relance.
 
 ## Démarrage — par la session PR, au go de son briefing
 
@@ -42,9 +42,10 @@ La session PR **pousse**, puis envoie à chaque passe de 4.2, par `SendMessage` 
 relis <SHA>, passe <k> — plage <début>..<fin>
 ```
 
-`<SHA>` est le SHA complet de tête ; `<k>` vaut `1`, `2` ou `relance`. La plage :
+`<SHA>` est le SHA complet de tête ; `<k>` vaut le rang de la passe — `1`, `2`, … — ou `relance`.
+La plage :
 `<base>..<SHA>` à la passe 1, `<base>` étant `git merge-base origin/<base de la PR> HEAD` ;
-`<SHA de fin de la passe 1>..<SHA>` à la passe 2 ;
+`<SHA de fin de la passe précédente>..<SHA>` aux suivantes ;
 `<sha avant>..<sha après>` des commits de correction à la relance. À partir de la passe 2, le
 message porte aussi les constats précédents, corrigés (commit, test qui tient la fermeture) ou
 écartés (raison) — et pour la relance, ce que chaque commit prétend régler. Plage et SHA arrivent à
@@ -64,7 +65,7 @@ chaque réveil, jamais au lancement : la tête bouge entre deux passes.
 3. `/security-review`, **seulement** si le diff touche une zone sensible ou une surface exposée
    (ligne « sécurité » de la config, qui porte ses préconditions) ; sinon une ligne le dit. Elle
    diffe `origin/HEAD...`, donc le trunk : sur une PR dont la base n'est pas le trunk — une PR de
-   lot —, elle relit aussi ce que la branche d'intégration a déjà reçu, et ses constats hors de la
+   lot coordonné —, elle relit aussi ce que la branche d'intégration a déjà reçu, et ses constats hors de la
    plage s'écartent.
 4. Le protocole de `relecteur.md` sur la plage — ce qu'une commande vient de trouver n'y est plus
    à chercher.
@@ -107,14 +108,14 @@ soit le trunk : `git branch -d`, qui compare à `HEAD`, n'est plus en jeu (obs 8
 Quand la session ne peut pas démarrer — go sans tour du mainteneur, `start_session` refusé —, la
 session PR lance le sous-agent `relecteur` (frontmatter de `.claude/agents/relecteur.md`) et joue
 elle-même les deux commandes intégrées avant lui : leur fin de tour est alors la sienne, et elle
-enchaîne dans le même tour (obs 94, 98). Un seul sous-agent pour la PR : la seconde passe et la
+enchaîne dans le même tour (obs 94, 98). Un seul sous-agent pour la PR : les passes suivantes et la
 relance lui reviennent par `SendMessage`, contexte intact — un agent neuf seulement s'il n'est plus
 joignable. Son worktree a trois gestes :
 
 - **Naissance.** Le harnais le crée à l'appel (`isolation: worktree`) depuis `origin/<trunk>` —
   `worktree.baseRef` par défaut, mesuré —, pas sur la tête de la PR : le sous-agent s'y détache
   sur le SHA complet reçu, isolation vérifiée d'abord.
-- **Réutilisation.** Le même worktree sert aux deux passes et à la relance ; à chaque reprise, le
+- **Réutilisation.** Le même worktree sert à toutes les passes et à la relance ; à chaque reprise, le
   message rappelle les deux vérifications **dans leur ordre** et ne demande jamais de restaurer
   une mutation avant elles : un agent repris peut reprendre dans l'arbre vivant de la session PR.
 - **Retrait — à la fermeture de la boucle**, par la session qui l'a lancé. Le verrou

@@ -38,7 +38,7 @@ l'application sur la branche de la PR telle qu'à ton démarrage, celui du harna
 `origin/<trunk>`. Une fois l'isolation confirmée :
 `git checkout --detach <SHA complet de tête reçu>`, puis `git rev-parse HEAD` doit le rendre. Sinon, arrête-toi et dis-le : sans ce geste tu relis le trunk
 et tu conclus sur un diff vide. La plage que tu reçois part de la base de la PR — sa branche
-d'intégration pour une PR de lot (`cycle-pr/references/coordinatrice.md`) — : relis-la telle
+d'intégration pour une PR de lot coordonné (`cycle-pr/references/coordinatrice.md`) — : relis-la telle
 quelle, jamais contre le trunk, qui y ajouterait les lots déjà mergés. **À chaque réveil** —
 seconde passe comme relance —, rejoue les deux gestes dans cet ordre sur le SHA reçu ; rien à
 récupérer du distant, ton worktree partage le dépôt d'objets du clone principal.

@@ -14,10 +14,10 @@ et leurs renvois de position (« ci-dessous », « plus bas ») depuis l'emplace
 3. Le cycle `modif → test → cleanup → test → commit` s'applique à chaque commit, triviaux
    compris.
 4. **Deux filets de cleanup** : un par commit (regard local), un sur la PR entière avant la
-   seconde relecture (4.1, regard global, inter-commits) — et une relecture à contexte vierge
-   **en deux temps** (une passe pour une PR à un commit de code ; voie courte : un sous-agent), au
-   socle et à la fin, jamais par commit, par **une seule session de relecture pour toute la PR**, démarrée au go et réveillée par message, dans son propre
-   worktree, plafonnée à deux passes et une relance qui lui reviennent. Elle ne se nettoie qu'à
+   passe finale (4.1, regard global, inter-commits) — et une relecture à contexte vierge
+   **par bloc** (une passe pour une PR à un commit de code ; voie courte : un sous-agent), à
+   chaque frontière de bloc puis à la fin, jamais par commit, par **une seule session de relecture pour toute la PR**, démarrée au go et réveillée par message, dans son propre
+   worktree, avec une passe de plus tant que la dernière trouve un bloquant ou un important. Elle ne se nettoie qu'à
    la fermeture de la boucle : plus tôt, la relance n'a plus de destinataire.
 5. La PR n'est **terminée qu'après la passe `repercussions`**, quand elle ferme une issue ou
    touche une source de vérité : une clôture peut bouleverser les
@@ -84,12 +84,13 @@ transcripts existent encore, ou le dire sur la ligne de comparaison.
 intermédiaire, écrire le prompt du lot suivant depuis
 [references/prompt-lot-suivant.md](references/prompt-lot-suivant.md), au chemin fixe de
 [references/sessions-liees.md](references/sessions-liees.md) (« Passation »), et le remettre par ce
-chemin, dans le message de fin, **à la coordinatrice**, qui ouvre la session du lot suivant sur ce
-pointeur — une session de lot l'écrit sans passe `repercussions`, qui tourne au merge de la PR
-d'intégration ([references/coordinatrice.md](references/coordinatrice.md)). Sans coordinatrice,
-ou en repli, **après** la passe `repercussions`, au **mainteneur**, qui ouvre la session neuve et
-lui donne le prompt. Pas le lead : sur une vague de cinq lots, chaque frontière passée par lui lui
-coûte un brief relu et un prompt écrit, et son contexte a grossi jusqu'à devoir être relayé
+chemin, dans le message de fin. En lot léger, le défaut (`.claude/rules/taille-pr.md`, point 4),
+ou en repli, **après** la passe `repercussions` quand elle est due, au **mainteneur**, qui démarre
+la session neuve par la carte que la session sortante lui propose (`cycle-pr` 3.5) et lui donne le
+prompt. Sous une coordinatrice, **à la coordinatrice**, qui ouvre la session du lot suivant sur ce
+pointeur — une session de lot coordonné l'écrit sans passe `repercussions`, qui tourne au merge de
+la PR d'intégration ([references/coordinatrice.md](references/coordinatrice.md)). Pas le lead :
+sur une vague de cinq lots, chaque frontière passée par lui lui coûte un brief relu et un prompt écrit, et son contexte a grossi jusqu'à devoir être relayé
 lui-même (obs 62). La session sortante tient les artefacts de son lot ; le lead connaît la vague,
 et c'est ce
 qu'il garde — croisement des fichiers après merge, tableau de bord, vigilance de vague. Quand la
@@ -142,7 +143,7 @@ secours depuis que la session PR délègue son code (#134, A1). La session sorta
 passation, depuis les artefacts, dans la variante « relais » de
 [references/prompt-lot-suivant.md](references/prompt-lot-suivant.md), au chemin fixe de
 [references/sessions-liees.md](references/sessions-liees.md) (« Passation »), et la remet par ce
-chemin à la coordinatrice pour une session de lot
+chemin à la coordinatrice pour une session de lot coordonné
 ([references/coordinatrice.md](references/coordinatrice.md), « Relais en cours de lot »), sinon au
 mainteneur.
 Trois choses que le relais ne peut pas reconstituer, chacune payée :

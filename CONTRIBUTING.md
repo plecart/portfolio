@@ -311,7 +311,7 @@ Chaque maillon nomme qui l'exécute ; la répartition des rôles est dans `CLAUD
    (dépôt, sources de vérité, labels, stack, commandes, domaines, surfaces). À relancer dès qu'une
    de ces valeurs change.
 1. **Planifier** — `vers-prd` (dialogue avec le mainteneur → PRD) → `vers-issues` (dans sa
-   propre session, `#issue-prd` en argument → petites issues) → `triage` (relevé, puis une session
+   propre session, `#issue-prd` en argument → une issue par sujet) → `triage` (relevé, puis une session
    de tri par issue, numéro en argument : machine à états, rattachement au thème, « agent brief »),
    chacun dans une session de dialogue avec le mainteneur.
 2. **Interroger** — `interroge-moi`, **obligatoire**, dans une session de dialogue — la sienne,
@@ -321,7 +321,7 @@ Chaque maillon nomme qui l'exécute ; la répartition des rôles est dans `CLAUD
 3. **Implémenter** — `cycle-pr`, porté par la session PR, qui orchestre et délègue : briefing
    pré-PR (relevés au `releveur`, cartographie à l'`executant`) → **PR draft ouverte avant tout
    code** → un `developpeur` neuf par bloc de plus de ~50 lignes : TDD red-green-refactor, cycle
-   `modif → test → cleanup → test → commit` (relecture à contexte vierge au socle, par la session
+   `modif → test → cleanup → test → commit` (relecture à contexte vierge à chaque bloc, par la session
    de relecture que la session PR démarre à son go) → cleanup holistique par un `developpeur`
    neuf au-delà de 3 commits ou 150 lignes → relecture à contexte vierge finale, par la même
    session → `gh pr ready` → CI → vérif de fumée → vérification d'avant-go par le `verificateur`,
@@ -343,7 +343,7 @@ Chaque maillon nomme qui l'exécute ; la répartition des rôles est dans `CLAUD
    vérité (un § falsifié → `contradiction`), puis corrige la spec — corps et brief d'agent —
    des issues dont la planification est devenue fausse. Porté par la session PR en fin de
    `cycle-pr` — collecte au `releveur`, go d'édition au mainteneur dans sa fenêtre ; pour une issue
-   en lots, par la coordinatrice au merge de la PR d'intégration.
+   en lots coordonnés, par la coordinatrice au merge de la PR d'intégration.
 5. **Valider** — `plan-qa` → `execution-qa` → `bug-vers-issue`, chacun dans une session de
    dialogue, proposé quand un **thème se vide** de ses issues ouvertes. La QA ne re-teste jamais
    ce que la CI couvre déjà.

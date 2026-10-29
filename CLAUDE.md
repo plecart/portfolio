@@ -97,8 +97,9 @@ travaille dans des **git worktrees** éphémères, et un journal écrit là disp
 
 **Une tâche par session.** La session de dialogue — la session PR dans un cycle ; hors cycle,
 celle de `triage`, d'`interroge-moi` ou de `vers-issues` ; le lead d'une vague, la coordinatrice
-d'une issue en lots — garde ce qui demande le plus de jugement : briefing, planification,
-arbitrages `decisions-vs-doc`, dialogue avec l'utilisateur, merge et clôture. Le reste part dans
+d'une issue en lots coordonnés (`.claude/rules/taille-pr.md`, point 4) — garde ce qui demande le
+plus de jugement : briefing, planification, arbitrages `decisions-vs-doc`, dialogue avec
+l'utilisateur, merge et clôture. Le reste part dans
 un contexte neuf qui meurt avec sa tâche : un équipier défini dans `.claude/agents/`, une session
 liée, ou un script quand le geste revient à l'identique d'un cycle à l'autre. **Le modèle n'est
 pas choisi par tâche, il est choisi par rôle** au moment de créer l'équipier :
@@ -162,8 +163,8 @@ plancher de 74,5 K sur Haiku ; celui-là se lance depuis une session neuve.
 **Sessions liées.** Les équipiers ci-dessus sont des sous-agents d'une session. Une session peut
 aussi en démarrer d'autres, complètes, dans l'application de bureau (`start_session`) : le lead
 d'une vague `pr-paralleles`, une par issue — à son étape 0 pour la trier et l'interroger, puis
-pour la développer ; la coordinatrice d'une issue en lots, une par lot et une par sous-lot — **un
-sous-lot est un lot** ; la session PR, une session de relecture par PR, au go de son briefing
+pour la développer ; la coordinatrice d'une issue en lots coordonnés, une par lot et une par
+sous-lot — **un sous-lot est un lot** ; la session PR, une session de relecture par PR, au go de son briefing
 (`.claude/skills/cycle-pr/references/session-relecture.md`).
 Leur protocole — héritage, identité, premier geste, messages, fin de travail, passation,
 nettoyage — vit dans `.claude/skills/cycle-pr/references/sessions-liees.md`, seule source.

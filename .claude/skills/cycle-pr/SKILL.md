@@ -193,12 +193,15 @@ La PR draft porte **dès sa création** :
 
 - **`Closes #<N>`** dans le body. C'est **la** ligne qui rend l'issue détectable comme en vol.
   Sans elle, `repercussions` la croira dormante et éditera sa spec en cours de développement.
-  **Cas découpé** (taille-pr impose plusieurs PR pour la même issue) : seule la **dernière** PR du
-  lot porte `Closes #<N>` — un `Closes` sur la première fermerait l'issue trop tôt. Chaque autre
-  PR du lot ouvre son body par la ligne **`En vol pour #<N> (lot k/n)`**, que `repercussions` lit
-  au même titre que `Closes` : sans elle, l'issue paraît dormante précisément pendant qu'on
-  travaille dessus. GitHub, lui, ne lit que le mot-clé : le lien des lots précédents se repose à
-  l'Étape 8, une fois l'issue close. Avec une coordinatrice, le `Closes` passe à la PR
+  **Cas découpé** — une issue en plusieurs lots, sur un motif écrit au brief (`taille-pr.md`,
+  point 3) : par défaut en **lot léger**, des PR successives vers `main`, chacune avec son go
+  (Étape 7), sans coordinatrice ni branche d'intégration (point 4). Seule la **dernière** PR porte
+  `Closes #<N>` — un `Closes` sur la première fermerait l'issue trop tôt. Chaque autre PR ouvre son
+  body par la ligne **`En vol pour #<N> (lot k/n)`**, que `repercussions` lit au même titre que
+  `Closes` : sans elle, l'issue paraît dormante précisément pendant qu'on travaille dessus. GitHub,
+  lui, ne lit que le mot-clé : le lien des lots précédents se repose à l'Étape 8, une fois l'issue
+  close. Chaque lot suivant part du prompt du lot suivant, base `main`, dans une session neuve
+  (3.5). Avec une coordinatrice — ses deux cas seulement —, le `Closes` passe à la PR
   d'intégration et **toutes** les PR de lot portent la ligne « En vol »
   ([references/coordinatrice.md](references/coordinatrice.md)).
 - Le **briefing de l'Étape 1** comme corps provisoire — le plan devient lisible par le mainteneur
@@ -229,8 +232,8 @@ Chaque commit suit :
 ```
 
 **La boucle s'enchaîne sans rendre la main.** Un cycle AFK va de 3.1 à 3.5 puis repart en 3.1
-jusqu'à l'Étape 4 — en lançant au passage la **première passe de relecture 4.2** dès que le
-commit qui vient d'être fait pose un invariant que les suivants supposeront vrai ; l'annonce de
+jusqu'à l'Étape 4 — en lançant au passage, à chaque frontière de bloc (3.5), la **passe de
+relecture 4.2** de ce bloc ; l'annonce de
 l'étape suivante (« Next : commit 2/3 ») est un **titre**, pas une demande d'autorisation. Les
 seuls arrêts légitimes du cycle : une question `[V]` dont dépend **tout** ce qui reste à faire, un
 arrêt `decisions-vs-doc` (`[C]`), le point d'arrêt humain (zone sensible, une fois par PR, au
@@ -244,7 +247,7 @@ groupée au prochain arrêt. Ailleurs, s'arrêter est une remise de main que per
 **La session PR écrit le bloc ; un `developpeur` neuf le code** (`.claude/agents/developpeur.md`)
 **dès que le bloc dépasse ~50 lignes de diff ou ajoute un module ; en dessous, la session code
 elle-même** — le brief coûterait plus que le code. Le brief d'un bloc porte ses fichiers, ses
-signatures, ses tests attendus et leur rouge, son comportement, son estimation en épingles
+signatures, ses tests attendus et leur rouge, son comportement, son estimation en blocs
 (Étape 1), la base du gabarit (3.5) et le niveau `ponytail` ; le `developpeur` part à `xhigh` quand le bloc écrit des tests. Il fait le TDD
 de cette étape, le cycle 3.2 à 3.5, la doc descriptive et le commit — jamais le push, que la
 session PR fait après chaque remise, derrière la ligne « validation » quand le delta la demande
@@ -343,28 +346,32 @@ session qui le code elle-même (3.1) — en est la frontière, où la session PR
   rejoue le test du sujet (`taille-pr.md`, point 1) : deux sujets, elle coupe en lot léger (Étape 2,
   « Cas découpé ») ; un seul, elle relaie (Étape 8, « Relais en cours de cycle »).
 
-**Un sous-lot est un lot** (D-9, #134). Les PR qu'un re-découpage fait naître suivent « Une session
-neuve par lot » (Étape 8) : la session courante finit son sous-lot et écrit la passation depuis
-les artefacts ; le sous-lot suivant reçoit sa session neuve, ouverte par la coordinatrice s'il y
-en a une ([references/coordinatrice.md](references/coordinatrice.md), « Ouvrir le lot suivant »),
-sinon proposée au mainteneur par une carte (`start_session`, `initiation: own_initiative`) — aucune
-session n'en démarre une autre hors d'un tour humain. Un re-découpage qui sépare un commit de ses
+**Un découpage rouvert en cours de cycle coupe en lot léger** (`taille-pr.md`, point 4). Les PR
+qu'il fait naître suivent « Une session neuve par lot » (Étape 8) : la session courante finit son
+lot — sa PR vers `main`, son go, la ligne « En vol » (Étape 2, « Cas découpé ») — et écrit la
+passation depuis les artefacts ; le lot suivant reçoit sa session neuve, proposée au mainteneur
+par une carte (`start_session`, `initiation: own_initiative`) — aucune session n'en démarre une
+autre hors d'un tour humain. **Un sous-lot n'existe que sous une coordinatrice** (D-9 de #134,
+borné par D-1 de #195) : un lot coordonné qui se rouvre devient un sous-lot, qu'elle ouvre comme un
+lot ([references/coordinatrice.md](references/coordinatrice.md), « Ouvrir le lot suivant »). Un
+re-découpage qui sépare un commit de ses
 correctifs rejoue d'abord la passe « affirmations » de `cleanup-verbatim.md` sur le premier
 morceau **seul** : chaque docstring s'y lit contre le code de ce morceau, pas contre l'état final,
 et les limites que le morceau suivant lève s'y nomment (obs 109).
 
-Puis la session PR pousse et enchaîne sur le bloc suivant (retour 3.1) — ou, si ce commit vient de
-poser le socle, lance d'abord la première passe de relecture (4.2). Si ce commit assemble un écran
+Puis la session PR pousse et enchaîne sur le bloc suivant (retour 3.1) — ou, à une frontière de
+bloc, lance d'abord la passe de ce bloc (4.2). Si ce commit assemble un écran
 d'une zone sensible, c'est maintenant qu'elle prend le point d'arrêt humain — cadence et forme
 dans `.claude/rules/contraintes.md`, « Points d'arrêt humains », source unique.
 
 ## Étape 4 — Relecture indépendante
 
 Deux relectures. Le cleanup pass holistique (4.1) quand tous les commits sont faits. La relecture
-à contexte vierge (4.2) **en deux temps** — une seule passe quand la PR tient en un commit de
-code — : une première fois dès que le socle est posé, en plein
-cycle de commit ; une seconde après 4.1, sur ce qui a été écrit depuis la première — ou sur toute
-la branche, `<base>..HEAD`, si aucun commit n'a posé de socle. `<base>` est le point de fork,
+à contexte vierge (4.2) **par bloc** (`taille-pr.md`, point 5) — une seule passe quand la PR tient
+en un commit de code — : une passe à chaque frontière de bloc (3.5), en plein cycle de commit, la
+première sur `<base>..HEAD` ; puis la **passe finale** après 4.1, sur ce qui a été écrit depuis la
+dernière ; et une passe de plus tant que la dernière trouve un bloquant ou un important (« La
+boucle », ci-dessous). `<base>` est le point de fork,
 `git merge-base origin/main HEAD`, jamais le nom du trunk : une plage adossée à un trunk qui
 avance se diffe à l'envers.
 
@@ -378,7 +385,7 @@ ou de 150 lignes de diff ; en dessous, elle l'exécute elle-même** ; la passe �
 `cleanup-verbatim.md` s'y joue aussi sur tout le delta — exigée par le brief du `developpeur`, ou
 faite par la session —, avec son dénombrement
 (N affirmations, k établies, N−k non vérifiées), que la session PR inscrit dans les Notes avant la
-première vérification d'avant-go (obs 113). Puis la seconde passe 4.2.
+première vérification d'avant-go (obs 113). Puis la passe finale 4.2.
 
 **4.2 Relecture par un contexte vierge.** Le cleanup holistique est fait sous le brief de la
 session PR, avec les hypothèses qui ont produit le code ; il ne les met pas à l'épreuve. Le diff est donc
@@ -428,34 +435,31 @@ alors pour la forme du rapport, pas pour l'arrêt du cycle, et elle enchaîne da
 La session PR **pousse**, puis réveille la session de relecture par le message de
 `session-relecture.md` (« Réveil »), qui porte la plage et le SHA. À la première passe, celle-ci
 ne lit **que** le corps de l'issue et son brief d'agent (ou le briefing de l'Étape 1), la plage
-`<base>..HEAD` et le SHA complet de tête. À la seconde, elle a déjà tout cela : elle ne reçoit que
-la plage `<sha de fin de la première passe>..HEAD` et les constats de la première, corrigés ou
-écartés. Elle rend chaque critère d'acceptation ✅ / ❌ / ⚠️ avec preuve, puis ses constats
+`<base>..HEAD` et le SHA complet de tête. Aux suivantes, elle a déjà tout cela : elle ne reçoit
+que la plage `<sha de fin de la passe précédente>..HEAD` et les constats de la précédente,
+corrigés ou écartés. Elle rend chaque critère d'acceptation ✅ / ❌ / ⚠️ avec preuve, puis ses constats
 classés bloquant / important / mineur, chacun avec fichier, raison et marqueur de provenance.
 
-**Une seule session de relecture pour la PR — les deux passes et la relance.** Pas de relecteur
+**Une seule session de relecture pour la PR — toutes ses passes et la relance.** Pas de relecteur
 par préoccupation, pas de contre-vérificateur par constat, pas de workflow : chaque agent de plus
 repaye le contexte entier et rend ses constats à la même distance du code. Un constat bloquant se
 re-mesure par la session PR, dans son arbre, en une commande, avant d'en écrire le brief — jamais par
 un agent de plus.
 
-**La seconde passe revient à la session de la première, réveillée par message** — jamais à une
-session ni à un agent neufs. Son contexte est intact : elle a déjà lu le brief, les critères et le
-socle, et son worktree est en place. Au lot 1b de #77, la passe 2 confiée à un agent neuf a
+**Chaque passe revient à la session de la première, réveillée par message** — jamais à une
+session ni à un agent neufs. Son contexte est intact : elle a déjà lu le brief, les critères et les
+blocs précédents, et son worktree est en place. Au lot 1b de #77, la passe 2 confiée à un agent neuf a
 repayé **un contexte entier** pour un diff que le relecteur de la passe 1 connaissait déjà. Le
 coût se compare **par contact** — passe, reprise, relance —, tel que `bilan-session.py` le lit
 dans son transcript.
 
-**En deux temps, jamais par commit — et une passe suffit quand la PR tient en un commit de
-code.** Sinon, une première passe dès qu'un commit pose un **invariant que les commits suivants
-supposeront vrai** — par exemple le contrat d'infrastructure : image, point d'entrée, fichier de composition, contrat de configuration ; pour une PR de règles, les règles —
-et une seconde, plus courte, à la fin, sur ce qui a été écrit après la première. Le déclencheur
-est le **contenu** du commit, jamais son rang : les premiers commits d'une PR portent souvent une
-constante et deux dépendances, et les invariants non gardés arrivent plus tard. Placée seulement
-à la fin, la relecture rend ses constats à la distance maximale du moment où ils auraient pu
-être absorbés. Un constat de la première
-passe se fond dans un commit qui restait à écrire ; un constat qui arrive après le passage en
-ready coûte un run de CI complet et le rejeu des vérifications manuelles (Étape 7).
+**Une passe par bloc, jamais par commit — et une passe suffit quand la PR tient en un commit de
+code.** Sinon, une passe à chaque frontière de bloc (3.5), qui remplace la passe au socle (étude du
+2026-10-29, §8.4 F9, dossier `etudes/` voisin du journal d'observations), puis la passe finale,
+plus courte, sur ce qui a été écrit après la dernière. Placée seulement à la fin, la relecture rend
+ses constats à la distance maximale du moment où ils auraient pu être absorbés. Un constat d'une
+passe de bloc se fond dans le bloc suivant ; un constat qui arrive après le passage en ready coûte
+un run de CI complet et le rejeu des vérifications manuelles (Étape 7).
 
 **Un worktree de relecture par PR, jamais l'arbre de la session PR.** → [references/relecture.md](references/relecture.md), « Un worktree de relecture par PR, jamais l'arbre de la session PR ».
 
@@ -502,16 +506,18 @@ contact de relecture chacune (obs 79).
 
 **Une lentille navigateur, dès qu'un script client entre dans le delta.** → [references/relecture.md](references/relecture.md), « Une lentille navigateur, dès qu'un script client entre dans le delta ».
 
-**Plafond — deux passes et une relance.** La relance n'est pas une passe : c'est une **revue des
-commits de correction**, ciblée par un diff explicite (`<sha avant>..<sha après>`) et par la liste
-de ce que chaque commit prétend régler et du test qui épingle chacun, avec la question
-obligatoire : « qu'est-ce que ce correctif a cassé, ou fait rougir à tort, que la version
-précédente voyait ? ». Elle revient à la **session de relecture de la PR**, réveillée par message
-— son contexte est intact, elle n'a rien à relire —, jamais à un agent neuf. Un correctif est du
-code neuf écrit sous pression de conclure — c'est la partie la moins éprouvée de la PR, pas la plus
-sûre. Après la relance : un bloquant qu'elle trouve se corrige et rouvre une relance ; un important
-se corrige, se prouve par un test vu rouge (3.1), et n'est pas relu par un tiers ; un mineur suit la
-règle ci-dessus. La boucle s'arrête là, et le body le dit. Les constats écartés sont notés avec
+**La boucle — une passe de plus tant que la dernière trouve un bloquant ou un important.**
+(`taille-pr.md`, point 5 ; la sonde de saturation de l'étude du 2026-10-29, §8.4 F3.) Les constats
+d'une passe de bloc se ferment dans le bloc suivant, que sa passe relit. Après la passe finale, la
+passe de plus est la **relance** : une **revue des commits de correction**, ciblée par un diff
+explicite (`<sha avant>..<sha après>`) et par la liste de ce que chaque commit prétend régler et du
+test qui épingle chacun, avec la question obligatoire : « qu'est-ce que ce correctif a cassé, ou
+fait rougir à tort, que la version précédente voyait ? ». Elle revient à la **session de relecture
+de la PR**, réveillée par message — son contexte est intact, elle n'a rien à relire —, jamais à un
+agent neuf. Un correctif est du code neuf écrit sous pression de conclure — c'est la partie la
+moins éprouvée de la PR, pas la plus sûre. Une relance qui trouve encore un bloquant ou un
+important en rouvre une, après correction ; un mineur suit la règle ci-dessus. La boucle s'arrête
+sur une passe sans bloquant ni important, et le body le dit. Les constats écartés sont notés avec
 leur raison dans le body (Étape 5).
 
 C'est **cette fermeture** — et elle seule — qui autorise le nettoyage de la session de relecture
@@ -519,7 +525,7 @@ C'est **cette fermeture** — et elle seule — qui autorise le nettoyage de la 
 relance, ils en sont le destinataire, et les retirer n'est pas un nettoyage, c'est une
 terminaison.
 
-**Pousser avant chaque réveil** — première passe, seconde passe, relance —, jamais en force :
+**Pousser avant chaque réveil** — chaque passe, relance —, jamais en force :
 `/code-review --comment` commente la tête poussée. Une draft n'a aucun run (Étape 2) : chaque
 passe relit un SHA sans verdict de CI, et un rouge de plateforme (3.2) se voit au passage en
 ready (Étape 5).
@@ -557,7 +563,7 @@ body définitif, puis de sortir du draft.
 - [x] <étape non applicable — cochée avec sa raison (« sans objet »), jamais laissée décochée>
 
 ## Relecture indépendante
-<verdicts des deux passes de l'Étape 4.2 : constats corrigés (commit) / écartés (raison)>
+<verdicts des passes de l'Étape 4.2 : constats corrigés (commit) / écartés (raison)>
 
 ## Notes
 <décisions, follow-ups différés, hors-scope, comportements tiers vérifiés (doc citée)>
@@ -648,8 +654,8 @@ récent.
   run : pousser sur une tête rouge repaie un verdict déjà connu (ADR 0019). Le réveil du moniteur
   de PR sur un échec est l'événement — en plein cycle de commit comme pendant l'attente de
   l'Étape 5 — : le tri ci-dessous précède le prochain push. Même règle pour la PR d'un lot d'une
-  issue découpée, et pour sa PR d'intégration, qui reste en draft jusqu'au dernier lot et ne
-  tourne donc pas à chaque merge de lot
+  issue découpée, et, sous une coordinatrice, pour sa PR d'intégration, qui reste en draft
+  jusqu'au dernier lot et ne tourne donc pas à chaque merge de lot
   ([references/coordinatrice.md](references/coordinatrice.md), « Au go du découpage »).
 - **Trier un rouge avant de toucher au code** — chaque famille de causes a son remède, et le
   premier message d'erreur du step les sépare presque toujours. La session PR lance elle-même
@@ -802,11 +808,12 @@ un par (PR, go), qui ne rend qu'un verdict (#134, décision 2), **si la PR ferme
 (`Closes`), porte des décisions verrouillées dans ses Notes, ou si `gh pr list` montre une autre
 branche en vol touchant ses fichiers ; sinon la porte de merge suffit** — en vague comme hors vague, le lead ne le lance plus (`pr-paralleles`
 Étape 6). Il reçoit le numéro de la PR, celui de l'issue, le chemin absolu du worktree et la liste des autres branches en vol (`gh pr list`), jamais le récit
-de la session. Hors vague et hors lot, l'accord du mainteneur se demande **avec les `[V]` du
-go du briefing** (Étape 1) — demandé à la fin, il attend la prochaine présence : 6 h 37 d'absence
-au lot 4b de #77 sur cette seule question, à un moment où il ne restait rien d'indépendant à faire.
-En vague, l'accord est celui du lot validé (`pr-paralleles` Étape 2) ; une session de lot : son
-accord est à [references/coordinatrice.md](references/coordinatrice.md), « La session de lot ».
+de la session. Hors vague et hors lot coordonné, l'accord du mainteneur se demande **avec les
+`[V]` du go du briefing** (Étape 1) — demandé à la fin, il attend la prochaine présence : 6 h 37
+d'absence au lot 4b de #77 sur cette seule question, à un moment où il ne restait rien
+d'indépendant à faire. En vague, l'accord est celui du lot validé (`pr-paralleles` Étape 2) ; une
+session de lot coordonné : son accord est à [references/coordinatrice.md](references/coordinatrice.md),
+« La session de lot ».
 
 **Le verdict s'inscrit dans les Notes du body avant le go**, relu après écriture
 (`contraintes.md`, « Écritures sur un artefact distant ») — au moins sa ligne d'en-tête (base,
@@ -972,9 +979,12 @@ python <répertoire de ce skill>/scripts/bilan-session.py <transcript .jsonl> [<
 
 → [references/cloture.md](references/cloture.md), « Les transcripts du bilan et ce que le script rend ».
 
-Écrire ces lignes, plus trois à la main — commits prévus contre commits de correction, constats
-par passe, correctifs qui ont cassé quelque chose — dans `retrospectives/<date>-<issue>.md`,
-dossier voisin du journal d'observations (chemin dans `CLAUDE.md`), hors du dépôt. C'est la seule
+Écrire ces lignes, plus quatre à la main — commits prévus contre commits de correction, constats
+par passe, correctifs qui ont cassé quelque chose, et **échappements** : chaque défaut trouvé
+pendant ce cycle dans du code déjà mergé par une **autre** PR, avec le numéro de cette PR d'origine
+et sa taille en lignes (`taille-pr.md`, point 8 ; un défaut ne se voit qu'après le merge de la PR
+qui l'a introduit, son propre bilan ne peut pas le compter) — dans
+`retrospectives/<date>-<issue>.md`, dossier voisin du journal d'observations (chemin dans `CLAUDE.md`), hors du dépôt. C'est la seule
 mesure qui dise si un changement de la pipeline a marché : l'attente et le coût des relectures ne
 se voient dans aucun compte rendu.
 

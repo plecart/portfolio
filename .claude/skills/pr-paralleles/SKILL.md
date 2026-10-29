@@ -358,11 +358,11 @@ ce paragraphe.
 **Une session neuve par lot, que le lead ne démarre qu'en repli** (étape 8, « Issue en plusieurs
 lots »). Une issue
 réalisée en plusieurs lots ne garde **pas** la même session d'un lot au suivant, ni d'un sous-lot
-au suivant (`cycle-pr` 3.5 et Étape 8, « Une session neuve par lot »). Elle est pilotée par sa
-coordinatrice
-(`.claude/skills/cycle-pr/references/coordinatrice.md`) : chaque lot a sa session et son worktree
-neufs, et la frontière de lot passe par la passation que la session sortante remet à la
-coordinatrice. Sans coordinatrice, ou en repli, la session qui finit un lot écrit, après sa passe
+au suivant (`cycle-pr` 3.5 et Étape 8, « Une session neuve par lot »). Sous une coordinatrice —
+ses deux cas seulement (`.claude/rules/taille-pr.md`, point 4) —, chaque lot a sa session et son
+worktree neufs, et la frontière de lot passe par la passation que la session sortante remet à la
+coordinatrice (`.claude/skills/cycle-pr/references/coordinatrice.md`). En lot léger, le défaut, ou
+en repli, la session qui finit un lot écrit, après sa passe
 `repercussions`, le prompt du lot suivant depuis
 `.claude/skills/cycle-pr/references/prompt-lot-suivant.md` et le **remet au mainteneur** ;
 la session neuve crée sa branche, puis envoie au lead son `local_…` (`get_session` sur `self`,
@@ -676,6 +676,14 @@ catégorie et thème vérifiés. Une vague qui ouvre plus d'issues qu'elle n'en 
 remonter au mainteneur, pas un résultat. Vérifier aussi que chaque issue réalisée en plusieurs
 lots affiche autant de PR liées que `cycle-pr` Étape 8 en attend (cas découpé) : chaque session a
 obéi à « un seul `Closes` », et le trou ne se voit qu'en regardant la population.
+
+**Revue de la règle du sujet, au bilan de la vague 2** (`.claude/rules/taille-pr.md`, point 8).
+Le lead agrège les lignes « échappements » des bilans de cycle de la vague (`cycle-pr` Étape 8,
+« Bilan chiffré du cycle ») par taille de leur PR d'origine, refait l'ajustement du coût d'une PR
+— tokens contre lignes de diff, par moindres carrés, comme l'étude du 2026-10-29 (§1.2, dossier
+`etudes/` voisin du journal d'observations) —, et remonte les deux au mainteneur, qui revoit la
+règle. La revue se prolonge au bilan de chaque vague suivante tant que l'échantillon compte moins
+de 3 PR de plus de 1 500 lignes.
 
 ## Règles
 

@@ -60,7 +60,7 @@ Es-tu sûr du changement ?
    résumée, pas explorée.
 2. **La décision gagne** — le document est **amendé maintenant**, par la session de dialogue qui a
    décidé (session PR ; `triage`, `interroge-moi` ou `vers-issues` hors cycle ; lead d'une vague,
-   coordinatrice d'une issue en lots — `CLAUDE.md`, « Orchestration »), seule à lancer
+   coordinatrice d'une issue en lots coordonnés — `CLAUDE.md`, « Orchestration »), seule à lancer
    `/contradiction` (qui propage aux rangs inférieurs et aux issues) ; les sous-agents remontent
    les deux citations.
 

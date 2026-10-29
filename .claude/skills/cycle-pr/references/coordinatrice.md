@@ -1,7 +1,12 @@
-# La coordinatrice — une issue en lots pilotée par sa session
+# La coordinatrice — une issue en lots coordonnés pilotée par sa session
 
-Lue quand l'Étape 1 de `cycle-pr` découpe une issue en n > 1 lots : la session qui a fait ce
-découpage devient la **coordinatrice** de ses lots. Le protocole commun des sessions liées —
+Une issue en lots se livre par défaut en **lot léger** : des PR successives vers `main`, sans
+coordinatrice ni branche d'intégration (`.claude/rules/taille-pr.md`, point 4 ; `cycle-pr`
+Étape 2, « Cas découpé »). Ce fichier ne sert que dans les **deux cas** où un merge intermédiaire
+sur `main` exposerait un état à moitié fait : une **surface visible à moitié livrée**, ou une
+**règle de pipeline à moitié appliquée pendant une vague**. Le briefing qui découpe nomme le cas
+(`cycle-pr` Étape 1, « Découpage en plusieurs lots »), et la session qui a fait ce découpage
+devient la **coordinatrice** de ses lots. Le protocole commun des sessions liées —
 héritage, identité, premier geste, fin de travail, passation, nettoyage — est dans
 [sessions-liees.md](sessions-liees.md) ; ce fichier ne le recopie pas (obs 52).
 
