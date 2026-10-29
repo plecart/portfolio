@@ -380,9 +380,10 @@ def conversation(run: Run, args: argparse.Namespace) -> Verdict:
     count, last, line = recorded(body)
     later = [item for item in items if last is None or item.at > last]
     unchanged = not later and len(items) == count
-    # Une revue de commentaires en ligne n'a pas de texte : sa ligne renvoie à ceux qui la portent.
+    # Une revue sans texte — de commentaires en ligne, ou une approbation nue — renvoie à ses
+    # commentaires en ligne, s'il y en a.
     inline = (
-        "sans texte — commentaires en ligne : "
+        "sans texte — ses commentaires en ligne, s'il y en a : "
         f"gh api --paginate repos/{{owner}}/{{repo}}/pulls/{args.pr}/comments"
     )
     lines = [
