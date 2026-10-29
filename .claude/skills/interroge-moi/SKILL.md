@@ -90,6 +90,14 @@ contre-éprouver — un `executant` présente le même composant sous une forme 
 le `releveur` y relance l'outil, la session compare. Un « 0 vulnérabilité » cachait 31 HIGH dans
 des binaires que le scanner n'avait pas ouverts, ce que son journal disait d'une ligne (obs 61).
 
+**Une économie se cadre sur le poste dominant mesuré** (obs 148). Une issue dont le critère
+d'acceptation est une économie — tokens, temps, minutes de CI — ne se verrouille qu'avec la
+répartition mesurée du coût actuel par poste (session et sous-agents, par modèle, par PR), la
+commande qui la produit (`etudes/tokens.py` sur les transcripts, dossier voisin du journal
+d'observations) et la part du poste visé, écrites dans la décision avant tout découpage. Un poste
+visé sous **25 %** du total ne se découpe pas en lots : l'issue tient en une PR, ou s'abandonne
+(seuil et motif : `cycle-pr/references/briefing.md`, « Estimation »).
+
 **Une tranche qui façonne un écran (HITL) montre l'écran avant de le verrouiller.** Lister les
 décisions héritées des rangs 1-2 (« Sources de vérité » de `.claude/pipeline.config.md`) qui
 déterminent ce que l'utilisateur y verra — structure, fixe ou libre, nombres, ordre — et les

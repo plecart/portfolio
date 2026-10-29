@@ -56,11 +56,15 @@ test.
 **Le cliquet — dénombrer avant de corriger, pas après.** Un constat de relecture est un
 échantillon, jamais un inventaire : dès qu'un correctif ferme **un chemin** d'une classe (voir le
 déclencheur de `cleanup-verbatim.md`), le dénombrement des chemins de cette classe s'écrit
-**avant** le premier correctif, dans la **docstring du test paramétré** qui les éprouve — N
-recensés, k fuyaient —, et la relance reçoit ce dénombrement avec la consigne de chercher celui
-qui manque. Écrit après, il se fait par morceaux : trois correctifs de suite sur une même classe,
-chacun rouvert par la relecture suivante, et le dénombrement rendu à la quatrième — par le
-relecteur. Le cliquet est ce qui empêche la classe de se re-payer.
+**avant** le premier correctif, et il part de la **source de la population** — le bloc, les
+décisions verrouillées, la liste des sites d'une règle —, jamais des constats : à la PR #109, le
+dénombrement recopiait les 9 invariants cités par le relecteur, et la passe suivante en a trouvé
+4 de plus, dont 2 sites sans garde (obs 107). Il s'écrit dans la **docstring du test paramétré**
+qui les éprouve, qui nomme cette source — « une entrée par point du bloc X et par décision Y » — et
+rend N recensés, k fuyaient ; la relance reçoit la source et le dénombrement, avec la consigne de
+chercher celui qui manque. Écrit après, il se fait par morceaux : trois correctifs de suite sur
+une même classe, chacun rouvert par la relecture suivante, et le dénombrement rendu à la
+quatrième — par le relecteur. Le cliquet est ce qui empêche la classe de se re-payer.
 
 ## Quand une garde imite un analyseur, c'est l'analyseur qui la corrige
 
