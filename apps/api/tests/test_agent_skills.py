@@ -5654,11 +5654,12 @@ def blocs_du_geste(path: Path, geste: re.Pattern[str]) -> list[str]:
     return [bloc for bloc in blocs if geste.search(bloc)]
 
 
-def sites_du_geste(geste: re.Pattern[str]) -> list[str]:
-    """Le fichier de chaque bloc de prose des skills qui porte le geste, trié."""
+def sites_du_geste(geste: re.Pattern[str], motif: str = SKILL_PROSE) -> list[str]:
+    """Le fichier de chaque bloc de prose qui porte le geste, trié ; la prose des skills par
+    défaut, `motif` pour une autre population."""
     return sorted(
         path.relative_to(REPOSITORY_ROOT).as_posix()
-        for path in REPOSITORY_ROOT.glob(SKILL_PROSE)
+        for path in REPOSITORY_ROOT.glob(motif)
         for _ in blocs_du_geste(path, geste)
     )
 
@@ -7957,6 +7958,9 @@ BORNE_DES_RELANCES = (
     "**Après 3 relances de suite dont la trace donne un trunk périmé, la session redemande"
     " l'accord**"
 )
+# `--releve` sort en 0 sans juger : chaîné par `&&`, il ferait passer n'importe quel merge. Dit là
+# où la prose le prescrit près d'un `gh pr merge` (`cycle-pr` Étape 7, `hors-scope.md` étape 6).
+RELEVE_JAMAIS_CHAINE = "il sort en 0 sans juger, et ne se chaîne jamais par `&&`"
 
 # Chaque énoncé restrictif que #197 ajoute, épinglé sur sa **moitié restrictive** (obs 126) : une
 # mutation qui la retire en laissant le reste de la phrase rougit ici. Ailleurs : les trois
@@ -8062,6 +8066,35 @@ INVARIANTS_DE_LA_PORTE_DE_MERGE = {
         HORS_SCOPE_REF,
         "en début de ligne — jamais dans une puce ni entre backticks",
     ),
+    # Passe 2 de relecture de la PR #200 : le gabarit du verdict, l'étape qui relève et la lecture
+    # de la trace après une réouverture, vus VERTS sous mutation par la relecture ; le SHA de tête
+    # commun aux deux commandes et le relevé qui ne se chaîne pas, phrases neuves, nés avec leur
+    # épingle.
+    "verificateur-ligne-base-du-gabarit": (
+        VERIFICATEUR_ROLE,
+        "Base : run <id>, extrait <court>, trunk <sha> (origin/<trunk> = <sha>) — à jour / périmée",
+    ),
+    "verificateur-ligne-conversation-du-gabarit": (
+        VERIFICATEUR_ROLE,
+        "Conversation : <k> commentaires et revues, dernier <horodatage | aucun>",
+    ),
+    "verificateur-releve-avant-lecture": (
+        VERIFICATEUR_ROLE,
+        "Puis relever la conversation, **avant** de la lire",
+    ),
+    "cycle-pr-trace-apres-reouverture": (
+        CYCLE_PR_SKILL,
+        (
+            "Ce run attendu, lire ce qu'il a extrait comme à l'Étape 7 : `git fetch origin`, seul,"
+            " puis la trace de checkout de ses jobs"
+        ),
+    ),
+    "cycle-pr-meme-sha-de-tete": (
+        CYCLE_PR_SKILL,
+        "le même SHA aux deux commandes",
+    ),
+    "cycle-pr-releve-jamais-chaine": (CYCLE_PR_SKILL, RELEVE_JAMAIS_CHAINE),
+    "hors-scope-releve-jamais-chaine": (HORS_SCOPE_REF, RELEVE_JAMAIS_CHAINE),
 }
 
 
@@ -8073,3 +8106,84 @@ INVARIANTS_DE_LA_PORTE_DE_MERGE = {
 def test_chaque_invariant_de_la_porte_de_merge_garde_sa_phrase(fichier: str, phrase: str) -> None:
     """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
     assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
+
+
+# Une lecture des commentaires d'une PR qui prouve un verdict ou garde un merge lit aussi ses
+# commentaires en ligne, **après** le relevé : `gh pr view <n> --comments` ne rend pas ceux d'une
+# revue, que `--releve` compte (PR #200, le 2026-10-29 vers 21 h UTC, population vivante : 9 revues
+# sans texte comptées, 0 ligne de `--comments`, 9 commentaires en ligne par `gh api` ; 5 éléments
+# pour 0 ligne à la passe 2 de relecture), et un élément arrivé entre une lecture et le relevé qui
+# la suit passerait la porte compté sans avoir été lu. **Dénombrement, écrit avant le correctif**
+# (relecture de la PR #200, passe 2, I1), sur `f165555` :
+#
+#     git grep -n -e "comments" f165555 -- ".claude/*.md" CLAUDE.md CONTRIBUTING.md
+#
+# rend 11 lignes en 8 fichiers. **2** lisent les commentaires d'une PR comme preuve, et **fuyaient**
+# toutes deux — aveugles aux commentaires en ligne, lues avant le relevé : le point 1 du
+# `verificateur` et la PR sans `verificateur` de `cycle-pr` Étape 7, qui gardent l'une et l'autre le
+# go. **6** lisent ceux d'une issue, qui n'a pas de revue (`gh issue view`, `issues/<n>/comments`),
+# et **3** parlent de commentaires de code : hors classe. Les sites qui prennent un relevé sans
+# commande de lecture : `git grep -n -e "--releve"` rend 4 lignes, les 2 ci-dessus plus la voie
+# courte, qui renvoie à « Vérification d'avant-go », indemne une fois sa lecture corrigée, et
+# l'étape 6 de `triage/hors-scope.md`, qui lisait avant de relever et **fuyait** ; le relevé neuf
+# de « Le go, puis le merge », lu sans la commande, renvoie de même. 3 sites corrigés en tout,
+# ceux de la table.
+LECTURES_DES_COMMENTAIRES_D_UNE_PR = {
+    "verificateur-point-1": VERIFICATEUR_ROLE,
+    "cycle-pr-pr-sans-verificateur": CYCLE_PR_SKILL,
+    "hors-scope-releve-neuf": HORS_SCOPE_REF,
+}
+LECTURE_DES_COMMENTAIRES_D_UNE_PR = re.compile(r"gh pr view <n> --comments")
+COMMENTAIRES_EN_LIGNE = "gh api --paginate repos/{owner}/{repo}/pulls/<n>/comments"
+
+
+def test_les_lectures_des_commentaires_d_une_pr_sont_celles_de_la_table() -> None:
+    """Un site neuf rougit ici tant qu'il n'est pas inscrit, donc lu par le test suivant ; les
+    rôles en font partie, d'où la population de `.claude/` entière."""
+    sites = sites_du_geste(LECTURE_DES_COMMENTAIRES_D_UNE_PR, ".claude/**/*.md")
+
+    assert sites == sorted(LECTURES_DES_COMMENTAIRES_D_UNE_PR.values())
+
+
+@pytest.mark.parametrize(
+    "fichier",
+    LECTURES_DES_COMMENTAIRES_D_UNE_PR.values(),
+    ids=LECTURES_DES_COMMENTAIRES_D_UNE_PR.keys(),
+)
+def test_chaque_lecture_des_commentaires_d_une_pr_suit_le_releve_et_lit_les_commentaires_en_ligne(
+    fichier: str,
+) -> None:
+    """Dans le bloc qui lit, le relevé précède la lecture, et la lecture nomme les commentaires en
+    ligne."""
+    blocs = blocs_du_geste(REPOSITORY_ROOT / fichier, LECTURE_DES_COMMENTAIRES_D_UNE_PR)
+
+    assert blocs, f"`{fichier}` ne lit plus les commentaires de la PR"
+    for bloc in blocs:
+        assert COMMENTAIRES_EN_LIGNE in bloc, f"`{fichier}` ne lit pas les commentaires en ligne"
+        assert "--releve" in bloc, f"`{fichier}` lit la conversation sans la relever"
+        assert bloc.index("--releve") < bloc.index("--comments"), (
+            f"`{fichier}` lit la conversation avant de la relever"
+        )
+
+
+# La tête que `porte-merge.py trunk` lie au run est celle que la porte passe à
+# `--match-head-commit` : un seul nom aux deux commandes, sans quoi deux valeurs peuvent les
+# remplir (correctif du script après la passe 2 de relecture de la PR #200). Dénombré sur
+# `f165555` : 5 appels de `trunk` dans la prose — voie courte, Étapes 5 et 7 de `cycle-pr`,
+# `verificateur.md`, `pr-paralleles` —, tous sous `<SHA de tête>`, la porte sous
+# `<SHA de tête vérifié>`.
+APPEL_DE_TRUNK = re.compile(r"porte-merge\.py trunk <run> (?:<[^<>]+>|\S+) <([^<>]+)>")
+NOM_DE_LA_TETE = "SHA de tête vérifié"
+
+
+def test_chaque_appel_de_trunk_nomme_la_tete_comme_la_porte() -> None:
+    """Le dernier argument de chaque appel de `trunk` porte le nom de la tête de `gh pr merge`."""
+    appels = [
+        (fichier, tete)
+        for fichier, texte in prose_du_harnais()
+        for tete in APPEL_DE_TRUNK.findall(texte)
+    ]
+
+    assert appels, "aucun appel de `porte-merge.py trunk` lu : le motif a-t-il cessé de mordre ?"
+    assert all(tete == NOM_DE_LA_TETE for _, tete in appels), appels
+    assert f"--match-head-commit <{NOM_DE_LA_TETE}>" in texte_normalise(CYCLE_PR_SKILL)
