@@ -6994,8 +6994,8 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
     "relecteur-plage-recue-au-reveil": (
         RELECTEUR_ROLE,
         (
-            "**À chaque réveil** — passe 1, passe 2, relance — tu reçois de la session PR la plage de"
-            " commits à relire"
+            "**À chaque réveil** — chaque passe, puis la relance — tu reçois de la session PR la plage"
+            " de commits à relire"
         ),
     ),
     "relecteur-ne-nait-pas-sur-le-sha": (
@@ -7005,8 +7005,8 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
     "relecteur-rejoue-a-chaque-reveil": (
         RELECTEUR_ROLE,
         (
-            "**À chaque réveil** — seconde passe comme relance —, rejoue les deux gestes dans cet ordre"
-            " sur le SHA reçu"
+            "**À chaque réveil** — passe suivante comme relance —, rejoue les deux gestes dans cet"
+            " ordre sur le SHA reçu"
         ),
     ),
     "relecteur-sous-agent-sans-write": (RELECTEUR_ROLE, "Le sous-agent n'a pas de `Write`"),
