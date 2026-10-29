@@ -55,24 +55,29 @@ Ce que tu vérifies, **dans cet ordre** — c'est un ordre de priorité, et tu t
    **leur union**. Le corps fait foi — il est amendé en cours de route, le brief est daté
    (`cycle-pr` Étape 8) — : une case du brief qui contredit le corps sort en ⚠️, avec les deux
    citations, comme « (−2° à +2°, §4.1) », restée au brief de #167 après l'amendement `[V]` qui
-   n'avait réécrit que le corps (obs 149). Lire aussi `gh pr view <n> --comments` : un commentaire
-   de revue automatisée ou de répercussion encore ouvert est un critère que la PR n'a pas soldé.
-   Puis relever la conversation :
+   n'avait réécrit que le corps (obs 149). Puis relever la conversation, **avant** de la lire :
    `python .claude/skills/cycle-pr/scripts/porte-merge.py conversation <n> --releve`, dont la
-   ligne se copie telle quelle dans le verdict.
+   ligne se copie telle quelle dans le verdict ; puis lire ce qu'elle compte,
+   `gh pr view <n> --comments` et les commentaires en ligne d'une revue, que cette commande ne rend
+   pas : `gh api --paginate repos/{owner}/{repo}/pulls/<n>/comments` (PR #200, le 2026-10-29 vers
+   21 h UTC, population vivante : 9 revues comptées, 0 ligne de `--comments`, 9 commentaires en
+   ligne). Lu avant le relevé, un élément arrivé entre les deux serait compté sans avoir été lu, et
+   passerait la porte. Un commentaire de revue automatisée ou de répercussion encore ouvert est un
+   critère que la PR n'a pas soldé.
 2. **La fraîcheur du trunk éprouvé**, et elle se date par ce que le run a réellement extrait.
-   `git fetch origin`, seul, puis la trace de checkout du dernier run `CI` de la tête — le plus
-   récent par `createdAt` de `gh run list --commit <tête> --workflow CI --json databaseId,createdAt` :
-   `python .claude/skills/cycle-pr/scripts/porte-merge.py trunk <run> <trunk> <SHA de tête>`. Il
-   sort en **0** si chaque job a combiné la tête à `origin/<trunk>`, en **1** sur un trunk périmé,
-   en **2** sur un refus, et sa dernière ligne fait la ligne « Base » du verdict. La référence de
-   fusion que porte la forge (`gh api …/git/ref/pull/<n>/merge` et ses parents) ne prouve rien,
-   relue avant ou après une relance : un run peut extraire une référence plus ancienne que celle
-   qu'elle porte (PR #185, run 40769309165 ; `cycle-pr` Étape 7, « Rejouer les vérifications
-   périmées », obs 83, 91, 110). Et GitHub ne la recalcule ni à chaque merge sur la base ni au
-   passage en ready : un run vert sur une référence périmée n'éprouve pas l'état combiné, et rien
-   ne le signale — ni le rollup, ni `mergeable`, ni le `head_sha` du run (obs 51). Puis l'absence
-   de conflit, par un **prédicat** :
+   `git fetch origin`, seul, puis la trace de checkout du dernier run `CI` de la tête de ton
+   verdict, `<SHA de tête vérifié>` — le plus récent par `createdAt` de
+   `gh run list --commit <SHA de tête vérifié> --workflow CI --json databaseId,createdAt` :
+   `python .claude/skills/cycle-pr/scripts/porte-merge.py trunk <run> <trunk> <SHA de tête vérifié>`.
+   Il sort en **0** si chaque job a combiné la tête à `origin/<trunk>`, en **1** sur un trunk
+   périmé, en **2** sur un refus, et sa dernière ligne fait la ligne « Base » du verdict. La
+   référence de fusion que porte la forge (`gh api …/git/ref/pull/<n>/merge` et ses parents) ne
+   prouve rien, relue avant ou après une relance : un run peut extraire une référence plus ancienne
+   que celle qu'elle porte (PR #185, run 40769309165 ; `cycle-pr` Étape 7, « Rejouer les
+   vérifications périmées », obs 83, 91, 110). Et GitHub ne la recalcule ni à chaque merge sur la
+   base ni au passage en ready : un run vert sur une référence périmée n'éprouve pas l'état
+   combiné, et rien ne le signale — ni le rollup, ni `mergeable`, ni le `head_sha` du run (obs 51).
+   Puis l'absence de conflit, par un **prédicat** :
    `git merge-tree --write-tree origin/<trunk> <branche>` sort en **0** sans conflit et en **1**
    avec — mesuré le 2026-10-13, témoin de chaque côté, table `FRESHNESS_GATE_FORMS` de
    `apps/api/tests/test_agent_skills.py` ; il imprime aussi les chemins en conflit, mais c'est son
