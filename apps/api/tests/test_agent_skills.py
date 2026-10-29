@@ -2346,6 +2346,13 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         SESSIONS_LIEES_REF,
         "et refuse en session sans surveillance",
     ),
+    "renommage-refuse-ne-bloque-pas": (
+        SESSIONS_LIEES_REF,
+        (
+            "Refusé, le renommage ne bloque rien : la session préfixe quand même ses enfants par le"
+            " titre qu'elle aurait pris, jamais par celui qu'elle garde."
+        ),
+    ),
     "un-exemple-par-forme": (
         SESSIONS_LIEES_REF,
         (
