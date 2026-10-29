@@ -2,7 +2,7 @@
 la PR depuis le relevé du verdict d'avant-go.
 
 Usage :
-    python porte-merge.py trunk <run> <base>
+    python porte-merge.py trunk <run> <base> <tête>
     python porte-merge.py conversation <PR> [--releve]
 
 `cycle-pr` Étape 7, « Le go, puis le merge » : en vague, une PR change pendant l'attente du go,
@@ -12,18 +12,43 @@ porte est une commande dont le code de sortie porte la condition »). `gh` et `g
 octets, décodés en UTF-8 explicitement, jamais par la page de code de la console (obs 108).
 
 Sortie, commune aux sous-commandes : 0 à jour / inchangée ; 1 périmé / changée ; 2 refus,
-« refus — <motif> » en une ligne sur la sortie standard, ou appel mal formé, usage sur la sortie
-d'erreur.
+« refus — <motif> » en une ligne sur la sortie standard, appel mal formé, usage sur la sortie
+d'erreur, ou aide demandée — l'aide n'est pas un verdict : `… --help && gh pr merge …` ne merge pas.
 
-**`trunk <run> <base>`** — le trunk que le run a extrait. Il lit `gh run view <run> --json
-status,headSha,jobs`, puis `gh run view <run> --log`, une ligne `<job>\\t<step>\\t<horodatage>
-<texte>` par ligne de journal — les 2 358 lignes du run 40769309165 ont cette forme (relevé le
-2026-10-29, gh 2.94.0) —, et `git rev-parse --verify refs/remotes/origin/<base>`. La référence de
-suivi se nomme en entier : `origin/<base>` nu désignerait d'abord une étiquette ou une branche
-locale du même nom s'il en existait (gitrevisions(7), « <refname> », git 2.47.1). Il refuse un run
-qui n'est pas `completed`, ou dont aucun job n'a tourné. Pour chaque job dont la conclusion n'est
-pas `skipped`, il cherche dans son journal la ligne de checkout, dont la forme est relevée sur le
-run 40769309165 de la PR #185 (job Back, ligne 128 du `--log`, le 2026-10-29) :
+**Les entrées que l'appelant tape**, et ce qui lie chacune à l'artefact qu'elle désigne. Une
+entrée que rien ne lie fait passer la porte sur une valeur mal tapée ou périmée : c'est la classe
+du constat I1 de la passe 1 de relecture du bloc 1 de #197 (PR #200). Dénombrées avant son
+correctif, sur `8a6332a`, dans l'usage des deux sous-commandes : 6 entrées, 4 liées à rien —
+`trunk <run>`, dont le `headSha` n'était comparé qu'à sa propre trace, jamais à la tête que la
+porte merge ; `-h` de chaque sous-commande, qui sortait en 0 ; `--releve`, qui sort en 0 sans
+juger. Depuis, 7 :
+
+- `trunk <run>` : son `headSha` doit égaler `<tête>` ;
+- `trunk <tête>` : 40 hexadécimaux, la valeur même que la porte passe à `--match-head-commit` — ce
+  dernier lien est à l'appelant, qui passe le même SHA à `trunk` puis à `gh pr merge` (`cycle-pr`
+  Étape 7) ;
+- `trunk <base>` : `origin/<base>` doit égaler le trunk que chaque job a fusionné ; son nom n'est
+  pas confronté à la base de la PR, qu'aucun des 17 champs de `gh run view --json` ne rend
+  (gh 2.94.0, relevé le 2026-10-29) ;
+- `conversation <PR>` : le relevé se lit dans le body de cette même PR ;
+- `-h` de chaque sous-commande, comme du script : sort en 2 ;
+- `conversation --releve` : un mode, pas un verdict, qui sort en 0 sans juger — liée à rien, à
+  dessein : elle ne se chaîne jamais par `&&`.
+
+La table `ENTREES` d'`apps/api/tests/test_porte_merge.py` tient un cas par entrée, et rougit
+quand l'usage d'une sous-commande en gagne une sans cas.
+
+**`trunk <run> <base> <tête>`** — le trunk que le run a extrait sur la tête visée. Il lit `gh run
+view <run> --json status,headSha,jobs`, puis `gh run view <run> --log`, une ligne
+`<job>\\t<step>\\t<horodatage> <texte>` par ligne de journal — les 2 358 lignes du run 40769309165
+ont cette forme (relevé le 2026-10-29, gh 2.94.0) —, et `git rev-parse --verify
+refs/remotes/origin/<base>`. La référence de suivi se nomme en entier : `origin/<base>` nu
+désignerait d'abord une étiquette ou une branche locale du même nom s'il en existait
+(gitrevisions(7), « <refname> », git 2.47.1). Il refuse un run qui n'est pas `completed`, dont le
+`headSha` n'est pas `<tête>` — un run sur la tête A ne prouve rien d'un merge de la tête B, poussée
+depuis —, ou dont aucun job n'a tourné. Pour chaque job dont la conclusion n'est pas `skipped`, il
+cherche dans son journal la ligne de checkout, dont la forme est relevée sur le run 40769309165 de
+la PR #185 (job Back, ligne 128 du `--log`, le 2026-10-29) :
 
     HEAD is now at 009f459 Merge 8d0200c26697fb8feeddb5c04b0962c9ab1527ed into 3e249191535972bb22dd506ee71d56d9b2b08247
 
@@ -56,12 +81,15 @@ fraction de seconde admise ; il se compare en `datetime`, jamais en chaîne.
     Conversation : <k> commentaires et revues, dernier <horodatage le plus récent | aucun>
 
 C'est cette ligne, copiée telle quelle aux Notes du body, que la porte relit : même règle de compte
-des deux côtés. Sans `--releve`, il lit la **dernière** ligne du body qui s'ouvre par
-`Conversation : ` — des verdicts successifs s'y empilent —, et refuse si elle manque ou n'a pas
-cette forme. 1 si le compte actuel diffère de `<k>` ou si un élément est postérieur à `dernier`,
-chacun nommé, du plus ancien au plus récent, `commentaire|revue de <login> à <horodatage> :
-<première ligne>` ; 0 sinon. Puis `PR <n> : inchangée|changée depuis « <relevé> » — actuel : <k>
-commentaires et revues, dernier <horodatage | aucun>`.
+des deux côtés. Sans `--releve`, il lit la **dernière** ligne du body qui s'ouvre par `Conversation
+: ` — des verdicts successifs s'y empilent —, et refuse si elle manque ou n'a pas cette forme. 1 si
+le compte actuel diffère de `<k>` ou si un élément est postérieur à `dernier`, chacun nommé, du plus
+ancien au plus récent, `commentaire|revue de <login> à <horodatage> : <première ligne>` — une revue
+de commentaires en ligne n'a pas de texte, et sa ligne renvoie alors à `gh api
+repos/{owner}/{repo}/pulls/<n>/comments`, qui les porte (PR #199 : 10 revues sans texte, 10
+commentaires en ligne de 10 revues distinctes, relevé le 2026-10-29) ; 0 sinon. Puis `PR <n> :
+inchangée|changée depuis « <relevé> » — actuel : <k> commentaires et revues, dernier <horodatage |
+aucun>`.
 
 Le relevé se lit dans l'artefact, jamais dans un argument retapé : une lecture suivie d'une
 seconde commande n'est pas une porte (`references/merge.md`, même section), et la valeur retapée
@@ -101,6 +129,8 @@ Verdict = tuple[bool, list[str]]
 
 # `str.isdigit` accepte « ² » : un numéro, qui entre dans une commande, se lit en ASCII.
 NUMBER = re.compile(r"[0-9]+")
+# La forme que la forge rend d'un `headSha`, et que `--match-head-commit` reçoit.
+FULL_SHA = re.compile(r"[0-9a-f]{40}")
 CHECKOUT = "HEAD is now at "
 # La ligne de checkout d'un run de PR (voir le module) : `<court> Merge <tête> into <trunk>`.
 MERGE_CHECKOUT = re.compile(
@@ -231,7 +261,8 @@ def checkout(job: str, lines: Sequence[str], head: str) -> Checkout:
 
 
 def trunk(run: Run, args: argparse.Namespace) -> Verdict:
-    """`trunk <run> <base>` : le trunk que chaque job du run a extrait, comparé à `origin/<base>`.
+    """`trunk <run> <base> <tête>` : le trunk que chaque job du run a extrait sur `<tête>`, comparé
+    à `origin/<base>`.
 
     Raises:
         Refusal: voir le module.
@@ -241,6 +272,11 @@ def trunk(run: Run, args: argparse.Namespace) -> Verdict:
     if status != "completed":
         raise Refusal(
             f"run {run_id} pas terminé (status {status}) : l'attendre par `attente-ci.py`"
+        )
+    if head != args.head:
+        raise Refusal(
+            f"le run {run_id} a éprouvé la tête {head}, pas la tête visée {args.head} : "
+            "lire le dernier run de la tête visée"
         )
     if not jobs:
         raise Refusal(f"aucun job du run {run_id} n'a tourné : il n'a rien extrait")
@@ -342,7 +378,15 @@ def conversation(run: Run, args: argparse.Namespace) -> Verdict:
     count, last, line = recorded(body)
     later = [item for item in items if last is None or item.at > last]
     unchanged = not later and len(items) == count
-    lines = [f"{item.kind} de {item.login} à {item.stamp} : {item.first_line}" for item in later]
+    # Une revue de commentaires en ligne n'a pas de texte : sa ligne renvoie à ceux qui la portent.
+    inline = (
+        "sans texte — commentaires en ligne : "
+        f"gh api repos/{{owner}}/{{repo}}/pulls/{args.pr}/comments"
+    )
+    lines = [
+        f"{item.kind} de {item.login} à {item.stamp} : {item.first_line or inline}"
+        for item in later
+    ]
     lines.append(
         f"PR {args.pr} : {STABILITY[unchanged]} depuis « {line} » — actuel : "
         f"{current.removeprefix(RECORD)}"
@@ -350,15 +394,21 @@ def conversation(run: Run, args: argparse.Namespace) -> Verdict:
     return unchanged, lines
 
 
-def number(value: str) -> str:
-    """Type argparse : un numéro de run ou de PR, chiffres ASCII seulement."""
-    if not NUMBER.fullmatch(value):
-        raise argparse.ArgumentTypeError(f"numéro attendu, pas {value!r}")
-    return value
+def matching(pattern: re.Pattern[str], expected: str) -> Callable[[str], str]:
+    """Type argparse : une valeur qui a tout entière la forme `pattern` ; l'erreur nomme
+    `expected`."""
+
+    def check(value: str) -> str:
+        if not pattern.fullmatch(value):
+            raise argparse.ArgumentTypeError(f"{expected} attendu, pas {value!r}")
+        return value
+
+    return check
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Les deux sous-commandes ; chacune pose sa porte, `gate`."""
+    """Les deux sous-commandes ; chacune pose sa porte, `gate`. Les métavariables font l'usage
+    que dénombre le module (« Les entrées que l'appelant tape »)."""
     parser = argparse.ArgumentParser(
         prog="porte-merge.py",
         description=__doc__,
@@ -366,11 +416,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     commands = parser.add_subparsers(dest="command", required=True)
     trunk_parser = commands.add_parser("trunk")
-    trunk_parser.add_argument("run", type=number)
-    trunk_parser.add_argument("base")
+    trunk_parser.add_argument("run", metavar="<run>", type=matching(NUMBER, "numéro"))
+    trunk_parser.add_argument("base", metavar="<base>")
+    trunk_parser.add_argument(
+        "head", metavar="<tête>", type=matching(FULL_SHA, "SHA complet de 40 hexadécimaux")
+    )
     trunk_parser.set_defaults(gate=trunk)
     conversation_parser = commands.add_parser("conversation")
-    conversation_parser.add_argument("pr", type=number)
+    conversation_parser.add_argument("pr", metavar="<PR>", type=matching(NUMBER, "numéro"))
     conversation_parser.add_argument("--releve", action="store_true")
     conversation_parser.set_defaults(gate=conversation)
     return parser
@@ -380,8 +433,9 @@ def main(argv: Sequence[str], run: Run = default_run) -> int:
     """Point d'entrée ; voir le module pour les sous-commandes et les sorties."""
     try:
         args = build_parser().parse_args(argv)
-    except SystemExit as stop:
-        return stop.code if isinstance(stop.code, int) else 2
+    except SystemExit:
+        # L'aide sort en 2 comme un appel mal formé : en 0, `… --help && gh pr merge …` mergerait.
+        return 2
     try:
         held, lines = args.gate(run, args)
     except Refusal as refusal:
