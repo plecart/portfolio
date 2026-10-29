@@ -19,9 +19,12 @@ Elle appelle `tableau_de_bord_maj` à chaque changement d'état d'un lot ou de l
 PR d'intégration en draft et sessions de lot démarrées (« Au go du découpage »), lot mergé et lot
 ouvert (« Ouvrir le lot suivant »), PR d'intégration sortie du draft puis mergée (« Après le
 dernier lot ») — et `tableau_de_bord_retirer` à son nettoyage final (même section). Mêmes champs,
-même saut silencieux si l'outil manque, et l'avancement par la formule des lots, écrits une fois à
-cette étape de `pr-paralleles`. Une carte par issue : les lots en sont des `sessions`, `role`
-`lot <k>` ou `<k><x>`, jamais des cartes ; sa propre session aussi, lue par
+`sessions` excepté, même saut silencieux si l'outil manque, et l'avancement par la formule des
+lots, écrits une fois à cette étape de `pr-paralleles`. Une carte par issue : les lots en sont des
+`sessions`, `role` `lot <k>` ou `<k><x>`, jamais des cartes. N'ayant pas de colonne Session, elle
+lit ses `sessions` dans `list_sessions {"linked": true}` : celles qu'elle a démarrées et leurs
+descendantes, relectures comprises, plus les relais que « Relais en cours de lot » lui annonce,
+sœurs que la chaîne de `startedBy` ne relie pas ; sa propre session aussi, lue par
 `get_session {"session_id":"self"}` — `list_sessions` l'exclut —, `role` `coordinatrice`. Son
 `etat` suit la PR d'intégration : `en-cours` en draft, `en-review` hors du draft, `mergee` au merge.
 
