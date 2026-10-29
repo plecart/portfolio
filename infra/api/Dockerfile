@@ -29,7 +29,7 @@ FROM python:3.12.15-slim-trixie@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269
 # lignes `FROM`, et une image citée seulement par `COPY --from` ne serait jamais mise à jour.
 # Version figée, comme toutes les épingles du dépôt : `latest` ferait dépendre la
 # reproductibilité de l'image de la date du build.
-FROM ghcr.io/astral-sh/uv:0.13.1@sha256:4a1f3666816dafadd20ceb71eac9a7d56d7ef30279f7d64048519ab901ada336 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
 
 
 FROM base AS build
