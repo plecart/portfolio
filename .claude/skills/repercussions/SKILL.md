@@ -135,7 +135,8 @@ Une contradiction avérée → **s'arrêter avant l'étape 2** et présenter l'a
 `.claude/rules/decisions-vs-doc.md` (bloc `## ⚠️ Contradiction`). Dans le tour où le mainteneur
 l'accepte, démarrer la session `contradiction` : `start_session`, `initiation: user_asked`,
 `context: fresh`, `use_worktree: true`, `title: <préfixe> › contradiction` (`sessions-liees.md`,
-« Identité »), prompt `/contradiction` suivi du bloc d'arrêt — ses deux citations — et de
+« Identité », une racine se nomme d'abord), prompt `/contradiction` suivi du bloc d'arrêt — ses
+deux citations — et de
 `origine : #<N>` ; hors d'un tour du mainteneur, une carte de proposition
 (`initiation: own_initiative`, `context: fresh`, `use_worktree: true`, même titre et même prompt). Quelle que soit sa sortie — amendement, document gagnant ou arrêt
 écarté —, elle redémarre `repercussions` sur `#<N>` avec la ligne `contradiction soldée` qui la
@@ -402,7 +403,7 @@ Conditions pour proposer :
 **Proposer, puis démarrer sur accord.** La proposition reste une question au mainteneur ; sur son
 accord, dans ce tour, démarrer la session : `start_session`, `initiation: user_asked`,
 `context: fresh`, `use_worktree: true`, `title: <préfixe> › plan-qa <thème>` (`sessions-liees.md`,
-« Identité »), prompt `/plan-qa "<thème>"`.
+« Identité », une racine se nomme d'abord), prompt `/plan-qa "<thème>"`.
 
 ## Ce que ce skill ne fait pas
 
@@ -419,10 +420,12 @@ accord, dans ce tour, démarrer la session : `start_session`, `initiation: user_
   dans sa propre session, démarrée dans le tour où le mainteneur l'accepte — `start_session`,
   `initiation: user_asked`, `context: fresh`, `use_worktree: true` : pour un défaut,
   `bug-vers-issue` avec la description en argument (`title: <préfixe> › bug` (`sessions-liees.md`,
-  « Identité »), prompt `/bug-vers-issue <description>`) ; pour du travail neuf, `vers-issues` sur un fichier de plan
+  « Identité », une racine se nomme d'abord), prompt `/bug-vers-issue <description>`) ; pour du
+  travail neuf, `vers-issues` sur un fichier de plan
   que la session écrit hors du dépôt, `plans/<date>-<issue fermée>.md` dans le dossier voisin du
   journal d'observations (chemin dans `CLAUDE.md`), les deux citations du vide dedans
-  (`title: <préfixe> › vers-issues` (`sessions-liees.md`, « Identité »), prompt
+  (`title: <préfixe> › vers-issues` (`sessions-liees.md`, « Identité », une racine se nomme
+  d'abord), prompt
   `/vers-issues <chemin>`). La session de brouillon le montre au
   mainteneur, qui décide (`.claude/rules/contraintes.md`, « Création d'issues en cours de cycle »,
   barreau 4). Hors du dépôt, parce que `vers-issues` exige une source écrite en argument et qu'un
