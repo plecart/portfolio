@@ -156,9 +156,9 @@ Ce que le brief de la coordinatrice change au cycle de `cycle-pr` :
   ce cas, la session s'arrête à son Étape 1. Sur un go délégué hors de ce cas, elle prévient
   d'abord la coordinatrice, puis pose la question au mainteneur dans la fenêtre du lot ; son
   message : « attend le mainteneur : <question> » (`sessions-liees.md`, « Messages »). Sur un go
-  humain, une `[V]` ou un écart avec le bloc du lot se posent au même go, et elle prévient la
-  coordinatrice : « bloquant : go humain requis dans cette
-  fenêtre — session de relecture à démarrer ». Sa note de fin de tour n'est pas un signal. Le go
+  humain, une `[V]` ou un écart avec le bloc du lot se posent au même go, et elle prévient d'abord
+  la coordinatrice : « attend le mainteneur : <[V] ou écart> — go humain, session de relecture à
+  démarrer ». Sa note de fin de tour n'est pas un signal. Le go
   conditionnel de #107 (décision 5) a pris fin avec la session de relecture (#134, lot 3).
 - **Sa session de relecture** : la session de lot la démarre à son go humain, en est le parent et la
   nettoie à son Étape 8 ([session-relecture.md](session-relecture.md)) — jamais la coordinatrice,
