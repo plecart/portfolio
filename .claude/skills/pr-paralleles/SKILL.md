@@ -289,10 +289,11 @@ Les champs, tous requis :
 - `resume` : une phrase en langage courant, réécrite à chaque appel, qui dit l'état courant et
   quand le mainteneur doit agir — « relecture indépendante en cours, 2 constats à corriger »,
   « attend ton go », « bloquée : CI rouge sur main » (D-6) ;
-- `sessions` : la session de l'issue et ses descendantes, lues dans
-  `list_sessions {"linked": true}` par la chaîne de `startedBy`, chacune en
-  `{ titre, local_id, role }` — son titre (`sessions-liees.md`, « Identité »), son `local_…`, son
-  rôle : `session PR`, `relecture`, `lot <k>`, `<k><x>`, `relais <r>` ;
+- `sessions` : les sessions de la colonne Session de ses lignes — relais et lots compris, des
+  sœurs que la chaîne de `startedBy` ne relie pas (étape 5) — et leurs descendantes, lues dans
+  `list_sessions {"linked": true}` par cette chaîne, chacune en `{ titre, local_id, role }` — son
+  titre (`sessions-liees.md`, « Identité »), son `local_…`, son rôle : `session PR`, `relecture`,
+  `lot <k>`, `<k><x>`, `relais <r>` ;
 - `etat` : la colonne État traduite — `🟡 en cours` → `en-cours`, `🔵 en review` → `en-review`,
   `🟢 mergée` → `mergee`, `⚪ worktree nettoyé` → `nettoyee`.
 
