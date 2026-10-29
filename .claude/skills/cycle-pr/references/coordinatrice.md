@@ -11,6 +11,20 @@ d'intégration jusqu'à son go. Entre deux lots, elle attend : son contexte ne g
 pointeurs qu'elle lit — la session d'un lot tient les artefacts de son lot, la coordinatrice
 connaît la suite des lots (obs 62).
 
+## Sa carte au tableau de bord des sessions
+
+La coordinatrice n'a pas de `PR-PARALLELES.md` : elle est le seul auteur de la carte de son issue
+au tableau de bord des sessions (`pr-paralleles` Étape 4, « Le tableau de bord des sessions »).
+Elle appelle `tableau_de_bord_maj` à chaque changement d'état d'un lot ou de la PR d'intégration —
+PR d'intégration en draft et sessions de lot démarrées (« Au go du découpage »), lot mergé et lot
+ouvert (« Ouvrir le lot suivant »), PR d'intégration sortie du draft puis mergée (« Après le
+dernier lot ») — et `tableau_de_bord_retirer` à son nettoyage final (même section). Mêmes champs,
+même saut silencieux si l'outil manque, et l'avancement par la formule des lots, écrits une fois à
+cette étape de `pr-paralleles`. Une carte par issue : les lots en sont des `sessions`, `role`
+`lot <k>` ou `<k><x>`, jamais des cartes ; sa propre session aussi, lue par
+`get_session {"session_id":"self"}` — `list_sessions` l'exclut —, `role` `coordinatrice`. Son
+`etat` suit la PR d'intégration : `en-cours` en draft, `en-review` hors du draft, `mergee` au merge.
+
 ## Au go du découpage — démarrer des sessions dans un tour du mainteneur
 
 `start_session` est refusé dans un tour ouvert par un message de session ou par un événement

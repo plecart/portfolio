@@ -266,6 +266,67 @@ d'écrire la moindre ligne**. Le lead la lit sans rien demander aux sessions —
 `gh pr list --state open --limit 200 --json number,headRefName,isDraft` relie chaque branche à sa PR. C'est ce
 qui rend le lot lisible d'un coup d'œil — et détectable par `repercussions`.
 
+**Le tableau de bord des sessions.** Un mod installé en local, hors du dépôt, affiche dans un
+panneau de l'application une carte par issue : avancement, résumé, sessions rattachées. À chaque
+mise à jour de `PR-PARALLELES.md`, le lead appelle `tableau_de_bord_maj`
+(`mcp__tableau-de-bord-sessions__tableau_de_bord_maj`) pour la carte de chaque issue dont la ligne
+a changé. Si l'outil n'est pas dans la liste d'outils de la session — ni chargé, ni trouvé par
+`ToolSearch` sur son nom complet —, l'appel est sauté, sans aucun message ni erreur : la pipeline
+ne dépend pas du mod (#186, D-9).
+
+Une carte a **un seul auteur** : la coordinatrice si l'issue en a une
+(`cycle-pr/references/coordinatrice.md`), sinon le lead. Le lead ne nourrit pas la carte d'une
+issue à coordinatrice, qu'il reconnaît à sa PR d'intégration, ouverte par « En vol pour #<N>
+(intégration », ou au titre de sa session, terminé par `coordinatrice` (D-3).
+
+Les champs, tous requis :
+
+- `sujet` : `#<N>` — une carte par issue ;
+- `titre` : `#<N> <titre court de l'issue>` ;
+- `avancement` : de 0 à 100, par le barème ci-dessous ;
+- `resume` : une phrase en langage courant, réécrite à chaque appel, qui dit l'état courant et
+  quand le mainteneur doit agir — « relecture indépendante en cours, 2 constats à corriger »,
+  « attend ton go », « bloquée : CI rouge sur main » (D-6) ;
+- `sessions` : la session de l'issue et ses descendantes, lues dans
+  `list_sessions {"linked": true}` par la chaîne de `startedBy`, chacune en
+  `{ titre, local_id, role }` — son titre (`sessions-liees.md`, « Identité »), son `local_…`, son
+  rôle : `session PR`, `relecture`, `lot <k>`, `<k><x>`, `relais <r>` ;
+- `etat` : la colonne État traduite — `🟡 en cours` → `en-cours`, `🔵 en review` → `en-review`,
+  `🟢 mergée` → `mergee`, `⚪ worktree nettoyé` → `nettoyee`.
+
+**L'avancement** suit l'étape `cycle-pr` de la PR, pondérée par l'effort (D-4) — barème écrit une
+fois, ici ; la coordinatrice y renvoie :
+
+| Étape `cycle-pr`      | Avancement |
+|-----------------------|------------|
+| Étape 1 — briefing    | 10 %       |
+| Étape 2 — draft       | 15 %       |
+| Étape 3 — commits     | 40 %       |
+| Étape 4 — relecture   | 60 %       |
+| Étape 5 — ready       | 70 %       |
+| Étape 6 — review + CI | 80 %       |
+| Étape 7 — avant-go    | 90 %       |
+| mergée                | 100 %      |
+
+Issue en `n` lots, dont le lot `k` est en cours : `((k−1) + avancement du lot k) / n` — 3 lots, le
+lot 2 à l'Étape 4 : `(1 + 0,60) / 3` ≈ 53 %.
+
+L'étape se lit sur des signaux que le lead observe déjà, sans nouveau message entre sessions
+(D-9) :
+
+- aucune PR pour la branche → Étape 1 ;
+- PR draft sans autre commit que l'amorce → Étape 2 ;
+- PR draft avec des commits → Étape 3 ;
+- PR draft portant des commentaires de relecture (`/code-review --comment` de la session de
+  relecture) → Étape 4 ;
+- PR draft dont le body porte `## Summary`, le body définitif de l'Étape 5 → Étape 5 ;
+- PR sortie du draft → Étape 6 ;
+- Notes portant le verdict d'avant-go → Étape 7 ;
+- PR mergée → 100 %.
+
+Un message reçu d'une session — fin de travail, blocage — peut faire avancer l'étape ou nuancer le
+`resume`.
+
 ### 5. Le brief de chaque session
 
 Le brief est le `prompt` que l'étape 3 passe à `start_session` : la session reçoit son premier tour
@@ -404,7 +465,8 @@ c'est le seul autre canal, et il passe par lui.
   le retirer termine la relecture et ferme la voie de la relance. Seule la session PR qui l'a
   démarré ou lancé le retire. Le `verificateur` de l'étape 6, lui, n'en crée **aucun** — il n'a pas
   d'`isolation` : un worktree par (PR, go) serait précisément le coût que son éphémérité évite.
-- Quand une PR passe en review puis est mergée, mettre à jour `PR-PARALLELES.md`.
+- Quand une PR passe en review puis est mergée, mettre à jour `PR-PARALLELES.md` et la carte de
+  son issue (étape 4).
 - Après chaque merge, la session concernée déroule la clôture de l'Étape 8 de `cycle-pr` —
   label d'état retiré, critères d'acceptation cochés, puis la passe `repercussions` ; une session
   de lot d'une coordinatrice la borne, et la passe attend le merge de la PR d'intégration
@@ -578,9 +640,11 @@ sous le clone principal, sinon relancer la commande `hooks` de la config **depui
 Un worktree supprimé qui avait installé les hooks laisse ce chemin mort, et la vague sabote le
 dépôt qu'elle servait.
 
-Marquer la ligne `⚪ worktree nettoyé` dans le tableau. Quand tout le lot est nettoyé, retirer le
-tableau de `PR-PARALLELES.md` (ou l'archiver dans les notes du projet) et garder son en-tête : la
-vague suivante y lit son rang (étape 4).
+Marquer la ligne `⚪ worktree nettoyé` dans le tableau, et sa carte `etat: nettoyee` (étape 4).
+Quand tout le lot est nettoyé, retirer le tableau de `PR-PARALLELES.md` (ou l'archiver dans les
+notes du projet) et garder son en-tête : la vague suivante y lit son rang (étape 4). Puis
+`tableau_de_bord_retirer` (`mcp__tableau-de-bord-sessions__tableau_de_bord_retirer`) sur le
+`sujet` de chaque carte que le lead a nourrie, avec le même saut silencieux (étape 4).
 
 **Issue en plusieurs lots.** La **branche** mergée d'un lot meurt : sous un trunk fusionné par
 rebase ou squash, ses commits réécrits doubleraient dans la PR du lot suivant (obs 36). Une session
