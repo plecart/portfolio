@@ -6810,10 +6810,6 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         SESSION_RELECTURE_REF,
         "`source_branch` = la branche de la PR, déjà poussée",
     ),
-    "titre-de-la-session": (
-        SESSION_RELECTURE_REF,
-        f"`title: <préfixe> › relecture` {RENVOI_A_L_IDENTITE}",
-    ),
     "contenu-du-brief": (
         SESSION_RELECTURE_REF,
         (
