@@ -7868,6 +7868,12 @@ INVARIANTS_DE_LA_REGLE_DU_SUJET = {
         RELECTEUR_ROLE,
         "un constat qui demande un cas que ni le bloc ni les critères de l'issue ne portent",
     ),
+    # La réponse type du mainteneur, critère de la voie T, chargée à chaque session : la taille n'y
+    # fait plus découper (`[V]` tranchée au go de la PR #199).
+    "contraintes-reponse-type-sans-taille": (
+        CONTRAINTES_RULE,
+        "la taille ne découpe pas, seul un second sujet ou un motif écrit le fait (`taille-pr.md`)",
+    ),
     "cycle-pr-vide-releve-sans-passe-de-plus": (
         CYCLE_PR_SKILL,
         "ne se corrige jamais dans la PR et ne déclenche jamais la passe de plus",
