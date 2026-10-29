@@ -1636,6 +1636,11 @@ INTAKE_ECHEC_REF = ".claude/skills/execution-qa/references/gabarit-intake-echec.
 COMMENTAIRE_PHASE_REF = ".claude/skills/execution-qa/references/gabarit-commentaire-phase.md"
 CORRECTION_BUG_REF = ".claude/skills/execution-qa/references/standard-correction-bug.md"
 PLAN_QA_SKILL = ".claude/skills/plan-qa/SKILL.md"
+# La ligne « commande de fond bornée », la même dans les quatre rôles à `Bash` (#195, obs 132).
+COMMANDE_DE_FOND = (
+    "**Commande de fond bornée** — toute commande susceptible de dépasser ~2 min part en arrière-plan"
+    " avec un `timeout` ; une recherche se borne au dépôt (`git grep`, le worktree)"
+)
 AUDIT_SPEC_UI_SKILL = ".claude/skills/audit-spec-ui/SKILL.md"
 INIT_PROJET_SKILL = ".claude/skills/init-projet/SKILL.md"
 GABARIT_PLAN_QA_REF = ".claude/skills/plan-qa/references/gabarit-plan-qa.md"
@@ -1926,11 +1931,16 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "go-delegue-question-au-mainteneur": (
         COORDINATRICE_REF,
         (
-            "Sur un go délégué hors de ce cas, elle pose la question au mainteneur dans la fenêtre"
-            " du lot et prévient la coordinatrice"
+            "Sur un go délégué hors de ce cas, elle prévient d'abord la coordinatrice, puis pose la"
+            " question au mainteneur dans la fenêtre du lot"
         ),
     ),
-    "bloquant-sur-go-delegue": (COORDINATRICE_REF, "bloquant : [V] en attente dans cette fenêtre"),
+    # #195 : la forme voisine « bloquant : [V] en attente dans cette fenêtre » se rabat sur celle de
+    # `sessions-liees.md` — un même événement, une seule forme.
+    "bloquant-sur-go-delegue": (
+        COORDINATRICE_REF,
+        "« attend le mainteneur : <question> » (`sessions-liees.md`, « Messages »)",
+    ),
     "fin-de-tour-pas-un-signal": (COORDINATRICE_REF, "note de fin de tour n'est pas un signal"),
     "ouverture-par-la-coordinatrice": (COORDINATRICE_REF, "La coordinatrice prépare alors"),
     "demarree-a-son-ouverture": (
@@ -2537,6 +2547,48 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "etat-de-la-pr-d-integration": (
         COORDINATRICE_REF,
         "`en-cours` en draft, `en-review` hors du draft, `mergee` au merge",
+    ),
+    # #195, sessions muettes (19ᵉ entrée de l'étude de tri du 2026-10-29) : une session liée
+    # prévient son parent avant toute question au mainteneur — la règle, sa forme figée, son
+    # renvoi aux trois endroits de `cycle-pr` où une `[V]` se pose, la lecture du lead ; et la
+    # commande de fond bornée (obs 132) — la ligne des quatre rôles à `Bash`, le diagnostic de 3.1.
+    "attend-le-mainteneur-la-regle": (
+        SESSIONS_LIEES_REF,
+        "**Avant toute question au mainteneur, la session prévient son parent.**",
+    ),
+    "attend-le-mainteneur-la-forme": (
+        SESSIONS_LIEES_REF,
+        "« attend le mainteneur : \\<question> », avant toute question au mainteneur",
+    ),
+    "attend-le-mainteneur-au-go-du-briefing": (
+        CYCLE_PR_SKILL,
+        "Une session liée prévient son parent avant de poser ses `[V]` : « attend le mainteneur :",
+    ),
+    "attend-le-mainteneur-a-l-arret-de-l-etape-3": (
+        CYCLE_PR_SKILL,
+        "Arrêtée sur une `[V]`, une session liée prévient d'abord son parent : « attend le mainteneur :",
+    ),
+    "attend-le-mainteneur-aux-questions-en-attente": (
+        CYCLE_PR_SKILL,
+        (
+            "se pose maintenant — par une session liée, après « attend le mainteneur : <question> »"
+            " à son parent"
+        ),
+    ),
+    "attend-ta-reponse-au-resume-de-la-carte": (
+        PR_PARALLELES_SKILL,
+        "« attend ta réponse : <question> »",
+    ),
+    "commande-de-fond-bornee-developpeur": (".claude/agents/developpeur.md", COMMANDE_DE_FOND),
+    "commande-de-fond-bornee-executant": (".claude/agents/executant.md", COMMANDE_DE_FOND),
+    "commande-de-fond-bornee-relecteur": (".claude/agents/relecteur.md", COMMANDE_DE_FOND),
+    "commande-de-fond-bornee-releveur": (RELEVEUR_ROLE, COMMANDE_DE_FOND),
+    "delegue-en-attente-diagnostique": (
+        CYCLE_PR_SKILL,
+        (
+            "**Un délégué qui attend son travail de fond au-delà de la durée prévue se diagnostique"
+            " avant toute nouvelle attente**"
+        ),
     ),
 }
 

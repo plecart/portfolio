@@ -153,10 +153,11 @@ Ce que le brief de la coordinatrice change au cycle de `cycle-pr` :
 - **Le go du briefing est humain, dans la fenêtre de la session de lot, ou délégué à la
   coordinatrice** quand le mainteneur le lui accorde, relayé par le fichier de démarrage et
   valable seulement pour un briefing sans `[V]`, sans écart au bloc du lot et sans `[C]`. Hors de
-  ce cas, la session s'arrête à son Étape 1. Sur un go délégué hors de ce cas, elle pose la
-  question au mainteneur dans la fenêtre du lot et prévient la coordinatrice : « bloquant : [V] en
-  attente dans cette fenêtre ». Sur un go humain, une `[V]` ou un écart avec le bloc du lot se
-  posent au même go, et elle prévient la coordinatrice : « bloquant : go humain requis dans cette
+  ce cas, la session s'arrête à son Étape 1. Sur un go délégué hors de ce cas, elle prévient
+  d'abord la coordinatrice, puis pose la question au mainteneur dans la fenêtre du lot ; son
+  message : « attend le mainteneur : <question> » (`sessions-liees.md`, « Messages »). Sur un go
+  humain, une `[V]` ou un écart avec le bloc du lot se posent au même go, et elle prévient la
+  coordinatrice : « bloquant : go humain requis dans cette
   fenêtre — session de relecture à démarrer ». Sa note de fin de tour n'est pas un signal. Le go
   conditionnel de #107 (décision 5) a pris fin avec la session de relecture (#134, lot 3).
 - **Sa session de relecture** : la session de lot la démarre à son go humain, en est le parent et la
