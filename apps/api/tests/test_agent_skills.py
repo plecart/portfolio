@@ -2384,7 +2384,159 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         ),
     ),
     "suffixe-d-un-sous-lot": (COORDINATRICE_REF, "suffixe `lot <k> › <k><x>` pour un sous-lot"),
+    # #186, volet 2 (D-3, D-4, D-6, D-9) : le lead et la coordinatrice nourrissent le tableau de
+    # bord des sessions. Une entrée par règle de `pr-paralleles` Étape 4 et de `coordinatrice.md`,
+    # moitié qui restreint comprise (obs 126), et par appel placé à l'étape qui agit. Le barème est
+    # gardé à part (`BAREME_D_AVANCEMENT`).
+    "maj-a-chaque-mise-a-jour-du-tableau": (
+        PR_PARALLELES_SKILL,
+        (
+            "À chaque mise à jour de `PR-PARALLELES.md`, le lead appelle `tableau_de_bord_maj`"
+            " (`mcp__tableau-de-bord-sessions__tableau_de_bord_maj`) pour la carte de chaque issue"
+            " dont la ligne a changé."
+        ),
+    ),
+    "outil-absent-saute-sans-bruit": (
+        PR_PARALLELES_SKILL,
+        "`ToolSearch` sur son nom complet —, l'appel est sauté, sans aucun message ni erreur",
+    ),
+    "un-seul-auteur-par-carte": (
+        PR_PARALLELES_SKILL,
+        "Une carte a **un seul auteur** : la coordinatrice si l'issue en a une",
+    ),
+    "le-lead-saute-les-cartes-a-coordinatrice": (
+        PR_PARALLELES_SKILL,
+        (
+            "Le lead ne nourrit pas la carte d'une issue à coordinatrice, qu'il reconnaît à sa PR"
+            " d'intégration, ouverte par « En vol pour #<N> (intégration », ou au titre de sa"
+            " session, terminé par `coordinatrice`"
+        ),
+    ),
+    "champ-sujet": (PR_PARALLELES_SKILL, "`sujet` : `#<N>` — une carte par issue ;"),
+    "champ-titre": (PR_PARALLELES_SKILL, "`titre` : `#<N> <titre court de l'issue>` ;"),
+    "champ-avancement": (PR_PARALLELES_SKILL, "`avancement` : de 0 à 100, par le barème"),
+    "champ-resume": (
+        PR_PARALLELES_SKILL,
+        "réécrite à chaque appel, qui dit l'état courant et quand le mainteneur doit agir",
+    ),
+    "champ-sessions": (
+        PR_PARALLELES_SKILL,
+        (
+            "`sessions` : la session de l'issue et ses descendantes, lues dans"
+            ' `list_sessions {"linked": true}` par la chaîne de `startedBy`, chacune en'
+            " `{ titre, local_id, role }`"
+        ),
+    ),
+    "champ-etat": (
+        PR_PARALLELES_SKILL,
+        (
+            "`etat` : la colonne État traduite — `🟡 en cours` → `en-cours`, `🔵 en review` →"
+            " `en-review`, `🟢 mergée` → `mergee`, `⚪ worktree nettoyé` → `nettoyee`."
+        ),
+    ),
+    "bareme-ecrit-une-fois": (
+        PR_PARALLELES_SKILL,
+        "barème écrit une fois, ici ; la coordinatrice y renvoie",
+    ),
+    "etape-lue-sans-nouveau-message": (
+        PR_PARALLELES_SKILL,
+        "L'étape se lit sur des signaux que le lead observe déjà, sans nouveau message entre sessions",
+    ),
+    "signaux-de-l-etape": (
+        PR_PARALLELES_SKILL,
+        (
+            "- aucune PR pour la branche → Étape 1 ; - PR draft sans autre commit que l'amorce →"
+            " Étape 2 ; - PR draft avec des commits → Étape 3 ; - PR draft portant des commentaires"
+            " de relecture (`/code-review --comment` de la session de relecture) → Étape 4 ; - PR"
+            " draft dont le body porte `## Summary`, le body définitif de l'Étape 5 → Étape 5 ; -"
+            " PR sortie du draft → Étape 6 ; - Notes portant le verdict d'avant-go → Étape 7 ; - PR"
+            " mergée → 100 %."
+        ),
+    ),
+    "message-recu-nuance-le-resume": (
+        PR_PARALLELES_SKILL,
+        "— fin de travail, blocage — peut faire avancer l'étape ou nuancer le `resume`",
+    ),
+    "carte-a-jour-a-la-convergence": (
+        PR_PARALLELES_SKILL,
+        "mettre à jour `PR-PARALLELES.md` et la carte de son issue (étape 4)",
+    ),
+    "carte-nettoyee": (PR_PARALLELES_SKILL, "et sa carte `etat: nettoyee` (étape 4)"),
+    "le-lead-retire-ses-seules-cartes": (
+        PR_PARALLELES_SKILL,
+        (
+            "`tableau_de_bord_retirer` (`mcp__tableau-de-bord-sessions__tableau_de_bord_retirer`)"
+            " sur le `sujet` de chaque carte que le lead a nourrie, avec le même saut silencieux"
+        ),
+    ),
+    "coordinatrice-seul-auteur-de-sa-carte": (
+        COORDINATRICE_REF,
+        (
+            "elle est le seul auteur de la carte de son issue au tableau de bord des sessions"
+            " (`pr-paralleles` Étape 4, « Le tableau de bord des sessions »)"
+        ),
+    ),
+    "coordinatrice-nourrit-sa-carte-a-chaque-changement": (
+        COORDINATRICE_REF,
+        (
+            "Elle appelle `tableau_de_bord_maj` à chaque changement d'état d'un lot ou de la PR"
+            " d'intégration — PR d'intégration en draft et sessions de lot démarrées (« Au go du"
+            " découpage »), lot mergé et lot ouvert (« Ouvrir le lot suivant »), PR d'intégration"
+            " sortie du draft puis mergée (« Après le dernier lot ») — et `tableau_de_bord_retirer`"
+            " à son nettoyage final (même section)."
+        ),
+    ),
+    "coordinatrice-renvoie-le-saut-et-la-formule": (
+        COORDINATRICE_REF,
+        "même saut silencieux si l'outil manque, et l'avancement par la formule des lots",
+    ),
+    "lots-jamais-des-cartes": (
+        COORDINATRICE_REF,
+        "les lots en sont des `sessions`, `role` `lot <k>` ou `<k><x>`, jamais des cartes",
+    ),
+    "coordinatrice-dans-ses-sessions": (
+        COORDINATRICE_REF,
+        'sa propre session aussi, lue par `get_session {"session_id":"self"}`',
+    ),
+    "etat-de-la-pr-d-integration": (
+        COORDINATRICE_REF,
+        "`en-cours` en draft, `en-review` hors du draft, `mergee` au merge",
+    ),
 }
+
+
+# #186, D-4 : le barème d'avancement s'écrit une fois, à l'Étape 4 de `pr-paralleles` ; la
+# coordinatrice y renvoie. Une ligne par étape, puis la formule d'une issue en lots.
+BAREME_D_AVANCEMENT = [
+    "| Étape 1 — briefing | 10 % |",
+    "| Étape 2 — draft | 15 % |",
+    "| Étape 3 — commits | 40 % |",
+    "| Étape 4 — relecture | 60 % |",
+    "| Étape 5 — ready | 70 % |",
+    "| Étape 6 — review + CI | 80 % |",
+    "| Étape 7 — avant-go | 90 % |",
+    "| mergée | 100 % |",
+    "`((k−1) + avancement du lot k) / n`",
+]
+
+
+@pytest.mark.parametrize("ligne", BAREME_D_AVANCEMENT)
+def test_le_bareme_d_avancement_s_ecrit_une_fois(ligne: str) -> None:
+    """Présente dans `pr-paralleles`, absente de toute autre prose du harnais : recopiée, elle
+    vieillit seule. Vu rouge en recopiant une ligne, puis la formule, dans `coordinatrice.md`."""
+    sites = [fichier for fichier, texte in prose_du_harnais() if ligne in texte]
+
+    assert sites == [PR_PARALLELES_SKILL], f"« {ligne} » : {sites}"
+
+
+def test_la_carte_de_la_coordinatrice_s_annonce_avant_son_premier_appel() -> None:
+    """La règle précède « Au go du découpage », premier geste qui nourrit la carte : lue après,
+    elle arrive une fois les sessions démarrées (`cleanup-verbatim.md`, ordre d'exécution)."""
+    assert_dans_l_ordre(
+        COORDINATRICE_REF,
+        "Elle appelle `tableau_de_bord_maj` à chaque changement d'état",
+        "Au go du découpage — démarrer des sessions dans un tour du mainteneur",
+    )
 
 
 # `use_worktree` omis, `start_session` donne à l'enfant le dossier de son parent quand celui-ci
