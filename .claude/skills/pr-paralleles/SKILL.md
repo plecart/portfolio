@@ -238,7 +238,7 @@ avec lui ; le hook d'écriture du harnais refuse le clone principal à une sessi
 | Issue | PR | Branche | Worktree | Session | Base du verdict | État |
 |-------|----|---------|----------|---------|-----------------|------|
 | #51 lot 1/2 | #62 (draft) | feat/extraction-pdf | .claude/worktrees/brave-turing-1a2b3c | vague-1 › #51 › lot 1 · local_7534fbb3… | — | 🟡 en cours |
-| #52 | #63 | fix/quota-upload | .claude/worktrees/calm-hopper-4d5e6f | vague-1 › #52 · local_2afdedb5…, local_9c1e0a4f… (relais) | 863d606 | 🔵 en review |
+| #52 | #63 | fix/quota-upload | .claude/worktrees/calm-hopper-4d5e6f | vague-1 › #52 · local_2afdedb5…, vague-1 › #52 (relais 2) · local_9c1e0a4f… | 863d606 | 🔵 en review |
 ```
 
 `<k>` est le rang de la vague : celui de l'en-tête que la vague précédente a laissé dans

@@ -2342,6 +2342,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         SESSIONS_LIEES_REF,
         "l'application demande l'accord du mainteneur si c'est lui qui a posé le titre",
     ),
+    "renommer-refuse-sans-surveillance": (
+        SESSIONS_LIEES_REF,
+        "et refuse en session sans surveillance",
+    ),
     "un-exemple-par-forme": (
         SESSIONS_LIEES_REF,
         (
@@ -2817,11 +2821,13 @@ def test_chaque_session_demarree_recoit_son_suffixe_et_le_renvoi_a_l_identite(
 
 def test_aucune_session_demarree_n_est_nommee_a_plat() -> None:
     """`name` ne porte ni ` › ` ni `#` : rétabli, il rend la barre latérale à plat. Vu rouge sur
-    `d2e9b09`, où la forme rend les 15 appels de `TITRES_DES_SESSIONS_DEMARREES`."""
+    `d2e9b09`, où la forme rend les 15 appels de `TITRES_DES_SESSIONS_DEMARREES`. Trois formes
+    d'un `name` muni d'une valeur : `` `name: x` ``, `` `name` : `x` `` et `` name `x` `` (relecture
+    de la PR #188, passe 1, constat 2 : la seule première laissait la troisième VERTE)."""
     a_plat = [
         (fichier, nom)
         for fichier, texte in prose_du_harnais()
-        for nom in re.findall(r"`name: [^,`]+", texte)
+        for nom in re.findall(r"`name: [^,`]+|`name`\s*:?\s*`[^`]+`|\bname `[^`]+`", texte)
     ]
 
     assert not a_plat, f"`name` à plat : {a_plat}"
