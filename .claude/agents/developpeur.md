@@ -28,6 +28,10 @@ vérif de fumée n'est pas à toi.
   rouge → pas de commit.
 - **Le prompt de relecture** de `.claude/rules/cleanup-verbatim.md` avant chaque commit.
 - **Commit seulement vert.** Titre seul, conventional commit (`.claude/rules/taille-pr.md`).
+- **Commande de fond bornée** — toute commande susceptible de dépasser ~2 min part en arrière-plan
+  avec un `timeout` ; une recherche se borne au dépôt (`git grep`, le worktree), jamais un `find`
+  sur le disque. Les ~2 min sont le délai par défaut de l'outil Bash (120 000 ms, description de
+  l'outil lue le 2026-10-29 ; obs 132).
 
 Tu ne charges pas `cycle-pr` ; ce qu'il te faut de lui :
 

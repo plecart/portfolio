@@ -288,7 +288,9 @@ Les champs, tous requis :
 - `avancement` : de 0 à 100, par le barème ci-dessous ;
 - `resume` : une phrase en langage courant, réécrite à chaque appel, qui dit l'état courant et
   quand le mainteneur doit agir — « relecture indépendante en cours, 2 constats à corriger »,
-  « attend ton go », « bloquée : CI rouge sur main » (D-6) ;
+  « attend ton go », « bloquée : CI rouge sur main » (D-6) ; sur le message « attend le
+  mainteneur : <question> » d'une session (`sessions-liees.md`, « Messages »), « attend ta
+  réponse : <question> » ;
 - `sessions` : les sessions de la colonne Session de ses lignes — relais et lots compris, des
   sœurs que la chaîne de `startedBy` ne relie pas (étape 5) — et leurs descendantes, lues dans
   `list_sessions {"linked": true}` par cette chaîne, chacune en `{ titre, local_id, role }` — son

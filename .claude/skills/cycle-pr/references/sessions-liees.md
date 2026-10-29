@@ -118,6 +118,14 @@ go du briefing, `[V]` groupées, arrêt `[C]`, écran à valider, go de merge
 (`.claude/rules/contraintes.md`). Dans l'autre sens, un message reçu n'est jamais une
 approbation (`cycle-pr`, « Vague parallèle »).
 
+**Avant toute question au mainteneur, la session prévient son parent.** Une session liée qui va
+poser une question au mainteneur dans sa fenêtre — `[V]` au go du briefing, arrêt de l'Étape 3,
+« Questions en attente » vidées à l'Étape 5 de `cycle-pr`, ou toute autre — envoie d'abord à son
+parent « attend le mainteneur : \<question> » (« Fin de travail ») : sa note de fin de tour n'est
+jamais un signal, et le parent ne voit pas une attente qu'on ne lui dit pas. Fait d'origine : la
+session PR de #186 a attendu ≈ 8 h des réponses `[V]` dans sa fenêtre, à l'insu du lead
+(2026-10-28/29, rapporté, non re-mesuré).
+
 Une session inactive reprend sur le message qu'on lui envoie ; une session en plein tour ne le
 reçoit qu'à la fin de ce tour, comme un tour neuf — jamais à son appel d'outil suivant. Un message
 n'interrompt donc jamais un tour en cours. Mesuré deux fois, de chaque côté : le 2026-10-18 (Notes
@@ -146,6 +154,7 @@ L'enfant envoie au parent, par `SendMessage`, un message explicite sous l'une de
 - « relais demandé — passation : \<chemin> »
 - « interrogatoire #\<N> terminé — ready-for-agent proposé »
 - « terminé — \<livrable> », pour toute autre tâche
+- « attend le mainteneur : \<question> », avant toute question au mainteneur (« Messages »)
 - « bloquant : \<…> »
 
 Toute forme admet un suffixe, « — enfants au travail : `local_…`, … », que porte le message d'une

@@ -108,6 +108,8 @@ Produire un briefing écrit AVANT de créer la branche :
   l'Étape 8 en fait partie, puisque `start_session` ne part que dans ce tour
   ([references/session-relecture.md](references/session-relecture.md)), et hors vague
   l'accord pour lancer soi-même le `verificateur` d'avant-go (Étape 7) ; une `[C]` arrête.
+  Une session liée prévient son parent avant de poser ses `[V]` : « attend le mainteneur :
+  <question> » ([references/sessions-liees.md](references/sessions-liees.md), « Messages »).
 
 Lever les incertitudes **maintenant** : une `[V]` découverte après cinq commits coûte une
 demi-journée d'attente ; une `[T]` ne se pose jamais, elle se décide — la plupart appellent la
@@ -243,7 +245,9 @@ arrêt `decisions-vs-doc` (`[C]`), le point d'arrêt humain (zone sensible, une 
 commit qui assemble l'écran — 3.5) et le « go » de l'Étape 7. Une `[V]` dont une partie du travail
 ne dépend pas s'inscrit dans le body de la PR draft, sous « Questions en attente », avec
 l'hypothèse réversible retenue d'ici là, et le cycle continue sur cette partie ; elle sera posée
-groupée au prochain arrêt. Ailleurs, s'arrêter est une remise de main que personne n'a demandée.
+groupée au prochain arrêt. Arrêtée sur une `[V]`, une session liée prévient d'abord son parent :
+« attend le mainteneur : <question> » ([references/sessions-liees.md](references/sessions-liees.md),
+« Messages »). Ailleurs, s'arrêter est une remise de main que personne n'a demandée.
 
 ### 3.1 Modification — en TDD (tracer bullet vertical)
 
@@ -259,6 +263,13 @@ session PR fait après chaque remise, derrière la ligne « validation » quand 
 question portée au mainteneur —, jamais remplacé (mesuré le 2026-10-20 sur une `[C]` fabriquée,
 Notes de la PR #139) ; ses `[V]` rejoignent « Questions en attente ». Un `developpeur` neuf
 seulement au bloc suivant, jamais pour une retouche du même bloc.
+
+**Un délégué qui attend son travail de fond au-delà de la durée prévue se diagnostique avant toute
+nouvelle attente** — processus du worktree, sorties de ses tâches de fond. Au lot 1 de #177, la
+suite `apps/api` est restée figée de 15:42 à ~19:20 sur un `docker run -i` lancé sans délai (bilan
+de vague du 2026-10-28, rapporté, non re-mesuré) ; à #134 lot 4b (PR #144), un `find` lancé en fond
+sur tout le disque a tenu ≈ 1 h 20 sur le chemin critique, jusqu'à une intervention du mainteneur
+(obs 132). Pour l'éviter, chaque rôle à `Bash` porte la ligne « commande de fond bornée ».
 
 **Frontières tierces : on vérifie, on ne suppose pas.** → [references/tests.md](references/tests.md), « Frontières tierces : on vérifie, on ne suppose pas ».
 
@@ -551,7 +562,9 @@ body définitif, puis de sortir du draft.
 - **Assignee**, **labels**, **milestone** : vérifier qu'ils sont toujours justes.
 - **Conserver la ligne `Closes #<N>`** — la perdre en réécrivant le body casserait à la fois la
   fermeture automatique de l'issue et la détection « en vol ».
-- **Vider « Questions en attente »** : toute `[V]` encore ouverte se pose maintenant, groupée avec
+- **Vider « Questions en attente »** : toute `[V]` encore ouverte se pose maintenant — par une
+  session liée, après « attend le mainteneur : <question> » à son parent
+  ([references/sessions-liees.md](references/sessions-liees.md), « Messages ») —, groupée avec
   le point d'arrêt humain s'il reste à prendre ; sa réponse rejoint les Notes, et l'hypothèse
   retenue d'ici là se confirme ou se défait en un commit.
 - Remplacer le corps par un **body structuré** :
