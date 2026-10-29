@@ -17,12 +17,13 @@ import pytest
 import yaml
 from test_image_scan import SCANNING_JOBS
 from test_infra import (
-    AVIS_WORKFLOW,
     BUILD_COMMAND,
+    CACHED_BUILDS,
     CI_WORKFLOW,
     PUBLISH_PREFIX,
     built_images,
     ci_build_flags,
+    job_steps,
     make_dry_run,
     run_bounded,
     run_make,
@@ -470,33 +471,24 @@ def test_la_publication_construit_sans_attestation() -> None:
     chaque manifeste entrerait au paquet comme une version sans étiquette — que la rétention, qui
     compte toute version, supprimerait sous l'index qui la cite —, et rien ne les consomme. Sans
     ces drapeaux, `make build` exporte une attestation (mesuré au lot 1)."""
-    flags = ci_build_flags("publish")
-    assert flags, "aucune étape du job `publish` ne passe `DOCKER_BUILD_FLAGS`"
-
-    printed = make_dry_run("build", environment={"DOCKER_BUILD_FLAGS": flags})
+    printed = make_dry_run("build", environment={"DOCKER_BUILD_FLAGS": ci_build_flags("publish")})
     builds = [match.group().split() for match in BUILD_COMMAND.finditer(printed)]
 
     assert builds, "aucune commande de build lue — sa forme a-t-elle changé ?"
     assert all({"--provenance=false", "--sbom=false"} <= set(build) for build in builds)
 
 
-def cache_inputs(workflow: Path, job: str, action: str) -> object:
-    """Les entrées de l'unique étape `action` du job `job` de `workflow`."""
-    steps = yaml.safe_load(workflow.read_text(encoding="utf-8"))["jobs"][job]["steps"]
+def cache_inputs(job: str, action: str) -> object:
+    """Les entrées de l'unique étape `action` du job `job` de `CACHED_BUILDS`."""
+    steps = job_steps(CACHED_BUILDS[job][0], job)
     found = [step for step in steps if str(step.get("uses", "")).startswith(f"{action}@")]
     assert len(found) == 1, f"le job `{job}` a {len(found)} étape `{action}`"
     return found[0]["with"]
 
 
-@pytest.mark.parametrize(
-    ("workflow", "job"),
-    [(CI_WORKFLOW, "publish"), (AVIS_WORKFLOW, "avis")],
-    ids=["publish", "avis"],
-)
-def test_la_reconstruction_reprend_le_cache_du_job_infra(workflow: Path, job: str) -> None:
+@pytest.mark.parametrize("job", [job for job, (_, writes) in CACHED_BUILDS.items() if not writes])
+def test_la_reconstruction_reprend_le_cache_du_job_infra(job: str) -> None:
     """`publish`, et `avis` qui construit pour scanner, restaurent l'entrée de cache d'`infra` sous
     la même clé — celle qu'`infra` a restaurée, ou écrite si la clé manquait —, et ne l'écrivent
     pas. Deux clés qui dériveraient feraient reconstruire à froid, sans un signal."""
-    assert cache_inputs(workflow, job, "actions/cache/restore") == cache_inputs(
-        CI_WORKFLOW, "infra", "actions/cache"
-    )
+    assert cache_inputs(job, "actions/cache/restore") == cache_inputs("infra", "actions/cache")

@@ -223,11 +223,37 @@ def stack_step(name: str, command: str) -> tuple[str, str]:
 
 
 Guard = Callable[[str], list[str]]
+# (garde, texte remplacé, remplacement, constat attendu).
+Form = tuple[Guard, str, str, bool]
 
-# Forme → (garde, texte remplacé, remplacement, constat attendu). Le texte remplacé est pris dans
-# `CONFORMING_WORKFLOW` : une forme qui ne le changerait pas resterait conforme, et son verdict
-# attendu la ferait rougir.
-FORMS: dict[str, tuple[Guard, str, str, bool]] = {
+
+def gated_forms(job: str) -> dict[str, Form]:
+    """Les formes qui écartent le job `job` de `GATED_JOBS` du conditionnement des ADR 0017 et
+    0019, chacune signalée."""
+    old_if = f"(github.event_name != 'pull_request' || needs.api.outputs.{job} == 'true')"
+    return {
+        f"{job} sans needs": (gating_findings, f"  {job}:\n    needs: api\n", f"  {job}:\n", True),
+        # Sur `main`, le job ne tournerait qu'au commit qui touche ses fichiers, et `publish`, qui
+        # l'attend, sauterait à chaque autre.
+        f"{job} : if qui ignore le push": (
+            gating_findings,
+            gated_if(job),
+            f"${{{{ needs.api.outputs.{job} == 'true' }}}}",
+            True,
+        ),
+        # Le `if` de l'ADR 0017 : derrière un `api` rouge, un run paierait ce job.
+        f"{job} : if avec !cancelled()": (
+            gating_findings,
+            gated_if(job),
+            f"${{{{ !cancelled() && {old_if} }}}}",
+            True,
+        ),
+    }
+
+
+# Forme → `Form`. Le texte remplacé est pris dans `CONFORMING_WORKFLOW` : une forme qui ne le
+# changerait pas resterait conforme, et son verdict attendu la ferait rougir.
+FORMS: dict[str, Form] = {
     "concurrence conforme": (concurrency_findings, "", "", False),
     "sans concurrence": (concurrency_findings, CONCURRENCY_BLOCK, "", True),
     "groupe constant": (concurrency_findings, GROUP_LINE, "  group: ci\n", True),
@@ -276,34 +302,7 @@ FORMS: dict[str, tuple[Guard, str, str, bool]] = {
     "étape jobs sans shell bash": (gating_findings, "        shell: bash\n", "", True),
     "commande sans GITHUB_OUTPUT": (gating_findings, ' >> "$GITHUB_OUTPUT"', "", True),
     "commande qui suit les renommages": (gating_findings, " --no-renames", "", True),
-    "web sans needs": (gating_findings, "  web:\n    needs: api\n", "  web:\n", True),
-    "infra sans needs": (gating_findings, "  infra:\n    needs: api\n", "  infra:\n", True),
-    # Sur `main`, `publish` perdrait l'artefact `dist` du job `web`.
-    "if de web qui ignore le push": (
-        gating_findings,
-        gated_if("web"),
-        "${{ needs.api.outputs.web == 'true' }}",
-        True,
-    ),
-    # L'ancien `if` (ADR 0017) : derrière un `api` rouge, un run payait `web` et `infra`.
-    "if de web avec !cancelled()": (
-        gating_findings,
-        gated_if("web"),
-        (
-            "${{ !cancelled() && (github.event_name != 'pull_request'"
-            " || needs.api.outputs.web == 'true') }}"
-        ),
-        True,
-    ),
-    "if d'infra avec !cancelled()": (
-        gating_findings,
-        gated_if("infra"),
-        (
-            "${{ !cancelled() && (github.event_name != 'pull_request'"
-            " || needs.api.outputs.infra == 'true') }}"
-        ),
-        True,
-    ),
+    **{name: form for job in GATED_JOBS for name, form in gated_forms(job).items()},
     "if de web inversé": (
         gating_findings,
         "needs.api.outputs.web == 'true'",
@@ -320,24 +319,6 @@ FORMS: dict[str, tuple[Guard, str, str, bool]] = {
         gating_findings,
         f"      avis: {API_OUTPUTS['avis']}\n",
         "",
-        True,
-    ),
-    "avis sans needs": (gating_findings, "  avis:\n    needs: api\n", "  avis:\n", True),
-    # Sur `main`, `avis` ne tournerait qu'au commit qui touche une entrée, et `publish`, qui
-    # l'attend, sauterait à chaque autre.
-    "if d'avis qui ignore le push": (
-        gating_findings,
-        gated_if("avis"),
-        "${{ needs.api.outputs.avis == 'true' }}",
-        True,
-    ),
-    "if d'avis avec !cancelled()": (
-        gating_findings,
-        gated_if("avis"),
-        (
-            "${{ !cancelled() && (github.event_name != 'pull_request'"
-            " || needs.api.outputs.avis == 'true') }}"
-        ),
         True,
     ),
     "portes d'avis à leur place": (advisory_findings, "", "", False),
