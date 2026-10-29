@@ -1615,6 +1615,7 @@ CYCLE_PR_SKILL = ".claude/skills/cycle-pr/SKILL.md"
 BRIEFING_REF = ".claude/skills/cycle-pr/references/briefing.md"
 PORTES_REF = ".claude/skills/cycle-pr/references/portes.md"
 CLOTURE_REF = ".claude/skills/cycle-pr/references/cloture.md"
+RELECTURE_REF = ".claude/skills/cycle-pr/references/relecture.md"
 TRIAGE_SKILL = ".claude/skills/triage/SKILL.md"
 HORS_SCOPE_REF = ".claude/skills/triage/hors-scope.md"
 RELEVEUR_ROLE = ".claude/agents/releveur.md"
@@ -7510,11 +7511,14 @@ RENVOI_DE_BARREAU_FORMES: dict[str, tuple[str, list[int]]] = {
 }
 # Chaque fichier de la prose du harnais qui cite un barreau par son numéro, et les numéros cités,
 # dans l'ordre du texte.
+# Le vide relevé (#195, obs 143) part au barreau 2 : `cycle-pr` Étape 4, « Sévérité », et
+# `relecteur.md`.
 RENVOIS_AUX_BARREAUX = {
     CONTRAINTES_RULE: [4],
     BUG_VERS_ISSUE_SKILL: [1, 3],
     CONTRADICTION_SKILL: [2, 4],
-    CYCLE_PR_SKILL: [3, 2, 3, 2],
+    CYCLE_PR_SKILL: [3, 2, 3, 2, 2],
+    RELECTEUR_ROLE: [2],
     "CONTRIBUTING.md": [3],
     REPERCUSSIONS_SKILL: [4],
     VERS_ISSUES_SKILL: [4],
@@ -7791,6 +7795,43 @@ INVARIANTS_DE_LA_REGLE_DU_SUJET = {
     "pr-paralleles-revue-de-fin-de-vague-2": (
         PR_PARALLELES_SKILL,
         "tant que l'échantillon compte moins de 3 PR de plus de 1 500 lignes",
+    ),
+    # Fondus dans la même issue (journal de spec du 2026-10-29) : le vide relevé, hors sévérité, sans
+    # quoi la passe de plus relance la boucle de la PR #155 (obs 143) ; label et milestone dans le
+    # bloc que l'agent copie (obs 114) ; le poste dominant mesuré d'une économie, seuil 25 % (obs
+    # 148, D-5) ; la source de la population du cliquet (obs 107).
+    "cycle-pr-vide-releve": (
+        CYCLE_PR_SKILL,
+        "un constat qui demande un cas que ni le bloc ni les critères de l'issue ne portent",
+    ),
+    "relecteur-vide-releve": (
+        RELECTEUR_ROLE,
+        "un constat qui demande un cas que ni le bloc ni les critères de l'issue ne portent",
+    ),
+    "cycle-pr-gh-pr-create-label-et-milestone": (
+        CYCLE_PR_SKILL,
+        '--label "<label de catégorie>" --milestone "<thème des fichiers>"',
+    ),
+    "briefing-poste-dominant": (
+        BRIEFING_REF,
+        (
+            "Un poste visé sous **25 %** du total ne se découpe pas en lots : l'issue tient en une"
+            " PR, ou s'abandonne"
+        ),
+    ),
+    "interroge-moi-poste-dominant": (
+        INTERROGE_MOI_SKILL,
+        (
+            "Un poste visé sous **25 %** du total ne se découpe pas en lots : l'issue tient en une"
+            " PR, ou s'abandonne"
+        ),
+    ),
+    "relecture-cliquet-source-de-la-population": (
+        RELECTURE_REF,
+        (
+            "il part de la **source de la population** — le bloc, les décisions verrouillées, la"
+            " liste des sites d'une règle —, jamais des constats"
+        ),
     ),
 }
 

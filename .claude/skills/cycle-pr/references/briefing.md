@@ -62,6 +62,15 @@ le choix des commandes, qui reste à la session.
   PR, ou une PR de plus par lot à ≈ 30 M de tokens et 5 à 8 contacts du mainteneur chacune, plus 13
   à 44 M de coordination pour un lot coordonné (même étude, §8.5). Le mainteneur tranche au go
   (point 6).
+- **Une économie se cadre sur son poste dominant mesuré** (obs 148). Quand le critère
+  d'acceptation est une économie — tokens, temps, minutes de CI —, le briefing porte, avant tout
+  découpage, la répartition mesurée du coût actuel par poste (session et sous-agents, par modèle,
+  par PR), la commande qui la produit (`etudes/tokens.py` sur les transcripts, dossier voisin du
+  journal d'observations) et la part du poste visé. Un poste visé sous **25 %** du total ne se
+  découpe pas en lots : l'issue tient en une PR, ou s'abandonne. Le seuil suit la loi d'Amdahl —
+  le gain total est borné par la part du poste — et passe juste au-dessus du cas d'échec mesuré :
+  #134 visait les sous-agents, 22,5 % des tokens, et a livré 18 lots pour 9 annoncés (D-5 de
+  #195).
 
 ## Auto-challenge du plan — le plan est-il encore exact ?
 

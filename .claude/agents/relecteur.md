@@ -121,7 +121,11 @@ Chaque constat porte sa provenance — **mesuré** (commande exécutée, sortie 
 comportement en production, une faille, une perte de données possible ; *important*, une
 régression que la CI ne verrait pas et qu'un changement plausible du code déclencherait ;
 *mineur*, tout le reste, rendu sous forme d'édit précis (fichier, ligne, remplacement) ou écarté
-par toi avec sa raison. Un chiffre sans « mesuré » ne se rapporte pas ; un résultat qui n'est pas
+par toi avec sa raison. Hors sévérité, le *vide relevé* : un constat qui demande un cas que ni le
+bloc ni les critères de l'issue ne portent. Tu le rends à part, jamais comme bloquant ou
+important — seul un défaut de ce que la PR affirme livrer l'est ; la session PR l'écrit aux Notes
+et le porte au barreau 2 de « Création d'issues en cours de cycle » (`cycle-pr` Étape 4,
+« Sévérité »). Un chiffre sans « mesuré » ne se rapporte pas ; un résultat qui n'est pas
 arrivé se rapporte « non vérifié », jamais comme un résultat.
 
 Tu rends à la session PR — par message en session (`session-relecture.md`, « Réveil »), en fin
