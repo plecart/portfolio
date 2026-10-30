@@ -23,7 +23,6 @@ une porte de CI (obs 53).
 """
 
 import ast
-import shutil
 import subprocess
 import sys
 from collections.abc import Callable
@@ -807,37 +806,59 @@ def author_gate() -> dict[str, Any]:
 
 
 def pr_merge_commit(repo: Path, author: str) -> None:
-    """Pose dans `repo` la forme que la CI extrait : un commit de fusion, tête de PR en second parent."""
+    """Pose dans `repo` la forme que la CI extrait : un commit de fusion, tête de PR en second parent.
+
+    `author` signe le premier commit de la PR, pas sa tête, et le trunk est d'auteur Claude : le pas
+    doit lire tous les commits de la PR, et eux seuls."""
 
     def git(*args: str) -> None:
-        identity = ("-c", "user.name=ci", "-c", "user.email=ci@example.test")
+        identity = (
+            "-c",
+            "user.name=ci",
+            "-c",
+            "user.email=ci@example.test",
+            "-c",
+            "commit.gpgsign=false",
+        )
         subprocess.run(["git", *identity, *args], cwd=repo, check=True, capture_output=True)
 
     git("init", "-b", "main")
     git("commit", "--allow-empty", "-m", "base")
     git("checkout", "-b", "pr")
     git("commit", "--allow-empty", "-m", "commit de la PR", f"--author={author}")
+    git("commit", "--allow-empty", "-m", "tête de la PR", f"--author={HUMAN_AUTHOR}")
     git("checkout", "main")
-    git("commit", "--allow-empty", "-m", "trunk")
+    git("commit", "--allow-empty", "-m", "trunk", f"--author={CLAUDE_AUTHOR}")
     git("merge", "--no-ff", "-m", "fusion", "pr")
+
+
+def play_author_step(repo: Path, bash: str) -> int:
+    """Le code de sortie du pas tel que `ci.yml` l'écrit, sous le shell d'Actions."""
+    step = next(s for s in author_gate()["steps"] if s.get("name") == AUTHOR_STEP)
+    return subprocess.run(
+        [bash, "-eo", "pipefail", "-c", step["run"]], cwd=repo, check=False
+    ).returncode
 
 
 @pytest.mark.parametrize(
     ("author", "code"),
-    [(CLAUDE_AUTHOR, 1), (HUMAN_AUTHOR, 0)],
-    ids=["auteur Claude refusé", "auteur humain accepté"],
+    [(CLAUDE_AUTHOR, 1), (CLAUDE_AUTHOR.upper(), 1), (HUMAN_AUTHOR, 0)],
+    ids=["auteur Claude refusé", "casse ignorée", "auteur humain accepté"],
 )
 def test_le_job_auteurs_refuse_un_commit_de_pr_signe_claude(
-    tmp_path: Path, author: str, code: int
+    tmp_path: Path, author: str, code: int, bash_de_ce_systeme: str
 ) -> None:
-    """Le pas tel que `ci.yml` l'écrit, joué sur un commit de fusion réel."""
+    """Joué sur un commit de fusion réel."""
     pr_merge_commit(tmp_path, author)
-    step = next(s for s in author_gate()["steps"] if s.get("name") == AUTHOR_STEP)
-    # `shutil.which` : sous Windows, `subprocess` trouverait d'abord le `bash` de WSL.
-    shell = shutil.which("bash")
-    assert shell is not None
-    done = subprocess.run([shell, "-eo", "pipefail", "-c", step["run"]], cwd=tmp_path, check=False)
-    assert done.returncode == code
+    assert play_author_step(tmp_path, bash_de_ce_systeme) == code
+
+
+def test_le_job_auteurs_echoue_ferme_si_git_log_echoue(
+    tmp_path: Path, bash_de_ce_systeme: str
+) -> None:
+    """Sans second parent, `git log` échoue : le pas rougit au lieu de passer sans rien lire."""
+    subprocess.run(["git", "init", "-b", "main"], cwd=tmp_path, check=True, capture_output=True)
+    assert play_author_step(tmp_path, bash_de_ce_systeme) != 0
 
 
 def test_le_job_auteurs_tourne_sur_une_pr_prete_avec_tout_l_historique() -> None:
