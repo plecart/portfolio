@@ -23,6 +23,7 @@ une porte de CI (obs 53).
 """
 
 import ast
+import shutil
 import subprocess
 import sys
 from collections.abc import Callable
@@ -789,3 +790,61 @@ def test_l_etape_5_traite_chaque_issue_de_la_lecture_du_run(anchor: str) -> None
     step = step_5()
     assert anchor in step
     assert step.index(anchor) > step.index("scripts/attente-ci.py <numéro>")
+
+
+# --- Auteurs des commits d'une PR ---
+
+AUTHOR_STEP = "Refuser un auteur Claude"
+CLAUDE_AUTHOR = "Claude <noreply@anthropic.com>"
+HUMAN_AUTHOR = "plecart <pacome@lecart.dev>"
+
+
+def author_gate() -> dict[str, Any]:
+    """Le job `auteurs` de `ci.yml`, sous sa forme analysée."""
+    return cast(
+        dict[str, Any], yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["auteurs"]
+    )
+
+
+def pr_merge_commit(repo: Path, author: str) -> None:
+    """Pose dans `repo` la forme que la CI extrait : un commit de fusion, tête de PR en second parent."""
+
+    def git(*args: str) -> None:
+        identity = ("-c", "user.name=ci", "-c", "user.email=ci@example.test")
+        subprocess.run(["git", *identity, *args], cwd=repo, check=True, capture_output=True)
+
+    git("init", "-b", "main")
+    git("commit", "--allow-empty", "-m", "base")
+    git("checkout", "-b", "pr")
+    git("commit", "--allow-empty", "-m", "commit de la PR", f"--author={author}")
+    git("checkout", "main")
+    git("commit", "--allow-empty", "-m", "trunk")
+    git("merge", "--no-ff", "-m", "fusion", "pr")
+
+
+@pytest.mark.parametrize(
+    ("author", "code"),
+    [(CLAUDE_AUTHOR, 1), (HUMAN_AUTHOR, 0)],
+    ids=["auteur Claude refusé", "auteur humain accepté"],
+)
+def test_le_job_auteurs_refuse_un_commit_de_pr_signe_claude(
+    tmp_path: Path, author: str, code: int
+) -> None:
+    """Le pas tel que `ci.yml` l'écrit, joué sur un commit de fusion réel."""
+    pr_merge_commit(tmp_path, author)
+    step = next(s for s in author_gate()["steps"] if s.get("name") == AUTHOR_STEP)
+    # `shutil.which` : sous Windows, `subprocess` trouverait d'abord le `bash` de WSL.
+    shell = shutil.which("bash")
+    assert shell is not None
+    done = subprocess.run([shell, "-eo", "pipefail", "-c", step["run"]], cwd=tmp_path, check=False)
+    assert done.returncode == code
+
+
+def test_le_job_auteurs_tourne_sur_une_pr_prete_avec_tout_l_historique() -> None:
+    """Hors draft comme les autres jobs (ADR 0019), et un clone complet : `fetch-depth: 2` ne verrait
+    pas les commits de la PR."""
+    job = author_gate()
+    assert job["if"] == (
+        "github.event_name == 'pull_request' && github.event.pull_request.draft == false"
+    )
+    assert job["steps"][0]["with"] == {"fetch-depth": 0}
