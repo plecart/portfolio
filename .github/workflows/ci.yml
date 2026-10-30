@@ -290,7 +290,7 @@ jobs:
       - name: Refuser un auteur Claude
         shell: bash
         run: |
-          commits=$(git log -i -F --author='<noreply@anthropic.com>' --format='%h %s' HEAD^1..HEAD^2)
+          commits=$(git log --no-mailmap -i -F --author='<noreply@anthropic.com>' --format='%h %s' HEAD^1..HEAD^2)
           if [ -n "$commits" ]; then echo "$commits"; exit 1; fi
 
   publish:
