@@ -270,6 +270,27 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || needs.api.outputs.avis == 'true' }}
     uses: ./.github/workflows/avis.yml
 
+  auteurs:
+    name: Auteurs — aucun commit signé Claude
+    runs-on: ubuntu-latest
+
+    # Six commits d'auteur Claude ont atteint `main` et son panneau des contributeurs : un hook local
+    # ne couvre pas une session cloud, ce contrôle couvre toute origine. Hors draft (ADR 0019).
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+
+    steps:
+      # Clone complet : le commit extrait fusionne la tête de la PR (`HEAD^2`) à sa base (`HEAD^1`),
+      # et `HEAD^1..HEAD^2` lit ses commits, que `fetch-depth: 2` ne porterait pas.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Refuser un auteur Claude
+        shell: bash
+        run: |
+          emails=$(git log --format=%ae HEAD^1..HEAD^2)
+          if grep -Fx noreply@anthropic.com <<<"$emails"; then exit 1; fi
+
   publish:
     name: Publication — images sur GHCR
     runs-on: ubuntu-latest
