@@ -808,7 +808,7 @@ def author_gate() -> dict[str, Any]:
 def pr_merge_commit(repo: Path, author: str) -> None:
     """Pose dans `repo` la forme que la CI extrait : un commit de fusion, tête de PR en second parent.
 
-    `author` signe le premier commit de la PR, pas sa tête, et le trunk est d'auteur Claude : le pas
+    `author` écrit le premier commit de la PR, pas sa tête, et le trunk est d'auteur Claude : le pas
     doit lire tous les commits de la PR, et eux seuls."""
 
     def git(*args: str) -> None:
@@ -842,10 +842,22 @@ def play_author_step(repo: Path, bash: str) -> int:
 
 @pytest.mark.parametrize(
     ("author", "code"),
-    [(CLAUDE_AUTHOR, 1), (CLAUDE_AUTHOR.upper(), 1), (HUMAN_AUTHOR, 0)],
-    ids=["auteur Claude refusé", "casse ignorée", "auteur humain accepté"],
+    [
+        (CLAUDE_AUTHOR, 1),
+        (CLAUDE_AUTHOR.upper(), 1),
+        (HUMAN_AUTHOR, 0),
+        ("noreply@anthropic.com <pacome@lecart.dev>", 0),
+        ("x <noreply@anthropic.com.evil>", 0),
+    ],
+    ids=[
+        "auteur Claude refusé",
+        "casse ignorée",
+        "auteur humain accepté",
+        "adresse dans le nom seulement",
+        "adresse plus longue",
+    ],
 )
-def test_le_job_auteurs_refuse_un_commit_de_pr_signe_claude(
+def test_le_job_auteurs_refuse_un_commit_de_pr_d_auteur_claude(
     tmp_path: Path, author: str, code: int, bash_de_ce_systeme: str
 ) -> None:
     """Joué sur un commit de fusion réel."""
@@ -856,9 +868,18 @@ def test_le_job_auteurs_refuse_un_commit_de_pr_signe_claude(
 def test_le_job_auteurs_echoue_ferme_si_git_log_echoue(
     tmp_path: Path, bash_de_ce_systeme: str
 ) -> None:
-    """Sans second parent, `git log` échoue : le pas rougit au lieu de passer sans rien lire."""
+    """Dans un dépôt sans commit, `git log` échoue : le pas rougit au lieu de passer sans rien lire."""
     subprocess.run(["git", "init", "-b", "main"], cwd=tmp_path, check=True, capture_output=True)
     assert play_author_step(tmp_path, bash_de_ce_systeme) != 0
+
+
+def test_le_job_auteurs_ignore_le_mailmap(tmp_path: Path, bash_de_ce_systeme: str) -> None:
+    """`--author` lit `.mailmap` : une PR qui en apporte un ne masque pas un commit Claude."""
+    pr_merge_commit(tmp_path, CLAUDE_AUTHOR)
+    (tmp_path / ".mailmap").write_text(
+        "plecart <pacome@lecart.dev> Claude <noreply@anthropic.com>\n", encoding="utf-8"
+    )
+    assert play_author_step(tmp_path, bash_de_ce_systeme) == 1
 
 
 def test_le_job_auteurs_tourne_sur_une_pr_prete_avec_tout_l_historique() -> None:
