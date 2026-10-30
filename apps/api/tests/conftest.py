@@ -1,5 +1,8 @@
 """Fixtures communes aux tests de `apps/api`."""
 
+import shutil
+import subprocess
+import sys
 from collections.abc import Generator
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -35,6 +38,31 @@ def require_settings() -> None:
     """
     if not settings.configured:
         pytest.fail(UNCONFIGURED, pytrace=False)
+
+
+@pytest.fixture(scope="module")
+def bash_de_ce_systeme() -> str:
+    """Le `bash` du `PATH`, par `shutil.which` (doc `subprocess`, avertissement de `Popen`), s'il lit
+    les chemins de ce système ; sinon, le test qui le prend est sauté.
+
+    Sous Windows, le test ne prend qu'un `bash` MSYS, dont `uname -s` commence par `MINGW` ou
+    `MSYS` (les deux mesurés sous Git Bash, selon `MSYSTEM`). Celui de WSL — le lanceur de
+    `System32` comme l'alias de `WindowsApps`, tous deux sur le poste — rend `Linux`, et la commande
+    y échoue : mesuré le 2026-10-26, 37 cas sur 37 sur « unexpected EOF while looking for
+    matching » avec un `PATH` de shell Windows où `shutil.which` le trouve d'abord. Un `"bash"` nu,
+    résolu par `CreateProcess`, le trouve même sous Git Bash. Ailleurs — en CI Linux, le test
+    tourne — le `bash` du `PATH` sert tel quel.
+    """
+    bash = shutil.which("bash")
+    if bash is not None and sys.platform == "win32":
+        uname = subprocess.run(
+            [bash, "-c", "uname -s"], capture_output=True, text=True, check=False
+        )
+        if not uname.stdout.startswith(("MINGW", "MSYS")):
+            bash = None
+    if bash is None:
+        pytest.skip("pas de `bash` POSIX (absent, ou celui de WSL) : le test ne se joue pas ici")
+    return bash
 
 
 @pytest.fixture
