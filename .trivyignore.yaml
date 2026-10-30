@@ -47,7 +47,7 @@
 # de sa durée (30 ou 90 jours, ci-dessus).
 
 vulnerabilities:
-  # --- Image `api` : paquets Debian 13 de l'image de base `python:3.12.14-slim-trixie` -------
+  # --- Image `api` : paquets Debian 13 de l'image de base `python:3.12.15-slim-trixie` -------
   #
   # Ce qui tourne : gunicorn, sous l'utilisateur `api`, sans privilège. Mesuré dans l'image :
   # `/etc/fstab` est vide, ni `systemd-homed` ni le module Perl `Archive::Tar` n'y sont.
@@ -133,46 +133,6 @@ vulnerabilities:
       et l'application n'exécute pas Perl. Alternatives : correctif reporté par Debian
       (`fix_deferred`) ; corrigé en amont par Archive::Tar 3.10.
     expired_at: 2026-12-29
-
-  - id: CVE-2026-75804
-    paths:
-      - "**/portfolio-api (debian 13.*)"
-    statement: >-
-      Place : OpenSSL, venu de l'image de base, dont dépend le module `ssl` de Python. Atteinte :
-      non — le défaut est dans la pile QUIC d'OpenSSL ; Python ne fait que du TLS sur TCP, et
-      rien dans l'image n'ouvre de connexion QUIC. Alternatives : corrigé dans Debian 13 par
-      `3.5.7-1~deb13u3`, absent de l'image `python:3.12.14-slim-trixie` publiée (construite le
-      2026-09-19) — monter l'empreinte dès sa reconstruction (ADR 0014) ; pas d'`apt-get upgrade`
-      au build, qui ferait dépendre l'image de sa date de construction.
-    expired_at: 2026-10-30
-
-  - id: CVE-2026-84782
-    paths:
-      - "**/portfolio-api (debian 13.*)"
-    statement: >-
-      Place : OpenSSL, venu de l'image de base, dont dépend le module `ssl` de Python. Atteinte :
-      non — le défaut est dans la retransmission DTLS ; Python ne fait que du TLS sur TCP, et
-      rien dans l'image n'ouvre de connexion DTLS. Alternatives : corrigé dans Debian 13 par
-      `3.5.7-1~deb13u3`, absent de l'image `python:3.12.14-slim-trixie` publiée (construite le
-      2026-09-19) — monter l'empreinte dès sa reconstruction (ADR 0014) ; pas d'`apt-get upgrade`
-      au build, qui ferait dépendre l'image de sa date de construction.
-    expired_at: 2026-10-30
-
-  - id: CVE-2026-103111
-    paths:
-      - "**/portfolio-api (debian 13.*)"
-    statement: >-
-      Place : libpcre2-8-0, venu de l'image de base, dépendance de `grep`, paquet essentiel de
-      Debian, et de `libselinux1`. Atteinte : non — le défaut demande de compiler, avec le JIT,
-      une expression régulière forgée par l'attaquant ; seuls `grep` et `libselinux1` lient la
-      bibliothèque, ni Python ni l'environnement de l'application (mesuré), rien de ce qui tourne
-      n'appelle `grep`, et `libselinux1` ne compile que les motifs d'une politique SELinux,
-      absente de l'image.
-      Alternatives : corrigé dans Debian 13 par `10.46-1~deb13u3`, absent de l'image
-      `python:3.12.14-slim-trixie` publiée (construite le 2026-09-19, empreinte inchangée au
-      2026-10-02) — monter l'empreinte dès sa reconstruction (ADR 0014) ; pas
-      d'`apt-get upgrade` au build, qui ferait dépendre l'image de sa date de construction.
-    expired_at: 2026-11-01
 
   # --- Image `caddy` : le binaire `caddy` 2.11.7, compilé par le projet avec Go 1.27.3 ---------
   #
