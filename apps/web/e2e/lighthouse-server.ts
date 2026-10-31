@@ -62,7 +62,13 @@ async function answer(pathname: string): Promise<Answer> {
 }
 
 createServer(async (request, response) => {
-  const { extension, body } = await answer(new URL(request.url!, ORIGIN).pathname)
+  const found = await answer(new URL(request.url!, ORIGIN).pathname).catch(() => null)
+  if (found === null) {
+    response.writeHead(404).end()
+    return
+  }
+
+  const { extension, body } = found
   const compressed = !COMPRESSED.includes(extension)
   response.writeHead(200, {
     'content-type': CONTENT_TYPES[extension] ?? 'application/octet-stream',
