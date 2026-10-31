@@ -7,7 +7,10 @@
  * n'entre dans l'application pour cela. Il les pose sur la table servie vide (le `test` d'`api.ts`),
  * que plus rien ne réécrit une fois la liste arrivée.
  */
-import { expect, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { expect, serveProjects } from './api.ts'
+import type { Project } from './projects.ts'
+import { scrollThrough } from './scroll.ts'
 
 /** La largeur de référence du bureau : la table sans cellule y laisse la colonne (spec §3.4). */
 export const COLUMN_VIEWPORT = { width: 1280, height: 800 }
@@ -18,6 +21,36 @@ export async function expectPlacement(page: Page, placement: 'column' | 'footer'
     'position',
     placement === 'column' ? 'fixed' : 'relative',
   )
+}
+
+/** Les cartes de la table, dans son ordre : ses liens. */
+export const cards = (page: Page) => page.getByRole('main').getByRole('link')
+
+/** Ouvre la table sur un jeu de projets, ses cartes rendues. */
+export async function openTable(page: Page, projects: Project[]) {
+  await serveProjects(page, projects)
+  await page.goto('/')
+  await expect(cards(page)).toHaveCount(projects.length)
+}
+
+/** Attend la fin des transitions en cours : ce qu'on lit ensuite les trouve arrivées. */
+export async function settle(page: Page) {
+  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)))
+}
+
+/**
+ * Fait entrer toutes les cartes : la page défilée écran par écran, puis ramenée en haut. Une carte
+ * qui n'est pas entrée reste à opacité 0, et un contrôle d'accessibilité ne la lirait pas.
+ */
+export async function enterCards(page: Page) {
+  const { clientHeight, scrollHeight } = await page.evaluate(() => {
+    const { clientHeight, scrollHeight } = document.documentElement
+    return { clientHeight, scrollHeight }
+  })
+  for (let top = 0; top < scrollHeight; top += clientHeight) await scrollThrough(page, top)
+  await scrollThrough(page, 0)
+  await expect(page.locator('.card:not([data-entered])')).toHaveCount(0)
+  await settle(page)
 }
 
 /**

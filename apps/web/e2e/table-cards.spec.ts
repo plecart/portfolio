@@ -8,24 +8,14 @@
 import { AxeBuilder } from '@axe-core/playwright'
 import type { Locator, Page } from '@playwright/test'
 import { cardPose } from '../src/table/cards.ts'
-import { expect, FAILURES, holdProjects, serveProjects, serving, test, type Answer } from './api.ts'
+import { expect, FAILURES, holdProjects, serving, test, type Answer } from './api.ts'
 import { resolveAll } from './css.ts'
 import { buildProject, FILES_ORIGIN, PROJECT_SETS, type Project } from './projects.ts'
 import { scrollThrough } from './scroll.ts'
-import { COLUMN_VIEWPORT, expectPlacement } from './table.ts'
-
-/** Les cartes de la table, dans son ordre : ses liens. */
-const cards = (page: Page) => page.getByRole('main').getByRole('link')
+import { cards, COLUMN_VIEWPORT, enterCards, expectPlacement, openTable } from './table.ts'
 
 /** Les couches de la couverture d'une carte : l'image, puis la copie d'un projet en cours. */
 const coverLayers = (card: Locator) => card.locator('img[srcset]')
-
-/** Ouvre la table sur un jeu de projets, ses cartes rendues. */
-async function openTable(page: Page, projects: Project[]) {
-  await serveProjects(page, projects)
-  await page.goto('/')
-  await expect(cards(page)).toHaveCount(projects.length)
-}
 
 /** La rotation d'un élément, en degrés, au dixième, lue sur sa transformation calculée. */
 const rotationOf = (element: Locator) =>
@@ -41,6 +31,7 @@ for (const [table, projects] of TABLES) {
     test(`table ${table} : aucune violation d'accessibilité — ${colorScheme}`, async ({ page }) => {
       await page.emulateMedia({ colorScheme })
       await openTable(page, projects)
+      await enterCards(page)
 
       const { violations } = await new AxeBuilder({ page }).analyze()
 

@@ -1,11 +1,12 @@
 /**
  * Les cartes de la table, en logique pure : leur ordre (spec §1.9), les technologies qu'elles
  * montrent (§1.4), leur pose (§1.3, §4.1) et l'empreinte qui la tire, leur libellé (§4.1), leurs
- * états (§1.6), leur taille (§4.2, §5.5) et leur couverture (§4.1).
+ * états (§1.6), leur taille (§4.2, §5.5), leur couverture (§4.1) et leur colonne (§3.1).
  */
 import { describe, expect, test } from 'vitest'
 import { buildProject, FILES_ORIGIN, PROJECT_SETS, type Project } from '../e2e/projects.ts'
 import {
+  cardColumns,
   cardDescription,
   cardLabel,
   cardPose,
@@ -389,5 +390,23 @@ describe('la couverture de la carte', () => {
     ['solo', '(min-width: 600px) 340px, calc((100vw - 32px) * 0.8 - 16px)'],
   ] as const)('annonce la largeur de la photo du tableau de §4.1 — %s', (size, sizes) => {
     expect(coverSizes(size)).toBe(sizes)
+  })
+})
+
+describe("l'indice de colonne d'une carte", () => {
+  // Spec §3.1 : à 1280 px, 118 px de marge, pistes de 240 px et gouttière de 28 px.
+  const STEP = 240 + 28
+  const column = (index: number) => 118 + index * STEP
+
+  test('se compte depuis la première colonne, au pas des pistes', () => {
+    expect(cardColumns([0, 1, 2, 3].map(column), STEP)).toEqual([0, 1, 2, 3])
+  })
+
+  test('une vitrine compte pour ses deux colonnes : la carte voisine garde sa vraie colonne', () => {
+    expect(cardColumns([column(0), column(2), column(3)], STEP)).toEqual([0, 2, 3])
+  })
+
+  test('tolère un bord fractionnaire', () => {
+    expect(cardColumns([16, 207.8, 16.2], 192)).toEqual([0, 1, 0])
   })
 })
