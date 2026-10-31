@@ -1,8 +1,8 @@
 /**
  * Les cartes de la table, en logique pure : leur ordre (spec §1.9), les technologies qu'elles
  * montrent (§1.4), leur pose (§1.3, §4.1), leurs états et leur libellé (§1.6, §4.1), leur taille
- * (§4.2, §5.5) et leur couverture (§4.1). Les projets entrent tels que l'API les sert, rien n'est
- * lu ailleurs.
+ * (§4.2, §5.5), leur couverture (§4.1) et leur colonne (§3.1). Les projets entrent tels que l'API
+ * les sert, rien n'est lu ailleurs.
  *
  * Typé depuis le schéma, et non par `api/projects.ts` : ce module-là lit `import.meta.env`, que
  * les tests, compilés sans les types de Vite (`tsconfig.node.json`), ne connaissent pas.
@@ -208,4 +208,18 @@ export function coverImage(
 export function coverSizes(size: CardSize): string {
   const { mobile, desktop } = COVER_WIDTHS[size]
   return `(min-width: ${BREAKPOINT}px) ${desktop}, ${mobile}`
+}
+
+/**
+ * L'indice de colonne de chaque cellule de la table (spec §3.1) : l'écart de son bord gauche à celui
+ * de la première colonne, compté en pas de grille. Le rang parmi les bords gauches ne suffirait pas :
+ * une vitrine en tête couvre deux colonnes, et aucune carte n'y commence la seconde.
+ *
+ * @param lefts Le bord gauche de chaque cellule, en px ; la première colonne en porte au moins un,
+ *   la grille se remplissant depuis elle.
+ * @param step Une piste et sa gouttière, en px.
+ */
+export function cardColumns(lefts: readonly number[], step: number): number[] {
+  const first = Math.min(...lefts)
+  return lefts.map((left) => Math.round((left - first) / step))
 }

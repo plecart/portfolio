@@ -4,6 +4,7 @@ import type { ProjectsStatus } from '../api/useProjects.ts'
 import { strings } from '../strings.ts'
 import { Card } from './Card.tsx'
 import { cardSize, orderProjects } from './cards.ts'
+import { useCardEntrance } from './useCardEntrance.ts'
 
 /**
  * La grille de la table (spec §3.1) : marge intérieure 24 px 16 px 32 px autour d'une largeur
@@ -108,7 +109,10 @@ export function Table({
   retried: boolean
 }) {
   const firstCard = useRef<HTMLAnchorElement>(null)
+  const grid = useRef<HTMLDivElement>(null)
   const ordered = orderProjects(projects)
+
+  useCardEntrance(grid, projects)
 
   useEffect(() => {
     if (retried && status === 'loaded') firstCard.current?.focus()
@@ -125,7 +129,10 @@ export function Table({
       {status === 'error' ? (
         <LoadError onRetry={onRetry} focusRetry={retried} />
       ) : (
-        <div className={`${GRID_CLASSES} ${ordered.length === 1 ? SOLO_TRACK_CLASSES : TRACK_CLASSES}`}>
+        <div
+          ref={grid}
+          className={`${GRID_CLASSES} ${ordered.length === 1 ? SOLO_TRACK_CLASSES : TRACK_CLASSES}`}
+        >
           {status === 'loading' &&
             LOADING_FRAMES.map((size, index) => <LoadingFrame key={index} size={size} />)}
           {ordered.map((project, index) => (

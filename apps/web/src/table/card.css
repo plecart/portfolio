@@ -37,9 +37,33 @@
     }
   }
 
-  /* La cellule d'une carte : sa rangée l'allongerait d'un vide cliquable sous la face. */
+  /* La cellule d'une carte : sa rangée l'allongerait d'un vide cliquable sous la face. Les distances
+     et les échelles de spec §2.7, sans jeton, n'ont que ces noms. */
   .card {
+    --card-rise: 8px;
     align-self: start;
+  }
+
+  /* L'entrée (spec §3.1, §6.3), que `useCardEntrance` déclenche et retarde d'un pas par colonne :
+     en mouvement réduit, un fondu de 150 ms, sans montée. */
+  .card-entry {
+    --card-delay: calc(var(--card-column, 0) * var(--delay-column));
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease-out) var(--card-delay);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .card-entry {
+      transform: translateY(var(--card-rise));
+      transition:
+        opacity var(--dur) var(--ease-out) var(--card-delay),
+        transform var(--dur) var(--ease-out) var(--card-delay);
+    }
+  }
+
+  .card[data-entered] .card-entry {
+    opacity: 1;
+    transform: none;
   }
 
   .card-pose {
