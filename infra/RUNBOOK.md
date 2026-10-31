@@ -42,6 +42,10 @@ entrée (D45). L'utilisateur `deploy` possède le dossier et tire les images de 
 L'environnement GitHub `production` n'admet que `main` : un workflow lancé depuis une autre branche
 ne lit pas ses secrets, même modifié.
 
+Le gestionnaire est KeePassXC (ADR 0022), un fichier chiffré local : copie-le hors du poste, sur un
+support distinct, après chaque secret ajouté. Le poste perdu sans cette copie, la clé privée `age`
+est perdue, et avec elle les sauvegardes.
+
 `SECRET_KEY`, `POSTGRES_PASSWORD` et `BACKUP_POSTGRES_PASSWORD` ne vivent que sur le VPS : rien hors
 de la pile ne s'en sert, et un VPS reconstruit en reçoit de neufs — la base restaurée garde ses
 données, pas ses rôles, que `bootstrap.sh` recrée. La clé privée `age`, elle, n'est jamais stockée
