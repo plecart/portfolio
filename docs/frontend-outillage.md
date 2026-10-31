@@ -151,7 +151,8 @@ Quatre points mesurés, non évidents :
   100, et `lhci` n'a aucune assertion de minimum — il ne lit que `minScore`, `maxLength` et
   `maxNumericValue`, et ignore `minNumericValue` en silence (`@lhci/utils`, `assertions.js`). C'est
   `e2e/lighthouse-server.spec.ts`, joué par `make web-e2e`, qui prouve que ce serveur rend les douze
-  cartes et leurs images, deux mutations du serveur vues rouges.
+  cartes et toutes leurs images, couvertures et icônes ; ses quatre routes (`dist`, API, images,
+  icônes), mutées une à une, y rougissent.
 - **La collecte ne tourne pas sous Windows** : `chrome-launcher` échoue sur `EPERM` en supprimant
   son dossier temporaire, que Chrome tient encore (reproduit trois fois, y compris avec `%TEMP%`
   déplacé). C'est donc une porte **de CI seulement** ; en local, `node e2e/lighthouse-server.ts`,
