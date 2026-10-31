@@ -115,8 +115,13 @@ export function Table({
   }, [retried, status])
 
   return (
-    // Le corps de page commence sous l'entête fixe de 56 px (spec §3.3).
-    <main ref={ref} aria-busy={status === 'loading' || undefined} className="flex flex-1 flex-col pt-14">
+    // Le corps de page commence sous l'entête fixe de 56 px (spec §3.3). Une pose extrême passe la
+    // marge de 16 px sous 600 px : `clip`, sans conteneur de défilement, la retient dans la page.
+    <main
+      ref={ref}
+      aria-busy={status === 'loading' || undefined}
+      className="flex flex-1 flex-col overflow-x-clip pt-14"
+    >
       {status === 'error' ? (
         <LoadError onRetry={onRetry} focusRetry={retried} />
       ) : (

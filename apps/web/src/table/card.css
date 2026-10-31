@@ -37,6 +37,11 @@
     }
   }
 
+  /* La cellule d'une carte : sa rangée l'allongerait d'un vide cliquable sous la face. */
+  .card {
+    align-self: start;
+  }
+
   .card-pose {
     transform: rotate(var(--card-rotation)) translate(var(--card-dx), var(--card-dy));
   }
@@ -133,6 +138,7 @@
 
   .card-ribbons {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--s-1);
   }
 
