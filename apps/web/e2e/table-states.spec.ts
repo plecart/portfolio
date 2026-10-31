@@ -213,8 +213,10 @@ test('erreur : « Réessayer » relance la requête sans recharger la page — c
   await expect(page.getByRole('status')).toHaveCount(0)
   await release(serving(PROJECT_SETS.threeWithShowcase))
   await expect(page.getByRole('main')).not.toHaveAttribute('aria-busy')
-  // La table, vide jusqu'aux cartes de #20 : ni cadre, ni message.
-  await expect(cells(page)).toHaveCount(0)
+  // Les trois cartes : ni cadre, ni message.
+  await expect(page.getByRole('main').getByRole('link')).toHaveCount(3)
+  await expect(cells(page)).toHaveCount(3)
+  await expect(page.locator('[data-table-cell][inert]')).toHaveCount(0)
   await expect(page.getByRole('status')).toHaveCount(0)
   expect(requests).toBe(2)
   expect(await page.evaluate(() => (window as unknown as { witness?: boolean }).witness)).toBe(true)

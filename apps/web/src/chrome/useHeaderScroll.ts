@@ -5,9 +5,11 @@ import { headerAtTop, nextHeaderScroll } from './header-scroll.ts'
  * L'état de l'entête au défilement de la fenêtre (spec §3.3).
  *
  * Lit `scrollY` une fois par image au plus — écoute passive de `scroll`, calcul au prochain
- * `requestAnimationFrame` —, et une première fois au montage, la page pouvant s'ouvrir défilée
- * (rechargement, retour) — lecture qu'aucun scénario ne prouve avant #168 : la page est trop courte
- * pour s'ouvrir défilée. Le calcul est `nextHeaderScroll`, en logique pure.
+ * `requestAnimationFrame` —, et une première fois au montage, la page pouvant s'ouvrir défilée.
+ * Lecture prouvée sur une page haute d'emblée (`e2e/table-cards.spec.ts`). La table la met moins à
+ * l'épreuve : sa liste arrive après le chargement, et le navigateur ne restaure le défilement que
+ * dans la hauteur des cadres — sur douze cartes, 0 à 1280 px et 145 px à 400 px (Chromium 156,
+ * mesuré le 2026-10-31, issue #168). Le calcul est `nextHeaderScroll`, en logique pure.
  *
  * @returns `detached` (fond et filet) et `hidden` (sortie par le haut). Deux booléens, pour que
  *   React ne rende de nouveau l'entête qu'à un changement d'état, pas à chaque image.

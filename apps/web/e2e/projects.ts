@@ -4,6 +4,7 @@
  * compilation (brief de #19, décision 10). Leurs règles de contenu — celles du glossaire — sont
  * tenues par `tests/fixtures.test.ts`.
  */
+import { basename, join } from 'node:path'
 import type { components } from '../src/api/schema.ts'
 
 /** Un projet tel que l'API le sert. */
@@ -14,9 +15,24 @@ type GalleryImage = components['schemas']['GalleryImageOut']
 
 /**
  * L'origine des fichiers — icônes et variantes —, réservée aux scénarios : ni la page ni l'API, et
- * jamais résolue (`.test`, RFC 2606). #20 et #21 y intercepteront les images.
+ * jamais résolue (`.test`, RFC 2606). Le `test` d'`api.ts` y intercepte toute requête.
  */
 export const FILES_ORIGIN = 'https://fichiers.test'
+
+/**
+ * Le fichier de `fixtures/` qui répond à une adresse de l'origine des fichiers : la même icône pour
+ * toutes les technologies, et les deux WebP carrés — 480 et 960 px de côté, générés une fois par
+ * Pillow — pour toutes les variantes.
+ *
+ * @param pathname Le chemin de l'adresse, par exemple `/images/projet-01/480.webp`.
+ */
+export function fixturePath(pathname: string): string {
+  return join(
+    import.meta.dirname,
+    'fixtures',
+    pathname.endsWith('.svg') ? 'icon.svg' : basename(pathname),
+  )
+}
 
 /** Les technologies que les projets puisent, une par type. */
 const TECHNOLOGIES: Technology[] = (
@@ -72,7 +88,7 @@ const STATUSES: Project['status'][] = ['finished', 'ongoing', 'archived']
 
 /**
  * Le i-ième projet d'un jeu : types, statuts, années, technologies, liens et sections varient d'un
- * projet à l'autre, pour l'ordre et les cartes de #20 ; le septième a sa couverture en attente.
+ * projet à l'autre, pour l'ordre et le contenu des cartes ; le septième a sa couverture en attente.
  */
 function numberedProject(index: number, showcase: boolean): Project {
   const number = String(index + 1).padStart(2, '0')

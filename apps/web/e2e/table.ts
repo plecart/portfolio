@@ -1,7 +1,7 @@
 /**
  * La table et la forme des liens de l'auteur, partagées par les scénarios.
  *
- * La table a ses propres cellules — les cadres de chargement de #19, puis les cartes de #20 — ;
+ * La table a ses propres cellules — ses cadres de chargement, puis ses cartes — ;
  * pour éprouver la mesure sur des largeurs quelconques, le scénario en pose de factices, au sens du
  * contrat « cellule de la table » — l'attribut `data-table-cell` sur la boîte de grille —, et rien
  * n'entre dans l'application pour cela. Il les pose sur la table servie vide (le `test` d'`api.ts`),

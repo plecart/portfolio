@@ -27,8 +27,8 @@ export default defineConfig({
 
   use: { baseURL: BASE_URL },
 
-  // Chromium seul (ADR 0008 : un seul moteur à maintenir). Les deux projets sont le contrat
-  // repris par #20 et #21 : la largeur desktop de référence, et un appareil tactile réel.
+  // Chromium seul (ADR 0008 : un seul moteur à maintenir). Les deux projets sont le contrat des
+  // scénarios : la largeur desktop de référence, et un appareil tactile réel.
   projects: [
     { name: 'desktop', use: devices['Desktop Chrome'] },
     {

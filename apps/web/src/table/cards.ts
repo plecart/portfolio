@@ -1,17 +1,23 @@
 /**
  * Les cartes de la table, en logique pure : leur ordre (spec §1.9), les technologies qu'elles
- * montrent (§1.4) et leur pose (§1.3, §4.1). Les projets entrent tels que l'API les sert, rien
- * n'est lu ailleurs.
+ * montrent (§1.4), leur pose (§1.3, §4.1), leurs états et leur libellé (§1.6, §4.1), leur taille
+ * (§4.2, §5.5) et leur couverture (§4.1). Les projets entrent tels que l'API les sert, rien n'est
+ * lu ailleurs.
  *
  * Typé depuis le schéma, et non par `api/projects.ts` : ce module-là lit `import.meta.env`, que
  * les tests, compilés sans les types de Vite (`tsconfig.node.json`), ne connaissent pas.
  */
 import type { components } from '../api/schema.ts'
+import { BREAKPOINT } from '../chrome/author-links-placement.ts'
+import { strings } from '../strings.ts'
 
 type Project = components['schemas']['ProjectOut']
 
 /** Une technologie qu'un projet emploie, telle que l'API la sert. */
 export type Technology = components['schemas']['TechnologyOut']
+
+/** Les trois tailles de carte (spec §4.1) : une parmi d'autres, la vitrine, ou seule à table. */
+export type CardSize = 'simple' | 'showcase' | 'solo'
 
 /** Les types de technologie qu'une carte montre (spec §1.4) : les outils restent sur la fiche. */
 const CARD_KINDS: readonly Technology['kind'][] = ['language', 'framework', 'infrastructure']
@@ -33,6 +39,19 @@ const JITTER_STEPS = 1000
 /** Les deux constantes de FNV-1a sur 32 bits : la valeur de départ et le nombre premier. */
 const FNV_OFFSET_BASIS = 2166136261
 const FNV_PRIME = 16777619
+
+/**
+ * La largeur de la photo par taille de carte (spec §4.1) : mobile, carte moins ses deux cadres ;
+ * bureau, en px.
+ */
+const COVER_WIDTHS: Record<CardSize, { mobile: string; desktop: string }> = {
+  simple: { mobile: 'calc((100vw - 48px) / 2 - 16px)', desktop: '220px' },
+  showcase: { mobile: 'calc(100vw - 56px)', desktop: '480px' },
+  solo: { mobile: 'calc((100vw - 32px) * 0.8 - 16px)', desktop: '340px' },
+}
+
+/** La ponctuation qui finit déjà une phrase. */
+const SENTENCE_END = /[.!?…]$/
 
 /** Compare deux chaînes par unités de code — dates ISO, slugs —, sans dépendre de la locale. */
 function compareText(a: string, b: string): number {
@@ -116,4 +135,77 @@ export function cardPose(slug: string): { rotation: number; dx: number; dy: numb
     dx: jitter(`${slug}:x`, MAX_OFFSET),
     dy: jitter(`${slug}:y`, MAX_OFFSET),
   }
+}
+
+/**
+ * Les deux états d'un projet, indépendants (spec §1.6) : « en cours » suit son statut, « en ligne »
+ * son lien démo, chaîne vide quand il n'en a pas.
+ */
+export function cardStates(project: Project): { ongoing: boolean; live: boolean } {
+  return { ongoing: project.status === 'ongoing', live: project.demo_url !== '' }
+}
+
+/** Un texte en phrase : un point à la fin, sauf s'il finit déjà une phrase. */
+function sentence(text: string): string {
+  return SENTENCE_END.test(text) ? text : `${text}.`
+}
+
+/**
+ * Le libellé du lien d'une carte (spec §4.1) : « Titre. Résumé. En cours. En ligne. », les états
+ * présents seulement.
+ */
+export function cardLabel(project: Project): string {
+  const { ongoing, live } = cardStates(project)
+  return [
+    project.title,
+    project.summary,
+    ...(ongoing ? [strings.stateOngoing] : []),
+    ...(live ? [strings.stateLive] : []),
+  ]
+    .map(sentence)
+    .join(' ')
+}
+
+/** La description du lien d'une carte : le nom de ses technologies (spec §1.4). */
+export function cardDescription(project: Project): string {
+  return cardTechnologies(project.technologies)
+    .map((technology) => technology.name)
+    .join(', ')
+}
+
+/**
+ * La taille de la carte d'un projet : la vitrine n'existe pas quand la table n'a qu'une carte (spec
+ * §4.2, §5.5).
+ *
+ * @param project Le projet.
+ * @param count Le nombre de cartes de la table.
+ */
+export function cardSize(project: Project, count: number): CardSize {
+  if (count === 1) return 'solo'
+  return project.showcase ? 'showcase' : 'simple'
+}
+
+/**
+ * Ce que l'image de couverture d'un projet demande à son `<img>` : la première image de la galerie,
+ * par ses variantes (spec §4.1).
+ *
+ * La condition lit les variantes, jamais l'état : une couverture en attente, en échec ou absente
+ * n'en a aucune.
+ *
+ * @returns `src`, `srcSet` et les dimensions de la première variante ; `null` sans variante.
+ */
+export function coverImage(
+  project: Project,
+): { src: string; srcSet: string; width: number; height: number } | null {
+  const variants = project.gallery[0]?.variants ?? []
+  if (variants.length === 0) return null
+  const [{ url, width, height }] = variants
+  const srcSet = variants.map((variant) => `${variant.url} ${variant.width}w`).join(', ')
+  return { src: url, srcSet, width, height }
+}
+
+/** L'attribut `sizes` de la photo d'une carte (spec §4.1) : sa largeur de part et d'autre de 600 px. */
+export function coverSizes(size: CardSize): string {
+  const { mobile, desktop } = COVER_WIDTHS[size]
+  return `(min-width: ${BREAKPOINT}px) ${desktop}, ${mobile}`
 }
