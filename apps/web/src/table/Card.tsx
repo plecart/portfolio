@@ -129,7 +129,7 @@ export function Card({
       href={`/projets/${project.slug}`}
       aria-describedby={descriptionId}
       data-table-cell
-      className={`card-${size}`}
+      className={`card card-${size}`}
     >
       <div className="card-entry">
         <div className="card-pose" style={poseStyle(project.slug)}>

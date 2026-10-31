@@ -7,6 +7,7 @@
  */
 import { AxeBuilder } from '@axe-core/playwright'
 import type { Locator, Page } from '@playwright/test'
+import { cardPose } from '../src/table/cards.ts'
 import { expect, FAILURES, holdProjects, serveProjects, serving, test, type Answer } from './api.ts'
 import { resolveAll } from './css.ts'
 import { buildProject, FILES_ORIGIN, PROJECT_SETS, type Project } from './projects.ts'
@@ -107,6 +108,54 @@ for (const [size, projects, index, desktop, mobile] of DIMENSIONS) {
   })
 }
 
+/**
+ * Le slug que la pose pousse le plus loin d'un côté, `-1` à gauche et `1` à droite : la rotation
+ * écarte le coin de la carte la plus haute de 5 px par degré (`sin 1°` × sa demi-hauteur, 300 px à
+ * 599 px de large), le décalage s'y ajoute.
+ */
+function farthestSlug(side: -1 | 1): string {
+  const reach = (slug: string) => {
+    const { rotation, dx } = cardPose(slug)
+    return Math.abs(rotation) * 5 + side * dx
+  }
+  return Array.from({ length: 1000 }, (_, number) => `projet-${number}`).reduce((farthest, slug) =>
+    reach(slug) > reach(farthest) ? slug : farthest,
+  )
+}
+
+/**
+ * Chaque taille de carte sous la pose extrême, de chaque côté : son nom et sa table. Le voisin d'une
+ * carte simple la place dans la colonne de son côté, l'ordre suivant le slug.
+ */
+const EXTREME_TABLES = ([-1, 1] as const).flatMap((side): [string, Project[]][] => {
+  const name = side < 0 ? 'à gauche' : 'à droite'
+  const extreme = buildProject({ slug: farthestSlug(side) })
+  const neighbor = buildProject({ slug: side < 0 ? 'voisin' : 'atelier' })
+  return [
+    [`simple ${name}`, [extreme, neighbor]],
+    [`vitrine ${name}`, [{ ...extreme, showcase: true }, neighbor]],
+    [`seule ${name}`, [extreme]],
+  ]
+})
+
+for (const width of [480, 599]) {
+  for (const [name, projects] of EXTREME_TABLES) {
+    test(`à ${width} px, la pose extrême d'une carte ${name} n'élargit pas la page`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await openTable(page, projects)
+
+      const { innerWidth, overflow } = await page.evaluate(() => ({
+        innerWidth: window.innerWidth,
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      }))
+
+      expect(overflow).toBe(0)
+      // Sur un appareil mobile, c'est toute la mise en page qui s'élargirait avec la page.
+      expect(innerWidth).toBe(width)
+    })
+  }
+}
+
 test('douze cartes et la vitrine : quinze cellules sur quatre rangées, ou six sous elle (spec §5.5)', async ({
   page,
   isMobile,
@@ -120,6 +169,20 @@ test('douze cartes et la vitrine : quinze cellules sur quatre rangées, ou six s
   })
 
   expect(rows).toEqual(isMobile ? [1, 2, 2, 2, 2, 2, 1] : [3, 2, 4, 3])
+})
+
+test('une cellule s’arrête à sa face : la rangée n’ajoute aucun vide cliquable sous une carte', async ({
+  page,
+  isMobile,
+}) => {
+  if (!isMobile) await page.setViewportSize(COLUMN_VIEWPORT)
+  await openTable(page, PROJECT_SETS.twelveWithShowcase)
+
+  const gaps = await cards(page).evaluateAll((links: HTMLAnchorElement[]) =>
+    links.map((link) => link.offsetHeight - link.querySelector<HTMLElement>('.card-face')!.offsetHeight),
+  )
+
+  expect(gaps).toEqual(Array(12).fill(0))
 })
 
 test('les cartes suivent l’ordre de la spec §1.9 : vitrine, en cours, puis du plus récent au plus ancien', async ({
@@ -347,6 +410,38 @@ test('les rubans d’état : « en cours » en texte, « en ligne » avec son po
   await expect(dot).toHaveCSS('background-color', accent)
   await expect(dot).toHaveCSS('width', '6px')
   await expect(dot).toHaveCSS('height', '6px')
+})
+
+test('à 320 px, la carte simple la plus chargée garde ses rubans dans sa bande (spec §4.1)', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 640 })
+  await openTable(page, [
+    buildProject({
+      slug: 'a',
+      status: 'ongoing',
+      finished_on: null,
+      demo_url: 'https://demo.test/a',
+      technologies: (['language', 'framework', 'infrastructure'] as const).map((kind) => ({
+        name: kind,
+        kind,
+        icon: `${FILES_ORIGIN}/icones/${kind}.svg`,
+      })),
+    }),
+    buildProject({ slug: 'b' }),
+  ])
+
+  const overflows = await cards(page)
+    .first()
+    .locator('.card-ribbons')
+    .evaluateAll((lists) =>
+      lists.map(
+        (list) =>
+          list.getBoundingClientRect().right - list.parentElement!.getBoundingClientRect().right,
+      ),
+    )
+
+  expect(Math.max(...overflows)).toBeLessThanOrEqual(0)
 })
 
 test('un projet sans état ne porte aucun ruban d’état', async ({ page }) => {
