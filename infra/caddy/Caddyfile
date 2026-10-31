@@ -77,5 +77,12 @@ http://{$SITE_HOST} {
 # L'hôte de l'API : l'API publique et l'admin, tout entiers servis par `api` — statiques de l'admin
 # compris, avec leurs propres en-têtes de cache (WhiteNoise, ADR 0014).
 http://{$API_HOST} {
+	# Cloudflare Access ne couvre pas `/admin%2Flogin/` (mesuré le 2026-10-30, #25). Caddy le relaie
+	# tel quel, et `gunicorn` le décode avant Django : le formulaire de l'admin sortirait sans Access.
+	# Aucune route n'attend de barre oblique encodée : refus sur le chemin brut — le matcher `path`
+	# lit le chemin décodé —, sans toucher la chaîne de requête (`?next=%2Fadmin%2F`).
+	@encoded_slash expression `{http.request.orig_uri}.matches("(?i)^[^?]*%2f")`
+	respond @encoded_slash 400
+
 	reverse_proxy api:8000
 }
