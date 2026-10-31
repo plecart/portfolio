@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import lighthouse from './lighthouserc.json' with { type: 'json' }
 
 /**
  * Port du serveur statique de test. Il n'apparaît qu'ici : le script `preview` du manifeste le
@@ -19,11 +20,20 @@ export default defineConfig({
   // `--strictPort` est indispensable : sans lui Vite glisse sur le port suivant quand 4173 est
   // pris, et les scénarios interrogeraient une application qui n'est pas celle qu'on vient de
   // compiler.
-  webServer: {
-    command: `npm run build && npm run preview -- --port ${PORT} --strictPort`,
-    url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: [
+    {
+      command: `npm run build && npm run preview -- --port ${PORT} --strictPort`,
+      url: BASE_URL,
+      reuseExistingServer: !process.env.CI,
+    },
+    // Le serveur de la collecte Lighthouse, que `lighthouse-server.spec.ts` éprouve. Attendu sur la
+    // liste : son index n'existe pas pendant que la compilation d'à côté vide `dist`.
+    {
+      command: 'node e2e/lighthouse-server.ts',
+      url: new URL('/api/projets', lighthouse.ci.collect.url[0]).href,
+      reuseExistingServer: !process.env.CI,
+    },
+  ],
 
   use: { baseURL: BASE_URL },
 
