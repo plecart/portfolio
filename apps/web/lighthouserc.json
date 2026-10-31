@@ -1,7 +1,8 @@
 {
   "ci": {
     "collect": {
-      "staticDistDir": "./dist",
+      "startServerCommand": "node e2e/lighthouse-server.ts",
+      "url": ["http://localhost:4174/"],
       "numberOfRuns": 3
     },
     "assert": {
