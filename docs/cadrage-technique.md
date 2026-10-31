@@ -82,7 +82,7 @@ Email (post-MVP, peut-être jamais) · anglais · commentaires (retirés) · MCP
 | Brique | Rôle | Phase | Écarté | ADR |
 |---|---|---|---|---|
 | Cloudflare | Registrar, DNS, proxy, CDN, WAF (fourni, sans implémentation), rate limiting, Access ; Turnstile optionnel en phase 2 | 1 | Caddy seul + Tailscale | 0003 |
-| VPS 2 vCPU en UE (Hetzner, OVH, Scaleway), 4 Go en phase 1, 8 Go en phase 2 | Calcul, Postgres, modèles locaux | 1 | PaaS, tout managé, Kubernetes | 0002 |
+| VPS x86 en UE (Hetzner, OVH, Scaleway), 1 vCPU et 2 Go au minimum en phase 1, 8 Go en phase 2 | Calcul, Postgres, modèles locaux | 1 | PaaS, tout managé, Kubernetes | 0002, 0023 |
 | Docker Compose | Orchestration locale des conteneurs | 1 | — | 0002 |
 | Caddy | Reverse proxy interne, statiques (TLS terminé par Cloudflare) | 1 | Traefik, nginx | 0002 |
 | Django | Contenu, admin, API | 1 | FastAPI seul | 0001 |
@@ -206,13 +206,13 @@ Réseau Docker privé ; aucun port de base de données exposé ; images construi
 
 | Brique | Solution | Par mois |
 |---|---|---|
-| VPS 2 vCPU / 4 Go | Hetzner CX22 ou CAX11, OVH, Scaleway | 4 à 8 € |
+| VPS 1 vCPU / 2 Go | Hetzner CPX12 ; OVH VPS-1 quand il revient en stock | 5 à 15 € |
 | VPS 8 Go à partir de la phase 2 (modèles locaux) | Hetzner CX32 ou équivalent | 7 à 12 € |
 | Domaine `.dev` | Cloudflare Registrar | ~1 € |
 | Cloudflare, R2, healthchecks.io, Sentry, LangSmith, GitHub Actions | Offres gratuites | 0 |
 | API Claude + embeddings | Usage réel, trafic faible | 5 à 15 € |
 | Snapshots du fournisseur (optionnel) | Hetzner, OVH | ~1 € |
-| **Total** | | **10 à 30 €** |
+| **Total** | | **11 à 32 €** |
 
 ## 7. Registre des décisions
 
@@ -279,6 +279,7 @@ Identifiants hérités du cadrage v0 (D1 à D38), sans trou ni renumérotation. 
 | D65 | CSP et en-têtes de sécurité par la brique native de Django | `SECURE_CSP`, `ContentSecurityPolicyMiddleware` et le processeur de contexte `csp` au lieu de `django-csp` : les gabarits de l'admin (Django 6.1.2) ne lisent que le nonce natif (`{% csp_nonce_attr %}`) ; aucune source tierce, seul l'hôte des médias du projet entre en `img-src` sous R2 ; `SecurityMiddleware` aux défauts de Django. Remplace le point « `django-csp` » de l'ADR 0001 (go du briefing de #6, 2026-10-28 ; ADR 0020). |
 | D66 | Noms des buckets R2 préfixés par le projet | `portfolio-<usage>` : `portfolio-medias`, `portfolio-backups`, pour lire le projet d'un bucket dans la liste du compte. Remplace le nom `backups` des ADR 0004 et 0007 (décision du mainteneur, #25, 2026-10-30 ; ADR 0021). |
 | D67 | KeePassXC comme gestionnaire de mots de passe | Un fichier chiffré local, copié à la main hors du poste : sans cette copie, la perte du poste emporterait la clé `age` et donc les sauvegardes. Remplace la mention « Bitwarden ou 1Password » de l'ADR 0007 (décision du mainteneur, #25, 2026-10-31 ; ADR 0022). |
+| D68 | VPS de phase 1 : x86, 1 vCPU et 2 Go au minimum | Hetzner CPX12 à 14,39 € TTC par mois : aucun VPS de 4 Go commandable en UE au prix prévu, et une pile mesurée à 262 Mio au repos. Remplace le point « Machine » de l'ADR 0002 pour la phase 1 (décision du mainteneur, #25, 2026-10-31 ; ADR 0023). |
 | D29 | (remplacée par D36, D37) | — |
 | D21 | (remplacée par D25) | — |
 

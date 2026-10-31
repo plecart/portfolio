@@ -136,7 +136,7 @@ services:
       <<: *app-environment
       # Vide : le point d'entrée ne joue aucune étape — c'est `api` qui migre (`entrypoint.sh`).
       STARTUP_STEPS: ""
-    # Un seul processus de traitement : un VPS de 4 Go partagé avec Postgres et Redis (ADR 0002).
+    # Un seul processus de traitement : un VPS de 2 Go partagé avec Postgres et Redis (ADR 0023).
     command: [celery, -A, config, worker, --loglevel, info, --concurrency, "1"]
     volumes: *app-volumes
     # `api` sain : ses migrations sont jouées avant le premier traitement.
@@ -205,7 +205,7 @@ services:
     # Les fichiers de travail de la chaîne — le dump en clair — en mémoire : un `tmpfs`, ni volume
     # ni couche du conteneur, que l'arrêt du conteneur vide. `docker stop` tue une sauvegarde en
     # cours sans qu'aucun piège du script ne joue (mesuré à la relecture de la PR #73). Borné : le
-    # dump et sa version chiffrée y tiennent ensemble, sur un VPS de 4 Go (ADR 0002) ; au-delà,
+    # dump et sa version chiffrée y tiennent ensemble, sur un VPS de 2 Go (ADR 0023) ; au-delà,
     # l'écriture échoue, l'étape est nommée et aucun ping ne part — sans borne, la moitié de la
     # RAM, au détriment de Postgres.
     tmpfs: ["/tmp:size=512m"]

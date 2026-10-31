@@ -94,7 +94,7 @@ SERVICE_ADDRESS_OVERRIDES = {
 # décision 10).
 WORKER_SHARED_KEYS = ["image", "env_file", "volumes"]
 
-# Sa commande : un seul processus de traitement, sur un VPS de 4 Go (décision 9).
+# Sa commande : un seul processus de traitement, sur un VPS de 2 Go (décision 9, ADR 0023).
 WORKER_COMMAND = ["celery", "-A", "config", "worker", "--loglevel", "info", "--concurrency", "1"]
 
 # Sa sonde de production : son propre nœud répond, broker joint (décision 10). `$$` : le `$` va au
