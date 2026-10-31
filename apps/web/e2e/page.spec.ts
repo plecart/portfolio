@@ -10,7 +10,8 @@
 // que le projet n'active pas.
 import { AxeBuilder } from '@axe-core/playwright'
 import type { Page } from '@playwright/test'
-import { API_ORIGIN, expect, test } from './api.ts'
+import { API_ORIGIN, expect, serveProjects, test } from './api.ts'
+import { FILES_ORIGIN, PROJECT_SETS } from './projects.ts'
 import { detachHeader } from './scroll.ts'
 
 /** L'origine que le site sert lui-même. */
@@ -27,20 +28,21 @@ test("la page déclare le français comme langue du document", async ({ page }) 
 /**
  * Ce que ce garde couvre, et ce qu'il ne couvre pas.
  *
- * Dénombrement du 2026-09-24 : **23 formes** de requête sortante recensées pour une page web,
- * **17 vues** ici — les 16 que `page.on('request')` rapporte (balises `src`/`href`, `@import`,
- * `url()` CSS, `@font-face`, `fetch`, `XHR`, `import()`, `sendBeacon`, `EventSource`, worker,
- * préchargements, `iframe`, `video`) plus le WebSocket, qui voyage sur un autre évènement.
+ * Dénombrement du 2026-09-24, repris le 2026-10-31 (#168) : **23 formes** de requête sortante
+ * recensées pour une page web, **18 vues** ici — les 17 que `page.on('request')` rapporte (balises
+ * `src`/`href`, `@import`, `url()` CSS, `@font-face`, `fetch`, `XHR`, `import()`, `sendBeacon`,
+ * `EventSource`, worker, préchargements, `iframe`, `video`, `<img loading="lazy">` sous la ligne de
+ * flottaison, la page défilée jusqu'en bas) plus le WebSocket, qui voyage sur un autre évènement.
  *
- * **6 hors portée**, à couvrir par l'issue qui les introduira, jamais à supposer couvertes ici :
- * Service Worker (hors du contexte de page) ; requête différée au-delà de `networkidle` ;
- * `<img loading="lazy">` sous la ligne de flottaison (#20) ; `fetch` derrière une interaction —
- * le seul du site, « Réessayer » (#19), rejoue l'adresse de la requête de démarrage, vue ici, et
- * `table-states.spec.ts` compte ses requêtes ; `preconnect` et `dns-prefetch`, qui joignent le
- * tiers en DNS et TLS sans jamais produire de requête HTTP.
+ * **5 hors portée**, à couvrir par l'issue qui les introduira, jamais à supposer couvertes ici :
+ * Service Worker (hors du contexte de page) ; requête différée au-delà de `networkidle` ; `fetch`
+ * derrière une interaction — le seul du site, « Réessayer » (#19), rejoue l'adresse de la requête
+ * de démarrage, vue ici, et `table-states.spec.ts` compte ses requêtes ; `preconnect` et
+ * `dns-prefetch`, qui joignent le tiers en DNS et TLS sans jamais produire de requête HTTP.
  *
  * L'API n'est pas un tiers (spec §6.4) : son origine est admise, lue dans la même source que la
- * compilation (brief de #19, décision 11). Tout le reste en est un.
+ * compilation (brief de #19, décision 11). Les fichiers non plus : le stockage média sert icônes et
+ * couvertures, et la CSP de production l'admet en `img-src`. Tout le reste en est un.
  */
 test("la page ne fait aucune requête vers un tiers", async ({ page }) => {
   const requested: string[] = []
@@ -52,13 +54,20 @@ test("la page ne fait aucune requête vers un tiers", async ({ page }) => {
   page.on('websocket', (socket) => {
     requested.push(socket.url())
   })
+  await serveProjects(page, PROJECT_SETS.twelveWithShowcase)
 
   await page.goto('/', { waitUntil: 'networkidle' })
+
+  // Une image `lazy` sous la ligne de flottaison ne part qu'à l'approche de l'écran.
+  await page.getByRole('contentinfo').scrollIntoViewIfNeeded()
+  await expect
+    .poll(() => page.evaluate(() => [...document.images].every((image) => image.complete)))
+    .toBe(true)
 
   // Les schémas `data:` et `blob:` n'ont pas d'origine et ne quittent jamais le document : les
   // compter comme tiers rendrait la mesure fausse. `ws:`/`wss:` en revanche partent bien chez un
   // tiers, et leur origine se compare après normalisation du schéma.
-  const admitted = [ownOrigin(page), API_ORIGIN]
+  const admitted = [ownOrigin(page), API_ORIGIN, FILES_ORIGIN]
   const thirdParty = requested.filter((url) => {
     const { protocol, origin } = new URL(url)
     if (!['http:', 'https:', 'ws:', 'wss:'].includes(protocol)) return false
@@ -115,9 +124,9 @@ test('le projet mobile émule un appareil tactile de 400 px', async ({ page }, t
 
   await page.goto('/')
 
-  // Contrat repris par #20 et #21 (brief de #3). Sans cette assertion, retirer le descripteur
-  // d'appareil de `playwright.config.ts` laissait la suite entièrement verte : un contrat que
-  // seule la lecture d'un fichier de configuration garantit n'est pas un contrat.
+  // Contrat du brief de #3, dont vivent les scénarios à 400 px. Sans cette assertion, retirer le
+  // descripteur d'appareil de `playwright.config.ts` laissait la suite entièrement verte : un
+  // contrat que seule la lecture d'un fichier de configuration garantit n'est pas un contrat.
   expect(
     await page.evaluate(() => ({
       width: window.innerWidth,

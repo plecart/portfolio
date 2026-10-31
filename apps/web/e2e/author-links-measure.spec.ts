@@ -170,7 +170,7 @@ test("la pose d'une cellule, sur son élément enfant, ne relit pas la marge", a
   await expectPlacement(page, 'column')
   const before = await cellReads()
 
-  // Une inclinaison écrite à chaque image, comme un survol qui suit le pointeur (#20, #22).
+  // Une inclinaison écrite à chaque image, comme un survol qui suit le pointeur (#168, #22).
   await page.locator('[data-table-cell] > div').evaluate(async (pose) => {
     for (const angle of [1, -1, 2]) {
       pose.style.rotate = `${angle}deg`

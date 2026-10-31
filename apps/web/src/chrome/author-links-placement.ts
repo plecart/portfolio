@@ -5,7 +5,7 @@
 
 /**
  * Le contrat « cellule de la table », par lequel la table déclare ce que la mesure regarde : un
- * cadre de chargement (`src/table/Table.tsx`, #19) ou une carte (#20) porte l'attribut
+ * cadre de chargement (`src/table/Table.tsx`) ou une carte (`src/table/Card.tsx`) porte l'attribut
  * `data-table-cell` sur sa **boîte de grille** — l'élément que la grille place, sans
  * transformation : la pose et l'animation vont sur un élément enfant (la pulsation d'un cadre sur
  * sa face), sinon la mesure suivrait l'inclinaison et la montée.
@@ -27,7 +27,7 @@ export const TABLE_CELL_SELECTOR = '[data-table-cell]'
  * Le point de rupture unique du site (spec §6.1) : en dessous, toujours le pied de page. Le même
  * que `--breakpoint-sm` d'`index.css`, chacun tenu à 600 par son test.
  */
-const BREAKPOINT = 600
+export const BREAKPOINT = 600
 
 /** La marge qui admet la colonne : 36 px de disque, 24 du bord, 16 de garde (spec §3.4). */
 const COLUMN_MARGIN = 76

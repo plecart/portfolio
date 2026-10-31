@@ -1,8 +1,8 @@
 /**
  * Défilement de la page servie, partagé par les scénarios.
  *
- * Rien ne fait défiler la page avant les cartes de #20 : le scénario l'allonge lui-même, et rien
- * n'entre dans l'application pour cela (brief de #18, décision 12).
+ * La table servie vide (le `test` d'`api.ts`) ne fait pas défiler la page : le scénario l'allonge
+ * lui-même, et rien n'entre dans l'application pour cela (brief de #18, décision 12).
  */
 import { expect, type Page } from '@playwright/test'
 

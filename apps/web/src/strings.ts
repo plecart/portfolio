@@ -18,4 +18,9 @@ export const strings = {
   /** Message d'erreur de la table, et le lien qui relance le chargement (spec §4.5). */
   loadError: 'Les projets ne se chargent pas.',
   retry: 'Réessayer',
+  /** États d'une carte : la phrase de son libellé, puis le texte de son ruban (spec §4.1). */
+  stateOngoing: 'En cours',
+  stateLive: 'En ligne',
+  ribbonOngoing: 'en cours',
+  ribbonLive: 'en ligne',
 } as const

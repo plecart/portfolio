@@ -349,8 +349,8 @@ test("l'index compilé ne porte que des scripts servis en fichier, la restaurati
 
 test("la base de page cède à l'utilitaire d'un composant", async ({ page }) => {
   await page.goto('/')
-  // Les cartes de #20 décaleront l'anneau par un utilitaire : la base doit rester dans la couche
-  // `base`, sous `utilities`. Hors couche, elle battrait toute classe.
+  // L'anneau d'une carte est à 4 px de sa face (spec §6.2) : la base doit rester dans la couche
+  // `base`, sous `components` et `utilities`. Hors couche, elle battrait toute classe.
   await page.evaluate(() => {
     const style = document.createElement('style')
     style.textContent = '@layer utilities { .probe-offset { outline-offset: 7px } }'

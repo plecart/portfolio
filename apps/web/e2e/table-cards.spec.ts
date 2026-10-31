@@ -1,0 +1,529 @@
+/**
+ * La table de cartes polaroid au repos (spec §1.3, §1.4, §1.9, §3.1, §4.1, §4.2, §5.5, §6.1, §6.2 ;
+ * issue #168), sur la page servie, l'API et les fichiers interceptés par les gestes d'`api.ts`.
+ *
+ * Les seuils de la marge sont prouvés en Vitest et sa relecture dans
+ * `author-links-measure.spec.ts` ; ici, la vraie table sous la mesure.
+ */
+import { AxeBuilder } from '@axe-core/playwright'
+import type { Locator, Page } from '@playwright/test'
+import { expect, FAILURES, holdProjects, serveProjects, serving, test, type Answer } from './api.ts'
+import { resolveAll } from './css.ts'
+import { buildProject, FILES_ORIGIN, PROJECT_SETS, type Project } from './projects.ts'
+import { scrollThrough } from './scroll.ts'
+import { COLUMN_VIEWPORT, expectPlacement } from './table.ts'
+
+/** Les cartes de la table, dans son ordre : ses liens. */
+const cards = (page: Page) => page.getByRole('main').getByRole('link')
+
+/** Les couches de la couverture d'une carte : l'image, puis la copie d'un projet en cours. */
+const coverLayers = (card: Locator) => card.locator('img[srcset]')
+
+/** Ouvre la table sur un jeu de projets, ses cartes rendues. */
+async function openTable(page: Page, projects: Project[]) {
+  await serveProjects(page, projects)
+  await page.goto('/')
+  await expect(cards(page)).toHaveCount(projects.length)
+}
+
+/** La rotation d'un élément, en degrés, au dixième, lue sur sa transformation calculée. */
+const rotationOf = (element: Locator) =>
+  element.evaluate((node) => {
+    const { a, b } = new DOMMatrix(getComputedStyle(node).transform)
+    return Math.round((Math.atan2(b, a) * 1800) / Math.PI) / 10
+  })
+
+const TABLES = Object.entries(PROJECT_SETS).filter(([, projects]) => projects.length > 0)
+
+for (const [table, projects] of TABLES) {
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`table ${table} : aucune violation d'accessibilité — ${colorScheme}`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme })
+      await openTable(page, projects)
+
+      const { violations } = await new AxeBuilder({ page }).analyze()
+
+      expect(violations.map((violation) => violation.id)).toEqual([])
+    })
+  }
+}
+
+/**
+ * Les dimensions de spec §4.1, §4.2 et §6.1, par taille de carte : son jeu, l'indice de la carte
+ * dans la table, et ses mesures au bureau puis sur mobile — largeur de carte, de photo, hauteur de
+ * face, taille du post-it, hauteur et taille des rubans. La bande et le cadre s'en déduisent.
+ */
+const DIMENSIONS = [
+  [
+    'simple',
+    PROJECT_SETS.threeWithShowcase,
+    1,
+    [240, 220, 282, 14, 20, 11],
+    [176, 160, 214, 13, 20, 11],
+  ],
+  [
+    'vitrine',
+    PROJECT_SETS.threeWithShowcase,
+    0,
+    [508, 480, 558, 18, 24, 12],
+    [368, 344, 412, 16, 20, 11],
+  ],
+  ['seule', PROJECT_SETS.one, 0, [360, 340, 402, 14, 20, 11], [294, 278, 332, 13, 20, 11]],
+] as const
+
+for (const [size, projects, index, desktop, mobile] of DIMENSIONS) {
+  test(`carte ${size} : les dimensions du tableau de §4.1, que \`sizes\` annonce`, async ({
+    page,
+    isMobile,
+  }) => {
+    if (!isMobile) await page.setViewportSize(COLUMN_VIEWPORT)
+    await openTable(page, projects)
+    const card = cards(page).nth(index)
+    const cover = coverLayers(card).first()
+    await expect(cover).toHaveJSProperty('complete', true)
+
+    const measured = await card.evaluate((link: HTMLAnchorElement) => {
+      const element = (selector: string) => link.querySelector<HTMLElement>(selector)!
+      const pixels = (selector: string, property: 'fontSize' | 'height') =>
+        parseFloat(getComputedStyle(element(selector))[property])
+      return {
+        sizes: [
+          link.offsetWidth,
+          element('.card-photo').offsetWidth,
+          element('.card-face').offsetHeight,
+          pixels('h2', 'fontSize'),
+          pixels('li', 'height'),
+          pixels('li', 'fontSize'),
+        ],
+        // Une image en largeurs a pour taille naturelle ce que `sizes` annonce pour elle.
+        announced: link.querySelector('img')!.naturalWidth,
+      }
+    })
+
+    const expected = isMobile ? mobile : desktop
+    expect(measured.sizes).toEqual(expected)
+    // Le navigateur arrondit la taille naturelle à l'entier inférieur.
+    expect(Math.abs(measured.announced - expected[1])).toBeLessThanOrEqual(1)
+  })
+}
+
+test('douze cartes et la vitrine : quinze cellules sur quatre rangées, ou six sous elle (spec §5.5)', async ({
+  page,
+  isMobile,
+}) => {
+  if (!isMobile) await page.setViewportSize(COLUMN_VIEWPORT)
+  await openTable(page, PROJECT_SETS.twelveWithShowcase)
+
+  const rows = await cards(page).evaluateAll((links) => {
+    const tops = links.map((link) => link.getBoundingClientRect().top)
+    return [...new Set(tops)].map((top) => tops.filter((other) => other === top).length)
+  })
+
+  expect(rows).toEqual(isMobile ? [1, 2, 2, 2, 2, 2, 1] : [3, 2, 4, 3])
+})
+
+test('les cartes suivent l’ordre de la spec §1.9 : vitrine, en cours, puis du plus récent au plus ancien', async ({
+  page,
+}) => {
+  await openTable(page, PROJECT_SETS.twelveWithShowcase)
+
+  const slugs = await cards(page).evaluateAll((links) =>
+    links.map((link) => link.getAttribute('href')),
+  )
+
+  // `projet-02`, la vitrine ; les trois autres en cours (05, 08, 11), puis les autres.
+  expect(slugs).toEqual(
+    ['02', '11', '08', '05', '12', '10', '09', '07', '06', '04', '03', '01'].map(
+      (number) => `/projets/projet-${number}`,
+    ),
+  )
+})
+
+test('les cartes remplacent les trois cadres à l’arrivée de la liste', async ({ page }) => {
+  const release = await holdProjects(page)
+  await page.goto('/')
+  const cells = page.locator('[data-table-cell]')
+  await expect(cells).toHaveCount(3)
+  await expect(cards(page)).toHaveCount(0)
+
+  await release(serving(PROJECT_SETS.twelveWithoutShowcase))
+
+  await expect(cells).toHaveCount(12)
+  await expect(cards(page)).toHaveCount(12)
+})
+
+test('une carte est un lien vers sa fiche, au libellé complet, états présents seulement', async ({
+  page,
+}) => {
+  await openTable(page, [
+    buildProject({
+      slug: 'atelier',
+      title: 'Atelier',
+      summary: 'Un atelier de reliure.',
+      status: 'ongoing',
+      finished_on: null,
+      demo_url: 'https://demo.test/atelier',
+    }),
+    buildProject({ slug: 'banc', title: 'Banc', summary: 'Un banc de test' }),
+  ])
+
+  const atelier = page.getByRole('link', { name: 'Atelier.' })
+  await expect(atelier).toHaveAccessibleName('Atelier. Un atelier de reliure. En cours. En ligne.')
+  await expect(atelier).toHaveAttribute('href', '/projets/atelier')
+  await expect(page.getByRole('link', { name: 'Banc.' })).toHaveAccessibleName(
+    'Banc. Un banc de test.',
+  )
+})
+
+test('les technologies décrivent le lien : leur nom reste aux lecteurs d’écran (spec §1.4)', async ({
+  page,
+}) => {
+  const icon = `${FILES_ORIGIN}/icones/icone.svg`
+  await openTable(page, [
+    buildProject({
+      technologies: [
+        { name: 'TypeScript', kind: 'language', icon },
+        { name: 'React', kind: 'framework', icon },
+      ],
+    }),
+  ])
+
+  await expect(cards(page)).toHaveAccessibleDescription('TypeScript, React')
+})
+
+test('dans l’arbre d’accessibilité de Chromium, le nom du lien est le libellé, sans ses rubans', async ({
+  page,
+}) => {
+  await openTable(page, [
+    buildProject({ title: 'Atelier', summary: 'Un atelier.', status: 'ongoing', finished_on: null }),
+  ])
+  const client = await page.context().newCDPSession(page)
+
+  // Le navigateur, pas Playwright ni axe : leur calcul ne voit pas une liste `aria-hidden` que
+  // `aria-describedby` désigne entrer dans le nom du lien.
+  const { nodes } = await client.send('Accessibility.getFullAXTree')
+  const links = nodes
+    .filter((node) => node.role?.value === 'link')
+    .map(({ name, description }) => [name?.value, description?.value])
+
+  expect(links).toContainEqual(['Atelier. Un atelier. En cours.', 'TypeScript'])
+})
+
+test('une carte porte son titre en `<h2>`, ses éléments décoratifs masqués', async ({ page }) => {
+  await openTable(page, [buildProject({ title: 'Atelier', status: 'ongoing', finished_on: null })])
+  const card = cards(page)
+
+  await expect(card.getByRole('heading', { level: 2, name: 'Atelier' })).toBeVisible()
+  await expect(card.locator('svg')).toHaveAttribute('aria-hidden', 'true')
+  // La couverture, sa copie en noir et blanc, l'icône : le libellé du lien les porte.
+  expect(
+    await card.locator('img').evaluateAll((images) => images.map((image) => image.getAttribute('alt'))),
+  ).toEqual(['', '', ''])
+  await expect(coverLayers(card).nth(1)).toHaveAttribute('aria-hidden', 'true')
+  await expect(card.locator('.card-band')).toHaveAttribute('aria-hidden', 'true')
+})
+
+test('toutes les cartes sont des cibles de 36 px au moins, et toutes leurs images `lazy`', async ({
+  page,
+}) => {
+  await openTable(page, PROJECT_SETS.twelveWithShowcase)
+
+  const boxes = await cards(page).evaluateAll((links) =>
+    links.map((link) => link.getBoundingClientRect()).map(({ width, height }) => [width, height]),
+  )
+  const loading = await page
+    .getByRole('main')
+    .locator('img')
+    .evaluateAll((images: HTMLImageElement[]) => images.map((image) => image.loading))
+
+  expect(Math.min(...boxes.flat())).toBeGreaterThanOrEqual(36)
+  // Onze couvertures, leurs quatre copies en cours, vingt icônes : toute la population.
+  expect(loading).toEqual(Array(11 + 4 + 20).fill('lazy'))
+})
+
+test('un post-it long tient sur deux lignes au plus, large de la carte moins 28 px (spec §4.1)', async ({
+  page,
+}) => {
+  // Trente caractères : le titre le plus long, en mots puis d'un seul tenant, qui atteint la borne.
+  await openTable(page, [
+    buildProject({ slug: 'a', title: 'Un titre long de trente lettre' }),
+    buildProject({ slug: 'b', title: 'Untitrelongdetrentelettresdune' }),
+  ])
+
+  const postits = await cards(page).evaluateAll((links: HTMLAnchorElement[]) =>
+    links.map((link) => {
+      const postit = link.querySelector('h2')!
+      const { lineHeight, paddingBottom, paddingTop } = getComputedStyle(postit)
+      const inset = parseFloat(paddingTop) + parseFloat(paddingBottom)
+      return {
+        card: link.offsetWidth,
+        width: postit.offsetWidth,
+        lines: Math.round((postit.offsetHeight - inset) / parseFloat(lineHeight)),
+      }
+    }),
+  )
+
+  expect(postits[0].lines).toBe(2)
+  expect(postits[1].width).toBe(postits[1].card - 28)
+})
+
+test('noir et blanc du projet en cours : la même image, recouverte par CSS (spec §4.1)', async ({
+  page,
+}) => {
+  const requested = new Set<string>()
+  page.on('request', (request) => {
+    if (request.url().endsWith('.webp')) requested.add(request.url())
+  })
+  await openTable(page, [
+    buildProject({ slug: 'en-cours', status: 'ongoing', finished_on: null }),
+    buildProject({ slug: 'termine' }),
+  ])
+  const [ongoing, finished] = [cards(page).first(), cards(page).last()]
+  const layers = coverLayers(ongoing)
+
+  await expect(layers).toHaveCount(2)
+  await expect(layers.first()).toHaveCSS('filter', 'none')
+  await expect(layers.last()).toHaveCSS('filter', 'grayscale(1)')
+  await expect(layers.last()).toHaveJSProperty('complete', true)
+  expect(await layers.last().evaluate((image: HTMLImageElement) => image.currentSrc)).toBe(
+    await layers.first().evaluate((image: HTMLImageElement) => image.currentSrc),
+  )
+  // Pas de variante en noir et blanc : le projet en cours ne demande qu'un seul fichier.
+  expect([...requested].filter((url) => url.includes('/en-cours/'))).toHaveLength(1)
+
+  await expect(coverLayers(finished)).toHaveCount(1)
+  await expect(coverLayers(finished)).toHaveCSS('filter', 'none')
+})
+
+test('les rubans : trois technologies au plus, icône, nom masqué et infobulle (spec §4.1)', async ({
+  page,
+}) => {
+  const technology = (name: string, kind: Project['technologies'][number]['kind']) => ({
+    name,
+    kind,
+    icon: `${FILES_ORIGIN}/icones/${name}.svg`,
+  })
+  await openTable(page, [
+    buildProject({
+      technologies: [
+        technology('Figma', 'tool'),
+        technology('TypeScript', 'language'),
+        technology('React', 'framework'),
+        technology('Docker', 'infrastructure'),
+        technology('Django', 'framework'),
+      ],
+    }),
+  ])
+  const ribbons = cards(page).locator('li')
+
+  await expect(ribbons).toHaveText(['TypeScript', 'React', 'Docker'])
+  for (const [index, name] of ['TypeScript', 'React', 'Docker'].entries()) {
+    const ribbon = ribbons.nth(index)
+    await expect(ribbon).toHaveAttribute('title', name)
+    await expect(ribbon.locator('img')).toHaveAttribute('src', `${FILES_ORIGIN}/icones/${name}.svg`)
+    await expect(ribbon.locator('img')).toHaveAttribute('alt', '')
+    await expect(ribbon.getByText(name)).toHaveClass('sr-only')
+  }
+  expect(await Promise.all((await ribbons.all()).map(rotationOf))).toEqual([-1.5, 1, -1.5])
+})
+
+test('les rubans d’état : « en cours » en texte, « en ligne » avec son point de 6 px', async ({
+  page,
+}) => {
+  await openTable(page, [
+    buildProject({
+      status: 'ongoing',
+      finished_on: null,
+      demo_url: 'https://demo.test/projet',
+      technologies: [],
+    }),
+  ])
+  const ribbons = cards(page).locator('li')
+  const [accent] = await resolveAll(page, [['background-color', 'var(--accent)']])
+
+  await expect(ribbons).toHaveText(['en cours', 'en ligne'])
+  await expect(ribbons.first().locator('.card-dot')).toHaveCount(0)
+  const dot = ribbons.last().locator('.card-dot')
+  await expect(dot).toHaveCSS('background-color', accent)
+  await expect(dot).toHaveCSS('width', '6px')
+  await expect(dot).toHaveCSS('height', '6px')
+})
+
+test('un projet sans état ne porte aucun ruban d’état', async ({ page }) => {
+  await openTable(page, [buildProject()])
+
+  await expect(cards(page).getByText('en cours')).toHaveCount(0)
+  await expect(cards(page).getByText('en ligne')).toHaveCount(0)
+})
+
+test('la pose vient de l’empreinte du slug, sous la CSP de production, sur un enfant de la cellule', async ({
+  page,
+}) => {
+  // Une CSP sans `style-src 'unsafe-inline'`, comme celle de Caddy, qu'aucun scénario ne traverse :
+  // elle bloque un attribut `style` analysé, jamais le CSSOM.
+  await page.route('/', async (route) => {
+    const response = await route.fetch()
+    await route.fulfill({
+      response,
+      headers: { ...response.headers(), 'content-security-policy': "style-src 'self'" },
+    })
+  })
+  await openTable(page, [buildProject({ slug: 'portfolio' })])
+  const card = cards(page)
+  // La pose de `tests/cards.test.ts`, calculée hors de JavaScript.
+  const [posed] = await resolveAll(page, [
+    ['transform', 'rotate(-0.738deg) translate(-3.264px, -1.56px)'],
+  ])
+
+  await expect(card.locator('.card-pose')).toHaveCSS('transform', posed)
+  await expect(card).toHaveCSS('transform', 'none')
+  await expect(card.locator('.card-entry')).toHaveCSS('transform', 'none')
+})
+
+for (const [width, placement] of [
+  [1280, 'column'],
+  [1200, 'column'],
+  [1000, 'column'],
+  [1100, 'footer'],
+  [600, 'footer'],
+] as const) {
+  test(`liens de l'auteur, douze cartes à ${width} px : ${placement} (spec §3.4)`, async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'largeurs de bureau : le projet desktop les porte')
+    await page.setViewportSize({ ...COLUMN_VIEWPORT, width })
+    await openTable(page, PROJECT_SETS.twelveWithShowcase)
+
+    // À 1200 px, 78 px de marge pour une garde de 76 : une mesure qui suivrait la pose basculerait.
+    await expectPlacement(page, placement)
+  })
+}
+
+for (const [name, projects] of [
+  ['non marquée', PROJECT_SETS.one],
+  ['marquée vitrine', PROJECT_SETS.one.map((project) => ({ ...project, showcase: true }))],
+] as const) {
+  test(`carte seule, ${name} : la carte seule, jamais la vitrine (spec §4.2, §5.5)`, async ({
+    page,
+    isMobile,
+  }) => {
+    if (!isMobile) await page.setViewportSize({ ...COLUMN_VIEWPORT, width: 1100 })
+    await openTable(page, projects)
+
+    const box = (await cards(page).boundingBox())!
+
+    if (isMobile) {
+      // 80 % des 368 px de la table, centrée.
+      expect(box.width).toBeCloseTo(294.4, 1)
+      expect(box.x).toBeCloseTo((400 - 294.4) / 2, 1)
+      await expectPlacement(page, 'footer')
+    } else {
+      expect([box.x, box.width]).toEqual([370, 360])
+      await expectPlacement(page, 'column')
+    }
+  })
+}
+
+/** Ouvre la page sur un premier échec, « Réessayer » focalisé ; rend le geste qui relance. */
+async function openFailed(page: Page): Promise<(answer: Answer) => Promise<void>> {
+  const failure = await holdProjects(page)
+  await page.goto('/')
+  await failure(FAILURES['statut 500'])
+  await page.getByRole('button', { name: 'Réessayer' }).focus()
+  const retry = await holdProjects(page)
+  return async (answer) => {
+    await page.keyboard.press('Enter')
+    await retry(answer)
+    await expect(page.getByRole('main')).not.toHaveAttribute('aria-busy')
+  }
+}
+
+for (const [name, projects, href] of [
+  ['la vitrine', PROJECT_SETS.threeWithShowcase, '/projets/projet-02'],
+  ['la première carte', PROJECT_SETS.threeWithoutShowcase, '/projets/projet-02'],
+] as const) {
+  test(`après une relance réussie au clavier, le focus va sur ${name}`, async ({ page }) => {
+    const retry = await openFailed(page)
+
+    await retry(serving(projects))
+
+    const active = cards(page).first()
+    await expect(active).toBeFocused()
+    await expect(active).toHaveAttribute('href', href)
+  })
+}
+
+test('après une relance réussie sur une liste vide, le focus n’est posé nulle part', async ({
+  page,
+}) => {
+  const retry = await openFailed(page)
+
+  await retry(serving(PROJECT_SETS.none))
+
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true)
+})
+
+/**
+ * Trois formes, les premières images sans variante que l'API peut servir (issue #168) ; le projet
+ * est en cours, pour que la couche noir et blanc ait une raison d'exister.
+ */
+const NO_VARIANT = { caption: 'Écran', width: 1600, height: 1600, variants: [] }
+const COVERLESS: [string, Project['gallery']][] = [
+  ['en attente', [{ ...NO_VARIANT, state: 'pending' }]],
+  ['en échec', [{ ...NO_VARIANT, state: 'failed' }]],
+  ['galerie vide', []],
+]
+
+for (const [name, gallery] of COVERLESS) {
+  test(`couverture sans variante, ${name} : la carte entière, un carré --line, sans image`, async ({
+    page,
+  }) => {
+    await openTable(page, [
+      buildProject({ title: 'Atelier', status: 'ongoing', finished_on: null, gallery }),
+    ])
+    const card = cards(page)
+    const [line] = await resolveAll(page, [['background-color', 'var(--line)']])
+    const photo = card.locator('.card-photo')
+
+    await expect(card.getByRole('heading', { name: 'Atelier' })).toBeVisible()
+    await expect(card.locator('li').last()).toHaveText('en cours')
+    await expect(photo).toHaveCSS('background-color', line)
+    expect(
+      await photo.evaluate((box: HTMLElement) => box.offsetWidth - box.offsetHeight),
+    ).toBe(0)
+    await expect(photo.locator('img')).toHaveCount(0)
+    await expect(photo.locator('*')).toHaveCount(0)
+  })
+}
+
+test('rechargée défilée, une page haute d’emblée ouvre l’entête décollée', async ({ page }) => {
+  // Allongée avant le montage, rien n'entre dans l'application : la liste arrive trop tard pour que
+  // le navigateur restaure tout le défilement.
+  await page.addInitScript(() => {
+    const sheet = new CSSStyleSheet()
+    sheet.replaceSync('body { min-height: 500vh }')
+    document.adoptedStyleSheets = [sheet]
+  })
+  await page.goto('/')
+  await scrollThrough(page, 1000)
+
+  await page.reload()
+
+  expect(await page.evaluate(() => window.scrollY)).toBe(1000)
+  await expect(page.getByRole('banner')).toHaveAttribute('data-detached')
+})
+
+test('rechargée, la table de douze cartes ouvre l’entête selon le défilement constaté', async ({
+  page,
+}) => {
+  await openTable(page, PROJECT_SETS.twelveWithShowcase)
+  await scrollThrough(page, 1000)
+
+  await page.reload()
+  await expect(cards(page)).toHaveCount(12)
+
+  const banner = expect(page.getByRole('banner'))
+  const scrolled = await page.evaluate(() => window.scrollY > 0)
+  await (scrolled ? banner : banner.not).toHaveAttribute('data-detached')
+})
