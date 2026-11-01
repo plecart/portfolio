@@ -55,7 +55,7 @@ function useImageIndex(count: number) {
 
 /**
  * La galerie d'une fiche (spec §4.4, §6.2) : une piste translatée dans un cadre carré, sa barre
- * dessous. Le carré et ses 28 px de barre se réservent en CSS : ni une image pas encore chargée, ni
+ * dessous. Le carré et ses 20 px de barre se réservent en CSS : ni une image pas encore chargée, ni
  * une galerie sans image prête ne changent la hauteur du panneau (§3.2).
  *
  * Le `style` de la piste s'écrit par le CSSOM, que la CSP de production laisse passer. Les images
