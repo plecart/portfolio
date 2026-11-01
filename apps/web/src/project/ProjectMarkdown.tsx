@@ -1,6 +1,6 @@
 import Markdown, { type MarkdownToJSX } from 'markdown-to-jsx/react'
 import type { ComponentProps, MouseEvent } from 'react'
-import { isModifiedClick, isSectionHash } from './project.ts'
+import { hasModifier, isSectionHash } from './project.ts'
 import { goToSection } from './useSectionAnchor.ts'
 
 /**
@@ -9,7 +9,7 @@ import { goToSection } from './useSectionAnchor.ts'
  * (`useProjectAddress`). Un clic modifié reste natif.
  */
 function followFragment(event: MouseEvent<HTMLAnchorElement>) {
-  if (isModifiedClick(event)) return
+  if (hasModifier(event)) return
   event.preventDefault()
   const { hash } = event.currentTarget
   if (isSectionHash(hash)) goToSection(hash)

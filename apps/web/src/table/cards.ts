@@ -12,6 +12,7 @@ import { BREAKPOINT } from '../chrome/author-links-placement.ts'
 import { strings } from '../strings.ts'
 
 type Project = components['schemas']['ProjectOut']
+type Variant = components['schemas']['VariantOut']
 
 /** Une technologie qu'un projet emploie, telle que l'API la sert. */
 export type Technology = components['schemas']['TechnologyOut']
@@ -185,22 +186,29 @@ export function cardSize(project: Project, count: number): CardSize {
 }
 
 /**
- * Ce que l'image de couverture d'un projet demande à son `<img>` : la première image de la galerie,
- * par ses variantes (spec §4.1).
+ * Ce qu'une image du projet demande à son `<img>`.
  *
- * La condition lit les variantes, jamais l'état : une couverture en attente, en échec ou absente
- * n'en a aucune.
+ * La condition lit les variantes, jamais l'état : une image en attente ou en échec n'en a aucune.
  *
+ * @param variants Les variantes de l'image.
  * @returns `src`, `srcSet` et les dimensions de la première variante ; `null` sans variante.
  */
-export function coverImage(
-  project: Project,
+export function imageSources(
+  variants: readonly Variant[],
 ): { src: string; srcSet: string; width: number; height: number } | null {
-  const variants = project.gallery[0]?.variants ?? []
   if (variants.length === 0) return null
   const [{ url, width, height }] = variants
   const srcSet = variants.map((variant) => `${variant.url} ${variant.width}w`).join(', ')
   return { src: url, srcSet, width, height }
+}
+
+/**
+ * L'image de couverture d'un projet : la première de sa galerie (spec §4.1).
+ *
+ * @returns Ses sources (`imageSources`) ; `null` si elle n'en a pas, ou s'il n'y en a aucune.
+ */
+export function coverImage(project: Project) {
+  return imageSources(project.gallery[0]?.variants ?? [])
 }
 
 /** L'attribut `sizes` de la photo d'une carte (spec §4.1) : sa largeur de part et d'autre de 600 px. */

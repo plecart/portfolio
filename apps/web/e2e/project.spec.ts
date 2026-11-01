@@ -18,16 +18,19 @@ import {
 } from './api.ts'
 import { resolveAll, settle } from './css.ts'
 import {
+  arriveAt,
   closeButton,
   expectClosed,
   holdNativeClicks,
+  nextImage,
   openProject,
   panel,
+  previousImage,
   readingColumn,
   watchAnimations,
   watchCspViolations,
 } from './project.ts'
-import { PROJECT_SETS } from './projects.ts'
+import { buildImage, PROJECT_SETS } from './projects.ts'
 import { nextFrames, scrollGesture, scrollThrough, scrollTop } from './scroll.ts'
 import {
   cards,
@@ -74,6 +77,42 @@ test('Tab et Maj+Tab ne sortent pas du panneau', async ({ page }) => {
 
     await page.keyboard.press(key)
     await expect(closeButton(page)).toBeFocused()
+  }
+})
+
+test('parcours clavier complet : Tab boucle sur tous les arrêts, Maj+Tab à l’envers', async ({
+  page,
+}) => {
+  await arriveAt(page, {
+    demo_url: 'https://demo.test/fiche',
+    repository_url: 'https://depot.test/fiche',
+    gallery: [buildImage('fiche', 'Une'), buildImage('fiche', 'Deux')],
+    sections: ['Architecture', 'Résultats'].map((title, index) => ({
+      title,
+      anchor: `section-${index}`,
+      body: 'Un corps.',
+    })),
+  })
+  const stops = [
+    closeButton(page),
+    previousImage(page),
+    nextImage(page),
+    panel(page).getByRole('link', { name: 'Voir le site' }),
+    panel(page).getByRole('link', { name: 'Voir le dépôt' }),
+    readingColumn(page),
+    panel(page).locator('summary').first(),
+    panel(page).locator('summary').last(),
+  ]
+  await expect(stops[0]).toBeFocused()
+
+  for (const stop of [...stops.slice(1), stops[0]]) {
+    await page.keyboard.press('Tab')
+    await expect(stop).toBeFocused()
+  }
+
+  for (const stop of stops.slice(1).reverse().concat(stops[0])) {
+    await page.keyboard.press('Shift+Tab')
+    await expect(stop).toBeFocused()
   }
 })
 

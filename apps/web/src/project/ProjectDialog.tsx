@@ -5,6 +5,7 @@ import { CloseIcon } from '../chrome/icons.tsx'
 import { strings } from '../strings.ts'
 import { projectPath } from './project.ts'
 import { ProjectContent } from './ProjectContent.tsx'
+import { ProjectGallery } from './ProjectGallery.tsx'
 
 /**
  * Le bouton de fermeture (spec §3.2) : 36 px, rond, papier, à 8 px du coin du panneau. Sur téléphone
@@ -32,7 +33,8 @@ function focusCard(slug: string) {
  *
  * Trois fermetures : le bouton, Échap et le retour du navigateur ; un clic hors du panneau n'en est
  * pas une. Le bouton, premier du panneau, reçoit le focus de Radix à l'ouverture. Pendant le fondu
- * de sortie, le projet a déjà quitté l'adresse : le dernier montré reste donc rendu.
+ * de sortie, le projet a déjà quitté l'adresse : le dernier montré reste donc rendu. Une autre fiche
+ * ouverte pendant ce fondu trouve le panneau encore monté : sa galerie repart de la première image.
  *
  * @param project Le projet à montrer ; `undefined`, fiche fermée.
  * @param onClose La demande de fermeture : le bouton ou Échap.
@@ -63,6 +65,7 @@ export function ProjectDialog({
           <DialogClose aria-label={strings.closeProject} className={CLOSE_CLASSES}>
             <CloseIcon />
           </DialogClose>
+          <ProjectGallery key={shown.slug} gallery={shown.gallery} />
           <ProjectContent project={shown} />
         </DialogContent>
       </DialogPortal>

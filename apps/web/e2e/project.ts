@@ -1,7 +1,9 @@
 /** La fiche et ses gestes, partagés par les scénarios. */
+import { AxeBuilder } from '@axe-core/playwright'
 import type { Locator, Page } from '@playwright/test'
-import { expect } from './api.ts'
+import { expect, serveProjects } from './api.ts'
 import { settle } from './css.ts'
+import { buildProject, type Project } from './projects.ts'
 
 /** Le panneau de la fiche. */
 export const panel = (page: Page) => page.getByRole('dialog')
@@ -11,6 +13,46 @@ export const closeButton = (page: Page) => page.getByRole('button', { name: 'Fer
 
 /** La colonne de lecture, arrêt de tabulation de ce qui défile. */
 export const readingColumn = (page: Page) => page.getByRole('region', { name: 'Contenu de la fiche' })
+
+/** La galerie de la fiche, et ses deux flèches. */
+export const gallery = (page: Page) => page.getByRole('group', { name: 'Images du projet' })
+export const previousImage = (page: Page) => page.getByRole('button', { name: 'Image précédente' })
+export const nextImage = (page: Page) => page.getByRole('button', { name: 'Image suivante' })
+
+/** Le projet d'une fiche à un seul slug, ces champs remplacés. */
+export const ficheProject = (overrides: Partial<Project> = {}) =>
+  buildProject({ slug: 'fiche', title: 'Fiche', ...overrides })
+
+/** De quoi faire défiler la colonne comme le panneau. */
+export const LONG_DESCRIPTION = Array.from(
+  { length: 40 },
+  (_, index) => `Paragraphe ${index + 1} de la description.`,
+).join('\n\n')
+
+/** Arrive sur la fiche par son adresse. */
+export async function arriveAt(page: Page, overrides: Partial<Project> = {}, hash = '') {
+  await serveProjects(page, [ficheProject(overrides)])
+  await page.goto(`/projets/fiche${hash}`)
+  await expect(panel(page)).toBeVisible()
+  await page.evaluate(async () => void (await document.fonts.ready))
+  await settle(page)
+}
+
+/** Attend un élément sans débordement horizontal. */
+export async function expectNoOverflow(element: Locator) {
+  const { scrollWidth, clientWidth } = await element.evaluate(
+    ({ scrollWidth, clientWidth }) => ({ scrollWidth, clientWidth }),
+  )
+
+  expect(scrollWidth).toBeLessThanOrEqual(clientWidth)
+}
+
+/** Aucune violation d'axe sur ce qui est rendu. */
+export async function expectNoViolations(page: Page) {
+  const { violations } = await new AxeBuilder({ page }).analyze()
+
+  expect(violations.map((violation) => violation.id)).toEqual([])
+}
 
 /** Ouvre la fiche d'une carte par Entrée, qui ouvre d'emblée sur les deux projets. */
 export async function openProject(card: Locator) {

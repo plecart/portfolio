@@ -28,6 +28,10 @@ export const strings = {
   /** Le bouton de la fiche (spec §3.2), puis le nom de ce qui y défile au clavier (§6.2). */
   closeProject: 'Fermer la fiche',
   projectReading: 'Contenu de la fiche',
+  /** La galerie de la fiche (spec §6.2) : son nom, puis ses flèches (§4.4). */
+  projectImages: 'Images du projet',
+  previousImage: 'Image précédente',
+  nextImage: 'Image suivante',
   /** Les post-its de lien de la fiche (spec §7). */
   viewSite: 'Voir le site',
   viewRepository: 'Voir le dépôt',

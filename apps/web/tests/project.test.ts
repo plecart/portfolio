@@ -6,12 +6,14 @@ import {
   projectDates,
   projectFacts,
   projectPath,
+  readyImages,
   sectionId,
   slugFromPath,
   splitStack,
+  swipeStep,
   visibleSections,
 } from '../src/project/project.ts'
-import { buildProject, buildTechnology, ONGOING } from '../e2e/projects.ts'
+import { buildImage, buildProject, buildTechnology, FILES_ORIGIN, ONGOING } from '../e2e/projects.ts'
 
 type Section = components['schemas']['SectionOut']
 
@@ -119,4 +121,42 @@ test('l’ancre d’une section donne son identifiant et son fragment', () => {
 
 test.each(['', '#', '#root', '#s', '#section'])('%s ne désigne aucune section', (hash) => {
   expect(isSectionHash(hash)).toBe(false)
+})
+
+test('une image prête donne sa légende et ses sources, en largeurs', () => {
+  expect(readyImages([buildImage('projet', 'Écran')])).toEqual([
+    {
+      caption: 'Écran',
+      src: `${FILES_ORIGIN}/images/projet/480.webp`,
+      srcSet: `${FILES_ORIGIN}/images/projet/480.webp 480w, ${FILES_ORIGIN}/images/projet/960.webp 960w`,
+      width: 480,
+      height: 480,
+    },
+  ])
+})
+
+test.each(['pending', 'failed'] as const)('une image à l’état %s n’entre pas', (state) => {
+  const gallery = [
+    buildImage('projet', 'Avant'),
+    buildImage('projet', 'Sans variante', state),
+    buildImage('projet', 'Après'),
+  ]
+
+  expect(readyImages(gallery).map(({ caption }) => caption)).toEqual(['Avant', 'Après'])
+})
+
+test('la condition lit les variantes : une image prête sans variante n’entre pas', () => {
+  expect(readyImages([{ ...buildImage('projet', 'Écran'), variants: [] }])).toEqual([])
+})
+
+test.each([
+  ['39 px vers la gauche : rien', -39, 0, 0],
+  ['40 px tout juste : rien', -40, 0, 0],
+  ['41 px vers la gauche : l’image suivante', -41, 0, 1],
+  ['41 px vers la droite : l’image précédente', 41, 0, -1],
+  ['plus vertical qu’horizontal : rien', -60, 61, 0],
+  ['autant vertical qu’horizontal : rien', -60, -60, 0],
+  ['plus horizontal que vertical : l’image suivante', -60, 59, 1],
+])('balayage de %s', (_, dx, dy, step) => {
+  expect(swipeStep(dx, dy)).toBe(step)
 })

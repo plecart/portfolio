@@ -18,15 +18,17 @@
     }
   }
 
-  /* Mobile : le panneau est la fenêtre, une colonne, et tout y défile. Dès 600 px, deux colonnes de
-     la largeur de la photo, au centre de la fenêtre : `left` se compte en `vw`, car la place gardée à
-     la barre sort de la boîte qu'`inset` et les marges automatiques connaissent. */
+  /* Mobile : le panneau est la fenêtre, une colonne, et tout y défile ; ses deux rangées, calées en
+     haut, ne s'étirent pas sur sa hauteur. Dès 600 px, deux colonnes de la largeur de la photo, au
+     centre de la fenêtre : `left` se compte en `vw`, car la place gardée à la barre sort de la boîte
+     qu'`inset` et les marges automatiques connaissent. */
   .project-panel {
     --photo: min(100vh - 104px, 660px, (100vw - 92px) / 2);
     position: fixed;
     inset: 0;
     z-index: 30;
     display: grid;
+    align-content: start;
     gap: var(--s-3);
     padding: var(--s-2);
     overflow-y: auto;
@@ -50,6 +52,76 @@
 
   .project-panel[data-state='closed'] {
     animation: project-out var(--dur-fast) var(--ease-out);
+  }
+
+  /* La galerie (§4.4) : son carré, ses 8 px, sa barre, soit la hauteur de sa colonne dès 600 px. */
+  .project-gallery {
+    min-width: 0;
+  }
+
+  /* Le cadre réserve son carré dès le premier rendu, image chargée ou non. */
+  .project-gallery-frame {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    background-color: var(--line);
+    touch-action: pan-y;
+  }
+
+  .project-gallery-track {
+    display: flex;
+    height: 100%;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .project-gallery-track {
+      transition: translate var(--dur) var(--ease-out);
+    }
+  }
+
+  /* Entière, jamais recadrée (§1.11) : le `cover` de la carte couperait une image non carrée. */
+  .project-gallery-image {
+    flex: none;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .project-gallery-arrow {
+    position: absolute;
+    inset-block: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin-block: auto;
+    border-radius: 50%;
+    background-color: color-mix(in srgb, var(--paper) 88%, transparent);
+    color: var(--ink);
+  }
+
+  /* Toujours 28 px, sans image comprise (§3.2) : le panneau en dépend. */
+  .project-gallery-bar {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-3);
+    height: 28px;
+    margin-top: var(--s-2);
+    color: var(--ink-2);
+    font-size: var(--fs-small);
+  }
+
+  .project-gallery-caption {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .project-gallery-counter {
+    flex: none;
+    font-variant-numeric: tabular-nums;
   }
 
   .project-reading {

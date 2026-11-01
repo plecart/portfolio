@@ -3,42 +3,26 @@
  * faits, sa stack, son Markdown, ses sections et leurs ancres, son défilement. Le dialogue, ses
  * adresses et ses fermetures : `project.spec.ts`.
  */
-import { AxeBuilder } from '@axe-core/playwright'
 import type { Locator, Page } from '@playwright/test'
-import { expect, serveProjects, test } from './api.ts'
+import { expect, test } from './api.ts'
 import { resolveAll, settle } from './css.ts'
 import {
+  arriveAt,
   closeButton,
   expectClosed,
+  expectNoOverflow,
+  expectNoViolations,
+  ficheProject,
   holdNativeClicks,
+  LONG_DESCRIPTION,
   openProject,
   panel,
   readingColumn,
   watchCspViolations,
 } from './project.ts'
-import { buildProject, buildTechnology, FILES_ORIGIN, ONGOING, type Project } from './projects.ts'
+import { buildTechnology, FILES_ORIGIN, ONGOING } from './projects.ts'
 import { scrollTop } from './scroll.ts'
 import { cards, COLUMN_VIEWPORT, openTable, serveUnderCsp } from './table.ts'
-
-/** Le projet d'une fiche à un seul slug, ces champs remplacés. */
-const ficheProject = (overrides: Partial<Project> = {}) =>
-  buildProject({ slug: 'fiche', title: 'Fiche', ...overrides })
-
-/** Arrive sur la fiche par son adresse. */
-async function arriveAt(page: Page, overrides: Partial<Project> = {}, hash = '') {
-  await serveProjects(page, [ficheProject(overrides)])
-  await page.goto(`/projets/fiche${hash}`)
-  await expect(panel(page)).toBeVisible()
-  await page.evaluate(async () => void (await document.fonts.ready))
-  await settle(page)
-}
-
-/** Aucune violation d'axe sur ce qui est rendu. */
-async function expectNoViolations(page: Page) {
-  const { violations } = await new AxeBuilder({ page }).analyze()
-
-  expect(violations.map((violation) => violation.id)).toEqual([])
-}
 
 /** La rotation d'un élément, en degrés, lue sur sa matrice calculée. */
 const rotation = (page: Page, selector: string) =>
@@ -289,12 +273,8 @@ test.describe('la description en Markdown', () => {
     test(`${name} ne déborde pas`, async ({ page }) => {
       await arriveAt(page, { description: markdown })
 
-      for (const element of [page.locator('.project-scroll'), panel(page)]) {
-        const { scrollWidth, clientWidth } = await element.evaluate(
-          ({ scrollWidth, clientWidth }) => ({ scrollWidth, clientWidth }),
-        )
-        expect(scrollWidth).toBeLessThanOrEqual(clientWidth)
-      }
+      await expectNoOverflow(page.locator('.project-scroll'))
+      await expectNoOverflow(panel(page))
     })
   }
 })
@@ -305,12 +285,6 @@ const SECTIONS = [
   { title: 'Section vide', anchor: 'vide', body: ' \n ' },
   { title: 'Résultats', anchor: 'resultats', body: 'Ce que le projet a [donné](https://exemple.test/).' },
 ]
-
-/** De quoi faire défiler la colonne comme le panneau. */
-const LONG_DESCRIPTION = Array.from(
-  { length: 40 },
-  (_, index) => `Paragraphe ${index + 1} de la description.`,
-).join('\n\n')
 
 /** Ce qui défile : la colonne au bureau, le panneau sur téléphone (spec §4.3). */
 const scroller = (page: Page, isMobile: boolean) =>
@@ -752,9 +726,7 @@ test.describe('un client à la borne de #7, 100 caractères', () => {
       const facts = page.locator('.project-facts')
       expect((await facts.boundingBox())!.height).toBeLessThanOrEqual(3 * LINE)
       for (const element of [facts, page.locator('.project-scroll'), panel(page)]) {
-        expect(await element.evaluate(({ scrollWidth, clientWidth }) => scrollWidth <= clientWidth)).toBe(
-          true,
-        )
+        await expectNoOverflow(element)
       }
       expect(await page.locator('.project-head').boundingBox()).toEqual(head)
     })
