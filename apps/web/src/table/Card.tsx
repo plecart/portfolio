@@ -68,7 +68,7 @@ function Photo({ project, size }: { project: Project; size: CardSize }) {
         <CoverLayer {...cover} sizes={sizes} className="card-photo-grey" aria-hidden />
       )}
       <p className="card-summary" aria-hidden>
-        {project.summary}
+        <span className="card-summary-text">{project.summary}</span>
       </p>
     </div>
   )
