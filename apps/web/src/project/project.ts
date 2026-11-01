@@ -6,12 +6,11 @@
 import type { components } from '../api/schema.ts'
 import { BREAKPOINT } from '../chrome/author-links-placement.ts'
 import { strings } from '../strings.ts'
-import { imageSources } from '../table/cards.ts'
+import { imageSources, type Technology } from '../table/cards.ts'
 
 type GalleryImage = components['schemas']['GalleryImageOut']
 type Project = components['schemas']['ProjectOut']
 type Section = components['schemas']['SectionOut']
-type Technology = components['schemas']['TechnologyOut']
 
 /** Le chemin d'une fiche, avec ou sans barre finale : un seul segment après `/projets/`. */
 const PROJECT_PATH = /^\/projets\/([^/]+)\/?$/
@@ -69,8 +68,8 @@ export function slugFromPath(pathname: string): string | null {
 }
 
 /**
- * Un geste modifié reste au navigateur : un clic ouvre le lien ailleurs, Alt+← revient en arrière.
- * Le bouton du milieu n'émet pas de `click`.
+ * Un geste modifié reste au navigateur : ni son clic ni sa touche ne sont annulés. Le bouton du
+ * milieu n'émet pas de `click`.
  */
 export function hasModifier(event: {
   ctrlKey: boolean

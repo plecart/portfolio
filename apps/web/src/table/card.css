@@ -47,13 +47,14 @@
     --card-perspective: 900px;
     align-self: start;
     transition: opacity var(--dur-fast) var(--ease-out);
-  }
 
-  /* Fiche ouverte, toutes les cartes s'effacent (§4.6, §6.3) : par l'opacité, jamais par une
-     transformation, que la mesure des liens de l'auteur suivrait (`TABLE_CELL_SELECTOR`). Le pointeur
-     ne les atteint plus : Radix pose `pointer-events: none` sur `<body>` pendant un dialogue modal. */
-  html[data-project-open] .card {
-    opacity: 0;
+    /* Fiche ouverte, toutes les cartes s'effacent (§4.6, §6.3) : par l'opacité, jamais par une
+       transformation, que la mesure des liens de l'auteur suivrait (`TABLE_CELL_SELECTOR`). Le
+       pointeur ne les atteint plus : Radix pose `pointer-events: none` sur `<body>` pendant un
+       dialogue modal. */
+    @variant project-open {
+      opacity: 0;
+    }
   }
 
   /* L'entrée (spec §3.1, §6.3), que `useCardEntrance` déclenche et retarde d'un pas par colonne :
@@ -132,8 +133,7 @@
   }
 
   /* Le titre d'un projet, sur sa carte et sur sa fiche. */
-  .card-postit,
-  .project-title {
+  .postit-title {
     background-color: var(--postit);
     letter-spacing: 0.005em;
     transform: rotate(-2deg);

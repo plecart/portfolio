@@ -79,7 +79,7 @@
     }
   }
 
-  /* Entière, jamais recadrée (§1.11) : le `cover` de la carte couperait une image non carrée. */
+  /* Entière, jamais recadrée (§1.11) : `contain`, là où la carte pose `cover`. */
   .project-gallery-image {
     flex: none;
     width: 100%;
