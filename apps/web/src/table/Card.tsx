@@ -9,7 +9,7 @@ import type { Project } from '../api/projects.ts'
 import { strings } from '../strings.ts'
 import {
   cardDescription,
-  cardLabelSuffix,
+  cardNameSuffix,
   cardPose,
   cardStates,
   cardTechnologies,
@@ -48,8 +48,8 @@ function Clip() {
   )
 }
 
-/** Une couche de la couverture : le libellé du lien porte le sens, jamais son texte alternatif. */
-function CoverLayer(props: ComponentProps<'img'>) {
+/** Une image de la carte : le nom du lien porte le sens, jamais son texte alternatif. */
+function CardImage(props: ComponentProps<'img'>) {
   return <img alt="" loading="lazy" {...props} />
 }
 
@@ -63,9 +63,9 @@ function Photo({ project, size }: { project: Project; size: CardSize }) {
   const sizes = coverSizes(size)
   return (
     <div className="card-photo">
-      {cover && <CoverLayer {...cover} sizes={sizes} />}
+      {cover && <CardImage {...cover} sizes={sizes} />}
       {cover && cardStates(project).ongoing && (
-        <CoverLayer {...cover} sizes={sizes} className="card-photo-grey" aria-hidden />
+        <CardImage {...cover} sizes={sizes} className="card-photo-grey" aria-hidden />
       )}
       <p className="card-summary" aria-hidden>
         <span className="card-summary-text">{project.summary}</span>
@@ -75,7 +75,7 @@ function Photo({ project, size }: { project: Project; size: CardSize }) {
 }
 
 /**
- * La bande basse (spec §4.1), masquée : le libellé du lien porte les états, et sa description les
+ * La bande basse (spec §4.1), masquée : le nom du lien porte les états, et sa description les
  * technologies. Les rubans de technologies à gauche, avec leur icône, leur nom en texte masqué et
  * en infobulle native ; les rubans d'état à droite. « Ouvrir » les remplace pendant la révélation
  * au toucher : un texte du lien, jamais un `<button>`, qu'un `<a>` ne peut contenir.
@@ -87,7 +87,7 @@ function Band({ project }: { project: Project }) {
       <ul className="card-ribbons">
         {cardTechnologies(project.technologies).map(({ name, icon }) => (
           <li key={name} className="card-ribbon" title={name}>
-            <img src={icon} alt="" loading="lazy" />
+            <CardImage src={icon} />
             <span className="sr-only">{name}</span>
           </li>
         ))}
@@ -113,7 +113,7 @@ function Band({ project }: { project: Project }) {
  * post-it, la photo et la bande basse.
  *
  * Le lien tire son nom de son contenu, où restent exposés le `<h2>`, que la navigation par titres
- * lit seul, et la suite du libellé, en texte masqué. Chromium sépare les deux d'une espace, devant
+ * lit seul, et la suite du nom, en texte masqué. Chromium sépare les deux d'une espace, devant
  * le point du titre (Chromium 156, mesuré le 2026-11-01). Ni `aria-label` ni `aria-labelledby` sur
  * le lien : `label-content-name-mismatch` (axe 4.14) comparerait ce nom au texte visible, où le
  * survol ajoute le résumé.
@@ -164,7 +164,7 @@ export function Card({
             <div ref={layer} className="card-tilt">
               <Clip />
               <h2 className="card-postit">{project.title}</h2>
-              <span className="sr-only">{cardLabelSuffix(project)}</span>
+              <span className="sr-only">{cardNameSuffix(project)}</span>
               <Photo project={project} size={size} />
               <Band project={project} />
             </div>

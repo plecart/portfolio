@@ -34,6 +34,11 @@ export function fixturePath(pathname: string): string {
   )
 }
 
+/** Une technologie de ce type, servie avec son icône. */
+export function buildTechnology(name: string, kind: Technology['kind']): Technology {
+  return { name, kind, icon: `${FILES_ORIGIN}/icones/${name.toLowerCase()}.svg` }
+}
+
 /** Les technologies que les projets puisent, une par type. */
 const TECHNOLOGIES: Technology[] = (
   [
@@ -43,10 +48,14 @@ const TECHNOLOGIES: Technology[] = (
     ['Docker', 'infrastructure'],
     ['Figma', 'tool'],
   ] as const
-).map(([name, kind]) => ({ name, kind, icon: `${FILES_ORIGIN}/icones/${name.toLowerCase()}.svg` }))
+).map(([name, kind]) => buildTechnology(name, kind))
 
-/** Une image carrée de 1600 px, prête — avec ses variantes — ou en attente, sans elles. */
-function image(slug: string, caption: string, state: GalleryImage['state'] = 'ready'): GalleryImage {
+/** Une image carrée de 1600 px, prête — avec ses variantes — ou en attente ou en échec, sans elles. */
+export function buildImage(
+  slug: string,
+  caption: string,
+  state: GalleryImage['state'] = 'ready',
+): GalleryImage {
   const variants = [480, 960].map((width) => ({
     url: `${FILES_ORIGIN}/images/${slug}/${width}.webp`,
     width,
@@ -54,6 +63,9 @@ function image(slug: string, caption: string, state: GalleryImage['state'] = 're
   }))
   return { caption, width: 1600, height: 1600, state, variants: state === 'ready' ? variants : [] }
 }
+
+/** Les champs d'un projet en cours : sans date de fin, comme l'API le sert. */
+export const ONGOING = { status: 'ongoing', finished_on: null } satisfies Partial<Project>
 
 /**
  * Un projet publié complet, valide pour le glossaire.
@@ -77,7 +89,7 @@ export function buildProject(overrides: Partial<Project> = {}): Project {
     demo_url: '',
     showcase: false,
     technologies: TECHNOLOGIES.slice(0, 1),
-    gallery: [image(slug, 'Écran d’accueil')],
+    gallery: [buildImage(slug, 'Écran d’accueil')],
     sections: [],
     ...overrides,
   }
@@ -95,7 +107,8 @@ function numberedProject(index: number, showcase: boolean): Project {
   const slug = `projet-${number}`
   const status = STATUSES[index % STATUSES.length]
   const year = 2014 + index
-  const cover = image(slug, `Projet ${number}, vue d’ensemble`, index === 6 ? 'pending' : 'ready')
+  const state = index === 6 ? 'pending' : 'ready'
+  const cover = buildImage(slug, `Projet ${number}, vue d’ensemble`, state)
   return buildProject({
     slug,
     title: `Projet ${number}`,
@@ -108,7 +121,7 @@ function numberedProject(index: number, showcase: boolean): Project {
     demo_url: index % 4 === 0 ? `https://demo.test/${slug}` : '',
     showcase,
     technologies: TECHNOLOGIES.slice(index % 4, (index % 4) + 1 + (index % 3)),
-    gallery: index % 2 === 0 ? [cover, image(slug, 'Détail de l’interface')] : [cover],
+    gallery: index % 2 === 0 ? [cover, buildImage(slug, 'Détail de l’interface')] : [cover],
     sections:
       index % 2 === 0
         ? [{ title: 'Architecture', anchor: 'architecture', body: 'Les briques du projet.' }]

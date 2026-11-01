@@ -3,7 +3,7 @@ import type { Project } from '../api/projects.ts'
 import type { ProjectsStatus } from '../api/useProjects.ts'
 import { strings } from '../strings.ts'
 import { Card } from './Card.tsx'
-import { cardSize, orderProjects } from './cards.ts'
+import { cardSize, orderProjects, type CardSize } from './cards.ts'
 import { useCardEntrance } from './useCardEntrance.ts'
 import { useTouchReveal } from './useTouchReveal.ts'
 
@@ -28,7 +28,7 @@ const TRACK_CLASSES = 'grid-cols-2 sm:grid-cols-[repeat(auto-fit,240px)]'
 const SOLO_TRACK_CLASSES = 'grid-cols-[80%] sm:grid-cols-[360px]'
 
 /** La table à trois cartes avec vitrine (spec §5.5), que le chargement annonce (§5.1). */
-const LOADING_FRAMES = ['showcase', 'simple', 'simple'] as const
+const LOADING_FRAMES: readonly CardSize[] = ['showcase', 'simple', 'simple']
 
 /**
  * Un cadre de chargement (spec §5.1) : une cellule de la table, au sens de `TABLE_CELL_SELECTOR`
@@ -37,7 +37,7 @@ const LOADING_FRAMES = ['showcase', 'simple', 'simple'] as const
  * sans contenu, et une barre de 40 % × 10 px en `--line`. Pulsation d'opacité, nulle en mouvement
  * réduit (§6.3).
  */
-function LoadingFrame({ size }: { size: (typeof LOADING_FRAMES)[number] }) {
+function LoadingFrame({ size }: { size: CardSize }) {
   return (
     <div data-table-cell aria-hidden inert className={`card-${size}`}>
       <div className="card-face animate-frame-pulse motion-reduce:animate-none">
