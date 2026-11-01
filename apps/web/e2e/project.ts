@@ -9,7 +9,7 @@ export const panel = (page: Page) => page.getByRole('dialog')
 /** Le bouton « Fermer la fiche ». */
 export const closeButton = (page: Page) => page.getByRole('button', { name: 'Fermer la fiche' })
 
-/** Ouvre la fiche d'une carte par Entrée, la seule activation commune aux deux projets. */
+/** Ouvre la fiche d'une carte par Entrée, qui ouvre d'emblée sur les deux projets. */
 export async function openProject(card: Locator) {
   await card.press('Enter')
   await expect(panel(card.page())).toBeVisible()
@@ -55,8 +55,7 @@ export async function watchAnimations(page: Page) {
 
 /**
  * Retient, sans les laisser agir, les clics que la page laisse au navigateur : un onglet ouvert
- * échapperait aux interceptions de la page, et le geste d'un modificateur varie selon le système.
- * Un clic du bouton du milieu est un `auxclick`.
+ * échapperait aux interceptions de la page. Un clic du bouton du milieu est un `auxclick`.
  *
  * @returns De quoi lire le nombre de clics que l'application n'a pas annulés.
  */
