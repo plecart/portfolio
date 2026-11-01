@@ -65,7 +65,7 @@
     aspect-ratio: 1;
     overflow: hidden;
     background-color: var(--line);
-    touch-action: pan-y;
+    touch-action: pan-y pinch-zoom;
   }
 
   .project-gallery-track {

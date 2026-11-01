@@ -354,6 +354,12 @@ test.describe('les repères de §3.2 et §4.4', () => {
     await expect(gallery(page).getByRole('img')).toHaveAttribute('loading', 'lazy')
   })
 
+  test('le cadre laisse le défilement vertical et le pincement au navigateur', async ({ page }) => {
+    await arriveAt(page, { gallery: THREE_IMAGES })
+
+    await expect(frame(page)).toHaveCSS('touch-action', 'pan-y pinch-zoom')
+  })
+
   test('les flèches : 36 px, rondes, centrées, à 8 px des bords, --paper à 88 %, --ink', async ({
     page,
   }) => {
