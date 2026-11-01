@@ -12,7 +12,15 @@ import { expect, FAILURES, holdProjects, serving, test, type Answer } from './ap
 import { resolveAll } from './css.ts'
 import { buildProject, FILES_ORIGIN, PROJECT_SETS, type Project } from './projects.ts'
 import { scrollThrough } from './scroll.ts'
-import { cards, COLUMN_VIEWPORT, enterCards, expectPlacement, openTable, settle } from './table.ts'
+import {
+  cards,
+  COLUMN_VIEWPORT,
+  enterCards,
+  expectPlacement,
+  openTable,
+  serveUnderCsp,
+  settle,
+} from './table.ts'
 
 /** Les couches de la couverture d'une carte : l'image, puis la copie d'un projet en cours. */
 const coverLayers = (card: Locator) => card.locator('img[srcset]')
@@ -471,15 +479,7 @@ test('un projet sans état ne porte aucun ruban d’état', async ({ page }) => 
 test('la pose vient de l’empreinte du slug, sous la CSP de production, sur un enfant de la cellule', async ({
   page,
 }) => {
-  // Une CSP sans `style-src 'unsafe-inline'`, comme celle de Caddy, qu'aucun scénario ne traverse :
-  // elle bloque un attribut `style` analysé, jamais le CSSOM.
-  await page.route('/', async (route) => {
-    const response = await route.fetch()
-    await route.fulfill({
-      response,
-      headers: { ...response.headers(), 'content-security-policy': "style-src 'self'" },
-    })
-  })
+  await serveUnderCsp(page)
   await openTable(page, [buildProject({ slug: 'portfolio' })])
   const card = cards(page)
   // La pose de `tests/cards.test.ts`, calculée hors de JavaScript.

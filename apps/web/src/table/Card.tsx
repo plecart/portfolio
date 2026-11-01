@@ -17,6 +17,7 @@ import {
   coverSizes,
   type CardSize,
 } from './cards.ts'
+import { useCardTilt } from './useCardTilt.ts'
 
 /** La pose d'une carte, en variables : le redressement la remplace par une règle de la feuille. */
 function poseStyle(slug: string): CSSProperties {
@@ -140,6 +141,7 @@ export function Card({
   ref?: Ref<HTMLAnchorElement>
 }) {
   const descriptionId = useId()
+  const { layer, ...tiltGestures } = useCardTilt()
 
   return (
     <a
@@ -150,11 +152,12 @@ export function Card({
       data-revealed={revealed || undefined}
       className={`card card-${size}`}
       onClick={onClick}
+      {...tiltGestures}
     >
       <div className="card-entry">
         <div className="card-pose" style={poseStyle(project.slug)}>
           <div className="card-face">
-            <div className="card-tilt">
+            <div ref={layer} className="card-tilt">
               <Clip />
               <h2 className="card-postit" aria-label={cardLabel(project)}>
                 {project.title}
