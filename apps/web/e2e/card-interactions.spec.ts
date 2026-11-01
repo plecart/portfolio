@@ -2,10 +2,11 @@
  * Les interactions d'une carte (spec §1.3, §1.7, §2.7, §3.1, §4.1, §6.1-6.3 ; issue #168), sur la
  * page servie, l'API et les fichiers interceptés par les gestes d'`api.ts`.
  */
-import type { Locator } from '@playwright/test'
+import { AxeBuilder } from '@axe-core/playwright'
+import type { Locator, Page } from '@playwright/test'
 import { expect, holdProjects, serving, test } from './api.ts'
 import { resolveAll } from './css.ts'
-import { PROJECT_SETS } from './projects.ts'
+import { buildProject, FILES_ORIGIN, PROJECT_SETS } from './projects.ts'
 import { scrollThrough } from './scroll.ts'
 import {
   cards,
@@ -16,8 +17,50 @@ import {
   settle,
 } from './table.ts'
 
-/** La couche d'entrée d'une carte. */
+/** Les couches d'une carte qui bougent, et son bandeau de résumé. */
 const entry = (card: Locator) => card.locator('.card-entry')
+const pose = (card: Locator) => card.locator('.card-pose')
+const face = (card: Locator) => card.locator('.card-face')
+const summary = (card: Locator) => card.locator('.card-summary')
+
+/** Le soulèvement (−6 px, ×1,02) et la pression (×0,985) de spec §2.7, en transformation calculée. */
+const LIFTED = 'matrix(1.02, 0, 0, 1.02, 0, -6)'
+const PRESSED = 'matrix(0.985, 0, 0, 0.985, 0, 0)'
+
+/** Focalise une carte au clavier : une touche d'abord, pour que `:focus-visible` s'applique. */
+async function focusByKeyboard(card: Locator) {
+  await card.page().keyboard.press('Tab')
+  await card.focus()
+}
+
+/** Attend l'ombre soulevée et le bandeau, apparus ou effacés. */
+async function expectRevealed(card: Locator, revealed: boolean) {
+  const opacity = revealed ? '1' : '0'
+  await expect(face(card)).toHaveCSS('opacity', opacity, { pseudo: 'after' })
+  await expect(summary(card)).toHaveCSS('opacity', opacity)
+}
+
+/** Les deux gestes d'une intention, sur un appareil à survol (spec §4.1). */
+const INTENTS: [string, (card: Locator) => Promise<void>][] = [
+  ['au survol', (card) => card.hover()],
+  ['au focus clavier', focusByKeyboard],
+]
+
+/** Une carte aux trois technologies et aux deux états : sous 600 px, ses rubans vont à la ligne. */
+const FULL_CARD = buildProject({
+  slug: 'pleine',
+  status: 'ongoing',
+  finished_on: null,
+  demo_url: 'https://demo.test/pleine',
+  technologies: (['language', 'framework', 'infrastructure'] as const).map((kind) => ({
+    name: kind,
+    kind,
+    icon: `${FILES_ORIGIN}/icones/${kind}.svg`,
+  })),
+})
+
+/** Deux cartes sur une rangée : la carte pleine, en cours donc en tête, et sa voisine. */
+const TWO_CARDS = [FULL_CARD, buildProject({ slug: 'voisine' })]
 
 test('à 15 % de sa surface dans l’écran, une carte entre : 8 px de montée et un fondu de 240 ms', async ({
   page,
@@ -157,3 +200,392 @@ test('les cartes remplacent les cadres en entrant, sans changer la forme des lie
   expect(moved.length).toBeGreaterThan(0)
   expect([...new Set(moved)]).toEqual(['card-entry'])
 })
+
+for (const width of [1280, 400]) {
+  for (const [gesture, act] of INTENTS) {
+    test(`${gesture} à ${width} px, la carte se redresse, se soulève, l'ombre s'élargit, le bandeau se révèle`, async ({
+      page,
+      isMobile,
+    }) => {
+      test.skip(isMobile, 'appareil sans survol : la révélation au toucher a ses scénarios')
+      await page.setViewportSize({ ...COLUMN_VIEWPORT, width })
+      await openTable(page, PROJECT_SETS.threeWithShowcase)
+      await settle(page)
+      const card = cards(page).first()
+
+      await expectRevealed(card, false)
+      await expect(summary(card)).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 6)')
+
+      await act(card)
+
+      await expect(pose(card)).toHaveCSS('transform', 'none')
+      await expect(face(card)).toHaveCSS('transform', LIFTED)
+      await expectRevealed(card, true)
+      await expect(summary(card)).toHaveCSS('transform', 'none')
+    })
+  }
+}
+
+test('les mouvements d’une carte suivent le tableau de spec §2.7', async ({ page }) => {
+  await openTable(page, PROJECT_SETS.one)
+  const card = cards(page)
+  const [fast, base, out, spring] = await resolveAll(page, [
+    ['transition-duration', 'var(--dur-fast)'],
+    ['transition-duration', 'var(--dur)'],
+    ['transition-timing-function', 'var(--ease-out)'],
+    ['transition-timing-function', 'var(--ease-spring)'],
+  ])
+  const expectMotion = async (layer: Locator, name: string, duration: string, curve: string) => {
+    await expect(layer).toHaveCSS('transition-property', name)
+    await expect(layer).toHaveCSS('transition-duration', duration)
+    await expect(layer).toHaveCSS('transition-timing-function', curve)
+  }
+
+  await expectMotion(pose(card), 'transform', base, out)
+  await expectMotion(face(card), 'transform', base, spring)
+  await expectMotion(summary(card), 'opacity, transform', `${fast}, ${base}`, `${out}, ${out}`)
+  await expect(face(card)).toHaveCSS('transition-property', 'opacity', { pseudo: 'after' })
+  await expect(face(card)).toHaveCSS('transition-duration', base, { pseudo: 'after' })
+  await expect(face(card)).toHaveCSS('transition-timing-function', out, { pseudo: 'after' })
+})
+
+test('le bandeau de résumé : absolu en bas de la photo, `--paper` à 94 %, 13 px, `--ink` (spec §4.1)', async ({
+  page,
+}) => {
+  await openTable(page, [buildProject({ summary: 'Un résumé.' })])
+  const card = cards(page)
+  const [paper, ink] = await resolveAll(page, [
+    ['background-color', 'color-mix(in srgb, var(--paper) 94%, transparent)'],
+    ['color', 'var(--ink)'],
+  ])
+
+  await expect(summary(card)).toHaveText('Un résumé.')
+  await expect(summary(card)).toHaveAttribute('aria-hidden', 'true')
+  await expect(summary(card)).toHaveCSS('background-color', paper)
+  await expect(summary(card)).toHaveCSS('color', ink)
+  await expect(summary(card)).toHaveCSS('font-size', '13px')
+  await expect(summary(card)).toHaveCSS('padding', '12px')
+  const gap = await summary(card).evaluate(
+    (band) =>
+      band.parentElement!.getBoundingClientRect().bottom - band.getBoundingClientRect().bottom,
+  )
+  // Caché, le bandeau est 6 px plus bas que sa place.
+  expect(Math.round(gap)).toBe(-6)
+})
+
+test('un résumé de 120 caractères tient en sept lignes sur la carte simple mobile (spec §7)', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, 'la carte simple de 176 px, la plus étroite de spec §7')
+  const longest =
+    'Une application de suivi des livraisons pour les artisans du bâtiment, avec planning partagé et alertes par messageries.'
+  expect(longest).toHaveLength(120)
+  await openTable(page, [
+    buildProject({ slug: 'a', summary: longest }),
+    buildProject({ slug: 'b' }),
+  ])
+
+  const { text, lineHeight, photo } = await summary(cards(page).first()).evaluate(
+    (band: HTMLElement) => ({
+      text: band.offsetHeight - 2 * 12,
+      lineHeight: parseFloat(getComputedStyle(band).lineHeight),
+      photo: band.parentElement!.offsetHeight,
+    }),
+  )
+
+  expect(Math.round(text / lineHeight)).toBeLessThanOrEqual(7)
+  expect(text + 2 * 12).toBeLessThanOrEqual(photo)
+})
+
+test('focus clavier : un anneau de 2 px `--accent` à 4 px de la face, aucun sur la cellule', async ({
+  page,
+}) => {
+  await openTable(page, PROJECT_SETS.threeWithShowcase)
+  const card = cards(page).first()
+  const [accent] = await resolveAll(page, [['outline-color', 'var(--accent)']])
+
+  await focusByKeyboard(card)
+
+  await expect(card).toHaveCSS('outline-style', 'none')
+  await expect(face(card)).toHaveCSS('outline-style', 'solid')
+  await expect(face(card)).toHaveCSS('outline-width', '2px')
+  await expect(face(card)).toHaveCSS('outline-offset', '4px')
+  await expect(face(card)).toHaveCSS('outline-color', accent)
+})
+
+/** Le nombre d'écouteurs de `pointerdown` sur le document, lu par le débogueur du navigateur. */
+async function documentPointerListeners(page: Page): Promise<number> {
+  const client = await page.context().newCDPSession(page)
+  const { result } = await client.send('Runtime.evaluate', { expression: 'document' })
+  const { listeners } = await client.send('DOMDebugger.getEventListeners', {
+    objectId: result.objectId!,
+  })
+  await client.detach()
+  return listeners.filter(({ type }) => type === 'pointerdown').length
+}
+
+test.describe('au toucher', () => {
+  test.skip(({ isMobile }) => !isMobile, 'un appareil sans survol : le projet mobile')
+
+  /** « Ouvrir », visible sur la page. */
+  const open = (page: Page) => page.getByText('Ouvrir').filter({ visible: true })
+
+  test('premier toucher : redressement, ombre et bandeau, sans soulèvement ; second : le lien', async ({
+    page,
+  }) => {
+    await openTable(page, TWO_CARDS)
+    await settle(page)
+    const card = cards(page).first()
+
+    await card.tap()
+
+    await expect(page).toHaveURL('/')
+    await expect(pose(card)).toHaveCSS('transform', 'none')
+    await expectRevealed(card, true)
+    await expect(face(card)).toHaveCSS('transform', 'none')
+    await expect(open(page)).toHaveCount(1)
+    await expect(card.locator('.card-ribbons').first()).toBeHidden()
+
+    await card.tap()
+
+    await expect(page).toHaveURL('/projets/pleine')
+  })
+
+  test('« Ouvrir » suit le lien : il ne remplace les rubans que pendant la révélation', async ({
+    page,
+  }) => {
+    await openTable(page, TWO_CARDS)
+    await settle(page)
+    const card = cards(page).first()
+    await expect(open(page)).toHaveCount(0)
+
+    await card.tap()
+    await open(page).tap()
+
+    await expect(page).toHaveURL('/projets/pleine')
+  })
+
+  test('« Ouvrir » : 30 px de haut, marge 0 12 px, bordure 1 px `--ink`, `--paper`, rayon 6 px, 13 / 600', async ({
+    page,
+  }) => {
+    await openTable(page, TWO_CARDS)
+    await settle(page)
+    await cards(page).first().tap()
+    const [ink, paper] = await resolveAll(page, [
+      ['border-top-color', 'var(--ink)'],
+      ['background-color', 'var(--paper)'],
+    ])
+
+    const button = open(page)
+    await expect(button).toHaveCSS('height', '30px')
+    await expect(button).toHaveCSS('padding', '0px 12px')
+    await expect(button).toHaveCSS('border-top-width', '1px')
+    await expect(button).toHaveCSS('border-top-color', ink)
+    await expect(button).toHaveCSS('background-color', paper)
+    await expect(button).toHaveCSS('border-top-left-radius', '6px')
+    await expect(button).toHaveCSS('font-size', '13px')
+    await expect(button).toHaveCSS('font-weight', '600')
+  })
+
+  for (const [band, project] of [
+    ['d’une ligne', buildProject({ slug: 'pleine' })],
+    ['de deux lignes', FULL_CARD],
+  ] as const) {
+    test(`la hauteur de la carte ne change pas quand « Ouvrir » remplace une bande ${band}`, async ({
+      page,
+    }) => {
+      await openTable(page, [buildProject({ slug: 'voisine' }), project])
+      await settle(page)
+      const card = cards(page).first()
+      const height = () => face(card).evaluate((element: HTMLElement) => element.offsetHeight)
+      const before = await height()
+
+      await card.tap()
+      await expect(open(page)).toHaveCount(1)
+
+      expect(await height()).toBe(before)
+    })
+  }
+
+  test('une seule carte révélée : toucher une autre carte déplace la révélation', async ({ page }) => {
+    await openTable(page, TWO_CARDS)
+    await settle(page)
+    const [first, second] = [cards(page).first(), cards(page).last()]
+
+    await first.tap()
+    await expectRevealed(first, true)
+    await second.tap()
+
+    await expectRevealed(first, false)
+    await expectRevealed(second, true)
+    await expect(open(page)).toHaveCount(1)
+    await expect(page).toHaveURL('/')
+  })
+
+  test('toucher hors des cartes referme, et l’écoute du document cesse avec la révélation', async ({
+    page,
+  }) => {
+    await openTable(page, TWO_CARDS)
+    await settle(page)
+    const card = cards(page).first()
+    const box = (await card.boundingBox())!
+    expect(await documentPointerListeners(page)).toBe(0)
+
+    await card.tap()
+    await expect(open(page)).toHaveCount(1)
+    expect(await documentPointerListeners(page)).toBe(1)
+
+    // Loin sous la table : le navigateur ajuste vers un lien proche le toucher qui le frôle.
+    await page.touchscreen.tap(box.x + box.width, box.y + box.height + 100)
+
+    await expect(open(page)).toHaveCount(0)
+    await expectRevealed(card, false)
+    await expect.poll(() => documentPointerListeners(page)).toBe(0)
+    await expect(page).toHaveURL('/')
+  })
+
+  test('un `pointerdown` seul referme : iOS n’émet aucun `click` hors d’un élément cliquable', async ({
+    page,
+  }) => {
+    await openTable(page, TWO_CARDS)
+    await settle(page)
+    await cards(page).first().tap()
+    await expect(open(page)).toHaveCount(1)
+
+    await page.evaluate(() =>
+      document.querySelector('main')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })),
+    )
+
+    await expect(open(page)).toHaveCount(0)
+  })
+
+  test('Entrée ouvre directement la carte focalisée, sans révélation (spec §6.2)', async ({ page }) => {
+    await openTable(page, TWO_CARDS)
+    await settle(page)
+    await cards(page).first().focus()
+
+    await page.keyboard.press('Enter')
+
+    await expect(page).toHaveURL('/projets/pleine')
+  })
+
+  test('un toucher enfonce la carte en 80 ms (spec §1.6, §4.1)', async ({ page }) => {
+    await openTable(page, TWO_CARDS)
+    await settle(page)
+    const [press] = await resolveAll(page, [['transition-duration', 'var(--dur-press)']])
+    // Un contact tenu par le protocole ne rend jamais `:active` : Chromium ne le pose qu'à la
+    // relève, le temps du toucher (mesuré le 2026-11-01). On lit donc la transition qui part.
+    const pressed = await page.evaluateHandle(() => {
+      const durations: string[] = []
+      addEventListener('transitionrun', ({ target, propertyName }) => {
+        const layer = target as Element
+        if (layer.matches('.card-face') && propertyName === 'transform') {
+          durations.push(getComputedStyle(layer).transitionDuration)
+        }
+      })
+      return durations
+    })
+
+    await cards(page).first().tap()
+
+    await expect.poll(async () => (await pressed.jsonValue())[0]).toBe(press)
+  })
+})
+
+test('sur un appareil à survol, un clic ouvre d’emblée', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'appareil sans survol : le premier toucher révèle')
+  await openTable(page, TWO_CARDS)
+  await settle(page)
+
+  await cards(page).first().click()
+
+  await expect(page).toHaveURL('/projets/pleine')
+})
+
+test('pressée au pointeur, la carte s’enfonce à ×0,985 en 80 ms (spec §4.1)', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'appareil sans pointeur : le toucher a son scénario')
+  await openTable(page, PROJECT_SETS.one)
+  await settle(page)
+  const card = cards(page)
+  const [press] = await resolveAll(page, [['transition-duration', 'var(--dur-press)']])
+  await card.hover()
+
+  await page.mouse.down()
+
+  await expect(face(card)).toHaveCSS('transform', PRESSED)
+  await expect(face(card)).toHaveCSS('transition-duration', press)
+})
+
+test.describe('en mouvement réduit', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+  })
+
+  for (const [gesture, act] of INTENTS) {
+    test(`${gesture}, ni redressement ni soulèvement : l'ombre et le fondu du bandeau seulement`, async ({
+      page,
+      isMobile,
+    }) => {
+      test.skip(isMobile, 'appareil sans survol : la révélation au toucher a son scénario')
+      await openTable(page, PROJECT_SETS.one)
+      await settle(page)
+      const card = cards(page)
+      const rest = await pose(card).evaluate((layer) => getComputedStyle(layer).transform)
+      await expect(summary(card)).toHaveCSS('transform', 'none')
+
+      await act(card)
+
+      await expectRevealed(card, true)
+      await expect(pose(card)).toHaveCSS('transform', rest)
+      await expect(face(card)).toHaveCSS('transform', 'none')
+    })
+  }
+
+  test('au toucher, ni redressement ni soulèvement : l’ombre et le fondu du bandeau seulement', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(!isMobile, 'un appareil sans survol : le projet mobile')
+    await openTable(page, TWO_CARDS)
+    await settle(page)
+    const card = cards(page).first()
+    const rest = await pose(card).evaluate((layer) => getComputedStyle(layer).transform)
+
+    await card.tap()
+
+    await expectRevealed(card, true)
+    await expect(pose(card)).toHaveCSS('transform', rest)
+  })
+
+  test('pressée, la carte ne s’enfonce pas', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'appareil sans pointeur')
+    await openTable(page, PROJECT_SETS.one)
+    await settle(page)
+    const card = cards(page)
+    await card.hover()
+
+    await page.mouse.down()
+
+    await expect(face(card)).toHaveCSS('transform', 'none')
+  })
+})
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`une carte révélée : aucune violation d'accessibilité — ${colorScheme}`, async ({
+    page,
+    isMobile,
+  }) => {
+    await page.emulateMedia({ colorScheme })
+    await openTable(page, TWO_CARDS)
+    await enterCards(page)
+    const card = cards(page).first()
+
+    await (isMobile ? card.tap() : card.hover())
+    await expectRevealed(card, true)
+    await settle(page)
+
+    const { violations } = await new AxeBuilder({ page }).analyze()
+    expect(violations.map((violation) => violation.id)).toEqual([])
+  })
+}

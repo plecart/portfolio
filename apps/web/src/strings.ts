@@ -23,4 +23,6 @@ export const strings = {
   stateLive: 'En ligne',
   ribbonOngoing: 'en cours',
   ribbonLive: 'en ligne',
+  /** Ce qui remplace les rubans d'une carte révélée au toucher (spec §4.1). */
+  openCard: 'Ouvrir',
 } as const

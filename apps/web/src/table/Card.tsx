@@ -1,4 +1,10 @@
-import { useId, type ComponentProps, type CSSProperties, type Ref } from 'react'
+import {
+  useId,
+  type ComponentProps,
+  type CSSProperties,
+  type MouseEventHandler,
+  type Ref,
+} from 'react'
 import type { Project } from '../api/projects.ts'
 import { strings } from '../strings.ts'
 import {
@@ -48,7 +54,8 @@ function CoverLayer(props: ComponentProps<'img'>) {
 
 /**
  * La photo (spec §4.1) : le carré `--line`, l'image de couverture si elle a des variantes et, pour
- * un projet en cours, sa copie en niveaux de gris par-dessus — la même image, par CSS seulement.
+ * un projet en cours, sa copie en niveaux de gris par-dessus — la même image, par CSS seulement. Le
+ * bandeau de résumé la recouvre, masqué : le résumé est dans le libellé du lien.
  */
 function Photo({ project, size }: { project: Project; size: CardSize }) {
   const cover = coverImage(project)
@@ -59,6 +66,9 @@ function Photo({ project, size }: { project: Project; size: CardSize }) {
       {cover && cardStates(project).ongoing && (
         <CoverLayer {...cover} sizes={sizes} className="card-photo-grey" aria-hidden />
       )}
+      <p className="card-summary" aria-hidden>
+        {project.summary}
+      </p>
     </div>
   )
 }
@@ -66,7 +76,8 @@ function Photo({ project, size }: { project: Project; size: CardSize }) {
 /**
  * La bande basse (spec §4.1), masquée : le libellé du lien porte les états, et sa description les
  * technologies. Les rubans de technologies à gauche, avec leur icône, leur nom en texte masqué et
- * en infobulle native ; les rubans d'état à droite.
+ * en infobulle native ; les rubans d'état à droite. « Ouvrir » les remplace pendant la révélation
+ * au toucher : un texte du lien, jamais un `<button>`, qu'un `<a>` ne peut contenir.
  */
 function Band({ project }: { project: Project }) {
   const { ongoing, live } = cardStates(project)
@@ -89,6 +100,7 @@ function Band({ project }: { project: Project }) {
           </li>
         )}
       </ul>
+      <span className="card-open">{strings.openCard}</span>
     </div>
   )
 }
@@ -110,15 +122,21 @@ function Band({ project }: { project: Project }) {
  *
  * @param project Le projet.
  * @param size La taille de la carte (`cardSize`).
+ * @param revealed La carte est révélée au toucher (`useTouchReveal`).
+ * @param onClick Le `click` du lien.
  * @param ref Le lien, que la table focalise après une relance réussie.
  */
 export function Card({
   project,
   size,
+  revealed,
+  onClick,
   ref,
 }: {
   project: Project
   size: CardSize
+  revealed: boolean
+  onClick: MouseEventHandler<HTMLAnchorElement>
   ref?: Ref<HTMLAnchorElement>
 }) {
   const descriptionId = useId()
@@ -129,7 +147,9 @@ export function Card({
       href={`/projets/${project.slug}`}
       aria-describedby={descriptionId}
       data-table-cell
+      data-revealed={revealed || undefined}
       className={`card card-${size}`}
+      onClick={onClick}
     >
       <div className="card-entry">
         <div className="card-pose" style={poseStyle(project.slug)}>
