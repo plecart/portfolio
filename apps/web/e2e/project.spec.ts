@@ -617,9 +617,10 @@ test.describe('les dimensions de spec §3.2', () => {
   test.skip(({ isMobile }) => isMobile, 'largeurs de bureau : le projet desktop les porte')
 
   for (const [width, height, photo, panelWidth, panelHeight] of [
-    [1280, 800, 594, 1232, 650],
-    [1440, 900, 660, 1364, 716],
-    [1024, 768, 466, 976, 522],
+    [1280, 800, 594, 1232, 642],
+    [1440, 900, 660, 1364, 708],
+    [1024, 768, 466, 976, 514],
+    [1280, 600, 504, 1052, 552],
   ]) {
     test(`à ${width} × ${height}, le panneau mesure ${panelWidth} × ${panelHeight}, deux colonnes de ${photo} px`, async ({
       page,
@@ -646,7 +647,7 @@ test.describe('les dimensions de spec §3.2', () => {
     await page.setViewportSize(COLUMN_VIEWPORT)
     await openFromTable(page, PROJECTS)
 
-    expect(await panel(page).locator('.project-head').boundingBox()).toMatchObject({ x: 652, y: 97 })
+    expect(await panel(page).locator('.project-head').boundingBox()).toMatchObject({ x: 652, y: 101 })
   })
 })
 

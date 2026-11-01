@@ -301,7 +301,7 @@ test.describe('les images prêtes seules comptent', () => {
     await expectNoCommands(page)
     await expect(caption(page)).toHaveText(CAPTIONS[0])
     await expect(gallery(page).getByRole('img')).toHaveAccessibleName(CAPTIONS[0])
-    expect((await bar(page).boundingBox())!.height).toBe(28)
+    expect((await bar(page).boundingBox())!.height).toBe(20)
     expect(await keys()).toEqual([false])
     await expectNoViolations(page)
   })
@@ -320,7 +320,7 @@ test.describe('les images prêtes seules comptent', () => {
       await expect(frame(page)).toHaveCSS('background-color', line)
       await expect(bar(page)).toHaveText('')
       expect((await frame(page).boundingBox())!.height).toBe(width)
-      expect((await bar(page).boundingBox())!.height).toBe(28)
+      expect((await bar(page).boundingBox())!.height).toBe(20)
       await expectPanelBox(page)
       await expectNoViolations(page)
     })
@@ -343,7 +343,7 @@ test.describe('les repères de §3.2 et §4.4', () => {
       x: panelX + inset,
       y: panelY + inset + side + 8,
       width: side,
-      height: 28,
+      height: 20,
     })
   })
 
@@ -415,7 +415,7 @@ test.describe('les repères de §3.2 et §4.4', () => {
 
     await expect(counter(page)).toHaveText('12 / 12')
     await expectNoOverflow(caption(page))
-    expect((await bar(page).boundingBox())!.height).toBe(28)
+    expect((await bar(page).boundingBox())!.height).toBe(20)
   })
 
   test('sous 400 px, la légende longue n’élargit ni le carré ni le panneau', async ({
@@ -427,8 +427,8 @@ test.describe('les repères de §3.2 et §4.4', () => {
     await arriveAt(page, { gallery: TWELVE_LONG_CAPTIONS })
 
     expect((await frame(page).boundingBox())!.width).toBe(304)
-    expect((await bar(page).boundingBox())!.height).toBe(28)
-    expect((await caption(page).boundingBox())!.height).toBeLessThan(28)
+    expect((await bar(page).boundingBox())!.height).toBe(20)
+    expect((await caption(page).boundingBox())!.height).toBeLessThan(20)
     await expectNoOverflow(panel(page))
   })
 
@@ -498,8 +498,8 @@ test.describe('les repères de §3.2 et §4.4', () => {
     test.skip(!isMobile, 'une rangée au bureau')
     await arriveAt(page, { gallery: THREE_IMAGES, description: 'Court.' })
 
-    expect((await gallery(page).boundingBox())!.height).toBe(420)
-    expect((await page.locator('.project-reading').boundingBox())!.y).toBe(440)
+    expect((await gallery(page).boundingBox())!.height).toBe(412)
+    expect((await page.locator('.project-reading').boundingBox())!.y).toBe(432)
   })
 
   test('sizes suit --photo : à 1024 × 768, la variante de 480 px suffit', async ({

@@ -226,8 +226,8 @@ De haut en bas : l'entête (§3.3), la table (`<main>`), les liens de l'auteur (
 ### 3.2 Fiche projet (`/projets/<slug>`)
 
 - **Panneau** : `role="dialog"` `aria-modal="true"`, nommé par le titre ; fixé au centre de la fenêtre, z-index 30, au-dessus de la table dont le défilement est verrouillé ; papier, rayon 2 px, `--shadow-lift`, marge intérieure 10 px ; deux colonnes « photo | lecture », gouttière 24 px.
-- **Dimension depuis la photo** : `--photo = min(100vh − 104px, 660px, (100vw − 92px) / 2)` ; largeur du panneau `2 × photo + 44 px` ; hauteur `photo + 56 px`. Constantes : 44 = 10 + 24 + 10 (marges intérieures et gouttière) ; 56 = 10 + 28 + 8 + 10 (marges, barre de galerie, écart sous la photo) ; 104 = 56 + 2 × 24 et 92 = 44 + 2 × 24 (le panneau garde 24 px de chaque bord de la fenêtre). Repères : 1280 × 800 → photo 594 px, panneau 1232 × 650 px (marges 24 px et 75 px) ; 1440 × 900 → photo 660 px (plafond), panneau 1364 × 716 px ; 1024 × 768 → photo 466 px, panneau 976 × 522 px.
-- **Colonne de lecture** : marge intérieure 12 px 16 px 0 0 ; en haut, fixes, le post-it du titre, les post-its de lien et la rangée de rubans ; dessous, la colonne défilante (§4.3). À 1280 × 800 : en-tête de 89 px, colonne défilante de 529 px, marge basse de 16 px comprise.
+- **Dimension depuis la photo** : `--photo = min(100vh − 96px, 660px, (100vw − 92px) / 2)` ; largeur du panneau `2 × photo + 44 px` ; hauteur `photo + 48 px`. Constantes : 44 = 10 + 24 + 10 (marges intérieures et gouttière) ; 48 = 10 + 20 + 8 + 10 (marges, barre de galerie, écart sous la photo) ; 96 = 48 + 2 × 24 et 92 = 44 + 2 × 24 (le panneau garde 24 px de chaque bord de la fenêtre). Repères : 1280 × 800 → photo 594 px, panneau 1232 × 642 px (marges 24 px et 79 px) ; 1440 × 900 → photo 660 px (plafond), panneau 1364 × 708 px ; 1024 × 768 → photo 466 px, panneau 976 × 514 px.
+- **Colonne de lecture** : marge intérieure 12 px 16 px 0 0 ; en haut, fixes, le post-it du titre, les post-its de lien et la rangée de rubans ; dessous, la colonne défilante (§4.3). À 1280 × 800 : en-tête de 89 px, colonne défilante de 521 px, marge basse de 16 px comprise.
 - **Mobile** (≤ 599 px) : le panneau est la fenêtre (100 vw × 100 vh, rayon 0, marge intérieure 8 px), une colonne, gouttière 12 px ; la photo prend la largeur disponible (384 px à 400 px) ; l'en-tête n'est plus fixe : tout défile avec le panneau ; colonne de lecture à marge 12 px 0 32 px.
 - **Fermeture** : bouton de 36 px en haut à droite du panneau, à 8 px des bords, papier, icône 20 px, libellé « Fermer la fiche » ; Échap ; retour du navigateur. Focus : sur ce bouton à l'ouverture, retenu dans le panneau, rendu à la carte d'origine à la fermeture. Chorégraphie : §4.6.
 
@@ -297,7 +297,7 @@ La carte du projet « vitrine » (§1.9) est une carte polaroid aux dimensions d
 
 - **Cadre** : carré de `--photo` (§3.2), fond `--line` ; piste de diapositives translatée de `−i × 100 %` en 240 ms ; une image non carrée s'affiche entière sur fond neutre (§1.11).
 - **Flèches** « Image précédente » et « Image suivante » : 36 px rondes, `--paper` à 88 %, `--ink`, icône 18 px, centrées verticalement, à 8 px des bords.
-- **Barre** sous l'image : 28 px, 13 px `--ink-2`, légende à gauche, compteur « n / N » à droite (chiffres tabulaires, `aria-live="polite"`).
+- **Barre** sous l'image : 20 px, 13 px `--ink-2`, légende à gauche, compteur « n / N » à droite (chiffres tabulaires, `aria-live="polite"`).
 - **Commandes** : les flèches ; ← et → au clavier quand la fiche est ouverte, sans autre effet ; balayage horizontal de plus de 40 px ; boucle après la dernière image.
 - **Une seule image** : ni flèches ni compteur ; la barre reste, avec la légende.
 - Texte alternatif = légende. Projet « en cours » : la copie en niveaux de gris ne couvre que la première image, pendant le vol ; la galerie est en couleur.
@@ -373,7 +373,7 @@ Un seul point de rupture, 600 px ; la colonne fixe des liens dépend de la marge
 | Liens de l'auteur | colonne fixe si la marge ≥ 76 px ou si la table n'a aucune cellule, sinon pied de page | pied de page (marge de 16 px) |
 | Survol et inclinaison | sur les appareils à survol | non ; révélation au toucher |
 
-Repères mesurés : 1280 × 800 → table 1044 px, carte 240 / 508 px, fiche 1232 × 650 px, colonne de liens ; 400 × 800 → carte 176 / 368 px, fiche 400 × 800 px, pied de page.
+Repères mesurés : 1280 × 800 → table 1044 px, carte 240 / 508 px, fiche 1232 × 642 px, colonne de liens ; 400 × 800 → carte 176 / 368 px, fiche 400 × 800 px, pied de page.
 
 ### 6.2 Accessibilité
 

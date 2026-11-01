@@ -579,7 +579,7 @@ test.describe('le défilement', () => {
     await expect(column).toHaveCSS('margin-bottom', '16px')
     await expect(column).toHaveCSS('scrollbar-width', 'thin')
     expect(Math.round(before!.height)).toBe(89)
-    expect(Math.round((await column.boundingBox())!.height + 16)).toBe(529)
+    expect(Math.round((await column.boundingBox())!.height + 16)).toBe(521)
 
     await scrollTo(column, 300)
 

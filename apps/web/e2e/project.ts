@@ -87,7 +87,7 @@ export async function expectPanelBox(page: Page) {
   expect(await panel(page).boundingBox()).toEqual(
     viewport.width < 600
       ? { x: 0, y: 0, ...viewport }
-      : { x: 24, y: 75, width: 1232, height: 650 },
+      : { x: 24, y: 79, width: 1232, height: 642 },
   )
 }
 
