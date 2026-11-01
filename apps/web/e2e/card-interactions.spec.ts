@@ -315,18 +315,23 @@ test('à mi-transition, aucun filet de l’image ne longe le bandeau', async ({ 
   expect(Math.max(...dips)).toBeLessThanOrEqual(2)
 })
 
+/** Le résumé le plus long de spec §7, 120 caractères, et son voisin : deux cartes simples. */
+const LONGEST_SUMMARY = [
+  buildProject({
+    slug: 'a',
+    summary:
+      'Une application de suivi des livraisons pour les artisans du bâtiment, avec planning partagé et alertes par messageries.',
+  }),
+  buildProject({ slug: 'b' }),
+]
+
 test('un résumé de 120 caractères tient en sept lignes sur la carte simple mobile (spec §7)', async ({
   page,
   isMobile,
 }) => {
   test.skip(!isMobile, 'la carte simple de 176 px, la plus étroite de spec §7')
-  const longest =
-    'Une application de suivi des livraisons pour les artisans du bâtiment, avec planning partagé et alertes par messageries.'
-  expect(longest).toHaveLength(120)
-  await openTable(page, [
-    buildProject({ slug: 'a', summary: longest }),
-    buildProject({ slug: 'b' }),
-  ])
+  expect(LONGEST_SUMMARY[0].summary).toHaveLength(120)
+  await openTable(page, LONGEST_SUMMARY)
 
   const { text, lineHeight, photo } = await summary(cards(page).first()).evaluate(
     (band: HTMLElement) => ({
@@ -339,6 +344,38 @@ test('un résumé de 120 caractères tient en sept lignes sur la carte simple mo
   expect(Math.round(text / lineHeight)).toBeLessThanOrEqual(7)
   expect(text + 2 * 12).toBeLessThanOrEqual(photo)
 })
+
+for (const [width, maxLines] of [
+  [320, 4],
+  [340, 5],
+  [380, 6],
+] as const) {
+  test(`à ${width} px, le bandeau s'arrête à ${maxLines} lignes : le haut du texte reste sous le post-it`, async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(!isMobile, 'des cartes simples plus étroites que celle de spec §7')
+    await page.setViewportSize({ ...COLUMN_VIEWPORT, width })
+    await openTable(page, LONGEST_SUMMARY)
+
+    const band = await summary(cards(page).first()).evaluate((element: HTMLElement) => {
+      const { lineHeight, paddingBottom, paddingTop } = getComputedStyle(element)
+      const inset = parseFloat(paddingTop) + parseFloat(paddingBottom)
+      const postit = element.closest('.card-tilt')!.querySelector<HTMLElement>('.card-postit')!
+      return {
+        textTop: element.offsetTop + parseFloat(paddingTop),
+        postitBottom: postit.offsetTop + postit.offsetHeight,
+        lines: Math.round((element.offsetHeight - inset) / parseFloat(lineHeight)),
+        overflow: element.scrollHeight - element.clientHeight,
+      }
+    })
+
+    expect(band.textTop).toBeGreaterThanOrEqual(band.postitBottom)
+    expect(band.lines).toBe(maxLines)
+    // Les lignes cachées ne reparaissent pas dans la marge basse du bandeau.
+    expect(band.overflow).toBe(0)
+  })
+}
 
 test('focus clavier : un anneau de 2 px `--accent` à 4 px de la face, aucun sur la cellule', async ({
   page,

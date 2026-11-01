@@ -164,6 +164,7 @@
     aspect-ratio: 1;
     overflow: hidden;
     background-color: var(--line);
+    container-type: inline-size;
     mask-image: linear-gradient(black, black);
   }
 
@@ -195,6 +196,35 @@
     transition:
       opacity var(--dur-fast) var(--ease-out),
       transform var(--dur) var(--ease-out);
+  }
+
+  /* Coupé dans la marge du bandeau, et non sur lui : ses lignes cachées reparaîtraient dans sa marge
+     basse. */
+  .card-summary-text {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 7;
+  }
+
+  /* Sous 400 px, la photo passe sous les 160 px de §7 : à 18,2 px la ligne et 12 px de marge basse,
+     le haut du texte passerait sous le post-it d'une ligne, qui descend à 20 px. */
+  @container (width < 160px) {
+    .card-summary-text {
+      -webkit-line-clamp: 6;
+    }
+  }
+
+  @container (width < 142px) {
+    .card-summary-text {
+      -webkit-line-clamp: 5;
+    }
+  }
+
+  @container (width < 124px) {
+    .card-summary-text {
+      -webkit-line-clamp: 4;
+    }
   }
 
   .card-band {
