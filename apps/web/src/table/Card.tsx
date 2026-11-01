@@ -9,7 +9,7 @@ import type { Project } from '../api/projects.ts'
 import { strings } from '../strings.ts'
 import {
   cardDescription,
-  cardLabel,
+  cardLabelSuffix,
   cardPose,
   cardStates,
   cardTechnologies,
@@ -113,11 +113,10 @@ function Band({ project }: { project: Project }) {
  * post-it, la photo et la bande basse.
  *
  * Le lien tire son nom de son contenu, où restent exposés le `<h2>`, que la navigation par titres
- * lit seul, son point et les états. Le point, à taille nulle, vit dans la ligne du titre : hors
- * d'elle, Chromium l'en sépare d'une espace (« Titre . », Chromium 156, mesuré le 2026-11-01). Les
- * états restent en `sr-only` : un navigateur qui ignorerait un texte à taille nulle n'y perdrait
- * qu'un point. Ni `aria-label` ni `aria-labelledby` sur le lien : `label-content-name-mismatch`
- * (axe 4.14) comparerait ce nom au texte visible, où le survol ajoute le résumé.
+ * lit seul, et la suite du libellé, en texte masqué. Chromium sépare les deux d'une espace, devant
+ * le point du titre (Chromium 156, mesuré le 2026-11-01). Ni `aria-label` ni `aria-labelledby` sur
+ * le lien : `label-content-name-mismatch` (axe 4.14) comparerait ce nom au texte visible, où le
+ * survol ajoute le résumé.
  *
  * Sa description, le résumé puis les technologies, vit dans un élément `hidden` : désigner la liste
  * des rubans la ferait entrer dans le nom du lien, tout `aria-hidden` qu'elle soit (Chromium 156,
@@ -147,7 +146,6 @@ export function Card({
 }) {
   const descriptionId = useId()
   const { layer, ...tiltGestures } = useCardTilt()
-  const label = cardLabel(project)
 
   return (
     <a
@@ -165,11 +163,8 @@ export function Card({
           <div className="card-face">
             <div ref={layer} className="card-tilt">
               <Clip />
-              <div className="card-postit">
-                <h2>{project.title}</h2>
-                <span className="card-title-stop">{label.stop}</span>
-              </div>
-              <span className="sr-only">{label.states}</span>
+              <h2 className="card-postit">{project.title}</h2>
+              <span className="sr-only">{cardLabelSuffix(project)}</span>
               <Photo project={project} size={size} />
               <Band project={project} />
             </div>

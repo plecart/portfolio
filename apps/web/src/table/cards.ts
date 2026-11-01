@@ -154,18 +154,14 @@ function sentence(text: string): string {
 }
 
 /**
- * Ce que le libellé du lien d'une carte ajoute à son titre, « Titre. En cours. En ligne. », en deux
- * morceaux que `Card` masque chacun à sa façon : le point du titre, et les états présents seulement.
- * Le résumé est dans sa description.
+ * Ce que le libellé du lien d'une carte, « Titre. En cours. En ligne. », ajoute à son titre : le
+ * point du titre puis les états présents ; rien sans état. Le résumé est dans sa description.
  */
-export function cardLabel(project: Project): { stop: string; states: string } {
+export function cardLabelSuffix(project: Project): string {
   const { ongoing, live } = cardStates(project)
-  return {
-    stop: sentence(project.title).slice(project.title.length),
-    states: [...(ongoing ? [strings.stateOngoing] : []), ...(live ? [strings.stateLive] : [])]
-      .map(sentence)
-      .join(' '),
-  }
+  const states = [...(ongoing ? [strings.stateOngoing] : []), ...(live ? [strings.stateLive] : [])]
+  if (states.length === 0) return ''
+  return [project.title, ...states].map(sentence).join(' ').slice(project.title.length).trim()
 }
 
 /** La description du lien d'une carte : son résumé, puis le nom de ses technologies (spec §1.4, §1.7). */
