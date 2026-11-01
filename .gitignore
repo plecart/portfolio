@@ -38,3 +38,4 @@ strix_runs/
 # `test_aucun_renvoi_vers_un_module_de_test_inexistant` sur le seul poste. Le tableau vit hors du
 # dépôt depuis le lot 3 de #107 (`pr-paralleles`, étape 4).
 .claude/worktrees/
+apps/web/.vitest/
