@@ -19,7 +19,10 @@ export default function App() {
     if (unknownAddress) dismiss()
   }, [unknownAddress, dismiss])
 
+  // La feuille lit l'attribut : le verrou de défilement, les cartes, l'entête et les liens de
+  // l'auteur n'ont ni prop ni état de plus.
   useEffect(() => {
+    document.documentElement.toggleAttribute('data-project-open', project !== undefined)
     document.title = project?.title ?? strings.siteName
   }, [project])
 

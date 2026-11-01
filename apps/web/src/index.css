@@ -67,6 +67,9 @@
   --breakpoint-sm: 600px;
 }
 
+/* Fiche ouverte (`App`) : ce qui s'efface devant elle le lit par cette variante. */
+@custom-variant project-open (html[data-project-open] &);
+
 /* Police variable 200–800, sous-ensemble latin (spec §2.2), servie par le site et jamais par un
    tiers : c'est ce qui rend tenable « aucune requête externe » (spec §6.4) avec une seule police
    de 25 Ko. */

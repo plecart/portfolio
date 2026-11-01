@@ -201,6 +201,7 @@ Page et colonne de lecture de la fiche : `scrollbar-width: thin ; scrollbar-colo
 | Pression sur une carte | 80 ms | `--ease-spring` |
 | Couleur au survol (nom, icônes, liens) ; fond et filet de l'entête | 150 ms | `--ease-out` |
 | Entête qui sort et revient | 240 ms | `--ease-out` |
+| Colonne des liens de l'auteur qui s'efface et revient | 150 ms | `--ease-out` |
 | Vol de la photo, du post-it et des rubans ; feuille ; recul des cartes ; couche noir et blanc | 280 ms | `--ease-out` |
 | Trombone | opacité 150 ms, translation 200 ms | `--ease-out` |
 | Contenu de la fiche : entrée / sortie | 200 ms (+ 8 px) / 150 ms | `--ease-out` |
@@ -236,6 +237,7 @@ De haut en bas : l'entête (§3.3), la table (`<main>`), les liens de l'auteur (
 - **Gauche** : le nom, 15 px / 600, lien vers `/`, `--accent` au survol.
 - **Droite**, groupe à 8 px d'écart : la place « Chat » (phase 2 ; « MCP », phase 3, à sa gauche, même composant) puis le bouton de mode : 36 px rond, icône au trait 20 px (soleil en mode clair, lune en mode sombre ; l'icône inactive est retirée du rendu), libellé « Passer en mode sombre » ou « Passer en mode clair », `--ink-2` → `--ink` au survol.
 - **Défilement** : en haut de page, l'entête est transparente. Dès 1 px de défilement, elle prend `--paper` à 94 % et un filet bas de 1 px `--line`. Au-delà de 56 px de défilement, 8 px cumulés vers le bas la font sortir par le haut (translation de −100 %, 240 ms) ; 8 px cumulés vers le haut la ramènent. Elle reste visible tant qu'elle contient le focus clavier.
+- **Fiche ouverte** : l'entête prend son état de sortie par le haut, quel que soit le défilement, et revient à la fermeture ; en mouvement réduit, fondu de 150 ms (§6.3).
 - **Place « Chat »** : lien texte 13 px / 600, 36 px de haut, marge intérieure 0 12 px, rayon 999 px, `--ink-2` → `--ink` ; absent du DOM en phase 1. À 400 px, le nom (114 px), « Chat » (54 px) et le bouton laissent environ 155 px libres. Trois liens au plus (§1.12).
 
 ### 3.4 Liens de l'auteur (D49)
@@ -244,6 +246,7 @@ Deux liens, GitHub puis LinkedIn, icônes au trait 22 px, libellés « GitHub de
 
 - **Colonne fixe** : dès que la marge entre le bord de la fenêtre et la cellule de carte la plus proche atteint 76 px (36 px de disque + 24 px du bord + 16 px de garde), le pied devient une colonne fixe en bas à droite : à 24 px des bords, z-index 40, 36 px de large ; un disque de 36 px par lien, écart 8 px (80 px de haut pour deux), papier, `--shadow-rest`, icône `--ink-2` ; survol : `--ink` et montée de 2 px (240 ms). La marge se mesure sur les cellules affichées dans la table — cartes et cadres de chargement, chacun sur sa boîte de grille, hors pose et hors animation —, et hors barre de défilement : la grille, centrée dans la largeur visible, recule de la moitié de la barre, que la mesure lui rend ; les repères ci-dessous valent donc avec ou sans barre (choix du mainteneur, 2026-10-14) ; une table sans cellule (écrans vide et erreur) a sa colonne fixe dès 600 px de large et son pied de page en dessous (brief de #18, décision 1). Recalculée au redimensionnement et quand les cellules changent. Repères : colonne à 1280 px (marge 118), 1200 px (78) et 1000 px (112, trois colonnes de cartes) ; pied de page à 1100 px (28, quatre colonnes), 600 px (46) et sur mobile (16).
 - **Pied de page** : après la table, une rangée centrée, marge 48 px 0 32 px, écart 24 px, un filet de 48 × 1 px `--line` centré au-dessus ; chaque icône dans une zone de 38 px (marge intérieure 8 px), sans disque, `--ink-2` → `--ink` et montée de 2 px au survol.
+- **Fiche ouverte** : la colonne fixe s'efface en 150 ms et revient à la fermeture ; le pied de page reste sous le plein écran.
 - **Place réservée** (§1.13) : un disque de plus en haut de la colonne, ou un lien de plus dans la rangée.
 
 ## 4. Composants
