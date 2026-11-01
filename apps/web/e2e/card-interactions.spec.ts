@@ -530,18 +530,18 @@ test.describe('au toucher', () => {
   test('un toucher enfonce la carte en 80 ms (spec §1.6, §4.1)', async ({ page }) => {
     await openTable(page, TWO_CARDS)
     const [press] = await resolveAll(page, [['transition-duration', 'var(--dur-press)']])
-    // Un contact tenu par le protocole ne rend jamais `:active` : Chromium ne le pose qu'à la
-    // relève, le temps du toucher (mesuré le 2026-11-01). On lit donc la transition qui part.
-    const transitions = await watchTransitions(page)
+    // Un contact tenu par le protocole ne rend jamais `:active`, que Chromium ne pose qu'à la relève,
+    // le temps du toucher (mesuré le 2026-11-01), et déjà retombé quand `transitionrun` arrive sur un
+    // poste lent (rouge en CI, run 41291811020). L'état se force donc, pour lire sa règle.
+    const client = await page.context().newCDPSession(page)
+    await client.send('DOM.enable')
+    await client.send('CSS.enable')
+    const { root } = await client.send('DOM.getDocument')
+    const { nodeId } = await client.send('DOM.querySelector', { nodeId: root.nodeId, selector: 'a.card' })
 
-    await cards(page).first().tap()
+    await client.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: ['active'] })
 
-    await expect
-      .poll(async () => {
-        const runs = await transitions('card-face')
-        return runs.find(({ property }) => property === 'transform')?.duration
-      })
-      .toBe(press)
+    await expect(face(cards(page).first())).toHaveCSS('transition-duration', press)
   })
 })
 
