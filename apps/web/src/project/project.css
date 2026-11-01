@@ -151,6 +151,10 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
+
+  .project-description {
+    margin-top: var(--s-4);
+  }
 }
 
 @keyframes project-in {
