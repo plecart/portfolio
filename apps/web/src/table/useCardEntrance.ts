@@ -9,9 +9,8 @@ const ENTRY_THRESHOLD = 0.15
  * — seule la couche d'entrée qu'elles contiennent bouge. Une cellule à 15 % dans l'écran reçoit
  * `data-entered`, que la feuille lit, et n'est plus observée : une carte n'entre qu'une fois.
  *
- * Le retard vaut l'indice de colonne mesuré × `--delay-column`. L'indice, relu à chaque
- * redimensionnement, s'écrit sur la couche d'entrée et non sur la cellule : la mesure des liens de
- * l'auteur relit les attributs de la cellule (`TABLE_CELL_SELECTOR`), jamais ce qu'elle contient.
+ * Le retard vaut l'indice de colonne mesuré × `--delay-column`, et l'indice se relit à chaque
+ * redimensionnement.
  *
  * @param grid La grille de la table.
  * @param projects Les projets rendus : les cellules à observer changent avec eux.
