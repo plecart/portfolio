@@ -16,7 +16,7 @@ import {
   readingColumn,
   watchCspViolations,
 } from './project.ts'
-import { buildProject, buildTechnology, ONGOING, type Project } from './projects.ts'
+import { buildProject, buildTechnology, FILES_ORIGIN, ONGOING, type Project } from './projects.ts'
 import { scrollTop } from './scroll.ts'
 import { cards, COLUMN_VIEWPORT, openTable, serveUnderCsp } from './table.ts'
 
@@ -268,6 +268,35 @@ test.describe('la description en Markdown', () => {
     await expect(description(page).locator('p')).toHaveText('Une seule ligne.')
     await expect(description(page).locator('p')).toHaveCSS('margin-bottom', '12px')
   })
+
+  test('un bloc entre deux lignes de tirets reste dans la description', async ({ page }) => {
+    await arriveAt(page, { description: '---\ntitre: valeur\n---\n\nLa suite.' })
+
+    await expect(description(page)).toContainText('titre: valeur')
+    await expect(description(page)).toContainText('La suite.')
+  })
+
+  const LONG_LINE = 'une ligne de code très longue '.repeat(30)
+  const LONG_TOKEN = 'x'.repeat(600)
+
+  for (const [name, markdown] of [
+    ['un bloc de code à longue ligne', `\`\`\`\n${LONG_LINE}\n\`\`\``],
+    ['un bloc de code sans espace', `\`\`\`\n${LONG_TOKEN}\n\`\`\``],
+    ['du code en ligne', `\`${LONG_TOKEN}\``],
+    ['un tableau', `| ${LONG_TOKEN} | b |\n|---|---|\n| ${LONG_LINE} | d |`],
+    ['une image', `![image](${FILES_ORIGIN}/images/fiche/960.webp)`],
+  ]) {
+    test(`${name} ne déborde pas`, async ({ page }) => {
+      await arriveAt(page, { description: markdown })
+
+      for (const element of [page.locator('.project-scroll'), panel(page)]) {
+        const { scrollWidth, clientWidth } = await element.evaluate(
+          ({ scrollWidth, clientWidth }) => ({ scrollWidth, clientWidth }),
+        )
+        expect(scrollWidth).toBeLessThanOrEqual(clientWidth)
+      }
+    })
+  }
 })
 
 /** Deux sections montrées, une omise entre elles ; un corps de deux blocs, l'autre avec un lien. */
@@ -508,15 +537,67 @@ test.describe('les ancres', () => {
     await expect(section(page, 'resultats').locator('summary')).toBeFocused()
   })
 
-  test('Ctrl sur un lien de la fiche garde le geste du navigateur', async ({ page }) => {
-    await arriveAt(page, LINKED)
-    const heldClicks = await holdNativeClicks(page)
+  for (const hash of ['#s-resultats', '#autre']) {
+    test(`Ctrl sur un lien vers ${hash} garde le geste du navigateur`, async ({ page }) => {
+      await arriveAt(page, {
+        description: `[Voir les résultats](${hash})\n\n${LONG_DESCRIPTION}`,
+        sections: LONG_SECTIONS,
+      })
+      const heldClicks = await holdNativeClicks(page)
 
-    await sectionLink(page).click({ modifiers: ['ControlOrMeta'] })
+      await sectionLink(page).click({ modifiers: ['ControlOrMeta'] })
 
-    expect(await heldClicks()).toBe(1)
-    await expect(section(page, 'resultats')).not.toHaveAttribute('open')
-  })
+      expect(await heldClicks()).toBe(1)
+      await expect(section(page, 'resultats')).not.toHaveAttribute('open')
+    })
+  }
+
+  /** La fiche ouverte depuis la table, un lien vers cette adresse en tête de sa description. */
+  async function openWithLink(page: Page, href: string) {
+    await openTable(page, [
+      ficheProject({ description: `[Le lien](${href})\n\n${LONG_DESCRIPTION}`, sections: SECTIONS }),
+    ])
+    await openProject(cards(page).first())
+    return panel(page).getByRole('link', { name: 'Le lien' })
+  }
+
+  for (const [name, href, url, opened] of [
+    ['d’une section', '#s-resultats', '/projets/fiche#s-resultats', 1],
+    ['d’une section inconnue', '#s-inconnue', '/projets/fiche#s-inconnue', 0],
+    ['hors section', '#autre', '/projets/fiche', 0],
+    ['vide', '#', '/projets/fiche', 0],
+  ] as const) {
+    test(`le fragment ${name} n’ajoute aucune entrée : un seul retour ferme`, async ({ page }) => {
+      const link = await openWithLink(page, href)
+      const entries = await page.evaluate(() => history.length)
+
+      await link.click()
+
+      await expect(panel(page).locator('details[open]')).toHaveCount(opened)
+      await expect(page).toHaveURL(url)
+      expect(await page.evaluate(() => history.length)).toBe(entries)
+      expect(await page.evaluate(() => history.state)).toEqual({ fromTable: true })
+
+      await page.goBack()
+
+      await expectClosed(page)
+      await expect(page).toHaveURL('/')
+    })
+  }
+
+  for (const [name, href] of [
+    ['relatif', '/autre'],
+    ['absolu', 'https://exemple.test/'],
+  ]) {
+    test(`un lien ${name} reste au navigateur`, async ({ page }) => {
+      const link = await openWithLink(page, href)
+      const heldClicks = await holdNativeClicks(page)
+
+      await link.click()
+
+      expect(await heldClicks()).toBe(1)
+    })
+  }
 
   /** Compte les défilements de la page à partir de maintenant, sur tout élément. */
   async function watchScrolls(page: Page) {

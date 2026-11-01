@@ -3,11 +3,16 @@ import type { ComponentProps, MouseEvent } from 'react'
 import { isModifiedClick, isSectionHash } from './project.ts'
 import { goToSection } from './useSectionAnchor.ts'
 
-/** Un clic sur un lien vers une section : un clic modifié reste natif. */
-function followSection(event: MouseEvent<HTMLAnchorElement>) {
+/**
+ * Un clic sur un fragment : une section s'ouvre, un autre fragment ne fait rien. Laissé au navigateur,
+ * il ajouterait une entrée sans `history.state`, que la fermeture ne saurait plus reculer
+ * (`useProjectAddress`). Un clic modifié reste natif.
+ */
+function followFragment(event: MouseEvent<HTMLAnchorElement>) {
   if (isModifiedClick(event)) return
   event.preventDefault()
-  goToSection(event.currentTarget.hash)
+  const { hash } = event.currentTarget
+  if (isSectionHash(hash)) goToSection(hash)
 }
 
 /**
@@ -20,7 +25,7 @@ function MarkdownLink({ href, children, ...props }: ComponentProps<'a'>) {
       {...props}
       href={href}
       className="text-(--accent) underline underline-offset-3"
-      onClick={href && isSectionHash(href) ? followSection : undefined}
+      onClick={href?.startsWith('#') ? followFragment : undefined}
     >
       {children}
     </a>
@@ -35,11 +40,14 @@ const LIST_CLASSES = `${BLOCK_CLASSES} pl-[18px]`
 
 /**
  * Le rendu de la fiche (ADR 0010, spec §4.3). Par défaut, seuls `script`, `iframe`, `style` et leurs
- * pareils sont échappés ; `disableParsingRawHTML` rend tout le HTML brut en texte. Sans `forceBlock`,
- * une seule ligne sortirait sans paragraphe ; sans `forceWrapper`, un seul bloc sans la classe de
- * l'appelant. Les URL dangereuses perdent leur `href` par le `sanitizer` par défaut.
+ * pareils sont échappés ; `disableParsingRawHTML` rend tout le HTML brut en texte. Sans
+ * `disableFrontmatter`, un bloc `clef: valeur` entre deux lignes de tirets, en tête, disparaîtrait
+ * en silence. Sans `forceBlock`, une seule ligne sortirait sans paragraphe ; sans `forceWrapper`, un
+ * seul bloc sans la classe de l'appelant. Les URL dangereuses perdent leur `href` par le `sanitizer`
+ * par défaut.
  */
 const OPTIONS: MarkdownToJSX.Options = {
+  disableFrontmatter: true,
   disableParsingRawHTML: true,
   forceBlock: true,
   forceWrapper: true,

@@ -6,13 +6,16 @@
 @layer components {
   /* Le verrou de défilement (§3.2), écrit ici et non par `RemoveScroll` : son `<style>` injecté tombe
      sous la CSP de production. Une barre classique garde sa place, et la table ne bouge pas ; sans
-     elle, `App` n'écrit pas `scrollbar`, et aucune gouttière ne pousse la table. */
+     elle, `App` n'écrit pas `scrollbar`, et aucune gouttière ne pousse la table. Sous 600 px, le
+     panneau est la fenêtre : il n'en laisse rien à une gouttière (§3.2). */
   html[data-project-open] {
     overflow: hidden;
   }
 
   html[data-project-open='scrollbar'] {
-    scrollbar-gutter: stable;
+    @variant sm {
+      scrollbar-gutter: stable;
+    }
   }
 
   /* Mobile : le panneau est la fenêtre, une colonne, et tout y défile. Dès 600 px, deux colonnes de
@@ -118,7 +121,8 @@
   }
 
   /* Ce qui défile (§4.3) : la colonne au bureau, le panneau sur téléphone. Un mot trop long pour la
-     colonne se coupe, plutôt que de la déborder. La colonne coupe ce qui la dépasse : elle s'élargit,
+     colonne se coupe, plutôt que de la déborder, et un bloc de code avec lui : une région défilante
+     de plus serait à rendre focalisable. La colonne coupe ce qui la dépasse : elle s'élargit,
      à chaque bord, de l'anneau de focus de ses `<summary>` (§6.2), 2 px à 3 px, sans déplacer son
      texte (marges de §4.3). */
   .project-scroll {
@@ -131,6 +135,10 @@
       margin: 0 calc(var(--s-2) - var(--ring-room)) var(--s-4) calc(-1 * var(--ring-room));
       padding-inline: var(--ring-room);
       overflow-y: auto;
+    }
+
+    pre {
+      white-space: pre-wrap;
     }
   }
 

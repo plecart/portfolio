@@ -29,6 +29,10 @@ test('le chemin d’une fiche se relit en son slug', () => {
   expect(slugFromPath(projectPath('atelier'))).toBe('atelier')
 })
 
+test('la suite tourne à l’ouest de Greenwich, où un jour lu en heure locale peut changer de mois', () => {
+  expect(new Date().getTimezoneOffset()).toBeGreaterThan(0)
+})
+
 test.each([
   ['terminé', 'finished', '2025-01-15', '2025-06-30', 'Janvier 2025 – juin 2025'],
   ['archivé', 'archived', '2023-08-01', '2024-02-29', 'Août 2023 – février 2024'],
