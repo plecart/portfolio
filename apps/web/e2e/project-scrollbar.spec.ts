@@ -30,3 +30,14 @@ for (const [name, projects, hasBar] of [
     expect(await panel(page).boundingBox()).toMatchObject({ x: 24, y: 75, width: 1232, height: 650 })
   })
 }
+
+test('sous 600 px, le plein écran ne garde aucune gouttière à la barre', async ({ page }) => {
+  const viewport = { width: 500, height: 800 }
+  await page.setViewportSize(viewport)
+  await openTable(page, PROJECT_SETS.twelveWithShowcase)
+  expect(await page.evaluate(() => document.documentElement.clientWidth)).toBeLessThan(viewport.width)
+
+  await openProject(cards(page).first())
+
+  expect(await panel(page).boundingBox()).toEqual({ x: 0, y: 0, ...viewport })
+})

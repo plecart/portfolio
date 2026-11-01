@@ -24,6 +24,10 @@ export default defineConfig(({ command, mode }) => {
       // Borné à `tests/` : le motif par défaut de Vitest ramasserait aussi les scénarios
       // Playwright de `e2e/`, qui ne tournent pas dans le même lanceur.
       include: ['tests/**/*.test.ts'],
+      // À l'ouest de Greenwich, un jour de l'API relu en heure locale change de mois : ce fuseau,
+      // quels que soient celui du poste et celui de la CI, tient `timeZone: 'UTC'` de `project.ts`.
+      // Vaut pour le pool par défaut, `forks` : `threads` ignore `TZ` (doc de Vitest, `env`).
+      env: { TZ: 'America/New_York' },
     },
   }
 })
