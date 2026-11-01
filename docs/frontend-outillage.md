@@ -81,7 +81,7 @@ Tout conservé. Les signalements, relus un par un, sont des faux positifs :
 | `prototype` | CAUTION | « never judge » : consigne de présentation des variantes |
 | autres | SAFE / CAUTION sans signalement | — |
 
-### 2.4 Application `apps/web` — 2026-09-23, amendée les 2026-09-25, 26, 2026-10-02, 04 et 16
+### 2.4 Application `apps/web` — 2026-09-23, amendée les 2026-09-25, 26, 2026-10-02, 04, 16 et 2026-11-01
 
 Node **24.21.0**, LTS active du jour, épinglée par `.nvmrc` et par `engines` (valeurs égales,
 vérifiées par un test). `@types/node` suit sa majeure, vérifiée par un autre test : des types d'une
@@ -99,6 +99,7 @@ datés.
 | Paquet | Rôle |
 |---|---|
 | `react`, `react-dom` | Interface en composants |
+| `@radix-ui/react-dialog` | Dialogue modal de la fiche, le `dialog` de shadcn/ui copié sans `init` et sans `Overlay` (CSP) (#170) |
 | `typescript` | Types vérifiés à la compilation, mode strict — **6.0, pas 7** (voir ci-dessous) |
 | `vite` | Serveur de développement et compilation |
 | `tailwindcss`, `@tailwindcss/vite` | Style utilitaire compilé au build, par le plugin Vite |
@@ -357,14 +358,14 @@ Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les C
 
 **État au 2026-09-23 (#3)** : les items **1, 2, 10, 11, 12 et 13 sont faits** — inventaire au
 §2.4, qui fait foi sur ce qui est installé ; versions dans le verrou `apps/web/package-lock.json`.
-L'item **9** l'est depuis le 2026-10-16 (#19). Les sept autres restent à faire, chacun avec
-l'issue qui le portera. Trois items se sont révélés
-partiellement faux à l'exécution ; l'écart est consigné sous chacun d'eux et détaillé au §2.4.
+L'item **9** l'est depuis le 2026-10-16 (#19), les items **3** et **4** sont tranchés depuis le
+2026-11-01 (#170). Les cinq autres restent à faire, chacun avec l'issue qui le portera. Trois
+items se sont révélés partiellement faux à l'exécution ; l'écart est consigné sous chacun d'eux et détaillé au §2.4.
 
 1. **Projet** ✅ *fait (#3)* : `npm create vite@latest apps/web -- --template react-ts`, puis suppression de la page de démonstration du gabarit. TypeScript strict **posé explicitement** — contrairement à ce que cet item affirmait, `create-vite` 9.2.1 ne l'active plus (§2.4).
 2. **Tailwind CSS v4** ✅ *fait (#3)* : `npm i -D tailwindcss @tailwindcss/vite`, plugin dans `vite.config.ts`, `@import "tailwindcss";` dans le CSS d'entrée. **Jamais** le script CDN `cdn.tailwindcss.com` (c'est lui qui affiche « ne pas utiliser en production »).
-3. **Alias `@/`** — à faire avec #170 (requis par shadcn) : `paths` dans `tsconfig.json` et `tsconfig.app.json`, `resolve.alias` dans `vite.config.ts` (`@types/node` est déjà installé, §2.4).
-4. **shadcn/ui** — à faire avec #170 : `npx shadcn@latest init`, puis `npx shadcn@latest add <composant>` au besoin (`dialog` pour la fiche projet en modal). Radix arrive comme dépendance de chaque composant ; rien à installer à part.
+3. **Alias `@/`** — sans objet (#170, décision du 2026-10-27) : le `dialog` copié n'en a pas besoin.
+4. **shadcn/ui** ✅ *fait autrement (#170)* : `dialog` copié sans `init`, décision du 2026-10-27 — aucune palette, aucun `tw-animate-css`, seule dépendance `@radix-ui/react-dialog` ; classes passées aux jetons, sans `Overlay` (CSP).
 5. **motion** — hors phase 1 (PRD #1) : `npm i motion` ; import depuis `motion/react`.
 6. **react-bits** — hors phase 1 (PRD #1) : composant par composant, `npx shadcn@latest add @react-bits/<Nom>-TS-TW`. **Licence MIT + Commons Clause** : usage libre, revente d'un produit fondé sur ces composants interdite — citée dans l'ADR 0008.
 7. **bklit-ui** (graphiques) — hors phase 1 (PRD #1) : composant par composant, `npx shadcn@latest add @bklit/<graphique>` ; vérifier si le registre `@bklit` doit être déclaré dans `components.json`. Composants MIT ; Bklit Studio (outil hébergé) propriétaire.

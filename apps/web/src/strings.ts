@@ -25,4 +25,6 @@ export const strings = {
   ribbonLive: 'en ligne',
   /** Ce qui remplace les rubans d'une carte révélée au toucher (spec §4.1). */
   openCard: 'Ouvrir',
+  /** Le bouton de la fiche (spec §3.2). */
+  closeProject: 'Fermer la fiche',
 } as const

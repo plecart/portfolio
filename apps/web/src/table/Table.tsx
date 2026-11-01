@@ -1,4 +1,4 @@
-import { useEffect, useRef, type Ref } from 'react'
+import { useEffect, useRef, type MouseEvent, type Ref } from 'react'
 import type { Project } from '../api/projects.ts'
 import type { ProjectsStatus } from '../api/useProjects.ts'
 import { strings } from '../strings.ts'
@@ -96,6 +96,7 @@ function LoadError({ onRetry, focusRetry }: { onRetry: () => void; focusRetry: b
  * @param onRetry Relance le chargement, depuis le message d'erreur.
  * @param retried Une relance a déjà eu lieu : le message qui revient reprend le focus, et la table
  *   qui arrive le donne à sa première carte, le bouton activé ayant disparu.
+ * @param onOpen Ouvre la fiche d'un projet, depuis le clic sur sa carte.
  */
 export function Table({
   ref,
@@ -103,12 +104,14 @@ export function Table({
   projects,
   onRetry,
   retried,
+  onOpen,
 }: {
   ref: Ref<HTMLElement>
   status: ProjectsStatus
   projects: Project[]
   onRetry: () => void
   retried: boolean
+  onOpen: (slug: string) => void
 }) {
   const firstCard = useRef<HTMLAnchorElement>(null)
   const grid = useRef<HTMLDivElement>(null)
@@ -121,6 +124,15 @@ export function Table({
   useEffect(() => {
     if (retried && status === 'loaded') firstCard.current?.focus()
   }, [retried, status])
+
+  // Un clic modifié reste celui d'un lien, et le bouton du milieu n'émet pas de `click`.
+  const openOnClick = (event: MouseEvent, slug: string) => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+    revealOnTouch(event, slug)
+    if (event.defaultPrevented) return
+    event.preventDefault()
+    onOpen(slug)
+  }
 
   return (
     // Le corps de page commence sous l'entête fixe de 56 px (spec §3.3). Une pose extrême passe la
@@ -146,7 +158,7 @@ export function Table({
               project={project}
               size={cardSize(project, ordered.length)}
               revealed={project.slug === revealed}
-              onClick={(event) => revealOnTouch(event, project.slug)}
+              onClick={(event) => openOnClick(event, project.slug)}
             />
           ))}
         </div>

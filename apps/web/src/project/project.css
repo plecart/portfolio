@@ -1,0 +1,56 @@
+/* La fiche (spec §1.10, §3.2) et ses fondus (§2.7). Dans la couche `components`, comme la carte.
+
+   Le panneau se centre sans transformation. Ses dimensions se comptent depuis la photo ; les
+   constantes de §3.2 n'ont pas d'autre nom. Les fondus sont des animations, jamais des transitions :
+   `Presence` de Radix ne retient le panneau à la sortie que si le nom de l'animation change. */
+@layer components {
+  /* Mobile : le panneau est la fenêtre, une colonne. Dès 600 px, deux colonnes de la largeur de la
+     photo, au centre de la fenêtre. */
+  .project-panel {
+    --photo: min(100vh - 104px, 660px, (100vw - 92px) / 2);
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: grid;
+    gap: var(--s-3);
+    padding: var(--s-2);
+    background-color: var(--paper);
+    box-shadow: var(--shadow-lift);
+    animation: project-in var(--dur-content) var(--ease-out);
+
+    @variant sm {
+      grid-template-columns: repeat(2, var(--photo));
+      gap: var(--s-5);
+      width: calc(2 * var(--photo) + 44px);
+      height: calc(var(--photo) + 56px);
+      margin: auto;
+      padding: 10px;
+      border-radius: var(--r-card);
+    }
+  }
+
+  .project-panel[data-state='closed'] {
+    animation: project-out var(--dur-fast) var(--ease-out);
+  }
+
+  .project-reading {
+    padding: var(--s-3) 0 var(--s-6);
+
+    @variant sm {
+      grid-column: 2;
+      padding: var(--s-3) var(--s-4) 0 0;
+    }
+  }
+}
+
+@keyframes project-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes project-out {
+  to {
+    opacity: 0;
+  }
+}

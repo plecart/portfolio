@@ -15,6 +15,7 @@
 @import 'tailwindcss';
 @import './tokens.css';
 @import './table/card.css';
+@import './project/project.css';
 
 /* Tailwind lit tout le dossier de l'application pour y trouver des classes : le texte des tests
    lui en donnait, livrées sans que rien ne les emploie — dont des valeurs que la règle refuse,
