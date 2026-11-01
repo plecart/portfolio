@@ -58,6 +58,25 @@ export function CloseIcon() {
   )
 }
 
+/** Une flèche de la galerie : 18 px (spec §4.4), trait de 1,8 comme au prototype. */
+function ChevronIcon({ path }: { path: string }) {
+  return (
+    <StrokeIcon strokeWidth={1.8} className="size-[18px]">
+      <path d={path} />
+    </StrokeIcon>
+  )
+}
+
+/** Chevron vers la gauche : l'image précédente. */
+export function ChevronLeftIcon() {
+  return <ChevronIcon path="M15 5l-7 7 7 7" />
+}
+
+/** Chevron vers la droite : l'image suivante. */
+export function ChevronRightIcon() {
+  return <ChevronIcon path="M9 5l7 7-7 7" />
+}
+
 /** Lien externe : celle des post-its de la fiche, 14 px (spec §4.3). */
 export function ExternalLinkIcon() {
   return (

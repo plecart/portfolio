@@ -1,11 +1,14 @@
 /**
- * L'adresse d'une fiche (spec §3.2), ses faits, sa stack et ses sections (§4.3, §7), en logique
- * pure. Les projets entrent tels que l'API les sert ; typé depuis le schéma pour la raison que donne
- * `table/cards.ts`.
+ * L'adresse d'une fiche (spec §3.2), ses faits, sa stack, ses sections (§4.3, §7) et sa galerie
+ * (§4.4), en logique pure. Les projets entrent tels que l'API les sert ; typé depuis le schéma pour
+ * la raison que donne `table/cards.ts`.
  */
 import type { components } from '../api/schema.ts'
+import { BREAKPOINT } from '../chrome/author-links-placement.ts'
 import { strings } from '../strings.ts'
+import { imageSources } from '../table/cards.ts'
 
+type GalleryImage = components['schemas']['GalleryImageOut']
 type Project = components['schemas']['ProjectOut']
 type Section = components['schemas']['SectionOut']
 type Technology = components['schemas']['TechnologyOut']
@@ -33,6 +36,18 @@ const KIND_LABELS: Record<Project['kind'], string> = {
 const FACT_SEPARATOR = ' · '
 const DATE_SEPARATOR = ' – '
 
+/** Ce qu'un balayage doit dépasser en horizontal, en px, pour changer d'image (spec §4.4). */
+const SWIPE_THRESHOLD = 40
+
+/**
+ * L'attribut `sizes` d'une image de galerie (spec §3.2) : `--photo` dès 600 px, recopiée de
+ * `project.css` car `sizes` ne lit pas les propriétés CSS, sinon le panneau moins ses marges de 8 px.
+ */
+export const GALLERY_SIZES = [
+  `(min-width: ${BREAKPOINT}px) min(100vh - 104px, 660px, (100vw - 92px) / 2)`,
+  'calc(100vw - 16px)',
+].join(', ')
+
 /**
  * Le chemin de la fiche d'un projet.
  *
@@ -54,16 +69,16 @@ export function slugFromPath(pathname: string): string | null {
 }
 
 /**
- * Un clic modifié reste celui d'un lien : c'est au navigateur de l'ouvrir. Le bouton du milieu
- * n'émet pas de `click`.
+ * Un geste modifié reste au navigateur : un clic ouvre le lien ailleurs, Alt+← revient en arrière.
+ * Le bouton du milieu n'émet pas de `click`.
  */
-export function isModifiedClick(click: {
+export function hasModifier(event: {
   ctrlKey: boolean
   metaKey: boolean
   shiftKey: boolean
   altKey: boolean
 }): boolean {
-  return click.ctrlKey || click.metaKey || click.shiftKey || click.altKey
+  return event.ctrlKey || event.metaKey || event.shiftKey || event.altKey
 }
 
 /** Le mois et l'année d'une date ISO, en minuscules : « janvier 2025 ». */
@@ -126,4 +141,30 @@ export function sectionId(anchor: string): string {
 /** Un fragment d'adresse (`location.hash`) désigne-t-il une section ? */
 export function isSectionHash(hash: string): boolean {
   return hash.startsWith(`#${SECTION_ID_PREFIX}`)
+}
+
+/**
+ * Les images que la galerie montre, dans l'ordre (spec §4.4) : celles qui ont des variantes.
+ *
+ * @param gallery Les images du projet, prêtes ou non.
+ * @returns La légende et les sources (`imageSources`) de chacune.
+ */
+export function readyImages(gallery: readonly GalleryImage[]) {
+  return gallery.flatMap(({ caption, variants }) => {
+    const sources = imageSources(variants)
+    return sources ? [{ caption, ...sources }] : []
+  })
+}
+
+/**
+ * Le pas d'un balayage (spec §4.4) : plus de 40 px en horizontal, dominant sur le vertical.
+ *
+ * @param dx Le déplacement horizontal, en px, positif vers la droite.
+ * @param dy Le déplacement vertical, en px.
+ * @returns `1` vers la gauche, l'image suivante ; `-1` vers la droite ; `0` sinon.
+ */
+export function swipeStep(dx: number, dy: number): number {
+  const distance = Math.abs(dx)
+  if (distance <= SWIPE_THRESHOLD || distance <= Math.abs(dy)) return 0
+  return dx < 0 ? 1 : -1
 }

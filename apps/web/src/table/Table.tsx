@@ -1,7 +1,7 @@
 import { useEffect, useRef, type MouseEvent, type Ref } from 'react'
 import type { Project } from '../api/projects.ts'
 import type { ProjectsStatus } from '../api/useProjects.ts'
-import { isModifiedClick } from '../project/project.ts'
+import { hasModifier } from '../project/project.ts'
 import { strings } from '../strings.ts'
 import { Card } from './Card.tsx'
 import { cardSize, orderProjects, type CardSize } from './cards.ts'
@@ -130,7 +130,7 @@ export function Table({
   }, [retried, status])
 
   const openOnClick = (event: MouseEvent, slug: string) => {
-    if (isModifiedClick(event)) return
+    if (hasModifier(event)) return
     revealOnTouch(event, slug)
     if (event.defaultPrevented) return
     event.preventDefault()
