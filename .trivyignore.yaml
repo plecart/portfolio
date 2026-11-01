@@ -104,8 +104,8 @@ vulnerabilities:
     statement: >-
       Place : libacl1, dépendance des paquets essentiels de Debian (coreutils), venue de l'image
       de base. Atteinte : non — le défaut demande un processus privilégié qui lit ou pose des
-      ACL sur un chemin que l'attaquant contrôle ; le seul processus de l'image est gunicorn,
-      sans privilège, qui n'appelle pas libacl. Alternatives : corrigé en amont par acl 2.4.0,
+      ACL sur un chemin que l'attaquant contrôle ; gunicorn et celery tournent sans privilège et
+      ne chargent pas libacl (`/proc/<pid>/maps`, 2026-11-01). Alternatives : corrigé en amont par acl 2.4.0,
       sans correctif dans Debian 13.
     expired_at: 2026-12-29
 
