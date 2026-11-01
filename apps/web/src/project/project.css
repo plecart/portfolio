@@ -5,9 +5,13 @@
    `Presence` de Radix ne retient le panneau à la sortie que si le nom de l'animation change. */
 @layer components {
   /* Le verrou de défilement (§3.2), écrit ici et non par `RemoveScroll` : son `<style>` injecté tombe
-     sous la CSP de production. La barre garde sa place, et la table ne bouge pas. */
+     sous la CSP de production. Une barre classique garde sa place, et la table ne bouge pas ; sans
+     elle, `App` n'écrit pas `scrollbar`, et aucune gouttière ne pousse la table. */
   html[data-project-open] {
     overflow: hidden;
+  }
+
+  html[data-project-open='scrollbar'] {
     scrollbar-gutter: stable;
   }
 

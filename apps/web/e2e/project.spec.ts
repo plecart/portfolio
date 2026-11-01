@@ -300,6 +300,28 @@ test.describe('l’historique, à partir de `/`', () => {
     await expect(page).toHaveURL('/')
   })
 
+  const DOUBLE_CLOSINGS: [string, (page: Page) => Promise<unknown>][] = [
+    ['un double clic sur « Fermer la fiche »', (page) => closeButton(page).dblclick()],
+    [
+      'Échap deux fois de suite',
+      async ({ keyboard }) => {
+        await Promise.all([keyboard.press('Escape'), keyboard.press('Escape')])
+      },
+    ],
+  ]
+
+  for (const [name, closeTwice] of DOUBLE_CLOSINGS) {
+    test(`${name} ne ferme qu’une fois et reste sur le site`, async ({ page }) => {
+      await openTable(page, PROJECTS)
+      await openProject(cards(page).first())
+
+      await closeTwice(page)
+
+      await expectClosed(page)
+      await expect(page).toHaveURL('/')
+    })
+  }
+
   test('ouvrir ajoute une entrée, « Fermer la fiche » n’en laisse aucune de plus', async ({ page }) => {
     await openTable(page, PROJECTS)
     const entries = () => page.evaluate(() => history.length)
