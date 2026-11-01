@@ -12,7 +12,7 @@ import { expect, FAILURES, holdProjects, serving, test, type Answer } from './ap
 import { resolveAll } from './css.ts'
 import { buildProject, FILES_ORIGIN, PROJECT_SETS, type Project } from './projects.ts'
 import { scrollThrough } from './scroll.ts'
-import { cards, COLUMN_VIEWPORT, enterCards, expectPlacement, openTable } from './table.ts'
+import { cards, COLUMN_VIEWPORT, enterCards, expectPlacement, openTable, settle } from './table.ts'
 
 /** Les couches de la couverture d'une carte : l'image, puis la copie d'un projet en cours. */
 const coverLayers = (card: Locator) => card.locator('img[srcset]')
@@ -115,22 +115,26 @@ function farthestSlug(side: -1 | 1): string {
 }
 
 /**
- * Chaque taille de carte sous la pose extrême, de chaque côté : son nom et sa table. Le voisin d'une
- * carte simple la place dans la colonne de son côté, l'ordre suivant le slug.
+ * Chaque taille de carte sous la pose extrême, de chaque côté : son nom, sa table, et son indice
+ * dans celle-ci. Le voisin d'une carte simple la place dans la colonne de son côté, l'ordre suivant
+ * le slug.
  */
-const EXTREME_TABLES = ([-1, 1] as const).flatMap((side): [string, Project[]][] => {
+const EXTREME_TABLES = ([-1, 1] as const).flatMap((side): [string, Project[], number][] => {
   const name = side < 0 ? 'à gauche' : 'à droite'
   const extreme = buildProject({ slug: farthestSlug(side) })
   const neighbor = buildProject({ slug: side < 0 ? 'voisin' : 'atelier' })
   return [
-    [`simple ${name}`, [extreme, neighbor]],
-    [`vitrine ${name}`, [{ ...extreme, showcase: true }, neighbor]],
-    [`seule ${name}`, [extreme]],
+    [`simple ${name}`, [extreme, neighbor], side < 0 ? 0 : 1],
+    [`vitrine ${name}`, [{ ...extreme, showcase: true }, neighbor], 0],
+    [`seule ${name}`, [extreme], 0],
   ]
 })
 
+/** L'anneau de focus d'une carte, depuis la face : 2 px, à 4 px d'elle (spec §6.2). */
+const FOCUS_RING = 2 + 4
+
 for (const width of [480, 599]) {
-  for (const [name, projects] of EXTREME_TABLES) {
+  for (const [name, projects, index] of EXTREME_TABLES) {
     test(`à ${width} px, la pose extrême d'une carte ${name} n'élargit pas la page`, async ({ page }) => {
       await page.setViewportSize({ width, height: 800 })
       await openTable(page, projects)
@@ -143,6 +147,28 @@ for (const width of [480, 599]) {
       expect(overflow).toBe(0)
       // Sur un appareil mobile, c'est toute la mise en page qui s'élargirait avec la page.
       expect(innerWidth).toBe(width)
+    })
+
+    test(`à ${width} px, l'anneau de focus d'une carte ${name} reste dans la page`, async ({
+      page,
+      isMobile,
+    }) => {
+      test.skip(isMobile, 'sans survol, la carte focalisée garde sa pose (spec §4.1)')
+      await page.setViewportSize({ width, height: 800 })
+      await openTable(page, projects)
+      const card = cards(page).nth(index)
+
+      await page.keyboard.press('Tab')
+      await card.focus()
+      await settle(page)
+
+      const { left, right, pageWidth } = await card.locator('.card-face').evaluate((face) => ({
+        left: face.getBoundingClientRect().left,
+        right: face.getBoundingClientRect().right,
+        pageWidth: document.documentElement.clientWidth,
+      }))
+      expect(left - FOCUS_RING).toBeGreaterThanOrEqual(0)
+      expect(right + FOCUS_RING).toBeLessThanOrEqual(pageWidth)
     })
   }
 }
@@ -438,8 +464,8 @@ test('à 320 px, la carte simple la plus chargée garde ses rubans dans sa bande
 test('un projet sans état ne porte aucun ruban d’état', async ({ page }) => {
   await openTable(page, [buildProject()])
 
-  await expect(cards(page).getByText('en cours')).toHaveCount(0)
-  await expect(cards(page).getByText('en ligne')).toHaveCount(0)
+  await expect(cards(page).locator('li', { hasText: 'en cours' })).toHaveCount(0)
+  await expect(cards(page).locator('li', { hasText: 'en ligne' })).toHaveCount(0)
 })
 
 test('la pose vient de l’empreinte du slug, sous la CSP de production, sur un enfant de la cellule', async ({
@@ -579,7 +605,6 @@ for (const [name, gallery] of COVERLESS) {
       await photo.evaluate((box: HTMLElement) => box.offsetWidth - box.offsetHeight),
     ).toBe(0)
     await expect(photo.locator('img')).toHaveCount(0)
-    await expect(photo.locator('*')).toHaveCount(0)
   })
 }
 

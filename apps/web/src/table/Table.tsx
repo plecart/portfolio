@@ -5,6 +5,7 @@ import { strings } from '../strings.ts'
 import { Card } from './Card.tsx'
 import { cardSize, orderProjects } from './cards.ts'
 import { useCardEntrance } from './useCardEntrance.ts'
+import { useTouchReveal } from './useTouchReveal.ts'
 
 /**
  * La grille de la table (spec §3.1) : marge intérieure 24 px 16 px 32 px autour d'une largeur
@@ -112,6 +113,8 @@ export function Table({
   const grid = useRef<HTMLDivElement>(null)
   const ordered = orderProjects(projects)
 
+  const { revealed, revealOnTouch } = useTouchReveal()
+
   useCardEntrance(grid, projects)
 
   useEffect(() => {
@@ -141,6 +144,8 @@ export function Table({
               ref={index === 0 ? firstCard : undefined}
               project={project}
               size={cardSize(project, ordered.length)}
+              revealed={project.slug === revealed}
+              onClick={(event) => revealOnTouch(event, project.slug)}
             />
           ))}
         </div>
