@@ -447,9 +447,17 @@ test.describe('les repères de §3.2 et §4.4', () => {
     return release
   }
 
-  test('le cadre réserve son carré avant toute image', async ({ page }) => {
+  test('le cadre réserve son carré avant toute image, quel que soit le format déclaré', async ({
+    page,
+  }) => {
+    const image = buildImage('fiche', 'Une bannière')
+    const banner = {
+      ...image,
+      height: image.width / 3,
+      variants: image.variants.map((variant) => ({ ...variant, height: variant.width / 3 })),
+    }
     await holdImages(page)
-    await arriveAt(page, { gallery: THREE_IMAGES })
+    await arriveAt(page, { gallery: [banner] })
     const { width, height } = (await frame(page).boundingBox())!
 
     expect(height).toBe(width)
