@@ -380,6 +380,30 @@ test('un post-it long tient sur deux lignes au plus, large de la carte moins 28 
   expect(postits[1].width).toBe(postits[1].card - 28)
 })
 
+test('un post-it coupé à deux lignes ne laisse rien paraître de la suite (spec §4.1)', async ({
+  page,
+}) => {
+  // À 320 px, un titre de trente caractères demande trois lignes.
+  await page.setViewportSize({ width: 320, height: 800 })
+  await openTable(page, [
+    buildProject({ slug: 'a', title: 'Un titre long de trente lettre' }),
+    buildProject({ slug: 'b' }),
+  ])
+
+  // Ce qui coupe le texte le coupe à ses deux lignes : une marge intérieure laisserait voir la suite.
+  const clippedLines = await cards(page)
+    .first()
+    .locator('h2')
+    .evaluate((postit) => {
+      const clip = [postit, ...postit.children].find(
+        (element) => getComputedStyle(element).overflowY === 'hidden',
+      )!
+      return clip.clientHeight / parseFloat(getComputedStyle(clip).lineHeight)
+    })
+
+  expect(clippedLines).toBeCloseTo(2, 1)
+})
+
 test('noir et blanc du projet en cours : la même image, recouverte par CSS (spec §4.1)', async ({
   page,
 }) => {

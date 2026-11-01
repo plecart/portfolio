@@ -588,6 +588,24 @@ test.describe('le défilement', () => {
     await expect(panel(page)).toHaveCSS('overflow-y', 'visible')
   })
 
+  for (const width of [640, 1280]) {
+    test(`à ${width} px, le titre et ses liens s'arrêtent avant le bouton Fermer`, async ({
+      page,
+      isMobile,
+    }) => {
+      test.skip(isMobile, 'au bureau : le projet desktop')
+      await page.setViewportSize({ ...COLUMN_VIEWPORT, width })
+      await arriveAt(page, { ...LINKS, title: 'Un titre de trente caractères.' })
+      const { x: buttonLeft } = (await closeButton(page).boundingBox())!
+
+      for (const element of await page.locator('.project-head > :not(.project-ribbons)').all()) {
+        const box = (await element.boundingBox())!
+
+        expect(box.x + box.width).toBeLessThanOrEqual(buttonLeft)
+      }
+    })
+  }
+
   test('sur téléphone, tout défile avec le panneau, le bouton reste en haut à droite', async ({
     page,
     isMobile,
