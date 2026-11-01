@@ -23,7 +23,7 @@
      centre de la fenêtre : `left` se compte en `vw`, car la place gardée à la barre sort de la boîte
      qu'`inset` et les marges automatiques connaissent. */
   .project-panel {
-    --photo: min(100vh - 104px, 660px, (100vw - 92px) / 2);
+    --photo: min(100vh - 96px, 660px, (100vw - 92px) / 2);
     position: fixed;
     inset: 0;
     z-index: 30;
@@ -42,7 +42,7 @@
       right: auto;
       left: calc(50vw - var(--photo) - 22px);
       width: calc(2 * var(--photo) + 44px);
-      height: calc(var(--photo) + 56px);
+      height: calc(var(--photo) + 48px);
       margin-block: auto;
       padding: 10px;
       overflow-y: visible;
@@ -101,13 +101,13 @@
     color: var(--ink);
   }
 
-  /* Toujours 28 px, sans image comprise (§3.2) : le panneau en dépend. */
+  /* Toujours 20 px, sans image comprise (§3.2) : le panneau en dépend. */
   .project-gallery-bar {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     gap: var(--s-3);
-    height: 28px;
+    height: 20px;
     margin-top: var(--s-2);
     color: var(--ink-2);
     font-size: var(--fs-small);
