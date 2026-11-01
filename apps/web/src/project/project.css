@@ -137,12 +137,17 @@
     }
   }
 
-  /* L'en-tête (§4.3) : fixe au bureau, seule la colonne en dessous défile. */
+  /* L'en-tête (§4.3) : fixe au bureau, seule la colonne en dessous défile. Dès 600 px, sa marge droite
+     écarte de 8 px le bouton Fermer, qui dépasse de 18 px dans la colonne. */
   .project-head {
     display: flex;
     flex-wrap: wrap;
     column-gap: var(--s-4);
     flex: none;
+
+    @variant sm {
+      padding-right: 26px;
+    }
   }
 
   .project-title {

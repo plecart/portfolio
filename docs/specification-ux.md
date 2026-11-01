@@ -284,7 +284,7 @@ La carte du projet « vitrine » (§1.9) est une carte polaroid aux dimensions d
 ### 4.3 Fiche
 
 - **Galerie** à gauche (§4.4), calée en haut.
-- **En-tête fixe** (retour à la ligne, écart horizontal 16 px) : le post-it du titre (`<h2>`, 22 / 600, marge intérieure 8 14 8 16, marge basse 8 px, rotation −2°, `--postit`) ; les post-its de lien (`<a>`) « Voir le site » (démo) puis « Voir le dépôt » (dépôt) : 15 / 600, marge intérieure 8 14, marge 6 px 0 12 px, rotation −4° gardée dans tous les états, `--postit-link`, icône de lien externe 14 px à 4 px du texte, survol : montée de 2 px (150 ms) ; absents sans lien. Puis, sur toute la largeur, la rangée de rubans de la carte (trois technologies, états), écart 4 px 8 px, marge basse 16 px.
+- **En-tête fixe** (retour à la ligne, écart horizontal 16 px ; marge droite de 26 px dès 600 px, qui l'arrête à 8 px du bouton de fermeture) : le post-it du titre (`<h2>`, 22 / 600, marge intérieure 8 14 8 16, marge basse 8 px, rotation −2°, `--postit`) ; les post-its de lien (`<a>`) « Voir le site » (démo) puis « Voir le dépôt » (dépôt) : 15 / 600, marge intérieure 8 14, marge 6 px 0 12 px, rotation −4° gardée dans tous les états, `--postit-link`, icône de lien externe 14 px à 4 px du texte, survol : montée de 2 px (150 ms) ; absents sans lien. Puis, sur toute la largeur, la rangée de rubans de la carte (trois technologies, états), écart 4 px 8 px, marge basse 16 px.
 - **Colonne défilante** (`overflow-y: auto` une fois la fiche posée ; marge 0 8 px 16 px 0 ; barre §2.6), dans l'ordre :
   1. ligne de faits « Type · Dates · Client », 13 px `--ink-2`, marge basse 16 px ; un fait absent disparaît avec son séparateur ;
   2. résumé, 16 px, marge basse 16 px ;

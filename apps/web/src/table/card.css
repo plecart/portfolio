@@ -144,12 +144,17 @@
     top: -8px;
     left: 14px;
     z-index: 2;
-    display: -webkit-box;
     /* Carte − 28 px (spec §4.1), mesurée depuis la largeur de la photo. */
     max-width: calc(100% + 2 * var(--card-frame) - 28px);
     padding: 6px 10px 6px 12px;
-    overflow: hidden;
     font-size: var(--card-title);
+  }
+
+  /* Coupé dans la marge du post-it, et non sur lui : comme le bandeau, ses lignes cachées
+     reparaîtraient dans sa marge basse. */
+  .card-postit-text {
+    display: -webkit-box;
+    overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
   }

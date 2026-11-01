@@ -197,7 +197,9 @@ export function Card({
           <div className="card-face">
             <div ref={layer} className="card-tilt">
               <Clip />
-              <h2 className="postit postit-title card-postit">{project.title}</h2>
+              <h2 className="postit postit-title card-postit">
+                <span className="card-postit-text">{project.title}</span>
+              </h2>
               <span className="sr-only">{cardNameSuffix(project)}</span>
               <Photo project={project} size={size} />
               <Band project={project} />
