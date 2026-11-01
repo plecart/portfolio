@@ -183,7 +183,7 @@ Filet de l'entête décollée : `0 1px 0 var(--line)`. Aucune autre ombre.
 
 ### 2.6 Barre de défilement
 
-Page et colonne de lecture de la fiche : `scrollbar-width: thin ; scrollbar-color: var(--line) transparent`. Moteurs WebKit : 6 px de large, curseur `--line` arrondi (999 px), piste transparente.
+Page, colonne de lecture de la fiche et, sur téléphone, son panneau : `scrollbar-width: thin ; scrollbar-color: var(--line) transparent`. Moteurs WebKit : 6 px de large, curseur `--line` arrondi (999 px), piste transparente.
 
 ### 2.7 Mouvement
 
@@ -227,7 +227,7 @@ De haut en bas : l'entête (§3.3), la table (`<main>`), les liens de l'auteur (
 
 - **Panneau** : `role="dialog"` `aria-modal="true"`, nommé par le titre ; fixé au centre de la fenêtre, z-index 30, au-dessus de la table dont le défilement est verrouillé ; papier, rayon 2 px, `--shadow-lift`, marge intérieure 10 px ; deux colonnes « photo | lecture », gouttière 24 px.
 - **Dimension depuis la photo** : `--photo = min(100vh − 104px, 660px, (100vw − 92px) / 2)` ; largeur du panneau `2 × photo + 44 px` ; hauteur `photo + 56 px`. Constantes : 44 = 10 + 24 + 10 (marges intérieures et gouttière) ; 56 = 10 + 28 + 8 + 10 (marges, barre de galerie, écart sous la photo) ; 104 = 56 + 2 × 24 et 92 = 44 + 2 × 24 (le panneau garde 24 px de chaque bord de la fenêtre). Repères : 1280 × 800 → photo 594 px, panneau 1232 × 650 px (marges 24 px et 75 px) ; 1440 × 900 → photo 660 px (plafond), panneau 1364 × 716 px ; 1024 × 768 → photo 466 px, panneau 976 × 522 px.
-- **Colonne de lecture** : marge intérieure 12 px 16 px 0 0 ; en haut, fixes, le post-it du titre, les post-its de lien et la rangée de rubans ; dessous, la colonne défilante (§4.3). À 1280 × 800 : en-tête de 89 px, colonne défilante de 529 px.
+- **Colonne de lecture** : marge intérieure 12 px 16 px 0 0 ; en haut, fixes, le post-it du titre, les post-its de lien et la rangée de rubans ; dessous, la colonne défilante (§4.3). À 1280 × 800 : en-tête de 89 px, colonne défilante de 529 px, marge basse de 16 px comprise.
 - **Mobile** (≤ 599 px) : le panneau est la fenêtre (100 vw × 100 vh, rayon 0, marge intérieure 8 px), une colonne, gouttière 12 px ; la photo prend la largeur disponible (384 px à 400 px) ; l'en-tête n'est plus fixe : tout défile avec le panneau ; colonne de lecture à marge 12 px 0 32 px.
 - **Fermeture** : bouton de 36 px en haut à droite du panneau, à 8 px des bords, papier, icône 20 px, libellé « Fermer la fiche » ; Échap ; retour du navigateur. Focus : sur ce bouton à l'ouverture, retenu dans le panneau, rendu à la carte d'origine à la fermeture. Chorégraphie : §4.6.
 
