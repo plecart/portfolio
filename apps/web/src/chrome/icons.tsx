@@ -49,6 +49,15 @@ export function MoonIcon() {
   )
 }
 
+/** Croix : fermer. */
+export function CloseIcon() {
+  return (
+    <StrokeIcon>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </StrokeIcon>
+  )
+}
+
 /** Icônes des liens de l'auteur : 22 px (spec §3.4), trait de 1,5 comme au prototype. */
 function AuthorLinkIcon({ children }: { children: ReactNode }) {
   return (

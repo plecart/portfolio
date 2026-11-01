@@ -7,7 +7,8 @@ const HOVER_DEVICE = '(hover: hover)'
 /**
  * La révélation au toucher (spec §1.7, §4.1), une carte à la fois, tenue au niveau de la table. Sur
  * un appareil sans survol, le premier `click` sur une carte la révèle au lieu de suivre le lien ; le
- * suivant le suit. Un `click` clavier, sans contact (`detail` à 0), ouvre directement (§6.2).
+ * suivant le laisse passer et achève la révélation. Un `click` clavier, sans contact (`detail` à 0),
+ * ouvre directement (§6.2).
  *
  * La révélation s'achève au `pointerdown` hors des cellules, et non au `click`, qu'iOS n'émet pas sur
  * un élément non cliquable. L'écouteur n'existe que pendant une révélation.
@@ -31,7 +32,10 @@ export function useTouchReveal(): {
   }, [revealing])
 
   const revealOnTouch = (event: MouseEvent, slug: string) => {
-    if (event.detail === 0 || slug === revealed || matchMedia(HOVER_DEVICE).matches) return
+    if (event.detail === 0 || slug === revealed || matchMedia(HOVER_DEVICE).matches) {
+      setRevealed(null)
+      return
+    }
     event.preventDefault()
     setRevealed(slug)
   }

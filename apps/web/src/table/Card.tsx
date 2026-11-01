@@ -6,6 +6,7 @@ import {
   type Ref,
 } from 'react'
 import type { Project } from '../api/projects.ts'
+import { projectPath } from '../project/project.ts'
 import { strings } from '../strings.ts'
 import {
   cardDescription,
@@ -150,7 +151,7 @@ export function Card({
   return (
     <a
       ref={ref}
-      href={`/projets/${project.slug}`}
+      href={projectPath(project.slug)}
       aria-describedby={descriptionId}
       data-table-cell
       data-revealed={revealed || undefined}

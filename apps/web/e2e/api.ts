@@ -59,6 +59,19 @@ export async function holdProjects(page: Page): Promise<(answer: Answer) => Prom
   return async (answer) => answer(await held)
 }
 
+/**
+ * Compte les requêtes de la liste à partir de maintenant, servies ou non.
+ *
+ * @returns De quoi lire le compte.
+ */
+export function countProjectRequests(page: Page): () => number {
+  let count = 0
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/projets')) count += 1
+  })
+  return () => count
+}
+
 /** Sert les images et les icônes des jeux depuis `fixtures/` : leur origine n'est jamais résolue. */
 async function serveFiles(page: Page) {
   await page.route(`${FILES_ORIGIN}/**`, (route) =>

@@ -65,9 +65,17 @@ const TOKENS_SHEET = 'tokens.css'
 
 const SRC = join(APP_ROOT, 'src')
 
+/** Toute feuille CSS de `src/` autre que celle des jetons. */
+const SHEETS = readdirSync(SRC, { recursive: true, encoding: 'utf8' }).filter(
+  (path) => path.endsWith('.css') && path !== TOKENS_SHEET,
+)
+
+/** Une feuille CSS sans ses commentaires. */
+const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
+
 /** Formes interdites présentes dans une feuille CSS, commentaires exclus : leurs noms. */
 function forbiddenIn(css: string): string[] {
-  const code = css.replace(/\/\*[\s\S]*?\*\//g, '')
+  const code = withoutComments(css)
 
   return FORBIDDEN_VALUES.filter(({ pattern }) => new RegExp(pattern, 'i').test(code)).map(
     ({ name }) => name,
@@ -121,15 +129,11 @@ describe('ESLint refuse une valeur en dur dans un composant', () => {
 })
 
 describe('aucune feuille CSS hors des jetons ne porte de valeur en dur', () => {
-  const sheets = readdirSync(SRC, { recursive: true, encoding: 'utf8' }).filter(
-    (path) => path.endsWith('.css') && path !== TOKENS_SHEET,
-  )
-
   test('la population balayée est celle du dépôt', () => {
-    expect(sheets).toContain('index.css')
+    expect(SHEETS).toContain('index.css')
   })
 
-  test.each(sheets)('%s', (path) => {
+  test.each(SHEETS)('%s', (path) => {
     expect(forbiddenIn(readFileSync(join(SRC, path), 'utf8'))).toEqual([])
   })
 
@@ -145,6 +149,43 @@ describe('aucune feuille CSS hors des jetons ne porte de valeur en dur', () => {
   test('un commentaire ne compte pas', () => {
     // Un renvoi d'issue à trois chiffres a la forme d'une couleur hexadécimale.
     expect(forbiddenIn('/* voir #164, 2s */ a { color: var(--ink) }')).toEqual([])
+  })
+})
+
+/**
+ * Ce que `shadcn init` écrit dans la feuille globale, et que le `dialog` copié sans lui n'apporte
+ * pas (issue #170, décision du 2026-10-27). Son `oklch(…)` tombe sous le balayage ci-dessus, et
+ * `--accent` n'y figure pas : c'est un jeton de la spec (§2.1).
+ */
+const SHADCN_FORMS: [string, RegExp][] = [
+  [
+    'variable de palette',
+    /--(background|foreground|card|card-foreground|popover|primary|secondary|muted|destructive|border|input|ring|sidebar|chart-[1-5])\s*:/,
+  ],
+  ['tw-animate-css', /tw-animate-css/],
+  ['couche base', /@apply\s+(border-border|bg-background)/],
+]
+
+/** Formes de `shadcn init` présentes dans une feuille CSS, commentaires exclus : leurs noms. */
+function shadcnFormsIn(css: string): string[] {
+  const code = withoutComments(css)
+
+  return SHADCN_FORMS.filter(([, form]) => form.test(code)).map(([name]) => name)
+}
+
+describe('aucune feuille ne porte ce que `shadcn init` y écrirait', () => {
+  test.each([...SHEETS, TOKENS_SHEET])('%s', (path) => {
+    expect(shadcnFormsIn(readFileSync(join(SRC, path), 'utf8'))).toEqual([])
+  })
+
+  test('le balayage voit chaque forme', () => {
+    const init = `
+      @import "tw-animate-css";
+      :root { --background: oklch(1 0 0); }
+      @layer base { * { @apply border-border; } }
+    `
+
+    expect(shadcnFormsIn(init)).toEqual(SHADCN_FORMS.map(([name]) => name))
   })
 })
 
