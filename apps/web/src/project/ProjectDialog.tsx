@@ -15,9 +15,16 @@ import { projectPath } from './project.ts'
 const CLOSE_CLASSES =
   'absolute top-(--s-2) right-(--s-2) flex size-9 items-center justify-center rounded-full bg-(--paper) text-(--ink-2) transition-colors hover:text-(--ink)'
 
-/** Rend le focus à la carte d'un projet, que son `href` désigne (spec §3.2). */
+/**
+ * Rend le focus à la carte d'un projet, que son `href` désigne (spec §3.2). Une carte encore dans la
+ * fenêtre, même en partie, laisse la page où elle était ; seule une carte hors de la fenêtre, après
+ * une arrivée directe, y vient.
+ */
 function focusCard(slug: string) {
-  document.querySelector<HTMLElement>(`.card[href="${projectPath(slug)}"]`)?.focus()
+  const card = document.querySelector<HTMLElement>(`.card[href="${projectPath(slug)}"]`)
+  if (!card) return
+  const { top, bottom } = card.getBoundingClientRect()
+  card.focus({ preventScroll: bottom > 0 && top < innerHeight })
 }
 
 /**

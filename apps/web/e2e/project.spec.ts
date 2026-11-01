@@ -19,7 +19,8 @@ import {
   watchCspViolations,
 } from './project.ts'
 import { PROJECT_SETS } from './projects.ts'
-import { cards, COLUMN_VIEWPORT, openTable, serveUnderCsp } from './table.ts'
+import { scrollGesture, scrollThrough, scrollTop } from './scroll.ts'
+import { cards, COLUMN_VIEWPORT, expectPlacement, openTable, serveUnderCsp } from './table.ts'
 
 /** Trois projets aux titres distincts. La première carte, celle du projet en cours : `projet-02`. */
 const PROJECTS = PROJECT_SETS.threeWithoutShowcase
@@ -83,17 +84,161 @@ test('une seule requête vers la liste, ouverture et fermetures comprises', asyn
   expect(requests()).toBe(1)
 })
 
-test('sous la CSP de production, ouvrir, faire défiler et fermer ne viole rien', async ({ page }) => {
+test('sous la CSP de production, la page ne défile pas pendant la fiche et rend sa position, sans violation', async ({
+  page,
+}) => {
   const violations = watchCspViolations(page)
   await serveUnderCsp(page)
   await openTable(page, PROJECT_SETS.twelveWithShowcase)
+  const card = cards(page).last()
+  await card.scrollIntoViewIfNeeded()
+  const top = await scrollTop(page)
+  expect(top).toBeGreaterThan(0)
 
-  await openProject(cards(page).first())
-  await page.mouse.wheel(0, 300)
+  await openProject(card)
+  await scrollGesture(page, -100)
+
+  expect(await scrollTop(page)).toBe(top)
+
   await closeButton(page).click()
   await expectClosed(page)
 
+  expect(await scrollTop(page)).toBe(top)
   expect(violations).toEqual([])
+
+  await scrollGesture(page, -100)
+
+  expect(await scrollTop(page)).toBeLessThan(top)
+})
+
+test('une carte coupée par le bord de la fenêtre ne fait pas défiler la page à la fermeture', async ({
+  page,
+}) => {
+  await openTable(page, PROJECT_SETS.twelveWithShowcase)
+  const card = cards(page).last()
+  const box = (await card.boundingBox())!
+  await scrollThrough(page, box.y + box.height / 2 - page.viewportSize()!.height)
+  const top = await scrollTop(page)
+
+  await card.dispatchEvent('click', { detail: 0 })
+  await closeButton(page).click()
+  await expectClosed(page)
+
+  await expect(card).toBeFocused()
+  expect(await scrollTop(page)).toBe(top)
+})
+
+test('une carte hors de la fenêtre après une arrivée directe y vient avec le focus', async ({ page }) => {
+  await serveProjects(page, PROJECT_SETS.twelveWithShowcase)
+  await page.goto('/projets/projet-01')
+
+  await closeButton(page).click()
+  await expectClosed(page)
+
+  const card = cards(page).last()
+  await expect(card).toBeFocused()
+  await expect(card).toBeInViewport()
+})
+
+test('toutes les cartes s’effacent en 150 ms, sans transformation ni pointeur, et reviennent', async ({
+  page,
+}) => {
+  await openTable(page, PROJECTS)
+  await settle(page)
+  const cells = await page.locator('.card').all()
+  const [fast] = await resolveAll(page, [['transition-duration', 'var(--dur-fast)']])
+
+  await openProject(cards(page).first())
+
+  for (const cell of cells) {
+    await expect(cell).toHaveCSS('opacity', '0')
+    await expect(cell).toHaveCSS('transition-property', 'opacity')
+    await expect(cell).toHaveCSS('transition-duration', fast)
+    await expect(cell).toHaveCSS('transform', 'none')
+    await expect(cell).toHaveCSS('pointer-events', 'none')
+  }
+
+  await closeButton(page).click()
+  await expectClosed(page)
+
+  for (const cell of cells) {
+    await expect(cell).toHaveCSS('opacity', '1')
+    await expect(cell).toHaveCSS('pointer-events', 'auto')
+  }
+})
+
+test('l’entête sort pendant la fiche, en haut de page aussi, et revient à la fermeture', async ({
+  page,
+}) => {
+  await openTable(page, PROJECTS)
+  const header = page.locator('header')
+  await expect(header).toBeInViewport()
+
+  await openProject(cards(page).first())
+
+  await expect(header).not.toBeInViewport()
+
+  await closeButton(page).click()
+
+  await expect(header).toBeInViewport()
+})
+
+test('à 1280 × 800, la colonne des liens s’efface en 150 ms et revient à la fermeture', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, 'largeur de bureau : le projet desktop la porte')
+  await page.setViewportSize(COLUMN_VIEWPORT)
+  await openTable(page, PROJECTS)
+  await expectPlacement(page, 'column')
+  const footer = page.locator('footer')
+  const [fast] = await resolveAll(page, [['transition-duration', 'var(--dur-fast)']])
+
+  await expect(footer).toHaveCSS('transition-property', 'opacity')
+  await expect(footer).toHaveCSS('transition-duration', fast)
+
+  await openProject(cards(page).first())
+
+  await expect(footer).toHaveCSS('opacity', '0')
+  await expect(footer).toHaveCSS('pointer-events', 'none')
+
+  await closeButton(page).click()
+
+  await expect(footer).toHaveCSS('opacity', '1')
+  await expect(footer).toHaveCSS('pointer-events', 'auto')
+})
+
+test('à 400 × 800, le pied de page reste sous le plein écran', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'le plein écran : le projet mobile')
+  await page.setViewportSize({ width: 400, height: 800 })
+  await openTable(page, PROJECTS)
+  await expectPlacement(page, 'footer')
+
+  await openProject(cards(page).first())
+
+  await expect(page.locator('footer')).toHaveCSS('opacity', '1')
+})
+
+test('en mouvement réduit, l’entête et la fiche passent par un fondu seul', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await openTable(page, PROJECTS)
+  const header = page.locator('header')
+  const animations = await watchAnimations(page)
+
+  await openProject(cards(page).first())
+
+  await expect(header).toHaveCSS('opacity', '0')
+  await expect(header).toHaveCSS('pointer-events', 'none')
+  await expect(header).toHaveCSS('translate', 'none')
+  await expect(panel(page)).toHaveCSS('transform', 'none')
+  await expect(panel(page)).toHaveCSS('translate', 'none')
+
+  await closeButton(page).click()
+  await expectClosed(page)
+
+  await expect(header).toHaveCSS('opacity', '1')
+  await expect(header).toHaveCSS('pointer-events', 'auto')
+  expect((await animations()).map(({ name }) => name)).toEqual(['project-in', 'project-out'])
 })
 
 test('un clic hors du panneau ne ferme pas la fiche', async ({ page, isMobile }) => {

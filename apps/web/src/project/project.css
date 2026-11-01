@@ -4,8 +4,16 @@
    constantes de §3.2 n'ont pas d'autre nom. Les fondus sont des animations, jamais des transitions :
    `Presence` de Radix ne retient le panneau à la sortie que si le nom de l'animation change. */
 @layer components {
+  /* Le verrou de défilement (§3.2), écrit ici et non par `RemoveScroll` : son `<style>` injecté tombe
+     sous la CSP de production. La barre garde sa place, et la table ne bouge pas. */
+  html[data-project-open] {
+    overflow: hidden;
+    scrollbar-gutter: stable;
+  }
+
   /* Mobile : le panneau est la fenêtre, une colonne. Dès 600 px, deux colonnes de la largeur de la
-     photo, au centre de la fenêtre. */
+     photo, au centre de la fenêtre : `left` se compte en `vw`, car la place gardée à la barre sort de
+     la boîte qu'`inset` et les marges automatiques connaissent. */
   .project-panel {
     --photo: min(100vh - 104px, 660px, (100vw - 92px) / 2);
     position: fixed;
@@ -21,9 +29,11 @@
     @variant sm {
       grid-template-columns: repeat(2, var(--photo));
       gap: var(--s-5);
+      right: auto;
+      left: calc(50vw - var(--photo) - 22px);
       width: calc(2 * var(--photo) + 44px);
       height: calc(var(--photo) + 56px);
-      margin: auto;
+      margin-block: auto;
       padding: 10px;
       border-radius: var(--r-card);
     }

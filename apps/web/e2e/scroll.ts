@@ -7,6 +7,26 @@
 import { expect, type Page } from '@playwright/test'
 import { settle } from './css.ts'
 
+/** La position de défilement de la page. */
+export const scrollTop = (page: Page) => page.evaluate(() => window.scrollY)
+
+/**
+ * Défile d'un vrai geste, résolu à sa fin : `mouse.wheel` n'attend aucun effet, et un `scrollTo`
+ * passe outre un `overflow: hidden`.
+ *
+ * @param distance Les pixels à parcourir vers le bas.
+ */
+export async function scrollGesture(page: Page, distance: number) {
+  const client = await page.context().newCDPSession(page)
+  await client.send('Input.synthesizeScrollGesture', {
+    x: 1,
+    y: 1,
+    yDistance: -distance,
+    speed: 6000,
+  })
+  await client.detach()
+}
+
 /** Allonge la page de quatre hauteurs de fenêtre, sous la table. */
 export async function lengthenPage(page: Page) {
   await page.evaluate(() => {

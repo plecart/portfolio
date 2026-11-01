@@ -29,6 +29,8 @@ const FOOTER_CLASSES = [
   // Colonne : fixe en bas à droite, à 24 px des bords, 8 px entre deux disques, sans filet.
   'data-docked:fixed data-docked:right-(--s-5) data-docked:bottom-(--s-5) data-docked:z-40',
   'data-docked:flex-col data-docked:gap-(--s-2) data-docked:p-0 data-docked:before:hidden',
+  // Fiche ouverte, la colonne s'efface en 150 ms (§2.7, §3.4) ; le pied de page reste.
+  'transition-opacity data-docked:project-open:pointer-events-none data-docked:project-open:opacity-0',
 ].join(' ')
 
 /** Classes d'un lien, sous les deux mêmes formes (`group-data-docked:` lit celle du `<footer>`). */
@@ -46,7 +48,8 @@ const LINK_CLASSES = [
 /**
  * Les liens de l'auteur (spec §1.13, §3.4) : GitHub puis LinkedIn, icônes au trait et libellé
  * accessible, dans le `<footer>` de la page — dernier dans l'ordre de tabulation sous ses deux
- * formes. Colonne fixe ou pied de page selon la marge mesurée à côté de la table.
+ * formes. Colonne fixe ou pied de page selon la marge mesurée à côté de la table ; fiche ouverte, la
+ * colonne s'efface.
  *
  * @param table La table, dont les cellules décident de la forme (`useAuthorLinksPlacement`).
  */

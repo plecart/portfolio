@@ -46,6 +46,14 @@
     --card-press-scale: 0.985;
     --card-perspective: 900px;
     align-self: start;
+    transition: opacity var(--dur-fast) var(--ease-out);
+  }
+
+  /* Fiche ouverte, toutes les cartes s'effacent (§4.6, §6.3) : par l'opacité, jamais par une
+     transformation, que la mesure des liens de l'auteur suivrait (`TABLE_CELL_SELECTOR`). Le pointeur
+     ne les atteint plus : Radix pose `pointer-events: none` sur `<body>` pendant un dialogue modal. */
+  html[data-project-open] .card {
+    opacity: 0;
   }
 
   /* L'entrée (spec §3.1, §6.3), que `useCardEntrance` déclenche et retarde d'un pas par colonne :
