@@ -274,6 +274,47 @@ test('le bandeau de résumé : absolu en bas de la photo, `--paper` à 94 %, 13 
   expect(Math.round(gap)).toBe(-6)
 })
 
+/** Le canal vert d'une capture PNG, colonne par colonne, décodé par la page. */
+const greenColumns = (page: Page, png: Buffer) =>
+  page.evaluate(async (url) => {
+    const bitmap = await createImageBitmap(await (await fetch(url)).blob())
+    const { width, height } = bitmap
+    const context = new OffscreenCanvas(width, height).getContext('2d')!
+    context.drawImage(bitmap, 0, 0)
+    const { data } = context.getImageData(0, 0, width, height)
+    return Array.from({ length: width }, (_, x) =>
+      Array.from({ length: height }, (_, y) => data[4 * (y * width + x) + 1]),
+    )
+  }, `data:image/png;base64,${png.toString('base64')}`)
+
+test('à mi-transition, aucun filet de l’image ne longe le bandeau', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'appareil sans survol : le filet se mesure sous la carte inclinée')
+  await page.setViewportSize(COLUMN_VIEWPORT)
+  await openTable(page, PROJECT_SETS.threeWithoutShowcase)
+  await enterCards(page)
+  const card = cards(page).first()
+  const { x, y, width, height } = (await card.boundingBox())!
+
+  await page.mouse.move(x + width / 2, y + height * 0.8)
+  await expect.poll(() => summary(card).evaluate((band) => band.getAnimations().length)).toBe(2)
+  await page.evaluate(() => {
+    for (const motion of document.getAnimations()) {
+      motion.pause()
+      motion.currentTime = 75
+    }
+  })
+
+  // Une bande à cheval sur le bord bas : du bandeau au papier, rien de plus sombre que les deux.
+  const band = (await summary(card).boundingBox())!
+  const edge = Math.floor(band.y + band.height)
+  const clip = { x: Math.ceil(band.x) + 2, y: edge - 12, width: Math.floor(band.width) - 4, height: 24 }
+  const columns = await greenColumns(page, await page.screenshot({ clip }))
+
+  expect(columns[0][0]).toBeLessThan(columns[0].at(-1)!)
+  const dips = columns.map((column) => Math.min(column[0], column.at(-1)!) - Math.min(...column))
+  expect(Math.max(...dips)).toBeLessThanOrEqual(2)
+})
+
 test('un résumé de 120 caractères tient en sept lignes sur la carte simple mobile (spec §7)', async ({
   page,
   isMobile,
