@@ -6,6 +6,7 @@ import { StateRibbons, TechnologyRibbon, TechnologyRibbons } from '../table/Card
 import type { Technology } from '../table/cards.ts'
 import { projectFacts, splitStack } from './project.ts'
 import { ProjectMarkdown } from './ProjectMarkdown.tsx'
+import { ProjectSections } from './ProjectSections.tsx'
 
 /** Un post-it de lien (spec §4.3), ouvert dans le même onglet, comme les liens de l'auteur. */
 function ProjectLink({ href, label }: { href: string; label: string }) {
@@ -65,6 +66,7 @@ export function ProjectContent({ project }: { project: Project }) {
         <StackGroup title={strings.technologies} technologies={technologies} />
         <StackGroup title={strings.tools} technologies={tools} />
         <ProjectMarkdown className="project-description">{project.description}</ProjectMarkdown>
+        <ProjectSections sections={project.sections} />
       </div>
     </div>
   )

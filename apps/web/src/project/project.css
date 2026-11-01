@@ -155,6 +155,52 @@
   .project-description {
     margin-top: var(--s-4);
   }
+
+  /* Les sections (§4.3). Le signe, décoratif, se lit dans `open`, sans état React. */
+  .project-sections {
+    margin-top: var(--s-4);
+    border-top: 1px solid var(--line);
+  }
+
+  .project-section {
+    border-bottom: 1px solid var(--line);
+    scroll-margin-top: var(--s-2);
+
+    > summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s-2);
+      min-height: 47px;
+      padding-block: var(--s-3);
+      font-size: 15px;
+      font-weight: 700;
+      list-style: none;
+      cursor: pointer;
+    }
+
+    > summary::-webkit-details-marker {
+      display: none;
+    }
+  }
+
+  .project-section-sign {
+    color: var(--ink-2);
+    font-size: 18px;
+    line-height: 1;
+
+    &::before {
+      content: '+';
+    }
+
+    [open] > summary > &::before {
+      content: '\2212';
+    }
+  }
+
+  .project-section-body {
+    margin-bottom: var(--s-3);
+  }
 }
 
 @keyframes project-in {

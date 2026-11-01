@@ -53,6 +53,19 @@ export function slugFromPath(pathname: string): string | null {
   return PROJECT_PATH.exec(pathname)?.[1] ?? null
 }
 
+/**
+ * Un clic modifié reste celui d'un lien : c'est au navigateur de l'ouvrir. Le bouton du milieu
+ * n'émet pas de `click`.
+ */
+export function isModifiedClick(click: {
+  ctrlKey: boolean
+  metaKey: boolean
+  shiftKey: boolean
+  altKey: boolean
+}): boolean {
+  return click.ctrlKey || click.metaKey || click.shiftKey || click.altKey
+}
+
 /** Le mois et l'année d'une date ISO, en minuscules : « janvier 2025 ». */
 function monthYear(date: string): string {
   return MONTH_YEAR.format(new Date(date))
