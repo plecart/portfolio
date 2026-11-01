@@ -137,6 +137,15 @@
     -webkit-line-clamp: 2;
   }
 
+  /* Le point que le nom du lien met au titre : sans taille, et sans quitter sa ligne (`Card`). */
+  .card-postit h2 {
+    display: inline;
+  }
+
+  .card-title-stop {
+    font-size: 0;
+  }
+
   .card-clip {
     position: absolute;
     top: -14px;
