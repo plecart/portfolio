@@ -43,7 +43,7 @@ const SWIPE_THRESHOLD = 40
  * `project.css` car `sizes` ne lit pas les propriétés CSS, sinon le panneau moins ses marges de 8 px.
  */
 export const GALLERY_SIZES = [
-  `(min-width: ${BREAKPOINT}px) min(100vh - 104px, 660px, (100vw - 92px) / 2)`,
+  `(min-width: ${BREAKPOINT}px) min(100vh - 96px, 660px, (100vw - 92px) / 2)`,
   'calc(100vw - 16px)',
 ].join(', ')
 

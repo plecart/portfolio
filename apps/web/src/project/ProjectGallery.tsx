@@ -77,6 +77,7 @@ export function ProjectGallery({ gallery }: { gallery: Project['gallery'] }) {
               key={position}
               {...sources}
               sizes={GALLERY_SIZES}
+              draggable={false}
               alt={caption}
               loading="lazy"
               aria-hidden={position !== index}
