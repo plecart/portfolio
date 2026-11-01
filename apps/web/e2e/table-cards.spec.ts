@@ -9,7 +9,7 @@ import { AxeBuilder } from '@axe-core/playwright'
 import type { Locator, Page } from '@playwright/test'
 import { cardPose } from '../src/table/cards.ts'
 import { expect, FAILURES, holdProjects, serving, test, type Answer } from './api.ts'
-import { resolveAll, settle } from './css.ts'
+import { resolveAll, rotationOf, settle } from './css.ts'
 import {
   buildImage,
   buildProject,
@@ -36,13 +36,6 @@ import {
 
 /** Les couches de la couverture d'une carte : l'image, puis la copie d'un projet en cours. */
 const coverLayers = (card: Locator) => card.locator('img[srcset]')
-
-/** La rotation d'un élément, en degrés, au dixième, lue sur sa transformation calculée. */
-const rotationOf = (element: Locator) =>
-  element.evaluate((node) => {
-    const { a, b } = new DOMMatrix(getComputedStyle(node).transform)
-    return Math.round((Math.atan2(b, a) * 1800) / Math.PI) / 10
-  })
 
 const TABLES = Object.entries(PROJECT_SETS).filter(([, projects]) => projects.length > 0)
 

@@ -4,7 +4,14 @@
  * Une valeur se compare **résolue** : Chrome sérialise à sa manière ce qu'il calcule — une couleur
  * `color-mix()`, une ombre, une durée —, et seule la valeur calculée des deux côtés se compare.
  */
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
+
+/** La rotation d'un élément, en degrés, au dixième, lue sur sa transformation calculée. */
+export const rotationOf = (element: Locator) =>
+  element.evaluate((node) => {
+    const { a, b } = new DOMMatrix(getComputedStyle(node).transform)
+    return Math.round((Math.atan2(b, a) * 1800) / Math.PI) / 10
+  })
 
 /**
  * Valeurs calculées de déclarations appliquées une à une à un élément sonde du document.

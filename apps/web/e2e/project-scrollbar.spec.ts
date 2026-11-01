@@ -4,7 +4,7 @@
  * `author-links-scrollbar.spec.ts`. Une page sans barre, elle, ne doit pas en gagner la place.
  */
 import { expect, test } from './api.ts'
-import { openProject, panel } from './project.ts'
+import { expectPanelBox, openProject } from './project.ts'
 import { PROJECT_SETS } from './projects.ts'
 import { cards, COLUMN_VIEWPORT, openTable } from './table.ts'
 
@@ -27,7 +27,7 @@ for (const [name, projects, hasBar] of [
     await openProject(card)
 
     expect((await page.locator('.card').first().boundingBox())!.x).toBe(left)
-    expect(await panel(page).boundingBox()).toMatchObject({ x: 24, y: 75, width: 1232, height: 650 })
+    await expectPanelBox(page)
   })
 }
 
@@ -39,5 +39,5 @@ test('sous 600 px, le plein écran ne garde aucune gouttière à la barre', asyn
 
   await openProject(cards(page).first())
 
-  expect(await panel(page).boundingBox()).toEqual({ x: 0, y: 0, ...viewport })
+  await expectPanelBox(page)
 })
