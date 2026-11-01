@@ -6,7 +6,7 @@
 import { AxeBuilder } from '@axe-core/playwright'
 import type { Page } from '@playwright/test'
 import { expect, serveProjects, test } from './api.ts'
-import { settle } from './css.ts'
+import { resolveAll, settle } from './css.ts'
 import { closeButton, openProject, panel, watchCspViolations } from './project.ts'
 import { buildProject, buildTechnology, ONGOING, type Project } from './projects.ts'
 import { cards, openTable, serveUnderCsp } from './table.ts'
@@ -180,6 +180,84 @@ test.describe('ce qui défile', () => {
 
     await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(['Technologies'])
     await expect(page.locator('.project-stack')).toHaveCount(1)
+  })
+})
+
+test.describe('la description en Markdown', () => {
+  const description = (page: Page) => page.locator('.project-description')
+
+  for (const html of [
+    '<script>alert(1)</script>',
+    '<b>x</b>',
+    '<img src=x onerror=alert(1)>',
+    '<a href="javascript:alert(1)">x</a>',
+  ]) {
+    test(`${html} s’affiche en texte, sans élément créé`, async ({ page }) => {
+      await arriveAt(page, { description: html })
+
+      await expect(description(page)).toHaveText(html)
+      await expect(description(page).locator('script, b, img, a')).toHaveCount(0)
+    })
+  }
+
+  /** Les protocoles qu'un lien ne doit jamais porter. */
+  const DANGEROUS = ['javascript:', 'vbscript:', 'data:']
+
+  for (const markdown of [
+    '[x](javascript:alert(1))',
+    '[x](JaVaScRiPt:alert(1))',
+    '[x](&#x6A;avascript:alert(1))',
+    '[x](<java&#9;script:alert(1)>)',
+    '<javascript:alert(1)>',
+    '[x][r]\n\n[r]: javascript:alert(1)',
+    '[x](data:text/html,x)',
+    '[x](vbscript:x)',
+  ]) {
+    test(`${JSON.stringify(markdown)} ne porte aucun href dangereux`, async ({ page }) => {
+      await arriveAt(page, { description: markdown })
+
+      const links = description(page).locator('a')
+
+      await expect(links).toHaveCount(1)
+      expect(DANGEROUS).not.toContain(await links.evaluate((link: HTMLAnchorElement) => link.protocol))
+    })
+  }
+
+  test('paragraphes, listes et liens conformes à §4.3, et axe ne trouve rien', async ({ page }) => {
+    await arriveAt(page, {
+      description: [
+        'Un paragraphe avec [un lien](https://exemple.test/).',
+        'Un autre, **en gras** et *en italique*.',
+        '- un point\n- un autre',
+        '1. premier\n2. second',
+      ].join('\n\n'),
+    })
+
+    await expect(description(page)).toHaveCSS('margin-top', '16px')
+    await expect(description(page).locator('p')).toHaveCount(2)
+    await expect(description(page).locator('p').first()).toHaveCSS('margin-bottom', '12px')
+    await expect(description(page).locator('p').first()).toHaveCSS('font-size', '16px')
+    await expect(description(page).locator('strong')).toHaveText('en gras')
+    await expect(description(page).locator('em')).toHaveText('en italique')
+    const [list, numbered] = [description(page).locator('ul'), description(page).locator('ol')]
+    await expect(list.getByRole('listitem')).toHaveText(['un point', 'un autre'])
+    await expect(list).toHaveCSS('padding-left', '18px')
+    await expect(list).toHaveCSS('list-style-type', 'disc')
+    await expect(numbered).toHaveCSS('padding-left', '18px')
+    await expect(numbered).toHaveCSS('list-style-type', 'decimal')
+    const [accent] = await resolveAll(page, [['color', 'var(--accent)']])
+    const link = description(page).getByRole('link', { name: 'un lien' })
+    await expect(link).toHaveAttribute('href', 'https://exemple.test/')
+    await expect(link).toHaveCSS('color', accent)
+    await expect(link).toHaveCSS('text-decoration-line', 'underline')
+    await expectNoViolations(page)
+  })
+
+  test('une seule ligne est un paragraphe comme les autres', async ({ page }) => {
+    await arriveAt(page, { description: 'Une seule ligne.' })
+
+    await expect(description(page).locator('p')).toHaveText('Une seule ligne.')
+    await expect(description(page).locator('p')).toHaveCSS('margin-bottom', '12px')
   })
 })
 
