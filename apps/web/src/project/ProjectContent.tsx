@@ -22,7 +22,7 @@ function ProjectLink({ href, label }: { href: string; label: string }) {
 function ProjectHeader({ project }: { project: Project }) {
   return (
     <div className="project-head">
-      <DialogTitle className="postit project-title">{project.title}</DialogTitle>
+      <DialogTitle className="postit postit-title project-title">{project.title}</DialogTitle>
       {project.demo_url && <ProjectLink href={project.demo_url} label={strings.viewSite} />}
       {project.repository_url && (
         <ProjectLink href={project.repository_url} label={strings.viewRepository} />
