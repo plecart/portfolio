@@ -5,34 +5,30 @@
 import { AxeBuilder } from '@axe-core/playwright'
 import type { Locator, Page } from '@playwright/test'
 import { expect, holdProjects, serving, test } from './api.ts'
-import { resolveAll } from './css.ts'
-import { buildProject, FILES_ORIGIN, PROJECT_SETS } from './projects.ts'
-import { scrollThrough } from './scroll.ts'
+import { resolveAll, settle } from './css.ts'
+import { buildProject, PROJECT_SETS } from './projects.ts'
+import { pageBottom, scrollThrough } from './scroll.ts'
 import {
   cards,
   COLUMN_VIEWPORT,
   enterCards,
+  entry,
   expectPlacement,
+  face,
+  focusByKeyboard,
+  FULL_CARD,
   openTable,
+  pose,
   serveUnderCsp,
-  settle,
+  summary,
+  tilt,
+  TWO_CARDS,
+  watchTransitions,
 } from './table.ts'
 
-/** Les couches d'une carte qui bougent, et son bandeau de résumé. */
-const entry = (card: Locator) => card.locator('.card-entry')
-const pose = (card: Locator) => card.locator('.card-pose')
-const face = (card: Locator) => card.locator('.card-face')
-const summary = (card: Locator) => card.locator('.card-summary')
-
-/** Le soulèvement (−6 px, ×1,02) et la pression (×0,985) de spec §2.7, en transformation calculée. */
+/** Le soulèvement (−6 px, ×1,02) et la pression (×0,985) de spec §4.1, en transformation calculée. */
 const LIFTED = 'matrix(1.02, 0, 0, 1.02, 0, -6)'
 const PRESSED = 'matrix(0.985, 0, 0, 0.985, 0, 0)'
-
-/** Focalise une carte au clavier : une touche d'abord, pour que `:focus-visible` s'applique. */
-async function focusByKeyboard(card: Locator) {
-  await card.page().keyboard.press('Tab')
-  await card.focus()
-}
 
 /** Attend l'ombre soulevée et le bandeau, apparus ou effacés. */
 async function expectRevealed(card: Locator, revealed: boolean) {
@@ -46,22 +42,6 @@ const INTENTS: [string, (card: Locator) => Promise<void>][] = [
   ['au survol', (card) => card.hover()],
   ['au focus clavier', focusByKeyboard],
 ]
-
-/** Une carte aux trois technologies et aux deux états : sous 600 px, ses rubans vont à la ligne. */
-const FULL_CARD = buildProject({
-  slug: 'pleine',
-  status: 'ongoing',
-  finished_on: null,
-  demo_url: 'https://demo.test/pleine',
-  technologies: (['language', 'framework', 'infrastructure'] as const).map((kind) => ({
-    name: kind,
-    kind,
-    icon: `${FILES_ORIGIN}/icones/${kind}.svg`,
-  })),
-})
-
-/** Deux cartes sur une rangée : la carte pleine, en cours donc en tête, et sa voisine. */
-const TWO_CARDS = [FULL_CARD, buildProject({ slug: 'voisine' })]
 
 test('à 15 % de sa surface dans l’écran, une carte entre : 8 px de montée et un fondu de 240 ms', async ({
   page,
@@ -92,18 +72,12 @@ test('à 15 % de sa surface dans l’écran, une carte entre : 8 px de montée e
 test('une carte n’entre qu’une fois : la revoir ne rejoue rien', async ({ page }) => {
   await openTable(page, PROJECT_SETS.twelveWithShowcase)
   await enterCards(page)
-  const replays = await page.evaluateHandle(() => {
-    const seen: string[] = []
-    addEventListener('transitionrun', ({ target, propertyName }) => {
-      if ((target as Element).matches('.card-entry')) seen.push(propertyName)
-    })
-    return seen
-  })
-  const bottom = await page.evaluate(() => document.documentElement.scrollHeight)
+  const transitions = await watchTransitions(page)
+  const bottom = await pageBottom(page)
 
   await scrollThrough(page, bottom, 0, bottom)
 
-  expect(await replays.jsonValue()).toEqual([])
+  expect(await transitions('card-entry')).toEqual([])
 })
 
 test('toute la table n’a qu’un observateur, qui lâche chaque carte entrée', async ({ page }) => {
@@ -142,7 +116,7 @@ test('le retard vaut 40 ms par colonne mesurée, et se relit au redimensionnemen
       }),
     )
 
-  expect(await columns()).toEqual([0, 2, 3, 2, 3, 0, 1, 2, 3, 0, 1, 2])
+  await expect.poll(columns).toEqual([0, 2, 3, 2, 3, 0, 1, 2, 3, 0, 1, 2])
 
   await page.setViewportSize({ ...COLUMN_VIEWPORT, width: 1000 })
   await expect.poll(columns).toEqual([0, 2, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2])
@@ -181,25 +155,24 @@ test('les cartes remplacent les cadres en entrant, sans changer la forme des lie
   const release = await holdProjects(page)
   await page.goto('/')
   await expectPlacement(page, 'column')
-  const watched = await page.evaluateHandle(() => {
-    const seen = { forms: 0, moved: [] as string[] }
-    new MutationObserver(() => (seen.forms += 1)).observe(document.querySelector('footer')!, {
+  const forms = await page.evaluateHandle(() => {
+    const seen = { count: 0 }
+    new MutationObserver(() => (seen.count += 1)).observe(document.querySelector('footer')!, {
       attributeFilter: ['data-docked'],
     })
-    addEventListener('transitionrun', ({ target }) => seen.moved.push((target as Element).className))
     return seen
   })
+  const transitions = await watchTransitions(page)
 
   await release(serving(PROJECT_SETS.twelveWithShowcase))
   await expect(page.locator('.card[data-entered]')).not.toHaveCount(0)
   await settle(page)
 
-  const { forms, moved } = await watched.jsonValue()
-  expect(forms).toBe(0)
+  expect(await forms.jsonValue()).toEqual({ count: 0 })
   await expectPlacement(page, 'column')
   // Rien ne bouge que la couche d'entrée : ni la cellule, que les liens mesurent, ni ses voisines.
-  expect(moved.length).toBeGreaterThan(0)
-  expect([...new Set(moved)]).toEqual(['card-entry'])
+  const moved = new Set((await transitions()).map(({ layer }) => layer))
+  expect([...moved]).toEqual(['card-entry'])
 })
 
 for (const width of [1280, 400]) {
@@ -211,7 +184,6 @@ for (const width of [1280, 400]) {
       test.skip(isMobile, 'appareil sans survol : la révélation au toucher a ses scénarios')
       await page.setViewportSize({ ...COLUMN_VIEWPORT, width })
       await openTable(page, PROJECT_SETS.threeWithShowcase)
-      await settle(page)
       const card = cards(page).first()
 
       await expectRevealed(card, false)
@@ -267,8 +239,9 @@ test('le bandeau de résumé : absolu en bas de la photo, `--paper` à 94 %, 13 
   await expect(summary(card)).toHaveCSS('font-size', '13px')
   await expect(summary(card)).toHaveCSS('padding', '12px')
   const gap = await summary(card).evaluate(
-    (band) =>
-      band.parentElement!.getBoundingClientRect().bottom - band.getBoundingClientRect().bottom,
+    (overlay) =>
+      overlay.parentElement!.getBoundingClientRect().bottom -
+      overlay.getBoundingClientRect().bottom,
   )
   // Caché, le bandeau est 6 px plus bas que sa place.
   expect(Math.round(gap)).toBe(-6)
@@ -294,20 +267,30 @@ test('à mi-transition, aucun filet de l’image ne longe le bandeau', async ({ 
   await enterCards(page)
   const card = cards(page).first()
   const { x, y, width, height } = (await card.boundingBox())!
+  // Figées dès leur départ : lues après coup, elles auraient pu finir sous une machine chargée.
+  await page.evaluate(() =>
+    addEventListener('transitionrun', () => {
+      for (const motion of document.getAnimations()) {
+        motion.pause()
+        motion.currentTime = 75
+      }
+    }),
+  )
 
   await page.mouse.move(x + width / 2, y + height * 0.8)
-  await expect.poll(() => summary(card).evaluate((band) => band.getAnimations().length)).toBe(2)
-  await page.evaluate(() => {
-    for (const motion of document.getAnimations()) {
-      motion.pause()
-      motion.currentTime = 75
-    }
-  })
+  await expect
+    .poll(() => summary(card).evaluate((overlay) => overlay.getAnimations().length))
+    .toBe(2)
 
   // Une bande à cheval sur le bord bas : du bandeau au papier, rien de plus sombre que les deux.
-  const band = (await summary(card).boundingBox())!
-  const edge = Math.floor(band.y + band.height)
-  const clip = { x: Math.ceil(band.x) + 2, y: edge - 12, width: Math.floor(band.width) - 4, height: 24 }
+  const overlay = (await summary(card).boundingBox())!
+  const edge = Math.floor(overlay.y + overlay.height)
+  const clip = {
+    x: Math.ceil(overlay.x) + 2,
+    y: edge - 12,
+    width: Math.floor(overlay.width) - 4,
+    height: 24,
+  }
   const columns = await greenColumns(page, await page.screenshot({ clip }))
 
   expect(columns[0][0]).toBeLessThan(columns[0].at(-1)!)
@@ -358,7 +341,7 @@ for (const [width, maxLines] of [
     await page.setViewportSize({ ...COLUMN_VIEWPORT, width })
     await openTable(page, LONGEST_SUMMARY)
 
-    const band = await summary(cards(page).first()).evaluate((element: HTMLElement) => {
+    const overlay = await summary(cards(page).first()).evaluate((element: HTMLElement) => {
       const { lineHeight, paddingBottom, paddingTop } = getComputedStyle(element)
       const inset = parseFloat(paddingTop) + parseFloat(paddingBottom)
       const postit = element.closest('.card-tilt')!.querySelector<HTMLElement>('.card-postit')!
@@ -370,10 +353,10 @@ for (const [width, maxLines] of [
       }
     })
 
-    expect(band.textTop).toBeGreaterThanOrEqual(band.postitBottom)
-    expect(band.lines).toBe(maxLines)
+    expect(overlay.textTop).toBeGreaterThanOrEqual(overlay.postitBottom)
+    expect(overlay.lines).toBe(maxLines)
     // Les lignes cachées ne reparaissent pas dans la marge basse du bandeau.
-    expect(band.overflow).toBe(0)
+    expect(overlay.overflow).toBe(0)
   })
 }
 
@@ -416,7 +399,6 @@ test.describe('au toucher', () => {
     }) => {
       await page.setViewportSize({ ...COLUMN_VIEWPORT, width })
       await openTable(page, TWO_CARDS)
-      await settle(page)
       const card = cards(page).first()
 
       await card.tap()
@@ -438,7 +420,6 @@ test.describe('au toucher', () => {
     page,
   }) => {
     await openTable(page, TWO_CARDS)
-    await settle(page)
     const card = cards(page).first()
     await expect(open(page)).toHaveCount(0)
 
@@ -452,7 +433,6 @@ test.describe('au toucher', () => {
     page,
   }) => {
     await openTable(page, TWO_CARDS)
-    await settle(page)
     await cards(page).first().tap()
     const [ink, paper] = await resolveAll(page, [
       ['border-top-color', 'var(--ink)'],
@@ -478,7 +458,6 @@ test.describe('au toucher', () => {
       page,
     }) => {
       await openTable(page, [buildProject({ slug: 'voisine' }), project])
-      await settle(page)
       const card = cards(page).first()
       const height = () => face(card).evaluate((element: HTMLElement) => element.offsetHeight)
       const before = await height()
@@ -492,7 +471,6 @@ test.describe('au toucher', () => {
 
   test('une seule carte révélée : toucher une autre carte déplace la révélation', async ({ page }) => {
     await openTable(page, TWO_CARDS)
-    await settle(page)
     const [first, second] = [cards(page).first(), cards(page).last()]
 
     await first.tap()
@@ -509,14 +487,13 @@ test.describe('au toucher', () => {
     page,
   }) => {
     await openTable(page, TWO_CARDS)
-    await settle(page)
     const card = cards(page).first()
     const box = (await card.boundingBox())!
     expect(await documentPointerListeners(page)).toBe(0)
 
     await card.tap()
     await expect(open(page)).toHaveCount(1)
-    expect(await documentPointerListeners(page)).toBe(1)
+    await expect.poll(() => documentPointerListeners(page)).toBe(1)
 
     // Loin sous la table : le navigateur ajuste vers un lien proche le toucher qui le frôle.
     await page.touchscreen.tap(box.x + box.width, box.y + box.height + 100)
@@ -531,7 +508,6 @@ test.describe('au toucher', () => {
     page,
   }) => {
     await openTable(page, TWO_CARDS)
-    await settle(page)
     await cards(page).first().tap()
     await expect(open(page)).toHaveCount(1)
 
@@ -544,7 +520,6 @@ test.describe('au toucher', () => {
 
   test('Entrée ouvre directement la carte focalisée, sans révélation (spec §6.2)', async ({ page }) => {
     await openTable(page, TWO_CARDS)
-    await settle(page)
     await cards(page).first().focus()
 
     await page.keyboard.press('Enter')
@@ -554,31 +529,25 @@ test.describe('au toucher', () => {
 
   test('un toucher enfonce la carte en 80 ms (spec §1.6, §4.1)', async ({ page }) => {
     await openTable(page, TWO_CARDS)
-    await settle(page)
     const [press] = await resolveAll(page, [['transition-duration', 'var(--dur-press)']])
     // Un contact tenu par le protocole ne rend jamais `:active` : Chromium ne le pose qu'à la
     // relève, le temps du toucher (mesuré le 2026-11-01). On lit donc la transition qui part.
-    const pressed = await page.evaluateHandle(() => {
-      const durations: string[] = []
-      addEventListener('transitionrun', ({ target, propertyName }) => {
-        const layer = target as Element
-        if (layer.matches('.card-face') && propertyName === 'transform') {
-          durations.push(getComputedStyle(layer).transitionDuration)
-        }
-      })
-      return durations
-    })
+    const transitions = await watchTransitions(page)
 
     await cards(page).first().tap()
 
-    await expect.poll(async () => (await pressed.jsonValue())[0]).toBe(press)
+    await expect
+      .poll(async () => {
+        const runs = await transitions('card-face')
+        return runs.find(({ property }) => property === 'transform')?.duration
+      })
+      .toBe(press)
   })
 })
 
 test('sur un appareil à survol, un clic ouvre d’emblée', async ({ page, isMobile }) => {
   test.skip(isMobile, 'appareil sans survol : le premier toucher révèle')
   await openTable(page, TWO_CARDS)
-  await settle(page)
 
   await cards(page).first().click()
 
@@ -588,7 +557,6 @@ test('sur un appareil à survol, un clic ouvre d’emblée', async ({ page, isMo
 test('pressée au pointeur, la carte s’enfonce à ×0,985 en 80 ms (spec §4.1)', async ({ page, isMobile }) => {
   test.skip(isMobile, 'appareil sans pointeur : le toucher a son scénario')
   await openTable(page, PROJECT_SETS.one)
-  await settle(page)
   const card = cards(page)
   const [press] = await resolveAll(page, [['transition-duration', 'var(--dur-press)']])
   await card.hover()
@@ -611,7 +579,6 @@ test.describe('en mouvement réduit', () => {
     }) => {
       test.skip(isMobile, 'appareil sans survol : la révélation au toucher a son scénario')
       await openTable(page, PROJECT_SETS.one)
-      await settle(page)
       const card = cards(page)
       const rest = await pose(card).evaluate((layer) => getComputedStyle(layer).transform)
       await expect(summary(card)).toHaveCSS('transform', 'none')
@@ -630,7 +597,6 @@ test.describe('en mouvement réduit', () => {
   }) => {
     test.skip(!isMobile, 'un appareil sans survol : le projet mobile')
     await openTable(page, TWO_CARDS)
-    await settle(page)
     const card = cards(page).first()
     const rest = await pose(card).evaluate((layer) => getComputedStyle(layer).transform)
 
@@ -643,7 +609,6 @@ test.describe('en mouvement réduit', () => {
   test('pressée, la carte ne s’enfonce pas', async ({ page, isMobile }) => {
     test.skip(isMobile, 'appareil sans pointeur')
     await openTable(page, PROJECT_SETS.one)
-    await settle(page)
     const card = cards(page)
     await card.hover()
 
@@ -674,16 +639,10 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
 /** L'inclinaison d'une carte sur chaque axe, au degré, lue sur sa transformation calculée. */
 const tiltOf = (card: Locator) =>
-  card.locator('.card-tilt').evaluate((layer) => {
+  tilt(card).evaluate((layer) => {
     const { m23, m31 } = new DOMMatrix(getComputedStyle(layer).transform)
     return [m23, m31].map((sine) => Math.round((Math.asin(sine) * 180) / Math.PI))
   })
-
-/** La durée des transitions en cours sur la couche d'inclinaison d'une carte, en ms. */
-const settling = (card: Locator) =>
-  card
-    .locator('.card-tilt')
-    .evaluate((layer) => layer.getAnimations().map((motion) => motion.effect?.getTiming().duration))
 
 /** Le coin haut droit d'une carte : le point qui l'incline de +6° sur chaque axe. */
 async function topRightCorner(card: Locator) {
@@ -705,9 +664,9 @@ for (const [size, index] of [
     test.skip(isMobile, 'appareil sans pointeur fin : aucune inclinaison')
     await page.setViewportSize(COLUMN_VIEWPORT)
     await openTable(page, PROJECT_SETS.threeWithShowcase)
-    await settle(page)
     const card = cards(page).nth(index)
     const { x, y, width, height } = (await card.boundingBox())!
+    const transitions = await watchTransitions(page)
 
     const corner = await topRightCorner(card)
     await page.mouse.move(corner.x, corner.y)
@@ -719,10 +678,12 @@ for (const [size, index] of [
     // Jamais d'inertie : la couche suit le pointeur sans transition.
     await page.mouse.move(x + 1, y + height - 1)
     await expect.poll(() => tiltOf(card)).toEqual([-6, -6])
-    expect(await settling(card)).toEqual([])
+    expect(await transitions('card-tilt')).toEqual([])
 
     await page.mouse.move(0, 0)
-    await expect.poll(() => settling(card)).toEqual([240])
+    await expect
+      .poll(() => transitions('card-tilt'))
+      .toEqual([{ layer: 'card-tilt', property: 'transform', duration: '0.24s' }])
     await expect.poll(() => tiltOf(card)).toEqual([0, 0])
   })
 }
@@ -732,9 +693,9 @@ test('la perspective de 900 px atteint la couche inclinée : elle est sur son pa
 }) => {
   await openTable(page, PROJECT_SETS.one)
 
-  const perspective = await cards(page)
-    .locator('.card-tilt')
-    .evaluate((layer) => getComputedStyle(layer.parentElement!).perspective)
+  const perspective = await tilt(cards(page)).evaluate(
+    (layer) => getComputedStyle(layer.parentElement!).perspective,
+  )
 
   expect(perspective).toBe('900px')
 })
@@ -745,7 +706,6 @@ test('aucune inclinaison sur un appareil tactile, ni au doigt ni à la souris', 
 }) => {
   test.skip(!isMobile, 'un appareil sans survol : le projet mobile')
   await openTable(page, PROJECT_SETS.one)
-  await settle(page)
   const card = cards(page)
   const { x, y } = await topRightCorner(card)
 
@@ -762,7 +722,6 @@ test('aucune inclinaison en mouvement réduit', async ({ page, isMobile }) => {
   test.skip(isMobile, 'appareil sans pointeur fin : aucune inclinaison')
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await openTable(page, PROJECT_SETS.one)
-  await settle(page)
   const card = cards(page)
   const { x, y } = await topRightCorner(card)
 
@@ -778,7 +737,6 @@ test('un autre pointeur que la souris n’incline rien, sur un appareil à souri
 }) => {
   test.skip(isMobile, 'un appareil à pointeur fin : le projet desktop')
   await openTable(page, PROJECT_SETS.one)
-  await settle(page)
   const card = cards(page)
   const client = await page.context().newCDPSession(page)
   const overs = await page.evaluateHandle(() => {
@@ -808,7 +766,6 @@ test('sous la CSP de production, inclinaison et retard s’écrivent : rien par 
   await serveUnderCsp(page)
   await page.setViewportSize(COLUMN_VIEWPORT)
   await openTable(page, TWO_CARDS)
-  await settle(page)
   const card = cards(page).first()
   const { x, y } = await topRightCorner(card)
 

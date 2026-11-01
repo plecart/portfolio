@@ -50,7 +50,7 @@ const TECHNOLOGIES: Technology[] = (
   ] as const
 ).map(([name, kind]) => buildTechnology(name, kind))
 
-/** Une image carrée de 1600 px, prête — avec ses variantes — ou en attente ou en échec, sans elles. */
+/** Une image carrée de 1600 px : prête, avec ses variantes ; en attente ou en échec, sans elles. */
 export function buildImage(
   slug: string,
   caption: string,
