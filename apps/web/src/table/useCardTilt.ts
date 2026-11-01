@@ -11,6 +11,11 @@ const TILTING_DEVICE =
  * attribut `style` analysé. La feuille assure le retour en 240 ms à la sortie, et ne transite pas
  * pendant le déplacement.
  *
+ * Seul le déplacement incline, jamais l'entrée : sous un stylet, Chromium rejoue un survol de type
+ * `mouse`, sans `pointermove`, alors qu'une souris qui entre émet les deux à la fois (Chromium 156,
+ * stylet simulé par CDP, mesuré le 2026-11-01). Une carte qui arrive sous une souris immobile
+ * attend donc qu'elle bouge.
+ *
  * @returns La couche d'inclinaison et les gestes de la cellule.
  */
 export function useCardTilt() {
@@ -26,5 +31,5 @@ export function useCardTilt() {
     layer.current?.style.removeProperty('transform')
   }
 
-  return { layer, onPointerEnter: follow, onPointerMove: follow, onPointerLeave: settle }
+  return { layer, onPointerMove: follow, onPointerLeave: settle }
 }

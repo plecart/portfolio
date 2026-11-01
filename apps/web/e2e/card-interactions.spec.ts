@@ -703,6 +703,11 @@ test('un autre pointeur que la souris n’incline rien, sur un appareil à souri
   await settle(page)
   const card = cards(page)
   const client = await page.context().newCDPSession(page)
+  const overs = await page.evaluateHandle(() => {
+    const pointerTypes: string[] = []
+    addEventListener('pointerover', ({ pointerType }) => pointerTypes.push(pointerType))
+    return pointerTypes
+  })
 
   // Un stylet : l'émulation tactile de Chromium change aussi `hover` et `pointer`, pas lui.
   await client.send('Input.dispatchMouseEvent', {
@@ -710,7 +715,9 @@ test('un autre pointeur que la souris n’incline rien, sur un appareil à souri
     pointerType: 'pen',
     ...(await topRightCorner(card)),
   })
-  await nextFrame(page)
+  // Sous lui, Chromium rejoue un survol de type `mouse`, sans `pointermove` : on l'attend, sans quoi
+  // lire l'inclinaison dépend de l'image où il tombe.
+  await expect.poll(() => overs.jsonValue()).toContain('mouse')
 
   expect(await tiltOf(card)).toEqual([0, 0])
 })
