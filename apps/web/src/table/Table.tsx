@@ -97,6 +97,7 @@ function LoadError({ onRetry, focusRetry }: { onRetry: () => void; focusRetry: b
  * @param retried Une relance a déjà eu lieu : le message qui revient reprend le focus, et la table
  *   qui arrive le donne à sa première carte, le bouton activé ayant disparu.
  * @param onOpen Ouvre la fiche d'un projet, depuis le clic sur sa carte.
+ * @param projectOpen La fiche est ouverte : les cartes attendent sa fermeture pour entrer.
  */
 export function Table({
   ref,
@@ -105,6 +106,7 @@ export function Table({
   onRetry,
   retried,
   onOpen,
+  projectOpen,
 }: {
   ref: Ref<HTMLElement>
   status: ProjectsStatus
@@ -112,6 +114,7 @@ export function Table({
   onRetry: () => void
   retried: boolean
   onOpen: (slug: string) => void
+  projectOpen: boolean
 }) {
   const firstCard = useRef<HTMLAnchorElement>(null)
   const grid = useRef<HTMLDivElement>(null)
@@ -119,7 +122,7 @@ export function Table({
 
   const { revealed, revealOnTouch } = useTouchReveal()
 
-  useCardEntrance(grid, projects)
+  useCardEntrance(grid, projects, projectOpen)
 
   useEffect(() => {
     if (retried && status === 'loaded') firstCard.current?.focus()

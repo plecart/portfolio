@@ -12,13 +12,22 @@ const ENTRY_THRESHOLD = 0.15
  * Le retard vaut l'indice de colonne mesuré × `--delay-column`, et l'indice se relit à chaque
  * redimensionnement.
  *
+ * Rien ne s'observe tant que `paused` est vrai : une carte n'entre pas sous la fiche, et une arrivée
+ * directe les fait entrer à la fermeture. Une carte déjà entrée, observée de nouveau, ne rejoue rien :
+ * son attribut reste.
+ *
  * @param grid La grille de la table.
  * @param projects Les projets rendus : les cellules à observer changent avec eux.
+ * @param paused L'entrée attend : la fiche est ouverte.
  */
-export function useCardEntrance(grid: RefObject<HTMLElement | null>, projects: readonly unknown[]) {
+export function useCardEntrance(
+  grid: RefObject<HTMLElement | null>,
+  projects: readonly unknown[],
+  paused: boolean,
+) {
   useEffect(() => {
     const table = grid.current
-    if (!table || projects.length === 0) return
+    if (!table || projects.length === 0 || paused) return
     const cells = [...table.querySelectorAll<HTMLElement>('.card')]
 
     const writeColumns = () => {
@@ -48,5 +57,5 @@ export function useCardEntrance(grid: RefObject<HTMLElement | null>, projects: r
       observer.disconnect()
       window.removeEventListener('resize', writeColumns)
     }
-  }, [grid, projects])
+  }, [grid, projects, paused])
 }

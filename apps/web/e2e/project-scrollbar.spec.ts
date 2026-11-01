@@ -1,6 +1,6 @@
 /**
  * Le verrou de défilement de la fiche sous une barre classique (spec §3.2) : Chromium sans écran
- * masque ses barres, et sous lui aucune place n'est à garder. Ce fichier les rend visibles, comme
+ * masque ses barres, et la table n'y a aucune barre à perdre. Ce fichier les rend visibles, comme
  * `author-links-scrollbar.spec.ts`.
  */
 import { expect, test } from './api.ts'

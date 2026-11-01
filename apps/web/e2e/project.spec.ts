@@ -7,7 +7,15 @@
  */
 import { AxeBuilder } from '@axe-core/playwright'
 import type { Locator, Page } from '@playwright/test'
-import { countProjectRequests, expect, serveProjects, test } from './api.ts'
+import {
+  countProjectRequests,
+  expect,
+  FAILURES,
+  holdProjects,
+  serveProjects,
+  serving,
+  test,
+} from './api.ts'
 import { resolveAll, settle } from './css.ts'
 import {
   closeButton,
@@ -19,8 +27,17 @@ import {
   watchCspViolations,
 } from './project.ts'
 import { PROJECT_SETS } from './projects.ts'
-import { scrollGesture, scrollThrough, scrollTop } from './scroll.ts'
-import { cards, COLUMN_VIEWPORT, expectPlacement, openTable, serveUnderCsp } from './table.ts'
+import { nextFrames, scrollGesture, scrollThrough, scrollTop } from './scroll.ts'
+import {
+  cards,
+  COLUMN_VIEWPORT,
+  enterCards,
+  expectPlacement,
+  openTable,
+  serveUnderCsp,
+  tilt,
+  watchTransitions,
+} from './table.ts'
 
 /** Trois projets aux titres distincts. La première carte, celle du projet en cours : `projet-02`. */
 const PROJECTS = PROJECT_SETS.threeWithoutShowcase
@@ -304,16 +321,135 @@ test.describe('l’historique, à partir de `/`', () => {
   })
 })
 
-test('arrivée directe puis « Fermer la fiche » : on reste sur le site, à `/`', async ({ page }) => {
-  await serveProjects(page, PROJECTS)
-  await page.goto(FIRST.path)
+test.describe('l’arrivée directe', () => {
+  /** Les cellules de la table entrées. */
+  const entered = (page: Page) => page.locator('.card[data-entered]')
+
+  test('« Fermer la fiche » reste sur le site, à `/`, et rend le focus à la carte', async ({ page }) => {
+    await serveProjects(page, PROJECTS)
+    await page.goto(FIRST.path)
+    await expect(panel(page)).toBeVisible()
+
+    await closeButton(page).click()
+
+    await expectClosed(page)
+    await expect(page).toHaveURL('/')
+    await expect(cards(page).first()).toBeFocused()
+  })
+
+  test('le chargement d’abord, puis la fiche en fondu, le focus sur « Fermer la fiche »', async ({
+    page,
+  }) => {
+    const release = await holdProjects(page)
+    await page.goto(FIRST.path)
+
+    await expect(page.locator('[data-table-cell]')).toHaveCount(3)
+    await expect(panel(page)).toHaveCount(0)
+
+    await release(serving(PROJECTS))
+
+    await expect(panel(page)).toHaveAccessibleName(FIRST.title)
+    await expect(panel(page)).toHaveCSS('animation-name', 'project-in')
+    await expect(closeButton(page)).toBeFocused()
+    await expect(page).toHaveTitle(FIRST.title)
+  })
+
+  test('en erreur, l’état d’erreur, puis la fiche quand « Réessayer » ramène la liste', async ({
+    page,
+  }) => {
+    const failure = await holdProjects(page)
+    await page.goto(FIRST.path)
+    await failure(FAILURES['statut 500'])
+    const retry = page.getByRole('button', { name: 'Réessayer' })
+    await expect(retry).toBeVisible()
+    await expect(panel(page)).toHaveCount(0)
+    await expect(page).toHaveURL(FIRST.path)
+    await serveProjects(page, PROJECTS)
+
+    await retry.click()
+
+    await expect(panel(page)).toHaveAccessibleName(FIRST.title)
+    await expect(closeButton(page)).toBeFocused()
+  })
+
+  test('un slug absent de la liste ramène à `/`, sans fiche, et les cartes entrent', async ({ page }) => {
+    await serveProjects(page, PROJECTS)
+
+    await page.goto('/projets/inconnu')
+
+    await expect(page).toHaveURL('/')
+    await expect(entered(page)).toHaveCount(PROJECTS.length)
+    await expect(panel(page)).toHaveCount(0)
+  })
+
+  test('les cartes n’entrent qu’à la fermeture de la fiche', async ({ page }) => {
+    await serveProjects(page, PROJECTS)
+    await page.goto(FIRST.path)
+    await expect(panel(page)).toBeVisible()
+    await settle(page)
+
+    await expect(entered(page)).toHaveCount(0)
+
+    await closeButton(page).click()
+    await expectClosed(page)
+
+    await expect(entered(page)).toHaveCount(PROJECTS.length)
+  })
+})
+
+test.describe('l’entrée des cartes autour d’une fiche ouverte depuis la table', () => {
+  test('une carte déjà entrée ne rejoue rien à la fermeture', async ({ page }) => {
+    await openTable(page, PROJECT_SETS.twelveWithShowcase)
+    await enterCards(page)
+    const transitions = await watchTransitions(page)
+
+    await openProject(cards(page).first())
+    await closeButton(page).click()
+    await expectClosed(page)
+
+    expect(await transitions('card-entry')).toEqual([])
+  })
+
+  test('une carte pas encore entrée entre encore après la fermeture', async ({ page }) => {
+    await openTable(page, PROJECT_SETS.twelveWithShowcase)
+    await openProject(cards(page).first())
+    await closeButton(page).click()
+    await expectClosed(page)
+    const last = cards(page).last()
+    await expect(last).not.toHaveAttribute('data-entered')
+
+    await last.scrollIntoViewIfNeeded()
+
+    await expect(last).toHaveAttribute('data-entered')
+  })
+})
+
+test('fiche ouverte, le pointeur sur une carte n’incline rien', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'appareil sans pointeur : rien n’incline')
+  await page.setViewportSize(COLUMN_VIEWPORT)
+  await openTable(page, PROJECT_SETS.twelveWithShowcase)
+  const cell = page.locator('.card').nth(8)
+  const box = (await cell.boundingBox())!
+  // La carte sous la marge basse du panneau, entre 725 et 800 px : le pointeur l'y atteindrait.
+  const [x, y] = [box.x + box.width / 2, 760]
+  await scrollThrough(page, box.y + box.height / 2 - y)
+  const moveOver = async () => {
+    await page.mouse.move(x, y)
+    await page.mouse.move(x + 20, y + 10)
+  }
+
+  await moveOver()
+  await expect(tilt(cell)).not.toHaveCSS('transform', 'none')
+  await page.mouse.move(0, 0)
+  await expect(tilt(cell)).toHaveCSS('transform', 'none')
+
+  await cell.dispatchEvent('click', { detail: 0 })
   await expect(panel(page)).toBeVisible()
+  await settle(page)
+  await moveOver()
+  await nextFrames(page)
 
-  await closeButton(page).click()
-
-  await expectClosed(page)
-  await expect(page).toHaveURL('/')
-  await expect(cards(page).first()).toBeFocused()
+  await expect(tilt(cell)).toHaveCSS('transform', 'none')
 })
 
 /** Les clics qui restent ceux d'un lien. */
@@ -407,6 +543,19 @@ test('les fondus : entrée 200 ms, sortie 150 ms, `--ease-out`, le panneau retir
     { name: 'project-in', duration: content, curve },
     { name: 'project-out', duration: fast, curve },
   ])
+})
+
+test('pendant le fondu de sortie, le panneau garde son titre', async ({ page }) => {
+  await openTable(page, PROJECTS)
+  await openProject(cards(page).first())
+  const client = await page.context().newCDPSession(page)
+  await client.send('Animation.enable')
+  await client.send('Animation.setPlaybackRate', { playbackRate: 0 })
+
+  await page.keyboard.press('Escape')
+
+  await expect(panel(page)).toHaveAttribute('data-state', 'closed')
+  await expect(panel(page).getByRole('heading')).toHaveText(FIRST.title)
 })
 
 test('le panneau : papier, ombre soulevée, z-index 30, sans voile', async ({ page }) => {

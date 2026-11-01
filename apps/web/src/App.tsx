@@ -36,6 +36,7 @@ export default function App() {
         onRetry={retry}
         retried={retried}
         onOpen={open}
+        projectOpen={project !== undefined}
       />
       <AuthorLinks table={table} />
       <ProjectDialog project={project} onClose={close} />

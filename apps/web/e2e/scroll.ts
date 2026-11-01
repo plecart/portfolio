@@ -7,6 +7,15 @@
 import { expect, type Page } from '@playwright/test'
 import { settle } from './css.ts'
 
+/** Attend deux images. */
+export const nextFrames = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      }),
+  )
+
 /** La position de défilement de la page. */
 export const scrollTop = (page: Page) => page.evaluate(() => window.scrollY)
 
@@ -42,14 +51,8 @@ export async function lengthenPage(page: Page) {
  */
 export async function scrollThrough(page: Page, ...positions: number[]) {
   for (const y of positions) {
-    await page.evaluate(
-      (top) =>
-        new Promise<void>((resolve) => {
-          window.scrollTo(0, top)
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-        }),
-      y,
-    )
+    await page.evaluate((top) => window.scrollTo(0, top), y)
+    await nextFrames(page)
   }
 }
 
