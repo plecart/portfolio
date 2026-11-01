@@ -27,4 +27,15 @@ export const strings = {
   openCard: 'Ouvrir',
   /** Le bouton de la fiche (spec §3.2). */
   closeProject: 'Fermer la fiche',
+  /** Les post-its de lien de la fiche (spec §7). */
+  viewSite: 'Voir le site',
+  viewRepository: 'Voir le dépôt',
+  /** La ligne de faits de la fiche (spec §7) : les types de projet, puis les dates d'un projet en cours. */
+  kindPersonal: 'Perso',
+  kindProfessional: 'Pro',
+  kindSchool: 'École',
+  since: 'Depuis',
+  /** Les intertitres de la stack (spec §4.3). */
+  technologies: 'Technologies',
+  tools: 'Outils',
 } as const

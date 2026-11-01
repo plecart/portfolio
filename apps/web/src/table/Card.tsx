@@ -17,6 +17,7 @@ import {
   coverImage,
   coverSizes,
   type CardSize,
+  type Technology,
 } from './cards.ts'
 import { useCardTilt } from './useCardTilt.ts'
 
@@ -76,31 +77,63 @@ function Photo({ project, size }: { project: Project; size: CardSize }) {
 }
 
 /**
+ * Un ruban de technologie (spec §4.1) : son icône, son nom en texte masqué et en infobulle native.
+ *
+ * @param technology La technologie.
+ * @param labelled Son nom en clair, sans infobulle : la stack de la fiche (§4.3).
+ */
+export function TechnologyRibbon({
+  technology: { name, icon },
+  labelled = false,
+}: {
+  technology: Technology
+  labelled?: boolean
+}) {
+  return (
+    <li className="card-ribbon" title={labelled ? undefined : name}>
+      <CardImage src={icon} />
+      <span className={labelled ? undefined : 'sr-only'}>{name}</span>
+    </li>
+  )
+}
+
+/** Les rubans de technologies d'un projet, ceux de sa carte (spec §1.4). */
+export function TechnologyRibbons({ project }: { project: Project }) {
+  return cardTechnologies(project.technologies).map((technology) => (
+    <TechnologyRibbon key={technology.name} technology={technology} />
+  ))
+}
+
+/** Les rubans d'état d'un projet (spec §4.1), les états présents seulement. */
+export function StateRibbons({ project }: { project: Project }) {
+  const { ongoing, live } = cardStates(project)
+  return (
+    <>
+      {ongoing && <li className="card-ribbon">{strings.ribbonOngoing}</li>}
+      {live && (
+        <li className="card-ribbon">
+          <span className="card-dot" />
+          {strings.ribbonLive}
+        </li>
+      )}
+    </>
+  )
+}
+
+/**
  * La bande basse (spec §4.1), masquée : le nom du lien porte les états, et sa description les
- * technologies. Les rubans de technologies à gauche, avec leur icône, leur nom en texte masqué et
- * en infobulle native ; les rubans d'état à droite. « Ouvrir » les remplace pendant la révélation
- * au toucher : un texte du lien, jamais un `<button>`, qu'un `<a>` ne peut contenir.
+ * technologies. Les rubans de technologies à gauche, les rubans d'état à droite. « Ouvrir » les
+ * remplace pendant la révélation au toucher : un texte du lien, jamais un `<button>`, qu'un `<a>` ne
+ * peut contenir.
  */
 function Band({ project }: { project: Project }) {
-  const { ongoing, live } = cardStates(project)
   return (
     <div className="card-band" aria-hidden>
       <ul className="card-ribbons">
-        {cardTechnologies(project.technologies).map(({ name, icon }) => (
-          <li key={name} className="card-ribbon" title={name}>
-            <CardImage src={icon} />
-            <span className="sr-only">{name}</span>
-          </li>
-        ))}
+        <TechnologyRibbons project={project} />
       </ul>
       <ul className="card-ribbons">
-        {ongoing && <li className="card-ribbon">{strings.ribbonOngoing}</li>}
-        {live && (
-          <li className="card-ribbon">
-            <span className="card-dot" />
-            {strings.ribbonLive}
-          </li>
-        )}
+        <StateRibbons project={project} />
       </ul>
       <span className="card-open">{strings.openCard}</span>
     </div>
@@ -164,7 +197,7 @@ export function Card({
           <div className="card-face">
             <div ref={layer} className="card-tilt">
               <Clip />
-              <h2 className="card-postit">{project.title}</h2>
+              <h2 className="postit card-postit">{project.title}</h2>
               <span className="sr-only">{cardNameSuffix(project)}</span>
               <Photo project={project} size={size} />
               <Band project={project} />
