@@ -480,7 +480,11 @@ test.describe('les ancres', () => {
 
     await expectClosed(page)
     await expect(page).toHaveURL('/')
-    await expect(page.evaluate(() => location.hash)).resolves.toBe('')
+
+    await page.goForward()
+
+    await expect(panel(page)).toBeVisible()
+    await expect(page).toHaveURL('/projets/fiche#s-resultats')
   })
 
   test('après une arrivée directe sur une ancre, le bouton ne laisse pas de fragment', async ({
@@ -581,12 +585,13 @@ test.describe('le défilement', () => {
     isMobile,
   }) => {
     test.skip(!isMobile, 'le plein écran : le projet mobile')
-    await arriveAt(page, { ...LONG, ...LINKS })
+    await arriveAt(page, { ...LONG, ...LINKS, title: 'Un titre de trente caractères.' })
     const button = await closeButton(page).boundingBox()
 
     await expect(page.locator('.project-scroll')).toHaveCSS('overflow-y', 'visible')
     await expect(panel(page)).toHaveCSS('overflow-y', 'auto')
     await expect(panel(page)).toHaveCSS('scrollbar-width', 'thin')
+    await closeButton(page).click({ trial: true })
 
     await scrollTo(panel(page), 300)
 
@@ -594,6 +599,23 @@ test.describe('le défilement', () => {
     expect(await closeButton(page).boundingBox()).toEqual(button)
     await closeButton(page).click()
     await expectClosed(page)
+  })
+
+  test('sur téléphone, un ruban qui passe sous le bouton reste dessous', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(!isMobile, 'le plein écran : le projet mobile')
+    const name = 'Une technologie au nom qui atteint le bord droit de la colonne'
+    await arriveAt(page, { ...LONG, technologies: [buildTechnology(name, 'tool')] })
+    const button = (await closeButton(page).boundingBox())!
+    const ribbon = (await page.locator('.project-stack .card-ribbon').boundingBox())!
+    expect(ribbon.x + ribbon.width).toBeGreaterThan(button.x + button.width / 2)
+    const { y, height } = ribbon
+
+    await scrollTo(panel(page), y + height / 2 - (button.y + button.height / 2))
+
+    await closeButton(page).click({ trial: true })
   })
 
   test('une description longue, sans lien ni section, défile au clavier, le focus d’ouverture au bouton', async ({

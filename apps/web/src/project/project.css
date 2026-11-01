@@ -17,8 +17,7 @@
 
   /* Mobile : le panneau est la fenêtre, une colonne, et tout y défile. Dès 600 px, deux colonnes de
      la largeur de la photo, au centre de la fenêtre : `left` se compte en `vw`, car la place gardée à
-     la barre sort de la boîte qu'`inset` et les marges automatiques connaissent. Sa hauteur est
-     fixe : la rangée ne grandit pas avec la colonne de lecture, qui défile en elle. */
+     la barre sort de la boîte qu'`inset` et les marges automatiques connaissent. */
   .project-panel {
     --photo: min(100vh - 104px, 660px, (100vw - 92px) / 2);
     position: fixed;
@@ -27,14 +26,13 @@
     display: grid;
     gap: var(--s-3);
     padding: var(--s-2);
-    overflow: hidden auto;
+    overflow-y: auto;
     background-color: var(--paper);
     box-shadow: var(--shadow-lift);
     animation: project-in var(--dur-content) var(--ease-out);
 
     @variant sm {
       grid-template-columns: repeat(2, var(--photo));
-      grid-template-rows: minmax(0, 1fr);
       gap: var(--s-5);
       right: auto;
       left: calc(50vw - var(--photo) - 22px);
@@ -42,7 +40,7 @@
       height: calc(var(--photo) + 56px);
       margin-block: auto;
       padding: 10px;
-      overflow: visible;
+      overflow-y: visible;
       border-radius: var(--r-card);
     }
   }
@@ -120,9 +118,9 @@
   }
 
   /* Ce qui défile (§4.3) : la colonne au bureau, le panneau sur téléphone. Un mot trop long pour la
-     colonne se coupe, plutôt que de la déborder. Les rotations n'ouvrent pas de défilement en
-     largeur. La colonne coupe ce qui la dépasse : elle s'élargit, à chaque bord, de l'anneau de focus
-     de ses `<summary>` (§6.2), 2 px à 3 px, sans déplacer son texte (marges de §4.3). */
+     colonne se coupe, plutôt que de la déborder. La colonne coupe ce qui la dépasse : elle s'élargit,
+     à chaque bord, de l'anneau de focus de ses `<summary>` (§6.2), 2 px à 3 px, sans déplacer son
+     texte (marges de §4.3). */
   .project-scroll {
     --ring-room: 5px;
     overflow-wrap: anywhere;
@@ -132,7 +130,7 @@
       min-height: 0;
       margin: 0 calc(var(--s-2) - var(--ring-room)) var(--s-4) calc(-1 * var(--ring-room));
       padding-inline: var(--ring-room);
-      overflow: hidden auto;
+      overflow-y: auto;
     }
   }
 
