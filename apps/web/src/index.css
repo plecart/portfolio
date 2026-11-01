@@ -98,7 +98,7 @@
   }
 
   /* La barre de la page et celles de la lecture d'une fiche : sa colonne au bureau, son panneau sur
-     téléphone. WebKit ne lit pas `scrollbar-color` : 6 px de large, curseur en disque (§2.4). Hors
+     téléphone. Moteurs WebKit : 6 px de large, curseur en disque (§2.4). Hors
      des scénarios : Chromium, seul moteur de la suite, ignore ces pseudo-éléments dès que
      `scrollbar-*` est posé. */
   html,
