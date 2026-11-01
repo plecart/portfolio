@@ -95,24 +95,30 @@
   html {
     background-color: var(--bg);
     color: var(--ink);
+  }
+
+  /* La barre de la page et celles de la lecture d'une fiche : sa colonne au bureau, son panneau sur
+     téléphone. WebKit ne lit pas `scrollbar-color` : 6 px de large, curseur en disque (§2.4). Hors
+     des scénarios : Chromium, seul moteur de la suite, ignore ces pseudo-éléments dès que
+     `scrollbar-*` est posé. */
+  html,
+  .project-panel,
+  .project-scroll {
     scrollbar-width: thin;
     scrollbar-color: var(--line) transparent;
-  }
 
-  /* WebKit ne lit pas `scrollbar-color` : 6 px de large, curseur en disque (§2.4). Hors des
-     scénarios : Chromium, seul moteur de la suite, ignore ces pseudo-éléments dès que
-     `scrollbar-*` est posé. */
-  html::-webkit-scrollbar {
-    width: 6px;
-  }
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
 
-  html::-webkit-scrollbar-thumb {
-    background-color: var(--line);
-    border-radius: 999px;
-  }
+    &::-webkit-scrollbar-thumb {
+      background-color: var(--line);
+      border-radius: 999px;
+    }
 
-  html::-webkit-scrollbar-track {
-    background-color: transparent;
+    &::-webkit-scrollbar-track {
+      background-color: transparent;
+    }
   }
 
   /* La page est une colonne de la hauteur de la fenêtre : la table s'y étire entre l'entête et les

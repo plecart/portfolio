@@ -122,6 +122,23 @@
     }
   }
 
+  /* Le papier et l'encre d'un post-it, de carte ou de fiche (spec §2.2, §2.4). */
+  .postit {
+    border-radius: 1px;
+    color: var(--postit-ink);
+    font-weight: 600;
+    line-height: 1.25;
+    transform-origin: left top;
+  }
+
+  /* Le titre d'un projet, sur sa carte et sur sa fiche. */
+  .card-postit,
+  .project-title {
+    background-color: var(--postit);
+    letter-spacing: 0.005em;
+    transform: rotate(-2deg);
+  }
+
   .card-postit {
     position: absolute;
     top: -8px;
@@ -132,15 +149,7 @@
     max-width: calc(100% + 2 * var(--card-frame) - 28px);
     padding: 6px 10px 6px 12px;
     overflow: hidden;
-    border-radius: 1px;
-    background-color: var(--postit);
-    color: var(--postit-ink);
     font-size: var(--card-title);
-    font-weight: 600;
-    line-height: 1.25;
-    letter-spacing: 0.005em;
-    transform: rotate(-2deg);
-    transform-origin: left top;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
   }
@@ -247,7 +256,7 @@
     --height: var(--card-ribbon-height, 20px);
     display: inline-flex;
     align-items: center;
-    gap: var(--s-1);
+    gap: var(--card-ribbon-gap, var(--s-1));
     height: var(--height);
     padding-inline: var(--card-ribbon-inset, 7px);
     border-radius: var(--r-tape);

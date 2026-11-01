@@ -1,19 +1,18 @@
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogPortal,
-  DialogTitle,
-} from '@radix-ui/react-dialog'
+import { Dialog, DialogClose, DialogContent, DialogPortal } from '@radix-ui/react-dialog'
 import { useState } from 'react'
 import type { Project } from '../api/projects.ts'
 import { CloseIcon } from '../chrome/icons.tsx'
 import { strings } from '../strings.ts'
 import { projectPath } from './project.ts'
+import { ProjectContent } from './ProjectContent.tsx'
 
-/** Le bouton de fermeture (spec §3.2) : 36 px, rond, papier, à 8 px du coin du panneau. */
+/**
+ * Le bouton de fermeture (spec §3.2) : 36 px, rond, papier, à 8 px du coin du panneau. Sur téléphone
+ * il reste visible pendant que le panneau défile ; au-dessus de ce qui défile sous lui, y compris
+ * des post-its et des rubans, que leur rotation fait peindre après lui.
+ */
 const CLOSE_CLASSES =
-  'absolute top-(--s-2) right-(--s-2) flex size-9 items-center justify-center rounded-full bg-(--paper) text-(--ink-2) transition-colors hover:text-(--ink)'
+  'fixed top-(--s-2) right-(--s-2) z-10 flex size-9 items-center justify-center rounded-full bg-(--paper) text-(--ink-2) transition-colors hover:text-(--ink) sm:absolute'
 
 /**
  * Rend le focus à la carte d'un projet, que son `href` désigne (spec §3.2). Une carte encore dans la
@@ -64,9 +63,7 @@ export function ProjectDialog({
           <DialogClose aria-label={strings.closeProject} className={CLOSE_CLASSES}>
             <CloseIcon />
           </DialogClose>
-          <div className="project-reading">
-            <DialogTitle>{shown.title}</DialogTitle>
-          </div>
+          <ProjectContent project={shown} />
         </DialogContent>
       </DialogPortal>
     </Dialog>

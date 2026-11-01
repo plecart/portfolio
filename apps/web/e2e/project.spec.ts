@@ -577,7 +577,7 @@ test('pendant le fondu de sortie, le panneau garde son titre', async ({ page }) 
   await page.keyboard.press('Escape')
 
   await expect(panel(page)).toHaveAttribute('data-state', 'closed')
-  await expect(panel(page).getByRole('heading')).toHaveText(FIRST.title)
+  await expect(panel(page).getByRole('heading', { level: 2 })).toHaveText(FIRST.title)
 })
 
 test('le panneau : papier, ombre soulevée, z-index 30, sans voile', async ({ page }) => {
@@ -651,7 +651,7 @@ test.describe('les dimensions de spec §3.2', () => {
 
     await openProject(cards(page).first())
 
-    expect(await panel(page).getByRole('heading').boundingBox()).toMatchObject({ x: 652, y: 97 })
+    expect(await panel(page).locator('.project-head').boundingBox()).toMatchObject({ x: 652, y: 97 })
   })
 })
 

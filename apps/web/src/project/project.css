@@ -15,9 +15,10 @@
     scrollbar-gutter: stable;
   }
 
-  /* Mobile : le panneau est la fenêtre, une colonne. Dès 600 px, deux colonnes de la largeur de la
-     photo, au centre de la fenêtre : `left` se compte en `vw`, car la place gardée à la barre sort de
-     la boîte qu'`inset` et les marges automatiques connaissent. */
+  /* Mobile : le panneau est la fenêtre, une colonne, et tout y défile. Dès 600 px, deux colonnes de
+     la largeur de la photo, au centre de la fenêtre : `left` se compte en `vw`, car la place gardée à
+     la barre sort de la boîte qu'`inset` et les marges automatiques connaissent. Sa hauteur est
+     fixe : la rangée ne grandit pas avec la colonne de lecture, qui défile en elle. */
   .project-panel {
     --photo: min(100vh - 104px, 660px, (100vw - 92px) / 2);
     position: fixed;
@@ -26,12 +27,14 @@
     display: grid;
     gap: var(--s-3);
     padding: var(--s-2);
+    overflow: hidden auto;
     background-color: var(--paper);
     box-shadow: var(--shadow-lift);
     animation: project-in var(--dur-content) var(--ease-out);
 
     @variant sm {
       grid-template-columns: repeat(2, var(--photo));
+      grid-template-rows: minmax(0, 1fr);
       gap: var(--s-5);
       right: auto;
       left: calc(50vw - var(--photo) - 22px);
@@ -39,6 +42,7 @@
       height: calc(var(--photo) + 56px);
       margin-block: auto;
       padding: 10px;
+      overflow: visible;
       border-radius: var(--r-card);
     }
   }
@@ -48,12 +52,104 @@
   }
 
   .project-reading {
+    min-width: 0;
     padding: var(--s-3) 0 var(--s-6);
 
     @variant sm {
       grid-column: 2;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
       padding: var(--s-3) var(--s-4) 0 0;
     }
+  }
+
+  /* L'en-tête (§4.3) : fixe au bureau, seule la colonne en dessous défile. */
+  .project-head {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: var(--s-4);
+    flex: none;
+  }
+
+  .project-title {
+    max-width: 100%;
+    margin-bottom: var(--s-2);
+    padding: var(--s-2) 14px var(--s-2) var(--s-4);
+    font-size: 22px;
+  }
+
+  /* Rotation −4° dans tous les états (§4.3) : la montée s'y ajoute, seule à bouger, et jamais en
+     mouvement réduit (§6.3). */
+  .project-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    margin: 6px 0 var(--s-3);
+    padding: var(--s-2) 14px;
+    background-color: var(--postit-link);
+    font-size: 15px;
+    transform: rotate(-4deg);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .project-link {
+      transition: translate var(--dur-fast) var(--ease-out);
+    }
+
+    @media (hover: hover) {
+      .project-link:hover {
+        translate: 0 -2px;
+      }
+    }
+  }
+
+  /* Les rubans de la carte, sur la fiche (§4.3) : leur rangée, et celles de la stack. */
+  .project-ribbons {
+    column-gap: var(--s-2);
+  }
+
+  .project-head .project-ribbons {
+    flex-basis: 100%;
+    margin-bottom: var(--s-4);
+  }
+
+  .project-stack {
+    --card-ribbon-inset: var(--s-2);
+    --card-ribbon-gap: 6px;
+  }
+
+  /* Ce qui défile (§4.3) : la colonne au bureau, le panneau sur téléphone. Un mot trop long pour la
+     colonne se coupe, plutôt que de la déborder. Les rotations n'ouvrent pas de défilement en
+     largeur. */
+  .project-scroll {
+    overflow-wrap: anywhere;
+
+    @variant sm {
+      flex: 1;
+      min-height: 0;
+      margin: 0 var(--s-2) var(--s-4) 0;
+      overflow: hidden auto;
+    }
+  }
+
+  .project-facts {
+    margin-bottom: var(--s-4);
+    color: var(--ink-2);
+    font-size: var(--fs-small);
+  }
+
+  .project-summary {
+    margin-bottom: var(--s-4);
+  }
+
+  .project-stack-title {
+    margin: var(--s-3) 0 var(--s-2);
+    color: var(--ink-2);
+    font-size: var(--fs-tiny);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 }
 

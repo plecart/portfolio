@@ -58,6 +58,15 @@ export function CloseIcon() {
   )
 }
 
+/** Lien externe : celle des post-its de la fiche, 14 px (spec §4.3). */
+export function ExternalLinkIcon() {
+  return (
+    <StrokeIcon className="size-3.5">
+      <path d="M14 5h5v5M19 5l-9 9M11 5H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+    </StrokeIcon>
+  )
+}
+
 /** Icônes des liens de l'auteur : 22 px (spec §3.4), trait de 1,5 comme au prototype. */
 function AuthorLinkIcon({ children }: { children: ReactNode }) {
   return (
