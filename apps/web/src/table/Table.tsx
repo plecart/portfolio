@@ -1,6 +1,7 @@
 import { useEffect, useRef, type MouseEvent, type Ref } from 'react'
 import type { Project } from '../api/projects.ts'
 import type { ProjectsStatus } from '../api/useProjects.ts'
+import { isModifiedClick } from '../project/project.ts'
 import { strings } from '../strings.ts'
 import { Card } from './Card.tsx'
 import { cardSize, orderProjects, type CardSize } from './cards.ts'
@@ -128,9 +129,8 @@ export function Table({
     if (retried && status === 'loaded') firstCard.current?.focus()
   }, [retried, status])
 
-  // Un clic modifié reste celui d'un lien, et le bouton du milieu n'émet pas de `click`.
   const openOnClick = (event: MouseEvent, slug: string) => {
-    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+    if (isModifiedClick(event)) return
     revealOnTouch(event, slug)
     if (event.defaultPrevented) return
     event.preventDefault()
