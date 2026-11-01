@@ -1,15 +1,22 @@
 /**
  * Les cartes de la table, en logique pure : leur ordre (spec §1.9), les technologies qu'elles
- * montrent (§1.4), leur pose (§1.3, §4.1) et l'empreinte qui la tire, leur libellé (§4.1), leurs
- * états (§1.6), leur taille (§4.2, §5.5), leur couverture (§4.1), leur colonne (§3.1) et leur
- * inclinaison (§4.1).
+ * montrent (§1.4), leur pose (§1.3, §4.1) et l'empreinte qui la tire, le nom et la description de
+ * leur lien (§1.7, §4.1), leurs états (§1.6), leur taille (§4.2, §5.5), leur couverture (§4.1), leur
+ * colonne (§3.1) et leur inclinaison (§4.1).
  */
 import { describe, expect, test } from 'vitest'
-import { buildProject, FILES_ORIGIN, PROJECT_SETS, type Project } from '../e2e/projects.ts'
+import {
+  buildProject,
+  buildTechnology,
+  FILES_ORIGIN,
+  ONGOING,
+  PROJECT_SETS,
+  type Project,
+} from '../e2e/projects.ts'
 import {
   cardColumns,
   cardDescription,
-  cardLabelSuffix,
+  cardNameSuffix,
   cardPose,
   cardSize,
   cardStates,
@@ -22,9 +29,9 @@ import {
   type Technology,
 } from '../src/table/cards.ts'
 
-/** Un projet en cours, commencé à `started_on` : sans date de fin, comme l'API le sert. */
+/** Un projet en cours, commencé à `started_on`. */
 function ongoing(slug: string, started_on: string): Project {
-  return buildProject({ slug, status: 'ongoing', started_on, finished_on: null })
+  return buildProject({ ...ONGOING, slug, started_on })
 }
 
 /**
@@ -135,11 +142,6 @@ describe("l'ordre des cartes", () => {
   })
 })
 
-/** Une technologie de ce type, nommée `name`. */
-function technology(name: string, kind: Technology['kind']): Technology {
-  return { name, kind, icon: `${FILES_ORIGIN}/icones/${name}.svg` }
-}
-
 /** Les noms des technologies que la carte montre. */
 function cardNames(technologies: Technology[]): string[] {
   return cardTechnologies(technologies).map((shown) => shown.name)
@@ -148,41 +150,41 @@ function cardNames(technologies: Technology[]): string[] {
 describe('les technologies de la carte', () => {
   test("montre les trois premières dans l'ordre de l'admin", () => {
     const technologies = [
-      technology('react', 'framework'),
-      technology('typescript', 'language'),
-      technology('docker', 'infrastructure'),
-      technology('django', 'framework'),
+      buildTechnology('react', 'framework'),
+      buildTechnology('typescript', 'language'),
+      buildTechnology('docker', 'infrastructure'),
+      buildTechnology('django', 'framework'),
     ]
     expect(cardNames(technologies)).toEqual(['react', 'typescript', 'docker'])
   })
 
   test('saute un outil sans le compter', () => {
     const technologies = [
-      technology('figma', 'tool'),
-      technology('react', 'framework'),
-      technology('typescript', 'language'),
-      technology('docker', 'infrastructure'),
+      buildTechnology('figma', 'tool'),
+      buildTechnology('react', 'framework'),
+      buildTechnology('typescript', 'language'),
+      buildTechnology('docker', 'infrastructure'),
     ]
     expect(cardNames(technologies)).toEqual(['react', 'typescript', 'docker'])
   })
 
   test('montre toutes les éligibles quand elles sont moins de trois', () => {
-    const technologies = [technology('python', 'language'), technology('git', 'tool')]
+    const technologies = [buildTechnology('python', 'language'), buildTechnology('git', 'tool')]
     expect(cardNames(technologies)).toEqual(['python'])
   })
 
   test("ne montre rien quand le projet n'emploie que des outils", () => {
-    expect(cardNames([technology('figma', 'tool')])).toEqual([])
+    expect(cardNames([buildTechnology('figma', 'tool')])).toEqual([])
   })
 
   test('joue les trois exemples du brief', () => {
-    const figma = technology('Figma', 'tool')
-    const docker = technology('Docker', 'infrastructure')
+    const figma = buildTechnology('Figma', 'tool')
+    const docker = buildTechnology('Docker', 'infrastructure')
     const all = [
       figma,
-      technology('TypeScript', 'language'),
-      technology('React', 'framework'),
-      technology('Django', 'framework'),
+      buildTechnology('TypeScript', 'language'),
+      buildTechnology('React', 'framework'),
+      buildTechnology('Django', 'framework'),
       docker,
     ]
     expect(cardNames(all)).toEqual(['TypeScript', 'React', 'Django'])
@@ -284,31 +286,29 @@ describe('les états de la carte', () => {
   })
 })
 
-describe('le libellé de la carte', () => {
+describe('le nom de la carte', () => {
   const titled = (overrides: Partial<Project>) => buildProject({ title: 'Portfolio', ...overrides })
 
   test('n’ajoute rien au titre, pas même un point, sans état', () => {
-    expect(cardLabelSuffix(titled({}))).toBe('')
+    expect(cardNameSuffix(titled({}))).toBe('')
   })
 
   test('ajoute le point du titre et « En cours. » à un projet en cours', () => {
-    expect(cardLabelSuffix(titled({ status: 'ongoing', finished_on: null }))).toBe('. En cours.')
+    expect(cardNameSuffix(titled(ONGOING))).toBe('. En cours.')
   })
 
   test('ajoute le point du titre et « En ligne. » à un projet qui a un lien démo', () => {
-    expect(cardLabelSuffix(titled({ demo_url: 'https://demo.test' }))).toBe('. En ligne.')
+    expect(cardNameSuffix(titled({ demo_url: 'https://demo.test' }))).toBe('. En ligne.')
   })
 
   test('dit les deux états dans l’ordre de la spec', () => {
-    expect(
-      cardLabelSuffix(
-        titled({ status: 'ongoing', finished_on: null, demo_url: 'https://demo.test' }),
-      ),
-    ).toBe('. En cours. En ligne.')
+    expect(cardNameSuffix(titled({ ...ONGOING, demo_url: 'https://demo.test' }))).toBe(
+      '. En cours. En ligne.',
+    )
   })
 
   test('ne redouble pas la ponctuation d’un titre', () => {
-    expect(cardLabelSuffix(titled({ title: 'Et après ?', demo_url: 'https://demo.test' }))).toBe(
+    expect(cardNameSuffix(titled({ title: 'Et après ?', demo_url: 'https://demo.test' }))).toBe(
       'En ligne.',
     )
   })
@@ -316,11 +316,10 @@ describe('le libellé de la carte', () => {
 
 describe('la description de la carte', () => {
   test('dit le résumé, puis nomme les technologies que la carte montre, sans les outils', () => {
-    const icon = `${FILES_ORIGIN}/icone.svg`
-    const technologies: Technology[] = [
-      { name: 'Figma', kind: 'tool', icon },
-      { name: 'TypeScript', kind: 'language', icon },
-      { name: 'React', kind: 'framework', icon },
+    const technologies = [
+      buildTechnology('Figma', 'tool'),
+      buildTechnology('TypeScript', 'language'),
+      buildTechnology('React', 'framework'),
     ]
 
     expect(cardDescription(buildProject({ summary: 'Un site', technologies }))).toBe(

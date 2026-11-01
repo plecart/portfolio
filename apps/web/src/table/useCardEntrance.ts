@@ -26,8 +26,7 @@ export function useCardEntrance(grid: RefObject<HTMLElement | null>, projects: r
       const step = parseFloat(gridTemplateColumns) + parseFloat(columnGap)
       const lefts = cells.map((cell) => cell.getBoundingClientRect().left)
       cardColumns(lefts, step).forEach((column, index) => {
-        const entry = cells[index].querySelector<HTMLElement>('.card-entry')
-        entry?.style.setProperty('--card-column', String(column))
+        cells[index].style.setProperty('--card-column', String(column))
       })
     }
 

@@ -38,7 +38,7 @@
   }
 
   /* La cellule d'une carte : sa rangée l'allongerait d'un vide cliquable sous la face. Les distances
-     et les échelles de spec §2.7, sans jeton, n'ont que ces noms. */
+     et les échelles de spec §2.7 et §4.1, sans jeton, n'ont que ces noms. */
   .card {
     --card-rise: 8px;
     --card-lift: -6px;
@@ -199,7 +199,7 @@
   }
 
   /* Sous 400 px, la photo passe sous les 160 px de §7 : à 18,2 px la ligne et 12 px de marge basse,
-     le haut du texte passerait sous le post-it d'une ligne, qui descend à 20 px. */
+     le haut du texte passerait derrière le post-it d'une ligne, qui descend à 20 px. */
   @container (width < 160px) {
     .card-summary-text {
       -webkit-line-clamp: 6;
