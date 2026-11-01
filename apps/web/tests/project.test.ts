@@ -2,6 +2,7 @@
 import { expect, test } from 'vitest'
 import type { components } from '../src/api/schema.ts'
 import {
+  isPageFragment,
   isSectionHash,
   projectDates,
   projectFacts,
@@ -121,6 +122,20 @@ test('l’ancre d’une section donne son identifiant et son fragment', () => {
 
 test.each(['', '#', '#root', '#s', '#section'])('%s ne désigne aucune section', (hash) => {
   expect(isSectionHash(hash)).toBe(false)
+})
+
+const PAGE = 'https://site.test/projets/fiche'
+
+test.each([
+  ['une ancre de la page', `${PAGE}#s-a`, PAGE, true],
+  ['un fragment vide', `${PAGE}#`, PAGE, true],
+  ['une autre ancre, la page sur la sienne', `${PAGE}#s-a`, `${PAGE}#s-b`, true],
+  ['la page sans fragment', PAGE, PAGE, false],
+  ['une autre requête', `${PAGE}?a=1#x`, PAGE, false],
+  ['un autre chemin', 'https://site.test/autre#x', PAGE, false],
+  ['une autre origine', 'https://autre.test/projets/fiche#x', PAGE, false],
+])('%s', (_, href, page, expected) => {
+  expect(isPageFragment(href, page)).toBe(expected)
 })
 
 test('une image prête donne sa légende et ses sources, en largeurs', () => {

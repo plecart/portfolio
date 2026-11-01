@@ -540,6 +540,8 @@ test.describe('les ancres', () => {
     ['d’une section inconnue', '#s-inconnue', '/projets/fiche#s-inconnue', 0],
     ['hors section', '#autre', '/projets/fiche', 0],
     ['vide', '#', '/projets/fiche', 0],
+    ['d’une section, par le chemin de la fiche', '/projets/fiche#s-resultats', '/projets/fiche#s-resultats', 1],
+    ['hors section, par le chemin de la fiche', '/projets/fiche#autre', '/projets/fiche', 0],
   ] as const) {
     test(`le fragment ${name} n’ajoute aucune entrée : un seul retour ferme`, async ({ page }) => {
       const link = await openWithLink(page, href)
@@ -561,7 +563,9 @@ test.describe('les ancres', () => {
 
   for (const [name, href] of [
     ['relatif', '/autre'],
+    ['relatif à fragment', '/autre#s-resultats'],
     ['absolu', 'https://exemple.test/'],
+    ['absolu à fragment', 'https://exemple.test/#s-resultats'],
   ]) {
     test(`un lien ${name} reste au navigateur`, async ({ page }) => {
       const link = await openWithLink(page, href)

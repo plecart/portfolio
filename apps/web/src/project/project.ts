@@ -144,6 +144,16 @@ export function isSectionHash(hash: string): boolean {
 }
 
 /**
+ * Un lien vise-t-il un fragment de la page où il se trouve, quelle que soit la façon de l'écrire ?
+ *
+ * @param href L'adresse résolue du lien (`HTMLAnchorElement.href`).
+ * @param page L'adresse de la page (`location.href`).
+ */
+export function isPageFragment(href: string, page: string): boolean {
+  return href.includes('#') && href.split('#')[0] === page.split('#')[0]
+}
+
+/**
  * Les images que la galerie montre, dans l'ordre (spec §4.4) : celles qui ont des variantes.
  *
  * @param gallery Les images du projet, prêtes ou non.

@@ -1,17 +1,17 @@
 import Markdown, { type MarkdownToJSX } from 'markdown-to-jsx/react'
 import type { ComponentProps, MouseEvent } from 'react'
-import { hasModifier, isSectionHash } from './project.ts'
+import { hasModifier, isPageFragment, isSectionHash } from './project.ts'
 import { goToSection } from './useSectionAnchor.ts'
 
 /**
- * Un clic sur un fragment : une section s'ouvre, un autre fragment ne fait rien. Laissé au navigateur,
- * il ajouterait une entrée sans `history.state`, que la fermeture ne saurait plus reculer
- * (`useProjectAddress`). Un clic modifié reste natif.
+ * Un clic sur un lien : vers un fragment de la fiche, une section s'ouvre, un autre fragment ne fait
+ * rien. Laissé au navigateur, il ajouterait une entrée sans `history.state`, que la fermeture ne
+ * saurait plus reculer (`useProjectAddress`). Tout autre lien, et tout clic modifié, restent natifs.
  */
 function followFragment(event: MouseEvent<HTMLAnchorElement>) {
-  if (hasModifier(event)) return
+  const { href, hash } = event.currentTarget
+  if (hasModifier(event) || !isPageFragment(href, location.href)) return
   event.preventDefault()
-  const { hash } = event.currentTarget
   if (isSectionHash(hash)) goToSection(hash)
 }
 
@@ -25,7 +25,7 @@ function MarkdownLink({ href, children, ...props }: ComponentProps<'a'>) {
       {...props}
       href={href}
       className="text-(--accent) underline underline-offset-3"
-      onClick={href?.startsWith('#') ? followFragment : undefined}
+      onClick={followFragment}
     >
       {children}
     </a>
