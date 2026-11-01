@@ -26,8 +26,10 @@ que si ce fichier est copié.
 
 ## Décision
 
-**Option 2.** La base KeePassXC est copiée hors du poste, sur un support distinct, dès sa création
-et après chaque secret ajouté (`infra/RUNBOOK.md`, « Où vit chaque secret »).
+**Option 2.** La base KeePassXC est copiée hors du poste, sur un support distinct, une fois rangés
+les secrets d'un chantier, et toujours avant que la clé `age` ne chiffre une première sauvegarde,
+donc avant `bootstrap.sh` : passé ce point, cette clé devient irremplaçable (`infra/RUNBOOK.md`,
+« Où vit chaque secret »).
 
 ## Conséquences
 
@@ -37,8 +39,8 @@ et après chaque secret ajouté (`infra/RUNBOOK.md`, « Où vit chaque secret »
 
 **Négatives, assumées**
 
-- La copie hors du poste est un geste à la main : oubliée, un poste perdu emporte les secrets ajoutés
-  depuis, et la clé `age` si elle en fait partie — donc les sauvegardes.
+- La copie hors du poste est un geste à la main : oubliée, un poste perdu emporte les secrets rangés
+  depuis la dernière copie, et la clé `age` si elle en fait partie — donc les sauvegardes.
 
 ## Comparaison des options
 
