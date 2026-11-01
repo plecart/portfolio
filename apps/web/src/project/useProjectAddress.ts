@@ -30,9 +30,13 @@ export function useProjectAddress() {
     setSlug(null)
   }, [])
 
+  // `history.back()` n'agit qu'au `popstate` suivant. L'état passe d'emblée à « fermée » : le dialogue,
+  // contrôlé, n'appelle plus `close` d'ici là, et un double clic ne recule pas de deux entrées.
   const close = () => {
-    if (history.state?.fromTable) history.back()
-    else dismiss()
+    if (history.state?.fromTable) {
+      history.back()
+      setSlug(null)
+    } else dismiss()
   }
 
   return { slug, open, close, dismiss }

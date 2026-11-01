@@ -20,9 +20,15 @@ export default function App() {
   }, [unknownAddress, dismiss])
 
   // La feuille lit l'attribut : le verrou de défilement, les cartes, l'entête et les liens de
-  // l'auteur n'ont ni prop ni état de plus.
+  // l'auteur n'ont ni prop ni état de plus. Sa valeur dit si une barre classique a sa place à garder,
+  // lue avant le verrou, qui la retire.
   useEffect(() => {
-    document.documentElement.toggleAttribute('data-project-open', project !== undefined)
+    const root = document.documentElement
+    if (project) {
+      root.setAttribute('data-project-open', innerWidth > root.clientWidth ? 'scrollbar' : '')
+    } else {
+      root.removeAttribute('data-project-open')
+    }
     document.title = project?.title ?? strings.siteName
   }, [project])
 
