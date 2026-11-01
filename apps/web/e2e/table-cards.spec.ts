@@ -243,7 +243,8 @@ test('les cartes remplacent les trois cadres à l’arrivée de la liste', async
 /**
  * Les liens, nom et description, et le nom des titres, lus dans l'arbre d'accessibilité de Chromium :
  * le navigateur, pas Playwright ni axe, dont le calcul ne voit pas une liste `aria-hidden` que
- * `aria-describedby` désigne entrer dans le nom.
+ * `aria-describedby` désigne entrer dans le nom. Un nom se compare sans l'espace que Chromium pose
+ * devant le point, entre le `<h2>` et le texte masqué qui le suit (« Atelier . En cours. »).
  */
 async function accessibilityTree(page: Page) {
   const client = await page.context().newCDPSession(page)
@@ -251,7 +252,10 @@ async function accessibilityTree(page: Page) {
   await client.detach()
   const named = (role: string) => nodes.filter((node) => node.role?.value === role)
   return {
-    links: named('link').map(({ name, description }) => [name?.value, description?.value]),
+    links: named('link').map(({ name, description }) => [
+      name?.value.replaceAll(' .', '.'),
+      description?.value,
+    ]),
     headings: named('heading').map(({ name }) => name?.value),
   }
 }
@@ -275,7 +279,7 @@ test('une carte est un lien vers sa fiche, nommé par son titre et ses états pr
   const { links } = await accessibilityTree(page)
 
   expect(links).toContainEqual(['Atelier. En cours. En ligne.', 'Un atelier de reliure. TypeScript'])
-  expect(links).toContainEqual(['Banc.', 'Un banc de test. TypeScript'])
+  expect(links).toContainEqual(['Banc', 'Un banc de test. TypeScript'])
   expect(links.map(([name]) => name)).toContain('Et après ? En cours.')
   await expect(page.getByRole('link', { name: 'Atelier' })).toHaveAttribute(
     'href',
@@ -324,9 +328,8 @@ test('une carte porte son titre en `<h2>`, ses éléments décoratifs masqués',
   const card = cards(page)
 
   await expect(card.getByRole('heading', { level: 2, name: 'Atelier' })).toBeVisible()
-  // Le point du titre et les états n'existent que pour le nom du lien : rien ne s'en voit.
-  await expect(card.locator('.card-title-stop')).toHaveJSProperty('offsetWidth', 0)
-  await expect(card.getByText('En cours.')).toHaveClass('sr-only')
+  // Le point du titre et les états n'existent que pour le nom du lien.
+  await expect(card.getByText('. En cours.')).toHaveClass('sr-only')
   await expect(card.locator('svg')).toHaveAttribute('aria-hidden', 'true')
   // La couverture, sa copie en noir et blanc, l'icône : le libellé du lien les porte.
   expect(
@@ -365,7 +368,7 @@ test('un post-it long tient sur deux lignes au plus, large de la carte moins 28 
 
   const postits = await cards(page).evaluateAll((links: HTMLAnchorElement[]) =>
     links.map((link) => {
-      const postit = link.querySelector<HTMLElement>('.card-postit')!
+      const postit = link.querySelector('h2')!
       const { lineHeight, paddingBottom, paddingTop } = getComputedStyle(postit)
       const inset = parseFloat(paddingTop) + parseFloat(paddingBottom)
       return {

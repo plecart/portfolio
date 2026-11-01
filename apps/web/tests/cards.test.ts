@@ -9,7 +9,7 @@ import { buildProject, FILES_ORIGIN, PROJECT_SETS, type Project } from '../e2e/p
 import {
   cardColumns,
   cardDescription,
-  cardLabel,
+  cardLabelSuffix,
   cardPose,
   cardSize,
   cardStates,
@@ -287,26 +287,30 @@ describe('les états de la carte', () => {
 describe('le libellé de la carte', () => {
   const titled = (overrides: Partial<Project>) => buildProject({ title: 'Portfolio', ...overrides })
 
-  test('met un point au titre, sans aucun état absent', () => {
-    expect(cardLabel(titled({}))).toEqual({ stop: '.', states: '' })
+  test('n’ajoute rien au titre, pas même un point, sans état', () => {
+    expect(cardLabelSuffix(titled({}))).toBe('')
   })
 
-  test('ajoute « En cours. » à un projet en cours', () => {
-    expect(cardLabel(titled({ status: 'ongoing', finished_on: null })).states).toBe('En cours.')
+  test('ajoute le point du titre et « En cours. » à un projet en cours', () => {
+    expect(cardLabelSuffix(titled({ status: 'ongoing', finished_on: null }))).toBe('. En cours.')
   })
 
-  test('ajoute « En ligne. » à un projet qui a un lien démo', () => {
-    expect(cardLabel(titled({ demo_url: 'https://demo.test' })).states).toBe('En ligne.')
+  test('ajoute le point du titre et « En ligne. » à un projet qui a un lien démo', () => {
+    expect(cardLabelSuffix(titled({ demo_url: 'https://demo.test' }))).toBe('. En ligne.')
   })
 
   test('dit les deux états dans l’ordre de la spec', () => {
     expect(
-      cardLabel(titled({ status: 'ongoing', finished_on: null, demo_url: 'https://demo.test' })).states,
-    ).toBe('En cours. En ligne.')
+      cardLabelSuffix(
+        titled({ status: 'ongoing', finished_on: null, demo_url: 'https://demo.test' }),
+      ),
+    ).toBe('. En cours. En ligne.')
   })
 
   test('ne redouble pas la ponctuation d’un titre', () => {
-    expect(cardLabel(titled({ title: 'Et après ?' })).stop).toBe('')
+    expect(cardLabelSuffix(titled({ title: 'Et après ?', demo_url: 'https://demo.test' }))).toBe(
+      'En ligne.',
+    )
   })
 })
 
