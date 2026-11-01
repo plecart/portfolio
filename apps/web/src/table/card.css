@@ -148,11 +148,14 @@
     transform: rotate(-12deg);
   }
 
+  /* Le masque, plein, ne retire rien : il efface le filet de l'image qui longe le bandeau pendant sa
+     transition, sur la carte inclinée (Chromium 156, mesuré le 2026-11-01). */
   .card-photo {
     position: relative;
     aspect-ratio: 1;
     overflow: hidden;
     background-color: var(--line);
+    mask-image: linear-gradient(black, black);
   }
 
   .card-photo img {
