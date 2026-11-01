@@ -49,8 +49,11 @@
 vulnerabilities:
   # --- Image `api` : paquets Debian 13 de l'image de base `python:3.12.15-slim-trixie` -------
   #
-  # Ce qui tourne : gunicorn, sous l'utilisateur `api`, sans privilège. Mesuré dans l'image :
-  # `/etc/fstab` est vide, ni `systemd-homed` ni le module Perl `Archive::Tar` n'y sont.
+  # Ce qui tourne : gunicorn et, pour le service `worker`, celery, sous l'utilisateur `api`, sans
+  # privilège. Mesuré dans l'image : `/etc/fstab` est vide, ni `systemd-homed` ni le module Perl
+  # `Archive::Tar` n'y sont. Le shell `sqlite3` n'y est pas non plus, et aucun processus de
+  # gunicorn ni de celery ne mappe `libsqlite3` (`/proc/<pid>/maps`, 2026-11-01 ; témoin : présente
+  # après `import sqlite3`).
 
   - id: CVE-2026-76642
     paths:
@@ -133,6 +136,31 @@ vulnerabilities:
       et l'application n'exécute pas Perl. Alternatives : correctif reporté par Debian
       (`fix_deferred`) ; corrigé en amont par Archive::Tar 3.10.
     expired_at: 2026-12-29
+
+  - id: CVE-2026-119373
+    paths:
+      - "**/portfolio-api (debian 13.*)"
+    statement: >-
+      Place : libsqlite3-0, venue de l'image de base, impossible à retirer — `liblastlog2-2` en
+      dépend, et `util-linux`, paquet essentiel, en pré-dépend. Atteinte : non — le défaut demande
+      d'écrire dans une table FTS5 `detail=none`, puis d'y lancer une requête `MATCH` ; rien
+      n'ouvre de base SQLite : `DATABASES` ne nomme que PostgreSQL, seul le moteur
+      `django.db.backends.sqlite3` importe `sqlite3`, et la bibliothèque n'est mappée par aucun
+      processus de gunicorn ni de celery. Alternatives : corrigé en amont par SQLite 3.54.0, sans
+      correctif dans Debian 13 ni dans sid (bogue Debian 1152790) ; `python:3.12.16-slim-trixie`
+      porte le même paquet.
+    expired_at: 2027-01-30
+
+  - id: CVE-2026-119586
+    paths:
+      - "**/portfolio-api (debian 13.*)"
+    statement: >-
+      Place : libsqlite3-0, venue de l'image de base, impossible à retirer — `liblastlog2-2` en
+      dépend, et `util-linux`, paquet essentiel, en pré-dépend. Atteinte : non — le défaut est
+      dans la commande `.recover` du shell `sqlite3`, absent de l'image : le paquet `sqlite3` n'y
+      est pas installé. Alternatives : aucun correctif dans Debian 13 ni dans sid (bogue Debian
+      1152790) ; `python:3.12.16-slim-trixie` porte le même paquet.
+    expired_at: 2027-01-30
 
   # --- Image `caddy` : le binaire `caddy` 2.11.7, compilé par le projet avec Go 1.27.3 ---------
   #
