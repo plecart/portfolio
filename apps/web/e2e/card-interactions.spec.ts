@@ -14,6 +14,7 @@ import {
   enterCards,
   expectPlacement,
   openTable,
+  serveUnderCsp,
   settle,
 } from './table.ts'
 
@@ -331,26 +332,29 @@ test.describe('au toucher', () => {
   /** « Ouvrir », visible sur la page. */
   const open = (page: Page) => page.getByText('Ouvrir').filter({ visible: true })
 
-  test('premier toucher : redressement, ombre et bandeau, sans soulèvement ; second : le lien', async ({
-    page,
-  }) => {
-    await openTable(page, TWO_CARDS)
-    await settle(page)
-    const card = cards(page).first()
+  for (const width of [400, 1280]) {
+    test(`à ${width} px, premier toucher : redressement, ombre et bandeau, sans soulèvement ; second : le lien`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ ...COLUMN_VIEWPORT, width })
+      await openTable(page, TWO_CARDS)
+      await settle(page)
+      const card = cards(page).first()
 
-    await card.tap()
+      await card.tap()
 
-    await expect(page).toHaveURL('/')
-    await expect(pose(card)).toHaveCSS('transform', 'none')
-    await expectRevealed(card, true)
-    await expect(face(card)).toHaveCSS('transform', 'none')
-    await expect(open(page)).toHaveCount(1)
-    await expect(card.locator('.card-ribbons').first()).toBeHidden()
+      await expect(page).toHaveURL('/')
+      await expect(pose(card)).toHaveCSS('transform', 'none')
+      await expectRevealed(card, true)
+      await expect(face(card)).toHaveCSS('transform', 'none')
+      await expect(open(page)).toHaveCount(1)
+      await expect(card.locator('.card-ribbons').first()).toBeHidden()
 
-    await card.tap()
+      await card.tap()
 
-    await expect(page).toHaveURL('/projets/pleine')
-  })
+      await expect(page).toHaveURL('/projets/pleine')
+    })
+  }
 
   test('« Ouvrir » suit le lien : il ne remplace les rubans que pendant la révélation', async ({
     page,
@@ -589,3 +593,142 @@ for (const colorScheme of ['light', 'dark'] as const) {
     expect(violations.map((violation) => violation.id)).toEqual([])
   })
 }
+
+/** L'inclinaison d'une carte sur chaque axe, au degré, lue sur sa transformation calculée. */
+const tiltOf = (card: Locator) =>
+  card.locator('.card-tilt').evaluate((layer) => {
+    const { m23, m31 } = new DOMMatrix(getComputedStyle(layer).transform)
+    return [m23, m31].map((sine) => Math.round((Math.asin(sine) * 180) / Math.PI))
+  })
+
+/** La durée des transitions en cours sur la couche d'inclinaison d'une carte, en ms. */
+const settling = (card: Locator) =>
+  card
+    .locator('.card-tilt')
+    .evaluate((layer) => layer.getAnimations().map((motion) => motion.effect?.getTiming().duration))
+
+/** Le coin haut droit d'une carte : le point qui l'incline de +6° sur chaque axe. */
+async function topRightCorner(card: Locator) {
+  const { x, y, width } = (await card.boundingBox())!
+  return { x: x + width - 1, y: y + 1 }
+}
+
+/** Laisse au navigateur le temps d'une image : ce qu'un geste écrit y est posé. */
+const nextFrame = (page: Page) => page.evaluate(() => new Promise(requestAnimationFrame))
+
+for (const [size, index] of [
+  ['vitrine', 0],
+  ['simple', 1],
+] as const) {
+  test(`au pointeur, une carte ${size} s'incline : +6° au coin haut droit, 0 au centre, retour en 240 ms`, async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'appareil sans pointeur fin : aucune inclinaison')
+    await page.setViewportSize(COLUMN_VIEWPORT)
+    await openTable(page, PROJECT_SETS.threeWithShowcase)
+    await settle(page)
+    const card = cards(page).nth(index)
+    const { x, y, width, height } = (await card.boundingBox())!
+
+    const corner = await topRightCorner(card)
+    await page.mouse.move(corner.x, corner.y)
+    await expect.poll(() => tiltOf(card)).toEqual([6, 6])
+
+    await page.mouse.move(x + width / 2, y + height / 2)
+    await expect.poll(() => tiltOf(card)).toEqual([0, 0])
+
+    // Jamais d'inertie : la couche suit le pointeur sans transition.
+    await page.mouse.move(x + 1, y + height - 1)
+    await expect.poll(() => tiltOf(card)).toEqual([-6, -6])
+    expect(await settling(card)).toEqual([])
+
+    await page.mouse.move(0, 0)
+    await expect.poll(() => settling(card)).toEqual([240])
+    await expect.poll(() => tiltOf(card)).toEqual([0, 0])
+  })
+}
+
+test('la perspective de 900 px atteint la couche inclinée : elle est sur son parent direct', async ({
+  page,
+}) => {
+  await openTable(page, PROJECT_SETS.one)
+
+  const perspective = await cards(page)
+    .locator('.card-tilt')
+    .evaluate((layer) => getComputedStyle(layer.parentElement!).perspective)
+
+  expect(perspective).toBe('900px')
+})
+
+test('aucune inclinaison sur un appareil tactile, ni au doigt ni à la souris', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, 'un appareil sans survol : le projet mobile')
+  await openTable(page, PROJECT_SETS.one)
+  await settle(page)
+  const card = cards(page)
+  const { x, y } = await topRightCorner(card)
+
+  await page.touchscreen.tap(x, y)
+  await nextFrame(page)
+  expect(await tiltOf(card)).toEqual([0, 0])
+
+  await page.mouse.move(x, y)
+  await nextFrame(page)
+  expect(await tiltOf(card)).toEqual([0, 0])
+})
+
+test('aucune inclinaison en mouvement réduit', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'appareil sans pointeur fin : aucune inclinaison')
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await openTable(page, PROJECT_SETS.one)
+  await settle(page)
+  const card = cards(page)
+  const { x, y } = await topRightCorner(card)
+
+  await page.mouse.move(x, y)
+  await nextFrame(page)
+
+  expect(await tiltOf(card)).toEqual([0, 0])
+})
+
+test('un autre pointeur que la souris n’incline rien, sur un appareil à souris', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, 'un appareil à pointeur fin : le projet desktop')
+  await openTable(page, PROJECT_SETS.one)
+  await settle(page)
+  const card = cards(page)
+  const client = await page.context().newCDPSession(page)
+
+  // Un stylet : l'émulation tactile de Chromium change aussi `hover` et `pointer`, pas lui.
+  await client.send('Input.dispatchMouseEvent', {
+    type: 'mouseMoved',
+    pointerType: 'pen',
+    ...(await topRightCorner(card)),
+  })
+  await nextFrame(page)
+
+  expect(await tiltOf(card)).toEqual([0, 0])
+})
+
+test('sous la CSP de production, inclinaison et retard s’écrivent : rien par un attribut analysé', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, 'appareil sans pointeur fin : aucune inclinaison')
+  await serveUnderCsp(page)
+  await page.setViewportSize(COLUMN_VIEWPORT)
+  await openTable(page, TWO_CARDS)
+  await settle(page)
+  const card = cards(page).first()
+  const { x, y } = await topRightCorner(card)
+
+  await page.mouse.move(x, y)
+
+  await expect.poll(() => tiltOf(card)).toEqual([6, 6])
+  await expect(entry(cards(page).last())).toHaveCSS('transition-delay', '0.04s, 0.04s')
+})

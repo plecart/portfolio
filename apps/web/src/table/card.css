@@ -44,6 +44,7 @@
     --card-lift: -6px;
     --card-lift-scale: 1.02;
     --card-press-scale: 0.985;
+    --card-perspective: 900px;
     align-self: start;
   }
 
@@ -74,7 +75,8 @@
     transition: transform var(--dur) var(--ease-out);
   }
 
-  /* La face : le papier et l'ombre au repos ; l'ombre soulevée, prête, s'y superpose à opacité 0. */
+  /* La face : le papier et l'ombre au repos ; l'ombre soulevée, prête, s'y superpose à opacité 0. La
+     perspective ne vaut que pour un enfant direct : c'est ici qu'elle atteint la couche inclinée. */
   .card-face {
     position: relative;
     z-index: 0;
@@ -82,6 +84,7 @@
     border-radius: var(--r-card);
     background-color: var(--paper);
     box-shadow: var(--shadow-rest);
+    perspective: var(--card-perspective);
     transition: transform var(--dur) var(--ease-spring);
   }
 
@@ -97,9 +100,18 @@
     transition: opacity var(--dur) var(--ease-out);
   }
 
-  /* Le repère du post-it et du trombone : leurs distances se comptent depuis la photo. */
+  /* Le repère du post-it et du trombone : leurs distances se comptent depuis la photo. L'inclinaison
+     que `useCardTilt` y écrit revient en 240 ms à la sortie ; sous le pointeur, elle le suit sans
+     inertie. */
   .card-tilt {
     position: relative;
+    transition: transform var(--dur) var(--ease-out);
+  }
+
+  @media (hover: hover) {
+    .card:hover .card-tilt {
+      transition: none;
+    }
   }
 
   .card-postit {

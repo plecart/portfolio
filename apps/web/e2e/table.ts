@@ -33,6 +33,20 @@ export async function openTable(page: Page, projects: Project[]) {
   await expect(cards(page)).toHaveCount(projects.length)
 }
 
+/**
+ * Sert la page sous une CSP sans `style-src 'unsafe-inline'`, comme celle de Caddy, qu'aucun scénario
+ * ne traverse : elle bloque un attribut `style` analysé, jamais le CSSOM.
+ */
+export async function serveUnderCsp(page: Page) {
+  await page.route('/', async (route) => {
+    const response = await route.fetch()
+    await route.fulfill({
+      response,
+      headers: { ...response.headers(), 'content-security-policy': "style-src 'self'" },
+    })
+  })
+}
+
 /** Attend la fin des transitions en cours : ce qu'on lit ensuite les trouve arrivées. */
 export async function settle(page: Page) {
   await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)))

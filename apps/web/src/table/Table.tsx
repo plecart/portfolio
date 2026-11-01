@@ -87,7 +87,8 @@ function LoadError({ onRetry, focusRetry }: { onRetry: () => void; focusRetry: b
 /**
  * La table (`<main>`, spec §3.1) et ses états (§5.1-5.3) : les trois cadres pendant le chargement,
  * le message d'erreur en échec, puis les cartes dans l'ordre de `orderProjects` — rien pour une
- * liste vide. Elle s'étire entre l'entête et les liens de l'auteur.
+ * liste vide. Elle s'étire entre l'entête et les liens de l'auteur, fait entrer ses cartes
+ * (`useCardEntrance`) et tient la seule révélée au toucher (`useTouchReveal`).
  *
  * @param ref La table, que les liens de l'auteur mesurent.
  * @param status L'état du chargement ; `loading` rend la table occupée (`aria-busy`).
