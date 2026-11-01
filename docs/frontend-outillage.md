@@ -163,11 +163,19 @@ Quatre points mesurés, non évidents :
   nécessaires pour y arriver : `public/robots.txt` (sans lui SEO plafonne à 91) et une icône
   déclarée `data:,` dans l'`index.html` (sans elle, le 404 sur `/favicon.ico` fait tomber l'audit
   « erreurs dans la console » et les bonnes pratiques à 96). La table à douze cartes, mesurée le
-  2026-10-31 sur trois runs : performance 98 à 99, accessibilité 100, bonnes pratiques 96, SEO 100,
-  LCP de l'ordre de 2 s, sur la couverture de la vitrine en `loading="lazy"`. Les images d'essai
-  pèsent 3 et 7 Ko ; avec des WebP de bruit de 90 et 357 Ko, performance 95 à 96 et LCP de l'ordre
-  de 2,6 s. Les quatre points perdus aux bonnes pratiques sont l'audit `font-size` : les rubans de
-  11 px (spec §2.2) sont 60 % du texte à cette largeur.
+  2026-11-01 sur quinze runs avec les images d'essai de 3 et 7 Ko : performance 98, accessibilité
+  100, bonnes pratiques 100, SEO 100, LCP de 1,8 à 2 s. L'audit `font-size` passe : les résumés
+  masqués comptent comme texte lisible et les rubans de 11 px (spec §2.2) n'en sont plus que
+  7,61 % ; sans résumés, ils remontent à 60 % et les bonnes pratiques retombent à 96. Le LCP porte
+  sur le `<h1>` de l'entête, 13 runs sur 15, et sur une couverture pour les 2 autres : `.card-entry`,
+  à opacité 0, écarte les couvertures, et celle de la vitrine le reprend 8 runs sur 8 une fois cette
+  opacité retirée de `dist`. Le chiffre reste sensible à leur poids : la simulation coupe son
+  graphe à l'instant observé du LCP, pas à son élément, et les images reçues avant lui y pèsent
+  (Lantern, `LargestContentfulPaint.js`). Avec des WebP de bruit de 92 et 351 Ko, le `<h1>` tient
+  12 runs sur 12, mais performance 95 et LCP de 2,6 s sur les 11 où les images arrivent avant lui,
+  98 et 2,1 s sur l'autre. Avant l'entrée des cartes, le 2026-10-31, le LCP portait sur la
+  couverture de la vitrine en `loading="lazy"` : performance 98 à 99 et LCP de l'ordre de 2 s avec
+  les images d'essai, 95 à 96 et de l'ordre de 2,6 s avec des WebP de bruit de 90 et 357 Ko.
 
 **`overrides` du manifeste — cinq avis de sécurité écartés à la racine.** `@lhci/cli` 0.15.1
 traînait 10 avis (`npm audit`, arbre complet), dont 7 `high`, sur trois racines (2026-09-25). Un
