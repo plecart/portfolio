@@ -166,11 +166,12 @@ Quatre points mesurés, non évidents :
   2026-11-01 sur quinze runs avec les images d'essai de 3 et 7 Ko : performance 98, accessibilité
   100, bonnes pratiques 100, SEO 100, LCP de 1,8 à 2 s. L'audit `font-size` passe : les résumés
   masqués comptent comme texte lisible et les rubans de 11 px (spec §2.2) n'en sont plus que
-  7,61 % ; sans résumés, ils remontent à 60 % et les bonnes pratiques retombent à 96. Le LCP porte
-  sur le `<h1>` de l'entête, 13 runs sur 15, et sur une couverture pour les 2 autres : `.card-entry`,
-  à opacité 0, écarte les couvertures, et celle de la vitrine le reprend 8 runs sur 8 une fois cette
-  opacité retirée de `dist`. Le chiffre reste sensible à leur poids : la simulation coupe son
-  graphe à l'instant observé du LCP, pas à son élément, et les images reçues avant lui y pèsent
+  7,38 %, le point masqué des titres 0,48 % ; sans résumés, les rubans remontent à 48 % et les
+  bonnes pratiques retombent à 96. Le LCP porte sur le `<h1>` de l'entête, 13 runs sur 15, et sur
+  une couverture pour les 2 autres : `.card-entry`, à opacité 0, écarte les couvertures, et celle
+  de la vitrine le reprend 8 runs sur 8 une fois cette opacité retirée de `dist`. Le chiffre reste
+  sensible à leur poids : la simulation coupe son graphe à l'instant observé du LCP, pas à son
+  élément, et les images reçues avant lui y pèsent
   (Lantern, `LargestContentfulPaint.js`). Avec des WebP de bruit de 92 et 351 Ko, le `<h1>` tient
   12 runs sur 12, mais performance 95 et LCP de 2,6 s sur les 11 où les images arrivent avant lui,
   98 et 2,1 s sur l'autre. Avant l'entrée des cartes, le 2026-10-31, le LCP portait sur la

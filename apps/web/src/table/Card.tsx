@@ -56,7 +56,7 @@ function CoverLayer(props: ComponentProps<'img'>) {
 /**
  * La photo (spec §4.1) : le carré `--line`, l'image de couverture si elle a des variantes et, pour
  * un projet en cours, sa copie en niveaux de gris par-dessus — la même image, par CSS seulement. Le
- * bandeau de résumé la recouvre, masqué : le résumé est dans le libellé du lien.
+ * bandeau de résumé la recouvre, masqué : le résumé est dans la description du lien.
  */
 function Photo({ project, size }: { project: Project; size: CardSize }) {
   const cover = coverImage(project)
@@ -112,11 +112,16 @@ function Band({ project }: { project: Project }) {
  * l'intérieur, la couche d'entrée, la pose, la face et l'inclinaison, qui porte le trombone, le
  * post-it, la photo et la bande basse.
  *
- * Le lien tire son nom de son contenu, où seul le post-it reste exposé : c'est lui qui porte le
- * libellé (spec §4.1). Un `aria-label` sur le lien tomberait sous `label-content-name-mismatch` dès
- * qu'un ruban d'état se voit, le résumé séparant dans le libellé le titre des états. Sa description
- * vit dans un élément `hidden` : désigner la liste des rubans la ferait entrer dans le nom du lien,
- * tout `aria-hidden` qu'elle soit (Chromium 156, mesuré le 2026-10-31).
+ * Le lien tire son nom de son contenu, où restent exposés le `<h2>`, que la navigation par titres
+ * lit seul, son point et les états. Le point, à taille nulle, vit dans la ligne du titre : hors
+ * d'elle, Chromium l'en sépare d'une espace (« Titre . », Chromium 156, mesuré le 2026-11-01). Les
+ * états restent en `sr-only` : un navigateur qui ignorerait un texte à taille nulle n'y perdrait
+ * qu'un point. Ni `aria-label` ni `aria-labelledby` sur le lien : `label-content-name-mismatch`
+ * (axe 4.14) comparerait ce nom au texte visible, où le survol ajoute le résumé.
+ *
+ * Sa description, le résumé puis les technologies, vit dans un élément `hidden` : désigner la liste
+ * des rubans la ferait entrer dans le nom du lien, tout `aria-hidden` qu'elle soit (Chromium 156,
+ * mesuré le 2026-10-31).
  *
  * La pose passe par la prop `style` de React, qui écrit par le CSSOM : la CSP de production
  * bloquerait un attribut `style` analysé (`setAttribute`).
@@ -142,6 +147,7 @@ export function Card({
 }) {
   const descriptionId = useId()
   const { layer, ...tiltGestures } = useCardTilt()
+  const label = cardLabel(project)
 
   return (
     <a
@@ -159,9 +165,11 @@ export function Card({
           <div className="card-face">
             <div ref={layer} className="card-tilt">
               <Clip />
-              <h2 className="card-postit" aria-label={cardLabel(project)}>
-                {project.title}
-              </h2>
+              <div className="card-postit">
+                <h2>{project.title}</h2>
+                <span className="card-title-stop">{label.stop}</span>
+              </div>
+              <span className="sr-only">{label.states}</span>
               <Photo project={project} size={size} />
               <Band project={project} />
             </div>

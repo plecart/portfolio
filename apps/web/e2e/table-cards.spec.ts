@@ -240,7 +240,23 @@ test('les cartes remplacent les trois cadres à l’arrivée de la liste', async
   await expect(cards(page)).toHaveCount(12)
 })
 
-test('une carte est un lien vers sa fiche, au libellé complet, états présents seulement', async ({
+/**
+ * Les liens, nom et description, et le nom des titres, lus dans l'arbre d'accessibilité de Chromium :
+ * le navigateur, pas Playwright ni axe, dont le calcul ne voit pas une liste `aria-hidden` que
+ * `aria-describedby` désigne entrer dans le nom.
+ */
+async function accessibilityTree(page: Page) {
+  const client = await page.context().newCDPSession(page)
+  const { nodes } = await client.send('Accessibility.getFullAXTree')
+  await client.detach()
+  const named = (role: string) => nodes.filter((node) => node.role?.value === role)
+  return {
+    links: named('link').map(({ name, description }) => [name?.value, description?.value]),
+    headings: named('heading').map(({ name }) => name?.value),
+  }
+}
+
+test('une carte est un lien vers sa fiche, nommé par son titre et ses états présents', async ({
   page,
 }) => {
   await openTable(page, [
@@ -253,22 +269,27 @@ test('une carte est un lien vers sa fiche, au libellé complet, états présents
       demo_url: 'https://demo.test/atelier',
     }),
     buildProject({ slug: 'banc', title: 'Banc', summary: 'Un banc de test' }),
+    buildProject({ slug: 'question', title: 'Et après ?', status: 'ongoing', finished_on: null }),
   ])
 
-  const atelier = page.getByRole('link', { name: 'Atelier.' })
-  await expect(atelier).toHaveAccessibleName('Atelier. Un atelier de reliure. En cours. En ligne.')
-  await expect(atelier).toHaveAttribute('href', '/projets/atelier')
-  await expect(page.getByRole('link', { name: 'Banc.' })).toHaveAccessibleName(
-    'Banc. Un banc de test.',
+  const { links } = await accessibilityTree(page)
+
+  expect(links).toContainEqual(['Atelier. En cours. En ligne.', 'Un atelier de reliure. TypeScript'])
+  expect(links).toContainEqual(['Banc.', 'Un banc de test. TypeScript'])
+  expect(links.map(([name]) => name)).toContain('Et après ? En cours.')
+  await expect(page.getByRole('link', { name: 'Atelier' })).toHaveAttribute(
+    'href',
+    '/projets/atelier',
   )
 })
 
-test('les technologies décrivent le lien : leur nom reste aux lecteurs d’écran (spec §1.4)', async ({
+test('le résumé puis les technologies décrivent le lien : leur nom reste aux lecteurs d’écran (spec §1.4, §1.7)', async ({
   page,
 }) => {
   const icon = `${FILES_ORIGIN}/icones/icone.svg`
   await openTable(page, [
     buildProject({
+      summary: 'Un site.',
       technologies: [
         { name: 'TypeScript', kind: 'language', icon },
         { name: 'React', kind: 'framework', icon },
@@ -276,25 +297,26 @@ test('les technologies décrivent le lien : leur nom reste aux lecteurs d’écr
     }),
   ])
 
-  await expect(cards(page)).toHaveAccessibleDescription('TypeScript, React')
+  await expect(cards(page)).toHaveAccessibleDescription('Un site. TypeScript, React')
 })
 
-test('dans l’arbre d’accessibilité de Chromium, le nom du lien est le libellé, sans ses rubans', async ({
+test('dans l’arbre d’accessibilité de Chromium, le résumé et les rubans restent hors du nom, carte révélée comprise', async ({
   page,
+  isMobile,
 }) => {
   await openTable(page, [
     buildProject({ title: 'Atelier', summary: 'Un atelier.', status: 'ongoing', finished_on: null }),
   ])
-  const client = await page.context().newCDPSession(page)
+  const card = cards(page)
+  const link = ['Atelier. En cours.', 'Un atelier. TypeScript']
+  expect((await accessibilityTree(page)).links).toContainEqual(link)
 
-  // Le navigateur, pas Playwright ni axe : leur calcul ne voit pas une liste `aria-hidden` que
-  // `aria-describedby` désigne entrer dans le nom du lien.
-  const { nodes } = await client.send('Accessibility.getFullAXTree')
-  const links = nodes
-    .filter((node) => node.role?.value === 'link')
-    .map(({ name, description }) => [name?.value, description?.value])
+  await (isMobile ? card.tap() : card.hover())
+  await expect(card.locator('.card-summary')).toHaveCSS('opacity', '1')
 
-  expect(links).toContainEqual(['Atelier. Un atelier. En cours.', 'TypeScript'])
+  const { links, headings } = await accessibilityTree(page)
+  expect(links).toContainEqual(link)
+  expect(headings).toContain('Atelier')
 })
 
 test('une carte porte son titre en `<h2>`, ses éléments décoratifs masqués', async ({ page }) => {
@@ -302,6 +324,9 @@ test('une carte porte son titre en `<h2>`, ses éléments décoratifs masqués',
   const card = cards(page)
 
   await expect(card.getByRole('heading', { level: 2, name: 'Atelier' })).toBeVisible()
+  // Le point du titre et les états n'existent que pour le nom du lien : rien ne s'en voit.
+  await expect(card.locator('.card-title-stop')).toHaveJSProperty('offsetWidth', 0)
+  await expect(card.getByText('En cours.')).toHaveClass('sr-only')
   await expect(card.locator('svg')).toHaveAttribute('aria-hidden', 'true')
   // La couverture, sa copie en noir et blanc, l'icône : le libellé du lien les porte.
   expect(
@@ -340,7 +365,7 @@ test('un post-it long tient sur deux lignes au plus, large de la carte moins 28 
 
   const postits = await cards(page).evaluateAll((links: HTMLAnchorElement[]) =>
     links.map((link) => {
-      const postit = link.querySelector('h2')!
+      const postit = link.querySelector<HTMLElement>('.card-postit')!
       const { lineHeight, paddingBottom, paddingTop } = getComputedStyle(postit)
       const inset = parseFloat(paddingTop) + parseFloat(paddingBottom)
       return {

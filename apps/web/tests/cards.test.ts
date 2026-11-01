@@ -285,27 +285,47 @@ describe('les états de la carte', () => {
 })
 
 describe('le libellé de la carte', () => {
-  const titled = (overrides: Partial<Project>) =>
-    buildProject({ title: 'Portfolio', summary: 'Un site', ...overrides })
+  const titled = (overrides: Partial<Project>) => buildProject({ title: 'Portfolio', ...overrides })
 
-  test('dit le titre puis le résumé, et aucun état absent', () => {
-    expect(cardLabel(titled({}))).toBe('Portfolio. Un site.')
+  test('met un point au titre, sans aucun état absent', () => {
+    expect(cardLabel(titled({}))).toEqual({ stop: '.', states: '' })
   })
 
   test('ajoute « En cours. » à un projet en cours', () => {
-    expect(cardLabel(titled({ status: 'ongoing', finished_on: null }))).toBe(
-      'Portfolio. Un site. En cours.',
-    )
+    expect(cardLabel(titled({ status: 'ongoing', finished_on: null })).states).toBe('En cours.')
   })
 
   test('ajoute « En ligne. » à un projet qui a un lien démo', () => {
-    expect(cardLabel(titled({ demo_url: 'https://demo.test' }))).toBe('Portfolio. Un site. En ligne.')
+    expect(cardLabel(titled({ demo_url: 'https://demo.test' })).states).toBe('En ligne.')
   })
 
   test('dit les deux états dans l’ordre de la spec', () => {
     expect(
-      cardLabel(titled({ status: 'ongoing', finished_on: null, demo_url: 'https://demo.test' })),
-    ).toBe('Portfolio. Un site. En cours. En ligne.')
+      cardLabel(titled({ status: 'ongoing', finished_on: null, demo_url: 'https://demo.test' })).states,
+    ).toBe('En cours. En ligne.')
+  })
+
+  test('ne redouble pas la ponctuation d’un titre', () => {
+    expect(cardLabel(titled({ title: 'Et après ?' })).stop).toBe('')
+  })
+})
+
+describe('la description de la carte', () => {
+  test('dit le résumé, puis nomme les technologies que la carte montre, sans les outils', () => {
+    const icon = `${FILES_ORIGIN}/icone.svg`
+    const technologies: Technology[] = [
+      { name: 'Figma', kind: 'tool', icon },
+      { name: 'TypeScript', kind: 'language', icon },
+      { name: 'React', kind: 'framework', icon },
+    ]
+
+    expect(cardDescription(buildProject({ summary: 'Un site', technologies }))).toBe(
+      'Un site. TypeScript, React',
+    )
+  })
+
+  test('s’arrête au résumé quand la carte ne montre aucune technologie', () => {
+    expect(cardDescription(buildProject({ summary: 'Un site', technologies: [] }))).toBe('Un site.')
   })
 
   test.each([
@@ -314,24 +334,7 @@ describe('le libellé de la carte', () => {
     ['un point d’interrogation', 'Un site ?'],
     ['des points de suspension', 'Un site…'],
   ])('ne redouble pas la ponctuation d’un résumé qui finit par %s', (_, summary) => {
-    expect(cardLabel(titled({ summary }))).toBe(`Portfolio. ${summary}`)
-  })
-
-  test('ne redouble pas non plus celle d’un titre', () => {
-    expect(cardLabel(titled({ title: 'Et après ?' }))).toBe('Et après ? Un site.')
-  })
-})
-
-describe('la description de la carte', () => {
-  test('nomme les technologies que la carte montre, sans les outils', () => {
-    const icon = `${FILES_ORIGIN}/icone.svg`
-    const technologies: Technology[] = [
-      { name: 'Figma', kind: 'tool', icon },
-      { name: 'TypeScript', kind: 'language', icon },
-      { name: 'React', kind: 'framework', icon },
-    ]
-
-    expect(cardDescription(buildProject({ technologies }))).toBe('TypeScript, React')
+    expect(cardDescription(buildProject({ summary, technologies: [] }))).toBe(summary)
   })
 })
 
