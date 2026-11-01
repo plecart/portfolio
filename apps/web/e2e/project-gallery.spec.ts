@@ -231,9 +231,8 @@ test.describe('le balayage', () => {
     await expectImage(page, 0)
   })
 
-  // Depuis une flèche : sur l'image, le glisser natif du navigateur annulerait le pointeur de lui-même.
   test('une souris ne balaie pas', async ({ page }) => {
-    const { x, y } = await center(nextImage(page))
+    const { x, y } = await center(frame(page))
 
     await page.mouse.move(x, y)
     await page.mouse.down()
@@ -519,6 +518,15 @@ test.describe('les repères de §3.2 et §4.4', () => {
     await expect
       .poll(() => gallery(page).getByRole('img').evaluate((image: HTMLImageElement) => image.currentSrc))
       .toMatch(/\/480\.webp$/)
+  })
+
+  test('sizes reprend mot pour mot la formule de --photo', async ({ page }) => {
+    await arriveAt(page, { gallery: THREE_IMAGES })
+    const photo = await panel(page).evaluate((element) =>
+      getComputedStyle(element).getPropertyValue('--photo'),
+    )
+
+    expect(await gallery(page).getByRole('img').getAttribute('sizes')).toContain(`) ${photo},`)
   })
 })
 
