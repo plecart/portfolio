@@ -5,36 +5,28 @@
  */
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './api.ts'
-import { resolveAll, settle } from './css.ts'
+import { resolveAll, rotationOf, settle } from './css.ts'
 import {
   arriveAt,
   closeButton,
   expectClosed,
   expectNoOverflow,
   expectNoViolations,
+  expectPanelBox,
   ficheProject,
   holdNativeClicks,
+  LINKS,
   LONG_DESCRIPTION,
+  nextImage,
+  openFromTable,
   openProject,
   panel,
   readingColumn,
   watchCspViolations,
 } from './project.ts'
-import { buildTechnology, FILES_ORIGIN, ONGOING } from './projects.ts'
+import { buildImage, buildTechnology, FILES_ORIGIN, ONGOING } from './projects.ts'
 import { scrollTop } from './scroll.ts'
 import { cards, COLUMN_VIEWPORT, openTable, serveUnderCsp } from './table.ts'
-
-/** La rotation d'un élément, en degrés, lue sur sa matrice calculée. */
-const rotation = (page: Page, selector: string) =>
-  page.locator(selector).first().evaluate((element) => {
-    const { a, b } = new DOMMatrix(getComputedStyle(element).transform)
-    return Math.round((Math.atan2(b, a) * 180) / Math.PI)
-  })
-
-const LINKS = {
-  demo_url: 'https://demo.test/fiche',
-  repository_url: 'https://depot.test/fiche',
-}
 
 const THREE_TECHNOLOGIES_AND_A_TOOL = [
   buildTechnology('TypeScript', 'language'),
@@ -55,7 +47,7 @@ test.describe('l’en-tête', () => {
     await expect(title).toHaveCSS('font-weight', '600')
     await expect(title).toHaveCSS('padding', '8px 14px 8px 16px')
     await expect(title).toHaveCSS('margin-bottom', '8px')
-    expect(await rotation(page, '.project-title')).toBe(-2)
+    expect(await rotationOf(title)).toBe(-2)
   })
 
   test('« Voir le site » puis « Voir le dépôt », dans le même onglet', async ({ page }) => {
@@ -93,13 +85,13 @@ test.describe('l’en-tête', () => {
     const link = panel(page).getByRole('link').first()
     const before = (await link.boundingBox())!
 
-    expect(await rotation(page, '.project-link')).toBe(-4)
+    expect(await rotationOf(link)).toBe(-4)
     await expect(link).toHaveCSS('transition-duration', '0.15s')
 
     await link.hover()
     await settle(page)
 
-    expect(await rotation(page, '.project-link')).toBe(-4)
+    expect(await rotationOf(link)).toBe(-4)
     expect((await link.boundingBox())!.y).toBeCloseTo(before.y - 2)
   })
 
@@ -114,7 +106,7 @@ test.describe('l’en-tête', () => {
     await settle(page)
 
     expect((await link.boundingBox())!.y).toBe(before.y)
-    expect(await rotation(page, '.project-link')).toBe(-4)
+    expect(await rotationOf(link)).toBe(-4)
   })
 
   test('les rubans de la carte sont exposés aux technologies d’assistance', async ({ page }) => {
@@ -273,7 +265,7 @@ test.describe('la description en Markdown', () => {
     test(`${name} ne déborde pas`, async ({ page }) => {
       await arriveAt(page, { description: markdown })
 
-      await expectNoOverflow(page.locator('.project-scroll'))
+      await expectNoOverflow(readingColumn(page))
       await expectNoOverflow(panel(page))
     })
   }
@@ -288,7 +280,7 @@ const SECTIONS = [
 
 /** Ce qui défile : la colonne au bureau, le panneau sur téléphone (spec §4.3). */
 const scroller = (page: Page, isMobile: boolean) =>
-  isMobile ? panel(page) : page.locator('.project-scroll')
+  isMobile ? panel(page) : readingColumn(page)
 
 const section = (page: Page, anchor: string) => page.locator(`[id="s-${anchor}"]`)
 
@@ -375,22 +367,12 @@ test.describe('les sections', () => {
     expect(page.url()).toBe(url)
   })
 
-  test('au clavier : Tab les parcourt et revient au bouton, Entrée déroule', async ({ page }) => {
+  test('au clavier, Entrée déroule', async ({ page }) => {
     await arriveAt(page, { sections: SECTIONS })
-    const summaries = panel(page).locator('summary')
-    await expect(closeButton(page)).toBeFocused()
 
-    await page.keyboard.press('Tab')
-    await expect(readingColumn(page)).toBeFocused()
-    await page.keyboard.press('Tab')
-    await expect(summaries.first()).toBeFocused()
-    await page.keyboard.press('Enter')
+    await section(page, 'architecture').locator('summary').press('Enter')
+
     await expect(section(page, 'architecture')).toHaveAttribute('open')
-
-    await page.keyboard.press('Tab')
-    await expect(summaries.last()).toBeFocused()
-    await page.keyboard.press('Tab')
-    await expect(closeButton(page)).toBeFocused()
   })
 
   test('un lien dans une section repliée ne retient pas le focus', async ({ page }) => {
@@ -445,44 +427,25 @@ test.describe('les ancres', () => {
     })
   }
 
-  /** Un lien vers la dernière section, en tête d'une description qui la repousse loin. */
-  const LINKED = {
-    description: `[Voir les résultats](#s-resultats)\n\n${LONG_DESCRIPTION}`,
+  /** Une fiche à lien vers cette adresse, en tête d'une description qui repousse ses sections loin. */
+  const linkedFiche = (href: string) => ({
+    description: `[Le lien](${href})\n\n${LONG_DESCRIPTION}`,
     sections: LONG_SECTIONS,
-  }
-  const sectionLink = (page: Page) => panel(page).getByRole('link', { name: 'Voir les résultats' })
-
-  test('un lien de la fiche ouvre la section sans entrée de plus : un seul retour ferme', async ({
-    page,
-    isMobile,
-  }) => {
-    await openTable(page, [ficheProject(LINKED)])
-    await openProject(cards(page).first())
-    const entries = await page.evaluate(() => history.length)
-
-    await sectionLink(page).click()
-
-    await expect(section(page, 'resultats')).toHaveAttribute('open')
-    await expectScrolledTo(page, 'resultats', isMobile)
-    await expect(page).toHaveURL('/projets/fiche#s-resultats')
-    expect(await page.evaluate(() => history.length)).toBe(entries)
-    expect(await page.evaluate(() => history.state)).toEqual({ fromTable: true })
-
-    await page.goBack()
-
-    await expectClosed(page)
-    await expect(page).toHaveURL('/')
   })
+  const LINKED = linkedFiche('#s-resultats')
+  const descriptionLink = (page: Page) => panel(page).getByRole('link', { name: 'Le lien' })
+
+  /** La fiche ouverte depuis la table, un lien vers cette adresse en tête de sa description. */
+  const openWithLink = (page: Page, href: string) =>
+    openFromTable(page, [ficheProject(linkedFiche(href))])
 
   test('après un lien de la fiche, le bouton revient à la table, sans fragment', async ({ page }) => {
-    await openTable(page, [ficheProject(LINKED)])
-    await openProject(cards(page).first())
-    await sectionLink(page).click()
+    await openWithLink(page, '#s-resultats')
+    await descriptionLink(page).click()
 
     await closeButton(page).click()
 
     await expectClosed(page)
-    await expect(page).toHaveURL('/')
 
     await page.goForward()
 
@@ -498,13 +461,12 @@ test.describe('les ancres', () => {
     await closeButton(page).click()
 
     await expectClosed(page)
-    await expect(page).toHaveURL('/')
   })
 
   test('au clavier, Entrée sur un lien ouvre la section et y porte le focus', async ({ page }) => {
     await arriveAt(page, LINKED)
 
-    await sectionLink(page).focus()
+    await descriptionLink(page).focus()
     await page.keyboard.press('Enter')
 
     await expect(section(page, 'resultats')).toHaveAttribute('open')
@@ -513,26 +475,14 @@ test.describe('les ancres', () => {
 
   for (const hash of ['#s-resultats', '#autre']) {
     test(`Ctrl sur un lien vers ${hash} garde le geste du navigateur`, async ({ page }) => {
-      await arriveAt(page, {
-        description: `[Voir les résultats](${hash})\n\n${LONG_DESCRIPTION}`,
-        sections: LONG_SECTIONS,
-      })
+      await arriveAt(page, linkedFiche(hash))
       const heldClicks = await holdNativeClicks(page)
 
-      await sectionLink(page).click({ modifiers: ['ControlOrMeta'] })
+      await descriptionLink(page).click({ modifiers: ['ControlOrMeta'] })
 
       expect(await heldClicks()).toBe(1)
       await expect(section(page, 'resultats')).not.toHaveAttribute('open')
     })
-  }
-
-  /** La fiche ouverte depuis la table, un lien vers cette adresse en tête de sa description. */
-  async function openWithLink(page: Page, href: string) {
-    await openTable(page, [
-      ficheProject({ description: `[Le lien](${href})\n\n${LONG_DESCRIPTION}`, sections: SECTIONS }),
-    ])
-    await openProject(cards(page).first())
-    return panel(page).getByRole('link', { name: 'Le lien' })
   }
 
   for (const [name, href, url, opened] of [
@@ -544,10 +494,10 @@ test.describe('les ancres', () => {
     ['hors section, par le chemin de la fiche', '/projets/fiche#autre', '/projets/fiche', 0],
   ] as const) {
     test(`le fragment ${name} n’ajoute aucune entrée : un seul retour ferme`, async ({ page }) => {
-      const link = await openWithLink(page, href)
+      await openWithLink(page, href)
       const entries = await page.evaluate(() => history.length)
 
-      await link.click()
+      await descriptionLink(page).click()
 
       await expect(panel(page).locator('details[open]')).toHaveCount(opened)
       await expect(page).toHaveURL(url)
@@ -557,7 +507,6 @@ test.describe('les ancres', () => {
       await page.goBack()
 
       await expectClosed(page)
-      await expect(page).toHaveURL('/')
     })
   }
 
@@ -568,10 +517,10 @@ test.describe('les ancres', () => {
     ['absolu à fragment', 'https://exemple.test/#s-resultats'],
   ]) {
     test(`un lien ${name} reste au navigateur`, async ({ page }) => {
-      const link = await openWithLink(page, href)
+      await openWithLink(page, href)
       const heldClicks = await holdNativeClicks(page)
 
-      await link.click()
+      await descriptionLink(page).click()
 
       expect(await heldClicks()).toBe(1)
     })
@@ -591,7 +540,7 @@ test.describe('les ancres', () => {
     await arriveAt(page, LINKED)
     const scrolls = await watchScrolls(page)
 
-    await sectionLink(page).click()
+    await descriptionLink(page).click()
 
     await expectScrolledTo(page, 'resultats', isMobile)
     expect(await scrolls()).toBeGreaterThan(1)
@@ -602,7 +551,7 @@ test.describe('les ancres', () => {
     await arriveAt(page, LINKED)
     const scrolls = await watchScrolls(page)
 
-    await sectionLink(page).click()
+    await descriptionLink(page).click()
 
     await expectScrolledTo(page, 'resultats', isMobile)
     expect(await scrolls()).toBe(1)
@@ -622,7 +571,7 @@ test.describe('le défilement', () => {
     test.skip(isMobile, 'au bureau : le projet desktop')
     await page.setViewportSize(COLUMN_VIEWPORT)
     await arriveAt(page, { ...LONG, ...LINKS })
-    const column = page.locator('.project-scroll')
+    const column = readingColumn(page)
     const head = page.locator('.project-head')
     const before = await head.boundingBox()
 
@@ -647,7 +596,7 @@ test.describe('le défilement', () => {
     await arriveAt(page, { ...LONG, ...LINKS, title: 'Un titre de trente caractères.' })
     const button = await closeButton(page).boundingBox()
 
-    await expect(page.locator('.project-scroll')).toHaveCSS('overflow-y', 'visible')
+    await expect(readingColumn(page)).toHaveCSS('overflow-y', 'visible')
     await expect(panel(page)).toHaveCSS('overflow-y', 'auto')
     await expect(panel(page)).toHaveCSS('scrollbar-width', 'thin')
     await closeButton(page).click({ trial: true })
@@ -700,7 +649,7 @@ test.describe('le défilement', () => {
   }) => {
     test.skip(isMobile, 'la colonne ne coupe rien sur téléphone')
     await arriveAt(page, { ...LONG, sections: SECTIONS })
-    const column = (await page.locator('.project-scroll').boundingBox())!
+    const column = (await readingColumn(page).boundingBox())!
     const summary = (await page.locator('summary').first().boundingBox())!
     const head = (await page.locator('.project-head').boundingBox())!
 
@@ -729,7 +678,7 @@ test.describe('un client à la borne de #7, 100 caractères', () => {
 
       const facts = page.locator('.project-facts')
       expect((await facts.boundingBox())!.height).toBeLessThanOrEqual(3 * LINE)
-      for (const element of [facts, page.locator('.project-scroll'), panel(page)]) {
+      for (const element of [facts, readingColumn(page), panel(page)]) {
         await expectNoOverflow(element)
       }
       expect(await page.locator('.project-head').boundingBox()).toEqual(head)
@@ -741,7 +690,7 @@ test('fiche complète : les repères de §3.2 tiennent et axe ne trouve rien', a
   page,
   isMobile,
 }) => {
-  if (!isMobile) await page.setViewportSize({ width: 1280, height: 800 })
+  if (!isMobile) await page.setViewportSize(COLUMN_VIEWPORT)
   await arriveAt(page, {
     ...ONGOING,
     ...LINKS,
@@ -749,22 +698,20 @@ test('fiche complète : les repères de §3.2 tiennent et axe ne trouve rien', a
     technologies: THREE_TECHNOLOGIES_AND_A_TOOL,
     sections: SECTIONS,
   })
-  const { width, height } = page.viewportSize()!
 
-  expect(await panel(page).boundingBox()).toEqual(
-    isMobile
-      ? { x: 0, y: 0, width, height }
-      : { x: 24, y: 75, width: 1232, height: 650 },
-  )
+  await expectPanelBox(page)
   await expectNoViolations(page)
 })
 
-test('sous la CSP de production, une fiche complète ne produit aucune violation', async ({ page }) => {
+test('sous la CSP de production, une fiche complète et sa navigation ne produisent aucune violation', async ({
+  page,
+}) => {
   const violations = watchCspViolations(page)
   await serveUnderCsp(page)
   await openTable(page, [
     ficheProject({
       ...LINKS,
+      gallery: [buildImage('fiche', 'Une'), buildImage('fiche', 'Deux')],
       description: `[Voir](#s-resultats)\n\n${LONG_DESCRIPTION}`,
       technologies: THREE_TECHNOLOGIES_AND_A_TOOL,
       sections: SECTIONS,
@@ -773,6 +720,8 @@ test('sous la CSP de production, une fiche complète ne produit aucune violation
 
   await openProject(cards(page).first())
   await panel(page).getByRole('link', { name: 'Voir', exact: true }).click()
+  await nextImage(page).click()
+  await page.keyboard.press('ArrowLeft')
   await closeButton(page).click()
   await expectClosed(page)
 

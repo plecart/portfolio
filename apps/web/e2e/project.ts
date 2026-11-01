@@ -4,6 +4,7 @@ import type { Locator, Page } from '@playwright/test'
 import { expect, serveProjects } from './api.ts'
 import { settle } from './css.ts'
 import { buildProject, type Project } from './projects.ts'
+import { cards, openTable } from './table.ts'
 
 /** Le panneau de la fiche. */
 export const panel = (page: Page) => page.getByRole('dialog')
@@ -22,6 +23,12 @@ export const nextImage = (page: Page) => page.getByRole('button', { name: 'Image
 /** Le projet d'une fiche à un seul slug, ces champs remplacés. */
 export const ficheProject = (overrides: Partial<Project> = {}) =>
   buildProject({ slug: 'fiche', title: 'Fiche', ...overrides })
+
+/** Les deux liens d'une fiche. */
+export const LINKS = {
+  demo_url: 'https://demo.test/fiche',
+  repository_url: 'https://depot.test/fiche',
+}
 
 /** De quoi faire défiler la colonne comme le panneau. */
 export const LONG_DESCRIPTION = Array.from(
@@ -61,9 +68,34 @@ export async function openProject(card: Locator) {
   await settle(card.page())
 }
 
-/** Attend la fiche fermée, panneau retiré au bout de son fondu de sortie. */
+/** Ouvre une table sur ces projets, puis la fiche de sa première carte. */
+export async function openFromTable(page: Page, projects: Project[]) {
+  await openTable(page, projects)
+  await openProject(cards(page).first())
+}
+
+/** Attend la fiche fermée, panneau retiré au bout de son fondu de sortie, et l'adresse à `/`. */
 export async function expectClosed(page: Page) {
   await expect(panel(page)).toHaveCount(0)
+  await expect(page).toHaveURL('/')
+}
+
+/** Attend le panneau à ses repères (spec §3.2) : la fenêtre sous 600 px, sinon ceux de 1280 × 800. */
+export async function expectPanelBox(page: Page) {
+  const viewport = page.viewportSize()!
+
+  expect(await panel(page).boundingBox()).toEqual(
+    viewport.width < 600
+      ? { x: 0, y: 0, ...viewport }
+      : { x: 24, y: 75, width: 1232, height: 650 },
+  )
+}
+
+/** Fige les animations de la page : un panneau qui se ferme reste dans son fondu de sortie. */
+export async function freezeAnimations(page: Page) {
+  const client = await page.context().newCDPSession(page)
+  await client.send('Animation.enable')
+  await client.send('Animation.setPlaybackRate', { playbackRate: 0 })
 }
 
 /**

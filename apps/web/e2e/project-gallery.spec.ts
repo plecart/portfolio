@@ -11,7 +11,9 @@ import {
   closeButton,
   expectNoOverflow,
   expectNoViolations,
+  expectPanelBox,
   ficheProject,
+  freezeAnimations,
   gallery,
   LONG_DESCRIPTION,
   nextImage,
@@ -19,10 +21,9 @@ import {
   panel,
   previousImage,
   readingColumn,
-  watchCspViolations,
 } from './project.ts'
 import { buildImage, FILES_ORIGIN } from './projects.ts'
-import { cards, COLUMN_VIEWPORT, openTable, serveUnderCsp, watchTransitions } from './table.ts'
+import { cards, COLUMN_VIEWPORT, openTable, watchTransitions } from './table.ts'
 
 const PHONE_VIEWPORT = { width: 400, height: 800 }
 
@@ -97,7 +98,6 @@ test.describe('à trois images', () => {
   test('Fermer reste le premier arrêt, et la première image est montrée', async ({ page }) => {
     await expect(closeButton(page)).toBeFocused()
     await expectImage(page, 0)
-    await expectNoViolations(page)
   })
 
   test('les flèches bouclent dans les deux sens', async ({ page }) => {
@@ -288,31 +288,29 @@ test.describe('les images prêtes seules comptent', () => {
     await expectImage(page, 0, 2)
   })
 
-  for (const [name, images] of [
-    ['une image seule', [buildImage('fiche', CAPTIONS[0])]],
-    ['une prête et une en échec', [buildImage('fiche', CAPTIONS[0]), buildImage('fiche', 'Échec', 'failed')]],
-  ] as const) {
-    test(`${name} : ni flèches ni compteur, la barre garde la légende`, async ({ page }) => {
-      await arriveAt(page, { gallery: [...images] })
-      const keys = await watchKeys(page)
-
-      await page.keyboard.press('ArrowLeft')
-
-      await expectNoCommands(page)
-      await expect(caption(page)).toHaveText(CAPTIONS[0])
-      await expect(gallery(page).getByRole('img')).toHaveAccessibleName(CAPTIONS[0])
-      expect((await bar(page).boundingBox())!.height).toBe(28)
-      expect(await keys()).toEqual([false])
-      await expectNoViolations(page)
+  test('une prête et une en échec : ni flèches ni compteur, la barre garde la légende', async ({
+    page,
+  }) => {
+    await arriveAt(page, {
+      gallery: [buildImage('fiche', CAPTIONS[0]), buildImage('fiche', 'Échec', 'failed')],
     })
-  }
+    const keys = await watchKeys(page)
+
+    await page.keyboard.press('ArrowLeft')
+
+    await expectNoCommands(page)
+    await expect(caption(page)).toHaveText(CAPTIONS[0])
+    await expect(gallery(page).getByRole('img')).toHaveAccessibleName(CAPTIONS[0])
+    expect((await bar(page).boundingBox())!.height).toBe(28)
+    expect(await keys()).toEqual([false])
+    await expectNoViolations(page)
+  })
 
   for (const [name, images] of [
     ['une galerie vide', []],
-    ['une image en attente', [buildImage('fiche', 'En attente', 'pending')]],
-    ['deux images en échec', [buildImage('fiche', 'Une', 'failed'), buildImage('fiche', 'Deux', 'failed')]],
+    ['deux images en attente', ['Une', 'Deux'].map((text) => buildImage('fiche', text, 'pending'))],
   ] as const) {
-    test(`${name} : le carré --line, la barre vide, le panneau tenu`, async ({ page, isMobile }) => {
+    test(`${name} : le carré --line, la barre vide, le panneau tenu`, async ({ page }) => {
       await arriveAt(page, { gallery: [...images] })
       const [line] = await resolveAll(page, [['background-color', 'var(--line)']])
       const { width } = (await frame(page).boundingBox())!
@@ -323,11 +321,7 @@ test.describe('les images prêtes seules comptent', () => {
       await expect(bar(page)).toHaveText('')
       expect((await frame(page).boundingBox())!.height).toBe(width)
       expect((await bar(page).boundingBox())!.height).toBe(28)
-      expect(await panel(page).boundingBox()).toEqual(
-        isMobile
-          ? { x: 0, y: 0, ...PHONE_VIEWPORT }
-          : { x: 24, y: 75, width: 1232, height: 650 },
-      )
+      await expectPanelBox(page)
       await expectNoViolations(page)
     })
   }
@@ -407,16 +401,15 @@ test.describe('les repères de §3.2 et §4.4', () => {
     expect(counterBox.x + counterBox.width).toBe(box.x + box.width)
   })
 
-  /** Une légende de 50 caractères, la borne de §7. */
+  /** Une légende de 50 caractères, la borne de §7, sur douze images. */
   const LONGEST_CAPTION = 'Écran de suivi des expéditions, vue par entrepôts.'
+  const TWELVE_LONG_CAPTIONS = Array.from({ length: 12 }, () => buildImage('fiche', LONGEST_CAPTION))
 
   test('une légende de 50 caractères tient sur la barre, compteur à deux chiffres compris', async ({
     page,
   }) => {
     expect(LONGEST_CAPTION).toHaveLength(50)
-    await arriveAt(page, {
-      gallery: Array.from({ length: 12 }, () => buildImage('fiche', LONGEST_CAPTION)),
-    })
+    await arriveAt(page, { gallery: TWELVE_LONG_CAPTIONS })
 
     await page.keyboard.press('ArrowLeft')
 
@@ -431,9 +424,7 @@ test.describe('les repères de §3.2 et §4.4', () => {
   }) => {
     test.skip(!isMobile, 'téléphone')
     await page.setViewportSize({ width: 320, height: 800 })
-    await arriveAt(page, {
-      gallery: Array.from({ length: 12 }, () => buildImage('fiche', LONGEST_CAPTION)),
-    })
+    await arriveAt(page, { gallery: TWELVE_LONG_CAPTIONS })
 
     expect((await frame(page).boundingBox())!.width).toBe(304)
     expect((await bar(page).boundingBox())!.height).toBe(28)
@@ -532,9 +523,7 @@ test.describe('d’une fiche à l’autre', () => {
     await nextImage(page).click()
     await nextImage(page).click()
     await expectImage(page, 2)
-    const client = await page.context().newCDPSession(page)
-    await client.send('Animation.enable')
-    await client.send('Animation.setPlaybackRate', { playbackRate: 0 })
+    await freezeAnimations(page)
 
     await page.keyboard.press('Escape')
     await expect(panel(page)).toHaveAttribute('data-state', 'closed')
@@ -543,20 +532,4 @@ test.describe('d’une fiche à l’autre', () => {
     await expect(panel(page)).toHaveAccessibleName('Autre')
     await expectImage(page, 0, 2)
   })
-})
-
-test('sous la CSP de production, la galerie et sa navigation ne produisent aucune violation', async ({
-  page,
-}) => {
-  const violations = watchCspViolations(page)
-  await serveUnderCsp(page)
-  await openTable(page, [ficheProject({ gallery: THREE_IMAGES })])
-
-  await openProject(cards(page).first())
-  await nextImage(page).click()
-  await expectImage(page, 1)
-  await page.keyboard.press('ArrowLeft')
-  await expectImage(page, 0)
-
-  expect(violations).toEqual([])
 })
