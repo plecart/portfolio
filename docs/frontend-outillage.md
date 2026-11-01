@@ -100,6 +100,7 @@ datés.
 |---|---|
 | `react`, `react-dom` | Interface en composants |
 | `@radix-ui/react-dialog` | Dialogue modal de la fiche, le `dialog` de shadcn/ui copié sans `init` et sans `Overlay` (CSP) (#170) |
+| `markdown-to-jsx` | Description et sections de la fiche rendues en éléments React, HTML brut en texte (ADR 0010) (#170) |
 | `typescript` | Types vérifiés à la compilation, mode strict — **6.0, pas 7** (voir ci-dessous) |
 | `vite` | Serveur de développement et compilation |
 | `tailwindcss`, `@tailwindcss/vite` | Style utilitaire compilé au build, par le plugin Vite |
@@ -358,8 +359,8 @@ Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les C
 
 **État au 2026-09-23 (#3)** : les items **1, 2, 10, 11, 12 et 13 sont faits** — inventaire au
 §2.4, qui fait foi sur ce qui est installé ; versions dans le verrou `apps/web/package-lock.json`.
-L'item **9** l'est depuis le 2026-10-16 (#19), les items **3** et **4** sont tranchés depuis le
-2026-11-01 (#170). Les cinq autres restent à faire, chacun avec l'issue qui le portera. Trois
+L'item **9** l'est depuis le 2026-10-16 (#19), les items **3**, **4** et **14** sont tranchés depuis
+le 2026-11-01 (#170). Les quatre autres restent à faire, chacun avec l'issue qui le portera. Trois
 items se sont révélés partiellement faux à l'exécution ; l'écart est consigné sous chacun d'eux et détaillé au §2.4.
 
 1. **Projet** ✅ *fait (#3)* : `npm create vite@latest apps/web -- --template react-ts`, puis suppression de la page de démonstration du gabarit. TypeScript strict **posé explicitement** — contrairement à ce que cet item affirmait, `create-vite` 9.2.1 ne l'active plus (§2.4).
@@ -375,7 +376,7 @@ items se sont révélés partiellement faux à l'exécution ; l'écart est consi
 11. **E2E** ✅ *fait (#3)*, par `npm i -D @playwright/test` plutôt que par l'assistant `npm init playwright@latest`, qui écrit des exemples à supprimer derrière lui (§2.4) ; `npm i -D @axe-core/playwright` pour un contrôle d'accessibilité par page. Couvre le site en phase 1, le chat en phase 2 (§8.4).
 12. **Lighthouse CI** ✅ *fait (#3)* : `@lhci/cli` dans GitHub Actions ; seuils sur performance, accessibilité, bonnes pratiques, SEO ; la PR échoue sous le seuil. Lighthouse = audit Google intégré à Chrome, notes sur 100 et indicateurs de vitesse ressentie.
 13. **Tests unitaires** ✅ *fait (#3)* : `npm i -D vitest` ; logique pure du front (format des dates, ordre des cartes, technologies de carte) ; script npm + CI (ADR 0010).
-14. **Markdown** — à faire avec la fiche projet : `npm i markdown-to-jsx` ; description et sections rendues en éléments React, HTML brut échappé, jamais d'insertion d'HTML (ADR 0010).
+14. **Markdown** ✅ *fait (#170)* : `npm i markdown-to-jsx`, importé depuis `markdown-to-jsx/react` avec `disableParsingRawHTML` ; description et sections rendues en éléments React, HTML brut en texte, jamais d'insertion d'HTML (ADR 0010).
 
 ### Build et déploiement
 
