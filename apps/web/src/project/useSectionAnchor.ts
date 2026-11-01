@@ -20,7 +20,7 @@ function showSection(hash: string) {
 /**
  * Suit un lien de la fiche vers une section (spec §4.3) : l'adresse se remplace, une entrée par
  * ouverture (§3.1), et garde `history.state`, dont dépend la fermeture (`useProjectAddress`). Le
- * focus suit, comme il le ferait sur un lien natif vers un fragment.
+ * focus va à la section : le parcours au clavier repart d'elle.
  *
  * @param hash Le fragment du lien.
  */
