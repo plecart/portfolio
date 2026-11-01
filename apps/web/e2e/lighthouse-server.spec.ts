@@ -10,7 +10,7 @@
 import { expect, test } from '@playwright/test'
 import lighthouse from '../lighthouserc.json' with { type: 'json' }
 import { API_ORIGIN } from './api.ts'
-import { scrollThrough } from './scroll.ts'
+import { pageBottom, scrollThrough } from './scroll.ts'
 
 /** L'adresse de la collecte : celle du serveur. */
 const [SERVER] = lighthouse.ci.collect.url
@@ -23,7 +23,7 @@ test('la collecte mesure la table à douze cartes, images comprises', async ({ p
   const table = page.getByRole('main')
   await expect(table.getByRole('link')).toHaveCount(12)
   // `lazy` : une image ne part qu'à l'approche de l'écran.
-  await scrollThrough(page, await page.evaluate(() => document.documentElement.scrollHeight))
+  await scrollThrough(page, await pageBottom(page))
   const images = table.locator('img')
   // Onze couvertures, leurs quatre copies en cours, vingt icônes : toute la population.
   await expect(images).toHaveCount(11 + 4 + 20)

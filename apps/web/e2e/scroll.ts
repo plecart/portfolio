@@ -5,6 +5,7 @@
  * lui-même, et rien n'entre dans l'application pour cela (brief de #18, décision 12).
  */
 import { expect, type Page } from '@playwright/test'
+import { settle } from './css.ts'
 
 /** Allonge la page de quatre hauteurs de fenêtre, sous la table. */
 export async function lengthenPage(page: Page) {
@@ -32,6 +33,10 @@ export async function scrollThrough(page: Page, ...positions: number[]) {
   }
 }
 
+/** Le bas de la page, en position de défilement. */
+export const pageBottom = (page: Page) =>
+  page.evaluate(() => document.documentElement.scrollHeight)
+
 /**
  * Décolle l'entête — page allongée, défilée de 1 px — et attend que son fond et son filet soient
  * posés (150 ms, spec §2.7) : ce qu'on mesure ensuite les trouve arrivés.
@@ -40,5 +45,5 @@ export async function detachHeader(page: Page) {
   await lengthenPage(page)
   await scrollThrough(page, 1)
   await expect(page.getByRole('banner')).toHaveAttribute('data-detached')
-  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)))
+  await settle(page)
 }

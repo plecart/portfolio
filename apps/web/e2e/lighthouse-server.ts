@@ -7,7 +7,8 @@
  * second build, pour que l'artefact mesuré reste celui de la production (spec §1.16 ; issue #168).
  * Le texte part compressé, comme le faisait `staticDistDir`.
  *
- * Lancé par Node, types effacés : `node e2e/lighthouse-server.ts`, depuis `apps/web`.
+ * Lancé par Node, types effacés : `node e2e/lighthouse-server.ts`, depuis `apps/web`. Il annonce
+ * `listening` sur sa sortie, que `lhci` attend (`collect.startServerReadyPattern`).
  */
 import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'

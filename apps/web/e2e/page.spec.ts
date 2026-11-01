@@ -12,7 +12,7 @@ import { AxeBuilder } from '@axe-core/playwright'
 import type { Page } from '@playwright/test'
 import { API_ORIGIN, expect, serveProjects, test } from './api.ts'
 import { FILES_ORIGIN, PROJECT_SETS } from './projects.ts'
-import { detachHeader } from './scroll.ts'
+import { detachHeader, pageBottom, scrollThrough } from './scroll.ts'
 
 /** L'origine que le site sert lui-même. */
 function ownOrigin(page: Page): string {
@@ -59,7 +59,7 @@ test("la page ne fait aucune requête vers un tiers", async ({ page }) => {
   await page.goto('/', { waitUntil: 'networkidle' })
 
   // Une image `lazy` sous la ligne de flottaison ne part qu'à l'approche de l'écran.
-  await page.getByRole('contentinfo').scrollIntoViewIfNeeded()
+  await scrollThrough(page, await pageBottom(page))
   await expect
     .poll(() => page.evaluate(() => [...document.images].every((image) => image.complete)))
     .toBe(true)

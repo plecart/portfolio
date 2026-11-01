@@ -9,17 +9,29 @@ import { AxeBuilder } from '@axe-core/playwright'
 import type { Locator, Page } from '@playwright/test'
 import { cardPose } from '../src/table/cards.ts'
 import { expect, FAILURES, holdProjects, serving, test, type Answer } from './api.ts'
-import { resolveAll } from './css.ts'
-import { buildProject, FILES_ORIGIN, PROJECT_SETS, type Project } from './projects.ts'
+import { resolveAll, settle } from './css.ts'
+import {
+  buildImage,
+  buildProject,
+  buildTechnology,
+  ONGOING,
+  PROJECT_SETS,
+  type Project,
+} from './projects.ts'
 import { scrollThrough } from './scroll.ts'
 import {
   cards,
   COLUMN_VIEWPORT,
   enterCards,
+  entry,
   expectPlacement,
+  face,
+  focusByKeyboard,
   openTable,
+  pose,
   serveUnderCsp,
-  settle,
+  summary,
+  TWO_CARDS,
 } from './table.ts'
 
 /** Les couches de la couverture d'une carte : l'image, puis la copie d'un projet en cours. */
@@ -166,13 +178,12 @@ for (const width of [480, 599]) {
       await openTable(page, projects)
       const card = cards(page).nth(index)
 
-      await page.keyboard.press('Tab')
-      await card.focus()
+      await focusByKeyboard(card)
       await settle(page)
 
-      const { left, right, pageWidth } = await card.locator('.card-face').evaluate((face) => ({
-        left: face.getBoundingClientRect().left,
-        right: face.getBoundingClientRect().right,
+      const { left, right, pageWidth } = await face(card).evaluate((layer) => ({
+        left: layer.getBoundingClientRect().left,
+        right: layer.getBoundingClientRect().right,
         pageWidth: document.documentElement.clientWidth,
       }))
       expect(left - FOCUS_RING).toBeGreaterThanOrEqual(0)
@@ -265,15 +276,14 @@ test('une carte est un lien vers sa fiche, nommé par son titre et ses états pr
 }) => {
   await openTable(page, [
     buildProject({
+      ...ONGOING,
       slug: 'atelier',
       title: 'Atelier',
       summary: 'Un atelier de reliure.',
-      status: 'ongoing',
-      finished_on: null,
       demo_url: 'https://demo.test/atelier',
     }),
     buildProject({ slug: 'banc', title: 'Banc', summary: 'Un banc de test' }),
-    buildProject({ slug: 'question', title: 'Et après ?', status: 'ongoing', finished_on: null }),
+    buildProject({ ...ONGOING, slug: 'question', title: 'Et après ?' }),
   ])
 
   const { links } = await accessibilityTree(page)
@@ -290,14 +300,10 @@ test('une carte est un lien vers sa fiche, nommé par son titre et ses états pr
 test('le résumé puis les technologies décrivent le lien : leur nom reste aux lecteurs d’écran (spec §1.4, §1.7)', async ({
   page,
 }) => {
-  const icon = `${FILES_ORIGIN}/icones/icone.svg`
   await openTable(page, [
     buildProject({
       summary: 'Un site.',
-      technologies: [
-        { name: 'TypeScript', kind: 'language', icon },
-        { name: 'React', kind: 'framework', icon },
-      ],
+      technologies: [buildTechnology('TypeScript', 'language'), buildTechnology('React', 'framework')],
     }),
   ])
 
@@ -308,15 +314,13 @@ test('dans l’arbre d’accessibilité de Chromium, le résumé et les rubans r
   page,
   isMobile,
 }) => {
-  await openTable(page, [
-    buildProject({ title: 'Atelier', summary: 'Un atelier.', status: 'ongoing', finished_on: null }),
-  ])
+  await openTable(page, [buildProject({ ...ONGOING, title: 'Atelier', summary: 'Un atelier.' })])
   const card = cards(page)
   const link = ['Atelier. En cours.', 'Un atelier. TypeScript']
   expect((await accessibilityTree(page)).links).toContainEqual(link)
 
   await (isMobile ? card.tap() : card.hover())
-  await expect(card.locator('.card-summary')).toHaveCSS('opacity', '1')
+  await expect(summary(card)).toHaveCSS('opacity', '1')
 
   const { links, headings } = await accessibilityTree(page)
   expect(links).toContainEqual(link)
@@ -324,14 +328,14 @@ test('dans l’arbre d’accessibilité de Chromium, le résumé et les rubans r
 })
 
 test('une carte porte son titre en `<h2>`, ses éléments décoratifs masqués', async ({ page }) => {
-  await openTable(page, [buildProject({ title: 'Atelier', status: 'ongoing', finished_on: null })])
+  await openTable(page, [buildProject({ ...ONGOING, title: 'Atelier' })])
   const card = cards(page)
 
   await expect(card.getByRole('heading', { level: 2, name: 'Atelier' })).toBeVisible()
   // Le point du titre et les états n'existent que pour le nom du lien.
   await expect(card.getByText('. En cours.')).toHaveClass('sr-only')
   await expect(card.locator('svg')).toHaveAttribute('aria-hidden', 'true')
-  // La couverture, sa copie en noir et blanc, l'icône : le libellé du lien les porte.
+  // La couverture, sa copie en noir et blanc, l'icône : le nom du lien les porte.
   expect(
     await card.locator('img').evaluateAll((images) => images.map((image) => image.getAttribute('alt'))),
   ).toEqual(['', '', ''])
@@ -391,7 +395,7 @@ test('noir et blanc du projet en cours : la même image, recouverte par CSS (spe
     if (request.url().endsWith('.webp')) requested.add(request.url())
   })
   await openTable(page, [
-    buildProject({ slug: 'en-cours', status: 'ongoing', finished_on: null }),
+    buildProject({ ...ONGOING, slug: 'en-cours' }),
     buildProject({ slug: 'termine' }),
   ])
   const [ongoing, finished] = [cards(page).first(), cards(page).last()]
@@ -414,29 +418,27 @@ test('noir et blanc du projet en cours : la même image, recouverte par CSS (spe
 test('les rubans : trois technologies au plus, icône, nom masqué et infobulle (spec §4.1)', async ({
   page,
 }) => {
-  const technology = (name: string, kind: Project['technologies'][number]['kind']) => ({
-    name,
-    kind,
-    icon: `${FILES_ORIGIN}/icones/${name}.svg`,
-  })
+  const shown = [
+    buildTechnology('TypeScript', 'language'),
+    buildTechnology('React', 'framework'),
+    buildTechnology('Docker', 'infrastructure'),
+  ]
   await openTable(page, [
     buildProject({
       technologies: [
-        technology('Figma', 'tool'),
-        technology('TypeScript', 'language'),
-        technology('React', 'framework'),
-        technology('Docker', 'infrastructure'),
-        technology('Django', 'framework'),
+        buildTechnology('Figma', 'tool'),
+        ...shown,
+        buildTechnology('Django', 'framework'),
       ],
     }),
   ])
   const ribbons = cards(page).locator('li')
 
-  await expect(ribbons).toHaveText(['TypeScript', 'React', 'Docker'])
-  for (const [index, name] of ['TypeScript', 'React', 'Docker'].entries()) {
+  await expect(ribbons).toHaveText(shown.map(({ name }) => name))
+  for (const [index, { name, icon }] of shown.entries()) {
     const ribbon = ribbons.nth(index)
     await expect(ribbon).toHaveAttribute('title', name)
-    await expect(ribbon.locator('img')).toHaveAttribute('src', `${FILES_ORIGIN}/icones/${name}.svg`)
+    await expect(ribbon.locator('img')).toHaveAttribute('src', icon)
     await expect(ribbon.locator('img')).toHaveAttribute('alt', '')
     await expect(ribbon.getByText(name)).toHaveClass('sr-only')
   }
@@ -447,12 +449,7 @@ test('les rubans d’état : « en cours » en texte, « en ligne » avec son po
   page,
 }) => {
   await openTable(page, [
-    buildProject({
-      status: 'ongoing',
-      finished_on: null,
-      demo_url: 'https://demo.test/projet',
-      technologies: [],
-    }),
+    buildProject({ ...ONGOING, demo_url: 'https://demo.test/projet', technologies: [] }),
   ])
   const ribbons = cards(page).locator('li')
   const [accent] = await resolveAll(page, [['background-color', 'var(--accent)']])
@@ -469,20 +466,7 @@ test('à 320 px, la carte simple la plus chargée garde ses rubans dans sa bande
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 640 })
-  await openTable(page, [
-    buildProject({
-      slug: 'a',
-      status: 'ongoing',
-      finished_on: null,
-      demo_url: 'https://demo.test/a',
-      technologies: (['language', 'framework', 'infrastructure'] as const).map((kind) => ({
-        name: kind,
-        kind,
-        icon: `${FILES_ORIGIN}/icones/${kind}.svg`,
-      })),
-    }),
-    buildProject({ slug: 'b' }),
-  ])
+  await openTable(page, TWO_CARDS)
 
   const overflows = await cards(page)
     .first()
@@ -515,9 +499,9 @@ test('la pose vient de l’empreinte du slug, sous la CSP de production, sur un 
     ['transform', 'rotate(-0.738deg) translate(-3.264px, -1.56px)'],
   ])
 
-  await expect(card.locator('.card-pose')).toHaveCSS('transform', posed)
+  await expect(pose(card)).toHaveCSS('transform', posed)
   await expect(card).toHaveCSS('transform', 'none')
-  await expect(card.locator('.card-entry')).toHaveCSS('transform', 'none')
+  await expect(entry(card)).toHaveCSS('transform', 'none')
 })
 
 for (const [width, placement] of [
@@ -608,10 +592,9 @@ test('après une relance réussie sur une liste vide, le focus n’est posé nul
  * Trois formes, les premières images sans variante que l'API peut servir (issue #168) ; le projet
  * est en cours, pour que la couche noir et blanc ait une raison d'exister.
  */
-const NO_VARIANT = { caption: 'Écran', width: 1600, height: 1600, variants: [] }
 const COVERLESS: [string, Project['gallery']][] = [
-  ['en attente', [{ ...NO_VARIANT, state: 'pending' }]],
-  ['en échec', [{ ...NO_VARIANT, state: 'failed' }]],
+  ['en attente', [buildImage('projet', 'Écran', 'pending')]],
+  ['en échec', [buildImage('projet', 'Écran', 'failed')]],
   ['galerie vide', []],
 ]
 
@@ -619,9 +602,7 @@ for (const [name, gallery] of COVERLESS) {
   test(`couverture sans variante, ${name} : la carte entière, un carré --line, sans image`, async ({
     page,
   }) => {
-    await openTable(page, [
-      buildProject({ title: 'Atelier', status: 'ongoing', finished_on: null, gallery }),
-    ])
+    await openTable(page, [buildProject({ ...ONGOING, title: 'Atelier', gallery })])
     const card = cards(page)
     const [line] = await resolveAll(page, [['background-color', 'var(--line)']])
     const photo = card.locator('.card-photo')
@@ -649,7 +630,7 @@ test('rechargée défilée, une page haute d’emblée ouvre l’entête décoll
 
   await page.reload()
 
-  expect(await page.evaluate(() => window.scrollY)).toBe(1000)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(1000)
   await expect(page.getByRole('banner')).toHaveAttribute('data-detached')
 })
 
@@ -662,7 +643,9 @@ test('rechargée, la table de douze cartes ouvre l’entête selon le défilemen
   await page.reload()
   await expect(cards(page)).toHaveCount(12)
 
-  const banner = expect(page.getByRole('banner'))
-  const scrolled = await page.evaluate(() => window.scrollY > 0)
-  await (scrolled ? banner : banner.not).toHaveAttribute('data-detached')
+  const followsScroll = () =>
+    page
+      .getByRole('banner')
+      .evaluate((header) => window.scrollY > 0 === header.hasAttribute('data-detached'))
+  await expect.poll(followsScroll).toBe(true)
 })
