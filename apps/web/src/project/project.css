@@ -121,14 +121,17 @@
 
   /* Ce qui défile (§4.3) : la colonne au bureau, le panneau sur téléphone. Un mot trop long pour la
      colonne se coupe, plutôt que de la déborder. Les rotations n'ouvrent pas de défilement en
-     largeur. */
+     largeur. La colonne coupe ce qui la dépasse : elle s'élargit, à chaque bord, de l'anneau de focus
+     de ses `<summary>` (§6.2), 2 px à 3 px, sans déplacer son texte (marges de §4.3). */
   .project-scroll {
+    --ring-room: 5px;
     overflow-wrap: anywhere;
 
     @variant sm {
       flex: 1;
       min-height: 0;
-      margin: 0 var(--s-2) var(--s-4) 0;
+      margin: 0 calc(var(--s-2) - var(--ring-room)) var(--s-4) calc(-1 * var(--ring-room));
+      padding-inline: var(--ring-room);
       overflow: hidden auto;
     }
   }
