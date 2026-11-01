@@ -9,6 +9,9 @@ export const panel = (page: Page) => page.getByRole('dialog')
 /** Le bouton « Fermer la fiche ». */
 export const closeButton = (page: Page) => page.getByRole('button', { name: 'Fermer la fiche' })
 
+/** La colonne de lecture, arrêt de tabulation de ce qui défile. */
+export const readingColumn = (page: Page) => page.getByRole('region', { name: 'Contenu de la fiche' })
+
 /** Ouvre la fiche d'une carte par Entrée, qui ouvre d'emblée sur les deux projets. */
 export async function openProject(card: Locator) {
   await card.press('Enter')

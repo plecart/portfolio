@@ -23,6 +23,7 @@ import {
   holdNativeClicks,
   openProject,
   panel,
+  readingColumn,
   watchAnimations,
   watchCspViolations,
 } from './project.ts'
@@ -69,7 +70,9 @@ test('Tab et Maj+Tab ne sortent pas du panneau', async ({ page }) => {
 
   for (const key of ['Tab', 'Shift+Tab']) {
     await page.keyboard.press(key)
+    await expect(readingColumn(page)).toBeFocused()
 
+    await page.keyboard.press(key)
     await expect(closeButton(page)).toBeFocused()
   }
 })

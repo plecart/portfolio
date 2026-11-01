@@ -4,7 +4,7 @@
  * adresses et ses fermetures : `project.spec.ts`.
  */
 import { AxeBuilder } from '@axe-core/playwright'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { expect, serveProjects, test } from './api.ts'
 import { resolveAll, settle } from './css.ts'
 import {
@@ -13,11 +13,12 @@ import {
   holdNativeClicks,
   openProject,
   panel,
+  readingColumn,
   watchCspViolations,
 } from './project.ts'
 import { buildProject, buildTechnology, ONGOING, type Project } from './projects.ts'
 import { scrollTop } from './scroll.ts'
-import { cards, openTable, serveUnderCsp } from './table.ts'
+import { cards, COLUMN_VIEWPORT, openTable, serveUnderCsp } from './table.ts'
 
 /** Le projet d'une fiche à un seul slug, ces champs remplacés. */
 const ficheProject = (overrides: Partial<Project> = {}) =>
@@ -377,6 +378,8 @@ test.describe('les sections', () => {
     await expect(closeButton(page)).toBeFocused()
 
     await page.keyboard.press('Tab')
+    await expect(readingColumn(page)).toBeFocused()
+    await page.keyboard.press('Tab')
     await expect(summaries.first()).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(section(page, 'architecture')).toHaveAttribute('open')
@@ -541,6 +544,118 @@ test.describe('les ancres', () => {
     await expectScrolledTo(page, 'resultats', isMobile)
     expect(await scrolls()).toBe(1)
   })
+})
+
+test.describe('le défilement', () => {
+  const LONG = { description: LONG_DESCRIPTION }
+
+  /** Fait défiler un élément, résolu une fois la position posée. */
+  const scrollTo = (element: Locator, top: number) =>
+    element.evaluate((scrolled, y) => scrolled.scrollTo({ top: y, behavior: 'instant' }), top)
+
+  const scrolledBy = (element: Locator) => element.evaluate((scrolled) => scrolled.scrollTop)
+
+  test('à 1280 × 800, seule la colonne défile, sous un en-tête fixe', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'au bureau : le projet desktop')
+    await page.setViewportSize(COLUMN_VIEWPORT)
+    await arriveAt(page, { ...LONG, ...LINKS })
+    const column = page.locator('.project-scroll')
+    const head = page.locator('.project-head')
+    const before = await head.boundingBox()
+
+    await expect(column).toHaveCSS('overflow-y', 'auto')
+    await expect(column).toHaveCSS('margin-bottom', '16px')
+    await expect(column).toHaveCSS('scrollbar-width', 'thin')
+    expect(Math.round(before!.height)).toBe(89)
+    expect(Math.round((await column.boundingBox())!.height + 16)).toBe(529)
+
+    await scrollTo(column, 300)
+
+    expect(await scrolledBy(column)).toBe(300)
+    expect(await head.boundingBox()).toEqual(before)
+    await expect(panel(page)).toHaveCSS('overflow-y', 'visible')
+  })
+
+  test('sur téléphone, tout défile avec le panneau, le bouton reste en haut à droite', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(!isMobile, 'le plein écran : le projet mobile')
+    await arriveAt(page, { ...LONG, ...LINKS })
+    const button = await closeButton(page).boundingBox()
+
+    await expect(page.locator('.project-scroll')).toHaveCSS('overflow-y', 'visible')
+    await expect(panel(page)).toHaveCSS('overflow-y', 'auto')
+    await expect(panel(page)).toHaveCSS('scrollbar-width', 'thin')
+
+    await scrollTo(panel(page), 300)
+
+    expect(await scrolledBy(panel(page))).toBe(300)
+    expect(await closeButton(page).boundingBox()).toEqual(button)
+    await closeButton(page).click()
+    await expectClosed(page)
+  })
+
+  test('une description longue, sans lien ni section, défile au clavier, le focus d’ouverture au bouton', async ({
+    page,
+    isMobile,
+  }) => {
+    await arriveAt(page, LONG)
+    await expect(closeButton(page)).toBeFocused()
+
+    await page.keyboard.press('Tab')
+
+    await expect(readingColumn(page)).toBeFocused()
+
+    await page.keyboard.press('PageDown')
+
+    await expect.poll(() => scrolledBy(scroller(page, isMobile))).toBeGreaterThan(0)
+    await expectNoViolations(page)
+  })
+
+  test('l’anneau de focus d’une section tient dans la colonne, le texte à sa place', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'la colonne ne coupe rien sur téléphone')
+    await arriveAt(page, { ...LONG, sections: SECTIONS })
+    const column = (await page.locator('.project-scroll').boundingBox())!
+    const summary = (await page.locator('summary').first().boundingBox())!
+    const head = (await page.locator('.project-head').boundingBox())!
+
+    expect(summary.x - column.x).toBeGreaterThanOrEqual(5)
+    expect(column.x + column.width - (summary.x + summary.width)).toBeGreaterThanOrEqual(5)
+    expect(summary.x).toBe(head.x)
+    expect(summary.x + summary.width).toBe(head.x + head.width - 8)
+  })
+})
+
+test.describe('un client à la borne de #7, 100 caractères', () => {
+  const WORDS =
+    'Compagnie générale des établissements industriels et commerciaux de la région d’Auvergne-Rhône-Alpes'
+  const LINE = 19.5
+
+  for (const [name, client] of [
+    ['en mots', WORDS],
+    ['sans une espace', 'x'.repeat(100)],
+  ]) {
+    test(`${name} : trois lignes au plus, sans déborder ni bouger l’en-tête`, async ({ page }) => {
+      expect(client).toHaveLength(100)
+      await arriveAt(page, { client: 'Acme' })
+      const head = await page.locator('.project-head').boundingBox()
+
+      await arriveAt(page, { client })
+
+      const facts = page.locator('.project-facts')
+      expect((await facts.boundingBox())!.height).toBeLessThanOrEqual(3 * LINE)
+      for (const element of [facts, page.locator('.project-scroll'), panel(page)]) {
+        expect(await element.evaluate(({ scrollWidth, clientWidth }) => scrollWidth <= clientWidth)).toBe(
+          true,
+        )
+      }
+      expect(await page.locator('.project-head').boundingBox()).toEqual(head)
+    })
+  }
 })
 
 test('fiche complète : les repères de §3.2 tiennent et axe ne trouve rien', async ({

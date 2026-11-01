@@ -51,7 +51,10 @@ function StackGroup({ title, technologies }: { title: string; technologies: Tech
 }
 
 /**
- * La colonne de lecture d'une fiche (spec §3.2, §4.3) : l'en-tête, puis ce qui défile.
+ * La colonne de lecture d'une fiche (spec §3.2, §4.3) : l'en-tête, puis ce qui défile, arrêt de
+ * tabulation (§6.2). Sans lien ni section, rien d'autre n'y porterait le clavier : le bouton
+ * « Fermer » est hors de la colonne au bureau et, fixe sur téléphone, hors de portée du défilement
+ * du panneau (Chromium 156, mesuré le 2026-11-01).
  *
  * @param project Le projet.
  */
@@ -60,7 +63,8 @@ export function ProjectContent({ project }: { project: Project }) {
   return (
     <div className="project-reading">
       <ProjectHeader project={project} />
-      <div className="project-scroll">
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
+      <div className="project-scroll" tabIndex={0} role="region" aria-label={strings.projectReading}>
         <p className="project-facts">{projectFacts(project)}</p>
         <p className="project-summary">{project.summary}</p>
         <StackGroup title={strings.technologies} technologies={technologies} />
