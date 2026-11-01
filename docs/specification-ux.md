@@ -112,7 +112,7 @@ Ancres vérifiées : frontend-outillage §3 item 12 (seuils annoncés sans valeu
 ### 1.17 Contraintes de contenu induites (récapitulatif, détaillé en §7)
 
 - Titre : **30 caractères** au plus, sur deux lignes au plus du post-it (une ligne de 30 caractères exige une carte d'au moins 250 px, jamais atteinte sur mobile).
-- Résumé : **120 caractères** au plus (sept lignes au plus sur la carte simple mobile, §7) ; sert aussi d'`og:description`.
+- Résumé : **120 caractères** au plus (sept lignes au plus sur la carte simple mobile, moins sous 400 px, §7) ; sert aussi d'`og:description`.
 - Couverture : **carrée, ≥ 1200 px de côté**, une par projet ; autres images libres, chacune avec une légende (texte alternatif).
 - Technologies : au moins une, ordonnées ; les trois premières de type langage / framework / infra vont sur la carte.
 - Dates : date de début obligatoire ; date de fin pour les projets terminés (ordre §1.9).
@@ -250,7 +250,7 @@ Deux liens, GitHub puis LinkedIn, icônes au trait 22 px, libellés « GitHub de
 
 ### 4.1 Carte polaroid
 
-- **Structure** : `<a href="/projets/<slug>">`, libellé accessible « Titre. Résumé. En cours. En ligne. » (les états présents seulement). Couches, de l'extérieur vers l'intérieur : entrée et recul ; pose (rotation, décalage) ; face (papier, ombre, cadre) ; inclinaison ; puis le trombone, le post-it, la photo (image, couche noir et blanc, bandeau de résumé) et la bande basse (rubans, bouton « Ouvrir »).
+- **Structure** : `<a href="/projets/<slug>">`, nom accessible « Titre. En cours. En ligne. » (les états présents seulement ; sans état, le titre seul), description accessible : le résumé puis les technologies. Couches, de l'extérieur vers l'intérieur : entrée et recul ; pose (rotation, décalage) ; face (papier, ombre, cadre) ; inclinaison ; puis le trombone, le post-it, la photo (image, couche noir et blanc, bandeau de résumé) et la bande basse (rubans, bouton « Ouvrir »).
 
 | Carte | Largeur | Cadre | Photo | Bande (min.) | Hauteur (min.) |
 |---|---|---|---|---|---|
@@ -268,10 +268,10 @@ Hauteur = cadre + photo + bande ; la bande grandit si les rubans passent sur deu
 - **Post-it** (`<h2>`) : absolu, 8 px au-dessus du cadre et 14 px de son bord gauche, largeur maximale = carte − 28 px, marge intérieure 6 10 6 12, rayon 1 px, rotation −2° (pivot haut gauche), texte §2.2, deux lignes au plus (troncature `line-clamp`).
 - **Trombone** : absolu, 14 px au-dessus du cadre et 6 px de son bord gauche, 14 × 30 px, trait 1,6 px `--ink-2`, rotation −12°, décoratif.
 - **Photo** : carré ; l'image de couverture (§1.11) remplit le cadre ; fond `--line` avant chargement ; débordement masqué. Projet « en cours » : une copie en niveaux de gris (`filter: grayscale(1)`) recouvre l'image ; elle s'efface pendant l'ouverture (§4.6).
-- **Bandeau de résumé** : absolu en bas de la photo, marge intérieure 12 px, `--paper` à 94 %, 13 px, `--ink` ; caché (opacité 0, 6 px plus bas) ; révélé au survol ou au focus (opacité 150 ms, translation 240 ms) et au premier toucher ; `aria-hidden` (le résumé est dans le libellé). Capacité : §7.
+- **Bandeau de résumé** : absolu en bas de la photo, marge intérieure 12 px, `--paper` à 94 %, 13 px, `--ink` ; caché (opacité 0, 6 px plus bas) ; révélé au survol ou au focus (opacité 150 ms, translation 240 ms) et au premier toucher ; `aria-hidden` (le résumé est dans la description accessible). Capacité : §7.
 - **Bande basse** : hauteur minimale selon la carte, marge 8 px 0, deux listes — rubans de technologies à gauche, rubans d'état à droite — écart 4 px, retour à la ligne si besoin. Sur un appareil sans survol, pendant la révélation, les deux listes laissent la place au bouton « Ouvrir » (30 px de haut, marge intérieure 0 12 px, bordure 1 px `--ink`, `--paper`, rayon 6 px, 13 / 600) : la hauteur de la carte ne change pas.
 - **Ruban** : 20 px de haut, marge intérieure 0 7 px, `--tape` / `--tape-ink`, rayon 2 px, 11 / 700, sans retour à la ligne, rotation −1,5° (impairs) ou +1° (pairs) ; sur la carte vitrine 24 px de haut, 12 px, marge 0 9 px. Technologie : icône visible, nom complet en texte masqué et en infobulle. « en cours » : texte seul. « en ligne » : point de 6 px `--accent` puis le texte.
-- **Survol et focus** (appareils à survol) : la pose revient à 0° et 0 px (240 ms) ; la face monte de 6 px et grandit de 2 % (240 ms, `--ease-spring`) ; l'ombre soulevée apparaît (240 ms) ; le bandeau se révèle. Au pointeur fin, hors mouvement réduit et sans fiche ouverte, la face s'incline jusqu'à ±6° sur chaque axe selon la position du pointeur (perspective 900 px) et revient en 240 ms à la sortie. Focus clavier : anneau de 2 px `--accent` à 4 px de la face. Pression : ×0,985 en 80 ms.
+- **Survol et focus** (appareils à survol) : la pose revient à 0° et 0 px (240 ms) ; la face monte de 6 px et grandit de 2 % (240 ms, `--ease-spring`) ; l'ombre soulevée apparaît (240 ms) ; le bandeau se révèle. Au pointeur fin, hors mouvement réduit et sans fiche ouverte, le contenu de la face s'incline jusqu'à ±6° sur chaque axe, papier et ombre restant à plat, selon la position du pointeur (perspective 900 px) et revient en 240 ms à la sortie. Focus clavier : anneau de 2 px `--accent` à 4 px de la face. Pression : ×0,985 en 80 ms.
 - **Toucher** : premier toucher = révélation (redressement, ombre soulevée, bandeau, bouton « Ouvrir ») ; second toucher, sur la carte ou le bouton = ouverture ; toucher hors des cartes = fin de la révélation ; une carte révélée à la fois ; pas d'inclinaison.
 
 ### 4.2 Carte vitrine
@@ -376,7 +376,7 @@ Repères mesurés : 1280 × 800 → table 1044 px, carte 240 / 508 px, fiche 123
 
 - **Contrastes** (WCAG, calculés sur les jetons, clair / sombre) : `--ink` sur `--paper` 14,16 / 11,94 ; `--ink` sur `--bg` 12,90 / 14,00 ; `--ink-2` sur `--bg` 5,07 / 6,43 ; `--ink-2` sur `--paper` 5,57 / 5,48 ; `--tape-ink` sur `--tape` 11,36 / 7,62 ; `--postit-ink` sur `--postit` 11,69 / 6,66 ; `--postit-ink` sur `--postit-link` 8,81 / 6,62 ; `--accent` sur `--bg` 4,67 / 6,80 ; `--accent` sur `--paper` 5,13 / 5,80 ; point « en ligne » (`--accent`) sur `--tape` 4,11 / 4,61. Surfaces translucides, composées sur leur fond réel : bandeau de résumé (`--paper` 94 %) sous `--ink`, sur une image noire 12,39 / 12,29, sur une image blanche 14,17 / 9,94 ; flèches de galerie (`--paper` 88 %) sous `--ink`, sur image noire 10,77 / 12,71, sur image blanche 14,27 / 8,17 ; entête décollée (`--paper` 94 % sur `--bg`) sous `--ink` 14,07 / 12,09 et sous `--ink-2` 5,53 / 5,55. Tout texte ≥ 4,5 ; anneau de focus et point « en ligne » ≥ 3 ; `--line` (1,27 / 1,45 sur `--bg`) ne porte que des filets décoratifs.
 - **Clavier** : Tab parcourt le nom, la place « Chat » quand elle existe, le bouton de mode, les cartes dans l'ordre de la table, puis les liens de l'auteur ; Entrée ouvre la carte focalisée ; dans la fiche, Tab boucle entre le bouton fermer, les flèches, les post-its de lien et les sections, ← / → changent d'image, Échap ferme ; le focus revient sur la carte. Anneau de focus : 2 px `--accent` à 3 px de l'élément (4 px de la face d'une carte), visible au clavier seulement (`:focus-visible`).
-- **Sémantique** : une carte est un lien au libellé complet ; un ruban de technologie porte son nom en texte masqué ; « en cours » et « en ligne » sont du texte ; la fiche est un dialogue modal nommé par le titre ; la galerie est un groupe « Images du projet » au compteur `aria-live` ; le message d'erreur est un `status` ; les icônes décoratives et les couches noir et blanc sont `aria-hidden` ; chaque bouton icône a un libellé ; l'icône de thème inactive est retirée du rendu.
+- **Sémantique** : une carte est un lien nommé par son titre et ses états, décrit par son résumé et ses technologies ; un ruban de technologie porte son nom en texte masqué ; « en cours » et « en ligne » sont du texte ; la fiche est un dialogue modal nommé par le titre ; la galerie est un groupe « Images du projet » au compteur `aria-live` ; le message d'erreur est un `status` ; les icônes décoratives et les couches noir et blanc sont `aria-hidden` ; chaque bouton icône a un libellé ; l'icône de thème inactive est retirée du rendu.
 - **Cibles** : boutons et liens icône 36 px (pied de page 38 px), flèches 36 px, « Ouvrir » 30 px de haut, lien « Réessayer » 24 px (sa ligne de texte) ; 8 px au moins entre deux cibles.
 - **Langue** : `lang="fr"` ; libellés et messages en français, dans le catalogue de chaînes (D28, D34), avec l'apostrophe typographique « ’ » dans les textes rendus.
 - Mouvement réduit : §6.3.
@@ -395,7 +395,7 @@ Seuils bloquants : §1.16. Moyens : police unique de 25 Ko incorporée, sans req
 
 ## 7. Contraintes de contenu
 
-Base : §1.17. Les capacités ci-dessous sont mesurées sur la carte simple mobile (176 px), la plus étroite ; ce qui y tient tient partout.
+Base : §1.17. Les capacités ci-dessous sont mesurées sur la carte simple mobile à 400 px de large (176 px) ; ce qui y tient tient partout à partir de cette largeur. Sous 400 px la photo rétrécit : le bandeau de résumé passe à six lignes, puis cinq et quatre, avec une ellipse, le texte complet restant dans la description accessible.
 
 - **Titre** : 30 caractères au plus ; sur le post-it de la carte simple mobile (13 px, 126 px de texte, environ 20 caractères par ligne) il tient sur deux lignes ; sur la fiche (22 px) il tient sur une ligne et laisse la place d'un post-it de lien à sa droite (le second passe à la ligne).
 - **Résumé** : 120 caractères au plus, aucun mot de plus de 20 caractères ; sur la carte simple mobile (13 px, 136 px de texte, environ 22 caractères par ligne) il occupe sept lignes au plus, soit 151 px dans une photo de 160 px ; cinq lignes sur la carte simple desktop, deux ou trois sur la vitrine. Sert d'`og:description`.
