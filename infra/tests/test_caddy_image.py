@@ -295,6 +295,23 @@ def test_l_hote_de_l_api_est_relaye_vers_api(stack: Stack) -> None:
     assert reply.body == UPSTREAM["UPSTREAM_BODY"]
 
 
+@pytest.mark.parametrize(
+    "path",
+    ["/admin%2Flogin/", "/admin%2flogin/", "/admin%2F", "/admin%2f", "/%2Fadmin/", "/x/%2F/admin/"],
+)
+def test_une_barre_oblique_encodee_n_atteint_pas_api(stack: Stack, path: str) -> None:
+    """Access ne couvre pas ces formes, que `gunicorn` décode en chemins de l'admin (#25)."""
+    assert stack.get(API, path).status == 400
+
+
+@pytest.mark.parametrize("path", ["/admin/?next=%2Fadmin%2F", "/admin%252Flogin/"])
+def test_seule_une_barre_oblique_encodee_dans_le_chemin_est_refusee(
+    stack: Stack, path: str
+) -> None:
+    """La chaîne de requête passe ; un encodage double se décode une fois, sans route d'admin."""
+    assert stack.get(API, path).body == UPSTREAM["UPSTREAM_BODY"]
+
+
 def test_les_statiques_de_l_admin_gardent_leur_cache(stack: Stack) -> None:
     """`api` sert lui-même les statiques de l'admin, sous `/static/`, avec ses en-têtes de cache
     (WhiteNoise, ADR 0014) : Caddy les relaie sans y toucher."""
