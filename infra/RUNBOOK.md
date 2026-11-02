@@ -44,7 +44,21 @@ ne lit pas ses secrets, même modifié.
 
 Le gestionnaire est KeePassXC (ADR 0022), un fichier chiffré local : copie-le hors du poste, sur un
 support distinct, une fois rangés les secrets d'un chantier, et toujours avant `bootstrap.sh`. Le
-poste perdu sans cette copie, la clé privée `age` est perdue, et avec elle les sauvegardes.
+poste perdu sans cette copie, la clé privée `age` est perdue, et avec elle les sauvegardes. Son mot
+de passe maître n'y est pas : il se retrouve sans elle.
+
+Entrées du groupe `Portfolio` : `Cloudflare`, `Cloudflare Tunnel`, `R2 portfolio-medias-rw`,
+`R2 portfolio-backups-rw`, `R2 portfolio-backups-ro`, `Age Sauvegardes` (clé publique dans les Notes,
+`age.key` en pièce jointe, seule copie de la clé privée), `Healthchecks backup` (adresse de ping),
+`healthchecks.io`, `GHCR token` (Notes : portée, expiration, renouvellement), `Pacome.dev Admin`
+(mot de passe, graine TOTP, codes de secours), `portfolio_admin` (phrase de passe de la clé SSH),
+`portfolio root console`, et les comptes Hetzner et GitHub. Hors du gestionnaire :
+
+- le client secret de l'application OAuth GitHub d'Access ne vit que dans Cloudflare : il se régénère
+  sur GitHub, puis se recolle dans Cloudflare ;
+- `portfolio root console` sert à la seule console web de Hetzner, qui demande un mot de passe pour
+  comparer l'empreinte de l'hôte : « Reset root password » le pose, SSH reste par clé. Cette console
+  est en QWERTY.
 
 `SECRET_KEY`, `POSTGRES_PASSWORD` et `BACKUP_POSTGRES_PASSWORD` ne vivent que sur le VPS : rien hors
 de la pile ne s'en sert, et un VPS reconstruit en reçoit de neufs — la base restaurée garde ses
@@ -62,26 +76,34 @@ healthchecks.io (#25). À la première connexion, `ssh` affiche l'empreinte de l
 celle que la console du fournisseur rend pour `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`
 — identiques, oui ou non ? Non : n'accepte pas.
 
-1. **La clé de déploiement**, sur le poste, dédiée et sans phrase de passe — la CI ne peut pas en
+Sous Windows, chaque geste du poste se lance dans **Git Bash** : PowerShell 5.1 refuse `<`, perd le
+`""` de `-N ""`, et son `|` abîme un binaire.
+
+1. **La clé de déploiement**, sur le poste, hors de tout clone, dédiée et sans phrase de passe — la CI ne peut pas en
    saisir une :
    ```
    ssh-keygen -t ed25519 -N "" -C deploy@portfolio -f deploy_key
    ```
 2. **Le jeton GHCR** : un jeton *classic*, portée `read:packages` seule — GHCR n'accepte pas les
    jetons à droits fins (doc GitHub « Working with the Container registry ») —, créé sur
-   `https://github.com/settings/tokens/new?scopes=read:packages`, rangé dans le gestionnaire.
+   `https://github.com/settings/tokens/new?scopes=read:packages`, rangé dans le gestionnaire, son
+   expiration dans ton agenda : un jeton expiré ne se restaure pas, et un `pull` échoue alors
+   (« Un déploiement rouge »). Le premier expire vers le 2027-11-01.
 3. **Le commit à déployer** : la tête de `main`, si son run a publié (`gh run list --branch main
    --limit 1` : `completed success` ?). Son SHA complet : `git fetch origin && git rev-parse
    origin/main`.
-4. **Les trois fichiers de ce commit**, tirés sans changer de branche, puis copiés sur le VPS :
+4. **Les trois fichiers de ce commit**, tirés dans le clone sans changer de branche, puis copiés
+   sur le VPS :
    ```
    git show <sha>:infra/bootstrap.sh > bootstrap.sh
    git show <sha>:infra/compose.yml > compose.yml
    git show <sha>:infra/prod.env.example > prod.env.example
+   wc -c bootstrap.sh compose.yml prod.env.example
    scp bootstrap.sh compose.yml prod.env.example root@<ip>:
    rm bootstrap.sh compose.yml prod.env.example
    ```
-   (Un `compose.yml` laissé à la racine du dépôt serait pris par tout `docker compose` lancé là.)
+   Aucun fichier à 0 octet : hors d'un clone, `git show` échoue et `>` laisse un fichier vide. (Un
+   `compose.yml` laissé à la racine du dépôt serait pris par tout `docker compose` lancé là.)
 5. **L'amorçage**, en `root` sur le VPS — `-t` pour les saisies sans écho :
    ```
    ssh -t root@<ip> bash bootstrap.sh
@@ -96,7 +118,8 @@ celle que la console du fournisseur rend pour `ssh-keygen -lf /etc/ssh/ssh_host_
    est `healthy`, et la ligne de la clé de l'hôte.
    Il s'arrête sur la première erreur ; relancé, il reprend sans rien refaire de ce qui est en
    place. `cloudflared` ne devient sain qu'avec un Tunnel configuré (#25) : sinon `--wait`
-   s'arrête sur « cloudflared is unhealthy ».
+   s'arrête sur « cloudflared is unhealthy ». Un noyau neuf installé en chemin attend un
+   redémarrage (`needrestart` le dit) : `ssh root@<ip> reboot`, et la pile revient seule.
 6. **L'environnement `production` et ses secrets**, depuis le poste, dans le dépôt — d'abord
    l'environnement restreint à `main` (doc GitHub « Deployments and environments »), puis les
    quatre secrets :
@@ -104,13 +127,16 @@ celle que la console du fournisseur rend pour `ssh-keygen -lf /etc/ssh/ssh_host_
    echo '{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}' | gh api -X PUT repos/plecart/portfolio/environments/production --input -
    gh api -X POST repos/plecart/portfolio/environments/production/deployment-branch-policies -f name=main -f type=branch
    gh secret set DEPLOY_SSH_KEY --env production < deploy_key
-   printf '%s %s\n' <ip> "<ligne de la clé de l'hôte affichée par bootstrap.sh>" | gh secret set DEPLOY_KNOWN_HOSTS --env production
+   ssh root@<ip> "cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub" | sed "s/^/<ip> /" | gh secret set DEPLOY_KNOWN_HOSTS --env production
    gh secret set DEPLOY_HOST --env production --body <ip>
    gh secret set DEPLOY_USER --env production --body deploy
+   ssh -i deploy_key deploy@<ip> docker compose ps
    rm deploy_key deploy_key.pub
    ```
-   `gh secret list --env production` liste-t-il les quatre noms ? (Il n'affiche jamais les
-   valeurs.)
+   Le `ssh -i` répond-il sans phrase de passe, chaque service `healthy` ? Sinon, ne supprime pas la
+   clé : elle ne se relit plus depuis GitHub. `gh secret list --env production` liste-t-il les
+   quatre noms ? (Il n'affiche jamais les valeurs, et `gh secret set` écrit « for plecart/portfolio »
+   même pour un secret d'environnement : c'est cette liste qui fait foi.)
 7. **Le déploiement continu** : `gh variable set DEPLOY_ENABLED --body true`. Le prochain push sur
    `main` déploie ; tant que la variable ne vaut pas `true`, le job `deploy` est sauté.
 
@@ -284,17 +310,64 @@ et son jeton.
 commande, qui ré-enrôle : l'ancienne application et les anciens codes ne valent plus. Elle ne
 demande aucune connexion à l'admin — sans code restant, la relancer sur le VPS suffit.
 
+**Session Access expirée devant un formulaire ouvert** (session de 24 h) : l'envoi ne part pas, et
+rien ne s'affiche — la console de Chrome écrit « violates the following Content Security Policy
+directive: "form-action 'self'" ». Access redirige vers une autre origine, très probablement la
+cause ; Firefox n'est pas testé (mesuré le 2026-11-02, #25). La directive reste : levée, l'envoi
+partirait vers Access et la saisie serait perdue au retour (déduit). Laisse la page ouverte, ouvre
+l'admin dans un autre onglet pour repasser Access, puis renvoie le formulaire (non éprouvé) ;
+recharger la page rétablit l'accès, sans la saisie.
+
+Pour éprouver Access à la main, la déconnexion se fait sur
+`https://api.pacome.dev/cdn-cgi/access/logout` : l'adresse de l'équipe rend « No Access cookie
+found ». Avec GitHub déjà connecté, Access repasse ensuite sans écran : ce n'est pas une barrière
+absente, l'onglet Network montre le détour par `cloudflareaccess.com` et GitHub.
+
 ## Cloudflare — l'état attendu
 
-Un état documenté (cadrage §6.7, point 7 ; ADR 0003) ; #25 le complète au premier déploiement,
-règle par règle.
+L'état constaté du 2026-10-30 au 2026-11-02 (cadrage §6.7, point 7 ; ADR 0003 ; #25). Compte
+protégé par un TOTP, que la connexion Google demande aussi.
 
-- **Tunnel** — géré depuis Cloudflare ; son jeton est `TUNNEL_TOKEN`. Les noms d'hôte publics du
-  site (apex) et de l'API (`api.`) mènent à `http://caddy:80`, qui route par nom d'hôte
+- **Domaine** — `pacome.dev`, Cloudflare Registrar, renouvellement automatique, expiration en
+  octobre 2027.
+- **Tunnel** — `portfolio`, géré depuis Cloudflare ; son jeton est `TUNNEL_TOKEN`. Routes, dans cet
+  ordre : `pacome.dev` puis `api.pacome.dev`, vers `http://caddy:80`, qui route par nom d'hôte
   (`infra/caddy/Caddyfile`).
-- **DNS** — `www` redirige vers l'apex ; `media.` sert R2 (#13).
-- **Access** — devant l'admin, `/admin/` sur l'hôte de l'API (#6, #25).
-- **WAF et protection DDoS** — ceux de l'offre gratuite, sans réglage. Turnstile : absent (D41).
+- **DNS** — `pacome.dev` et `api` de type Tunnel vers `portfolio` ; `media` de type R2 vers
+  `portfolio-medias` ; `www` CNAME vers `pacome.dev` ; tous Proxied. TXT `@` `v=spf1 -all` et TXT
+  `_dmarc` `v=DMARC1;p=reject;sp=reject;adkim=s;aspf=s`, en DNS only : le domaine n'envoie aucun
+  e-mail.
+- **Redirection** — Redirect Rule `www-vers-apex` : `https://www.pacome.dev/*` vers
+  `https://pacome.dev/${1}`, 301, chaîne de requête conservée.
+- **R2** — `portfolio-medias`, public par `media.pacome.dev` seul, URL `r2.dev` désactivée ;
+  `portfolio-backups`, privé. WEUR par indice, classe Standard. Trois jetons bornés à un bucket :
+  `portfolio-medias-rw`, `portfolio-backups-rw`, `portfolio-backups-ro` (« Où vit chaque secret »).
+  `media.pacome.dev` n'ajoute ni `X-Content-Type-Options` ni CSP, SVG compris : ses fichiers ne
+  viennent que de l'auteur, et cet hôte ne porte aucun cookie (`<img>` n'exécute pas un SVG).
+- **Access** — équipe `pacome`, fournisseur GitHub (application OAuth `Portfolio Cloudflare
+  Access`). Application `portfolio-admin`, chemin `api.pacome.dev/admin`, GitHub seul, session 24 h ;
+  politique `admin-mainteneur` : Allow, l'adresse e-mail que GitHub transmet pour le mainteneur. Le
+  reste de l'hôte de l'API n'est pas couvert.
+- **Barre oblique encodée** — Access ne couvre pas `/admin%2Flogin/`, ni `/admin%2f` : Caddy refuse
+  sur l'hôte de l'API tout chemin qui en porte une (`infra/caddy/Caddyfile`).
+- **WAF et protection DDoS** — ceux de l'offre gratuite, sans réglage, aucune règle personnalisée.
+  La console affiche « No Managed rules created » : l'activité du jeu de règles gratuit n'est pas
+  établie. Turnstile : absent (D41).
+- **Limitation de débit** — règle `api-100-par-10s`, seule de l'offre gratuite : chemin commençant
+  par `/api/`, par IP, 100 requêtes par 10 secondes, Block 10 secondes. L'offre ne filtre pas par
+  hôte : le chemin couvre l'API publique, ni l'admin, ni le site, ni les médias.
+- **TLS** — minimum 1.2 sur la zone et sur `media.pacome.dev`, deux réglages distincts.
+- **Alerte de budget** — `alerte-1-dollar`, 1 $, par e-mail : Cloudflare n'a pas de plafond dur.
+
+Coût constaté (2026-11-02) : environ 15 € par mois, pour une cible d'une dizaine d'euros (ADR 0023) :
+
+| Poste | Prix | Lu sur |
+|---|---|---|
+| VPS Hetzner CPX12 | 14,39 € TTC par mois, facturation horaire plafonnée | console, [Billing FAQ](https://docs.hetzner.com/cloud/billing/faq/) |
+| `pacome.dev` | 8,20 $ la première année, 12,20 $ par an ensuite | caisse, [Registrar](https://developers.cloudflare.com/registrar/about/) |
+| R2 | 0 $ : 10 Go-mois, 1 M d'opérations A et 10 M d'opérations B inclus ; au-delà 0,015 $ le Go-mois, 4,50 $ et 0,36 $ le million | caisse, [Pricing](https://developers.cloudflare.com/r2/pricing/) |
+| Zero Trust (Access, Tunnel) | 0 $, offre Free, un seul utilisateur ; le plafond de l'offre n'est pas dans les pages lues | caisse, [Account limits](https://developers.cloudflare.com/cloudflare-one/account-limits/) |
+| healthchecks.io | 0 $, 1 contrôle sur 20 | [Pricing](https://healthchecks.io/pricing/) |
 
 ## Sauvegarde et restauration
 
@@ -306,6 +379,12 @@ puis healthchecks.io reçoit le ping. La première étape qui échoue arrête to
 healthchecks.io alerte de son absence. Pour revenir à une sauvegarde : « Restaurer une sauvegarde »,
 et, si la machine elle-même est perdue, « Le VPS a disparu », plus bas. Que la dernière se restaure,
 un workflow le prouve chaque mois : « Le test mensuel ».
+
+**Risque accepté** : le jeton du VPS peut supprimer les sauvegardes — R2 n'a pas de droit d'écriture
+sans suppression — et la purge nocturne reste inchangée, sans verrou de bucket (#25). Un VPS
+compromis peut donc effacer le bucket. À réexaminer le jour où le site porte un contenu que l'auteur
+ne saurait pas ressaisir ; un verrou se pose alors avec une purge adaptée dans le même geste, sinon
+la purge échoue chaque nuit, sans ping.
 
 **Lancer une sauvegarde à la main**, en `deploy` dans `/srv/portfolio` (« Commandes sur le VPS ») —
 pas autour de 03:00 UTC, où deux chaînes se disputeraient la purge :
@@ -322,19 +401,23 @@ chaque objet purgé —, `== ping`, et sort en 0. Un échec écrit `échec à l'
    d'une taille proche de celle de la veille.
 3. Le ping : healthchecks.io, contrôle de la sauvegarde — état « up », dernier ping de la nuit.
 
-**Au premier déploiement qui porte `backup`** (#25) — ce qu'aucun test ne peut voir :
-- [ ] **Le rôle** : `bootstrap.sh` l'a créé si `docker compose ps backup` le dit `healthy` — sa
+**Au premier déploiement qui porte `backup`** (#25) — ce qu'aucun test ne peut voir, coché le
+2026-11-02 :
+- [x] **Le rôle** : `bootstrap.sh` l'a créé si `docker compose ps backup` le dit `healthy` — sa
   sonde ouvre une session sous ce rôle.
-- [ ] **Le jeton écrit, liste et supprime dans le vrai bucket** : trois sauvegardes à la main, le
+- [x] **Le jeton écrit, liste et supprime dans le vrai bucket** : trois sauvegardes à la main, le
   même jour. Les trois réussissent (écrire, lister), et la deuxième disparaît du bucket à la
   troisième (supprimer) : la règle quotidienne garde la plus récente du jour, la plus ancienne
-  reste tant que le bucket est jeune.
-- [ ] **Le ping arrive, et l'alerte part quand il manque** : après une sauvegarde à la main, le
-  contrôle est « up » ; puis, sa période et son délai de grâce réduits au plus court dans
-  healthchecks.io, l'alerte arrive une fois les deux écoulés sans ping — remets ensuite la période
-  d'un jour et son délai de grâce.
-- [ ] **La clé privée déchiffre une sauvegarde, sur le poste** : l'objet téléchargé du tableau de
-  bord R2, le fichier `age.key` tiré du gestionnaire de mots de passe, puis
+  reste tant que le bucket est jeune. Une sauvegarde de la nuit déjà là, c'est elle la plus
+  ancienne : la première manuelle disparaît dès la deuxième.
+- [x] **Le ping arrive, et l'alerte part quand il manque** : après une sauvegarde à la main, le
+  contrôle est « up ». Réduis sa période et son délai de grâce à 1 minute, envoie un ping (« Ping
+  Now »), et attends sans rien toucher : l'alerte arrive. Réduire après le dernier ping ne teste
+  rien : le passage à « down » qu'un réglage provoque ne notifie pas (constaté). Remets ensuite la
+  période d'un jour et son délai de grâce, puis un ping.
+- [x] **La clé privée déchiffre une sauvegarde, sur le poste** : l'objet téléchargé du tableau de
+  bord R2, le fichier `age.key` tiré du gestionnaire de mots de passe, puis, dans Git Bash
+  (« Amorcer un VPS neuf »)
   ```
   age --decrypt --identity age.key <objet> | docker run --rm -i <image de postgres dans infra/compose.yml> pg_restore --list
   rm age.key <objet>
@@ -443,7 +526,7 @@ gh run watch
 ```
 
 **Au premier déploiement** (#25) — ce qu'aucun test ne peut voir :
-- [ ] **Les secrets et variables** dans l'environnement `production`, le fichier `age.key` tiré du
+- [x] **Les secrets et variables** dans l'environnement `production`, le fichier `age.key` tiré du
   gestionnaire ; les deux `RESTORE_R2_*` saisis au clavier, jamais en argument :
   ```
   gh secret set BACKUP_AGE_IDENTITY --env production < age.key
@@ -461,3 +544,30 @@ gh run watch
 - [ ] **Une restauration réelle, chronométrée** : `make restore HOST=<ip> BACKUP=derniere`
   (« Restaurer une sauvegarde »), de la commande au site vérifié — la mesure du RTO (1 h), notée
   ici.
+
+## Premier déploiement — la liste
+
+Ce qu'aucun test ne voit, sur la vraie pile. Coché le 2026-11-02 sur `66bd224` (#25), où vivent les
+mesures brutes ; à rejouer sur un hôte ou un Tunnel neuf. Les listes de « Sauvegarde et
+restauration » la complètent.
+
+- [x] `https://pacome.dev/` répond par Cloudflare, `www` redirige vers l'apex en 301, le Tunnel
+  `portfolio` est Healthy, chaque service `healthy`, y compris après un `reboot`.
+- [x] **Aucun port web ouvert** : scan TCP IPv4 des 65 535 ports depuis l'extérieur de la pile,
+  22 seul ouvert. UDP et IPv6 non scannés de l'extérieur ; `ufw` n'y ouvre que 22.
+- [x] **Access couvre l'admin** : `curl -I --path-as-is` rend un 302 vers
+  `pacome.cloudflareaccess.com` pour `/admin`, `/admin/`, `/admin/login/`, `/admin/auth/user/`,
+  `/admin/?x=1`, `/ADMIN/`, `/Admin/`, `/%61dmin/`, `//admin/`, `/./admin/`, `/x/../admin/`,
+  `/%2e/admin/` ; un 404 de l'API, sans Access, pour `/`, `/adminx`, `/administration/`, `/api/`,
+  `/health/` et `/admin;x/`, sans formulaire. Une autre identité GitHub n'est pas éprouvée, faute de
+  second compte.
+- [x] **Second facteur** : Access, mot de passe, code ; graine et codes rangés, copie du gestionnaire
+  refaite hors du poste.
+- [x] **CSRF** : un envoi multipart de l'admin passe, schéma `https` compris.
+- [x] **Session Access expirée** : la limite de `form-action 'self'` est écrite (« Admin »).
+- [x] **Médias** : un téléversement réel depuis l'admin rend cinq variantes `image/webp` sur
+  `media.pacome.dev` ; la suppression vide le dossier de l'image.
+- [x] **Jetons R2** : `-rw` écrit, liste et supprime ; `-ro` refuse l'écriture en 403.
+- [x] **Limitation de débit** : 150 requêtes en 4 s, 43 refusées en 429, retour à 200 après 10 s.
+- [x] **Mémoire sur le CPX12**, 19 h après le démarrage, sans trafic : 841 Mo utilisés sur 1 909,
+  1 068 Mo disponibles, disque à 12 % ; `docker stats` : `worker` 338 Mio, `api` 207 Mio.

@@ -40,8 +40,9 @@ un worker `gunicorn` par défaut, `worker` sur une concurrence de 1.
 
 **Positives**
 
-- 9,60 € par mois de moins que le CPX22, avec une marge estimée à environ 1 Go au pic : la pile est
-  mesurée, le système, Docker et `cloudflared` ne le sont pas.
+- 9,60 € par mois de moins que le CPX22. Marge mesurée sur le CPX12 le 2026-11-02, à vide, 19 h après
+  le démarrage : 1 068 Mo disponibles, conteneurs à 679 Mio, dont `worker` 338 et `api` 207, plus
+  que sur le poste. Le pic d'une image reste à mesurer sur cette machine.
 - Facturation horaire avec plafond mensuel : un passage au VPS-1 d'OVH, revenu en stock, suit
   « Le VPS a disparu » (`infra/RUNBOOK.md`).
 
@@ -58,7 +59,7 @@ un worker `gunicorn` par défaut, `worker` sur une concurrence de 1.
 |---|---|---|---|
 | Commandable le 2026-10-31 en UE | oui | oui | non |
 | Prix TTC par mois | 23,99 € | 14,39 € | ~5,39 € |
-| vCPU et mémoire | 2 vCPU, 4 Go | 1 vCPU, 2 Go | non retenu faute de stock |
+| vCPU et mémoire | 2 vCPU, 4 Go | 1 vCPU, 2 Go | 2 vCores, 4 Go |
 | Verdict | Écartée | **Retenue** | À reprendre au retour du stock |
 
 ## Conditions de réexamen
