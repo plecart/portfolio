@@ -96,14 +96,12 @@ services:
       MEDIA_R2_BUCKET: ${MEDIA_R2_BUCKET:?}
       MEDIA_R2_ACCESS_KEY_ID: ${MEDIA_R2_ACCESS_KEY_ID:?}
       MEDIA_R2_SECRET_ACCESS_KEY: ${MEDIA_R2_SECRET_ACCESS_KEY:?}
-      # Le volume et son dossier, que R2 laisse sans usage, se retirent avec #25.
+      # Sans usage avec R2, sans volume (#25) : `Env` l'exige, et ce fichier porte chacun de ses champs.
       MEDIA_ROOT: /app/media
       # Le compte unique de l'admin, que `ensure_superuser` pose au démarrage d'`api`
       # (`infra/api/entrypoint.sh`) ; le `worker`, qui ne joue aucune étape, n'en fait rien.
       ADMIN_USERNAME: ${ADMIN_USERNAME:?}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?}
-    volumes: &app-volumes
-      - media:/app/media
     # `api` joue les migrations à son démarrage (`infra/api/entrypoint.sh`) : la base doit répondre.
     depends_on:
       postgres:
@@ -128,8 +126,7 @@ services:
     restart: unless-stopped
 
   # Le worker d'images (ADR 0015) : l'image d'`api`, à la même étiquette, et une autre commande ;
-  # mêmes variables — le bucket des médias, où il lit l'original et écrit les variantes — et mêmes
-  # volumes.
+  # mêmes variables — le bucket des médias, où il lit l'original et écrit les variantes.
   worker:
     image: ghcr.io/plecart/portfolio-api:${IMAGE_TAG:?}
     environment:
@@ -138,7 +135,6 @@ services:
       STARTUP_STEPS: ""
     # Un seul processus de traitement : un VPS de 2 Go partagé avec Postgres et Redis (ADR 0023).
     command: [celery, -A, config, worker, --loglevel, info, --concurrency, "1"]
-    volumes: *app-volumes
     # `api` sain : ses migrations sont jouées avant le premier traitement.
     depends_on:
       api:
@@ -218,4 +214,3 @@ services:
 
 volumes:
   postgres-data:
-  media:

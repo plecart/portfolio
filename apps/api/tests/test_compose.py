@@ -89,9 +89,9 @@ SERVICE_ADDRESS_OVERRIDES = {
 
 
 # Ce que le `worker` partage avec `api`, tel quel : l'image — le même point d'entrée —, le fichier
-# d'environnement du poste et les volumes, `media` compris — il lit l'original et écrit les
-# variantes sur le stockage d'`api`, le disque sur le poste et R2 en production (brief de #12,
-# décision 10).
+# d'environnement du poste et les volumes, `media` sur le poste — il lit l'original et écrit les
+# variantes sur le stockage d'`api`, le disque sur le poste et R2 en production, sans volume (brief
+# de #12, décision 10).
 WORKER_SHARED_KEYS = ["image", "env_file", "volumes"]
 
 # Sa commande : un seul processus de traitement, sur un VPS de 2 Go (décision 9, ADR 0023).
