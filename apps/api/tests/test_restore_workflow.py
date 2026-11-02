@@ -18,6 +18,7 @@ from typing import Any
 import pytest
 import yaml
 from call_witness import recording, witnessed
+from config.env import Env
 from test_deployment import checkout_then_scripts_findings
 from test_infra import REPOSITORY_ROOT, job_steps
 from test_publication import WORKFLOW_TOKEN_ENV
@@ -366,6 +367,23 @@ def test_les_valeurs_que_le_workflow_substitue_sont_des_variables_du_modele() ->
     assert substituted >= {"IMAGE_TAG", "BACKUP_R2_ACCESS_KEY_ID", "BACKUP_R2_BUCKET"}
 
     assert substituted - declared == set()
+
+
+def test_api_demarre_sur_les_valeurs_factices_du_modele(monkeypatch: pytest.MonkeyPatch) -> None:
+    """L'étape `migrations` du workflow lance `api` sur `prod.env.example` : une valeur factice que
+    `Env` refuse ne se voit que sur le runner, passé `sélection`, `déchiffrement` et `restauration`
+    (mesuré au premier run, `SECRET_KEY` trop courte, #25)."""
+    model_text = (REPOSITORY_ROOT / "infra" / "prod.env.example").read_text(encoding="utf-8")
+    model = dict(re.findall(r"^([A-Z_][A-Z0-9_]*)=(.*)$", model_text, re.MULTILINE))
+    compose = yaml.safe_load(
+        (REPOSITORY_ROOT / "infra" / "compose.yml").read_text(encoding="utf-8")
+    )
+
+    for name, value in compose["services"]["api"]["environment"].items():
+        resolved = re.sub(r"\$\{(\w+):\?\}", lambda match: model[match[1]], str(value))
+        monkeypatch.setenv(name, resolved)
+
+    assert Env(_env_file=None).SECRET_KEY  # pyright: ignore[reportCallIssue]
 
 
 def test_la_base_et_son_proprietaire_du_vps_sont_ceux_du_modele() -> None:
