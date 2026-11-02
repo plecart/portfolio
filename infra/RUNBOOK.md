@@ -366,7 +366,7 @@ Coût constaté (2026-11-02) : environ 15 € par mois, pour une cible d'une diz
 | VPS Hetzner CPX12 | 14,39 € TTC par mois, facturation horaire plafonnée | console, [Billing FAQ](https://docs.hetzner.com/cloud/billing/faq/) |
 | `pacome.dev` | 8,20 $ la première année, 12,20 $ par an ensuite | caisse, [Registrar](https://developers.cloudflare.com/registrar/about/) |
 | R2 | 0 $ : 10 Go-mois, 1 M d'opérations A et 10 M d'opérations B inclus ; au-delà 0,015 $ le Go-mois, 4,50 $ et 0,36 $ le million | caisse, [Pricing](https://developers.cloudflare.com/r2/pricing/) |
-| Zero Trust (Access, Tunnel) | 0 $, offre Free, un seul utilisateur ; le plafond de l'offre n'est pas dans les pages lues | caisse, [Account limits](https://developers.cloudflare.com/cloudflare-one/account-limits/) |
+| Zero Trust (Access, Tunnel) | 0 $, offre Free, 50 utilisateurs, un seul ici | caisse, [Pricing](https://www.cloudflare.com/plans/sase-zero-trust.md) |
 | healthchecks.io | 0 $, 1 contrôle sur 20 | [Pricing](https://healthchecks.io/pricing/) |
 | GitHub Pro | abonnement du compte, hors de ce total, prix non relevé ; requis : sur un dépôt privé, sans lui, l'environnement `production` tombe, et avec lui `deploy` et le test mensuel | [Managing environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments) |
 
@@ -539,9 +539,9 @@ gh run watch
   ```
   Si l'environnement n'est pas disponible sur le plan du compte, mêmes noms en secrets et
   variables de dépôt (#25).
-- [ ] **Le workflow, lancé à la main, est vert** — `DEPLOY_ENABLED` à `true` et une sauvegarde dans
+- [x] **Le workflow, lancé à la main, est vert** — `DEPLOY_ENABLED` à `true` et une sauvegarde dans
   le bucket : le tirage des images par le jeton du workflow, le vrai jeton en lecture seule, la
-  vraie clé.
+  vraie clé. Vert le 2026-11-02, sur `54fd6dd`.
 - [x] **Une restauration réelle, chronométrée** : `make restore HOST=<ip> BACKUP=derniere`
   (« Restaurer une sauvegarde »), de la commande au site vérifié — la mesure du RTO (1 h), notée
   ici. Mesuré le 2026-11-02, sur une base presque vide : 47 s pour la commande, phrases de passe
@@ -564,9 +564,9 @@ restauration » la complètent.
   `/%2e/admin/` ; un 404 de l'API, sans Access, pour `/`, `/adminx`, `/administration/`, `/api/`,
   `/health/` et `/admin;x/`, sans formulaire. Une autre identité GitHub n'est pas éprouvée, faute de
   second compte.
-- [ ] **Barre oblique encodée refusée** : `/admin%2Flogin/` et `/admin%2f` rendent 400. Sur
-  `66bd224`, avant la garde de Caddy, le premier servait le formulaire sans Access, et le second
-  redirigeait sans Access.
+- [x] **Barre oblique encodée refusée**, sur `54fd6dd` : `/admin%2Flogin/` et `/admin%2f` rendent
+  400. Sur `66bd224`, avant la garde de Caddy, le premier servait le formulaire sans Access, et le
+  second redirigeait sans Access.
 - [x] **Second facteur** : Access, mot de passe, code ; graine et codes rangés, copie du gestionnaire
   refaite hors du poste.
 - [x] **CSRF** : un envoi multipart de l'admin passe, schéma `https` compris.
