@@ -1,5 +1,12 @@
 # Exceptions du scan des images (`make scan`), lues par Trivy (`--ignorefile`).
 #
+# Trou accepté (#25, 2026-10-27) : Trivy n'inventorie pas les bibliothèques natives embarquées par
+# les roues de `psycopg-binary` et de `pillow`. Une faille dans ces copies ne bloque le scan que par
+# un avis publié pour la roue elle-même. La `libpq` de `psycopg-binary` ne joint que la base du
+# réseau privé, et `pillow` ne traite que les images de l'auteur, téléversées derrière Cloudflare
+# Access et le second facteur. `psycopg[c]` ne refermerait que la moitié du trou. À réexaminer si un
+# téléversement s'ouvre à d'autres que l'auteur, ou si Trivy inventorie ces bibliothèques.
+#
 # Le scan bloque toute vulnérabilité HIGH ou CRITICAL, corrigeable ou non (ADR 0014). Une
 # vulnérabilité sans correctif pour l'image arrête la CI le temps d'une évaluation en trois
 # points, que le `statement` de son exception résume :
