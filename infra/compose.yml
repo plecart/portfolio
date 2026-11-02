@@ -96,7 +96,7 @@ services:
       MEDIA_R2_BUCKET: ${MEDIA_R2_BUCKET:?}
       MEDIA_R2_ACCESS_KEY_ID: ${MEDIA_R2_ACCESS_KEY_ID:?}
       MEDIA_R2_SECRET_ACCESS_KEY: ${MEDIA_R2_SECRET_ACCESS_KEY:?}
-      # Sans usage avec R2, sans volume (#25) : `Env` l'exige, et ce fichier porte chacun de ses champs.
+      # Sans usage avec R2, sans volume (#25) : ce fichier porte chaque champ d'`Env` (`test_compose.py`).
       MEDIA_ROOT: /app/media
       # Le compte unique de l'admin, que `ensure_superuser` pose au démarrage d'`api`
       # (`infra/api/entrypoint.sh`) ; le `worker`, qui ne joue aucune étape, n'en fait rien.

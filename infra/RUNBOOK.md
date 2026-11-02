@@ -368,6 +368,7 @@ Coût constaté (2026-11-02) : environ 15 € par mois, pour une cible d'une diz
 | R2 | 0 $ : 10 Go-mois, 1 M d'opérations A et 10 M d'opérations B inclus ; au-delà 0,015 $ le Go-mois, 4,50 $ et 0,36 $ le million | caisse, [Pricing](https://developers.cloudflare.com/r2/pricing/) |
 | Zero Trust (Access, Tunnel) | 0 $, offre Free, un seul utilisateur ; le plafond de l'offre n'est pas dans les pages lues | caisse, [Account limits](https://developers.cloudflare.com/cloudflare-one/account-limits/) |
 | healthchecks.io | 0 $, 1 contrôle sur 20 | [Pricing](https://healthchecks.io/pricing/) |
+| GitHub Pro | abonnement du compte, hors de ce total, prix non relevé ; requis : sur un dépôt privé, sans lui, l'environnement `production` tombe, et avec lui `deploy` et le test mensuel | [Managing environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments) |
 
 ## Sauvegarde et restauration
 
@@ -572,7 +573,8 @@ restauration » la complètent.
 - [x] **Session Access expirée** : la limite de `form-action 'self'` est écrite (« Admin »).
 - [x] **Médias** : un téléversement réel depuis l'admin rend cinq variantes `image/webp` sur
   `media.pacome.dev` ; la suppression vide le dossier de l'image.
-- [x] **Jetons R2** : `-rw` écrit, liste et supprime ; `-ro` refuse l'écriture en 403.
+- [x] **Jetons R2** : les deux `-rw` écrivent et suppriment ; celui des sauvegardes liste, celui des
+  médias aussi, par déduction de `delete_folder` ; `-ro` liste et refuse l'écriture en 403.
 - [x] **Limitation de débit** : 150 requêtes en 4 s, 43 refusées en 429, retour à 200 après 10 s.
 - [x] **Mémoire sur le CPX12**, 19 h après le démarrage, sans trafic : 841 Mo utilisés sur 1 909,
   1 068 Mo disponibles, disque à 12 % ; `docker stats` : `worker` 338 Mio, `api` 207 Mio.
