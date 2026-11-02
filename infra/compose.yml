@@ -40,7 +40,7 @@ name: portfolio
 
 services:
   cloudflared:
-    image: cloudflare/cloudflared:2026.10.3@sha256:faa8e0a1475f137c910be6025f43c8e4092fdd35461b31e19fd1390657a1ff39
+    image: cloudflare/cloudflared:2026.10.7@sha256:4955524aeaa379e154023d5a027c250f7b35041a2e7e950cf13f144bc9b9c5ba
     # Le point d'entrée de l'image est `cloudflared --no-autoupdate` : la version est celle de
     # l'épingle, que Dependabot monte. Le Tunnel est géré depuis Cloudflare, qui route les noms
     # d'hôte vers `http://caddy:80` (#25) ; `tunnel run` lit son jeton dans `TUNNEL_TOKEN`.
@@ -168,7 +168,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7.4.11-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    image: redis:7.4.12-alpine@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s
