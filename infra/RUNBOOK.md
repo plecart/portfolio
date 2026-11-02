@@ -130,7 +130,7 @@ Sous Windows, chaque geste du poste se lance dans **Git Bash** : PowerShell 5.1 
    ssh root@<ip> "cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub" | sed "s/^/<ip> /" | gh secret set DEPLOY_KNOWN_HOSTS --env production
    gh secret set DEPLOY_HOST --env production --body <ip>
    gh secret set DEPLOY_USER --env production --body deploy
-   ssh -i deploy_key deploy@<ip> docker compose ps
+   ssh -i deploy_key deploy@<ip> "cd /srv/portfolio && docker compose ps"
    rm deploy_key deploy_key.pub
    ```
    Le `ssh -i` répond-il sans phrase de passe, chaque service `healthy` ? Sinon, ne supprime pas la
@@ -563,6 +563,9 @@ restauration » la complètent.
   `/%2e/admin/` ; un 404 de l'API, sans Access, pour `/`, `/adminx`, `/administration/`, `/api/`,
   `/health/` et `/admin;x/`, sans formulaire. Une autre identité GitHub n'est pas éprouvée, faute de
   second compte.
+- [ ] **Barre oblique encodée refusée** : `/admin%2Flogin/` et `/admin%2f` rendent 400. Sur
+  `66bd224`, avant la garde de Caddy, le premier servait le formulaire sans Access, et le second
+  redirigeait sans Access.
 - [x] **Second facteur** : Access, mot de passe, code ; graine et codes rangés, copie du gestionnaire
   refaite hors du poste.
 - [x] **CSRF** : un envoi multipart de l'admin passe, schéma `https` compris.

@@ -27,7 +27,7 @@ _Le design (UI/UX) est hors périmètre de ce document._
 
 ## 3. Contraintes
 
-- **Budget** : environ 50 € par mois maximum. Estimation actuelle : 10 à 30 € (§6.7).
+- **Budget** : environ 50 € par mois maximum. Estimation actuelle : 11 à 32 € (§6.7).
 - **Langue** : contenu en français uniquement. Rien en dur dans le code : libellés dans un catalogue de chaînes unique, contenu en base. Pas de plomberie multilingue (champs traduits, sélecteur de langue) tant que l'anglais n'est pas demandé.
 - **Email** : aucun envoi d'email, nulle part. Sujet post-MVP, peut-être jamais.
 - **Trafic** : un ou deux visiteurs occasionnels. On conçoit pour un faible trafic avec des protections robustes.
