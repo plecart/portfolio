@@ -4,6 +4,7 @@
  * compilation (brief de #19, décision 10). Leurs règles de contenu — celles du glossaire — sont
  * tenues par `tests/fixtures.test.ts`.
  */
+import { basename, join } from 'node:path'
 import type { components } from '../src/api/schema.ts'
 
 /** Un projet tel que l'API le sert. */
@@ -14,9 +15,29 @@ type GalleryImage = components['schemas']['GalleryImageOut']
 
 /**
  * L'origine des fichiers — icônes et variantes —, réservée aux scénarios : ni la page ni l'API, et
- * jamais résolue (`.test`, RFC 2606). #20 et #21 y intercepteront les images.
+ * jamais résolue (`.test`, RFC 2606). Le `test` d'`api.ts` y intercepte toute requête.
  */
 export const FILES_ORIGIN = 'https://fichiers.test'
+
+/**
+ * Le fichier de `fixtures/` qui répond à une adresse de l'origine des fichiers : la même icône pour
+ * toutes les technologies, et les deux WebP carrés — 480 et 960 px de côté, générés une fois par
+ * Pillow — pour toutes les variantes.
+ *
+ * @param pathname Le chemin de l'adresse, par exemple `/images/projet-01/480.webp`.
+ */
+export function fixturePath(pathname: string): string {
+  return join(
+    import.meta.dirname,
+    'fixtures',
+    pathname.endsWith('.svg') ? 'icon.svg' : basename(pathname),
+  )
+}
+
+/** Une technologie de ce type, servie avec son icône. */
+export function buildTechnology(name: string, kind: Technology['kind']): Technology {
+  return { name, kind, icon: `${FILES_ORIGIN}/icones/${name.toLowerCase()}.svg` }
+}
 
 /** Les technologies que les projets puisent, une par type. */
 const TECHNOLOGIES: Technology[] = (
@@ -27,10 +48,14 @@ const TECHNOLOGIES: Technology[] = (
     ['Docker', 'infrastructure'],
     ['Figma', 'tool'],
   ] as const
-).map(([name, kind]) => ({ name, kind, icon: `${FILES_ORIGIN}/icones/${name.toLowerCase()}.svg` }))
+).map(([name, kind]) => buildTechnology(name, kind))
 
-/** Une image carrée de 1600 px, prête — avec ses variantes — ou en attente, sans elles. */
-function image(slug: string, caption: string, state: GalleryImage['state'] = 'ready'): GalleryImage {
+/** Une image carrée de 1600 px : prête, avec ses variantes ; en attente ou en échec, sans elles. */
+export function buildImage(
+  slug: string,
+  caption: string,
+  state: GalleryImage['state'] = 'ready',
+): GalleryImage {
   const variants = [480, 960].map((width) => ({
     url: `${FILES_ORIGIN}/images/${slug}/${width}.webp`,
     width,
@@ -38,6 +63,9 @@ function image(slug: string, caption: string, state: GalleryImage['state'] = 're
   }))
   return { caption, width: 1600, height: 1600, state, variants: state === 'ready' ? variants : [] }
 }
+
+/** Les champs d'un projet en cours : sans date de fin, comme l'API le sert. */
+export const ONGOING = { status: 'ongoing', finished_on: null } satisfies Partial<Project>
 
 /**
  * Un projet publié complet, valide pour le glossaire.
@@ -61,7 +89,7 @@ export function buildProject(overrides: Partial<Project> = {}): Project {
     demo_url: '',
     showcase: false,
     technologies: TECHNOLOGIES.slice(0, 1),
-    gallery: [image(slug, 'Écran d’accueil')],
+    gallery: [buildImage(slug, 'Écran d’accueil')],
     sections: [],
     ...overrides,
   }
@@ -72,14 +100,15 @@ const STATUSES: Project['status'][] = ['finished', 'ongoing', 'archived']
 
 /**
  * Le i-ième projet d'un jeu : types, statuts, années, technologies, liens et sections varient d'un
- * projet à l'autre, pour l'ordre et les cartes de #20 ; le septième a sa couverture en attente.
+ * projet à l'autre, pour l'ordre et le contenu des cartes ; le septième a sa couverture en attente.
  */
 function numberedProject(index: number, showcase: boolean): Project {
   const number = String(index + 1).padStart(2, '0')
   const slug = `projet-${number}`
   const status = STATUSES[index % STATUSES.length]
   const year = 2014 + index
-  const cover = image(slug, `Projet ${number}, vue d’ensemble`, index === 6 ? 'pending' : 'ready')
+  const state = index === 6 ? 'pending' : 'ready'
+  const cover = buildImage(slug, `Projet ${number}, vue d’ensemble`, state)
   return buildProject({
     slug,
     title: `Projet ${number}`,
@@ -92,7 +121,7 @@ function numberedProject(index: number, showcase: boolean): Project {
     demo_url: index % 4 === 0 ? `https://demo.test/${slug}` : '',
     showcase,
     technologies: TECHNOLOGIES.slice(index % 4, (index % 4) + 1 + (index % 3)),
-    gallery: index % 2 === 0 ? [cover, image(slug, 'Détail de l’interface')] : [cover],
+    gallery: index % 2 === 0 ? [cover, buildImage(slug, 'Détail de l’interface')] : [cover],
     sections:
       index % 2 === 0
         ? [{ title: 'Architecture', anchor: 'architecture', body: 'Les briques du projet.' }]

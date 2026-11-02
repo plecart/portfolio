@@ -1,6 +1,6 @@
 /**
- * L'API publique dans les scénarios : la requête de la liste est toujours interceptée, jamais
- * envoyée (brief de #19, décision 10).
+ * L'API publique et les fichiers dans les scénarios : la requête de la liste et celles des images
+ * sont toujours interceptées, jamais envoyées (brief de #19, décision 10).
  *
  * Toute page sert `[]` par défaut — le `test` de ce module, que chaque scénario importe à la place
  * de celui de Playwright : sans lui, la version compilée appellerait l'API de production. Un geste
@@ -12,7 +12,7 @@
 import { join } from 'node:path'
 import { test as base, type Page, type Route } from '@playwright/test'
 import { loadEnv } from 'vite'
-import type { Project } from './projects.ts'
+import { FILES_ORIGIN, fixturePath, type Project } from './projects.ts'
 
 export { expect } from '@playwright/test'
 
@@ -59,10 +59,31 @@ export async function holdProjects(page: Page): Promise<(answer: Answer) => Prom
   return async (answer) => answer(await held)
 }
 
-export const test = base.extend<{ emptyApi: void }>({
-  emptyApi: [
+/**
+ * Compte les requêtes de la liste à partir de maintenant, servies ou non.
+ *
+ * @returns De quoi lire le compte.
+ */
+export function countProjectRequests(page: Page): () => number {
+  let count = 0
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/projets')) count += 1
+  })
+  return () => count
+}
+
+/** Sert les images et les icônes des jeux depuis `fixtures/` : leur origine n'est jamais résolue. */
+async function serveFiles(page: Page) {
+  await page.route(`${FILES_ORIGIN}/**`, (route) =>
+    route.fulfill({ path: fixturePath(new URL(route.request().url()).pathname) }),
+  )
+}
+
+export const test = base.extend<{ isolatedNetwork: void }>({
+  isolatedNetwork: [
     async ({ page }, use) => {
       await serveProjects(page, [])
+      await serveFiles(page)
       await use()
     },
     { auto: true },

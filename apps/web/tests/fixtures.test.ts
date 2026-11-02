@@ -1,7 +1,7 @@
 /**
  * Les jeux de projets des scénarios (`e2e/projects.ts`) tiennent les règles du glossaire
- * (UBIQUITOUS_LANGUAGE.md, « Projet » et « API publique ») : une table de #20 ou une fiche de #21
- * éprouvée sur une donnée que l'API ne peut pas servir prouverait un cas qui n'existe pas.
+ * (UBIQUITOUS_LANGUAGE.md, « Projet » et « API publique ») : une table ou une fiche éprouvée sur
+ * une donnée que l'API ne peut pas servir prouverait un cas qui n'existe pas.
  *
  * Que les jeux suivent le contrat, `tsc` le prouve : ils sont typés par le module généré.
  */
@@ -102,8 +102,8 @@ for (const [name, projects] of Object.entries(PROJECT_SETS)) {
 test('le jeu de douze varie types, statuts et années, et porte une image en attente', () => {
   const projects = PROJECT_SETS.twelveWithShowcase
 
-  // L'ordre des cartes de #20 se trie sur ces champs (spec §1.9) ; une image en attente n'a pas
-  // de variante (glossaire, « Image de galerie »), et #20 doit savoir la rendre.
+  // L'ordre des cartes se trie sur ces champs (spec §1.9) ; une image en attente n'a pas de
+  // variante (glossaire, « Image de galerie »), et la carte la rend en carré `--line`.
   expect({
     kinds: new Set(projects.map((project) => project.kind)).size,
     statuses: new Set(projects.map((project) => project.status)).size,

@@ -18,4 +18,29 @@ export const strings = {
   /** Message d'erreur de la table, et le lien qui relance le chargement (spec §4.5). */
   loadError: 'Les projets ne se chargent pas.',
   retry: 'Réessayer',
+  /** États d'une carte : la phrase du nom de son lien, puis le texte de son ruban (spec §4.1). */
+  stateOngoing: 'En cours',
+  stateLive: 'En ligne',
+  ribbonOngoing: 'en cours',
+  ribbonLive: 'en ligne',
+  /** Ce qui remplace les rubans d'une carte révélée au toucher (spec §4.1). */
+  openCard: 'Ouvrir',
+  /** Le bouton de la fiche (spec §3.2), puis le nom de ce qui y défile au clavier (§6.2). */
+  closeProject: 'Fermer la fiche',
+  projectReading: 'Contenu de la fiche',
+  /** La galerie de la fiche (spec §6.2) : son nom, puis ses flèches (§4.4). */
+  projectImages: 'Images du projet',
+  previousImage: 'Image précédente',
+  nextImage: 'Image suivante',
+  /** Les post-its de lien de la fiche (spec §7). */
+  viewSite: 'Voir le site',
+  viewRepository: 'Voir le dépôt',
+  /** La ligne de faits de la fiche (spec §7) : les types de projet, puis les dates d'un projet en cours. */
+  kindPersonal: 'Perso',
+  kindProfessional: 'Pro',
+  kindSchool: 'École',
+  since: 'Depuis',
+  /** Les intertitres de la stack (spec §4.3). */
+  technologies: 'Technologies',
+  tools: 'Outils',
 } as const

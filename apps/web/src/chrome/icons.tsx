@@ -49,6 +49,43 @@ export function MoonIcon() {
   )
 }
 
+/** Croix : fermer. */
+export function CloseIcon() {
+  return (
+    <StrokeIcon>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </StrokeIcon>
+  )
+}
+
+/** Une flèche de la galerie : 18 px (spec §4.4), trait de 1,8 comme au prototype. */
+function ChevronIcon({ path }: { path: string }) {
+  return (
+    <StrokeIcon strokeWidth={1.8} className="size-[18px]">
+      <path d={path} />
+    </StrokeIcon>
+  )
+}
+
+/** Chevron vers la gauche : l'image précédente. */
+export function ChevronLeftIcon() {
+  return <ChevronIcon path="M15 5l-7 7 7 7" />
+}
+
+/** Chevron vers la droite : l'image suivante. */
+export function ChevronRightIcon() {
+  return <ChevronIcon path="M9 5l7 7-7 7" />
+}
+
+/** Lien externe : celle des post-its de la fiche, 14 px (spec §4.3). */
+export function ExternalLinkIcon() {
+  return (
+    <StrokeIcon className="size-3.5">
+      <path d="M14 5h5v5M19 5l-9 9M11 5H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+    </StrokeIcon>
+  )
+}
+
 /** Icônes des liens de l'auteur : 22 px (spec §3.4), trait de 1,5 comme au prototype. */
 function AuthorLinkIcon({ children }: { children: ReactNode }) {
   return (

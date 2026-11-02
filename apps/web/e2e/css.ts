@@ -1,10 +1,17 @@
 /**
- * Lecture de valeurs CSS calculées, partagée par les scénarios.
+ * Lecture de valeurs CSS calculées et attente des transitions, partagées par les scénarios.
  *
  * Une valeur se compare **résolue** : Chrome sérialise à sa manière ce qu'il calcule — une couleur
  * `color-mix()`, une ombre, une durée —, et seule la valeur calculée des deux côtés se compare.
  */
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
+
+/** La rotation d'un élément, en degrés, au dixième, lue sur sa transformation calculée. */
+export const rotationOf = (element: Locator) =>
+  element.evaluate((node) => {
+    const { a, b } = new DOMMatrix(getComputedStyle(node).transform)
+    return Math.round((Math.atan2(b, a) * 1800) / Math.PI) / 10
+  })
 
 /**
  * Valeurs calculées de déclarations appliquées une à une à un élément sonde du document.
@@ -27,4 +34,12 @@ export async function resolveAll(page: Page, declarations: [string, string][]): 
     probe.remove()
     return values
   }, declarations)
+}
+
+/**
+ * Attend la fin des transitions en cours : ce qu'on lit ensuite les trouve arrivées. Une transition
+ * remplacée en route rejette sa promesse `finished` : c'est une fin comme une autre.
+ */
+export async function settle(page: Page) {
+  await page.evaluate(() => Promise.allSettled(document.getAnimations().map((a) => a.finished)))
 }

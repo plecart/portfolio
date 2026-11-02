@@ -28,7 +28,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0007](0007-sauvegardes-et-plan-de-reprise.md) | Sauvegardes et plan de reprise | D26, D33, D38, D42 | accepté ; geste « pointer le DNS » du point 6 remplacé par le Tunnel de 0003 (D45, D58) ; nom `backups` remplacé par 0021 ; mention « Bitwarden ou 1Password » remplacée par 0022 |
 | [0008](0008-frontend-statique-vite-react.md) | Frontend statique Vite + React + TypeScript + Tailwind CSS + shadcn/ui | D44 (remplace D15) | accepté ; point « slug inconnu » remplacé par 0009 ; condition « Vitest » levée par 0010 ; point « balises injectées » remplacé par 0011 |
 | [0009](0009-adresse-de-fiche-inconnue.md) | Adresse de fiche inconnue : redirection vers l'accueil | D50 (remplace le point « slug inconnu » de 0008) | accepté |
-| [0010](0010-rendu-markdown-dans-le-front.md) | Rendu du Markdown dans le front ; Vitest en phase 1 | D51 (remplace le point « Rendu Markdown » de 0001) | accepté ; décompte « quatre balises » corrigé par 0011 |
+| [0010](0010-rendu-markdown-dans-le-front.md) | Rendu du Markdown dans le front ; Vitest en phase 1 | D51 (remplace le point « Rendu Markdown » de 0001) | accepté ; décompte « quatre balises » corrigé par 0011 ; poids et HTML brut par défaut corrigés par 0024 |
 | [0011](0011-balises-d-apercu-du-gabarit.md) | Balises d'aperçu du gabarit : cinq, dont la description SEO | D53 (remplace le point « balises injectées » de 0008) | accepté |
 | [0012](0012-deux-fichiers-compose.md) | Deux fichiers Compose, mêmes images | D54 (remplace le point « un seul fichier Compose » de 0002 et l'argument de 0005) | accepté ; `worker` parmi ce que la production porte en propre remplacé par 0016 |
 | [0013](0013-ordre-des-lignes-par-glisser-deposer.md) | Ordre des lignes de l'admin par glisser-déposer | D55 | accepté |
@@ -42,6 +42,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0021](0021-buckets-r2-prefixes-par-le-projet.md) | Noms des buckets R2 préfixés par le projet | D66 (remplace le nom `backups` de 0004 et 0007) | accepté |
 | [0022](0022-keepassxc-comme-gestionnaire.md) | KeePassXC comme gestionnaire de mots de passe | D67 (remplace la mention « Bitwarden ou 1Password » de 0007) | accepté |
 | [0023](0023-vps-de-phase-1-a-2-go.md) | VPS de phase 1 : 1 vCPU et 2 Go au minimum | D68 (remplace le point « Machine » de 0002 pour la phase 1, son estimation, et le contexte « VPS de 4 Go » de 0015) | accepté |
+| [0024](0024-markdown-to-jsx-poids-et-html-brut.md) | `markdown-to-jsx` : poids mesuré et HTML brut désactivé | D51 (corrige deux énoncés de 0010) | accepté |
 
 ## À écrire à leur phase
 

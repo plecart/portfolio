@@ -1,0 +1,382 @@
+/* La carte polaroid (spec §4.1, §4.2), ses interactions (§2.7, §6.3) et les cadres de chargement
+   qui partagent ses dimensions (§5.1). Dans la couche `components`, pour qu'un utilitaire l'emporte.
+
+   Les dimensions propres à l'objet s'écrivent telles quelles (spec §2.3, §4.1) ; couleurs, ombres,
+   durées et courbes viennent des seuls jetons. Le point de rupture aussi : `@variant sm` lit
+   `--breakpoint-sm` d'`index.css`, sans le recopier. */
+@layer components {
+  /* Les tailles (spec §4.1, §6.1) : mobile, puis dès 600 px. */
+  .card-simple,
+  .card-solo {
+    --card-frame: 8px;
+    --card-band: 46px;
+    --card-title: 13px;
+
+    @variant sm {
+      --card-frame: 10px;
+      --card-band: 52px;
+      --card-title: 14px;
+    }
+  }
+
+  /* La vitrine (spec §4.2) : deux colonnes, et deux rangées dès 600 px. */
+  .card-showcase {
+    --card-frame: 12px;
+    --card-band: 56px;
+    --card-title: 16px;
+    grid-column: span 2;
+
+    @variant sm {
+      --card-frame: 14px;
+      --card-band: 64px;
+      --card-title: 18px;
+      --card-ribbon-height: 24px;
+      --card-ribbon-inset: 9px;
+      --card-ribbon-size: 12px;
+      grid-row: span 2;
+    }
+  }
+
+  /* La cellule d'une carte : sa rangée l'allongerait d'un vide cliquable sous la face. Les distances
+     et les échelles de spec §2.7 et §4.1, sans jeton, n'ont que ces noms. */
+  .card {
+    --card-rise: 8px;
+    --card-lift: -6px;
+    --card-lift-scale: 1.02;
+    --card-press-scale: 0.985;
+    --card-perspective: 900px;
+    align-self: start;
+    transition: opacity var(--dur-fast) var(--ease-out);
+
+    /* Fiche ouverte, toutes les cartes s'effacent (§4.6, §6.3) : par l'opacité, jamais par une
+       transformation, que la mesure des liens de l'auteur suivrait (`TABLE_CELL_SELECTOR`). Le
+       pointeur ne les atteint plus : Radix pose `pointer-events: none` sur `<body>` pendant un
+       dialogue modal. */
+    @variant project-open {
+      opacity: 0;
+    }
+  }
+
+  /* L'entrée (spec §3.1, §6.3), que `useCardEntrance` déclenche et retarde d'un pas par colonne :
+     en mouvement réduit, un fondu de 150 ms, sans montée. */
+  .card-entry {
+    --card-delay: calc(var(--card-column, 0) * var(--delay-column));
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease-out) var(--card-delay);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .card-entry {
+      transform: translateY(var(--card-rise));
+      transition:
+        opacity var(--dur) var(--ease-out) var(--card-delay),
+        transform var(--dur) var(--ease-out) var(--card-delay);
+    }
+  }
+
+  .card[data-entered] .card-entry {
+    opacity: 1;
+    transform: none;
+  }
+
+  .card-pose {
+    transform: rotate(var(--card-rotation)) translate(var(--card-dx), var(--card-dy));
+    transition: transform var(--dur) var(--ease-out);
+  }
+
+  /* La face : le papier et l'ombre au repos ; l'ombre soulevée, prête, s'y superpose à opacité 0. La
+     perspective ne vaut que pour un enfant direct : c'est ici qu'elle atteint la couche inclinée. */
+  .card-face {
+    position: relative;
+    z-index: 0;
+    padding: var(--card-frame) var(--card-frame) 0;
+    border-radius: var(--r-card);
+    background-color: var(--paper);
+    box-shadow: var(--shadow-rest);
+    perspective: var(--card-perspective);
+    transition: transform var(--dur) var(--ease-spring);
+  }
+
+  .card-face::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    box-shadow: var(--shadow-lift);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur) var(--ease-out);
+  }
+
+  /* Le repère du post-it et du trombone : leurs distances se comptent depuis la photo. L'inclinaison
+     que `useCardTilt` y écrit revient en 240 ms à la sortie ; sous le pointeur, elle le suit sans
+     inertie. */
+  .card-tilt {
+    position: relative;
+    transition: transform var(--dur) var(--ease-out);
+  }
+
+  @media (hover: hover) {
+    .card:hover .card-tilt {
+      transition: none;
+    }
+  }
+
+  /* Le papier et l'encre d'un post-it, de carte ou de fiche (spec §2.2, §2.4). */
+  .postit {
+    border-radius: 1px;
+    color: var(--postit-ink);
+    font-weight: 600;
+    line-height: 1.25;
+    transform-origin: left top;
+  }
+
+  /* Le titre d'un projet, sur sa carte et sur sa fiche. */
+  .postit-title {
+    background-color: var(--postit);
+    letter-spacing: 0.005em;
+    transform: rotate(-2deg);
+  }
+
+  .card-postit {
+    position: absolute;
+    top: -8px;
+    left: 14px;
+    z-index: 2;
+    /* Carte − 28 px (spec §4.1), mesurée depuis la largeur de la photo. */
+    max-width: calc(100% + 2 * var(--card-frame) - 28px);
+    padding: 6px 10px 6px 12px;
+    font-size: var(--card-title);
+  }
+
+  /* Coupé dans la marge du post-it, et non sur lui : comme le bandeau, ses lignes cachées
+     reparaîtraient dans sa marge basse. */
+  .card-postit-text {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .card-clip {
+    position: absolute;
+    top: -14px;
+    left: 6px;
+    z-index: 3;
+    width: 14px;
+    height: 30px;
+    color: var(--ink-2);
+    transform: rotate(-12deg);
+  }
+
+  /* Le masque, plein, ne retire rien : il efface le filet de l'image qui longe le bandeau pendant sa
+     transition, sur la carte inclinée (Chromium 156, mesuré le 2026-11-01). */
+  .card-photo {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    background-color: var(--line);
+    container-type: inline-size;
+    mask-image: linear-gradient(black, black);
+  }
+
+  .card-photo img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Le projet en cours : par CSS, jamais par une variante d'image (spec §4.1). */
+  .card-photo-grey {
+    filter: grayscale(1);
+  }
+
+  /* Le bandeau de résumé (spec §4.1) : 1,4 d'interligne pour sept lignes dans une photo de 160 px
+     (§7), le prototype retenu. */
+  .card-summary {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    padding: var(--s-3);
+    background-color: color-mix(in srgb, var(--paper) 94%, transparent);
+    color: var(--ink);
+    font-size: var(--fs-small);
+    line-height: 1.4;
+    opacity: 0;
+    transition:
+      opacity var(--dur-fast) var(--ease-out),
+      transform var(--dur) var(--ease-out);
+  }
+
+  /* Coupé dans la marge du bandeau, et non sur lui : ses lignes cachées reparaîtraient dans sa marge
+     basse. */
+  .card-summary-text {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 7;
+  }
+
+  /* Sous 400 px, la photo passe sous les 160 px de §7 : à 18,2 px la ligne et 12 px de marge basse,
+     le haut du texte passerait derrière le post-it d'une ligne, qui descend à 20 px. */
+  @container (width < 160px) {
+    .card-summary-text {
+      -webkit-line-clamp: 6;
+    }
+  }
+
+  @container (width < 142px) {
+    .card-summary-text {
+      -webkit-line-clamp: 5;
+    }
+  }
+
+  @container (width < 124px) {
+    .card-summary-text {
+      -webkit-line-clamp: 4;
+    }
+  }
+
+  .card-band {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-1);
+    min-height: var(--card-band);
+    padding-block: var(--s-2);
+  }
+
+  .card-ribbons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1);
+  }
+
+  .card-ribbon {
+    --height: var(--card-ribbon-height, 20px);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--card-ribbon-gap, var(--s-1));
+    height: var(--height);
+    padding-inline: var(--card-ribbon-inset, 7px);
+    border-radius: var(--r-tape);
+    background-color: var(--tape);
+    color: var(--tape-ink);
+    font-size: var(--card-ribbon-size, var(--fs-tiny));
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    transform: rotate(-1.5deg);
+  }
+
+  .card-ribbon:nth-child(even) {
+    transform: rotate(1deg);
+  }
+
+  /* L'icône laisse 4 px en haut et en bas du ruban. */
+  .card-ribbon img {
+    width: calc(var(--height) - 2 * var(--s-1));
+    height: calc(var(--height) - 2 * var(--s-1));
+  }
+
+  .card-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background-color: var(--accent);
+  }
+
+  /* « Ouvrir » (spec §4.1) : posé sur la bande, pour que ses rubans, cachés, lui gardent sa hauteur
+     même quand ils passent sur deux lignes. */
+  .card-open {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    display: none;
+    align-items: center;
+    height: 30px;
+    padding-inline: var(--s-3);
+    border: 1px solid var(--ink);
+    border-radius: var(--r-button);
+    background-color: var(--paper);
+    color: var(--ink);
+    font-size: var(--fs-small);
+    font-weight: 600;
+    transform: translateY(-50%);
+  }
+
+  @media (hover: none) {
+    .card[data-revealed] .card-ribbons {
+      visibility: hidden;
+    }
+
+    .card[data-revealed] .card-open {
+      display: inline-flex;
+    }
+  }
+
+  /* L'ombre soulevée et le bandeau, seuls retours d'une intention en mouvement réduit (spec §2.7,
+     §6.3) : survol et focus sur un appareil à survol, révélation au toucher ailleurs. */
+  .card[data-revealed] .card-face::after {
+    opacity: 1;
+  }
+
+  .card[data-revealed] .card-summary {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (hover: hover) {
+    .card:is(:hover, :focus-visible) .card-face::after {
+      opacity: 1;
+    }
+
+    .card:is(:hover, :focus-visible) .card-summary {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* L'anneau de focus suit la face (spec §6.2). */
+  .card:focus-visible {
+    outline: none;
+  }
+
+  .card:focus-visible .card-face {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+  }
+
+  /* Le mouvement d'une intention (spec §4.1) : ni redressement, ni soulèvement, ni pression en
+     mouvement réduit (§6.3). La pression, après le soulèvement, l'emporte sur lui. */
+  @media (prefers-reduced-motion: no-preference) {
+    .card-summary {
+      transform: translateY(6px);
+    }
+
+    .card[data-revealed] .card-pose {
+      transform: none;
+    }
+
+    @media (hover: hover) {
+      .card:is(:hover, :focus-visible) .card-pose {
+        transform: none;
+      }
+
+      .card:is(:hover, :focus-visible) .card-face {
+        transform: translateY(var(--card-lift)) scale(var(--card-lift-scale));
+      }
+    }
+
+    .card:active .card-face {
+      transform: scale(var(--card-press-scale));
+      transition-duration: var(--dur-press);
+    }
+  }
+}

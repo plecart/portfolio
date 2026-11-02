@@ -1,0 +1,302 @@
+/* La fiche (spec §1.10, §3.2) et ses fondus (§2.7). Dans la couche `components`, comme la carte.
+
+   Le panneau se centre sans transformation. Ses dimensions se comptent depuis la photo ; les
+   constantes de §3.2 n'ont pas d'autre nom. Les fondus sont des animations, jamais des transitions :
+   `Presence` de Radix ne retient le panneau à la sortie que si le nom de l'animation change. */
+@layer components {
+  /* Le verrou de défilement (§3.2), écrit ici et non par `RemoveScroll` : son `<style>` injecté tombe
+     sous la CSP de production. Une barre classique garde sa place, et la table ne bouge pas ; sans
+     elle, `App` n'écrit pas `scrollbar`, et aucune gouttière ne pousse la table. Sous 600 px, le
+     panneau est la fenêtre : il n'en laisse rien à une gouttière (§3.2). */
+  html[data-project-open] {
+    overflow: hidden;
+  }
+
+  html[data-project-open='scrollbar'] {
+    @variant sm {
+      scrollbar-gutter: stable;
+    }
+  }
+
+  /* Mobile : le panneau est la fenêtre, une colonne, et tout y défile ; ses deux rangées, calées en
+     haut, ne s'étirent pas sur sa hauteur. Dès 600 px, deux colonnes de la largeur de la photo, au
+     centre de la fenêtre : `left` se compte en `vw`, car la place gardée à la barre sort de la boîte
+     qu'`inset` et les marges automatiques connaissent. */
+  .project-panel {
+    --photo: min(100vh - 96px, 660px, (100vw - 92px) / 2);
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: grid;
+    align-content: start;
+    gap: var(--s-3);
+    padding: var(--s-2);
+    overflow-y: auto;
+    background-color: var(--paper);
+    box-shadow: var(--shadow-lift);
+    animation: project-in var(--dur-content) var(--ease-out);
+
+    @variant sm {
+      grid-template-columns: repeat(2, var(--photo));
+      gap: var(--s-5);
+      right: auto;
+      left: calc(50vw - var(--photo) - 22px);
+      width: calc(2 * var(--photo) + 44px);
+      height: calc(var(--photo) + 48px);
+      margin-block: auto;
+      padding: 10px;
+      overflow-y: visible;
+      border-radius: var(--r-card);
+    }
+  }
+
+  .project-panel[data-state='closed'] {
+    animation: project-out var(--dur-fast) var(--ease-out);
+  }
+
+  /* La galerie (§4.4) : son carré, ses 8 px, sa barre, soit la hauteur de sa colonne dès 600 px. */
+  .project-gallery {
+    min-width: 0;
+  }
+
+  /* Le cadre réserve son carré dès le premier rendu, image chargée ou non. */
+  .project-gallery-frame {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    background-color: var(--line);
+    touch-action: pan-y pinch-zoom;
+  }
+
+  .project-gallery-track {
+    display: flex;
+    height: 100%;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .project-gallery-track {
+      transition: translate var(--dur) var(--ease-out);
+    }
+  }
+
+  /* Entière, jamais recadrée (§1.11) : `contain`, là où la carte pose `cover`. */
+  .project-gallery-image {
+    flex: none;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .project-gallery-arrow {
+    position: absolute;
+    inset-block: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin-block: auto;
+    border-radius: 50%;
+    background-color: color-mix(in srgb, var(--paper) 88%, transparent);
+    color: var(--ink);
+  }
+
+  /* Toujours 20 px, sans image comprise (§3.2) : le panneau en dépend. */
+  .project-gallery-bar {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-3);
+    height: 20px;
+    margin-top: var(--s-2);
+    color: var(--ink-2);
+    font-size: var(--fs-small);
+  }
+
+  .project-gallery-caption {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .project-gallery-counter {
+    flex: none;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .project-reading {
+    min-width: 0;
+    padding: var(--s-3) 0 var(--s-6);
+
+    @variant sm {
+      grid-column: 2;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: var(--s-3) var(--s-4) 0 0;
+    }
+  }
+
+  /* L'en-tête (§4.3) : fixe au bureau, seule la colonne en dessous défile. Dès 600 px, sa marge droite
+     écarte de 8 px le bouton Fermer, qui dépasse de 18 px dans la colonne. */
+  .project-head {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: var(--s-4);
+    flex: none;
+
+    @variant sm {
+      padding-right: 26px;
+    }
+  }
+
+  .project-title {
+    max-width: 100%;
+    margin-bottom: var(--s-2);
+    padding: var(--s-2) 14px var(--s-2) var(--s-4);
+    font-size: 22px;
+  }
+
+  /* Rotation −4° dans tous les états (§4.3) : la montée s'y ajoute, seule à bouger, et jamais en
+     mouvement réduit (§6.3). */
+  .project-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    margin: 6px 0 var(--s-3);
+    padding: var(--s-2) 14px;
+    background-color: var(--postit-link);
+    font-size: 15px;
+    transform: rotate(-4deg);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .project-link {
+      transition: translate var(--dur-fast) var(--ease-out);
+    }
+
+    @media (hover: hover) {
+      .project-link:hover {
+        translate: 0 -2px;
+      }
+    }
+  }
+
+  /* Les rubans de la carte, sur la fiche (§4.3) : leur rangée, et celles de la stack. */
+  .project-ribbons {
+    column-gap: var(--s-2);
+  }
+
+  .project-head .project-ribbons {
+    flex-basis: 100%;
+    margin-bottom: var(--s-4);
+  }
+
+  .project-stack {
+    --card-ribbon-inset: var(--s-2);
+    --card-ribbon-gap: 6px;
+  }
+
+  /* Ce qui défile (§4.3) : la colonne au bureau, le panneau sur téléphone. Un mot trop long pour la
+     colonne se coupe, plutôt que de la déborder, et un bloc de code avec lui : une région défilante
+     de plus serait à rendre focalisable. La colonne coupe ce qui la dépasse : elle s'élargit,
+     à chaque bord, de l'anneau de focus de ses `<summary>` (§6.2), 2 px à 3 px, sans déplacer son
+     texte (marges de §4.3). */
+  .project-scroll {
+    --ring-room: 5px;
+    overflow-wrap: anywhere;
+
+    @variant sm {
+      flex: 1;
+      min-height: 0;
+      margin: 0 calc(var(--s-2) - var(--ring-room)) var(--s-4) calc(-1 * var(--ring-room));
+      padding-inline: var(--ring-room);
+      overflow-y: auto;
+    }
+
+    pre {
+      white-space: pre-wrap;
+    }
+  }
+
+  .project-facts {
+    margin-bottom: var(--s-4);
+    color: var(--ink-2);
+    font-size: var(--fs-small);
+  }
+
+  .project-summary {
+    margin-bottom: var(--s-4);
+  }
+
+  .project-stack-title {
+    margin: var(--s-3) 0 var(--s-2);
+    color: var(--ink-2);
+    font-size: var(--fs-tiny);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .project-description {
+    margin-top: var(--s-4);
+  }
+
+  /* Les sections (§4.3). Le signe, décoratif, se lit dans `open`, sans état React. */
+  .project-sections {
+    margin-top: var(--s-4);
+    border-top: 1px solid var(--line);
+  }
+
+  .project-section {
+    border-bottom: 1px solid var(--line);
+    scroll-margin-top: var(--s-2);
+
+    > summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s-2);
+      min-height: 47px;
+      padding-block: var(--s-3);
+      font-size: 15px;
+      font-weight: 700;
+      list-style: none;
+      cursor: pointer;
+    }
+
+    > summary::-webkit-details-marker {
+      display: none;
+    }
+  }
+
+  .project-section-sign {
+    color: var(--ink-2);
+    font-size: 18px;
+    line-height: 1;
+
+    &::before {
+      content: '+';
+    }
+
+    [open] > summary > &::before {
+      content: '\2212';
+    }
+  }
+
+  .project-section-body {
+    margin-bottom: var(--s-3);
+  }
+}
+
+@keyframes project-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes project-out {
+  to {
+    opacity: 0;
+  }
+}

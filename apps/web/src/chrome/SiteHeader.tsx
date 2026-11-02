@@ -19,6 +19,10 @@ const HEADER_CLASSES = [
   'motion-safe:data-hidden:not-has-focus-visible:-translate-y-full',
   'motion-reduce:data-hidden:not-has-focus-visible:pointer-events-none',
   'motion-reduce:data-hidden:not-has-focus-visible:opacity-0',
+  // Fiche ouverte : la même sortie, quel que soit le défilement (§3.3).
+  'motion-safe:project-open:-translate-y-full',
+  'motion-reduce:project-open:pointer-events-none',
+  'motion-reduce:project-open:opacity-0',
 ].join(' ')
 
 /**
@@ -26,7 +30,7 @@ const HEADER_CLASSES = [
  * de la page (brief de #18, décision 9), lien vers l'accueil —, le bouton de mode à droite, seul
  * en phase 1 : la place « Chat » est absente du DOM. Transparente en haut de page, elle se
  * décolle au défilement, sort en descendant, revient en remontant, et reste visible tant qu'elle
- * contient le focus clavier.
+ * contient le focus clavier. Fiche ouverte, elle sort aussi, le temps de la fiche.
  */
 export function SiteHeader() {
   const { detached, hidden } = useHeaderScroll()

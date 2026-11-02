@@ -7,7 +7,7 @@ import type { Page } from '@playwright/test'
 import { API_ORIGIN, expect, FAILURES, holdProjects, serving, test, type Answer } from './api.ts'
 import { resolveAll } from './css.ts'
 import { PROJECT_SETS } from './projects.ts'
-import { COLUMN_VIEWPORT, expectPlacement } from './table.ts'
+import { cards, COLUMN_VIEWPORT, expectPlacement } from './table.ts'
 
 /** Les cellules de la table : pendant le chargement, ses trois cadres. */
 const cells = (page: Page) => page.locator('[data-table-cell]')
@@ -213,8 +213,10 @@ test('erreur : « Réessayer » relance la requête sans recharger la page — c
   await expect(page.getByRole('status')).toHaveCount(0)
   await release(serving(PROJECT_SETS.threeWithShowcase))
   await expect(page.getByRole('main')).not.toHaveAttribute('aria-busy')
-  // La table, vide jusqu'aux cartes de #20 : ni cadre, ni message.
-  await expect(cells(page)).toHaveCount(0)
+  // Les trois cartes : ni cadre, ni message.
+  await expect(cards(page)).toHaveCount(3)
+  await expect(cells(page)).toHaveCount(3)
+  await expect(page.locator('[data-table-cell][inert]')).toHaveCount(0)
   await expect(page.getByRole('status')).toHaveCount(0)
   expect(requests).toBe(2)
   expect(await page.evaluate(() => (window as unknown as { witness?: boolean }).witness)).toBe(true)

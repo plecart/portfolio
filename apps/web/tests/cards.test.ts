@@ -1,20 +1,37 @@
 /**
  * Les cartes de la table, en logique pure : leur ordre (spec §1.9), les technologies qu'elles
- * montrent (§1.4), leur pose (§1.3, §4.1) et l'empreinte qui la tire.
+ * montrent (§1.4), leur pose (§1.3, §4.1) et l'empreinte qui la tire, le nom et la description de
+ * leur lien (§1.7, §4.1), leurs états (§1.6), leur taille (§4.2, §5.5), leur couverture (§4.1), leur
+ * colonne (§3.1) et leur inclinaison (§4.1).
  */
 import { describe, expect, test } from 'vitest'
-import { buildProject, FILES_ORIGIN, PROJECT_SETS, type Project } from '../e2e/projects.ts'
 import {
+  buildProject,
+  buildTechnology,
+  FILES_ORIGIN,
+  ONGOING,
+  PROJECT_SETS,
+  type Project,
+} from '../e2e/projects.ts'
+import {
+  cardColumns,
+  cardDescription,
+  cardNameSuffix,
   cardPose,
+  cardSize,
+  cardStates,
   cardTechnologies,
+  cardTilt,
+  coverImage,
+  coverSizes,
   fnv1a,
   orderProjects,
   type Technology,
 } from '../src/table/cards.ts'
 
-/** Un projet en cours, commencé à `started_on` : sans date de fin, comme l'API le sert. */
+/** Un projet en cours, commencé à `started_on`. */
 function ongoing(slug: string, started_on: string): Project {
-  return buildProject({ slug, status: 'ongoing', started_on, finished_on: null })
+  return buildProject({ ...ONGOING, slug, started_on })
 }
 
 /**
@@ -125,11 +142,6 @@ describe("l'ordre des cartes", () => {
   })
 })
 
-/** Une technologie de ce type, nommée `name`. */
-function technology(name: string, kind: Technology['kind']): Technology {
-  return { name, kind, icon: `${FILES_ORIGIN}/icones/${name}.svg` }
-}
-
 /** Les noms des technologies que la carte montre. */
 function cardNames(technologies: Technology[]): string[] {
   return cardTechnologies(technologies).map((shown) => shown.name)
@@ -138,41 +150,41 @@ function cardNames(technologies: Technology[]): string[] {
 describe('les technologies de la carte', () => {
   test("montre les trois premières dans l'ordre de l'admin", () => {
     const technologies = [
-      technology('react', 'framework'),
-      technology('typescript', 'language'),
-      technology('docker', 'infrastructure'),
-      technology('django', 'framework'),
+      buildTechnology('react', 'framework'),
+      buildTechnology('typescript', 'language'),
+      buildTechnology('docker', 'infrastructure'),
+      buildTechnology('django', 'framework'),
     ]
     expect(cardNames(technologies)).toEqual(['react', 'typescript', 'docker'])
   })
 
   test('saute un outil sans le compter', () => {
     const technologies = [
-      technology('figma', 'tool'),
-      technology('react', 'framework'),
-      technology('typescript', 'language'),
-      technology('docker', 'infrastructure'),
+      buildTechnology('figma', 'tool'),
+      buildTechnology('react', 'framework'),
+      buildTechnology('typescript', 'language'),
+      buildTechnology('docker', 'infrastructure'),
     ]
     expect(cardNames(technologies)).toEqual(['react', 'typescript', 'docker'])
   })
 
   test('montre toutes les éligibles quand elles sont moins de trois', () => {
-    const technologies = [technology('python', 'language'), technology('git', 'tool')]
+    const technologies = [buildTechnology('python', 'language'), buildTechnology('git', 'tool')]
     expect(cardNames(technologies)).toEqual(['python'])
   })
 
   test("ne montre rien quand le projet n'emploie que des outils", () => {
-    expect(cardNames([technology('figma', 'tool')])).toEqual([])
+    expect(cardNames([buildTechnology('figma', 'tool')])).toEqual([])
   })
 
   test('joue les trois exemples du brief', () => {
-    const figma = technology('Figma', 'tool')
-    const docker = technology('Docker', 'infrastructure')
+    const figma = buildTechnology('Figma', 'tool')
+    const docker = buildTechnology('Docker', 'infrastructure')
     const all = [
       figma,
-      technology('TypeScript', 'language'),
-      technology('React', 'framework'),
-      technology('Django', 'framework'),
+      buildTechnology('TypeScript', 'language'),
+      buildTechnology('React', 'framework'),
+      buildTechnology('Django', 'framework'),
       docker,
     ]
     expect(cardNames(all)).toEqual(['TypeScript', 'React', 'Django'])
@@ -252,5 +264,189 @@ describe('la pose de la carte', () => {
     ['projet-341', 'dx', -6],
   ] as const)('atteint ses bornes : %s, %s = %d', (slug, axis, bound) => {
     expect(cardPose(slug)[axis]).toBe(bound)
+  })
+})
+
+describe('les états de la carte', () => {
+  test('un projet sans statut en cours ni lien démo ne porte aucun état', () => {
+    expect(cardStates(buildProject())).toEqual({ ongoing: false, live: false })
+  })
+
+  test('« en cours » suit le statut, « en ligne » le lien démo, indépendants', () => {
+    expect(cardStates(ongoing('en-cours', '2026-01-01')).ongoing).toBe(true)
+    expect(cardStates(ongoing('en-cours', '2026-01-01')).live).toBe(false)
+    expect(cardStates(buildProject({ demo_url: 'https://demo.test' }))).toEqual({
+      ongoing: false,
+      live: true,
+    })
+  })
+
+  test.each(['finished', 'archived'] as const)("un projet %s n'est pas en cours", (status) => {
+    expect(cardStates(buildProject({ status })).ongoing).toBe(false)
+  })
+})
+
+describe('le nom de la carte', () => {
+  const titled = (overrides: Partial<Project>) => buildProject({ title: 'Portfolio', ...overrides })
+
+  test('n’ajoute rien au titre, pas même un point, sans état', () => {
+    expect(cardNameSuffix(titled({}))).toBe('')
+  })
+
+  test('ajoute le point du titre et « En cours. » à un projet en cours', () => {
+    expect(cardNameSuffix(titled(ONGOING))).toBe('. En cours.')
+  })
+
+  test('ajoute le point du titre et « En ligne. » à un projet qui a un lien démo', () => {
+    expect(cardNameSuffix(titled({ demo_url: 'https://demo.test' }))).toBe('. En ligne.')
+  })
+
+  test('dit les deux états dans l’ordre de la spec', () => {
+    expect(cardNameSuffix(titled({ ...ONGOING, demo_url: 'https://demo.test' }))).toBe(
+      '. En cours. En ligne.',
+    )
+  })
+
+  test('ne redouble pas la ponctuation d’un titre', () => {
+    expect(cardNameSuffix(titled({ title: 'Et après ?', demo_url: 'https://demo.test' }))).toBe(
+      'En ligne.',
+    )
+  })
+})
+
+describe('la description de la carte', () => {
+  test('dit le résumé, puis nomme les technologies que la carte montre, sans les outils', () => {
+    const technologies = [
+      buildTechnology('Figma', 'tool'),
+      buildTechnology('TypeScript', 'language'),
+      buildTechnology('React', 'framework'),
+    ]
+
+    expect(cardDescription(buildProject({ summary: 'Un site', technologies }))).toBe(
+      'Un site. TypeScript, React',
+    )
+  })
+
+  test('s’arrête au résumé quand la carte ne montre aucune technologie', () => {
+    expect(cardDescription(buildProject({ summary: 'Un site', technologies: [] }))).toBe('Un site.')
+  })
+
+  test.each([
+    ['un point', 'Un site.'],
+    ['un point d’exclamation', 'Un site !'],
+    ['un point d’interrogation', 'Un site ?'],
+    ['des points de suspension', 'Un site…'],
+  ])('ne redouble pas la ponctuation d’un résumé qui finit par %s', (_, summary) => {
+    expect(cardDescription(buildProject({ summary, technologies: [] }))).toBe(summary)
+  })
+})
+
+describe('la taille de la carte', () => {
+  test('une carte parmi d’autres est simple', () => {
+    expect(cardSize(buildProject(), 3)).toBe('simple')
+  })
+
+  test('le projet vitrine, parmi d’autres, a la carte vitrine', () => {
+    expect(cardSize(buildProject({ showcase: true }), 3)).toBe('showcase')
+  })
+
+  test.each([false, true])('un projet seul a la carte seule, vitrine : %s', (showcase) => {
+    expect(cardSize(buildProject({ showcase }), 1)).toBe('solo')
+  })
+})
+
+describe('la couverture de la carte', () => {
+  const image = (state: 'ready' | 'pending' | 'failed', widths: number[]) => ({
+    caption: 'Écran',
+    width: 1600,
+    height: 1600,
+    state,
+    variants: widths.map((width) => ({ url: `${FILES_ORIGIN}/${width}.webp`, width, height: width })),
+  })
+
+  test('décrit chaque variante de la première image, en largeurs', () => {
+    expect(coverImage(buildProject({ gallery: [image('ready', [480, 960])] }))).toEqual({
+      src: `${FILES_ORIGIN}/480.webp`,
+      srcSet: `${FILES_ORIGIN}/480.webp 480w, ${FILES_ORIGIN}/960.webp 960w`,
+      width: 480,
+      height: 480,
+    })
+  })
+
+  test('ne lit que la première image de la galerie', () => {
+    const gallery = [image('pending', []), image('ready', [480])]
+
+    expect(coverImage(buildProject({ gallery }))).toBeNull()
+  })
+
+  test.each([
+    ['en attente', [image('pending', [])]],
+    ['en échec', [image('failed', [])]],
+    ['une galerie vide', []],
+  ])('rien à montrer : %s', (_, gallery) => {
+    expect(coverImage(buildProject({ gallery }))).toBeNull()
+  })
+
+  // La condition lit les variantes, jamais l'état : une image prête sans variante ne se rend pas.
+  test('rien à montrer non plus sans variante, même à l’état prêt', () => {
+    expect(coverImage(buildProject({ gallery: [image('ready', [])] }))).toBeNull()
+  })
+
+  test.each([
+    ['simple', '(min-width: 600px) 220px, calc((100vw - 48px) / 2 - 16px)'],
+    ['showcase', '(min-width: 600px) 480px, calc(100vw - 56px)'],
+    ['solo', '(min-width: 600px) 340px, calc((100vw - 32px) * 0.8 - 16px)'],
+  ] as const)('annonce la largeur de la photo du tableau de §4.1 — %s', (size, sizes) => {
+    expect(coverSizes(size)).toBe(sizes)
+  })
+})
+
+describe("l'indice de colonne d'une carte", () => {
+  // Spec §3.1 : à 1280 px, 118 px de marge, pistes de 240 px et gouttière de 28 px.
+  const STEP = 240 + 28
+  const column = (index: number) => 118 + index * STEP
+
+  test('se compte depuis la première colonne, au pas des pistes', () => {
+    expect(cardColumns([0, 1, 2, 3].map(column), STEP)).toEqual([0, 1, 2, 3])
+  })
+
+  test('une vitrine compte pour ses deux colonnes : la carte voisine garde sa vraie colonne', () => {
+    expect(cardColumns([column(0), column(2), column(3)], STEP)).toEqual([0, 2, 3])
+  })
+
+  test('tolère un bord fractionnaire', () => {
+    expect(cardColumns([16, 207.8, 16.2], 192)).toEqual([0, 1, 0])
+  })
+})
+
+describe("l'inclinaison d'une carte", () => {
+  const CELL = { left: 100, top: 200, width: 240, height: 282 }
+  const [right, bottom] = [CELL.left + CELL.width, CELL.top + CELL.height]
+  const tiltAt = (clientX: number, clientY: number) => cardTilt({ clientX, clientY }, CELL)
+
+  test('au coin haut droit : +6° sur chaque axe', () => {
+    expect(tiltAt(right, CELL.top)).toEqual({ rotateX: 6, rotateY: 6 })
+  })
+
+  test('au coin bas gauche : −6° sur chaque axe', () => {
+    expect(tiltAt(CELL.left, bottom)).toEqual({ rotateX: -6, rotateY: -6 })
+  })
+
+  test('au centre : 0°', () => {
+    const { rotateX, rotateY } = tiltAt(CELL.left + CELL.width / 2, CELL.top + CELL.height / 2)
+
+    expect(rotateX).toBeCloseTo(0)
+    expect(rotateY).toBeCloseTo(0)
+  })
+
+  test('chaque axe suit le sien : le haut au milieu ne touche que `rotateX`', () => {
+    const { rotateX, rotateY } = tiltAt(CELL.left + CELL.width / 2, CELL.top)
+
+    expect(rotateX).toBe(6)
+    expect(rotateY).toBeCloseTo(0)
+  })
+
+  test('hors de la cellule, sur un trombone qui la déborde : ±6° au plus', () => {
+    expect(tiltAt(CELL.left - 20, CELL.top - 14)).toEqual({ rotateX: 6, rotateY: -6 })
   })
 })

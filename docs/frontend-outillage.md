@@ -81,7 +81,7 @@ Tout conservé. Les signalements, relus un par un, sont des faux positifs :
 | `prototype` | CAUTION | « never judge » : consigne de présentation des variantes |
 | autres | SAFE / CAUTION sans signalement | — |
 
-### 2.4 Application `apps/web` — 2026-09-23, amendée les 2026-09-25, 26, 2026-10-02, 04 et 16
+### 2.4 Application `apps/web` — 2026-09-23, amendée les 2026-09-25, 26, 2026-10-02, 04, 16 et 2026-11-01
 
 Node **24.21.0**, LTS active du jour, épinglée par `.nvmrc` et par `engines` (valeurs égales,
 vérifiées par un test). `@types/node` suit sa majeure, vérifiée par un autre test : des types d'une
@@ -99,6 +99,8 @@ datés.
 | Paquet | Rôle |
 |---|---|
 | `react`, `react-dom` | Interface en composants |
+| `@radix-ui/react-dialog` | Dialogue modal de la fiche, le `dialog` de shadcn/ui copié sans `init` et sans `Overlay` (CSP) (#170) |
+| `markdown-to-jsx` | Description et sections de la fiche rendues en éléments React, HTML brut en texte (ADR 0010) (#170) |
 | `typescript` | Types vérifiés à la compilation, mode strict — **6.0, pas 7** (voir ci-dessous) |
 | `vite` | Serveur de développement et compilation |
 | `tailwindcss`, `@tailwindcss/vite` | Style utilitaire compilé au build, par le plugin Vite |
@@ -136,21 +138,46 @@ avant de toucher au bloc :
 L'explication vit ici et non dans l'`index.html` : ce fichier est servi à chaque visite et recopié
 dans l'image `api`, chaque ligne de commentaire y voyage sur le réseau.
 
-**Lighthouse CI.** `lighthouserc.json` sert la version compilée depuis `staticDistDir` et assied les
-quatre seuils de la spec §1.16. Trois points mesurés, non évidents :
+**Lighthouse CI.** `lighthouserc.json` mesure la table à douze cartes et assied les quatre seuils de
+la spec §1.16. Sa collecte démarre `e2e/lighthouse-server.ts` (`collect.startServerCommand`) et lit
+son adresse (`collect.url`) : un serveur rangé avec les tests, lancé par Node sans outil de plus, qui
+sert le `dist` réel, repli SPA compris, la liste de `PROJECT_SETS.twelveWithShowcase` et de vrais
+WebP, le tout sur son origine. `dist` portant `VITE_API_URL` en dur, il remplace cette origine par
+la sienne dans le JS servi, sans second build : l'artefact mesuré reste celui de la production.
+Quatre points mesurés, non évidents :
 
 - La porte est **`lhci autorun`, jamais `lhci assert` seul** : sans rapport collecté, `assert`
   annonce « 0 URL(s), 0 run(s), All results processed » et sort **0**. Une collecte cassée rendrait
   donc la porte verte sans avoir rien vérifié. `autorun` sort 1 dans le même cas.
+- **Les seuils ne prouvent pas que la table a été mesurée** : l'écran d'erreur rend 99, 100, 100,
+  100, et `lhci` n'a aucune assertion de minimum — il ne lit que `minScore`, `maxLength` et
+  `maxNumericValue`, et ignore `minNumericValue` en silence (`@lhci/utils`, `assertions.js`). C'est
+  `e2e/lighthouse-server.spec.ts`, joué par `make web-e2e`, qui prouve que ce serveur rend les douze
+  cartes et toutes leurs images, couvertures et icônes ; ses quatre routes (`dist`, API, images,
+  icônes), mutées une à une, y rougissent.
 - **La collecte ne tourne pas sous Windows** : `chrome-launcher` échoue sur `EPERM` en supprimant
   son dossier temporaire, que Chrome tient encore (reproduit trois fois, y compris avec `%TEMP%`
-  déplacé). C'est donc une porte **de CI seulement** ; en local, `npx lighthouse <url>` écrit bien
-  son rapport JSON avant le plantage de nettoyage, ce qui suffit à mesurer.
-- Les scores de la page minimale, mesurés le 2026-09-23 (Lighthouse 12.6.1, profil mobile) :
+  déplacé). C'est donc une porte **de CI seulement** ; en local, `node e2e/lighthouse-server.ts`,
+  puis `npx lighthouse <url>` écrit bien son rapport JSON avant le plantage de nettoyage, ce qui
+  suffit à mesurer. `lhci collect` y démarre le serveur et lance Lighthouse jusqu'à ce même plantage.
+- Les scores, profil mobile, Lighthouse 12.6.1. La page minimale, mesurée le 2026-09-23 :
   performance 100, accessibilité 100, bonnes pratiques 100, SEO 100. Deux correctifs ont été
   nécessaires pour y arriver : `public/robots.txt` (sans lui SEO plafonne à 91) et une icône
   déclarée `data:,` dans l'`index.html` (sans elle, le 404 sur `/favicon.ico` fait tomber l'audit
-  « erreurs dans la console » et les bonnes pratiques à 96).
+  « erreurs dans la console » et les bonnes pratiques à 96). La table à douze cartes, mesurée le
+  2026-11-01 sur quinze runs avec les images d'essai de 3 et 7 Ko : performance 98, accessibilité
+  100, bonnes pratiques 100, SEO 100, LCP de 1,8 à 2 s. L'audit `font-size` passe : les résumés
+  masqués comptent comme texte lisible et les rubans de 11 px (spec §2.2) n'en sont plus que
+  7,38 % ; sans résumés, ils remontent à 48 % et les bonnes pratiques retombent à 96. Le LCP porte
+  sur le `<h1>` de l'entête, 13 runs sur 15, et sur une couverture pour les 2 autres : `.card-entry`,
+  à opacité 0, écarte les couvertures, et celle de la vitrine le reprend 8 runs sur 8 une fois cette
+  opacité retirée de `dist`. Le chiffre reste sensible à leur poids : la simulation coupe son
+  graphe à l'instant observé du LCP, pas à son élément, et les images reçues avant lui y pèsent
+  (Lantern, `LargestContentfulPaint.js`). Avec des WebP de bruit de 92 et 351 Ko, le `<h1>` tient
+  12 runs sur 12, mais performance 95 et LCP de 2,6 s sur les 11 où les images arrivent avant lui,
+  98 et 2,1 s sur l'autre. Avant l'entrée des cartes, le 2026-10-31, le LCP portait sur la
+  couverture de la vitrine en `loading="lazy"` : performance 98 à 99 et LCP de l'ordre de 2 s avec
+  les images d'essai, 95 à 96 et de l'ordre de 2,6 s avec des WebP de bruit de 90 et 357 Ko.
 
 **`overrides` du manifeste — cinq avis de sécurité écartés à la racine.** `@lhci/cli` 0.15.1
 traînait 10 avis (`npm audit`, arbre complet), dont 7 `high`, sur trois racines (2026-09-25). Un
@@ -332,14 +359,14 @@ Ordre à suivre. Vérifier les commandes contre la doc officielle du jour (les C
 
 **État au 2026-09-23 (#3)** : les items **1, 2, 10, 11, 12 et 13 sont faits** — inventaire au
 §2.4, qui fait foi sur ce qui est installé ; versions dans le verrou `apps/web/package-lock.json`.
-L'item **9** l'est depuis le 2026-10-16 (#19). Les sept autres restent à faire, chacun avec
-l'issue qui le portera. Trois items se sont révélés
-partiellement faux à l'exécution ; l'écart est consigné sous chacun d'eux et détaillé au §2.4.
+L'item **9** l'est depuis le 2026-10-16 (#19), les items **3**, **4** et **14** sont tranchés depuis
+le 2026-11-01 (#170). Les quatre autres restent à faire, chacun avec l'issue qui le portera. Trois
+items se sont révélés partiellement faux à l'exécution ; l'écart est consigné sous chacun d'eux et détaillé au §2.4.
 
 1. **Projet** ✅ *fait (#3)* : `npm create vite@latest apps/web -- --template react-ts`, puis suppression de la page de démonstration du gabarit. TypeScript strict **posé explicitement** — contrairement à ce que cet item affirmait, `create-vite` 9.2.1 ne l'active plus (§2.4).
 2. **Tailwind CSS v4** ✅ *fait (#3)* : `npm i -D tailwindcss @tailwindcss/vite`, plugin dans `vite.config.ts`, `@import "tailwindcss";` dans le CSS d'entrée. **Jamais** le script CDN `cdn.tailwindcss.com` (c'est lui qui affiche « ne pas utiliser en production »).
-3. **Alias `@/`** — à faire avec #170 (requis par shadcn) : `paths` dans `tsconfig.json` et `tsconfig.app.json`, `resolve.alias` dans `vite.config.ts` (`@types/node` est déjà installé, §2.4).
-4. **shadcn/ui** — à faire avec #170 : `npx shadcn@latest init`, puis `npx shadcn@latest add <composant>` au besoin (`dialog` pour la fiche projet en modal). Radix arrive comme dépendance de chaque composant ; rien à installer à part.
+3. **Alias `@/`** — sans objet (#170, décision du 2026-10-27) : le `dialog` copié n'en a pas besoin.
+4. **shadcn/ui** ✅ *fait autrement (#170)* : `dialog` copié sans `init`, décision du 2026-10-27 — aucune palette, aucun `tw-animate-css`, seule dépendance `@radix-ui/react-dialog` ; classes passées aux jetons, sans `Overlay` (CSP).
 5. **motion** — hors phase 1 (PRD #1) : `npm i motion` ; import depuis `motion/react`.
 6. **react-bits** — hors phase 1 (PRD #1) : composant par composant, `npx shadcn@latest add @react-bits/<Nom>-TS-TW`. **Licence MIT + Commons Clause** : usage libre, revente d'un produit fondé sur ces composants interdite — citée dans l'ADR 0008.
 7. **bklit-ui** (graphiques) — hors phase 1 (PRD #1) : composant par composant, `npx shadcn@latest add @bklit/<graphique>` ; vérifier si le registre `@bklit` doit être déclaré dans `components.json`. Composants MIT ; Bklit Studio (outil hébergé) propriétaire.
@@ -349,7 +376,7 @@ partiellement faux à l'exécution ; l'écart est consigné sous chacun d'eux et
 11. **E2E** ✅ *fait (#3)*, par `npm i -D @playwright/test` plutôt que par l'assistant `npm init playwright@latest`, qui écrit des exemples à supprimer derrière lui (§2.4) ; `npm i -D @axe-core/playwright` pour un contrôle d'accessibilité par page. Couvre le site en phase 1, le chat en phase 2 (§8.4).
 12. **Lighthouse CI** ✅ *fait (#3)* : `@lhci/cli` dans GitHub Actions ; seuils sur performance, accessibilité, bonnes pratiques, SEO ; la PR échoue sous le seuil. Lighthouse = audit Google intégré à Chrome, notes sur 100 et indicateurs de vitesse ressentie.
 13. **Tests unitaires** ✅ *fait (#3)* : `npm i -D vitest` ; logique pure du front (format des dates, ordre des cartes, technologies de carte) ; script npm + CI (ADR 0010).
-14. **Markdown** — à faire avec la fiche projet : `npm i markdown-to-jsx` ; description et sections rendues en éléments React, HTML brut échappé, jamais d'insertion d'HTML (ADR 0010).
+14. **Markdown** ✅ *fait (#170)* : `npm i markdown-to-jsx`, importé depuis `markdown-to-jsx/react` avec `disableParsingRawHTML` ; description et sections rendues en éléments React, HTML brut en texte, jamais d'insertion d'HTML (ADR 0010).
 
 ### Build et déploiement
 
