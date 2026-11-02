@@ -541,9 +541,11 @@ gh run watch
 - [ ] **Le workflow, lancé à la main, est vert** — `DEPLOY_ENABLED` à `true` et une sauvegarde dans
   le bucket : le tirage des images par le jeton du workflow, le vrai jeton en lecture seule, la
   vraie clé.
-- [ ] **Une restauration réelle, chronométrée** : `make restore HOST=<ip> BACKUP=derniere`
+- [x] **Une restauration réelle, chronométrée** : `make restore HOST=<ip> BACKUP=derniere`
   (« Restaurer une sauvegarde »), de la commande au site vérifié — la mesure du RTO (1 h), notée
-  ici.
+  ici. Mesuré le 2026-11-02, sur une base presque vide : 47 s pour la commande, phrases de passe
+  comprises ; moins de 7 min jusqu'à l'admin rouvert, second facteur compris. Une base pleine prendra
+  plus longtemps.
 
 ## Premier déploiement — la liste
 
