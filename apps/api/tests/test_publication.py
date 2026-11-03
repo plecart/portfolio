@@ -41,8 +41,8 @@ PRUNE_RECIPE = re.compile(
 )
 
 # gojq, le moteur `jq` que `gh` embarque — v0.12.17 dans `gh` 2.94.0 (son `go.mod`) —, dans l'image
-# que publie son auteur, épinglée étiquette et empreinte comme Trivy : Dependabot ne la suit pas,
-# elle se monte à la main, avec la version de `gh`.
+# que publie son auteur, épinglée étiquette et empreinte comme Trivy et Ryuk : Dependabot ne la
+# suit pas, elle se monte à la main, avec la version de `gh`.
 GOJQ_IMAGE = (
     "ghcr.io/itchyny/gojq:0.12.17"
     "@sha256:e9ddedb60bb27df4c7fd9ae92f38c05d4f3745fa8a6f2179499ca243a38b65ff"
