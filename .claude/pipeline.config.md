@@ -442,11 +442,13 @@ Une commande que la prose fait taper à un rôle suit donc `cycle-pr/references/
 Un `ask` passe avant tout `allow`, y compris celui qu'un hook renvoie (doc permissions : « a
 matching ask rule still prompts even when the hook returned "allow" »), en mode auto compris
 (doc permission-modes, § auto mode : « Explicit ask rules still force a prompt ») :
-`permissions.ask` sur `gh pr merge` et sur `gh pr update-branch … --rebase` — forme d'origine,
-forme `rtk`, `rtk proxy`, outil PowerShell — est la porte de « jamais d'auto-merge dans le trunk »
-et du « rebase explicitement demandé » (`contraintes.md`), épinglée par
-`apps/api/tests/test_agent_permissions.py`. Seule exception, hors du trunk : le script
-`.claude/skills/cycle-pr/scripts/merge-lot.py`, autorisé en `allow`, qui lance lui-même
+`permissions.ask` sur `gh pr merge` et sur `gh pr update-branch`, avec ou sans `--rebase` — forme
+d'origine, forme `rtk`, `rtk proxy`, outil PowerShell — est la porte de « jamais d'auto-merge dans
+le trunk », du « rebase explicitement demandé » (`contraintes.md`) et du « ni commit de fusion » de
+`cycle-pr` Étape 6 : sans `--rebase`, `update-branch` fusionne la base dans la branche de la PR
+(`gh pr update-branch --help`, gh 2.94.0) ; jamais en `deny`, le mainteneur gardant la main
+(#198, D-2). Épinglée par `apps/api/tests/test_agent_permissions.py`. Seule exception, hors du
+trunk : le script `.claude/skills/cycle-pr/scripts/merge-lot.py`, autorisé en `allow`, qui lance lui-même
 `gh pr merge` vers une branche d'intégration et refuse le trunk (`cycle-pr` Étape 7, « Le merge
 d'un lot ») — un sous-processus, que les règles du harnais ne voient pas : « Bash rules match the
 whole command text » (doc permissions, lue le 2026-10-17), celui que l'agent lance, pas ce que le
@@ -478,6 +480,16 @@ ne réécrit pas. Restent ouverts, et la doc le dit (« isn't a security boundar
 program ») : un glob sans `.env` littéral (`.en?`), `grep -r` sans nom de fichier, une indirection
 par variable (`f=.env; cat "$f"`), une lecture par l'outil PowerShell (`Get-Content .env`, non
 vérifiée), tout sous-processus qui ouvre le fichier lui-même.
+
+`.claude/skills/cycle-pr/scripts/porte-merge.py` est en `allow` sous une forme unique, comme
+`merge-lot.py` — `rtk rewrite` ne réécrit pas `python …` (sortie 1 sans rien rendre, mesuré le
+2026-11-03) : il ne fait que lire `gh` et `git`, et chaque appel de la session ou du
+`verificateur` faisait une invite (#198, D-3). Son édition n'est pas en `deny`, à la différence de
+`merge-lot.py` : il a reçu 5 commits au seul cycle de #197. La porte de merge, qui le chaîne avant
+`gh pr merge`, garde son invite — « Deny and ask rules apply when any subcommand matches them »
+(doc permissions, § Compound commands, lue le 2026-11-03) —, épinglée par
+`apps/api/tests/test_agent_permissions.py`. Reste ouvert, comme pour `.env` : un script édité puis
+lancé dans la même session passe sans invite, quoi qu'il lance alors, un `gh pr merge` compris.
 
 **Outils hors dépôt** (`uv tool`, environnements isolés — frontend-outillage §2.2) :
 - SkillSpector 2.11.2 (NVIDIA/skillspector @ d162d9b) — `skillspector scan .claude/skills/<skill> --no-llm` après chaque ajout ou mise à jour de skill

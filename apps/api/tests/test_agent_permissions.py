@@ -11,17 +11,21 @@ merge d'une PR, que la même règle réserve à un « go » humain : seul un `as
 `allow`, y compris celui que le hook renvoie — en fait une porte, sous chaque outil qui peut le
 lancer (`Bash`, où RTK réécrit, et `PowerShell`, qu'il ne touche pas).
 
-Ce module émule l'appariement des règles — `*` vaut n'importe quel texte, y compris vide (doc
-« Configure permissions », § Wildcard patterns) — et épingle le dénombrement : chaque forme à
-refuser tombe sur un `deny`, chaque merge tombe sur un `ask`, chaque témoin ordinaire ne touche ni
-l'un ni l'autre. Une première version des règles fermait `rtk read .env` seul ; la relecture de la
-PR #54 a mesuré trois contournements (guillemets, glob, `grep`) — d'où la liste.
+Ce module émule l'appariement des règles — `*` vaut n'importe quel texte, y compris vide, et un
+` *` final, seule étoile du motif, accepte aussi la commande nue (doc « Configure permissions »,
+§ Wildcard patterns) — et épingle le dénombrement : chaque forme à refuser tombe sur un `deny`,
+chaque merge ou `update-branch` sur un `ask`, chaque script autorisé sur un `allow` qui ne couvre
+que lui, chaque témoin ordinaire ni sur l'un ni sur l'autre. Le harnais de mutation refuse de muter
+un réglage de sécurité (obs 53) : l'affaiblissement de ce que #198 ajoute se voit sur un recueil de
+formes fautives construites en mémoire (`FAULTY_SETTINGS`). Une première version des règles fermait
+`rtk read .env` seul ; la relecture de la PR #54 a mesuré trois contournements (guillemets, glob,
+`grep`) — d'où la liste.
 """
 
 import json
 import re
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import pytest
 
@@ -67,39 +71,53 @@ FORCE_PUSHES = [
     "git push --force-with-lease origin main",
 ]
 
-# Le merge d'une PR, par chaque outil et sous chaque forme qui peut le lancer : celle que Claude
-# écrit, celle que RTK lui substitue, le passage brut par `rtk proxy`, et l'outil PowerShell que le
-# hook RTK ne voit pas (son matcher ne vise que `Bash`). Et `update-branch --rebase`, qui réécrit la
-# branche d'une PR ouverte — le « rebase explicitement demandé » de `contraintes.md`.
+# Chaque outil et chaque forme qui peuvent lancer une commande : celle que Claude écrit, celle que
+# RTK lui substitue, le passage brut par `rtk proxy`, et l'outil PowerShell que le hook RTK ne voit
+# pas (son matcher ne vise que `Bash`).
+CALL_FORMS = [("Bash", ""), ("Bash", "rtk "), ("Bash", "rtk proxy "), ("PowerShell", "")]
+
+# Le merge d'une PR, et `update-branch`, qui réécrit la branche d'une PR ouverte : avec `--rebase`,
+# le « rebase explicitement demandé » de `contraintes.md` ; sans, un commit de fusion de la base
+# (`gh pr update-branch --help`, gh 2.94.0), que `cycle-pr` Étape 6 interdit (#198, D-2). Chaque
+# forme d'`update-branch` avec et sans argument, avec et sans `--rebase` : la règle ` *` qui a
+# remplacé `*--rebase*` se prouve sur chacune des quatre entrées qu'elle remplace.
+GATED_COMMANDS = [
+    "gh pr merge 54 --rebase --delete-branch",
+    "gh pr update-branch",
+    "gh pr update-branch --rebase",
+    "gh pr update-branch 56",
+    "gh pr update-branch 56 --rebase",
+]
 GATED_CALLS = [
-    ("Bash", "gh pr merge 54 --rebase --delete-branch"),
-    ("Bash", "rtk gh pr merge 54 --rebase --delete-branch"),
-    ("Bash", "rtk proxy gh pr merge 54 --rebase"),
-    ("PowerShell", "gh pr merge 54 --rebase --delete-branch"),
-    ("Bash", "gh pr update-branch 56 --rebase"),
-    ("Bash", "rtk gh pr update-branch 56 --rebase"),
-    ("Bash", "rtk proxy gh pr update-branch 56 --rebase"),
-    ("PowerShell", "gh pr update-branch 56 --rebase"),
+    (tool, prefix + command) for command in GATED_COMMANDS for tool, prefix in CALL_FORMS
 ]
 
-# La seule voie de merge sans invite : le script de merge d'un lot dans sa branche d'intégration,
-# qui refuse lui-même le trunk (`.claude/skills/cycle-pr/scripts/merge-lot.py`, #107 lot 2a). Une
-# règle `Bash(cmd *)` n'approuve pas `cmd && autre` : Claude Code apparie chaque sous-commande
-# séparément (doc « Configure permissions », § Compound commands, lue le 2026-10-17) — d'où une
-# seule forme simple ici, comme dans tout ce module. Une redirection (`… > fichier`) n'est pas
-# couverte par la règle non plus : sa cible se contrôle contre les règles `Edit`, « A rule such as
+# Les scripts autorisés sans invite, chacun sous une forme unique : RTK ne réécrit pas `python …`
+# (`rtk rewrite` sort en 1 sans rien rendre, mesuré le 2026-11-03). `merge-lot.py` est la seule voie
+# de merge sans invite — un lot dans sa branche d'intégration, le trunk refusé par le script lui-même
+# (#107 lot 2a) ; `porte-merge.py` ne fait que lire `gh` et `git` (#198, D-3). Une règle
+# `Bash(cmd *)` n'approuve pas `cmd && autre` : Claude Code apparie chaque sous-commande séparément
+# (doc « Configure permissions », § Compound commands, lue le 2026-10-17) — d'où une seule forme
+# simple ici, comme dans tout ce module. Une redirection (`… > fichier`) n'est pas couverte par la
+# règle non plus : sa cible se contrôle contre les règles `Edit`, « A rule such as
 # `Bash(git commit *)` allows the command, not the target » (même doc, § Redirections, même date).
 MERGE_LOT = "python .claude/skills/cycle-pr/scripts/merge-lot.py"
-ALLOWED_MERGE = ("Bash", f"{MERGE_LOT} 118 {'a' * 40} feat/sessions-liees")
+PORTE_MERGE = "python .claude/skills/cycle-pr/scripts/porte-merge.py"
+ALLOWED_SCRIPT_CALLS = {
+    "merge-lot": ("Bash", f"{MERGE_LOT} 118 {'a' * 40} feat/sessions-liees"),
+    "porte-merge-trunk": ("Bash", f"{PORTE_MERGE} trunk 40963627023 main {'a' * 40}"),
+    "porte-merge-conversation": ("Bash", f"{PORTE_MERGE} conversation 200 --releve"),
+}
 
-# Ce que l'entrée du script ne doit pas autoriser en passant : un autre script du même dossier,
-# Python en général, et le script appelé par un autre chemin, que la règle n'apparie pas — il
-# retombe alors sur le régime ordinaire (invite, ou classifieur en mode auto), jamais sur cette
+# Ce que les entrées des scripts ne doivent pas autoriser en passant : un autre script du même
+# dossier, Python en général, et un script appelé par un autre chemin, que la règle n'apparie pas —
+# il retombe alors sur le régime ordinaire (invite, ou classifieur en mode auto), jamais sur cette
 # autorisation.
-NOT_ALLOWED_BY_THE_MERGE_RULE = [
+NOT_ALLOWED_BY_THE_SCRIPT_RULES = [
     ("Bash", "python .claude/skills/cycle-pr/scripts/mutation.py . m.json"),
     ("Bash", "python -c print(1)"),
     ("Bash", f"python ./.claude/skills/cycle-pr/scripts/merge-lot.py 118 {'a' * 40} main"),
+    ("Bash", "python ./.claude/skills/cycle-pr/scripts/porte-merge.py conversation 200"),
 ]
 
 # Des commandes ordinaires, par outil, qu'aucun `deny` ni `ask` ne doit attraper.
@@ -111,7 +129,6 @@ HARMLESS_CALLS = [
     ("Bash", "git push origin main --follow-tags"),
     ("Bash", "rtk gh pr view 54"),
     ("Bash", "gh pr ready 54"),
-    ("Bash", "gh pr update-branch 56"),
     ("PowerShell", "gh pr view 54"),
 ]
 
@@ -119,33 +136,119 @@ Section = Literal["allow", "ask", "deny"]
 RULE = re.compile(r"^(?P<tool>[A-Za-z]+)\((?P<pattern>.*)\)$")
 
 
-def rule_patterns(section: Section, tool: str) -> list[re.Pattern[str]]:
+def rule_patterns(
+    section: Section, tool: str, settings: dict[str, Any] | None = None
+) -> list[re.Pattern[str]]:
     """Les règles d'un outil dans une section de `permissions`, traduites en expressions régulières.
 
     Args:
         section: `allow`, `ask` ou `deny` — absente du fichier, elle vaut la liste vide.
         tool: le nom d'outil qui préfixe la règle (`Bash`, `PowerShell`…).
+        settings: des réglages construits en mémoire ; à défaut, ceux du dépôt.
 
     Returns:
-        Une expression par règle `<tool>(...)` de la section, où chaque `*` devient `.*` et tout
-        le reste est pris au pied de la lettre — l'émulation de l'appariement documenté, pas
-        l'appariement lui-même. Elle ne découpe pas les commandes composées (`;`, `&&`, `|`),
-        n'applique ni la règle du ` *` final qui accepte aussi la commande nue, ni le retrait des
-        enveloppes (`timeout`, `FOO=1`) : les listes de ce module ne contiennent donc que des
-        formes simples, sans séparateur.
+        Une expression par règle `<tool>(...)` de la section (`rule_regex`) — l'émulation de
+        l'appariement documenté, pas l'appariement lui-même. Elle ne découpe pas les commandes
+        composées (`;`, `&&`, `|`) et n'applique pas le retrait des enveloppes (`timeout`,
+        `FOO=1`) : les listes de ce module ne contiennent donc que des formes simples, sans
+        séparateur.
     """
-    settings = json.loads(SETTINGS.read_text(encoding="utf-8"))
-    patterns: list[re.Pattern[str]] = []
-    for rule in settings["permissions"].get(section, []):
-        if (match := RULE.match(rule)) and match.group("tool") == tool:
-            parts = match.group("pattern").split("*")
-            patterns.append(re.compile(".*".join(re.escape(part) for part in parts)))
-    return patterns
+    loaded: dict[str, Any] = (
+        json.loads(SETTINGS.read_text(encoding="utf-8")) if settings is None else settings
+    )
+    rules: list[str] = loaded["permissions"].get(section, [])
+    return [
+        rule_regex(match.group("pattern"))
+        for rule in rules
+        if (match := RULE.match(rule)) and match.group("tool") == tool
+    ]
 
 
-def matches_a_rule(command: str, section: Section, tool: str = "Bash") -> bool:
+def rule_regex(pattern: str) -> re.Pattern[str]:
+    """Le motif d'une règle en expression régulière : chaque `*` vaut n'importe quel texte, le
+    reste se prend au pied de la lettre, et un ` *` final qui est la seule étoile du motif accepte
+    aussi la commande nue — « A `*` at the end, with a space before it, also matches the bare
+    command. […] That holds only when the trailing `*` is the rule's only wildcard » (doc
+    « Configure permissions », § Wildcard patterns, lue le 2026-11-03)."""
+    parts = pattern.split("*")
+    if len(parts) == 2 and parts[0].endswith(" ") and not parts[1]:
+        return re.compile(f"{re.escape(parts[0][:-1])}(?: .*)?")
+    return re.compile(".*".join(re.escape(part) for part in parts))
+
+
+def matches_a_rule(
+    command: str, section: Section, tool: str = "Bash", settings: dict[str, Any] | None = None
+) -> bool:
     """Vrai si une règle de la section, pour cet outil, apparie la commande entière."""
-    return any(pattern.fullmatch(command) for pattern in rule_patterns(section, tool))
+    return any(pattern.fullmatch(command) for pattern in rule_patterns(section, tool, settings))
+
+
+def settings_with(old: str, new: str) -> dict[str, Any]:
+    """Les réglages du dépôt, une règle remplacée en mémoire : le fichier n'est jamais affaibli."""
+    text = SETTINGS.read_text(encoding="utf-8")
+    assert text.count(old) == 1, f"« {old} » n'apparaît pas une seule fois dans les réglages"
+    return json.loads(text.replace(old, new))
+
+
+def update_branch_rule(tool: str, prefix: str) -> str:
+    """L'entrée `ask` d'`update-branch` sous une forme d'appel (`CALL_FORMS`)."""
+    return f'"{tool}({prefix}gh pr update-branch *)"'
+
+
+# Le recueil des formes fautives de ce que #198 ajoute (D-2, D-3) : le harnais de mutation refuse de
+# muter un réglage de sécurité (obs 53), chaque affaiblissement se construit donc en mémoire depuis
+# les réglages du dépôt — la règle remplacée, sa remplaçante, puis la section, l'outil et l'appel dont
+# le verdict change, et ce verdict fautif. `update-branch` ramené à `*--rebase*` laisse passer l'appel
+# sans `--rebase`, retiré il laisse passer `--rebase` : chacune des quatre entrées ` *` couvre ce que
+# couvrait celle qu'elle remplace, et le reste.
+FAULTY_SETTINGS: dict[str, tuple[str, str, Section, str, str, bool]] = {
+    **{
+        f"{tool}: {prefix}update-branch ramené à --rebase": (
+            update_branch_rule(tool, prefix),
+            update_branch_rule(tool, prefix).replace(" *)", " *--rebase*)"),
+            "ask",
+            tool,
+            f"{prefix}gh pr update-branch 56",
+            False,
+        )
+        for tool, prefix in CALL_FORMS
+    },
+    **{
+        f"{tool}: {prefix}update-branch retiré": (
+            update_branch_rule(tool, prefix),
+            '"Bash(retiré)"',
+            "ask",
+            tool,
+            f"{prefix}gh pr update-branch 56 --rebase",
+            False,
+        )
+        for tool, prefix in CALL_FORMS
+    },
+    "porte-merge hors allow": (
+        f'"Bash({PORTE_MERGE} *)"',
+        '"Bash(retiré)"',
+        "allow",
+        "Bash",
+        ALLOWED_SCRIPT_CALLS["porte-merge-trunk"][1],
+        False,
+    ),
+    "porte-merge élargi au dossier": (
+        "scripts/porte-merge.py *)",
+        "scripts/*)",
+        "allow",
+        "Bash",
+        NOT_ALLOWED_BY_THE_SCRIPT_RULES[0][1],
+        True,
+    ),
+    "merge hors ask": (
+        '"Bash(gh pr merge *)"',
+        '"Bash(retiré)"',
+        "ask",
+        "Bash",
+        "gh pr merge 200",
+        False,
+    ),
+}
 
 
 @pytest.mark.parametrize("command", LEAKING_COMMANDS + ACCEPTED_COLLATERAL + FORCE_PUSHES)
@@ -160,11 +263,35 @@ def test_chaque_forme_a_refuser_tombe_sur_un_deny(command: str) -> None:
     ("tool", "command"), GATED_CALLS, ids=[f"{t}: {c}" for t, c in GATED_CALLS]
 )
 def test_le_merge_ou_le_rebase_d_une_pr_demande_une_permission(tool: str, command: str) -> None:
-    """« Jamais d'auto-merge », « jamais de force-push sur une PR ouverte sauf rebase demandé » :
-    le go humain est une invite du harnais, pas une consigne."""
+    """« Jamais d'auto-merge », « jamais de force-push sur une PR ouverte sauf rebase demandé »,
+    « ni commit de fusion » (`cycle-pr` Étape 6) : le go humain est une invite du harnais, pas une
+    consigne."""
     assert matches_a_rule(command, "ask", tool), (
         f"{tool} « {command} » ne tombe sur aucun `ask` — l'appel passerait sans go humain"
     )
+
+
+# Les règles d'appariement de la doc (§ Wildcard patterns), sur ses propres exemples : le motif, la
+# commande, et si la règle l'apparie.
+WILDCARD_FORMS = {
+    "etoile-finale-et-arguments": ("git log *", "git log --oneline", True),
+    "etoile-finale-et-commande-nue": ("ls *", "ls", True),
+    "espace-avant-l-etoile-finale": ("ls *", "lsof", False),
+    "etoile-finale-sans-espace": ("ls*", "lsof", True),
+    "deux-etoiles-sans-commande-nue": ("* --help *", "npm --help", False),
+    "deux-etoiles-et-argument": ("* --help *", "npm --help x", True),
+}
+
+
+@pytest.mark.parametrize(
+    ("pattern", "command", "matched"), WILDCARD_FORMS.values(), ids=WILDCARD_FORMS.keys()
+)
+def test_l_emulation_suit_les_regles_d_appariement_documentees(
+    pattern: str, command: str, matched: bool
+) -> None:
+    """Le témoin de l'émulation, des deux côtés : la commande nue n'est acceptée que par un ` *`
+    final seule étoile du motif."""
+    assert bool(rule_regex(pattern).fullmatch(command)) is matched
 
 
 @pytest.mark.parametrize(
@@ -178,14 +305,30 @@ def test_une_commande_ordinaire_ne_tombe_ni_sur_un_deny_ni_sur_un_ask(
     assert not matches_a_rule(command, "ask", tool), f"« {command} » déclenche un `ask`"
 
 
-def test_le_script_de_merge_d_un_lot_est_autorise_sans_invite() -> None:
+@pytest.mark.parametrize(
+    ("tool", "command"), ALLOWED_SCRIPT_CALLS.values(), ids=ALLOWED_SCRIPT_CALLS.keys()
+)
+def test_chaque_script_autorise_part_sans_invite(tool: str, command: str) -> None:
     """« Jamais d'auto-merge dans le trunk » : le merge d'un lot dans sa branche d'intégration
-    part sans go humain, par ce script seul — les formes de `GATED_CALLS` restent en `ask`."""
-    tool, command = ALLOWED_MERGE
-
+    part sans go humain, par `merge-lot.py` seul, et `porte-merge.py`, qui lit, ne demande rien —
+    les formes de `GATED_CALLS` restent en `ask`."""
     assert matches_a_rule(command, "allow", tool), f"« {command} » n'est autorisé par aucun `allow`"
     assert not matches_a_rule(command, "ask", tool), f"« {command} » déclenche un `ask`"
     assert not matches_a_rule(command, "deny", tool), f"« {command} » est arrêté par un `deny`"
+
+
+def test_la_porte_de_merge_garde_l_invite_de_gh_pr_merge() -> None:
+    """La porte chaîne `porte-merge.py` à `gh pr merge` (`cycle-pr` Étape 7, « Le go, puis le
+    merge ») : l'`allow` du script n'y approuve pas le merge, qui reste en `ask` — « Deny and ask
+    rules apply when any subcommand matches them » (doc « Configure permissions », § Compound
+    commands, lue le 2026-11-03). L'émulation ne découpant pas, le test découpe la porte."""
+    porte = (
+        f"{PORTE_MERGE} conversation 200 && gh pr merge 200 --rebase --match-head-commit {'b' * 40}"
+    )
+    script, merge = porte.split(" && ")
+
+    assert matches_a_rule(script, "allow"), f"« {script} » n'est autorisé par aucun `allow`"
+    assert matches_a_rule(merge, "ask"), f"« {merge} » ne tombe sur aucun `ask`"
 
 
 def test_le_script_de_merge_d_un_lot_ne_s_edite_pas_sans_le_mainteneur() -> None:
@@ -201,10 +344,24 @@ def test_le_script_de_merge_d_un_lot_ne_s_edite_pas_sans_le_mainteneur() -> None
 
 @pytest.mark.parametrize(
     ("tool", "command"),
-    NOT_ALLOWED_BY_THE_MERGE_RULE,
-    ids=[f"{t}: {c}" for t, c in NOT_ALLOWED_BY_THE_MERGE_RULE],
+    NOT_ALLOWED_BY_THE_SCRIPT_RULES,
+    ids=[f"{t}: {c}" for t, c in NOT_ALLOWED_BY_THE_SCRIPT_RULES],
 )
-def test_l_autorisation_du_script_de_merge_ne_couvre_que_lui(tool: str, command: str) -> None:
+def test_l_autorisation_des_scripts_ne_couvre_qu_eux(tool: str, command: str) -> None:
     """Une règle élargie à `python *` ou au dossier entier autoriserait sans invite tout ce que
     Python peut lancer, `gh pr merge` compris."""
     assert not matches_a_rule(command, "allow", tool), f"« {command} » est autorisé sans invite"
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "section", "tool", "command", "faulty"),
+    FAULTY_SETTINGS.values(),
+    ids=FAULTY_SETTINGS.keys(),
+)
+def test_chaque_forme_fautive_des_reglages_change_le_verdict_de_sa_garde(
+    old: str, new: str, section: Section, tool: str, command: str, faulty: bool
+) -> None:
+    """Le rouge des gardes ci-dessus, vu en mémoire : sous la forme fautive, l'appel change de
+    verdict ; sous les réglages du dépôt, le témoin, il garde le bon."""
+    assert matches_a_rule(command, section, tool, settings_with(old, new)) is faulty
+    assert matches_a_rule(command, section, tool) is not faulty
