@@ -26,8 +26,11 @@ import {
   holdNativeClicks,
   LINKS,
   nextImage,
+  NO_OUTSIDE,
   openFromTable,
   openProject,
+  OUTSIDE,
+  clickOutsideOverCard,
   panel,
   previousImage,
   readingColumn,
@@ -98,7 +101,8 @@ test('parcours clavier complet : Tab boucle sur tous les arrêts, Maj+Tab à l�
 })
 
 for (const [name, close] of CLOSINGS) {
-  test(`${name} ferme la fiche et rend le focus à la carte`, async ({ page }) => {
+  test(`${name} ferme la fiche et rend le focus à la carte`, async ({ page, isMobile }) => {
+    test.skip(isMobile && name === OUTSIDE, NO_OUTSIDE)
     await openTable(page, PROJECTS)
     const card = cards(page).last()
     await openProject(card)
@@ -110,11 +114,15 @@ for (const [name, close] of CLOSINGS) {
   })
 }
 
-test('une seule requête vers la liste, ouverture et fermetures comprises', async ({ page }) => {
+test('une seule requête vers la liste, ouverture et fermetures comprises', async ({
+  page,
+  isMobile,
+}) => {
   const requests = countProjectRequests(page)
   await openTable(page, PROJECTS)
 
-  for (const [, close] of CLOSINGS) {
+  for (const [name, close] of CLOSINGS) {
+    if (isMobile && name === OUTSIDE) continue
     await openProject(cards(page).first())
     await close(page)
     await expectClosed(page)
@@ -286,15 +294,23 @@ test('en mouvement réduit, l’entête et la fiche passent par un fondu seul', 
   expect(await animations()).toEqual([])
 })
 
-test('un clic hors du panneau ne ferme pas la fiche', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'plein écran : le panneau n’a pas de dehors')
-  await openFromTable(page, PROJECTS)
-
-  await page.mouse.click(4, 4)
+test('arrivée directe : un clic hors du panneau la ferme par son fondu, sans atteindre la carte dessous', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, NO_OUTSIDE)
+  await serveProjects(page, PROJECT_SETS.twelveWithShowcase)
+  await page.goto('/projets/projet-03')
+  await expect(panel(page)).toBeVisible()
   await settle(page)
+  const animations = await watchAnimations(page)
 
-  await expect(panel(page)).toHaveAttribute('data-state', 'open')
-  await expect(page).toHaveURL(FIRST.path)
+  await clickOutsideOverCard(page)
+
+  await expectClosed(page)
+  await settle(page)
+  await expect(page).toHaveURL('/')
+  expect((await animations()).map(({ name }) => name)).toEqual(['project-out'])
 })
 
 test.describe('l’historique, à partir de `/`', () => {

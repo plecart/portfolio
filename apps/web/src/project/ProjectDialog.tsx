@@ -32,18 +32,22 @@ function focusCard(slug: string) {
  * La fiche d'un projet (spec §1.10, §3.2) : le dialogue modal de Radix, sans `DialogOverlay`, dont
  * le `RemoveScroll` poserait un `<style>` que la CSP de production bloque.
  *
- * Trois fermetures : le bouton, Échap et le retour du navigateur ; un clic hors du panneau n'en est
- * pas une. Ouverte depuis sa carte, elle en part et y revient (`useChoreography`, spec §4.6) : le
- * focus attend la pose sur le panneau, et la fiche reste ouverte pour Radix jusqu'à son retour,
- * quand le projet a déjà quitté l'adresse ; s'il y est revenu entre-temps, elle se rouvre alors par
- * son fondu. Sinon, deux fondus, et le bouton, premier du panneau, reçoit le focus de Radix à
+ * Quatre fermetures : le bouton, Échap, le retour du navigateur et, dès 600 px, un clic hors du
+ * panneau — sous 600 px, le panneau est la fenêtre. Ce clic n'atteint pas une carte dessous : son
+ * appui tombe sur `<html>`, Radix retirant le pointeur à `<body>` tant que la fiche est ouverte, et
+ * le `click` part de l'ancêtre commun de l'appui et du relâché (Chromium 156, mesuré le 2026-11-03).
+ *
+ * Ouverte depuis sa carte, elle en part et y revient (`useChoreography`, spec §4.6) : le focus
+ * attend la pose sur le panneau, et la fiche reste ouverte pour Radix jusqu'à son retour, quand le
+ * projet a déjà quitté l'adresse ; s'il y est revenu entre-temps, elle se rouvre alors par son
+ * fondu. Sinon, deux fondus, et le bouton, premier du panneau, reçoit le focus de Radix à
  * l'ouverture. Le dernier projet montré reste rendu jusqu'au retrait du panneau ; une autre fiche
  * ouverte pendant le fondu de sortie trouve le panneau encore monté : sa galerie repart de la
  * première image.
  *
  * @param project Le projet à montrer ; `undefined`, fiche fermée.
  * @param origin La carte d'où la fiche s'ouvre, jusqu'à son retour ; `null` sans carte d'origine.
- * @param onClose La demande de fermeture : le bouton ou Échap.
+ * @param onClose La demande de fermeture : le bouton, Échap ou un clic hors du panneau.
  * @param onLanded La fiche est revenue à sa carte d'origine.
  */
 export function ProjectDialog({
@@ -89,7 +93,6 @@ export function ProjectDialog({
             event.preventDefault()
             panel?.focus()
           }}
-          onInteractOutside={(event) => event.preventDefault()}
           onCloseAutoFocus={(event) => {
             event.preventDefault()
             focusCard(shown.slug)
