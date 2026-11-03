@@ -7,7 +7,7 @@
  * durées, ses retards et sa courbe se comparent aux jetons résolus. Seules comptent celles de la
  * Web Animations API — ni les transitions ni les animations CSS de la page.
  */
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './api.ts'
 import { resolveAll, settle } from './css.ts'
 import {
@@ -17,12 +17,13 @@ import {
   ficheProject,
   freezeAnimations,
   LINKS,
+  nextImage,
   openProject,
   panel,
   readingColumn,
   watchAnimations,
 } from './project.ts'
-import { buildImage, PROJECT_SETS } from './projects.ts'
+import { buildImage, ONGOING, PROJECT_SETS } from './projects.ts'
 import { cards, COLUMN_VIEWPORT, countCellReads, enterCards, expectPlacement, openTable } from './table.ts'
 
 /** Trois projets ; la première carte, celle d'un projet en cours, à une seule image. */
@@ -58,6 +59,10 @@ async function motion(page: Page) {
     easing,
   }
 }
+
+/** La boîte d'un élément à l'écran. */
+const boxOf = (element: Locator): Promise<Box> =>
+  element.evaluate((node) => node.getBoundingClientRect().toJSON())
 
 /** Deux boîtes égales au demi-pixel. */
 function expectSameBox(actual: Box, expected: Box) {
@@ -142,7 +147,7 @@ test('la feuille, la photo, le post-it et les rubans partent de leur homologue s
   await openFrozen(page, FIRST_PATH)
 
   const flights = await page.evaluate(readFlights, { path: FIRST_PATH })
-  const panelBox = await panel(page).evaluate((element) => element.getBoundingClientRect().toJSON())
+  const panelBox = await boxOf(panel(page))
 
   expect(flights.length).toBeGreaterThan(3)
   for (const [index, flight] of flights.entries()) {
@@ -260,6 +265,28 @@ test('un projet en cours : la couche noir et blanc couvre la première image et 
   await settle(page)
 
   await expect(images).toHaveCount(1)
+})
+
+test('fermée depuis sa deuxième image, la galerie revient d’un coup à la première, celle de la carte, et la couche noir et blanc s’y pose', async ({
+  page,
+}) => {
+  await openEnteredTable(page, [
+    ficheProject({ ...ONGOING, gallery: [buildImage('fiche', 'Une'), buildImage('fiche', 'Deux')] }),
+  ])
+  await openProject(page.locator('.card[href="/projets/fiche"]'))
+  await nextImage(page).click()
+  await settle(page)
+  await freezeAnimations(page)
+  const frame = panel(page).locator('.project-gallery-frame')
+  const track = panel(page).locator('.project-gallery-track')
+
+  await page.keyboard.press('Escape')
+
+  expect(await track.evaluate((element) => element.getAnimations().length)).toBe(0)
+  expectSameBox(await boxOf(frame.locator('img').first()), await boxOf(frame))
+  await finishAnimations(page)
+  const grey = await frame.evaluate(readGreyLayer)
+  expectSameBox(grey.box, await boxOf(frame))
 })
 
 test('les autres cartes de l’écran reculent de 48 px à l’opposé de la carte ouverte et s’effacent ; hors de l’écran, rien ne bouge', async ({
@@ -412,7 +439,7 @@ test('à la fermeture, le contenu s’efface en `--dur-fast`, puis la feuille, l
   await openEnteredTable(page, PROJECTS)
   const { open, fast, ribbon, easing } = await motion(page)
   await openProject(page.locator(`.card[href="${FIRST_PATH}"]`))
-  const panelBox = await panel(page).evaluate((element) => element.getBoundingClientRect().toJSON())
+  const panelBox = await boxOf(panel(page))
   const [paper] = await resolveAll(page, [['background-color', 'var(--paper)']])
   await freezeAnimations(page)
 
