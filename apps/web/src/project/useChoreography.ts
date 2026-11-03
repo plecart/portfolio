@@ -248,15 +248,20 @@ function fading(panel: HTMLElement, { fast, reducedFade, easing }: Motion): Step
   }
 }
 
-/** La fin de toutes ces animations. */
-const allFinished = (animations: Animation[]) =>
-  Promise.all(animations.map(({ finished }) => finished))
+/**
+ * La fin de toutes ces animations, qu'elles aillent à leur terme ou qu'on les annule en route : une
+ * annulation rejette `finished`, et ce qui attend la fin n'arriverait jamais.
+ */
+const allSettled = (animations: Animation[]) =>
+  Promise.allSettled(animations.map(({ finished }) => finished))
 
 /**
  * Fait décoller une fiche de sa carte (spec §4.6, §6.3) — un vol, ou des fondus en mouvement réduit
  * —, mesurée avant d'être peinte, pendant que les cartes de la table s'effacent. Quand elle devient
- * active, « Fermer la fiche » prend le focus, et le panneau en vol reprend son papier. Le panneau et
- * ses ancêtres ne se transforment jamais : sous 600 px, le bouton Fermer y est fixe.
+ * active, « Fermer la fiche » prend le focus, et le panneau en vol reprend son papier. Une animation
+ * annulée en route ne retient ni la pose ni le retour : chacun attend la fin des siennes, quelle
+ * qu'elle soit (`allSettled`). Le panneau et ses ancêtres ne se transforment jamais : sous 600 px,
+ * le bouton Fermer y est fixe.
  *
  * @returns L'atterrissage, qui ramène la fiche à sa carte, et l'abandon, qui retire tout sans
  *   mouvement.
@@ -268,14 +273,18 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
   const moves = cardMoves(card, motion.reduced)
   const receding = moveCards(moves, motion, 'out')
   const flights = steps.out()
-  flights[0].addEventListener('finish', () => {
+  let landed = false
+  let aborted = false
+  // La pose, au bout du premier vol, même annulé en route ; jamais après l'abandon.
+  void allSettled([flights[0]]).then(() => {
+    if (aborted) return
     panel.removeAttribute('data-flight')
     panel.querySelector<HTMLElement>('.project-close')?.focus()
   })
-  let landed = false
 
   const abort = () => {
     if (landed) return
+    aborted = true
     for (const animation of [...flights, ...receding]) animation.cancel()
     card.removeAttribute('data-origin')
     panel.removeAttribute('data-flight')
@@ -296,10 +305,10 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
     // ponytail: fermée en vol, la fiche se pose d'abord d'un coup ; le retour depuis la position
     // courante de chaque élément (décision de #22) remplacera ce saut.
     for (const animation of flights) animation.finish()
-    await allFinished(steps.clear())
+    await allSettled(steps.clear())
     const back = steps.back()
     for (const animation of receding) animation.cancel()
-    await allFinished([...back, ...moveCards(moves, motion, 'back')])
+    await allSettled([...back, ...moveCards(moves, motion, 'back')])
     card.removeAttribute('data-origin')
     landed = true
   }
