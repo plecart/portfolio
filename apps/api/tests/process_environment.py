@@ -51,15 +51,27 @@ VALID_ENVIRONMENT = {
 # Un chemin qui n'existe pas : `pydantic-settings` n'y lit rien, sans bruit.
 NO_ENV_FILE = Path(__file__).with_name("aucun-fichier-env")
 
+# Ryuk, le conteneur de nettoyage de testcontainers, reçoit le socket Docker en écriture : c'est
+# l'image la plus privilégiée que les tests lancent. Épinglée par empreinte, comme les images de
+# base du Dockerfile — une étiquette peut changer de contenu, une empreinte non. L'étiquette reste
+# celle que testcontainers attend : `test_process_environment.py` le vérifie à chaque montée.
+# Dependabot ne voit pas cette épingle : l'empreinte d'une nouvelle étiquette se lit sur la ligne
+# « Digest » de `docker buildx imagetools inspect testcontainers/ryuk:<étiquette>`.
+RYUK_IMAGE = (
+    "testcontainers/ryuk:0.8.1"
+    "@sha256:bf3f74a47dee0acda89aba4b2fc9c7fdcf994a084db02a2d06566f07baae022e"
+)
+
 # Les variables des outils, hors des champs d'`Env` : quels réglages pytest-django charge — il lit
-# l'environnement avant `pyproject.toml` —, quel fichier `Env` lit, et par quelle adresse
-# testcontainers joint ses conteneurs. `127.0.0.1` et non le `localhost` qu'il rend de lui-même :
-# sous Windows, `localhost` se résout d'abord en `::1`, et un port publié pour `127.0.0.1`
-# seulement ferait attendre chaque connexion. Par `TC_HOST`, que testcontainers lit avant
-# `TESTCONTAINERS_HOST_OVERRIDE` (`testcontainers/core/config.py`).
+# l'environnement avant `pyproject.toml` —, quel fichier `Env` lit, quelle image Ryuk
+# testcontainers lance, et par quelle adresse il joint ses conteneurs. `127.0.0.1` et non le
+# `localhost` qu'il rend de lui-même : sous Windows, `localhost` se résout d'abord en `::1`, et
+# un port publié pour `127.0.0.1` seulement ferait attendre chaque connexion. Par `TC_HOST`, que
+# testcontainers lit avant `TESTCONTAINERS_HOST_OVERRIDE` (`testcontainers/core/config.py`).
 TOOLING_ENVIRONMENT = {
     "DJANGO_SETTINGS_MODULE": "config.settings",
     "ENV_FILE": str(NO_ENV_FILE),
+    "RYUK_CONTAINER_IMAGE": RYUK_IMAGE,
     "TC_HOST": "127.0.0.1",
 }
 
