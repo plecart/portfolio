@@ -8816,10 +8816,15 @@ BORNE_DES_RELANCES = (
 # `--releve` sort en 0 sans juger : chaîné par `&&`, il ferait passer n'importe quel merge. Dit là
 # où la prose le prescrit près d'un `gh pr merge` (`cycle-pr` Étape 7, `hors-scope.md` étape 6).
 RELEVE_JAMAIS_CHAINE = "il sort en 0 sans juger, et ne se chaîne jamais par `&&`"
+# L'état de fusion que porte la forge, dit au même titre dans `cycle-pr` Étape 7 et chez le
+# `verificateur`.
+MERGEABLE_NE_PROUVE_RIEN = (
+    "L'état `MERGEABLE` de la forge, lui, se met à jour en différé et ne prouve rien"
+)
 
 # Chaque énoncé restrictif que #197 ajoute, épinglé sur sa **moitié restrictive** (obs 126) : une
-# mutation qui la retire en laissant le reste de la phrase rougit ici. Ailleurs : les trois
-# énoncés de l'Étape 6, bornés à leur passage (`ADVISORY_GATE_RULES`), le prédicat de
+# mutation qui la retire en laissant le reste de la phrase rougit ici. Ailleurs : les énoncés de
+# l'Étape 6, bornés à leur passage (`ADVISORY_GATE_RULES`), le prédicat de
 # conversation chaîné à `gh pr merge` (`PORTES_PRESCRITES`), la relance couverte par le go et
 # nommée à l'Étape 1 (`QUESTIONS_DU_GO`).
 INVARIANTS_DE_LA_PORTE_DE_MERGE = {
@@ -8855,7 +8860,7 @@ INVARIANTS_DE_LA_PORTE_DE_MERGE = {
     ),
     "cycle-pr-porte-jamais-sur-la-reference-de-la-forge": (
         CYCLE_PR_SKILL,
-        "jamais lu dans la référence que porte la forge",
+        "jamais supposé égal à la base de branche, jamais lu dans la référence que porte la forge",
     ),
     "cycle-pr-borne-des-relances": (
         CYCLE_PR_SKILL,
@@ -8959,6 +8964,359 @@ INVARIANTS_DE_LA_PORTE_DE_MERGE = {
             " 40963627023)"
         ),
     ),
+    # #198, D-5 : les morceaux qui prescrivent dans les passages déclarés de la table.
+    "cycle-pr-aucun-run-consulter-le-statut": (
+        CYCLE_PR_SKILL,
+        (
+            "**Si aucun run n'apparaît** pour le SHA de tête — sortie 3 : sauté, annulé sans"
+            " remplaçant ou aucun run —, consulter d'abord"
+            " `https://www.githubstatus.com/api/v2/components.json`"
+        ),
+    ),
+    "cycle-pr-re-declenchement-propre": (
+        CYCLE_PR_SKILL,
+        "Le re-déclenchement propre est `gh pr close` puis `gh pr reopen`",
+    ),
+    "cycle-pr-re-declenchement-jamais-de-commit-vide": (
+        CYCLE_PR_SKILL,
+        (
+            "couverte d'avance et bornée comme à l'Étape 7 (« Rejouer les vérifications périmées"
+            " ») — jamais de commit vide ni de force-push"
+        ),
+    ),
+    "cycle-pr-relancer-le-script": (
+        CYCLE_PR_SKILL,
+        "Puis relancer le script, comme ci-dessus : le run de la réouverture est le plus récent",
+    ),
+    "cycle-pr-sha-de-tete-verifie-passe-a-match-head": (
+        CYCLE_PR_SKILL,
+        (
+            "Le `<SHA de tête vérifié>` est celui que la porte de merge passera à"
+            " `--match-head-commit`"
+        ),
+    ),
+    "cycle-pr-le-script-lit-la-ligne-de-checkout": (
+        CYCLE_PR_SKILL,
+        "Le script lit, sur chaque job qui a tourné, la ligne de checkout de sa trace",
+    ),
+    "cycle-pr-premier-parent-trunk-eprouve": (
+        CYCLE_PR_SKILL,
+        (
+            "le **premier parent** du commit extrait, le `<trunk>` du message, est le **trunk"
+            " éprouvé**"
+        ),
+    ),
+    "cycle-pr-la-porte-consomme-le-trunk-eprouve": (
+        CYCLE_PR_SKILL,
+        (
+            "et c'est **lui** que la porte de merge consomme, sous le nom `<SHA du trunk"
+            " éprouvé>`, inscrit au Test plan avec le numéro du run"
+        ),
+    ),
+    "cycle-pr-trunk-sorties-1-et-2": (
+        CYCLE_PR_SKILL,
+        "**1**, trunk périmé ; **2**, refus, son motif en une ligne",
+    ),
+    "cycle-pr-absence-de-conflit-par-merge-tree": (
+        CYCLE_PR_SKILL,
+        (
+            "Puis vérifier l'absence de conflit par `git merge-tree --write-tree origin/<trunk>"
+            " HEAD`, qui est un **prédicat**"
+        ),
+    ),
+    "cycle-pr-merge-tree-s-enchaine-par-et": (
+        CYCLE_PR_SKILL,
+        "donc il s'enchaîne par `&&`, et ce qu'il imprime n'est qu'un détail de diagnostic",
+    ),
+    "cycle-pr-mergeable-ne-prouve-rien": (
+        CYCLE_PR_SKILL,
+        MERGEABLE_NE_PROUVE_RIEN,
+    ),
+    "cycle-pr-redater-les-preuves": (
+        CYCLE_PR_SKILL,
+        "Puis redater les preuves locales sur cette base",
+    ),
+    "cycle-pr-trunk-bouge-apres-relancer": (
+        CYCLE_PR_SKILL,
+        "Si elle a bougé **après**, relancer la CI de même, puis relire la trace du nouveau run",
+    ),
+    "cycle-pr-jamais-de-commit-de-fusion": (
+        CYCLE_PR_SKILL,
+        "Sur un trunk fusionné par rebase ou squash, jamais de commit de fusion",
+    ),
+    "cycle-pr-verdict-aux-notes-avant-le-go": (
+        CYCLE_PR_SKILL,
+        "**Le verdict s'inscrit dans les Notes du body avant le go**, relu après écriture",
+    ),
+    "cycle-pr-porte-refuse-sans-la-ligne": (
+        CYCLE_PR_SKILL,
+        "la porte de merge compare la dernière ligne de cette forme du body, et refuse sans elle",
+    ),
+    "cycle-pr-releve-copie-puis-lecture": (
+        CYCLE_PR_SKILL,
+        (
+            "la ligne que rend `python <répertoire de ce skill>/scripts/porte-merge.py"
+            " conversation <n> --releve`, copiée telle quelle, puis la lecture de ce qu'il compte,"
+            " `gh pr view <n> --comments` et les commentaires en ligne d'une revue, que cette"
+            " commande ne rend pas : `gh api --paginate repos/{owner}/{repo}/pulls/<n>/comments`"
+        ),
+    ),
+    "cycle-pr-relever-d-abord": (CYCLE_PR_SKILL, "Relever d'abord"),
+    "cycle-pr-le-releve-n-est-pas-une-porte": (CYCLE_PR_SKILL, "Le relevé n'est pas une porte"),
+    "cycle-pr-match-head-et-conversation": (
+        CYCLE_PR_SKILL,
+        (
+            "`--match-head-commit` ferme le même trou côté tête, et `porte-merge.py conversation"
+            " <n>` côté conversation"
+        ),
+    ),
+    "cycle-pr-conversation-compare-a-la-derniere-ligne": (
+        CYCLE_PR_SKILL,
+        (
+            "il compare les commentaires et revues soumises de la PR à la **dernière** ligne"
+            " `Conversation : …` du body"
+        ),
+    ),
+    "cycle-pr-conversation-sorties-1-et-2": (
+        CYCLE_PR_SKILL,
+        (
+            "et sort en **1** sur tout élément postérieur ou sur un compte qui a changé, en **2**"
+            " sur une ligne absente ou mal formée"
+        ),
+    ),
+    "cycle-pr-trunk-avance-ne-part-pas": (
+        CYCLE_PR_SKILL,
+        "Si le trunk a avancé depuis, la commande **ne part pas**",
+    ),
+    "cycle-pr-trunk-avance-verificateur-neuf": (
+        CYCLE_PR_SKILL,
+        (
+            "rejouer « Rejouer les vérifications périmées », relire la trace du nouveau run, puis"
+            " un `verificateur` neuf"
+        ),
+    ),
+    "cycle-pr-conversation-changee-lire-chaque-element": (
+        CYCLE_PR_SKILL,
+        (
+            "lire chaque élément que le prédicat nomme — un commentaire de répercussion se traite"
+            " à l'Étape 6 —, puis un `verificateur` neuf, ou pour une PR qui n'en a pas, un relevé"
+            " neuf aux Notes, pris puis lu comme plus haut"
+        ),
+    ),
+    "briefing-go-couvre-les-relances": (
+        BRIEFING_REF,
+        (
+            "**Le go du briefing couvre les relances de CI de la PR**, par `gh pr close` puis `gh"
+            " pr reopen`"
+        ),
+    ),
+    "briefing-denombrer-les-cases": (
+        BRIEFING_REF,
+        (
+            "**Dénombrer les cases du corps et celles du brief** — les lignes `- [` du corps et du"
+            " commentaire `## Brief d'agent`"
+        ),
+    ),
+    "verificateur-aucune-commande-du-projet": (
+        VERIFICATEUR_ROLE,
+        "**Tu ne lances aucune commande du projet** — ni suite, ni lint, ni mutation",
+    ),
+    "verificateur-le-verdict-se-lit": (
+        VERIFICATEUR_ROLE,
+        "leur verdict se **lit** (`gh pr checks`)",
+    ),
+    "verificateur-chaque-critere-avec-sa-preuve": (
+        VERIFICATEUR_ROLE,
+        (
+            "**Chaque critère d'acceptation** de l'issue, sur le diff — ✅ / ❌ / ⚠️ par case, avec"
+            " sa preuve"
+        ),
+    ),
+    "verificateur-la-preuve": (
+        VERIFICATEUR_ROLE,
+        "le fichier et la ligne du diff, ou la case du Test plan et ce qu'elle observe",
+    ),
+    "verificateur-le-verdict-juge-leur-union": (
+        VERIFICATEUR_ROLE,
+        "le verdict juge **leur union**",
+    ),
+    "verificateur-le-corps-fait-foi": (VERIFICATEUR_ROLE, "Le corps fait foi"),
+    "verificateur-ligne-copiee-telle-quelle": (
+        VERIFICATEUR_ROLE,
+        (
+            "`python .claude/skills/cycle-pr/scripts/porte-merge.py conversation <n> --releve`,"
+            " dont la ligne se copie telle quelle dans le verdict"
+        ),
+    ),
+    "verificateur-puis-lire-ce-qu-elle-compte": (
+        VERIFICATEUR_ROLE,
+        (
+            "puis lire ce qu'elle compte, `gh pr view <n> --comments` et les commentaires en ligne"
+            " d'une revue, que cette commande ne rend pas : `gh api --paginate"
+            " repos/{owner}/{repo}/pulls/<n>/comments`"
+        ),
+    ),
+    "verificateur-commentaire-ouvert-critere-non-solde": (
+        VERIFICATEUR_ROLE,
+        (
+            "Un commentaire de revue automatisée ou de répercussion encore ouvert est un critère"
+            " que la PR n'a pas soldé"
+        ),
+    ),
+    "verificateur-fraicheur-par-ce-que-le-run-a-extrait": (
+        VERIFICATEUR_ROLE,
+        "**La fraîcheur du trunk éprouvé**, et elle se date par ce que le run a réellement extrait",
+    ),
+    "verificateur-trace-du-dernier-run": (
+        VERIFICATEUR_ROLE,
+        (
+            "`git fetch origin`, seul, puis la trace de checkout du dernier run `CI` de la tête de"
+            " ton verdict, `<SHA de tête vérifié>` — le plus récent par `createdAt` de `gh run list"
+            " --commit <SHA de tête vérifié> --workflow CI --json databaseId,createdAt` : `python"
+            " .claude/skills/cycle-pr/scripts/porte-merge.py trunk <run> <trunk> <SHA de tête"
+            " vérifié>`"
+        ),
+    ),
+    "verificateur-trunk-sorties": (
+        VERIFICATEUR_ROLE,
+        (
+            "Il sort en **0** si chaque job a combiné la tête à `origin/<trunk>`, en **1** sur un"
+            " trunk périmé, en **2** sur un refus"
+        ),
+    ),
+    "verificateur-ligne-base-du-verdict": (
+        VERIFICATEUR_ROLE,
+        (
+            "sa dernière ligne donne les valeurs de la ligne « Base » du verdict, qui garde la"
+            " forme du gabarit"
+        ),
+    ),
+    "verificateur-absence-de-conflit-par-predicat": (
+        VERIFICATEUR_ROLE,
+        (
+            "Puis l'absence de conflit, par un **prédicat** : `git merge-tree --write-tree"
+            " origin/<trunk> <branche>` sort en **0** sans conflit et en **1** avec"
+        ),
+    ),
+    "verificateur-code-de-sortie-porte-la-condition": (
+        VERIFICATEUR_ROLE,
+        "c'est son code de sortie qui porte la condition",
+    ),
+    "verificateur-reference-introuvable-jamais-un-conflit": (
+        VERIFICATEUR_ROLE,
+        "ce 1-là se rapporte comme une référence introuvable, jamais comme un conflit",
+    ),
+    "verificateur-mergeable-ne-prouve-rien": (
+        VERIFICATEUR_ROLE,
+        MERGEABLE_NE_PROUVE_RIEN,
+    ),
+    "pr-paralleles-signalement-bloquant-par-sendmessage": (
+        PR_PARALLELES_SKILL,
+        (
+            "Un signalement **bloquant** sur une issue du lot : le lead l'écrit à la session par"
+            " `SendMessage` (« signalement bloquant : … — arrête-toi et remonte-le au mainteneur »)"
+        ),
+    ),
+    "pr-paralleles-recu-en-fin-de-tour": (
+        PR_PARALLELES_SKILL,
+        "occupée, elle ne le reçoit qu'à la fin de son tour en cours",
+    ),
+    "pr-paralleles-croisement-une-ligne-par-fichier": (
+        PR_PARALLELES_SKILL,
+        (
+            "Le script rend une ligne `<fichier> → <branches>` par fichier mergé que touche au"
+            " moins une branche"
+        ),
+    ),
+    "pr-paralleles-croisement-predicat-par-branche": (
+        PR_PARALLELES_SKILL,
+        (
+            "puis, pour chaque branche, le code de `git merge-tree --write-tree` contre"
+            " `origin/main`, **prédicat** : 0 sans conflit, 1 avec, les fichiers en conflit cités"
+        ),
+    ),
+    "pr-paralleles-le-script-valide-chaque-reference": (
+        PR_PARALLELES_SKILL,
+        "Ce 1 ne prouve un conflit que parce que le script valide d'abord chaque référence",
+    ),
+    "pr-paralleles-refuse-une-pr-non-mergee": (
+        PR_PARALLELES_SKILL,
+        (
+            "Il refuse une PR non mergée, et une base qui ne contient pas son merge en nommant les"
+            " deux remèdes"
+        ),
+    ),
+    "pr-paralleles-les-deux-remedes": (
+        PR_PARALLELES_SKILL,
+        (
+            "`git fetch origin`, qu'il ne fait pas, ou `--base origin/<branche où la PR a été"
+            " mergée>`, qu'il lit sur la PR"
+        ),
+    ),
+    "pr-paralleles-ce-que-le-croisement-ne-voit-pas": (
+        PR_PARALLELES_SKILL,
+        (
+            "Il ne voit ni un renommage, ni un fichier qu'une branche touche hors du merge, ni un"
+            " conflit de sens sans conflit de texte"
+        ),
+    ),
+    "pr-paralleles-consigne-jamais-sur-la-carte": (
+        PR_PARALLELES_SKILL,
+        "La consigne se fonde sur ce croisement, jamais sur la carte de recouvrement de l'étape 2",
+    ),
+    "pr-paralleles-le-script-ne-relance-rien": (
+        PR_PARALLELES_SKILL,
+        "Le script ne l'envoie pas, et ne relance rien",
+    ),
+    "pr-paralleles-branche-qui-recouvre-relance": (
+        PR_PARALLELES_SKILL,
+        "une branche qui recouvre relance sa CI",
+    ),
+    "pr-paralleles-pas-de-commit-de-fusion-ni-de-rebase": (
+        PR_PARALLELES_SKILL,
+        (
+            "pas de commit de fusion sur un trunk fusionné par rebase, ni de rebase d'une branche"
+            " poussée sans demande explicite"
+        ),
+    ),
+    "pr-paralleles-conflit-par-un-commit-reel": (
+        PR_PARALLELES_SKILL,
+        "un conflit se résout par un commit réel sur la branche",
+    ),
+    "hors-scope-commit-en-isolation": (
+        HORS_SCOPE_REF,
+        (
+            "Il commite sur une branche partie de `origin/main`, lancé en isolation `worktree`"
+            " comme le `relecteur` — le dossier de la session, que d'autres sessions peuvent lire,"
+            " ne change pas de branche"
+        ),
+    ),
+    "hors-scope-presentee-au-mainteneur": (HORS_SCOPE_REF, "et la présente au mainteneur"),
+    "hors-scope-merge-au-go-par-la-porte": (
+        HORS_SCOPE_REF,
+        (
+            "Au go du mainteneur, dans sa fenêtre, la session merge la PR (`python"
+            " .claude/skills/cycle-pr/scripts/porte-merge.py conversation <n> && gh pr merge <n>"
+            " --rebase --match-head-commit <SHA relu>`, le `headRefOid` relu à l'étape 5)"
+        ),
+    ),
+    "hors-scope-conversation-changee-avant-tout-go": (
+        HORS_SCOPE_REF,
+        (
+            "un 1 de la conversation — un commentaire ou une revue depuis l'ouverture, chacun"
+            " nommé — se présente au mainteneur avant tout nouveau go, après un relevé neuf, relevé"
+            " d'abord puis lu"
+        ),
+    ),
+    "hors-scope-releve-puis-lecture": (
+        HORS_SCOPE_REF,
+        (
+            "au body, la ligne que rend `porte-merge.py conversation <n> --releve`, puis la"
+            " lecture de `gh pr view <n> --comments` et des commentaires en ligne, `gh api"
+            " --paginate repos/{owner}/{repo}/pulls/<n>/comments`, que la première ne rend pas"
+        ),
+    ),
+    "hors-scope-le-releve-n-est-pas-une-porte": (HORS_SCOPE_REF, "Ce relevé n'est pas une porte"),
 }
 
 
@@ -8970,6 +9328,238 @@ INVARIANTS_DE_LA_PORTE_DE_MERGE = {
 def test_chaque_invariant_de_la_porte_de_merge_garde_sa_phrase(fichier: str, phrase: str) -> None:
     """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
     assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
+
+
+# Les passages déclarés de la porte de merge (#197 ; #198, D-5), là où la session, le
+# `verificateur`, le lead et le tri des hors-scope la lisent.
+PASSAGES_DE_LA_PORTE_DE_MERGE = (
+    Passage(
+        CYCLE_PR_SKILL,
+        "**Si aucun run n'apparaît** pour le SHA de tête",
+        "# Étape 6 — Review + CI",
+        {
+            "motif": [
+                (
+                    "un événement émis pendant une panne d'Actions, le passage en ready compris,"
+                    " n'est **pas rejoué** au rétablissement."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "Le `<SHA de tête vérifié>` est celui que la porte de merge passera",
+        "**Trace périmée** :",
+        {
+            "relevé daté": [
+                (
+                    "aux PR #73 (run 37209134824) et #185 (run 40769309165, référence relue sur"
+                    " `155b355`, extrait sur `3e24919`), elle portait déjà le trunk neuf quand le"
+                    " run avait extrait l'ancien ;"
+                ),
+                (
+                    "aux PR #95 (runs 38646490017 et 38703579686) et #109 (runs 38960319135 et"
+                    " 38967746705), deux réouvertures de suite ont extrait une référence ancienne,"
+                    " et le run 38980769989 la bonne, le trunk n'ayant pas bougé (obs 83, 91, 110)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**Trace périmée** :",
+        "**Un critère qui nomme une commande se solde par cette commande",
+        {
+            "intitulé": [
+                "**Trace périmée** :",
+            ],
+            "motif": [
+                "il ne respecte pas le format des messages et tombe au merge.",
+            ],
+        },
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**Le verdict s'inscrit dans les Notes du body avant le go**",
+        "**Une PR sans `verificateur`**",
+        {
+            "motif": [
+                (
+                    "Rendu seulement à la session qui l'a commandé, il ne survit que par sa"
+                    " mémoire, et la passation suivante le relaie comme un énoncé sans source :"
+                ),
+            ],
+            "relevé daté": [
+                (
+                    "deux lots de suite, le prompt du lot suivant a cité un verdict que ni le"
+                    " corps ni les commentaires de la PR ne portaient (obs 81)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**Une PR sans `verificateur`**",
+        "Le verdict rendu :",
+        {
+            "motif": [
+                (
+                    "lu avant, un élément arrivé entre la lecture et le relevé passerait la porte"
+                    " compté sans avoir été lu (`.claude/agents/verificateur.md`, point 1, qui suit"
+                    " le même ordre)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "Le `<SHA du trunk éprouvé>` est **le premier parent du commit",
+        "**Une porte est une commande dont le code de sortie",
+        {},
+    ),
+    Passage(
+        BRIEFING_REF,
+        "**Le go du briefing couvre les relances de CI de la PR**",
+        "# Auto-challenge du plan",
+        {
+            "relevé daté": [
+                "D-1 de 197 :",
+                "à la vague 1, chaque relance de la PR #185 avait coûté un aller-retour d'accord.",
+            ],
+        },
+    ),
+    Passage(
+        BRIEFING_REF,
+        "- **Dénombrer les cases du corps et celles du brief**",
+        "- **Reproduire chaque chiffre de référence",
+        {
+            "relevé daté": [
+                "Sur #167 :",
+                (
+                    "corps 2 cases, brief 7 dont « Les critères du corps de l'issue », soit 6"
+                    " cases du brief hors du corps (relevé du 2026-10-29, obs 149)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        VERIFICATEUR_ROLE,
+        "**Tu ne lances aucune commande du projet**",
+        "Une PR de lot coordonné vise la branche d'intégration",
+        {
+            "motif": [
+                "Lancée dans l'arbre de la session, une suite rougirait sur son travail en cours :",
+                "une demi-session perdue pour un résultat que la forge possède déjà.",
+                "C'est aussi ce qui te distingue du `relecteur`, qui mute et éprouve.",
+            ],
+        },
+    ),
+    Passage(
+        VERIFICATEUR_ROLE,
+        "1. **Chaque critère d'acceptation** de l'issue, sur le diff",
+        "2. **La fraîcheur du trunk éprouvé**",
+        {
+            "intitulé": [
+                "1.",
+            ],
+            "motif": [
+                (
+                    "Lu avant le relevé, un élément arrivé entre les deux serait compté sans avoir"
+                    " été lu, et passerait la porte."
+                ),
+            ],
+            "relevé daté": [
+                "9 revues comptées, 0 ligne de `--comments`, 9 commentaires en ligne).",
+            ],
+        },
+    ),
+    Passage(
+        VERIFICATEUR_ROLE,
+        "2. **La fraîcheur du trunk éprouvé**",
+        "3. **Les heurts `decisions-vs-doc`.**",
+        {
+            "intitulé": [
+                "2.",
+            ],
+            "motif": [
+                (
+                    "un run peut extraire une référence plus ancienne que celle qu'elle porte (PR"
+                    " #185, run 40769309165 ;"
+                ),
+                "Et GitHub ne la recalcule ni à chaque merge sur la base ni au passage en ready :",
+                (
+                    "un run vert sur une référence périmée n'éprouve pas l'état combiné, et rien"
+                    " ne le signale — ni le rollup, ni `mergeable`, ni le `head_sha` du run (obs"
+                    " 51)."
+                ),
+                (
+                    "Il sort en **1** aussi sur une référence inconnue — une `<branche>` absente"
+                    " de ce clone —, sortie standard vide (même table ;"
+                ),
+            ],
+            "relevé daté": [
+                "`cycle-pr` Étape 7, « Rejouer les vérifications périmées », obs 83, 91, 110).",
+                "sortie mesurée le 2026-10-21, git 2.47.1) :",
+            ],
+        },
+    ),
+    Passage(
+        VERIFICATEUR_ROLE,
+        "``` Verdict PR #<n> — issue #<N>",
+        "La ligne `Conversation : …`, relevée au point 1",
+        {},
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "- Un signalement **bloquant** sur une issue du lot",
+        "- **Après chaque merge du lot, avant toute consigne",
+        {
+            "motif": [
+                (
+                    "le travail de ce tour peut être à jeter, et un merge lancé dans ce tour"
+                    " n'attend pas le message — mais la porte de merge l'arrête :"
+                ),
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "Le script rend une ligne `<fichier> → <branches>`",
+        "**Session disparue.**",
+        {
+            "motif": [
+                "elle décrit des issues entières, un merge livre un lot.",
+            ],
+            "relevé daté": [
+                (
+                    "`merge-tree` sort en 1 aussi sur une référence inconnue — mesuré les"
+                    " 2026-10-13 et 2026-10-21, un témoin de chaque côté (table"
+                    " `FRESHNESS_GATE_FORMS` de `apps/api/tests/test_agent_skills.py`)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        HORS_SCOPE_REF,
+        "5. Il commite sur une branche partie de `origin/main`",
+        "6. Au go du mainteneur",
+        {
+            "intitulé": [
+                "5.",
+            ],
+        },
+    ),
+    Passage(
+        HORS_SCOPE_REF,
+        "6. Au go du mainteneur, dans sa fenêtre",
+        "7. Puis seulement, la PR mergée",
+        {
+            "intitulé": [
+                "6.",
+            ],
+        },
+    ),
+)
 
 
 # Une lecture des commentaires d'une PR qui prouve un verdict ou garde un merge lit aussi ses
@@ -9398,6 +9988,7 @@ def test_les_conforts_ne_rendent_pas_ce_qu_ils_ont_retire(fichier: str, phrase: 
 PASSAGES_DECLARES: dict[str, tuple[Passage, ...]] = {
     "INVARIANTS_DE_LA_SESSION_DE_RELECTURE": PASSAGES_DE_LA_SESSION_DE_RELECTURE,
     "INVARIANTS_DE_LA_REGLE_DU_SUJET": PASSAGES_DE_LA_REGLE_DU_SUJET,
+    "INVARIANTS_DE_LA_PORTE_DE_MERGE": PASSAGES_DE_LA_PORTE_DE_MERGE,
 }
 
 
