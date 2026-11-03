@@ -429,7 +429,7 @@ d'abord relevé le 2026-10-26 (obs 144) :
   sort en 2 (« Unmatched [ ») au lieu de rendre 1. Témoins : avec espace,
   `grep -c 'a\* b' etoile.txt` rend 1 ; sans caractère de glob, `grep -c 'a\.b' temoin.txt`
   rend 1 ; et le `?` de même, relevé vers 17:26 UTC : `grep -cE 'a\?b' point.txt` et
-  `rtk proxy grep -cE 'a\?b' point.txt` rendent 4 au lieu de 1, le même motif après un `|`
+  `rtk proxy grep -cE 'a\?b' point.txt` rendent 4 eux aussi, le même motif après un `|`
   rend 1 ;
 - un `grep` placé après un `|` n'est pas réécrit (`rtk rewrite` le rend intact) :
   `cat etoile.txt | grep -c 'a\*b'` rend 1 ;
