@@ -6,6 +6,7 @@ Le worker la trouve par `app.autodiscover_tasks()` (`config/celery.py`), qui imp
 transaction qui crée l'image ou remplace son original.
 """
 
+import logging
 from contextlib import suppress
 from functools import partial
 from typing import TYPE_CHECKING
@@ -24,6 +25,8 @@ if TYPE_CHECKING:
 # Les réessais d'un traitement en erreur (décision 8) : quatre essais en tout, séparés de 1, 2 puis
 # 4 s (`retry_backoff`, sans l'aléa que Celery y met par défaut).
 MAX_RETRIES = 3
+
+logger = logging.getLogger(__name__)
 
 
 # L'annotation de `self` est une chaîne : `Task` n'est générique que dans les stubs de
@@ -78,7 +81,7 @@ def attempt(image: "QuerySet[GalleryImage]", original_name: str) -> None:
     puis « prêt » et leur liste, posés ensemble par une requête conditionnelle (décision 7) ; si
     elle a écrit, le cache du contenu vidé. Une purge qui échouerait ne fait ni supprimer les
     variantes que la ligne nomme désormais, ni réessayer un traitement réussi, qui en écrirait
-    d'autres : `django-redis` journalise déjà un Redis injoignable (`config/settings.py`).
+    d'autres : elle est journalisée (`purge_or_log`).
 
     Args:
         image: la ligne de l'image, filtrée sur son identifiant et l'original traité.
@@ -99,8 +102,7 @@ def attempt(image: "QuerySet[GalleryImage]", original_name: str) -> None:
     if not written:
         discard(variants)
         return
-    with suppress(Exception):
-        purge()
+    purge_or_log()
 
 
 def mark_failed(image: "QuerySet[GalleryImage]") -> None:
@@ -114,7 +116,19 @@ def mark_failed(image: "QuerySet[GalleryImage]") -> None:
     """
     with suppress(Exception):
         if image.update(state=ProcessingState.FAILED):
-            purge()
+            purge_or_log()
+
+
+def purge_or_log() -> None:
+    """Vide le cache du contenu après une écriture de la tâche, sans lever : la ligne est validée,
+    rien n'est à défaire. Une purge qui échoue est journalisée avec sa trace — `django-redis` ne
+    journalise que les erreurs de Redis, qu'il ignore lui-même (connexion, délai, réponse en
+    erreur ; `config/settings.py`) ; une autre, de réglage ou de sérialisation, passerait sans
+    trace, la liste périmée jusqu'à la durée de vie de ses clés."""
+    try:
+        purge()
+    except Exception:
+        logger.exception("Le cache du contenu n'a pas été vidé.")
 
 
 def discard(variants: list[Variant]) -> None:

@@ -29,28 +29,41 @@ def new_generation() -> str:
     return uuid4().hex
 
 
-def content_key(request: HttpRequest, name: str) -> str:
-    """La clé de la réponse `name` servie à l'origine de `request`, sous la génération courante.
+def content_key(request: HttpRequest, name: str) -> str | None:
+    """La clé de la réponse `name` servie à l'origine de `request`, sous la génération courante ;
+    `None` sans génération.
 
     L'origine — schéma et hôte — en fait partie : le corps porte des adresses absolues construites
     sur elle (`absolute_url`, `content/schemas.py`). La génération est lue ici, avant que la vue ne
     lise la base : une réponse lue avant une écriture se range sous l'ancienne génération, que plus
     rien ne lit une fois la purge passée.
 
+    Une génération absente — jamais posée, expirée, ou Redis qui ne répond pas, que `django-redis`
+    rend de même (`IGNORE_EXCEPTIONS`) — est remplacée par une neuve, posée par `add`, qui ne
+    recouvre pas celle d'une purge passée entre-temps. Quand elle ne se pose pas — `add` rend faux
+    si une autre requête l'a devancée, `None` si Redis ne répond toujours pas —, il n'y a pas de
+    clé : un Redis muet ne coûte à la requête que ces deux opérations.
+
     Args:
         request: la requête servie.
         name: le nom de la réponse dans l'espace — `projets` pour la liste.
 
     Returns:
-        La clé, par exemple `contenu:<génération>:projets:http://testserver` sous le client de test.
+        La clé, par exemple `contenu:<génération>:projets:http://testserver` sous le client de
+        test ; `None` si aucune génération n'est lue ni posée.
     """
-    generation = cache.get_or_set(GENERATION, new_generation)
+    generation: str | None = cache.get(GENERATION)
+    if generation is None:
+        generation = new_generation()
+        if not cache.add(GENERATION, generation):
+            return None
     return f"{SPACE}:{generation}:{name}:{request.scheme}://{request.get_host()}"
 
 
 def cached(name: str) -> Callable[[View], View]:
     """Décorateur de vue : sert depuis le cache la réponse `name` qu'une vue a déjà rendue avec
-    succès ; sinon la vue la rend, et sa réponse `200` est gardée sous `content_key`.
+    succès ; sinon la vue la rend, et sa réponse `200` est gardée sous `content_key` — rien n'est
+    lu ni gardé sans clé.
 
     Le cache garde le corps rendu et son type, jamais des objets : la réponse servie depuis le cache
     est celle de la base, octet pour octet, donc de même `ETag` (`ConditionalGetMiddleware`). Rien
@@ -67,6 +80,8 @@ def cached(name: str) -> Callable[[View], View]:
         @wraps(view)
         def serve(request: HttpRequest, *args: object, **kwargs: object) -> HttpResponseBase:
             key = content_key(request, name)
+            if key is None:
+                return view(request, *args, **kwargs)
             stored: tuple[bytes, str] | None = cache.get(key)
             if stored is not None:
                 content, content_type = stored
