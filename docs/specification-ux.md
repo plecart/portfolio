@@ -323,7 +323,7 @@ Un paragraphe (`role="status"`) centré, horizontalement et verticalement, dans 
 |---|---|
 | t = 0 | Le contenu apparu à la pose s'efface (150 ms). |
 | t = 150 ms | Le panneau redevient transparent ; la feuille est dessous. La photo, le post-it et les rubans repartent vers la carte (280 ms) ; la feuille se replie sur le cadre de la carte (280 ms) ; les autres cartes reviennent à leur place en réapparaissant (280 ms). |
-| t = 570 ms | La carte réapparaît d'un coup sous la photo posée ; panneau et feuille sont retirés ; défilement rendu ; focus sur la carte. |
+| t = 430 ms (+ retard du dernier ruban) | La carte réapparaît d'un coup sous la photo posée ; panneau et feuille sont retirés ; défilement rendu ; focus sur la carte. |
 
 Règles : jamais de fondu croisé entre deux images, la bascule est instantanée ; la photo de la carte et la première image de la galerie sont la même image ; les bascules du thème sont instantanées.
 
