@@ -12,12 +12,38 @@ export const panel = (page: Page) => page.getByRole('dialog')
 /** Le bouton « Fermer la fiche ». */
 export const closeButton = (page: Page) => page.getByRole('button', { name: 'Fermer la fiche' })
 
-/** Les trois fermetures (spec §3.2). */
+/** Le clic hors du panneau, au coin de la fenêtre : une fermeture dès 600 px seulement (spec §3.2). */
+export const OUTSIDE = 'un clic hors du panneau'
+
+/** Sous 600 px, le panneau est la fenêtre (spec §3.2) : rien n'est hors de lui. */
+export const NO_OUTSIDE = 'sous 600 px, le panneau est la fenêtre'
+
+/** Les quatre fermetures (spec §3.2), dont `OUTSIDE`, dès 600 px. */
 export const CLOSINGS: [string, (page: Page) => Promise<unknown>][] = [
   ['le bouton', (page) => closeButton(page).click()],
   ['Échap', (page) => page.keyboard.press('Escape')],
   ['le retour du navigateur', (page) => page.goBack()],
+  [OUTSIDE, (page) => page.mouse.click(4, 4)],
 ]
+
+/** L'appui d'un clic à la main, en millisecondes : la page a le temps de réagir avant le relâché. */
+const PRESS = 100
+
+/**
+ * Clique hors du panneau, sous sa marge basse, sur une carte de la table : le clic tomberait sur
+ * elle s'il traversait.
+ */
+export async function clickOutsideOverCard(page: Page) {
+  const { x, y } = await page.evaluate(() => {
+    const { bottom } = document.querySelector('[role="dialog"]')!.getBoundingClientRect()
+    const y = (bottom + innerHeight) / 2
+    const card = [...document.querySelectorAll('.card')]
+      .map((cell) => cell.getBoundingClientRect())
+      .find((box) => box.top < y && y < box.bottom)!
+    return { x: card.left + card.width / 2, y }
+  })
+  await page.mouse.click(x, y, { delay: PRESS })
+}
 
 /** La colonne de lecture, arrêt de tabulation de ce qui défile. */
 export const readingColumn = (page: Page) => page.getByRole('region', { name: 'Contenu de la fiche' })

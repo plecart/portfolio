@@ -18,7 +18,10 @@ import {
   freezeAnimations,
   LINKS,
   nextImage,
+  NO_OUTSIDE,
   openProject,
+  OUTSIDE,
+  clickOutsideOverCard,
   panel,
   readingColumn,
   watchAnimations,
@@ -716,7 +719,9 @@ test('tant que la fiche est ouverte, les autres cartes restent effacées, et rec
 for (const [name, close] of CLOSINGS) {
   test(`${name} : à la fin du retour seulement, la carte réapparaît, panneau et feuille partent sans fondu, le défilement et le focus lui reviennent`, async ({
     page,
+    isMobile,
   }) => {
+    test.skip(isMobile && name === OUTSIDE, NO_OUTSIDE)
     await openEnteredTable(page, PROJECTS)
     const card = page.locator(`.card[href="${FIRST_PATH}"]`)
     await openProject(card)
@@ -810,7 +815,9 @@ const INTERRUPTIONS = CLOSINGS.filter(([name]) => name !== 'le bouton')
 for (const [name, close] of INTERRUPTIONS) {
   test(`${name} en plein vol : chaque élément repart vers la carte d’où il est, en \`--dur-open\`, le contenu reste caché, et la fermeture va à son terme`, async ({
     page,
+    isMobile,
   }) => {
+    test.skip(isMobile && name === OUTSIDE, NO_OUTSIDE)
     await openEnteredTable(page, PROJECTS)
     const { open, easing } = await motion(page)
     const card = page.locator(`.card[href="${FIRST_PATH}"]`)
@@ -922,6 +929,23 @@ test('« suivant » puis « précédent » pendant le retour : un seul retour, q
   }
   await resume()
   await expectClosed(page)
+  await expect(card).toBeFocused()
+})
+
+test('un clic hors du panneau sur une autre carte ramène la fiche à la sienne, sans ouvrir l’autre', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, NO_OUTSIDE)
+  await openEnteredTable(page, PROJECT_SETS.twelveWithShowcase)
+  const card = page.locator(`.card[href="${await cards(page).nth(2).getAttribute('href')}"]`)
+  await openProject(card)
+
+  await clickOutsideOverCard(page)
+
+  await expectClosed(page)
+  await settle(page)
+  await expect(page).toHaveURL('/')
   await expect(card).toBeFocused()
 })
 
