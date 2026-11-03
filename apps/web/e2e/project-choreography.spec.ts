@@ -421,6 +421,26 @@ test('à la pose, le contenu monte de 8 px en `--dur-content`, puis « Fermer la
   await expect(panel(page)).toHaveCSS('background-color', paper)
 })
 
+for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+  test(`(${reducedMotion}) rien dans la fiche ne réagit au pointeur avant qu’elle soit active, ni une fois sa fermeture demandée`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion })
+    await openEnteredTable(page, PROJECTS)
+    const resume = await openFrozen(page, FIRST_PATH)
+    // Le panneau réagit, une fois que Radix l'a écrit sur lui : ses enfants, non.
+    await expect(panel(page)).toHaveCSS('pointer-events', 'auto')
+
+    await expect(closeButton(page)).toHaveCSS('pointer-events', 'none')
+    await resume()
+    await expect(closeButton(page)).toBeFocused()
+    await expect(closeButton(page)).toHaveCSS('pointer-events', 'auto')
+    await freezeAnimations(page)
+    await page.keyboard.press('Escape')
+    await expect(closeButton(page)).toHaveCSS('pointer-events', 'none')
+  })
+}
+
 /**
  * Page figée, achève les animations de la page : le contenu de la fiche, effacé, laisse partir le
  * retour à la carte, qui reste à son premier instant.
