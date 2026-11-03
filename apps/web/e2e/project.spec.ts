@@ -18,6 +18,7 @@ import {
 import { resolveAll, settle } from './css.ts'
 import {
   arriveAt,
+  CLOSINGS,
   closeButton,
   expectClosed,
   expectPanelBox,
@@ -49,13 +50,6 @@ import {
 /** Trois projets aux titres distincts. La première carte, celle du projet en cours : `projet-02`. */
 const PROJECTS = PROJECT_SETS.threeWithoutShowcase
 const FIRST = { title: 'Projet 02', path: '/projets/projet-02' }
-
-/** Les trois fermetures (spec §3.2). */
-const CLOSINGS: [string, (page: Page) => Promise<unknown>][] = [
-  ['le bouton', (page) => closeButton(page).click()],
-  ['Échap', (page) => page.keyboard.press('Escape')],
-  ['le retour du navigateur', (page) => page.goBack()],
-]
 
 test('la fiche est un dialogue modal nommé par son titre, le focus sur « Fermer la fiche »', async ({
   page,
@@ -578,8 +572,8 @@ test('à l’arrivée directe, les fondus : entrée 200 ms, sortie 150 ms, `--ea
   ])
 })
 
-test('pendant le fondu de sortie, le panneau garde son titre', async ({ page }) => {
-  await openFromTable(page, PROJECTS)
+test('à l’arrivée directe, pendant le fondu de sortie, le panneau garde son titre', async ({ page }) => {
+  await arriveAt(page, { title: FIRST.title })
   await freezeAnimations(page)
 
   await page.keyboard.press('Escape')

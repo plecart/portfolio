@@ -11,8 +11,8 @@ import {
 } from './choreography.ts'
 
 /**
- * Ce qui vole de la carte à la fiche (spec §4.6) : chaque élément de la fiche, puis son homologue
- * sur la carte. La feuille en tête : sa fin est la pose.
+ * Ce qui vole entre la carte et la fiche (spec §4.6) : chaque élément de la fiche, puis son
+ * homologue sur la carte. La feuille en tête : sa fin est la pose.
  */
 const TRAVELERS = [
   ['.project-sheet', '.card-face'],
@@ -23,7 +23,7 @@ const TRAVELERS = [
 /** Les rubans de l'en-tête de la fiche, puis ceux de la bande de la carte, dans le même ordre. */
 const RIBBONS = ['.project-head .card-ribbon', '.card-band .card-ribbon'] as const
 
-/** Le reste de la fiche, qui apparaît à la pose (spec §4.6). */
+/** Le reste de la fiche, qui apparaît à la pose et s'efface le premier (spec §4.6). */
 const CONTENT =
   '.project-close, .project-gallery-arrow, .project-gallery-bar, .project-link, .project-scroll'
 
@@ -38,6 +38,7 @@ function readMotion() {
   return {
     open: time('--dur-open'),
     content: time('--dur-content'),
+    fast: time('--dur-fast'),
     ribbonDelay: time('--delay-ribbon'),
     easing: tokens.getPropertyValue('--ease-out').trim(),
   }
@@ -47,6 +48,12 @@ type Motion = ReturnType<typeof readMotion>
 
 /** Un élément de la fiche en vol : l'image clé qui le pose sur son homologue, et son retard. */
 type Leg = { element: HTMLElement; from: Frame; delay: number; dimmed: boolean }
+
+/** Une autre carte : sa couche d'entrée, et son effacement, recul compris quand elle est à l'écran. */
+type Move = { entry: HTMLElement; keyframes: Keyframe[] }
+
+/** Le sens d'un mouvement : de la carte à la fiche, ou le retour. */
+type Way = 'out' | 'back'
 
 /** L'image clé qui pose `element`, au repos, sur `homologue`, mesurés à l'instant. */
 function startOn(element: HTMLElement, homologue: Element): Frame {
@@ -74,53 +81,67 @@ function legs(panel: HTMLElement, card: HTMLElement, { ribbonDelay }: Motion): L
   return [...travelers, ...ribbons]
 }
 
-/** Fait voler chaque élément de son homologue à sa place, en `--dur-open` (spec §4.6). */
-function flyOut(route: Leg[], { open, easing }: Motion) {
-  return route.map(({ element, from, delay, dimmed }) =>
-    element.animate(dimmed ? dimmedKeyframes(from, AT_REST) : [from, AT_REST], {
+/**
+ * Fait voler chaque élément de son homologue à sa place en `--dur-open` (spec §4.6), ou de sa place
+ * à son homologue au retour, où il reste jusqu'au retrait du panneau.
+ */
+function fly(route: Leg[], { open, easing }: Motion, way: Way) {
+  const back = way === 'back'
+  return route.map(({ element, from, delay, dimmed }) => {
+    const [start, end] = back ? [AT_REST, from] : [from, AT_REST]
+    return element.animate(dimmed ? dimmedKeyframes(start, end) : [start, end], {
       duration: open,
       easing,
       delay,
-      fill: 'backwards',
-    }),
-  )
+      fill: back ? 'forwards' : 'backwards',
+    })
+  })
 }
 
 /**
  * Les autres cartes entrées (spec §4.6) : celles de l'écran reculent à l'opposé de la carte ouverte
  * en s'effaçant, celles hors de l'écran s'effacent sans bouger. Le recul se pose sur la couche
  * d'entrée, sous la cellule, que la mesure des liens de l'auteur suit (`TABLE_CELL_SELECTOR`).
- * Les cartes restent effacées jusqu'au retour.
  */
-function recede(card: HTMLElement, { open, easing }: Motion) {
+function cardMoves(card: HTMLElement): Move[] {
   const opened = card.getBoundingClientRect()
   return [...document.querySelectorAll<HTMLElement>('.card[data-entered]')]
     .filter((cell) => cell !== card)
     .map((cell) => {
       const box = cell.getBoundingClientRect()
-      const onScreen = box.bottom > 0 && box.top < innerHeight
       const { x, y } = recoil(opened, box, RECOIL)
-      const keyframes = onScreen
-        ? [
-            { opacity: 1, translate: NO_SHIFT },
-            { opacity: 0, translate: `${x}px ${y}px` },
-          ]
-        : [{ opacity: 1 }, { opacity: 0 }]
-      return cell.querySelector('.card-entry')!.animate(keyframes, {
-        duration: open,
-        easing,
-        fill: 'forwards',
-      })
+      const keyframes =
+        box.bottom > 0 && box.top < innerHeight
+          ? [
+              { opacity: 1, translate: NO_SHIFT },
+              { opacity: 0, translate: `${x}px ${y}px` },
+            ]
+          : [{ opacity: 1 }, { opacity: 0 }]
+      return { entry: cell.querySelector<HTMLElement>('.card-entry')!, keyframes }
     })
+}
+
+/** Les autres cartes reculent, et restent effacées ; au retour, elles reviennent (spec §4.6). */
+function moveCards(moves: Move[], { open, easing }: Motion, way: Way) {
+  const back = way === 'back'
+  return moves.map(({ entry, keyframes }) =>
+    entry.animate(back ? [...keyframes].reverse() : keyframes, {
+      duration: open,
+      easing,
+      fill: back ? 'none' : 'forwards',
+    }),
+  )
 }
 
 /**
  * La couche noir et blanc d'un projet en cours (spec §4.4, §4.6) : une copie grise de la première
- * image de la galerie, posée sur elle, qui s'efface pendant le vol puis disparaît.
+ * image de la galerie, posée sur elle, qui s'efface pendant le vol, puis disparaît ; au retour, elle
+ * revient, et part avec le panneau.
  *
  * @returns Son fondu ; aucun sans projet en cours ou sans image.
  */
-function fadeGrey(panel: HTMLElement, card: HTMLElement, { open, easing }: Motion) {
+function fadeGrey(panel: HTMLElement, card: HTMLElement, { open, easing }: Motion, way: Way) {
+  const back = way === 'back'
   const image = panel.querySelector('.project-gallery-image')
   if (!image || !card.querySelector('.card-photo-grey')) return []
   const grey = image.cloneNode() as HTMLImageElement
@@ -128,8 +149,13 @@ function fadeGrey(panel: HTMLElement, card: HTMLElement, { open, easing }: Motio
   grey.alt = ''
   grey.ariaHidden = 'true'
   image.after(grey)
-  const fade = grey.animate([{ opacity: 1 }, { opacity: 0 }], { duration: open, easing })
-  fade.addEventListener('finish', () => grey.remove())
+  const keyframes = [{ opacity: 1 }, { opacity: 0 }]
+  const fade = grey.animate(back ? keyframes.reverse() : keyframes, {
+    duration: open,
+    easing,
+    fill: back ? 'forwards' : 'none',
+  })
+  if (!back) fade.addEventListener('finish', () => grey.remove())
   fade.addEventListener('cancel', () => grey.remove())
   return [fade]
 }
@@ -147,6 +173,17 @@ function revealContent(panel: HTMLElement, { open, content, easing }: Motion) {
   )
 }
 
+/** Le reste de la fiche, qui s'efface le premier à la fermeture (spec §4.6), jusqu'au retrait. */
+function hideContent(panel: HTMLElement, { fast, easing }: Motion) {
+  return [...panel.querySelectorAll<HTMLElement>(CONTENT)].map((element) =>
+    element.animate([{ opacity: 0 }], { duration: fast, easing, fill: 'forwards' }),
+  )
+}
+
+/** La fin de toutes ces animations. */
+const allFinished = (animations: Animation[]) =>
+  Promise.all(animations.map(({ finished }) => finished))
+
 /**
  * Fait décoller une fiche de sa carte (spec §4.6). La fiche, rendue, est mesurée avant d'être
  * peinte : le panneau, transparent, montre sa feuille posée sur la carte, et la photo, le post-it et
@@ -155,18 +192,20 @@ function revealContent(panel: HTMLElement, { open, content, easing }: Motion) {
  *
  * Le panneau et ses ancêtres ne se transforment jamais : sous 600 px, le bouton Fermer y est fixe.
  *
- * @returns L'atterrissage, qui rend la carte, et l'abandon, qui retire tout sans mouvement.
+ * @returns L'atterrissage, qui ramène la fiche à sa carte, et l'abandon, qui retire tout sans
+ *   mouvement.
  */
 function takeOff(panel: HTMLElement, card: HTMLElement) {
   const motion = readMotion()
   panel.setAttribute('data-choreography', '')
   panel.setAttribute('data-flight', '')
+  const moves = cardMoves(card)
   const route = legs(panel, card, motion)
-  const receding = recede(card, motion)
+  const receding = moveCards(moves, motion, 'out')
   card.setAttribute('data-origin', '')
   const flights = [
-    ...flyOut(route, motion),
-    ...fadeGrey(panel, card, motion),
+    ...fly(route, motion, 'out'),
+    ...fadeGrey(panel, card, motion, 'out'),
     ...revealContent(panel, motion),
   ]
   // La pose, au bout de la feuille, premier des trajets.
@@ -185,11 +224,32 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
     panel.removeAttribute('data-choreography')
   }
 
-  // ponytail: fermeture par le fondu de #170, le temps que le retour à la carte arrive.
-  const land = () => {
-    abort()
+  /**
+   * Le retour à la carte (spec §4.6) : le contenu s'efface ; puis le panneau redevient transparent
+   * sur sa feuille, et la photo, le post-it, les rubans et la feuille, mesurés de nouveau, repartent
+   * vers la carte pendant que les autres cartes reviennent. Au bout du dernier, la carte réapparaît
+   * d'un coup sous la photo posée. Une carte sortie du document n'a plus de place où revenir : la
+   * fiche se retire alors par le fondu de sortie.
+   */
+  const land = async () => {
+    if (!card.isConnected) {
+      abort()
+      return
+    }
+    // ponytail: fermée en vol, la fiche se pose d'abord d'un coup ; le retour depuis la position
+    // courante de chaque élément (décision de #22) remplacera ce saut.
+    for (const animation of flights) animation.finish()
+    await allFinished(hideContent(panel, motion))
+    panel.setAttribute('data-flight', '')
+    const homeward = legs(panel, card, motion)
+    for (const animation of receding) animation.cancel()
+    await allFinished([
+      ...fly(homeward, motion, 'back'),
+      ...fadeGrey(panel, card, motion, 'back'),
+      ...moveCards(moves, motion, 'back'),
+    ])
+    card.removeAttribute('data-origin')
     landed = true
-    return Promise.resolve()
   }
 
   return { land, abort }

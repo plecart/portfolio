@@ -54,7 +54,8 @@
     animation: project-out var(--dur-fast) var(--ease-out);
   }
 
-  /* La fiche ouverte depuis sa carte (§4.6) : `useChoreography` la fait voler, sans fondu d'entrée. */
+  /* La fiche ouverte depuis sa carte (§4.6) : `useChoreography` la fait voler, sans fondu. Marquée
+     jusqu'à son retrait, elle quitte le document sans fondu de sortie, au retour à sa carte. */
   .project-panel[data-choreography] {
     animation: none;
   }

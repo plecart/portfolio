@@ -4,7 +4,7 @@
  * la légende, l'accessibilité et la position disent laquelle est montrée.
  */
 import type { Locator, Page } from '@playwright/test'
-import { expect, test } from './api.ts'
+import { expect, serveProjects, test } from './api.ts'
 import { resolveAll, settle } from './css.ts'
 import {
   arriveAt,
@@ -17,13 +17,12 @@ import {
   gallery,
   LONG_DESCRIPTION,
   nextImage,
-  openProject,
   panel,
   previousImage,
   readingColumn,
 } from './project.ts'
 import { buildImage, FILES_ORIGIN } from './projects.ts'
-import { cards, COLUMN_VIEWPORT, openTable, watchTransitions } from './table.ts'
+import { COLUMN_VIEWPORT, watchTransitions } from './table.ts'
 
 const PHONE_VIEWPORT = { width: 400, height: 800 }
 
@@ -537,11 +536,12 @@ test.describe('d’une fiche à l’autre', () => {
     gallery: CAPTIONS.slice(0, 2).map((text) => buildImage('autre', text)),
   }
 
-  test('une autre fiche ouverte pendant le fondu de sortie repart de la première image', async ({
+  test('une autre fiche ouverte pendant le fondu de sortie d’une arrivée directe repart de la première image', async ({
     page,
   }) => {
-    await openTable(page, [ficheProject({ gallery: THREE_IMAGES }), ficheProject(OTHER)])
-    await openProject(cards(page).filter({ hasText: 'Fiche' }))
+    await serveProjects(page, [ficheProject({ gallery: THREE_IMAGES }), ficheProject(OTHER)])
+    await page.goto('/projets/fiche')
+    await expect(panel(page)).toBeVisible()
     await nextImage(page).click()
     await nextImage(page).click()
     await expectImage(page, 2)

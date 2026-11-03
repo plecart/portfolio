@@ -1,5 +1,6 @@
 /**
- * La chorégraphie de la fiche (spec §2.7, §4.6 ; issue #22) : ouverte depuis sa carte, elle en part.
+ * La chorégraphie de la fiche (spec §2.7, §4.6 ; issue #22) : ouverte depuis sa carte, elle en part
+ * et y revient.
  *
  * Les animations se lisent par `getAnimations()`, jamais au chronomètre : la page figée
  * (`freezeAnimations`), une animation se place à l'instant voulu par son `currentTime`, et ses
@@ -10,12 +11,16 @@ import type { Page } from '@playwright/test'
 import { expect, test } from './api.ts'
 import { resolveAll, settle } from './css.ts'
 import {
+  CLOSINGS,
   closeButton,
+  expectClosed,
   ficheProject,
   freezeAnimations,
   LINKS,
+  openProject,
   panel,
   readingColumn,
+  watchAnimations,
 } from './project.ts'
 import { buildImage, PROJECT_SETS } from './projects.ts'
 import { cards, enterCards, openTable } from './table.ts'
@@ -76,6 +81,40 @@ async function openFrozen(page: Page, path: string) {
   return resume
 }
 
+/**
+ * Dans la page : chaque élément volant de la fiche — la feuille, la photo, le post-it, puis chaque
+ * ruban — et son homologue sur la carte, avec sa seule animation, lue à son premier et à son dernier
+ * instant.
+ */
+function readFlights(path: string) {
+  const card = document.querySelector(`.card[href="${path}"]`)!
+  const dialog = document.querySelector('[role="dialog"]')!
+  const box = (element: Element) => {
+    const { left, top, width, height } = element.getBoundingClientRect()
+    return { left, top, width, height }
+  }
+  const homologues = card.querySelectorAll('.card-band .card-ribbon')
+  const pairs = [
+    [dialog.querySelector('.project-sheet')!, card.querySelector('.card-face')!],
+    [dialog.querySelector('.project-gallery-frame')!, card.querySelector('.card-photo')!],
+    [dialog.querySelector('.project-title')!, card.querySelector('.card-postit')!],
+    ...[...dialog.querySelectorAll('.project-head .card-ribbon')].map((ribbon, index) => [
+      ribbon,
+      homologues[index],
+    ]),
+  ]
+  return pairs.map(([element, homologue]) => {
+    const flights = element.getAnimations().filter((animation) => animation.constructor === Animation)
+    const [flight] = flights
+    flight.currentTime = 0
+    const start = box(element)
+    flight.currentTime = flight.effect!.getComputedTiming().endTime as number
+    const end = box(element)
+    const { duration, delay, easing } = flight.effect!.getTiming()
+    return { count: flights.length, start, end, homologue: box(homologue), duration, delay, easing }
+  })
+}
+
 test('la feuille, la photo, le post-it et les rubans partent de leur homologue sur la carte, en `--dur-open`, `--ease-out`', async ({
   page,
 }) => {
@@ -83,34 +122,7 @@ test('la feuille, la photo, le post-it et les rubans partent de leur homologue s
   const { open, ribbon, easing } = await motion(page)
   await openFrozen(page, FIRST_PATH)
 
-  const flights = await page.evaluate((path) => {
-    const card = document.querySelector(`.card[href="${path}"]`)!
-    const dialog = document.querySelector('[role="dialog"]')!
-    const box = (element: Element) => {
-      const { left, top, width, height } = element.getBoundingClientRect()
-      return { left, top, width, height }
-    }
-    const homologues = card.querySelectorAll('.card-band .card-ribbon')
-    const pairs = [
-      [dialog.querySelector('.project-sheet')!, card.querySelector('.card-face')!],
-      [dialog.querySelector('.project-gallery-frame')!, card.querySelector('.card-photo')!],
-      [dialog.querySelector('.project-title')!, card.querySelector('.card-postit')!],
-      ...[...dialog.querySelectorAll('.project-head .card-ribbon')].map((ribbon, index) => [
-        ribbon,
-        homologues[index],
-      ]),
-    ]
-    return pairs.map(([element, homologue]) => {
-      const flights = element.getAnimations().filter((animation) => animation.constructor === Animation)
-      const [flight] = flights
-      flight.currentTime = 0
-      const start = box(element)
-      flight.currentTime = flight.effect!.getComputedTiming().endTime as number
-      const end = box(element)
-      const { duration, delay, easing } = flight.effect!.getTiming()
-      return { count: flights.length, start, end, homologue: box(homologue), duration, delay, easing }
-    })
-  }, FIRST_PATH)
+  const flights = await page.evaluate(readFlights, FIRST_PATH)
   const panelBox = await panel(page).evaluate((element) => element.getBoundingClientRect().toJSON())
 
   expect(flights.length).toBeGreaterThan(3)
@@ -324,4 +336,131 @@ test('à la pose, le contenu monte de 8 px en `--dur-content`, puis « Fermer la
   await expect(closeButton(page)).toBeFocused()
   const [paper] = await resolveAll(page, [['background-color', 'var(--paper)']])
   await expect(panel(page)).toHaveCSS('background-color', paper)
+})
+
+/**
+ * Page figée, achève les animations de la page : le contenu de la fiche, effacé, laisse partir le
+ * retour à la carte, qui reste à son premier instant.
+ */
+async function finishAnimations(page: Page) {
+  await page.evaluate(() => {
+    for (const animation of document.getAnimations()) {
+      if (animation.constructor === Animation) animation.finish()
+    }
+  })
+}
+
+test('à la fermeture, le contenu s’efface en `--dur-fast`, puis la feuille, la photo, le post-it et les rubans repartent vers la carte en `--dur-open`', async ({
+  page,
+}) => {
+  await openEnteredTable(page, PROJECTS)
+  const { open, fast, ribbon, easing } = await motion(page)
+  await openProject(page.locator(`.card[href="${FIRST_PATH}"]`))
+  const panelBox = await panel(page).evaluate((element) => element.getBoundingClientRect().toJSON())
+  const [paper] = await resolveAll(page, [['background-color', 'var(--paper)']])
+  await freezeAnimations(page)
+
+  await page.keyboard.press('Escape')
+
+  for (const element of [closeButton(page), panel(page).locator('.project-gallery-bar'), readingColumn(page)]) {
+    const fade = await element.evaluate((node) => {
+      const [animation] = node.getAnimations().filter((candidate) => candidate.constructor === Animation)
+      return {
+        timing: animation.effect!.getTiming(),
+        end: (animation.effect as KeyframeEffect).getKeyframes().at(-1)!.opacity,
+      }
+    })
+    expect(fade).toEqual({ timing: expect.objectContaining({ duration: fast, easing }), end: '0' })
+  }
+  await expect(panel(page)).toHaveCSS('background-color', paper)
+
+  await finishAnimations(page)
+
+  await expect(panel(page)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  const flights = await page.evaluate(readFlights, FIRST_PATH)
+  expect(flights.length).toBeGreaterThan(3)
+  for (const [index, flight] of flights.entries()) {
+    expect(flight.count).toBe(1)
+    expectSameBox(flight.end, flight.homologue)
+    expect(flight.duration).toBe(open)
+    expect(flight.easing).toBe(easing)
+    expect(flight.delay).toBe(Math.max(0, index - 3) * ribbon)
+  }
+  expectSameBox(flights[0].start, panelBox)
+})
+
+test('à la fermeture, les autres cartes reviennent à leur place en réapparaissant, en `--dur-open`', async ({
+  page,
+}) => {
+  await openEnteredTable(page, PROJECT_SETS.twelveWithShowcase)
+  const { open, easing } = await motion(page)
+  const path = (await cards(page).nth(2).getAttribute('href'))!
+  await openProject(page.locator(`.card[href="${path}"]`))
+  await freezeAnimations(page)
+
+  await page.keyboard.press('Escape')
+  await finishAnimations(page)
+
+  const returns = await page.evaluate((opened) => {
+    return [...document.querySelectorAll(`.card:not([href="${opened}"]) .card-entry`)].map((entry) => {
+      const animations = entry.getAnimations()
+      const keyframes = (animations[0].effect as KeyframeEffect).getKeyframes()
+      return {
+        count: animations.length,
+        timing: animations[0].effect!.getTiming(),
+        first: keyframes[0],
+        last: keyframes.at(-1)!,
+      }
+    })
+  }, path)
+
+  expect(returns.filter(({ first }) => 'translate' in first).length).toBeGreaterThan(0)
+  for (const { count, timing, first, last } of returns) {
+    expect(count).toBe(1)
+    expect(timing).toMatchObject({ duration: open, easing })
+    expect([first.opacity, last.opacity]).toEqual(['0', '1'])
+    if (!('translate' in first)) continue
+    expect(Math.hypot(...Object.values(offsetOf(first.translate)))).toBeCloseTo(48, 3)
+    expect(offsetOf(last.translate)).toEqual({ x: 0, y: 0 })
+  }
+})
+
+for (const [name, close] of CLOSINGS) {
+  test(`${name} : à la fin du retour seulement, la carte réapparaît, panneau et feuille partent sans fondu, le défilement et le focus lui reviennent`, async ({
+    page,
+  }) => {
+    await openEnteredTable(page, PROJECTS)
+    const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+    await openProject(card)
+    const animations = await watchAnimations(page)
+    const resume = await freezeAnimations(page)
+
+    await close(page)
+
+    await expect(page.locator('html')).toHaveAttribute('data-project-open')
+    await expect(card.locator('.card-photo')).toHaveCSS('opacity', '0')
+    await expect(panel(page)).toHaveCount(1)
+
+    await resume()
+
+    await expectClosed(page)
+    await expect(page.locator('.project-sheet')).toHaveCount(0)
+    await expect(page.locator('html')).not.toHaveAttribute('data-project-open')
+    await expect(card.locator('.card-photo')).toHaveCSS('opacity', '1')
+    await expect(card).toBeFocused()
+    expect(await animations()).toEqual([])
+  })
+}
+
+test('sa carte d’origine sortie du document, la fiche se ferme par le fondu de sortie', async ({ page }) => {
+  await openEnteredTable(page, PROJECTS)
+  const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+  await openProject(card)
+  await card.evaluate((cell) => cell.remove())
+  const animations = await watchAnimations(page)
+
+  await closeButton(page).click()
+
+  await expectClosed(page)
+  expect((await animations()).map(({ name }) => name)).toEqual(['project-out'])
 })

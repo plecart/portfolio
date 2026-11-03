@@ -12,6 +12,13 @@ export const panel = (page: Page) => page.getByRole('dialog')
 /** Le bouton « Fermer la fiche ». */
 export const closeButton = (page: Page) => page.getByRole('button', { name: 'Fermer la fiche' })
 
+/** Les trois fermetures (spec §3.2). */
+export const CLOSINGS: [string, (page: Page) => Promise<unknown>][] = [
+  ['le bouton', (page) => closeButton(page).click()],
+  ['Échap', (page) => page.keyboard.press('Escape')],
+  ['le retour du navigateur', (page) => page.goBack()],
+]
+
 /** La colonne de lecture, arrêt de tabulation de ce qui défile. */
 export const readingColumn = (page: Page) => page.getByRole('region', { name: 'Contenu de la fiche' })
 

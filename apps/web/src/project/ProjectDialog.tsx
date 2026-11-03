@@ -33,12 +33,12 @@ function focusCard(slug: string) {
  * le `RemoveScroll` poserait un `<style>` que la CSP de production bloque.
  *
  * Trois fermetures : le bouton, Échap et le retour du navigateur ; un clic hors du panneau n'en est
- * pas une. Ouverte depuis sa carte, elle en part (`useChoreography`, spec §4.6) : le focus attend la
- * pose sur le panneau, et la fiche reste ouverte pour Radix jusqu'à son atterrissage, quand le
- * projet a déjà quitté l'adresse. Sinon, le bouton, premier du panneau, reçoit le focus de Radix à
- * l'ouverture. Le dernier projet montré reste rendu jusqu'au retrait du panneau ; une autre fiche
- * ouverte pendant le fondu de sortie trouve le panneau encore monté : sa galerie repart de la
- * première image.
+ * pas une. Ouverte depuis sa carte, elle en part et y revient (`useChoreography`, spec §4.6) : le
+ * focus attend la pose sur le panneau, et la fiche reste ouverte pour Radix jusqu'à son retour,
+ * quand le projet a déjà quitté l'adresse. Sinon, deux fondus, et le bouton, premier du panneau,
+ * reçoit le focus de Radix à l'ouverture. Le dernier projet montré reste rendu jusqu'au retrait du
+ * panneau ; une autre fiche ouverte pendant le fondu de sortie trouve le panneau encore monté : sa
+ * galerie repart de la première image.
  *
  * @param project Le projet à montrer ; `undefined`, fiche fermée.
  * @param origin La carte d'où la fiche s'ouvre, jusqu'à son retour ; `null` sans carte d'origine.
