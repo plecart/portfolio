@@ -9,9 +9,10 @@
 // (`dist/index.d.ts`), et la forme par défaut n'est pas constructible sans `esModuleInterop`,
 // que le projet n'active pas.
 import { AxeBuilder } from '@axe-core/playwright'
-import type { Page } from '@playwright/test'
-import { API_ORIGIN, expect, serveProjects, test } from './api.ts'
-import { FILES_ORIGIN, PROJECT_SETS } from './projects.ts'
+import type { Locator, Page } from '@playwright/test'
+import { API_ORIGIN, expect, FAILURES, holdProjects, serveProjects, test } from './api.ts'
+import { arriveAt, closeButton, nextImage, panel, previousImage } from './project.ts'
+import { buildImage, FILES_ORIGIN, PROJECT_SETS } from './projects.ts'
 import { detachHeader, pageBottom, scrollThrough } from './scroll.ts'
 
 /** L'origine que le site sert lui-même. */
@@ -195,4 +196,71 @@ for (const colorScheme of ['light', 'dark'] as const) {
       expect(violations.map((violation) => violation.id)).toEqual([])
     })
   }
+}
+
+/** Ouvre la fiche d'un projet à deux images et une section : chacun de ses boutons y est. */
+const arriveAtFullFiche = (page: Page) =>
+  arriveAt(page, {
+    gallery: [buildImage('fiche', 'Une'), buildImage('fiche', 'Deux')],
+    sections: [{ title: 'Architecture', anchor: 'architecture', body: 'Les briques du projet.' }],
+  })
+
+/**
+ * Tout bouton du site montre la main : Tailwind 4 leur rend le curseur par défaut du navigateur
+ * (guide de migration, « Buttons use the default cursor »). Les boutons de la source, dénombrés le
+ * 2026-11-03 : cinq sites, six boutons — le bouton de mode, « Réessayer », « Fermer la fiche », les
+ * deux flèches de la galerie, le `<summary>` d'une section ; « Réessayer » et le `<summary>` la
+ * montraient déjà, chacun par sa propre règle.
+ */
+const BUTTONS: [string, (page: Page) => Promise<Locator>][] = [
+  [
+    'le bouton de mode',
+    async (page) => {
+      await page.goto('/')
+      return page.getByRole('banner').getByRole('button')
+    },
+  ],
+  [
+    '« Réessayer »',
+    async (page) => {
+      const release = await holdProjects(page)
+      await page.goto('/')
+      await release(FAILURES['statut 500'])
+      return page.getByRole('button', { name: 'Réessayer' })
+    },
+  ],
+  [
+    '« Fermer la fiche »',
+    async (page) => {
+      await arriveAtFullFiche(page)
+      return closeButton(page)
+    },
+  ],
+  [
+    '« Image précédente »',
+    async (page) => {
+      await arriveAtFullFiche(page)
+      return previousImage(page)
+    },
+  ],
+  [
+    '« Image suivante »',
+    async (page) => {
+      await arriveAtFullFiche(page)
+      return nextImage(page)
+    },
+  ],
+  [
+    'le titre d’une section',
+    async (page) => {
+      await arriveAtFullFiche(page)
+      return panel(page).locator('summary')
+    },
+  ],
+]
+
+for (const [name, find] of BUTTONS) {
+  test(`${name} montre la main`, async ({ page }) => {
+    await expect(await find(page)).toHaveCSS('cursor', 'pointer')
+  })
 }
