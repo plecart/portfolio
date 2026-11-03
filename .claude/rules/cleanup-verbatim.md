@@ -85,7 +85,10 @@ avant tout jugement, chaque finding cité par §.
   citée dont elle est tirée** (lu), ou **« non vérifiée »** (supposé). Rendre le dénombrement :
   N affirmations, k établies, N−k non vérifiées. Les messages d'assertion se comptent par analyse
   syntaxique (`ast`), jamais par expression régulière : une regex qui franchit les lignes a rendu
-  deux dénombrements faux avant le bon.
+  deux dénombrements faux avant le bon. Un **dénombrement de population écrit en commentaire** —
+  « N énoncés, N épinglés » au-dessus d'une table — est une affirmation sans commande : « non
+  vérifiée » tant qu'un test ne le recompte pas à chaque exécution ; un « 55 morceaux » écrit
+  au-dessus d'une table d'épingles en comptait 92 par sa propre règle (obs 127).
 
   **Pourquoi trois et non deux** : une mesure héritée d'une observation datée n'a pas de commande
   et n'est pas pour autant non vérifiée. Dénombré sur le delta qui a introduit cette passe —
