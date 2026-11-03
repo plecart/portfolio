@@ -2295,8 +2295,9 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         PR_PARALLELES_SKILL,
         "Invoque le skill `triage` (outil Skill) avec #N",
     ),
-    # #198 : l'archivage d'une session de tri, mesuré sans effet sur la tête du lead (D-6), retiré
-    # de l'interdit ; son retrait est gardé par `RETIRES_PAR_LES_CONFORTS`.
+    # #198 : l'archivage d'une session sans worktree, mesuré sans effet sur la tête du dossier
+    # qu'elle partage, dans un worktree (D-6), retiré de l'interdit ; son retrait est gardé par
+    # `RETIRES_PAR_LES_CONFORTS`.
     "etape-0-tri-archive-apres-verification": (
         PR_PARALLELES_SKILL,
         (
@@ -7440,6 +7441,10 @@ def test_la_session_de_relecture_garde_l_ordre_de_son_reveil(avant: str, apres: 
     assert_dans_l_ordre(SESSION_RELECTURE_REF, avant, apres)
 
 
+# Le code en ligne, que le découpage ne coupe jamais et où aucune marque restrictive ne se lit.
+CODE_EN_LIGNE = re.compile(r"(`[^`]*`)")
+
+
 def morceaux_du_texte(texte: str) -> list[str]:
     """Le texte découpé après chaque `.`, `;` ou `:` suivi d'un blanc, hors du code en ligne.
 
@@ -7448,7 +7453,7 @@ def morceaux_du_texte(texte: str) -> list[str]:
     """
     morceaux: list[str] = []
     courant = ""
-    for rang, bout in enumerate(re.split(r"(`[^`]*`)", texte)):
+    for rang, bout in enumerate(CODE_EN_LIGNE.split(texte)):
         if rang % 2:
             courant += bout
             continue
@@ -7467,9 +7472,9 @@ class Passage(NamedTuple):
     présente **une** fois ; un titre de section s'y lit avec un `#` de moins, la marge que
     `texte_normalise` retire. Une table neuve borne ses passages aux paragraphes, ou éléments de
     liste, qui portent ses ancres — consécutifs, ils forment un seul passage (D-5). `exemptions` :
-    ses morceaux sans prescription, en littéraux, rangés sous
-    une catégorie de `CATEGORIES_D_EXEMPTION`. `empruntees` : les ancres d'une autre table qui
-    garde le même passage."""
+    ses morceaux sans prescription, en littéraux, rangés sous une catégorie de
+    `CATEGORIES_D_EXEMPTION`. `empruntees` : les ancres d'une autre table qui garde le même
+    passage."""
 
     fichier: str
     debut: str
@@ -7507,6 +7512,11 @@ def zones_des_ancres(texte: str, ancres: Iterable[str]) -> list[tuple[int, int]]
     return [(m.start(), m.end()) for ancre in ancres for m in re.finditer(re.escape(ancre), texte)]
 
 
+def recouvert(debut: int, fin: int, zones: Iterable[tuple[int, int]]) -> bool:
+    """Vrai si une zone recouvre au moins un caractère de `debut` à `fin`, exclue."""
+    return any(gauche < fin and debut < droite for gauche, droite in zones)
+
+
 def morceaux_nus(texte: str, ancres: Iterable[str]) -> set[str]:
     """Les morceaux du texte qu'aucune ancre ne recouvre à sa place : une ancre qui enjambe deux
     morceaux les tient l'un et l'autre, et un morceau ne se tient pas par une ancre qui porte son
@@ -7515,12 +7525,13 @@ def morceaux_nus(texte: str, ancres: Iterable[str]) -> set[str]:
     return {
         morceau
         for debut, fin, morceau in morceaux_situes(texte)
-        if not any(gauche < fin and debut < droite for gauche, droite in zones)
+        if not recouvert(debut, fin, zones)
     }
 
 
-# Les marques d'une moitié restrictive (`cycle-pr/references/tests.md`, « Le rouge se constate, il
-# ne se suppose pas », huitième cas), en mots entiers : « ne … que » se lit par « ne » ou « n' ».
+# Les marques d'une moitié restrictive, en mots entiers : celles du huitième cas de « Le rouge se
+# constate, il ne se suppose pas » (`cycle-pr/references/tests.md`) — « ne … pas » comme « ne …
+# que » s'y lisent par « ne » ou « n' » —, plus « seul », « ni », « sans », « aucun » et « aucune ».
 MARQUES_RESTRICTIVES = (
     "jamais",
     "seule",
@@ -7550,17 +7561,15 @@ def restrictions_hors_ancre(texte: str, ancres: Iterable[str]) -> dict[str, list
     ne recouvre : elles y changeraient en vert (obs 126). Le code en ligne n'en porte aucune — un
     gabarit ou une commande s'y lit comme un littéral."""
     zones = zones_des_ancres(texte, ancres)
+    code = [(m.start(), m.end()) for m in CODE_EN_LIGNE.finditer(texte)]
     masque = list(texte)
-    for code in re.finditer(r"`[^`]*`", texte):
-        masque[code.start() : code.end()] = " " * (code.end() - code.start())
-    for gauche, droite in zones:
+    for gauche, droite in code + zones:
         masque[gauche:droite] = " " * (droite - gauche)
     nu = "".join(masque)
     return {
         morceau: [marque.group(0) for marque in MARQUE_RESTRICTIVE.finditer(nu, debut, fin)]
         for debut, fin, morceau in morceaux_situes(texte)
-        if any(gauche < fin and debut < droite for gauche, droite in zones)
-        and MARQUE_RESTRICTIVE.search(nu, debut, fin)
+        if recouvert(debut, fin, zones) and MARQUE_RESTRICTIVE.search(nu, debut, fin)
     }
 
 
@@ -9954,38 +9963,6 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
             " sans rien rendre"
         ),
     ),
-    "repercussions-description-lot-leger": (
-        REPERCUSSIONS_SKILL,
-        (
-            "Aussi au merge d'une PR de lot léger intermédiaire, dont l'issue reste en vol et ne"
-            " s'édite pas"
-        ),
-    ),
-    "repercussions-argument-pr-de-lot-leger": (
-        REPERCUSSIONS_SKILL,
-        "[#issue fermée | #PR d'amendement | #PR de lot léger]",
-    ),
-    "repercussions-lot-leger-delta-reel": (
-        REPERCUSSIONS_SKILL,
-        (
-            "Avec une PR de lot léger intermédiaire — mergée vers `<trunk>` avec la ligne `En vol"
-            " pour #<N> (lot k/n)` et sans `Closes`"
-        ),
-    ),
-    "repercussions-lot-leger-issue-en-vol-sans-pr": (
-        REPERCUSSIONS_SKILL,
-        (
-            "Son issue `#<N>` reste **en vol** même sans PR ouverte, le lot suivant n'ayant pas"
-            " encore forcément la sienne"
-        ),
-    ),
-    "repercussions-lot-leger-issue-pas-editee": (
-        REPERCUSSIONS_SKILL,
-        (
-            "elle se classe en vol à l'étape 2 et ne s'édite pas (étape 5, « Issues en vol →"
-            " signaler sur la PR, ne rien éditer »)"
-        ),
-    ),
     "rtk-sortie-tronquee": (PIPELINE_CONFIG, "la sortie d'une commande réécrite est **tronquée**"),
     "rtk-tronquee-aussi-en-tete-d-un-tube": (
         PIPELINE_CONFIG,
@@ -10065,6 +10042,38 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
     "cloture-due-sur-un-lot-leger": (
         CLOTURE_REF,
         "toujours sur un lot léger, qui porte `En vol pour #N` vers `main` (`cycle-pr` Étape 8)",
+    ),
+    "repercussions-description-lot-leger": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Aussi au merge d'une PR de lot léger intermédiaire, dont l'issue reste en vol et ne"
+            " s'édite pas"
+        ),
+    ),
+    "repercussions-argument-pr-de-lot-leger": (
+        REPERCUSSIONS_SKILL,
+        "[#issue fermée | #PR d'amendement | #PR de lot léger]",
+    ),
+    "repercussions-lot-leger-delta-reel": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Avec une PR de lot léger intermédiaire — mergée vers `<trunk>` avec la ligne `En vol"
+            " pour #<N> (lot k/n)` et sans `Closes`"
+        ),
+    ),
+    "repercussions-lot-leger-issue-en-vol-sans-pr": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Son issue `#<N>` reste **en vol** même sans PR ouverte, le lot suivant n'ayant pas"
+            " encore forcément la sienne"
+        ),
+    ),
+    "repercussions-lot-leger-issue-pas-editee": (
+        REPERCUSSIONS_SKILL,
+        (
+            "elle se classe en vol à l'étape 2 et ne s'édite pas (étape 5, « Issues en vol →"
+            " signaler sur la PR, ne rien éditer »)"
+        ),
     ),
     # Passe 1 de relecture de la PR #220 (M4) : le point 4 de `CONTRIBUTING.md` renvoie à la
     # condition de l'Étape 8 au lieu de la paraphraser ; une ancre par morceau de son élément.
@@ -10373,10 +10382,7 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
             " l'ancienne forme de « Cases sans type » a rendu « 42 matches in 1 files:"
         ),
     ),
-    "plan-qa-renvoi-aux-frontieres-tierces": (
-        PLAN_QA_SKILL,
-        "(`cycle-pr/references/tests.md`, « Frontières tierces : on vérifie, on ne suppose pas »)",
-    ),
+    "plan-qa-renvoi-aux-frontieres-tierces": (PLAN_QA_SKILL, f"({RENVOI_AUX_FRONTIERES_TIERCES})"),
     "execution-qa-releveur-cases-commande": (
         EXECUTION_QA_SKILL,
         (
@@ -10865,7 +10871,8 @@ RETIRES_PAR_LES_CONFORTS = {
     ("fichier", "phrase"), RETIRES_PAR_LES_CONFORTS.values(), ids=RETIRES_PAR_LES_CONFORTS.keys()
 )
 def test_les_conforts_ne_rendent_pas_ce_qu_ils_ont_retire(fichier: str, phrase: str) -> None:
-    """Chacune présente une fois sur `00b180f` (`git grep -c`), vue rouge en la remettant."""
+    """Chacune présente une fois sur `00b180f`, texte aux espaces normalisés — « Ne pas archiver une
+    session sans worktree » y était coupée en fin de ligne —, vue rouge en la remettant."""
     assert not porte_la_forme(fichier, phrase), f"`{fichier}` porte encore « {phrase} »"
 
 
@@ -10912,10 +10919,16 @@ PASSAGES_DECLARES: dict[str, tuple[Passage, ...]] = {
 }
 
 
+def invariants_de(table: str) -> dict[str, tuple[str, str]]:
+    """La table d'invariants du module qui porte ce nom."""
+    return globals()[table]
+
+
 def ancres_du_passage(table: str, passage: Passage) -> list[str]:
     """Les phrases de la table sur le fichier du passage, et les ancres qu'il emprunte."""
-    invariants: dict[str, tuple[str, str]] = globals()[table]
-    ancres = [phrase for fichier, phrase in invariants.values() if fichier == passage.fichier]
+    ancres = [
+        phrase for fichier, phrase in invariants_de(table).values() if fichier == passage.fichier
+    ]
     return [*ancres, *passage.empruntees]
 
 
@@ -10957,23 +10970,18 @@ def test_chaque_moitie_restrictive_d_un_morceau_tenu_est_sous_une_ancre(table: s
     assert not fuites, "\n".join(fuites)
 
 
-# Les ancres d'une table du registre que leur texte fait paraître plus d'une fois dans leur fichier,
-# chacune avec son motif : une ancre doublée tient toutes les places où elle apparaît.
-ANCRES_DOUBLEES: dict[str, dict[str, str]] = {}
-
-
 @pytest.mark.parametrize("table", PASSAGES_DECLARES)
 def test_chaque_ancre_d_une_table_du_registre_est_seule_dans_son_fichier(table: str) -> None:
     """Une ancre qui paraît deux fois dans son fichier laisse vert le test de présence quand on
-    retire l'une, et tient les deux places au recompte (passe 2 de relecture de la PR #220, I2)."""
-    invariants: dict[str, tuple[str, str]] = globals()[table]
-    doublees = {
+    retire l'une, et tient les deux places au recompte (passe 2 de relecture de la PR #220, I2) :
+    une ancre doublée s'allonge jusqu'à n'apparaître qu'une fois."""
+    doublees = sorted(
         cle
-        for cle, (fichier, phrase) in invariants.items()
+        for cle, (fichier, phrase) in invariants_de(table).items()
         if texte_normalise(fichier).count(phrase) > 1
-    }
+    )
 
-    assert doublees == set(ANCRES_DOUBLEES.get(table, {})), sorted(doublees)
+    assert not doublees, doublees
 
 
 # Les tables que le lot 2 de #198 couvre (D-7), hors du registre jusque-là.
