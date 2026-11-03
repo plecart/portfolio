@@ -1,10 +1,11 @@
 """Tests du cache du contenu : la liste des projets servie depuis le cache, à l'identique de la
-base ; le cache vidé après chaque écriture validée du contenu, jamais avant ni pour une écriture
-annulée, et par la tâche d'image après chacune de ses écritures ; Redis injoignable sans effet
-pour le client (brief de #11, décisions 1, 3 à 5, 7 à 10).
+base, jamais une réponse d'erreur ni une lecture antérieure à une écriture validée ; le cache vidé
+après chaque écriture validée du contenu, jamais avant ni pour une écriture annulée, et par la
+tâche d'image après chacune de ses écritures ; Redis injoignable sans effet pour le client, au
+prix de deux opérations sur Redis au plus (brief de #11, décisions 1, 3 à 5, 7 à 10).
 
 La suite tourne sur le cache en mémoire que pose le harnais (`conftest`, `memory_cache`), vidé
-avant chaque test ; seul le test de Redis injoignable charge le vrai client, `django-redis`.
+avant chaque test ; seuls les tests de Redis injoignable chargent le vrai client, `django-redis`.
 """
 
 import ast
@@ -15,9 +16,11 @@ from pathlib import Path
 from typing import Any, cast
 
 import config.settings
+import content.api
 import content.models
 import pytest
 from content import tasks
+from content.api import published_projects
 from content.models import GalleryImage, ProcessingState, Project, ProjectTechnology, Variant
 from content.tasks import process_image
 from content.variants import make_variants
@@ -28,12 +31,43 @@ from django.db import transaction
 from django.db.models import Model
 from django.test import Client, override_settings
 from factories import gallery_image, project, saved, section, technology
+from ninja.errors import HttpError
 from pytest_django import DjangoAssertNumQueries, DjangoCaptureOnCommitCallbacks
 from test_api import PROJECTS, complete_project, listed
 from test_tasks import Rollback, variant_files
 
 # La durée de vie de chaque clé du cache (décision 5).
 TTL = 300
+
+# Les opérations sur Redis qu'une requête de la liste paie quand Redis ne répond pas : lire la
+# génération, puis tenter d'en poser une neuve. Sur un Redis figé, chacune attend ses délais
+# (`REDIS_DELAYS`) avant d'être ignorée — de l'ordre de 0,2 s, mesuré par la relecture de la
+# PR #218 sur un hôte qui ne répond pas.
+OPERATIONS_WITHOUT_REDIS = 2
+
+# Les délais de `django-redis` qu'une opération sur un Redis muet attend (décision 7) : chacun
+# posé, et d'au plus `REDIS_DELAY` secondes.
+REDIS_DELAYS = ["SOCKET_CONNECT_TIMEOUT", "SOCKET_TIMEOUT"]
+REDIS_DELAY = 0.2
+
+# Des options de `django-redis`, puis les délais que la garde doit y signaler.
+DELAY_FORMS: dict[str, tuple[dict[str, object], list[str]]] = {
+    "délai de connexion absent": ({"SOCKET_TIMEOUT": 0.2}, ["SOCKET_CONNECT_TIMEOUT"]),
+    "délai de réponse sans fin": (
+        {"SOCKET_CONNECT_TIMEOUT": 0.2, "SOCKET_TIMEOUT": None},
+        ["SOCKET_TIMEOUT"],
+    ),
+    "délais trop longs": (
+        {"SOCKET_CONNECT_TIMEOUT": 5, "SOCKET_TIMEOUT": 0.3},
+        ["SOCKET_CONNECT_TIMEOUT", "SOCKET_TIMEOUT"],
+    ),
+}
+
+# L'issue d'un traitement : son original rendu illisible ou non, puis l'état qu'il écrit.
+OUTCOMES: dict[str, tuple[bool, ProcessingState]] = {
+    "prêt": (False, ProcessingState.READY),
+    "échec": (True, ProcessingState.FAILED),
+}
 
 # Le projet de la fabrique : son slug, son résumé, puis celui qu'un test écrit sans qu'aucun
 # signal parte.
@@ -105,6 +139,16 @@ def expiries() -> list[float | None]:
     return list(expire_info.values())
 
 
+def slow_delays(options: dict[str, object]) -> list[str]:
+    """Les délais de `REDIS_DELAYS` que `options` ne pose pas, pose sans borne (`None`), ou pose
+    au-delà de `REDIS_DELAY`."""
+    return [
+        name
+        for name in REDIS_DELAYS
+        if not isinstance(delay := options.get(name), int | float) or delay > REDIS_DELAY
+    ]
+
+
 @pytest.fixture
 def lines() -> dict[str, Model]:
     """Pour chaque modèle de contenu, une ligne enregistrée, qu'un test enregistre de nouveau ou
@@ -164,6 +208,49 @@ def test_chaque_origine_recoit_la_liste_a_ses_propres_adresses(
     response = client.get(PROJECTS, **request_options)
 
     assert response.json()[0]["technologies"][0]["icon"].startswith(f"{origin}/media/")
+
+
+@pytest.mark.django_db
+def test_une_liste_lue_avant_une_ecriture_validee_n_est_pas_servie_apres(
+    client: Client,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La vue lit la base, puis une écriture du contenu est validée et vide le cache, avant que la
+    réponse ne soit gardée : l'appel suivant montre le contenu neuf. La génération est lue avant
+    la base (décision 8) ; relue après, elle rangerait l'ancien contenu sous la neuve."""
+    published = saved(project(published=True))
+
+    def read_then_written() -> list[Project]:
+        read = list(published_projects())
+        with django_capture_on_commit_callbacks(execute=True):
+            published.title = "Écrit pendant la lecture"
+            published.save()
+        return read
+
+    with monkeypatch.context() as patched:
+        patched.setattr(content.api, "published_projects", read_then_written)
+        during = titles(client)
+
+    assert (during, titles(client)) == (["Portfolio"], ["Écrit pendant la lecture"])
+
+
+@pytest.mark.django_db
+def test_une_reponse_d_erreur_de_la_vue_n_entre_pas_dans_le_cache(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Une erreur que django-ninja rend en réponse (`on_exception`) n'est jamais gardée : l'appel
+    suivant relit la base, et rend la liste."""
+    saved(project(published=True))
+
+    def unavailable() -> list[Project]:
+        raise HttpError(503, "Base injoignable.")
+
+    with monkeypatch.context() as patched:
+        patched.setattr(content.api, "published_projects", unavailable)
+        failed = client.get(PROJECTS).status_code
+
+    assert (failed, titles(client)) == (503, ["Portfolio"])
 
 
 @pytest.mark.django_db
@@ -278,6 +365,38 @@ def test_redis_injoignable_la_liste_vient_de_la_base_et_l_incident_est_journalis
     assert logged == {("django_redis.cache", logging.ERROR, "Exception ignored")}
 
 
+@pytest.mark.django_db
+def test_redis_injoignable_une_requete_de_la_liste_ne_paie_que_deux_operations(
+    client: Client, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Le vrai client sur l'adresse injoignable : chaque opération sur Redis échoue, puis
+    `django-redis` l'ignore et la journalise, une entrée chacune (`omit_exception`,
+    `django_redis/cache.py` 7.0.0). La génération lue, une neuve qui ne se pose pas, et rien ne se
+    lit ni ne s'écrit ensuite."""
+    with override_settings(CACHES=config.settings.CACHES):
+        client.get(PROJECTS)
+
+    ignored = [record for record in caplog.records if record.name == "django_redis.cache"]
+    assert len(ignored) == OPERATIONS_WITHOUT_REDIS
+
+
+def test_les_delais_de_redis_des_reglages_sont_courts() -> None:
+    """Chaque opération sur un Redis qui ne répond pas les attend avant que la liste ne vienne de
+    la base (décision 7)."""
+    options = cast("dict[str, object]", config.settings.CACHES["default"]["OPTIONS"])
+
+    assert slow_delays(options) == []
+
+
+@pytest.mark.parametrize(("options", "expected"), DELAY_FORMS.values(), ids=DELAY_FORMS.keys())
+def test_la_garde_des_delais_de_redis_rend_son_verdict_sur_chaque_forme(
+    options: dict[str, object], expected: list[str]
+) -> None:
+    """Les réglages de cache ne se mutent pas (réglage de sécurité, `mutation.py`) : la garde se
+    voit rougir ici, sur des options construites."""
+    assert slow_delays(options) == expected
+
+
 def gallery_states(client: Client) -> list[str]:
     """L'état de chaque image de la galerie du seul projet de la liste que `client` reçoit."""
     [listed_project] = listed(client)
@@ -289,6 +408,14 @@ def replace_original_silently(image: GalleryImage) -> None:
     l'écriture conditionnelle de la tâche ne la trouve plus, et seule la tâche pourrait vider le
     cache."""
     GalleryImage.objects.filter(pk=image.pk).update(original="images/autre/original.png")
+
+
+def make_unreadable(image: GalleryImage) -> None:
+    """Remplace le fichier de l'original de `image` par des octets qui ne sont pas une image :
+    chaque essai de son traitement échoue."""
+    name = image.original.name or ""
+    default_storage.delete(name)
+    default_storage.save(name, ContentFile(b"Plus une image."))
 
 
 @pytest.fixture
@@ -318,24 +445,30 @@ def test_la_liste_montre_l_image_en_echec_des_la_fin_de_son_traitement(
 ) -> None:
     """Un original devenu illisible : réessais épuisés, l'image passe en échec, et la tâche vide
     le cache de même."""
-    name = pending_image.original.name or ""
-    default_storage.delete(name)
-    default_storage.save(name, ContentFile(b"Plus une image."))
+    make_unreadable(pending_image)
     before = gallery_states(client)
 
-    process_image.delay(pending_image.pk, name)
+    process_image.delay(pending_image.pk, pending_image.original.name or "")
 
     assert (before, gallery_states(client)) == (["pending"], ["failed"])
 
 
 @pytest.mark.django_db
 @pytest.mark.usefixtures("unpropagated")
-def test_une_purge_qui_echoue_ne_defait_pas_un_traitement_reussi(
+@pytest.mark.parametrize(("unreadable", "state"), OUTCOMES.values(), ids=OUTCOMES.keys())
+def test_une_purge_qui_echoue_est_journalisee_sans_defaire_le_traitement(
     pending_image: GalleryImage,
+    caplog: pytest.LogCaptureFixture,
+    unreadable: bool,
+    state: ProcessingState,
 ) -> None:
     """Le vrai client sur une adresse injoignable, ses exceptions non ignorées : la purge lève
-    après l'écriture de « prêt ». L'image reste prête, sans réessai qui la passerait en échec, et
-    son dossier ne tient que les variantes qu'elle nomme."""
+    après l'écriture de « prêt » comme d'« échec ». L'image garde l'état écrit, sans réessai qui
+    la ferait passer de « prêt » à « échec », son dossier ne tient que les variantes qu'elle
+    nomme, et l'erreur est journalisée avec sa trace — `django-redis` ne journalise que celles
+    qu'il ignore."""
+    if unreadable:
+        make_unreadable(pending_image)
     production = config.settings.CACHES["default"]
     options = cast("dict[str, object]", production["OPTIONS"])
     raising = {**production, "OPTIONS": {**options, "IGNORE_EXCEPTIONS": False}}
@@ -345,7 +478,8 @@ def test_une_purge_qui_echoue_ne_defait_pas_un_traitement_reussi(
 
     row = GalleryImage.objects.get(pk=pending_image.pk)
     named = sorted(variant["name"].rsplit("/", 1)[1] for variant in row.variants)
-    assert (row.state, variant_files(row)) == (ProcessingState.READY, named)
+    logged = [(r.levelno, bool(r.exc_info)) for r in caplog.records if r.name == "content.tasks"]
+    assert (row.state, variant_files(row), logged) == (state, named, [(logging.ERROR, True)])
 
 
 @pytest.mark.django_db
