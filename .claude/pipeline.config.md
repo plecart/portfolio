@@ -433,11 +433,15 @@ d'abord relevé le 2026-10-26 (obs 144) :
   rend 1 ;
 - un `grep` placé après un `|` n'est pas réécrit (`rtk rewrite` le rend intact) :
   `cat etoile.txt | grep -c 'a\*b'` rend 1 ;
-- une commande qui porte une redirection de fichier — `>`, `>>`, `2>` ou `<` — n'est réécrite
-  dans aucun de ses segments, alors que `2>&1` n'empêche rien ; relevé entre 20:36 et 20:52 UTC :
-  `rtk rewrite` sort en 1 sans rien rendre sur `printf 'x' > r.txt && grep -c 'a\*b' etoile.txt`
-  comme sur `grep -c 'a\*b' etoile.txt > r.txt`, et réécrit `grep -c 'a\*b' etoile.txt` seul ; ce `grep`
-  rend 4 seul, et 1 derrière `printf 'x' > r.txt &&` ;
+- une commande qui porte une redirection vers un fichier — `>`, `>>`, `2>` ou `<`, `/dev/null`
+  excepté — n'est réécrite dans aucun de ses segments, alors que `2>&1` n'empêche rien ; relevé
+  entre 20:36 et 20:52 UTC : `rtk rewrite` sort en 1 sans rien rendre sur
+  `printf 'x' > r.txt && grep -c 'a\*b' etoile.txt` comme sur `grep -c 'a\*b' etoile.txt > r.txt`,
+  et réécrit `grep -c 'a\*b' etoile.txt` seul ; ce `grep` rend 4 seul, et 1 derrière
+  `printf 'x' > r.txt &&` ; relevé vers 21:24 UTC, `grep -c ab point.txt` suivi de
+  `> /dev/null`, de `>/dev/null` ou de `2>/dev/null`, ou précédé de `printf x > /dev/null &&`,
+  est réécrit en `rtk grep`, quand `>> r.txt`, `2> r.txt` et `< point.txt` sortent en 1 sans rien
+  rendre ;
 - la sortie d'une commande réécrite est **tronquée** : `grep ligne long.txt`, 300 lignes
   appariées, rend « 300 matches in 1 files: », 25 lignes et « +275 more », et 28 lignes en tête
   d'un tube. Témoins : `rtk proxy grep ligne long.txt` et `cat long.txt | grep ligne` en rendent
