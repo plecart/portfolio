@@ -93,15 +93,15 @@ function startOn(element: HTMLElement, homologue: Element): Frame {
 
 /** Les trajets de la fiche (spec §4.6) : la feuille, la photo, le post-it, puis chaque ruban. */
 function legs(panel: HTMLElement, card: HTMLElement, { ribbonDelay }: Motion): Leg[] {
-  const travelers = TRAVELERS.map(([fiche, origin]) => ({
-    element: panel.querySelector<HTMLElement>(fiche)!,
-    homologue: card.querySelector(origin)!,
+  const travelers = TRAVELERS.map(([inPanel, onCard]) => ({
+    element: panel.querySelector<HTMLElement>(inPanel)!,
+    homologue: card.querySelector(onCard)!,
     delay: 0,
     dimmed: false,
   }))
-  const [fiche, origin] = RIBBONS
-  const homologues = card.querySelectorAll(origin)
-  const ribbons = [...panel.querySelectorAll<HTMLElement>(fiche)].map((element, index) => ({
+  const [inPanel, onCard] = RIBBONS
+  const homologues = card.querySelectorAll(onCard)
+  const ribbons = [...panel.querySelectorAll<HTMLElement>(inPanel)].map((element, index) => ({
     element,
     homologue: homologues[index],
     delay: index * ribbonDelay,
@@ -123,6 +123,7 @@ function shown(element: Element, properties: readonly string[]): Frame {
  * éléments, relevé en argument, avant que les animations relayées ne soient retirées ; une mesure que
  * prend `next` ne voit plus que le repos.
  *
+ * @param relayed Les animations en cours, annulées une fois `from` relevé.
  * @param from Ce que montre chaque élément (`shown`), au repos ou en plein mouvement.
  * @param next Les animations suivantes, depuis ces relevés, dans leur ordre.
  */
