@@ -52,6 +52,9 @@ services:
 
   redis:
     image: redis:7.4.12-alpine@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f
+    # La commande de la production (`compose.yml`), pour qu'un effet de la borne se reproduise
+    # ici (ADR 0012).
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "volatile-lru"]
     ports:
       - "127.0.0.1:${REDIS_PORT}:6379"
     healthcheck:
