@@ -9939,7 +9939,293 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
     ),
     "rtk-point-d-interrogation": (
         PIPELINE_CONFIG,
-        "rendent 4 au lieu de 1, le même motif après un `|` rend 1",
+        "rendent 4 eux aussi, le même motif après un `|` rend 1",
+    ),
+    # #198, D-5 : les morceaux qui prescrivent dans les passages déclarés de la table.
+    "developpeur-frontieres-tierces-lis-l-api": (
+        DEVELOPPEUR_ROLE,
+        (
+            "avant d'appuyer un comportement sur une bibliothèque à une frontière (réseau,"
+            " encodage, secrets, fusion avec une config par défaut, cycle de vie), lis ce que fait"
+            " réellement l'API, par `context7` ou les sources du paquet, et note-le avec sa"
+            " référence dans ton rapport"
+        ),
+    ),
+    "relecteur-commandes-dans-ce-worktree": (
+        RELECTEUR_ROLE,
+        (
+            "Toutes tes commandes s'exécutent dans ce worktree, la commande de test comprise —"
+            " celle de `.claude/pipeline.config.md`, jamais un appel direct au lanceur"
+        ),
+    ),
+    "relecteur-install-d-abord": (
+        RELECTEUR_ROLE,
+        "Si une pile touchée n'y est pas installée, lance d'abord sa commande `install`",
+    ),
+    "relecteur-aucun-fichier-hors-mutation": (
+        RELECTEUR_ROLE,
+        (
+            "Tu n'écris aucun fichier du dépôt hors d'une mutation restaurée : un fichier de"
+            " travail va dans ton scratchpad"
+        ),
+    ),
+    "relecteur-frontieres-tierces-comportement-reel": (
+        RELECTEUR_ROLE,
+        (
+            "**Les frontières tierces** — réseau, sérialisation et encodage, secrets, fusion avec"
+            " un thème ou une config par défaut, cycle de vie de ressources : le comportement réel"
+            " de la bibliothèque, lu dans sa documentation à jour (`context7`) ou dans ses sources"
+        ),
+    ),
+    "relecteur-ecart-est-un-constat": (
+        RELECTEUR_ROLE,
+        "tout écart avec ce que le code suppose est un constat",
+    ),
+    "relecteur-avis-sans-correctif": (
+        RELECTEUR_ROLE,
+        (
+            "Un avis de sécurité sans version corrigée se remonte par la chaîne de dépendance"
+            " avant d'être rapporté « irréductible »"
+        ),
+    ),
+    "relecteur-rendu-dans-cet-ordre": (
+        RELECTEUR_ROLE,
+        (
+            "Tu rends à la session PR — par message en session (`session-relecture.md`, « Réveil"
+            " »), en fin de tâche en sous-agent —, dans cet ordre"
+        ),
+    ),
+    "relecteur-rendu-les-criteres": (
+        RELECTEUR_ROLE,
+        "les critères avec leur verdict et leur preuve",
+    ),
+    "relecteur-rendu-les-constats": (
+        RELECTEUR_ROLE,
+        "les constats par sévérité, chacun avec fichier, raison et provenance",
+    ),
+    "relecteur-rendu-le-non-verifie": (
+        RELECTEUR_ROLE,
+        "**ce que le plafond a laissé « non vérifié », point par point avec son rang**",
+    ),
+    "relecteur-rendu-les-mutations": (RELECTEUR_ROLE, "les mutations jouées avec leur verdict"),
+    "releveur-edits-verbatim-par-l-outil-edit": (
+        RELEVEUR_ROLE,
+        (
+            "**Édits verbatim** — une table (fichier, ligne, texte remplacé, texte de"
+            " remplacement) appliquée par l'outil Edit"
+        ),
+    ),
+    "releveur-edit-jamais-heredoc": (
+        RELEVEUR_ROLE,
+        "Tu modifies les fichiers par l'outil Edit, jamais par un heredoc",
+    ),
+    "releveur-rend-le-recompte": (RELEVEUR_ROLE, "et tu rends le recompte avec le `git diff`"),
+    "qualite-heredoc-seulement-sans-antislash": (
+        PIPELINE_CONFIG,
+        "Un heredoc ne convient qu'à un contenu sans antislash",
+    ),
+    "rtk-commandes-reecrites": (
+        PIPELINE_CONFIG,
+        (
+            "réécrit la commande avant son exécution — `make …`, `gh …` (sauf `gh label` et `gh"
+            " api … --jq`), `cat`/`head -N`/`tail` (→ `rtk read …` ; `head -n N` n'est pas"
+            " réécrit), `ls`, `wc`, `grep`"
+        ),
+    ),
+    "rtk-ni-git-ni-sed": (PIPELINE_CONFIG, "ni `git …` ni `sed`, ni l'outil PowerShell"),
+    "rtk-permissions-sur-la-forme-reecrite": (
+        PIPELINE_CONFIG,
+        "Les règles de permission sont évaluées sur la forme **réécrite**",
+    ),
+    "rtk-allow-commencent-par-rtk": (
+        PIPELINE_CONFIG,
+        "c'est pourquoi les entrées `allow` de `.claude/settings.json` commencent par `rtk`",
+    ),
+    "rtk-les-deux-formes-se-doublent": (PIPELINE_CONFIG, "les deux se doublent à dessein"),
+    "permissions-ask-avant-allow": (
+        PIPELINE_CONFIG,
+        "Un `ask` passe avant tout `allow`, y compris celui qu'un hook renvoie",
+    ),
+    "permissions-en-mode-auto-compris": (PIPELINE_CONFIG, "en mode auto compris"),
+    "permissions-quatre-formes-et-trois-portes": (
+        PIPELINE_CONFIG,
+        (
+            "forme d'origine, forme `rtk`, `rtk proxy`, outil PowerShell — est la porte de «"
+            " jamais d'auto-merge dans le trunk », du « rebase explicitement demandé »"
+            " (`contraintes.md`) et du « ni commit de fusion » de `cycle-pr` Étape 6"
+        ),
+    ),
+    "permissions-epinglee-par-test-agent-permissions": (
+        PIPELINE_CONFIG,
+        "Épinglée par `apps/api/tests/test_agent_permissions.py`",
+    ),
+    "permissions-seule-exception-merge-lot": (
+        PIPELINE_CONFIG,
+        (
+            "Seule exception, hors du trunk : le script"
+            " `.claude/skills/cycle-pr/scripts/merge-lot.py`, autorisé en `allow`, qui lance"
+            " lui-même `gh pr merge` vers une branche d'intégration et refuse le trunk"
+        ),
+    ),
+    "permissions-merge-lot-ecriture-en-deny": (
+        PIPELINE_CONFIG,
+        (
+            "son écriture est en `deny` (`Edit(/.claude/skills/cycle-pr/scripts/merge-lot.py)`) et"
+            " se fait par le mainteneur"
+        ),
+    ),
+    "permissions-merge-lot-risque-ouvert": (
+        PIPELINE_CONFIG,
+        "Reste ouvert, comme pour `.env` : un sous-processus qui écrirait le fichier lui-même",
+    ),
+    "permissions-ask-apres-et": (
+        PIPELINE_CONFIG,
+        "Elle se déclenche aussi sur `gh pr merge` placé **après `&&`** dans une commande composée",
+    ),
+    "permissions-restent-ouverts": (
+        PIPELINE_CONFIG,
+        (
+            "Restent ouverts : un merge local suivi de `git push origin main` (`main` n'est pas"
+            " protégée côté GitHub), `gh api -X PUT …/pulls/<n>/merge` et `gh -R … pr merge` —"
+            " aucun `allow` ne les couvre"
+        ),
+    ),
+    "cleanup-passe-mecanique-et-denombrable": (
+        CLEANUP_VERBATIM_RULE,
+        "La passe est **mécanique et dénombrable**",
+    ),
+    "cleanup-enumerer-chaque-assertion": (
+        CLEANUP_VERBATIM_RULE,
+        (
+            "énumérer chaque assertion que le delta fait sur lui-même — propriété annoncée dans un"
+            " docstring, commentaire « mesuré », ligne de `pipeline.config.md`, case de Test plan,"
+            " message d'assertion"
+        ),
+    ),
+    "cleanup-trois-provenances": (
+        CLEANUP_VERBATIM_RULE,
+        (
+            "l'une des **trois** provenances que porte déjà `.claude/agents/relecteur.md` : **la"
+            " commande qui l'établit** (mesuré), **la mesure datée et citée dont elle est tirée**"
+            " (lu), ou **« non vérifiée »** (supposé)"
+        ),
+    ),
+    "cleanup-rendre-le-denombrement": (
+        CLEANUP_VERBATIM_RULE,
+        "Rendre le dénombrement : N affirmations, k établies, N−k non vérifiées",
+    ),
+    "cleanup-messages-par-ast-jamais-par-regex": (
+        CLEANUP_VERBATIM_RULE,
+        (
+            "Les messages d'assertion se comptent par analyse syntaxique (`ast`), jamais par"
+            " expression régulière"
+        ),
+    ),
+    "tests-le-rouge-ne-se-suppose-pas": (TESTS_REF, "**Le rouge se constate, il ne se suppose pas"),
+    "tests-un-test-jamais-vu-rouge": (
+        TESTS_REF,
+        "un test qui n'a pas été vu rouge n'est pas un test",
+    ),
+    "tests-registre-des-passages": (
+        TESTS_REF,
+        "registre `PASSAGES_DECLARES` de `apps/api/tests/test_agent_skills.py`",
+    ),
+    "plan-qa-chemin-du-brouillon-et-du-releve": (
+        PLAN_QA_SKILL,
+        "La session lui passe le chemin du brouillon et celui du relevé des issues du périmètre",
+    ),
+    "plan-qa-aucun-motif-n-y-porte-d-antislash": (PLAN_QA_SKILL, "Aucun motif n'y porte de `\\`"),
+    "plan-qa-caracteres-entre-crochets": (
+        PLAN_QA_SKILL,
+        "un caractère spécial s'y écrit entre crochets — `[[]`, `[]]`, `[*]`, `[(]`, `[)]` —",
+    ),
+    "plan-qa-rtk-grep-a-cache-la-case": (
+        PLAN_QA_SKILL,
+        (
+            "le hook le réécrit en `rtk grep`, dont la sortie reformatée et tronquée a caché la"
+            " case sans type d'un brouillon témoin"
+        ),
+    ),
+    "plan-qa-renvoi-aux-frontieres-tierces": (
+        PLAN_QA_SKILL,
+        "(`cycle-pr/references/tests.md`, « Frontières tierces : on vérifie, on ne suppose pas »)",
+    ),
+    "execution-qa-releveur-cases-commande": (
+        EXECUTION_QA_SKILL,
+        (
+            "**`releveur`** — les cases **Commande** : la commande exacte et l'attendu du plan,"
+            " tapés tels qu'écrits, la sortie lue brute, sans résumeur"
+        ),
+    ),
+    "execution-qa-releveur-rend-ok-ko": (
+        EXECUTION_QA_SKILL,
+        (
+            "Il rend OK ou KO par case, le code de sortie, la sortie brute si KO, et s'arrête au"
+            " premier KO, qui remonte"
+        ),
+    ),
+    "execution-qa-un-seul-brief-par-bloc": (
+        EXECUTION_QA_SKILL,
+        "plusieurs cases d'un bloc partent dans un seul brief",
+    ),
+    "execution-qa-lui-reviennent-aussi": (
+        EXECUTION_QA_SKILL,
+        "Lui reviennent aussi l'état de l'arbre et les fichiers que les cases du bloc nomment",
+    ),
+    "execution-qa-verdict-reste-a-la-session": (
+        EXECUTION_QA_SKILL,
+        "Le verdict de la case reste à la session",
+    ),
+    "cycle-pr-repercussions-sinon-un-grep": (
+        CYCLE_PR_SKILL,
+        (
+            "sinon — demande directe sans issue —, un `grep` des ancres du diff sur `docs/` et sur"
+            " les issues ouvertes (`gh issue list --search <ancre>`) par la session, et une ligne"
+            " dans le body"
+        ),
+    ),
+    "cycle-pr-repercussions-immediatement-apres-le-merge": (
+        CYCLE_PR_SKILL,
+        (
+            "Quand elle est due, **immédiatement après le merge**, la session PR lance le skill"
+            " `repercussions`"
+        ),
+    ),
+    "cycle-pr-repercussions-collecte-au-releveur": (
+        CYCLE_PR_SKILL,
+        "La collecte (delta, issues du thème, briefs pré-filtrés par ancre) part à un `releveur`",
+    ),
+    "cycle-pr-repercussions-go-d-edition": (
+        CYCLE_PR_SKILL,
+        "le go d'édition se demande au mainteneur dans la fenêtre de la session PR",
+    ),
+    "cloture-frontiere-de-lot-par-la-session-sortante": (
+        CLOTURE_REF,
+        "**Cas découpé : la frontière de lot se franchit par la session sortante.**",
+    ),
+    "cloture-prompt-du-lot-suivant": (
+        CLOTURE_REF,
+        (
+            "Sur un lot intermédiaire, écrire le prompt du lot suivant depuis"
+            " [references/prompt-lot-suivant.md](references/prompt-lot-suivant.md)"
+        ),
+    ),
+    "cloture-sous-une-coordinatrice": (
+        CLOTURE_REF,
+        (
+            "Sous une coordinatrice, **à la coordinatrice**, qui ouvre la session du lot suivant"
+            " sur ce pointeur — une session de lot coordonné l'écrit sans passe `repercussions`,"
+            " qui tourne au merge de la PR d'intégration"
+        ),
+    ),
+    "cloture-pas-le-lead": (CLOTURE_REF, "Pas le lead"),
+    "cloture-deux-replis": (
+        CLOTURE_REF,
+        (
+            "Quand la session sortante a disparu, deux replis de `pr-paralleles` : Étape 7, «"
+            " Session disparue », pour reconstituer ce qu'elle n'a pas remis, et Étape 8, « Issue"
+            " en plusieurs lots », où c'est le lead qui démarre la session du lot suivant"
+        ),
     ),
 }
 
@@ -9954,6 +10240,312 @@ def test_chaque_invariant_des_conforts_de_pipeline_garde_sa_phrase(
 ) -> None:
     """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
     assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
+
+
+# Les passages déclarés des conforts de pipeline (#198, D-5). Dans `.claude/pipeline.config.md`,
+# seulement la puce heredoc de « Qualité », les paragraphes RTK et ceux des permissions : la fin de
+# « Qualité » appartient à #11.
+PASSAGES_DES_CONFORTS_DE_PIPELINE = (
+    Passage(
+        DEVELOPPEUR_ROLE,
+        "- **Écrire un fichier** — piège",
+        "- **Le prompt de relecture**",
+        {},
+    ),
+    Passage(
+        DEVELOPPEUR_ROLE,
+        "- **Frontières tierces** (`cycle-pr` 3.1)",
+        "- **Test brut** (`cycle-pr` 3.2)",
+        {},
+    ),
+    Passage(
+        EXECUTANT_ROLE,
+        "**Écrire un fichier de la tranche**",
+        "Tu **commites ta tranche**",
+        {},
+    ),
+    Passage(
+        RELECTEUR_ROLE,
+        "Toutes tes commandes s'exécutent dans ce worktree",
+        "**Commande de fond bornée**",
+        {},
+        empruntees=(INVARIANTS_DE_LA_SESSION_DE_RELECTURE["relecteur-sous-agent-sans-write"][1],),
+    ),
+    Passage(
+        RELECTEUR_ROLE,
+        "3. **Les frontières tierces**",
+        "4. **Les cibles du fichier de commandes**",
+        {
+            "intitulé": [
+                "3.",
+            ],
+        },
+    ),
+    Passage(
+        RELECTEUR_ROLE,
+        "Tu rends à la session PR — par message en session",
+        "Pas de relecteur par préoccupation",
+        {},
+    ),
+    Passage(
+        RELEVEUR_ROLE,
+        "- **Édits verbatim**",
+        "- **Écritures distantes verbatim**",
+        {},
+    ),
+    Passage(
+        RELEVEUR_ROLE,
+        "- **Heredoc et antislashs**",
+        "- **`<rev>:<chemin>`**",
+        {
+            "motif": [
+                (
+                    "un fichier écrit par `cat <<'EOF'` depuis l'outil Bash arrive avec ses"
+                    " antislashs divisés par deux, et l'outil Edit peut décoder un échappement en"
+                    " route."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        PIPELINE_CONFIG,
+        "- **heredoc de l'outil Bash et antislashs**",
+        "- **cache de compilation et mutation de même longueur**",
+        {
+            "motif": [
+                (
+                    "- **heredoc de l'outil Bash et antislashs** — un fichier écrit par `cat >> …"
+                    " <<'EOF'` depuis l'outil Bash du poste arrive sur disque avec ses antislashs"
+                    " **divisés par deux** :"
+                ),
+            ],
+            "relevé daté": [
+                (
+                    "mesuré le 2026-10-13, un motif `\\\\?<` tapé est devenu `\\?<`, soit un `?`"
+                    " littéral, et une porte sur la prose des skills n'appariait plus rien — vue"
+                    " rouge sur son témoin, pas sur son motif."
+                ),
+                "obs 133 :",
+                (
+                    "`Write` a écrit 5 BOM et 1 U+FFFD dans un test et 1 BOM dans un script,"
+                    " `Edit` 1 BOM."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        PIPELINE_CONFIG,
+        "**RTK** (hook utilisateur `rtk hook claude`",
+        "La réécriture change aussi le **résultat**",
+        {
+            "relevé daté": [
+                (
+                    "RTK lit aussi `permissions.allow` et renvoie lui-même `permissionDecision:"
+                    ' "allow"` quand la commande **d\'origine** y figure (`gh pr *`, `gh issue'
+                    " *`…), et retient cet `allow` dès que la forme d'origine figure en `ask`"
+                    " (mesuré, rtk 0.43.0) :"
+                ),
+            ],
+        },
+    ),
+    Passage(
+        PIPELINE_CONFIG,
+        "La réécriture change aussi le **résultat**",
+        "Un `ask` passe avant tout `allow`",
+        {
+            "intitulé": [
+                "Témoins :",
+            ],
+            "relevé daté": [
+                "d'abord relevé le 2026-10-26 (obs 144) :",
+                "et le `?` de même, relevé vers 17:26 UTC :",
+                "`cat etoile.txt | grep -c 'a\\*b'` rend 1 ;",
+                "`grep ligne long.txt`, 300 lignes appariées, rend « 300 matches in 1 files:",
+            ],
+        },
+    ),
+    Passage(
+        PIPELINE_CONFIG,
+        "Un `ask` passe avant tout `allow`",
+        "Même logique de forme réécrite pour les `deny`",
+        {
+            "motif": [
+                "Le contenu du script est donc ce que l'`allow` autorise :",
+                (
+                    "C'est ce qui rend sûre la porte de merge **à une commande** de `cycle-pr`"
+                    " Étape 7 (« Le go, puis le merge ») ;"
+                ),
+                (
+                    "l'émulation du test, elle, ne sait pas le vérifier — elle ne découpe pas les"
+                    " commandes composées, et le dit."
+                ),
+            ],
+            "relevé daté": [
+                "« Explicit ask rules still force a prompt ») :",
+                (
+                    "« Bash rules match the whole command text » (doc permissions, lue le"
+                    " 2026-10-17), celui que l'agent lance, pas ce que le script lance à son tour."
+                ),
+                "Mesuré le 2026-10-17 sur la PR jetable #120 (Test plan de la PR #117) :",
+                (
+                    "le merge est parti sans invite, alors qu'une règle `ask` en force une même en"
+                    " mode auto (doc permission-modes, lue le même jour)."
+                ),
+                "Mesuré le 2026-10-17 :",
+                "l'outil d'édition est refusé, motif « denied by your permission settings » ;",
+                (
+                    "un `sed` est refusé aussi, sans que le refus dise qui de la règle ou du"
+                    " classifieur du mode auto l'a arrêté."
+                ),
+                "Les redirections sont couvertes selon la doc (§ Redirections), non mesurées.",
+                (
+                    "l'invite est apparue dans la fenêtre du mainteneur, et la commande n'a tourné"
+                    " qu'après."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        PIPELINE_CONFIG,
+        "`.claude/skills/cycle-pr/scripts/porte-merge.py` est en `allow`",
+        "**Outils hors dépôt**",
+        {
+            "motif": [
+                (
+                    "il ne fait que lire `gh` et `git`, et chaque appel de la session ou du"
+                    " `verificateur` faisait une invite (#198, D-3)."
+                ),
+            ],
+            "relevé daté": [
+                "il a reçu 5 commits au seul cycle de #197.",
+            ],
+        },
+    ),
+    Passage(
+        CLEANUP_VERBATIM_RULE,
+        "La passe est **mécanique et dénombrable**",
+        "**Pourquoi trois et non deux**",
+        {
+            "relevé daté": [
+                "une regex qui franchit les lignes a rendu deux dénombrements faux avant le bon.",
+                (
+                    "un « 55 morceaux » écrit au-dessus d'une table d'épingles en comptait 92 par"
+                    " sa propre règle (obs 127)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        CLEANUP_VERBATIM_RULE,
+        "- **Une lecture d'état `git` qui décide",
+        "- **Vérifier aussi les 3 axes de conception**",
+        {
+            "relevé daté": [
+                (
+                    "sous `status.showUntrackedFiles=no`, il rendait « rien à commiter », sortie"
+                    " 0, devant un fichier non suivi (obs 145)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        TESTS_REF,
+        "**Une commande que la prose fait taper à un rôle**",
+        "# Un zéro rendu par un outil de contrôle",
+        {
+            "relevé daté": [
+                "mesures datées au paragraphe **RTK** de `.claude/pipeline.config.md`).",
+            ],
+        },
+    ),
+    Passage(
+        TESTS_REF,
+        "**Le rouge se constate, il ne se suppose pas — un test",
+        "- **Le test passe du premier coup",
+        {},
+    ),
+    Passage(
+        TESTS_REF,
+        "- **La garde cite une phrase de règle**",
+        "# Contrôles complémentaires de 3.2",
+        {
+            "motif": [
+                (
+                    "une ancre posée sur la moitié qui fait laisse retirer en vert celle qui"
+                    " interdit (obs 126)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        PLAN_QA_SKILL,
+        "La session lui passe le chemin du brouillon",
+        "- **Cases sans type**",
+        {
+            "relevé daté": [
+                "» et « +17 more », sans la case de la ligne 73.",
+            ],
+        },
+        empruntees=(INVARIANTS_DU_CONTEXTE_COURT["7a-plan-qa-passe-comptable-refuse"][1],),
+    ),
+    Passage(
+        EXECUTION_QA_SKILL,
+        "- **`releveur`** — les cases **Commande**",
+        "- **script** — la prochaine case",
+        {},
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "La PR et la conversation qui l'a résolue ont pu acter",
+        "Il confronte le **delta réel**",
+        {
+            "motif": [
+                (
+                    "La PR et la conversation qui l'a résolue ont pu acter des décisions, déplacer"
+                    " un contrat d'interface, déjà faire une partie d'un autre lot, ou rendre une"
+                    " hypothèse caduque ailleurs."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        CLOTURE_REF,
+        "5. La PR n'est **terminée qu'après la passe `repercussions`**",
+        "# Le contrat d'ecriture-relue.py",
+        {
+            "intitulé": [
+                "5.",
+            ],
+            "motif": [
+                (
+                    "un merge peut bouleverser les autres issues — la session PR le vérifie tant"
+                    " qu'elle tient le brief, les Notes et les constats."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        CLOTURE_REF,
+        "**Cas découpé : la frontière de lot se franchit par la session sortante",
+        "# La passation s'écrit en dernier",
+        {
+            "motif": [
+                "La session sortante tient les artefacts de son lot ;",
+                (
+                    "le lead connaît la vague, et c'est ce qu'il garde — croisement des fichiers"
+                    " après merge, tableau de bord, vigilance de vague."
+                ),
+            ],
+            "relevé daté": [
+                (
+                    "sur une vague de cinq lots, chaque frontière passée par lui lui coûte un"
+                    " brief relu et un prompt écrit, et son contexte a grossi jusqu'à devoir être"
+                    " relayé lui-même (obs 62)."
+                ),
+            ],
+        },
+    ),
+)
 
 
 # Ce que #198 retire : l'écriture par `echo` du `relecteur` et sa copie de la règle des lectures
@@ -9989,6 +10581,7 @@ PASSAGES_DECLARES: dict[str, tuple[Passage, ...]] = {
     "INVARIANTS_DE_LA_SESSION_DE_RELECTURE": PASSAGES_DE_LA_SESSION_DE_RELECTURE,
     "INVARIANTS_DE_LA_REGLE_DU_SUJET": PASSAGES_DE_LA_REGLE_DU_SUJET,
     "INVARIANTS_DE_LA_PORTE_DE_MERGE": PASSAGES_DE_LA_PORTE_DE_MERGE,
+    "INVARIANTS_DES_CONFORTS_DE_PIPELINE": PASSAGES_DES_CONFORTS_DE_PIPELINE,
 }
 
 
@@ -10014,3 +10607,21 @@ def test_chaque_morceau_d_un_passage_declare_tient_une_ancre(table: str) -> None
             )
 
     assert not ecarts, "\n".join(ecarts)
+
+
+# Les tables que le lot 2 de #198 couvre (D-7), hors du registre jusque-là.
+TABLES_COUVERTES_AU_LOT_2 = ("INVARIANTS_DES_SESSIONS_LIEES", "INVARIANTS_DU_CONTEXTE_COURT")
+
+
+def test_chaque_table_d_invariants_est_au_registre_ou_au_lot_2() -> None:
+    """**Population recomptée à chaque exécution** : les tables `INVARIANTS_` du module (obs 127,
+    D-4). Chacune a ses passages déclarés ou attend le lot 2, jamais les deux : une table ajoutée
+    sans entrée rougit, une entrée sans table aussi."""
+    tables = {nom for nom in globals() if nom.startswith("INVARIANTS_")}
+    attendues = set(PASSAGES_DECLARES) | set(TABLES_COUVERTES_AU_LOT_2)
+
+    assert set(PASSAGES_DECLARES).isdisjoint(TABLES_COUVERTES_AU_LOT_2)
+    assert tables == attendues, (
+        f"hors du registre : {sorted(tables - attendues)} ;"
+        f" sans table : {sorted(attendues - tables)}"
+    )
