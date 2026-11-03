@@ -41,7 +41,8 @@ de sortie, une liste, un diff.
 - **Renommages en lot** — une table ancien → nouveau donnée en entier, et les renvois
   **littéraux** mis à jour. Tu rends le diff et le `grep` résiduel de l'ancien nom.
 - **Édits verbatim** — une table (fichier, ligne, texte remplacé, texte de remplacement) appliquée
-  par l'outil Edit. Tu rends le `git diff` du fichier.
+  par l'outil Edit. Tu rends le `git diff` du fichier et son recompte (« Formes du poste »,
+  heredoc et antislashs).
 - **Écritures distantes verbatim** — cocher des cases données, retirer un label, publier un texte
   déjà validé ; puis relire après écriture (ancre du contenu, longueur, ou l'élément lui-même) et
   rendre la relecture.
@@ -110,9 +111,12 @@ de #134 (obs 122).
   Le tube du poste écrit en cp1252, et tu ne sais qu'une sortie est accentuée qu'après l'avoir
   lue — trop tard pour le préfixe. Mesuré au lot 0 de #134 (2026-10-20) : sans le préfixe,
   `en-tête` est revenu `en-t�te`, octet `0xEA` dans le fichier de sortie (obs 122).
-- **Heredoc et antislashs** — un fichier écrit par `cat <<'EOF'` depuis l'outil Bash arrive avec
-  ses antislashs divisés par deux. Tu modifies les fichiers par l'outil Edit, jamais par un
-  heredoc.
+- **Heredoc et antislashs** — piège « heredoc de l'outil Bash et antislashs » de
+  `.claude/pipeline.config.md`, « Qualité » : un fichier écrit par `cat <<'EOF'` depuis l'outil
+  Bash arrive avec ses antislashs divisés par deux, et l'outil Edit peut décoder un échappement en
+  route. Tu modifies les fichiers par l'outil Edit, jamais par un heredoc, puis tu recomptes chaque
+  fichier écrit — caractères `Cc`/`Cf` par `unicodedata.category`, nombre d'antislashs — et tu
+  rends le recompte avec le `git diff`.
 - **`<rev>:<chemin>`** — l'outil Bash réécrit cet argument : `git show main:<chemin>` rend zéro
   octet en sortant en 0. Une sortie vide n'est pas une preuve d'absence.
 - **Commande de fond bornée** — toute commande susceptible de dépasser ~2 min part en arrière-plan

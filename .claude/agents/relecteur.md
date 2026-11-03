@@ -88,7 +88,9 @@ Ce que tu vérifies :
    ou une config par défaut, cycle de vie de ressources : le comportement réel de la bibliothèque,
    lu dans sa documentation à jour (`context7`) ou dans ses sources ; tout écart avec ce que le
    code suppose est un constat. Un avis de sécurité sans version corrigée se remonte par la
-   chaîne de dépendance avant d'être rapporté « irréductible ».
+   chaîne de dépendance avant d'être rapporté « irréductible ». Une commande que le delta fait
+   taper à un rôle relève de la règle des commandes que la prose fait taper
+   (`cycle-pr/references/tests.md`, « Frontières tierces : on vérifie, on ne suppose pas »).
 4. **Les cibles du fichier de commandes** touchées par le diff et que la suite n'appelle pas :
    exécutées, ou vérifiées sur leur forme expansée (`make --dry-run <cible>`, ou l'équivalent du
    lanceur du projet).
