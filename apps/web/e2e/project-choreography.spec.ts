@@ -34,6 +34,7 @@ import {
   enterCards,
   expectPlacement,
   face,
+  focusByKeyboard,
   openTable,
 } from './table.ts'
 
@@ -103,10 +104,15 @@ async function openEnteredTable(page: Page, projects: Parameters<typeof openTabl
  */
 const cardAt = (page: Page, path: string) => page.locator(`.card[href="${path}"]`)
 
-/** Ouvre, page figée, la fiche d'une carte par Entrée : la chorégraphie reste à son premier instant. */
+/**
+ * Ouvre, page figée, la fiche d'une carte par son activation seule, comme une technologie
+ * d'assistance : la chorégraphie reste à son premier instant. Entrée lui donnerait le focus au même
+ * instant : levée d'un coup sous `[data-origin]` pour la mesure du vol, elle retomberait dès que le
+ * panneau le prend.
+ */
 async function openFrozen(page: Page, path: string) {
   const resume = await freezeAnimations(page)
-  await cardAt(page, path).press('Enter')
+  await cardAt(page, path).dispatchEvent('click', { detail: 0 })
   await expect(panel(page)).toBeVisible()
   return resume
 }
@@ -268,7 +274,7 @@ const TILTS: [string, { flat: Gesture; tilt: Gesture; open: Gesture }][] = [
           }
         })
       },
-      open: (page) => cardAt(page, FIRST_PATH).press('Enter'),
+      open: (page) => cardAt(page, FIRST_PATH).dispatchEvent('click', { detail: 0 }),
     },
   ],
 ]
@@ -886,6 +892,42 @@ for (const [name, close] of INTERRUPTIONS) {
     await expectLanded(page, card)
   })
 }
+
+/*
+ * Au décollage, la carte perd ses états d'intention — le focus, que prend le panneau, et le survol,
+ * que Radix retire au pointeur —, et ses couches en reviendraient par transition. Les couches d'une
+ * carte qui transitent (`card.css`), dénombrées le 2026-11-03 : huit. Déplacent la face, la photo,
+ * le post-it ou les rubans, quatre : la levée et la pression (`.card-face`) et l'inclinaison
+ * (`.card-tilt`), qu'une intention perdue au décollage ferait revenir, coupées sous `[data-origin]` ;
+ * la pose (`.card-pose`), voulue : elle revient à 0° en `--dur-open` (§4.6) ; l'entrée
+ * (`.card-entry`), qui ne court qu'avant la fin de la montée de la carte. N'en déplacent aucun,
+ * quatre : la cellule et l'ombre soulevée, par leur seule opacité ; le bandeau de résumé et le
+ * trombone, sans homologue.
+ */
+test('levée par le focus, fermée en plein vol : chaque élément revient sur la carte au repos', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, 'la levée suit un appareil à survol')
+  await openEnteredTable(page, PROJECTS)
+  const { open } = await motion(page)
+  const card = cardAt(page, FIRST_PATH)
+  await focusByKeyboard(card)
+  await settle(page)
+  await expect(face(card)).not.toHaveCSS('transform', 'none')
+  await openFrozen(page, FIRST_PATH)
+  await page.evaluate(seekAnimations, open / 2)
+
+  await page.keyboard.press('Escape')
+  // La carte au repos sous `[data-origin]` : ses transitions achevées.
+  await card.evaluate((cell) => {
+    for (const transition of cell.getAnimations({ subtree: true })) transition.finish()
+  })
+
+  const returning = await page.evaluate(readFlights, { path: FIRST_PATH })
+  expect(returning.length).toBeGreaterThan(3)
+  for (const { end, homologue } of returning) expectSameBox(end, homologue)
+})
 
 /*
  * Une ouverture n'est prise qu'une fois la fermeture finie (décision de #22). Les voies qui ouvrent
