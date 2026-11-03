@@ -40,15 +40,23 @@ type Box = { left: number; top: number; width: number; height: number }
 
 /** Les durées et la courbe de §2.7, résolues : millisecondes et courbe sérialisée par le navigateur. */
 async function motion(page: Page) {
-  const [open, content, fast, ribbon, easing] = await resolveAll(page, [
+  const [open, content, fast, reduced, ribbon, easing] = await resolveAll(page, [
     ['transition-duration', 'var(--dur-open)'],
     ['transition-duration', 'var(--dur-content)'],
     ['transition-duration', 'var(--dur-fast)'],
+    ['transition-duration', 'var(--dur-reduced)'],
     ['transition-delay', 'var(--delay-ribbon)'],
     ['transition-timing-function', 'var(--ease-out)'],
   ])
   const ms = (seconds: string) => Math.round(parseFloat(seconds) * 1000)
-  return { open: ms(open), content: ms(content), fast: ms(fast), ribbon: ms(ribbon), easing }
+  return {
+    open: ms(open),
+    content: ms(content),
+    fast: ms(fast),
+    reduced: ms(reduced),
+    ribbon: ms(ribbon),
+    easing,
+  }
 }
 
 /** Deux boîtes égales au demi-pixel. */
@@ -206,6 +214,24 @@ test('la carte se cache d’un coup, sauf son trombone, qui monte de 14 px en s�
   )
 })
 
+/**
+ * Dans le cadre de la galerie : la couche noir et blanc — l'image grise posée sur la première —,
+ * sa boîte et celle de l'image, et son fondu.
+ */
+function readGreyLayer(frame: Element) {
+  const [image, ...others] = frame.querySelectorAll('img')
+  const grey = others.find((other) => getComputedStyle(other).filter === 'grayscale(1)')!
+  const [fade] = grey.getAnimations()
+  return {
+    same: grey.src === image.src,
+    box: grey.getBoundingClientRect().toJSON(),
+    image: image.getBoundingClientRect().toJSON(),
+    hidden: grey.getAttribute('aria-hidden'),
+    duration: fade.effect!.getTiming().duration,
+    opacities: (fade.effect as KeyframeEffect).getKeyframes().map(({ opacity }) => Number(opacity)),
+  }
+}
+
 test('un projet en cours : la couche noir et blanc couvre la première image et s’efface pendant le vol', async ({
   page,
 }) => {
@@ -214,21 +240,7 @@ test('un projet en cours : la couche noir et blanc couvre la première image et 
   const resume = await openFrozen(page, FIRST_PATH)
   const images = panel(page).locator('.project-gallery-frame img')
 
-  const layer = await panel(page)
-    .locator('.project-gallery-frame')
-    .evaluate((frame) => {
-      const [image, ...others] = frame.querySelectorAll('img')
-      const grey = others.find((other) => getComputedStyle(other).filter === 'grayscale(1)')!
-      const [fade] = grey.getAnimations()
-      return {
-        same: grey.src === image.src,
-        box: grey.getBoundingClientRect().toJSON(),
-        image: image.getBoundingClientRect().toJSON(),
-        hidden: grey.getAttribute('aria-hidden'),
-        duration: fade.effect!.getTiming().duration,
-        opacities: (fade.effect as KeyframeEffect).getKeyframes().map(({ opacity }) => Number(opacity)),
-      }
-    })
+  const layer = await panel(page).locator('.project-gallery-frame').evaluate(readGreyLayer)
 
   expect(layer).toMatchObject({ same: true, hidden: 'true', duration: open, opacities: [1, 0] })
   expectSameBox(layer.box, layer.image)
@@ -301,7 +313,7 @@ test('pendant le vol, ni une cellule de la table ni sa grille ne se transforment
   expect(transformed).toBe(0)
 })
 
-test('à la pose, le contenu monte de 8 px en `--dur-content`, puis « Fermer la fiche » prend le focus', async ({
+test('à la pose, le contenu monte de 8 px en `--dur-content`, puis « Fermer la fiche » prend le focus, que le panneau tient sans anneau d’ici là', async ({
   page,
 }) => {
   await openEnteredTable(page, [FULL_FICHE])
@@ -318,6 +330,7 @@ test('à la pose, le contenu monte de 8 px en `--dur-content`, puis « Fermer la
   ]
 
   await expect(panel(page)).toBeFocused()
+  await expect(panel(page)).toHaveCSS('outline-style', 'none')
   for (const element of appearing) {
     await expect(element).toHaveCSS('opacity', '0')
     const entrance = await element.evaluate((node) => {
@@ -350,7 +363,7 @@ async function finishAnimations(page: Page) {
   })
 }
 
-test('à la fermeture, le contenu s’efface en `--dur-fast`, puis la feuille, la photo, le post-it et les rubans repartent vers la carte en `--dur-open`', async ({
+test('à la fermeture, le contenu s’efface en `--dur-fast`, puis la feuille, la photo, le post-it et les rubans repartent vers la carte en `--dur-open`, et la couche noir et blanc revient', async ({
   page,
 }) => {
   await openEnteredTable(page, PROJECTS)
@@ -387,6 +400,9 @@ test('à la fermeture, le contenu s’efface en `--dur-fast`, puis la feuille, l
     expect(flight.delay).toBe(Math.max(0, index - 3) * ribbon)
   }
   expectSameBox(flights[0].start, panelBox)
+  const grey = await panel(page).locator('.project-gallery-frame').evaluate(readGreyLayer)
+  expect(grey).toMatchObject({ same: true, duration: open, opacities: [0, 1] })
+  expectSameBox(grey.box, grey.image)
 })
 
 test('à la fermeture, les autres cartes reviennent à leur place en réapparaissant, en `--dur-open`', async ({
@@ -463,4 +479,93 @@ test('sa carte d’origine sortie du document, la fiche se ferme par le fondu de
 
   await expectClosed(page)
   expect((await animations()).map(({ name }) => name)).toEqual(['project-out'])
+})
+
+/**
+ * Dans la page : les animations de la Web Animations API, par la classe de leur cible, ce qu'elles
+ * animent, leurs opacités, leur durée et leur fin.
+ */
+function readFades() {
+  const ignored = new Set(['offset', 'computedOffset', 'easing', 'composite'])
+  return document
+    .getAnimations()
+    .filter((animation) => animation.constructor === Animation)
+    .map((animation) => {
+      const effect = animation.effect as KeyframeEffect
+      const keyframes = effect.getKeyframes()
+      return {
+        target: (effect.target as Element).className,
+        properties: [...new Set(keyframes.flatMap(Object.keys))].filter((key) => !ignored.has(key)),
+        opacities: keyframes.map(({ opacity }) => opacity),
+        duration: effect.getTiming().duration,
+        end: effect.getComputedTiming().endTime,
+      }
+    })
+}
+
+test.describe('en mouvement réduit (spec §6.3)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+  })
+
+  test('la fiche apparaît pendant que toutes les cartes s’effacent, en `--dur-fast`, sans feuille ni vol ; elle est active à `--dur-reduced`', async ({
+    page,
+  }) => {
+    await openEnteredTable(page, PROJECT_SETS.twelveWithShowcase)
+    const { fast, reduced } = await motion(page)
+    const entered = await page.locator('.card[data-entered]').count()
+    const resume = await openFrozen(page, (await cards(page).nth(2).getAttribute('href'))!)
+
+    const fades = await page.evaluate(readFades)
+
+    expect(new Set(fades.flatMap(({ properties }) => properties))).toEqual(new Set(['opacity']))
+    expect(fades.filter(({ target }) => target === 'project-panel')).toEqual([
+      { target: 'project-panel', properties: ['opacity'], opacities: ['0', '1'], duration: fast, end: reduced },
+    ])
+    const cardFades = fades.filter(({ target }) => target === 'card-entry')
+    expect(cardFades).toHaveLength(entered)
+    for (const fade of cardFades) expect(fade).toMatchObject({ opacities: ['1', '0'], duration: fast })
+    await expect(page.locator('.project-sheet')).toBeHidden()
+    await expect(panel(page)).toBeFocused()
+
+    await resume()
+
+    await expect(closeButton(page)).toBeFocused()
+  })
+
+  test('à la fermeture, le contenu s’efface en `--dur-reduced`, puis la fiche en `--dur-reduced` pendant que les cartes reviennent en `--dur-fast`', async ({
+    page,
+  }) => {
+    await openEnteredTable(page, PROJECTS)
+    const { fast, reduced } = await motion(page)
+    const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+    await openProject(card)
+    const resume = await freezeAnimations(page)
+
+    await page.keyboard.press('Escape')
+
+    const content = (await page.evaluate(readFades)).filter(({ target }) => target !== 'card-entry')
+    expect(content.length).toBeGreaterThan(2)
+    for (const fade of content) {
+      expect(fade).toMatchObject({ properties: ['opacity'], duration: reduced })
+      expect(fade.opacities.at(-1)).toBe('0')
+    }
+
+    await finishAnimations(page)
+
+    const fades = await page.evaluate(readFades)
+    const [fiche, ...others] = fades.filter(({ target }) => target === 'project-panel')
+    expect(others).toEqual([])
+    expect(fiche).toMatchObject({ properties: ['opacity'], duration: reduced })
+    expect(fiche.opacities.at(-1)).toBe('0')
+    const returns = fades.filter(({ target }) => target === 'card-entry')
+    expect(returns).toHaveLength(PROJECTS.length)
+    for (const fade of returns) expect(fade).toMatchObject({ opacities: ['0', '1'], duration: fast })
+
+    await resume()
+
+    await expectClosed(page)
+    await expect(page.locator('html')).not.toHaveAttribute('data-project-open')
+    await expect(card).toBeFocused()
+  })
 })

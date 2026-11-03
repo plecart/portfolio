@@ -188,7 +188,7 @@ Page, colonne de lecture de la fiche et, sur téléphone, son panneau : `scrollb
 ### 2.7 Mouvement
 
 - **Propriétés** : `transform` (position, échelle) et `opacity` pour tout mouvement ; `color`, `background-color` et `box-shadow` seulement pour un retour de survol, de focus ou d'état (§1.2).
-- **Durées** : `--dur-fast` 150 ms · `--dur` 240 ms · `--dur-open` 280 ms. Durées fixes, nommées (#19) : `--dur-content` 200 ms (entrée du contenu de fiche, retrait du trombone, arrivée directe) · `--dur-press` 80 ms (pression) · `--delay-column` 40 ms (retard d'entrée par colonne) · `--delay-ribbon` 20 ms (retard entre rubans en vol) · `--dur-pulse` 1,8 s (pulsation des cadres vides).
+- **Durées** : `--dur-fast` 150 ms · `--dur` 240 ms · `--dur-open` 280 ms. Durées fixes, nommées (#19) : `--dur-content` 200 ms (entrée du contenu de fiche, retrait du trombone, arrivée directe) · `--dur-press` 80 ms (pression) · `--delay-column` 40 ms (retard d'entrée par colonne) · `--delay-ribbon` 20 ms (retard entre rubans en vol) · `--dur-pulse` 1,8 s (pulsation des cadres vides) · `--dur-reduced` 160 ms (activation et fermeture de la fiche en mouvement réduit, §6.3).
 - **Courbes** : `--ease-out` `cubic-bezier(.22, 1, .36, 1)` pour toute transition · `--ease-spring` `linear(0, .28 6%, .62 13%, .88 20%, 1.03 28%, 1.01 40%, 1)` pour le seul soulèvement d'une carte · `--ease-in-out` `cubic-bezier(.65, 0, .35, 1)` pour la seule pulsation.
 
 | Mouvement | Durée | Courbe |

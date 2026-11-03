@@ -16,7 +16,7 @@ type Mode = 'light' | 'dark'
 /** Un jeton : la propriété qui le résout, sa valeur claire, et sa valeur sombre s'il en a une. */
 type SpecToken = { property: string; light: string; dark?: string }
 
-/** Les 37 jetons de la spec §2, valeurs recopiées telles que la spec les écrit. */
+/** Les 38 jetons de la spec §2, valeurs recopiées telles que la spec les écrit. */
 const SPEC_TOKENS: Record<string, SpecToken> = {
   // §2.1 — couleurs
   '--bg': { property: 'color', light: '#F3EDE4', dark: '#1C1A17' },
@@ -72,6 +72,8 @@ const SPEC_TOKENS: Record<string, SpecToken> = {
   '--delay-column': { property: 'transition-delay', light: '40ms' },
   '--delay-ribbon': { property: 'transition-delay', light: '20ms' },
   '--dur-pulse': { property: 'animation-duration', light: '1.8s' },
+  // Les 160 ms du mouvement réduit de §6.3, nommées par #22.
+  '--dur-reduced': { property: 'transition-duration', light: '160ms' },
   '--ease-out': { property: 'transition-timing-function', light: 'cubic-bezier(.22, 1, .36, 1)' },
   '--ease-spring': {
     property: 'transition-timing-function',
@@ -135,8 +137,8 @@ async function prependButton(page: Page): Promise<Locator> {
   return page.getByRole('button', { name: 'cible' })
 }
 
-test('la table des jetons compte les 37 jetons de la spec', () => {
-  expect(Object.keys(SPEC_TOKENS)).toHaveLength(37)
+test('la table des jetons compte les 38 jetons de la spec', () => {
+  expect(Object.keys(SPEC_TOKENS)).toHaveLength(38)
 })
 
 for (const state of PALETTE_STATES) {

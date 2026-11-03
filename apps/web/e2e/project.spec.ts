@@ -281,7 +281,9 @@ test('en mouvement réduit, l’entête et la fiche passent par un fondu seul', 
 
   await expect(header).toHaveCSS('opacity', '1')
   await expect(header).toHaveCSS('pointer-events', 'auto')
-  expect((await animations()).map(({ name }) => name)).toEqual(['project-in', 'project-out'])
+  // Ouverte depuis sa carte, la fiche passe par les fondus de §6.3 (`project-choreography.spec.ts`),
+  // jamais en plus par ceux de l'arrivée directe.
+  expect(await animations()).toEqual([])
 })
 
 test('un clic hors du panneau ne ferme pas la fiche', async ({ page, isMobile }) => {
