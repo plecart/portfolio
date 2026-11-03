@@ -8247,6 +8247,10 @@ DEVELOPPEUR_ROLE = ".claude/agents/developpeur.md"
 EXECUTANT_ROLE = ".claude/agents/executant.md"
 PIPELINE_CONFIG = ".claude/pipeline.config.md"
 CLEANUP_VERBATIM_RULE = ".claude/rules/cleanup-verbatim.md"
+TESTS_REF = ".claude/skills/cycle-pr/references/tests.md"
+RENVOI_AUX_FRONTIERES_TIERCES = (
+    "`cycle-pr/references/tests.md`, « Frontières tierces : on vérifie, on ne suppose pas »"
+)
 # Le piège d'écriture, dit au point où écrit chacun des trois rôles que nomme E1 (obs 130 et 133) :
 # le même renvoi et la même phrase aux trois sites.
 RENVOI_AU_PIEGE_D_ECRITURE = (
@@ -8328,6 +8332,76 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
     "relecteur-renvoi-aux-lectures-d-etat-git": (
         RELECTEUR_ROLE,
         "(lectures d'état `git` : `.claude/rules/cleanup-verbatim.md`, « Comment l'appliquer »)",
+    ),
+    # La frontière RTK (obs 144) : la règle des commandes que la prose fait taper, son renvoi
+    # depuis `execution-qa`, et la frontière re-mesurée qui la fonde.
+    "tests-commande-tapee-rejouee-avant-d-etre-epinglee": (
+        TESTS_REF,
+        (
+            "**se rejoue sous le hook du poste, telle qu'écrite, sur un témoin des deux côtés, avant"
+            " d'être épinglée**"
+        ),
+    ),
+    "tests-la-forme-reecrite-rend-autre-chose": (
+        TESTS_REF,
+        "le hook RTK peut la réécrire, et la forme réécrite rendre autre chose sans le signaler",
+    ),
+    "tests-conforme-sur-du-vide": (
+        TESTS_REF,
+        "une passe comptable a conclu « conforme » sur du vide",
+    ),
+    "tests-sans-antislash-ni-sortie-longue": (
+        TESTS_REF,
+        (
+            "Tant que le hook la réécrit, elle s'écrit sans antislash, et sans sortie longue lue"
+            " d'une commande réécrite, non pipée ou en tête d'un tube"
+        ),
+    ),
+    "execution-qa-renvoi-aux-frontieres-tierces": (
+        EXECUTION_QA_SKILL,
+        (
+            "Tapée telle qu'écrite, elle suit la règle des commandes que la prose fait taper"
+            f" ({RENVOI_AUX_FRONTIERES_TIERCES})"
+        ),
+    ),
+    "rtk-seule-tete-d-un-tube": (
+        PIPELINE_CONFIG,
+        "chaque segment d'une commande composée par `&&`, mais la seule tête d'un tube",
+    ),
+    "rtk-remesure-datee": (
+        PIPELINE_CONFIG,
+        "re-mesuré le 2026-11-03 vers 15:20 UTC sur rtk 0.43.0",
+    ),
+    "rtk-argument-sans-espace": (PIPELINE_CONFIG, "un argument **sans espace** qui porte un"),
+    "rtk-devant-un-caractere-de-glob": (
+        PIPELINE_CONFIG,
+        (
+            "devant un caractère de glob le perd, sous `rtk grep` (la forme réécrite) comme sous"
+            " `rtk proxy grep`"
+        ),
+    ),
+    "rtk-rendent-4-au-lieu-de-1": (PIPELINE_CONFIG, "rendent 4 au lieu de 1"),
+    "rtk-unmatched-au-lieu-de-1": (
+        PIPELINE_CONFIG,
+        "sort en 2 (« Unmatched [ ») au lieu de rendre 1. Témoins : avec espace,",
+    ),
+    "rtk-temoin-sans-caractere-de-glob": (PIPELINE_CONFIG, "rend 1 ; sans caractère de glob,"),
+    "rtk-grep-apres-un-tube": (
+        PIPELINE_CONFIG,
+        "un `grep` placé après un `|` n'est pas réécrit (`rtk rewrite` le rend intact)",
+    ),
+    "rtk-sortie-tronquee": (PIPELINE_CONFIG, "la sortie d'une commande réécrite est **tronquée**"),
+    "rtk-tronquee-aussi-en-tete-d-un-tube": (
+        PIPELINE_CONFIG,
+        "25 lignes et « +275 more », et 28 lignes en tête d'un tube",
+    ),
+    "rtk-temoins-entiers": (
+        PIPELINE_CONFIG,
+        "en rendent 300, comptées par un `python` en bout de tube",
+    ),
+    "rtk-renvoi-aux-frontieres-tierces": (
+        PIPELINE_CONFIG,
+        f"Une commande que la prose fait taper à un rôle suit donc {RENVOI_AUX_FRONTIERES_TIERCES}",
     ),
 }
 

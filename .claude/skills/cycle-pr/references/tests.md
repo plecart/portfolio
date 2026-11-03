@@ -89,6 +89,13 @@ geste demandé — cas non couverts, états refusés ; chaque entrée est une qu
 avant la première ligne avec l'alternative chiffrée, jamais une note découverte après l'ADR
 (obs 38).
 
+**Une commande que la prose fait taper à un rôle** — porte, passe comptable, case Commande — **se
+rejoue sous le hook du poste, telle qu'écrite, sur un témoin des deux côtés, avant d'être
+épinglée** : le hook RTK peut la réécrire, et la forme réécrite rendre autre chose sans le
+signaler — une passe comptable a conclu « conforme » sur du vide (obs 144 ; mesures datées au
+paragraphe **RTK** de `.claude/pipeline.config.md`). Tant que le hook la réécrit, elle s'écrit
+sans antislash, et sans sortie longue lue d'une commande réécrite, non pipée ou en tête d'un tube.
+
 ## Un zéro rendu par un outil de contrôle se lit avec son inventaire
 
 **Un zéro rendu par un outil de contrôle se lit avec son inventaire** — types de cibles, nombre

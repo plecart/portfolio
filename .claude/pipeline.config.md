@@ -410,14 +410,34 @@ suivante d'abord, étapes numérotées, état restitué à chaque tour ; `/i-hav
 **RTK** (hook utilisateur `rtk hook claude`, `~/.claude/RTK.md`, hors dépôt) réécrit la commande
 avant son exécution — `make …`, `gh …` (sauf `gh label` et `gh api … --jq`), `cat`/`head -N`/`tail`
 (→ `rtk read …` ; `head -n N` n'est pas réécrit), `ls`, `wc`, `grep`, chaque segment d'une commande
-composée ; ni `git …` ni `sed`, ni l'outil PowerShell (son matcher ne vise que `Bash`). Les règles
-de permission sont évaluées sur la forme **réécrite** (doc hooks, `updatedInput`, mesuré le
-2026-09-29) : c'est pourquoi les entrées `allow` de `.claude/settings.json` commencent par `rtk`, et
-pourquoi les lectures auto-autorisées par Claude Code (`cat`, `gh pr view`…) y figurent quand même.
+composée par `&&`, mais la seule tête d'un tube ; ni `git …` ni `sed`, ni l'outil PowerShell (son
+matcher ne vise que `Bash`). Les règles de permission sont évaluées sur la forme **réécrite** (doc
+hooks, `updatedInput`, mesuré le 2026-09-29) : c'est pourquoi les entrées `allow` de
+`.claude/settings.json` commencent par `rtk`, et pourquoi les lectures auto-autorisées par Claude
+Code (`cat`, `gh pr view`…) y figurent quand même.
 RTK lit aussi `permissions.allow` et renvoie lui-même `permissionDecision: "allow"` quand la
 commande **d'origine** y figure (`gh pr *`, `gh issue *`…), et retient cet `allow` dès que la forme
 d'origine figure en `ask` (mesuré, rtk 0.43.0) : les entrées sous forme d'origine restent actives,
 et les entrées `rtk` sont celles que le harnais évalue sans lui — les deux se doublent à dessein.
+
+La réécriture change aussi le **résultat** de certaines commandes — re-mesuré le 2026-11-03
+vers 15:20 UTC sur rtk 0.43.0, outil Bash du poste (Git Bash), témoins dans un dossier jetable ;
+d'abord relevé le 2026-10-26 (obs 144) :
+- un argument **sans espace** qui porte un `\` devant un caractère de glob le perd, sous
+  `rtk grep` (la forme réécrite) comme sous `rtk proxy grep` : `grep -c 'a\*b' etoile.txt` et
+  `rtk proxy grep -c 'a\*b' etoile.txt` rendent 4 au lieu de 1, `grep -c 'a\[b' crochet.txt`
+  sort en 2 (« Unmatched [ ») au lieu de rendre 1. Témoins : avec espace,
+  `grep -c 'a\* b' etoile.txt` rend 1 ; sans caractère de glob, `grep -c 'a\.b' temoin.txt`
+  rend 1 ;
+- un `grep` placé après un `|` n'est pas réécrit (`rtk rewrite` le rend intact) :
+  `cat etoile.txt | grep -c 'a\*b'` rend 1 ;
+- la sortie d'une commande réécrite est **tronquée** : `grep ligne long.txt`, 300 lignes
+  appariées, rend « 300 matches in 1 files: », 25 lignes et « +275 more », et 28 lignes en tête
+  d'un tube. Témoins : `rtk proxy grep ligne long.txt` et `cat long.txt | grep ligne` en rendent
+  300, comptées par un `python` en bout de tube.
+
+Une commande que la prose fait taper à un rôle suit donc `cycle-pr/references/tests.md`,
+« Frontières tierces : on vérifie, on ne suppose pas ».
 
 Un `ask` passe avant tout `allow`, y compris celui qu'un hook renvoie (doc permissions : « a
 matching ask rule still prompts even when the hook returned "allow" »), en mode auto compris
