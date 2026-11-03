@@ -7,7 +7,6 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
-from config.celery import app as celery_app
 from content import tasks
 from content.models import GalleryImage, ProcessingState, Project, Variant
 from content.tasks import process_image
@@ -223,14 +222,6 @@ def test_une_image_supprimee_pendant_le_traitement_ne_laisse_aucune_variante(
     process_image.delay(made.pk, made.original.name or "")
 
     assert variant_files(made) == []
-
-
-@pytest.fixture
-def unpropagated(monkeypatch: pytest.MonkeyPatch) -> None:
-    """La propagation du mode synchrone coupée le temps du test : Celery 5.6.3 y relance le
-    `Retry` dès la première erreur (`on_error` de `celery/app/trace.py`), et aucun réessai ne se
-    rejouerait ; l'issue d'une tâche se lit alors dans son résultat."""
-    monkeypatch.setitem(celery_app.conf, "task_eager_propagates", False)
 
 
 @pytest.mark.django_db
