@@ -312,10 +312,10 @@ Un paragraphe (`role="status"`) centré, horizontalement et verticalement, dans 
 
 | Instant | Ce qui se passe |
 |---|---|
-| t = 0 | La fiche est rendue, invisible. Une feuille (`--paper`, rayon 2 px, `--shadow-lift`) est posée exactement sur le cadre de la carte. La photo, le post-it et chaque ruban de la fiche reçoivent leur trajet depuis leur homologue sur la carte (translation et échelle, pivot haut gauche). |
+| t = 0 | La fiche est rendue, invisible. Une feuille (`--paper`, rayon 2 px, `--shadow-lift`) est posée exactement sur le cadre de la carte. La photo, le post-it et chaque ruban de la fiche reçoivent leur trajet depuis leur homologue sur la carte (translation et échelle, pivot haut gauche). Entrée d'historique `/projets/<slug>`. |
 | image suivante | La carte se cache d'un coup : photo, post-it, bande, papier et ombre à 0, sans transition ; sa pose revient à 0° (280 ms). Le trombone monte de 14 px (200 ms) en s'effaçant (150 ms). Les autres cartes visibles reculent de 48 px dans la direction opposée à la carte ouverte et s'effacent (280 ms, toutes en même temps) ; les cartes hors de l'écran ne bougent pas (§1.6). |
 | image suivante | La photo vole du cadre de la carte au cadre de la galerie (280 ms). La feuille s'étire de la carte au panneau (280 ms, échelle non uniforme). Le post-it vole vers le titre (280 ms). Les rubans volent vers la rangée de rubans, le i-ème avec 20 × i ms de retard, à 35 % d'opacité entre 30 % et 70 % du trajet. La couche noir et blanc s'efface (280 ms). |
-| t = 280 ms | La fiche est posée : papier et ombre du panneau, interactions actives. Le reste — bouton fermer, flèches, barre de galerie, post-its de lien, colonne défilante — apparaît en 200 ms avec une montée de 8 px. Focus sur « Fermer la fiche ». Entrée d'historique `/projets/<slug>`. |
+| t = 280 ms | La fiche est posée : papier et ombre du panneau, interactions actives. Le reste — bouton fermer, flèches, barre de galerie, post-its de lien, colonne défilante — apparaît en 200 ms avec une montée de 8 px. Focus sur « Fermer la fiche ». |
 
 **Fermeture** (bouton, Échap, retour du navigateur).
 

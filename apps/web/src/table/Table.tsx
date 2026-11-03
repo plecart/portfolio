@@ -97,7 +97,7 @@ function LoadError({ onRetry, focusRetry }: { onRetry: () => void; focusRetry: b
  * @param onRetry Relance le chargement, depuis le message d'erreur.
  * @param retried Une relance a déjà eu lieu : le message qui revient reprend le focus, et la table
  *   qui arrive le donne à sa première carte, le bouton activé ayant disparu.
- * @param onOpen Ouvre la fiche d'un projet, depuis le clic sur sa carte.
+ * @param onOpen Ouvre la fiche d'un projet, depuis le clic sur sa carte, qu'il reçoit.
  * @param projectOpen La fiche est ouverte : les cartes attendent sa fermeture pour entrer.
  */
 export function Table({
@@ -114,7 +114,7 @@ export function Table({
   projects: Project[]
   onRetry: () => void
   retried: boolean
-  onOpen: (slug: string) => void
+  onOpen: (slug: string, card: HTMLElement) => void
   projectOpen: boolean
 }) {
   const firstCard = useRef<HTMLAnchorElement>(null)
@@ -129,12 +129,12 @@ export function Table({
     if (retried && status === 'loaded') firstCard.current?.focus()
   }, [retried, status])
 
-  const openOnClick = (event: MouseEvent, slug: string) => {
+  const openOnClick = (event: MouseEvent<HTMLElement>, slug: string) => {
     if (hasModifier(event)) return
     revealOnTouch(event, slug)
     if (event.defaultPrevented) return
     event.preventDefault()
-    onOpen(slug)
+    onOpen(slug, event.currentTarget)
   }
 
   return (

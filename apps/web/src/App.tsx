@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useProjects } from './api/useProjects.ts'
 import { AuthorLinks } from './chrome/AuthorLinks.tsx'
 import { SiteHeader } from './chrome/SiteHeader.tsx'
@@ -7,11 +7,18 @@ import { useProjectAddress } from './project/useProjectAddress.ts'
 import { strings } from './strings.ts'
 import { Table } from './table/Table.tsx'
 
+// ponytail: le mouvement réduit garde le fondu de #170, le temps que sa chorégraphie (§6.3) arrive.
+const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
+
 export default function App() {
   const table = useRef<HTMLElement>(null)
   const { status, projects, retry, retried } = useProjects()
   const { slug, open, close, dismiss } = useProjectAddress()
   const project = projects.find((candidate) => candidate.slug === slug)
+  // La carte d'où la fiche s'ouvre, jusqu'à ce qu'elle y revienne : la fiche est à l'écran tout ce
+  // temps, à l'adresse ou non.
+  const [origin, setOrigin] = useState<HTMLElement | null>(null)
+  const onScreen = project !== undefined || origin !== null
 
   const unknownAddress = status === 'loaded' && slug !== null && project === undefined
 
@@ -19,18 +26,32 @@ export default function App() {
     if (unknownAddress) dismiss()
   }, [unknownAddress, dismiss])
 
+  // Avant l'attribut de la fiche ouverte : une carte qui le lirait seul commencerait à s'effacer par
+  // la feuille, sous la chorégraphie.
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-choreography', origin !== null)
+  }, [origin])
+
   // La feuille lit l'attribut : le verrou de défilement, les cartes, l'entête et les liens de
   // l'auteur n'ont ni prop ni état de plus. Sa valeur dit si une barre classique a sa place à garder,
   // lue avant le verrou, qui la retire.
   useEffect(() => {
     const root = document.documentElement
-    if (project) {
+    if (onScreen) {
       root.setAttribute('data-project-open', innerWidth > root.clientWidth ? 'scrollbar' : '')
     } else {
       root.removeAttribute('data-project-open')
     }
+  }, [onScreen])
+
+  useEffect(() => {
     document.title = project?.title ?? strings.siteName
   }, [project])
+
+  const openFromCard = (next: string, card: HTMLElement) => {
+    if (!matchMedia(REDUCED_MOTION).matches) setOrigin(card)
+    open(next)
+  }
 
   return (
     <>
@@ -41,11 +62,16 @@ export default function App() {
         projects={projects}
         onRetry={retry}
         retried={retried}
-        onOpen={open}
+        onOpen={openFromCard}
         projectOpen={project !== undefined}
       />
       <AuthorLinks table={table} />
-      <ProjectDialog project={project} onClose={close} />
+      <ProjectDialog
+        project={project}
+        origin={origin}
+        onClose={close}
+        onLanded={() => setOrigin(null)}
+      />
     </>
   )
 }

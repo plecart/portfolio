@@ -54,6 +54,43 @@
     animation: project-out var(--dur-fast) var(--ease-out);
   }
 
+  /* La fiche ouverte depuis sa carte (§4.6) : `useChoreography` la fait voler, sans fondu d'entrée. */
+  .project-panel[data-choreography] {
+    animation: none;
+  }
+
+  /* En vol (§4.6) : le panneau, transparent, laisse voir sa feuille, et rien n'y réagit avant la
+     pose — par ses enfants, Radix écrivant `pointer-events: auto` sur le panneau lui-même. */
+  .project-panel[data-flight] {
+    background-color: transparent;
+    box-shadow: none;
+
+    > * {
+      pointer-events: none;
+    }
+  }
+
+  /* La feuille (§4.6) : le papier du panneau, à part, pour qu'aucun vol ne transforme le panneau ni un
+     de ses ancêtres — le bouton Fermer y est fixe sous 600 px. Sous son contenu, sur sa boîte : la
+     fenêtre sous 600 px, que le défilement du panneau ne déplace pas. Visible en vol seulement. */
+  .project-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    display: none;
+    border-radius: var(--r-card);
+    background-color: var(--paper);
+    box-shadow: var(--shadow-lift);
+
+    @variant sm {
+      position: absolute;
+    }
+
+    [data-flight] > & {
+      display: block;
+    }
+  }
+
   /* La galerie (§4.4) : son carré, ses 8 px, sa barre, soit la hauteur de sa colonne dès 600 px. */
   .project-gallery {
     min-width: 0;
@@ -69,8 +106,16 @@
   }
 
   .project-gallery-track {
+    position: relative;
     display: flex;
     height: 100%;
+  }
+
+  /* La couche noir et blanc d'un projet en cours, en vol (§4.4, §4.6) : posée sur la première image. */
+  .project-gallery-track > .card-photo-grey {
+    position: absolute;
+    top: 0;
+    left: 0;
   }
 
   @media (prefers-reduced-motion: no-preference) {

@@ -91,11 +91,17 @@ export async function expectPanelBox(page: Page) {
   )
 }
 
-/** Fige les animations de la page : un panneau qui se ferme reste dans son fondu de sortie. */
+/**
+ * Fige les animations de la page, celles qui partiront comme celles en cours : un panneau qui se
+ * ferme reste dans son fondu de sortie.
+ *
+ * @returns Le geste qui les relance à leur vitesse.
+ */
 export async function freezeAnimations(page: Page) {
   const client = await page.context().newCDPSession(page)
   await client.send('Animation.enable')
   await client.send('Animation.setPlaybackRate', { playbackRate: 0 })
+  return () => client.send('Animation.setPlaybackRate', { playbackRate: 1 })
 }
 
 /**
