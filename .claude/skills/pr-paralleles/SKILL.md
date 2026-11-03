@@ -108,7 +108,8 @@ dite au mainteneur, comme celle dont la session envoie un « bloquant » ; une s
 l'étape 7, « Session disparue ». **Une session de tri s'archive dès que le lead a vérifié son issue
 sur GitHub**, sur l'accord demandé à la proposition, comme la session d'une issue `bug`, et garde
 `use_worktree: false` : l'archivage d'une session sans worktree ne détache pas la tête du dossier
-qu'elle partage, ici celui du lead (mesuré le 2026-11-03, `sessions-liees.md`, « Nettoyage »).
+qu'elle partage, ici celui du lead (mesuré le 2026-11-03 dans un worktree, `sessions-liees.md`,
+« Nettoyage » ; clone principal non mesuré).
 Archiver le lead de préparation archive avec lui ses sessions de tri, qui partagent son worktree
 (description d'`archive_session`, lue le 2026-11-03 : « Archiving a session also archives its side
 sessions that share its worktree or have finished » ; relevé le même jour vers 15:15 UTC par

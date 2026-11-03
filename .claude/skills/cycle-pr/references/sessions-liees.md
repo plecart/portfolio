@@ -194,9 +194,8 @@ le 2026-11-03 sur une session jetable (`local_130da77a`) démarrée dans le work
 de #198, arbre propre, tête `3bd49c9` : `git symbolic-ref -q HEAD` a rendu
 `refs/heads/chore/conforts-pipeline`, sortie 0, à 15:11:55Z et 15:12:19Z avant `archive_session`,
 puis à 15:12:28Z et 15:13:45Z après ; l'arbre est resté propre et le worktree listé par
-`git worktree list`. L'archivage arrête en revanche ce qui tenait le dossier : archivé, l'enfant
-laisse `git worktree remove`
-aboutir ; non archivé, le retrait échoue sur la racine (mesuré le 2026-10-18, obs 42). La session
+`git worktree list`. Mesuré dans un worktree ; clone principal non mesuré. L'archivage arrête en
+revanche ce qui tenait le dossier : archivé, l'enfant laisse `git worktree remove` aboutir ; non archivé, le retrait échoue sur la racine (mesuré le 2026-10-18, obs 42). La session
 qui l'a démarré nettoie après lui : `git worktree remove <chemin>`, puis l'échafaudage derrière sa
 porte
 d'ancêtre :
