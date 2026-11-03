@@ -106,14 +106,18 @@ def purge() -> None:
 
 
 def purge_after_commit(**signal: object) -> None:
-    """Récepteur de `post_save` et `post_delete` des modèles de contenu (`ContentConfig.ready`) :
-    vide l'espace une fois la transaction en cours validée — aussitôt hors de toute transaction ;
-    jamais si elle est annulée (doc Django, « Performing actions after commit »).
+    """Vide l'espace une fois la transaction en cours validée — aussitôt hors de toute transaction,
+    comme dans le worker ; jamais si elle est annulée (doc Django, « Performing actions after
+    commit »). Récepteur de `post_save` et `post_delete` des modèles de contenu
+    (`ContentConfig.ready`), et appelée par la tâche d'image après ses écritures, qui échappent
+    aux signaux (`content/tasks.py`).
 
     `robust`, comme les autres rappels après validation du contenu : l'écriture est déjà validée,
-    une purge qui échoue est journalisée (`django.db.backends.base`) sans la faire échouer.
+    rien n'est à défaire. Une purge qui échoue est journalisée avec sa trace
+    (`django.db.backends.base`) sans faire échouer l'écriture — toute erreur, quand `django-redis`
+    ne journalise que celles de Redis qu'il ignore (`config/settings.py`).
 
     Args:
-        signal: les arguments du signal, sans effet.
+        signal: les arguments du signal, sans effet ; aucun hors d'un signal.
     """
     transaction.on_commit(purge, robust=True)
