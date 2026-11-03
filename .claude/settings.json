@@ -40,6 +40,7 @@
       "Bash(rtk gh issue *)",
       "Bash(rtk gh run list *)",
       "Bash(python .claude/skills/cycle-pr/scripts/merge-lot.py *)",
+      "Bash(python .claude/skills/cycle-pr/scripts/porte-merge.py *)",
       "mcp__context7__resolve-library-id",
       "mcp__context7__query-docs"
     ],
@@ -48,10 +49,10 @@
       "Bash(rtk gh pr merge *)",
       "Bash(rtk proxy gh pr merge *)",
       "PowerShell(gh pr merge *)",
-      "Bash(gh pr update-branch *--rebase*)",
-      "Bash(rtk gh pr update-branch *--rebase*)",
-      "Bash(rtk proxy gh pr update-branch *--rebase*)",
-      "PowerShell(gh pr update-branch *--rebase*)"
+      "Bash(gh pr update-branch *)",
+      "Bash(rtk gh pr update-branch *)",
+      "Bash(rtk proxy gh pr update-branch *)",
+      "PowerShell(gh pr update-branch *)"
     ],
     "deny": [
       "Read(.env)",

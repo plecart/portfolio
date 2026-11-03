@@ -734,7 +734,7 @@ ses jobs,
     0019, décision 2), le reste du tri étant celui du trunk. Sa CI se relance par le geste de
     l'Étape 7, `gh pr close` puis `gh pr reopen`, et ce que le nouveau run a combiné se lit dans
     la trace de son checkout. Ni commit de fusion — `gh pr update-branch` sans `--rebase`
-    compris, qui passe sous l'`allow` `Bash(gh pr *)` de `.claude/settings.json` —, ni rebase
+    compris, en `ask` dans `.claude/settings.json` comme sa forme `--rebase` —, ni rebase
     d'une branche poussée sans demande explicite (`contraintes.md`), ici comme à l'Étape 7 : à la
     PR #75, faute d'un geste à cette étape, deux sessions de suite ont planifié de fusionner
     `main` dans la branche (obs 82). Un rerun de la PR, lui, ne prouve rien : l'avis ne part pas
@@ -809,7 +809,9 @@ extrait, le `<trunk>` du message, est le **trunk éprouvé** — ce que le run a
 tête —, et c'est **lui** que la porte de merge consomme, sous le nom `<SHA du trunk éprouvé>`,
 inscrit au Test plan avec le numéro du run. Le `<SHA du trunk éprouvé>` ne vaut qu'à la sortie
 **0**, chaque job ayant combiné `origin/<trunk>` ; **1**, trunk périmé ; **2**, refus, son motif en
-une ligne (docstring du script). **La référence de fusion que porte la forge ne prouve rien**,
+une ligne (docstring du script). `porte-merge.py trunk` suppose la PR sortie de draft : sur une
+draft, le dernier run de la tête a tous ses jobs sautés, et le script refuse en 2 (mesuré sur la
+PR #200, run 40963627023). **La référence de fusion que porte la forge ne prouve rien**,
 relue avant ou après la relance : aux PR #73 (run 37209134824) et #185 (run 40769309165, référence
 relue sur `155b355`, extrait sur `3e24919`), elle portait déjà le trunk neuf quand le run avait
 extrait l'ancien ; aux PR #95 (runs 38646490017 et 38703579686) et #109 (runs 38960319135 et

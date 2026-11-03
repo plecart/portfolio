@@ -6640,7 +6640,10 @@ ADVISORY_GATE_RULES = {
             "Jamais un rerun d'un run du trunk",
             "sous un nom propre au trunk",
             "rien à corriger dans la PR",
-            "Ni commit de fusion — `gh pr update-branch` sans `--rebase` compris",
+            (
+                "Ni commit de fusion — `gh pr update-branch` sans `--rebase` compris, en `ask` dans"
+                " `.claude/settings.json` comme sa forme `--rebase`"
+            ),
             "ni rebase d'une branche poussée",
         ),
     ),
@@ -8143,6 +8146,15 @@ INVARIANTS_DE_LA_PORTE_DE_MERGE = {
     ),
     "cycle-pr-releve-jamais-chaine": (CYCLE_PR_SKILL, RELEVE_JAMAIS_CHAINE),
     "hors-scope-releve-jamais-chaine": (HORS_SCOPE_REF, RELEVE_JAMAIS_CHAINE),
+    # #198, complétion de la PR #200 : la trace d'une draft n'a aucun job qui ait tourné.
+    "cycle-pr-trunk-suppose-la-pr-sortie-de-draft": (
+        CYCLE_PR_SKILL,
+        (
+            "`porte-merge.py trunk` suppose la PR sortie de draft : sur une draft, le dernier run de"
+            " la tête a tous ses jobs sautés, et le script refuse en 2 (mesuré sur la PR #200, run"
+            " 40963627023)"
+        ),
+    ),
 }
 
 
@@ -8402,6 +8414,39 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
     "rtk-renvoi-aux-frontieres-tierces": (
         PIPELINE_CONFIG,
         f"Une commande que la prose fait taper à un rôle suit donc {RENVOI_AUX_FRONTIERES_TIERCES}",
+    ),
+    # Ce que la PR #200 laisse au harnais (D-2, D-3) : `update-branch` en `ask`, `porte-merge.py`
+    # en `allow`, et le risque que cet `allow` laisse ouvert.
+    "permissions-update-branch-avec-ou-sans-rebase": (
+        PIPELINE_CONFIG,
+        "`permissions.ask` sur `gh pr merge` et sur `gh pr update-branch`, avec ou sans `--rebase`",
+    ),
+    "permissions-sans-rebase-commit-de-fusion": (
+        PIPELINE_CONFIG,
+        "sans `--rebase`, `update-branch` fusionne la base dans la branche de la PR",
+    ),
+    "permissions-update-branch-jamais-en-deny": (
+        PIPELINE_CONFIG,
+        "jamais en `deny`, le mainteneur gardant la main (#198, D-2)",
+    ),
+    "permissions-porte-merge-en-allow": (
+        PIPELINE_CONFIG,
+        "`.claude/skills/cycle-pr/scripts/porte-merge.py` est en `allow` sous une forme unique",
+    ),
+    "permissions-porte-merge-edition-sans-deny": (
+        PIPELINE_CONFIG,
+        "Son édition n'est pas en `deny`, à la différence de `merge-lot.py`",
+    ),
+    "permissions-porte-chainee-garde-son-invite": (
+        PIPELINE_CONFIG,
+        "La porte de merge, qui le chaîne avant `gh pr merge`, garde son invite",
+    ),
+    "permissions-porte-merge-risque-ouvert": (
+        PIPELINE_CONFIG,
+        (
+            "Reste ouvert, comme pour `.env` : un script édité puis lancé dans la même session passe"
+            " sans invite"
+        ),
     ),
 }
 
