@@ -292,10 +292,10 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
     script, `Edit` 1 BOM. Un fichier qui doit porter un échappement se construit donc par
     programme (`chr(92)`…), puis se recompte après écriture, quel que soit l'outil qui l'a écrit :
     caractères `Cc`/`Cf` par `unicodedata.category`, nombre d'antislashs — règle que portent aussi
-    `developpeur.md`, `executant.md` et `relecteur.md`. Pas de hook `PreToolUse` pour la garder :
-    écarté le 2026-11-03 (#198, D-1), chaque occurrence mesurée ayant été vue par le recompte ; à
-    réexaminer à la première violation du piège heredoc ou d'échappement après le merge de la
-    PR #220
+    `developpeur.md`, `executant.md`, `relecteur.md` et, pour ce qu'il édite, `releveur.md`. Pas
+    de hook `PreToolUse` pour la garder : écarté le 2026-11-03 (#198, D-1), chaque occurrence
+    mesurée ayant été vue par le recompte ; à réexaminer à la première violation du piège heredoc
+    ou d'échappement après le merge de la PR #220
   - **cache de compilation et mutation de même longueur**
     (`.claude/skills/cycle-pr/scripts/mutation.py`, fonction `rewrite`) — `__pycache__`
     s'invalide sur le couple (date, taille) : une mutation qui ne change ni l'une ni l'autre
@@ -428,6 +428,8 @@ d'abord relevé le 2026-10-26 (obs 144) :
   `rtk proxy grep -c 'a\*b' etoile.txt` rendent 4 au lieu de 1, `grep -c 'a\[b' crochet.txt`
   sort en 2 (« Unmatched [ ») au lieu de rendre 1. Témoins : avec espace,
   `grep -c 'a\* b' etoile.txt` rend 1 ; sans caractère de glob, `grep -c 'a\.b' temoin.txt`
+  rend 1 ; et le `?` de même, relevé vers 17:26 UTC : `grep -cE 'a\?b' point.txt` et
+  `rtk proxy grep -cE 'a\?b' point.txt` rendent 4 au lieu de 1, le même motif après un `|`
   rend 1 ;
 - un `grep` placé après un `|` n'est pas réécrit (`rtk rewrite` le rend intact) :
   `cat etoile.txt | grep -c 'a\*b'` rend 1 ;

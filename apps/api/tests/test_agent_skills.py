@@ -4437,8 +4437,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-plan-qa-cases-sans-type-commande": (
         PLAN_QA_SKILL,
         (
-            "grep -nE '^([[:blank:]>]*([-*+]|[[:digit:]]+[.)])[[:blank:]]+)+[[][[:blank:]xX][]]"
-            "[[:blank:]]+' <brouillon> | grep -vE '^[[:digit:]]+:([[:blank:]>]*([-*+]|"
+            "cat <brouillon> | grep -nE '^([[:blank:]>]*([-*+]|[[:digit:]]+[.)])[[:blank:]]+)+"
+            "[[][[:blank:]xX][]][[:blank:]]+' | grep -vE '^[[:digit:]]+:([[:blank:]>]*([-*+]|"
             "[[:digit:]]+[.)])[[:blank:]]+)+[[][[:blank:]xX][]][[:blank:]]+([*][*]Commande[*][*] —"
             " `[^`]+`|[*][*]Observation[*][*] — .+) → [^[:space:]]'"
         ),
@@ -4446,9 +4446,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-plan-qa-criteres-vers-cases": (
         PLAN_QA_SKILL,
         (
-            "`grep -nE '^## |^- [*][*]C[[:digit:]]+[*][*] — |^([[:blank:]>]*([-*+]|[[:digit:]]+"
-            "[.)])[[:blank:]]+)+[[][[:blank:]xX][]][[:blank:]]+.*[(]C[[:digit:]]+(, C[[:digit:]]+)*"
-            "[)]' <brouillon>` : chaque issue du relevé a son titre"
+            "`cat <brouillon> | grep -nE '^## |^- [*][*]C[[:digit:]]+[*][*] — |^([[:blank:]>]*"
+            "([-*+]|[[:digit:]]+[.)])[[:blank:]]+)+[[][[:blank:]xX][]][[:blank:]]+.*[(]C"
+            "[[:digit:]]+(, C[[:digit:]]+)*[)]'` : chaque issue du relevé a son titre"
             " `## Bloc de fonctionnalité : Issue #<N>` ; sous chacun, avant le titre suivant,"
             " autant de lignes `- **C<k>** —` que l'issue a de critères, et chaque `C<k>` cité par"
             " au moins une case"
@@ -4457,8 +4457,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-plan-qa-marqueurs": (
         PLAN_QA_SKILL,
         (
-            "`grep -nE 'TODO|FIXME|à compléter|<[^<>[:space:]][^<>]*>' <brouillon>` : toute ligne"
-            " sortie porte un marqueur ou un espace réservé du gabarit"
+            "`cat <brouillon> | grep -nE 'TODO|FIXME|à compléter|<[^<>[:space:]][^<>]*>'` : toute"
+            " ligne sortie porte un marqueur ou un espace réservé du gabarit"
         ),
     ),
     "7a-plan-qa-structure": (
@@ -6160,11 +6160,12 @@ def test_aucune_case_d_un_plan_de_qa_ne_porte_de_marque_reglee(fichier: str) -> 
 
 
 # Les commandes de la passe comptable (`plan-qa`, « Passe finale avant publication »), chacune sous
-# sa puce `- **<nom>** — ` : un bloc clôturé `bash`, ou un segment `grep …` entre accents graves.
+# sa puce `- **<nom>** — ` : un bloc clôturé `bash`, ou un segment `cat …` ou `grep …` entre accents
+# graves.
 PASSE_COMPTABLE = re.compile(r"^### 1\. Passe comptable.*?(?=^### )", re.MULTILINE | re.DOTALL)
 PUCE_DE_LA_PASSE = re.compile(r"^- \*\*", re.MULTILINE)
 COMMANDE_EN_BLOC = re.compile(r"```bash\n(.+?)\n")
-COMMANDE_EN_LIGNE = re.compile(r"`(grep [^`]+)`")
+COMMANDE_EN_LIGNE = re.compile(r"`((?:cat|grep) [^`]+)`")
 # Leurs noms, en littéraux (obs 80) ; leur égalité avec le texte est un second test.
 COMMANDES_DE_LA_PASSE_COMPTABLE = ("Cases sans type", "Critères → cases", "Marqueurs", "Structure")
 
@@ -6185,6 +6186,17 @@ def commandes_de_la_passe_comptable() -> dict[str, str]:
 def test_la_passe_comptable_n_a_que_les_commandes_recensees() -> None:
     """Une commande ajoutée à la passe comptable entre au recueil, donc sous l'épingle suivante."""
     assert tuple(commandes_de_la_passe_comptable()) == COMMANDES_DE_LA_PASSE_COMPTABLE
+
+
+@pytest.mark.parametrize("nom", COMMANDES_DE_LA_PASSE_COMPTABLE)
+def test_une_commande_de_la_passe_comptable_lit_le_brouillon_par_un_tube(nom: str) -> None:
+    """Le brouillon entre par `cat <brouillon> |` : le hook RTK du poste réécrit un `grep` de tête
+    en `rtk grep`, dont la sortie reformatée et tronquée a caché la case sans type d'un brouillon
+    témoin, et laisse natif le `grep` placé après le `|`. Rejouées sous le hook, telles qu'écrites,
+    le 2026-11-03 vers 17:30 UTC sur deux brouillons témoins, l'un conforme, l'autre fautif
+    (`plan-qa`, « Passe comptable »). **Ce que ce test ne voit pas** : le hook lui-même, absent de
+    la CI."""
+    assert commandes_de_la_passe_comptable()[nom].startswith("cat <brouillon> | grep ")
 
 
 @pytest.mark.parametrize("nom", COMMANDES_DE_LA_PASSE_COMPTABLE)
@@ -7378,8 +7390,9 @@ def test_chaque_invariant_de_la_session_de_relecture_garde_sa_phrase(
 
 # L'ordre d'un réveil : les commandes avant le protocole du `relecteur`, qui n'a plus à chercher ce
 # qu'une commande a trouvé (`cycle-pr` 4.2, « Les portes bon marché d'abord »), et le message de
-# constats en dernier — c'est lui qui réveille la session PR. **Population** : les 5 étapes
-# numérotées du réveil, 4 couples consécutifs.
+# constats en dernier — c'est lui qui réveille la session PR. **Population** : les étapes
+# numérotées du réveil, deux à deux consécutives ; une étape ajoutée sans ancre rougit au recompte du
+# protocole (`PASSAGES_DE_LA_SESSION_DE_RELECTURE`).
 ORDRE_DU_REVEIL = {
     "verifications-avant-code-review": (
         "1. Les deux vérifications de `relecteur.md`",
@@ -8336,8 +8349,9 @@ TESTS_REF = ".claude/skills/cycle-pr/references/tests.md"
 RENVOI_AUX_FRONTIERES_TIERCES = (
     "`cycle-pr/references/tests.md`, « Frontières tierces : on vérifie, on ne suppose pas »"
 )
-# Le piège d'écriture, dit au point où écrit chacun des trois rôles que nomme E1 (obs 130 et 133) :
-# le même renvoi et la même phrase aux trois sites.
+# Le piège d'écriture, dit au point où écrit chacun des rôles que nomme E1 (obs 130 et 133) : le
+# même renvoi et la même phrase à chaque site ; le `releveur`, qui édite sans construire, en porte le
+# renvoi et le recompte.
 RENVOI_AU_PIEGE_D_ECRITURE = (
     "« heredoc de l'outil Bash et antislashs » de `.claude/pipeline.config.md`, « Qualité »"
 )
@@ -8577,6 +8591,44 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
             "est une affirmation sans commande : « non vérifiée » tant qu'un test ne le recompte"
             " pas à chaque exécution"
         ),
+    ),
+    # Les vides du bloc 1 : la passe comptable sous le hook, le recompte du `releveur`, la règle
+    # des commandes tapées chez le `developpeur` et le `relecteur`, le `?` sous rtk.
+    "plan-qa-aucune-commande-ne-commence-par-grep": (
+        PLAN_QA_SKILL,
+        "Aucune ne commence non plus par un `grep`",
+    ),
+    "plan-qa-le-brouillon-entre-par-cat": (
+        PLAN_QA_SKILL,
+        "Le brouillon y entre donc par `cat <brouillon> |`",
+    ),
+    "releveur-renvoi-au-piege-d-ecriture": (RELEVEUR_ROLE, RENVOI_AU_PIEGE_D_ECRITURE),
+    "releveur-recompte-apres-ecriture": (
+        RELEVEUR_ROLE,
+        (
+            "puis tu recomptes chaque fichier écrit — caractères `Cc`/`Cf` par"
+            " `unicodedata.category`, nombre d'antislashs"
+        ),
+    ),
+    "releveur-edits-verbatim-rendent-le-recompte": (
+        RELEVEUR_ROLE,
+        "Tu rends le `git diff` du fichier et son recompte",
+    ),
+    "qualite-releveur-porte-aussi-la-regle": (
+        PIPELINE_CONFIG,
+        "et, pour ce qu'il édite, `releveur.md`",
+    ),
+    "developpeur-renvoi-aux-frontieres-tierces": (
+        DEVELOPPEUR_ROLE,
+        f"suit la règle des commandes que la prose fait taper ({RENVOI_AUX_FRONTIERES_TIERCES})",
+    ),
+    "relecteur-renvoi-aux-frontieres-tierces": (
+        RELECTEUR_ROLE,
+        f"relève de la règle des commandes que la prose fait taper ({RENVOI_AUX_FRONTIERES_TIERCES})",
+    ),
+    "rtk-point-d-interrogation": (
+        PIPELINE_CONFIG,
+        "rendent 4 au lieu de 1, le même motif après un `|` rend 1",
     ),
 }
 

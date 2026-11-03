@@ -42,7 +42,9 @@ Tu ne charges pas `cycle-pr` ; ce qu'il te faut de lui :
 - **Frontières tierces** (`cycle-pr` 3.1) — avant d'appuyer un comportement sur une bibliothèque à
   une frontière (réseau, encodage, secrets, fusion avec une config par défaut, cycle de vie), lis
   ce que fait réellement l'API, par `context7` ou les sources du paquet, et note-le avec sa
-  référence dans ton rapport.
+  référence dans ton rapport. Une commande que ton bloc fait taper à un rôle suit la règle des
+  commandes que la prose fait taper (`cycle-pr/references/tests.md`, « Frontières tierces : on
+  vérifie, on ne suppose pas »).
 - **Test brut** (`cycle-pr` 3.2) — un bilan qui annonce zéro test collecté, ou tout état autre
   que le rouge attendu, se relit sur la sortie brute du lanceur : ligne « test brut » de
   `.claude/pipeline.config.md`. Un résumeur n'est pas un verdict.
