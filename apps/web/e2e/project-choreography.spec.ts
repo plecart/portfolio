@@ -83,7 +83,10 @@ function expectSameBox(actual: Box, expected: Box) {
   }
 }
 
-/** Une translation lue sur une image clé : Chromium écrit `48px` pour `48px 0px`, et `0px` au repos. */
+/**
+ * Une translation lue sur une image clé : Chromium écrit `48px` pour `48px 0px`, et `0px` au repos
+ * (Chromium 156, `getKeyframes()` sondé le 2026-11-03).
+ */
 function offsetOf(translate: unknown) {
   const [x, y = 0] = String(translate).split(' ').map(parseFloat)
   return { x, y }
@@ -261,8 +264,8 @@ const TILTS: [string, { flat: Gesture; tilt: Gesture; open: Gesture }][] = [
     'qui revient, le pointeur sorti',
     {
       flat: away,
-      // Le soulèvement et la pose reviennent avec elle, mais la feuille et la photo ensemble : ils
-      // finissent d'abord, et seule l'inclinaison reste en route.
+      // Le soulèvement et la pose reviennent avec elle : achevés d'abord, seule l'inclinaison reste
+      // en route.
       tilt: async (page, card) => {
         await toCorner(page, card)
         await away(page, card)

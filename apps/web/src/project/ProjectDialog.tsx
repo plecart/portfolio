@@ -86,8 +86,7 @@ export function ProjectDialog({
           ref={setPanel}
           aria-modal="true"
           className="project-panel"
-          // En vol, le panneau garde le focus jusqu'à la pose : laissé sur la carte cachée, Entrée
-          // la rouvrirait.
+          // En vol, le panneau tient le focus : « Fermer la fiche » ne le prend qu'à la pose (§4.6).
           onOpenAutoFocus={(event) => {
             if (!origin) return
             event.preventDefault()

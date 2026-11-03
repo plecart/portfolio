@@ -583,7 +583,8 @@ test('à l’arrivée directe, les fondus : entrée 200 ms, sortie 150 ms, `--ea
   await closeButton(page).click()
   await expectClosed(page)
 
-  // Sans la pulsation des cadres de chargement, qui peut partir après le geste.
+  // Sans la pulsation des cadres de chargement, qui peut partir après le geste : 4 runs sur 20
+  // (desktop et mobile, sondé le 2026-11-03).
   expect((await animations()).filter(({ name }) => name.startsWith('project-'))).toEqual([
     { name: 'project-in', duration: content, curve },
     { name: 'project-out', duration: fast, curve },
