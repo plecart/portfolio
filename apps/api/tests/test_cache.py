@@ -1,6 +1,7 @@
 """Tests du cache du contenu : la liste des projets servie depuis le cache, à l'identique de la
 base ; le cache vidé après chaque écriture validée du contenu, jamais avant ni pour une écriture
-annulée ; Redis injoignable sans effet pour le client (brief de #11, décisions 1, 3, 5, 7 à 10).
+annulée, et par la tâche d'image après chacune de ses écritures ; Redis injoignable sans effet
+pour le client (brief de #11, décisions 1, 3 à 5, 7 à 10).
 
 La suite tourne sur le cache en mémoire que pose le harnais (`conftest`, `memory_cache`), vidé
 avant chaque test ; seul le test de Redis injoignable charge le vrai client, `django-redis`.
@@ -11,20 +12,25 @@ import logging
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import config.settings
 import content.models
 import pytest
-from content.models import Project, ProjectTechnology
+from content import tasks
+from content.models import GalleryImage, ProcessingState, Project, ProjectTechnology, Variant
+from content.tasks import process_image
+from content.variants import make_variants
 from django.core.cache import caches
+from django.core.files.base import ContentFile
+from django.core.files.storage import Storage, default_storage
 from django.db import transaction
 from django.db.models import Model
 from django.test import Client, override_settings
 from factories import gallery_image, project, saved, section, technology
 from pytest_django import DjangoAssertNumQueries, DjangoCaptureOnCommitCallbacks
 from test_api import PROJECTS, complete_project, listed
-from test_tasks import Rollback
+from test_tasks import Rollback, variant_files
 
 # La durée de vie de chaque clé du cache (décision 5).
 TTL = 300
@@ -270,3 +276,121 @@ def test_redis_injoignable_la_liste_vient_de_la_base_et_l_incident_est_journalis
     assert (degraded.status_code, degraded.content) == (200, from_base.content)
     logged = {(r.name, r.levelno, r.getMessage()) for r in caplog.records if r.exc_info}
     assert logged == {("django_redis.cache", logging.ERROR, "Exception ignored")}
+
+
+def gallery_states(client: Client) -> list[str]:
+    """L'état de chaque image de la galerie du seul projet de la liste que `client` reçoit."""
+    [listed_project] = listed(client)
+    return [image["state"] for image in listed_project["gallery"]]
+
+
+def replace_original_silently(image: GalleryImage) -> None:
+    """Remplace l'original de la ligne de `image` sans qu'aucun signal parte (`QuerySet.update`) :
+    l'écriture conditionnelle de la tâche ne la trouve plus, et seule la tâche pourrait vider le
+    cache."""
+    GalleryImage.objects.filter(pk=image.pk).update(original="images/autre/original.png")
+
+
+@pytest.fixture
+def pending_image() -> GalleryImage:
+    """Une image en attente d'un projet publié, enregistrée hors de tout rappel exécuté : son
+    traitement n'est pas enfilé, et le test le lance lui-même."""
+    return saved(gallery_image(saved(project(published=True))))
+
+
+@pytest.mark.django_db
+def test_la_liste_montre_l_image_prete_des_la_fin_de_son_traitement(
+    client: Client, pending_image: GalleryImage
+) -> None:
+    """L'écriture du worker échappe aux signaux (`QuerySet.update`) : la tâche vide le cache
+    elle-même, sans attendre la durée de vie (décision 4)."""
+    before = gallery_states(client)
+
+    process_image.delay(pending_image.pk, pending_image.original.name or "")
+
+    assert (before, gallery_states(client)) == (["pending"], ["ready"])
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("unpropagated")
+def test_la_liste_montre_l_image_en_echec_des_la_fin_de_son_traitement(
+    client: Client, pending_image: GalleryImage
+) -> None:
+    """Un original devenu illisible : réessais épuisés, l'image passe en échec, et la tâche vide
+    le cache de même."""
+    name = pending_image.original.name or ""
+    default_storage.delete(name)
+    default_storage.save(name, ContentFile(b"Plus une image."))
+    before = gallery_states(client)
+
+    process_image.delay(pending_image.pk, name)
+
+    assert (before, gallery_states(client)) == (["pending"], ["failed"])
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("unpropagated")
+def test_une_purge_qui_echoue_ne_defait_pas_un_traitement_reussi(
+    pending_image: GalleryImage,
+) -> None:
+    """Le vrai client sur une adresse injoignable, ses exceptions non ignorées : la purge lève
+    après l'écriture de « prêt ». L'image reste prête, sans réessai qui la passerait en échec, et
+    son dossier ne tient que les variantes qu'elle nomme."""
+    production = config.settings.CACHES["default"]
+    options = cast("dict[str, object]", production["OPTIONS"])
+    raising = {**production, "OPTIONS": {**options, "IGNORE_EXCEPTIONS": False}}
+
+    with override_settings(CACHES={"default": raising}):
+        process_image.delay(pending_image.pk, pending_image.original.name or "")
+
+    row = GalleryImage.objects.get(pk=pending_image.pk)
+    named = sorted(variant["name"].rsplit("/", 1)[1] for variant in row.variants)
+    assert (row.state, variant_files(row)) == (ProcessingState.READY, named)
+
+
+@pytest.mark.django_db
+def test_un_traitement_qui_n_ecrit_rien_ne_vide_pas_le_cache(
+    client: Client,
+    pending_image: GalleryImage,
+    monkeypatch: pytest.MonkeyPatch,
+    django_assert_num_queries: DjangoAssertNumQueries,
+) -> None:
+    """L'original remplacé pendant le traitement : « prêt » ne s'écrit sur aucune ligne, et la
+    liste reste servie depuis le cache."""
+    listed(client)
+
+    def replaced_meanwhile(storage: Storage, original_name: str) -> list[Variant]:
+        replace_original_silently(pending_image)
+        return make_variants(storage, original_name)
+
+    monkeypatch.setattr(tasks, "make_variants", replaced_meanwhile)
+    process_image.delay(pending_image.pk, pending_image.original.name or "")
+
+    with django_assert_num_queries(0):
+        listed(client)
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("unpropagated")
+def test_un_echec_qui_n_ecrit_rien_ne_vide_pas_le_cache(
+    client: Client,
+    pending_image: GalleryImage,
+    monkeypatch: pytest.MonkeyPatch,
+    django_assert_num_queries: DjangoAssertNumQueries,
+) -> None:
+    """L'original remplacé pendant le dernier essai : « échec » ne s'écrit sur aucune ligne, et
+    la liste reste servie depuis le cache."""
+    listed(client)
+    attempts: list[str] = []
+
+    def failing(storage: Storage, original_name: str) -> list[Variant]:
+        attempts.append(original_name)
+        if len(attempts) == tasks.MAX_RETRIES + 1:
+            replace_original_silently(pending_image)
+        raise OSError("stockage injoignable")
+
+    monkeypatch.setattr(tasks, "make_variants", failing)
+    process_image.delay(pending_image.pk, pending_image.original.name or "")
+
+    with django_assert_num_queries(0):
+        listed(client)

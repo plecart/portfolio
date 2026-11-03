@@ -14,6 +14,7 @@ from celery import Task, shared_task
 from django.core.files.storage import default_storage
 from django.db import transaction
 
+from content.cache import purge
 from content.models import GalleryImage, ProcessingState, Variant
 from content.variants import make_variants
 
@@ -49,9 +50,11 @@ def process_image(self: "Task[[int, str], None]", image_id: int, original_name: 
     Toute erreur est réessayée `MAX_RETRIES` fois. Réessais épuisés, quelle que soit l'origine de
     l'erreur, l'image passe à « échec » par la même écriture conditionnelle, si la base est
     joignable ; sinon elle reste « en attente » (ADR 0015 § Décision, « Échecs » ; `mark_failed`).
-    L'erreur du dernier essai sort de la tâche : le worker la journalise (Sentry la recevra avec
-    #17). Aucun essai ne laisse de fichier que la ligne ne nomme pas, sauf celui qu'une
-    suppression refuse (`make_variants`, `discard`).
+    Chaque écriture qui touche la ligne, « prêt » comme « échec », vide ensuite le cache du
+    contenu : elle échappe aux signaux (brief de #11, décision 4), et le worker n'ouvre aucune
+    transaction — la ligne est validée quand la purge part. L'erreur du dernier essai sort de la
+    tâche : le worker la journalise (Sentry la recevra avec #17). Aucun essai ne laisse de fichier
+    que la ligne ne nomme pas, sauf celui qu'une suppression refuse (`make_variants`, `discard`).
 
     Args:
         self: la tâche, liée (`bind`) : son contexte d'exécution dit le numéro de l'essai.
@@ -72,7 +75,10 @@ def process_image(self: "Task[[int, str], None]", image_id: int, original_name: 
 
 def attempt(image: "QuerySet[GalleryImage]", original_name: str) -> None:
     """Un essai du traitement : rien si la ligne ne porte plus l'original ; sinon ses variantes,
-    puis « prêt » et leur liste, posés ensemble par une requête conditionnelle (décision 7).
+    puis « prêt » et leur liste, posés ensemble par une requête conditionnelle (décision 7) ; si
+    elle a écrit, le cache du contenu vidé. Une purge qui échouerait ne fait ni supprimer les
+    variantes que la ligne nomme désormais, ni réessayer un traitement réussi, qui en écrirait
+    d'autres : `django-redis` journalise déjà un Redis injoignable (`config/settings.py`).
 
     Args:
         image: la ligne de l'image, filtrée sur son identifiant et l'original traité.
@@ -92,19 +98,23 @@ def attempt(image: "QuerySet[GalleryImage]", original_name: str) -> None:
         raise
     if not written:
         discard(variants)
+        return
+    with suppress(Exception):
+        purge()
 
 
 def mark_failed(image: "QuerySet[GalleryImage]") -> None:
     """Pose l'état « échec » sur la ligne `image` — sans variante, la ligne étant « en attente » —,
-    si la base le permet : une écriture qui échoue à son tour laisse l'image « en attente », sans
-    masquer l'erreur d'origine, celle que le worker doit journaliser (ADR 0015 § Décision,
-    « Échecs »).
+    si la base le permet, et vide alors le cache du contenu : une écriture qui échoue à son tour
+    laisse l'image « en attente », sans masquer l'erreur d'origine, celle que le worker doit
+    journaliser (ADR 0015 § Décision, « Échecs »).
 
     Args:
         image: la ligne de l'image, filtrée sur son identifiant et l'original traité.
     """
     with suppress(Exception):
-        image.update(state=ProcessingState.FAILED)
+        if image.update(state=ProcessingState.FAILED):
+            purge()
 
 
 def discard(variants: list[Variant]) -> None:

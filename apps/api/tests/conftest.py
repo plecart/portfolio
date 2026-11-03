@@ -113,6 +113,14 @@ def synchronous_tasks() -> None:
     celery_app.conf.update(task_always_eager=True, task_eager_propagates=True)
 
 
+@pytest.fixture
+def unpropagated(monkeypatch: pytest.MonkeyPatch) -> None:
+    """La propagation du mode synchrone coupée le temps du test : Celery 5.6.3 y relance le
+    `Retry` dès la première erreur (`on_error` de `celery/app/trace.py`), et aucun réessai ne se
+    rejouerait ; l'issue d'une tâche se lit alors dans son résultat."""
+    monkeypatch.setitem(celery_app.conf, "task_eager_propagates", False)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def memory_cache() -> Generator[None]:
     """Le cache du processus de test est en mémoire, à la durée de vie de celui de la production
