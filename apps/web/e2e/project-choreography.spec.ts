@@ -468,6 +468,63 @@ for (const [name, close] of CLOSINGS) {
   })
 }
 
+/** Dans la page : annule les animations de la Web Animations API, comme un tiers qui les retire. */
+function cancelAnimations() {
+  for (const animation of document.getAnimations()) {
+    if (animation.constructor === Animation) animation.cancel()
+  }
+}
+
+/**
+ * Une animation annulée en route — son `finished` rejette, son `finish` ne part pas — n'arrête pas
+ * la chorégraphie. Les attentes d'une fin d'animation de `useChoreography`, dénombrées dans sa
+ * source avant correctif (2026-11-03) : cinq.
+ *
+ * - fuyaient : la pose, au `finish` du premier vol (rien sur `cancel`) ; l'effacement du contenu et
+ *   le retour à la carte, deux `await` de `Promise.all` ; l'atterrissage, `land().then(onLanded)`,
+ *   que ces deux rejets coupent ;
+ * - indemne : le retrait de la couche noir et blanc, sur `finish` comme sur `cancel`.
+ *
+ * Un cas par instant où une attente est en cours ; les deux modes passent par les mêmes attentes.
+ */
+const CANCELLATIONS: [string, (page: Page) => Promise<unknown>][] = [
+  ['pendant que le contenu s’efface', async () => {}],
+  ['pendant le retour à la carte', finishAnimations],
+]
+
+test('une animation annulée pendant le vol : la fiche se pose quand même, « Fermer la fiche » prend le focus', async ({
+  page,
+}) => {
+  await openEnteredTable(page, PROJECTS)
+  const [paper] = await resolveAll(page, [['background-color', 'var(--paper)']])
+  const resume = await openFrozen(page, FIRST_PATH)
+
+  await page.evaluate(cancelAnimations)
+  await resume()
+
+  await expect(closeButton(page)).toBeFocused()
+  await expect(panel(page)).toHaveCSS('background-color', paper)
+})
+
+for (const [moment, reach] of CANCELLATIONS) {
+  test(`une animation annulée ${moment} : la fermeture va à son terme`, async ({ page }) => {
+    await openEnteredTable(page, PROJECTS)
+    const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+    await openProject(card)
+    const resume = await freezeAnimations(page)
+
+    await page.keyboard.press('Escape')
+    await reach(page)
+    await page.evaluate(cancelAnimations)
+    await resume()
+
+    await expectClosed(page)
+    await expect(page.locator('html')).not.toHaveAttribute('data-project-open')
+    await expect(card.locator('.card-photo')).toHaveCSS('opacity', '1')
+    await expect(card).toBeFocused()
+  })
+}
+
 test('sa carte d’origine sortie du document, la fiche se ferme par le fondu de sortie', async ({ page }) => {
   await openEnteredTable(page, PROJECTS)
   const card = page.locator(`.card[href="${FIRST_PATH}"]`)
