@@ -18,6 +18,7 @@ import {
 import { resolveAll, settle } from './css.ts'
 import {
   arriveAt,
+  clickOutsideOverCard,
   CLOSINGS,
   closeButton,
   expectClosed,
@@ -30,7 +31,6 @@ import {
   openFromTable,
   openProject,
   OUTSIDE,
-  clickOutsideOverCard,
   panel,
   previousImage,
   readingColumn,

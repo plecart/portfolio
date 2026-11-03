@@ -26,17 +26,16 @@ function rotation(degrees: number) {
 
 const IDENTITY = rotation(0)
 
+type Box = ReturnType<typeof box>
+type Matrix = ReturnType<typeof rotation>
+type Point = { x: number; y: number }
+
 /**
  * La boîte englobante d'un élément au repos, de boîte de mise en page `layout` et tourné de
  * `matrix` autour de `origin`, après `translate` et `scale` autour du même pivot : ce que le
  * navigateur rend au premier instant d'un vol.
  */
-function boxInFlight(
-  layout: ReturnType<typeof box>,
-  matrix: ReturnType<typeof rotation>,
-  origin: { x: number; y: number },
-  keyframe: Frame,
-) {
+function boxInFlight(layout: Box, matrix: Matrix, origin: Point, keyframe: Frame) {
   const [x, y] = String(keyframe.translate).split(' ').map(parseFloat)
   const [sx, sy] = String(keyframe.scale).split(' ').map(Number)
   const pivot = { x: layout.left + origin.x, y: layout.top + origin.y }
@@ -56,14 +55,11 @@ function boxInFlight(
 }
 
 /** La boîte englobante au repos : le vol au point de départ, sans translation ni échelle. */
-const boxAtRest = (
-  layout: ReturnType<typeof box>,
-  matrix: ReturnType<typeof rotation>,
-  origin: { x: number; y: number },
-) => boxInFlight(layout, matrix, origin, AT_REST)
+const boxAtRest = (layout: Box, matrix: Matrix, origin: Point) =>
+  boxInFlight(layout, matrix, origin, AT_REST)
 
 /** Deux boîtes égales au millième de pixel. */
-function expectSameBox(actual: ReturnType<typeof box>, expected: ReturnType<typeof box>) {
+function expectSameBox(actual: Box, expected: Box) {
   for (const key of ['left', 'top', 'width', 'height'] as const) {
     expect(actual[key]).toBeCloseTo(expected[key], 3)
   }
@@ -114,7 +110,7 @@ describe('le vol d’un élément depuis son homologue', () => {
   }
 
   test('à mi-trajet, un même point passe au même endroit quel que soit le pivot', () => {
-    const halfway = (origin: { x: number; y: number }) => {
+    const halfway = (origin: Point) => {
       const start = flightStart(CARD, LAYOUT, pivotIn(IDENTITY, LAYOUT.width, LAYOUT.height, origin))
       const [x, y] = String(start.translate).split(' ').map(parseFloat)
       const [sx, sy] = String(start.scale).split(' ').map(Number)
