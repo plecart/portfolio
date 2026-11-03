@@ -89,11 +89,14 @@ export function recoil(opened: Box, card: Box, distance: number): Point {
   return length === 0 ? { x: 0, y: 0 } : { x: (x / length) * distance, y: (y / length) * distance }
 }
 
-/** Les images clés d'un ruban en vol de `start` à `end`, à l'aller comme au retour (spec §4.6). */
+/**
+ * Les images clés d'un ruban en vol de `start` à `end`, à l'aller comme au retour (spec §4.6) :
+ * plein aux deux bouts, sauf un départ qui porte son opacité — celle d'un ruban relevé en plein vol.
+ */
 export function dimmedKeyframes(start: Frame, end: Frame): Frame[] {
   const { opacity, from, to } = RIBBON_DIP
   return [
-    { ...start, opacity: 1 },
+    { opacity: 1, ...start },
     { offset: from, opacity },
     { offset: to, opacity },
     { ...end, opacity: 1 },
