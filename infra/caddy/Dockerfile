@@ -18,7 +18,7 @@
 # qui exigerait un Go plus récent fait échouer le build au lieu d'en télécharger un autre. Le module
 # principal vit dans `/src` : Go ignore un `go.mod` posé dans `/go`, le `GOPATH` de l'image
 # (mesuré).
-FROM golang:1.27.3-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS go
+FROM golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS go
 ENV CGO_ENABLED=0
 WORKDIR /src
 
