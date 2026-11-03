@@ -62,6 +62,7 @@
   --delay-column: 40ms;
   --delay-ribbon: 20ms;
   --dur-pulse: 1.8s;
+  --dur-reduced: 160ms;
   --ease-out: cubic-bezier(.22, 1, .36, 1);
   --ease-spring: linear(0, .28 6%, .62 13%, .88 20%, 1.03 28%, 1.01 40%, 1);
   --ease-in-out: cubic-bezier(.65, 0, .35, 1);

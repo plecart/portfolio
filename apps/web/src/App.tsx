@@ -7,9 +7,6 @@ import { useProjectAddress } from './project/useProjectAddress.ts'
 import { strings } from './strings.ts'
 import { Table } from './table/Table.tsx'
 
-// ponytail: le mouvement réduit garde le fondu de #170, le temps que sa chorégraphie (§6.3) arrive.
-const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
-
 export default function App() {
   const table = useRef<HTMLElement>(null)
   const { status, projects, retry, retried } = useProjects()
@@ -49,7 +46,7 @@ export default function App() {
   }, [project])
 
   const openFromCard = (next: string, card: HTMLElement) => {
-    if (!matchMedia(REDUCED_MOTION).matches) setOrigin(card)
+    setOrigin(card)
     open(next)
   }
 

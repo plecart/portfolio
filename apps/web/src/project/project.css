@@ -60,6 +60,12 @@
     animation: none;
   }
 
+  /* Le panneau tient le focus jusqu'à ce que la fiche devienne active (§4.6, §6.3) : il n'est pas un
+     arrêt de tabulation (§6.2), et n'a pas d'anneau, même ouvert au clavier. */
+  .project-panel:focus-visible {
+    outline: none;
+  }
+
   /* En vol (§4.6) : le panneau, transparent, laisse voir sa feuille, et rien n'y réagit avant la
      pose — par ses enfants, Radix écrivant `pointer-events: auto` sur le panneau lui-même. */
   .project-panel[data-flight] {
