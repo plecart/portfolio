@@ -101,7 +101,7 @@ jobs:
         shell: bash
         run: git diff --name-only --no-renames HEAD^1 HEAD | python3 infra/ci/changed_jobs.py >> "$GITHUB_OUTPUT"
 
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
 
       - name: Install
         run: make install
@@ -251,7 +251,7 @@ jobs:
       # Les tests des images que l'étape précédente a chargées — le test de fumée de `caddy`, la
       # chaîne de sauvegarde de `backup` —, écrits en pytest comme ceux du back : `uv` et
       # l'environnement Python d'abord. Leur scan est au job `avis`.
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
 
       - name: Environnement Python
         run: make install
