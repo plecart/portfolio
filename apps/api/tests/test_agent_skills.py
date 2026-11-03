@@ -7391,8 +7391,8 @@ def test_chaque_invariant_de_la_session_de_relecture_garde_sa_phrase(
 # L'ordre d'un réveil : les commandes avant le protocole du `relecteur`, qui n'a plus à chercher ce
 # qu'une commande a trouvé (`cycle-pr` 4.2, « Les portes bon marché d'abord »), et le message de
 # constats en dernier — c'est lui qui réveille la session PR. **Population** : les étapes
-# numérotées du réveil, deux à deux consécutives ; une étape ajoutée sans ancre rougit au recompte du
-# protocole (`PASSAGES_DE_LA_SESSION_DE_RELECTURE`).
+# numérotées du réveil, deux à deux consécutives ; une étape ajoutée sans ancre rougit au recompte
+# du protocole (`PASSAGES_DE_LA_SESSION_DE_RELECTURE`).
 ORDRE_DU_REVEIL = {
     "verifications-avant-code-review": (
         "1. Les deux vérifications de `relecteur.md`",
@@ -7443,7 +7443,10 @@ def morceaux_du_texte(texte: str) -> list[str]:
 class Passage(NamedTuple):
     """Un passage déclaré d'une table d'invariants (#198, D-5), lu dans le texte normalisé de son
     fichier : de `debut` à `fin`, exclue — `None`, jusqu'au bout du fichier —, chaque borne
-    présente **une** fois. `exemptions` : ses morceaux sans prescription, en littéraux, rangés sous
+    présente **une** fois ; un titre de section s'y lit avec un `#` de moins, la marge que
+    `texte_normalise` retire. Une table neuve borne ses passages aux paragraphes, ou éléments de
+    liste, qui portent ses ancres — consécutifs, ils forment un seul passage (D-5). `exemptions` :
+    ses morceaux sans prescription, en littéraux, rangés sous
     une catégorie de `CATEGORIES_D_EXEMPTION`. `empruntees` : les ancres d'une autre table qui
     garde le même passage."""
 
@@ -7508,8 +7511,8 @@ PASSAGES_DE_LA_SESSION_DE_RELECTURE = (
                 ),
                 "son contexte tient toutes ses passes et la relance.",
                 (
-                    "un autre parent serait réveillé à chaque fin de tour de la session de relecture"
-                    " pour rien."
+                    "un autre parent serait réveillé à chaque fin de tour de la session de"
+                    " relecture pour rien."
                 ),
                 "la tête bouge entre deux passes.",
                 "C'est sans coût ici :",
@@ -7968,7 +7971,10 @@ INVARIANTS_DE_LA_REGLE_DU_SUJET = {
     ),
     "cycle-pr-cas-decoupe-lot-leger": (
         CYCLE_PR_SKILL,
-        "par défaut en **lot léger**, des PR successives vers `main`, chacune avec son go",
+        (
+            "par défaut en **lot léger**, des PR successives vers `main`, chacune avec son go"
+            " (Étape 7), sans coordinatrice ni branche d'intégration"
+        ),
     ),
     "cycle-pr-une-passe-par-bloc": (CYCLE_PR_SKILL, "**Une passe par bloc, jamais par commit"),
     "cycle-pr-passe-de-plus": (
@@ -7991,7 +7997,10 @@ INVARIANTS_DE_LA_REGLE_DU_SUJET = {
         BRIEFING_REF,
         "le briefing porte la ligne **« pourquoi un seul sujet »**",
     ),
-    "briefing-motif-et-cout": (BRIEFING_REF, "que sur un **motif** écrit avec son **coût**"),
+    "briefing-motif-et-cout": (
+        BRIEFING_REF,
+        "Le briefing ne découpe l'issue en n > 1 lots que sur un **motif** écrit avec son **coût**",
+    ),
     "coordinatrice-deux-cas": (
         COORDINATRICE_REF,
         (
@@ -8039,7 +8048,10 @@ INVARIANTS_DE_LA_REGLE_DU_SUJET = {
     ),
     "relecteur-vide-releve-jamais-bloquant": (
         RELECTEUR_ROLE,
-        "Tu le rends à part, jamais comme bloquant ou important",
+        (
+            "Tu le rends à part, jamais comme bloquant ou important — seul un défaut de ce que la"
+            " PR affirme livrer l'est"
+        ),
     ),
     "briefing-poste-dominant": (
         BRIEFING_REF,
@@ -8062,6 +8074,506 @@ INVARIANTS_DE_LA_REGLE_DU_SUJET = {
             " liste des sites d'une règle —, jamais des constats"
         ),
     ),
+    # #198, D-5 : les morceaux qui prescrivent dans les passages déclarés de la table.
+    "cycle-pr-cas-decoupe-sur-un-motif": (
+        CYCLE_PR_SKILL,
+        "une issue en plusieurs lots, sur un motif écrit au brief",
+    ),
+    "cycle-pr-seule-la-derniere-pr-ferme": (
+        CYCLE_PR_SKILL,
+        "Seule la **dernière** PR porte `Closes #<N>`",
+    ),
+    "cycle-pr-ligne-en-vol": (
+        CYCLE_PR_SKILL,
+        "Chaque autre PR ouvre son body par la ligne **`En vol pour #<N> (lot k/n)`**",
+    ),
+    "cycle-pr-lien-repose-a-l-etape-8": (
+        CYCLE_PR_SKILL,
+        "le lien des lots précédents se repose à l'Étape 8, une fois l'issue close",
+    ),
+    "cycle-pr-lot-suivant-en-session-neuve": (
+        CYCLE_PR_SKILL,
+        "Chaque lot suivant part du prompt du lot suivant, base `main`, dans une session neuve",
+    ),
+    "cycle-pr-closes-a-la-pr-d-integration": (
+        CYCLE_PR_SKILL,
+        (
+            "Avec une coordinatrice — ses deux cas seulement —, le `Closes` passe à la PR"
+            " d'intégration et **toutes** les PR de lot portent la ligne « En vol »"
+        ),
+    ),
+    "cycle-pr-chiffre-du-gabarit-a-chaque-commit": (
+        CYCLE_PR_SKILL,
+        "Le `developpeur` rend avec chaque commit le chiffre du gabarit",
+    ),
+    "cycle-pr-trois-choses-a-la-frontiere": (
+        CYCLE_PR_SKILL,
+        (
+            "La remise d'un bloc — ou le commit de la session qui le code elle-même (3.1) — en est"
+            " la frontière, où la session PR lit trois choses"
+        ),
+    ),
+    "cycle-pr-frontiere-les-blocs": (
+        CYCLE_PR_SKILL,
+        "**les blocs** — le chiffre contre l'estimation en blocs du briefing",
+    ),
+    "cycle-pr-depassement-en-une-ligne": (
+        CYCLE_PR_SKILL,
+        "un dépassement tient en une ligne de Notes",
+    ),
+    "cycle-pr-frontiere-le-perimetre": (
+        CYCLE_PR_SKILL,
+        (
+            "**le périmètre** — un bloc qui a dû toucher ce que ni son brief ni les critères de"
+            " l'issue ne portent rouvre le découpage maintenant, pas à l'Étape 5"
+        ),
+    ),
+    "cycle-pr-relais-rejoue-le-test-du-sujet": (
+        CYCLE_PR_SKILL,
+        "si un relais s'annonce, elle rejoue le test du sujet",
+    ),
+    "cycle-pr-deux-sujets-lot-leger": (CYCLE_PR_SKILL, "deux sujets, elle coupe en lot léger"),
+    "cycle-pr-un-sujet-relais": (CYCLE_PR_SKILL, "un seul, elle relaie"),
+    "cycle-pr-decoupage-rouvert-lot-leger": (
+        CYCLE_PR_SKILL,
+        "**Un découpage rouvert en cours de cycle coupe en lot léger**",
+    ),
+    "cycle-pr-rouvert-session-neuve-par-lot": (
+        CYCLE_PR_SKILL,
+        "Les PR qu'il fait naître suivent « Une session neuve par lot »",
+    ),
+    "cycle-pr-rouvert-la-session-courante-finit": (
+        CYCLE_PR_SKILL,
+        (
+            "la session courante finit son lot — sa PR vers `main`, son go, la ligne « En vol »"
+            " (Étape 2, « Cas découpé ») — et écrit la passation depuis les artefacts"
+        ),
+    ),
+    "cycle-pr-rouvert-aucune-session-hors-tour-humain": (
+        CYCLE_PR_SKILL,
+        (
+            "le lot suivant reçoit sa session neuve, proposée au mainteneur par une carte"
+            " (`start_session`, `initiation: own_initiative`) — aucune session n'en démarre une"
+            " autre hors d'un tour humain"
+        ),
+    ),
+    "cycle-pr-sous-lot-ouvert-comme-un-lot": (
+        CYCLE_PR_SKILL,
+        "un lot coordonné qui se rouvre devient un sous-lot, qu'elle ouvre comme un lot",
+    ),
+    "cycle-pr-re-decoupage-premier-morceau-seul": (
+        CYCLE_PR_SKILL,
+        (
+            "rejoue d'abord la passe « affirmations » de `cleanup-verbatim.md` sur le premier"
+            " morceau **seul**"
+        ),
+    ),
+    "cycle-pr-docstring-contre-son-morceau": (
+        CYCLE_PR_SKILL,
+        (
+            "chaque docstring s'y lit contre le code de ce morceau, pas contre l'état final, et"
+            " les limites que le morceau suivant lève s'y nomment"
+        ),
+    ),
+    "cycle-pr-constat-de-bloc-fondu": (
+        CYCLE_PR_SKILL,
+        "Un constat d'une passe de bloc se fond dans le bloc suivant",
+    ),
+    "cycle-pr-severite-bloquant": (
+        CYCLE_PR_SKILL,
+        (
+            "*Bloquant* : un défaut de comportement en production, une faille, une perte de"
+            " données possible"
+        ),
+    ),
+    "cycle-pr-severite-important": (
+        CYCLE_PR_SKILL,
+        (
+            "*Important* : une régression que la CI ne verrait pas et qu'un changement plausible"
+            " du code déclencherait"
+        ),
+    ),
+    "cycle-pr-severite-mineur": (
+        CYCLE_PR_SKILL,
+        (
+            "*Mineur* : tout le reste — lisibilité, nommage, doc, et « ce test pourrait tenir"
+            " davantage »"
+        ),
+    ),
+    "cycle-pr-mineur-quelle-que-soit-sa-longueur": (
+        CYCLE_PR_SKILL,
+        (
+            "Un constat qui n'entre dans aucune des deux premières est mineur, quelle que soit sa"
+            " longueur"
+        ),
+    ),
+    "cycle-pr-mineur-en-edit-precis": (
+        CYCLE_PR_SKILL,
+        (
+            "La session de relecture rend chaque mineur sous forme d'**édit précis** — fichier,"
+            " ligne, remplacement — ou l'écarte elle-même avec sa raison"
+        ),
+    ),
+    "cycle-pr-seul-un-defaut-livre-bloque": (
+        CYCLE_PR_SKILL,
+        "Seul un défaut de ce que la PR affirme livrer est bloquant ou important",
+    ),
+    "cycle-pr-constats-fermes-au-bloc-suivant": (
+        CYCLE_PR_SKILL,
+        "Les constats d'une passe de bloc se ferment dans le bloc suivant, que sa passe relit",
+    ),
+    "cycle-pr-passe-de-plus-la-relance": (
+        CYCLE_PR_SKILL,
+        "Après la passe finale, la passe de plus est la **relance**",
+    ),
+    "cycle-pr-relance-revue-des-correctifs": (
+        CYCLE_PR_SKILL,
+        (
+            "une **revue des commits de correction**, ciblée par un diff explicite (`<sha"
+            " avant>..<sha après>`) et par la liste de ce que chaque commit prétend régler et du"
+            " test qui épingle chacun, avec la question obligatoire"
+        ),
+    ),
+    "cycle-pr-question-obligatoire": (
+        CYCLE_PR_SKILL,
+        (
+            "« qu'est-ce que ce correctif a cassé, ou fait rougir à tort, que la version"
+            " précédente voyait ? »"
+        ),
+    ),
+    "cycle-pr-relance-jamais-un-agent-neuf": (
+        CYCLE_PR_SKILL,
+        (
+            "Elle revient à la **session de relecture de la PR**, réveillée par message — son"
+            " contexte est intact, elle n'a rien à relire —, jamais à un agent neuf"
+        ),
+    ),
+    "cycle-pr-vide-releve-ne-rouvre-rien": (
+        CYCLE_PR_SKILL,
+        "un mineur suit la règle ci-dessus, et un vide relevé ne rouvre rien",
+    ),
+    "cycle-pr-la-boucle-s-arrete": (
+        CYCLE_PR_SKILL,
+        "La boucle s'arrête sur une passe sans bloquant ni important, et le body le dit",
+    ),
+    "cycle-pr-constats-ecartes-notes": (
+        CYCLE_PR_SKILL,
+        "Les constats écartés sont notés avec leur raison dans le body",
+    ),
+    "cycle-pr-bilan-quatre-lignes-a-la-main": (
+        CYCLE_PR_SKILL,
+        (
+            "plus quatre à la main — commits prévus contre commits de correction, constats par"
+            " passe, correctifs qui ont cassé quelque chose, et **échappements**"
+        ),
+    ),
+    "cycle-pr-bilan-hors-du-depot": (
+        CYCLE_PR_SKILL,
+        (
+            "dans `retrospectives/<date>-<issue>.md`, dossier voisin du journal d'observations"
+            " (chemin dans `CLAUDE.md`), hors du dépôt"
+        ),
+    ),
+    "briefing-bloc-650-lignes": (
+        BRIEFING_REF,
+        "≈ 650 lignes ou ≈ 350 K de contexte de `developpeur` chacun",
+    ),
+    "briefing-lignes-par-critere-jamais-en-prose": (
+        BRIEFING_REF,
+        (
+            "Les lignes se comptent **par critère**, en artefacts que le critère doit laisser,"
+            " jamais en prose qui le décrit"
+        ),
+    ),
+    "briefing-porte-ou-invariant": (
+        BRIEFING_REF,
+        "une porte ou un invariant → un test paramétré à témoins des deux côtés (~100-150 lignes)",
+    ),
+    "briefing-script": (BRIEFING_REF, "un script → le script et son fichier de test (~400)"),
+    "briefing-regle-de-skill": (
+        BRIEFING_REF,
+        "une règle de skill → sa ligne, plus la docstring de dénombrement si elle ferme une classe",
+    ),
+    "briefing-estimation-en-prose-plancher": (
+        BRIEFING_REF,
+        "une estimation en prose est un plancher",
+    ),
+    "briefing-estimation-planifie": (
+        BRIEFING_REF,
+        "L'estimation planifie les blocs, leurs frontières et leurs passes de relecture",
+    ),
+    "briefing-estimation-ne-decoupe-rien": (BRIEFING_REF, "elle ne découpe rien"),
+    "briefing-pourquoi-un-seul-sujet-et-ses-deux-voies": (
+        BRIEFING_REF,
+        (
+            "ce qui lie les morceaux au test du sujet (`taille-pr.md`, point 1), et le coût des"
+            " deux voies — une PR, ou une PR de plus par lot à ≈ 30 M de tokens et 5 à 8 contacts"
+            " du mainteneur chacune, plus 13 à 44 M de coordination pour un lot coordonné"
+        ),
+    ),
+    "briefing-le-mainteneur-tranche-au-go": (BRIEFING_REF, "Le mainteneur tranche au go"),
+    "briefing-economie-poste-dominant": (
+        BRIEFING_REF,
+        "**Une économie se cadre sur son poste dominant mesuré**",
+    ),
+    "briefing-economie-repartition-mesuree": (
+        BRIEFING_REF,
+        (
+            "le briefing porte, avant tout découpage, la répartition mesurée du coût actuel par"
+            " poste (session et sous-agents, par modèle, par PR), la commande qui la produit"
+            " (`etudes/tokens.py` sur les transcripts, dossier voisin du journal d'observations) et"
+            " la part du poste visé"
+        ),
+    ),
+    "briefing-les-motifs-d-un-lot": (
+        BRIEFING_REF,
+        (
+            "une dépendance de mise en service, une relecture d'une autre nature ou un risque"
+            " distinct, un parallélisme dont le gain est nommé"
+        ),
+    ),
+    "briefing-cout-d-un-lot": (
+        BRIEFING_REF,
+        "≈ 30 M de tokens et 5 à 8 contacts du mainteneur par PR de plus",
+    ),
+    "briefing-deux-sujets-deux-issues": (
+        BRIEFING_REF,
+        "Deux sujets ne font pas deux lots, ils font deux issues",
+    ),
+    "briefing-lots-legers-par-defaut": (BRIEFING_REF, "Par défaut, les lots sont **légers**"),
+    "briefing-lot-suivant-session-neuve": (
+        BRIEFING_REF,
+        (
+            "la session porte le premier comme toute session PR, et chaque lot suivant reçoit sa"
+            " session neuve"
+        ),
+    ),
+    "briefing-coordinatrice-deux-cas": (
+        BRIEFING_REF,
+        (
+            "Contre une surface visible à moitié livrée ou une règle de pipeline à moitié"
+            " appliquée pendant une vague, le briefing nomme ce cas, et la session devient la"
+            " **coordinatrice** de ses lots"
+        ),
+    ),
+    "briefing-coordinatrice-n-ecrit-pas-de-code": (
+        BRIEFING_REF,
+        (
+            "elle n'écrit pas de code, et son go — le go du découpage — fait démarrer les sessions"
+            " de lot, ou chacune à son ouverture"
+        ),
+    ),
+    "briefing-un-seul-lot-ne-change-rien": (
+        BRIEFING_REF,
+        (
+            "Une issue à un seul lot ne change rien : la session porte le cycle elle-même et"
+            " délègue le code"
+        ),
+    ),
+    "briefing-session-de-lot-coordonne": (
+        BRIEFING_REF,
+        (
+            "Une session de lot coordonné attend le go ci-dessous dans sa fenêtre comme toute"
+            " session PR, et y démarre sa session de relecture — sauf go délégué à la"
+            " coordinatrice, qui lève l'attente et passe la relecture au repli `relecteur`"
+        ),
+    ),
+    "coordinatrice-lot-leger-par-defaut": (
+        COORDINATRICE_REF,
+        (
+            "Une issue en lots se livre par défaut en **lot léger** : des PR successives vers"
+            " `main`, sans coordinatrice ni branche d'intégration (`.claude/rules/taille-pr.md`,"
+            " point 4 ; `cycle-pr` Étape 2, « Cas découpé »)"
+        ),
+    ),
+    "coordinatrice-ne-sert-que-dans-deux-cas": (
+        COORDINATRICE_REF,
+        (
+            "Ce fichier ne sert que dans les **deux cas** où un merge intermédiaire sur `main`"
+            " exposerait un état à moitié fait"
+        ),
+    ),
+    "coordinatrice-la-session-qui-decoupe": (
+        COORDINATRICE_REF,
+        (
+            "Le briefing qui découpe nomme le cas (`cycle-pr` Étape 1, « Découpage en plusieurs"
+            " lots »), et la session qui a fait ce découpage devient la **coordinatrice** de ses"
+            " lots"
+        ),
+    ),
+    "coordinatrice-ne-recopie-pas-le-protocole": (
+        COORDINATRICE_REF,
+        "est dans [sessions-liees.md](sessions-liees.md) ; ce fichier ne le recopie pas",
+    ),
+    "vers-issues-deux-sujets-deux-issues": (
+        VERS_ISSUES_SKILL,
+        (
+            "Deux sujets → deux issues ; un sujet → une issue et une PR, sans limite de lignes ni"
+            " de fichiers"
+        ),
+    ),
+    "vers-issues-se-valident-ensemble": (
+        VERS_ISSUES_SKILL,
+        (
+            "Des morceaux qui se valident ensemble — même écran, même point d'arrêt visuel, même"
+            " ADR — sont un seul sujet"
+        ),
+    ),
+    "vers-issues-lots-sur-motif": (
+        VERS_ISSUES_SKILL,
+        (
+            "Une issue ne porte des lots que sur un motif écrit au corps avec son coût — une"
+            " dépendance de mise en service, une relecture d'une autre nature ou un risque"
+            " distinct, un parallélisme dont le gain est nommé"
+        ),
+    ),
+    "vers-issues-lots-des-la-creation": (
+        VERS_ISSUES_SKILL,
+        "elle porte ses lots dès sa création, légers par défaut (point 4), chacun estimé en blocs",
+    ),
+    "vers-issues-plancher-300-lignes": (
+        VERS_ISSUES_SKILL,
+        "Une tranche estimée sous ~300 lignes ne fait pas une issue à elle seule",
+    ),
+    "vers-issues-hors-plancher": (
+        VERS_ISSUES_SKILL,
+        "Le correctif évident (voie courte de `cycle-pr`) et l'urgence restent hors plancher",
+    ),
+    "vers-issues-triage-meme-plancher": (
+        VERS_ISSUES_SKILL,
+        "`triage` applique le même plancher aux issues qu'il trie",
+    ),
+    "triage-plancher-meme-que-vers-issues": (
+        TRIAGE_SKILL,
+        "**Plancher** (`.claude/rules/taille-pr.md`, point 2 ; même plancher que `vers-issues` §3)",
+    ),
+    "triage-plancher-300-lignes": (
+        TRIAGE_SKILL,
+        "Une issue estimée sous ~300 lignes ne fait pas une PR à elle seule",
+    ),
+    "triage-hors-plancher": (
+        TRIAGE_SKILL,
+        "Le correctif évident (voie courte de `cycle-pr`) et l'urgence restent hors plancher",
+    ),
+    "triage-le-mainteneur-tranche-l-hote-recoit": (
+        TRIAGE_SKILL,
+        (
+            "Le mainteneur tranche ; accepté, le critère entre dans le corps et le brief de l'hôte"
+            " avec sa ligne au « Journal de spec », et la petite issue se ferme sur un renvoi à"
+            " l'hôte, par le déroulé de `repercussions`, « Fermer en doublon »"
+        ),
+    ),
+    "pr-paralleles-le-lead-agrege-les-echappements": (
+        PR_PARALLELES_SKILL,
+        "Le lead agrège les lignes « échappements » des bilans de cycle de la vague",
+    ),
+    "pr-paralleles-ajustement-remonte-au-mainteneur": (
+        PR_PARALLELES_SKILL,
+        "et remonte les deux au mainteneur, qui revoit la règle",
+    ),
+    "relecteur-provenance-et-severite": (
+        RELECTEUR_ROLE,
+        (
+            "Chaque constat porte sa provenance — **mesuré** (commande exécutée, sortie citée),"
+            " **lu** (fichier et ligne ouverts), **supposé** (à vérifier) — et sa sévérité"
+        ),
+    ),
+    "relecteur-severite-bloquant": (
+        RELECTEUR_ROLE,
+        (
+            "*bloquant*, un défaut de comportement en production, une faille, une perte de données"
+            " possible"
+        ),
+    ),
+    "relecteur-severite-important": (
+        RELECTEUR_ROLE,
+        (
+            "*important*, une régression que la CI ne verrait pas et qu'un changement plausible du"
+            " code déclencherait"
+        ),
+    ),
+    "relecteur-severite-mineur": (
+        RELECTEUR_ROLE,
+        (
+            "*mineur*, tout le reste, rendu sous forme d'édit précis (fichier, ligne,"
+            " remplacement) ou écarté par toi avec sa raison"
+        ),
+    ),
+    "relecteur-vide-releve-aux-notes": (
+        RELECTEUR_ROLE,
+        (
+            "la session PR l'écrit aux Notes et le porte au barreau 2 de « Création d'issues en"
+            " cours de cycle »"
+        ),
+    ),
+    "relecteur-chiffre-sans-mesure": (
+        RELECTEUR_ROLE,
+        "Un chiffre sans « mesuré » ne se rapporte pas",
+    ),
+    "relecteur-resultat-non-arrive": (
+        RELECTEUR_ROLE,
+        "un résultat qui n'est pas arrivé se rapporte « non vérifié », jamais comme un résultat",
+    ),
+    "contraintes-reponse-type-code-organise": (
+        CONTRAINTES_RULE,
+        "Sans oublier que nous voulons un code organisé",
+    ),
+    "contraintes-reponse-type-eliminez": (
+        CONTRAINTES_RULE,
+        "tout code dupliqué, inutile ou obsolète",
+    ),
+    "contraintes-reponse-type-scalable": (
+        CONTRAINTES_RULE,
+        "Et surtout, rendez-le scalable, modulaire et > générique",
+    ),
+    "contraintes-reponse-type-decomposez": (
+        CONTRAINTES_RULE,
+        "Décomposez les fonctions et séparez les responsabilités",
+    ),
+    "contraintes-reponse-type-objectif": (
+        CONTRAINTES_RULE,
+        "L'objectif est d'obtenir un code propre, clair, concis et optimisé",
+    ),
+    "contraintes-reponse-type-ne-rabote-pas": (
+        CONTRAINTES_RULE,
+        "Ne > rabote pas la qualité pour tenir dans un gabarit de PR",
+    ),
+    "interroge-moi-economie-poste-dominant": (
+        INTERROGE_MOI_SKILL,
+        "**Une économie se cadre sur le poste dominant mesuré**",
+    ),
+    "interroge-moi-economie-ne-se-verrouille-qu-avec": (
+        INTERROGE_MOI_SKILL,
+        (
+            "ne se verrouille qu'avec la répartition mesurée du coût actuel par poste (session et"
+            " sous-agents, par modèle, par PR), la commande qui la produit (`etudes/tokens.py` sur"
+            " les transcripts, dossier voisin du journal d'observations) et la part du poste visé,"
+            " écrites dans la décision avant tout découpage"
+        ),
+    ),
+    "interroge-moi-renvoi-au-seuil": (
+        INTERROGE_MOI_SKILL,
+        "(seuil et motif : `cycle-pr/references/briefing.md`, « Estimation »)",
+    ),
+    "relecture-cliquet-echantillon-jamais-inventaire": (
+        RELECTURE_REF,
+        "Un constat de relecture est un échantillon, jamais un inventaire",
+    ),
+    "relecture-cliquet-dans-la-docstring": (
+        RELECTURE_REF,
+        (
+            "Il s'écrit dans la **docstring du test paramétré** qui les éprouve, qui nomme cette"
+            " source — « une entrée par point du bloc X et par décision Y » — et rend N recensés, k"
+            " fuyaient"
+        ),
+    ),
+    "relecture-cliquet-la-relance-recoit": (
+        RELECTURE_REF,
+        (
+            "la relance reçoit la source et le dénombrement, avec la consigne de chercher celui"
+            " qui manque"
+        ),
+    ),
 }
 
 
@@ -8073,6 +8585,212 @@ INVARIANTS_DE_LA_REGLE_DU_SUJET = {
 def test_chaque_invariant_de_la_regle_du_sujet_garde_sa_phrase(fichier: str, phrase: str) -> None:
     """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
     assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
+
+
+# Les passages déclarés de la règle du sujet (#198, D-5), là où la session qui découpe, estime,
+# relit ou fait le bilan la lit.
+PASSAGES_DE_LA_REGLE_DU_SUJET = (
+    Passage(
+        CYCLE_PR_SKILL,
+        "**Cas découpé** — une issue en plusieurs lots",
+        "- Le **briefing de l'Étape 1**",
+        {
+            "motif": [
+                "sans elle, l'issue paraît dormante précisément pendant qu'on travaille dessus.",
+                "GitHub, lui, ne lit que le mot-clé :",
+            ],
+        },
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**Puis la frontière de bloc**",
+        "**Un découpage rouvert en cours de cycle",
+        {
+            "intitulé": [
+                "**Puis la frontière de bloc** (`taille-pr.md`, points 5 et 7).",
+            ],
+        },
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**Un découpage rouvert en cours de cycle",
+        "Puis la session PR pousse et enchaîne",
+        {},
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**Une passe par bloc, jamais par commit",
+        "**Un worktree de relecture par PR",
+        {
+            "motif": [
+                (
+                    "Placée seulement à la fin, la relecture rend ses constats à la distance"
+                    " maximale du moment où ils auraient pu être absorbés."
+                ),
+                (
+                    "un constat qui arrive après le passage en ready coûte un run de CI complet et"
+                    " le rejeu des vérifications manuelles (Étape 7)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**Sévérité — trois définitions, pas trois nuances.**",
+        "**Traitement — par passe, jamais par constat.**",
+        {
+            "intitulé": [
+                "Hors sévérité, le ***vide relevé*** :",
+            ],
+            "motif": [
+                (
+                    "sans cette frontière, la passe de plus relance la boucle mesurée sur la PR"
+                    " 155 — gabarit ×4 (1 301 lignes pour ~320 estimées), 6 `developpeur` à"
+                    " `xhigh`, ~5 % du quota hebdomadaire (obs 143)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**La boucle — une passe de plus tant que",
+        "C'est **cette fermeture**",
+        {
+            "motif": [
+                (
+                    "Un correctif est du code neuf écrit sous pression de conclure — c'est la"
+                    " partie la moins éprouvée de la PR, pas la plus sûre."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "Écrire ces lignes, plus quatre à la main",
+        "**La ligne de comparaison au cycle précédent",
+        {
+            "motif": [
+                "C'est la seule mesure qui dise si un changement de la pipeline a marché :",
+                "l'attente et le coût des relectures ne se voient dans aucun compte rendu.",
+            ],
+        },
+    ),
+    Passage(
+        BRIEFING_REF,
+        "- **Estimation** — en **blocs**",
+        "# Ce que couvre le go du briefing",
+        {
+            "intitulé": [
+                "Calibration mesurée :",
+            ],
+            "motif": [
+                (
+                    "Le seuil suit la loi d'Amdahl — le gain total est borné par la part du poste"
+                    " — et passe juste au-dessus du cas d'échec mesuré :"
+                ),
+            ],
+            "relevé daté": [
+                (
+                    "étude du 2026-10-29, §8.4 F10, dossier `etudes/` voisin du journal"
+                    " d'observations)."
+                ),
+                (
+                    "134 visait les sous-agents, 22,5 % des tokens, et a livré 18 lots pour 9"
+                    " annoncés (D-5 de 195)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        BRIEFING_REF,
+        "**Découpage en plusieurs lots.** Le briefing",
+        "# La PR est le premier artefact produit",
+        {},
+    ),
+    Passage(
+        COORDINATRICE_REF,
+        "Une issue en lots se livre par défaut en **lot léger**",
+        "La coordinatrice **n'écrit pas de code**.",
+        {},
+    ),
+    Passage(
+        VERS_ISSUES_SKILL,
+        "**Le découpage suit la règle du sujet, jamais la taille**",
+        "## 4. Interroger l'utilisateur",
+        {
+            "intitulé": [
+                "**Plancher** (même règle, point 2).",
+            ],
+            "motif": [
+                "les séparer fait valider deux fois le même écran, ou un demi-écran.",
+            ],
+        },
+    ),
+    Passage(
+        TRIAGE_SKILL,
+        "**Plancher** (`.claude/rules/taille-pr.md`, point 2",
+        "3. **Reproduire (bugs uniquement).**",
+        {},
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "**Revue de la règle du sujet, au bilan de la vague 2**",
+        "# Règles",
+        {
+            "intitulé": [
+                (
+                    "**Revue de la règle du sujet, au bilan de la vague 2**"
+                    " (`.claude/rules/taille-pr.md`, point 8)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        RELECTEUR_ROLE,
+        "Chaque constat porte sa provenance",
+        "Tu rends à la session PR — par message",
+        {
+            "intitulé": [
+                "Hors sévérité, le *vide relevé* :",
+            ],
+        },
+    ),
+    Passage(
+        CONTRAINTES_RULE,
+        "> Quelles sont les bonnes pratiques pour cela ?",
+        "- **Voie V — vision.**",
+        {},
+    ),
+    Passage(
+        INTERROGE_MOI_SKILL,
+        "**Une économie se cadre sur le poste dominant mesuré**",
+        "**Une tranche qui façonne un écran (HITL)",
+        {},
+    ),
+    Passage(
+        RELECTURE_REF,
+        "**Le cliquet — dénombrer avant de corriger, pas après.**",
+        "# Quand une garde imite un analyseur",
+        {
+            "motif": [
+                "Écrit après, il se fait par morceaux :",
+                "Le cliquet est ce qui empêche la classe de se re-payer.",
+            ],
+            "relevé daté": [
+                (
+                    "à la PR #109, le dénombrement recopiait les 9 invariants cités par le"
+                    " relecteur, et la passe suivante en a trouvé 4 de plus, dont 2 sites sans"
+                    " garde (obs 107)."
+                ),
+                (
+                    "trois correctifs de suite sur une même classe, chacun rouvert par la"
+                    " relecture suivante, et le dénombrement rendu à la quatrième — par le"
+                    " relecteur."
+                ),
+            ],
+        },
+    ),
+)
 
 
 def test_le_bloc_gh_pr_create_porte_label_et_milestone() -> None:
@@ -8350,8 +9068,8 @@ RENVOI_AUX_FRONTIERES_TIERCES = (
     "`cycle-pr/references/tests.md`, « Frontières tierces : on vérifie, on ne suppose pas »"
 )
 # Le piège d'écriture, dit au point où écrit chacun des rôles que nomme E1 (obs 130 et 133) : le
-# même renvoi et la même phrase à chaque site ; le `releveur`, qui édite sans construire, en porte le
-# renvoi et le recompte.
+# même renvoi et la même phrase à chaque site ; le `releveur`, qui édite sans construire, en porte
+# le renvoi et le recompte.
 RENVOI_AU_PIEGE_D_ECRITURE = (
     "« heredoc de l'outil Bash et antislashs » de `.claude/pipeline.config.md`, « Qualité »"
 )
@@ -8624,7 +9342,10 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
     ),
     "relecteur-renvoi-aux-frontieres-tierces": (
         RELECTEUR_ROLE,
-        f"relève de la règle des commandes que la prose fait taper ({RENVOI_AUX_FRONTIERES_TIERCES})",
+        (
+            "relève de la règle des commandes que la prose fait taper"
+            f" ({RENVOI_AUX_FRONTIERES_TIERCES})"
+        ),
     ),
     "rtk-point-d-interrogation": (
         PIPELINE_CONFIG,
@@ -8676,6 +9397,7 @@ def test_les_conforts_ne_rendent_pas_ce_qu_ils_ont_retire(fichier: str, phrase: 
 # sort de ses passages à chaque exécution, jamais d'un compte écrit en commentaire (obs 127).
 PASSAGES_DECLARES: dict[str, tuple[Passage, ...]] = {
     "INVARIANTS_DE_LA_SESSION_DE_RELECTURE": PASSAGES_DE_LA_SESSION_DE_RELECTURE,
+    "INVARIANTS_DE_LA_REGLE_DU_SUJET": PASSAGES_DE_LA_REGLE_DU_SUJET,
 }
 
 
