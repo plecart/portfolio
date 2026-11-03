@@ -30,7 +30,8 @@ C'est la règle qui structure tout le reste.
   « pour information ».
 - **Unique exception : l'issue est déjà en cours de développement.** On ne réécrit pas une spec
   sous les pieds d'une session qui l'a déjà lue — on la prévient par un commentaire sur **sa PR
-  ouverte** (étape 5). C'est la seule sortie commentée du skill.
+  ouverte**, ou, sans PR entre deux lots légers, par le prompt du lot suivant (étape 5). C'est la
+  seule sortie commentée du skill.
 
 **Règle d'or** : ce skill **propose**, il n'écrit jamais en silence. Aucune édition sans **« go »
 explicite** du mainteneur.
@@ -192,8 +193,9 @@ gh pr list --state open --json number,title,body,isDraft,headRefName
 
 `cycle-pr` ouvre sa **PR draft à l'Étape 2, avant la première ligne de code**, avec `Closes #N`
 dans le body. Une issue en cours de développement a donc **toujours** une PR ouverte qui la
-référence — c'est ce qui rend cette détection fiable plutôt qu'approximative. Les drafts comptent
-autant que les autres : c'est même leur seule raison d'exister ici.
+référence — sauf l'issue d'un lot léger intermédiaire mergé, en vol sans PR (étape 1), que ce
+relevé ne voit pas. C'est ce qui rend cette détection fiable plutôt qu'approximative. Les drafts
+comptent autant que les autres : c'est même leur seule raison d'exister ici.
 
 **Lire aussi la ligne `En vol pour #<N> (lot k/n)`** en tête de body, au même titre que `Closes` :
 une PR découpée en lots ne porte `Closes` que sur son **dernier** lot, et ce marqueur est ce qui
@@ -262,9 +264,10 @@ Sous `## 🔭 Répercussions`, **uniquement les issues impactées**, groupées p
   La session développe déjà contre l'ancien contrat.
 ```
 
-Toujours afficher le marqueur **[dormante]** ou **[EN VOL → PR #n]** : c'est lui qui dit au
-mainteneur si une session est en train de partir dans le mur. Chaque bloc de correction nomme son
-support — « dans le corps », « dans le brief », ou les deux blocs l'un sous l'autre.
+Toujours afficher le marqueur **[dormante]** ou **[EN VOL → PR #n]**, et **[EN VOL → lot
+suivant]** pour l'issue d'un lot léger intermédiaire mergé, sans PR (étape 1) : c'est lui qui dit
+au mainteneur si une session est en train de partir dans le mur. Chaque bloc de correction nomme
+son support — « dans le corps », « dans le brief », ou les deux blocs l'un sous l'autre.
 
 Montrer les **lignes** avant/après, pas une prose qui décrit le changement : un diff se juge en
 deux secondes, un paragraphe demande de raisonner.
@@ -320,7 +323,11 @@ session qui la développe les a déjà lus ; les modifier ne l'atteindrait pas, 
 Le signalement va **en commentaire sur la PR ouverte**, par `comment <PR> --body-file <fichier>`,
 que le script relit en entier — c'est la seule sortie GitHub commentée de ce skill, et elle est
 justifiée : `cycle-pr` traite déjà les commentaires de PR à son Étape 6, en bouclant jusqu'à
-review vide. Le message atterrit donc exactement là où la session le lira.
+review vide. Le message atterrit donc exactement là où la session le lira. Sans PR ouverte —
+`#<N>`, l'issue d'un lot léger intermédiaire mergé (étape 1) —, il va dans le prompt du lot
+suivant, que la session sortante écrit après cette passe (`cycle-pr/references/cloture.md`, « Cas
+découpé : la frontière de lot se franchit par la session sortante ») : c'est lui que la session du
+lot suivant lit en premier.
 
 ```markdown
 > *Généré par IA — répercussion de la clôture de #47.*
@@ -455,8 +462,9 @@ accord, dans ce tour, démarrer la session : `start_session`, `initiation: user_
 2. **Deux citations ou rien.** La ligne devenue fausse et le fait qui la falsifie. Sans les deux,
    la répercussion n'existe pas.
 3. **Dormante ou en vol.** On réécrit la spec d'une issue que personne ne développe ; on **prévient
-   sur sa PR** celle qui est en chantier. Éditer sous les pieds d'une session en cours est le seul
-   dégât irrattrapable que ce skill puisse causer.
+   sur sa PR** celle qui est en chantier, ou par le prompt du lot suivant entre deux lots légers.
+   Éditer sous les pieds d'une session en cours est le seul dégât irrattrapable que ce skill puisse
+   causer.
 4. **Périmètre mécanique** (thème + ancres) et **idempotence** (journal de spec) : le skill se
    relance après chaque merge sans re-brasser le backlog.
 5. **Les documents avant les issues.** Un delta qui falsifie un § de référence passe par
