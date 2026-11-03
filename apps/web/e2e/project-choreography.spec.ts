@@ -11,6 +11,7 @@ import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './api.ts'
 import { resolveAll, settle } from './css.ts'
 import {
+  clickOutsideOverCard,
   CLOSINGS,
   closeButton,
   expectClosed,
@@ -21,13 +22,20 @@ import {
   NO_OUTSIDE,
   openProject,
   OUTSIDE,
-  clickOutsideOverCard,
   panel,
   readingColumn,
   watchAnimations,
 } from './project.ts'
 import { buildImage, ONGOING, PROJECT_SETS } from './projects.ts'
-import { cards, COLUMN_VIEWPORT, countCellReads, enterCards, expectPlacement, openTable } from './table.ts'
+import {
+  cards,
+  COLUMN_VIEWPORT,
+  countCellReads,
+  enterCards,
+  expectPlacement,
+  face,
+  openTable,
+} from './table.ts'
 
 /** Trois projets ; la première carte, celle d'un projet en cours, à une seule image. */
 const PROJECTS = PROJECT_SETS.threeWithoutShowcase
@@ -89,12 +97,64 @@ async function openEnteredTable(page: Page, projects: Parameters<typeof openTabl
   await enterCards(page)
 }
 
+/**
+ * La carte d'un projet, par son adresse : la fiche ouverte, Radix cache les cartes des technologies
+ * d'assistance, et `cards` ne les trouve plus.
+ */
+const cardAt = (page: Page, path: string) => page.locator(`.card[href="${path}"]`)
+
 /** Ouvre, page figée, la fiche d'une carte par Entrée : la chorégraphie reste à son premier instant. */
 async function openFrozen(page: Page, path: string) {
   const resume = await freezeAnimations(page)
-  await page.locator(`.card[href="${path}"]`).press('Enter')
+  await cardAt(page, path).press('Enter')
   await expect(panel(page)).toBeVisible()
   return resume
+}
+
+/** Dans la page : place chaque animation de la Web Animations API à `time` ms de son début. */
+function seekAnimations(time: number) {
+  for (const animation of document.getAnimations()) {
+    if (animation.constructor === Animation) animation.currentTime = time
+  }
+}
+
+/** Dans la page : annule les animations de la Web Animations API, comme un tiers qui les retire. */
+function cancelAnimations() {
+  for (const animation of document.getAnimations()) {
+    if (animation.constructor === Animation) animation.cancel()
+  }
+}
+
+/**
+ * Page figée, achève les animations de la page : le contenu de la fiche, effacé, laisse partir le
+ * retour à la carte, qui reste à son premier instant. Une lecture de ce que tient un remplissage
+ * achève dans sa propre fonction de page (`readFlights`) : Playwright n'envoie à la page que le texte
+ * de la fonction, et la fiche tire la suite au microtâche suivant.
+ */
+async function finishAnimations(page: Page) {
+  await page.evaluate(() => {
+    for (const animation of document.getAnimations()) {
+      if (animation.constructor === Animation) animation.finish()
+    }
+  })
+}
+
+/**
+ * Trois éléments du contenu qui apparaît à la pose (spec §4.6) : le bouton Fermer, la barre de la
+ * galerie, la colonne de lecture.
+ */
+const contentSample = (page: Page) => [
+  closeButton(page),
+  panel(page).locator('.project-gallery-bar'),
+  readingColumn(page),
+]
+
+/** La fiche revenue à sa carte : panneau retiré, défilement rendu, la carte montrée et focalisée. */
+async function expectLanded(page: Page, card: Locator) {
+  await expectClosed(page)
+  await expect(page.locator('html')).not.toHaveAttribute('data-project-open')
+  await expect(card.locator('.card-photo')).toHaveCSS('opacity', '1')
+  await expect(card).toBeFocused()
 }
 
 /**
@@ -201,14 +261,14 @@ const TILTS: [string, { flat: Gesture; tilt: Gesture; open: Gesture }][] = [
         await toCorner(page, card)
         await away(page, card)
         await freezeAnimations(page)
-        await page.locator(`.card[href="${FIRST_PATH}"]`).evaluate((cell) => {
+        await cardAt(page, FIRST_PATH).evaluate((cell) => {
           const layer = cell.querySelector('.card-tilt')
           for (const animation of cell.getAnimations({ subtree: true })) {
             if ((animation.effect as KeyframeEffect).target !== layer) animation.finish()
           }
         })
       },
-      open: (page) => page.locator(`.card[href="${FIRST_PATH}"]`).press('Enter'),
+      open: (page) => cardAt(page, FIRST_PATH).press('Enter'),
     },
   ],
 ]
@@ -220,7 +280,7 @@ for (const [state, { flat, tilt, open }] of TILTS) {
   }) => {
     test.skip(isMobile, 'l’inclinaison suit une souris')
     await openEnteredTable(page, PROJECTS)
-    const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+    const card = cardAt(page, FIRST_PATH)
     const cell = await boxOf(card)
     await flat(page, cell)
     await settle(page)
@@ -265,7 +325,7 @@ test('la carte se cache d’un coup, sauf son trombone, qui monte de 14 px en s�
 }) => {
   await openEnteredTable(page, PROJECTS)
   const { open, content, fast } = await motion(page)
-  const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+  const card = cardAt(page, FIRST_PATH)
   await freezeAnimations(page)
 
   await card.dispatchEvent('click', { detail: 0 })
@@ -274,8 +334,8 @@ test('la carte se cache d’un coup, sauf son trombone, qui monte de 14 px en s�
   for (const part of ['.card-photo', '.card-postit', '.card-band']) {
     await expect(card.locator(part)).toHaveCSS('opacity', '0')
   }
-  await expect(card.locator('.card-face')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
-  await expect(card.locator('.card-face')).toHaveCSS('box-shadow', 'none')
+  await expect(face(card)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(face(card)).toHaveCSS('box-shadow', 'none')
   const transitions = await card.evaluate((cell) =>
     ['.card-clip', '.card-pose'].flatMap((layer) =>
       cell
@@ -352,7 +412,7 @@ test('fermée depuis sa deuxième image, la galerie revient d’un coup à la pr
   await openEnteredTable(page, [
     ficheProject({ ...ONGOING, gallery: [buildImage('fiche', 'Une'), buildImage('fiche', 'Deux')] }),
   ])
-  await openProject(page.locator('.card[href="/projets/fiche"]'))
+  await openProject(cardAt(page, '/projets/fiche'))
   await nextImage(page).click()
   await settle(page)
   await freezeAnimations(page)
@@ -564,31 +624,19 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
   })
 }
 
-/**
- * Page figée, achève les animations de la page : le contenu de la fiche, effacé, laisse partir le
- * retour à la carte, qui reste à son premier instant.
- */
-async function finishAnimations(page: Page) {
-  await page.evaluate(() => {
-    for (const animation of document.getAnimations()) {
-      if (animation.constructor === Animation) animation.finish()
-    }
-  })
-}
-
 test('à la fermeture, le contenu s’efface en `--dur-fast`, puis la feuille, la photo, le post-it et les rubans repartent vers la carte en `--dur-open`, et la couche noir et blanc revient', async ({
   page,
 }) => {
   await openEnteredTable(page, PROJECTS)
   const { open, fast, ribbon, easing } = await motion(page)
-  await openProject(page.locator(`.card[href="${FIRST_PATH}"]`))
+  await openProject(cardAt(page, FIRST_PATH))
   const panelBox = await boxOf(panel(page))
   const [paper] = await resolveAll(page, [['background-color', 'var(--paper)']])
   await freezeAnimations(page)
 
   await page.keyboard.press('Escape')
 
-  for (const element of [closeButton(page), panel(page).locator('.project-gallery-bar'), readingColumn(page)]) {
+  for (const element of contentSample(page)) {
     const fade = await element.evaluate((node) => {
       const [animation] = node.getAnimations().filter((candidate) => candidate.constructor === Animation)
       return {
@@ -624,7 +672,7 @@ test('à la fermeture, les autres cartes reviennent à leur place en réapparais
   await openEnteredTable(page, PROJECT_SETS.twelveWithShowcase)
   const { open, easing } = await motion(page)
   const path = (await cards(page).nth(2).getAttribute('href'))!
-  await openProject(page.locator(`.card[href="${path}"]`))
+  await openProject(cardAt(page, path))
   await freezeAnimations(page)
 
   await page.keyboard.press('Escape')
@@ -686,13 +734,13 @@ test('au bout du retour, jusqu’au retrait du panneau, la feuille, la photo, le
   page,
 }) => {
   await openEnteredTable(page, PROJECTS)
-  await openProject(page.locator(`.card[href="${FIRST_PATH}"]`))
+  await openProject(cardAt(page, FIRST_PATH))
   await freezeAnimations(page)
 
   await page.keyboard.press('Escape')
   await finishAnimations(page)
 
-  for (const element of [closeButton(page), panel(page).locator('.project-gallery-bar'), readingColumn(page)]) {
+  for (const element of contentSample(page)) {
     await expect(element).toHaveCSS('opacity', '0')
   }
   const held = await page.evaluate(readFlights, { path: FIRST_PATH, finish: true })
@@ -705,7 +753,7 @@ test('tant que la fiche est ouverte, les autres cartes restent effacées, et rec
 }) => {
   await openEnteredTable(page, PROJECT_SETS.twelveWithShowcase)
   const path = (await cards(page).nth(2).getAttribute('href'))!
-  await openProject(page.locator(`.card[href="${path}"]`))
+  await openProject(cardAt(page, path))
 
   const others = await page.evaluate(readEntries, path)
 
@@ -723,7 +771,7 @@ for (const [name, close] of CLOSINGS) {
   }) => {
     test.skip(isMobile && name === OUTSIDE, NO_OUTSIDE)
     await openEnteredTable(page, PROJECTS)
-    const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+    const card = cardAt(page, FIRST_PATH)
     await openProject(card)
     const animations = await watchAnimations(page)
     const resume = await freezeAnimations(page)
@@ -736,20 +784,10 @@ for (const [name, close] of CLOSINGS) {
 
     await resume()
 
-    await expectClosed(page)
+    await expectLanded(page, card)
     await expect(page.locator('.project-sheet')).toHaveCount(0)
-    await expect(page.locator('html')).not.toHaveAttribute('data-project-open')
-    await expect(card.locator('.card-photo')).toHaveCSS('opacity', '1')
-    await expect(card).toBeFocused()
     expect(await animations()).toEqual([])
   })
-}
-
-/** Dans la page : annule les animations de la Web Animations API, comme un tiers qui les retire. */
-function cancelAnimations() {
-  for (const animation of document.getAnimations()) {
-    if (animation.constructor === Animation) animation.cancel()
-  }
 }
 
 /**
@@ -786,7 +824,7 @@ test('une animation annulée pendant le vol : la fiche se pose quand même, « F
 for (const [moment, reach] of CANCELLATIONS) {
   test(`une animation annulée ${moment} : la fermeture va à son terme`, async ({ page }) => {
     await openEnteredTable(page, PROJECTS)
-    const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+    const card = cardAt(page, FIRST_PATH)
     await openProject(card)
     const resume = await freezeAnimations(page)
 
@@ -795,18 +833,8 @@ for (const [moment, reach] of CANCELLATIONS) {
     await page.evaluate(cancelAnimations)
     await resume()
 
-    await expectClosed(page)
-    await expect(page.locator('html')).not.toHaveAttribute('data-project-open')
-    await expect(card.locator('.card-photo')).toHaveCSS('opacity', '1')
-    await expect(card).toBeFocused()
+    await expectLanded(page, card)
   })
-}
-
-/** Dans la page : place chaque animation de la Web Animations API à `time` ms de son début. */
-function seekAnimations(time: number) {
-  for (const animation of document.getAnimations()) {
-    if (animation.constructor === Animation) animation.currentTime = time
-  }
 }
 
 /** Les fermetures possibles en plein vol : le bouton n'y réagit pas encore. */
@@ -820,7 +848,7 @@ for (const [name, close] of INTERRUPTIONS) {
     test.skip(isMobile && name === OUTSIDE, NO_OUTSIDE)
     await openEnteredTable(page, PROJECTS)
     const { open, easing } = await motion(page)
-    const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+    const card = cardAt(page, FIRST_PATH)
     const resume = await openFrozen(page, FIRST_PATH)
     await page.evaluate(seekAnimations, open / 2)
     const flying = await page.evaluate(readFlights, { path: FIRST_PATH })
@@ -849,16 +877,13 @@ for (const [name, close] of INTERRUPTIONS) {
       expect(flight).toMatchObject({ duration: open, easing })
     }
     expect(await page.evaluate(readEntries, FIRST_PATH)).toEqual(receding)
-    for (const element of [closeButton(page), panel(page).locator('.project-gallery-bar'), readingColumn(page)]) {
+    for (const element of contentSample(page)) {
       await expect(element).toHaveCSS('opacity', '0')
     }
 
     await resume()
 
-    await expectClosed(page)
-    await expect(page.locator('html')).not.toHaveAttribute('data-project-open')
-    await expect(card.locator('.card-photo')).toHaveCSS('opacity', '1')
-    await expect(card).toBeFocused()
+    await expectLanded(page, card)
   })
 }
 
@@ -877,9 +902,9 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
   }) => {
     await page.emulateMedia({ reducedMotion })
     await openEnteredTable(page, PROJECTS)
-    const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+    const card = cardAt(page, FIRST_PATH)
     const otherPath = (await cards(page).nth(1).getAttribute('href'))!
-    const other = page.locator(`.card[href="${otherPath}"]`)
+    const other = cardAt(page, otherPath)
     await openProject(card)
     const resume = await freezeAnimations(page)
 
@@ -903,7 +928,7 @@ test('« suivant » de l’historique pendant le retour : la fiche se rouvre une
 }) => {
   await openEnteredTable(page, PROJECTS)
   const [paper] = await resolveAll(page, [['background-color', 'var(--paper)']])
-  await openProject(page.locator(`.card[href="${FIRST_PATH}"]`))
+  await openProject(cardAt(page, FIRST_PATH))
   const resume = await freezeAnimations(page)
   await page.keyboard.press('Escape')
   await expect(page).toHaveURL('/')
@@ -925,7 +950,7 @@ test('« suivant » puis « précédent » pendant le retour : un seul retour, q
   page,
 }) => {
   await openEnteredTable(page, PROJECTS)
-  const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+  const card = cardAt(page, FIRST_PATH)
   await openProject(card)
   const resume = await freezeAnimations(page)
   await page.keyboard.press('Escape')
@@ -949,7 +974,7 @@ test('un clic hors du panneau sur une autre carte ramène la fiche à la sienne,
 }) => {
   test.skip(isMobile, NO_OUTSIDE)
   await openEnteredTable(page, PROJECT_SETS.twelveWithShowcase)
-  const card = page.locator(`.card[href="${await cards(page).nth(2).getAttribute('href')}"]`)
+  const card = cardAt(page, (await cards(page).nth(2).getAttribute('href'))!)
   await openProject(card)
 
   await clickOutsideOverCard(page)
@@ -962,7 +987,7 @@ test('un clic hors du panneau sur une autre carte ramène la fiche à la sienne,
 
 test('sa carte d’origine sortie du document, la fiche se ferme par le fondu de sortie', async ({ page }) => {
   await openEnteredTable(page, PROJECTS)
-  const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+  const card = cardAt(page, FIRST_PATH)
   await openProject(card)
   await card.evaluate((cell) => cell.remove())
   const animations = await watchAnimations(page)
@@ -1044,7 +1069,7 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
   }) => {
     await openEnteredTable(page, PROJECTS)
     const { fast, reduced } = await motion(page)
-    const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+    const card = cardAt(page, FIRST_PATH)
     await openProject(card)
     const resume = await freezeAnimations(page)
 
@@ -1083,7 +1108,7 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
   }) => {
     await openEnteredTable(page, PROJECTS)
     const { fast, reduced } = await motion(page)
-    const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+    const card = cardAt(page, FIRST_PATH)
     const resume = await openFrozen(page, FIRST_PATH)
     await page.evaluate(seekAnimations, fast / 2)
     const appearing = await panel(page).evaluate((element) => getComputedStyle(element).opacity)
@@ -1107,7 +1132,7 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
     page,
   }) => {
     await openEnteredTable(page, PROJECTS)
-    await openProject(page.locator(`.card[href="${FIRST_PATH}"]`))
+    await openProject(cardAt(page, FIRST_PATH))
     await freezeAnimations(page)
 
     await page.keyboard.press('Escape')
