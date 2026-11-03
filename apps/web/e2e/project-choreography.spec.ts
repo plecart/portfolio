@@ -895,8 +895,8 @@ test('sa carte d’origine sortie du document, la fiche se ferme par le fondu de
 })
 
 /**
- * Dans la page : les animations de la Web Animations API, par la classe de leur cible, ce qu'elles
- * animent, leurs opacités, leur durée et leur fin.
+ * Dans la page : les animations de la Web Animations API, par la classe de leur cible et la carte
+ * qui la contient, s'il y en a une, ce qu'elles animent, leurs opacités, leur durée et leur fin.
  */
 function readFades() {
   const ignored = new Set(['offset', 'computedOffset', 'easing', 'composite'])
@@ -906,14 +906,23 @@ function readFades() {
     .map((animation) => {
       const effect = animation.effect as KeyframeEffect
       const keyframes = effect.getKeyframes()
+      const target = effect.target as Element
       return {
-        target: (effect.target as Element).className,
+        target: target.className,
+        card: target.closest('.card')?.getAttribute('href') ?? undefined,
         properties: [...new Set(keyframes.flatMap(Object.keys))].filter((key) => !ignored.has(key)),
         opacities: keyframes.map(({ opacity }) => opacity),
         duration: effect.getTiming().duration,
         end: effect.getComputedTiming().endTime,
       }
     })
+}
+
+/** Dans la page : l'opacité des deux couches de chaque carte qu'un fondu efface, l'entrée et la face. */
+function readCardOpacities() {
+  return [...document.querySelectorAll('.card')].map((cell) =>
+    ['.card-entry', '.card-face'].map((layer) => getComputedStyle(cell.querySelector(layer)!).opacity),
+  )
 }
 
 test.describe('en mouvement réduit (spec §6.3)', () => {
@@ -927,7 +936,8 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
     await openEnteredTable(page, PROJECT_SETS.twelveWithShowcase)
     const { fast, reduced } = await motion(page)
     const entered = await page.locator('.card[data-entered]').count()
-    const resume = await openFrozen(page, (await cards(page).nth(2).getAttribute('href'))!)
+    const opened = (await cards(page).nth(2).getAttribute('href'))!
+    const resume = await openFrozen(page, opened)
 
     const fades = await page.evaluate(readFades)
 
@@ -935,9 +945,13 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
     expect(fades.filter(({ target }) => target === 'project-panel')).toEqual([
       { target: 'project-panel', properties: ['opacity'], opacities: ['0', '1'], duration: fast, end: reduced },
     ])
-    const cardFades = fades.filter(({ target }) => target === 'card-entry')
+    // La carte ouverte, par sa face (§6.3) ; les autres, entières.
+    const cardFades = fades.filter(({ card }) => card)
     expect(cardFades).toHaveLength(entered)
-    for (const fade of cardFades) expect(fade).toMatchObject({ opacities: ['1', '0'], duration: fast })
+    for (const fade of cardFades) {
+      const target = fade.card === opened ? 'card-face' : 'card-entry'
+      expect(fade).toMatchObject({ target, opacities: ['1', '0'], duration: fast })
+    }
     await expect(page.locator('.project-sheet')).toBeHidden()
     await expect(panel(page)).toBeFocused()
 
@@ -957,7 +971,7 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
 
     await page.keyboard.press('Escape')
 
-    const content = (await page.evaluate(readFades)).filter(({ target }) => target !== 'card-entry')
+    const content = (await page.evaluate(readFades)).filter(({ card }) => !card)
     expect(content.length).toBeGreaterThan(2)
     for (const fade of content) {
       expect(fade).toMatchObject({ properties: ['opacity'], duration: reduced })
@@ -971,9 +985,12 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
     expect(others).toEqual([])
     expect(fiche).toMatchObject({ properties: ['opacity'], duration: reduced })
     expect(fiche.opacities.at(-1)).toBe('0')
-    const returns = fades.filter(({ target }) => target === 'card-entry')
+    const returns = fades.filter(({ card }) => card)
     expect(returns).toHaveLength(PROJECTS.length)
-    for (const fade of returns) expect(fade).toMatchObject({ opacities: ['0', '1'], duration: fast })
+    for (const fade of returns) {
+      const target = fade.card === FIRST_PATH ? 'card-face' : 'card-entry'
+      expect(fade).toMatchObject({ target, opacities: ['0', '1'], duration: fast })
+    }
 
     await resume()
 
@@ -991,7 +1008,7 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
     const resume = await openFrozen(page, FIRST_PATH)
     await page.evaluate(seekAnimations, fast / 2)
     const appearing = await panel(page).evaluate((element) => getComputedStyle(element).opacity)
-    const fading = await page.evaluate(readEntries, '')
+    const fading = await page.evaluate(readCardOpacities)
 
     await page.keyboard.press('Escape')
 
@@ -999,7 +1016,7 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
     expect(fiche).toEqual([
       { target: 'project-panel', properties: ['opacity'], opacities: [appearing, '0'], duration: reduced, end: reduced },
     ])
-    expect(await page.evaluate(readEntries, '')).toEqual(fading)
+    expect(await page.evaluate(readCardOpacities)).toEqual(fading)
 
     await resume()
 
