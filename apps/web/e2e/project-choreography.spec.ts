@@ -825,9 +825,20 @@ for (const [name, close] of INTERRUPTIONS) {
     await page.evaluate(seekAnimations, open / 2)
     const flying = await page.evaluate(readFlights, { path: FIRST_PATH })
     const receding = await page.evaluate(readEntries, FIRST_PATH)
+    const frame = panel(page).locator('.project-gallery-frame')
+    const greyShown = await frame
+      .locator('.card-photo-grey')
+      .evaluate((layer) => Number(getComputedStyle(layer).opacity))
 
     await close(page)
 
+    // La pose n'arrive plus : le panneau reste transparent, le focus loin de « Fermer la fiche ».
+    await expect(panel(page)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+    await expect(closeButton(page)).not.toBeFocused()
+    const [from, to] = (await frame.evaluate(readGreyLayer)).opacities
+    expect(greyShown).toBeGreaterThan(0)
+    expect(from).toBeCloseTo(greyShown, 3)
+    expect(to).toBe(1)
     const returning = await page.evaluate(readFlights, { path: FIRST_PATH })
     expect(returning).toHaveLength(flying.length)
     for (const [index, flight] of returning.entries()) {
