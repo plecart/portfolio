@@ -1086,8 +1086,11 @@ se voient dans aucun compte rendu.
 **La ligne de comparaison au cycle précédent porte l'attente hors absences** → [references/cloture.md](references/cloture.md), « La ligne de comparaison au cycle précédent porte l'attente hors absences ».
 
 La PR et la conversation qui l'a résolue ont pu acter des décisions, déplacer un contrat d'interface, déjà faire une partie d'un autre lot, ou rendre une
-hypothèse caduque ailleurs. **La passe est due si la PR porte `Closes #N`, touche un fichier de la
-section « Sources de vérité », ou a rangé un résidu au barreau 2 en cours de cycle** ; sinon —
+hypothèse caduque ailleurs. **La passe est due si la PR porte `Closes #N`, ou `En vol pour #N` vers
+`main` — un lot léger intermédiaire —, touche un fichier de la section « Sources de vérité », ou a
+rangé un résidu au barreau 2 en cours de cycle** : un lot léger intermédiaire peut déplacer un
+contrat dont dépend une autre issue ouverte, et son issue, en vol, ne s'édite pas
+(`repercussions`, étape 5, « Issues en vol → signaler sur la PR, ne rien éditer ») ; sinon —
 demande directe sans issue —, un `grep` des ancres du diff sur `docs/` et sur les issues ouvertes
 (`gh issue list --search <ancre>`) par la session, et une ligne dans le body. Quand elle est due,
 **immédiatement après le merge**, la session PR lance le skill `repercussions` — elle tient le

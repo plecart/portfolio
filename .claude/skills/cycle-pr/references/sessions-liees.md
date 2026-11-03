@@ -187,8 +187,15 @@ Archiver un enfant attend l'accord du mainteneur — consignes de l'application 
 le 2026-10-18 : « you may offer to archive them (only on the user's yes) ». Archiver un enfant
 (`archive_session`, réversible) détache son HEAD et ne retire ni le worktree,
 ni le dossier, ni les branches (mesuré le 2026-10-16, relevé à 5 s et à 30 s, puis le 2026-10-18),
-quoi qu'en dise la description de l'outil, lue le même jour (« cleans up its worktree »). Il
-arrête en revanche ce qui tenait le dossier : archivé, l'enfant laisse `git worktree remove`
+quoi qu'en dise la description de l'outil, lue le même jour (« cleans up its worktree »).
+Cette mesure porte sur un enfant **avec** son worktree : l'archivage d'une session **sans**
+worktree propre (`use_worktree: false`) ne détache pas la tête du dossier qu'elle partage — mesuré
+le 2026-11-03 sur une session jetable (`local_130da77a`) démarrée dans le worktree de la session PR
+de #198, arbre propre, tête `3bd49c9` : `git symbolic-ref -q HEAD` a rendu
+`refs/heads/chore/conforts-pipeline`, sortie 0, à 15:11:55Z et 15:12:19Z avant `archive_session`,
+puis à 15:12:28Z et 15:13:45Z après ; l'arbre est resté propre et le worktree listé par
+`git worktree list`. L'archivage arrête en revanche ce qui tenait le dossier : archivé, l'enfant
+laisse `git worktree remove`
 aboutir ; non archivé, le retrait échoue sur la racine (mesuré le 2026-10-18, obs 42). La session
 qui l'a démarré nettoie après lui : `git worktree remove <chemin>`, puis l'échafaudage derrière sa
 porte

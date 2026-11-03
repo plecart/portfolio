@@ -58,7 +58,8 @@ trois phrases par issue de l'étape 2. `n` donné → `n` issues ; sans argument
 un degré et le motive : domaines disjoints, chemin critique, temps du mainteneur, chaque
 interrogatoire se menant dans sa fenêtre. Les issues déjà prêtes y entrent sans session. Rien ne
 s'ouvre avant l'accord : la question nomme les sessions que l'accord démarrera, et demande l'accord
-d'archiver, une fois vérifiée, la session d'une issue `bug` (ci-dessous).
+d'archiver chacune une fois son issue vérifiée — session de tri comme session d'une issue `bug`
+(ci-dessous).
 
 **Démarrer les sessions**, dans le tour de l'accord et dans celui-là seulement (étape 3, même
 raison) : le lead se nomme d'abord `vague-<k>` (`set_session_title` sur `"self"`, `<k>` lu comme
@@ -97,16 +98,23 @@ lecture. » par : « Ni branche ni commit, dans ton propre worktree. Premier ges
 à 5 de `pr-paralleles` étape 3, « Provisionner son worktree » ; la reproduction de `triage`
 (étape 3) se joue ici. » Le geste détache la tête sur le trunk sans créer de branche (mesuré le
 2026-10-19 sur un worktree jetable, git 2.47.1 : sortie 0, `HEAD` égal à `origin/main`,
-`git symbolic-ref -q HEAD` en 1). C'est la seule session de l'étape qui s'archive, sur l'accord de
-la proposition, puis se nettoie comme à l'étape 8 (liens, worktree, échafaudage).
+`git symbolic-ref -q HEAD` en 1). Elle s'archive sur l'accord de la proposition, comme une session
+de tri, puis se nettoie comme à l'étape 8 (liens, worktree, échafaudage).
 
 **Fin — un message, puis GitHub.** Le message réveille le lead ; il ne prouve rien seul (#107,
 bloc « Lot 4/4 »). Pour chaque issue, `gh issue view <N> --json labels` porte `ready-for-agent` et
 `gh issue view <N> --comments` un `## Brief d'agent` ; une issue qui n'y est pas sort de la vague,
 dite au mainteneur, comme celle dont la session envoie un « bloquant » ; une session muette suit
-l'étape 7, « Session disparue ». Ne pas archiver une
-session sans worktree : l'archivage détache la tête du dossier de la session (`sessions-liees.md`,
-« Nettoyage ») — ici celui du lead, non mesuré sur une session sans worktree. Chaque message reçu et
+l'étape 7, « Session disparue ». **Une session de tri s'archive dès que le lead a vérifié son issue
+sur GitHub**, sur l'accord demandé à la proposition, comme la session d'une issue `bug`, et garde
+`use_worktree: false` : l'archivage d'une session sans worktree ne détache pas la tête du dossier
+qu'elle partage, ici celui du lead (mesuré le 2026-11-03, `sessions-liees.md`, « Nettoyage »).
+Archiver le lead de préparation archive avec lui ses sessions de tri, qui partagent son worktree
+(description d'`archive_session`, lue le 2026-11-03 : « Archiving a session also archives its side
+sessions that share its worktree or have finished » ; relevé le même jour vers 15:15 UTC par
+`get_session` : les trois sessions de tri de la préparation de la vague 3, `local_9cc0a634`,
+`local_08600026` et `local_04a2a910`, rendaient `isArchived: true`, archivées avec leur lead) :
+la règle vaut tant que le lead de préparation vit. Chaque message reçu et
 vérifié, la préparation **se termine** : préparer la vague et la conduire sont deux sessions (#134,
 D-10). Elle rend au mainteneur la liste des issues vérifiées, plus celles déjà prêtes de la
 proposition, et propose une carte « démarrer la vague » — `start_session`,

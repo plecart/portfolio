@@ -19,8 +19,8 @@ et leurs renvois de position (« ci-dessous », « plus bas ») depuis l'emplace
    chaque frontière de bloc puis à la fin, jamais par commit, par **une seule session de relecture pour toute la PR**, démarrée au go et réveillée par message, dans son propre
    worktree, avec une passe de plus tant que la dernière trouve un bloquant ou un important. Elle ne se nettoie qu'à
    la fermeture de la boucle : plus tôt, la relance n'a plus de destinataire.
-5. La PR n'est **terminée qu'après la passe `repercussions`**, quand elle ferme une issue ou
-   touche une source de vérité : une clôture peut bouleverser les
+5. La PR n'est **terminée qu'après la passe `repercussions`**, quand elle est due (`cycle-pr`
+   Étape 8) : un merge peut bouleverser les
    autres issues — la session PR le vérifie tant qu'elle tient le brief, les Notes et les constats.
 
 ## Le contrat d'ecriture-relue.py
@@ -85,7 +85,8 @@ intermédiaire, écrire le prompt du lot suivant depuis
 [references/prompt-lot-suivant.md](references/prompt-lot-suivant.md), au chemin fixe de
 [references/sessions-liees.md](references/sessions-liees.md) (« Passation »), et le remettre par ce
 chemin, dans le message de fin. En lot léger, le défaut (`.claude/rules/taille-pr.md`, point 4),
-ou en repli, **après** la passe `repercussions` quand elle est due, au **mainteneur**, qui démarre
+ou en repli, **après** la passe `repercussions` quand elle est due — toujours sur un lot léger,
+qui porte `En vol pour #N` vers `main` (`cycle-pr` Étape 8) —, au **mainteneur**, qui démarre
 la session neuve par la carte que la session sortante lui propose (`cycle-pr` 3.5) et lui donne le
 prompt. Sous une coordinatrice, **à la coordinatrice**, qui ouvre la session du lot suivant sur ce
 pointeur — une session de lot coordonné l'écrit sans passe `repercussions`, qui tourne au merge de
