@@ -117,7 +117,7 @@ non prévu pour elle **s'éprouve en exécutant réellement l'outil**, pas en re
 ## Le rouge se constate, il ne se suppose pas
 
 **Le rouge se constate, il ne se suppose pas — un test qui n'a pas été vu rouge n'est pas un
-test.** Sept cas à traiter explicitement :
+test.** Huit cas à traiter explicitement :
 
 - **Le test passe du premier coup, avant tout changement de production** → il mesure autre chose ;
   ne jamais conclure « le défaut n'existe pas ». Cas fréquent : lire une configuration statique
@@ -162,6 +162,14 @@ test.** Sept cas à traiter explicitement :
   dans l'orthographe réelle ; l'égalité entre la table et la constante est un **second** test, qui
   garde l'autre sens. Mesuré au lot 3 de #77 : la mutation « préfixe retiré » est restée `VERT`
   après un correctif qui construisait ses cas depuis le tuple du script (obs 80).
+- **La garde cite une phrase de règle** (une table d'épingles sur une prose normative) → l'ancre
+  couvre chaque **moitié restrictive** de l'énoncé — « jamais », « seule », « seulement », « ne …
+  pas », « reste à » — et chaque élément qu'un commentaire dénombre : une ancre posée sur la moitié
+  qui fait laisse retirer en vert celle qui interdit (obs 126). La mutation se joue sur la moitié
+  restrictive, jamais sur la phrase entière, qu'une absence rend rouge quel que soit l'ancrage. La
+  population de la table se recompte à chaque exécution par ses passages déclarés, jamais par un
+  chiffre en commentaire (obs 127 ; registre `PASSAGES_DECLARES` de
+  `apps/api/tests/test_agent_skills.py`).
 
 ## Contrôles complémentaires de 3.2
 

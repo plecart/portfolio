@@ -8548,6 +8548,36 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
         CLOTURE_REF,
         "toujours sur un lot léger, qui porte `En vol pour #N` vers `main` (`cycle-pr` Étape 8)",
     ),
+    # E2 : la garde qui cite une phrase de règle (obs 126) et le compte écrit en commentaire
+    # (obs 127).
+    "tests-huit-cas": (TESTS_REF, "Huit cas à traiter explicitement"),
+    "tests-l-ancre-couvre-la-moitie-restrictive": (
+        TESTS_REF,
+        "l'ancre couvre chaque **moitié restrictive** de l'énoncé",
+    ),
+    "tests-les-moities-restrictives": (
+        TESTS_REF,
+        "« jamais », « seule », « seulement », « ne … pas », « reste à »",
+    ),
+    "tests-chaque-element-denombre": (TESTS_REF, "et chaque élément qu'un commentaire dénombre"),
+    "tests-mutation-jamais-sur-la-phrase-entiere": (
+        TESTS_REF,
+        "La mutation se joue sur la moitié restrictive, jamais sur la phrase entière",
+    ),
+    "tests-population-jamais-par-un-chiffre-en-commentaire": (
+        TESTS_REF,
+        (
+            "se recompte à chaque exécution par ses passages déclarés, jamais par un chiffre en"
+            " commentaire"
+        ),
+    ),
+    "cleanup-compte-en-commentaire-non-verifie": (
+        CLEANUP_VERBATIM_RULE,
+        (
+            "est une affirmation sans commande : « non vérifiée » tant qu'un test ne le recompte"
+            " pas à chaque exécution"
+        ),
+    ),
 }
 
 
@@ -8603,7 +8633,8 @@ def test_chaque_morceau_d_un_passage_declare_tient_une_ancre(table: str) -> None
     table sur ce fichier, ou une ancre empruntée — ou figure parmi les exemptions du passage : un
     énoncé ajouté sans ancre rougit, une exemption périmée aussi. **Borne** : un morceau tenu en
     partie n'est gardé que sur son ancre, le reste peut changer en vert ; c'est pourquoi une ancre
-    couvre la moitié restrictive de son morceau (obs 126)."""
+    couvre la moitié restrictive de son morceau (`cycle-pr/references/tests.md`, « Le rouge se
+    constate, il ne se suppose pas », obs 126)."""
     invariants: dict[str, tuple[str, str]] = globals()[table]
     ecarts: list[str] = []
     for passage in PASSAGES_DECLARES[table]:
