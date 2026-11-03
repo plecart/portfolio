@@ -18,8 +18,8 @@ from django.test import Client, override_settings
 from process_environment import VALID_ENVIRONMENT
 from pydantic import PostgresDsn, TypeAdapter
 
-# Ce module se charge aussi sans réglages (`test_sans_reglages_chaque_test_echoue`), et un modèle
-# ne s'importe qu'avec eux : les fixtures qui en demandent un l'importent elles-mêmes.
+# Ce module se charge aussi sans réglages — chaque test échoue alors par `require_settings` —, et un
+# modèle ne s'importe qu'avec eux : les fixtures qui en demandent un l'importent elles-mêmes.
 if TYPE_CHECKING:
     from django.contrib.auth.models import User
 
