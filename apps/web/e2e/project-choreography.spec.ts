@@ -427,6 +427,50 @@ test('pendant le vol, ni une cellule de la table ni sa grille ne se transforment
   expect(transformed).toBe(0)
 })
 
+/**
+ * Dans la page : les ancêtres du panneau, lui compris, qui portent une transformation, et la place
+ * du bouton Fermer, sa propre montée de 8 px retirée (spec §4.6).
+ */
+function readClosePlace() {
+  const transformed: string[] = []
+  let node: Element | null = document.querySelector('.project-panel')
+  for (; node; node = node.parentElement) {
+    const { transform, translate, scale, rotate } = getComputedStyle(node)
+    if ([transform, translate, scale, rotate].some((value) => value !== 'none')) {
+      transformed.push(node.tagName)
+    }
+  }
+  const button = document.querySelector('.project-close')!
+  const rise = getComputedStyle(button).translate.split(' ')
+  const [x = 0, y = 0] = rise.map((value) => parseFloat(value) || 0)
+  const { left, top, width, height } = button.getBoundingClientRect()
+  return { transformed, place: { left: left - x, top: top - y, width, height } }
+}
+
+test('sous 600 px, pendant le vol, ni le panneau ni ses ancêtres ne se transforment : le bouton Fermer reste à sa place', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, 'le bouton Fermer est fixe sous 600 px')
+  await openEnteredTable(page, PROJECTS)
+  const { open } = await motion(page)
+  const resume = await openFrozen(page, FIRST_PATH)
+  const instants = []
+
+  for (const time of [0, open / 4, open / 2, (open * 3) / 4]) {
+    await page.evaluate(seekAnimations, time)
+    instants.push(await page.evaluate(readClosePlace))
+  }
+  await resume()
+  await settle(page)
+  const posed = await page.evaluate(readClosePlace)
+
+  for (const { transformed, place } of instants) {
+    expect(transformed).toEqual([])
+    expectSameBox(place, posed.place)
+  }
+})
+
 test('de l’ouverture à la fin du retour, la mesure des liens de l’auteur n’est pas relue, et, relue de force, rend la même forme', async ({
   page,
   isMobile,
