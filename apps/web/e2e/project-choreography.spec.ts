@@ -160,6 +160,82 @@ test('la feuille, la photo, le post-it et les rubans partent de leur homologue s
   expectSameBox(flights[0].end, panelBox)
 })
 
+/** Un geste du scénario sur la page, à partir de la boîte d'une carte. */
+type Gesture = (page: Page, card: Box) => Promise<unknown>
+
+/** Le pointeur sur un coin de la carte : l'inclinaison y est la plus forte (spec §4.1). */
+const toCorner: Gesture = (page, card) =>
+  page.mouse.move(card.left + card.width * 0.9, card.top + card.height * 0.1)
+
+/** Le pointeur hors de la table. */
+const away: Gesture = (page) => page.mouse.move(1, 1)
+
+/**
+ * Une carte encore inclinée par le pointeur au décollage (`useCardTilt`), dans ses deux états
+ * dénombrés dans la source le 2026-11-03 : écrite sous le pointeur (`follow`), ou qui revient en
+ * `--dur` après sa sortie (`settle`). Chaque cas place le pointeur pour la mesure à plat, incline
+ * la carte, page figée, puis l'ouvre.
+ */
+const TILTS: [string, { flat: Gesture; tilt: Gesture; open: Gesture }][] = [
+  [
+    'sous le pointeur',
+    {
+      flat: (page, card) => page.mouse.move(card.left + card.width / 2, card.top + card.height / 2),
+      tilt: toCorner,
+      open: async (page) => {
+        await page.mouse.down()
+        await page.mouse.up()
+      },
+    },
+  ],
+  [
+    'qui revient, le pointeur sorti',
+    {
+      flat: away,
+      // Le soulèvement et la pose reviennent avec elle, mais la feuille et la photo ensemble : ils
+      // finissent d'abord, et seule l'inclinaison reste en route.
+      tilt: async (page, card) => {
+        await toCorner(page, card)
+        await away(page, card)
+        await freezeAnimations(page)
+        await page.locator(`.card[href="${FIRST_PATH}"]`).evaluate((cell) => {
+          const layer = cell.querySelector('.card-tilt')
+          for (const animation of cell.getAnimations({ subtree: true })) {
+            if ((animation.effect as KeyframeEffect).target !== layer) animation.finish()
+          }
+        })
+      },
+      open: (page) => page.locator(`.card[href="${FIRST_PATH}"]`).press('Enter'),
+    },
+  ],
+]
+
+for (const [state, { flat, tilt, open }] of TILTS) {
+  test(`une carte inclinée ${state} : la photo et le post-it partent de leur homologue remis à plat`, async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'l’inclinaison suit une souris')
+    await openEnteredTable(page, PROJECTS)
+    const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+    const cell = await boxOf(card)
+    await flat(page, cell)
+    await settle(page)
+    const flatPhoto = await boxOf(card.locator('.card-photo'))
+    const flatPostit = await boxOf(card.locator('.card-postit'))
+    await tilt(page, cell)
+    await freezeAnimations(page)
+    await expect(card.locator('.card-tilt')).not.toHaveCSS('transform', 'none')
+
+    await open(page, cell)
+    await expect(panel(page)).toBeVisible()
+
+    const [, photo, postit] = await page.evaluate(readFlights, { path: FIRST_PATH })
+    expectSameBox(photo.start, flatPhoto)
+    expectSameBox(postit.start, flatPostit)
+  })
+}
+
 test('les rubans passent par 35 % d’opacité entre 30 % et 70 % du trajet', async ({ page }) => {
   await openEnteredTable(page, PROJECTS)
   await openFrozen(page, FIRST_PATH)
