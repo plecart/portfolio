@@ -65,8 +65,8 @@ type Motion = ReturnType<typeof readMotion>
 /** Un élément de la fiche qui vole : son homologue sur la carte, son retard, son creux d'opacité. */
 type Leg = { element: HTMLElement; homologue: Element; delay: number; dimmed: boolean }
 
-/** Une carte de la table : sa couche d'entrée, et son effacement, recul compris s'il y en a un. */
-type Move = { entry: HTMLElement; keyframes: Keyframe[] }
+/** Une carte de la table : la couche qui s'efface, et son effacement, recul compris s'il y en a un. */
+type Move = { layer: HTMLElement; keyframes: Keyframe[] }
 
 /**
  * Les temps de la fiche, qu'elle vole ou qu'elle se fonde ; les cartes de la table à part. Le retour
@@ -155,7 +155,7 @@ function fly(
  * §4.6) : celles de l'écran reculent à l'opposé de la carte ouverte en s'effaçant, celles hors de
  * l'écran s'effacent sans bouger. Le recul se pose sur la couche d'entrée, sous la cellule, que la
  * mesure des liens de l'auteur suit (`TABLE_CELL_SELECTOR`). En mouvement réduit (§6.3), toutes
- * s'effacent sans bouger, la carte ouverte comprise.
+ * s'effacent sans bouger, la carte ouverte comprise, par sa face.
  */
 function cardMoves(card: HTMLElement, reduced: boolean): Move[] {
   const opened = card.getBoundingClientRect()
@@ -171,7 +171,8 @@ function cardMoves(card: HTMLElement, reduced: boolean): Move[] {
               { opacity: 0, translate: `${x}px ${y}px` },
             ]
           : [SHOWN, HIDDEN]
-      return { entry: cell.querySelector<HTMLElement>('.card-entry')!, keyframes }
+      const layer = cell.querySelector<HTMLElement>(cell === card ? '.card-face' : '.card-entry')!
+      return { layer, keyframes }
     })
 }
 
@@ -183,8 +184,8 @@ const cardTiming = ({ reduced, open, fast, easing }: Motion) => ({
 
 /** Les cartes s'effacent, et le restent tant que la fiche est ouverte (spec §4.6, §6.3). */
 function recede(moves: Move[], motion: Motion) {
-  return moves.map(({ entry, keyframes }) =>
-    entry.animate(keyframes, { ...cardTiming(motion), fill: 'forwards' }),
+  return moves.map(({ layer, keyframes }) =>
+    layer.animate(keyframes, { ...cardTiming(motion), fill: 'forwards' }),
   )
 }
 
@@ -195,10 +196,10 @@ function recede(moves: Move[], motion: Motion) {
 function comeBack(moves: Move[], receding: Animation[], motion: Motion) {
   return relay(
     receding,
-    moves.map(({ entry, keyframes: [rest] }) => shown(entry, Object.keys(rest))),
+    moves.map(({ layer, keyframes: [rest] }) => shown(layer, Object.keys(rest))),
     (froms) =>
-      moves.map(({ entry, keyframes: [rest] }, index) =>
-        entry.animate([froms[index], rest], cardTiming(motion)),
+      moves.map(({ layer, keyframes: [rest] }, index) =>
+        layer.animate([froms[index], rest], cardTiming(motion)),
       ),
   )
 }
