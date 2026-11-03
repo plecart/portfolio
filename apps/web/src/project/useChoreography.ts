@@ -384,7 +384,7 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
    * réapparaît d'un coup sous la photo posée. Une carte sortie du document n'a plus de place où
    * revenir : la fiche se retire alors par le fondu de sortie.
    */
-  const land = async () => {
+  const comeHome = async () => {
     if (!card.isConnected) {
       abort()
       return
@@ -397,6 +397,10 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
     card.removeAttribute('data-origin')
     phase = 'gone'
   }
+
+  // Un seul retour, même demandé deux fois : l'adresse peut encore changer pendant qu'il vole.
+  let landing: Promise<void> | undefined
+  const land = () => (landing ??= comeHome())
 
   return { land, abort }
 }

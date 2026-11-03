@@ -45,7 +45,9 @@ export default function App() {
     document.title = project?.title ?? strings.siteName
   }, [project])
 
+  // Une ouverture n'est prise qu'une fois la fiche revenue à sa carte (décision de #22).
   const openFromCard = (next: string, card: HTMLElement) => {
+    if (origin) return
     setOrigin(card)
     open(next)
   }

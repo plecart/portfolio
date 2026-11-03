@@ -35,10 +35,11 @@ function focusCard(slug: string) {
  * Trois fermetures : le bouton, Échap et le retour du navigateur ; un clic hors du panneau n'en est
  * pas une. Ouverte depuis sa carte, elle en part et y revient (`useChoreography`, spec §4.6) : le
  * focus attend la pose sur le panneau, et la fiche reste ouverte pour Radix jusqu'à son retour,
- * quand le projet a déjà quitté l'adresse. Sinon, deux fondus, et le bouton, premier du panneau,
- * reçoit le focus de Radix à l'ouverture. Le dernier projet montré reste rendu jusqu'au retrait du
- * panneau ; une autre fiche ouverte pendant le fondu de sortie trouve le panneau encore monté : sa
- * galerie repart de la première image.
+ * quand le projet a déjà quitté l'adresse ; s'il y est revenu entre-temps, elle se rouvre alors par
+ * son fondu. Sinon, deux fondus, et le bouton, premier du panneau, reçoit le focus de Radix à
+ * l'ouverture. Le dernier projet montré reste rendu jusqu'au retrait du panneau ; une autre fiche
+ * ouverte pendant le fondu de sortie trouve le panneau encore monté : sa galerie repart de la
+ * première image.
  *
  * @param project Le projet à montrer ; `undefined`, fiche fermée.
  * @param origin La carte d'où la fiche s'ouvre, jusqu'à son retour ; `null` sans carte d'origine.
@@ -59,8 +60,14 @@ export function ProjectDialog({
   const [shown, setShown] = useState(project)
   if (project && project !== shown) setShown(project)
   const [panel, setPanel] = useState<HTMLDivElement | null>(null)
+  // Rouverte par l'adresse (« suivant ») pendant son retour, la fiche, revenue à sa carte, reprend un
+  // panneau neuf, qui entre par son fondu : celui du vol ne sert qu'à lui.
+  const [reopenings, setReopenings] = useState(0)
   const open = project !== undefined
-  useChoreography(panel, origin, open, onLanded)
+  useChoreography(panel, origin, open, () => {
+    if (open) setReopenings((count) => count + 1)
+    onLanded()
+  })
   if (!shown) return null
 
   return (
@@ -69,6 +76,7 @@ export function ProjectDialog({
     <Dialog open={open || origin !== null} onOpenChange={() => open && onClose()}>
       <DialogPortal>
         <DialogContent
+          key={reopenings}
           ref={setPanel}
           aria-modal="true"
           className="project-panel"
