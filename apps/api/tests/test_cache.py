@@ -33,6 +33,7 @@ from django.test import Client, override_settings
 from factories import gallery_image, project, saved, section, technology
 from ninja.errors import HttpError
 from pytest_django import DjangoAssertNumQueries, DjangoCaptureOnCommitCallbacks
+from redis.exceptions import RedisError
 from test_api import PROJECTS, complete_project, listed
 from test_tasks import Rollback, variant_files
 
@@ -421,19 +422,36 @@ def make_unreadable(image: GalleryImage) -> None:
 @pytest.fixture
 def pending_image() -> GalleryImage:
     """Une image en attente d'un projet publié, enregistrée hors de tout rappel exécuté : son
-    traitement n'est pas enfilé, et le test le lance lui-même."""
+    traitement n'est pas enfilé, et le test le lance lui-même (`process`)."""
     return saved(gallery_image(saved(project(published=True))))
+
+
+@pytest.fixture
+def process(
+    pending_image: GalleryImage,
+    django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
+) -> Callable[[], None]:
+    """Lance le traitement de `pending_image`, ses rappels après validation exécutés comme dans le
+    worker, qui n'ouvre aucune transaction : le test, lui, tourne dans une transaction que rien ne
+    valide, et une purge qui n'y partirait jamais ferait passer à vide un test où elle ne doit pas
+    partir."""
+
+    def run() -> None:
+        with django_capture_on_commit_callbacks(execute=True):
+            process_image.delay(pending_image.pk, pending_image.original.name or "")
+
+    return run
 
 
 @pytest.mark.django_db
 def test_la_liste_montre_l_image_prete_des_la_fin_de_son_traitement(
-    client: Client, pending_image: GalleryImage
+    client: Client, process: Callable[[], None]
 ) -> None:
     """L'écriture du worker échappe aux signaux (`QuerySet.update`) : la tâche vide le cache
     elle-même, sans attendre la durée de vie (décision 4)."""
     before = gallery_states(client)
 
-    process_image.delay(pending_image.pk, pending_image.original.name or "")
+    process()
 
     assert (before, gallery_states(client)) == (["pending"], ["ready"])
 
@@ -441,14 +459,14 @@ def test_la_liste_montre_l_image_prete_des_la_fin_de_son_traitement(
 @pytest.mark.django_db
 @pytest.mark.usefixtures("unpropagated")
 def test_la_liste_montre_l_image_en_echec_des_la_fin_de_son_traitement(
-    client: Client, pending_image: GalleryImage
+    client: Client, pending_image: GalleryImage, process: Callable[[], None]
 ) -> None:
     """Un original devenu illisible : réessais épuisés, l'image passe en échec, et la tâche vide
     le cache de même."""
     make_unreadable(pending_image)
     before = gallery_states(client)
 
-    process_image.delay(pending_image.pk, pending_image.original.name or "")
+    process()
 
     assert (before, gallery_states(client)) == (["pending"], ["failed"])
 
@@ -458,6 +476,7 @@ def test_la_liste_montre_l_image_en_echec_des_la_fin_de_son_traitement(
 @pytest.mark.parametrize(("unreadable", "state"), OUTCOMES.values(), ids=OUTCOMES.keys())
 def test_une_purge_qui_echoue_est_journalisee_sans_defaire_le_traitement(
     pending_image: GalleryImage,
+    process: Callable[[], None],
     caplog: pytest.LogCaptureFixture,
     unreadable: bool,
     state: ProcessingState,
@@ -465,8 +484,8 @@ def test_une_purge_qui_echoue_est_journalisee_sans_defaire_le_traitement(
     """Le vrai client sur une adresse injoignable, ses exceptions non ignorées : la purge lève
     après l'écriture de « prêt » comme d'« échec ». L'image garde l'état écrit, sans réessai qui
     la ferait passer de « prêt » à « échec », son dossier ne tient que les variantes qu'elle
-    nomme, et l'erreur est journalisée avec sa trace — `django-redis` ne journalise que celles
-    qu'il ignore."""
+    nomme, et l'erreur de Redis est journalisée une fois, avec sa trace — `django-redis` ne
+    journalise que celles qu'il ignore."""
     if unreadable:
         make_unreadable(pending_image)
     production = config.settings.CACHES["default"]
@@ -474,18 +493,21 @@ def test_une_purge_qui_echoue_est_journalisee_sans_defaire_le_traitement(
     raising = {**production, "OPTIONS": {**options, "IGNORE_EXCEPTIONS": False}}
 
     with override_settings(CACHES={"default": raising}):
-        process_image.delay(pending_image.pk, pending_image.original.name or "")
+        process()
 
     row = GalleryImage.objects.get(pk=pending_image.pk)
     named = sorted(variant["name"].rsplit("/", 1)[1] for variant in row.variants)
-    logged = [(r.levelno, bool(r.exc_info)) for r in caplog.records if r.name == "content.tasks"]
-    assert (row.state, variant_files(row), logged) == (state, named, [(logging.ERROR, True)])
+    logged = [
+        r.levelno for r in caplog.records if r.exc_info and isinstance(r.exc_info[1], RedisError)
+    ]
+    assert (row.state, variant_files(row), logged) == (state, named, [logging.ERROR])
 
 
 @pytest.mark.django_db
 def test_un_traitement_qui_n_ecrit_rien_ne_vide_pas_le_cache(
     client: Client,
     pending_image: GalleryImage,
+    process: Callable[[], None],
     monkeypatch: pytest.MonkeyPatch,
     django_assert_num_queries: DjangoAssertNumQueries,
 ) -> None:
@@ -498,7 +520,7 @@ def test_un_traitement_qui_n_ecrit_rien_ne_vide_pas_le_cache(
         return make_variants(storage, original_name)
 
     monkeypatch.setattr(tasks, "make_variants", replaced_meanwhile)
-    process_image.delay(pending_image.pk, pending_image.original.name or "")
+    process()
 
     with django_assert_num_queries(0):
         listed(client)
@@ -509,6 +531,7 @@ def test_un_traitement_qui_n_ecrit_rien_ne_vide_pas_le_cache(
 def test_un_echec_qui_n_ecrit_rien_ne_vide_pas_le_cache(
     client: Client,
     pending_image: GalleryImage,
+    process: Callable[[], None],
     monkeypatch: pytest.MonkeyPatch,
     django_assert_num_queries: DjangoAssertNumQueries,
 ) -> None:
@@ -524,7 +547,7 @@ def test_un_echec_qui_n_ecrit_rien_ne_vide_pas_le_cache(
         raise OSError("stockage injoignable")
 
     monkeypatch.setattr(tasks, "make_variants", failing)
-    process_image.delay(pending_image.pk, pending_image.original.name or "")
+    process()
 
     with django_assert_num_queries(0):
         listed(client)
