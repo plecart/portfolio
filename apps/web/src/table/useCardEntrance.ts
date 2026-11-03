@@ -18,7 +18,7 @@ const ENTRY_THRESHOLD = 0.15
  *
  * @param grid La grille de la table.
  * @param projects Les projets rendus : les cellules à observer changent avec eux.
- * @param paused L'entrée attend : la fiche est ouverte.
+ * @param paused L'entrée attend : la fiche est à l'écran, retour à sa carte compris.
  */
 export function useCardEntrance(
   grid: RefObject<HTMLElement | null>,

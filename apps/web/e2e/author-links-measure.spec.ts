@@ -6,7 +6,7 @@
  * une barre de défilement visible, dans `author-links-scrollbar.spec.ts`.
  */
 import { expect, test } from './api.ts'
-import { COLUMN_VIEWPORT, expectPlacement, placeCells } from './table.ts'
+import { COLUMN_VIEWPORT, countCellReads, expectPlacement, placeCells } from './table.ts'
 
 test.skip(({ isMobile }) => isMobile, 'largeurs de bureau : le projet desktop les porte')
 
@@ -149,17 +149,7 @@ test('la marge se relit quand un attribut de la grille déplace ses cellules', a
 })
 
 test("la pose d'une cellule, sur son élément enfant, ne relit pas la marge", async ({ page }) => {
-  // Compte les lectures de boîte des cellules : chacune force une mise en page.
-  await page.addInitScript(() => {
-    const read = Element.prototype.getBoundingClientRect
-    let cellReads = 0
-    Element.prototype.getBoundingClientRect = function (this: Element) {
-      if (this.matches('[data-table-cell]')) cellReads += 1
-      return read.call(this)
-    }
-    Object.defineProperty(window, 'cellReads', { get: () => cellReads })
-  })
-  const cellReads = () => page.evaluate(() => (window as unknown as { cellReads: number }).cellReads)
+  const cellReads = await countCellReads(page)
   await page.setViewportSize({ width: 1100, height: 800 })
   await page.goto('/')
   await placeCells(page, [360])

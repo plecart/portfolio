@@ -62,7 +62,7 @@ export default function App() {
         onRetry={retry}
         retried={retried}
         onOpen={openFromCard}
-        projectOpen={project !== undefined}
+        projectOpen={onScreen}
       />
       <AuthorLinks table={table} />
       <ProjectDialog

@@ -16,12 +16,35 @@ import { scrollThrough } from './scroll.ts'
 /** La largeur de référence du bureau : la table sans cellule y laisse la colonne (spec §3.4). */
 export const COLUMN_VIEWPORT = { width: 1280, height: 800 }
 
-/** La forme des liens, lue sur leur boîte : fixe en colonne, dans le flux en pied de page. */
+/**
+ * La forme des liens, lue sur leur boîte : fixe en colonne, dans le flux en pied de page. Aussi
+ * sous une fiche ouverte, qui les cache des technologies d'assistance.
+ */
 export async function expectPlacement(page: Page, placement: 'column' | 'footer') {
-  await expect(page.getByRole('contentinfo')).toHaveCSS(
+  await expect(page.getByRole('contentinfo', { includeHidden: true })).toHaveCSS(
     'position',
     placement === 'column' ? 'fixed' : 'relative',
   )
+}
+
+/**
+ * Compte, dès le chargement, les lectures de boîte des cellules de la table (`data-table-cell`) :
+ * chacune force une mise en page, et la mesure des liens de l'auteur en fait une par cellule à
+ * chaque relecture.
+ *
+ * @returns De quoi lire le compte.
+ */
+export async function countCellReads(page: Page) {
+  await page.addInitScript(() => {
+    const read = Element.prototype.getBoundingClientRect
+    let cellReads = 0
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      if (this.matches('[data-table-cell]')) cellReads += 1
+      return read.call(this)
+    }
+    Object.defineProperty(window, 'cellReads', { get: () => cellReads })
+  })
+  return () => page.evaluate(() => (window as unknown as { cellReads: number }).cellReads)
 }
 
 /** Les cartes de la table, dans son ordre : ses liens. */
