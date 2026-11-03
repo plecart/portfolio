@@ -280,6 +280,7 @@ WILDCARD_FORMS = {
     "etoile-finale-sans-espace": ("ls*", "lsof", True),
     "deux-etoiles-sans-commande-nue": ("* --help *", "npm --help", False),
     "deux-etoiles-et-argument": ("* --help *", "npm --help x", True),
+    "deux-etoiles-consecutives": ("ls **", "ls", False),
 }
 
 
@@ -317,16 +318,29 @@ def test_chaque_script_autorise_part_sans_invite(tool: str, command: str) -> Non
     assert not matches_a_rule(command, "deny", tool), f"« {command} » est arrêté par un `deny`"
 
 
-def test_la_porte_de_merge_garde_l_invite_de_gh_pr_merge() -> None:
-    """La porte chaîne `porte-merge.py` à `gh pr merge` (`cycle-pr` Étape 7, « Le go, puis le
-    merge ») : l'`allow` du script n'y approuve pas le merge, qui reste en `ask` — « Deny and ask
-    rules apply when any subcommand matches them » (doc « Configure permissions », § Compound
-    commands, lue le 2026-11-03). L'émulation ne découpant pas, le test découpe la porte."""
-    porte = (
-        f"{PORTE_MERGE} conversation 200 && gh pr merge 200 --rebase --match-head-commit {'b' * 40}"
-    )
-    script, merge = porte.split(" && ")
+SKILL_DIRECTORY = ("<répertoire de ce skill>", ".claude/skills/cycle-pr")
+# Les portes de merge que la prose fait taper, `porte-merge.py` chaîné à `gh … merge` : `cycle-pr`
+# Étape 7 (« Le go, puis le merge ») et l'étape 6 de `triage/hors-scope.md`, relevées le 2026-11-03
+# par `git grep -n "porte-merge.py conversation <[a-zA-Z]*> &&" -- .claude CLAUDE.md CONTRIBUTING.md
+# .github` : 2 sites, un par fichier.
+PORTES_DE_MERGE = {
+    "cycle-pr-etape-7": ".claude/skills/cycle-pr/SKILL.md",
+    "hors-scope-etape-6": ".claude/skills/triage/hors-scope.md",
+}
+PORTE_DE_MERGE = re.compile(r"python \S*porte-merge\.py conversation <n> && gh [^`\n]*")
 
+
+@pytest.mark.parametrize("fichier", PORTES_DE_MERGE.values(), ids=PORTES_DE_MERGE.keys())
+def test_la_porte_de_merge_garde_l_invite_de_gh_pr_merge(fichier: str) -> None:
+    """La porte telle que la prose la fait taper, `<répertoire de ce skill>` lu depuis la racine :
+    l'`allow` de `porte-merge.py` n'y approuve pas le merge chaîné, qui reste en `ask` — « Deny and
+    ask rules apply when any subcommand matches them » (doc « Configure permissions », § Compound
+    commands, lue le 2026-11-03). L'émulation ne découpant pas, le test découpe la porte sur `&&`."""
+    texte = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8").replace(*SKILL_DIRECTORY)
+    portes = PORTE_DE_MERGE.findall(texte)
+
+    assert len(portes) == 1, f"`{fichier}` porte {len(portes)} portes de merge : {portes}"
+    script, merge = portes[0].split(" && ")
     assert matches_a_rule(script, "allow"), f"« {script} » n'est autorisé par aucun `allow`"
     assert matches_a_rule(merge, "ask"), f"« {merge} » ne tombe sur aucun `ask`"
 

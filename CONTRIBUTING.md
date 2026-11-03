@@ -338,8 +338,8 @@ Chaque maillon nomme qui l'exécute ; la répartition des rôles est dans `CLAUD
    `.claude/pipeline.config.md`) : le document est amendé par la session de dialogue qui a décidé,
    ou la décision est abandonnée — ou son effet déplacé hors de ce que le document affirme.
    Déclenché par la règle `decisions-vs-doc`, à n'importe quel moment.
-4. **Répercuter** — `repercussions` après chaque merge qui ferme une issue ou touche une source
-   de vérité : confronte d'abord le delta aux sources de
+4. **Répercuter** — `repercussions` après chaque merge qui la rend due (`cycle-pr` Étape 8) :
+   confronte d'abord le delta aux sources de
    vérité (un § falsifié → `contradiction`), puis corrige la spec — corps et brief d'agent —
    des issues dont la planification est devenue fausse. Porté par la session PR en fin de
    `cycle-pr` — collecte au `releveur`, go d'édition au mainteneur dans sa fenêtre ; pour une issue

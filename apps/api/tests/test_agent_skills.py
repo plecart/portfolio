@@ -1762,6 +1762,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
             " 15:11:55Z et 15:12:19Z avant `archive_session`, puis à 15:12:28Z et 15:13:45Z après"
         ),
     ),
+    "archivage-sans-worktree-clone-principal-non-mesure": (
+        SESSIONS_LIEES_REF,
+        "Mesuré dans un worktree ; clone principal non mesuré.",
+    ),
     # Commandes intégrées (obs 94, 98, 115) : elles closent le tour de la session de relecture,
     # sans coût ; la session PR ne les joue qu'en repli, et y enchaîne dans le même tour.
     "commandes-integrees-closent-le-tour-de-la-relecture": (
@@ -2305,6 +2309,14 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         (
             "et garde `use_worktree: false` : l'archivage d'une session sans worktree ne détache pas"
             " la tête du dossier qu'elle partage"
+        ),
+    ),
+    # Passe 1 de relecture de la PR #220 (M5) : la mesure D-6 vaut pour un worktree, pas plus.
+    "etape-0-archivage-mesure-dans-un-worktree": (
+        PR_PARALLELES_SKILL,
+        (
+            "(mesuré le 2026-11-03 dans un worktree, `sessions-liees.md`, « Nettoyage » ; clone"
+            " principal non mesuré)"
         ),
     ),
     "etape-0-archiver-le-lead-archive-le-tri": (
@@ -7634,22 +7646,47 @@ def test_un_controle_de_proprete_par_git_status_voit_les_fichiers_non_suivis() -
 VOIT_LES_NON_SUIVIS = "--untracked-files=normal"
 
 
+def arguments_de_git(node: ast.AST) -> list[ast.expr] | None:
+    """Les arguments qui suivent `git` dans un appel de l'une des deux formes lues : une séquence —
+    tuple, liste ou arguments d'un appel — dont la tête est la constante `"git"`, ou l'appel d'une
+    fonction nommée `git`, dont les arguments suivent un `git` implicite ; `None` hors de ces formes.
+    Ne sont pas lues : une tête nommée (`(GIT, "status")`) et une chaîne shell (`"git status …"`)."""
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "git":
+        return node.args
+    if isinstance(node, ast.Tuple | ast.List):
+        elements = node.elts
+    elif isinstance(node, ast.Call):
+        elements = node.args
+    else:
+        return None
+    tete = elements[0] if elements else None
+    return elements[1:] if isinstance(tete, ast.Constant) and tete.value == "git" else None
+
+
+def sous_commande_git(arguments: list[ast.expr]) -> object:
+    """Le premier argument qui n'est pas une option globale — `-C <dossier>` et `-c <clé=valeur>`
+    sautés avec leur valeur —, ou `None` : `git submodule status` a pour sous-commande `submodule`."""
+    rang = 0
+    while rang < len(arguments):
+        argument = arguments[rang]
+        valeur = argument.value if isinstance(argument, ast.Constant) else None
+        if valeur in ("-C", "-c"):
+            rang += 2
+        elif isinstance(valeur, str) and valeur.startswith("-"):
+            rang += 1
+        else:
+            return valeur
+    return None
+
+
 def lectures_de_git_status(source: str) -> list[list[object]]:
-    """Les constantes de chaque lecture de `git status` du source Python : une séquence — tuple,
-    liste ou arguments d'un appel — qui commence par `"git"` et porte `"status"`. L'arbre syntaxique
-    la lit quelle que soit sa mise en page, une option `-C` avant la sous-commande comprise."""
+    """Les constantes de chaque lecture de `git status` du source Python (`arguments_de_git`), lue
+    par l'arbre syntaxique quelle que soit sa mise en page."""
     sites: list[list[object]] = []
     for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Tuple | ast.List):
-            elements = node.elts
-        elif isinstance(node, ast.Call):
-            elements = node.args
-        else:
-            continue
-        constantes: list[object] = [e.value for e in elements if isinstance(e, ast.Constant)]
-        tete = elements[0] if elements else None
-        if isinstance(tete, ast.Constant) and tete.value == "git" and "status" in constantes:
-            sites.append(constantes)
+        arguments = arguments_de_git(node)
+        if arguments is not None and sous_commande_git(arguments) == "status":
+            sites.append([e.value for e in arguments if isinstance(e, ast.Constant)])
     return sites
 
 
@@ -7666,7 +7703,17 @@ LECTURES_DE_GIT_STATUS_FORMES: dict[str, tuple[str, list[bool]]] = {
         'run(["git", "-C", d, "status", "--untracked-files=normal"])',
         [True],
     ),
+    "option-c-minuscule-avant-la-sous-commande": (
+        'run(["git", "-c", "core.quotepath=off", "status"])',
+        [False],
+    ),
+    "option-longue-avant-la-sous-commande": ('run(["git", "--no-pager", "status"])', [False]),
     "arguments-d-un-appel": ('run("git", "status", "--porcelain")', [False]),
+    "fonction-git-sans-l-option": ('git("status", "--porcelain")', [False]),
+    "fonction-git-avec-l-option": ('git("status", "--untracked-files=normal")', [True]),
+    "tete-nommee-non-lue": ('run((GIT, "status", "--porcelain"))', []),
+    "chaine-shell-non-lue": ('run("git status --porcelain", shell=True)', []),
+    "submodule-status-hors-classe": ('S = ("git", "submodule", "status")', []),
     "gh-auth-status-hors-classe": ('A = ("gh", "auth", "status")', []),
     "git-log-hors-classe": ('L = ("git", "log", "-1")', []),
 }
@@ -7680,7 +7727,8 @@ LECTURES_DE_GIT_STATUS_FORMES: dict[str, tuple[str, list[bool]]] = {
 def test_une_lecture_de_git_status_se_lit_avec_ou_sans_l_option(
     source: str, attendu: list[bool]
 ) -> None:
-    """Le témoin : la lecture sans l'option se voit, celle qui la porte passe, et `gh auth status`
+    """Le témoin, une forme par entrée : la lecture sans l'option se voit, celle qui la porte passe ;
+    une tête nommée et une chaîne shell ne sont pas lues ; `git submodule status`, `gh auth status`
     ou un autre `git` restent hors de la population."""
     sites = lectures_de_git_status(source)
 
@@ -7693,9 +7741,13 @@ def test_chaque_script_qui_lit_git_status_voit_les_fichiers_non_suivis() -> None
     (obs 145).
 
     **Population recomptée à chaque exécution** : les scripts Python suivis sous `.claude/`, lus par
-    `lectures_de_git_status` — jamais une liste de sites. Relevé le 2026-11-03 sur `00b180f`,
-    `git grep -n '"git", "status"' -- '.claude/*.py'` : 2 sites, 2 avec l'option
-    (`sonde-outillage.py`, `amorcage.py`) ; un site ajouté entre au test sans y être inscrit.
+    `lectures_de_git_status` — jamais une liste de sites. Deux formes lues, la séquence à tête
+    `"git"` et l'appel d'une fonction `git` ; une tête nommée et une chaîne shell ne le sont pas
+    (`arguments_de_git`, témoins au recueil). Relevé le 2026-11-03 sur `05014a6` :
+    `git grep -n '"status"' -- '.claude/*.py'` rend 2 séquences à tête `"git"`, les 2 avec l'option
+    (`sonde-outillage.py`, `amorcage.py`), 0 tête nommée, 0 autre sous-commande `git` ;
+    `git grep -n -e "git status" -e "def git" -e "git(" -- '.claude/*.py'`, 0 appel de fonction
+    `git` et 0 chaîne shell hors docstring.
     """
     lectures = [
         (fichier, site)
@@ -9654,6 +9706,7 @@ EXECUTANT_ROLE = ".claude/agents/executant.md"
 PIPELINE_CONFIG = ".claude/pipeline.config.md"
 CLEANUP_VERBATIM_RULE = ".claude/rules/cleanup-verbatim.md"
 TESTS_REF = ".claude/skills/cycle-pr/references/tests.md"
+CONTRIBUTING_GUIDE = "CONTRIBUTING.md"
 RENVOI_AUX_FRONTIERES_TIERCES = (
     "`cycle-pr/references/tests.md`, « Frontières tierces : on vérifie, on ne suppose pas »"
 )
@@ -9797,6 +9850,22 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
         PIPELINE_CONFIG,
         "un `grep` placé après un `|` n'est pas réécrit (`rtk rewrite` le rend intact)",
     ),
+    # Passe 1 de relecture de la PR #220 (M3) : la redirection, relevée entre 20:36 et 20:52 UTC.
+    "rtk-redirection-aucun-segment": (
+        PIPELINE_CONFIG,
+        (
+            "une commande qui porte une redirection de fichier — `>`, `>>`, `2>` ou `<` — n'est"
+            " réécrite dans aucun de ses segments, alors que `2>&1` n'empêche rien"
+        ),
+    ),
+    "rtk-redirection-rewrite-sort-en-1": (
+        PIPELINE_CONFIG,
+        "relevé entre 20:36 et 20:52 UTC : `rtk rewrite` sort en 1 sans rien rendre sur",
+    ),
+    "rtk-redirection-4-seul-1-derriere": (
+        PIPELINE_CONFIG,
+        "ce `grep` rend 4 seul, et 1 derrière `printf 'x' > r.txt &&` ;",
+    ),
     "rtk-sortie-tronquee": (PIPELINE_CONFIG, "la sortie d'une commande réécrite est **tronquée**"),
     "rtk-tronquee-aussi-en-tete-d-un-tube": (
         PIPELINE_CONFIG,
@@ -9869,6 +9938,24 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
     "cloture-due-sur-un-lot-leger": (
         CLOTURE_REF,
         "toujours sur un lot léger, qui porte `En vol pour #N` vers `main` (`cycle-pr` Étape 8)",
+    ),
+    # Passe 1 de relecture de la PR #220 (M4) : le point 4 de `CONTRIBUTING.md` renvoie à la
+    # condition de l'Étape 8 au lieu de la paraphraser ; une ancre par morceau de son élément.
+    "contributing-repercussions-quand-elle-est-due": (
+        CONTRIBUTING_GUIDE,
+        "`repercussions` après chaque merge qui la rend due (`cycle-pr` Étape 8)",
+    ),
+    "contributing-repercussions-confronte-d-abord": (
+        CONTRIBUTING_GUIDE,
+        "confronte d'abord le delta aux sources de vérité (un § falsifié → `contradiction`)",
+    ),
+    "contributing-repercussions-portee-par-la-session-pr": (
+        CONTRIBUTING_GUIDE,
+        "Porté par la session PR en fin de `cycle-pr`",
+    ),
+    "contributing-repercussions-lot-coordonne": (
+        CONTRIBUTING_GUIDE,
+        "pour une issue en lots coordonnés, par la coordinatrice au merge de la PR d'intégration",
     ),
     # E2 : la garde qui cite une phrase de règle (obs 126) et le compte écrit en commentaire
     # (obs 127).
@@ -10505,6 +10592,16 @@ PASSAGES_DES_CONFORTS_DE_PIPELINE = (
                     " un contrat d'interface, déjà faire une partie d'un autre lot, ou rendre une"
                     " hypothèse caduque ailleurs."
                 ),
+            ],
+        },
+    ),
+    Passage(
+        CONTRIBUTING_GUIDE,
+        "4. **Répercuter**",
+        "5. **Valider**",
+        {
+            "intitulé": [
+                "4.",
             ],
         },
     ),
