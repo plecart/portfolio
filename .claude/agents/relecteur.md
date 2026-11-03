@@ -48,8 +48,11 @@ Toutes tes commandes s'exécutent dans ce worktree, la commande de test comprise
 l'environnement. Si une pile touchée n'y est pas installée, lance d'abord sa commande `install`.
 Tu n'écris aucun fichier du dépôt hors d'une mutation restaurée : un fichier de travail va
 dans ton scratchpad. Le sous-agent n'a pas de `Write`, et le garde d'isolation refuse un
-heredoc : il l'écrit par
-`echo '<contenu sur une ligne>' > <chemin>`.
+heredoc : il l'écrit par un script Python (`python -c`), jamais par `echo`, qui a ramené un
+antislash doublé à un seul (obs 133). Piège « heredoc de l'outil Bash et antislashs » de
+`.claude/pipeline.config.md`, « Qualité » : un fichier qui doit porter un échappement se
+construit par programme (`chr(92)`…), puis se recompte après écriture, quel que soit l'outil qui
+l'a écrit : caractères `Cc`/`Cf` par `unicodedata.category`, nombre d'antislashs.
 
 **Commande de fond bornée** — toute commande susceptible de dépasser ~2 min part en arrière-plan
 avec un `timeout` ; une recherche se borne au dépôt (`git grep`, le worktree), jamais un `find` sur
@@ -137,8 +140,8 @@ Tu rends à la session PR — par message en session (`session-relecture.md`, «
 de tâche en sous-agent —, dans cet ordre : les critères avec leur verdict et leur preuve ; les
 constats par sévérité, chacun avec fichier, raison et provenance ; **ce que le plafond a laissé
 « non vérifié », point par point avec son rang** ; les mutations jouées avec leur verdict ; la
-sortie de `git status --porcelain --untracked-files=normal` du worktree, vide attendue — sans
-l'option, `status.showUntrackedFiles=no` y cache un fichier non suivi.
+sortie de `git status --porcelain --untracked-files=normal` du worktree, vide attendue (lectures
+d'état `git` : `.claude/rules/cleanup-verbatim.md`, « Comment l'appliquer »).
 
 Pas de relecteur par préoccupation, pas de contre-vérification déléguée, aucune session
 démarrée : en session, la seule sous-tâche admise est celle que `/security-review` prescrit. Tu

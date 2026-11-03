@@ -283,9 +283,19 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
   - **heredoc de l'outil Bash et antislashs** — un fichier écrit par `cat >> … <<'EOF'` depuis
     l'outil Bash du poste arrive sur disque avec ses antislashs **divisés par deux** : mesuré le
     2026-10-13, un motif `\\?<` tapé est devenu `\?<`, soit un `?` littéral, et une porte sur la
-    prose des skills n'appariait plus rien — vue rouge sur son témoin, pas sur son motif. Écrire
-    les fichiers par l'outil d'écriture ou d'édition (littéraux) ; un heredoc ne convient qu'à un
-    contenu sans antislash
+    prose des skills n'appariait plus rien — vue rouge sur son témoin, pas sur son motif. Un
+    heredoc ne convient qu'à un contenu sans antislash, et les outils d'écriture et d'édition
+    peuvent décoder un échappement en route : mesuré le 2026-11-03, `Write` d'un littéral Python
+    qui porte l'échappement d'un BOM a écrit le BOM lui-même (octets `EF BB BF`), recompté 1 `Cf`
+    et 0 antislash, quand la même ligne construite par `chr(92)` se recompte 0 `Cf` et
+    1 antislash ; obs 133 : `Write` a écrit 5 BOM et 1 U+FFFD dans un test et 1 BOM dans un
+    script, `Edit` 1 BOM. Un fichier qui doit porter un échappement se construit donc par
+    programme (`chr(92)`…), puis se recompte après écriture, quel que soit l'outil qui l'a écrit :
+    caractères `Cc`/`Cf` par `unicodedata.category`, nombre d'antislashs — règle que portent aussi
+    `developpeur.md`, `executant.md` et `relecteur.md`. Pas de hook `PreToolUse` pour la garder :
+    écarté le 2026-11-03 (#198, D-1), chaque occurrence mesurée ayant été vue par le recompte ; à
+    réexaminer à la première violation du piège heredoc ou d'échappement après le merge de la
+    PR #220
   - **cache de compilation et mutation de même longueur**
     (`.claude/skills/cycle-pr/scripts/mutation.py`, fonction `rewrite`) — `__pycache__`
     s'invalide sur le couple (date, taille) : une mutation qui ne change ni l'une ni l'autre
