@@ -645,6 +645,87 @@ for (const [name, close] of INTERRUPTIONS) {
   })
 }
 
+/*
+ * Une ouverture n'est prise qu'une fois la fermeture finie (décision de #22). Les voies qui ouvrent
+ * une fiche, dénombrées dans la source le 2026-11-03 : trois. L'activation d'une carte (`onOpen` de
+ * la table : clic, Entrée, second toucher) et l'historique (`popstate`) peuvent arriver pendant un
+ * retour ; l'adresse au chargement, jamais. Radix retient le pointeur et le focus tant que la fiche
+ * est à l'écran : l'activation d'une carte arrive ici par l'événement lui-même, comme celle d'une
+ * technologie d'assistance.
+ */
+
+for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+  test(`pendant la fermeture (${reducedMotion}), une autre carte activée n’ouvre rien ; la fermeture finie, elle ouvre`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion })
+    await openEnteredTable(page, PROJECTS)
+    const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+    const otherPath = (await cards(page).nth(1).getAttribute('href'))!
+    const other = page.locator(`.card[href="${otherPath}"]`)
+    await openProject(card)
+    const resume = await freezeAnimations(page)
+
+    await page.keyboard.press('Escape')
+    await other.dispatchEvent('click', { detail: 0 })
+
+    await expect(page).toHaveURL('/')
+    await resume()
+    await expectClosed(page)
+    await expect(card).toBeFocused()
+
+    await other.press('Enter')
+
+    await expect(panel(page)).toBeVisible()
+    await expect(page).toHaveURL(otherPath)
+  })
+}
+
+test('« suivant » de l’historique pendant le retour : la fiche se rouvre une fois la carte rejointe, par le fondu de l’arrivée directe', async ({
+  page,
+}) => {
+  await openEnteredTable(page, PROJECTS)
+  const [paper] = await resolveAll(page, [['background-color', 'var(--paper)']])
+  await openProject(page.locator(`.card[href="${FIRST_PATH}"]`))
+  const resume = await freezeAnimations(page)
+  await page.keyboard.press('Escape')
+  await expect(page).toHaveURL('/')
+  const animations = await watchAnimations(page)
+
+  await page.goForward()
+  await resume()
+  await expect(page.locator('html')).not.toHaveAttribute('data-choreography')
+  await settle(page)
+
+  await expect(page).toHaveURL(FIRST_PATH)
+  await expect(closeButton(page)).toBeFocused()
+  await expect(panel(page)).toHaveCSS('background-color', paper)
+  await expect(closeButton(page)).toHaveCSS('opacity', '1')
+  expect((await animations()).map(({ name }) => name)).toEqual(['project-in'])
+})
+
+test('« suivant » puis « précédent » pendant le retour : un seul retour, qui va à son terme', async ({
+  page,
+}) => {
+  await openEnteredTable(page, PROJECTS)
+  const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+  await openProject(card)
+  const resume = await freezeAnimations(page)
+  await page.keyboard.press('Escape')
+  await expect(page).toHaveURL('/')
+  await finishAnimations(page)
+
+  await page.goForward()
+  await page.goBack()
+
+  for (const flight of await page.evaluate(readFlights, { path: FIRST_PATH })) {
+    expect(flight.count).toBe(1)
+  }
+  await resume()
+  await expectClosed(page)
+  await expect(card).toBeFocused()
+})
+
 test('sa carte d’origine sortie du document, la fiche se ferme par le fondu de sortie', async ({ page }) => {
   await openEnteredTable(page, PROJECTS)
   const card = page.locator(`.card[href="${FIRST_PATH}"]`)
