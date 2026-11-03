@@ -341,10 +341,11 @@ const allSettled = (animations: Animation[]) =>
 /**
  * Fait décoller une fiche de sa carte (spec §4.6, §6.3) — un vol, ou des fondus en mouvement réduit
  * —, mesurée avant d'être peinte, pendant que les cartes de la table s'effacent. Quand elle devient
- * active, « Fermer la fiche » prend le focus, et le panneau en vol reprend son papier. Une animation
- * annulée en route ne retient ni la pose ni le retour : chacun attend la fin des siennes, quelle
- * qu'elle soit (`allSettled`). Le panneau et ses ancêtres ne se transforment jamais : sous 600 px,
- * le bouton Fermer y est fixe.
+ * active, elle réagit au pointeur, « Fermer la fiche » prend le focus, et le panneau en vol reprend
+ * son papier ; sa fermeture demandée, elle n'y réagit plus. Une animation annulée en route ne
+ * retient ni la pose ni le retour : chacun attend la fin des siennes, quelle qu'elle soit
+ * (`allSettled`). Le panneau et ses ancêtres ne se transforment jamais : sous 600 px, le bouton
+ * Fermer y est fixe.
  *
  * @returns L'atterrissage, qui ramène la fiche à sa carte, et l'abandon, qui retire tout sans
  *   mouvement.
@@ -353,6 +354,7 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
   const motion = readMotion()
   const steps = motion.reduced ? fading(panel, motion) : flying(panel, card, motion)
   panel.setAttribute('data-choreography', '')
+  panel.setAttribute('data-inactive', '')
   const moves = cardMoves(card, motion.reduced)
   const receding = recede(moves, motion)
   const flights = steps.out()
@@ -364,6 +366,7 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
   void allSettled([flights[0]]).then(() => {
     if (phase !== 'flight') return
     phase = 'posed'
+    panel.removeAttribute('data-inactive')
     panel.removeAttribute('data-flight')
     panel.querySelector<HTMLElement>('.project-close')?.focus()
   })
@@ -373,8 +376,9 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
     phase = 'gone'
     for (const animation of [...flights, ...receding]) animation.cancel()
     card.removeAttribute('data-origin')
-    panel.removeAttribute('data-flight')
-    panel.removeAttribute('data-choreography')
+    for (const attribute of ['data-inactive', 'data-flight', 'data-choreography']) {
+      panel.removeAttribute(attribute)
+    }
   }
 
   /**
@@ -391,6 +395,7 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
     }
     const posed = phase === 'posed'
     phase = 'return'
+    panel.setAttribute('data-inactive', '')
     const clearing = steps.clear()
     if (posed) await allSettled(clearing)
     await allSettled([...steps.back(), ...comeBack(moves, receding, motion)])

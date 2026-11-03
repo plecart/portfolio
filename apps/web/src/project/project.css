@@ -66,15 +66,17 @@
     outline: none;
   }
 
-  /* En vol (§4.6) : le panneau, transparent, laisse voir sa feuille, et rien n'y réagit avant la
-     pose — par ses enfants, Radix écrivant `pointer-events: auto` sur le panneau lui-même. */
+  /* Ouverte depuis sa carte, rien n'y réagit avant qu'elle soit active, ni une fois sa fermeture
+     demandée (§4.6, §6.3) — par ses enfants, Radix écrivant `pointer-events: auto` sur le panneau
+     lui-même. */
+  .project-panel[data-inactive] > * {
+    pointer-events: none;
+  }
+
+  /* En vol (§4.6) : le panneau, transparent, laisse voir sa feuille. */
   .project-panel[data-flight] {
     background-color: transparent;
     box-shadow: none;
-
-    > * {
-      pointer-events: none;
-    }
   }
 
   /* La feuille (§4.6) : le papier du panneau, à part, pour qu'aucun vol ne transforme le panneau ni un
