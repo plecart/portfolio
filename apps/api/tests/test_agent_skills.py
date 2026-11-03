@@ -10501,6 +10501,78 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
         REPERCUSSIONS_SKILL,
         "la ligne de journal et la clé d'idempotence citent cette PR, comme en mode amendement",
     ),
+    # Relance de la relecture de la PR #220 (M8, M9) : l'issue d'un lot léger intermédiaire mergé,
+    # en vol sans PR, annoncée à chaque site de `repercussions` qui suppose une PR ouverte à une
+    # issue en vol. Relevé le 2026-11-03 avant correctif par `git grep -n -i -e "en vol"
+    # -e "PR ouverte" -e "sa PR" -e "PR #n" -- .claude/skills/repercussions/SKILL.md` : 28 lignes
+    # en 22 passages, 5 fuyaient — le principe, les étapes 2, 4 et 5, l'idée 3 —, une ancre chacun.
+    "repercussions-principe-prevenir-sans-pr": (
+        REPERCUSSIONS_SKILL,
+        (
+            "**Unique exception : l'issue est déjà en cours de développement.** On ne réécrit pas"
+            " une spec sous les pieds d'une session qui l'a déjà lue — on la prévient par un"
+            " commentaire sur **sa PR ouverte**, ou, sans PR entre deux lots légers, par le prompt"
+            " du lot suivant (étape 5)"
+        ),
+    ),
+    "repercussions-principe-seule-sortie-commentee": (
+        REPERCUSSIONS_SKILL,
+        "C'est la seule sortie commentée du skill",
+    ),
+    "repercussions-en-vol-sauf-le-lot-leger-sans-pr": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Une issue en cours de développement a donc **toujours** une PR ouverte qui la"
+            " référence — sauf l'issue d'un lot léger intermédiaire mergé, en vol sans PR (étape"
+            " 1), que ce relevé ne voit pas"
+        ),
+    ),
+    "repercussions-les-drafts-comptent": (
+        REPERCUSSIONS_SKILL,
+        "Les drafts comptent autant que les autres",
+    ),
+    "repercussions-marqueur-du-lot-suivant": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Toujours afficher le marqueur **[dormante]** ou **[EN VOL → PR #n]**, et **[EN VOL →"
+            " lot suivant]** pour l'issue d'un lot léger intermédiaire mergé, sans PR (étape 1)"
+        ),
+    ),
+    "repercussions-chaque-bloc-nomme-son-support": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Chaque bloc de correction nomme son support — « dans le corps », « dans le brief »,"
+            " ou les deux blocs l'un sous l'autre"
+        ),
+    ),
+    "repercussions-signalement-en-commentaire-sur-la-pr": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Le signalement va **en commentaire sur la PR ouverte**, par `comment <PR> --body-file"
+            " <fichier>`, que le script relit en entier — c'est la seule sortie GitHub commentée de"
+            " ce skill"
+        ),
+    ),
+    "repercussions-sans-pr-le-prompt-du-lot-suivant": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Sans PR ouverte — `#<N>`, l'issue d'un lot léger intermédiaire mergé (étape 1) —, il"
+            " va dans le prompt du lot suivant, que la session sortante écrit après cette passe"
+            " (`cycle-pr/references/cloture.md`, « Cas découpé : la frontière de lot se franchit"
+            " par la session sortante »)"
+        ),
+    ),
+    "repercussions-idee-3-reecrire-la-dormante": (
+        REPERCUSSIONS_SKILL,
+        "**Dormante ou en vol.** On réécrit la spec d'une issue que personne ne développe",
+    ),
+    "repercussions-idee-3-prevenir-sans-pr": (
+        REPERCUSSIONS_SKILL,
+        (
+            "on **prévient sur sa PR** celle qui est en chantier, ou par le prompt du lot suivant"
+            " entre deux lots légers"
+        ),
+    ),
 }
 
 
@@ -10846,6 +10918,68 @@ PASSAGES_DES_CONFORTS_DE_PIPELINE = (
         "Avec une PR de lot léger intermédiaire",
         "Écrire un résumé court de **ce que cette clôture",
         {},
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "- **Unique exception : l'issue est déjà en cours de développement.**",
+        "**Règle d'or** : ce skill **propose**",
+        {},
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "`cycle-pr` ouvre sa **PR draft à l'Étape 2",
+        "**Lire aussi la ligne `En vol pour #<N> (lot k/n)`**",
+        {
+            "motif": [
+                (
+                    "`cycle-pr` ouvre sa **PR draft à l'Étape 2, avant la première ligne de code**,"
+                    " avec `Closes #N` dans le body."
+                ),
+                "C'est ce qui rend cette détection fiable plutôt qu'approximative.",
+                "c'est même leur seule raison d'exister ici.",
+            ],
+        },
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "Toujours afficher le marqueur **[dormante]**",
+        "Montrer les **lignes** avant/après",
+        {
+            "motif": [
+                "c'est lui qui dit au mainteneur si une session est en train de partir dans le mur.",
+            ],
+        },
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "Le signalement va **en commentaire sur la PR ouverte**",
+        "```markdown > *Généré par IA — répercussion de la clôture de #47.*",
+        {
+            "motif": [
+                (
+                    "`cycle-pr` traite déjà les commentaires de PR à son Étape 6, en bouclant"
+                    " jusqu'à review vide."
+                ),
+                "Le message atterrit donc exactement là où la session le lira.",
+                "c'est lui que la session du lot suivant lit en premier.",
+            ],
+        },
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "3. **Dormante ou en vol.**",
+        "4. **Périmètre mécanique**",
+        {
+            "intitulé": [
+                "3.",
+            ],
+            "motif": [
+                (
+                    "Éditer sous les pieds d'une session en cours est le seul dégât irrattrapable"
+                    " que ce skill puisse causer."
+                ),
+            ],
+        },
     ),
 )
 
