@@ -18,7 +18,7 @@ import shlex
 import subprocess
 from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import cast
+from typing import NamedTuple, cast
 
 import pytest
 import yaml
@@ -6782,11 +6782,10 @@ RELECTEUR_ROLE = ".claude/agents/relecteur.md"
 
 # Le protocole de la session de relecture et celui qu'elle suit — un énoncé par geste, chacun
 # épinglé sur sa moitié restrictive autant que sur celle qui fait (critère en tête de
-# `INVARIANTS_DU_CONTEXTE_COURT`, obs 126). **Population** : les morceaux de `session-relecture.md`
-# — `morceaux_du_texte`, qui découpe le texte normalisé après `.`, `;` ou `:` hors du code en
-# ligne — et les 13 phrases que ce lot réécrit dans `relecteur.md`. Le dénombrement n'est pas écrit
-# ici : il sort de `test_chaque_morceau_du_protocole_tient_une_ancre`, qui exige que chaque morceau
-# tienne une ancre ou figure dans `MORCEAUX_SANS_PRESCRIPTION`. Relecture de la PR #141 : un
+# `INVARIANTS_DU_CONTEXTE_COURT`, obs 126). **Population** : les morceaux de
+# `session-relecture.md` (`PASSAGES_DE_LA_SESSION_DE_RELECTURE`) ; les phrases de la table dans
+# d'autres fichiers sont hors de ce recompte. Le dénombrement n'est pas écrit ici : il sort de
+# `test_chaque_morceau_d_un_passage_declare_tient_une_ancre`. Relecture de la PR #141 : un
 # « 55 morceaux » écrit en commentaire ne se reproduisait pas par sa propre règle (92), et deux
 # passes ont trouvé chacune des énoncés nus — la classe d'obs 107, 124 et 126. Chaque ancre vue
 # rouge en retirant sa moitié restrictive ou son élément (Notes de la PR #141) ; l'ordre du réveil
@@ -7428,72 +7427,97 @@ def morceaux_du_texte(texte: str) -> list[str]:
     return [morceau.strip() for morceau in morceaux if morceau.strip()]
 
 
-# Les morceaux du protocole qui ne prescrivent rien, par catégorie, en littéraux : un intitulé, un
-# motif, un relevé daté. Tout autre morceau tient une ancre.
-MORCEAUX_SANS_PRESCRIPTION: dict[str, list[str]] = {
-    "intitulé": [
-        "**Premier geste de la session de relecture** :",
-        "La plage :",
-        "Paramètres de `start_session` :",
-        "À chaque réveil, dans cet ordre :",
-    ],
-    "motif": [
-        "Une session, et non un sous-agent, pour trois raisons :",
-        "le mainteneur la **joint** dans sa fenêtre ;",
-        (
-            "ses commandes intégrées, `/code-review` et `/security-review`, closent **son** tour et non"
-            " celui de la session PR (obs 94, 98, 115) ;"
-        ),
-        "son contexte tient toutes ses passes et la relance.",
-        "un autre parent serait réveillé à chaque fin de tour de la session de relecture pour rien.",
-        "la tête bouge entre deux passes.",
-        "C'est sans coût ici :",
-        "un constat se rapporte.",
-        "un agent repris peut reprendre dans l'arbre vivant de la session PR.",
-    ],
-    "relevé daté": [
-        "Mesuré le 2026-10-20 sur la PR #141 :",
-        (
-            "`get_session` rend un worktree sous `.claude/worktrees/<slug>`, la branche"
-            " `claude/<slug>`, la `sourceBranch` demandée et le parent."
-        ),
-        "la seconde l'a clos, la première non.",
-        "Ce qu'elle rapporte à nouveau à la passe 2, sur une PR qu'elle a déjà commentée :",
-        "non mesuré.",
-        "non mesuré).",
-    ],
-}
+class Passage(NamedTuple):
+    """Un passage déclaré d'une table d'invariants (#198, D-5), lu dans le texte normalisé de son
+    fichier : de `debut` à `fin`, exclue — `None`, jusqu'au bout du fichier —, chaque borne
+    présente **une** fois. `exemptions` : ses morceaux sans prescription, en littéraux, rangés sous
+    une catégorie de `CATEGORIES_D_EXEMPTION`. `empruntees` : les ancres d'une autre table qui
+    garde le même passage."""
+
+    fichier: str
+    debut: str
+    fin: str | None
+    exemptions: dict[str, list[str]]
+    empruntees: tuple[str, ...] = ()
 
 
-def test_chaque_morceau_du_protocole_tient_une_ancre() -> None:
-    """Le dénombrement de la population sort d'ici, jamais d'un commentaire.
+CATEGORIES_D_EXEMPTION = ("intitulé", "motif", "relevé daté")
 
-    Un morceau tient une ancre quand une phrase de `INVARIANTS_DE_LA_SESSION_DE_RELECTURE` sur ce
-    fichier, ou de `ORDRE_DU_REVEIL`, le contient, ou qu'il la contient. Les morceaux nus doivent être exactement
-    ceux de `MORCEAUX_SANS_PRESCRIPTION` : un énoncé ajouté sans ancre rougit, une exemption
-    périmée aussi. **Borne** : un morceau tenu en partie — il contient une ancre plus courte que
-    lui — n'est gardé que sur elle, le reste peut changer en vert ; c'est le cas de la plupart, dont
-    beaucoup ne perdent que leur ponctuation. Les prescriptions qu'une mutation partielle a laissées
-    vertes (relance de la PR #141 : reprise à l'étape suivante, outil de rapport de `/code-review`,
-    repli humain avec le diff) sont ancrées en entier, comme toute ancre qui ferme la classe.
-    """
-    ancres = [
-        phrase
-        for fichier, phrase in INVARIANTS_DE_LA_SESSION_DE_RELECTURE.values()
-        if fichier == SESSION_RELECTURE_REF
-    ]
-    ancres += [ancre for couple in ORDRE_DU_REVEIL.values() for ancre in couple]
-    nus = {
-        morceau
-        for morceau in morceaux_du_texte(texte_normalise(SESSION_RELECTURE_REF))
-        if not any(ancre in morceau or morceau in ancre for ancre in ancres)
-    }
-    exemptes = {morceau for liste in MORCEAUX_SANS_PRESCRIPTION.values() for morceau in liste}
 
-    assert nus == exemptes, (
-        f"sans ancre ni exemption : {sorted(nus - exemptes)} ; exemptions périmées :"
-        f" {sorted(exemptes - nus)}"
-    )
+def texte_du_passage(passage: Passage) -> str:
+    """Le texte normalisé du passage. Une borne absente ou doublée rougit ici au lieu de déplacer
+    le passage en silence."""
+    texte = texte_normalise(passage.fichier)
+    for borne in filter(None, (passage.debut, passage.fin)):
+        assert texte.count(borne) == 1, (
+            f"`{borne}` apparaît {texte.count(borne)} fois dans `{passage.fichier}`"
+        )
+    debut = texte.index(passage.debut)
+    return texte[debut : texte.index(passage.fin, debut) if passage.fin else None]
+
+
+def morceaux_nus(texte: str, ancres: Iterable[str]) -> set[str]:
+    """Les morceaux du texte qu'aucune ancre ne recouvre à sa place : une ancre qui enjambe deux
+    morceaux les tient l'un et l'autre, et un morceau ne se tient pas par une ancre qui porte son
+    texte ailleurs."""
+    zones = [(m.start(), m.end()) for ancre in ancres for m in re.finditer(re.escape(ancre), texte)]
+    nus: set[str] = set()
+    fin = 0
+    for morceau in morceaux_du_texte(texte):
+        debut = texte.index(morceau, fin)
+        fin = debut + len(morceau)
+        if not any(gauche < fin and debut < droite for gauche, droite in zones):
+            nus.add(morceau)
+    return nus
+
+
+# Le protocole de la session de relecture, son fichier entier : la population que recomptait le
+# test propre à cette table avant le registre, reprise telle quelle — une table neuve se borne à ses
+# passages (D-5).
+PASSAGES_DE_LA_SESSION_DE_RELECTURE = (
+    Passage(
+        SESSION_RELECTURE_REF,
+        "La session de relecture — une par PR",
+        None,
+        {
+            "intitulé": [
+                "**Premier geste de la session de relecture** :",
+                "La plage :",
+                "Paramètres de `start_session` :",
+                "À chaque réveil, dans cet ordre :",
+            ],
+            "motif": [
+                "Une session, et non un sous-agent, pour trois raisons :",
+                "le mainteneur la **joint** dans sa fenêtre ;",
+                (
+                    "ses commandes intégrées, `/code-review` et `/security-review`, closent **son**"
+                    " tour et non celui de la session PR (obs 94, 98, 115) ;"
+                ),
+                "son contexte tient toutes ses passes et la relance.",
+                (
+                    "un autre parent serait réveillé à chaque fin de tour de la session de relecture"
+                    " pour rien."
+                ),
+                "la tête bouge entre deux passes.",
+                "C'est sans coût ici :",
+                "un constat se rapporte.",
+                "un agent repris peut reprendre dans l'arbre vivant de la session PR.",
+            ],
+            "relevé daté": [
+                "Mesuré le 2026-10-20 sur la PR #141 :",
+                (
+                    "`get_session` rend un worktree sous `.claude/worktrees/<slug>`, la branche"
+                    " `claude/<slug>`, la `sourceBranch` demandée et le parent."
+                ),
+                "la seconde l'a clos, la première non.",
+                "Ce qu'elle rapporte à nouveau à la passe 2, sur une PR qu'elle a déjà commentée :",
+                "non mesuré.",
+                "non mesuré).",
+            ],
+        },
+        empruntees=tuple(ancre for couple in ORDRE_DU_REVEIL.values() for ancre in couple),
+    ),
+)
 
 
 def test_le_decoupage_ne_coupe_pas_le_code_en_ligne() -> None:
@@ -7503,6 +7527,12 @@ def test_le_decoupage_ne_coupe_pas_le_code_en_ligne() -> None:
         "`name: x` ;",
         "puis la suite.",
     ]
+
+
+def test_une_ancre_tient_les_morceaux_qu_elle_recouvre_a_leur_place() -> None:
+    """Témoin de `morceaux_nus` : l'ancre enjambe « Un : » et « deux. », qu'elle tient l'un et
+    l'autre ; le second « Un : », qu'elle ne recouvre pas, reste nu malgré son texte."""
+    assert morceaux_nus("Un : deux. Trois. Un :", ["Un : deux"]) == {"Trois.", "Un :"}
 
 
 # Ce que le lot 3 retire, et qui ne doit pas revenir. Chaque forme a été vue présente sur
@@ -8556,3 +8586,35 @@ RETIRES_PAR_LES_CONFORTS = {
 def test_les_conforts_ne_rendent_pas_ce_qu_ils_ont_retire(fichier: str, phrase: str) -> None:
     """Chacune présente une fois sur `00b180f` (`git grep -c`), vue rouge en la remettant."""
     assert not porte_la_forme(fichier, phrase), f"`{fichier}` porte encore « {phrase} »"
+
+
+# --- Une table d'invariants recompte sa population par ses passages déclarés (#198, D-5) ---------
+
+# Une entrée par table, ses passages déclarés à côté d'elle (`Passage`) : la population d'une table
+# sort de ses passages à chaque exécution, jamais d'un compte écrit en commentaire (obs 127).
+PASSAGES_DECLARES: dict[str, tuple[Passage, ...]] = {
+    "INVARIANTS_DE_LA_SESSION_DE_RELECTURE": PASSAGES_DE_LA_SESSION_DE_RELECTURE,
+}
+
+
+@pytest.mark.parametrize("table", PASSAGES_DECLARES)
+def test_chaque_morceau_d_un_passage_declare_tient_une_ancre(table: str) -> None:
+    """Chaque morceau d'un passage déclaré (`morceaux_du_texte`) tient une ancre — une phrase de la
+    table sur ce fichier, ou une ancre empruntée — ou figure parmi les exemptions du passage : un
+    énoncé ajouté sans ancre rougit, une exemption périmée aussi. **Borne** : un morceau tenu en
+    partie n'est gardé que sur son ancre, le reste peut changer en vert ; c'est pourquoi une ancre
+    couvre la moitié restrictive de son morceau (obs 126)."""
+    invariants: dict[str, tuple[str, str]] = globals()[table]
+    ecarts: list[str] = []
+    for passage in PASSAGES_DECLARES[table]:
+        assert set(passage.exemptions) <= set(CATEGORIES_D_EXEMPTION), passage.exemptions.keys()
+        ancres = [phrase for fichier, phrase in invariants.values() if fichier == passage.fichier]
+        nus = morceaux_nus(texte_du_passage(passage), [*ancres, *passage.empruntees])
+        exemptes = {morceau for liste in passage.exemptions.values() for morceau in liste}
+        if nus != exemptes:
+            ecarts.append(
+                f"`{passage.fichier}`, « {passage.debut} » — sans ancre ni exemption :"
+                f" {sorted(nus - exemptes)} ; exemptions périmées : {sorted(exemptes - nus)}"
+            )
+
+    assert not ecarts, "\n".join(ecarts)
