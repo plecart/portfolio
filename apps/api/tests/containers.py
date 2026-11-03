@@ -57,7 +57,7 @@ def postgres() -> PostgresContainer:
 def running[C: DockerContainer](create: Callable[[], C]) -> Generator[C]:
     """Crée et démarre un conteneur pour la durée du bloc, puis l'arrête.
 
-    Générique : rien ici n'est propre à Postgres. #11 y passera son Redis.
+    Générique : rien ici n'est propre à Postgres.
 
     Args:
         create: la fabrique du conteneur. Elle est appelée ici, et non par l'appelant, parce que

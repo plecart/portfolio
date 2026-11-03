@@ -5,7 +5,7 @@ l'unique instance d'`Env` (`config/env.py`). Aucune valeur d'environnement en du
 ailleurs.
 
 Chaque réglage arrive avec la brique qui l'utilise, jamais « au cas où » (ADR 0001, « aucun
-résidu du squelette `startproject` »). Ce qui manque encore est délibéré : le cache Redis (#11).
+résidu du squelette `startproject` »).
 """
 
 import django_stubs_ext
@@ -87,6 +87,30 @@ MEDIA_URL = "media/"
 # Le broker du worker d'images (ADR 0015) : le Redis de l'ADR 0006, rôle 2. L'application Celery
 # lit les réglages préfixés `CELERY_` (`config/celery.py`) ; aucun backend de résultats.
 CELERY_BROKER_URL = str(env.REDIS_URL)
+
+# Le cache du contenu (ADR 0006, rôle 1 ; `content/cache.py`), dans le même Redis que le broker.
+# Chaque clé expire après `TIMEOUT` secondes. C'est un filet, pas le mécanisme : chaque écriture
+# du contenu vide le cache ; les 300 s bornent la fraîcheur d'une écriture qui échapperait aux
+# signaux — `QuerySet.update`, shell, migration de données (brief de #11, décision 5 ; ADR 0006,
+# « TTL courts »). Aucune clé du cache sans durée de vie : sous `volatile-lru`, les clés à durée de
+# vie sont les seules que Redis évince, et la file du broker n'en a pas (ADR 0015). Redis
+# injoignable ou muet : une connexion abandonne après 0,2 s, une réponse attendue aussi — sans ces
+# délais, la connexion attendrait celui du système, la réponse sans fin (redis-py 6.4) ;
+# l'exception est ignorée et journalisée (logger `django_redis.cache`), et la liste vient de la
+# base (décision 7).
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": str(env.REDIS_URL),
+        "TIMEOUT": 300,
+        "OPTIONS": {
+            "IGNORE_EXCEPTIONS": True,
+            "SOCKET_CONNECT_TIMEOUT": 0.2,
+            "SOCKET_TIMEOUT": 0.2,
+        },
+    }
+}
+DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"

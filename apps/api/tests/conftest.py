@@ -12,6 +12,7 @@ from config.celery import app as celery_app
 from config.database import database_settings
 from containers import postgres, running
 from django.conf import settings
+from django.core.cache import cache
 from django.core.management import call_command
 from django.test import Client, override_settings
 from process_environment import VALID_ENVIRONMENT
@@ -110,6 +111,29 @@ def synchronous_tasks() -> None:
     prouve rien du worker, que la fumée sur la pile complète éprouve (#26).
     """
     celery_app.conf.update(task_always_eager=True, task_eager_propagates=True)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def memory_cache() -> Generator[None]:
+    """Le cache du processus de test est en mémoire, à la durée de vie de celui de la production
+    (`TIMEOUT`) : la suite n'a besoin d'aucun Redis (ADR 0015, « Tests » ; brief de #11,
+    décision 1).
+
+    Posé ici, jamais par une branche des réglages, comme le mode synchrone de Celery : la
+    production reste sur Redis, et `test_cache.py` éprouve le vrai client sur une adresse
+    injoignable.
+    """
+    require_settings()
+    timeout = settings.CACHES["default"]["TIMEOUT"]
+    memory = {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "TIMEOUT": timeout}
+    with override_settings(CACHES={"default": memory}):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def empty_cache() -> None:
+    """Chaque test part d'un cache vide : le cache en mémoire survit d'un test à l'autre."""
+    cache.clear()
 
 
 @pytest.fixture
