@@ -14,10 +14,12 @@ from content.models import (
     Technology,
     TechnologyKind,
 )
+from django.core.cache import cache
 from django.db import connection
 from django.test import Client, override_settings
 from django.test.utils import CaptureQueriesContext
 from factories import gallery_image, project, saved, section, technology
+from pytest_django import DjangoCaptureOnCommitCallbacks
 from test_markdown_preview import importers
 
 PROJECTS = "/api/projets"
@@ -240,13 +242,15 @@ def test_le_contrat_n_expose_aucun_champ_ecarte(client: Client) -> None:
 @pytest.mark.django_db
 def test_la_liste_coute_autant_de_requetes_pour_un_projet_que_pour_douze(client: Client) -> None:
     """Le nombre de requêtes SQL ne dépend pas du nombre de projets (décision 12) : l'invariant est
-    l'égalité des deux décomptes, jamais leur valeur."""
+    l'égalité des deux décomptes, jamais leur valeur. Le cache vidé, le second appel lit la base
+    comme le premier."""
     employed = saved(technology())
     complete_project("projet-0", employed)
     with CaptureQueriesContext(connection) as single:
         listed(client)
     for index in range(1, 12):
         complete_project(f"projet-{index}", employed)
+    cache.clear()
 
     with CaptureQueriesContext(connection) as twelve:
         assert len(listed(client)) == 12
@@ -312,15 +316,19 @@ def test_la_liste_ne_pose_aucun_cookie(client: Client) -> None:
 
 
 @pytest.mark.django_db
-def test_l_etag_est_l_empreinte_du_corps(client: Client) -> None:
-    """Même contenu, même `ETag` ; une légende modifiée — un changement qu'`updated_at` du projet
-    ne voit pas — en change (décision 6)."""
+def test_l_etag_est_l_empreinte_du_corps(
+    client: Client, django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks
+) -> None:
+    """Même contenu, même `ETag` — le second appel est servi depuis le cache ; une légende
+    modifiée — un changement qu'`updated_at` du projet ne voit pas — en change, une fois
+    l'écriture validée et le cache vidé (décision 6 ; brief de #11, décision 3)."""
     published = complete_project("empreinte", saved(technology()))
 
     first, second = client.get(PROJECTS), client.get(PROJECTS)
     image = published.gallery.get()
     image.caption = "Une autre légende."
-    image.save()
+    with django_capture_on_commit_callbacks(execute=True):
+        image.save()
     third = client.get(PROJECTS)
 
     assert first["ETag"] == second["ETag"]

@@ -13,6 +13,7 @@ from django.views.decorators.cache import cache_control
 from ninja import NinjaAPI
 from ninja.decorators import decorate_view
 
+from content.cache import cached
 from content.models import Project, ProjectTechnology
 from content.schemas import ProjectOut
 
@@ -49,10 +50,13 @@ def published_projects() -> QuerySet[Project]:
 # `Cache-Control: no-cache` (décision 7) : le navigateur stocke la réponse et la revalide à chaque
 # visite par son `ETag`, que `ConditionalGetMiddleware` pose (décision 6). Un décorateur de vue
 # Django ne s'applique à une opération ninja que par `decorate_view` (doc django-ninja, « Using
-# @decorate_view ») : posé directement, il envelopperait le résultat avant sa sérialisation. Ni
+# @decorate_view ») : posé directement, il envelopperait le résultat avant sa sérialisation. Le plus
+# bas enveloppe l'opération au plus près : `cached` garde la réponse que ninja a rendue, et
+# `cache_control` repose son en-tête sur celle que le cache sert (`content/cache.py`, #11). Ni
 # session ni CSRF : aucun cookie (décision 9).
 @api.get("/projets", response=list[ProjectOut])
 @decorate_view(cache_control(no_cache=True))
+@decorate_view(cached("projets"))
 def projects(request: HttpRequest) -> QuerySet[Project]:
     """`GET /api/projets` : la liste nue des projets publiés, `[]` s'il n'y en a aucun.
 
