@@ -91,10 +91,18 @@ async function openFrozen(page: Page, path: string) {
 
 /**
  * Dans la page : chaque élément volant de la fiche — la feuille, la photo, le post-it, puis chaque
- * ruban — et son homologue sur la carte, avec sa seule animation, lue à son premier et à son dernier
- * instant.
+ * ruban — et son homologue sur la carte : sa boîte à l'instant, et sa seule animation, lue à son
+ * premier et à son dernier instant, puis rendue au sien.
+ *
+ * @param finish Achève d'abord les animations de la page et lit aussitôt, avant que la fiche n'en
+ *   tire la suite au microtâche suivant : ce que tient leur remplissage.
  */
-function readFlights(path: string) {
+function readFlights({ path, finish = false }: { path: string; finish?: boolean }) {
+  if (finish) {
+    for (const animation of document.getAnimations()) {
+      if (animation.constructor === Animation) animation.finish()
+    }
+  }
   const card = document.querySelector(`.card[href="${path}"]`)!
   const dialog = document.querySelector('[role="dialog"]')!
   const box = (element: Element) => {
@@ -112,14 +120,17 @@ function readFlights(path: string) {
     ]),
   ]
   return pairs.map(([element, homologue]) => {
+    const now = box(element)
     const flights = element.getAnimations().filter((animation) => animation.constructor === Animation)
     const [flight] = flights
+    const at = flight.currentTime
     flight.currentTime = 0
     const start = box(element)
     flight.currentTime = flight.effect!.getComputedTiming().endTime as number
     const end = box(element)
+    flight.currentTime = at
     const { duration, delay, easing } = flight.effect!.getTiming()
-    return { count: flights.length, start, end, homologue: box(homologue), duration, delay, easing }
+    return { count: flights.length, now, start, end, homologue: box(homologue), duration, delay, easing }
   })
 }
 
@@ -130,7 +141,7 @@ test('la feuille, la photo, le post-it et les rubans partent de leur homologue s
   const { open, ribbon, easing } = await motion(page)
   await openFrozen(page, FIRST_PATH)
 
-  const flights = await page.evaluate(readFlights, FIRST_PATH)
+  const flights = await page.evaluate(readFlights, { path: FIRST_PATH })
   const panelBox = await panel(page).evaluate((element) => element.getBoundingClientRect().toJSON())
 
   expect(flights.length).toBeGreaterThan(3)
@@ -390,7 +401,7 @@ test('à la fermeture, le contenu s’efface en `--dur-fast`, puis la feuille, l
   await finishAnimations(page)
 
   await expect(panel(page)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
-  const flights = await page.evaluate(readFlights, FIRST_PATH)
+  const flights = await page.evaluate(readFlights, { path: FIRST_PATH })
   expect(flights.length).toBeGreaterThan(3)
   for (const [index, flight] of flights.entries()) {
     expect(flight.count).toBe(1)
@@ -438,6 +449,67 @@ test('à la fermeture, les autres cartes reviennent à leur place en réapparais
     if (!('translate' in first)) continue
     expect(Math.hypot(...Object.values(offsetOf(first.translate)))).toBeCloseTo(48, 3)
     expect(offsetOf(last.translate)).toEqual({ x: 0, y: 0 })
+  }
+})
+
+/*
+ * Ce que tient le remplissage (`fill`) de chaque animation de `useChoreography`, dénombré dans sa
+ * source le 2026-11-03 (7738d91) : sept appels à `animate()`, onze animations par sens.
+ *
+ * - tiennent quelque chose, sept : le vol à l'aller (`backwards`, un ruban qui attend son retard
+ *   reste sur son homologue : test « … partent de leur homologue », lu au temps 0) ; le vol au retour
+ *   (`forwards`, sur la carte jusqu'au retrait) ; l'effacement des cartes à l'aller (`forwards`, tant
+ *   que la fiche est ouverte) ; l'apparition du contenu (`backwards`, caché jusqu'à la pose : test
+ *   « à la pose, le contenu monte… », lu au temps 0) ; son effacement (`forwards`) ; en mouvement
+ *   réduit, l'effacement des enfants du panneau puis du panneau (`forwards`, jusqu'au retrait) ;
+ * - ne tiennent rien, leur fin étant leur repos, quatre : le retour des cartes, les deux fondus de la
+ *   couche noir et blanc — retirée à l'aller, opaque au retour —, l'apparition du panneau en
+ *   mouvement réduit.
+ *
+ * Les cinq qui tiennent jusqu'au retrait ou tant que la fiche est ouverte sont épinglés ici ; chacun
+ * des sept rougit son test quand son remplissage est retiré (mutations du 2026-11-03).
+ */
+
+/** Dans la page : la couche d'entrée des cartes autres que `opened`, dans l'écran ou non, et sa pose. */
+function readEntries(opened: string) {
+  return [...document.querySelectorAll(`.card:not([href="${opened}"])`)].map((cell) => {
+    const { top, bottom } = cell.getBoundingClientRect()
+    const { opacity, translate } = getComputedStyle(cell.querySelector('.card-entry')!)
+    return { onScreen: bottom > 0 && top < innerHeight, opacity, translate }
+  })
+}
+
+test('au bout du retour, jusqu’au retrait du panneau, la feuille, la photo, le post-it et les rubans restent sur la carte, le contenu effacé', async ({
+  page,
+}) => {
+  await openEnteredTable(page, PROJECTS)
+  await openProject(page.locator(`.card[href="${FIRST_PATH}"]`))
+  await freezeAnimations(page)
+
+  await page.keyboard.press('Escape')
+  await finishAnimations(page)
+
+  for (const element of [closeButton(page), panel(page).locator('.project-gallery-bar'), readingColumn(page)]) {
+    await expect(element).toHaveCSS('opacity', '0')
+  }
+  const held = await page.evaluate(readFlights, { path: FIRST_PATH, finish: true })
+  expect(held.length).toBeGreaterThan(3)
+  for (const { now, homologue } of held) expectSameBox(now, homologue)
+})
+
+test('tant que la fiche est ouverte, les autres cartes restent effacées, et reculées dans l’écran', async ({
+  page,
+}) => {
+  await openEnteredTable(page, PROJECT_SETS.twelveWithShowcase)
+  const path = (await cards(page).nth(2).getAttribute('href'))!
+  await openProject(page.locator(`.card[href="${path}"]`))
+
+  const others = await page.evaluate(readEntries, path)
+
+  expect(others.filter(({ onScreen }) => onScreen).length).toBeGreaterThan(0)
+  for (const { onScreen, opacity, translate } of others) {
+    expect(opacity).toBe('0')
+    expect(translate === 'none').toBe(!onScreen)
   }
 })
 
@@ -624,5 +696,26 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
     await expectClosed(page)
     await expect(page.locator('html')).not.toHaveAttribute('data-project-open')
     await expect(card).toBeFocused()
+  })
+
+  test('au bout de la fermeture, jusqu’au retrait du panneau, la fiche et son contenu restent effacés', async ({
+    page,
+  }) => {
+    await openEnteredTable(page, PROJECTS)
+    await openProject(page.locator(`.card[href="${FIRST_PATH}"]`))
+    await freezeAnimations(page)
+
+    await page.keyboard.press('Escape')
+    await finishAnimations(page)
+    // Achevées et lues dans la même tâche : au microtâche suivant, la fiche quitte le document.
+    const opacities = await panel(page).evaluate((element) => {
+      for (const animation of document.getAnimations()) {
+        if (animation.constructor === Animation) animation.finish()
+      }
+      return [element, ...element.children].map((node) => getComputedStyle(node).opacity)
+    })
+
+    expect(opacities.length).toBeGreaterThan(2)
+    expect(new Set(opacities)).toEqual(new Set(['0']))
   })
 })
