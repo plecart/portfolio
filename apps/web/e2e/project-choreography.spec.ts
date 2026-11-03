@@ -454,11 +454,12 @@ test('à la fermeture, les autres cartes reviennent à leur place en réapparais
 
 /*
  * Ce que tient le remplissage (`fill`) de chaque animation de `useChoreography`, dénombré dans sa
- * source le 2026-11-03 (7738d91) : sept appels à `animate()`, onze animations par sens.
+ * source le 2026-11-03 : onze animations, une par sens de chaque mouvement.
  *
  * - tiennent quelque chose, sept : le vol à l'aller (`backwards`, un ruban qui attend son retard
  *   reste sur son homologue : test « … partent de leur homologue », lu au temps 0) ; le vol au retour
- *   (`forwards`, sur la carte jusqu'au retrait) ; l'effacement des cartes à l'aller (`forwards`, tant
+ *   (`both` : sur la carte jusqu'au retrait, et, pendant son retard, là où le ruban était : test
+ *   « … en plein vol … », lu au temps 0) ; l'effacement des cartes à l'aller (`forwards`, tant
  *   que la fiche est ouverte) ; l'apparition du contenu (`backwards`, caché jusqu'à la pose : test
  *   « à la pose, le contenu monte… », lu au temps 0) ; son effacement (`forwards`) ; en mouvement
  *   réduit, l'effacement des enfants du panneau puis du panneau (`forwards`, jusqu'au retrait) ;
@@ -597,6 +598,53 @@ for (const [moment, reach] of CANCELLATIONS) {
   })
 }
 
+/** Dans la page : place chaque animation de la Web Animations API à `time` ms de son début. */
+function seekAnimations(time: number) {
+  for (const animation of document.getAnimations()) {
+    if (animation.constructor === Animation) animation.currentTime = time
+  }
+}
+
+/** Les fermetures possibles en plein vol : le bouton n'y réagit pas encore. */
+const INTERRUPTIONS = CLOSINGS.filter(([name]) => name !== 'le bouton')
+
+for (const [name, close] of INTERRUPTIONS) {
+  test(`${name} en plein vol : chaque élément repart vers la carte d’où il est, en \`--dur-open\`, le contenu reste caché, et la fermeture va à son terme`, async ({
+    page,
+  }) => {
+    await openEnteredTable(page, PROJECTS)
+    const { open, easing } = await motion(page)
+    const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+    const resume = await openFrozen(page, FIRST_PATH)
+    await page.evaluate(seekAnimations, open / 2)
+    const flying = await page.evaluate(readFlights, { path: FIRST_PATH })
+    const receding = await page.evaluate(readEntries, FIRST_PATH)
+
+    await close(page)
+
+    const returning = await page.evaluate(readFlights, { path: FIRST_PATH })
+    expect(returning).toHaveLength(flying.length)
+    for (const [index, flight] of returning.entries()) {
+      expect(flight.count).toBe(1)
+      expectSameBox(flight.now, flying[index].now)
+      expectSameBox(flight.start, flying[index].now)
+      expectSameBox(flight.end, flight.homologue)
+      expect(flight).toMatchObject({ duration: open, easing })
+    }
+    expect(await page.evaluate(readEntries, FIRST_PATH)).toEqual(receding)
+    for (const element of [closeButton(page), panel(page).locator('.project-gallery-bar'), readingColumn(page)]) {
+      await expect(element).toHaveCSS('opacity', '0')
+    }
+
+    await resume()
+
+    await expectClosed(page)
+    await expect(page.locator('html')).not.toHaveAttribute('data-project-open')
+    await expect(card.locator('.card-photo')).toHaveCSS('opacity', '1')
+    await expect(card).toBeFocused()
+  })
+}
+
 test('sa carte d’origine sortie du document, la fiche se ferme par le fondu de sortie', async ({ page }) => {
   await openEnteredTable(page, PROJECTS)
   const card = page.locator(`.card[href="${FIRST_PATH}"]`)
@@ -695,6 +743,31 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
 
     await expectClosed(page)
     await expect(page.locator('html')).not.toHaveAttribute('data-project-open')
+    await expect(card).toBeFocused()
+  })
+
+  test('Échap pendant l’apparition : la fiche s’efface depuis son opacité, en `--dur-reduced`, et les cartes reviennent d’où elles sont', async ({
+    page,
+  }) => {
+    await openEnteredTable(page, PROJECTS)
+    const { fast, reduced } = await motion(page)
+    const card = page.locator(`.card[href="${FIRST_PATH}"]`)
+    const resume = await openFrozen(page, FIRST_PATH)
+    await page.evaluate(seekAnimations, fast / 2)
+    const appearing = await panel(page).evaluate((element) => getComputedStyle(element).opacity)
+    const fading = await page.evaluate(readEntries, '')
+
+    await page.keyboard.press('Escape')
+
+    const fiche = (await page.evaluate(readFades)).filter(({ target }) => target === 'project-panel')
+    expect(fiche).toEqual([
+      { target: 'project-panel', properties: ['opacity'], opacities: [appearing, '0'], duration: reduced, end: reduced },
+    ])
+    expect(await page.evaluate(readEntries, '')).toEqual(fading)
+
+    await resume()
+
+    await expectClosed(page)
     await expect(card).toBeFocused()
   })
 

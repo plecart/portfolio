@@ -27,9 +27,20 @@ const RIBBONS = ['.project-head .card-ribbon', '.card-band .card-ribbon'] as con
 const CONTENT =
   '.project-close, .project-gallery-arrow, .project-gallery-bar, .project-link, .project-scroll'
 
+/** La couche noir et blanc de la fiche, tant qu'elle vole (`fadeGrey`). */
+const GREY = '.project-gallery-track > .card-photo-grey'
+
 /** Les distances de spec §4.6, sans jeton : le recul des autres cartes, la montée du contenu. */
 const RECOIL = 48
 const CONTENT_RISE = '0px 8px'
+
+/** Visible, effacé : les deux bouts d'un fondu. */
+const SHOWN: Frame = { opacity: 1 }
+const HIDDEN: Frame = { opacity: 0 }
+
+/** Ce que change un vol : la translation et l'échelle, et l'opacité d'un ruban (spec §4.6). */
+const FLIGHT = ['translate', 'scale']
+const DIMMED_FLIGHT = [...FLIGHT, 'opacity']
 
 /**
  * Le mouvement réduit (spec §6.3), et les durées et la courbe de spec §2.7, lues dans les jetons au
@@ -51,20 +62,21 @@ function readMotion() {
 
 type Motion = ReturnType<typeof readMotion>
 
-/** Un élément de la fiche en vol : l'image clé qui le pose sur son homologue, et son retard. */
-type Leg = { element: HTMLElement; from: Frame; delay: number; dimmed: boolean }
+/** Un élément de la fiche qui vole : son homologue sur la carte, son retard, son creux d'opacité. */
+type Leg = { element: HTMLElement; homologue: Element; delay: number; dimmed: boolean }
 
 /** Une carte de la table : sa couche d'entrée, et son effacement, recul compris s'il y en a un. */
 type Move = { entry: HTMLElement; keyframes: Keyframe[] }
 
-/** Le sens d'un mouvement : de la carte à la fiche, ou le retour. */
-type Way = 'out' | 'back'
-
-/** Les temps de la fiche, qu'elle vole ou qu'elle se fonde ; les cartes de la table à part. */
+/**
+ * Les temps de la fiche, qu'elle vole ou qu'elle se fonde ; les cartes de la table à part. Le retour
+ * part toujours de ce que montre chaque élément (`relay`) : au repos, ou en plein mouvement quand la
+ * fermeture interrompt l'ouverture (décision de #22).
+ */
 type Steps = {
   /** L'ouverture, dont la première animation finit quand la fiche devient active. */
   out: () => Animation[]
-  /** Le premier temps du retour : ce qui s'efface d'abord. */
+  /** Le premier temps du retour : ce qui s'efface d'abord. Pas encore apparu, il reste caché. */
   clear: () => Animation[]
   /** Le second : ce qui revient à la carte, ou s'efface. */
   back: () => Animation[]
@@ -81,35 +93,60 @@ function startOn(element: HTMLElement, homologue: Element): Frame {
 
 /** Les trajets de la fiche (spec §4.6) : la feuille, la photo, le post-it, puis chaque ruban. */
 function legs(panel: HTMLElement, card: HTMLElement, { ribbonDelay }: Motion): Leg[] {
-  const travelers = TRAVELERS.map(([fiche, origin]) => {
-    const element = panel.querySelector<HTMLElement>(fiche)!
-    return { element, from: startOn(element, card.querySelector(origin)!), delay: 0, dimmed: false }
-  })
+  const travelers = TRAVELERS.map(([fiche, origin]) => ({
+    element: panel.querySelector<HTMLElement>(fiche)!,
+    homologue: card.querySelector(origin)!,
+    delay: 0,
+    dimmed: false,
+  }))
   const [fiche, origin] = RIBBONS
   const homologues = card.querySelectorAll(origin)
   const ribbons = [...panel.querySelectorAll<HTMLElement>(fiche)].map((element, index) => ({
     element,
-    from: startOn(element, homologues[index]),
+    homologue: homologues[index],
     delay: index * ribbonDelay,
     dimmed: true,
   }))
   return [...travelers, ...ribbons]
 }
 
+/** Ce que montre `element` à l'instant dans ces propriétés, animations comprises. */
+function shown(element: Element, properties: readonly string[]): Frame {
+  const style = getComputedStyle(element)
+  return Object.fromEntries(
+    properties.map((property) => [property, style.getPropertyValue(property)]),
+  )
+}
+
 /**
- * Fait voler chaque élément de son homologue à sa place en `--dur-open` (spec §4.6), ou de sa place
- * à son homologue au retour, où il reste jusqu'au retrait du panneau.
+ * Relaie des animations sans saut (décision de #22) : les suivantes partent de ce que montraient les
+ * éléments, relevé en argument, avant que les animations relayées ne soient retirées ; une mesure que
+ * prend `next` ne voit plus que le repos.
+ *
+ * @param from Ce que montre chaque élément (`shown`), au repos ou en plein mouvement.
+ * @param next Les animations suivantes, depuis ces relevés, dans leur ordre.
  */
-function fly(route: Leg[], { open, easing }: Motion, way: Way) {
-  const back = way === 'back'
-  return route.map(({ element, from, delay, dimmed }) => {
-    const [start, end] = back ? [AT_REST, from] : [from, AT_REST]
-    return element.animate(dimmed ? dimmedKeyframes(start, end) : [start, end], {
-      duration: open,
-      easing,
-      delay,
-      fill: back ? 'forwards' : 'backwards',
-    })
+function relay(relayed: Animation[], from: Frame[], next: (from: Frame[]) => Animation[]) {
+  for (const animation of relayed) animation.cancel()
+  return next(from)
+}
+
+/**
+ * Le vol d'un élément de `start` à `end` en `--dur-open`, après son retard (spec §4.6) ; un ruban
+ * passe par son creux d'opacité.
+ */
+function fly(
+  { element, delay, dimmed }: Leg,
+  start: Frame,
+  end: Frame,
+  { open, easing }: Motion,
+  fill: FillMode,
+) {
+  return element.animate(dimmed ? dimmedKeyframes(start, end) : [start, end], {
+    duration: open,
+    easing,
+    delay,
+    fill,
   })
 }
 
@@ -133,35 +170,53 @@ function cardMoves(card: HTMLElement, reduced: boolean): Move[] {
               { opacity: 1, translate: NO_SHIFT },
               { opacity: 0, translate: `${x}px ${y}px` },
             ]
-          : [{ opacity: 1 }, { opacity: 0 }]
+          : [SHOWN, HIDDEN]
       return { entry: cell.querySelector<HTMLElement>('.card-entry')!, keyframes }
     })
 }
 
-/**
- * Les cartes s'effacent, en `--dur-open`, ou en `--dur-fast` en mouvement réduit, et le restent ;
- * au retour, elles reviennent (spec §4.6, §6.3).
- */
-function moveCards(moves: Move[], { reduced, open, fast, easing }: Motion, way: Way) {
-  const back = way === 'back'
+/** Le temps d'un mouvement des cartes : `--dur-open`, ou `--dur-fast` en mouvement réduit (§6.3). */
+const cardTiming = ({ reduced, open, fast, easing }: Motion) => ({
+  duration: reduced ? fast : open,
+  easing,
+})
+
+/** Les cartes s'effacent, et le restent tant que la fiche est ouverte (spec §4.6, §6.3). */
+function recede(moves: Move[], motion: Motion) {
   return moves.map(({ entry, keyframes }) =>
-    entry.animate(back ? [...keyframes].reverse() : keyframes, {
-      duration: reduced ? fast : open,
-      easing,
-      fill: back ? 'none' : 'forwards',
-    }),
+    entry.animate(keyframes, { ...cardTiming(motion), fill: 'forwards' }),
+  )
+}
+
+/**
+ * Les cartes reviennent à leur place en réapparaissant (spec §4.6, §6.3), d'où elles sont : effacées,
+ * ou en route quand la fermeture interrompt l'ouverture.
+ */
+function comeBack(moves: Move[], receding: Animation[], motion: Motion) {
+  return relay(
+    receding,
+    moves.map(({ entry, keyframes: [rest] }) => shown(entry, Object.keys(rest))),
+    (froms) =>
+      moves.map(({ entry, keyframes: [rest] }, index) =>
+        entry.animate([froms[index], rest], cardTiming(motion)),
+      ),
   )
 }
 
 /**
  * La couche noir et blanc d'un projet en cours (spec §4.4, §4.6) : une copie grise de la première
- * image de la galerie, posée sur elle, qui s'efface pendant le vol, puis disparaît ; au retour, elle
- * revient, et part avec le panneau.
+ * image de la galerie, posée sur elle, qui s'efface pendant le vol puis disparaît ; au retour, elle
+ * revient depuis `from`, et part avec le panneau. Annulée, elle disparaît.
  *
  * @returns Son fondu ; aucun sans projet en cours ou sans image.
  */
-function fadeGrey(panel: HTMLElement, card: HTMLElement, { open, easing }: Motion, way: Way) {
-  const back = way === 'back'
+function fadeGrey(
+  panel: HTMLElement,
+  card: HTMLElement,
+  { open, easing }: Motion,
+  way: 'out' | 'back',
+  from = HIDDEN,
+) {
   const image = panel.querySelector('.project-gallery-image')
   if (!image || !card.querySelector('.card-photo-grey')) return []
   const grey = image.cloneNode() as HTMLImageElement
@@ -169,14 +224,11 @@ function fadeGrey(panel: HTMLElement, card: HTMLElement, { open, easing }: Motio
   grey.alt = ''
   grey.ariaHidden = 'true'
   image.after(grey)
-  const keyframes = [{ opacity: 1 }, { opacity: 0 }]
-  const fade = grey.animate(back ? keyframes.reverse() : keyframes, {
-    duration: open,
-    easing,
-    fill: back ? 'forwards' : 'none',
-  })
-  if (!back) fade.addEventListener('finish', () => grey.remove())
-  fade.addEventListener('cancel', () => grey.remove())
+  const out = way === 'out'
+  const fade = grey.animate(out ? [SHOWN, HIDDEN] : [from, SHOWN], { duration: open, easing })
+  const remove = () => grey.remove()
+  if (out) fade.addEventListener('finish', remove)
+  fade.addEventListener('cancel', remove)
   return [fade]
 }
 
@@ -193,10 +245,19 @@ function revealContent(panel: HTMLElement, { open, content, easing }: Motion) {
   )
 }
 
-/** Le reste de la fiche, qui s'efface le premier à la fermeture (spec §4.6), jusqu'au retrait. */
-function hideContent(panel: HTMLElement, { fast, easing }: Motion) {
-  return [...panel.querySelectorAll<HTMLElement>(CONTENT)].map((element) =>
-    element.animate([{ opacity: 0 }], { duration: fast, easing, fill: 'forwards' }),
+/**
+ * Le reste de la fiche, qui s'efface le premier à la fermeture (spec §4.6), depuis ce qu'il montre,
+ * jusqu'au retrait : pas encore apparu, il reste caché.
+ */
+function hideContent(panel: HTMLElement, reveals: Animation[], { fast, easing }: Motion) {
+  const content = [...panel.querySelectorAll<HTMLElement>(CONTENT)]
+  return relay(
+    reveals,
+    content.map((element) => shown(element, ['opacity', 'translate'])),
+    (froms) =>
+      content.map((element, index) =>
+        element.animate([froms[index], HIDDEN], { duration: fast, easing, fill: 'forwards' }),
+      ),
   )
 }
 
@@ -204,25 +265,41 @@ function hideContent(panel: HTMLElement, { fast, easing }: Motion) {
  * Le vol (spec §4.6) : à l'ouverture, le panneau, transparent, montre sa feuille posée sur la carte,
  * et la photo, le post-it et les rubans posés sur leurs homologues ; la carte se cache d'un coup, et
  * tout part ensemble, la feuille en tête. Au retour, le contenu s'efface ; puis le panneau redevient
- * transparent sur sa feuille, et tout repart vers la carte, mesuré de nouveau.
+ * transparent sur sa feuille, et tout repart vers la carte, mesurée de nouveau.
  */
 function flying(panel: HTMLElement, card: HTMLElement, motion: Motion): Steps {
+  const route = legs(panel, card, motion)
+  let outbound: Animation[] = []
+  let reveals: Animation[] = []
   return {
     out: () => {
       panel.setAttribute('data-flight', '')
-      const route = legs(panel, card, motion)
+      const starts = route.map(({ element, homologue }) => startOn(element, homologue))
       card.setAttribute('data-origin', '')
-      return [
-        ...fly(route, motion, 'out'),
+      outbound = [
+        ...route.map((leg, index) => fly(leg, starts[index], AT_REST, motion, 'backwards')),
         ...fadeGrey(panel, card, motion, 'out'),
-        ...revealContent(panel, motion),
       ]
+      reveals = revealContent(panel, motion)
+      return [...outbound, ...reveals]
     },
-    clear: () => hideContent(panel, motion),
+    clear: () => hideContent(panel, reveals, motion),
     back: () => {
       panel.setAttribute('data-flight', '')
-      const route = legs(panel, card, motion)
-      return [...fly(route, motion, 'back'), ...fadeGrey(panel, card, motion, 'back')]
+      // La couche qui s'efface encore, quand la fermeture interrompt l'ouverture.
+      const fading = panel.querySelector(GREY)
+      const grey = fading ? shown(fading, ['opacity']) : HIDDEN
+      return [
+        ...relay(
+          outbound,
+          route.map(({ element, dimmed }) => shown(element, dimmed ? DIMMED_FLIGHT : FLIGHT)),
+          (froms) =>
+            route.map((leg, index) =>
+              fly(leg, froms[index], startOn(leg.element, leg.homologue), motion, 'both'),
+            ),
+        ),
+        ...fadeGrey(panel, card, motion, 'back', grey),
+      ]
     },
   }
 }
@@ -233,18 +310,24 @@ function flying(panel: HTMLElement, card: HTMLElement, motion: Motion): Steps {
  * retour, son contenu s'efface en `--dur-reduced`, puis elle-même.
  */
 function fading(panel: HTMLElement, { fast, reducedFade, easing }: Motion): Steps {
-  const fadeOut = (element: Element) =>
-    element.animate([{ opacity: 0 }], { duration: reducedFade, easing, fill: 'forwards' })
+  let appearing: Animation[] = []
+  const fadeOut = (element: Element, from: Frame) =>
+    element.animate([from, HIDDEN], { duration: reducedFade, easing, fill: 'forwards' })
+  const fadeAllOut = (relayed: Animation[], elements: Element[]) =>
+    relay(
+      relayed,
+      elements.map((element) => shown(element, ['opacity'])),
+      (froms) => elements.map((element, index) => fadeOut(element, froms[index])),
+    )
   return {
-    out: () => [
-      panel.animate([{ opacity: 0 }, { opacity: 1 }], {
-        duration: fast,
-        endDelay: reducedFade - fast,
-        easing,
-      }),
-    ],
-    clear: () => [...panel.children].map(fadeOut),
-    back: () => [fadeOut(panel)],
+    out: () => {
+      appearing = [
+        panel.animate([HIDDEN, SHOWN], { duration: fast, endDelay: reducedFade - fast, easing }),
+      ]
+      return appearing
+    },
+    clear: () => fadeAllOut([], [...panel.children]),
+    back: () => fadeAllOut(appearing, [panel]),
   }
 }
 
@@ -271,20 +354,23 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
   const steps = motion.reduced ? fading(panel, motion) : flying(panel, card, motion)
   panel.setAttribute('data-choreography', '')
   const moves = cardMoves(card, motion.reduced)
-  const receding = moveCards(moves, motion, 'out')
+  const receding = recede(moves, motion)
   const flights = steps.out()
-  let landed = false
-  let aborted = false
-  // La pose, au bout du premier vol, même annulé en route ; jamais après l'abandon.
+  // En vol, posée, sur le retour, ou partie : revenue à sa carte, ou abandonnée.
+  let phase: 'flight' | 'posed' | 'return' | 'gone' = 'flight'
+
+  // La pose, au bout du premier vol, même annulé en route par un tiers ; jamais une fois le retour
+  // parti, qui l'annule.
   void allSettled([flights[0]]).then(() => {
-    if (aborted) return
+    if (phase !== 'flight') return
+    phase = 'posed'
     panel.removeAttribute('data-flight')
     panel.querySelector<HTMLElement>('.project-close')?.focus()
   })
 
   const abort = () => {
-    if (landed) return
-    aborted = true
+    if (phase === 'gone') return
+    phase = 'gone'
     for (const animation of [...flights, ...receding]) animation.cancel()
     card.removeAttribute('data-origin')
     panel.removeAttribute('data-flight')
@@ -293,24 +379,23 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
 
   /**
    * Le retour à la carte (spec §4.6, §6.3) : ce qui s'efface d'abord, puis le reste, pendant que les
-   * cartes de la table reviennent. Au bout du dernier, la carte réapparaît d'un coup sous la photo
-   * posée. Une carte sortie du document n'a plus de place où revenir : la fiche se retire alors par
-   * le fondu de sortie.
+   * cartes de la table reviennent. Une fermeture en plein vol repart de là où est chaque élément, et
+   * n'attend pas le contenu, qui n'est pas apparu (décision de #22). Au bout du dernier, la carte
+   * réapparaît d'un coup sous la photo posée. Une carte sortie du document n'a plus de place où
+   * revenir : la fiche se retire alors par le fondu de sortie.
    */
   const land = async () => {
     if (!card.isConnected) {
       abort()
       return
     }
-    // ponytail: fermée en vol, la fiche se pose d'abord d'un coup ; le retour depuis la position
-    // courante de chaque élément (décision de #22) remplacera ce saut.
-    for (const animation of flights) animation.finish()
-    await allSettled(steps.clear())
-    const back = steps.back()
-    for (const animation of receding) animation.cancel()
-    await allSettled([...back, ...moveCards(moves, motion, 'back')])
+    const posed = phase === 'posed'
+    phase = 'return'
+    const clearing = steps.clear()
+    if (posed) await allSettled(clearing)
+    await allSettled([...steps.back(), ...comeBack(moves, receding, motion)])
     card.removeAttribute('data-origin')
-    landed = true
+    phase = 'gone'
   }
 
   return { land, abort }

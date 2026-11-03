@@ -170,4 +170,8 @@ describe('les images clés d’un ruban en vol (spec §4.6)', () => {
   test('au retour, le même creux, du repos vers la carte', () => {
     expect(dimmedKeyframes(AT_REST, START).at(-1)).toEqual({ ...START, opacity: 1 })
   })
+
+  test('un départ relevé en plein creux garde son opacité : le retour d’une ouverture interrompue', () => {
+    expect(dimmedKeyframes({ ...START, opacity: '0.5' }, AT_REST)[0]).toEqual({ ...START, opacity: '0.5' })
+  })
 })
