@@ -6851,7 +6851,10 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
         SESSION_RELECTURE_REF,
         "`/security-review`, **seulement** si le diff touche une zone sensible ou une surface exposée",
     ),
-    "reprise-apres-une-fin-de-tour": (SESSION_RELECTURE_REF, "répond « reprends la passe <k> »"),
+    "reprise-apres-une-fin-de-tour": (
+        SESSION_RELECTURE_REF,
+        "réveillée par la fin de tour sans message de constats, répond « reprends la passe <k> »",
+    ),
     "note-jamais-un-constat": (
         SESSION_RELECTURE_REF,
         "La note de fin de tour n'est jamais un constat",
@@ -6882,7 +6885,12 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
     ),
     "repli-commandes-jouees-par-la-session-pr": (
         SESSION_RELECTURE_REF,
-        "joue elle-même les deux commandes intégrées avant lui",
+        (
+            "Quand la session ne peut pas démarrer — go sans tour du mainteneur, `start_session`"
+            " refusé —, la session PR lance le sous-agent `relecteur` (frontmatter de"
+            " `.claude/agents/relecteur.md`) et joue elle-même les deux commandes intégrées avant"
+            " lui"
+        ),
     ),
     "repli-agent-neuf-seulement-injoignable": (
         SESSION_RELECTURE_REF,
@@ -6930,8 +6938,9 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
     "securite-constats-hors-plage-ecartes": (
         SESSION_RELECTURE_REF,
         (
-            "elle relit aussi ce que la branche d'intégration a déjà reçu, et ses constats hors de la"
-            " plage s'écartent"
+            "sur une PR dont la base n'est pas le trunk — une PR de lot coordonné —, elle relit"
+            " aussi ce que la branche d'intégration a déjà reçu, et ses constats hors de la plage"
+            " s'écartent"
         ),
     ),
     "config-securite-constats-hors-plage-ecartes": (
@@ -7484,19 +7493,75 @@ def texte_du_passage(passage: Passage) -> str:
     return texte[debut : texte.index(passage.fin, debut) if passage.fin else None]
 
 
-def morceaux_nus(texte: str, ancres: Iterable[str]) -> set[str]:
-    """Les morceaux du texte qu'aucune ancre ne recouvre à sa place : une ancre qui enjambe deux
-    morceaux les tient l'un et l'autre, et un morceau ne se tient pas par une ancre qui porte son
-    texte ailleurs."""
-    zones = [(m.start(), m.end()) for ancre in ancres for m in re.finditer(re.escape(ancre), texte)]
-    nus: set[str] = set()
+def morceaux_situes(texte: str) -> Iterator[tuple[int, int, str]]:
+    """Chaque morceau du texte (`morceaux_du_texte`) avec ses positions de début et de fin."""
     fin = 0
     for morceau in morceaux_du_texte(texte):
         debut = texte.index(morceau, fin)
         fin = debut + len(morceau)
-        if not any(gauche < fin and debut < droite for gauche, droite in zones):
-            nus.add(morceau)
-    return nus
+        yield debut, fin, morceau
+
+
+def zones_des_ancres(texte: str, ancres: Iterable[str]) -> list[tuple[int, int]]:
+    """Les positions de chaque occurrence de chaque ancre dans le texte."""
+    return [(m.start(), m.end()) for ancre in ancres for m in re.finditer(re.escape(ancre), texte)]
+
+
+def morceaux_nus(texte: str, ancres: Iterable[str]) -> set[str]:
+    """Les morceaux du texte qu'aucune ancre ne recouvre à sa place : une ancre qui enjambe deux
+    morceaux les tient l'un et l'autre, et un morceau ne se tient pas par une ancre qui porte son
+    texte ailleurs."""
+    zones = zones_des_ancres(texte, ancres)
+    return {
+        morceau
+        for debut, fin, morceau in morceaux_situes(texte)
+        if not any(gauche < fin and debut < droite for gauche, droite in zones)
+    }
+
+
+# Les marques d'une moitié restrictive (`cycle-pr/references/tests.md`, « Le rouge se constate, il
+# ne se suppose pas », huitième cas), en mots entiers : « ne … que » se lit par « ne » ou « n' ».
+MARQUES_RESTRICTIVES = (
+    "jamais",
+    "seule",
+    "seul",
+    "seulement",
+    "reste à",
+    "ne",
+    "n'",
+    "ni",
+    "sans",
+    "aucun",
+    "aucune",
+)
+MARQUE_RESTRICTIVE = re.compile(
+    r"(?<!\w)(?:"
+    + "|".join(
+        re.escape(marque) + ("" if marque.endswith("'") else r"(?!\w)")
+        for marque in sorted(MARQUES_RESTRICTIVES, key=len, reverse=True)
+    )
+    + ")",
+    re.IGNORECASE,
+)
+
+
+def restrictions_hors_ancre(texte: str, ancres: Iterable[str]) -> dict[str, list[str]]:
+    """Pour chaque morceau tenu par une ancre, les marques restrictives de la part qu'aucune ancre
+    ne recouvre : elles y changeraient en vert (obs 126). Le code en ligne n'en porte aucune — un
+    gabarit ou une commande s'y lit comme un littéral."""
+    zones = zones_des_ancres(texte, ancres)
+    masque = list(texte)
+    for code in re.finditer(r"`[^`]*`", texte):
+        masque[code.start() : code.end()] = " " * (code.end() - code.start())
+    for gauche, droite in zones:
+        masque[gauche:droite] = " " * (droite - gauche)
+    nu = "".join(masque)
+    return {
+        morceau: [marque.group(0) for marque in MARQUE_RESTRICTIVE.finditer(nu, debut, fin)]
+        for debut, fin, morceau in morceaux_situes(texte)
+        if any(gauche < fin and debut < droite for gauche, droite in zones)
+        and MARQUE_RESTRICTIVE.search(nu, debut, fin)
+    }
 
 
 # Le protocole de la session de relecture, son fichier entier : la population que recomptait le
@@ -8322,8 +8387,9 @@ INVARIANTS_DE_LA_REGLE_DU_SUJET = {
     "cycle-pr-bilan-hors-du-depot": (
         CYCLE_PR_SKILL,
         (
-            "dans `retrospectives/<date>-<issue>.md`, dossier voisin du journal d'observations"
-            " (chemin dans `CLAUDE.md`), hors du dépôt"
+            "un défaut ne se voit qu'après le merge de la PR qui l'a introduit, son propre bilan"
+            " ne peut pas le compter) — dans `retrospectives/<date>-<issue>.md`, dossier voisin du"
+            " journal d'observations (chemin dans `CLAUDE.md`), hors du dépôt"
         ),
     ),
     "briefing-bloc-650-lignes": (
@@ -8960,7 +9026,11 @@ INVARIANTS_DE_LA_PORTE_DE_MERGE = {
     ),
     "verificateur-case-contradictoire-en-avertissement": (
         VERIFICATEUR_ROLE,
-        "une case du brief qui contredit le corps sort en ⚠️, avec les deux citations",
+        (
+            "une case du brief qui contredit le corps sort en ⚠️, avec les deux citations, comme «"
+            " (−2° à +2°, §4.1) », restée au brief de #167 après l'amendement `[V]` qui n'avait"
+            " réécrit que le corps"
+        ),
     ),
     "verificateur-la-reference-de-la-forge-ne-prouve-rien": (
         VERIFICATEUR_ROLE,
@@ -8972,7 +9042,10 @@ INVARIANTS_DE_LA_PORTE_DE_MERGE = {
     ),
     "pr-paralleles-jamais-la-reference-de-la-forge": (
         PR_PARALLELES_SKILL,
-        "jamais dans la référence que porte la forge",
+        (
+            "jamais dans la référence que porte la forge, que GitHub ne recalcule pas d'office et"
+            " qu'un run peut ne pas avoir extraite"
+        ),
     ),
     "hors-scope-releve-en-debut-de-ligne": (
         HORS_SCOPE_REF,
@@ -9078,7 +9151,10 @@ INVARIANTS_DE_LA_PORTE_DE_MERGE = {
     ),
     "cycle-pr-merge-tree-s-enchaine-par-et": (
         CYCLE_PR_SKILL,
-        "donc il s'enchaîne par `&&`, et ce qu'il imprime n'est qu'un détail de diagnostic",
+        (
+            "il sort en 0 sans conflit et en 1 avec (mesuré le 2026-10-13, témoin de chaque côté),"
+            " donc il s'enchaîne par `&&`, et ce qu'il imprime n'est qu'un détail de diagnostic"
+        ),
     ),
     "cycle-pr-mergeable-ne-prouve-rien": (
         CYCLE_PR_SKILL,
@@ -9343,7 +9419,10 @@ INVARIANTS_DE_LA_PORTE_DE_MERGE = {
             " ne change pas de branche"
         ),
     ),
-    "hors-scope-presentee-au-mainteneur": (HORS_SCOPE_REF, "et la présente au mainteneur"),
+    "hors-scope-presentee-au-mainteneur": (
+        HORS_SCOPE_REF,
+        "`ecriture-relue.py` n'a pas de `pr create`) et la présente au mainteneur",
+    ),
     "hors-scope-merge-au-go-par-la-porte": (
         HORS_SCOPE_REF,
         (
@@ -9862,6 +9941,7 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
         PIPELINE_CONFIG,
         "relevé entre 20:36 et 20:52 UTC : `rtk rewrite` sort en 1 sans rien rendre sur",
     ),
+    "rtk-redirection-reecrit-le-grep-seul": (PIPELINE_CONFIG, "etoile.txt` seul ;"),
     "rtk-redirection-4-seul-1-derriere": (
         PIPELINE_CONFIG,
         "ce `grep` rend 4 seul, et 1 derrière `printf 'x' > r.txt &&` ;",
@@ -9895,7 +9975,11 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
     ),
     "permissions-porte-merge-en-allow": (
         PIPELINE_CONFIG,
-        "`.claude/skills/cycle-pr/scripts/porte-merge.py` est en `allow` sous une forme unique",
+        (
+            "`.claude/skills/cycle-pr/scripts/porte-merge.py` est en `allow` sous une forme"
+            " unique, comme `merge-lot.py` — `rtk rewrite` ne réécrit pas `python …` (sortie 1 sans"
+            " rien rendre, mesuré le 2026-11-03)"
+        ),
     ),
     "permissions-porte-merge-edition-sans-deny": (
         PIPELINE_CONFIG,
@@ -9933,7 +10017,10 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
     ),
     "cloture-repercussions-quand-elle-est-due": (
         CLOTURE_REF,
-        "quand elle est due (`cycle-pr` Étape 8)",
+        (
+            "La PR n'est **terminée qu'après la passe `repercussions`**, quand elle est due"
+            " (`cycle-pr` Étape 8)"
+        ),
     ),
     "cloture-due-sur-un-lot-leger": (
         CLOTURE_REF,
@@ -10119,7 +10206,10 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
             " réécrit), `ls`, `wc`, `grep`"
         ),
     ),
-    "rtk-ni-git-ni-sed": (PIPELINE_CONFIG, "ni `git …` ni `sed`, ni l'outil PowerShell"),
+    "rtk-ni-git-ni-sed": (
+        PIPELINE_CONFIG,
+        "ni `git …` ni `sed`, ni l'outil PowerShell (son matcher ne vise que `Bash`)",
+    ),
     "rtk-permissions-sur-la-forme-reecrite": (
         PIPELINE_CONFIG,
         "Les règles de permission sont évaluées sur la forme **réécrite**",
@@ -10128,7 +10218,13 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
         PIPELINE_CONFIG,
         "c'est pourquoi les entrées `allow` de `.claude/settings.json` commencent par `rtk`",
     ),
-    "rtk-les-deux-formes-se-doublent": (PIPELINE_CONFIG, "les deux se doublent à dessein"),
+    "rtk-les-deux-formes-se-doublent": (
+        PIPELINE_CONFIG,
+        (
+            "les entrées `rtk` sont celles que le harnais évalue sans lui — les deux se doublent à"
+            " dessein"
+        ),
+    ),
     "permissions-ask-avant-allow": (
         PIPELINE_CONFIG,
         "Un `ask` passe avant tout `allow`, y compris celui qu'un hook renvoie",
@@ -10151,7 +10247,9 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
         (
             "Seule exception, hors du trunk : le script"
             " `.claude/skills/cycle-pr/scripts/merge-lot.py`, autorisé en `allow`, qui lance"
-            " lui-même `gh pr merge` vers une branche d'intégration et refuse le trunk"
+            " lui-même `gh pr merge` vers une branche d'intégration et refuse le trunk (`cycle-pr`"
+            " Étape 7, « Le merge d'un lot ») — un sous-processus, que les règles du harnais ne"
+            " voient pas"
         ),
     ),
     "permissions-merge-lot-ecriture-en-deny": (
@@ -10226,11 +10324,13 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
         PLAN_QA_SKILL,
         "un caractère spécial s'y écrit entre crochets — `[[]`, `[]]`, `[*]`, `[(]`, `[)]` —",
     ),
+    "plan-qa-argument-sans-espace": (PLAN_QA_SKILL, "à un argument sans espace"),
     "plan-qa-rtk-grep-a-cache-la-case": (
         PLAN_QA_SKILL,
         (
             "le hook le réécrit en `rtk grep`, dont la sortie reformatée et tronquée a caché la"
-            " case sans type d'un brouillon témoin"
+            " case sans type d'un brouillon témoin — rejouée le 2026-11-03 vers 17:30 UTC,"
+            " l'ancienne forme de « Cases sans type » a rendu « 42 matches in 1 files:"
         ),
     ),
     "plan-qa-renvoi-aux-frontieres-tierces": (
@@ -10682,20 +10782,23 @@ PASSAGES_DECLARES: dict[str, tuple[Passage, ...]] = {
 }
 
 
+def ancres_du_passage(table: str, passage: Passage) -> list[str]:
+    """Les phrases de la table sur le fichier du passage, et les ancres qu'il emprunte."""
+    invariants: dict[str, tuple[str, str]] = globals()[table]
+    ancres = [phrase for fichier, phrase in invariants.values() if fichier == passage.fichier]
+    return [*ancres, *passage.empruntees]
+
+
 @pytest.mark.parametrize("table", PASSAGES_DECLARES)
 def test_chaque_morceau_d_un_passage_declare_tient_une_ancre(table: str) -> None:
     """Chaque morceau d'un passage déclaré (`morceaux_du_texte`) tient une ancre — une phrase de la
     table sur ce fichier, ou une ancre empruntée — ou figure parmi les exemptions du passage : un
-    énoncé ajouté sans ancre rougit, une exemption périmée aussi. **Borne** : un morceau tenu en
-    partie n'est gardé que sur son ancre, le reste peut changer en vert ; c'est pourquoi une ancre
-    couvre la moitié restrictive de son morceau (`cycle-pr/references/tests.md`, « Le rouge se
-    constate, il ne se suppose pas », obs 126)."""
-    invariants: dict[str, tuple[str, str]] = globals()[table]
+    énoncé ajouté sans ancre rougit, une exemption périmée aussi. Un morceau tenu en partie n'est
+    gardé que sur son ancre : sa moitié restrictive l'est par le test suivant."""
     ecarts: list[str] = []
     for passage in PASSAGES_DECLARES[table]:
         assert set(passage.exemptions) <= set(CATEGORIES_D_EXEMPTION), passage.exemptions.keys()
-        ancres = [phrase for fichier, phrase in invariants.values() if fichier == passage.fichier]
-        nus = morceaux_nus(texte_du_passage(passage), [*ancres, *passage.empruntees])
+        nus = morceaux_nus(texte_du_passage(passage), ancres_du_passage(table, passage))
         exemptes = {morceau for liste in passage.exemptions.values() for morceau in liste}
         if nus != exemptes:
             ecarts.append(
@@ -10704,6 +10807,43 @@ def test_chaque_morceau_d_un_passage_declare_tient_une_ancre(table: str) -> None
             )
 
     assert not ecarts, "\n".join(ecarts)
+
+
+@pytest.mark.parametrize("table", PASSAGES_DECLARES)
+def test_chaque_moitie_restrictive_d_un_morceau_tenu_est_sous_une_ancre(table: str) -> None:
+    """Dans un morceau tenu, la part qu'aucune ancre ne recouvre ne porte aucune marque de
+    `MARQUES_RESTRICTIVES` : l'ancre couvre chaque moitié restrictive (huitième cas de « Le rouge
+    se constate, il ne se suppose pas », `cycle-pr/references/tests.md`). Sans ce test, une ancre
+    qui recouvre un seul caractère du morceau le tient en entier, et retirer sa restriction restait
+    vert (passe 2 de relecture de la PR #220, I2)."""
+    fuites = [
+        f"`{passage.fichier}` : {marques} hors ancre dans « {morceau} »"
+        for passage in PASSAGES_DECLARES[table]
+        for morceau, marques in restrictions_hors_ancre(
+            texte_du_passage(passage), ancres_du_passage(table, passage)
+        ).items()
+    ]
+
+    assert not fuites, "\n".join(fuites)
+
+
+# Les ancres d'une table du registre que leur texte fait paraître plus d'une fois dans leur fichier,
+# chacune avec son motif : une ancre doublée tient toutes les places où elle apparaît.
+ANCRES_DOUBLEES: dict[str, dict[str, str]] = {}
+
+
+@pytest.mark.parametrize("table", PASSAGES_DECLARES)
+def test_chaque_ancre_d_une_table_du_registre_est_seule_dans_son_fichier(table: str) -> None:
+    """Une ancre qui paraît deux fois dans son fichier laisse vert le test de présence quand on
+    retire l'une, et tient les deux places au recompte (passe 2 de relecture de la PR #220, I2)."""
+    invariants: dict[str, tuple[str, str]] = globals()[table]
+    doublees = {
+        cle
+        for cle, (fichier, phrase) in invariants.items()
+        if texte_normalise(fichier).count(phrase) > 1
+    }
+
+    assert doublees == set(ANCRES_DOUBLEES.get(table, {})), sorted(doublees)
 
 
 # Les tables que le lot 2 de #198 couvre (D-7), hors du registre jusque-là.
