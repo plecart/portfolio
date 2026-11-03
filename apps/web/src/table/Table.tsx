@@ -76,7 +76,7 @@ function LoadError({ onRetry, focusRetry }: { onRetry: () => void; focusRetry: b
           ref={retry}
           type="button"
           onClick={onRetry}
-          className="mx-auto block cursor-pointer text-(--accent) underline underline-offset-[3px] transition-colors hover:text-(--ink)"
+          className="mx-auto block text-(--accent) underline underline-offset-[3px] transition-colors hover:text-(--ink)"
         >
           {strings.retry}
         </button>
