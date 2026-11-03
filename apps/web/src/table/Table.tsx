@@ -98,7 +98,8 @@ function LoadError({ onRetry, focusRetry }: { onRetry: () => void; focusRetry: b
  * @param retried Une relance a déjà eu lieu : le message qui revient reprend le focus, et la table
  *   qui arrive le donne à sa première carte, le bouton activé ayant disparu.
  * @param onOpen Ouvre la fiche d'un projet, depuis le clic sur sa carte, qu'il reçoit.
- * @param projectOpen La fiche est ouverte : les cartes attendent sa fermeture pour entrer.
+ * @param projectOpen La fiche est à l'écran, retour à sa carte compris : les cartes attendent
+ *   qu'elle en parte pour entrer.
  */
 export function Table({
   ref,

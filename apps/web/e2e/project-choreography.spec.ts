@@ -23,7 +23,7 @@ import {
   watchAnimations,
 } from './project.ts'
 import { buildImage, PROJECT_SETS } from './projects.ts'
-import { cards, enterCards, openTable } from './table.ts'
+import { cards, COLUMN_VIEWPORT, countCellReads, enterCards, expectPlacement, openTable } from './table.ts'
 
 /** Trois projets ; la première carte, celle d'un projet en cours, à une seule image. */
 const PROJECTS = PROJECT_SETS.threeWithoutShowcase
@@ -322,6 +322,38 @@ test('pendant le vol, ni une cellule de la table ni sa grille ne se transforment
   })
 
   expect(transformed).toBe(0)
+})
+
+test('de l’ouverture à la fin du retour, la mesure des liens de l’auteur n’est pas relue, et, relue de force, rend la même forme', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, 'la colonne demande la largeur du bureau')
+  const cellReads = await countCellReads(page)
+  // 118 px de marge à 1280 px (spec §3.1) : un recul de 48 px posé sur une cellule la passerait
+  // sous les 76 px qui admettent la colonne (§3.4).
+  await page.setViewportSize(COLUMN_VIEWPORT)
+  await openEnteredTable(page, PROJECT_SETS.twelveWithShowcase)
+  const { open } = await motion(page)
+  await expectPlacement(page, 'column')
+  await openFrozen(page, (await cards(page).nth(2).getAttribute('href'))!)
+  const instants: [string, () => Promise<unknown>][] = [
+    ['en plein vol', () => page.evaluate(seekAnimations, open / 2)],
+    ['à la pose', () => page.evaluate(seekAnimations, open)],
+    ['à la demande de fermeture', () => page.keyboard.press('Escape')],
+    ['au départ du retour', () => finishAnimations(page)],
+    ['en plein retour', () => page.evaluate(seekAnimations, open / 2)],
+  ]
+
+  for (const [instant, reach] of instants) {
+    const before = await cellReads()
+    await reach()
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)))
+    expect(await cellReads(), instant).toBe(before)
+    await page.evaluate(() => dispatchEvent(new Event('resize')))
+    expect(await cellReads(), instant).toBeGreaterThan(before)
+    await expectPlacement(page, 'column')
+  }
 })
 
 test('à la pose, le contenu monte de 8 px en `--dur-content`, puis « Fermer la fiche » prend le focus, que le panneau tient sans anneau d’ici là', async ({
