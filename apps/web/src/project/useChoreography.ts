@@ -274,8 +274,11 @@ function flying(panel: HTMLElement, card: HTMLElement, motion: Motion): Steps {
   return {
     out: () => {
       panel.setAttribute('data-flight', '')
-      const starts = route.map(({ element, homologue }) => startOn(element, homologue))
+      // Mesurée à plat : marquée, la carte perd d'un coup l'inclinaison que le pointeur y a laissée
+      // (`useCardTilt`), qu'elle la porte ou qu'elle la rende.
       card.setAttribute('data-origin', '')
+      card.querySelector<HTMLElement>('.card-tilt')!.style.removeProperty('transform')
+      const starts = route.map(({ element, homologue }) => startOn(element, homologue))
       outbound = [
         ...route.map((leg, index) => fly(leg, starts[index], AT_REST, motion, 'backwards')),
         ...fadeGrey(panel, card, motion, 'out'),

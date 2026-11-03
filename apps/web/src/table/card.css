@@ -384,9 +384,9 @@
 
   /* La carte d'où la fiche s'envole (§4.6), que `useChoreography` marque jusqu'à son retour : sa
      photo, son post-it, sa bande, son papier et ses ombres disparaissent d'un coup ; sa pose revient
-     à 0° et son trombone monte en s'effaçant. Après les états d'intention, qu'elle remplace. Photo,
-     post-it, bande, papier, ombre au repos et trombone reviennent d'un coup : hors de ce bloc, aucun
-     ne transite. */
+     à 0° et son trombone monte en s'effaçant ; son inclinaison tombe d'un coup, avant la mesure du
+     vol. Après les états d'intention, qu'elle remplace. Photo, post-it, bande, papier, ombre au repos
+     et trombone reviennent d'un coup : hors de ce bloc, aucun ne transite. */
   .card[data-origin] {
     :is(.card-photo, .card-postit, .card-band) {
       opacity: 0;
@@ -399,6 +399,10 @@
 
     .card-face::after {
       opacity: 0;
+      transition: none;
+    }
+
+    .card-tilt {
       transition: none;
     }
 
