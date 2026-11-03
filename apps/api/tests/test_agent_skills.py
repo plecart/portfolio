@@ -9954,6 +9954,38 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
             " sans rien rendre"
         ),
     ),
+    "repercussions-description-lot-leger": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Aussi au merge d'une PR de lot léger intermédiaire, dont l'issue reste en vol et ne"
+            " s'édite pas"
+        ),
+    ),
+    "repercussions-argument-pr-de-lot-leger": (
+        REPERCUSSIONS_SKILL,
+        "[#issue fermée | #PR d'amendement | #PR de lot léger]",
+    ),
+    "repercussions-lot-leger-delta-reel": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Avec une PR de lot léger intermédiaire — mergée vers `<trunk>` avec la ligne `En vol"
+            " pour #<N> (lot k/n)` et sans `Closes`"
+        ),
+    ),
+    "repercussions-lot-leger-issue-en-vol-sans-pr": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Son issue `#<N>` reste **en vol** même sans PR ouverte, le lot suivant n'ayant pas"
+            " encore forcément la sienne"
+        ),
+    ),
+    "repercussions-lot-leger-issue-pas-editee": (
+        REPERCUSSIONS_SKILL,
+        (
+            "elle se classe en vol à l'étape 2 et ne s'édite pas (étape 5, « Issues en vol →"
+            " signaler sur la PR, ne rien éditer »)"
+        ),
+    ),
     "rtk-sortie-tronquee": (PIPELINE_CONFIG, "la sortie d'une commande réécrite est **tronquée**"),
     "rtk-tronquee-aussi-en-tete-d-un-tube": (
         PIPELINE_CONFIG,
@@ -10422,6 +10454,47 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
             " en plusieurs lots », où c'est le lead qui démarre la session du lot suivant"
         ),
     ),
+    "repercussions-description-cloture": (
+        REPERCUSSIONS_SKILL,
+        (
+            "À la clôture d'une issue (PR mergée), corrige la planification des autres issues"
+            " ouvertes que cette clôture a rendues fausses"
+        ),
+    ),
+    "repercussions-livrable-jamais-un-commentaire": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Le livrable est une édition de la spec des issues impactées — corps et brief d'agent"
+            " — jamais un commentaire"
+        ),
+    ),
+    "repercussions-a-utiliser-apres-un-merge": (
+        REPERCUSSIONS_SKILL,
+        "À utiliser juste après un merge qui ferme une issue",
+    ),
+    "repercussions-aussi-pr-d-amendement": (
+        REPERCUSSIONS_SKILL,
+        "Aussi au merge d'une PR d'amendement ouverte par `contradiction`",
+    ),
+    "repercussions-lot-leger-passe-due": (
+        REPERCUSSIONS_SKILL,
+        "la passe y est due (`cycle-pr` Étape 8) —, le delta réel est cette PR",
+    ),
+    "repercussions-lot-leger-etapes-2-a-6": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Les étapes 2 à 6 s'appliquent aux autres issues ouvertes, le thème de `#<N>` tenant"
+            " lieu de thème de l'issue fermée"
+        ),
+    ),
+    "repercussions-lot-leger-etape-7-sans-objet": (
+        REPERCUSSIONS_SKILL,
+        "l'étape 7 est sans objet, aucune issue ne s'étant fermée",
+    ),
+    "repercussions-lot-leger-cle-d-idempotence": (
+        REPERCUSSIONS_SKILL,
+        "la ligne de journal et la clé d'idempotence citent cette PR, comme en mode amendement",
+    ),
 }
 
 
@@ -10749,6 +10822,24 @@ PASSAGES_DES_CONFORTS_DE_PIPELINE = (
                 ),
             ],
         },
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "description: À la clôture d'une issue (PR mergée)",
+        "Mouvement **sortant** de la pipeline",
+        {
+            "intitulé": [
+                "description:",
+                "argument-hint:",
+                '<sortie>]" --- Répercussions',
+            ],
+        },
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "Avec une PR de lot léger intermédiaire",
+        "Écrire un résumé court de **ce que cette clôture",
+        {},
     ),
 )
 

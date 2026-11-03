@@ -1,7 +1,7 @@
 ---
 name: repercussions
-description: À la clôture d'une issue (PR mergée), corrige la planification des autres issues ouvertes que cette clôture a rendues fausses — hypothèses caduques, contrats déplacés, périmètres déjà couverts, ordres de dépendance. Le livrable est une édition de la spec des issues impactées — corps et brief d'agent — jamais un commentaire. À utiliser juste après un merge qui ferme une issue, ou « vérifie l'impact de cette issue sur les autres ». Aussi au merge d'une PR d'amendement ouverte par `contradiction`.
-argument-hint: "[#issue fermée | #PR d'amendement] [bloc d'arrêt et contradiction soldée : <sortie>]"
+description: À la clôture d'une issue (PR mergée), corrige la planification des autres issues ouvertes que cette clôture a rendues fausses — hypothèses caduques, contrats déplacés, périmètres déjà couverts, ordres de dépendance. Le livrable est une édition de la spec des issues impactées — corps et brief d'agent — jamais un commentaire. À utiliser juste après un merge qui ferme une issue, ou « vérifie l'impact de cette issue sur les autres ». Aussi au merge d'une PR d'amendement ouverte par `contradiction`. Aussi au merge d'une PR de lot léger intermédiaire, dont l'issue reste en vol et ne s'édite pas.
+argument-hint: "[#issue fermée | #PR d'amendement | #PR de lot léger] [bloc d'arrêt et contradiction soldée : <sortie>]"
 ---
 
 # Répercussions
@@ -84,6 +84,15 @@ cette PR, pas une issue fermée (« Réconciliée avec la PR #<m> (amendement du
 déplacement de …), du 26 août 2026 »). En mode amendement, `#<fermée>`, `<issue fermée>` et le
 `#47` des exemples se lisent « l'amendement, PR #<m> » — `pr-<m>` dans un chemin : la clé
 d'idempotence de l'étape 2 est alors la ligne qui cite cette PR.
+
+Avec une PR de lot léger intermédiaire — mergée vers `<trunk>` avec la ligne `En vol pour #<N> (lot
+k/n)` et sans `Closes` (`cycle-pr` Étape 2, « Cas découpé ») ; la passe y est due (`cycle-pr`
+Étape 8) —, le delta réel est cette PR. Son issue `#<N>` reste **en vol** même sans PR ouverte, le
+lot suivant n'ayant pas encore forcément la sienne : elle se classe en vol à l'étape 2 et ne
+s'édite pas (étape 5, « Issues en vol → signaler sur la PR, ne rien éditer »). Les étapes 2 à 6
+s'appliquent aux autres issues ouvertes, le thème de `#<N>` tenant lieu de thème de l'issue
+fermée ; l'étape 7 est sans objet, aucune issue ne s'étant fermée ; la ligne de journal et la clé
+d'idempotence citent cette PR, comme en mode amendement.
 
 Écrire un résumé court de **ce que cette clôture a réellement changé** — pas ce que l'issue
 promettait, ce qui a été *fait*. Sources, qu'un `releveur` rend : le **diff mergé**
