@@ -1743,6 +1743,25 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         SESSIONS_LIEES_REF,
         "Archiver un enfant (`archive_session`, réversible) détache son HEAD et ne retire ni",
     ),
+    # #198, D-6 : la mesure qui précède vaut pour un enfant avec son worktree, pas sans.
+    "archivage-mesure-avec-son-worktree": (
+        SESSIONS_LIEES_REF,
+        "Cette mesure porte sur un enfant **avec** son worktree",
+    ),
+    "archivage-sans-worktree-ne-detache-pas": (
+        SESSIONS_LIEES_REF,
+        (
+            "l'archivage d'une session **sans** worktree propre (`use_worktree: false`) ne détache"
+            " pas la tête du dossier qu'elle partage"
+        ),
+    ),
+    "archivage-sans-worktree-releve-date": (
+        SESSIONS_LIEES_REF,
+        (
+            "`git symbolic-ref -q HEAD` a rendu `refs/heads/chore/conforts-pipeline`, sortie 0, à"
+            " 15:11:55Z et 15:12:19Z avant `archive_session`, puis à 15:12:28Z et 15:13:45Z après"
+        ),
+    ),
     # Commandes intégrées (obs 94, 98, 115) : elles closent le tour de la session de relecture,
     # sans coût ; la session PR ne les joue qu'en repli, et y enchaîne dans le même tour.
     "commandes-integrees-closent-le-tour-de-la-relecture": (
@@ -2225,13 +2244,17 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         PR_PARALLELES_SKILL,
         "puis les gestes 1 à 5 de `pr-paralleles` étape 3, « Provisionner son worktree »",
     ),
-    "etape-0-bug-seul-archive": (
+    # #198 : la session d'une issue `bug` n'est plus la seule de l'étape qui s'archive.
+    "etape-0-bug-archive-comme-le-tri": (
         PR_PARALLELES_SKILL,
-        "C'est la seule session de l'étape qui s'archive, sur l'accord de la proposition",
+        "Elle s'archive sur l'accord de la proposition, comme une session de tri",
     ),
-    "etape-0-accord-d-archiver-le-bug": (
+    "etape-0-accord-d-archiver-chaque-session": (
         PR_PARALLELES_SKILL,
-        "demande l'accord d'archiver, une fois vérifiée, la session d'une issue `bug`",
+        (
+            "demande l'accord d'archiver chacune une fois son issue vérifiée — session de tri comme"
+            " session d'une issue `bug`"
+        ),
     ),
     "etape-0-ecriture-exigee-bloquante": (
         PR_PARALLELES_SKILL,
@@ -2268,9 +2291,29 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         PR_PARALLELES_SKILL,
         "Invoque le skill `triage` (outil Skill) avec #N",
     ),
-    "etape-0-sessions-non-archivees": (
+    # #198 : l'archivage d'une session de tri, mesuré sans effet sur la tête du lead (D-6), retiré
+    # de l'interdit ; son retrait est gardé par `RETIRES_PAR_LES_CONFORTS`.
+    "etape-0-tri-archive-apres-verification": (
         PR_PARALLELES_SKILL,
-        "Ne pas archiver une session sans worktree",
+        (
+            "**Une session de tri s'archive dès que le lead a vérifié son issue sur GitHub**, sur"
+            " l'accord demandé à la proposition"
+        ),
+    ),
+    "etape-0-tri-garde-use-worktree-false": (
+        PR_PARALLELES_SKILL,
+        (
+            "et garde `use_worktree: false` : l'archivage d'une session sans worktree ne détache pas"
+            " la tête du dossier qu'elle partage"
+        ),
+    ),
+    "etape-0-archiver-le-lead-archive-le-tri": (
+        PR_PARALLELES_SKILL,
+        "Archiver le lead de préparation archive avec lui ses sessions de tri, qui partagent son worktree",
+    ),
+    "etape-0-regle-tant-que-le-lead-vit": (
+        PR_PARALLELES_SKILL,
+        "la règle vaut tant que le lead de préparation vit",
     ),
     "etape-0-message-puis-github": (PR_PARALLELES_SKILL, "il ne prouve rien seul"),
     # Vérification d'avant-go de la PR #133, go 1 : l'attente de **chaque** message de fin.
@@ -8448,6 +8491,33 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
             " sans invite"
         ),
     ),
+    # La passe `repercussions` d'un lot léger intermédiaire (vide relevé à la PR #199).
+    "cycle-pr-repercussions-due-au-lot-leger": (
+        CYCLE_PR_SKILL,
+        (
+            "**La passe est due si la PR porte `Closes #N`, ou `En vol pour #N` vers `main` — un lot"
+            " léger intermédiaire —,"
+        ),
+    ),
+    "cycle-pr-lot-leger-deplace-un-contrat": (
+        CYCLE_PR_SKILL,
+        "un lot léger intermédiaire peut déplacer un contrat dont dépend une autre issue ouverte",
+    ),
+    "cycle-pr-issue-en-vol-pas-editee": (
+        CYCLE_PR_SKILL,
+        (
+            "son issue, en vol, ne s'édite pas (`repercussions`, étape 5, « Issues en vol → signaler"
+            " sur la PR, ne rien éditer »)"
+        ),
+    ),
+    "cloture-repercussions-quand-elle-est-due": (
+        CLOTURE_REF,
+        "quand elle est due (`cycle-pr` Étape 8)",
+    ),
+    "cloture-due-sur-un-lot-leger": (
+        CLOTURE_REF,
+        "toujours sur un lot léger, qui porte `En vol pour #N` vers `main` (`cycle-pr` Étape 8)",
+    ),
 }
 
 
@@ -8464,10 +8534,19 @@ def test_chaque_invariant_des_conforts_de_pipeline_garde_sa_phrase(
 
 
 # Ce que #198 retire : l'écriture par `echo` du `relecteur` et sa copie de la règle des lectures
-# d'état `git`, qui vit désormais dans `cleanup-verbatim.md`.
+# d'état `git`, qui vit désormais dans `cleanup-verbatim.md` ; l'interdit d'archiver une session
+# sans worktree et son motif non mesuré, que la mesure du 2026-11-03 (D-6) remplace.
 RETIRES_PAR_LES_CONFORTS = {
     "relecteur-ecriture-par-echo": (RELECTEUR_ROLE, "echo '<contenu sur une ligne>'"),
     "relecteur-copie-de-la-regle-git": (RELECTEUR_ROLE, "y cache un fichier non suivi"),
+    "pr-paralleles-pas-d-archivage-sans-worktree": (
+        PR_PARALLELES_SKILL,
+        "Ne pas archiver une session sans worktree",
+    ),
+    "pr-paralleles-archivage-non-mesure": (
+        PR_PARALLELES_SKILL,
+        "non mesuré sur une session sans worktree",
+    ),
 }
 
 
