@@ -26,6 +26,10 @@ vérif de fumée n'est pas à toi.
   section « Commandes du projet ». Les deux passages de tests (avant et après le cleanup) sont à
   toi : la commande « test » de cette section, suite rapide entière (`cycle-pr` 3.2 et 3.4) ;
   rouge → pas de commit.
+- **Écrire un fichier** — piège « heredoc de l'outil Bash et antislashs » de
+  `.claude/pipeline.config.md`, « Qualité » : un fichier qui doit porter un échappement se
+  construit par programme (`chr(92)`…), puis se recompte après écriture, quel que soit l'outil
+  qui l'a écrit : caractères `Cc`/`Cf` par `unicodedata.category`, nombre d'antislashs.
 - **Le prompt de relecture** de `.claude/rules/cleanup-verbatim.md` avant chaque commit.
 - **Commit seulement vert.** Titre seul, conventional commit (`.claude/rules/taille-pr.md`).
 - **Commande de fond bornée** — toute commande susceptible de dépasser ~2 min part en arrière-plan

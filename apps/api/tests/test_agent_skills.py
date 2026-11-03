@@ -12,6 +12,7 @@ le tient pour un document de référence rangé avec les rôles et le saute (`cl
 hors CI). Même cause possible — un « seulement : » sans guillemets dans la `description`.
 """
 
+import ast
 import re
 import shlex
 import subprocess
@@ -7538,6 +7539,83 @@ def test_un_controle_de_proprete_par_git_status_voit_les_fichiers_non_suivis() -
     assert sites == [PORTES_REF], sites
 
 
+VOIT_LES_NON_SUIVIS = "--untracked-files=normal"
+
+
+def lectures_de_git_status(source: str) -> list[list[object]]:
+    """Les constantes de chaque lecture de `git status` du source Python : une séquence — tuple,
+    liste ou arguments d'un appel — qui commence par `"git"` et porte `"status"`. L'arbre syntaxique
+    la lit quelle que soit sa mise en page, une option `-C` avant la sous-commande comprise."""
+    sites: list[list[object]] = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Tuple | ast.List):
+            elements = node.elts
+        elif isinstance(node, ast.Call):
+            elements = node.args
+        else:
+            continue
+        constantes: list[object] = [e.value for e in elements if isinstance(e, ast.Constant)]
+        tete = elements[0] if elements else None
+        if isinstance(tete, ast.Constant) and tete.value == "git" and "status" in constantes:
+            sites.append(constantes)
+    return sites
+
+
+# Le témoin des deux côtés, en littéraux : chaque forme, et pour chacune de ses lectures, si elle
+# porte l'option.
+LECTURES_DE_GIT_STATUS_FORMES: dict[str, tuple[str, list[bool]]] = {
+    "tuple-avec-l-option": (
+        'S = ("git", "status", "--porcelain", "--untracked-files=normal")',
+        [True],
+    ),
+    "tuple-sans-l-option": ('S = ("git", "status", "--porcelain")', [False]),
+    "liste-sur-plusieurs-lignes": ('run([\n    "git",\n    "status",\n])', [False]),
+    "option-c-avant-la-sous-commande": (
+        'run(["git", "-C", d, "status", "--untracked-files=normal"])',
+        [True],
+    ),
+    "arguments-d-un-appel": ('run("git", "status", "--porcelain")', [False]),
+    "gh-auth-status-hors-classe": ('A = ("gh", "auth", "status")', []),
+    "git-log-hors-classe": ('L = ("git", "log", "-1")', []),
+}
+
+
+@pytest.mark.parametrize(
+    ("source", "attendu"),
+    LECTURES_DE_GIT_STATUS_FORMES.values(),
+    ids=LECTURES_DE_GIT_STATUS_FORMES.keys(),
+)
+def test_une_lecture_de_git_status_se_lit_avec_ou_sans_l_option(
+    source: str, attendu: list[bool]
+) -> None:
+    """Le témoin : la lecture sans l'option se voit, celle qui la porte passe, et `gh auth status`
+    ou un autre `git` restent hors de la population."""
+    sites = lectures_de_git_status(source)
+
+    assert [VOIT_LES_NON_SUIVIS in site for site in sites] == attendu
+
+
+def test_chaque_script_qui_lit_git_status_voit_les_fichiers_non_suivis() -> None:
+    """Même règle que la prose (`cleanup-verbatim.md`, « Comment l'appliquer ») : `amorcage.py
+    commit` l'a enfreinte dans du code livré, défaut passé sous 32 mutations rouges sur 32
+    (obs 145).
+
+    **Population recomptée à chaque exécution** : les scripts Python suivis sous `.claude/`, lus par
+    `lectures_de_git_status` — jamais une liste de sites. Relevé le 2026-11-03 sur `00b180f`,
+    `git grep -n '"git", "status"' -- '.claude/*.py'` : 2 sites, 2 avec l'option
+    (`sonde-outillage.py`, `amorcage.py`) ; un site ajouté entre au test sans y être inscrit.
+    """
+    lectures = [
+        (fichier, site)
+        for fichier in tracked_files()
+        if fichier.startswith(".claude/") and fichier.endswith(".py")
+        for site in lectures_de_git_status((REPOSITORY_ROOT / fichier).read_text(encoding="utf-8"))
+    ]
+
+    assert lectures, "aucune lecture de `git status` lue : le motif a-t-il cessé de mordre ?"
+    assert [f for f, site in lectures if VOIT_LES_NON_SUIVIS not in site] == []
+
+
 # --- Les renvois aux barreaux de « Création d'issues en cours de cycle » (#134, lot 7c) ----------
 
 SECTION_DES_BARREAUX = "## Création d'issues en cours de cycle"
@@ -8161,3 +8239,122 @@ def test_chaque_appel_de_trunk_nomme_la_tete_comme_la_porte() -> None:
     assert appels, "aucun appel de `porte-merge.py trunk` lu : le motif a-t-il cessé de mordre ?"
     assert all(tete == NOM_DE_LA_TETE for _, tete in appels), appels
     assert f"--match-head-commit <{NOM_DE_LA_TETE}>" in texte_normalise(CYCLE_PR_SKILL)
+
+
+# --- Les conforts de pipeline (#198, lot 1) ------------------------------------------------------
+
+DEVELOPPEUR_ROLE = ".claude/agents/developpeur.md"
+EXECUTANT_ROLE = ".claude/agents/executant.md"
+PIPELINE_CONFIG = ".claude/pipeline.config.md"
+CLEANUP_VERBATIM_RULE = ".claude/rules/cleanup-verbatim.md"
+# Le piège d'écriture, dit au point où écrit chacun des trois rôles que nomme E1 (obs 130 et 133) :
+# le même renvoi et la même phrase aux trois sites.
+RENVOI_AU_PIEGE_D_ECRITURE = (
+    "« heredoc de l'outil Bash et antislashs » de `.claude/pipeline.config.md`, « Qualité »"
+)
+RECOMPTE_APRES_ECRITURE = (
+    "un fichier qui doit porter un échappement se construit par programme (`chr(92)`…), puis se"
+    " recompte après écriture, quel que soit l'outil qui l'a écrit : caractères `Cc`/`Cf` par"
+    " `unicodedata.category`, nombre d'antislashs"
+)
+
+# Chaque énoncé que #198 ajoute, épinglé sur sa **moitié restrictive** (obs 126) : une mutation qui
+# la retire en laissant le reste de la phrase rougit ici.
+INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
+    "developpeur-renvoi-au-piege-d-ecriture": (DEVELOPPEUR_ROLE, RENVOI_AU_PIEGE_D_ECRITURE),
+    "developpeur-recompte-apres-ecriture": (DEVELOPPEUR_ROLE, RECOMPTE_APRES_ECRITURE),
+    "executant-renvoi-au-piege-d-ecriture": (EXECUTANT_ROLE, RENVOI_AU_PIEGE_D_ECRITURE),
+    "executant-recompte-apres-ecriture": (EXECUTANT_ROLE, RECOMPTE_APRES_ECRITURE),
+    "relecteur-renvoi-au-piege-d-ecriture": (RELECTEUR_ROLE, RENVOI_AU_PIEGE_D_ECRITURE),
+    "relecteur-recompte-apres-ecriture": (RELECTEUR_ROLE, RECOMPTE_APRES_ECRITURE),
+    "relecteur-ecrit-par-python-jamais-par-echo": (
+        RELECTEUR_ROLE,
+        (
+            "il l'écrit par un script Python (`python -c`), jamais par `echo`, qui a ramené un"
+            " antislash doublé à un seul (obs 133)"
+        ),
+    ),
+    "qualite-ecriture-et-edition-decodent": (
+        PIPELINE_CONFIG,
+        "les outils d'écriture et d'édition peuvent décoder un échappement en route",
+    ),
+    "qualite-bom-ecrit-par-write": (
+        PIPELINE_CONFIG,
+        (
+            "`Write` d'un littéral Python qui porte l'échappement d'un BOM a écrit le BOM lui-même"
+            " (octets `EF BB BF`), recompté 1 `Cf` et 0 antislash"
+        ),
+    ),
+    "qualite-temoin-construit-par-chr-92": (
+        PIPELINE_CONFIG,
+        "la même ligne construite par `chr(92)` se recompte 0 `Cf` et 1 antislash",
+    ),
+    "qualite-recompte-quel-que-soit-l-outil": (
+        PIPELINE_CONFIG,
+        (
+            "se construit donc par programme (`chr(92)`…), puis se recompte après écriture, quel"
+            " que soit l'outil qui l'a écrit"
+        ),
+    ),
+    "qualite-pas-de-hook": (
+        PIPELINE_CONFIG,
+        "Pas de hook `PreToolUse` pour la garder : écarté le 2026-11-03 (#198, D-1)",
+    ),
+    "qualite-condition-de-reexamen": (
+        PIPELINE_CONFIG,
+        (
+            "à réexaminer à la première violation du piège heredoc ou d'échappement après le merge"
+            " de la PR #220"
+        ),
+    ),
+    "cleanup-lecture-d-etat-git": (
+        CLEANUP_VERBATIM_RULE,
+        (
+            "**Une lecture d'état `git` qui décide se pose la question des clés de configuration"
+            " qui changent sa sortie.**"
+        ),
+    ),
+    "cleanup-controle-de-proprete-avec-l-option": (
+        CLEANUP_VERBATIM_RULE,
+        "Un contrôle de propreté lit donc `git status --porcelain --untracked-files=normal`",
+    ),
+    "cleanup-test-isole-la-configuration": (
+        CLEANUP_VERBATIM_RULE,
+        (
+            "le test d'un script `git` isole la configuration du poste : `GIT_CONFIG_GLOBAL` vers"
+            " un fichier vide, `GIT_CONFIG_NOSYSTEM=1`"
+        ),
+    ),
+    "relecteur-renvoi-aux-lectures-d-etat-git": (
+        RELECTEUR_ROLE,
+        "(lectures d'état `git` : `.claude/rules/cleanup-verbatim.md`, « Comment l'appliquer »)",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("fichier", "phrase"),
+    INVARIANTS_DES_CONFORTS_DE_PIPELINE.values(),
+    ids=INVARIANTS_DES_CONFORTS_DE_PIPELINE.keys(),
+)
+def test_chaque_invariant_des_conforts_de_pipeline_garde_sa_phrase(
+    fichier: str, phrase: str
+) -> None:
+    """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
+    assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
+
+
+# Ce que #198 retire : l'écriture par `echo` du `relecteur` et sa copie de la règle des lectures
+# d'état `git`, qui vit désormais dans `cleanup-verbatim.md`.
+RETIRES_PAR_LES_CONFORTS = {
+    "relecteur-ecriture-par-echo": (RELECTEUR_ROLE, "echo '<contenu sur une ligne>'"),
+    "relecteur-copie-de-la-regle-git": (RELECTEUR_ROLE, "y cache un fichier non suivi"),
+}
+
+
+@pytest.mark.parametrize(
+    ("fichier", "phrase"), RETIRES_PAR_LES_CONFORTS.values(), ids=RETIRES_PAR_LES_CONFORTS.keys()
+)
+def test_les_conforts_ne_rendent_pas_ce_qu_ils_ont_retire(fichier: str, phrase: str) -> None:
+    """Chacune présente une fois sur `00b180f` (`git grep -c`), vue rouge en la remettant."""
+    assert not porte_la_forme(fichier, phrase), f"`{fichier}` porte encore « {phrase} »"

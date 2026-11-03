@@ -41,6 +41,11 @@ lue le 2026-10-29 ; obs 132).
 
 ## Ton commit
 
+**Écrire un fichier de la tranche** — piège « heredoc de l'outil Bash et antislashs » de
+`.claude/pipeline.config.md`, « Qualité » : un fichier qui doit porter un échappement se
+construit par programme (`chr(92)`…), puis se recompte après écriture, quel que soit l'outil qui
+l'a écrit : caractères `Cc`/`Cf` par `unicodedata.category`, nombre d'antislashs.
+
 Tu **commites ta tranche** — elle seule, ses fichiers nommés un à un — avec le titre que ton brief
 donne, quand ses tests ciblés **et** la commande « test » de `.claude/pipeline.config.md` sont
 verts (`cycle-pr` 3.2 et 3.4 : rouge → pas de commit) ; jamais de push.

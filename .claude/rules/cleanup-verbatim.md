@@ -119,6 +119,13 @@ avant tout jugement, chaque finding cité par §.
   générale de la doc ; une entrée qui s'avère morte se **retire**, elle ne se réveille pas.
   Mesuré : `Bash(gh api repos/:*)`, normalisé en `Bash(gh api repos/*)`, a rendu vivante une
   règle morte depuis l'amorçage, et silencieuses les écritures REST qu'elle couvrait (obs 47).
+- **Une lecture d'état `git` qui décide se pose la question des clés de configuration qui
+  changent sa sortie.** Quatre clés changeaient la conclusion des lectures d'`amorcage.py commit`
+  (mesuré le 2026-10-26, git 2.47.1, commentaire de `STATUS`) : sous
+  `status.showUntrackedFiles=no`, il rendait « rien à commiter », sortie 0, devant un fichier non
+  suivi (obs 145). Un contrôle de propreté lit donc
+  `git status --porcelain --untracked-files=normal`, et le test d'un script `git` isole la
+  configuration du poste : `GIT_CONFIG_GLOBAL` vers un fichier vide, `GIT_CONFIG_NOSYSTEM=1`.
 - **Vérifier aussi les 3 axes de conception** de `.claude/rules/contraintes.md` (modulaire /
   fractionné / scalable), en plus de KISS / DRY / YAGNI.
 - **Relancer les tests après le cleanup** : il a pu casser quelque chose.
