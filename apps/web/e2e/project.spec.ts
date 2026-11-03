@@ -185,15 +185,19 @@ test('une carte hors de la fenêtre après une arrivée directe y vient avec le 
   await expect(card).toBeInViewport()
 })
 
-test('toutes les cartes s’effacent en 150 ms, sans transformation ni pointeur, et reviennent', async ({
+test('rouverte par l’historique, sans carte d’origine, la fiche efface toutes les cartes en 150 ms, sans transformation ni pointeur, et elles reviennent', async ({
   page,
 }) => {
   await openTable(page, PROJECTS)
   await settle(page)
   const cells = await page.locator('.card').all()
   const [fast] = await resolveAll(page, [['transition-duration', 'var(--dur-fast)']])
-
   await openProject(cards(page).first())
+  await closeButton(page).click()
+  await expectClosed(page)
+
+  await page.goForward()
+  await expect(panel(page)).toBeVisible()
 
   for (const cell of cells) {
     await expect(cell).toHaveCSS('opacity', '0')
@@ -550,10 +554,11 @@ test('au toucher, le premier révèle, le second ouvre et finit la révélation'
   await expect(cell).not.toHaveAttribute('data-revealed')
 })
 
-test('les fondus : entrée 200 ms, sortie 150 ms, `--ease-out`, le panneau retiré à la fin', async ({
+test('à l’arrivée directe, les fondus : entrée 200 ms, sortie 150 ms, `--ease-out`, le panneau retiré à la fin', async ({
   page,
 }) => {
-  await openTable(page, PROJECTS)
+  const release = await holdProjects(page)
+  await page.goto(FIRST.path)
   const [content, fast, curve] = await resolveAll(page, [
     ['animation-duration', 'var(--dur-content)'],
     ['animation-duration', 'var(--dur-fast)'],
@@ -561,11 +566,13 @@ test('les fondus : entrée 200 ms, sortie 150 ms, `--ease-out`, le panneau retir
   ])
   const animations = await watchAnimations(page)
 
-  await openProject(cards(page).first())
+  await release(serving(PROJECTS))
+  await expect(panel(page)).toBeVisible()
   await closeButton(page).click()
   await expectClosed(page)
 
-  expect(await animations()).toEqual([
+  // Sans la pulsation des cadres de chargement, qui peut partir après le geste.
+  expect((await animations()).filter(({ name }) => name.startsWith('project-'))).toEqual([
     { name: 'project-in', duration: content, curve },
     { name: 'project-out', duration: fast, curve },
   ])

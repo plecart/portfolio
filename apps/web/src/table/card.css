@@ -45,16 +45,18 @@
     --card-lift-scale: 1.02;
     --card-press-scale: 0.985;
     --card-perspective: 900px;
+    --card-clip-rise: -14px;
     align-self: start;
     transition: opacity var(--dur-fast) var(--ease-out);
+  }
 
-    /* Fiche ouverte, toutes les cartes s'effacent (§4.6, §6.3) : par l'opacité, jamais par une
-       transformation, que la mesure des liens de l'auteur suivrait (`TABLE_CELL_SELECTOR`). Le
-       pointeur ne les atteint plus : Radix pose `pointer-events: none` sur `<body>` pendant un
-       dialogue modal. */
-    @variant project-open {
-      opacity: 0;
-    }
+  /* Fiche ouverte sans carte d'origine — arrivée directe, historique —, toutes les cartes s'effacent
+     (§4.6) : par l'opacité, jamais par une transformation, que la mesure des liens de l'auteur
+     suivrait (`TABLE_CELL_SELECTOR`). Ouverte depuis une carte, `useChoreography` les anime. Le
+     pointeur ne les atteint plus : Radix pose `pointer-events: none` sur `<body>` pendant un
+     dialogue modal. */
+  html[data-project-open]:not([data-choreography]) .card {
+    opacity: 0;
   }
 
   /* L'entrée (spec §3.1, §6.3), que `useCardEntrance` déclenche et retarde d'un pas par colonne :
@@ -377,6 +379,40 @@
     .card:active .card-face {
       transform: scale(var(--card-press-scale));
       transition-duration: var(--dur-press);
+    }
+  }
+
+  /* La carte d'où la fiche s'envole (§4.6), que `useChoreography` marque jusqu'à son retour : sa
+     photo, son post-it, sa bande, son papier et ses ombres disparaissent d'un coup ; sa pose revient
+     à 0° et son trombone monte en s'effaçant. Après les états d'intention, qu'elle remplace. Photo,
+     post-it, bande, papier, ombre au repos et trombone reviennent d'un coup : hors de ce bloc, aucun
+     ne transite. */
+  .card[data-origin] {
+    :is(.card-photo, .card-postit, .card-band) {
+      opacity: 0;
+    }
+
+    .card-face {
+      background-color: transparent;
+      box-shadow: none;
+    }
+
+    .card-face::after {
+      opacity: 0;
+      transition: none;
+    }
+
+    .card-pose {
+      transform: none;
+      transition-duration: var(--dur-open);
+    }
+
+    .card-clip {
+      opacity: 0;
+      translate: 0 var(--card-clip-rise);
+      transition:
+        opacity var(--dur-fast) var(--ease-out),
+        translate var(--dur-content) var(--ease-out);
     }
   }
 }
