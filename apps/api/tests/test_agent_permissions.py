@@ -113,8 +113,9 @@ ALLOWED_SCRIPT_CALLS = {
 # dossier, Python en général, et un script appelé par un autre chemin, que la règle n'apparie pas —
 # il retombe alors sur le régime ordinaire (invite, ou classifieur en mode auto), jamais sur cette
 # autorisation.
+SIBLING_SCRIPT = ("Bash", "python .claude/skills/cycle-pr/scripts/mutation.py . m.json")
 NOT_ALLOWED_BY_THE_SCRIPT_RULES = [
-    ("Bash", "python .claude/skills/cycle-pr/scripts/mutation.py . m.json"),
+    SIBLING_SCRIPT,
     ("Bash", "python -c print(1)"),
     ("Bash", f"python ./.claude/skills/cycle-pr/scripts/merge-lot.py 118 {'a' * 40} main"),
     ("Bash", "python ./.claude/skills/cycle-pr/scripts/porte-merge.py conversation 200"),
@@ -237,7 +238,7 @@ FAULTY_SETTINGS: dict[str, tuple[str, str, Section, str, str, bool]] = {
         "scripts/*)",
         "allow",
         "Bash",
-        NOT_ALLOWED_BY_THE_SCRIPT_RULES[0][1],
+        SIBLING_SCRIPT[1],
         True,
     ),
     "merge hors ask": (
@@ -271,8 +272,9 @@ def test_le_merge_ou_le_rebase_d_une_pr_demande_une_permission(tool: str, comman
     )
 
 
-# Les règles d'appariement de la doc (§ Wildcard patterns), sur ses propres exemples : le motif, la
-# commande, et si la règle l'apparie.
+# Les règles d'appariement de la doc (§ Wildcard patterns), sur ses exemples — plus `ls **`, deux
+# étoiles dont la seconde finale, que sa règle de la seule étoile refuse à la commande nue (passe 1
+# de relecture de la PR #220) : le motif, la commande, et si la règle l'apparie.
 WILDCARD_FORMS = {
     "etoile-finale-et-arguments": ("git log *", "git log --oneline", True),
     "etoile-finale-et-commande-nue": ("ls *", "ls", True),
