@@ -23,8 +23,6 @@ export default function App() {
     if (unknownAddress) dismiss()
   }, [unknownAddress, dismiss])
 
-  // Avant l'attribut de la fiche ouverte : une carte qui le lirait seul commencerait à s'effacer par
-  // la feuille, sous la chorégraphie.
   useEffect(() => {
     document.documentElement.toggleAttribute('data-choreography', origin !== null)
   }, [origin])

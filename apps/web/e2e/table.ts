@@ -28,9 +28,9 @@ export async function expectPlacement(page: Page, placement: 'column' | 'footer'
 }
 
 /**
- * Compte, dès le chargement, les lectures de boîte des cellules de la table (`data-table-cell`) :
- * chacune force une mise en page, et la mesure des liens de l'auteur en fait une par cellule à
- * chaque relecture.
+ * Compte, dès le chargement, les lectures de boîte des cellules de la table (`data-table-cell`) ;
+ * la mesure des liens de l'auteur en fait une par cellule à chaque relecture
+ * (`useAuthorLinksPlacement`).
  *
  * @returns De quoi lire le compte.
  */
