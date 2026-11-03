@@ -169,6 +169,10 @@ services:
 
   redis:
     image: redis:7.4.12-alpine@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f
+    # Le cache de l'API et la file du worker partagent ce Redis : 64 Mo au plus sur un VPS de 2 Go
+    # (ADR 0023), et à la borne Redis n'évince que des clés à durée de vie — celles du cache,
+    # jamais la file du broker (ADR 0015 ; brief de #11, décision 6). Même commande sur le poste.
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "volatile-lru"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s

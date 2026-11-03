@@ -29,6 +29,10 @@ COMPOSE_BY_ENVIRONMENT = {"développement": COMPOSE_DEV, "production": COMPOSE_P
 # Les services de données, à la même image dans les deux fichiers (ADR 0012).
 DATA_SERVICES = ["postgres", "redis"]
 
+# La commande de Redis dans les deux fichiers : 64 Mo de mémoire au plus, et à la borne l'éviction
+# de la clé à durée de vie la moins récemment utilisée (brief de #11, décision 6).
+REDIS_COMMAND = ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "volatile-lru"]
+
 # Une image du dépôt en production : celle que le job `publish` a poussée sous le préfixe GHCR,
 # à l'étiquette du commit que le job de déploiement fixe — jamais `latest`, jamais reconstruite
 # pour un environnement (ADR 0012, critères de #16).
@@ -577,6 +581,18 @@ def test_les_services_de_donnees_ont_la_meme_image_sur_le_poste_et_en_production
     }
 
     assert len(set(images.values())) == 1, images
+
+
+@pytest.mark.parametrize(
+    "compose_file", COMPOSE_BY_ENVIRONMENT.values(), ids=COMPOSE_BY_ENVIRONMENT.keys()
+)
+def test_redis_borne_sa_memoire_et_n_evince_que_les_cles_a_duree_de_vie(
+    compose_file: Path,
+) -> None:
+    """Une borne sur le VPS partagé (ADR 0023), la même sur le poste (ADR 0012) ; à la borne,
+    Redis n'évince que des clés à durée de vie — celles du cache, jamais la file du broker
+    (brief de #11, décision 6 ; ADR 0015)."""
+    assert read_services(compose_file)["redis"].get("command") == REDIS_COMMAND
 
 
 def test_la_production_tire_chaque_image_du_depot_publiee_a_l_etiquette_du_commit() -> None:
