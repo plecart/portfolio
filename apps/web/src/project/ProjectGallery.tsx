@@ -62,16 +62,29 @@ function useImageIndex(count: number) {
  * que la piste met hors du cadre sont retirées de l'arbre d'accessibilité.
  *
  * @param gallery Les images du projet, prêtes ou non.
+ * @param rewound La fiche revient à sa carte : la galerie montre d'un coup sa première image, la
+ *   photo de la carte (spec §4.6), quelle que soit celle choisie.
  */
-export function ProjectGallery({ gallery }: { gallery: Project['gallery'] }) {
+export function ProjectGallery({
+  gallery,
+  rewound = false,
+}: {
+  gallery: Project['gallery']
+  rewound?: boolean
+}) {
   const images = readyImages(gallery)
-  const { index, go, navigable } = useImageIndex(images.length)
+  const { index: chosen, go, navigable } = useImageIndex(images.length)
+  const index = rewound ? 0 : chosen
   const swipe = useSwipe(go)
 
   return (
     <div role="group" aria-label={strings.projectImages} className="project-gallery">
       <div className="project-gallery-frame" {...(navigable && swipe)}>
-        <div className="project-gallery-track" style={{ translate: `${-index * 100}%` }}>
+        <div
+          className="project-gallery-track"
+          data-rewound={rewound || undefined}
+          style={{ translate: `${-index * 100}%` }}
+        >
           {images.map(({ caption, ...sources }, position) => (
             <img
               key={position}

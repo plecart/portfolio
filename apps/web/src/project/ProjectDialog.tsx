@@ -64,6 +64,8 @@ export function ProjectDialog({
   // panneau neuf, qui entre par son fondu : celui du vol ne sert qu'à lui.
   const [reopenings, setReopenings] = useState(0)
   const open = project !== undefined
+  // Sur le retour à sa carte : le projet a déjà quitté l'adresse.
+  const returning = !open && origin !== null
   useChoreography(panel, origin, open, () => {
     if (open) setReopenings((count) => count + 1)
     onLanded()
@@ -73,7 +75,7 @@ export function ProjectDialog({
   return (
     // Pendant le retour à la carte, le projet a quitté l'adresse : une seconde demande de fermeture
     // n'a plus rien à fermer.
-    <Dialog open={open || origin !== null} onOpenChange={() => open && onClose()}>
+    <Dialog open={open || returning} onOpenChange={() => open && onClose()}>
       <DialogPortal>
         <DialogContent
           key={reopenings}
@@ -97,7 +99,11 @@ export function ProjectDialog({
           <DialogClose aria-label={strings.closeProject} className={CLOSE_CLASSES}>
             <CloseIcon />
           </DialogClose>
-          <ProjectGallery key={shown.slug} gallery={shown.gallery} />
+          <ProjectGallery
+            key={shown.slug}
+            gallery={shown.gallery}
+            rewound={returning}
+          />
           <ProjectContent project={shown} />
         </DialogContent>
       </DialogPortal>

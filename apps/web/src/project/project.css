@@ -125,8 +125,10 @@
     left: 0;
   }
 
+  /* Le glissement d'une image à l'autre (§4.4) ; au retour à la carte, la bascule vers la première
+     est instantanée (§4.6). */
   @media (prefers-reduced-motion: no-preference) {
-    .project-gallery-track {
+    .project-gallery-track:not([data-rewound]) {
       transition: translate var(--dur) var(--ease-out);
     }
   }
