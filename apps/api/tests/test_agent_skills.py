@@ -9933,8 +9933,9 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
     "rtk-redirection-aucun-segment": (
         PIPELINE_CONFIG,
         (
-            "une commande qui porte une redirection de fichier — `>`, `>>`, `2>` ou `<` — n'est"
-            " réécrite dans aucun de ses segments, alors que `2>&1` n'empêche rien"
+            "une commande qui porte une redirection vers un fichier — `>`, `>>`, `2>` ou `<`,"
+            " `/dev/null` excepté — n'est réécrite dans aucun de ses segments, alors que `2>&1`"
+            " n'empêche rien"
         ),
     ),
     "rtk-redirection-rewrite-sort-en-1": (
@@ -9945,6 +9946,13 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
     "rtk-redirection-4-seul-1-derriere": (
         PIPELINE_CONFIG,
         "ce `grep` rend 4 seul, et 1 derrière `printf 'x' > r.txt &&` ;",
+    ),
+    "rtk-redirection-dev-null-reecrite": (
+        PIPELINE_CONFIG,
+        (
+            "est réécrit en `rtk grep`, quand `>> r.txt`, `2> r.txt` et `< point.txt` sortent en 1"
+            " sans rien rendre"
+        ),
     ),
     "rtk-sortie-tronquee": (PIPELINE_CONFIG, "la sortie d'une commande réécrite est **tronquée**"),
     "rtk-tronquee-aussi-en-tete-d-un-tube": (
@@ -10768,6 +10776,37 @@ RETIRES_PAR_LES_CONFORTS = {
 def test_les_conforts_ne_rendent_pas_ce_qu_ils_ont_retire(fichier: str, phrase: str) -> None:
     """Chacune présente une fois sur `00b180f` (`git grep -c`), vue rouge en la remettant."""
     assert not porte_la_forme(fichier, phrase), f"`{fichier}` porte encore « {phrase} »"
+
+
+NOMBRES_EN_LETTRES = (
+    "zéro",
+    "un",
+    "deux",
+    "trois",
+    "quatre",
+    "cinq",
+    "six",
+    "sept",
+    "huit",
+    "neuf",
+    "dix",
+    "onze",
+    "douze",
+)
+
+
+def test_le_nombre_de_cas_du_rouge_est_celui_de_ses_puces() -> None:
+    """« Huit cas » se recompte à chaque exécution : les puces `- **` de « Le rouge se constate, il
+    ne se suppose pas » (`cycle-pr/references/tests.md`), jusqu'au titre suivant, contre le nombre
+    que la section écrit en toutes lettres (passe 2 de relecture de la PR #220, M6)."""
+    texte = (REPOSITORY_ROOT / TESTS_REF).read_text(encoding="utf-8")
+    section = texte[texte.index("## Le rouge se constate, il ne se suppose pas") :]
+    section = section[: section.index("\n## ")]
+    annonce = re.search(r"(\w+) cas à traiter explicitement", section)
+    puces = len(re.findall(r"(?m)^- \*\*", section))
+
+    assert annonce, "la section n'annonce plus son nombre de cas"
+    assert NOMBRES_EN_LETTRES.index(annonce.group(1).lower()) == puces, (annonce.group(1), puces)
 
 
 # --- Une table d'invariants recompte sa population par ses passages déclarés (#198, D-5) ---------
