@@ -228,6 +228,25 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
                                                   # en `high` le 2026-10-20 (PR #141, cause non
                                                   # vérifiée) — la session de relecture rapporte
                                                   # celui de l'en-tête rendu.
+- restrictions : python .claude/skills/cycle-pr/scripts/restrictions-du-delta.py <début>
+                                                  # passe « restrictions du delta », lancée par
+                                                  # la session de relecture à chaque réveil,
+                                                  # après la ligne relecture — par le
+                                                  # `relecteur` en sous-agent, en repli
+                                                  # (`session-relecture.md`, « Réveil »). Ce
+                                                  # qu'elle couvre : chaque ligne retirée de
+                                                  # `.claude/**/*.md`, `CLAUDE.md` ou
+                                                  # `CONTRIBUTING.md` qui porte une marque
+                                                  # restrictive, sous sa section, quelle que
+                                                  # soit la configuration `git` du poste
+                                                  # (`test_restrictions_du_delta.py`, une
+                                                  # mutation par option jouée le 2026-11-04 :
+                                                  # 14 ROUGE sur 14). Ce qu'elle ne couvre pas :
+                                                  # une restriction affaiblie sans ligne marquée
+                                                  # retirée, une ligne déplacée, la prose hors
+                                                  # de ces chemins (docstring du script). Elle
+                                                  # ne juge pas : chaque ligne rendue reçoit sa
+                                                  # réponse dans le message de constats.
 - sécurité     : /security-review                 # même nature. Lancée par la session de
                                                   # relecture (par la session PR seulement en
                                                   # repli), **seulement** si le diff touche

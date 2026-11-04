@@ -19,9 +19,9 @@ contradiction `[C]`, elle arrête (`.claude/rules/contraintes.md`).
 
 **Commandes du projet.** Ce skill ne présuppose aucune stack : les commandes `test`,
 `test-pipeline`, `test ciblé`, `lint`, `format`, `typecheck` et `build` se lisent dans la section
-« Commandes du projet » de `.claude/pipeline.config.md`. Une étape marquée `n/a` s'ignore.
-Si le fichier est absent, s'arrêter et proposer une session `init-projet` distincte (`init-projet`, « Note pour les autres
-skills ») ; ne jamais deviner une commande.
+« Commandes du projet » de `.claude/pipeline.config.md`. Une étape marquée `n/a` s'ignore. Si le
+fichier est absent, s'arrêter et proposer une session `init-projet` distincte (`init-projet`,
+« Note pour les autres skills ») ; ne jamais deviner une commande.
 
 **Vague parallèle.** → [references/briefing.md](references/briefing.md), « Vague parallèle ».
 
@@ -439,7 +439,9 @@ qu'elle couvre et ce qu'elle ne voit pas — jamais de mémoire :
 2. La ligne **relecture**, en balayage mécanique du diff. C'est la session de relecture qui
    l'invoque, à chaque réveil — à la différence de `/code-review ultra`, qui demande un geste du
    mainteneur et reste hors pipeline.
-3. La ligne **sécurité**, quand le diff touche une zone sensible ou une surface exposée
+3. La ligne **restrictions**, jouée par la session de relecture à chaque réveil, juste après :
+   chaque ligne restrictive que le delta retire de la prose normative reçoit sa réponse.
+4. La ligne **sécurité**, quand le diff touche une zone sensible ou une surface exposée
    (section « Périmètre » de la config), jouée par la session de relecture. Sinon, le dire en une
    ligne et passer. Un échec d'outillage de la porte — précondition absente, commande qui échoue
    avant toute analyse — se dit dans « Relecture indépendante » du body, jamais en saut

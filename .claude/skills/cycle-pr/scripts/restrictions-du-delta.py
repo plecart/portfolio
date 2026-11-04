@@ -55,7 +55,8 @@ l'attribut `diff` — 42 clés, 20 neutralisées, 22 indemnes.
 ajoutée ailleurs qui la contredit, un mot hors de la table. Une ligne déplacée, que le diff rend
 retirée ou non selon son alignement. La prose hors de ces chemins. L'environnement de `git`, hors
 de sa configuration et de `GIT_DIFF_OPTS`, que le script retire : `--unified=3` y passait devant
-`-U0` (mesuré le 2026-11-04). La réponse à chaque ligne : le script la donne à la relecture, il ne juge pas.
+`-U0` (mesuré le 2026-11-04). La réponse à chaque ligne : le script la donne à la relecture, il ne
+juge pas.
 
 Sortie : 0 dès que `git` répond, ligne rendue ou non ; 2 `git` en échec — base inconnue, hors
 d'un dépôt, `git` introuvable —, motif sur la sortie d'erreur, ou appel mal formé. Python 3.11
@@ -230,7 +231,8 @@ def main(argv: Sequence[str]) -> int:
 
 if __name__ == "__main__":
     # Sur un poste dont la page de code est cp1252, Python écrit un tube dans cet encodage : les
-    # lignes, accentuées, arriveraient illisibles à la relecture (`pipeline.config.md`, « Qualité »).
+    # lignes, accentuées, arriveraient illisibles à la relecture (`pipeline.config.md`,
+    # « Qualité »).
     for stream in (sys.stdout, sys.stderr):
         if isinstance(stream, io.TextIOWrapper):
             stream.reconfigure(encoding="utf-8")
