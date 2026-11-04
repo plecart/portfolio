@@ -9,24 +9,53 @@ devenu « Interrompre rarement pour le journal » — ne fait rougir aucun test 
 diff, et chaque ligne rendue reçoit sa réponse dans le message de constats. Dans cet ordre :
 
 1. la gauche du delta, `git merge-base <base> HEAD` — celle de `git diff <base>...HEAD` ;
-2. `git diff -U0 --find-renames <gauche> HEAD`, restreint à `.claude/**/*.md`, `CLAUDE.md` et
-   `CONTRIBUTING.md`, chemins pris à la racine du dépôt quel que soit le dossier courant ;
+2. `git diff <gauche> HEAD` sous `DIFF_OPTIONS` — `-U0`, renommages suivis —, restreint à
+   `.claude/**/*.md`, `CLAUDE.md` et `CONTRIBUTING.md`, chemins pris à la racine du dépôt quel
+   que soit le dossier courant ;
 3. chaque ligne retirée — une ligne modifiée y est retirée, puis ajoutée — qui porte une marque de
    `MARQUES_RESTRICTIVES`, en mot entier, sans la casse ;
 4. sa section : le dernier titre Markdown au-dessus d'elle dans la version de gauche du fichier
-   (`git cat-file blob <gauche>:<fichier>`), hors des blocs de code clôturés ; `—` sans titre.
+   (`git cat-file blob <gauche>:<fichier>`), hors des blocs de code clôturés (CommonMark 0.31.2,
+   §4.5) ; `—` sans titre.
 
 Sur la sortie standard, une ligne par ligne retenue, `<fichier> § <section> : <ligne retirée>`,
-le fichier sous son chemin de gauche ; rien si aucune ligne marquée n'est retirée. Les clés de
-configuration qui changent ce que `git diff` rend — `color.ui`, `diff.external`, `diff.relative`,
-`diff.noprefix`, `diff.renames`, `core.quotePath` — sont neutralisées par ses options (mesuré le
-2026-11-04, git 2.47.1). Chaque lecture décode ses octets en UTF-8 explicitement, jamais par la page de code
-de la console (obs 108).
+le fichier sous son chemin de gauche ; rien si aucune ligne marquée n'est retirée. Chaque lecture
+décode ses octets en UTF-8 explicitement, jamais par la page de code de la console (obs 108).
+
+**La configuration git ne change pas ce qui est lu.** Population recensée le 2026-11-04 sur
+git 2.47.1 : les 34 clés `diff.*` de `git help --config`, les 7 autres que leur description dans
+`git-config.html` rattache à un diff, `git gui` mis à part, et `core.attributesFile`, qui pose
+l'attribut `diff` — 42 clés, 20 neutralisées, 22 indemnes.
+
+- Neutralisées par une option de `DIFF_OPTIONS`, chacune vue changer la sortie sans elle
+  (mesuré, une ligne chacune dans la table de configuration des tests) : `color.ui`, `color.diff`
+  (`--no-color`) ; `diff.external`, `diff.<pilote>.command` (`--no-ext-diff`) ;
+  `diff.<pilote>.textconv` (`--no-textconv`) ; `core.attributesFile`, `core.bigFileThreshold`,
+  `diff.<pilote>.binary`, qui font lire un fichier binaire, sans ligne (`--text`) ;
+  `diff.relative` (`--no-relative`) ; `diff.interHunkContext` (`--inter-hunk-context=0`) ;
+  `diff.renames` (`--find-renames`) ; `diff.renameLimit` (`-l0`) ; `diff.algorithm`
+  (`--diff-algorithm=myers`) ; `diff.indentHeuristic` (`--indent-heuristic`) — 14.
+- Neutralisées par le format que le script lit, sans lequel tout cas rougit (mesuré) :
+  `diff.context` (`-U0`) ; `diff.noPrefix`, `diff.mnemonicPrefix`, `diff.srcPrefix`,
+  `diff.dstPrefix` (`--no-prefix`) ; `core.quotePath` (`-c core.quotePath=false`, tenue par le
+  chemin accentué des tests) — 6.
+- Indemnes, par leur description — et par une mesure pour les six marquées d'un astérisque :
+  sans effet sous `--no-color` — `core.whitespace`*, `diff.colorMoved`*, `diff.colorMovedWS`,
+  `diff.wsErrorHighlight`* ; propres à un diff externe ou à une conversion déjà écartés —
+  `diff.trustExitCode`, `diff.<pilote>.trustExitCode`, `diff.<pilote>.cachetextconv` ; propres
+  à un autre affichage ou à un autre outil — `diff.statGraphWidth`, `diff.statNameWidth`,
+  `diff.dirstat`, `diff.wordRegex`, `diff.<pilote>.wordRegex`, `diff.tool`, `diff.guitool` ;
+  propres à l'arbre de travail ou aux sous-modules — `diff.autoRefreshIndex`,
+  `core.preloadIndex`, `diff.ignoreSubmodules`, `diff.submodule`, `submodule.<nom>.ignore` ; sur
+  ce que le script ne lit pas — la fin de l'en-tête de bloc (`diff.<pilote>.xfuncname`*), les
+  lignes de contexte, qu'il n'y a plus (`diff.suppressBlankEmpty`*) — ou sur l'ordre seul des
+  lignes rendues (`diff.orderFile`*) — 22.
 
 **Ce qu'il ne couvre pas.** Une restriction affaiblie sans ligne marquée retirée — une marque
 ajoutée ailleurs qui la contredit, un mot hors de la table. Une ligne déplacée, que le diff rend
-retirée ou non selon son alignement. La prose hors de ces chemins. La réponse à chaque ligne :
-le script la donne à la relecture, il ne juge pas.
+retirée ou non selon son alignement. La prose hors de ces chemins. L'environnement de `git`, hors
+de sa configuration : `GIT_DIFF_OPTS=--unified=3` passe devant `-U0` (mesuré le 2026-11-04). La
+réponse à chaque ligne : le script la donne à la relecture, il ne juge pas.
 
 Sortie : 0 dès que `git` répond, ligne rendue ou non ; 2 `git` en échec — base inconnue, hors
 d'un dépôt, `git` introuvable —, motif sur la sortie d'erreur, ou appel mal formé. Python 3.11
@@ -41,30 +70,49 @@ import sys
 from collections.abc import Iterator, Sequence
 
 PATHSPECS = (":(top,glob).claude/**/*.md", ":(top)CLAUDE.md", ":(top)CONTRIBUTING.md")
-# Toutes sauf `-U0` neutralisent une clé : `color.ui`, `diff.external`, `diff.relative`, les
-# préfixes, `diff.renames`.
+# Le format que `removed_lines` lit — `--no-prefix`, `-U0` —, et une option par clé de
+# configuration qui le changerait (docstring).
 DIFF_OPTIONS = (
     "--no-color",
     "--no-ext-diff",
+    "--no-textconv",
+    "--text",
     "--no-relative",
     "--no-prefix",
     "-U0",
+    "--inter-hunk-context=0",
     "--find-renames",
+    "-l0",
+    "--diff-algorithm=myers",
+    "--indent-heuristic",
 )
-# Les marques d'une moitié restrictive, en mots entiers : « ne … pas » comme « ne … que » s'y
-# lisent par « ne » ou « n' ».
+# Les marques d'une moitié restrictive, en mots entiers, chacune sous ses flexions en genre et en
+# nombre : « ne … pas » comme « ne … que » s'y lisent par « ne » ou « n' », la négation nominale
+# « Pas de … » par « pas ».
 MARQUES_RESTRICTIVES = (
     "jamais",
-    "seule",
+    "toujours",
     "seul",
+    "seule",
+    "seuls",
+    "seules",
     "seulement",
+    "uniquement",
     "reste à",
+    "restent à",
     "ne",
     "n'",
     "ni",
+    "pas",
     "sans",
     "aucun",
     "aucune",
+    "aucuns",
+    "aucunes",
+    "interdit",
+    "interdite",
+    "interdits",
+    "interdites",
 )
 MARQUE_RESTRICTIVE = re.compile(
     r"(?<!\w)(?:"
@@ -78,7 +126,9 @@ MARQUE_RESTRICTIVE = re.compile(
 # `@@ -<début>[,<nombre>] +… @@` : la place des lignes retirées dans la version de gauche.
 HUNK = re.compile(r"@@ -(\d+)(?:,(\d+))? ")
 HEADING = re.compile(r" {0,3}#{1,6}[ \t]+(.+)")
-FENCE = re.compile(r" {0,3}(?:```|~~~)")
+# Une clôture de bloc de code, ouvrante ou fermante, et ce qui la suit — qui ne porte pas d'accent
+# grave derrière une clôture d'accents graves (§4.5).
+FENCE = re.compile(r" {0,3}(`{3,}(?=[^`]*$)|~{3,})(.*)")
 
 
 class GitError(Exception):
@@ -116,14 +166,25 @@ def removed_lines(diff: str) -> Iterator[tuple[str, int, str]]:
             number, pending = int(hunk[1]), int(hunk[2] or 1)
 
 
+def closes(fence: str, line: str) -> bool:
+    """`line` ferme-t-elle le bloc ouvert par `fence` ? Même caractère, au moins aussi longue,
+    suivie de blancs seuls (CommonMark 0.31.2, §4.5)."""
+    found = FENCE.match(line)
+    return bool(
+        found and found[1][0] == fence[0] and len(found[1]) >= len(fence) and not found[2].strip()
+    )
+
+
 def section(lines: Sequence[str], number: int) -> str:
     """Le dernier titre Markdown au-dessus de la ligne `number` (1 pour la première), hors des
     blocs de code clôturés ; `—` sans titre."""
-    title, fenced = "—", False
+    title, fence = "—", ""
     for line in lines[: number - 1]:
-        if FENCE.match(line):
-            fenced = not fenced
-        elif not fenced and (heading := HEADING.match(line)):
+        if fence:
+            fence = "" if closes(fence, line) else fence
+        elif opening := FENCE.match(line):
+            fence = opening[1]
+        elif heading := HEADING.match(line):
             title = heading[1].strip()
     return title
 

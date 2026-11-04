@@ -159,12 +159,16 @@ CONTAINER_TEXT_GLOBS = [
 # entrants qu'aucune porte ne voit — mesuré : le Dockerfile a continué de désigner
 # `test_image.py` après que ce module soit devenu `test_infra.py`, et seule une relecture l'a vu.
 PROSE_GLOBS = ["infra/**/*", "*.md", "Makefile", ".github/workflows/*.yml", ".claude/**/*.md"]
-TESTS_DIRECTORY = REPOSITORY_ROOT / "apps" / "api" / "tests"
-TEST_MODULE_REFERENCE = re.compile(r"apps/api/tests/(?P<name>\w+\.py)")
+# Les dossiers de modules de test, depuis la racine : un dossier ajouté entre ici, et la porte le
+# lit sans autre changement.
+TEST_DIRECTORIES = ("apps/api/tests", ".claude/tests")
+TEST_MODULE_REFERENCE = re.compile(
+    "(?P<path>(?:" + "|".join(re.escape(folder) for folder in TEST_DIRECTORIES) + r")/\w+\.py)"
+)
 
 
 def cited_test_modules(root: Path, population: Iterable[str]) -> dict[str, set[str]]:
-    """Les modules de test que la prose du dépôt désigne, par nom, avec les fichiers qui citent.
+    """Les modules de test que la prose du dépôt désigne, avec les fichiers qui citent.
 
     **Ce que cette porte ne couvre pas, et pourquoi on ne l'a pas élargie.** Elle apparie un
     chemin de *module* (`TEST_MODULE_REFERENCE`). Les renvois vers un *nom* de test ne sont
@@ -189,12 +193,18 @@ def cited_test_modules(root: Path, population: Iterable[str]) -> dict[str, set[s
             docstring de `tracked_files`.
 
     Returns:
-        Les noms de modules cités, chacun avec le nom des fichiers qui les citent.
+        Les chemins des modules cités, depuis la racine, chacun avec le nom des fichiers qui les
+        citent.
     """
     cited: dict[str, set[str]] = {}
     for citing, reference in prose_citations(root, population, PROSE_GLOBS, TEST_MODULE_REFERENCE):
-        cited.setdefault(reference.group("name"), set()).add(citing.name)
+        cited.setdefault(reference.group("path"), set()).add(citing.name)
     return cited
+
+
+def absent_test_modules(root: Path, cited: Mapping[str, set[str]]) -> dict[str, list[str]]:
+    """Les modules cités que `root` ne porte pas, chacun avec les fichiers qui les citent."""
+    return {path: sorted(where) for path, where in cited.items() if not (root / path).exists()}
 
 
 def shell_instructions(script: Path) -> list[str]:
@@ -738,12 +748,24 @@ def test_aucun_renvoi_vers_un_module_de_test_inexistant() -> None:
     cited = cited_test_modules(REPOSITORY_ROOT, tracked_files())
 
     assert cited, "aucun renvoi trouvé — les motifs ont-ils cessé de mordre ?"
-    missing = {
-        name: sorted(where)
-        for name, where in cited.items()
-        if not (TESTS_DIRECTORY / name).exists()
-    }
+    missing = absent_test_modules(REPOSITORY_ROOT, cited)
     assert not missing, f"{len(cited)} modules cités, introuvables : {missing}"
+
+
+@pytest.mark.parametrize("folder", ["apps/api/tests", ".claude/tests"])
+def test_la_porte_des_renvois_lit_chaque_dossier_de_tests(tmp_path: Path, folder: str) -> None:
+    """Un témoin de chaque côté dans chaque dossier de tests : le module cité qui existe passe,
+    celui qui manque est rendu. Depuis le déplacement des tests de la pipeline, une porte réduite
+    à `apps/api/tests` laissait passer tout renvoi cassé vers `.claude/tests`."""
+    (tmp_path / folder).mkdir(parents=True)
+    (tmp_path / folder / "test_present.py").write_text("", encoding="utf-8")
+    (tmp_path / "brouillon.md").write_text(
+        f"voir {folder}/test_present.py et {folder}/test_absent.py", encoding="utf-8"
+    )
+
+    cited = cited_test_modules(tmp_path, ["brouillon.md"])
+
+    assert absent_test_modules(tmp_path, cited) == {f"{folder}/test_absent.py": ["brouillon.md"]}
 
 
 def test_un_brouillon_non_suivi_n_entre_pas_dans_la_population(tmp_path: Path) -> None:
@@ -758,7 +780,7 @@ def test_un_brouillon_non_suivi_n_entre_pas_dans_la_population(tmp_path: Path) -
 
     assert cited_test_modules(tmp_path, []) == {}
     assert cited_test_modules(tmp_path, ["brouillon.md"]) == {
-        "test_inexistant.py": {"brouillon.md"}
+        "apps/api/tests/test_inexistant.py": {"brouillon.md"}
     }
 
 

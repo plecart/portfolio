@@ -1,10 +1,11 @@
 """Tests de la passe « restrictions du delta »
 (`.claude/skills/cycle-pr/scripts/restrictions-du-delta.py`).
 
-Chaque cas bâtit un dépôt jetable dans `tmp_path`, la configuration git du poste écartée
-(`GIT_CONFIG_GLOBAL` vers un fichier vide, `GIT_CONFIG_NOSYSTEM=1` : `cleanup-verbatim.md`,
-« Comment l'appliquer »), y commite une base puis un delta, et lance le script sur `HEAD~1` par un
-tube, comme la session le lit (`run_in_pipe`). Le cas d'origine est la mutation M5 de l'étude du
+Chaque cas bâtit un dépôt jetable dans `tmp_path` — la table de configuration en partage un, bâti
+une fois par module —, la configuration git du poste écartée (`GIT_CONFIG_GLOBAL` vers un fichier
+vide, `GIT_CONFIG_NOSYSTEM=1` : `cleanup-verbatim.md`, « Comment l'appliquer »), y commite une base
+puis un delta, et lance le script sur `HEAD~1` par un tube, comme la session le lit
+(`run_in_pipe`). Les marques et les clôtures de bloc de code se lisent sans dépôt. Le cas d'origine est la mutation M5 de l'étude du
 2026-11-04 (`docs/etudes/2026-11-04-etude-tests-de-la-pipeline.md` §2.4) : une moitié restrictive
 retirée de `CLAUDE.md`, que la suite des phrases figées laissait verte. Les cas s'écrivent en
 littéraux, jamais dérivés des constantes du script (`cycle-pr/references/tests.md`, « Le rouge se
@@ -49,11 +50,16 @@ def lance(base: str = "HEAD~1") -> tuple[int, list[str]]:
     return done.returncode, done.stdout.decode("utf-8").splitlines()
 
 
+def isole_git(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Écarte la configuration git du poste des `git` lancés ensuite, script compris."""
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+
+
 @pytest.fixture
 def depot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Un dépôt vide, dossier courant du test."""
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    isole_git(monkeypatch)
     monkeypatch.chdir(tmp_path)
     git("init", "-q", "-b", "main")
 
@@ -189,26 +195,116 @@ def test_un_delta_sans_restriction_retiree_rend_une_sortie_vide(
     assert lance() == (0, [])
 
 
-@pytest.mark.usefixtures("depot")
-@pytest.mark.parametrize(
-    ("cle", "valeur"),
-    [("color.ui", "always"), ("diff.external", "false"), ("diff.relative", "true")],
-    ids=["couleur-forcee", "diff-externe", "diff-relatif"],
-)
-def test_la_configuration_git_du_depot_ne_change_pas_la_ligne_rendue(
-    cle: str, valeur: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Trois clés qui changent ce que `git diff` rend (mesuré le 2026-11-04, git 2.47.1) : la
-    couleur forcée préfixe chaque ligne d'un échappement, un diff externe qui échoue fait sortir
-    `git` en 128, un diff relatif le borne au dossier courant — d'où la passe lancée depuis un
-    sous-dossier."""
-    commite(M5_BASE)
-    commite(M5_DELTA)
-    git("config", cle, valeur)
-    Path("apps").mkdir()
-    monkeypatch.chdir("apps")
+# Le dépôt de la table de configuration : un fichier par effet, chacun rendant une ligne que la
+# clé qui le vise change sans son option (mesuré le 2026-11-04, git 2.47.1).
+CONFIGURATION_TETE = ("# Pipeline", "", "## Observation continue (`task-observer`)", "")
+CONFIGURATION_RENOMME = ("# T", "Seul B.", "Ligne un.", "Ligne deux.")
+CONFIGURATION_BASE: Fichiers = {
+    # Deux retraits proches, puis un retrait dans le fichier suivant : sous
+    # `diff.interHunkContext`, les deux blocs fusionnent autour de leur ligne de contexte, que le
+    # compte du bloc ne décompte pas, et ce compte déborde sur l'en-tête du fichier suivant.
+    "CLAUDE.md": (*CONFIGURATION_TETE, "**Ne jamais interrompre.**", "Une ligne.", "Sans revue."),
+    "CONTRIBUTING.md": ("## Démarrer", "Seul le mainteneur merge."),
+    # `diff.algorithm=patience` garde « Sans B. » et retire les « y ».
+    ".claude/algorithme.md": ("Sans B.", "  y", "  y"),
+    # Sans l'heuristique d'indentation, le bloc retiré glisse sous « ## S ».
+    ".claude/indentation.md": ("Ne jamais A.", "  y", "## S", "Ne jamais A.", ""),
+    # Deux fichiers renommés et retouchés : lus comme des suppressions — `diff.renames=false`, ou
+    # deux renommages au-delà de `diff.renameLimit=1` —, ils rendraient aussi « Seul B. » et
+    # « Aucun C. », que le delta garde.
+    ".claude/a.md": (*CONFIGURATION_RENOMME, "Ne jamais A."),
+    ".claude/c.md": ("# U", "Aucun C.", "Ligne trois.", "Ligne quatre.", "Ne jamais D."),
+}
+CONFIGURATION_DELTA: Fichiers = {
+    "CLAUDE.md": (*CONFIGURATION_TETE, "**Interrompre rarement.**", "Une ligne.", "Avec revue."),
+    "CONTRIBUTING.md": ("## Démarrer", "Le mainteneur merge."),
+    ".claude/algorithme.md": ("  y", "Sans B."),
+    ".claude/indentation.md": ("Ne jamais A.", ""),
+    ".claude/b.md": (*CONFIGURATION_RENOMME, "Rarement A."),
+    ".claude/d.md": ("# U", "Aucun C.", "Ligne trois.", "Ligne quatre.", "Rarement D."),
+    # Une copie retouchée de `CLAUDE.md` : sous `diff.renames=copies`, elle se diffe contre lui,
+    # et la restriction qu'il retire se rend deux fois.
+    ".claude/copie.md": (*CONFIGURATION_TETE, "**Rarement.**", "Une ligne.", "Sans revue."),
+}
+CONFIGURATION_LIGNES = [
+    ".claude/algorithme.md § — : Sans B.",
+    ".claude/a.md § T : Ne jamais A.",
+    ".claude/c.md § U : Ne jamais D.",
+    ".claude/indentation.md § — : Ne jamais A.",
+    "CLAUDE.md § Observation continue (`task-observer`) : **Ne jamais interrompre.**",
+    "CLAUDE.md § Observation continue (`task-observer`) : Sans revue.",
+    "CONTRIBUTING.md § Démarrer : Seul le mainteneur merge.",
+]
+# Les fichiers d'attributs que `core.attributesFile` désigne, rangés dans le `.git` du dépôt.
+ATTRIBUTS = {"pilote": "* diff=p\n", "binaire": "* binary\n"}
 
-    assert lance() == (0, [M5_LIGNE])
+# Une ligne par clé que la docstring du script dit neutralisée par une option, avec la valeur qui
+# change la sortie sans elle ; `{pilote}` et `{binaire}` valent les fichiers d'`ATTRIBUTS`.
+CONFIGURATIONS: dict[str, tuple[tuple[str, str], ...]] = {
+    "sans-configuration": (),
+    "couleur-forcee": (("color.ui", "always"),),
+    "couleur-du-diff": (("color.diff", "always"),),
+    # `git` sort en 128 : le diff externe échoue.
+    "diff-externe": (("diff.external", "false"),),
+    "pilote-externe": (("core.attributesFile", "{pilote}"), ("diff.p.command", "false")),
+    "conversion-de-texte": (
+        ("core.attributesFile", "{pilote}"),
+        ("diff.p.textconv", "sed s/jamais/souvent/"),
+    ),
+    # Un fichier lu binaire ne rend aucune ligne.
+    "pilote-binaire": (("core.attributesFile", "{pilote}"), ("diff.p.binary", "true")),
+    "attribut-binaire": (("core.attributesFile", "{binaire}"),),
+    "seuil-des-gros-fichiers": (("core.bigFileThreshold", "1"),),
+    # Lancée depuis un sous-dossier, la passe n'y verrait que lui.
+    "diff-relatif": (("diff.relative", "true"),),
+    "contexte-entre-blocs": (("diff.interHunkContext", "3"),),
+    "renommages-coupes": (("diff.renames", "false"),),
+    "copies-cherchees": (("diff.renames", "copies"),),
+    "limite-de-renommage": (("diff.renameLimit", "1"),),
+    "algorithme-patience": (("diff.algorithm", "patience"),),
+    "sans-heuristique-d-indentation": (("diff.indentHeuristic", "false"),),
+}
+
+
+@pytest.fixture(scope="module")
+def depot_de_configuration(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Le dépôt de la table de configuration, bâti une fois : chaque ligne n'y change que
+    l'environnement de la passe, jamais le dépôt."""
+    racine = tmp_path_factory.mktemp("configuration")
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        isole_git(monkeypatch)
+        monkeypatch.chdir(racine)
+        git("init", "-q", "-b", "main")
+        commite(CONFIGURATION_BASE)
+        for renomme in (".claude/a.md", ".claude/c.md"):
+            Path(renomme).unlink()
+        commite(CONFIGURATION_DELTA)
+    (racine / "apps").mkdir()
+    for nom, contenu in ATTRIBUTS.items():
+        (racine / ".git" / nom).write_text(contenu, encoding="utf-8")
+    return racine
+
+
+@pytest.mark.parametrize("cles", CONFIGURATIONS.values(), ids=CONFIGURATIONS.keys())
+def test_la_configuration_git_ne_change_pas_les_lignes_rendues(
+    cles: tuple[tuple[str, str], ...],
+    depot_de_configuration: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Chaque clé que la docstring du script neutralise par une option change la sortie sans elle
+    (mesuré le 2026-11-04, git 2.47.1) ; le témoin sans configuration rend les mêmes lignes. La
+    clé passe par `GIT_CONFIG_COUNT`, que `git` ajoute à sa configuration, au-dessus des fichiers
+    (`git-config`, « ENVIRONMENT ») ; la passe part d'un sous-dossier, que `diff.relative`
+    borne."""
+    isole_git(monkeypatch)
+    fichiers = {nom: str(depot_de_configuration / ".git" / nom) for nom in ATTRIBUTS}
+    monkeypatch.setenv("GIT_CONFIG_COUNT", str(len(cles)))
+    for rang, (cle, valeur) in enumerate(cles):
+        monkeypatch.setenv(f"GIT_CONFIG_KEY_{rang}", cle)
+        monkeypatch.setenv(f"GIT_CONFIG_VALUE_{rang}", valeur.format(**fichiers))
+    monkeypatch.chdir(depot_de_configuration / "apps")
+
+    assert lance() == (0, CONFIGURATION_LIGNES)
 
 
 @pytest.mark.usefixtures("depot")
@@ -227,21 +323,6 @@ def test_une_base_qui_a_avance_se_lit_depuis_le_point_de_depart_commun() -> None
 
 
 @pytest.mark.usefixtures("depot")
-def test_un_fichier_renomme_se_lit_sous_son_chemin_de_la_base() -> None:
-    """Renommé et retouché, le fichier se diffe contre son ancien chemin : seule la ligne retouchée
-    est retirée — lu comme une suppression, il rendrait aussi « Seul B. », que le delta garde. Sous
-    `diff.renames=false` : sans elle, `git diff` suit déjà les renommages, et la mutation qui retire
-    `--find-renames` restait verte (mesuré le 2026-11-04, git 2.47.1)."""
-    lignes = ("# T", "Seul B.", "Ligne un.", "Ligne deux.")
-    commite({".claude/a.md": (*lignes, "Ne jamais A.")})
-    git("mv", ".claude/a.md", ".claude/b.md")
-    commite({".claude/b.md": (*lignes, "Rarement A.")})
-    git("config", "diff.renames", "false")
-
-    assert lance() == (0, [".claude/a.md § T : Ne jamais A."])
-
-
-@pytest.mark.usefixtures("depot")
 def test_une_base_inconnue_sort_en_2_avec_le_motif_de_git_sur_la_sortie_d_erreur() -> None:
     """`git` en échec : rien sur la sortie standard, le motif sur la sortie d'erreur."""
     commite(M5_BASE)
@@ -252,21 +333,36 @@ def test_une_base_inconnue_sort_en_2_avec_le_motif_de_git_sur_la_sortie_d_erreur
     assert b"inconnue" in done.stderr
 
 
-# Chaque marque seule dans sa phrase, puis un mot qui en contient une sans l'être.
+# Chaque forme de marque seule dans sa phrase — une par marque et par flexion en genre et en
+# nombre, la règle de fin de mot refusant toute autre forme —, puis un mot qui en contient une
+# sans l'être.
 FORMES_DE_MARQUE = {
     "jamais": ("Jamais d'auto-merge.", True),
-    "seule": ("Une seule voie.", True),
+    "toujours": ("Toujours un brief.", True),
     "seul": ("Le seul cas.", True),
+    "seule": ("Une seule voie.", True),
+    "seuls": ("Les seuls cas.", True),
+    "seules": ("Les seules voies.", True),
     "seulement": ("Seulement sur verdict vert.", True),
+    "uniquement": ("Uniquement sur verdict vert.", True),
     "reste-a": ("La décision reste à la session.", True),
+    "restent-a": ("Les décisions restent à la session.", True),
     "ne": ("On ne merge pas.", True),
     "n-apostrophe": ("Il n'existe pas.", True),
     "ni": ("Ni push, ni force.", True),
+    "pas-nominal": ("Pas de proposition de revue.", True),
     "sans": ("Sans exception.", True),
     "aucun": ("Aucun commit cassé.", True),
     "aucune": ("Aucune issue.", True),
+    "aucuns": ("Aucuns frais.", True),
+    "aucunes": ("Aucunes données.", True),
+    "interdit": ("Le force-push est interdit.", True),
+    "interdite": ("Une écriture interdite.", True),
+    "interdits": ("Des pushs interdits.", True),
+    "interdites": ("Des écritures interdites.", True),
     "ne-en-fin-de-mot": ("Une donnée.", False),
     "ni-en-tete-de-mot": ("Un nid.", False),
+    "pas-en-tete-de-mot": ("Il passe.", False),
     "aucun-en-tete-de-mot": ("Aucunement.", False),
     "reste-sans-a": ("Il reste du texte.", False),
 }
@@ -280,3 +376,27 @@ def test_une_marque_restrictive_se_reconnait_en_mot_entier_sans_la_casse(
 ) -> None:
     """Le témoin des deux côtés de `MARQUE_RESTRICTIVE`, sans dépôt."""
     assert bool(restrictions.MARQUE_RESTRICTIVE.search(texte)) is marquee
+
+
+# Une clôture de bloc de code (CommonMark 0.31.2, §4.5) : même caractère que l'ouvrante, au moins
+# aussi longue, suivie de blancs seuls ; une ouvrante à accents graves n'en porte pas dans son
+# info. Chaque cas : les lignes, et la section de la dernière.
+CLOTURES = {
+    "accents-graves-dans-un-bloc-tilde": (
+        ("# Avant", "~~~", "```", "# Dedans", "~~~", "x"),
+        "Avant",
+    ),
+    "cloture-plus-courte": (("# Avant", "````", "```", "# Dedans", "````", "x"), "Avant"),
+    "cloture-suivie-d-un-texte": (("# Avant", "```", "```bash", "# Dedans", "```", "x"), "Avant"),
+    "accent-grave-dans-l-info": (("# Avant", "```a`b", "# Après", "x"), "Après"),
+    "cloture-plus-longue": (("# Avant", "~~~", "# Dedans", "~~~~", "# Après", "x"), "Après"),
+}
+
+
+@pytest.mark.parametrize(("lignes", "attendue"), CLOTURES.values(), ids=CLOTURES.keys())
+def test_un_bloc_de_code_ne_se_ferme_que_sur_une_cloture_de_son_caractere(
+    lignes: tuple[str, ...], attendue: str
+) -> None:
+    """Un titre dans un bloc de code n'est pas une section : la clôture qui le ferme à tort fait
+    lire comme titre ce qui le suit, et le témoin d'une clôture plus longue garde l'autre côté."""
+    assert restrictions.section(lignes, len(lignes)) == attendue
