@@ -16,7 +16,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from skill_scripts import load_script, run_in_pipe
+from conftest import load_script, run_in_pipe
 
 restrictions = load_script("cycle-pr", "restrictions-du-delta")
 

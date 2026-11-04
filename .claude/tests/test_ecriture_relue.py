@@ -22,7 +22,7 @@ from typing import Any
 
 import pytest
 from command_doubles import json_success, sortie_d_echec, success
-from skill_scripts import load_script, run_in_pipe
+from conftest import load_script, run_in_pipe
 from test_agent_skills import PLAN_QA_CASE_FORMS
 
 ecriture_relue = load_script("cycle-pr", "ecriture-relue")

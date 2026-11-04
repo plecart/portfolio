@@ -44,6 +44,8 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
+# `apps` seul : les tests de la pipeline, sous `.claude/tests`, se lancent à part
+# (`make test-pipeline`).
 testpaths = ["apps"]
 # Le greffon `process_environment` pose l'environnement de test — réglages Django compris — avant
 # que pytest-django ne les charge, ce qu'aucun `conftest.py` ne peut faire : pytest les importe
@@ -84,8 +86,9 @@ extend-exclude = [".claude/worktrees"]
 typeCheckingMode = "strict"
 # `infra` : le code Python de la CI (`infra/ci`) est tenu au même mode strict. Pas sous `.github/` :
 # pyright y exclut tout dossier caché, et cette exclusion l'emporte sur `include` — mesuré, une
-# erreur de type délibérée y passait sans diagnostic. Les scripts des skills, sous `.claude/`, ont
-# donc leur propre projet, `.claude/skills/pyrightconfig.json`, que `make typecheck` lance aussi.
+# erreur de type délibérée y passait sans diagnostic. Les scripts des skills et les tests de la
+# pipeline, sous `.claude/`, ont donc leur propre projet, `.claude/pyrightconfig.json`, que
+# `make typecheck` lance aussi.
 include = ["apps", "infra"]
 # Le `pythonpath` de pytest, vu de pyright : les modules d'appui des tests s'importent par leur nom.
 extraPaths = ["apps/api/tests", "infra/ci"]

@@ -24,13 +24,11 @@ formes fautives construites en mémoire (`FAULTY_SETTINGS`). Une première versi
 
 import json
 import re
-from pathlib import Path
 from typing import Any, Literal
 
 import pytest
+from conftest import REPOSITORY_ROOT
 
-# `test_agent_permissions.py` → `tests` → `api` → `apps` → racine du dépôt.
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 SETTINGS = REPOSITORY_ROOT / ".claude" / "settings.json"
 
 # Les formes que RTK produit pour `cat`, `head -N`, `tail -N` et `grep` sur `.env`, mesurées le

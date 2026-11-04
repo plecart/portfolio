@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from skill_scripts import load_script, run_in_pipe
+from conftest import load_script, run_in_pipe
 
 sonde = load_script("cycle-pr", "sonde-outillage")
 

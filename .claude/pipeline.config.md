@@ -52,9 +52,16 @@ back vert (ADR 0019).
 
 **Back (`apps/api/`)** — vérifiées le 2026-09-23 au premier scaffold du back (#2) :
 - install      : make install                     # uv sync
-- test         : make test                        # suite complète ; exige Docker : les tests de base
-                                                  # démarrent Postgres par testcontainers (#7) ;
-                                                  # vérifiée le 2026-09-26
+- test         : make test                        # suite du back, `apps` ; exige Docker : les
+                                                  # tests de base démarrent Postgres par
+                                                  # testcontainers (#7) ; vérifiée le 2026-11-04
+- test-pipeline : make test-pipeline              # tests de la pipeline, `.claude/tests`, sans
+                                                  # Django ni le `conftest.py` du back ; à lancer
+                                                  # aussi quand le delta touche `.claude/`,
+                                                  # `CLAUDE.md`, `CONTRIBUTING.md`, `.github/` ou
+                                                  # ce qui les lance (`Makefile`, `pyproject.toml`,
+                                                  # `uv.lock`) ; sortie brute : `rtk proxy make
+                                                  # test-pipeline` ; vérifiée le 2026-11-04
 - test ciblé   : uv run pytest <chemin|motif>     # une seule cible, pour la boucle TDD
 - test brut    : rtk proxy make test              # sortie du lanceur sans le résumeur RTK du poste :
                                                   # le verdict se lit ici, par le `developpeur`
@@ -64,10 +71,10 @@ back vert (ADR 0019).
 - format       : make format                      # ruff format — écrit
 - format:check : make format-check                # vérifie sans écrire
 - typecheck    : make typecheck                   # pyright, mode strict (cadrage §8.4) : le projet
-                                                  # racine, puis `.claude/skills/pyrightconfig.json`
-                                                  # pour les scripts des skills, qu'un dossier caché
-                                                  # soustrait au premier (#145) ; vérifiée le
-                                                  # 2026-10-28
+                                                  # racine, puis `.claude/pyrightconfig.json` pour
+                                                  # les scripts des skills et les tests de la
+                                                  # pipeline, qu'un dossier caché soustrait au
+                                                  # premier (#145) ; vérifiée le 2026-11-04
 - openapi      : make openapi                     # écrit `apps/api/openapi.json`, le schéma de
                                                   # l'API publique (commande de django-ninja) ;
                                                   # à relancer après tout changement du contrat,
@@ -162,7 +169,7 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
                                                   # front. Le rapporteur qui la consomme est
                                                   # éprouvé **dans la suite** sur un rapport
                                                   # JSON réel recopié (`PLAYWRIGHT_REPORT` de
-                                                  # `apps/api/tests/test_mutation.py`) ; le
+                                                  # `.claude/tests/test_mutation.py`) ; le
                                                   # bout-en-bout contre le vrai lanceur a été
                                                   # joué **à la main** le 2026-10-09, il n'est
                                                   # pas dans la suite — aucune porte ne le rejoue
@@ -182,11 +189,14 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
                                                   # `.claude/{skills,agents,commands}` (doc :
                                                   # « those three directories under its
                                                   # `.claude` »), le manifeste s'il existe et
-                                                  # les entrées MCP. **Muette** sur un
-                                                  # frontmatter de rôle absent ou illisible —
-                                                  # mesuré sur v2.1.295, 3 classes de faute :
-                                                  # c'est `apps/api/tests/test_agent_skills.py`
-                                                  # qui garde celle-là. Installée hors dépôt
+                                                  # les entrées MCP. **Muette** sur 3 classes
+                                                  # de faute sur 6 : deux-points non cités
+                                                  # (skill, rôle), description vide (skill,
+                                                  # rôle), rôle sans frontmatter — re-mesuré le
+                                                  # 2026-11-04 sur v2.1.295, recueil
+                                                  # `FRONTMATTER_FORMS` en témoins jetables :
+                                                  # c'est `.claude/tests/test_agent_skills.py`
+                                                  # qui garde celles-là. Installée hors dépôt
                                                   # (`npm i -g @anthropic-ai/claude-code`) ; se
                                                   # lance **depuis la racine**, le PATH du poste
                                                   # portant une entrée relative qui résout un
@@ -308,7 +318,7 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
     "import locale,sys; print(locale.getpreferredencoding(False), sys.stdout.encoding)" | cat`
     rend `cp1252 cp1252`, et `print('tête')` en tube écrit les octets `t\xeate`). Un script de skill
     dont la sortie est lue force `sys.stdout.reconfigure(encoding="utf-8")` ; sa garde le lance par
-    `run_in_pipe` (`apps/api/tests/skill_scripts.py`), qui impose cp1252 à l'enfant, et rougit
+    `run_in_pipe` (`.claude/tests/conftest.py`), qui impose cp1252 à l'enfant, et rougit
     sans lui (mutation jouée, mesuré le 2026-10-17) quel que soit l'environnement hérité —
     `PYTHONIOENCODING=utf-8` ou `PYTHONUTF8=1` au parent la laissaient verte avant cette
     imposition (mesuré le 2026-10-21) ; sur un runner Linux, rouge par la même imposition, non
@@ -458,7 +468,7 @@ d'origine, forme `rtk`, `rtk proxy`, outil PowerShell — est la porte de « jam
 le trunk », du « rebase explicitement demandé » (`contraintes.md`) et du « ni commit de fusion » de
 `cycle-pr` Étape 6 : sans `--rebase`, `update-branch` fusionne la base dans la branche de la PR
 (`gh pr update-branch --help`, gh 2.94.0) ; jamais en `deny`, le mainteneur gardant la main
-(#198, D-2). Épinglée par `apps/api/tests/test_agent_permissions.py`. Seule exception, hors du
+(#198, D-2). Épinglée par `.claude/tests/test_agent_permissions.py`. Seule exception, hors du
 trunk : le script `.claude/skills/cycle-pr/scripts/merge-lot.py`, autorisé en `allow`, qui lance lui-même
 `gh pr merge` vers une branche d'intégration et refuse le trunk (`cycle-pr` Étape 7, « Le merge
 d'un lot ») — un sous-processus, que les règles du harnais ne voient pas : « Bash rules match the
@@ -499,7 +509,7 @@ vérifiée), tout sous-processus qui ouvre le fichier lui-même.
 `merge-lot.py` : il a reçu 5 commits au seul cycle de #197. La porte de merge, qui le chaîne avant
 `gh pr merge`, garde son invite — « Deny and ask rules apply when any subcommand matches them »
 (doc permissions, § Compound commands, lue le 2026-11-03) —, épinglée par
-`apps/api/tests/test_agent_permissions.py`. Reste ouvert, comme pour `.env` : un script édité puis
+`.claude/tests/test_agent_permissions.py`. Reste ouvert, comme pour `.env` : un script édité puis
 lancé dans la même session passe sans invite, quoi qu'il lance alors, un `gh pr merge` compris.
 
 **Outils hors dépôt** (`uv tool`, environnements isolés — frontend-outillage §2.2) :

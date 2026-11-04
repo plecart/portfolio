@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 from call_witness import recording, witnessed
-from test_infra import MAKEFILE, REPOSITORY_ROOT, run_make
+from system_commands import MAKEFILE, REPOSITORY_ROOT, run_make
 
 HOST = "vps.example"
 REMOTE_SCRIPT = "/root/portfolio-restore.sh"

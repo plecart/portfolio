@@ -17,9 +17,9 @@ pas d'auto-merge dans le trunk, pas de force-push, pas de code mort, format des 
 — technique `[T]`, elle se décide et se trace ; vision `[V]`, elle attend le mainteneur, groupée ;
 contradiction `[C]`, elle arrête (`.claude/rules/contraintes.md`).
 
-**Commandes du projet.** Ce skill ne présuppose aucune stack : les commandes `test`, `test ciblé`,
-`lint`, `format`, `typecheck` et `build` se lisent dans la section « Commandes du projet » de
-`.claude/pipeline.config.md`. Une étape marquée `n/a` s'ignore. Si le fichier est absent,
+**Commandes du projet.** Ce skill ne présuppose aucune stack : les commandes `test`,
+`test-pipeline`, `test ciblé`, `lint`, `format`, `typecheck` et `build` se lisent dans la section
+« Commandes du projet » de `.claude/pipeline.config.md`. Une étape marquée `n/a` s'ignore. Si le fichier est absent,
 s'arrêter et proposer une session `init-projet` distincte (`init-projet`, « Note pour les autres
 skills ») ; ne jamais deviner une commande.
 
@@ -313,8 +313,8 @@ le même commit** — voir `.claude/rules/contraintes.md`. La doc ne se met jama
 
 ### 3.2 Premier passage de tests
 
-Le `developpeur` lance la suite rapide. **Si rouge → pas de commit.** Il répare. Contrôles
-complémentaires :
+Le `developpeur` lance la suite rapide, et « test-pipeline » si le delta la concerne (« Commandes
+du projet »). **Si rouge → pas de commit.** Il répare. Contrôles complémentaires :
 
 → [references/tests.md](references/tests.md), « Contrôles complémentaires de 3.2 ».
 
@@ -432,9 +432,10 @@ trouve en dix secondes ne se paie pas en jetons. Avant chaque appel, dans cet or
 Chaque commande se lit dans « Commandes du projet » de `.claude/pipeline.config.md`, avec ce
 qu'elle couvre et ce qu'elle ne voit pas — jamais de mémoire :
 
-1. **`lint`, `typecheck` et la suite** verts, et la ligne **validation** si le delta touche
-   `.claude/` ou `CLAUDE.md` — un `releveur` lancé par la session PR, qui rend le verdict et les
-   lignes en échec ; sur zéro test collecté, la sortie brute du lanceur (3.2).
+1. **`lint`, `typecheck` et la suite** verts — « test-pipeline » compris si le delta la
+   concerne —, et la ligne **validation** si le delta touche `.claude/` ou `CLAUDE.md` — un
+   `releveur` lancé par la session PR, qui rend le verdict et les lignes en échec ; sur zéro
+   test collecté, la sortie brute du lanceur (3.2).
 2. La ligne **relecture**, en balayage mécanique du diff. C'est la session de relecture qui
    l'invoque, à chaque réveil — à la différence de `/code-review ultra`, qui demande un geste du
    mainteneur et reste hors pipeline.
@@ -969,7 +970,7 @@ python .claude/skills/cycle-pr/scripts/merge-lot.py <n> <SHA de tête vérifié>
 ```
 
 C'est la **seule** voie de merge que `.claude/settings.json` autorise sans invite ; `gh pr merge`
-reste en `ask`, épinglé par `apps/api/tests/test_agent_permissions.py`. Le script porte lui-même
+reste en `ask`, épinglé par `.claude/tests/test_agent_permissions.py`. Le script porte lui-même
 les portes de « Le go, puis le merge » — trunk refusé, base qui doit être la tête d'une PR
 d'intégration ouverte, tête comparée au SHA vérifié — et une plus stricte : la tête du lot doit
 **contenir** la tête actuelle de sa base, par un historique sans commit de merge. La CI de la tête
@@ -978,7 +979,7 @@ forge recalcule à son rythme (obs 51). Puis `--rebase --match-head-commit`. Il 
 conversation changée depuis la ligne `Conversation : …` du verdict, ou sans relevé lisible, qu'il
 lit par `porte-merge.py conversation <n>` en dernier avant `gh pr merge`, refus qui se traite comme
 celui de la porte (« Le go, puis le merge »). Ses refus, et ce qu'il
-ne prouve pas, sont dans sa docstring ; son contrat, dans `apps/api/tests/test_merge_lot.py`. Un
+ne prouve pas, sont dans sa docstring ; son contrat, dans `.claude/tests/test_merge_lot.py`. Un
 refus sort en une ligne et se traite comme une porte qui ne part pas : rejouer « Rejouer les
 vérifications périmées », jamais le contourner par `gh pr merge` — sauf un refus de contenance ou
 de commit de merge, que ces vérifications ne lèvent pas et qui suit la phrase suivante. **Un lot en

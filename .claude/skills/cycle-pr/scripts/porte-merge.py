@@ -35,7 +35,7 @@ juger. Depuis, 7 :
 - `conversation --releve` : un mode, pas un verdict, qui sort en 0 sans juger — liée à rien, à
   dessein : elle ne se chaîne jamais par `&&`.
 
-La table `ENTREES` d'`apps/api/tests/test_porte_merge.py` tient un cas par entrée, et rougit
+La table `ENTREES` d'`.claude/tests/test_porte_merge.py` tient un cas par entrée, et rougit
 quand l'usage d'une sous-commande en gagne une sans cas.
 
 **`trunk <run> <base> <tête>`** — le trunk que le run a extrait sur la tête visée. Il lit `gh run

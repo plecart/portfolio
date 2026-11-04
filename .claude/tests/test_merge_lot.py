@@ -21,7 +21,7 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 import pytest
-from skill_scripts import REPOSITORY_ROOT, load_script, run_in_pipe, script_path
+from conftest import REPOSITORY_ROOT, load_script, run_in_pipe, script_path
 
 merge_lot = load_script("cycle-pr", "merge-lot")
 

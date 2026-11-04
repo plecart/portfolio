@@ -18,7 +18,7 @@ from typing import Any, NamedTuple
 
 import pytest
 from command_doubles import ABSENT, Reply, altered, failure, json_success, stdout_lines, success
-from skill_scripts import load_script, run_in_pipe
+from conftest import load_script, run_in_pipe
 
 attente_ci = load_script("cycle-pr", "attente-ci")
 

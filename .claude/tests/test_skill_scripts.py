@@ -1,5 +1,5 @@
 """Tests des portes des scripts de skills : l'encodage qu'un enfant reçoit en tube, et leur
-couverture par `make typecheck`."""
+couverture, avec celle des tests de la pipeline, par `make typecheck`."""
 
 import json
 import shlex
@@ -7,12 +7,11 @@ import subprocess
 import sys
 
 import pytest
-from skill_scripts import REPOSITORY_ROOT, pipe_environment
-from test_infra import make_dry_run
+from conftest import REPOSITORY_ROOT, make_dry_run, pipe_environment
 
-# Le projet pyright des scripts des skills, que le projet racine ne voit pas (`Makefile`, cible
-# `typecheck`).
-SKILLS = REPOSITORY_ROOT / ".claude" / "skills"
+# Le projet pyright des scripts des skills et des tests de la pipeline, que le projet racine ne
+# voit pas (`Makefile`, cible `typecheck`).
+PROJECT = REPOSITORY_ROOT / ".claude"
 
 # Ce que le parent peut hériter du shell pour mettre l'enfant en UTF-8 sans son correctif ; une
 # variable absente d'un cas est ôtée du parent.
@@ -67,26 +66,29 @@ def test_make_typecheck_lance_pyright_sur_le_projet_des_scripts_des_skills() -> 
     """Retirer cette invocation laissait toute la suite verte : c'est le défaut d'origine de #145."""
     commandes = [shlex.split(ligne) for ligne in make_dry_run("typecheck").splitlines()]
 
-    assert any(commande[-3:] == ["pyright", "-p", ".claude/skills"] for commande in commandes)
+    assert any(commande[-3:] == ["pyright", "-p", ".claude"] for commande in commandes)
 
 
 def test_le_projet_pyright_des_skills_est_en_mode_strict() -> None:
     """Sans la clé, pyright analyserait les mêmes fichiers en mode basique, gardes vertes."""
-    config = json.loads((SKILLS / "pyrightconfig.json").read_text(encoding="utf-8"))
+    config = json.loads((PROJECT / "pyrightconfig.json").read_text(encoding="utf-8"))
 
     assert config["typeCheckingMode"] == "strict"
 
 
 def test_le_projet_pyright_des_skills_analyse_chacun_de_leurs_scripts() -> None:
     """Un projet mal réglé analyse moins qu'il ne prétend, et rend « 0 errors » quand même :
-    `"include": ["*/scripts"]` y a été mesuré à 0 fichier analysé (#145)."""
+    `"include": ["*/scripts"]` y a été mesuré à 0 fichier analysé (#145), `skills/*/scripts` de
+    même depuis `.claude` (2026-11-04). Le compte porte les scripts et les tests de la pipeline."""
     done = subprocess.run(
-        [sys.executable, "-m", "pyright", "--outputjson", "-p", str(SKILLS)],
+        [sys.executable, "-m", "pyright", "--outputjson", "-p", str(PROJECT)],
         capture_output=True,
         cwd=REPOSITORY_ROOT,
         check=False,
     )
 
-    scripts = list(SKILLS.glob("*/scripts/*.py"))
-    assert scripts, f"aucun script sous {SKILLS}"
-    assert json.loads(done.stdout)["summary"]["filesAnalyzed"] == len(scripts), done.stderr
+    scripts = list(PROJECT.glob("skills/*/scripts/*.py"))
+    tests = list(PROJECT.glob("tests/*.py"))
+    assert scripts and tests, f"aucun script ou aucun test sous {PROJECT}"
+    analysed = json.loads(done.stdout)["summary"]["filesAnalyzed"]
+    assert analysed == len(scripts) + len(tests), done.stderr

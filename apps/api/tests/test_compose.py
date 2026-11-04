@@ -18,8 +18,9 @@ import pytest
 import yaml
 from config.env import Env
 from containers import POSTGRES_IMAGE
+from system_commands import make_dry_run
 from test_env import declared_variables
-from test_infra import COMPOSE_DEV, IMAGE_DOCKERFILES, PUBLISH_PREFIX, make_dry_run
+from test_infra import COMPOSE_DEV, IMAGE_DOCKERFILES, PUBLISH_PREFIX
 from test_supply_chain import compose_services
 
 COMPOSE_PROD = COMPOSE_DEV.with_name("compose.yml")

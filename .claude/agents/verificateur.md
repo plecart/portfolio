@@ -81,7 +81,7 @@ Ce que tu vérifies, **dans cet ordre** — c'est un ordre de priorité, et tu t
    Puis l'absence de conflit, par un **prédicat** :
    `git merge-tree --write-tree origin/<trunk> <branche>` sort en **0** sans conflit et en **1**
    avec — mesuré le 2026-10-13, témoin de chaque côté, table `FRESHNESS_GATE_FORMS` de
-   `apps/api/tests/test_agent_skills.py` ; il imprime aussi les chemins en conflit, mais c'est son
+   `.claude/tests/test_agent_skills.py` ; il imprime aussi les chemins en conflit, mais c'est son
    code de sortie qui porte la condition. Il sort en **1** aussi sur une référence inconnue — une
    `<branche>` absente de ce clone —, sortie standard vide (même table ; sortie mesurée le
    2026-10-21, git 2.47.1) : ce 1-là se rapporte comme une référence introuvable, jamais comme un

@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from skill_scripts import load_script
+from conftest import load_script
 
 mutation = load_script("cycle-pr", "mutation")
 
@@ -621,7 +621,7 @@ def test_un_fichier_de_mutations_sans_mutation_est_une_panne(tmp_path: Path) -> 
 
 ORDINAIRES = {
     "le propre test de refus du harnais": {
-        "file": "apps/api/tests/test_mutation.py",
+        "file": ".claude/tests/test_mutation.py",
         "old": '"old": "--exit-code 1"',
         "new": '"old": ""',
     },

@@ -22,11 +22,15 @@ from typing import cast
 
 import pytest
 import yaml
-from skill_scripts import load_script
-from test_supply_chain import prose_citations, tracked_files
+from conftest import (
+    REPOSITORY_ROOT,
+    bash_de_ce_systeme,
+    load_script,
+    prose_citations,
+    texte_normalise,
+    tracked_files,
+)
 
-# `test_agent_skills.py` → `tests` → `api` → `apps` → racine du dépôt.
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 SKILLS = sorted(REPOSITORY_ROOT.glob(".claude/skills/*/SKILL.md"))
 AGENTS = sorted(REPOSITORY_ROOT.glob(".claude/agents/*.md"))
 
@@ -80,7 +84,9 @@ def complaint(name: str, text: str) -> str | None:
 # Le recueil : une forme fautive par classe, et le fragment de message qui doit la nommer. Les
 # **deux premières** sont celles sur lesquelles `claude plugin validate` est muet — mesuré le
 # 2026-10-09 sur v2.1.295, avec témoins —, c'est-à-dire exactement la classe qui a fait charger
-# le rôle `relecteur` sans aucun champ. Cette table est la seule porte qui les attrape.
+# le rôle `relecteur` sans aucun champ ; la dernière, « description vide », aussi — re-mesuré le
+# 2026-11-04 sur la même version, `--strict`, skill et rôle (« aucun frontmatter » pour un rôle
+# seulement). Cette table est la seule porte qui les attrape.
 FRONTMATTER_FORMS = {
     "aucun frontmatter": ("# Un rôle sans frontmatter\n", "aucun frontmatter"),
     "deux-points non cités dans la description": (
@@ -1606,12 +1612,6 @@ def test_chaque_liste_gh_de_pr_paralleles_porte_sa_limite() -> None:
     assert all("--limit" in site for site in sites), [s for s in sites if "--limit" not in s]
 
 
-def texte_normalise(fichier: str) -> str:
-    """Le texte du fichier, espaces normalisés et marges `# ` de tête de ligne retirées."""
-    brut = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig")
-    return " ".join(re.sub(r"(?m)^[ \t]*#[ \t]?", "", brut).split())
-
-
 def prose_du_harnais() -> Iterator[tuple[str, str]]:
     """Chaque fichier suivi de la prose du harnais (`HARNESS_PROSE_GLOBS`), avec son texte
     normalisé : une forme coupée en fin de ligne s'y lit d'un tenant (obs 124)."""
@@ -1998,7 +1998,7 @@ def test_une_commande_de_la_passe_comptable_n_a_aucune_barre_oblique_inverse(nom
     ids=PLAN_QA_CASE_FORMS.keys(),
 )
 def test_la_commande_des_cases_sans_type_s_accorde_au_recueil(
-    ligne: str, sans_type: bool, bash_de_ce_systeme: str, tmp_path: Path
+    ligne: str, sans_type: bool, tmp_path: Path
 ) -> None:
     """La commande « Cases sans type » de la passe comptable sort une ligne du recueil si et
     seulement si `cases_sans_type` la refuse (I2 de la passe 2 de relecture de la PR #157 : l'une
@@ -2018,7 +2018,7 @@ def test_la_commande_des_cases_sans_type_s_accorde_au_recueil(
     )
 
     resultat = subprocess.run(
-        [bash_de_ce_systeme, "-c", commande],
+        [bash_de_ce_systeme(), "-c", commande],
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -2377,7 +2377,7 @@ def test_les_renvois_aux_barreaux_sont_ceux_de_la_table() -> None:
     Hors de cette forme (obs 139), les renvois sans numéro : « Création d'issues en cours de
     cycle » cherché sur le même texte normalisé rend, hors de la règle, **13** renvois, dont ces 3
     numérotés et **10** sans numéro ; **1** fuyait, la vérif de fumée de `cycle-pr` Étape 7, qui
-    énumère les barreaux — épinglée à part. Les 9 autres renvoient à la règle sans l'énumérer,
+    énumère les barreaux. Les 9 autres renvoient à la règle sans l'énumérer,
     pour une décision, ou vers un brouillon `bug-vers-issue`, qui qualifie (`repercussions` ×2).
     """
     renvois = {
