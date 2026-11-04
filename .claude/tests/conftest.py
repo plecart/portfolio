@@ -7,7 +7,8 @@ tout paquet importable. `ruff` les lit ; `pyright` aussi, mais par un projet à 
 (`.claude/pyrightconfig.json`, lancé par `make typecheck`), le projet racine excluant les dossiers
 cachés quoi que dise son `include` (mesuré le 2026-10-09). Ni l'un ni l'autre ne les exécute : la
 seule porte qui éprouve leur *comportement* est cette suite, et c'est pourquoi elle les charge par
-chemin.
+chemin. Un script qui lance `git` s'éprouve sur un dépôt témoin, que `git_temoin` construit, la
+configuration du poste écartée par `isole_git`.
 
 Les aides que le back partage avec cette suite gardent leur seule définition dans des modules de
 `apps/api/tests/` sans Django — `test_supply_chain.py`, `system_commands.py` — ; ce module les
@@ -25,12 +26,15 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
 from system_commands import bash_de_ce_systeme, make_dry_run
 from test_supply_chain import prose_citations, texte_normalise, tracked_files
 
 __all__ = [
     "REPOSITORY_ROOT",
     "bash_de_ce_systeme",
+    "git_temoin",
+    "isole_git",
     "load_script",
     "make_dry_run",
     "pipe_environment",
@@ -110,3 +114,26 @@ def run_in_pipe(skill: str, name: str, *args: str) -> subprocess.CompletedProces
         env=pipe_environment(),
         check=False,
     )
+
+
+def isole_git(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Écarte la configuration git du poste des `git` lancés ensuite, script sous test compris :
+    `GIT_CONFIG_GLOBAL` vers un fichier vide, `GIT_CONFIG_NOSYSTEM=1`
+    (`.claude/rules/cleanup-verbatim.md`, « Comment l'appliquer »)."""
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+
+
+def git_temoin(*args: str, cwd: Path | None = None) -> str:
+    """`git <args>` dans `cwd` — le dossier courant par défaut —, sa sortie standard en UTF-8.
+
+    Une erreur lève : le dépôt témoin se construit, il ne se mesure pas. L'auteur est posé et
+    `core.autocrlf` coupé, pour qu'un commit témoin ne dépende ni de l'identité ni des fins de
+    ligne du poste.
+    """
+    return subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.autocrlf=false", *args],
+        cwd=cwd,
+        capture_output=True,
+        check=True,
+    ).stdout.decode("utf-8")
