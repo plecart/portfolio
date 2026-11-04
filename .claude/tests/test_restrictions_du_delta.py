@@ -5,11 +5,13 @@ Chaque cas bâtit un dépôt jetable dans `tmp_path` — la table de configurati
 une fois par module —, la configuration git du poste écartée (`GIT_CONFIG_GLOBAL` vers un fichier
 vide, `GIT_CONFIG_NOSYSTEM=1` : `cleanup-verbatim.md`, « Comment l'appliquer »), y commite une base
 puis un delta, et lance le script sur `HEAD~1` par un tube, comme la session le lit
-(`run_in_pipe`). Les marques et les clôtures de bloc de code se lisent sans dépôt. Le cas d'origine est la mutation M5 de l'étude du
-2026-11-04 (`docs/etudes/2026-11-04-etude-tests-de-la-pipeline.md` §2.4) : une moitié restrictive
-retirée de `CLAUDE.md`, que la suite des phrases figées laissait verte. Les cas s'écrivent en
-littéraux, jamais dérivés des constantes du script (`cycle-pr/references/tests.md`, « Le rouge se
-constate, il ne se suppose pas »).
+(`run_in_pipe`). Les marques et les clôtures de bloc de code se lisent sans dépôt.
+
+Le cas d'origine est la mutation M5 de l'étude du 2026-11-04
+(`docs/etudes/2026-11-04-etude-tests-de-la-pipeline.md` §2.4) : une moitié restrictive retirée de
+`CLAUDE.md`, que la suite des phrases figées laissait verte. Les cas s'écrivent en littéraux,
+jamais dérivés des constantes du script (`cycle-pr/references/tests.md`, « Le rouge se constate,
+il ne se suppose pas »).
 """
 
 import os
