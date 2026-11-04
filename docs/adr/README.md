@@ -35,7 +35,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0014](0014-ci-cd-github-actions-et-ghcr.md) | CI/CD : GitHub Actions et GHCR | D56 (confirme D43) | accepté ; point « Scan sur chaque PR » remplacé par 0017 |
 | [0015](0015-moteur-du-worker-celery.md) | Moteur du worker : Celery ; variantes par Pillow seul | D59 (remplace le point « `django-imagekit` » de 0001 et 0004, et la règle « outbox » de 0006 pour le worker d'images ; rôle 2 « broker » de 0006 avancé en phase 1) | accepté ; contexte « VPS de 4 Go » remplacé par 0023 |
 | [0016](0016-le-worker-dans-les-deux-fichiers-compose.md) | Le worker dans les deux fichiers Compose | D60 (remplace « le worker » parmi ce que la production porte en propre dans 0012 et D54) | accepté |
-| [0017](0017-jobs-de-la-ci-selon-le-delta.md) | Les jobs de la CI selon le delta d'une PR | D61 (remplace le point « Scan : Trivy, sur chaque PR » de 0014) | accepté ; points « Le passage en ready ne déclenche plus de run », « seule l'ouverture d'une draft le saute », « partent après `api`, même rouge » et « le scan Trivy tourne sur chaque PR qui touche un fichier hors du harnais » remplacés par 0019 |
+| [0017](0017-jobs-de-la-ci-selon-le-delta.md) | Les jobs de la CI selon le delta d'une PR | D61 (remplace le point « Scan : Trivy, sur chaque PR » de 0014) | accepté ; points « Le passage en ready ne déclenche plus de run », « seule l'ouverture d'une draft le saute », « partent après `api`, même rouge » et « le scan Trivy tourne sur chaque PR qui touche un fichier hors du harnais » remplacés par 0019 ; point « la suite du back porte aussi les tests de la pipeline » remplacé par 0025 |
 | [0018](0018-binaires-go-compiles-par-le-projet.md) | Binaires Go compilés par le projet | D62 (exerce une condition de réexamen de 0014, sans le remplacer) | accepté |
 | [0019](0019-runs-de-ci-au-ready-et-avis-planifies.md) | Runs de CI au passage en ready, portes d'avis planifiées | D63 (remplace quatre points de 0017, dont deux repris dans D61 ; renverse la décision « sans horloge » de #77) | accepté |
 | [0020](0020-csp-native-de-django.md) | CSP et en-têtes de sécurité par la brique native de Django | D65 (remplace le point « `django-csp` » de 0001) | accepté |
@@ -43,6 +43,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0022](0022-keepassxc-comme-gestionnaire.md) | KeePassXC comme gestionnaire de mots de passe | D67 (remplace la mention « Bitwarden ou 1Password » de 0007) | accepté |
 | [0023](0023-vps-de-phase-1-a-2-go.md) | VPS de phase 1 : 1 vCPU et 2 Go au minimum | D68 (remplace le point « Machine » de 0002 pour la phase 1, son estimation, et le contexte « VPS de 4 Go » de 0015) | accepté |
 | [0024](0024-markdown-to-jsx-poids-et-html-brut.md) | `markdown-to-jsx` : poids mesuré et HTML brut désactivé | D51 (corrige deux énoncés de 0010) | accepté |
+| [0025](0025-tests-de-la-pipeline-avec-elle-sur-son-delta.md) | Les tests de la pipeline vivent avec elle et tournent sur son delta | D69 (remplace le point « la suite du back porte aussi les tests de la pipeline » de 0017) | accepté |
 
 ## À écrire à leur phase
 

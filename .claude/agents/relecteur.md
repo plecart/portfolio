@@ -107,6 +107,9 @@ Ce que tu vérifies :
    `.claude/pipeline.config.md`, cache HTTP désactivé, données jetables — jamais une
    démonstration regardée. C'est toi qui la lances : la session PR l'a fait vérifier sur le
    chemin qu'elle a choisi.
+6. **Les tests de la pipeline** que le diff ajoute ou change, sous `.claude/tests/` : chacun
+   tient la barre de `cycle-pr/references/tests.md`, « Ce qu'un test de la pipeline peut
+   être » ; un test qui fige une phrase de comportement est un constat.
 
 Éprouver un test par mutation **s'appelle** — le harnais est versionné, tu ne le réécris pas :
 

@@ -52,8 +52,9 @@ Tu ne charges pas `cycle-pr` ; ce qu'il te faut de lui :
   étant celle que ton brief nomme ; aucun chiffre ne t'arrête. Un bloc qui ne tient plus sans
   toucher ce que ni ton brief ni les critères de l'issue ne portent, si : tu rends la main, le
   re-découpage est à la session PR.
-- **Références** — `.claude/skills/cycle-pr/references/` : `tests.md` (bons et mauvais tests),
-  `mocking.md` (frontières du système seulement), `design-interface.md`, `modules-profonds.md`,
+- **Références** — `.claude/skills/cycle-pr/references/` : `tests.md` (bons et mauvais tests ;
+  un test de la pipeline tient « Ce qu'un test de la pipeline peut être »), `mocking.md`
+  (frontières du système seulement), `design-interface.md`, `modules-profonds.md`,
   `refactoring.md`. Lis celle dont le bloc relève, avant d'écrire.
 
 ## La doc
