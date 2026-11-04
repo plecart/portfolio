@@ -62,7 +62,7 @@ def test_l_enfant_d_un_tube_ecrit_en_cp1252_quel_que_soit_l_environnement_herite
     assert done.stdout.decode("ascii").split() == ["cp1252", "cp1252"]
 
 
-def test_make_typecheck_lance_pyright_sur_le_projet_des_scripts_des_skills() -> None:
+def test_make_typecheck_lance_pyright_sur_le_projet_de_la_pipeline() -> None:
     """Retirer cette invocation laissait toute la suite verte : c'est le défaut d'origine de #145."""
     commandes = [shlex.split(ligne) for ligne in make_dry_run("typecheck").splitlines()]
 
@@ -79,14 +79,14 @@ def test_make_test_et_make_test_pipeline_lancent_chacun_leur_suite() -> None:
     assert pipeline[-4:] == ["pytest", ".claude/tests", "-p", "no:process_environment"]
 
 
-def test_le_projet_pyright_des_skills_est_en_mode_strict() -> None:
+def test_le_projet_pyright_de_la_pipeline_est_en_mode_strict() -> None:
     """Sans la clé, pyright analyserait les mêmes fichiers en mode basique, gardes vertes."""
     config = json.loads((PROJECT / "pyrightconfig.json").read_text(encoding="utf-8"))
 
     assert config["typeCheckingMode"] == "strict"
 
 
-def test_le_projet_pyright_des_skills_analyse_chacun_de_leurs_scripts() -> None:
+def test_le_projet_pyright_de_la_pipeline_analyse_ses_scripts_et_ses_tests() -> None:
     """Un projet mal réglé analyse moins qu'il ne prétend, et rend « 0 errors » quand même :
     `"include": ["*/scripts"]` y a été mesuré à 0 fichier analysé (#145), `skills/*/scripts` de
     même depuis `.claude` (2026-11-04). Le compte porte les scripts et les tests de la pipeline."""
