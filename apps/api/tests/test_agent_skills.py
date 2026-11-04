@@ -2986,7 +2986,7 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         PR_PARALLELES_SKILL,
         (
             "Introuvable, ou muette après un message, elle se traite comme perdue — règle de"
-            " prudence, aucun cas mesuré"
+            " prudence, aucun cas mesuré. Dans cet ordre"
         ),
     ),
     "transcript-dans-le-dossier-du-worktree": (
@@ -7869,6 +7869,11 @@ class Passage(NamedTuple):
 CATEGORIES_D_EXEMPTION = ("intitulé", "motif", "relevé daté")
 
 
+def ancres_de(table: dict[str, tuple[str, str]], *cles: str) -> tuple[str, ...]:
+    """Les phrases de ces entrées d'une table d'invariants : les ancres qu'un passage emprunte."""
+    return tuple(table[cle][1] for cle in cles)
+
+
 def texte_du_passage(passage: Passage) -> str:
     """Le texte normalisé du passage. Une borne absente ou doublée rougit ici au lieu de déplacer
     le passage en silence."""
@@ -10998,7 +11003,9 @@ PASSAGES_DES_CONFORTS_DE_PIPELINE = (
         "Toutes tes commandes s'exécutent dans ce worktree",
         "**Commande de fond bornée**",
         {},
-        empruntees=(INVARIANTS_DE_LA_SESSION_DE_RELECTURE["relecteur-sous-agent-sans-write"][1],),
+        empruntees=ancres_de(
+            INVARIANTS_DE_LA_SESSION_DE_RELECTURE, "relecteur-sous-agent-sans-write"
+        ),
     ),
     Passage(
         RELECTEUR_ROLE,
@@ -11215,7 +11222,7 @@ PASSAGES_DES_CONFORTS_DE_PIPELINE = (
                 "» et « +17 more », sans la case de la ligne 73.",
             ],
         },
-        empruntees=(INVARIANTS_DU_CONTEXTE_COURT["7a-plan-qa-passe-comptable-refuse"][1],),
+        empruntees=ancres_de(INVARIANTS_DU_CONTEXTE_COURT, "7a-plan-qa-passe-comptable-refuse"),
     ),
     Passage(
         EXECUTION_QA_SKILL,
@@ -11425,12 +11432,6 @@ def test_le_nombre_de_cas_du_rouge_est_celui_de_ses_puces() -> None:
 
 
 # --- Une table d'invariants recompte sa population par ses passages déclarés (#198, D-5) ---------
-
-
-def ancres_de(table: dict[str, tuple[str, str]], *cles: str) -> tuple[str, ...]:
-    """Les phrases de ces entrées d'une table d'invariants : les ancres qu'un passage emprunte."""
-    return tuple(table[cle][1] for cle in cles)
-
 
 # Les passages déclarés des sessions liées (#198, D-5), après les tables qui leur prêtent une ancre.
 PASSAGES_DES_SESSIONS_LIEES = (
@@ -11673,9 +11674,6 @@ PASSAGES_DES_SESSIONS_LIEES = (
         "**Session disparue.** Le silence",
         "1. **Mesurer les",
         {
-            "intitulé": [
-                "Dans cet ordre :",
-            ],
             "motif": [
                 "une session arrêtée et une session qui attend un go rendent le même (obs 54).",
             ],
