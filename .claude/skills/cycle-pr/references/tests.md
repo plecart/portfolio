@@ -64,6 +64,21 @@ test("createUser rend l'utilisateur récupérable", async () => {
 });
 ```
 
+## Ce qu'un test de la pipeline peut être
+
+Les tests de la pipeline — skills, règles, rôles et leurs scripts — vivent dans `.claude/tests/` et
+tournent sur son delta (ADR 0025). Chacun lit l'une de ces choses :
+
+- un **format** qu'une machine lit : le frontmatter d'un skill ou d'un rôle, `settings.json` ;
+- un **chemin ou un titre cité** par la prose, qui doit résoudre ;
+- un **code de sortie d'un outil**, mesuré sur un dépôt témoin ;
+- le **comportement d'un script** ;
+- la **forme d'une commande** écrite dans la prose.
+
+Jamais une phrase de comportement. Une classe de prose se relit par la passe « restrictions du
+delta » (`session-relecture.md`, « Réveil »), elle ne s'épingle pas : c'est le huitième cas de « Le
+rouge se constate, il ne se suppose pas », ci-dessous.
+
 ---
 
 Passages déplacés mot pour mot de `cycle-pr/SKILL.md` (issue #177), chacun sous le titre que
