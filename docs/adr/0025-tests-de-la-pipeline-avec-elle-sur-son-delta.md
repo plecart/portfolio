@@ -78,9 +78,11 @@ Ce qui remplace une phrase figée (étude §6.3) :
 Jamais une phrase de comportement. Une classe de prose se relit par la passe « restrictions du
 delta », elle ne s'épingle pas.
 
-Le retrait s'est fait par nature, sur le classement de l'étude (§1.2) : de `test_agent_skills.py`,
-67 tests et 418 cas sont conservés — catégories (a), (b), (c), (e), (f) —, 30 tests et 1 381 cas
-retirés — la catégorie (d). Le point de l'ADR 0017 remplacé : le job `api` tourne sur chaque
+Le retrait s'est fait par la nature de ce que chaque test lit, cette barre à la main, et non par le
+classement manuel de l'étude (§1.2 : 62 tests conservés, 35 retirés), qui ne se reproduit pas : de
+`test_agent_skills.py`, 67 tests et 418 cas sont conservés, 30 tests et 1 381 cas retirés. Les 5 de
+plus que l'étude sont des gardes de forme de commande ou de format (journal « Décisions » de
+l'issue #225, 2026-11-04). Le point de l'ADR 0017 remplacé : le job `api` tourne sur chaque
 push ; la suite de la pipeline, `.claude/tests/`, y tourne quand le delta la concerne, et sur
 chaque push vers `main`.
 
