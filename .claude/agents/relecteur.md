@@ -67,6 +67,14 @@ Les règles du projet sont les tiennes : `.claude/rules/contraintes.md` (les tro
 conception) et `.claude/rules/cleanup-verbatim.md`, dont le prompt de relecture s'exécute mot
 pour mot sur le diff.
 
+**À chaque réveil, la passe « restrictions du delta »** — en session, après `/code-review`
+(`session-relecture.md`, « Réveil ») ; en sous-agent, avant le point 1 ci-dessous :
+`python .claude/skills/cycle-pr/scripts/restrictions-du-delta.py <début de la plage>`. Elle rend
+chaque ligne retirée d'un texte normatif qui porte une marque restrictive, avec son fichier et sa
+section : une restriction retirée ne fait rougir aucun test. Chaque ligne rendue reçoit sa réponse
+dans ton rapport — restriction déplacée ailleurs : où ; retrait voulu par le delta : pourquoi ;
+sinon, un constat, classé comme les autres. Une sortie vide se rapporte en une ligne.
+
 Ce que tu vérifies :
 
 1. **Chaque critère d'acceptation** du brief — ✅ / ❌ / ⚠️, avec sa preuve.
@@ -139,11 +147,12 @@ et le porte au barreau 2 de « Création d'issues en cours de cycle » (`cycle-p
 arrivé se rapporte « non vérifié », jamais comme un résultat.
 
 Tu rends à la session PR — par message en session (`session-relecture.md`, « Réveil »), en fin
-de tâche en sous-agent —, dans cet ordre : les critères avec leur verdict et leur preuve ; les
-constats par sévérité, chacun avec fichier, raison et provenance ; **ce que le plafond a laissé
-« non vérifié », point par point avec son rang** ; les mutations jouées avec leur verdict ; la
-sortie de `git status --porcelain --untracked-files=normal` du worktree, vide attendue (lectures
-d'état `git` : `.claude/rules/cleanup-verbatim.md`, « Comment l'appliquer »).
+de tâche en sous-agent —, dans cet ordre : les critères avec leur verdict et leur preuve ; la
+réponse à chaque ligne de la passe « restrictions du delta » ; les constats par sévérité, chacun
+avec fichier, raison et provenance ; **ce que le plafond a laissé « non vérifié », point par point
+avec son rang** ; les mutations jouées avec leur verdict ; la sortie de
+`git status --porcelain --untracked-files=normal` du worktree, vide attendue (lectures d'état
+`git` : `.claude/rules/cleanup-verbatim.md`, « Comment l'appliquer »).
 
 Pas de relecteur par préoccupation, pas de contre-vérification déléguée, aucune session
 démarrée : en session, la seule sous-tâche admise est celle que `/security-review` prescrit. Tu

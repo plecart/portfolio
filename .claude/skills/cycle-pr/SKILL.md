@@ -459,8 +459,9 @@ La session PR **pousse**, puis réveille la session de relecture par le message 
 ne lit **que** le corps de l'issue et son brief d'agent (ou le briefing de l'Étape 1), la plage
 `<base>..HEAD` et le SHA complet de tête. Aux suivantes, elle a déjà tout cela : elle ne reçoit
 que la plage `<sha de fin de la passe précédente>..HEAD` et les constats de la précédente,
-corrigés ou écartés. Elle rend chaque critère d'acceptation ✅ / ❌ / ⚠️ avec preuve, puis ses constats
-classés bloquant / important / mineur, chacun avec fichier, raison et marqueur de provenance.
+corrigés ou écartés. Elle rend chaque critère d'acceptation ✅ / ❌ / ⚠️ avec preuve, la réponse à
+chaque ligne de la passe « restrictions du delta », puis ses constats classés bloquant / important
+/ mineur, chacun avec fichier, raison et marqueur de provenance.
 
 **Une seule session de relecture pour la PR — toutes ses passes et la relance.** Pas de relecteur
 par préoccupation, pas de contre-vérificateur par constat, pas de workflow : chaque agent de plus
