@@ -3749,20 +3749,6 @@ def test_aucun_geste_retire_de_pr_paralleles_ne_reste_dans_sa_prose(
     assert not porte_la_forme(fichier, forme), f"`{fichier}` porte encore « {forme} »"
 
 
-@pytest.mark.parametrize(
-    ("fichier", "phrase"),
-    INVARIANTS_DES_SESSIONS_LIEES.values(),
-    ids=INVARIANTS_DES_SESSIONS_LIEES.keys(),
-)
-def test_chaque_invariant_des_sessions_liees_garde_sa_phrase(fichier: str, phrase: str) -> None:
-    """La phrase est lue sur le texte aux espaces normalisés, marges `# ` de tête de ligne retirées :
-    un retour à la ligne de la prose, ou du commentaire en colonne de `pipeline.config.md`, ne la
-    casse pas, une réécriture si."""
-    texte = texte_normalise(fichier)
-
-    assert phrase in texte, f"`{fichier}` ne porte plus « {phrase} »"
-
-
 # #186, D-1 : chaque `start_session` qui nommait son enfant à plat lui donne son titre — le
 # suffixe seul, la règle dans « Identité ». **Population**, sur `d2e9b09` : la commande de D-1,
 # `grep -rnoE "\`?name: [^,\`]+" .claude/skills CLAUDE.md CONTRIBUTING.md`, frontmatter et
@@ -7381,16 +7367,6 @@ INVARIANTS_DU_CONTEXTE_COURT = {
 }
 
 
-@pytest.mark.parametrize(
-    ("fichier", "phrase"),
-    INVARIANTS_DU_CONTEXTE_COURT.values(),
-    ids=INVARIANTS_DU_CONTEXTE_COURT.keys(),
-)
-def test_chaque_invariant_du_contexte_court_garde_sa_phrase(fichier: str, phrase: str) -> None:
-    """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
-    assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
-
-
 # Une fermeture d'issue prescrite retire aussi son état : une issue **fermée** n'en porte aucun, et
 # une fermeture manuelle laisse ce geste à faire (`triage`, « Rôles »). Dénombrement (relecture de
 # la PR #153, passe 1, I2 ; classe : une fermeture d'issue sans retrait de son état),
@@ -9106,18 +9082,6 @@ INVARIANTS_DE_LA_SESSION_DE_RELECTURE = {
 }
 
 
-@pytest.mark.parametrize(
-    ("fichier", "phrase"),
-    INVARIANTS_DE_LA_SESSION_DE_RELECTURE.values(),
-    ids=INVARIANTS_DE_LA_SESSION_DE_RELECTURE.keys(),
-)
-def test_chaque_invariant_de_la_session_de_relecture_garde_sa_phrase(
-    fichier: str, phrase: str
-) -> None:
-    """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
-    assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
-
-
 # L'ordre d'un réveil : les commandes avant le protocole du `relecteur`, qui n'a plus à chercher ce
 # qu'une commande a trouvé (`cycle-pr` 4.2, « Les portes bon marché d'abord »), et le message de
 # constats en dernier — c'est lui qui réveille la session PR. **Population** : les étapes
@@ -10417,16 +10381,6 @@ INVARIANTS_DE_LA_REGLE_DU_SUJET = {
 }
 
 
-@pytest.mark.parametrize(
-    ("fichier", "phrase"),
-    INVARIANTS_DE_LA_REGLE_DU_SUJET.values(),
-    ids=INVARIANTS_DE_LA_REGLE_DU_SUJET.keys(),
-)
-def test_chaque_invariant_de_la_regle_du_sujet_garde_sa_phrase(fichier: str, phrase: str) -> None:
-    """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
-    assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
-
-
 # Les passages déclarés de la règle du sujet (#198, D-5), là où la session qui découpe, estime,
 # relit ou fait le bilan la lit.
 PASSAGES_DE_LA_REGLE_DU_SUJET = (
@@ -11171,16 +11125,6 @@ INVARIANTS_DE_LA_PORTE_DE_MERGE = {
     ),
     "hors-scope-le-releve-n-est-pas-une-porte": (HORS_SCOPE_REF, "Ce relevé n'est pas une porte"),
 }
-
-
-@pytest.mark.parametrize(
-    ("fichier", "phrase"),
-    INVARIANTS_DE_LA_PORTE_DE_MERGE.values(),
-    ids=INVARIANTS_DE_LA_PORTE_DE_MERGE.keys(),
-)
-def test_chaque_invariant_de_la_porte_de_merge_garde_sa_phrase(fichier: str, phrase: str) -> None:
-    """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
-    assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
 
 
 # Les passages déclarés de la porte de merge (#197 ; #198, D-5), là où la session, le
@@ -12287,18 +12231,6 @@ INVARIANTS_DES_CONFORTS_DE_PIPELINE = {
         ),
     ),
 }
-
-
-@pytest.mark.parametrize(
-    ("fichier", "phrase"),
-    INVARIANTS_DES_CONFORTS_DE_PIPELINE.values(),
-    ids=INVARIANTS_DES_CONFORTS_DE_PIPELINE.keys(),
-)
-def test_chaque_invariant_des_conforts_de_pipeline_garde_sa_phrase(
-    fichier: str, phrase: str
-) -> None:
-    """Même lecture que les invariants des sessions liées : texte aux espaces normalisés."""
-    assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
 
 
 # Les passages déclarés des conforts de pipeline (#198, D-5). Dans `.claude/pipeline.config.md`,
@@ -15381,6 +15313,21 @@ def ancres_du_passage(table: str, passage: Passage) -> list[str]:
     return [*ancres, *passage.empruntees]
 
 
+@pytest.mark.parametrize(
+    ("fichier", "phrase"),
+    [
+        pytest.param(fichier, phrase, id=f"{table}-{cle}")
+        for table in PASSAGES_DECLARES
+        for cle, (fichier, phrase) in invariants_de(table).items()
+    ],
+)
+def test_chaque_invariant_du_registre_garde_sa_phrase(fichier: str, phrase: str) -> None:
+    """Chaque phrase d'une table du registre se lit dans son fichier, sur le texte aux espaces
+    normalisés, marges `# ` de tête de ligne retirées : un retour à la ligne de la prose, ou du
+    commentaire en colonne de `pipeline.config.md`, ne la casse pas, une réécriture si."""
+    assert phrase in texte_normalise(fichier), f"`{fichier}` ne porte plus « {phrase} »"
+
+
 @pytest.mark.parametrize("table", PASSAGES_DECLARES)
 def test_chaque_morceau_d_un_passage_declare_tient_une_ancre(table: str) -> None:
     """Chaque morceau d'un passage déclaré (`morceaux_du_texte`) tient une ancre — une phrase de la
@@ -15433,19 +15380,13 @@ def test_chaque_ancre_d_une_table_du_registre_est_seule_dans_son_fichier(table: 
     assert not doublees, doublees
 
 
-# Les tables du lot 2 de #198 (D-7) hors du registre : aucune depuis l'entrée du contexte court.
-TABLES_COUVERTES_AU_LOT_2: tuple[str, ...] = ()
-
-
-def test_chaque_table_d_invariants_est_au_registre_ou_au_lot_2() -> None:
+def test_chaque_table_d_invariants_est_au_registre() -> None:
     """**Population recomptée à chaque exécution** : les tables `INVARIANTS_` du module (obs 127,
-    D-4). Chacune a ses passages déclarés ou attend le lot 2, jamais les deux : une table ajoutée
-    sans entrée rougit, une entrée sans table aussi."""
+    D-4), chacune au registre avec ses passages déclarés : une table ajoutée sans entrée rougit,
+    une entrée sans table aussi."""
     tables = {nom for nom in globals() if nom.startswith("INVARIANTS_")}
-    attendues = set(PASSAGES_DECLARES) | set(TABLES_COUVERTES_AU_LOT_2)
+    registre = set(PASSAGES_DECLARES)
 
-    assert set(PASSAGES_DECLARES).isdisjoint(TABLES_COUVERTES_AU_LOT_2)
-    assert tables == attendues, (
-        f"hors du registre : {sorted(tables - attendues)} ;"
-        f" sans table : {sorted(attendues - tables)}"
+    assert tables == registre, (
+        f"hors du registre : {sorted(tables - registre)} ; sans table : {sorted(registre - tables)}"
     )
