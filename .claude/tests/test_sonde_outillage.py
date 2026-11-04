@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from conftest import load_script, run_in_pipe
+from conftest import isole_git, load_script, run_in_pipe
 
 sonde = load_script("cycle-pr", "sonde-outillage")
 
@@ -308,10 +308,7 @@ def depot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     s'y déclencherait au commit de sonde — et réglé pour cacher les fichiers non suivis
     (`status.showUntrackedFiles=no`) : la sonde doit les voir quand même.
     """
-    configuration_vide = tmp_path / "gitconfig"
-    configuration_vide.touch()
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(configuration_vide))
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    isole_git(monkeypatch)
     depot = tmp_path / "depot"
     depot.mkdir()
     monkeypatch.chdir(depot)

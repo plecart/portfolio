@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 from command_doubles import Reply, failure, sortie_d_echec, success
-from conftest import load_script, run_in_pipe
+from conftest import git_temoin, isole_git, load_script, run_in_pipe
 
 amorcage = load_script("init-projet", "amorcage")
 
@@ -55,17 +55,11 @@ def projet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     dossier.mkdir()
     monkeypatch.chdir(dossier)
     monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    isole_git(monkeypatch)
     for role in ("AUTHOR", "COMMITTER"):
         monkeypatch.setenv(f"GIT_{role}_NAME", "Amorce")
         monkeypatch.setenv(f"GIT_{role}_EMAIL", "amorce@example.invalid")
     return dossier
-
-
-def git(*args: str) -> str:
-    """La sortie du vrai `git` dans le répertoire courant, qui doit réussir."""
-    return subprocess.run(["git", *args], capture_output=True, check=True).stdout.decode()
 
 
 def lance(*args: str, run: Run | None = None) -> int:
@@ -77,14 +71,14 @@ def test_depot_init_cree_le_depot_sur_main_puis_le_relit(
     projet: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert lance("depot", "init") == 0
-    assert git("symbolic-ref", "--short", "HEAD") == "main\n"
+    assert git_temoin("symbolic-ref", "--short", "HEAD") == "main\n"
     assert capsys.readouterr().out == "initialisé et relu — dépôt git sur main\n"
 
 
 def test_depot_init_n_a_rien_a_faire_dans_un_depot_sur_main(
     projet: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    git("init", "-b", "main")
+    git_temoin("init", "-b", "main")
 
     assert lance("depot", "init") == 0
     assert capsys.readouterr().out == "rien à faire — dépôt git déjà sur main\n"
@@ -93,10 +87,10 @@ def test_depot_init_n_a_rien_a_faire_dans_un_depot_sur_main(
 def test_depot_init_refuse_un_depot_sur_une_autre_branche_sans_la_renommer(
     projet: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    git("init", "-b", "master")
+    git_temoin("init", "-b", "master")
 
     assert lance("depot", "init") == 1
-    assert git("symbolic-ref", "--short", "HEAD") == "master\n"
+    assert git_temoin("symbolic-ref", "--short", "HEAD") == "master\n"
     assert capsys.readouterr().out == (
         "refus — le dépôt est sur la branche master, pas main : rien n'est renommé\n"
     )
@@ -314,7 +308,7 @@ def test_valide_refuse_quand_ni_uvx_ni_pipx_ne_se_lancent(
 @pytest.fixture
 def depot_ignorant(projet: Path) -> Path:
     """Le projet en dépôt git, sous un `.gitignore` qui exclut journaux, verrous et dépendances."""
-    git("init", "-b", "main")
+    git_temoin("init", "-b", "main")
     (projet / ".gitignore").write_bytes(b"*.log\n*.lock\nnode_modules/\n")
     return projet
 
@@ -346,7 +340,7 @@ def test_ignore_voit_le_motif_qui_exclut_un_fichier_deja_suivi(
     `uv.lock` suivi masquerait le motif `*.lock`, qui l'exclurait d'un clone neuf
     (git-check-ignore(1), « --no-index » ; mesuré le 2026-10-26, git 2.47.1)."""
     (depot_ignorant / "uv.lock").write_bytes(b"version = 1\n")
-    git("add", "-f", "uv.lock")
+    git_temoin("add", "-f", "uv.lock")
 
     assert lance("ignore", "--exclus", "app.log", "--suivis", "uv.lock") == 1
     assert capsys.readouterr().out == "refus — devrait rester suivi : uv.lock\n"
@@ -431,7 +425,7 @@ TITRE = "chore: amorçage pipeline de dev"
 @pytest.fixture
 def depot_a_commiter(projet: Path) -> Path:
     """Le projet en dépôt git sans commit : un `.gitignore`, un fichier à suivre, un exclu."""
-    git("init", "-b", "main")
+    git_temoin("init", "-b", "main")
     garnit(projet, {".gitignore": b"*.log\n", "README.md": b"# Vitrine\n", "debug.log": b""})
     return projet
 
@@ -440,8 +434,8 @@ def test_commit_commite_le_projet_hors_exclus_puis_relit_le_commit(
     depot_a_commiter: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert lance("commit") == 0
-    assert git("log", "-1", "--format=%s") == f"{TITRE}\n"
-    assert git("ls-files") == ".gitignore\nREADME.md\n"
+    assert git_temoin("log", "-1", "--format=%s") == f"{TITRE}\n"
+    assert git_temoin("ls-files") == ".gitignore\nREADME.md\n"
     assert capsys.readouterr().out == f"commité et relu — {TITRE}\n"
 
 
@@ -461,10 +455,10 @@ def test_commit_refuse_un_fichier_suivi_que_les_regles_d_ignore_excluent(
     """Un `.gitignore` n'agit pas sur ce qui est déjà suivi. Le nom se lit tel quel, accents
     compris — sans `-z`, `git ls-files` l'écrirait entre guillemets, en octal."""
     (depot_a_commiter / "brouillon-été.log").write_bytes(b"")
-    git("add", "-f", "brouillon-été.log")
+    git_temoin("add", "-f", "brouillon-été.log")
 
     assert lance("commit") == 1
-    assert git("rev-list", "--all") == ""
+    assert git_temoin("rev-list", "--all") == ""
     assert capsys.readouterr().out == (
         "refus — fichiers suivis que les règles d'ignore excluent, à retirer par"
         " `git rm --cached` : brouillon-été.log\n"
@@ -476,24 +470,24 @@ def signe_par_ssh(depot: Path) -> None:
     `ssh-keygen` doit être sur le `PATH`."""
     cle = depot.parent / "cle"
     subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(cle)], check=True)
-    git("config", "gpg.format", "ssh")
-    git("config", "user.signingKey", str(cle))
-    git("config", "commit.gpgsign", "true")
+    git_temoin("config", "gpg.format", "ssh")
+    git_temoin("config", "user.signingKey", str(cle))
+    git_temoin("config", "commit.gpgsign", "true")
 
 
 def commite_un_depot_imbrique() -> None:
     """Tout le projet commité, dont le dépôt imbriqué `module`, à un commit."""
-    git("init", "-b", "main", "module")
-    git("-C", "module", "commit", "--allow-empty", "-m", "un")
-    git("add", "-A")
-    git("commit", "-m", "initial")
+    git_temoin("init", "-b", "main", "module")
+    git_temoin("-C", "module", "commit", "--allow-empty", "-m", "un")
+    git_temoin("add", "-A")
+    git_temoin("commit", "-m", "initial")
 
 
 def avance_un_depot_imbrique(_depot: Path) -> None:
     """Tout est commité, sauf le pointeur d'un dépôt imbriqué, avancé d'un commit : la seule
     chose que `git add -A` ait à commiter."""
     commite_un_depot_imbrique()
-    git("-C", "module", "commit", "--allow-empty", "-m", "deux")
+    git_temoin("-C", "module", "commit", "--allow-empty", "-m", "deux")
 
 
 # Chaque clé éprouvée — l'id de son cas —, sa valeur, et ce qui prépare le dépôt pour qu'elle
@@ -545,12 +539,13 @@ def test_commit_commite_et_relit_quelle_que_soit_la_configuration_git(
     valeur, prepare = CONFIGURATIONS[cle]
     if prepare:
         prepare(depot_a_commiter)
-    git("config", cle, valeur)
+    git_temoin("config", cle, valeur)
 
     assert lance("commit") == 0
     assert capsys.readouterr().out == f"commité et relu — {TITRE}\n"
     assert (
-        git("status", "--porcelain", "--untracked-files=normal", "--ignore-submodules=none") == ""
+        git_temoin("status", "--porcelain", "--untracked-files=normal", "--ignore-submodules=none")
+        == ""
     )
 
 
@@ -566,7 +561,7 @@ def test_commit_n_a_rien_a_faire_quand_seul_l_interieur_d_un_depot_imbrique_chan
 
     assert lance("commit") == 0
     assert capsys.readouterr().out == "rien à faire — rien à commiter\n"
-    assert git("rev-list", "--count", "HEAD") == "1\n"
+    assert git_temoin("rev-list", "--count", "HEAD") == "1\n"
 
 
 @pytest.mark.parametrize(

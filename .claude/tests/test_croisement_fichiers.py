@@ -16,7 +16,7 @@ from typing import Any, NamedTuple
 
 import pytest
 from command_doubles import Reply, failure, json_success, stdout_lines, success
-from conftest import load_script, run_in_pipe
+from conftest import git_temoin, load_script, run_in_pipe
 
 croisement = load_script("pr-paralleles", "croisement-fichiers")
 
@@ -46,25 +46,13 @@ class Depot(NamedTuple):
     ailleurs: str
 
 
-def git(depot: Path, *args: str) -> str:
-    """`git <args>` dans `depot`, sa sortie standard ; une erreur lève : le dépôt témoin se
-    construit, il ne se mesure pas."""
-    done = subprocess.run(
-        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.autocrlf=false", *args],
-        cwd=depot,
-        capture_output=True,
-        check=True,
-    )
-    return done.stdout.decode().strip()
-
-
 def commit(depot: Path, message: str, fichiers: dict[str, str]) -> str:
     """Écrit `fichiers` dans `depot`, les commite sur la branche courante, et rend le SHA."""
     for nom, contenu in fichiers.items():
         (depot / nom).write_text(contenu, encoding="utf-8")
-    git(depot, "add", *fichiers)
-    git(depot, "commit", "-qm", message)
-    return git(depot, "rev-parse", "HEAD")
+    git_temoin("add", *fichiers, cwd=depot)
+    git_temoin("commit", "-qm", message, cwd=depot)
+    return git_temoin("rev-parse", "HEAD", cwd=depot).strip()
 
 
 @pytest.fixture(scope="module")
@@ -74,19 +62,19 @@ def depot(tmp_path_factory: pytest.TempPathFactory) -> Depot:
     mêmes lignes ; `propre` prolonge le merge sur `g.txt` ; `ailleurs`, partie d'avant le merge,
     ne touche que `k.txt` — un diff à deux points lui prêterait aussi `f.txt` et `g.txt`."""
     chemin = tmp_path_factory.mktemp("croisement")
-    git(chemin, "init", "-q", "-b", "main")
+    git_temoin("init", "-q", "-b", "main", cwd=chemin)
     commit(chemin, "base", {"f.txt": "base\n", "g.txt": "base\n", "k.txt": "base\n"})
-    git(chemin, "branch", "conflit")
-    git(chemin, "branch", "ailleurs")
+    git_temoin("branch", "conflit", cwd=chemin)
+    git_temoin("branch", "ailleurs", cwd=chemin)
     merge = commit(chemin, "PR 127", {"f.txt": "merge\n", "g.txt": "merge\n"})
-    git(chemin, "update-ref", "refs/remotes/origin/main", merge)
-    git(chemin, "checkout", "-q", "-b", "propre")
+    git_temoin("update-ref", "refs/remotes/origin/main", merge, cwd=chemin)
+    git_temoin("checkout", "-q", "-b", "propre", cwd=chemin)
     commit(chemin, "suite", {"g.txt": "suite\n"})
-    git(chemin, "checkout", "-q", "conflit")
+    git_temoin("checkout", "-q", "conflit", cwd=chemin)
     commit(chemin, "autre", {"f.txt": "autre\n", "g.txt": "autre\n"})
-    git(chemin, "checkout", "-q", "ailleurs")
+    git_temoin("checkout", "-q", "ailleurs", cwd=chemin)
     ailleurs = commit(chemin, "ailleurs", {"k.txt": "ailleurs\n"})
-    git(chemin, "checkout", "-q", "main")
+    git_temoin("checkout", "-q", "main", cwd=chemin)
     return Depot(chemin, merge, ailleurs)
 
 

@@ -2,8 +2,7 @@
 (`.claude/skills/cycle-pr/scripts/restrictions-du-delta.py`).
 
 Chaque cas bâtit un dépôt jetable dans `tmp_path` — la table de configuration en partage un, bâti
-une fois par module —, la configuration git du poste écartée (`GIT_CONFIG_GLOBAL` vers un fichier
-vide, `GIT_CONFIG_NOSYSTEM=1` : `cleanup-verbatim.md`, « Comment l'appliquer »), y commite une base
+une fois par module —, la configuration git du poste écartée (`isole_git`), y commite une base
 puis un delta, et lance le script sur `HEAD~1` par un tube, comme la session le lit
 (`run_in_pipe`). Les marques et les clôtures de bloc de code se lisent sans dépôt.
 
@@ -14,25 +13,15 @@ jamais dérivés des constantes du script (`cycle-pr/references/tests.md`, « Le
 il ne se suppose pas »).
 """
 
-import os
-import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import load_script, run_in_pipe
+from conftest import git_temoin, isole_git, load_script, run_in_pipe
 
 restrictions = load_script("cycle-pr", "restrictions-du-delta")
 
 # Chemin → lignes du fichier.
 Fichiers = dict[str, tuple[str, ...]]
-
-
-def git(*args: str) -> None:
-    """`git <args>` dans le dossier courant ; une erreur lève : le dépôt témoin se construit, il ne
-    se mesure pas."""
-    subprocess.run(
-        ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], capture_output=True, check=True
-    )
 
 
 def commite(fichiers: Fichiers) -> None:
@@ -41,8 +30,8 @@ def commite(fichiers: Fichiers) -> None:
         chemin = Path(nom)
         chemin.parent.mkdir(parents=True, exist_ok=True)
         chemin.write_bytes("".join(f"{ligne}\n" for ligne in lignes).encode())
-    git("add", "--all")
-    git("commit", "-qm", "commit")
+    git_temoin("add", "--all")
+    git_temoin("commit", "-qm", "commit")
 
 
 def lance(base: str = "HEAD~1") -> tuple[int, list[str]]:
@@ -52,18 +41,12 @@ def lance(base: str = "HEAD~1") -> tuple[int, list[str]]:
     return done.returncode, done.stdout.decode("utf-8").splitlines()
 
 
-def isole_git(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Écarte la configuration git du poste des `git` lancés ensuite, script compris."""
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-
-
 @pytest.fixture
 def depot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Un dépôt vide, dossier courant du test."""
     isole_git(monkeypatch)
     monkeypatch.chdir(tmp_path)
-    git("init", "-q", "-b", "main")
+    git_temoin("init", "-q", "-b", "main")
 
 
 M5_TETE = ("# Pipeline de développement", "", "## Observation continue (`task-observer`)", "")
@@ -276,7 +259,7 @@ def depot_de_configuration(tmp_path_factory: pytest.TempPathFactory) -> Path:
     with pytest.MonkeyPatch.context() as monkeypatch:
         isole_git(monkeypatch)
         monkeypatch.chdir(racine)
-        git("init", "-q", "-b", "main")
+        git_temoin("init", "-q", "-b", "main")
         commite(CONFIGURATION_BASE)
         for renomme in (".claude/a.md", ".claude/c.md"):
             Path(renomme).unlink()
@@ -327,11 +310,11 @@ def test_une_base_qui_a_avance_se_lit_depuis_le_point_de_depart_commun() -> None
     insérée au-dessus de la ligne, une restriction ajoutée — sans que ni sa section ni son ajout
     n'entrent dans la passe de `pr`."""
     commite({"CLAUDE.md": ("## Avant", "Ne jamais A.")})
-    git("checkout", "-q", "-b", "pr")
+    git_temoin("checkout", "-q", "-b", "pr")
     commite({"CLAUDE.md": ("## Avant", "Rarement A.")})
-    git("checkout", "-q", "main")
+    git_temoin("checkout", "-q", "main")
     commite({"CLAUDE.md": ("## Insérée", "## Avant", "Ne jamais A.", "Seul B.")})
-    git("checkout", "-q", "pr")
+    git_temoin("checkout", "-q", "pr")
 
     assert lance("main") == (0, ["CLAUDE.md § Avant : Ne jamais A."])
 
