@@ -162,14 +162,11 @@ test.** Huit cas à traiter explicitement :
   dans l'orthographe réelle ; l'égalité entre la table et la constante est un **second** test, qui
   garde l'autre sens. Mesuré au lot 3 de #77 : la mutation « préfixe retiré » est restée `VERT`
   après un correctif qui construisait ses cas depuis le tuple du script (obs 80).
-- **La garde cite une phrase de règle** (une table d'épingles sur une prose normative) → l'ancre
-  couvre chaque **moitié restrictive** de l'énoncé — « jamais », « seule », « seulement », « ne …
-  pas », « reste à » — et chaque élément qu'un commentaire dénombre : une ancre posée sur la moitié
-  qui fait laisse retirer en vert celle qui interdit (obs 126). La mutation se joue sur la moitié
-  restrictive, jamais sur la phrase entière, qu'une absence rend rouge quel que soit l'ancrage. La
-  population de la table se recompte à chaque exécution par ses passages déclarés, jamais par un
-  chiffre en commentaire (obs 127 ; registre `PASSAGES_DECLARES` de
-  `apps/api/tests/test_agent_skills.py`).
+- **La garde cite une phrase de règle** (une table d'épingles sur une prose normative) → une garde
+  ne cite pas une phrase de règle : une règle se relit par la passe « restrictions du delta »
+  (`session-relecture.md`, « Réveil ») ; une garde cite un chemin, un titre, un numéro ou la forme
+  d'une commande. Une table d'épingles laissait retirer en vert la moitié restrictive qu'aucune
+  ancre ne couvrait (obs 126) ; la passe lit chaque ligne retirée sur le diff.
 
 ## Contrôles complémentaires de 3.2
 

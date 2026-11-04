@@ -69,7 +69,10 @@ avant tout jugement, chaque finding cité par §.
   n'y en avait qu'un. Écrit après, le dénombrement se fait par morceaux, un correctif par
   relecture. Il est à qui reçoit le constat : la session PR pour un constat de relecture, qu'elle
   porte avec sa classe dans le brief du `developpeur` de correction (`cycle-pr` 4.2, « Le
-  cliquet ») ; le `developpeur` pour ce que son propre cleanup trouve.
+  cliquet ») ; le `developpeur` pour ce que son propre cleanup trouve. Le test paramétré s'entend
+  d'une classe de code ou de contrat : une population de prose normative ne s'épingle pas, elle se
+  relit par la passe « restrictions du delta » (`cycle-pr/references/session-relecture.md`,
+  « Réveil »).
 - **Passe « affirmations » — ce que le delta dit de lui-même.** Le prompt ci-dessus fait relire le
   **code** : duplication, naming, responsabilités. Il ne fait jamais relire les **affirmations
   attachées au code**, et c'est là que l'angle mort de l'auteur est maximal — une affirmation est
@@ -88,7 +91,9 @@ avant tout jugement, chaque finding cité par §.
   deux dénombrements faux avant le bon. Un **dénombrement de population écrit en commentaire** —
   « N énoncés, N épinglés » au-dessus d'une table — est une affirmation sans commande : « non
   vérifiée » tant qu'un test ne le recompte pas à chaque exécution ; un « 55 morceaux » écrit
-  au-dessus d'une table d'épingles en comptait 92 par sa propre règle (obs 127).
+  au-dessus d'une table d'épingles en comptait 92 par sa propre règle (obs 127). Ce recompte vaut
+  pour une classe de code ou de contrat : une population de prose normative se relit par la passe
+  « restrictions du delta », jamais par une table d'épingles.
 
   **Pourquoi trois et non deux** : une mesure héritée d'une observation datée n'a pas de commande
   et n'est pas pour autant non vérifiée. Dénombré sur le delta qui a introduit cette passe —

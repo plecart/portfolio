@@ -51,11 +51,10 @@ le choix des commandes, qui reste à la session.
 - **Estimation** — en **blocs** (`taille-pr.md`, point 5) : ≈ 650 lignes ou ≈ 350 K de contexte
   de `developpeur` chacun (deux points mesurés, #13 et le commit 1 de #187 : étude du 2026-10-29,
   §8.4 F10, dossier `etudes/` voisin du journal d'observations). Les lignes se comptent **par
-  critère**, en artefacts que le critère doit laisser, jamais en prose qui le décrit : une porte ou
-  un invariant → un test paramétré à témoins des deux côtés (~100-150 lignes) ; un script → le
-  script et son fichier de test (~400) ; une règle de skill → sa ligne, plus la docstring de
-  dénombrement si elle ferme une classe. Calibration mesurée : les lots 1, 2 et 3 de #77 ont
-  dépassé la leur de 2 à 5×, tous du même côté — une estimation en prose est un plancher.
+  critère**, en artefacts que le critère doit laisser, jamais en prose qui le décrit : une porte →
+  un test paramétré à témoins des deux côtés (~100-150 lignes) ; un script → le script et son
+  fichier de test (~400) ; une règle de skill → sa ligne. Calibration mesurée : les lots 1, 2 et 3
+  de #77 ont dépassé la leur de 2 à 5×, tous du même côté — une estimation en prose est un plancher.
   L'estimation planifie les blocs, leurs frontières et leurs passes de relecture (`cycle-pr` 3.5
   et Étape 4) ; elle ne découpe rien.
 - **Au-delà de ~3 blocs estimés**, le briefing porte la ligne **« pourquoi un seul sujet »** : ce

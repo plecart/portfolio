@@ -62,14 +62,22 @@ chaque réveil, jamais au lancement : la tête bouge entre deux passes.
    rendu. Ses commentaires se relisent sur la PR après écriture (`contraintes.md`, « Écritures
    sur un artefact distant »). Ce qu'elle rapporte à nouveau à la passe 2, sur une PR qu'elle a déjà
    commentée : non mesuré.
-3. `/security-review`, **seulement** si le diff touche une zone sensible ou une surface exposée
+3. La passe « restrictions du delta » —
+   `python .claude/skills/cycle-pr/scripts/restrictions-du-delta.py <début>`, `<début>` étant
+   celui de la plage reçue. Une restriction retirée d'un texte normatif ne fait rougir aucun test :
+   le script rend chaque ligne retirée de `.claude/**/*.md`, `CLAUDE.md` ou `CONTRIBUTING.md` qui
+   porte une marque restrictive, avec son fichier et sa section. Chaque ligne rendue reçoit sa
+   réponse dans le message de constats : restriction déplacée ailleurs — où ; retrait voulu par le
+   delta — pourquoi ; sinon, un constat. À chaque réveil, relance comprise, pas seulement à la
+   passe finale ; une sortie vide se rapporte en une ligne.
+4. `/security-review`, **seulement** si le diff touche une zone sensible ou une surface exposée
    (ligne « sécurité » de la config, qui porte ses préconditions) ; sinon une ligne le dit. Elle
    diffe `origin/HEAD...`, donc le trunk : sur une PR dont la base n'est pas le trunk — une PR de
    lot coordonné —, elle relit aussi ce que la branche d'intégration a déjà reçu, et ses constats hors de la
    plage s'écartent.
-4. Le protocole de `relecteur.md` sur la plage — ce qu'une commande vient de trouver n'y est plus
+5. Le protocole de `relecteur.md` sur la plage — ce qu'une commande vient de trouver n'y est plus
    à chercher.
-5. Le message de constats à l'émetteur du réveil — la session PR, ou son relais —, par
+6. Le message de constats à l'émetteur du réveil — la session PR, ou son relais —, par
    `SendMessage` :
    `constats passe <k> (<SHA court>) — <b> bloquants, <i> importants, <m> mineurs, <v> vides
    relevés`, puis le rapport que `relecteur.md` ordonne, les constats de chaque commande intégrée
