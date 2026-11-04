@@ -28,7 +28,7 @@ from command_doubles import (
     stdout_lines,
     success,
 )
-from skill_scripts import load_script, run_in_pipe
+from conftest import load_script, run_in_pipe
 
 porte_merge = load_script("cycle-pr", "porte-merge")
 

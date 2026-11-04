@@ -31,6 +31,7 @@ import pytest
 import yaml
 from call_witness import recording, witnessed
 from config.env import Env
+from system_commands import MAKEFILE, make_dry_run
 from test_supply_chain import (
     DOCKER_FROM,
     WORKFLOW_GLOBS,
@@ -45,7 +46,6 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 DOCKERFILE = REPOSITORY_ROOT / "infra" / "api" / "Dockerfile"
 ENTRYPOINT = REPOSITORY_ROOT / "infra" / "api" / "entrypoint.sh"
 COMPOSE_DEV = REPOSITORY_ROOT / "infra" / "compose.dev.yml"
-MAKEFILE = REPOSITORY_ROOT / "Makefile"
 PYTHON_VERSION_FILE = REPOSITORY_ROOT / ".python-version"
 DOCKERIGNORE = REPOSITORY_ROOT / ".dockerignore"
 CI_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
@@ -109,19 +109,6 @@ BUILD_COMMAND = re.compile(
 
 # L'étiquette d'une entrée du cache local de BuildKit, dans une commande de build imprimée.
 CACHE_TAG = re.compile(r"--cache-(?:from|to) type=local,\S*?\btag=(?P<tag>[^,\s]+)")
-
-# Les variables que le `Makefile` laisse surcharger (`?=`) : `make_dry_run` les retire de
-# l'environnement hérité, pour vérifier le `Makefile` et non le shell qui lance le test
-# (`process_environment.py`). Mesuré : `IMAGE_PREFIX` exporté faisait rougir le test du nom des
-# images.
-OVERRIDABLE = re.compile(r"^(?P<name>\w+)[ \t]*\?=", re.MULTILINE)
-
-# Ce qu'un `make` englobant transmet au nôtre par l'environnement : ses options et les variables
-# de sa ligne de commande (`MAKEFLAGS`, doc GNU make « Communicating Options to a Sub-make »), des
-# makefiles à lire en plus (`MAKEFILES`), et sa profondeur (`MAKELEVEL`), qui fait imprimer au
-# nôtre « Entering directory » comme à un sous-make. Mesuré : `make test IMAGE_PREFIX=zz-` faisait
-# rougir le test du nom des images, et `make test` la lecture ligne à ligne de `make push`.
-MAKE_CONTROL = {"MAKEFLAGS", "GNUMAKEFLAGS", "MAKEFILES", "MAKELEVEL"}
 
 # Toute image de base qui embarque un interpréteur porte sa version dans son nom. Le motif les
 # capture toutes : un seul étage qui dériverait suffirait à faire tourner l'application sur une
@@ -225,67 +212,6 @@ def shell_instructions(script: Path) -> list[str]:
         for line in script.read_text(encoding="utf-8").splitlines()
         if (stripped := line.strip()) and not stripped.startswith("#")
     ]
-
-
-def run_make(
-    *arguments: str,
-    makefile: Path = MAKEFILE,
-    directory: Path = REPOSITORY_ROOT,
-    environment: Mapping[str, str] | None = None,
-    **variables: str,
-) -> subprocess.CompletedProcess[str]:
-    """Lance `make` sur un `Makefile` — celui du dépôt par défaut —, sans hériter du shell qui
-    lance les tests.
-
-    Ni les variables que le `Makefile` laisse surcharger, ni ce qu'un `make` englobant transmet
-    (`make test IMAGE_PREFIX=…`) ne viennent du processus qui lance les tests : seules celles que
-    l'appel pose comptent.
-
-    Args:
-        arguments: les options et la cible de `make`.
-        makefile: le fichier de commandes — celui du dépôt, ou une copie témoin.
-        directory: le dossier où `make` tourne — la racine du dépôt, ou une arborescence témoin.
-        environment: des variables posées dans l'environnement, comme la CI les passe.
-        variables: des variables posées sur la ligne de commande, qui priment sur le `Makefile`.
-
-    Returns:
-        Le processus terminé, sorties capturées ; son code de sortie n'est pas vérifié.
-    """
-    ignored = set(OVERRIDABLE.findall(makefile.read_text(encoding="utf-8"))) | MAKE_CONTROL
-    inherited = {name: value for name, value in os.environ.items() if name not in ignored}
-    assignments = [f"{name}={value}" for name, value in variables.items()]
-    return subprocess.run(
-        ["make", "-f", str(makefile), *arguments, *assignments],
-        cwd=directory,
-        env=inherited | dict(environment or {}),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-
-def make_dry_run(
-    target: str,
-    directory: Path = REPOSITORY_ROOT,
-    environment: Mapping[str, str] | None = None,
-    **variables: str,
-) -> str:
-    """Les commandes que le `Makefile` du dépôt exécuterait pour `target`, sans les exécuter.
-
-    Returns:
-        La sortie de `make --dry-run`, variables développées — y compris celles des appels
-        récursifs à `$(MAKE)`, que `--dry-run` parcourt sans rien exécuter.
-    """
-    printed = run_make(
-        "--dry-run",
-        target,
-        makefile=MAKEFILE,
-        directory=directory,
-        environment=environment,
-        **variables,
-    )
-    printed.check_returncode()
-    return printed.stdout
 
 
 def built_images(printed: str) -> dict[str, str]:

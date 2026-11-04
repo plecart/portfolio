@@ -1,11 +1,21 @@
-"""Charge un script d'un skill de `.claude/` pour le tester, ou le lance comme la session le lit.
+"""Les aides des tests de la pipeline. Chaque test les importe (`from conftest import …`) : aucune
+fixture, et la suite tourne aussi sous `--noconftest`.
 
-Les scripts des skills vivent sous `.claude/skills/<skill>/scripts/` : un dossier caché, donc
-hors de tout paquet importable. `ruff` les lit ; `pyright` aussi, mais par un projet à part
-(`.claude/skills/pyrightconfig.json`, lancé par `make typecheck`), le projet racine excluant les
-dossiers cachés quoi que dise son `include` (mesuré le 2026-10-09). Ni l'un ni l'autre ne les
-exécute : la seule porte qui éprouve leur *comportement* est cette suite, et c'est pourquoi elle
-les charge par chemin.
+Charge un script d'un skill de `.claude/` pour le tester, ou le lance comme la session le lit. Les
+scripts des skills vivent sous `.claude/skills/<skill>/scripts/` : un dossier caché, donc hors de
+tout paquet importable. `ruff` les lit ; `pyright` aussi, mais par un projet à part
+(`.claude/pyrightconfig.json`, lancé par `make typecheck`), le projet racine excluant les dossiers
+cachés quoi que dise son `include` (mesuré le 2026-10-09). Ni l'un ni l'autre ne les exécute : la
+seule porte qui éprouve leur *comportement* est cette suite, et c'est pourquoi elle les charge par
+chemin.
+
+Les aides que le back partage avec cette suite gardent leur seule définition dans des modules de
+`apps/api/tests/` sans Django — `test_supply_chain.py`, `system_commands.py` — ; ce module les
+réexporte. Le `conftest.py` du back porte le même nom de module, et pytest retire `conftest` de
+`sys.modules` avant de charger chacun (`_importconftest`, pytest 9.2.0) : une session qui
+collecte les deux suites rend aux imports d'ici le dernier chargé — `ImportError` quand
+`.claude/tests` précède `apps` sur la ligne de commande, mesuré le 2026-11-04. Les deux suites se
+lancent donc séparément, `make test` puis `make test-pipeline`.
 """
 
 import importlib.util
@@ -15,8 +25,24 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
-# `skill_scripts.py` → `tests` → `api` → `apps` → racine du dépôt.
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+from system_commands import bash_de_ce_systeme, make_dry_run
+from test_supply_chain import prose_citations, texte_normalise, tracked_files
+
+__all__ = [
+    "REPOSITORY_ROOT",
+    "bash_de_ce_systeme",
+    "load_script",
+    "make_dry_run",
+    "pipe_environment",
+    "prose_citations",
+    "run_in_pipe",
+    "script_path",
+    "texte_normalise",
+    "tracked_files",
+]
+
+# `conftest.py` → `tests` → `.claude` → racine du dépôt.
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 # L'encodage qu'un tube reçoit d'un Python sans réglage sur ce poste, dont la page de code est
 # cp1252 (`pipeline.config.md`, « Qualité »).

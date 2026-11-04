@@ -16,7 +16,7 @@ from typing import Any, NamedTuple
 
 import pytest
 from command_doubles import Reply, failure, json_success, stdout_lines, success
-from skill_scripts import load_script, run_in_pipe
+from conftest import load_script, run_in_pipe
 
 croisement = load_script("pr-paralleles", "croisement-fichiers")
 

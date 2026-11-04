@@ -24,8 +24,8 @@ vérif de fumée n'est pas à toi.
 - **TDD red-green-refactor**, cycle de commit modif → test → cleanup → test → commit, comme décrit
   dans `CONTRIBUTING.md`. Les commandes du projet se lisent dans `.claude/pipeline.config.md`,
   section « Commandes du projet ». Les deux passages de tests (avant et après le cleanup) sont à
-  toi : la commande « test » de cette section, suite rapide entière (`cycle-pr` 3.2 et 3.4) ;
-  rouge → pas de commit.
+  toi : la commande « test » de cette section, suite rapide entière, et « test-pipeline » si le
+  delta la concerne (`cycle-pr` 3.2 et 3.4) ; rouge → pas de commit.
 - **Écrire un fichier** — piège « heredoc de l'outil Bash et antislashs » de
   `.claude/pipeline.config.md`, « Qualité » : un fichier qui doit porter un échappement se
   construit par programme (`chr(92)`…), puis se recompte après écriture, quel que soit l'outil

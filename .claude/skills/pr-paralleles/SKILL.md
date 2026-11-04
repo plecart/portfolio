@@ -521,7 +521,7 @@ c'est le seul autre canal, et il passe par lui.
   `origin/main`, **prédicat** : 0 sans conflit, 1 avec, les fichiers en conflit cités. Ce 1 ne
   prouve un conflit que parce que le script valide d'abord chaque référence : `merge-tree` sort en
   1 aussi sur une référence inconnue — mesuré les 2026-10-13 et 2026-10-21, un témoin de chaque
-  côté (table `FRESHNESS_GATE_FORMS` de `apps/api/tests/test_agent_skills.py`). Il refuse une PR
+  côté (table `FRESHNESS_GATE_FORMS` de `.claude/tests/test_agent_skills.py`). Il refuse une PR
   non mergée, et une base qui ne contient pas son merge en nommant les deux remèdes : `git fetch
   origin`, qu'il ne fait pas, ou `--base origin/<branche où la PR a été mergée>`, qu'il lit sur la
   PR. Il ne voit ni un renommage, ni un fichier qu'une branche touche hors du merge, ni un

@@ -23,15 +23,13 @@ from typing import cast
 
 import pytest
 import yaml
+from system_commands import MAKEFILE, make_dry_run, run_make
 from test_infra import (
     AVIS_WORKFLOW,
     CI_WORKFLOW,
-    MAKEFILE,
     PUBLISH_PREFIX,
     REPOSITORY_ROOT,
     built_images,
-    make_dry_run,
-    run_make,
 )
 from test_supply_chain import PINNED_IMAGE
 

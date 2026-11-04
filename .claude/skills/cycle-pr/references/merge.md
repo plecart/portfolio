@@ -17,7 +17,7 @@ commande — `test "$(git rev-parse origin/<trunk>)" = "<sha>" && …` — est *
 d'une session isolée en worktree ; `--is-ancestor` est la forme acceptée, et elle vaut l'égalité
 parce que le trunk n'avance que vers l'avant. Mesuré le 2026-10-13, témoin de chaque côté : **1**
 quand le trunk a avancé, **0** sur deux références égales — table `FRESHNESS_GATE_FORMS` de
-`apps/api/tests/test_agent_skills.py`. Depuis #197, la porte de merge vers le trunk chaîne **deux**
+`.claude/tests/test_agent_skills.py`. Depuis #197, la porte de merge vers le trunk chaîne **deux**
 prédicats, chacun par son `&&` : `--is-ancestor` pour le trunk éprouvé, puis
 `<répertoire de ce skill>/scripts/porte-merge.py conversation <n>` pour la conversation depuis le
 relevé du verdict (`cycle-pr` Étape 7, « Le go, puis le merge » ; table `PORTES_PRESCRITES` du

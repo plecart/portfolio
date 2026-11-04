@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 from command_doubles import Reply, failure, sortie_d_echec, success
-from skill_scripts import load_script, run_in_pipe
+from conftest import load_script, run_in_pipe
 
 amorcage = load_script("init-projet", "amorcage")
 

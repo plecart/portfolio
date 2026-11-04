@@ -280,6 +280,12 @@ def prose_citations(
             yield from ((path, reference_found) for reference_found in reference.finditer(text))
 
 
+def texte_normalise(fichier: str) -> str:
+    """Le texte du fichier, espaces normalisés et marges `# ` de tête de ligne retirées."""
+    brut = (REPOSITORY_ROOT / fichier).read_text(encoding="utf-8-sig")
+    return " ".join(re.sub(r"(?m)^[ \t]*#[ \t]?", "", brut).split())
+
+
 def is_dockerfile(name: str) -> bool:
     """Le nom désigne-t-il un Dockerfile, au sens de Dependabot, hors `*.dockerignore` ?"""
     return bool(DOCKERFILE_NAME.search(name)) and not name.lower().endswith(DOCKERIGNORE_SUFFIX)

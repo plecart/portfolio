@@ -107,7 +107,7 @@ PACKAGE_VERSIONS = users/$(dir $(PACKAGE))packages/container/$(notdir $(PACKAGE)
 # `gh`, qui porte la rétention ; les tests le remplacent par un témoin.
 GH ?= gh
 
-.PHONY: install test lint format format-check typecheck openapi audit build $(IMAGE_BUILDS) compose-config dev
+.PHONY: install test test-pipeline lint format format-check typecheck openapi audit build $(IMAGE_BUILDS) compose-config dev
 .PHONY: scan $(IMAGE_SCANS) image-test push $(IMAGE_PUSHES) prune $(IMAGE_PRUNES)
 .PHONY: web-install web-browsers web-lint web-typecheck web-test web-openapi web-build web-e2e web-lighthouse web-audit
 
@@ -115,7 +115,15 @@ install:
 	$(UV) sync
 
 test:
-	$(UV) run pytest
+	$(UV) run pytest apps
+
+# Les tests de la pipeline — skills, règles, rôles et leurs scripts —, hors de `make test`, qui ne
+# lit que `apps` : ils vivent avec elle, dans `.claude/tests`, sans Django ni le `conftest.py` du
+# back. `-p no:process_environment` retire le greffon de l'`addopts` racine, qui pose
+# `DJANGO_SETTINGS_MODULE` : sans lui, pytest-django ne charge pas Django — près de 2 s par
+# lancement sur ce poste (mesuré le 2026-11-04).
+test-pipeline:
+	$(UV) run pytest .claude/tests -p no:process_environment
 
 lint:
 	$(UV) run ruff check .
@@ -126,14 +134,17 @@ format:
 format-check:
 	$(UV) run ruff format --check .
 
-# Deux projets pyright. Le second, `.claude/skills/pyrightconfig.json`, porte les scripts des
-# skills : le projet racine ne les voit pas, son exclusion par défaut `**/.*` sautant tout dossier
-# caché quoi que dise `include` ; vu depuis `.claude/skills`, plus aucun dossier du chemin ne l'est.
-# Il vise Python 3.11, que ces scripts promettent : calé sur le venv (3.12), il laisserait passer
-# une syntaxe de 3.12. Les deux gardes de `test_skill_scripts.py` tiennent cette couverture.
+# Deux projets pyright. Le second, `.claude/pyrightconfig.json`, porte les scripts des skills et
+# les tests de la pipeline : le projet racine ne les voit pas, son exclusion par défaut `**/.*`
+# sautant tout dossier caché quoi que dise `include` ; vu depuis `.claude`, plus aucun dossier du
+# chemin ne l'est. Il vise Python 3.11, que les scripts promettent : calé sur le venv (3.12), il
+# laisserait passer une syntaxe de 3.12 ; les tests, qui tournent sur le venv, y sont analysés en
+# 3.12 (`executionEnvironments`). Son `include` écrit `skills/**/scripts` : `skills/*/scripts` n'y
+# analyse aucun fichier (pyright 1.1.414, mesuré le 2026-11-04). Les gardes de
+# `test_skill_scripts.py` tiennent cette couverture.
 typecheck:
 	$(UV) run pyright
-	$(UV) run pyright -p .claude/skills
+	$(UV) run pyright -p .claude
 
 # Le schéma OpenAPI de l'API publique, versionné : le front en dérive ses types (#19). À relancer
 # après tout changement du contrat — sinon le test de fraîcheur de `make test` rougit. La commande

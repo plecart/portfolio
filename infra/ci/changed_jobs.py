@@ -10,8 +10,7 @@ déplacé du front vers `docs/` fait donc tourner `web`.
 Lit sur l'entrée standard les chemins du delta, un par ligne, lignes vides ignorées, et écrit
 `web=true|false`, `infra=true|false`, puis `avis=true|false`. Sur une PR, les jobs `web`, `infra`
 et `avis` ne tournent que si leur réponse vaut `true` ; sur un push vers `main`, le workflow ne la
-lit pas et tout tourne (ADR 0017, ADR 0019). Le job `api` tourne sur chaque push : la suite du back
-porte aussi les tests de la pipeline.
+lit pas et tout tourne (ADR 0017, ADR 0019). Le job `api` tourne sur chaque push.
 
 Règles, par motif `fnmatch` — où `*` traverse `/` :
 
@@ -53,6 +52,7 @@ HARNESS = (
 IMAGE_TESTS = (
     "apps/api/tests/call_witness.py",
     "apps/api/tests/process_environment.py",
+    "apps/api/tests/system_commands.py",
     "apps/api/tests/test_env.py",
     "apps/api/tests/test_infra.py",
     "apps/api/tests/test_supply_chain.py",

@@ -15,6 +15,7 @@ from typing import cast
 
 import pytest
 import yaml
+from system_commands import make_dry_run, run_make
 from test_image_scan import SCANNING_JOBS
 from test_infra import (
     BUILD_COMMAND,
@@ -24,9 +25,7 @@ from test_infra import (
     built_images,
     ci_build_flags,
     job_steps,
-    make_dry_run,
     run_bounded,
-    run_make,
 )
 
 # Le SHA complet d'un commit, étiquette de l'image publiée à côté de `latest`.

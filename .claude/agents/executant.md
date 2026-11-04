@@ -48,7 +48,8 @@ l'a écrit : caractères `Cc`/`Cf` par `unicodedata.category`, nombre d'antislas
 
 Tu **commites ta tranche** — elle seule, ses fichiers nommés un à un — avec le titre que ton brief
 donne, quand ses tests ciblés **et** la commande « test » de `.claude/pipeline.config.md` sont
-verts (`cycle-pr` 3.2 et 3.4 : rouge → pas de commit) ; jamais de push.
+verts, « test-pipeline » aussi si la tranche la concerne (`cycle-pr` 3.2 et 3.4 : rouge → pas de
+commit) ; jamais de push.
 Une cible hors dépôt ne se commite pas, ni ce que ta mission dit **sans commit**.
 **Sans cleanup pass** (`cycle-pr` 3.3) : chaque ligne de la tranche a été décidée par ton
 appelant, et le cleanup holistique de la PR (`cycle-pr` 4.1) la relit avec le reste du diff. Un

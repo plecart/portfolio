@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from skill_scripts import load_script
+from conftest import load_script
 
 bilan = load_script("cycle-pr", "bilan-session")
 

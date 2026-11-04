@@ -28,6 +28,11 @@ du Compose de développement — par testcontainers, et échouent en le disant s
 pas. Ils ne lisent jamais `.env` : leur environnement est posé par
 [apps/api/tests/process_environment.py](apps/api/tests/process_environment.py).
 
+`make test-pipeline` lance à part les tests de la pipeline — skills, règles, rôles et leurs
+scripts —, qui vivent dans [.claude/tests/](.claude/tests/), sans Django ni Docker : à lancer
+quand un changement les concerne (« Commandes du projet » de
+[.claude/pipeline.config.md](.claude/pipeline.config.md)).
+
 **Réglage recommandé du poste.** Docker publie par défaut chaque port sur toutes les interfaces.
 Pendant les tests, le Postgres jetable et Ryuk — le conteneur de nettoyage de testcontainers, qui
 détient le socket Docker et n'exige aucune authentification — sont donc joignables depuis le

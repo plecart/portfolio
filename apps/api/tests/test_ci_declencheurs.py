@@ -33,10 +33,9 @@ from typing import Any, cast
 import pytest
 import yaml
 from changed_jobs import IMAGE_TESTS, jobs_for
-from test_agent_skills import CYCLE_PR, texte_normalise
 from test_infra import AVIS_WORKFLOW, CI_WORKFLOW, REPOSITORY_ROOT
 from test_restore_workflow import triggers
-from test_supply_chain import repository_files
+from test_supply_chain import repository_files, texte_normalise
 
 # Un run par PR, le plus récent : le groupe est le numéro de la PR. Sur un push vers `main`,
 # `github.event.pull_request` est vide (doc GitHub « Contexts ») : le groupe se replie sur le SHA,
@@ -719,6 +718,9 @@ def test_aucune_prose_ne_dit_qu_une_draft_tourne_ni_que_le_ready_ne_lance_rien(
     """Une prose qui le dirait ferait attendre, en draft, un run qui ne vient pas, ou sortir du
     draft sur la foi d'un verdict qui n'existe pas."""
     assert [name for name, text in pipeline_texts().items() if phrase in text] == []
+
+
+CYCLE_PR = REPOSITORY_ROOT / ".claude" / "skills" / "cycle-pr" / "SKILL.md"
 
 
 def step_5() -> str:
