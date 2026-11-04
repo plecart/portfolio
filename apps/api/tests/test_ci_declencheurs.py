@@ -32,7 +32,7 @@ from typing import Any, cast
 
 import pytest
 import yaml
-from changed_jobs import IMAGE_TESTS, jobs_for
+from changed_jobs import IMAGE_TESTS, PIPELINE_TESTS, jobs_for
 from test_infra import AVIS_WORKFLOW, CI_WORKFLOW, REPOSITORY_ROOT
 from test_restore_workflow import triggers
 from test_supply_chain import repository_files, texte_normalise
@@ -181,6 +181,31 @@ def trigger_findings(workflow: str) -> list[str]:
     )
 
 
+# L'étape des tests de la pipeline, dans le job `api`, après celle de la suite du back : sur une PR,
+# seulement si le delta la concerne — la sortie `pipeline` de l'étape `jobs` ; sur un push vers
+# `main`, toujours (ADR 0025). Aucun job neuf : un job vide coûte une minute facturée (ADR 0017).
+PIPELINE_IF = "github.event_name != 'pull_request' || steps.jobs.outputs.pipeline == 'true'"
+PIPELINE_STEP = {"name": "Tests pipeline", "if": PIPELINE_IF, "run": "make test-pipeline"}
+
+
+def pipeline_step_findings(workflow: str) -> list[str]:
+    """Ce qui, dans un workflow, écarte les tests de la pipeline de leur étape (ADR 0025).
+
+    Returns:
+        Un constat si le job `api` ne porte pas une et une seule étape `PIPELINE_STEP`, ou s'il
+        la porte avant l'étape `make test` ; liste vide sinon.
+    """
+    jobs = cast(dict[str, dict[str, Any]], yaml.safe_load(workflow)["jobs"])
+    steps = cast(list[dict[str, Any]], (jobs.get("api") or {}).get("steps") or [])
+    runs = [step.get("run") for step in steps]
+    found = [step for step in steps if step.get("run") == PIPELINE_STEP["run"]]
+    if found != [PIPELINE_STEP]:
+        return [f"`api` porte {found}, attendu une étape {PIPELINE_STEP}"]
+    if "make test" not in runs or runs.index(PIPELINE_STEP["run"]) < runs.index("make test"):
+        return ["l'étape des tests de la pipeline ne suit pas celle de la suite du back"]
+    return []
+
+
 # --- Le recueil des formes : chaque cas recensé, avec son verdict attendu ---------------------
 
 TYPES_LINE = "    types: [opened, synchronize, reopened, ready_for_review]\n"
@@ -200,6 +225,11 @@ JOBS_STEP_LINES = (
     f"        run: {CHANGED_JOBS_COMMAND}\n"
 )
 INSTALL_LINES = "      - uses: astral-sh/setup-uv@v0\n      - run: make install\n"
+# Les deux suites, celle du back puis celle de la pipeline.
+TESTS_LINE = "      - run: make test\n"
+PIPELINE_STEP_LINES = (
+    f"      - name: Tests pipeline\n        if: {PIPELINE_IF}\n        run: make test-pipeline\n"
+)
 # Les jobs conditionnés : `web` et `infra` sans pas, `avis` qui appelle son workflow.
 GATED_LINES = "".join(
     f"  {name}:\n    needs: api\n    if: {gated_if(name)}\n"
@@ -208,7 +238,8 @@ GATED_LINES = "".join(
 )
 CONFORMING_WORKFLOW = (
     f"{TRIGGERS_BLOCK}{CONCURRENCY_BLOCK}jobs:\n  api:\n{API_IF_LINE}{OUTPUTS_LINES}    steps:\n"
-    f"      - uses: actions/checkout@v0\n{DEPTH_LINES}{JOBS_STEP_LINES}{INSTALL_LINES}{GATED_LINES}"
+    f"      - uses: actions/checkout@v0\n{DEPTH_LINES}{JOBS_STEP_LINES}{INSTALL_LINES}"
+    f"{TESTS_LINE}{PIPELINE_STEP_LINES}{GATED_LINES}"
 )
 
 
@@ -362,6 +393,45 @@ FORMS: dict[str, Form] = {
     # workflows », relue le 2026-10-28) : `ready_for_review` en sortirait.
     "sans types": (trigger_findings, "  pull_request:\n" + TYPES_LINE, "  pull_request:\n", True),
     "push sur toute branche": (trigger_findings, "  push:\n" + BRANCHES_LINE, "  push:\n", True),
+    "étape des tests de la pipeline conforme": (pipeline_step_findings, "", "", False),
+    "sans étape des tests de la pipeline": (
+        pipeline_step_findings,
+        PIPELINE_STEP_LINES,
+        "",
+        True,
+    ),
+    # Sans garde, l'étape paierait la suite sur chaque PR, que son delta la concerne ou non.
+    "étape de la pipeline sans garde": (
+        pipeline_step_findings,
+        f"        if: {PIPELINE_IF}\n",
+        "",
+        True,
+    ),
+    # Sur `main`, la suite ne tournerait qu'au commit qui touche la pipeline.
+    "garde de la pipeline qui ignore le push": (
+        pipeline_step_findings,
+        PIPELINE_IF,
+        "steps.jobs.outputs.pipeline == 'true'",
+        True,
+    ),
+    "garde qui lit la sortie de web": (
+        pipeline_step_findings,
+        "steps.jobs.outputs.pipeline",
+        "steps.jobs.outputs.web",
+        True,
+    ),
+    "étape de la pipeline avant la suite du back": (
+        pipeline_step_findings,
+        TESTS_LINE + PIPELINE_STEP_LINES,
+        PIPELINE_STEP_LINES + TESTS_LINE,
+        True,
+    ),
+    "étape de la pipeline en double": (
+        pipeline_step_findings,
+        PIPELINE_STEP_LINES,
+        PIPELINE_STEP_LINES * 2,
+        True,
+    ),
 }
 
 
@@ -516,53 +586,73 @@ def test_le_workflow_des_portes_d_avis_est_conforme() -> None:
 
 CHANGED_JOBS = REPOSITORY_ROOT / "infra" / "ci" / "changed_jobs.py"
 
-# Delta → (`web`, `infra`, `avis`) attendus. En littéraux, jamais dérivés des motifs du script :
-# une table tirée de l'artefact sous test perdrait son cas avec le motif retiré (obs 80). Chaque
-# motif du script a au moins un témoin qui rougit s'il disparaît : `.claude/*` et `docs/*` ont le
-# leur hors Markdown, que `*.md` couvrirait seul. Les entrées témoins du corps de #124 y sont — il
-# en annonce 11, sa liste en compte 10 —, plus quatre : pipeline et documentation hors Markdown,
-# Dependabot et test mensuel, chemin non ASCII. Pour `avis`, une par entrée de l'ADR 0019,
+# Delta → (`web`, `infra`, `avis`, `pipeline`) attendus. En littéraux, jamais dérivés des motifs du
+# script : une table tirée de l'artefact sous test perdrait son cas avec le motif retiré (obs 80).
+# Chaque motif du script a au moins un témoin qui rougit s'il disparaît : `.claude/*` et `docs/*`
+# ont le leur hors Markdown, que `*.md` couvrirait seul. Les entrées témoins du corps de #124 y sont
+# — il en annonce 11, sa liste en compte 10 —, plus quatre : pipeline et documentation hors
+# Markdown, Dependabot et test mensuel, chemin non ASCII. Pour `avis`, une par entrée de l'ADR 0019,
 # décision 2 — onze, dont le `Makefile` et le verrou Python, déjà là —, une par chemin de `ALL` et
-# le chemin cité ; les autres sont hors entrées.
-JOBS_WITNESSES: dict[str, tuple[list[str], bool, bool, bool]] = {
-    "delta vide": ([], False, False, False),
+# le chemin cité ; les autres sont hors entrées. Pour `pipeline` (ADR 0025), un par motif de
+# `PIPELINE` — `.claude/` hors Markdown, `CLAUDE.md`, `CONTRIBUTING.md`, `.github/` hors `ci.yml`,
+# le manifeste racine et le verrou — et par chemin de `ALL`, le chemin cité, et le témoin du back,
+# `apps/api/content/models.py`, qui ne la fait pas tourner.
+JOBS_WITNESSES: dict[str, tuple[list[str], bool, bool, bool, bool]] = {
+    "delta vide": ([], False, False, False, False),
     "harnais seul": (
         [".claude/skills/x/SKILL.md", "apps/api/tests/test_x.py", "docs/a.md", "CLAUDE.md"],
         False,
         False,
         False,
+        True,
     ),
-    "pipeline hors Markdown": ([".claude/settings.json"], False, False, False),
-    "documentation hors Markdown": (["docs/diagramme.svg"], False, False, False),
+    "pipeline hors Markdown": ([".claude/settings.json"], False, False, False, True),
+    "règles de la session": (["CLAUDE.md"], False, False, False, True),
+    "guide du contributeur": (["CONTRIBUTING.md"], False, False, False, True),
+    "documentation hors Markdown": (["docs/diagramme.svg"], False, False, False, False),
     "Dependabot et test mensuel": (
         [".github/dependabot.yml", ".github/workflows/restore.yml"],
         False,
         False,
         False,
+        True,
     ),
-    "front": (["apps/web/src/a.tsx"], True, True, False),
-    "back": (["apps/api/content/models.py"], False, True, False),
-    "schéma de l'API": (["apps/api/openapi.json"], True, True, False),
-    "Makefile": (["Makefile"], True, True, True),
-    "workflow de CI": ([".github/workflows/ci.yml"], True, True, True),
-    "le script lui-même": (["infra/ci/changed_jobs.py"], True, True, True),
-    "manifeste racine": (["pyproject.toml"], False, True, True),
-    "manifeste du back": (["apps/api/pyproject.toml"], False, True, True),
-    "verrou Python": (["uv.lock"], False, True, True),
-    "manifeste du front": (["apps/web/package.json"], True, True, True),
-    "verrou du front": (["apps/web/package-lock.json"], True, True, True),
-    "Dockerfile d'une image": (["infra/caddy/Dockerfile"], False, True, True),
-    "exceptions du scan": ([".trivyignore.yaml"], False, True, True),
-    "exceptions de l'audit Python": (["infra/ci/pip-audit-exceptions.toml"], False, True, True),
-    "porte de l'audit Python": (["infra/ci/pip_audit_gate.py"], False, True, True),
-    "workflow des portes d'avis": ([".github/workflows/avis.yml"], False, False, True),
-    "tests des images": (["infra/tests/test_caddy_image.py"], False, True, False),
-    "module d'appui des tests des images": (["apps/api/tests/test_infra.py"], False, True, False),
+    "front": (["apps/web/src/a.tsx"], True, True, False, False),
+    "back": (["apps/api/content/models.py"], False, True, False, False),
+    "schéma de l'API": (["apps/api/openapi.json"], True, True, False, False),
+    "Makefile": (["Makefile"], True, True, True, True),
+    "workflow de CI": ([".github/workflows/ci.yml"], True, True, True, True),
+    "le script lui-même": (["infra/ci/changed_jobs.py"], True, True, True, True),
+    "manifeste racine": (["pyproject.toml"], False, True, True, True),
+    "manifeste du back": (["apps/api/pyproject.toml"], False, True, True, False),
+    "verrou Python": (["uv.lock"], False, True, True, True),
+    "manifeste du front": (["apps/web/package.json"], True, True, True, False),
+    "verrou du front": (["apps/web/package-lock.json"], True, True, True, False),
+    "Dockerfile d'une image": (["infra/caddy/Dockerfile"], False, True, True, False),
+    "exceptions du scan": ([".trivyignore.yaml"], False, True, True, False),
+    "exceptions de l'audit Python": (
+        ["infra/ci/pip-audit-exceptions.toml"],
+        False,
+        True,
+        True,
+        False,
+    ),
+    "porte de l'audit Python": (["infra/ci/pip_audit_gate.py"], False, True, True, False),
+    "workflow des portes d'avis": ([".github/workflows/avis.yml"], False, False, True, True),
+    "tests des images": (["infra/tests/test_caddy_image.py"], False, True, False, False),
+    "module d'appui des tests des images": (
+        ["apps/api/tests/test_infra.py"],
+        False,
+        True,
+        False,
+        False,
+    ),
     # `fnmatchcase` : les chemins de git sont sensibles à la casse. Rouge sous Windows seulement
     # si `fnmatch` revenait : sous Linux, les deux coïncident.
-    "casse distincte du front": (["APPS/WEB/a.tsx"], False, True, False),
+    "casse distincte du front": (["APPS/WEB/a.tsx"], False, True, False, False),
     "chemin non ASCII, mis entre guillemets par git": (
         [r'"docs/caf\303\251.md"'],
+        True,
         True,
         True,
         True,
@@ -571,20 +661,24 @@ JOBS_WITNESSES: dict[str, tuple[list[str], bool, bool, bool]] = {
 
 
 @pytest.mark.parametrize(
-    ("paths", "web", "infra", "avis"), JOBS_WITNESSES.values(), ids=JOBS_WITNESSES.keys()
+    ("paths", "web", "infra", "avis", "pipeline"),
+    JOBS_WITNESSES.values(),
+    ids=JOBS_WITNESSES.keys(),
 )
-def test_le_delta_decide_des_jobs_web_infra_et_avis(
-    paths: list[str], web: bool, infra: bool, avis: bool
+def test_le_delta_decide_des_jobs_et_des_tests_de_la_pipeline(
+    paths: list[str], web: bool, infra: bool, avis: bool, pipeline: bool
 ) -> None:
-    """Chaque témoin : la réponse de `jobs_for`, `web`, `infra` puis `avis`."""
-    assert jobs_for(paths) == {"web": web, "infra": infra, "avis": avis}
+    """Chaque témoin : la réponse de `jobs_for`, `web`, `infra`, `avis` puis `pipeline`."""
+    assert jobs_for(paths) == {"web": web, "infra": infra, "avis": avis, "pipeline": pipeline}
 
 
 @pytest.mark.parametrize(
-    ("paths", "web", "infra", "avis"), JOBS_WITNESSES.values(), ids=JOBS_WITNESSES.keys()
+    ("paths", "web", "infra", "avis", "pipeline"),
+    JOBS_WITNESSES.values(),
+    ids=JOBS_WITNESSES.keys(),
 )
 def test_le_script_ecrit_sa_reponse_au_format_github_output(
-    paths: list[str], web: bool, infra: bool, avis: bool
+    paths: list[str], web: bool, infra: bool, avis: bool, pipeline: bool
 ) -> None:
     """Le script tel que l'étape `jobs` le lance : les chemins sur l'entrée standard, une ligne
     vide en plus — `git diff` n'en écrit pas, la ligne vide est ignorée —, et la réponse sur la
@@ -597,27 +691,23 @@ def test_le_script_ecrit_sa_reponse_au_format_github_output(
         encoding="utf-8",
         check=True,
     )
-    assert completed.stdout == (
-        f"web={str(web).lower()}\ninfra={str(infra).lower()}\navis={str(avis).lower()}\n"
+    answers = {"web": web, "infra": infra, "avis": avis, "pipeline": pipeline}
+    assert completed.stdout == "".join(
+        f"{job}={str(runs).lower()}\n" for job, runs in answers.items()
     )
 
 
-# Les dossiers où `pytest` résout un import de module d'appui : son `pythonpath`, et les dossiers
-# de tests eux-mêmes (`rootdir` et mode d'import par défaut).
-SUPPORT_DIRS = ("apps/api/tests", "infra/tests")
-
-
-def image_test_modules() -> set[str]:
-    """Les fichiers de `apps/api/tests/` que `make image-test` charge : le greffon de `addopts`,
-    `process_environment`, et tout module d'appui que `infra/tests/` importe, directement ou non.
+def loaded_modules(seeds: list[Path], folders: tuple[str, ...]) -> set[str]:
+    """Les fichiers de `apps/` qu'une suite charge : ses `seeds`, et tout module d'appui qu'ils
+    importent, directement ou non, résolu dans le premier de `folders` qui le porte — l'ordre où
+    `pytest` le cherche : le dossier du test d'abord (mode d'import par défaut), puis son
+    `pythonpath`.
 
     Lue par l'analyseur de Python (`ast`), jamais par un motif : un `import` dans une fonction
-    compte comme un `import` en tête. Dénombré le 2026-10-20 (relecture de la PR #137, passe 1) :
-    5 fichiers — `call_witness`, `process_environment`, `test_env`, `test_infra`,
-    `test_supply_chain` —, que le motif `apps/api/tests/*` sortait tous du job `infra`.
+    compte comme un `import` en tête. Le premier dossier seul compte : `conftest`, présent dans
+    `.claude/tests` et dans `apps/api/tests`, ne désigne que le premier.
     """
-    todo = [*(REPOSITORY_ROOT / "infra" / "tests").glob("*.py")]
-    todo.append(REPOSITORY_ROOT / "apps" / "api" / "tests" / "process_environment.py")
+    todo = list(seeds)
     seen: set[Path] = set()
     while todo:
         module = todo.pop()
@@ -631,17 +721,35 @@ def image_test_modules() -> set[str]:
                 names = [node.module]
             else:
                 continue
-            todo += [
-                REPOSITORY_ROOT / folder / f"{name.split('.')[0]}.py"
-                for name in names
-                for folder in SUPPORT_DIRS
-                if (REPOSITORY_ROOT / folder / f"{name.split('.')[0]}.py").is_file()
-            ]
+            for name in names:
+                paths = [
+                    REPOSITORY_ROOT / folder / f"{name.split('.')[0]}.py" for folder in folders
+                ]
+                todo += [path for path in paths if path.is_file()][:1]
     return {
         module.relative_to(REPOSITORY_ROOT).as_posix()
         for module in seen
         if module.is_relative_to(REPOSITORY_ROOT / "apps")
     }
+
+
+def image_test_modules() -> set[str]:
+    """Les fichiers de `apps/api/tests/` que `make image-test` charge : le greffon de `addopts`,
+    `process_environment`, et tout module d'appui que `infra/tests/` importe, directement ou non.
+    Dénombré le 2026-10-20 (relecture de la PR #137, passe 1) : 5 fichiers — `call_witness`,
+    `process_environment`, `test_env`, `test_infra`, `test_supply_chain` —, que le motif
+    `apps/api/tests/*` sortait tous du job `infra`.
+    """
+    seeds = [*(REPOSITORY_ROOT / "infra" / "tests").glob("*.py")]
+    seeds.append(REPOSITORY_ROOT / "apps" / "api" / "tests" / "process_environment.py")
+    return loaded_modules(seeds, ("infra/tests", "apps/api/tests"))
+
+
+def pipeline_test_modules() -> set[str]:
+    """Les fichiers de `apps/api/tests/` que `make test-pipeline` charge : ce que `.claude/tests/`
+    importe, directement ou non — sans `process_environment`, que la cible retire."""
+    seeds = [*(REPOSITORY_ROOT / ".claude" / "tests").glob("*.py")]
+    return loaded_modules(seeds, (".claude/tests", "apps/api/tests"))
 
 
 def test_chaque_module_que_charge_image_test_fait_tourner_infra() -> None:
@@ -652,6 +760,14 @@ def test_chaque_module_que_charge_image_test_fait_tourner_infra() -> None:
     modules = image_test_modules()
     assert modules == set(IMAGE_TESTS)
     assert all(jobs_for([module])["infra"] for module in modules)
+
+
+def test_chaque_module_que_charge_test_pipeline_fait_tourner_ses_tests() -> None:
+    """Même règle pour la suite de la pipeline : un module d'appui du back qu'elle importe, changé
+    seul, la fait tourner (ADR 0025)."""
+    modules = pipeline_test_modules()
+    assert modules == set(PIPELINE_TESTS)
+    assert all(jobs_for([module])["pipeline"] for module in modules)
 
 
 # --- La prose de la pipeline : le premier run vient du passage en ready ------------------------

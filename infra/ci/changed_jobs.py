@@ -1,4 +1,5 @@
-"""Les jobs de la CI que concerne un delta de PR — `web`, `infra`, `avis` —, en `$GITHUB_OUTPUT`.
+"""Ce que concerne un delta de PR — les jobs `web`, `infra`, `avis`, et les tests de la
+pipeline —, en `$GITHUB_OUTPUT`.
 
 Lancé par la première étape du job `api` de `.github/workflows/ci.yml`, sur le delta de la PR :
 
@@ -8,9 +9,10 @@ Lancé par la première étape du job `api` de `.github/workflows/ci.yml`, sur l
 déplacé du front vers `docs/` fait donc tourner `web`.
 
 Lit sur l'entrée standard les chemins du delta, un par ligne, lignes vides ignorées, et écrit
-`web=true|false`, `infra=true|false`, puis `avis=true|false`. Sur une PR, les jobs `web`, `infra`
-et `avis` ne tournent que si leur réponse vaut `true` ; sur un push vers `main`, le workflow ne la
-lit pas et tout tourne (ADR 0017, ADR 0019). Le job `api` tourne sur chaque push.
+`web=true|false`, `infra=true|false`, `avis=true|false`, puis `pipeline=true|false`. Sur une PR,
+les jobs `web`, `infra` et `avis`, et l'étape « Tests pipeline » du job `api`, ne tournent que si
+leur réponse vaut `true` ; sur un push vers `main`, le workflow ne la lit pas et tout tourne
+(ADR 0017, ADR 0019, ADR 0025). Le job `api` tourne sur chaque push.
 
 Règles, par motif `fnmatch` — où `*` traverse `/` :
 
@@ -22,14 +24,16 @@ Règles, par motif `fnmatch` — où `*` traverse `/` :
   sauf les modules d'appui que `make image-test` charge aussi (`IMAGE_TESTS`), qui le font tourner ;
 - `avis` : une entrée des portes d'avis — ce que lisent `make audit`, `make web-audit` et
   `make scan`, et ce qui les définit (`AVIS`, ADR 0019, décision 2) ;
-- les trois : un chemin de `ALL`, qui décide des jobs eux-mêmes, ou un chemin que `git` a mis
+- `pipeline` : ce que la suite de la pipeline (`make test-pipeline`) lit, et ce qui la lance
+  (`PIPELINE`) ; ou un module d'appui du back qu'elle importe (`PIPELINE_TESTS`) ;
+- tous : un chemin de `ALL`, qui décide des jobs eux-mêmes, ou un chemin que `git` a mis
   entre guillemets (`QUOTED`) — il le fait pour tout chemin non ASCII, que plus aucun motif
   n'apparie ; un job sauté à tort cacherait un rouge, un job lancé pour rien ne coûte que des
-  minutes. Ces chemins sont hors du harnais : `infra` les prend déjà, `web` et `avis` les
-  ajoutent.
+  minutes. Ces chemins sont hors du harnais : `infra` les prend déjà, `web`, `avis` et
+  `pipeline` les ajoutent.
 
-Liste vide : aucun des trois. Code de sortie 0 ; l'étape qui le lance tourne sous `pipefail`, et un
-`git diff` en échec y fait rougir le job `api` au lieu de rendre `false` en silence.
+Liste vide : aucun des quatre. Code de sortie 0 ; l'étape qui le lance tourne sous `pipefail`, et
+un `git diff` en échec y fait rougir le job `api` au lieu de rendre `false` en silence.
 """
 
 import sys
@@ -72,6 +76,14 @@ AVIS = (
     "infra/ci/pip_audit_gate.py",
     ".github/workflows/avis.yml",
 )
+# Ce que lit la suite de la pipeline, `.claude/tests` (ADR 0025) : la prose, les réglages et les
+# scripts du harnais, et `.github/`, dont elle relit les renvois et les commandes ; puis ce qui la
+# lance, le manifeste racine — son `pytest` et son `addopts` — et le verrou. `ALL` et `QUOTED`
+# s'y ajoutent, comme pour `web` et `avis`.
+PIPELINE = (".claude/*", "CLAUDE.md", "CONTRIBUTING.md", ".github/*", "pyproject.toml", "uv.lock")
+# Les modules de `apps/api/tests/` que `make test-pipeline` charge : ce que `.claude/tests/`
+# importe, directement ou non. Recalculés par `test_ci_declencheurs.py`, comme `IMAGE_TESTS`.
+PIPELINE_TESTS = ("apps/api/tests/system_commands.py", "apps/api/tests/test_supply_chain.py")
 # Ce qui décide des jobs eux-mêmes.
 ALL = ("Makefile", ".github/workflows/ci.yml", "infra/ci/changed_jobs.py")
 # Un chemin que `git` a mis entre guillemets : non ASCII, aucun autre motif ne l'apparie plus.
@@ -92,18 +104,21 @@ def jobs_for(paths: Iterable[str]) -> dict[str, bool]:
             les écrit sous `--no-renames` ; une chaîne vide est ignorée.
 
     Returns:
-        `{"web": …, "infra": …, "avis": …}`, dans cet ordre ; `False` pour les trois sur un delta
-        vide.
+        `{"web": …, "infra": …, "avis": …, "pipeline": …}`, dans cet ordre ; `False` pour les
+        quatre sur un delta vide.
 
     Example:
         >>> jobs_for(["apps/api/content/models.py"])
-        {'web': False, 'infra': True, 'avis': False}
+        {'web': False, 'infra': True, 'avis': False, 'pipeline': False}
     """
     delta = [path for path in paths if path]
     return {
         "web": any(matches(path, (*WEB, *ALL, QUOTED)) for path in delta),
         "infra": any(path in IMAGE_TESTS or not matches(path, HARNESS) for path in delta),
         "avis": any(matches(path, (*AVIS, *ALL, QUOTED)) for path in delta),
+        "pipeline": any(
+            path in PIPELINE_TESTS or matches(path, (*PIPELINE, *ALL, QUOTED)) for path in delta
+        ),
     }
 
 

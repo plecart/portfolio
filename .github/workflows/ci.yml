@@ -77,7 +77,8 @@ jobs:
     # attendent ce job, et un job sauté saute ceux qui l'attendent.
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
 
-    # Les jobs que le delta de la PR concerne, lus par `web`, `infra` et `avis`.
+    # Les jobs que le delta de la PR concerne, lus par `web`, `infra` et `avis`. La sortie
+    # `pipeline` de l'étape `jobs` n'en est pas : l'étape « Tests pipeline » la lit dans ce job.
     outputs:
       web: ${{ steps.jobs.outputs.web }}
       infra: ${{ steps.jobs.outputs.infra }}
@@ -117,6 +118,13 @@ jobs:
 
       - name: Tests
         run: make test
+
+      # Les tests de la pipeline (`.claude/tests`) : sur une PR, seulement si le delta la concerne
+      # — la sortie `pipeline` de l'étape `jobs` ; sur un push vers `main`, toujours (ADR 0025).
+      # Une étape et non un job : un job vide coûte une minute facturée (ADR 0017).
+      - name: Tests pipeline
+        if: github.event_name != 'pull_request' || steps.jobs.outputs.pipeline == 'true'
+        run: make test-pipeline
 
   web:
     name: Front — lint, types, tests, build, e2e, lighthouse

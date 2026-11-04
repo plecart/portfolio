@@ -57,10 +57,9 @@ back vert (ADR 0019).
                                                   # testcontainers (#7) ; vérifiée le 2026-11-04
 - test-pipeline : make test-pipeline              # tests de la pipeline, `.claude/tests`, sans
                                                   # Django ni le `conftest.py` du back ; à lancer
-                                                  # aussi quand le delta touche `.claude/`,
-                                                  # `CLAUDE.md`, `CONTRIBUTING.md`, `.github/` ou
-                                                  # ce qui les lance (`Makefile`, `pyproject.toml`,
-                                                  # `uv.lock`) ; sortie brute : `rtk proxy make
+                                                  # aussi quand le delta la concerne : la sortie
+                                                  # `pipeline` d'`infra/ci/changed_jobs.py`, la
+                                                  # règle de la CI ; sortie brute : `rtk proxy make
                                                   # test-pipeline` ; vérifiée le 2026-11-04
 - test ciblé   : uv run pytest <chemin|motif>     # une seule cible, pour la boucle TDD
 - test brut    : rtk proxy make test              # sortie du lanceur sans le résumeur RTK du poste :
@@ -325,7 +324,7 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
     mesuré
 - gates bloquants en CI — sur une PR, `web`, `infra` et `avis` ne tournent que si le delta touche leurs fichiers (règle dans `infra/ci/changed_jobs.py`, lue par la première étape du job `api`), `api` toujours, et les trois attendent un `api` vert ; sur un push vers `main`, les quatre (ADR 0017, ADR 0019) :
   - auteurs : aucun commit de la PR d'auteur `noreply@anthropic.com` (job `auteurs`, sur une PR hors draft seulement)
-  - back : lint, format:check, typecheck, test
+  - back : lint, format:check, typecheck, test, puis test-pipeline — sur une PR, seulement si le delta touche la pipeline (sortie `pipeline` de `infra/ci/changed_jobs.py`), sur un push vers `main` toujours (ADR 0025)
   - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse
   - infra : compose (résolution de `infra/compose.dev.yml` et `infra/compose.yml`), build des images `api`, `backup` et `caddy` sans publication, tests des images (`make image-test`)
   - avis : audit Python (`make audit`), audit npm (`make web-audit`), build puis scan des images (Trivy : HIGH et CRITICAL, corrigeables ou non, et fin de vie ; exceptions datées de `.trivyignore.yaml`) — le job `avis` appelle le workflow `avis.yml` ; sur une PR, seulement si le delta touche une entrée d'un avis — manifestes et verrous, Dockerfiles, exceptions datées, porte de `pip-audit`, `avis.yml` — ou ce qui décide des jobs (`Makefile`, `ci.yml`, `changed_jobs.py`)
