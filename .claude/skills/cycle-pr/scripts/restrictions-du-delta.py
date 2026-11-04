@@ -35,10 +35,10 @@ l'attribut `diff` — 42 clés, 20 neutralisées, 22 indemnes.
   `diff.relative` (`--no-relative`) ; `diff.interHunkContext` (`--inter-hunk-context=0`) ;
   `diff.renames` (`--find-renames`) ; `diff.renameLimit` (`-l0`) ; `diff.algorithm`
   (`--diff-algorithm=myers`) ; `diff.indentHeuristic` (`--indent-heuristic`) — 14.
-- Neutralisées par le format que le script lit, sans lequel tout cas rougit (mesuré) :
-  `diff.context` (`-U0`) ; `diff.noPrefix`, `diff.mnemonicPrefix`, `diff.srcPrefix`,
-  `diff.dstPrefix` (`--no-prefix`) ; `core.quotePath` (`-c core.quotePath=false`, tenue par le
-  chemin accentué des tests) — 6.
+- Neutralisées par le format que le script lit (mesuré) : `diff.context` (`-U0`) ;
+  `diff.noPrefix`, `diff.mnemonicPrefix`, `diff.srcPrefix`, `diff.dstPrefix` (`--no-prefix`) —
+  sans l'une ou l'autre option, chaque ligne de la table de configuration rougit — ;
+  `core.quotePath` (`-c core.quotePath=false`, tenue par le chemin accentué des tests) — 6.
 - Indemnes, par leur description — et par une mesure pour les six marquées d'un astérisque :
   sans effet sous `--no-color` — `core.whitespace`*, `diff.colorMoved`*, `diff.colorMovedWS`,
   `diff.wsErrorHighlight`* ; propres à un diff externe ou à une conversion déjà écartés —
