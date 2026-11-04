@@ -1645,7 +1645,8 @@ PLAN_QA_SKILL = ".claude/skills/plan-qa/SKILL.md"
 # La ligne « commande de fond bornée », la même dans les quatre rôles à `Bash` (#195, obs 132).
 COMMANDE_DE_FOND = (
     "**Commande de fond bornée** — toute commande susceptible de dépasser ~2 min part en arrière-plan"
-    " avec un `timeout` ; une recherche se borne au dépôt (`git grep`, le worktree)"
+    " avec un `timeout` ; une recherche se borne au dépôt (`git grep`, le worktree), jamais un"
+    " `find` sur le disque"
 )
 AUDIT_SPEC_UI_SKILL = ".claude/skills/audit-spec-ui/SKILL.md"
 INIT_PROJET_SKILL = ".claude/skills/init-projet/SKILL.md"
@@ -1709,7 +1710,12 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "pr-paralleles-le-lead-ne-verifie-plus": (
         PR_PARALLELES_SKILL,
-        "le lead ne reçoit plus d'état à vérifier et ne lance aucun `verificateur`",
+        (
+            "Le `verificateur` d'avant-go, éphémère, un par (PR, go), est lancé par la **session"
+            " PR** elle-même (`cycle-pr` Étape 7, « Vérification d'avant-go » ; #134, décision 2),"
+            " sur l'accord donné à l'étape 2 : le lead ne reçoit plus d'état à vérifier et ne lance"
+            " aucun `verificateur` — son contexte ne grossit plus d'un verdict par PR et par go"
+        ),
     ),
     # Fin de travail (décision 11, obs 85, 94, 98).
     "fin-de-tour-jamais-un-signal": (
@@ -1726,7 +1732,12 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "interroge-moi-previent-le-parent": (
         INTERROGE_MOI_SKILL,
-        "prévenir le parent par le message de fin de la même référence",
+        (
+            "**Session démarrée par une autre** (son prompt système nomme le parent,"
+            " `.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») : une fois les"
+            " décisions écrites et la transition proposée, prévenir le parent par le message de fin"
+            " de la même référence (« Fin de travail ») — la fin du tour ne le prévient pas"
+        ),
     ),
     # Passation (décision 9).
     "passation-du-lot-termine": (
@@ -1795,8 +1806,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "interroge-moi-moment-et-forme": (
         INTERROGE_MOI_SKILL,
         (
-            "le groupement porte sur le **moment** — un point d'arrêt, jamais le fil de l'eau —, "
-            "cette règle sur la **forme**"
+            "Ce n'est pas le contraire du groupement des `[V]` de la règle d'or (`contraintes.md`)"
+            " : le groupement porte sur le **moment** — un point d'arrêt, jamais le fil de l'eau —,"
+            " cette règle sur la **forme** — dans ce point d'arrêt, une question par tour, la plus"
+            " lourde d'abord"
         ),
     ),
     # Coordinatrice (#107, lot 2b) : le découpage et ce qu'il fait de la session.
@@ -2036,11 +2049,19 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "relecteur-plage-depuis-la-base-de-la-pr": (
         ".claude/agents/relecteur.md",
-        "La plage que tu reçois part de la base de la PR",
+        (
+            "La plage que tu reçois part de la base de la PR — sa branche d'intégration pour une PR"
+            " de lot coordonné (`cycle-pr/references/coordinatrice.md`) — : relis-la telle quelle,"
+            " jamais contre le trunk"
+        ),
     ),
     "verificateur-base-d-une-pr-de-lot": (
         ".claude/agents/verificateur.md",
-        "`<trunk>` se lit cette branche partout ci-dessous",
+        (
+            "Une PR de lot coordonné vise la branche d'intégration de son issue, pas le trunk"
+            " (`cycle-pr/references/coordinatrice.md`) : pour elle, `<trunk>` se lit cette branche"
+            " partout ci-dessous, gabarit du verdict compris"
+        ),
     ),
     # Passation (obs 85) et frontière de lot.
     "passation-en-dernier": (
@@ -2060,7 +2081,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "pr-paralleles-un-worktree-neuf-par-lot": (
         PR_PARALLELES_SKILL,
-        "chaque lot a sa session et son worktree neufs",
+        (
+            "Sous une coordinatrice — ses deux cas seulement (`.claude/rules/taille-pr.md`, point"
+            " 4) —, chaque lot a sa session et son worktree neufs"
+        ),
     ),
     # Lot 3 : `pr-paralleles` démarre, suit et nettoie ses sessions (bloc « Lot 3/4 », décisions
     # 8, 9, 16 du brief, obs 92, 93, 103, et la mesure de `bind_pr` du journal de spec du
@@ -2087,7 +2111,11 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # Décision 8 : barème d'effort et plafond de l'arbre.
     "effort-par-bareme": (
         PR_PARALLELES_SKILL,
-        "L'effort de chaque session suit le barème de la coordinatrice",
+        (
+            "L'effort de chaque session suit le barème de la coordinatrice (même référence, point"
+            " 3), sous le plafond du lead (question de l'étape 2), fixé au démarrage et jamais"
+            " changé en cours de session"
+        ),
     ),
     "plafond-demande-a-l-etape-2": (
         PR_PARALLELES_SKILL,
@@ -2109,7 +2137,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "archivage-dans-le-tour-du-message": (
         PR_PARALLELES_SKILL,
-        "deux archivages acceptés dans un tour ouvert par un message de session",
+        (
+            "Il passe dans le tour que le message de fin ouvre : mesuré le 2026-10-18, deux"
+            " archivages acceptés dans un tour ouvert par un message de session"
+        ),
     ),
     # `/code-review` de la PR #130 : omis, `use_worktree` donne le dossier du lead.
     "worktree-demande-en-clair": (
@@ -2124,11 +2155,19 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "orphelines-sans-pagination": (PR_PARALLELES_SKILL, "rend 20 lignes par défaut"),
     "lead-ne-cree-ni-worktree-ni-branche": (
         PR_PARALLELES_SKILL,
-        "Le lead ne crée ni worktree ni branche",
+        (
+            "Le lead ne crée ni worktree ni branche. L'application place chaque session sous"
+            " `.claude/worktrees/`, et son premier geste crée sa branche depuis le distant"
+            " (`sessions-liees.md`, « Premier geste ») : la fraîcheur vient d'`origin/main`, sans"
+            " porte à jouer sur un `main` local"
+        ),
     ),
     "provisionnement-par-la-session": (
         PR_PARALLELES_SKILL,
-        "**Provisionner son worktree — la session le fait, juste après son premier geste.**",
+        (
+            "**Provisionner son worktree — la session le fait, juste après son premier geste.** Le"
+            " lead ne connaît pas le worktree avant le démarrage de la session"
+        ),
     ),
     # Étape 4 : le tableau hors dépôt (décision 9), et qui le lit.
     "tableau-hors-depot": (
@@ -2146,7 +2185,11 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # Étape 5 : relais ; Étape 6 : le résumé au mainteneur (obs 103).
     "relais-de-vague-par-carte": (
         PR_PARALLELES_SKILL,
-        "le lead ne peut pas démarrer la remplaçante : il la propose par une carte de proposition",
+        (
+            "le lead ne peut pas démarrer la remplaçante : il la propose par une carte de"
+            " proposition (`start_session`, `initiation: own_initiative`, `use_worktree: true`,"
+            " brief : la passation), qu'un clic du mainteneur démarre"
+        ),
     ),
     "resume-information-pas-question": (
         PR_PARALLELES_SKILL,
@@ -2159,21 +2202,36 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # Étape 7 : l'état et le récit d'une session silencieuse.
     "session-disparue-par-get-session": (
         PR_PARALLELES_SKILL,
-        "Son état se lit par `get_session` sur le `local_…` du tableau",
+        (
+            "Son état se lit par `get_session` sur le `local_…` du tableau — `isRunning`,"
+            " `isArchived`, `lastActivityAt`, mesurés le 2026-10-18 —, pas par `list_sessions"
+            ' {"linked": true}`, qui ne range pas forcément une remplaçante démarrée par une carte'
+            " de proposition parmi les sessions liées du lead"
+        ),
     ),
     "transcript-d-un-dossier-reutilise": (
         PR_PARALLELES_SKILL,
         "le bon transcript est celui dont la dernière écriture rejoint son `lastActivityAt`",
     ),
     # Étape 8 : archiver, puis worktree, branche de PR, échafaudage, orphelines (décision 16).
-    "archiver-avant-de-retirer": (PR_PARALLELES_SKILL, "**archiver la session d'abord**"),
+    "archiver-avant-de-retirer": (
+        PR_PARALLELES_SKILL,
+        (
+            "**archiver la session d'abord** : `archive_session` sur son `local_…`, sur l'accord"
+            " demandé à l'étape 2"
+        ),
+    ),
     "echafaudage-source-lue-par-get-session": (
         SESSIONS_LIEES_REF,
         "`get_session` le rend (`sourceBranch`",
     ),
     "orphelines-hors-sessions-vivantes": (
         PR_PARALLELES_SKILL,
-        "qu'aucune session non archivée ne nomme (`list_sessions`, champ `branch`)",
+        (
+            "Puis les **branches `claude/*` orphelines** : celles qu'aucun worktree n'extrait (`git"
+            " worktree list`) et qu'aucune session non archivée ne nomme (`list_sessions`, champ"
+            " `branch`)"
+        ),
     ),
     "bind-pr-en-repli": (
         SESSIONS_LIEES_REF,
@@ -2187,22 +2245,35 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "claude-md-sessions-liees": ("CLAUDE.md", "**Sessions liées.**"),
     "taille-pr-premier-geste": (
         ".claude/rules/taille-pr.md",
-        "la porte vaut pour une branche créée sur `main`",
+        (
+            "Une session démarrée par une autre, dans un worktree de l'application, crée la sienne"
+            " par le premier geste de `.claude/skills/cycle-pr/references/sessions-liees.md`,"
+            " depuis le distant : la porte vaut pour une branche créée sur `main`"
+        ),
     ),
     # Lot 4 : l'étape 0 de `pr-paralleles` — entrée, crible, proposition, sessions, fin.
     "etape-0-entree": (
         PR_PARALLELES_SKILL,
-        "aucune, moins que le `n` donné, ou une seule sans argument",
+        (
+            "Si ce qui reste ne suffit pas à une vague — aucune, moins que le `n` donné, ou une"
+            " seule sans argument"
+        ),
     ),
     # `/code-review` de la PR #133 : argument mêlé, troncature de `gh`, issues en vol au crible,
     # dossier partagé, session muette.
     "etape-0-argument-mele": (
         PR_PARALLELES_SKILL,
-        "ou si une issue nommée en argument n'est pas prête",
+        (
+            "ou si une issue nommée en argument n'est pas prête, l'étape 0 la prépare ; sinon,"
+            " passer à l'étape 1"
+        ),
     ),
     "etape-0-crible-sans-troncature": (
         PR_PARALLELES_SKILL,
-        "`gh issue list --state open --limit 200 --json number,title,labels,author,body`",
+        (
+            "`gh issue list --state open --limit 200 --json number,title,labels,author,body` — sans"
+            " `--limit`, `gh` s'arrête à 30"
+        ),
     ),
     "etape-0-crible-sans-issue-en-vol": (
         PR_PARALLELES_SKILL,
@@ -2210,7 +2281,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "etape-0-dossier-du-lead-fige": (
         PR_PARALLELES_SKILL,
-        "tant que ses sessions lisent, n'y écrit rien et n'y change pas de branche",
+        (
+            "La session n'écrit que dans GitHub et lit le code dans le dossier du lead — qui, tant"
+            " que ses sessions lisent, n'y écrit rien et n'y change pas de branche"
+        ),
     ),
     "etape-0-session-muette": (
         PR_PARALLELES_SKILL,
@@ -2221,13 +2295,18 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "etape-0-premier-geste-du-lead": (
         PR_PARALLELES_SKILL,
         (
-            "`git fetch origin && git merge-base --is-ancestor HEAD origin/main && git merge"
-            " --ff-only origin/main`"
+            "**Premier geste du lead**, l'étape ouverte, avant le crible — une porte, dans son"
+            " dossier : les sessions de cette étape n'ont pas de worktree et y lisent le code, qui"
+            " doit être le trunk (#107, décision 15) : `git fetch origin && git merge-base"
+            " --is-ancestor HEAD origin/main && git merge --ff-only origin/main`"
         ),
     ),
     "etape-0-tete-en-avance-refusee": (
         PR_PARALLELES_SKILL,
-        "Le prédicat refuse une tête en avance ou divergente",
+        (
+            "Le prédicat refuse une tête en avance ou divergente — `--ff-only` seul laisse passer"
+            " la première"
+        ),
     ),
     "etape-0-message-apres-la-transition": (
         PR_PARALLELES_SKILL,
@@ -2246,7 +2325,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "etape-0-bug-provisionne": (
         PR_PARALLELES_SKILL,
-        "puis les gestes 1 à 5 de `pr-paralleles` étape 3, « Provisionner son worktree »",
+        (
+            "puis les gestes 1 à 5 de `pr-paralleles` étape 3, « Provisionner son worktree » ; la"
+            " reproduction de `triage` (étape 3) se joue ici"
+        ),
     ),
     # #198 : la session d'une issue `bug` n'est plus la seule de l'étape qui s'archive.
     "etape-0-bug-archive-comme-le-tri": (
@@ -2264,7 +2346,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         PR_PARALLELES_SKILL,
         "ne se fait pas ici : « bloquant : <…> » à ton parent",
     ),
-    "etape-0-etats-sans-session": (PR_PARALLELES_SKILL, "hors `needs-info` et `ready-for-human`"),
+    "etape-0-etats-sans-session": (
+        PR_PARALLELES_SKILL,
+        "hors `needs-info` et `ready-for-human`, qu'aucune session ne fait avancer",
+    ),
     "etape-0-issues-pretes-sans-session": (
         PR_PARALLELES_SKILL,
         "Les issues déjà prêtes y entrent sans session",
@@ -2275,7 +2360,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "etape-0-brief-d-agent-verifie": (
         PR_PARALLELES_SKILL,
-        "`gh issue view <N> --comments` un `## Brief d'agent`",
+        (
+            "`gh issue view <N> --comments` un `## Brief d'agent` ; une issue qui n'y est pas sort"
+            " de la vague, dite au mainteneur, comme celle dont la session envoie un « bloquant »"
+        ),
     ),
     "etape-0-bloqueurs-lus-dans-github": (
         PR_PARALLELES_SKILL,
@@ -2283,7 +2371,11 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "etape-0-recouvrement-par-le-crible-de-l-etape-2": (
         PR_PARALLELES_SKILL,
-        "le crible de l'étape 2, lu par domaines",
+        (
+            "le crible de l'étape 2, lu par domaines (section « Périmètre » de"
+            " `.claude/pipeline.config.md`) — une issue non triée n'a pas de brief qui nomme ses"
+            " zones"
+        ),
     ),
     "etape-0-proposition-motivee": (
         PR_PARALLELES_SKILL,
@@ -2328,7 +2420,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         PR_PARALLELES_SKILL,
         "la règle vaut tant que le lead de préparation vit",
     ),
-    "etape-0-message-puis-github": (PR_PARALLELES_SKILL, "il ne prouve rien seul"),
+    "etape-0-message-puis-github": (
+        PR_PARALLELES_SKILL,
+        "**Fin — un message, puis GitHub.** Le message réveille le lead ; il ne prouve rien seul",
+    ),
     # Vérification d'avant-go de la PR #133, go 1 : l'attente de **chaque** message de fin.
     "etape-0-chaque-message-attendu": (
         PR_PARALLELES_SKILL,
@@ -2447,8 +2542,9 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "rang-de-la-vague": (
         PR_PARALLELES_SKILL,
         (
-            "`<k>` est le rang de la vague : celui de l'en-tête que la vague précédente a laissé dans"
-            " `PR-PARALLELES.md` (étape 8), plus 1 — 1 sans fichier"
+            "`<k>` est le rang de la vague : celui de l'en-tête que la vague précédente a laissé"
+            " dans `PR-PARALLELES.md` (étape 8), plus 1 — 1 sans fichier. Le lead le lit avant de"
+            " se nommer `vague-<k>` (étape 0 ou 3), puis l'écrit en tête du fichier"
         ),
     ),
     "titre-repere-local-adresse": (
@@ -2486,7 +2582,11 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "outil-absent-saute-sans-bruit": (
         PR_PARALLELES_SKILL,
-        "`ToolSearch` sur son nom complet —, l'appel est sauté, sans aucun message ni erreur",
+        (
+            "Si l'outil n'est pas dans la liste d'outils de la session — ni chargé, ni trouvé par"
+            " `ToolSearch` sur son nom complet —, l'appel est sauté, sans aucun message ni erreur :"
+            " la pipeline ne dépend pas du mod"
+        ),
     ),
     "un-seul-auteur-par-carte": (
         PR_PARALLELES_SKILL,
@@ -2505,15 +2605,20 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "champ-avancement": (PR_PARALLELES_SKILL, "`avancement` : de 0 à 100, par le barème"),
     "champ-resume": (
         PR_PARALLELES_SKILL,
-        "réécrite à chaque appel, qui dit l'état courant et quand le mainteneur doit agir",
+        (
+            "réécrite à chaque appel, qui dit l'état courant et quand le mainteneur doit agir —"
+            " « relecture indépendante en cours, 2 constats à corriger », « attend ton go »,"
+            " « bloquée : CI rouge sur main »"
+        ),
     ),
     "champ-sessions": (
         PR_PARALLELES_SKILL,
         (
-            "`sessions` : les sessions de la colonne Session de ses lignes — relais et lots compris,"
-            " des sœurs que la chaîne de `startedBy` ne relie pas (étape 5) — et leurs descendantes,"
-            ' lues dans `list_sessions {"linked": true}` par cette chaîne, chacune en'
-            " `{ titre, local_id, role }`"
+            "`sessions` : les sessions de la colonne Session de ses lignes — relais et lots"
+            " compris, des sœurs que la chaîne de `startedBy` ne relie pas (étape 5) — et leurs"
+            ' descendantes, lues dans `list_sessions {"linked": true}` par cette chaîne, chacune en'
+            " `{ titre, local_id, role }` — son titre (`sessions-liees.md`, « Identité »), son"
+            " `local_…`, son rôle : `session PR`, `relecture`, `lot <k>`, `<k><x>`, `relais <r>`"
         ),
     ),
     "champ-etat": (
@@ -2639,7 +2744,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "attend-ta-reponse-au-resume-de-la-carte": (
         PR_PARALLELES_SKILL,
-        "« attend ta réponse : <question> »",
+        (
+            "sur le message « attend le mainteneur : <question> » d'une session"
+            " (`sessions-liees.md`, « Messages »), « attend ta réponse : <question> »"
+        ),
     ),
     "commande-de-fond-bornee-developpeur": (".claude/agents/developpeur.md", COMMANDE_DE_FOND),
     "commande-de-fond-bornee-executant": (".claude/agents/executant.md", COMMANDE_DE_FOND),
@@ -2650,6 +2758,281 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         (
             "**Un délégué qui attend son travail de fond au-delà de la durée prévue se diagnostique"
             " avant toute nouvelle attente**"
+        ),
+    ),
+    # #198, lot 2 (D-5) : l'ancre neuve de chaque morceau prescriptif d'un passage déclaré
+    # (`PASSAGES_DES_SESSIONS_LIEES`) que n'atteignait pas une ancre voisine allongée, moitié
+    # restrictive comprise (obs 126).
+    "claude-md-une-session-en-demarre-d-autres": (
+        "CLAUDE.md",
+        (
+            "Une session peut aussi en démarrer d'autres, complètes, dans l'application de bureau"
+            " (`start_session`) : le lead d'une vague `pr-paralleles`, une par issue — à son étape"
+            " 0 pour la trier et l'interroger, puis pour la développer"
+        ),
+    ),
+    "claude-md-protocole-seule-source": (
+        "CLAUDE.md",
+        (
+            "Leur protocole — héritage, identité, premier geste, messages, fin de travail,"
+            " passation, nettoyage — vit dans"
+            " `.claude/skills/cycle-pr/references/sessions-liees.md`, seule source"
+        ),
+    ),
+    "contributing-etape-0-une-session-de-tri-par-issue": (
+        "CONTRIBUTING.md",
+        (
+            "son étape 0 ouvre d'abord une session de triage et d'interrogatoire par issue, puis se"
+            " termine sur la liste des issues prêtes et une carte « démarrer la vague »"
+        ),
+    ),
+    "contributing-voie-courte": (
+        "CONTRIBUTING.md",
+        "la **voie courte** de `cycle-pr`, sans issue ni draft, une passe de relecture, un go",
+    ),
+    "repercussions-ligne-non-nettoyee-en-vol": (
+        REPERCUSSIONS_SKILL,
+        "toute ligne qui n'est pas `⚪ worktree nettoyé` désigne une issue en vol",
+    ),
+    "interroge-moi-une-question-a-la-fois": (
+        INTERROGE_MOI_SKILL,
+        (
+            "**Une question à la fois.** Une question accolée en fin de message — même binaire,"
+            " même « au passage » — n'est pas lue"
+        ),
+    ),
+    "interroge-moi-decision-en-suspens-seule-dans-son-tour": (
+        INTERROGE_MOI_SKILL,
+        (
+            "Si une décision reste en suspens, elle a droit à son propre tour, et à rien d'autre"
+            " dans ce tour"
+        ),
+    ),
+    "interroge-moi-c-ouvre-seul-puis-les-v": (
+        INTERROGE_MOI_SKILL,
+        (
+            "Un arrêt `[C]` ouvre seul, son pour et son contre déjà pesés ; les `[V]` suivent une"
+            " fois la `[C]` tranchée"
+        ),
+    ),
+    "relecteur-detache-sur-le-sha-recu-sinon-arret": (
+        ".claude/agents/relecteur.md",
+        (
+            "Une fois l'isolation confirmée : `git checkout --detach <SHA complet de tête reçu>`,"
+            " puis `git rev-parse HEAD` doit le rendre. Sinon, arrête-toi et dis-le"
+        ),
+    ),
+    "relecteur-rien-a-recuperer-du-distant": (
+        ".claude/agents/relecteur.md",
+        "rien à récupérer du distant, ton worktree partage le dépôt d'objets du clone principal",
+    ),
+    "etape-0-entree-retire-les-issues-en-vol": (
+        PR_PARALLELES_SKILL,
+        (
+            "Lister les issues prêtes comme à l'étape 1, argument compris, et en retirer celles qui"
+            " sont **en vol**"
+        ),
+    ),
+    "etape-0-refus-remonte-au-mainteneur": (
+        PR_PARALLELES_SKILL,
+        "Un refus se remonte au mainteneur.",
+    ),
+    "etape-0-degre-recommande-et-motive": (
+        PR_PARALLELES_SKILL,
+        (
+            "`n` donné → `n` issues ; sans argument, le skill recommande un degré et le motive :"
+            " domaines disjoints, chemin critique, temps du mainteneur, chaque interrogatoire se"
+            " menant dans sa fenêtre"
+        ),
+    ),
+    "etape-0-demarrage-au-seul-tour-de-l-accord": (
+        PR_PARALLELES_SKILL,
+        "**Démarrer les sessions**, dans le tour de l'accord et dans celui-là seulement",
+    ),
+    "etape-0-bug-brief-sans-ecriture-github": (
+        PR_PARALLELES_SKILL,
+        (
+            "Son brief remplace « Tu n'écris que dans GitHub : ni fichier, ni branche, ni commande"
+            " du projet hors lecture. » par : « Ni branche ni commit, dans ton propre worktree."
+            " Premier geste"
+        ),
+    ),
+    "lead-de-vague-ne-reveille-plus-la-preparation": (
+        PR_PARALLELES_SKILL,
+        "pour qu'elle ne soit plus réveillée à chacune de ses fins de tour",
+    ),
+    "etape-2-tableau-et-phrases-par-issue": (
+        PR_PARALLELES_SKILL,
+        (
+            "Présenter le lot proposé à l'utilisateur sous forme de tableau (issue, titre, zones"
+            " touchées, risque de recouvrement), suivi pour chaque issue de **deux ou trois phrases"
+            " en langage courant** qui disent ce qu'elle apporte à l'utilisateur final et ce"
+            " qu'elle change dans le code — pas le titre reformulé, pas le brief recopié"
+        ),
+    ),
+    "etape-2-confirmation-avant-toute-creation": (
+        PR_PARALLELES_SKILL,
+        "Puis **demander confirmation** avant de créer quoi que ce soit",
+    ),
+    "etape-2-degre-de-parallelisme-raisonnable": (
+        PR_PARALLELES_SKILL,
+        (
+            "Recommander un degré de parallélisme raisonnable (souvent 2–4, ou le nombre donné en"
+            " argument) plutôt que tout d'un coup"
+        ),
+    ),
+    "etape-2-la-reponse-ouvre-le-seul-tour": (
+        PR_PARALLELES_SKILL,
+        (
+            "C'est la réponse à cette question qui ouvre le seul tour où le lead peut démarrer les"
+            " sessions"
+        ),
+    ),
+    "provisionnement-cinq-gestes-dans-l-ordre": (
+        PR_PARALLELES_SKILL,
+        "Le brief (étape 5) fait jouer cinq gestes, dans l'ordre",
+    ),
+    "colonne-session-relayee-ajoute-la-sienne": (
+        PR_PARALLELES_SKILL,
+        (
+            "Une session **relayée** ajoute le sien à côté de ceux qui l'ont précédée au lieu de"
+            " les remplacer"
+        ),
+    ),
+    "relais-suit-la-voie-de-la-coordinatrice": (
+        PR_PARALLELES_SKILL,
+        (
+            "La session dont le contexte se remplit suit la voie de"
+            " `.claude/skills/cycle-pr/references/coordinatrice.md`, « Relais en cours de lot », le"
+            " lead tenant la place de la coordinatrice"
+        ),
+    ),
+    "relais-demande-par-message-au-lead": (
+        PR_PARALLELES_SKILL,
+        (
+            "elle pousse sa branche, détache sa tête, écrit la variante « relais » de"
+            " `.claude/skills/cycle-pr/references/prompt-lot-suivant.md` (`cycle-pr` Étape 8,"
+            " « Relais en cours de cycle ») et envoie au lead « relais demandé — passation : <chemin> »"
+        ),
+    ),
+    "relais-ajoute-le-local-de-la-remplacante": (
+        PR_PARALLELES_SKILL,
+        (
+            "Il **ajoute** ensuite le `local_…` de la remplaçante — le `from` de son premier"
+            " message, qui porte l'identifiant de l'émettrice (mesuré le 2026-10-18 sur deux"
+            " sessions témoins) — à la colonne « Session », en gardant ceux des sessions"
+            " précédentes"
+        ),
+    ),
+    "relais-passation-porte-l-adresse-du-lead": (
+        PR_PARALLELES_SKILL,
+        "sa passation porte l'adresse du lead et renvoie à ce paragraphe",
+    ),
+    "une-session-neuve-par-lot": (
+        PR_PARALLELES_SKILL,
+        (
+            "**Une session neuve par lot, que le lead ne démarre qu'en repli** (étape 8, « Issue en"
+            " plusieurs lots »). Une issue réalisée en plusieurs lots ne garde **pas** la même"
+            " session d'un lot au suivant, ni d'un sous-lot au suivant"
+        ),
+    ),
+    "lot-leger-prompt-remis-au-mainteneur": (
+        PR_PARALLELES_SKILL,
+        (
+            "En lot léger, le défaut, ou en repli, la session qui finit un lot écrit, après sa"
+            " passe `repercussions`, le prompt du lot suivant depuis"
+            " `.claude/skills/cycle-pr/references/prompt-lot-suivant.md` et le **remet au"
+            " mainteneur**"
+        ),
+    ),
+    "session-neuve-envoie-son-local-et-sa-branche": (
+        PR_PARALLELES_SKILL,
+        (
+            "la session neuve crée sa branche, puis envoie au lead son `local_…` (`get_session` sur"
+            " `self`, mesuré le 2026-10-18) et sa branche"
+        ),
+    ),
+    "lead-repond-par-ce-que-lui-seul-sait": (
+        PR_PARALLELES_SKILL,
+        (
+            "Le lead l'inscrit au tableau (étape 4), et répond par ce que lui seul sait : base du"
+            " moment, PR en vol, fichiers croisés"
+        ),
+    ),
+    "lead-ne-reecrit-plus-le-prompt": (
+        PR_PARALLELES_SKILL,
+        "Le lead ne réécrit plus le prompt à chaque frontière",
+    ),
+    "resume-dans-la-fenetre-du-lead": (
+        PR_PARALLELES_SKILL,
+        (
+            "**Résumer à l'utilisateur** dans la fenêtre du lead : les deux phrases de"
+            " vulgarisation de l'étape 2 de ce skill sur ce que fait la PR, le verdict, et la"
+            " session où le go se donne"
+        ),
+    ),
+    "session-disparue-le-silence-ne-dit-rien": (
+        PR_PARALLELES_SKILL,
+        "**Session disparue.** Le silence d'une session dont la PR est ouverte ne dit rien",
+    ),
+    "session-inactive-reprend-sur-un-message": (
+        PR_PARALLELES_SKILL,
+        (
+            "Une session inactive reprend sur le message qu'on lui envoie (`sessions-liees.md`,"
+            " « Messages »)"
+        ),
+    ),
+    "session-introuvable-traitee-comme-perdue": (
+        PR_PARALLELES_SKILL,
+        (
+            "Introuvable, ou muette après un message, elle se traite comme perdue — règle de"
+            " prudence, aucun cas mesuré"
+        ),
+    ),
+    "transcript-dans-le-dossier-du-worktree": (
+        PR_PARALLELES_SKILL,
+        (
+            "Le transcript vit sous `~/.claude/projects/<worktreePath encodé>/<uuid>.jsonl`, ses"
+            " sous-agents dans `<uuid>/subagents/` — le dossier **du worktree** de l'application,"
+            " pas celui du clone principal"
+        ),
+    ),
+    "recit-rend-le-dernier-texte-des-sous-agents": (
+        PR_PARALLELES_SKILL,
+        (
+            "Le script rend les derniers tours, les messages du mainteneur — débarrassés des blocs"
+            " que le harnais injecte — et le dernier texte de chaque sous-agent, « mort avant de"
+            " rendre » compris"
+        ),
+    ),
+    "l-archivage-ne-retire-ni-worktree-ni-branches": (
+        PR_PARALLELES_SKILL,
+        (
+            "L'archivage ne retire ni le worktree ni les branches (`sessions-liees.md`, « Nettoyage »"
+            ") : le lead le fait ensuite"
+        ),
+    ),
+    "echafaudage-derriere-sa-porte-d-ancetre": (
+        PR_PARALLELES_SKILL,
+        (
+            "Puis l'**échafaudage** `claude/…` relevé avant l'archivage, derrière sa porte"
+            " d'ancêtre, sa `sourceBranch` pour `<source>` (`sessions-liees.md`, « Nettoyage »)"
+        ),
+    ),
+    "orphelines-les-deux-lectures-comptent": (PR_PARALLELES_SKILL, "Les deux lectures comptent"),
+    "orphelines-seule-la-seconde-protege": (
+        PR_PARALLELES_SKILL,
+        (
+            "`git worktree list` ne l'extrait plus, `get_session` le rend encore pour elle), et"
+            " seule la seconde le protège — à condition de les lire toutes"
+        ),
+    ),
+    "orphelines-meme-porte-refus-remonte": (
+        PR_PARALLELES_SKILL,
+        (
+            "Chacune passe par la même porte, `<source>` valant `origin/main` quand on ne la"
+            " connaît plus ; un refus se remonte au mainteneur avec `git log --oneline"
+            " origin/main..<branche>`"
         ),
     ),
 }
@@ -11043,6 +11426,427 @@ def test_le_nombre_de_cas_du_rouge_est_celui_de_ses_puces() -> None:
 
 # --- Une table d'invariants recompte sa population par ses passages déclarés (#198, D-5) ---------
 
+
+def ancres_de(table: dict[str, tuple[str, str]], *cles: str) -> tuple[str, ...]:
+    """Les phrases de ces entrées d'une table d'invariants : les ancres qu'un passage emprunte."""
+    return tuple(table[cle][1] for cle in cles)
+
+
+# Les passages déclarés des sessions liées (#198, D-5), après les tables qui leur prêtent une ancre.
+PASSAGES_DES_SESSIONS_LIEES = (
+    Passage(
+        PR_PARALLELES_SKILL,
+        "**Entrée.** Lister les issues prêtes",
+        "**Crible**, en lecture",
+        {
+            "relevé daté": [
+                "» et sortie 0 (mesuré le 2026-10-19 sur `fd6678f`, tête de la PR #133).",
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "1. `gh issue list --state open --limit 200",
+        "4. Le chemin critique",
+        {
+            "intitulé": [
+                "1.",
+                "2.",
+                "Les bloqueurs :",
+                "3.",
+                "Le recouvrement :",
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "**Proposition.** Un tableau",
+        "## 1. Rassembler les issues",
+        {
+            "intitulé": [
+                "Le brief :",
+            ],
+            "motif": [
+                (
+                    "la reproduction de `triage` (étape 3) lance des commandes du projet, que le"
+                    " dossier du lead ne porte pas."
+                ),
+            ],
+            "relevé daté": [
+                (
+                    "omis, `use_worktree` lui donne un worktree à elle dès que le lead travaille"
+                    " dans un worktree (description de l'outil, lue le 2026-10-19)."
+                ),
+                (
+                    "» Le geste détache la tête sur le trunk sans créer de branche (mesuré le"
+                    " 2026-10-19 sur un worktree jetable, git 2.47.1 :"
+                ),
+                "sortie 0, `HEAD` égal à `origin/main`, `git symbolic-ref -q HEAD` en 1).",
+                (
+                    "« Archiving a session also archives its side sessions that share its worktree"
+                    " or have finished » ;"
+                ),
+                "relevé le même jour vers 15:15 UTC par `get_session` :",
+                (
+                    "les trois sessions de tri de la préparation de la vague 3, `local_9cc0a634`,"
+                    " `local_08600026` et `local_04a2a910`, rendaient `isArchived: true`, archivées"
+                    " avec leur lead) :"
+                ),
+                "non mesuré).",
+            ],
+        },
+        empruntees=ancres_de(
+            INVARIANTS_DE_LA_SESSION_DE_RELECTURE,
+            "pr-paralleles-preparation-se-termine",
+            "pr-paralleles-lead-neuf-avec-la-seule-liste",
+            "pr-paralleles-lead-detache-de-la-preparation",
+        ),
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "Présenter le lot proposé à l'utilisateur",
+        "## 3. Démarrer une session",
+        {
+            "motif": [
+                (
+                    "la première session fixe le plafond de l'arbre (`sessions-liees.md`,"
+                    " « Héritage »)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "Dans le tour où le mainteneur valide le lot",
+        "`start_session` rend le",
+        {
+            "relevé daté": [
+                (
+                    "omis, l'outil donne à l'enfant le dossier du lead quand celui-ci travaille"
+                    " dans un dossier simple (description de l'outil, lue le 2026-10-18), et les"
+                    " premiers gestes des sessions basculeraient tour à tour la même branche."
+                ),
+            ],
+        },
+        empruntees=ancres_de(
+            INVARIANTS_DE_LA_SESSION_DE_RELECTURE,
+            "pr-paralleles-le-lead-ne-demarre-aucune-relecture",
+        ),
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "Le lead ne crée ni worktree ni branche.",
+        "- `<type>` =",
+        {},
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "**Provisionner son worktree",
+        "1. **Copier depuis",
+        {
+            "motif": [
+                "Un worktree est un checkout neuf, pas une copie de l'environnement de travail :",
+                "tout ce que git ignore en est absent.",
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "Maintenir un fichier `PR-PARALLELES.md`",
+        "Trois colonnes portent",
+        {
+            "motif": [
+                "Écrit dans un worktree, il partirait avec lui ;",
+                (
+                    "le hook d'écriture du harnais refuse le clone principal à une session placée"
+                    " ailleurs (obs 93)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "- **Session** — le titre passé",
+        "- **Base du verdict**",
+        {
+            "motif": [
+                (
+                    "l'unité qui survit au relais est le cycle, et c'est elle qui porte la liste de"
+                    " ses sessions (obs 40)."
+                ),
+            ],
+            "relevé daté": [
+                "`list_events` :",
+                "description de l'outil, lue le 2026-10-18).",
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "**Le tableau de bord des sessions.**",
+        "Les champs, tous",
+        {
+            "intitulé": [
+                (
+                    "**Le tableau de bord des sessions.** Un mod installé en local, hors du dépôt,"
+                    " affiche dans un panneau de l'application une carte par issue :"
+                ),
+                "avancement, résumé, sessions rattachées.",
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "- `sujet` : `#<N>` — une carte par issue",
+        "| Étape `cycle-pr`",
+        {
+            "intitulé": [
+                "- `resume` :",
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "L'étape se lit sur des signaux",
+        "## 5. Le brief de chaque session",
+        {},
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "**Session relayée.** Un cycle",
+        "**Le brief**, dans",
+        {
+            "intitulé": [
+                "**Session relayée.** Un cycle peut durer plus qu'un contexte.",
+            ],
+            "motif": [
+                "C'est la session sortante qui sait que son contexte se remplit, pas le lead :",
+            ],
+            "relevé daté": [
+                "la voie n'est pas mesurée (même référence).",
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "``` Tu es la session de l'issue #N",
+        "**Une consigne du",
+        {},
+        empruntees=ancres_de(
+            INVARIANTS_DE_LA_SESSION_DE_RELECTURE, "pr-paralleles-brief-relecture-a-la-session"
+        ),
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "Le `verificateur` d'avant-go, éphémère",
+        "1. **Lire le",
+        {
+            "intitulé": [
+                "Ce qu'il garde :",
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "2. **Résumer à l'utilisateur**",
+        "Après corrections, la",
+        {
+            "intitulé": [
+                "2.",
+            ],
+            "motif": [
+                (
+                    "la session pose déjà la question du go dans sa fenêtre, et toute demande du"
+                    " lead la double (obs 103)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "- Quand une PR passe en review",
+        "- Après chaque",
+        {},
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "**Session disparue.** Le silence",
+        "1. **Mesurer les",
+        {
+            "intitulé": [
+                "Dans cet ordre :",
+            ],
+            "motif": [
+                "une session arrêtée et une session qui attend un go rendent le même (obs 54).",
+            ],
+            "relevé daté": [
+                (
+                    "qu'elle reprenne aussi après un redémarrage de l'application n'est **pas"
+                    " mesuré**."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "Le transcript vit sous",
+        "3. **Écrire la",
+        {
+            "motif": [
+                "Ce dossier sert à plusieurs sessions successives :",
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "Une fois une PR mergée, sa branche supprimée",
+        "Puis **détacher ce",
+        {
+            "relevé daté": [
+                "Mesuré le 2026-10-18 sur deux enfants jetables :",
+                "archivé, `git worktree remove` sort en 0 et le dossier disparaît ;",
+                (
+                    "inactif mais non archivé, il désenregistre le worktree, **efface tout son"
+                    " contenu**, puis échoue sur le dossier racine (« Permission denied », sortie"
+                    " 255) — l'état d'obs 42, que la procédure ne décrit nulle part."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "Puis l'**échafaudage** `claude/…` relevé",
+        "Vérifier ensuite que",
+        {
+            "relevé daté": [
+                (
+                    "après son premier geste, l'échafaudage d'une session vivante n'est plus"
+                    " extrait nulle part (mesuré le 2026-10-19 sur la session du lot 4 de #107 :"
+                ),
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "Marquer la ligne `⚪ worktree nettoyé`",
+        "**Issue en plusieurs",
+        {},
+    ),
+    Passage(
+        "CLAUDE.md",
+        "**Sessions liées.** Les équipiers",
+        "# Skills de la pipeline",
+        {},
+        empruntees=ancres_de(
+            INVARIANTS_DU_CONTEXTE_COURT,
+            "sessions-liees-une-par-sous-lot",
+            "sessions-liees-une-session-de-relecture-par-pr",
+        ),
+    ),
+    Passage(
+        CONTRIBUTING_GUIDE,
+        "3. **Implémenter** —",
+        "3bis. **Amender** —",
+        {
+            "intitulé": [
+                "3.",
+                "Plusieurs PR en parallèle :",
+                "Trop peu d'issues prêtes :",
+                "Correctif évident (`contraintes.md`, barreau 3) :",
+            ],
+        },
+        empruntees=(
+            *ancres_de(INVARIANTS_DE_LA_SESSION_DE_RELECTURE, "contributing-deux-sessions"),
+            *ancres_de(
+                INVARIANTS_DU_CONTEXTE_COURT,
+                "contributing-implementer",
+                "contributing-developpeur-relecteur-cleanup",
+                "contributing-verificateur",
+                "contributing-lead-tient-le-tableau",
+            ),
+        ),
+    ),
+    Passage(
+        ".claude/rules/taille-pr.md",
+        "- Une session démarrée par une autre, dans un worktree",
+        None,
+        {},
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "Le `releveur` rend aussi le tableau de bord",
+        "Classer chaque issue",
+        {
+            "motif": [
+                "Il sert de filet si une session a sauté l'Étape 2.",
+            ],
+        },
+    ),
+    Passage(
+        INTERROGE_MOI_SKILL,
+        "- **Une question à la fois.**",
+        "- **Chaque question",
+        {
+            "motif": [
+                (
+                    "le lecteur répond à la dernière chose qui a demandé de l'effort, et une"
+                    " question secondaire n'est pas une question plus petite, c'est une question"
+                    " invisible."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        INTERROGE_MOI_SKILL,
+        "**Session démarrée par une autre** (son prompt système",
+        None,
+        {},
+    ),
+    Passage(
+        RELECTEUR_ROLE,
+        "**Second geste — sur quoi ?**",
+        "Toutes tes commandes s'exécutent",
+        {
+            "motif": [
+                "sans ce geste tu relis le trunk et tu conclus sur un diff vide.",
+            ],
+        },
+        empruntees=ancres_de(
+            INVARIANTS_DE_LA_SESSION_DE_RELECTURE,
+            "relecteur-ne-nait-pas-sur-le-sha",
+            "relecteur-rejoue-a-chaque-reveil",
+        ),
+    ),
+    Passage(
+        VERIFICATEUR_ROLE,
+        "Une PR de lot coordonné vise la branche d'intégration",
+        "Ce que tu vérifies,",
+        {},
+    ),
+    *(
+        Passage(
+            role,
+            COMMANDE_DE_FOND,
+            fin,
+            {
+                "relevé daté": [
+                    (
+                        "Les ~2 min sont le délai par défaut de l'outil Bash (120 000 ms,"
+                        " description de l'outil lue le 2026-10-29 ;"
+                    ),
+                    "obs 132).",
+                ],
+            },
+        )
+        for role, fin in (
+            (DEVELOPPEUR_ROLE, "Tu ne charges pas `cycle-pr`"),
+            (EXECUTANT_ROLE, "# Ton commit"),
+            (RELECTEUR_ROLE, "**Laisse ton worktree"),
+            (RELEVEUR_ROLE, "# Ce que tu n'appliques pas"),
+        )
+    ),
+)
+
 # Une entrée par table, ses passages déclarés à côté d'elle (`Passage`) : la population d'une table
 # sort de ses passages à chaque exécution, jamais d'un compte écrit en commentaire (obs 127).
 PASSAGES_DECLARES: dict[str, tuple[Passage, ...]] = {
@@ -11050,6 +11854,7 @@ PASSAGES_DECLARES: dict[str, tuple[Passage, ...]] = {
     "INVARIANTS_DE_LA_REGLE_DU_SUJET": PASSAGES_DE_LA_REGLE_DU_SUJET,
     "INVARIANTS_DE_LA_PORTE_DE_MERGE": PASSAGES_DE_LA_PORTE_DE_MERGE,
     "INVARIANTS_DES_CONFORTS_DE_PIPELINE": PASSAGES_DES_CONFORTS_DE_PIPELINE,
+    "INVARIANTS_DES_SESSIONS_LIEES": PASSAGES_DES_SESSIONS_LIEES,
 }
 
 
@@ -11118,8 +11923,8 @@ def test_chaque_ancre_d_une_table_du_registre_est_seule_dans_son_fichier(table: 
     assert not doublees, doublees
 
 
-# Les tables que le lot 2 de #198 couvre (D-7), hors du registre jusque-là.
-TABLES_COUVERTES_AU_LOT_2 = ("INVARIANTS_DES_SESSIONS_LIEES", "INVARIANTS_DU_CONTEXTE_COURT")
+# La table que le lot 2 de #198 couvre (D-7) et qui n'est pas encore au registre.
+TABLES_COUVERTES_AU_LOT_2 = ("INVARIANTS_DU_CONTEXTE_COURT",)
 
 
 def test_chaque_table_d_invariants_est_au_registre_ou_au_lot_2() -> None:
