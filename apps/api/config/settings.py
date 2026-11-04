@@ -91,7 +91,7 @@ CELERY_BROKER_URL = str(env.REDIS_URL)
 # Le cache du contenu (ADR 0006, rôle 1 ; `content/cache.py`), dans le même Redis que le broker.
 # Chaque clé expire après `TIMEOUT` secondes. C'est un filet, pas le mécanisme : chaque écriture
 # du contenu vide le cache ; les 300 s bornent la fraîcheur d'une écriture qui échapperait aux
-# signaux — `QuerySet.update`, shell, migration de données (brief de #11, décision 5 ; ADR 0006,
+# signaux — `QuerySet.update`, SQL brut, migration de données (brief de #11, décision 5 ; ADR 0006,
 # « TTL courts »). Aucune clé du cache sans durée de vie : sous `volatile-lru`, les clés à durée de
 # vie sont les seules que Redis évince, et la file du broker n'en a pas (ADR 0015). Redis
 # injoignable ou muet : une connexion abandonne après 0,2 s, une réponse attendue aussi — sans ces
