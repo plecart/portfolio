@@ -595,8 +595,8 @@ CHANGED_JOBS = REPOSITORY_ROOT / "infra" / "ci" / "changed_jobs.py"
 # décision 2 — onze, dont le `Makefile` et le verrou Python, déjà là —, une par chemin de `ALL` et
 # le chemin cité ; les autres sont hors entrées. Pour `pipeline` (ADR 0025), un par motif de
 # `PIPELINE` — `.claude/` hors Markdown, `CLAUDE.md`, `CONTRIBUTING.md`, `.github/` hors `ci.yml`,
-# le manifeste racine et le verrou — et par chemin de `ALL`, le chemin cité, et le témoin du back,
-# `apps/api/content/models.py`, qui ne la fait pas tourner.
+# le manifeste racine, le verrou et la version de Python — et par chemin de `ALL`, le chemin cité,
+# et le témoin du back, `apps/api/content/models.py`, qui ne la fait pas tourner.
 JOBS_WITNESSES: dict[str, tuple[list[str], bool, bool, bool, bool]] = {
     "delta vide": ([], False, False, False, False),
     "harnais seul": (
@@ -626,6 +626,7 @@ JOBS_WITNESSES: dict[str, tuple[list[str], bool, bool, bool, bool]] = {
     "manifeste racine": (["pyproject.toml"], False, True, True, True),
     "manifeste du back": (["apps/api/pyproject.toml"], False, True, True, False),
     "verrou Python": (["uv.lock"], False, True, True, True),
+    "version de Python": ([".python-version"], False, True, False, True),
     "manifeste du front": (["apps/web/package.json"], True, True, True, False),
     "verrou du front": (["apps/web/package-lock.json"], True, True, True, False),
     "Dockerfile d'une image": (["infra/caddy/Dockerfile"], False, True, True, False),
