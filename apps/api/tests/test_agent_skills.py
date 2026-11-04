@@ -3865,11 +3865,24 @@ def porte_la_forme(fichier: str, forme: str) -> bool:
 # écrit avant le correctif, sur `b82a8fe` : **24** moitiés restrictives dans les énoncés de ce delta,
 # **7** épinglées, **17** non — 15 gardées par une ancre allongée ou neuve ci-dessous, 2 (« contexte
 # complet », « cleanup pass, review avant merge ») par le test d'absence qui suit la table.
+# Depuis #198 (lot 2, D-5), sa population se recompte au registre : `PASSAGES_DU_CONTEXTE_COURT`.
 INVARIANTS_DU_CONTEXTE_COURT = {
-    "une-tache-par-session": ("CLAUDE.md", "**Une tâche par session.**"),
+    "une-tache-par-session": (
+        "CLAUDE.md",
+        (
+            "**Une tâche par session.** La session de dialogue — la session PR dans un cycle ;"
+            " hors cycle, celle de `triage`, d'`interroge-moi` ou de `vers-issues` ; le lead"
+            " d'une vague, la coordinatrice d'une issue en lots coordonnés"
+            " (`.claude/rules/taille-pr.md`, point 4) — garde ce qui demande le plus de jugement"
+        ),
+    ),
     "le-reste-part-dans-un-contexte-neuf": (
         "CLAUDE.md",
-        "Le reste part dans un contexte neuf qui meurt avec sa tâche",
+        (
+            "Le reste part dans un contexte neuf qui meurt avec sa tâche : un équipier défini"
+            " dans `.claude/agents/`, une session liée, ou un script quand le geste revient à"
+            " l'identique d'un cycle à l'autre"
+        ),
     ),
     "effort-d-une-session-pr-fixe-au-demarrage": (
         "CLAUDE.md",
@@ -3889,7 +3902,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "liste-tools-troisieme-axe": ("CLAUDE.md", "La **liste `tools:`** fixe le plancher"),
     "le-brief-porte-le-niveau-ponytail": (
         "CLAUDE.md",
-        "son brief porte le bloc, le niveau `ponytail` (« Minimalisme »)",
+        (
+            "**Le brief porte ce que l'équipier ne charge pas.** Un sous-agent ne voit jamais la"
+            " conversation de sa session (même étude, §15.2) : son brief porte le bloc, le niveau"
+            " `ponytail` (« Minimalisme »)"
+        ),
     ),
     "task-observer-reste-aux-sessions": ("CLAUDE.md", "`task-observer` reste aux sessions"),
     "reprise-par-message": ("CLAUDE.md", "**Un sous-agent arrêté se reprend par message**"),
@@ -3907,14 +3924,41 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         "CLAUDE.md",
         "la reprise d'une conversation garde la liste de son démarrage",
     ),
-    "repli-general-purpose-borne": ("CLAUDE.md", "pour un rôle **sans** liste `tools:` seulement"),
+    "repli-general-purpose-borne": (
+        "CLAUDE.md",
+        (
+            "pour un rôle **sans** liste `tools:` seulement — il rendrait à un rôle à outils"
+            " réduits tous les outils et un plancher de 74,5 K sur Haiku ; celui-là se lance"
+            " depuis une session neuve"
+        ),
+    ),
     "cycle-pr-repli-borne": (
         CYCLE_PR_SKILL,
-        "un rôle à outils réduits se lance depuis une session neuve (`CLAUDE.md`, « Orchestration »)",
+        (
+            "**4.2 Relecture par un contexte vierge.** Le cleanup holistique est fait sous le"
+            " brief de la session PR, avec les hypothèses qui ont produit le code ; il ne les met"
+            " pas à l'épreuve. Le diff est donc relu par un lecteur qui ne les a pas : la"
+            " **session de relecture** de la PR, que la session PR démarre au go du briefing,"
+            " réveille par message et nettoie — protocole dans"
+            " [references/session-relecture.md](references/session-relecture.md) —, et qui suit"
+            " `.claude/agents/relecteur.md` : ce qu'elle reçoit, ce qu'elle vérifie, ce qu'elle"
+            " rend. Le sous-agent `relecteur` en est le repli écrit (même référence, « Repli »)."
+            " Un rôle ajouté dans `.claude/agents/` pendant cette session n'existe pas encore"
+            " pour l'outil Agent : le repli `general-purpose` ne vaut que pour un rôle sans liste"
+            " `tools:`, et `relecteur` en a une — un rôle à outils réduits se lance depuis une"
+            " session neuve (`CLAUDE.md`, « Orchestration »)"
+        ),
     ),
     "cycle-pr-repli-hors-tour-humain": (
         CYCLE_PR_SKILL,
-        "que la session PR ne démarre pas hors d'un tour humain",
+        (
+            "que la session PR ne démarre pas hors d'un tour humain : d'ici là, la relecture"
+            " passe au relecteur humain, ci-dessous. L'invocation de `cycle-pr` — `/cycle-pr`"
+            " tapé par l'utilisateur, ou prompt de démarrage d'une vague `pr-paralleles` — **vaut"
+            " demande** pour ce sous-agent : une consigne de session « pas de sous-agent sans"
+            " demande de l'utilisateur » est déjà satisfaite. S'il ne peut pas même être lancé,"
+            " la relecture passe au relecteur humain (même référence, « Repli »)"
+        ),
     ),
     "sessions-liees-une-par-sous-lot": (
         "CLAUDE.md",
@@ -3924,10 +3968,25 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         "CLAUDE.md",
         "la session PR, une session de relecture par PR, au go de son briefing",
     ),
-    "observation-une-session-seulement": ("CLAUDE.md", "**Seule une session** l'invoque"),
+    "observation-une-session-seulement": (
+        "CLAUDE.md",
+        (
+            "Invoquer le skill `task-observer` **sur demande du mainteneur** — jamais d'office au"
+            " début d'un cycle de PR, d'un audit ou d'une passe de spec ; son coût résident se"
+            " paie à chaque tour. **Seule une session** l'invoque et tient le plafond ci-dessous"
+            " ; un sous-agent remonte ses observations candidates dans son rapport, et la session"
+            " qui l'a lancé décide de les consigner"
+        ),
+    ),
     "observation-un-sous-agent-ne-lit-pas-le-journal": (
         "CLAUDE.md",
-        "Un sous-agent ne lit pas le journal",
+        (
+            "Au chargement de **n'importe quel skill**, consulter le journal d'observations pour"
+            " les entrées OPEN rattachées à ce skill et en appliquer les enseignements au travail"
+            " en cours — même si le fichier du skill n'a pas encore été mis à jour. Un sous-agent"
+            " ne lit pas le journal : la session qui le lance met dans son brief les entrées OPEN"
+            " qui touchent son bloc"
+        ),
     ),
     # Les règles de fond sans porteur nommé : **15** sur 40 (étude du 2026-10-19, §19.6, lu le
     # 2026-10-20), chacune nommant le sien là où elle vit — 7 dans `contraintes.md`, 3 dans
@@ -3936,28 +3995,73 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # (`grep` sur le texte aux blancs normalisés), la règle comprise ; le rapport du `developpeur`.
     "porteur-voie-v": (
         CONTRAINTES_RULE,
-        "Un `developpeur` ne la pose pas : il note son hypothèse et rend la `[V]` dans son rapport",
+        (
+            "**Voie V — vision.** Ce que l'utilisateur voit, le contenu, le ton, le périmètre, un"
+            " compromis produit : tout choix qu'un autre expert technique ferait autrement **pour"
+            " une raison de goût ou de produit**. Elle attend le mainteneur, mais **groupée** —"
+            " au go du briefing, à l'arrêt visuel ou avant le go du merge —, jamais seule au fil"
+            " de l'eau. En attendant, l'agent avance sur ce qui n'en dépend pas, en notant sous"
+            " la question l'hypothèse réversible qu'il retient d'ici là ; il ne rend la main que"
+            " si tout ce qui reste dépend de la réponse. Un `developpeur` ne la pose pas : il"
+            " note son hypothèse et rend la `[V]` dans son rapport"
+        ),
     ),
     "porteur-voie-v-executant-et-releveur": (
         CONTRAINTES_RULE,
-        "`executant` et `releveur` ne classent aucune question, ils remontent tout choix",
+        (
+            "`executant` et `releveur` ne classent aucune question, ils remontent tout choix à"
+            " leur appelant (leur rôle, « Ce que tu n'appliques pas »)"
+        ),
     ),
     "porteur-voie-c": (
         CONTRAINTES_RULE,
-        "Un `developpeur` s'arrête et remonte les deux citations",
+        (
+            "**Voie C — contradiction.** La décision contredit une source de vérité : arrêt"
+            " immédiat, deux citations, `.claude/rules/decisions-vs-doc.md`. Rien ne change. Un"
+            " `developpeur` s'arrête et remonte les deux citations ; la session de dialogue"
+            " présente l'arrêt"
+        ),
     ),
     "porteur-explorer-plutot-que-demander": (
         CONTRAINTES_RULE,
         (
             "par un `releveur` pour un relevé, l'`executant` pour une cartographie (`cycle-pr`"
-            " Étape 1), la conclusion restant à la session"
+            " Étape 1), la conclusion restant à la session ; un `developpeur` explore lui-même"
+            " dans son bloc. Pour un grilling approfondi, utiliser `interroge-moi`. L'exploration"
+            " ne s'arrête pas au dépôt : pour un comportement d'outil **non documenté**, les logs"
+            " applicatifs, l'arborescence de données locale et les horodatages sont des sources"
+            " de premier ordre — la documentation décrit l'intention, les logs enregistrent le"
+            " comportement. Distinguer explicitement ce qui est **prouvé** (cité, horodaté) de ce"
+            " qui n'a pas pu être vérifié"
         ),
     ),
     "porteur-creation-d-issues": (
         CONTRAINTES_RULE,
-        "un sous-agent n'ouvre ni issue ni brouillon, le `developpeur` remonte le vide dans son rapport",
+        (
+            "**Un cycle n'ouvre jamais d'issue seul.** Chaque skill a sa porte de sortie"
+            " « nouvelle issue » (résidu de relecture, « ce que cette PR ne couvre pas », vide"
+            " relevé par `repercussions`, échappatoire de `decisions-vs-doc`) ; chacune est"
+            " raisonnable seule, leur somme ne l'est pas. La borne vit ici, au-dessus des skills."
+            " Elle est portée par la session PR, hors cycle par la session de dialogue qui relève"
+            " le vide ; un sous-agent n'ouvre ni issue ni brouillon, le `developpeur` remonte le"
+            " vide dans son rapport"
+        ),
     ),
-    "porteur-ecritures-distantes": (CONTRAINTES_RULE, "La relecture est à qui écrit"),
+    "porteur-ecritures-distantes": (
+        CONTRAINTES_RULE,
+        (
+            "**Toute écriture sur un artefact distant se relit après écriture** — corps ou"
+            " commentaire d'issue, body de PR, label, milestone : re-télécharger et vérifier que"
+            " ce qu'on voulait y est, une **ancre** du contenu pour un texte, l'élément lui-même"
+            " pour un label ou un milestone, **et** pour un texte que la **longueur** est"
+            " plausible. Le code de retour atteste que la requête a abouti, jamais que le contenu"
+            " écrit est celui qu'on voulait : une forme destructrice (un chemin pris pour un"
+            " contenu, un `-f` tapé pour `-F`) rend exactement le même succès qu'une édition — et"
+            " un brief entier remplacé par son chemin ne se voit qu'à la relecture. La relecture"
+            " est à qui écrit : la session, ou le `releveur` à qui elle confie une écriture"
+            " verbatim et qui rend ce qu'il a relu"
+        ),
+    ),
     "porteur-maintenance-continue": (
         CONTRAINTES_RULE,
         "l'auteur du commit — le `developpeur` pour la doc descriptive de son bloc",
@@ -3969,31 +4073,67 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "porteur-points-d-arret-humains": (
         CONTRAINTES_RULE,
         (
-            "C'est la session PR qui prend l'arrêt : elle coupe le bloc du `developpeur` au commit"
-            " qui assemble l'écran"
+            "**Cadence : une fois par PR, dès que l'écran est assemblé** — au commit qui le rend"
+            " visible, jamais plus tard, et toujours avant `gh pr ready` — regardé dans les deux"
+            " modes ; pas avant chaque commit. Un écran n'existe pas avant d'être assemblé : au"
+            " commit qui pose un composant, un jeton de thème ou une clé de texte, il n'y a rien"
+            " à regarder, et demander de valider à l'aveugle transforme le point d'arrêt en"
+            " formalité qu'on apprend à expédier. C'est le contraire de ce qu'il sert. Mais"
+            " attendre la fin de la PR coûte autant : les attentes du mainteneur arrivent alors"
+            " après la dernière relecture, et chacune rouvre un cycle. Si une passe de relecture"
+            " indépendante part au même commit (`cycle-pr` 4.2), la lancer d'abord, puis montrer"
+            " l'écran : les deux attentes se recouvrent, et la passe suivante absorbe ce que le"
+            " mainteneur demande. C'est la session PR qui prend l'arrêt : elle coupe le bloc du"
+            " `developpeur` au commit qui assemble l'écran"
         ),
     ),
     "porteur-cleanup-holistique": (
         ".claude/rules/cleanup-verbatim.md",
         (
-            "le cleanup holistique, un `developpeur` neuf sur le diff complet de la branche, qui ne"
-            " rend que des commits"
+            "Cela couvre aussi bien les étapes de la pipeline (cycle de commit, cleanup"
+            " holistique de PR, refactor TDD, relecture indépendante) qu'une **demande directe et"
+            " informelle** de l'utilisateur — « relis ça », « nettoie ce fichier », « améliore ce"
+            " code », « tu peux revoir ce que tu viens d'écrire ? ». Il n'y a pas de relecture"
+            " « informelle » qui échapperait à ce prompt : s'il s'agit de repasser sur du code,"
+            " c'est ce prompt qui s'applique. Seule exception : le commit d'une tranche"
+            " entièrement spécifiée par l'`executant` (`.claude/agents/executant.md`, « Ton"
+            " commit »), que le cleanup holistique de `cycle-pr` 4.1 relit. Qui l'exécute : au"
+            " commit, qui a codé le bloc — `developpeur`, ou la session sous le seuil de"
+            " `cycle-pr` 3.1 (`cycle-pr` 3.3) ; le cleanup holistique, un `developpeur` neuf sur"
+            " le diff complet de la branche, qui ne rend que des commits, ou la session sous son"
+            " seuil (`cycle-pr` 4.1) ; une demande directe, la session à qui elle est faite"
         ),
     ),
     "porteur-rapporter-a-voix-haute": (
         ".claude/rules/cleanup-verbatim.md",
         (
-            "Un `developpeur` le rend dans son rapport final — son contexte meurt avec lui —, et la"
-            " session PR le relaie aux Notes de la PR"
+            "**Rapporter à voix haute** sous un titre `## 🧹 Cleanup pass`, pour que le relecteur"
+            " vérifie d'un coup d'œil que l'étape n'a pas été sautée. Un `developpeur` le rend"
+            " dans son rapport final — son contexte meurt avec lui —, et la session PR le relaie"
+            " aux Notes de la PR"
         ),
     ),
     "porteur-denombrement-avant-correctif": (
         ".claude/rules/cleanup-verbatim.md",
-        "la session PR pour un constat de relecture",
+        (
+            "« La seule voie », « le seul cas », « le dernier endroit » sont interdits tant qu'un"
+            " **dénombrement** ne les accompagne pas — N formes recensées, k fuyaient — écrit"
+            " **avant le premier correctif** et épinglé dans l'artefact par un test paramétré,"
+            " pas par une phrase de docstring : la preuve que le chemin connu est fermé se lit"
+            " spontanément comme la preuve qu'il n'y en avait qu'un. Écrit après, le dénombrement"
+            " se fait par morceaux, un correctif par relecture. Il est à qui reçoit le constat :"
+            " la session PR pour un constat de relecture, qu'elle porte avec sa classe dans le"
+            " brief du `developpeur` de correction (`cycle-pr` 4.2, « Le cliquet ») ; le"
+            " `developpeur` pour ce que son propre cleanup trouve"
+        ),
     ),
     "porteur-gabarit-a-chaque-commit": (
         ".claude/rules/taille-pr.md",
-        "Le `developpeur` rend le chiffre de `git diff --stat <base>...HEAD` avec chaque commit",
+        (
+            "Le `developpeur` rend le chiffre de `git diff --stat <base>...HEAD` avec chaque"
+            " commit, la base de son brief (`cycle-pr` 3.5). Un dépassement tient en une ligne de"
+            " Notes. Seul le **périmètre** rouvre le découpage"
+        ),
     ),
     "porteur-deux-sorties": (
         ".claude/rules/decisions-vs-doc.md",
@@ -4010,16 +4150,53 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " sous-agents remontent les deux citations"
         ),
     ),
-    "porteur-niveau-ponytail": ("CLAUDE.md", "le niveau voyage dans le brief"),
-    "porteur-glossaire": ("CLAUDE.md", "Les noms de tests sont à qui les écrit"),
-    "porteur-context7": ("CLAUDE.md", "parmi les rôles, ceux dont la liste `tools:` le porte"),
+    "porteur-niveau-ponytail": (
+        "CLAUDE.md",
+        (
+            "Niveau par défaut : `full`. Se change par `/ponytail lite|full|ultra` et persiste"
+            " jusqu'à la fin de la session. Un sous-agent ne le charge pas par l'outil Skill : le"
+            " `developpeur` le lit (`Read`) au niveau que nomme son brief — le niveau voyage dans"
+            " le brief —, et la tranche d'un `executant` arrive déjà minimale de la session qui"
+            " l'a spécifiée. Ponctuellement : `/ponytail-review` (relecture anti-sur-ingénierie"
+            " d'un diff), `/ponytail-audit` (dépôt entier), `/ponytail-debt` (raccourcis marqués"
+            " `ponytail:` à reprendre)"
+        ),
+    ),
+    "porteur-glossaire": (
+        "CLAUDE.md",
+        (
+            "Utiliser le glossaire de domaine du projet (`UBIQUITOUS_LANGUAGE.md` s'il existe)"
+            " dans les noms de tests, les titres d'issues et de PR. Respecter les ADR de la zone"
+            " touchée. Les noms de tests sont à qui les écrit — le `developpeur`, ou la session"
+            " dans la tranche qu'elle spécifie à l'`executant` ; les titres d'issues et de PR, à"
+            " la session de dialogue"
+        ),
+    ),
+    "porteur-context7": (
+        "CLAUDE.md",
+        (
+            "Pour toute question sur une lib/framework de la stack (API, config, migration de"
+            " version), **utiliser en priorité le serveur MCP `context7`** plutôt que la mémoire"
+            " ou une recherche web : il renvoie la doc à jour de la lib demandée, ce qui"
+            " économise des tokens et évite les réponses périmées. Installé par `init-projet`"
+            " (`claude mcp list` pour vérifier). La session l'a ; parmi les rôles, ceux dont la"
+            " liste `tools:` le porte"
+        ),
+    ),
     "porteur-context7-un-role-sans-remonte": (
         "CLAUDE.md",
         "un rôle qui ne l'a pas remonte la question à son appelant",
     ),
     "renvoi-deux-sorties-claude-md": (
         "CLAUDE.md",
-        "amendé par la session de dialogue qui a décidé",
+        (
+            "Les **sources de vérité** (documents de référence, puis les issues ouvertes) y sont"
+            " classées par **rang de normativité**. C'est cette table que lisent la règle"
+            " `decisions-vs-doc` et le skill `contradiction` : une décision qui contredit un rang"
+            " s'arrête, et soit elle est abandonnée — ou son effet déplacé hors de ce que le"
+            " document affirme —, soit le document est amendé par la session de dialogue qui a"
+            " décidé"
+        ),
     ),
     "renvoi-deux-sorties-contributing": (
         "CONTRIBUTING.md",
@@ -4031,7 +4208,12 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "renvoi-gabarit-et-vides-au-rapport": (
         ".claude/agents/developpeur.md",
-        "le chiffre de `git diff --stat <base>...HEAD` après chaque commit",
+        (
+            "le chiffre de `git diff --stat <base>...HEAD` après chaque commit (`cycle-pr` 3.5),"
+            " les vides ou hors-périmètre relevés — sans issue ni brouillon"
+            " (`.claude/rules/contraintes.md`, « Création d'issues en cours de cycle ») —, ce qui"
+            " reste du bloc s'il en reste"
+        ),
     ),
     # **Une épingle par élément dénombré** : un commentaire qui compte N éléments sans une ancre
     # chacun dénombre ce qu'il ne garde pas (relecture de la PR #140, passe 2, I-1 : 10 sondes sur
@@ -4046,17 +4228,25 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "config-test-brut": (
         ".claude/pipeline.config.md",
         (
-            "le verdict se lit ici, par le `developpeur` avant commit (cycle-pr 3.2) et le"
-            " `releveur` des portes (4.2)"
+            "rtk proxy make test # sortie du lanceur sans le résumeur RTK du poste : le verdict"
+            " se lit ici, par le `developpeur` avant commit (cycle-pr 3.2) et le `releveur` des"
+            " portes (4.2)"
         ),
     ),
     "config-test-brut-front": (
         ".claude/pipeline.config.md",
-        "lue comme celle du back (`developpeur` avant commit, `releveur` des portes)",
+        (
+            "rtk proxy make web-test # sortie du lanceur sans le résumeur RTK du poste, lue comme"
+            " celle du back (`developpeur` avant commit, `releveur` des portes)"
+        ),
     ),
     "config-validation": (
         ".claude/pipeline.config.md",
-        "Jouée par un `releveur` que la session PR lance avant tout push",
+        (
+            "Sans cible `make` : le binaire n'est pas installé dans le runner de CI, et une cible"
+            " que la CI ne peut pas appeler ferait croire à une porte qui n'existe pas là-bas."
+            " Jouée par un `releveur` que la session PR lance avant tout push"
+        ),
     ),
     "config-relecture": (
         ".claude/pipeline.config.md",
@@ -4075,12 +4265,34 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # `CONTRIBUTING.md`, « Le flux en une page » : 7 maillons (0, 1, 2, 3, 3bis, 4, 5), chacun
     # nomme qui l'exécute — le 3bis deux fois : qui lance, et qui amende
     # (`renvoi-deux-sorties-contributing`, ci-dessus).
-    "contributing-configurer": ("CONTRIBUTING.md", "`init-projet`, dans une session de dialogue"),
+    "contributing-configurer": (
+        "CONTRIBUTING.md",
+        (
+            "`init-projet`, dans une session de dialogue, écrit `.claude/pipeline.config.md`"
+            " (dépôt, sources de vérité, labels, stack, commandes, domaines, surfaces). À"
+            " relancer dès qu'une de ces valeurs change"
+        ),
+    ),
     "contributing-planifier": (
         "CONTRIBUTING.md",
-        "chacun dans une session de dialogue avec le mainteneur",
+        (
+            "**Planifier** — `vers-prd` (dialogue avec le mainteneur → PRD) → `vers-issues` (dans"
+            " sa propre session, `#issue-prd` en argument → une issue par sujet) → `triage`"
+            " (relevé, puis une session de tri par issue, numéro en argument : machine à états,"
+            " rattachement au thème, « agent brief »), chacun dans une session de dialogue avec"
+            " le mainteneur"
+        ),
     ),
-    "contributing-interroger": ("CONTRIBUTING.md", "**obligatoire**, dans une session de dialogue"),
+    "contributing-interroger": (
+        "CONTRIBUTING.md",
+        (
+            "**obligatoire**, dans une session de dialogue — la sienne, numéro de l'issue en"
+            " argument : `ready-for-agent` et `ready-for-human` ne s'atteignent que via l'état"
+            " `needs-interrogation`. Les décisions tranchées sont écrites dans le corps de"
+            " l'issue, section « Décisions », que le brief reprend — pas laissées dans une"
+            " conversation"
+        ),
+    ),
     "contributing-amender-lance-par-la-session": (
         "CONTRIBUTING.md",
         "`contradiction`, lancé par la session de dialogue dès qu'une de ses décisions",
@@ -4120,20 +4332,50 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "contributing-valider": (
         "CONTRIBUTING.md",
-        "`bug-vers-issue`, chacun dans une session de dialogue",
+        (
+            "`bug-vers-issue`, chacun dans une session de dialogue, proposé quand un **thème se"
+            " vide** de ses issues ouvertes. La QA ne re-teste jamais ce que la CI couvre déjà"
+        ),
     ),
     # Lot 6a2 de #134 : les skills de cadrage et de tri nomment leur exécutant (`triage` d'abord).
     "6a-releveur-cite-sans-conclure": (
         RELEVEUR_ROLE,
-        "le passage qui répond, cité mot pour mot ; ce qu'il faut en conclure n'est pas à toi",
+        (
+            "**Questions de documentation** — une question sur une bibliothèque, écrite par ton"
+            " appelant, posée à `context7` : résoudre l'identifiant de la bibliothèque nommée,"
+            " puis la requête. Tu rends l'identifiant résolu, la requête et le passage qui"
+            " répond, cité mot pour mot ; ce qu'il faut en conclure n'est pas à toi. Plusieurs"
+            " bibliothèques candidates : c'est un choix, il remonte"
+        ),
     ),
     "6a-triage-une-session-par-issue": (
         TRIAGE_SKILL,
-        "une session de tri par issue, qui ne reçoit que le numéro",
+        (
+            "Invoqué **sans argument**, `/triage` est la session de **relevé** : elle montre ce"
+            " qui requiert l'attention (section « Montrer ce qui requiert l'attention ») et ne"
+            " trie aucune issue elle-même, hors une transition sans brief ni fichier («"
+            " Changement d'état rapide »). Avec un numéro, `/triage <N>` est la session de tri de"
+            " cette issue — une session de tri par issue, qui ne reçoit que le numéro (« Trier"
+            " une issue spécifique »). Dans l'une comme dans l'autre, le mainteneur décrit ce"
+            " qu'il veut en langage naturel : interprète la demande et agis"
+        ),
     ),
     "6a-triage-jamais-l-interrogatoire-dans-le-tri": (
         TRIAGE_SKILL,
-        "jamais l'interrogatoire dans la session de tri",
+        (
+            "Applique `needs-interrogation` comme à l'étape 5 — thème, `label`, notes de triage."
+            " Puis, si **tous les bloqueurs de « Bloquée par » sont fermés** et que le mainteneur"
+            " est disponible tout de suite, **démarre la session d'interrogatoire** dans le tour"
+            " où il l'accepte : `start_session`, `initiation: user_asked`, `context: fresh`,"
+            " `use_worktree: false` — elle lit le code et n'écrit que dans GitHub —, `title:"
+            " <préfixe> › interrogatoire` (`sessions-liees.md`, « Identité », une racine se nomme"
+            " d'abord), prompt `/interroge-moi <N>`. La tâche de la session de tri est alors"
+            " finie : jamais l'interrogatoire dans la session de tri. Une session dont le brief"
+            " enchaîne elle-même tri et interrogatoire — la préparation de vague, `pr-paralleles`"
+            " Étape 0 — suit son brief. L'état de chaque bloqueur se lit dans GitHub (`gh issue"
+            " view <n|url> --json state` — l'URL pour un bloqueur d'un autre dépôt), jamais dans"
+            " la mémoire de la session"
+        ),
     ),
     "6a-triage-out-of-scope-par-une-pr": (
         TRIAGE_SKILL,
@@ -4141,11 +4383,20 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6a-hors-scope-jamais-sur-le-trunk": (
         HORS_SCOPE_REF,
-        "par une PR, jamais par un commit direct sur le trunk",
+        (
+            "Uniquement lorsqu'un **enhancement** (pas un bug) est rejeté en `wontfix`. Le"
+            " fichier change par une PR, jamais par un commit direct sur le trunk"
+        ),
     ),
     "6a-themes-domaines-par-une-pr": (
         THEMES_MILESTONES_REF,
-        "les domaines de `.claude/pipeline.config.md` s'amendent par une PR",
+        (
+            "la **liste de domaines est incomplète** → proposer une **session `init-projet`"
+            " distincte**, en mode reconfiguration, qui ajoute le domaine : les domaines de"
+            " `.claude/pipeline.config.md` s'amendent par une PR (D-12 de #134). Elle est"
+            " démarrée avec `use_worktree: true` : elle écrit sur une branche, jamais dans le"
+            " dossier que partagent les sessions de tri. Le thème se crée au tri suivant"
+        ),
     ),
     "6a-brief-reprend-les-decisions": (
         BRIEF_AGENT_REF,
@@ -4153,38 +4404,76 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6a-interroge-moi-decisions-dans-le-corps": (
         INTERROGE_MOI_SKILL,
-        "dans la section « Décisions » du corps de l'issue, chaque ligne datée",
+        (
+            "dans la section « Décisions » du corps de l'issue, chaque ligne datée, par `issue"
+            " edit <N> --body-file` : le corps courant relu en octets (`gh api"
+            " repos/{owner}/{repo}/issues/<N> --jq .body`), la section ajoutée ou complétée, sans"
+            " le LF final que `--jq` ajoute, dans un fichier qui garde les fins de ligne lues —"
+            " le script relit contre ce fichier et ne voit pas une conversion (obs 106) —, le"
+            " corps entier réécrit, que le script relit en entier ; dans le briefing pré-PR"
+            " sinon. Le brief d'agent les reprendra : la session de tri le rédige"
+            " (`triage/brief-agent.md`)"
+        ),
     ),
     "6a-interroge-moi-jamais-dans-la-session-pr": (
         INTERROGE_MOI_SKILL,
-        "jamais dans la session PR",
+        (
+            "Une session PR qui trouve son issue non interrogée — aucune trace d'interrogatoire,"
+            " ou brief marqué `⚠️ Non interrogée au triage` — s'arrête à son Étape 1 et propose"
+            " une session d'interrogatoire sur le numéro, jamais dans la session PR. Une demande"
+            " directe sans issue n'y échappe pas : ses décisions vont dans le briefing pré-PR"
+        ),
     ),
     "6a-interroge-moi-jamais-dans-le-dossier-partage": (
         INTERROGE_MOI_SKILL,
-        "jamais dans le dossier partagé",
+        (
+            "jamais dans le dossier partagé où la session a été démarrée (`use_worktree: false`)"
+            " — la contre-épreuve à fabriquer, un de ses « Artefacts jetables » : le composant"
+            " présenté sous une forme que l'outil analyse"
+        ),
     ),
     "6a-vers-prd-archive-par-une-pr": (
         VERS_PRD_SKILL,
-        "le fichier d'archive s'écrit par une PR",
+        (
+            "**Règle de rédaction — l'état courant seul.** Un PRD est lu par des agents, et un"
+            " agent n'a pas de mémoire de lecture : tout ce qui figure dans le document est vrai"
+            " au même titre. Écrire chaque section à la voix affirmative, sans date de révision,"
+            " sans bloc « Avant / Après », sans mention de ce qui a été envisagé puis abandonné."
+            " Quand une révision est intégrée plus tard, réécrire le passage **comme s'il avait"
+            " toujours été ainsi**, et chercher toutes les occurrences de la valeur révisée avant"
+            " de clore. Le raisonnement et l'historique vivent dans un fichier d'archive séparé,"
+            " marqué non normatif : le fichier d'archive s'écrit par une PR"
+        ),
     ),
     "6a-vers-prd-archive-jamais-sur-le-trunk": (
         VERS_PRD_SKILL,
         (
             "rien n'attend ce merge, pas même la publication du PRD ; jamais un commit direct sur"
-            " le trunk"
+            " le trunk. Une justification garde sa place tant qu'elle explique pourquoi la règle"
+            " actuelle est celle-là ; elle part dès qu'elle explique pourquoi elle a changé"
         ),
     ),
     "6a-vers-prd-vers-issues-dans-sa-session": (
         VERS_PRD_SKILL,
-        "`vers-issues` part du PRD publié, dans sa propre session",
+        (
+            "`vers-issues` part du PRD publié, dans sa propre session : dans le tour où le"
+            " mainteneur valide l'étape 2, une fois la publication relue, `start_session`,"
+            " `initiation: user_asked`, `context: fresh`, `use_worktree: false`, `title:"
+            " <préfixe> › vers-issues #<n>` (`sessions-liees.md`, « Identité », une racine se"
+            " nomme d'abord), prompt `/vers-issues #<n>` — `<n>` le numéro du PRD"
+        ),
     ),
     "6a-vers-issues-source-en-argument": (
         VERS_ISSUES_SKILL,
-        "la source se passe en argument",
+        "Le découpage part d'une source écrite : la source se passe en argument",
     ),
     "6a-vers-issues-sans-argument-s-arrete": (
         VERS_ISSUES_SKILL,
-        "Sans argument, la session s'arrête et demande la référence",
+        (
+            "Un résidu de cycle sans PRD (`contraintes.md`, « Création d'issues en cours de cycle »"
+            ", barreau 4) s'écrit d'abord dans un fichier de plan, passé par son chemin. Sans"
+            " argument, la session s'arrête et demande la référence"
+        ),
     ),
     "6a-vers-issues-lots-des-la-creation": (
         VERS_ISSUES_SKILL,
@@ -4211,17 +4500,31 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6a-triage-interrogee-avant-d-13": (
         TRIAGE_SKILL,
         (
-            "interrogée avant D-13 de #134, ses « Décisions verrouillées » consignées en commentaire"
-            " — d'un brief d'agent ou d'un interrogatoire —"
+            "**Déjà interrogée** — en `needs-interrogation`, son corps porte la section"
+            " « Décisions » ; ou, interrogée avant D-13 de #134, ses « Décisions verrouillées »"
+            " consignées en commentaire — d'un brief d'agent ou d'un interrogatoire —, où la"
+            " session qui rédige le brief les lit : c'est le cas « rédiger le brief », à l'étape"
+            " 5"
         ),
     ),
     "6a-triage-notes-de-triage-jamais-interrogatoire": (
         TRIAGE_SKILL,
-        "Des notes de triage seules ne valent jamais interrogatoire",
+        (
+            "Un brief marqué `**⚠️ Non interrogée au triage**` ne compte jamais : ses « Décisions"
+            " verrouillées » n'ont pas été interrogées. Des notes de triage seules ne valent"
+            " jamais interrogatoire : l'étape 5 en poste à toute issue mise en"
+            " `needs-interrogation`"
+        ),
     ),
     "6a-triage-prete-si-deja-interrogee": (
         TRIAGE_SKILL,
-        "ne se posent que sur une issue déjà interrogée (étape 4)",
+        (
+            "ne se posent que sur une issue déjà interrogée (étape 4) — hors passage en force («"
+            " Changement d'état rapide ») : c'est le cas « rédiger le brief » de la session de"
+            " tri. Le brief reprend ses décisions ([brief-agent.md](brief-agent.md)) ; au go du"
+            " mainteneur, dans sa fenêtre, `brief write` **puis** `label` — une issue n'est"
+            " jamais prête sans son brief"
+        ),
     ),
     "6a-triage-rapide-deja-interrogee": (TRIAGE_SKILL, "L'issue est déjà interrogée (étape 4)"),
     "6a-brief-decisions-d-avant-d-13": (
@@ -4241,7 +4544,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # d'`interroge-moi` (aucune issue fermée), l'exemple de brief d'enhancement (pas un geste).
     "6a-triage-jamais-fermee-avant-le-merge": (
         TRIAGE_SKILL,
-        "l'issue ne se ferme jamais sur un fichier absent du trunk",
+        (
+            "puis seulement `comment`, `label` et `issue close` — l'issue ne se ferme jamais sur"
+            " un fichier absent du trunk. Déroulé : [hors-scope.md](hors-scope.md), « Quand"
+            " écrire dans `.out-of-scope/` »"
+        ),
     ),
     "6a-hors-scope-sans-go-reste-ouverte": (
         HORS_SCOPE_REF,
@@ -4261,31 +4568,76 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # puce hors commit), création d'un `.out-of-scope/` (nom et raison laissés à son choix).
     "6a-releveur-lectures-bornees": (
         RELEVEUR_ROLE,
-        "le texte ou les lignes rendus tels quels, sans dire ce qui compte",
+        (
+            "le texte ou les lignes rendus tels quels, sans dire ce qui compte ; la synthèse"
+            " reste à ton appelant. Tu n'as pas d'accès web : une page à lire hors du dépôt, de"
+            " GitHub et de `context7` remonte"
+        ),
     ),
-    "6a-releveur-collectes-compte": (RELEVEUR_ROLE, "tout compte d'une commande donnée"),
-    "6a-releveur-cases-reproduction": (RELEVEUR_ROLE, "ou d'une reproduction de bug"),
+    "6a-releveur-collectes-compte": (
+        RELEVEUR_ROLE,
+        "tout compte d'une commande donnée : la liste brute, sans dire laquelle compte",
+    ),
+    "6a-releveur-cases-reproduction": (
+        RELEVEUR_ROLE,
+        (
+            "ou d'une reproduction de bug : OK / KO par case, la sortie brute si KO. Une case KO"
+            " s'arrête et remonte ; la suite n'est pas à toi"
+        ),
+    ),
     # Décision du mainteneur, 2026-10-23, sur l'arrêt `decisions-vs-doc` de la passe 1 : le
     # `releveur` vérifie une capacité de fournisseur par `context7` quand la doc y est indexée, la
     # session sinon ; il rend les commentaires tels quels, filtrés par les critères de l'appelant.
-    "6a-releveur-fournisseur-par-context7": (RELEVEUR_ROLE, "une doc absente de l'index remonte"),
+    "6a-releveur-fournisseur-par-context7": (
+        RELEVEUR_ROLE,
+        (
+            "Même geste pour une capacité d'un fournisseur (plafond, quota, révocation…) dont la"
+            " doc officielle est indexée dans `context7` ; une doc absente de l'index remonte"
+        ),
+    ),
     "6a-releveur-commentaires-filtres": (
         RELEVEUR_ROLE,
         "ses commentaires tels quels, tous ou filtrés par les critères que donne ton appelant",
     ),
     "6a-triage-fournisseur-par-context7": (
         TRIAGE_SKILL,
-        "ou plusieurs candidates, remonte à la session, qui la lit à la source",
+        (
+            "**`releveur`** — le relevé des cinq catégories (« Collectes »), la lecture de"
+            " l'issue, des fichiers de `.out-of-scope/` et du code autour des ancres données («"
+            " Lectures bornées »), la reproduction d'un bug (« Cases », commandes et attendus"
+            " donnés), une question de bibliothèque ou une capacité de fournisseur par `context7`"
+            " (« Questions de documentation ») ; une doc absente de l'index, ou plusieurs"
+            " candidates, remonte à la session, qui la lit à la source"
+        ),
     ),
     "6a-vers-issues-fournisseur-par-context7": (
         VERS_ISSUES_SKILL,
-        "ou plusieurs candidates, remonte à la session, qui la lit à la source",
+        (
+            "**`releveur`** — la lecture de la source (corps, et commentaires filtrés par les"
+            " critères que la session donne) et du code autour des ancres données (« Lectures"
+            " bornées »), les dénombrements par commande donnée (« Collectes »), la publication"
+            " en série (étape 5), et une capacité de fournisseur par `context7` (« Questions de"
+            " documentation ») ; une doc absente de l'index, ou plusieurs candidates, remonte à"
+            " la session, qui la lit à la source"
+        ),
     ),
     "6a-executant-artefacts-jetables": (
         ".claude/agents/executant.md",
-        "**sans commit** ; ce qu'il faut en conclure n'est pas à toi",
+        (
+            "**Artefacts jetables** — un fichier ou une forme entièrement donnés, produits pour"
+            " une mesure dans le worktree isolé où ton appelant te lance — un scratch qui importe"
+            " un paquet et se compile, un composant présenté sous une forme qu'un outil analyse :"
+            " tu rends le chemin et la sortie de la commande donnée, **sans commit** ; ce qu'il"
+            " faut en conclure n'est pas à toi"
+        ),
     ),
-    "6a-hors-scope-nom-et-texte-donnes": (HORS_SCOPE_REF, "nom et texte rédigés par la session"),
+    "6a-hors-scope-nom-et-texte-donnes": (
+        HORS_SCOPE_REF,
+        (
+            "Si non : un `executant` crée un nouveau fichier avec le nom du concept, la décision,"
+            " la raison et la première demande antérieure — nom et texte rédigés par la session"
+        ),
+    ),
     "6a-vers-issues-commentaires-tels-quels": (
         VERS_ISSUES_SKILL,
         "rend le corps et les commentaires tels quels, filtrés par les critères que la session donne",
@@ -4333,7 +4685,19 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6a-interroge-moi-arret-attend-le-merge": (
         INTERROGE_MOI_SKILL,
-        "L'amendement qu'un arrêt décide part par une PR, et la décision attend son merge",
+        (
+            "**Chaque décision qui affirme un fait sur l'existant est confrontée aux sources"
+            " avant d'être écrite.** Une valeur, une composition, un comportement de spec : un"
+            " `releveur` passe le `grep` des sources de vérité (`.claude/pipeline.config.md`,"
+            " « Sources de vérité ») sur deux ou trois ancres par décision — toutes les décisions"
+            " en un lot, ancres données, lignes rendues — **avant** que le verrou s'écrive ; le"
+            " verdict reste à la session, et l'ancre vérifiée est notée dans la décision (« §1.2"
+            " muet », « §1.2 conforme ») ; une décision sans ancre porte `⚠️ non confrontée`. Le"
+            " verrou est un point d'écriture au sens de `decisions-vs-doc` : une contradiction"
+            " qui le traverse ne se découvre qu'au briefing d'une session ultérieure, en arrêt de"
+            " chantier. L'amendement qu'un arrêt décide part par une PR, et la décision attend"
+            " son merge"
+        ),
     ),
     # Lot 6b de #134, bloc 1 (2026-10-23) : `repercussions` nomme ses exécutants. Une entrée par
     # point du brief du bloc qui écrit une règle, et la moitié restrictive de chaque énoncé qui en
@@ -4395,7 +4759,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         SESSIONS_LIEES_REF,
         (
             "Toute forme admet un suffixe, « — enfants au travail : `local_…`, … », que porte le"
-            " message d'une session qui a démarré des enfants encore au travail"
+            " message d'une session qui a démarré des enfants encore au travail : un identifiant"
+            " par enfant (« Identité »), pour la session qui l'archivera (« Nettoyage »)"
         ),
     ),
     # Relecture de la PR #153, relance, m8 : sans borne, une forme qui finit par `<chemin>` faisait
@@ -4457,7 +4822,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " cette PR"
         ),
     ),
-    "6b-repercussions-amendement-sans-qa": (REPERCUSSIONS_SKILL, "l'étape 7 est sans objet"),
+    "6b-repercussions-amendement-sans-qa": (
+        REPERCUSSIONS_SKILL,
+        "l'étape 7 est sans objet, aucun thème ne s'étant vidé",
+    ),
     "6b-repercussions-journal-de-l-amendement": (
         REPERCUSSIONS_SKILL,
         (
@@ -4702,11 +5070,32 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6b-cycle-pr-repercussions-prescrit-le-commentaire": (
         CYCLE_PR_SKILL,
-        "`repercussions` le prescrit à son étape 5, « Issues en vol »",
+        (
+            "**Commentaire de répercussion.** Un merge survenu ailleurs pendant que cette PR"
+            " était ouverte a > pu rendre sa spec fausse ; `repercussions` le signale ici même,"
+            " par un commentaire sur la PR (le > corps de l'issue n'est volontairement pas"
+            " modifié tant que la PR est ouverte). L'instrument qui > publie un tel commentaire"
+            " puis le relit en entier est > `python <répertoire de ce"
+            " skill>/scripts/ecriture-relue.py comment <n> --body-file <fichier>` > (Étape 8) ;"
+            " `repercussions` le prescrit à son étape 5, « Issues en vol ». Un signalement >"
+            " **bloquant** se traite comme tel : intégrer la correction dans cette PR, ou"
+            " remonter au > mainteneur si cela déplace le périmètre — ne jamais merger"
+            " par-dessus. Le prédicat de > conversation de la porte de merge le garantit (Étape"
+            " 7, « Le go, puis le merge ») : > `porte-merge.py conversation <n>` sort en 1 sur"
+            " tout commentaire ou revue postérieurs au relevé > du verdict, « à ajuster » compris"
+            " ; antérieur, il a été lu avec le relevé (« Vérification > d'avant-go »)"
+        ),
     ),
     "6b-pr-paralleles-repercussions-prescrit-le-commentaire": (
         PR_PARALLELES_SKILL,
-        "`repercussions` le prescrit à son étape 5, « Issues en vol »",
+        (
+            "`repercussions` les détecte comme **« en vol »** (via les PR ouvertes et ce tableau"
+            " de bord) : il **n'édite pas** leur corps et **ne change pas** leurs labels, il"
+            " dépose un commentaire sur **leur PR ouverte**, que `cycle-pr` traite à son Étape 6."
+            " L'instrument qui publie ce commentaire et le relit après écriture est"
+            " `.claude/skills/cycle-pr/scripts/ecriture-relue.py comment <PR> --body-file"
+            " <fichier>` ; `repercussions` le prescrit à son étape 5, « Issues en vol »"
+        ),
     ),
     # Lot 6b2 de #134 (2026-10-25) : `contradiction` et `bug-vers-issue` nomment leurs exécutants.
     # Une entrée par point du brief du lot qui écrit une règle dans le corps — le frontmatter et le
@@ -5368,10 +5757,20 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-cycle-pr-plan-qa-nomme-la-famille": (
         CLOTURE_REF,
         (
-            "`triage`, `interroge-moi`, `vers-prd`, `vers-issues`, `repercussions`,"
-            " `bug-vers-issue`, `plan-qa`, `execution-qa` et `init-projet` (`depot create`,"
-            " `label create`) les nomment. Toute écriture qu'il ne fait pas reste sous la règle"
-            " « Écritures sur un artefact distant »"
+            "Il lit la forge en octets, écrit, puis relit : un label retiré doit s'y relire"
+            " absent, un texte écrit s'y compare **entier** à l'attendu — une relecture qui ne"
+            " compare qu'une ancre ou une longueur laisse passer une conversion des fins de ligne"
+            " qui les préserve (obs 106). Sortie 0 : écrit et relu, rien à écrire, ou lu"
+            " (`checkbox next`) ; 1 : refus sans rien écrire, ou relecture non conforme — motif"
+            " en une ligne ; 2 : appel mal formé. **Ce qu'il ne couvre pas** : il ne choisit pas"
+            " les cases, la session PR les nomme ; il ne compte pas les PR liées, la requête"
+            " GraphQL du cas découpé reste. La famille sait aussi créer une issue, remplacer un"
+            " corps, publier un brief, poser un label, fermer une issue, rattacher une issue à un"
+            " milestone, fermer un milestone, créer les labels d'un dépôt ou créer le dépôt ; son"
+            " `--help` en porte le contrat. `triage`, `interroge-moi`, `vers-prd`, `vers-issues`,"
+            " `repercussions`, `bug-vers-issue`, `plan-qa`, `execution-qa` et `init-projet`"
+            " (`depot create`, `label create`) les nomment. Toute écriture qu'il ne fait pas"
+            " reste sous la règle « Écritures sur un artefact distant »"
         ),
     ),
     # Lot 7b2 de #134 (2026-10-26) : `execution-qa` délègue, son état est la forge, son échec
@@ -6247,11 +6646,21 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "8b-executant-init-projet-sans-commit-en-amorcage": (
         ".claude/agents/executant.md",
-        "en amorçage **sans commit**, le premier commit étant celui d'amorçage, que la session fait",
+        (
+            "**Mise en place d'`init-projet`** — générer les fichiers que la session spécifie :"
+            " config, CI, Dependabot, `.gitignore`, `CLAUDE.md` finalisé ; en amorçage **sans"
+            " commit**, le premier commit étant celui d'amorçage, que la session fait"
+        ),
     ),
     "8b-executant-hors-depot-sans-commit": (
         ".claude/agents/executant.md",
-        "Une cible hors dépôt ne se commite pas, ni ce que ta mission dit **sans commit**.",
+        (
+            "Tu **commites ta tranche** — elle seule, ses fichiers nommés un à un — avec le titre"
+            " que ton brief donne, quand ses tests ciblés **et** la commande « test » de"
+            " `.claude/pipeline.config.md` sont verts (`cycle-pr` 3.2 et 3.4 : rouge → pas de"
+            " commit) ; jamais de push. Une cible hors dépôt ne se commite pas, ni ce que ta"
+            " mission dit **sans commit**."
+        ),
     ),
     # Le même lot y renvoie aussi les cinq autres skills qui lançaient `init-projet` sans
     # configuration (`LANCER_INIT_PROJET`) : une entrée par phrase neuve, « s'arrêter »
@@ -6259,8 +6668,12 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "8b-cycle-pr-sans-config-propose-init-projet": (
         CYCLE_PR_SKILL,
         (
-            "Si le fichier est absent, s'arrêter et proposer une session `init-projet` distincte"
-            " (`init-projet`, « Note pour les autres skills ») ; ne jamais deviner une commande."
+            "**Commandes du projet.** Ce skill ne présuppose aucune stack : les commandes `test`,"
+            " `test ciblé`, `lint`, `format`, `typecheck` et `build` se lisent dans la section"
+            " « Commandes du projet » de `.claude/pipeline.config.md`. Une étape marquée `n/a`"
+            " s'ignore. Si le fichier est absent, s'arrêter et proposer une session `init-projet`"
+            " distincte (`init-projet`, « Note pour les autres skills ») ; ne jamais deviner une"
+            " commande."
         ),
     ),
     "8b-pr-paralleles-sans-config-propose-init-projet": (
@@ -6269,7 +6682,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "8b-triage-sans-config-propose-init-projet": (
         TRIAGE_SKILL,
-        "sinon s'arrêter et proposer une session `init-projet` distincte",
+        (
+            "Ce sont les noms de rôles canoniques ; le mapping vers les vrais labels GitHub est"
+            " dans `.claude/pipeline.config.md` — sinon s'arrêter et proposer une session"
+            " `init-projet` distincte"
+        ),
     ),
     "8b-vers-issues-sans-config-propose-init-projet": (
         VERS_ISSUES_SKILL,
@@ -6303,24 +6720,44 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         (
             "Elle **remplace** les Étapes 1, 2, 5, 7 et 8 ; les Étapes 3 et 6 s'appliquent telles"
             " quelles — 3.2 et 3.4 réduits au `lint` et au test ciblé —, la session codant"
-            " elle-même (3.1), l'Étape 4 sous la forme du point 3."
+            " elle-même (3.1), l'Étape 4 sous la forme du point 3. Dès qu'une condition tombe en"
+            " cours de route — diff qui dépasse, décision à prendre, fichier de `.claude/` —, la"
+            " PR repasse en draft (`gh pr ready --undo`), son body reçoit le briefing de l'Étape"
+            " 1, et le cycle complet reprend à l'étape atteinte ; le body le dit"
         ),
     ),
     "voie-courte-conditions-d-entree": (
         CYCLE_PR_SKILL,
         (
-            "dont le diff attendu tient en **≤ 50 lignes et ≤ 3 fichiers**, sans zone sensible ni"
-            " surface visible (`.claude/pipeline.config.md`, « Périmètre ») et sans toucher"
-            " `.claude/`, emprunte cette voie."
+            "Un **correctif évident** au sens du barreau 3 de `.claude/rules/contraintes.md` —"
+            " visible à la lecture des lignes, sans décision de comportement — dont le diff"
+            " attendu tient en **≤ 50 lignes et ≤ 3 fichiers**, sans zone sensible ni surface"
+            " visible (`.claude/pipeline.config.md`, « Périmètre ») et sans toucher `.claude/`,"
+            " emprunte cette voie."
         ),
     ),
-    "voie-courte-go-humain": (CYCLE_PR_SKILL, "puis go humain, puis"),
+    "voie-courte-go-humain": (
+        CYCLE_PR_SKILL,
+        (
+            "**CI verte**, lue dans `gh pr checks` — pas d'`attente-ci.py` en fond —, puis le"
+            " relevé de conversation inscrit au body, sans `verificateur`, par `python"
+            " <répertoire de ce skill>/scripts/porte-merge.py conversation <n> --releve`, puis lu"
+            " (Étape 7, « Vérification d'avant-go »), puis go humain, puis le merge par la porte"
+            " de « Le go, puis le merge » (Étape 7), le `<SHA du trunk éprouvé>` lu par"
+            " `porte-merge.py trunk <run> <trunk> <SHA de tête vérifié>` (« Rejouer les"
+            " vérifications périmées ») et noté dans le body avec le numéro du run ; trunk avancé"
+            " : relancer et relire la trace, sans `verificateur`"
+        ),
+    ),
     "7c-cycle-pr-fumee-petite-pr-avant-le-brouillon": (
         CYCLE_PR_SKILL,
         (
-            "puis propriétaire ouvert (une automatisation qu'on a fait taire se répare, elle ne se"
-            " doublonne pas), puis petite PR pour un correctif évident, puis brouillon soumis au"
-            " mainteneur"
+            "Un écart constaté → le traiter comme un finding de l'Étape 7 (corriger, re-tester,"
+            " push). S'il sort du périmètre de la PR, appliquer « Création d'issues en cours de"
+            " cycle » (`.claude/rules/contraintes.md`) — PR courante, puis propriétaire ouvert"
+            " (une automatisation qu'on a fait taire se répare, elle ne se doublonne pas), puis"
+            " petite PR pour un correctif évident, puis brouillon soumis au mainteneur. Jamais un"
+            " `gh issue create` de la session"
         ),
     ),
     "7c-bug-vers-issue-description": (
@@ -6484,21 +6921,66 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7c-cycle-pr-correctif-evident-sans-interrogatoire": (
         CYCLE_PR_SKILL,
         (
-            "Un correctif évident — visible à la lecture, sans décision de comportement"
-            " (`contraintes.md`, barreau 3) — n'a rien à interroger : sa qualification, écrite"
-            " dans le body de la PR — draft, ou PR de la voie courte — avec sa preuve, en tient lieu."
+            "**Demande directe sans issue** → l'interrogatoire s'applique aussi ; il n'y a pas de"
+            " raccourci parce que le travail n'a pas de ticket. Un correctif évident — visible à"
+            " la lecture, sans décision de comportement (`contraintes.md`, barreau 3) — n'a rien"
+            " à interroger : sa qualification, écrite dans le body de la PR — draft, ou PR de la"
+            " voie courte — avec sa preuve, en tient lieu."
         ),
     ),
     "7c-cycle-pr-marqueur-de-la-petite-pr": (
         CYCLE_PR_SKILL,
         (
-            "Pour une draft née d'un échec de QA (case ` 🔴 correctif évident — …`), la session,"
-            " une fois la draft ouverte, remplace ce marqueur par ` 🔴 PR #<M>` sur la case, par"
-            " une paire"
-            " (`python .claude/skills/cycle-pr/scripts/ecriture-relue.py checkbox patch <plan>"
-            " --paires <fichier>`, `execution-qa/references/patch-checkbox-gh.md`) : c'est ce que"
-            " lit la reprise de la QA."
+            "Pour une **demande directe sans issue**, ouvrir quand même la draft : sans `Closes`,"
+            " mais le travail reste visible du reste de la pipeline. Pour une draft née d'un"
+            " échec de QA (case ` 🔴 correctif évident — …`), la session, une fois la draft"
+            " ouverte, remplace ce marqueur par ` 🔴 PR #<M>` sur la case, par une paire (`python"
+            " .claude/skills/cycle-pr/scripts/ecriture-relue.py checkbox patch <plan> --paires"
+            " <fichier>`, `execution-qa/references/patch-checkbox-gh.md`) : c'est ce que lit la"
+            " reprise de la QA."
         ),
+    ),
+    # #198, lot 2 (D-5) : l'ancre neuve de chaque morceau prescriptif d'un passage déclaré
+    # (`PASSAGES_DU_CONTEXTE_COURT`) que n'atteignait pas une ancre voisine allongée, moitié
+    # restrictive comprise (obs 126).
+    "claude-md-le-modele-se-choisit-par-role": (
+        "CLAUDE.md",
+        (
+            "**Le modèle n'est pas choisi par tâche, il est choisi par rôle** au moment de créer"
+            " l'équipier"
+        ),
+    ),
+    "claude-md-trois-axes-le-mandat-choisit-le-modele": (
+        "CLAUDE.md",
+        (
+            "**Trois axes par rôle, chacun dans son frontmatter.** Le **mandat** — ce que le rôle"
+            " peut trancher — choisit le modèle : **ce qui rend un rôle éligible au modèle le"
+            " moins cher, c'est un mandat sans aucune décision**, pas une tâche qui paraît"
+            " facile. Chaque rôle dit en tête de son fichier s'il tranche"
+        ),
+    ),
+    "claude-md-l-effort-est-la-profondeur-de-reflexion": (
+        "CLAUDE.md",
+        (
+            "L'**effort** (`effort`) est la profondeur de réflexion : un rôle sans décision peut"
+            " en porter un élevé, qui paie alors de la vérification et non de l'architecture"
+        ),
+    ),
+    "claude-md-deleguer-suppose-la-tranche-ecrite": (
+        "CLAUDE.md",
+        (
+            "Déléguer à un rôle sans décision suppose que la session ait écrit la tranche"
+            " entièrement — fichiers, signatures, tests attendus, comportement — avant l'envoi :"
+            " si la spécifier demande encore de réfléchir, c'est son travail"
+        ),
+    ),
+    "contributing-amender-a-tout-moment": (
+        "CONTRIBUTING.md",
+        "Déclenché par la règle `decisions-vs-doc`, à n'importe quel moment",
+    ),
+    "executant-sans-cleanup-pass": (
+        ".claude/agents/executant.md",
+        "**Sans cleanup pass** (`cycle-pr` 3.3)",
     ),
 }
 
@@ -12913,6 +13395,635 @@ PASSAGES_DES_SESSIONS_LIEES = (
     ),
 )
 
+# Les passages déclarés du contexte court (#198, D-5), après les tables qui leur prêtent une ancre.
+PASSAGES_DU_CONTEXTE_COURT = (
+    Passage(
+        "CLAUDE.md",
+        "Les **sources de vérité**",
+        "Les **domaines** servent aussi",
+        {},
+    ),
+    Passage(
+        "CLAUDE.md",
+        "Utiliser le glossaire de",
+        "# Documentation des bibliothèques",
+        {},
+    ),
+    Passage(
+        "CLAUDE.md",
+        "Pour toute question sur",
+        "# Minimalisme (`ponytail`)",
+        {},
+    ),
+    Passage(
+        "CLAUDE.md",
+        "Niveau par défaut :",
+        "**Ce qu'il ne simplifie",
+        {},
+    ),
+    Passage(
+        "CLAUDE.md",
+        "Invoquer le skill `task-observer`",
+        "**Seuil de consignation —",
+        {},
+    ),
+    Passage(
+        "CLAUDE.md",
+        "Au chargement de **n'importe",
+        "**Emplacement du journal, à",
+        {},
+    ),
+    Passage(
+        "CLAUDE.md",
+        "**Une tâche par session.**",
+        "| Rôle | Modèle",
+        {},
+    ),
+    Passage(
+        "CLAUDE.md",
+        "**Trois axes par rôle,",
+        "**Une commande ponctuelle se",
+        {
+            "relevé daté": [
+                (
+                    "26 à 31 K de contexte au premier appel pour les quatre rôles mesurés —"
+                    " `releveur`, `executant`, `developpeur`, `relecteur`, le 2026-10-20 (journal"
+                    " de spec de l'issue #134, lot 2a), avant que le `releveur` reçoive ses deux"
+                    " outils `context7` (lot 6a2) ;"
+                ),
+                (
+                    "lui re-mesuré à 32,3 K le 2026-10-28 (lot 3 de #177) —, contre 74,5 K pour"
+                    " `general-purpose` sans liste, sur Haiku (étude du 2026-10-19, dossier"
+                    " `etudes/` voisin du journal d'observations, §15.2)."
+                ),
+                (
+                    "Le `releveur`, seul rôle à porter `omitClaudeMd: true`, démarre en outre"
+                    " sans `CLAUDE.md` ni les règles de `.claude/rules/` (doc des sous-agents,"
+                    " lue le 2026-10-28) :"
+                ),
+                (
+                    "11,4 K au premier appel contre 32,1 K sans lui à la même sonde (même"
+                    " définition, 2026-10-28, Notes de la PR #183)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        "CLAUDE.md",
+        "**Lire borné.** Session ou",
+        "# Skills de la",
+        {
+            "intitulé": [
+                "Repli :",
+            ],
+            "motif": [
+                "Ce qui est lu reste dans le contexte, relu à chaque appel suivant.",
+            ],
+        },
+        empruntees=ancres_de(
+            INVARIANTS_DES_SESSIONS_LIEES,
+            "claude-md-sessions-liees",
+            "claude-md-une-session-en-demarre-d-autres",
+            "claude-md-protocole-seule-source",
+        ),
+    ),
+    Passage(
+        CONTRIBUTING_GUIDE,
+        "0. **Configurer** — `init-projet`,",
+        "# Les règles qui",
+        {
+            "intitulé": [
+                "0.",
+                "1.",
+                "2.",
+                "3.",
+                "Plusieurs PR en parallèle :",
+                "Trop peu d'issues prêtes :",
+                "Correctif évident (`contraintes.md`, barreau 3) :",
+                "3bis.",
+                "4.",
+                "5.",
+            ],
+        },
+        empruntees=(
+            *ancres_de(
+                INVARIANTS_DES_CONFORTS_DE_PIPELINE,
+                "contributing-repercussions-quand-elle-est-due",
+                "contributing-repercussions-confronte-d-abord",
+                "contributing-repercussions-portee-par-la-session-pr",
+                "contributing-repercussions-lot-coordonne",
+            ),
+            *ancres_de(
+                INVARIANTS_DES_SESSIONS_LIEES,
+                "contributing-une-session-par-issue",
+                "contributing-etape-0-une-session-de-tri-par-issue",
+                "contributing-voie-courte",
+            ),
+            *ancres_de(INVARIANTS_DE_LA_SESSION_DE_RELECTURE, "contributing-deux-sessions"),
+        ),
+    ),
+    Passage(
+        CONTRAINTES_RULE,
+        "- **Voie V —",
+        "Dans le doute sur",
+        {},
+    ),
+    Passage(
+        CONTRAINTES_RULE,
+        "- Si la réponse",
+        "- **Un « go",
+        {},
+    ),
+    Passage(
+        CONTRAINTES_RULE,
+        "- **Un cycle n'ouvre",
+        "- Tout vide, résidu",
+        {},
+    ),
+    Passage(
+        CONTRAINTES_RULE,
+        "3. **un correctif évident**",
+        "4. **sinon** → un",
+        {},
+    ),
+    Passage(
+        CONTRAINTES_RULE,
+        "- **Toute écriture sur",
+        "# Maintenance continue",
+        {},
+    ),
+    Passage(
+        CONTRAINTES_RULE,
+        "- **Porteur** : l'auteur",
+        "# Points d'arrêt humains",
+        {
+            "intitulé": [
+                "- **Porteur** :",
+            ],
+        },
+    ),
+    Passage(
+        CONTRAINTES_RULE,
+        "- **Cadence : une",
+        "- Une zone sensible",
+        {},
+    ),
+    Passage(
+        CLEANUP_VERBATIM_RULE,
+        "Cela couvre aussi bien",
+        "**Relire un document normatif**",
+        {},
+    ),
+    Passage(
+        CLEANUP_VERBATIM_RULE,
+        "- **Rapporter à voix",
+        "- **Même rigueur sur",
+        {},
+    ),
+    Passage(
+        CLEANUP_VERBATIM_RULE,
+        "« La seule voie",
+        "- **Passe « affirmations",
+        {},
+    ),
+    Passage(
+        ".claude/rules/decisions-vs-doc.md",
+        "2. **La décision gagne**",
+        "Si l'amendement est trop",
+        {
+            "intitulé": [
+                "2.",
+            ],
+        },
+    ),
+    Passage(
+        ".claude/rules/taille-pr.md",
+        "- Le `developpeur` rend",
+        "6. **Au-delà de ~3",
+        {},
+    ),
+    Passage(
+        DEVELOPPEUR_ROLE,
+        "Les commits (SHA et",
+        "# Effort",
+        {},
+    ),
+    Passage(
+        EXECUTANT_ROLE,
+        "- **Mise en place",
+        "Les relevés **rendus comme",
+        {},
+    ),
+    Passage(
+        EXECUTANT_ROLE,
+        "Tu **commites ta tranche**",
+        "# Ce que tu n'appliques",
+        {
+            "motif": [
+                (
+                    "chaque ligne de la tranche a été décidée par ton appelant, et le cleanup"
+                    " holistique de la PR (`cycle-pr` 4.1) la relit avec le reste du diff."
+                ),
+                "Un nettoyage de ta part serait une décision que ta tranche ne te donne pas.",
+            ],
+        },
+    ),
+    Passage(
+        RELEVEUR_ROLE,
+        "- **Cases « commande",
+        "- **Croisements** — **après",
+        {},
+    ),
+    Passage(
+        RELEVEUR_ROLE,
+        "- **Collectes** — doublons",
+        "**Lire borné** (`CLAUDE.md`, que",
+        {},
+    ),
+    Passage(
+        PIPELINE_CONFIG,
+        "- test brut : rtk proxy make test",
+        "- lint : make lint",
+        {
+            "intitulé": [
+                "- test brut :",
+            ],
+            "relevé daté": [
+                "vérifiée le 2026-09-25",
+            ],
+        },
+    ),
+    Passage(
+        PIPELINE_CONFIG,
+        "- test brut : rtk proxy make web-test",
+        "- openapi : make web-openapi",
+        {
+            "intitulé": [
+                "- test brut :",
+            ],
+            "relevé daté": [
+                "vérifiée le 2026-09-25",
+            ],
+        },
+    ),
+    Passage(
+        PIPELINE_CONFIG,
+        "**Harnais (`.claude/`, `CLAUDE.md`)** —",
+        "- validation : claude",
+        {
+            "relevé daté": [
+                (
+                    "**Harnais (`.claude/`, `CLAUDE.md`)** — vérifiée le 2026-10-09 depuis la"
+                    " racine, avec témoins."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        PIPELINE_CONFIG,
+        "- relecture : /code-review",
+        "# Qualité",
+        {
+            "intitulé": [
+                "- relecture :",
+                "- sécurité :",
+                "Inventaire :",
+            ],
+            "relevé daté": [
+                (
+                    "Ce qu'elle couvre, mesuré le 2026-10-12 sur le delta de #85 (672 lignes,"
+                    " niveau `medium`) :"
+                ),
+                (
+                    "**1 défaut de correction réel** qu'aucune des deux passes de relecture"
+                    " n'avait vu — un motif non ancré à gauche qui jetait le préfixe d'un chemin."
+                ),
+                "Ce qu'elle ne couvre pas, mesuré au même run :",
+                (
+                    "**zéro** constat sur la prose de protocole, où vivaient les 2 bloquants et 7"
+                    " importants de la relecture à contexte vierge."
+                ),
+                (
+                    "Mesure le 2026-10-14, commit 1 de la PR #92 (rôle Postgres de `backup`, 5"
+                    " fichiers, +204/−63, surface « persistance Postgres ») :"
+                ),
+                "**zéro** constat.",
+                (
+                    "son prompt écarte les constats portant sur les tests et la documentation"
+                    " (exclusions 11 et 16) — seuls 2 fichiers sur 5 pouvaient en porter"
+                    " (`bootstrap.sh`, le modèle de `.env`), ni la pile de test, ni le runbook où"
+                    " vivent les rotations."
+                ),
+                "Son prompt lui interdit de lancer une commande :",
+                (
+                    "un zéro de lecture, sur des droits que les tests du rôle et quatre mutations"
+                    " tenaient déjà."
+                ),
+                (
+                    "Son prompt prescrit des sous-tâches (une de recherche, une de filtre par"
+                    " constat) ;"
+                ),
+                "la session l'a déroulée sans elles.",
+                "obs 84).",
+                (
+                    "Autre mesure, même jour, au commit `b5b0b2a` de la PR #75 (17 fichiers, dont"
+                    " 7 hors tests et documentation :"
+                ),
+                "admin, téléversement, migration) :",
+                "**zéro** constat, de lecture aussi, déroulée sans les sous-tâches.",
+            ],
+        },
+        empruntees=(
+            *ancres_de(
+                INVARIANTS_DES_SESSIONS_LIEES,
+                "config-relecture-fin-de-tour-sans-cout",
+                "config-securite-fin-de-tour-sans-cout",
+                "config-relecture-commande-integree",
+                "config-relecture-ne-remplace-rien",
+                "config-relecture-niveau-rapporte-par-la-relecture",
+                "config-securite-meme-nature",
+                "config-securite-origin-head-prerequis",
+                "config-securite-diffe-le-trunk",
+            ),
+            *ancres_de(
+                INVARIANTS_DE_LA_SESSION_DE_RELECTURE,
+                "config-securite-constats-hors-plage-ecartes",
+                "config-relecture-niveau-non-garanti",
+                "config-securite-deux-prerequis",
+            ),
+        ),
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**Commandes du projet.** Ce",
+        "**Vague parallèle.** → [references/briefing.md](references/briefing.md),",
+        {},
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "Un **correctif évident** au",
+        "1. **Branche** derrière la",
+        {},
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "4. **CI verte**, lue",
+        "5. Ni `verificateur`, ni",
+        {
+            "intitulé": [
+                "4.",
+            ],
+        },
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "- **Demande directe sans",
+        "Le point n'est pas",
+        {},
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "Pour une **demande directe",
+        "> **Une PR en",
+        {},
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**4.2 Relecture par un",
+        "**Les portes bon marché",
+        {},
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "> **Commentaire de répercussion.**",
+        "# Étape 7 —",
+        {},
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "Un écart constaté →",
+        "## Vérification d'avant-go —",
+        {},
+    ),
+    Passage(
+        CLOTURE_REF,
+        "Il lit la forge",
+        "# Les transcripts du",
+        {},
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        "Toute forme admet un",
+        "Une session de relecture",
+        {},
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        "La session qui archive",
+        None,
+        {},
+    ),
+    Passage(
+        INTERROGE_MOI_SKILL,
+        "- **`executant`**, en isolation",
+        "- **script** — les",
+        {},
+    ),
+    Passage(
+        INTERROGE_MOI_SKILL,
+        "- Une session PR",
+        "# Consigner les décisions",
+        {},
+    ),
+    Passage(
+        INTERROGE_MOI_SKILL,
+        "- **Les points tranchés**",
+        "- **Les questions restées",
+        {},
+    ),
+    Passage(
+        INTERROGE_MOI_SKILL,
+        "**Chaque décision qui affirme",
+        "Puis, si la session",
+        {},
+    ),
+    Passage(
+        TRIAGE_SKILL,
+        "- **`releveur`** — le",
+        "- **`executant`**, en isolation",
+        {},
+    ),
+    Passage(
+        TRIAGE_SKILL,
+        "Ce sont les noms",
+        "**Les issues portant un",
+        {},
+    ),
+    Passage(
+        TRIAGE_SKILL,
+        "Invoqué **sans argument**, `/triage`",
+        "- « Montre-moi tout",
+        {
+            "intitulé": [
+                "Exemples :",
+            ],
+        },
+    ),
+    Passage(
+        TRIAGE_SKILL,
+        "- **Déjà interrogée** —",
+        "- **Un bloqueur encore",
+        {},
+    ),
+    Passage(
+        TRIAGE_SKILL,
+        "- `ready-for-agent` et `ready-for-human`",
+        "- `ready-for-human` — son",
+        {},
+    ),
+    Passage(
+        TRIAGE_SKILL,
+        "- `wontfix` (enhancement) —",
+        "- `needs-triage` — `label`.",
+        {},
+    ),
+    Passage(
+        TRIAGE_SKILL,
+        "- L'issue est déjà",
+        "- Elle n'y est",
+        {},
+    ),
+    Passage(
+        BRIEF_AGENT_REF,
+        "Les « Décisions verrouillées",
+        "- **Une décision négative",
+        {
+            "intitulé": [
+                "Des règles de rédaction :",
+            ],
+        },
+    ),
+    Passage(
+        HORS_SCOPE_REF,
+        "- **Confirmer** — la",
+        "- **Être en désaccord**",
+        {},
+    ),
+    Passage(
+        HORS_SCOPE_REF,
+        "Uniquement lorsqu'un **enhancement** (pas",
+        "1. Le mainteneur décide",
+        {},
+    ),
+    Passage(
+        HORS_SCOPE_REF,
+        "4. Si non :",
+        "5. Il commite sur",
+        {
+            "intitulé": [
+                "4.",
+            ],
+        },
+    ),
+    Passage(
+        HORS_SCOPE_REF,
+        "7. Puis seulement, la",
+        "8. Poser `wontfix` (`label",
+        {
+            "intitulé": [
+                "7.",
+            ],
+        },
+    ),
+    Passage(
+        HORS_SCOPE_REF,
+        "- Supprime le fichier",
+        "- Le skill n'a",
+        {},
+    ),
+    Passage(
+        THEMES_MILESTONES_REF,
+        "- la **liste de",
+        "Cette boucle est ce",
+        {},
+    ),
+    Passage(
+        VERS_ISSUES_SKILL,
+        "Le dépôt GitHub et",
+        "# Délégation",
+        {},
+    ),
+    Passage(
+        VERS_ISSUES_SKILL,
+        "- **`releveur`** — la",
+        "- **script** — `issue",
+        {},
+    ),
+    Passage(
+        VERS_ISSUES_SKILL,
+        "Le découpage part d'une",
+        "## 2. Explorer la",
+        {},
+    ),
+    Passage(
+        VERS_ISSUES_SKILL,
+        "**Le découpage suit la règle du sujet, jamais la taille**",
+        "## 4. Interroger l'utilisateur",
+        {
+            "intitulé": [
+                "**Plancher** (même règle, point 2).",
+            ],
+            "motif": [
+                "les séparer fait valider deux fois le même écran, ou un demi-écran.",
+            ],
+        },
+        empruntees=ancres_de(
+            INVARIANTS_DE_LA_REGLE_DU_SUJET,
+            "vers-issues-test-du-sujet",
+            "vers-issues-plancher-et-ses-gardes",
+            "vers-issues-deux-sujets-deux-issues",
+            "vers-issues-se-valident-ensemble",
+            "vers-issues-lots-sur-motif",
+            "vers-issues-lots-des-la-creation",
+            "vers-issues-plancher-300-lignes",
+            "vers-issues-hors-plancher",
+            "vers-issues-triage-meme-plancher",
+        ),
+    ),
+    Passage(
+        VERS_PRD_SKILL,
+        "Le dépôt GitHub et",
+        "# Délégation",
+        {},
+    ),
+    Passage(
+        VERS_PRD_SKILL,
+        "**Règle de rédaction —",
+        "<prd-template>",
+        {
+            "intitulé": [
+                "4.",
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "Prérequis : `.claude/pipeline.config.md` existe",
+        "# Quand l'utiliser",
+        {
+            "intitulé": [
+                "Prérequis :",
+            ],
+        },
+    ),
+    Passage(
+        PR_PARALLELES_SKILL,
+        "- `repercussions` les détecte",
+        "- **Tenir `PR-PARALLELES.md` à",
+        {},
+    ),
+)
+
 # Une entrée par table, ses passages déclarés à côté d'elle (`Passage`) : la population d'une table
 # sort de ses passages à chaque exécution, jamais d'un compte écrit en commentaire (obs 127).
 PASSAGES_DECLARES: dict[str, tuple[Passage, ...]] = {
@@ -12921,6 +14032,7 @@ PASSAGES_DECLARES: dict[str, tuple[Passage, ...]] = {
     "INVARIANTS_DE_LA_PORTE_DE_MERGE": PASSAGES_DE_LA_PORTE_DE_MERGE,
     "INVARIANTS_DES_CONFORTS_DE_PIPELINE": PASSAGES_DES_CONFORTS_DE_PIPELINE,
     "INVARIANTS_DES_SESSIONS_LIEES": PASSAGES_DES_SESSIONS_LIEES,
+    "INVARIANTS_DU_CONTEXTE_COURT": PASSAGES_DU_CONTEXTE_COURT,
 }
 
 
@@ -12989,8 +14101,8 @@ def test_chaque_ancre_d_une_table_du_registre_est_seule_dans_son_fichier(table: 
     assert not doublees, doublees
 
 
-# La table que le lot 2 de #198 couvre (D-7) et qui n'est pas encore au registre.
-TABLES_COUVERTES_AU_LOT_2 = ("INVARIANTS_DU_CONTEXTE_COURT",)
+# Les tables du lot 2 de #198 (D-7) hors du registre : aucune depuis l'entrée du contexte court.
+TABLES_COUVERTES_AU_LOT_2: tuple[str, ...] = ()
 
 
 def test_chaque_table_d_invariants_est_au_registre_ou_au_lot_2() -> None:
