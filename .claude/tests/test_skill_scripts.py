@@ -69,6 +69,16 @@ def test_make_typecheck_lance_pyright_sur_le_projet_des_scripts_des_skills() -> 
     assert any(commande[-3:] == ["pyright", "-p", ".claude"] for commande in commandes)
 
 
+def test_make_test_et_make_test_pipeline_lancent_chacun_leur_suite() -> None:
+    """`make test` ne lit que `apps` ; `make test-pipeline` lit `.claude/tests` sans le greffon
+    qui charge Django (ADR 0025) — retirer le drapeau laissait toute la suite verte."""
+    (test,) = map(shlex.split, make_dry_run("test").splitlines())
+    (pipeline,) = map(shlex.split, make_dry_run("test-pipeline").splitlines())
+
+    assert test[-2:] == ["pytest", "apps"]
+    assert pipeline[-4:] == ["pytest", ".claude/tests", "-p", "no:process_environment"]
+
+
 def test_le_projet_pyright_des_skills_est_en_mode_strict() -> None:
     """Sans la clé, pyright analyserait les mêmes fichiers en mode basique, gardes vertes."""
     config = json.loads((PROJECT / "pyrightconfig.json").read_text(encoding="utf-8"))

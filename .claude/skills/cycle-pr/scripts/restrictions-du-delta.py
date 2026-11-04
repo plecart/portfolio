@@ -54,8 +54,8 @@ l'attribut `diff` — 42 clés, 20 neutralisées, 22 indemnes.
 **Ce qu'il ne couvre pas.** Une restriction affaiblie sans ligne marquée retirée — une marque
 ajoutée ailleurs qui la contredit, un mot hors de la table. Une ligne déplacée, que le diff rend
 retirée ou non selon son alignement. La prose hors de ces chemins. L'environnement de `git`, hors
-de sa configuration : `GIT_DIFF_OPTS=--unified=3` passe devant `-U0` (mesuré le 2026-11-04). La
-réponse à chaque ligne : le script la donne à la relecture, il ne juge pas.
+de sa configuration et de `GIT_DIFF_OPTS`, que le script retire : `--unified=3` y passait devant
+`-U0` (mesuré le 2026-11-04). La réponse à chaque ligne : le script la donne à la relecture, il ne juge pas.
 
 Sortie : 0 dès que `git` répond, ligne rendue ou non ; 2 `git` en échec — base inconnue, hors
 d'un dépôt, `git` introuvable —, motif sur la sortie d'erreur, ou appel mal formé. Python 3.11
@@ -64,6 +64,7 @@ ou plus, bibliothèque standard seule ; `git`, lancé depuis le dépôt.
 
 import argparse
 import io
+import os
 import re
 import subprocess
 import sys
@@ -136,10 +137,15 @@ class GitError(Exception):
 
 
 def git(*args: str) -> str:
-    """La sortie standard de `git <args>`, décodée en UTF-8."""
+    """La sortie standard de `git <args>`, décodée en UTF-8, sans `GIT_DIFF_OPTS`, qui passerait
+    devant `-U0`."""
+    environment = {name: value for name, value in os.environ.items() if name != "GIT_DIFF_OPTS"}
     try:
         done = subprocess.run(
-            ["git", "-c", "core.quotePath=false", *args], capture_output=True, check=False
+            ["git", "-c", "core.quotePath=false", *args],
+            capture_output=True,
+            check=False,
+            env=environment,
         )
     except OSError as error:
         raise GitError(f"git introuvable : {error}") from error
