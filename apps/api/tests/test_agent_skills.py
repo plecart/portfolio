@@ -2436,7 +2436,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # Docs mises à jour dans le même lot (bloc « Lot 3/4 », dernier point).
     "contributing-une-session-par-issue": (
         "CONTRIBUTING.md",
-        "la session lead démarre une session par issue, chacune dans un worktree de l'application",
+        (
+            "Plusieurs PR en parallèle : `pr-paralleles` (la session lead démarre une session par"
+            " issue, chacune dans un worktree de l'application"
+        ),
     ),
     "claude-md-sessions-liees": ("CLAUDE.md", "**Sessions liées.**"),
     "taille-pr-premier-geste": (
@@ -3026,13 +3029,17 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "contributing-etape-0-une-session-de-tri-par-issue": (
         "CONTRIBUTING.md",
         (
-            "son étape 0 ouvre d'abord une session de triage et d'interrogatoire par issue, puis se"
-            " termine sur la liste des issues prêtes et une carte « démarrer la vague »"
+            "Trop peu d'issues prêtes : son étape 0 ouvre d'abord une session de triage et"
+            " d'interrogatoire par issue, puis se termine sur la liste des issues prêtes et une"
+            " carte « démarrer la vague »"
         ),
     ),
     "contributing-voie-courte": (
         "CONTRIBUTING.md",
-        "la **voie courte** de `cycle-pr`, sans issue ni draft, une passe de relecture, un go",
+        (
+            "Correctif évident (`contraintes.md`, barreau 3) : la **voie courte** de `cycle-pr`,"
+            " sans issue ni draft, une passe de relecture, un go"
+        ),
     ),
     "repercussions-ligne-non-nettoyee-en-vol": (
         REPERCUSSIONS_SKILL,
@@ -4721,8 +4728,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b-repercussions-sessions-au-tour-du-mainteneur": (
         REPERCUSSIONS_SKILL,
         (
-            "chacune démarrée dans le tour du mainteneur qui l'accepte, hors de ce tour par une"
-            " carte de proposition"
+            "**sessions distinctes** — `contradiction` (étape 1), `plan-qa` (étape 7),"
+            " `bug-vers-issue` ou `vers-issues` pour un brouillon (« Ce que ce skill ne fait pas »"
+            "), chacune démarrée dans le tour du mainteneur qui l'accepte, hors de ce tour par"
+            " une carte de proposition ; protocole commun :"
+            " `.claude/skills/cycle-pr/references/sessions-liees.md`."
         ),
     ),
     "6b-repercussions-worktree-de-ses-sessions": (
@@ -4824,7 +4834,7 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6b-repercussions-amendement-sans-qa": (
         REPERCUSSIONS_SKILL,
-        "l'étape 7 est sans objet, aucun thème ne s'étant vidé",
+        "Les étapes 2 à 6 s'appliquent ; l'étape 7 est sans objet, aucun thème ne s'étant vidé",
     ),
     "6b-repercussions-journal-de-l-amendement": (
         REPERCUSSIONS_SKILL,
@@ -4843,7 +4853,15 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6b-repercussions-grep-des-sources-au-releveur": (
         REPERCUSSIONS_SKILL,
-        "un `releveur` le passe et rend les passages autour des ancres ; le verdict reste à la session",
+        (
+            "C'est un `grep` des ancres sur les fichiers des rangs supérieurs, rien de plus : un"
+            " `releveur` le passe et rend les passages autour des ancres ; le verdict reste à la"
+            " session. Même seuil que pour les issues : **deux citations ou rien** — la ligne"
+            " exacte du §, et le fait du delta qui la falsifie. Un document **muet** sur le point"
+            " (le cadrage décrit le serveur, le delta touche le poste de dev) n'est pas"
+            " contredit. Une contradiction déjà portée par une issue ouverte — l'échappatoire de"
+            " `decisions-vs-doc` — est déjà tracée : ne pas la signaler une seconde fois."
+        ),
     ),
     "6b-repercussions-contradiction-au-tour-du-mainteneur": (
         REPERCUSSIONS_SKILL,
@@ -4855,6 +4873,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             "`start_session`, `initiation: user_asked`, `context: fresh`, `use_worktree: true`,"
             f" `title: <préfixe> › contradiction` {RENVOI_A_L_IDENTITE}, prompt"
             " `/contradiction` suivi du bloc d'arrêt — ses deux citations — et de `origine : #<N>`"
+            " ; hors d'un tour du mainteneur, une carte de proposition (`initiation:"
+            " own_initiative`, `context: fresh`, `use_worktree: true`, même titre et même prompt)."
         ),
     ),
     "6b-repercussions-reprise-sur-l-issue-fermee": (
@@ -4887,8 +4907,12 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b2-repercussions-document-gagne-deja-porte": (
         REPERCUSSIONS_SKILL,
         (
-            "sauf si une issue ouverte le porte déjà (« Une contradiction déjà portée par une issue"
-            " ouverte », ci-dessus) ; puis les étapes 2 à 7 suivent"
+            "sauf si une issue ouverte le porte déjà (« Une contradiction déjà portée par une"
+            " issue ouverte », ci-dessus) ; puis les étapes 2 à 7 suivent. Avec `amendement PR"
+            " #<m>`, `amendement reporté — #<k>`, que `#<k>` porte déjà, ou `écartée — <raison>`,"
+            " elles suivent directement. Une contradiction avérée → **s'arrêter avant l'étape 2**"
+            " et présenter l'arrêt de `.claude/rules/decisions-vs-doc.md` (bloc `## ⚠️"
+            " Contradiction`)."
         ),
     ),
     "6b-repercussions-arret-previent-le-parent": (
@@ -4912,7 +4936,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # la dernière, sur une QA déjà proposée.
     "6b-repercussions-sans-impact-passe-a-l-etape-6": (
         REPERCUSSIONS_SKILL,
-        "— et passer à l'étape 6, l'étape 7 restant due",
+        (
+            "Si aucune issue n'est impactée, le dire en une ligne — « Aucune répercussion : la"
+            " clôture de #47 ne rend fausse la planification d'aucune issue examinée. » — et"
+            " passer à l'étape 6, l'étape 7 restant due"
+        ),
     ),
     # Relecture de la PR #155, passe 1, I2, hors de `bug-vers-issue` : le corps et le brief que
     # `repercussions` réécrit sont lus par la session, jamais repris d'un rapport. Dénombrement de
@@ -4920,17 +4948,21 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b2-repercussions-releveur-pas-ce-que-l-etape-5-reecrit": (
         REPERCUSSIONS_SKILL,
         (
-            "le corps des issues examinées et leurs commentaires filtrés par les ancres données, le"
-            " brief en entier — contexte des étapes 2 et 3, pas le corps ni le brief que l'étape 5"
+            "**`releveur`** — la collecte (« Collectes ») : la PR mergée et ses fichiers, `git"
+            " log`, les issues du thème, les matchs d'ancre, les PR ouvertes, le compte d'issues"
+            " ouvertes d'un milestone ; les lectures bornées (« Lectures bornées ») : le corps"
+            " des issues examinées et leurs commentaires filtrés par les ancres données, le brief"
+            " en entier — contexte des étapes 2 et 3, pas le corps ni le brief que l'étape 5"
             " réécrit —"
         ),
     ),
     "6b2-repercussions-corps-lu-par-la-session": (
         REPERCUSSIONS_SKILL,
         (
-            "le corps courant, lu par la session elle-même juste avant d'écrire, dans ce même"
-            " `<fichier>` (`gh api repos/{owner}/{repo}/issues/<n> --jq .body`, sans le LF final"
-            " que `--jq` ajoute)"
+            "**Éditer le corps** de chaque issue retenue par `issue edit <n> --body-file"
+            " <fichier>` : le corps courant, lu par la session elle-même juste avant d'écrire,"
+            " dans ce même `<fichier>` (`gh api repos/{owner}/{repo}/issues/<n> --jq .body`, sans"
+            " le LF final que `--jq` ajoute)"
         ),
     ),
     "6b2-repercussions-corps-par-aucun-rapport": (
@@ -4946,7 +4978,12 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6b2-repercussions-relire-c-est-la-lecture-de-la-session": (
         REPERCUSSIONS_SKILL,
-        "c'est la lecture de la session ci-dessus, faite au moment d'écrire",
+        (
+            "**Relire le corps — et le brief — juste avant d'écrire** : c'est la lecture de la"
+            " session ci-dessus, faite au moment d'écrire. S'ils ont changé depuis la"
+            " présentation du diff — une autre passe de répercussions a pu passer entre-temps, ou"
+            " le mainteneur a édité — ne pas écrire par-dessus : re-présenter le diff recalculé."
+        ),
     ),
     "6b2-repercussions-doublon-lu-par-la-session": (
         REPERCUSSIONS_SKILL,
@@ -4957,7 +4994,15 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6b2-repercussions-completion-lue-par-la-session": (
         REPERCUSSIONS_SKILL,
-        "corps et brief lus par la session elle-même comme à l'étape 5 (« Éditer le corps »)",
+        (
+            "**Il ne crée aucune issue.** Un besoin non couvert révélé par la clôture n'est pas"
+            " une répercussion, c'est du travail neuf — et il suit"
+            " `.claude/rules/contraintes.md`, « Création d'issues en cours de cycle ». Si une"
+            " issue ouverte possède le sujet, ce skill y **ajoute le critère dans la même passe**"
+            " — bloc marqué `[complétion]` à l'étape 4, appliqué sur le même « go » par `issue"
+            " edit --body-file` (et `brief write` si le brief porte les critères), corps et brief"
+            " lus par la session elle-même comme à l'étape 5 (« Éditer le corps »)"
+        ),
     ),
     "6b-repercussions-remplacements-ancres": (
         REPERCUSSIONS_SKILL,
@@ -4969,7 +5014,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6b-repercussions-appel-apres-les-controles": (
         REPERCUSSIONS_SKILL,
-        "l'appel attend les deux contrôles ci-dessous",
+        (
+            "l'appel attend les deux contrôles ci-dessous. Ne jamais profiter de l'édition pour"
+            " reformuler autre chose."
+        ),
     ),
     "6b-repercussions-brief-write": (
         REPERCUSSIONS_SKILL,
@@ -4990,8 +5038,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b-repercussions-verification-dans-le-fichier": (
         REPERCUSSIONS_SKILL,
         (
-            "chercher dans le fichier chaque « citation issue » marquée `brief` — **zéro occurrence"
-            " attendue** — et l'ancre du contenu voulu — **présente**"
+            "**Vérification avant l'appel**, sur une issue portant un brief : chercher dans le"
+            " fichier chaque « citation issue » marquée `brief` — **zéro occurrence attendue** —"
+            " et l'ancre du contenu voulu — **présente**"
         ),
     ),
     "6b-repercussions-comment-pr": (
@@ -5000,7 +5049,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6b-repercussions-retour-par-label": (
         REPERCUSSIONS_SKILL,
-        "`label <n> --add needs-interrogation --remove <ready-for-agent | ready-for-human>`",
+        (
+            "`label <n> --add needs-interrogation --remove <ready-for-agent | ready-for-human>`"
+            " (labels réels : mapping de `.claude/pipeline.config.md`)"
+        ),
     ),
     # Relecture de la PR #153, passe 1, I2 : la fermeture en doublon laissait le label d'état sur
     # une issue fermée. Tenu aussi par `test_chaque_fermeture_d_issue_retire_son_etat`, dont la
@@ -5008,10 +5060,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b-repercussions-fermee-en-doublon": (
         REPERCUSSIONS_SKILL,
         (
-            "— le skill ne commente jamais une issue —, puis `issue close <n> --reason not_planned`,"
-            " puis `label <n> --remove <état>` — l'état que l'issue porte, lu sur elle, sous son"
-            " label réel (mapping de `.claude/pipeline.config.md`) : une issue fermée n'en porte"
-            " aucun (`triage`, « Rôles »)"
+            "— le skill ne commente jamais une issue —, puis `issue close <n> --reason"
+            " not_planned`, puis `label <n> --remove <état>` — l'état que l'issue porte, lu sur"
+            " elle, sous son label réel (mapping de `.claude/pipeline.config.md`) : une issue"
+            " fermée n'en porte aucun (`triage`, « Rôles »). Recouvrement partiel → on réduit le"
+            " périmètre dans le corps, on ne ferme pas."
         ),
     ),
     "6b-repercussions-seules-transitions-d-etat": (
@@ -5030,9 +5083,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b-repercussions-fin-de-travail": (
         REPERCUSSIONS_SKILL,
         (
-            "la passe finie — après l'étape 7, ou à l'arrêt de l'étape 1 —, prévenir le parent par"
-            " le message de fin de la même référence (« Fin de travail ») — la fin du tour ne le"
-            " prévient pas"
+            "**Session démarrée par une autre** — une session `contradiction` (son prompt système"
+            " nomme le parent, `.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité »"
+            ") : la passe finie — après l'étape 7, ou à l'arrêt de l'étape 1 —, prévenir le"
+            " parent par le message de fin de la même référence (« Fin de travail ») — la fin du"
+            " tour ne le prévient pas"
         ),
     ),
     "6b-repercussions-proposer-puis-demarrer": (
@@ -5054,7 +5109,13 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6b-repercussions-brouillon-au-tour-du-mainteneur": (
         REPERCUSSIONS_SKILL,
-        "un brouillon dans sa propre session, démarrée dans le tour où le mainteneur l'accepte",
+        (
+            "un brouillon dans sa propre session, démarrée dans le tour où le mainteneur"
+            " l'accepte — `start_session`, `initiation: user_asked`, `context: fresh`,"
+            " `use_worktree: true` : pour un défaut, `bug-vers-issue` avec la description en"
+            " argument (`title: <préfixe> › bug` (`sessions-liees.md`, « Identité », une racine"
+            " se nomme d'abord), prompt `/bug-vers-issue <description>`)"
+        ),
     ),
     "6b-repercussions-plan-hors-depot": (
         REPERCUSSIONS_SKILL,
@@ -5113,15 +5174,33 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     # (`USE_WORKTREE_EXPLICITE`), le contexte vivant retiré (`RETIRES_DU_CONTEXTE_VIVANT`).
     "6b2-contradiction-ecriture-de-depot-par-une-pr": (
         CONTRADICTION_SKILL,
-        "toute écriture de dépôt de ce skill part par une PR (D-12 de #134",
+        (
+            "**Règle d'or** : ce skill **propose**, il n'écrit jamais en silence. Aucune édition"
+            " sans « go » explicite, et toute écriture de dépôt de ce skill part par une PR (D-12"
+            " de #134 ; étape 4)"
+        ),
     ),
     "6b2-contradiction-raisonnement-dans-le-body": (
         CONTRADICTION_SKILL,
-        "le raisonnement va dans le body de la PR qui porte l'amendement",
+        (
+            "**Le raisonnement ne va pas dans le document normatif.** Les documents des rangs"
+            " supérieurs ne portent que l'**état courant**. Le pourquoi, les options écartées et"
+            " la date vont dans l'emplacement **Non normatif** déclaré par la table « Sources de"
+            " vérité » de `.claude/pipeline.config.md` — s'il n'en déclare aucun, le raisonnement"
+            " va dans le body de la PR qui porte l'amendement"
+        ),
     ),
     "6b2-contradiction-affirmation-reste-a-la-session": (
         CONTRADICTION_SKILL,
-        "la recherche « par affirmation » — reste à la session, sur les passages rendus",
+        (
+            "**`releveur`** — les lectures bornées (« Lectures bornées ») : la table « Sources de"
+            " vérité », les passages des documents autour des ancres données, la carte des"
+            " miroirs et des renvois ; les collectes de la cascade (« Collectes ») : par ancre"
+            " lexicale et par dénombrement, sur les termes que donne la session (étape 2) ; la"
+            " vérification `context7` d'une reco (« Questions de documentation », étape 3)."
+            " Reconnaître une même affirmation sous d'autres mots — la recherche « par"
+            " affirmation » — reste à la session, sur les passages rendus"
+        ),
     ),
     "6b2-contradiction-entree-arret-ecrit": (CONTRADICTION_SKILL, "L'entrée est l'arrêt écrit"),
     "6b2-contradiction-entree-par-ses-deux-voies": (
@@ -5142,8 +5221,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b2-contradiction-premier-geste": (
         CONTRADICTION_SKILL,
         (
-            "son premier geste lit les documents sur le trunk à jour,"
-            " `git fetch origin && git switch --detach origin/<trunk>`"
+            "**Démarrée par une autre**, cette session vit dans son propre worktree, coupé sans"
+            " fetch sur sa source (`.claude/skills/cycle-pr/references/sessions-liees.md`,"
+            " « Premier geste ») : son premier geste lit les documents sur le trunk à jour, `git"
+            " fetch origin && git switch --detach origin/<trunk>` (`<trunk>` :"
+            " `.claude/pipeline.config.md`)"
         ),
     ),
     "6b2-contradiction-aucune-branche": (
@@ -5152,7 +5234,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6b2-contradiction-relecture-des-citations-a-la-session": (
         CONTRADICTION_SKILL,
-        "Cette relecture reste à la session",
+        (
+            "Reprendre les deux citations de l'arrêt et les **vérifier dans le fichier** — pas de"
+            " mémoire, on relit la ligne. Cette relecture reste à la session"
+        ),
     ),
     "6b2-contradiction-cascade-au-releveur": (
         CONTRADICTION_SKILL,
@@ -5165,12 +5250,17 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         CONTRADICTION_SKILL,
         (
             "un `releveur` pose la question à la documentation à jour de la bibliothèque"
-            " (`context7`) et rend le passage cité mot pour mot ; la conclusion reste à la session"
+            " (`context7`) et rend le passage cité mot pour mot ; la conclusion reste à la"
+            " session, qui cite dans la ligne de reco ce qui a été vérifié (« vérifié : X"
+            " n'insère pas d'HTML »)"
         ),
     ),
     "6b2-contradiction-doc-hors-index-a-la-session": (
         CONTRADICTION_SKILL,
-        "ou plusieurs candidates, remonte à la session, qui la lit à la source",
+        (
+            "ou plusieurs candidates, remonte à la session, qui la lit à la source. Une reco"
+            " fondée sur la sécurité n'y échappe pas"
+        ),
     ),
     "6b2-contradiction-par-une-pr": (
         CONTRADICTION_SKILL,
@@ -5212,12 +5302,15 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         (
             "Quand le mainteneur retient à l'étape 3 l'effet déplacé dans le dépôt (sortie 1b de"
             " `decisions-vs-doc`), la table des édits porte ce déplacement, et non un amendement,"
-            " par le même déroulé de PR"
+            " par le même déroulé de PR ; les quatre gestes ci-dessous sont ceux d'un amendement."
         ),
     ),
     "6b2-contradiction-quatre-gestes-un-commit": (
         CONTRADICTION_SKILL,
-        "La table des édits porte, dans le même commit, ces quatre gestes",
+        (
+            "La table des édits porte, dans le même commit, ces quatre gestes, dans l'ordre, sans"
+            " en sauter"
+        ),
     ),
     "6b2-hors-scope-nomme-contradiction": (
         HORS_SCOPE_REF,
@@ -5237,8 +5330,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b2-contradiction-rien-a-demarrer-en-session-pr": (
         CONTRADICTION_SKILL,
         (
-            "la passe `repercussions` de `cycle-pr` Étape 8 le confronte aux issues — rien à"
-            " démarrer ici"
+            "**Dans une session PR**, l'amendement ou le déplacement fait partie du delta de sa"
+            " PR : la passe `repercussions` de `cycle-pr` Étape 8 le confronte aux issues — rien"
+            " à démarrer ici"
         ),
     ),
     # Relecture de la PR #155, passe 2, I1 : la relance part à la sortie, plus au seul merge d'un
@@ -5247,14 +5341,17 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         CONTRADICTION_SKILL,
         (
             "**Hors PR**, dans le tour du mainteneur où la sortie est connue, démarrer la session"
-            " `repercussions`"
+            " `repercussions` : `start_session`, `initiation: user_asked`, `context: fresh`,"
+            " `use_worktree: true`, et"
         ),
     ),
     "6b2-contradiction-rend-la-passe-quelle-que-soit-la-sortie": (
         CONTRADICTION_SKILL,
         (
-            "il **délègue à `repercussions`** une fois sa PR mergée, et, démarré par une passe"
-            " `repercussions`, la fait reprendre quelle que soit la sortie"
+            "Les deux partagent la même discipline : **deux citations ou rien**, un diff"
+            " avant/après, et aucune écriture sans « go ». Ce skill ne la réimplémente pas côté"
+            " issues — il **délègue à `repercussions`** une fois sa PR mergée, et, démarré par"
+            " une passe `repercussions`, la fait reprendre quelle que soit la sortie"
         ),
     ),
     "6b2-contradiction-se-taire-ne-dispense-pas-de-la-relance": (
@@ -5264,18 +5361,22 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b2-contradiction-citation-introuvable-vers-l-etape-5": (
         CONTRADICTION_SKILL,
         (
-            "Une citation qui ne s'y retrouve pas : pas de contradiction (« Le livrable »), et, avec"
-            " `origine : #<N>`, la session passe aux étapes 5 et 6"
+            "Une citation qui ne s'y retrouve pas : pas de contradiction (« Le livrable »), et,"
+            " avec `origine : #<N>`, la session passe aux étapes 5 et 6. Puis situer le **rang**"
+            " touché dans la table « Sources de vérité » de `.claude/pipeline.config.md`, qu'un"
+            " `releveur` rend."
         ),
     ),
     "6b2-contradiction-fin-de-travail": (
         CONTRADICTION_SKILL,
         (
-            "prévenir le parent par le message de fin de `sessions-liees.md` (« Fin de travail »),"
-            " sous la forme que la table de l'étape 5 donne à sa sortie, suivie du suffixe"
-            " « — enfants au travail : `local_…` » qui nomme la session `repercussions` démarrée,"
-            " absent quand la relance est restée une carte de proposition — la fin du tour ne le"
-            " prévient pas"
+            "**Session démarrée par une autre** — par `repercussions` (son prompt système nomme"
+            " le parent, `.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») :"
+            " le récapitulatif fait, prévenir le parent par le message de fin de"
+            " `sessions-liees.md` (« Fin de travail »), sous la forme que la table de l'étape 5"
+            " donne à sa sortie, suivie du suffixe « — enfants au travail : `local_…` » qui nomme"
+            " la session `repercussions` démarrée, absent quand la relance est restée une carte"
+            " de proposition — la fin du tour ne le prévient pas"
         ),
     ),
     "6b2-contradiction-l-archiveur-nettoie": (
@@ -5289,8 +5390,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b2-contradiction-code-perime-par-creation-d-issues": (
         CONTRADICTION_SKILL,
         (
-            "Une décision qui périme du code déjà écrit suit « Création d'issues en cours de"
-            " cycle » (`.claude/rules/contraintes.md`), pas une édition sauvage"
+            "**Il ne touche pas au code.** Une décision qui périme du code déjà écrit suit"
+            " « Création d'issues en cours de cycle » (`.claude/rules/contraintes.md`), pas une"
+            " édition sauvage"
         ),
     ),
     "6b2-bug-vers-issue-releveur-sans-conclure": (
@@ -5333,7 +5435,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6b2-bug-vers-issue-coupables-a-la-session": (
         BUG_VERS_ISSUE_SKILL,
-        "le choix du ou des coupables reste à la session",
+        (
+            "Utilise `references/collecte-contexte.md` comme liste de contrôle. Ses lectures et"
+            " ses `git log` partent au `releveur` (« Délégation ») ; le choix du ou des coupables"
+            " reste à la session"
+        ),
     ),
     "6b2-bug-vers-issue-argument-et-intake": (
         BUG_VERS_ISSUE_SKILL,
@@ -5344,7 +5450,15 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6b2-bug-vers-issue-proprietaire-a-la-session": (
         BUG_VERS_ISSUE_SKILL,
-        "la conclusion — qui possède le sujet — reste à la session",
+        (
+            "Avant de rédiger, chercher **qui possède déjà ce sujet** : une automatisation"
+            " déclarée (bot de dépendances, workflow planifié, hook), une issue ouverte dont"
+            " c'est le critère, une PR fermée qui le portait. Si un mécanisme existe, la question"
+            " devient « pourquoi n'a-t-il pas agi ? » — souvent parce qu'on l'a fait taire — et"
+            " c'est *ça* qu'on corrige. Un ticket est la façon de confier un problème à un humain"
+            " ; vérifier d'abord qu'il n'est pas déjà confié à une machine. La recherche est une"
+            " collecte du `releveur` ; la conclusion — qui possède le sujet — reste à la session"
+        ),
     ),
     "6b2-bug-vers-issue-ouverte-commentee": (
         BUG_VERS_ISSUE_SKILL,
@@ -5361,7 +5475,14 @@ INVARIANTS_DU_CONTEXTE_COURT = {
             " serait hors de toute file de tri, et `ecriture-relue.py` n'a pas de réouverture"
         ),
     ),
-    "6b2-bug-vers-issue-pas-en-silence": (BUG_VERS_ISSUE_SKILL, "ne consigne pas en silence"),
+    "6b2-bug-vers-issue-pas-en-silence": (
+        BUG_VERS_ISSUE_SKILL,
+        (
+            "Si piloté par un plan, cherche dans le corps du plan QA un marqueur `🔴 BUG #<N>`"
+            " près de la case qui échoue. S'il en existe un pour cette case précise, signale-le"
+            " au mainteneur — ne consigne pas en silence"
+        ),
+    ),
     "6b2-bug-vers-issue-creation-relue": (
         BUG_VERS_ISSUE_SKILL,
         (
@@ -5371,11 +5492,17 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6b2-bug-vers-issue-labels-du-mapping": (
         BUG_VERS_ISSUE_SKILL,
-        "`<qa-finding>` et `<needs-triage>` sont les labels réels du mapping",
+        (
+            "`<qa-finding>` et `<needs-triage>` sont les labels réels du mapping (« Labels ») ;"
+            " la sortie porte le numéro créé."
+        ),
     ),
     "6b2-bug-vers-issue-decoupage-une-creation-a-la-fois": (
         BUG_VERS_ISSUE_SKILL,
-        "puis les enfants un par un, dans l'ordre des dépendances, chacun par son `issue create`",
+        (
+            "En cas de découpage : le parent d'abord, puis les enfants un par un, dans l'ordre"
+            " des dépendances, chacun par son `issue create`"
+        ),
     ),
     "6b2-bug-vers-issue-patch-du-plan": (
         BUG_VERS_ISSUE_SKILL,
@@ -5406,8 +5533,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b2-bug-vers-issue-releveur-pas-le-corps-patche": (
         BUG_VERS_ISSUE_SKILL,
         (
-            "le corps du plan QA autour de la case — contexte des étapes 2 et 3, pas le corps que"
-            " l'étape 7 patche —"
+            "**`releveur`** — les collectes (« Collectes ») : doublons et propriétaire du sujet"
+            " par `gh issue list --search` sur les mots-clés que donne la session, issues"
+            " récemment fermées touchant la zone, `git log` ; les lectures bornées (« Lectures"
+            " bornées ») : l'intake d'échec écrit, le corps du plan QA autour de la case —"
+            " contexte des étapes 2 et 3, pas le corps que l'étape 7 patche —"
         ),
     ),
     "6b2-bug-vers-issue-remplacements-en-memoire": (
@@ -5445,21 +5575,32 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "6b2-bug-vers-issue-fin-de-travail": (
         BUG_VERS_ISSUE_SKILL,
         (
-            "prévenir le parent par le message de fin de la même référence (« Fin de travail »),"
-            " « terminé — <livrable> », le livrable nommant la classe : « BUG #<N> consigné »,"
-            " « attendu faux, case réécrite », « environnement, case à rejouer », « correctif"
-            " évident, petite PR proposée » ou « correctif évident, rendu à ta PR : <correctif> »"
-            " — la fin du tour ne le prévient pas"
+            "**Session démarrée par une autre** (son prompt système nomme le parent,"
+            " `.claude/skills/cycle-pr/references/sessions-liees.md`, « Identité ») : la sortie"
+            " de sa classe faite — issue publiée ou commentée et plan patché en mode piloté, case"
+            " réécrite, marqueur retiré ou remplacé, petite PR proposée —, prévenir le parent par"
+            " le message de fin de la même référence (« Fin de travail »), « terminé — <livrable> »"
+            ", le livrable nommant la classe : « BUG #<N> consigné », « attendu faux, case"
+            " réécrite », « environnement, case à rejouer », « correctif évident, petite PR"
+            " proposée » ou « correctif évident, rendu à ta PR : <correctif> » — la fin du tour"
+            " ne le prévient pas"
         ),
     ),
     "6b2-bug-vers-issue-la-qa-reprend": (BUG_VERS_ISSUE_SKILL, "la QA reprend dans sa session"),
     "6b2-bug-vers-issue-labels-reels": (
         BUG_VERS_ISSUE_SKILL,
-        "Les labels réels se lisent dans le mapping de `.claude/pipeline.config.md`",
+        (
+            "Toujours les rôles `qa-finding` et `needs-triage`. Les labels réels se lisent dans"
+            " le mapping de `.claude/pipeline.config.md` : `qa-finding` y figure."
+        ),
     ),
     "6b2-bug-vers-issue-label-absent-arrete": (
         BUG_VERS_ISSUE_SKILL,
-        "`issue create` refuse en le nommant : s'arrêter et le dire au mainteneur",
+        (
+            "`issue create` refuse en le nommant : s'arrêter et le dire au mainteneur ;"
+            " `init-projet`, en reconfiguration, le pose (étape 6, « Créer les labels manquants"
+            " dans GitHub »)."
+        ),
     ),
     "6b2-bug-vers-issue-erreur-intake-ecrit": (
         BUG_VERS_ISSUE_SKILL,
@@ -5478,7 +5619,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "6b2-gabarit-decoupage-une-creation-a-la-fois": (
         GABARIT_DECOUPAGE_REF,
-        "une `issue create` à la fois (SKILL.md, étape 6)",
+        (
+            "une `issue create` à la fois (SKILL.md, étape 6) : le parent d'abord, puis les"
+            " enfants sans bloqueurs, puis les enfants bloqués par des enfants précédents."
+        ),
     ),
     # Lot 7a de #134 (2026-10-26) : `plan-qa` nomme ses exécutants et publie par l'écriture relue.
     # Une entrée par point du brief du bloc 2 qui écrit une règle — « Délégation », « Entrées »,
@@ -5512,8 +5656,13 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-plan-qa-releveur-noms-verifies": (
         PLAN_QA_SKILL,
         (
-            "chaque nom vérifié contre les migrations ou les modèles, chaque endpoint ou chemin"
-            " incertain vérifié localement (étapes 1 et 5)"
+            "**`releveur`** — les relevés de l'entrée (« Entrées ») : les issues du périmètre —"
+            " numéros, titres, corps, critères — par `gh issue list` ou `gh issue view` (modes 1"
+            " à 3), le PRD, les thèmes clos sans issue `qa-plan` (mode 4) ; `git log"
+            ' --grep="#<numéro-issue>"` par issue, et les chemins modifiés ; la carte des'
+            " surfaces de l'étape 1 — routes, commandes, URLs, composants, tables, fixtures,"
+            " variables d'environnement —, chaque nom vérifié contre les migrations ou les"
+            " modèles, chaque endpoint ou chemin incertain vérifié localement (étapes 1 et 5)"
         ),
     ),
     "7a-plan-qa-releveur-sans-conclure": (
@@ -5523,8 +5672,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-plan-qa-executant-ne-corrige-rien": (
         PLAN_QA_SKILL,
         (
-            "il rend « conforme » ou les lignes en échec, et ne corrige rien ; une case sans type"
-            " refuse la publication"
+            "**`executant`** — la passe comptable de la « Passe finale avant publication », sur"
+            " le brouillon : il rend « conforme » ou les lignes en échec, et ne corrige rien ;"
+            " une case sans type refuse la publication"
         ),
     ),
     "7a-plan-qa-script-par-la-session": (
@@ -5542,7 +5692,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         PLAN_QA_SKILL,
         (
             "la QA se déroule dans une session `execution-qa` distincte, qui reçoit le numéro du"
-            " plan publié, jamais dans le contexte de celle-ci"
+            " plan publié, jamais dans le contexte de celle-ci (protocole commun :"
+            " `.claude/skills/cycle-pr/references/sessions-liees.md`)"
         ),
     ),
     "7a-plan-qa-ne-demarre-pas-execution-qa": (
@@ -5551,23 +5702,38 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "7a-plan-qa-mode-1-au-releveur": (
         PLAN_QA_SKILL,
-        "Le `releveur` (« Délégation ») relève le corps du PRD, puis les issues d'implémentation",
+        (
+            "Mode 1 — **Référence PRD** : `/plan-qa #42` où `#42` est une issue PRD. Le"
+            " `releveur` (« Délégation ») relève le corps du PRD, puis les issues"
+            """ d'implémentation qui en découlent : `gh issue list --search "parent #42" --state"""
+            " all` (ou les issues qui mentionnent `#42`)."
+        ),
     ),
     "7a-plan-qa-mode-2-au-releveur": (
         PLAN_QA_SKILL,
-        "Le `releveur` relève le corps et les critères d'acceptation de chaque issue.",
+        (
+            "Mode 2 — **Liste explicite d'issues** : `/plan-qa #51 #52 #53`. Le `releveur` relève"
+            " le corps et les critères d'acceptation de chaque issue."
+        ),
     ),
     "7a-plan-qa-mode-3-au-releveur": (
         PLAN_QA_SKILL,
-        "Le `releveur` relève les issues du milestone",
+        (
+            """Mode 3 — **Thème terminé** : `/plan-qa "Facturation"` où l'argument est un thème"""
+            " (milestone). C'est le mode le plus courant, proposé automatiquement par"
+            " `repercussions` quand le dernier ticket d'un thème se ferme. Le `releveur` relève"
+            ' les issues du milestone : `gh issue list --milestone "<thème>" --state all --json'
+            " number,title,body`."
+        ),
     ),
     "7a-plan-qa-mode-4-question-a-la-session": (
         PLAN_QA_SKILL,
         (
-            "le `releveur` relève les thèmes dont toutes les issues sont fermées et qui n'ont pas"
-            " encore d'issue `qa-plan`, et la session demande au mainteneur lequel recetter. S'il"
-            " n'y en a aucun, elle lui demande quelles issues sont dans le périmètre — **ne jamais"
-            " deviner un périmètre de QA**"
+            "Mode 4 — **Aucun argument** : le `releveur` relève les thèmes dont toutes les issues"
+            " sont fermées et qui n'ont pas encore d'issue `qa-plan`, et la session demande au"
+            " mainteneur lequel recetter. S'il n'y en a aucun, elle lui demande quelles issues"
+            " sont dans le périmètre — **ne jamais deviner un périmètre de QA**, un plan mal"
+            " cadré est un plan qu'on ne déroule pas."
         ),
     ),
     "7a-plan-qa-tous-les-modes-au-releveur": (
@@ -5587,8 +5753,13 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-plan-qa-inspection-au-releveur": (
         PLAN_QA_SKILL,
         (
-            "L'inspection part au `releveur` (« Délégation »), à qui la session donne la liste des"
-            " surfaces de la config et des fichiers touchés par les commits du périmètre"
+            "L'inspection part au `releveur` (« Délégation »), à qui la session donne la liste"
+            " des surfaces de la config et des fichiers touchés par les commits du périmètre :"
+            " `docs/`, `README`, le fichier de commandes du projet, puis les points d'entrée"
+            " réels de **chaque surface déclarée** — selon le projet : routeur/contrôleurs,"
+            " définition des commandes CLI, routes d'interface, schéma/migrations, définition des"
+            " jobs —, plus tout fixture que ces commits touchent. Il cherche par `rg`/`rg"
+            " --files` d'abord, et rend la carte des surfaces"
         ),
     ),
     "7a-plan-qa-instruction-verifiee-seule": (
@@ -5605,15 +5776,16 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-plan-qa-label-absent-arrete": (
         PLAN_QA_SKILL,
         (
-            "S'il manque au dépôt, `issue create` refuse en le nommant : s'arrêter et le dire"
-            " au mainteneur"
+            "S'il manque au dépôt, `issue create` refuse en le nommant : s'arrêter et le dire au"
+            " mainteneur ; `init-projet`, en reconfiguration, le pose (étape 6, « Créer les"
+            " labels manquants dans GitHub »)."
         ),
     ),
     "7a-plan-qa-persistance-par-le-releve": (
         PLAN_QA_SKILL,
         (
-            "uniquement sur les noms réels que le relevé du `releveur` a vérifiés contre les"
-            " migrations"
+            "Requêtes sur la persistance : uniquement sur les noms réels que le relevé du"
+            " `releveur` a vérifiés contre les migrations"
         ),
     ),
     "7a-plan-qa-decision-apres-le-type": (
@@ -5634,8 +5806,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-plan-qa-publication-relue": (
         PLAN_QA_SKILL,
         (
-            "python .claude/skills/cycle-pr/scripts/ecriture-relue.py issue create --title"
-            ' "Plan QA: <périmètre>" --body-file <brouillon> --label <qa-plan>'
+            "GitHub : `python .claude/skills/cycle-pr/scripts/ecriture-relue.py issue create"
+            ' --title "Plan QA: <périmètre>" --body-file <brouillon> --label <qa-plan>'
         ),
     ),
     "7a-plan-qa-label-reel-et-numero": (
@@ -5689,8 +5861,13 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-plan-qa-marqueurs": (
         PLAN_QA_SKILL,
         (
-            "`cat <brouillon> | grep -nE 'TODO|FIXME|à compléter|<[^<>[:space:]][^<>]*>'` : toute"
-            " ligne sortie porte un marqueur ou un espace réservé du gabarit"
+            "**Marqueurs** — `cat <brouillon> | grep -nE 'TODO|FIXME|à"
+            " compléter|<[^<>[:space:]][^<>]*>'` : toute ligne sortie porte un marqueur ou un"
+            " espace réservé du gabarit ; une valeur d'exécution s'écrit en variable"
+            " (`$CLIENT_A_ID`, étape 5) ou, produite par une case, se relit du fichier que cette"
+            " case écrit (`$QA_RUN/upload.json`, `references/exemple-bloc-issue.md`). -"
+            """ **Structure** — `cat <brouillon> | grep -nE "^## |^[*][*]Règle d'arrêt[*][*]"` :"""
+            " « Vue d'ensemble », « Types de case » et « Saisie d'échec » présents"
         ),
     ),
     "7a-plan-qa-structure": (
@@ -5712,26 +5889,54 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7a-plan-qa-erreur-case-sans-type": (
         PLAN_QA_SKILL,
         (
-            "`**Commande** —` ou `**Observation** —` en tête, puis ` → ` et l'attendu sur la ligne"
-            " de la case (gabarit, « Types de case ») ; la passe comptable la refuse"
+            "| **Cases qui refont le travail de la CI** (« les tests passent », « le lint est"
+            " vert ») | Les supprimer. Le plan ne contient que ce qu'un test ne peut pas voir. |"
+            " | **Sections pour des surfaces inexistantes** (frontend sur une CLI, BDD sur une"
+            " lib) | Déduire les surfaces de `.claude/pipeline.config.md`. Une surface absente ne"
+            " produit aucune section, pas même un « N/A ». | | **Case sans type** | `**Commande**"
+            " —` ou `**Observation** —` en tête, puis ` → ` et l'attendu sur la ligne de la case"
+            " (gabarit, « Types de case ») ; la passe comptable la refuse. | | Le plan couvre des"
+            " zones qu'aucune issue récente n'a touchées | Recadrer. Uniquement les phases de"
+            " couche A pour le transversal, les blocs de couche B liés aux issues dans le"
+            " périmètre. | | Vérifications génériques (« l'API marche », « l'UI s'affiche ») |"
+            " Ancrer à des routes/composants/états/codes de statut attendus spécifiques. | | Jobs"
+            " asynchrones sans vérifications d'état terminal | Ajouter les chemins explicites"
+            " succès ET échec, avec l'état persisté attendu pour chacun. | | Fichiers"
+            " entrants/produits sans assertion sur l'artefact | Vérifier chemin, taille, format,"
+            " préservation de l'original, et la trace persistée correspondante. | | Un unique"
+            " état « réussi/échoué » par phase | Chaque surface du projet est suivie séparément —"
+            " ne jamais les fusionner en un verdict. | | Longues queues de logs (`docker logs"
+            " --follow`) | Utiliser des queues bornées. Les logs en preuve QA doivent être petits"
+            " et copiables-collables. | | Langues mélangées | Français, vocabulaire du domaine,"
+            " pas de fuite de jargon interne. Les preuves collées par l'utilisateur restent dans"
+            " leur forme native. |"
         ),
     ),
     "7a-gabarit-plan-qa-passe-comptable-refuse": (
         GABARIT_PLAN_QA_REF,
-        "Une case sans type n'est pas publiable : la passe comptable la refuse",
+        (
+            "**Chaque case porte son type**, juste après la case à cocher : ``- [ ] **Commande**"
+            " — `<commande exacte>` → <attendu>`` ou ``- [ ] **Observation** — <action ou endroit"
+            " à regarder> → <attendu>`` (« Types de case » ci-dessous). Une case sans type n'est"
+            " pas publiable : la passe comptable la refuse"
+        ),
     ),
     "7a-gabarit-plan-qa-commande-attendu-sur-sa-ligne": (
         GABARIT_PLAN_QA_REF,
         (
-            "dans un seul segment entre accents graves, puis ` → ` et son attendu sur la ligne même"
-            " de la case"
+            "Chaque case porte son type juste après la case à cocher, pour se jouer sans"
+            " décision. Une case **Commande** tient sa commande exacte dans un seul segment entre"
+            " accents graves, puis ` → ` et son attendu sur la ligne même de la case : elle se"
+            " déroule telle qu'écrite, comparée à son attendu."
         ),
     ),
     "7a-gabarit-plan-qa-observation-porte-son-attendu": (
         GABARIT_PLAN_QA_REF,
         (
-            "Une case **Observation** — rendu, état d'écran, console, ergonomie — porte de même"
-            " ` → ` et son attendu sur sa première ligne"
+            "Une case **Observation** — rendu, état d'écran, console, ergonomie — porte de même `"
+            " → ` et son attendu sur sa première ligne, et se joue avec le mainteneur. Une case"
+            " qui couvre un critère d'acceptation le cite en fin de texte, avant toute annotation"
+            " : `(C1)` ou `(C1, C3)`."
         ),
     ),
     "7a-gabarit-plan-qa-intake-ecrit": (
@@ -5808,10 +6013,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7b2-execution-qa-principe": (
         EXECUTION_QA_SKILL,
         (
-            "Chaque échec offre à l'utilisateur trois options explicites (consigner, reporter, faire"
+            "Chaque case basculée en `[x]` doit reposer sur une preuve observée. Chaque échec"
+            " offre à l'utilisateur trois options explicites (consigner, reporter, faire"
             " corriger). Ne jamais auto-invoquer `bug-vers-issue`. **Ne jamais fusionner deux"
-            " surfaces en un seul verdict** quand une seule a été réellement testée — « le service"
-            " répond » ne dit rien de ce que l'utilisateur voit."
+            " surfaces en un seul verdict** quand une seule a été réellement testée — « le"
+            " service répond » ne dit rien de ce que l'utilisateur voit."
         ),
     ),
     "7b2-execution-qa-jugement-a-la-session": (
@@ -5861,9 +6067,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         EXECUTION_QA_SKILL,
         (
             "**sessions distinctes** — la consignation d'un échec (`bug-vers-issue`, §4, option"
-            " (a)), sa correction (`cycle-pr`, option (c)), et la reprise de la case corrigée : une"
-            " session de QA neuve, démarrée sur le numéro du plan une fois la correction mergée,"
-            " dont le §2 trouve la case — jamais la suite du contexte qui a corrigé"
+            " (a)), sa correction (`cycle-pr`, option (c)), et la reprise de la case corrigée :"
+            " une session de QA neuve, démarrée sur le numéro du plan une fois la correction"
+            " mergée, dont le §2 trouve la case — jamais la suite du contexte qui a corrigé ;"
+            " protocole commun : `.claude/skills/cycle-pr/references/sessions-liees.md`."
         ),
     ),
     "7b2-execution-qa-etat-a-la-forge": (
@@ -5943,7 +6150,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         EXECUTION_QA_SKILL,
         (
             "**Examiner les résultats observés** — le relevé du `releveur`, ou ce que rapporte le"
-            " mainteneur."
+            " mainteneur. Comparer à l'attendu. Si quelque chose manque qui changerait la"
+            " décision, le demander (code de statut, extrait de corps, ligne de console, nombre"
+            " de lignes en BD)."
         ),
     ),
     "7b2-execution-qa-pas-de-preuve-inutile": (
@@ -5969,7 +6178,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7b2-execution-qa-patch-par-paires": (
         EXECUTION_QA_SKILL,
         (
-            "une paire par case décidée, dans un fichier, appliquée par"
+            "**Patcher le plan** à la fin du bloc (ou après un sous-groupe significatif au sein"
+            " d'un bloc long) : une paire par case décidée, dans un fichier, appliquée par"
             " `python .claude/skills/cycle-pr/scripts/ecriture-relue.py checkbox patch <plan>"
             " --paires <fichier>`"
         ),
@@ -6018,18 +6228,23 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7b2-execution-qa-prompt-de-consignation": (
         EXECUTION_QA_SKILL,
         (
-            "prompt `/bug-vers-issue #<plan> <ancre de la case> <URL de l'intake>`, la forme de son"
-            " `argument-hint`"
+            "`start_session`, `initiation: user_asked`, `context: fresh`, `use_worktree: false` —"
+            " elle lit le code de la campagne et n'écrit que dans GitHub —, `title: <préfixe> ›"
+            " bug` (`sessions-liees.md`, « Identité », une racine se nomme d'abord), prompt"
+            " `/bug-vers-issue #<plan> <ancre de la case> <URL de l'intake>`, la forme de son"
+            " `argument-hint`. Hors d'un tour du mainteneur, une carte de proposition"
+            " (`initiation: own_initiative`, `context: fresh`, `use_worktree: false`, même titre"
+            " et même prompt)."
         ),
     ),
     "7b2-execution-qa-un-seul-auteur": (
         EXECUTION_QA_SKILL,
         (
             "Le marqueur `🔴 BUG #N` et l'Index des constats, ou la case que réécrit une autre"
-            " classe, la session `bug-vers-issue` les patche elle-même (ses étapes 1 et 7) : cette"
-            " session ne les écrit pas, un seul auteur. La QA reprend dans cette session sur son"
-            " message « terminé — <livrable> » (`sessions-liees.md`, « Fin de travail »), jamais sur"
-            " sa fin de tour."
+            " classe, la session `bug-vers-issue` les patche elle-même (ses étapes 1 et 7) :"
+            " cette session ne les écrit pas, un seul auteur. La QA reprend dans cette session"
+            " sur son message « terminé — <livrable> » (`sessions-liees.md`, « Fin de travail »),"
+            " jamais sur sa fin de tour. Mise en avant par défaut."
         ),
     ),
     "7b2-execution-qa-reporter": (
@@ -6064,8 +6279,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7b2-execution-qa-decision-ou-accepte": (
         EXECUTION_QA_SKILL,
         (
-            "` — Décision : <politique choisie>, <date>` si la case passe, ` — accepté : <décision>,"
-            " <date>` si l'écart est accepté sans qu'elle passe (§3, étape 4)."
+            "Enregistrer la décision en ligne sur la case concernée : ` — Décision : <politique"
+            " choisie>, <date>` si la case passe, ` — accepté : <décision>, <date>` si l'écart"
+            " est accepté sans qu'elle passe (§3, étape 4)."
         ),
     ),
     "7b2-execution-qa-code-jamais-dans-cette-session": (
@@ -6098,8 +6314,23 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7b2-execution-qa-erreur-consigner-par-defaut": (
         EXECUTION_QA_SKILL,
         (
-            "| Auto-invoquer bug-vers-issue sur un échec | Toujours proposer les trois options"
-            " d'abord. Mise en avant par défaut = (a) consigner. |"
+            "| Basculer `[x]` sans preuve observée | Toujours exiger : commande exécutée, statut"
+            " / corps / ligne / log vu. | | Fusionner deux surfaces en une seule affirmation de"
+            " passage | Suivre chaque surface indépendamment, et ne rien affirmer d'une surface"
+            " non testée. | | Auto-invoquer bug-vers-issue sur un échec | Toujours proposer les"
+            " trois options d'abord. Mise en avant par défaut = (a) consigner. | | Maintenir un"
+            " fichier de trace séparé | Non. Le corps du plan et ses commentaires SONT la trace."
+            " | | Déverser d'énormes logs dans le corps du plan | Les commentaires de synthèse de"
+            " phase reçoivent la preuve lourde. Le corps garde les annotations en ligne courtes."
+            " | | Patcher le corps à la main, ou depuis une copie locale | Une paire par case,"
+            " appliquée au corps courant par `checkbox patch --paires` — voir"
+            " `references/patch-checkbox-gh.md`. | | Écrire `🔴 BUG #N` ou l'Index des constats"
+            " depuis cette session | La session `bug-vers-issue` les écrit, seule (§4, option"
+            " (a)). | | Démarrer la phase suivante alors qu'une règle d'arrêt est active |"
+            " Respecter la règle d'arrêt jusqu'à ce que l'utilisateur accepte explicitement"
+            " l'exception. | | Corriger un bug dans la session de QA | Jamais : (a) qualifie ; la"
+            " correction passe par `cycle-pr`, dans sa propre session, en petite PR ou sur"
+            " l'issue consignée (c). |"
         ),
     ),
     "7b2-execution-qa-erreur-patch-a-la-main": (
@@ -6130,21 +6361,23 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7b2-intake-ecrit-et-consomme-en-argument": (
         INTAKE_ECHEC_REF,
         (
-            "L'intake s'**écrit** : en commentaire de l'issue du plan, publié par `comment <plan>"
-            " --body-file` depuis un fichier du scratchpad de la session, jamais de l'arbre de la"
-            " campagne (`SKILL.md` §4, étape 2), ou, en mode de repli markdown, dans un fichier hors"
-            " de l'arbre de la campagne et de tout worktree éphémère. La session `bug-vers-issue`"
-            " distincte qui le consomme le reçoit en argument — son URL ou son chemin — quand"
-            " l'utilisateur choisit l'option (a) « consigner maintenant » : elle ne lit rien"
-            " d'autre de la session de QA."
+            "Utiliser ce gabarit dès qu'une case échoue. L'intake s'**écrit** : en commentaire de"
+            " l'issue du plan, publié par `comment <plan> --body-file` depuis un fichier du"
+            " scratchpad de la session, jamais de l'arbre de la campagne (`SKILL.md` §4, étape"
+            " 2), ou, en mode de repli markdown, dans un fichier hors de l'arbre de la campagne"
+            " et de tout worktree éphémère. La session `bug-vers-issue` distincte qui le consomme"
+            " le reçoit en argument — son URL ou son chemin — quand l'utilisateur choisit"
+            " l'option (a) « consigner maintenant » : elle ne lit rien d'autre de la session de"
+            " QA."
         ),
     ),
     "7b2-patch-checkbox-etat-a-la-forge": (
         PATCH_CHECKBOX_REF,
         (
-            "L'état du plan est la forge : ni copie locale du corps, ni paire gardée hors d'un"
-            " fichier — chaque mise à jour est un fichier de paires que `ecriture-relue.py` applique"
-            " au corps courant, puis relit."
+            "Comment `execution-qa` met à jour l'issue du plan de QA sans perdre les éditions de"
+            " l'utilisateur. L'état du plan est la forge : ni copie locale du corps, ni paire"
+            " gardée hors d'un fichier — chaque mise à jour est un fichier de paires que"
+            " `ecriture-relue.py` applique au corps courant, puis relit."
         ),
     ),
     "7b2-patch-checkbox-regle-fondamentale": (
@@ -6176,7 +6409,8 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         PATCH_CHECKBOX_REF,
         (
             "2. Correspondance par ligne complète Appliquer la substitution par **correspondance"
-            " exacte de ligne complète**."
+            " exacte de ligne complète**. Ne jamais faire correspondre par numéro de ligne. Ne"
+            " jamais faire correspondre par préfixe seul — un préfixe `- [ ]` n'est pas unique."
         ),
     ),
     "7b2-patch-checkbox-editions-concurrentes": (
@@ -6218,9 +6452,9 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7b2-patch-checkbox-ce-qu-il-ne-prouve-pas": (
         PATCH_CHECKBOX_REF,
         (
-            "il ne verrouille rien : une édition faite par un tiers entre sa lecture et son écriture"
-            " est écrasée — est écrit dans sa docstring, « Ce qu'il ne prouve pas » (`--help`),"
-            " seule source."
+            "Ce que le script ne garantit pas — il ne verrouille rien : une édition faite par un"
+            " tiers entre sa lecture et son écriture est écrasée — est écrit dans sa docstring,"
+            " « Ce qu'il ne prouve pas » (`--help`), seule source."
         ),
     ),
     "7b2-correction-jamais-dans-la-qa": (
@@ -6297,14 +6531,18 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         (
             "Ces deux fichiers, la preuve et le commentaire, s'écrivent dans le scratchpad de la"
             " session, jamais dans l'arbre de la campagne : le §2 en préserve le `git status`."
+            " Sauter le commentaire pour les blocs verts triviaux."
         ),
     ),
     # Même passe, constat 4 de la passe mécanique : le script n'a pas de forçage.
     "7b2-patch-checkbox-introuvable-en-paire-neuve": (
         PATCH_CHECKBOX_REF,
         (
-            "Demander s'il faut sauter cette mise à jour, l'écrire en une paire neuve sur la ligne"
-            " actuelle, ou abandonner."
+            "Si trouvée zéro fois → l'utilisateur (ou un autre agent) a édité cette ligne."
+            " **S'arrêter et faire remonter un avertissement** à l'utilisateur avec"
+            " l'`ancienne_ligne` originale et la ligne la plus ressemblante actuellement dans le"
+            " corps. Demander s'il faut sauter cette mise à jour, l'écrire en une paire neuve sur"
+            " la ligne actuelle, ou abandonner."
         ),
     ),
     # Lot 8b de #134 (2026-10-26) : `audit-spec-ui` prend son chemin en argument et nomme ses
@@ -6320,7 +6558,13 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "8b-audit-spec-ui-argument": (AUDIT_SPEC_UI_SKILL, "[chemin du document à auditer — requis]"),
     "8b-audit-spec-ui-description": (
         AUDIT_SPEC_UI_SKILL,
-        "puis, après le go du mainteneur sur le rapport, appliquer les corrections",
+        (
+            "puis, après le go du mainteneur sur le rapport, appliquer les corrections en trois"
+            " passes (édition, propagation, résidus). À utiliser quand l'utilisateur demande de"
+            " relire, auditer ou corriger une spec d'interface ou un document de design — « relis"
+            " la description de l'interface », « dis-moi ce qui semble mauvais dans cette spec »,"
+            " « applique ces corrections à la spec »."
+        ),
     ),
     "8b-audit-spec-ui-jugement": (
         AUDIT_SPEC_UI_SKILL,
@@ -6341,7 +6585,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "8b-audit-spec-ui-executant-edition": (
         AUDIT_SPEC_UI_SKILL,
-        "et ne juge ni ne corrige ; puis l'édition des corrections que la session a choisies",
+        (
+            "il rend chaque passe « constat(s) », chacun avec son § et son scénario d'échec, ou"
+            " « sans objet » avec sa raison, et ne juge ni ne corrige ; puis l'édition des"
+            " corrections que la session a choisies"
+        ),
     ),
     "8b-audit-spec-ui-correction-par-une-pr": (
         AUDIT_SPEC_UI_SKILL,
@@ -6355,23 +6603,40 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "8b-audit-spec-ui-arret-sans-chemin": (
         AUDIT_SPEC_UI_SKILL,
-        "**Sans chemin, la session s'arrête et demande le chemin au mainteneur** — jamais une spec",
+        (
+            "L'objet audité est le document dont le chemin est passé en argument. **Sans chemin,"
+            " la session s'arrête et demande le chemin au mainteneur** — jamais une spec"
+        ),
     ),
     "8b-audit-spec-ui-etape-0-1": (AUDIT_SPEC_UI_SKILL, "**Inventorier** — le `releveur`"),
     "8b-audit-spec-ui-passes": (AUDIT_SPEC_UI_SKILL, "L'`executant` (« Délégation ») les déroule"),
     "8b-audit-spec-ui-aucune-correction-avant-le-go": (
         AUDIT_SPEC_UI_SKILL,
-        "**aucune correction ne part avant son go sur le rapport**",
+        (
+            "**Arrêt avant les corrections**, dans la même session : le rapport — périmètre,"
+            " passes, constats, jugements — est présenté au mainteneur, et **aucune correction ne"
+            " part avant son go sur le rapport**"
+        ),
     ),
     "8b-audit-spec-ui-go-partiel": (AUDIT_SPEC_UI_SKILL, "le go peut n'en retenir qu'une partie"),
     "8b-audit-spec-ui-edition": (AUDIT_SPEC_UI_SKILL, "**Édition** — l'`executant` applique"),
     "8b-audit-spec-ui-propagation": (AUDIT_SPEC_UI_SKILL, "le `releveur` cherche la valeur"),
     "8b-audit-spec-ui-propagation-retenue": (
         AUDIT_SPEC_UI_SKILL,
-        "celles que la session retient repartent à l'`executant`",
+        (
+            "celles que la session retient repartent à l'`executant`. La recherche porte sur"
+            " l'ancienne valeur, pas la nouvelle"
+        ),
     ),
     "8b-audit-spec-ui-residus": (AUDIT_SPEC_UI_SKILL, "**Résidus** — le `releveur` re-cherche"),
-    "8b-audit-spec-ui-reste": (AUDIT_SPEC_UI_SKILL, "la session vérifie qu'il n'en reste aucune"),
+    "8b-audit-spec-ui-reste": (
+        AUDIT_SPEC_UI_SKILL,
+        (
+            "la session vérifie qu'il n'en reste aucune, ou que celles qui restent sont"
+            " délibérément citées. L'exécuter comme une liste d'assertions, pas comme une"
+            " relecture."
+        ),
+    ),
     "8b-audit-spec-ui-case-de-l-arret": (
         AUDIT_SPEC_UI_SKILL,
         "aucune correction partie avant son go sur le rapport",
@@ -6395,10 +6660,13 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "8b-init-projet-reconfiguration-par-une-pr": (
         INIT_PROJET_SKILL,
         (
-            "Ses écritures de dépôt partent **par une PR**, portée par la session qui a décidé,"
-            " jamais par un commit direct sur le trunk (D-12 de #134) : la session l'ouvre, la"
-            " relit et la merge au go du mainteneur, au déroulé de `triage/hors-scope.md`"
-            " (« Quand écrire », étapes 5 et 6)."
+            "**Reconfiguration** — le fichier existe : le lire, afficher l'état actuel, demander"
+            " ce qu'il faut changer, puis ne rejouer que les étapes concernées (typiquement 3 →"
+            " 7). Ne jamais écraser en silence une valeur déjà renseignée. Ses écritures de dépôt"
+            " partent **par une PR**, portée par la session qui a décidé, jamais par un commit"
+            " direct sur le trunk (D-12 de #134) : la session l'ouvre, la relit et la merge au go"
+            " du mainteneur, au déroulé de `triage/hors-scope.md` (« Quand écrire », étapes 5 et"
+            " 6)."
         ),
     ),
     "8b-init-projet-copie-non-rejouee": (
@@ -6483,7 +6751,12 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "8b-init-projet-mapping-en-fichier": (
         INIT_PROJET_SKILL,
-        "Le mapping validé s'écrit dans un fichier JSON pour l'étape 6",
+        (
+            "Demander à l'utilisateur s'il veut des chaînes différentes (ex. labels existants du"
+            " projet). Le mapping validé s'écrit dans un fichier JSON pour l'étape 6 : une liste"
+            """ d'objets `{"nom", "couleur", "description"}`, la description portant le rôle, au"""
+            " format de `label create` (son `--help`)."
+        ),
     ),
     # Passe 1 de la PR #162, m3 : des 4 fichiers de travail de l'amorçage, seul le mapping n'avait
     # pas de lieu — inspection et verdicts du `releveur` à `mktemp`, copie de `valide` en tempfile.
@@ -6505,9 +6778,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "8b-init-projet-label-create": (
         INIT_PROJET_SKILL,
         (
-            "`ecriture-relue.py label create --mapping <fichier>` (« Délégation »), sur le fichier"
-            " de l'étape 4, crée les labels absents du dépôt ; sa sortie dit ce qui a été créé, et"
-            " nomme un label présent sous une autre couleur sans le modifier."
+            "`ecriture-relue.py label create --mapping <fichier>` (« Délégation »), sur le"
+            " fichier de l'étape 4, crée les labels absents du dépôt ; sa sortie dit ce qui a été"
+            " créé, et nomme un label présent sous une autre couleur sans le modifier. Confirmer"
+            " à l'utilisateur ce qui a été créé."
         ),
     ),
     "8b-init-projet-copie": (
@@ -6524,7 +6798,12 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "8b-init-projet-ci-par-l-executant": (
         INIT_PROJET_SKILL,
-        "l'`executant` génère `.github/workflows/ci.yml`",
+        (
+            "Puis, **si le projet a déjà du code**, l'`executant` génère"
+            " `.github/workflows/ci.yml` à partir de `template/.github/workflows/ci.yml`, qui est"
+            " un modèle à trous — pour un projet sans code encore, le `ci.yml` et le"
+            " `dependabot.yml` attendent sa première PR de code (étape 11)"
+        ),
     ),
     "8b-init-projet-empreintes-par-le-releveur": (
         INIT_PROJET_SKILL,
@@ -6533,8 +6812,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "8b-init-projet-garde-sortie-du-draft": (
         INIT_PROJET_SKILL,
         (
-            "une draft n'a aucun run, le premier part au passage en ready (`cycle-pr` Étape 5),"
-            " puis chaque push en lance un"
+            "**Conserver le garde `if:` et `ready_for_review`.** Le garde saute toute PR en"
+            " draft, quel que soit l'événement — ouverture, push, réouverture —, et"
+            " `ready_for_review` figure dans les `types` du `pull_request` : une draft n'a aucun"
+            " run, le premier part au passage en ready (`cycle-pr` Étape 5), puis chaque push en"
+            " lance un"
         ),
     ),
     "8b-init-projet-dependabot-par-l-executant": (
@@ -6543,7 +6825,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "8b-init-projet-ecosysteme-cite-par-le-releveur": (
         INIT_PROJET_SKILL,
-        "pas de mémoire — le `releveur` en cite le passage",
+        (
+            "pas de mémoire — le `releveur` en cite le passage :"
+            " https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference"
+        ),
     ),
     "8b-init-projet-runtime-par-le-releveur": (
         INIT_PROJET_SKILL,
@@ -6555,7 +6840,12 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "8b-init-projet-gitignore-par-l-executant": (
         INIT_PROJET_SKILL,
-        "L'`executant` le génère depuis les **chemins déclarés**",
+        (
+            "**`.gitignore` — généré depuis le profil, puis testé.** L'`executant` le génère"
+            " depuis les **chemins déclarés** (une section par langage présent, motifs"
+            " indépendants de la profondeur `**/` dès qu'un paquet vit hors racine), jamais d'un"
+            " gabarit mono-paquet dont les motifs sont ancrés à la racine."
+        ),
     ),
     "8b-init-projet-ignore-et-barre-finale": (
         INIT_PROJET_SKILL,
@@ -6573,7 +6863,15 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "8b-init-projet-claude-md-par-l-executant": (
         INIT_PROJET_SKILL,
-        "l'`executant` (« Délégation »), sur les sections et le chemin que la session lui donne",
+        (
+            "l'`executant` (« Délégation »), sur les sections et le chemin que la session lui"
+            " donne : retirer chaque section précédée d'un commentaire `<!-- init-projet :"
+            " section à retirer si … -->` dont le skill n'a pas été retenu, puis supprimer ces"
+            " commentaires. Remplacer `{{CHEMIN_JOURNAL_OBSERVATIONS}}` par un chemin **stable"
+            " hors du dépôt** — `~/.claude/projects/<projet>/skill-observations/log.md` — jamais"
+            " relatif au répertoire courant (sans `task-observer`, la section qui le porte est"
+            " retirée avec lui)."
+        ),
     ),
     "8b-init-projet-mcp": (
         INIT_PROJET_SKILL,
@@ -6588,8 +6886,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "8b-init-projet-cle-au-mainteneur": (
         INIT_PROJET_SKILL,
         (
-            "**ce geste reste au mainteneur, qui tape lui-même la commande** (`contraintes.md`,"
-            " « Jamais d'information dérivée d'un secret »)."
+            "Pour un débit plus élevé, une clé (gratuite sur `context7.com/dashboard`) se passe"
+            " par en-tête : **ce geste reste au mainteneur, qui tape lui-même la commande**"
+            " (`contraintes.md`, « Jamais d'information dérivée d'un secret »). **Ne jamais la"
+            " committer** : la garder en portée `user` (config locale hors dépôt), ou via"
+            " variable d'environnement si on préfère `--scope project` (`.mcp.json` versionné)"
         ),
     ),
     "8b-init-projet-verdict-par-le-releveur": (
@@ -6603,8 +6904,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "8b-init-projet-premiere-pr-de-code-distincte": (
         INIT_PROJET_SKILL,
         (
-            "Cette première PR de code est une **session `cycle-pr` distincte** (« Délégation »)"
-            " : celle-ci ne la mène pas."
+            "Le marqueur est l'engagement : `cycle-pr` le lit à son Étape 1, et la première PR de"
+            " code rejoue la génération CI et Dependabot de l'étape 7 — paragraphe « Runtime"
+            " épinglé » compris — et cette vérification, puis retire les marqueurs. Cette"
+            " première PR de code est une **session `cycle-pr` distincte** (« Délégation ») :"
+            " celle-ci ne la mène pas."
         ),
     ),
     "8b-init-projet-commit": (
@@ -6619,17 +6923,25 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "8b-init-projet-prochaines-etapes-proposees": (
         INIT_PROJET_SKILL,
         (
-            "que la session **propose** en sessions distinctes (« Délégation »), jamais"
-            " enchaînées dans celle-ci."
+            "Afficher : dépôt GitHub, profil du projet retenu (stack + commandes + domaines),"
+            " labels créés, CI et Dependabot générés — ou reportés à la première PR de code,"
+            " projet sans code (étape 11) —, skills maison déployés, skills publics installés,"
+            " context7 disponible, et les prochaines étapes : `vers-prd` ou `vers-issues` pour"
+            " démarrer la planification, que la session **propose** en sessions distinctes («"
+            " Délégation »), jamais enchaînées dans celle-ci. Elles démarrent avec `use_worktree:"
+            " false`"
         ),
     ),
     "8b-init-projet-note-s-arrete": (
         INIT_PROJET_SKILL,
         (
-            "S'il est absent ou incomplet, le skill **s'arrête** et propose une session"
-            " `init-projet` distincte (protocole :"
+            "Quand un skill a besoin du dépôt, du vocabulaire de labels, des commandes ou des"
+            " domaines, il lit `.claude/pipeline.config.md`. S'il est absent ou incomplet, le"
+            " skill **s'arrête** et propose une session `init-projet` distincte (protocole :"
             " `.claude/skills/cycle-pr/references/sessions-liees.md`) — il ne l'enchaîne pas dans"
-            " sa propre session."
+            " sa propre session. Absent, c'est un amorçage, `use_worktree: false` : il écrit à la"
+            " racine du projet, qui n'est peut-être pas encore un dépôt git ; incomplet, une"
+            " reconfiguration, `use_worktree: true` : elle écrit sur une branche, par une PR."
         ),
     ),
     # Passe 1 de la PR #162, I1 — classe : une tranche confiée à l'`executant` par le lot, dont la
@@ -6763,19 +7075,35 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7c-bug-vers-issue-description": (
         BUG_VERS_ISSUE_SKILL,
         (
-            "Qualifie d'abord l'échec : attendu faux, environnement et correctif évident ne"
-            " deviennent pas une issue."
+            "À utiliser lorsqu'un bug fait surface et doit être consigné comme une issue GitHub"
+            " avec le contexte QA / implémentation / PRD attaché. Déclencheurs : « ouvre une"
+            " issue pour ce bug », « consigne ça comme un bug », « c'est cassé, logue-le », tout"
+            " échec surfacé par execution-qa que l'utilisateur veut capturer, et les rapports"
+            " libres de bug en dehors d'un plan QA actif (« ce truc est faux, logue-le »)."
+            " Qualifie d'abord l'échec : attendu faux, environnement et correctif évident ne"
+            " deviennent pas une issue. Montre toujours un brouillon et demande confirmation"
+            ' avant de publier." argument-hint: "[description du bug | #<plan-qa> <ancre de la'
+            " case> <chemin ou URL de l'intake>]"
         ),
     ),
     "7c-bug-vers-issue-consigne-le-seul-defaut-a-etudier": (
         BUG_VERS_ISSUE_SKILL,
-        "le qualifier et, défaut à étudier, le consigner comme une issue GitHub",
+        (
+            "le qualifier et, défaut à étudier, le consigner comme une issue GitHub durable et"
+            " centrée sur l'utilisateur, avec des liens explicites vers le plan QA (s'il y en a"
+            " un), les issues d'implémentation, le PRD et les commits à l'origine. Montre"
+            " toujours un brouillon au mainteneur et confirme avant de publier."
+        ),
     ),
     "7c-bug-vers-issue-principe": (
         BUG_VERS_ISSUE_SKILL,
         (
-            "et elle n'existe que pour un défaut à étudier : l'échec se qualifie d'abord (étape 1)."
-            " Toujours pré-publier, ne jamais publier en silence."
+            "L'issue de bug doit être **durable** (encore lisible après des refactos majeures),"
+            " **centrée sur l'utilisateur** (décrit un comportement, pas du code), **traçable**"
+            " (renvoie vers le plan / le PRD / le commit) et **sans doublon** (ne consigne pas à"
+            " nouveau pour une case déjà liée à un `🔴 BUG #N`) — et elle n'existe que pour un"
+            " défaut à étudier : l'échec se qualifie d'abord (étape 1). Toujours pré-publier, ne"
+            " jamais publier en silence."
         ),
     ),
     "7c-bug-vers-issue-classe-a-la-session": (
@@ -6795,7 +7123,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     ),
     "7c-bug-vers-issue-demarre-la-petite-pr": (
         BUG_VERS_ISSUE_SKILL,
-        "elle démarre la session `cycle-pr` de la petite PR d'un correctif évident (étape 1)",
+        (
+            "elle démarre la session `cycle-pr` de la petite PR d'un correctif évident (étape 1)"
+            " ; protocole commun : `.claude/skills/cycle-pr/references/sessions-liees.md`."
+        ),
     ),
     "7c-bug-vers-issue-qualifier-avant-toute-ecriture": (
         BUG_VERS_ISSUE_SKILL,
@@ -6867,9 +7198,11 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7c-bug-vers-issue-correctif-evident-sans-issue": (
         BUG_VERS_ISSUE_SKILL,
         (
-            "le prompt décrivant le correctif et, piloté par un plan, le plan et l'ancre de la"
-            " case. Aucune issue ; piloté par un plan, ` 🔴 needs-issue — …` devient ` 🔴 correctif"
-            " évident — <résumé>` par une paire."
+            "`start_session`, `initiation: user_asked` dans un tour où le mainteneur la demande,"
+            " sinon une carte de proposition, `initiation: own_initiative` ; `context: fresh`,"
+            " `use_worktree: true`, le prompt décrivant le correctif et, piloté par un plan, le"
+            " plan et l'ancre de la case. Aucune issue ; piloté par un plan, ` 🔴 needs-issue — …`"
+            " devient ` 🔴 correctif évident — <résumé>` par une paire."
         ),
     ),
     "7c-bug-vers-issue-defaut-a-etudier": (
@@ -6887,7 +7220,21 @@ INVARIANTS_DU_CONTEXTE_COURT = {
         BUG_VERS_ISSUE_SKILL,
         (
             "| Consigner sans qualifier l'échec | Une classe prouvée d'abord (étape 1) : seul le"
-            " défaut à étudier devient une issue ; dans le doute, défaut à étudier. |"
+            " défaut à étudier devient une issue ; dans le doute, défaut à étudier. | | Consigner"
+            " sans montrer le brouillon | Toujours montrer + demander « on le publie ? ». Aucune"
+            " exception. | | Consigner un doublon pour une case déjà liée | Parcours d'abord le"
+            " corps du plan pour repérer `🔴 BUG #N` près de la case. | | Inclure des chemins de"
+            " fichiers et des numéros de ligne dans le corps | Ils deviennent obsolètes. Utilise"
+            " le langage métier et les comportements. | | Oublier de mettre à jour le plan QA"
+            " après avoir consigné | Remplace `🔴 needs-issue` par `🔴 BUG #N` et ajoute à l'Index"
+            " des constats, par `issue edit --body-file` (étape 7). | | Découper alors qu'une"
+            " seule issue suffirait | Privilégie l'unique. Découpe uniquement pour des causes"
+            " racines séparables. | | Sauter les liens vers l'issue d'implémentation / le PRD /"
+            " le commit | Ce sont la trace durable. Inclus-les toujours quand ils sont connus. |"
+            " | Appliquer automatiquement de nombreux labels | Seulement `qa-finding` +"
+            " `needs-triage`. Le tri ajoute le reste. | | Rédiger sans relire l'intake d'échec"
+            " écrit | Le bloc d'intake est l'entrée de la plus haute qualité dont tu disposes."
+            " Utilise-le tel quel. |"
         ),
     ),
     # La petite PR en QA : `🔴 correctif évident — …`, puis `🔴 PR #<M>`, rejouée à la reprise.
@@ -6907,8 +7254,10 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "7c-plan-qa-echecs-qualifies": (
         PLAN_QA_SKILL,
         (
-            "les échecs trouvés pendant l'exécution sont qualifiés par `bug-vers-issue`, qui ne"
-            " consigne en issue que le défaut à étudier."
+            "Construis un plan de QA exhaustif et exécutable, cadré sur un lot de travaux précis,"
+            " et publie-le sous forme d'issue GitHub avec un corps à cases à cocher. Le plan est"
+            " ensuite exécuté par `execution-qa`, et les échecs trouvés pendant l'exécution sont"
+            " qualifiés par `bug-vers-issue`, qui ne consigne en issue que le défaut à étudier."
         ),
     ),
     "7c-gabarit-plan-qa-petite-pr": (
@@ -6981,6 +7330,53 @@ INVARIANTS_DU_CONTEXTE_COURT = {
     "executant-sans-cleanup-pass": (
         ".claude/agents/executant.md",
         "**Sans cleanup pass** (`cycle-pr` 3.3)",
+    ),
+    "repercussions-le-script-relit-la-forge-contre-le-fichier": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Le script relit ensuite la forge en entier contre ce fichier. Une citation encore"
+            " présente signale un support oublié, pas une passe terminée."
+        ),
+    ),
+    "repercussions-retour-en-arriere-et-doublon-bornes": (
+        REPERCUSSIONS_SKILL,
+        (
+            "Une simple mise à jour de référence ne déclenche pas ce retour en arrière. **Fermer"
+            " en doublon** — seul cas où ce skill ferme quelque chose. Exige un recouvrement"
+            " **total et non ambigu**, et un **« go » nommément sur cette issue** (un « go »"
+            " global ne suffit pas à fermer)."
+        ),
+    ),
+    "init-projet-epingler-par-empreinte": (
+        INIT_PROJET_SKILL,
+        (
+            "**Épingler chaque `uses:` par empreinte de commit** — ceux du modèle"
+            " (`{{ACTION_SHA}} # {{ACTION_VERSION}}`) comme ceux de `{{SETUP_STEPS}}`, sur la"
+            " dernière version publiée de l'**action**, pré-versions exclues. L'empreinte se"
+            " résout à la source, jamais de mémoire : `git ls-remote --tags --sort=-v:refname"
+            " https://github.com/<owner>/<repo>.git` — le dépôt, pas le sous-dossier d'une action"
+            " comme `github/codeql-action/init` ; pour une étiquette annotée, la ligne `^{}`"
+            " donne le commit. Le commentaire porte l'étiquette **la plus précise** de ce commit"
+            " (`v7.0.1`, pas `v7`)"
+        ),
+    ),
+    "init-projet-une-entree-par-ecosysteme": (
+        INIT_PROJET_SKILL,
+        (
+            "Ajouter une entrée par écosystème de la stack — celui du gestionnaire de paquets"
+            " déclaré, `docker` si un `Dockerfile` ou un `Containerfile` existe, `docker-compose`"
+            " pour les fichiers Compose —, copiée de l'entrée modèle avec le `directory` de son"
+            " manifeste, puis retirer le bloc `{{ECOSYSTEMES_STACK}}`. Pour `docker`, une entrée"
+            " **par dossier de Dockerfile**, jamais une entrée à `directories`"
+        ),
+    ),
+    "init-projet-projet-sans-code-ne-genere-pas-la-ci": (
+        INIT_PROJET_SKILL,
+        (
+            "Corriger la config si l'une échoue pour cause d'erreur de saisie. **Projet sans code"
+            " encore** : il n'y a rien à lancer. Enregistrer les commandes cibles avec le"
+            " marqueur `# non vérifiée`, et **ne générer ni `ci.yml` ni `dependabot.yml`**"
+        ),
     ),
 }
 
@@ -12677,9 +13073,6 @@ PASSAGES_DES_SESSIONS_LIEES = (
         {
             "intitulé": [
                 "3.",
-                "Plusieurs PR en parallèle :",
-                "Trop peu d'issues prêtes :",
-                "Correctif évident (`contraintes.md`, barreau 3) :",
             ],
         },
         empruntees=(
@@ -13497,9 +13890,6 @@ PASSAGES_DU_CONTEXTE_COURT = (
                 "1.",
                 "2.",
                 "3.",
-                "Plusieurs PR en parallèle :",
-                "Trop peu d'issues prêtes :",
-                "Correctif évident (`contraintes.md`, barreau 3) :",
                 "3bis.",
                 "4.",
                 "5.",
@@ -14020,6 +14410,948 @@ PASSAGES_DU_CONTEXTE_COURT = (
         PR_PARALLELES_SKILL,
         "- `repercussions` les détecte",
         "- **Tenir `PR-PARALLELES.md` à",
+        {},
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "- **`releveur`** — la",
+        "# Document de référence",
+        {},
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "Avec une PR d'amendement",
+        "Avec une PR de",
+        {},
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "C'est un `grep` des",
+        "## 2. Sélectionner les",
+        {},
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "Si aucune issue n'est",
+        "## 5. Appliquer —",
+        {
+            "motif": [
+                "la QA d'un thème vidé ne dépend pas des issues impactées.",
+            ],
+        },
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "**Éditer le corps** de",
+        "### Issues en vol",
+        {
+            "motif": [
+                (
+                    "Le journal de spec vit dans le corps, mais le contrat que `cycle-pr` exécute"
+                    " est le brief :"
+                ),
+                "un correctif appliqué au seul corps laisse le contrat faux.",
+                "un fichier vidé passe le contrôle des citations haut la main.",
+                "Deux merges rapprochés font tourner deux passes qui peuvent viser la même issue.",
+            ],
+        },
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "Le signalement va **en commentaire sur la PR ouverte**",
+        "```markdown > *Généré par IA — répercussion de la clôture de #47.*",
+        {
+            "motif": [
+                (
+                    "`cycle-pr` traite déjà les commentaires de PR à son Étape 6, en bouclant"
+                    " jusqu'à review vide."
+                ),
+                "Le message atterrit donc exactement là où la session le lira.",
+                "c'est lui que la session du lot suivant lit en premier.",
+            ],
+        },
+        empruntees=ancres_de(
+            INVARIANTS_DES_CONFORTS_DE_PIPELINE,
+            "repercussions-signalement-en-commentaire-sur-la-pr",
+            "repercussions-sans-pr-le-prompt-du-lot-suivant",
+        ),
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "**Repasser en `needs-interrogation`** toute",
+        "Au moindre cas ambigu",
+        {
+            "motif": [
+                "son interrogatoire portait sur une spec qui n'existe plus, il doit être refait.",
+            ],
+        },
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "**Session démarrée par une",
+        "## 7. Le thème",
+        {},
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "**Proposer, puis démarrer sur",
+        "# Ce que ce",
+        {},
+    ),
+    Passage(
+        REPERCUSSIONS_SKILL,
+        "- **Il ne crée",
+        "- **Il ne relit",
+        {
+            "motif": [
+                "Le vide relevé par une clôture a presque toujours un propriétaire ouvert.",
+            ],
+        },
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "--- name: bug-vers-issue description:",
+        "Bug vers issue",
+        {
+            "intitulé": [
+                "--- name:",
+                "bug-vers-issue description:",
+            ],
+        },
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "Capturer un bug —",
+        "# Principe fondamental",
+        {},
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "L'issue de bug doit",
+        "# Délégation",
+        {},
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "La session garde le",
+        "# Deux points d'entrée",
+        {
+            "intitulé": [
+                "Le reste change de main :",
+            ],
+        },
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "Le mode se lit",
+        "2. **Libre** — une",
+        {
+            "intitulé": [
+                "1.",
+            ],
+        },
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "Sans argument, la session",
+        "# Procédure",
+        {},
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "- **Piloté par un",
+        "- ce qu'il attendait",
+        {},
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "**Qualifier.** La session elle-même,",
+        "## 2. Rassembler le",
+        {},
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "Utilise `references/collecte-contexte.md` comme liste",
+        "- **Lien vers le",
+        {
+            "intitulé": [
+                "En résumé :",
+            ],
+        },
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "Avant de rédiger, chercher",
+        "- Cherche dans les",
+        {
+            "intitulé": [
+                "Puis :",
+            ],
+        },
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "```bash python .claude/skills/cycle-pr/scripts/ecriture-relue.py issue",
+        "## 7. Après la",
+        {},
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "- Si piloté par un plan, patche",
+        "- Dis au mainteneur",
+        {},
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "**Session démarrée par une",
+        "# Règles du corps",
+        {},
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "- Toujours les rôles",
+        "- N'applique jamais d'autres",
+        {},
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "Si l'un d'eux manque",
+        "# Erreurs courantes",
+        {},
+    ),
+    Passage(
+        BUG_VERS_ISSUE_SKILL,
+        "| Erreur | Correctif",
+        None,
+        {},
+    ),
+    Passage(
+        COLLECTE_CONTEXTE_REF,
+        "Les commandes de ce",
+        "- La description du",
+        {},
+    ),
+    Passage(
+        GABARIT_DECOUPAGE_REF,
+        "Crée les issues dans",
+        "# Issue parente (de",
+        {
+            "motif": [
+                "Ainsi chaque champ « Bloqué par » peut référencer de vrais numéros d'issue.",
+            ],
+        },
+    ),
+    Passage(
+        EXECUTION_QA_SKILL,
+        "Chaque case basculée en",
+        "# Délégation",
+        {},
+    ),
+    Passage(
+        EXECUTION_QA_SKILL,
+        "La session garde le",
+        "# Processus",
+        {
+            "intitulé": [
+                "Le reste change de main :",
+            ],
+        },
+        empruntees=ancres_de(
+            INVARIANTS_DES_CONFORTS_DE_PIPELINE,
+            "execution-qa-renvoi-aux-frontieres-tierces",
+            "execution-qa-releveur-cases-commande",
+            "execution-qa-releveur-rend-ok-ko",
+            "execution-qa-un-seul-brief-par-bloc",
+            "execution-qa-lui-reviennent-aussi",
+            "execution-qa-verdict-reste-a-la-session",
+        ),
+    ),
+    Passage(
+        EXECUTION_QA_SKILL,
+        "L'état du plan est",
+        "## 2. Établir l'état",
+        {},
+    ),
+    Passage(
+        EXECUTION_QA_SKILL,
+        "- **La prochaine case**",
+        "Résumer brièvement à l'utilisateur",
+        {},
+    ),
+    Passage(
+        EXECUTION_QA_SKILL,
+        "- **Commande** — au",
+        "- **Passe** → basculer",
+        {
+            "intitulé": [
+                "3.",
+                "4.",
+            ],
+        },
+    ),
+    Passage(
+        EXECUTION_QA_SKILL,
+        "- **Accepté** → un",
+        "- **Échec** → voir",
+        {},
+    ),
+    Passage(
+        EXECUTION_QA_SKILL,
+        "5. **Patcher le plan**",
+        "## 4. Gérer une",
+        {
+            "intitulé": [
+                "5.",
+                "6.",
+            ],
+        },
+    ),
+    Passage(
+        EXECUTION_QA_SKILL,
+        "1. Annoter la ligne",
+        "3. Offrir à l'utilisateur",
+        {
+            "intitulé": [
+                "1.",
+            ],
+        },
+    ),
+    Passage(
+        EXECUTION_QA_SKILL,
+        "- **(a) Consigner maintenant**",
+        "## 5. Règles d'arrêt",
+        {},
+    ),
+    Passage(
+        EXECUTION_QA_SKILL,
+        "- Vérifier que chaque case",
+        "- Dire à l'utilisateur",
+        {},
+    ),
+    Passage(
+        EXECUTION_QA_SKILL,
+        "5. Enregistrer la décision",
+        "# Passe finale avant",
+        {
+            "intitulé": [
+                "5.",
+                "6.",
+            ],
+        },
+    ),
+    Passage(
+        EXECUTION_QA_SKILL,
+        "- [ ] Chaque case",
+        "- [ ] Chaque surface",
+        {},
+    ),
+    Passage(
+        EXECUTION_QA_SKILL,
+        "- [ ] La",
+        "- [ ] Aucune",
+        {},
+    ),
+    Passage(
+        EXECUTION_QA_SKILL,
+        "| Erreur | Correction",
+        None,
+        {},
+    ),
+    Passage(
+        COMMENTAIRE_PHASE_REF,
+        "La session le rédige",
+        "```markdown # Phase /",
+        {},
+    ),
+    Passage(
+        INTAKE_ECHEC_REF,
+        "Utiliser ce gabarit dès",
+        "Les champs sans contenu",
+        {},
+    ),
+    Passage(
+        PATCH_CHECKBOX_REF,
+        "Comment `execution-qa` met à",
+        "# Règle fondamentale",
+        {},
+    ),
+    Passage(
+        PATCH_CHECKBOX_REF,
+        "**Faire correspondre par texte",
+        "# Procédure",
+        {},
+    ),
+    Passage(
+        PATCH_CHECKBOX_REF,
+        "Pour chaque case à",
+        "```text < - [",
+        {
+            "intitulé": [
+                "Exemple :",
+            ],
+        },
+    ),
+    Passage(
+        PATCH_CHECKBOX_REF,
+        "L'ancienne ligne se copie",
+        "- Si l'`ancienne_ligne` est",
+        {},
+    ),
+    Passage(
+        PATCH_CHECKBOX_REF,
+        "- Si trouvée zéro",
+        "- Si trouvée plus",
+        {},
+    ),
+    Passage(
+        PATCH_CHECKBOX_REF,
+        "Le script tient ces",
+        "## 4. Appliquer",
+        {},
+    ),
+    Passage(
+        PATCH_CHECKBOX_REF,
+        "Appelé par la session",
+        "## 5. Cadence",
+        {},
+    ),
+    Passage(
+        PATCH_CHECKBOX_REF,
+        "Patcher à la fin",
+        "# Mode de repli",
+        {},
+    ),
+    Passage(
+        PATCH_CHECKBOX_REF,
+        "- Utiliser l'outil `Edit`",
+        "- Suggérer à l'utilisateur",
+        {},
+    ),
+    Passage(
+        PATCH_CHECKBOX_REF,
+        "Ce que le script",
+        None,
+        {},
+    ),
+    Passage(
+        CORRECTION_BUG_REF,
+        "La session de QA",
+        "# Standard minimal",
+        {},
+    ),
+    Passage(
+        CORRECTION_BUG_REF,
+        "La case ne se",
+        "# Inacceptable",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "- **Reconfiguration** — le",
+        "# Délégation",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "La session garde le",
+        "# Process",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "- Si le projet",
+        "- Lire `git remote",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "- Sinon, demander public",
+        "- Brancher trunk-based sur",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "**Ne rien inventer en",
+        "**Signaux à inspecter** (liste",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "Demander à l'utilisateur s'il",
+        "## 5. Écrire `.claude/pipeline.config.md`",
+        {
+            "motif": [
+                "`commit` (étape 12) fait `git add -A` et l'emporterait.",
+            ],
+        },
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "L'`executant` (« Délégation »)",
+        "<gabarit-config>",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "**Métadonnées d'une PR** —",
+        "- **assignee** : son",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "`ecriture-relue.py label create --mapping",
+        "## 7. Copier le",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "`amorcage.py copie <boilerplate>` («",
+        "- `CLAUDE.md` (renvoie aux",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "**L'ordre est copie, puis",
+        "`CLAUDE.md` est copié **tel",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "Puis, **si le projet",
+        "- Remplacer chaque `{{CMD_*}}`",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "- **Épingler chaque `uses:`",
+        "- **Conserver `permissions: contents:",
+        {
+            "motif": [
+                (
+                    "Dependabot ne réécrit qu'un commentaire dont l'étiquette pointe encore sur"
+                    " le commit épinglé."
+                ),
+            ],
+            "relevé daté": [
+                "Une étiquette peut être déplacée par qui prend la main sur le dépôt de l'action ;",
+                "une empreinte non (GitHub, « Secure use reference »).",
+            ],
+        },
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "- **Conserver le garde",
+        "- **Donner une horloge",
+        {
+            "motif": [
+                "La forge tient la règle, aucune session n'a à se la rappeler à chaque push ;",
+                (
+                    "un rouge de plateforme se voit au passage en ready, après la relecture — le"
+                    " prix assumé."
+                ),
+                (
+                    "Sans `ready_for_review`, une PR sortie du draft resterait sans run jusqu'à"
+                    " son prochain push."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "Puis l'`executant` génère `.github/dependabot.yml`",
+        "**Images de base** —",
+        {
+            "motif": [
+                (
+                    "les empreintes du `ci.yml` n'avancent que si Dependabot les tient, et le"
+                    " modèle porte déjà l'écosystème `github-actions`."
+                ),
+                (
+                    "tant qu'une PR de groupe est ouverte, Dependabot n'examine plus aucun"
+                    " dossier de son entrée, et une image peut rester des semaines sans"
+                    " proposition."
+                ),
+            ],
+            "relevé daté": [
+                (
+                    "Dependabot diffère un groupe quand une PR ouverte porte le même nom de"
+                    " groupe et que ses dossiers sont inclus dans ceux de l'entrée — une PR sans"
+                    " dossier enregistré compte comme incluse (`find_existing_group_pr`,"
+                    " `updater/lib/dependabot/updater/ group_update_creation.rb` de"
+                    " dependabot-core, lu le 2026-10-18)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "- À la génération,",
+        "## 8. Déployer les",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "`copie` (étape 7) a",
+        "`init-projet`, `vers-prd`, `vers-issues`, `triage`,",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "6. **Finaliser `CLAUDE.md`** —",
+        "## 10. Installer les",
+        {
+            "intitulé": [
+                "6.",
+            ],
+        },
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "1. `amorcage.py mcp context7",
+        "``` claude mcp add --scope user --transport",
+        {
+            "intitulé": [
+                "1.",
+            ],
+        },
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "Pour un débit plus",
+        "``` claude mcp add --scope user --header",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "Avant de committer, le",
+        "Deux pièges de diagnostic",
+        {
+            "motif": [
+                "Une commande déclarée mais fausse est pire qu'absente :",
+                "elle casse `cycle-pr` et la CI au premier usage.",
+                (
+                    "un workflow committé avant le code qu'il vérifie est rouge dès son premier"
+                    " run (`uv sync` sans manifeste), contre la règle « aucun commit cassé »."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "`amorcage.py commit` (« Délégation",
+        "## 13. Récapituler",
+        {},
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "Afficher : dépôt GitHub,",
+        "# Checklist finale",
+        {
+            "motif": [
+                (
+                    "leur seule écriture de dépôt, l'archive de `vers-prd`, passe par son"
+                    " `executant` en isolation `worktree`."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        INIT_PROJET_SKILL,
+        "Quand un skill a",
+        None,
+        {},
+    ),
+    Passage(
+        PLAN_QA_SKILL,
+        "Construis un plan de",
+        "# Principe fondamental",
+        {},
+    ),
+    Passage(
+        PLAN_QA_SKILL,
+        "La session garde le",
+        "# Entrées (un mode",
+        {
+            "intitulé": [
+                "Le reste change de main :",
+            ],
+        },
+    ),
+    Passage(
+        PLAN_QA_SKILL,
+        "Mode 1 — **Référence",
+        "- le corps et",
+        {},
+    ),
+    Passage(
+        PLAN_QA_SKILL,
+        "- La session lit",
+        "## 2. Décide où",
+        {},
+    ),
+    Passage(
+        PLAN_QA_SKILL,
+        "- Si `gh` est",
+        "- Sinon, replie-toi sur",
+        {},
+    ),
+    Passage(
+        PLAN_QA_SKILL,
+        "- Requêtes sur la",
+        "- Logs : toujours",
+        {},
+    ),
+    Passage(
+        PLAN_QA_SKILL,
+        "Quand un comportement dépend",
+        "- Comportement actuel (d'après",
+        {
+            "intitulé": [
+                "Indique :",
+            ],
+        },
+    ),
+    Passage(
+        PLAN_QA_SKILL,
+        "- La « Passe",
+        "- Affiche le corps",
+        {},
+    ),
+    Passage(
+        PLAN_QA_SKILL,
+        "- GitHub : `python",
+        "- Repli markdown :",
+        {},
+    ),
+    Passage(
+        PLAN_QA_SKILL,
+        "- Rends le numéro",
+        "# Sortie : titre",
+        {},
+    ),
+    Passage(
+        PLAN_QA_SKILL,
+        "## 1. Passe comptable",
+        "- **Cases sans type**",
+        {
+            "relevé daté": [
+                "» et « +17 more », sans la case de la ligne 73.",
+            ],
+        },
+        empruntees=ancres_de(
+            INVARIANTS_DES_CONFORTS_DE_PIPELINE,
+            "plan-qa-aucune-commande-ne-commence-par-grep",
+            "plan-qa-le-brouillon-entre-par-cat",
+            "plan-qa-chemin-du-brouillon-et-du-releve",
+            "plan-qa-aucun-motif-n-y-porte-d-antislash",
+            "plan-qa-caracteres-entre-crochets",
+            "plan-qa-argument-sans-espace",
+            "plan-qa-rtk-grep-a-cache-la-case",
+            "plan-qa-renvoi-aux-frontieres-tierces",
+        ),
+    ),
+    Passage(
+        PLAN_QA_SKILL,
+        "```bash cat <brouillon> |",
+        "- [ ] La section",
+        {},
+    ),
+    Passage(
+        PLAN_QA_SKILL,
+        "- [ ] Chaque route,",
+        "- [ ] *S'il y a des traitements",
+        {},
+    ),
+    Passage(
+        PLAN_QA_SKILL,
+        "| Erreur | Correction",
+        None,
+        {},
+    ),
+    Passage(
+        GABARIT_PLAN_QA_REF,
+        "3. **Chaque case porte",
+        "````markdown",
+        {
+            "intitulé": [
+                "3.",
+            ],
+        },
+    ),
+    Passage(
+        GABARIT_PLAN_QA_REF,
+        "Chaque case porte son type juste après",
+        "# Saisie d'échec",
+        {},
+    ),
+    Passage(
+        GABARIT_PLAN_QA_REF,
+        "Quand une case échoue, l'intake",
+        "# Données de test",
+        {},
+    ),
+    Passage(
+        GABARIT_PLAN_QA_REF,
+        "- [ ] **Observation** — chaque constat majeur",
+        "- [ ] **Observation** — les actions en échec",
+        {},
+    ),
+    Passage(
+        GABARIT_PLAN_QA_REF,
+        "*(La session `bug-vers-issue` ajoute",
+        "- 🔴 #<numéro-issue-bug>",
+        {},
+    ),
+    Passage(
+        GABARIT_PLAN_QA_REF,
+        "La dernière ligne, modèle d'une entrée",
+        None,
+        {
+            "motif": [
+                (
+                    "la passe comptable refuserait ses espaces réservés (SKILL.md, « Passe finale"
+                    " avant publication », « Marqueurs »)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        CONTRADICTION_SKILL,
+        "Les deux partagent la",
+        "# Le livrable est",
+        {},
+    ),
+    Passage(
+        CONTRADICTION_SKILL,
+        "- **Le raisonnement ne",
+        "# Délégation",
+        {},
+    ),
+    Passage(
+        CONTRADICTION_SKILL,
+        "- **`releveur`** — les",
+        "- **`executant`** — l'amendement",
+        {},
+    ),
+    Passage(
+        CONTRADICTION_SKILL,
+        "L'entrée est l'arrêt écrit",
+        "Si la contradiction porte",
+        {
+            "motif": [
+                "c'est une lecture, un geste isolé (`CLAUDE.md`, « Orchestration »).",
+            ],
+        },
+    ),
+    Passage(
+        CONTRADICTION_SKILL,
+        "Chercher les §§ qui",
+        "1. **Par ancre lexicale**",
+        {},
+    ),
+    Passage(
+        CONTRADICTION_SKILL,
+        "**Une reco qui oppose",
+        "## 4. Appliquer —",
+        {
+            "motif": [
+                "c'est celle qu'on conteste le moins, donc celle qui trompe le plus longtemps.",
+            ],
+        },
+    ),
+    Passage(
+        CONTRADICTION_SKILL,
+        "Sur « go »,",
+        "134) :",
+        {},
+    ),
+    Passage(
+        CONTRADICTION_SKILL,
+        "- **dans une session",
+        "1. **Amender chaque §**",
+        {},
+    ),
+    Passage(
+        CONTRADICTION_SKILL,
+        "Le mode qui confronte",
+        "- **avec `origine :",
+        {},
+    ),
+    Passage(
+        CONTRADICTION_SKILL,
+        "**Session démarrée par une",
+        "# Ce que ce",
+        {},
+    ),
+    Passage(
+        CONTRADICTION_SKILL,
+        "- **Il n'édite aucune",
+        "# Les 3 idées",
+        {},
+    ),
+    Passage(
+        AUDIT_SPEC_UI_SKILL,
+        "--- name: audit-spec-ui description:",
+        "Audit de spécification d'interface",
+        {
+            "intitulé": [
+                "--- name:",
+                "audit-spec-ui description:",
+                "argument-hint:",
+            ],
+        },
+    ),
+    Passage(
+        AUDIT_SPEC_UI_SKILL,
+        "La session garde le",
+        "# Étape 0 —",
+        {
+            "intitulé": [
+                "Le reste change de main :",
+            ],
+        },
+    ),
+    Passage(
+        AUDIT_SPEC_UI_SKILL,
+        "L'objet audité est le",
+        "2. **Chercher la déclaration",
+        {
+            "intitulé": [
+                "1.",
+            ],
+        },
+    ),
+    Passage(
+        AUDIT_SPEC_UI_SKILL,
+        "L'`executant` (« Délégation »)",
+        "1. **Jetons déclarés vs",
+        {},
+    ),
+    Passage(
+        AUDIT_SPEC_UI_SKILL,
+        "**Arrêt avant les corrections**,",
+        "Presque chaque correction a",
+        {},
+    ),
+    Passage(
+        AUDIT_SPEC_UI_SKILL,
+        "1. **Édition** — l'`executant`",
+        "Le rapport de correction",
+        {
+            "intitulé": [
+                "1.",
+                "2.",
+                "3.",
+            ],
+            "motif": [
+                "c'est la seule qui révèle ce qu'on a oublié.",
+            ],
+        },
+    ),
+    Passage(
+        AUDIT_SPEC_UI_SKILL,
+        "- [ ] Le rapport",
+        "- [ ] Si",
         {},
     ),
 )
