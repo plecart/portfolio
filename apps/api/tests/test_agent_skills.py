@@ -9209,31 +9209,8 @@ def morceaux_nus(texte: str, ancres: Iterable[str]) -> set[str]:
     }
 
 
-# Les marques d'une moitié restrictive, en mots entiers : celles du huitième cas de « Le rouge se
-# constate, il ne se suppose pas » (`cycle-pr/references/tests.md`) — « ne … pas » comme « ne …
-# que » s'y lisent par « ne » ou « n' » —, plus « seul », « ni », « sans », « aucun » et « aucune ».
-MARQUES_RESTRICTIVES = (
-    "jamais",
-    "seule",
-    "seul",
-    "seulement",
-    "reste à",
-    "ne",
-    "n'",
-    "ni",
-    "sans",
-    "aucun",
-    "aucune",
-)
-MARQUE_RESTRICTIVE = re.compile(
-    r"(?<!\w)(?:"
-    + "|".join(
-        re.escape(marque) + ("" if marque.endswith("'") else r"(?!\w)")
-        for marque in sorted(MARQUES_RESTRICTIVES, key=len, reverse=True)
-    )
-    + ")",
-    re.IGNORECASE,
-)
+# Les marques d'une moitié restrictive, celles de la passe « restrictions du delta », qui les porte.
+MARQUE_RESTRICTIVE = load_script("cycle-pr", "restrictions-du-delta").MARQUE_RESTRICTIVE
 
 
 def restrictions_hors_ancre(texte: str, ancres: Iterable[str]) -> dict[str, list[str]]:
