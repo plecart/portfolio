@@ -1733,9 +1733,8 @@ def test_les_reecritures_de_corps_sont_celles_de_la_table() -> None:
 # Chaque marque de `SETTLED_MARKS` (`ecriture-relue.py`) — une case laissée `[ ]` qui la porte,
 # `checkbox next` ne la rend plus — avec l'annotation qu'`execution-qa/SKILL.md` prescrit pour
 # elle, en littéraux, lue dans tout le fichier : une marque réglée qu'aucune étape n'écrit laisse la
-# case en attente pour toujours. Contrainte V1 du lot 7b1 : rouge
-# sur `ffbe52e` pour ` — accepté`, que `SKILL.md` n'y écrivait qu'au §6 et dans la « Passe
-# finale », sans tiret ni date.
+# case en attente pour toujours. Contrainte V1 du lot 7b1 : rouge sur `ffbe52e` pour ` — accepté`,
+# que `SKILL.md` n'y écrivait qu'au §6 et dans la « Passe finale », sans tiret ni date.
 ANNOTATIONS_QUI_REGLENT_UNE_CASE = {
     "needs-issue": ("🔴", "` 🔴 needs-issue — <résumé sur une ligne>`"),
     "bloque": (" — BLOQUÉ", "` — BLOQUÉ : <raison>`"),
