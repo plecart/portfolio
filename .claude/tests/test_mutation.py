@@ -11,6 +11,7 @@ import os
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,16 @@ mutation = load_script("cycle-pr", "mutation")
 # recopié trois fois se relâche une fois. Mesuré le 2026-10-10 sur ce poste : un délai de 2 s
 # rend 2,09 s, un délai de 3 s avec petit-fils rend 3,1 s.
 MARGE_SECONDS = 5
+# Les délais que les tests de borne donnent au harnais, courts pour qu'aucun n'attende ceux de
+# production — 900 s par lancement, 10 s de grâce —, qu'un test épingle à part
+# (`test_le_harnais_garde_ses_delais_de_production`). Le délai passe par le fichier de mutations
+# (`timeout`), la grâce par le module (`GRACE_SECONDS`), que `run_bounded` lit à chaque appel.
+DELAI_SECONDS = 0.2
+# Le petit-fils doit avoir démarré et écrit avant l'expiration : deux interpréteurs à lancer.
+DELAI_PETIT_FILS_SECONDS = 1
+GRACE_SECONDS = 0.5
+# La fenêtre où le marqueur d'un petit-fils survivant bougerait : il écrit toutes les 0,02 s.
+OBSERVATION_SECONDS = 0.3
 
 # Un extrait de « Commandes du projet » fidèle au vrai fichier : trois piles, des libellés qui se
 # répètent d'une pile à l'autre, des commentaires alignés, un gabarit entre chevrons, un `n/a`.
@@ -196,18 +207,37 @@ def test_rend_un_positif():
 """
 
 
-def build_repo(tmp_path: Path, suite: str = SUITE) -> Path:
-    """Un dépôt jetable : une configuration, une source, une suite. Aucune infrastructure."""
-    (tmp_path / ".claude").mkdir(exist_ok=True)
-    (tmp_path / ".claude" / "pipeline.config.md").write_text(
-        "## Commandes du projet\n\n"
-        "**Back (`.`)** — vérifiées :\n"
-        f'- test ciblé   : "{sys.executable}" -m pytest -p no:cacheprovider\n',
+def pose_la_commande(root: Path, commande: str) -> None:
+    """Écrit la configuration du dépôt témoin : `commande` pour seule ligne « test ciblé »."""
+    (root / ".claude").mkdir(exist_ok=True)
+    (root / ".claude" / "pipeline.config.md").write_text(
+        f"## Commandes du projet\n\n**Back (`.`)** — vérifiées :\n- test ciblé   : {commande}\n",
         encoding="utf-8",
+    )
+
+
+# Une commande qui ne rend la main qu'après 30 s, bien au-delà des bornes de ces tests.
+DORMEUR = f'"{sys.executable}" -c "import time; time.sleep(30)"'
+
+
+def build_repo(tmp_path: Path, suite: str = SUITE) -> Path:
+    """Un dépôt jetable : une configuration, une source, une suite. Aucune infrastructure.
+
+    Le `pytest` enfant ne charge aucun greffon d'office : la suite témoin n'en lit aucun, et
+    `pytest-django`, le seul installé, coûtait 7 % de chaque lancement (mesuré le 2026-11-04).
+    """
+    pose_la_commande(
+        tmp_path, f'"{sys.executable}" -m pytest -p no:cacheprovider --disable-plugin-autoload'
     )
     (tmp_path / "source.py").write_text(SOURCE, encoding="utf-8")
     (tmp_path / "test_source.py").write_text(suite, encoding="utf-8")
     return tmp_path
+
+
+# La mutation que la plupart des tests jouent : la garde du négatif retirée, que
+# `test_refuse_un_negatif` protège.
+ATTENDU = ["test_refuse_un_negatif"]
+GARDE_RETIREE = {"file": "source.py", "old": "if n < 0:", "new": "if False:", "expect": ATTENDU}
 
 
 def spec(**mutation: object) -> dict[str, object]:
@@ -215,110 +245,148 @@ def spec(**mutation: object) -> dict[str, object]:
     return {"targets": ["test_source.py"], "mutations": [{"expect": [], **mutation}]}
 
 
+def borne(delai: float, name: str) -> dict[str, object]:
+    """Un fichier de mutations pour un test de borne : la garde retirée, sous `delai` secondes,
+    sans cible — la commande du témoin est un `DORMEUR` ou un lanceur fabriqué."""
+    return {"targets": [], "timeout": delai, "mutations": [{**GARDE_RETIREE, "name": name}]}
+
+
+# --- Le lanceur partagé ------------------------------------------------------------------------
+#
+# Un `play` lance un vrai `pytest` pour son témoin, puis un par mutation qui va jusqu'à la suite :
+# de l'ordre de 0,6 s chacun sur ce poste (mesuré le 2026-11-04). Les tests qui lisent un même
+# dépôt témoin lisent donc un même `play`, joué une fois par module, chacun sous le nom de sa
+# mutation ; les tests dont le dépôt diffère gardent le leur.
+
+# Les mutations du dépôt témoin par défaut, chacune lue par le test qui la nomme. Les familles que
+# des tables plus bas décrivent — `HORS_RACINE`, `CLES_OBLIGATOIRES`, `CHAMPS_DE_LISTE` — s'y
+# ajoutent dans `jeu_du_depot`.
+MUTATIONS_DU_DEPOT: dict[str, dict[str, Any]] = {
+    "garde du négatif retirée": GARDE_RETIREE,
+    "doublement cassé": {
+        "file": "source.py",
+        "old": "return n * 2",
+        "new": "return n * 3",
+        "expect": ["test_rend_un_positif"],
+    },
+    "retour faussé": {
+        "file": "source.py",
+        "old": "    return n\n",
+        "new": "    return n + 1\n",
+        "expect": ATTENDU,
+    },
+    "old absent": {"file": "source.py", "old": "zzz", "new": "y", "expect": ATTENDU},
+    "old multiple": {"file": "source.py", "old": "n", "new": "m", "expect": ATTENDU},
+    "sans effet": {**GARDE_RETIREE, "new": "if n < 0:"},
+    "sans attendu": {**GARDE_RETIREE, "expect": []},
+    "attendu mal orthographié": {**GARDE_RETIREE, "expect": ["test_refuse_un_negatiff"]},
+    "composition affaiblie": {
+        "file": "compose.yml",
+        "old": "image: x",
+        "new": "image: y",
+        "expect": ATTENDU,
+    },
+    "collecte impossible": {
+        "file": "source.py",
+        "old": "def positive(n):",
+        "new": "def renommee(n):",
+        "expect": ATTENDU,
+    },
+}
+
+
+@dataclass(frozen=True)
+class Jeu:
+    """Un `play` joué une fois : ses verdicts par nom de mutation, et la source avant et après."""
+
+    verdicts: dict[str, Any]
+    avant: bytes
+    apres: bytes
+
+
+def jouer(root: Path, mutations: dict[str, dict[str, Any]]) -> Jeu:
+    """Joue `mutations` en un seul `play` contre `test_source.py`, chacune nommée par sa clé."""
+    avant = (root / "source.py").read_bytes()
+    entries = [{"name": name, **entry} for name, entry in mutations.items()]
+    verdicts = mutation.play(root, {"targets": ["test_source.py"], "mutations": entries})
+    assert [verdict.name for verdict in verdicts] == list(mutations), "un verdict par mutation"
+    return Jeu(
+        dict(zip(mutations, verdicts, strict=True)), avant, (root / "source.py").read_bytes()
+    )
+
+
+@pytest.fixture(scope="module")
+def jeu_du_depot(tmp_path_factory: pytest.TempPathFactory) -> Jeu:
+    """Le dépôt témoin par défaut, une composition de production en plus : `MUTATIONS_DU_DEPOT`,
+    une évasion par forme de `HORS_RACINE`, une clé de `CLES_OBLIGATOIRES` retirée par mutation,
+    et `expect` écrit en chaîne (`CHAMPS_DE_LISTE`)."""
+    root = build_repo(tmp_path_factory.mktemp("depot"))
+    (root / "compose.yml").write_text("services:\n  api:\n    image: x\n", encoding="utf-8")
+    ancre = root.anchor.replace("\\", "/")
+    evasions = {
+        f"évasion : {cas}": {
+            **GARDE_RETIREE,
+            "file": chemin.format(anchor=ancre),
+            "old": "quoi que ce soit",
+            "new": "",
+        }
+        for cas, chemin in HORS_RACINE.items()
+    }
+    manquantes = {
+        f"clé manquante : {cle}": {k: v for k, v in GARDE_RETIREE.items() if k != cle}
+        for cle in CLES_OBLIGATOIRES
+    }
+    en_chaine = {
+        "champ de liste en chaîne : expect": {**GARDE_RETIREE, **CHAMPS_DE_LISTE["expect"]}
+    }
+    return jouer(root, {**MUTATIONS_DU_DEPOT, **evasions, **manquantes, **en_chaine})
+
+
 def test_une_mutation_attrapee_est_rouge_et_le_fichier_revient_octet_pour_octet(
-    tmp_path: Path,
+    jeu_du_depot: Jeu,
 ) -> None:
     """Le cœur du contrat : la garde retirée, le test qui la protège doit rougir."""
-    root = build_repo(tmp_path)
-    before = (root / "source.py").read_bytes()
-
-    verdicts = mutation.play(
-        root,
-        spec(
-            name="garde du négatif retirée",
-            file="source.py",
-            old="if n < 0:",
-            new="if False:",
-            expect=["test_refuse_un_negatif"],
-        ),
-    )
-
-    assert [v.verdict for v in verdicts] == ["ROUGE"]
-    assert (root / "source.py").read_bytes() == before
+    assert jeu_du_depot.verdicts["garde du négatif retirée"].verdict == "ROUGE"
+    assert jeu_du_depot.apres == jeu_du_depot.avant
 
 
-def test_un_test_qui_ne_tient_pas_est_vert(tmp_path: Path) -> None:
+def test_un_test_qui_ne_tient_pas_est_vert(jeu_du_depot: Jeu) -> None:
     """Muter ce qu'aucun test n'observe doit rendre VERT, jamais ROUGE."""
-    root = build_repo(tmp_path)
-
-    verdicts = mutation.play(
-        root,
-        spec(
-            name="doublement cassé",
-            file="source.py",
-            old="return n * 2",
-            new="return n * 3",
-            expect=["test_rend_un_positif"],
-        ),
-    )
-
-    assert [v.verdict for v in verdicts] == ["VERT"]
+    assert jeu_du_depot.verdicts["doublement cassé"].verdict == "VERT"
 
 
-def test_le_rouge_d_un_autre_test_ne_vaut_pas_le_rouge_attendu(tmp_path: Path) -> None:
+def test_le_rouge_d_un_autre_test_ne_vaut_pas_le_rouge_attendu(jeu_du_depot: Jeu) -> None:
     """Mesuré le 2026-10-04 : une mutation a compté ROUGE sur l'échec d'un *autre* test.
 
     Ici la mutation fait rougir `test_rend_un_positif` mais pas `test_refuse_un_negatif`, qu'on
     prétend éprouver. Un verdict pris sur le code de sortie dirait ROUGE.
     """
-    root = build_repo(tmp_path)
+    verdict = jeu_du_depot.verdicts["retour faussé"]
 
-    verdicts = mutation.play(
-        root,
-        spec(
-            name="retour faussé",
-            file="source.py",
-            old="    return n\n",
-            new="    return n + 1\n",
-            expect=["test_refuse_un_negatif"],
-        ),
-    )
-
-    assert [v.verdict for v in verdicts] == ["VERT"]
-    assert "test_rend_un_positif" in verdicts[0].detail
+    assert verdict.verdict == "VERT"
+    assert "test_rend_un_positif" in verdict.detail
 
 
-def test_un_old_absent_ou_multiple_est_une_panne_et_ne_touche_rien(tmp_path: Path) -> None:
+def test_un_old_absent_ou_multiple_est_une_panne_et_ne_touche_rien(jeu_du_depot: Jeu) -> None:
     """Un remplacement non unique muterait autre chose que ce que la mutation prétend."""
-    root = build_repo(tmp_path)
-    before = (root / "source.py").read_bytes()
+    absent = jeu_du_depot.verdicts["old absent"]
+    multiple = jeu_du_depot.verdicts["old multiple"]
 
-    attendu = ["test_refuse_un_negatif"]
-    absent = mutation.play(
-        root, spec(name="absent", file="source.py", old="zzz", new="y", expect=attendu)
-    )
-    multiple = mutation.play(
-        root, spec(name="multiple", file="source.py", old="n", new="m", expect=attendu)
-    )
-
-    assert [v.verdict for v in absent] == ["PANNE"]
-    assert [v.verdict for v in multiple] == ["PANNE"]
-    assert "0 fois" in absent[0].detail
-    assert (root / "source.py").read_bytes() == before
+    assert (absent.verdict, multiple.verdict) == ("PANNE", "PANNE")
+    assert "0 fois" in absent.detail
+    assert jeu_du_depot.apres == jeu_du_depot.avant
 
 
-def test_une_mutation_qui_ne_mute_rien_est_une_panne(tmp_path: Path) -> None:
+def test_une_mutation_qui_ne_mute_rien_est_une_panne(jeu_du_depot: Jeu) -> None:
     """`new` identique à `old` réécrit le fichier à l'identique : le test visé reste vert, et ce
     VERT se lit « l'invariant n'est pas gardé » alors que rien n'a été muté (obs 77). Mesuré au
     lot 2 de #77 : une ancre choisie par sous-chaîne avait pris le commentaire qui citait le code,
     et son remplacement ne trouvait rien."""
-    root = build_repo(tmp_path)
-    before = (root / "source.py").read_bytes()
+    verdict = jeu_du_depot.verdicts["sans effet"]
 
-    verdicts = mutation.play(
-        root,
-        spec(
-            name="sans effet",
-            file="source.py",
-            old="if n < 0:",
-            new="if n < 0:",
-            expect=["test_refuse_un_negatif"],
-        ),
-    )
-
-    assert [v.verdict for v in verdicts] == ["PANNE"]
-    assert "ne mute rien" in verdicts[0].detail
-    assert (root / "source.py").read_bytes() == before
+    assert verdict.verdict == "PANNE"
+    assert "ne mute rien" in verdict.detail
+    assert jeu_du_depot.apres == jeu_du_depot.avant
 
 
 def test_les_fins_de_ligne_du_fichier_mute_sont_respectees(tmp_path: Path) -> None:
@@ -348,9 +416,7 @@ def test_un_temoin_rouge_arrete_avant_toute_mutation(tmp_path: Path) -> None:
     root = build_repo(tmp_path, suite=SUITE + "\n\ndef test_deja_rouge():\n    assert False\n")
     before = (root / "source.py").read_bytes()
 
-    verdicts = mutation.play(
-        root, spec(name="jamais jouée", file="source.py", old="if n < 0:", new="if False:")
-    )
+    verdicts = mutation.play(root, spec(**GARDE_RETIREE, name="jamais jouée"))
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
     assert "témoin" in verdicts[0].detail
@@ -406,16 +472,12 @@ def test_une_mutation_d_un_reglage_de_securite_est_refusee(
     assert "recueil de formes fautives" in refusal
 
 
-def test_une_mutation_sans_rouge_attendu_est_une_panne(tmp_path: Path) -> None:
+def test_une_mutation_sans_rouge_attendu_est_une_panne(jeu_du_depot: Jeu) -> None:
     """« Le rouge attendu nommé » est tout le propos : sans nom, il n'y a rien à conclure."""
-    root = build_repo(tmp_path)
+    verdict = jeu_du_depot.verdicts["sans attendu"]
 
-    verdicts = mutation.play(
-        root, spec(name="sans attendu", file="source.py", old="if n < 0:", new="if False:")
-    )
-
-    assert [v.verdict for v in verdicts] == ["PANNE"]
-    assert "`expect` est vide" in verdicts[0].detail
+    assert verdict.verdict == "PANNE"
+    assert "`expect` est vide" in verdict.detail
 
 
 # --- Ce que la première passe de relecture a trouvé (2026-10-09) -------------------------------
@@ -436,39 +498,21 @@ def test_un_rouge_attendu_ambigu_est_une_panne_pas_un_rouge(tmp_path: Path) -> N
     )
 
     verdicts = mutation.play(
-        root,
-        spec(
-            name="retour faussé",
-            file="source.py",
-            old="    return n\n",
-            new="    return n + 1\n",
-            expect=["test_refuse_un_negatif"],
-        ),
+        root, spec(**MUTATIONS_DU_DEPOT["retour faussé"], name="retour faussé")
     )
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
     assert "apparie 2 tests" in verdicts[0].detail
 
 
-def test_un_rouge_attendu_introuvable_est_une_panne(tmp_path: Path) -> None:
+def test_un_rouge_attendu_introuvable_est_une_panne(jeu_du_depot: Jeu) -> None:
     """Une faute de frappe dans `expect`, ou un identifiant que le lanceur échappe — pytest
     échappe les non-ASCII des cas paramétrés —, rendait VERT : un verdict sur un test jamais
     nommé. Zéro appariement est une panne, pas un test qui ne tient pas."""
-    root = build_repo(tmp_path)
+    verdict = jeu_du_depot.verdicts["attendu mal orthographié"]
 
-    verdicts = mutation.play(
-        root,
-        spec(
-            name="attendu mal orthographié",
-            file="source.py",
-            old="if n < 0:",
-            new="if False:",
-            expect=["test_refuse_un_negatiff"],
-        ),
-    )
-
-    assert [v.verdict for v in verdicts] == ["PANNE"]
-    assert "apparie 0 tests" in verdicts[0].detail
+    assert verdict.verdict == "PANNE"
+    assert "apparie 0 tests" in verdict.detail
 
 
 # Des chemins **neutres** à dessein : un chemin absolu de réglage de sécurité serait arrêté par
@@ -480,8 +524,8 @@ HORS_RACINE = {
 }
 
 
-@pytest.mark.parametrize("declared", HORS_RACINE.values(), ids=HORS_RACINE.keys())
-def test_un_fichier_hors_de_la_racine_est_refuse(tmp_path: Path, declared: str) -> None:
+@pytest.mark.parametrize("cas", HORS_RACINE)
+def test_un_fichier_hors_de_la_racine_est_refuse(jeu_du_depot: Jeu, cas: str) -> None:
     """`Path` ne borne rien : joint à un chemin absolu, il le rend tel quel.
 
     Un `file` qui sort de la racine fait muter — et restaurer — hors du worktree isolé, donc
@@ -489,21 +533,10 @@ def test_un_fichier_hors_de_la_racine_est_refuse(tmp_path: Path, declared: str) 
     que la vérification de `git rev-parse --show-toplevel` existe pour empêcher, et elle
     contourne au passage le refus de sécurité, qui n'apparie que le chemin **déclaré**.
     """
-    root = build_repo(tmp_path)
+    verdict = jeu_du_depot.verdicts[f"évasion : {cas}"]
 
-    verdicts = mutation.play(
-        root,
-        spec(
-            name="évasion",
-            file=declared.format(anchor=tmp_path.anchor.replace("\\", "/")),
-            old="quoi que ce soit",
-            new="",
-            expect=["test_refuse_un_negatif"],
-        ),
-    )
-
-    assert [v.verdict for v in verdicts] == ["PANNE"]
-    assert "sort de la racine" in verdicts[0].detail
+    assert verdict.verdict == "PANNE"
+    assert "sort de la racine" in verdict.detail
 
 
 def test_un_rapport_illisible_est_une_panne(tmp_path: Path) -> None:
@@ -527,22 +560,9 @@ def test_un_lanceur_qui_ne_demarre_pas_est_une_panne_d_outil(tmp_path: Path) -> 
     commande, et une cible `make` ou `just` les refuse.
     """
     root = build_repo(tmp_path)
-    (root / ".claude" / "pipeline.config.md").write_text(
-        "## Commandes du projet\n\n**Back (`.`)** — v :\n"
-        "- test ciblé   : binaire-absent-pour-la-sonde --run\n",
-        encoding="utf-8",
-    )
+    pose_la_commande(root, "binaire-absent-pour-la-sonde --run")
 
-    verdicts = mutation.play(
-        root,
-        spec(
-            name="jamais jouée",
-            file="source.py",
-            old="if n < 0:",
-            new="if False:",
-            expect=["test_refuse_un_negatif"],
-        ),
-    )
+    verdicts = mutation.play(root, spec(**GARDE_RETIREE, name="jamais jouée"))
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
     assert "aucun rapport produit" in verdicts[0].detail
@@ -563,35 +583,16 @@ def test_un_delai_depasse_est_une_panne_et_restaure_le_fichier(tmp_path: Path) -
     """
     root = build_repo(tmp_path)
     before = (root / "source.py").read_bytes()
-    (root / ".claude" / "pipeline.config.md").write_text(
-        "## Commandes du projet\n\n**Back (`.`)** — v :\n"
-        f'- test ciblé   : "{sys.executable}" -c "import time; time.sleep(30)"\n',
-        encoding="utf-8",
-    )
+    pose_la_commande(root, DORMEUR)
     started = time.monotonic()
 
-    verdicts = mutation.play(
-        root,
-        {
-            "targets": [],
-            "timeout": 2,
-            "mutations": [
-                {
-                    "name": "boucle sans fin",
-                    "file": "source.py",
-                    "old": "if n < 0:",
-                    "new": "if False:",
-                    "expect": ["test_refuse_un_negatif"],
-                }
-            ],
-        },
-    )
+    verdicts = mutation.play(root, borne(DELAI_SECONDS, "boucle sans fin"))
     elapsed = time.monotonic() - started
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
-    assert "délai de 2 s dépassé" in verdicts[0].detail
+    assert f"délai de {DELAI_SECONDS:g} s dépassé" in verdicts[0].detail
     assert (root / "source.py").read_bytes() == before
-    assert elapsed < 2 + MARGE_SECONDS, f"la borne n'a pas tenu : {elapsed:.2f} s"
+    assert elapsed < DELAI_SECONDS + MARGE_SECONDS, f"la borne n'a pas tenu : {elapsed:.2f} s"
 
 
 def test_un_rapporteur_inconnu_est_une_panne(tmp_path: Path) -> None:
@@ -735,42 +736,21 @@ def test_un_attendu_saute_est_une_panne_pas_un_vert(tmp_path: Path) -> None:
         ),
     )
 
-    verdicts = mutation.play(
-        root,
-        spec(
-            name="garde du négatif retirée",
-            file="source.py",
-            old="if n < 0:",
-            new="if False:",
-            expect=["test_refuse_un_negatif"],
-        ),
-    )
+    verdicts = mutation.play(root, spec(**GARDE_RETIREE, name="garde du négatif retirée"))
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
     assert "n'ont pas tourné" in verdicts[0].detail
 
 
-def test_un_refus_de_securite_arrete_la_mutation_dans_play(tmp_path: Path) -> None:
+def test_un_refus_de_securite_arrete_la_mutation_dans_play(jeu_du_depot: Jeu) -> None:
     """La garde vivait en deux endroits qui se masquaient : retirer l'un laissait l'autre rendre
     le même verdict, donc aucun test ne pouvait épingler ni l'un ni l'autre. Il n'en reste
     qu'un, et ce test l'éprouve au niveau où il agit."""
-    root = build_repo(tmp_path)
-    (root / "compose.yml").write_text("services:\n  api:\n    image: x\n", encoding="utf-8")
+    verdict = jeu_du_depot.verdicts["composition affaiblie"]
 
-    verdicts = mutation.play(
-        root,
-        spec(
-            name="composition affaiblie",
-            file="compose.yml",
-            old="image: x",
-            new="image: y",
-            expect=["test_refuse_un_negatif"],
-        ),
-    )
-
-    assert [v.verdict for v in verdicts] == ["PANNE"]
-    assert "réglage de sécurité" in verdicts[0].detail
-    assert "recueil de formes fautives" in verdicts[0].detail
+    assert verdict.verdict == "PANNE"
+    assert "réglage de sécurité" in verdict.detail
+    assert "recueil de formes fautives" in verdict.detail
 
 
 # --- Ce que les sondes de la passe 2 ont trouvé (2026-10-09) -----------------------------------
@@ -780,7 +760,7 @@ def test_un_refus_de_securite_arrete_la_mutation_dans_play(tmp_path: Path) -> No
 # worktree ; les relire et les jouer a coûté moins que de redécouvrir ce qu'il avait vu.
 
 
-def test_un_expect_ecrit_en_chaine_est_refuse_avant_toute_resolution(tmp_path: Path) -> None:
+def test_un_expect_ecrit_en_chaine_est_refuse_avant_toute_resolution(jeu_du_depot: Jeu) -> None:
     """Une chaîne est itérable : chaque **lettre** deviendrait un fragment de `expect`.
 
     Mesuré le 2026-10-09 : sur une suite témoin à un seul test, chaque lettre s'y résolvait, et
@@ -788,22 +768,10 @@ def test_un_expect_ecrit_en_chaine_est_refuse_avant_toute_resolution(tmp_path: P
     orthographié. C'est le défaut que `resolve` ferme, rouvert par une erreur de type : le refus
     doit donc venir **avant** la résolution.
     """
-    root = build_repo(tmp_path)
+    verdict = jeu_du_depot.verdicts["champ de liste en chaîne : expect"]
 
-    verdicts = mutation.play(
-        root,
-        spec(
-            name="expect mal typé",
-            file="source.py",
-            old="if n < 0:",
-            new="if False:",
-            expect="test_refuse_un_negatif",
-        ),
-    )
-
-    assert [v.verdict for v in verdicts] == ["PANNE"]
-    assert [v.verdict for v in verdicts] == ["PANNE"]
-    assert "`expect` est une chaîne" in verdicts[0].detail
+    assert verdict.verdict == "PANNE"
+    assert "`expect` est une chaîne" in verdict.detail
 
 
 # Une suite témoin dont le cas paramétré porte un accent, comme près de trois dixièmes de ceux
@@ -822,7 +790,23 @@ def test_refuse_un_negatif(valeur):
 """
 
 
-def test_un_identifiant_accentue_se_nomme_dans_sa_forme_naturelle(tmp_path: Path) -> None:
+@pytest.fixture(scope="module")
+def jeu_accentue(tmp_path_factory: pytest.TempPathFactory) -> Jeu:
+    """La suite témoin accentuée : un seul `play` pour les deux formes du même cas paramétré."""
+    root = build_repo(tmp_path_factory.mktemp("accentue"), suite=SUITE_ACCENTUEE)
+    return jouer(
+        root,
+        {
+            "forme naturelle": {**GARDE_RETIREE, "expect": ["test_refuse_un_negatif[à la borne]"]},
+            "forme du lanceur": {
+                **GARDE_RETIREE,
+                "expect": ["test_refuse_un_negatif[\\xe0 la borne]"],
+            },
+        },
+    )
+
+
+def test_un_identifiant_accentue_se_nomme_dans_sa_forme_naturelle(jeu_accentue: Jeu) -> None:
     """`expect` nomme un cas paramétré accentué comme on l'écrit, pas comme pytest l'échappe.
 
     pytest échappe les non-ASCII des identifiants paramétrés : `à la borne` devient le littéral
@@ -844,65 +828,29 @@ def test_un_identifiant_accentue_se_nomme_dans_sa_forme_naturelle(tmp_path: Path
     figée par un commit, donc reproductible à SHA égal ; elle grossit à chaque lot, donc le
     couple 302/1041 se relit, jamais se recopie.
     """
-    root = build_repo(tmp_path, suite=SUITE_ACCENTUEE)
-
-    verdicts = mutation.play(
-        root,
-        spec(
-            name="garde du négatif retirée",
-            file="source.py",
-            old="if n < 0:",
-            new="if False:",
-            expect=["test_refuse_un_negatif[à la borne]"],
-        ),
-    )
-
-    assert [v.verdict for v in verdicts] == ["ROUGE"]
+    assert jeu_accentue.verdicts["forme naturelle"].verdict == "ROUGE"
 
 
-def test_un_identifiant_accentue_se_nomme_aussi_dans_la_forme_du_lanceur(tmp_path: Path) -> None:
+def test_un_identifiant_accentue_se_nomme_aussi_dans_la_forme_du_lanceur(jeu_accentue: Jeu) -> None:
     """La forme échappée, celle que le rapport affiche, reste acceptée : les deux mènent au test.
 
     C'est ce que la PANNE donne à lire à qui l'a rencontrée ; la refuser l'obligerait à
     deviner laquelle des deux formes le harnais attend.
     """
-    root = build_repo(tmp_path, suite=SUITE_ACCENTUEE)
-
-    verdicts = mutation.play(
-        root,
-        spec(
-            name="garde du négatif retirée",
-            file="source.py",
-            old="if n < 0:",
-            new="if False:",
-            expect=["test_refuse_un_negatif[\\xe0 la borne]"],
-        ),
-    )
-
-    assert [v.verdict for v in verdicts] == ["ROUGE"]
+    assert jeu_accentue.verdicts["forme du lanceur"].verdict == "ROUGE"
 
 
 CLES_OBLIGATOIRES = ("file", "old", "new")
 
 
 @pytest.mark.parametrize("missing", CLES_OBLIGATOIRES)
-def test_une_cle_obligatoire_absente_est_une_panne(tmp_path: Path, missing: str) -> None:
+def test_une_cle_obligatoire_absente_est_une_panne(jeu_du_depot: Jeu, missing: str) -> None:
     """Le fichier de mutations s'écrit à la main : une clé oubliée rendait une `KeyError` nue,
     qui abandonnait les mutations suivantes du lot avec une trace au lieu d'un verdict."""
-    root = build_repo(tmp_path)
-    entry = {
-        "name": "clé manquante",
-        "file": "source.py",
-        "old": "if n < 0:",
-        "new": "if False:",
-        "expect": ["test_refuse_un_negatif"],
-    }
-    del entry[missing]
+    verdict = jeu_du_depot.verdicts[f"clé manquante : {missing}"]
 
-    verdicts = mutation.play(root, {"targets": ["test_source.py"], "mutations": [entry]})
-
-    assert [v.verdict for v in verdicts] == ["PANNE"]
-    assert f"clé « {missing} » absente" in verdicts[0].detail
+    assert verdict.verdict == "PANNE"
+    assert f"clé « {missing} » absente" in verdict.detail
 
 
 MAUVAIS_DELAIS = {
@@ -923,23 +871,8 @@ def test_un_delai_qui_n_est_pas_un_nombre_positif_est_une_panne(
     `True` est refusé aussi : il vaudrait une seconde, et toute suite dépasserait ce délai —
     une PANNE généralisée qui se lirait comme un environnement cassé.
     """
-    root = build_repo(tmp_path)
-
     verdicts = mutation.play(
-        root,
-        {
-            "targets": ["test_source.py"],
-            "timeout": value,
-            "mutations": [
-                {
-                    "name": "délai absurde",
-                    "file": "source.py",
-                    "old": "if n < 0:",
-                    "new": "if False:",
-                    "expect": ["test_refuse_un_negatif"],
-                }
-            ],
-        },
+        build_repo(tmp_path), {**spec(**GARDE_RETIREE, name="délai absurde"), "timeout": value}
     )
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
@@ -1018,30 +951,20 @@ CHAMPS_DE_LISTE = {
 
 @pytest.mark.parametrize("surcharge", CHAMPS_DE_LISTE.values(), ids=CHAMPS_DE_LISTE.keys())
 def test_aucun_champ_de_liste_n_accepte_une_chaine(
-    tmp_path: Path, surcharge: dict[str, str]
+    tmp_path: Path, surcharge: dict[str, str], jeu_du_depot: Jeu
 ) -> None:
     """Une chaîne est itérable : écrite là où une liste est attendue, elle est lue lettre par
     lettre, et chaque lettre devient un élément.
 
     Mesuré sur `expect` : `"un"` rendait ROUGE. La même forme sur `targets` aurait envoyé une
     lettre par argument au lanceur, et sur `mutations` aurait fait appeler `.get` sur une lettre.
-    Dénombrement de la classe : **3 champs de liste recensés, 3 refusés.**
+    Dénombrement de la classe : **3 champs de liste recensés, 3 refusés.** `expect` vit dans une
+    entrée de mutation, donc dans le `play` partagé ; les deux autres, dans le fichier entier.
     """
-    root = build_repo(tmp_path)
-    entry: dict[str, Any] = {
-        "name": "sonde",
-        "file": "source.py",
-        "old": "if n < 0:",
-        "new": "if False:",
-        "expect": ["test_refuse_un_negatif"],
-    }
-    base: dict[str, Any] = {"targets": ["test_source.py"], "mutations": [entry]}
     if "expect" in surcharge:
-        entry["expect"] = surcharge["expect"]
+        verdicts = [jeu_du_depot.verdicts["champ de liste en chaîne : expect"]]
     else:
-        base.update(surcharge)
-
-    verdicts = mutation.play(root, base)
+        verdicts = mutation.play(build_repo(tmp_path), {**spec(**GARDE_RETIREE), **surcharge})
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
     # Le message **spécifique**, pas le repli générique « au lieu d'une liste » : une assertion
@@ -1083,40 +1006,23 @@ def test_un_petit_fils_en_boucle_sans_fin_ne_bloque_pas_le_harnais(tmp_path: Pat
         "import subprocess, sys\nsubprocess.run([sys.executable, 'petit_fils.py', sys.argv[1]])\n",
         encoding="utf-8",
     )
-    (root / ".claude" / "pipeline.config.md").write_text(
-        "## Commandes du projet\n\n**Back (`.`)** — v :\n"
-        f'- test ciblé   : "{sys.executable}" lanceur.py "{marker}"\n',
-        encoding="utf-8",
-    )
+    pose_la_commande(root, f'"{sys.executable}" lanceur.py "{marker}"')
     started = time.monotonic()
 
-    verdicts = mutation.play(
-        root,
-        {
-            "targets": [],
-            "timeout": 3,
-            "mutations": [
-                {
-                    "name": "petit-fils immortel",
-                    "file": "source.py",
-                    "old": "if n < 0:",
-                    "new": "if False:",
-                    "expect": ["test_refuse_un_negatif"],
-                }
-            ],
-        },
-    )
+    verdicts = mutation.play(root, borne(DELAI_PETIT_FILS_SECONDS, "petit-fils immortel"))
     elapsed = time.monotonic() - started
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
     assert "descendance tués" in verdicts[0].detail
-    assert elapsed < 3 + MARGE_SECONDS, f"le délai n'a pas borné l'arbre : {elapsed:.2f} s"
+    assert elapsed < DELAI_PETIT_FILS_SECONDS + MARGE_SECONDS, (
+        f"le délai n'a pas borné l'arbre : {elapsed:.2f} s"
+    )
     assert (root / "source.py").read_bytes() == before
 
     # La preuve que le petit-fils est bien mort : son marqueur cesse de bouger.
     assert marker.exists(), "le petit-fils n'a jamais tourné — le montage ne prouve rien"
     first = marker.read_text(encoding="utf-8")
-    time.sleep(1)
+    time.sleep(OBSERVATION_SECONDS)
     assert marker.read_text(encoding="utf-8") == first, "le petit-fils écrit encore"
 
 
@@ -1159,42 +1065,32 @@ def test_un_tueur_d_arbre_indisponible_laisse_la_borne_et_le_lot_intacts(
     Les deux pièces sont éprouvées d'un coup : un verdict rendu prouve que rien n'a levé, et le
     temps écoulé prouve qu'aucune attente n'est restée sans borne. La borne admet ici le second
     recours en entier : le tueur absent, la descendance tient les tubes jusqu'au bout de la
-    grâce — c'est le prix voulu, et il est fini.
+    grâce — c'est le prix voulu, et il est fini. Le test la pose courte, comme le délai.
     """
     root = build_repo(tmp_path)
     before = (root / "source.py").read_bytes()
-    (root / ".claude" / "pipeline.config.md").write_text(
-        "## Commandes du projet\n\n**Back (`.`)** — v :\n"
-        f'- test ciblé   : "{sys.executable}" -c "import time; time.sleep(30)"\n',
-        encoding="utf-8",
-    )
+    pose_la_commande(root, DORMEUR)
     casse_le_tueur_d_arbre(monkeypatch)
+    monkeypatch.setattr(mutation, "GRACE_SECONDS", GRACE_SECONDS)
     started = time.monotonic()
 
-    verdicts = mutation.play(
-        root,
-        {
-            "targets": [],
-            "timeout": 2,
-            "mutations": [
-                {
-                    "name": "boucle sans fin, tueur d'arbre absent",
-                    "file": "source.py",
-                    "old": "if n < 0:",
-                    "new": "if False:",
-                    "expect": ["test_refuse_un_negatif"],
-                }
-            ],
-        },
-    )
+    verdicts = mutation.play(root, borne(DELAI_SECONDS, "boucle sans fin, tueur d'arbre absent"))
     elapsed = time.monotonic() - started
 
     assert [v.verdict for v in verdicts] == ["PANNE"]
-    assert "délai de 2 s dépassé" in verdicts[0].detail
+    assert f"délai de {DELAI_SECONDS:g} s dépassé" in verdicts[0].detail
     assert (root / "source.py").read_bytes() == before
-    assert elapsed < 2 + mutation.GRACE_SECONDS + MARGE_SECONDS, (
+    assert elapsed < DELAI_SECONDS + GRACE_SECONDS + MARGE_SECONDS, (
         f"la borne n'a pas tenu : {elapsed:.2f} s"
     )
+
+
+def test_le_harnais_garde_ses_delais_de_production(tmp_path: Path) -> None:
+    """Les tests de borne jouent des délais courts — `timeout` par le fichier de mutations, la
+    grâce posée sur le module — ; sans eux, le harnais garde les siens : 900 s par lancement,
+    10 s de grâce après que la descendance a été tuée."""
+    assert mutation.Suite.from_spec(build_repo(tmp_path), {"targets": []}).timeout == 900
+    assert mutation.GRACE_SECONDS == 10
 
 
 def test_terminate_tree_ne_leve_pas_quand_son_tueur_manque(
@@ -1220,28 +1116,17 @@ def test_terminate_tree_ne_leve_pas_quand_son_tueur_manque(
         process.wait(timeout=mutation.GRACE_SECONDS)
 
 
-def test_un_attendu_absent_du_rapport_mute_est_une_panne_pas_un_vert(tmp_path: Path) -> None:
+def test_un_attendu_absent_du_rapport_mute_est_une_panne_pas_un_vert(jeu_du_depot: Jeu) -> None:
     """Une mutation qui empêche la **collecte** fait disparaître le test visé du rapport.
 
     Il n'a alors ni rougi ni tenu : il n'a pas tourné. Mesuré en relecture — il était compté
     « survivant », donc VERT, ce qui condamne un test que personne n'a éprouvé. C'est
     exactement la distinction que `Unusable` existe pour tenir.
     """
-    root = build_repo(tmp_path)
+    verdict = jeu_du_depot.verdicts["collecte impossible"]
 
-    verdicts = mutation.play(
-        root,
-        spec(
-            name="collecte impossible",
-            file="source.py",
-            old="def positive(n):",
-            new="def renommee(n):",
-            expect=["test_refuse_un_negatif"],
-        ),
-    )
-
-    assert [v.verdict for v in verdicts] == ["PANNE"]
-    assert "n'ont pas tourné" in verdicts[0].detail
+    assert verdict.verdict == "PANNE"
+    assert "n'ont pas tourné" in verdict.detail
 
 
 def test_une_mutation_de_meme_longueur_change_la_date_du_fichier(tmp_path: Path) -> None:
