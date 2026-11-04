@@ -78,9 +78,18 @@ AVIS = (
 )
 # Ce que lit la suite de la pipeline, `.claude/tests` (ADR 0025) : la prose, les réglages et les
 # scripts du harnais, et `.github/`, dont elle relit les renvois et les commandes ; puis ce qui la
-# lance, le manifeste racine — son `pytest` et son `addopts` — et le verrou. `ALL` et `QUOTED`
-# s'y ajoutent, comme pour `web` et `avis`.
-PIPELINE = (".claude/*", "CLAUDE.md", "CONTRIBUTING.md", ".github/*", "pyproject.toml", "uv.lock")
+# lance, le manifeste racine — son `pytest` et son `addopts` —, le verrou, et `.python-version`,
+# l'interpréteur que `uv` lui donne (doc uv, « Project structure »). `ALL` et `QUOTED` s'y
+# ajoutent, comme pour `web` et `avis`.
+PIPELINE = (
+    ".claude/*",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    ".github/*",
+    "pyproject.toml",
+    "uv.lock",
+    ".python-version",
+)
 # Les modules de `apps/api/tests/` que `make test-pipeline` charge : ce que `.claude/tests/`
 # importe, directement ou non. Recalculés par `test_ci_declencheurs.py`, comme `IMAGE_TESTS`.
 PIPELINE_TESTS = ("apps/api/tests/system_commands.py", "apps/api/tests/test_supply_chain.py")
