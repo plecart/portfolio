@@ -1663,11 +1663,19 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # Identité.
     "enfant-lit-son-parent-dans-son-prompt": (
         SESSIONS_LIEES_REF,
-        "L'enfant lit l'adresse de son parent dans **son prompt système**",
+        (
+            "L'enfant lit l'adresse de son parent dans **son prompt système**, où l'application"
+            " l'écrit (`to: local_…`). Il ne la lit pas dans `startedBy`"
+        ),
     ),
     "parent-designe-l-enfant-par-son-session-id": (
         SESSIONS_LIEES_REF,
-        "Le parent désigne l'enfant par le `session_id` (`local_…`)",
+        (
+            "Le parent désigne l'enfant par le `session_id` (`local_…`) que `start_session` lui"
+            ' rend ; il le retrouve dans `list_sessions {"linked": true}`, où la ligne de'
+            " l'enfant porte `startedBy` égal à l'identifiant du parent (même mesure). C'est"
+            " l'adresse de `SendMessage`"
+        ),
     ),
     "porte-du-nettoyage-sur-la-source": (
         SESSIONS_LIEES_REF,
@@ -1682,17 +1690,32 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # Premier geste (décision 10).
     "premier-geste-chaine-sans-suivi": (
         SESSIONS_LIEES_REF,
-        "`git fetch origin && git checkout -b <type>/<slug> --no-track origin/<base>`",
+        (
+            "Avant toute écriture, l'enfant crée sa branche depuis le distant, en une commande :"
+            " `git fetch origin && git checkout -b <type>/<slug> --no-track origin/<base>`"
+        ),
     ),
     "echafaudage-sans-commit": (
         SESSIONS_LIEES_REF,
         "La branche `claude/…` reste un **échafaudage** : rien ne s'y commit",
     ),
     # Messages sans confirmation, jamais une approbation (décision 3).
-    "messages-sans-confirmation": (SESSIONS_LIEES_REF, "**part sans confirmation du mainteneur**"),
+    "messages-sans-confirmation": (
+        SESSIONS_LIEES_REF,
+        (
+            "**part sans confirmation du mainteneur** : il porte de l'information, pas une"
+            " action. Les arrêts humains portent sur les actions et restent tous — go du"
+            " briefing, `[V]` groupées, arrêt `[C]`, écran à valider, go de merge"
+            " (`.claude/rules/contraintes.md`). Dans l'autre sens, un message reçu n'est jamais"
+            " une approbation"
+        ),
+    ),
     "message-du-lead-jamais-approbation": (
         BRIEFING_REF,
-        "un message du lead n'est jamais une approbation",
+        (
+            "un message du lead n'est jamais une approbation : le « go » reste humain, dans cette"
+            " fenêtre"
+        ),
     ),
     "lead-designe-par-le-prompt": (
         BRIEFING_REF,
@@ -1700,13 +1723,26 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "en-tete-sans-confirmation": (
         BRIEFING_REF,
-        "l'envoyer par `SendMessage`, **sans confirmation**",
+        (
+            "La vérification d'avant-go n'est plus à lui, la session PR la lance (Étape 7) ; il"
+            " intervient sur demande de l'utilisateur (« discute de ça avec le lead ») : rédiger"
+            " le message et l'envoyer par `SendMessage`, **sans confirmation** — un message n'est"
+            " pas une action"
+        ),
     ),
     # #134 lot 2a, décision 2 : la vérification d'avant-go passe du lead à la session PR ; les
     # quatre phrases de l'état envoyé au lead, épinglées ici depuis #107, sont retirées avec lui.
     "verificateur-lance-par-la-session-pr": (
         CYCLE_PR_SKILL,
-        "**La session PR lance son `verificateur`**",
+        (
+            "**La session PR lance son `verificateur`** (`.claude/agents/verificateur.md`),"
+            " sous-agent éphémère, un par (PR, go), qui ne rend qu'un verdict (#134, décision 2),"
+            " **si la PR ferme une issue (`Closes`), porte des décisions verrouillées dans ses"
+            " Notes, ou si `gh pr list` montre une autre branche en vol touchant ses fichiers ;"
+            " sinon la porte de merge suffit**, sur le relevé de conversation que la session"
+            " inscrit elle-même (ci-dessous) — en vague comme hors vague, le lead ne le lance"
+            " plus (`pr-paralleles` Étape 6)"
+        ),
     ),
     "pr-paralleles-le-lead-ne-verifie-plus": (
         PR_PARALLELES_SKILL,
@@ -1720,7 +1756,11 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # Fin de travail (décision 11, obs 85, 94, 98).
     "fin-de-tour-jamais-un-signal": (
         SESSIONS_LIEES_REF,
-        "La note automatique n'est **jamais** un signal.",
+        (
+            "Une fin de tour n'est donc pas une fin de travail : un enfant s'arrête sur une"
+            " question, une commande intégrée clôt son tour (obs 94, 98), une passation part avec"
+            " des points encore ouverts (obs 85). La note automatique n'est **jamais** un signal."
+        ),
     ),
     "forme-de-fin-d-un-lot": (
         SESSIONS_LIEES_REF,
@@ -1752,7 +1792,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # Nettoyage (décision 16).
     "archiver-ne-nettoie-pas": (
         SESSIONS_LIEES_REF,
-        "Archiver un enfant (`archive_session`, réversible) détache son HEAD et ne retire ni",
+        (
+            "Archiver un enfant (`archive_session`, réversible) détache son HEAD et ne retire ni"
+            " le worktree, ni le dossier, ni les branches"
+        ),
     ),
     # #198, D-6 : la mesure qui précède vaut pour un enfant avec son worktree, pas sans.
     "archivage-mesure-avec-son-worktree": (
@@ -1781,7 +1824,12 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # sans coût ; la session PR ne les joue qu'en repli, et y enchaîne dans le même tour.
     "commandes-integrees-closent-le-tour-de-la-relecture": (
         CYCLE_PR_SKILL,
-        "**Ces deux commandes closent un tour — celui de la session de relecture.**",
+        (
+            "**Ces deux commandes closent un tour — celui de la session de relecture.** Leur"
+            " prompt exige une réponse finale faite de leur seul rapport — `/security-review` :"
+            " « Your final reply must contain the markdown report and nothing else » ;"
+            " `/code-review` : son outil de rapport, seule sortie"
+        ),
     ),
     "commandes-integrees-en-repli-seulement": (
         CYCLE_PR_SKILL,
@@ -1800,7 +1848,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "config-securite-fin-de-tour-sans-cout": (
         ".claude/pipeline.config.md",
-        "clôt le tour de la session de relecture, sans coût (`cycle-pr` 4.2, obs 98, 115).",
+        (
+            "Son rapport exigé comme seule sortie clôt le tour de la session de relecture, sans"
+            " coût (`cycle-pr` 4.2, obs 98, 115)."
+        ),
     ),
     # Question à la fois et groupement des `[V]` (obs 102).
     "interroge-moi-moment-et-forme": (
@@ -1821,7 +1872,16 @@ INVARIANTS_DES_SESSIONS_LIEES = {
         BRIEFING_REF,
         "Une issue à un seul lot ne change rien : la session porte le cycle elle-même et délègue le code (3.1)",
     ),
-    "coordinatrice-sans-code": (COORDINATRICE_REF, "La coordinatrice **n'écrit pas de code**"),
+    "coordinatrice-sans-code": (
+        COORDINATRICE_REF,
+        (
+            "La coordinatrice **n'écrit pas de code**. Elle ouvre la branche et la PR"
+            " d'intégration, démarre les sessions de lot, ouvre chaque lot sur deux preuves,"
+            " guette la dérive avec le trunk, puis porte la PR d'intégration jusqu'à son go."
+            " Entre deux lots, elle attend : son contexte ne grossit que des pointeurs qu'elle"
+            " lit"
+        ),
+    ),
     # Au go du découpage (journal de spec, 2026-10-17 ; décisions 8, 12).
     "sessions-demarrees-au-go-du-decoupage": (
         COORDINATRICE_REF,
@@ -1834,23 +1894,40 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "effort-par-lot": (
         COORDINATRICE_REF,
         (
-            "`high` par défaut, `max` si le bloc du lot porte un ADR, une surface de sécurité ou "
-            "un contrat entre piles, `medium` pour un lot de doc ou de config seule"
+            "Effort par lot, fixé au démarrage par ce brief et jamais changé en cours de session"
+            " (#134, D-15 ; l'effet d'un `/effort` en cours de session sur le cache n'est pas"
+            " mesuré) : `high` par défaut, `max` si le bloc du lot porte un ADR, une surface de"
+            " sécurité ou un contrat entre piles, `medium` pour un lot de doc ou de config seule"
+            " ; `model` omis quand la coordinatrice est en Opus 5.5, `claude-opus-5-5` si elle"
+            " est au-dessus"
         ),
     ),
     "brief-nomme-le-lead-ou-aucun": (
         COORDINATRICE_REF,
-        "nomme toujours son lead — celui de la vague, ou « aucun »",
+        (
+            "Le brief d'une session de lot porte : le bloc du lot dans le corps de l'issue,"
+            " l'effort retenu, la branche d'intégration, son lead, et la consigne « porte le"
+            " cycle complet et délègue le code » (`cycle-pr` 3.1). Il nomme toujours son lead —"
+            " celui de la vague, ou « aucun »"
+        ),
     ),
     # Branche et PR d'intégration (décision 4 ; journal de spec, 2026-10-17).
     "branche-d-integration-depuis-le-trunk": (
         COORDINATRICE_REF,
-        "`git fetch origin && git checkout -b <type>/<slug> --no-track origin/<trunk>`",
+        (
+            "Dans ce tour, dans cet ordre : 1. **La branche d'intégration**, depuis le trunk :"
+            " `git fetch origin && git checkout -b <type>/<slug> --no-track origin/<trunk>`"
+        ),
     ),
     "amorce-de-la-pr-d-integration": (COORDINATRICE_REF, "GitHub refuse une PR sans commit"),
     "pr-d-integration-marquee": (
         COORDINATRICE_REF,
-        "« En vol pour #<N> (intégration, <n> lots) », puis `Closes #<N>`",
+        (
+            "**La PR d'intégration**, en draft, vers le trunk : son body s'ouvre par « En vol"
+            " pour #<N> (intégration, <n> lots) », puis `Closes #<N>`, puis le découpage. C'est"
+            " la seule PR de l'issue qui porte `Closes`, et la première ligne est celle que lit"
+            " le script de merge d'un lot"
+        ),
     ),
     "branche-de-lot-depuis-l-integration": (
         COORDINATRICE_REF,
@@ -1858,22 +1935,37 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "pr-de-lot-sans-closes": (
         COORDINATRICE_REF,
-        "« En vol pour #<N> (lot <k>/<n>) », sans `Closes`",
+        (
+            "**Sa PR** vise la branche d'intégration ; son body s'ouvre par « En vol pour #<N>"
+            " (lot <k>/<n>) », sans `Closes`"
+        ),
     ),
     # Deux preuves, puis la dérive (décisions 12, 14 ; obs 85).
     "message-sans-passation-n-ouvre-rien": (
         COORDINATRICE_REF,
-        "Un message de fin sans fichier de passation n'ouvre pas le lot suivant",
+        (
+            "Un message de fin sans fichier de passation n'ouvre pas le lot suivant : la"
+            " coordinatrice répond « passation absente : <chemin> » à la session du lot k, et"
+            " attend"
+        ),
     ),
     # Cité : un chemin de passation Windows perd ses antislashs dans le shell (`/code-review` de la
     # PR #122), et le fichier présent se lirait absent.
-    "passation-testee-chemin-cite": (COORDINATRICE_REF, "`test -f '<chemin>'` sort en 0"),
+    "passation-testee-chemin-cite": (
+        COORDINATRICE_REF,
+        "le fichier présent à ce chemin : `test -f '<chemin>'` sort en 0",
+    ),
     # La condition du protocole (relecture de la PR #122, I1 : mutés, restaient verts) ; son
     # **ordre** l'est par `ORDRE_DE_LA_COORDINATRICE`, plus bas — une phrase présente ne dit rien de
     # sa place (relance, N1 : deux mutations VERTES).
     "attente-des-lots-suivants": (
         COORDINATRICE_REF,
-        "chaque autre lot reçoit « attends le message « ouvre le lot <k>/<n> — passation : <chemin> »",
+        (
+            "Le premier lot non mergé — le lot 1, ou celui où reprend une issue déjà entamée —"
+            " reçoit l'ordre d'ouvrir dans ce brief même ; chaque autre lot reçoit « attends le"
+            " message « ouvre le lot <k>/<n> — passation : <chemin> » ; d'ici là, réponds « en"
+            " attente » et termine ton tour »"
+        ),
     ),
     "premier-geste-pas-avant-ouvre": (
         COORDINATRICE_REF,
@@ -1897,7 +1989,11 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "derive-apres-chaque-lot": (
         COORDINATRICE_REF,
-        "`git merge-tree --write-tree origin/<trunk> origin/<type>/<slug>`",
+        (
+            "Puis la dérive, après chaque merge de lot : `git fetch origin`, puis `git merge-tree"
+            " --write-tree origin/<trunk> origin/<type>/<slug>` — un prédicat, 0 sans conflit, 1"
+            " avec, mais 1 aussi sur une référence inconnue, sortie standard vide"
+        ),
     ),
     "arret-au-premier-conflit": (
         COORDINATRICE_REF,
@@ -1905,18 +2001,42 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "jamais-de-force-push-sur-l-integration": (
         COORDINATRICE_REF,
-        "jamais de force-push sur la branche d'intégration",
+        (
+            "Dans les deux cas, sans ouvrir de lot : jamais de force-push sur la branche"
+            " d'intégration, et la résolution n'est pas la sienne"
+        ),
     ),
-    "merge-final-en-rebase": (COORDINATRICE_REF, "squash seulement sur demande explicite"),
+    "merge-final-en-rebase": (
+        COORDINATRICE_REF,
+        (
+            "elle passe par les Étapes 5 à 7 seulement — ready, CI, vérification d'avant-go, puis"
+            " le seul go de merge de l'issue, dans la fenêtre de la coordinatrice, et le merge"
+            " derrière la porte de l'Étape 7, en `--rebase` ; squash seulement sur demande"
+            " explicite"
+        ),
+    ),
     "repercussions-une-fois": (
         COORDINATRICE_REF,
-        "`repercussions` tourne une fois, au merge de la PR d'intégration",
+        "Puis l'Étape 8 entière : `repercussions` tourne une fois, au merge de la PR d'intégration",
     ),
-    "relais-par-carte": (COORDINATRICE_REF, "par une **carte de proposition**"),
+    "relais-par-carte": (
+        COORDINATRICE_REF,
+        (
+            "Réveillée par ce message, la coordinatrice ne peut pas démarrer la remplaçante"
+            " elle-même : elle la propose par une **carte de proposition** (`start_session`,"
+            " `initiation: own_initiative`, `use_worktree: true`, brief : la passation de"
+            " relais), qu'un clic du mainteneur démarre dans un worktree neuf ; la remplaçante y"
+            " reprend la même branche par `git fetch origin && git switch <type>/<slug>-lot-<k>`"
+        ),
+    ),
     # Relecture de la PR #122 : I2 à I6, M4.
     "gabarit-worktree-sans-coordinatrice": (
         PROMPT_LOT_SUIVANT,
-        "Si worktree, sans coordinatrice : tu es sur la branche **mergée**",
+        (
+            "Si worktree, sans coordinatrice : tu es sur la branche **mergée** du lot précédent."
+            r" `git fetch origin`, puis `git checkout -b \<type>/\<slug> origin/\<trunk>` — le"
+            " point de départ est **explicite**"
+        ),
     ),
     "relais-remis-a-la-coordinatrice": (
         CLOTURE_REF,
@@ -1924,7 +2044,14 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "coordinatrice-au-plafond": (
         COORDINATRICE_REF,
-        "La coordinatrice y tourne en Opus 5.5, effort `high`",
+        (
+            "La coordinatrice y tourne en Opus 5.5, effort `high` (#134, décision 4, qui remplace"
+            " sur ce point #107 décision 8) : un enfant n'étant ni plus fort ni d'effort plus"
+            " haut que son parent (`sessions-liees.md`, « Héritage »), la question du go ne"
+            " demande au mainteneur `/effort max` — et Opus 5.5 au sélecteur de modèle — que si"
+            " le découpage contient un lot que le barème du point 3 met à `max`, le geste tombant"
+            " avant tout enfant"
+        ),
     ),
     "nettoyage-des-sessions-de-lot": (
         COORDINATRICE_REF,
@@ -1936,21 +2063,42 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "pas-de-mot-cle-sur-une-pr-de-lot": (
         CYCLE_PR_SKILL,
-        "une PR de lot vers une branche d'intégration n'en reçoit pas",
+        (
+            "Sur une issue close, le mot-clé ne change aucun état ; une PR de lot vers une"
+            " branche d'intégration n'en reçoit pas"
+        ),
     ),
     "arret-de-lot-previent-la-coordinatrice": (
         COORDINATRICE_REF,
-        "« attend le mainteneur : <[V] ou écart> — go humain, session de relecture à démarrer »",
+        (
+            "Sur un go humain, une `[V]` ou un écart avec le bloc du lot se posent au même go, et"
+            " elle prévient d'abord la coordinatrice : « attend le mainteneur : <[V] ou écart> —"
+            " go humain, session de relecture à démarrer »"
+        ),
     ),
-    "repli-manuel": (COORDINATRICE_REF, "l'échec devient une observation du journal"),
+    "repli-manuel": (
+        COORDINATRICE_REF,
+        (
+            "Si la coordinatrice ne peut pas ouvrir un lot — `start_session` refusé au go,"
+            " session de lot disparue de `list_sessions`, message qui n'arrive pas —, la"
+            " frontière reprend la voie manuelle : la passation est remise au mainteneur, qui"
+            " ouvre la session du lot (`cycle-pr` Étape 8, « Cas découpé »), et l'échec devient"
+            " une observation du journal"
+        ),
+    ),
     # La session de lot (décisions 5, 17).
     "en-tete-session-de-lot": (
         CYCLE_PR_SKILL,
-        "lire d'abord [references/coordinatrice.md](references/coordinatrice.md), « La session de lot »",
+        (
+            "lire d'abord [references/coordinatrice.md](references/coordinatrice.md), « La"
+            " session de lot » : il change le premier geste, la base de la PR, le go de l'Étape"
+            " 1, le body de la PR, le destinataire de la vérification d'avant-go, le merge, le"
+            " relais et l'Étape 8"
+        ),
     ),
     "lead-d-une-session-de-lot": (
         BRIEFING_REF,
-        "pour une session de lot, celle que son brief nomme, ou aucune",
+        "pour une session de lot, celle que son brief nomme, ou aucune : retenir son identifiant",
     ),
     # Lot 8b de #134 (2026-10-26) : le démarrage des lots par la coordinatrice, le go délégué et sa
     # relecture (journal de spec de #134, 2026-10-21, relais de la coordinatrice ; obs 131) ; les
@@ -1958,7 +2106,13 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # ajoutées : 10 moitiés restrictives — 4 « seul(ement) », 2 « sauf », 2 « ne … pas », « aucun »,
     # « hors de ce cas » —, et 1 reprise d'une ligne repliée (« jamais un point de départ »), toutes
     # épinglées et vues rouges par `mutation.py`.
-    "branche-mergee-jamais-un-depart": (COORDINATRICE_REF, "n'est jamais un point de départ"),
+    "branche-mergee-jamais-un-depart": (
+        COORDINATRICE_REF,
+        (
+            "Chaque lot a donc son worktree neuf ; la branche mergée d'un lot n'est jamais un"
+            " point de départ"
+        ),
+    ),
     "go-du-briefing-humain-ou-delegue": (
         COORDINATRICE_REF,
         "humain, dans la fenêtre de la session de lot, ou délégué à la coordinatrice**",
@@ -1981,10 +2135,27 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # `sessions-liees.md` — un même événement, une seule forme.
     "bloquant-sur-go-delegue": (
         COORDINATRICE_REF,
-        "« attend le mainteneur : <question> » (`sessions-liees.md`, « Messages »)",
+        "son message : « attend le mainteneur : <question> » (`sessions-liees.md`, « Messages »)",
     ),
-    "fin-de-tour-pas-un-signal": (COORDINATRICE_REF, "note de fin de tour n'est pas un signal"),
-    "ouverture-par-la-coordinatrice": (COORDINATRICE_REF, "La coordinatrice prépare alors"),
+    "fin-de-tour-pas-un-signal": (
+        COORDINATRICE_REF,
+        (
+            "note de fin de tour n'est pas un signal. Le go conditionnel de #107 (décision 5) a"
+            " pris fin avec la session de relecture"
+        ),
+    ),
+    "ouverture-par-la-coordinatrice": (
+        COORDINATRICE_REF,
+        (
+            "La coordinatrice prépare alors le worktree git frère `<dossier du clone>--<N>-<k>`"
+            " sur la tête à jour de la branche d'intégration, et le fichier de démarrage qui lui"
+            " tient lieu de brief — identité, go, mesures, fin —,"
+            " `passations/<date>-issue-<N>-lot-<k>-demarrage.md` au dossier de passation"
+            " (`sessions-liees.md`, « Passation ») ; puis elle appelle `start_session` — `cwd` :"
+            " ce dossier, `use_worktree: false`, effort du barème du point 3, `context: fresh`,"
+            " `wake_when_done: true`"
+        ),
+    ),
     "demarree-a-son-ouverture": (
         COORDINATRICE_REF,
         "**démarrée à son ouverture**, sur décision du mainteneur, elle naît après le merge",
@@ -1996,16 +2167,19 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "outils-d-une-session-pre-demarree": (
         COORDINATRICE_REF,
         (
-            "pré-démarrée, elle lit `git diff <SHA de son démarrage>..HEAD -- .claude/ CLAUDE.md`"
-            " et les sections touchées par `Read`, et passe un rôle modifié dans le brief de son"
-            " sous-agent"
+            "Puis ses outils (obs 131) : l'outil Skill et la liste des rôles servent leur version"
+            " du démarrage de la session. Démarrée à son ouverture sur la tête à jour, elle les a"
+            " à jour ; pré-démarrée, elle lit `git diff <SHA de son démarrage>..HEAD -- .claude/"
+            " CLAUDE.md` et les sections touchées par `Read`, et passe un rôle modifié dans le"
+            " brief de son sous-agent"
         ),
     ),
     "relecture-en-repli-sur-go-delegue": (
         COORDINATRICE_REF,
         (
-            "la relecture passe par le repli sous-agent `relecteur` (`session-relecture.md`,"
-            " « Repli »), sauf si un tour humain s'ouvre dans la fenêtre du lot avant la passe"
+            "Au go délégué, sans tour du mainteneur, la relecture passe par le repli sous-agent"
+            " `relecteur` (`session-relecture.md`, « Repli »), sauf si un tour humain s'ouvre"
+            " dans la fenêtre du lot avant la passe : il démarre alors la session de relecture"
         ),
     ),
     "repli-par-un-message-d-abord": (
@@ -2033,18 +2207,36 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "go-du-decoupage-annonce-un-go-par-lot": (
         COORDINATRICE_REF,
-        "annonce un go par lot, dans sa fenêtre",
+        (
+            "Le go du découpage est ce tour : la question du go nomme donc les n sessions qu'il"
+            " fera démarrer, avec l'accord pour le `verificateur` de chaque lot (`cycle-pr` Étape"
+            " 7, « Vérification d'avant-go »), et annonce un go par lot, dans sa fenêtre"
+        ),
     ),
-    "base-de-la-pr-de-lot": (COORDINATRICE_REF, "se lit `origin/<type>/<slug>`"),
+    "base-de-la-pr-de-lot": (
+        COORDINATRICE_REF,
+        (
+            "**La base de la PR** : partout où `cycle-pr` mesure contre le trunk ce que la PR"
+            " apporte — gabarit (3.5), diff holistique (4.1), plage du relecteur (4.2), base de"
+            " branche et verdict (Étape 7) —, le trunk, `main` comme `origin/main`, se lit"
+            " `origin/<type>/<slug>`"
+        ),
+    ),
     "verification-jamais-a-la-coordinatrice": (
         COORDINATRICE_REF,
-        "lance elle-même son `verificateur` (`cycle-pr` Étape 7), jamais la coordinatrice",
+        (
+            "**La vérification d'avant-go** : la session lance elle-même son `verificateur`"
+            " (`cycle-pr` Étape 7), jamais la coordinatrice ni le lead, sur l'accord du go du"
+            " découpage"
+        ),
     ),
     "etape-8-du-lot-bornee": (
         COORDINATRICE_REF,
         (
-            "Son Étape 8 se borne à cocher ses critères, nettoyer sa session de relecture et écrire"
-            " sa passation"
+            "Son Étape 8 se borne à cocher ses critères, nettoyer sa session de relecture et"
+            " écrire sa passation** — en dernier, liste vide ou arbitrée (`cycle-pr` Étape 8,"
+            " « Cas découpé ») —, puis le message de fin à la coordinatrice. L'issue reste ouverte"
+            " : aucun label d'état ne tombe, et `repercussions` ne tourne pas ici"
         ),
     ),
     "relecteur-plage-depuis-la-base-de-la-pr": (
@@ -2077,7 +2269,11 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "passation-sans-point-ouvert": (PROMPT_LOT_SUIVANT, "jamais un point encore ouvert (obs 85)"),
     "passation-remise-a-la-coordinatrice": (
         PROMPT_LOT_SUIVANT,
-        "remis par ce chemin à la coordinatrice",
+        (
+            "remis par ce chemin à la coordinatrice, dans le message de fin"
+            " ([coordinatrice.md](coordinatrice.md)) — sans coordinatrice, au mainteneur, qui le"
+            " donne à une session neuve"
+        ),
     ),
     "pr-paralleles-un-worktree-neuf-par-lot": (
         PR_PARALLELES_SKILL,
@@ -2444,7 +2640,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # à l'étape qui agit. Les 15 appels sont gardés à part (`TITRES_DES_SESSIONS_DEMARREES`).
     "titre-repere-modifiable": (
         SESSIONS_LIEES_REF,
-        "Ni le titre d'une session, un repère que l'application ou le mainteneur peuvent changer",
+        (
+            "Ni le titre d'une session, un repère que l'application ou le mainteneur peuvent"
+            " changer (« Titre » ci-dessous), ni le chemin de son scratchpad"
+        ),
     ),
     "titre-separateur": (
         SESSIONS_LIEES_REF,
@@ -2475,19 +2674,26 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "prefixe-sans-le-role": (
         SESSIONS_LIEES_REF,
-        "**sans le rôle qui suit le sujet de son dernier segment**",
+        (
+            "**sans le rôle qui suit le sujet de son dernier segment** : `vague-3 › #145"
+            " coordinatrice` et `vague-3 › #145 tri` donnent `vague-3 › #145`"
+        ),
     ),
     "prefixe-garde-le-relais": (SESSIONS_LIEES_REF, "Le rang de relais, lui, reste."),
     "suffixe-numerote-si-autre-sujet": (
         SESSIONS_LIEES_REF,
-        "précédé de `#<N>` quand l'enfant porte une autre issue ou PR que son parent",
+        (
+            "précédé de `#<N>` quand l'enfant porte une autre issue ou PR que son parent ; il"
+            " peut contenir ` › ` (un sous-lot : `lot 2 › 2a`)"
+        ),
     ),
     "racines": (
         SESSIONS_LIEES_REF,
         (
-            "lead de vague `vague-<k>` (`<k>` : `pr-paralleles` Étape 4) ; session PR seule ou"
-            " session de tri `#<N>` ; campagne de QA `qa-<plan>` ; relevé `/triage` `triage` ;"
-            " toute autre, `#<N>` si elle porte une issue, sinon le nom de son skill"
+            "**Une racine**, session sans parent, compose son titre : lead de vague `vague-<k>`"
+            " (`<k>` : `pr-paralleles` Étape 4) ; session PR seule ou session de tri `#<N>` ;"
+            " campagne de QA `qa-<plan>` ; relevé `/triage` `triage` ; toute autre, `#<N>` si"
+            " elle porte une issue, sinon le nom de son skill"
         ),
     ),
     "racine-se-nomme-avant-son-premier-start-session": (
@@ -2496,7 +2702,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "coordinatrice-se-renomme": (
         SESSIONS_LIEES_REF,
-        "la session qui devient coordinatrice se renomme `<son titre> coordinatrice`",
+        (
+            "**Un changement de rôle** se lit dans le titre : la session qui devient"
+            " coordinatrice se renomme `<son titre> coordinatrice`"
+        ),
     ),
     "relais-soeur-pas-fille": (
         SESSIONS_LIEES_REF,
@@ -2505,10 +2714,19 @@ INVARIANTS_DES_SESSIONS_LIEES = {
             " ses enfants prennent ce titre pour préfixe"
         ),
     ),
-    "homonymes-numerotes": (SESSIONS_LIEES_REF, "le second prend ` 2`, le suivant ` 3`"),
+    "homonymes-numerotes": (
+        SESSIONS_LIEES_REF,
+        (
+            "**Deux enfants d'un même parent** qui recevraient le même titre : le second prend `"
+            " 2`, le suivant ` 3`"
+        ),
+    ),
     "renommer-demande-l-accord-du-mainteneur": (
         SESSIONS_LIEES_REF,
-        "l'application demande l'accord du mainteneur si c'est lui qui a posé le titre",
+        (
+            "`set_session_title` renomme la session courante ; l'application demande l'accord du"
+            " mainteneur si c'est lui qui a posé le titre"
+        ),
     ),
     "renommer-refuse-sans-surveillance": (
         SESSIONS_LIEES_REF,
@@ -2673,8 +2891,9 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "coordinatrice-seul-auteur-de-sa-carte": (
         COORDINATRICE_REF,
         (
-            "elle est le seul auteur de la carte de son issue au tableau de bord des sessions"
-            " (`pr-paralleles` Étape 4, « Le tableau de bord des sessions »)"
+            "La coordinatrice n'a pas de `PR-PARALLELES.md` : elle est le seul auteur de la carte"
+            " de son issue au tableau de bord des sessions (`pr-paralleles` Étape 4, « Le tableau"
+            " de bord des sessions »)"
         ),
     ),
     "coordinatrice-nourrit-sa-carte-a-chaque-changement": (
@@ -2693,7 +2912,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "lots-jamais-des-cartes": (
         COORDINATRICE_REF,
-        "les lots en sont des `sessions`, `role` `lot <k>` ou `<k><x>`, jamais des cartes",
+        (
+            "Une carte par issue : les lots en sont des `sessions`, `role` `lot <k>` ou `<k><x>`,"
+            " jamais des cartes"
+        ),
     ),
     "coordinatrice-memes-champs-sauf-sessions": (
         COORDINATRICE_REF,
@@ -2702,9 +2924,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     "coordinatrice-lit-ses-sessions-sans-colonne": (
         COORDINATRICE_REF,
         (
-            "N'ayant pas de colonne Session, elle lit ses `sessions` dans"
-            ' `list_sessions {"linked": true}` : celles qu\'elle a démarrées et leurs descendantes,'
-            " relectures comprises, plus les relais que « Relais en cours de lot » lui annonce"
+            "N'ayant pas de colonne Session, elle lit ses `sessions` dans `list_sessions"
+            """ {"linked": true}` : celles qu'elle a démarrées et leurs descendantes, relectures"""
+            " comprises, plus les relais que « Relais en cours de lot » lui annonce, sœurs que la"
+            " chaîne de `startedBy` ne relie pas"
         ),
     ),
     "coordinatrice-dans-ses-sessions": (
@@ -2713,7 +2936,10 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "etat-de-la-pr-d-integration": (
         COORDINATRICE_REF,
-        "`en-cours` en draft, `en-review` hors du draft, `mergee` au merge",
+        (
+            "Son `etat` suit la PR d'intégration : `en-cours` en draft, `en-review` hors du"
+            " draft, `mergee` au merge"
+        ),
     ),
     # #195, sessions muettes (19ᵉ entrée de l'étude de tri du 2026-10-29) : une session liée
     # prévient son parent avant toute question au mainteneur — la règle, sa forme figée, son
@@ -2721,7 +2947,14 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     # commande de fond bornée (obs 132) — la ligne des quatre rôles à `Bash`, le diagnostic de 3.1.
     "attend-le-mainteneur-la-regle": (
         SESSIONS_LIEES_REF,
-        "**Avant toute question au mainteneur, la session prévient son parent.**",
+        (
+            "**Avant toute question au mainteneur, la session prévient son parent.** Une session"
+            " liée qui va poser une question au mainteneur dans sa fenêtre — `[V]` au go du"
+            " briefing, arrêt de l'Étape 3, « Questions en attente » vidées à l'Étape 5 de"
+            " `cycle-pr`, ou toute autre — envoie d'abord à son parent « attend le mainteneur :"
+            r" \<question> » (« Fin de travail ») : sa note de fin de tour n'est jamais un signal,"
+            " et le parent ne voit pas une attente qu'on ne lui dit pas"
+        ),
     ),
     "attend-le-mainteneur-la-forme": (
         SESSIONS_LIEES_REF,
@@ -2729,17 +2962,28 @@ INVARIANTS_DES_SESSIONS_LIEES = {
     ),
     "attend-le-mainteneur-au-go-du-briefing": (
         CYCLE_PR_SKILL,
-        "Une session liée prévient son parent avant de poser ses `[V]` : « attend le mainteneur :",
+        (
+            "Une session liée prévient son parent avant de poser ses `[V]` : « attend le"
+            " mainteneur : <question> »"
+        ),
     ),
     "attend-le-mainteneur-a-l-arret-de-l-etape-3": (
         CYCLE_PR_SKILL,
-        "Arrêtée sur une `[V]`, une session liée prévient d'abord son parent : « attend le mainteneur :",
+        (
+            "Arrêtée sur une `[V]`, une session liée prévient d'abord son parent : « attend le"
+            " mainteneur : <question> »"
+            " ([references/sessions-liees.md](references/sessions-liees.md), « Messages »)."
+            " Ailleurs, s'arrêter est une remise de main que personne n'a demandée"
+        ),
     ),
     "attend-le-mainteneur-aux-questions-en-attente": (
         CYCLE_PR_SKILL,
         (
-            "se pose maintenant — par une session liée, après « attend le mainteneur : <question> »"
-            " à son parent"
+            "**Vider « Questions en attente »** : toute `[V]` encore ouverte se pose maintenant —"
+            " par une session liée, après « attend le mainteneur : <question> » à son parent"
+            " ([references/sessions-liees.md](references/sessions-liees.md), « Messages ») —,"
+            " groupée avec le point d'arrêt humain s'il reste à prendre ; sa réponse rejoint les"
+            " Notes, et l'hypothèse retenue d'ici là se confirme ou se défait en un commit"
         ),
     ),
     "attend-ta-reponse-au-resume-de-la-carte": (
@@ -3033,6 +3277,209 @@ INVARIANTS_DES_SESSIONS_LIEES = {
             "Chacune passe par la même porte, `<source>` valant `origin/main` quand on ne la"
             " connaît plus ; un refus se remonte au mainteneur avec `git log --oneline"
             " origin/main..<branche>`"
+        ),
+    ),
+    "coordinatrice-start-session-au-seul-tour-du-mainteneur": (
+        COORDINATRICE_REF,
+        (
+            "`start_session` est refusé dans un tour ouvert par un message de session ou par un"
+            " événement automatique (provoqué par le lead de la vague le 2026-10-16 — #107,"
+            " journal de spec, 2026-10-17) ; seul un tour ouvert par le mainteneur le démarre, et"
+            " seulement sur sa demande écrite"
+        ),
+    ),
+    "coordinatrice-deux-formes-de-session-de-lot": (
+        COORDINATRICE_REF,
+        (
+            "Elle démarre de deux façons : **pré-démarrée** au go du découpage (« Au go du"
+            " découpage », point 3), elle attend le message « ouvre »"
+        ),
+    ),
+    "relais-de-lot-pousse-detache-et-envoie": (
+        COORDINATRICE_REF,
+        (
+            "La session de lot dont le contexte se remplit pousse sa branche, détache sa tête"
+            " (`git switch --detach` — une branche ne s'extrait que dans un seul worktree :"
+            " mesuré le 2026-10-18, git 2.47.1, « is already used by worktree », sortie 128),"
+            " écrit la variante relais de [prompt-lot-suivant.md](prompt-lot-suivant.md) et"
+            " envoie « relais demandé — passation : <chemin> »"
+        ),
+    ),
+    "sessions-liees-enfant-coupe-sans-fetch": (
+        SESSIONS_LIEES_REF,
+        (
+            "L'application place l'enfant sous `<repo>/.claude/worktrees/<slug>-<hex>`, sur une"
+            " branche `claude/<slug>-<hex>` sans upstream, coupée **sans fetch** sur sa"
+            " **source**"
+        ),
+    ),
+    "sessions-liees-source-rendue-par-get-session": (
+        SESSIONS_LIEES_REF,
+        "La règle n'est pas établie ; `get_session` rend la valeur (« Nettoyage »)",
+    ),
+    "sessions-liees-nettoyage-par-la-session-qui-demarre": (
+        SESSIONS_LIEES_REF,
+        (
+            "La session qui l'a démarré nettoie après lui : `git worktree remove <chemin>`, puis"
+            " l'échafaudage derrière sa porte d'ancêtre"
+        ),
+    ),
+    "sessions-liees-refus-de-la-porte-remonte": (
+        SESSIONS_LIEES_REF,
+        (
+            "Un refus de la porte signale un commit sur l'échafaudage — `git log --oneline"
+            " <source>..claude/<slug>-<hex>` liste les commits qui bloquent : le remonter au"
+            " mainteneur, jamais `-D` sans la porte. Une branche de PR mergée suit"
+            " `pr-paralleles` Étape 8"
+        ),
+    ),
+    "cycle-pr-questions-residuelles-chacune-sa-voie": (
+        CYCLE_PR_SKILL,
+        (
+            "**Questions résiduelles** — découpage, format des données, transitions d'état,"
+            " comportements, edge cases — **chacune avec sa voie** (`contraintes.md`, règle d'or)"
+            " : une `[T]` se tranche ici même, avec sa source, et rejoint les décisions"
+            " verrouillées"
+        ),
+    ),
+    "cycle-pr-go-couvre-les-relances-de-ci": (
+        CYCLE_PR_SKILL,
+        (
+            "Le go couvre aussi les relances de CI de la PR par fermeture-réouverture (Étapes 5"
+            " et 7), bornées ; une `[C]` arrête"
+        ),
+    ),
+    "cycle-pr-boucle-sans-rendre-la-main": (
+        CYCLE_PR_SKILL,
+        (
+            "**La boucle s'enchaîne sans rendre la main.** Un cycle AFK va de 3.1 à 3.5 puis"
+            " repart en 3.1 jusqu'à l'Étape 4 — en lançant au passage, à chaque frontière de bloc"
+            " (3.5), la **passe de relecture 4.2** de ce bloc ; l'annonce de l'étape suivante («"
+            " Next : commit 2/3 ») est un **titre**, pas une demande d'autorisation"
+        ),
+    ),
+    "cycle-pr-seuls-arrets-legitimes": (
+        CYCLE_PR_SKILL,
+        (
+            "Les seuls arrêts légitimes du cycle : une question `[V]` dont dépend **tout** ce qui"
+            " reste à faire, un arrêt `decisions-vs-doc` (`[C]`), le point d'arrêt humain (zone"
+            " sensible, une fois par PR, au commit qui assemble l'écran — 3.5) et le « go » de"
+            " l'Étape 7"
+        ),
+    ),
+    "cycle-pr-v-partielle-en-questions-en-attente": (
+        CYCLE_PR_SKILL,
+        (
+            "Une `[V]` dont une partie du travail ne dépend pas s'inscrit dans le body de la PR"
+            " draft, sous « Questions en attente », avec l'hypothèse réversible retenue d'ici là,"
+            " et le cycle continue sur cette partie ; elle sera posée groupée au prochain arrêt"
+        ),
+    ),
+    "cycle-pr-chaque-role-a-bash-porte-la-commande-de-fond": (
+        CYCLE_PR_SKILL,
+        "Pour l'éviter, chaque rôle à `Bash` porte la ligne « commande de fond bornée »",
+    ),
+    "cycle-pr-verificateur-recoit-jamais-le-recit": (
+        CYCLE_PR_SKILL,
+        (
+            "Il reçoit le numéro de la PR, celui de l'issue, le chemin absolu du worktree et la"
+            " liste des autres branches en vol (`gh pr list`), jamais le récit de la session"
+        ),
+    ),
+    "cycle-pr-accord-du-verificateur-au-go-du-briefing": (
+        CYCLE_PR_SKILL,
+        (
+            "Hors vague et hors lot coordonné, l'accord du mainteneur se demande **avec les `[V]`"
+            " du go du briefing** (Étape 1) — demandé à la fin, il attend la prochaine présence"
+        ),
+    ),
+    "cycle-pr-accord-du-verificateur-en-vague-ou-en-lot": (
+        CYCLE_PR_SKILL,
+        (
+            "En vague, l'accord est celui du lot validé (`pr-paralleles` Étape 2) ; une session"
+            " de lot coordonné : son accord est à"
+            " [references/coordinatrice.md](references/coordinatrice.md), « La session de lot »"
+        ),
+    ),
+    "cycle-pr-reposer-le-lien-des-lots-precedents": (
+        CYCLE_PR_SKILL,
+        (
+            "**Cas découpé : reposer le lien des lots précédents.** GitHub ne lie une PR à une"
+            " issue que par un mot-clé de fermeture, et seul le lot final en portait un (Étape 2)"
+            " ; sans ce geste, l'issue n'affiche qu'une PR sur les k qu'elle a coûté"
+        ),
+    ),
+    "cycle-pr-lien-repose-par-ecriture-relue": (
+        CYCLE_PR_SKILL,
+        (
+            "Une fois l'issue close, ajouter en fin de body de **chaque lot précédent** mergé"
+            " dans le trunk le bloc ci-dessous, écrit dans un fichier : `ecriture-relue.py issue"
+            " edit <n> --append <fichier>`"
+        ),
+    ),
+    "config-relecture-commande-integree": (
+        ".claude/pipeline.config.md",
+        (
+            "/code-review <niveau> # commande **intégrée au binaire**, pas un skill du dépôt :"
+            " rien dans `.claude/` ne la porte"
+        ),
+    ),
+    "config-relecture-ne-remplace-rien": (
+        ".claude/pipeline.config.md",
+        "Deux portes, deux populations — elle ne remplace rien",
+    ),
+    "config-relecture-niveau-rapporte-par-la-relecture": (
+        ".claude/pipeline.config.md",
+        "la session de relecture rapporte celui de l'en-tête rendu",
+    ),
+    "config-securite-meme-nature": (".claude/pipeline.config.md", "/security-review # même nature"),
+    "config-securite-origin-head-prerequis": (
+        ".claude/pipeline.config.md",
+        (
+            "Et `origin/HEAD`, qu'elle diffe (`git diff origin/HEAD...`) — absent, elle échoue"
+            " avant toute analyse ; `git remote set-head origin main` le pose"
+        ),
+    ),
+    "config-securite-diffe-le-trunk": (
+        ".claude/pipeline.config.md",
+        (
+            "Elle diffe donc le trunk : sur une PR de lot coordonné, toute la branche"
+            " d'intégration depuis lui"
+        ),
+    ),
+    "briefing-lead-ecrit-en-plein-travail": (
+        BRIEFING_REF,
+        (
+            "Dans l'autre sens, le lead peut écrire en plein travail — signalement bloquant,"
+            " ordre de merge du lot : son message n'arrive qu'à la fin du tour en cours (même"
+            " référence, « Messages »), et se traite comme le commentaire de répercussion de"
+            " l'Étape 6 — remonter à l'utilisateur, jamais merger par-dessus"
+        ),
+    ),
+    "cloture-relais-ce-qu-elle-seule-possede": (
+        CLOTURE_REF,
+        (
+            "**Relais en cours de cycle — la session sortante passe ce qu'elle seule possède.**"
+            " Un cycle peut remplir un contexte avant son Étape 8, et une session neuve reprend"
+            " alors le même lot"
+        ),
+    ),
+    "prompt-lot-suivant-pas-par-le-lead": (PROMPT_LOT_SUIVANT, "Pas par le lead"),
+    "prompt-lot-suivant-supprime-la-branche-mergee": (
+        PROMPT_LOT_SUIVANT,
+        (
+            "Supprime ensuite cette branche, locale **et** distante ; le pourquoi et le repli"
+            " sont à `pr-paralleles` Étape 8, « Issue en plusieurs lots ». Rejoue la commande"
+            " `install` des piles que ton lot touche si un verrou a bougé, puis la commande de"
+            " fumée"
+        ),
+    ),
+    "prompt-lot-suivant-pointeur-jamais-le-resume": (
+        PROMPT_LOT_SUIVANT,
+        (
+            r"Ce qui concerne d'autres branches ou d'autres lots : section Notes de la PR #\<M>,"
+            " lignes « Fichiers croisés » et « Non vérifié » du verdict d'avant-go — le pointeur,"
+            " jamais leur résumé"
         ),
     ),
 }
@@ -11820,6 +12267,627 @@ PASSAGES_DES_SESSIONS_LIEES = (
         "Une PR de lot coordonné vise la branche d'intégration",
         "Ce que tu vérifies,",
         {},
+    ),
+    Passage(
+        COORDINATRICE_REF,
+        "La coordinatrice **n'écrit pas de code**.",
+        "# Sa carte au tableau de bord",
+        {},
+    ),
+    Passage(
+        COORDINATRICE_REF,
+        "La coordinatrice n'a pas de `PR-PARALLELES.md`",
+        "# Au go du découpage",
+        {},
+    ),
+    Passage(
+        COORDINATRICE_REF,
+        "`start_session` est refusé dans un tour",
+        "# Ouvrir le lot suivant",
+        {
+            "intitulé": [
+                "2.",
+                "3.",
+                "**Les sessions de lot** :",
+            ],
+            "motif": [
+                (
+                    "sans ce nom, la règle « à défaut l'émettrice » de `cycle-pr` (« Vague"
+                    " parallèle ») ferait de la coordinatrice le lead."
+                ),
+            ],
+            "relevé daté": [
+                "mesuré le même jour, PR #122).",
+            ],
+        },
+    ),
+    Passage(
+        COORDINATRICE_REF,
+        "2. le fichier présent à ce chemin",
+        "Puis seulement, par `SendMessage`",
+        {
+            "intitulé": [
+                "2.",
+            ],
+            "relevé daté": [
+                "sortie mesurée le 2026-10-21, git 2.47.1).",
+            ],
+        },
+    ),
+    Passage(
+        COORDINATRICE_REF,
+        "Elle démarre de deux façons",
+        "Ce que le brief de la coordinatrice",
+        {
+            "relevé daté": [
+                "Précédent mesuré :",
+                "les lots 5 à 8 de #134 (journal de spec, 2026-10-21).",
+            ],
+        },
+    ),
+    Passage(
+        COORDINATRICE_REF,
+        "- **Premier geste**, au message « ouvre »",
+        "- **Le merge** suit",
+        {
+            "intitulé": [
+                "- **Sa session de relecture** :",
+            ],
+            "motif": [
+                "Contre le trunk, chaque mesure compterait les lots déjà mergés.",
+            ],
+        },
+        empruntees=ancres_de(
+            INVARIANTS_DE_LA_SESSION_DE_RELECTURE, "coordinatrice-jamais-parente-de-la-relecture"
+        ),
+    ),
+    Passage(
+        COORDINATRICE_REF,
+        "- **Son Étape 8 se borne",
+        "# Relais en cours de lot",
+        {},
+    ),
+    Passage(
+        COORDINATRICE_REF,
+        "La session de lot dont le contexte se remplit",
+        "# Après le dernier lot",
+        {
+            "relevé daté": [
+                "Non mesuré à ce jour.",
+            ],
+        },
+    ),
+    Passage(
+        COORDINATRICE_REF,
+        "Elle n'a pas de code propre",
+        "# Repli — la passation manuelle",
+        {
+            "motif": [
+                "Elle n'a pas de code propre, et chaque lot a eu son relecteur :",
+                (
+                    "L'issue affiche la PR d'intégration, dont le body liste ses PR de lot («"
+                    " Ouvrir le lot suivant »)."
+                ),
+            ],
+            "relevé daté": [
+                (
+                    "elle vise la branche d'intégration, et GitHub ignore un mot-clé de fermeture"
+                    " hors de la branche par défaut — « these keywords are ignored, no links are"
+                    " created » (doc « Linking a pull request to an issue », lue le 2026-10-18)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        COORDINATRICE_REF,
+        "Pour une session démarrée à son ouverture",
+        None,
+        {},
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        "- **Jamais de `permission_mode`**",
+        "- Modèle et effort s'héritent",
+        {
+            "motif": [
+                (
+                    "Un message entre deux sessions de modes différents est retenu pour"
+                    " approbation, et un message retenu expire après 5 min sur l'application de"
+                    " bureau, qui n'affiche pas la boîte d'approbation (doc officielle"
+                    " `cross-session-messaging`)."
+                ),
+            ],
+            "relevé daté": [
+                "Mesuré le 2026-10-16 :",
+                (
+                    "en mode `auto` hérité, le `SendMessage` de l'enfant au parent est livré sans"
+                    " approbation."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        "- `context: fresh`, jamais `fork`",
+        "# Identité — un identifiant",
+        {
+            "motif": [
+                (
+                    "l'enfant part d'un regard neuf, pour la même raison que la relecture à"
+                    " contexte vierge (`cycle-pr` 4.2)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        "- L'enfant lit l'adresse de son parent",
+        "## Titre — un repère",
+        {
+            "relevé daté": [
+                (
+                    "`list_sessions` exclut la session courante, donc l'enfant ne voit jamais sa"
+                    " propre ligne (mesuré le 2026-10-16, enfant jetable `local_1c8a08b0…`)."
+                ),
+                (
+                    "la session du lot 1 de #107 a son scratchpad et son transcript sous"
+                    " `4efeea8f-…`, et l'identifiant `local_8b381acb-…`)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        "Le titre d'une session porte son ascendance",
+        "# Premier geste dans un worktree",
+        {
+            "relevé daté": [
+                "Mesuré le 2026-10-28 :",
+                "non mesuré).",
+            ],
+        },
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        "L'application place l'enfant sous",
+        "`<base>` est la branche",
+        {
+            "relevé daté": [
+                (
+                    "le `main` local quand le parent travaille dans le clone principal (mesuré le"
+                    " 2026-10-16 :"
+                ),
+                (
+                    "4 commits de retard sur `origin/main`), une référence du parent quand il"
+                    " travaille dans un worktree, qui n'est pas toujours sa tête :"
+                ),
+                (
+                    "sa tête le 2026-10-16 (`fee1e2a`, tête de la PR #109), sa `sourceBranch` le"
+                    " 2026-10-18 (deux enfants coupés sur `feat/sessions-liees`, `ded3567`,"
+                    " parent à `ef0b3a8`)."
+                ),
+                (
+                    "Le registre de l'application garde ensuite ce nom de branche, même après le"
+                    " premier geste (mesuré le 2026-10-16)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        "La branche `claude/…` reste un **échafaudage**",
+        "# Messages — ni confirmation",
+        {
+            "relevé daté": [
+                "Le suivi de PR par l'application résiste à ce rebranchement :",
+                (
+                    "après `gh pr create`, `get_status` rapporte la PR liée sans `bind_pr`"
+                    " (mesuré le 2026-10-18, PR #130, registre de la session resté sur"
+                    " `claude/…`)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        "Un message vers le parent ou le lead",
+        "Une session inactive reprend",
+        {
+            "intitulé": [
+                "Fait d'origine :",
+            ],
+            "relevé daté": [
+                (
+                    "la session PR de #186 a attendu ≈ 8 h des réponses `[V]` dans sa fenêtre, à"
+                    " l'insu du lead (2026-10-28/29, rapporté, non re-mesuré)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        "Le parent est réveillé à la fin d'un tour",
+        "L'enfant envoie au parent,",
+        {
+            "relevé daté": [
+                (
+                    "Le parent est réveillé à la fin d'un tour de l'enfant, avec les 400 premiers"
+                    " caractères de son rapport ;"
+                ),
+                (
+                    "un tour piloté par le mainteneur dans l'enfant ne le réveille pas (mesuré le"
+                    " 2026-10-16)."
+                ),
+                (
+                    "Les consignes de l'application au parent, lues le même jour, ne distinguent"
+                    " aucun tour :"
+                ),
+                "« when it ends a turn, a note reaches you ».",
+            ],
+        },
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        r"- « lot \<k>/\<n> terminé",
+        "- « relais demandé",
+        {},
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        r"- « interrogatoire #\<N> terminé",
+        "- « terminé —",
+        {},
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        "- « attend le mainteneur",
+        "- « bloquant :",
+        {},
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        "Une session de relecture rend ses constats",
+        "# Passation — sur disque",
+        {},
+        empruntees=ancres_de(
+            INVARIANTS_DE_LA_SESSION_DE_RELECTURE, "sessions-liees-forme-des-constats"
+        ),
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        "- `passations/<date>-issue-<N>-lot-<k>-prompt.md`",
+        "Les fichiers antérieurs au",
+        {},
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        "La passation se remet par son chemin",
+        "# Nettoyage — archiver",
+        {
+            "motif": [
+                (
+                    "un fichier écrit dans un worktree part avec lui, et un rapport se lit"
+                    " tronqué à 400 caractères."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        SESSIONS_LIEES_REF,
+        "Archiver un enfant attend l'accord",
+        "La session qui archive un parent",
+        {
+            "relevé daté": [
+                "« you may offer to archive them (only on the user's yes) ».",
+                "l'arbre est resté propre et le worktree listé par `git worktree list`.",
+                "L'archivage arrête en revanche ce qui tenait le dossier :",
+                "archivé, l'enfant laisse `git worktree remove` aboutir ;",
+                "non archivé, le retrait échoue sur la racine (mesuré le 2026-10-18, obs 42).",
+                (
+                    "`feat/sessions-liees`, dont la tête était celle de l'échafaudage de la"
+                    " session du lot 3 de #107)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**Session de lot.** Si ce prompt",
+        "**Relais.** Un contexte qui",
+        {},
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "- **Questions résiduelles** —",
+        "Lever les incertitudes **maintenant**",
+        {},
+        empruntees=ancres_de(INVARIANTS_DE_LA_SESSION_DE_RELECTURE, "cycle-pr-question-du-go"),
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**La boucle s'enchaîne sans rendre la main.**",
+        "## 3.1 Modification",
+        {},
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**Un délégué qui attend son travail de fond",
+        "**Frontières tierces :",
+        {
+            "relevé daté": [
+                (
+                    "Au lot 1 de #177, la suite `apps/api` est restée figée de 15:42 à ~19:20 sur"
+                    " un `docker run -i` lancé sans délai (bilan de vague du 2026-10-28,"
+                    " rapporté, non re-mesuré) ;"
+                ),
+                (
+                    "à #134 lot 4b (PR #144), un `find` lancé en fond sur tout le disque a tenu ≈"
+                    " 1 h 20 sur le chemin critique, jusqu'à une intervention du mainteneur (obs"
+                    " 132)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**Ces deux commandes closent un tour",
+        "→ [references/relecture.md](references/relecture.md), « Ces",
+        {
+            "motif": [
+                (
+                    "dans la session de relecture, l'arrêt ne coûte rien (`session-relecture.md`,"
+                    " « Réveil »)."
+                ),
+            ],
+            "relevé daté": [
+                (
+                    "Jouées par la session PR, elles ont arrêté son cycle trois fois, la dernière"
+                    " après qu'une phrase les avait bornées (obs 94, 98, 115) ;"
+                ),
+            ],
+        },
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "- **Vider « Questions en attente »**",
+        "- Remplacer le corps",
+        {},
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**La session PR lance son `verificateur`**",
+        "**Une PR sans `verificateur`**",
+        {
+            "motif": [
+                (
+                    "Rendu seulement à la session qui l'a commandé, il ne survit que par sa"
+                    " mémoire, et la passation suivante le relaie comme un énoncé sans source :"
+                ),
+            ],
+            "relevé daté": [
+                (
+                    "6 h 37 d'absence au lot 4b de #77 sur cette seule question, à un moment où"
+                    " il ne restait rien d'indépendant à faire."
+                ),
+                (
+                    "deux lots de suite, le prompt du lot suivant a cité un verdict que ni le"
+                    " corps ni les commentaires de la PR ne portaient (obs 81)."
+                ),
+            ],
+        },
+        empruntees=ancres_de(
+            INVARIANTS_DE_LA_PORTE_DE_MERGE,
+            "cycle-pr-releve-en-debut-de-ligne",
+            "cycle-pr-verdict-aux-notes-avant-le-go",
+            "cycle-pr-porte-refuse-sans-la-ligne",
+        ),
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**Cas découpé : reposer le lien",
+        "```markdown *Rattachement a posteriori",
+        {},
+    ),
+    Passage(
+        CYCLE_PR_SKILL,
+        "**La passation s'écrit en dernier, depuis les artefacts** →",
+        "**Une session neuve par",
+        {},
+    ),
+    Passage(
+        PIPELINE_CONFIG,
+        "- relecture : /code-review <niveau>",
+        "- sécurité : /security-review",
+        {
+            "intitulé": [
+                "- relecture :",
+            ],
+            "relevé daté": [
+                (
+                    "Ce qu'elle couvre, mesuré le 2026-10-12 sur le delta de #85 (672 lignes,"
+                    " niveau `medium`) :"
+                ),
+                (
+                    "**1 défaut de correction réel** qu'aucune des deux passes de relecture"
+                    " n'avait vu — un motif non ancré à gauche qui jetait le préfixe d'un chemin."
+                ),
+                "Ce qu'elle ne couvre pas, mesuré au même run :",
+                (
+                    "**zéro** constat sur la prose de protocole, où vivaient les 2 bloquants et 7"
+                    " importants de la relecture à contexte vierge."
+                ),
+            ],
+        },
+        empruntees=(
+            *ancres_de(
+                INVARIANTS_DE_LA_SESSION_DE_RELECTURE, "config-relecture-niveau-non-garanti"
+            ),
+            *ancres_de(INVARIANTS_DU_CONTEXTE_COURT, "config-relecture"),
+        ),
+    ),
+    Passage(
+        PIPELINE_CONFIG,
+        "- sécurité : /security-review",
+        "# Qualité",
+        {
+            "intitulé": [
+                "- sécurité :",
+                "Inventaire :",
+            ],
+            "relevé daté": [
+                (
+                    "Mesure le 2026-10-14, commit 1 de la PR #92 (rôle Postgres de `backup`, 5"
+                    " fichiers, +204/−63, surface « persistance Postgres ») :"
+                ),
+                "**zéro** constat.",
+                (
+                    "son prompt écarte les constats portant sur les tests et la documentation"
+                    " (exclusions 11 et 16) — seuls 2 fichiers sur 5 pouvaient en porter"
+                    " (`bootstrap.sh`, le modèle de `.env`), ni la pile de test, ni le runbook où"
+                    " vivent les rotations."
+                ),
+                "Son prompt lui interdit de lancer une commande :",
+                (
+                    "un zéro de lecture, sur des droits que les tests du rôle et quatre mutations"
+                    " tenaient déjà."
+                ),
+                (
+                    "Son prompt prescrit des sous-tâches (une de recherche, une de filtre par"
+                    " constat) ;"
+                ),
+                "la session l'a déroulée sans elles.",
+                "obs 84).",
+                (
+                    "Autre mesure, même jour, au commit `b5b0b2a` de la PR #75 (17 fichiers, dont"
+                    " 7 hors tests et documentation :"
+                ),
+                "admin, téléversement, migration) :",
+                "**zéro** constat, de lecture aussi, déroulée sans les sous-tâches.",
+            ],
+        },
+        empruntees=(
+            *ancres_de(
+                INVARIANTS_DE_LA_SESSION_DE_RELECTURE,
+                "config-securite-constats-hors-plage-ecartes",
+                "config-securite-deux-prerequis",
+            ),
+            *ancres_de(INVARIANTS_DU_CONTEXTE_COURT, "config-securite"),
+        ),
+    ),
+    Passage(
+        BRIEFING_REF,
+        "**Vague parallèle.** Si le prompt",
+        "# Éprouver les outils",
+        {},
+        empruntees=ancres_de(
+            INVARIANTS_DE_LA_SESSION_DE_RELECTURE, "cycle-pr-message-du-lead-en-fin-de-tour"
+        ),
+    ),
+    Passage(
+        BRIEFING_REF,
+        "**Découpage en plusieurs lots.** Le briefing",
+        "# La PR est le premier artefact produit",
+        {},
+        empruntees=(
+            *ancres_de(
+                INVARIANTS_DE_LA_REGLE_DU_SUJET,
+                "briefing-motif-et-cout",
+                "briefing-les-motifs-d-un-lot",
+                "briefing-cout-d-un-lot",
+                "briefing-deux-sujets-deux-issues",
+                "briefing-lots-legers-par-defaut",
+                "briefing-lot-suivant-session-neuve",
+                "briefing-coordinatrice-deux-cas",
+                "briefing-coordinatrice-n-ecrit-pas-de-code",
+                "briefing-un-seul-lot-ne-change-rien",
+                "briefing-session-de-lot-coordonne",
+            ),
+            *ancres_de(
+                INVARIANTS_DE_LA_SESSION_DE_RELECTURE,
+                "cycle-pr-go-d-une-session-de-lot",
+                "cycle-pr-sauf-go-delegue",
+            ),
+        ),
+    ),
+    Passage(
+        CLOTURE_REF,
+        "**Cas découpé : la frontière de lot se franchit par la session sortante",
+        "# La passation s'écrit en dernier",
+        {
+            "motif": [
+                "La session sortante tient les artefacts de son lot ;",
+                (
+                    "le lead connaît la vague, et c'est ce qu'il garde — croisement des fichiers"
+                    " après merge, tableau de bord, vigilance de vague."
+                ),
+            ],
+            "relevé daté": [
+                (
+                    "sur une vague de cinq lots, chaque frontière passée par lui lui coûte un"
+                    " brief relu et un prompt écrit, et son contexte a grossi jusqu'à devoir être"
+                    " relayé lui-même (obs 62)."
+                ),
+            ],
+        },
+        empruntees=ancres_de(
+            INVARIANTS_DES_CONFORTS_DE_PIPELINE,
+            "cloture-due-sur-un-lot-leger",
+            "cloture-frontiere-de-lot-par-la-session-sortante",
+            "cloture-prompt-du-lot-suivant",
+            "cloture-sous-une-coordinatrice",
+            "cloture-pas-le-lead",
+            "cloture-deux-replis",
+        ),
+    ),
+    Passage(
+        CLOTURE_REF,
+        "**Relais en cours de cycle",
+        "- **son bilan, déposé",
+        {
+            "intitulé": [
+                "Trois choses que le relais ne peut pas reconstituer, chacune payée :",
+            ],
+        },
+    ),
+    Passage(
+        PROMPT_LOT_SUIVANT,
+        "Écrit par la **session sortante**",
+        "**Ce gabarit ne porte",
+        {
+            "motif": [
+                "La session sortante, elle, tient les artefacts de son lot.",
+            ],
+            "relevé daté": [
+                (
+                    "sur une vague de cinq lots, chaque frontière passée par lui lui coûte un"
+                    " brief relu et un prompt écrit, et son contexte a grossi jusqu'à devoir être"
+                    " relayé (obs 62)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        PROMPT_LOT_SUIVANT,
+        r"\<Si worktree, sans coordinatrice",
+        r"\<Si session de lot",
+        {
+            "motif": [
+                (
+                    "sans lui, `checkout -b` part de la branche morte et emporte ses commits"
+                    " réécrits (mesuré)."
+                ),
+            ],
+        },
+    ),
+    Passage(
+        PROMPT_LOT_SUIVANT,
+        "**Ce que je n'ai pas fait",
+        r"Préviens \<la coordinatrice",
+        {
+            "intitulé": [
+                "**Ce que je n'ai pas fait, et pourquoi** :",
+            ],
+        },
     ),
     *(
         Passage(
