@@ -1585,8 +1585,11 @@ def test_chaque_skill_des_sessions_liees_cite_leur_reference(skill: str) -> None
 # restaient sans garde (héritage du mode, `fresh`, note automatique, commandes intégrées) et 2
 # renvois après corrections pouvaient retrouver leur confirmation (mesuré : mutations VERTES).
 #
-# **Borne** : le test exige que la phrase **existe**, pas qu'aucune phrase contraire ne s'ajoute
-# ailleurs — une confirmation rétablie à côté d'une phrase intacte reste verte (mesuré, passe 2).
+# **Borne** : le test de présence exige que la phrase **existe**, pas qu'aucune phrase contraire ne
+# s'ajoute ailleurs — une confirmation rétablie à côté d'une phrase intacte restait verte (mesuré,
+# passe 2). Depuis #198 (lot 2, D-5), elle rougit dans un passage déclaré
+# (`PASSAGES_DES_SESSIONS_LIEES`), où son morceau ne tient aucune ancre (mesuré le 2026-11-04) ;
+# hors des passages, elle reste verte.
 # Une phrase réécrite fait rougir, et c'est voulu : la réécriture d'un invariant verrouillé se
 # relit.
 #
@@ -12690,6 +12693,56 @@ def test_le_nombre_de_cas_du_rouge_est_celui_de_ses_puces() -> None:
 
 # --- Une table d'invariants recompte sa population par ses passages déclarés (#198, D-5) ---------
 
+# Les morceaux sans prescription des lignes `relecture` et `sécurité` de `pipeline.config.md`, ses
+# commandes intégrées : le même passage, gardé par les sessions liées et le contexte court.
+EXEMPTIONS_DES_COMMANDES_INTEGREES = {
+    "intitulé": [
+        "- relecture :",
+        "- sécurité :",
+        "Inventaire :",
+    ],
+    "relevé daté": [
+        (
+            "Ce qu'elle couvre, mesuré le 2026-10-12 sur le delta de #85 (672 lignes,"
+            " niveau `medium`) :"
+        ),
+        (
+            "**1 défaut de correction réel** qu'aucune des deux passes de relecture"
+            " n'avait vu — un motif non ancré à gauche qui jetait le préfixe d'un chemin."
+        ),
+        "Ce qu'elle ne couvre pas, mesuré au même run :",
+        (
+            "**zéro** constat sur la prose de protocole, où vivaient les 2 bloquants et 7"
+            " importants de la relecture à contexte vierge."
+        ),
+        (
+            "Mesure le 2026-10-14, commit 1 de la PR #92 (rôle Postgres de `backup`, 5"
+            " fichiers, +204/−63, surface « persistance Postgres ») :"
+        ),
+        "**zéro** constat.",
+        (
+            "son prompt écarte les constats portant sur les tests et la documentation"
+            " (exclusions 11 et 16) — seuls 2 fichiers sur 5 pouvaient en porter"
+            " (`bootstrap.sh`, le modèle de `.env`), ni la pile de test, ni le runbook où"
+            " vivent les rotations."
+        ),
+        "Son prompt lui interdit de lancer une commande :",
+        (
+            "un zéro de lecture, sur des droits que les tests du rôle et quatre mutations"
+            " tenaient déjà."
+        ),
+        "Son prompt prescrit des sous-tâches (une de recherche, une de filtre par constat) ;",
+        "la session l'a déroulée sans elles.",
+        "obs 84).",
+        (
+            "Autre mesure, même jour, au commit `b5b0b2a` de la PR #75 (17 fichiers, dont"
+            " 7 hors tests et documentation :"
+        ),
+        "admin, téléversement, migration) :",
+        "**zéro** constat, de lecture aussi, déroulée sans les sous-tâches.",
+    ],
+}
+
 # Les passages déclarés des sessions liées (#198, D-5), après les tables qui leur prêtent une ancre.
 PASSAGES_DES_SESSIONS_LIEES = (
     Passage(
@@ -13503,82 +13556,17 @@ PASSAGES_DES_SESSIONS_LIEES = (
     ),
     Passage(
         PIPELINE_CONFIG,
-        "- relecture : /code-review <niveau>",
-        "- sécurité : /security-review",
-        {
-            "intitulé": [
-                "- relecture :",
-            ],
-            "relevé daté": [
-                (
-                    "Ce qu'elle couvre, mesuré le 2026-10-12 sur le delta de #85 (672 lignes,"
-                    " niveau `medium`) :"
-                ),
-                (
-                    "**1 défaut de correction réel** qu'aucune des deux passes de relecture"
-                    " n'avait vu — un motif non ancré à gauche qui jetait le préfixe d'un chemin."
-                ),
-                "Ce qu'elle ne couvre pas, mesuré au même run :",
-                (
-                    "**zéro** constat sur la prose de protocole, où vivaient les 2 bloquants et 7"
-                    " importants de la relecture à contexte vierge."
-                ),
-            ],
-        },
-        empruntees=(
-            *ancres_de(
-                INVARIANTS_DE_LA_SESSION_DE_RELECTURE, "config-relecture-niveau-non-garanti"
-            ),
-            *ancres_de(INVARIANTS_DU_CONTEXTE_COURT, "config-relecture"),
-        ),
-    ),
-    Passage(
-        PIPELINE_CONFIG,
-        "- sécurité : /security-review",
+        "- relecture : /code-review",
         "# Qualité",
-        {
-            "intitulé": [
-                "- sécurité :",
-                "Inventaire :",
-            ],
-            "relevé daté": [
-                (
-                    "Mesure le 2026-10-14, commit 1 de la PR #92 (rôle Postgres de `backup`, 5"
-                    " fichiers, +204/−63, surface « persistance Postgres ») :"
-                ),
-                "**zéro** constat.",
-                (
-                    "son prompt écarte les constats portant sur les tests et la documentation"
-                    " (exclusions 11 et 16) — seuls 2 fichiers sur 5 pouvaient en porter"
-                    " (`bootstrap.sh`, le modèle de `.env`), ni la pile de test, ni le runbook où"
-                    " vivent les rotations."
-                ),
-                "Son prompt lui interdit de lancer une commande :",
-                (
-                    "un zéro de lecture, sur des droits que les tests du rôle et quatre mutations"
-                    " tenaient déjà."
-                ),
-                (
-                    "Son prompt prescrit des sous-tâches (une de recherche, une de filtre par"
-                    " constat) ;"
-                ),
-                "la session l'a déroulée sans elles.",
-                "obs 84).",
-                (
-                    "Autre mesure, même jour, au commit `b5b0b2a` de la PR #75 (17 fichiers, dont"
-                    " 7 hors tests et documentation :"
-                ),
-                "admin, téléversement, migration) :",
-                "**zéro** constat, de lecture aussi, déroulée sans les sous-tâches.",
-            ],
-        },
+        EXEMPTIONS_DES_COMMANDES_INTEGREES,
         empruntees=(
             *ancres_de(
                 INVARIANTS_DE_LA_SESSION_DE_RELECTURE,
+                "config-relecture-niveau-non-garanti",
                 "config-securite-constats-hors-plage-ecartes",
                 "config-securite-deux-prerequis",
             ),
-            *ancres_de(INVARIANTS_DU_CONTEXTE_COURT, "config-securite"),
+            *ancres_de(INVARIANTS_DU_CONTEXTE_COURT, "config-relecture", "config-securite"),
         ),
     ),
     Passage(
@@ -14005,56 +13993,7 @@ PASSAGES_DU_CONTEXTE_COURT = (
         PIPELINE_CONFIG,
         "- relecture : /code-review",
         "# Qualité",
-        {
-            "intitulé": [
-                "- relecture :",
-                "- sécurité :",
-                "Inventaire :",
-            ],
-            "relevé daté": [
-                (
-                    "Ce qu'elle couvre, mesuré le 2026-10-12 sur le delta de #85 (672 lignes,"
-                    " niveau `medium`) :"
-                ),
-                (
-                    "**1 défaut de correction réel** qu'aucune des deux passes de relecture"
-                    " n'avait vu — un motif non ancré à gauche qui jetait le préfixe d'un chemin."
-                ),
-                "Ce qu'elle ne couvre pas, mesuré au même run :",
-                (
-                    "**zéro** constat sur la prose de protocole, où vivaient les 2 bloquants et 7"
-                    " importants de la relecture à contexte vierge."
-                ),
-                (
-                    "Mesure le 2026-10-14, commit 1 de la PR #92 (rôle Postgres de `backup`, 5"
-                    " fichiers, +204/−63, surface « persistance Postgres ») :"
-                ),
-                "**zéro** constat.",
-                (
-                    "son prompt écarte les constats portant sur les tests et la documentation"
-                    " (exclusions 11 et 16) — seuls 2 fichiers sur 5 pouvaient en porter"
-                    " (`bootstrap.sh`, le modèle de `.env`), ni la pile de test, ni le runbook où"
-                    " vivent les rotations."
-                ),
-                "Son prompt lui interdit de lancer une commande :",
-                (
-                    "un zéro de lecture, sur des droits que les tests du rôle et quatre mutations"
-                    " tenaient déjà."
-                ),
-                (
-                    "Son prompt prescrit des sous-tâches (une de recherche, une de filtre par"
-                    " constat) ;"
-                ),
-                "la session l'a déroulée sans elles.",
-                "obs 84).",
-                (
-                    "Autre mesure, même jour, au commit `b5b0b2a` de la PR #75 (17 fichiers, dont"
-                    " 7 hors tests et documentation :"
-                ),
-                "admin, téléversement, migration) :",
-                "**zéro** constat, de lecture aussi, déroulée sans les sous-tâches.",
-            ],
-        },
+        EXEMPTIONS_DES_COMMANDES_INTEGREES,
         empruntees=(
             *ancres_de(
                 INVARIANTS_DES_SESSIONS_LIEES,
@@ -15288,8 +15227,9 @@ PASSAGES_DU_CONTEXTE_COURT = (
     ),
 )
 
-# Une entrée par table, ses passages déclarés à côté d'elle (`Passage`) : la population d'une table
-# sort de ses passages à chaque exécution, jamais d'un compte écrit en commentaire (obs 127).
+# Une entrée par table et ses passages déclarés (`Passage`), à côté d'elle ou après les tables qui
+# leur prêtent une ancre : la population d'une table sort de ses passages à chaque exécution, jamais
+# d'un compte écrit en commentaire (obs 127).
 PASSAGES_DECLARES: dict[str, tuple[Passage, ...]] = {
     "INVARIANTS_DE_LA_SESSION_DE_RELECTURE": PASSAGES_DE_LA_SESSION_DE_RELECTURE,
     "INVARIANTS_DE_LA_REGLE_DU_SUJET": PASSAGES_DE_LA_REGLE_DU_SUJET,
