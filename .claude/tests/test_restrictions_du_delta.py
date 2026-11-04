@@ -307,6 +307,18 @@ def test_la_configuration_git_ne_change_pas_les_lignes_rendues(
     assert lance() == (0, CONFIGURATION_LIGNES)
 
 
+def test_l_environnement_git_diff_opts_ne_change_pas_les_lignes_rendues(
+    depot_de_configuration: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`GIT_DIFF_OPTS=--unified=3` passe devant `-U0` (mesuré le 2026-11-04, git 2.47.1) : ses
+    lignes de contexte fusionnent les blocs voisins, comme `diff.interHunkContext`."""
+    isole_git(monkeypatch)
+    monkeypatch.setenv("GIT_DIFF_OPTS", "--unified=3")
+    monkeypatch.chdir(depot_de_configuration)
+
+    assert lance() == (0, CONFIGURATION_LIGNES)
+
+
 @pytest.mark.usefixtures("depot")
 def test_une_base_qui_a_avance_se_lit_depuis_le_point_de_depart_commun() -> None:
     """`<base>...HEAD` part de `git merge-base <base> HEAD` : `main` a avancé depuis — une section

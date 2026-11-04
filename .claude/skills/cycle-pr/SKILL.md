@@ -19,8 +19,8 @@ contradiction `[C]`, elle arrête (`.claude/rules/contraintes.md`).
 
 **Commandes du projet.** Ce skill ne présuppose aucune stack : les commandes `test`,
 `test-pipeline`, `test ciblé`, `lint`, `format`, `typecheck` et `build` se lisent dans la section
-« Commandes du projet » de `.claude/pipeline.config.md`. Une étape marquée `n/a` s'ignore. Si le fichier est absent,
-s'arrêter et proposer une session `init-projet` distincte (`init-projet`, « Note pour les autres
+« Commandes du projet » de `.claude/pipeline.config.md`. Une étape marquée `n/a` s'ignore.
+Si le fichier est absent, s'arrêter et proposer une session `init-projet` distincte (`init-projet`, « Note pour les autres
 skills ») ; ne jamais deviner une commande.
 
 **Vague parallèle.** → [references/briefing.md](references/briefing.md), « Vague parallèle ».
