@@ -21,12 +21,14 @@ SVG_LOGO = "https://cdn.jsdelivr.net/npm/simple-icons@15.0.0/icons/{}.svg"
 SVG_LUCIDE = "https://cdn.jsdelivr.net/npm/lucide-static@0.460.0/icons/{}.svg"
 DONNEES = "https://cdn.jsdelivr.net/npm/simple-icons@15.0.0/data/simple-icons.json"
 # Un logo au slug déclaré, un logo au slug tiré de son titre — `.` et `+` remplacés, l'accent
-# décomposé puis ôté.
+# décomposé puis ôté —, un logo au slug à modificateur, après un `_`, qui départage deux marques
+# homonymes (`hive_blockchain`, l'un des 5 slugs à `_` de la 15.0.0, mesuré le 2026-11-05).
 LOGOS = [
     {"title": "Hetzner Cloud", "hex": "D50C2D", "slug": "hetzner"},
     {"title": "Nodé.js+", "hex": "5FA04E"},
+    {"title": "Hive", "hex": "E31337", "slug": "hive_blockchain"},
 ]
-HETZNER, NODE = LOGOS
+HETZNER, NODE = LOGOS[:2]
 # Le `couleurs.json` du dossier témoin, au format du dossier du skill.
 COULEURS_TEMOINS = """{
   "caddy": "#1F88C0",
@@ -84,12 +86,15 @@ def illisibles(fiches: object, champ: str) -> tuple[str, str, Cdn, str]:
     return "hetzner", "--simple-icons", cdn, f"données illisibles sur {DONNEES} — {champ} :"
 
 
-@pytest.mark.parametrize(("nom", "hexa"), [("hetzner", "#D50C2D"), ("nodedotjsplus", "#5FA04E")])
+@pytest.mark.parametrize(
+    ("nom", "hexa"),
+    [("hetzner", "#D50C2D"), ("nodedotjsplus", "#5FA04E"), ("hive_blockchain", "#E31337")],
+)
 def test_un_logo_s_ecrit_tel_quel_avec_sa_couleur_parmi_les_cles_triees(
     nom: str, hexa: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Le SVG octet pour octet ; la couleur lue au slug du logo — déclaré, ou tiré du titre
-    comme le fait Simple Icons —, ajoutée à `couleurs.json` au format du dossier."""
+    """Le SVG octet pour octet ; la couleur lue au slug du logo — déclaré, `_` compris, ou tiré
+    du titre comme le fait Simple Icons —, ajoutée à `couleurs.json` au format du dossier."""
     svg = b'<svg role="img"><path d="M0 0h24"/></svg>'
     cdn = Cdn({SVG_LOGO.format(nom): svg, DONNEES: json.dumps(LOGOS).encode()})
 
@@ -110,14 +115,15 @@ def test_un_logo_s_ecrit_tel_quel_avec_sa_couleur_parmi_les_cles_triees(
 def test_une_icone_neutre_s_ecrit_sans_toucher_aux_couleurs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Le SVG Lucide octet pour octet ; ni les données des logos ni `couleurs.json`."""
+    """Le SVG Lucide octet pour octet, d'un nom à tirets, la forme de Lucide ; ni les données des
+    logos ni `couleurs.json`."""
     svg = b"<!-- @license lucide-static v0.460.0 - ISC --><svg/>"
-    cdn = Cdn({SVG_LUCIDE.format("vault"): svg})
+    cdn = Cdn({SVG_LUCIDE.format("square-terminal"): svg})
 
-    assert lancer(monkeypatch, tmp_path, cdn, "vault", "--lucide") == 0
+    assert lancer(monkeypatch, tmp_path, cdn, "square-terminal", "--lucide") == 0
 
-    assert (tmp_path / "lucide" / "vault.svg").read_bytes() == svg
-    assert cdn.urls == [SVG_LUCIDE.format("vault")]
+    assert (tmp_path / "lucide" / "square-terminal.svg").read_bytes() == svg
+    assert cdn.urls == [SVG_LUCIDE.format("square-terminal")]
     assert (tmp_path / "simple-icons" / "couleurs.json").read_text() == COULEURS_TEMOINS
 
 
@@ -227,14 +233,36 @@ def test_un_fichier_des_couleurs_illisible_sort_en_2_avant_toute_ecriture(
     assert (couleurs.read_bytes() if couleurs.exists() else None) == contenu
 
 
-def test_un_nom_qui_sortirait_du_dossier_est_refuse(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Le nom devient un chemin et une URL : minuscules, chiffres et tirets seulement."""
-    with pytest.raises(SystemExit) as sortie:
-        lancer(monkeypatch, tmp_path, Cdn({}), "../caddy", "--lucide")
+# Un appel mal formé : un nom hors de la forme de son jeu — un slug de Simple Icons, minuscules et
+# chiffres puis un modificateur après un seul `_` ; un nom Lucide, minuscules, chiffres et
+# tirets —, un nom ou un jeu absent, deux jeux.
+APPELS_MAL_FORMES = {
+    "sortirait-du-dossier-des-logos": ("../caddy", "--simple-icons"),
+    "sortirait-du-dossier-des-neutres": ("../caddy", "--lucide"),
+    "vide": ("", "--lucide"),
+    "majuscule": ("Caddy", "--simple-icons"),
+    "tiret-dans-un-slug": ("hive-blockchain", "--simple-icons"),
+    "tiret-bas-en-tete-d-un-slug": ("_hive", "--simple-icons"),
+    "deux-tirets-bas-dans-un-slug": ("hive_block_chain", "--simple-icons"),
+    "tiret-bas-dans-un-nom-lucide": ("square_terminal", "--lucide"),
+    "sans-nom": ("--lucide",),
+    "sans-jeu": ("caddy",),
+    "deux-jeux": ("caddy", "--simple-icons", "--lucide"),
+}
 
-    assert sortie.value.code == 2
+
+@pytest.mark.parametrize("args", APPELS_MAL_FORMES.values(), ids=APPELS_MAL_FORMES.keys())
+def test_un_appel_mal_forme_sort_en_2_avant_toute_requete(
+    args: tuple[str, ...], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le nom devient un chemin et une URL, le jeu choisit les deux : sortie 2, et rien n'est
+    tiré."""
+    cdn = Cdn({})
+
+    with pytest.raises(SystemExit) as sortie:
+        lancer(monkeypatch, tmp_path, cdn, *args)
+
+    assert (sortie.value.code, cdn.urls) == (2, [])
 
 
 def test_les_couleurs_du_skill_couvrent_exactement_ses_logos() -> None:
