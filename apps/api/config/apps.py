@@ -7,18 +7,19 @@ from django.contrib.staticfiles.apps import StaticFilesConfig as DjangoStaticFil
 class AdminConfig(DjangoAdminConfig):
     """`django.contrib.admin`, dont le site par défaut exige un second facteur (#6).
 
-    `OTPAdminSite` de `django-otp` : son formulaire de connexion demande, après le mot de passe,
-    l'appareil et son jeton, et son `has_permission` exige `is_verified()` — sans second facteur,
-    seule la page de connexion est servie. `default_site` est la voie que la doc de Django donne
-    (« Overriding the default admin site ») : `admin.site`, les enregistrements et `config/urls.py`
-    restent tels quels.
+    `access.site.SecondFactorAdminSite` : l'`OTPAdminSite` de `django-otp`, sans le bouton de défi
+    de sa page de connexion (#215). Son formulaire demande, après le mot de passe, l'appareil et son
+    jeton, et son `has_permission` exige `is_verified()` — sans second facteur, seule la page de
+    connexion est servie. `default_site` est la voie que la doc de Django donne (« Overriding the
+    default admin site ») : un chemin pointé, résolu au premier accès à `admin.site` ;
+    `admin.site`, les enregistrements et `config/urls.py` restent tels quels.
 
     Ici et non dans `access/apps.py` : Django prend pour configuration d'une application la seule
     sous-classe d'`AppConfig` de son module `apps` (`AppConfig.create`), et celle-ci hérite de
     `default = True` — `access` deviendrait l'admin.
     """
 
-    default_site = "django_otp.admin.OTPAdminSite"
+    default_site = "access.site.SecondFactorAdminSite"
 
 
 class StaticFilesConfig(DjangoStaticFilesConfig):
