@@ -21,7 +21,7 @@ from django.views.decorators.cache import cache_control
 
 from content.cache import cached_response
 from content.models import Project
-from content.schemas import absolute_url
+from content.schemas import variant_url
 from content.variants import VARIANT_WIDTHS
 
 # Les deux marqueurs du bloc d'aperçu, chacun une fois dans le gabarit compilé
@@ -106,7 +106,7 @@ def cover_url(request: HttpRequest, project: Project) -> str | None:
     variant = next((v for v in cover.variants if v["width"] == OG_IMAGE_WIDTH), None)
     if variant is None:
         return None
-    return absolute_url({"request": request}, cover.original.storage.url(variant["name"]))
+    return variant_url({"request": request}, cover, variant)
 
 
 def meta_tags(project: Project, image: str | None) -> bytes:
@@ -119,7 +119,7 @@ def meta_tags(project: Project, image: str | None) -> bytes:
         image: l'adresse de l'`og:image` (`cover_url`), ou `None` pour l'omettre.
 
     Returns:
-        Les balises, en UTF-8, sans séparateur.
+        Les balises, en UTF-8.
     """
     title, summary = escape(project.title), escape(project.summary)
     tags = [
