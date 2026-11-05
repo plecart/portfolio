@@ -180,6 +180,10 @@ COULEURS_ILLISIBLES = {
     "json-mal-forme": b'{"caddy": "#1F88C0",',
     "pas-en-utf-8": b'{"caddy": "#1F88C0", "\xe9": "#000000"}',
     "absent": None,
+    "pas-un-objet": b'["#1F88C0"]',
+    "couleur-d-un-autre-type": b'{"caddy": 7}',
+    # Le `hex` de Simple Icons, recopié sans son `#`.
+    "couleur-qui-n-est-pas-rrggbb": b'{"caddy": "1F88C0"}',
 }
 
 
