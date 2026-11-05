@@ -1015,8 +1015,8 @@ def test_supprimer_une_image_dont_le_dossier_a_disparu_ne_journalise_aucune_erre
     caplog: pytest.LogCaptureFixture,
     django_capture_on_commit_callbacks: DjangoCaptureOnCommitCallbacks,
 ) -> None:
-    """Un dossier déjà absent n'a rien à supprimer : pas d'erreur journalisée, qui deviendrait une
-    alerte avec #17."""
+    """Un dossier déjà absent n'a rien à supprimer : pas d'erreur journalisée, qui deviendrait un
+    événement Sentry (ADR 0027)."""
     made = saved(gallery_image(portfolio))
     shutil.rmtree(default_storage.path((made.original.name or "").rsplit("/", 1)[0]))
 

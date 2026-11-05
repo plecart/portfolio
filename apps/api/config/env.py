@@ -202,6 +202,10 @@ class Env(BaseSettings):
             projet (`content/link_preview.py`). Par défaut `/app/web/index.html`, où l'image `api`
             copie la compilation (ADR 0014) ; sur le poste, un chemin relatif est ancré sur la
             racine du dépôt, comme `MEDIA_ROOT`.
+        SENTRY_DSN: le DSN du projet Sentry qui reçoit les erreurs de `api` et de `worker`
+            (ADR 0027, `config/observability.py`). Vide par défaut, et hors de la production :
+            Sentry ne s'initialise pas, rien ne part. `SecretStr` comme `SECRET_KEY` : qui le
+            connaît envoie des événements au projet, et en épuise le quota.
     """
 
     model_config = SettingsConfigDict(env_file=ENV_FILE)
@@ -222,6 +226,7 @@ class Env(BaseSettings):
     ADMIN_USERNAME: str = ""
     ADMIN_PASSWORD: SecretStr = SecretStr("")
     LINK_PREVIEW_TEMPLATE: Path = Path("/app/web/index.html")
+    SENTRY_DSN: SecretStr = SecretStr("")
 
     @field_validator("MEDIA_ROOT", "LINK_PREVIEW_TEMPLATE")
     @classmethod

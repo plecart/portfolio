@@ -377,7 +377,7 @@ def test_api_demarre_sur_les_valeurs_factices_du_modele(monkeypatch: pytest.Monk
     )
 
     for name, value in compose["services"]["api"]["environment"].items():
-        resolved = re.sub(r"\$\{(\w+):\?\}", lambda match: model[match[1]], str(value))
+        resolved = re.sub(r"\$\{(\w+):[?-]\}", lambda match: model[match[1]], str(value))
         monkeypatch.setenv(name, resolved)
 
     assert Env(_env_file=None).SECRET_KEY  # pyright: ignore[reportCallIssue]

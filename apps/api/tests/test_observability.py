@@ -1,12 +1,14 @@
 """Tests de l'observabilité du back (ADR 0027) : un seul rendu des journaux, une ligne JSON par
 événement en production et un rendu lisible en développement, pour les loggers de l'application
 comme pour ceux des bibliothèques ; une configuration posée une fois, que le worker garde ; un
-identifiant de corrélation par requête HTTP et par exécution de tâche.
+identifiant de corrélation par requête HTTP et par exécution de tâche ; les erreurs remontées à
+Sentry, et rien sans DSN.
 
 La configuration se pose à l'import des réglages, une fois par processus : elle s'éprouve par un
 sous-processus neuf, comme `gunicorn` ou `celery -A config worker` le démarrent
 (`test_django_project.run_python`). Le reste s'éprouve dans le processus de test, sur le rendu que
-ses réglages y ont posé (`journal`).
+ses réglages y ont posé (`journal`), et sur un Sentry initialisé le temps d'un test, que son
+transport factice empêche de rien envoyer (`sent`).
 """
 
 import io
@@ -14,16 +16,24 @@ import json
 import logging
 import subprocess
 from collections.abc import Callable, Generator
-from typing import Any
+from typing import Any, cast
 
 import pytest
+import sentry_sdk
 import structlog
 from celery import shared_task
-from config.observability import CORRELATION_ID
+from config.observability import CORRELATION_ID, init_sentry
+from content.tasks import process_image
 from django.http import HttpRequest, HttpResponse
 from django.test import Client, override_settings
 from django.urls import path
+from factories import gallery_image, project, saved
+from pydantic import SecretStr
+from sentry_sdk.envelope import Envelope
+from sentry_sdk.transport import Transport
+from test_cache import make_unreadable
 from test_django_project import run_python
+from test_env import SENTRY_ENVIRONMENT
 
 # Le démarrage de Django, dans un processus neuf.
 STARTED = """
@@ -154,6 +164,14 @@ def journaling_task() -> None:
     structlog.get_logger(LOGGER).info("événement de la tâche")
 
 
+@pytest.fixture(autouse=True)
+def unbound_context() -> Generator[None]:
+    """Aucun contexte de journal ne survit à un test, même interrompu au milieu d'une requête ou
+    d'une tâche : le suivant part d'un contexte vide."""
+    yield
+    structlog.contextvars.clear_contextvars()
+
+
 @pytest.fixture
 def journal() -> Generator[Journal]:
     """Les événements journalisés pendant le test, rendus par le formateur que les réglages ont
@@ -204,3 +222,116 @@ def test_chaque_tache_porte_son_identifiant_de_correlation(journal: Journal) -> 
     structlog.get_logger(LOGGER).info("hors de toute tâche")
 
     assert correlation_ids(journal()) == [first.id, second.id, None]
+
+
+# Le DSN factice des tests d'`Env` : le transport factice n'envoie rien, et l'hôte ne se résout
+# nulle part.
+DSN = SecretStr(SENTRY_ENVIRONMENT["SENTRY_DSN"])
+
+# Un événement tel que Sentry l'envoie : le JSON de l'enveloppe, déjà sérialisé.
+SentEvent = dict[str, Any]
+
+
+class RecordingTransport(Transport):
+    """Un transport Sentry factice : il retient chaque événement au lieu de l'envoyer."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.events: list[SentEvent] = []
+
+    def capture_envelope(self, envelope: Envelope) -> None:
+        event = envelope.get_event()
+        if event is not None:
+            self.events.append(cast("SentEvent", event))
+
+
+@pytest.fixture
+def sentry_isolated() -> Generator[None]:
+    """Le test dans sa propre portée Sentry, puis le client remis à zéro : rien de ce qu'il
+    initialise ou enregistre ne passe au test suivant."""
+    with sentry_sdk.isolation_scope():
+        yield
+    sentry_sdk.get_client().close()
+    sentry_sdk.get_global_scope().set_client(None)
+
+
+@pytest.fixture
+def sent(sentry_isolated: None) -> list[SentEvent]:
+    """Les événements que Sentry envoie pendant le test — initialisé comme en production, sur le
+    DSN de test —, retenus par le transport factice."""
+    transport = RecordingTransport()
+    init_sentry(DSN, debug=False, transport=transport)
+    return transport.events
+
+
+def exception_type(event: SentEvent) -> str:
+    """Le type de l'exception que porte `event`, la dernière de sa chaîne."""
+    return event["exception"]["values"][-1]["type"]
+
+
+def test_sans_dsn_sentry_ne_s_initialise_pas(monkeypatch: pytest.MonkeyPatch) -> None:
+    """DSN vide — le développement, les tests, la CI : `sentry_sdk.init` n'est jamais appelé, aucun
+    client n'est actif, rien ne part. Le processus de test tourne lui-même ainsi
+    (`process_environment`)."""
+    calls: list[dict[str, object]] = []
+
+    def recorded(**options: object) -> None:
+        calls.append(options)
+
+    monkeypatch.setattr(sentry_sdk, "init", recorded)
+
+    init_sentry(SecretStr(""), debug=False)
+
+    assert calls == []
+    assert not sentry_sdk.is_initialized()
+
+
+@pytest.mark.usefixtures("sentry_isolated")
+@pytest.mark.parametrize(
+    ("debug", "environment"),
+    [(False, "production"), (True, "development")],
+    ids=["production", "développement"],
+)
+def test_l_environnement_sentry_se_deduit_de_debug(debug: bool, environment: str) -> None:
+    """Aucune variable de plus : `DEBUG` faux, c'est la production."""
+    init_sentry(DSN, debug=debug, transport=RecordingTransport())
+
+    assert sentry_sdk.get_client().options["environment"] == environment
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("unpropagated")
+def test_un_echec_de_traitement_aux_reessais_epuises_envoie_un_seul_evenement(
+    sent: list[SentEvent],
+) -> None:
+    """Un original illisible, quatre essais : les réessais ne sont pas des erreurs, et la ligne
+    d'erreur que le worker journalise ensuite (`celery.app.trace`) n'en fait pas un second
+    (`init_sentry`, deux voies dont chacune suffit). L'événement porte l'identifiant de la
+    tâche."""
+    image = saved(gallery_image(saved(project())))
+    make_unreadable(image)
+
+    result = process_image.delay(image.pk, image.original.name or "")
+
+    assert result.state == "FAILURE"
+    assert [(exception_type(event), event["tags"][CORRELATION_ID]) for event in sent] == [
+        ("UnidentifiedImageError", result.id)
+    ]
+
+
+@pytest.mark.parametrize("logger", ["django_redis.cache", "django.db.backends.base"])
+def test_un_evenement_d_erreur_d_un_logger_de_bibliotheque_envoie_un_evenement(
+    sent: list[SentEvent], logger: str
+) -> None:
+    """Émis comme la bibliothèque l'émet — `logger.exception`, ou `logger.error` avec la trace,
+    dans le `except` qui écarte l'erreur (`test_cache.py`, `test_tasks.py`) —, pendant une requête
+    ou une tâche : un événement, qui porte l'identifiant de corrélation."""
+    with structlog.contextvars.bound_contextvars(**{CORRELATION_ID: "identifiant-temoin"}):
+        try:
+            raise ConnectionError("Redis injoignable")
+        except ConnectionError:
+            logging.getLogger(logger).exception("Exception ignored")
+
+    assert [(event["logger"], event["tags"][CORRELATION_ID]) for event in sent] == [
+        (logger, "identifiant-temoin")
+    ]

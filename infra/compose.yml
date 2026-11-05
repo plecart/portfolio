@@ -11,8 +11,10 @@
 # l'interpolation `${…}`, et `infra/bootstrap.sh` l'écrit depuis les secrets. `prod.env.example`
 # les déclare toutes, aux valeurs factices : c'est avec lui que `make compose-config` résout ce
 # fichier. Chacune est exigée (`:?`) : absente, la résolution échoue au lieu de démarrer un service
-# sur une valeur vide. Aucun `env_file:` : chaque service reçoit les siennes et elles seules — le
-# jeton du Tunnel ne va qu'à `cloudflared`.
+# sur une valeur vide. Une seule exception, `SENTRY_DSN`, facultative (`:-`) : vide, `api` et
+# `worker` ne remontent rien à Sentry — ainsi tournent les piles jetables, sur `prod.env.example`.
+# Aucun `env_file:` : chaque service reçoit les siennes et elles seules — le jeton du Tunnel ne va
+# qu'à `cloudflared`.
 #
 # `restart: unless-stopped` partout : un conteneur arrêté par une panne ou par un redémarrage du
 # VPS repart seul (cadrage §6.7, « politiques de redémarrage »).
@@ -106,6 +108,9 @@ services:
       # C'est le défaut d'`Env`, écrit comme chaque champ (`test_compose.py`) ; le `worker` n'en
       # fait rien.
       LINK_PREVIEW_TEMPLATE: /app/web/index.html
+      # Le DSN du projet Sentry, où `api` et `worker` remontent leurs erreurs (ADR 0027) ; la seule
+      # variable facultative (en-tête de ce fichier).
+      SENTRY_DSN: ${SENTRY_DSN:-}
     # `api` joue les migrations à son démarrage (`infra/api/entrypoint.sh`) : la base doit répondre.
     depends_on:
       postgres:

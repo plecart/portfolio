@@ -36,6 +36,7 @@ entrée (D45). L'utilisateur `deploy` possède le dossier et tire les images de 
 | Jeton du bucket des médias (`MEDIA_R2_ACCESS_KEY_ID`, `MEDIA_R2_SECRET_ACCESS_KEY`), borné à ce bucket, droit de lister compris | gestionnaire ; `.env` du VPS | `bootstrap.sh` | un nouveau jeton R2, `bootstrap.sh` avec les deux noms, puis l'ancien révoqué |
 | Jeton du bucket des sauvegardes (`BACKUP_R2_ACCESS_KEY_ID`, `BACKUP_R2_SECRET_ACCESS_KEY`) | gestionnaire ; `.env` du VPS | `bootstrap.sh` | un nouveau jeton R2, `bootstrap.sh` avec les deux noms, puis l'ancien révoqué |
 | Adresse de ping (`BACKUP_PING_URL`) | le contrôle healthchecks.io ; `.env` du VPS | `bootstrap.sh` | un nouveau contrôle, `bootstrap.sh BACKUP_PING_URL`, puis l'ancien supprimé |
+| DSN Sentry (`SENTRY_DSN`) | le projet Sentry (« Client Keys (DSN) ») ; `.env` du VPS | `bootstrap.sh` | une nouvelle clé du projet, `bootstrap.sh SENTRY_DSN`, puis l'ancienne révoquée |
 | Clé privée `age` des sauvegardes | gestionnaire ; secret `BACKUP_AGE_IDENTITY` de `production`, pour le test mensuel — ni le dépôt, ni une image (ADR 0007, point 2) ; jamais stockée sur le VPS : elle transite par `ssh` vers la mémoire d'un conteneur jetable, le temps d'une restauration | le mainteneur, sur le poste | une nouvelle paire, sa clé publique à `bootstrap.sh BACKUP_AGE_RECIPIENT`, sa clé privée à `BACKUP_AGE_IDENTITY` ; l'ancienne gardée |
 | Jeton du bucket en lecture seule (`RESTORE_R2_ACCESS_KEY_ID`, `RESTORE_R2_SECRET_ACCESS_KEY`) | gestionnaire ; secrets de `production` — le test mensuel seul s'en sert, jamais le VPS | le mainteneur | un nouveau jeton R2, les deux secrets remplacés, puis l'ancien révoqué |
 
@@ -234,6 +235,10 @@ niveau ni tirer d'image déjà présente.
 - `BACKUP_PING_URL` — l'adresse d'un contrôle ne change pas, son UUID « is immutable » (doc
   healthchecks.io « HTTP API ») : un nouveau contrôle, même période et même délai de grâce, puis
   l'ancien supprimé — sinon il alerte, faute de ping.
+- `SENTRY_DSN` — une nouvelle clé dans « Client Keys (DSN) » du projet, puis l'ancienne révoquée,
+  une fois `api` et `worker` recréés : la doc Sentry permet de tourner et de révoquer un DSN
+  ([DSN](https://docs.sentry.io/concepts/key-terms/dsn-explainer/), lue le 2026-11-05). Puis la
+  vérification de « Sentry — les erreurs ».
 - `BACKUP_AGE_RECIPIENT` — une nouvelle paire sur le poste, `age-keygen -o age.key`, qui n'affiche
   que la clé publique : celle-ci à `bootstrap.sh BACKUP_AGE_RECIPIENT`, le fichier joint à une
   entrée du gestionnaire, et au secret du test mensuel —
@@ -374,7 +379,51 @@ Coût constaté (2026-11-02) : environ 15 € par mois, pour une cible d'une diz
 | R2 | 0 $ : 10 Go-mois, 1 M d'opérations A et 10 M d'opérations B inclus ; au-delà 0,015 $ le Go-mois, 4,50 $ et 0,36 $ le million | caisse, [Pricing](https://developers.cloudflare.com/r2/pricing/) |
 | Zero Trust (Access, Tunnel) | 0 $, offre Free, 50 utilisateurs, un seul ici | caisse, [Pricing](https://www.cloudflare.com/plans/sase-zero-trust.md) |
 | healthchecks.io | 0 $, 1 contrôle sur 20 | [Pricing](https://healthchecks.io/pricing/) |
+| Sentry | 0 $, offre *Developer* : 5 000 erreurs, un utilisateur, 30 jours d'historique ; au-delà du quota, les événements sont refusés, rien n'est facturé | [Pricing](https://sentry.io/pricing/), [Quotas](https://docs.sentry.io/pricing/quotas/), lues le 2026-11-05 par l'ADR 0027 |
 | GitHub Pro | abonnement du compte, hors de ce total, prix non relevé ; requis : sur un dépôt privé, sans lui, l'environnement `production` tombe, et avec lui `deploy` et le test mensuel | [Managing environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments) |
+
+## Sentry — les erreurs
+
+Les erreurs de `api` et de `worker` arrivent dans le projet Sentry (ADR 0027,
+`apps/api/config/observability.py`) : exceptions non gérées de l'API, échecs de tâches — réessais
+épuisés compris, en un seul événement —, et tout événement de niveau erreur d'un logger,
+`django_redis.cache` et `django.db.backends.base` compris ; chacun porte l'identifiant de
+corrélation de sa requête ou de sa tâche, en tag `correlation_id`, le même que dans les journaux.
+Rien d'autre : pas de traces de performance. Sans `SENTRY_DSN`, rien ne part : c'est l'état du
+poste, de la CI et des piles jetables, qui tournent sur `prod.env.example`. Les alertes sont celles
+que Sentry crée par défaut.
+
+**Créer le projet**, une fois :
+
+1. Une organisation, **région Union européenne (Francfort)**, choisie à sa création et définitive :
+   « once selected, your data storage location can't be changed »
+   ([Data Storage Location](https://docs.sentry.io/organization/data-storage-location/), lue le
+   2026-11-05 par l'ADR 0027).
+2. Un projet de plateforme Django.
+3. Son DSN, dans « Client Keys (DSN) » des réglages du projet
+   ([DSN](https://docs.sentry.io/concepts/key-terms/dsn-explainer/), lue le 2026-11-05).
+
+Seul le choix de la région à la création est vérifié dans la doc ; l'ordre des écrans de la console
+ne l'est pas.
+
+**Poser le DSN** — `sudo bash bootstrap.sh SENTRY_DSN`, comme toute rotation (« Tourner un
+secret ») : il le saisit sans écho. C'est un secret : qui le connaît envoie des événements au
+projet, et en épuise le quota. `bootstrap.sh` refuse une valeur vide, comme pour toute variable du
+modèle ; seul `compose.yml` le tolère absent (`${SENTRY_DSN:-}`), pour les piles jetables.
+
+**Vérifier la chaîne après un déploiement** — une erreur volontaire depuis chaque conteneur, en
+`deploy` dans `/srv/portfolio` :
+```
+docker compose exec api python manage.py shell -c "import logging; logging.getLogger('verification').error('Sentry depuis api')"
+docker compose exec worker python manage.py shell -c "import logging; logging.getLogger('verification').error('Sentry depuis worker')"
+```
+Chacune doit ouvrir une issue dans le projet, environnement `production`. Le processus envoie
+avant de sortir : le SDK vide sa file à l'arrêt de l'interpréteur, en attendant au plus
+`shutdown_timeout`, 2 s par défaut
+([Shutdown and Draining](https://docs.sentry.io/platforms/python/configuration/draining/), lue le
+2026-11-05). Éprouvé en test, sur un transport factice : une erreur journalisée fait un événement
+(`apps/api/tests/test_observability.py`). Non vérifié avant le premier déploiement : l'arrivée
+réelle dans la console, et son délai — c'est ce que ces deux commandes établissent.
 
 ## Sauvegarde et restauration
 

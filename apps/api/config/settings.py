@@ -13,7 +13,7 @@ from django.utils.csp import CSP
 
 from config.database import database_settings
 from config.env import REPOSITORY_ROOT, Env
-from config.observability import configure_logging
+from config.observability import configure_logging, init_sentry
 from config.storage import media_storage
 
 # Rend indexables à l'exécution les classes que django-stubs déclare génériques
@@ -37,6 +37,11 @@ ALLOWED_HOSTS = env.ALLOWED_HOSTS
 # voie que la doc Django donne pour configurer soi-même (« Disabling logging configuration »).
 LOGGING_CONFIG = None
 configure_logging(debug=DEBUG)
+
+# Les erreurs de `api` et de `worker`, remontées à Sentry depuis ce même point (ADR 0027) : la doc
+# Sentry l'initialise dans les réglages Django, que le worker lit aussi (« Set up Celery With
+# Django »). Sans `SENTRY_DSN`, rien ne s'initialise.
+init_sentry(env.SENTRY_DSN, debug=DEBUG)
 
 # Cloudflare termine le TLS, `cloudflared` puis Caddy relaient en HTTP, et Caddy ne transmet
 # `X-Forwarded-Proto` que depuis le réseau privé (`infra/caddy/Caddyfile`) : Django y lit le schéma

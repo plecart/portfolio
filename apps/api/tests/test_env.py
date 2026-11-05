@@ -62,7 +62,14 @@ SECRET_TRAVEL_FORMS: list[tuple[str, Callable[[Env, str], str]]] = [
 
 # Les secrets d'`Env`, écrits ici et non lus sur ses types : un champ qui cesserait d'être un
 # `SecretStr` fait rougir ses cas.
-SECRETS = ["SECRET_KEY", "MEDIA_R2_SECRET_ACCESS_KEY", "ADMIN_PASSWORD"]
+SECRETS = ["SECRET_KEY", "MEDIA_R2_SECRET_ACCESS_KEY", "ADMIN_PASSWORD", "SENTRY_DSN"]
+
+# Un DSN Sentry factice : il vise `.invalid`, qui ne se résout nulle part (RFC 2606).
+SENTRY_ENVIRONMENT = {"SENTRY_DSN": "https://cle-publique-factice@sentry.invalid/1"}
+
+# Les secrets vides de l'environnement de test, à des valeurs factices : une valeur vide se
+# trouverait dans toute forme, et le test de fuite des secrets ne prouverait rien.
+SECRET_VALUES = R2_ENVIRONMENT | SENTRY_ENVIRONMENT
 
 # Les façons de rendre la configuration invalide — **six mécanismes de refus distincts**,
 # et c'est le dénombrement qui compte : borne de longueur, URL mal formée (deux fois, car deux
@@ -258,9 +265,9 @@ def test_un_secret_n_apparait_dans_aucune_forme(
     render: Callable[[Env, str], str],
 ) -> None:
     """Le masquage se solde sur la classe : 8 formes recensées, 8 éprouvées ici par secret."""
-    set_variables(monkeypatch, R2_ENVIRONMENT)
+    set_variables(monkeypatch, SECRET_VALUES)
 
-    assert (variables | R2_ENVIRONMENT)[secret] not in render(build_env(), secret)
+    assert (variables | SECRET_VALUES)[secret] not in render(build_env(), secret)
 
 
 def test_une_cle_secrete_trop_courte_est_refusee(monkeypatch: pytest.MonkeyPatch) -> None:
