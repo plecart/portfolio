@@ -125,8 +125,9 @@ scénario de bout en bout vérifie sur la version servie et non sur la source. T
 avant de toucher au bloc :
 
 - Les valeurs par défaut sont celles du site. Servies telles quelles à un robot d'aperçu, elles
-  restent correctes — c'est le comportement attendu hors `/projets/<slug>` et pour un slug inconnu
-  (ADR 0008 : « gabarit sans balises projet »).
+  restent correctes — c'est le comportement attendu hors `/projets/<slug>`. Une adresse de
+  `/projets/*` sans projet publié ne sert pas le gabarit : elle redirige en `302` vers `/`
+  (ADR 0009, D50).
 - **`og:image` n'a pas de valeur par défaut.** Partout où la documentation le nomme, c'est la
   **couverture du projet** (spec §1.11 et §7, ADR 0008), et aucune image de site n'existe. #14
   l'injecte avec les autres ; une image d'ouverture propre au site n'existe pas en phase 1 (PRD #1,
