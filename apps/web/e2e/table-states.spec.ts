@@ -7,15 +7,9 @@ import type { Page } from '@playwright/test'
 import { LOADING_FRAME_COUNT } from '../src/table/cards.ts'
 import { API_ORIGIN, expect, FAILURES, holdProjects, serving, test, type Answer } from './api.ts'
 import { resolveAll } from './css.ts'
-import { PROJECT_SETS } from './projects.ts'
+import { PROJECT_SETS, projectSet } from './projects.ts'
 import { nextFrames } from './scroll.ts'
-import {
-  ANNOUNCED_PROJECTS,
-  cards,
-  COLUMN_VIEWPORT,
-  countCellReads,
-  expectPlacement,
-} from './table.ts'
+import { cards, COLUMN_VIEWPORT, countCellReads, expectPlacement } from './table.ts'
 
 /** Les cellules de la table : pendant le chargement, ses cadres. */
 const cells = (page: Page) => page.locator('[data-table-cell]')
@@ -28,9 +22,12 @@ async function openLoading(page: Page) {
   return release
 }
 
-/** Libère la liste tenue sur les projets que les cadres annoncent, et attend leurs cartes. */
+/**
+ * Libère la liste tenue sur les projets que les cadres annoncent (spec §5.1) — autant que de cadres,
+ * dont la vitrine dès qu'il y en a plusieurs —, et attend leurs cartes.
+ */
 async function releaseAnnounced(page: Page, release: (answer: Answer) => Promise<void>) {
-  await release(serving(ANNOUNCED_PROJECTS))
+  await release(serving(projectSet(LOADING_FRAME_COUNT, true)))
   await expect(cards(page)).toHaveCount(LOADING_FRAME_COUNT)
 }
 
