@@ -218,13 +218,16 @@ def structlog_message(hint: "Hint") -> str | None:
     `msg` du `LogRecord` (`structlog/stdlib.py`), et l'intégration `logging` de Sentry en tire le
     message de l'événement comme celui du fil d'Ariane, avant de joindre le `LogRecord` au crochet
     (`hint["log_record"]`, `sentry_sdk/integrations/logging.py`) : les deux crochets y substituent
-    ce message, sans quoi chaque paire partirait chez Sentry.
+    ce message, sans quoi chaque paire partirait chez Sentry. Le `LogRecord` d'un événement
+    `structlog` se reconnaît à l'attribut `_logger` que `wrap_for_formatter` y pose : un logger
+    standard qui journalise un dictionnaire garde son message.
 
     Args:
         hint: ce que Sentry joint à un événement ou à un élément du fil d'Ariane.
     """
-    event_dict: object = getattr(hint.get("log_record"), "msg", None)
-    if not isinstance(event_dict, dict):
+    record: object = hint.get("log_record")
+    event_dict: object = getattr(record, "msg", None)
+    if not hasattr(record, "_logger") or not isinstance(event_dict, dict):
         return None
     return str(cast("dict[str, object]", event_dict).get("event"))
 

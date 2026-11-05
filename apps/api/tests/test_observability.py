@@ -425,6 +425,14 @@ def test_un_evenement_structlog_ne_part_que_sous_son_message(
     )
 
 
+def test_le_dictionnaire_d_un_logger_standard_garde_son_message(sent: list[SentEvent]) -> None:
+    """Un logger standard qui journalise un dictionnaire n'est pas pris pour `structlog` : son
+    événement garde le dictionnaire pour message, jamais `"None"` ni la seule clé `event`."""
+    logging.getLogger(LOGGER).error({"code": 42, "event": "x"})
+
+    assert [event["logentry"]["message"] for event in sent] == ["{'code': 42, 'event': 'x'}"]
+
+
 # L'auteur, seul compte de l'admin, à des valeurs reconnaissables : son identifiant ne se confond
 # avec aucun chiffre d'un événement ou d'une ligne de journal.
 AUTHOR_ID = 1618033988
