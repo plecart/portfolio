@@ -102,6 +102,10 @@ services:
       # (`infra/api/entrypoint.sh`) ; le `worker`, qui ne joue aucune étape, n'en fait rien.
       ADMIN_USERNAME: ${ADMIN_USERNAME:?}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?}
+      # Le gabarit des aperçus de lien : l'`index.html` compilé que l'image copie là (ADR 0014).
+      # C'est le défaut d'`Env`, écrit comme chaque champ (`test_compose.py`) ; le `worker` n'en
+      # fait rien.
+      LINK_PREVIEW_TEMPLATE: /app/web/index.html
     # `api` joue les migrations à son démarrage (`infra/api/entrypoint.sh`) : la base doit répondre.
     depends_on:
       postgres:

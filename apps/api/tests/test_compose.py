@@ -82,12 +82,14 @@ ADMIN_VARIABLES = {"ADMIN_USERNAME", "ADMIN_PASSWORD"}
 # reçoit rien que par `environment` (brief de #23, décision 9).
 INDIRECT_CHANNELS = ["env_file", "extends", "secrets", "configs"]
 
-# Les adresses que le service `api` reçoit avec les noms de service. Sur le poste, `env_file`
-# apporte celles du `.env` (`127.0.0.1`), qui ne désignent rien depuis un conteneur, et
-# `environment:` les remplace ; en production, rien d'autre ne les apporte. Absentes, elles
-# laissent `docker compose config` vert et ne cassent qu'au démarrage — d'où ce test.
+# Les adresses que le service `api` reçoit avec les noms de service, et les chemins du conteneur.
+# Sur le poste, `env_file` apporte ceux du `.env` (`127.0.0.1`, chemins du dépôt), qui ne
+# désignent rien depuis un conteneur, et `environment:` les remplace ; en production, rien d'autre
+# ne les apporte. Absents, ils laissent `docker compose config` vert et ne cassent qu'au démarrage
+# — ou, pour le gabarit des aperçus de lien, à la première page de projet — d'où ce test.
 SERVICE_ADDRESS_OVERRIDES = {
     "DATABASE_URL": "@postgres:5432/",
+    "LINK_PREVIEW_TEMPLATE": "/app/web/index.html",
     "MEDIA_ROOT": "/app/media",
     "REDIS_URL": "redis://redis:6379",
 }

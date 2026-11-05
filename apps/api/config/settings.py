@@ -84,6 +84,10 @@ DATABASES = {"default": database_settings(env.DATABASE_URL)}
 MEDIA_ROOT = env.MEDIA_ROOT
 MEDIA_URL = "media/"
 
+# Le gabarit des aperçus de lien (ADR 0011, `content/link_preview.py`) : l'`index.html` du front,
+# relu à chaque requête de `/projets/<slug>`.
+LINK_PREVIEW_TEMPLATE = env.LINK_PREVIEW_TEMPLATE
+
 # Le broker du worker d'images (ADR 0015) : le Redis de l'ADR 0006, rôle 2. L'application Celery
 # lit les réglages préfixés `CELERY_` (`config/celery.py`) ; aucun backend de résultats.
 CELERY_BROKER_URL = str(env.REDIS_URL)
