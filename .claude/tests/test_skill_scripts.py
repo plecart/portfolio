@@ -69,6 +69,15 @@ def test_make_typecheck_lance_pyright_sur_le_projet_de_la_pipeline() -> None:
     assert any(commande[-3:] == ["pyright", "-p", ".claude"] for commande in commandes)
 
 
+def test_make_typecheck_nomme_le_projet_racine() -> None:
+    """Sans `-p .`, pyright remonte les dossiers jusqu'au premier `pyrightconfig.json` : dans un
+    worktree `.claude/worktrees/*`, celui du clone principal, qui n'analysait que 35 fichiers sur
+    96, le back absent (mesuré le 2026-11-05, `pyright --verbose`, PR #234)."""
+    commandes = [shlex.split(ligne) for ligne in make_dry_run("typecheck").splitlines()]
+
+    assert any(commande[-3:] == ["pyright", "-p", "."] for commande in commandes)
+
+
 def test_make_test_et_make_test_pipeline_lancent_chacun_leur_suite() -> None:
     """`make test` ne lit que `apps` ; `make test-pipeline` lit `.claude/tests` sans le greffon
     qui charge Django (ADR 0025) — retirer le drapeau laissait toute la suite verte."""
