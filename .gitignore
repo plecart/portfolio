@@ -31,6 +31,10 @@ apps/web/.lighthouseci/
 # strix (pentest, docs/frontend-outillage.md §2.2)
 strix_runs/
 
+# Le schéma d'architecture s'exporte du JSON voisin, seul versionné ; l'image vit dans la galerie
+# (#217, « Décisions »).
+docs/schema/architecture.png
+
 # Les worktrees que le harnais crée pour les équipiers, et l'application pour les sessions liées.
 # Non ignorés, ils entreraient dans la population des portes qui énumèrent le dépôt par le système
 # de fichiers — mesuré le 2026-10-09 sur le tableau de bord d'une vague, alors à la racine : il

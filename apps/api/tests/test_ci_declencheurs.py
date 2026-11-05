@@ -774,14 +774,21 @@ def test_chaque_module_que_charge_test_pipeline_fait_tourner_ses_tests() -> None
 # --- La prose de la pipeline : le premier run vient du passage en ready ------------------------
 
 
+# Les binaires de `.claude/`, où aucune prose ne se lit : les polices du rendu du skill
+# `schema-architecture`. Un binaire d'une autre extension fait rougir la lecture en UTF-8 de
+# `pipeline_texts()`, qui le signale au lieu de l'omettre.
+BINARY_SUFFIXES = (".woff2",)
+
+
 def pipeline_prose() -> list[str]:
     """Les fichiers de la pipeline : tout `.claude/` — skills, règles, rôles, scripts, réglages —,
     `CONTRIBUTING.md` et `CLAUDE.md`, tels que le prochain commit peut les contenir — un worktree
-    sous `.claude/`, ignoré par git, n'en fait pas partie."""
+    sous `.claude/`, ignoré par git, n'en fait pas partie —, hors de ses binaires."""
     return [
         name
         for name in repository_files()
-        if name.startswith(".claude/") or name in {"CONTRIBUTING.md", "CLAUDE.md"}
+        if (name.startswith(".claude/") or name in {"CONTRIBUTING.md", "CLAUDE.md"})
+        and not name.endswith(BINARY_SUFFIXES)
     ]
 
 
