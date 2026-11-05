@@ -9,6 +9,7 @@ et n'y change qu'une valeur. Les cas s'écrivent en littéraux, jamais dérivés
 script (`cycle-pr/references/tests.md`, « Le rouge se constate, il ne se suppose pas »).
 """
 
+import codecs
 import copy
 import json
 from pathlib import Path
@@ -192,6 +193,15 @@ FORMES: dict[str, dict[str, Cas]] = {
             "links", [{"from": "a", "to": "b", "label": "x"}], '"label"', "links[0].label"
         ),
     },
+    "clé en double": {
+        # L'objet tel que `json.loads` le lit avec le hook du script ; un `dict` n'en garderait
+        # que la dernière valeur, sans rien dire.
+        "cle-en-double": Cas(
+            "secretManager",
+            description.Objet([("name", "KeePassXC"), ("icon", "keepassxc"), ("name", "K")]),
+            '"name"',
+        ),
+    },
     "icône absente du dossier": {
         "carte-icone-absente": Cas("zones[0][0].rows[0][0].icon", "absente", '"absente"'),
         "zone-icone-absente": Cas("zones[0][0].icon", "absente", '"absente"'),
@@ -247,7 +257,7 @@ def test_une_forme_d_erreur_rend_une_erreur_au_chemin_du_champ_fautif(cas: Cas) 
 
     Population : la forme verrouillée de la description — 5 objets (racine, `secretManager`,
     zone, carte, lien), 21 champs dont 13 requis, 2 contenants positionnels (entrée, rangée) —
-    et les contraintes qui lient ses champs. **84 formes**, une par cas de `FORMES` :
+    et les contraintes qui lient ses champs. **85 formes**, une par cas de `FORMES` :
 
     - champ requis manquant : 13, un par champ requis ;
     - champ d'un autre type : 31 — un par champ (21), le booléen là où un entier est attendu
@@ -256,6 +266,7 @@ def test_une_forme_d_erreur_rend_une_erreur_au_chemin_du_champ_fautif(cas: Cas) 
     - valeur vide ou hors des bornes de son type : 12 — chaque chaîne non vide (8), chaque liste
       non vide (racine `zones`, zones côte à côte, rangée), `columns` à 0 ;
     - clé inconnue : 5, une par objet ;
+    - clé en double dans un objet : 1, la même lecture pour les 5 objets ;
     - icône absente du dossier : 3 (carte, zone, `secretManager`) ;
     - valeur hors de son ensemble : 2 (`color`, `route`) ;
     - colonne hors de la grille (2, une par bord), hors du span de sa zone (1), pas un multiple
@@ -283,6 +294,7 @@ def test_les_cas_d_erreur_comptent_les_formes_de_leur_docstring() -> None:
         "champ d'un autre type": 31,
         "valeur vide ou hors des bornes de son type": 12,
         "clé inconnue": 5,
+        "clé en double": 1,
         "icône absente du dossier": 3,
         "valeur hors de son ensemble": 2,
         "colonne": 5,
@@ -292,7 +304,24 @@ def test_les_cas_d_erreur_comptent_les_formes_de_leur_docstring() -> None:
         "références": 4,
         "secret sans gestionnaire": 1,
     }
-    assert len(CAS) == 84
+    assert len(CAS) == 85
+
+
+def test_les_tables_de_la_forme_comptent_les_champs_de_la_docstring() -> None:
+    """« 21 champs dont 13 requis » (docstring du test paramétré), recompté sur les tables des 5
+    objets du script, et un cas « champ requis manquant » par champ requis : un champ requis
+    ajouté sans son cas rougit ici."""
+    tables = (
+        description.RACINE,
+        description.GESTIONNAIRE,
+        description.ZONE,
+        description.CARTE,
+        description.LIEN,
+    )
+
+    assert sum(map(len, tables)) == 21
+    assert sum(sum(table.values()) for table in tables) == 13
+    assert len(FORMES["champ requis manquant"]) == 13
 
 
 def test_une_passe_rend_toutes_les_erreurs_et_verifie_les_freres_d_un_noeud_fautif() -> None:
@@ -391,6 +420,60 @@ def test_la_cli_valide_la_description_de_pacome_dev() -> None:
     done = run_in_pipe("schema-architecture", "description", str(PACOME_DEV))
 
     assert (done.returncode, done.stdout.decode("utf-8").splitlines()) == (0, ["valide"])
+
+
+def test_la_cli_lit_une_description_precedee_d_un_bom(tmp_path: Path) -> None:
+    """Un BOM UTF-8 en tête ne rend pas le fichier illisible : Windows PowerShell 5.1 en écrit un
+    sous `Set-Content -Encoding UTF8` (mesuré le 2026-11-05, octets `EF BB BF`)."""
+    chemin = tmp_path / "architecture.json"
+    chemin.write_bytes(codecs.BOM_UTF8 + PACOME_DEV.read_bytes())
+
+    done = run_in_pipe("schema-architecture", "description", str(chemin))
+
+    assert (done.returncode, done.stdout.decode("utf-8").splitlines()) == (0, ["valide"])
+
+
+def test_la_cli_releve_une_cle_en_double_que_json_loads_ecraserait(tmp_path: Path) -> None:
+    """Le fichier se lit avec le hook qui garde les clés répétées : l'erreur porte le chemin de
+    l'objet et nomme la clé."""
+    texte = PACOME_DEV.read_text(encoding="utf-8")
+    doublee = texte.replace('"columns": 4,', '"columns": 4, "columns": 4,', 1)
+    assert doublee != texte
+    chemin = tmp_path / "architecture.json"
+    chemin.write_text(doublee, encoding="utf-8")
+
+    done = run_in_pipe("schema-architecture", "description", str(chemin))
+
+    assert (done.returncode, done.stdout.decode("utf-8").splitlines()) == (
+        1,
+        ['(racine) : clé en double, reçu "columns"'],
+    )
+
+
+def svg_temoins(dossier: Path, *chemins: str) -> None:
+    """Écrit un SVG témoin à chaque chemin `<jeu>/<nom>.svg` de `dossier`."""
+    for chemin in chemins:
+        fichier = dossier / chemin
+        fichier.parent.mkdir(parents=True, exist_ok=True)
+        fichier.write_text("<svg/>", encoding="utf-8")
+
+
+def test_le_dossier_d_icones_donne_a_chaque_nom_son_fichier(tmp_path: Path) -> None:
+    """Le nom sans extension de chaque SVG des deux jeux, avec son fichier."""
+    svg_temoins(tmp_path, "simple-icons/caddy.svg", "lucide/globe.svg")
+
+    assert description.icones_disponibles(tmp_path) == {
+        "caddy": tmp_path / "simple-icons" / "caddy.svg",
+        "globe": tmp_path / "lucide" / "globe.svg",
+    }
+
+
+def test_un_nom_present_dans_les_deux_jeux_arrete_la_lecture_du_dossier(tmp_path: Path) -> None:
+    """Le rendu n'a jamais à choisir entre deux fichiers : le nom en double est nommé."""
+    svg_temoins(tmp_path, "simple-icons/globe.svg", "lucide/globe.svg", "lucide/vault.svg")
+
+    with pytest.raises(description.Abandon, match="globe"):
+        description.icones_disponibles(tmp_path)
 
 
 def test_la_cli_rend_une_ligne_par_erreur_en_utf_8_dans_un_tube(tmp_path: Path) -> None:
