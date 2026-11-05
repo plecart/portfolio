@@ -1,8 +1,9 @@
 {
-  // Les scénarios Playwright vivent dans deux mondes : le pilote tourne dans Node, mais les
-  // rappels passés à `page.evaluate` s'exécutent dans le navigateur. Ils ont donc besoin de
-  // `DOM` — que `tsconfig.node.json` ne doit surtout pas recevoir, sans quoi un `document`
-  // égaré dans `vite.config.ts` ou dans un test Vitest compilerait avant d'échouer à l'exécution.
+  // Les scénarios Playwright — ceux de `e2e/`, et la fumée de la pile complète, `smoke/` — vivent
+  // dans deux mondes : le pilote tourne dans Node, mais les rappels passés à `page.evaluate`
+  // s'exécutent dans le navigateur. Ils ont donc besoin de `DOM` — que `tsconfig.node.json` ne
+  // doit surtout pas recevoir, sans quoi un `document` égaré dans `vite.config.ts` ou dans un test
+  // Vitest compilerait avant d'échouer à l'exécution.
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.e2e.tsbuildinfo",
@@ -10,5 +11,5 @@
     "module": "nodenext",
     "types": ["node"]
   },
-  "include": ["playwright.config.ts", "e2e"]
+  "include": ["playwright.config.ts", "e2e", "smoke"]
 }

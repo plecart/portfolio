@@ -108,7 +108,7 @@ PACKAGE_VERSIONS = users/$(dir $(PACKAGE))packages/container/$(notdir $(PACKAGE)
 GH ?= gh
 
 .PHONY: install test test-pipeline lint format format-check typecheck openapi audit build $(IMAGE_BUILDS) compose-config dev
-.PHONY: scan $(IMAGE_SCANS) image-test push $(IMAGE_PUSHES) prune $(IMAGE_PRUNES)
+.PHONY: scan $(IMAGE_SCANS) image-test smoke push $(IMAGE_PUSHES) prune $(IMAGE_PRUNES)
 .PHONY: web-install web-browsers web-lint web-typecheck web-test web-openapi web-build web-e2e web-lighthouse web-audit
 
 install:
@@ -202,6 +202,31 @@ $(IMAGE_SCANS): scan-%:
 # Sans dépendance vers `build`, pour la même raison que `scan` : la CI les lance après son build.
 image-test:
 	$(UV) run pytest infra/tests
+
+# La fumée de la pile complète (#26) : le Compose de production, surchargé par
+# `apps/web/smoke/compose.yml`, puis Playwright sur Chromium (`make web-browsers`), avec la
+# configuration de `apps/web/smoke/`. Les images sont celles d'`IMAGE_PREFIX` à l'étiquette
+# `IMAGE_TAG` : en CI, le préfixe GHCR et le SHA du commit ; sur le poste, `make build` d'abord,
+# puis `make smoke IMAGE_TAG=latest`, l'étiquette des images qu'il charge.
+#
+# Sous un nom de projet à elle, jamais celui d'une autre pile : le moteur Docker est partagé avec
+# les piles du poste, et `down -v` emporte les volumes du projet qu'il nomme. `caddy`, `api`,
+# `worker` et le témoin S3, `postgres` et `redis` par leurs `depends_on` : ni `cloudflared`, malade
+# sans vrai Tunnel, ni `backup` (brief de #26, décision 1). `--wait-timeout` : le plafond du
+# déploiement. Les noms d'hôte de la production, par-dessus le modèle : le front publié appelle
+# l'API de production, et Playwright relaie ses origines vers la pile (décision 5 ;
+# `apps/web/.env.production`, `infra/RUNBOOK.md`, « Cloudflare »). La pile est jetée, run vert ou
+# rouge, et la recette sort sur le code du run.
+smoke: export SMOKE_COMPOSE := docker compose --project-name portfolio-fumee \
+	--env-file infra/prod.env.example -f infra/compose.yml -f $(WEB)/smoke/compose.yml
+smoke: export SITE_HOST := pacome.dev
+smoke: export API_HOST := api.pacome.dev
+smoke: export MEDIA_HOST := media.pacome.dev
+smoke:
+	$(if $(IMAGE_TAG),,$(error IMAGE_TAG manque : l'étiquette des images à éprouver))
+	$(SMOKE_COMPOSE) up -d --wait --wait-timeout 300 caddy api worker s3 \
+		&& ($(WEB_NPM) exec -- playwright test --config smoke/playwright.config.ts); \
+	status=$$?; $(SMOKE_COMPOSE) down -v; exit $$status
 
 # Publie chaque image que `make build` a chargée, sous `IMAGE_TAG` puis sous `latest` — l'étiquette
 # que le build lui a donnée. Dans cet ordre, `latest` ne désigne jamais une image dont l'étiquette
