@@ -27,8 +27,8 @@ requires-python = ">=3.12"
 # `django-ninja` porte l'API publique (ADR 0001) : `content/api.py` et `content/schemas.py` sont
 # les seuls modules qui l'importent, ce que `tests/test_api.py` tient.
 #
-# `django-otp` porte le second facteur de l'admin (#6) : `OTPAdminSite`, site par défaut
-# (`config/apps.py`), son middleware, et les deux appareils, TOTP et codes de secours. Sans l'extra
+# `django-otp` porte le second facteur de l'admin (#6) : `OTPAdminSite`, dont hérite le site par
+# défaut (`access/site.py`, gabarit de connexion recopié et épinglé), son middleware, et les deux appareils, TOTP et codes de secours. Sans l'extra
 # `qrcode` : l'URI `otpauth://` qu'imprime `enroll_second_factor` suffit à l'application TOTP. Le
 # paquet n'est pas typé — ni `py.typed` en 1.7.5, ni `types-django-otp` ou `django-otp-stubs` sur
 # PyPI (2026-10-28) : chacun de ses imports porte `# pyright: ignore[reportMissingTypeStubs]`,
