@@ -1,17 +1,18 @@
-"""Tests de la publication des images sur GHCR : `make push`, `make prune`, et le job `publish`.
+"""Tests de la publication des images sur GHCR : `make push`, `make prune`, le job `publish`, et le
+job de fumée qui éprouve ses images avant leur déploiement (#26).
 
 La publication tourne sur GitHub Actions, après chaque push sur `main` (ADR 0014) ; le poste n'a ni
 le jeton ni le registre. Ces tests lisent donc ce que `make` exécuterait — `make --dry-run`, ou la
 recette lancée sur un `gh` témoin —, sans rien pousser ni supprimer, et le workflow tel que
-l'analyseur YAML le lit. Comme dans `test_image_scan.py`, la garde du job est une fonction sur du
-texte, appliquée au dépôt et à un recueil de formes, `PUBLISH_FORMS`.
+l'analyseur YAML le lit. Comme dans `test_image_scan.py`, la garde de chaque job est une fonction
+sur du texte, appliquée au dépôt et à un recueil de formes, `PUBLISH_FORMS` et `SMOKE_FORMS`.
 """
 
 import json
 import re
 import subprocess
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pytest
 import yaml
@@ -88,6 +89,17 @@ PUBLISH_NEEDS = {"api", "web", "infra", "avis"}
 PUBLISH_IF = "github.event_name == 'push' && github.ref == 'refs/heads/main'"
 READ_ONLY = {"contents": "read"}
 PUBLISH_PERMISSIONS = {"contents": "read", "packages": "write"}
+
+# Ce que porte le job de fumée (brief de #26) : il éprouve les images que `publish` vient de
+# pousser, avant que `deploy` ne les tire — sur un push vers `main` seulement, la condition de
+# `publish`. Il tire les images privées du registre (ADR 0014) : la lecture des paquets, seule
+# permission admise hors de `publish`, sur ce seul job. Les images du commit, jamais `latest`
+# (décision 2). Ni `continue-on-error` ni `if` d'étape : rouge, il doit sauter `deploy`.
+SMOKE_JOB = "fumee"
+SMOKE_NEEDS = ["publish"]
+SMOKE_PERMISSIONS = {"contents": "read", "packages": "read"}
+SMOKE_RUN = f'make smoke IMAGE_PREFIX={PUBLISH_PREFIX} IMAGE_TAG="$GITHUB_SHA"'
+SMOKE_JOB_KEYS = {"name", "runs-on", "needs", "if", "permissions", "timeout-minutes", "steps"}
 
 # Les commandes du job, mot pour mot : le build et le scan de `SCANNING_JOBS`, la connexion au
 # registre, le push de ce qui vient d'être scanné, sous l'étiquette du commit, puis la rétention.
@@ -176,14 +188,22 @@ def stale_versions(versions: list[dict[str, object]]) -> list[int]:
     return [int(number) for number in evaluated.stdout.split()]
 
 
+def needed(job: dict[str, Any]) -> list[str]:
+    """Les jobs qu'attend `job`, que `needs` les nomme en chaîne ou en liste (doc GitHub
+    « Workflow syntax », `jobs.<job_id>.needs`)."""
+    needs: str | list[str] = job.get("needs") or []
+    return [needs] if isinstance(needs, str) else needs
+
+
 def publish_findings(workflow: str) -> list[str]:
     """Ce qui, dans un workflow, écarte le job `publish` de ce que le brief de #15 exige.
 
     Returns:
         Un constat si le job manque ; sinon un par propriété altérée — `needs`, `if`, permissions
-        du job, du workflow ou d'un autre job, `concurrency`, la liste exacte de ses étapes et de
-        leur environnement (`PUBLISH_STEPS`), une clé d'étape hors de `STEP_KEYS`, et le checkout
-        qui ne garde pas l'identifiant du dépôt. Liste vide : le job est conforme.
+        du job, du workflow ou d'un autre job, hors `SMOKE_PERMISSIONS` sur le job de fumée,
+        `concurrency`, la liste exacte de ses étapes et de leur environnement (`PUBLISH_STEPS`),
+        une clé d'étape hors de `STEP_KEYS`, et le checkout qui ne garde pas l'identifiant du
+        dépôt. Liste vide : le job est conforme.
     """
     document = yaml.safe_load(workflow)
     jobs = document["jobs"]
@@ -191,7 +211,7 @@ def publish_findings(workflow: str) -> list[str]:
     if job is None:
         return ["aucun job `publish`"]
     findings: list[str] = []
-    if set(job.get("needs") or []) != PUBLISH_NEEDS:
+    if set(needed(job)) != PUBLISH_NEEDS:
         findings.append(f"`needs` vaut {job.get('needs')}, attendu {sorted(PUBLISH_NEEDS)}")
     if job.get("if") != PUBLISH_IF:
         findings.append(f"`if` vaut {job.get('if')!r}, attendu {PUBLISH_IF!r}")
@@ -200,9 +220,11 @@ def publish_findings(workflow: str) -> list[str]:
     if job.get("permissions") != PUBLISH_PERMISSIONS:
         findings.append(f"le job donne {job.get('permissions')}, attendu {PUBLISH_PERMISSIONS}")
     findings += [
-        f"le job `{name}` règle ses permissions"
+        f"le job `{name}` donne {other['permissions']}"
         for name, other in jobs.items()
-        if name != "publish" and "permissions" in other
+        if name != "publish"
+        and "permissions" in other
+        and (name, other["permissions"]) != (SMOKE_JOB, SMOKE_PERMISSIONS)
     ]
     concurrency = job.get("concurrency")
     settings: dict[str, object] = (
@@ -234,7 +256,57 @@ def publish_findings(workflow: str) -> list[str]:
     return findings
 
 
+def smoke_findings(workflow: str) -> list[str]:
+    """Ce qui, dans un workflow, écarte le job de fumée de ce que le brief de #26 exige.
+
+    Ce que la fumée fait, `make smoke` et `apps/web/smoke/` le portent, `test_compose.py` en tient
+    la pile ; la garde tient ce qui l'entoure — ce qui la déclenche, la saute ou tolère son échec,
+    ce qu'elle reçoit, et les images qu'elle éprouve.
+
+    Returns:
+        Un constat si le job manque ; sinon un par propriété altérée — `needs`, `if`,
+        `permissions`, une clé de job hors de `SMOKE_JOB_KEYS` (`continue-on-error`, `env`…),
+        aucune étape qui lance `SMOKE_RUN`, une clé de cette étape hors de `STEP_KEYS`. Liste
+        vide : le job est conforme.
+    """
+    job = yaml.safe_load(workflow)["jobs"].get(SMOKE_JOB)
+    if job is None:
+        return [f"aucun job `{SMOKE_JOB}`"]
+    findings: list[str] = []
+    if needed(job) != SMOKE_NEEDS:
+        findings.append(f"`needs` vaut {job.get('needs')}, attendu {SMOKE_NEEDS}")
+    if job.get("if") != PUBLISH_IF:
+        findings.append(f"`if` vaut {job.get('if')!r}, attendu {PUBLISH_IF!r}")
+    if job.get("permissions") != SMOKE_PERMISSIONS:
+        findings.append(f"le job donne {job.get('permissions')}, attendu {SMOKE_PERMISSIONS}")
+    if extra := sorted(set(job) - SMOKE_JOB_KEYS):
+        findings.append(f"le job porte {extra}")
+    steps: list[dict[str, object]] = job.get("steps") or []
+    smokes = [step for step in steps if step.get("run") == SMOKE_RUN]
+    if not smokes:
+        findings.append(f"aucune étape ne lance {SMOKE_RUN!r}")
+    findings += [
+        f"l'étape de fumée porte {sorted(set(step) - STEP_KEYS)}"
+        for step in smokes
+        if set(step) - STEP_KEYS
+    ]
+    return findings
+
+
 # --- Le recueil des formes : chaque cas recensé, avec son verdict attendu ---------------------
+
+
+def forms(
+    conforming: str, changes: dict[str, tuple[str, str, bool]]
+) -> dict[str, tuple[str, bool]]:
+    """Le recueil d'une garde : chaque forme de `changes` — texte remplacé dans `conforming`,
+    remplacement, constat attendu — rendue en workflow et constat attendu ; un texte remplacé
+    vide rend `conforming` tel quel."""
+    return {
+        form: (conforming.replace(old, new) if old else conforming, expected)
+        for form, (old, new, expected) in changes.items()
+    }
+
 
 PERSIST_LINES = "        with:\n          persist-credentials: false\n"
 CHECKOUT_LINE = "      - uses: actions/checkout@v0\n" + PERSIST_LINES
@@ -255,6 +327,8 @@ jobs:
     steps: []
   infra:
     steps: []
+  {SMOKE_JOB}:
+    steps: []
   publish:
     needs: [api, web, infra, avis]
     if: {PUBLISH_IF}
@@ -272,6 +346,14 @@ jobs:
       - run: {PUBLISH_BUILD}
         env:
 {BUILD_FLAGS_LINE}{SCAN_LINE}{LOGIN_LINE}{PUSH_LINE}{PRUNE_LINE}"""
+
+
+def granted(job: str, permissions: dict[str, str]) -> tuple[str, str]:
+    """Le texte remplacé et son remplacement qui donnent `permissions` au job `job` de
+    `CONFORMING_WORKFLOW`, qui n'en règle aucune."""
+    scopes = "".join(f"      {scope}: {access}\n" for scope, access in permissions.items())
+    return f"  {job}:\n    steps: []\n", f"  {job}:\n    permissions:\n{scopes}    steps: []\n"
+
 
 # Forme → (texte remplacé, remplacement, constat attendu). Le texte remplacé est pris dans
 # `CONFORMING_WORKFLOW` : une forme qui ne le changerait pas resterait conforme, et son verdict
@@ -299,11 +381,15 @@ PUBLISH_CHANGES = {
         "    permissions: write-all\n",
         True,
     ),
-    "permissions sur un autre job": (
-        "  infra:\n    steps: []",
-        "  infra:\n    permissions:\n      packages: write\n    steps: []",
+    "permissions sur un autre job": (*granted("infra", {"packages": "write"}), True),
+    # La lecture des paquets du job de fumée, sur lui seul et telle quelle (brief de #26).
+    "lecture des paquets sur la fumée": (*granted(SMOKE_JOB, SMOKE_PERMISSIONS), False),
+    "écriture des paquets sur la fumée": (*granted(SMOKE_JOB, PUBLISH_PERMISSIONS), True),
+    "scope de plus sur la fumée": (
+        *granted(SMOKE_JOB, SMOKE_PERMISSIONS | {"actions": "read"}),
         True,
     ),
+    "lecture des paquets sur un autre job": (*granted("infra", SMOKE_PERMISSIONS), True),
     "concurrence qui annule": ("cancel-in-progress: false", "cancel-in-progress: true", True),
     "concurrence sans annulation implicite": ("      cancel-in-progress: false\n", "", True),
     "sans concurrence": (
@@ -354,10 +440,42 @@ PUBLISH_CHANGES = {
     ),
     "checkout qui garde l'identifiant du dépôt": (PERSIST_LINES, "", True),
 }
-PUBLISH_FORMS = {
-    form: (CONFORMING_WORKFLOW.replace(old, new) if old else CONFORMING_WORKFLOW, expected)
-    for form, (old, new, expected) in PUBLISH_CHANGES.items()
+PUBLISH_FORMS = forms(CONFORMING_WORKFLOW, PUBLISH_CHANGES)
+
+SMOKE_LINE = f"      - run: {SMOKE_RUN}\n"
+SMOKE_CONFORMING = f"""\
+jobs:
+  {SMOKE_JOB}:
+    runs-on: ubuntu-latest
+    needs: publish
+    if: {PUBLISH_IF}
+    permissions:
+      contents: read
+      packages: read
+    timeout-minutes: 20
+    steps:
+{CHECKOUT_LINE}{SMOKE_LINE}"""
+
+# Même recueil pour le job de fumée, pris dans `SMOKE_CONFORMING`.
+SMOKE_CHANGES = {
+    "conforme": ("", "", False),
+    "needs en liste": ("needs: publish", "needs: [publish]", False),
+    "sans le job": (f"  {SMOKE_JOB}:", "  autre:", True),
+    "avant la publication": ("needs: publish", "needs: infra", True),
+    "sur un push vers toute branche": (PUBLISH_IF, "github.event_name == 'push'", True),
+    "sans la lecture des paquets": ("      packages: read\n", "", True),
+    "écriture des paquets": ("packages: read", "packages: write", True),
+    "job toléré en échec": (
+        "    timeout-minutes: 20\n",
+        "    timeout-minutes: 20\n    continue-on-error: true\n",
+        True,
+    ),
+    "images sous latest": ('IMAGE_TAG="$GITHUB_SHA"', "IMAGE_TAG=latest", True),
+    "sans la fumée": (SMOKE_LINE, "", True),
+    "fumée tolérée en échec": (SMOKE_LINE, SMOKE_LINE + "        continue-on-error: true\n", True),
+    "fumée sautée": (SMOKE_LINE, SMOKE_LINE + "        if: false\n", True),
 }
+SMOKE_FORMS = forms(SMOKE_CONFORMING, SMOKE_CHANGES)
 
 
 def test_make_push_publie_chaque_image_sous_son_sha_puis_latest() -> None:
@@ -463,6 +581,21 @@ def test_le_job_publish_ne_publie_qu_un_commit_vert_de_main_une_fois_scanne() ->
     depuis le workflow de la branche par défaut, la seconde un commit dont `api` ou `web` a
     échoué (ADR 0014)."""
     assert publish_findings(CI_WORKFLOW.read_text(encoding="utf-8")) == []
+
+
+@pytest.mark.parametrize(("workflow", "expected"), SMOKE_FORMS.values(), ids=SMOKE_FORMS.keys())
+def test_la_garde_du_job_de_fumee_rend_son_verdict_sur_chaque_forme(
+    workflow: str, expected: bool
+) -> None:
+    """Chaque forme recensée : signalée si, et seulement si, elle s'écarte du brief de #26."""
+    assert bool(smoke_findings(workflow)) is expected, smoke_findings(workflow)
+
+
+def test_le_job_de_fumee_eprouve_les_images_du_commit_apres_leur_publication() -> None:
+    """Après `publish`, sur un push vers `main` seulement, la lecture du dépôt et des paquets et
+    rien d'autre, `make smoke` sur les images GHCR du commit — jamais `latest` —, et rien qui saute
+    ou tolère son échec : rouge, il saute `deploy` (brief de #26, décision 2)."""
+    assert smoke_findings(CI_WORKFLOW.read_text(encoding="utf-8")) == []
 
 
 def test_la_publication_construit_sans_attestation() -> None:

@@ -195,6 +195,10 @@ tourne sur un schéma plus récent que le sien. Le prochain déploiement de la C
   autre machine. Vérifie l'empreinte comme à l'amorçage avant de remplacer `DEPLOY_KNOWN_HOSTS`.
 - **« main est passée à … »** — pas une erreur : un commit plus récent se déploie par son propre
   run.
+- **`deploy` sauté derrière un `fumee` rouge** — les images du commit sont publiées, jamais
+  déployées : le journal du job nomme l'étape ou le scénario, `make smoke` le rejoue sur le poste
+  (`CONTRIBUTING.md`) et le correctif passe par une PR ; ne relance le job que sur un rouge du
+  runner — tirage, délai.
 
 ## Tourner un secret
 
