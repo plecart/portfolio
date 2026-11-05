@@ -18,6 +18,10 @@ Un langage, un framework, une brique d'infrastructure ou un outil qu'un projet e
 | icône | `icon` | fichier SVG, obligatoire |
 | site | `website` | adresse facultative, 200 caractères au plus ; stockée, ni exposée par l'API ni affichée sur le site en phase 1 |
 
+Supprimer une technologie ou remplacer son icône supprime du stockage l'ancienne icône, une fois la
+transaction validée ; une transaction annulée n'en supprime aucune, et une technologie qu'un projet
+emploie ne se supprime pas.
+
 ## Projet — `Project`
 
 Un projet du portfolio : une carte de la table, une fiche (cadrage §6.1). « En ligne » n'est pas

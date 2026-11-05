@@ -9,23 +9,20 @@ garantit pour toute ligne écrite hors de l'admin. Quand un champ la vérifie d�
 messages pour une même faute.
 """
 
-from collections.abc import Collection, Iterable
+from collections.abc import Mapping
 from datetime import date, datetime
-from typing import TYPE_CHECKING, Any, Self, TypedDict
+from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
 
 from config import strings
 from django.db import models
 from django.db.models.functions import Length, Lower
 from django.db.models.lookups import LessThanOrEqual
-from django.db.models.signals import pre_delete
-from django.dispatch import receiver
 
 from content.images import OriginalField, delete_folder_after_commit, validate_original
+from content.stored_files import Removal, StoredFiles, delete_file_after_commit
 from content.validators import validate_svg
 
 if TYPE_CHECKING:
-    from django.db.models import QuerySet
-    from django.db.models.fetch_modes import FetchMode
     from django.db.models.fields.related_descriptors import RelatedManager
 
 
@@ -43,8 +40,13 @@ class TechnologyKind(models.TextChoices):
     TOOL = "tool", strings.TECHNOLOGY_KIND_TOOL
 
 
-class Technology(models.Model):
-    """Une technologie qu'un projet emploie (cadrage §6.1)."""
+class Technology(StoredFiles):
+    """Une technologie qu'un projet emploie (cadrage §6.1).
+
+    Son icône sort du stockage, seule, une fois validée la transaction qui supprime la technologie
+    ou remplace son icône (`StoredFiles`) ; une technologie qu'un projet emploie ne se supprime pas,
+    et garde son icône.
+    """
 
     # Borne technique : la spec ne borne pas ce nom.
     name: models.CharField[str, str] = models.CharField(strings.TECHNOLOGY_NAME, max_length=50)
@@ -60,6 +62,9 @@ class Technology(models.Model):
     website: models.URLField[str, str] = models.URLField(
         strings.TECHNOLOGY_WEBSITE, max_length=200, blank=True
     )
+
+    # Le fichier seul : toutes les icônes partagent le dossier `technologies/`.
+    removals: ClassVar[Mapping[str, Removal]] = {"icon": delete_file_after_commit}
 
     class Meta:
         verbose_name = strings.TECHNOLOGY
@@ -450,7 +455,7 @@ CAPTION_MAX_LENGTH = 50
 COVER_MIN_SIDE = 1200
 
 
-class GalleryImage(models.Model):
+class GalleryImage(StoredFiles):
     """Une image de la galerie d'un projet, à sa place dans la galerie (`project.gallery`). Le
     site l'affiche entière dans le cadre carré, sur fond neutre (spec §1.11).
 
@@ -463,6 +468,10 @@ class GalleryImage(models.Model):
     produit les variantes et seul il écrit l'état et les variantes (brief de #9, décision 5 ;
     `content/tasks.py`) : ici, une image naît « en attente », sans variante, et son traitement est
     enfilé après la validation de la transaction qui la crée ou remplace son original.
+
+    L'original que la ligne ne nomme plus — l'image supprimée, seule ou avec son projet, ou son
+    original remplacé — sort du stockage avec son dossier, variantes comprises, une fois la
+    transaction validée, jamais si elle est annulée (décision 10 ; `StoredFiles`).
     """
 
     original = OriginalField(
@@ -504,6 +513,11 @@ class GalleryImage(models.Model):
     position: models.PositiveSmallIntegerField[int, int] = models.PositiveSmallIntegerField(
         strings.GALLERY_IMAGE_POSITION
     )
+
+    # Le dossier entier : le worker range les variantes à côté de l'original, et peut y en écrire
+    # entre la lecture de la ligne et son écriture, que la ligne ne nomme pas
+    # (`delete_folder_after_commit`).
+    removals: ClassVar[Mapping[str, Removal]] = {"original": delete_folder_after_commit}
 
     class Meta:
         verbose_name = strings.GALLERY_IMAGE
@@ -550,139 +564,36 @@ class GalleryImage(models.Model):
     def __str__(self) -> str:
         return f"{self.project} · {self.caption}"
 
-    # Le nom de l'original que la ligne portait quand cette instance l'a lue ou écrite pour la
-    # dernière fois : ce qu'elle-même change, et rien d'autre (`_replaced_original`).
-    _stored_original: str | None = None
-
-    @classmethod
-    def from_db(
-        cls,
-        db: str | None,
-        field_names: Collection[str],
-        values: Collection[Any],
-        *,
-        fetch_mode: "FetchMode | None" = None,
-    ) -> Self:
-        """La ligne lue, qui retient le nom de son original s'il a été chargé (doc Django,
-        « Customizing model loading »)."""
-        image = super().from_db(db, field_names, values, fetch_mode=fetch_mode)
-        if "original" in field_names:
-            image._stored_original = image.original.name
-        return image
-
-    def refresh_from_db(
-        self,
-        using: str | None = None,
-        fields: Iterable[str] | None = None,
-        from_queryset: "QuerySet[Any] | None" = None,
-    ) -> None:
-        """La ligne relue, qui retient le nom de son original s'il a été relu — le chargement à
-        la demande d'un champ différé passe par ici (`DeferredAttribute`).
-
-        Args:
-            using, fields, from_queryset: ceux de `Model.refresh_from_db`.
-        """
-        fields = None if fields is None else set(fields)
-        reloads_original = (
-            "original" not in self.get_deferred_fields() if fields is None else "original" in fields
-        )
-        super().refresh_from_db(using=using, fields=fields, from_queryset=from_queryset)
-        if reloads_original:
-            self._stored_original = self.original.name
-
-    def save(self, **kwargs: Any) -> None:
-        """Enregistre l'image ; un original remplacé la remet en attente et sort du stockage ; un
-        original neuf est traité par le worker.
+    def save_replacing(self, replaced: Mapping[str, str], **kwargs: Any) -> None:
+        """Écrit l'image ; un original remplacé la remet en attente ; un original neuf est traité
+        par le worker.
 
         Remplacer l'original d'une image enregistrée — un nouveau fichier, téléversé ou
         enregistré par `OriginalFile.save` — la remet à l'état « en attente » et vide ses
-        variantes : elles décrivaient l'ancien fichier (décision 5). L'original que la ligne
-        référençait sort du stockage avec son dossier — ses variantes, celles qu'un worker y a
-        écrites pendant cet enregistrement comprises — une fois la transaction validée, jamais si
-        elle est annulée (décision 10 ; `delete_folder_after_commit`). Un enregistrement partiel (`update_fields`) ne remplace que s'il
-        écrit l'original ; il écrit alors aussi ses dimensions, qui décrivent le nouveau fichier,
-        et l'état et les variantes qu'un remplacement remet à zéro.
+        variantes : elles décrivaient l'ancien fichier (décision 5). Un enregistrement partiel
+        (`update_fields`) qui écrit l'original écrit aussi ses dimensions, qui décrivent le nouveau
+        fichier, et l'état et les variantes qu'un remplacement remet à zéro.
 
         Les deux enregistrements qui mettent l'image « en attente » — sa création, le
         remplacement de son original — enfilent son traitement, une fois la transaction validée
         (`process_after_commit`, brief de #12, décision 5) ; aucun autre.
 
         Args:
+            replaced: ceux de `StoredFiles.save_replacing` ; l'original, s'il est remplacé.
             kwargs: ceux de `Model.save`.
         """
         creating = self._state.adding
-        # Un itérable quelconque, que Django relira : lu une fois ici, gardé en ensemble.
-        update_fields = kwargs.get("update_fields")
-        if update_fields is not None:
-            update_fields = frozenset(update_fields)
-        writes_original = update_fields is None or "original" in update_fields
-        replaced = self._replaced_original() if writes_original else None
-        if replaced:
+        replacing = "original" in replaced
+        if replacing:
             self.state = ProcessingState.PENDING
             self.variants = []
-        if update_fields is not None:
-            if writes_original:
-                reset = {"state", "variants"} if replaced else set[str]()
-                update_fields |= {"width", "height", *reset}
-            kwargs["update_fields"] = update_fields
-        super().save(**kwargs)
-        if writes_original:
-            self._stored_original = self.original.name
-        if replaced:
-            delete_folder_after_commit(self.original.storage, replaced)
-        if creating or replaced:
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "original" in update_fields:
+            reset = {"state", "variants"} if replacing else set[str]()
+            kwargs["update_fields"] = update_fields | {"width", "height", *reset}
+        super().save_replacing(replaced, **kwargs)
+        if creating or replacing:
             # Importée ici : la tâche lit ce module, qui ne peut donc pas la lire à son chargement.
             from content.tasks import process_after_commit
 
             process_after_commit(self.pk, self.original.name or "")
-
-    def _replaced_original(self) -> str | None:
-        """Le nom de l'original que la ligne référence et que cette instance remplace en
-        s'enregistrant ; aucun pour une image neuve, ou dont cette instance n'a pas changé
-        l'original.
-
-        Un téléversement affecté au champ remplace toujours : ce que la ligne référence au moment
-        de l'écriture ne l'est plus après, quoi que l'instance ait lu. Un nom déjà stocké ne
-        remplace que si l'instance sait lequel elle a lu ou écrit, et l'a changé — un fichier
-        enregistré par `OriginalFile.save` ; une instance qui ignore ce nom — son original chargé
-        avec ses pairs (`FETCH_PEERS`), sans passer par `refresh_from_db` — ne supprime rien.
-        La ligne est relue, jamais le fichier, et son original sort du stockage avec son dossier
-        s'il n'est pas ce que l'instance écrit.
-        """
-        if self._state.adding:
-            return None
-        uploading = bool(self.original) and not self.original.stored
-        known = self._stored_original is not None
-        if not uploading and not (known and self.original.name != self._stored_original):
-            return None
-        row = type(self).objects.only("original").filter(pk=self.pk).first()
-        if row is None or row.original.name == self.original.name:
-            return None
-        return row.original.name
-
-
-@receiver(pre_delete, sender=GalleryImage)
-def delete_image_files(
-    sender: type[GalleryImage], instance: GalleryImage, **kwargs: object
-) -> None:
-    """Une image supprimée — seule, ou avec son projet : Django envoie le signal pour chaque ligne
-    qu'une cascade emporte — sort du stockage une fois la transaction validée, original et
-    variantes (décision 10). Django ne le fait pas de lui-même, et le bucket des images est
-    public (ADR 0004) : une image retirée resterait servie.
-
-    L'original se lit dans la ligne, avant sa suppression : pas dans l'instance, qui peut tenir
-    un original remplacé en mémoire, des valeurs périmées ou différées (`only`). Son dossier sort
-    entier, variantes comprises — y compris celles qu'un worker y écrit entre cette lecture et la
-    suppression, que la ligne ne nomme pas (`delete_folder_after_commit`).
-
-    Args:
-        sender: le modèle de l'image.
-        instance: l'image supprimée.
-        kwargs: le reste du signal.
-    """
-    # ponytail: une lecture par image supprimée, cascades comprises — une galerie compte quelques
-    # images ; si elles se comptent par centaines, lire les noms d'un coup au `pre_delete` du
-    # projet.
-    row = sender.objects.only("original").filter(pk=instance.pk).first()
-    if row is not None and row.original.name:
-        delete_folder_after_commit(row.original.storage, row.original.name)
