@@ -42,15 +42,15 @@ l'accord.
 ### 3. Écrire la description
 
 Écrire `docs/schema/architecture.json` dans le dépôt du projet. C'est la documentation du dépôt,
-pas un contenu du site (D16, cadrage §7 ; ADR 0001 § Décision), et la seule source versionnée du
-schéma. Puis la valider :
+pas un contenu du site, et la seule source versionnée du schéma. Puis la valider :
 
 ```
 python <répertoire de ce skill>/scripts/description.py docs/schema/architecture.json
 ```
 
 Sortie 0 et `valide` ; sinon une ligne `<chemin> : <message>` par erreur, toutes en une passe —
-les corriger toutes, puis relancer. La forme est résumée plus bas, « La description ».
+les corriger toutes, puis relancer. Une icône absente du dossier se tire par `scripts/icones.py`
+(« Icônes »), jamais en la remplaçant par une icône présente. La forme est résumée plus bas, « La description ».
 
 ### 4. Dessiner
 
