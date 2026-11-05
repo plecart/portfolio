@@ -27,9 +27,9 @@ VERSIONED_STYLESHEET = r"admin/css/base\.[0-9a-f]{12}\.css"
 GZIP_MAGIC = b"\x1f\x8b"
 
 
-def test_whitenoise_ouvre_la_chaine_des_middlewares() -> None:
-    """Juste après `SecurityMiddleware`, en tête (doc WhiteNoise, « Enable WhiteNoise ») — derrière
-    le seul middleware de corrélation, qui doit voir chaque requête (ADR 0027).
+def test_correlation_security_puis_whitenoise_ouvrent_la_chaine_des_middlewares() -> None:
+    """WhiteNoise juste après `SecurityMiddleware`, en tête (doc WhiteNoise, « Enable WhiteNoise »)
+    — derrière le seul middleware de corrélation, qui doit voir chaque requête (ADR 0027).
 
     `SecurityMiddleware` passe d'abord pour que ses en-têtes couvrent aussi les fichiers
     statiques ; WhiteNoise avant tous les autres, pour qu'une requête de fichier s'arrête là, sans

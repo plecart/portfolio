@@ -169,9 +169,10 @@ INSTALLED_APPS = [
 # session ni utilisateur. Puis `SecurityMiddleware`, juste devant WhiteNoise (doc WhiteNoise,
 # « Enable WhiteNoise ») : ses en-têtes — `nosniff`, `Referrer-Policy` et
 # `Cross-Origin-Opener-Policy`, aux défauts de Django — couvrent aussi les fichiers statiques. Puis
-# WhiteNoise : une requête de fichier statique s'arrête là, sans ouvrir de session. Puis CORS, borné aux routes de l'API (`CORS_URLS_REGEX`) —
-# après WhiteNoise, et non avant comme le propose django-cors-headers : aucun fichier statique
-# n'est servi sous `/api/`. Puis le `GET` conditionnel : `ETag` d'empreinte du corps et `304` sur
+# WhiteNoise : une requête de fichier statique s'arrête là, sans ouvrir de session. Puis CORS, borné
+# aux routes de l'API (`CORS_URLS_REGEX`) — après WhiteNoise, et non avant comme le propose
+# django-cors-headers : aucun fichier statique n'est servi sous `/api/`.
+# Puis le `GET` conditionnel : `ETag` d'empreinte du corps et `304` sur
 # `If-None-Match` (cadrage §6.7), pour toute réponse qui n'est pas `no-store` — l'admin, en
 # `never_cache`, n'en reçoit pas ; **après** CORS, parce que le `304` qu'il construit ne recopie pas
 # `Access-Control-Allow-Origin` (`get_conditional_response`, Django 6.1.1), et CORS doit le
