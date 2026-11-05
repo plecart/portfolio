@@ -10,7 +10,7 @@ Le gabarit est un fichier de fixture de test, que désigne l'environnement de te
 import logging
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from content.api import api
@@ -406,9 +406,10 @@ def test_un_gabarit_defectueux_est_une_erreur_journalisee_jamais_une_page(
 def test_aucune_operation_declaree_de_l_api_publique_ne_repond_en_html(client: Client) -> None:
     """Chaque opération que déclare le schéma de l'API publique, appelée : aucune ne répond en
     `text/html` (décision 7). L'admin, HTML par nature (ADR 0001), en est hors."""
-    # `OpenAPISchema` hérite d'un `dict` nu (`ninja/openapi/schema.py`) : ses chemins se typent ici,
-    # sinon pyright strict les tient pour en partie inconnus (relevé en CI, run 41946822022).
-    paths: dict[str, dict[str, object]] = api.get_openapi_schema()["paths"]
+    # `OpenAPISchema` hérite d'un `dict` nu (`ninja/openapi/schema.py`) : ses chemins se typent par
+    # `cast`, comme `test_cache.py`, sinon pyright strict les tient pour inconnus (runs de CI
+    # 41946822022 et 41947066641 ; une annotation seule ne suffit pas).
+    paths = cast("dict[str, dict[str, object]]", api.get_openapi_schema()["paths"])
     operations = [(method.upper(), path) for path, methods in paths.items() for method in methods]
 
     types = {
