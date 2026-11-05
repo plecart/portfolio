@@ -4,16 +4,17 @@ Usage :
     python icones.py <nom> (--simple-icons | --lucide)
 
 `<nom>` est le nom du SVG chez l'amont, sans extension : le slug Simple Icons d'un logo
-(`--simple-icons`), le nom Lucide d'une icône neutre (`--lucide`). Le SVG se tire de la version
-épinglée par son URL versionnée sur jsDelivr, et s'écrit tel quel dans
-`icones/<jeu>/<nom>.svg`. Un logo y ajoute sa couleur, lue dans les données de la même version, à
-`icones/simple-icons/couleurs.json`, clés triées. Rien ne s'écrit avant que tout soit lu.
+(`--simple-icons`), le nom Lucide d'une icône neutre (`--lucide`), chacun dans la forme de son jeu
+(`FORMES_DES_NOMS`). Le SVG se tire de la version épinglée par son URL versionnée sur jsDelivr, et
+s'écrit tel quel dans `icones/<jeu>/<nom>.svg`. Un logo y ajoute sa couleur, lue dans les données
+de la même version, à `icones/simple-icons/couleurs.json`, clés triées. Rien ne s'écrit avant que
+tout soit lu.
 
 Sortie : 0 et ce qui a été écrit, ou que l'icône est déjà là ; 1 et son motif en une ligne sur la
 sortie d'erreur — nom inconnu chez l'amont (404), réseau en échec, données de l'amont illisibles,
 le champ fautif nommé, logo absent des données, nom déjà pris par l'autre jeu — ; 2 et son motif,
-appel mal formé, nom présent dans les deux jeux ou fichier des couleurs illisible. Python 3.11 ou
-plus, bibliothèque standard seule.
+appel mal formé — nom hors de la forme de son jeu compris —, nom présent dans les deux jeux ou
+fichier des couleurs illisible. Python 3.11 ou plus, bibliothèque standard seule.
 """
 
 import argparse
@@ -50,6 +51,11 @@ SOURCES = {
     LOGOS: f"{CDN}/simple-icons@{SIMPLE_ICONS}/icons/{{}}.svg",
     NEUTRES: f"{CDN}/lucide-static@{LUCIDE}/icons/{{}}.svg",
 }
+# La forme d'un nom d'icône, par jeu ; aucune ne sort du dossier du jeu ni ne change l'URL. Un slug
+# Simple Icons : motif `slug` de son `.jsonschema.json`, un modificateur après `_` départageant
+# deux marques homonymes. Un nom Lucide : minuscules, chiffres et tirets. Couvrent les 3 291 slugs
+# de la 15.0.0 et les 1 539 noms de lucide-static 0.460.0 (mesuré le 2026-11-05).
+FORMES_DES_NOMS = {LOGOS: "[a-z0-9]+(_[a-z0-9]+)?", NEUTRES: "[a-z0-9-]+"}
 # Le titre et la couleur de chaque logo ; le `data.json` du matériel de départ n'est pas celui de
 # cette version (mesuré au bloc A de #217).
 DONNEES = f"{CDN}/simple-icons@{SIMPLE_ICONS}/data/simple-icons.json"
@@ -71,13 +77,6 @@ REMPLACEMENTS = {
     "ŧ": "t",
     "ø": "o",
 }
-
-
-def nom_d_icone(texte: str) -> str:
-    """`texte` s'il peut nommer un fichier d'icône : minuscules ASCII, chiffres et tirets."""
-    if not re.fullmatch("[a-z0-9-]+", texte):
-        raise argparse.ArgumentTypeError(f"nom d'icône invalide : {texte!r}")
-    return texte
 
 
 def slug(titre: str) -> str:
@@ -194,11 +193,13 @@ def main(argv: Sequence[str]) -> int:
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("nom", type=nom_d_icone, help="le nom du SVG chez l'amont, sans extension")
+    parser.add_argument("nom", help="le nom du SVG chez l'amont, sans extension")
     jeux = parser.add_mutually_exclusive_group(required=True)
     for jeu in SOURCES:
         jeux.add_argument(f"--{jeu}", dest="jeu", action="store_const", const=jeu)
     arguments = parser.parse_args(argv)
+    if not re.fullmatch(FORMES_DES_NOMS[arguments.jeu], arguments.nom):
+        parser.error(f"nom d'icône invalide pour {arguments.jeu} : {arguments.nom!r}")
     try:
         code, compte_rendu = ajouter(arguments.nom, arguments.jeu)
     except Abandon as motif:
