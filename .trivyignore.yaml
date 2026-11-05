@@ -54,7 +54,7 @@
 # de sa durée (30 ou 90 jours, ci-dessus).
 
 vulnerabilities:
-  # --- Image `api` : paquets Debian 13 de l'image de base `python:3.12.15-slim-trixie` -------
+  # --- Image `api` : paquets Debian 13 de l'image de base `python:3.12.16-slim-trixie` -------
   #
   # Ce qui tourne : gunicorn et, pour le service `worker`, celery, sous l'utilisateur `api`, sans
   # privilège. Mesuré dans l'image : `/etc/fstab` est vide, ni `systemd-homed` ni le module Perl
@@ -168,6 +168,30 @@ vulnerabilities:
       est pas installé. Alternatives : aucun correctif dans Debian 13 ni dans sid (bogue Debian
       1152790) ; `python:3.12.16-slim-trixie` porte le même paquet.
     expired_at: 2027-01-30
+
+  - id: CVE-2026-109518
+    paths:
+      - "**/portfolio-api (debian 13.*)"
+    statement: >-
+      Place : apt et libapt-pkg7.0, venus de l'image de base ; l'image n'installe aucun paquet.
+      Atteinte : non — le défaut se déclenche quand apt télécharge un paquet à installer ; ni le
+      Dockerfile ni ce qui tourne n'appellent apt. Alternatives : corrigé par apt 3.0.4 dans
+      Debian 13 (DSA-6607-1), absent de toute empreinte publiée de `python:3.12.16-slim-trixie`
+      au 2026-11-05 : l'exception attend sa reconstruction.
+    expired_at: 2026-12-05
+
+  - id: CVE-2026-76844
+    paths:
+      - "**/portfolio-api (debian 13.*)"
+    statement: >-
+      Place : zlib1g, venu de l'image de base, impossible à retirer — `dpkg`, paquet essentiel,
+      en pré-dépend. Atteinte : non — le défaut est dans l'écriture d'un fichier `gz*` après un
+      `write()` en échec ; seuls `libapt-pkg` et `dpkg-deb` importent ces fonctions, et ni apt ni
+      dpkg ne tournent (relevé des objets ELF de l'image, 2026-11-05). Trivy affiche le titre de
+      l'avis GitHub GHSA-g84c-rxfj-3j2c (webpack-dev-middleware), qui porte ce CVE par erreur ;
+      NVD, OSV et le tracker Debian le donnent à zlib. Alternatives : corrigé dans sid
+      (1:1.3.dfsg+really1.3.2-4, bogue Debian 1153063), sans correctif dans Debian 13.
+    expired_at: 2027-02-03
 
   # --- Image `caddy` : le binaire `caddy` 2.11.7, compilé par le projet avec Go 1.27.3 ---------
   #
