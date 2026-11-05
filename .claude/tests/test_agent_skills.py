@@ -715,10 +715,8 @@ ROLE_NAMES = [path.stem for path in AGENTS]
 # des fichiers qu'`init-projet` copie. Elle se retire du texte lu, et nulle part ailleurs.
 ROLE_FILE_LIST = re.compile(r"^- `\.claude/agents/` \([^)]*\)", re.MULTILINE)
 
-# Le paragraphe « Maison » de `.claude/pipeline.config.md`, « Skills du projet ».
-HOUSE_SKILLS_PARAGRAPH = re.compile(r"^\*\*Maison\*\*.*?\n\n", re.MULTILINE | re.DOTALL)
-
-# Les quatorze skills maison, en littéral ; un test garde l'égalité avec la config.
+# Les skills maison, en littéral ; un test garde l'égalité avec chaque liste écrite en prose
+# (`HOUSE_SKILLS_LISTS`).
 HOUSE_SKILLS = (
     "init-projet",
     "vers-prd",
@@ -824,13 +822,44 @@ def test_une_citation_d_executant_se_reconnait(text: str, expected: bool) -> Non
     assert cites_an_executor(text, ROLE_NAMES) is expected
 
 
-def test_les_skills_maison_du_test_sont_ceux_de_la_config() -> None:
-    """Un skill maison ajouté à la config sans l'être ici échapperait au second paramétrage."""
-    config = (REPOSITORY_ROOT / ".claude/pipeline.config.md").read_text(encoding="utf-8")
-    paragraph = HOUSE_SKILLS_PARAGRAPH.search(config)
-    assert paragraph, "le paragraphe « Maison » de `pipeline.config.md` a changé de forme"
+# Un nom de skill entre accents graves.
+BACKTICKED_SKILL = re.compile(r"`([a-z-]+)`")
+# Chaque liste des skills maison écrite en prose : son fichier, le motif du passage qui la porte
+# (groupe 1), et celui d'un nom dans ce passage.
+HOUSE_SKILLS_LISTS = {
+    "pipeline-config-maison": (
+        ".claude/pipeline.config.md",
+        re.compile(r"^(\*\*Maison\*\*.*?)\n\n", re.MULTILINE | re.DOTALL),
+        BACKTICKED_SKILL,
+    ),
+    "init-projet-etape-8": (
+        ".claude/skills/init-projet/SKILL.md",
+        re.compile(
+            r"^### 8\. Déployer les skills MAISON\n\n.*?:\n\n(.*?)\n\n", re.MULTILINE | re.DOTALL
+        ),
+        BACKTICKED_SKILL,
+    ),
+    "claude-md-skills-de-la-pipeline": (
+        "CLAUDE.md",
+        re.compile(r"^## Skills de la pipeline\n(.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL),
+        re.compile(r"^\| `/([a-z-]+)` \|", re.MULTILINE),
+    ),
+}
 
-    assert set(re.findall(r"`([a-z-]+)`", paragraph.group(0))) == set(HOUSE_SKILLS)
+
+@pytest.mark.parametrize(
+    ("path", "passage", "name"), HOUSE_SKILLS_LISTS.values(), ids=HOUSE_SKILLS_LISTS.keys()
+)
+def test_chaque_liste_des_skills_maison_est_celle_du_test(
+    path: str, passage: re.Pattern[str], name: re.Pattern[str]
+) -> None:
+    """Un skill maison absent d'une liste, ou de celle du test, rougit ici : il échapperait au
+    second paramétrage de D5 (test suivant), au déploiement d'`init-projet` (étape 8) ou à la
+    table des commandes de `CLAUDE.md`."""
+    found = passage.search((REPOSITORY_ROOT / path).read_text(encoding="utf-8"))
+    assert found, f"la liste des skills maison de `{path}` a changé de forme"
+
+    assert sorted(name.findall(found[1])) == sorted(HOUSE_SKILLS)
 
 
 @pytest.mark.parametrize("skill", HOUSE_SKILLS)
