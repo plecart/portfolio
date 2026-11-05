@@ -9,7 +9,13 @@ import { API_ORIGIN, expect, FAILURES, holdProjects, serving, test, type Answer 
 import { resolveAll } from './css.ts'
 import { PROJECT_SETS } from './projects.ts'
 import { nextFrames } from './scroll.ts'
-import { ANNOUNCED_PROJECTS, cards, COLUMN_VIEWPORT, expectPlacement } from './table.ts'
+import {
+  ANNOUNCED_PROJECTS,
+  cards,
+  COLUMN_VIEWPORT,
+  countCellReads,
+  expectPlacement,
+} from './table.ts'
 
 /** Les cellules de la table : pendant le chargement, ses cadres. */
 const cells = (page: Page) => page.locator('[data-table-cell]')
@@ -136,13 +142,27 @@ test('chargement en mouvement réduit : aucune pulsation (spec §6.3)', async ({
   }
 })
 
+test('chargement : chaque cadre est une cellule, que la mesure des liens de l’auteur lit', async ({
+  page,
+}) => {
+  const cellReads = await countCellReads(page)
+  await openLoading(page)
+  const before = await cellReads()
+
+  // Relue, la mesure lit chaque cellule une fois (`useAuthorLinksPlacement`).
+  await page.evaluate(() => dispatchEvent(new Event('resize')))
+
+  expect((await cellReads()) - before).toBe(LOADING_FRAME_COUNT)
+})
+
 /** Les largeurs de bureau comparées : deux pistes de 240 px à 600 px, quatre à 1100 et 1280. */
 const DESKTOP_WIDTHS = [600, 1100, 1280]
 
 /**
  * La forme des liens à chaque largeur de bureau, par la position de leur boîte (`expectPlacement`),
- * lue deux images après le redimensionnement : le temps que la mesure, relue à l'événement
- * `resize`, pose la forme.
+ * lue deux images après chaque redimensionnement. La mesure se relit à l'événement `resize`, mais
+ * React pose la forme dans une tâche à lui, sans échéance d'image : la comparaison avec la table
+ * chargée se sonde (`expect.poll`).
  */
 async function placements(page: Page) {
   const positions = []
@@ -156,7 +176,7 @@ async function placements(page: Page) {
   return positions
 }
 
-test("chargement : les cadres sont des cellules — liens de l'auteur à la forme de la table qui les remplace", async ({
+test("chargement : les liens de l'auteur ont la forme de la table qui remplace les cadres", async ({
   page,
   isMobile,
 }) => {
@@ -166,7 +186,7 @@ test("chargement : les cadres sont des cellules — liens de l'auteur à la form
 
   await releaseAnnounced(page, release)
 
-  expect(await placements(page)).toEqual(loading)
+  await expect.poll(() => placements(page)).toEqual(loading)
 })
 
 for (const [failure, answer] of Object.entries(FAILURES)) {
