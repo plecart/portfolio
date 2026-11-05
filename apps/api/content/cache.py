@@ -60,17 +60,43 @@ def content_key(request: HttpRequest, name: str) -> str | None:
     return f"{SPACE}:{generation}:{name}:{request.scheme}://{request.get_host()}"
 
 
-def cached(name: str) -> Callable[[View], View]:
-    """Décorateur de vue : sert depuis le cache la réponse `name` qu'une vue a déjà rendue avec
-    succès ; sinon la vue la rend, et sa réponse `200` est gardée sous `content_key` — rien n'est
-    lu ni gardé sans clé.
+def cached_response(
+    request: HttpRequest, name: str, render: Callable[[], HttpResponseBase]
+) -> HttpResponseBase:
+    """La réponse `name` servie à `request` : depuis le cache si elle a déjà été rendue avec
+    succès ; sinon celle que rend `render`, gardée sous `content_key` si c'est un `200` — rien
+    n'est lu ni gardé sans clé.
 
     Le cache garde le corps rendu et son type, jamais des objets : la réponse servie depuis le cache
     est celle de la base, octet pour octet, donc de même `ETag` (`ConditionalGetMiddleware`). Rien
-    d'autre : un en-tête que la vue poserait elle-même manquerait à la réponse du cache ; ceux des
-    décorateurs extérieurs (`cache_control`) se reposent à chaque appel. Posé sur une opération
-    django-ninja, il enveloppe aussi ses contrôles — authentification, limite de débit — qu'un
-    succès du cache ne joue pas : il ne sert qu'une opération publique qui n'en a aucun.
+    d'autre : un en-tête que `render` poserait lui-même manquerait à la réponse du cache ; ceux des
+    décorateurs extérieurs (`cache_control`) se reposent à chaque appel.
+
+    Args:
+        request: la requête servie.
+        name: le nom de la réponse dans l'espace (`content_key`).
+        render: rend la réponse quand le cache ne la tient pas ; appelé après la lecture de la
+            génération, jamais avant (`content_key`).
+    """
+    key = content_key(request, name)
+    if key is None:
+        return render()
+    stored: tuple[bytes, str] | None = cache.get(key)
+    if stored is not None:
+        content, content_type = stored
+        return HttpResponse(content, content_type=content_type)
+    response = render()
+    if isinstance(response, HttpResponse) and response.status_code == 200:
+        cache.set(key, (response.content, response["Content-Type"]))
+    return response
+
+
+def cached(name: str) -> Callable[[View], View]:
+    """Décorateur de vue : sa réponse est `cached_response` sous le nom fixe `name`.
+
+    Posé sur une opération django-ninja, il enveloppe aussi ses contrôles — authentification,
+    limite de débit — qu'un succès du cache ne joue pas : il ne sert qu'une opération publique qui
+    n'en a aucun.
 
     Args:
         name: le nom de la réponse dans l'espace (`content_key`).
@@ -79,17 +105,7 @@ def cached(name: str) -> Callable[[View], View]:
     def decorate(view: View) -> View:
         @wraps(view)
         def serve(request: HttpRequest, *args: object, **kwargs: object) -> HttpResponseBase:
-            key = content_key(request, name)
-            if key is None:
-                return view(request, *args, **kwargs)
-            stored: tuple[bytes, str] | None = cache.get(key)
-            if stored is not None:
-                content, content_type = stored
-                return HttpResponse(content, content_type=content_type)
-            response = view(request, *args, **kwargs)
-            if isinstance(response, HttpResponse) and response.status_code == 200:
-                cache.set(key, (response.content, response["Content-Type"]))
-            return response
+            return cached_response(request, name, lambda: view(request, *args, **kwargs))
 
         return serve
 
