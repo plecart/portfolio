@@ -141,9 +141,11 @@ format-check:
 # laisserait passer une syntaxe de 3.12 ; les tests, qui tournent sur le venv, y sont analysés en
 # 3.12 (`executionEnvironments`). Son `include` écrit `skills/**/scripts` : `skills/*/scripts` n'y
 # analyse aucun fichier (pyright 1.1.414, mesuré le 2026-11-04). Les gardes de
-# `test_skill_scripts.py` tiennent cette couverture.
+# `test_skill_scripts.py` tiennent cette couverture. Le premier nomme le projet racine (`-p .`) :
+# sans lui, pyright remonte les dossiers jusqu'au premier `pyrightconfig.json`, et dans un worktree
+# `.claude/worktrees/*` trouve celui du clone principal, sans le back (mesuré le 2026-11-05).
 typecheck:
-	$(UV) run pyright
+	$(UV) run pyright -p .
 	$(UV) run pyright -p .claude
 
 # Le schéma OpenAPI de l'API publique, versionné : le front en dérive ses types (#19). À relancer
