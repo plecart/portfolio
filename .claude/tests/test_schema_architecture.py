@@ -260,6 +260,13 @@ FORMES: dict[str, dict[str, Cas]] = {
             "links", [{"from": "fantome", "to": "a"}], '"fantome"', "links[0].from"
         ),
         "lien-vers-elle-meme": Cas("links", [{"from": "a", "to": "a"}], '"a"', "links[0].to"),
+        # La route n'entre pas dans la paire : le second lien en porte une, et répète le premier.
+        "lien-en-double": Cas(
+            "links",
+            [{"from": "a", "to": "b"}, {"from": "a", "to": "b", "route": "under"}],
+            "links[0]",
+            "links[1]",
+        ),
     },
     "secret sans gestionnaire": {
         "secret-sans-secretmanager": Cas("secretManager", RETIREE, None, f"{CARTE_D}.secret"),
@@ -274,7 +281,7 @@ def test_une_forme_d_erreur_rend_une_erreur_au_chemin_du_champ_fautif(cas: Cas) 
 
     Population : la forme verrouillée de la description — 5 objets (racine, `secretManager`,
     zone, carte, lien), 21 champs dont 13 requis, 2 contenants positionnels (entrée, rangée) —
-    et les contraintes qui lient ses champs. **88 formes**, une par cas de `FORMES` :
+    et les contraintes qui lient ses champs. **89 formes**, une par cas de `FORMES` :
 
     - champ requis manquant : 13, un par champ requis ;
     - champ d'un autre type : 31 — un par champ (21), le booléen là où un entier est attendu
@@ -293,7 +300,8 @@ def test_une_forme_d_erreur_rend_une_erreur_au_chemin_du_champ_fautif(cas: Cas) 
       bord) ou inversé (1) : 5 ;
     - zones côte à côte qui se chevauchent, ou sans span : 2 ;
     - zone sans `rows` ni `zones` non vides : 3 ;
-    - `id` en double, lien vers ou depuis une carte inconnue, lien d'une carte vers elle-même : 4 ;
+    - `id` en double, lien vers ou depuis une carte inconnue, lien d'une carte vers elle-même,
+      lien qui répète le `from` et le `to` d'un lien précédent : 5 ;
     - `secret` sans `secretManager` : 1.
 
     Chaque cas rend **une** erreur, au chemin exact, dont le message nomme la valeur fautive.
@@ -320,10 +328,10 @@ def test_les_cas_d_erreur_comptent_les_formes_de_leur_docstring() -> None:
         "span": 5,
         "zones côte à côte": 2,
         "zone sans contenu": 3,
-        "références": 4,
+        "références": 5,
         "secret sans gestionnaire": 1,
     }
-    assert len(CAS) == 88
+    assert len(CAS) == 89
 
 
 def test_les_tables_de_la_forme_comptent_les_champs_de_la_docstring() -> None:
@@ -417,6 +425,13 @@ VALIDES: dict[str, dict[str, Any]] = {
             ]
         ],
         "links": [{"from": "g", "to": "d", "route": "under"}],
+    },
+    # Le sens compte : `a → b` et `b → a` sont deux liens.
+    "liens-dans-les-deux-sens": {
+        "intro": "Deux services qui s'appellent l'un l'autre.",
+        "columns": 2,
+        "zones": [{"label": "Serveur", "color": "grey", "rows": [[carte("a", 0), carte("b", 1)]]}],
+        "links": [{"from": "a", "to": "b"}, {"from": "b", "to": "a", "route": "under"}],
     },
     # Sous un span : une zone sans span prend celui de sa parente, une autre a le sien, dedans.
     "sections-imbriquees-sous-un-span": {
