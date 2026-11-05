@@ -637,9 +637,10 @@ def test_la_pile_de_la_fumee_ne_publie_que_sur_le_poste() -> None:
 
 
 def test_make_smoke_mene_compose_sous_un_nom_de_projet_a_lui() -> None:
-    """Chaque appel de Compose de `make smoke` porte le même nom de projet, celui d'aucune autre
-    pile du dépôt : `down -v` emporte les volumes du projet qu'il nomme, et sous le nom d'une autre
-    — ou sans nom, sous le `name:` de `infra/compose.yml` —, la fumée en effacerait la base."""
+    """Chaque appel de Compose de `make smoke` porte le même nom de projet, ni celui du poste ni
+    celui de la production (`name:` de `infra/compose.dev.yml` et `infra/compose.yml`) : `down -v`
+    emporte les volumes du projet qu'il nomme, et sous l'un d'eux — ou sans nom, sous le `name:` de
+    `infra/compose.yml` —, la fumée en effacerait la base."""
     names = {
         match["name"] for match in COMPOSE_PROJECT.finditer(make_dry_run("smoke", IMAGE_TAG="x"))
     }
