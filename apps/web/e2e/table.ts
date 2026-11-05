@@ -8,10 +8,9 @@
  * plus rien ne réécrit une fois la liste arrivée.
  */
 import type { Locator, Page } from '@playwright/test'
-import { LOADING_FRAME_COUNT } from '../src/table/cards.ts'
 import { expect, serveProjects } from './api.ts'
 import { settle } from './css.ts'
-import { buildProject, buildTechnology, ONGOING, projectSet, type Project } from './projects.ts'
+import { buildProject, buildTechnology, ONGOING, type Project } from './projects.ts'
 import { scrollThrough } from './scroll.ts'
 
 /** La largeur de référence du bureau : la table sans cellule y laisse la colonne (spec §3.4). */
@@ -47,12 +46,6 @@ export async function countCellReads(page: Page) {
   })
   return () => page.evaluate(() => (window as unknown as { cellReads: number }).cellReads)
 }
-
-/**
- * Les projets que les cadres de chargement annoncent (spec §5.1) : autant que de cadres, dont la
- * vitrine dès qu'il y en a plusieurs.
- */
-export const ANNOUNCED_PROJECTS = projectSet(LOADING_FRAME_COUNT, true)
 
 /** Les cartes de la table, dans son ordre : ses liens. */
 export const cards = (page: Page) => page.getByRole('main').getByRole('link')
