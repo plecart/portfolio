@@ -52,9 +52,10 @@ def process_image(self: "Task[[int, str], None]", image_id: int, original_name: 
     joignable ; sinon elle reste « en attente » (ADR 0015 § Décision, « Échecs » ; `mark_failed`).
     Chaque écriture qui touche la ligne, « prêt » comme « échec », vide ensuite le cache du
     contenu par le rappel des signaux, une fois validée (`purge_after_commit`) : elle leur échappe
-    (brief de #11, décision 4). L'erreur du dernier essai sort de la tâche : le worker la journalise
-    (Sentry la recevra avec #17). Aucun essai ne laisse de fichier que la ligne ne nomme pas, sauf
-    celui qu'une suppression refuse (`make_variants`, `discard`).
+    (brief de #11, décision 4). L'erreur du dernier essai sort de la tâche : le worker la
+    journalise, et Sentry la reçoit, en un seul événement (ADR 0027, `config/observability.py`).
+    Aucun essai ne laisse de fichier que la ligne ne nomme pas, sauf celui qu'une suppression
+    refuse (`make_variants`, `discard`).
 
     Args:
         self: la tâche, liée (`bind`) : son contexte d'exécution dit le numéro de l'essai.

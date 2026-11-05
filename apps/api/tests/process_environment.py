@@ -49,6 +49,10 @@ VALID_ENVIRONMENT = {
     # sortie, et le test de fuite des secrets ne prouverait rien.
     "ADMIN_USERNAME": "admin-de-test",
     "ADMIN_PASSWORD": "phrase-de-passe-de-test-sans-valeur-reelle",
+    # Vide : Sentry ne s'initialise pas, et la suite n'envoie rien — un DSN du shell n'y entre pas.
+    # Les tests de Sentry l'initialisent eux-mêmes, sur un transport factice
+    # (`test_observability.py`).
+    "SENTRY_DSN": "",
 }
 
 # Un chemin qui n'existe pas : `pydantic-settings` n'y lit rien, sans bruit.

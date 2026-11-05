@@ -1,5 +1,6 @@
-"""L'observabilité du back : la journalisation structurée de `api` et de `worker`, et
-l'identifiant de corrélation de chaque requête et de chaque exécution de tâche (ADR 0027).
+"""L'observabilité du back : la journalisation structurée de `api` et de `worker`, l'identifiant de
+corrélation de chaque requête et de chaque exécution de tâche, et la remontée de leurs erreurs à
+Sentry (ADR 0027).
 
 Un seul point de configuration, `configure_logging`, appelé par les réglages Django
 (`config/settings.py`) : `api` les charge au démarrage de Django, `worker` par l'application
@@ -19,15 +20,23 @@ Hors de ce rendu : les lignes de `gunicorn` lui-même — démarrage, arrêt de 
 
 L'identifiant de corrélation est lié au contexte de journal (`structlog.contextvars`) le temps
 d'une requête (`correlation_middleware`) ou d'une exécution de tâche (`bind_task_id`) : chaque
-événement émis pendant ce temps le porte, sous la clé `CORRELATION_ID`.
+événement émis pendant ce temps le porte, sous la clé `CORRELATION_ID` — et l'événement Sentry
+capturé pendant ce temps aussi, en tag (`tag_correlation_id`).
+
+Sentry s'initialise, lui aussi, depuis les réglages (`init_sentry`), et seulement si `SENTRY_DSN`
+est posé.
 """
 
 import logging
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+import sentry_sdk
 import structlog
 from celery.signals import setup_logging, task_postrun, task_prerun
+from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
 from structlog.typing import Processor
 
 if TYPE_CHECKING:
@@ -35,6 +44,9 @@ if TYPE_CHECKING:
 
     from django.http import HttpRequest
     from django.http.response import HttpResponseBase
+    from pydantic import SecretStr
+    from sentry_sdk.transport import Transport
+    from sentry_sdk.types import Event, Hint
 
 # La clé de l'identifiant de corrélation dans le contexte de journal.
 CORRELATION_ID = "correlation_id"
@@ -96,6 +108,75 @@ def configure_logging(debug: bool) -> None:
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
+
+
+def init_sentry(dsn: "SecretStr", debug: bool, transport: "Transport | None" = None) -> None:
+    """Initialise Sentry pour les erreurs du processus — ou rien, sans DSN.
+
+    DSN vide — le poste, les tests, la CI, les piles jetables : `sentry_sdk.init` n'est pas appelé,
+    et rien ne part. Sinon, trois intégrations remontent les erreurs : Django, les exceptions non
+    gérées de l'API ; Celery, les échecs de tâches ; `logging`, tout événement de niveau `ERROR`
+    d'un logger. Un échec de tâche aux réessais épuisés n'en fait qu'un : un réessai (`Retry`)
+    n'est pas une erreur, et la ligne d'erreur que Celery journalise ensuite, trace comprise
+    (`celery.app.trace`), n'en fait pas un second, par deux voies dont chacune suffit :
+    l'intégration Celery écarte ce logger (`ignore_logger`, `sentry_sdk/integrations/celery`), et
+    l'intégration par défaut `DedupeIntegration` écarte une exception déjà capturée. Mesuré au
+    transport factice le 2026-11-05, sentry-sdk 2.74.0 : un événement sans l'une, comme sans
+    l'autre ; deux sans les deux. Il en va de même de la ligne de `django.request` pour l'exception
+    d'une vue, que l'intégration Django reçoit par le signal `got_request_exception`.
+
+    Erreurs seulement : ni `traces_sample_rate`, ni profilage. Aucune donnée personnelle de
+    Sentry lui-même — ni utilisateur, ni cookie, ni adresse IP : `send_default_pii` reste faux,
+    laissé à son défaut. Le passer, même à faux, émet un `DeprecationWarning` en 2.74.0
+    (`_get_options`, `sentry_sdk/client.py`) ; absent, il vaut faux à chacune des quatre lectures
+    que le SDK en fait (`client.py` : l'avertissement, le nettoyeur d'événements,
+    `should_send_default_pii` ; `data_collection.py` : `_resolve_data_collection`). Chaque
+    événement porte l'identifiant de corrélation en tag (`tag_correlation_id`).
+
+    Rejouée avec un DSN, elle remplace le client ; les intégrations, elles, s'installent une fois
+    par processus (`Integration.setup_once`) et restent sans effet sans client actif.
+
+    Args:
+        dsn: le `SENTRY_DSN` d'`Env`.
+        debug: le `DEBUG` des réglages, d'où l'environnement Sentry : `development` s'il est vrai,
+            `production` sinon.
+        transport: ce par quoi partent les événements ; par défaut, celui de Sentry, en HTTP. Les
+            tests en passent un factice, qui n'envoie rien.
+    """
+    if not dsn.get_secret_value():
+        return
+    sentry_sdk.init(
+        dsn=dsn.get_secret_value(),
+        environment="development" if debug else "production",
+        integrations=[
+            DjangoIntegration(),
+            CeleryIntegration(),
+            LoggingIntegration(event_level=logging.ERROR),
+        ],
+        before_send=tag_correlation_id,
+        transport=transport,
+    )
+
+
+def tag_correlation_id(event: "Event", _hint: "Hint") -> "Event":
+    """Crochet `before_send` de Sentry : l'identifiant de corrélation lié au contexte de journal —
+    celui de la requête ou de la tâche en cours — devient un tag de l'événement, sous la même clé.
+
+    Sentry l'appelle dans le fil qui capture l'événement, avant de le confier à l'envoi en
+    arrière-plan (`_prepare_event`, `sentry_sdk/client.py`) : le contexte y est encore celui de la
+    requête ou de la tâche. Hors de l'une comme de l'autre, l'événement n'a pas ce tag.
+
+    Args:
+        event: l'événement, tel que Sentry s'apprête à l'envoyer.
+        _hint: ce que Sentry joint à l'événement ; sans usage ici.
+
+    Returns:
+        L'événement, jamais écarté.
+    """
+    correlation_id = structlog.contextvars.get_contextvars().get(CORRELATION_ID)
+    if correlation_id is not None:
+        event.setdefault("tags", {})[CORRELATION_ID] = correlation_id
+    return event
 
 
 def correlation_middleware(

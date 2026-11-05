@@ -49,6 +49,11 @@ INTERPOLATION = re.compile(
     r"(?<!\$)(?:\$\$)*\$(?:\{(?P<name>\w+)(?P<modifier>[^}]*)\}|(?P<bare>[A-Za-z_]\w*))"
 )
 
+# Les seules interpolations de production qui ne sont pas exigées, sous leur forme exacte : le DSN
+# Sentry, vide par défaut — `api` et `worker` ne remontent alors rien (ADR 0027) —, comme dans les
+# piles jetables qui tournent sur `prod.env.example`.
+OPTIONAL_INTERPOLATIONS = {"${SENTRY_DSN:-}"}
+
 # Ce qu'un service de production ne porte jamais : toute clé qui le rendrait joignable autrement
 # que par le réseau du projet — un port publié, le réseau de l'hôte ou d'un autre conteneur, un
 # réseau nommé qui pourrait être externe — ou qui reprendrait un autre fichier, hors de la vue de
@@ -233,11 +238,13 @@ def interpolated_names(node: object) -> set[str]:
 
 def interpolation_findings(text: str) -> list[str]:
     """Les interpolations d'un fichier Compose qui ne sont pas exigées (`${NOM:?…}`) : une variable
-    absente y deviendrait une valeur vide ou une valeur par défaut, au lieu d'arrêter Compose."""
+    absente y deviendrait une valeur vide ou une valeur par défaut, au lieu d'arrêter Compose — sauf
+    celles d'`OPTIONAL_INTERPOLATIONS`, sous leur forme exacte."""
     return [
         match.group()
         for match in interpolations(text)
-        if match["bare"] or not match["modifier"].startswith(":?")
+        if (match["bare"] or not match["modifier"].startswith(":?"))
+        and match.group() not in OPTIONAL_INTERPOLATIONS
     ]
 
 
@@ -305,6 +312,9 @@ INTERPOLATION_FORMS = {
     "nom échappé": (environment_value("$$X"), False),
     "échappement suivi d'un nom": (environment_value("$$$X"), True),
     "deux échappements": (environment_value("$$$$X"), False),
+    "DSN Sentry, vide par défaut": (environment_value("${SENTRY_DSN:-}"), False),
+    "DSN Sentry, autre défaut": (environment_value("${SENTRY_DSN:-https://x@y/1}"), True),
+    "DSN Sentry, sans modificateur": (environment_value("${SENTRY_DSN}"), True),
 }
 
 
@@ -732,9 +742,10 @@ def test_aucun_service_de_production_ne_lit_de_fichier_d_environnement() -> None
 
 
 def test_chaque_variable_de_production_est_exigee_et_declaree_dans_son_modele() -> None:
-    """`${NOM:?…}` partout : une variable absente du `.env` du VPS fait échouer la résolution,
-    au lieu de démarrer un service sur une valeur vide. Et `infra/prod.env.example` les déclare
-    toutes, rien de plus : c'est le modèle de ce `.env`, et ce que `make compose-config` résout."""
+    """`${NOM:?…}` partout, sauf le DSN Sentry (`OPTIONAL_INTERPOLATIONS`) : une variable absente
+    du `.env` du VPS fait échouer la résolution, au lieu de démarrer un service sur une valeur vide.
+    Et `infra/prod.env.example` les déclare toutes, rien de plus : c'est le modèle de ce `.env`, et
+    ce que `make compose-config` résout."""
     text = COMPOSE_PROD.read_text(encoding="utf-8")
     found = interpolations(text)
 
