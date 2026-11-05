@@ -13,6 +13,7 @@ from django.utils.csp import CSP
 
 from config.database import database_settings
 from config.env import REPOSITORY_ROOT, Env
+from config.observability import configure_logging
 from config.storage import media_storage
 
 # Rend indexables à l'exécution les classes que django-stubs déclare génériques
@@ -28,6 +29,14 @@ env = Env.load()
 SECRET_KEY = env.SECRET_KEY.get_secret_value()
 DEBUG = env.DEBUG
 ALLOWED_HOSTS = env.ALLOWED_HOSTS
+
+# La journalisation, posée ici une fois pour `api` comme pour `worker`, qui charge ces réglages
+# (ADR 0027, `config/observability.py`) : une ligne JSON par événement en production, un rendu
+# lisible en développement. `LOGGING_CONFIG = None` retire la configuration par défaut de Django,
+# qui ajouterait son propre rendu aux loggers `django` en développement (`DEFAULT_LOGGING`) — la
+# voie que la doc Django donne pour configurer soi-même (« Disabling logging configuration »).
+LOGGING_CONFIG = None
+configure_logging(debug=DEBUG)
 
 # Cloudflare termine le TLS, `cloudflared` puis Caddy relaient en HTTP, et Caddy ne transmet
 # `X-Forwarded-Proto` que depuis le réseau privé (`infra/caddy/Caddyfile`) : Django y lit le schéma

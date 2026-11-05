@@ -53,6 +53,9 @@ requires-python = ">=3.12"
 # `tests/test_cache.py` l'atteint par ses tests de Redis injoignable — le reste de la suite tourne
 # sur le cache en mémoire que pose le harnais. 7.0.0 admet Django jusqu'à 7.0 exclu, mais ses
 # classificateurs s'arrêtent à 6.0 (PyPI, 2026-11-03) : c'est la suite qui l'éprouve sur la 6.1.
+#
+# `structlog` porte la journalisation de `api` et de `worker` (ADR 0027) : `config/observability.py`
+# la configure, une fois, et `tests/test_observability.py` l'éprouve dans un processus neuf.
 dependencies = [
     "celery[redis]>=5.6.3",
     "django>=6.0",
@@ -68,6 +71,7 @@ dependencies = [
     "pillow>=12.3.0",
     "psycopg[binary]>=3.2",
     "pydantic-settings>=2",
+    "structlog>=26.1.0",
     "whitenoise>=6.12.0",
 ]
 
