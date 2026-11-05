@@ -12,8 +12,10 @@ Chaque événement — d'un logger `structlog` comme d'un logger standard : Djan
 posé sur l'unique gestionnaire du logger racine (doc structlog, « Standard Library Logging »,
 « Rendering using structlog-based formatters within logging ») : aucun ne sort sous deux formats.
 Le code de l'application journalise par `structlog.get_logger(__name__)` ou
-`logging.getLogger(__name__)`, sans rien configurer — une erreur destinée à Sentry, par le second
-(`configure_logging`).
+`logging.getLogger(__name__)`, sans rien configurer. Une exception part à Sentry avec sa trace par
+`exception()` ; à un logger `structlog`, `exc_info=True` ne la transmet pas : il reste une paire du
+dictionnaire de l'événement, que `wrap_for_formatter` ne passe pas au `LogRecord`
+(`structlog/stdlib.py`) — mesuré au transport factice le 2026-11-05.
 
 Hors de ce rendu : les lignes de `gunicorn` lui-même — démarrage, arrêt de ses workers —, qu'il
 écrit par ses propres gestionnaires, sans les transmettre au logger racine (`propagate = False`,
@@ -29,7 +31,7 @@ est posé.
 """
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
 import sentry_sdk
@@ -47,7 +49,7 @@ if TYPE_CHECKING:
     from django.http.response import HttpResponseBase
     from pydantic import SecretStr
     from sentry_sdk.transport import Transport
-    from sentry_sdk.types import Event, Hint
+    from sentry_sdk.types import Breadcrumb, BreadcrumbHint, Event, Hint
 
 # La clé de l'identifiant de corrélation dans le contexte de journal.
 CORRELATION_ID = "correlation_id"
@@ -103,13 +105,6 @@ def configure_logging(debug: bool) -> None:
     root = logging.getLogger()
     root.handlers = [handler]
     root.setLevel(logging.INFO)
-    # ponytail: `wrap_for_formatter` passe le dictionnaire de l'événement en `msg` du `LogRecord`
-    # (`structlog/stdlib.py`), que l'intégration `logging` de Sentry prend pour message : une erreur
-    # d'un logger `structlog` y arrive sous ce dictionnaire, horodatage compris — mesuré au
-    # transport factice le 2026-11-05, sentry-sdk 2.74.0, structlog 26.1.0. Aucun appel de
-    # l'application n'en journalise une ; le jour où il le faudra, `before_send` rendra le seul
-    # `event` du `LogRecord` que Sentry lui joint (`hint["log_record"]`,
-    # `sentry_sdk/integrations/logging.py`).
     structlog.configure(
         processors=[*SHARED_PROCESSORS, structlog.stdlib.ProcessorFormatter.wrap_for_formatter],
         logger_factory=structlog.stdlib.LoggerFactory(),
@@ -143,8 +138,10 @@ def init_sentry(dsn: "SecretStr", debug: bool, transport: "Transport | None" = N
     d'une vue de l'admin peuvent tenir l'auteur (`include_local_variables`) ; le corps de la
     requête, envoyé quel que soit `send_default_pii` jusqu'à `max_request_body_size`
     (`RequestExtractor.extract_into_event`, `sentry_sdk/integrations/_wsgi_common.py`) ; et les
-    en-têtes de la requête qu'il ne sait pas sensibles (`without_request_headers`). Chaque événement
-    porte l'identifiant de corrélation en tag (`tag_correlation_id`).
+    en-têtes de la requête qu'il ne sait pas sensibles (`without_request_headers`). Un événement
+    `structlog` ne part à Sentry que sous son message, en événement comme en fil d'Ariane
+    (`structlog_message`). Chaque événement porte l'identifiant de corrélation en tag
+    (`tag_correlation_id`).
 
     Rejouée avec un DSN, elle remplace le client ; les intégrations, elles, s'installent une fois
     par processus (`Integration.setup_once`) et restent sans effet sans client actif.
@@ -169,13 +166,15 @@ def init_sentry(dsn: "SecretStr", debug: bool, transport: "Transport | None" = N
         include_local_variables=False,
         max_request_body_size="never",
         before_send=before_send,
+        before_breadcrumb=before_breadcrumb,
         transport=transport,
     )
 
 
-def before_send(event: "Event", _hint: "Hint") -> "Event":
+def before_send(event: "Event", hint: "Hint") -> "Event":
     """Crochet `before_send` de Sentry : chaque événement part sans les en-têtes de sa requête
-    (`without_request_headers`), et avec son identifiant de corrélation (`tag_correlation_id`).
+    (`without_request_headers`), sous le seul message d'un événement `structlog`
+    (`structlog_message`), et avec son identifiant de corrélation (`tag_correlation_id`).
 
     Sentry l'appelle dans le fil qui capture l'événement, avant de le confier à l'envoi en
     arrière-plan (`_prepare_event`, `sentry_sdk/client.py`) : le contexte y est encore celui de la
@@ -183,12 +182,51 @@ def before_send(event: "Event", _hint: "Hint") -> "Event":
 
     Args:
         event: l'événement, tel que Sentry s'apprête à l'envoyer.
-        _hint: ce que Sentry joint à l'événement ; sans usage ici.
+        hint: ce que Sentry joint à l'événement — celui d'un logger, son `LogRecord`.
 
     Returns:
         L'événement, jamais écarté.
     """
+    message = structlog_message(hint)
+    if message is not None:
+        event["logentry"] = {"message": message, "formatted": message}
     return tag_correlation_id(without_request_headers(event))
+
+
+def before_breadcrumb(crumb: "Breadcrumb", hint: "BreadcrumbHint") -> "Breadcrumb":
+    """Crochet `before_breadcrumb` de Sentry : le fil d'Ariane d'un événement `structlog` ne garde
+    que son message (`structlog_message`).
+
+    Args:
+        crumb: l'élément du fil d'Ariane, tel que Sentry s'apprête à l'ajouter.
+        hint: ce que Sentry joint à l'élément — celui d'un logger, son `LogRecord`.
+
+    Returns:
+        L'élément, jamais écarté.
+    """
+    message = structlog_message(hint)
+    if message is not None:
+        crumb["message"] = message
+    return crumb
+
+
+def structlog_message(hint: "Hint") -> str | None:
+    """Le message d'un événement `structlog` — la seule chaîne `event` de son dictionnaire —, ou
+    `None` pour ce qui n'en vient pas.
+
+    `wrap_for_formatter` passe ce dictionnaire entier, paires clé-valeur et horodatage compris, pour
+    `msg` du `LogRecord` (`structlog/stdlib.py`), et l'intégration `logging` de Sentry en tire le
+    message de l'événement comme celui du fil d'Ariane, avant de joindre le `LogRecord` au crochet
+    (`hint["log_record"]`, `sentry_sdk/integrations/logging.py`) : les deux crochets y substituent
+    ce message, sans quoi chaque paire partirait chez Sentry.
+
+    Args:
+        hint: ce que Sentry joint à un événement ou à un élément du fil d'Ariane.
+    """
+    event_dict: object = getattr(hint.get("log_record"), "msg", None)
+    if not isinstance(event_dict, dict):
+        return None
+    return str(cast("dict[str, object]", event_dict).get("event"))
 
 
 def without_request_headers(event: "Event") -> "Event":

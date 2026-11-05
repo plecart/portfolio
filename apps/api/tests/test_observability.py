@@ -251,13 +251,16 @@ SentEvent = dict[str, Any]
 
 
 class RecordingTransport(Transport):
-    """Un transport Sentry factice : il retient chaque événement au lieu de l'envoyer."""
+    """Un transport Sentry factice : il retient chaque enveloppe au lieu de l'envoyer, et ses
+    événements à part."""
 
     def __init__(self) -> None:
         super().__init__()
+        self.envelopes: list[Envelope] = []
         self.events: list[SentEvent] = []
 
     def capture_envelope(self, envelope: Envelope) -> None:
+        self.envelopes.append(envelope)
         event = envelope.get_event()
         if event is not None:
             self.events.append(cast("SentEvent", event))
@@ -274,11 +277,17 @@ def sentry_isolated() -> Generator[None]:
 
 
 @pytest.fixture
-def sent(sentry_isolated: None) -> list[SentEvent]:
-    """Les événements que Sentry envoie pendant le test — initialisé comme en production, sur le
-    DSN de test —, retenus par le transport factice."""
+def transport(sentry_isolated: None) -> RecordingTransport:
+    """Le transport factice d'un Sentry initialisé le temps du test comme en production, sur le
+    DSN de test."""
     transport = RecordingTransport()
     init_sentry(DSN, debug=False, transport=transport)
+    return transport
+
+
+@pytest.fixture
+def sent(transport: RecordingTransport) -> list[SentEvent]:
+    """Les événements que Sentry envoie pendant le test, retenus par le transport factice."""
     return transport.events
 
 
@@ -353,6 +362,67 @@ def test_un_evenement_d_erreur_d_un_logger_de_bibliotheque_envoie_un_evenement(
     assert [(event["logger"], event["tags"][CORRELATION_ID]) for event in sent] == [
         (logger, "identifiant-temoin")
     ]
+
+
+# Les voies par lesquelles l'intégration `logging` de Sentry peut faire partir le contenu d'un
+# événement `structlog` — son message et ses paires clé-valeur, que `wrap_for_formatter` passe
+# ensemble, en dictionnaire, pour `msg` du `LogRecord` (`structlog/stdlib.py`) —, recensées dans
+# `sentry_sdk/integrations/logging.py`, 2.74.0 ; chacune, la méthode du logger qui l'emprunte, ce
+# que le transport factice en reçoit, et ce qu'il doit en recevoir. L'événement d'un `ERROR`
+# (`EventHandler`) : son `logentry` — `message`, `formatted`, `params` — et ses `extra`. Le fil
+# d'Ariane de tout événement d'au moins `INFO` (`BreadcrumbHandler`), que porte l'événement
+# suivant : son `message` et ses `data`. Sentry Logs (`SentryLogsHandler`) : coupé, `enable_logs`
+# n'étant pas posé ; activé, il fait partir le dictionnaire en `body` — mesuré au transport
+# factice le 2026-11-05.
+STRUCTLOG_PATHS: dict[str, tuple[str, Callable[[RecordingTransport], object], object]] = {
+    "evenement": (
+        "error",
+        lambda transport: [
+            (event["logentry"], event["tags"][CORRELATION_ID])
+            for event in transport.events
+            if event.get("logger") == LOGGER
+        ],
+        [({"message": "boom", "formatted": "boom"}, "identifiant-temoin")],
+    ),
+    "fil-d-ariane": (
+        "info",
+        lambda transport: [
+            (crumb["message"], crumb["data"])
+            for event in transport.events
+            for crumb in event.get("breadcrumbs", {}).get("values", [])
+            if crumb["category"] == LOGGER
+        ],
+        [("boom", {})],
+    ),
+    "sentry-logs": (
+        "info",
+        lambda transport: [
+            item.type for envelope in transport.envelopes for item in envelope if item.type == "log"
+        ],
+        [],
+    ),
+}
+
+
+@pytest.mark.parametrize("path", STRUCTLOG_PATHS)
+def test_un_evenement_structlog_ne_part_que_sous_son_message(
+    transport: RecordingTransport, path: str
+) -> None:
+    """Un événement `structlog` à paire clé-valeur témoin, pendant une requête ou une tâche, puis
+    un événement qui emporte le fil d'Ariane, et tout ce qui attend envoyé (`flush`) : la voie ne
+    porte que le message, `event` — et le tag de corrélation, pour l'événement ; rien, pour Sentry
+    Logs —, et le témoin n'est nulle part dans ce que reçoit le transport."""
+    method, carried, expected = STRUCTLOG_PATHS[path]
+    witness = f"TEMOIN-{path}"
+    with structlog.contextvars.bound_contextvars(**{CORRELATION_ID: "identifiant-temoin"}):
+        getattr(structlog.get_logger(LOGGER), method)("boom", secret=witness)
+        sentry_sdk.capture_message("clôture")
+    sentry_sdk.flush()
+
+    assert carried(transport) == expected
+    assert witness.encode() not in b"".join(
+        envelope.serialize() for envelope in transport.envelopes
+    )
 
 
 # L'auteur, seul compte de l'admin, à des valeurs reconnaissables : son identifiant ne se confond
