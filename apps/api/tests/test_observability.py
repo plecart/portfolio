@@ -1,15 +1,28 @@
 """Tests de l'observabilité du back (ADR 0027) : un seul rendu des journaux, une ligne JSON par
 événement en production et un rendu lisible en développement, pour les loggers de l'application
-comme pour ceux des bibliothèques ; une configuration posée une fois, que le worker garde.
+comme pour ceux des bibliothèques ; une configuration posée une fois, que le worker garde ; un
+identifiant de corrélation par requête HTTP et par exécution de tâche.
 
 La configuration se pose à l'import des réglages, une fois par processus : elle s'éprouve par un
 sous-processus neuf, comme `gunicorn` ou `celery -A config worker` le démarrent
-(`test_django_project.run_python`).
+(`test_django_project.run_python`). Le reste s'éprouve dans le processus de test, sur le rendu que
+ses réglages y ont posé (`journal`).
 """
 
+import io
 import json
+import logging
 import subprocess
+from collections.abc import Callable, Generator
+from typing import Any
 
+import pytest
+import structlog
+from celery import shared_task
+from config.observability import CORRELATION_ID
+from django.http import HttpRequest, HttpResponse
+from django.test import Client, override_settings
+from django.urls import path
 from test_django_project import run_python
 
 # Le démarrage de Django, dans un processus neuf.
@@ -115,3 +128,79 @@ def test_le_worker_garde_la_journalisation_des_reglages(variables: dict[str, str
     assert [json.loads(line)["event"] for line in lines] == [
         "le worker garde le rendu des réglages"
     ]
+
+
+# Le logger de l'application que journalisent la vue et la tâche de test.
+LOGGER = "content"
+
+# Les événements journalisés depuis le début d'un test, chacun l'objet de sa ligne JSON.
+Journal = Callable[[], list[dict[str, Any]]]
+
+
+def journaling_view(request: HttpRequest) -> HttpResponse:
+    """Une vue de test : deux événements, par les deux sortes de loggers."""
+    structlog.get_logger(LOGGER).info("premier événement de la requête")
+    logging.getLogger(LOGGER).info("second événement de la requête")
+    return HttpResponse()
+
+
+# Les routes d'un test qui pose `ROOT_URLCONF` sur ce module.
+urlpatterns = [path("journal/", journaling_view)]
+
+
+@shared_task
+def journaling_task() -> None:
+    """Une tâche de test : un événement."""
+    structlog.get_logger(LOGGER).info("événement de la tâche")
+
+
+@pytest.fixture
+def journal() -> Generator[Journal]:
+    """Les événements journalisés pendant le test, rendus par le formateur que les réglages ont
+    posé sur le logger racine — une ligne JSON chacun, `DEBUG` étant faux —, qu'emprunte un
+    gestionnaire de plus, retiré après le test."""
+    root = logging.getLogger()
+    [configured] = [
+        handler
+        for handler in root.handlers
+        if isinstance(handler.formatter, structlog.stdlib.ProcessorFormatter)
+    ]
+    stream = io.StringIO()
+    reader = logging.StreamHandler(stream)
+    reader.setFormatter(configured.formatter)
+    root.addHandler(reader)
+    yield lambda: [json.loads(line) for line in stream.getvalue().splitlines()]
+    root.removeHandler(reader)
+
+
+def correlation_ids(events: list[dict[str, Any]]) -> list[str | None]:
+    """L'identifiant de corrélation de chaque événement du logger de l'application, `None` pour
+    celui qui n'en porte pas."""
+    return [event.get(CORRELATION_ID) for event in events if event["logger"] == LOGGER]
+
+
+@override_settings(ROOT_URLCONF=__name__)
+def test_chaque_requete_porte_son_identifiant_de_correlation(
+    client: Client, journal: Journal
+) -> None:
+    """Deux requêtes successives : un identifiant chacune, porté par tous ses événements ; aucun
+    après elles — le contexte ne survit pas à la requête."""
+    client.get("/journal/")
+    client.get("/journal/")
+    structlog.get_logger(LOGGER).info("hors de toute requête")
+
+    ids = correlation_ids(journal())
+    first, second = ids[0], ids[2]
+    assert ids == [first, first, second, second, None]
+    assert None not in (first, second)
+    assert first != second
+
+
+def test_chaque_tache_porte_son_identifiant_de_correlation(journal: Journal) -> None:
+    """L'identifiant d'une exécution de tâche est celui de la tâche ; aucun après elle — le
+    contexte ne passe pas d'une tâche à la suivante."""
+    first = journaling_task.delay()
+    second = journaling_task.delay()
+    structlog.get_logger(LOGGER).info("hors de toute tâche")
+
+    assert correlation_ids(journal()) == [first.id, second.id, None]

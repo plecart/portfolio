@@ -16,6 +16,7 @@ from django.urls import reverse
 
 WHITENOISE = "whitenoise.middleware.WhiteNoiseMiddleware"
 SECURITY = "django.middleware.security.SecurityMiddleware"
+CORRELATION = "config.observability.correlation_middleware"
 RUNSERVER_NOSTATIC = "whitenoise.runserver_nostatic"
 # `django.contrib.staticfiles`, par sa configuration propre au projet (`config/apps.py`).
 STATICFILES = "config.apps.StaticFilesConfig"
@@ -27,13 +28,15 @@ GZIP_MAGIC = b"\x1f\x8b"
 
 
 def test_whitenoise_ouvre_la_chaine_des_middlewares() -> None:
-    """Juste après `SecurityMiddleware`, en tête (doc WhiteNoise, « Enable WhiteNoise »).
+    """Juste après `SecurityMiddleware`, en tête (doc WhiteNoise, « Enable WhiteNoise ») — derrière
+    le seul middleware de corrélation, qui doit voir chaque requête (ADR 0027).
 
     `SecurityMiddleware` passe d'abord pour que ses en-têtes couvrent aussi les fichiers
     statiques ; WhiteNoise avant tous les autres, pour qu'une requête de fichier s'arrête là, sans
-    ouvrir de session ni lire l'utilisateur.
+    ouvrir de session ni lire l'utilisateur — ce que le middleware de corrélation ne fait pas non
+    plus.
     """
-    assert settings.MIDDLEWARE[:2] == [SECURITY, WHITENOISE]
+    assert settings.MIDDLEWARE[:3] == [CORRELATION, SECURITY, WHITENOISE]
 
 
 def test_runserver_nostatic_precede_staticfiles() -> None:

@@ -159,8 +159,10 @@ INSTALLED_APPS = [
     "access",
 ]
 
-# `SecurityMiddleware` en tête, juste devant WhiteNoise (doc WhiteNoise, « Enable WhiteNoise ») :
-# ses en-têtes — `nosniff`, `Referrer-Policy` et `Cross-Origin-Opener-Policy`, aux défauts de
+# L'identifiant de corrélation en tête (ADR 0027, `config/observability.py`) : tout ce que
+# journalise une requête le porte, jusqu'aux refus des middlewares qui le suivent ; il n'ouvre ni
+# session ni utilisateur. Puis `SecurityMiddleware`, juste devant WhiteNoise (doc WhiteNoise,
+# « Enable WhiteNoise ») : ses en-têtes — `nosniff`, `Referrer-Policy` et `Cross-Origin-Opener-Policy`, aux défauts de
 # Django — couvrent aussi les fichiers statiques. Puis WhiteNoise : une requête de fichier statique
 # s'arrête là, sans ouvrir de session. Puis CORS, borné aux routes de l'API (`CORS_URLS_REGEX`) —
 # après WhiteNoise, et non avant comme le propose django-cors-headers : aucun fichier statique
@@ -176,6 +178,7 @@ INSTALLED_APPS = [
 # elle pose le nonce de la requête avant la vue, et un middleware qui le lirait se placerait après
 # elle — aucun ne le lit.
 MIDDLEWARE = [
+    "config.observability.correlation_middleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",

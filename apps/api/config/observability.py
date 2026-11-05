@@ -1,4 +1,5 @@
-"""L'observabilité du back : la journalisation structurée de `api` et de `worker` (ADR 0027).
+"""L'observabilité du back : la journalisation structurée de `api` et de `worker`, et
+l'identifiant de corrélation de chaque requête et de chaque exécution de tâche (ADR 0027).
 
 Un seul point de configuration, `configure_logging`, appelé par les réglages Django
 (`config/settings.py`) : `api` les charge au démarrage de Django, `worker` par l'application
@@ -15,13 +16,28 @@ Le code de l'application journalise par `structlog.get_logger(__name__)` ou
 Hors de ce rendu : les lignes de `gunicorn` lui-même — démarrage, arrêt de ses workers —, qu'il
 écrit par ses propres gestionnaires, sans les transmettre au logger racine (`propagate = False`,
 `gunicorn/glogging.py`).
+
+L'identifiant de corrélation est lié au contexte de journal (`structlog.contextvars`) le temps
+d'une requête (`correlation_middleware`) ou d'une exécution de tâche (`bind_task_id`) : chaque
+événement émis pendant ce temps le porte, sous la clé `CORRELATION_ID`.
 """
 
 import logging
+from typing import TYPE_CHECKING
+from uuid import uuid4
 
 import structlog
-from celery.signals import setup_logging
+from celery.signals import setup_logging, task_postrun, task_prerun
 from structlog.typing import Processor
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from django.http import HttpRequest
+    from django.http.response import HttpResponseBase
+
+# La clé de l'identifiant de corrélation dans le contexte de journal.
+CORRELATION_ID = "correlation_id"
 
 # Ce que chaque événement porte, qu'il vienne de `structlog` ou d'un logger standard : le contexte
 # lié au fil d'exécution (`structlog.contextvars`), le nom du logger, le niveau et l'heure UTC.
@@ -82,6 +98,53 @@ def configure_logging(debug: bool) -> None:
     )
 
 
+def correlation_middleware(
+    get_response: "Callable[[HttpRequest], HttpResponseBase]",
+) -> "Callable[[HttpRequest], HttpResponseBase]":
+    """Middleware Django : un identifiant de corrélation neuf par requête HTTP, lié au contexte de
+    journal le temps de la requête.
+
+    L'identifiant est engendré ici (`uuid4`), jamais lu dans la requête : un en-tête que le client
+    envoie n'est pas une donnée de confiance. À la sortie, le contexte retrouve son état d'avant
+    (`structlog.contextvars.bound_contextvars`) : rien ne passe à la requête suivante. Placé en
+    tête de `MIDDLEWARE` (`config/settings.py`).
+
+    Args:
+        get_response: la suite de la chaîne des middlewares.
+
+    Returns:
+        Le middleware : il rend la réponse de `get_response`.
+    """
+
+    def middleware(request: "HttpRequest") -> "HttpResponseBase":
+        with structlog.contextvars.bound_contextvars(**{CORRELATION_ID: str(uuid4())}):
+            return get_response(request)
+
+    return middleware
+
+
+def bind_task_id(task_id: str, **_: object) -> None:
+    """Récepteur du signal `task_prerun` de Celery : l'identifiant de la tâche qui démarre devient
+    l'identifiant de corrélation de son exécution.
+
+    Args:
+        task_id: l'identifiant de la tâche, que Celery passe à ce signal (doc Celery, « Signals »,
+            `task_prerun`).
+    """
+    structlog.contextvars.bind_contextvars(**{CORRELATION_ID: task_id})
+
+
+def unbind_task_id(**_: object) -> None:
+    """Récepteur du signal `task_postrun` de Celery : délie l'identifiant de la tâche qui finit —
+    réussie ou en échec, Celery envoie ce signal dans un `finally` (`celery/app/trace.py`) —, et la
+    suivante ne l'hérite pas."""
+    # ponytail: délie au lieu de restaurer — une tâche exécutée dans une requête, ce que seul le
+    # mode synchrone des tests fait, retire à la fin de cette requête son identifiant ; restaurer
+    # l'état d'avant par les jetons de `bind_contextvars` si une tâche doit un jour s'exécuter dans
+    # le processus de l'API.
+    structlog.contextvars.unbind_contextvars(CORRELATION_ID)
+
+
 def keep_logging(**_: object) -> None:
     """Récepteur du signal `setup_logging` de Celery : ne fait rien, et c'est son rôle.
 
@@ -95,10 +158,13 @@ def keep_logging(**_: object) -> None:
 
 def connect_worker_signals() -> None:
     """Branche le worker sur l'observabilité : la journalisation des réglages gardée
-    (`keep_logging`).
+    (`keep_logging`), l'identifiant de chaque tâche lié le temps de son exécution (`bind_task_id`,
+    `unbind_task_id`).
 
     Appelée par `config/celery.py`, que `celery -A config worker` importe avant de configurer quoi
     que ce soit. Rejouée, elle ne branche rien de plus : un signal Celery ne tient qu'une fois un
     même récepteur.
     """
     setup_logging.connect(keep_logging)
+    task_prerun.connect(bind_task_id)
+    task_postrun.connect(unbind_task_id)
