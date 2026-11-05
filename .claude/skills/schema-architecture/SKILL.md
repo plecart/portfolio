@@ -50,7 +50,8 @@ python <répertoire de ce skill>/scripts/description.py docs/schema/architecture
 
 Sortie 0 et `valide` ; sinon une ligne `<chemin> : <message>` par erreur, toutes en une passe —
 les corriger toutes, puis relancer. Une icône absente du dossier se tire par `scripts/icones.py`
-(« Icônes »), jamais en la remplaçant par une icône présente. La forme est résumée plus bas, « La description ».
+(« Icônes »), jamais en la remplaçant par une icône présente. La forme est résumée plus bas,
+« La description ».
 
 ### 4. Dessiner
 

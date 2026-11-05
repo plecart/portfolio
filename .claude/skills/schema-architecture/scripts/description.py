@@ -56,7 +56,8 @@ ICONES = Path(__file__).resolve().parent.parent / "icones"
 # Le jeu des logos, chacun peint à la couleur que porte le fichier `COULEURS_DES_LOGOS` de son
 # dossier ; puis celui des icônes neutres.
 LOGOS = "simple-icons"
-JEUX_D_ICONES = (LOGOS, "lucide")
+NEUTRES = "lucide"
+JEUX_D_ICONES = (LOGOS, NEUTRES)
 COULEURS_DES_LOGOS = "couleurs.json"
 COULEURS = ("gold", "blue", "orange", "red", "green", "grey", "lane")
 ROUTES = ("left", "right", "under")
