@@ -595,7 +595,8 @@ CHANGED_JOBS = REPOSITORY_ROOT / "infra" / "ci" / "changed_jobs.py"
 # décision 2 — onze, dont le `Makefile` et le verrou Python, déjà là —, une par chemin de `ALL` et
 # le chemin cité ; les autres sont hors entrées. Pour `pipeline` (ADR 0025), un par motif de
 # `PIPELINE` — `.claude/` hors Markdown, `CLAUDE.md`, `CONTRIBUTING.md`, `.github/` hors `ci.yml`,
-# le manifeste racine, le verrou et la version de Python — et par chemin de `ALL`, le chemin cité,
+# la description du schéma d'architecture, le manifeste racine, le verrou et la version de Python —
+# et par chemin de `ALL`, le chemin cité,
 # et le témoin du back, `apps/api/content/models.py`, qui ne la fait pas tourner.
 JOBS_WITNESSES: dict[str, tuple[list[str], bool, bool, bool, bool]] = {
     "delta vide": ([], False, False, False, False),
@@ -610,6 +611,13 @@ JOBS_WITNESSES: dict[str, tuple[list[str], bool, bool, bool, bool]] = {
     "règles de la session": (["CLAUDE.md"], False, False, False, True),
     "guide du contributeur": (["CONTRIBUTING.md"], False, False, False, True),
     "documentation hors Markdown": (["docs/diagramme.svg"], False, False, False, False),
+    "description du schéma d'architecture": (
+        ["docs/schema/architecture.json"],
+        False,
+        False,
+        False,
+        True,
+    ),
     "Dependabot et test mensuel": (
         [".github/dependabot.yml", ".github/workflows/restore.yml"],
         False,

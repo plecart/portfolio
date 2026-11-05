@@ -77,7 +77,8 @@ AVIS = (
     ".github/workflows/avis.yml",
 )
 # Ce que lit la suite de la pipeline, `.claude/tests` (ADR 0025) : la prose, les réglages et les
-# scripts du harnais, et `.github/`, dont elle relit les renvois et les commandes ; puis ce qui la
+# scripts du harnais, `.github/`, dont elle relit les renvois et les commandes, et la description
+# du schéma d'architecture, que le skill `schema-architecture` valide et dessine ; puis ce qui la
 # lance, le manifeste racine — son `pytest` et son `addopts` —, le verrou, et `.python-version`,
 # l'interpréteur que `uv` lui donne (doc uv, « Project structure »). `ALL` et `QUOTED` s'y
 # ajoutent, comme pour `web` et `avis`.
@@ -86,6 +87,7 @@ PIPELINE = (
     "CLAUDE.md",
     "CONTRIBUTING.md",
     ".github/*",
+    "docs/schema/*",
     "pyproject.toml",
     "uv.lock",
     ".python-version",
