@@ -25,8 +25,9 @@ répétée dans un même objet :
 - carte : `id`, chaîne non vide, unique dans la description ; `name`, chaîne non vide ; `icon`,
   icône ; `column`, nombre multiple de 0,5, dans la grille `[0, columns - 1]` et dans le span
   effectif de sa zone ; `secret` (optionnel), chaîne non vide, qui demande un `secretManager` ;
-- lien : `from` et `to`, deux `id` de cartes existantes, différents ; `route` (optionnel), l'une
-  de `ROUTES`.
+- lien : `from` et `to`, deux `id` de cartes existantes, différents — une paire qu'aucun autre lien
+  ne répète, dans le même sens et quelle que soit sa route : `a → b` et `b → a` sont deux liens ;
+  `route` (optionnel), l'une de `ROUTES`.
 
 Une icône est le nom, sans extension, d'un SVG de `icones/simple-icons/` ou de `icones/lucide/`,
 dans le dossier du skill — d'un seul des deux : le rendu n'a jamais à choisir. Les bornes de la
@@ -239,7 +240,7 @@ def valider(description: object, icones: Collection[str]) -> list[Erreur]:
 class Passe:
     """Une lecture de la description : les erreurs relevées, et ce que la suite de la lecture
     doit savoir de ce qui a été lu — la grille, la présence d'un gestionnaire de secrets, les
-    `id` déjà vus."""
+    `id` et les paires de liens déjà vus."""
 
     def __init__(self, icones: Collection[str]) -> None:
         self.icones = icones
@@ -248,6 +249,8 @@ class Passe:
         self.gestionnaire = False
         # Chaque `id` lu, avec le chemin de la carte qui le porte la première.
         self.cartes: dict[str, str] = {}
+        # Chaque paire (`from`, `to`) lue, avec le chemin du lien qui la porte le premier.
+        self.liens: dict[tuple[str | None, str | None], str] = {}
 
     def signaler(self, chemin: str, message: str) -> None:
         """Relève une erreur sans valeur à nommer."""
@@ -434,7 +437,8 @@ class Passe:
         self.refuser(champ(chemin, "column"), motif, colonne)
 
     def lien(self, valeur: object, chemin: str) -> None:
-        """Lit un lien : deux cartes existantes et différentes, une route connue."""
+        """Lit un lien : deux cartes existantes et différentes, une paire (`from`, `to`) qu'aucun
+        lien précédent ne porte, une route connue."""
         lien = self.ouvrir(valeur, chemin, LIEN)
         if lien is None:
             return
@@ -444,6 +448,11 @@ class Passe:
                 self.refuser(champ(chemin, cle), "aucune carte ne porte cet id", identifiant)
         if bouts["from"] in self.cartes and bouts["from"] == bouts["to"]:
             self.refuser(champ(chemin, "to"), "lien d'une carte vers elle-même", bouts["to"])
+        paire = (bouts["from"], bouts["to"])
+        if paire in self.liens:
+            self.refuser(chemin, f"même from et to que {self.liens[paire]}", lien)
+        elif None not in paire:
+            self.liens[paire] = chemin
         self.parmi(lien, chemin, "route", ROUTES, f"l'une des routes {', '.join(ROUTES)}")
 
 
