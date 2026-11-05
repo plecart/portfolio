@@ -26,6 +26,7 @@ LOGOS = [
     {"title": "Hetzner Cloud", "hex": "D50C2D", "slug": "hetzner"},
     {"title": "Nodé.js+", "hex": "5FA04E"},
 ]
+HETZNER, NODE = LOGOS
 # Le `couleurs.json` du dossier témoin, au format du dossier du skill.
 COULEURS_TEMOINS = """{
   "caddy": "#1F88C0",
@@ -74,6 +75,13 @@ def lancer(
     monkeypatch.setattr(icones, "ICONES", dossier_temoin(tmp_path, couleurs))
     monkeypatch.setattr(icones, "urlopen", cdn)
     return icones.main(list(args))
+
+
+def illisibles(fiches: object, champ: str) -> tuple[str, str, Cdn, str]:
+    """Un cas d'`ECHECS` : le logo `hetzner` demandé, les données de l'amont `fiches`, et le
+    motif qui nomme leur champ fautif `champ`."""
+    cdn = Cdn({SVG_LOGO.format("hetzner"): b"<svg/>", DONNEES: json.dumps(fiches).encode()})
+    return "hetzner", "--simple-icons", cdn, f"données illisibles sur {DONNEES} — {champ} :"
 
 
 @pytest.mark.parametrize(("nom", "hexa"), [("hetzner", "#D50C2D"), ("nodedotjsplus", "#5FA04E")])
@@ -147,6 +155,17 @@ ECHECS = {
         Cdn({SVG_LOGO.format("hetzner"): b"<svg/>", DONNEES: b"<!doctype html>"}),
         "illisibles",
     ),
+    # Ce que lit `couleur` — la racine, chaque fiche, son `slug` ou son `title`, le `hex` de la
+    # fiche du logo —, absent ou d'un autre type, le `hex` aussi mal formé. La fiche fautive est
+    # la seconde, après celle de `Nodé.js+` : le motif porte son rang, 1.
+    "donnees-pas-une-liste": illisibles({"icons": LOGOS}, "(racine)"),
+    "fiche-pas-un-objet": illisibles([NODE, "hetzner"], "[1]"),
+    "fiche-sans-slug-ni-title": illisibles([NODE, {"hex": "D50C2D"}], "[1].title"),
+    "slug-d-un-autre-type": illisibles([NODE, {**HETZNER, "slug": 7}], "[1].slug"),
+    "title-d-un-autre-type": illisibles([NODE, {"title": 7, "hex": "D50C2D"}], "[1].title"),
+    "fiche-sans-hex": illisibles([NODE, {"title": "Hetzner", "slug": "hetzner"}], "[1].hex"),
+    "hex-d-un-autre-type": illisibles([NODE, {**HETZNER, "hex": 123456}], "[1].hex"),
+    "hex-qui-n-est-pas-rrggbb": illisibles([NODE, {**HETZNER, "hex": "#D50C2D"}], "[1].hex"),
 }
 
 
