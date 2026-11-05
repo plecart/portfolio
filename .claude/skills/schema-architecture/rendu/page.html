@@ -6,7 +6,8 @@
   Le gabarit du rendu, porté de la version 13 validée le 2026-11-03 : le schéma seul, centré dans
   un carré qui remplit la fenêtre — le côté de l'image est celui de la fenêtre. `scripts/export.py`
   remplace chaque marqueur en majuscules entre `/*` et `*/` par sa ressource en ligne : les
-  polices en `data:`, rough.js, la description et les icônes qu'elle nomme. Aucune requête.
+  polices en `data:`, rough.js, la description, les icônes qu'elle nomme et l'attribut que la
+  page pose une fois rendue. Aucune requête.
 -->
 <style>
 @font-face { font-family: 'Manrope'; font-weight: 200 800; src: url("/*MANROPE*/") format('woff2'); }
@@ -203,6 +204,7 @@ function render() {
   cadre.style.width = W * s + 'px'; cadre.style.height = H * s + 'px';
 }
 
-// Le rendu attend toutes les polices, puis pose le marqueur que l'export attend avant de capturer.
-Promise.all([...document.fonts].map(f => f.load())).then(() => { render(); document.body.dataset.rendu = 'pret'; });
+// Le rendu attend toutes les polices, puis pose sur `<body>` l'attribut que l'export injecte ici et
+// attend avant de capturer.
+Promise.all([...document.fonts].map(f => f.load())).then(() => { render(); document.body.setAttribute(/*PRET*/, ''); });
 </script>

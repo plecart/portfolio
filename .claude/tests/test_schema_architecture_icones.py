@@ -13,7 +13,7 @@ from email.message import Message
 from pathlib import Path
 
 import pytest
-from conftest import load_script, run_in_pipe
+from conftest import REPOSITORY_ROOT, load_script, run_in_pipe
 
 icones = load_script("schema-architecture", "icones")
 
@@ -51,18 +51,27 @@ class Cdn:
         return io.BytesIO(self.contenus[url])
 
 
-def dossier_temoin(tmp_path: Path) -> Path:
-    """Un dossier d'icônes : un logo et sa couleur, une icône neutre."""
+def dossier_temoin(tmp_path: Path, couleurs: bytes | None) -> Path:
+    """Un dossier d'icônes : un logo, une icône neutre, et le fichier des couleurs de contenu
+    `couleurs`, absent sous `None`."""
     for jeu, nom in (("simple-icons", "caddy"), ("lucide", "globe")):
         (tmp_path / jeu).mkdir()
         (tmp_path / jeu / f"{nom}.svg").write_text("<svg/>", encoding="utf-8")
-    (tmp_path / "simple-icons" / "couleurs.json").write_bytes(COULEURS_TEMOINS.encode())
+    if couleurs is not None:
+        (tmp_path / "simple-icons" / "couleurs.json").write_bytes(couleurs)
     return tmp_path
 
 
-def lancer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, cdn: Cdn, *args: str) -> int:
-    """`icones.main(args)` sur le dossier témoin, le réseau remplacé par `cdn`."""
-    monkeypatch.setattr(icones, "ICONES", dossier_temoin(tmp_path))
+def lancer(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    cdn: Cdn,
+    *args: str,
+    couleurs: bytes | None = COULEURS_TEMOINS.encode(),
+) -> int:
+    """`icones.main(args)` sur le dossier témoin, son fichier des couleurs de contenu `couleurs`
+    — celui du logo témoin par défaut —, le réseau remplacé par `cdn`."""
+    monkeypatch.setattr(icones, "ICONES", dossier_temoin(tmp_path, couleurs))
     monkeypatch.setattr(icones, "urlopen", cdn)
     return icones.main(list(args))
 
@@ -132,6 +141,12 @@ ECHECS = {
         "aucun logo",
     ),
     "nom-pris-par-l-autre-jeu": ("globe", "--simple-icons", Cdn({}), "lucide"),
+    "donnees-illisibles": (
+        "hetzner",
+        "--simple-icons",
+        Cdn({SVG_LOGO.format("hetzner"): b"<svg/>", DONNEES: b"<!doctype html>"}),
+        "illisibles",
+    ),
 }
 
 
@@ -160,6 +175,35 @@ def test_un_echec_sort_en_1_avec_son_motif_en_une_ligne_sans_rien_ecrire(
     ]
 
 
+# Le contenu du `couleurs.json` du dossier témoin → ce qui le rend illisible ; `None` : absent.
+COULEURS_ILLISIBLES = {
+    "json-mal-forme": b'{"caddy": "#1F88C0",',
+    "pas-en-utf-8": b'{"caddy": "#1F88C0", "\xe9": "#000000"}',
+    "absent": None,
+}
+
+
+@pytest.mark.parametrize("contenu", COULEURS_ILLISIBLES.values(), ids=COULEURS_ILLISIBLES.keys())
+def test_un_fichier_des_couleurs_illisible_sort_en_2_avant_toute_ecriture(
+    contenu: bytes | None,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Le fichier des couleurs se lit avant que le logo s'écrive : illisible, sortie 2, son motif
+    en une ligne qui le nomme, et aucune des deux écritures — ni le SVG, ni les couleurs."""
+    cdn = Cdn({SVG_LOGO.format("hetzner"): b"<svg/>", DONNEES: json.dumps(LOGOS).encode()})
+
+    rendu = lancer(monkeypatch, tmp_path, cdn, "hetzner", "--simple-icons", couleurs=contenu)
+
+    lignes = capsys.readouterr().err.splitlines()
+    assert (rendu, len(lignes)) == (2, 1)
+    assert "couleurs.json" in lignes[0]
+    couleurs = tmp_path / "simple-icons" / "couleurs.json"
+    assert not (tmp_path / "simple-icons" / "hetzner.svg").exists()
+    assert (couleurs.read_bytes() if couleurs.exists() else None) == contenu
+
+
 def test_un_nom_qui_sortirait_du_dossier_est_refuse(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -168,6 +212,15 @@ def test_un_nom_qui_sortirait_du_dossier_est_refuse(
         lancer(monkeypatch, tmp_path, Cdn({}), "../caddy", "--lucide")
 
     assert sortie.value.code == 2
+
+
+def test_les_couleurs_du_skill_couvrent_exactement_ses_logos() -> None:
+    """Le dossier des logos du skill : une couleur par SVG, aucune de plus — un logo sans couleur
+    se peindrait en noir, une couleur sans logo ne sert à rien."""
+    logos = REPOSITORY_ROOT / ".claude/skills/schema-architecture/icones/simple-icons"
+    couleurs = json.loads((logos / "couleurs.json").read_text(encoding="utf-8"))
+
+    assert sorted(couleurs) == sorted(chemin.stem for chemin in logos.glob("*.svg"))
 
 
 def test_la_cli_ecrit_en_utf_8_dans_un_tube() -> None:

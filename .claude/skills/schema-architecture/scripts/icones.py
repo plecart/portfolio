@@ -10,9 +10,10 @@ Usage :
 `icones/simple-icons/couleurs.json`, clés triées. Rien ne s'écrit avant que tout soit lu.
 
 Sortie : 0 et ce qui a été écrit, ou que l'icône est déjà là ; 1 et son motif en une ligne sur la
-sortie d'erreur — nom inconnu chez l'amont (404), réseau en échec, logo sans couleur dans les
-données, nom déjà pris par l'autre jeu — ; 2 et son motif, appel mal formé ou nom présent dans
-les deux jeux. Python 3.11 ou plus, bibliothèque standard seule.
+sortie d'erreur — nom inconnu chez l'amont (404), réseau en échec, données de l'amont illisibles,
+logo sans couleur dans les données, nom déjà pris par l'autre jeu — ; 2 et son motif, appel mal
+formé, nom présent dans les deux jeux ou fichier des couleurs illisible. Python 3.11 ou plus,
+bibliothèque standard seule.
 """
 
 import argparse
@@ -20,7 +21,7 @@ import json
 import re
 import sys
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import cast
 from urllib.error import HTTPError, URLError
@@ -32,6 +33,7 @@ from description import (
     LOGOS,
     Abandon,
     icones_disponibles,
+    lire_couleurs,
     sorties_en_utf_8,
 )
 
@@ -100,20 +102,21 @@ def couleur(nom: str) -> str | None:
     return None
 
 
-def ajouter_couleur(dossier: Path, nom: str, valeur: str) -> None:
-    """Ajoute `nom` et sa couleur `valeur` au fichier des couleurs de `dossier`, clés triées."""
-    chemin = dossier / COULEURS_DES_LOGOS
-    couleurs = cast(dict[str, str], json.loads(chemin.read_text(encoding="utf-8")))
-    couleurs[nom] = valeur
+def ecrire_couleurs(dossier: Path, couleurs: Mapping[str, str]) -> None:
+    """Écrit `couleurs` dans le fichier des couleurs du jeu de logos `dossier`, clés triées."""
     texte = json.dumps(couleurs, ensure_ascii=False, indent=2, sort_keys=True)
-    chemin.write_text(f"{texte}\n", encoding="utf-8", newline="")
+    (dossier / COULEURS_DES_LOGOS).write_text(f"{texte}\n", encoding="utf-8", newline="")
 
 
 def ajouter(nom: str, jeu: str) -> tuple[int, str]:
-    """Copie l'icône `nom` du jeu `jeu` dans le dossier d'icônes du skill.
+    """Copie l'icône `nom` du jeu `jeu` dans le dossier d'icônes du skill : tout se lit — le
+    dossier, le fichier des couleurs pour un logo, l'amont —, puis tout s'écrit.
 
     Returns:
         Le code de sortie et ce qu'il faut en dire, en une ligne.
+
+    Raises:
+        Abandon: un nom est présent dans les deux jeux, ou le fichier des couleurs est illisible.
     """
     presente = icones_disponibles(ICONES).get(nom)
     if presente is not None:
@@ -121,6 +124,7 @@ def ajouter(nom: str, jeu: str) -> tuple[int, str]:
             return 0, f"{nom} : déjà présente, {presente}"
         return 1, f"{nom} : nom déjà pris par le jeu {presente.parent.name}"
     logo = jeu == LOGOS
+    couleurs = lire_couleurs(ICONES) if logo else {}
     try:
         svg = tirer(SOURCES[jeu].format(nom))
         teinte = couleur(nom) if logo else None
@@ -128,13 +132,15 @@ def ajouter(nom: str, jeu: str) -> tuple[int, str]:
         return 1, f"{nom} : HTTP {erreur.code} sur {erreur.url}"
     except URLError as erreur:
         return 1, f"{nom} : réseau en échec — {erreur.reason}"
+    except ValueError as erreur:
+        return 1, f"{nom} : données illisibles sur {DONNEES} — {erreur}"
     if logo and teinte is None:
         return 1, f"{nom} : aucun logo de ce slug dans {DONNEES}"
     dossier = ICONES / jeu
     (dossier / f"{nom}.svg").write_bytes(svg)
     if teinte is None:
         return 0, f"{nom} : écrite dans {dossier}"
-    ajouter_couleur(dossier, nom, teinte)
+    ecrire_couleurs(dossier, {**couleurs, nom: teinte})
     return 0, f"{nom} : écrite dans {dossier}, couleur {teinte}"
 
 
