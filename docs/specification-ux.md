@@ -92,7 +92,7 @@ _Document normatif de rang 2 (`.claude/pipeline.config.md`, « Sources de vérit
 
 ### 1.15 États
 
-- **Chargement** : des cadres de polaroid vides, dans la gamme du fond, à la place des cartes — un double et deux simples, la table à trois cartes retenue ; remplacés par les cartes avec l'animation d'apparition.
+- **Chargement** : des cadres de polaroid vides, dans la gamme du fond, à la place des cartes — autant que de projets publiés, nombre tenu à la main (§5.1) ; remplacés par les cartes avec l'animation d'apparition.
 - **Erreur** (API injoignable) : un texte centré, « Les projets ne se chargent pas. », suivi d'un lien « Réessayer » qui relance le chargement ; aucun polaroid.
 - **Vide** (aucun projet publié) : rien — entête et liens seuls, table vide, aucun message.
 - **Adresse inconnue** (`/projets/<slug>` sans projet, ADR 0009) : le serveur redirige vers l'accueil ; aucune page 404.
@@ -335,7 +335,7 @@ Mouvement réduit : §6.3.
 
 ### 5.1 Chargement
 
-Trois cadres vides à la place des cartes, dans la disposition de la table à trois cartes avec vitrine (§5.5) : un cadre double aux dimensions de la carte vitrine et deux simples (§4.1), `aria-hidden` et inertes (aucune réaction au survol, au focus ni au clic), sans post-it ni ruban ; papier, zone image `--line`, une barre `--line` de 40 % × 10 px (rayon 999 px) dans la bande ; pulsation de 1,8 s (opacité jusqu'à 55 %, `--ease-in-out`, infinie). À l'arrivée des données, les cartes les remplacent avec leur animation d'entrée ; sans projet vitrine, le cadre double laisse place à deux cartes simples.
+Autant de cadres vides que de projets publiés, à la place des cartes et dans la disposition de la table qu'ils annoncent (§5.5) : un cadre seul prend la taille et la piste de la carte seule, centré ; à partir de deux, un cadre double aux dimensions de la carte vitrine puis des simples (§4.1). Le nombre est tenu à la main dans le front et sa mise à jour est facultative : un écart ne casse rien, la table prend sa forme à l'arrivée des cartes. Les cadres sont `aria-hidden` et inertes (aucune réaction au survol, au focus ni au clic), sans post-it ni ruban ; papier, zone image `--line`, une barre `--line` de 40 % × 10 px (rayon 999 px) dans la bande ; pulsation de 1,8 s (opacité jusqu'à 55 %, `--ease-in-out`, infinie). À l'arrivée des données, les cartes les remplacent avec leur animation d'entrée ; sans projet vitrine, le cadre double laisse place à deux cartes simples.
 
 ### 5.2 Erreur
 
