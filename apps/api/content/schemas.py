@@ -30,6 +30,7 @@ from content.models import (
     Section,
     Technology,
     TechnologyKind,
+    Variant,
 )
 
 
@@ -50,6 +51,18 @@ def absolute_url(context: dict[str, Any], url: str) -> str:
     """
     request: HttpRequest = context["request"]
     return request.build_absolute_uri(url)
+
+
+def variant_url(context: dict[str, Any], image: GalleryImage, variant: Variant) -> str:
+    """L'adresse absolue de la variante `variant` de `image`, sur le stockage de son original :
+    celle que sert l'API publique, et que reprend l'aperçu de lien (`content/link_preview.py`).
+
+    Args:
+        context: le contexte de validation, qui porte la requête en cours sous `request`.
+        image: l'image de la galerie.
+        variant: une variante de `image`.
+    """
+    return absolute_url(context, image.original.storage.url(variant["name"]))
 
 
 class TechnologyOut(Schema):
@@ -85,10 +98,9 @@ class GalleryImageOut(Schema):
 
     @staticmethod
     def resolve_variants(image: GalleryImage, context: dict[str, Any]) -> list[VariantOut]:
-        storage = image.original.storage
         return [
             VariantOut(
-                url=absolute_url(context, storage.url(variant["name"])),
+                url=variant_url(context, image, variant),
                 width=variant["width"],
                 height=variant["height"],
             )
