@@ -66,7 +66,7 @@ class Technology(StoredFiles):
     # Le fichier seul : toutes les icônes partagent le dossier `technologies/`.
     removals: ClassVar[Mapping[str, Removal]] = {"icon": delete_file_after_commit}
 
-    class Meta:
+    class Meta(StoredFiles.Meta):
         verbose_name = strings.TECHNOLOGY
         verbose_name_plural = strings.TECHNOLOGIES
         ordering = ("name",)
@@ -519,7 +519,7 @@ class GalleryImage(StoredFiles):
     # (`delete_folder_after_commit`).
     removals: ClassVar[Mapping[str, Removal]] = {"original": delete_folder_after_commit}
 
-    class Meta:
+    class Meta(StoredFiles.Meta):
         verbose_name = strings.GALLERY_IMAGE
         verbose_name_plural = strings.GALLERY_IMAGES
         # L'ordre de l'admin est l'ordre stocké ; à position égale, l'ordre de saisie.
