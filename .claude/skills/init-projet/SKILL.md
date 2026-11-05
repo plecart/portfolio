@@ -382,7 +382,8 @@ teste.
 **`.claude/skills/`** du projet :
 
 `init-projet`, `vers-prd`, `vers-issues`, `triage`, `interroge-moi`, `cycle-pr`, `contradiction`,
-`repercussions`, `pr-paralleles`, `plan-qa`, `execution-qa`, `bug-vers-issue`, `audit-spec-ui`.
+`repercussions`, `pr-paralleles`, `plan-qa`, `execution-qa`, `bug-vers-issue`, `audit-spec-ui`,
+`schema-architecture`.
 
 Chaque skill s'invoque par `/<nom>` (`/triage`, `/cycle-pr`, `/plan-qa`…) : c'est le skill
 lui-même qui crée la commande, et son `argument-hint` vit dans le frontmatter du `SKILL.md`.
