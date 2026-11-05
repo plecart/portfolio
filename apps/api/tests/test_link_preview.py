@@ -8,7 +8,9 @@ Le gabarit est un fichier de fixture de test, que désigne l'environnement de te
 """
 
 import logging
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from content.api import api
@@ -17,10 +19,15 @@ from content.models import ProcessingState, Project
 from django.test import Client, override_settings
 from factories import gallery_image, project, saved
 from pytest_django import DjangoAssertNumQueries, DjangoCaptureOnCommitCallbacks
+from test_cache import OTHER_ORIGINS
 from test_markdown_preview import tags
 
 # Le gabarit de fixture de test : la forme de l'`index.html` compilé du front.
 TEMPLATE = Path(__file__).with_name("gabarit-apercu.html").read_bytes()
+
+# Les deux fins de ligne qu'un gabarit peut porter : LF, celle du dépôt, et CRLF, celle d'une copie
+# de travail Windows sous `core.autocrlf` (`.gitattributes`).
+LINE_ENDINGS = {"LF": b"\n", "CRLF": b"\r\n"}
 
 # Le gabarit d'une autre compilation : d'autres octets hors du bloc marqué.
 DEPLOYED = TEMPLATE + b"<!-- La compilation suivante. -->"
@@ -46,12 +53,13 @@ INJECTED: dict[str, tuple[dict[str, str], str | None]] = {
 }
 
 # La couverture prête : ses variantes telles que le worker les écrit, par largeur croissante, puis
-# l'adresse absolue de celle de 1200 px sous le client de test.
+# le chemin de celle de 1200 px, et son adresse absolue sous le client de test.
 COVER_VARIANTS = [
     {"name": "images/couverture/960.webp", "width": 960, "height": 960},
     {"name": "images/couverture/1200.webp", "width": 1200, "height": 1200},
 ]
-COVER_URL = "http://testserver/media/images/couverture/1200.webp"
+COVER_PATH = "/media/images/couverture/1200.webp"
+COVER_URL = f"http://testserver{COVER_PATH}"
 
 # Les quatre balises de tout aperçu, puis l'`og:image` d'une couverture prête, telles que les lit
 # l'analyseur HTML : valeurs déséchappées.
@@ -117,6 +125,15 @@ def served(client: Client) -> tuple[object, ...]:
 
 
 @pytest.fixture
+def template(tmp_path: Path) -> Iterator[Path]:
+    """Le gabarit que la vue lit le temps du test, à la place de la fixture de test : absent tant
+    que le test ne l'écrit pas."""
+    path = tmp_path / "index.html"
+    with override_settings(LINK_PREVIEW_TEMPLATE=path):
+        yield path
+
+
+@pytest.fixture
 def published() -> Project:
     """Le projet publié du brief, sans image."""
     return saved(project(slug=SLUG, title=TITLE, summary=SUMMARY, published=True))
@@ -158,10 +175,16 @@ def test_chaque_valeur_injectee_est_echappee(fields: dict[str, str], image: str 
 
 @pytest.mark.django_db
 @pytest.mark.usefixtures("covered")
-def test_hors_du_bloc_marque_la_page_est_le_gabarit_octet_pour_octet(client: Client) -> None:
+@pytest.mark.parametrize("newline", LINE_ENDINGS.values(), ids=LINE_ENDINGS.keys())
+def test_hors_du_bloc_marque_la_page_est_le_gabarit_octet_pour_octet(
+    client: Client, template: Path, newline: bytes
+) -> None:
     """Les fichiers hachés de la compilation, le reste du `<head>` et le `<body>` sont ceux du
-    gabarit, marqueurs compris : seul le bloc change."""
-    assert outside(client.get(PAGE).content) == outside(TEMPLATE)
+    gabarit, marqueurs et fins de ligne compris : seul le bloc change."""
+    content = TEMPLATE.replace(b"\r\n", b"\n").replace(b"\n", newline)
+    template.write_bytes(content)
+
+    assert outside(client.get(PAGE).content) == outside(content)
 
 
 @pytest.mark.django_db
@@ -214,15 +237,13 @@ def test_une_adresse_sans_projet_publie_redirige_vers_l_accueil(
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("template")
 def test_une_adresse_hors_du_motif_redirige_sans_lire_ni_le_gabarit_ni_la_base(
-    client: Client, tmp_path: Path, django_assert_num_queries: DjangoAssertNumQueries
+    client: Client, django_assert_num_queries: DjangoAssertNumQueries
 ) -> None:
     """Ce qui n'a pas la forme d'un slug ne peut nommer aucun projet (`validate_slug`) : la
     redirection précède toute lecture — un gabarit introuvable n'y change rien."""
-    with (
-        override_settings(LINK_PREVIEW_TEMPLATE=tmp_path / "absent.html"),
-        django_assert_num_queries(0),
-    ):
+    with django_assert_num_queries(0):
         response = client.get(REDIRECTED["slug hors du motif"])
 
     assert (response.status_code, response["Location"]) == (302, "/")
@@ -264,6 +285,26 @@ def test_la_page_gardee_d_un_projet_n_est_jamais_servie_pour_un_autre(client: Cl
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("covered")
+@pytest.mark.parametrize(
+    ("request_options", "origin"), OTHER_ORIGINS.values(), ids=OTHER_ORIGINS.keys()
+)
+def test_chaque_origine_recoit_la_page_a_sa_propre_og_image(
+    client: Client, request_options: dict[str, Any], origin: str
+) -> None:
+    """L'`og:image` est une adresse absolue construite sur l'origine de la requête : la page gardée
+    pour une origine n'est jamais servie à une autre (décision 4)."""
+    client.get(PAGE)
+
+    response = client.get(PAGE, **request_options)
+
+    assert tags(marked_block(response.content))[-1] == (
+        "meta",
+        {"property": "og:image", "content": f"{origin}{COVER_PATH}"},
+    )
+
+
+@pytest.mark.django_db
 def test_une_redirection_n_est_jamais_gardee(client: Client) -> None:
     """Un brouillon publié sans qu'aucun signal parte (`QuerySet.update`), donc sans purge : sa
     page suit aussitôt, faute d'une redirection gardée qui la masquerait (décision 4) — le cache,
@@ -298,18 +339,16 @@ def test_apres_sauvegarde_du_projet_l_apercu_rend_le_nouveau_titre(
 @pytest.mark.django_db
 @pytest.mark.usefixtures("published")
 def test_un_gabarit_change_n_est_jamais_servi_depuis_l_entree_de_l_ancien(
-    client: Client, tmp_path: Path
+    client: Client, template: Path
 ) -> None:
     """Même slug, même génération, un autre gabarit — un déploiement : la clé porte l'empreinte du
     gabarit, et la page gardée avant ne cite jamais des fichiers que Caddy ne sert plus
     (décision 4)."""
-    template = tmp_path / "index.html"
     template.write_bytes(TEMPLATE)
+    before = client.get(PAGE).content
 
-    with override_settings(LINK_PREVIEW_TEMPLATE=template):
-        before = client.get(PAGE).content
-        template.write_bytes(DEPLOYED)
-        after = client.get(PAGE).content
+    template.write_bytes(DEPLOYED)
+    after = client.get(PAGE).content
 
     assert (outside(before), outside(after)) == (outside(TEMPLATE), outside(DEPLOYED))
 
@@ -318,16 +357,14 @@ def test_un_gabarit_change_n_est_jamais_servi_depuis_l_entree_de_l_ancien(
 @pytest.mark.usefixtures("published")
 @pytest.mark.parametrize("content", BROKEN_TEMPLATES.values(), ids=BROKEN_TEMPLATES.keys())
 def test_un_gabarit_defectueux_est_une_erreur_journalisee_jamais_une_page(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture, content: bytes | None
+    template: Path, caplog: pytest.LogCaptureFixture, content: bytes | None
 ) -> None:
     """Introuvable, ou sans ses deux marqueurs uniques dans l'ordre : `500`, et l'erreur, qui nomme
     le gabarit, est journalisée par Django avec sa trace (décision 8)."""
-    template = tmp_path / "index.html"
     if content is not None:
         template.write_bytes(content)
 
-    with override_settings(LINK_PREVIEW_TEMPLATE=template):
-        response = Client(raise_request_exception=False).get(PAGE)
+    response = Client(raise_request_exception=False).get(PAGE)
 
     logged = [
         (record.name, record.levelno, record.exc_info[1])
