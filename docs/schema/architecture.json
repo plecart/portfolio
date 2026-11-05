@@ -1,0 +1,146 @@
+{
+  "intro": "Le chemin d’une visite, de haut en bas : Internet, Cloudflare, puis le serveur. Le logo KeePassXC marque ce qui détient un jeton ou une clé dont KeePassXC garde la copie.",
+  "columns": 4,
+  "secretManager": {"name": "KeePassXC", "icon": "keepassxc"},
+  "zones": [
+    [
+      {
+        "label": "Sécurité",
+        "icon": "lock-keyhole",
+        "color": "gold",
+        "span": [0, 1],
+        "rows": [
+          [
+            {"id": "keepass", "name": "KeePassXC", "icon": "keepassxc", "column": 0},
+            {"id": "safe", "name": "Coffre-fort", "icon": "vault", "column": 1}
+          ]
+        ]
+      },
+      {
+        "label": "Internet",
+        "icon": "globe",
+        "color": "blue",
+        "span": [2, 2],
+        "rows": [[{"id": "visiteur", "name": "Visiteur", "icon": "globe", "column": 2}]]
+      },
+      {
+        "label": "healthchecks.io",
+        "icon": "heart-pulse",
+        "color": "green",
+        "span": [3, 3],
+        "rows": [
+          [{"id": "hc", "name": "Contrôle de sauvegarde", "icon": "heart-pulse", "column": 3}]
+        ]
+      }
+    ],
+    {
+      "label": "Cloudflare",
+      "icon": "cloudflare",
+      "color": "orange",
+      "rows": [
+        [
+          {"id": "r2m", "name": "R2 images", "icon": "archive", "column": 0},
+          {"id": "porte", "name": "DNS et pare-feu", "icon": "shield", "column": 1},
+          {"id": "tunnel", "name": "Tunnel", "icon": "cable", "column": 2},
+          {
+            "id": "r2b",
+            "name": "R2 sauvegardes",
+            "icon": "file-lock",
+            "column": 3,
+            "secret": "la clé qui déchiffre les sauvegardes"
+          }
+        ]
+      ]
+    },
+    {
+      "label": "Hetzner",
+      "icon": "hetzner",
+      "color": "red",
+      "zones": [
+        {
+          "label": "Docker",
+          "icon": "docker",
+          "color": "grey",
+          "zones": [
+            {
+              "label": "Répondre aux visites",
+              "color": "lane",
+              "rows": [
+                [
+                  {
+                    "id": "cfd",
+                    "name": "Connecteur Cloudflare",
+                    "icon": "cloudflare",
+                    "column": 0.5,
+                    "secret": "le jeton du Tunnel"
+                  },
+                  {"id": "caddy", "name": "Caddy", "icon": "caddy", "column": 1.5},
+                  {
+                    "id": "api",
+                    "name": "Django",
+                    "icon": "django",
+                    "column": 2.5,
+                    "secret": "le jeton R2 des images"
+                  }
+                ]
+              ]
+            },
+            [
+              {
+                "label": "Préparer les images",
+                "color": "lane",
+                "span": [0, 1],
+                "rows": [
+                  [
+                    {
+                      "id": "worker",
+                      "name": "Celery",
+                      "icon": "celery",
+                      "column": 0,
+                      "secret": "le jeton R2 des images"
+                    },
+                    {"id": "redis", "name": "Redis", "icon": "redis", "column": 1}
+                  ]
+                ]
+              },
+              {
+                "label": "Garder les données",
+                "color": "lane",
+                "span": [2, 3],
+                "rows": [
+                  [
+                    {"id": "pg", "name": "PostgreSQL", "icon": "postgresql", "column": 2},
+                    {
+                      "id": "backup",
+                      "name": "Sauvegarde chiffrée",
+                      "icon": "square-terminal",
+                      "column": 3,
+                      "secret": "le jeton R2 des sauvegardes et l’adresse de ping"
+                    }
+                  ]
+                ]
+              }
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "links": [
+    {"from": "keepass", "to": "safe"},
+    {"from": "visiteur", "to": "porte"},
+    {"from": "porte", "to": "r2m"},
+    {"from": "porte", "to": "tunnel"},
+    {"from": "tunnel", "to": "cfd"},
+    {"from": "cfd", "to": "caddy"},
+    {"from": "caddy", "to": "api"},
+    {"from": "api", "to": "redis"},
+    {"from": "redis", "to": "worker"},
+    {"from": "worker", "to": "r2m", "route": "left"},
+    {"from": "worker", "to": "pg", "route": "under"},
+    {"from": "api", "to": "pg"},
+    {"from": "backup", "to": "pg"},
+    {"from": "backup", "to": "r2b"},
+    {"from": "backup", "to": "hc", "route": "right"}
+  ]
+}
