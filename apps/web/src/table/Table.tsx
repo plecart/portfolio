@@ -150,10 +150,7 @@ export function Table({
       {status === 'error' ? (
         <LoadError onRetry={onRetry} focusRetry={retried} />
       ) : (
-        <div
-          ref={grid}
-          className={`${GRID_CLASSES} ${tracks}`}
-        >
+        <div ref={grid} className={`${GRID_CLASSES} ${tracks}`}>
           {frames.map((size, index) => <LoadingFrame key={index} size={size} />)}
           {ordered.map((project, index) => (
             <Card
