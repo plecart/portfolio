@@ -8,9 +8,9 @@ class AdminConfig(DjangoAdminConfig):
     """`django.contrib.admin`, dont le site par défaut exige un second facteur (#6).
 
     `access.site.SecondFactorAdminSite` : l'`OTPAdminSite` de `django-otp`, sans le bouton de défi
-    de sa page de connexion (#215). Son formulaire demande, après le mot de passe, l'appareil et son
-    jeton, et son `has_permission` exige `is_verified()` — sans second facteur, seule la page de
-    connexion est servie. `default_site` est la voie que la doc de Django donne (« Overriding the
+    de sa page de connexion, et dont le formulaire vérifie le jeton contre l'application TOTP du
+    compte quand aucun appareil n'est choisi (#215). Son `has_permission` exige `is_verified()` —
+    sans second facteur, seule la page de connexion est servie. `default_site` est la voie que la doc de Django donne (« Overriding the
     default admin site ») : un chemin pointé, résolu au premier accès à `admin.site` ;
     `admin.site`, les enregistrements et `config/urls.py` restent tels quels.
 

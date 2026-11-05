@@ -303,8 +303,10 @@ docker compose exec api python manage.py enroll_second_factor
 Elle imprime une seule fois l'URI `otpauth://` et les dix codes : range-les aussitôt dans le
 gestionnaire de mots de passe, et ouvre ou colle l'URI dans l'application TOTP ; rien ne les
 réaffiche. Sans second facteur, l'admin ne sert que sa page de connexion. La connexion se fait en
-deux envois : nom, mot de passe et jeton, puis l'appareil — l'application ou un code de secours —
-et son jeton.
+un envoi : nom, mot de passe et jeton de l'application. Un code de secours en demande deux : nom et
+mot de passe, jeton vide — la page revient avec le sélecteur « Appareil OTP », présélectionné sur
+l'application —, puis « Code de secours » choisi et le code. Envoyé sans ce choix, un code de
+secours est refusé comme un jeton faux de l'application, et reste valable.
 
 **Application perdue** : un code de secours ouvre l'admin, une seule fois. Relance ensuite la
 commande, qui ré-enrôle : l'ancienne application et les anciens codes ne valent plus. Elle ne

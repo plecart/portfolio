@@ -153,9 +153,10 @@ docker compose --env-file infra/dev.env -f infra/compose.dev.yml exec api python
 ```
 
 La commande imprime une seule fois l'URI `otpauth://`, à ouvrir ou coller dans une application
-TOTP, puis les dix codes. La connexion se fait en deux envois : nom, mot de passe et jeton, puis
-l'appareil — l'application ou un code de secours — et son jeton. Relancée, la commande ré-enrôle :
-l'ancienne application et les anciens codes ne valent plus.
+TOTP, puis les dix codes. La connexion se fait en un envoi : nom, mot de passe et jeton de
+l'application ; un code de secours se donne après avoir choisi « Code de secours » dans le
+sélecteur « Appareil OTP », que la page porte une fois le mot de passe accepté. Relancée, la
+commande ré-enrôle : l'ancienne application et les anciens codes ne valent plus.
 
 La pile démarrée, ouvrir `http://127.0.0.1:8000/admin/`.
 
