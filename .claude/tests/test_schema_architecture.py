@@ -119,6 +119,15 @@ class Cas(NamedTuple):
 # La carte `d` de `BASE` — dans une section imbriquée sans span, à secret, visée par aucun lien —,
 # où un champ fautif ne fait naître aucune autre erreur.
 CARTE_D = "zones[1].zones[0].rows[0][0]"
+
+
+def imbriquee(span: list[int], colonne: float) -> list[dict[str, Any]]:
+    """Une liste d'une zone imbriquée de span `span`, d'une carte en `colonne` — à poser sous une
+    zone de `BASE` qui a un span."""
+    carte = {"id": "e", "name": "E", "icon": "globe", "column": colonne}
+    return [{"label": "Dedans", "color": "lane", "span": span, "rows": [[carte]]}]
+
+
 FORMES: dict[str, dict[str, Cas]] = {
     "champ requis manquant": {
         "intro-manquant": Cas("intro", RETIREE, None),
@@ -217,6 +226,8 @@ FORMES: dict[str, dict[str, Cas]] = {
         "colonne-apres-la-grille": Cas(f"{CARTE_D}.column", 4, "4"),
         "colonne-avant-la-grille": Cas(f"{CARTE_D}.column", -0.5, "-0.5"),
         "colonne-hors-du-span": Cas("zones[0][0].rows[0][1].column", 2, "2"),
+        # La zone de `d`, sans span, prend celui que reçoit sa parente.
+        "colonne-hors-du-span-herite": Cas("zones[1].span", [2, 3], "1.5", f"{CARTE_D}.column"),
         "colonne-quart": Cas(f"{CARTE_D}.column", 0.25, "0.25"),
         "colonne-nan": Cas(f"{CARTE_D}.column", float("nan"), "NaN"),
     },
@@ -224,6 +235,12 @@ FORMES: dict[str, dict[str, Cas]] = {
         "span-apres-la-grille": Cas("zones[0][1].span", [2, 4], "[2, 4]"),
         "span-avant-la-grille": Cas("zones[0][0].span", [-1, 1], "[-1, 1]"),
         "span-inverse": Cas("zones[0][1].span", [3, 2], "[3, 2]"),
+        "span-apres-le-span-parent": Cas(
+            "zones[0][0].zones", imbriquee([1, 2], 1), "[1, 2]", "zones[0][0].zones[0].span"
+        ),
+        "span-avant-le-span-parent": Cas(
+            "zones[0][1].zones", imbriquee([1, 2], 2), "[1, 2]", "zones[0][1].zones[0].span"
+        ),
     },
     "zones côte à côte": {
         "cote-a-cote-chevauchement": Cas("zones[0][1].span", [1, 3], "zones[0][0]"),
@@ -257,7 +274,7 @@ def test_une_forme_d_erreur_rend_une_erreur_au_chemin_du_champ_fautif(cas: Cas) 
 
     Population : la forme verrouillée de la description — 5 objets (racine, `secretManager`,
     zone, carte, lien), 21 champs dont 13 requis, 2 contenants positionnels (entrée, rangée) —
-    et les contraintes qui lient ses champs. **85 formes**, une par cas de `FORMES` :
+    et les contraintes qui lient ses champs. **88 formes**, une par cas de `FORMES` :
 
     - champ requis manquant : 13, un par champ requis ;
     - champ d'un autre type : 31 — un par champ (21), le booléen là où un entier est attendu
@@ -269,9 +286,11 @@ def test_une_forme_d_erreur_rend_une_erreur_au_chemin_du_champ_fautif(cas: Cas) 
     - clé en double dans un objet : 1, la même lecture pour les 5 objets ;
     - icône absente du dossier : 3 (carte, zone, `secretManager`) ;
     - valeur hors de son ensemble : 2 (`color`, `route`) ;
-    - colonne hors de la grille (2, une par bord), hors du span de sa zone (1), pas un multiple
-      de 0,5 (2, dont NaN, que `json.loads` accepte) : 5 ;
-    - span hors de la grille (2, une par bord) ou inversé (1) : 3 ;
+    - colonne hors de la grille (2, une par bord), hors du span de sa zone (1), hors du span
+      qu'une zone sans span prend de sa parente (1), pas un multiple de 0,5 (2, dont NaN, que
+      `json.loads` accepte) : 6 ;
+    - span hors de la grille (2, une par bord), hors du span de sa zone parente (2, une par
+      bord) ou inversé (1) : 5 ;
     - zones côte à côte qui se chevauchent, ou sans span : 2 ;
     - zone sans `rows` ni `zones` non vides : 3 ;
     - `id` en double, lien vers ou depuis une carte inconnue, lien d'une carte vers elle-même : 4 ;
@@ -297,14 +316,14 @@ def test_les_cas_d_erreur_comptent_les_formes_de_leur_docstring() -> None:
         "clé en double": 1,
         "icône absente du dossier": 3,
         "valeur hors de son ensemble": 2,
-        "colonne": 5,
-        "span": 3,
+        "colonne": 6,
+        "span": 5,
         "zones côte à côte": 2,
         "zone sans contenu": 3,
         "références": 4,
         "secret sans gestionnaire": 1,
     }
-    assert len(CAS) == 85
+    assert len(CAS) == 88
 
 
 def test_les_tables_de_la_forme_comptent_les_champs_de_la_docstring() -> None:
@@ -398,6 +417,34 @@ VALIDES: dict[str, dict[str, Any]] = {
             ]
         ],
         "links": [{"from": "g", "to": "d", "route": "under"}],
+    },
+    # Sous un span : une zone sans span prend celui de sa parente, une autre a le sien, dedans.
+    "sections-imbriquees-sous-un-span": {
+        "intro": "Des sections dans des sections côte à côte.",
+        "columns": 4,
+        "zones": [
+            [
+                {
+                    "label": "Gauche",
+                    "color": "gold",
+                    "span": [0, 1],
+                    "zones": [{"label": "Dedans", "color": "lane", "rows": [[carte("g", 0.5)]]}],
+                },
+                {
+                    "label": "Droite",
+                    "color": "blue",
+                    "span": [2, 3],
+                    "zones": [
+                        {
+                            "label": "Dedans",
+                            "color": "lane",
+                            "span": [3, 3],
+                            "rows": [[carte("d", 3)]],
+                        }
+                    ],
+                },
+            ]
+        ],
     },
 }
 

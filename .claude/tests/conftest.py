@@ -66,7 +66,9 @@ def script_path(skill: str, name: str) -> Path:
 
 
 def load_script(skill: str, name: str) -> ModuleType:
-    """Importe `.claude/skills/<skill>/scripts/<name>.py` sous son nom de fichier.
+    """Importe `.claude/skills/<skill>/scripts/<name>.py` sous son nom de fichier, comme Python
+    le lance : son dossier en tête de `sys.path` le temps de l'exécuter, pour qu'il importe ses
+    voisins.
 
     Args:
         skill: le dossier du skill, par exemple `cycle-pr`.
@@ -83,7 +85,11 @@ def load_script(skill: str, name: str) -> ModuleType:
     spec = importlib.util.spec_from_file_location(name, path)
     assert spec and spec.loader, f"{path} n'est pas chargeable comme module"
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    sys.path.insert(0, str(path.parent))
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.remove(str(path.parent))
     return module
 
 

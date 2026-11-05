@@ -17,12 +17,14 @@ répétée dans un même objet :
 - entrée : une zone, ou une liste non vide de zones posées côte à côte ;
 - zone : `label`, chaîne non vide ; `color`, l'une de `COULEURS` ; `icon` (optionnel), icône ;
   `span` (optionnel, requis pour une zone côte à côte), `[premier, dernier]`, deux entiers,
-  `0 ≤ premier ≤ dernier ≤ columns - 1` — les spans de zones côte à côte ne se chevauchent
-  pas ; `rows` (optionnel), liste de rangées, chacune une liste non vide de cartes ; `zones`
-  (optionnel), liste d'entrées ; `rows` ou `zones` non vide, l'un au moins ;
+  `0 ≤ premier ≤ dernier ≤ columns - 1`, dans le span effectif de sa zone parente — les spans
+  de zones côte à côte ne se chevauchent pas ; sans `span`, une zone prend le span effectif de
+  sa parente, la grille au premier niveau ; `rows` (optionnel), liste de rangées, chacune une
+  liste non vide de cartes ; `zones` (optionnel), liste d'entrées ; `rows` ou `zones` non vide,
+  l'un au moins ;
 - carte : `id`, chaîne non vide, unique dans la description ; `name`, chaîne non vide ; `icon`,
-  icône ; `column`, nombre multiple de 0,5, dans la grille `[0, columns - 1]` et dans le span de
-  sa zone ; `secret` (optionnel), chaîne non vide, qui demande un `secretManager` ;
+  icône ; `column`, nombre multiple de 0,5, dans la grille `[0, columns - 1]` et dans le span
+  effectif de sa zone ; `secret` (optionnel), chaîne non vide, qui demande un `secretManager` ;
 - lien : `from` et `to`, deux `id` de cartes existantes, différents ; `route` (optionnel), l'une
   de `ROUTES`.
 
@@ -51,7 +53,11 @@ from pathlib import Path
 from typing import Generic, TypeGuard, TypeVar
 
 ICONES = Path(__file__).resolve().parent.parent / "icones"
-JEUX_D_ICONES = ("simple-icons", "lucide")
+# Le jeu des logos, chacun peint à la couleur que porte le fichier `COULEURS_DES_LOGOS` de son
+# dossier ; puis celui des icônes neutres.
+LOGOS = "simple-icons"
+JEUX_D_ICONES = (LOGOS, "lucide")
+COULEURS_DES_LOGOS = "couleurs.json"
 COULEURS = ("gold", "blue", "orange", "red", "green", "grey", "lane")
 ROUTES = ("left", "right", "under")
 # Les clés de chaque objet de la description, chacune requise ou non.
@@ -163,6 +169,11 @@ def champ(chemin: str, cle: str) -> str:
 def dans(valeur: float, bornes: Bornes) -> bool:
     """`valeur` est-elle dans `bornes`, bornes comprises ?"""
     return bornes[0] <= valeur <= bornes[1]
+
+
+def inclus(span: Bornes, bornes: Bornes) -> bool:
+    """Le span `span`, non inversé, est-il dans `bornes`, bornes comprises ?"""
+    return bornes[0] <= span[0] and span[1] <= bornes[1]
 
 
 def icones_disponibles(dossier: Path = ICONES) -> dict[str, Path]:
@@ -295,26 +306,28 @@ class Passe:
             if gestionnaire is not None:
                 self.lire(gestionnaire, "secretManager", "name", TEXTE)
                 self.icone(gestionnaire, "secretManager")
-        self.entrees(self.lire(racine, "", "zones", LISTE_NON_VIDE) or [], "zones")
+        zones = self.lire(racine, "", "zones", LISTE_NON_VIDE) or []
+        self.entrees(zones, "zones", self.grille)
         for i, lien in enumerate(self.lire(racine, "", "links", LISTE) or []):
             self.lien(lien, f"links[{i}]")
 
-    def entrees(self, entrees: Iterable[object], chemin: str) -> None:
+    def entrees(self, entrees: Iterable[object], chemin: str, parente: Bornes | None) -> None:
         """Lit chaque entrée de la liste au chemin `chemin` : une zone, ou des zones côte à
-        côte."""
+        côte, sous une parente de span effectif `parente` — la grille au premier niveau, `None`
+        s'il est invalide."""
         for i, entree in enumerate(entrees):
             if est_liste(entree):
-                self.cote_a_cote(entree, f"{chemin}[{i}]")
+                self.cote_a_cote(entree, f"{chemin}[{i}]", parente)
             else:
-                self.zone(entree, f"{chemin}[{i}]", cote_a_cote=False)
+                self.zone(entree, f"{chemin}[{i}]", parente, cote_a_cote=False)
 
-    def cote_a_cote(self, zones: object, chemin: str) -> None:
+    def cote_a_cote(self, zones: object, chemin: str, parente: Bornes | None) -> None:
         """Lit des zones côte à côte : une liste non vide, chacune avec un span, et aucun span
         qui en chevauche un autre."""
         vus: list[tuple[str, Bornes]] = []
         for i, zone in enumerate(self.verifier(zones, chemin, LISTE_NON_VIDE) or []):
             sous = f"{chemin}[{i}]"
-            span = self.zone(zone, sous, cote_a_cote=True)
+            span = self.zone(zone, sous, parente, cote_a_cote=True)
             if span is None:
                 continue
             for autre, bornes in vus:
@@ -324,8 +337,11 @@ class Passe:
                     )
             vus.append((sous, span))
 
-    def zone(self, valeur: object, chemin: str, cote_a_cote: bool) -> Bornes | None:
-        """Lit une zone, ses rangées et ses sous-zones ; rend son span s'il est valide."""
+    def zone(
+        self, valeur: object, chemin: str, parente: Bornes | None, cote_a_cote: bool
+    ) -> Bornes | None:
+        """Lit une zone sous une parente de span effectif `parente`, ses rangées et ses
+        sous-zones ; rend son span s'il est valide."""
         zone = self.ouvrir(valeur, chemin, ZONE)
         if zone is None:
             return None
@@ -334,33 +350,42 @@ class Passe:
         self.lire(zone, chemin, "label", TEXTE)
         self.parmi(zone, chemin, "color", COULEURS, f"l'une des couleurs {', '.join(COULEURS)}")
         self.icone(zone, chemin)
-        span = self.span(zone, chemin)
+        span = self.span(zone, chemin, parente)
+        # Le span effectif : sans span, celui de la parente ; un span invalide, qui porte déjà
+        # son erreur, ne borne rien.
+        effectif = span if "span" in zone else parente
         for i, rangee in enumerate(self.lire(zone, chemin, "rows", LISTE) or []):
             sous = f"{chemin}.rows[{i}]"
             for j, carte in enumerate(self.verifier(rangee, sous, LISTE_NON_VIDE) or []):
-                self.carte(carte, f"{sous}[{j}]", span)
-        self.entrees(self.lire(zone, chemin, "zones", LISTE) or [], champ(chemin, "zones"))
+                self.carte(carte, f"{sous}[{j}]", effectif)
+        zones = self.lire(zone, chemin, "zones", LISTE) or []
+        self.entrees(zones, champ(chemin, "zones"), effectif)
         if all(zone.get(cle, []) == [] for cle in ("rows", "zones")):
             self.signaler(chemin, "zone sans rows ni zones non vides")
         return span
 
-    def span(self, zone: Mapping[str, object], chemin: str) -> Bornes | None:
-        """Le span de la zone au chemin `chemin`, s'il est présent et valide."""
+    def span(
+        self, zone: Mapping[str, object], chemin: str, parente: Bornes | None
+    ) -> Bornes | None:
+        """Le span de la zone au chemin `chemin`, s'il est présent et valide : dans la grille et
+        dans `parente`, le span effectif de sa parente."""
         valeur = self.lire(zone, chemin, "span", SPAN)
         if valeur is None:
             return None
         premier, dernier = valeur
         if premier > dernier:
             motif = "span inversé"
-        elif self.grille and not (dans(premier, self.grille) and dans(dernier, self.grille)):
+        elif self.grille and not inclus((premier, dernier), self.grille):
             motif = f"span hors de la grille {list(self.grille)}"
+        elif parente and not inclus((premier, dernier), parente):
+            motif = f"span hors du span {list(parente)} de sa zone parente"
         else:
             return premier, dernier
         self.refuser(champ(chemin, "span"), motif, valeur)
         return None
 
     def carte(self, valeur: object, chemin: str, span: Bornes | None) -> None:
-        """Lit une carte de la zone de span `span` — `None` sans span valide."""
+        """Lit une carte d'une zone de span effectif `span` — `None` s'il est invalide."""
         carte = self.ouvrir(valeur, chemin, CARTE)
         if carte is None:
             return
@@ -407,6 +432,36 @@ class Passe:
         self.parmi(lien, chemin, "route", ROUTES, f"l'une des routes {', '.join(ROUTES)}")
 
 
+def verifier_fichier(chemin: Path) -> tuple[int, object, dict[str, Path]]:
+    """Lit et valide le fichier `chemin` contre le dossier d'icônes du skill, en écrivant ce qui
+    l'arrête : le motif d'un `Abandon` sur la sortie d'erreur, ou les erreurs, une ligne
+    `<chemin> : <message>` chacune, sur la sortie standard.
+
+    Returns:
+        Le code de sortie — 0, 1 sur des erreurs, 2 sur un `Abandon` —, puis la description lue
+        et les icônes disponibles, `None` et `{}` sur un `Abandon`.
+    """
+    try:
+        description = lire_description(chemin)
+        icones = icones_disponibles()
+    except Abandon as motif:
+        print(motif, file=sys.stderr)
+        return 2, None, {}
+    erreurs = valider(description, icones)
+    for erreur in erreurs:
+        print(erreur)
+    return (1 if erreurs else 0), description, icones
+
+
+def sorties_en_utf_8() -> None:
+    """Écrit les sorties standard en UTF-8 : sur un poste dont la page de code est cp1252, Python
+    écrit un tube dans cet encodage, et les chemins et les messages, accentués, arriveraient
+    illisibles à la session (`pipeline.config.md`, « Qualité »)."""
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8")
+
+
 def main(argv: Sequence[str]) -> int:
     """Point d'entrée ; voir le module pour les sorties."""
     parser = argparse.ArgumentParser(
@@ -415,27 +470,12 @@ def main(argv: Sequence[str]) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("chemin", type=Path, help="le fichier JSON de la description")
-    chemin: Path = parser.parse_args(argv).chemin
-    try:
-        description = lire_description(chemin)
-        icones = icones_disponibles()
-    except Abandon as motif:
-        print(motif, file=sys.stderr)
-        return 2
-    erreurs = valider(description, icones)
-    for erreur in erreurs:
-        print(erreur)
-    if erreurs:
-        return 1
-    print("valide")
-    return 0
+    code, _, _ = verifier_fichier(parser.parse_args(argv).chemin)
+    if code == 0:
+        print("valide")
+    return code
 
 
 if __name__ == "__main__":
-    # Sur un poste dont la page de code est cp1252, Python écrit un tube dans cet encodage : les
-    # chemins et les messages, accentués, arriveraient illisibles à la session
-    # (`pipeline.config.md`, « Qualité »).
-    for stream in (sys.stdout, sys.stderr):
-        if isinstance(stream, io.TextIOWrapper):
-            stream.reconfigure(encoding="utf-8")
+    sorties_en_utf_8()
     sys.exit(main(sys.argv[1:]))
