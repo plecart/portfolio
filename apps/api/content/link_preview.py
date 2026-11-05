@@ -18,6 +18,7 @@ from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.http.response import HttpResponseBase
 from django.utils.html import escape
 from django.views.decorators.cache import cache_control
+from django.views.decorators.http import require_safe
 
 from content.cache import cached_response
 from content.models import Project
@@ -135,20 +136,25 @@ def meta_tags(project: Project, image: str | None) -> bytes:
 
 # `no-cache`, comme l'`index.html` que Caddy sert : la page cite les fichiers hachés de la
 # compilation du moment (décision 5). Autour de la réponse en cache, comme pour la liste
-# (`content/api.py`) : l'en-tête se repose sur la page que sert le cache.
+# (`content/api.py`) : l'en-tête se repose sur la page que sert le cache. `require_safe` : la page
+# se lit, `405` à toute autre méthode.
+@require_safe
 @cache_control(no_cache=True)
 def link_preview(request: HttpRequest, slug: str) -> HttpResponseBase:
     """`GET /projets/<slug>` : le gabarit, son bloc marqué remplacé par les balises du projet
     publié `slug` ; `302 Found` vers `/` sans projet publié à cette adresse (décision 1).
 
-    `slug` est tout ce qui suit `projets/` : ce qui n'a pas la forme d'un slug (`slug_re`, celle
-    que valide le champ) redirige sans lire ni le gabarit ni la base. La page `200` est gardée
+    `slug` est tout ce qui suit `projets/`, une barre finale ôtée : `/projets/<slug>/` est la même
+    fiche, comme pour le site (`PROJECT_PATH`, `apps/web/src/project/project.ts`). Ce qui n'a pas
+    alors la forme d'un slug (`slug_re`, celle que valide le champ) redirige sans lire ni le
+    gabarit ni la base. La page `200` est gardée
     dans l'espace du contenu, vidé à chaque écriture du contenu, sous une clé qui distingue le
     slug, l'origine et l'empreinte du gabarit (décision 4) ; une redirection ne l'est jamais.
 
     Raises:
         LinkPreviewTemplateError: le gabarit est illisible ou mal marqué (`read_template`).
     """
+    slug = slug.removesuffix("/")
     if not slug_re.match(slug):
         return HttpResponseRedirect("/")
     template = read_template(settings.LINK_PREVIEW_TEMPLATE)

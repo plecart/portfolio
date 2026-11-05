@@ -82,9 +82,13 @@ REDIRECTED = {
     "sans slug": "/projets/",
     "deux segments": "/projets/a/b",
     "slug hors du motif": "/projets/a%20b",
-    "slug suivi d'une barre": f"{PAGE}/",
+    "slug suivi de deux barres": f"{PAGE}//",
     "slug suivi d'un retour à la ligne": f"{PAGE}%0A",
 }
+
+# Les méthodes qui ne lisent pas la page : `405`, sans corps. `POST` en est, mais le middleware CSRF
+# le refuse avant la vue.
+UNSAFE_METHODS = ["PUT", "PATCH", "DELETE", "OPTIONS"]
 
 # Les gabarits défectueux (décision 8) : leur contenu, `None` pour un fichier absent.
 BROKEN_TEMPLATES: dict[str, bytes | None] = {
@@ -234,6 +238,26 @@ def test_une_adresse_sans_projet_publie_redirige_vers_l_accueil(
     response = client.get(address)
 
     assert (response.status_code, response["Location"]) == (302, "/")
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("published")
+def test_une_barre_finale_rend_la_meme_page(client: Client) -> None:
+    """`/projets/<slug>/` est l'adresse de la même fiche, comme pour le site
+    (`apps/web/src/project/project.ts`, `PROJECT_PATH`) : Caddy relaie tout `/projets/*` ici."""
+    response = client.get(f"{PAGE}/")
+
+    assert (response.status_code, response.content) == (200, client.get(PAGE).content)
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("published")
+@pytest.mark.parametrize("method", UNSAFE_METHODS)
+def test_une_methode_qui_ne_lit_pas_est_refusee(client: Client, method: str) -> None:
+    """Seuls `GET` et `HEAD` lisent la page (`require_safe`)."""
+    response = client.generic(method, PAGE)
+
+    assert (response.status_code, response.content) == (405, b"")
 
 
 @pytest.mark.django_db
@@ -393,4 +417,7 @@ def test_aucune_operation_declaree_de_l_api_publique_ne_repond_en_html(client: C
     }
 
     assert operations
+    # Un chemin paramétré serait appelé accolades comprises, donc sur sa 404 : le jour où une
+    # opération en déclare un, ce test doit lui donner une valeur.
+    assert [path for _, path in operations if "{" in path] == []
     assert [operation for operation, kind in types.items() if kind.startswith("text/html")] == []
