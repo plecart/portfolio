@@ -151,6 +151,8 @@ test('les cartes remplacent les cadres en entrant, sans changer la forme des lie
 }) => {
   test.skip(isMobile, 'largeurs de bureau : le projet desktop les porte')
   // À 1200 px, 78 px de marge pour une garde de 76 : une mesure qui suivrait l'entrée basculerait.
+  // Douze cartes, et non le jeu que les cadres annoncent : une carte seule laisse 120 px de marge
+  // dès 600 px. Les cadres, quel qu'en soit le nombre, laissent la colonne : quatre pistes au plus.
   await page.setViewportSize({ ...COLUMN_VIEWPORT, width: 1200 })
   const release = await holdProjects(page)
   await page.goto('/')

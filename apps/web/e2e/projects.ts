@@ -130,7 +130,7 @@ function numberedProject(index: number, showcase: boolean): Project {
 }
 
 /** Un jeu de `count` projets, triés par slug comme l'API les sert ; la vitrine, si elle y est, en second. */
-function projectSet(count: number, showcase: boolean): Project[] {
+export function projectSet(count: number, showcase: boolean): Project[] {
   return Array.from({ length: count }, (_, index) => numberedProject(index, showcase && index === 1))
 }
 

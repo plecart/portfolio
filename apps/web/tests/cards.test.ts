@@ -1,8 +1,8 @@
 /**
  * Les cartes de la table, en logique pure : leur ordre (spec §1.9), les technologies qu'elles
  * montrent (§1.4), leur pose (§1.3, §4.1) et l'empreinte qui la tire, le nom et la description de
- * leur lien (§1.7, §4.1), leurs états (§1.6), leur taille (§4.2, §5.5), leur couverture (§4.1), leur
- * colonne (§3.1) et leur inclinaison (§4.1).
+ * leur lien (§1.7, §4.1), leurs états (§1.6), leur taille et celle des cadres de chargement (§4.2,
+ * §5.1, §5.5), leur couverture (§4.1), leur colonne (§3.1) et leur inclinaison (§4.1).
  */
 import { describe, expect, test } from 'vitest'
 import {
@@ -25,6 +25,7 @@ import {
   coverImage,
   coverSizes,
   fnv1a,
+  frameSizes,
   orderProjects,
   type Technology,
 } from '../src/table/cards.ts'
@@ -352,6 +353,16 @@ describe('la taille de la carte', () => {
 
   test.each([false, true])('un projet seul a la carte seule, vitrine : %s', (showcase) => {
     expect(cardSize(buildProject({ showcase }), 1)).toBe('solo')
+  })
+})
+
+describe('la taille des cadres de chargement', () => {
+  test.each([
+    [1, ['solo']],
+    [2, ['showcase', 'simple']],
+    [3, ['showcase', 'simple', 'simple']],
+  ] as const)('%d cadre(s) prennent la taille des cartes qu’ils annoncent : %j', (count, sizes) => {
+    expect(frameSizes(count)).toEqual(sizes)
   })
 })
 

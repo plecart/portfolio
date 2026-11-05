@@ -1,8 +1,9 @@
 /**
  * Les cartes de la table, en logique pure : leur ordre (spec §1.9), les technologies qu'elles
  * montrent (§1.4), leur pose (§1.3, §4.1), leurs états, le nom et la description de leur lien
- * (§1.6, §1.7, §4.1), leur taille (§4.2, §5.5), leur couverture (§4.1), leur colonne (§3.1) et leur
- * inclinaison (§4.1). Les projets entrent tels que l'API les sert.
+ * (§1.6, §1.7, §4.1), leur taille et celle des cadres de chargement qui les annoncent (§4.2, §5.1,
+ * §5.5), leur couverture (§4.1), leur colonne (§3.1) et leur inclinaison (§4.1). Les projets
+ * entrent tels que l'API les sert.
  *
  * Typé depuis le schéma, et non par `api/projects.ts` : ce module-là lit `import.meta.env`, que
  * les tests, compilés sans les types de Vite (`tsconfig.node.json`), ne connaissent pas.
@@ -19,6 +20,15 @@ export type Technology = components['schemas']['TechnologyOut']
 
 /** Les trois tailles de carte (spec §4.1) : une parmi d'autres, la vitrine, ou seule à table. */
 export type CardSize = 'simple' | 'showcase' | 'solo'
+
+/**
+ * Le nombre de cadres que le chargement pose (spec §5.1). Il suit le nombre de projets publiés en
+ * production, pour que les cadres annoncent la table qui les remplace : une PR de la voie courte de
+ * `cycle-pr` le met à jour après chaque fiche publiée. Un écart ne casse rien — une finition,
+ * jamais une condition de publication : ajouter un projet ne demande jamais de toucher au code
+ * (cadrage §1). 1 tant que la première fiche (#27) n'est pas publiée.
+ */
+export const LOADING_FRAME_COUNT = 1
 
 /** Les types de technologie qu'une carte montre (spec §1.4) : les outils restent sur la fiche. */
 const CARD_KINDS: readonly Technology['kind'][] = ['language', 'framework', 'infrastructure']
@@ -174,15 +184,38 @@ export function cardDescription(project: Project): string {
 }
 
 /**
- * La taille de la carte d'un projet : la vitrine n'existe pas quand la table n'a qu'une carte (spec
- * §4.2, §5.5).
+ * La taille d'une cellule de la table, carte ou cadre de chargement : la vitrine n'existe pas quand
+ * la table n'a qu'une cellule (spec §4.2, §5.5).
+ *
+ * @param showcase La cellule tient le rôle de la vitrine.
+ * @param count Le nombre de cellules de la table.
+ */
+function cellSize(showcase: boolean, count: number): CardSize {
+  if (count === 1) return 'solo'
+  return showcase ? 'showcase' : 'simple'
+}
+
+/**
+ * La taille de la carte d'un projet, par la règle des cellules (`cellSize`).
  *
  * @param project Le projet.
  * @param count Le nombre de cartes de la table.
  */
 export function cardSize(project: Project, count: number): CardSize {
-  if (count === 1) return 'solo'
-  return project.showcase ? 'showcase' : 'simple'
+  return cellSize(project.showcase, count)
+}
+
+/**
+ * La taille de chaque cadre de chargement (spec §5.1) : celle de la carte qu'il annonce, par la
+ * règle des cellules (`cellSize`), le premier tenant le rôle de la vitrine, que la table met en
+ * tête (§1.9, §5.5). Sans projet vitrine, le cadre double laisse place à deux cartes simples
+ * (§5.1).
+ *
+ * @param count Le nombre de cadres.
+ * @returns Une taille par cadre, dans l'ordre de la table.
+ */
+export function frameSizes(count: number): CardSize[] {
+  return Array.from({ length: count }, (_, index) => cellSize(index === 0, count))
 }
 
 /**

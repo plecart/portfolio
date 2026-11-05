@@ -7,7 +7,7 @@
  */
 import { AxeBuilder } from '@axe-core/playwright'
 import type { Locator, Page } from '@playwright/test'
-import { cardPose } from '../src/table/cards.ts'
+import { cardPose, LOADING_FRAME_COUNT } from '../src/table/cards.ts'
 import { expect, FAILURES, holdProjects, serving, test, type Answer } from './api.ts'
 import { resolveAll, rotationOf, settle } from './css.ts'
 import {
@@ -231,11 +231,11 @@ test('les cartes suivent l’ordre de la spec §1.9 : vitrine, en cours, puis du
   )
 })
 
-test('les cartes remplacent les trois cadres à l’arrivée de la liste', async ({ page }) => {
+test('les cartes remplacent les cadres à l’arrivée de la liste', async ({ page }) => {
   const release = await holdProjects(page)
   await page.goto('/')
   const cells = page.locator('[data-table-cell]')
-  await expect(cells).toHaveCount(3)
+  await expect(cells).toHaveCount(LOADING_FRAME_COUNT)
   await expect(cards(page)).toHaveCount(0)
 
   await release(serving(PROJECT_SETS.twelveWithoutShowcase))
