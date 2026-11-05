@@ -7,7 +7,8 @@ La description dit ce que le rendu dessine ; ce script la vérifie avant tout de
 passe** qui rend **toutes** les erreurs : chaque champ pour sa présence et son type, puis les
 contraintes qui lient les champs. Une erreur de type d'un nœud n'empêche pas de lire ses frères.
 
-La forme — toute clé absente de cette liste est une erreur, à tout niveau :
+La forme — toute clé absente de cette liste est une erreur, à tout niveau, comme toute clé
+répétée dans un même objet :
 
 - racine : `intro`, chaîne non vide ; `columns`, entier ≥ 1, le nombre de colonnes de la grille ;
   `secretManager` (optionnel), `{"name": chaîne non vide, "icon": icône}`, le gestionnaire de
@@ -26,21 +27,24 @@ La forme — toute clé absente de cette liste est une erreur, à tout niveau :
   de `ROUTES`.
 
 Une icône est le nom, sans extension, d'un SVG de `icones/simple-icons/` ou de `icones/lucide/`,
-dans le dossier du skill. Les bornes de la grille ne se vérifient que sur un `columns` valide :
-invalide, il porte déjà son erreur.
+dans le dossier du skill — d'un seul des deux : le rendu n'a jamais à choisir. Les bornes de la
+grille ne se vérifient que sur un `columns` valide : invalide, il porte déjà son erreur.
 
 Chaque erreur porte le chemin du champ en forme d'accès JSON — `zones[2][1].rows[0][1].column`,
-`links[3].to` — et un message qui nomme la valeur fautive, en JSON, quand il y en a une.
+`links[3].to` — et un message qui nomme la valeur fautive, en JSON, quand il y en a une ; une clé
+en double, le chemin de son objet et le nom de la clé.
 
-Sortie : 0 et la ligne « valide » ; 1 et une ligne `<chemin> : <message>` par erreur, sur la
-sortie standard ; 2 et son motif en une ligne sur la sortie d'erreur, fichier illisible ou JSON
-mal formé — ou appel mal formé. Python 3.11 ou plus, bibliothèque standard seule.
+Le fichier se lit en UTF-8, un BOM en tête permis. Sortie : 0 et la ligne « valide » ; 1 et une
+ligne `<chemin> : <message>` par erreur, sur la sortie standard ; 2 et son motif en une ligne sur
+la sortie d'erreur, fichier illisible, JSON mal formé ou nom d'icône présent dans les deux jeux —
+ou appel mal formé. Python 3.11 ou plus, bibliothèque standard seule.
 """
 
 import argparse
 import io
 import json
 import sys
+from collections import Counter
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -60,6 +64,26 @@ LIEN = {"from": True, "to": True, "route": False}
 T = TypeVar("T")
 # Un intervalle de colonnes, bornes comprises : la grille, ou le span d'une zone.
 Bornes = tuple[int, int]
+
+
+class Abandon(Exception):
+    """Ce qui empêche la validation de commencer — fichier illisible, JSON mal formé, nom d'icône
+    présent dans les deux jeux —, avec son motif en une ligne."""
+
+
+class Objet(dict[str, object]):
+    """Un objet JSON lu par `lire_description` : ses champs, et `doublons`, les clés qu'il porte
+    plus d'une fois — `json.loads` n'en garderait que la dernière valeur, sans rien dire.
+
+    Args:
+        paires: les champs dans l'ordre du texte, tels que les passe `object_pairs_hook`.
+    """
+
+    def __init__(self, paires: Iterable[tuple[str, object]]) -> None:
+        paires = list(paires)
+        super().__init__(paires)
+        comptes = Counter(cle for cle, _ in paires)
+        self.doublons = [cle for cle, nombre in comptes.items() if nombre > 1]
 
 
 @dataclass(frozen=True)
@@ -141,11 +165,36 @@ def dans(valeur: float, bornes: Bornes) -> bool:
     return bornes[0] <= valeur <= bornes[1]
 
 
-def icones_disponibles() -> frozenset[str]:
-    """Les icônes du dossier du skill : le nom sans extension de chaque SVG de ses jeux."""
-    return frozenset(
-        chemin.stem for jeu in JEUX_D_ICONES for chemin in (ICONES / jeu).glob("*.svg")
+def icones_disponibles(dossier: Path = ICONES) -> dict[str, Path]:
+    """Les icônes d'un dossier d'icônes — celui du skill par défaut : le nom sans extension de
+    chaque SVG de ses jeux, et son fichier.
+
+    Raises:
+        Abandon: un nom est présent dans les deux jeux — le rendu aurait à choisir.
+    """
+    fichiers = [chemin for jeu in JEUX_D_ICONES for chemin in sorted((dossier / jeu).glob("*.svg"))]
+    doublons = sorted(
+        nom for nom, nombre in Counter(chemin.stem for chemin in fichiers).items() if nombre > 1
     )
+    if doublons:
+        raise Abandon(f"icône présente dans les deux jeux de {dossier} : {', '.join(doublons)}")
+    return {chemin.stem: chemin for chemin in fichiers}
+
+
+def lire_description(chemin: Path) -> object:
+    """La description du fichier `chemin`, chaque objet lu en `Objet`.
+
+    Raises:
+        Abandon: le fichier est illisible ou pas en UTF-8, ou son JSON est mal formé.
+    """
+    try:
+        texte = chemin.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeDecodeError) as erreur:
+        raise Abandon(f"fichier illisible — {erreur}") from erreur
+    try:
+        return json.loads(texte, object_pairs_hook=Objet)
+    except ValueError as erreur:
+        raise Abandon(f"JSON mal formé — {erreur}") from erreur
 
 
 def valider(description: object, icones: Collection[str]) -> list[Erreur]:
@@ -216,11 +265,13 @@ class Passe:
     def ouvrir(
         self, valeur: object, chemin: str, cles: Mapping[str, bool]
     ) -> dict[str, object] | None:
-        """`valeur` si c'est un objet, ses clés inconnues et ses clés requises manquantes
-        relevées ; sinon l'erreur relevée, et `None`."""
+        """`valeur` si c'est un objet, ses clés en double, ses clés inconnues et ses clés
+        requises manquantes relevées ; sinon l'erreur relevée, et `None`."""
         objet = self.verifier(valeur, chemin, OBJET)
         if objet is None:
             return None
+        for cle in objet.doublons if isinstance(objet, Objet) else []:
+            self.refuser(chemin, "clé en double", cle)
         for cle in objet:
             if cle not in cles:
                 self.refuser(champ(chemin, cle), "clé inconnue", cle)
@@ -366,16 +417,12 @@ def main(argv: Sequence[str]) -> int:
     parser.add_argument("chemin", type=Path, help="le fichier JSON de la description")
     chemin: Path = parser.parse_args(argv).chemin
     try:
-        texte = chemin.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as erreur:
-        print(f"fichier illisible — {erreur}", file=sys.stderr)
+        description = lire_description(chemin)
+        icones = icones_disponibles()
+    except Abandon as motif:
+        print(motif, file=sys.stderr)
         return 2
-    try:
-        description = json.loads(texte)
-    except ValueError as erreur:
-        print(f"JSON mal formé — {erreur}", file=sys.stderr)
-        return 2
-    erreurs = valider(description, icones_disponibles())
+    erreurs = valider(description, icones)
     for erreur in erreurs:
         print(erreur)
     if erreurs:
