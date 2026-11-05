@@ -12,7 +12,8 @@ Chaque événement — d'un logger `structlog` comme d'un logger standard : Djan
 posé sur l'unique gestionnaire du logger racine (doc structlog, « Standard Library Logging »,
 « Rendering using structlog-based formatters within logging ») : aucun ne sort sous deux formats.
 Le code de l'application journalise par `structlog.get_logger(__name__)` ou
-`logging.getLogger(__name__)`, sans rien configurer.
+`logging.getLogger(__name__)`, sans rien configurer — une erreur destinée à Sentry, par le second
+(`configure_logging`).
 
 Hors de ce rendu : les lignes de `gunicorn` lui-même — démarrage, arrêt de ses workers —, qu'il
 écrit par ses propres gestionnaires, sans les transmettre au logger racine (`propagate = False`,
@@ -102,6 +103,13 @@ def configure_logging(debug: bool) -> None:
     root = logging.getLogger()
     root.handlers = [handler]
     root.setLevel(logging.INFO)
+    # ponytail: `wrap_for_formatter` passe le dictionnaire de l'événement en `msg` du `LogRecord`
+    # (`structlog/stdlib.py`), que l'intégration `logging` de Sentry prend pour message : une erreur
+    # d'un logger `structlog` y arrive sous ce dictionnaire, horodatage compris — mesuré au
+    # transport factice le 2026-11-05, sentry-sdk 2.74.0, structlog 26.1.0. Aucun appel de
+    # l'application n'en journalise une ; le jour où il le faudra, `before_send` rendra le seul
+    # `event` du `LogRecord` que Sentry lui joint (`hint["log_record"]`,
+    # `sentry_sdk/integrations/logging.py`).
     structlog.configure(
         processors=[*SHARED_PROCESSORS, structlog.stdlib.ProcessorFormatter.wrap_for_formatter],
         logger_factory=structlog.stdlib.LoggerFactory(),
