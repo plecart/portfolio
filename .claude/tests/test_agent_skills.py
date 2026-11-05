@@ -718,7 +718,7 @@ ROLE_FILE_LIST = re.compile(r"^- `\.claude/agents/` \([^)]*\)", re.MULTILINE)
 # Le paragraphe « Maison » de `.claude/pipeline.config.md`, « Skills du projet ».
 HOUSE_SKILLS_PARAGRAPH = re.compile(r"^\*\*Maison\*\*.*?\n\n", re.MULTILINE | re.DOTALL)
 
-# Les treize skills maison, en littéral ; un test garde l'égalité avec la config.
+# Les quatorze skills maison, en littéral ; un test garde l'égalité avec la config.
 HOUSE_SKILLS = (
     "init-projet",
     "vers-prd",
@@ -733,6 +733,7 @@ HOUSE_SKILLS = (
     "execution-qa",
     "bug-vers-issue",
     "audit-spec-ui",
+    "schema-architecture",
 )
 
 

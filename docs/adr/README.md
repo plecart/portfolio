@@ -44,6 +44,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0023](0023-vps-de-phase-1-a-2-go.md) | VPS de phase 1 : 1 vCPU et 2 Go au minimum | D68 (remplace le point « Machine » de 0002 pour la phase 1, son estimation, et le contexte « VPS de 4 Go » de 0015) | accepté |
 | [0024](0024-markdown-to-jsx-poids-et-html-brut.md) | `markdown-to-jsx` : poids mesuré et HTML brut désactivé | D51 (corrige deux énoncés de 0010) | accepté |
 | [0025](0025-tests-de-la-pipeline-avec-elle-sur-son-delta.md) | Les tests de la pipeline vivent avec elle et tournent sur son delta | D69 (remplace le point « la suite du back porte aussi les tests de la pipeline » de 0017) | accepté |
+| [0026](0026-schema-d-architecture-hors-ligne-et-playwright-python.md) | Le schéma d'architecture : rendu hors ligne, export par Playwright Python | D70 | accepté |
 
 ## À écrire à leur phase
 

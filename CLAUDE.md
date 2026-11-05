@@ -189,3 +189,4 @@ automatiquement sur sa description.
 | `/execution-qa` | Dérouler le plan de QA |
 | `/bug-vers-issue` | Consigner un bug en issue |
 | `/audit-spec-ui` | Audit mécanique d'une spec d'interface ou d'un document normatif |
+| `/schema-architecture` | Schéma d'architecture d'un projet en image carrée, pour la galerie de sa fiche |
