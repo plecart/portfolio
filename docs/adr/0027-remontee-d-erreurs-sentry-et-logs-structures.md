@@ -1,6 +1,6 @@
 # 0027 — Remontée d'erreurs Sentry et logs structurés
 
-- **Statut** : proposé
+- **Statut** : accepté
 - **Date** : 2026-11-05
 - **Décisions du cadrage** : D71 (`docs/cadrage-technique.md` §7) ; précise « Observabilité » de
   §6.7 et la ligne « Sentry, healthchecks.io » de §5.2 ; healthchecks.io reste celui de l'ADR 0007
