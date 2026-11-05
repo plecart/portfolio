@@ -16,14 +16,13 @@ stockage le rend rare sans l'exclure : un nom pris en rend un autre (`file_overw
 """
 
 from collections.abc import Callable, Collection, Iterable, Mapping
+from functools import partial
 from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 from django.core.files.storage import Storage
-from django.db import models
+from django.db import models, transaction
 from django.db.models.fields.files import FieldFile
 from django.db.models.signals import pre_delete
-
-from content.images import delete_after_commit
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -32,6 +31,23 @@ if TYPE_CHECKING:
 # Ce qu'un nom retiré emporte : appelé avec le stockage du champ et le nom, il enregistre les
 # suppressions à faire une fois la transaction validée.
 Removal = Callable[[Storage, str], None]
+
+
+def delete_after_commit(storage: Storage, names: Iterable[str]) -> None:
+    """Supprime `names` de `storage` une fois la transaction en cours validée — aussitôt hors de
+    toute transaction ; aucun si elle est annulée (doc Django, « Performing actions after
+    commit »).
+
+    Un rappel par fichier, chacun `robust` : la ligne est déjà validée quand il s'exécute, une
+    panne du stockage sur un fichier est journalisée (`django.db.backends.base`) sans empêcher les
+    suivants ni faire échouer la requête qui a validé.
+
+    Args:
+        storage: le stockage qui tient les fichiers.
+        names: leurs noms de stockage.
+    """
+    for name in names:
+        transaction.on_commit(partial(storage.delete, name), robust=True)
 
 
 def delete_file_after_commit(storage: Storage, name: str) -> None:
