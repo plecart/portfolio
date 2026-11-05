@@ -91,6 +91,10 @@ export async function relay(
   return api.fetch(target.url, { ...options, headers, maxRedirects: 0 })
 }
 
+/** Le projet semé et le bucket de ses fichiers, que `seed.py` écrit sur sa sortie. */
+export const seeded = () =>
+  JSON.parse(env('SMOKE_SEED')) as { slug: string; title: string; summary: string; bucket: string }
+
 /** L'adresse de la liste des projets, celle que le front compilé appelle. */
 export const projectsUrl = () => `${origin('API_HOST')}/api/projets`
 

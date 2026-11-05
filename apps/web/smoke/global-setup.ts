@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { request } from '@playwright/test'
-import { compose, servedCoverState } from './stack.ts'
+import { compose, seeded, servedCoverState } from './stack.ts'
 
 /**
  * Le démarrage global entier, `worker` relancé et couverture traitée compris, prend de l'ordre de
@@ -43,9 +43,8 @@ export default async function globalSetup() {
   compose(['stop', 'worker'])
   const seed = readFileSync(join(import.meta.dirname, 'seed.py'), 'utf8')
   process.env.SMOKE_SEED = compose(['exec', '-T', 'api', 'python', '-'], seed)
-  const { bucket } = JSON.parse(process.env.SMOKE_SEED) as { bucket: string }
   process.env.SMOKE_CADDY = published('caddy', 80)
-  process.env.SMOKE_MEDIA = `${published('s3', 8080)}/${bucket}`
+  process.env.SMOKE_MEDIA = `${published('s3', 8080)}/${seeded().bucket}`
 
   const api = await request.newContext()
   process.env.SMOKE_FIRST_STATE = await servedCoverState(api)

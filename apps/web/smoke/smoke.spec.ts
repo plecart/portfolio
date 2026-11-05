@@ -8,11 +8,16 @@
  * démarrage global l'a préparée, et aucun appel de la liste ne doit la précéder.
  */
 import { test as base, expect, type APIRequestContext } from '@playwright/test'
-import { compose, env, inStack, origin, projectsUrl, relay, servedCoverState } from './stack.ts'
-
-/** Le projet semé, que le démarrage global a lu sur la sortie de `seed.py`. */
-type Seeded = { slug: string; title: string; summary: string }
-const seeded = () => JSON.parse(env('SMOKE_SEED')) as Seeded
+import {
+  compose,
+  env,
+  inStack,
+  origin,
+  projectsUrl,
+  relay,
+  seeded,
+  servedCoverState,
+} from './stack.ts'
 
 /** Le préfixe des messages de la sonde : un événement `securitypolicyviolation` de la page. */
 const PROBE = 'securitypolicyviolation'
