@@ -406,11 +406,10 @@ def test_un_gabarit_defectueux_est_une_erreur_journalisee_jamais_une_page(
 def test_aucune_operation_declaree_de_l_api_publique_ne_repond_en_html(client: Client) -> None:
     """Chaque opération que déclare le schéma de l'API publique, appelée : aucune ne répond en
     `text/html` (décision 7). L'admin, HTML par nature (ADR 0001), en est hors."""
-    operations = [
-        (method.upper(), path)
-        for path, methods in api.get_openapi_schema()["paths"].items()
-        for method in methods
-    ]
+    # `OpenAPISchema` hérite d'un `dict` nu (`ninja/openapi/schema.py`) : ses chemins se typent ici,
+    # sinon pyright strict les tient pour en partie inconnus (relevé en CI, run 41946822022).
+    paths: dict[str, dict[str, object]] = api.get_openapi_schema()["paths"]
+    operations = [(method.upper(), path) for path, methods in paths.items() for method in methods]
 
     types = {
         operation: client.generic(*operation).get("Content-Type", "") for operation in operations
