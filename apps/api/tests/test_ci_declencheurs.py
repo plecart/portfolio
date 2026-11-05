@@ -596,8 +596,8 @@ CHANGED_JOBS = REPOSITORY_ROOT / "infra" / "ci" / "changed_jobs.py"
 # le chemin cité ; les autres sont hors entrées. Pour `pipeline` (ADR 0025), un par motif de
 # `PIPELINE` — `.claude/` hors Markdown, `CLAUDE.md`, `CONTRIBUTING.md`, `.github/` hors `ci.yml`,
 # la description du schéma d'architecture, le manifeste racine, le verrou et la version de Python —
-# et par chemin de `ALL`, le chemin cité,
-# et le témoin du back, `apps/api/content/models.py`, qui ne la fait pas tourner.
+# et par chemin de `ALL`, le chemin cité, et le témoin du back, `apps/api/content/models.py`, qui
+# ne la fait pas tourner.
 JOBS_WITNESSES: dict[str, tuple[list[str], bool, bool, bool, bool]] = {
     "delta vide": ([], False, False, False, False),
     "harnais seul": (

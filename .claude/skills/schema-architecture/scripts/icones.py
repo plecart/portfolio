@@ -31,6 +31,7 @@ from description import (
     COULEURS_DES_LOGOS,
     ICONES,
     LOGOS,
+    NEUTRES,
     Abandon,
     icones_disponibles,
     lire_couleurs,
@@ -43,7 +44,7 @@ CDN = "https://cdn.jsdelivr.net/npm"
 # L'URL du SVG d'une icône, par jeu.
 SOURCES = {
     LOGOS: f"{CDN}/simple-icons@{SIMPLE_ICONS}/icons/{{}}.svg",
-    "lucide": f"{CDN}/lucide-static@{LUCIDE}/icons/{{}}.svg",
+    NEUTRES: f"{CDN}/lucide-static@{LUCIDE}/icons/{{}}.svg",
 }
 # Le titre et la couleur de chaque logo ; le `data.json` du matériel de départ n'est pas celui de
 # cette version (mesuré au bloc A de #217).

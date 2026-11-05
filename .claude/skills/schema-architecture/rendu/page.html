@@ -63,6 +63,7 @@ const ICONES = /*ICONES*/;
 // constant ; une section en contient d'autres (zones) ou des rangées de cartes (rows), placées sur
 // une grille de colonnes commune à toutes, pour que les traits verticaux restent droits.
 const L = { cw: 230, card: 180, head: 64, rowGap: 30, pad: 24, inset: 14, gap: 40, side: 28, split: 6 };
+const NS = 'http://www.w3.org/2000/svg';
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function icone(nom, cls = 'ico') { const e = el('span', cls); e.innerHTML = ICONES[nom]; return e; }
@@ -132,7 +133,7 @@ function render() {
   const H = y + 10;
   stage.style.height = H + 'px';
 
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  const svg = document.createElementNS(NS, 'svg');
   svg.classList.add('wires'); svg.setAttribute('width', W); svg.setAttribute('height', H);
   stage.prepend(svg);
   const rc = rough.svg(svg), seed = 7;
@@ -149,7 +150,7 @@ function render() {
 
   // 3. Les liens : des courbes douces, la pointe dans l'axe de leur fin. Entre deux rangées, un lien
   // part et arrive à côté du scotch ; « route » fait un détour à coins arrondis.
-  const stroke = css('--wire'), TAPE = 40, GAP = 4, R = 18, NS = 'http://www.w3.org/2000/svg';
+  const stroke = css('--wire'), TAPE = 40, GAP = 4, R = 18;
   const draw = d => {
     const e = document.createElementNS(NS, 'path');
     for (const [k, v] of Object.entries({ d, fill: 'none', stroke, 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))
