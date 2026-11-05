@@ -79,13 +79,6 @@ def lancer(
     return icones.main(list(args))
 
 
-def illisibles(fiches: object, champ: str) -> tuple[str, str, Cdn, str]:
-    """Un cas d'`ECHECS` : le logo `hetzner` demandé, les données de l'amont `fiches`, et le
-    motif qui nomme leur champ fautif `champ`."""
-    cdn = Cdn({SVG_LOGO.format("hetzner"): b"<svg/>", DONNEES: json.dumps(fiches).encode()})
-    return "hetzner", "--simple-icons", cdn, f"données illisibles sur {DONNEES} — {champ} :"
-
-
 @pytest.mark.parametrize(
     ("nom", "hexa"),
     [("hetzner", "#D50C2D"), ("nodedotjsplus", "#5FA04E"), ("hive_blockchain", "#E31337")],
@@ -137,6 +130,13 @@ def test_une_icone_deja_presente_sort_en_0_sans_requete(
 
     assert "déjà présente" in capsys.readouterr().out
     assert cdn.urls == []
+
+
+def illisibles(fiches: object, champ: str) -> tuple[str, str, Cdn, str]:
+    """Un cas d'`ECHECS` : le logo `hetzner` demandé, les données de l'amont `fiches`, et le
+    motif qui nomme leur champ fautif `champ`."""
+    cdn = Cdn({SVG_LOGO.format("hetzner"): b"<svg/>", DONNEES: json.dumps(fiches).encode()})
+    return "hetzner", "--simple-icons", cdn, f"données illisibles sur {DONNEES} — {champ} :"
 
 
 # Ce que rend le CDN → ce que nomme le motif. Le nom déjà pris par l'autre jeu ne tire rien.

@@ -146,6 +146,12 @@ def est_span(valeur: object) -> TypeGuard[list[int]]:
     return est_liste(valeur) and len(valeur) == 2 and all(map(est_entier, valeur))
 
 
+def est_couleur(valeur: object) -> TypeGuard[str]:
+    """Une couleur `#RRGGBB`, la forme qu'écrit `icones.py` : rien qui sorte de l'attribut `fill`
+    où l'export la pose."""
+    return isinstance(valeur, str) and re.fullmatch("#[0-9A-Fa-f]{6}", valeur) is not None
+
+
 # `class Attendu[T]` demande Python 3.12 ; le script tient 3.11 (docstring du module).
 @dataclass(frozen=True)
 class Attendu(Generic[T]):  # noqa: UP046
@@ -193,12 +199,6 @@ def icones_disponibles(dossier: Path = ICONES) -> dict[str, Path]:
     if doublons:
         raise Abandon(f"icône présente dans les deux jeux de {dossier} : {', '.join(doublons)}")
     return {chemin.stem: chemin for chemin in fichiers}
-
-
-def est_couleur(valeur: object) -> TypeGuard[str]:
-    """Une couleur `#RRGGBB`, la forme qu'écrit `icones.py` : rien qui sorte de l'attribut `fill`
-    où l'export la pose."""
-    return isinstance(valeur, str) and re.fullmatch("#[0-9A-Fa-f]{6}", valeur) is not None
 
 
 def lire_couleurs(dossier: Path) -> dict[str, str]:
