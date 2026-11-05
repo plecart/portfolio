@@ -1,11 +1,15 @@
-"""Tests de l'accès à l'admin : le second facteur de `django-otp`, les écrans retirés, et la fumée
-de ceux qui restent.
+"""Tests de l'accès à l'admin : le second facteur de `django-otp`, sa page de connexion, les écrans
+retirés, et la fumée de ceux qui restent.
 
-L'admin est `OTPAdminSite` (`config/apps.py`) : il ne sert aucune page à un superutilisateur
-qu'aucun appareil n'a vérifié — l'application TOTP ou un code de secours, qu'enrôle
-`manage.py enroll_second_factor`. La fixture `admin_client` (`conftest.py`) arrive vérifiée ; les
-tests de connexion partent d'un client nu et passent par le formulaire.
+L'admin est un `OTPAdminSite` (`access/site.py`, `config/apps.py`) : il ne sert aucune page à un
+superutilisateur qu'aucun appareil n'a vérifié — l'application TOTP ou un code de secours,
+qu'enrôle `manage.py enroll_second_factor`. Sa page de connexion est celle de la bibliothèque, sans
+le bouton de défi. La fixture `admin_client` (`conftest.py`) arrive vérifiée ; les tests de
+connexion partent d'un client nu et passent par le formulaire.
 """
+
+import hashlib
+from importlib.resources import files
 
 import pytest
 from content.preview import PREVIEW_ROUTE
@@ -25,11 +29,17 @@ from django_otp.plugins.otp_static.models import (  # pyright: ignore[reportMiss
 )
 from django_otp.plugins.otp_totp.models import TOTPDevice  # pyright: ignore[reportMissingTypeStubs]
 from factories import saved
+from pytest_django.asserts import assertContains, assertNotContains, assertTemplateUsed
 from test_security_headers import INLINE_CODE, header_nonces, tag_nonces
 
 USERNAME = "auteur-du-portfolio"
 PASSWORD = "phrase-de-passe-du-superutilisateur"
 BACKUP_CODE = "codedesecours"
+
+# Le gabarit de connexion de `django-otp`, que celui du projet étend (`access/site.py`), et son
+# empreinte en 1.7.5 : `access/login.html` en recopie le bloc `content`, sans le bouton de défi.
+OTP_LOGIN_TEMPLATE = "otp/admin111/login.html"
+OTP_LOGIN_TEMPLATE_SHA256 = "b5f782875e85a6ceab418ed13bfe817192c77bf67b5c6d4c903c73c60fe4887d"
 
 # Une page de chaque sorte, par sa méthode et sa route : l'index, la liste d'un écran, et l'aperçu
 # Markdown — vue du projet, que `config/urls.py` place sous les règles de l'admin.
@@ -126,6 +136,49 @@ def test_un_code_de_secours_ouvre_l_admin_une_seule_fois(client: Client) -> None
     log_in(client, device, BACKUP_CODE)
 
     assert (opened, admin_opens(client)) == (True, False)
+
+
+@pytest.fixture
+def password_accepted(db: None, client: Client) -> HttpResponseBase:
+    """La page que rend le premier envoi du formulaire — nom et mot de passe justes, jeton vide —
+    pour un compte enrôlé : elle redemande le jeton, et l'appareil qui l'a produit."""
+    saved(TOTPDevice(user=superuser(), name="totp"))
+
+    return client.post(
+        reverse("admin:login"), {"username": USERNAME, "password": PASSWORD, "otp_token": ""}
+    )
+
+
+def test_apres_le_mot_de_passe_la_connexion_n_offre_pas_de_defi(
+    password_accepted: HttpResponseBase,
+) -> None:
+    """Le bouton de défi de `django-otp` demande à l'appareil choisi d'émettre un défi : ni
+    l'application TOTP ni les codes de secours ne le savent, et il ne rendait qu'une erreur. Le
+    choix de l'appareil et son jeton restent."""
+    assertNotContains(password_accepted, 'name="otp_challenge"')
+    assertContains(password_accepted, 'name="otp_device"')
+    assertContains(password_accepted, 'name="otp_token"')
+
+
+def test_la_connexion_est_rendue_par_le_gabarit_du_projet_qui_etend_celui_de_django_otp(
+    password_accepted: HttpResponseBase,
+) -> None:
+    """Le projet n'en redéfinit que le bloc `content` : le reste de la page — styles et
+    `form.media` compris — reste celui de la bibliothèque, qu'il étend."""
+    assertTemplateUsed(password_accepted, "access/login.html")
+    assertTemplateUsed(password_accepted, OTP_LOGIN_TEMPLATE)
+
+
+def test_le_gabarit_de_connexion_de_django_otp_est_celui_que_le_projet_recopie() -> None:
+    """Lu dans le paquet installé : une montée de `django-otp` qui change le gabarit rougit, et le
+    bloc recopié se relit avant d'en reporter l'empreinte."""
+    template = files("django_otp").joinpath("templates", OTP_LOGIN_TEMPLATE)
+
+    assert hashlib.sha256(template.read_bytes()).hexdigest() == OTP_LOGIN_TEMPLATE_SHA256, (
+        f"le gabarit {OTP_LOGIN_TEMPLATE} de django-otp a changé : relis son bloc `content`, "
+        "recopié sans le bouton de défi dans `access/templates/access/login.html`, puis reporte "
+        "ici sa nouvelle empreinte"
+    )
 
 
 @pytest.mark.django_db
