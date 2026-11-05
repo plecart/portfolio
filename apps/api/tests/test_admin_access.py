@@ -113,7 +113,7 @@ def log_in(
 
 
 def selected_option(device: TOTPDevice | StaticDevice, label: str) -> str:
-    """L'option du sélecteur « Appareil OTP » qui présente `device` sous `label`, présélectionnée."""
+    """L'option présélectionnée du sélecteur « Appareil OTP » qui présente `device` sous `label`."""
     return f'<option value="{device.persistent_id}" selected>{label}</option>'
 
 
