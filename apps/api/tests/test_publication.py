@@ -137,6 +137,17 @@ PUBLISH_STEPS: list[tuple[str, dict[str, str] | None]] = [
     (PUBLISH_PRUNE, WORKFLOW_TOKEN_ENV),
 ]
 
+# Les étapes du job de fumée, de même : la connexion après les installations, dont les scripts ne
+# voient donc pas l'identifiant du registre, et aucun tirage à part — `up` tire les images.
+SMOKE_STEPS: list[tuple[str, dict[str, str] | None]] = [
+    ("actions/checkout", None),
+    ("actions/setup-node", None),
+    ("make web-install", None),
+    ("make web-browsers", None),
+    (PUBLISH_LOGIN, WORKFLOW_TOKEN_ENV),
+    (SMOKE_RUN, None),
+]
+
 # Les clés qu'une étape du job peut porter : ni `if` qui la sauterait, ni `continue-on-error` qui
 # tolérerait son échec, ni `shell` ou `working-directory` qui changeraient ce qu'elle lance.
 STEP_KEYS = {"name", "uses", "with", "run", "env"}
@@ -195,15 +206,46 @@ def needed(job: dict[str, Any]) -> list[str]:
     return [needs] if isinstance(needs, str) else needs
 
 
+def steps_findings(
+    steps: list[dict[str, object]], expected: list[tuple[str, dict[str, str] | None]]
+) -> list[str]:
+    """Ce qui écarte les étapes d'un job de la liste exacte `expected` — l'action, sans son
+    empreinte, ou la commande, chacune avec son environnement, dans cet ordre.
+
+    Returns:
+        Un constat si la liste diffère, un par étape qui porte une clé hors de `STEP_KEYS`, et un
+        si le checkout garde l'identifiant du dépôt. Liste vide : les étapes sont conformes.
+    """
+    launched = [
+        (step.get("run") or str(step.get("uses", "")).split("@")[0], step.get("env"))
+        for step in steps
+    ]
+    findings: list[str] = []
+    if launched != expected:
+        findings.append(f"le job lance {launched}, attendu, dans cet ordre, {expected}")
+    findings += [
+        f"l'étape `{name}` porte {sorted(set(step) - STEP_KEYS)}"
+        for step, (name, _) in zip(steps, launched, strict=True)
+        if set(step) - STEP_KEYS
+    ]
+    checkout = [
+        step.get("with")
+        for step, (name, _) in zip(steps, launched, strict=True)
+        if name == "actions/checkout"
+    ]
+    if checkout != [{"persist-credentials": False}]:
+        findings.append(f"le checkout reçoit {checkout}, attendu `persist-credentials: false`")
+    return findings
+
+
 def publish_findings(workflow: str) -> list[str]:
     """Ce qui, dans un workflow, écarte le job `publish` de ce que le brief de #15 exige.
 
     Returns:
         Un constat si le job manque ; sinon un par propriété altérée — `needs`, `if`, permissions
         du job, du workflow ou d'un autre job, hors `SMOKE_PERMISSIONS` sur le job de fumée,
-        `concurrency`, la liste exacte de ses étapes et de leur environnement (`PUBLISH_STEPS`),
-        une clé d'étape hors de `STEP_KEYS`, et le checkout qui ne garde pas l'identifiant du
-        dépôt. Liste vide : le job est conforme.
+        `concurrency`, et ses étapes (`steps_findings`, `PUBLISH_STEPS`). Liste vide : le job est
+        conforme.
     """
     document = yaml.safe_load(workflow)
     jobs = document["jobs"]
@@ -234,26 +276,7 @@ def publish_findings(workflow: str) -> list[str]:
         findings.append(
             "`concurrency` doit nommer son groupe et porter `cancel-in-progress: false`"
         )
-    steps: list[dict[str, object]] = job.get("steps") or []
-    launched = [
-        (step.get("run") or str(step.get("uses", "")).split("@")[0], step.get("env"))
-        for step in steps
-    ]
-    if launched != PUBLISH_STEPS:
-        findings.append(f"le job lance {launched}, attendu, dans cet ordre, {PUBLISH_STEPS}")
-    findings += [
-        f"l'étape `{name}` porte {sorted(set(step) - STEP_KEYS)}"
-        for step, (name, _) in zip(steps, launched, strict=True)
-        if set(step) - STEP_KEYS
-    ]
-    checkout = [
-        step.get("with")
-        for step, (name, _) in zip(steps, launched, strict=True)
-        if name == "actions/checkout"
-    ]
-    if checkout != [{"persist-credentials": False}]:
-        findings.append(f"le checkout reçoit {checkout}, attendu `persist-credentials: false`")
-    return findings
+    return findings + steps_findings(job.get("steps") or [], PUBLISH_STEPS)
 
 
 def smoke_findings(workflow: str) -> list[str]:
@@ -265,9 +288,8 @@ def smoke_findings(workflow: str) -> list[str]:
 
     Returns:
         Un constat si le job manque ; sinon un par propriété altérée — `needs`, `if`,
-        `permissions`, une clé de job hors de `SMOKE_JOB_KEYS` (`continue-on-error`, `env`…),
-        aucune étape qui lance `SMOKE_RUN`, une clé de cette étape hors de `STEP_KEYS`. Liste
-        vide : le job est conforme.
+        `permissions`, une clé de job hors de `SMOKE_JOB_KEYS` (`continue-on-error`, `env`…), et
+        ses étapes (`steps_findings`, `SMOKE_STEPS`). Liste vide : le job est conforme.
     """
     job = yaml.safe_load(workflow)["jobs"].get(SMOKE_JOB)
     if job is None:
@@ -281,16 +303,7 @@ def smoke_findings(workflow: str) -> list[str]:
         findings.append(f"le job donne {job.get('permissions')}, attendu {SMOKE_PERMISSIONS}")
     if extra := sorted(set(job) - SMOKE_JOB_KEYS):
         findings.append(f"le job porte {extra}")
-    steps: list[dict[str, object]] = job.get("steps") or []
-    smokes = [step for step in steps if step.get("run") == SMOKE_RUN]
-    if not smokes:
-        findings.append(f"aucune étape ne lance {SMOKE_RUN!r}")
-    findings += [
-        f"l'étape de fumée porte {sorted(set(step) - STEP_KEYS)}"
-        for step in smokes
-        if set(step) - STEP_KEYS
-    ]
-    return findings
+    return findings + steps_findings(job.get("steps") or [], SMOKE_STEPS)
 
 
 # --- Le recueil des formes : chaque cas recensé, avec son verdict attendu ---------------------
@@ -442,6 +455,8 @@ PUBLISH_CHANGES = {
 }
 PUBLISH_FORMS = forms(CONFORMING_WORKFLOW, PUBLISH_CHANGES)
 
+INSTALL_LINES = "      - uses: actions/setup-node@v0\n      - run: make web-install\n"
+BROWSERS_LINE = "      - run: make web-browsers\n"
 SMOKE_LINE = f"      - run: {SMOKE_RUN}\n"
 SMOKE_CONFORMING = f"""\
 jobs:
@@ -454,7 +469,7 @@ jobs:
       packages: read
     timeout-minutes: 20
     steps:
-{CHECKOUT_LINE}{SMOKE_LINE}"""
+{CHECKOUT_LINE}{INSTALL_LINES}{BROWSERS_LINE}{LOGIN_LINE}{SMOKE_LINE}"""
 
 # Même recueil pour le job de fumée, pris dans `SMOKE_CONFORMING`.
 SMOKE_CHANGES = {
@@ -474,6 +489,13 @@ SMOKE_CHANGES = {
     "sans la fumée": (SMOKE_LINE, "", True),
     "fumée tolérée en échec": (SMOKE_LINE, SMOKE_LINE + "        continue-on-error: true\n", True),
     "fumée sautée": (SMOKE_LINE, SMOKE_LINE + "        if: false\n", True),
+    "checkout qui garde l'identifiant du dépôt": (PERSIST_LINES, "", True),
+    "connexion avant l'installation": (
+        INSTALL_LINES + BROWSERS_LINE + LOGIN_LINE,
+        LOGIN_LINE + INSTALL_LINES + BROWSERS_LINE,
+        True,
+    ),
+    "tirage à part": (SMOKE_LINE, "      - run: docker compose pull\n" + SMOKE_LINE, True),
 }
 SMOKE_FORMS = forms(SMOKE_CONFORMING, SMOKE_CHANGES)
 
