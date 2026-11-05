@@ -192,6 +192,20 @@ def icones_disponibles(dossier: Path = ICONES) -> dict[str, Path]:
     return {chemin.stem: chemin for chemin in fichiers}
 
 
+def lire_couleurs(dossier: Path) -> dict[str, str]:
+    """La couleur de chaque logo du dossier d'icônes `dossier`, lue dans le fichier
+    `COULEURS_DES_LOGOS` de son jeu de logos.
+
+    Raises:
+        Abandon: le fichier est illisible ou pas en UTF-8, ou son JSON est mal formé.
+    """
+    chemin = dossier / LOGOS / COULEURS_DES_LOGOS
+    try:
+        return json.loads(chemin.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as erreur:
+        raise Abandon(f"{chemin} illisible — {erreur}") from erreur
+
+
 def lire_description(chemin: Path) -> object:
     """La description du fichier `chemin`, chaque objet lu en `Objet`.
 

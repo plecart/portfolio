@@ -195,7 +195,8 @@ def test_la_capture_est_la_cli_de_playwright_epinglee_hors_de_tout_projet(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """`uv run --no-project --with playwright==1.64.1`, Chromium, fenêtre de 1200 × 1200 px,
-    schéma clair, capture après un marqueur."""
+    schéma clair, capture après le marqueur que pose la page (test suivant), 30 s au plus par
+    attente."""
     capture = Capture(png=png_temoin(1200, 1200))
 
     lancer(monkeypatch, capture, PACOME_DEV, tmp_path / "architecture.png")
@@ -215,8 +216,17 @@ def test_la_capture_est_la_cli_de_playwright_epinglee_hors_de_tout_projet(
         "--browser": "chromium",
         "--viewport-size": "1200,1200",
         "--color-scheme": "light",
+        "--wait-for-selector": "body[data-rendu-pret]",
+        "--timeout": "30000",
     }.items() <= options.items()
-    assert "--wait-for-selector" in options
+
+
+def test_la_page_assemblee_pose_le_marqueur_qu_attend_la_capture_une_fois_rendue() -> None:
+    """Le rendu fait, la page pose sur `<body>` l'attribut que la capture attend (test
+    précédent) ; l'export l'injecte dans le gabarit, qui n'en porte aucun en propre."""
+    page = page_de_pacome_dev()
+
+    assert page.count("""render(); document.body.setAttribute("data-rendu-pret", '');""") == 1
 
 
 ERREUR_CHROMIUM = b"""Error: Executable doesn't exist at /x/chromium_headless_shell-1248/headless_shell
@@ -250,6 +260,25 @@ def test_une_capture_impossible_sort_en_1_avec_son_motif_en_une_ligne(
     lignes = capsys.readouterr().err.splitlines()
     assert (rendu, len(lignes), png.exists()) == (1, 1, False)
     assert fragment in lignes[0]
+
+
+def test_un_fichier_des_couleurs_illisible_sort_en_2_sans_capture_ni_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Le fichier des couleurs des logos se lit avant toute capture : mal formé, sortie 2, son
+    motif en une ligne qui le nomme, aucun navigateur, aucune image (formes du fichier : le test
+    d'`icones.py`, même lecteur)."""
+    (tmp_path / "simple-icons").mkdir()
+    (tmp_path / "simple-icons" / "couleurs.json").write_text("{", encoding="utf-8")
+    monkeypatch.setattr(export, "ICONES", tmp_path)
+    capture = Capture(png=png_temoin(1200, 1200))
+    png = tmp_path / "architecture.png"
+
+    rendu = lancer(monkeypatch, capture, PACOME_DEV, png)
+
+    lignes = capsys.readouterr().err.splitlines()
+    assert (rendu, len(lignes), capture.commandes, png.exists()) == (2, 1, [], False)
+    assert "couleurs.json" in lignes[0]
 
 
 def test_la_cli_rend_ses_erreurs_en_utf_8_dans_un_tube(tmp_path: Path) -> None:

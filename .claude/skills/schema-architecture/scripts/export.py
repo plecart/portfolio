@@ -12,12 +12,13 @@ Trois temps, chacun arrêté par un échec :
    erreurs : elles sortent toutes, et aucun navigateur ne démarre ;
 2. **assembler** une page autonome dans un dossier temporaire : le gabarit `rendu/page.html`,
    rough.js et la description en ligne, les polices en `data:` (base64), les icônes que nomme la
-   description en SVG en ligne, chaque logo peint à sa couleur (`couleurs.json`). La page ne
-   fait aucune requête, ni réseau ni fichier voisin ;
+   description en SVG en ligne, chaque logo peint à sa couleur (`couleurs.json`), et le nom de
+   l'attribut qu'elle pose une fois rendue (`PRET`). La page ne fait aucune requête, ni réseau
+   ni fichier voisin ;
 3. **capturer** la page par la CLI de Playwright, le paquet Python à la version `PLAYWRIGHT`,
    lancé par `uv run --no-project --with`, hors de tout projet : Chromium sans fenêtre —
-   `screenshot` le lance ainsi —, fenêtre de 1200 × 1200 px, schéma clair, capture après le
-   marqueur que la page pose une fois rendue. Le facteur d'échelle vaut 1 : la CLI ne le fixe
+   `screenshot` le lance ainsi —, fenêtre de 1200 × 1200 px, schéma clair, capture après cet
+   attribut, `DELAI` au plus par attente. Le facteur d'échelle vaut 1 : la CLI ne le fixe
    que sous `--device`, et le défaut d'un contexte est 1 (Playwright 1.64.1, `launchContext` et
    `screenshot` du pilote, `docs/src/api/params.md`, lus le 2026-11-05). Puis la taille se
    relit dans l'en-tête IHDR du PNG : le côté ne dépend ni du zoom ni de l'écran du poste.
@@ -30,8 +31,9 @@ Prérequis, une fois par poste : `uv`, puis Chromium pour cette version de Playw
 Sortie : 0 et la ligne `<png> : 1200 × 1200` ; 1 et une ligne `<chemin> : <message>` par erreur
 de la description, sur la sortie standard, ou le motif en une ligne sur la sortie d'erreur —
 prérequis absent, capture en échec ou d'une autre taille ; 2 et son motif en une ligne sur la
-sortie d'erreur, description illisible ou mal formée, nom d'icône présent dans les deux jeux — ou
-appel mal formé. Python 3.11 ou plus, bibliothèque standard seule : aucun `import playwright`.
+sortie d'erreur, description ou fichier des couleurs illisible ou mal formé, nom d'icône présent
+dans les deux jeux — ou appel mal formé. Python 3.11 ou plus, bibliothèque standard seule :
+aucun `import playwright`.
 """
 
 import argparse
@@ -46,11 +48,11 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from description import (
-    COULEURS_DES_LOGOS,
     ICONES,
-    LOGOS,
+    Abandon,
     est_liste,
     est_objet,
+    lire_couleurs,
     sorties_en_utf_8,
     verifier_fichier,
 )
@@ -59,8 +61,10 @@ PLAYWRIGHT = "1.64.1"
 COTE = 1200
 PREREQUIS = f"uv run --no-project --with playwright=={PLAYWRIGHT} playwright install chromium"
 RENDU = Path(__file__).resolve().parent.parent / "rendu"
-# Ce que la page pose une fois rendue, polices chargées (`rendu/page.html`).
-MARQUEUR = "body[data-rendu=pret]"
+# L'attribut que la page pose sur `<body>` une fois rendue, polices chargées : l'export l'injecte
+# dans le gabarit (`/*PRET*/`) et attend `MARQUEUR` avant de capturer — une seule source.
+PRET = "data-rendu-pret"
+MARQUEUR = f"body[{PRET}]"
 # Le délai de chaque attente de la capture, en millisecondes : la CLI n'en a aucun par défaut
 # (`--timeout`), et une page qui ne poserait pas son marqueur l'attendrait sans fin.
 DELAI = 30_000
@@ -107,16 +111,18 @@ def assembler(description: object, icones: Mapping[str, Path]) -> str:
     Args:
         description: la description validée.
         icones: le fichier de chaque icône disponible — `icones_disponibles()`.
+
+    Raises:
+        Abandon: le fichier des couleurs des logos est illisible (`lire_couleurs`).
     """
-    couleurs: dict[str, str] = json.loads(
-        (ICONES / LOGOS / COULEURS_DES_LOGOS).read_text(encoding="utf-8")
-    )
+    couleurs = lire_couleurs(ICONES)
     polices = RENDU / "polices"
     ressources = {
         "MANROPE": en_data(polices / "manrope-latin.woff2", "font/woff2"),
         "SHANTELL_SANS": en_data(polices / "shantell-sans-latin-wght-normal.woff2", "font/woff2"),
         "ROUGH": (RENDU / "rough.js").read_text(encoding="utf-8"),
         "DESCRIPTION": en_js(description),
+        "PRET": en_js(PRET),
         "ICONES": en_js(
             {
                 nom: svg_en_ligne(icones[nom], couleurs.get(nom))
@@ -183,7 +189,11 @@ def taille_png(chemin: Path) -> tuple[int, int] | None:
 
 def exporter(description: object, icones: Mapping[str, Path], png: Path) -> str | None:
     """Dessine `description` et l'écrit à `png`, à la bonne taille ; le motif de l'échec en une
-    ligne, `None` si l'export aboutit."""
+    ligne, `None` si l'export aboutit.
+
+    Raises:
+        Abandon: la page ne s'assemble pas (`assembler`) ; rien n'est capturé ni écrit.
+    """
     with tempfile.TemporaryDirectory() as dossier:
         page, capture = Path(dossier) / "schema.html", Path(dossier) / "schema.png"
         page.write_text(assembler(description, icones), encoding="utf-8")
@@ -225,7 +235,11 @@ def main(argv: Sequence[str]) -> int:
     code, description, icones = verifier_fichier(arguments.description)
     if code:
         return code
-    motif = exporter(description, icones, arguments.png)
+    try:
+        motif = exporter(description, icones, arguments.png)
+    except Abandon as abandon:
+        print(abandon, file=sys.stderr)
+        return 2
     if motif:
         print(motif, file=sys.stderr)
         return 1
