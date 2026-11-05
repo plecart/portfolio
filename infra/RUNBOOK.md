@@ -389,9 +389,11 @@ Les erreurs de `api` et de `worker` arrivent dans le projet Sentry (ADR 0027,
 épuisés compris, en un seul événement —, et tout événement de niveau erreur d'un logger,
 `django_redis.cache` et `django.db.backends.base` compris ; chacun porte l'identifiant de
 corrélation de sa requête ou de sa tâche, en tag `correlation_id`, le même que dans les journaux.
-Rien d'autre : pas de traces de performance. Sans `SENTRY_DSN`, rien ne part : c'est l'état du
-poste, de la CI et des piles jetables, qui tournent sur `prod.env.example`. Les alertes sont celles
-que Sentry crée par défaut.
+Rien d'autre : ni traces de performance, ni donnée personnelle — ni utilisateur, ni adresse IP, ni
+cookie, ni en-tête, ni corps de requête, ni variable locale d'une trace —, dans Sentry comme dans
+les journaux (`apps/api/tests/test_observability.py`, sur une requête de l'admin en erreur). Sans
+`SENTRY_DSN`, rien ne part : c'est l'état du poste, de la CI et des piles jetables, qui tournent
+sur `prod.env.example`. Les alertes sont celles que Sentry crée par défaut.
 
 **Créer le projet**, une fois :
 

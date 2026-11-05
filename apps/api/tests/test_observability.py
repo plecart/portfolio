@@ -2,7 +2,7 @@
 événement en production et un rendu lisible en développement, pour les loggers de l'application
 comme pour ceux des bibliothèques ; une configuration posée une fois, que le worker garde ; un
 identifiant de corrélation par requête HTTP et par exécution de tâche ; les erreurs remontées à
-Sentry, et rien sans DSN.
+Sentry, et rien sans DSN ; rien de personnel, ni dans Sentry ni dans les journaux.
 
 La configuration se pose à l'import des réglages, une fois par processus : elle s'éprouve par un
 sous-processus neuf, comme `gunicorn` ou `celery -A config worker` le démarrent
@@ -24,9 +24,15 @@ import structlog
 from celery import shared_task
 from config.observability import CORRELATION_ID, init_sentry
 from content.tasks import process_image
+from django.conf import settings
+from django.contrib.auth.models import User
+from django.core.handlers.wsgi import WSGIHandler, WSGIRequest
+from django.core.signals import request_started
+from django.db import close_old_connections
 from django.http import HttpRequest, HttpResponse
-from django.test import Client, override_settings
+from django.test import Client, RequestFactory, override_settings
 from django.urls import path
+from django.views.decorators.csrf import csrf_exempt
 from factories import gallery_image, project, saved
 from pydantic import SecretStr
 from sentry_sdk.envelope import Envelope
@@ -44,12 +50,13 @@ django.setup()
 
 # Un événement de chaque sorte de logger — l'appel qui le crée, le logger, le niveau, le message :
 # celui de l'application, par `structlog` ; un logger de Django, dont la configuration par défaut
-# ajouterait son propre rendu en développement ; un logger de bibliothèque qui porte un incident
-# (#11).
+# ajouterait son propre rendu en développement ; les deux loggers de bibliothèque qui portent un
+# incident : Redis injoignable (#11), un rappel `on_commit(robust=True)` en échec.
 EVENTS = [
     ("structlog.get_logger", "content", "info", "un événement de l'application"),
     ("logging.getLogger", "django.request", "warning", "Not Found: /absent/"),
     ("logging.getLogger", "django_redis.cache", "error", "Exception ignored"),
+    ("logging.getLogger", "django.db.backends.base", "error", "Error calling in on_commit()"),
 ]
 LOGGED_EVENTS = STARTED + "\n".join(
     f"{factory}({name!r}).{level}({message!r})" for factory, name, level, message in EVENTS
@@ -154,8 +161,19 @@ def journaling_view(request: HttpRequest) -> HttpResponse:
     return HttpResponse()
 
 
+@csrf_exempt
+def failing_view(request: HttpRequest) -> HttpResponse:
+    """Une vue de test qui échoue pour l'auteur connecté, qu'une variable locale tient — comme le
+    code de l'admin tient la requête et ce qu'elle édite. Exemptée du contrôle CSRF, que la requête
+    de test ne porte pas : ce n'est pas ce qu'elle éprouve."""
+    author = request.user
+    if author.is_authenticated:
+        raise RuntimeError("panne de la vue")
+    return HttpResponse()
+
+
 # Les routes d'un test qui pose `ROOT_URLCONF` sur ce module.
-urlpatterns = [path("journal/", journaling_view)]
+urlpatterns = [path("journal/", journaling_view), path("panne/", failing_view)]
 
 
 @shared_task
@@ -335,3 +353,115 @@ def test_un_evenement_d_erreur_d_un_logger_de_bibliotheque_envoie_un_evenement(
     assert [(event["logger"], event["tags"][CORRELATION_ID]) for event in sent] == [
         (logger, "identifiant-temoin")
     ]
+
+
+# L'auteur, seul compte de l'admin, à des valeurs reconnaissables : son identifiant ne se confond
+# avec aucun chiffre d'un événement ou d'une ligne de journal.
+AUTHOR_ID = 1618033988
+AUTHOR = "auteur-reconnaissable"
+AUTHOR_EMAIL = "auteur-reconnaissable@exemple.test"
+
+# Ce que porte sa requête, chaque valeur reconnaissable : l'adresse du relais qui la transmet et
+# celle du visiteur, que Cloudflare passe à l'origine (`CF-Connecting-IP`) — deux plages réservées
+# à la documentation (RFC 5737) —, le jeton qu'Access y joint (`Cf-Access-Jwt-Assertion`), un
+# en-tête qui porte l'adresse de l'auteur, un en-tête d'autorisation et un corps.
+RELAY_ADDRESS = "203.0.113.77"
+VISITOR_ADDRESS = "198.51.100.23"
+AUTHORIZATION = "Bearer jeton-reconnaissable"
+ACCESS_TOKEN = "jwt-access-reconnaissable"
+BODY = "corps-reconnaissable"
+
+
+@pytest.fixture
+def admin_user(django_user_model: type[User], db: None) -> User:
+    """L'auteur, à ses valeurs reconnaissables — remplace la fixture de pytest-django, que
+    `admin_client` (`conftest.py`) connecte et vérifie par un second facteur."""
+    return django_user_model.objects.create_superuser(
+        pk=AUTHOR_ID, username=AUTHOR, email=AUTHOR_EMAIL, password="phrase-de-passe-de-test"
+    )
+
+
+@pytest.fixture
+def served() -> Generator[Callable[[WSGIRequest], str]]:
+    """Sert une requête par un `WSGIHandler`, ce qu'est `config.wsgi.application`, l'objet que
+    `gunicorn` appelle (`get_wsgi_application`) — et que l'intégration Django de Sentry enveloppe
+    de son middleware WSGI, qui joint à l'événement les en-têtes de la requête et son adresse ; le
+    client de test de Django n'y passe pas. Construit au test, et non à l'import du module : ses
+    middlewares s'instancient alors, WhiteNoise compris, sur les fichiers statiques collectés.
+
+    Sans la fermeture des connexions à la base que chaque requête déclenche
+    (`close_old_connections`, au signal `request_started`) : elle romprait la transaction du test,
+    ce que le client de test de Django évite de même (`ClientHandler`).
+
+    Returns:
+        Une fonction qui sert la requête et rend le statut de la réponse.
+    """
+
+    application = WSGIHandler()
+
+    def serve(request: WSGIRequest) -> str:
+        statuses: list[str] = []
+
+        def start_response(
+            status: str, headers: list[tuple[str, str]], exc_info: object = None
+        ) -> Callable[[bytes], object]:
+            statuses.append(status)
+            return lambda _body: None
+
+        application(request.environ, start_response)
+        return statuses[0]
+
+    request_started.disconnect(close_old_connections)
+    yield serve
+    request_started.connect(close_old_connections)
+
+
+@override_settings(ROOT_URLCONF=__name__)
+def test_rien_de_personnel_ne_part_d_une_requete_de_l_admin_en_erreur(
+    admin_client: Client,
+    served: Callable[[WSGIRequest], str],
+    sent: list[SentEvent],
+    journal: Journal,
+) -> None:
+    """Une requête de l'auteur connecté qui échoue, servie comme en production : un événement, qui
+    porte l'identifiant de corrélation de ses lignes de journal, et rien de ce qui désigne l'auteur
+    ou sa requête — ni son identifiant, son nom ou son adresse, ni l'adresse du relais ou du
+    visiteur, ni le cookie de session, ni l'en-tête d'autorisation, ni le jeton d'Access, ni le
+    corps —, dans l'événement comme dans les lignes de journal."""
+    factory = RequestFactory()
+    factory.cookies = admin_client.cookies
+    request = factory.post(
+        "/panne/",
+        {"note": BODY},
+        headers={
+            "Authorization": AUTHORIZATION,
+            "CF-Connecting-IP": VISITOR_ADDRESS,
+            "Cf-Access-Jwt-Assertion": ACCESS_TOKEN,
+            "Cf-Access-Authenticated-User-Email": AUTHOR_EMAIL,
+        },
+        REMOTE_ADDR=RELAY_ADDRESS,
+    )
+
+    status = served(request)
+
+    session = admin_client.cookies[settings.SESSION_COOKIE_NAME].value
+    identifying = [
+        str(AUTHOR_ID),
+        AUTHOR,
+        AUTHOR_EMAIL,
+        RELAY_ADDRESS,
+        VISITOR_ADDRESS,
+        session,
+        AUTHORIZATION,
+        ACCESS_TOKEN,
+        BODY,
+    ]
+    [event] = sent
+    [logged] = [line for line in journal() if line["logger"] == "django.request"]
+    assert (status, exception_type(event), event["tags"][CORRELATION_ID]) == (
+        "500 Internal Server Error",
+        "RuntimeError",
+        logged[CORRELATION_ID],
+    )
+    assert [value for value in identifying if value in json.dumps(sent)] == []
+    assert [value for value in identifying if value in json.dumps(journal())] == []

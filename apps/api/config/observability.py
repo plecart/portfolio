@@ -130,8 +130,13 @@ def init_sentry(dsn: "SecretStr", debug: bool, transport: "Transport | None" = N
     laissé à son défaut. Le passer, même à faux, émet un `DeprecationWarning` en 2.74.0
     (`_get_options`, `sentry_sdk/client.py`) ; absent, il vaut faux à chacune des quatre lectures
     que le SDK en fait (`client.py` : l'avertissement, le nettoyeur d'événements,
-    `should_send_default_pii` ; `data_collection.py` : `_resolve_data_collection`). Chaque
-    événement porte l'identifiant de corrélation en tag (`tag_correlation_id`).
+    `should_send_default_pii` ; `data_collection.py` : `_resolve_data_collection`). Ce défaut
+    laisse passer trois choses, coupées ici : les variables locales des cadres d'une trace — celles
+    d'une vue de l'admin peuvent tenir l'auteur (`include_local_variables`) ; le corps de la
+    requête, envoyé quel que soit `send_default_pii` jusqu'à `max_request_body_size`
+    (`RequestExtractor.extract_into_event`, `sentry_sdk/integrations/_wsgi_common.py`) ; et les
+    en-têtes de la requête qu'il ne sait pas sensibles (`without_request_headers`). Chaque événement
+    porte l'identifiant de corrélation en tag (`tag_correlation_id`).
 
     Rejouée avec un DSN, elle remplace le client ; les intégrations, elles, s'installent une fois
     par processus (`Integration.setup_once`) et restent sans effet sans client actif.
@@ -153,18 +158,20 @@ def init_sentry(dsn: "SecretStr", debug: bool, transport: "Transport | None" = N
             CeleryIntegration(),
             LoggingIntegration(event_level=logging.ERROR),
         ],
-        before_send=tag_correlation_id,
+        include_local_variables=False,
+        max_request_body_size="never",
+        before_send=before_send,
         transport=transport,
     )
 
 
-def tag_correlation_id(event: "Event", _hint: "Hint") -> "Event":
-    """Crochet `before_send` de Sentry : l'identifiant de corrélation lié au contexte de journal —
-    celui de la requête ou de la tâche en cours — devient un tag de l'événement, sous la même clé.
+def before_send(event: "Event", _hint: "Hint") -> "Event":
+    """Crochet `before_send` de Sentry : chaque événement part sans les en-têtes de sa requête
+    (`without_request_headers`), et avec son identifiant de corrélation (`tag_correlation_id`).
 
     Sentry l'appelle dans le fil qui capture l'événement, avant de le confier à l'envoi en
     arrière-plan (`_prepare_event`, `sentry_sdk/client.py`) : le contexte y est encore celui de la
-    requête ou de la tâche. Hors de l'une comme de l'autre, l'événement n'a pas ce tag.
+    requête ou de la tâche.
 
     Args:
         event: l'événement, tel que Sentry s'apprête à l'envoyer.
@@ -172,6 +179,41 @@ def tag_correlation_id(event: "Event", _hint: "Hint") -> "Event":
 
     Returns:
         L'événement, jamais écarté.
+    """
+    return tag_correlation_id(without_request_headers(event))
+
+
+def without_request_headers(event: "Event") -> "Event":
+    """Retire de `event` tous les en-têtes de sa requête.
+
+    Sentry ne masque que ceux qu'il sait sensibles — `Authorization`, `Cookie`, `X-Forwarded-For`,
+    `X-Real-Ip`… (`SENSITIVE_ENV_KEYS`, `sentry_sdk/integrations/_wsgi_common.py`) — et laisse
+    passer ceux que la chaîne de production ajoute : `CF-Connecting-IP`, l'adresse du visiteur que
+    Cloudflare transmet à l'origine (doc Cloudflare, « HTTP request headers »), et
+    `Cf-Access-Jwt-Assertion`, le jeton signé qu'Access joint à chaque requête de l'admin (doc
+    Cloudflare, « Validate JWTs »). Une liste de refus ne suit pas ce qu'un relais ajoute : aucun
+    en-tête ne part.
+
+    Args:
+        event: l'événement, sérialisé ; un événement hors requête n'a pas d'en-têtes.
+
+    Returns:
+        `event`, modifié en place.
+    """
+    event.get("request", {}).pop("headers", None)
+    return event
+
+
+def tag_correlation_id(event: "Event") -> "Event":
+    """Pose en tag de `event` l'identifiant de corrélation lié au contexte de journal — celui de la
+    requête ou de la tâche en cours —, sous la même clé ; hors de l'une comme de l'autre,
+    l'événement n'a pas ce tag.
+
+    Args:
+        event: l'événement, capturé dans le fil de la requête ou de la tâche.
+
+    Returns:
+        `event`, modifié en place.
     """
     correlation_id = structlog.contextvars.get_contextvars().get(CORRELATION_ID)
     if correlation_id is not None:
