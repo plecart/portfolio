@@ -4,20 +4,28 @@
  */
 import { AxeBuilder } from '@axe-core/playwright'
 import type { Page } from '@playwright/test'
+import { LOADING_FRAME_COUNT } from '../src/table/cards.ts'
 import { API_ORIGIN, expect, FAILURES, holdProjects, serving, test, type Answer } from './api.ts'
 import { resolveAll } from './css.ts'
 import { PROJECT_SETS } from './projects.ts'
-import { cards, COLUMN_VIEWPORT, expectPlacement } from './table.ts'
+import { nextFrames } from './scroll.ts'
+import { ANNOUNCED_PROJECTS, cards, COLUMN_VIEWPORT, expectPlacement } from './table.ts'
 
-/** Les cellules de la table : pendant le chargement, ses trois cadres. */
+/** Les cellules de la table : pendant le chargement, ses cadres. */
 const cells = (page: Page) => page.locator('[data-table-cell]')
 
 /** Ouvre la page sur la requête de la liste tenue en attente : l'état chargement. */
 async function openLoading(page: Page) {
   const release = await holdProjects(page)
   await page.goto('/')
-  await expect(cells(page)).toHaveCount(3)
+  await expect(cells(page)).toHaveCount(LOADING_FRAME_COUNT)
   return release
+}
+
+/** Libère la liste tenue sur les projets que les cadres annoncent, et attend leurs cartes. */
+async function releaseAnnounced(page: Page, release: (answer: Answer) => Promise<void>) {
+  await release(serving(ANNOUNCED_PROJECTS))
+  await expect(cards(page)).toHaveCount(LOADING_FRAME_COUNT)
 }
 
 /** Ouvre la page sur une réponse, et attend qu'elle ait quitté l'état chargement. */
@@ -56,32 +64,25 @@ for (const [name, answer] of Object.entries({ 'liste vide': serving([]), ...FAIL
   })
 }
 
-test('chargement : trois cadres aux dimensions des cartes, la vitrine en tête (spec §4.1, §5.5)', async ({
+test('chargement : chaque cadre a la boîte de la carte qui le remplace (spec §4.1, §5.1, §5.5)', async ({
   page,
   isMobile,
 }) => {
   if (!isMobile) await page.setViewportSize(COLUMN_VIEWPORT)
-  await openLoading(page)
+  const release = await openLoading(page)
+  const boxes = () =>
+    cells(page).evaluateAll((elements) =>
+      elements.map((element) => {
+        const { x, y, width, height } = element.getBoundingClientRect()
+        return { x, y, width, height }
+      }),
+    )
+  const frames = await boxes()
 
-  const boxes = await Promise.all((await cells(page).all()).map((cell) => cell.boundingBox()))
-  const [showcase, first, second] = boxes.map((box) => [box!.x, box!.y, box!.width, box!.height])
+  await releaseAnnounced(page, release)
 
-  if (isMobile) {
-    // 400 px : la vitrine sur la première rangée entière, les deux simples dessous ; 16 px de
-    // marge et de gouttière.
-    expect(showcase).toEqual([16, showcase[1], 368, 412])
-    expect([first, second]).toEqual([
-      [16, showcase[1] + 412 + 16, 176, 214],
-      [208, showcase[1] + 412 + 16, 176, 214],
-    ])
-  } else {
-    // 1280 px : quatre colonnes, un bloc de 1044 px centré, 118 px de marge de chaque côté.
-    expect(showcase).toEqual([118, showcase[1], 508, 558])
-    expect([first, second]).toEqual([
-      [118 + 508 + 28, showcase[1], 240, 282],
-      [118 + 508 + 28 + 240 + 28, showcase[1], 240, 282],
-    ])
-  }
+  // Les dimensions de chaque taille de carte sont tenues par `table-cards.spec.ts`.
+  await expect.poll(boxes).toEqual(frames)
 })
 
 test('chargement : les cadres sont cachés et inertes, sans post-it ni ruban', async ({ page }) => {
@@ -135,18 +136,37 @@ test('chargement en mouvement réduit : aucune pulsation (spec §6.3)', async ({
   }
 })
 
-test("chargement : les cadres sont des cellules — liens de l'auteur en pied de page à 1100 px, en colonne à 1280", async ({
+/** Les largeurs de bureau comparées : deux pistes de 240 px à 600 px, quatre à 1100 et 1280. */
+const DESKTOP_WIDTHS = [600, 1100, 1280]
+
+/**
+ * La forme des liens à chaque largeur de bureau, par la position de leur boîte (`expectPlacement`),
+ * lue deux images après le redimensionnement : le temps que la mesure, relue à l'événement
+ * `resize`, pose la forme.
+ */
+async function placements(page: Page) {
+  const positions = []
+  for (const width of DESKTOP_WIDTHS) {
+    await page.setViewportSize({ ...COLUMN_VIEWPORT, width })
+    await nextFrames(page)
+    positions.push(
+      await page.getByRole('contentinfo').evaluate((links) => getComputedStyle(links).position),
+    )
+  }
+  return positions
+}
+
+test("chargement : les cadres sont des cellules — liens de l'auteur à la forme de la table qui les remplace", async ({
   page,
   isMobile,
 }) => {
   test.skip(isMobile, 'largeurs de bureau : le projet desktop les porte')
-  await page.setViewportSize({ width: 1100, height: 800 })
-  await openLoading(page)
+  const release = await openLoading(page)
+  const loading = await placements(page)
 
-  // Quatre colonnes : un bloc de 1044 px, 28 px de marge (spec §3.4).
-  await expectPlacement(page, 'footer')
-  await page.setViewportSize(COLUMN_VIEWPORT)
-  await expectPlacement(page, 'column')
+  await releaseAnnounced(page, release)
+
+  expect(await placements(page)).toEqual(loading)
 })
 
 for (const [failure, answer] of Object.entries(FAILURES)) {
@@ -209,7 +229,7 @@ test('erreur : « Réessayer » relance la requête sans recharger la page — c
 
   await page.getByRole('button', { name: 'Réessayer' }).click()
 
-  await expect(cells(page)).toHaveCount(3)
+  await expect(cells(page)).toHaveCount(LOADING_FRAME_COUNT)
   await expect(page.getByRole('status')).toHaveCount(0)
   await release(serving(PROJECT_SETS.threeWithShowcase))
   await expect(page.getByRole('main')).not.toHaveAttribute('aria-busy')
@@ -237,7 +257,7 @@ test('« Réessayer » relance aussi au clavier, et reprend le focus si la relan
   await page.getByRole('button', { name: 'Réessayer' }).focus()
   await page.keyboard.press('Enter')
 
-  await expect(cells(page)).toHaveCount(3)
+  await expect(cells(page)).toHaveCount(LOADING_FRAME_COUNT)
   expect(requests).toBe(2)
   await release(FAILURES['statut 500'])
   // Le bouton activé a disparu avec le message : celui qui revient reprend le focus.

@@ -4,7 +4,7 @@ import type { ProjectsStatus } from '../api/useProjects.ts'
 import { hasModifier } from '../project/project.ts'
 import { strings } from '../strings.ts'
 import { Card } from './Card.tsx'
-import { cardSize, orderProjects, type CardSize } from './cards.ts'
+import { cardSize, frameSizes, LOADING_FRAME_COUNT, orderProjects, type CardSize } from './cards.ts'
 import { useCardEntrance } from './useCardEntrance.ts'
 import { useTouchReveal } from './useTouchReveal.ts'
 
@@ -22,14 +22,12 @@ const GRID_CLASSES = [
 
 /**
  * Les pistes de la grille. Une table : deux colonnes `1fr` sous 600 px, au-dessus des pistes de
- * 240 px — deux à quatre colonnes selon la largeur. Une carte seule a sa propre piste : 80 % de la
- * table sous 600 px, 360 px au-dessus (spec §4.1, §5.5).
+ * 240 px — deux à quatre colonnes selon la largeur. Une cellule seule, carte ou cadre de
+ * chargement, a sa propre piste : 80 % de la table sous 600 px, 360 px au-dessus (spec §4.1, §5.1,
+ * §5.5).
  */
 const TRACK_CLASSES = 'grid-cols-2 sm:grid-cols-[repeat(auto-fit,240px)]'
 const SOLO_TRACK_CLASSES = 'grid-cols-[80%] sm:grid-cols-[360px]'
-
-/** La table à trois cartes avec vitrine (spec §5.5), que le chargement annonce (§5.1). */
-const LOADING_FRAMES: readonly CardSize[] = ['showcase', 'simple', 'simple']
 
 /**
  * Un cadre de chargement (spec §5.1) : une cellule de la table, au sens de `TABLE_CELL_SELECTOR`
@@ -86,10 +84,11 @@ function LoadError({ onRetry, focusRetry }: { onRetry: () => void; focusRetry: b
 }
 
 /**
- * La table (`<main>`, spec §3.1) et ses états (§5.1-5.3) : les trois cadres pendant le chargement,
- * le message d'erreur en échec, puis les cartes dans l'ordre de `orderProjects` — rien pour une
- * liste vide. Elle s'étire entre l'entête et les liens de l'auteur, fait entrer ses cartes
- * (`useCardEntrance`) et tient la seule révélée au toucher (`useTouchReveal`).
+ * La table (`<main>`, spec §3.1) et ses états (§5.1-5.3) : `LOADING_FRAME_COUNT` cadres pendant le
+ * chargement, aux tailles de `frameSizes`, le message d'erreur en échec, puis les cartes dans
+ * l'ordre de `orderProjects` — rien pour une liste vide. Elle s'étire entre l'entête et les liens
+ * de l'auteur, fait entrer ses cartes (`useCardEntrance`) et tient la seule révélée au toucher
+ * (`useTouchReveal`).
  *
  * @param ref La table, que les liens de l'auteur mesurent.
  * @param status L'état du chargement ; `loading` rend la table occupée (`aria-busy`).
@@ -121,6 +120,8 @@ export function Table({
   const firstCard = useRef<HTMLAnchorElement>(null)
   const grid = useRef<HTMLDivElement>(null)
   const ordered = orderProjects(projects)
+  const frames = status === 'loading' ? frameSizes(LOADING_FRAME_COUNT) : []
+  const tracks = frames.length + ordered.length === 1 ? SOLO_TRACK_CLASSES : TRACK_CLASSES
 
   const { revealed, revealOnTouch } = useTouchReveal()
 
@@ -151,10 +152,9 @@ export function Table({
       ) : (
         <div
           ref={grid}
-          className={`${GRID_CLASSES} ${ordered.length === 1 ? SOLO_TRACK_CLASSES : TRACK_CLASSES}`}
+          className={`${GRID_CLASSES} ${tracks}`}
         >
-          {status === 'loading' &&
-            LOADING_FRAMES.map((size, index) => <LoadingFrame key={index} size={size} />)}
+          {frames.map((size, index) => <LoadingFrame key={index} size={size} />)}
           {ordered.map((project, index) => (
             <Card
               key={project.slug}
