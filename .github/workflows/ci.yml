@@ -446,11 +446,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      # Les images du commit, jamais `latest` (décision 2). Le tirage n'a pas d'étape à lui : `up`
-      # tire toute image absente du moteur — la politique d'un service sans `pull_policy` ni
-      # `build`, comme tous ceux de la pile —, et le runner neuf n'en a aucune (doc Compose,
-      # `up --pull`, défaut `policy` ; `restore.yml` en dépend déjà). Sans la connexion, le tirage
-      # échoue, et la fumée avec lui (mesuré sur le poste le 2026-11-05, Compose 5.0.2 : 401).
+      # Les images du commit, jamais `latest` (brief de #26, décision 2). Le tirage n'a pas
+      # d'étape à lui : `up` tire toute image absente du moteur — la politique d'un service sans
+      # `pull_policy` ni `build`, comme tous ceux de la pile —, et le runner neuf n'en a aucune
+      # (doc Compose, `up --pull`, défaut `policy` ; `restore.yml` en dépend déjà). Sans la
+      # connexion, le tirage échoue, et la fumée avec lui (mesuré sur le poste le 2026-11-05,
+      # Compose 5.0.2 : 401).
       #
       # Durée, en ordre de grandeur, non mesurée sur un runner : quelques minutes. Les attentes,
       # dans l'ordre : Node et les paquets npm, comme dans `web` ; Chromium et ses dépendances

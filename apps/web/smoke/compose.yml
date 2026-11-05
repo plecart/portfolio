@@ -1,7 +1,6 @@
 # La pile de la fumée (#26) : surcharge du Compose de production (`infra/compose.yml`, inchangé),
-# que `make smoke` démarre sous son propre nom de projet — le moteur Docker est partagé avec les
-# piles du poste. Chaque valeur vient de l'environnement de la cible, par-dessus le modèle
-# `prod.env.example`.
+# que `make smoke` démarre sous son propre nom de projet. Chaque valeur vient de l'environnement de
+# la cible, par-dessus le modèle `prod.env.example`.
 #
 # Ce fichier n'y change que ce que la fumée exige (brief de #26, décisions 2 à 4) :
 #
