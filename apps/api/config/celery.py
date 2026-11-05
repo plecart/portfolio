@@ -15,11 +15,16 @@ Deux voies la chargent :
 Aucun backend de résultats : l'état d'un traitement vit en base, Redis ne transporte que les
 messages (ADR 0015, ADR 0006). Les tests la mettent en mode synchrone depuis leur harnais
 (`tests/conftest.py`), jamais par un réglage d'ici.
+
+La journalisation du worker est celle des réglages (ADR 0027) : branché ici, avant que le worker
+ne configure quoi que ce soit, `connect_worker_signals` l'empêche d'y toucher.
 """
 
 import os
 
 from celery import Celery
+
+from config.observability import connect_worker_signals
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
@@ -28,3 +33,4 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 # Le module `tasks` de chaque application installée, importé quand le worker en a besoin : sans
 # lui, le worker ne connaîtrait pas `content.tasks.process_image`.
 app.autodiscover_tasks()
+connect_worker_signals()
