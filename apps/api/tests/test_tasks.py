@@ -215,7 +215,7 @@ def test_une_image_supprimee_pendant_le_traitement_ne_laisse_aucune_variante(
     portfolio: Project, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Aucune erreur ; l'original, lui, sort du stockage avec la transaction qui supprime son
-    image (`delete_image_files`)."""
+    image (`StoredFiles`)."""
     made = saved(gallery_image(portfolio))
     during_processing(monkeypatch, GalleryImage.objects.get(pk=made.pk).delete)
 
@@ -320,14 +320,14 @@ def test_une_tache_qui_ecrit_entre_la_lecture_et_l_ecriture_d_un_remplacement_ne
     dossier qui sort, pas les seuls noms que l'auteur a lus."""
     made = saved(gallery_image(portfolio))
     old = made.original.name or ""
-    read_row = GalleryImage._replaced_original  # pyright: ignore[reportPrivateUsage]
+    read_row = GalleryImage._replaced_name  # pyright: ignore[reportPrivateUsage]
 
-    def read_then_processed(image: GalleryImage) -> str | None:
-        replaced = read_row(image)
+    def read_then_processed(image: GalleryImage, field: str) -> str | None:
+        replaced = read_row(image, field)
         process_image.delay(made.pk, old)
         return replaced
 
-    monkeypatch.setattr(GalleryImage, "_replaced_original", read_then_processed)
+    monkeypatch.setattr(GalleryImage, "_replaced_name", read_then_processed)
     made.original = image_upload("nouvelle.png")
 
     with django_capture_on_commit_callbacks(execute=True):

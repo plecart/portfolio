@@ -8,22 +8,20 @@ La suite tourne sur le cache en mémoire que pose le harnais (`conftest`, `memor
 avant chaque test ; seuls les tests de Redis injoignable chargent le vrai client, `django-redis`.
 """
 
-import ast
 import logging
 import time
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any, cast
 
 import config.settings
 import content.api
-import content.models
 import pytest
 from content import tasks
 from content.api import published_projects
 from content.models import GalleryImage, ProcessingState, Project, ProjectTechnology, Variant
 from content.tasks import process_image
 from content.variants import make_variants
+from django.apps import apps
 from django.core.cache import caches
 from django.core.files.base import ContentFile
 from django.core.files.storage import Storage, default_storage
@@ -120,14 +118,11 @@ def titles(client: Client) -> list[str]:
 
 
 def declared_models() -> set[str]:
-    """Les classes que le module des modèles de contenu déclare `(models.Model)`."""
-    tree = ast.parse(Path(content.models.__file__).read_text(encoding="utf-8"))
-    return {
-        node.name
-        for node in tree.body
-        if isinstance(node, ast.ClassDef)
-        and any(ast.unparse(base) == "models.Model" for base in node.bases)
-    }
+    """Les modèles de l'application de contenu, ceux qu'elle branche sur la purge
+    (`ContentConfig.ready`) : lus dans le registre des applications, et non dans la syntaxe du
+    module — un modèle qui hérite d'une base abstraite (`StoredFiles`) n'y écrit pas
+    `models.Model`."""
+    return {model.__name__ for model in apps.get_app_config("content").get_models()}
 
 
 def expiries() -> list[float | None]:
