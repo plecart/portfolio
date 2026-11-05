@@ -72,7 +72,7 @@ La capture :
 Les options écartées :
 
 - **le CDN au rendu** : une image qui dépend du réseau et d'une version servie ailleurs ;
-- **tout le `data.json` de Simple Icons** : 460 Ko pour la couleur de quelques logos ;
+- **tout le `data.json` de Simple Icons** : 370 Ko à la version 15.0.0 (369 263 octets, mesuré le 2026-11-05) pour la couleur de quelques logos ;
 - **le Playwright npm d'`apps/web`** : le skill dépendrait d'un front, et Playwright y reste
   l'outil E2E (ADR 0008) ;
 - **la capture manuelle par le navigateur du MCP** : zoom de 0,75 mesuré le 2026-11-03, côté non
@@ -100,7 +100,7 @@ Les options écartées :
 |---|---|---|
 | Option 1 | **hors ligne, licences jointes, quelques Ko d'icônes** | **1200 × 1200 vérifié, Python et `uv` seuls** |
 | Option 2 | réseau à chaque rendu, version servie par un tiers | dépend d'un front et de Node |
-| Option 3 | 460 Ko de données pour quelques couleurs | zoom 0,75, côté non garanti, geste manuel |
+| Option 3 | 370 Ko de données pour quelques couleurs | zoom 0,75, côté non garanti, geste manuel |
 
 ## Conditions de réexamen
 
