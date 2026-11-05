@@ -45,7 +45,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0024](0024-markdown-to-jsx-poids-et-html-brut.md) | `markdown-to-jsx` : poids mesuré et HTML brut désactivé | D51 (corrige deux énoncés de 0010) | accepté |
 | [0025](0025-tests-de-la-pipeline-avec-elle-sur-son-delta.md) | Les tests de la pipeline vivent avec elle et tournent sur son delta | D69 (remplace le point « la suite du back porte aussi les tests de la pipeline » de 0017) | accepté |
 | [0026](0026-schema-d-architecture-hors-ligne-et-playwright-python.md) | Le schéma d'architecture : rendu hors ligne, export par Playwright Python | D70 | accepté |
-| [0027](0027-remontee-d-erreurs-sentry-et-logs-structures.md) | Remontée d'erreurs Sentry et logs structurés | D71 | proposé |
+| [0027](0027-remontee-d-erreurs-sentry-et-logs-structures.md) | Remontée d'erreurs Sentry et logs structurés | D71 | accepté |
 
 ## À écrire à leur phase
 
