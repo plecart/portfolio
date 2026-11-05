@@ -83,6 +83,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       # Le volume, pas un dossier du dépôt : un chemin d'hôte n'aurait aucun sens ici.
       MEDIA_ROOT: /app/media
+      # Le gabarit compilé que l'image copie, pas le gabarit source du `.env` : `apps/web` n'est
+      # pas dans le conteneur.
+      LINK_PREVIEW_TEMPLATE: /app/web/index.html
     # Remplace le `gunicorn` de l'image (ADR 0001), qui reste sa commande de production. Le
     # rechargement à chaud vient du serveur de développement de Django, pas d'un réglage d'image.
     command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]

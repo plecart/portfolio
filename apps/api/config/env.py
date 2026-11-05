@@ -197,6 +197,11 @@ class Env(BaseSettings):
             les variables du stockage R2 : le `collectstatic` du build de l'image et `make openapi`
             chargent `Env` sans avoir l'usage du compte. C'est la commande qui refuse un compte
             vide, et Compose qui exige les deux en production.
+        LINK_PREVIEW_TEMPLATE: le gabarit des aperçus de lien (ADR 0011) : l'`index.html` du
+            front, dont la vue de `/projets/<slug>` remplace le bloc marqué par les balises du
+            projet (`content/link_preview.py`). Par défaut `/app/web/index.html`, où l'image `api`
+            copie la compilation (ADR 0014) ; sur le poste, un chemin relatif est ancré sur la
+            racine du dépôt, comme `MEDIA_ROOT`.
     """
 
     model_config = SettingsConfigDict(env_file=ENV_FILE)
@@ -216,11 +221,12 @@ class Env(BaseSettings):
     CORS_ALLOWED_ORIGINS: list[str] = Field(min_length=1)
     ADMIN_USERNAME: str = ""
     ADMIN_PASSWORD: SecretStr = SecretStr("")
+    LINK_PREVIEW_TEMPLATE: Path = Path("/app/web/index.html")
 
-    @field_validator("MEDIA_ROOT")
+    @field_validator("MEDIA_ROOT", "LINK_PREVIEW_TEMPLATE")
     @classmethod
-    def _anchor_media_root(cls, value: Path) -> Path:
-        """Ancre un `MEDIA_ROOT` relatif, comme `ENV_FILE` l'est déjà."""
+    def _anchor_paths(cls, value: Path) -> Path:
+        """Ancre un chemin relatif, comme `ENV_FILE` l'est déjà."""
         return _anchored_path(value)
 
     @field_validator("CORS_ALLOWED_ORIGINS")

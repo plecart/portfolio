@@ -16,7 +16,7 @@ SERVICE_URLS = ["DATABASE_URL", "REDIS_URL"]
 # Les variables dont la valeur est un chemin. Même rôle que la liste ci-dessus : c'est elle qui
 # fait des deux tests d'ancrage une garantie de classe. Tout champ `Path` ajouté à `Env` s'y
 # inscrit, sans quoi son ancrage n'est garanti par rien.
-PATH_VARIABLES = ["MEDIA_ROOT"]
+PATH_VARIABLES = ["MEDIA_ROOT", "LINK_PREVIEW_TEMPLATE"]
 
 # Un stockage R2 complet, aux valeurs factices : l'adresse du compte vise `.invalid`, qui ne se
 # résout nulle part (RFC 2606), et l'hôte public est celui de `infra/prod.env.example`.
@@ -397,6 +397,19 @@ def test_le_media_root_par_defaut_est_dans_le_depot(monkeypatch: pytest.MonkeyPa
     monkeypatch.delenv("MEDIA_ROOT")
 
     assert build_env().MEDIA_ROOT == REPOSITORY_ROOT / "media"
+
+
+def test_le_gabarit_des_apercus_est_par_defaut_celui_de_l_image_api(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`/app/web/index.html`, où l'image `api` copie l'`index.html` compilé du front (brief de #15,
+    décision 10) : le conteneur de production n'a rien à renseigner. La racine est celle du
+    système, `/` dans le conteneur ; sous Windows, un chemin sans lecteur n'est pas absolu, et
+    s'ancre sur le lecteur du dépôt."""
+    monkeypatch.delenv("LINK_PREVIEW_TEMPLATE")
+
+    expected = Path(REPOSITORY_ROOT.anchor) / "app" / "web" / "index.html"
+    assert build_env().LINK_PREVIEW_TEMPLATE == expected
 
 
 def test_le_stockage_des_medias_est_le_disque_par_defaut(monkeypatch: pytest.MonkeyPatch) -> None:
