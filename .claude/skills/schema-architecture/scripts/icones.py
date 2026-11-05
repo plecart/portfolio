@@ -11,9 +11,9 @@ Usage :
 
 Sortie : 0 et ce qui a été écrit, ou que l'icône est déjà là ; 1 et son motif en une ligne sur la
 sortie d'erreur — nom inconnu chez l'amont (404), réseau en échec, données de l'amont illisibles,
-logo sans couleur dans les données, nom déjà pris par l'autre jeu — ; 2 et son motif, appel mal
-formé, nom présent dans les deux jeux ou fichier des couleurs illisible. Python 3.11 ou plus,
-bibliothèque standard seule.
+le champ fautif nommé, logo absent des données, nom déjà pris par l'autre jeu — ; 2 et son motif,
+appel mal formé, nom présent dans les deux jeux ou fichier des couleurs illisible. Python 3.11 ou
+plus, bibliothèque standard seule.
 """
 
 import argparse
@@ -33,6 +33,10 @@ from description import (
     LOGOS,
     NEUTRES,
     Abandon,
+    est_couleur,
+    est_liste,
+    est_objet,
+    est_texte,
     icones_disponibles,
     lire_couleurs,
     sorties_en_utf_8,
@@ -93,13 +97,51 @@ def tirer(url: str) -> bytes:
         return cast(bytes, reponse.read())
 
 
+def slug_de(fiche: Mapping[str, object], rang: int) -> str:
+    """Le slug de `fiche`, la fiche de rang `rang` des données : son `slug`, sinon celui de son
+    `title`.
+
+    Raises:
+        ValueError: le champ lu n'est pas une chaîne non vide.
+    """
+    cle = "slug" if "slug" in fiche else "title"
+    valeur = fiche.get(cle)
+    if not est_texte(valeur):
+        raise ValueError(f"[{rang}].{cle} : attendu une chaîne non vide")
+    return valeur if cle == "slug" else slug(valeur)
+
+
+def teinte_de(fiche: Mapping[str, object], rang: int) -> str:
+    """La couleur de `fiche`, la fiche de rang `rang` des données, en `#RRGGBB` : son `hex`.
+
+    Raises:
+        ValueError: son `hex` n'est pas une chaîne de six chiffres hexadécimaux.
+    """
+    hexa = fiche.get("hex")
+    teinte = f"#{hexa}" if isinstance(hexa, str) else None
+    if not est_couleur(teinte):
+        raise ValueError(f"[{rang}].hex : attendu six chiffres hexadécimaux")
+    return teinte
+
+
 def couleur(nom: str) -> str | None:
     """La couleur du logo de slug `nom`, en `#RRGGBB`, lue dans les données de la version
-    épinglée ; `None` s'il n'y figure pas."""
-    logos = cast(list[dict[str, str]], json.loads(tirer(DONNEES)))
-    for logo in logos:
-        if logo.get("slug", slug(logo["title"])) == nom:
-            return f"#{logo['hex']}"
+    épinglée ; `None` s'il n'y figure pas.
+
+    Raises:
+        URLError: le réseau a échoué (`tirer`).
+        ValueError: les données ne sont pas du JSON ou pas une liste, une fiche lue n'est pas un
+            objet ou n'a pas de slug lisible (`slug_de`), ou celle du logo pas de `hex` lisible
+            (`teinte_de`) — le motif nomme le champ fautif.
+    """
+    fiches = json.loads(tirer(DONNEES))
+    if not est_liste(fiches):
+        raise ValueError("(racine) : attendu une liste")
+    for rang, fiche in enumerate(fiches):
+        if not est_objet(fiche):
+            raise ValueError(f"[{rang}] : attendu un objet")
+        if slug_de(fiche, rang) == nom:
+            return teinte_de(fiche, rang)
     return None
 
 
