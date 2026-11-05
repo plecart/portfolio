@@ -46,6 +46,7 @@ ou appel mal formé. Python 3.11 ou plus, bibliothèque standard seule.
 import argparse
 import io
 import json
+import re
 import sys
 from collections import Counter
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
@@ -194,18 +195,34 @@ def icones_disponibles(dossier: Path = ICONES) -> dict[str, Path]:
     return {chemin.stem: chemin for chemin in fichiers}
 
 
+def est_couleur(valeur: object) -> TypeGuard[str]:
+    """Une couleur `#RRGGBB`, la forme qu'écrit `icones.py` : rien qui sorte de l'attribut `fill`
+    où l'export la pose."""
+    return isinstance(valeur, str) and re.fullmatch("#[0-9A-Fa-f]{6}", valeur) is not None
+
+
 def lire_couleurs(dossier: Path) -> dict[str, str]:
     """La couleur de chaque logo du dossier d'icônes `dossier`, lue dans le fichier
-    `COULEURS_DES_LOGOS` de son jeu de logos.
+    `COULEURS_DES_LOGOS` de son jeu de logos : un objet, chaque valeur une couleur `#RRGGBB`.
 
     Raises:
-        Abandon: le fichier est illisible ou pas en UTF-8, ou son JSON est mal formé.
+        Abandon: le fichier est illisible ou pas en UTF-8, son JSON est mal formé, ou il n'est
+            pas un objet dont chaque valeur est une couleur — le motif nomme la première fautive.
     """
     chemin = dossier / LOGOS / COULEURS_DES_LOGOS
     try:
-        return json.loads(chemin.read_text(encoding="utf-8"))
+        couleurs = json.loads(chemin.read_text(encoding="utf-8"))
     except (OSError, ValueError) as erreur:
         raise Abandon(f"{chemin} illisible — {erreur}") from erreur
+    if not est_objet(couleurs):
+        raise Abandon(f"{chemin} illisible — attendu un objet")
+    lues: dict[str, str] = {}
+    for logo, couleur in couleurs.items():
+        if not est_couleur(couleur):
+            recue = json.dumps(couleur, ensure_ascii=False)
+            raise Abandon(f"{chemin} illisible — {logo} : attendu #RRGGBB, reçu {recue}")
+        lues[logo] = couleur
+    return lues
 
 
 def lire_description(chemin: Path) -> object:
