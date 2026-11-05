@@ -173,11 +173,13 @@ vulnerabilities:
     paths:
       - "**/portfolio-api (debian 13.*)"
     statement: >-
-      Place : apt et libapt-pkg7.0, venus de l'image de base ; l'image n'installe aucun paquet.
-      Atteinte : non — le défaut se déclenche quand apt télécharge un paquet à installer ; ni le
-      Dockerfile ni ce qui tourne n'appellent apt. Alternatives : corrigé par apt 3.0.4 dans
-      Debian 13 (DSA-6607-1), absent de toute empreinte publiée de `python:3.12.16-slim-trixie`
-      au 2026-11-05 : l'exception attend sa reconstruction.
+      Place : apt et libapt-pkg7.0, venus de l'image de base, retirables (ni `Essential` ni
+      `Protected`), sans usage : l'image n'installe aucun paquet. Atteinte : non — le défaut se
+      déclenche quand apt télécharge un paquet à installer ; ni le Dockerfile ni ce qui tourne
+      n'appellent apt. Alternatives : corrigé par apt 3.0.4 dans Debian 13 (DSA-6607-1), absent
+      de toute empreinte publiée de `python:3.12.16-slim-trixie` au 2026-11-05 : l'exception
+      attend sa reconstruction. Retirer apt de l'étage `runtime` fermerait l'avis, mais change
+      la composition de l'image (ADR 0014) pour une faille que la reconstruction ferme.
     expired_at: 2026-12-05
 
   - id: CVE-2026-76844
@@ -187,9 +189,10 @@ vulnerabilities:
       Place : zlib1g, venu de l'image de base, impossible à retirer — `dpkg`, paquet essentiel,
       en pré-dépend. Atteinte : non — le défaut est dans l'écriture d'un fichier `gz*` après un
       `write()` en échec ; seuls `libapt-pkg` et `dpkg-deb` importent ces fonctions, et ni apt ni
-      dpkg ne tournent (relevé des objets ELF de l'image, 2026-11-05). Trivy affiche le titre de
-      l'avis GitHub GHSA-g84c-rxfj-3j2c (webpack-dev-middleware), qui porte ce CVE par erreur ;
-      NVD, OSV et le tracker Debian le donnent à zlib. Alternatives : corrigé dans sid
+      dpkg ne tournent (relevé des objets ELF de l'image, 2026-11-05). Trivy affiche un titre de
+      webpack-dev-middleware, repris de la fiche Red Hat (bogue 2521896), qui rattache ce CVE à
+      ce paquet par erreur, comme l'avis GitHub GHSA-g84c-rxfj-3j2c ; NVD, OSV et le tracker
+      Debian le donnent à zlib. Alternatives : corrigé dans sid
       (1:1.3.dfsg+really1.3.2-4, bogue Debian 1153063), sans correctif dans Debian 13.
     expired_at: 2027-02-03
 
