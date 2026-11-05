@@ -113,6 +113,16 @@ le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node a
                                                   # le 2026-10-15 (#24) ;
                                                   # hors de `make test`, `make build` d'abord ;
                                                   # vérifiée le 2026-10-04 (#23)
+- smoke        : make smoke IMAGE_TAG=<étiquette> # la fumée de la pile complète (#26) : le
+                                                  # Compose de production surchargé par
+                                                  # `apps/web/smoke/compose.yml` — `caddy`, `api`,
+                                                  # `worker` et un témoin S3 —, semé, puis
+                                                  # Playwright, Chromium, projet desktop ; exige
+                                                  # Docker, les images de `make build` sous
+                                                  # `IMAGE_PREFIX` (`latest` sur le poste) et
+                                                  # Chromium (`make web-browsers`) ; la pile est
+                                                  # jetée, verte ou rouge ; de l'ordre de la minute
+                                                  # sur le poste ; vérifiée le 2026-11-05
 - publication  : make push                        # **CI seulement** (job `publish`) : chaque image
                                                   # sous `IMAGE_TAG`, le SHA du commit, puis `latest` ;
                                                   # préfixe GHCR par `IMAGE_PREFIX` ; vérifiée le

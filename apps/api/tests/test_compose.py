@@ -10,7 +10,7 @@ par Dependabot, ont leurs tests dans `test_supply_chain.py`.
 """
 
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any, cast
 
@@ -18,7 +18,7 @@ import pytest
 import yaml
 from config.env import Env
 from containers import POSTGRES_IMAGE
-from system_commands import make_dry_run
+from system_commands import REPOSITORY_ROOT, make_dry_run
 from test_env import declared_variables
 from test_infra import COMPOSE_DEV, IMAGE_DOCKERFILES, PUBLISH_PREFIX
 from test_supply_chain import compose_services
@@ -26,6 +26,13 @@ from test_supply_chain import compose_services
 COMPOSE_PROD = COMPOSE_DEV.with_name("compose.yml")
 PROD_ENV_EXAMPLE = COMPOSE_DEV.with_name("prod.env.example")
 COMPOSE_BY_ENVIRONMENT = {"développement": COMPOSE_DEV, "production": COMPOSE_PROD}
+
+# La surcharge de la fumée de la pile complète, que `make smoke` démarre (#26).
+SMOKE_OVERLAY = REPOSITORY_ROOT / "apps" / "web" / "smoke" / "compose.yml"
+
+# Chaque appel de Compose d'une commande, et le nom de projet qu'il porte — `None` s'il n'en porte
+# pas : Compose prend alors le `name:` du premier fichier.
+COMPOSE_PROJECT = re.compile(r"docker compose(?: --project-name (?P<name>[^ ]+))?")
 
 # Les services de données, à la même image dans les deux fichiers (ADR 0012).
 DATA_SERVICES = ["postgres", "redis"]
@@ -185,13 +192,29 @@ def read_services(compose_file: Path) -> dict[str, dict[str, Any]]:
     return cast(dict[str, dict[str, Any]], services)
 
 
-def exposure_findings(text: str) -> list[str]:
+def on_loopback(port: object) -> bool:
+    """Vrai pour un port publié sur `127.0.0.1` seulement : `127.0.0.1:<hôte>:<conteneur>` en
+    syntaxe courte — port de l'hôte vide, Docker le choisit —, `host_ip` en syntaxe longue."""
+    if isinstance(port, dict):
+        return cast(dict[str, object], port).get("host_ip") == "127.0.0.1"
+    return str(port).startswith("127.0.0.1:")
+
+
+def exposure_findings(
+    text: str, admitted: Callable[[object], bool] = lambda port: False
+) -> list[str]:
     """Ce par quoi un fichier Compose rendrait un service joignable hors du réseau du projet.
+
+    Args:
+        text: le fichier Compose.
+        admitted: les ports qu'un service peut publier — aucun par défaut, comme en production ;
+            ceux du poste pour la pile de la fumée (`on_loopback`).
 
     Returns:
         Un constat par clé de `EXPOSING_TOP_LEVEL_KEYS` portée par le fichier et par clé de
-        `EXPOSING_KEYS` portée par un service. Liste vide : chaque service, tout entier écrit dans
-        ce fichier, n'a que le réseau privé du projet.
+        `EXPOSING_KEYS` portée par un service — `ports` dès qu'un de ses ports n'est pas admis.
+        Liste vide : chaque service, tout entier écrit dans ce fichier, n'a que le réseau privé du
+        projet et ses ports admis.
     """
     document: dict[str, Any] = yaml.safe_load(text)
     declared = [f"fichier : {key}" for key in EXPOSING_TOP_LEVEL_KEYS if key in document]
@@ -199,7 +222,7 @@ def exposure_findings(text: str) -> list[str]:
         f"{name} : {key}"
         for name, service in document["services"].items()
         for key in EXPOSING_KEYS
-        if key in service
+        if key in service and not (key == "ports" and all(map(admitted, service["ports"])))
     ]
 
 
@@ -334,6 +357,26 @@ EXPOSURE_FORMS = {
         single_service("    extends:\n      file: autre.yml\n      service: web\n"),
         True,
     ),
+}
+
+# Sous `on_loopback`, les ports admis de la pile de la fumée : forme → constat attendu (`True`) ou
+# aucun (`False`).
+LOOPBACK_FORMS = {
+    "port du poste, choisi par Docker": (single_service('    ports: ["127.0.0.1::80"]\n'), False),
+    "port du poste, fixé": (single_service('    ports: ["127.0.0.1:8080:80"]\n'), False),
+    "port du poste, syntaxe longue": (
+        single_service("    ports:\n      - target: 80\n        host_ip: 127.0.0.1\n"),
+        False,
+    ),
+    "port de toutes les interfaces": (single_service('    ports: ["8080:80"]\n'), True),
+    "port du conteneur seul": (single_service('    ports: ["80"]\n'), True),
+    "adresse voisine": (single_service('    ports: ["127.0.0.10::80"]\n'), True),
+    "syntaxe longue sans adresse": (single_service("    ports:\n      - target: 80\n"), True),
+    "un port du poste, un autre de toutes les interfaces": (
+        single_service('    ports: ["127.0.0.1::80", "8080:8080"]\n'),
+        True,
+    ),
+    "réseau de l'hôte": (single_service("    network_mode: host\n"), True),
 }
 
 
@@ -572,6 +615,41 @@ def test_aucun_service_de_production_n_est_joignable_hors_du_reseau_du_projet() 
     findings = exposure_findings(COMPOSE_PROD.read_text(encoding="utf-8"))
 
     assert not findings, findings
+
+
+@pytest.mark.parametrize(("text", "expected"), LOOPBACK_FORMS.values(), ids=LOOPBACK_FORMS.keys())
+def test_la_garde_d_exposition_de_la_fumee_rend_son_verdict_sur_chaque_forme(
+    text: str, expected: bool
+) -> None:
+    """Chaque façon recensée de publier un port, et une voie autre qu'un port."""
+    findings = exposure_findings(text, admitted=on_loopback)
+
+    assert bool(findings) is expected, findings
+
+
+def test_la_pile_de_la_fumee_ne_publie_que_sur_le_poste() -> None:
+    """La surcharge de la fumée publie `caddy` et le témoin S3, que Playwright joint (brief de #26,
+    décision 3) : sur `127.0.0.1` seulement — lié à toutes les interfaces, un port est joignable
+    de la machine d'à côté."""
+    findings = exposure_findings(SMOKE_OVERLAY.read_text(encoding="utf-8"), admitted=on_loopback)
+
+    assert not findings, findings
+
+
+def test_make_smoke_mene_compose_sous_un_nom_de_projet_a_lui() -> None:
+    """Chaque appel de Compose de `make smoke` porte le même nom de projet, celui d'aucune autre
+    pile du dépôt : `down -v` emporte les volumes du projet qu'il nomme, et sous le nom d'une autre
+    — ou sans nom, sous le `name:` de `infra/compose.yml` —, la fumée en effacerait la base."""
+    names = {
+        match["name"] for match in COMPOSE_PROJECT.finditer(make_dry_run("smoke", IMAGE_TAG="x"))
+    }
+    others = {
+        yaml.safe_load(path.read_text(encoding="utf-8"))["name"]
+        for path in COMPOSE_BY_ENVIRONMENT.values()
+    }
+
+    assert len(names) == 1, f"un seul nom de projet pour chaque appel de Compose : {names}"
+    assert names.isdisjoint({None, *others}), names
 
 
 @pytest.mark.parametrize("service", DATA_SERVICES)

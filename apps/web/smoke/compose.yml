@@ -1,0 +1,50 @@
+# La pile de la fumée (#26) : surcharge du Compose de production (`infra/compose.yml`, inchangé),
+# que `make smoke` démarre sous son propre nom de projet — le moteur Docker est partagé avec les
+# piles du poste. Chaque valeur vient de l'environnement de la cible, par-dessus le modèle
+# `prod.env.example`.
+#
+# Ce fichier n'y change que ce que la fumée exige (brief de #26, décisions 2 à 4) :
+#
+# - les images du dépôt sous le préfixe et l'étiquette de l'appel — en CI le préfixe GHCR et le SHA
+#   du commit, les images mêmes que le déploiement tire ; sur le poste celles que `make build` a
+#   chargées, comme `infra/compose.dev.yml` les nomme ;
+# - `caddy` publié sur `127.0.0.1` seulement, à un port que Docker choisit : Playwright le joint là,
+#   et la production ne publie rien (D45) ;
+# - un témoin S3 à la place de R2, `rclone serve s3` tiré de l'image `backup` — aucune image de
+#   plus à épingler, le motif de `infra/tests/backup.yml` —, publié de même : `MEDIA_STORAGE` reste
+#   `r2`, et `api` et le `worker` suivent le chemin de production. Sans `--auth-key`, le témoin
+#   admet leurs requêtes signées, identifiants factices compris, et sert sans signature
+#   `/<bucket>/<chemin>` au relais des médias de Playwright (mesuré le 2026-11-05, rclone 1.75.2).
+#   botocore le joint en chemin (`http://s3:8080/<bucket>/…`), sans nom d'hôte par bucket (mesuré,
+#   botocore 1.43.120). Le bucket est un dossier du témoin, créé avant son démarrage, donc avant le
+#   premier téléversement.
+
+services:
+  caddy:
+    image: ${IMAGE_PREFIX:?}caddy:${IMAGE_TAG:?}
+    ports:
+      - "127.0.0.1::80"
+
+  api:
+    image: ${IMAGE_PREFIX:?}api:${IMAGE_TAG:?}
+    environment: &media-endpoint
+      MEDIA_R2_ENDPOINT: http://s3:8080
+
+  worker:
+    image: ${IMAGE_PREFIX:?}api:${IMAGE_TAG:?}
+    environment: *media-endpoint
+
+  s3:
+    image: ${IMAGE_PREFIX:?}backup:${IMAGE_TAG:?}
+    # Le nom du bucket entre en argument du shell (`$$0`), jamais dans le texte de la commande.
+    command:
+      - sh
+      - -c
+      - mkdir -p "/tmp/s3/$$0" && exec rclone serve s3 --addr :8080 /tmp/s3
+      - ${MEDIA_R2_BUCKET:?}
+    ports:
+      - "127.0.0.1::8080"
+    healthcheck:
+      test: [CMD, nc, -z, 127.0.0.1, "8080"]
+      interval: 1s
+      retries: 30
