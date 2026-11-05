@@ -1,11 +1,12 @@
 """Tests du job `deploy` de la CI : le déploiement de la production par SSH (brief de #16,
 décision 6).
 
-Le déploiement tourne sur GitHub Actions, après chaque publication sur `main` ; le poste n'a ni la
-clé ni le VPS. Ces tests lisent le job tel que l'analyseur YAML le lit, et exécutent son script
-avec des témoins à la place de `gh`, `scp` et `ssh` : ce qu'il déposerait et lancerait sur le VPS
-se lit dans leurs appels, argument par argument. Comme pour `publish`, la garde de la forme du job
-est une fonction sur du texte, appliquée au dépôt et à un recueil de formes, `DEPLOY_FORMS`.
+Le déploiement tourne sur GitHub Actions, après chaque publication sur `main` et la fumée de ses
+images (#26) ; le poste n'a ni la clé ni le VPS. Ces tests lisent le job tel que l'analyseur YAML
+le lit, et exécutent son script avec des témoins à la place de `gh`, `scp` et `ssh` : ce qu'il
+déposerait et lancerait sur le VPS se lit dans leurs appels, argument par argument. Comme pour
+`publish`, la garde de la forme du job est une fonction sur du texte, appliquée au dépôt et à un
+recueil de formes, `DEPLOY_FORMS`.
 """
 
 import os
@@ -16,15 +17,16 @@ from typing import Any, cast
 import pytest
 import yaml
 from test_infra import CI_WORKFLOW, REPOSITORY_ROOT
-from test_publication import SHA, STEP_KEYS, WORKFLOW_TOKEN_ENV
+from test_publication import SHA, STEP_KEYS, WORKFLOW_TOKEN_ENV, forms, needed
 
-# Ce que porte le job (décision 6) : il suit la publication des images du commit, ne tourne que
-# sur un push vers `main`, et seulement une fois le VPS prêt — la variable de dépôt
-# `DEPLOY_ENABLED`, qu'un `if` de job lit dans `vars`, jamais dans `secrets` (doc GitHub
-# « Contexts »). Aucun `permissions` : le jeton du workflow, en lecture, suffit. Ses secrets sont
-# ceux de l'environnement `production`, que seule `main` peut viser (`infra/RUNBOOK.md`) : un run
-# d'une autre branche ne les lit pas.
-DEPLOY_NEEDS = ["publish"]
+# Ce que porte le job (décision 6) : il suit la fumée des images du commit, elle-même après leur
+# publication — une image rouge à la fumée reste publiée, jamais déployée (brief de #26,
+# décision 2) ; il ne tourne que sur un push vers `main`, et seulement une fois le VPS prêt — la
+# variable de dépôt `DEPLOY_ENABLED`, qu'un `if` de job lit dans `vars`, jamais dans `secrets`
+# (doc GitHub « Contexts »). Aucun `permissions` : le jeton du workflow, en lecture, suffit. Ses
+# secrets sont ceux de l'environnement `production`, que seule `main` peut viser
+# (`infra/RUNBOOK.md`) : un run d'une autre branche ne les lit pas.
+DEPLOY_NEEDS = ["fumee"]
 DEPLOY_IF = (
     "github.event_name == 'push' && github.ref == 'refs/heads/main'"
     " && vars.DEPLOY_ENABLED == 'true'"
@@ -79,9 +81,8 @@ def deploy_findings(workflow: str) -> list[str]:
     if job is None:
         return ["aucun job `deploy`"]
     findings: list[str] = []
-    needs = job.get("needs")
-    if ([needs] if isinstance(needs, str) else needs) != DEPLOY_NEEDS:
-        findings.append(f"`needs` vaut {needs}, attendu {DEPLOY_NEEDS}")
+    if needed(job) != DEPLOY_NEEDS:
+        findings.append(f"`needs` vaut {job.get('needs')}, attendu {DEPLOY_NEEDS}")
     if job.get("if") != DEPLOY_IF:
         findings.append(f"`if` vaut {job.get('if')!r}, attendu {DEPLOY_IF!r}")
     if job.get("environment") != DEPLOY_ENVIRONMENT:
@@ -148,7 +149,7 @@ CONFORMING_WORKFLOW = f"""\
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    needs: publish
+    needs: fumee
     if: {DEPLOY_IF}
     environment: {DEPLOY_ENVIRONMENT}
     timeout-minutes: 15
@@ -161,10 +162,11 @@ jobs:
 # attendu la ferait rougir.
 DEPLOY_CHANGES = {
     "conforme": ("", "", False),
-    "needs en liste": ("needs: publish", "needs: [publish]", False),
+    "needs en liste": ("needs: fumee", "needs: [fumee]", False),
     "sans le job": ("  deploy:", "  autre:", True),
-    "après un autre job": ("needs: publish", "needs: infra", True),
-    "sans attendre la publication": ("    needs: publish\n", "", True),
+    "après un autre job": ("needs: fumee", "needs: infra", True),
+    "après la publication, sans la fumée": ("needs: fumee", "needs: publish", True),
+    "sans attendre la fumée": ("    needs: fumee\n", "", True),
     "sans la variable du VPS prêt": (" && vars.DEPLOY_ENABLED == 'true'", "", True),
     "variable lue dans les secrets": ("vars.DEPLOY_ENABLED", "secrets.DEPLOY_ENABLED", True),
     "sur un push vers toute branche": (" && github.ref == 'refs/heads/main'", "", True),
@@ -202,10 +204,7 @@ DEPLOY_CHANGES = {
     ),
     "secret de plus": (ENV_LINES, ENV_LINES + "          AUTRE: ${{ secrets.AUTRE }}\n", True),
 }
-DEPLOY_FORMS = {
-    form: (CONFORMING_WORKFLOW.replace(old, new) if old else CONFORMING_WORKFLOW, expected)
-    for form, (old, new, expected) in DEPLOY_CHANGES.items()
-}
+DEPLOY_FORMS = forms(CONFORMING_WORKFLOW, DEPLOY_CHANGES)
 
 
 @pytest.mark.parametrize(("workflow", "expected"), DEPLOY_FORMS.values(), ids=DEPLOY_FORMS.keys())
@@ -216,8 +215,8 @@ def test_la_garde_du_job_deploy_rend_son_verdict_sur_chaque_forme(
     assert bool(deploy_findings(workflow)) is expected, deploy_findings(workflow)
 
 
-def test_le_job_deploy_suit_la_publication_d_un_push_sur_main_une_fois_le_vps_pret() -> None:
-    """`needs: publish`, push vers `main`, `DEPLOY_ENABLED` lue dans `vars`, aucun `permissions`,
+def test_le_job_deploy_suit_la_fumee_d_un_push_sur_main_une_fois_le_vps_pret() -> None:
+    """`needs: fumee`, push vers `main`, `DEPLOY_ENABLED` lue dans `vars`, aucun `permissions`,
     un déploiement à la fois, et rien qui saute ou tolère l'échec de son script."""
     assert deploy_findings(CI_WORKFLOW.read_text(encoding="utf-8")) == []
 

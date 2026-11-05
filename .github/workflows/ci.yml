@@ -19,9 +19,10 @@
 # `main` : leur verdict change sans commit, quand une base d'avis se publie. Il attend `api` comme
 # les deux autres, et sur une PR ne tourne que si le delta touche leurs entrées (ADR 0019,
 # décision 2). Un cinquième, `publish`, ne tourne qu'après un push sur `main`, une fois les
-# quatre autres verts : il publie les images sur GHCR. Un sixième, `deploy`, les déploie ensuite
-# sur le VPS, une fois celui-ci prêt. Un septième, `auteurs`, ne tourne que sur une PR hors draft,
-# sans attendre `api`.
+# quatre autres verts : il publie les images sur GHCR. Un sixième, `fumee`, démarre la pile de
+# production depuis ces images et la fait éprouver par Playwright ; un septième, `deploy`, ne les
+# déploie sur le VPS, une fois celui-ci prêt, qu'après une fumée verte. Un huitième, `auteurs`, ne
+# tourne que sur une PR hors draft, sans attendre `api`.
 #
 # Chaque action est épinglée par **empreinte de commit**, sa version en commentaire : une
 # étiquette peut être déplacée par son propriétaire ou par un attaquant, et le déplacement
@@ -37,7 +38,8 @@ name: CI
 # Aucune étape n'écrit sur le dépôt : le jeton ne reçoit que la lecture. Le défaut d'un dépôt
 # peut être bien plus large, et il ne se resserre pas tout seul quand un workflow n'en a pas
 # besoin. Seul le job `publish` reçoit en plus l'écriture des paquets, pour pousser les images et
-# supprimer leurs anciennes versions — dans le registre, jamais sur le dépôt.
+# supprimer leurs anciennes versions — dans le registre, jamais sur le dépôt ; le job `fumee`, leur
+# lecture, pour tirer les images qu'il éprouve.
 permissions:
   contents: read
 
@@ -392,18 +394,91 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+  fumee:
+    name: Fumée — pile de production par Playwright
+    runs-on: ubuntu-latest
+
+    # Après la publication, sur un push vers `main` seulement — la condition de `publish` : la pile
+    # de production démarre des images que `publish` vient de pousser, celles mêmes que `deploy`
+    # tire ensuite. Rouge, il saute `deploy`. La seule preuve en CI que la pile démarre : `infra` ne
+    # démarre que des piles d'image (brief de #26). `apps/api/tests/test_publication.py` tient ces
+    # réglages.
+    needs: publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    # Tirer les images privées du registre (ADR 0014). `contents: read` se répète, comme dans
+    # `publish` : des permissions de job remplacent celles du workflow, et un scope non nommé vaut
+    # `none` (doc GitHub « Workflow syntax », `permissions`).
+    permissions:
+      contents: read
+      packages: read
+
+    # Un plafond, pas une durée : les installations, puis les attentes bornées de l'étape
+    # « Fumée » — 300 s d'`up --wait`, 120 s d'attente du worker et au plus 120 s par commande
+    # Compose au démarrage global, 30 s par scénario, le défaut de Playwright.
+    timeout-minutes: 20
+
+    steps:
+      # Ce job exécute le code des paquets npm : le jeton du dépôt ne reste pas dans `.git/config`.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Playwright et Chromium, comme dans le job `web`. Pas le front compilé : il est dans l'image
+      # `caddy`.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: apps/web/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install
+        run: make web-install
+
+      - name: Browsers
+        run: make web-browsers
+
+      # Après les installations : les scripts d'installation des paquets npm ne voient pas
+      # l'identifiant du registre. Docker le garde pour les tirages de l'étape suivante, comme dans
+      # `restore.yml`.
+      - name: Connexion à GHCR
+        run: echo "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # Les images du commit, jamais `latest` (décision 2). Le tirage n'a pas d'étape à lui : `up`
+      # tire toute image absente du moteur — la politique d'un service sans `pull_policy` ni
+      # `build`, comme tous ceux de la pile —, et le runner neuf n'en a aucune (doc Compose,
+      # `up --pull`, défaut `policy` ; `restore.yml` en dépend déjà). Sans la connexion, le tirage
+      # échoue, et la fumée avec lui (mesuré sur le poste le 2026-11-05, Compose 5.0.2 : 401).
+      #
+      # Durée, en ordre de grandeur, non mesurée sur un runner : quelques minutes. Les attentes,
+      # dans l'ordre : Node et les paquets npm, comme dans `web` ; Chromium et ses dépendances
+      # système ; le tirage des images ; puis la recette, 32 à 45 s sur le poste (2026-11-05) —
+      # `up --wait`, chaque service attendu sain sur sa sonde ; le démarrage global, le `worker`
+      # relancé après un premier appel de la liste puis attendu jusqu'à l'état « prêt » de la
+      # semence, une dizaine de secondes ; les scénarios de Playwright, environ 15 s ; `down`.
+      #
+      # La pile est jetée par la recette, verte ou rouge. Annulé ou hors délai, le job peut la
+      # laisser debout : aucune étape `if: always()` ne la rattrape, la machine du runner étant
+      # détruite avec le job (doc GitHub « Using GitHub-hosted runners »).
+      - name: Fumée
+        run: make smoke IMAGE_PREFIX=ghcr.io/plecart/portfolio- IMAGE_TAG="$GITHUB_SHA"
+
   deploy:
     name: Déploiement — production par SSH
     runs-on: ubuntu-latest
 
-    # Après la publication des images du commit, sur un push vers `main`, et seulement une fois le
-    # VPS prêt : la variable de dépôt `DEPLOY_ENABLED` vaut `true` quand ses secrets existent
+    # Publication, fumée, puis déploiement : après la fumée des images du commit, elle-même après
+    # leur publication — une image rouge à la fumée reste publiée, `latest` compris, mais n'est
+    # jamais déployée (brief de #26, décision 2) —, sur un push vers `main`, et seulement une fois
+    # le VPS prêt : la variable de dépôt `DEPLOY_ENABLED` vaut `true` quand ses secrets existent
     # (`infra/RUNBOOK.md`). Avant, le job est sauté et `main` ne rougit pas ; après, un secret
     # manquant le fait échouer. Le `if` d'un job lit `vars`, jamais `secrets` (doc GitHub
     # « Contexts »). Aucun `permissions` : le jeton du workflow, en lecture, suffit à lire la tête
     # de `main` ; le VPS tire les images avec son propre jeton. `apps/api/tests/test_deployment.py`
     # tient ces réglages et exécute le script.
-    needs: publish
+    needs: fumee
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
     # Les secrets du VPS sont ceux de cet environnement, restreint à `main` : un workflow lancé
     # depuis une autre branche ne les lit pas, même modifié (doc GitHub « Deployments and

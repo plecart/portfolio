@@ -222,7 +222,9 @@ place de R2 —, la sème d'un projet publié, puis la fait éprouver par Playwr
 Caddyfile, le cache contre le vrai Redis. Le navigateur y voit les origines de production, que
 Playwright relaie vers la pile : aucune requête n'en sort. Des images construites sous un autre
 préfixe se nomment de même : `make smoke IMAGE_PREFIX=<préfixe> IMAGE_TAG=latest`. La pile tourne
-sous son propre nom de projet Compose, ses ports sur `127.0.0.1`, et se jette, verte ou rouge.
+sous son propre nom de projet Compose, ses ports sur `127.0.0.1`, et se jette, verte ou rouge. En
+CI, le job `fumee` la joue après chaque publication sur `main`, sur les images du commit tirées de
+GHCR : rouge, il bloque le déploiement.
 
 **Scan des images.** `make scan` scanne avec Trivy chaque image que `make build` a construite :
 toute vulnérabilité HIGH ou CRITICAL bloque, corrigeable ou non, comme une image de base en fin
@@ -285,12 +287,13 @@ sous `latest` (`make push`) ; chaque paquet garde ses trois versions les plus r�
 ([ADR 0014](docs/adr/0014-ci-cd-github-actions-et-ghcr.md)). Un déploiement vise l'étiquette du
 commit : `latest` peut désigner l'avant-dernier quand deux pushes se suivent de près.
 
-**Déploiement.** Rien à faire à la main non plus : après chaque publication sur `main`, le job
-`deploy` se connecte au VPS par SSH, y dépose `infra/compose.yml`, fixe `IMAGE_TAG` au SHA du
-commit dans son `.env`, puis lance `docker compose pull` et `up -d --wait` — il rougit si un
-service ne devient pas sain. Il ne déploie que la tête de `main`, et reste sauté tant que la
-variable de dépôt `DEPLOY_ENABLED` ne vaut pas `true`. Amorçage du VPS, secrets et déploiement de
-secours : [infra/RUNBOOK.md](infra/RUNBOOK.md).
+**Déploiement.** Rien à faire à la main non plus : après chaque publication sur `main`, une fois la
+fumée de ses images verte (job `fumee`), le job `deploy` se connecte au VPS par SSH, y dépose
+`infra/compose.yml`, fixe `IMAGE_TAG` au SHA du commit dans son `.env`, puis lance
+`docker compose pull` et `up -d --wait` — il rougit si un service ne devient pas sain. Il ne
+déploie que la tête de `main`, et reste sauté tant que la variable de dépôt `DEPLOY_ENABLED` ne
+vaut pas `true`. Amorçage du VPS, secrets et déploiement de secours :
+[infra/RUNBOOK.md](infra/RUNBOOK.md).
 
 **Test de restauration.** Rien à faire à la main : le 1ᵉʳ de chaque mois, le workflow
 [`restore.yml`](.github/workflows/restore.yml) restaure la dernière sauvegarde dans une pile

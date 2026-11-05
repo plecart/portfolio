@@ -21,7 +21,7 @@ from call_witness import recording, witnessed
 from config.env import Env
 from test_deployment import checkout_then_scripts_findings
 from test_infra import REPOSITORY_ROOT, job_steps
-from test_publication import WORKFLOW_TOKEN_ENV
+from test_publication import WORKFLOW_TOKEN_ENV, forms
 
 RESTORE_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "restore.yml"
 
@@ -194,10 +194,7 @@ RESTORE_CHANGES = {
         True,
     ),
 }
-RESTORE_FORMS = {
-    form: (CONFORMING_WORKFLOW.replace(old, new) if old else CONFORMING_WORKFLOW, expected)
-    for form, (old, new, expected) in RESTORE_CHANGES.items()
-}
+RESTORE_FORMS = forms(CONFORMING_WORKFLOW, RESTORE_CHANGES)
 
 
 @pytest.mark.parametrize(("workflow", "expected"), RESTORE_FORMS.values(), ids=RESTORE_FORMS.keys())
