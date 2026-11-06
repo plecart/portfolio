@@ -153,9 +153,9 @@ vulnerabilities:
       d'écrire dans une table FTS5 `detail=none`, puis d'y lancer une requête `MATCH` ; rien
       n'ouvre de base SQLite : `DATABASES` ne nomme que PostgreSQL, seul le moteur
       `django.db.backends.sqlite3` importe `sqlite3`, et la bibliothèque n'est mappée par aucun
-      processus de gunicorn ni de celery. Alternatives : corrigé en amont par SQLite 3.54.0, sans
-      correctif dans Debian 13 ni dans sid (bogue Debian 1152790) ; `python:3.12.16-slim-trixie`
-      porte le même paquet.
+      processus de gunicorn ni de celery. Alternatives : corrigé en amont par SQLite 3.54.0 et dans
+      sid (3.54.1-1), sans correctif dans Debian 13, classé « no-dsa » (bogue Debian 1152790) ;
+      `python:3.12.16-slim-trixie` porte le même paquet.
     expired_at: 2027-01-30
 
   - id: CVE-2026-119586
@@ -166,7 +166,7 @@ vulnerabilities:
       dépend, et `util-linux`, paquet essentiel, en pré-dépend. Atteinte : non — le défaut est
       dans la commande `.recover` du shell `sqlite3`, absent de l'image : le paquet `sqlite3` n'y
       est pas installé. Alternatives : aucun correctif dans Debian 13 ni dans sid (bogue Debian
-      1152790) ; `python:3.12.16-slim-trixie` porte le même paquet.
+      1152878) ; `python:3.12.16-slim-trixie` porte le même paquet.
     expired_at: 2027-01-30
 
   - id: CVE-2026-119374
@@ -178,7 +178,7 @@ vulnerabilities:
       d'ouvrir une base dont l'index FTS5 est corrompu, puis d'y supprimer en `secure-delete` ;
       rien n'ouvre de base SQLite : `DATABASES` ne nomme que PostgreSQL, et la bibliothèque n'est
       mappée par aucun processus de gunicorn ni de celery. Alternatives : corrigé en amont par
-      SQLite 3.54.0 et dans sid (3.54.1-2), sans correctif dans Debian 13, classé « no-dsa » (bogue
+      SQLite 3.54.0 et dans sid (3.54.1-1), sans correctif dans Debian 13, classé « no-dsa » (bogue
       Debian 1152790) ; `python:3.12.16-slim-trixie` porte le même paquet.
     expired_at: 2027-02-04
 
@@ -191,7 +191,7 @@ vulnerabilities:
       dans `sqlite3changeset_apply()` de l'extension de session, qu'atteint seulement un
       programme qui applique un changeset ; rien n'ouvre de base SQLite, et la bibliothèque n'est
       mappée par aucun processus de gunicorn ni de celery. Alternatives : corrigé en amont par
-      SQLite 3.54.0 et dans sid (3.54.1-2), sans correctif dans Debian 13, classé « no-dsa » (bogue
+      SQLite 3.54.0 et dans sid (3.54.1-1), sans correctif dans Debian 13, classé « no-dsa » (bogue
       Debian 1152790) ; `python:3.12.16-slim-trixie` porte le même paquet.
     expired_at: 2027-02-04
 
