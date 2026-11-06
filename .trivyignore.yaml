@@ -169,6 +169,32 @@ vulnerabilities:
       1152790) ; `python:3.12.16-slim-trixie` porte le même paquet.
     expired_at: 2027-01-30
 
+  - id: CVE-2026-119374
+    paths:
+      - "**/portfolio-api (debian 13.*)"
+    statement: >-
+      Place : libsqlite3-0, venue de l'image de base, impossible à retirer — `liblastlog2-2` en
+      dépend, et `util-linux`, paquet essentiel, en pré-dépend. Atteinte : non — le défaut demande
+      d'ouvrir une base dont l'index FTS5 est corrompu, puis d'y supprimer en `secure-delete` ;
+      rien n'ouvre de base SQLite : `DATABASES` ne nomme que PostgreSQL, et la bibliothèque n'est
+      mappée par aucun processus de gunicorn ni de celery. Alternatives : corrigé en amont par
+      SQLite 3.54.0 et dans sid (3.54.1-2), sans correctif dans Debian 13, classé « no-dsa » (bogue
+      Debian 1152790) ; `python:3.12.16-slim-trixie` porte le même paquet.
+    expired_at: 2027-02-04
+
+  - id: CVE-2026-119379
+    paths:
+      - "**/portfolio-api (debian 13.*)"
+    statement: >-
+      Place : libsqlite3-0, venue de l'image de base, impossible à retirer — `liblastlog2-2` en
+      dépend, et `util-linux`, paquet essentiel, en pré-dépend. Atteinte : non — le défaut est
+      dans `sqlite3changeset_apply()` de l'extension de session, qu'atteint seulement un
+      programme qui applique un changeset ; rien n'ouvre de base SQLite, et la bibliothèque n'est
+      mappée par aucun processus de gunicorn ni de celery. Alternatives : corrigé en amont par
+      SQLite 3.54.0 et dans sid (3.54.1-2), sans correctif dans Debian 13, classé « no-dsa » (bogue
+      Debian 1152790) ; `python:3.12.16-slim-trixie` porte le même paquet.
+    expired_at: 2027-02-04
+
   - id: CVE-2026-109518
     paths:
       - "**/portfolio-api (debian 13.*)"
@@ -195,6 +221,18 @@ vulnerabilities:
       Debian le donnent à zlib. Alternatives : corrigé dans sid
       (1:1.3.dfsg+really1.3.2-4, bogue Debian 1153063), sans correctif dans Debian 13.
     expired_at: 2027-02-03
+
+  - id: CVE-2026-85091
+    paths:
+      - "**/portfolio-api (debian 13.*)"
+    statement: >-
+      Place : zlib1g, venu de l'image de base, impossible à retirer — `dpkg`, paquet essentiel,
+      en pré-dépend. Atteinte : non — le défaut est dans `gz_vacate()`, qu'atteint un appel à
+      `gzprintf()` ou `gzvprintf()` après une écriture bloquée ; seuls `libapt-pkg` et
+      `dpkg-deb` importent les fonctions `gz*`, et ni apt ni dpkg ne tournent (relevé des objets
+      ELF de l'image, 2026-11-05). Alternatives : corrigé en amont par zlib 1.4 et dans sid
+      (1:1.3.dfsg+really1.3.2-4, bogue Debian 1146895), sans correctif dans Debian 13.
+    expired_at: 2027-02-04
 
   # --- Image `caddy` : le binaire `caddy` 2.11.7, compilé par le projet avec Go 1.27.3 ---------
   #
