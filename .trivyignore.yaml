@@ -272,8 +272,7 @@ vulnerabilities:
       release de caddy 2.11.9 ; son paquet `x/net/html` n'a qu'un importeur,
       `github.com/smallstep/cli-utils/usage`, tiré par `caddypki` via `smallstep/certificates`
       (mesuré par `go list -deps` et `go mod why` sur le module du Dockerfile, 2026-11-07 ;
-      `govulncheck` 1.9.0, en mode source sur caddy 2.11.7, le range parmi les paquets importés
-      et non appelés).
+      `govulncheck` 1.9.0, en mode source, le range parmi les paquets importés et non appelés).
       Atteinte : non — le défaut épuise le processeur à l'analyse d'un HTML forgé ; `html.Parse`
       n'y est appelé que par le générateur de l'aide HTML (`help --html <dossier> --report`)
       d'une application `urfave/cli` du CLI `step`, et Caddy, dont la ligne de commande est en
