@@ -79,12 +79,15 @@ l'admin.
 
 ## Les règles de style
 
-Validées sur le schéma de pacome.dev le 2026-11-03 (version 13) ; elles valent pour tout projet.
+Validées sur le schéma de pacome.dev le 2026-11-03 (version 13), l'étiquette décidée le
+2026-11-07 (PR #241) ; elles valent pour tout projet.
 
 - **Le nom de l'outil** sur chaque carte, sans description.
 - **Le logo officiel** quand l'outil en a un ; une icône neutre (Lucide) sinon.
 - **Le logo du gestionnaire de secrets** que nomme la description (`secretManager`) se pose
   seulement sur ce qui détient un jeton ou une clé, jamais sur un compte à second facteur.
+- **Un service tiers qu'appellent des cartes** s'y scotche en étiquette (`sticker`), sans
+  section ni flèche, quand ses flèches traverseraient le dessin.
 - **Aucun texte sur les flèches**, et **jamais de valeur de secret** : le champ `secret` d'une
   carte dit *quel* secret le gestionnaire garde, jamais sa valeur.
 - **Les rangées centrées** : une carte se pose à une demi-colonne pour centrer sa rangée.

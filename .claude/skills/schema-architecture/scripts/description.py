@@ -11,9 +11,11 @@ La forme — toute clé absente de cette liste est une erreur, à tout niveau, c
 répétée dans un même objet :
 
 - racine : `intro`, chaîne non vide ; `columns`, entier ≥ 1, le nombre de colonnes de la grille ;
-  `secretManager` (optionnel), `{"name": chaîne non vide, "icon": icône}`, le gestionnaire de
-  secrets dont le logo marque les cartes à `secret` ; `zones`, liste non vide d'entrées ;
-  `links` (optionnel, vide permis), liste de liens ;
+  `secretManager` (optionnel), une marque : le gestionnaire de secrets, dont le logo se pose sur
+  les cartes à `secret` ; `zones`, liste non vide d'entrées ; `links` (optionnel, vide permis),
+  liste de liens ;
+- marque : `name`, chaîne non vide ; `icon`, icône — le nom et le logo d'un outil, posés sur des
+  cartes ;
 - entrée : une zone, ou une liste non vide de zones posées côte à côte ;
 - zone : `label`, chaîne non vide ; `color`, l'une de `COULEURS` ; `icon` (optionnel), icône ;
   `span` (optionnel, requis pour une zone côte à côte), `[premier, dernier]`, deux entiers,
@@ -25,6 +27,8 @@ répétée dans un même objet :
 - carte : `id`, chaîne non vide, unique dans la description ; `name`, chaîne non vide ; `icon`,
   icône ; `column`, nombre multiple de 0,5, dans la grille `[0, columns - 1]` et dans le span
   effectif de sa zone ; `secret` (optionnel), chaîne non vide, qui demande un `secretManager` ;
+  `sticker` (optionnel), une marque : l'étiquette d'un service tiers que la carte appelle, posée
+  sur elle sans flèche ;
 - lien : `from` et `to`, deux `id` de cartes existantes, différents — une paire qu'aucun autre lien
   ne répète, dans le même sens et quelle que soit sa route : `a → b` et `b → a` sont deux liens ;
   `route` (optionnel), l'une de `ROUTES`.
@@ -65,9 +69,9 @@ COULEURS = ("gold", "blue", "orange", "red", "green", "grey", "lane")
 ROUTES = ("left", "right", "under")
 # Les clés de chaque objet de la description, chacune requise ou non.
 RACINE = {"intro": True, "columns": True, "secretManager": False, "zones": True, "links": False}
-GESTIONNAIRE = {"name": True, "icon": True}
+MARQUE = {"name": True, "icon": True}
 ZONE = {"label": True, "color": True, "icon": False, "span": False, "rows": False, "zones": False}
-CARTE = {"id": True, "name": True, "icon": True, "column": True, "secret": False}
+CARTE = {"id": True, "name": True, "icon": True, "column": True, "secret": False, "sticker": False}
 LIEN = {"from": True, "to": True, "route": False}
 
 T = TypeVar("T")
@@ -336,15 +340,22 @@ class Passe:
         colonnes = self.lire(racine, "", "columns", ENTIER_POSITIF)
         self.grille = None if colonnes is None else (0, colonnes - 1)
         self.gestionnaire = "secretManager" in racine
-        if self.gestionnaire:
-            gestionnaire = self.ouvrir(racine["secretManager"], "secretManager", GESTIONNAIRE)
-            if gestionnaire is not None:
-                self.lire(gestionnaire, "secretManager", "name", TEXTE)
-                self.icone(gestionnaire, "secretManager")
+        self.marque(racine, "", "secretManager")
         zones = self.lire(racine, "", "zones", LISTE_NON_VIDE) or []
         self.entrees(zones, "zones", self.grille)
         for i, lien in enumerate(self.lire(racine, "", "links", LISTE) or []):
             self.lien(lien, f"links[{i}]")
+
+    def marque(self, objet: Mapping[str, object], chemin: str, cle: str) -> None:
+        """Lit le champ `cle`, s'il est présent : une marque, le nom et le logo d'un outil posés
+        sur des cartes."""
+        if cle not in objet:
+            return
+        sous = champ(chemin, cle)
+        marque = self.ouvrir(objet[cle], sous, MARQUE)
+        if marque is not None:
+            self.lire(marque, sous, "name", TEXTE)
+            self.icone(marque, sous)
 
     def entrees(self, entrees: Iterable[object], chemin: str, parente: Bornes | None) -> None:
         """Lit chaque entrée de la liste au chemin `chemin` : une zone, ou des zones côte à
@@ -436,6 +447,7 @@ class Passe:
         self.colonne(carte, chemin, span)
         if self.lire(carte, chemin, "secret", TEXTE) is not None and not self.gestionnaire:
             self.signaler(champ(chemin, "secret"), "secret sans secretManager à la racine")
+        self.marque(carte, chemin, "sticker")
 
     def colonne(self, carte: Mapping[str, object], chemin: str, span: Bornes | None) -> None:
         """Vérifie la colonne d'une carte : un multiple de 0,5, dans la grille, dans `span`."""
