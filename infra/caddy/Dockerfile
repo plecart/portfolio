@@ -32,7 +32,7 @@ WORKDIR /src
 # Go sont montés hors du layer, qui ne garde que le binaire et son module principal.
 RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod \
     go mod init caddy \
-    && go mod edit -require=github.com/caddyserver/caddy/v2@v2.11.7 \
+    && go mod edit -require=github.com/caddyserver/caddy/v2@v2.11.9 \
     && go mod download github.com/caddyserver/caddy/v2 \
     && cp "$(go list -m -f '{{.Dir}}' github.com/caddyserver/caddy/v2)/cmd/caddy/main.go" . \
     && go mod tidy \
@@ -40,7 +40,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/g
         -o /go/bin/caddy
 
 
-FROM caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
+FROM caddy:2.11.9-alpine@sha256:0bbb055bda6793c999bde78b1b5ce3e89f829fb031af2cf50056ea1246559fee
 
 # `curl` vient de l'image de base et rien ne l'appelle : la sonde de production appelle `wget`
 # (busybox), et le binaire `caddy`, statique, ne charge aucune bibliothèque. Retiré avec ce qu'il

@@ -234,7 +234,7 @@ vulnerabilities:
       (1:1.3.dfsg+really1.3.2-4, bogue Debian 1146895), sans correctif dans Debian 13.
     expired_at: 2027-02-04
 
-  # --- Image `caddy` : le binaire `caddy` 2.11.7, compilé par le projet avec Go 1.27.3 ---------
+  # --- Image `caddy` : le binaire `caddy` 2.11.9, compilé par le projet avec Go 1.27.3 ---------
   #
   # Ce qui tourne : le Caddyfile de production (`infra/caddy/Caddyfile`) — un serveur de fichiers
   # statiques et un reverse proxy interne vers `api`, routés par nom d'hôte, en HTTP, sans TLS ni
@@ -244,45 +244,32 @@ vulnerabilities:
   # graphe d'appels du binaire : `govulncheck` y trouve tous les symboles vulnérables, le binaire
   # embarquant tous les modules de Caddy. Exception : un paquet qu'aucun chemin de Caddy n'appelle,
   # mesuré par `govulncheck` en mode source sur le module du Dockerfile.
-  # Les versions sont celles que Trivy 0.74.0 lit dans le binaire au scan du 2026-10-21 : `caddy`
-  # v2.11.7, `stdlib` v1.27.3, `golang.org/x/net` v0.59.0. Le projet compile caddy avec le Go de
+  # Les versions sont celles que Trivy 0.74.0 lit dans le binaire au scan du 2026-11-07 : `caddy`
+  # v2.11.9, `stdlib` v1.27.3, `golang.org/x/net` v0.60.0. Le projet compile caddy avec le Go de
   # l'image `golang` épinglée, ses modules aux versions que fixe sa release (ADR 0018) : la
   # bibliothèque standard n'y porte plus d'exception, seuls ses modules en gardent.
-
-  - id: CVE-2026-78669
-    paths:
-      - usr/bin/caddy
-    statement: >-
-      Place : module `golang.org/x/net` v0.59.0 du binaire `caddy`, raison d'être de l'image, à
-      la version que fixe la release de caddy 2.11.7. Atteinte : non — le défaut consomme le
-      processeur d'un serveur **HTTP/2** par des changements répétés de fenêtre initiale ;
-      `infra/caddy/Caddyfile` restreint ses serveurs à HTTP/1.1 (`protocols h1`), et le test de
-      fumée vérifie que la préface `h2c` ne reçoit aucune réponse HTTP/2. Alternatives : corrigé
-      par x/net 0.60.0, absent de caddy 2.11.7, dernière version publiée ; le projet ne monte pas
-      un module au-delà de ce que fixe la release (ADR 0018).
-    expired_at: 2027-01-19
 
   - id: CVE-2026-116587
     paths:
       - usr/bin/caddy
     statement: >-
-      Place : modules `github.com/go-jose/go-jose/v3` v3.0.5 et `/v4` v4.1.5 du binaire `caddy`,
-      aux versions que fixe la release de caddy 2.11.7, tirés par l'autorité de certification de
-      smallstep (`go.step.sm/crypto/jose`, `coreos/go-oidc`) qu'embarque `caddypki` (mesuré par
-      `go list -deps` sur le module du Dockerfile, 2026-10-28). Atteinte : non — le défaut épuise
+      Place : module `github.com/go-jose/go-jose/v3` v3.0.5 du binaire `caddy`, à la version que
+      fixe la release de caddy 2.11.9, tiré par l'autorité de certification de smallstep
+      (`go.step.sm/crypto/jose`) qu'embarque `caddypki` (mesuré par `go list -deps` et
+      `go mod why` sur le module du Dockerfile, 2026-11-07). Atteinte : non — le défaut épuise
       le processeur à l'analyse d'une clé JWK RSA ; Caddy n'en analyse une venue du réseau que
       dans son serveur ACME, monté par le handler `acme_server`, absent de `infra/caddy/Caddyfile`
-      — le test de fumée vérifie qu'il manque à la configuration adaptée. Alternatives : v4 corrigé
-      par 4.1.6, v3 sans correctif, ni l'un ni l'autre dans caddy 2.11.7, dernière version
-      publiée ; le projet ne monte pas un module au-delà de ce que fixe la release (ADR 0018).
-    expired_at: 2027-01-26
+      — le test de fumée vérifie qu'il manque à la configuration adaptée. Alternatives : v3 sans
+      correctif ; `/v4`, corrigé par 4.1.6, l'est dans caddy 2.11.9, dernière version publiée ;
+      le projet ne monte pas un module au-delà de ce que fixe la release (ADR 0018).
+    expired_at: 2027-02-05
 
   - id: CVE-2026-78661
     paths:
       - usr/bin/caddy
     statement: >-
-      Place : module `golang.org/x/net` v0.59.0 du binaire `caddy`, à la version que fixe la
-      release de caddy 2.11.7 ; son paquet `x/net/html` n'a qu'un importeur,
+      Place : module `golang.org/x/net` v0.60.0 du binaire `caddy`, à la version que fixe la
+      release de caddy 2.11.9 ; son paquet `x/net/html` n'a qu'un importeur,
       `github.com/smallstep/cli-utils/usage`, tiré par `caddypki` via `smallstep/certificates`
       (mesuré par `go list -deps` et `go mod why` sur le module du Dockerfile, 2026-11-07 ;
       `govulncheck` 1.9.0, en mode source, le range parmi les paquets importés et non appelés).
@@ -292,7 +279,6 @@ vulnerabilities:
       cobra, ne monte aucune application `urfave/cli` : `cli-utils/command`, qui déclare cette
       aide, n'y est importé que par `cli-utils/fileutil`, pour `command.IsForce()`. Ce chemin ne
       tourne jamais, et il ne lit que l'aide générée par `step`, jamais une entrée du réseau.
-      Alternatives : corrigé par x/net 0.62.0, absent de caddy 2.11.7 comme de 2.11.8 et 2.11.9,
-      dernière version publiée (x/net 0.60.0) ; le projet ne monte pas un module au-delà de ce
-      que fixe la release (ADR 0018).
+      Alternatives : corrigé par x/net 0.62.0, absent de caddy 2.11.9, dernière version
+      publiée ; le projet ne monte pas un module au-delà de ce que fixe la release (ADR 0018).
     expired_at: 2027-02-05

@@ -14,7 +14,7 @@
 
 		# HTTP/1.1 seulement : `cloudflared` n'en parle pas d'autre à l'origine. Sans cette ligne,
 		# Caddy 2.11.4 accepte HTTP/2 en clair (`h2c`) sur son port HTTP — mesuré à la relecture de
-		# la PR #67 —, le serveur HTTP/2 que vise CVE-2026-78669 (`.trivyignore.yaml`).
+		# la PR #67 —, le serveur HTTP/2 que visait CVE-2026-78669, corrigée par Caddy 2.11.9.
 		protocols h1
 	}
 }
