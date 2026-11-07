@@ -141,6 +141,7 @@
     {"from": "api", "to": "pg"},
     {"from": "backup", "to": "pg"},
     {"from": "backup", "to": "r2b"},
-    {"from": "backup", "to": "hc", "route": "right"}
+    {"from": "backup", "to": "hc", "route": "right"},
+    {"from": "api", "to": "r2m"}
   ]
 }

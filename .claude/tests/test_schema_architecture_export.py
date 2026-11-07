@@ -70,13 +70,14 @@ def lancer(
     return export.main([str(lue), str(png)])
 
 
-def pacome_dev_fautive(tmp_path: Path, cible: str) -> Path:
-    """La description de pacome.dev, un lien de plus vers la carte d'id `cible`, absente."""
+def pacome_dev_fautive(tmp_path: Path, cible: str) -> tuple[Path, int]:
+    """La description de pacome.dev, un lien de plus vers la carte d'id `cible`, absente : son
+    chemin et l'index de ce lien, que la description réelle déplace à chaque lien ajouté."""
     fautive = json.loads(PACOME_DEV.read_text(encoding="utf-8"))
     fautive["links"].append({"from": "api", "to": cible})
     chemin = tmp_path / "architecture.json"
     chemin.write_text(json.dumps(fautive, ensure_ascii=False), encoding="utf-8")
-    return chemin
+    return chemin, len(fautive["links"]) - 1
 
 
 def chaines(noeud: object) -> list[str]:
@@ -171,11 +172,13 @@ def test_une_description_invalide_sort_en_1_sans_capture_ni_image(
     capture = Capture(png=png_temoin(1200, 1200))
     png = tmp_path / "architecture.png"
 
-    rendu = lancer(monkeypatch, capture, pacome_dev_fautive(tmp_path, "fantome"), png)
+    fautive, index = pacome_dev_fautive(tmp_path, "fantome")
+
+    rendu = lancer(monkeypatch, capture, fautive, png)
 
     assert rendu == 1
     assert capsys.readouterr().out.splitlines() == [
-        'links[15].to : aucune carte ne porte cet id, reçu "fantome"'
+        f'links[{index}].to : aucune carte ne porte cet id, reçu "fantome"'
     ]
     assert (capture.commandes, png.exists()) == ([], False)
 
@@ -286,12 +289,12 @@ def test_la_cli_rend_ses_erreurs_en_utf_8_dans_un_tube(tmp_path: Path) -> None:
     sortie 1, la ligne d'erreur lisible en UTF-8, aucune image."""
     png = tmp_path / "architecture.png"
 
-    done = run_in_pipe(
-        "schema-architecture", "export", str(pacome_dev_fautive(tmp_path, "fantôme")), str(png)
-    )
+    fautive, index = pacome_dev_fautive(tmp_path, "fantôme")
+
+    done = run_in_pipe("schema-architecture", "export", str(fautive), str(png))
 
     assert done.returncode == 1
     assert done.stdout.decode("utf-8").splitlines() == [
-        'links[15].to : aucune carte ne porte cet id, reçu "fantôme"'
+        f'links[{index}].to : aucune carte ne porte cet id, reçu "fantôme"'
     ]
     assert not png.exists()
