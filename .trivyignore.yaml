@@ -240,9 +240,10 @@ vulnerabilities:
   # statiques et un reverse proxy interne vers `api`, routés par nom d'hôte, en HTTP, sans TLS ni
   # certificat : Cloudflare le termine, `cloudflared` est la seule entrée (cadrage §7, D45).
   # HTTP/1.1 seulement (`protocols h1`) ; ni `templates`, ni `file_server browse`, ni `tracing`,
-  # ni `acme_server`, ni amont en HTTPS. L'atteinte est jugée sur cette configuration, pas sur un
-  # graphe d'appels : `govulncheck` trouve tous les symboles vulnérables dans le binaire, qui
-  # embarque tous les modules de Caddy.
+  # ni `acme_server`, ni amont en HTTPS. L'atteinte est jugée sur cette configuration, pas sur le
+  # graphe d'appels du binaire : `govulncheck` y trouve tous les symboles vulnérables, le binaire
+  # embarquant tous les modules de Caddy. Exception : un paquet qu'aucun chemin de Caddy n'appelle,
+  # mesuré par `govulncheck` en mode source sur le module du Dockerfile.
   # Les versions sont celles que Trivy 0.74.0 lit dans le binaire au scan du 2026-10-21 : `caddy`
   # v2.11.7, `stdlib` v1.27.3, `golang.org/x/net` v0.59.0. Le projet compile caddy avec le Go de
   # l'image `golang` épinglée, ses modules aux versions que fixe sa release (ADR 0018) : la
@@ -283,12 +284,15 @@ vulnerabilities:
       Place : module `golang.org/x/net` v0.59.0 du binaire `caddy`, à la version que fixe la
       release de caddy 2.11.7 ; son paquet `x/net/html` n'a qu'un importeur,
       `github.com/smallstep/cli-utils/usage`, tiré par `caddypki` via `smallstep/certificates`
-      (mesuré par `go list -deps` et `go mod why` sur le module du Dockerfile, 2026-11-07).
+      (mesuré par `go list -deps` et `go mod why` sur le module du Dockerfile, 2026-11-07 ;
+      `govulncheck` 1.9.0, en mode source, le range parmi les paquets importés et non appelés).
       Atteinte : non — le défaut épuise le processeur à l'analyse d'un HTML forgé ; `html.Parse`
-      n'y est appelé que par le générateur de l'aide HTML (`help --html`) d'une application
-      `urfave/cli` du CLI `step`, et Caddy, dont la ligne de commande est en cobra, n'importe
-      `cli-utils/command` que pour `command.IsForce()` : ce chemin ne tourne jamais, et il ne lit
-      que l'aide générée par `step`, jamais une entrée du réseau. Alternatives : corrigé par x/net
-      0.62.0, absent de caddy 2.11.7 comme de 2.11.8 et 2.11.9, dernière version publiée (x/net
-      0.60.0) ; le projet ne monte pas un module au-delà de ce que fixe la release (ADR 0018).
+      n'y est appelé que par le générateur de l'aide HTML (`help --html <dossier> --report`)
+      d'une application `urfave/cli` du CLI `step`, et Caddy, dont la ligne de commande est en
+      cobra, ne monte aucune application `urfave/cli` : `cli-utils/command`, qui déclare cette
+      aide, n'y est importé que par `cli-utils/fileutil`, pour `command.IsForce()`. Ce chemin ne
+      tourne jamais, et il ne lit que l'aide générée par `step`, jamais une entrée du réseau.
+      Alternatives : corrigé par x/net 0.62.0, absent de caddy 2.11.7 comme de 2.11.8 et 2.11.9,
+      dernière version publiée (x/net 0.60.0) ; le projet ne monte pas un module au-delà de ce
+      que fixe la release (ADR 0018).
     expired_at: 2027-02-05
