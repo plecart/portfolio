@@ -80,7 +80,8 @@
                     "name": "Django",
                     "icon": "django",
                     "column": 2.5,
-                    "secret": "le jeton R2 des images"
+                    "secret": "le jeton R2 des images",
+                    "sticker": {"name": "Sentry", "icon": "sentry"}
                   }
                 ]
               ]
@@ -97,7 +98,8 @@
                       "name": "Celery",
                       "icon": "celery",
                       "column": 0,
-                      "secret": "le jeton R2 des images"
+                      "secret": "le jeton R2 des images",
+                      "sticker": {"name": "Sentry", "icon": "sentry"}
                     },
                     {"id": "redis", "name": "Redis", "icon": "redis", "column": 1}
                   ]

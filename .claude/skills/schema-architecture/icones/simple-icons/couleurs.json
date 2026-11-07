@@ -7,5 +7,6 @@
   "hetzner": "#D50C2D",
   "keepassxc": "#6CAC4D",
   "postgresql": "#4169E1",
-  "redis": "#FF4438"
+  "redis": "#FF4438",
+  "sentry": "#362D59"
 }

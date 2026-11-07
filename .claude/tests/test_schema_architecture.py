@@ -4,9 +4,10 @@
 Le validateur reçoit les icônes disponibles en paramètre : les cas d'erreur s'éprouvent sur un jeu
 témoin écrit ici, sans disque ; seule la description de pacome.dev se valide contre le dossier
 d'icônes réel du skill. Chaque cas d'erreur part de `BASE`, une description valide qui porte
-chaque structure de la forme — sections côte à côte, section imbriquée, demi-colonne, secret —,
-et n'y change qu'une valeur. Les cas s'écrivent en littéraux, jamais dérivés des constantes du
-script (`cycle-pr/references/tests.md`, « Le rouge se constate, il ne se suppose pas »).
+chaque structure de la forme — sections côte à côte, section imbriquée, demi-colonne, secret,
+étiquette —, et n'y change qu'une valeur. Les cas s'écrivent en littéraux, jamais dérivés des
+constantes du script (`cycle-pr/references/tests.md`, « Le rouge se constate, il ne se suppose
+pas »).
 """
 
 import codecs
@@ -22,7 +23,9 @@ description = load_script("schema-architecture", "description")
 
 PACOME_DEV = REPOSITORY_ROOT / "docs" / "schema" / "architecture.json"
 # Les icônes disponibles des cas : celles de `BASE` et des descriptions valides, rien d'autre.
-ICONES_TEMOINS = frozenset({"keepassxc", "lock-keyhole", "vault", "globe", "docker", "django"})
+ICONES_TEMOINS = frozenset(
+    {"keepassxc", "lock-keyhole", "vault", "globe", "docker", "django", "sentry"}
+)
 
 BASE: dict[str, Any] = {
     "intro": "Un projet témoin.",
@@ -65,6 +68,7 @@ BASE: dict[str, Any] = {
                                 "icon": "django",
                                 "column": 1.5,
                                 "secret": "le jeton",
+                                "sticker": {"name": "Sentry", "icon": "sentry"},
                             }
                         ]
                     ],
@@ -116,8 +120,8 @@ class Cas(NamedTuple):
     chemin: str | None = None
 
 
-# La carte `d` de `BASE` — dans une section imbriquée sans span, à secret, visée par aucun lien —,
-# où un champ fautif ne fait naître aucune autre erreur.
+# La carte `d` de `BASE` — dans une section imbriquée sans span, à secret et à étiquette, visée
+# par aucun lien —, où un champ fautif ne fait naître aucune autre erreur.
 CARTE_D = "zones[1].zones[0].rows[0][0]"
 
 
@@ -141,6 +145,8 @@ FORMES: dict[str, dict[str, Cas]] = {
         "carte-name-manquant": Cas(f"{CARTE_D}.name", RETIREE, None),
         "carte-icon-manquant": Cas(f"{CARTE_D}.icon", RETIREE, None),
         "carte-column-manquant": Cas(f"{CARTE_D}.column", RETIREE, None),
+        "sticker-name-manquant": Cas(f"{CARTE_D}.sticker.name", RETIREE, None),
+        "sticker-icon-manquant": Cas(f"{CARTE_D}.sticker.icon", RETIREE, None),
         "lien-from-manquant": Cas("links", [{"to": "a"}], None, "links[0].from"),
         "lien-to-manquant": Cas("links", [{"from": "a"}], None, "links[0].to"),
     },
@@ -167,6 +173,9 @@ FORMES: dict[str, dict[str, Cas]] = {
         "carte-column-chaine": Cas(f"{CARTE_D}.column", "1", '"1"'),
         "carte-column-booleen": Cas(f"{CARTE_D}.column", True, "true"),
         "carte-secret-nombre": Cas(f"{CARTE_D}.secret", 7, "7"),
+        "sticker-chaine": Cas(f"{CARTE_D}.sticker", "Sentry", '"Sentry"'),
+        "sticker-name-nombre": Cas(f"{CARTE_D}.sticker.name", 7, "7"),
+        "sticker-icon-nombre": Cas(f"{CARTE_D}.sticker.icon", 7, "7"),
         "lien-from-nombre": Cas("links", [{"from": 7, "to": "a"}], "7", "links[0].from"),
         "lien-to-nombre": Cas("links", [{"from": "a", "to": 7}], "7", "links[0].to"),
         "lien-route-nombre": Cas(
@@ -186,6 +195,7 @@ FORMES: dict[str, dict[str, Cas]] = {
         "carte-id-vide": Cas(f"{CARTE_D}.id", "", '""'),
         "carte-name-vide": Cas(f"{CARTE_D}.name", "", '""'),
         "carte-secret-vide": Cas(f"{CARTE_D}.secret", "", '""'),
+        "sticker-name-vide": Cas(f"{CARTE_D}.sticker.name", "", '""'),
         "lien-from-vide": Cas("links", [{"from": "", "to": "a"}], '""', "links[0].from"),
         "lien-to-vide": Cas("links", [{"from": "a", "to": ""}], '""', "links[0].to"),
         "zones-vide": Cas("zones", [], "[]"),
@@ -198,6 +208,7 @@ FORMES: dict[str, dict[str, Cas]] = {
         "secretmanager-cle-inconnue": Cas("secretManager.url", "x", '"url"'),
         "zone-cle-inconnue": Cas("zones[1].couleur", "x", '"couleur"'),
         "carte-cle-inconnue": Cas(f"{CARTE_D}.c", 1, '"c"'),
+        "sticker-cle-inconnue": Cas(f"{CARTE_D}.sticker.url", "x", '"url"'),
         "lien-cle-inconnue": Cas(
             "links", [{"from": "a", "to": "b", "label": "x"}], '"label"', "links[0].label"
         ),
@@ -215,6 +226,7 @@ FORMES: dict[str, dict[str, Cas]] = {
         "carte-icone-absente": Cas("zones[0][0].rows[0][0].icon", "absente", '"absente"'),
         "zone-icone-absente": Cas("zones[0][0].icon", "absente", '"absente"'),
         "secretmanager-icone-absente": Cas("secretManager.icon", "absente", '"absente"'),
+        "sticker-icone-absente": Cas(f"{CARTE_D}.sticker.icon", "absente", '"absente"'),
     },
     "valeur hors de son ensemble": {
         "couleur-inconnue": Cas("zones[1].color", "pink", '"pink"'),
@@ -277,21 +289,22 @@ CAS = {nom: cas for groupe in FORMES.values() for nom, cas in groupe.items()}
 
 @pytest.mark.parametrize("cas", CAS.values(), ids=CAS.keys())
 def test_une_forme_d_erreur_rend_une_erreur_au_chemin_du_champ_fautif(cas: Cas) -> None:
-    """**Dénombrement des formes, écrit avant le premier correctif** (#217, bloc A, 2026-11-05).
+    """**Dénombrement des formes, écrit avant le premier correctif** (#217, bloc A, 2026-11-05 ;
+    `sticker` ajouté le 2026-11-07, PR #241).
 
-    Population : la forme verrouillée de la description — 5 objets (racine, `secretManager`,
-    zone, carte, lien), 21 champs dont 13 requis, 2 contenants positionnels (entrée, rangée) —
-    et les contraintes qui lient ses champs. **89 formes**, une par cas de `FORMES` :
+    Population : la forme verrouillée de la description — 6 objets (racine, `secretManager`,
+    zone, carte, `sticker`, lien), 24 champs dont 15 requis, 2 contenants positionnels (entrée,
+    rangée) — et les contraintes qui lient ses champs. **97 formes**, une par cas de `FORMES` :
 
-    - champ requis manquant : 13, un par champ requis ;
-    - champ d'un autre type : 31 — un par champ (21), le booléen là où un entier est attendu
+    - champ requis manquant : 15, un par champ requis ;
+    - champ d'un autre type : 34 — un par champ (24), le booléen là où un entier est attendu
       (`columns`, `column`, borne de `span`), le `span` d'un seul entier, et chaque contenant
       qui n'est pas de son type (racine, entrée, zone côte à côte, rangée, carte, lien) ;
-    - valeur vide ou hors des bornes de son type : 12 — chaque chaîne non vide (8), chaque liste
+    - valeur vide ou hors des bornes de son type : 13 — chaque chaîne non vide (9), chaque liste
       non vide (racine `zones`, zones côte à côte, rangée), `columns` à 0 ;
-    - clé inconnue : 5, une par objet ;
-    - clé en double dans un objet : 1, la même lecture pour les 5 objets ;
-    - icône absente du dossier : 3 (carte, zone, `secretManager`) ;
+    - clé inconnue : 6, une par objet ;
+    - clé en double dans un objet : 1, la même lecture pour les 6 objets ;
+    - icône absente du dossier : 4 (carte, zone, `secretManager`, `sticker`) ;
     - valeur hors de son ensemble : 2 (`color`, `route`) ;
     - colonne hors de la grille (2, une par bord), hors du span de sa zone (1), hors du span
       qu'une zone sans span prend de sa parente (1), pas un multiple de 0,5 (2, dont NaN, que
@@ -317,12 +330,12 @@ def test_les_cas_d_erreur_comptent_les_formes_de_leur_docstring() -> None:
     (`.claude/rules/cleanup-verbatim.md`, passe « affirmations ») : un nom de cas répété d'un
     groupe à l'autre en ôterait un de `CAS`."""
     assert {groupe: len(cas) for groupe, cas in FORMES.items()} == {
-        "champ requis manquant": 13,
-        "champ d'un autre type": 31,
-        "valeur vide ou hors des bornes de son type": 12,
-        "clé inconnue": 5,
+        "champ requis manquant": 15,
+        "champ d'un autre type": 34,
+        "valeur vide ou hors des bornes de son type": 13,
+        "clé inconnue": 6,
         "clé en double": 1,
-        "icône absente du dossier": 3,
+        "icône absente du dossier": 4,
         "valeur hors de son ensemble": 2,
         "colonne": 6,
         "span": 5,
@@ -331,24 +344,25 @@ def test_les_cas_d_erreur_comptent_les_formes_de_leur_docstring() -> None:
         "références": 5,
         "secret sans gestionnaire": 1,
     }
-    assert len(CAS) == 89
+    assert len(CAS) == 97
 
 
 def test_les_tables_de_la_forme_comptent_les_champs_de_la_docstring() -> None:
-    """« 21 champs dont 13 requis » (docstring du test paramétré), recompté sur les tables des 5
-    objets du script, et un cas « champ requis manquant » par champ requis : un champ requis
-    ajouté sans son cas rougit ici."""
-    tables = (
+    """« 24 champs dont 15 requis » (docstring du test paramétré), recompté sur la table de
+    chacun des 6 objets du script — `MARQUE` pour `secretManager` et pour `sticker` —, et un cas
+    « champ requis manquant » par champ requis : un champ requis ajouté sans son cas rougit ici."""
+    objets = (
         description.RACINE,
-        description.GESTIONNAIRE,
+        description.MARQUE,
         description.ZONE,
         description.CARTE,
+        description.MARQUE,
         description.LIEN,
     )
 
-    assert sum(map(len, tables)) == 21
-    assert sum(sum(table.values()) for table in tables) == 13
-    assert len(FORMES["champ requis manquant"]) == 13
+    assert sum(map(len, objets)) == 24
+    assert sum(sum(table.values()) for table in objets) == 15
+    assert len(FORMES["champ requis manquant"]) == 15
 
 
 def test_une_passe_rend_toutes_les_erreurs_et_verifie_les_freres_d_un_noeud_fautif() -> None:
