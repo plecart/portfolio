@@ -281,9 +281,10 @@ RESTORE_REMOTE := /root/portfolio-restore.sh
 .PHONY: restore
 
 # Restaure une sauvegarde dans la base de production, depuis le poste (brief de #24, décision 1) :
-#   make restore HOST=<adresse du VPS> BACKUP=<derniere|AAAAMMJJTHHMMSSZ>
+#   make restore HOST=portfolio BACKUP=<derniere|AAAAMMJJTHHMMSSZ>
 # La copie de travail de `infra/restore.sh` copiée sur le VPS, puis lancée dans le dossier de la
-# pile, la clé privée sur l'entrée standard — jamais en argument. En `root`, comme l'amorçage :
+# pile, la clé privée sur l'entrée standard — jamais en argument. En `root`, comme l'amorçage, par
+# l'alias `portfolio` du `~/.ssh/config`, qui porte l'adresse et la clé (RUNBOOK, « L'accès `root` ») :
 # `deploy` n'admet que la clé de la CI. `HOST` et `BACKUP` se donnent sur la ligne de commande,
 # sans défaut — restaurer détruit — : une variable homonyme de l'environnement ne compte pas. Le
 # script vérifie le format de `BACKUP` ; la cible borne les caractères de `HOST`, qui entre dans la
@@ -291,7 +292,7 @@ RESTORE_REMOTE := /root/portfolio-restore.sh
 # chemin de la clé est cité : un dossier du poste peut porter une espace. Procédure :
 # `infra/RUNBOOK.md`.
 restore:
-	$(if $(and $(filter command line,$(origin HOST)),$(HOST)),,$(error HOST manque : l'adresse du VPS))
+	$(if $(and $(filter command line,$(origin HOST)),$(HOST)),,$(error HOST manque : l'alias SSH du VPS (portfolio)))
 	$(if $(and $(filter command line,$(origin BACKUP)),$(BACKUP)),,$(error BACKUP manque : derniere, ou l'horodatage <AAAAMMJJ>T<HHMMSS>Z))
 	@test -r '$(AGE_IDENTITY)' || { \
 		echo "AGE_IDENTITY : $(AGE_IDENTITY) introuvable, le fichier de la clé privée age" >&2; exit 1; }
