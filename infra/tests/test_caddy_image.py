@@ -421,7 +421,8 @@ def test_caddy_ne_sert_aucun_telechargement_partiel(stack: Stack) -> None:
 
 def test_caddy_ne_parle_pas_http2_en_clair(stack: Stack) -> None:
     """`cloudflared` joint Caddy en HTTP/1.1 : HTTP/2 en clair (`h2c`) n'a rien à servir, et c'est
-    le serveur HTTP/2 que vise CVE-2026-78669 (`.trivyignore.yaml`). Caddy 2.11.4 l'accepte pourtant
+    le serveur HTTP/2 que visait CVE-2026-78669, exceptée jusqu'à Caddy 2.11.9 (x/net 0.60.0) ; c'est
+    le cadre de l'atteinte de toute faille HTTP/2 future. Caddy 2.11.4 l'accepte pourtant
     sans qu'on le lui demande — mesuré à la relecture de la PR #67 : sa réponse à la préface
     commence par une trame SETTINGS. Une réponse HTTP/1.1 ou une connexion fermée conviennent."""
     with socket.create_connection(("127.0.0.1", stack.port), timeout=5) as connection:
