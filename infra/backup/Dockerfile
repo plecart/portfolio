@@ -46,7 +46,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/g
 FROM go AS rclone
 RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod \
     go install -trimpath -ldflags "-s -X github.com/rclone/rclone/fs.VersionSuffix=" \
-    github.com/rclone/rclone@v1.75.2
+    github.com/rclone/rclone@v1.76.0
 
 
 # `paquets` : l'étage que la CI reconstruit à chaque build, sans son cache (`ci.yml`) — les paquets
