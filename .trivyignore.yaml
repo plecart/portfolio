@@ -275,3 +275,20 @@ vulnerabilities:
       par 4.1.6, v3 sans correctif, ni l'un ni l'autre dans caddy 2.11.7, dernière version
       publiée ; le projet ne monte pas un module au-delà de ce que fixe la release (ADR 0018).
     expired_at: 2027-01-26
+
+  - id: CVE-2026-78661
+    paths:
+      - usr/bin/caddy
+    statement: >-
+      Place : module `golang.org/x/net` v0.59.0 du binaire `caddy`, à la version que fixe la
+      release de caddy 2.11.7 ; son paquet `x/net/html` n'a qu'un importeur,
+      `github.com/smallstep/cli-utils/usage`, tiré par `caddypki` via `smallstep/certificates`
+      (mesuré par `go list -deps` et `go mod why` sur le module du Dockerfile, 2026-11-07).
+      Atteinte : non — le défaut épuise le processeur à l'analyse d'un HTML forgé ; `html.Parse`
+      n'y est appelé que par le générateur de l'aide HTML (`help --html`) d'une application
+      `urfave/cli` du CLI `step`, et Caddy, dont la ligne de commande est en cobra, n'importe
+      `cli-utils/command` que pour `command.IsForce()` : ce chemin ne tourne jamais, et il ne lit
+      que l'aide générée par `step`, jamais une entrée du réseau. Alternatives : corrigé par x/net
+      0.62.0, absent de caddy 2.11.7 comme de 2.11.8 et 2.11.9, dernière version publiée (x/net
+      0.60.0) ; le projet ne monte pas un module au-delà de ce que fixe la release (ADR 0018).
+    expired_at: 2027-02-05
