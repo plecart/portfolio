@@ -70,12 +70,28 @@ n'est pas un secret.
 
 ## Amorcer un VPS neuf
 
-Prérequis : un VPS x86 sous Ubuntu LTS en UE (ADR 0002, 0023), joignable en `root` par ta clé SSH ; dans le
+Prérequis : un VPS x86 sous Ubuntu LTS en UE (ADR 0002, 0023), joignable en `root` par la clé SSH
+`~/.ssh/portfolio_admin` (phrase de passe : entrée `portfolio_admin`), et l'alias `portfolio` de
+« L'accès `root` » ci-dessous, son `HostName` à l'adresse du VPS ; dans le
 gestionnaire de mots de passe, le jeton du Tunnel, ceux du bucket des médias et du bucket des
 sauvegardes, la paire `age` et le compte de l'admin (« Admin ») ; l'adresse de ping du contrôle
 healthchecks.io (#25). À la première connexion, `ssh` affiche l'empreinte de l'hôte : compare-la à
 celle que la console du fournisseur rend pour `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`
 — identiques, oui ou non ? Non : n'accepte pas.
+
+**L'accès `root`.** Toute commande `root` vers le VPS passe par l'alias `portfolio` du
+`~/.ssh/config` du poste — `ssh portfolio`, `scp … portfolio:` —, posé une fois à la création du
+VPS et retouché à chaque VPS reconstruit (`HostName`) :
+```
+Host portfolio
+    HostName <ip>
+    User root
+    IdentityFile ~/.ssh/portfolio_admin
+    IdentitiesOnly yes
+```
+`IdentitiesOnly yes` n'offre que cette clé, pas celles de l'agent ni `~/.ssh/id_*`, que le serveur
+refuse (`ssh_config(5)`). La clé de déploiement (`deploy_key`, utilisateur `deploy`) reste hors de
+l'alias : elle est à la CI, et ne sert au poste qu'une fois, avec `-i`, à l'étape 6.
 
 Sous Windows, chaque geste du poste se lance dans **Git Bash** : PowerShell 5.1 refuse `<`, perd le
 `""` de `-N ""`, et son `|` abîme un binaire.
@@ -100,14 +116,14 @@ Sous Windows, chaque geste du poste se lance dans **Git Bash** : PowerShell 5.1 
    git show <sha>:infra/compose.yml > compose.yml
    git show <sha>:infra/prod.env.example > prod.env.example
    wc -c bootstrap.sh compose.yml prod.env.example
-   scp bootstrap.sh compose.yml prod.env.example root@<ip>:
+   scp bootstrap.sh compose.yml prod.env.example portfolio:
    rm bootstrap.sh compose.yml prod.env.example
    ```
    Aucun fichier à 0 octet : hors d'un clone, `git show` échoue et `>` laisse un fichier vide. (Un
    `compose.yml` laissé à la racine du dépôt serait pris par tout `docker compose` lancé là.)
 5. **L'amorçage**, en `root` sur le VPS — `-t` pour les saisies sans écho :
    ```
-   ssh -t root@<ip> bash bootstrap.sh
+   ssh -t portfolio bash bootstrap.sh
    ```
    Il demande : la clé publique (le contenu de `deploy_key.pub`), le jeton GHCR, `IMAGE_TAG` (le
    SHA de l'étape 3), `TUNNEL_TOKEN`, les noms d'hôte — `SITE_HOST`, `API_HOST`, `MEDIA_HOST`
@@ -120,7 +136,7 @@ Sous Windows, chaque geste du poste se lance dans **Git Bash** : PowerShell 5.1 
    Il s'arrête sur la première erreur ; relancé, il reprend sans rien refaire de ce qui est en
    place. `cloudflared` ne devient sain qu'avec un Tunnel configuré (#25) : sinon `--wait`
    s'arrête sur « cloudflared is unhealthy ». Un noyau neuf installé en chemin attend un
-   redémarrage (`needrestart` le dit) : `ssh root@<ip> reboot`, et la pile revient seule.
+   redémarrage (`needrestart` le dit) : `ssh portfolio reboot`, et la pile revient seule.
 6. **L'environnement `production` et ses secrets**, depuis le poste, dans le dépôt — d'abord
    l'environnement restreint à `main` (doc GitHub « Deployments and environments »), puis les
    quatre secrets :
@@ -128,7 +144,7 @@ Sous Windows, chaque geste du poste se lance dans **Git Bash** : PowerShell 5.1 
    echo '{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}' | gh api -X PUT repos/plecart/portfolio/environments/production --input -
    gh api -X POST repos/plecart/portfolio/environments/production/deployment-branch-policies -f name=main -f type=branch
    gh secret set DEPLOY_SSH_KEY --env production < deploy_key
-   ssh root@<ip> "cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub" | sed "s/^/<ip> /" | gh secret set DEPLOY_KNOWN_HOSTS --env production
+   ssh portfolio "cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub" | sed "s/^/<ip> /" | gh secret set DEPLOY_KNOWN_HOSTS --env production
    gh secret set DEPLOY_HOST --env production --body <ip>
    gh secret set DEPLOY_USER --env production --body deploy
    ssh -i deploy_key deploy@<ip> "cd /srv/portfolio && docker compose ps"
@@ -145,7 +161,7 @@ Sous Windows, chaque geste du poste se lance dans **Git Bash** : PowerShell 5.1 
 
 En `deploy`, dans le dossier de la pile — `root` lit l'état aussi, mais n'a pas d'accès à GHCR :
 ```
-ssh root@<ip>
+ssh portfolio
 sudo -iu deploy
 cd /srv/portfolio
 docker compose ps
@@ -168,7 +184,7 @@ commits publiés ont encore leurs images (`make prune`) :
 1. Le Compose de ce commit, depuis le poste :
    ```
    git show <sha>:infra/compose.yml > compose.yml
-   scp compose.yml root@<ip>:/tmp/compose.yml
+   scp compose.yml portfolio:/tmp/compose.yml
    rm compose.yml
    ```
 2. Sur le VPS, les gestes du job `deploy` :
@@ -497,10 +513,10 @@ site est indisponible le temps de la restauration — quelques minutes.
    `portfolio-20261015T030000Z.dump.age` (tableau de bord Cloudflare, R2, bucket des sauvegardes).
 3. **La restauration** :
    ```
-   make restore HOST=<ip> BACKUP=derniere
+   make restore HOST=portfolio BACKUP=derniere
    ```
-   `HOST` : une adresse IPv4 ou un nom d'hôte — lettres, chiffres, `.` et `-` ; pour un VPS en
-   IPv6 seul, un alias de `~/.ssh/config`.
+   `HOST` : l'alias `portfolio` (« Amorcer un VPS neuf », « L'accès `root` ») — `make` y prend
+   `root@portfolio`, que l'alias sert avec la bonne clé. Lettres, chiffres, `.` et `-` seulement.
    Elle écrit, dans l'ordre : `== sélection` et `sauvegarde : <objet>` ; `== téléchargement` ;
    `== déchiffrement` ; `== arrêt` et `arrêtés : api worker` ; `== restauration` ; `== migrations`, avec
    chaque migration que Django applique ; `== contrôle` et
