@@ -89,8 +89,9 @@ Host portfolio
     IdentityFile ~/.ssh/portfolio_admin
     IdentitiesOnly yes
 ```
-`IdentitiesOnly yes` n'offre que cette clé, pas celles de l'agent ni `~/.ssh/id_*`, que le serveur
-refuse (`ssh_config(5)`). La clé de déploiement (`deploy_key`, utilisateur `deploy`) reste hors de
+`IdentityFile` remplace les `~/.ssh/id_*` par défaut et `IdentitiesOnly yes` écarte les clés de
+l'agent, que le serveur refuse : seule cette clé est offerte, tant qu'aucun autre bloc (`Host *`)
+n'ajoute d'`IdentityFile` (`ssh_config(5)`). La clé de déploiement (`deploy_key`, utilisateur `deploy`) reste hors de
 l'alias : elle est à la CI, et ne sert au poste qu'une fois, avec `-i`, à l'étape 6.
 
 Sous Windows, chaque geste du poste se lance dans **Git Bash** : PowerShell 5.1 refuse `<`, perd le
@@ -549,8 +550,9 @@ DNS.
 
 1. **Suspendre le déploiement continu** (1 min) — sinon chaque push vise l'ancien hôte :
    `gh variable set DEPLOY_ENABLED --body false`.
-2. **Louer un VPS** x86 sous Ubuntu LTS en UE (ADR 0002, 0023), joignable en `root` par ta clé SSH
-   (10 min).
+2. **Louer un VPS** x86 sous Ubuntu LTS en UE (ADR 0002, 0023), joignable en `root` par la clé
+   `portfolio_admin`, puis remettre le `HostName` de l'alias `portfolio` à sa nouvelle adresse
+   (« Amorcer un VPS neuf », « L'accès `root` ») (10 min).
 3. **L'amorcer** : « Amorcer un VPS neuf », étapes 1 à 5 (25 min) — une clé de déploiement neuve,
    le jeton GHCR, `bootstrap.sh` —, puis, de son étape 6, les trois secrets que la machine change
    seulement, l'environnement `production` et sa règle de branche existant déjà :
