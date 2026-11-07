@@ -351,7 +351,7 @@ def test_les_tables_de_la_forme_comptent_les_champs_de_la_docstring() -> None:
     """« 24 champs dont 15 requis » (docstring du test paramétré), recompté sur la table de
     chacun des 6 objets du script — `MARQUE` pour `secretManager` et pour `sticker` —, et un cas
     « champ requis manquant » par champ requis : un champ requis ajouté sans son cas rougit ici."""
-    objets = (
+    tables = (
         description.RACINE,
         description.MARQUE,
         description.ZONE,
@@ -360,8 +360,8 @@ def test_les_tables_de_la_forme_comptent_les_champs_de_la_docstring() -> None:
         description.LIEN,
     )
 
-    assert sum(map(len, objets)) == 24
-    assert sum(sum(table.values()) for table in objets) == 15
+    assert sum(map(len, tables)) == 24
+    assert sum(sum(table.values()) for table in tables) == 15
     assert len(FORMES["champ requis manquant"]) == 15
 
 
