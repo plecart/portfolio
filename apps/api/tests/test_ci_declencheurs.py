@@ -283,7 +283,7 @@ DEPTH_LINE = "          fetch-depth: 0\n"
 CHECKOUT_LINES = f"      - uses: actions/checkout@v0\n        with:\n{REF_LINE}{DEPTH_LINE}"
 # Le pas de fusion, par son seul nom : son contenu, `test_chaque_pas_de_fusion_est_celui_du_job_api`
 # le tient sur les fichiers du dépôt.
-FUSION_LINE = f"      - name: {FUSION_NAME}\n"
+FUSION_STEP_LINE = f"      - name: {FUSION_NAME}\n"
 JOBS_STEP_LINES = (
     "      - name: Jobs à lancer\n        id: jobs\n        shell: bash\n"
     f"        run: {CHANGED_JOBS_COMMAND}\n"
@@ -302,7 +302,7 @@ GATED_LINES = "".join(
 )
 CONFORMING_WORKFLOW = (
     f"{TRIGGERS_BLOCK}{CONCURRENCY_BLOCK}jobs:\n  api:\n{API_IF_LINE}{OUTPUTS_LINES}    steps:\n"
-    f"{CHECKOUT_LINES}{FUSION_LINE}{JOBS_STEP_LINES}{INSTALL_LINES}"
+    f"{CHECKOUT_LINES}{FUSION_STEP_LINE}{JOBS_STEP_LINES}{INSTALL_LINES}"
     f"{TESTS_LINE}{PIPELINE_STEP_LINES}{GATED_LINES}"
 )
 
@@ -390,12 +390,12 @@ FORMS: dict[str, Form] = {
     "checkout sans fetch-depth": (gating_findings, DEPTH_LINE, "", True),
     # L'ancienne profondeur, et celle que rendrait `cond && 0 || 2` : `0` y est faux.
     "checkout à profondeur 2": (gating_findings, DEPTH_LINE, "          fetch-depth: 2\n", True),
-    "api sans pas de fusion": (gating_findings, FUSION_LINE, "", True),
+    "api sans pas de fusion": (gating_findings, FUSION_STEP_LINE, "", True),
     # L'étape `jobs` lirait le delta avant la fusion : `HEAD^1` serait le parent de la tête.
     "pas de fusion après l'étape jobs": (
         gating_findings,
-        FUSION_LINE + JOBS_STEP_LINES,
-        JOBS_STEP_LINES + FUSION_LINE,
+        FUSION_STEP_LINE + JOBS_STEP_LINES,
+        JOBS_STEP_LINES + FUSION_STEP_LINE,
         True,
     ),
     "étape jobs après make install": (
@@ -460,11 +460,11 @@ FORMS: dict[str, Form] = {
     "fusion conforme": (fusion_findings, "", "", False),
     "fusion : checkout sans ref": (fusion_findings, REF_LINE, "", True),
     "fusion : checkout sans fetch-depth": (fusion_findings, DEPTH_LINE, "", True),
-    "fusion : pas absent": (fusion_findings, FUSION_LINE, "", True),
+    "fusion : pas absent": (fusion_findings, FUSION_STEP_LINE, "", True),
     "fusion : pas qui ne suit pas le checkout": (
         fusion_findings,
-        FUSION_LINE + JOBS_STEP_LINES,
-        JOBS_STEP_LINES + FUSION_LINE,
+        FUSION_STEP_LINE + JOBS_STEP_LINES,
+        JOBS_STEP_LINES + FUSION_STEP_LINE,
         True,
     ),
     # La garde vaut pour tout job qui peut tourner sur une PR, pas pour `api` seul.
@@ -475,13 +475,13 @@ FORMS: dict[str, Form] = {
     ),
     "fusion : web qui extrait et fusionne": (
         fusion_findings,
-        *stack_step("web", CHECKOUT_LINES + FUSION_LINE),
+        *stack_step("web", CHECKOUT_LINES + FUSION_STEP_LINE),
         False,
     ),
     "fusion : publish qui fusionne": (
         fusion_findings,
         "jobs:\n",
-        "jobs:\n  publish:\n    steps:\n" + CHECKOUT_LINES + FUSION_LINE,
+        "jobs:\n  publish:\n    steps:\n" + CHECKOUT_LINES + FUSION_STEP_LINE,
         True,
     ),
     "fusion : publish qui extrait sans fusionner": (
@@ -588,6 +588,13 @@ def fusion_steps() -> list[tuple[str, str, dict[str, Any]]]:
         for step in steps
         if step.get("name") == FUSION_NAME
     ]
+
+
+def fusion_step() -> dict[str, Any]:
+    """Le pas de fusion du job `api` de `ci.yml`, sous sa forme analysée : celui que les autres
+    jobs reprennent."""
+    (step,) = [step for name, job, step in fusion_steps() if (name, job) == ("ci.yml", "api")]
+    return step
 
 
 def test_chaque_job_qui_peut_tourner_sur_une_pr_fusionne_la_tete_au_trunk_courant() -> None:
@@ -717,7 +724,7 @@ AVIS_CHANGES = {
     "sans appel par la CI": ("  workflow_call:\n", "", True),
     "écriture sur le dépôt": ("  contents: read\n", "  contents: write\n", True),
     "un second job": ("jobs:\n", "jobs:\n  autre:\n    steps: []\n", True),
-    "sans fusion du trunk": (FUSION_LINE, "", True),
+    "sans fusion du trunk": (FUSION_STEP_LINE, "", True),
     "sans audit Python": ("      - run: make audit\n", "", True),
     "sans audit npm": ("      - run: make web-audit\n", "", True),
     "sans build": ("      - run: make build\n", "", True),
@@ -1234,27 +1241,17 @@ FUSION_FRAME = {
 }
 # L'identité du commit de fusion, que le pas se donne : le runner n'en a aucune.
 FUSION_COMMITTER = "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
-# Le préfixe de la ligne de trace, destinée à `porte-merge.py trunk`, qui la lit dans le journal.
+# Le préfixe de la ligne de trace, qu'un pas en échec n'écrit pas. Sa forme, et qu'aucune ligne du
+# script ne l'imite, `.claude/tests/test_porte_merge.py` les tient : il fait lire par la porte ce
+# que le pas écrit, script recopié compris.
 TRACE_PREFIX = "Fusion explicite"
 # Le fichier que la base porte et que le trunk change : la tête qui le change aussi entre en conflit.
 CONFLICTED = "conflit.txt"
-# Le `GITHUB_SHA` du run, que le runner donne à chaque pas (doc GitHub « Variables », lue le
-# 2026-11-08) : sur une PR, la référence de fusion dont le run a lu la définition du workflow.
-WORKFLOW_SHA = "9" * 40
-
-
-def fusion_step() -> dict[str, Any]:
-    """Le pas de fusion du job `api` de `ci.yml`, sous sa forme analysée : celui que les autres
-    jobs reprennent."""
-    (step,) = [step for name, job, step in fusion_steps() if (name, job) == ("ci.yml", "api")]
-    return step
 
 
 def play_fusion(repo: Path, bash: str, head: str) -> subprocess.CompletedProcess[str]:
     """Le pas de fusion joué dans `repo` comme sur une PR de tête `head` vers `main`."""
-    return play_step(
-        fusion_step(), repo, bash, TRUNK="main", HEAD_SHA=head, GITHUB_SHA=WORKFLOW_SHA
-    )
+    return play_step(fusion_step(), repo, bash, TRUNK="main", HEAD_SHA=head)
 
 
 def error_lines(played: subprocess.CompletedProcess[str]) -> list[str]:
@@ -1306,8 +1303,7 @@ def trunk_and_head(repo: Path, changed: str) -> tuple[str, str]:
 
 
 def trace_lines(text: str) -> list[str]:
-    """Les lignes de `text` que `porte-merge.py trunk` lirait : blancs ôtés, celles qui commencent
-    par `TRACE_PREFIX`."""
+    """Les lignes de `text` qui commencent par `TRACE_PREFIX`, blancs ôtés."""
     return [line for line in map(str.strip, text.splitlines()) if line.startswith(TRACE_PREFIX)]
 
 
@@ -1320,34 +1316,23 @@ def test_le_pas_de_fusion_ne_joue_que_sur_une_pr_vers_sa_branche_cible() -> None
     assert "${{" not in step["run"]
 
 
-def test_aucune_ligne_du_script_de_fusion_n_imite_sa_trace() -> None:
-    """Le journal du run recopie le script du pas avant sa sortie : une ligne du script qui
-    commencerait par `TRACE_PREFIX` se lirait comme une trace, sur un pas qui n'a rien fusionné."""
-    assert trace_lines(fusion_step()["run"]) == []
-
-
 @pytest.mark.usefixtures("git_isole")
 def test_le_pas_fusionne_la_tete_au_trunk_courant_trunk_en_premier_parent(
     tmp_path: Path, bash_de_ce_systeme: str
 ) -> None:
     """Le trunk en premier parent, la tête en second — `HEAD^1..HEAD` reste le delta, `HEAD^1..HEAD^2`
-    les commits de la PR —, le message en SHA complets, l'identité du robot d'Actions, et une ligne
-    de trace, une seule, relue sur les parents du commit et nommant le `GITHUB_SHA` du run."""
+    les commits de la PR —, le message en SHA complets et l'identité du robot d'Actions. La ligne de
+    trace, `.claude/tests/test_porte_merge.py` la fait lire par la porte."""
     trunk, head = trunk_and_head(tmp_path, "autre.txt")
 
     played = play_fusion(tmp_path, bash_de_ce_systeme, head)
 
     assert played.returncode == 0, played.stderr
-    merge, first, second = git(tmp_path, "rev-parse", "HEAD", "HEAD^1", "HEAD^2").split()
+    first, second = git(tmp_path, "rev-parse", "HEAD^1", "HEAD^2").split()
     assert [first, second] == [trunk, head]
     assert git(tmp_path, "log", "-1", "--format=%s%n%cn <%ce>").splitlines() == [
         f"Merge {head} into {trunk}",
         FUSION_COMMITTER,
-    ]
-    # Le journal d'un run mêle les deux sorties.
-    log = played.stdout + played.stderr
-    assert trace_lines(log) == [
-        f"{TRACE_PREFIX} : {merge} Merge {head} into {trunk} (workflow {WORKFLOW_SHA})"
     ]
 
 

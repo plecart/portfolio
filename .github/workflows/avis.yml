@@ -39,9 +39,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Appelé par `ci.yml` sur une PR, il en hérite l'événement : la tête, fusionnée au trunk
-      # courant comme dans les jobs de `ci.yml`. Planifié, à la main ou appelé sur un push, `ref`
-      # est vide — le checkout prend le commit de l'événement — et le pas de fusion ne joue pas.
+      # Appelé par `ci.yml` sur une PR, il en hérite l'événement et le `GITHUB_SHA` (doc GitHub
+      # « Events that trigger workflows », `workflow_call`, lue le 2026-11-08) : la tête, fusionnée
+      # au trunk courant comme dans les jobs de `ci.yml`, et la ligne de fusion nomme le même
+      # workflow qu'eux. Planifié, à la main ou appelé sur un push, `ref` est vide — le checkout
+      # prend le commit de l'événement — et le pas de fusion ne joue pas.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
