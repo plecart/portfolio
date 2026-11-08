@@ -1,8 +1,8 @@
 /**
- * La couche plein écran de la galerie (issue #243) : son ouverture, son clavier, son zoom par
- * boutons et touches, ses fermetures, sa palette sombre et son fondu, aux deux largeurs. Les images
- * des scénarios sont carrées : à ×1, l'image a pour côté le plus petit de la zone d'image — sa
- * hauteur au bureau, sa largeur sur téléphone.
+ * La couche plein écran de la galerie (issue #243) : son ouverture, son clavier, son zoom, ses
+ * fermetures, sa palette sombre et son fondu, aux deux largeurs. Les images des scénarios sont
+ * carrées : à ×1, l'image a pour côté le plus petit de la zone d'image — sa hauteur au bureau, sa
+ * largeur sur téléphone.
  */
 import type { Page } from '@playwright/test'
 import { expect, test } from './api.ts'
@@ -32,8 +32,7 @@ const ONE_IMAGE = [buildImage('fiche', CAPTIONS[0])]
 /** L'image de la couche, et ses commandes. */
 const viewerImage = (page: Page) => viewer(page).getByRole('img')
 const viewerButton = (page: Page, name: string) => viewer(page).getByRole('button', { name })
-const zoomIn = (page: Page) => viewerButton(page, 'Zoom avant')
-const zoomOut = (page: Page) => viewerButton(page, 'Zoom arrière')
+const viewerBar = (page: Page) => page.locator('.image-viewer-bar')
 const viewerCaption = (page: Page) => viewer(page).locator('.project-gallery-caption')
 const viewerCounter = (page: Page) => viewer(page).locator('.project-gallery-counter')
 const galleryCounter = (page: Page) => gallery(page).locator('.project-gallery-counter')
@@ -44,6 +43,15 @@ const transformOf = (page: Page) =>
 
 /** La vue d'ouverture : l'image entière, centrée. */
 const FIT = 'translate(0px, 0px) scale(1)'
+
+/** La zone d'image : la fenêtre moins la barre. */
+const zoneOf = async (page: Page) => (await page.locator('.image-viewer-zone').boundingBox())!
+
+/** Le côté de l'image carrée à ×1 : le plus petit de la zone. */
+const sideOf = async (page: Page) => {
+  const { width, height } = await zoneOf(page)
+  return Math.min(width, height)
+}
 
 /** Ouvre la couche par « Agrandir l’image », fondu d'entrée achevé. */
 async function openViewer(page: Page) {
@@ -87,18 +95,21 @@ test.describe('l’ouverture', () => {
     await arriveAt(page, { gallery: THREE_IMAGES })
     await openViewer(page)
     const { width, height } = page.viewportSize()!
-    // La barre : 36 px de boutons et 8 px de marge (PR #250, H6).
-    const zone = { width, height: height - 44 }
+    const bar = (await viewerBar(page).boundingBox())!
+    const zone = { width, height: height - bar.height }
     const side = Math.min(zone.width, zone.height)
 
     expect(await viewer(page).boundingBox()).toEqual({ x: 0, y: 0, width, height })
+    expect(await zoneOf(page)).toEqual({ x: 0, y: 0, ...zone })
+    expect(bar).toMatchObject({ x: 0, y: zone.height, width })
+    // La barre, à 8 px de chaque bord (PR #250, H6) : la légende, puis le compteur.
+    await expect(viewerBar(page)).toHaveCSS('padding', '8px')
     expect(await viewerImage(page).boundingBox()).toEqual({
       x: (zone.width - side) / 2,
       y: (zone.height - side) / 2,
       width: side,
       height: side,
     })
-    expect(await zoomIn(page).boundingBox()).toMatchObject({ y: height - 44, width: 36, height: 36 })
     expect(await closeImageButton(page).boundingBox()).toEqual({
       x: width - 44,
       y: 8,
@@ -142,9 +153,7 @@ test.describe('à trois images', () => {
     await page.keyboard.press('ArrowRight')
     // 100 px vers la gauche, ou jusqu'au bord de l'image : l'image carrée, à ×2, dépasse la zone de
     // 36 px de chaque côté au bureau (1 352 px pour 1 280), de 200 px sur téléphone.
-    const { width, height } = page.viewportSize()!
-    const side = Math.min(width, height - 44)
-    const pan = Math.min(100, (2 * side - width) / 2)
+    const pan = Math.min(100, (2 * (await sideOf(page)) - (await zoneOf(page)).width) / 2)
     expect(await transformOf(page)).toBe(`translate(${-pan}px, 0px) scale(2)`)
     await expect(viewerCounter(page)).toHaveText('2 / 3')
 
@@ -170,65 +179,57 @@ test.describe('à trois images', () => {
     page,
   }) => {
     await openViewer(page)
-    await zoomIn(page).click()
+    await page.keyboard.press('+')
 
     await viewerButton(page, 'Image précédente').click()
 
     await expect(viewerCounter(page)).toHaveText('3 / 3')
     expect(await transformOf(page)).toBe(FIT)
-    await expect(zoomOut(page)).toBeDisabled()
 
     await viewerButton(page, 'Image suivante').click()
     await expect(viewerCounter(page)).toHaveText('1 / 3')
   })
 
-  test('à ×4, « Zoom avant » est désactivé et + sans effet', async ({ page }) => {
+  test('+ zoome d’une unité jusqu’à ×4, puis reste sans effet', async ({ page }) => {
     await openViewer(page)
 
-    for (const scale of [2, 3, 4]) {
+    for (const scale of [2, 3, 4, 4]) {
       await page.keyboard.press('+')
       expect(await transformOf(page)).toBe(`translate(0px, 0px) scale(${scale})`)
     }
-    await expect(zoomIn(page)).toBeDisabled()
-    await expect(zoomOut(page)).toBeEnabled()
-
-    await page.keyboard.press('+')
-    expect(await transformOf(page)).toBe('translate(0px, 0px) scale(4)')
   })
 
-  test('à ×1, « Zoom arrière » est désactivé et − sans effet', async ({ page }) => {
+  test('− dézoome d’une unité jusqu’à ×1, puis reste sans effet', async ({ page }) => {
     await openViewer(page)
+    for (const key of ['+', '+', '+']) await page.keyboard.press(key)
 
-    await expect(zoomOut(page)).toBeDisabled()
-    await page.keyboard.press('-')
-    expect(await transformOf(page)).toBe(FIT)
-
-    await zoomIn(page).click()
-    await zoomOut(page).click()
-    expect(await transformOf(page)).toBe(FIT)
-    await expect(zoomOut(page)).toBeDisabled()
+    for (const scale of [3, 2, 1, 1]) {
+      await page.keyboard.press('-')
+      expect(await transformOf(page)).toBe(`translate(0px, 0px) scale(${scale})`)
+    }
   })
 
-  test('le bouton qui atteint sa borne passe le focus à l’autre : le clavier reste à la couche', async ({
+  test('aucun bouton de zoom (décision 8) : la fermeture et les flèches, qu’aucun zoom ne désactive', async ({
     page,
   }) => {
     await openViewer(page)
+    /** Les contrôles de la couche, seuls éléments qu'un attribut `disabled` désactive. */
+    const controls = () =>
+      viewer(page)
+        .locator('button, input, select, textarea, fieldset')
+        .evaluateAll((elements) =>
+          elements.map((element) => [element.getAttribute('aria-label'), element.matches(':disabled')]),
+        )
 
-    for (const scale of [2, 3, 4]) {
-      await zoomIn(page).click()
+    for (const scale of [1, 2, 3, 4]) {
+      if (scale > 1) await page.keyboard.press('+')
       expect(await transformOf(page)).toBe(`translate(0px, 0px) scale(${scale})`)
+      expect(await controls()).toEqual([
+        ['Fermer l’image', false],
+        ['Image précédente', false],
+        ['Image suivante', false],
+      ])
     }
-    await expect(zoomIn(page)).toBeDisabled()
-    await expect(zoomOut(page)).toBeFocused()
-    await page.keyboard.press('ArrowDown')
-    expect(await transformOf(page)).toBe('translate(0px, -100px) scale(4)')
-
-    for (const scale of [3, 2, 1]) {
-      await zoomOut(page).click()
-      expect(await transformOf(page)).toContain(`scale(${scale})`)
-    }
-    await expect(zoomOut(page)).toBeDisabled()
-    await expect(zoomIn(page)).toBeFocused()
   })
 
   for (const modifier of ['Control', 'Alt', 'Meta']) {
@@ -316,7 +317,7 @@ test.describe('les fermetures', () => {
   test('rouverte, la couche repart de ×1 sur l’image courante', async ({ page }) => {
     await openViewer(page)
     await viewerButton(page, 'Image suivante').click()
-    await zoomIn(page).click()
+    await page.keyboard.press('+')
     await page.keyboard.press('Escape')
     await expect(viewer(page)).toHaveCount(0)
 
@@ -362,10 +363,9 @@ test('une image seule : ni flèches ni compteur, le zoom disponible', async ({ p
   await expect(viewerButton(page, 'Image suivante')).toHaveCount(0)
   await expect(viewerCounter(page)).toHaveCount(0)
   await expect(viewerCaption(page)).toHaveText(CAPTIONS[0])
-  await expect(zoomIn(page)).toBeEnabled()
 
   await page.keyboard.press('ArrowRight')
-  await zoomIn(page).click()
+  await page.keyboard.press('+')
 
   expect(await transformOf(page)).toBe('translate(0px, 0px) scale(2)')
 })
@@ -399,9 +399,7 @@ for (const mode of ['light', 'dark'] as const) {
     await expect(viewer(page)).toHaveCSS('color-scheme', 'dark')
     await expect(viewerCaption(page)).toHaveCSS('color', ink2)
     await expect(viewerCounter(page)).toHaveCSS('color', ink2)
-    for (const button of [closeImageButton(page), zoomIn(page)]) {
-      await expect(button).toHaveCSS('color', ink2)
-    }
+    await expect(closeImageButton(page)).toHaveCSS('color', ink2)
     await expect(viewerButton(page, 'Image suivante')).toHaveCSS('color', ink)
     await expectNoViolations(page)
   })

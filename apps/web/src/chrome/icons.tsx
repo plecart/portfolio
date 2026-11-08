@@ -85,16 +85,6 @@ export function ExpandIcon() {
   return <GalleryIcon path="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6" />
 }
 
-/** Plus : zoom avant. */
-export function ZoomInIcon() {
-  return <GalleryIcon path="M12 5v14M5 12h14" />
-}
-
-/** Moins : zoom arrière. */
-export function ZoomOutIcon() {
-  return <GalleryIcon path="M5 12h14" />
-}
-
 /** Lien externe : celle des post-its de la fiche, 14 px (spec §4.3). */
 export function ExternalLinkIcon() {
   return (

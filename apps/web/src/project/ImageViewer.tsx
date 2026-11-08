@@ -1,14 +1,14 @@
 import { DialogClose, DialogContent, DialogPortal, DialogTitle } from '@radix-ui/react-dialog'
-import { type KeyboardEvent, type Ref, useEffect, useRef, useState } from 'react'
-import { CloseIcon, ZoomInIcon, ZoomOutIcon } from '../chrome/icons.tsx'
+import { type Ref, useEffect, useState } from 'react'
+import { CloseIcon } from '../chrome/icons.tsx'
 import { strings } from '../strings.ts'
-import { directionStep, GalleryArrows } from './GalleryArrows.tsx'
+import { GalleryArrows } from './GalleryArrows.tsx'
 import { PAPER_BUTTON, type readyImages } from './project.ts'
+import { keyCommand } from './viewerKeys.ts'
 import {
   clampView,
   containedSize,
   FIT,
-  MAX_SCALE,
   MIN_SCALE,
   panBy,
   type Point,
@@ -19,35 +19,6 @@ import {
 
 /** Une image prête de la galerie : sa légende et ses sources. */
 type Image = ReturnType<typeof readyImages>[number]
-
-/** Le pas d'un déplacement au clavier, en px (PR #250, H3). */
-const PAN_STEP = 100
-
-/**
- * Le déplacement de chaque flèche, une fois zoomé : celui du défilement d'une page, qui montre ce
- * qui est plus loin dans le sens de la flèche — l'image part à l'opposé.
- */
-const PAN_KEYS = new Map<string, Point>([
-  ['ArrowLeft', { x: PAN_STEP, y: 0 }],
-  ['ArrowRight', { x: -PAN_STEP, y: 0 }],
-  ['ArrowUp', { x: 0, y: PAN_STEP }],
-  ['ArrowDown', { x: 0, y: -PAN_STEP }],
-])
-
-/** Le pas de zoom de chaque touche, d'une unité (PR #250, H1). */
-const ZOOM_KEYS = new Map([
-  ['+', 1],
-  ['-', -1],
-])
-
-/** Les boutons de zoom de la barre, dans leur ordre : leur pas, leur nom, leur icône. */
-const ZOOM_BUTTONS = [
-  { by: -1, label: strings.zoomOut, Icon: ZoomOutIcon },
-  { by: 1, label: strings.zoomIn, Icon: ZoomInIcon },
-]
-
-/** Le facteur est-il à la borne vers laquelle zoome ce pas ? */
-const atBound = (scale: number, by: number) => (by < 0 ? scale <= MIN_SCALE : scale >= MAX_SCALE)
 
 /**
  * La taille d'un élément, suivie à chaque redimensionnement.
@@ -69,7 +40,7 @@ function useSize(element: HTMLElement | null): Size | null {
   return size
 }
 
-/** Le centre d'une zone : le point visé par un zoom au bouton ou à la touche (PR #250, H1). */
+/** Le centre d'une zone : le point visé par un zoom à la touche (PR #250, H1). */
 const centerOf = ({ width, height }: Size): Point => ({ x: width / 2, y: height / 2 })
 
 type ViewerProps = {
@@ -103,18 +74,14 @@ export function ImageViewer(props: ViewerProps) {
  * transmise au `DialogContent` : sans elle, la couche disparaîtrait sans fondu.
  *
  * Toute la fenêtre, sur la palette sombre (`data-scheme`, tokens.css), dans les deux modes : la
- * zone d'image, puis sa barre — légende, zoom, compteur. L'image tient entière dans la zone à ×1,
- * centrée ; une seule est montée, et changer d'image la remplace d'un coup, à ×1 (décision 7). Son
- * `transform` s'écrit par le CSSOM, comme la piste de la galerie.
+ * zone d'image, puis sa barre — légende et compteur ; aucun bouton de zoom (décision 8). L'image
+ * tient entière dans la zone à ×1, centrée ; une seule est montée, et changer d'image la remplace
+ * d'un coup, à ×1 (décision 7). Son `transform` s'écrit par le CSSOM, comme la piste de la galerie.
  *
- * Le clavier, tenu par la couche qui retient le focus (décision 6) : + et − zooment d'une unité au
- * centre ; à ×1, ← et → changent d'image ; zoomé, ← → ↑ ↓ déplacent de 100 px, borné. Ctrl, Cmd
- * et Alt laissent la touche au navigateur ; Maj ne compte que pour les flèches. « Zoom arrière » et
- * « Zoom avant » se désactivent à leur borne : celui qui l'atteint passe le focus à l'autre, sans
- * quoi le navigateur le rendrait au document, hors de la couche (« focus fixup » de HTML ; une
- * flèche pressée ensuite s'y perdait parfois, Chromium 156, mesuré le 2026-11-08). Échap, le bouton
- * « Fermer l'image » et un clic sur le fond la ferment seule ; le focus revient à « Agrandir
- * l'image ».
+ * Le clavier, tenu par la couche qui retient le focus (décision 6), suit `keyCommand` : + et −
+ * zooment d'une unité au centre de la zone ; à ×1, ← et → changent d'image ; zoomé, ← → ↑ ↓
+ * déplacent l'image. Échap, le bouton « Fermer l'image » et un clic sur le fond la ferment seule ;
+ * le focus revient à « Agrandir l'image ».
  */
 function ViewerLayer({
   ref,
@@ -126,7 +93,6 @@ function ViewerLayer({
   const [zone, setZone] = useState<HTMLDivElement | null>(null)
   const zoneSize = useSize(zone)
   const [view, setView] = useState(FIT)
-  const zoomButtons = useRef<(HTMLButtonElement | null)[]>([])
   const { caption, ...sources } = images[index]
   const stage: Stage | null = zoneSize && {
     zone: zoneSize,
@@ -141,28 +107,6 @@ function ViewerLayer({
     setView(FIT)
     onStep(by)
   }
-  /** Zoome d'une unité au centre de la zone ; rend le facteur atteint. */
-  const zoomBy = (by: number) => {
-    if (!stage) return shown.scale
-    const next = zoomAt(shown, shown.scale + by, centerOf(stage.zone), stage)
-    setView(next)
-    return next.scale
-  }
-
-  /** Ce que fait une touche, selon le zoom ; rien pour une touche modifiée, hors Maj pour + et −. */
-  const keyAction = ({ key, shiftKey, ctrlKey, metaKey, altKey }: KeyboardEvent) => {
-    if (ctrlKey || metaKey || altKey) return
-    const zoom = ZOOM_KEYS.get(key)
-    // Le + s'obtient avec Maj sur certains claviers.
-    if (zoom !== undefined) return () => zoomBy(zoom)
-    if (shiftKey) return
-    if (shown.scale > MIN_SCALE) {
-      const delta = PAN_KEYS.get(key)
-      return delta && (() => stage && setView(panBy(shown, delta, stage)))
-    }
-    const direction = directionStep(key)
-    if (navigable && direction !== null) return () => step(direction)
-  }
 
   return (
     <DialogContent
@@ -172,10 +116,16 @@ function ViewerLayer({
       data-scheme="dark"
       className="image-viewer"
       onKeyDown={(event) => {
-        const action = keyAction(event)
-        if (!action) return
+        const command = keyCommand(event, { zoomed: shown.scale > MIN_SCALE, navigable })
+        if (!command) return
         event.preventDefault()
-        action()
+        if ('step' in command) return step(command.step)
+        if (!stage) return
+        setView(
+          'pan' in command
+            ? panBy(shown, command.pan, stage)
+            : zoomAt(shown, shown.scale + command.zoom, centerOf(stage.zone), stage),
+        )
       }}
     >
       <DialogTitle className="sr-only">{strings.imageViewer}</DialogTitle>
@@ -208,24 +158,6 @@ function ViewerLayer({
       </div>
       <div className="image-viewer-bar">
         <span className="project-gallery-caption">{caption}</span>
-        {ZOOM_BUTTONS.map(({ by, label, Icon }, position) => (
-          <button
-            key={by}
-            ref={(button) => {
-              zoomButtons.current[position] = button
-            }}
-            type="button"
-            aria-label={label}
-            disabled={atBound(shown.scale, by)}
-            className={`${PAPER_BUTTON} disabled:opacity-40`}
-            onClick={() => {
-              // Désactivé à sa borne, il perdrait le focus, et la couche son clavier : l'autre le prend.
-              if (atBound(zoomBy(by), by)) zoomButtons.current[1 - position]?.focus()
-            }}
-          >
-            <Icon />
-          </button>
-        ))}
         {navigable && (
           <span className="project-gallery-counter" aria-live="polite">
             {index + 1} / {images.length}

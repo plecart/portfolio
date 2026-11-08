@@ -38,6 +38,12 @@ const DATE_SEPARATOR = ' – '
 /** Ce qu'un balayage doit dépasser en horizontal, en px, pour changer d'image (spec §4.4). */
 const SWIPE_THRESHOLD = 40
 
+/** Les touches des deux sens de la galerie (spec §4.4), et leur pas. */
+const DIRECTION_KEYS = new Map([
+  ['ArrowLeft', -1],
+  ['ArrowRight', 1],
+])
+
 /**
  * L'attribut `sizes` d'une image de galerie (spec §3.2) : `--photo` dès 600 px, recopiée de
  * `project.css` car `sizes` ne lit pas les propriétés CSS, sinon le panneau moins ses marges de 8 px.
@@ -49,11 +55,11 @@ export const GALLERY_SIZES = [
 
 /**
  * Le disque d'un bouton icône sur papier (spec §3.2) : 36 px, rond, `--paper`, icône `--ink-2`,
- * `--ink` au survol d'un bouton actif. Les fermetures de la fiche et de sa couche plein écran, et les
- * boutons de zoom de la couche, le portent ; chacun se place à part.
+ * `--ink` au survol. Les fermetures de la fiche et de sa couche plein écran le portent ; chacune se
+ * place à part.
  */
 export const PAPER_BUTTON =
-  'flex size-9 items-center justify-center rounded-full bg-(--paper) text-(--ink-2) transition-colors enabled:hover:text-(--ink)'
+  'flex size-9 items-center justify-center rounded-full bg-(--paper) text-(--ink-2) transition-colors hover:text-(--ink)'
 
 /**
  * Le chemin de la fiche d'un projet.
@@ -171,6 +177,16 @@ export function readyImages(gallery: readonly GalleryImage[]) {
     const sources = imageSources(variants)
     return sources ? [{ caption, ...sources }] : []
   })
+}
+
+/**
+ * Le pas de la touche d'un sens de la galerie (spec §4.4).
+ *
+ * @param key La touche (`KeyboardEvent.key`).
+ * @returns `-1` pour ←, `1` pour → ; `null` pour toute autre touche.
+ */
+export function directionStep(key: string): number | null {
+  return DIRECTION_KEYS.get(key) ?? null
 }
 
 /**
