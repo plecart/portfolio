@@ -54,7 +54,6 @@ export const cards = (page: Page) => page.getByRole('main').getByRole('link')
 export const entry = (card: Locator) => card.locator('.card-entry')
 export const pose = (card: Locator) => card.locator('.card-pose')
 export const face = (card: Locator) => card.locator('.card-face')
-export const tilt = (card: Locator) => card.locator('.card-tilt')
 export const summary = (card: Locator) => card.locator('.card-summary')
 
 /** Une carte aux trois technologies et aux deux états : sous 600 px, ses rubans vont à la ligne. */

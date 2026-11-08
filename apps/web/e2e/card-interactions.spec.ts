@@ -21,7 +21,6 @@ import {
   pose,
   serveUnderCsp,
   summary,
-  tilt,
   TWO_CARDS,
   watchTransitions,
 } from './table.ts'
@@ -263,7 +262,7 @@ const greenColumns = (page: Page, png: Buffer) =>
   }, `data:image/png;base64,${png.toString('base64')}`)
 
 test('à mi-transition, aucun filet de l’image ne longe le bandeau', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'appareil sans survol : le filet se mesure sous la carte inclinée')
+  test.skip(isMobile, 'appareil sans survol : le filet se mesure sous la carte soulevée')
   await page.setViewportSize(COLUMN_VIEWPORT)
   await openTable(page, PROJECT_SETS.threeWithoutShowcase)
   await enterCards(page)
@@ -346,10 +345,12 @@ for (const [width, maxLines] of [
     const overlay = await summary(cards(page).first()).evaluate((element: HTMLElement) => {
       const { lineHeight, paddingBottom, paddingTop } = getComputedStyle(element)
       const inset = parseFloat(paddingTop) + parseFloat(paddingBottom)
-      const postit = element.closest('.card-tilt')!.querySelector<HTMLElement>('.card-postit')!
+      // Depuis le haut de la photo, repère du bandeau ; le post-it se place dans la face.
+      const photo = element.offsetParent as HTMLElement
+      const postit = element.closest('.card-face')!.querySelector<HTMLElement>('.card-postit')!
       return {
         textTop: element.offsetTop + parseFloat(paddingTop),
-        postitBottom: postit.offsetTop + postit.offsetHeight,
+        postitBottom: postit.offsetTop + postit.offsetHeight - photo.offsetTop,
         lines: Math.round((element.offsetHeight - inset) / parseFloat(lineHeight)),
         overflow: element.scrollHeight - element.clientHeight,
       }
@@ -639,140 +640,39 @@ for (const colorScheme of ['light', 'dark'] as const) {
   })
 }
 
-/** L'inclinaison d'une carte sur chaque axe, au degré, lue sur sa transformation calculée. */
-const tiltOf = (card: Locator) =>
-  tilt(card).evaluate((layer) => {
-    const { m23, m31 } = new DOMMatrix(getComputedStyle(layer).transform)
-    return [m23, m31].map((sine) => Math.round((Math.asin(sine) * 180) / Math.PI))
-  })
-
-/** Le coin haut droit d'une carte : le point qui l'incline de +6° sur chaque axe. */
-async function topRightCorner(card: Locator) {
-  const { x, y, width } = (await card.boundingBox())!
-  return { x: x + width - 1, y: y + 1 }
-}
-
-/** Laisse au navigateur le temps d'une image : ce qu'un geste écrit y est posé. */
-const nextFrame = (page: Page) => page.evaluate(() => new Promise(requestAnimationFrame))
-
-for (const [size, index] of [
-  ['vitrine', 0],
-  ['simple', 1],
-] as const) {
-  test(`au pointeur, une carte ${size} s'incline : +6° au coin haut droit, 0 au centre, retour en 240 ms`, async ({
-    page,
-    isMobile,
-  }) => {
-    test.skip(isMobile, 'appareil sans pointeur fin : aucune inclinaison')
-    await page.setViewportSize(COLUMN_VIEWPORT)
-    await openTable(page, PROJECT_SETS.threeWithShowcase)
-    const card = cards(page).nth(index)
-    const { x, y, width, height } = (await card.boundingBox())!
-    const transitions = await watchTransitions(page)
-
-    const corner = await topRightCorner(card)
-    await page.mouse.move(corner.x, corner.y)
-    await expect.poll(() => tiltOf(card)).toEqual([6, 6])
-
-    await page.mouse.move(x + width / 2, y + height / 2)
-    await expect.poll(() => tiltOf(card)).toEqual([0, 0])
-
-    // Jamais d'inertie : la couche suit le pointeur sans transition.
-    await page.mouse.move(x + 1, y + height - 1)
-    await expect.poll(() => tiltOf(card)).toEqual([-6, -6])
-    expect(await transitions('card-tilt')).toEqual([])
-
-    await page.mouse.move(0, 0)
-    await expect
-      .poll(() => transitions('card-tilt'))
-      .toEqual([{ layer: 'card-tilt', property: 'transform', duration: '0.24s' }])
-    await expect.poll(() => tiltOf(card)).toEqual([0, 0])
-  })
-}
-
-test('la perspective de 900 px atteint la couche inclinée : elle est sur son parent direct', async ({
-  page,
-}) => {
-  await openTable(page, PROJECT_SETS.one)
-
-  const perspective = await tilt(cards(page)).evaluate(
-    (layer) => getComputedStyle(layer.parentElement!).perspective,
+/** La transformation calculée de chaque élément de la face, dans l'ordre du document. */
+const contentTransforms = (card: Locator) =>
+  face(card).evaluate((layer) =>
+    [...layer.querySelectorAll('*')].map((element) => getComputedStyle(element).transform),
   )
 
-  expect(perspective).toBe('900px')
-})
-
-test('aucune inclinaison sur un appareil tactile, ni au doigt ni à la souris', async ({
+test('au pointeur, rien ne bouge dans la face : du coin au coin opposé, les transformations du focus clavier', async ({
   page,
   isMobile,
 }) => {
-  test.skip(!isMobile, 'un appareil sans survol : le projet mobile')
-  await openTable(page, PROJECT_SETS.one)
-  const card = cards(page)
-  const { x, y } = await topRightCorner(card)
+  test.skip(isMobile, 'appareil sans survol')
+  await openTable(page, TWO_CARDS)
+  const card = cards(page).first()
+  await focusByKeyboard(card)
+  await settle(page)
+  const focused = await contentTransforms(card)
+  const { x, y, width, height } = (await card.boundingBox())!
 
-  await page.touchscreen.tap(x, y)
-  await nextFrame(page)
-  expect(await tiltOf(card)).toEqual([0, 0])
+  await page.mouse.move(x + width - 1, y + 1)
+  await settle(page)
+  const atCorner = await contentTransforms(card)
+  await page.mouse.move(x + 1, y + height - 1)
+  await settle(page)
 
-  await page.mouse.move(x, y)
-  await nextFrame(page)
-  expect(await tiltOf(card)).toEqual([0, 0])
+  expect([atCorner, await contentTransforms(card)]).toEqual([focused, focused])
 })
 
-test('aucune inclinaison en mouvement réduit', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'appareil sans pointeur fin : aucune inclinaison')
-  await page.emulateMedia({ reducedMotion: 'reduce' })
-  await openTable(page, PROJECT_SETS.one)
-  const card = cards(page)
-  const { x, y } = await topRightCorner(card)
-
-  await page.mouse.move(x, y)
-  await nextFrame(page)
-
-  expect(await tiltOf(card)).toEqual([0, 0])
-})
-
-test('un autre pointeur que la souris n’incline rien, sur un appareil à souris', async ({
+test('sous la CSP de production, le retard d’entrée s’écrit : rien par un attribut analysé', async ({
   page,
-  isMobile,
 }) => {
-  test.skip(isMobile, 'un appareil à pointeur fin : le projet desktop')
-  await openTable(page, PROJECT_SETS.one)
-  const card = cards(page)
-  const client = await page.context().newCDPSession(page)
-  const overs = await page.evaluateHandle(() => {
-    const pointerTypes: string[] = []
-    addEventListener('pointerover', ({ pointerType }) => pointerTypes.push(pointerType))
-    return pointerTypes
-  })
-
-  // Un stylet : l'émulation tactile de Chromium change aussi `hover` et `pointer`, pas lui.
-  await client.send('Input.dispatchMouseEvent', {
-    type: 'mouseMoved',
-    pointerType: 'pen',
-    ...(await topRightCorner(card)),
-  })
-  // Sous lui, Chromium rejoue un survol de type `mouse`, sans `pointermove` : on l'attend, sans quoi
-  // lire l'inclinaison dépend de l'image où il tombe.
-  await expect.poll(() => overs.jsonValue()).toContain('mouse')
-
-  expect(await tiltOf(card)).toEqual([0, 0])
-})
-
-test('sous la CSP de production, inclinaison et retard s’écrivent : rien par un attribut analysé', async ({
-  page,
-  isMobile,
-}) => {
-  test.skip(isMobile, 'appareil sans pointeur fin : aucune inclinaison')
   await serveUnderCsp(page)
   await page.setViewportSize(COLUMN_VIEWPORT)
   await openTable(page, TWO_CARDS)
-  const card = cards(page).first()
-  const { x, y } = await topRightCorner(card)
 
-  await page.mouse.move(x, y)
-
-  await expect.poll(() => tiltOf(card)).toEqual([6, 6])
   await expect(entry(cards(page).last())).toHaveCSS('transition-delay', '0.04s, 0.04s')
 })

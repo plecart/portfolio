@@ -44,7 +44,6 @@
     --card-lift: -6px;
     --card-lift-scale: 1.02;
     --card-press-scale: 0.985;
-    --card-perspective: 900px;
     --card-clip-rise: -14px;
     align-self: start;
     transition: opacity var(--dur-fast) var(--ease-out);
@@ -86,8 +85,7 @@
     transition: transform var(--dur) var(--ease-out);
   }
 
-  /* La face : le papier et l'ombre au repos ; l'ombre soulevée, prête, s'y superpose à opacité 0. La
-     perspective ne vaut que pour un enfant direct : c'est ici qu'elle atteint la couche inclinée. */
+  /* La face : papier et ombre au repos ; l'ombre soulevée, prête, s'y superpose à opacité 0. */
   .card-face {
     position: relative;
     z-index: 0;
@@ -95,7 +93,6 @@
     border-radius: var(--r-card);
     background-color: var(--paper);
     box-shadow: var(--shadow-rest);
-    perspective: var(--card-perspective);
     transition: transform var(--dur) var(--ease-spring);
   }
 
@@ -109,20 +106,6 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity var(--dur) var(--ease-out);
-  }
-
-  /* Le repère du post-it et du trombone : leurs distances se comptent depuis la photo. L'inclinaison
-     que `useCardTilt` y écrit revient en 240 ms à la sortie ; sous le pointeur, elle le suit sans
-     inertie. */
-  .card-tilt {
-    position: relative;
-    transition: transform var(--dur) var(--ease-out);
-  }
-
-  @media (hover: hover) {
-    .card:hover .card-tilt {
-      transition: none;
-    }
   }
 
   /* Le papier et l'encre d'un post-it, de carte ou de fiche (spec §2.2, §2.4). */
@@ -141,13 +124,18 @@
     transform: rotate(-2deg);
   }
 
+  /* Le post-it et le trombone se placent depuis la photo, un cadre à l'intérieur de la face. Le
+     post-it passe à la ligne au bord droit de la photo ; un mot trop long le dépasse, jusqu'à la
+     largeur maximale. */
   .card-postit {
     position: absolute;
-    top: -8px;
-    left: 14px;
+    top: calc(var(--card-frame) - 8px);
+    right: var(--card-frame);
+    left: calc(var(--card-frame) + 14px);
     z-index: 2;
-    /* Carte − 28 px (spec §4.1), mesurée depuis la largeur de la photo. */
-    max-width: calc(100% + 2 * var(--card-frame) - 28px);
+    width: fit-content;
+    /* Carte − 28 px (spec §4.1). */
+    max-width: calc(100% - 28px);
     padding: 6px 10px 6px 12px;
     font-size: var(--card-title);
   }
@@ -163,8 +151,8 @@
 
   .card-clip {
     position: absolute;
-    top: -14px;
-    left: 6px;
+    top: calc(var(--card-frame) - 14px);
+    left: calc(var(--card-frame) + 6px);
     z-index: 3;
     width: 14px;
     height: 30px;
@@ -173,7 +161,7 @@
   }
 
   /* Le masque, plein, ne retire rien : il efface le filet de l'image qui longe le bandeau pendant sa
-     transition, sur la carte inclinée (Chromium 156, mesuré le 2026-11-01). */
+     transition, sur la carte soulevée (Chromium 156, mesuré le 2026-11-08). */
   .card-photo {
     position: relative;
     aspect-ratio: 1;
@@ -384,8 +372,8 @@
 
   /* La carte d'où la fiche s'envole (§4.6), que `useChoreography` marque jusqu'à son retour : sa
      photo, son post-it, sa bande, son papier et ses ombres disparaissent d'un coup ; sa pose revient
-     à 0° et son trombone monte en s'effaçant. Sa levée et son inclinaison, que le panneau lui retire
-     en prenant focus et pointeur, tombent d'un coup : le retour se mesure sur la carte au repos.
+     à 0° et son trombone monte en s'effaçant. Sa levée, que le panneau lui retire en prenant focus
+     et pointeur, tombe d'un coup : le retour se mesure sur la carte au repos.
      Après les états d'intention, qu'elle remplace. Photo, post-it, bande, papier, ombre au repos et
      trombone reviennent d'un coup : hors de ce bloc, aucun ne transite. */
   .card[data-origin] {
@@ -396,14 +384,11 @@
     .card-face {
       background-color: transparent;
       box-shadow: none;
+      transition: none;
     }
 
     .card-face::after {
       opacity: 0;
-      transition: none;
-    }
-
-    :is(.card-face, .card-tilt) {
       transition: none;
     }
 

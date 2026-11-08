@@ -2,7 +2,7 @@
  * Les cartes de la table, en logique pure : leur ordre (spec §1.9), les technologies qu'elles
  * montrent (§1.4), leur pose (§1.3, §4.1) et l'empreinte qui la tire, le nom et la description de
  * leur lien (§1.7, §4.1), leurs états (§1.6), leur taille et celle des cadres de chargement (§4.2,
- * §5.1, §5.5), leur couverture (§4.1), leur colonne (§3.1) et leur inclinaison (§4.1).
+ * §5.1, §5.5), leur couverture (§4.1) et leur colonne (§3.1).
  */
 import { describe, expect, test } from 'vitest'
 import {
@@ -21,7 +21,6 @@ import {
   cardSize,
   cardStates,
   cardTechnologies,
-  cardTilt,
   coverImage,
   coverSizes,
   fnv1a,
@@ -427,37 +426,5 @@ describe("l'indice de colonne d'une carte", () => {
 
   test('tolère un bord fractionnaire', () => {
     expect(cardColumns([16, 207.8, 16.2], 192)).toEqual([0, 1, 0])
-  })
-})
-
-describe("l'inclinaison d'une carte", () => {
-  const CELL = { left: 100, top: 200, width: 240, height: 282 }
-  const [right, bottom] = [CELL.left + CELL.width, CELL.top + CELL.height]
-  const tiltAt = (clientX: number, clientY: number) => cardTilt({ clientX, clientY }, CELL)
-
-  test('au coin haut droit : +6° sur chaque axe', () => {
-    expect(tiltAt(right, CELL.top)).toEqual({ rotateX: 6, rotateY: 6 })
-  })
-
-  test('au coin bas gauche : −6° sur chaque axe', () => {
-    expect(tiltAt(CELL.left, bottom)).toEqual({ rotateX: -6, rotateY: -6 })
-  })
-
-  test('au centre : 0°', () => {
-    const { rotateX, rotateY } = tiltAt(CELL.left + CELL.width / 2, CELL.top + CELL.height / 2)
-
-    expect(rotateX).toBeCloseTo(0)
-    expect(rotateY).toBeCloseTo(0)
-  })
-
-  test('chaque axe suit le sien : le haut au milieu ne touche que `rotateX`', () => {
-    const { rotateX, rotateY } = tiltAt(CELL.left + CELL.width / 2, CELL.top)
-
-    expect(rotateX).toBe(6)
-    expect(rotateY).toBeCloseTo(0)
-  })
-
-  test('hors de la cellule, sur un trombone qui la déborde : ±6° au plus', () => {
-    expect(tiltAt(CELL.left - 20, CELL.top - 14)).toEqual({ rotateX: 6, rotateY: -6 })
   })
 })

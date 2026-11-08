@@ -39,7 +39,7 @@ import {
   watchCspViolations,
 } from './project.ts'
 import { buildImage, PROJECT_SETS } from './projects.ts'
-import { nextFrames, scrollGesture, scrollThrough, scrollTop } from './scroll.ts'
+import { scrollGesture, scrollThrough, scrollTop } from './scroll.ts'
 import {
   cards,
   COLUMN_VIEWPORT,
@@ -47,7 +47,6 @@ import {
   expectPlacement,
   openTable,
   serveUnderCsp,
-  tilt,
   watchTransitions,
 } from './table.ts'
 
@@ -473,34 +472,6 @@ test.describe('l’entrée des cartes autour d’une fiche ouverte depuis la tab
 
     await expect(last).toHaveAttribute('data-entered')
   })
-})
-
-test('fiche ouverte, le pointeur sur une carte n’incline rien', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'appareil sans pointeur : rien n’incline')
-  await page.setViewportSize(COLUMN_VIEWPORT)
-  await openTable(page, PROJECT_SETS.twelveWithShowcase)
-  const cell = page.locator('.card').nth(8)
-  const box = (await cell.boundingBox())!
-  // La carte sous la marge basse du panneau, entre 725 et 800 px : le pointeur l'y atteindrait.
-  const [x, y] = [box.x + box.width / 2, 760]
-  await scrollThrough(page, box.y + box.height / 2 - y)
-  const moveOver = async () => {
-    await page.mouse.move(x, y)
-    await page.mouse.move(x + 20, y + 10)
-  }
-
-  await moveOver()
-  await expect(tilt(cell)).not.toHaveCSS('transform', 'none')
-  await page.mouse.move(0, 0)
-  await expect(tilt(cell)).toHaveCSS('transform', 'none')
-
-  await cell.dispatchEvent('click', { detail: 0 })
-  await expect(panel(page)).toBeVisible()
-  await settle(page)
-  await moveOver()
-  await nextFrames(page)
-
-  await expect(tilt(cell)).toHaveCSS('transform', 'none')
 })
 
 /** Les clics qui restent ceux d'un lien. */
