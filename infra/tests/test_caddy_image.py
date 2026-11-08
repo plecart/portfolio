@@ -72,10 +72,10 @@ UPSTREAM = {
 
 # Les en-têtes de sécurité de l'hôte du site (brief de #16, décision 3 ; PRD « Sécurité ») : la
 # politique n'admet que des fichiers servis par le site, les appels à l'API et les images de
-# `media` — `data:` pour l'icône vide d'`index.html` ; aucun `unsafe-inline`.
+# `media` ; ni `data:`, ni `unsafe-inline`.
 SITE_SECURITY_HEADERS = {
     "Content-Security-Policy": (
-        f"default-src 'self'; connect-src https://{API}; img-src 'self' data: https://{MEDIA}; "
+        f"default-src 'self'; connect-src https://{API}; img-src 'self' https://{MEDIA}; "
         "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
     ),
     "X-Frame-Options": "DENY",
@@ -122,13 +122,16 @@ class Stack:
             headers: des en-têtes de plus, comme `cloudflared` en ajoute.
 
         Returns:
-            La réponse, corps lu et décodé.
+            La réponse, corps lu et décodé — les octets d'une image, qui ne sont pas de l'UTF-8,
+            remplacés.
         """
         connection = HTTPConnection("127.0.0.1", self.port, timeout=5)
         try:
             connection.request("GET", path, headers={"Host": host, **(headers or {})})
             response = connection.getresponse()
-            return Reply(response.status, response.headers, response.read().decode())
+            return Reply(
+                response.status, response.headers, response.read().decode(errors="replace")
+            )
         finally:
             connection.close()
 
@@ -263,6 +266,28 @@ def test_le_script_de_restauration_du_mode_est_servi_sans_cache(stack: Stack) ->
     assert reply.headers.get_all("Cache-Control") == ["no-cache"]
     # Sous `nosniff`, un autre type ferait refuser le script par le navigateur.
     assert "javascript" in (reply.headers.get("Content-Type") or "")
+
+
+# Les icônes du site (#237) et les types admis pour chacune.
+SITE_ICONS = {
+    "/icon.svg": ("image/svg+xml",),
+    "/favicon.ico": ("image/vnd.microsoft.icon", "image/x-icon"),
+    "/apple-touch-icon.png": ("image/png",),
+}
+
+
+@pytest.mark.parametrize(("path", "types"), SITE_ICONS.items(), ids=SITE_ICONS.keys())
+def test_les_icones_du_site_sont_servies_sans_cache(
+    stack: Stack, path: str, types: tuple[str, ...]
+) -> None:
+    """Une icône absente de l'image ne rend pas 404 : `try_files` rend `index.html` sous son nom.
+    Leurs noms sont stables, comme `/theme.js` : revalidées à chaque visite, jamais immuables."""
+    reply = stack.get(SITE, path)
+
+    assert reply.status == 200
+    assert reply.headers.get("Content-Type") in types
+    assert APP_SHELL not in reply.body
+    assert reply.headers.get_all("Cache-Control") == ["no-cache"]
 
 
 def test_un_fichier_hache_absent_rend_404_sans_cache_long(stack: Stack) -> None:

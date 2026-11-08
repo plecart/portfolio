@@ -78,6 +78,7 @@ _Document normatif de rang 2 (`.claude/pipeline.config.md`, « Sources de vérit
 - **Une ligne, fixe, fine** : à gauche le nom (texte, lien vers la table) ; à droite le bouton clair / sombre (icône, libellé accessible). Aucun logo, aucun menu replié, aucun autre lien en phase 1.
 - Se fait discrète en défilant vers le bas, réapparaît dès qu'on remonte.
 - **Place réservée** : phase 2, entrée « Chat » à gauche du bouton de mode (absente si le service IA est indisponible, cadrage §6.7) ; phase 3, entrée « MCP ». Trois liens au plus, jamais de menu. Ancres vérifiées : cadrage §4 phases 2 et 3 conformes ; cadrage §6.7 « Dégradation gracieuse » conforme.
+- **Icône du site** (onglet, favoris, écran d'accueil d'un téléphone) : le cadre polaroid penché de 8°, sa photo couleur post-it portant un « P » de Manrope 800 ; elle suit le thème du système ou du navigateur (`prefers-color-scheme`), pas le bouton de mode, avec un cadre clair dans les deux modes pour rester visible sur un onglet sombre. Absente de l'entête, qui reste sans logo. Source et jetons : #237. Ancres vérifiées : §1.8 conforme (deux des trois objets, aucun nouveau) ; §1.5 conforme (le bouton règle la page, pas le navigateur).
 
 ### 1.13 Pas de page « à propos » ; liens de l'auteur
 

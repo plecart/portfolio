@@ -81,7 +81,7 @@ Tout conservé. Les signalements, relus un par un, sont des faux positifs :
 | `prototype` | CAUTION | « never judge » : consigne de présentation des variantes |
 | autres | SAFE / CAUTION sans signalement | — |
 
-### 2.4 Application `apps/web` — 2026-09-23, amendée les 2026-09-25, 26, 2026-10-02, 04, 16 et 2026-11-01
+### 2.4 Application `apps/web` — 2026-09-23, amendée les 2026-09-25, 26, 2026-10-02, 04, 16, 2026-11-01 et 08
 
 Node **24.21.0**, LTS active du jour, épinglée par `.nvmrc` et par `engines` (valeurs égales,
 vérifiées par un test). `@types/node` suit sa majeure, vérifiée par un autre test : des types d'une
@@ -164,8 +164,9 @@ Quatre points mesurés, non évidents :
 - Les scores, profil mobile, Lighthouse 12.6.1. La page minimale, mesurée le 2026-09-23 :
   performance 100, accessibilité 100, bonnes pratiques 100, SEO 100. Deux correctifs ont été
   nécessaires pour y arriver : `public/robots.txt` (sans lui SEO plafonne à 91) et une icône
-  déclarée `data:,` dans l'`index.html` (sans elle, le 404 sur `/favicon.ico` fait tomber l'audit
-  « erreurs dans la console » et les bonnes pratiques à 96). La table à douze cartes, mesurée le
+  déclarée `data:,` dans l'`index.html` (sans elle, le 404 sur `/favicon.ico` faisait tomber l'audit
+  « erreurs dans la console » et les bonnes pratiques à 96), remplacée le 2026-11-08 par les icônes
+  du site (ci-dessous). La table à douze cartes, mesurée le
   2026-11-01 sur quinze runs avec les images d'essai de 3 et 7 Ko : performance 98, accessibilité
   100, bonnes pratiques 100, SEO 100, LCP de 1,8 à 2 s. L'audit `font-size` passe : les résumés
   masqués comptent comme texte lisible et les rubans de 11 px (spec §2.2) n'en sont plus que
@@ -323,6 +324,41 @@ prix, accepté par le brief de #18 (décision 4) : une requête bloquante de plu
 nom sans empreinte, que Caddy sert `no-cache` comme `index.html`. `tsc` ne le lit pas ; le lint le
 lit en script classique — un test le vérifie — et `e2e/tokens.spec.ts` l'exécute, application
 bloquée.
+
+**Icônes du site** (#237, 2026-11-08) : `public/icon.svg`, `public/favicon.ico` et
+`public/apple-touch-icon.png`, copiés tels quels par Vite, déclarés dans le `<head>` dans cet ordre :
+l'ICO avec `sizes="32x32"` — sans lui, Chrome préfère l'ICO au SVG —, le SVG, puis l'icône iOS. Le
+SVG est la source (dessin et jetons : corps de #237) ; il suit `prefers-color-scheme`, le thème du
+système ou du navigateur, pas le bouton de mode. L'ICO, une image 32 × 32 sur fond transparent, et
+le PNG, 180 × 180, opaque, le polaroid à 140 × 140 centré sur le fond `#F3EDE4`, sont deux rendus
+commités de sa version claire. Ils ne se refont que si le dessin change, par cette commande, depuis
+la racine du dépôt, sous un shell POSIX : Chromium de Playwright (`make web-browsers`) rend, Pillow
+(dépendance de l'API) écrit l'ICO, sans dépendance ajoutée ni script commité.
+
+```sh
+(cd apps/web && node --input-type=module -e '
+import { readFileSync } from "node:fs"
+import { chromium } from "@playwright/test"
+const svg = readFileSync("public/icon.svg", "utf8")
+const browser = await chromium.launch()
+const page = await browser.newPage({ colorScheme: "light" })
+for (const [path, size, inset, background] of [
+  ["favicon-32.png", 32, 0, "transparent"],
+  ["public/apple-touch-icon.png", 140, 20, "#F3EDE4"],
+]) {
+  const box = `width:${size}px;height:${size}px;padding:${inset}px;background:${background}`
+  await page.setContent(`<style>body{margin:0}svg{display:block;${box}}</style>${svg}`)
+  await page.locator("svg").screenshot({ path, omitBackground: true })
+}
+await browser.close()
+') && uv run python -c "from PIL import Image; Image.open('apps/web/favicon-32.png').save('apps/web/public/favicon.ico', sizes=[(32, 32)])" && rm apps/web/favicon-32.png
+```
+
+`sizes=[(32, 32)]` garde une seule image : sans lui, Pillow écrit aussi le 16 et le 24 (doc Pillow
+13, format ICO). Caddy sert les trois sous leur nom, sans empreinte, en `no-cache` comme
+`index.html` ; un fichier absent n'y rendrait pas 404 mais `index.html` (`try_files`), et c'est un
+test de l'image qui les demande. L'icône vide partie, la CSP de l'hôte du site n'admet plus `data:`
+en `img-src`.
 
 **Police** : `src/assets/fonts/manrope-latin.woff2` — Manrope variable 200–800, sous-ensemble latin,
 Google Fonts v20, 24,3 Ko, sous SIL Open Font License 1.1. L'OFL veut que la notice **et** le texte
