@@ -25,18 +25,17 @@
 # tourne que sur une PR hors draft, sans attendre `api`.
 #
 # Sur une PR, chaque job qui extrait le dépôt en extrait la tête, clone complet, puis la fusionne
-# lui-même au trunk courant (`.github/actions/fusion-trunk`, qui dit pourquoi) : le trunk en
-# premier parent, la tête en second. Sur un push vers `main`, le checkout prend le commit poussé,
-# et rien ne se fusionne.
+# lui-même au trunk courant (le pas « Fusion explicite du trunk » du job `api`, qui dit pourquoi) :
+# le trunk en premier parent, la tête en second. Sur un push vers `main`, le checkout prend le
+# commit poussé, et rien ne se fusionne.
 #
-# Chaque action d'un autre dépôt est épinglée par **empreinte de commit**, sa version en
-# commentaire : une étiquette peut être déplacée par son propriétaire ou par un attaquant, et le
-# déplacement s'exécuterait ici sans aucun signal ; une empreinte ne bouge pas. Dependabot
+# Chaque action est épinglée par **empreinte de commit**, sa version en commentaire : une
+# étiquette peut être déplacée par son propriétaire ou par un attaquant, et le déplacement
+# s'exécuterait ici sans aucun signal ; une empreinte ne bouge pas. Dependabot
 # (`.github/dependabot.yml`) les met à jour chaque mois, empreinte et commentaire ensemble. Le
 # commentaire porte l'étiquette la plus précise du commit (`v7.0.1`, pas `v7`) : Dependabot ne
 # réécrit qu'un commentaire dont l'étiquette pointe encore sur le commit épinglé, et une étiquette
 # majeure cesse d'y pointer dès qu'une version sort — précisément quand la mise à jour arrive.
-# L'action de fusion, elle, est du dépôt : lue dans l'arbre extrait, sans `uses` à elle.
 # `apps/api/tests/test_supply_chain.py` refuse toute autre forme.
 
 name: CI
@@ -54,7 +53,8 @@ on:
     # `ready_for_review` produit le premier run d'une PR : le garde `if:` du job `api` saute toute
     # draft, et aucun run n'a donc couvert son SHA (ADR 0019). `cycle-pr` sort du draft, puis
     # attend ce run (Étape 5) ; chaque push en lance un autre ; `reopened` relance une PR dont
-    # l'événement s'est perdu.
+    # l'événement s'est perdu, ou dont le trunk a changé la définition du workflow depuis le
+    # déclenchement : seul un événement neuf la relit (ADR 0029).
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
@@ -93,15 +93,54 @@ jobs:
       avis: ${{ steps.jobs.outputs.avis }}
 
     steps:
-      # Sur une PR, la tête, que l'action suivante fusionne au trunk courant : `HEAD^1` est le
-      # trunk qu'elle combine, et `HEAD^1..HEAD` le delta de la PR. Sur un push vers `main`, ce
-      # n'est que le dernier commit : `web`, `infra` et `avis` n'y lisent pas la réponse.
+      # Sur une PR, la tête, que le pas suivant fusionne au trunk courant : `HEAD^1` est le trunk
+      # qu'il combine, et `HEAD^1..HEAD` le delta de la PR. Sur un push vers `main`, ce n'est que
+      # le dernier commit : `web`, `infra` et `avis` n'y lisent pas la réponse.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - uses: ./.github/actions/fusion-trunk
+      # La fusion explicite du trunk (ADR 0029), écrite ici en entier sous l'ancre `fusion`, que
+      # `web`, `infra` et `auteurs` reprennent par `*fusion` (doc GitHub « Reusing workflow
+      # configurations ») ; `avis.yml` en porte une copie, une ancre ne valant que dans son fichier,
+      # et `apps/api/tests/test_ci_declencheurs.py` les tient égales. Elle vit dans la définition du
+      # workflow, que le run lit à son commit, jamais dans l'arbre extrait : une action locale se
+      # lirait dans la tête, qu'une PR ouverte avant elle ne porte pas.
+      #
+      # Le trunk est la branche que la PR vise — une PR de lot vise la branche d'intégration de son
+      # issue —, lue dans `refs/remotes/origin/`, que le clone complet écrit pour chaque branche
+      # (`getRefSpecForAllHistory` d'`actions/checkout`, lu le 2026-11-08). Branche et tête passent
+      # par l'environnement, jamais développées dans le script.
+      #
+      # Le runner n'a pas d'identité git : le commit prend celle du robot d'Actions. `--quiet` : le
+      # résumé de la fusion, un nom de fichier par ligne, ne s'écrit pas — un fichier nommé comme la
+      # trace l'imiterait ; un conflit s'écrit quand même. Une tête que le trunk contient déjà ne
+      # construit rien, et `merge` sort pourtant en 0 : le pas échoue plutôt que de donner un commit
+      # du trunk pour une fusion. La trace, en dernier, relit les parents du commit et nomme le
+      # `GITHUB_SHA` du run, la référence de fusion dont il a lu cette définition, qu'un
+      # `gh run rerun` garde : une ligne destinée à `porte-merge.py trunk`, et aucune ligne du
+      # script, que le journal recopie, ne commence par son préfixe — celle qui l'écrit commence
+      # par `printf`.
+      - &fusion
+        name: Fusion explicite du trunk
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          TRUNK: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git checkout --quiet --detach "refs/remotes/origin/$TRUNK"
+          trunk=$(git rev-parse HEAD)
+          if ! git -c 'user.name=github-actions[bot]' -c 'user.email=41898282+github-actions[bot]@users.noreply.github.com' merge --no-ff --quiet -m "Merge $HEAD_SHA into $trunk" "$HEAD_SHA"; then
+            echo "::error::La tête $HEAD_SHA ne se fusionne pas sans conflit dans origin/$TRUNK ($trunk). Fichiers en conflit : $(git diff --name-only --diff-filter=U | paste -sd ' ' -)"
+            exit 1
+          fi
+          if [ "$(git rev-parse HEAD)" = "$trunk" ]; then
+            echo "::error::La tête $HEAD_SHA est déjà dans origin/$TRUNK ($trunk) : rien à fusionner."
+            exit 1
+          fi
+          printf 'Fusion explicite : %s Merge %s into %s (workflow %s)\n' "$(git rev-parse HEAD)" "$(git rev-parse HEAD^2)" "$(git rev-parse HEAD^1)" "$GITHUB_SHA"
 
       # Avant toute installation : un `uv sync` rouge ne cache pas le delta aux autres jobs.
       # `shell: bash` lance `bash -eo pipefail` : sans lui, un `git diff` en échec rendrait `false`
@@ -155,7 +194,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - uses: ./.github/actions/fusion-trunk
+      - *fusion
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -211,7 +250,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - uses: ./.github/actions/fusion-trunk
+      - *fusion
 
       # Compose refuse de résoudre un `env_file` dont la cible manque — y compris pour un simple
       # `config`, et y compris avec `--env-file` (mesuré). Le geste est exactement celui que
@@ -310,14 +349,14 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
 
     steps:
-      # L'action de fusion combine la tête de la PR (`HEAD^2`) au trunk courant (`HEAD^1`), et
+      # Le pas de fusion combine la tête de la PR (`HEAD^2`) au trunk courant (`HEAD^1`), et
       # `HEAD^1..HEAD^2` lit ses commits.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - uses: ./.github/actions/fusion-trunk
+      - *fusion
 
       - name: Refuser un auteur Claude
         shell: bash

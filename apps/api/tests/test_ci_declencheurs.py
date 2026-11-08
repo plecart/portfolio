@@ -6,8 +6,8 @@ en cours d'une PR s'annule au push suivant de la même PR, jamais sur `main` ; `
 `avis` attendent un `api` vert et, sur une PR, ne tournent que si le delta touche leurs fichiers —
 règle de `infra/ci/changed_jobs.py`, lue par la première étape du job `api`. Le job `avis` appelle
 `.github/workflows/avis.yml`, qui joue aussi les portes d'avis chaque jour sur `main`. Sur une PR,
-chaque job qui extrait le dépôt fusionne lui-même la tête au trunk courant, par l'action
-`.github/actions/fusion-trunk`, dont le pas se joue ici (issue #249).
+chaque job qui extrait le dépôt fusionne lui-même la tête au trunk courant, par le pas
+« Fusion explicite du trunk », écrit dans la définition du workflow et joué ici (ADR 0029).
 
 Mesure qui fonde ces réglages, relevée le 2026-10-18 sur les runs du 2026-10-04 au 2026-10-17 —
 `gh api --paginate "repos/plecart/portfolio/actions/runs?created=%3E%3D2026-10-04&per_page=100"`,
@@ -78,18 +78,20 @@ AVIS_CALL = "./.github/workflows/avis.yml"
 ADVISORY_TARGETS = {"audit", "web-audit", "scan"}
 STACK_JOBS = ("api", "web", "infra")
 # Sur une PR, chaque job qui extrait le dépôt en extrait la tête, puis la fusionne lui-même au trunk
-# courant par l'action locale : la référence de fusion de la forge n'est pas recalculée quand le
-# trunk avance, et un `gh run rerun` la réutilise (issue #249). Clone complet : la fusion exige
+# courant par le pas de ce nom : la référence de fusion de la forge n'est pas recalculée quand le
+# trunk avance, et un `gh run rerun` la réutilise (ADR 0029). Clone complet : la fusion exige
 # l'ancêtre commun. Sur un push vers `main`, `ref` est vide et le checkout prend son défaut, le
-# commit de l'événement (`src/input-helper.ts` d'`actions/checkout`, lu le 2026-11-08).
-FUSION_ACTION = "./.github/actions/fusion-trunk"
+# commit de l'événement (`src/input-helper.ts` d'`actions/checkout`, lu le 2026-11-08). Le pas vit
+# dans la définition du workflow, lue au commit du run, jamais dans l'arbre extrait : une action
+# locale se lirait dans la tête, qu'une PR ouverte avant elle ne porte pas.
+FUSION_NAME = "Fusion explicite du trunk"
 PR_HEAD = "${{ github.event.pull_request.head.sha }}"
 FUSION_CHECKOUT = {"ref": PR_HEAD, "fetch-depth": 0}
 # Les jobs qui ne tournent que sur un push vers `main`, où rien ne se fusionne : leur `if`, ce sont
 # `test_publication.py` et `test_deployment.py` qui le tiennent.
 PUSH_ONLY_JOBS = ("publish", "fumee", "deploy")
 # L'étape `jobs`, sans son nom : le delta de la PR contre le trunk qu'elle a fusionné — `HEAD^1`,
-# premier parent du commit de l'action de fusion —, passé au script. `shell: bash` lance
+# premier parent du commit du pas de fusion —, passé au script. `shell: bash` lance
 # `bash -eo pipefail` (doc GitHub « Workflow syntax », `jobs.<job_id>.steps[*].shell`) : sans lui,
 # un `git diff` en échec rendrait `false` pour chaque job, en silence. `--no-renames` : sans lui,
 # un renommage ne s'écrit que sous son nouveau chemin (mesuré le 2026-10-20 : `apps/web/a.tsx`
@@ -115,7 +117,7 @@ def gating_findings(workflow: str) -> list[str]:
     Returns:
         Un constat par propriété altérée : un job `changes` (un job de plus coûte une minute
         facturée par run), un `needs` sur `api`, son garde, ses `outputs`, son premier pas qui
-        n'est pas le checkout `FUSION_CHECKOUT`, son second qui n'est pas `FUSION_ACTION` — le
+        n'est pas le checkout `FUSION_CHECKOUT`, son second qui n'est pas le pas `FUSION_NAME` — le
         trunk en premier parent, `HEAD^1..HEAD` le delta —, son troisième qui n'est pas l'étape
         `JOBS_STEP` ; puis, pour chaque job de `GATED_JOBS`, un `needs` autre que `api` ou un `if`
         autre que `gated_if`. Liste vide : le workflow est conforme.
@@ -139,8 +141,8 @@ def gating_findings(workflow: str) -> list[str]:
         findings.append(
             f"le premier pas d'`api` est {checkout}, attendu un checkout {FUSION_CHECKOUT}"
         )
-    if fusion.get("uses") != FUSION_ACTION:
-        findings.append(f"le second pas d'`api` est {fusion}, attendu `{FUSION_ACTION}`")
+    if fusion.get("name") != FUSION_NAME:
+        findings.append(f"le second pas d'`api` est {fusion}, attendu le pas « {FUSION_NAME} »")
     if {key: value for key, value in step.items() if key != "name"} != JOBS_STEP:
         findings.append(f"le troisième pas d'`api` est {step}, attendu {JOBS_STEP}")
     for name in GATED_JOBS:
@@ -163,14 +165,15 @@ def fusion_findings(workflow: str) -> list[str]:
 
     Returns:
         Pour chaque job hors de `PUSH_ONLY_JOBS`, un constat par checkout qui ne porte pas la paire
-        `FUSION_CHECKOUT`, et un si `FUSION_ACTION` ne suit pas immédiatement chaque checkout, et
-        lui seul ; pour chaque job de `PUSH_ONLY_JOBS`, un constat s'il l'appelle. Liste vide : le
-        workflow est conforme.
+        `FUSION_CHECKOUT`, et un si le pas `FUSION_NAME` ne suit pas immédiatement chaque checkout,
+        et lui seul ; pour chaque job de `PUSH_ONLY_JOBS`, un constat s'il le porte. Que ce pas soit
+        celui du job `api`, `test_chaque_pas_de_fusion_est_celui_du_job_api` le tient. Liste
+        vide : le workflow est conforme.
     """
     findings: list[str] = []
     for name, steps in workflow_steps(workflow).items():
         uses = [str(step.get("uses", "")) for step in steps]
-        fusions = [index for index, action in enumerate(uses) if action == FUSION_ACTION]
+        fusions = [index for index, step in enumerate(steps) if step.get("name") == FUSION_NAME]
         if name in PUSH_ONLY_JOBS:
             if fusions:
                 findings.append(f"`{name}`, qui ne tourne que sur un push, fusionne")
@@ -216,7 +219,8 @@ def advisory_findings(workflow: str) -> list[str]:
 # Les déclencheurs du workflow. `ready_for_review` lance le premier run d'une PR, aucune draft n'en
 # ayant (ADR 0019) : `cycle-pr` sort du draft, puis attend ce run (Étape 5). `reopened` reste :
 # c'est la voie de relance d'une PR dont un événement s'est perdu pendant une panne d'Actions (même
-# Étape).
+# Étape), ou dont le trunk a changé la définition du workflow depuis le déclenchement — seul un
+# événement neuf la relit (ADR 0029).
 TRIGGERS = {
     "pull_request": {"types": ["opened", "synchronize", "reopened", "ready_for_review"]},
     "push": {"branches": ["main"]},
@@ -277,7 +281,9 @@ OUTPUTS_LINES = "    outputs:\n" + "".join(f"      {k}: {v}\n" for k, v in API_O
 REF_LINE = f"          ref: {PR_HEAD}\n"
 DEPTH_LINE = "          fetch-depth: 0\n"
 CHECKOUT_LINES = f"      - uses: actions/checkout@v0\n        with:\n{REF_LINE}{DEPTH_LINE}"
-FUSION_LINE = f"      - uses: {FUSION_ACTION}\n"
+# Le pas de fusion, par son seul nom : son contenu, `test_chaque_pas_de_fusion_est_celui_du_job_api`
+# le tient sur les fichiers du dépôt.
+FUSION_LINE = f"      - name: {FUSION_NAME}\n"
 JOBS_STEP_LINES = (
     "      - name: Jobs à lancer\n        id: jobs\n        shell: bash\n"
     f"        run: {CHANGED_JOBS_COMMAND}\n"
@@ -384,9 +390,9 @@ FORMS: dict[str, Form] = {
     "checkout sans fetch-depth": (gating_findings, DEPTH_LINE, "", True),
     # L'ancienne profondeur, et celle que rendrait `cond && 0 || 2` : `0` y est faux.
     "checkout à profondeur 2": (gating_findings, DEPTH_LINE, "          fetch-depth: 2\n", True),
-    "api sans action de fusion": (gating_findings, FUSION_LINE, "", True),
+    "api sans pas de fusion": (gating_findings, FUSION_LINE, "", True),
     # L'étape `jobs` lirait le delta avant la fusion : `HEAD^1` serait le parent de la tête.
-    "action de fusion après l'étape jobs": (
+    "pas de fusion après l'étape jobs": (
         gating_findings,
         FUSION_LINE + JOBS_STEP_LINES,
         JOBS_STEP_LINES + FUSION_LINE,
@@ -454,8 +460,8 @@ FORMS: dict[str, Form] = {
     "fusion conforme": (fusion_findings, "", "", False),
     "fusion : checkout sans ref": (fusion_findings, REF_LINE, "", True),
     "fusion : checkout sans fetch-depth": (fusion_findings, DEPTH_LINE, "", True),
-    "fusion : action absente": (fusion_findings, FUSION_LINE, "", True),
-    "fusion : action pas juste après le checkout": (
+    "fusion : pas absent": (fusion_findings, FUSION_LINE, "", True),
+    "fusion : pas qui ne suit pas le checkout": (
         fusion_findings,
         FUSION_LINE + JOBS_STEP_LINES,
         JOBS_STEP_LINES + FUSION_LINE,
@@ -563,6 +569,7 @@ def test_le_workflow_de_ci_est_conforme(guard: Guard) -> None:
 
 # Les jobs dont le checkout fusionne, en littéraux (obs 80) : ceux de `ci.yml` qui peuvent tourner
 # sur une PR, et le job de `avis.yml`, que `ci.yml` appelle sur une PR.
+FUSING_WORKFLOWS = (CI_WORKFLOW, AVIS_WORKFLOW)
 FUSING_JOBS = {
     ("ci.yml", "api"),
     ("ci.yml", "web"),
@@ -572,20 +579,34 @@ FUSING_JOBS = {
 }
 
 
+def fusion_steps() -> list[tuple[str, str, dict[str, Any]]]:
+    """Les pas de fusion de `ci.yml` et `avis.yml`, chacun avec son fichier et son job."""
+    return [
+        (path.name, job, step)
+        for path in FUSING_WORKFLOWS
+        for job, steps in workflow_steps(path.read_text(encoding="utf-8")).items()
+        for step in steps
+        if step.get("name") == FUSION_NAME
+    ]
+
+
 def test_chaque_job_qui_peut_tourner_sur_une_pr_fusionne_la_tete_au_trunk_courant() -> None:
     """`ci.yml` et `avis.yml` passent la garde de la fusion, et les jobs qui fusionnent sont ceux
     de `FUSING_JOBS` : un job que la garde cesserait de lire en sortirait."""
-    texts = {path.name: path.read_text(encoding="utf-8") for path in (CI_WORKFLOW, AVIS_WORKFLOW)}
-    fusing = {
-        (name, job)
-        for name, text in texts.items()
-        for job, steps in workflow_steps(text).items()
-        if any(step.get("uses") == FUSION_ACTION for step in steps)
-    }
+    texts = {path.name: path.read_text(encoding="utf-8") for path in FUSING_WORKFLOWS}
     assert {name: fusion_findings(text) for name, text in texts.items()} == {
         name: [] for name in texts
     }
-    assert fusing == FUSING_JOBS
+    assert {(name, job) for name, job, _ in fusion_steps()} == FUSING_JOBS
+
+
+def test_chaque_pas_de_fusion_est_celui_du_job_api() -> None:
+    """Le pas du job `api` de `ci.yml` est le seul écrit en entier : les autres jobs de `ci.yml` le
+    reprennent par alias (doc GitHub « Reusing workflow configurations », lue le 2026-11-08), et
+    `avis.yml` en porte une copie, une ancre ne valant que dans son fichier. Analysés, ils lui sont
+    égaux."""
+    canonical = fusion_step()
+    assert [(name, job) for name, job, step in fusion_steps() if step != canonical] == []
 
 
 # --- Le workflow des portes d'avis : `.github/workflows/avis.yml` ------------------------------
@@ -600,13 +621,13 @@ AVIS_TRIGGERS = {
     "workflow_call": None,
 }
 AVIS_PERMISSIONS = {"contents": "read"}
-# Les pas de son seul job, dans l'ordre — l'action sans son empreinte, ou la commande : le checkout
-# et la fusion du trunk, qui ne joue qu'appelé sur une PR, l'audit Python, l'audit npm, puis le
-# build des images et leur scan, chaque porte après ce qu'elle lit. Le cache des couches est celui
-# du job `infra`, restauré et jamais réécrit, comme dans `publish`.
+# Les pas de son seul job, dans l'ordre — ce que chacun lance, `launched` : le checkout et le pas de
+# fusion, qui ne joue qu'appelé sur une PR, l'audit Python, l'audit npm, puis le build des images et
+# leur scan, chaque porte après ce qu'elle lit. Le cache des couches est celui du job `infra`,
+# restauré et jamais réécrit, comme dans `publish`.
 AVIS_STEPS = [
     "actions/checkout",
-    FUSION_ACTION,
+    FUSION_NAME,
     "astral-sh/setup-uv",
     "make install",
     "make audit",
@@ -618,6 +639,14 @@ AVIS_STEPS = [
     "make build",
     "make scan",
 ]
+
+
+def launched(step: dict[str, Any]) -> str:
+    """Ce qu'un pas lance : le pas de fusion, son nom ; une commande, telle quelle ; une action,
+    sans son empreinte."""
+    if step.get("name") == FUSION_NAME:
+        return FUSION_NAME
+    return step.get("run") or str(step.get("uses", "")).split("@")[0]
 
 
 def avis_findings(text: str) -> list[str]:
@@ -640,9 +669,9 @@ def avis_findings(text: str) -> list[str]:
     if list(jobs) != ["avis"]:
         return [*findings, f"jobs {list(jobs)}, attendu le seul job `avis`"]
     steps = cast(list[dict[str, Any]], jobs["avis"].get("steps") or [])
-    launched = [step.get("run") or str(step.get("uses", "")).split("@")[0] for step in steps]
-    if launched != AVIS_STEPS:
-        findings.append(f"le job lance {launched}, attendu, dans cet ordre, {AVIS_STEPS}")
+    found = [launched(step) for step in steps]
+    if found != AVIS_STEPS:
+        findings.append(f"le job lance {found}, attendu, dans cet ordre, {AVIS_STEPS}")
     return findings
 
 
@@ -665,7 +694,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v0
-      - uses: {FUSION_ACTION}
+      - name: {FUSION_NAME}
       - uses: astral-sh/setup-uv@v0
       - run: make install
       - run: make audit
@@ -688,7 +717,7 @@ AVIS_CHANGES = {
     "sans appel par la CI": ("  workflow_call:\n", "", True),
     "écriture sur le dépôt": ("  contents: read\n", "  contents: write\n", True),
     "un second job": ("jobs:\n", "jobs:\n  autre:\n    steps: []\n", True),
-    "sans fusion du trunk": (f"      - uses: {FUSION_ACTION}\n", "", True),
+    "sans fusion du trunk": (FUSION_LINE, "", True),
     "sans audit Python": ("      - run: make audit\n", "", True),
     "sans audit npm": ("      - run: make web-audit\n", "", True),
     "sans build": ("      - run: make build\n", "", True),
@@ -1190,12 +1219,11 @@ def test_le_job_auteurs_tourne_sur_une_pr_prete_avec_tout_l_historique() -> None
     assert job["steps"][0]["with"] == FUSION_CHECKOUT
 
 
-# --- La fusion explicite du trunk : `.github/actions/fusion-trunk/action.yml` ------------------
+# --- La fusion explicite du trunk : le pas « Fusion explicite du trunk » de `ci.yml` ------------
 
-FUSION_ACTION_FILE = REPOSITORY_ROOT / ".github" / "actions" / "fusion-trunk" / "action.yml"
-# Son pas : sur une PR seulement ; le trunk est la branche cible de la PR — pas `main` en dur : une
-# PR de lot vise la branche d'intégration de son issue —, passé avec la tête par l'environnement,
-# jamais développé dans le script.
+# Son cadre : sur une PR seulement ; le trunk est la branche cible de la PR — pas `main` en dur :
+# une PR de lot vise la branche d'intégration de son issue —, passé avec la tête par
+# l'environnement, jamais développé dans le script.
 FUSION_FRAME = {
     "if": "github.event_name == 'pull_request'",
     "shell": "bash",
@@ -1210,12 +1238,28 @@ FUSION_COMMITTER = "github-actions[bot] <41898282+github-actions[bot]@users.nore
 TRACE_PREFIX = "Fusion explicite"
 # Le fichier que la base porte et que le trunk change : la tête qui le change aussi entre en conflit.
 CONFLICTED = "conflit.txt"
+# Le `GITHUB_SHA` du run, que le runner donne à chaque pas (doc GitHub « Variables », lue le
+# 2026-11-08) : sur une PR, la référence de fusion dont le run a lu la définition du workflow.
+WORKFLOW_SHA = "9" * 40
 
 
 def fusion_step() -> dict[str, Any]:
-    """Le pas unique de l'action de fusion, sous sa forme analysée."""
-    (step,) = yaml.safe_load(FUSION_ACTION_FILE.read_text(encoding="utf-8"))["runs"]["steps"]
-    return cast(dict[str, Any], step)
+    """Le pas de fusion du job `api` de `ci.yml`, sous sa forme analysée : celui que les autres
+    jobs reprennent."""
+    (step,) = [step for name, job, step in fusion_steps() if (name, job) == ("ci.yml", "api")]
+    return step
+
+
+def play_fusion(repo: Path, bash: str, head: str) -> subprocess.CompletedProcess[str]:
+    """Le pas de fusion joué dans `repo` comme sur une PR de tête `head` vers `main`."""
+    return play_step(
+        fusion_step(), repo, bash, TRUNK="main", HEAD_SHA=head, GITHUB_SHA=WORKFLOW_SHA
+    )
+
+
+def error_lines(played: subprocess.CompletedProcess[str]) -> list[str]:
+    """Les annotations d'erreur que le pas a écrites."""
+    return [line for line in played.stdout.splitlines() if line.startswith("::error::")]
 
 
 @pytest.fixture
@@ -1229,14 +1273,23 @@ def git_isole(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
-def trunk_and_head(repo: Path, changed: str) -> tuple[str, str]:
-    """Pose dans `repo` ce que le checkout laisse au pas : `refs/remotes/origin/main`, avancé depuis
-    la base de la tête, et la tête extraite détachée, sans branche locale.
-
-    La base porte `CONFLICTED`, que le trunk change ; la tête change `changed`.
+def as_checked_out(repo: Path) -> tuple[str, str]:
+    """Laisse `repo` comme le checkout le laisse au pas : le trunk, la branche `main`, en
+    `refs/remotes/origin/main`, et la tête, la branche `pr`, extraite détachée, sans branche locale.
 
     Returns:
         Le trunk et la tête, en SHA complets.
+    """
+    git(repo, "update-ref", "refs/remotes/origin/main", "main")
+    trunk, head = git(repo, "rev-parse", "main", "pr").split()
+    git(repo, "checkout", "--detach", head)
+    git(repo, "branch", "-D", "main", "pr")
+    return trunk, head
+
+
+def trunk_and_head(repo: Path, changed: str) -> tuple[str, str]:
+    """Pose dans `repo` un trunk avancé depuis la base de la tête, tel que le checkout le laisse
+    (`as_checked_out`). La base porte `CONFLICTED`, que le trunk change ; la tête change `changed`.
     """
     git(repo, "init", "-b", "main")
     (repo / CONFLICTED).write_text("base", encoding="utf-8")
@@ -1249,11 +1302,7 @@ def trunk_and_head(repo: Path, changed: str) -> tuple[str, str]:
     git(repo, "checkout", "main")
     (repo / CONFLICTED).write_text("trunk", encoding="utf-8")
     git(repo, "commit", "-am", "trunk")
-    git(repo, "update-ref", "refs/remotes/origin/main", "main")
-    trunk, head = git(repo, "rev-parse", "main", "pr").split()
-    git(repo, "checkout", "--detach", head)
-    git(repo, "branch", "-D", "main", "pr")
-    return trunk, head
+    return as_checked_out(repo)
 
 
 def trace_lines(text: str) -> list[str]:
@@ -1262,7 +1311,7 @@ def trace_lines(text: str) -> list[str]:
     return [line for line in map(str.strip, text.splitlines()) if line.startswith(TRACE_PREFIX)]
 
 
-def test_l_action_de_fusion_ne_joue_que_sur_une_pr_vers_sa_branche_cible() -> None:
+def test_le_pas_de_fusion_ne_joue_que_sur_une_pr_vers_sa_branche_cible() -> None:
     """Sur un push, rien ne se fusionne ; sur une PR, le trunk est celui qu'elle vise. Aucune
     expression dans le script : une branche nommée par l'auteur de la PR y serait développée en
     shell."""
@@ -1278,15 +1327,15 @@ def test_aucune_ligne_du_script_de_fusion_n_imite_sa_trace() -> None:
 
 
 @pytest.mark.usefixtures("git_isole")
-def test_l_action_fusionne_la_tete_au_trunk_courant_trunk_en_premier_parent(
+def test_le_pas_fusionne_la_tete_au_trunk_courant_trunk_en_premier_parent(
     tmp_path: Path, bash_de_ce_systeme: str
 ) -> None:
     """Le trunk en premier parent, la tête en second — `HEAD^1..HEAD` reste le delta, `HEAD^1..HEAD^2`
     les commits de la PR —, le message en SHA complets, l'identité du robot d'Actions, et une ligne
-    de trace, une seule, relue sur les parents du commit."""
+    de trace, une seule, relue sur les parents du commit et nommant le `GITHUB_SHA` du run."""
     trunk, head = trunk_and_head(tmp_path, "autre.txt")
 
-    played = play_step(fusion_step(), tmp_path, bash_de_ce_systeme, TRUNK="main", HEAD_SHA=head)
+    played = play_fusion(tmp_path, bash_de_ce_systeme, head)
 
     assert played.returncode == 0, played.stderr
     merge, first, second = git(tmp_path, "rev-parse", "HEAD", "HEAD^1", "HEAD^2").split()
@@ -1297,21 +1346,66 @@ def test_l_action_fusionne_la_tete_au_trunk_courant_trunk_en_premier_parent(
     ]
     # Le journal d'un run mêle les deux sorties.
     log = played.stdout + played.stderr
-    assert trace_lines(log) == [f"{TRACE_PREFIX} : {merge} Merge {head} into {trunk}"]
+    assert trace_lines(log) == [
+        f"{TRACE_PREFIX} : {merge} Merge {head} into {trunk} (workflow {WORKFLOW_SHA})"
+    ]
 
 
 @pytest.mark.usefixtures("git_isole")
-def test_l_action_echoue_sur_un_conflit_et_nomme_le_fichier(
+def test_le_pas_echoue_sur_un_conflit_et_nomme_le_fichier(
     tmp_path: Path, bash_de_ce_systeme: str
 ) -> None:
     """La même ligne changée des deux côtés : le pas échoue, une annotation d'erreur nomme la tête,
     le trunk et le fichier en conflit, et aucune trace de fusion n'est écrite."""
     trunk, head = trunk_and_head(tmp_path, CONFLICTED)
 
-    played = play_step(fusion_step(), tmp_path, bash_de_ce_systeme, TRUNK="main", HEAD_SHA=head)
+    played = play_fusion(tmp_path, bash_de_ce_systeme, head)
 
-    errors = [line for line in played.stdout.splitlines() if line.startswith("::error::")]
+    errors = error_lines(played)
     assert played.returncode != 0
     assert len(errors) == 1, played.stdout
     assert all(part in errors[0] for part in (head, f"origin/main ({trunk})", CONFLICTED)), errors
+    assert trace_lines(played.stdout + played.stderr) == []
+
+
+# Les formes d'une tête que le trunk contient déjà : les gestes qui, la tête posée sur la branche
+# `pr` depuis la base, amènent `main` à la contenir. Sur chacune, `merge --no-ff` sort en 0 sans
+# construire de commit (mesuré le 2026-11-08, git 2.47.1).
+CONTAINED_HEADS = {
+    "tête au sommet du trunk": [("merge", "--ff-only", "pr")],
+    "tête ancêtre du trunk": [
+        ("merge", "--ff-only", "pr"),
+        ("commit", "--allow-empty", "-m", "trunk"),
+    ],
+    # Le sommet du trunk est une fusion, la tête en second parent : `HEAD^2` existe, et seul le
+    # commit construit, comparé au trunk, dit que rien ne l'a été.
+    "tête second parent du sommet du trunk": [
+        ("commit", "--allow-empty", "-m", "trunk"),
+        ("merge", "--no-ff", "-m", "fusion", "pr"),
+    ],
+}
+
+
+@pytest.mark.usefixtures("git_isole")
+@pytest.mark.parametrize("gestures", CONTAINED_HEADS.values(), ids=CONTAINED_HEADS.keys())
+def test_le_pas_echoue_sur_une_tete_que_le_trunk_contient_deja(
+    tmp_path: Path, gestures: list[tuple[str, ...]], bash_de_ce_systeme: str
+) -> None:
+    """Rien n'est construit : le pas échoue, une annotation d'erreur nomme la tête et le trunk, et
+    aucune trace n'est écrite — elle donnerait pour fusion un commit du trunk."""
+    git(tmp_path, "init", "-b", "main")
+    git(tmp_path, "commit", "--allow-empty", "-m", "base")
+    git(tmp_path, "checkout", "-b", "pr")
+    git(tmp_path, "commit", "--allow-empty", "-m", "tête de la PR")
+    git(tmp_path, "checkout", "main")
+    for gesture in gestures:
+        git(tmp_path, *gesture)
+    trunk, head = as_checked_out(tmp_path)
+
+    played = play_fusion(tmp_path, bash_de_ce_systeme, head)
+
+    errors = error_lines(played)
+    assert played.returncode != 0
+    assert len(errors) == 1, played.stdout
+    assert all(part in errors[0] for part in (head, f"origin/main ({trunk})")), errors
     assert trace_lines(played.stdout + played.stderr) == []
