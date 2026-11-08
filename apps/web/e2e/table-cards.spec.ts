@@ -27,8 +27,12 @@ import {
   expectPlacement,
   face,
   focusByKeyboard,
+  LIVE_CARD,
+  NARROW_VIEWPORT,
   openTable,
   pose,
+  RIBBON_SIZES,
+  ribbonSizes,
   serveUnderCsp,
   summary,
   TWO_CARDS,
@@ -55,25 +59,13 @@ for (const [table, projects] of TABLES) {
 
 /**
  * Les dimensions de spec §4.1, §4.2 et §6.1, par taille de carte : son jeu, l'indice de la carte
- * dans la table, et ses mesures au bureau puis sur mobile — largeur de carte, de photo, hauteur de
- * face, taille du post-it, hauteur et taille des rubans. La bande et le cadre s'en déduisent.
+ * dans la table, et ses mesures au bureau puis sur mobile, à 400 px — largeur de carte, de photo,
+ * hauteur de face. La bande et le cadre s'en déduisent.
  */
 const DIMENSIONS = [
-  [
-    'simple',
-    PROJECT_SETS.threeWithShowcase,
-    1,
-    [240, 220, 282, 14, 20, 11],
-    [176, 160, 214, 13, 20, 11],
-  ],
-  [
-    'vitrine',
-    PROJECT_SETS.threeWithShowcase,
-    0,
-    [508, 480, 558, 18, 24, 12],
-    [368, 344, 412, 16, 20, 11],
-  ],
-  ['seule', PROJECT_SETS.one, 0, [360, 340, 402, 14, 20, 11], [294, 278, 332, 13, 20, 11]],
+  ['simple', PROJECT_SETS.threeWithShowcase, 1, [240, 220, 282], [176, 160, 216]],
+  ['vitrine', PROJECT_SETS.threeWithShowcase, 0, [508, 480, 558], [368, 344, 412]],
+  ['seule', PROJECT_SETS.one, 0, [360, 340, 402], [294, 278, 334]],
 ] as const
 
 for (const [size, projects, index, desktop, mobile] of DIMENSIONS) {
@@ -89,16 +81,11 @@ for (const [size, projects, index, desktop, mobile] of DIMENSIONS) {
 
     const measured = await card.evaluate((link: HTMLAnchorElement) => {
       const element = (selector: string) => link.querySelector<HTMLElement>(selector)!
-      const pixels = (selector: string, property: 'fontSize' | 'height') =>
-        parseFloat(getComputedStyle(element(selector))[property])
       return {
         sizes: [
           link.offsetWidth,
           element('.card-photo').offsetWidth,
           element('.card-face').offsetHeight,
-          pixels('h2', 'fontSize'),
-          pixels('li', 'height'),
-          pixels('li', 'fontSize'),
         ],
         // Une image en largeurs a pour taille naturelle ce que `sizes` annonce pour elle.
         announced: link.querySelector('img')!.naturalWidth,
@@ -111,6 +98,60 @@ for (const [size, projects, index, desktop, mobile] of DIMENSIONS) {
     expect(Math.abs(measured.announced - expected[1])).toBeLessThanOrEqual(1)
   })
 }
+
+/**
+ * Les tailles de spec §2.2, §4.1, §4.2 et §6.1, par taille de carte : son jeu, l'indice de la carte
+ * dans la table, et ses mesures à 1280 px puis à 375 px — post-it, résumé révélé, hauteur minimale
+ * de la bande. Ses rubans sont ceux de toute carte, aux deux largeurs.
+ */
+const TYPOGRAPHY = [
+  ['simple', PROJECT_SETS.threeWithShowcase, 1, [16, 14, 52], [14, 13, 48]],
+  ['vitrine', PROJECT_SETS.threeWithShowcase, 0, [20, 14, 64], [18, 13, 56]],
+  ['seule', PROJECT_SETS.one, 0, [16, 14, 52], [14, 13, 48]],
+] as const
+
+for (const [size, projects, index, desktop, narrow] of TYPOGRAPHY) {
+  test(`carte ${size} : post-it, résumé, bande et rubans à 1280 px, puis à 375 px`, async ({
+    page,
+    isMobile,
+  }) => {
+    await page.setViewportSize(isMobile ? NARROW_VIEWPORT : COLUMN_VIEWPORT)
+    await openTable(page, projects)
+    const card = cards(page).nth(index)
+
+    const sizes = await card.evaluate((link) => {
+      const style = (selector: string) => getComputedStyle(link.querySelector(selector)!)
+      return [style('h2').fontSize, style('.card-summary').fontSize, style('.card-band').minHeight]
+    })
+
+    expect(sizes.map(parseFloat)).toEqual(isMobile ? narrow : desktop)
+    expect(await ribbonSizes(card)).toEqual(RIBBON_SIZES)
+  })
+}
+
+test('carte simple à trois technologies et « en ligne » : une rangée de rubans à 1280 px, deux à 375 px, l’état calé à droite (spec §4.1)', async ({
+  page,
+  isMobile,
+}) => {
+  await page.setViewportSize(isMobile ? NARROW_VIEWPORT : COLUMN_VIEWPORT)
+  await openTable(page, [LIVE_CARD, buildProject({ slug: 'voisine' })])
+
+  // Les boîtes avant rotation, depuis la bande, qui les positionne.
+  const { rows, stateGap } = await cards(page)
+    .first()
+    .locator('.card-band')
+    .evaluate((band: HTMLElement) => {
+      const ribbons = [...band.querySelectorAll<HTMLElement>('.card-ribbon')]
+      const live = ribbons.at(-1)!
+      return {
+        rows: new Set(ribbons.map((ribbon) => ribbon.offsetTop)).size,
+        stateGap: band.clientWidth - (live.offsetLeft + live.offsetWidth),
+      }
+    })
+
+  expect(rows).toBe(isMobile ? 2 : 1)
+  expect(Math.abs(stateGap)).toBeLessThanOrEqual(1)
+})
 
 /**
  * Le slug que la pose pousse le plus loin d'un côté, `-1` à gauche et `1` à droite : la rotation
@@ -462,19 +503,19 @@ test('les rubans : trois technologies au plus, icône, nom masqué et infobulle 
   expect(await Promise.all((await ribbons.all()).map(rotationOf))).toEqual([-1.5, 1, -1.5])
 })
 
-test('les rubans d’état : « en cours » en texte, « en ligne » avec son point de 6 px', async ({
+test('les rubans d’état : « en cours » en texte, « en ligne » avec son point de 6 px `--live`', async ({
   page,
 }) => {
   await openTable(page, [
     buildProject({ ...ONGOING, demo_url: 'https://demo.test/projet', technologies: [] }),
   ])
   const ribbons = cards(page).locator('li')
-  const [accent] = await resolveAll(page, [['background-color', 'var(--accent)']])
+  const [live] = await resolveAll(page, [['background-color', 'var(--live)']])
 
   await expect(ribbons).toHaveText(['en cours', 'en ligne'])
   await expect(ribbons.first().locator('.card-dot')).toHaveCount(0)
   const dot = ribbons.last().locator('.card-dot')
-  await expect(dot).toHaveCSS('background-color', accent)
+  await expect(dot).toHaveCSS('background-color', live)
   await expect(dot).toHaveCSS('width', '6px')
   await expect(dot).toHaveCSS('height', '6px')
 })

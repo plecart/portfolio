@@ -9,13 +9,13 @@
   .card-simple,
   .card-solo {
     --card-frame: 8px;
-    --card-band: 46px;
-    --card-title: 13px;
+    --card-band: 48px;
+    --card-title: 14px;
 
     @variant sm {
       --card-frame: 10px;
       --card-band: 52px;
-      --card-title: 14px;
+      --card-title: 16px;
     }
   }
 
@@ -23,16 +23,13 @@
   .card-showcase {
     --card-frame: 12px;
     --card-band: 56px;
-    --card-title: 16px;
+    --card-title: 18px;
     grid-column: span 2;
 
     @variant sm {
       --card-frame: 14px;
       --card-band: 64px;
-      --card-title: 18px;
-      --card-ribbon-height: 24px;
-      --card-ribbon-inset: 9px;
-      --card-ribbon-size: 12px;
+      --card-title: 20px;
       grid-row: span 2;
     }
   }
@@ -184,8 +181,8 @@
     filter: grayscale(1);
   }
 
-  /* Le bandeau de résumé (spec §4.1) : 1,4 d'interligne pour sept lignes dans une photo de 160 px
-     (§7), le prototype retenu. */
+  /* Le bandeau de résumé (spec §4.1) : 13 px, 14 px dès 600 px ; 1,4 d'interligne pour sept lignes
+     de 13 px dans une photo de 160 px (§7), le prototype retenu. */
   .card-summary {
     position: absolute;
     inset-inline: 0;
@@ -199,6 +196,10 @@
     transition:
       opacity var(--dur-fast) var(--ease-out),
       transform var(--dur) var(--ease-out);
+
+    @variant sm {
+      font-size: 14px;
+    }
   }
 
   /* Coupé dans la marge du bandeau, et non sur lui : ses lignes cachées reparaîtraient dans sa marge
@@ -211,7 +212,10 @@
   }
 
   /* Sous 400 px, la photo passe sous les 160 px de §7 : à 18,2 px la ligne et 12 px de marge basse,
-     le haut du texte passerait derrière le post-it d'une ligne, qui descend à 20 px. */
+     le haut du texte passerait derrière le post-it d'une ligne. Les seuils sont tirés d'un post-it
+     qui descend à 20 px ; à 14 px de titre, il descend à 21,5 px, et la ligne du haut le touche de
+     moins d'un pixel juste au-dessus de chaque seuil : relevés d'un pixel, ils retireraient la
+     septième ligne de la photo de 160 px, que §7 garde. */
   @container (width < 160px) {
     .card-summary-text {
       -webkit-line-clamp: 6;
@@ -235,7 +239,6 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
     gap: var(--s-1);
     min-height: var(--card-band);
     padding-block: var(--s-2);
@@ -247,17 +250,24 @@
     gap: var(--s-1);
   }
 
+  /* Les rubans d'état à droite, même seuls sur leur rangée quand la place manque (spec §4.1). */
+  .card-states {
+    margin-inline-start: auto;
+  }
+
+  /* Le ruban (spec §4.1), le même sur toute carte et sur la fiche : la stack n'en change que la
+     marge et l'écart (§4.3). */
   .card-ribbon {
-    --height: var(--card-ribbon-height, 20px);
+    --height: 32px;
     display: inline-flex;
     align-items: center;
     gap: var(--card-ribbon-gap, var(--s-1));
     height: var(--height);
-    padding-inline: var(--card-ribbon-inset, 7px);
+    padding-inline: var(--card-ribbon-inset, 9px);
     border-radius: var(--r-tape);
     background-color: var(--tape);
     color: var(--tape-ink);
-    font-size: var(--card-ribbon-size, var(--fs-tiny));
+    font-size: var(--fs-small);
     font-weight: 700;
     line-height: 1;
     letter-spacing: 0.02em;
@@ -279,7 +289,7 @@
     width: 6px;
     height: 6px;
     border-radius: 999px;
-    background-color: var(--accent);
+    background-color: var(--live);
   }
 
   /* « Ouvrir » (spec §4.1) : posé sur la bande, pour que ses rubans, cachés, lui gardent sa hauteur

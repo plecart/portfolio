@@ -121,9 +121,9 @@ export function StateRibbons({ project }: { project: Project }) {
 
 /**
  * La bande basse (spec §4.1), masquée : le nom du lien porte les états, et sa description les
- * technologies. Les rubans de technologies à gauche, les rubans d'état à droite. « Ouvrir » les
- * remplace pendant la révélation au toucher : un texte du lien, jamais un `<button>`, qu'un `<a>` ne
- * peut contenir.
+ * technologies. Les rubans de technologies à gauche, les rubans d'état à droite, même passés à la
+ * ligne. « Ouvrir » les remplace pendant la révélation au toucher : un texte du lien, jamais un
+ * `<button>`, qu'un `<a>` ne peut contenir.
  */
 function Band({ project }: { project: Project }) {
   return (
@@ -131,7 +131,7 @@ function Band({ project }: { project: Project }) {
       <ul className="card-ribbons">
         <TechnologyRibbons project={project} />
       </ul>
-      <ul className="card-ribbons">
+      <ul className="card-ribbons card-states">
         <StateRibbons project={project} />
       </ul>
       <span className="card-open">{strings.openCard}</span>
