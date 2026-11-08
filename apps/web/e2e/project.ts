@@ -4,7 +4,7 @@ import type { Locator, Page } from '@playwright/test'
 import type { Point } from '../src/project/zoom.ts'
 import { expect, serveProjects } from './api.ts'
 import { settle } from './css.ts'
-import { buildProject, type Project } from './projects.ts'
+import { buildImage, buildProject, type Project } from './projects.ts'
 import { cards, openTable } from './table.ts'
 
 /** Le panneau de la fiche. */
@@ -54,12 +54,25 @@ export const gallery = (page: Page) => page.getByRole('group', { name: 'Images d
 export const previousImage = (page: Page) => page.getByRole('button', { name: 'Image précédente' })
 export const nextImage = (page: Page) => page.getByRole('button', { name: 'Image suivante' })
 
+/** Les légendes des trois images de la fiche des scénarios de galerie, et ces images. */
+export const CAPTIONS = ['Écran d’accueil', 'Détail de l’interface', 'Vue d’ensemble']
+export const THREE_IMAGES = CAPTIONS.map((caption) => buildImage('fiche', caption))
+
+/** Le centre d'un élément. */
+export async function center(element: Locator): Promise<Point> {
+  const { x, y, width, height } = (await element.boundingBox())!
+  return { x: x + width / 2, y: y + height / 2 }
+}
+
 /** « Agrandir l’image », le bouton de la galerie qui ouvre la couche plein écran (issue #243). */
 export const expandButton = (page: Page) => page.getByRole('button', { name: 'Agrandir l’image' })
 
 /** La couche plein écran, et son bouton de fermeture. */
 export const viewer = (page: Page) => page.getByRole('dialog', { name: 'Image en plein écran' })
 export const closeImageButton = (page: Page) => page.getByRole('button', { name: 'Fermer l’image' })
+
+/** Un bouton de la couche, par son nom. */
+export const viewerButton = (page: Page, name: string) => viewer(page).getByRole('button', { name })
 
 /** L'image de la couche, et son compteur. */
 export const viewerImage = (page: Page) => viewer(page).getByRole('img')
@@ -68,6 +81,19 @@ export const viewerCounter = (page: Page) => viewer(page).locator('.project-gall
 /** La boîte de la zone d'image de la couche : la fenêtre moins la barre. */
 export const viewerZone = async (page: Page) =>
   (await page.locator('.image-viewer-zone').boundingBox())!
+
+/**
+ * Les bornes de la translation de la couche à ce facteur : le débord de l'image carrée des
+ * scénarios, de chaque côté — à ×1, elle a pour côté le plus petit de la zone d'image.
+ */
+export async function boundsAt(page: Page, scale: number): Promise<Point> {
+  const zone = await viewerZone(page)
+  const side = Math.min(zone.width, zone.height)
+  return {
+    x: Math.max(0, (side * scale - zone.width) / 2),
+    y: Math.max(0, (side * scale - zone.height) / 2),
+  }
+}
 
 /** La transformation que la couche écrit sur son image : translation et facteur. */
 export const transformOf = (page: Page) =>
