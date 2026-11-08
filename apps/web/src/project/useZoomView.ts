@@ -50,18 +50,20 @@ export function useZoomView(zone: HTMLElement | null, natural: Size) {
     glide: glide !== null && glide === size,
     /**
      * Change la vue ; sans effet avant la première mesure. Chaque changement part du précédent,
-     * même pas encore rendu : plusieurs pointeurs peuvent bouger entre deux rendus.
+     * même pas encore rendu : plusieurs pointeurs peuvent bouger entre deux rendus. Un `next` qui
+     * rend la vue reçue telle quelle (`snapToFit` au-dessus de ×1,05) ne touche à rien : la fin
+     * d'une molette ne coupe pas le glissement d'une touche pressée juste après.
      *
      * @param next La nouvelle vue, de la vue en place, de la zone et de la vue retenue (`hold`).
      * @param glides Un pas qui glisse ; par défaut, l'image suit sans retard.
      */
     change(next: (view: View, stage: Stage, held: View) => View, glides = false) {
       if (!stage) return
-      setState((state) => ({
-        ...state,
-        view: next(clampView(state.view, stage), stage, state.held),
-        glide: glides ? stage.zone : null,
-      }))
+      setState((state) => {
+        const current = clampView(state.view, stage)
+        const view = next(current, stage, state.held)
+        return view === current ? state : { ...state, view, glide: glides ? stage.zone : null }
+      })
     },
     /**
      * Retient la vue en place : un pincement part d'elle à chacun de ses pas, sans cumuler les
