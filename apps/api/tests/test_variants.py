@@ -7,8 +7,8 @@ from typing import IO, Any
 from uuid import uuid4
 
 import pytest
-from content.models import Variant
-from content.variants import make_variants
+from content.models import COVER_MIN_SIDE, Variant
+from content.variants import VARIANT_WIDTHS, make_variants
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage, default_storage
 from PIL import Image, ImageCms, UnidentifiedImageError
@@ -21,15 +21,30 @@ ROTATE_90_CLOCKWISE = 6
 SRGB = ImageCms.createProfile("sRGB")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 SRGB_PROFILE: bytes = ImageCms.ImageCmsProfile(SRGB).tobytes()  # pyright: ignore[reportUnknownArgumentType]
 
-# Les entrées nommées de la décision 6, écrites en littéraux : la taille de l'original, puis la
-# taille de chaque variante attendue, dans l'ordre de l'échelle.
+# Les entrées nommées de la décision 6, puis celles du brief de #242, écrites en littéraux : la
+# taille de l'original, puis la taille de chaque variante attendue, dans l'ordre de l'échelle.
 NAMED_ENTRIES = [
-    ((1300, 1300), [(320, 320), (480, 480), (720, 720), (960, 960), (1200, 1200)]),
+    ((1300, 1300), [(320, 320), (480, 480), (720, 720), (960, 960), (1200, 1200), (1300, 1300)]),
     ((800, 600), [(320, 240), (480, 360), (720, 540), (800, 600)]),
-    ((2000, 1000), [(320, 160), (480, 240), (720, 360), (960, 480), (1200, 600)]),
+    (
+        (2000, 1000),
+        [(320, 160), (480, 240), (720, 360), (960, 480), (1200, 600), (1320, 660), (2000, 1000)],
+    ),
     ((300, 300), [(300, 300)]),
-    # La couverture minimale (spec §1.11) garde sa variante d'aperçu de lien.
-    ((1200, 1200), [(320, 320), (480, 480), (720, 720), (960, 960), (1200, 1200)]),
+    # La couverture minimale (spec §1.11) reçoit chaque barreau, l'aperçu de lien compris, et le
+    # dernier à son propre côté : son côté se lit par son nom (brief de #242, décision 6).
+    (
+        (COVER_MIN_SIDE, COVER_MIN_SIDE),
+        [
+            (320, 320),
+            (480, 480),
+            (720, 720),
+            (960, 960),
+            (1200, 1200),
+            (1320, 1320),
+            (COVER_MIN_SIDE, COVER_MIN_SIDE),
+        ],
+    ),
 ]
 
 
@@ -63,8 +78,8 @@ def test_l_original_donne_les_variantes_de_l_echelle_sans_agrandissement(
     size: tuple[int, int], expected: list[tuple[int, int]]
 ) -> None:
     """Une variante par barreau inférieur ou égal à la largeur de l'original, plus une à sa largeur
-    sous 1200 px ; hauteur en proportion ; chacune un fichier WebP de ces dimensions, rangé dans le
-    dossier de l'original sous sa largeur."""
+    sous le dernier barreau ; hauteur en proportion ; chacune un fichier WebP de ces dimensions,
+    rangé dans le dossier de l'original sous sa largeur."""
     original = stored_original(encoded(Image.new("RGB", size)))
     folder = original.rsplit("/", 1)[0]
 
@@ -178,13 +193,7 @@ def test_un_original_tres_allonge_garde_une_hauteur_d_un_pixel() -> None:
 
     variants = make_variants(default_storage, original)
 
-    assert [(v["width"], v["height"]) for v in variants] == [
-        (320, 1),
-        (480, 1),
-        (720, 1),
-        (960, 1),
-        (1200, 1),
-    ]
+    assert [(v["width"], v["height"]) for v in variants] == [(width, 1) for width in VARIANT_WIDTHS]
 
 
 def test_un_original_d_un_autre_format_n_est_pas_decode() -> None:

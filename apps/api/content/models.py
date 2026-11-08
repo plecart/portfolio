@@ -451,8 +451,9 @@ class Variant(TypedDict):
 # compteur.
 CAPTION_MAX_LENGTH = 50
 
-# Le côté minimal de la couverture, première image de la galerie (spec §1.11 et §7).
-COVER_MIN_SIDE = 1200
+# Le côté minimal de la couverture, première image de la galerie (spec §1.11 et §7, ADR 0028) :
+# une couverture de ce côté reçoit chaque barreau de l'échelle des variantes, plein écran compris.
+COVER_MIN_SIDE = 2400
 
 
 class GalleryImage(StoredFiles):
@@ -460,9 +461,9 @@ class GalleryImage(StoredFiles):
     site l'affiche entière dans le cadre carré, sur fond neutre (spec §1.11).
 
     La première est la couverture : la photo de la carte, la première image de la fiche et
-    l'`og:image` (spec §1.11 et §7, ADR 0011), carrée, d'au moins 1200 px de côté. Ces règles
-    lisent l'ordre des images d'un projet, comme « une image au moins » : la base ne peut pas les
-    porter, l'écran Projet les tient (brief de #9, décision 4).
+    l'`og:image` (spec §1.11 et §7, ADR 0011), carrée, d'au moins `COVER_MIN_SIDE` px de côté.
+    Ces règles lisent l'ordre des images d'un projet, comme « une image au moins » : la base ne
+    peut pas les porter, l'écran Projet les tient (brief de #9, décision 4).
 
     L'original est gardé tel que téléversé, jamais recadré ni réencodé (spec §1.11). Le worker en
     produit les variantes et seul il écrit l'état et les variantes (brief de #9, décision 5 ;

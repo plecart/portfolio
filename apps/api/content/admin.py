@@ -136,9 +136,10 @@ class ProjectTechnologyInline(SortableInline[ProjectTechnology, Project]):
 
 class GalleryFormSet(SortableFormSet[GalleryImage, Project]):
     """Les images d'un projet : une au moins, brouillon compris, et la première — la couverture —
-    carrée, d'au moins 1200 px de côté (brief de #9, décisions 2, 4 et 8). Ces règles lisent les
-    images ensemble : la base ne peut pas les porter, le formulaire les tient, comme « au moins une
-    technologie ». Le message par défaut de Django pour le minimum parle de formulaires."""
+    carrée, d'au moins `COVER_MIN_SIDE` px de côté (brief de #9, décisions 2, 4 et 8). Ces règles
+    lisent les images ensemble : la base ne peut pas les porter, le formulaire les tient, comme
+    « au moins une technologie ». Le message par défaut de Django pour le minimum parle de
+    formulaires."""
 
     default_error_messages: ClassVar[dict[str, StrOrPromise]] = {
         "too_few_forms": strings.PROJECT_IMAGES_MISSING
@@ -147,9 +148,12 @@ class GalleryFormSet(SortableFormSet[GalleryImage, Project]):
     def clean(self) -> None:
         """Les règles de `SortableFormSet`, puis la couverture : la première des images gardées,
         dans l'ordre que l'enregistrement donne à la galerie (`_rank`), refusée sous sa ligne si
-        elle n'est pas carrée, ou si son petit côté fait moins de 1200 px. Une ligne déjà refusée
-        n'est pas jugée une seconde fois : ses dimensions ne décrivent rien d'admis. Une image
-        glissée en tête devient la couverture, et en reçoit les règles."""
+        elle n'est pas carrée, ou si son petit côté fait moins de `COVER_MIN_SIDE` px. Elle est
+        jugée à chaque enregistrement du projet, son fichier changé ou non : une couverture
+        enregistrée sous une borne plus basse est refusée, sans tolérance (brief de #242,
+        décision 2). Une ligne déjà refusée n'est pas jugée une seconde fois : ses dimensions ne
+        décrivent rien d'admis. Une image glissée en tête devient la couverture, et en reçoit les
+        règles."""
         super().clean()
         kept = self.kept_forms()
         if not kept:

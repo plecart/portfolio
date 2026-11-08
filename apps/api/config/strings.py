@@ -146,12 +146,14 @@ GALLERY_IMAGE_POSITION = "position"
 # Image de galerie : le titre de leur tableau dans l'écran Projet
 GALLERY_HEADING = "Galerie"
 
-# Image de galerie : refus de la première, la couverture
+# Image de galerie : refus de la première, la couverture ; le second écrit `COVER_MIN_SIDE`
+# (`content/models.py`), que le catalogue ne peut pas importer — le modèle importe le catalogue —,
+# et que `test_image_admin.py` tient d'accord avec lui
 GALLERY_COVER_NOT_SQUARE = (
     "La première image est la couverture : elle est carrée, sa largeur égale sa hauteur."
 )
 GALLERY_COVER_TOO_SMALL = (
-    "La première image est la couverture : elle mesure au moins 1200 px de côté."
+    "La première image est la couverture : elle mesure au moins 2400 px de côté."
 )
 
 # Aperçu Markdown de l'admin, sous la description d'un projet et le corps d'une section : sa

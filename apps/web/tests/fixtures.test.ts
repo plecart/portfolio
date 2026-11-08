@@ -50,8 +50,8 @@ function glossaryViolations(project: Project): string[] {
     ['nom de technologie de 50 caractères au plus', project.technologies.every((t) => t.name.length <= 50)],
     ['une image au moins', project.gallery.length >= 1],
     [
-      'couverture carrée de 1200 px au moins',
-      cover !== undefined && cover.width === cover.height && cover.width >= 1200,
+      'couverture carrée de 2400 px au moins',
+      cover !== undefined && cover.width === cover.height && cover.width >= 2400,
     ],
     [
       'légende de 50 caractères au plus, jamais blanche',

@@ -104,7 +104,7 @@ la couverture, et lui en applique les règles.
 
 | Terme | Identifiant | Règle |
 |---|---|---|
-| forme | `width`, `height` | carrée — largeur égale à la hauteur —, 1200 px de côté au moins ; l'écran Projet la tient, la base ne le peut pas |
+| forme | `width`, `height` | carrée — largeur égale à la hauteur —, 2400 px de côté au moins ; l'écran Projet la tient, la base ne le peut pas |
 
 ## API publique
 

@@ -1,4 +1,4 @@
-"""Exporte le schéma d'architecture d'un projet en image PNG carrée de 1200 × 1200 px.
+"""Exporte le schéma d'architecture d'un projet en image PNG carrée de 2400 × 2400 px.
 
 Usage :
     python export.py [<description> [<png>]]
@@ -17,10 +17,15 @@ Trois temps, chacun arrêté par un échec :
    ni fichier voisin ;
 3. **capturer** la page par la CLI de Playwright, le paquet Python à la version `PLAYWRIGHT`,
    lancé par `uv run --no-project --with`, hors de tout projet : Chromium sans fenêtre —
-   `screenshot` le lance ainsi —, fenêtre de 1200 × 1200 px, schéma clair, capture après cet
-   attribut, `DELAI` au plus par attente. Le facteur d'échelle vaut 1 : la CLI ne le fixe
-   que sous `--device`, et le défaut d'un contexte est 1 (Playwright 1.64.1, `launchContext` et
-   `screenshot` du pilote, `docs/src/api/params.md`, lus le 2026-11-05). Puis la taille se
+   `screenshot` le lance ainsi —, fenêtre de 1200 × 1200 px (`FENETRE`) au facteur d'échelle 2
+   (`FACTEUR`) du descripteur « Desktop Chrome HiDPI » (`APPAREIL`), schéma clair, capture après
+   cet attribut, `DELAI` au plus par attente. Le descripteur fixe le facteur, `--viewport-size`
+   remplace sa fenêtre : le dessin garde la mise en page de 1200 px et double sa finesse
+   (Playwright 1.64.1, `launchContext` du pilote, `driver/package/lib/coreBundle.js` : le
+   descripteur copié, puis sa fenêtre remplacée par celle de `--viewport-size` ; son facteur
+   n'est remplacé que sous une fenêtre de navigateur, que `screenshot` n'ouvre pas ; le
+   descripteur à `deviceScaleFactor: 2` ; lus le 2026-11-08). Mesuré le 2026-11-08 sur le
+   poste : un PNG de 2400 × 2400, où un carré de 600 px CSS occupe 1200 px. Puis la taille se
    relit dans l'en-tête IHDR du PNG : le côté ne dépend ni du zoom ni de l'écran du poste.
 
 L'image n'est écrite à `<png>` qu'à la fin, à la bonne taille.
@@ -28,7 +33,7 @@ L'image n'est écrite à `<png>` qu'à la fin, à la bonne taille.
 Prérequis, une fois par poste : `uv`, puis Chromium pour cette version de Playwright,
 `uv run --no-project --with playwright==<PLAYWRIGHT> playwright install chromium`.
 
-Sortie : 0 et la ligne `<png> : 1200 × 1200` ; 1 et une ligne `<chemin> : <message>` par erreur
+Sortie : 0 et la ligne `<png> : 2400 × 2400` ; 1 et une ligne `<chemin> : <message>` par erreur
 de la description, sur la sortie standard, ou le motif en une ligne sur la sortie d'erreur —
 prérequis absent, capture en échec ou d'une autre taille ; 2 et son motif en une ligne sur la
 sortie d'erreur, description ou fichier des couleurs illisible ou mal formé, nom d'icône présent
@@ -58,7 +63,13 @@ from description import (
 )
 
 PLAYWRIGHT = "1.64.1"
-COTE = 1200
+# La fenêtre de la capture, en px CSS : la mise en page du dessin.
+FENETRE = 1200
+# Le descripteur de la capture, et le facteur d'échelle qu'il fixe (docstring, temps 3).
+APPAREIL = "Desktop Chrome HiDPI"
+FACTEUR = 2
+# Le côté de l'image, en pixels, que l'en-tête du PNG doit porter.
+COTE = FENETRE * FACTEUR
 PREREQUIS = f"uv run --no-project --with playwright=={PLAYWRIGHT} playwright install chromium"
 RENDU = Path(__file__).resolve().parent.parent / "rendu"
 # L'attribut que la page pose sur `<body>` une fois rendue, polices chargées : l'export l'injecte
@@ -151,8 +162,10 @@ def capturer(page: Path, png: Path) -> str | None:
             "screenshot",
             "--browser",
             "chromium",
+            "--device",
+            APPAREIL,
             "--viewport-size",
-            f"{COTE},{COTE}",
+            f"{FENETRE},{FENETRE}",
             "--color-scheme",
             "light",
             "--wait-for-selector",

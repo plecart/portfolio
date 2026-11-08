@@ -61,11 +61,13 @@ ACCEPTED = [
 # Les formes d'un fichier qui n'est pas une image JPEG, PNG ou WebP — c'est le dénombrement qui
 # compte : un fichier qui n'est pas une image, des images d'autres formats sous une extension
 # admise, et un document SVG, qu'un `<img>` afficherait mais que le worker de #12 ne convertit pas.
+# Le BMP et le TIFF, non compressés, sont petits : au côté de la fabrique, leur poids dépasserait
+# la borne, jugée avant le format.
 NOT_ACCEPTED = [
     ("texte", SimpleUploadedFile("notes.png", b"Pas une image.")),
     ("GIF nommé .png", image_upload("image.png", image_format="GIF")),
-    ("BMP nommé .jpg", image_upload("image.jpg", image_format="BMP")),
-    ("TIFF nommé .webp", image_upload("image.webp", image_format="TIFF")),
+    ("BMP nommé .jpg", image_upload("image.jpg", size=(300, 300), image_format="BMP")),
+    ("TIFF nommé .webp", image_upload("image.webp", size=(300, 300), image_format="TIFF")),
     ("SVG nommé .png", SimpleUploadedFile("icone.png", SVG)),
 ]
 
@@ -124,7 +126,7 @@ def test_une_bombe_de_decompression_est_refusee(monkeypatch: pytest.MonkeyPatch)
     catalogue, jamais une exception de `validate_original`. L'affectation au modèle, elle, lit les
     dimensions avec Django (`get_image_dimensions`), qui laisse passer l'exception — un formulaire
     valide l'original avant de l'affecter (`OriginalFormField`). La limite est abaissée le temps du
-    test : un carré de 1200 px la dépasse alors."""
+    test : l'image de la fabrique la dépasse alors."""
     monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 1000)
 
     with pytest.raises(ValidationError) as refusal:

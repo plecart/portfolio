@@ -14,8 +14,9 @@ from typing import Any, cast
 
 import pytest
 from content.api import api
-from content.link_preview import LinkPreviewTemplateError, meta_tags
-from content.models import ProcessingState, Project
+from content.link_preview import OG_IMAGE_WIDTH, LinkPreviewTemplateError, meta_tags
+from content.models import ProcessingState, Project, Variant
+from content.variants import VARIANT_WIDTHS
 from django.test import Client, override_settings
 from factories import gallery_image, project, saved
 from pytest_django import DjangoAssertNumQueries, DjangoCaptureOnCommitCallbacks
@@ -52,11 +53,12 @@ INJECTED: dict[str, tuple[dict[str, str], str | None]] = {
     "image": ({}, HOSTILE),
 }
 
-# La couverture prête : ses variantes telles que le worker les écrit, par largeur croissante, puis
-# le chemin de celle de 1200 px, et son adresse absolue sous le client de test.
-COVER_VARIANTS = [
-    {"name": "images/couverture/960.webp", "width": 960, "height": 960},
-    {"name": "images/couverture/1200.webp", "width": 1200, "height": 1200},
+# La couverture prête : ses variantes telles que le worker les écrit, une par barreau de l'échelle
+# — par largeur croissante, le dernier au-dessus de l'aperçu —, puis le chemin de celle de l'aperçu
+# de lien, 1200 px (ADR 0011), et son adresse absolue sous le client de test.
+COVER_VARIANTS: list[Variant] = [
+    {"name": f"images/couverture/{width}.webp", "width": width, "height": width}
+    for width in VARIANT_WIDTHS
 ]
 COVER_PATH = "/media/images/couverture/1200.webp"
 COVER_URL = f"http://testserver{COVER_PATH}"
@@ -219,11 +221,19 @@ def test_une_premiere_image_qui_n_est_pas_prete_n_a_pas_d_og_image(
 def test_une_couverture_prete_sans_variante_de_1200_px_n_a_pas_d_og_image(
     client: Client, published: Project
 ) -> None:
-    """Un état que l'admin refuse — une couverture de moins de 1200 px de côté — rend la page
-    sans `og:image`, jamais une erreur."""
-    saved(gallery_image(published, state=ProcessingState.READY, variants=COVER_VARIANTS[:1]))
+    """Un état que l'admin refuse — une couverture de moins de 1200 px de côté, sous son côté
+    minimal — rend la page sans `og:image`, jamais une erreur."""
+    smaller = [variant for variant in COVER_VARIANTS if variant["width"] < OG_IMAGE_WIDTH]
+    saved(gallery_image(published, state=ProcessingState.READY, variants=smaller))
 
     assert tags(marked_block(client.get(PAGE).content)) == FOUR_TAGS
+
+
+def test_la_variante_de_l_apercu_de_lien_est_le_barreau_de_1200_px() -> None:
+    """1200 px (ADR 0011), découplée du dernier barreau, et toujours un barreau de l'échelle :
+    sans quoi aucune couverture n'en aurait la variante (ADR 0028)."""
+    assert OG_IMAGE_WIDTH == 1200
+    assert OG_IMAGE_WIDTH in VARIANT_WIDTHS
 
 
 @pytest.mark.django_db

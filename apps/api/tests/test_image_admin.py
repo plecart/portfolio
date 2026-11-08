@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from config import strings
 from content.inlines import HANDLE_CLASS
-from content.models import GalleryImage, ProcessingState, Project
+from content.models import COVER_MIN_SIDE, GalleryImage, ProcessingState, Project
 from django.contrib.admin.helpers import InlineAdminFormSet
 from django.contrib.staticfiles import finders
 from django.core.files.storage import default_storage
@@ -65,9 +65,9 @@ IMAGE_REFUSALS = [
     ("légende sans fichier", {"original": ""}, strings.IMAGE_ORIGINAL_MISSING),
 ]
 
-# Le côté minimal de la couverture (spec §1.11 et §7), écrit ici et non lu sur le modèle, pour
-# qu'une borne changée fasse rougir ce fichier.
-MIN_SIDE = 1200
+# Le côté minimal de la couverture (spec §1.11 et §7), lu sur le modèle par son nom (brief de #242,
+# décision 6) : les bornes s'éprouvent de part et d'autre, et le message les nomme.
+MIN_SIDE = COVER_MIN_SIDE
 
 # Les formes que la couverture refuse, bornes éprouvées des deux côtés, chacune avec ses refus.
 SHAPE_REFUSALS = [
@@ -88,7 +88,7 @@ SHAPE_REFUSALS = [
 
 # Une image libre, qui ne peut pas être la couverture : en paysage, assez haute pour ne recevoir
 # qu'un refus en tête.
-LANDSCAPE = (1600, MIN_SIDE)
+LANDSCAPE = (MIN_SIDE + 400, MIN_SIDE)
 
 
 def with_rows(count: int) -> dict[str, object]:
@@ -234,7 +234,7 @@ def test_l_admin_refuse_une_image_hors_de_ses_regles(
 @pytest.mark.parametrize(
     "size", [(MIN_SIDE, MIN_SIDE), (MIN_SIDE + 1, MIN_SIDE + 1)], ids=["à la borne", "au-delà"]
 )
-def test_une_couverture_carree_d_au_moins_1200_px_est_acceptee(
+def test_une_couverture_carree_d_au_moins_le_cote_minimal_est_acceptee(
     admin_client: Client, size: tuple[int, int]
 ) -> None:
     data = new_project_data(
@@ -257,8 +257,8 @@ def test_une_couverture_carree_d_au_moins_1200_px_est_acceptee(
 def test_l_admin_refuse_une_couverture_hors_de_sa_forme(
     admin_client: Client, size: tuple[int, int], expected: list[str]
 ) -> None:
-    """La première image est la couverture : carrée, 1200 px de côté au moins (décision 8). Ses
-    refus s'affichent sous sa ligne, avec les messages du catalogue, et rien ne s'enregistre."""
+    """La première image est la couverture : carrée, `MIN_SIDE` px de côté au moins (décision 8).
+    Ses refus s'affichent sous sa ligne, avec les messages du catalogue, et rien ne s'enregistre."""
     data = new_project_data(
         admin_client,
         **line(0, saved(technology(name="Django")), 1),
@@ -270,6 +270,32 @@ def test_l_admin_refuse_une_couverture_hors_de_sa_forme(
     assert response.status_code == 200
     assert messages(inline_group(response, GALLERY).formset.forms[0]) == expected
     assert not Project.objects.exists()
+
+
+def test_le_refus_d_une_couverture_trop_petite_nomme_le_cote_minimal() -> None:
+    """Le catalogue ne peut pas lire la constante du modèle, qui l'importe : le message l'écrit, et
+    ce test les tient d'accord (brief de #242, décision 6)."""
+    assert f"au moins {MIN_SIDE} px de côté" in strings.GALLERY_COVER_TOO_SMALL
+
+
+@pytest.mark.django_db
+def test_une_couverture_enregistree_sous_le_cote_minimal_est_refusee_au_prochain_enregistrement(
+    admin_client: Client,
+) -> None:
+    """Refus strict (brief de #242, décision 2) : une couverture enregistrée plus petite — sous une
+    borne plus basse — est jugée à chaque enregistrement du projet, son fichier inchangé ; le projet
+    ne s'enregistre plus tant qu'une image conforme ne la remplace pas."""
+    portfolio = saved_project(saved(technology(name="Django")))
+    cover = portfolio.gallery.get()
+    cover.original = image_upload(size=(MIN_SIDE - 1, MIN_SIDE - 1))
+    cover.save()
+    url = reverse("admin:content_project_change", args=[portfolio.pk])
+
+    response = admin_client.post(url, rendered_data(admin_client, url))
+
+    assert response.status_code == 200
+    forms = inline_group(response, GALLERY).formset.forms
+    assert messages(forms[0]) == [strings.GALLERY_COVER_TOO_SMALL]
 
 
 @pytest.mark.django_db
@@ -286,7 +312,10 @@ def test_une_image_libre_a_la_seconde_place_est_acceptee(admin_client: Client) -
     response = admin_client.post(reverse("admin:content_project_add"), data)
 
     assert response.status_code == 302
-    assert [image.width for image in Project.objects.get().gallery.all()] == [MIN_SIDE, 1600]
+    assert [image.width for image in Project.objects.get().gallery.all()] == [
+        MIN_SIDE,
+        LANDSCAPE[0],
+    ]
 
 
 @pytest.mark.django_db
@@ -301,7 +330,7 @@ def test_une_image_libre_glissee_en_tete_est_refusee(admin_client: Client) -> No
     assert response.status_code == 200
     forms = inline_group(response, GALLERY).formset.forms
     assert [messages(form) for form in forms[:2]] == [[], [strings.GALLERY_COVER_NOT_SQUARE]]
-    assert [image.width for image in portfolio.gallery.all()] == [MIN_SIDE, 1600]
+    assert [image.width for image in portfolio.gallery.all()] == [MIN_SIDE, LANDSCAPE[0]]
 
 
 @pytest.mark.django_db
@@ -334,7 +363,7 @@ def test_une_couverture_enregistree_arrivee_sans_position_reste_la_couverture(
     )
 
     assert response.status_code == 302
-    assert [image.width for image in portfolio.gallery.all()] == [MIN_SIDE, 1600]
+    assert [image.width for image in portfolio.gallery.all()] == [MIN_SIDE, LANDSCAPE[0]]
 
 
 @pytest.mark.django_db
@@ -392,7 +421,7 @@ def test_une_ligne_neuve_sans_position_n_est_pas_jugee_couverture(
     response = admin_client.post(url, data)
 
     assert response.status_code == 302
-    assert [image.width for image in portfolio.gallery.all()] == [MIN_SIDE, 1600]
+    assert [image.width for image in portfolio.gallery.all()] == [MIN_SIDE, LANDSCAPE[0]]
 
 
 @pytest.mark.django_db
@@ -411,7 +440,7 @@ def test_une_ligne_neuve_sans_position_se_range_apres_une_image_enregistree_aill
     response = admin_client.post(url, data)
 
     assert response.status_code == 302
-    assert [image.width for image in portfolio.gallery.all()] == [MIN_SIDE, 1300, 1600]
+    assert [image.width for image in portfolio.gallery.all()] == [MIN_SIDE, 1300, LANDSCAPE[0]]
 
 
 @pytest.mark.django_db
@@ -438,7 +467,7 @@ def test_l_auteur_remplace_le_fichier_d_une_image(admin_client: Client) -> None:
     before = portfolio.gallery.get().original.name
     url = reverse("admin:content_project_change", args=[portfolio.pk])
     data = rendered_data(admin_client, url) | {
-        f"{GALLERY}-0-original": image_upload(size=(1300, 1300))
+        f"{GALLERY}-0-original": image_upload(size=(MIN_SIDE + 100, MIN_SIDE + 100))
     }
 
     response = admin_client.post(url, data)
@@ -446,7 +475,7 @@ def test_l_auteur_remplace_le_fichier_d_une_image(admin_client: Client) -> None:
     assert response.status_code == 302
     replaced = portfolio.gallery.get()
     assert replaced.original.name != before
-    assert (replaced.width, replaced.state) == (1300, ProcessingState.PENDING)
+    assert (replaced.width, replaced.state) == (MIN_SIDE + 100, ProcessingState.PENDING)
 
 
 @pytest.mark.django_db

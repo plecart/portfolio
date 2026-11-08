@@ -5,7 +5,9 @@ La capture passe par une frontière, `subprocess.run`, que ces tests remplacent 
 (`Capture`) : il note la commande, et écrit au dernier chemin qu'elle nomme un PNG témoin construit
 ici octet par octet. Un navigateur n'entre pas dans la suite : l'export réel se joue sur le poste.
 Les cas s'écrivent en littéraux, jamais tirés des constantes du script
-(`cycle-pr/references/tests.md`, « Le rouge se constate, il ne se suppose pas »).
+(`cycle-pr/references/tests.md`, « Le rouge se constate, il ne se suppose pas ») ; seul le PNG
+témoin d'une capture réussie, là où la taille n'est pas le cas éprouvé, prend le côté du script
+(`CONFORME`).
 """
 
 import json
@@ -136,11 +138,16 @@ def test_la_page_assemblee_porte_la_description_et_ses_icones() -> None:
     assert [nom for nom in nommees if couleurs.get(nom, f"lucide lucide-{nom}") not in page] == []
 
 
+# Le PNG témoin d'une capture réussie, au côté que le script attend.
+CONFORME = png_temoin(export.COTE, export.COTE)
+
 TAILLES = {
-    "carre-de-1200": (png_temoin(1200, 1200), 0, "architecture.png : 1200 × 1200"),
-    "autre-taille": (png_temoin(1200, 900), 1, "1200 × 900"),
-    "signature-fausse": (b"GIF89a" + png_temoin(1200, 1200)[6:], 1, "pas un PNG"),
-    "premier-bloc-pas-ihdr": (png_temoin(1200, 1200).replace(b"IHDR", b"IDAT"), 1, "pas un PNG"),
+    "carre-de-2400": (png_temoin(2400, 2400), 0, "architecture.png : 2400 × 2400"),
+    # La fenêtre sans le facteur d'échelle du descripteur.
+    "carre-de-1200": (png_temoin(1200, 1200), 1, "1200 × 1200"),
+    "autre-taille": (png_temoin(2400, 1800), 1, "2400 × 1800"),
+    "signature-fausse": (b"GIF89a" + CONFORME[6:], 1, "pas un PNG"),
+    "premier-bloc-pas-ihdr": (CONFORME.replace(b"IHDR", b"IDAT"), 1, "pas un PNG"),
 }
 
 
@@ -153,8 +160,9 @@ def test_la_taille_se_relit_dans_l_en_tete_du_png(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """1200 × 1200 : l'image est écrite, sortie 0. Une autre taille ou un fichier qui n'est pas
-    un PNG : sortie 1, le motif nomme ce qui a été lu, et rien n'est écrit."""
+    """2400 × 2400 : l'image est écrite, sortie 0. Une autre taille — la fenêtre de 1200 sans son
+    facteur d'échelle comprise — ou un fichier qui n'est pas un PNG : sortie 1, le motif nomme ce
+    qui a été lu, et rien n'est écrit."""
     png = tmp_path / "docs" / "architecture.png"
 
     rendu = lancer(monkeypatch, Capture(png=capturee), PACOME_DEV, png)
@@ -169,7 +177,7 @@ def test_une_description_invalide_sort_en_1_sans_capture_ni_image(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Valider d'abord : les erreurs sortent, aucun navigateur ne démarre, aucune image."""
-    capture = Capture(png=png_temoin(1200, 1200))
+    capture = Capture(png=CONFORME)
     png = tmp_path / "architecture.png"
 
     fautive, index = pacome_dev_fautive(tmp_path, "fantome")
@@ -187,7 +195,7 @@ def test_une_description_illisible_sort_en_2_sans_capture(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Fichier absent : sortie 2, son motif en une ligne sur la sortie d'erreur."""
-    capture = Capture(png=png_temoin(1200, 1200))
+    capture = Capture(png=CONFORME)
 
     rendu = lancer(monkeypatch, capture, tmp_path / "absente.json", tmp_path / "a.png")
 
@@ -197,10 +205,10 @@ def test_une_description_illisible_sort_en_2_sans_capture(
 def test_la_capture_est_la_cli_de_playwright_epinglee_hors_de_tout_projet(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`uv run --no-project --with playwright==1.64.1`, Chromium, fenêtre de 1200 × 1200 px,
-    schéma clair, capture après le marqueur que pose la page (test suivant), 30 s au plus par
-    attente."""
-    capture = Capture(png=png_temoin(1200, 1200))
+    """`uv run --no-project --with playwright==1.64.1`, Chromium, fenêtre de 1200 × 1200 px au
+    facteur d'échelle du descripteur « Desktop Chrome HiDPI », schéma clair, capture après le
+    marqueur que pose la page (test suivant), 30 s au plus par attente."""
+    capture = Capture(png=CONFORME)
 
     lancer(monkeypatch, capture, PACOME_DEV, tmp_path / "architecture.png")
 
@@ -217,6 +225,7 @@ def test_la_capture_est_la_cli_de_playwright_epinglee_hors_de_tout_projet(
     ]
     assert {
         "--browser": "chromium",
+        "--device": "Desktop Chrome HiDPI",
         "--viewport-size": "1200,1200",
         "--color-scheme": "light",
         "--wait-for-selector": "body[data-rendu-pret]",
@@ -274,7 +283,7 @@ def test_un_fichier_des_couleurs_illisible_sort_en_2_sans_capture_ni_image(
     (tmp_path / "simple-icons").mkdir()
     (tmp_path / "simple-icons" / "couleurs.json").write_text("{", encoding="utf-8")
     monkeypatch.setattr(export, "ICONES", tmp_path)
-    capture = Capture(png=png_temoin(1200, 1200))
+    capture = Capture(png=CONFORME)
     png = tmp_path / "architecture.png"
 
     rendu = lancer(monkeypatch, capture, PACOME_DEV, png)

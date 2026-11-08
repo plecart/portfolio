@@ -71,7 +71,7 @@ _Document normatif de rang 2 (`.claude/pipeline.config.md`, « Sources de vérit
 
 ### 1.11 Format des images
 
-- **Cadre carré 1:1** pour la photo de la carte et pour la galerie. Chaque projet fournit une **couverture carrée** (carte, première image de la galerie, `og:image` de l'ADR 0008), d'au moins 1200 px de côté. Les autres images sont libres et s'affichent entières dans le cadre carré sur fond neutre, jamais recadrées. Ancres vérifiées : cadrage §6.7 « images WebP redimensionnées » conforme ; ADR 0008 « og:image » conforme.
+- **Cadre carré 1:1** pour la photo de la carte et pour la galerie. Chaque projet fournit une **couverture carrée** (carte, première image de la galerie, `og:image` de l'ADR 0011), d'au moins 2400 px de côté, pour le plein écran et les écrans denses ; l'`og:image` en sert la variante de 1200 px (ADR 0028). Les autres images sont libres et s'affichent entières dans le cadre carré sur fond neutre, jamais recadrées. Ancres vérifiées : cadrage §6.7 « images WebP redimensionnées » conforme ; ADR 0011 « og:image » conforme ; cadrage §7 D72.
 
 ### 1.12 Entête et navigation
 
@@ -114,7 +114,7 @@ Ancres vérifiées : frontend-outillage §3 item 12 (seuils annoncés sans valeu
 
 - Titre : **30 caractères** au plus, sur deux lignes au plus du post-it (à 14 px, une ligne de 30 caractères, environ 204 px de texte, exige une carte d'environ 255 px, que la carte simple n'atteint pas à 400 px).
 - Résumé : **120 caractères** au plus (sept lignes au plus sur la carte simple mobile, moins sous 400 px, §7) ; sert aussi d'`og:description`.
-- Couverture : **carrée, ≥ 1200 px de côté**, une par projet ; autres images libres, chacune avec une légende (texte alternatif).
+- Couverture : **carrée, ≥ 2400 px de côté**, une par projet ; autres images libres, chacune avec une légende (texte alternatif).
 - Technologies : au moins une, ordonnées ; les trois premières de type langage / framework / infra vont sur la carte.
 - Dates : date de début obligatoire ; date de fin pour les projets terminés (ordre §1.9).
 - Liens : dépôt et démo facultatifs ; « en ligne » découle de la démo.
@@ -397,7 +397,7 @@ Repères mesurés : 1280 × 800 → table 1044 px, carte 240 / 508 px, fiche 123
 
 ### 6.4 Performance
 
-Seuils bloquants : §1.16. Moyens : police unique de 25 Ko incorporée, sans requête vers un service tiers ; images WebP redimensionnées (cadrage §6.7) en `loading="lazy"` ; couverture carrée d'au moins 1200 px (§1.11) ; animations sur `transform` et `opacity` (§2.7) ; entrée des cartes par `IntersectionObserver` ; aucune bibliothèque d'animation chargée pour ce qui précède ; aucune requête externe (§1.14).
+Seuils bloquants : §1.16. Moyens : police unique de 25 Ko incorporée, sans requête vers un service tiers ; images WebP redimensionnées (cadrage §6.7) en `loading="lazy"` ; couverture carrée d'au moins 2400 px (§1.11) ; animations sur `transform` et `opacity` (§2.7) ; entrée des cartes par `IntersectionObserver` ; aucune bibliothèque d'animation chargée pour ce qui précède ; aucune requête externe (§1.14).
 
 ## 7. Contraintes de contenu
 
@@ -405,7 +405,7 @@ Base : §1.17. Les capacités ci-dessous sont mesurées sur la carte simple mobi
 
 - **Titre** : 30 caractères au plus ; sur le post-it de la carte simple mobile (14 px, 126 px de texte, environ 18 caractères par ligne) il tient sur deux lignes ; sur la fiche (22 px) il tient sur une ligne et laisse la place d'un post-it de lien à sa droite (le second passe à la ligne).
 - **Résumé** : 120 caractères au plus, aucun mot de plus de 20 caractères ; sur la carte simple mobile (13 px, 136 px de texte, environ 22 caractères par ligne) il occupe sept lignes au plus, soit 151 px dans une photo de 160 px ; cinq lignes sur la carte simple desktop (14 px, 98 px de haut, remesurés au prototype le 2026-11-08), trois sur la carte seule, deux sur la vitrine. Sert d'`og:description`.
-- **Couverture** : carrée, WebP, 1200 px de côté au moins, une par projet ; c'est la photo de la carte, la première image de la galerie et l'`og:image`.
+- **Couverture** : carrée, WebP, 2400 px de côté au moins, une par projet ; c'est la photo de la carte, la première image de la galerie et l'`og:image`, servie en variante de 1200 px.
 - **Autres images** : format libre, affichées entières dans le carré ; chacune avec une légende de 50 caractères au plus, qui sert de texte alternatif et tient sur la ligne de la barre de galerie à côté du compteur (336 px disponibles à 400 px).
 - **Technologies** : au moins une, ordonnées dans l'admin, chacune avec une icône ; les trois premières de type langage / framework / infra vont sur la carte ; toutes vont dans la fiche, les outils dans le groupe « Outils ».
 - **Faits** : type parmi Perso, Pro, École ; dates « Depuis <mois année> » pour un projet en cours, « <Mois année> – <mois année> » sinon ; client facultatif ; affichés « Type · Dates · Client ».
