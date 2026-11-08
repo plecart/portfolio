@@ -169,7 +169,8 @@ Quatre points mesurés, non évidents :
   du site (ci-dessous). La table à douze cartes, mesurée le
   2026-11-01 sur quinze runs avec les images d'essai de 3 et 7 Ko : performance 98, accessibilité
   100, bonnes pratiques 100, SEO 100, LCP de 1,8 à 2 s. L'audit `font-size` passe : les résumés
-  masqués comptent comme texte lisible et les rubans de 11 px (spec §2.2) n'en sont plus que
+  masqués comptent comme texte lisible et les rubans, alors de 11 px (13 px depuis #244, au-dessus
+  du seuil de 12 px de l'audit), n'en sont plus que
   7,38 % ; sans résumés, ils remontent à 48 % et les bonnes pratiques retombent à 96. Le LCP porte
   sur le `<h1>` de l'entête, 13 runs sur 15, et sur une couverture pour les 2 autres : `.card-entry`,
   à opacité 0, écarte les couvertures, et celle de la vitrine le reprend 8 runs sur 8 une fois cette
@@ -276,7 +277,7 @@ La famille Manrope est déclarée **comme jeton de thème Tailwind** (`@theme { 
 que sur `:root` : la feuille de base de Tailwind pose déjà la police du document depuis ce jeton, et
 deux déclarations se disputeraient la même propriété.
 
-**Les jetons de la spec §2** vivent dans `src/tokens.css` : les 38, sur `:root`, sous leur nom de
+**Les jetons de la spec §2** vivent dans `src/tokens.css` : les 39, sur `:root`, sous leur nom de
 spec et hors de toute couche — pas dans `@theme`, qui n'émet que les variables utilisées. Six sont
 les durées fixes de §2.7, nommées par #19 et #22 pour que la règle des valeurs n'admette aucun
 littéral de durée hors de ce fichier. Cinq autres tombent dans un espace de noms de Tailwind (`--shadow-*` :
