@@ -231,7 +231,7 @@
     overflow: hidden;
   }
 
-  /* Zoomée, l'image se saisit pour se déplacer (PR #250, H5). */
+  /* Zoomée, l'image se saisit pour se déplacer (spec §4.4). */
   .image-viewer-zone[data-zoomed] {
     cursor: grab;
 
@@ -240,7 +240,7 @@
     }
   }
 
-  /* Le double clic et les touches glissent (PR #250, H4) ; l'image suit sans retard un glisser, une
+  /* Le double clic et les touches glissent (spec §4.4) ; l'image suit sans retard un glisser, une
      molette ou un pincement, et la bascule d'une image à l'autre reste instantanée. */
   @media (prefers-reduced-motion: no-preference) {
     .image-viewer-image[data-glide] {
@@ -248,7 +248,7 @@
     }
   }
 
-  /* La barre, une rangée à elle sous la zone d'image (PR #250, H6), à 8 px de chaque bord : la
+  /* La barre, une rangée à elle sous la zone d'image (spec §4.4), à 8 px de chaque bord : la
      légende prend la place qui reste, le compteur à droite. */
   .image-viewer-bar {
     display: flex;

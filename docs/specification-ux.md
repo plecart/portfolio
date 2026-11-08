@@ -67,6 +67,7 @@ _Document normatif de rang 2 (`.claude/pipeline.config.md`, « Sources de vérit
 - **Mobile** : galerie en haut, texte dessous, le tout défile ; galerie non fixe.
 - **Fermeture** : bouton fixe en haut à droite, `Échap`, bouton « retour » du navigateur, clic hors du panneau (desktop).
 - **Galerie** : balayage tactile, flèches gauche/droite à l'écran, flèches du clavier, compteur « n / N », légende sous l'image, texte alternatif = légende. Une seule image : ni flèches ni compteur.
+- **Plein écran** : le bouton « Agrandir l'image » ou un clic sur l'image l'ouvre en plein écran, sur fond sombre, où l'on zoome (double clic ou double tape, molette, pincement) et où l'on se déplace (glisser, flèches) ; Échap, « Fermer l'image » ou un clic sur le fond referment, la fiche restant ouverte (§4.4).
 - **Continuité** : la photo du polaroid devient la première image de la galerie ; le post-it devient le titre ; les rubans de la carte deviennent la rangée de rubans de la fiche. Ancres vérifiées : cadrage §4 « Fiche projet (modal) » conforme ; §6.1 « galerie d'images avec légendes » conforme.
 
 ### 1.11 Format des images
@@ -142,7 +143,7 @@ Les jetons sont des propriétés CSS déclarées sur `:root`. La palette suit `p
 | `--tape` | `#E8DFCF` | `#3D372F` | rubans |
 | `--tape-ink` | `#2A2622` | `#D8CFC0` | texte des rubans |
 
-Teintes dérivées, toujours par `color-mix` sur ces jetons : bandeau de résumé et entête décollée = `--paper` à 94 % ; flèches de galerie = `--paper` à 88 %. Jamais de blanc ni de noir purs (§1.14). Contrastes : §6.2.
+Teintes dérivées, toujours par `color-mix` sur ces jetons : bandeau de résumé et entête décollée = `--paper` à 94 % ; flèches de galerie et bouton « Agrandir l'image » = `--paper` à 88 %. La couche plein écran de la galerie (§4.4) prend les valeurs sombres de cette table dans les deux modes. Jamais de blanc ni de noir purs (§1.14). Contrastes : §6.2.
 
 ### 2.2 Typographie
 
@@ -209,6 +210,8 @@ Page, colonne de lecture de la fiche et, sur téléphone, son panneau : `scrollb
 | Trombone | opacité 150 ms, translation 200 ms | `--ease-out` |
 | Contenu de la fiche : entrée / sortie | 200 ms (+ 8 px) / 150 ms | `--ease-out` |
 | Galerie (glissement) | 240 ms | `--ease-out` |
+| Plein écran : fondu d'ouverture et de fermeture | 240 ms | `--ease-out` |
+| Plein écran : zoom au double clic et aux touches, déplacement aux touches (aucune transition au glisser, à la molette, au pincement ; changer d'image est instantané) | 240 ms | `--ease-out` |
 | Post-it lien (survol, −2 px) / liens de l'auteur (survol, −2 px) | 150 ms / 240 ms | `--ease-out` |
 | Arrivée directe : entrée / sortie | 200 ms / 150 ms | `--ease-out` |
 | Pulsation des cadres vides | 1,8 s, infinie | `--ease-in-out` |
@@ -304,6 +307,14 @@ La carte du projet « vitrine » (§1.9) est une carte polaroid aux dimensions d
 - **Commandes** : les flèches ; ← et → au clavier quand la fiche est ouverte, sans autre effet ; balayage horizontal de plus de 40 px ; boucle après la dernière image.
 - **Une seule image** : ni flèches ni compteur ; la barre reste, avec la légende.
 - Texte alternatif = légende. Projet « en cours » : la copie en niveaux de gris ne couvre que la première image, pendant le vol ; la galerie est en couleur.
+- **Plein écran** (#243) :
+  - **Ouverture** : le bouton « Agrandir l'image » (36 px, rond, `--paper` à 88 %, `--ink`, icône 18 px, en bas à droite du cadre à 8 px, présent à une seule image) ou un clic sur l'image (curseur loupe) ouvre la couche sur l'image courante ; un balayage ne l'ouvre pas.
+  - **La couche** : un second dialogue modal, « Image en plein écran », sur toute la fenêtre, fond `--bg` et valeurs sombres des jetons dans les deux modes (§2.1). Une zone d'image (la fenêtre moins la barre) où l'image entière se centre, servie par `srcset` avec `sizes="100vw"` ; « Fermer l'image » en haut à droite à 8 px (36 px, `--paper`, `--ink-2`) ; les flèches de la galerie, à 8 px des bords, centrées dans la zone, absentes à une seule image, qui changent toujours d'image, en boucle ; une barre dessous, 13 px `--ink-2`, à 8 px des bords : légende à gauche, compteur « n / N » à droite (`aria-live="polite"`), absent à une seule image. Aucun bouton de zoom. Une seule image montée : changer d'image est une bascule instantanée et remet le zoom à ×1.
+  - **Zoom** de ×1 à ×4, bornes fixes : double clic, ou double tape au doigt (deux appuis à moins de 500 ms et 20 px), de ×1 à ×2 au point visé, et de tout zoom supérieur à ×1 ; molette au point du curseur (+15 % par cran de 100 px ; le pincement du pavé tactile, molette avec Ctrl, zoome l'image et non la page) ; pincement à deux doigts, au point milieu ; touches + et −, d'une unité, au centre de la zone. Le point visé reste sous le pointeur.
+  - **Déplacement**, une fois zoomé : glisser à la souris ou au doigt, depuis l'image ou le fond (curseur main) ; ← → ↑ ↓ de 100 px, dans le sens du défilement d'une page. Toujours borné : aucun bord de l'image zoomée ne s'écarte du bord de la zone qu'il dépasse, et l'image reste centrée sur un axe où elle tient. À ×1, ← et → et le balayage horizontal au doigt (plus de 40 px) changent d'image. Au redimensionnement, la vue revient dans ses bornes.
+  - **Tactile** : la couche prend tous les gestes du doigt (`touch-action: none`) ; le cadre de la galerie garde les siens au navigateur.
+  - **Fermeture** : Échap, « Fermer l'image », ou un toucher du fond (un appui et un relâché sur le fond, sans glisser au-delà de 10 px) ferment la couche seule ; un second Échap ferme la fiche. La couche n'a pas d'entrée d'historique : le retour du navigateur ferme la fiche entière (§3.1). À l'ouverture, le focus va sur « Fermer l'image » et reste dans la couche ; à la fermeture, il revient sur « Agrandir l'image », et la galerie montre l'image vue en dernier.
+  - **Mouvement** : fondu d'ouverture et de fermeture de 240 ms ; zoom au double clic et aux touches en 240 ms ; aucune transition pendant un glisser, une molette ou un pincement (§2.7, §6.3).
 
 ### 4.5 Message d'erreur
 
@@ -380,10 +391,10 @@ Repères mesurés : 1280 × 800 → table 1044 px, carte 240 / 508 px, fiche 123
 
 ### 6.2 Accessibilité
 
-- **Contrastes** (WCAG, calculés sur les jetons, clair / sombre) : `--ink` sur `--paper` 14,16 / 11,94 ; `--ink` sur `--bg` 12,90 / 14,00 ; `--ink-2` sur `--bg` 5,07 / 6,43 ; `--ink-2` sur `--paper` 5,57 / 5,48 ; `--tape-ink` sur `--tape` 11,36 / 7,62 ; `--postit-ink` sur `--postit` 11,69 / 6,66 ; `--postit-ink` sur `--postit-link` 8,81 / 6,62 ; `--accent` sur `--bg` 4,67 / 6,80 ; `--accent` sur `--paper` 5,13 / 5,80 ; point « en ligne » (`--live`) sur `--tape` 3,68 / 5,35 (rapport (L1 + 0,05) / (L2 + 0,05) des luminances relatives de WCAG 2.x, calculé le 2026-11-08 sur `#4A7C59` / `#E8DFCF` et `#8FB996` / `#3D372F`, les paires ci-dessus rejouées en témoins). Surfaces translucides, composées sur leur fond réel : bandeau de résumé (`--paper` 94 %) sous `--ink`, sur une image noire 12,39 / 12,29, sur une image blanche 14,17 / 9,94 ; flèches de galerie (`--paper` 88 %) sous `--ink`, sur image noire 10,77 / 12,71, sur image blanche 14,27 / 8,17 ; entête décollée (`--paper` 94 % sur `--bg`) sous `--ink` 14,07 / 12,09 et sous `--ink-2` 5,53 / 5,55. Tout texte ≥ 4,5 ; anneau de focus et point « en ligne » ≥ 3 ; `--line` (1,27 / 1,45 sur `--bg`) ne porte que des filets décoratifs.
-- **Clavier** : Tab parcourt le nom, la place « Chat » quand elle existe, le bouton de mode, les cartes dans l'ordre de la table, puis les liens de l'auteur ; Entrée ouvre la carte focalisée ; dans la fiche, Tab boucle entre le bouton fermer, les flèches, les post-its de lien, la colonne de lecture et ses sections, ← / → changent d'image, Échap ferme ; le focus revient sur la carte. Anneau de focus : 2 px `--accent` à 3 px de l'élément (4 px de la face d'une carte), visible au clavier seulement (`:focus-visible`).
-- **Sémantique** : une carte est un lien nommé par son titre et ses états, décrit par son résumé et ses technologies ; un ruban de technologie porte son nom en texte masqué ; « en cours » et « en ligne » sont du texte ; la fiche est un dialogue modal nommé par le titre ; la galerie est un groupe « Images du projet » au compteur `aria-live` ; le message d'erreur est un `status` ; les icônes décoratives et les couches noir et blanc sont `aria-hidden` ; chaque bouton icône a un libellé ; l'icône de thème inactive est retirée du rendu.
-- **Cibles** : boutons et liens icône 36 px (pied de page 38 px), flèches 36 px, « Ouvrir » 30 px de haut, lien « Réessayer » 24 px (sa ligne de texte) ; 8 px au moins entre deux cibles.
+- **Contrastes** (WCAG, calculés sur les jetons, clair / sombre) : `--ink` sur `--paper` 14,16 / 11,94 ; `--ink` sur `--bg` 12,90 / 14,00 ; `--ink-2` sur `--bg` 5,07 / 6,43 ; `--ink-2` sur `--paper` 5,57 / 5,48 ; `--tape-ink` sur `--tape` 11,36 / 7,62 ; `--postit-ink` sur `--postit` 11,69 / 6,66 ; `--postit-ink` sur `--postit-link` 8,81 / 6,62 ; `--accent` sur `--bg` 4,67 / 6,80 ; `--accent` sur `--paper` 5,13 / 5,80 ; point « en ligne » (`--live`) sur `--tape` 3,68 / 5,35 (rapport (L1 + 0,05) / (L2 + 0,05) des luminances relatives de WCAG 2.x, calculé le 2026-11-08 sur `#4A7C59` / `#E8DFCF` et `#8FB996` / `#3D372F`, les paires ci-dessus rejouées en témoins). Surfaces translucides, composées sur leur fond réel : bandeau de résumé (`--paper` 94 %) sous `--ink`, sur une image noire 12,39 / 12,29, sur une image blanche 14,17 / 9,94 ; flèches de galerie (`--paper` 88 %) sous `--ink`, sur image noire 10,77 / 12,71, sur image blanche 14,27 / 8,17 ; entête décollée (`--paper` 94 % sur `--bg`) sous `--ink` 14,07 / 12,09 et sous `--ink-2` 5,53 / 5,55. Couche plein écran (§4.4), valeurs sombres dans les deux modes : `--ink` sur `--bg` 14,00, `--ink-2` sur `--bg` 6,43 (en clair, `--ink-2` sur ce fond tomberait à 2,94). Tout texte ≥ 4,5 ; anneau de focus et point « en ligne » ≥ 3 ; `--line` (1,27 / 1,45 sur `--bg`) ne porte que des filets décoratifs.
+- **Clavier** : Tab parcourt le nom, la place « Chat » quand elle existe, le bouton de mode, les cartes dans l'ordre de la table, puis les liens de l'auteur ; Entrée ouvre la carte focalisée ; dans la fiche, Tab boucle entre le bouton fermer, les flèches, « Agrandir l'image », les post-its de lien, la colonne de lecture et ses sections, ← / → changent d'image, Échap ferme ; le focus revient sur la carte. Dans la couche plein écran (§4.4), Tab boucle entre « Fermer l'image » et les flèches ; à ×1, ← / → changent d'image ; zoomée, ← → ↑ ↓ déplacent l'image ; + / − zooment ; Échap ferme la couche et rend le focus à « Agrandir l'image ». Anneau de focus : 2 px `--accent` à 3 px de l'élément (4 px de la face d'une carte), visible au clavier seulement (`:focus-visible`).
+- **Sémantique** : une carte est un lien nommé par son titre et ses états, décrit par son résumé et ses technologies ; un ruban de technologie porte son nom en texte masqué ; « en cours » et « en ligne » sont du texte ; la fiche est un dialogue modal nommé par le titre ; la couche plein écran, un dialogue modal « Image en plein écran » ; la galerie est un groupe « Images du projet » au compteur `aria-live` ; le message d'erreur est un `status` ; les icônes décoratives et les couches noir et blanc sont `aria-hidden` ; chaque bouton icône a un libellé ; l'icône de thème inactive est retirée du rendu.
+- **Cibles** : boutons et liens icône 36 px (pied de page 38 px), flèches 36 px, « Agrandir l'image » et « Fermer l'image » 36 px, « Ouvrir » 30 px de haut, lien « Réessayer » 24 px (sa ligne de texte) ; 8 px au moins entre deux cibles.
 - **Langue** : `lang="fr"` ; libellés et messages en français, dans le catalogue de chaînes (D28, D34), avec l'apostrophe typographique « ’ » dans les textes rendus.
 - Mouvement réduit : §6.3.
 
@@ -393,6 +404,7 @@ Repères mesurés : 1280 × 800 → table 1044 px, carte 240 / 508 px, fiche 123
 - Ouverture : la face de la carte s'efface (150 ms) pendant que la fiche apparaît (150 ms), sans feuille ni vol ; les autres cartes s'effacent (150 ms) sans reculer ; la fiche est active à 160 ms. Fermeture : contenu en 160 ms, puis fiche en 160 ms, les cartes réapparaissent (150 ms).
 - Entête : sortie et retour par fondu de 150 ms, sans translation.
 - Galerie : bascule instantanée ; ancre de section : défilement instantané.
+- Plein écran : ouverture et fermeture par fondu de 150 ms ; zoom et déplacement sans transition.
 - Post-its de lien et liens de l'auteur : pas de montée au survol ; les couleurs transitent encore (150 ms).
 
 ### 6.4 Performance

@@ -89,7 +89,7 @@ test.describe('l’ouverture', () => {
     expect(await viewer(page).boundingBox()).toEqual({ x: 0, y: 0, width, height })
     expect(await viewerZone(page)).toEqual({ x: 0, y: 0, ...zone })
     expect(bar).toMatchObject({ x: 0, y: zone.height, width })
-    // La barre, à 8 px de chaque bord (PR #250, H6) : la légende, puis le compteur.
+    // La barre, à 8 px de chaque bord (spec §4.4) : la légende, puis le compteur.
     await expect(viewerBar(page)).toHaveCSS('padding', '8px')
     expect(await viewerImage(page).boundingBox()).toEqual({
       x: (zone.width - side) / 2,
