@@ -12,25 +12,24 @@ import { expect, test } from './api.ts'
 import { resolveAll, settle } from './css.ts'
 import {
   arriveAt,
+  boundsAt,
+  center,
   FIT,
   gallery,
   openViewer,
   outlastOpening,
   panel,
   penDrag,
+  THREE_IMAGES,
   transformOf,
   viewer,
+  viewerButton,
   viewerCounter,
   viewerImage,
   viewerZone,
   watchAnimations,
 } from './project.ts'
-import { buildImage } from './projects.ts'
 import { watchTransitions } from './table.ts'
-
-const THREE_IMAGES = ['Écran d’accueil', 'Détail de l’interface', 'Vue d’ensemble'].map((caption) =>
-  buildImage('fiche', caption),
-)
 
 /**
  * Le cran d'une molette de souris, en px, tel que Playwright l'envoie : la page le reçoit divisé par
@@ -60,21 +59,8 @@ const viewOf = (page: Page) =>
     return { scale, x, y }
   })
 
-/** Les bornes de la translation à ce facteur : le débord de l'image carrée, de chaque côté. */
-async function boundsAt(page: Page, scale: number): Promise<Point> {
-  const zone = await viewerZone(page)
-  const side = Math.min(zone.width, zone.height)
-  return {
-    x: Math.max(0, (side * scale - zone.width) / 2),
-    y: Math.max(0, (side * scale - zone.height) / 2),
-  }
-}
-
 /** Le centre de l'image. */
-async function imageCenter(page: Page): Promise<Point> {
-  const { x, y, width, height } = (await viewerImage(page).boundingBox())!
-  return { x: x + width / 2, y: y + height / 2 }
-}
+const imageCenter = (page: Page) => center(viewerImage(page))
 
 /**
  * Un point de l'image loin de son centre, que tout zoom depuis ×1 garde sous le pointeur, bornes
@@ -436,7 +422,7 @@ test.describe('les états des gestes, soldés', () => {
     [
       '« Image suivante »',
       'souris',
-      (page) => viewer(page).getByRole('button', { name: 'Image suivante' }).click(),
+      (page) => viewerButton(page, 'Image suivante').click(),
       false,
     ],
     ['la touche →', 'souris', (page) => page.keyboard.press('ArrowRight'), false],

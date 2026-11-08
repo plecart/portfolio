@@ -1,8 +1,9 @@
 import { DialogClose, DialogContent, DialogPortal, DialogTitle } from '@radix-ui/react-dialog'
-import { type Ref, useState } from 'react'
+import { type KeyboardEvent, type Ref, useState } from 'react'
 import { CloseIcon } from '../chrome/icons.tsx'
 import { strings } from '../strings.ts'
 import { GalleryArrows } from './GalleryArrows.tsx'
+import { GalleryCaption } from './GalleryCaption.tsx'
 import { PAPER_BUTTON, type readyImages } from './project.ts'
 import { useGestures } from './useGestures.ts'
 import { useZoomView } from './useZoomView.ts'
@@ -95,6 +96,20 @@ function ViewerLayer({
     onBackgroundTap: onClose,
   })
 
+  /** Une touche (`keyCommand`) : changer d'image, ou zoomer et déplacer l'image en glissant. */
+  const onKeyDown = (event: KeyboardEvent) => {
+    const command = keyCommand(event, { zoomed, navigable })
+    if (!command) return
+    event.preventDefault()
+    if ('step' in command) return step(command.step)
+    forgetTap()
+    change(
+      (view, stage) =>
+        'pan' in command ? panBy(view, command.pan, stage) : stepZoom(view, command.zoom, stage),
+      true,
+    )
+  }
+
   return (
     <DialogContent
       ref={ref}
@@ -102,20 +117,7 @@ function ViewerLayer({
       aria-describedby={undefined}
       data-scheme="dark"
       className="image-viewer"
-      onKeyDown={(event) => {
-        const command = keyCommand(event, { zoomed, navigable })
-        if (!command) return
-        event.preventDefault()
-        if ('step' in command) return step(command.step)
-        forgetTap()
-        change(
-          (view, stage) =>
-            'pan' in command
-              ? panBy(view, command.pan, stage)
-              : stepZoom(view, command.zoom, stage),
-          true,
-        )
-      }}
+      onKeyDown={onKeyDown}
     >
       <DialogTitle className="sr-only">{strings.imageViewer}</DialogTitle>
       <DialogClose
@@ -147,12 +149,7 @@ function ViewerLayer({
         {navigable && <GalleryArrows onStep={step} />}
       </div>
       <div className="image-viewer-bar">
-        <span className="project-gallery-caption">{caption}</span>
-        {navigable && (
-          <span className="project-gallery-counter" aria-live="polite">
-            {index + 1} / {images.length}
-          </span>
-        )}
+        <GalleryCaption caption={caption} index={index} count={images.length} />
       </div>
     </DialogContent>
   )

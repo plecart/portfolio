@@ -3,11 +3,13 @@
  * qu'elle tient du panneau, aux deux largeurs. Toutes les images d'une fiche partagent leur fichier ;
  * la légende, l'accessibilité et la position disent laquelle est montrée.
  */
-import type { Locator, Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { expect, serveProjects, test } from './api.ts'
 import { resolveAll, settle } from './css.ts'
 import {
   arriveAt,
+  CAPTIONS,
+  center,
   closeButton,
   expectNoOverflow,
   expectNoViolations,
@@ -18,8 +20,10 @@ import {
   LONG_DESCRIPTION,
   nextImage,
   panel,
+  penDrag,
   previousImage,
   readingColumn,
+  THREE_IMAGES,
   viewer,
 } from './project.ts'
 import { buildImage, FILES_ORIGIN } from './projects.ts'
@@ -27,19 +31,10 @@ import { COLUMN_VIEWPORT, watchTransitions } from './table.ts'
 
 const PHONE_VIEWPORT = { width: 400, height: 800 }
 
-const CAPTIONS = ['Écran d’accueil', 'Détail de l’interface', 'Vue d’ensemble']
-const THREE_IMAGES = CAPTIONS.map((caption) => buildImage('fiche', caption))
-
 const frame = (page: Page) => page.locator('.project-gallery-frame')
 const bar = (page: Page) => page.locator('.project-gallery-bar')
 const caption = (page: Page) => page.locator('.project-gallery-caption')
 const counter = (page: Page) => page.locator('.project-gallery-counter')
-
-/** Le centre d'un élément. */
-async function center(element: Locator) {
-  const { x, y, width, height } = (await element.boundingBox())!
-  return { x: x + width / 2, y: y + height / 2 }
-}
 
 /** Attend une image montrée : posée dans le cadre, légendée, comptée, seule exposée. */
 async function expectImage(page: Page, position: number, count = CAPTIONS.length) {
@@ -246,24 +241,9 @@ test.describe('le balayage', () => {
   })
 
   test('un stylet balaie', async ({ page }) => {
-    const { x, y } = await center(frame(page))
-    const client = await page.context().newCDPSession(page)
-    const pen = (type: 'mouseMoved' | 'mousePressed' | 'mouseReleased', position: number) =>
-      client.send('Input.dispatchMouseEvent', {
-        type,
-        x: position,
-        y,
-        button: 'left',
-        buttons: 1,
-        clickCount: 1,
-        pointerType: 'pen',
-      })
+    const start = await center(frame(page))
 
-    await pen('mouseMoved', x)
-    await pen('mousePressed', x)
-    await pen('mouseMoved', x - 60)
-    await pen('mouseReleased', x - 60)
-    await client.detach()
+    await penDrag(page, start, { x: start.x - 60, y: start.y })
 
     await expectImage(page, 1)
     await expect(viewer(page)).toHaveCount(0)

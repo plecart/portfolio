@@ -4,6 +4,7 @@ import type { Project } from '../api/projects.ts'
 import { ExpandIcon } from '../chrome/icons.tsx'
 import { strings } from '../strings.ts'
 import { GalleryArrows } from './GalleryArrows.tsx'
+import { GalleryCaption } from './GalleryCaption.tsx'
 import { ImageViewer } from './ImageViewer.tsx'
 import { directionStep, GALLERY_SIZES, hasModifier, readyImages } from './project.ts'
 import { useClickWithoutSwipe, useSwipe } from './useSwipe.ts'
@@ -111,12 +112,7 @@ export function ProjectGallery({
           )}
         </div>
         <div className="project-gallery-bar">
-          <span className="project-gallery-caption">{images[index]?.caption}</span>
-          {navigable && (
-            <span className="project-gallery-counter" aria-live="polite">
-              {index + 1} / {images.length}
-            </span>
-          )}
+          <GalleryCaption caption={images[index]?.caption} index={index} count={images.length} />
         </div>
       </div>
       {viewable && (
