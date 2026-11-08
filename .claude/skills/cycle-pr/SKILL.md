@@ -710,7 +710,9 @@ ses jobs,
   Le tri est une décision, à la session PR ; un correctif, à un `developpeur` :
   - *Rouge d'infrastructure* : échec de téléchargement (403/5xx/timeout d'un dépôt d'artefacts,
     « error while downloading ») alors que le diff ne touche aucune dépendance et qu'un run
-    voisin passe le même step → `gh run rerun <id> --failed`, noter la cause et le rerun dans le
+    voisin passe le même step → `gh run rerun <id> --failed`, ou le run entier si le trunk a
+    avancé depuis le run : une relance partielle laisse aux jobs verts leur ancien trunk, et la
+    porte de l'Étape 7 sortirait en 1 (« Sortie 1 ») ; noter la cause et le rerun dans le
     Test plan. Corriger du code sur un rouge d'infra coûte un cycle complet pour rien.
   - *CI qui ne démarre pas* : `startup_failure` **immédiat et reproductible au re-run** → le
     fichier de workflow est en cause ; job resté `queued` sans runner, ou `startup_failure` dont
@@ -835,8 +837,9 @@ ligne, se relance de même (ADR 0029, « Conséquences »). **Trunk périmé, d�
 relancer par un commit réel, ou par `gh run rerun <run>` — le run **entier**, qui refait la fusion
 sur le trunk du moment (ADR 0029), jamais `--failed`, dont les jobs verts garderaient leur ancien
 trunk. Puis attendre le run neuf ou la nouvelle tentative (`attente-ci.py`, Étape 5 : un run
-relancé garde son `created_at`), et lire **sa** ligne de fusion ; que `gh run view --log` rende
-alors la dernière tentative d'un run relancé est **non vérifié**. **Après 3 relances de suite dont
+relancé garde son `created_at`), et lire **sa** ligne de fusion : `gh run view --log` rend la
+dernière tentative d'un run relancé (run 39559119382, tentative 2 : mêmes octets qu'avec
+`--attempt 2`, relevé le 2026-11-08, gh 2.94.0). **Après 3 relances de suite dont
 la porte sort en 1, la session redemande l'accord** du mainteneur avant la suivante. Puis vérifier
 l'absence de conflit par
 `git merge-tree --write-tree origin/<trunk> HEAD`, qui est un **prédicat** : il sort en 0 sans
