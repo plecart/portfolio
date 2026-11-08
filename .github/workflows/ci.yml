@@ -24,13 +24,19 @@
 # déploie sur le VPS, une fois celui-ci prêt, qu'après une fumée verte. Un huitième, `auteurs`, ne
 # tourne que sur une PR hors draft, sans attendre `api`.
 #
-# Chaque action est épinglée par **empreinte de commit**, sa version en commentaire : une
-# étiquette peut être déplacée par son propriétaire ou par un attaquant, et le déplacement
-# s'exécuterait ici sans aucun signal ; une empreinte ne bouge pas. Dependabot
+# Sur une PR, chaque job qui extrait le dépôt en extrait la tête, clone complet, puis la fusionne
+# lui-même au trunk courant (`.github/actions/fusion-trunk`, qui dit pourquoi) : le trunk en
+# premier parent, la tête en second. Sur un push vers `main`, le checkout prend le commit poussé,
+# et rien ne se fusionne.
+#
+# Chaque action d'un autre dépôt est épinglée par **empreinte de commit**, sa version en
+# commentaire : une étiquette peut être déplacée par son propriétaire ou par un attaquant, et le
+# déplacement s'exécuterait ici sans aucun signal ; une empreinte ne bouge pas. Dependabot
 # (`.github/dependabot.yml`) les met à jour chaque mois, empreinte et commentaire ensemble. Le
 # commentaire porte l'étiquette la plus précise du commit (`v7.0.1`, pas `v7`) : Dependabot ne
 # réécrit qu'un commentaire dont l'étiquette pointe encore sur le commit épinglé, et une étiquette
 # majeure cesse d'y pointer dès qu'une version sort — précisément quand la mise à jour arrive.
+# L'action de fusion, elle, est du dépôt : lue dans l'arbre extrait, sans `uses` à elle.
 # `apps/api/tests/test_supply_chain.py` refuse toute autre forme.
 
 name: CI
@@ -87,12 +93,15 @@ jobs:
       avis: ${{ steps.jobs.outputs.avis }}
 
     steps:
-      # Profondeur 2 : sur une PR, le checkout est le commit de fusion, et `HEAD^1` la base qu'il
-      # combine — `HEAD^1..HEAD` est le delta de la PR. Sur un push vers `main`, ce ne serait que
-      # le dernier commit : `web`, `infra` et `avis` n'y lisent pas la réponse.
+      # Sur une PR, la tête, que l'action suivante fusionne au trunk courant : `HEAD^1` est le
+      # trunk qu'elle combine, et `HEAD^1..HEAD` le delta de la PR. Sur un push vers `main`, ce
+      # n'est que le dernier commit : `web`, `infra` et `avis` n'y lisent pas la réponse.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: ./.github/actions/fusion-trunk
 
       # Avant toute installation : un `uv sync` rouge ne cache pas le delta aux autres jobs.
       # `shell: bash` lance `bash -eo pipefail` : sans lui, un `git diff` en échec rendrait `false`
@@ -142,6 +151,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: ./.github/actions/fusion-trunk
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -193,6 +207,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: ./.github/actions/fusion-trunk
 
       # Compose refuse de résoudre un `env_file` dont la cible manque — y compris pour un simple
       # `config`, et y compris avec `--env-file` (mesuré). Le geste est exactement celui que
@@ -291,11 +310,14 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
 
     steps:
-      # Clone complet : le commit extrait fusionne la tête de la PR (`HEAD^2`) à sa base (`HEAD^1`),
-      # et `HEAD^1..HEAD^2` lit ses commits, que `fetch-depth: 2` ne porterait pas.
+      # L'action de fusion combine la tête de la PR (`HEAD^2`) au trunk courant (`HEAD^1`), et
+      # `HEAD^1..HEAD^2` lit ses commits.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+
+      - uses: ./.github/actions/fusion-trunk
 
       - name: Refuser un auteur Claude
         shell: bash
