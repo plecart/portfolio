@@ -1,7 +1,8 @@
 /**
  * Les gestes de la couche plein écran (issue #243, décision 8) : double clic et double tape,
  * glisser, molette, pincement et balayage, à la souris et au doigt, aux deux largeurs ; la fermeture
- * au fond, qu'aucun autre geste ne déclenche ; les transitions, et le mouvement réduit. Les images
+ * au fond, qu'aucun autre geste ne déclenche ; les états qu'ils laissent, et ce qui les solde ; les
+ * transitions, et le mouvement réduit. Les images
  * sont carrées : à ×1, l'image a pour côté le plus petit de la zone d'image — sa hauteur au bureau,
  * sa largeur sur téléphone.
  */
@@ -14,7 +15,9 @@ import {
   FIT,
   gallery,
   openViewer,
+  outlastOpening,
   panel,
+  penDrag,
   transformOf,
   viewer,
   viewerCounter,
@@ -120,8 +123,15 @@ async function mouseDrag(page: Page, from: Point, to: Point) {
   await page.mouse.up()
 }
 
-/** Des doigts posés ensemble, menés chacun de son départ à son arrivée en quatre temps, puis levés. */
-async function fingers(page: Page, paths: [Point, Point][]) {
+/**
+ * Des doigts posés ensemble, menés chacun de son départ à son arrivée en quatre temps, puis levés —
+ * ou interrompus par le navigateur (`touchCancel`).
+ */
+async function fingers(
+  page: Page,
+  paths: [Point, Point][],
+  end: 'touchEnd' | 'touchCancel' = 'touchEnd',
+) {
   const client = await page.context().newCDPSession(page)
   const at = (step: number) =>
     paths.map(([from, to], id) => ({
@@ -134,7 +144,7 @@ async function fingers(page: Page, paths: [Point, Point][]) {
   for (const step of [1, 2, 3, 4]) {
     await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at(step) })
   }
-  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await client.send('Input.dispatchTouchEvent', { type: end, touchPoints: [] })
   await client.detach()
 }
 
@@ -154,6 +164,23 @@ const pinchOut = (page: Page, from: Point, to = from) =>
     ],
   ])
 
+/** Deux doigts écartés de 100 px à 102 px autour d'un point : un pincement de ×1,02. */
+const pinchSlightly = (page: Page, { x, y }: Point, end?: 'touchEnd' | 'touchCancel') =>
+  fingers(
+    page,
+    [
+      [
+        { x: x - 50, y },
+        { x: x - 51, y },
+      ],
+      [
+        { x: x + 50, y },
+        { x: x + 51, y },
+      ],
+    ],
+    end,
+  )
+
 /** Deux touchers au même point, coup sur coup. */
 async function doubleTap(page: Page, { x, y }: Point) {
   await page.touchscreen.tap(x, y)
@@ -168,6 +195,18 @@ async function wheel(page: Page, { x, y }: Point, notches: number) {
   }
 }
 
+/** Le toucher d'un pointeur à un point : un clic de la souris, ou un toucher du doigt. */
+const TAPS = {
+  souris: (page: Page, { x, y }: Point) => page.mouse.click(x, y),
+  doigt: (page: Page, { x, y }: Point) => page.touchscreen.tap(x, y),
+}
+
+/** Attend deux images : React a rendu ce qu'un événement hors de ses gestionnaires a demandé. */
+const nextFrames = (page: Page) =>
+  page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+  )
+
 /** Où un geste du recensement se joue : le centre de l'image, un point du fond. */
 type Places = { image: Point; background: Point }
 
@@ -178,8 +217,9 @@ const nudge = ({ x, y }: Point): Point => ({ x: x + 30, y: y + 30 })
  * Les gestes du pointeur qui finissent dans la zone d'image, recensés : seize formes, souris puis
  * doigt, chacune avec le facteur qu'elle laisse, ou `null` si elle ferme la couche. Seul un clic ou
  * un toucher sur le fond, sans glisser, la ferme — un double clic ou un double tape sur le fond dès
- * son premier temps. Un glisser relâché sur le fond n'est pas un clic du fond, même si son `click`
- * part de leur ancêtre commun ; un clic droit non plus.
+ * son premier temps —, une fois passé le double clic qui l'a ouverte (`outlastOpening`). Un
+ * glisser relâché sur le fond n'est pas un clic du fond, même si son `click` part de leur ancêtre
+ * commun ; un clic droit non plus.
  */
 const POINTER_GESTURES: [string, (page: Page, at: Places) => Promise<unknown>, number | null][] = [
   ['un clic sur l’image', (page, { image: { x, y } }) => page.mouse.click(x, y), 1],
@@ -214,6 +254,7 @@ test.describe('les gestes du pointeur, recensés', () => {
     const outcome = scale === null ? 'ferme la couche seule' : `laisse la couche ouverte, à ×${scale}`
     test(`${name} ${outcome}`, async ({ page }) => {
       await openViewer(page)
+      await outlastOpening(page)
 
       await gesture(page, { image: await imageCenter(page), background: await backgroundPoint(page) })
 
@@ -311,17 +352,25 @@ test.describe('le glisser', () => {
     await expect(viewerCounter(page)).toHaveText('1 / 3')
   })
 
-  test('à ×1, un balayage du doigt change d’image, dans les deux sens', async ({ page }) => {
-    await openViewer(page)
-    const start = await imageCenter(page)
+  // Le doigt et le stylet balaient ; la souris, qui glisse, non (spec §1.10).
+  for (const [pointer, drag, swipes] of [
+    ['du doigt', (page: Page, from: Point, to: Point) => fingers(page, [[from, to]]), true],
+    ['du stylet', penDrag, true],
+    ['de la souris', mouseDrag, false],
+  ] as const) {
+    const outcome = swipes ? 'change d’image, dans les deux sens' : 'ne change pas d’image'
+    test(`à ×1, un balayage ${pointer} ${outcome}`, async ({ page }) => {
+      await openViewer(page)
+      const start = await imageCenter(page)
 
-    await fingers(page, [[start, { x: start.x - 60, y: start.y }]])
-    await expect(viewerCounter(page)).toHaveText('2 / 3')
+      await drag(page, start, { x: start.x - 60, y: start.y })
+      await expect(viewerCounter(page)).toHaveText(swipes ? '2 / 3' : '1 / 3')
 
-    await fingers(page, [[start, { x: start.x + 60, y: start.y }]])
-    await expect(viewerCounter(page)).toHaveText('1 / 3')
-    expect(await transformOf(page)).toBe(FIT)
-  })
+      await drag(page, start, { x: start.x + 60, y: start.y })
+      await expect(viewerCounter(page)).toHaveText('1 / 3')
+      expect(await transformOf(page)).toBe(FIT)
+    })
+  }
 
   test('zoomée, l’image se saisit : grab, puis grabbing pendant le glisser', async ({
     page,
@@ -341,6 +390,171 @@ test.describe('le glisser', () => {
     await expect(zone).toHaveCSS('cursor', 'grabbing')
     await page.mouse.up()
   })
+})
+
+/**
+ * Les états des gestes de la couche, et ce qui doit les solder (passe 2 de relecture de #243) : le
+ * dernier toucher, le pincement, la vue et son glissement. Un démontage ou un état neuf solde tout
+ * à l'ouverture et à la fermeture, sauf le double clic que la galerie commence et qui ouvre la
+ * couche à son premier temps ; le reste se rejoue ici, une forme par ligne, en quatre tables.
+ */
+test.describe('les états des gestes, soldés', () => {
+  /** Les deux temps d'un double clic sur la galerie, à tant de ms : la couche paraît au premier. */
+  const OPENING_DOUBLE_CLICKS = (['souris', 'doigt'] as const).flatMap((pointer) =>
+    [60, 150, 300].map((gap) => [pointer, gap] as const),
+  )
+
+  /** Ce qui se joue au point d'un geste : le centre de l'image. */
+  type Act = (page: Page, at: Point) => Promise<unknown>
+
+  /**
+   * Ce qui, entre deux touchers au même point, rompt le double toucher qu'ils feraient : un autre
+   * geste, une molette, un changement d'image, une touche — la dernière sur la couche zoomée.
+   */
+  const TAP_BREAKS: [string, keyof typeof TAPS, Act, boolean][] = [
+    ['un glisser de la souris', 'souris', (page, at) => mouseDrag(page, at, nudge(at)), false],
+    [
+      'un glisser du doigt, sans balayage',
+      'doigt',
+      (page, at) => fingers(page, [[at, { x: at.x, y: at.y + 30 }]]),
+      false,
+    ],
+    [
+      'un balayage du doigt',
+      'doigt',
+      (page, at) => fingers(page, [[at, { x: at.x - 60, y: at.y }]]),
+      false,
+    ],
+    [
+      'un geste du doigt interrompu',
+      'doigt',
+      (page, at) => fingers(page, [[at, at]], 'touchCancel'),
+      false,
+    ],
+    ['un pincement', 'doigt', (page, at) => pinchOut(page, at), false],
+    ['deux crans de molette', 'souris', (page, at) => wheel(page, at, -2), false],
+    [
+      '« Image suivante »',
+      'souris',
+      (page) => viewer(page).getByRole('button', { name: 'Image suivante' }).click(),
+      false,
+    ],
+    ['la touche →', 'souris', (page) => page.keyboard.press('ArrowRight'), false],
+    ['la touche +', 'souris', (page) => page.keyboard.press('+'), false],
+    ['la touche ↓', 'souris', (page) => page.keyboard.press('ArrowDown'), true],
+  ]
+
+  /** Les zooms qui s'achèvent, et le facteur qu'ils laissent : sous ×1,05, l'image entière. */
+  const ZOOM_ENDS: [string, Act, number][] = [
+    ['un pincement de ×1,02', (page, at) => pinchSlightly(page, at), 1],
+    [
+      'un pincement de ×1,02 que le navigateur interrompt',
+      (page, at) => pinchSlightly(page, at, 'touchCancel'),
+      1,
+    ],
+    [
+      'une molette fine, Ctrl enfoncé',
+      async (page, { x, y }) => {
+        await page.mouse.move(x, y)
+        await page.keyboard.down('Control')
+        await page.mouse.wheel(0, -2)
+        await page.keyboard.up('Control')
+      },
+      1,
+    ],
+    [
+      'deux pincements, qui doublent chacun',
+      async (page, at) => {
+        await pinchOut(page, at)
+        await pinchOut(page, at)
+      },
+      4,
+    ],
+  ]
+
+  /** Ce qui suit un pas qui glisse — la vue zoomée et déplacée à la touche — sans glisser. */
+  const GLIDE_BREAKS: [string, Act][] = [
+    ['un cran de molette', (page, at) => wheel(page, at, -1)],
+    ['un pincement', (page, at) => pinchOut(page, at)],
+    [
+      'le redimensionnement',
+      async (page) => {
+        const before = await transformOf(page)
+        await page.setViewportSize({ width: page.viewportSize()!.width, height: 400 })
+        await expect.poll(() => transformOf(page)).not.toBe(before)
+      },
+    ],
+  ]
+
+  test('vingt-trois formes : six doubles clics d’ouverture, dix ruptures, quatre fins de zoom, trois pas', () => {
+    const tables = [OPENING_DOUBLE_CLICKS, TAP_BREAKS, ZOOM_ENDS, GLIDE_BREAKS]
+
+    expect(tables.map((forms) => forms.length)).toEqual([6, 10, 4, 3])
+  })
+
+  for (const [pointer, gap] of OPENING_DOUBLE_CLICKS) {
+    const twice = pointer === 'souris' ? 'double clic' : 'double tape'
+    test(`un ${twice} sur la galerie hors de l’image de la couche la laisse ouverte, ses temps à ${gap} ms`, async ({
+      page,
+    }) => {
+      const frame = (await gallery(page).locator('.project-gallery-frame').boundingBox())!
+      const at = { x: frame.x + 20, y: frame.y + 20 }
+
+      await TAPS[pointer](page, at)
+      await page.waitForTimeout(gap)
+      await TAPS[pointer](page, at)
+
+      await expect(viewer(page)).toHaveAttribute('data-state', 'open')
+      // Le second temps est tombé sur le fond de la couche, hors de son image.
+      const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.className, at)
+      expect(hit).toBe('image-viewer-zone')
+    })
+  }
+
+  for (const [event, pointer, act, zoomed] of TAP_BREAKS) {
+    test(`${event}${zoomed ? ', zoomée,' : ''} entre deux touchers rompt le double toucher`, async ({
+      page,
+    }) => {
+      await openViewer(page)
+      const at = await imageCenter(page)
+      if (zoomed) await page.keyboard.press('+')
+      await TAPS[pointer](page, at)
+      await act(page, at)
+      await nextFrames(page)
+      const left = await viewOf(page)
+
+      await TAPS[pointer](page, at)
+
+      expect(await viewOf(page)).toEqual(left)
+    })
+  }
+
+  for (const [name, gesture, scale] of ZOOM_ENDS) {
+    test(`${name} laisse ×${scale}`, async ({ page }) => {
+      await openViewer(page)
+
+      await gesture(page, await imageCenter(page))
+
+      await expect.poll(async () => (await viewOf(page)).scale).toBeCloseTo(scale, 4)
+    })
+  }
+
+  for (const [event, act] of GLIDE_BREAKS) {
+    test(`${event}, après un pas qui glisse, ne glisse pas`, async ({ page }) => {
+      await openViewer(page)
+      const at = await imageCenter(page)
+      for (const key of ['+', 'ArrowRight', 'ArrowRight', 'ArrowRight']) {
+        await page.keyboard.press(key)
+      }
+      await settle(page)
+      const transitions = await watchTransitions(page)
+
+      await act(page, at)
+      await settle(page)
+
+      expect(await transitions('image-viewer-image')).toEqual([])
+    })
+  }
 })
 
 test.describe('la molette', () => {

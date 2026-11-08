@@ -18,6 +18,12 @@ const TAP_SLOP = 10
 const DOUBLE_TAP = { delay: 500, distance: 20 }
 
 /**
+ * La fin d'un zoom à la molette : aucun cran depuis 150 ms, le délai de d3-zoom (doc de d3-zoom,
+ * « Zoom events », note 7, lue par context7 le 2026-11-08).
+ */
+const WHEEL_END_DELAY = 150
+
+/**
  * Le zoom d'une molette, par unité de `deltaMode` (pixel, ligne, page) : le facteur vaut 2 puissance
  * (−`deltaY` × ce taux), un cran de 100 px zoomant de 15 % — le `wheelDelta` par défaut de d3-zoom
  * (même lecture). Le pincement d'un pavé tactile arrive en molette, Ctrl enfoncé (MDN,
@@ -60,11 +66,17 @@ export type GestureHandlers = {
    * leur milieu est passé de `from` à `to`.
    */
   onPinch: (factor: number, from: Point, to: Point) => void
+  /** Un zoom s'achève : le geste qui a pincé finit, ou la molette se tait (`WHEEL_END_DELAY`). */
+  onZoomEnd: () => void
   /** Un double toucher, à ce point. */
   onDoubleTap: (point: Point) => void
   /** Un balayage franc d'un doigt ou d'un stylet, de ce pas (`swipeStep`). */
   onSwipe: (step: number) => void
-  /** Un toucher sur le fond : l'élément lui-même, hors de ses enfants. */
+  /**
+   * Un toucher sur le fond : l'élément lui-même, hors de ses enfants. Un toucher commencé moins de
+   * `DOUBLE_TAP.delay` après l'apparition de l'élément n'en est pas un : c'est le second temps du
+   * double clic qui l'a fait paraître dès le premier.
+   */
   onBackgroundTap: () => void
 }
 
@@ -99,27 +111,52 @@ type Gesture = {
  * Un pincement suit ses deux premiers pointeurs, et chacun de ses pas part de son début : les pas
  * successifs des deux doigts, qui font osciller leur milieu, ne cumulent pas les bornes de la vue.
  *
- * @param element L'élément, `null` avant son montage : la molette s'y écoute.
+ * Un double toucher, ce sont deux touchers de suite : tout autre geste entre eux — glisser,
+ * balayage, pincement, molette, geste interrompu — le rompt, et ce qui change la vue ou l'image
+ * hors des gestes le rompt par `forgetTap`.
+ *
+ * @param element L'élément, `null` avant son montage : son apparition se date, et sa molette s'y
+ *   écoute.
  * @param handlers Ce que chaque geste demande.
- * @returns Les gestionnaires de pointeur à poser sur l'élément.
+ * @returns `listeners`, les gestionnaires de pointeur à poser sur l'élément ; `forgetTap`, qui
+ *   rompt un double toucher commencé.
  */
 export function useGestures(element: HTMLElement | null, handlers: GestureHandlers) {
   const pointers = useRef(new Map<number, Point>())
   const gesture = useRef<Gesture | null>(null)
   const lastTap = useRef<{ time: number; point: Point } | null>(null)
+  /** L'apparition de l'élément, sur l'horloge des `timeStamp` (`performance.now`). */
+  const appearedAt = useRef(0)
+
+  /** Rompt un double toucher commencé : son premier toucher s'oublie. */
+  const forgetTap = () => {
+    lastTap.current = null
+  }
 
   const onWheel = useEffectEvent((event: WheelEvent) => {
     event.preventDefault()
+    forgetTap()
     const point = localPoint(event.currentTarget as Element, clientPoint(event))
     handlers.onZoom(wheelFactor(event), point)
   })
+  const onWheelEnd = useEffectEvent(() => handlers.onZoomEnd())
 
   useEffect(() => {
     if (!element) return
+    appearedAt.current = performance.now()
+    let wheelEnd: ReturnType<typeof setTimeout> | undefined
+    const listener = (event: WheelEvent) => {
+      onWheel(event)
+      clearTimeout(wheelEnd)
+      wheelEnd = setTimeout(() => onWheelEnd(), WHEEL_END_DELAY)
+    }
     // React pose `onWheel` en passif (react-dom 19.3.1, `addTrappedEventListener`), où
     // `preventDefault` est sans effet : la page défilerait, ou zoomerait au pincement du pavé tactile.
-    element.addEventListener('wheel', onWheel, { passive: false })
-    return () => element.removeEventListener('wheel', onWheel)
+    element.addEventListener('wheel', listener, { passive: false })
+    return () => {
+      element.removeEventListener('wheel', listener)
+      clearTimeout(wheelEnd)
+    }
   }, [element])
 
   /** Le pincement des deux premiers pointeurs posés, s'il y en a deux ; il commence. */
@@ -131,7 +168,11 @@ export function useGestures(element: HTMLElement | null, handlers: GestureHandle
 
   /** Le toucher qui achève un geste : le fond, ou la seconde moitié d'un double toucher. */
   const tap = (event: PointerEvent<HTMLElement>, current: Gesture) => {
-    if (current.onBackground) return handlers.onBackgroundTap()
+    if (current.onBackground) {
+      // Plus tôt, c'est le second temps du double clic qui a fait paraître l'élément.
+      if (current.time - appearedAt.current > DOUBLE_TAP.delay) handlers.onBackgroundTap()
+      return
+    }
     const point = clientPoint(event)
     const last = lastTap.current
     const double =
@@ -142,7 +183,7 @@ export function useGestures(element: HTMLElement | null, handlers: GestureHandle
     if (double) handlers.onDoubleTap(localPoint(event.currentTarget, point))
   }
 
-  return {
+  const listeners = {
     onPointerDown(event: PointerEvent<HTMLElement>) {
       const { target, currentTarget, pointerId, button, pointerType, timeStamp } = event
       if (button !== 0 || (target as Element).closest('button')) return
@@ -188,17 +229,22 @@ export function useGestures(element: HTMLElement | null, handlers: GestureHandle
       // glisse seul.
       if (pointers.current.size > 0) return startPinch(current)
       gesture.current = null
-      if (current.pinched) return
-      if (!current.moved) return tap(event, current)
+      if (!current.moved && !current.pinched) return tap(event, current)
+      forgetTap()
+      if (current.pinched) return handlers.onZoomEnd()
       const { x, y } = clientPoint(event)
       const step = current.swipes ? swipeStep(x - current.start.x, y - current.start.y) : 0
       if (step !== 0) handlers.onSwipe(step)
     },
 
-    /** Un geste que le navigateur interrompt est oublié. */
+    /** Un geste que le navigateur interrompt est oublié ; s'il pinçait, le zoom s'achève. */
     onPointerCancel() {
+      if (gesture.current?.pinched) handlers.onZoomEnd()
       pointers.current.clear()
       gesture.current = null
+      forgetTap()
     },
   }
+
+  return { listeners, forgetTap }
 }

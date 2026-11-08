@@ -1,6 +1,7 @@
 /** La fiche et ses gestes, partagés par les scénarios. */
 import { AxeBuilder } from '@axe-core/playwright'
 import type { Locator, Page } from '@playwright/test'
+import type { Point } from '../src/project/zoom.ts'
 import { expect, serveProjects } from './api.ts'
 import { settle } from './css.ts'
 import { buildProject, type Project } from './projects.ts'
@@ -74,6 +75,37 @@ export const transformOf = (page: Page) =>
 
 /** La vue d'ouverture de la couche : l'image entière, centrée. */
 export const FIT = 'translate(0px, 0px) scale(1)'
+
+/**
+ * Attend que la couche soit ouverte depuis plus d'un double toucher (500 ms, spec §4.4) : avant, un
+ * toucher du fond est le second temps du double clic qui l'a ouverte, et ne la ferme pas.
+ */
+export const outlastOpening = (page: Page) => page.waitForTimeout(500)
+
+/**
+ * Un stylet glissé d'un point à un autre, en un pas : Playwright n'a que la souris, le clavier et un
+ * écran tactile qui ne fait que toucher (doc de Playwright, classe `Touchscreen`, lue par context7 le
+ * 2026-11-08) ; le protocole de Chromium simule le stylet.
+ */
+export async function penDrag(page: Page, from: Point, to: Point) {
+  const client = await page.context().newCDPSession(page)
+  const pen = (type: 'mouseMoved' | 'mousePressed' | 'mouseReleased', { x, y }: Point) =>
+    client.send('Input.dispatchMouseEvent', {
+      type,
+      x,
+      y,
+      button: 'left',
+      buttons: 1,
+      clickCount: 1,
+      pointerType: 'pen',
+    })
+
+  await pen('mouseMoved', from)
+  await pen('mousePressed', from)
+  await pen('mouseMoved', to)
+  await pen('mouseReleased', to)
+  await client.detach()
+}
 
 /** Ouvre la couche par « Agrandir l’image », fondu d'entrée achevé. */
 export async function openViewer(page: Page) {
