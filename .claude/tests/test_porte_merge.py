@@ -89,7 +89,7 @@ def diff_des_workflows(origin: str) -> tuple[str, ...]:
 
 
 # `git diff --quiet` sur des workflows changés : 1, sans rien écrire.
-DIFF_NON_VIDE = subprocess.CompletedProcess([], 1, stdout=b"", stderr=b"")
+DIFF_NON_VIDE = failure(b"")
 
 # Le checkout de la tête, un commit nu — la forme que `git checkout <sha>` écrit —, que la porte ne
 # lit pas.
@@ -260,12 +260,12 @@ def test_la_ligne_de_fusion_rend_le_trunk_que_chaque_job_a_fusionne(
     assert lance(forge, *TRUNK) == code
     assert forge.appels == [RUN_JSON, RUN_LOG, COMMIT_JSON, REV_PARSE, diff_des_workflows(origin)]
     assert stdout_lines(capsys) == [
-        f"{BACK} : extrait {COMMIT_BACK}, trunk {TRUNK_FUSIONNE} — {fraicheur}",
-        f"{INFRA} : extrait {COMMIT_INFRA}, trunk {TRUNK_FUSIONNE} — {fraicheur}",
+        f"{BACK} : construit {COMMIT_BACK}, trunk {TRUNK_FUSIONNE} — {fraicheur}",
+        f"{INFRA} : construit {COMMIT_INFRA}, trunk {TRUNK_FUSIONNE} — {fraicheur}",
         f"workflow {WORKFLOW}, déclenché sur le trunk {TRUNK_FUSIONNE} : {WORKFLOWS_INCHANGES}",
         (
-            f"trunk éprouvé {TRUNK_FUSIONNE} — run {RUN}, extrait {COMMIT_BACK}, {COMMIT_INFRA},"
-            f" workflow {WORKFLOW} : {fraicheur} (origin/main = {origin})"
+            f"trunk éprouvé {TRUNK_FUSIONNE} — run {RUN}, workflow {WORKFLOW} : {fraicheur}"
+            f" (origin/main = {origin})"
         ),
     ]
 
@@ -281,12 +281,12 @@ def test_un_seul_job_au_trunk_perime_rend_le_run_perime(
     assert lance(forge, *TRUNK) == 1
     sortie = stdout_lines(capsys)
     assert sortie[:2] == [
-        f"{BACK} : extrait {COMMIT_BACK}, trunk {TRUNK_FUSIONNE} — périmé",
-        f"{INFRA} : extrait {COMMIT_INFRA}, trunk {MAIN_AU_GO} — à jour",
+        f"{BACK} : construit {COMMIT_BACK}, trunk {TRUNK_FUSIONNE} — périmé",
+        f"{INFRA} : construit {COMMIT_INFRA}, trunk {MAIN_AU_GO} — à jour",
     ]
     assert sortie[-1] == (
-        f"trunk éprouvé {TRUNK_FUSIONNE}, {MAIN_AU_GO} — run {RUN}, extrait {COMMIT_BACK},"
-        f" {COMMIT_INFRA}, workflow {WORKFLOW} : périmé (origin/main = {MAIN_AU_GO})"
+        f"trunk éprouvé {TRUNK_FUSIONNE}, {MAIN_AU_GO} — run {RUN}, workflow {WORKFLOW} : périmé"
+        f" (origin/main = {MAIN_AU_GO})"
     )
 
 
@@ -309,12 +309,12 @@ def test_un_run_relance_sur_le_trunk_courant_juge_aussi_sa_definition(
 
     assert lance(forge, *TRUNK) == code
     assert stdout_lines(capsys) == [
-        f"{BACK} : extrait {COMMIT_BACK}, trunk {MAIN_AU_GO} — à jour",
-        f"{INFRA} : extrait {COMMIT_INFRA}, trunk {MAIN_AU_GO} — à jour",
+        f"{BACK} : construit {COMMIT_BACK}, trunk {MAIN_AU_GO} — à jour",
+        f"{INFRA} : construit {COMMIT_INFRA}, trunk {MAIN_AU_GO} — à jour",
         f"workflow {WORKFLOW}, déclenché sur le trunk {TRUNK_FUSIONNE} : {definition}",
         (
-            f"trunk éprouvé {MAIN_AU_GO} — run {RUN}, extrait {COMMIT_BACK}, {COMMIT_INFRA},"
-            f" workflow {WORKFLOW} : {fraicheur} (origin/main = {MAIN_AU_GO})"
+            f"trunk éprouvé {MAIN_AU_GO} — run {RUN}, workflow {WORKFLOW} : {fraicheur}"
+            f" (origin/main = {MAIN_AU_GO})"
         ),
     ]
 
@@ -329,10 +329,10 @@ def sans_jobs_qui_tournent() -> dict[str, Any]:
 
 # Le motif d'un job sans ligne de fusion.
 SANS_LIGNE = (
-    "aucune ligne `Fusion explicite : …` au journal — run d'un `push`, ou d'un workflow d'avant la"
-    " fusion explicite (ADR 0029)"
+    "aucune ligne `Fusion explicite : …` au journal — job arrêté avant sa fusion, run d'un `push`, ou"
+    " d'un workflow d'avant la fusion explicite, à relancer par fermeture-réouverture (ADR 0029)"
 )
-# La ligne que la fusion explicite écrivait avant de nommer son workflow (ADR 0029).
+# Une ligne de fusion privée de son workflow.
 SANS_WORKFLOW = ligne_de_fusion(COMMIT_BACK).removesuffix(f" (workflow {WORKFLOW})")
 # `git diff` sur un objet que le clone n'a pas.
 OBJET_INCONNU = subprocess.CompletedProcess(
