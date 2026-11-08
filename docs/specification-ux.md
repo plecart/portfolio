@@ -111,7 +111,7 @@ Ancres vérifiées : frontend-outillage §3 item 12 (seuils annoncés sans valeu
 
 ### 1.17 Contraintes de contenu induites (récapitulatif, détaillé en §7)
 
-- Titre : **30 caractères** au plus, sur deux lignes au plus du post-it (à 14 px, une ligne de 30 caractères exige une carte d'environ 255 px, jamais atteinte à 400 px).
+- Titre : **30 caractères** au plus, sur deux lignes au plus du post-it (à 14 px, une ligne de 30 caractères, environ 204 px de texte, exige une carte d'environ 255 px, que la carte simple n'atteint pas à 400 px).
 - Résumé : **120 caractères** au plus (sept lignes au plus sur la carte simple mobile, moins sous 400 px, §7) ; sert aussi d'`og:description`.
 - Couverture : **carrée, ≥ 1200 px de côté**, une par projet ; autres images libres, chacune avec une légende (texte alternatif).
 - Technologies : au moins une, ordonnées ; les trois premières de type langage / framework / infra vont sur la carte.
