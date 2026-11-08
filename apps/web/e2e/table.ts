@@ -16,6 +16,9 @@ import { scrollThrough } from './scroll.ts'
 /** La largeur de référence du bureau : la table sans cellule y laisse la colonne (spec §3.4). */
 export const COLUMN_VIEWPORT = { width: 1280, height: 800 }
 
+/** Un téléphone plus étroit que le projet mobile (400 px) : les tailles mobiles de §6.1. */
+export const NARROW_VIEWPORT = { ...COLUMN_VIEWPORT, width: 375 }
+
 /**
  * La forme des liens, lue sur leur boîte : fixe en colonne, dans le flux en pied de page. Aussi
  * sous une fiche ouverte, qui les cache des technologies d'assistance.
@@ -56,18 +59,52 @@ export const pose = (card: Locator) => card.locator('.card-pose')
 export const face = (card: Locator) => card.locator('.card-face')
 export const summary = (card: Locator) => card.locator('.card-summary')
 
+/** Les trois technologies qu'une carte montre au plus (spec §1.4), une par type. */
+const THREE_TECHNOLOGIES = (['language', 'framework', 'infrastructure'] as const).map((kind) =>
+  buildTechnology(kind, kind),
+)
+
 /** Une carte aux trois technologies et aux deux états : sous 600 px, ses rubans vont à la ligne. */
 export const FULL_CARD = buildProject({
   ...ONGOING,
   slug: 'pleine',
   demo_url: 'https://demo.test/pleine',
-  technologies: (['language', 'framework', 'infrastructure'] as const).map((kind) =>
-    buildTechnology(kind, kind),
-  ),
+  technologies: THREE_TECHNOLOGIES,
+})
+
+/**
+ * Une carte aux trois technologies, en ligne : sur la carte simple, ses rubans tiennent sur une
+ * rangée au bureau, à 2 px près, et en prennent deux à 375 px (spec §4.1).
+ */
+export const LIVE_CARD = buildProject({
+  slug: 'en-ligne',
+  demo_url: 'https://demo.test/en-ligne',
+  technologies: THREE_TECHNOLOGIES,
 })
 
 /** Deux cartes sur une rangée : la carte pleine, en cours donc en tête, et sa voisine. */
 export const TWO_CARDS = [FULL_CARD, buildProject({ slug: 'voisine' })]
+
+/** Les tailles de tout ruban, de carte ou de fiche (spec §4.1, §4.3), lues par `ribbonSizes`. */
+export const RIBBON_SIZES = { ribbons: ['32px 13px'], icons: ['24px 24px'] }
+
+/**
+ * Les tailles calculées des rubans sous un élément, chacune une fois : hauteur et police des
+ * rubans, largeur et hauteur de leurs icônes. Une seule de chaque quand tous ont la même ; aucune
+ * sans ruban.
+ */
+export const ribbonSizes = (container: Locator) =>
+  container.locator('.card-ribbon').evaluateAll((ribbons) => {
+    const distinct = (values: string[]) => [...new Set(values)]
+    const style = (element: Element) => getComputedStyle(element)
+    const icons = ribbons.flatMap((ribbon) => [...ribbon.querySelectorAll('img')])
+    return {
+      ribbons: distinct(
+        ribbons.map((ribbon) => `${style(ribbon).height} ${style(ribbon).fontSize}`),
+      ),
+      icons: distinct(icons.map((icon) => `${style(icon).width} ${style(icon).height}`)),
+    }
+  })
 
 /**
  * Ouvre la table sur un jeu de projets, ses cartes rendues et sa police arrivée : `font-display:

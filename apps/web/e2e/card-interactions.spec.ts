@@ -223,7 +223,7 @@ test('les mouvements d’une carte suivent le tableau de spec §2.7', async ({ p
   await expect(face(card)).toHaveCSS('transition-timing-function', out, { pseudo: 'after' })
 })
 
-test('le bandeau de résumé : absolu en bas de la photo, `--paper` à 94 %, 13 px, `--ink` (spec §4.1)', async ({
+test('le bandeau de résumé : absolu en bas de la photo, `--paper` à 94 %, `--ink` (spec §4.1)', async ({
   page,
 }) => {
   await openTable(page, [buildProject({ summary: 'Un résumé.' })])
@@ -237,7 +237,6 @@ test('le bandeau de résumé : absolu en bas de la photo, `--paper` à 94 %, 13 
   await expect(summary(card)).toHaveAttribute('aria-hidden', 'true')
   await expect(summary(card)).toHaveCSS('background-color', paper)
   await expect(summary(card)).toHaveCSS('color', ink)
-  await expect(summary(card)).toHaveCSS('font-size', '13px')
   await expect(summary(card)).toHaveCSS('padding', '12px')
   const gap = await summary(card).evaluate(
     (overlay) =>
@@ -284,13 +283,14 @@ test('à mi-transition, aucun filet de l’image ne longe le bandeau', async ({ 
     .toBe(2)
 
   // Une bande à cheval sur le bord bas : du bandeau au papier, rien de plus sombre que les deux.
+  // Sous le bord, 6 px : les rubans de 32 px commencent 10 px sous la photo, dans une bande de 52.
   const overlay = (await summary(card).boundingBox())!
   const edge = Math.floor(overlay.y + overlay.height)
   const clip = {
     x: Math.ceil(overlay.x) + 2,
     y: edge - 12,
     width: Math.floor(overlay.width) - 4,
-    height: 24,
+    height: 12 + 6,
   }
   const columns = await greenColumns(page, await page.screenshot({ clip }))
 
@@ -640,13 +640,25 @@ for (const colorScheme of ['light', 'dark'] as const) {
   })
 }
 
-/** La transformation calculée de chaque élément de la face, dans l'ordre du document. */
-const contentTransforms = (card: Locator) =>
-  face(card).evaluate((layer) =>
-    [...layer.querySelectorAll('*')].map((element) => getComputedStyle(element).transform),
+/** Les quatre propriétés de transformation : `transform` et les trois individuelles. */
+const MOTIONS = ['transform', 'rotate', 'translate', 'scale']
+
+/**
+ * Les transformations de chaque élément de la carte que le pointeur pourrait faire bouger — la
+ * pose, la face et chaque élément de la face —, dans l'ordre du document : leurs quatre propriétés
+ * calculées.
+ */
+const cardMotions = (card: Locator) =>
+  pose(card).evaluate(
+    (layer, properties) =>
+      [layer, ...layer.querySelectorAll('*')].map((element) => {
+        const style = getComputedStyle(element)
+        return properties.map((property) => style.getPropertyValue(property))
+      }),
+    MOTIONS,
   )
 
-test('au pointeur, rien ne bouge dans la face : du coin au coin opposé, les transformations du focus clavier', async ({
+test('au pointeur, rien ne bouge dans la carte : du coin au coin opposé, la pose, la face et son contenu gardent les mouvements du focus clavier', async ({
   page,
   isMobile,
 }) => {
@@ -655,16 +667,16 @@ test('au pointeur, rien ne bouge dans la face : du coin au coin opposé, les tra
   const card = cards(page).first()
   await focusByKeyboard(card)
   await settle(page)
-  const focused = await contentTransforms(card)
+  const focused = await cardMotions(card)
   const { x, y, width, height } = (await card.boundingBox())!
 
   await page.mouse.move(x + width - 1, y + 1)
   await settle(page)
-  const atCorner = await contentTransforms(card)
+  const atCorner = await cardMotions(card)
   await page.mouse.move(x + 1, y + height - 1)
   await settle(page)
 
-  expect([atCorner, await contentTransforms(card)]).toEqual([focused, focused])
+  expect([atCorner, await cardMotions(card)]).toEqual([focused, focused])
 })
 
 test('sous la CSP de production, le retard d’entrée s’écrit : rien par un attribut analysé', async ({

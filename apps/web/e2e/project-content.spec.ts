@@ -26,7 +26,15 @@ import {
 } from './project.ts'
 import { buildImage, buildTechnology, FILES_ORIGIN, ONGOING } from './projects.ts'
 import { scrollTop } from './scroll.ts'
-import { cards, COLUMN_VIEWPORT, openTable, serveUnderCsp } from './table.ts'
+import {
+  cards,
+  COLUMN_VIEWPORT,
+  NARROW_VIEWPORT,
+  openTable,
+  RIBBON_SIZES,
+  ribbonSizes,
+  serveUnderCsp,
+} from './table.ts'
 
 const THREE_TECHNOLOGIES_AND_A_TOOL = [
   buildTechnology('TypeScript', 'language'),
@@ -127,16 +135,31 @@ test.describe('l’en-tête', () => {
 })
 
 test.describe('ce qui défile', () => {
-  test('la ligne de faits, puis le résumé', async ({ page }) => {
+  test('la ligne de faits, puis le résumé, détaché de la description (spec §2.2)', async ({
+    page,
+  }) => {
     await arriveAt(page, { kind: 'professional', client: 'Acme', summary: 'Le résumé.' })
 
     const facts = page.locator('.project-facts')
+    const summary = page.locator('.project-facts + .project-summary')
 
     await expect(facts).toHaveText('Pro · Janvier 2025 – juin 2025 · Acme')
     await expect(facts).toHaveCSS('font-size', '13px')
     await expect(facts).toHaveCSS('margin-bottom', '16px')
-    await expect(page.locator('.project-facts + .project-summary')).toHaveText('Le résumé.')
-    await expect(page.locator('.project-summary')).toHaveCSS('font-size', '16px')
+    await expect(summary).toHaveText('Le résumé.')
+    // Taille, graisse, interligne calculé : 18 / 500 / 1,4, puis 16 / 400 / 1,5.
+    const fonts = await Promise.all(
+      [summary, page.locator('.project-description p').first()].map((text) =>
+        text.evaluate((element) => {
+          const { fontSize, fontWeight, lineHeight } = getComputedStyle(element)
+          return [fontSize, fontWeight, lineHeight]
+        }),
+      ),
+    )
+    expect(fonts).toEqual([
+      ['18px', '500', '25.2px'],
+      ['16px', '400', '24px'],
+    ])
   })
 
   test('toutes les technologies, puis les outils, nommés en clair', async ({ page }) => {
@@ -166,6 +189,23 @@ test.describe('ce qui défile', () => {
     await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(['Technologies'])
     await expect(page.locator('.project-stack')).toHaveCount(1)
   })
+})
+
+test('les rubans de l’en-tête, des technologies et des outils ont les tailles de la carte, à 1280 px puis à 375 px', async ({
+  page,
+  isMobile,
+}) => {
+  await page.setViewportSize(isMobile ? NARROW_VIEWPORT : COLUMN_VIEWPORT)
+  await arriveAt(page, {
+    ...ONGOING,
+    demo_url: LINKS.demo_url,
+    technologies: THREE_TECHNOLOGIES_AND_A_TOOL,
+  })
+  const stacks = page.locator('.project-stack')
+
+  for (const ribbons of [page.locator('.project-head'), stacks.first(), stacks.last()]) {
+    expect(await ribbonSizes(ribbons)).toEqual(RIBBON_SIZES)
+  }
 })
 
 test.describe('la description en Markdown', () => {
@@ -578,8 +618,8 @@ test.describe('le défilement', () => {
     await expect(column).toHaveCSS('overflow-y', 'auto')
     await expect(column).toHaveCSS('margin-bottom', '16px')
     await expect(column).toHaveCSS('scrollbar-width', 'thin')
-    expect(Math.round(before!.height)).toBe(89)
-    expect(Math.round((await column.boundingBox())!.height + 16)).toBe(521)
+    expect(Math.round(before!.height)).toBe(101)
+    expect(Math.round((await column.boundingBox())!.height + 16)).toBe(509)
 
     await scrollTo(column, 300)
 

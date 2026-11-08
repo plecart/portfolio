@@ -281,8 +281,12 @@
     font-size: var(--fs-small);
   }
 
+  /* Le résumé se détache de la description (spec §2.2). */
   .project-summary {
     margin-bottom: var(--s-4);
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1.4;
   }
 
   .project-stack-title {
