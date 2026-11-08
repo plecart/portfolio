@@ -37,7 +37,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0016](0016-le-worker-dans-les-deux-fichiers-compose.md) | Le worker dans les deux fichiers Compose | D60 (remplace « le worker » parmi ce que la production porte en propre dans 0012 et D54) | accepté |
 | [0017](0017-jobs-de-la-ci-selon-le-delta.md) | Les jobs de la CI selon le delta d'une PR | D61 (remplace le point « Scan : Trivy, sur chaque PR » de 0014) | accepté ; points « Le passage en ready ne déclenche plus de run », « seule l'ouverture d'une draft le saute », « partent après `api`, même rouge » et « le scan Trivy tourne sur chaque PR qui touche un fichier hors du harnais » remplacés par 0019 ; point « la suite du back porte aussi les tests de la pipeline » remplacé par 0025 |
 | [0018](0018-binaires-go-compiles-par-le-projet.md) | Binaires Go compilés par le projet | D62 (exerce une condition de réexamen de 0014, sans le remplacer) | accepté |
-| [0019](0019-runs-de-ci-au-ready-et-avis-planifies.md) | Runs de CI au passage en ready, portes d'avis planifiées | D63 (remplace quatre points de 0017, dont deux repris dans D61 ; renverse la décision « sans horloge » de #77) | accepté |
+| [0019](0019-runs-de-ci-au-ready-et-avis-planifies.md) | Runs de CI au passage en ready, portes d'avis planifiées | D63 (remplace quatre points de 0017, dont deux repris dans D61 ; renverse la décision « sans horloge » de #77) | accepté ; points « Il tourne, comme tout run de PR, sur la référence de fusion que GitHub calcule… » (§ Décision, point 1) et « la porte de fraîcheur de l'Étape 7 reste la seule preuve de l'état combiné… » (§ Conséquences) remplacés par 0029 |
 | [0020](0020-csp-native-de-django.md) | CSP et en-têtes de sécurité par la brique native de Django | D65 (remplace le point « `django-csp` » de 0001) | accepté |
 | [0021](0021-buckets-r2-prefixes-par-le-projet.md) | Noms des buckets R2 préfixés par le projet | D66 (remplace le nom `backups` de 0004 et 0007) | accepté |
 | [0022](0022-keepassxc-comme-gestionnaire.md) | KeePassXC comme gestionnaire de mots de passe | D67 (remplace la mention « Bitwarden ou 1Password » de 0007) | accepté |
@@ -47,6 +47,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0026](0026-schema-d-architecture-hors-ligne-et-playwright-python.md) | Le schéma d'architecture : rendu hors ligne, export par Playwright Python | D70 | accepté ; points « 1200 × 1200 px » et « facteur d'échelle 1 » remplacés par 0028 |
 | [0027](0027-remontee-d-erreurs-sentry-et-logs-structures.md) | Remontée d'erreurs Sentry et logs structurés | D71 | accepté |
 | [0028](0028-couverture-et-schema-a-2400-px.md) | La couverture et le schéma d'architecture à 2400 px de côté | D72 (remplace le point « échelle … 1200 px plafonnent » de 0015, les points « 1200 × 1200 px » et « facteur d'échelle 1 » de 0026, et le point du côté de D70) | accepté |
+| [0029](0029-fusion-explicite-du-trunk-dans-les-runs-de-pr.md) | Les runs de PR fusionnent eux-mêmes la tête au trunk courant | D73 (remplace le point 1 de § Décision et un point de § Conséquences de 0019) | accepté |
 
 ## À écrire à leur phase
 
