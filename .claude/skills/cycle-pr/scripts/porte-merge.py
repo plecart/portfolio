@@ -121,9 +121,12 @@ entré dans `main`.
 
 **Ce qu'il ne prouve pas.** `trunk` ne relance rien, et ne récupère pas `origin/<base>` : il
 compare à la référence de suivi que le dernier `git fetch origin` a laissée, à lancer d'abord
-(`cycle-pr` Étape 7). Un `gh run rerun` refait la fusion sur le trunk du moment (ADR 0029) ; que
-`gh run view <run> --log` et `--json jobs` rendent alors la **dernière tentative** du run relancé
-est **non vérifié**. De la définition du workflow, il ne compare au trunk courant que
+(`cycle-pr` Étape 7). Un `gh run rerun` refait la fusion sur le trunk du moment (ADR 0029), et
+`gh run view <run> --log` rend la **dernière tentative** du run relancé — run 39559119382,
+tentative 2 : mêmes octets qu'avec `--attempt 2`, et `--attempt 1` en rend d'autres (relevé le
+2026-11-08, gh 2.94.0) ; une relance partielle y laisse aux jobs non relancés le journal de la
+tentative précédente, donc leur ancien trunk. Que `--json jobs` rende la même tentative est **non
+vérifié**. De la définition du workflow, il ne compare au trunk courant que
 `.github/workflows/`. `conversation` ne juge pas ce que dit un
 commentaire — un écart renvoie à sa lecture —, ne lit d'un élément que sa date de création ou de
 soumission, si bien que l'édition d'un commentaire existant lui échappe, et ne prouve pas que le
