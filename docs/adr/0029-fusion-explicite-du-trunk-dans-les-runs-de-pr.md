@@ -57,23 +57,32 @@ croît avec le nombre de PR de la vague, pas avec le risque.
 
 - Sur un événement `pull_request`, chaque job qui extrait le code — `api`, `web`, `infra`,
   `auteurs` de `ci.yml`, et `avis.yml` qu'il appelle — extrait la tête de la PR avec tout
-  l'historique, puis une action locale, `.github/actions/fusion-trunk`, la fusionne à
+  l'historique, puis un pas écrit en ligne dans le workflow la fusionne à
   `origin/<branche cible de la PR>` tel qu'il est au démarrage du job. Le commit obtenu a le trunk
   en premier parent et la tête en second.
+- Le pas vit dans la définition du workflow — une ancre YAML dans `ci.yml`, sa copie dans
+  `avis.yml`, tenues égales par un test —, jamais dans l'arbre extrait : une action locale
+  (`uses: ./…`) se lirait dans la tête, et une PR ouverte avant ce changement, dont la tête ne la
+  porte pas, échouerait à chaque job (relecture de la PR #251, passe 1). La définition, elle, se
+  lit au commit du run (doc GitHub « Workflows », « Each workflow run will use the version of the
+  workflow that is present in the associated commit SHA », lue le 2026-11-08).
 - Un conflit fait échouer le job, et sa trace le dit. Une PR déjà en conflit à l'événement ne
   déclenche aucun run (doc GitHub « Events that trigger workflows », `pull_request`, lue le
   2026-11-08) : ce cas-ci est celui d'un trunk qui a avancé en conflit, vu à la relance.
-- L'action est du code du dépôt, lue dans l'arbre extrait et sans `uses` à elle : rien n'y
-  échappe à Dependabot, et les gardes d'épinglage (`apps/api/tests/test_supply_chain.py`)
-  l'acceptent à ce titre.
 - Chaque job écrit dans sa trace une ligne stable,
-  `Fusion explicite : <commit> Merge <tête> into <trunk>`, lue sur les parents du commit ;
-  `porte-merge.py trunk` la lit au lieu de la ligne de checkout de la forge, et exige toujours que
-  **chaque** job ait fusionné `origin/<trunk>` : les jobs démarrent à des moments différents.
+  `Fusion explicite : <commit> Merge <tête> into <trunk> (workflow <GITHUB_SHA>)`, lue sur les
+  parents du commit ; `porte-merge.py trunk` la lit au lieu de la ligne de checkout de la forge, et
+  exige toujours que **chaque** job ait fusionné `origin/<trunk>` : les jobs démarrent à des
+  moments différents.
+- Elle exige aussi que la définition jouée soit celle du trunk courant. Une relance garde « the
+  same `GITHUB_SHA` … and `GITHUB_REF` … of the original event » (doc GitHub « Re-running
+  workflows and jobs », lue le 2026-11-08), donc la définition du déclenchement : si le trunk a
+  changé `.github/workflows/` depuis le premier parent de ce commit, la porte sort en 1.
 - Sur un `push` vers `main`, rien ne change : aucune fusion.
 - Quand le trunk a avancé, la relance est `gh run rerun <run>`, run entier : elle refait la fusion
   sur le trunk du moment. La fermeture-réouverture ne reste que pour un événement perdu
-  (`cycle-pr` Étape 5, « Si aucun run n'apparaît »).
+  (`cycle-pr` Étape 5, « Si aucun run n'apparaît ») et pour une définition de workflow que le
+  trunk a changée depuis le déclenchement : seul un événement neuf relit la définition.
 
 Les options écartées :
 
@@ -106,13 +115,16 @@ Les options écartées :
   `git count-objects -vH`).
 - Un run d'avant cette décision n'écrit pas la ligne : `porte-merge.py trunk` le refuse, et sa
   relance relit l'ancien workflow ; une PR ouverte au merge de cette décision se relance encore
-  par fermeture-réouverture, jusqu'à un run qui écrit la ligne.
+  par fermeture-réouverture, jusqu'à un run qui écrit la ligne. Le même geste vaut pour toute PR
+  ouverte quand le trunk reçoit un changement de `.github/workflows/`.
+- Le pas de fusion existe en deux copies, une par fichier de workflow : une ancre YAML ne
+  traverse pas les fichiers, et un test les tient égales.
 
 ## Comparaison des options
 
 | | Relances par avancée du trunk | Preuve de l'état combiné | Coût de mise en place |
 |---|---|---|---|
-| Option 1 | **une, `gh run rerun`** | **inchangée, chaque job** | **workflow, une action, la porte** |
+| Option 1 | **une, `gh run rerun`** | **inchangée, chaque job** | **un pas de workflow, la porte** |
 | Option 2 | zéro sur piles disjointes | relâchée | une liste de contrats à tenir |
 | Option 3 | une par PR, sérialisée | inchangée | aucun script, l'ordre à la main |
 | Option 4 | zéro | par la file | abonnement, protection de `main`, auto-merge |
@@ -123,4 +135,4 @@ Les options écartées :
 - Le dépôt passe à une offre qui permet la protection de `main` et la file de merge, et la
   doctrine du go humain s'y accommode : l'option 4 se rouvre.
 - GitHub recalcule la référence de fusion à chaque avancée du trunk, ou un `gh run rerun` la
-  relit : l'action devient inutile.
+  relit : le pas de fusion devient inutile.
