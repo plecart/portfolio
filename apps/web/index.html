@@ -4,8 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Icône vide déclarée : sans elle, 404 sur `/favicon.ico` et bonnes pratiques à 96. -->
-    <link rel="icon" href="data:," />
+    <!-- Icônes du site : ordre et `sizes`, docs/frontend-outillage.md §2.4. -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
     <!-- Mode forcé posé avant le premier rendu : script classique et bloquant, servi en fichier
          par un chemin absolu — docs/frontend-outillage.md §2.4. -->

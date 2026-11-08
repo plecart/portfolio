@@ -37,12 +37,11 @@ http://{$SITE_HOST} {
 	# après celle de l'amont (doc Caddy « header ») : ceux de Django sont remplacés, pas doublés —
 	# deux politiques de sécurité s'additionneraient. La politique n'admet que des fichiers servis
 	# par le site, les appels à l'API et les images de `media`, sans `unsafe-inline` (OWASP
-	# « Content Security Policy ») ; `data:` dans `img-src` seulement, pour l'icône vide
-	# d'`index.html` — une image n'exécute rien, et c'est la seule violation mesurée sur le front
-	# compilé (2026-10-03). `X-Frame-Options` double `frame-ancestors` pour les navigateurs qui
-	# l'ignorent (OWASP « Clickjacking Defense »). Pas de HSTS : le domaine `.dev` l'impose déjà.
+	# « Content Security Policy ») ni `data:` : les icônes du site sont des fichiers servis ici
+	# (#237). `X-Frame-Options` double `frame-ancestors` pour les navigateurs qui l'ignorent
+	# (OWASP « Clickjacking Defense »). Pas de HSTS : le domaine `.dev` l'impose déjà.
 	header {
-		>Content-Security-Policy "default-src 'self'; connect-src https://{$API_HOST}; img-src 'self' data: https://{$MEDIA_HOST}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		>Content-Security-Policy "default-src 'self'; connect-src https://{$API_HOST}; img-src 'self' https://{$MEDIA_HOST}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 		>X-Frame-Options DENY
 		>X-Content-Type-Options nosniff
 		>Referrer-Policy strict-origin-when-cross-origin
