@@ -439,6 +439,7 @@ def dated_front(root: Path, files: list[str]) -> Path:
         "package.json",
         "package-lock.json",
         "tsconfig.app.json",
+        ".env",
         ".env.production",
     ],
 )
