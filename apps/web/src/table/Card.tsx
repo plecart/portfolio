@@ -19,7 +19,6 @@ import {
   type CardSize,
   type Technology,
 } from './cards.ts'
-import { useCardTilt } from './useCardTilt.ts'
 
 /** La pose d'une carte, en variables : le redressement la remplace par une règle de la feuille. */
 function poseStyle(slug: string): CSSProperties {
@@ -143,8 +142,8 @@ function Band({ project }: { project: Project }) {
 /**
  * Une carte polaroid (spec §4.1, §4.2) : le lien est la cellule de la table, au sens de
  * `TABLE_CELL_SELECTOR` — sa boîte de grille, sans transformation. Il contient, de l'extérieur vers
- * l'intérieur, la couche d'entrée, la pose, la face et l'inclinaison, qui porte le trombone, le
- * post-it, la photo et la bande basse.
+ * l'intérieur, la couche d'entrée, la pose et la face, qui porte le trombone, le post-it, la photo
+ * et la bande basse.
  *
  * Le lien tire son nom de son contenu, où restent exposés le `<h2>`, que la navigation par titres
  * lit seul, et la suite du nom, en texte masqué. Chromium sépare les deux d'une espace, devant
@@ -179,7 +178,6 @@ export function Card({
   ref?: Ref<HTMLAnchorElement>
 }) {
   const descriptionId = useId()
-  const { layer, ...tiltGestures } = useCardTilt()
 
   return (
     <a
@@ -190,20 +188,17 @@ export function Card({
       data-revealed={revealed || undefined}
       className={`card card-${size}`}
       onClick={onClick}
-      {...tiltGestures}
     >
       <div className="card-entry">
         <div className="card-pose" style={poseStyle(project.slug)}>
           <div className="card-face">
-            <div ref={layer} className="card-tilt">
-              <Clip />
-              <h2 className="postit postit-title card-postit">
-                <span className="card-postit-text">{project.title}</span>
-              </h2>
-              <span className="sr-only">{cardNameSuffix(project)}</span>
-              <Photo project={project} size={size} />
-              <Band project={project} />
-            </div>
+            <Clip />
+            <h2 className="postit postit-title card-postit">
+              <span className="card-postit-text">{project.title}</span>
+            </h2>
+            <span className="sr-only">{cardNameSuffix(project)}</span>
+            <Photo project={project} size={size} />
+            <Band project={project} />
           </div>
         </div>
       </div>

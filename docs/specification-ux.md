@@ -23,7 +23,7 @@ _Document normatif de rang 2 (`.claude/pipeline.config.md`, « Sources de vérit
 
 - **Une carte par projet, de style polaroid** : image en haut, titre, et en bas deux ou trois icônes de technologies plus un indicateur « en ligne » (choix des technologies et sens de « en ligne » : §1.4). Le projet marqué « vitrine » dans l'admin (un seul à la fois, §1.9) occupe deux colonnes en tête de table ; sans projet vitrine, toutes les cartes ont la même taille.
 - **Disposition** : grille fluide sur le fond de page, sans table dessinée ni 3D. Chaque carte porte une rotation légère (−3° à +3°) et un décalage de quelques pixels, déterminés par le projet, identiques à chaque visite. Le relief vient des ombres des cartes seulement.
-- **Survol / focus** : la carte se redresse à 0°, se soulève, l'ombre s'élargit ; au pointeur, inclinaison en perspective (« tilt ») qui suit la souris.
+- **Survol / focus** : la carte se redresse à 0°, se soulève, l'ombre s'élargit ; son contenu reste immobile.
 - **Défilement** : vertical, continu, sans pagination ni limite ; toutes les fiches publiées sont chargées d'un coup, images en `loading="lazy"`. Chaque carte apparaît à l'entrée dans l'écran (montée de quelques pixels + fondu, décalage entre voisines).
 - **Sélection** : la carte sélectionnée grandit pour devenir la fiche (sa photo, son post-it et ses rubans voyagent jusqu'à leur place dans la fiche) ; toutes les autres reculent légèrement dans la direction opposée à la carte sélectionnée et s'effacent, toutes en même temps. À la fermeture, mouvement inverse : les cartes reviennent à leur place en réapparaissant, la fiche redevient sa carte. Arrivée directe par `/projets/<slug>` : la fiche apparaît centrée en fondu ; sa fermeture fait apparaître les cartes à leur place, avec leur animation d'entrée.
 - **Repli `prefers-reduced-motion`** : fondu croisé entre la table et la fiche, sans déplacement.
@@ -44,7 +44,7 @@ _Document normatif de rang 2 (`.claude/pipeline.config.md`, « Sources de vérit
 - **Téléphone** : deux colonnes de cartes (largeur exacte : prototype §4), défilement continu ; la fiche occupe tout l'écran ; le bouton « retour » du navigateur ferme la fiche (une entrée d'historique par ouverture, adresse `/projets/<slug>`).
 - **Desktop** : fiche en panneau centré à largeur bornée.
 - **Seules les cartes visibles à l'écran sont animées** à l'ouverture et à la fermeture, sur tous les appareils.
-- **Tactile** : pas de tilt ni de parallaxe ; état « pressé » (léger enfoncement) avant l'ouverture. Ancres vérifiées : cadrage muet ; ADR 0008 « Aperçus de lien » conforme.
+- **Tactile** : pas de parallaxe ; état « pressé » (léger enfoncement) avant l'ouverture. Ancres vérifiées : cadrage muet ; ADR 0008 « Aperçus de lien » conforme.
 - **Deux étiquettes d'état, indépendantes** : « en cours » (statut « en cours » du modèle §6.1 ; l'image de la carte passe en noir et blanc, l'étiquette accompagne toujours la couleur) et « en ligne » (un lien démo existe ; ne dit rien de l'achèvement). Un projet sans lien ne porte aucune étiquette de plus : pas de notion « privé » affichée. Ancres vérifiées : cadrage §6.1 « statut (en cours / terminé / archivé) », « liens (dépôt, démo : absents pour les projets privés) » conformes.
 
 ### 1.7 Révéler le résumé, ouvrir la fiche
@@ -194,7 +194,7 @@ Page, colonne de lecture de la fiche et, sur téléphone, son panneau : `scrollb
 | Mouvement | Durée | Courbe |
 |---|---|---|
 | Entrée d'une carte (montée de 8 px + fondu) | 240 ms, + 40 ms par colonne | `--ease-out` |
-| Redressement, recul et retour d'une carte, fin d'inclinaison | 240 ms | `--ease-out` |
+| Redressement, recul et retour d'une carte | 240 ms | `--ease-out` |
 | Soulèvement d'une carte (−6 px, ×1,02) | 240 ms | `--ease-spring` |
 | Ombre soulevée (opacité) | 240 ms | `--ease-out` |
 | Bandeau de résumé | opacité 150 ms, translation 240 ms | `--ease-out` |
@@ -253,7 +253,7 @@ Deux liens, GitHub puis LinkedIn, icônes au trait 22 px, libellés « GitHub de
 
 ### 4.1 Carte polaroid
 
-- **Structure** : `<a href="/projets/<slug>">`, nom accessible « Titre. En cours. En ligne. » (les états présents seulement ; sans état, le titre seul), description accessible : le résumé puis les technologies. Couches, de l'extérieur vers l'intérieur : entrée et recul ; pose (rotation, décalage) ; face (papier, ombre, cadre) ; inclinaison ; puis le trombone, le post-it, la photo (image, couche noir et blanc, bandeau de résumé) et la bande basse (rubans, bouton « Ouvrir »).
+- **Structure** : `<a href="/projets/<slug>">`, nom accessible « Titre. En cours. En ligne. » (les états présents seulement ; sans état, le titre seul), description accessible : le résumé puis les technologies. Couches, de l'extérieur vers l'intérieur : entrée et recul ; pose (rotation, décalage) ; face (papier, ombre, cadre) ; puis le trombone, le post-it, la photo (image, couche noir et blanc, bandeau de résumé) et la bande basse (rubans, bouton « Ouvrir »).
 
 | Carte | Largeur | Cadre | Photo | Bande (min.) | Hauteur (min.) |
 |---|---|---|---|---|---|
@@ -274,8 +274,8 @@ Hauteur = cadre + photo + bande ; la bande grandit si les rubans passent sur deu
 - **Bandeau de résumé** : absolu en bas de la photo, marge intérieure 12 px, `--paper` à 94 %, 13 px, `--ink` ; caché (opacité 0, 6 px plus bas) ; révélé au survol ou au focus (opacité 150 ms, translation 240 ms) et au premier toucher ; `aria-hidden` (le résumé est dans la description accessible). Capacité : §7.
 - **Bande basse** : hauteur minimale selon la carte, marge 8 px 0, deux listes — rubans de technologies à gauche, rubans d'état à droite — écart 4 px, retour à la ligne si besoin. Sur un appareil sans survol, pendant la révélation, les deux listes laissent la place au bouton « Ouvrir » (30 px de haut, marge intérieure 0 12 px, bordure 1 px `--ink`, `--paper`, rayon 6 px, 13 / 600) : la hauteur de la carte ne change pas.
 - **Ruban** : 20 px de haut, marge intérieure 0 7 px, `--tape` / `--tape-ink`, rayon 2 px, 11 / 700, sans retour à la ligne, rotation −1,5° (impairs) ou +1° (pairs) ; sur la carte vitrine 24 px de haut, 12 px, marge 0 9 px. Technologie : icône visible, nom complet en texte masqué et en infobulle. « en cours » : texte seul. « en ligne » : point de 6 px `--accent` puis le texte.
-- **Survol et focus** (appareils à survol) : la pose revient à 0° et 0 px (240 ms) ; la face monte de 6 px et grandit de 2 % (240 ms, `--ease-spring`) ; l'ombre soulevée apparaît (240 ms) ; le bandeau se révèle. Au pointeur fin, hors mouvement réduit et sans fiche ouverte, le contenu de la face s'incline jusqu'à ±6° sur chaque axe, papier et ombre restant à plat, selon la position du pointeur (perspective 900 px) et revient en 240 ms à la sortie. Focus clavier : anneau de 2 px `--accent` à 4 px de la face. Pression : ×0,985 en 80 ms.
-- **Toucher** : premier toucher = révélation (redressement, ombre soulevée, bandeau, bouton « Ouvrir ») ; second toucher, sur la carte ou le bouton = ouverture ; toucher hors des cartes = fin de la révélation ; une carte révélée à la fois ; pas d'inclinaison.
+- **Survol et focus** (appareils à survol) : la pose revient à 0° et 0 px (240 ms) ; la face monte de 6 px et grandit de 2 % (240 ms, `--ease-spring`) ; l'ombre soulevée apparaît (240 ms) ; le bandeau se révèle. Focus clavier : anneau de 2 px `--accent` à 4 px de la face. Pression : ×0,985 en 80 ms.
+- **Toucher** : premier toucher = révélation (redressement, ombre soulevée, bandeau, bouton « Ouvrir ») ; second toucher, sur la carte ou le bouton = ouverture ; toucher hors des cartes = fin de la révélation ; une carte révélée à la fois.
 
 ### 4.2 Carte vitrine
 
@@ -371,7 +371,7 @@ Un seul point de rupture, 600 px ; la colonne fixe des liens dépend de la marge
 | Cadre / bande | 10 / 52 px (vitrine 14 / 64) | 8 / 46 px (vitrine 12 / 56) |
 | Fiche | panneau centré dimensionné depuis la photo, deux colonnes, en-tête fixe | plein écran, une colonne, tout défile |
 | Liens de l'auteur | colonne fixe si la marge ≥ 76 px ou si la table n'a aucune cellule, sinon pied de page | pied de page (marge de 16 px) |
-| Survol et inclinaison | sur les appareils à survol | non ; révélation au toucher |
+| Survol | sur les appareils à survol | non ; révélation au toucher |
 
 Repères mesurés : 1280 × 800 → table 1044 px, carte 240 / 508 px, fiche 1232 × 642 px, colonne de liens ; 400 × 800 → carte 176 / 368 px, fiche 400 × 800 px, pied de page.
 
@@ -386,7 +386,7 @@ Repères mesurés : 1280 × 800 → table 1044 px, carte 240 / 508 px, fiche 123
 
 ### 6.3 Mouvement réduit (`prefers-reduced-motion: reduce`)
 
-- Cartes : entrée par fondu de 150 ms sans montée ; ni redressement, ni soulèvement, ni inclinaison ; bandeau de résumé par fondu seul ; pas de pulsation des cadres vides.
+- Cartes : entrée par fondu de 150 ms sans montée ; ni redressement, ni soulèvement ; bandeau de résumé par fondu seul ; pas de pulsation des cadres vides.
 - Ouverture : la face de la carte s'efface (150 ms) pendant que la fiche apparaît (150 ms), sans feuille ni vol ; les autres cartes s'effacent (150 ms) sans reculer ; la fiche est active à 160 ms. Fermeture : contenu en 160 ms, puis fiche en 160 ms, les cartes réapparaissent (150 ms).
 - Entête : sortie et retour par fondu de 150 ms, sans translation.
 - Galerie : bascule instantanée ; ancre de section : défilement instantané.

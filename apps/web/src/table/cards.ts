@@ -2,8 +2,8 @@
  * Les cartes de la table, en logique pure : leur ordre (spec §1.9), les technologies qu'elles
  * montrent (§1.4), leur pose (§1.3, §4.1), leurs états, le nom et la description de leur lien
  * (§1.6, §1.7, §4.1), leur taille et celle des cadres de chargement qui les annoncent (§4.2, §5.1,
- * §5.5), leur couverture (§4.1), leur colonne (§3.1) et leur inclinaison (§4.1). Les projets
- * entrent tels que l'API les sert.
+ * §5.5), leur couverture (§4.1) et leur colonne (§3.1). Les projets entrent tels que l'API
+ * les sert.
  *
  * Typé depuis le schéma, et non par `api/projects.ts` : ce module-là lit `import.meta.env`, que
  * les tests, compilés sans les types de Vite (`tsconfig.node.json`), ne connaissent pas.
@@ -43,9 +43,6 @@ const MAX_ROTATION = 3
 
 /** Le décalage d'une carte au plus sur chaque axe, en px, de part et d'autre de 0 (spec §4.1). */
 const MAX_OFFSET = 6
-
-/** L'inclinaison d'une carte au plus sur chaque axe, en degrés, de part et d'autre de 0 (spec §4.1). */
-const MAX_TILT = 6
 
 /** Le nombre de pas d'un écart, entre ses deux bornes comprises (prototype retenu). */
 const JITTER_STEPS = 1000
@@ -262,28 +259,4 @@ export function coverSizes(size: CardSize): string {
 export function cardColumns(lefts: readonly number[], step: number): number[] {
   const first = Math.min(...lefts)
   return lefts.map((left) => Math.round((left - first) / step))
-}
-
-/** La position d'un point sur une longueur, de −1 à 1 depuis son milieu, bornée à ses extrémités. */
-function fromMiddle(offset: number, length: number): number {
-  return Math.max(-1, Math.min(1, (2 * offset) / length - 1))
-}
-
-/**
- * L'inclinaison d'une carte sous le pointeur (spec §4.1) : +6° sur chaque axe au coin haut droit de
- * la cellule, 0° en son centre. Le trombone et le post-it débordent de la cellule : un pointeur posé
- * sur eux reste borné à ±6°.
- *
- * @param pointer La position du pointeur, en px depuis la fenêtre.
- * @param cell La boîte de la cellule, immobile sous la carte qui bouge.
- * @returns Les rotations `rotateX` et `rotateY`, en degrés.
- */
-export function cardTilt(
-  { clientX, clientY }: { clientX: number; clientY: number },
-  { left, top, width, height }: { left: number; top: number; width: number; height: number },
-): { rotateX: number; rotateY: number } {
-  return {
-    rotateX: -fromMiddle(clientY - top, height) * MAX_TILT,
-    rotateY: fromMiddle(clientX - left, width) * MAX_TILT,
-  }
 }
