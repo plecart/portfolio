@@ -19,13 +19,17 @@ WEB := apps/web
 WEB_INDEX := $(WEB)/dist/index.html
 
 # Les entrées de la compilation : ce qui change le contenu de `dist`. Ni les tests, ni `e2e`,
-# `smoke` ou `scripts` : les modifier ne recompile rien. `tree` rend chaque chemin existant de la
-# liste, puis tout ce qu'il contient — `wildcard` ne descend pas —, dossiers compris, datés de leur
-# dernier ajout ou retrait : un fichier retiré de `public/` recompile aussi. Les fichiers cachés
-# d'un dossier n'y figurent pas (`*`).
+# `smoke` ou `scripts` : les modifier ne recompile rien. Tailwind lit aussi `smoke` et `scripts`
+# (seuls `tests` et `e2e` sont exclus par `@source not` dans `src/index.css`) : une classe écrite
+# là seulement, que le site n'emploie pas, ne recompile pas — sans effet visible.
+#
+# `tree` rend chaque chemin existant de la liste, puis tout ce qu'il contient — `wildcard` ne
+# descend pas —, dossiers compris, datés de leur dernier ajout ou retrait : un fichier retiré de
+# `public/` recompile aussi. Les fichiers cachés d'un dossier n'y figurent pas (`*`).
 tree = $(foreach entry,$(1),$(entry) $(call tree,$(wildcard $(entry)/*)))
 WEB_INPUTS := $(call tree,$(wildcard $(addprefix $(WEB)/,src public index.html vite.config.ts \
-	package.json package-lock.json tsconfig*.json .env .env.production)))
+	package.json package-lock.json tsconfig.json tsconfig.base.json tsconfig.app.json \
+	tsconfig.node.json .env .env.production)))
 
 # `cd` plutôt que `npm --prefix` : mesuré, `--prefix` ne déplace pas le répertoire courant, et
 # les scripts du front résolvent leurs chemins depuis celui-ci. Le préfixe est nommé une fois :

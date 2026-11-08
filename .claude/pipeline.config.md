@@ -95,7 +95,8 @@ premier serait lue comme la bonne.
 **Infra (`infra/`)** — vérifiées le 2026-09-24 à la naissance d'`infra/` (#4), chacune lancée
 depuis la racine et rendant 0, la pile démarrée et regardée. Ces cibles demandent Docker, et
 `build` et `dev` le front installé (`make web-install`) : ils le compilent s'il manque ou si une
-entrée de sa compilation est plus récente que lui, les images le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node aussi.
+entrée de sa compilation est plus récente que lui, les images le copient (ADR 0014). La CI en fait
+un troisième job, qui installe donc Node aussi.
 - build        : make build                       # une image par dossier `infra/<service>/` (`api`,
                                                   # `backup`, `caddy`), front compilé s'il manque
                                                   # ou s'il est périmé ;
