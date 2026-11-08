@@ -11,7 +11,10 @@
 /** Une largeur et une hauteur, en px. */
 export type Size = { width: number; height: number }
 
-/** Un point de la zone d'image depuis son coin haut gauche, ou un déplacement ; en px. */
+/**
+ * Un point ou un déplacement, en px ; un point du zoom se compte depuis le coin haut gauche de la
+ * zone d'image.
+ */
 export type Point = { x: number; y: number }
 
 /** Une vue : le facteur, et la translation de l'image depuis sa position centrée, en px. */
