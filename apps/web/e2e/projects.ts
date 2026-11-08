@@ -50,7 +50,7 @@ const TECHNOLOGIES: Technology[] = (
   ] as const
 ).map(([name, kind]) => buildTechnology(name, kind))
 
-/** Une image carrée de 1600 px : prête, avec ses variantes ; en attente ou en échec, sans elles. */
+/** Une image carrée de 2400 px : prête, avec ses variantes ; en attente ou en échec, sans elles. */
 export function buildImage(
   slug: string,
   caption: string,
@@ -61,7 +61,7 @@ export function buildImage(
     width,
     height: width,
   }))
-  return { caption, width: 1600, height: 1600, state, variants: state === 'ready' ? variants : [] }
+  return { caption, width: 2400, height: 2400, state, variants: state === 'ready' ? variants : [] }
 }
 
 /** Les champs d'un projet en cours : sans date de fin, comme l'API le sert. */

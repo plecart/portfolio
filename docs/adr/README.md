@@ -33,7 +33,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0012](0012-deux-fichiers-compose.md) | Deux fichiers Compose, mêmes images | D54 (remplace le point « un seul fichier Compose » de 0002 et l'argument de 0005) | accepté ; `worker` parmi ce que la production porte en propre remplacé par 0016 |
 | [0013](0013-ordre-des-lignes-par-glisser-deposer.md) | Ordre des lignes de l'admin par glisser-déposer | D55 | accepté |
 | [0014](0014-ci-cd-github-actions-et-ghcr.md) | CI/CD : GitHub Actions et GHCR | D56 (confirme D43) | accepté ; point « Scan sur chaque PR » remplacé par 0017 |
-| [0015](0015-moteur-du-worker-celery.md) | Moteur du worker : Celery ; variantes par Pillow seul | D59 (remplace le point « `django-imagekit` » de 0001 et 0004, et la règle « outbox » de 0006 pour le worker d'images ; rôle 2 « broker » de 0006 avancé en phase 1) | accepté ; contexte « VPS de 4 Go » remplacé par 0023 |
+| [0015](0015-moteur-du-worker-celery.md) | Moteur du worker : Celery ; variantes par Pillow seul | D59 (remplace le point « `django-imagekit` » de 0001 et 0004, et la règle « outbox » de 0006 pour le worker d'images ; rôle 2 « broker » de 0006 avancé en phase 1) | accepté ; contexte « VPS de 4 Go » remplacé par 0023 ; point « échelle … dont les 1200 px plafonnent l'échelle » remplacé par 0028 |
 | [0016](0016-le-worker-dans-les-deux-fichiers-compose.md) | Le worker dans les deux fichiers Compose | D60 (remplace « le worker » parmi ce que la production porte en propre dans 0012 et D54) | accepté |
 | [0017](0017-jobs-de-la-ci-selon-le-delta.md) | Les jobs de la CI selon le delta d'une PR | D61 (remplace le point « Scan : Trivy, sur chaque PR » de 0014) | accepté ; points « Le passage en ready ne déclenche plus de run », « seule l'ouverture d'une draft le saute », « partent après `api`, même rouge » et « le scan Trivy tourne sur chaque PR qui touche un fichier hors du harnais » remplacés par 0019 ; point « la suite du back porte aussi les tests de la pipeline » remplacé par 0025 |
 | [0018](0018-binaires-go-compiles-par-le-projet.md) | Binaires Go compilés par le projet | D62 (exerce une condition de réexamen de 0014, sans le remplacer) | accepté |
@@ -44,8 +44,9 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0023](0023-vps-de-phase-1-a-2-go.md) | VPS de phase 1 : 1 vCPU et 2 Go au minimum | D68 (remplace le point « Machine » de 0002 pour la phase 1, son estimation, et le contexte « VPS de 4 Go » de 0015) | accepté |
 | [0024](0024-markdown-to-jsx-poids-et-html-brut.md) | `markdown-to-jsx` : poids mesuré et HTML brut désactivé | D51 (corrige deux énoncés de 0010) | accepté |
 | [0025](0025-tests-de-la-pipeline-avec-elle-sur-son-delta.md) | Les tests de la pipeline vivent avec elle et tournent sur son delta | D69 (remplace le point « la suite du back porte aussi les tests de la pipeline » de 0017) | accepté |
-| [0026](0026-schema-d-architecture-hors-ligne-et-playwright-python.md) | Le schéma d'architecture : rendu hors ligne, export par Playwright Python | D70 | accepté |
+| [0026](0026-schema-d-architecture-hors-ligne-et-playwright-python.md) | Le schéma d'architecture : rendu hors ligne, export par Playwright Python | D70 | accepté ; points « 1200 × 1200 px » et « facteur d'échelle 1 » remplacés par 0028 |
 | [0027](0027-remontee-d-erreurs-sentry-et-logs-structures.md) | Remontée d'erreurs Sentry et logs structurés | D71 | accepté |
+| [0028](0028-couverture-et-schema-a-2400-px.md) | La couverture et le schéma d'architecture à 2400 px de côté | D72 (remplace le point « échelle … 1200 px plafonnent » de 0015, les points « 1200 × 1200 px » et « facteur d'échelle 1 » de 0026, et le point du côté de D70) | accepté |
 
 ## À écrire à leur phase
 

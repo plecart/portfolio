@@ -10,7 +10,7 @@ import pytest
 from content import tasks
 from content.models import GalleryImage, ProcessingState, Project, Variant
 from content.tasks import process_image
-from content.variants import make_variants
+from content.variants import VARIANT_WIDTHS, make_variants
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage, Storage, default_storage
 from django.db import DatabaseError, transaction
@@ -21,8 +21,9 @@ from kombu.exceptions import OperationalError
 from PIL import UnidentifiedImageError
 from pytest_django import DjangoCaptureOnCommitCallbacks
 
-# Les largeurs des variantes d'un carré de 1200 px, l'image de la fabrique (décision 6).
-SQUARE_WIDTHS = [320, 480, 720, 960, 1200]
+# Les largeurs des variantes de l'image de la fabrique, un carré de `COVER_MIN_SIDE` px : chaque
+# barreau de l'échelle (décision 6), que `test_variants.py` éprouve.
+SQUARE_WIDTHS = list(VARIANT_WIDTHS)
 
 
 @pytest.fixture

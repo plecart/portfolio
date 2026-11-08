@@ -1,6 +1,6 @@
 ---
 name: schema-architecture
-description: "Produit le schéma d'architecture d'un projet en image PNG carrée de 1200 × 1200 px, pour la galerie de sa fiche — lire le projet (Compose, infra, CI, configuration), faire valider par le mainteneur la liste des sections, cartes et liens, l'écrire en `docs/schema/architecture.json`, la dessiner avec le rendu du skill, puis exporter l'image et la montrer. À utiliser dans le dépôt du projet quand l'utilisateur demande son schéma d'architecture ou l'image de ce schéma — « fais le schéma d'architecture », « dessine l'architecture du projet », « image du schéma pour la fiche », « régénère le schéma d'architecture »."
+description: "Produit le schéma d'architecture d'un projet en image PNG carrée de 2400 × 2400 px — une fenêtre de 1200 au facteur d'échelle 2 —, pour la galerie de sa fiche — lire le projet (Compose, infra, CI, configuration), faire valider par le mainteneur la liste des sections, cartes et liens, l'écrire en `docs/schema/architecture.json`, la dessiner avec le rendu du skill, puis exporter l'image et la montrer. À utiliser dans le dépôt du projet quand l'utilisateur demande son schéma d'architecture ou l'image de ce schéma — « fais le schéma d'architecture », « dessine l'architecture du projet », « image du schéma pour la fiche », « régénère le schéma d'architecture »."
 ---
 
 # Schéma d'architecture
@@ -71,11 +71,11 @@ Puis, depuis la racine du projet :
 python <répertoire de ce skill>/scripts/export.py
 ```
 
-Le script valide, assemble la page hors ligne, la capture et écrit l'image, 1200 × 1200 px quel
-que soit le zoom du poste ; ses sorties sont dans sa docstring. Montrer l'image au mainteneur, et
-la relire contre les règles de style : un écart se corrige dans la description (étapes 3 et 4),
-puis s'exporte de nouveau. L'auteur dépose ensuite l'image dans la galerie de la fiche, depuis
-l'admin.
+Le script valide, assemble la page hors ligne, la capture et écrit l'image, 2400 × 2400 px — la
+mise en page d'une fenêtre de 1200 × 1200 px au facteur d'échelle 2 —, quel que soit le zoom du
+poste ; ses sorties sont dans sa docstring. Montrer l'image au mainteneur, et la relire contre
+les règles de style : un écart se corrige dans la description (étapes 3 et 4), puis s'exporte
+de nouveau. L'auteur dépose ensuite l'image dans la galerie de la fiche, depuis l'admin.
 
 ## Les règles de style
 

@@ -23,7 +23,6 @@ from django.views.decorators.http import require_safe
 from content.cache import cached_response
 from content.models import Project
 from content.schemas import variant_url
-from content.variants import VARIANT_WIDTHS
 
 # Les deux marqueurs du bloc d'aperçu, chacun une fois dans le gabarit compilé
 # (`docs/frontend-outillage.md` §2.4) : la vue remplace ce qui est entre eux, et les garde.
@@ -33,9 +32,9 @@ END = b"<!--meta:end-->"
 # Le gabarit est en UTF-8, et la page en reprend les octets tels quels.
 CONTENT_TYPE = "text/html; charset=utf-8"
 
-# La largeur de la variante de l'`og:image` : le dernier barreau de l'échelle, 1200 px (spec §1.11,
-# ADR 0011).
-OG_IMAGE_WIDTH = VARIANT_WIDTHS[-1]
+# La largeur de la variante de l'`og:image`, 1200 px (spec §1.11, ADR 0011) : un barreau de
+# l'échelle des variantes (`VARIANT_WIDTHS`), découplé du dernier (ADR 0028).
+OG_IMAGE_WIDTH = 1200
 
 
 class LinkPreviewTemplateError(RuntimeError):

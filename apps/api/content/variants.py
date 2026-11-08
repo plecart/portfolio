@@ -15,10 +15,11 @@ from PIL import Image, ImageOps
 from content.images import DECODERS
 from content.models import Variant
 
-# L'échelle des largeurs, en pixels, source unique (décision 6) : la photo de carte de 160 à
-# 480 px CSS (spec §4.1), la galerie jusqu'à 660 px (spec §3.2), chaque largeur doublée pour les
-# écrans denses, et l'aperçu de lien de 1200 px (spec §1.11, ADR 0011), qui plafonne tout.
-VARIANT_WIDTHS = (320, 480, 720, 960, 1200)
+# L'échelle des largeurs, en pixels, source unique (décision 6 ; ADR 0028) : chaque largeur CSS
+# doublée pour les écrans denses — la photo de carte de 160 à 480 px CSS (spec §4.1), la galerie
+# jusqu'à 660 px (spec §3.2), doublée en 1320 —, 2400 pour le plein écran (#243), et 1200 pour
+# l'aperçu de lien (spec §1.11, ADR 0011).
+VARIANT_WIDTHS = (320, 480, 720, 960, 1200, 1320, 2400)
 
 # Les modes d'un original dont le profil ICC décrit aussi ses variantes, RGB ou RGBA.
 RGB_MODES = ("RGB", "RGBA", "P")
@@ -36,7 +37,8 @@ def variant_widths(width: int) -> list[int]:
 
     Returns:
         Les largeurs, sans doublon. Exemples : 800 → `[320, 480, 720, 800]` ; 300 → `[300]` ;
-        1300 → l'échelle entière.
+        1300 → `[320, 480, 720, 960, 1200, 1300]` ;
+        2000 → `[320, 480, 720, 960, 1200, 1320, 2000]` ; 2400 → l'échelle entière.
     """
     widths = [rung for rung in VARIANT_WIDTHS if rung <= width]
     if width < VARIANT_WIDTHS[-1] and width not in widths:

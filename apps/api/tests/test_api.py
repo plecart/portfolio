@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import pytest
 from content.models import (
+    COVER_MIN_SIDE,
     ProcessingState,
     Project,
     ProjectStatus,
@@ -131,15 +132,15 @@ def test_la_liste_rend_un_projet_publie_dans_le_contrat(client: Client) -> None:
     assert listed_project.pop("gallery") == [
         {
             "caption": "La fiche d'un projet.",
-            "width": 1200,
-            "height": 1200,
+            "width": COVER_MIN_SIDE,
+            "height": COVER_MIN_SIDE,
             "state": "pending",
             "variants": [],
         },
         {
             "caption": "Le détail.",
-            "width": 1200,
-            "height": 1200,
+            "width": COVER_MIN_SIDE,
+            "height": COVER_MIN_SIDE,
             "state": "ready",
             "variants": [
                 {"url": "http://testserver/media/images/x/800.webp", "width": 800, "height": 800}
