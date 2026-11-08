@@ -1,8 +1,6 @@
 import { type MouseEvent, type PointerEvent, useRef } from 'react'
 import { swipeStep } from './project.ts'
-
-/** Un point de la fenêtre, en px. */
-type Point = { x: number; y: number }
+import type { Point } from './zoom.ts'
 
 /**
  * Le balayage d'un élément (spec §4.4), en événements de pointeur natifs : ni suivi du doigt, ni

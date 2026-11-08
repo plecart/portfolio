@@ -163,6 +163,21 @@ test.describe('à trois images', () => {
     await expect(expandButton(page)).toBeFocused()
   })
 
+  test('la fenêtre redimensionnée ramène la vue dans ses nouvelles bornes', async ({ page }) => {
+    await openViewer(page)
+    /** La borne de la translation horizontale à ×2 : le débord de l'image carrée, de chaque côté. */
+    const bound = async () => Math.max(0, (2 * (await sideOf(page)) - (await zoneOf(page)).width) / 2)
+    await page.keyboard.press('+')
+    for (const key of ['ArrowRight', 'ArrowRight', 'ArrowRight']) await page.keyboard.press(key)
+    expect(await transformOf(page)).toBe(`translate(${-(await bound())}px, 0px) scale(2)`)
+
+    // Moins haute, la zone rétrécit l'image : son débord diminue, et la vue le suit.
+    await page.setViewportSize({ width: page.viewportSize()!.width, height: 400 })
+
+    const shrunk = `translate(${-(await bound())}px, 0px) scale(2)`
+    await expect.poll(() => transformOf(page)).toBe(shrunk)
+  })
+
   test('← à ×1 change d’image en boucle ; ↑ et ↓ ne font rien', async ({ page }) => {
     await openViewer(page)
 
@@ -297,7 +312,7 @@ test.describe('les fermetures', () => {
     await expect(expandButton(page)).toBeFocused()
   })
 
-  test('un clic sur le fond ferme la couche ; un clic sur l’image la laisse ouverte', async ({
+  test('un clic sur le fond ferme la couche et rend le focus à « Agrandir l’image » ; un clic sur l’image la laisse ouverte', async ({
     page,
   }) => {
     await openViewer(page)
@@ -312,6 +327,7 @@ test.describe('les fermetures', () => {
     await page.mouse.click(background.x, background.y)
     await expect(viewer(page)).toHaveCount(0)
     await expect(panel(page)).toHaveAccessibleName('Fiche')
+    await expect(expandButton(page)).toBeFocused()
   })
 
   test('rouverte, la couche repart de ×1 sur l’image courante', async ({ page }) => {
@@ -335,15 +351,21 @@ test.describe('le retour du navigateur, couche ouverte', () => {
     await openViewer(page)
   })
 
-  test('ferme la couche avec la fiche, d’un seul pas : l’adresse est / et la couche déjà sortie', async ({
+  test('ferme la couche avec la fiche, d’un seul pas : l’adresse est / et la couche déjà sortie, sur l’image vue', async ({
     page,
   }) => {
+    await page.keyboard.press('ArrowLeft')
+    await expect(viewerCounter(page)).toHaveText('3 / 3')
     await freezeAnimations(page)
 
     await page.goBack()
 
     await expect(page).toHaveURL('/')
-    await expect(page.locator('.image-viewer')).toHaveAttribute('data-state', 'closed')
+    const leaving = page.locator('.image-viewer')
+    await expect(leaving).toHaveAttribute('data-state', 'closed')
+    // La galerie revient à sa première image, la photo de la carte (spec §4.6) ; la couche qui
+    // s'efface garde la sienne.
+    await expect(leaving.locator('.project-gallery-counter')).toHaveText('3 / 3')
   })
 
   test('ne laisse ni fiche ni couche, le focus rendu à la carte', async ({ page }) => {

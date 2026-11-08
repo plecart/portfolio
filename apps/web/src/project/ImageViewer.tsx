@@ -56,7 +56,7 @@ type ViewerProps = {
  * poserait un `<style>` que la CSP de production bloque.
  *
  * @param images Les images prêtes de la galerie, une au moins.
- * @param index Le rang de l'image montrée, celui de la galerie.
+ * @param index Le rang de l'image montrée, celui que la galerie a choisi.
  * @param onStep Change l'image de la galerie, du pas reçu, en boucle.
  * @param onClose La fermeture par un clic sur le fond, hors de l'image ; Radix tient les autres.
  */

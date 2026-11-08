@@ -50,9 +50,10 @@ function useImageIndex(count: number, listening: boolean) {
  * que la piste met hors du cadre sont retirées de l'arbre d'accessibilité.
  *
  * Son image s'ouvre en plein écran (issue #243) par « Agrandir l'image », ou d'un clic qui n'est pas
- * un balayage : la couche, second dialogue imbriqué dans la fiche, partage son rang et le lui laisse
- * à la fermeture, où Radix rend le focus au bouton. Elle n'a pas d'entrée d'historique : elle se
- * ferme avec la fiche, au même rendu.
+ * un balayage, dès qu'une image est prête : la couche, second dialogue imbriqué dans la fiche,
+ * partage son rang et le lui laisse à la fermeture, où Radix rend le focus au bouton. Elle n'a pas
+ * d'entrée d'historique : elle se ferme avec la fiche, au même rendu, et montre pendant son fondu de
+ * sortie l'image choisie, quand la galerie revient à la première.
  *
  * @param gallery Les images du projet, prêtes ou non.
  * @param open La fiche est ouverte ; fermée, elle ferme la couche avec elle.
@@ -73,9 +74,9 @@ export function ProjectGallery({
   if (viewing && !open) setViewing(false)
   const { index: chosen, go, navigable } = useImageIndex(images.length, !viewing)
   const index = rewound ? 0 : chosen
-  const swipe = useSwipe(go)
-  const openOnClick = useClickWithoutSwipe(() => setViewing(true))
   const viewable = images.length > 0
+  const swipe = useSwipe(go)
+  const openOnClick = useClickWithoutSwipe(() => viewable && setViewing(true))
 
   return (
     <Dialog open={viewing} onOpenChange={setViewing}>
@@ -119,7 +120,7 @@ export function ProjectGallery({
         </div>
       </div>
       {viewable && (
-        <ImageViewer images={images} index={index} onStep={go} onClose={() => setViewing(false)} />
+        <ImageViewer images={images} index={chosen} onStep={go} onClose={() => setViewing(false)} />
       )}
     </Dialog>
   )
