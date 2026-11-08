@@ -47,13 +47,10 @@ COMPOSITE_ACTION_GLOB = ".github/actions/**/action.y*ml"
 USES = re.compile(r"^\s*(?:-\s+)?uses:\s*(?P<reference>\S+)(?P<comment>.*)$", re.MULTILINE)
 PINNED_REFERENCE = re.compile(r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}$")
 VERSION_COMMENT = re.compile(r"^ # v\d+\.\d+\.\d+$")
-# Une référence du dépôt, sans `@` : un workflow réutilisable, lu au commit même du workflow qui
-# l'appelle (doc GitHub « Reuse workflows », lue le 2026-10-29), ou une action locale de
-# `.github/actions/`, lue dans l'arbre que le job a extrait (doc GitHub « Find and customize
-# actions », lue le 2026-11-08) : épinglés par construction. Une action locale qui porterait ses
-# propres `uses` les cacherait à Dependabot : `test_aucune_action_composite_n_echappe_a_dependabot`
-# le refuse.
-LOCAL_REFERENCE = re.compile(r"^\./\.github/(?:workflows/[\w.-]+\.ya?ml|actions/[\w-]+)$")
+# Un workflow réutilisable du dépôt, sans `@` : il est lu au commit même du workflow qui l'appelle
+# (doc GitHub « Reuse workflows », lue le 2026-10-29), épinglé par construction. Une action locale
+# (`./.github/actions/…`) n'en est pas une : ses propres `uses` échappent à Dependabot.
+LOCAL_WORKFLOW = re.compile(r"^\./\.github/workflows/[\w.-]+\.ya?ml$")
 
 # Les écosystèmes que Dependabot surveille (brief de #5), chacun avec un fichier qu'il doit trouver
 # dans le dossier configuré.
@@ -309,8 +306,8 @@ def workflow_findings(text: str) -> list[str]:
     """Ce qui, dans un workflow, n'est pas une action épinglée par empreinte.
 
     Returns:
-        Un constat par `uses` non épinglé ou mal commenté — une référence du dépôt
-        (`LOCAL_REFERENCE`), sans commentaire, l'est par construction ; un constat si l'analyseur
+        Un constat par `uses` non épinglé ou mal commenté — un workflow réutilisable du dépôt
+        (`LOCAL_WORKFLOW`), sans commentaire, l'est par construction ; un constat si l'analyseur
         YAML et le motif ne lisent pas les mêmes références — une forme que le motif ne sait pas
         vérifier. Liste vide : tout est épinglé.
     """
@@ -324,7 +321,7 @@ def workflow_findings(text: str) -> list[str]:
         if not (
             PINNED_REFERENCE.match(match["reference"]) and VERSION_COMMENT.match(match["comment"])
         )
-        and not (LOCAL_REFERENCE.match(match["reference"]) and not match["comment"])
+        and not (LOCAL_WORKFLOW.match(match["reference"]) and not match["comment"])
     ]
 
 
@@ -586,14 +583,7 @@ WORKFLOW_FORMS = {
         "on: push\njobs:\n  a:\n    uses: ./.github/workflows/x.yml # v1.0.0\n",
         True,
     ),
-    "action locale": (workflow("      - uses: ./.github/actions/x\n"), False),
-    "action locale avec commentaire de version": (
-        workflow("      - uses: ./.github/actions/x # v1.0.0\n"),
-        True,
-    ),
-    # Hors de `.github/actions/`, que `COMPOSITE_ACTION_GLOB` repasse : ses `uses` y échapperaient.
-    "action locale hors de .github/actions": (workflow("      - uses: ./outils/x\n"), True),
-    "action locale qui en remonte": (workflow("      - uses: ./.github/actions/..\n"), True),
+    "action locale": (workflow("      - uses: ./.github/actions/x\n"), True),
     "workflow vide": ("", False),
     "clé uses sous le with: d'une action": pytest.param(
         workflow(PINNED_STEP + "        with:\n          uses: autre-chose\n"),
@@ -923,21 +913,14 @@ def test_chaque_action_est_epinglee_par_empreinte_de_commit() -> None:
 def test_aucune_action_composite_n_echappe_a_dependabot() -> None:
     """L'entrée `github-actions` ne lit que `.github/workflows/` et la racine du dépôt.
 
-    Un `uses` épinglé par empreinte dans une action composite de `.github/actions/` n'y serait
-    jamais mis à jour (`github_actions/file_fetcher.rb`, dependabot-core). Aucune n'en porte : la
-    première qui en porte un fait échouer ce test, le temps d'ajouter son dossier à l'entrée
-    Dependabot et à `WORKFLOW_GLOBS`.
+    Une action composite de `.github/actions/` épinglée par empreinte n'y serait jamais mise à
+    jour (`github_actions/file_fetcher.rb`, dependabot-core). Il n'en existe aucune : la première
+    qui arrive fait échouer ce test, le temps d'ajouter son dossier à l'entrée Dependabot et à
+    `WORKFLOW_GLOBS`.
     """
     composites = sorted(REPOSITORY_ROOT.glob(COMPOSITE_ACTION_GLOB))
-    escaping = {
-        path.parent.name: uses
-        for path in composites
-        if (uses := uses_values(yaml.safe_load(path.read_text(encoding="utf-8"))))
-    }
 
-    assert not escaping, (
-        f"{len(composites)} actions composites, `uses` hors de Dependabot : {escaping}"
-    )
+    assert not composites, f"actions composites hors de Dependabot : {composites}"
 
 
 def dependabot_updates() -> list[dict[str, Any]]:

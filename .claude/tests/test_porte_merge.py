@@ -8,7 +8,8 @@ lus, noms et conclusions réels (gh 2.94.0, relevé le 2026-10-29) ; son `GITHUB
 de fusion `009f459` qu'il a extraite, a pour parents `3e24919` puis la tête `8d0200c`
 (`gh api repos/{owner}/{repo}/commits/009f459…`, relevé le 2026-11-08), réduit au champ lu. Sa
 ligne de fusion est écrite ici sur la forme que fixe l'ADR 0029, aucun run réel ne l'ayant
-encore écrite ; le journal d'avant la fusion explicite est un extrait réel de
+encore écrite — le pas de `ci.yml` qui l'écrit est joué sur un dépôt témoin, et la porte lit sa
+ligne — ; le journal d'avant la fusion explicite est un extrait réel de
 `gh run view 40769309165 --log` — même relevé du 2026-10-29 : lignes 101, 109 à 111 et 128 du job
 Back, 613, 621 à 623 et 640 du job Infra. La conversation est celle de la PR #94
 (`gh pr view 94 --json body,comments,reviews`, relevée le 2026-10-29) : son commentaire, réduit à
@@ -17,12 +18,15 @@ relevé de chaque cas.
 """
 
 import copy
+import os
 import subprocess
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from command_doubles import (
     ABSENT,
     Reply,
@@ -33,7 +37,14 @@ from command_doubles import (
     stdout_lines,
     success,
 )
-from conftest import load_script, run_in_pipe
+from conftest import (
+    REPOSITORY_ROOT,
+    bash_de_ce_systeme,
+    git_temoin,
+    isole_git,
+    load_script,
+    run_in_pipe,
+)
 
 porte_merge = load_script("cycle-pr", "porte-merge")
 
@@ -416,6 +427,68 @@ def test_un_run_qui_n_a_pas_eprouve_la_tete_visee_refuse_le_merge_en_2(
     assert (
         f"le run {RUN} a éprouvé la tête {TETE}, pas la tête visée {AUTRE_TETE}"
         in sortie_d_echec(capsys, "refus")
+    )
+
+
+# Le pas qui écrit la ligne de fusion : celui du job `api` de `ci.yml`, que les autres jobs de la CI
+# reprennent (ADR 0029).
+CI_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
+PAS_DE_FUSION = "Fusion explicite du trunk"
+IDENTITE_GIT = (
+    "GIT_AUTHOR_NAME",
+    "GIT_AUTHOR_EMAIL",
+    "GIT_COMMITTER_NAME",
+    "GIT_COMMITTER_EMAIL",
+    "EMAIL",
+)
+
+
+def pas_de_fusion() -> dict[str, Any]:
+    """Le pas de fusion du job `api` de `ci.yml`, sous sa forme analysée."""
+    steps = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["api"]["steps"]
+    (pas,) = [pas for pas in steps if pas.get("name") == PAS_DE_FUSION]
+    return pas
+
+
+def test_la_ligne_qu_ecrit_le_pas_de_fusion_de_la_ci_est_celle_que_la_porte_lit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le contrat de l'émetteur à la porte. Le pas, joué sous le shell d'Actions (`shell: bash`,
+    `bash -eo pipefail`, doc GitHub « Workflow syntax ») dans un dépôt témoin — le trunk en
+    `refs/remotes/origin/main`, la tête extraite détachée, la configuration git du poste et son
+    identité écartées —, écrit une ligne que la porte trouve dans le journal du job, script recopié
+    compris, et dont elle rend le commit construit, la tête, le trunk et le `GITHUB_SHA` du run."""
+    isole_git(monkeypatch)
+    for nom in IDENTITE_GIT:
+        monkeypatch.delenv(nom, raising=False)
+    for args in (
+        ("init", "-b", "main"),
+        ("commit", "--allow-empty", "-m", "base"),
+        ("checkout", "-b", "pr"),
+        ("commit", "--allow-empty", "-m", "tête de la PR"),
+        ("checkout", "main"),
+        ("commit", "--allow-empty", "-m", "trunk"),
+        ("update-ref", "refs/remotes/origin/main", "main"),
+    ):
+        git_temoin(*args, cwd=tmp_path)
+    trunk, tete = git_temoin("rev-parse", "main", "pr", cwd=tmp_path).split()
+    git_temoin("checkout", "--detach", tete, cwd=tmp_path)
+    pas = pas_de_fusion()
+
+    joue = subprocess.run(
+        [bash_de_ce_systeme(), "-eo", "pipefail", "-c", pas["run"]],
+        cwd=tmp_path,
+        env={**os.environ, "TRUNK": "main", "HEAD_SHA": tete, "GITHUB_SHA": WORKFLOW},
+        capture_output=True,
+        check=False,
+    )
+
+    assert joue.returncode == 0, joue.stderr
+    textes = [*pas["run"].splitlines(), *(joue.stdout + joue.stderr).decode().splitlines()]
+    log = "".join(f"{BACK}\t{STEP}\t2026-11-08T09:00:00.0000000Z {texte}\n" for texte in textes)
+    construit = git_temoin("rev-parse", "HEAD", cwd=tmp_path).strip()
+    assert porte_merge.fusion(BACK, porte_merge.fusion_lines(log).get(BACK, []), tete) == (
+        porte_merge.Fusion(BACK, construit, trunk, WORKFLOW)
     )
 
 
