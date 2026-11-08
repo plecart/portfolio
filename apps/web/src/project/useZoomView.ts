@@ -30,17 +30,24 @@ function useSize(element: HTMLElement | null): Size | null {
  * @param natural La taille naturelle de l'image montrée, ou toute taille au même format.
  * @returns `shown`, la vue à rendre ; `box`, la taille de l'image à ×1, `null` avant la première
  *   mesure ; `glide`, la vue vient d'un pas — touche, double clic — qui glisse (spec §4.4), et non
- *   d'un geste que l'image suit ; `change`, `hold` et `reset`, qui la changent.
+ *   d'un geste que l'image suit ni d'un redimensionnement qui la borne ; `change`, `hold` et
+ *   `reset`, qui la changent.
  */
 export function useZoomView(zone: HTMLElement | null, natural: Size) {
   const size = useSize(zone)
-  const [{ view, glide }, setState] = useState({ view: FIT, held: FIT, glide: false })
+  // `glide` : la zone mesurée quand un pas qui glisse a changé la vue ; un redimensionnement la
+  // remplace, et la vue qu'il ramène dans ses bornes ne glisse pas.
+  const [{ view, glide }, setState] = useState<{ view: View; held: View; glide: Size | null }>({
+    view: FIT,
+    held: FIT,
+    glide: null,
+  })
   const stage: Stage | null = size && { zone: size, natural }
 
   return {
     shown: stage ? clampView(view, stage) : FIT,
     box: stage && containedSize(stage.zone, natural),
-    glide,
+    glide: glide !== null && glide === size,
     /**
      * Change la vue ; sans effet avant la première mesure. Chaque changement part du précédent,
      * même pas encore rendu : plusieurs pointeurs peuvent bouger entre deux rendus.
@@ -53,7 +60,7 @@ export function useZoomView(zone: HTMLElement | null, natural: Size) {
       setState((state) => ({
         ...state,
         view: next(clampView(state.view, stage), stage, state.held),
-        glide: glides,
+        glide: glides ? stage.zone : null,
       }))
     },
     /**
@@ -64,6 +71,6 @@ export function useZoomView(zone: HTMLElement | null, natural: Size) {
       if (stage) setState((state) => ({ ...state, held: clampView(state.view, stage) }))
     },
     /** Remet l'image entière, d'un coup : changer d'image la remplace à ×1 (décision 7). */
-    reset: () => setState({ view: FIT, held: FIT, glide: false }),
+    reset: () => setState({ view: FIT, held: FIT, glide: null }),
   }
 }

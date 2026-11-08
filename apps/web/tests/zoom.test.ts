@@ -8,6 +8,7 @@ import {
   containedSize,
   FIT,
   panBy,
+  snapToFit,
   stepZoom,
   toggleZoom,
   zoomAt,
@@ -152,4 +153,16 @@ describe('les touches + et −, d’une unité', () => {
       expect(stepZoom({ scale, x: 0, y: 0 }, step, SQUARE).scale).toBe(next)
     },
   )
+})
+
+describe('la fin d’un pincement ou d’une molette', () => {
+  test.each([1.02, 1.049])('à ×%s, l’image revient entière', (scale) => {
+    expect(snapToFit({ scale, x: 3, y: -2 })).toEqual(FIT)
+  })
+
+  test.each([1.05, 2])('à ×%s, la vue reste', (scale) => {
+    const view = { scale, x: 3, y: -2 }
+
+    expect(snapToFit(view)).toEqual(view)
+  })
 })

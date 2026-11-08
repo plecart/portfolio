@@ -7,7 +7,7 @@ import { PAPER_BUTTON, type readyImages } from './project.ts'
 import { useGestures } from './useGestures.ts'
 import { useZoomView } from './useZoomView.ts'
 import { keyCommand } from './viewerKeys.ts'
-import { MIN_SCALE, panBy, stepZoom, toggleZoom, zoomAt } from './zoom.ts'
+import { MIN_SCALE, panBy, snapToFit, stepZoom, toggleZoom, zoomAt } from './zoom.ts'
 
 /** Une image prête de la galerie : sa légende et ses sources. */
 type Image = ReturnType<typeof readyImages>[number]
@@ -49,12 +49,14 @@ export function ImageViewer(props: ViewerProps) {
  *
  * Le zoom (`useZoomView`) se commande de deux voies. Les gestes de la zone (`useGestures`) : le
  * double clic ou le double tape bascule de ×1 à ×2 au point visé, et revient à ×1 ; le glisser
- * déplace l'image ; molette et pincement zooment au point visé ; à ×1, un balayage du doigt change
- * d'image ; un toucher du fond ferme la couche. Le clavier, tenu par la couche qui retient le focus
- * (décision 6), suit `keyCommand` : + et − zooment d'une unité au centre de la zone ; à ×1, ← et →
- * changent d'image ; zoomé, ← → ↑ ↓ déplacent l'image. Le double clic et les touches glissent ;
- * l'image suit le reste sans retard. Échap et le bouton « Fermer l'image » la ferment seule aussi ;
- * le focus revient à « Agrandir l'image ».
+ * déplace l'image ; molette et pincement zooment au point visé, et s'achèvent à ×1 sous ×1,05
+ * (`snapToFit`) ; à ×1, un balayage du doigt ou du stylet change d'image ; un toucher du fond ferme
+ * la couche. Le clavier, tenu par la couche qui retient le focus (décision 6), suit `keyCommand` :
+ * + et − zooment d'une unité, au palier entier suivant ou précédent, au centre de la zone ; à ×1,
+ * ← et → changent d'image ; zoomé, ← → ↑ ↓ déplacent l'image. Le double clic et les touches
+ * glissent ; l'image suit le reste sans retard. Une touche, comme un changement d'image, rompt un
+ * double toucher commencé (`forgetTap`). Échap et le bouton « Fermer l'image » la ferment seule
+ * aussi ; le focus revient à « Agrandir l'image ».
  */
 function ViewerLayer({
   ref,
@@ -73,17 +75,19 @@ function ViewerLayer({
   const navigable = images.length > 1
 
   const step = (by: number) => {
+    forgetTap()
     reset()
     onStep(by)
   }
 
-  const gestures = useGestures(zone, {
+  const { listeners, forgetTap } = useGestures(zone, {
     onDrag: (delta) => change((view, stage) => panBy(view, delta, stage)),
     onZoom: (factor, point) =>
       change((view, stage) => zoomAt(view, view.scale * factor, point, stage)),
     onPinchStart: hold,
     onPinch: (factor, from, to) =>
       change((_, stage, held) => zoomAt(held, held.scale * factor, from, stage, to)),
+    onZoomEnd: () => change(snapToFit),
     onDoubleTap: (point) => change((view, stage) => toggleZoom(view, point, stage), true),
     onSwipe: (by) => {
       if (!zoomed) step(by)
@@ -103,6 +107,7 @@ function ViewerLayer({
         if (!command) return
         event.preventDefault()
         if ('step' in command) return step(command.step)
+        forgetTap()
         change(
           (view, stage) =>
             'pan' in command
@@ -123,7 +128,7 @@ function ViewerLayer({
         ref={setZone}
         className="image-viewer-zone"
         data-zoomed={zoomed || undefined}
-        {...gestures}
+        {...listeners}
       >
         <img
           key={index}

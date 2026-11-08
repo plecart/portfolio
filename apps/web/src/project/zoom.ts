@@ -34,6 +34,14 @@ export const FIT: View = { scale: MIN_SCALE, x: 0, y: 0 }
 const DOUBLE_TAP_SCALE = 2
 
 /**
+ * Le facteur sous lequel une vue revient à l'image entière, à la fin d'un pincement ou d'une
+ * molette : un pincement de 100 à 102 px laisserait ×1,02, que l'œil ne distingue pas de ×1, et la
+ * couche se croirait zoomée — le glisser déplacerait l'image, et ni ← → ni le balayage ne
+ * changeraient d'image. Un cran de molette de 100 px zoome de 15 %, au-dessus.
+ */
+const SNAP_SCALE = 1.05
+
+/**
  * L'écart sous lequel un facteur se tient sur son palier entier : cinq crans de molette depuis ×1
  * rendent 2,000…01, d'où − mènerait à ×2 au lieu de ×1.
  */
@@ -127,6 +135,16 @@ export function toggleZoom(view: View, point: Point, stage: Stage): View {
 export function stepZoom(view: View, step: number, stage: Stage): View {
   const from = step > 0 ? Math.floor(view.scale + ROUNDING) : Math.ceil(view.scale - ROUNDING)
   return zoomAt(view, from + step, centerOf(stage.zone), stage)
+}
+
+/**
+ * La vue à la fin d'un pincement ou d'une molette : sous ×1,05 (`SNAP_SCALE`), l'image entière.
+ *
+ * @param view La vue en place.
+ * @returns L'image entière, ou la même vue.
+ */
+export function snapToFit(view: View): View {
+  return view.scale < SNAP_SCALE ? FIT : view
 }
 
 /**

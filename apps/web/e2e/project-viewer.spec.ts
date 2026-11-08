@@ -19,6 +19,7 @@ import {
   gallery,
   openFromTable,
   openViewer,
+  outlastOpening,
   panel,
   transformOf,
   viewer,
@@ -312,6 +313,7 @@ test.describe('les fermetures', () => {
     await viewerImage(page).click()
     await expect(viewer(page)).toHaveAttribute('data-state', 'open')
 
+    await outlastOpening(page)
     await page.mouse.click(background.x, background.y)
     await expect(viewer(page)).toHaveCount(0)
     await expect(panel(page)).toHaveAccessibleName('Fiche')
