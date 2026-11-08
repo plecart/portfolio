@@ -6,7 +6,7 @@
 import { directionStep } from './project.ts'
 import type { Point } from './zoom.ts'
 
-/** Le pas d'un déplacement au clavier, en px (PR #250, H3). */
+/** Le pas d'un déplacement au clavier, en px (spec §4.4). */
 const PAN_STEP = 100
 
 /**
@@ -20,7 +20,7 @@ const PAN_KEYS = new Map<string, Point>([
   ['ArrowDown', { x: 0, y: -PAN_STEP }],
 ])
 
-/** Le pas de zoom de chaque touche, d'une unité (PR #250, H1). */
+/** Le pas de zoom de chaque touche, d'une unité (spec §4.4). */
 const ZOOM_KEYS = new Map([
   ['+', 1],
   ['-', -1],

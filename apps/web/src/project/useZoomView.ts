@@ -29,7 +29,7 @@ function useSize(element: HTMLElement | null): Size | null {
  * @param zone La zone d'image, `null` avant son montage.
  * @param natural La taille naturelle de l'image montrée, ou toute taille au même format.
  * @returns `shown`, la vue à rendre ; `box`, la taille de l'image à ×1, `null` avant la première
- *   mesure ; `glide`, la vue vient d'un pas — touche, double clic — qui glisse (PR #250, H4), et non
+ *   mesure ; `glide`, la vue vient d'un pas — touche, double clic — qui glisse (spec §4.4), et non
  *   d'un geste que l'image suit ; `change`, `hold` et `reset`, qui la changent.
  */
 export function useZoomView(zone: HTMLElement | null, natural: Size) {

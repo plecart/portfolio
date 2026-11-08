@@ -70,7 +70,7 @@ export function clampView({ scale, x, y }: View, stage: Stage): View {
   return { scale, x: limit(x, 'width'), y: limit(y, 'height') }
 }
 
-/** Le centre d'une zone : le point visé par un zoom à la touche (PR #250, H1). */
+/** Le centre d'une zone : le point visé par un zoom à la touche (spec §4.4). */
 export const centerOf = ({ width, height }: Size): Point => ({ x: width / 2, y: height / 2 })
 
 /**
