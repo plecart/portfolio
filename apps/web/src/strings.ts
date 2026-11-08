@@ -32,12 +32,10 @@ export const strings = {
   projectImages: 'Images du projet',
   previousImage: 'Image précédente',
   nextImage: 'Image suivante',
-  /** La couche plein écran de la galerie (issue #243) : son bouton d'ouverture, son nom, ses boutons. */
+  /** La couche plein écran de la galerie (issue #243) : son bouton d'ouverture, son nom, sa fermeture. */
   expandImage: 'Agrandir l’image',
   imageViewer: 'Image en plein écran',
   closeImage: 'Fermer l’image',
-  zoomOut: 'Zoom arrière',
-  zoomIn: 'Zoom avant',
   /** Les post-its de lien de la fiche (spec §7). */
   viewSite: 'Voir le site',
   viewRepository: 'Voir le dépôt',

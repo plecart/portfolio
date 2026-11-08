@@ -231,7 +231,7 @@
     max-width: none;
   }
 
-  /* Le zoom par bouton et par touche (PR #250, H4) ; la bascule d'une image à l'autre reste
+  /* Le zoom et le déplacement à la touche (PR #250, H4) ; la bascule d'une image à l'autre reste
      instantanée. */
   @media (prefers-reduced-motion: no-preference) {
     .image-viewer-image {
@@ -239,14 +239,14 @@
     }
   }
 
-  /* La barre, une rangée à elle (PR #250, H6) : 36 px de boutons et 8 px de marge ; la légende
-     prend la place qui reste, le zoom puis le compteur à droite. */
+  /* La barre, une rangée à elle sous la zone d'image (PR #250, H6), à 8 px de chaque bord : la
+     légende prend la place qui reste, le compteur à droite. */
   .image-viewer-bar {
     display: flex;
     flex: none;
     align-items: center;
     gap: var(--s-2);
-    padding: 0 var(--s-2) var(--s-2);
+    padding: var(--s-2);
     color: var(--ink-2);
     font-size: var(--fs-small);
 

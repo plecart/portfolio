@@ -70,7 +70,7 @@ export function clampView({ scale, x, y }: View, stage: Stage): View {
  *
  * @param view La vue en place.
  * @param scale Le facteur demandé, ramené de ×1 à ×4 : à sa borne, la vue ne change pas.
- * @param point Le point visé, dans la zone ; son centre pour un zoom par bouton ou par touche.
+ * @param point Le point visé, dans la zone ; son centre pour un zoom à la touche.
  * @param stage La zone et l'image.
  * @returns La nouvelle vue.
  */

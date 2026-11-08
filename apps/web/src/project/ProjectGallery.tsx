@@ -3,9 +3,9 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Project } from '../api/projects.ts'
 import { ExpandIcon } from '../chrome/icons.tsx'
 import { strings } from '../strings.ts'
-import { directionStep, GalleryArrows } from './GalleryArrows.tsx'
+import { GalleryArrows } from './GalleryArrows.tsx'
 import { ImageViewer } from './ImageViewer.tsx'
-import { GALLERY_SIZES, hasModifier, readyImages } from './project.ts'
+import { directionStep, GALLERY_SIZES, hasModifier, readyImages } from './project.ts'
 import { useClickWithoutSwipe, useSwipe } from './useSwipe.ts'
 
 /**
