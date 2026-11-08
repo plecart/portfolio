@@ -58,8 +58,11 @@ export function CloseIcon() {
   )
 }
 
-/** Une flèche de la galerie : 18 px (spec §4.4), trait de 1,8 comme au prototype. */
-function ChevronIcon({ path }: { path: string }) {
+/**
+ * Une icône de la galerie et de sa couche plein écran : 18 px, comme ses flèches (spec §4.4), trait
+ * de 1,8 comme au prototype.
+ */
+function GalleryIcon({ path }: { path: string }) {
   return (
     <StrokeIcon strokeWidth={1.8} className="size-[18px]">
       <path d={path} />
@@ -69,12 +72,27 @@ function ChevronIcon({ path }: { path: string }) {
 
 /** Chevron vers la gauche : l'image précédente. */
 export function ChevronLeftIcon() {
-  return <ChevronIcon path="M15 5l-7 7 7 7" />
+  return <GalleryIcon path="M15 5l-7 7 7 7" />
 }
 
 /** Chevron vers la droite : l'image suivante. */
 export function ChevronRightIcon() {
-  return <ChevronIcon path="M9 5l7 7-7 7" />
+  return <GalleryIcon path="M9 5l7 7-7 7" />
+}
+
+/** Deux flèches vers les coins : agrandir l'image en plein écran. */
+export function ExpandIcon() {
+  return <GalleryIcon path="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6" />
+}
+
+/** Plus : zoom avant. */
+export function ZoomInIcon() {
+  return <GalleryIcon path="M12 5v14M5 12h14" />
+}
+
+/** Moins : zoom arrière. */
+export function ZoomOutIcon() {
+  return <GalleryIcon path="M5 12h14" />
 }
 
 /** Lien externe : celle des post-its de la fiche, 14 px (spec §4.3). */

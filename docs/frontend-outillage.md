@@ -307,10 +307,19 @@ La palette sombre ne vit dans aucun sélecteur : chaque couleur porte ses deux v
 `light-dark()`, et `color-scheme` choisit — `light dark` par défaut, le mode de `data-theme` quand
 il est forcé. La minification de Vite 8.3 (Lightning CSS, cible « baseline widely available »)
 réécrit `light-dark()` en une bascule de variables `--lightningcss-light` / `--lightningcss-dark`,
-posée sur `:root` par `prefers-color-scheme` et par les deux règles `data-theme`. Même comportement
-tant que seul `:root` porte `color-scheme` : un `color-scheme` local ne rebascule pas les jetons
-dans le build, alors qu'il le fait en développement, où `light-dark()` reste natif (mesuré à la
-première relecture de #18) ; aucun composant ne branche sur le mode, les jetons portent la palette.
+qu'elle pose sur chaque règle qui déclare `color-scheme` (documentation de Lightning CSS,
+« Transpilation », § `light-dark()`, lue par context7 le 2026-11-08) : sur `:root`, par
+`prefers-color-scheme` et par les deux règles `data-theme`. Un jeton se résout là où il est
+déclaré, puis s'hérite résolu : un `color-scheme` local seul ne rebascule donc pas les jetons dans
+le build, alors qu'il le fait en développement, où `light-dark()` reste natif (mesuré à la première
+relecture de #18). D'où un second porteur de la palette depuis #243 : la couche plein écran de la
+galerie, sombre dans les deux modes, est marquée `data-scheme="dark"`, et `tokens.css` déclare les
+jetons qui changent avec le mode — couleurs et ombres — sur `:root, [data-scheme='dark']`, puis
+`color-scheme: dark` sur `[data-scheme='dark']`, sans recopier une valeur. Le build pose la bascule
+sombre sur le marqueur, où la palette se redéclare et se résout en sombre (mesuré le 2026-11-08 :
+`[data-scheme=dark]{--lightningcss-light: ;--lightningcss-dark:initial;color-scheme:dark}` dans
+`dist/assets/*.css`, et `e2e/project-viewer.spec.ts` lit le fond `#1C1A17` de la couche en mode
+clair forcé). Aucun composant ne branche sur le mode : les jetons portent la palette.
 La valeur brute d'un jeton lue depuis le JavaScript diffère aussi — `light-dark(…)` en
 développement, la couleur résolue dans le build : l'appliquer à une propriété et lire sa valeur
 calculée, comme le fait `e2e/tokens.spec.ts`.

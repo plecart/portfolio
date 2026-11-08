@@ -1,0 +1,502 @@
+/**
+ * La couche plein écran de la galerie (issue #243) : son ouverture, son clavier, son zoom par
+ * boutons et touches, ses fermetures, sa palette sombre et son fondu, aux deux largeurs. Les images
+ * des scénarios sont carrées : à ×1, l'image a pour côté le plus petit de la zone d'image — sa
+ * hauteur au bureau, sa largeur sur téléphone.
+ */
+import type { Page } from '@playwright/test'
+import { expect, test } from './api.ts'
+import { resolveAll, settle } from './css.ts'
+import {
+  arriveAt,
+  closeImageButton,
+  expandButton,
+  expectClosed,
+  expectNoViolations,
+  ficheProject,
+  freezeAnimations,
+  gallery,
+  openFromTable,
+  panel,
+  viewer,
+  watchAnimations,
+  watchCspViolations,
+} from './project.ts'
+import { buildImage } from './projects.ts'
+import { cards, serveUnderCsp, watchTransitions } from './table.ts'
+
+const CAPTIONS = ['Écran d’accueil', 'Détail de l’interface', 'Vue d’ensemble']
+const THREE_IMAGES = CAPTIONS.map((caption) => buildImage('fiche', caption))
+const ONE_IMAGE = [buildImage('fiche', CAPTIONS[0])]
+
+/** L'image de la couche, et ses commandes. */
+const viewerImage = (page: Page) => viewer(page).getByRole('img')
+const viewerButton = (page: Page, name: string) => viewer(page).getByRole('button', { name })
+const zoomIn = (page: Page) => viewerButton(page, 'Zoom avant')
+const zoomOut = (page: Page) => viewerButton(page, 'Zoom arrière')
+const viewerCaption = (page: Page) => viewer(page).locator('.project-gallery-caption')
+const viewerCounter = (page: Page) => viewer(page).locator('.project-gallery-counter')
+const galleryCounter = (page: Page) => gallery(page).locator('.project-gallery-counter')
+
+/** La transformation que la couche écrit sur son image : translation et facteur. */
+const transformOf = (page: Page) =>
+  viewerImage(page).evaluate((image: HTMLElement) => image.style.transform)
+
+/** La vue d'ouverture : l'image entière, centrée. */
+const FIT = 'translate(0px, 0px) scale(1)'
+
+/** Ouvre la couche par « Agrandir l’image », fondu d'entrée achevé. */
+async function openViewer(page: Page) {
+  await expandButton(page).click()
+  await expect(viewer(page)).toBeVisible()
+  await settle(page)
+}
+
+test.describe('l’ouverture', () => {
+  for (const [name, open] of [
+    ['« Agrandir l’image »', (page: Page) => expandButton(page).click()],
+    ['un clic sur l’image', (page: Page) => gallery(page).getByRole('img').click()],
+  ] as const) {
+    test(`${name} ouvre la couche sur l’image courante, le focus à « Fermer l’image »`, async ({
+      page,
+    }) => {
+      const warnings: string[] = []
+      page.on('console', (message) => {
+        if (['warning', 'error'].includes(message.type())) warnings.push(message.text())
+      })
+      await arriveAt(page, { gallery: THREE_IMAGES })
+
+      await open(page)
+
+      await expect(viewer(page)).toBeVisible()
+      await expect(viewer(page)).toHaveAttribute('aria-modal', 'true')
+      await expect(closeImageButton(page)).toBeFocused()
+      await expect(viewerImage(page)).toHaveAccessibleName(CAPTIONS[0])
+      await expect(viewerImage(page)).toHaveAttribute('sizes', '100vw')
+      await expect(viewerImage(page)).toHaveAttribute('srcset', /960w/)
+      await expect(viewerCaption(page)).toHaveText(CAPTIONS[0])
+      await expect(viewerCounter(page)).toHaveText('1 / 3')
+      await expect(viewerCounter(page)).toHaveAttribute('aria-live', 'polite')
+      expect(warnings).toEqual([])
+    })
+  }
+
+  test('la couche couvre la fenêtre ; l’image entière se centre dans la zone au-dessus de la barre', async ({
+    page,
+  }) => {
+    await arriveAt(page, { gallery: THREE_IMAGES })
+    await openViewer(page)
+    const { width, height } = page.viewportSize()!
+    // La barre : 36 px de boutons et 8 px de marge (PR #250, H6).
+    const zone = { width, height: height - 44 }
+    const side = Math.min(zone.width, zone.height)
+
+    expect(await viewer(page).boundingBox()).toEqual({ x: 0, y: 0, width, height })
+    expect(await viewerImage(page).boundingBox()).toEqual({
+      x: (zone.width - side) / 2,
+      y: (zone.height - side) / 2,
+      width: side,
+      height: side,
+    })
+    expect(await zoomIn(page).boundingBox()).toMatchObject({ y: height - 44, width: 36, height: 36 })
+    expect(await closeImageButton(page).boundingBox()).toEqual({
+      x: width - 44,
+      y: 8,
+      width: 36,
+      height: 36,
+    })
+    // Les flèches de §4.4 : à 8 px des bords de la fenêtre, centrées dans la zone d'image.
+    const middle = zone.height / 2 - 18
+    expect(await viewerButton(page, 'Image précédente').boundingBox()).toEqual({
+      x: 8,
+      y: middle,
+      width: 36,
+      height: 36,
+    })
+    expect(await viewerButton(page, 'Image suivante').boundingBox()).toEqual({
+      x: width - 44,
+      y: middle,
+      width: 36,
+      height: 36,
+    })
+  })
+})
+
+test.describe('à trois images', () => {
+  test.beforeEach(async ({ page }) => {
+    await arriveAt(page, { gallery: THREE_IMAGES })
+  })
+
+  test('→ à ×1 change d’image ; zoomé, → déplace l’image ; la galerie garde l’image vue, le focus à « Agrandir l’image »', async ({
+    page,
+  }) => {
+    await openViewer(page)
+
+    await page.keyboard.press('ArrowRight')
+    await expect(viewerCounter(page)).toHaveText('2 / 3')
+    await expect(viewerImage(page)).toHaveAccessibleName(CAPTIONS[1])
+
+    await page.keyboard.press('+')
+    expect(await transformOf(page)).toBe('translate(0px, 0px) scale(2)')
+
+    await page.keyboard.press('ArrowRight')
+    // 100 px vers la gauche, ou jusqu'au bord de l'image : l'image carrée, à ×2, dépasse la zone de
+    // 36 px de chaque côté au bureau (1 352 px pour 1 280), de 200 px sur téléphone.
+    const { width, height } = page.viewportSize()!
+    const side = Math.min(width, height - 44)
+    const pan = Math.min(100, (2 * side - width) / 2)
+    expect(await transformOf(page)).toBe(`translate(${-pan}px, 0px) scale(2)`)
+    await expect(viewerCounter(page)).toHaveText('2 / 3')
+
+    await page.keyboard.press('Escape')
+    await expect(viewer(page)).toHaveCount(0)
+    await expect(galleryCounter(page)).toHaveText('2 / 3')
+    await expect(expandButton(page)).toBeFocused()
+  })
+
+  test('← à ×1 change d’image en boucle ; ↑ et ↓ ne font rien', async ({ page }) => {
+    await openViewer(page)
+
+    await page.keyboard.press('ArrowLeft')
+    await expect(viewerCounter(page)).toHaveText('3 / 3')
+
+    await page.keyboard.press('ArrowUp')
+    await page.keyboard.press('ArrowDown')
+    await expect(viewerCounter(page)).toHaveText('3 / 3')
+    expect(await transformOf(page)).toBe(FIT)
+  })
+
+  test('les flèches à l’écran changent toujours d’image, en boucle, et remettent ×1', async ({
+    page,
+  }) => {
+    await openViewer(page)
+    await zoomIn(page).click()
+
+    await viewerButton(page, 'Image précédente').click()
+
+    await expect(viewerCounter(page)).toHaveText('3 / 3')
+    expect(await transformOf(page)).toBe(FIT)
+    await expect(zoomOut(page)).toBeDisabled()
+
+    await viewerButton(page, 'Image suivante').click()
+    await expect(viewerCounter(page)).toHaveText('1 / 3')
+  })
+
+  test('à ×4, « Zoom avant » est désactivé et + sans effet', async ({ page }) => {
+    await openViewer(page)
+
+    for (const scale of [2, 3, 4]) {
+      await page.keyboard.press('+')
+      expect(await transformOf(page)).toBe(`translate(0px, 0px) scale(${scale})`)
+    }
+    await expect(zoomIn(page)).toBeDisabled()
+    await expect(zoomOut(page)).toBeEnabled()
+
+    await page.keyboard.press('+')
+    expect(await transformOf(page)).toBe('translate(0px, 0px) scale(4)')
+  })
+
+  test('à ×1, « Zoom arrière » est désactivé et − sans effet', async ({ page }) => {
+    await openViewer(page)
+
+    await expect(zoomOut(page)).toBeDisabled()
+    await page.keyboard.press('-')
+    expect(await transformOf(page)).toBe(FIT)
+
+    await zoomIn(page).click()
+    await zoomOut(page).click()
+    expect(await transformOf(page)).toBe(FIT)
+    await expect(zoomOut(page)).toBeDisabled()
+  })
+
+  test('le bouton qui atteint sa borne passe le focus à l’autre : le clavier reste à la couche', async ({
+    page,
+  }) => {
+    await openViewer(page)
+
+    for (const scale of [2, 3, 4]) {
+      await zoomIn(page).click()
+      expect(await transformOf(page)).toBe(`translate(0px, 0px) scale(${scale})`)
+    }
+    await expect(zoomIn(page)).toBeDisabled()
+    await expect(zoomOut(page)).toBeFocused()
+    await page.keyboard.press('ArrowDown')
+    expect(await transformOf(page)).toBe('translate(0px, -100px) scale(4)')
+
+    for (const scale of [3, 2, 1]) {
+      await zoomOut(page).click()
+      expect(await transformOf(page)).toContain(`scale(${scale})`)
+    }
+    await expect(zoomOut(page)).toBeDisabled()
+    await expect(zoomIn(page)).toBeFocused()
+  })
+
+  for (const modifier of ['Control', 'Alt', 'Meta']) {
+    test(`${modifier} laisse +, − et les flèches au navigateur, à ×1 comme zoomé`, async ({
+      page,
+    }) => {
+      await openViewer(page)
+
+      for (const key of ['+', '-', 'ArrowRight']) await page.keyboard.press(`${modifier}+${key}`)
+      await expect(viewerCounter(page)).toHaveText('1 / 3')
+      expect(await transformOf(page)).toBe(FIT)
+
+      await page.keyboard.press('+')
+      for (const key of ['+', '-', 'ArrowDown']) await page.keyboard.press(`${modifier}+${key}`)
+      expect(await transformOf(page)).toBe('translate(0px, 0px) scale(2)')
+    })
+  }
+
+  test('Maj zoome avec + et − — le + s’obtient avec Maj sur certains claviers —, et laisse les flèches au navigateur', async ({
+    page,
+  }) => {
+    await openViewer(page)
+
+    await page.keyboard.press('Shift+ArrowRight')
+    await expect(viewerCounter(page)).toHaveText('1 / 3')
+
+    await page.keyboard.press('Shift++')
+    expect(await transformOf(page)).toBe('translate(0px, 0px) scale(2)')
+
+    await page.keyboard.press('Shift+ArrowDown')
+    expect(await transformOf(page)).toBe('translate(0px, 0px) scale(2)')
+
+    await page.keyboard.press('Shift+-')
+    expect(await transformOf(page)).toBe(FIT)
+  })
+})
+
+test.describe('les fermetures', () => {
+  test.beforeEach(async ({ page }) => {
+    await arriveAt(page, { gallery: THREE_IMAGES })
+  })
+
+  test('Échap ferme la couche seule ; un second Échap ferme la fiche', async ({ page }) => {
+    await openViewer(page)
+
+    await page.keyboard.press('Escape')
+
+    await expect(viewer(page)).toHaveCount(0)
+    await expect(panel(page)).toHaveAccessibleName('Fiche')
+    await expect(page).toHaveURL('/projets/fiche')
+
+    await page.keyboard.press('Escape')
+    await expectClosed(page)
+  })
+
+  test('« Fermer l’image » ferme la couche seule et rend le focus à « Agrandir l’image »', async ({
+    page,
+  }) => {
+    await openViewer(page)
+
+    await closeImageButton(page).click()
+
+    await expect(viewer(page)).toHaveCount(0)
+    await expect(panel(page)).toHaveAccessibleName('Fiche')
+    await expect(expandButton(page)).toBeFocused()
+  })
+
+  test('un clic sur le fond ferme la couche ; un clic sur l’image la laisse ouverte', async ({
+    page,
+  }) => {
+    await openViewer(page)
+    const image = (await viewerImage(page).boundingBox())!
+    // Hors de l'image, des flèches et de « Fermer l'image » : le coin haut gauche de la zone.
+    const background = { x: 60, y: 60 }
+    expect(background.x < image.x || background.y < image.y).toBe(true)
+
+    await viewerImage(page).click()
+    await expect(viewer(page)).toHaveAttribute('data-state', 'open')
+
+    await page.mouse.click(background.x, background.y)
+    await expect(viewer(page)).toHaveCount(0)
+    await expect(panel(page)).toHaveAccessibleName('Fiche')
+  })
+
+  test('rouverte, la couche repart de ×1 sur l’image courante', async ({ page }) => {
+    await openViewer(page)
+    await viewerButton(page, 'Image suivante').click()
+    await zoomIn(page).click()
+    await page.keyboard.press('Escape')
+    await expect(viewer(page)).toHaveCount(0)
+
+    await openViewer(page)
+
+    await expect(viewerCounter(page)).toHaveText('2 / 3')
+    expect(await transformOf(page)).toBe(FIT)
+  })
+})
+
+test.describe('le retour du navigateur, couche ouverte', () => {
+  /** La fiche ouverte depuis sa carte, qui a son entrée d'historique, puis sa couche. */
+  test.beforeEach(async ({ page }) => {
+    await openFromTable(page, [ficheProject({ gallery: THREE_IMAGES })])
+    await openViewer(page)
+  })
+
+  test('ferme la couche avec la fiche, d’un seul pas : l’adresse est / et la couche déjà sortie', async ({
+    page,
+  }) => {
+    await freezeAnimations(page)
+
+    await page.goBack()
+
+    await expect(page).toHaveURL('/')
+    await expect(page.locator('.image-viewer')).toHaveAttribute('data-state', 'closed')
+  })
+
+  test('ne laisse ni fiche ni couche, le focus rendu à la carte', async ({ page }) => {
+    await page.goBack()
+
+    await expect(viewer(page)).toHaveCount(0)
+    await expectClosed(page)
+    await expect(cards(page).first()).toBeFocused()
+  })
+})
+
+test('une image seule : ni flèches ni compteur, le zoom disponible', async ({ page }) => {
+  await arriveAt(page, { gallery: ONE_IMAGE })
+  await openViewer(page)
+
+  await expect(viewerButton(page, 'Image précédente')).toHaveCount(0)
+  await expect(viewerButton(page, 'Image suivante')).toHaveCount(0)
+  await expect(viewerCounter(page)).toHaveCount(0)
+  await expect(viewerCaption(page)).toHaveText(CAPTIONS[0])
+  await expect(zoomIn(page)).toBeEnabled()
+
+  await page.keyboard.press('ArrowRight')
+  await zoomIn(page).click()
+
+  expect(await transformOf(page)).toBe('translate(0px, 0px) scale(2)')
+})
+
+test('un toucher sur l’image ouvre la couche', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'tactile')
+  await arriveAt(page, { gallery: THREE_IMAGES })
+
+  await gallery(page).getByRole('img').tap()
+
+  await expect(viewer(page)).toBeVisible()
+})
+
+for (const mode of ['light', 'dark'] as const) {
+  test(`la couche prend la palette sombre, mode ${mode} forcé, sans violation d’axe`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: mode })
+    await arriveAt(page, { gallery: THREE_IMAGES })
+    await page.evaluate((forced) => (document.documentElement.dataset.theme = forced), mode)
+    await openViewer(page)
+    // Les valeurs sombres de §2.1, résolues comme le navigateur les sérialise.
+    const [bg, ink, ink2] = await resolveAll(page, [
+      ['color', '#1C1A17'],
+      ['color', '#EDE6DA'],
+      ['color', '#A69C8F'],
+    ])
+
+    expect(bg).toBe('rgb(28, 26, 23)')
+    await expect(viewer(page)).toHaveCSS('background-color', bg)
+    await expect(viewer(page)).toHaveCSS('color-scheme', 'dark')
+    await expect(viewerCaption(page)).toHaveCSS('color', ink2)
+    await expect(viewerCounter(page)).toHaveCSS('color', ink2)
+    for (const button of [closeImageButton(page), zoomIn(page)]) {
+      await expect(button).toHaveCSS('color', ink2)
+    }
+    await expect(viewerButton(page, 'Image suivante')).toHaveCSS('color', ink)
+    await expectNoViolations(page)
+  })
+}
+
+test.describe('« Agrandir l’image » et la loupe', () => {
+  for (const [count, images] of [
+    ['trois images', THREE_IMAGES],
+    ['une image', ONE_IMAGE],
+  ] as const) {
+    test(`à ${count} : 36 px, rond, à 8 px du coin bas droit du cadre, --paper à 88 %, --ink`, async ({
+      page,
+    }) => {
+      await arriveAt(page, { gallery: [...images] })
+      const frame = (await page.locator('.project-gallery-frame').boundingBox())!
+      const [paper, ink] = await resolveAll(page, [
+        ['background-color', 'color-mix(in srgb, var(--paper) 88%, transparent)'],
+        ['color', 'var(--ink)'],
+      ])
+
+      expect(await expandButton(page).boundingBox()).toEqual({
+        x: frame.x + frame.width - 44,
+        y: frame.y + frame.height - 44,
+        width: 36,
+        height: 36,
+      })
+      await expect(expandButton(page)).toHaveCSS('border-radius', '50%')
+      await expect(expandButton(page)).toHaveCSS('background-color', paper)
+      await expect(expandButton(page)).toHaveCSS('color', ink)
+      await expect(expandButton(page).locator('svg')).toHaveAttribute('aria-hidden', 'true')
+      expect(await expandButton(page).locator('svg').boundingBox()).toMatchObject({
+        width: 18,
+        height: 18,
+      })
+    })
+  }
+
+  test('le curseur est une loupe sur l’image de la galerie', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'pas de curseur au doigt')
+    await arriveAt(page, { gallery: THREE_IMAGES })
+
+    await expect(gallery(page).getByRole('img')).toHaveCSS('cursor', 'zoom-in')
+  })
+})
+
+test('le zoom glisse en 240 ms, par la courbe --ease-out ; changer d’image ne glisse pas', async ({
+  page,
+}) => {
+  await arriveAt(page, { gallery: THREE_IMAGES })
+  const [curve] = await resolveAll(page, [['transition-timing-function', 'var(--ease-out)']])
+  await openViewer(page)
+  const transitions = await watchTransitions(page)
+
+  await page.keyboard.press('+')
+  await settle(page)
+
+  expect(await transitions('image-viewer-image')).toEqual([
+    { layer: 'image-viewer-image', property: 'transform', duration: '0.24s' },
+  ])
+  await expect(viewerImage(page)).toHaveCSS('transition-timing-function', curve)
+
+  await viewerButton(page, 'Image suivante').click()
+  await settle(page)
+
+  expect(await transitions('image-viewer-image')).toHaveLength(1)
+  expect(await transformOf(page)).toBe(FIT)
+})
+
+test('sous la CSP de production, la couche s’ouvre, zoome et se ferme sans violation', async ({
+  page,
+}) => {
+  const violations = watchCspViolations(page)
+  await serveUnderCsp(page)
+  await openFromTable(page, [ficheProject({ gallery: THREE_IMAGES })])
+
+  await openViewer(page)
+  await page.keyboard.press('+')
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Escape')
+
+  await expect(viewer(page)).toHaveCount(0)
+  expect(violations).toEqual([])
+})
+
+test('ouverture et fermeture par fondu de 240 ms, par la courbe --ease-out', async ({ page }) => {
+  await arriveAt(page, { gallery: THREE_IMAGES })
+  const [curve] = await resolveAll(page, [['animation-timing-function', 'var(--ease-out)']])
+  const animations = await watchAnimations(page)
+
+  await openViewer(page)
+  await page.keyboard.press('Escape')
+  await expect(viewer(page)).toHaveCount(0)
+
+  expect(await animations()).toEqual([
+    { name: 'project-in', duration: '0.24s', curve },
+    { name: 'project-out', duration: '0.24s', curve },
+  ])
+})

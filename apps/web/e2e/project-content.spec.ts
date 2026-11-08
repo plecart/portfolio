@@ -9,6 +9,7 @@ import { resolveAll, rotationOf, settle } from './css.ts'
 import {
   arriveAt,
   closeButton,
+  expandButton,
   expectClosed,
   expectNoOverflow,
   expectNoViolations,
@@ -691,6 +692,9 @@ test.describe('le défilement', () => {
     await arriveAt(page, LONG)
     await expect(closeButton(page)).toBeFocused()
 
+    // La galerie de la fiche type a une image : « Agrandir l’image » passe avant la colonne.
+    await page.keyboard.press('Tab')
+    await expect(expandButton(page)).toBeFocused()
     await page.keyboard.press('Tab')
 
     await expect(readingColumn(page)).toBeFocused()
