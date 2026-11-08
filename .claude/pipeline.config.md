@@ -94,10 +94,11 @@ premier serait lue comme la bonne.
 
 **Infra (`infra/`)** — vérifiées le 2026-09-24 à la naissance d'`infra/` (#4), chacune lancée
 depuis la racine et rendant 0, la pile démarrée et regardée. Ces cibles demandent Docker, et
-`build` et `dev` le front installé (`make web-install`) : ils le compilent s'il manque, les images
-le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node aussi.
+`build` et `dev` le front installé (`make web-install`) : ils le compilent s'il manque ou si une
+entrée de sa compilation est plus récente que lui, les images le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node aussi.
 - build        : make build                       # une image par dossier `infra/<service>/` (`api`,
-                                                  # `backup`, `caddy`), front compilé s'il manque ;
+                                                  # `backup`, `caddy`), front compilé s'il manque
+                                                  # ou s'il est périmé ;
                                                   # sans publication ; vérifiée le 2026-10-04 (#23)
 - scan         : make scan                        # Trivy sur chaque image que `make build` a
                                                   # chargée : HIGH et CRITICAL bloquent, corrigeables
@@ -136,7 +137,8 @@ le copient (ADR 0014). La CI en fait un troisième job, qui installe donc Node a
                                                   # racine — et `infra/compose.yml`, avec le modèle
                                                   # `infra/prod.env.example` ; vérifiée le 2026-10-03 (#16)
 - run local    : make dev                         # pile Postgres + Redis + `api` + `worker`, ports sur
-                                                  # `127.0.0.1` ; front compilé s'il manque
+                                                  # `127.0.0.1` ; front compilé s'il manque ou
+                                                  # s'il est périmé
 - restauration : make restore HOST=<ip> BACKUP=<derniere|AAAAMMJJTHHMMSSZ>
                                                   # **production seulement**, du poste : copie
                                                   # `infra/restore.sh` sur le VPS et l'y lance, la clé

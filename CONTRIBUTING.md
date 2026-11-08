@@ -84,8 +84,8 @@ privé. Demande Docker, et le front installé (`make web-install`) : l'image `ap
 seulement.
 
 ```
-make dev                    # compile le front s'il manque, construit l'image `api` si besoin,
-                            # puis démarre la pile
+make dev                    # compile le front s'il manque ou s'il est périmé, construit
+                            # l'image `api` si besoin, puis démarre la pile
 ```
 
 `make dev` plutôt qu'un `docker compose` direct : la cible passe `--env-file infra/dev.env`, sans
