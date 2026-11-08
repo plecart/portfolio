@@ -61,8 +61,8 @@ ACCEPTED = [
 # Les formes d'un fichier qui n'est pas une image JPEG, PNG ou WebP — c'est le dénombrement qui
 # compte : un fichier qui n'est pas une image, des images d'autres formats sous une extension
 # admise, et un document SVG, qu'un `<img>` afficherait mais que le worker de #12 ne convertit pas.
-# Le BMP et le TIFF, non compressés, sont petits : au côté de la fabrique, leur poids dépasserait
-# la borne, jugée avant le format.
+# Le BMP et le TIFF, non compressés, s'y fabriquent à 300 px : au côté de la fabrique, leur poids
+# dépasserait la borne, jugée avant le format.
 NOT_ACCEPTED = [
     ("texte", SimpleUploadedFile("notes.png", b"Pas une image.")),
     ("GIF nommé .png", image_upload("image.png", image_format="GIF")),
