@@ -2,13 +2,18 @@
 
 Le script lit `gh` et `git` par une seule fonction, `run`, que ces tests remplacent par une forge
 témoin : elle ne répond qu'aux commandes complètes attendues, écrites en littéraux, jamais dérivées
-du script, et lève sur toute autre (`cycle-pr` 3.1). La trace est un extrait réel de
-`gh run view 40769309165 --log` — PR #185, gh 2.94.0, relevé le 2026-10-29 : lignes 101, 109 à 111
-et 128 du job Back, 613, 621 à 623 et 640 du job Infra — et ses jobs ceux de
-`gh run view 40769309165 --json status,headSha,jobs`, réduits aux champs lus, noms et conclusions
-réels. La conversation est celle de la PR #94 (`gh pr view 94 --json body,comments,reviews`,
-même date) : son commentaire, réduit à ses trois premières lignes et aux champs lus ; son body,
-écrit ici, ne porte que les lignes de relevé de chaque cas.
+du script, et lève sur toute autre (`cycle-pr` 3.1). Le run est le 40769309165 de la PR #185 :
+ses jobs sont ceux de `gh run view 40769309165 --json status,headSha,jobs`, réduits aux champs
+lus, noms et conclusions réels (gh 2.94.0, relevé le 2026-10-29) ; son `GITHUB_SHA`, la référence
+de fusion `009f459` qu'il a extraite, a pour parents `3e24919` puis la tête `8d0200c`
+(`gh api repos/{owner}/{repo}/commits/009f459…`, relevé le 2026-11-08), réduit au champ lu. Sa
+ligne de fusion est écrite ici sur la forme que fixe l'ADR 0029, aucun run réel ne l'ayant
+encore écrite ; le journal d'avant la fusion explicite est un extrait réel de
+`gh run view 40769309165 --log` — même relevé du 2026-10-29 : lignes 101, 109 à 111 et 128 du job
+Back, 613, 621 à 623 et 640 du job Infra. La conversation est celle de la PR #94
+(`gh pr view 94 --json body,comments,reviews`, relevée le 2026-10-29) : son commentaire, réduit à
+ses trois premières lignes et aux champs lus ; son body, écrit ici, ne porte que les lignes de
+relevé de chaque cas.
 """
 
 import copy
@@ -37,20 +42,81 @@ TETE = "8d0200c26697fb8feeddb5c04b0962c9ab1527ed"
 # Une autre tête que celle du run — poussée après lui, celle que la porte passerait à
 # `--match-head-commit`.
 AUTRE_TETE = "f" * 40
-TRUNK_EXTRAIT = "3e249191535972bb22dd506ee71d56d9b2b08247"
+TRUNK_FUSIONNE = "3e249191535972bb22dd506ee71d56d9b2b08247"
 MAIN_AU_GO = "155b355b0ea3332b2f79d3e49291e4e3b1a653d1"
+# Le `GITHUB_SHA` du run, dont il a lu la définition du workflow, et un autre.
+WORKFLOW = "009f4593fbf06d8ebb28fff5b78b437131042629"
+AUTRE_WORKFLOW = "e" * 40
+# Le commit que chaque job construit : un SHA de test par job, deux fusions n'ayant pas la même date.
+COMMIT_BACK = "bac0" * 10
+COMMIT_INFRA = "1f4a" * 10
 BACK = "Back — audit, lint, format, types, tests"
 INFRA = "Infra — configuration Compose, images, tests des images, scan"
-CHECKOUT = "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+# Le step sous lequel le journal témoin range chaque ligne : la porte lit par job, quel que soit
+# son step.
+STEP = "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+WORKFLOWS_INCHANGES = "définition à jour, `.github/workflows/` inchangé jusqu'à origin/main"
+WORKFLOWS_CHANGES = (
+    "le trunk a changé `.github/workflows/` depuis le déclenchement : `gh run rerun` rejouerait"
+    " l'ancienne définition — relancer par fermeture-réouverture"
+)
 
 RUN_JSON = ("gh", "run", "view", RUN, "--json", "status,headSha,jobs")
 RUN_LOG = ("gh", "run", "view", RUN, "--log")
+COMMIT_JSON = (
+    "gh",
+    "api",
+    "repos/{owner}/{repo}/commits/009f4593fbf06d8ebb28fff5b78b437131042629",
+)
 REV_PARSE = ("git", "rev-parse", "--verify", "refs/remotes/origin/main")
 PR_VIEW = ("gh", "pr", "view", "94", "--json", "body,comments,reviews")
 
-# Les lignes du journal de chaque job, sans leurs deux premiers champs ; le checkout est la
+
+def diff_des_workflows(origin: str) -> tuple[str, ...]:
+    """`git diff` de `.github/workflows/`, du trunk du déclenchement à `origin`."""
+    return ("git", "diff", "--quiet", TRUNK_FUSIONNE, origin, "--", ".github/workflows/")
+
+
+# `git diff --quiet` sur des workflows changés : 1, sans rien écrire.
+DIFF_NON_VIDE = subprocess.CompletedProcess([], 1, stdout=b"", stderr=b"")
+
+# Le checkout de la tête, un commit nu — la forme que `git checkout <sha>` écrit —, que la porte ne
+# lit pas.
+COMMIT_NU = (
+    "2026-10-28T21:07:49.3773653Z HEAD is now at 8d0200c feat(pipeline): lit la trace du run"
+)
+
+
+def ligne_de_fusion(
+    commit: str, trunk: str = TRUNK_FUSIONNE, tete: str = TETE, workflow: str = WORKFLOW
+) -> str:
+    """La ligne de fusion d'un job, horodatée."""
+    return (
+        f"2026-10-28T21:07:52.1043722Z Fusion explicite : {commit} Merge {tete} into {trunk}"
+        f" (workflow {workflow})"
+    )
+
+
+# Les lignes du journal de chaque job, sans leurs deux premiers champs ; la ligne de fusion est la
 # dernière.
-TRACE_BACK = (
+TRACE_BACK = (COMMIT_NU, ligne_de_fusion(COMMIT_BACK))
+TRACE_INFRA = (COMMIT_NU, ligne_de_fusion(COMMIT_INFRA))
+# Après un `gh run rerun` sur `main` avancé : chaque job fusionne `155b355`.
+RELANCE_BACK = (COMMIT_NU, ligne_de_fusion(COMMIT_BACK, trunk=MAIN_AU_GO))
+RELANCE_INFRA = (COMMIT_NU, ligne_de_fusion(COMMIT_INFRA, trunk=MAIN_AU_GO))
+# Le checkout d'un run `push`, sans fusion : les deux lignes que relevait la docstring de la porte
+# (run 40934348730, le 2026-10-29), préfixe `[command]` et horodatages écrits ici.
+TRACE_PUSH = (
+    (
+        "2026-10-29T08:12:03.5512346Z [command]/usr/bin/git checkout --progress --force -B main"
+        " refs/remotes/origin/main"
+    ),
+    "2026-10-29T08:12:03.5871102Z Switched to a new branch 'main'",
+)
+
+# Le journal d'avant la fusion explicite, extrait réel : la ligne de checkout de la forge, la
+# dernière, et aucune ligne de fusion.
+TRACE_BACK_AVANT_249 = (
     (
         "2026-10-28T21:07:48.3485583Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags"
         " --prune --no-recurse-submodules --depth=2 origin"
@@ -67,7 +133,7 @@ TRACE_BACK = (
         " 8d0200c26697fb8feeddb5c04b0962c9ab1527ed into 3e249191535972bb22dd506ee71d56d9b2b08247"
     ),
 )
-TRACE_INFRA = (
+TRACE_INFRA_AVANT_249 = (
     (
         "2026-10-28T21:11:29.3280419Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags"
         " --prune --no-recurse-submodules --depth=1 origin"
@@ -89,7 +155,7 @@ TRACE_INFRA = (
 def journal(back: Sequence[str] = TRACE_BACK, infra: Sequence[str] = TRACE_INFRA) -> bytes:
     """La sortie de `gh run view --log` : une ligne `<job>\\t<step>\\t<texte>` par texte."""
     lignes = [(BACK, texte) for texte in back] + [(INFRA, texte) for texte in infra]
-    return "".join(f"{job}\t{CHECKOUT}\t{texte}\n" for job, texte in lignes).encode()
+    return "".join(f"{job}\t{STEP}\t{texte}\n" for job, texte in lignes).encode()
 
 
 def jobs_du_run() -> dict[str, Any]:
@@ -129,16 +195,27 @@ class Forge:
         return reponse
 
 
+def commit_du_workflow() -> dict[str, Any]:
+    """`gh api repos/{owner}/{repo}/commits/009f459…`, réduit au champ lu : ses parents, le trunk
+    du déclenchement puis la tête."""
+    return {"parents": [{"sha": TRUNK_FUSIONNE}, {"sha": TETE}]}
+
+
 def forge_du_run(
     jobs: Reply | None = None,
     log: Reply | None = None,
+    commit: Reply | None = None,
     git: Reply | None = None,
+    diff: Reply | None = None,
     origin: str = MAIN_AU_GO,
 ) -> Forge:
-    """La forge du run 40769309165, `origin/main` à `origin` ; une réponse donnée — `jobs`, `log`,
-    ou `git` pour `git rev-parse` — remplace la réponse réelle."""
+    """La forge du run 40769309165, `origin/main` à `origin`, `.github/workflows/` inchangé depuis
+    le déclenchement ; une réponse donnée — `jobs`, `log`, `commit` pour `gh api …/commits`, `git`
+    pour `git rev-parse`, `diff` pour `git diff` — remplace la réponse témoin."""
     return Forge(
         {
+            COMMIT_JSON: json_success(commit_du_workflow()) if commit is None else commit,
+            diff_des_workflows(origin): success(b"") if diff is None else diff,
             RUN_JSON: json_success(jobs_du_run()) if jobs is None else jobs,
             RUN_LOG: success(journal()) if log is None else log,
             REV_PARSE: success(f"{origin}\n".encode()) if git is None else git,
@@ -157,47 +234,76 @@ TRUNK = ("trunk", RUN, "main", TETE)
 
 @pytest.mark.parametrize(
     ("origin", "code", "fraicheur"),
-    [(MAIN_AU_GO, 1, "périmé"), (TRUNK_EXTRAIT, 0, "à jour")],
-    ids=["main-avance-a-155b355", "main-au-trunk-extrait"],
+    [(MAIN_AU_GO, 1, "périmé"), (TRUNK_FUSIONNE, 0, "à jour")],
+    ids=["main-avance-a-155b355", "main-au-trunk-fusionne"],
 )
-def test_la_trace_du_run_40769309165_rend_le_trunk_que_ses_jobs_ont_extrait(
+def test_la_ligne_de_fusion_rend_le_trunk_que_chaque_job_a_fusionne(
     origin: str, code: int, fraicheur: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """L'incident de la PR #185 : la référence relue avait pour parents `155b355` / `8d0200c`,
-    mais les deux jobs du run ont extrait `009f459`, fusion de `8d0200c` dans `3e24919`.
-    `155b355` n'a jamais été éprouvé : contre lui, la porte sort en 1 ; le témoin, `origin/main`
-    au trunk extrait, en 0."""
+    """L'incident de la PR #185 sous la fusion explicite : les deux jobs ont fusionné la tête
+    `8d0200c` à `3e24919`, puis `main` a avancé à `155b355`, que le run n'a jamais éprouvé : contre
+    lui, la porte sort en 1 ; le témoin, `origin/main` au trunk fusionné, en 0. La définition du
+    workflow est à jour dans les deux cas."""
     forge = forge_du_run(origin=origin)
 
     assert lance(forge, *TRUNK) == code
-    assert forge.appels == [RUN_JSON, RUN_LOG, REV_PARSE]
+    assert forge.appels == [RUN_JSON, RUN_LOG, COMMIT_JSON, REV_PARSE, diff_des_workflows(origin)]
     assert stdout_lines(capsys) == [
-        f"{BACK} : extrait 009f459, trunk {TRUNK_EXTRAIT} — {fraicheur}",
-        f"{INFRA} : extrait 009f459, trunk {TRUNK_EXTRAIT} — {fraicheur}",
+        f"{BACK} : extrait {COMMIT_BACK}, trunk {TRUNK_FUSIONNE} — {fraicheur}",
+        f"{INFRA} : extrait {COMMIT_INFRA}, trunk {TRUNK_FUSIONNE} — {fraicheur}",
+        f"workflow {WORKFLOW}, déclenché sur le trunk {TRUNK_FUSIONNE} : {WORKFLOWS_INCHANGES}",
         (
-            f"trunk éprouvé {TRUNK_EXTRAIT} — run {RUN}, extrait 009f459 : {fraicheur}"
-            f" (origin/main = {origin})"
+            f"trunk éprouvé {TRUNK_FUSIONNE} — run {RUN}, extrait {COMMIT_BACK}, {COMMIT_INFRA},"
+            f" workflow {WORKFLOW} : {fraicheur} (origin/main = {origin})"
         ),
     ]
 
 
-def test_deux_jobs_aux_trunks_differents_rendent_le_run_perime(
+def test_un_seul_job_au_trunk_perime_rend_le_run_perime(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Un job à jour ne rattrape pas l'autre : le run n'a pas éprouvé un état combiné unique."""
-    autre_base = (
-        f"2026-10-28T21:11:30.0709772Z HEAD is now at 1a2b3c4 Merge {TETE} into {MAIN_AU_GO}"
-    )
-    infra = (*TRACE_INFRA[:-1], autre_base)
-    forge = forge_du_run(log=success(journal(infra=infra)))
+    """Chaque job fusionne le trunk de son propre démarrage : Infra, parti après le merge de
+    `155b355`, est à jour, Back non. Un job à jour ne rattrape pas l'autre : le run n'a pas éprouvé
+    un état combiné unique."""
+    forge = forge_du_run(log=success(journal(infra=RELANCE_INFRA)))
 
     assert lance(forge, *TRUNK) == 1
+    sortie = stdout_lines(capsys)
+    assert sortie[:2] == [
+        f"{BACK} : extrait {COMMIT_BACK}, trunk {TRUNK_FUSIONNE} — périmé",
+        f"{INFRA} : extrait {COMMIT_INFRA}, trunk {MAIN_AU_GO} — à jour",
+    ]
+    assert sortie[-1] == (
+        f"trunk éprouvé {TRUNK_FUSIONNE}, {MAIN_AU_GO} — run {RUN}, extrait {COMMIT_BACK},"
+        f" {COMMIT_INFRA}, workflow {WORKFLOW} : périmé (origin/main = {MAIN_AU_GO})"
+    )
+
+
+@pytest.mark.parametrize(
+    ("diff", "code", "definition", "fraicheur"),
+    [
+        (success(b""), 0, WORKFLOWS_INCHANGES, "à jour"),
+        (DIFF_NON_VIDE, 1, WORKFLOWS_CHANGES, "périmé"),
+    ],
+    ids=["workflows-inchanges", "workflows-changes-par-le-trunk"],
+)
+def test_un_run_relance_sur_le_trunk_courant_juge_aussi_sa_definition(
+    diff: Reply, code: int, definition: str, fraicheur: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Un `gh run rerun` refait la fusion sur `155b355`, mais garde le `GITHUB_SHA` du
+    déclenchement, donc la définition du workflow lue sur le trunk `3e24919` : si `main` a changé
+    `.github/workflows/` depuis, la porte sort en 1, chaque job pourtant à jour, et nomme la
+    fermeture-réouverture."""
+    forge = forge_du_run(log=success(journal(RELANCE_BACK, RELANCE_INFRA)), diff=diff)
+
+    assert lance(forge, *TRUNK) == code
     assert stdout_lines(capsys) == [
-        f"{BACK} : extrait 009f459, trunk {TRUNK_EXTRAIT} — périmé",
-        f"{INFRA} : extrait 1a2b3c4, trunk {MAIN_AU_GO} — à jour",
+        f"{BACK} : extrait {COMMIT_BACK}, trunk {MAIN_AU_GO} — à jour",
+        f"{INFRA} : extrait {COMMIT_INFRA}, trunk {MAIN_AU_GO} — à jour",
+        f"workflow {WORKFLOW}, déclenché sur le trunk {TRUNK_FUSIONNE} : {definition}",
         (
-            f"trunk éprouvé {TRUNK_EXTRAIT}, {MAIN_AU_GO} — run {RUN}, extrait 009f459, 1a2b3c4 :"
-            f" périmé (origin/main = {MAIN_AU_GO})"
+            f"trunk éprouvé {MAIN_AU_GO} — run {RUN}, extrait {COMMIT_BACK}, {COMMIT_INFRA},"
+            f" workflow {WORKFLOW} : {fraicheur} (origin/main = {MAIN_AU_GO})"
         ),
     ]
 
@@ -210,13 +316,16 @@ def sans_jobs_qui_tournent() -> dict[str, Any]:
     return run
 
 
-# Le checkout d'un commit nu, sans fusion : la forme que `git checkout <sha>` écrit.
-COMMIT_NU = (
-    "2026-10-28T21:07:49.3773653Z HEAD is now at 8d0200c feat(pipeline): lit la trace du run"
+# Le motif d'un job sans ligne de fusion.
+SANS_LIGNE = (
+    "aucune ligne `Fusion explicite : …` au journal — run d'un `push`, ou d'un workflow d'avant la"
+    " fusion explicite (ADR 0029)"
 )
-# Un checkout qui fusionne au trunk une autre tête que celle du run.
-CHECKOUT_AUTRE_TETE = (
-    f"2026-10-28T21:07:49.3773653Z HEAD is now at 1a2b3c4 Merge {AUTRE_TETE} into {TRUNK_EXTRAIT}"
+# La ligne que la fusion explicite écrivait avant de nommer son workflow (ADR 0029).
+SANS_WORKFLOW = ligne_de_fusion(COMMIT_BACK).removesuffix(f" (workflow {WORKFLOW})")
+# `git diff` sur un objet que le clone n'a pas.
+OBJET_INCONNU = subprocess.CompletedProcess(
+    [], 128, stdout=b"", stderr=f"fatal: bad object {TRUNK_FUSIONNE}".encode()
 )
 
 # Un cas par refus de `trunk` : chacun change une seule chose au run 40769309165, et la sortie doit
@@ -228,31 +337,59 @@ REFUS_TRUNK: dict[str, tuple[dict[str, Any], str]] = {
         "pas terminé (status in_progress)",
     ),
     "aucun-job-n-a-tourne": ({"jobs": json_success(sans_jobs_qui_tournent())}, "aucun job"),
-    "job-sans-checkout": (
+    "journal-d-un-push": (
+        {"log": success(journal(TRACE_PUSH, TRACE_PUSH))},
+        f"job « {BACK} » : {SANS_LIGNE}",
+    ),
+    "journal-d-avant-la-fusion-explicite": (
+        {"log": success(journal(TRACE_BACK_AVANT_249, TRACE_INFRA_AVANT_249))},
+        f"job « {BACK} » : {SANS_LIGNE}",
+    ),
+    "un-job-sans-ligne-de-fusion": (
         {"log": success(journal(infra=TRACE_INFRA[:-1]))},
-        f"job « {INFRA} » : 0 lignes",
+        f"job « {INFRA} » : {SANS_LIGNE}",
     ),
-    "job-a-deux-checkouts": (
+    "job-a-deux-lignes-de-fusion": (
         {"log": success(journal(back=(*TRACE_BACK, TRACE_BACK[-1])))},
-        f"job « {BACK} » : 2 lignes",
+        f"job « {BACK} » : 2 lignes `Fusion explicite : …` au journal, une attendue",
     ),
-    "checkout-d-un-commit-nu": (
-        {"log": success(journal(back=(*TRACE_BACK[:-1], COMMIT_NU)))},
-        "hors de la forme `Merge <tête> into <trunk>`",
+    "commit-abrege": (
+        {"log": success(journal(back=(COMMIT_NU, ligne_de_fusion(COMMIT_BACK[:7]))))},
+        f"job « {BACK} » : ligne hors de la forme",
     ),
-    "checkout-d-une-autre-tete-que-celle-du-run": (
-        {"log": success(journal(back=(*TRACE_BACK[:-1], CHECKOUT_AUTRE_TETE)))},
-        f"extrait la tête {AUTRE_TETE}, pas le headSha du run {TETE}",
+    "ligne-sans-workflow": (
+        {"log": success(journal(back=(COMMIT_NU, SANS_WORKFLOW)))},
+        f"job « {BACK} » : ligne hors de la forme",
+    ),
+    "fusion-d-une-autre-tete-que-celle-du-run": (
+        {"log": success(journal(back=(COMMIT_NU, ligne_de_fusion(COMMIT_BACK, tete=AUTRE_TETE))))},
+        f"a fusionné la tête {AUTRE_TETE}, pas le headSha du run {TETE}",
+    ),
+    "jobs-a-deux-workflows": (
+        {
+            "log": success(
+                journal(infra=(COMMIT_NU, ligne_de_fusion(COMMIT_INFRA, workflow=AUTRE_WORKFLOW)))
+            )
+        },
+        f"nomment plusieurs workflows : {WORKFLOW}, {AUTRE_WORKFLOW}",
     ),
     "jobs-hors-json": ({"jobs": success(b"<html>")}, "ne rend pas du JSON"),
     "gh-en-echec": ({"jobs": failure(b"HTTP 502")}, "a échoué (1) : HTTP 502"),
     "gh-absent": ({"jobs": FileNotFoundError("gh introuvable")}, "`gh` ne se lance pas"),
     "journal-en-echec": ({"log": failure(b"log not found")}, "a échoué (1) : log not found"),
+    "commit-du-workflow-en-echec": (
+        {"commit": failure(b"HTTP 422: No commit found for SHA")},
+        "a échoué (1) : HTTP 422: No commit found for SHA",
+    ),
     "git-en-echec": (
         {"git": failure(b"fatal: Needed a single revision")},
         "`git rev-parse --verify refs/remotes/origin/main` a échoué (1)",
     ),
     "git-absent": ({"git": FileNotFoundError("git introuvable")}, "`git` ne se lance pas"),
+    "diff-des-workflows-en-erreur": (
+        {"diff": OBJET_INCONNU},
+        f"a échoué (128) : fatal: bad object {TRUNK_FUSIONNE}",
+    ),
 }
 
 
@@ -469,6 +606,15 @@ CHAMPS_DU_RUN: dict[str, tuple[tuple[str | int, ...], Any]] = {
     "jobs.conclusion": (("jobs", 0, "conclusion"), ABSENT),
     "jobs-null": (("jobs",), None),
 }
+# `IndexError` aussi, par une liste vide ; et un parent qui n'est pas un SHA complet, qui entrerait
+# dans la commande `git diff`.
+CHAMPS_DU_COMMIT: dict[str, tuple[tuple[str | int, ...], Any]] = {
+    "parents": (("parents",), ABSENT),
+    "parents-vide": (("parents",), []),
+    "parents.sha": (("parents", 0, "sha"), ABSENT),
+    "parents.sha-null": (("parents", 0, "sha"), None),
+    "parents.sha-hors-forme": (("parents", 0, "sha"), "--output=workflows.diff"),
+}
 CHAMPS_DE_LA_PR: dict[str, tuple[tuple[str | int, ...], Any]] = {
     "body": (("body",), ABSENT),
     "comments": (("comments",), ABSENT),
@@ -491,6 +637,18 @@ def test_un_champ_lu_du_run_absent_ou_d_une_autre_forme_refuse_en_2(
     champ: tuple[str | int, ...], valeur: Any, capsys: pytest.CaptureFixture[str]
 ) -> None:
     forge = forge_du_run(jobs=json_success(altered(jobs_du_run(), champ, valeur)))
+
+    assert lance(forge, *TRUNK) == 2
+    assert "ne rend pas la forme attendue" in sortie_d_echec(capsys, "refus")
+
+
+@pytest.mark.parametrize(
+    ("champ", "valeur"), CHAMPS_DU_COMMIT.values(), ids=CHAMPS_DU_COMMIT.keys()
+)
+def test_un_champ_lu_du_commit_du_workflow_absent_ou_d_une_autre_forme_refuse_en_2(
+    champ: tuple[str | int, ...], valeur: Any, capsys: pytest.CaptureFixture[str]
+) -> None:
+    forge = forge_du_run(commit=json_success(altered(commit_du_workflow(), champ, valeur)))
 
     assert lance(forge, *TRUNK) == 2
     assert "ne rend pas la forme attendue" in sortie_d_echec(capsys, "refus")
@@ -591,9 +749,9 @@ def test_chaque_entree_tapee_est_liee_a_l_artefact_ou_le_dit(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """`<run>` lié à `<tête>` par le `headSha` ; `<tête>` complète, celle que la porte passe à
-    `--match-head-commit` ; `<base>` lié au trunk que chaque job a fusionné ; `<PR>` lié au
-    relevé de son propre body ; l'aide en 2. `--releve` sort en 0 sur une conversation changée :
-    c'est un mode, liée à rien à dessein, qui ne se chaîne jamais par `&&`."""
+    `--match-head-commit` ; `<base>` lié au trunk que chaque job a fusionné et à la définition du
+    workflow ; `<PR>` lié au relevé de son propre body ; l'aide en 2. `--releve` sort en 0 sur une
+    conversation changée : c'est un mode, liée à rien à dessein, qui ne se chaîne jamais par `&&`."""
     assert lance(forge, *appel) == code
     sortie = getattr(capsys.readouterr(), flux)
     assert texte in sortie, sortie
@@ -633,7 +791,7 @@ def test_le_releve_copie_dans_le_body_rend_la_conversation_inchangee(
 @pytest.mark.parametrize(
     ("args", "code", "flux", "texte"),
     [
-        (["--help"], 2, "stdout", "le trunk que le run a réellement extrait"),
+        (["--help"], 2, "stdout", "le trunk que le run a réellement fusionné"),
         (["trunk", "²", "main", TETE], 2, "stderr", "numéro attendu, pas '²'"),
     ],
     ids=["aide-sur-stdout", "usage-sur-stderr"],

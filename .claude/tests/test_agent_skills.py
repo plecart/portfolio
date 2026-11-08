@@ -2116,8 +2116,9 @@ CYCLE_PR = REPOSITORY_ROOT / CYCLE_PR_SKILL
 QUESTIONS_DU_GO = {
     "accord pour le vérificateur hors vague": "l'accord pour lancer soi-même",
     "accord pour la session de relecture": "l'accord pour démarrer sa session de relecture",
-    # D-1 de #197 : les relances de CI de la PR, couvertes d'avance, que l'Étape 7 renvoie au go.
-    "relances de CI couvertes par le go": "Le go couvre aussi les relances de CI de la PR",
+    # D-1 de #197 : les relances de CI de la PR, couvertes d'avance, que l'Étape 7 renvoie au go —
+    # depuis l'ADR 0029, d'abord par `gh run rerun`.
+    "relances de CI couvertes par le go": "relances de CI de la PR par `gh run rerun`",
 }
 
 
@@ -2145,6 +2146,13 @@ def test_chaque_renvoi_au_go_du_briefing_a_sa_question_dans_le_recueil() -> None
         "question(s) au recueil : une question renvoyée au go s'inscrit à QUESTIONS_DU_GO et se "
         "nomme à l'Étape 1 ; une mention qui n'est pas une question se reformule"
     )
+
+
+def test_cycle_pr_ne_proscrit_plus_le_gh_run_rerun() -> None:
+    """Depuis l'ADR 0029, un `gh run rerun` refait la fusion sur le trunk du moment : c'est la
+    relance d'un trunk avancé. L'ancienne proscription, restée au texte, ferait de nouveau fermer
+    puis rouvrir la PR à chaque avancée du trunk."""
+    assert "jamais un `gh run rerun`" not in texte_normalise(CYCLE_PR_SKILL).lower()
 
 
 # --- La session de relecture, une par PR (#134, lot 3) -------------------------------------------

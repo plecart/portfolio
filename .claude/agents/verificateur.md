@@ -64,20 +64,21 @@ Ce que tu vérifies, **dans cet ordre** — c'est un ordre de priorité, et tu t
    ligne). Lu avant le relevé, un élément arrivé entre les deux serait compté sans avoir été lu, et
    passerait la porte. Un commentaire de revue automatisée ou de répercussion encore ouvert est un
    critère que la PR n'a pas soldé.
-2. **La fraîcheur du trunk éprouvé**, et elle se date par ce que le run a réellement extrait.
-   `git fetch origin`, seul, puis la trace de checkout du dernier run `CI` de la tête de ton
+2. **La fraîcheur du trunk éprouvé**, et elle se date par ce que le run a réellement combiné.
+   `git fetch origin`, seul, puis la ligne de fusion des jobs du dernier run `CI` de la tête de ton
    verdict, `<SHA de tête vérifié>` — le plus récent par `createdAt` de
    `gh run list --commit <SHA de tête vérifié> --workflow CI --json databaseId,createdAt` :
    `python .claude/skills/cycle-pr/scripts/porte-merge.py trunk <run> <trunk> <SHA de tête vérifié>`.
-   Il sort en **0** si chaque job a combiné la tête à `origin/<trunk>`, en **1** sur un trunk
-   périmé, en **2** sur un refus ; sa dernière ligne donne les valeurs de la ligne « Base » du
-   verdict, qui garde la forme du gabarit. La
-   référence de fusion que porte la forge (`gh api …/git/ref/pull/<n>/merge` et ses parents) ne
-   prouve rien, relue avant ou après une relance : un run peut extraire une référence plus ancienne
-   que celle qu'elle porte (PR #185, run 40769309165 ; `cycle-pr` Étape 7, « Rejouer les
-   vérifications périmées », obs 83, 91, 110). Et GitHub ne la recalcule ni à chaque merge sur la
-   base ni au passage en ready : un run vert sur une référence périmée n'éprouve pas l'état
-   combiné, et rien ne le signale — ni le rollup, ni `mergeable`, ni le `head_sha` du run (obs 51).
+   Il sort en **0** si chaque job a combiné la tête à `origin/<trunk>` sous une définition du
+   workflow à jour, en **1** sur un trunk ou une définition périmés — une définition périmée se
+   relance par fermeture-réouverture, que sa sortie nomme, un trunk périmé par `gh run rerun` —,
+   en **2** sur un refus ; sa dernière ligne donne les
+   valeurs de la ligne « Base » du verdict, qui garde la forme du gabarit. Chaque job fusionne la
+   tête au trunk de son propre démarrage et l'écrit dans cette ligne (ADR 0029) : un run vert dont
+   un job a fusionné un trunk ancien n'éprouve pas l'état combiné, et rien d'autre ne le signale —
+   ni le rollup, ni `mergeable`, ni le `head_sha` du run (obs 51). La référence de fusion que porte
+   la forge (`gh api …/git/ref/pull/<n>/merge` et ses parents) n'en dit rien : les jobs ne
+   l'extraient plus (`cycle-pr` Étape 7, « Rejouer les vérifications périmées »).
    Puis l'absence de conflit, par un **prédicat** :
    `git merge-tree --write-tree origin/<trunk> <branche>` sort en **0** sans conflit et en **1**
    avec — mesuré le 2026-10-13, témoin de chaque côté, table `FRESHNESS_GATE_FORMS` de
@@ -112,7 +113,7 @@ Tu rends **un verdict structuré**, et rien d'autre — pas de récit, pas de r�
 Verdict PR #<n> — issue #<N>, base <sha de origin/<trunk>>, tête <SHA complet de tête>
 Critères   : <un par case du corps et du brief, ✅/❌/⚠️, avec sa preuve>
 Conversation : <k> commentaires et revues, dernier <horodatage | aucun>
-Base       : run <id>, extrait <court>, trunk <sha> (origin/<trunk> = <sha>) — à jour / périmée
+Base       : run <id>, extrait <commit>, workflow <sha>, trunk <sha> (origin/<trunk> = <sha>) — à jour / périmée
 Conflit    : aucun / <fichiers> (git merge-tree, code de sortie cité)
 decisions-vs-doc : aucun heurt / <fichier §n, rang r, les deux citations>
 Fichiers croisés : aucun / <fichier → branche>
