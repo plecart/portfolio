@@ -959,9 +959,9 @@ def pipeline_texts() -> dict[str, str]:
 # 4 (docstring, verdict vert), `init-projet/SKILL.md` 1 (« Conserver le garde `if:` »),
 # `CONTRIBUTING.md` 1 (« Deux choses qui surprennent au début »). Hors de la table, parce que
 # vrai : GitHub ne recalcule la référence de fusion « ni au passage en ready » (obs 51), dans
-# `cycle-pr` et `verificateur.md` ; et le rollup tout `SKIPPED` de `cycle-pr/scripts/merge-lot.py`,
-# « l'amorce vide d'une draft », exemple étroit d'une tête poussée en draft, dont le garde saute
-# encore chaque job.
+# `cycle-pr` (Étape 7, ce qui justifie l'ADR 0029) ; et le rollup tout `SKIPPED` de
+# `cycle-pr/scripts/merge-lot.py`, « l'amorce vide d'une draft », exemple étroit d'une tête poussée
+# en draft, dont le garde saute encore chaque job.
 CONTRARY_PROSE = {
     "CI à chaque push d'une draft": "draft comprise",
     "premier run au premier push de code": "au premier push de code",

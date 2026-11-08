@@ -74,11 +74,13 @@ le choix des commandes, qui reste à la session.
 
 ## Ce que couvre le go du briefing
 
-**Le go du briefing couvre les relances de CI de la PR**, par `gh pr close` puis `gh pr reopen`
-(`cycle-pr` Étapes 5 et 7) : la session ne redemande pas l'accord à chaque relance, et la trace de
-checkout du run garde la preuve (`<répertoire de ce skill>/scripts/porte-merge.py trunk`, Étape 7,
-« Rejouer les vérifications périmées »). **Après 3 relances de suite dont la trace donne un trunk
-périmé, la session redemande l'accord** avant la suivante. Ni commit vide ni force-push, inchangé.
+**Le go du briefing couvre les relances de CI de la PR** (`cycle-pr` Étapes 5 et 7) :
+`gh run rerun <run>`, run entier, quand le trunk a avancé ; `gh pr close` puis `gh pr reopen`
+quand la porte dit la définition du workflow périmée, ou qu'un événement s'est perdu. La session
+ne redemande pas l'accord à chaque relance, et la ligne de fusion des jobs du run garde la preuve
+(`<répertoire de ce skill>/scripts/porte-merge.py trunk`, Étape 7, « Rejouer les vérifications
+périmées »). **Après 3 relances de suite dont la porte sort en 1, la session redemande l'accord**
+avant la suivante. Ni commit vide ni force-push, inchangé.
 Il ne couvre **jamais** le go de merge, demandé à part (Étape 7, « Le go, puis le merge »). D-1 de
 #197 : à la vague 1, chaque relance de la PR #185 avait coûté un aller-retour d'accord.
 

@@ -1,4 +1,4 @@
-"""Porte de merge vers le trunk : le trunk que le run a réellement extrait, et la conversation de
+"""Porte de merge vers le trunk : le trunk que le run a réellement fusionné, et la conversation de
 la PR depuis le relevé du verdict d'avant-go.
 
 Usage :
@@ -27,9 +27,10 @@ juger. Depuis, 7 :
 - `trunk <tête>` : 40 hexadécimaux, la valeur même que la porte passe à `--match-head-commit` — ce
   dernier lien est à l'appelant, qui passe le même SHA à `trunk` puis à `gh pr merge` (`cycle-pr`
   Étape 7) ;
-- `trunk <base>` : `origin/<base>` doit égaler le trunk que chaque job a fusionné ; son nom n'est
-  pas confronté à la base de la PR, qu'aucun des 17 champs de `gh run view --json` ne rend
-  (gh 2.94.0, relevé le 2026-10-29) ;
+- `trunk <base>` : `origin/<base>` doit égaler le trunk que chaque job a fusionné, et n'avoir pas
+  changé `.github/workflows/` depuis le trunk du déclenchement ; son nom n'est pas confronté à la
+  base de la PR, qu'aucun des 17 champs de `gh run view --json` ne rend (gh 2.94.0, relevé le
+  2026-10-29) ;
 - `conversation <PR>` : le relevé se lit dans le body de cette même PR ;
 - `-h` de chaque sous-commande, comme du script : sort en 2 ;
 - `conversation --releve` : un mode, pas un verdict, qui sort en 0 sans juger — liée à rien, à
@@ -38,7 +39,8 @@ juger. Depuis, 7 :
 La table `ENTREES` d'`.claude/tests/test_porte_merge.py` tient un cas par entrée, et rougit
 quand l'usage d'une sous-commande en gagne une sans cas.
 
-**`trunk <run> <base> <tête>`** — le trunk que le run a extrait sur la tête visée. Il lit `gh run
+**`trunk <run> <base> <tête>`** — le trunk que chaque job a fusionné à la tête visée, et la
+définition du workflow que le run a jouée. Il lit `gh run
 view <run> --json status,headSha,jobs`, puis `gh run view <run> --log`, une ligne
 `<job>\\t<step>\\t<horodatage> <texte>` par ligne de journal — les 2 358 lignes du run 40769309165
 ont cette forme (relevé le 2026-10-29, gh 2.94.0) —, et `git rev-parse --verify
@@ -47,24 +49,41 @@ désignerait d'abord une étiquette ou une branche locale du même nom s'il en e
 (gitrevisions(7), « <refname> », git 2.47.1). Il refuse un run qui n'est pas `completed`, dont le
 `headSha` n'est pas `<tête>` — un run sur la tête A ne prouve rien d'un merge de la tête B, poussée
 depuis —, ou dont aucun job n'a tourné. Pour chaque job dont la conclusion n'est pas `skipped`, il
-cherche dans son journal la ligne de checkout, dont la forme est relevée sur le run 40769309165 de
-la PR #185 (job Back, ligne 128 du `--log`, le 2026-10-29) :
+cherche dans son journal la ligne de fusion, que chaque job d'un run de PR écrit après avoir
+fusionné la tête au trunk courant (ADR 0029) :
 
-    HEAD is now at 009f459 Merge 8d0200c26697fb8feeddb5c04b0962c9ab1527ed into 3e249191535972bb22dd506ee71d56d9b2b08247
+    Fusion explicite : <commit> Merge <tête> into <trunk> (workflow <sha>)
 
-— le commit extrait fusionne la tête de la PR au trunk, et son premier parent, le `<trunk>` du
-message, est le trunk éprouvé : `gh api repos/plecart/portfolio/commits/009f459…` rend les parents
-`3e24919…` puis `8d0200c…` (relevé le 2026-10-29). La ligne se cherche par job, quel que soit son
-step : `gh` range le journal entier d'un job sous `UNKNOWN STEP` quand il ne sait pas l'associer à
-ses steps (`erreurs-ci.py`, « Le journal entier d'un job »). Il refuse un job qui a tourné sans
-ligne `HEAD is now at`, ou avec plusieurs — un run `push` n'en écrit aucune, son checkout étant
-`git checkout --progress --force -B main refs/remotes/origin/main` puis `Switched to a new branch
-'main'` (run 40934348730, 0 ligne sur 5 982, relevé le 2026-10-29) ; un checkout d'une autre
-forme que `Merge … into …`, celui d'un commit nu ; une tête du message autre que le `headSha` du
-run. Sinon 0 si le trunk de chaque job égale `origin/<base>`, 1 sinon, trunks différents entre jobs
-compris. Il rend une ligne par job, `<job> : extrait <court>, trunk <sha> — à jour|périmé`, puis
-`trunk éprouvé <sha> — run <run>, extrait <court> : à jour|périmé (origin/<base> = <sha>)`, qui
-nomme chaque valeur distincte quand les jobs divergent.
+— quatre SHA complets : le commit construit ; son second parent, la tête de la PR ; son premier
+parent, le trunk fusionné, le **trunk éprouvé** ; le `GITHUB_SHA` du run, la référence de fusion
+que la forge a calculée au déclenchement, dont le run a lu la définition du workflow. Aucun run
+réel ne l'a encore écrite : sa forme est celle que fixe l'ADR 0029, non relevée. La ligne se
+cherche par job, quel que soit son step : `gh` range le journal entier d'un job sous
+`UNKNOWN STEP` quand il ne sait pas l'associer à ses steps (`erreurs-ci.py`, « Le journal entier
+d'un job ») ;
+l'horodatage ôté, le préfixe se teste sur le texte débarrassé de ses blancs. Il refuse un job qui a
+tourné sans ligne de fusion — run d'un `push`, qui ne fusionne rien, ou d'un workflow d'avant la
+fusion explicite, dont le journal ne porte que la ligne de checkout de la forge, `HEAD is now at
+<court> Merge <tête> into <trunk>` —, ou avec plusieurs ; une ligne d'une autre forme, un SHA
+abrégé compris ; une tête autre que le `headSha` du run ; des jobs qui nomment des workflows
+différents, quand un run n'a qu'un `GITHUB_SHA`.
+
+La définition se juge sur le trunk du déclenchement, le premier parent du workflow, lu par
+`gh api repos/{owner}/{repo}/commits/<sha>`, champ `parents` — pour `009f459`, la référence de
+fusion qu'a extraite le run 40769309165, le trunk `3e24919…` puis la tête `8d0200c…` (relevé le
+2026-11-08, gh 2.94.0) —, puis par `git diff --quiet <ce parent> <origin/<base>> --
+.github/workflows/` : 0 sans changement, 1 avec, 128 sur un objet inconnu, un autre code que 0 ou 1
+refusé (mesuré le 2026-11-08, git 2.47.1 ; ni `diff.external` ni un pilote de diff ne changent ce
+code). Un `gh run rerun` garde le `GITHUB_SHA` du déclenchement, donc sa définition (doc GitHub
+« Re-running workflows and jobs » et « Workflows », lues le 2026-11-08) : si le trunk a changé
+`.github/workflows/` depuis, la sortie 1 nomme la fermeture-réouverture comme relance.
+
+Sortie 0 si le trunk de chaque job égale `origin/<base>` et si la définition est à jour, 1 sinon,
+trunks différents entre jobs compris — chaque job fusionne le trunk de son propre démarrage. Il
+rend une ligne par job, `<job> : extrait <commit>, trunk <sha> — à jour|périmé`, une ligne de la
+définition, `workflow <sha>, déclenché sur le trunk <sha> : <à jour, ou la relance à faire>`, puis
+`trunk éprouvé <sha> — run <run>, extrait <commit>, workflow <sha> : à jour|périmé
+(origin/<base> = <sha>)`, qui nomme chaque valeur distincte quand les jobs divergent.
 
 **`conversation <PR> [--releve]`** — la conversation n'a pas bougé depuis le relevé. Il lit
 `gh pr view <PR> --json body,comments,reviews` et compte chaque commentaire, daté par `createdAt`,
@@ -101,10 +120,10 @@ entré dans `main`.
 
 **Ce qu'il ne prouve pas.** `trunk` ne relance rien, et ne récupère pas `origin/<base>` : il
 compare à la référence de suivi que le dernier `git fetch origin` a laissée, à lancer d'abord
-(`cycle-pr` Étape 7). Un `gh run rerun` réutilise le commit enregistré au déclenchement (obs 83) :
-il ne change pas ce que le run extrait. La référence de fusion que porte la forge, relue avant ou
-après une relance, ne dit pas ce que le run a extrait (`cycle-pr` Étape 7, « Rejouer les
-vérifications périmées », qui cite les runs mesurés). `conversation` ne juge pas ce que dit un
+(`cycle-pr` Étape 7). Un `gh run rerun` refait la fusion sur le trunk du moment (ADR 0029) ; que
+`gh run view <run> --log` et `--json jobs` rendent alors la **dernière tentative** du run relancé
+est **non vérifié**. De la définition du workflow, il ne compare au trunk courant que
+`.github/workflows/`. `conversation` ne juge pas ce que dit un
 commentaire — un écart renvoie à sa lecture —, ne lit d'un élément que sa date de création ou de
 soumission, si bien que l'édition d'un commentaire existant lui échappe, et ne prouve pas que le
 relevé a été pris à l'heure du verdict, seulement qu'il est inscrit.
@@ -119,7 +138,7 @@ import json
 import re
 import subprocess
 import sys
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Container, Iterable, Sequence
 from datetime import datetime
 from typing import Any, NamedTuple
 
@@ -131,11 +150,15 @@ Verdict = tuple[bool, list[str]]
 NUMBER = re.compile(r"[0-9]+")
 # La forme que la forge rend d'un `headSha`, et que `--match-head-commit` reçoit.
 FULL_SHA = re.compile(r"[0-9a-f]{40}")
-CHECKOUT = "HEAD is now at "
-# La ligne de checkout d'un run de PR (voir le module) : `<court> Merge <tête> into <trunk>`.
-MERGE_CHECKOUT = re.compile(
-    r"HEAD is now at ([0-9a-f]{4,40}) Merge ([0-9a-f]{40}) into ([0-9a-f]{40})"
+FUSION = "Fusion explicite : "
+# La ligne de fusion d'un job de PR (voir le module) : `<commit> Merge <tête> into <trunk>
+# (workflow <sha>)`, quatre SHA complets.
+FUSION_LINE = re.compile(
+    rf"{FUSION}({FULL_SHA.pattern}) Merge ({FULL_SHA.pattern}) into ({FULL_SHA.pattern})"
+    rf" \(workflow ({FULL_SHA.pattern})\)"
 )
+# Ce que la définition d'un run lit à son `GITHUB_SHA`, et qu'un `gh run rerun` rejoue tel quel.
+WORKFLOWS = ".github/workflows/"
 FRESHNESS = {True: "à jour", False: "périmé"}
 STAMP = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z")
 RECORD = "Conversation : "
@@ -151,12 +174,14 @@ class Refusal(Exception):
     est le motif, en une ligne."""
 
 
-class Checkout(NamedTuple):
-    """Ce qu'un job a extrait : le commit, abrégé comme la trace l'écrit, et son premier parent."""
+class Fusion(NamedTuple):
+    """Ce qu'un job a fusionné, lu sur sa ligne de fusion : le commit construit, son premier parent,
+    et le commit dont le run a lu la définition du workflow."""
 
     job: str
-    short: str
+    commit: str
     trunk: str
+    workflow: str
 
 
 class Element(NamedTuple):
@@ -175,21 +200,30 @@ def default_run(cmd: Sequence[str]) -> subprocess.CompletedProcess[bytes]:
     return subprocess.run(list(cmd), capture_output=True, check=False)
 
 
-def output(run: Run, *cmd: str) -> str:
-    """La sortie standard de `cmd`, décodée en UTF-8.
+def launch(run: Run, *cmd: str, codes: Container[int] = (0,)) -> subprocess.CompletedProcess[bytes]:
+    """`cmd`, lancé et sorti sur l'un des `codes`.
 
     Raises:
-        Refusal: la commande ne se lance pas, ou sort autrement qu'en 0 — sa sortie d'erreur fait
+        Refusal: la commande ne se lance pas, ou sort sur un autre code — sa sortie d'erreur fait
             le motif, ramenée à une ligne.
     """
     try:
         done = run(cmd)
     except OSError as error:
         raise Refusal(f"`{cmd[0]}` ne se lance pas : {error}") from error
-    if done.returncode != 0:
+    if done.returncode not in codes:
         motif = " ".join(done.stderr.decode("utf-8", "replace").split())
         raise Refusal(f"`{' '.join(cmd)}` a échoué ({done.returncode}) : {motif}")
-    return done.stdout.decode("utf-8", "replace")
+    return done
+
+
+def output(run: Run, *cmd: str) -> str:
+    """La sortie standard de `cmd`, décodée en UTF-8.
+
+    Raises:
+        Refusal: comme `launch`, la commande sortie autrement qu'en 0.
+    """
+    return launch(run, *cmd).stdout.decode("utf-8", "replace")
 
 
 def json_output(run: Run, *cmd: str) -> Any:
@@ -231,40 +265,100 @@ def read_run(run: Run, run_id: str) -> tuple[str, str, list[str]]:
         raise shape_refusal(cmd, error) from error
 
 
-def checkout_lines(log: str) -> dict[str, list[str]]:
-    """Les lignes `HEAD is now at` de `gh run view --log`, horodatage ôté, rangées par job."""
+def fusion_lines(log: str) -> dict[str, list[str]]:
+    """Les lignes de fusion de `gh run view --log`, horodatage ôté, rangées par job."""
     found: dict[str, list[str]] = {}
     for line in log.split("\n"):
         job, _, rest = line.partition("\t")
         text = rest.partition("\t")[2].partition(" ")[2].strip()
-        if text.startswith(CHECKOUT):
+        if text.startswith(FUSION):
             found.setdefault(job, []).append(text)
     return found
 
 
-def checkout(job: str, lines: Sequence[str], head: str) -> Checkout:
-    """Ce que `job` a extrait, lu sur sa ligne de checkout.
+def fusion(job: str, lines: Sequence[str], head: str) -> Fusion:
+    """Ce que `job` a fusionné, lu sur sa ligne de fusion.
 
     Raises:
-        Refusal: aucune ligne ou plusieurs, une ligne d'une autre forme que `Merge … into …`, ou
-            une tête fusionnée autre que `head`.
+        Refusal: aucune ligne ou plusieurs, une ligne d'une autre forme, ou une tête fusionnée
+            autre que `head`.
     """
-    if len(lines) != 1:
-        raise Refusal(f"job « {job} » : {len(lines)} lignes `{CHECKOUT}…` au journal, une attendue")
-    match = MERGE_CHECKOUT.fullmatch(lines[0])
+    if not lines:
+        raise Refusal(
+            f"job « {job} » : aucune ligne `{FUSION}…` au journal — run d'un `push`, ou d'un "
+            "workflow d'avant la fusion explicite (ADR 0029)"
+        )
+    if len(lines) > 1:
+        raise Refusal(f"job « {job} » : {len(lines)} lignes `{FUSION}…` au journal, une attendue")
+    match = FUSION_LINE.fullmatch(lines[0])
     if match is None:
         raise Refusal(
-            f"job « {job} » : checkout hors de la forme `Merge <tête> into <trunk>` — {lines[0]}"
+            f"job « {job} » : ligne hors de la forme `{FUSION}<commit> Merge <tête> into <trunk> "
+            f"(workflow <sha>)`, en SHA complets — {lines[0]}"
         )
-    short, merged, trunk = match.groups()
+    commit, merged, trunk, workflow = match.groups()
     if merged != head:
-        raise Refusal(f"job « {job} » : extrait la tête {merged}, pas le headSha du run {head}")
-    return Checkout(job, short, trunk)
+        raise Refusal(f"job « {job} » : a fusionné la tête {merged}, pas le headSha du run {head}")
+    return Fusion(job, commit, trunk, workflow)
+
+
+def run_workflow(run_id: str, fusions: Sequence[Fusion]) -> str:
+    """Le workflow que nomment les lignes de fusion des jobs du run.
+
+    Raises:
+        Refusal: les jobs en nomment plusieurs, quand un run n'a qu'un `GITHUB_SHA`.
+    """
+    workflows = {seen.workflow for seen in fusions}
+    if len(workflows) > 1:
+        raise Refusal(
+            f"les jobs du run {run_id} nomment plusieurs workflows : "
+            f"{distinct(seen.workflow for seen in fusions)}"
+        )
+    return workflows.pop()
+
+
+def triggering_trunk(run: Run, workflow: str) -> str:
+    """Le premier parent de `workflow`, la référence de fusion du déclenchement : le trunk d'alors.
+
+    Raises:
+        Refusal: `gh` en échec, ou une réponse d'une autre forme — un parent qui n'est pas un SHA
+            complet compris : il entre dans une commande `git`.
+    """
+    cmd = ("gh", "api", f"repos/{{owner}}/{{repo}}/commits/{workflow}")
+    document = json_output(run, *cmd)
+    try:
+        parent = document["parents"][0]["sha"]
+        if not FULL_SHA.fullmatch(parent):
+            raise ValueError(f"premier parent hors de la forme d'un SHA complet : {parent!r}")
+    except (IndexError, KeyError, TypeError, ValueError) as error:
+        raise shape_refusal(cmd, error) from error
+    return parent
+
+
+def workflows_changed(run: Run, since: str, until: str) -> bool:
+    """`.github/workflows/` diffère-t-il de `since` à `until` ?
+
+    Raises:
+        Refusal: `git diff` ne se lance pas, ou sort autrement qu'en 0 ou 1.
+    """
+    cmd = ("git", "diff", "--quiet", since, until, "--", WORKFLOWS)
+    return launch(run, *cmd, codes=(0, 1)).returncode == 1
+
+
+def definition_line(workflow: str, triggered: str, current: bool, base: str) -> str:
+    """La ligne de la définition du workflow : à jour, ou la relance qu'elle demande."""
+    verdict = (
+        f"définition à jour, `{WORKFLOWS}` inchangé jusqu'à origin/{base}"
+        if current
+        else f"le trunk a changé `{WORKFLOWS}` depuis le déclenchement : `gh run rerun` "
+        "rejouerait l'ancienne définition — relancer par fermeture-réouverture"
+    )
+    return f"workflow {workflow}, déclenché sur le trunk {triggered} : {verdict}"
 
 
 def trunk(run: Run, args: argparse.Namespace) -> Verdict:
-    """`trunk <run> <base> <tête>` : le trunk que chaque job du run a extrait sur `<tête>`, comparé
-    à `origin/<base>`.
+    """`trunk <run> <base> <tête>` : le trunk que chaque job du run a fusionné à `<tête>`, comparé
+    à `origin/<base>`, et la définition du workflow que le run a jouée.
 
     Raises:
         Refusal: voir le module.
@@ -282,20 +376,24 @@ def trunk(run: Run, args: argparse.Namespace) -> Verdict:
         )
     if not jobs:
         raise Refusal(f"aucun job du run {run_id} n'a tourné : il n'a rien extrait")
-    found = checkout_lines(output(run, "gh", "run", "view", run_id, "--log"))
-    checkouts = [checkout(job, found.get(job, []), head) for job in jobs]
+    found = fusion_lines(output(run, "gh", "run", "view", run_id, "--log"))
+    fusions = [fusion(job, found.get(job, []), head) for job in jobs]
+    workflow = run_workflow(run_id, fusions)
+    triggered = triggering_trunk(run, workflow)
     origin = output(run, "git", "rev-parse", "--verify", f"refs/remotes/origin/{base}").strip()
+    current = not workflows_changed(run, triggered, origin)
     lines = [
-        f"{seen.job} : extrait {seen.short}, trunk {seen.trunk} — {FRESHNESS[seen.trunk == origin]}"
-        for seen in checkouts
+        f"{seen.job} : extrait {seen.commit}, trunk {seen.trunk} — {FRESHNESS[seen.trunk == origin]}"
+        for seen in fusions
     ]
-    fresh = all(seen.trunk == origin for seen in checkouts)
+    lines.append(definition_line(workflow, triggered, current, base))
+    held = current and all(seen.trunk == origin for seen in fusions)
     lines.append(
-        f"trunk éprouvé {distinct(seen.trunk for seen in checkouts)} — run {run_id}, extrait "
-        f"{distinct(seen.short for seen in checkouts)} : {FRESHNESS[fresh]} "
+        f"trunk éprouvé {distinct(seen.trunk for seen in fusions)} — run {run_id}, extrait "
+        f"{distinct(seen.commit for seen in fusions)}, workflow {workflow} : {FRESHNESS[held]} "
         f"(origin/{base} = {origin})"
     )
-    return fresh, lines
+    return held, lines
 
 
 def moment(stamp: str) -> datetime:
