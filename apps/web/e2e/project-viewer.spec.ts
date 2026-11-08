@@ -1,8 +1,8 @@
 /**
- * La couche plein écran de la galerie (issue #243) : son ouverture, son clavier, son zoom, ses
- * fermetures, sa palette sombre et son fondu, aux deux largeurs. Les images des scénarios sont
- * carrées : à ×1, l'image a pour côté le plus petit de la zone d'image — sa hauteur au bureau, sa
- * largeur sur téléphone.
+ * La couche plein écran de la galerie (issue #243) : son ouverture, son clavier, ses fermetures, sa
+ * palette sombre et son fondu, aux deux largeurs ; ses gestes ont leurs scénarios
+ * (`project-viewer-gestures.spec.ts`). Les images des scénarios sont carrées : à ×1, l'image a pour
+ * côté le plus petit de la zone d'image — sa hauteur au bureau, sa largeur sur téléphone.
  */
 import type { Page } from '@playwright/test'
 import { expect, test } from './api.ts'
@@ -14,11 +14,17 @@ import {
   expectClosed,
   expectNoViolations,
   ficheProject,
+  FIT,
   freezeAnimations,
   gallery,
   openFromTable,
+  openViewer,
   panel,
+  transformOf,
   viewer,
+  viewerCounter,
+  viewerImage,
+  viewerZone,
   watchAnimations,
   watchCspViolations,
 } from './project.ts'
@@ -29,35 +35,16 @@ const CAPTIONS = ['Écran d’accueil', 'Détail de l’interface', 'Vue d’ens
 const THREE_IMAGES = CAPTIONS.map((caption) => buildImage('fiche', caption))
 const ONE_IMAGE = [buildImage('fiche', CAPTIONS[0])]
 
-/** L'image de la couche, et ses commandes. */
-const viewerImage = (page: Page) => viewer(page).getByRole('img')
+/** Les commandes de la couche, et le compteur de la galerie. */
 const viewerButton = (page: Page, name: string) => viewer(page).getByRole('button', { name })
 const viewerBar = (page: Page) => page.locator('.image-viewer-bar')
 const viewerCaption = (page: Page) => viewer(page).locator('.project-gallery-caption')
-const viewerCounter = (page: Page) => viewer(page).locator('.project-gallery-counter')
 const galleryCounter = (page: Page) => gallery(page).locator('.project-gallery-counter')
-
-/** La transformation que la couche écrit sur son image : translation et facteur. */
-const transformOf = (page: Page) =>
-  viewerImage(page).evaluate((image: HTMLElement) => image.style.transform)
-
-/** La vue d'ouverture : l'image entière, centrée. */
-const FIT = 'translate(0px, 0px) scale(1)'
-
-/** La zone d'image : la fenêtre moins la barre. */
-const zoneOf = async (page: Page) => (await page.locator('.image-viewer-zone').boundingBox())!
 
 /** Le côté de l'image carrée à ×1 : le plus petit de la zone. */
 const sideOf = async (page: Page) => {
-  const { width, height } = await zoneOf(page)
+  const { width, height } = await viewerZone(page)
   return Math.min(width, height)
-}
-
-/** Ouvre la couche par « Agrandir l’image », fondu d'entrée achevé. */
-async function openViewer(page: Page) {
-  await expandButton(page).click()
-  await expect(viewer(page)).toBeVisible()
-  await settle(page)
 }
 
 test.describe('l’ouverture', () => {
@@ -100,7 +87,7 @@ test.describe('l’ouverture', () => {
     const side = Math.min(zone.width, zone.height)
 
     expect(await viewer(page).boundingBox()).toEqual({ x: 0, y: 0, width, height })
-    expect(await zoneOf(page)).toEqual({ x: 0, y: 0, ...zone })
+    expect(await viewerZone(page)).toEqual({ x: 0, y: 0, ...zone })
     expect(bar).toMatchObject({ x: 0, y: zone.height, width })
     // La barre, à 8 px de chaque bord (PR #250, H6) : la légende, puis le compteur.
     await expect(viewerBar(page)).toHaveCSS('padding', '8px')
@@ -153,7 +140,7 @@ test.describe('à trois images', () => {
     await page.keyboard.press('ArrowRight')
     // 100 px vers la gauche, ou jusqu'au bord de l'image : l'image carrée, à ×2, dépasse la zone de
     // 36 px de chaque côté au bureau (1 352 px pour 1 280), de 200 px sur téléphone.
-    const pan = Math.min(100, (2 * (await sideOf(page)) - (await zoneOf(page)).width) / 2)
+    const pan = Math.min(100, (2 * (await sideOf(page)) - (await viewerZone(page)).width) / 2)
     expect(await transformOf(page)).toBe(`translate(${-pan}px, 0px) scale(2)`)
     await expect(viewerCounter(page)).toHaveText('2 / 3')
 
@@ -166,7 +153,8 @@ test.describe('à trois images', () => {
   test('la fenêtre redimensionnée ramène la vue dans ses nouvelles bornes', async ({ page }) => {
     await openViewer(page)
     /** La borne de la translation horizontale à ×2 : le débord de l'image carrée, de chaque côté. */
-    const bound = async () => Math.max(0, (2 * (await sideOf(page)) - (await zoneOf(page)).width) / 2)
+    const bound = async () =>
+      Math.max(0, (2 * (await sideOf(page)) - (await viewerZone(page)).width) / 2)
     await page.keyboard.press('+')
     for (const key of ['ArrowRight', 'ArrowRight', 'ArrowRight']) await page.keyboard.press(key)
     expect(await transformOf(page)).toBe(`translate(${-(await bound())}px, 0px) scale(2)`)

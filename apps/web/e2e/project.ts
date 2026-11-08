@@ -60,6 +60,28 @@ export const expandButton = (page: Page) => page.getByRole('button', { name: 'Ag
 export const viewer = (page: Page) => page.getByRole('dialog', { name: 'Image en plein écran' })
 export const closeImageButton = (page: Page) => page.getByRole('button', { name: 'Fermer l’image' })
 
+/** L'image de la couche, et son compteur. */
+export const viewerImage = (page: Page) => viewer(page).getByRole('img')
+export const viewerCounter = (page: Page) => viewer(page).locator('.project-gallery-counter')
+
+/** La boîte de la zone d'image de la couche : la fenêtre moins la barre. */
+export const viewerZone = async (page: Page) =>
+  (await page.locator('.image-viewer-zone').boundingBox())!
+
+/** La transformation que la couche écrit sur son image : translation et facteur. */
+export const transformOf = (page: Page) =>
+  viewerImage(page).evaluate((image: HTMLElement) => image.style.transform)
+
+/** La vue d'ouverture de la couche : l'image entière, centrée. */
+export const FIT = 'translate(0px, 0px) scale(1)'
+
+/** Ouvre la couche par « Agrandir l’image », fondu d'entrée achevé. */
+export async function openViewer(page: Page) {
+  await expandButton(page).click()
+  await expect(viewer(page)).toBeVisible()
+  await settle(page)
+}
+
 /** Le projet d'une fiche à un seul slug, ces champs remplacés. */
 export const ficheProject = (overrides: Partial<Project> = {}) =>
   buildProject({ slug: 'fiche', title: 'Fiche', ...overrides })

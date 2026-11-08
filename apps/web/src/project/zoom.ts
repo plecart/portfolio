@@ -30,6 +30,9 @@ export const MAX_SCALE = 4
 /** L'image entière, centrée : la vue d'ouverture, et celle de toute image montrée. */
 export const FIT: View = { scale: MIN_SCALE, x: 0, y: 0 }
 
+/** Le facteur où le double clic porte l'image depuis ×1 (issue #243, décision 8). */
+const DOUBLE_TAP_SCALE = 2
+
 /** `value` ramenée entre `min` et `max`. */
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
@@ -67,26 +70,42 @@ export function clampView({ scale, x, y }: View, stage: Stage): View {
   return { scale, x: limit(x, 'width'), y: limit(y, 'height') }
 }
 
+/** Le centre d'une zone : le point visé par un zoom à la touche (PR #250, H1). */
+export const centerOf = ({ width, height }: Size): Point => ({ x: width / 2, y: height / 2 })
+
 /**
- * Le zoom vers un facteur, au point visé : le point de l'image sous ce point y reste, puis la
- * translation est bornée (`clampView`), ce qui peut l'en écarter près d'un bord.
+ * Le zoom vers un facteur, au point visé : le point de l'image sous ce point y reste — ou vient sous
+ * `to`, quand le milieu d'un pincement s'est déplacé —, puis la translation est bornée
+ * (`clampView`), ce qui peut l'en écarter près d'un bord.
  *
  * @param view La vue en place.
- * @param scale Le facteur demandé, ramené de ×1 à ×4 : à sa borne, la vue ne change pas.
+ * @param scale Le facteur demandé, ramené de ×1 à ×4 : à sa borne, le facteur ne change plus.
  * @param point Le point visé, dans la zone ; son centre pour un zoom à la touche.
+ * @param stage La zone et l'image.
+ * @param to Le point de la zone où le point de l'image visé arrive ; `point` par défaut.
+ * @returns La nouvelle vue.
+ */
+export function zoomAt(view: View, scale: number, point: Point, stage: Stage, to = point): View {
+  const next = clamp(scale, MIN_SCALE, MAX_SCALE)
+  const ratio = next / view.scale
+  const center = centerOf(stage.zone)
+  // Depuis le centre de la zone : la translation qui amène sous `to` le point de l'image visé.
+  const shift = (axis: keyof Point) =>
+    to[axis] - center[axis] - ratio * (point[axis] - center[axis] - view[axis])
+  return clampView({ scale: next, x: shift('x'), y: shift('y') }, stage)
+}
+
+/**
+ * Le double clic, ou le double tape (décision 8) : de ×1 à ×2 au point visé (`zoomAt`), et retour à
+ * l'image entière depuis tout zoom supérieur.
+ *
+ * @param view La vue en place.
+ * @param point Le point visé, dans la zone.
  * @param stage La zone et l'image.
  * @returns La nouvelle vue.
  */
-export function zoomAt(view: View, scale: number, point: Point, stage: Stage): View {
-  const next = clamp(scale, MIN_SCALE, MAX_SCALE)
-  const ratio = next / view.scale
-  // Le point visé, depuis le centre de la zone : la translation y garde le même point de l'image.
-  const dx = point.x - stage.zone.width / 2
-  const dy = point.y - stage.zone.height / 2
-  return clampView(
-    { scale: next, x: dx - ratio * (dx - view.x), y: dy - ratio * (dy - view.y) },
-    stage,
-  )
+export function toggleZoom(view: View, point: Point, stage: Stage): View {
+  return view.scale > MIN_SCALE ? FIT : zoomAt(view, DOUBLE_TAP_SCALE, point, stage)
 }
 
 /**
