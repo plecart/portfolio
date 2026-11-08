@@ -25,7 +25,8 @@ const RIBBONS = ['.project-head .card-ribbon', '.card-band .card-ribbon'] as con
 
 /** Le reste de la fiche, qui apparaît à la pose et s'efface le premier (spec §4.6). */
 const CONTENT =
-  '.project-close, .project-gallery-arrow, .project-gallery-bar, .project-link, .project-scroll'
+  '.project-close, .project-gallery-arrow, .project-gallery-expand, .project-gallery-bar, ' +
+  '.project-link, .project-scroll'
 
 /** La couche noir et blanc de la fiche, tant qu'elle vole (`fadeGrey`). */
 const GREY = '.project-gallery-track > .card-photo-grey'

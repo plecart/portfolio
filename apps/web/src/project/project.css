@@ -135,26 +135,40 @@
     }
   }
 
-  /* Entière, jamais recadrée (§1.11) : `contain`, là où la carte pose `cover`. */
+  /* Entière, jamais recadrée (§1.11) : `contain`, là où la carte pose `cover`. Un clic l'ouvre en
+     plein écran (#243) : la loupe le dit. */
   .project-gallery-image {
     flex: none;
     width: 100%;
     height: 100%;
     object-fit: contain;
+    cursor: zoom-in;
   }
 
-  .project-gallery-arrow {
+  /* Les boutons posés sur l'image (§4.4, #243) : 36 px, ronds, `--paper` à 88 %, `--ink`. */
+  .project-gallery-arrow,
+  .project-gallery-expand {
     position: absolute;
-    inset-block: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     width: 36px;
     height: 36px;
-    margin-block: auto;
     border-radius: 50%;
     background-color: color-mix(in srgb, var(--paper) 88%, transparent);
     color: var(--ink);
+  }
+
+  /* Les flèches, centrées verticalement dans leur cadre : la galerie ou la zone d'image. */
+  .project-gallery-arrow {
+    inset-block: 0;
+    margin-block: auto;
+  }
+
+  /* « Agrandir l'image », au coin bas droit du cadre, à 8 px. */
+  .project-gallery-expand {
+    right: var(--s-2);
+    bottom: var(--s-2);
   }
 
   /* Toujours 20 px, sans image comprise (§3.2) : le panneau en dépend. */
@@ -178,6 +192,67 @@
   .project-gallery-counter {
     flex: none;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* La couche plein écran (#243) : toute la fenêtre, au-dessus du panneau (30), de l'entête et des
+     liens de l'auteur (40), sur la palette sombre dans les deux modes (`data-scheme`, tokens.css).
+     Fondus d'entrée et de sortie, comme le panneau. */
+  .image-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg);
+    color: var(--ink);
+    animation: project-in var(--dur) var(--ease-out);
+  }
+
+  .image-viewer[data-state='closed'] {
+    animation: project-out var(--dur) var(--ease-out);
+  }
+
+  /* La zone d'image : la fenêtre moins la barre. L'image s'y centre, à la taille que la couche lui
+     écrit ; ses flèches s'y posent. */
+  .image-viewer-zone {
+    position: relative;
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* À la taille que la couche lui écrit : ni la zone ne la rétrécit, ni la base de Tailwind ne la
+     borne. */
+  .image-viewer-image {
+    flex: none;
+    max-width: none;
+  }
+
+  /* Le zoom par bouton et par touche (PR #250, H4) ; la bascule d'une image à l'autre reste
+     instantanée. */
+  @media (prefers-reduced-motion: no-preference) {
+    .image-viewer-image {
+      transition: transform var(--dur) var(--ease-out);
+    }
+  }
+
+  /* La barre, une rangée à elle (PR #250, H6) : 36 px de boutons et 8 px de marge ; la légende
+     prend la place qui reste, le zoom puis le compteur à droite. */
+  .image-viewer-bar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--s-2);
+    padding: 0 var(--s-2) var(--s-2);
+    color: var(--ink-2);
+    font-size: var(--fs-small);
+
+    > .project-gallery-caption {
+      flex: 1;
+    }
   }
 
   .project-reading {

@@ -13,20 +13,6 @@
 :root {
   color-scheme: light dark;
 
-  /* §2.1 — couleurs */
-  --bg: light-dark(#F3EDE4, #1C1A17);
-  --paper: light-dark(#FBF8F2, #2B2724);
-  --ink: light-dark(#2A2622, #EDE6DA);
-  --ink-2: light-dark(#6B635A, #A69C8F);
-  --line: light-dark(#DCD3C6, #3B3631);
-  --accent: light-dark(#B4471F, #E88A5E);
-  --live: light-dark(#4A7C59, #8FB996);
-  --postit: light-dark(#F4E3A1, #B59F55);
-  --postit-ink: light-dark(#2A2622, #1C1A17);
-  --postit-link: color-mix(in srgb, var(--accent) 22%, var(--postit));
-  --tape: light-dark(#E8DFCF, #3D372F);
-  --tape-ink: light-dark(#2A2622, #D8CFC0);
-
   /* §2.2 — échelle typographique */
   --fs-body: 16px;
   --fs-small: 13px;
@@ -46,14 +32,6 @@
   --r-tape: 2px;
   --r-button: 6px;
 
-  /* §2.5 — ombres : la géométrie est commune aux deux modes, seule la couleur change */
-  --shadow-rest:
-    0 1px 2px light-dark(rgba(42,38,34,.08), rgba(0,0,0,.30)),
-    0 4px 12px light-dark(rgba(42,38,34,.10), rgba(0,0,0,.35));
-  --shadow-lift:
-    0 4px 8px light-dark(rgba(42,38,34,.10), rgba(0,0,0,.35)),
-    0 20px 40px light-dark(rgba(42,38,34,.20), rgba(0,0,0,.55));
-
   /* §2.7 — durées et courbes */
   --dur-fast: 150ms;
   --dur: 240ms;
@@ -67,6 +45,39 @@
   --ease-out: cubic-bezier(.22, 1, .36, 1);
   --ease-spring: linear(0, .28 6%, .62 13%, .88 20%, 1.03 28%, 1.01 40%, 1);
   --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+}
+
+/* Les jetons qui changent avec le mode : la palette et ses ombres. Un élément marqué
+   `data-scheme='dark'` — la couche plein écran de la galerie (#243) — les redéclare sous son propre
+   `color-scheme` : dans le build, un jeton se résout là où il est déclaré, et un `color-scheme`
+   local seul ne le rebascule pas (docs/frontend-outillage.md §2.4). */
+:root,
+[data-scheme='dark'] {
+  /* §2.1 — couleurs */
+  --bg: light-dark(#F3EDE4, #1C1A17);
+  --paper: light-dark(#FBF8F2, #2B2724);
+  --ink: light-dark(#2A2622, #EDE6DA);
+  --ink-2: light-dark(#6B635A, #A69C8F);
+  --line: light-dark(#DCD3C6, #3B3631);
+  --accent: light-dark(#B4471F, #E88A5E);
+  --live: light-dark(#4A7C59, #8FB996);
+  --postit: light-dark(#F4E3A1, #B59F55);
+  --postit-ink: light-dark(#2A2622, #1C1A17);
+  --postit-link: color-mix(in srgb, var(--accent) 22%, var(--postit));
+  --tape: light-dark(#E8DFCF, #3D372F);
+  --tape-ink: light-dark(#2A2622, #D8CFC0);
+
+  /* §2.5 — ombres : la géométrie est commune aux deux modes, seule la couleur change */
+  --shadow-rest:
+    0 1px 2px light-dark(rgba(42,38,34,.08), rgba(0,0,0,.30)),
+    0 4px 12px light-dark(rgba(42,38,34,.10), rgba(0,0,0,.35));
+  --shadow-lift:
+    0 4px 8px light-dark(rgba(42,38,34,.10), rgba(0,0,0,.35)),
+    0 20px 40px light-dark(rgba(42,38,34,.20), rgba(0,0,0,.55));
+}
+
+[data-scheme='dark'] {
+  color-scheme: dark;
 }
 
 /* Mode forcé, par le bouton de l'entête ou restauré au chargement : le schéma suit, et avec lui

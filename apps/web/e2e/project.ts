@@ -53,6 +53,13 @@ export const gallery = (page: Page) => page.getByRole('group', { name: 'Images d
 export const previousImage = (page: Page) => page.getByRole('button', { name: 'Image précédente' })
 export const nextImage = (page: Page) => page.getByRole('button', { name: 'Image suivante' })
 
+/** « Agrandir l’image », le bouton de la galerie qui ouvre la couche plein écran (issue #243). */
+export const expandButton = (page: Page) => page.getByRole('button', { name: 'Agrandir l’image' })
+
+/** La couche plein écran, et son bouton de fermeture. */
+export const viewer = (page: Page) => page.getByRole('dialog', { name: 'Image en plein écran' })
+export const closeImageButton = (page: Page) => page.getByRole('button', { name: 'Fermer l’image' })
+
 /** Le projet d'une fiche à un seul slug, ces champs remplacés. */
 export const ficheProject = (overrides: Partial<Project> = {}) =>
   buildProject({ slug: 'fiche', title: 'Fiche', ...overrides })

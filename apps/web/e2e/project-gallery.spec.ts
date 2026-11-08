@@ -20,6 +20,7 @@ import {
   panel,
   previousImage,
   readingColumn,
+  viewer,
 } from './project.ts'
 import { buildImage, FILES_ORIGIN } from './projects.ts'
 import { COLUMN_VIEWPORT, watchTransitions } from './table.ts'
@@ -202,6 +203,7 @@ test.describe('le balayage', () => {
 
     await touch(page, 41, 0, 'touchEnd')
     await expectImage(page, 0)
+    await expect(viewer(page)).toHaveCount(0)
   })
 
   test('un frémissement vertical ne change pas d’image, et fait défiler le panneau', async ({
@@ -239,6 +241,8 @@ test.describe('le balayage', () => {
     await page.mouse.up()
 
     await expectImage(page, 0)
+    // Un glissé n'est pas un clic : il n'ouvre pas la couche plein écran (#243).
+    await expect(viewer(page)).toHaveCount(0)
   })
 
   test('un stylet balaie', async ({ page }) => {
@@ -262,6 +266,7 @@ test.describe('le balayage', () => {
     await client.detach()
 
     await expectImage(page, 1)
+    await expect(viewer(page)).toHaveCount(0)
   })
 })
 

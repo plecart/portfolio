@@ -48,6 +48,14 @@ export const GALLERY_SIZES = [
 ].join(', ')
 
 /**
+ * Le disque d'un bouton icône sur papier (spec §3.2) : 36 px, rond, `--paper`, icône `--ink-2`,
+ * `--ink` au survol d'un bouton actif. Les fermetures de la fiche et de sa couche plein écran, et les
+ * boutons de zoom de la couche, le portent ; chacun se place à part.
+ */
+export const PAPER_BUTTON =
+  'flex size-9 items-center justify-center rounded-full bg-(--paper) text-(--ink-2) transition-colors enabled:hover:text-(--ink)'
+
+/**
  * Le chemin de la fiche d'un projet.
  *
  * @param slug Le slug du projet.

@@ -3,7 +3,7 @@ import { useState } from 'react'
 import type { Project } from '../api/projects.ts'
 import { CloseIcon } from '../chrome/icons.tsx'
 import { strings } from '../strings.ts'
-import { projectPath } from './project.ts'
+import { PAPER_BUTTON, projectPath } from './project.ts'
 import { ProjectContent } from './ProjectContent.tsx'
 import { ProjectGallery } from './ProjectGallery.tsx'
 import { useChoreography } from './useChoreography.ts'
@@ -13,8 +13,7 @@ import { useChoreography } from './useChoreography.ts'
  * il reste visible pendant que le panneau défile ; au-dessus de ce qui défile sous lui, y compris
  * des post-its et des rubans, que leur rotation fait peindre après lui.
  */
-const CLOSE_CLASSES =
-  'project-close fixed top-(--s-2) right-(--s-2) z-10 flex size-9 items-center justify-center rounded-full bg-(--paper) text-(--ink-2) transition-colors hover:text-(--ink) sm:absolute'
+const CLOSE_CLASSES = `project-close fixed top-(--s-2) right-(--s-2) z-10 sm:absolute ${PAPER_BUTTON}`
 
 /**
  * Rend le focus à la carte d'un projet, que son `href` désigne (spec §3.2). Une carte encore dans la
@@ -104,6 +103,7 @@ export function ProjectDialog({
           <ProjectGallery
             key={shown.slug}
             gallery={shown.gallery}
+            open={open}
             rewound={returning}
           />
           <ProjectContent project={shown} />
