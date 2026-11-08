@@ -413,6 +413,66 @@ def test_build_et_dev_compilent_le_front_s_il_manque(tmp_path: Path, target: str
     assert FRONT_BUILD not in make_dry_run(target, WEB=web.as_posix())
 
 
+def dated_front(root: Path, files: list[str]) -> Path:
+    """Un front témoin sous `root/web`, compilé après ses sources : chaque chemin, dossiers
+    compris, daté d'une heure plus tôt, puis `dist/index.html` d'une minute de plus — un `dist` à
+    jour. Rend le dossier du front, à passer en `WEB`."""
+    web = root / "web"
+    for name in [*files, "dist/index.html"]:
+        (web / name).parent.mkdir(parents=True, exist_ok=True)
+        (web / name).write_text("", encoding="utf-8")
+    sources = time.time() - 3600
+    for path in [web, *web.rglob("*")]:
+        os.utime(path, (sources, sources))
+    os.utime(web / "dist" / "index.html", (sources + 60, sources + 60))
+    return web
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "src/main.tsx",
+        "src/assets/fonts/police.woff2",
+        "public/icon.svg",
+        "index.html",
+        "vite.config.ts",
+        "package.json",
+        "package-lock.json",
+        "tsconfig.app.json",
+        ".env.production",
+    ],
+)
+def test_build_recompile_le_front_plus_ancien_qu_une_de_ses_entrees(
+    tmp_path: Path, source: str
+) -> None:
+    """Un `dist` repris d'une compilation antérieure — un worktree réutilisé — ne porte pas ce
+    qu'on a ajouté au front depuis : `build` le recompile dès qu'une entrée de la compilation est
+    plus récente que lui, à toute profondeur, et le reprend tant qu'il est à jour. Mesuré avant
+    correction (PR #247) : trois icônes ajoutées à `public/` servies en `text/html`."""
+    web = dated_front(tmp_path, [source])
+    fresh = make_dry_run("build", WEB=web.as_posix())
+    (web / source).touch()
+
+    assert FRONT_BUILD not in fresh
+    assert FRONT_BUILD in make_dry_run("build", WEB=web.as_posix())
+
+
+def test_build_recompile_le_front_quand_un_fichier_quitte_ses_entrees(tmp_path: Path) -> None:
+    """Retirer un fichier de `public/` date son dossier : `dist`, qui le porte encore, est périmé."""
+    web = dated_front(tmp_path, ["public/icon.svg", "public/robots.txt"])
+    (web / "public" / "icon.svg").unlink()
+
+    assert FRONT_BUILD in make_dry_run("build", WEB=web.as_posix())
+
+
+def test_build_ne_recompile_pas_le_front_pour_ce_qui_n_y_entre_pas(tmp_path: Path) -> None:
+    """Les tests du front n'entrent pas dans `dist` : les modifier ne le recompile pas."""
+    web = dated_front(tmp_path, ["src/main.tsx", "tests/cards.test.ts"])
+    (web / "tests" / "cards.test.ts").touch()
+
+    assert FRONT_BUILD not in make_dry_run("build", WEB=web.as_posix())
+
+
 def test_le_contexte_de_build_ne_porte_du_front_que_sa_compilation(tmp_path: Path) -> None:
     """`caddy` sert `apps/web/dist`, `api` en garde `index.html` (ADR 0014) : ce dossier entre dans
     le contexte de build, et rien d'autre du front — ni ses sources, ni ses dépendances, qui

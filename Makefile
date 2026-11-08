@@ -12,9 +12,20 @@ NPM ?= npm
 WEB := apps/web
 
 # Le front compilé, que les images copient depuis le contexte de build (ADR 0014). `index.html`
-# en est le témoin : absent, `build` et `dev` compilent le front ; présent, ils le reprennent tel
-# quel — `make web-build` le recompile à la demande.
+# en est le témoin : absent, ou plus ancien qu'une entrée de la compilation, `build` et `dev`
+# compilent le front ; à jour, ils le reprennent tel quel — `make web-build` le recompile à la
+# demande. Sans ces entrées, un worktree réutilisé construisait ses images sur un `dist` d'avant
+# ses derniers ajouts au front (mesuré à la PR #247).
 WEB_INDEX := $(WEB)/dist/index.html
+
+# Les entrées de la compilation : ce qui change le contenu de `dist`. Ni les tests, ni `e2e`,
+# `smoke` ou `scripts` : les modifier ne recompile rien. `tree` rend chaque chemin existant de la
+# liste, puis tout ce qu'il contient — `wildcard` ne descend pas —, dossiers compris, datés de leur
+# dernier ajout ou retrait : un fichier retiré de `public/` recompile aussi. Les fichiers cachés
+# d'un dossier n'y figurent pas (`*`).
+tree = $(foreach entry,$(1),$(entry) $(call tree,$(wildcard $(entry)/*)))
+WEB_INPUTS := $(call tree,$(wildcard $(addprefix $(WEB)/,src public index.html vite.config.ts \
+	package.json package-lock.json tsconfig*.json .env .env.production)))
 
 # `cd` plutôt que `npm --prefix` : mesuré, `--prefix` ne déplace pas le répertoire courant, et
 # les scripts du front résolvent leurs chemins depuis celui-ci. Le préfixe est nommé une fois :
@@ -308,7 +319,7 @@ restore:
 dev: $(WEB_INDEX)
 	$(COMPOSE) up --build
 
-$(WEB_INDEX):
+$(WEB_INDEX): $(WEB_INPUTS)
 	$(MAKE) web-build
 
 # Cibles du front. Elles restent séparées des cibles back et d'infrastructure plutôt que fondues
