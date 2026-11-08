@@ -56,8 +56,12 @@ fusionné la tête au trunk courant (ADR 0029) :
 
 — quatre SHA complets : le commit construit ; son second parent, la tête de la PR ; son premier
 parent, le trunk fusionné, le **trunk éprouvé** ; le `GITHUB_SHA` du run, la référence de fusion
-que la forge a calculée au déclenchement, dont le run a lu la définition du workflow. Aucun run
-réel ne l'a encore écrite : sa forme est celle que fixe l'ADR 0029, non relevée. La ligne se
+que la forge a calculée au déclenchement, dont le run a lu la définition du workflow. Relevée sur
+le run 42515735475 de la PR jetable #253 (job Back, tentative 1, le 2026-11-08) :
+
+    Fusion explicite : d5fcf7a5d87e20efde7ca0c5a32fdce58791a8a2 Merge ddacc6fb537a5fe77f4a99993d217bc4f95b95e1 into a580599b224424c1a2c1a1253e74cf1ba0f0f9cb (workflow 353b5a0b6ea5501c7c2d0941f5ed8a3a421da7c0)
+
+La ligne se
 cherche par job, quel que soit son step : `gh` range le journal entier d'un job sous
 `UNKNOWN STEP` quand il ne sait pas l'associer à ses steps (`erreurs-ci.py`, « Le journal entier
 d'un job ») ;

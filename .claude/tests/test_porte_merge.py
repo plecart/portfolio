@@ -7,9 +7,9 @@ ses jobs sont ceux de `gh run view 40769309165 --json status,headSha,jobs`, réd
 lus, noms et conclusions réels (gh 2.94.0, relevé le 2026-10-29) ; son `GITHUB_SHA`, la référence
 de fusion `009f459` qu'il a extraite, a pour parents `3e24919` puis la tête `8d0200c`
 (`gh api repos/{owner}/{repo}/commits/009f459…`, relevé le 2026-11-08), réduit au champ lu. Sa
-ligne de fusion est écrite ici sur la forme que fixe l'ADR 0029, aucun run réel ne l'ayant
-encore écrite — le pas de `ci.yml` qui l'écrit est joué sur un dépôt témoin, et la porte lit sa
-ligne — ; le journal d'avant la fusion explicite est un extrait réel de
+ligne de fusion est écrite ici sur la forme que fixe l'ADR 0029, relevée telle sur le run
+42515735475 (docstring de la porte) — le pas de `ci.yml` qui l'écrit est joué sur un dépôt témoin,
+et la porte lit sa ligne — ; le journal d'avant la fusion explicite est un extrait réel de
 `gh run view 40769309165 --log` — même relevé du 2026-10-29 : lignes 101, 109 à 111 et 128 du job
 Back, 613, 621 à 623 et 640 du job Infra. La conversation est celle de la PR #94
 (`gh pr view 94 --json body,comments,reviews`, relevée le 2026-10-29) : son commentaire, réduit à
