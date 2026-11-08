@@ -28,7 +28,7 @@ _2026-09-18, amendé le 2026-09-23 au scaffold de `apps/web` (#3), puis le 2026-
 ## 2. Inventaire installé
 
 Skills et outils en ligne de commande : 2026-09-18 (§2.1 à §2.3). Application `apps/web` :
-2026-09-23, amendée les 2026-09-25, 26 et 2026-10-02 (§2.4). C'est cette section qui fait foi
+2026-09-23, amendements datés au titre de §2.4. C'est cette section qui fait foi
 sur ce qui est installé et pourquoi ; les versions de `apps/web` se lisent dans son manifeste et
 son verrou (§2.4). Le §3 reste le plan, avec l'état de chaque item.
 
