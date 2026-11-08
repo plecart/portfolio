@@ -95,14 +95,19 @@ export const RIBBON_SIZES = { ribbons: ['32px 13px'], icons: ['24px 24px'] }
  */
 export const ribbonSizes = (container: Locator) =>
   container.locator('.card-ribbon').evaluateAll((ribbons) => {
-    const distinct = (values: string[]) => [...new Set(values)]
-    const style = (element: Element) => getComputedStyle(element)
+    /** Les valeurs calculées des propriétés, jointes par élément, chaque combinaison une fois. */
+    const distinct = (elements: Element[], properties: string[]) => [
+      ...new Set(
+        elements.map((element) => {
+          const style = getComputedStyle(element)
+          return properties.map((property) => style.getPropertyValue(property)).join(' ')
+        }),
+      ),
+    ]
     const icons = ribbons.flatMap((ribbon) => [...ribbon.querySelectorAll('img')])
     return {
-      ribbons: distinct(
-        ribbons.map((ribbon) => `${style(ribbon).height} ${style(ribbon).fontSize}`),
-      ),
-      icons: distinct(icons.map((icon) => `${style(icon).width} ${style(icon).height}`)),
+      ribbons: distinct(ribbons, ['height', 'font-size']),
+      icons: distinct(icons, ['width', 'height']),
     }
   })
 
