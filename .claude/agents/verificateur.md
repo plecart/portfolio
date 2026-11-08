@@ -113,7 +113,7 @@ Tu rends **un verdict structuré**, et rien d'autre — pas de récit, pas de r�
 Verdict PR #<n> — issue #<N>, base <sha de origin/<trunk>>, tête <SHA complet de tête>
 Critères   : <un par case du corps et du brief, ✅/❌/⚠️, avec sa preuve>
 Conversation : <k> commentaires et revues, dernier <horodatage | aucun>
-Base       : run <id>, extrait <commit>, workflow <sha>, trunk <sha> (origin/<trunk> = <sha>) — à jour / périmée
+Base       : run <id>, workflow <sha>, trunk <sha> (origin/<trunk> = <sha>) — à jour / périmée
 Conflit    : aucun / <fichiers> (git merge-tree, code de sortie cité)
 decisions-vs-doc : aucun heurt / <fichier §n, rang r, les deux citations>
 Fichiers croisés : aucun / <fichier → branche>

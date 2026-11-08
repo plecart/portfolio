@@ -736,14 +736,14 @@ ses jobs,
     vert sur cette porte** — correctif mergé depuis la base de branche : rien à corriger dans la
     PR, qui ne fait tourner le job `avis` que parce que son delta touche une de ses entrées (ADR
     0019, décision 2), le reste du tri étant celui du trunk. Sa CI se relance par le geste de
-    l'Étape 7, que `porte-merge.py trunk` lancé sur ce run nomme — `gh run rerun <run>`, run
-    entier, qui refait la fusion sur le trunk corrigé, ou la fermeture-réouverture quand il dit la
-    définition périmée —, et ce que le nouveau run a combiné se lit dans la ligne de fusion de ses
-    jobs. Ni commit de fusion — `gh pr update-branch`
-    sans `--rebase` compris, en `ask` dans `.claude/settings.json` comme sa forme `--rebase` —, ni
-    rebase d'une branche poussée sans demande explicite (`contraintes.md`), ici comme à l'Étape 7 :
-    à la PR #75, faute d'un geste à cette étape, deux sessions de suite ont planifié de fusionner
-    `main` dans la branche (obs 82).
+    l'Étape 7, que tranche la ligne de définition de `porte-merge.py trunk`, lancé sur ce run après
+    `git fetch origin` — `gh run rerun <run>`, run entier, qui refait la fusion sur le trunk
+    corrigé, ou la fermeture-réouverture quand elle dit la définition périmée —, et ce que le
+    nouveau run a combiné se lit dans la ligne de fusion de ses jobs. Ni commit de fusion —
+    `gh pr update-branch` sans `--rebase` compris, en `ask` dans `.claude/settings.json` comme sa
+    forme `--rebase` —, ni rebase d'une branche poussée sans demande explicite (`contraintes.md`),
+    ici comme à l'Étape 7 : à la PR #75, faute d'un geste à cette étape, deux sessions de suite ont
+    planifié de fusionner `main` dans la branche (obs 82).
   - *Rouge de code* : tout le reste, y compris un rouge de plateforme (3.2) → cycle complet
     3.1→3.5.
 - **Revue** : les commentaires d'une revue automatisée (bot), s'il y en a une. Un `developpeur` a
@@ -820,8 +820,9 @@ Le `<SHA du trunk éprouvé>` ne vaut qu'à la sortie **0**, chaque job ayant co
 son motif en une ligne (docstring du script). `porte-merge.py trunk` suppose la PR sortie de
 draft : sur une draft, le dernier run de la tête a tous ses jobs sautés, et le script refuse en 2
 (mesuré sur la PR #200, run 40963627023). La référence de fusion de la forge
-(`gh api …/git/ref/pull/<n>/merge`) ne dit pas ce qu'un run a combiné : le script n'en lit que le
-premier parent, le trunk du déclenchement, pour juger la définition.
+(`gh api …/git/ref/pull/<n>/merge`) ne dit pas ce qu'un run a combiné : du `GITHUB_SHA` du run,
+la référence calculée au déclenchement, le script ne lit que le premier parent, le trunk d'alors,
+pour juger la définition.
 
 **Sortie 1** : la ligne de définition du script tranche le geste, une relance de CI de la PR dans les
 deux cas, couverte par le go du briefing (Étape 1) — jamais un commit vide ni un force-push.

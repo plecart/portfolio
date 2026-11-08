@@ -62,11 +62,12 @@ cherche par job, quel que soit son step : `gh` range le journal entier d'un job 
 `UNKNOWN STEP` quand il ne sait pas l'associer à ses steps (`erreurs-ci.py`, « Le journal entier
 d'un job ») ;
 l'horodatage ôté, le préfixe se teste sur le texte débarrassé de ses blancs. Il refuse un job qui a
-tourné sans ligne de fusion — run d'un `push`, qui ne fusionne rien, ou d'un workflow d'avant la
-fusion explicite, dont le journal ne porte que la ligne de checkout de la forge, `HEAD is now at
-<court> Merge <tête> into <trunk>` —, ou avec plusieurs ; une ligne d'une autre forme, un SHA
-abrégé compris ; une tête autre que le `headSha` du run ; des jobs qui nomment des workflows
-différents, quand un run n'a qu'un `GITHUB_SHA`.
+tourné sans ligne de fusion — arrêté avant son pas de fusion, run d'un `push`, qui ne fusionne
+rien, ou d'un workflow d'avant la fusion explicite, dont le journal ne porte que la ligne de
+checkout de la forge, `HEAD is now at <court> Merge <tête> into <trunk>`, et que seule une
+fermeture-réouverture relance sous la fusion explicite (ADR 0029, « Conséquences ») —, ou avec
+plusieurs ; une ligne d'une autre forme, un SHA abrégé compris ; une tête autre que le `headSha`
+du run ; des jobs qui nomment des workflows différents, quand un run n'a qu'un `GITHUB_SHA`.
 
 La définition se juge sur le trunk du déclenchement, le premier parent du workflow, lu par
 `gh api repos/{owner}/{repo}/commits/<sha>`, champ `parents` — pour `009f459`, la référence de
@@ -80,10 +81,10 @@ code). Un `gh run rerun` garde le `GITHUB_SHA` du déclenchement, donc sa défin
 
 Sortie 0 si le trunk de chaque job égale `origin/<base>` et si la définition est à jour, 1 sinon,
 trunks différents entre jobs compris — chaque job fusionne le trunk de son propre démarrage. Il
-rend une ligne par job, `<job> : extrait <commit>, trunk <sha> — à jour|périmé`, une ligne de la
+rend une ligne par job, `<job> : construit <commit>, trunk <sha> — à jour|périmé`, une ligne de la
 définition, `workflow <sha>, déclenché sur le trunk <sha> : <à jour, ou la relance à faire>`, puis
-`trunk éprouvé <sha> — run <run>, extrait <commit>, workflow <sha> : à jour|périmé
-(origin/<base> = <sha>)`, qui nomme chaque valeur distincte quand les jobs divergent.
+`trunk éprouvé <sha> — run <run>, workflow <sha> : à jour|périmé (origin/<base> = <sha>)`, qui
+nomme chaque trunk distinct quand les jobs divergent.
 
 **`conversation <PR> [--releve]`** — la conversation n'a pas bougé depuis le relevé. Il lit
 `gh pr view <PR> --json body,comments,reviews` et compte chaque commentaire, daté par `createdAt`,
@@ -285,8 +286,9 @@ def fusion(job: str, lines: Sequence[str], head: str) -> Fusion:
     """
     if not lines:
         raise Refusal(
-            f"job « {job} » : aucune ligne `{FUSION}…` au journal — run d'un `push`, ou d'un "
-            "workflow d'avant la fusion explicite (ADR 0029)"
+            f"job « {job} » : aucune ligne `{FUSION}…` au journal — job arrêté avant sa fusion, run "
+            "d'un `push`, ou d'un workflow d'avant la fusion explicite, à relancer par "
+            "fermeture-réouverture (ADR 0029)"
         )
     if len(lines) > 1:
         raise Refusal(f"job « {job} » : {len(lines)} lignes `{FUSION}…` au journal, une attendue")
@@ -383,15 +385,15 @@ def trunk(run: Run, args: argparse.Namespace) -> Verdict:
     origin = output(run, "git", "rev-parse", "--verify", f"refs/remotes/origin/{base}").strip()
     current = not workflows_changed(run, triggered, origin)
     lines = [
-        f"{seen.job} : extrait {seen.commit}, trunk {seen.trunk} — {FRESHNESS[seen.trunk == origin]}"
+        f"{seen.job} : construit {seen.commit}, trunk {seen.trunk} — "
+        f"{FRESHNESS[seen.trunk == origin]}"
         for seen in fusions
     ]
     lines.append(definition_line(workflow, triggered, current, base))
     held = current and all(seen.trunk == origin for seen in fusions)
     lines.append(
-        f"trunk éprouvé {distinct(seen.trunk for seen in fusions)} — run {run_id}, extrait "
-        f"{distinct(seen.commit for seen in fusions)}, workflow {workflow} : {FRESHNESS[held]} "
-        f"(origin/{base} = {origin})"
+        f"trunk éprouvé {distinct(seen.trunk for seen in fusions)} — run {run_id}, workflow "
+        f"{workflow} : {FRESHNESS[held]} (origin/{base} = {origin})"
     )
     return held, lines
 
