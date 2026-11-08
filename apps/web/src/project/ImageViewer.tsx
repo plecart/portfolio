@@ -7,7 +7,7 @@ import { PAPER_BUTTON, type readyImages } from './project.ts'
 import { useGestures } from './useGestures.ts'
 import { useZoomView } from './useZoomView.ts'
 import { keyCommand } from './viewerKeys.ts'
-import { centerOf, MIN_SCALE, panBy, toggleZoom, zoomAt } from './zoom.ts'
+import { MIN_SCALE, panBy, stepZoom, toggleZoom, zoomAt } from './zoom.ts'
 
 /** Une image prête de la galerie : sa légende et ses sources. */
 type Image = ReturnType<typeof readyImages>[number]
@@ -107,7 +107,7 @@ function ViewerLayer({
           (view, stage) =>
             'pan' in command
               ? panBy(view, command.pan, stage)
-              : zoomAt(view, view.scale + command.zoom, centerOf(stage.zone), stage),
+              : stepZoom(view, command.zoom, stage),
           true,
         )
       }}

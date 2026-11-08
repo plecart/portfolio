@@ -3,7 +3,15 @@
  * une image carrée s'affiche en 800 × 800 à ×1.
  */
 import { describe, expect, test } from 'vitest'
-import { clampView, containedSize, FIT, panBy, toggleZoom, zoomAt } from '../src/project/zoom.ts'
+import {
+  clampView,
+  containedSize,
+  FIT,
+  panBy,
+  stepZoom,
+  toggleZoom,
+  zoomAt,
+} from '../src/project/zoom.ts'
 
 const ZONE = { width: 1000, height: 800 }
 const CENTER = { x: 500, y: 400 }
@@ -116,4 +124,32 @@ describe('le double clic', () => {
   test.each([1.15, 2, 4])('depuis ×%s : l’image entière, quel que soit le point', (scale) => {
     expect(toggleZoom({ scale, x: -50, y: 30 }, { x: 900, y: 100 }, SQUARE)).toEqual(FIT)
   })
+})
+
+describe('les touches + et −, d’une unité', () => {
+  test.each([
+    [1, 1, 2],
+    [1.15, 1, 2],
+    [2, 1, 3],
+    [3.5, 1, 4],
+    [4, 1, 4],
+    [4, -1, 3],
+    [2.5, -1, 2],
+    [2, -1, 1],
+    [1.15, -1, 1],
+    [1, -1, 1],
+  ])('depuis ×%s, un pas de %d mène au palier ×%s', (scale, step, next) => {
+    expect(stepZoom({ scale, x: 0, y: 0 }, step, SQUARE)).toEqual({ scale: next, x: 0, y: 0 })
+  })
+
+  // Cinq crans de molette depuis ×1 rendent 2,000…01 ; cinq depuis ×4, 1,999…93.
+  test.each([
+    [2.000000000000001, -1, 1],
+    [1.9999999999999993, 1, 3],
+  ])(
+    'à un écart d’arrondi de son palier, depuis ×%s, un pas de %d mène au palier ×%s',
+    (scale, step, next) => {
+      expect(stepZoom({ scale, x: 0, y: 0 }, step, SQUARE).scale).toBe(next)
+    },
+  )
 })

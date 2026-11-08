@@ -33,6 +33,12 @@ export const FIT: View = { scale: MIN_SCALE, x: 0, y: 0 }
 /** Le facteur où le double clic porte l'image depuis ×1 (issue #243, décision 8). */
 const DOUBLE_TAP_SCALE = 2
 
+/**
+ * L'écart sous lequel un facteur se tient sur son palier entier : cinq crans de molette depuis ×1
+ * rendent 2,000…01, d'où − mènerait à ×2 au lieu de ×1.
+ */
+const ROUNDING = 1e-9
+
 /** `value` ramenée entre `min` et `max`. */
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
@@ -71,7 +77,7 @@ export function clampView({ scale, x, y }: View, stage: Stage): View {
 }
 
 /** Le centre d'une zone : le point visé par un zoom à la touche (spec §4.4). */
-export const centerOf = ({ width, height }: Size): Point => ({ x: width / 2, y: height / 2 })
+const centerOf = ({ width, height }: Size): Point => ({ x: width / 2, y: height / 2 })
 
 /**
  * Le zoom vers un facteur, au point visé : le point de l'image sous ce point y reste — ou vient sous
@@ -106,6 +112,21 @@ export function zoomAt(view: View, scale: number, point: Point, stage: Stage, to
  */
 export function toggleZoom(view: View, point: Point, stage: Stage): View {
   return view.scale > MIN_SCALE ? FIT : zoomAt(view, DOUBLE_TAP_SCALE, point, stage)
+}
+
+/**
+ * Le zoom à la touche (spec §4.4) : d'une unité, au palier entier suivant ou précédent — depuis
+ * ×1,15 qu'une molette a laissé, + mène à ×2 et − à ×1 —, au centre de la zone (`zoomAt`, qui le
+ * borne).
+ *
+ * @param view La vue en place.
+ * @param step Le nombre de paliers : positif pour +, négatif pour −.
+ * @param stage La zone et l'image.
+ * @returns La nouvelle vue.
+ */
+export function stepZoom(view: View, step: number, stage: Stage): View {
+  const from = step > 0 ? Math.floor(view.scale + ROUNDING) : Math.ceil(view.scale - ROUNDING)
+  return zoomAt(view, from + step, centerOf(stage.zone), stage)
 }
 
 /**
