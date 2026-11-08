@@ -3,7 +3,7 @@
  * une image carrée s'affiche en 800 × 800 à ×1.
  */
 import { describe, expect, test } from 'vitest'
-import { clampView, containedSize, FIT, panBy, zoomAt } from '../src/project/zoom.ts'
+import { clampView, containedSize, FIT, panBy, toggleZoom, zoomAt } from '../src/project/zoom.ts'
 
 const ZONE = { width: 1000, height: 800 }
 const CENTER = { x: 500, y: 400 }
@@ -81,6 +81,14 @@ describe('le zoom', () => {
     expect(zoomAt(FIT, 2, { x: 850, y: 400 }, SQUARE)).toEqual({ scale: 2, x: -300, y: 0 })
   })
 
+  test('le point visé déplacé entraîne l’image : (700, 400) amené en (650, 400), à ×2', () => {
+    expect(zoomAt(FIT, 2, { x: 700, y: 400 }, SQUARE, { x: 650, y: 400 })).toEqual({
+      scale: 2,
+      x: -250,
+      y: 0,
+    })
+  })
+
   test('au centre de la zone, la translation suit le facteur', () => {
     expect(zoomAt({ scale: 2, x: -200, y: 100 }, 3, CENTER, SQUARE)).toEqual({
       scale: 3,
@@ -93,5 +101,19 @@ describe('le zoom', () => {
     const view = { scale: 4, x: -500, y: 300 }
 
     expect(zoomAt(view, 5, { x: 900, y: 100 }, SQUARE)).toEqual(view)
+  })
+})
+
+describe('le double clic', () => {
+  test('à ×1, au point (700, 400) : ×2, et ce point de l’image reste sous le pointeur', () => {
+    expect(toggleZoom(FIT, { x: 700, y: 400 }, SQUARE)).toEqual({ scale: 2, x: -200, y: 0 })
+  })
+
+  test('à ×1, au point (850, 400) : ×2, la translation bornée à −300', () => {
+    expect(toggleZoom(FIT, { x: 850, y: 400 }, SQUARE)).toEqual({ scale: 2, x: -300, y: 0 })
+  })
+
+  test.each([1.15, 2, 4])('depuis ×%s : l’image entière, quel que soit le point', (scale) => {
+    expect(toggleZoom({ scale, x: -50, y: 30 }, { x: 900, y: 100 }, SQUARE)).toEqual(FIT)
   })
 })

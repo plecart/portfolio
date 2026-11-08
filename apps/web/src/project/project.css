@@ -196,8 +196,10 @@
 
   /* La couche plein écran (#243) : toute la fenêtre, au-dessus du panneau (30), de l'entête et des
      liens de l'auteur (40), sur la palette sombre dans les deux modes (`data-scheme`, tokens.css).
-     Fondus d'entrée et de sortie, comme le panneau. */
+     Fondus d'entrée et de sortie, comme le panneau ; 150 ms en mouvement réduit (§6.3). Les gestes
+     du doigt sont tous à elle (`useGestures`) : ni défilement ni zoom de la page. */
   .image-viewer {
+    --viewer-fade: var(--dur);
     position: fixed;
     inset: 0;
     z-index: 50;
@@ -205,11 +207,16 @@
     flex-direction: column;
     background-color: var(--bg);
     color: var(--ink);
-    animation: project-in var(--dur) var(--ease-out);
+    touch-action: none;
+    animation: project-in var(--viewer-fade) var(--ease-out);
+
+    @media (prefers-reduced-motion: reduce) {
+      --viewer-fade: var(--dur-fast);
+    }
   }
 
   .image-viewer[data-state='closed'] {
-    animation: project-out var(--dur) var(--ease-out);
+    animation: project-out var(--viewer-fade) var(--ease-out);
   }
 
   /* La zone d'image : la fenêtre moins la barre. L'image s'y centre, à la taille que la couche lui
@@ -224,10 +231,19 @@
     overflow: hidden;
   }
 
-  /* Le zoom et le déplacement à la touche (PR #250, H4) ; la bascule d'une image à l'autre reste
-     instantanée. */
+  /* Zoomée, l'image se saisit pour se déplacer (PR #250, H5). */
+  .image-viewer-zone[data-zoomed] {
+    cursor: grab;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  /* Le double clic et les touches glissent (PR #250, H4) ; l'image suit sans retard un glisser, une
+     molette ou un pincement, et la bascule d'une image à l'autre reste instantanée. */
   @media (prefers-reduced-motion: no-preference) {
-    .image-viewer-image {
+    .image-viewer-image[data-glide] {
       transition: transform var(--dur) var(--ease-out);
     }
   }

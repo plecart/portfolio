@@ -1,0 +1,69 @@
+import { useEffect, useState } from 'react'
+import { clampView, containedSize, FIT, type Size, type Stage, type View } from './zoom.ts'
+
+/**
+ * La taille d'un élément, suivie à chaque redimensionnement.
+ *
+ * @returns `null` avant la première mesure.
+ */
+function useSize(element: HTMLElement | null): Size | null {
+  const [size, setSize] = useState<Size | null>(null)
+
+  useEffect(() => {
+    if (!element) return
+    const observer = new ResizeObserver(([{ contentRect }]) =>
+      setSize({ width: contentRect.width, height: contentRect.height }),
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [element])
+
+  return size
+}
+
+/**
+ * La vue de la couche plein écran (issue #243) : son facteur et sa translation, bornés à la zone
+ * d'image telle qu'elle est mesurée, la fenêtre pouvant changer de taille sous une vue. Elle part de
+ * ×1, l'image entière.
+ *
+ * @param zone La zone d'image, `null` avant son montage.
+ * @param natural La taille naturelle de l'image montrée, ou toute taille au même format.
+ * @returns `shown`, la vue à rendre ; `box`, la taille de l'image à ×1, `null` avant la première
+ *   mesure ; `glide`, la vue vient d'un pas — touche, double clic — qui glisse (PR #250, H4), et non
+ *   d'un geste que l'image suit ; `change`, `hold` et `reset`, qui la changent.
+ */
+export function useZoomView(zone: HTMLElement | null, natural: Size) {
+  const size = useSize(zone)
+  const [{ view, glide }, setState] = useState({ view: FIT, held: FIT, glide: false })
+  const stage: Stage | null = size && { zone: size, natural }
+
+  return {
+    shown: stage ? clampView(view, stage) : FIT,
+    box: stage && containedSize(stage.zone, natural),
+    glide,
+    /**
+     * Change la vue ; sans effet avant la première mesure. Chaque changement part du précédent,
+     * même pas encore rendu : plusieurs pointeurs peuvent bouger entre deux rendus.
+     *
+     * @param next La nouvelle vue, de la vue en place, de la zone et de la vue retenue (`hold`).
+     * @param glides Un pas qui glisse ; par défaut, l'image suit sans retard.
+     */
+    change(next: (view: View, stage: Stage, held: View) => View, glides = false) {
+      if (!stage) return
+      setState((state) => ({
+        ...state,
+        view: next(clampView(state.view, stage), stage, state.held),
+        glide: glides,
+      }))
+    },
+    /**
+     * Retient la vue en place : un pincement part d'elle à chacun de ses pas, sans cumuler les
+     * bornes de ses pas précédents.
+     */
+    hold() {
+      if (stage) setState((state) => ({ ...state, held: clampView(state.view, stage) }))
+    },
+    /** Remet l'image entière, d'un coup : changer d'image la remplace à ×1 (décision 7). */
+    reset: () => setState({ view: FIT, held: FIT, glide: false }),
+  }
+}
