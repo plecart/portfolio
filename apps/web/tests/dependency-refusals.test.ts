@@ -12,10 +12,12 @@
  * Le verrou ne change que par une PR : le rouge apparaît dans celle qui apporte la nouvelle
  * version du plugin, celles de Dependabot comprises.
  *
- * Le sens inverse a le même mécanisme et deux occurrences au 2026-10-25 — les deux entrées
+ * Le sens inverse a le même mécanisme et trois occurrences au 2026-11-09 — les trois entrées
  * imbriquées de l'`overrides` du manifeste : `openapi-typescript`, dont le pair `typescript` est
- * **forcé** sur la majeure installée, qu'il ne déclare pas, et `chromium-bidi`, dont la dépendance
- * `zod` est forcée sur la 4, seule corrigée de GHSA-mrhx-c7xc-m3w5 (§2.4). Hors de la table,
+ * **forcé** sur la majeure installée, qu'il ne déclare pas, `chromium-bidi`, dont la dépendance
+ * `zod` est forcée sur la 4, seule corrigée de GHSA-mrhx-c7xc-m3w5, et
+ * `@typescript-eslint/typescript-estree`, dont la dépendance `minimatch` est forcée sur la 11,
+ * seule corrigée de GHSA-g3hv-75wg-m249 (§2.4). Hors de la table,
  * puisque rien n'est refusé à Dependabot : chaque cas rougit le jour où la plage du paquet accepte
  * cette majeure, et l'override se retire alors.
  */
@@ -133,14 +135,29 @@ test("l'override du pair typescript d'openapi-typescript reste nécessaire", () 
   ).toBe(false)
 })
 
-test("l'override de la dépendance zod de chromium-bidi reste nécessaire", () => {
-  const lockfile = readAppJson<Lockfile>('package-lock.json')
-  const installed = String(major(installedPackage(lockfile, 'zod').version))
-  const range = installedPackage(lockfile, 'chromium-bidi').dependencies?.zod
-  if (range === undefined) throw new Error('chromium-bidi ne dépend plus de zod : retirer son override')
+/** Les dépendances forcées sur une majeure que leur parent ne déclare pas : `[parent, dépendance]`. */
+const FORCED_DEPENDENCIES: [parent: string, dependency: string][] = [
+  ['chromium-bidi', 'zod'],
+  ['@typescript-eslint/typescript-estree', 'minimatch'],
+]
 
-  expect(
-    acceptsMajor(range, installed),
-    `chromium-bidi accepte zod ${installed} (${range}) : retirer son override du manifeste`,
-  ).toBe(false)
-})
+test.each(FORCED_DEPENDENCIES)(
+  "l'override de la dépendance %s → %s reste nécessaire",
+  (parent, dependency) => {
+    const lockfile = readAppJson<Lockfile>('package-lock.json')
+    // Résolution de npm : la copie imbriquée sous le parent d'abord, sinon celle de la racine.
+    const resolved =
+      lockfile.packages[`node_modules/${parent}/node_modules/${dependency}`] ??
+      installedPackage(lockfile, dependency)
+    const installed = String(major(resolved.version))
+    const range = installedPackage(lockfile, parent).dependencies?.[dependency]
+    if (range === undefined) {
+      throw new Error(`${parent} ne dépend plus de ${dependency} : retirer son override`)
+    }
+
+    expect(
+      acceptsMajor(range, installed),
+      `${parent} accepte ${dependency} ${installed} (${range}) : retirer son override du manifeste`,
+    ).toBe(false)
+  },
+)
