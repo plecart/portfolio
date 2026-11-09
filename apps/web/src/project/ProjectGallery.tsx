@@ -54,27 +54,19 @@ function useImageIndex(count: number, listening: boolean) {
  * un balayage, dès qu'une image est prête : la couche, second dialogue imbriqué dans la fiche,
  * partage son rang et le lui laisse à la fermeture, où Radix rend le focus au bouton. Elle n'a pas
  * d'entrée d'historique : elle se ferme avec la fiche, au même rendu, et montre pendant son fondu de
- * sortie l'image choisie, quand la galerie revient à la première.
+ * sortie l'image choisie.
+ *
+ * Sur le retour à sa carte, elle garde l'image choisie : la carte réapparaît avec sa photo au bout
+ * du vol, d'un coup (spec §4.6).
  *
  * @param gallery Les images du projet, prêtes ou non.
  * @param open La fiche est ouverte ; fermée, elle ferme la couche avec elle.
- * @param rewound La fiche revient à sa carte : la galerie montre d'un coup sa première image, la
- *   photo de la carte (spec §4.6), quelle que soit celle choisie.
  */
-export function ProjectGallery({
-  gallery,
-  open,
-  rewound = false,
-}: {
-  gallery: Project['gallery']
-  open: boolean
-  rewound?: boolean
-}) {
+export function ProjectGallery({ gallery, open }: { gallery: Project['gallery']; open: boolean }) {
   const images = readyImages(gallery)
   const [viewing, setViewing] = useState(false)
   if (viewing && !open) setViewing(false)
-  const { index: chosen, go, navigable } = useImageIndex(images.length, !viewing)
-  const index = rewound ? 0 : chosen
+  const { index, go, navigable } = useImageIndex(images.length, !viewing)
   const viewable = images.length > 0
   const swipe = useSwipe(go)
   const openOnClick = useClickWithoutSwipe(() => viewable && setViewing(true))
@@ -86,7 +78,6 @@ export function ProjectGallery({
           {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- « Agrandir l'image » porte le geste au clavier */}
           <div
             className="project-gallery-track"
-            data-rewound={rewound || undefined}
             style={{ translate: `${-index * 100}%` }}
             onPointerDown={openOnClick.onPointerDown}
             onClick={openOnClick.onClick}
@@ -116,7 +107,7 @@ export function ProjectGallery({
         </div>
       </div>
       {viewable && (
-        <ImageViewer images={images} index={chosen} onStep={go} onClose={() => setViewing(false)} />
+        <ImageViewer images={images} index={index} onStep={go} onClose={() => setViewing(false)} />
       )}
     </Dialog>
   )

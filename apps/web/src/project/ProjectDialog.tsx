@@ -100,12 +100,7 @@ export function ProjectDialog({
           <DialogClose aria-label={strings.closeProject} className={CLOSE_CLASSES}>
             <CloseIcon />
           </DialogClose>
-          <ProjectGallery
-            key={shown.slug}
-            gallery={shown.gallery}
-            open={open}
-            rewound={returning}
-          />
+          <ProjectGallery key={shown.slug} gallery={shown.gallery} open={open} />
           {/* Une clé à elle : des enfants voisins ne partagent jamais la leur. */}
           <ProjectContent key={`${shown.slug}/content`} project={shown} />
         </DialogContent>
