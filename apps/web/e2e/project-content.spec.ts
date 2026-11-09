@@ -244,6 +244,9 @@ test.describe('la stack repliée à deux rangées', () => {
   /** La liste d'un groupe de la stack, par son rang. */
   const stack = (page: Page, index: number) => panel(page).locator('.project-stack').nth(index)
 
+  /** Le dernier élément d'une liste de la stack : son ruban-bouton, quand elle en a un. */
+  const lastItem = (list: Locator) => list.getByRole('listitem').last()
+
   /** Le nombre de rangées d'une liste, par le haut de ses éléments. */
   const rowsOf = (list: Locator) =>
     list
@@ -272,7 +275,7 @@ test.describe('la stack repliée à deux rangées', () => {
 
         expect(shown).toBeLessThan(total)
         expect(await rowsOf(list)).toBe(2)
-        await expect(list.getByRole('listitem').last()).toHaveText(folded)
+        await expect(lastItem(list)).toHaveText(folded)
         await expect(button).toHaveText(folded)
         await expect(button).toHaveAccessibleName(name)
         await expect(button).toHaveAttribute('aria-expanded', 'false')
@@ -285,7 +288,7 @@ test.describe('la stack repliée à deux rangées', () => {
         await expect(button).toHaveAccessibleName(name)
         await expect(button).toBeFocused()
         await expect(list.locator('[data-ribbon]')).toHaveCount(total)
-        await expect(list.getByRole('listitem').last()).toHaveText('Réduire')
+        await expect(lastItem(list)).toHaveText('Réduire')
         await expectNoViolations(page)
 
         await button.press('Enter')
@@ -307,7 +310,7 @@ test.describe('la stack repliée à deux rangées', () => {
         ['border-top-color', 'var(--tape)'],
         ['color', 'var(--ink)'],
       ])
-      const more = stack(page, 0).getByRole('listitem').last()
+      const more = lastItem(stack(page, 0))
 
       await expect(more).toHaveCSS('height', '32px')
       await expect(more).toHaveCSS('border-top-style', 'dashed')
@@ -325,7 +328,7 @@ test.describe('la stack repliée à deux rangées', () => {
   }) => {
     test.skip(isMobile, 'appareil sans survol')
     await arriveAt(page, MANY)
-    const more = stack(page, 0).getByRole('listitem').last()
+    const more = lastItem(stack(page, 0))
     const before = (await more.boundingBox())!
 
     await expect(more).toHaveCSS('transition-duration', '0.15s')
@@ -340,7 +343,7 @@ test.describe('la stack repliée à deux rangées', () => {
     test.skip(isMobile, 'appareil sans survol')
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await arriveAt(page, MANY)
-    const more = stack(page, 0).getByRole('listitem').last()
+    const more = lastItem(stack(page, 0))
     const before = (await more.boundingBox())!
 
     await more.hover()

@@ -92,14 +92,26 @@ export const strapColors = (page: Page) =>
 /** Une couleur qu'aucune couche de la carte ne prend, ni aucun mélange des siennes. */
 const PROBE = 'rgb(255, 0, 255)'
 
-/** Pose ces jetons sur la sangle d'une carte, à cette couleur ; vide, elle les y retire. */
-const recolorStrap = (card: Locator, tokens: string[], color: string) =>
-  strap(card).evaluate(
+/**
+ * Pose ces jetons sur la sangle d'une carte, à cette couleur.
+ *
+ * @returns De quoi lui rendre son style en ligne d'avant, ce qu'un appel précédent y a posé
+ *   compris.
+ */
+async function recolorStrap(card: Locator, tokens: string[], color: string) {
+  const before = await strap(card).evaluate(
     (element: HTMLElement, [names, value]) => {
+      const inline = element.style.cssText
       for (const name of names) element.style.setProperty(name, value)
+      return inline
     },
     [tokens, color] as const,
   )
+  return () =>
+    strap(card).evaluate((element: HTMLElement, inline) => {
+      element.style.cssText = inline
+    }, before)
+}
 
 /**
  * Peint la tranche de la sangle d'une carte de la couleur témoin, jusqu'à la fin du scénario : la
@@ -125,7 +137,10 @@ const PIXEL_TOLERANCE = 6
  */
 type Capture = { data: Uint8ClampedArray; columns: number; rows: number; scale: number }
 
-/** Capture une zone de la page et la décode dans la page, où un relevé la lit sans la rapatrier. */
+/**
+ * Capture une zone de la page et la décode dans la page, où un relevé la lit sans la rapatrier ; à
+ * libérer (`dispose`) une fois lue.
+ */
 async function capture(page: Page, zone: Rect): Promise<JSHandle<Capture>> {
   const png = await page.screenshot({ clip: zone })
   return page.evaluateHandle(
@@ -157,7 +172,8 @@ export async function pixelDistances(
   colors: string[],
   rect: Rect = zone,
 ): Promise<number[][]> {
-  return (await capture(page, zone)).evaluate(
+  const shot = await capture(page, zone)
+  const distances = await shot.evaluate(
     (
       { data, columns, rows, scale },
       { colors: targets, rect: { x, y, width, height }, tolerance },
@@ -190,16 +206,18 @@ export async function pixelDistances(
       tolerance: PIXEL_TOLERANCE,
     },
   )
+  await shot.dispose()
+  return distances
 }
 
 /**
  * Les pixels que la sangle d'une carte peint dans une zone de la page : ceux qui changent, d'un canal
  * au moins de plus que `PIXEL_TOLERANCE`, la zone capturée de nouveau, ses couleurs passées à la
- * couleur témoin, puis rendues à `:root`, tranche témoin (`probeTranche`) comprise. Chacun par son
- * centre, en px CSS, depuis le coin haut-gauche d'`origin` : abscisse, ordonnée. Son bord anticrénelé
- * compte comme le reste, à cette tolérance près. Repeinte et non masquée : masquée (`visibility:
- * hidden`), 3 à 5 pixels de la bande basse changeaient aussi au bureau, hors de sa portée ; repeinte,
- * aucun (Chromium 156, mesuré le 2026-11-09).
+ * couleur témoin, puis rendues à ce qu'elles étaient, tranche témoin (`probeTranche`) comprise.
+ * Chacun par son centre, en px CSS, depuis le coin haut-gauche d'`origin` : abscisse, ordonnée. Son
+ * bord anticrénelé compte comme le reste, à cette tolérance près. Repeinte et non masquée : masquée
+ * (`visibility: hidden`), 3 à 5 pixels de la bande basse changeaient aussi au bureau, hors de sa
+ * portée ; repeinte, aucun (Chromium 156, mesuré le 2026-11-09).
  *
  * @param zone La zone capturée.
  * @param origin Le rectangle d'où se comptent les coordonnées.
@@ -207,10 +225,10 @@ export async function pixelDistances(
 export async function strapPixels(card: Locator, zone: Rect, origin: Rect) {
   const page = card.page()
   const shown = await capture(page, zone)
-  await recolorStrap(card, STRAP_TOKENS, PROBE)
+  const restore = await recolorStrap(card, STRAP_TOKENS, PROBE)
   const probed = await capture(page, zone)
-  await recolorStrap(card, STRAP_TOKENS, '')
-  return shown.evaluate(
+  await restore()
+  const painted = await shown.evaluate(
     ({ data, columns, rows, scale }, { other, offset: [dx, dy], tolerance }) => {
       const points: [number, number][] = []
       for (let row = 0; row < rows; row += 1) {
@@ -230,6 +248,8 @@ export async function strapPixels(card: Locator, zone: Rect, origin: Rect) {
       tolerance: PIXEL_TOLERANCE,
     },
   )
+  await Promise.all([shown.dispose(), probed.dispose()])
+  return painted
 }
 
 /** Les trois technologies qu'une carte montre au plus (spec §1.4), une par type. */

@@ -384,8 +384,8 @@ async function openStrappedCard(page: Page): Promise<Locator> {
 
 /**
  * Les pixels de la sangle dans la boîte du bandeau de résumé d'une carte : son jaune, et la moitié de
- * son jaune et de son encre, teinte de sa tranche et des frontières lissées de ses rayures. Son encre
- * est aussi celle du texte.
+ * son jaune et de son encre, teinte de sa tranche et des frontières lissées de ses rayures. Son
+ * encre, non : en mode clair, c'est celle du texte (`--strap-ink`, `--ink`).
  */
 async function strapOverSummary(card: Locator): Promise<number> {
   const [yellow, , edge] = await strapColors(card.page())
@@ -422,6 +422,9 @@ const strapRuns = async (transitions: Awaited<ReturnType<typeof watchTransitions
     .map(({ layer, property }) => [layer, property])
     .sort()
 
+/** Les deux boîtes de la sangle, qui portent chacune sa bande : sa tranche, puis ses rayures. */
+const strapBoxes = (card: Locator) => [strap(card), strap(card).locator('.card-strap-stripes')]
+
 /** Le glissement : une transition de la transformation de la bande, dans chaque boîte. */
 const GLIDE_RUNS = [
   ['card-strap', 'transform'],
@@ -449,7 +452,7 @@ for (const [gesture, act] of INTENTS) {
     expect(await strapOverSummary(card)).toBe(0)
     await expectCornered(card)
     expect(await strapRuns(transitions)).toEqual(GLIDE_RUNS)
-    for (const band of [strap(card), strap(card).locator('.card-strap-stripes')]) {
+    for (const band of strapBoxes(card)) {
       await expect(band).toHaveCSS('transition-duration', duration, { pseudo: 'before' })
       await expect(band).toHaveCSS('transition-timing-function', easing, { pseudo: 'before' })
       // Amincie : sa transformation, hors de sa rotation, la réduit.
@@ -754,7 +757,7 @@ test.describe('en mouvement réduit', () => {
       ['card-strap-stripes', 'opacity'],
       ['card-strap-stripes', 'opacity'],
     ])
-    for (const band of [strap(card), strap(card).locator('.card-strap-stripes')]) {
+    for (const band of strapBoxes(card)) {
       await expect(band).toHaveCSS('opacity', '0', { pseudo: 'before' })
       await expect(band).toHaveCSS('opacity', '1', { pseudo: 'after' })
     }
