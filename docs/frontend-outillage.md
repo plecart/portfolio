@@ -139,9 +139,11 @@ avant de toucher au bloc :
 L'explication vit ici et non dans l'`index.html` : ce fichier est servi à chaque visite et recopié
 dans l'image `api`, chaque ligne de commentaire y voyage sur le réseau.
 
-**Lighthouse CI.** `lighthouserc.json` mesure la table à douze cartes et assied les quatre seuils de
-la spec §1.16. Sa collecte démarre `e2e/lighthouse-server.ts` (`collect.startServerCommand`) et lit
-son adresse (`collect.url`) : un serveur rangé avec les tests, lancé par Node sans outil de plus, qui
+**Lighthouse CI.** `lighthouserc.json` mesure deux adresses (`collect.url`) — la table à douze
+cartes, `/`, puis la fiche du premier projet, `/projets/projet-01` — et assied sur chacune les
+quatre seuils de la spec §1.16. Sa collecte démarre `e2e/lighthouse-server.ts`
+(`collect.startServerCommand`), qui prend son origine dans la première : un serveur rangé avec les
+tests, lancé par Node sans outil de plus, qui
 sert le `dist` réel, repli SPA compris, la liste de `PROJECT_SETS.twelveWithShowcase` et de vrais
 WebP, le tout sur son origine. `dist` portant `VITE_API_URL` en dur, il remplace cette origine par
 la sienne dans le JS servi, sans second build : l'artefact mesuré reste celui de la production.
@@ -150,12 +152,14 @@ Quatre points mesurés, non évidents :
 - La porte est **`lhci autorun`, jamais `lhci assert` seul** : sans rapport collecté, `assert`
   annonce « 0 URL(s), 0 run(s), All results processed » et sort **0**. Une collecte cassée rendrait
   donc la porte verte sans avoir rien vérifié. `autorun` sort 1 dans le même cas.
-- **Les seuils ne prouvent pas que la table a été mesurée** : l'écran d'erreur rend 99, 100, 100,
-  100, et `lhci` n'a aucune assertion de minimum — il ne lit que `minScore`, `maxLength` et
-  `maxNumericValue`, et ignore `minNumericValue` en silence (`@lhci/utils`, `assertions.js`). C'est
-  `e2e/lighthouse-server.spec.ts`, joué par `make web-e2e`, qui prouve que ce serveur rend les douze
-  cartes et toutes leurs images, couvertures et icônes ; ses quatre routes (`dist`, API, images,
-  icônes), mutées une à une, y rougissent.
+- **Les seuils ne prouvent pas que la table ni la fiche ont été mesurées** : l'écran d'erreur rend
+  99, 100, 100, 100, et `lhci` n'a aucune assertion de minimum — il ne lit que `minScore`,
+  `maxLength` et `maxNumericValue`, et ignore `minNumericValue` en silence (`@lhci/utils`,
+  `assertions.js`). C'est `e2e/lighthouse-server.spec.ts`, joué par `make web-e2e`, qui prouve que
+  ce serveur rend les douze cartes et toutes leurs images, couvertures et icônes ; ses quatre routes
+  (`dist`, API, images, icônes), mutées une à une, y rougissent. Il prouve de même que la seconde
+  adresse ouvre la fiche du premier projet, la première image de sa galerie décodée : l'adresse
+  mutée vers un slug absent du jeu, ou la route des images retirée, il y rougit.
 - **La collecte ne tourne pas sous Windows** : `chrome-launcher` échoue sur `EPERM` en supprimant
   son dossier temporaire, que Chrome tient encore (reproduit trois fois, y compris avec `%TEMP%`
   déplacé). C'est donc une porte **de CI seulement** ; en local, `node e2e/lighthouse-server.ts`,
@@ -180,7 +184,13 @@ Quatre points mesurés, non évidents :
   12 runs sur 12, mais performance 95 et LCP de 2,6 s sur les 11 où les images arrivent avant lui,
   98 et 2,1 s sur l'autre. Avant l'entrée des cartes, le 2026-10-31, le LCP portait sur la
   couverture de la vitrine en `loading="lazy"` : performance 98 à 99 et LCP de l'ordre de 2 s avec
-  les images d'essai, 95 à 96 et de l'ordre de 2,6 s avec des WebP de bruit de 90 et 357 Ko.
+  les images d'essai, 95 à 96 et de l'ordre de 2,6 s avec des WebP de bruit de 90 et 357 Ko. La
+  fiche du premier projet, mesurée le 2026-11-09 : performance 91 à 93, accessibilité 100, bonnes
+  pratiques 100, SEO 100, LCP de 2,5 s sur la première image de sa galerie, que le navigateur ne
+  découvre qu'après le HTML, le JS puis la liste. Le serveur ne pose pas l'en-tête `Link` qui la
+  précharge en production (`apps/api/content/link_preview.py`, #27) — il ne fait pas tourner
+  Django —, d'où ce score au plus près du seuil ; `lhci assert` garde le meilleur des trois runs
+  (`aggregationMethod`, `optimistic` par défaut, `@lhci/utils` 0.15.1, `assertions.js`).
 
 **`overrides` du manifeste — six avis de sécurité écartés à la racine.** `@lhci/cli` 0.15.1
 traînait 10 avis (`npm audit`, arbre complet), dont 7 `high`, sur trois racines (2026-09-25). Un
