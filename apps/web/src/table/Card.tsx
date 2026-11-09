@@ -55,23 +55,30 @@ function CardImage(props: ComponentProps<'img'>) {
 }
 
 /**
- * La photo (spec §4.1) : le carré `--line`, l'image de couverture si elle a des variantes et, pour
- * un projet en cours, sa copie en niveaux de gris par-dessus — la même image, par CSS seulement. Le
+ * La photo (spec §4.1) : le carré `--line` et l'image de couverture si elle a des variantes. Le
  * bandeau de résumé la recouvre, masqué : le résumé est dans la description du lien.
  */
 function Photo({ project, size }: { project: Project; size: CardSize }) {
   const cover = coverImage(project)
-  const sizes = coverSizes(size)
   return (
     <div className="card-photo">
-      {cover && <CardImage {...cover} sizes={sizes} />}
-      {cover && cardStates(project).ongoing && (
-        <CardImage {...cover} sizes={sizes} className="card-photo-grey" aria-hidden />
-      )}
+      {cover && <CardImage {...cover} sizes={coverSizes(size)} />}
       <p className="card-summary" aria-hidden>
         <span className="card-summary-text">{project.summary}</span>
       </p>
     </div>
+  )
+}
+
+/**
+ * La sangle de chantier d'un projet en cours (spec §4.1), décorative : deux boîtes, qui la coupent
+ * 3 px au-delà du cadre puis au cadre (`card.css`).
+ */
+function Strap() {
+  return (
+    <span className="card-strap" aria-hidden>
+      <span className="card-strap-stripes" />
+    </span>
   )
 }
 
@@ -106,24 +113,31 @@ function TechnologyRibbons({ project }: { project: Project }) {
 }
 
 /**
- * Les rubans d'état d'un projet (spec §4.1), les états présents seulement ; leur identité, comme
- * celle d'un ruban de technologie (`TechnologyRibbon`) : `ongoing`, `live`.
+ * Un ruban d'état (spec §4.1) : son point, fixe, à la couleur de l'état, puis son texte. Son identité
+ * est l'état, comme celle d'un ruban de technologie est son nom (`TechnologyRibbon`).
  */
+function StateRibbon({
+  state,
+  label,
+}: {
+  state: keyof ReturnType<typeof cardStates>
+  label: string
+}) {
+  return (
+    <li className="card-ribbon" data-ribbon={state}>
+      <span className={`card-dot card-dot-${state}`} />
+      {label}
+    </li>
+  )
+}
+
+/** Les rubans d'état d'un projet (spec §4.1), les états présents seulement. */
 export function StateRibbons({ project }: { project: Project }) {
   const { ongoing, live } = cardStates(project)
   return (
     <>
-      {ongoing && (
-        <li className="card-ribbon" data-ribbon="ongoing">
-          {strings.ribbonOngoing}
-        </li>
-      )}
-      {live && (
-        <li className="card-ribbon" data-ribbon="live">
-          <span className="card-dot" />
-          {strings.ribbonLive}
-        </li>
-      )}
+      {ongoing && <StateRibbon state="ongoing" label={strings.ribbonOngoing} />}
+      {live && <StateRibbon state="live" label={strings.ribbonLive} />}
     </>
   )
 }
@@ -151,8 +165,8 @@ function Band({ project }: { project: Project }) {
 /**
  * Une carte polaroid (spec §4.1, §4.2) : le lien est la cellule de la table, au sens de
  * `TABLE_CELL_SELECTOR` — sa boîte de grille, sans transformation. Il contient, de l'extérieur vers
- * l'intérieur, la couche d'entrée, la pose et la face, qui porte le trombone, le post-it, la photo
- * et la bande basse.
+ * l'intérieur, la couche d'entrée, la pose et la face, qui porte le trombone, le post-it, la photo,
+ * la sangle d'un projet en cours et la bande basse.
  *
  * Le lien tire son nom de son contenu, où restent exposés le `<h2>`, que la navigation par titres
  * lit seul, et la suite du nom, en texte masqué. Chromium sépare les deux d'une espace, devant
@@ -207,6 +221,7 @@ export function Card({
             </h2>
             <span className="sr-only">{cardNameSuffix(project)}</span>
             <Photo project={project} size={size} />
+            {cardStates(project).ongoing && <Strap />}
             <Band project={project} />
           </div>
         </div>

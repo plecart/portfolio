@@ -10,6 +10,7 @@ import type { Locator, Page } from '@playwright/test'
 import { cardPose, LOADING_FRAME_COUNT } from '../src/table/cards.ts'
 import { expect, FAILURES, holdProjects, serving, test, type Answer } from './api.ts'
 import { resolveAll, rotationOf, settle } from './css.ts'
+import { arriveAt, panel } from './project.ts'
 import {
   buildImage,
   buildProject,
@@ -30,16 +31,21 @@ import {
   LIVE_CARD,
   NARROW_VIEWPORT,
   openTable,
+  pixelDistances,
   pose,
   RIBBON_SIZES,
   ribbonSizes,
   serveUnderCsp,
+  straighten,
+  strap,
+  strapColors,
+  STRAPPED,
   summary,
   TWO_CARDS,
 } from './table.ts'
 
-/** Les couches de la couverture d'une carte : l'image, puis la copie d'un projet en cours. */
-const coverLayers = (card: Locator) => card.locator('img[srcset]')
+/** La couverture d'une carte : sa seule image en largeurs. */
+const cover = (card: Locator) => card.locator('img[srcset]')
 
 const TABLES = Object.entries(PROJECT_SETS).filter(([, projects]) => projects.length > 0)
 
@@ -76,8 +82,7 @@ for (const [size, projects, index, desktop, mobile] of DIMENSIONS) {
     if (!isMobile) await page.setViewportSize(COLUMN_VIEWPORT)
     await openTable(page, projects)
     const card = cards(page).nth(index)
-    const cover = coverLayers(card).first()
-    await expect(cover).toHaveJSProperty('complete', true)
+    await expect(cover(card)).toHaveJSProperty('complete', true)
 
     const measured = await card.evaluate((link: HTMLAnchorElement) => {
       const element = (selector: string) => link.querySelector<HTMLElement>(selector)!
@@ -369,11 +374,11 @@ test('une carte porte son titre en `<h2>`, ses éléments décoratifs masqués',
   // Le point du titre et les états n'existent que pour le nom du lien.
   await expect(card.getByText('. En cours.')).toHaveClass('sr-only')
   await expect(card.locator('svg')).toHaveAttribute('aria-hidden', 'true')
-  // La couverture, sa copie en noir et blanc, l'icône : le nom du lien les porte.
+  // La couverture, l'icône : le nom du lien les porte.
   expect(
     await card.locator('img').evaluateAll((images) => images.map((image) => image.getAttribute('alt'))),
-  ).toEqual(['', '', ''])
-  await expect(coverLayers(card).nth(1)).toHaveAttribute('aria-hidden', 'true')
+  ).toEqual(['', ''])
+  await expect(strap(card)).toHaveAttribute('aria-hidden', 'true')
   await expect(card.locator('.card-band')).toHaveAttribute('aria-hidden', 'true')
 })
 
@@ -391,8 +396,8 @@ test('toutes les cartes sont des cibles de 36 px au moins, et toutes leurs image
     .evaluateAll((images: HTMLImageElement[]) => images.map((image) => image.loading))
 
   expect(Math.min(...boxes.flat())).toBeGreaterThanOrEqual(36)
-  // Onze couvertures, leurs quatre copies en cours, vingt icônes : toute la population.
-  expect(loading).toEqual(Array(11 + 4 + 20).fill('lazy'))
+  // Onze couvertures, vingt icônes : toute la population.
+  expect(loading).toEqual(Array(11 + 20).fill('lazy'))
 })
 
 test('un post-it long tient sur deux lignes au plus, large de la carte moins 28 px (spec §4.1)', async ({
@@ -445,33 +450,65 @@ test('un post-it coupé à deux lignes ne laisse rien paraître de la suite (spe
   expect(clippedLines).toBeCloseTo(2, 1)
 })
 
-test('noir et blanc du projet en cours : la même image, recouverte par CSS (spec §4.1)', async ({
+test('la photo d’un projet en cours reste en couleur : sa seule image, sans filtre (spec §4.1)', async ({
   page,
 }) => {
-  const requested = new Set<string>()
-  page.on('request', (request) => {
-    if (request.url().endsWith('.webp')) requested.add(request.url())
-  })
-  await openTable(page, [
-    buildProject({ ...ONGOING, slug: 'en-cours' }),
-    buildProject({ slug: 'termine' }),
-  ])
-  const [ongoing, finished] = [cards(page).first(), cards(page).last()]
-  const layers = coverLayers(ongoing)
+  await openTable(page, [buildProject({ ...ONGOING, slug: 'en-cours' })])
+  const images = cards(page).locator('.card-photo img')
 
-  await expect(layers).toHaveCount(2)
-  await expect(layers.first()).toHaveCSS('filter', 'none')
-  await expect(layers.last()).toHaveCSS('filter', 'grayscale(1)')
-  await expect(layers.last()).toHaveJSProperty('complete', true)
-  expect(await layers.last().evaluate((image: HTMLImageElement) => image.currentSrc)).toBe(
-    await layers.first().evaluate((image: HTMLImageElement) => image.currentSrc),
-  )
-  // Pas de variante en noir et blanc : le projet en cours ne demande qu'un seul fichier.
-  expect([...requested].filter((url) => url.includes('/en-cours/'))).toHaveLength(1)
-
-  await expect(coverLayers(finished)).toHaveCount(1)
-  await expect(coverLayers(finished)).toHaveCSS('filter', 'none')
+  await expect(images).toHaveCount(1)
+  await expect(images).toHaveCSS('filter', 'none')
 })
+
+test('la sangle de chantier : sur chaque projet en cours, carte simple et vitrine, et nulle part ailleurs (spec §4.1)', async ({
+  page,
+}) => {
+  await openTable(page, PROJECT_SETS.twelveWithShowcase)
+  const ongoing = cards(page).filter({ has: page.locator('[data-ribbon="ongoing"]') })
+
+  // La vitrine en tête, puis les trois projets en cours du jeu (spec §1.9).
+  await expect(ongoing).toHaveCount(4)
+  await expect(page.locator('.card-strap')).toHaveCount(4)
+  for (const card of await ongoing.all()) await expect(strap(card)).toHaveCount(1)
+  await expect(cards(page).first()).toHaveClass(/card-showcase/)
+  await expect(strap(cards(page).first())).toHaveCount(1)
+})
+
+/** Un projet ni en cours ni couvert, voisin de la carte sanglée. */
+const NEIGHBOUR = buildProject({ slug: 'voisine', gallery: [] })
+
+for (const [size, projects] of [
+  ['simple', [STRAPPED, NEIGHBOUR]],
+  ['vitrine', [{ ...STRAPPED, showcase: true }, NEIGHBOUR]],
+] as const) {
+  test(`carte ${size} au repos : la sangle à −35° en travers de la face, rayures jaune et encre coupées au cadre, sa tranche 3 px au-delà, rien plus loin (spec §4.1)`, async ({
+    page,
+  }) => {
+    await openTable(page, [...projects])
+    await enterCards(page)
+    const card = cards(page).first()
+    await straighten(card)
+    const [yellow, ink, edge] = await strapColors(page)
+    const box = (await face(card).boundingBox())!
+    const around = { x: box.x - 8, y: box.y - 8, width: box.width + 16, height: box.height + 16 }
+    const photo = (await card.locator('.card-photo').boundingBox())!
+
+    const [yellows, edges] = await pixelDistances(page, around, [yellow, edge], box)
+    // La moitié basse de la photo, sans texte : ce que l'encre y peint est la sangle.
+    const lower = { ...photo, y: photo.y + photo.height / 2, height: photo.height / 2 }
+    const stripes = await pixelDistances(page, lower, [yellow, ink])
+
+    expect(
+      await strap(card).evaluate((element) => getComputedStyle(element, '::before').rotate),
+    ).toBe('-35deg')
+    expect(yellows.filter((distance) => distance <= -1).length).toBeGreaterThan(0)
+    expect(yellows.filter((distance) => distance >= 1)).toEqual([])
+    expect(edges.filter((distance) => distance <= -1)).toEqual([])
+    expect(edges.filter((distance) => distance >= 1 && distance <= 2).length).toBeGreaterThan(0)
+    expect(edges.filter((distance) => distance >= 4)).toEqual([])
+    expect(stripes.map((pixels) => pixels.length > 0)).toEqual([true, true])
+  })
+}
 
 test('les rubans : trois technologies au plus, icône, nom masqué et infobulle (spec §4.1)', async ({
   page,
@@ -503,21 +540,42 @@ test('les rubans : trois technologies au plus, icône, nom masqué et infobulle 
   expect(await Promise.all((await ribbons.all()).map(rotationOf))).toEqual([-1.5, 1, -1.5])
 })
 
-test('les rubans d’état : « en cours » en texte, « en ligne » avec son point de 6 px `--live`', async ({
+/** Un projet en cours et en ligne, sans technologie : ses deux rubans d'état, seuls. */
+const STATES_ONLY = { ...ONGOING, demo_url: 'https://demo.test/projet', technologies: [] }
+
+/**
+ * Attend, dans ces rubans d'état, « en cours » puis « en ligne », chacun ouvert par un point de 6 px
+ * à sa couleur, `--ongoing` puis `--live`, que rien n'anime.
+ */
+async function expectStateDots(ribbons: Locator) {
+  const colors = await resolveAll(ribbons.page(), [
+    ['background-color', 'var(--ongoing)'],
+    ['background-color', 'var(--live)'],
+  ])
+  await expect(ribbons).toHaveText(['en cours', 'en ligne'])
+  for (const [index, color] of colors.entries()) {
+    const dot = ribbons.nth(index).locator('.card-dot')
+    await expect(dot).toHaveCSS('background-color', color)
+    await expect(dot).toHaveCSS('width', '6px')
+    await expect(dot).toHaveCSS('height', '6px')
+    // À gauche du texte : le premier enfant du ruban.
+    expect(await dot.evaluate((element) => element === element.parentNode!.firstChild)).toBe(true)
+    expect(await dot.evaluate((element) => element.getAnimations().length)).toBe(0)
+  }
+}
+
+test('les rubans d’état : un point fixe de 6 px à gauche du texte, `--ongoing` pour « en cours », `--live` pour « en ligne »', async ({
   page,
 }) => {
-  await openTable(page, [
-    buildProject({ ...ONGOING, demo_url: 'https://demo.test/projet', technologies: [] }),
-  ])
-  const ribbons = cards(page).locator('li')
-  const [live] = await resolveAll(page, [['background-color', 'var(--live)']])
+  await openTable(page, [buildProject(STATES_ONLY)])
 
-  await expect(ribbons).toHaveText(['en cours', 'en ligne'])
-  await expect(ribbons.first().locator('.card-dot')).toHaveCount(0)
-  const dot = ribbons.last().locator('.card-dot')
-  await expect(dot).toHaveCSS('background-color', live)
-  await expect(dot).toHaveCSS('width', '6px')
-  await expect(dot).toHaveCSS('height', '6px')
+  await expectStateDots(cards(page).locator('li'))
+})
+
+test('dans l’en-tête de la fiche, les rubans d’état gardent leur point fixe', async ({ page }) => {
+  await arriveAt(page, STATES_ONLY)
+
+  await expectStateDots(panel(page).locator('.project-head li'))
 })
 
 test('à 320 px, la carte simple la plus chargée garde ses rubans dans sa bande (spec §4.1)', async ({
@@ -648,7 +706,7 @@ test('après une relance réussie sur une liste vide, le focus n’est posé nul
 
 /**
  * Trois formes, les premières images sans variante que l'API peut servir (issue #168) ; le projet
- * est en cours, pour que la couche noir et blanc ait une raison d'exister.
+ * est en cours : sa sangle ne dépend pas de l'image.
  */
 const COVERLESS: [string, Project['gallery']][] = [
   ['en attente', [buildImage('projet', 'Écran', 'pending')]],
@@ -672,6 +730,7 @@ for (const [name, gallery] of COVERLESS) {
       await photo.evaluate((box: HTMLElement) => box.offsetWidth - box.offsetHeight),
     ).toBe(0)
     await expect(photo.locator('img')).toHaveCount(0)
+    await expect(strap(card)).toHaveCount(1)
   })
 }
 

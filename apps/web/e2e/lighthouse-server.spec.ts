@@ -25,8 +25,8 @@ test('la collecte mesure la table à douze cartes, images comprises', async ({ p
   // `lazy` : une image ne part qu'à l'approche de l'écran.
   await scrollThrough(page, await pageBottom(page))
   const images = table.locator('img')
-  // Onze couvertures, leurs quatre copies en cours, vingt icônes : toute la population.
-  await expect(images).toHaveCount(11 + 4 + 20)
+  // Onze couvertures, vingt icônes : toute la population.
+  await expect(images).toHaveCount(11 + 20)
   // Le repli SPA rend du HTML en 200 pour une route perdue : seule l'image décodée la prouve.
   await expect
     .poll(() =>

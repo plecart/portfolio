@@ -18,8 +18,13 @@ import {
   focusByKeyboard,
   FULL_CARD,
   openTable,
+  pixelDistances,
   pose,
   serveUnderCsp,
+  straighten,
+  strap,
+  strapColors,
+  STRAPPED,
   summary,
   TWO_CARDS,
   watchTransitions,
@@ -363,6 +368,104 @@ for (const [width, maxLines] of [
   })
 }
 
+/**
+ * La carte sanglée au résumé le plus long, et sa voisine : son bandeau, le plus haut, est celui qui
+ * approche le plus le coin où va la sangle.
+ */
+const STRAPPED_LONGEST = [{ ...STRAPPED, summary: LONGEST_SUMMARY[0].summary }, LONGEST_SUMMARY[1]]
+
+/** Ouvre la table de `STRAPPED_LONGEST`, ses cartes entrées : rend la carte sanglée. */
+async function openStrappedCard(page: Page): Promise<Locator> {
+  await openTable(page, STRAPPED_LONGEST)
+  await enterCards(page)
+  return cards(page).first()
+}
+
+/**
+ * Les pixels de la sangle dans la boîte du bandeau de résumé d'une carte : son jaune et sa tranche.
+ * Son encre est aussi celle du texte.
+ */
+async function strapOverSummary(card: Locator): Promise<number> {
+  const [yellow, , edge] = await strapColors(card.page())
+  const box = (await summary(card).boundingBox())!
+  return (await pixelDistances(card.page(), box, [yellow, edge])).flat().length
+}
+
+/**
+ * Attend la sangle au coin haut-gauche de la face : son jaune visible, dans le quart haut-gauche
+ * seulement, et sa tranche nulle part sur la face, à 1 px de son bord près.
+ */
+async function expectCornered(card: Locator) {
+  const page = card.page()
+  const [yellow, , edge] = await strapColors(page)
+  const box = (await face(card).boundingBox())!
+  const corner = { ...box, width: box.width / 2, height: box.height / 2 }
+  const [yellows] = await pixelDistances(page, box, [yellow], corner)
+  const [edges] = await pixelDistances(page, box, [edge], box)
+
+  expect(yellows.length).toBeGreaterThan(0)
+  expect(yellows.filter((distance) => distance > 0)).toEqual([])
+  expect(edges.filter((distance) => distance <= -1)).toEqual([])
+}
+
+/**
+ * Les transitions parties sur les bandes de la sangle (`watchTransitions`) : la boîte de chacune,
+ * puis sa propriété, triées.
+ */
+const strapRuns = async (transitions: Awaited<ReturnType<typeof watchTransitions>>) =>
+  (await transitions())
+    .filter(({ layer }) => layer.startsWith('card-strap'))
+    .map(({ layer, property }) => [layer, property])
+    .sort()
+
+/** Le glissement : une transition de la transformation de la bande, dans chaque boîte. */
+const GLIDE_RUNS = [
+  ['card-strap', 'transform'],
+  ['card-strap-stripes', 'transform'],
+]
+
+for (const [gesture, act] of INTENTS) {
+  test(`${gesture}, la sangle glisse au coin haut-gauche, amincie, en \`--dur-strap\` et \`--ease-out\`, et dégage le bandeau de résumé`, async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'appareil sans survol : la révélation au toucher a son scénario')
+    const card = await openStrappedCard(page)
+    const [duration, easing] = await resolveAll(page, [
+      ['transition-duration', 'var(--dur-strap)'],
+      ['transition-timing-function', 'var(--ease-out)'],
+    ])
+    const transitions = await watchTransitions(page)
+    expect(await strapOverSummary(card)).toBeGreaterThan(0)
+
+    await act(card)
+    await expectRevealed(card, true)
+    await settle(page)
+
+    expect(await strapOverSummary(card)).toBe(0)
+    await expectCornered(card)
+    expect(await strapRuns(transitions)).toEqual(GLIDE_RUNS)
+    for (const band of [strap(card), strap(card).locator('.card-strap-stripes')]) {
+      await expect(band).toHaveCSS('transition-duration', duration, { pseudo: 'before' })
+      await expect(band).toHaveCSS('transition-timing-function', easing, { pseudo: 'before' })
+      // Amincie : sa transformation, hors de sa rotation, la réduit.
+      const scales = await band.evaluate((element) => {
+        const { a, d } = new DOMMatrix(getComputedStyle(element, '::before').transform)
+        return [a, d]
+      })
+      expect(scales.every((scale) => scale > 0 && scale < 1)).toBe(true)
+    }
+
+    // Au retour, le trajet inverse : la sangle revient en travers de la face, en glissant.
+    await page.mouse.move(0, 0)
+    await card.evaluate((link: HTMLElement) => link.blur())
+    await settle(page)
+
+    expect(await strapOverSummary(card)).toBeGreaterThan(0)
+    expect(await strapRuns(transitions)).toEqual([...GLIDE_RUNS, ...GLIDE_RUNS].sort())
+  })
+}
+
 test('focus clavier : un anneau de 2 px `--accent` à 4 px de la face, aucun sur la cellule', async ({
   page,
 }) => {
@@ -418,6 +521,22 @@ test.describe('au toucher', () => {
       await expect(page).toHaveURL('/projets/pleine')
     })
   }
+
+  test('premier toucher : la sangle glisse au coin et dégage le bandeau, au résumé le plus long', async ({
+    page,
+  }) => {
+    const card = await openStrappedCard(page)
+    const transitions = await watchTransitions(page)
+    expect(await strapOverSummary(card)).toBeGreaterThan(0)
+
+    await card.tap()
+    await expectRevealed(card, true)
+    await settle(page)
+
+    expect(await strapOverSummary(card)).toBe(0)
+    await expectCornered(card)
+    expect(await strapRuns(transitions)).toEqual(GLIDE_RUNS)
+  })
 
   test('« Ouvrir » suit le lien : il ne remplace les rubans que pendant la révélation', async ({
     page,
@@ -607,6 +726,34 @@ test.describe('en mouvement réduit', () => {
 
     await expectRevealed(card, true)
     await expect(pose(card)).toHaveCSS('transform', rest)
+  })
+
+  test('sur une intention, la sangle passe au coin par un fondu croisé, sans transformation animée, et dégage le bandeau', async ({
+    page,
+    isMobile,
+  }) => {
+    const card = await openStrappedCard(page)
+    // La pose reste en mouvement réduit : redressée, la boîte du bandeau est le bandeau.
+    await straighten(card)
+    const transitions = await watchTransitions(page)
+
+    await (isMobile ? card.tap() : card.hover())
+    await expectRevealed(card, true)
+    await settle(page)
+
+    expect(await strapOverSummary(card)).toBe(0)
+    await expectCornered(card)
+    // Les deux bandes de chaque boîte, celle qui s'efface et celle qui apparaît.
+    expect(await strapRuns(transitions)).toEqual([
+      ['card-strap', 'opacity'],
+      ['card-strap', 'opacity'],
+      ['card-strap-stripes', 'opacity'],
+      ['card-strap-stripes', 'opacity'],
+    ])
+    for (const band of [strap(card), strap(card).locator('.card-strap-stripes')]) {
+      await expect(band).toHaveCSS('opacity', '0', { pseudo: 'before' })
+      await expect(band).toHaveCSS('opacity', '1', { pseudo: 'after' })
+    }
   })
 
   test('pressée, la carte ne s’enfonce pas', async ({ page, isMobile }) => {

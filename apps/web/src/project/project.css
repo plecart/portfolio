@@ -115,16 +115,8 @@
   }
 
   .project-gallery-track {
-    position: relative;
     display: flex;
     height: 100%;
-  }
-
-  /* La couche noir et blanc d'un projet en cours, en vol (§4.4, §4.6) : posée sur la première image. */
-  .project-gallery-track > .card-photo-grey {
-    position: absolute;
-    top: 0;
-    left: 0;
   }
 
   /* Le glissement d'une image à l'autre (§4.4) ; au retour à la carte, la bascule vers la première

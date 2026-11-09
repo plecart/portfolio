@@ -37,6 +37,7 @@ import {
   face,
   focusByKeyboard,
   openTable,
+  strap,
 } from './table.ts'
 
 /** Trois projets ; la première carte, celle d'un projet en cours, à une seule image. */
@@ -529,7 +530,7 @@ test('les rubans passent par 35 % d’opacité entre 30 % et 70 % du trajet', as
   ])
 })
 
-test('la carte se cache d’un coup, sauf son trombone, qui monte de 14 px en s’effaçant, et sa pose revient à 0°', async ({
+test('la carte se cache d’un coup, sangle comprise avec son cadre, sauf son trombone, qui monte de 14 px en s’effaçant, et sa pose revient à 0°', async ({
   page,
 }) => {
   await openEnteredTable(page, PROJECTS)
@@ -540,7 +541,7 @@ test('la carte se cache d’un coup, sauf son trombone, qui monte de 14 px en s�
   await card.dispatchEvent('click', { detail: 0 })
   await expect(panel(page)).toBeVisible()
 
-  for (const part of ['.card-photo', '.card-postit', '.card-band']) {
+  for (const part of ['.card-photo', '.card-postit', '.card-band', '.card-strap']) {
     await expect(card.locator(part)).toHaveCSS('opacity', '0')
   }
   await expect(face(card)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
@@ -578,44 +579,39 @@ test('la carte se cache d’un coup, sauf son trombone, qui monte de 14 px en s�
   )
 })
 
-/**
- * Dans le cadre de la galerie : la couche noir et blanc — l'image grise posée sur la première —,
- * sa boîte et celle de l'image, et son fondu.
- */
-function readGreyLayer(frame: Element) {
-  const [image, ...others] = frame.querySelectorAll('img')
-  const grey = others.find((other) => getComputedStyle(other).filter === 'grayscale(1)')!
-  const [fade] = grey.getAnimations()
-  return {
-    same: grey.src === image.src,
-    box: grey.getBoundingClientRect().toJSON(),
-    image: image.getBoundingClientRect().toJSON(),
-    hidden: grey.getAttribute('aria-hidden'),
-    duration: fade.effect!.getTiming().duration,
-    opacities: (fade.effect as KeyframeEffect).getKeyframes().map(({ opacity }) => Number(opacity)),
-  }
+/** Les images du cadre de la galerie, en vol ou posé. */
+const frameImages = (page: Page) => panel(page).locator('.project-gallery-frame img')
+
+/** Attend le cadre de la galerie à sa seule image, en couleur. */
+async function expectColorFrame(page: Page) {
+  await expect(frameImages(page)).toHaveCount(1)
+  await expect(frameImages(page)).toHaveCSS('filter', 'none')
 }
 
-test('un projet en cours : la couche noir et blanc couvre la première image et s’efface pendant le vol', async ({
+test('un projet en cours : sa photo vole en couleur, à l’aller comme au retour, la fiche sans sangle ; posée, la carte retrouve la sienne', async ({
   page,
 }) => {
   await openEnteredTable(page, PROJECTS)
-  const { open } = await motion(page)
+  const card = cardAt(page, FIRST_PATH)
   const resume = await openFrozen(page, FIRST_PATH)
-  const images = panel(page).locator('.project-gallery-frame img')
 
-  const layer = await panel(page).locator('.project-gallery-frame').evaluate(readGreyLayer)
-
-  expect(layer).toMatchObject({ same: true, hidden: 'true', duration: open, opacities: [1, 0] })
-  expectSameBox(layer.box, layer.image)
-
+  await expectColorFrame(page)
+  await expect(panel(page).locator('.card-strap')).toHaveCount(0)
   await resume()
   await settle(page)
+  const resumeReturn = await freezeAnimations(page)
+  await page.keyboard.press('Escape')
+  await finishAnimations(page)
 
-  await expect(images).toHaveCount(1)
+  await expectColorFrame(page)
+  await expect(strap(card)).toHaveCSS('opacity', '0')
+  await resumeReturn()
+
+  await expectLanded(page, card)
+  await expect(strap(card)).toHaveCSS('opacity', '1')
 })
 
-test('fermée depuis sa deuxième image, la galerie revient d’un coup à la première, celle de la carte, et la couche noir et blanc s’y pose', async ({
+test('fermée depuis sa deuxième image, la galerie revient d’un coup à la première, celle de la carte', async ({
   page,
 }) => {
   await openEnteredTable(page, [
@@ -632,9 +628,6 @@ test('fermée depuis sa deuxième image, la galerie revient d’un coup à la pr
 
   expect(await track.evaluate((element) => element.getAnimations().length)).toBe(0)
   expectSameBox(await boxOf(frame.locator('img').first()), await boxOf(frame))
-  await finishAnimations(page)
-  const grey = await frame.evaluate(readGreyLayer)
-  expectSameBox(grey.box, await boxOf(frame))
 })
 
 test('les autres cartes de l’écran reculent de 48 px à l’opposé de la carte ouverte et s’effacent ; hors de l’écran, rien ne bouge', async ({
@@ -833,7 +826,7 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
   })
 }
 
-test('à la fermeture, le contenu s’efface en `--dur-fast`, puis la feuille, la photo, le post-it et les rubans repartent vers la carte en `--dur-open`, et la couche noir et blanc revient', async ({
+test('à la fermeture, le contenu s’efface en `--dur-fast`, puis la feuille, la photo, le post-it et les rubans repartent vers la carte en `--dur-open`', async ({
   page,
 }) => {
   await openEnteredTable(page, PROJECTS)
@@ -870,9 +863,6 @@ test('à la fermeture, le contenu s’efface en `--dur-fast`, puis la feuille, l
     expect(flight.delay).toBe(flight.rank * ribbon)
   }
   expectSameBox(flights[0].start, panelBox)
-  const grey = await panel(page).locator('.project-gallery-frame').evaluate(readGreyLayer)
-  expect(grey).toMatchObject({ same: true, duration: open, opacities: [0, 1] })
-  expectSameBox(grey.box, grey.image)
 })
 
 test('à la fermeture, les autres cartes reviennent à leur place en réapparaissant, en `--dur-open`', async ({
@@ -913,8 +903,8 @@ test('à la fermeture, les autres cartes reviennent à leur place en réapparais
 
 /*
  * Ce que tient le remplissage (`fill`) de chaque animation de `useChoreography`, dénombré dans sa
- * source le 2026-11-03, puis le 2026-11-09 (#255) : treize animations, une par sens de chaque
- * mouvement.
+ * source le 2026-11-03, puis deux fois le 2026-11-09 (#255) : onze animations, une par sens de
+ * chaque mouvement.
  *
  * - tiennent quelque chose, neuf : le vol à l'aller (`backwards`, la copie d'un ruban qui attend son
  *   retard reste sur son homologue : test « … partent de leur homologue », lu au temps 0) ; le vol
@@ -926,9 +916,8 @@ test('à la fermeture, les autres cartes reviennent à leur place en réapparais
  *   l'apparition du contenu (`backwards`, caché jusqu'à la pose : test « à la pose, le contenu
  *   monte… », lu au temps 0) ; son effacement (`forwards`) ; en mouvement réduit, l'effacement des
  *   enfants du panneau puis du panneau (`forwards`, jusqu'au retrait) ;
- * - ne tiennent rien, leur fin étant leur repos, quatre : le retour des cartes, les deux fondus de la
- *   couche noir et blanc — retirée à l'aller, opaque au retour —, l'apparition du panneau en
- *   mouvement réduit.
+ * - ne tiennent rien, leur fin étant leur repos, deux : le retour des cartes, l'apparition du
+ *   panneau en mouvement réduit.
  *
  * Les six qui tiennent jusqu'au retrait ou tant que la fiche est ouverte sont épinglés ici ; chacun
  * des neuf rougit son test quand son remplissage est retiré (mutations du 2026-11-03 ; du 2026-11-09
@@ -1018,7 +1007,8 @@ for (const [name, close] of CLOSINGS) {
  * - fuyaient : la pose, au `finish` du premier vol (rien sur `cancel`) ; l'effacement du contenu et
  *   le retour à la carte, deux `await` de `Promise.all` ; l'atterrissage, `land().then(onLanded)`,
  *   que ces deux rejets coupent ;
- * - indemne : le retrait de la couche noir et blanc, sur `finish` comme sur `cancel`.
+ * - indemne : le retrait de la couche noir et blanc, sur `finish` comme sur `cancel`, parti avec
+ *   elle (#255).
  *
  * Un cas par instant où une attente est en cours ; les deux modes passent par les mêmes attentes.
  */
@@ -1073,20 +1063,12 @@ for (const [name, close] of INTERRUPTIONS) {
     await page.evaluate(seekAnimations, open / 2)
     const flying = await page.evaluate(readFlights, { path: FIRST_PATH })
     const receding = await page.evaluate(readEntries, FIRST_PATH)
-    const frame = panel(page).locator('.project-gallery-frame')
-    const greyShown = await frame
-      .locator('.card-photo-grey')
-      .evaluate((layer) => Number(getComputedStyle(layer).opacity))
 
     await close(page)
 
     // La pose n'arrive plus : le panneau reste transparent, le focus loin de « Fermer la fiche ».
     await expect(panel(page)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
     await expect(closeButton(page)).not.toBeFocused()
-    const [from, to] = (await frame.evaluate(readGreyLayer)).opacities
-    expect(greyShown).toBeGreaterThan(0)
-    expect(from).toBeCloseTo(greyShown, 3)
-    expect(to).toBe(1)
     const returning = await page.evaluate(readFlights, { path: FIRST_PATH })
     expect(returning).toHaveLength(flying.length)
     for (const [index, flight] of returning.entries()) {

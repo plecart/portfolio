@@ -176,11 +176,6 @@
     object-fit: cover;
   }
 
-  /* Le projet en cours : par CSS, jamais par une variante d'image (spec §4.1). */
-  .card-photo-grey {
-    filter: grayscale(1);
-  }
-
   /* Le bandeau de résumé (spec §4.1) : 13 px, 14 px dès 600 px ; 1,4 d'interligne pour sept lignes
      de 13 px dans une photo de 160 px (§7), le prototype retenu. */
   .card-summary {
@@ -231,6 +226,104 @@
   @container (width < 124px) {
     .card-summary-text {
       -webkit-line-clamp: 4;
+    }
+  }
+
+  /* La sangle de chantier d'un projet en cours (spec §4.1), sur la photo, sous le post-it, le
+     trombone et la bande : en travers de la face au repos ; au coin haut-gauche, amincie, sur une
+     intention, où le bandeau se révèle. Deux boîtes la coupent : la face et `--strap-overhang`
+     autour, où ne se voit que sa tranche, le retour de la sangle derrière la carte ; puis, par-dessus,
+     la face seule, ses rayures. Chacune porte la même bande — `::before`, et `::after` au coin en
+     mouvement réduit —, dont les longueurs suivent la première boîte, leur conteneur. */
+  .card-strap {
+    --strap-overhang: 3px;
+    --strap-angle: 35deg;
+    --strap-width: 8cqw;
+    /* Au coin : la part de son épaisseur qui reste, et la distance de son axe au coin. */
+    --strap-thin: 0.5;
+    --strap-inset: 8cqw;
+    /* La course jusqu'au coin, perpendiculaire à la bande : du centre de la boîte, à `--strap-inset`
+       de son coin haut-gauche, qui en est à 50cqw × sin(angle) + 50cqh × cos(angle) sur cet axe. */
+    --strap-reach: calc(
+      var(--strap-inset) - 50cqw * sin(var(--strap-angle)) - 50cqh * cos(var(--strap-angle))
+    );
+    /* 1 sur une intention, 0 sinon. */
+    --strap-cornered: 0;
+    position: absolute;
+    inset: calc(-1 * var(--strap-overhang));
+    overflow: hidden;
+    container-type: size;
+  }
+
+  /* Au-dessus des bandes de la tranche, `::after` compris, que l'ordre du document mettrait dessus. */
+  .card-strap-stripes {
+    position: absolute;
+    inset: var(--strap-overhang);
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  /* Une bande : au centre de sa boîte, inclinée, assez longue pour la traverser. */
+  :is(.card-strap, .card-strap-stripes)::before,
+  :is(.card-strap, .card-strap-stripes)::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 150cqw;
+    height: var(--strap-width);
+    translate: -50% -50%;
+    rotate: calc(-1 * var(--strap-angle));
+  }
+
+  :is(.card-strap, .card-strap-stripes)::before {
+    content: '';
+  }
+
+  .card-strap::before,
+  .card-strap::after {
+    background-color: var(--strap-edge);
+  }
+
+  .card-strap-stripes::before,
+  .card-strap-stripes::after {
+    background: repeating-linear-gradient(
+      45deg,
+      var(--strap) 0 calc(var(--strap-width) / 2),
+      var(--strap-ink) 0 var(--strap-width)
+    );
+  }
+
+  .card[data-revealed] .card-strap {
+    --strap-cornered: 1;
+  }
+
+  @media (hover: hover) {
+    .card:is(:hover, :focus-visible) .card-strap {
+      --strap-cornered: 1;
+    }
+  }
+
+  /* Elle glisse le long de sa diagonale jusqu'au coin, et en revient. */
+  @media (prefers-reduced-motion: no-preference) {
+    :is(.card-strap, .card-strap-stripes)::before {
+      transform: translateY(calc(var(--strap-cornered) * var(--strap-reach)))
+        scale(calc(1 - var(--strap-cornered) * (1 - var(--strap-thin))));
+      transition: transform var(--dur-strap) var(--ease-out);
+    }
+  }
+
+  /* En mouvement réduit (§6.3), une seconde bande attend au coin : un fondu croisé, sans glissement. */
+  @media (prefers-reduced-motion: reduce) {
+    :is(.card-strap, .card-strap-stripes)::before {
+      opacity: calc(1 - var(--strap-cornered));
+      transition: opacity var(--dur-fast) var(--ease-out);
+    }
+
+    :is(.card-strap, .card-strap-stripes)::after {
+      content: '';
+      opacity: var(--strap-cornered);
+      transform: translateY(var(--strap-reach)) scale(var(--strap-thin));
+      transition: opacity var(--dur-fast) var(--ease-out);
     }
   }
 
@@ -285,10 +378,18 @@
     height: calc(var(--height) - 2 * var(--s-1));
   }
 
+  /* Le point d'un ruban d'état (spec §4.1), fixe : rien ne l'anime. */
   .card-dot {
     width: 6px;
     height: 6px;
     border-radius: 999px;
+  }
+
+  .card-dot-ongoing {
+    background-color: var(--ongoing);
+  }
+
+  .card-dot-live {
     background-color: var(--live);
   }
 
@@ -381,13 +482,14 @@
   }
 
   /* La carte d'où la fiche s'envole (§4.6), que `useChoreography` marque jusqu'à son retour : sa
-     photo, son post-it, sa bande, son papier et ses ombres disparaissent d'un coup ; sa pose revient
-     à 0° et son trombone monte en s'effaçant. Sa levée, que le panneau lui retire en prenant focus
-     et pointeur, tombe d'un coup : le retour se mesure sur la carte au repos.
-     Après les états d'intention, qu'elle remplace. Photo, post-it, bande, papier, ombre au repos et
-     trombone reviennent d'un coup : hors de ce bloc, aucun ne transite. */
+     photo, son post-it, sa bande, son papier et ses ombres disparaissent d'un coup, et sa sangle
+     avec son cadre, que la fiche ne porte pas ; sa pose revient à 0° et son trombone monte en
+     s'effaçant. Sa levée, que le panneau lui retire en prenant focus et pointeur, tombe d'un coup :
+     le retour se mesure sur la carte au repos.
+     Après les états d'intention, qu'elle remplace. Photo, post-it, bande, sangle, papier, ombre au
+     repos et trombone reviennent d'un coup : hors de ce bloc, aucun ne transite. */
   .card[data-origin] {
-    :is(.card-photo, .card-postit, .card-band) {
+    :is(.card-photo, .card-postit, .card-band, .card-strap) {
       opacity: 0;
     }
 
