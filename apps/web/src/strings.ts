@@ -47,4 +47,16 @@ export const strings = {
   /** Les intertitres de la stack (spec §4.3). */
   technologies: 'Technologies',
   tools: 'Outils',
+  /**
+   * Le ruban-bouton d'un groupe replié de la stack (spec §4.3, §6.2) : son libellé, « +N ⌄ », puis
+   * « Réduire ⌃ » une fois le groupe déplié ; son nom, le même dans les deux cas, qui contient leurs
+   * verbes et leur nombre, pour plusieurs rubans repliés — `{count}` en tient le nombre — puis pour
+   * un seul (`stackButtonName`).
+   */
+  expandStack: '⌄',
+  collapseStack: 'Réduire ⌃',
+  otherTechnologies: 'Afficher ou réduire les {count} autres technologies',
+  otherTechnology: 'Afficher ou réduire 1 autre technologie',
+  otherTools: 'Afficher ou réduire les {count} autres outils',
+  otherTool: 'Afficher ou réduire 1 autre outil',
 } as const

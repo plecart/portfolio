@@ -1,12 +1,14 @@
 import { DialogTitle } from '@radix-ui/react-dialog'
+import { useId, useState } from 'react'
 import type { Project } from '../api/projects.ts'
 import { ExternalLinkIcon } from '../chrome/icons.tsx'
 import { strings } from '../strings.ts'
 import { StateRibbons, TechnologyRibbon } from '../table/Card.tsx'
 import { cardStates, type Technology } from '../table/cards.ts'
-import { projectFacts, splitStack } from './project.ts'
+import { projectFacts, splitStack, stackButtonName, type StackKind } from './project.ts'
 import { ProjectMarkdown } from './ProjectMarkdown.tsx'
 import { ProjectSections } from './ProjectSections.tsx'
+import { useStackFold } from './useStackFold.ts'
 
 /** Un post-it de lien (spec §4.3), ouvert dans le même onglet, comme les liens de l'auteur. */
 function ProjectLink({ href, label }: { href: string; label: string }) {
@@ -41,17 +43,57 @@ function ProjectHeader({ project }: { project: Project }) {
   )
 }
 
-/** Un groupe de la stack (spec §4.3) : son intertitre et ses rubans ; rien sans technologie. */
-function StackGroup({ title, technologies }: { title: string; technologies: Technology[] }) {
+/**
+ * Les rubans d'un groupe de la stack, dans l'ordre de l'admin, sur deux rangées au plus (spec §4.3,
+ * `useStackFold`). Ceux qui n'y tiennent pas sont retirés du rendu ; le ruban-bouton prend la
+ * dernière place de la deuxième rangée, « +N ⌄ », et les déplie sur place : il devient alors
+ * « Réduire ⌃ », en fin de liste, et garde son nom (`stackButtonName`) et le focus (spec §6.2).
+ * L'état déplié vit avec la fiche rendue : chaque ouverture montre le groupe replié.
+ *
+ * @param kind Le groupe : ses technologies, ou ses outils.
+ */
+function StackList({ kind, technologies }: { kind: StackKind; technologies: Technology[] }) {
+  const id = useId()
+  const [expanded, setExpanded] = useState(false)
+  const [list, shown] = useStackFold(expanded)
+  // Le temps d'une mesure : tous les rubans, et le ruban-bouton à son compte le plus large.
+  // ponytail: le « +N » se mesure à ce compte, pas au sien : un chiffre de trop au plus, donc parfois
+  // un ruban de moins qu'il n'en tiendrait, jamais une troisième rangée ; le mesurer à son compte
+  // réel demanderait une seconde mesure, une fois le repli connu.
+  const measuring = shown === undefined
+  const hidden = technologies.length - (shown ?? 0)
+  return (
+    <ul id={id} ref={list} className="card-ribbons project-ribbons project-stack">
+      {(expanded || measuring ? technologies : technologies.slice(0, shown)).map((technology) => (
+        <TechnologyRibbon key={technology.name} technology={technology} labelled />
+      ))}
+      {hidden > 0 && (
+        <li className="card-ribbon project-more">
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-controls={id}
+            aria-label={stackButtonName(kind, hidden)}
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded && !measuring ? strings.collapseStack : `+${hidden} ${strings.expandStack}`}
+          </button>
+        </li>
+      )}
+    </ul>
+  )
+}
+
+/**
+ * Un groupe de la stack (spec §4.3) : son intertitre, « Technologies » ou « Outils », et ses rubans
+ * (`StackList`) ; rien sans technologie.
+ */
+function StackGroup({ kind, technologies }: { kind: StackKind; technologies: Technology[] }) {
   if (technologies.length === 0) return null
   return (
     <>
-      <h3 className="project-stack-title">{title}</h3>
-      <ul className="card-ribbons project-ribbons project-stack">
-        {technologies.map((technology) => (
-          <TechnologyRibbon key={technology.name} technology={technology} labelled />
-        ))}
-      </ul>
+      <h3 className="project-stack-title">{strings[kind]}</h3>
+      <StackList kind={kind} technologies={technologies} />
     </>
   )
 }
@@ -73,8 +115,8 @@ export function ProjectContent({ project }: { project: Project }) {
       <div className="project-scroll" tabIndex={0} role="region" aria-label={strings.projectReading}>
         <p className="project-facts">{projectFacts(project)}</p>
         <p className="project-summary">{project.summary}</p>
-        <StackGroup title={strings.technologies} technologies={technologies} />
-        <StackGroup title={strings.tools} technologies={tools} />
+        <StackGroup kind="technologies" technologies={technologies} />
+        <StackGroup kind="tools" technologies={tools} />
         <ProjectMarkdown className="project-description">{project.description}</ProjectMarkdown>
         <ProjectSections sections={project.sections} />
       </div>

@@ -42,7 +42,7 @@ function focusCard(slug: string) {
  * fondu. Sinon, deux fondus, et le bouton, premier du panneau, reçoit le focus de Radix à
  * l'ouverture. Le dernier projet montré reste rendu jusqu'au retrait du panneau ; une autre fiche
  * ouverte pendant le fondu de sortie trouve le panneau encore monté : sa galerie repart de la
- * première image.
+ * première image, et sa stack, repliée.
  *
  * @param project Le projet à montrer ; `undefined`, fiche fermée.
  * @param origin La carte d'où la fiche s'ouvre, jusqu'à son retour ; `null` sans carte d'origine.
@@ -106,7 +106,8 @@ export function ProjectDialog({
             open={open}
             rewound={returning}
           />
-          <ProjectContent project={shown} />
+          {/* Une clé à elle : des enfants voisins ne partagent jamais la leur. */}
+          <ProjectContent key={`${shown.slug}/content`} project={shown} />
         </DialogContent>
       </DialogPortal>
     </Dialog>

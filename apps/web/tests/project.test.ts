@@ -11,6 +11,7 @@ import {
   sectionId,
   slugFromPath,
   splitStack,
+  stackButtonName,
   swipeStep,
   visibleSections,
 } from '../src/project/project.ts'
@@ -100,6 +101,15 @@ test('les trois premières technologies de la stack sont celles de la carte, dan
   ]
 
   expect(splitStack(technologies).technologies.slice(0, 3)).toEqual(cardTechnologies(technologies))
+})
+
+test.each([
+  ['technologies', 1, 'Afficher ou réduire 1 autre technologie'],
+  ['technologies', 3, 'Afficher ou réduire les 3 autres technologies'],
+  ['tools', 1, 'Afficher ou réduire 1 autre outil'],
+  ['tools', 12, 'Afficher ou réduire les 12 autres outils'],
+] as const)('le ruban-bouton du groupe %s, %i ruban(s) replié(s) : « %s »', (kind, hidden, name) => {
+  expect(stackButtonName(kind, hidden)).toBe(name)
 })
 
 test.each([

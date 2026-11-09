@@ -442,6 +442,27 @@ test('fermée sa stack défilée hors de vue, chaque ruban repart de sa vraie pl
   }
 })
 
+test('un ruban de la carte dont la stack replie l’homologue n’a pas de trajet ; la fiche se pose quand même', async ({
+  page,
+}) => {
+  // Chacun seul sur sa rangée, à 1280 comme à 400 px : le troisième au moins passe dans le repli.
+  const technologies = ['Alpha', 'Beta', 'Gamma'].map((name) =>
+    buildTechnology(`${name}, une technologie au nom bien long`, 'language'),
+  )
+  await openEnteredTable(page, [ficheProject({ technologies })])
+  const resume = await openFrozen(page, RIBBONED_PATH)
+
+  const flown = ribbonFlights(await page.evaluate(readFlights, { path: RIBBONED_PATH }))
+  const rendered = await readingColumn(page)
+    .locator('[data-ribbon]')
+    .evaluateAll((ribbons) => ribbons.map((ribbon) => (ribbon as HTMLElement).dataset.ribbon))
+
+  expect(rendered.length).toBeLessThan(technologies.length)
+  expect(flown.map(({ name }) => name)).toEqual(rendered)
+  await resume()
+  await expect(closeButton(page)).toBeFocused()
+})
+
 test('les rubans passent par 35 % d’opacité entre 30 % et 70 % du trajet', async ({ page }) => {
   await openEnteredTable(page, PROJECTS)
   await openFrozen(page, FIRST_PATH)

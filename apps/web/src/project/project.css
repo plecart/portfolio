@@ -297,8 +297,7 @@
     font-size: 22px;
   }
 
-  /* Rotation −4° dans tous les états (§4.3) : la montée s'y ajoute, seule à bouger, et jamais en
-     mouvement réduit (§6.3). */
+  /* Rotation −4° dans tous les états (§4.3) : la montée s'y ajoute, seule à bouger. */
   .project-link {
     display: inline-flex;
     align-items: center;
@@ -310,13 +309,16 @@
     transform: rotate(-4deg);
   }
 
+  /* La montée au survol des post-its de lien et du ruban-bouton de la stack (§4.3), jamais en
+     mouvement réduit (§6.3). */
   @media (prefers-reduced-motion: no-preference) {
-    .project-link {
+    .project-link,
+    .project-more {
       transition: translate var(--dur-fast) var(--ease-out);
     }
 
     @media (hover: hover) {
-      .project-link:hover {
+      :is(.project-link, .project-more):hover {
         translate: 0 -2px;
       }
     }
@@ -335,6 +337,23 @@
   .project-stack {
     --card-ribbon-inset: var(--s-2);
     --card-ribbon-gap: 6px;
+  }
+
+  /* Le ruban-bouton d'un groupe replié (§4.3) : la forme, la hauteur et l'inclinaison des rubans, en
+     contour — fond transparent, bord pointillé `--tape`, texte à l'encre. Son bouton le remplit :
+     toute sa forme est la cible. Chiffres tabulaires : sa largeur ne dépend que du nombre de chiffres
+     de son compte, que la mesure du repli prend au plus large (`useStackFold`). */
+  .project-more {
+    padding: 0;
+    border: 1px dashed var(--tape);
+    background-color: transparent;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+
+    > button {
+      height: 100%;
+      padding-inline: var(--card-ribbon-inset);
+    }
   }
 
   /* La copie volante d'un ruban (§4.6, `useChoreography`) : fixe, hors de la colonne défilante qui
