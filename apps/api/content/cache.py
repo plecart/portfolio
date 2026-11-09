@@ -70,10 +70,12 @@ def cached_response(
     succès ; sinon celle que rend `render`, gardée sous `content_key` si c'est un `200` — rien
     n'est lu ni gardé sans clé.
 
-    Le cache garde le corps rendu et son type, jamais des objets : la réponse servie depuis le cache
-    est celle de la base, octet pour octet, donc de même `ETag` (`ConditionalGetMiddleware`). Rien
-    d'autre : un en-tête que `render` poserait lui-même manquerait à la réponse du cache ; ceux des
-    décorateurs extérieurs (`cache_control`) se reposent à chaque appel.
+    Le cache garde le corps rendu et ses en-têtes — son type, et chacun de ceux que `render` a
+    posés, comme le `Link` d'un aperçu de lien —, jamais des objets : la réponse servie depuis le
+    cache est celle de la base, octet pour octet, donc de même `ETag` (`ConditionalGetMiddleware`),
+    et en-tête pour en-tête. Ceux des décorateurs extérieurs (`cache_control`) et des middlewares se
+    reposent à chaque appel. Une entrée d'avant les en-têtes, le corps et son type, que Redis tient
+    encore au déploiement, est tenue pour absente : rendue à nouveau, puis réécrite.
 
     Args:
         request: la requête servie.
@@ -84,13 +86,12 @@ def cached_response(
     key = content_key(request, name)
     if key is None:
         return render()
-    stored: tuple[bytes, str] | None = cache.get(key)
-    if stored is not None:
-        content, content_type = stored
-        return HttpResponse(content, content_type=content_type)
+    stored: tuple[bytes, dict[str, str] | str] | None = cache.get(key)
+    if stored is not None and isinstance(headers := stored[1], dict):
+        return HttpResponse(stored[0], headers=headers)
     response = render()
     if isinstance(response, HttpResponse) and response.status_code == 200:
-        cache.set(key, (response.content, response["Content-Type"]))
+        cache.set(key, (response.content, dict(response.headers)))
     return response
 
 

@@ -1,5 +1,7 @@
 """Tests du cache du contenu : la liste des projets servie depuis le cache, à l'identique de la
-base, jamais une réponse d'erreur ni une lecture antérieure à une écriture validée ; le cache vidé
+base, jamais une réponse d'erreur ni une lecture antérieure à une écriture validée ; une réponse
+servie avec les en-têtes de son rendu, et une entrée d'une forme antérieure rendue à nouveau
+(#27) ; le cache vidé
 après chaque écriture validée du contenu, jamais avant ni pour une écriture annulée, et par la
 tâche d'image après chacune de ses écritures ; Redis injoignable sans effet pour le client, au
 prix de deux opérations sur Redis au plus (brief de #11, décisions 1, 3 à 5, 7 à 10).
@@ -11,23 +13,26 @@ avant chaque test ; seuls les tests de Redis injoignable chargent le vrai client
 import logging
 import time
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 import config.settings
 import content.api
 import pytest
 from content import tasks
 from content.api import published_projects
+from content.cache import cached_response, content_key
 from content.models import GalleryImage, ProcessingState, Project, ProjectTechnology, Variant
 from content.tasks import process_image
 from content.variants import make_variants
 from django.apps import apps
-from django.core.cache import caches
+from django.core.cache import cache, caches
 from django.core.files.base import ContentFile
 from django.core.files.storage import Storage, default_storage
 from django.db import transaction
 from django.db.models import Model
-from django.test import Client, override_settings
+from django.http import HttpResponse
+from django.http.response import HttpResponseBase
+from django.test import Client, RequestFactory, override_settings
 from factories import gallery_image, project, saved, section, technology
 from ninja.errors import HttpError
 from pytest_django import DjangoAssertNumQueries, DjangoCaptureOnCommitCallbacks
@@ -92,6 +97,26 @@ WRITES: dict[str, Callable[[Model], object]] = {
     "enregistrement": lambda line: line.save(),
     "suppression": lambda line: line.delete(),
 }
+
+# Le nom, dans l'espace, de la réponse témoin que rend `rendered`.
+NAME = "temoin"
+
+
+def rendered() -> HttpResponse:
+    """Une réponse rendue : son corps, son type, et un en-tête qu'elle pose elle-même — ni
+    `Content-Type` ni celui d'un décorateur extérieur."""
+    return HttpResponse(b"corps", content_type="text/plain", headers={"X-Rendu": "témoin"})
+
+
+def not_rendered() -> NoReturn:
+    """Un rendu que le cache, quand il tient la réponse, n'appelle jamais."""
+    pytest.fail("rendu alors que le cache tient la réponse")
+
+
+def seen(response: HttpResponseBase) -> tuple[object, ...]:
+    """Ce qu'un client reçoit de `response` : statut, en-têtes, corps."""
+    assert isinstance(response, HttpResponse)
+    return (response.status_code, dict(response.headers), response.content)
 
 
 def served(client: Client) -> tuple[object, ...]:
@@ -187,6 +212,32 @@ def test_la_reponse_servie_depuis_le_cache_est_celle_de_la_base(
         from_cache = served(client)
 
     assert from_cache == from_base
+
+
+def test_un_en_tete_pose_par_le_rendu_revient_tel_quel_depuis_le_cache(rf: RequestFactory) -> None:
+    """La réponse servie depuis le cache est celle du rendu, en-têtes compris : ceux qu'il pose
+    lui-même aussi — le `Link` d'un aperçu de lien —, sans cas particulier."""
+    request = rf.get("/")
+    from_render = seen(cached_response(request, NAME, rendered))
+
+    from_cache = seen(cached_response(request, NAME, not_rendered))
+
+    assert from_cache == from_render
+
+
+def test_une_entree_d_une_forme_anterieure_est_rendue_puis_reecrite(rf: RequestFactory) -> None:
+    """Une entrée d'avant les en-têtes, le corps et son type, que Redis tient encore au
+    déploiement : la clé de la liste n'a pas d'empreinte, et celle d'un aperçu survit à un gabarit
+    inchangé. Tenue pour absente, elle est rendue à nouveau, puis réécrite sous la forme neuve."""
+    request = rf.get("/")
+    key = content_key(request, NAME)
+    assert key is not None
+    cache.set(key, (b"ancien", "text/plain"))
+
+    from_render = seen(cached_response(request, NAME, rendered))
+    from_cache = seen(cached_response(request, NAME, not_rendered))
+
+    assert from_render == from_cache == seen(rendered())
 
 
 @pytest.mark.django_db

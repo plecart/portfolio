@@ -1,7 +1,8 @@
 """Tests des aperçus de lien des fiches projet : `/projets/<slug>` rend le gabarit du front, son
-bloc marqué remplacé par les balises du projet publié, ou redirige vers l'accueil ; la page rendue
-est gardée dans l'espace du cache du contenu ; un gabarit défectueux est une erreur, jamais une page
-sans balises ; et l'API publique ne répond jamais en HTML (brief de #14, décisions 1 à 8).
+bloc marqué remplacé par les balises du projet publié, ou redirige vers l'accueil ; la page
+précharge l'image de tête de la galerie par un en-tête `Link` (#27) ; la page rendue est gardée
+dans l'espace du cache du contenu, en-têtes compris ; un gabarit défectueux est une erreur, jamais
+une page sans balises ; et l'API publique ne répond jamais en HTML (brief de #14, décisions 1 à 8).
 
 Le gabarit est un fichier de fixture de test, que désigne l'environnement de test
 (`process_environment.py`) — jamais l'`index.html` du front.
@@ -14,7 +15,12 @@ from typing import Any, cast
 
 import pytest
 from content.api import api
-from content.link_preview import OG_IMAGE_WIDTH, LinkPreviewTemplateError, meta_tags
+from content.link_preview import (
+    GALLERY_SIZES,
+    OG_IMAGE_WIDTH,
+    LinkPreviewTemplateError,
+    meta_tags,
+)
 from content.models import ProcessingState, Project, Variant
 from content.variants import VARIANT_WIDTHS
 from django.test import Client, override_settings
@@ -75,6 +81,35 @@ OG_IMAGE: tuple[str, dict[str, str | None]] = (
     "meta",
     {"property": "og:image", "content": COVER_URL},
 )
+
+# L'image de tête prête — la première que la galerie de la fiche montre — et ses trois variantes,
+# par largeur croissante comme le worker les écrit ; puis l'en-tête `Link` qui la précharge sous le
+# client de test : les sources que le site lui donne (`imageSources`, `apps/web/src/table/cards.ts`),
+# à la taille de la galerie.
+HEAD_VARIANTS: list[Variant] = [
+    {"name": f"images/tete/{width}.webp", "width": width, "height": width}
+    for width in (320, 480, 2400)
+]
+PRELOAD = (
+    "<http://testserver/media/images/tete/320.webp>; rel=preload; as=image; fetchpriority=high; "
+    'imagesrcset="http://testserver/media/images/tete/320.webp 320w, '
+    "http://testserver/media/images/tete/480.webp 480w, "
+    'http://testserver/media/images/tete/2400.webp 2400w"; '
+    f'imagesizes="{GALLERY_SIZES}"'
+)
+
+# Les deux états d'une image qui n'est pas prête.
+UNREADY_STATES = {"en attente": ProcessingState.PENDING, "en échec": ProcessingState.FAILED}
+
+# Les galeries sans image prête — sans variante, comme pour le site —, par l'état de chacune de
+# leurs images.
+UNREADY_GALLERIES: dict[str, list[ProcessingState]] = {
+    "sans image": [],
+    "en attente": [ProcessingState.PENDING],
+    "en échec": [ProcessingState.FAILED],
+    "en attente puis en échec": [ProcessingState.PENDING, ProcessingState.FAILED],
+    "prête sans variante": [ProcessingState.READY],
+}
 
 # Les adresses de `/projets/*` sans projet publié (décision 1). Le projet publié du brief existe :
 # une adresse qui commence par son slug ne doit pas le servir.
@@ -152,6 +187,13 @@ def covered(published: Project) -> Project:
     return published
 
 
+@pytest.fixture
+def headed(published: Project) -> Project:
+    """Le projet publié du brief, avec une image de tête prête."""
+    saved(gallery_image(published, state=ProcessingState.READY, variants=HEAD_VARIANTS))
+    return published
+
+
 @pytest.mark.django_db
 @pytest.mark.usefixtures("covered")
 def test_un_projet_publie_rend_ses_cinq_balises_echappees(client: Client) -> None:
@@ -201,9 +243,7 @@ def test_sans_image_l_apercu_n_a_pas_d_og_image(client: Client) -> None:
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize(
-    "state", [ProcessingState.PENDING, ProcessingState.FAILED], ids=["en attente", "en échec"]
-)
+@pytest.mark.parametrize("state", UNREADY_STATES.values(), ids=UNREADY_STATES.keys())
 def test_une_premiere_image_qui_n_est_pas_prete_n_a_pas_d_og_image(
     client: Client, published: Project, state: ProcessingState
 ) -> None:
@@ -237,17 +277,58 @@ def test_la_variante_de_l_apercu_de_lien_est_le_barreau_de_1200_px() -> None:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("headed")
+def test_l_image_de_tete_est_prechargee_par_un_en_tete_link(client: Client) -> None:
+    """Le navigateur la demande dès la page reçue, sans attendre le JS ni la liste : sa première
+    variante, ses variantes dans leur ordre et la taille de la galerie, celles du site."""
+    response = client.get(PAGE)
+
+    assert (response.status_code, response.get("Link")) == (200, PRELOAD)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("states", UNREADY_GALLERIES.values(), ids=UNREADY_GALLERIES.keys())
+def test_sans_image_prete_la_page_n_a_pas_d_en_tete_link(
+    client: Client, published: Project, states: list[ProcessingState]
+) -> None:
+    """Rien à précharger : la galerie n'en montre aucune."""
+    for position, state in enumerate(states, start=1):
+        saved(gallery_image(published, position=position, state=state))
+
+    response = client.get(PAGE)
+
+    assert (response.status_code, response.has_header("Link")) == (200, False)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("state", UNREADY_STATES.values(), ids=UNREADY_STATES.keys())
+def test_l_image_prechargee_est_la_premiere_prete_de_la_galerie(
+    client: Client, published: Project, state: ProcessingState
+) -> None:
+    """Une première image qui n'est pas prête, puis une prête : la galerie montre la seconde en
+    premier, et la page la précharge — à l'inverse de l'`og:image`, qui reste la couverture."""
+    saved(gallery_image(published, state=state))
+    saved(gallery_image(published, position=2, state=ProcessingState.READY, variants=HEAD_VARIANTS))
+
+    assert client.get(PAGE).get("Link") == PRELOAD
+
+
+@pytest.mark.django_db
 @pytest.mark.usefixtures("published")
 @pytest.mark.parametrize("address", REDIRECTED.values(), ids=REDIRECTED.keys())
 def test_une_adresse_sans_projet_publie_redirige_vers_l_accueil(
     client: Client, address: str
 ) -> None:
-    """`302 Found` vers `/`, jamais une 404 (décision 1, ADR 0009)."""
+    """`302 Found` vers `/`, jamais une 404 (décision 1, ADR 0009), sans rien à précharger."""
     saved(project(slug="brouillon", published=False))
 
     response = client.get(address)
 
-    assert (response.status_code, response["Location"]) == (302, "/")
+    assert (response.status_code, response["Location"], response.has_header("Link")) == (
+        302,
+        "/",
+        False,
+    )
 
 
 @pytest.mark.django_db
@@ -309,6 +390,20 @@ def test_la_seconde_requete_est_servie_par_le_cache(
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("headed")
+def test_la_page_servie_par_le_cache_garde_son_en_tete_link(
+    client: Client, django_assert_num_queries: DjangoAssertNumQueries
+) -> None:
+    """Le cache garde les en-têtes que la vue pose sur la page, pas seulement son corps."""
+    from_base = client.get(PAGE).get("Link")
+
+    with django_assert_num_queries(0):
+        from_cache = client.get(PAGE).get("Link")
+
+    assert (from_base, from_cache) == (PRELOAD, PRELOAD)
+
+
+@pytest.mark.django_db
 @pytest.mark.usefixtures("published")
 def test_la_page_gardee_d_un_projet_n_est_jamais_servie_pour_un_autre(client: Client) -> None:
     """La clé distingue le slug (décision 4)."""
@@ -342,7 +437,7 @@ def test_chaque_origine_recoit_la_page_a_sa_propre_og_image(
 def test_une_redirection_n_est_jamais_gardee(client: Client) -> None:
     """Un brouillon publié sans qu'aucun signal parte (`QuerySet.update`), donc sans purge : sa
     page suit aussitôt, faute d'une redirection gardée qui la masquerait (décision 4) — le cache,
-    qui ne garde que le corps et son type, la rejouerait en `200` vide."""
+    qui ne garde que le corps et les en-têtes, la rejouerait en `200` vide."""
     saved(project(slug="brouillon", title="Brouillon", published=False))
     before = client.get("/projets/brouillon")
 

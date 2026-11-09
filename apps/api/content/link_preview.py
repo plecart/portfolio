@@ -6,6 +6,10 @@ l'`index.html` compilé, `LINK_PREVIEW_TEMPLATE` — dont le bloc marqué porte 
 celles que lit un robot d'aperçu ; un navigateur y charge le site, qui affiche la fiche. Toute
 autre adresse redirige vers l'accueil (décision 1). La CSP et les en-têtes de sécurité restent
 ceux de Caddy (décision 5).
+
+La page porte aussi un en-tête `Link` qui précharge l'image de tête de la galerie (`preload_link`,
+#27) : le navigateur la demande dès la page reçue, sans attendre le JS ni la liste des projets.
+Un en-tête, et non une balise : le bloc marqué s'en tient à ses cinq balises (D53, ADR 0011).
 """
 
 import hashlib
@@ -35,6 +39,13 @@ CONTENT_TYPE = "text/html; charset=utf-8"
 # La largeur de la variante de l'`og:image`, 1200 px (spec §1.11, ADR 0011) : un barreau de
 # l'échelle des variantes (`VARIANT_WIDTHS`), découplé du dernier (ADR 0028).
 OG_IMAGE_WIDTH = 1200
+
+# L'attribut `sizes` des images de la galerie, recopié de `GALLERY_SIZES`
+# (`apps/web/src/project/project.ts`) et épinglé par `apps/web/tests/project.test.ts` : le
+# préchargement choisit sa variante dans les mêmes sources, à la même taille, que l'image du site.
+GALLERY_SIZES = (
+    "(min-width: 600px) min(100vh - 96px, 660px, (100vw - 92px) / 2), calc(100vw - 16px)"
+)
 
 
 class LinkPreviewTemplateError(RuntimeError):
@@ -109,6 +120,39 @@ def cover_url(request: HttpRequest, project: Project) -> str | None:
     return variant_url({"request": request}, cover, variant)
 
 
+def preload_link(request: HttpRequest, project: Project) -> str | None:
+    """L'en-tête `Link` qui précharge l'image de tête de la galerie de `project` : la première
+    image prête, celle que le site montre en premier (`readyImages`,
+    `apps/web/src/project/project.ts`) ; `None` sans image prête.
+
+    Prête veut dire qui a des variantes, comme pour le site : une image en attente ou en échec plus
+    tôt dans la galerie cède la tête à la suivante — à l'inverse de la couverture (`cover_url`).
+    Les sources sont celles que le site lui donne (`imageSources`, `apps/web/src/table/cards.ts`) :
+    la première variante, puis chacune dans l'ordre stocké avec sa largeur, aux adresses de l'API
+    publique (`variant_url`) — l'image que le site demande ensuite est celle déjà reçue.
+
+    Args:
+        request: la requête servie, dont l'origine complète une adresse relative.
+        project: le projet de la page.
+
+    Returns:
+        L'en-tête, par exemple `<http://testserver/media/images/x/320.webp>; rel=preload; as=image;
+        fetchpriority=high; imagesrcset="http://testserver/media/images/x/320.webp 320w, …";
+        imagesizes="<GALLERY_SIZES>"` sous le client de test.
+    """
+    image = project.gallery.exclude(variants=[]).first()
+    if image is None:
+        return None
+    urls = [variant_url({"request": request}, image, variant) for variant in image.variants]
+    srcset = ", ".join(
+        f"{url} {variant['width']}w" for url, variant in zip(urls, image.variants, strict=True)
+    )
+    return (
+        f"<{urls[0]}>; rel=preload; as=image; fetchpriority=high; "
+        f'imagesrcset="{srcset}"; imagesizes="{GALLERY_SIZES}"'
+    )
+
+
 def meta_tags(project: Project, image: str | None) -> bytes:
     """Les balises du bloc marqué (ADR 0011) : le titre dans `<title>` et `og:title`, le résumé
     dans `description` et `og:description`, et l'`og:image` s'il y a une `image`. Chaque valeur
@@ -141,12 +185,13 @@ def meta_tags(project: Project, image: str | None) -> bytes:
 @cache_control(no_cache=True)
 def link_preview(request: HttpRequest, slug: str) -> HttpResponseBase:
     """`GET /projets/<slug>` : le gabarit, son bloc marqué remplacé par les balises du projet
-    publié `slug` ; `302 Found` vers `/` sans projet publié à cette adresse (décision 1).
+    publié `slug`, et l'en-tête qui précharge son image de tête s'il en a une (`preload_link`) ;
+    `302 Found` vers `/` sans projet publié à cette adresse (décision 1).
 
     `slug` est tout ce qui suit `projets/`, une barre finale ôtée : `/projets/<slug>/` est la même
     fiche, comme pour le site (`PROJECT_PATH`, `apps/web/src/project/project.ts`). Ce qui n'a pas
     alors la forme d'un slug (`slug_re`, celle que valide le champ) redirige sans lire ni le
-    gabarit ni la base. La page `200` est gardée
+    gabarit ni la base. La page `200`, en-têtes compris, est gardée
     dans l'espace du contenu, vidé à chaque écriture du contenu, sous une clé qui distingue le
     slug, l'origine et l'empreinte du gabarit (décision 4) ; une redirection ne l'est jamais.
 
@@ -163,6 +208,9 @@ def link_preview(request: HttpRequest, slug: str) -> HttpResponseBase:
         if project is None:
             return HttpResponseRedirect("/")
         block = meta_tags(project, cover_url(request, project))
-        return HttpResponse(template.head + block + template.tail, content_type=CONTENT_TYPE)
+        response = HttpResponse(template.head + block + template.tail, content_type=CONTENT_TYPE)
+        if (link := preload_link(request, project)) is not None:
+            response["Link"] = link
+        return response
 
     return cached_response(request, f"apercu:{slug}:{template.digest}", render)
