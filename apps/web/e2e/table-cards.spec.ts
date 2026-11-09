@@ -597,6 +597,74 @@ test('à 320 px, la carte simple la plus chargée garde ses rubans dans sa bande
   expect(Math.max(...overflows)).toBeLessThanOrEqual(0)
 })
 
+/**
+ * Dans la page : la sangle d'une carte face au pointeur, puis dans l'ordre d'empilement. Sur une
+ * grille de 2 px, les points de la face où elle est l'élément touché ; puis, pour chaque couche de
+ * `layers`, ses points — la sangle hors du test de touche — et ceux où la sangle l'emporte, son
+ * pointeur rétabli le temps de la mesure : le test de touche suit l'ordre de peinture.
+ */
+function strapLayering({ path, layers }: { path: string; layers: string[] }) {
+  const card = document.querySelector(`.card[href="${path}"]`)!
+  const strap = card.querySelector<HTMLElement>('.card-strap')!
+  const grid = (element: Element) => {
+    const { left, top, width, height } = element.getBoundingClientRect()
+    const points: [number, number][] = []
+    for (let x = left + 1; x < left + width - 1; x += 2) {
+      for (let y = top + 1; y < top + height - 1; y += 2) points.push([x, y])
+    }
+    return points
+  }
+  const onStrap = ([x, y]: [number, number]) => strap.contains(document.elementFromPoint(x, y))
+  const intercepted = grid(card.querySelector('.card-face')!).filter(onStrap).length
+  return {
+    intercepted,
+    layers: layers.map((selector) => {
+      const layer = card.querySelector(selector)!
+      strap.style.pointerEvents = 'none'
+      const points = grid(layer).filter(([x, y]) => layer.contains(document.elementFromPoint(x, y)))
+      strap.style.pointerEvents = 'auto'
+      const covered = points.filter(onStrap).length
+      strap.style.removeProperty('pointer-events')
+      return { selector, points: points.length, covered }
+    }),
+  }
+}
+
+/** Ce que la sangle recouvre (spec §4.1) : la photo ; ce qui la recouvre : trombone, post-it, bande. */
+const UNDER_STRAP = ['.card-photo']
+const OVER_STRAP = ['.card-clip', '.card-postit', '.card-band']
+
+/** La sangle au repos, puis au coin : le survol au bureau, le toucher sur un téléphone. */
+const STRAP_STATES: [string, (card: Locator, isMobile: boolean) => Promise<unknown>][] = [
+  ['au repos', async () => {}],
+  ['au coin', (card, isMobile) => (isMobile ? card.tap() : card.hover())],
+]
+
+for (const [state, act] of STRAP_STATES) {
+  test(`la sangle ${state}, à 375 px et au bureau : au-dessus de la photo, sous le trombone, le post-it et la bande, et sans prendre le pointeur (spec §4.1)`, async ({
+    page,
+    isMobile,
+  }) => {
+    await page.setViewportSize(isMobile ? NARROW_VIEWPORT : COLUMN_VIEWPORT)
+    await openTable(page, TWO_CARDS)
+    await enterCards(page)
+    const card = cards(page).first()
+    await act(card, isMobile)
+    await settle(page)
+
+    const { intercepted, layers } = await page.evaluate(strapLayering, {
+      path: (await card.getAttribute('href'))!,
+      layers: [...UNDER_STRAP, ...OVER_STRAP],
+    })
+
+    expect(intercepted).toBe(0)
+    for (const { selector, points, covered } of layers) {
+      expect(points, selector).toBeGreaterThan(0)
+      expect(covered, selector).toBe(UNDER_STRAP.includes(selector) ? points : 0)
+    }
+  })
+}
+
 test('un projet sans état ne porte aucun ruban d’état', async ({ page }) => {
   await openTable(page, [buildProject()])
 

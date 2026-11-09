@@ -229,12 +229,14 @@
     }
   }
 
-  /* La sangle de chantier d'un projet en cours (spec §4.1), sur la photo, sous le post-it, le
-     trombone et la bande : en travers de la face au repos ; au coin haut-gauche, amincie, sur une
-     intention, où le bandeau se révèle. Deux boîtes la coupent : la face et `--strap-overhang`
-     autour, où ne se voit que sa tranche, le retour de la sangle derrière la carte ; puis, par-dessus,
-     la face seule, ses rayures. Chacune porte la même bande — `::before`, et `::after` au coin en
-     mouvement réduit —, dont les longueurs suivent la première boîte, leur conteneur. */
+  /* La sangle de chantier d'un projet en cours (spec §4.1) : au-dessus de la photo et sous la bande,
+     par l'ordre du document ; sous le trombone et le post-it, par leur `z-index`. Isolée, rien de ce
+     qu'elle empile ne s'en échappe ; décorative, elle ne prend aucun pointeur. En travers de la face
+     au repos ; au coin haut-gauche, amincie, sur une intention, où le bandeau se révèle. Deux boîtes
+     la coupent : la face et `--strap-overhang` autour, où ne se voit que sa tranche, le retour de la
+     sangle derrière la carte ; puis, par-dessus, la face seule, ses rayures. Chacune porte la même
+     bande — `::before`, et `::after` au coin en mouvement réduit —, dont les longueurs suivent la
+     première boîte, leur conteneur. */
   .card-strap {
     --strap-overhang: 3px;
     --strap-angle: 35deg;
@@ -251,11 +253,15 @@
     --strap-cornered: 0;
     position: absolute;
     inset: calc(-1 * var(--strap-overhang));
+    isolation: isolate;
     overflow: hidden;
+    pointer-events: none;
     container-type: size;
   }
 
-  /* Au-dessus des bandes de la tranche, `::after` compris, que l'ordre du document mettrait dessus. */
+  /* Au-dessus des bandes de la tranche, `::after` compris, que l'ordre du document mettrait dessus :
+     dans la sangle seulement, qui l'isole — `container-type` n'en fait pas un contexte d'empilement
+     (Chromium 156, mesuré le 2026-11-09). */
   .card-strap-stripes {
     position: absolute;
     inset: var(--strap-overhang);
