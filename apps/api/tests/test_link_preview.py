@@ -341,6 +341,21 @@ def test_un_en_tete_link_change_sous_un_corps_inchange_n_est_pas_valide_par_un_3
 
 
 @pytest.mark.django_db
+def test_un_corps_change_sous_un_en_tete_link_inchange_n_est_pas_valide_par_un_304(
+    client: Client, headed: Project
+) -> None:
+    """L'`ETag` d'une page qui précharge son image emprunte aussi au corps : un titre changé sous
+    la même image n'est pas validé par un `304`."""
+    before = client.get(PAGE)
+    Project.objects.filter(pk=headed.pk).update(title="Autre")
+    purge()
+
+    after = client.get(PAGE, headers={"If-None-Match": before["ETag"]})
+
+    assert (after.status_code, after["Link"]) == (200, PRELOAD)
+
+
+@pytest.mark.django_db
 @pytest.mark.usefixtures("published")
 @pytest.mark.parametrize("address", REDIRECTED.values(), ids=REDIRECTED.keys())
 def test_une_adresse_sans_projet_publie_redirige_vers_l_accueil(
