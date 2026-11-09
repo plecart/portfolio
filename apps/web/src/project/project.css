@@ -115,8 +115,16 @@
   }
 
   .project-gallery-track {
+    position: relative;
     display: flex;
     height: 100%;
+  }
+
+  /* La couverture de la carte, au retour (§4.6) : posée sur l'image montrée, à la gauche que
+     `fadeCover` lui écrit. */
+  .project-gallery-cover {
+    position: absolute;
+    top: 0;
   }
 
   /* Le glissement d'une image à l'autre (§4.4). */
