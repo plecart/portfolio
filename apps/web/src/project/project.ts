@@ -47,6 +47,8 @@ const DIRECTION_KEYS = new Map([
 /**
  * L'attribut `sizes` d'une image de galerie (spec §3.2) : `--photo` dès 600 px, recopiée de
  * `project.css` car `sizes` ne lit pas les propriétés CSS, sinon le panneau moins ses marges de 8 px.
+ * Recopié à son tour par la vue des aperçus de lien (`apps/api/content/link_preview.py`), qui
+ * précharge l'image de tête : `tests/project.test.ts` tient les deux égaux.
  */
 export const GALLERY_SIZES = [
   `(min-width: ${BREAKPOINT}px) min(100vh - 96px, 660px, (100vw - 92px) / 2)`,

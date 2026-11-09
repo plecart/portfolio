@@ -1,7 +1,12 @@
-/** L'adresse et les faits d'une fiche (spec §3.2, §4.3, §7 ; issue #170), en logique pure. */
+/**
+ * L'adresse et les faits d'une fiche (spec §3.2, §4.3, §7 ; issue #170), en logique pure ; et la
+ * copie de la taille de la galerie que porte la vue des aperçus de lien (#27).
+ */
+import { readFileSync } from 'node:fs'
 import { expect, test } from 'vitest'
 import type { components } from '../src/api/schema.ts'
 import {
+  GALLERY_SIZES,
   isPageFragment,
   isSectionHash,
   projectDates,
@@ -19,6 +24,9 @@ import { cardTechnologies } from '../src/table/cards.ts'
 import { buildImage, buildProject, buildTechnology, FILES_ORIGIN, ONGOING } from '../e2e/projects.ts'
 
 type Section = components['schemas']['SectionOut']
+
+/** La vue des aperçus de lien : elle précharge l’image de tête à la taille de la galerie (#27). */
+const LINK_PREVIEW = new URL('../../api/content/link_preview.py', import.meta.url)
 
 test.each([
   ['/', null],
@@ -186,6 +194,10 @@ test.each(['pending', 'failed'] as const)('une image à l’état %s n’entre p
 
 test('la condition lit les variantes : une image prête sans variante n’entre pas', () => {
   expect(readyImages([{ ...buildImage('projet', 'Écran'), variants: [] }])).toEqual([])
+})
+
+test('l’image de tête se précharge à la taille de la galerie : la vue des aperçus en porte la copie', () => {
+  expect(readFileSync(LINK_PREVIEW, 'utf8')).toContain(`"${GALLERY_SIZES}"`)
 })
 
 test.each([
