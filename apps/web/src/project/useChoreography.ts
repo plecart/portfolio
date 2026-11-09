@@ -27,6 +27,9 @@ const TRAVELERS = [
  */
 const RIBBON = '[data-ribbon]'
 
+/** La copie volante d'un ruban, par l'identité de son ruban (`flyerOf`). */
+const FLYER = '[data-flyer]'
+
 /**
  * Le reste de la fiche hors de la colonne défilante, qui apparaît à la pose et s'efface le premier
  * (spec §4.6) ; la colonne, `COLUMN`, en fait autant autour des rubans visés (`contentOf`).
@@ -451,6 +454,8 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
     if (phase === 'gone') return
     phase = 'gone'
     for (const animation of [...flights, ...receding]) animation.cancel()
+    // Les copies volantes des rubans (`flyerOf`), que la fiche abandonnée ne fera plus voler.
+    for (const flyer of panel.querySelectorAll(FLYER)) flyer.remove()
     card.removeAttribute('data-origin')
     for (const attribute of ['data-inactive', 'data-flight', 'data-choreography']) {
       panel.removeAttribute(attribute)
