@@ -10,6 +10,7 @@ nu et passent par le formulaire.
 """
 
 import hashlib
+import re
 from collections.abc import Callable
 from importlib.resources import files
 
@@ -23,7 +24,7 @@ from django.contrib.auth import SESSION_KEY
 from django.contrib.auth.models import Group, User
 from django.db import connection
 from django.db.models import Model
-from django.http.response import HttpResponseBase
+from django.http.response import HttpResponseBase, StreamingHttpResponse
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -69,6 +70,22 @@ SCREENS = [
         for view in ("changelist", "add")
     ),
 ]
+
+# Les icônes de l'hôte de l'API, pendant de celles du site sur fond orange (#256), et leur type.
+BROWSER_ICONS = {
+    "/favicon.ico": "image/x-icon",
+    "/icon.svg": "image/svg+xml",
+    "/apple-touch-icon.png": "image/png",
+}
+
+# Leurs balises, dans l'ordre du site (`docs/frontend-outillage.md`, « Icônes du site »).
+ICON_LINKS = [
+    '<link rel="icon" href="/favicon.ico" sizes="32x32">',
+    '<link rel="icon" href="/icon.svg" type="image/svg+xml">',
+    '<link rel="apple-touch-icon" href="/apple-touch-icon.png">',
+]
+# Une balise `<link>` de la page, attributs compris.
+LINK_TAG = re.compile(r"<link [^>]*>")
 
 
 def superuser(username: str = USERNAME) -> User:
@@ -392,7 +409,25 @@ def test_la_page_de_connexion_repond_a_la_sonde_d_api(client: Client) -> None:
     assert response.status_code < 400
 
 
-def test_l_icone_que_demande_le_navigateur_ne_rend_pas_d_erreur(client: Client) -> None:
-    """Toute page de l'admin fait demander `/favicon.ico` au navigateur : un 404 s'inscrirait en
-    erreur dans sa console. L'hôte de l'API n'a pas d'icône, et le dit sans erreur."""
-    assert client.get("/favicon.ico").status_code == 204
+@pytest.mark.parametrize(("path", "media_type"), BROWSER_ICONS.items())
+def test_l_icone_que_demande_le_navigateur_est_servie_sous_son_type(
+    client: Client, path: str, media_type: str
+) -> None:
+    """À la racine de l'hôte de l'API, par WhiteNoise, avant toute vue."""
+    response = client.get(path)
+
+    assert isinstance(response, StreamingHttpResponse), "l'icône n'est pas servie par WhiteNoise"
+    assert (response.status_code, response["Content-Type"]) == (200, media_type)
+    # Lire le corps referme le fichier servi, sans le signal de fin de requête qui toucherait la
+    # base (`test_static_files.py`).
+    assert response.getvalue()
+
+
+def test_une_page_de_l_admin_declare_les_icones_du_navigateur_dans_l_ordre_du_site(
+    client: Client,
+) -> None:
+    """La page de connexion, anonyme, étend `admin/base_site.html` par `otp/admin111/login.html` :
+    c'est la surcharge du projet de ce gabarit qui les déclare."""
+    page = client.get(reverse("admin:login")).content.decode()
+
+    assert [tag for tag in LINK_TAG.findall(page) if tag in ICON_LINKS] == ICON_LINKS

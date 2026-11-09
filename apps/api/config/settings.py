@@ -8,6 +8,8 @@ Chaque réglage arrive avec la brique qui l'utilise, jamais « au cas où » (AD
 résidu du squelette `startproject` »).
 """
 
+from pathlib import Path
+
 import django_stubs_ext
 from django.utils.csp import CSP
 
@@ -203,13 +205,19 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = env.CORS_ALLOWED_ORIGINS
 CORS_URLS_REGEX = r"^/api/"
 
-# Les gabarits de l'admin vivent dans son application (`APP_DIRS`). Ses processeurs de contexte :
-# `auth` et `messages` sont exigés (`admin.E402`, `admin.E404`), `request` alimente sa barre de
-# navigation (`admin.W411`), `csp` donne à ses balises le nonce de la requête
-# (`{% csp_nonce_attr %}`).
+# Le dossier de ce module, qui porte les gabarits du projet et les fichiers servis à la racine.
+CONFIG_DIR = Path(__file__).resolve().parent
+
+# Les gabarits de l'admin vivent dans son application (`APP_DIRS`), ceux du projet qui en
+# surchargent un de même nom dans `config/templates` (`DIRS`) : Django y cherche avant les
+# applications, dont l'admin est la première (`INSTALLED_APPS`) — une surcharge rangée dans une
+# application passerait après lui. Ses processeurs de contexte : `auth` et `messages` sont exigés
+# (`admin.E402`, `admin.E404`), `request` alimente sa barre de navigation (`admin.W411`), `csp`
+# donne à ses balises le nonce de la requête (`{% csp_nonce_attr %}`).
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [CONFIG_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -236,6 +244,17 @@ STORAGES = {
     "default": media_storage(env),
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
+
+# Les icônes de l'hôte de l'API (#256), pendant du `public/` du site sur fond orange : `icon.svg`,
+# la source, celle du site aux deux teintes de `.p` près, puis `favicon.ico` et
+# `apple-touch-icon.png`, deux rendus commités de sa version claire ; la surcharge de
+# `admin/base_site.html` les déclare. Les rendus se refont par la commande de
+# `docs/frontend-outillage.md`, « Icônes du site », chaque `public/` remplacé par
+# `../api/config/root/`. WhiteNoise sert ce dossier à la racine, sous des noms sans empreinte :
+# `max-age=60` hors `DEBUG`, 0 en `DEBUG` (`WHITENOISE_MAX_AGE`), et les fichiers listés au
+# démarrage, ou cherchés à chaque requête en `DEBUG` (`WHITENOISE_AUTOREFRESH`) — doc WhiteNoise,
+# « Available Settings », et `whitenoise/middleware.py` de la 6.12.
+WHITENOISE_ROOT = CONFIG_DIR / "root"
 
 # Contenu en français seulement, sans plomberie multilingue (cadrage §3) : `LANGUAGE_CODE`
 # traduit les écrans et messages propres à Django. Heure de Paris : le défaut de Django est
