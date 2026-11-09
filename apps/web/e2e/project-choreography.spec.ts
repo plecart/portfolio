@@ -1005,7 +1005,7 @@ test('un projet en cours : sa photo vole en couleur, à l’aller comme au retou
   await expectLanded(page, card)
 })
 
-test('fermée depuis sa deuxième image, la galerie la garde pendant tout le retour à sa carte', async ({
+test('fermée depuis sa deuxième image, la galerie la garde pendant tout le retour à sa carte, flèches du clavier comprises', async ({
   page,
 }) => {
   await openEnteredTable(page, [
@@ -1019,6 +1019,7 @@ test('fermée depuis sa deuxième image, la galerie la garde pendant tout le ret
   const track = panel(page).locator('.project-gallery-track')
 
   await page.keyboard.press('Escape')
+  await page.keyboard.press('ArrowRight')
 
   expect(await track.evaluate((element) => element.getAnimations().length)).toBe(0)
   expectSameBox(await boxOf(frame.locator('img').nth(1)), await boxOf(frame))

@@ -16,7 +16,7 @@ import { useClickWithoutSwipe, useSwipe } from './useSwipe.ts'
  *
  * @param count Le nombre d'images.
  * @param listening L'écouteur est posé ; suspendu, la couche plein écran tient seule les flèches
- *   (issue #243, décision 6).
+ *   (issue #243, décision 6), ou la fiche, fermée, revient à sa carte avec l'image choisie.
  * @returns `index`, son rang ; `go`, le pas qui la change ; `navigable`, plus d'une image à montrer.
  */
 function useImageIndex(count: number, listening: boolean) {
@@ -66,7 +66,7 @@ export function ProjectGallery({ gallery, open }: { gallery: Project['gallery'];
   const images = readyImages(gallery)
   const [viewing, setViewing] = useState(false)
   if (viewing && !open) setViewing(false)
-  const { index, go, navigable } = useImageIndex(images.length, !viewing)
+  const { index, go, navigable } = useImageIndex(images.length, open && !viewing)
   const viewable = images.length > 0
   const swipe = useSwipe(go)
   const openOnClick = useClickWithoutSwipe(() => viewable && setViewing(true))
