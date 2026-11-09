@@ -1,0 +1,13 @@
+{% extends "admin/base_site.html" %}
+{% comment %}
+Le gabarit que les pages de l'admin étendent, surchargé pour déclarer les icônes de l'hôte de
+l'API, servies à sa racine (`WHITENOISE_ROOT`, `config/settings.py`), dans l'ordre du site
+(`docs/frontend-outillage.md`, « Icônes du site »). Il étend celui de l'admin, de même nom : la
+recherche d'un `extends` saute les gabarits déjà traversés (`ExtendsNode.find_template`).
+{% endcomment %}
+
+{% block extrahead %}{{ block.super }}
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+{% endblock %}
