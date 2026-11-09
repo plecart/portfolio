@@ -44,6 +44,9 @@ import {
 const PROJECTS = PROJECT_SETS.threeWithoutShowcase
 const FIRST_PATH = '/projets/projet-02'
 
+/** Le chemin de toute fiche de `ficheProject`. */
+const FICHE_PATH = '/projets/fiche'
+
 /** Une fiche à deux images et deux liens : tout son contenu apparaît à la pose. */
 const FULL_FICHE = ficheProject({
   ...LINKS,
@@ -294,7 +297,6 @@ const RIBBONED_FIELDS = {
     buildTechnology('PostgreSQL', 'infrastructure'),
   ],
 }
-const RIBBONED_PATH = '/projets/fiche'
 
 /** Dans la stack « Technologies » de `RIBBONED_FIELDS`, les rubans que visent ceux de la carte. */
 const TARGETED = '[data-ribbon]:not([data-ribbon="Redis"], [data-ribbon="PostgreSQL"])'
@@ -312,9 +314,9 @@ test('chaque ruban de technologie vole vers le ruban de la stack « Technologies
   page,
 }) => {
   await openEnteredTable(page, [ficheProject(RIBBONED_FIELDS)])
-  const resume = await openFrozen(page, RIBBONED_PATH)
+  const resume = await openFrozen(page, FICHE_PATH)
 
-  const opening = ribbonFlights(await page.evaluate(readFlights, { path: RIBBONED_PATH }))
+  const opening = ribbonFlights(await page.evaluate(readFlights, { path: FICHE_PATH }))
 
   expect(opening.map(({ name, place }) => [name, place])).toEqual(RIBBON_PLACES)
   for (const { start, end, homologue, rest } of opening) {
@@ -328,7 +330,7 @@ test('chaque ruban de technologie vole vers le ruban de la stack « Technologies
   await page.keyboard.press('Escape')
   await finishAnimations(page)
 
-  const closing = ribbonFlights(await page.evaluate(readFlights, { path: RIBBONED_PATH }))
+  const closing = ribbonFlights(await page.evaluate(readFlights, { path: FICHE_PATH }))
 
   expect(closing.map(({ name, place }) => [name, place])).toEqual(RIBBON_PLACES)
   for (const { count, start, end, homologue, rest } of closing) {
@@ -374,7 +376,7 @@ test('en vol, les rubans visés sont seuls visibles dans la colonne, sans qu’e
 }) => {
   await openEnteredTable(page, [ficheProject({ ...RIBBONED_FIELDS, description: LONG_DESCRIPTION })])
   const { open, content } = await motion(page)
-  const resume = await openFrozen(page, RIBBONED_PATH)
+  const resume = await openFrozen(page, FICHE_PATH)
   const column = readingColumn(page)
   const flyers = panel(page).locator('[data-flyer]')
   const targets = column.locator('.project-stack').first().locator(TARGETED)
@@ -427,7 +429,7 @@ test('à la fermeture, la colonne s’efface d’abord, sauf les rubans visés, 
 }) => {
   await openEnteredTable(page, [ficheProject(RIBBONED_FIELDS)])
   const { fast } = await motion(page)
-  await openProject(cardAt(page, RIBBONED_PATH))
+  await openProject(cardAt(page, FICHE_PATH))
   await freezeAnimations(page)
   const column = readingColumn(page)
   const targets = column.locator('.project-stack').first().locator(TARGETED)
@@ -466,7 +468,7 @@ test('fermée sa stack défilée hors de vue, chaque ruban repart de sa vraie pl
   isMobile,
 }) => {
   await openEnteredTable(page, [ficheProject({ ...RIBBONED_FIELDS, description: LONG_DESCRIPTION })])
-  await openProject(cardAt(page, RIBBONED_PATH))
+  await openProject(cardAt(page, FICHE_PATH))
   // Ce qui défile : la colonne au bureau, le panneau sur téléphone (spec §4.3).
   const scroller = isMobile ? panel(page) : readingColumn(page)
   await scroller.evaluate((element) =>
@@ -478,7 +480,7 @@ test('fermée sa stack défilée hors de vue, chaque ruban repart de sa vraie pl
   await page.keyboard.press('Escape')
   await finishAnimations(page)
 
-  const closing = ribbonFlights(await page.evaluate(readFlights, { path: RIBBONED_PATH }))
+  const closing = ribbonFlights(await page.evaluate(readFlights, { path: FICHE_PATH }))
   const technologies = closing.filter(({ place }) => place === 'technologies')
   expect(technologies).toHaveLength(3)
   for (const { start, end, homologue, rest } of technologies) {
@@ -496,9 +498,9 @@ test('un ruban de la carte dont la stack replie l’homologue n’a pas de traje
     buildTechnology(`${name}, une technologie au nom bien long`, 'language'),
   )
   await openEnteredTable(page, [ficheProject({ technologies })])
-  const resume = await openFrozen(page, RIBBONED_PATH)
+  const resume = await openFrozen(page, FICHE_PATH)
 
-  const flown = ribbonFlights(await page.evaluate(readFlights, { path: RIBBONED_PATH }))
+  const flown = ribbonFlights(await page.evaluate(readFlights, { path: FICHE_PATH }))
   const rendered = await readingColumn(page)
     .locator('[data-ribbon]')
     .evaluateAll((ribbons) => ribbons.map((ribbon) => (ribbon as HTMLElement).dataset.ribbon))
@@ -617,7 +619,7 @@ test('fermée depuis sa deuxième image, la galerie revient d’un coup à la pr
   await openEnteredTable(page, [
     ficheProject({ ...ONGOING, gallery: [buildImage('fiche', 'Une'), buildImage('fiche', 'Deux')] }),
   ])
-  await openProject(cardAt(page, '/projets/fiche'))
+  await openProject(cardAt(page, FICHE_PATH))
   await nextImage(page).click()
   await settle(page)
   await freezeAnimations(page)
@@ -773,7 +775,7 @@ test('à la pose, le contenu monte de 8 px en `--dur-content`, puis « Fermer la
 }) => {
   await openEnteredTable(page, [FULL_FICHE])
   const { open, content, easing } = await motion(page)
-  const resume = await openFrozen(page, '/projets/fiche')
+  const resume = await openFrozen(page, FICHE_PATH)
   const appearing = [
     closeButton(page),
     panel(page).getByRole('button', { name: 'Image précédente' }),
