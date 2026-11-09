@@ -186,8 +186,8 @@ Quatre points mesurés, non évidents :
   couverture de la vitrine en `loading="lazy"` : performance 98 à 99 et LCP de l'ordre de 2 s avec
   les images d'essai, 95 à 96 et de l'ordre de 2,6 s avec des WebP de bruit de 90 et 357 Ko. La
   fiche du premier projet, mesurée le 2026-11-09 : performance 91 à 93, accessibilité 100, bonnes
-  pratiques 100, SEO 100, LCP de 2,5 s sur la première image de sa galerie, que le navigateur ne
-  découvre qu'après le HTML, le JS puis la liste. Le serveur ne pose pas l'en-tête `Link` qui la
+  pratiques 100, SEO 100, LCP de 2,0 à 2,5 s sur la première image de sa galerie, que le navigateur
+  ne découvre qu'après le HTML, le JS puis la liste. Le serveur ne pose pas l'en-tête `Link` qui la
   précharge en production (`apps/api/content/link_preview.py`, #27) — il ne fait pas tourner
   Django —, d'où ce score au plus près du seuil ; `lhci assert` garde le meilleur des trois runs
   (`aggregationMethod`, `optimistic` par défaut, `@lhci/utils` 0.15.1, `assertions.js`).

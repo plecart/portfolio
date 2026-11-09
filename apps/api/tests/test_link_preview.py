@@ -15,13 +15,14 @@ from typing import Any, cast
 
 import pytest
 from content.api import api
+from content.cache import purge
 from content.link_preview import (
     GALLERY_SIZES,
     OG_IMAGE_WIDTH,
     LinkPreviewTemplateError,
     meta_tags,
 )
-from content.models import ProcessingState, Project, Variant
+from content.models import GalleryImage, ProcessingState, Project, Variant
 from content.variants import VARIANT_WIDTHS
 from django.test import Client, override_settings
 from factories import gallery_image, project, saved
@@ -311,6 +312,32 @@ def test_l_image_prechargee_est_la_premiere_prete_de_la_galerie(
     saved(gallery_image(published, position=2, state=ProcessingState.READY, variants=HEAD_VARIANTS))
 
     assert client.get(PAGE).get("Link") == PRELOAD
+
+
+@pytest.mark.django_db
+def test_un_en_tete_link_change_sous_un_corps_inchange_n_est_pas_valide_par_un_304(
+    client: Client, published: Project
+) -> None:
+    """L'`ETag` du middleware n'emprunte qu'au corps : sous une tête qui n'est pas prête, la page
+    garde son corps quand l'image préchargée change. Un `304` laisserait au navigateur l'ancien
+    `Link`, et une image que la galerie ne montre plus."""
+    saved(gallery_image(published, state=ProcessingState.PENDING))
+    image = saved(
+        gallery_image(published, position=2, state=ProcessingState.READY, variants=HEAD_VARIANTS)
+    )
+    before = client.get(PAGE)
+    GalleryImage.objects.filter(pk=image.pk).update(
+        variants=[
+            {**variant, "name": variant["name"].replace("tete", "autre")}
+            for variant in HEAD_VARIANTS
+        ]
+    )
+    purge()
+
+    after = client.get(PAGE, headers={"If-None-Match": before["ETag"]})
+
+    assert (after.status_code, after.content) == (200, before.content)
+    assert after["Link"] == PRELOAD.replace("tete", "autre")
 
 
 @pytest.mark.django_db

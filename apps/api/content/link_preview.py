@@ -21,6 +21,7 @@ from django.core.validators import slug_re
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.http.response import HttpResponseBase
 from django.utils.html import escape
+from django.utils.http import quote_etag
 from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_safe
 
@@ -211,6 +212,12 @@ def link_preview(request: HttpRequest, slug: str) -> HttpResponseBase:
         response = HttpResponse(template.head + block + template.tail, content_type=CONTENT_TYPE)
         if (link := preload_link(request, project)) is not None:
             response["Link"] = link
+            # L'`ETag` que poserait `ConditionalGetMiddleware` n'emprunte qu'au corps : un `Link`
+            # changé sous un corps inchangé serait validé par un `304`, et le navigateur garderait
+            # l'ancien. Le middleware garde un `ETag` déjà posé.
+            response["ETag"] = quote_etag(
+                hashlib.md5(response.content + link.encode(), usedforsecurity=False).hexdigest()
+            )
         return response
 
     return cached_response(request, f"apercu:{slug}:{template.digest}", render)
