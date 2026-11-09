@@ -372,6 +372,11 @@ await browser.close()
 test de l'image qui les demande. L'icône vide partie, la CSP de l'hôte du site n'admet plus `data:`
 en `img-src`.
 
+L'admin, sur l'hôte de l'API, en porte le pendant sur fond orange (#256) : les trois mêmes fichiers
+dans `apps/api/config/root/`, servis à la racine par WhiteNoise (`WHITENOISE_ROOT`,
+`apps/api/config/settings.py`). Un changement du dessin les refait aussi, par la même commande où
+chaque `public/` devient `../api/config/root/`.
+
 **Police** : `src/assets/fonts/manrope-latin.woff2` — Manrope variable 200–800, sous-ensemble latin,
 Google Fonts v20, 24,3 Ko, sous SIL Open Font License 1.1. L'OFL veut que la notice **et** le texte
 de la licence accompagnent la police partout où elle est distribuée : la notice voyage en
