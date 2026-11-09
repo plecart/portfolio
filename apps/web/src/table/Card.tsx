@@ -77,6 +77,8 @@ function Photo({ project, size }: { project: Project; size: CardSize }) {
 
 /**
  * Un ruban de technologie (spec §4.1) : son icône, son nom en texte masqué et en infobulle native.
+ * Son nom est aussi son identité (`data-ribbon`) : le ruban de la carte vole vers celui de la fiche
+ * qui porte la même (`useChoreography`).
  *
  * @param technology La technologie.
  * @param labelled Son nom en clair, sans infobulle : la stack de la fiche (§4.3).
@@ -89,7 +91,7 @@ export function TechnologyRibbon({
   labelled?: boolean
 }) {
   return (
-    <li className="card-ribbon" title={labelled ? undefined : name}>
+    <li className="card-ribbon" data-ribbon={name} title={labelled ? undefined : name}>
       <CardImage src={icon} />
       <span className={labelled ? undefined : 'sr-only'}>{name}</span>
     </li>
@@ -97,20 +99,27 @@ export function TechnologyRibbon({
 }
 
 /** Les rubans de technologies d'un projet, ceux de sa carte (spec §1.4). */
-export function TechnologyRibbons({ project }: { project: Project }) {
+function TechnologyRibbons({ project }: { project: Project }) {
   return cardTechnologies(project.technologies).map((technology) => (
     <TechnologyRibbon key={technology.name} technology={technology} />
   ))
 }
 
-/** Les rubans d'état d'un projet (spec §4.1), les états présents seulement. */
+/**
+ * Les rubans d'état d'un projet (spec §4.1), les états présents seulement ; leur identité, comme
+ * celle d'un ruban de technologie (`TechnologyRibbon`) : `ongoing`, `live`.
+ */
 export function StateRibbons({ project }: { project: Project }) {
   const { ongoing, live } = cardStates(project)
   return (
     <>
-      {ongoing && <li className="card-ribbon">{strings.ribbonOngoing}</li>}
+      {ongoing && (
+        <li className="card-ribbon" data-ribbon="ongoing">
+          {strings.ribbonOngoing}
+        </li>
+      )}
       {live && (
-        <li className="card-ribbon">
+        <li className="card-ribbon" data-ribbon="live">
           <span className="card-dot" />
           {strings.ribbonLive}
         </li>

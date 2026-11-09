@@ -322,7 +322,7 @@
     }
   }
 
-  /* Les rubans de la carte, sur la fiche (§4.3) : leur rangée, et celles de la stack. */
+  /* Les rubans de la fiche (§4.3) : ceux d'état de l'en-tête, et ceux de la stack. */
   .project-ribbons {
     column-gap: var(--s-2);
   }
@@ -335,6 +335,13 @@
   .project-stack {
     --card-ribbon-inset: var(--s-2);
     --card-ribbon-gap: 6px;
+  }
+
+  /* La copie volante d'un ruban (§4.6, `useChoreography`) : fixe, hors de la colonne défilante qui
+     couperait son vol ; cachée hors de ses vols, qui la montrent. */
+  [data-flyer] {
+    position: fixed;
+    visibility: hidden;
   }
 
   /* Ce qui défile (§4.3) : la colonne au bureau, le panneau sur téléphone. Un mot trop long pour la
@@ -356,6 +363,11 @@
 
     pre {
       white-space: pre-wrap;
+    }
+
+    /* En vol, la colonne ne montre que les rubans visés (§4.6) : sa barre attend la pose. */
+    [data-flight] & {
+      scrollbar-color: transparent transparent;
     }
   }
 
