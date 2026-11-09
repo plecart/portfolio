@@ -46,8 +46,8 @@ function ProjectHeader({ project }: { project: Project }) {
 /**
  * Les rubans d'un groupe de la stack, dans l'ordre de l'admin, sur deux rangées au plus (spec §4.3,
  * `useStackFold`). Ceux qui n'y tiennent pas sont retirés du rendu ; le ruban-bouton prend la
- * dernière place de la deuxième rangée, « +N ⌄ », et les déplie sur place : il devient alors
- * « Réduire ⌃ », en fin de liste, et garde son nom (`stackButtonName`) et le focus (spec §6.2).
+ * dernière place de la deuxième rangée, « +N », et les déplie sur place : il devient alors
+ * « Réduire », en fin de liste, et garde son nom (`stackButtonName`) et le focus (spec §6.2).
  * L'état déplié vit avec la fiche rendue : chaque ouverture montre le groupe replié.
  *
  * @param kind Le groupe : ses technologies, ou ses outils.
@@ -76,7 +76,7 @@ function StackList({ kind, technologies }: { kind: StackKind; technologies: Tech
             aria-label={stackButtonName(kind, hidden)}
             onClick={() => setExpanded(!expanded)}
           >
-            {expanded && !measuring ? strings.collapseStack : `+${hidden} ${strings.expandStack}`}
+            {expanded && !measuring ? strings.collapseStack : `+${hidden}`}
           </button>
         </li>
       )}

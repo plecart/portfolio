@@ -231,23 +231,35 @@
 
   /* La sangle de chantier d'un projet en cours (spec §4.1) : au-dessus de la photo et sous la bande,
      par l'ordre du document ; sous le trombone et le post-it, par leur `z-index`. Isolée, rien de ce
-     qu'elle empile ne s'en échappe ; décorative, elle ne prend aucun pointeur. En travers de la face
-     au repos ; au coin haut-gauche, amincie, sur une intention, où le bandeau se révèle. Deux boîtes
-     la coupent : la face et `--strap-overhang` autour, où ne se voit que sa tranche, le retour de la
-     sangle derrière la carte ; puis, par-dessus, la face seule, ses rayures. Chacune porte la même
-     bande — `::before`, et `::after` au coin en mouvement réduit —, dont les longueurs suivent la
-     première boîte, leur conteneur. */
+     qu'elle empile ne s'en échappe ; décorative, elle ne prend aucun pointeur. Au repos, tendue du
+     bord gauche de la face, au bas de la photo, à son bord droit, au haut de la photo ; au coin
+     haut-gauche, amincie, sur une intention, où le bandeau se révèle. Deux boîtes la coupent : la face
+     et `--strap-overhang` autour, où ne se voit que sa tranche, le retour de la sangle derrière la
+     carte ; puis, par-dessus, la face seule, ses rayures. Chacune porte la même bande — `::before`,
+     et `::after` au coin en mouvement réduit —, dont les longueurs suivent la première boîte, leur
+     conteneur. */
   .card-strap {
     --strap-overhang: 3px;
-    --strap-angle: 35deg;
     --strap-width: 8cqw;
+    /* La largeur de la face, et le côté de sa photo carrée, dans le cadre. */
+    --strap-face: calc(100cqw - 2 * var(--strap-overhang));
+    --strap-photo: calc(var(--strap-face) - 2 * var(--card-frame));
+    /* Au repos, son bord bas passe par le coin bas-gauche du rectangle large comme la face et haut
+       comme la photo, son bord haut par le coin haut-droit : l'angle de la diagonale, moins celui
+       qu'y prend son épaisseur, asin(épaisseur / diagonale). Le rapport de deux longueurs vient de
+       tan(atan2()) : les diviser l'une par l'autre demande l'arithmétique typée, que MDN ne donne
+       qu'aux navigateurs qui la prennent en charge (`calc()`, lu le 2026-11-09). */
+    --strap-angle: calc(
+      atan2(var(--strap-photo), var(--strap-face)) -
+        asin(tan(atan2(var(--strap-width), hypot(var(--strap-face), var(--strap-photo)))))
+    );
     /* Au coin : la part de son épaisseur qui reste, et la distance de son axe au coin. */
     --strap-thin: 0.5;
     --strap-inset: 8cqw;
-    /* La course jusqu'au coin, perpendiculaire à la bande : du centre de la boîte, à `--strap-inset`
-       de son coin haut-gauche, qui en est à 50cqw × sin(angle) + 50cqh × cos(angle) sur cet axe. */
+    /* La course jusqu'au coin, perpendiculaire à la bande : de son centre, à `--strap-inset` du coin
+       haut-gauche de la boîte, qui en est à 50cqw × (sin(angle) + cos(angle)) sur cet axe. */
     --strap-reach: calc(
-      var(--strap-inset) - 50cqw * sin(var(--strap-angle)) - 50cqh * cos(var(--strap-angle))
+      var(--strap-inset) - 50cqw * (sin(var(--strap-angle)) + cos(var(--strap-angle)))
     );
     /* 1 sur une intention, 0 sinon. */
     --strap-cornered: 0;
@@ -269,11 +281,13 @@
     overflow: hidden;
   }
 
-  /* Une bande : au centre de sa boîte, inclinée, assez longue pour la traverser. */
+  /* Une bande, inclinée, assez longue pour traverser sa boîte, centrée sur la photo : au centre du
+     carré en tête de la face, à 50cqw du haut et de la gauche de la première boîte, donc à
+     50cqw − 50cqh sous le centre de chacune, qu'elles partagent. */
   :is(.card-strap, .card-strap-stripes)::before,
   :is(.card-strap, .card-strap-stripes)::after {
     position: absolute;
-    top: 50%;
+    top: calc(50% + 50cqw - 50cqh);
     left: 50%;
     width: 150cqw;
     height: var(--strap-width);
@@ -290,12 +304,16 @@
     background-color: var(--strap-edge);
   }
 
+  /* Chaque rayure passe à la suivante en 1 px, pris sur elle : sans lui, la bande tournée les crénèle
+     (Chromium 156, mesuré le 2026-11-09). Leur largeur ne change pas, et le motif se raccorde sur le
+     jaune. */
   .card-strap-stripes::before,
   .card-strap-stripes::after {
     background: repeating-linear-gradient(
       45deg,
-      var(--strap) 0 calc(var(--strap-width) / 2),
-      var(--strap-ink) 0 var(--strap-width)
+      var(--strap) 0 calc(var(--strap-width) / 2 - 1px),
+      var(--strap-ink) calc(var(--strap-width) / 2) calc(var(--strap-width) - 1px),
+      var(--strap) var(--strap-width)
     );
   }
 

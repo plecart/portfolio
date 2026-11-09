@@ -7,7 +7,7 @@
  * dans l'application pour cela. Il les pose sur la table servie vide (le `test` d'`api.ts`), que
  * plus rien ne réécrit une fois la liste arrivée.
  */
-import type { Locator, Page } from '@playwright/test'
+import type { JSHandle, Locator, Page } from '@playwright/test'
 import { expect, serveProjects } from './api.ts'
 import { resolveAll, settle } from './css.ts'
 import { buildProject, buildTechnology, ONGOING, type Project } from './projects.ts'
@@ -79,19 +79,66 @@ export async function straighten(card: Locator) {
   await settle(card.page())
 }
 
+/** Les jetons de couleur de la sangle : ses rayures jaune et encre, puis sa tranche. */
+const STRAP_TOKENS = ['--strap', '--strap-ink', '--strap-edge']
+
 /** Les couleurs de la sangle, résolues : ses rayures jaune et encre, puis sa tranche. */
 export const strapColors = (page: Page) =>
-  resolveAll(page, [
-    ['color', 'var(--strap)'],
-    ['color', 'var(--strap-ink)'],
-    ['color', 'var(--strap-edge)'],
-  ])
+  resolveAll(
+    page,
+    STRAP_TOKENS.map((token): [string, string] => ['color', `var(${token})`]),
+  )
+
+/** Une couleur qu'aucune couche de la carte ne prend, ni aucun mélange des siennes. */
+const PROBE = 'rgb(255, 0, 255)'
+
+/** Pose ces jetons sur la sangle d'une carte, à cette couleur ; vide, elle les y retire. */
+const recolorStrap = (card: Locator, tokens: string[], color: string) =>
+  strap(card).evaluate(
+    (element: HTMLElement, [names, value]) => {
+      for (const name of names) element.style.setProperty(name, value)
+    },
+    [tokens, color] as const,
+  )
+
+/**
+ * Peint la tranche de la sangle d'une carte de la couleur témoin, jusqu'à la fin du scénario : la
+ * sienne, `--strap-edge`, est la moitié exacte du jaune et de l'encre, que traverse le lissage de
+ * leurs frontières (`card.css`).
+ *
+ * @returns La couleur témoin.
+ */
+export async function probeTranche(card: Locator) {
+  await recolorStrap(card, ['--strap-edge'], PROBE)
+  return PROBE
+}
 
 /** Un rectangle de la page, en px CSS. */
-type Rect = { x: number; y: number; width: number; height: number }
+export type Rect = { x: number; y: number; width: number; height: number }
 
 /** L'écart toléré sur chaque canal d'un pixel de couleur unie : l'anticrénelage d'un bord le dépasse. */
 const PIXEL_TOLERANCE = 6
+
+/**
+ * Une zone capturée, décodée : ses octets RGBA, ses colonnes et ses rangées de pixels, et leur
+ * nombre par px CSS.
+ */
+type Capture = { data: Uint8ClampedArray; columns: number; rows: number; scale: number }
+
+/** Capture une zone de la page et la décode dans la page, où un relevé la lit sans la rapatrier. */
+async function capture(page: Page, zone: Rect): Promise<JSHandle<Capture>> {
+  const png = await page.screenshot({ clip: zone })
+  return page.evaluateHandle(
+    async ({ url, width }) => {
+      const bitmap = await createImageBitmap(await (await fetch(url)).blob())
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d')!
+      canvas.drawImage(bitmap, 0, 0)
+      const { data } = canvas.getImageData(0, 0, bitmap.width, bitmap.height)
+      return { data, columns: bitmap.width, rows: bitmap.height, scale: bitmap.width / width }
+    },
+    { url: `data:image/png;base64,${png.toString('base64')}`, width: zone.width },
+  )
+}
 
 /**
  * Les pixels de ces couleurs dans une zone de la page, capturée : pour chaque couleur, la distance
@@ -110,24 +157,21 @@ export async function pixelDistances(
   colors: string[],
   rect: Rect = zone,
 ): Promise<number[][]> {
-  const png = await page.screenshot({ clip: zone })
-  return page.evaluate(
-    async ({ url, width: zoneWidth, colors: targets, rect: { x, y, width, height }, tolerance }) => {
-      const bitmap = await createImageBitmap(await (await fetch(url)).blob())
-      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d')!
-      canvas.drawImage(bitmap, 0, 0)
-      const { data } = canvas.getImageData(0, 0, bitmap.width, bitmap.height)
+  return (await capture(page, zone)).evaluate(
+    (
+      { data, columns, rows, scale },
+      { colors: targets, rect: { x, y, width, height }, tolerance },
+    ) => {
       const swatch = new OffscreenCanvas(1, 1).getContext('2d')!
       const bytes = targets.map((color) => {
         swatch.fillStyle = color
         swatch.fillRect(0, 0, 1, 1)
         return swatch.getImageData(0, 0, 1, 1).data
       })
-      const scale = bitmap.width / zoneWidth
       const distances = bytes.map((): number[] => [])
-      for (let row = 0; row < bitmap.height; row += 1) {
-        for (let column = 0; column < bitmap.width; column += 1) {
-          const at = 4 * (row * bitmap.width + column)
+      for (let row = 0; row < rows; row += 1) {
+        for (let column = 0; column < columns; column += 1) {
+          const at = 4 * (row * columns + column)
           const [left, top] = [(column + 0.5) / scale, (row + 0.5) / scale]
           const distance = Math.max(x - left, left - x - width, y - top, top - y - height)
           bytes.forEach((target, index) => {
@@ -141,10 +185,48 @@ export async function pixelDistances(
       return distances
     },
     {
-      url: `data:image/png;base64,${png.toString('base64')}`,
-      width: zone.width,
       colors,
       rect: { ...rect, x: rect.x - zone.x, y: rect.y - zone.y },
+      tolerance: PIXEL_TOLERANCE,
+    },
+  )
+}
+
+/**
+ * Les pixels que la sangle d'une carte peint dans une zone de la page : ceux qui changent, d'un canal
+ * au moins de plus que `PIXEL_TOLERANCE`, la zone capturée de nouveau, ses couleurs passées à la
+ * couleur témoin, puis rendues à `:root`, tranche témoin (`probeTranche`) comprise. Chacun par son
+ * centre, en px CSS, depuis le coin haut-gauche d'`origin` : abscisse, ordonnée. Son bord anticrénelé
+ * compte comme le reste, à cette tolérance près. Repeinte et non masquée : masquée (`visibility:
+ * hidden`), 3 à 5 pixels de la bande basse changeaient aussi au bureau, hors de sa portée ; repeinte,
+ * aucun (Chromium 156, mesuré le 2026-11-09).
+ *
+ * @param zone La zone capturée.
+ * @param origin Le rectangle d'où se comptent les coordonnées.
+ */
+export async function strapPixels(card: Locator, zone: Rect, origin: Rect) {
+  const page = card.page()
+  const shown = await capture(page, zone)
+  await recolorStrap(card, STRAP_TOKENS, PROBE)
+  const probed = await capture(page, zone)
+  await recolorStrap(card, STRAP_TOKENS, '')
+  return shown.evaluate(
+    ({ data, columns, rows, scale }, { other, offset: [dx, dy], tolerance }) => {
+      const points: [number, number][] = []
+      for (let row = 0; row < rows; row += 1) {
+        for (let column = 0; column < columns; column += 1) {
+          const at = 4 * (row * columns + column)
+          const changed = [0, 1, 2].some(
+            (channel) => Math.abs(data[at + channel] - other.data[at + channel]) > tolerance,
+          )
+          if (changed) points.push([(column + 0.5) / scale + dx, (row + 0.5) / scale + dy])
+        }
+      }
+      return points
+    },
+    {
+      other: probed,
+      offset: [zone.x - origin.x, zone.y - origin.y],
       tolerance: PIXEL_TOLERANCE,
     },
   )
