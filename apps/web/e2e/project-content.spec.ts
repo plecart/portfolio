@@ -4,7 +4,7 @@
  * adresses et ses fermetures : `project.spec.ts`.
  */
 import type { Locator, Page } from '@playwright/test'
-import { expect, test } from './api.ts'
+import { expect, serveProjects, test } from './api.ts'
 import { resolveAll, rotationOf, settle } from './css.ts'
 import {
   arriveAt,
@@ -15,6 +15,7 @@ import {
   expectNoViolations,
   expectPanelBox,
   ficheProject,
+  freezeAnimations,
   holdNativeClicks,
   LINKS,
   LONG_DESCRIPTION,
@@ -171,7 +172,9 @@ test.describe('ce qui défile', () => {
     ])
   })
 
-  test('toutes les technologies, puis les outils, nommés en clair', async ({ page }) => {
+  test('toutes les technologies, puis les outils, nommés en clair : en deux rangées, aucun ruban-bouton', async ({
+    page,
+  }) => {
     await arriveAt(page, { technologies: THREE_TECHNOLOGIES_AND_A_TOOL })
 
     const headings = panel(page).getByRole('heading', { level: 3 })
@@ -190,6 +193,7 @@ test.describe('ce qui défile', () => {
     await expect(stacks.first().getByRole('listitem').first()).toHaveCSS('padding-inline-start', '8px')
     await expect(stacks.first().getByRole('listitem').first()).toHaveCSS('column-gap', '6px')
     await expect(stacks.first().locator('.sr-only')).toHaveCount(0)
+    await expect(stacks.getByRole('button')).toHaveCount(0)
   })
 
   test('sans outil, ni intertitre « Outils » ni rubans', async ({ page }) => {
@@ -197,6 +201,231 @@ test.describe('ce qui défile', () => {
 
     await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(['Technologies'])
     await expect(page.locator('.project-stack')).toHaveCount(1)
+  })
+})
+
+test.describe('la stack repliée à deux rangées', () => {
+  /** Douze technologies et quatorze outils : plus de deux rangées par groupe, à 1280 et à 375 px. */
+  const MANY = {
+    technologies: [
+      ...['TypeScript', 'Python', 'Rust', 'Go', 'Kotlin', 'Swift'].map((name) =>
+        buildTechnology(name, 'language'),
+      ),
+      ...['React', 'Django', 'Vue', 'Svelte'].map((name) => buildTechnology(name, 'framework')),
+      ...['Docker', 'Kubernetes'].map((name) => buildTechnology(name, 'infrastructure')),
+      ...[
+        'Figma',
+        'Git',
+        'Vite',
+        'Vitest',
+        'Playwright',
+        'ESLint',
+        'Storybook',
+        'Sentry',
+        'Prettier',
+        'Webpack',
+        'Jest',
+        'Postman',
+        'Notion',
+        'Jira',
+      ].map((name) => buildTechnology(name, 'tool')),
+    ],
+  }
+
+  /** Chaque groupe : la fin du nom de son ruban-bouton, au pluriel et au singulier, et ses rubans. */
+  const GROUPS = [
+    ['technologies', 'technologie', 12],
+    ['outils', 'outil', 14],
+  ] as const
+
+  /** Un téléphone de 375 × 812 px. */
+  const PHONE = { width: 375, height: 812 }
+
+  /** La liste d'un groupe de la stack, par son rang. */
+  const stack = (page: Page, index: number) => panel(page).locator('.project-stack').nth(index)
+
+  /** Le nombre de rangées d'une liste, par le haut de ses éléments. */
+  const rowsOf = (list: Locator) =>
+    list
+      .getByRole('listitem')
+      .evaluateAll((items) => new Set(items.map((item) => (item as HTMLElement).offsetTop)).size)
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`(${colorScheme}) chaque groupe tient en deux rangées, « +N ⌄ » à la dernière place : il déplie le groupe sur place et devient « Réduire ⌃ », en fin de liste, qui le replie, le focus sur lui et son nom inchangé`, async ({
+      page,
+      isMobile,
+    }) => {
+      await page.emulateMedia({ colorScheme })
+      await page.setViewportSize(isMobile ? PHONE : COLUMN_VIEWPORT)
+      await arriveAt(page, MANY)
+
+      for (const [index, [others, other, total]] of GROUPS.entries()) {
+        const list = stack(page, index)
+        const button = list.getByRole('button')
+        const shown = await list.locator('[data-ribbon]').count()
+        const hidden = total - shown
+        const folded = `+${hidden} ⌄`
+        const name =
+          hidden === 1
+            ? `Afficher ou réduire 1 autre ${other}`
+            : `Afficher ou réduire les ${hidden} autres ${others}`
+
+        expect(shown).toBeLessThan(total)
+        expect(await rowsOf(list)).toBe(2)
+        await expect(list.getByRole('listitem').last()).toHaveText(folded)
+        await expect(button).toHaveText(folded)
+        await expect(button).toHaveAccessibleName(name)
+        await expect(button).toHaveAttribute('aria-expanded', 'false')
+        await expect(button).toHaveAttribute('aria-controls', (await list.getAttribute('id'))!)
+
+        await button.click()
+
+        await expect(button).toHaveAttribute('aria-expanded', 'true')
+        await expect(button).toHaveText('Réduire ⌃')
+        await expect(button).toHaveAccessibleName(name)
+        await expect(button).toBeFocused()
+        await expect(list.locator('[data-ribbon]')).toHaveCount(total)
+        await expect(list.getByRole('listitem').last()).toHaveText('Réduire ⌃')
+        await expectNoViolations(page)
+
+        await button.press('Enter')
+
+        await expect(button).toHaveAttribute('aria-expanded', 'false')
+        await expect(button).toHaveText(folded)
+        await expect(button).toBeFocused()
+        await expect(list.locator('[data-ribbon]')).toHaveCount(shown)
+      }
+      await expectNoViolations(page)
+    })
+
+    test(`(${colorScheme}) le ruban-bouton : la forme, la hauteur et l’inclinaison des rubans, en contour pointillé \`--tape\`, sans fond, à l’encre`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme })
+      await arriveAt(page, MANY)
+      const [tape, ink] = await resolveAll(page, [
+        ['border-top-color', 'var(--tape)'],
+        ['color', 'var(--ink)'],
+      ])
+      const more = stack(page, 0).getByRole('listitem').last()
+
+      await expect(more).toHaveCSS('height', '32px')
+      await expect(more).toHaveCSS('border-top-style', 'dashed')
+      await expect(more).toHaveCSS('border-top-color', tape)
+      await expect(more).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+      await expect(more.getByRole('button')).toHaveCSS('color', ink)
+      const rank = await more.evaluate((item) => [...item.parentElement!.children].indexOf(item))
+      expect(await rotationOf(more)).toBe(rank % 2 === 0 ? -1.5 : 1)
+    })
+  }
+
+  test('au survol, le ruban-bouton monte de 2 px en 150 ms, comme les post-its de lien', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'appareil sans survol')
+    await arriveAt(page, MANY)
+    const more = stack(page, 0).getByRole('listitem').last()
+    const before = (await more.boundingBox())!
+
+    await expect(more).toHaveCSS('transition-duration', '0.15s')
+
+    await more.hover()
+    await settle(page)
+
+    expect((await more.boundingBox())!.y).toBeCloseTo(before.y - 2)
+  })
+
+  test('en mouvement réduit, le ruban-bouton ne monte pas', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'appareil sans survol')
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await arriveAt(page, MANY)
+    const more = stack(page, 0).getByRole('listitem').last()
+    const before = (await more.boundingBox())!
+
+    await more.hover()
+    await settle(page)
+
+    expect((await more.boundingBox())!.y).toBe(before.y)
+  })
+
+  test('la colonne plus étroite, le repli se mesure de nouveau, en deux rangées', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'au bureau : la colonne suit la fenêtre')
+    await page.setViewportSize(COLUMN_VIEWPORT)
+    await arriveAt(page, MANY)
+    const list = stack(page, 0)
+    const wide = await list.locator('[data-ribbon]').count()
+
+    await page.setViewportSize({ ...COLUMN_VIEWPORT, width: 900 })
+
+    await expect.poll(() => list.locator('[data-ribbon]').count()).toBeLessThan(wide)
+    expect(await rowsOf(list)).toBe(2)
+  })
+
+  test('dépliée, la colonne plus étroite ne change pas le nom du ruban-bouton ; replié, il suit le nouveau repli', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'au bureau : la colonne suit la fenêtre')
+    await page.setViewportSize(COLUMN_VIEWPORT)
+    await arriveAt(page, MANY)
+    const list = stack(page, 0)
+    const button = list.getByRole('button')
+    const wide = await list.locator('[data-ribbon]').count()
+    const name = (await button.getAttribute('aria-label'))!
+    await button.click()
+
+    await page.setViewportSize({ ...COLUMN_VIEWPORT, width: 900 })
+    // Deux images, puis une tâche : de quoi laisser une nouvelle mesure se rendre.
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve))),
+        ),
+    )
+
+    await expect(button).toHaveAccessibleName(name)
+    await button.click()
+    await expect.poll(() => list.locator('[data-ribbon]').count()).toBeLessThan(wide)
+    expect(await rowsOf(list)).toBe(2)
+  })
+
+  test('une autre fiche ouverte pendant le fondu de sortie d’une arrivée directe montre ses groupes repliés', async ({
+    page,
+  }) => {
+    await serveProjects(page, [
+      ficheProject(MANY),
+      ficheProject({ ...MANY, slug: 'autre', title: 'Autre' }),
+    ])
+    await page.goto('/projets/fiche')
+    await expect(panel(page)).toBeVisible()
+    const button = stack(page, 0).getByRole('button')
+    await button.click()
+    await expect(button).toHaveAttribute('aria-expanded', 'true')
+    await freezeAnimations(page)
+
+    await page.keyboard.press('Escape')
+    await expect(panel(page)).toHaveAttribute('data-state', 'closed')
+    await page.locator('.card', { hasText: 'Autre' }).evaluate((card: HTMLElement) => card.click())
+
+    await expect(panel(page)).toHaveAccessibleName('Autre')
+    await expect(stack(page, 0).getByRole('button')).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  test('rouverte, la fiche montre ses groupes repliés', async ({ page }) => {
+    await openFromTable(page, [ficheProject(MANY)])
+    const button = stack(page, 0).getByRole('button')
+    await button.click()
+    await expect(button).toHaveAttribute('aria-expanded', 'true')
+
+    await page.keyboard.press('Escape')
+    await expectClosed(page)
+    await openProject(cards(page).first())
+
+    await expect(stack(page, 0).getByRole('button')).toHaveAttribute('aria-expanded', 'false')
   })
 })
 

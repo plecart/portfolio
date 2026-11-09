@@ -141,6 +141,29 @@ export function splitStack(technologies: readonly Technology[]): {
   }
 }
 
+/** Un groupe de la stack (spec §4.3), sous son nom dans `splitStack`. */
+export type StackKind = keyof ReturnType<typeof splitStack>
+
+/** Le nom du ruban-bouton de chaque groupe (spec §6.2) : pour plusieurs rubans repliés, ou un seul. */
+const STACK_BUTTON_NAMES: Record<StackKind, { many: string; one: string }> = {
+  technologies: { many: strings.otherTechnologies, one: strings.otherTechnology },
+  tools: { many: strings.otherTools, one: strings.otherTool },
+}
+
+/**
+ * Le nom du ruban-bouton d'un groupe replié de la stack (spec §4.3, §6.2) : le même replié ou déplié,
+ * il contient ses deux libellés, leur verbe et leur nombre (WCAG 2.5.3) — « Afficher ou réduire les
+ * N autres technologies », « … 1 autre technologie » pour un seul ruban replié ; de même pour les
+ * outils.
+ *
+ * @param kind Le groupe.
+ * @param hidden Le nombre de ses rubans repliés, un au moins.
+ */
+export function stackButtonName(kind: StackKind, hidden: number): string {
+  const { many, one } = STACK_BUTTON_NAMES[kind]
+  return hidden === 1 ? one : many.replace('{count}', String(hidden))
+}
+
 /** Les sections que la fiche montre (spec §4.3) : une section au corps vide n'est pas rendue. */
 export function visibleSections(sections: readonly Section[]): Section[] {
   return sections.filter(({ body }) => body.trim() !== '')
