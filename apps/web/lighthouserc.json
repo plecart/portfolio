@@ -2,7 +2,7 @@
   "ci": {
     "collect": {
       "startServerCommand": "node e2e/lighthouse-server.ts",
-      "url": ["http://localhost:4174/"],
+      "url": ["http://localhost:4174/", "http://localhost:4174/projets/projet-01"],
       "numberOfRuns": 3
     },
     "assert": {
