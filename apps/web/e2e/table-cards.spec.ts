@@ -33,12 +33,15 @@ import {
   openTable,
   pixelDistances,
   pose,
+  probeTranche,
+  type Rect,
   RIBBON_SIZES,
   ribbonSizes,
   serveUnderCsp,
   straighten,
   strap,
   strapColors,
+  strapPixels,
   STRAPPED,
   summary,
   TWO_CARDS,
@@ -477,38 +480,94 @@ test('la sangle de chantier : sur chaque projet en cours, carte simple et vitrin
 /** Un projet ni en cours ni couvert, voisin de la carte sanglée. */
 const NEIGHBOUR = buildProject({ slug: 'voisine', gallery: [] })
 
-for (const [size, projects] of [
+/** Une carte sanglée par taille, en tête de sa table ; seule, elle prend la taille « seule ». */
+const STRAPPED_TABLES = [
   ['simple', [STRAPPED, NEIGHBOUR]],
   ['vitrine', [{ ...STRAPPED, showcase: true }, NEIGHBOUR]],
-] as const) {
-  test(`carte ${size} au repos : la sangle à −35° en travers de la face, rayures jaune et encre coupées au cadre, sa tranche 3 px au-delà, rien plus loin (spec §4.1)`, async ({
+  ['seule', [STRAPPED]],
+] as const
+
+/** La tranche de la sangle, au-delà de chaque bord de la face (spec §4.1), en px. */
+const OVERHANG = 3
+
+/**
+ * Ouvre la table, ses cartes entrées, et redresse sa première carte : sa face, droite, se mesure au
+ * pixel près.
+ *
+ * @returns La carte, sa face, la zone capturée autour, 8 px au-delà de chaque bord, et sa photo.
+ */
+async function openStraightened(page: Page, projects: readonly Project[]) {
+  await openTable(page, [...projects])
+  await enterCards(page)
+  const card = cards(page).first()
+  await straighten(card)
+  const box = (await face(card).boundingBox())!
+  const around = { x: box.x - 8, y: box.y - 8, width: box.width + 16, height: box.height + 16 }
+  const photo = (await card.locator('.card-photo').boundingBox())!
+  return { card, box, around, photo }
+}
+
+/** La moitié basse d'une photo, sans texte : ce que l'encre y peint est la sangle. */
+const lowerHalf = (photo: Rect): Rect => ({
+  ...photo,
+  y: photo.y + photo.height / 2,
+  height: photo.height / 2,
+})
+
+/**
+ * Attend une mesure à 1 px de sa valeur : un pixel qu'un bord anticrénelé teinte en partie compte, et
+ * son centre est à un demi-pixel de ce bord ; la face, elle, se pose à une fraction de pixel.
+ */
+const expectNear = (measured: number, expected: number, what: string) =>
+  expect(Math.abs(measured - expected), what).toBeLessThanOrEqual(1)
+
+for (const [size, projects] of STRAPPED_TABLES) {
+  test(`carte ${size} au repos : la sangle tendue du bord gauche, au bas de la photo, au bord droit, à son haut, toute son épaisseur dans la hauteur de la photo ; rayures jaune et encre coupées au cadre, sa tranche 3 px au-delà des bords gauche et droit, rien plus loin (spec §4.1)`, async ({
     page,
   }) => {
-    await openTable(page, [...projects])
-    await enterCards(page)
-    const card = cards(page).first()
-    await straighten(card)
-    const [yellow, ink, edge] = await strapColors(page)
-    const box = (await face(card).boundingBox())!
-    const around = { x: box.x - 8, y: box.y - 8, width: box.width + 16, height: box.height + 16 }
-    const photo = (await card.locator('.card-photo').boundingBox())!
+    const { card, box, around, photo } = await openStraightened(page, projects)
+    const [top, bottom] = [photo.y - box.y, photo.y + photo.height - box.y]
+    const [yellow, ink] = await strapColors(page)
 
-    const [yellows, edges] = await pixelDistances(page, around, [yellow, edge], box)
-    // La moitié basse de la photo, sans texte : ce que l'encre y peint est la sangle.
-    const lower = { ...photo, y: photo.y + photo.height / 2, height: photo.height / 2 }
-    const stripes = await pixelDistances(page, lower, [yellow, ink])
+    const painted = await strapPixels(card, around, box)
+    const abscissas = painted.map(([x]) => x)
+    const onFace = painted.filter(([x]) => x > 0 && x < box.width)
+    /** Les ordonnées de ses pixels dans la colonne de 1 px qui part de cette abscisse. */
+    const column = (left: number) =>
+      onFace.filter(([x]) => x > left && x < left + 1).map(([, y]) => y)
+    const tranche = await probeTranche(card)
+    const [yellows, tranches] = await pixelDistances(page, around, [yellow, tranche], box)
+    const stripes = await pixelDistances(page, lowerHalf(photo), [yellow, ink])
 
-    expect(
-      await strap(card).evaluate((element) => getComputedStyle(element, '::before').rotate),
-    ).toBe('-35deg')
+    expect(onFace.filter(([, y]) => y < top - 1 || y > bottom + 1)).toEqual([])
+    expectNear(Math.max(...column(0)), bottom, 'bord gauche')
+    expectNear(Math.min(...column(box.width - 1)), top, 'bord droit')
+    expectNear(-Math.min(...abscissas), OVERHANG, 'tranche à gauche')
+    expectNear(Math.max(...abscissas) - box.width, OVERHANG, 'tranche à droite')
     expect(yellows.filter((distance) => distance <= -1).length).toBeGreaterThan(0)
     expect(yellows.filter((distance) => distance >= 1)).toEqual([])
-    expect(edges.filter((distance) => distance <= -1)).toEqual([])
-    expect(edges.filter((distance) => distance >= 1 && distance <= 2).length).toBeGreaterThan(0)
-    expect(edges.filter((distance) => distance >= 4)).toEqual([])
+    expect(tranches.filter((distance) => distance <= -1)).toEqual([])
+    expect(tranches.filter((distance) => distance >= 1).length).toBeGreaterThan(0)
     expect(stripes.map((pixels) => pixels.length > 0)).toEqual([true, true])
   })
 }
+
+test('carte au repos : les frontières des rayures de la sangle sont lissées, du jaune à l’encre par leurs teintes du quart, de la moitié et des trois quarts (spec §4.1)', async ({
+  page,
+}) => {
+  const { photo } = await openStraightened(page, [STRAPPED, NEIGHBOUR])
+  const shades = await resolveAll(
+    page,
+    [75, 50, 25].map((share) => [
+      'color',
+      `color-mix(in srgb, var(--strap) ${share}%, var(--strap-ink))`,
+    ]),
+  )
+
+  const found = await pixelDistances(page, lowerHalf(photo), shades)
+
+  expect(found.map((pixels) => pixels.length > 0)).toEqual([true, true, true])
+})
 
 test('les rubans : trois technologies au plus, icône, nom masqué et infobulle (spec §4.1)', async ({
   page,

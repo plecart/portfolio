@@ -20,6 +20,7 @@ import {
   openTable,
   pixelDistances,
   pose,
+  probeTranche,
   serveUnderCsp,
   straighten,
   strap,
@@ -382,8 +383,9 @@ async function openStrappedCard(page: Page): Promise<Locator> {
 }
 
 /**
- * Les pixels de la sangle dans la boîte du bandeau de résumé d'une carte : son jaune et sa tranche.
- * Son encre est aussi celle du texte.
+ * Les pixels de la sangle dans la boîte du bandeau de résumé d'une carte : son jaune, et la moitié de
+ * son jaune et de son encre, teinte de sa tranche et des frontières lissées de ses rayures. Son encre
+ * est aussi celle du texte.
  */
 async function strapOverSummary(card: Locator): Promise<number> {
   const [yellow, , edge] = await strapColors(card.page())
@@ -393,19 +395,21 @@ async function strapOverSummary(card: Locator): Promise<number> {
 
 /**
  * Attend la sangle au coin haut-gauche de la face : son jaune visible, dans le quart haut-gauche
- * seulement, et sa tranche nulle part sur la face, à 1 px de son bord près.
+ * seulement, et sa tranche, à la couleur témoin (`probeTranche`), nulle part sur la face, à 1 px de
+ * son bord près.
  */
 async function expectCornered(card: Locator) {
   const page = card.page()
-  const [yellow, , edge] = await strapColors(page)
+  const [yellow] = await strapColors(page)
+  const tranche = await probeTranche(card)
   const box = (await face(card).boundingBox())!
   const corner = { ...box, width: box.width / 2, height: box.height / 2 }
   const [yellows] = await pixelDistances(page, box, [yellow], corner)
-  const [edges] = await pixelDistances(page, box, [edge], box)
+  const [tranches] = await pixelDistances(page, box, [tranche], box)
 
   expect(yellows.length).toBeGreaterThan(0)
   expect(yellows.filter((distance) => distance > 0)).toEqual([])
-  expect(edges.filter((distance) => distance <= -1)).toEqual([])
+  expect(tranches.filter((distance) => distance <= -1)).toEqual([])
 }
 
 /**

@@ -251,7 +251,7 @@ test.describe('la stack repliée à deux rangées', () => {
       .evaluateAll((items) => new Set(items.map((item) => (item as HTMLElement).offsetTop)).size)
 
   for (const colorScheme of ['light', 'dark'] as const) {
-    test(`(${colorScheme}) chaque groupe tient en deux rangées, « +N ⌄ » à la dernière place : il déplie le groupe sur place et devient « Réduire ⌃ », en fin de liste, qui le replie, le focus sur lui et son nom inchangé`, async ({
+    test(`(${colorScheme}) chaque groupe tient en deux rangées, « +N » à la dernière place : il déplie le groupe sur place et devient « Réduire », en fin de liste, qui le replie, le focus sur lui et son nom inchangé`, async ({
       page,
       isMobile,
     }) => {
@@ -264,7 +264,7 @@ test.describe('la stack repliée à deux rangées', () => {
         const button = list.getByRole('button')
         const shown = await list.locator('[data-ribbon]').count()
         const hidden = total - shown
-        const folded = `+${hidden} ⌄`
+        const folded = `+${hidden}`
         const name =
           hidden === 1
             ? `Afficher ou réduire 1 autre ${other}`
@@ -281,11 +281,11 @@ test.describe('la stack repliée à deux rangées', () => {
         await button.click()
 
         await expect(button).toHaveAttribute('aria-expanded', 'true')
-        await expect(button).toHaveText('Réduire ⌃')
+        await expect(button).toHaveText('Réduire')
         await expect(button).toHaveAccessibleName(name)
         await expect(button).toBeFocused()
         await expect(list.locator('[data-ribbon]')).toHaveCount(total)
-        await expect(list.getByRole('listitem').last()).toHaveText('Réduire ⌃')
+        await expect(list.getByRole('listitem').last()).toHaveText('Réduire')
         await expectNoViolations(page)
 
         await button.press('Enter')
