@@ -39,9 +39,6 @@ const CONTENT =
   '.project-link'
 const COLUMN = '.project-scroll'
 
-/** La couche noir et blanc de la fiche, tant qu'elle vole (`fadeGrey`). */
-const GREY = '.project-gallery-track > .card-photo-grey'
-
 /** Les distances de spec §4.6, sans jeton : le recul des autres cartes, la montée du contenu. */
 const RECOIL = 48
 const CONTENT_RISE = '0px 8px'
@@ -258,35 +255,6 @@ function comeBack(moves: Move[], receding: Animation[], motion: Motion) {
   )
 }
 
-/**
- * La couche noir et blanc d'un projet en cours (spec §4.4, §4.6) : une copie grise de la première
- * image de la galerie, posée sur elle, qui s'efface pendant le vol puis disparaît ; au retour, elle
- * revient depuis `from`, et part avec le panneau. Annulée, elle disparaît.
- *
- * @returns Son fondu ; aucun sans projet en cours ou sans image.
- */
-function fadeGrey(
-  panel: HTMLElement,
-  card: HTMLElement,
-  { open, easing }: Motion,
-  way: 'out' | 'back',
-  from = HIDDEN,
-) {
-  const image = panel.querySelector('.project-gallery-image')
-  if (!image || !card.querySelector('.card-photo-grey')) return []
-  const grey = image.cloneNode() as HTMLImageElement
-  grey.classList.add('card-photo-grey')
-  grey.alt = ''
-  grey.ariaHidden = 'true'
-  image.after(grey)
-  const out = way === 'out'
-  const fade = grey.animate(out ? [SHOWN, HIDDEN] : [from, SHOWN], { duration: open, easing })
-  const remove = () => grey.remove()
-  if (out) fade.addEventListener('finish', remove)
-  fade.addEventListener('cancel', remove)
-  return [fade]
-}
-
 /** Les éléments de `root` qui ne contiennent rien de `kept`, chacun au plus haut. */
 function around(root: Element, kept: readonly Element[]): Element[] {
   return [...root.children].flatMap((child) => {
@@ -354,10 +322,7 @@ function flying(panel: HTMLElement, card: HTMLElement, motion: Motion): Steps {
       card.setAttribute('data-origin', '')
       placeFlyers()
       const starts = route.map(({ element, homologue }) => startOn(element, homologue))
-      outbound = [
-        ...route.flatMap((leg, index) => fly(leg, starts[index], AT_REST, motion, 'backwards')),
-        ...fadeGrey(panel, card, motion, 'out'),
-      ]
+      outbound = route.flatMap((leg, index) => fly(leg, starts[index], AT_REST, motion, 'backwards'))
       reveals = revealContent(contentOf(panel, kept), motion)
       return [...outbound, ...reveals]
     },
@@ -365,20 +330,14 @@ function flying(panel: HTMLElement, card: HTMLElement, motion: Motion): Steps {
     back: () => {
       panel.setAttribute('data-flight', '')
       placeFlyers()
-      // La couche qui s'efface encore, quand la fermeture interrompt l'ouverture.
-      const fading = panel.querySelector(GREY)
-      const grey = fading ? shown(fading, ['opacity']) : HIDDEN
-      return [
-        ...relay(
-          outbound,
-          route.map(({ element, ribbon }) => shown(element, ribbon ? DIMMED_FLIGHT : FLIGHT)),
-          (froms) =>
-            route.flatMap((leg, index) =>
-              fly(leg, froms[index], startOn(leg.element, leg.homologue), motion, 'both'),
-            ),
-        ),
-        ...fadeGrey(panel, card, motion, 'back', grey),
-      ]
+      return relay(
+        outbound,
+        route.map(({ element, ribbon }) => shown(element, ribbon ? DIMMED_FLIGHT : FLIGHT)),
+        (froms) =>
+          route.flatMap((leg, index) =>
+            fly(leg, froms[index], startOn(leg.element, leg.homologue), motion, 'both'),
+          ),
+      )
     },
   }
 }

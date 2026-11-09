@@ -42,6 +42,7 @@
   --delay-ribbon: 20ms;
   --dur-pulse: 1.8s;
   --dur-reduced: 160ms;
+  --dur-strap: 500ms;
   --ease-out: cubic-bezier(.22, 1, .36, 1);
   --ease-spring: linear(0, .28 6%, .62 13%, .88 20%, 1.03 28%, 1.01 40%, 1);
   --ease-in-out: cubic-bezier(.65, 0, .35, 1);
@@ -66,6 +67,12 @@
   --postit-link: color-mix(in srgb, var(--accent) 22%, var(--postit));
   --tape: light-dark(#E8DFCF, #3D372F);
   --tape-ink: light-dark(#2A2622, #D8CFC0);
+  /* Le chantier d'un projet en cours : le point de son ruban, puis sa sangle — rayures jaune et
+     encre, tranche plus sombre. */
+  --ongoing: light-dark(#9A6A0E, #C98A12);
+  --strap: light-dark(#F0C23A, #CCA531);
+  --strap-ink: light-dark(#2A2622, #1C1A17);
+  --strap-edge: color-mix(in srgb, var(--strap) 50%, var(--strap-ink));
 
   /* §2.5 — ombres : la géométrie est commune aux deux modes, seule la couleur change */
   --shadow-rest:

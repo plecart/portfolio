@@ -16,7 +16,7 @@ type Mode = 'light' | 'dark'
 /** Un jeton : la propriété qui le résout, sa valeur claire, et sa valeur sombre s'il en a une. */
 type SpecToken = { property: string; light: string; dark?: string }
 
-/** Les 39 jetons de la spec §2, valeurs recopiées telles que la spec les écrit. */
+/** Les 44 jetons de la spec §2, valeurs recopiées telles que la spec les écrit. */
 const SPEC_TOKENS: Record<string, SpecToken> = {
   // §2.1 — couleurs
   '--bg': { property: 'color', light: '#F3EDE4', dark: '#1C1A17' },
@@ -35,6 +35,15 @@ const SPEC_TOKENS: Record<string, SpecToken> = {
   },
   '--tape': { property: 'color', light: '#E8DFCF', dark: '#3D372F' },
   '--tape-ink': { property: 'color', light: '#2A2622', dark: '#D8CFC0' },
+  // Le chantier d'un projet en cours (#255) : le point « en cours », la sangle et sa tranche.
+  '--ongoing': { property: 'color', light: '#9A6A0E', dark: '#C98A12' },
+  '--strap': { property: 'color', light: '#F0C23A', dark: '#CCA531' },
+  '--strap-ink': { property: 'color', light: '#2A2622', dark: '#1C1A17' },
+  '--strap-edge': {
+    property: 'color',
+    light: 'color-mix(in srgb, #F0C23A 50%, #2A2622)',
+    dark: 'color-mix(in srgb, #CCA531 50%, #1C1A17)',
+  },
   // §2.2 — échelle typographique
   '--fs-body': { property: 'font-size', light: '16px' },
   '--fs-small': { property: 'font-size', light: '13px' },
@@ -75,6 +84,8 @@ const SPEC_TOKENS: Record<string, SpecToken> = {
   '--dur-pulse': { property: 'animation-duration', light: '1.8s' },
   // Les 160 ms du mouvement réduit de §6.3, nommées par #22.
   '--dur-reduced': { property: 'transition-duration', light: '160ms' },
+  // Le glissement de la sangle au coin de sa carte (#255).
+  '--dur-strap': { property: 'transition-duration', light: '500ms' },
   '--ease-out': { property: 'transition-timing-function', light: 'cubic-bezier(.22, 1, .36, 1)' },
   '--ease-spring': {
     property: 'transition-timing-function',
@@ -138,8 +149,8 @@ async function prependButton(page: Page): Promise<Locator> {
   return page.getByRole('button', { name: 'cible' })
 }
 
-test('la table des jetons compte les 39 jetons de la spec', () => {
-  expect(Object.keys(SPEC_TOKENS)).toHaveLength(39)
+test('la table des jetons compte les 44 jetons de la spec', () => {
+  expect(Object.keys(SPEC_TOKENS)).toHaveLength(44)
 })
 
 for (const state of PALETTE_STATES) {
@@ -150,9 +161,9 @@ for (const state of PALETTE_STATES) {
     await openInState(page, state)
 
     const entries = Object.entries(SPEC_TOKENS)
-    // Un jeton absent rend la valeur héritée ou initiale de sa propriété, que trois attentes
-    // partagent (`--fs-body` 16 px, `--postit-ink` et `--tape-ink` clairs = `--ink`) : sa
-    // présence sur `:root` se vérifie à part.
+    // Un jeton absent rend la valeur héritée ou initiale de sa propriété, que quatre attentes
+    // partagent (`--fs-body` 16 px, `--postit-ink`, `--tape-ink` et `--strap-ink` clairs =
+    // `--ink`) : sa présence sur `:root` se vérifie à part.
     const missing = await page.evaluate(
       (names) =>
         names.filter(

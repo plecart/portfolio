@@ -9,7 +9,7 @@
  */
 import type { Locator, Page } from '@playwright/test'
 import { expect, serveProjects } from './api.ts'
-import { settle } from './css.ts'
+import { resolveAll, settle } from './css.ts'
 import { buildProject, buildTechnology, ONGOING, type Project } from './projects.ts'
 import { scrollThrough } from './scroll.ts'
 
@@ -58,6 +58,97 @@ export const entry = (card: Locator) => card.locator('.card-entry')
 export const pose = (card: Locator) => card.locator('.card-pose')
 export const face = (card: Locator) => card.locator('.card-face')
 export const summary = (card: Locator) => card.locator('.card-summary')
+
+/** La sangle de chantier d'une carte (spec §4.1) : sa boîte, la face et sa tranche. */
+export const strap = (card: Locator) => card.locator('.card-strap')
+
+/**
+ * Un projet en cours sans couverture : sa photo est un carré `--line` uni, où rien d'autre que la
+ * sangle ne prend ses couleurs.
+ */
+export const STRAPPED = buildProject({ ...ONGOING, slug: 'chantier', gallery: [] })
+
+/**
+ * Redresse la pose d'une carte, à 0° et sans décalage : sa face, droite, et ce qu'elle contient se
+ * mesurent au pixel près dans une capture.
+ */
+export async function straighten(card: Locator) {
+  await pose(card).evaluate((layer: HTMLElement) => {
+    for (const name of ['--card-rotation', '--card-dx', '--card-dy']) layer.style.setProperty(name, '0')
+  })
+  await settle(card.page())
+}
+
+/** Les couleurs de la sangle, résolues : ses rayures jaune et encre, puis sa tranche. */
+export const strapColors = (page: Page) =>
+  resolveAll(page, [
+    ['color', 'var(--strap)'],
+    ['color', 'var(--strap-ink)'],
+    ['color', 'var(--strap-edge)'],
+  ])
+
+/** Un rectangle de la page, en px CSS. */
+type Rect = { x: number; y: number; width: number; height: number }
+
+/** L'écart toléré sur chaque canal d'un pixel de couleur unie : l'anticrénelage d'un bord le dépasse. */
+const PIXEL_TOLERANCE = 6
+
+/**
+ * Les pixels de ces couleurs dans une zone de la page, capturée : pour chaque couleur, la distance
+ * de chacun de ses pixels à `rect`, en px CSS, mesurée au centre du pixel — la plus grande des
+ * quatre, négative dedans. Une couleur résolue, `color(srgb …)` d'un `color-mix()` comprise, passe
+ * par un canevas, qui la rend en octets comme la page peint la capture ; un pixel la porte à
+ * `PIXEL_TOLERANCE` près sur chaque canal.
+ *
+ * @param zone La zone capturée.
+ * @param colors Les couleurs, résolues (`resolveAll`).
+ * @param rect Le rectangle d'où se comptent les distances ; la zone elle-même par défaut.
+ */
+export async function pixelDistances(
+  page: Page,
+  zone: Rect,
+  colors: string[],
+  rect: Rect = zone,
+): Promise<number[][]> {
+  const png = await page.screenshot({ clip: zone })
+  return page.evaluate(
+    async ({ url, width: zoneWidth, colors: targets, rect: { x, y, width, height }, tolerance }) => {
+      const bitmap = await createImageBitmap(await (await fetch(url)).blob())
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d')!
+      canvas.drawImage(bitmap, 0, 0)
+      const { data } = canvas.getImageData(0, 0, bitmap.width, bitmap.height)
+      const swatch = new OffscreenCanvas(1, 1).getContext('2d')!
+      const bytes = targets.map((color) => {
+        swatch.fillStyle = color
+        swatch.fillRect(0, 0, 1, 1)
+        return swatch.getImageData(0, 0, 1, 1).data
+      })
+      const scale = bitmap.width / zoneWidth
+      const distances = bytes.map((): number[] => [])
+      for (let row = 0; row < bitmap.height; row += 1) {
+        for (let column = 0; column < bitmap.width; column += 1) {
+          const at = 4 * (row * bitmap.width + column)
+          const [left, top] = [(column + 0.5) / scale, (row + 0.5) / scale]
+          const distance = Math.max(x - left, left - x - width, y - top, top - y - height)
+          bytes.forEach((target, index) => {
+            const close = [0, 1, 2].every(
+              (channel) => Math.abs(data[at + channel] - target[channel]) <= tolerance,
+            )
+            if (close) distances[index].push(distance)
+          })
+        }
+      }
+      return distances
+    },
+    {
+      url: `data:image/png;base64,${png.toString('base64')}`,
+      width: zone.width,
+      colors,
+      rect: { ...rect, x: rect.x - zone.x, y: rect.y - zone.y },
+      tolerance: PIXEL_TOLERANCE,
+    },
+  )
+}
 
 /** Les trois technologies qu'une carte montre au plus (spec §1.4), une par type. */
 const THREE_TECHNOLOGIES = (['language', 'framework', 'infrastructure'] as const).map((kind) =>
