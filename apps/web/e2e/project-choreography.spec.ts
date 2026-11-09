@@ -18,6 +18,7 @@ import {
   ficheProject,
   freezeAnimations,
   LINKS,
+  LONG_DESCRIPTION,
   nextImage,
   NO_OUTSIDE,
   openProject,
@@ -26,7 +27,7 @@ import {
   readingColumn,
   watchAnimations,
 } from './project.ts'
-import { buildImage, ONGOING, PROJECT_SETS } from './projects.ts'
+import { buildImage, buildTechnology, ONGOING, PROJECT_SETS } from './projects.ts'
 import {
   cards,
   COLUMN_VIEWPORT,
@@ -150,12 +151,12 @@ async function finishAnimations(page: Page) {
 
 /**
  * Trois éléments du contenu qui apparaît à la pose (spec §4.6) : le bouton Fermer, la barre de la
- * galerie, la colonne de lecture.
+ * galerie, le résumé, dans la colonne de lecture.
  */
 const contentSample = (page: Page) => [
   closeButton(page),
   panel(page).locator('.project-gallery-bar'),
-  readingColumn(page),
+  readingColumn(page).locator('.project-summary'),
 ]
 
 /** La fiche revenue à sa carte : panneau retiré, défilement rendu, la carte montrée et focalisée. */
@@ -167,9 +168,13 @@ async function expectLanded(page: Page, card: Locator) {
 }
 
 /**
- * Dans la page : chaque élément volant de la fiche — la feuille, la photo, le post-it, puis chaque
- * ruban — et son homologue sur la carte : sa boîte à l'instant, et sa seule animation, lue à son
- * premier et à son dernier instant, puis rendue au sien.
+ * Dans la page : chaque élément volant de la fiche — la feuille, la photo, le post-it, puis la copie
+ * volante de chaque ruban (`data-flyer`) — et son homologue sur la carte : sa boîte à l'instant, et
+ * sa seule animation, lue à son premier et à son dernier instant, puis rendue au sien ; la boîte et
+ * la visibilité de l'élément de la fiche qu'il fait voler, lui-même ou le ruban d'une copie. Une
+ * copie dit aussi le nom de son ruban, le rang de son homologue dans la bande de la carte, et la
+ * place du ruban : la stack « Technologies » ou l'en-tête ; un autre élément, ni nom, ni rang, ni
+ * place.
  *
  * @param finish Achève d'abord les animations de la page et lit aussitôt, avant que la fiche n'en
  *   tire la suite au microtâche suivant : ce que tient leur remplissage.
@@ -186,17 +191,7 @@ function readFlights({ path, finish = false }: { path: string; finish?: boolean 
     const { left, top, width, height } = element.getBoundingClientRect()
     return { left, top, width, height }
   }
-  const homologues = card.querySelectorAll('.card-band .card-ribbon')
-  const pairs = [
-    [dialog.querySelector('.project-sheet')!, card.querySelector('.card-face')!],
-    [dialog.querySelector('.project-gallery-frame')!, card.querySelector('.card-photo')!],
-    [dialog.querySelector('.project-title')!, card.querySelector('.card-postit')!],
-    ...[...dialog.querySelectorAll('.project-head .card-ribbon')].map((ribbon, index) => [
-      ribbon,
-      homologues[index],
-    ]),
-  ]
-  return pairs.map(([element, homologue]) => {
+  const flightOf = (element: Element, homologue: Element, rest = element) => {
     const now = box(element)
     const flights = element.getAnimations().filter((animation) => animation.constructor === Animation)
     const [flight] = flights
@@ -207,11 +202,35 @@ function readFlights({ path, finish = false }: { path: string; finish?: boolean 
     const end = box(element)
     flight.currentTime = at
     const { duration, delay, easing } = flight.effect!.getTiming()
-    return { count: flights.length, now, start, end, homologue: box(homologue), duration, delay, easing }
+    const boxes = { now, start, end, homologue: box(homologue), rest: box(rest) }
+    const seen = getComputedStyle(rest).visibility
+    return { count: flights.length, ...boxes, seen, duration, delay, easing }
+  }
+  const travelers = [
+    [dialog.querySelector('.project-sheet')!, card.querySelector('.card-face')!],
+    [dialog.querySelector('.project-gallery-frame')!, card.querySelector('.card-photo')!],
+    [dialog.querySelector('.project-title')!, card.querySelector('.card-postit')!],
+  ].map(([element, homologue]) => ({ ...flightOf(element, homologue), name: '', rank: 0, place: '' }))
+  const band = [...card.querySelectorAll<HTMLElement>('.card-band [data-ribbon]')]
+  const technologies = dialog.querySelector('.project-stack')
+  const ribbons = [...dialog.querySelectorAll<HTMLElement>('[data-flyer]')].map((flyer) => {
+    const name = flyer.dataset.flyer!
+    const rank = band.findIndex((homologue) => homologue.dataset.ribbon === name)
+    const ribbon = dialog.querySelector(`[data-ribbon="${name}"]`)!
+    const place = technologies?.contains(ribbon)
+      ? 'technologies'
+      : ribbon.closest('.project-head')
+        ? 'head'
+        : ''
+    return { ...flightOf(flyer, band[rank], ribbon), name, rank, place }
   })
+  return [...travelers, ...ribbons.sort((one, other) => one.rank - other.rank)]
 }
 
-test('la feuille, la photo, le post-it et les rubans partent de leur homologue sur la carte, en `--dur-open`, `--ease-out`', async ({
+/** Les vols des rubans parmi ceux de `readFlights`, dans l'ordre de la bande de la carte. */
+const ribbonFlights = (flights: ReturnType<typeof readFlights>) => flights.filter(({ name }) => name)
+
+test('la feuille, la photo, le post-it et les rubans partent de leur homologue sur la carte, en `--dur-open`, `--ease-out`, le i-ème ruban de la bande avec 20 × i ms de retard', async ({
   page,
 }) => {
   await openEnteredTable(page, PROJECTS)
@@ -222,14 +241,205 @@ test('la feuille, la photo, le post-it et les rubans partent de leur homologue s
   const panelBox = await boxOf(panel(page))
 
   expect(flights.length).toBeGreaterThan(3)
-  for (const [index, flight] of flights.entries()) {
+  for (const flight of flights) {
     expect(flight.count).toBe(1)
     expectSameBox(flight.start, flight.homologue)
     expect(flight.duration).toBe(open)
     expect(flight.easing).toBe(easing)
-    expect(flight.delay).toBe(Math.max(0, index - 3) * ribbon)
+    expect(flight.delay).toBe(flight.rank * ribbon)
   }
   expectSameBox(flights[0].end, panelBox)
+})
+
+/**
+ * Une fiche en cours et en ligne, deux outils intercalés dans l'ordre de l'admin : sa carte montre
+ * TypeScript, React et Docker, puis ses deux états ; sa stack « Technologies » commence par les
+ * trois mêmes, et Redis et PostgreSQL les suivent. Cinq rubans : la copie d'un ruban, au bout de
+ * la liste, n'a pas son rang pair ou impair, ni donc son inclinaison par la feuille.
+ */
+const RIBBONED_FIELDS = {
+  ...ONGOING,
+  demo_url: LINKS.demo_url,
+  technologies: [
+    buildTechnology('Figma', 'tool'),
+    buildTechnology('TypeScript', 'language'),
+    buildTechnology('React', 'framework'),
+    buildTechnology('Git', 'tool'),
+    buildTechnology('Docker', 'infrastructure'),
+    buildTechnology('Redis', 'infrastructure'),
+    buildTechnology('PostgreSQL', 'infrastructure'),
+  ],
+}
+const RIBBONED_PATH = '/projets/fiche'
+
+/** Les rubans de la carte de `RIBBONED_FIELDS`, et la place de leur homologue sur la fiche. */
+const RIBBON_PLACES = [
+  ['TypeScript', 'technologies'],
+  ['React', 'technologies'],
+  ['Docker', 'technologies'],
+  ['ongoing', 'head'],
+  ['live', 'head'],
+]
+
+test('chaque ruban de technologie vole vers le ruban de la stack « Technologies » de même nom, chaque état vers le sien dans l’en-tête, et en revient', async ({
+  page,
+}) => {
+  await openEnteredTable(page, [ficheProject(RIBBONED_FIELDS)])
+  const resume = await openFrozen(page, RIBBONED_PATH)
+
+  const opening = ribbonFlights(await page.evaluate(readFlights, { path: RIBBONED_PATH }))
+
+  expect(opening.map(({ name, place }) => [name, place])).toEqual(RIBBON_PLACES)
+  for (const { start, end, homologue, rest } of opening) {
+    expectSameBox(start, homologue)
+    expectSameBox(end, rest)
+  }
+
+  await resume()
+  await settle(page)
+  await freezeAnimations(page)
+  await page.keyboard.press('Escape')
+  await finishAnimations(page)
+
+  const closing = ribbonFlights(await page.evaluate(readFlights, { path: RIBBONED_PATH }))
+
+  expect(closing.map(({ name, place }) => [name, place])).toEqual(RIBBON_PLACES)
+  for (const { count, start, end, homologue, rest } of closing) {
+    expect(count).toBe(1)
+    expectSameBox(start, rest)
+    expectSameBox(end, homologue)
+  }
+})
+
+/**
+ * Dans la page : chaque copie volante d'un ruban, sa visibilité et la part de sa boîte que montre
+ * la fenêtre, coupes de ses ancêtres comprises (`IntersectionObserver`) ; la visibilité du ruban de
+ * la fiche qu'elle remplace, et si elle a son inclinaison ; enfin, son `aria-hidden`.
+ */
+function readFlyers() {
+  const dialog = document.querySelector('[role="dialog"]')!
+  const flyers = [...dialog.querySelectorAll<HTMLElement>('[data-flyer]')]
+  const shownPart = (element: Element) =>
+    new Promise<number>((resolve) => {
+      const observer = new IntersectionObserver(([entry]) => {
+        observer.disconnect()
+        resolve(entry.intersectionRatio)
+      })
+      observer.observe(element)
+    })
+  return Promise.all(
+    flyers.map(async (flyer) => {
+      const ribbon = dialog.querySelector(`[data-ribbon="${flyer.dataset.flyer}"]`)!
+      const [style, ribbonStyle] = [flyer, ribbon].map((element) => getComputedStyle(element))
+      return {
+        visibility: style.visibility,
+        ratio: await shownPart(flyer),
+        ribbon: ribbonStyle.visibility,
+        tilted: style.transform === ribbonStyle.transform,
+        ariaHidden: flyer.ariaHidden,
+      }
+    }),
+  )
+}
+
+test('en vol, les rubans visés sont seuls visibles dans la colonne, sans qu’elle coupe leur vol ; posés, ils y prennent leur place, et le reste apparaît autour d’eux', async ({
+  page,
+}) => {
+  await openEnteredTable(page, [ficheProject({ ...RIBBONED_FIELDS, description: LONG_DESCRIPTION })])
+  const resume = await openFrozen(page, RIBBONED_PATH)
+  const column = readingColumn(page)
+  const rest = [
+    column.locator('.project-summary'),
+    column.locator('.project-stack-title').first(),
+    column.locator('[data-ribbon="Redis"]'),
+    column.locator('.project-stack').last(),
+  ]
+
+  const flying = await page.evaluate(readFlyers)
+
+  expect(flying).toHaveLength(RIBBON_PLACES.length)
+  for (const flyer of flying) {
+    expect(flyer).toEqual({
+      visibility: 'visible',
+      ratio: 1,
+      ribbon: 'hidden',
+      tilted: true,
+      ariaHidden: 'true',
+    })
+  }
+  // Sa barre aussi : seule sa boîte reste, qui ne se voit pas.
+  const [unseen] = await resolveAll(page, [['scrollbar-color', 'transparent transparent']])
+  await expect(column).toHaveCSS('scrollbar-color', unseen)
+  await expect(column).toHaveCSS('opacity', '1')
+  for (const element of rest) await expect(element).toHaveCSS('opacity', '0')
+
+  await resume()
+  await settle(page)
+
+  for (const flyer of await page.evaluate(readFlyers)) {
+    expect(flyer).toMatchObject({ visibility: 'hidden', ribbon: 'visible' })
+  }
+  for (const element of rest) await expect(element).toHaveCSS('opacity', '1')
+  await expect(column).not.toHaveCSS('scrollbar-color', unseen)
+})
+
+test('à la fermeture, la colonne s’efface d’abord, sauf les rubans visés, qui repartent ensuite vers la carte', async ({
+  page,
+}) => {
+  await openEnteredTable(page, [ficheProject(RIBBONED_FIELDS)])
+  await openProject(cardAt(page, RIBBONED_PATH))
+  await freezeAnimations(page)
+  const column = readingColumn(page)
+  const targets = column
+    .locator('.project-stack')
+    .first()
+    .locator('[data-ribbon]:not([data-ribbon="Redis"], [data-ribbon="PostgreSQL"])')
+
+  await page.keyboard.press('Escape')
+
+  const animationCount = (element: Locator) =>
+    element.evaluate((node) => node.getAnimations().length)
+  expect(await animationCount(column.locator('.project-summary'))).toBe(1)
+  await expect(targets).toHaveCount(3)
+  for (const target of await targets.all()) {
+    expect(await animationCount(target)).toBe(0)
+    await expect(target).toHaveCSS('visibility', 'visible')
+  }
+  for (const flyer of await page.evaluate(readFlyers)) expect(flyer.visibility).toBe('hidden')
+
+  await finishAnimations(page)
+
+  await expect(column.locator('.project-summary')).toHaveCSS('opacity', '0')
+  for (const flyer of await page.evaluate(readFlyers)) {
+    expect(flyer).toMatchObject({ visibility: 'visible', ribbon: 'hidden' })
+  }
+})
+
+test('fermée sa stack défilée hors de vue, chaque ruban repart de sa vraie place, sans test de visibilité', async ({
+  page,
+  isMobile,
+}) => {
+  await openEnteredTable(page, [ficheProject({ ...RIBBONED_FIELDS, description: LONG_DESCRIPTION })])
+  await openProject(cardAt(page, RIBBONED_PATH))
+  // Ce qui défile : la colonne au bureau, le panneau sur téléphone (spec §4.3).
+  const scroller = isMobile ? panel(page) : readingColumn(page)
+  await scroller.evaluate((element) =>
+    element.scrollTo({ top: element.scrollHeight, behavior: 'instant' }),
+  )
+  const { y: scrollerTop } = (await scroller.boundingBox())!
+  await freezeAnimations(page)
+
+  await page.keyboard.press('Escape')
+  await finishAnimations(page)
+
+  const closing = ribbonFlights(await page.evaluate(readFlights, { path: RIBBONED_PATH }))
+  const technologies = closing.filter(({ place }) => place === 'technologies')
+  expect(technologies).toHaveLength(3)
+  for (const { start, end, homologue, rest } of technologies) {
+    expect(rest.top + rest.height).toBeLessThan(scrollerTop)
+    expectSameBox(start, rest)
+    expectSameBox(end, homologue)
+  }
 })
 
 test('les rubans passent par 35 % d’opacité entre 30 % et 70 % du trajet', async ({ page }) => {
@@ -237,7 +447,7 @@ test('les rubans passent par 35 % d’opacité entre 30 % et 70 % du trajet', as
   await openFrozen(page, FIRST_PATH)
 
   const keyframes = await panel(page)
-    .locator('.project-head .card-ribbon')
+    .locator('[data-flyer]')
     .first()
     .evaluate((ribbon) =>
       (ribbon.getAnimations()[0].effect as KeyframeEffect)
@@ -512,7 +722,7 @@ test('à la pose, le contenu monte de 8 px en `--dur-content`, puis « Fermer la
     panel(page).locator('.project-gallery-bar'),
     panel(page).getByRole('link', { name: 'Voir le site' }),
     panel(page).getByRole('link', { name: 'Voir le dépôt' }),
-    readingColumn(page),
+    readingColumn(page).locator('.project-summary'),
   ]
 
   await expect(panel(page)).toBeFocused()
@@ -586,12 +796,12 @@ test('à la fermeture, le contenu s’efface en `--dur-fast`, puis la feuille, l
   await expect(panel(page)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
   const flights = await page.evaluate(readFlights, { path: FIRST_PATH })
   expect(flights.length).toBeGreaterThan(3)
-  for (const [index, flight] of flights.entries()) {
+  for (const flight of flights) {
     expect(flight.count).toBe(1)
     expectSameBox(flight.end, flight.homologue)
     expect(flight.duration).toBe(open)
     expect(flight.easing).toBe(easing)
-    expect(flight.delay).toBe(Math.max(0, index - 3) * ribbon)
+    expect(flight.delay).toBe(flight.rank * ribbon)
   }
   expectSameBox(flights[0].start, panelBox)
   const grey = await panel(page).locator('.project-gallery-frame').evaluate(readGreyLayer)
@@ -637,21 +847,26 @@ test('à la fermeture, les autres cartes reviennent à leur place en réapparais
 
 /*
  * Ce que tient le remplissage (`fill`) de chaque animation de `useChoreography`, dénombré dans sa
- * source le 2026-11-03 : onze animations, une par sens de chaque mouvement.
+ * source le 2026-11-03, puis le 2026-11-09 (#255) : treize animations, une par sens de chaque
+ * mouvement.
  *
- * - tiennent quelque chose, sept : le vol à l'aller (`backwards`, un ruban qui attend son retard
- *   reste sur son homologue : test « … partent de leur homologue », lu au temps 0) ; le vol au retour
- *   (`both` : sur la carte jusqu'au retrait, et, pendant son retard, là où le ruban était : test
- *   « … en plein vol … », lu au temps 0) ; l'effacement des cartes à l'aller (`forwards`, tant
- *   que la fiche est ouverte) ; l'apparition du contenu (`backwards`, caché jusqu'à la pose : test
- *   « à la pose, le contenu monte… », lu au temps 0) ; son effacement (`forwards`) ; en mouvement
- *   réduit, l'effacement des enfants du panneau puis du panneau (`forwards`, jusqu'au retrait) ;
+ * - tiennent quelque chose, neuf : le vol à l'aller (`backwards`, la copie d'un ruban qui attend son
+ *   retard reste sur son homologue : test « … partent de leur homologue », lu au temps 0) ; le vol
+ *   au retour (`both` : sur la carte jusqu'au retrait, et, pendant son retard, là où le ruban était :
+ *   test « … en plein vol … », lu au temps 0) ; le ruban caché tant que sa copie vole, à l'aller
+ *   (`backwards`, pendant le retard : test « en vol, les rubans visés… », lu au temps 0) et au retour
+ *   (`both` : test « à la fermeture, la colonne s’efface d’abord… », lu au temps 0, et jusqu'au
+ *   retrait) ; l'effacement des cartes à l'aller (`forwards`, tant que la fiche est ouverte) ;
+ *   l'apparition du contenu (`backwards`, caché jusqu'à la pose : test « à la pose, le contenu
+ *   monte… », lu au temps 0) ; son effacement (`forwards`) ; en mouvement réduit, l'effacement des
+ *   enfants du panneau puis du panneau (`forwards`, jusqu'au retrait) ;
  * - ne tiennent rien, leur fin étant leur repos, quatre : le retour des cartes, les deux fondus de la
  *   couche noir et blanc — retirée à l'aller, opaque au retour —, l'apparition du panneau en
  *   mouvement réduit.
  *
- * Les cinq qui tiennent jusqu'au retrait ou tant que la fiche est ouverte sont épinglés ici ; chacun
- * des sept rougit son test quand son remplissage est retiré (mutations du 2026-11-03).
+ * Les six qui tiennent jusqu'au retrait ou tant que la fiche est ouverte sont épinglés ici ; chacun
+ * des neuf rougit son test quand son remplissage est retiré (mutations du 2026-11-03 ; du 2026-11-09
+ * pour les deux du ruban caché).
  */
 
 /** Dans la page : la couche d'entrée des cartes autres que `opened`, dans l'écran ou non, et sa pose. */
@@ -679,6 +894,8 @@ test('au bout du retour, jusqu’au retrait du panneau, la feuille, la photo, le
   const held = await page.evaluate(readFlights, { path: FIRST_PATH, finish: true })
   expect(held.length).toBeGreaterThan(3)
   for (const { now, homologue } of held) expectSameBox(now, homologue)
+  // Chaque ruban de la fiche, que sa copie a remplacé, reste caché.
+  expect(ribbonFlights(held).map(({ seen }) => seen)).toEqual(['hidden', 'hidden', 'hidden'])
 })
 
 test('tant que la fiche est ouverte, les autres cartes restent effacées, et reculées dans l’écran', async ({

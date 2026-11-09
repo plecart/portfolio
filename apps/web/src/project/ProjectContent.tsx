@@ -2,8 +2,8 @@ import { DialogTitle } from '@radix-ui/react-dialog'
 import type { Project } from '../api/projects.ts'
 import { ExternalLinkIcon } from '../chrome/icons.tsx'
 import { strings } from '../strings.ts'
-import { StateRibbons, TechnologyRibbon, TechnologyRibbons } from '../table/Card.tsx'
-import type { Technology } from '../table/cards.ts'
+import { StateRibbons, TechnologyRibbon } from '../table/Card.tsx'
+import { cardStates, type Technology } from '../table/cards.ts'
 import { projectFacts, splitStack } from './project.ts'
 import { ProjectMarkdown } from './ProjectMarkdown.tsx'
 import { ProjectSections } from './ProjectSections.tsx'
@@ -18,8 +18,13 @@ function ProjectLink({ href, label }: { href: string; label: string }) {
   )
 }
 
-/** L'en-tête (spec §4.3) : le post-it du titre, les liens qui existent, les rubans de la carte. */
+/**
+ * L'en-tête (spec §4.3) : le post-it du titre, les liens qui existent, puis les rubans d'état ; sans
+ * état, ni leur rangée ni sa marge basse. Les technologies de la carte sont dans la stack, où leurs
+ * rubans volent (`useChoreography`).
+ */
 function ProjectHeader({ project }: { project: Project }) {
+  const { ongoing, live } = cardStates(project)
   return (
     <div className="project-head">
       <DialogTitle className="postit postit-title project-title">{project.title}</DialogTitle>
@@ -27,10 +32,11 @@ function ProjectHeader({ project }: { project: Project }) {
       {project.repository_url && (
         <ProjectLink href={project.repository_url} label={strings.viewRepository} />
       )}
-      <ul className="card-ribbons project-ribbons">
-        <TechnologyRibbons project={project} />
-        <StateRibbons project={project} />
-      </ul>
+      {(ongoing || live) && (
+        <ul className="card-ribbons project-ribbons">
+          <StateRibbons project={project} />
+        </ul>
+      )}
     </div>
   )
 }

@@ -14,6 +14,7 @@ import {
   swipeStep,
   visibleSections,
 } from '../src/project/project.ts'
+import { cardTechnologies } from '../src/table/cards.ts'
 import { buildImage, buildProject, buildTechnology, FILES_ORIGIN, ONGOING } from '../e2e/projects.ts'
 
 type Section = components['schemas']['SectionOut']
@@ -86,6 +87,19 @@ test('la stack sépare les outils des technologies, l’ordre d’entrée conser
     technologies: [react, docker],
     tools: [figma, git],
   })
+})
+
+test('les trois premières technologies de la stack sont celles de la carte, dans l’ordre : leurs rubans y volent (spec §4.6)', () => {
+  const technologies = [
+    buildTechnology('Figma', 'tool'),
+    buildTechnology('TypeScript', 'language'),
+    buildTechnology('Git', 'tool'),
+    buildTechnology('React', 'framework'),
+    buildTechnology('Docker', 'infrastructure'),
+    buildTechnology('Redis', 'infrastructure'),
+  ]
+
+  expect(splitStack(technologies).technologies.slice(0, 3)).toEqual(cardTechnologies(technologies))
 })
 
 test.each([

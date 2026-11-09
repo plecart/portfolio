@@ -118,7 +118,9 @@ test.describe('l’en-tête', () => {
     expect(await rotationOf(link)).toBe(-4)
   })
 
-  test('les rubans de la carte sont exposés aux technologies d’assistance', async ({ page }) => {
+  test('les seuls rubans d’état, sans les technologies de la carte, exposés aux technologies d’assistance', async ({
+    page,
+  }) => {
     await arriveAt(page, {
       ...ONGOING,
       demo_url: LINKS.demo_url,
@@ -127,11 +129,17 @@ test.describe('l’en-tête', () => {
 
     const ribbons = panel(page).locator('.project-head').getByRole('listitem')
 
-    await expect(ribbons).toHaveText(['TypeScript', 'React', 'Docker', 'en cours', 'en ligne'])
+    await expect(ribbons).toHaveText(['en cours', 'en ligne'])
     await expect(panel(page).locator('.project-head .project-ribbons')).toHaveCSS(
       'column-gap',
       '8px',
     )
+  })
+
+  test('sans état, ni rangée de rubans ni sa marge basse', async ({ page }) => {
+    await arriveAt(page, { technologies: THREE_TECHNOLOGIES_AND_A_TOOL })
+
+    await expect(panel(page).locator('.project-head').getByRole('list')).toHaveCount(0)
   })
 })
 
@@ -204,7 +212,9 @@ test('les rubans de l’en-tête, des technologies et des outils ont les tailles
   })
   const stacks = page.locator('.project-stack')
 
-  for (const ribbons of [page.locator('.project-head'), stacks.first(), stacks.last()]) {
+  // Les rubans d'état n'ont pas d'icône.
+  expect(await ribbonSizes(page.locator('.project-head'))).toEqual({ ...RIBBON_SIZES, icons: [] })
+  for (const ribbons of [stacks.first(), stacks.last()]) {
     expect(await ribbonSizes(ribbons)).toEqual(RIBBON_SIZES)
   }
 })

@@ -12,7 +12,7 @@ import {
 
 /**
  * Ce qui vole entre la carte et la fiche (spec §4.6) : chaque élément de la fiche, puis son
- * homologue sur la carte. La feuille en tête : sa fin est la pose.
+ * homologue sur la carte. La feuille en tête : sa fin est la pose. Les rubans à part (`RIBBON`).
  */
 const TRAVELERS = [
   ['.project-sheet', '.card-face'],
@@ -20,13 +20,21 @@ const TRAVELERS = [
   ['.project-title', '.card-postit'],
 ] as const
 
-/** Les rubans de l'en-tête de la fiche, puis ceux de la bande de la carte, dans le même ordre. */
-const RIBBONS = ['.project-head .card-ribbon', '.card-band .card-ribbon'] as const
+/**
+ * Un ruban, sur la carte comme sur la fiche, par son identité : sa technologie, ou son état
+ * (`TechnologyRibbon`, `StateRibbons`). Chaque ruban de la bande de la carte vole vers celui de la
+ * fiche qui porte la même, dans la stack « Technologies » ou dans l'en-tête.
+ */
+const RIBBON = '[data-ribbon]'
 
-/** Le reste de la fiche, qui apparaît à la pose et s'efface le premier (spec §4.6). */
+/**
+ * Le reste de la fiche hors de la colonne défilante, qui apparaît à la pose et s'efface le premier
+ * (spec §4.6) ; la colonne, `COLUMN`, en fait autant autour des rubans visés (`contentOf`).
+ */
 const CONTENT =
   '.project-close, .project-gallery-arrow, .project-gallery-expand, .project-gallery-bar, ' +
-  '.project-link, .project-scroll'
+  '.project-link'
+const COLUMN = '.project-scroll'
 
 /** La couche noir et blanc de la fiche, tant qu'elle vole (`fadeGrey`). */
 const GREY = '.project-gallery-track > .card-photo-grey'
@@ -38,6 +46,10 @@ const CONTENT_RISE = '0px 8px'
 /** Visible, effacé : les deux bouts d'un fondu. */
 const SHOWN: Frame = { opacity: 1 }
 const HIDDEN: Frame = { opacity: 0 }
+
+/** Ce que montre le vol d'un ruban : sa copie (`flyerOf`), et non le ruban qu'elle remplace. */
+const SEEN: Frame = { visibility: 'visible' }
+const UNSEEN: Frame[] = [{ visibility: 'hidden' }, { visibility: 'hidden' }]
 
 /** Ce que change un vol : la translation et l'échelle, et l'opacité d'un ruban (spec §4.6). */
 const FLIGHT = ['translate', 'scale']
@@ -63,8 +75,11 @@ function readMotion() {
 
 type Motion = ReturnType<typeof readMotion>
 
-/** Un élément de la fiche qui vole : son homologue sur la carte, son retard, son creux d'opacité. */
-type Leg = { element: HTMLElement; homologue: Element; delay: number; dimmed: boolean }
+/**
+ * Un élément de la fiche qui vole : son homologue sur la carte et son retard. Un ruban vole par sa
+ * copie (`flyerOf`), `element`, qui passe par le creux d'opacité, et reste caché tant qu'elle vole.
+ */
+type Leg = { element: HTMLElement; homologue: Element; delay: number; ribbon?: HTMLElement }
 
 /** Une carte de la table : la couche qui s'efface, et son effacement, recul compris s'il y en a un. */
 type Move = { layer: HTMLElement; keyframes: Keyframe[] }
@@ -92,22 +107,55 @@ function startOn(element: HTMLElement, homologue: Element): Frame {
   return flightStart(homologue.getBoundingClientRect(), element.getBoundingClientRect(), pivot)
 }
 
-/** Les trajets de la fiche (spec §4.6) : la feuille, la photo, le post-it, puis chaque ruban. */
+/**
+ * La copie volante d'un ruban de la fiche (spec §4.6) : fixe, elle vole hors de la colonne
+ * défilante, qui couperait son vol, et ne la suit ni à son apparition ni à son effacement
+ * (`contentOf`). Au bout de sa liste, elle ne déplace aucun ruban ; elle garde l'inclinaison du
+ * sien, quel que soit son rang. Cachée hors de ses vols (`project.css`), qui la montrent (`fly`), et
+ * des technologies d'assistance.
+ */
+function flyerOf(ribbon: HTMLElement): HTMLElement {
+  const flyer = ribbon.cloneNode(true) as HTMLElement
+  flyer.dataset.flyer = ribbon.dataset.ribbon
+  delete flyer.dataset.ribbon
+  flyer.ariaHidden = 'true'
+  flyer.style.transform = getComputedStyle(ribbon).transform
+  ribbon.parentElement!.append(flyer)
+  return flyer
+}
+
+/**
+ * Pose une copie volante sur son ruban, là où il est à l'instant, défilé hors de vue compris : sa
+ * boîte, que son inclinaison fait tourner autour de son centre, comme celle de la copie.
+ */
+function place(flyer: HTMLElement, ribbon: HTMLElement) {
+  const { left, top, width, height } = ribbon.getBoundingClientRect()
+  const layout = getComputedStyle(ribbon)
+  flyer.style.left = `${left + (width - parseFloat(layout.width)) / 2}px`
+  flyer.style.top = `${top + (height - parseFloat(layout.height)) / 2}px`
+}
+
+/**
+ * Les trajets de la fiche (spec §4.6) : la feuille, la photo, le post-it, puis chaque ruban de la
+ * bande de la carte vers celui de la fiche de même identité (`RIBBON`), le i-ème de la bande avec
+ * `i` retards. Un ruban dont la fiche ne rend pas l'homologue, replié, n'a pas de trajet.
+ */
 function legs(panel: HTMLElement, card: HTMLElement, { ribbonDelay }: Motion): Leg[] {
   const travelers = TRAVELERS.map(([inPanel, onCard]) => ({
     element: panel.querySelector<HTMLElement>(inPanel)!,
     homologue: card.querySelector(onCard)!,
     delay: 0,
-    dimmed: false,
   }))
-  const [inPanel, onCard] = RIBBONS
-  const homologues = card.querySelectorAll(onCard)
-  const ribbons = [...panel.querySelectorAll<HTMLElement>(inPanel)].map((element, index) => ({
-    element,
-    homologue: homologues[index],
-    delay: index * ribbonDelay,
-    dimmed: true,
-  }))
+  const panelRibbons = new Map(
+    [...panel.querySelectorAll<HTMLElement>(RIBBON)].map((ribbon) => [ribbon.dataset.ribbon, ribbon]),
+  )
+  const ribbons = [...card.querySelectorAll<HTMLElement>(`.card-band ${RIBBON}`)].flatMap(
+    (homologue, index) => {
+      const ribbon = panelRibbons.get(homologue.dataset.ribbon)
+      if (!ribbon) return []
+      return [{ element: flyerOf(ribbon), homologue, delay: index * ribbonDelay, ribbon }]
+    },
+  )
   return [...travelers, ...ribbons]
 }
 
@@ -134,22 +182,23 @@ function relay(relayed: Animation[], from: Frame[], next: (from: Frame[]) => Ani
 }
 
 /**
- * Le vol d'un élément de `start` à `end` en `--dur-open`, après son retard (spec §4.6) ; un ruban
- * passe par son creux d'opacité.
+ * Le vol d'un élément de `start` à `end` en `--dur-open`, après son retard (spec §4.6). Un ruban vole
+ * par sa copie, montrée le temps du vol, retard compris, et passe par son creux d'opacité ; le ruban
+ * reste caché autant.
  */
 function fly(
-  { element, delay, dimmed }: Leg,
+  { element, delay, ribbon }: Leg,
   start: Frame,
   end: Frame,
   { open, easing }: Motion,
   fill: FillMode,
 ) {
-  return element.animate(dimmed ? dimmedKeyframes(start, end) : [start, end], {
-    duration: open,
-    easing,
-    delay,
-    fill,
-  })
+  const timing = { duration: open, easing, delay, fill }
+  if (!ribbon) return [element.animate([start, end], timing)]
+  return [
+    element.animate(dimmedKeyframes({ ...start, ...SEEN }, { ...end, ...SEEN }), timing),
+    ribbon.animate(UNSEEN, timing),
+  ]
 }
 
 /**
@@ -235,9 +284,26 @@ function fadeGrey(
   return [fade]
 }
 
-/** Le reste de la fiche, invisible jusqu'à la pose, puis montant de 8 px (spec §4.6). */
-function revealContent(panel: HTMLElement, { open, content, easing }: Motion) {
-  return [...panel.querySelectorAll<HTMLElement>(CONTENT)].map((element) =>
+/** Les éléments de `root` qui ne contiennent rien de `kept`, chacun au plus haut. */
+function around(root: Element, kept: readonly Element[]): Element[] {
+  return [...root.children].flatMap((child) => {
+    if (kept.includes(child)) return []
+    return kept.some((element) => child.contains(element)) ? around(child, kept) : [child]
+  })
+}
+
+/**
+ * Le reste de la fiche (spec §4.6) : `CONTENT`, puis la colonne défilante, élément par élément autour
+ * de ce que le vol y garde — les rubans visés et leurs copies volantes —, qui ne suit ni son
+ * apparition ni son effacement. La colonne elle-même ne s'efface pas : elle les contient.
+ */
+function contentOf(panel: HTMLElement, kept: readonly Element[]): Element[] {
+  return [...panel.querySelectorAll(CONTENT), ...around(panel.querySelector(COLUMN)!, kept)]
+}
+
+/** Le reste (`contentOf`), invisible jusqu'à la pose, puis montant de 8 px (spec §4.6). */
+function revealContent(elements: Element[], { open, content, easing }: Motion) {
+  return elements.map((element) =>
     element.animate(
       [
         { opacity: 0, translate: CONTENT_RISE },
@@ -249,16 +315,15 @@ function revealContent(panel: HTMLElement, { open, content, easing }: Motion) {
 }
 
 /**
- * Le reste de la fiche, qui s'efface le premier à la fermeture (spec §4.6), depuis ce qu'il montre,
- * jusqu'au retrait : pas encore apparu, il reste caché.
+ * Le reste de la fiche (`contentOf`), qui s'efface le premier à la fermeture (spec §4.6), depuis ce
+ * qu'il montre, jusqu'au retrait : pas encore apparu, il reste caché.
  */
-function hideContent(panel: HTMLElement, reveals: Animation[], { fast, easing }: Motion) {
-  const content = [...panel.querySelectorAll<HTMLElement>(CONTENT)]
+function hideContent(elements: Element[], reveals: Animation[], { fast, easing }: Motion) {
   return relay(
     reveals,
-    content.map((element) => shown(element, ['opacity', 'translate'])),
+    elements.map((element) => shown(element, ['opacity', 'translate'])),
     (froms) =>
-      content.map((element, index) =>
+      elements.map((element, index) =>
         element.animate([froms[index], HIDDEN], { duration: fast, easing, fill: 'forwards' }),
       ),
   )
@@ -268,36 +333,44 @@ function hideContent(panel: HTMLElement, reveals: Animation[], { fast, easing }:
  * Le vol (spec §4.6) : à l'ouverture, le panneau, transparent, montre sa feuille posée sur la carte,
  * et la photo, le post-it et les rubans posés sur leurs homologues ; la carte se cache d'un coup, et
  * tout part ensemble, la feuille en tête. Au retour, le contenu s'efface ; puis le panneau redevient
- * transparent sur sa feuille, et tout repart vers la carte, mesurée de nouveau.
+ * transparent sur sa feuille, et tout repart vers la carte, mesurée de nouveau. Chaque ruban part de
+ * sa place à l'instant, défilée hors de vue ou non : aucun test de visibilité.
  */
 function flying(panel: HTMLElement, card: HTMLElement, motion: Motion): Steps {
   const route = legs(panel, card, motion)
+  const kept = route.flatMap(({ element, ribbon }) => (ribbon ? [element, ribbon] : []))
+  // Au départ d'un vol, chaque copie volante sur son ruban.
+  const placeFlyers = () => {
+    for (const { element, ribbon } of route) if (ribbon) place(element, ribbon)
+  }
   let outbound: Animation[] = []
   let reveals: Animation[] = []
   return {
     out: () => {
       panel.setAttribute('data-flight', '')
       card.setAttribute('data-origin', '')
+      placeFlyers()
       const starts = route.map(({ element, homologue }) => startOn(element, homologue))
       outbound = [
-        ...route.map((leg, index) => fly(leg, starts[index], AT_REST, motion, 'backwards')),
+        ...route.flatMap((leg, index) => fly(leg, starts[index], AT_REST, motion, 'backwards')),
         ...fadeGrey(panel, card, motion, 'out'),
       ]
-      reveals = revealContent(panel, motion)
+      reveals = revealContent(contentOf(panel, kept), motion)
       return [...outbound, ...reveals]
     },
-    clear: () => hideContent(panel, reveals, motion),
+    clear: () => hideContent(contentOf(panel, kept), reveals, motion),
     back: () => {
       panel.setAttribute('data-flight', '')
+      placeFlyers()
       // La couche qui s'efface encore, quand la fermeture interrompt l'ouverture.
       const fading = panel.querySelector(GREY)
       const grey = fading ? shown(fading, ['opacity']) : HIDDEN
       return [
         ...relay(
           outbound,
-          route.map(({ element, dimmed }) => shown(element, dimmed ? DIMMED_FLIGHT : FLIGHT)),
+          route.map(({ element, ribbon }) => shown(element, ribbon ? DIMMED_FLIGHT : FLIGHT)),
           (froms) =>
-            route.map((leg, index) =>
+            route.flatMap((leg, index) =>
               fly(leg, froms[index], startOn(leg.element, leg.homologue), motion, 'both'),
             ),
         ),
