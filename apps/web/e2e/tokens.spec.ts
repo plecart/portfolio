@@ -230,6 +230,54 @@ for (const state of PALETTE_STATES) {
   })
 }
 
+/** La luminance relative de WCAG 2.x d'une couleur calculée, `rgb(…)` ou `color(srgb …)`. */
+function luminance(color: string): number {
+  const channels = color.match(/[\d.]+/g)!.slice(0, 3).map(Number)
+  const srgb = color.startsWith('color(') ? channels : channels.map((channel) => channel / 255)
+  const [r, g, b] = srgb.map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/** Le rapport de contraste de WCAG 2.x entre deux couleurs calculées. */
+function contrast(one: string, other: string): number {
+  const [light, dark] = [luminance(one), luminance(other)].sort((a, b) => b - a)
+  return (light + 0.05) / (dark + 0.05)
+}
+
+/**
+ * Les objets graphiques que la spec §6.2 tient à 3:1 au moins — « anneau de focus et points « en
+ * ligne » et « en cours » ≥ 3 » —, chacun sur le fond où il se pose, avec le rapport que §6.2
+ * écrit pour la paire, clair puis sombre : l'anneau sur le fond de page et sur le papier, chaque
+ * point sur son ruban.
+ */
+const GRAPHIC_CONTRASTS = [
+  ['anneau de focus sur le fond', '--accent', '--bg', [4.67, 6.8]],
+  ['anneau de focus sur le papier', '--accent', '--paper', [5.13, 5.8]],
+  ['point « en ligne » sur son ruban', '--live', '--tape', [3.68, 5.35]],
+  ['point « en cours » sur son ruban', '--ongoing', '--tape', [3.58, 3.99]],
+] as const
+
+/** Le seuil de WCAG 1.4.11 pour un objet graphique. */
+const GRAPHIC_MINIMUM = 3
+
+for (const [index, mode] of (['light', 'dark'] as const).entries()) {
+  test(`les objets graphiques de §6.2 tiennent 3:1 sur leur fond — ${mode}`, async ({ page }) => {
+    await openInState(page, { system: mode })
+
+    const ratios: [string, number][] = []
+    for (const [object, color, background] of GRAPHIC_CONTRASTS) {
+      const [front, back] = await resolveAll(page, [
+        ['color', `var(${color})`],
+        ['color', `var(${background})`],
+      ])
+      ratios.push([object, Math.round(contrast(front, back) * 100) / 100])
+    }
+
+    expect(ratios).toEqual(GRAPHIC_CONTRASTS.map(([object, , , spec]) => [object, spec[index]]))
+    expect(ratios.filter(([, ratio]) => ratio < GRAPHIC_MINIMUM)).toEqual([])
+  })
+}
+
 /** Relève, là où il s'exécute, le mode posé et le fond de page calculé. */
 const RECORD =
   'globalThis.firstRender = [document.documentElement.dataset.theme, ' +
