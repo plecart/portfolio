@@ -352,6 +352,29 @@ function around(root: Element, kept: readonly Element[]): Element[] {
 }
 
 /**
+ * La couverture de la carte au retour (spec §4.6) : quand la galerie montre une autre image que la
+ * première, une copie de la première, posée sur l'image montrée, y apparaît en fondu pendant le vol,
+ * et part avec le panneau. Annulée, elle disparaît.
+ *
+ * @returns Son fondu ; aucun quand la galerie montre la première image, ou n'en a pas.
+ */
+function fadeCover(panel: HTMLElement, { open, easing }: Motion) {
+  const images = [...panel.querySelectorAll<HTMLImageElement>('.project-gallery-image')]
+  // L'image montrée : la seule que la galerie laisse aux technologies d'assistance.
+  const current = images.findIndex((image) => image.ariaHidden !== 'true')
+  if (current < 1) return []
+  const cover = images[0].cloneNode() as HTMLImageElement
+  cover.classList.add('project-gallery-cover')
+  cover.alt = ''
+  cover.ariaHidden = 'true'
+  cover.style.left = `${current * 100}%`
+  images[current].after(cover)
+  const fade = cover.animate([HIDDEN, SHOWN], { duration: open, easing })
+  fade.addEventListener('cancel', () => cover.remove())
+  return [fade]
+}
+
+/**
  * Le reste de la fiche (spec §4.6) : `CONTENT`, puis la colonne défilante, élément par élément autour
  * de ce que le vol y garde — les rubans visés et leurs copies volantes —, qui ne suit ni son
  * apparition ni son effacement. La colonne elle-même ne s'efface pas : elle les contient.
@@ -453,12 +476,15 @@ function flying(panel: HTMLElement, card: HTMLElement, motion: Motion): Steps {
       panel.setAttribute('data-flight', '')
       strapFlight?.back()
       placeFlyers()
-      return relay(
-        outbound,
-        route.map(({ element, ribbon }) => shown(element, ribbon ? RIBBON_FLIGHT : FLIGHT)),
-        (froms) =>
-          route.flatMap((leg, index) => fly(leg, froms[index], cardEnd(leg), motion, 'both')),
-      )
+      return [
+        ...relay(
+          outbound,
+          route.map(({ element, ribbon }) => shown(element, ribbon ? RIBBON_FLIGHT : FLIGHT)),
+          (froms) =>
+            route.flatMap((leg, index) => fly(leg, froms[index], cardEnd(leg), motion, 'both')),
+        ),
+        ...fadeCover(panel, motion),
+      ]
     },
   }
 }

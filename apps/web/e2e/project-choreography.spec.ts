@@ -1005,27 +1005,49 @@ test('un projet en cours : sa photo vole en couleur, à l’aller comme au retou
   await expectLanded(page, card)
 })
 
-test('fermée depuis sa deuxième image, la galerie la garde pendant tout le retour à sa carte, flèches du clavier comprises', async ({
+/**
+ * Dans le cadre de la galerie, la couverture posée en vol — la copie de la première image —, sa
+ * boîte et son fondu.
+ */
+function readCoverLayer(frame: Element) {
+  const [image, ...others] = frame.querySelectorAll('img')
+  const cover = others.find((other) => other.getAnimations().length > 0)!
+  const [fade] = cover.getAnimations()
+  return {
+    same: cover.src === image.src,
+    box: cover.getBoundingClientRect().toJSON(),
+    hidden: cover.getAttribute('aria-hidden'),
+    duration: fade.effect!.getTiming().duration,
+    opacities: (fade.effect as KeyframeEffect).getKeyframes().map(({ opacity }) => Number(opacity)),
+  }
+}
+
+test('fermée depuis sa deuxième image, la galerie la garde, flèches du clavier comprises, et la couverture y apparaît en fondu pendant le vol', async ({
   page,
 }) => {
   await openEnteredTable(page, [
-    ficheProject({ ...ONGOING, gallery: [buildImage('fiche', 'Une'), buildImage('fiche', 'Deux')] }),
+    ficheProject({ gallery: [buildImage('une', 'Une'), buildImage('deux', 'Deux')] }),
   ])
+  const { open } = await motion(page)
   await openProject(cardAt(page, FICHE_PATH))
   await nextImage(page).click()
   await settle(page)
   await freezeAnimations(page)
   const frame = panel(page).locator('.project-gallery-frame')
   const track = panel(page).locator('.project-gallery-track')
+  const second = frame.locator('img').nth(1)
 
   await page.keyboard.press('Escape')
   await page.keyboard.press('ArrowRight')
 
   expect(await track.evaluate((element) => element.getAnimations().length)).toBe(0)
-  expectSameBox(await boxOf(frame.locator('img').nth(1)), await boxOf(frame))
+  expectSameBox(await boxOf(second), await boxOf(frame))
   await finishAnimations(page)
   await expect.poll(() => frame.evaluate((element) => element.getAnimations().length)).toBe(1)
-  expectSameBox(await boxOf(frame.locator('img').nth(1)), await boxOf(frame))
+  const cover = await frame.evaluate(readCoverLayer)
+  expect(cover).toMatchObject({ same: true, hidden: 'true', duration: open, opacities: [0, 1] })
+  expectSameBox(cover.box, await boxOf(second))
+  expectSameBox(await boxOf(second), await boxOf(frame))
 })
 
 test('les autres cartes de l’écran reculent de 48 px à l’opposé de la carte ouverte et s’effacent ; hors de l’écran, rien ne bouge', async ({

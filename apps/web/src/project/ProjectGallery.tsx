@@ -56,8 +56,8 @@ function useImageIndex(count: number, listening: boolean) {
  * d'entrée d'historique : elle se ferme avec la fiche, au même rendu, et montre pendant son fondu de
  * sortie l'image choisie.
  *
- * Sur le retour à sa carte, elle garde l'image choisie : la carte réapparaît avec sa photo au bout
- * du vol, d'un coup (spec §4.6).
+ * Sur le retour à sa carte, elle garde l'image choisie, sur laquelle la couverture de la carte
+ * apparaît en fondu pendant le vol (`useChoreography`, spec §4.6).
  *
  * @param gallery Les images du projet, prêtes ou non.
  * @param open La fiche est ouverte ; fermée, elle ferme la couche avec elle.
