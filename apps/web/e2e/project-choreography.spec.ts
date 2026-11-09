@@ -1005,7 +1005,7 @@ test('un projet en cours : sa photo vole en couleur, à l’aller comme au retou
   await expectLanded(page, card)
 })
 
-test('fermée depuis sa deuxième image, la galerie revient d’un coup à la première, celle de la carte', async ({
+test('fermée depuis sa deuxième image, la galerie la garde pendant tout le retour à sa carte', async ({
   page,
 }) => {
   await openEnteredTable(page, [
@@ -1021,7 +1021,10 @@ test('fermée depuis sa deuxième image, la galerie revient d’un coup à la pr
   await page.keyboard.press('Escape')
 
   expect(await track.evaluate((element) => element.getAnimations().length)).toBe(0)
-  expectSameBox(await boxOf(frame.locator('img').first()), await boxOf(frame))
+  expectSameBox(await boxOf(frame.locator('img').nth(1)), await boxOf(frame))
+  await finishAnimations(page)
+  await expect.poll(() => frame.evaluate((element) => element.getAnimations().length)).toBe(1)
+  expectSameBox(await boxOf(frame.locator('img').nth(1)), await boxOf(frame))
 })
 
 test('les autres cartes de l’écran reculent de 48 px à l’opposé de la carte ouverte et s’effacent ; hors de l’écran, rien ne bouge', async ({
