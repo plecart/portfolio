@@ -393,10 +393,11 @@ function hideContent(elements: Element[], reveals: Animation[], { fast, easing }
  * carte montre à l'instant, transition comprise, avant de l'ôter (`data-origin`, `card.css`) ; à
  * l'ouverture, ses deux bandes, la tranche et les rayures, glissent ensemble perpendiculairement à
  * leur axe, vers le coin haut-gauche, jusqu'à quitter leur boîte, où la copie se tient ôtée
- * (`project.css`), en `--dur-open`, sans retard. Au retour, en plein vol comme posée, la copie est
- * retirée : la carte réapparue fait glisser sa propre sangle en place.
+ * (`project.css`), en `--dur-open`, sans retard ; la copie s'efface en `--dur-fast` pendant qu'elle
+ * glisse, comme le trombone qui monte. Au retour, en plein vol comme posée, la copie est retirée : la
+ * carte réapparue fait glisser sa propre sangle en place.
  */
-function strapTrip(panel: HTMLElement, strap: HTMLElement, { open, easing }: Motion) {
+function strapTrip(panel: HTMLElement, strap: HTMLElement, { open, fast, easing }: Motion) {
   const start = bandOf(strap)
   const flyer = strapFlyerOf(strap, panel)
   return {
@@ -405,9 +406,12 @@ function strapTrip(panel: HTMLElement, strap: HTMLElement, { open, easing }: Mot
         { ...SEEN, transform: start },
         { ...SEEN, transform: bandOf(flyer) },
       ]
-      return [flyer, flyer.querySelector(STRIPES)!].map((box) =>
-        box.animate(keyframes, { duration: open, easing, pseudoElement: BAND }),
-      )
+      return [
+        ...[flyer, flyer.querySelector(STRIPES)!].map((box) =>
+          box.animate(keyframes, { duration: open, easing, pseudoElement: BAND }),
+        ),
+        flyer.animate([SHOWN, HIDDEN], { duration: fast, easing, fill: 'forwards' }),
+      ]
     },
     back: () => flyer.remove(),
   }
