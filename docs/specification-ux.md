@@ -210,8 +210,8 @@ Page, colonne de lecture de la fiche et, sur téléphone, son panneau : `scrollb
 | Couleur au survol (nom, icônes, liens) ; fond et filet de l'entête | 150 ms | `--ease-out` |
 | Entête qui sort et revient | 240 ms | `--ease-out` |
 | Colonne des liens de l'auteur qui s'efface et revient | 150 ms | `--ease-out` |
-| Glissement de la sangle au coin et retour | 500 ms | `--ease-out` |
-| Vol de la photo, du post-it et des rubans ; feuille ; recul des cartes | 280 ms | `--ease-out` |
+| Glissement de la sangle au coin et retour ; son entrée sur la carte réapparue (§4.6) | 500 ms | `--ease-out` |
+| Vol de la photo, du post-it et des rubans ; sortie de la sangle ; feuille ; recul des cartes | 280 ms | `--ease-out` |
 | Trombone | opacité 150 ms, translation 200 ms | `--ease-out` |
 | Contenu de la fiche : entrée / sortie | 200 ms (+ 8 px) / 150 ms | `--ease-out` |
 | Galerie (glissement) | 240 ms | `--ease-out` |
@@ -333,7 +333,7 @@ Un paragraphe (`role="status"`) centré, horizontalement et verticalement, dans 
 | Instant | Ce qui se passe |
 |---|---|
 | t = 0 | La fiche est rendue, invisible. Une feuille (`--paper`, rayon 2 px, `--shadow-lift`) est posée exactement sur le cadre de la carte. La photo et le post-it reçoivent leur trajet vers leur homologue dans la fiche (translation et échelle, pivot haut gauche), et chaque ruban de la carte le sien, roulé : translation et échelle uniforme (rapport des hauteurs), centré sur son homologue de la carte, sa largeur et sa marge intérieure ramenées aux siennes, ce qui les dépasse coupé, le nom d'une technologie effacé côté carte et entier côté fiche ; un ruban s'apparie par son identité (`data-ribbon`, §4.1), jamais par sa place : une technologie vole vers son ruban de la stack « Technologies », un état vers son ruban de l'en-tête. Un ruban dont l'homologue est replié (§4.3) n'a pas de trajet et disparaît avec la carte. Chaque ruban visé vole par une copie fixe (`[data-flyer]`, `aria-hidden`, même inclinaison), posée sur sa place du moment — hors de vue comprise — que la colonne défilante ne coupe pas ; le ruban lui-même reste caché pendant le vol. Entrée d'historique `/projets/<slug>`. |
-| image suivante | La carte se cache d'un coup : photo, post-it, bande, papier et ombre à 0, sans transition ; sa sangle passe à sa copie (fixe, `aria-hidden`, posée sur elle, au-dessus de la feuille et de la photo), qui glisse hors de la carte le long de son axe, vers le haut droit (280 ms) ; sa pose revient à 0° (280 ms). Le trombone monte de 14 px (200 ms) en s'effaçant (150 ms). Les autres cartes visibles reculent de 48 px dans la direction opposée à la carte ouverte et s'effacent (280 ms, toutes en même temps) ; les cartes hors de l'écran ne bougent pas (§1.6). |
+| image suivante | La carte se cache d'un coup : photo, post-it, bande, papier et ombre à 0, sans transition ; sa sangle sort d'un coup de la carte et passe à sa copie (fixe, `aria-hidden`, posée sur elle, au-dessus de la feuille et de la photo), qui glisse perpendiculairement à son axe vers le coin haut-gauche jusqu'à quitter la carte (280 ms) ; sa pose revient à 0° (280 ms). Le trombone monte de 14 px (200 ms) en s'effaçant (150 ms). Les autres cartes visibles reculent de 48 px dans la direction opposée à la carte ouverte et s'effacent (280 ms, toutes en même temps) ; les cartes hors de l'écran ne bougent pas (§1.6). |
 | image suivante | La photo vole du cadre de la carte au cadre de la galerie (280 ms). La feuille s'étire de la carte au panneau (280 ms, échelle non uniforme). Le post-it vole vers le titre (280 ms). Les rubans volent vers leur homologue, le i-ème de la bande de la carte avec 20 × i ms de retard, à 35 % d'opacité entre 30 % et 70 % du trajet ; les rubans visés de la stack sont seuls visibles dans la colonne, dont la barre de défilement reste transparente pendant le vol. |
 | t = 280 ms | La fiche est posée : papier et ombre du panneau, interactions actives. Le reste — bouton fermer, flèches, barre de galerie, post-its de lien, et dans la colonne défilante chaque élément qui ne contient aucun ruban visé — apparaît en 200 ms avec une montée de 8 px, autour des rubans posés. Focus sur « Fermer la fiche ». |
 
@@ -342,8 +342,8 @@ Un paragraphe (`role="status"`) centré, horizontalement et verticalement, dans 
 | Instant | Ce qui se passe |
 |---|---|
 | t = 0 | Le contenu apparu à la pose s'efface (150 ms) ; les rubans visés restent. |
-| t = 150 ms | Le panneau redevient transparent ; la feuille est dessous. La photo, le post-it et les rubans repartent vers la carte (280 ms), chaque ruban visé par sa copie reposée sur sa place du moment, défilée hors de vue comprise ; la copie de la sangle revient sur le même trajet jusqu'à la sangle de la carte (280 ms) ; la feuille se replie sur le cadre de la carte (280 ms) ; les autres cartes reviennent à leur place en réapparaissant (280 ms). |
-| t = 430 ms (+ retard du dernier ruban) | La carte réapparaît d'un coup sous la photo et la sangle posées ; panneau et feuille sont retirés ; défilement rendu ; focus sur la carte. |
+| t = 150 ms | Le panneau redevient transparent ; la feuille est dessous. La photo, le post-it et les rubans repartent vers la carte (280 ms), chaque ruban visé par sa copie reposée sur sa place du moment, défilée hors de vue comprise ; la copie de la sangle est retirée, la sangle de la carte reste hors d'elle ; la feuille se replie sur le cadre de la carte (280 ms) ; les autres cartes reviennent à leur place en réapparaissant (280 ms). |
+| t = 430 ms (+ retard du dernier ruban) | La carte réapparaît d'un coup sous la photo posée, puis sa sangle y glisse perpendiculairement à son axe depuis le haut, au-delà du coin haut-gauche, jusqu'à sa pose (500 ms) ; panneau et feuille sont retirés ; défilement rendu ; focus sur la carte. |
 
 Règles : jamais de fondu croisé entre deux images, la bascule est instantanée ; la photo de la carte et la première image de la galerie sont la même image ; les bascules du thème sont instantanées.
 

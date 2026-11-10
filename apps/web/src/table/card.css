@@ -237,7 +237,8 @@
      bandeau se révèle. Deux boîtes la coupent : la face et `--strap-overhang` autour, où ne se voit
      que sa tranche, le retour de la sangle derrière la carte ; puis, par-dessus, la face seule, ses
      rayures. Chacune porte la même bande — `::before`, et `::after` au coin en mouvement réduit —,
-     dont les longueurs suivent la première boîte, leur conteneur. */
+     dont les longueurs suivent la première boîte, leur conteneur. Ôtée de sa carte, d'où la fiche
+     s'envole (§4.6), sa bande sort de ses boîtes au-delà du coin haut-gauche, et y revient. */
   .card-strap {
     --strap-overhang: 3px;
     --strap-width: 10cqw;
@@ -256,13 +257,18 @@
     /* Au coin : la part de son épaisseur qui reste, et la distance de son axe au coin. */
     --strap-thin: 0.5;
     --strap-inset: 8cqw;
-    /* La course jusqu'au coin, perpendiculaire à la bande : de son centre, à `--strap-inset` du coin
-       haut-gauche de la boîte, qui en est à 50cqw × (sin(angle) + cos(angle)) sur cet axe. */
-    --strap-reach: calc(
-      var(--strap-inset) - 50cqw * (sin(var(--strap-angle)) + cos(var(--strap-angle)))
-    );
+    /* La distance de son centre au coin haut-gauche de la boîte, perpendiculairement à la bande : à
+       50cqw du haut et de la gauche, il en est à 50cqw × (sin(angle) + cos(angle)) sur cet axe. */
+    --strap-corner: calc(50cqw * (sin(var(--strap-angle)) + cos(var(--strap-angle))));
+    /* Les courses, perpendiculaires à la bande, vers ce coin : jusqu'au coin, son axe à
+       `--strap-inset` de lui ; hors de la boîte, son bord le plus proche passé ce coin, le point de
+       la boîte le plus avancé sur cet axe. */
+    --strap-reach: calc(var(--strap-inset) - var(--strap-corner));
+    --strap-clear: calc(-1 * (var(--strap-corner) + var(--strap-width) / 2));
     /* 1 sur une intention, 0 sinon. */
     --strap-cornered: 0;
+    /* 1 ôtée de sa carte, d'où la fiche s'envole, 0 sinon. */
+    --strap-off: 0;
     position: absolute;
     inset: calc(-1 * var(--strap-overhang));
     z-index: 4;
@@ -327,10 +333,13 @@
     }
   }
 
-  /* Elle glisse le long de sa diagonale jusqu'au coin, et en revient. */
+  /* Elle glisse le long de sa diagonale jusqu'au coin, et en revient ; ôtée, hors de ses boîtes,
+     au-delà du coin, au coin ou non. */
   @media (prefers-reduced-motion: no-preference) {
     :is(.card-strap, .card-strap-stripes)::before {
-      transform: translateY(calc(var(--strap-cornered) * var(--strap-reach)))
+      transform: translateY(
+          calc(var(--strap-cornered) * var(--strap-reach) + var(--strap-off) * var(--strap-clear))
+        )
         scale(calc(1 - var(--strap-cornered) * (1 - var(--strap-thin))));
       transition: transform var(--dur-strap) var(--ease-out);
     }
@@ -513,14 +522,23 @@
 
   /* La carte d'où la fiche s'envole (§4.6), que `useChoreography` marque jusqu'à son retour : sa
      photo, son post-it, sa bande, son papier et ses ombres disparaissent d'un coup, et sa sangle,
-     que la fiche ne porte pas, passe à sa copie volante ; sa pose revient à 0° et son trombone monte
-     en s'effaçant. Sa levée, que le panneau lui retire en prenant focus et pointeur, tombe d'un coup :
-     le retour se mesure sur la carte au repos.
-     Après les états d'intention, qu'elle remplace. Photo, post-it, bande, sangle, papier, ombre au
-     repos et trombone reviennent d'un coup : hors de ce bloc, aucun ne transite. */
+     que la fiche ne porte pas, sort d'un coup de ses boîtes, sa copie volante prenant sa place ; sa
+     pose revient à 0° et son trombone monte en s'effaçant. Sa levée, que le panneau lui retire en
+     prenant focus et pointeur, tombe d'un coup : le retour se mesure sur la carte au repos.
+     Après les états d'intention, qu'elle remplace. Photo, post-it, bande, papier, ombre au repos et
+     trombone reviennent d'un coup : hors de ce bloc, aucun ne transite. La sangle, elle, revient en
+     glissant depuis le coin haut-gauche, par la transition de son intention (`--dur-strap`). */
   .card[data-origin] {
-    :is(.card-photo, .card-postit, .card-band, .card-strap) {
+    :is(.card-photo, .card-postit, .card-band) {
       opacity: 0;
+    }
+
+    .card-strap {
+      --strap-off: 1;
+    }
+
+    :is(.card-strap, .card-strap-stripes)::before {
+      transition: none;
     }
 
     .card-face {
