@@ -691,7 +691,8 @@ test('la carte se cache d’un coup, sauf son trombone, qui monte de 14 px en s�
  * `at` ms des animations de la copie, à leur fin (`'end'`), ou à l'instant, lues puis rendues à leur
  * instant. De chacune, sa boîte, sa largeur de mise en page, et ce que montre chacune de ses deux
  * bandes, la tranche puis les rayures : sa transformation, sa rotation, sa visibilité, son épaisseur.
- * De la copie, en plus, son `aria-hidden` et le temps de chacun de ses glissements ; de la carte, les
+ * De la copie, en plus, son `aria-hidden`, son opacité et le temps de chacune de ses animations — ses
+ * deux glissements et son effacement ; de la carte, les
  * transitions en cours de ses bandes : propriété, durée, courbe, départ et arrivée, en matrices comme
  * ce que montre une bande — une transition les écrit en liste de fonctions.
  */
@@ -719,6 +720,7 @@ function readStrap({ path, at }: { path: string; at?: number | 'end' }) {
   const copy = flyer && {
     ...read(flyer),
     ariaHidden: flyer.ariaHidden,
+    opacity: getComputedStyle(flyer).opacity,
     slides: animations.map(({ effect }) => {
       const { duration, delay, easing } = effect!.getTiming()
       return { duration, delay, easing }
@@ -829,11 +831,11 @@ const STRAP_STARTS: [string, (card: Locator) => Promise<unknown>][] = [
 ]
 
 for (const [state, prepare] of STRAP_STARTS) {
-  test(`sangle ${state} : à l’ouverture, la carte l’ôte d’un coup, et une copie \`aria-hidden\`, posée sur elle, au-dessus de la photo volante et de la feuille, glisse perpendiculairement à son axe vers le coin haut-gauche jusqu’à juste quitter sa boîte, en \`--dur-open\`, \`--ease-out\`, sans retard, encore dans la face à mi-course ; posée, la fiche n’en montre rien`, async ({
+  test(`sangle ${state} : à l’ouverture, la carte l’ôte d’un coup, et une copie \`aria-hidden\`, posée sur elle, au-dessus de la photo volante et de la feuille, glisse perpendiculairement à son axe vers le coin haut-gauche jusqu’à juste quitter sa boîte, en \`--dur-open\`, \`--ease-out\`, sans retard, encore dans la face à mi-course, et s’efface en \`--dur-fast\` en glissant ; posée, la fiche n’en montre rien`, async ({
     page,
   }) => {
     await openEnteredTable(page, PROJECTS)
-    const { open, easing } = await motion(page)
+    const { open, fast, easing } = await motion(page)
     const midway = open * MID_COURSE
     await prepare(cardAt(page, FIRST_PATH))
     const { card: before } = await page.evaluate(readStrap, { path: FIRST_PATH })
@@ -856,7 +858,14 @@ for (const [state, prepare] of STRAP_STARTS) {
     expect(copy).toBeGreaterThanOrEqual(0)
     expect(photo).toBeGreaterThan(copy)
     expect(sheet).toBeGreaterThan(photo)
-    expect(start!.slides).toEqual([0, 1].map(() => ({ duration: open, delay: 0, easing })))
+    expect(start!.slides).toHaveLength(3)
+    expect(start!.slides).toEqual(
+      expect.arrayContaining([
+        ...[0, 1].map(() => ({ duration: open, delay: 0, easing })),
+        { duration: fast, delay: 0, easing },
+      ]),
+    )
+    expect([start!.opacity, end!.opacity]).toEqual(['1', '0'])
     expect(hidden.transitions).toEqual([])
     for (const [index, { transform: rest, rotate }] of before.bands.entries()) {
       // Sa course : d'où elle part, au repos ou au coin, à juste hors de sa boîte.
