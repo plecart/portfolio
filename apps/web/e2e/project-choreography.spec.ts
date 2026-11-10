@@ -37,7 +37,9 @@ import {
   face,
   focusByKeyboard,
   openTable,
+  straighten,
   strap,
+  strapPixels,
 } from './table.ts'
 
 /** Trois projets ; la première carte, celle d'un projet en cours, à une seule image. */
@@ -86,6 +88,20 @@ function expectSameBox(actual: Box, expected: Box) {
   for (const key of ['left', 'top', 'width', 'height'] as const) {
     expect(actual[key], key).toBeCloseTo(expected[key], 0)
   }
+}
+
+/**
+ * Attend un élément volant de `readFlights` posé sur son homologue de la carte : sa boîte ; la copie
+ * d'un ruban, roulée sous une échelle uniforme, son centre, au demi-pixel — leurs boîtes englobantes
+ * ne diffèrent que de leurs inclinaisons, et sa taille est celle de son homologue (test « chaque
+ * ruban vole roulé »).
+ */
+function expectOnHomologue(actual: Box, { name, homologue }: { name: string; homologue: Box }) {
+  if (!name) return expectSameBox(actual, homologue)
+  const centerOf = ({ left, top, width, height }: Box) => [left + width / 2, top + height / 2]
+  const [[x, y], [expectedX, expectedY]] = [centerOf(actual), centerOf(homologue)]
+  expect(x, `centre de ${name}`).toBeCloseTo(expectedX, 0)
+  expect(y, `centre de ${name}`).toBeCloseTo(expectedY, 0)
 }
 
 /**
@@ -270,7 +286,7 @@ test('la feuille, la photo, le post-it et les rubans partent de leur homologue s
   expect(flights.length).toBeGreaterThan(3)
   for (const flight of flights) {
     expect(flight.count).toBe(1)
-    expectSameBox(flight.start, flight.homologue)
+    expectOnHomologue(flight.start, flight)
     expect(flight.duration).toBe(open)
     expect(flight.easing).toBe(easing)
     expect(flight.delay).toBe(flight.rank * ribbon)
@@ -319,9 +335,9 @@ test('chaque ruban de technologie vole vers le ruban de la stack « Technologies
   const opening = ribbonFlights(await page.evaluate(readFlights, { path: FICHE_PATH }))
 
   expect(opening.map(({ name, place }) => [name, place])).toEqual(RIBBON_PLACES)
-  for (const { start, end, homologue, rest } of opening) {
-    expectSameBox(start, homologue)
-    expectSameBox(end, rest)
+  for (const flight of opening) {
+    expectOnHomologue(flight.start, flight)
+    expectSameBox(flight.end, flight.rest)
   }
 
   await resume()
@@ -333,10 +349,85 @@ test('chaque ruban de technologie vole vers le ruban de la stack « Technologies
   const closing = ribbonFlights(await page.evaluate(readFlights, { path: FICHE_PATH }))
 
   expect(closing.map(({ name, place }) => [name, place])).toEqual(RIBBON_PLACES)
-  for (const { count, start, end, homologue, rest } of closing) {
-    expect(count).toBe(1)
-    expectSameBox(start, rest)
-    expectSameBox(end, homologue)
+  for (const flight of closing) {
+    expect(flight.count).toBe(1)
+    expectSameBox(flight.start, flight.rest)
+    expectOnHomologue(flight.end, flight)
+  }
+})
+
+/**
+ * Dans la page : la copie volante de chaque ruban (`data-flyer`) à la part `at` de son vol, de 0, son
+ * début, à 1, sa fin, lue puis rendue à son instant : son échelle, sur ses deux axes ; sa largeur et
+ * sa marge en ligne, puis celles de son homologue sur la carte et de son ruban sur la fiche ;
+ * l'opacité de son nom, s'il en a un.
+ */
+function readRolls({ path, at }: { path: string; at: number }) {
+  const card = document.querySelector(`.card[href="${path}"]`)!
+  const dialog = document.querySelector('[role="dialog"]')!
+  const sizeOf = (element: HTMLElement) => ({
+    width: element.offsetWidth,
+    padding: getComputedStyle(element).paddingInline,
+  })
+  return [...dialog.querySelectorAll<HTMLElement>('[data-flyer]')].map((flyer) => {
+    const name = flyer.dataset.flyer!
+    const [flight] = flyer.getAnimations().filter((animation) => animation.constructor === Animation)
+    const now = flight.currentTime
+    const { delay, duration } = flight.effect!.getComputedTiming()
+    flight.currentTime = delay! + at * (duration as number)
+    // Un seul nombre vaut pour les deux axes (`scale`).
+    const [sx, sy = sx] = getComputedStyle(flyer).scale.split(' ').map(Number)
+    const label = flyer.querySelector('.card-ribbon-name')
+    const read = {
+      name,
+      scale: [sx, sy],
+      ...sizeOf(flyer),
+      label: label && getComputedStyle(label).opacity,
+      homologue: sizeOf(card.querySelector<HTMLElement>(`.card-band [data-ribbon="${name}"]`)!),
+      ribbon: sizeOf(dialog.querySelector<HTMLElement>(`[data-ribbon="${name}"]`)!),
+    }
+    flight.currentTime = now
+    return read
+  })
+}
+
+/** Les rubans de technologies de la carte de `RIBBONED_FIELDS` : ceux qui portent un nom. */
+const NAMED = RIBBON_PLACES.filter(([, place]) => place === 'technologies').map(([name]) => name)
+
+test('chaque ruban vole roulé : au bout carte, sa copie a la largeur et la marge en ligne de son homologue, sous une échelle uniforme, le nom d’une technologie effacé ; au bout fiche, les siennes, son nom entier ; entre les deux, nom et largeur passent par des valeurs intermédiaires — à l’aller comme au retour', async ({
+  page,
+}) => {
+  await openEnteredTable(page, [ficheProject(RIBBONED_FIELDS)])
+  const resume = await openFrozen(page, FICHE_PATH)
+  const opening = await page.evaluate(readRolls, { path: FICHE_PATH, at: 0 })
+  await resume()
+  await settle(page)
+  await freezeAnimations(page)
+  await page.keyboard.press('Escape')
+  await finishAnimations(page)
+  const leaving = await page.evaluate(readRolls, { path: FICHE_PATH, at: 0 })
+  const halfway = await page.evaluate(readRolls, { path: FICHE_PATH, at: 0.5 })
+  const landing = await page.evaluate(readRolls, { path: FICHE_PATH, at: 1 })
+
+  expect(opening).toHaveLength(RIBBON_PLACES.length)
+  for (const { name, scale, width, padding, label, homologue } of [...opening, ...landing]) {
+    const [sx, sy] = scale
+    expect(sy, name).toBe(sx)
+    expect({ width, padding }, name).toEqual(homologue)
+    expect(label, name).toBe(NAMED.includes(name) ? '0' : null)
+  }
+  for (const { name, width, padding, label, ribbon } of leaving) {
+    expect({ width, padding }, name).toEqual(ribbon)
+    expect(label, name).toBe(NAMED.includes(name) ? '1' : null)
+  }
+  // Le nom s'interpole (`card.css`, sa propriété enregistrée), la largeur avec lui.
+  const named = halfway.filter(({ label }) => label)
+  expect(named).toHaveLength(NAMED.length)
+  for (const { name, width, label, homologue, ribbon } of named) {
+    expect(Number(label), name).toBeGreaterThan(0)
+    expect(Number(label), name).toBeLessThan(1)
+    expect(width, name).toBeGreaterThan(homologue.width)
+    expect(width, name).toBeLessThan(ribbon.width)
   }
 })
 
@@ -483,10 +574,10 @@ test('fermée sa stack défilée hors de vue, chaque ruban repart de sa vraie pl
   const closing = ribbonFlights(await page.evaluate(readFlights, { path: FICHE_PATH }))
   const technologies = closing.filter(({ place }) => place === 'technologies')
   expect(technologies).toHaveLength(3)
-  for (const { start, end, homologue, rest } of technologies) {
-    expect(rest.top + rest.height).toBeLessThan(scrollerTop)
-    expectSameBox(start, rest)
-    expectSameBox(end, homologue)
+  for (const flight of technologies) {
+    expect(flight.rest.top + flight.rest.height).toBeLessThan(scrollerTop)
+    expectSameBox(flight.start, flight.rest)
+    expectOnHomologue(flight.end, flight)
   }
 })
 
@@ -532,7 +623,7 @@ test('les rubans passent par 35 % d’opacité entre 30 % et 70 % du trajet', as
   ])
 })
 
-test('la carte se cache d’un coup, sangle comprise avec son cadre, sauf son trombone, qui monte de 14 px en s’effaçant, et sa pose revient à 0°', async ({
+test('la carte se cache d’un coup, sa sangle passant à sa copie, sauf son trombone, qui monte de 14 px en s’effaçant, et sa pose revient à 0°', async ({
   page,
 }) => {
   await openEnteredTable(page, PROJECTS)
@@ -581,6 +672,236 @@ test('la carte se cache d’un coup, sangle comprise avec son cadre, sauf son tr
   )
 })
 
+/**
+ * Dans la page : la copie volante de la sangle (`data-strap-flyer`) à `at` ms de ses animations, à
+ * leur fin (`'end'`), ou à l'instant, lue puis rendue à son instant : son `aria-hidden`, sa boîte, et
+ * ce que montre chacune de ses deux bandes, la tranche puis les rayures — sa transformation, sa
+ * rotation, sa visibilité, sa longueur ; le temps de chacun de ses glissements. Puis la sangle de la
+ * carte : sa boîte, son opacité, et la transformation et la rotation de chacune de ses bandes.
+ */
+function readStrap({ path, at }: { path: string; at?: number | 'end' }) {
+  const flyer = document.querySelector('[role="dialog"] [data-strap-flyer]')!
+  const strap = document.querySelector(`.card[href="${path}"] .card-strap`)!
+  const boxOf = (element: Element) => {
+    const { left, top, width, height } = element.getBoundingClientRect()
+    return { left, top, width, height }
+  }
+  const bandsOf = (box: Element) =>
+    [box, box.querySelector('.card-strap-stripes')!].map((band) => {
+      const { transform, rotate, visibility, width } = getComputedStyle(band, '::before')
+      return { transform, rotate, visibility, length: parseFloat(width) }
+    })
+  const animations = flyer.getAnimations({ subtree: true })
+  const times = animations.map(({ currentTime }) => currentTime)
+  for (const animation of at === undefined ? [] : animations) {
+    const { endTime } = animation.effect!.getComputedTiming()
+    animation.currentTime = at === 'end' ? (endTime as number) : (at as number)
+  }
+  const read = {
+    ariaHidden: flyer.ariaHidden,
+    box: boxOf(flyer),
+    bands: bandsOf(flyer),
+    slides: animations
+      .filter(({ effect }) => (effect as KeyframeEffect).pseudoElement === '::before')
+      .map(({ effect }) => {
+        const { duration, delay, easing } = effect!.getTiming()
+        return { duration, delay, easing }
+      }),
+    card: {
+      box: boxOf(strap),
+      opacity: getComputedStyle(strap).opacity,
+      bands: bandsOf(strap).map(({ transform, rotate }) => ({ transform, rotate })),
+    },
+  }
+  animations.forEach((animation, index) => {
+    animation.currentTime = times[index]
+  })
+  return read
+}
+
+/** Les six nombres d'une transformation calculée, `matrix(a, b, c, d, e, f)`. */
+const matrixOf = (transform: string) => transform.slice('matrix('.length, -1).split(',').map(Number)
+
+/**
+ * Attend une bande de la sangle glissée de `shift` px le long de son axe depuis `rest` : sa
+ * transformation, que sa rotation précède (`card.css`), ne change que de sa translation horizontale.
+ */
+function expectSlid(transform: string, rest: string, shift: number) {
+  const expected = matrixOf(rest).map((value, index) => (index === 4 ? value + shift : value))
+  matrixOf(transform).forEach((value, index) => {
+    expect(value, `${transform} : ${index}`).toBeCloseTo(expected[index], 1)
+  })
+}
+
+/** Les pixels que peint la copie de la sangle dans sa boîte (`strapPixels`) : la sangle du panneau. */
+async function strapCopyPixels(page: Page) {
+  const box = (await panel(page).locator('[data-strap-flyer]').boundingBox())!
+  return strapPixels(panel(page), box, box)
+}
+
+/**
+ * Dans la page : au centre de la photo de la carte, l'ordre de peinture de la copie de la sangle, de
+ * la photo volante et de la feuille, chacune rendue au pointeur et montrée le temps de la mesure — la
+ * boîte de la copie, cachée, ne montre que ses bandes : le test de touche suit l'ordre de peinture.
+ * Le rang de chacune, du dessus vers le dessous.
+ */
+function strapCopyRanks(path: string) {
+  const dialog = document.querySelector('[role="dialog"]')!
+  const layers = ['[data-strap-flyer]', '.project-gallery-frame', '.project-sheet'].map(
+    (selector) => dialog.querySelector<HTMLElement>(selector)!,
+  )
+  const photo = document.querySelector(`.card[href="${path}"] .card-photo`)!
+  const { left, top, width, height } = photo.getBoundingClientRect()
+  const shown = { pointerEvents: 'auto', visibility: 'visible' }
+  for (const layer of layers) Object.assign(layer.style, shown)
+  const hits = document.elementsFromPoint(left + width / 2, top + height / 2)
+  for (const layer of layers) Object.assign(layer.style, { pointerEvents: '', visibility: '' })
+  return layers.map((layer) => hits.findIndex((hit) => layer.contains(hit)))
+}
+
+/**
+ * Révèle une carte de la main du test, comme un premier toucher, la fiche ouverte ou non : sa sangle
+ * passe au coin, et sa pose se redresse (`card.css`).
+ */
+async function reveal(card: Locator) {
+  await card.evaluate((cell) => cell.setAttribute('data-revealed', ''))
+  await settle(card.page())
+}
+
+/**
+ * La sangle de la carte au départ : au repos, sa pose redressée, pour que sa boîte se mesure au
+ * pixel près ; au coin, révélée (`reveal`).
+ */
+const STRAP_STARTS: [string, (card: Locator) => Promise<unknown>][] = [
+  ['au repos', straighten],
+  ['au coin', reveal],
+]
+
+for (const [state, prepare] of STRAP_STARTS) {
+  test(`sangle ${state} : à l’ouverture, elle passe à une copie \`aria-hidden\`, posée sur elle, au-dessus de la photo volante et de la feuille, dont les deux bandes glissent de toute leur longueur le long de leur axe hors de vue, en \`--dur-open\`, \`--ease-out\`, sans retard ; posée, la fiche n’en montre rien`, async ({
+    page,
+  }) => {
+    await openEnteredTable(page, PROJECTS)
+    const { open, easing } = await motion(page)
+    await prepare(cardAt(page, FIRST_PATH))
+    const resume = await openFrozen(page, FIRST_PATH)
+
+    const start = await page.evaluate(readStrap, { path: FIRST_PATH, at: 0 })
+    const middle = await page.evaluate(readStrap, { path: FIRST_PATH, at: open / 2 })
+    const end = await page.evaluate(readStrap, { path: FIRST_PATH, at: 'end' as const })
+    const [copy, photo, sheet] = await page.evaluate(strapCopyRanks, FIRST_PATH)
+
+    expect(start.ariaHidden).toBe('true')
+    expect(start.card.opacity).toBe('0')
+    expectSameBox(start.box, start.card.box)
+    expect(copy).toBeGreaterThanOrEqual(0)
+    expect(photo).toBeGreaterThan(copy)
+    expect(sheet).toBeGreaterThan(photo)
+    expect(start.slides).toEqual([0, 1].map(() => ({ duration: open, delay: 0, easing })))
+    for (const [index, { transform, rotate, visibility, length }] of start.bands.entries()) {
+      const { transform: rest, rotate: tilt } = start.card.bands[index]
+      const halfway = matrixOf(middle.bands[index].transform)[4] - matrixOf(rest)[4]
+      expect(visibility).toBe('visible')
+      expect(rotate).toBe(tilt)
+      expectSlid(transform, rest, 0)
+      expect(halfway).toBeGreaterThan(0)
+      expect(halfway).toBeLessThan(length)
+      expectSlid(middle.bands[index].transform, rest, halfway)
+      expectSlid(end.bands[index].transform, rest, length)
+    }
+    expect((await strapCopyPixels(page)).length).toBeGreaterThan(0)
+    await page.evaluate(seekAnimations, open)
+    expect(await strapCopyPixels(page)).toEqual([])
+
+    await resume()
+    await settle(page)
+
+    expect(await strapCopyPixels(page)).toEqual([])
+  })
+}
+
+test('à la fermeture, les bandes de la copie de la sangle reviennent sur le même trajet jusqu’à la sangle de la carte remesurée, en `--dur-open`, et y restent jusqu’au retrait du panneau, qui l’emporte ; la carte réapparue, sa sangle est à la même place', async ({
+  page,
+}) => {
+  await openEnteredTable(page, PROJECTS)
+  const { open, easing } = await motion(page)
+  const card = cardAt(page, FIRST_PATH)
+  await openProject(card)
+  const resume = await freezeAnimations(page)
+  await page.keyboard.press('Escape')
+  await finishAnimations(page)
+
+  const start = await page.evaluate(readStrap, { path: FIRST_PATH, at: 0 })
+  const end = await page.evaluate(readStrap, { path: FIRST_PATH, at: 'end' as const })
+
+  expect(start.slides).toEqual([0, 1].map(() => ({ duration: open, delay: 0, easing })))
+  for (const [index, { transform, length }] of start.bands.entries()) {
+    expectSlid(transform, start.card.bands[index].transform, length)
+    expect(end.bands[index]).toMatchObject({ ...end.card.bands[index], visibility: 'visible' })
+  }
+  expectSameBox(end.box, end.card.box)
+  await resume()
+
+  await expectLanded(page, card)
+  await expect(strap(card)).toHaveCSS('opacity', '1')
+  await expect(page.locator('[data-strap-flyer]')).toHaveCount(0)
+})
+
+test('la sangle de la carte passée au coin pendant que la fiche était posée, la copie de la sangle l’y rejoint au retour', async ({
+  page,
+}) => {
+  await openEnteredTable(page, PROJECTS)
+  const card = cardAt(page, FIRST_PATH)
+  await openProject(card)
+  await reveal(card)
+  await freezeAnimations(page)
+  await page.keyboard.press('Escape')
+  await finishAnimations(page)
+
+  const { bands, card: onCard } = await page.evaluate(readStrap, {
+    path: FIRST_PATH,
+    at: 'end' as const,
+  })
+
+  for (const [index, band] of bands.entries()) {
+    expect(band).toMatchObject(onCard.bands[index])
+    // Au coin, amincie de moitié (`--strap-thin`).
+    expect(matrixOf(band.transform)[0]).toBeCloseTo(0.5, 3)
+  }
+})
+
+test('levée par le focus, fermée en plein vol : la copie de la sangle repart d’où elle est, bandes et boîte, jusqu’à la sangle de la carte au repos', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, 'la levée suit un appareil à survol')
+  await openEnteredTable(page, PROJECTS)
+  const { open } = await motion(page)
+  const card = cardAt(page, FIRST_PATH)
+  await focusByKeyboard(card)
+  await settle(page)
+  await openFrozen(page, FIRST_PATH)
+  await page.evaluate(seekAnimations, open / 2)
+  const flying = await page.evaluate(readStrap, { path: FIRST_PATH })
+
+  await page.keyboard.press('Escape')
+  // La carte au repos sous `[data-origin]` : ses transitions achevées.
+  await card.evaluate((cell) => {
+    for (const transition of cell.getAnimations({ subtree: true })) transition.finish()
+  })
+
+  const start = await page.evaluate(readStrap, { path: FIRST_PATH, at: 0 })
+  const end = await page.evaluate(readStrap, { path: FIRST_PATH, at: 'end' as const })
+  // Posée sur la carte levée, la copie a du chemin à faire jusqu'à la carte au repos.
+  expect(Math.abs(end.box.top - flying.box.top)).toBeGreaterThan(1)
+  expectSameBox(start.box, flying.box)
+  expectSameBox(end.box, end.card.box)
+  for (const [index, { transform }] of start.bands.entries()) {
+    expectSlid(transform, flying.bands[index].transform, 0)
+    expectSlid(end.bands[index].transform, end.card.bands[index].transform, 0)
+  }
+})
+
 /** Les images du cadre de la galerie, en vol ou posé. */
 const frameImages = (page: Page) => panel(page).locator('.project-gallery-frame img')
 
@@ -598,7 +919,8 @@ test('un projet en cours : sa photo vole en couleur, à l’aller comme au retou
   const resume = await openFrozen(page, FIRST_PATH)
 
   await expectColorFrame(page)
-  await expect(panel(page).locator('.card-strap')).toHaveCount(0)
+  // Sa seule sangle est la copie de celle de la carte.
+  await expect(panel(page).locator('.card-strap:not([data-strap-flyer])')).toHaveCount(0)
   await resume()
   await settle(page)
   const resumeReturn = await freezeAnimations(page)
@@ -859,7 +1181,7 @@ test('à la fermeture, le contenu s’efface en `--dur-fast`, puis la feuille, l
   expect(flights.length).toBeGreaterThan(3)
   for (const flight of flights) {
     expect(flight.count).toBe(1)
-    expectSameBox(flight.end, flight.homologue)
+    expectOnHomologue(flight.end, flight)
     expect(flight.duration).toBe(open)
     expect(flight.easing).toBe(easing)
     expect(flight.delay).toBe(flight.rank * ribbon)
@@ -905,10 +1227,10 @@ test('à la fermeture, les autres cartes reviennent à leur place en réapparais
 
 /*
  * Ce que tient le remplissage (`fill`) de chaque animation de `useChoreography`, dénombré dans sa
- * source le 2026-11-03, puis deux fois le 2026-11-09 (#255) : onze animations, une par sens de
- * chaque mouvement.
+ * source le 2026-11-03, puis deux fois le 2026-11-09 (#255), puis le 2026-11-10 : quatorze
+ * animations, une par sens de chaque mouvement, les deux bandes de la sangle n'en faisant qu'un.
  *
- * - tiennent quelque chose, neuf : le vol à l'aller (`backwards`, la copie d'un ruban qui attend son
+ * - tiennent quelque chose, onze : le vol à l'aller (`backwards`, la copie d'un ruban qui attend son
  *   retard reste sur son homologue : test « … partent de leur homologue », lu au temps 0) ; le vol
  *   au retour (`both` : sur la carte jusqu'au retrait, et, pendant son retard, là où le ruban était :
  *   test « … en plein vol … », lu au temps 0) ; le ruban caché tant que sa copie vole, à l'aller
@@ -917,13 +1239,17 @@ test('à la fermeture, les autres cartes reviennent à leur place en réapparais
  *   retrait) ; l'effacement des cartes à l'aller (`forwards`, tant que la fiche est ouverte) ;
  *   l'apparition du contenu (`backwards`, caché jusqu'à la pose : test « à la pose, le contenu
  *   monte… », lu au temps 0) ; son effacement (`forwards`) ; en mouvement réduit, l'effacement des
- *   enfants du panneau puis du panneau (`forwards`, jusqu'au retrait) ;
- * - ne tiennent rien, leur fin étant leur repos, deux : le retour des cartes, l'apparition du
- *   panneau en mouvement réduit.
+ *   enfants du panneau puis du panneau (`forwards`, jusqu'au retrait) ; le glissement des bandes de
+ *   la copie de la sangle à l'aller (`forwards` : hors de leurs boîtes tant que la fiche est posée,
+ *   d'où part le retour : test « à la fermeture, les bandes de la copie… », lu au temps 0) et au
+ *   retour (`both` : sur la carte jusqu'au retrait, même test, lu à la fin) ;
+ * - ne tiennent rien, leur fin étant leur repos, trois : le retour des cartes, l'apparition du
+ *   panneau en mouvement réduit, la boîte de la copie de la sangle qui suit la carte au retour.
  *
- * Les six qui tiennent jusqu'au retrait ou tant que la fiche est ouverte sont épinglés ici ; chacun
- * des neuf rougit son test quand son remplissage est retiré (mutations du 2026-11-03 ; du 2026-11-09
- * pour les deux du ruban caché).
+ * Les six qui tiennent jusqu'au retrait ou tant que la fiche est ouverte sont épinglés ici, les deux
+ * de la sangle par leur test ; chacun des onze rougit son test quand son remplissage est retiré
+ * (mutations du 2026-11-03 ; du 2026-11-09 pour les deux du ruban caché ; du 2026-11-10 pour les
+ * deux de la sangle).
  */
 
 /** Dans la page : la couche d'entrée des cartes autres que `opened`, dans l'écran ou non, et sa pose. */
@@ -950,10 +1276,10 @@ test('au bout du retour, jusqu’au retrait du panneau, la feuille, la photo, le
   }
   const held = await page.evaluate(readFlights, { path: FIRST_PATH, finish: true })
   expect(held.length).toBeGreaterThan(3)
-  for (const { now, homologue, opacity } of held) {
-    expectSameBox(now, homologue)
+  for (const flight of held) {
+    expectOnHomologue(flight.now, flight)
     // Vus entiers sur la carte : aucun de leurs ancêtres ne s'est effacé avec le contenu.
-    expect(opacity).toBe(1)
+    expect(flight.opacity).toBe(1)
   }
   // Chaque ruban de la fiche, que sa copie a remplacé, reste caché.
   expect(ribbonFlights(held).map(({ seen }) => seen)).toEqual(['hidden', 'hidden', 'hidden'])
@@ -1077,7 +1403,7 @@ for (const [name, close] of INTERRUPTIONS) {
       expect(flight.count).toBe(1)
       expectSameBox(flight.now, flying[index].now)
       expectSameBox(flight.start, flying[index].now)
-      expectSameBox(flight.end, flight.homologue)
+      expectOnHomologue(flight.end, flight)
       expect(flight).toMatchObject({ duration: open, easing })
     }
     expect(await page.evaluate(readEntries, FIRST_PATH)).toEqual(receding)
@@ -1123,7 +1449,7 @@ test('levée par le focus, fermée en plein vol : chaque élément revient sur l
 
   const returning = await page.evaluate(readFlights, { path: FIRST_PATH })
   expect(returning.length).toBeGreaterThan(3)
-  for (const { end, homologue } of returning) expectSameBox(end, homologue)
+  for (const flight of returning) expectOnHomologue(flight.end, flight)
 })
 
 /*
@@ -1224,7 +1550,7 @@ test('un clic hors du panneau sur une autre carte ramène la fiche à la sienne,
   await expect(card).toBeFocused()
 })
 
-test('sa carte d’origine sortie du document, la fiche se retire sans laisser une copie volante', async ({
+test('sa carte d’origine sortie du document, la fiche se retire sans laisser une copie volante, de ruban ni de sangle', async ({
   page,
 }) => {
   await openEnteredTable(page, PROJECTS)
@@ -1238,7 +1564,7 @@ test('sa carte d’origine sortie du document, la fiche se retire sans laisser u
   // Abandonnée, la fiche part par son fondu de sortie, figé : le panneau est encore là.
   const fiche = page.locator('.project-panel')
   await expect(fiche).toHaveAttribute('data-state', 'closed')
-  await expect(fiche.locator('[data-flyer]')).toHaveCount(0)
+  await expect(fiche.locator('[data-flyer], [data-strap-flyer]')).toHaveCount(0)
   await resume()
   await expectClosed(page)
 })

@@ -229,18 +229,18 @@
     }
   }
 
-  /* La sangle de chantier d'un projet en cours (spec §4.1) : au-dessus de la photo et sous la bande,
-     par l'ordre du document ; sous le trombone et le post-it, par leur `z-index`. Isolée, rien de ce
-     qu'elle empile ne s'en échappe ; décorative, elle ne prend aucun pointeur. Au repos, tendue du
-     bord gauche de la face, au bas de la photo, à son bord droit, au haut de la photo ; au coin
-     haut-gauche, amincie, sur une intention, où le bandeau se révèle. Deux boîtes la coupent : la face
-     et `--strap-overhang` autour, où ne se voit que sa tranche, le retour de la sangle derrière la
-     carte ; puis, par-dessus, la face seule, ses rayures. Chacune porte la même bande — `::before`,
-     et `::after` au coin en mouvement réduit —, dont les longueurs suivent la première boîte, leur
-     conteneur. */
+  /* La sangle de chantier d'un projet en cours (spec §4.1) : par-dessus tout ce que porte la face —
+     la photo, le trombone et le post-it, et la bande, qu'elle ne croise pas —, par son `z-index`, au-
+     dessus de celui du trombone, qui l'isole : rien de ce qu'elle empile ne s'en échappe. Décorative,
+     elle ne prend aucun pointeur. Au repos, tendue du bord gauche de la face, au bas de la photo, à
+     son bord droit, au haut de la photo ; au coin haut-gauche, amincie, sur une intention, où le
+     bandeau se révèle. Deux boîtes la coupent : la face et `--strap-overhang` autour, où ne se voit
+     que sa tranche, le retour de la sangle derrière la carte ; puis, par-dessus, la face seule, ses
+     rayures. Chacune porte la même bande — `::before`, et `::after` au coin en mouvement réduit —,
+     dont les longueurs suivent la première boîte, leur conteneur. */
   .card-strap {
     --strap-overhang: 3px;
-    --strap-width: 8cqw;
+    --strap-width: 10cqw;
     /* La largeur de la face, et le côté de sa photo carrée, dans le cadre. */
     --strap-face: calc(100cqw - 2 * var(--strap-overhang));
     --strap-photo: calc(var(--strap-face) - 2 * var(--card-frame));
@@ -265,7 +265,7 @@
     --strap-cornered: 0;
     position: absolute;
     inset: calc(-1 * var(--strap-overhang));
-    isolation: isolate;
+    z-index: 4;
     overflow: hidden;
     pointer-events: none;
     container-type: size;
@@ -402,6 +402,12 @@
     height: calc(var(--height) - 2 * var(--s-1));
   }
 
+  /* Le nom d'une technologie, entier, sauf sur la copie volante d'un ruban de la fiche roulée vers
+     celui de la carte, qui l'efface (§4.6, `useChoreography`). */
+  .card-ribbon-name {
+    opacity: var(--card-ribbon-name);
+  }
+
   /* Le point d'un ruban d'état (spec §4.1), fixe : rien ne l'anime. */
   .card-dot {
     width: 6px;
@@ -506,9 +512,9 @@
   }
 
   /* La carte d'où la fiche s'envole (§4.6), que `useChoreography` marque jusqu'à son retour : sa
-     photo, son post-it, sa bande, son papier et ses ombres disparaissent d'un coup, et sa sangle
-     avec son cadre, que la fiche ne porte pas ; sa pose revient à 0° et son trombone monte en
-     s'effaçant. Sa levée, que le panneau lui retire en prenant focus et pointeur, tombe d'un coup :
+     photo, son post-it, sa bande, son papier et ses ombres disparaissent d'un coup, et sa sangle,
+     que la fiche ne porte pas, passe à sa copie volante ; sa pose revient à 0° et son trombone monte
+     en s'effaçant. Sa levée, que le panneau lui retire en prenant focus et pointeur, tombe d'un coup :
      le retour se mesure sur la carte au repos.
      Après les états d'intention, qu'elle remplace. Photo, post-it, bande, sangle, papier, ombre au
      repos et trombone reviennent d'un coup : hors de ce bloc, aucun ne transite. */
@@ -541,4 +547,12 @@
         translate var(--dur-content) var(--ease-out);
     }
   }
+}
+
+/* L'opacité du nom d'une technologie (`.card-ribbon-name`), héritée de son ruban : enregistrée, elle
+   s'interpole pendant le vol de la copie, que la copie fait passer de 1 à 0 et retour. */
+@property --card-ribbon-name {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
 }

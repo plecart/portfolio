@@ -60,21 +60,45 @@ export function pivotIn({ a, b, c, d }: Linear, width: number, height: number, o
 }
 
 /**
- * L'image clé qui pose un élément sur son homologue (spec §4.6) : une translation, puis une échelle
- * non uniforme autour de son pivot, par les propriétés `translate` et `scale`, qui s'ajoutent à sa
- * propre transformation sans la remplacer. L'interpolation de l'une et de l'autre fait le même
- * trajet quel que soit le pivot : le haut gauche de la spec n'en est qu'un.
+ * L'image clé qui pose le haut gauche d'un élément sur celui de son homologue (spec §4.6) : une
+ * translation, puis une échelle autour de son pivot, par les propriétés `translate` et `scale`, qui
+ * s'ajoutent à sa propre transformation sans la remplacer. L'interpolation de l'une et de l'autre
+ * fait le même trajet quel que soit le pivot : le haut gauche de la spec n'en est qu'un.
  *
  * @param from La boîte de l'homologue, sur la carte.
  * @param to La boîte de l'élément au repos.
  * @param pivot Son pivot dans cette boîte (`pivotIn`).
+ * @param sx Son échelle horizontale ; `sy`, la verticale.
  */
-export function flightStart(from: Box, to: Box, pivot: Point): Frame {
-  const sx = from.width / to.width
-  const sy = from.height / to.height
+function landing(from: Box, to: Box, pivot: Point, sx: number, sy: number): Frame {
   const x = from.left - to.left + (sx - 1) * pivot.x
   const y = from.top - to.top + (sy - 1) * pivot.y
   return { translate: `${x}px ${y}px`, scale: `${sx} ${sy}` }
+}
+
+/**
+ * L'image clé qui pose un élément exactement sur son homologue (`landing`) : une échelle non
+ * uniforme, chaque axe au rapport du sien — la feuille, la photo, le post-it.
+ */
+export const flightStart = (from: Box, to: Box, pivot: Point): Frame =>
+  landing(from, to, pivot, from.width / to.width, from.height / to.height)
+
+/**
+ * L'image clé qui pose la copie d'un ruban, roulée à la largeur de son homologue avant la mesure de
+ * `to`, sur ce ruban de la carte (`landing`) : une échelle uniforme, qui n'écrase ni son icône ni son
+ * texte, et leurs centres confondus. Le centre d'une boîte tournée est celui de sa boîte englobante :
+ * celles de la copie et du ruban ne diffèrent que de leurs inclinaisons.
+ *
+ * @param scale L'échelle, le rapport de leurs hauteurs de mise en page, que l'inclinaison ne fausse
+ *   pas.
+ */
+export function rolledStart(from: Box, to: Box, pivot: Point, scale: number): Frame {
+  const centered = {
+    ...from,
+    left: from.left + (from.width - scale * to.width) / 2,
+    top: from.top + (from.height - scale * to.height) / 2,
+  }
+  return landing(centered, to, pivot, scale, scale)
 }
 
 /**

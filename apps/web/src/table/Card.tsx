@@ -83,9 +83,10 @@ function Strap() {
 }
 
 /**
- * Un ruban de technologie (spec §4.1) : son icône, son nom en texte masqué et en infobulle native.
- * Son nom est aussi son identité (`data-ribbon`) : le ruban de la carte vole vers celui de la fiche
- * qui porte la même (`useChoreography`).
+ * Un ruban de technologie (spec §4.1) : son icône, son nom (`card-ribbon-name`) en texte masqué et en
+ * infobulle native. Son nom est aussi son identité (`data-ribbon`) : le ruban de la carte vole vers
+ * celui de la fiche qui porte la même, et la copie de celui-ci efface le sien en se roulant à la
+ * largeur du premier (`useChoreography`).
  *
  * @param technology La technologie.
  * @param labelled Son nom en clair, sans infobulle : la stack de la fiche (§4.3).
@@ -100,7 +101,7 @@ export function TechnologyRibbon({
   return (
     <li className="card-ribbon" data-ribbon={name} title={labelled ? undefined : name}>
       <CardImage src={icon} />
-      <span className={labelled ? undefined : 'sr-only'}>{name}</span>
+      <span className={labelled ? 'card-ribbon-name' : 'card-ribbon-name sr-only'}>{name}</span>
     </li>
   )
 }
