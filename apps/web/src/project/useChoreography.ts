@@ -138,7 +138,9 @@ function rollOf(ribbon: HTMLElement) {
  * largeur et à sa marge en ligne, son nom effacé, sous une échelle uniforme, le rapport de leurs
  * hauteurs (`rolledStart`). La translation se mesure sur la copie à cette largeur, que la mesure lui
  * rend aussitôt : le bout carte tombe sur le ruban de la carte, et ce qui dépasse de la copie est
- * coupé (`project.css`). La levée de la carte est ignorée, comme sa pose.
+ * coupé (`project.css`). Centrée sur le ruban tel qu'il est à l'écran, elle ne prend ni l'échelle de
+ * la levée de la carte, ses mesures étant de mise en page, ni l'inclinaison de sa pose, gardant celle
+ * de son ruban (`flyerOf`).
  */
 function rolledOn(flyer: HTMLElement, homologue: HTMLElement): Frame {
   const roll = rollOf(homologue)
@@ -194,11 +196,13 @@ const STRAP_STATE = ['--card-frame', '--strap-cornered']
 
 /**
  * La copie volante de la sangle d'une carte (spec §4.6), `aria-hidden` comme elle : fixe, dans le
- * panneau, au-dessus de la feuille et de la photo volante par son `z-index` (`card.css`). Posée sur
- * la sangle telle qu'elle est à l'instant — sa boîte (`place`), sa taille, l'état qu'elle tient de sa
- * carte — avant d'entrer dans le document, elle y entre d'emblée dans cet état. La pose de la carte
- * est ignorée, comme pour la photo, dont le départ est une boîte englobante non tournée. Hors de son
- * vol, ôtée de sa boîte et cachée (`project.css`).
+ * panneau, au-dessus de la feuille et de la photo volante par sa place, la dernière du panneau, comme
+ * par son `z-index` (`card.css`) — chacun y suffit. Posée sur la sangle telle qu'elle est à l'instant
+ * — centrée sur sa boîte (`place`), à sa taille de mise en page, dans l'état qu'elle tient de sa
+ * carte — avant d'entrer dans le document, elle y entre d'emblée dans cet état. Elle ne prend donc ni
+ * l'inclinaison de la pose de la carte ni l'échelle de sa levée : plus petite de 2 % qu'une sangle
+ * levée (`--card-lift-scale`), quand la photo part de sa boîte englobante, non tournée mais levée.
+ * Hors de son vol, ôtée de sa boîte et cachée (`project.css`).
  */
 function strapFlyerOf(strap: HTMLElement, panel: HTMLElement): HTMLElement {
   const flyer = strap.cloneNode(true) as HTMLElement
