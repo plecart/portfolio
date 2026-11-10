@@ -257,14 +257,16 @@
     /* Au coin : la part de son épaisseur qui reste, et la distance de son axe au coin. */
     --strap-thin: 0.5;
     --strap-inset: 8cqw;
+    /* Son échelle : 1 au repos, `--strap-thin` au coin. */
+    --strap-scale: calc(1 - var(--strap-cornered) * (1 - var(--strap-thin)));
     /* La distance de son centre au coin haut-gauche de la boîte, perpendiculairement à la bande : à
        50cqw du haut et de la gauche, il en est à 50cqw × (sin(angle) + cos(angle)) sur cet axe. */
     --strap-corner: calc(50cqw * (sin(var(--strap-angle)) + cos(var(--strap-angle))));
-    /* Les courses, perpendiculaires à la bande, vers ce coin : jusqu'au coin, son axe à
-       `--strap-inset` de lui ; hors de la boîte, son bord le plus proche passé ce coin, le point de
-       la boîte le plus avancé sur cet axe. */
+    /* Les places de son axe, perpendiculairement à la bande, depuis le centre vers ce coin : au coin,
+       à `--strap-inset` de lui ; hors de la boîte, son bord le plus proche juste passé ce coin, le
+       point de la boîte le plus avancé sur cet axe — à son épaisseur, mince au coin. */
     --strap-reach: calc(var(--strap-inset) - var(--strap-corner));
-    --strap-clear: calc(-1 * (var(--strap-corner) + var(--strap-width) / 2));
+    --strap-clear: calc(-1 * (var(--strap-corner) + var(--strap-scale) * var(--strap-width) / 2));
     /* 1 sur une intention, 0 sinon. */
     --strap-cornered: 0;
     /* 1 ôtée de sa carte, d'où la fiche s'envole, 0 sinon. */
@@ -333,14 +335,18 @@
     }
   }
 
-  /* Elle glisse le long de sa diagonale jusqu'au coin, et en revient ; ôtée, hors de ses boîtes,
-     au-delà du coin, au coin ou non. */
+  /* Elle glisse le long de sa diagonale jusqu'au coin, et en revient ; ôtée, juste hors de ses
+     boîtes au-delà du coin, à son épaisseur : d'où qu'elle parte, elle n'en sort qu'au bout de sa
+     course. */
   @media (prefers-reduced-motion: no-preference) {
     :is(.card-strap, .card-strap-stripes)::before {
       transform: translateY(
-          calc(var(--strap-cornered) * var(--strap-reach) + var(--strap-off) * var(--strap-clear))
+          calc(
+            (1 - var(--strap-off)) * var(--strap-cornered) * var(--strap-reach) +
+              var(--strap-off) * var(--strap-clear)
+          )
         )
-        scale(calc(1 - var(--strap-cornered) * (1 - var(--strap-thin))));
+        scale(var(--strap-scale));
       transition: transform var(--dur-strap) var(--ease-out);
     }
   }
