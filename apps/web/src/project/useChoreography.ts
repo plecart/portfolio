@@ -354,7 +354,7 @@ function around(root: Element, kept: readonly Element[]): Element[] {
 /**
  * La couverture de la carte au retour (spec §4.6) : quand la galerie montre une autre image que la
  * première, une copie de la première, posée sur l'image montrée, y apparaît en fondu pendant le vol,
- * et part avec le panneau. Annulée, elle disparaît.
+ * et part avec le panneau.
  *
  * @returns Son fondu ; aucun quand la galerie montre la première image, ou n'en a pas.
  */
@@ -369,9 +369,7 @@ function fadeCover(panel: HTMLElement, { open, easing }: Motion) {
   cover.ariaHidden = 'true'
   cover.style.left = `${current * 100}%`
   images[current].after(cover)
-  const fade = cover.animate([HIDDEN, SHOWN], { duration: open, easing })
-  fade.addEventListener('cancel', () => cover.remove())
-  return [fade]
+  return [cover.animate([HIDDEN, SHOWN], { duration: open, easing })]
 }
 
 /**
