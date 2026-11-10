@@ -26,9 +26,9 @@ export type CardSize = 'simple' | 'showcase' | 'solo'
  * production, pour que les cadres annoncent la table qui les remplace : une PR de la voie courte de
  * `cycle-pr` le met à jour après chaque fiche publiée. Un écart ne casse rien — une finition,
  * jamais une condition de publication : ajouter un projet ne demande jamais de toucher au code
- * (cadrage §1). 1 tant que la première fiche (#27) n'est pas publiée.
+ * (cadrage §1).
  */
-export const LOADING_FRAME_COUNT = 1
+export const LOADING_FRAME_COUNT = 3
 
 /** Les types de technologie qu'une carte montre (spec §1.4) : les outils restent sur la fiche. */
 const CARD_KINDS: readonly Technology['kind'][] = ['language', 'framework', 'infrastructure']
