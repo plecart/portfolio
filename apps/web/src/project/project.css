@@ -359,11 +359,10 @@
     visibility: hidden;
   }
 
-  /* Les bandes de la copie de la sangle ne bougent que par ses glissements : l'état qu'elle reprend
-     de sa carte en se posant ne part pas en transition, que son retour lirait comme son arrivée. */
-  .card-strap[data-strap-flyer]::before,
-  .card-strap[data-strap-flyer] .card-strap-stripes::before {
-    transition: none;
+  /* Hors de son vol, la copie de la sangle se tient ôtée de sa boîte (`card.css`), où son vol la
+     mène (`useChoreography`). */
+  .card-strap[data-strap-flyer] {
+    --strap-off: 1;
   }
 
   /* Ce qui défile (§4.3) : la colonne au bureau, le panneau sur téléphone. Un mot trop long pour la

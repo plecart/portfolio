@@ -45,16 +45,6 @@ const BAND = '::before'
 const STRAP_FLYER = '[data-strap-flyer]'
 
 /**
- * Une bande de la sangle à sa place, puis glissée de toute sa longueur le long de son axe, vers le
- * haut droit : une translation en tête de sa transformation, que sa rotation oriente et que l'échelle
- * du coin ne réduit pas. Sa queue passe alors à 75cqw au moins au-delà du centre de la photo sur cet
- * axe, et sa boîte n'en dépasse jamais 50√2cqw, soit 70,7cqw (`card.css`) : elle en sort entière, au
- * repos comme au coin.
- */
-const BAND_IN = 'translateX(0%)'
-const BAND_OUT = 'translateX(100%)'
-
-/**
  * Le reste de la fiche hors de la colonne défilante, qui apparaît à la pose et s'efface le premier
  * (spec §4.6) ; la colonne, `COLUMN`, en fait autant autour des rubans visés (`contentOf`).
  */
@@ -197,33 +187,28 @@ function place(flyer: HTMLElement, original: HTMLElement) {
 }
 
 /**
- * La copie volante de la sangle d'une carte (spec §4.6), `aria-hidden` comme elle : fixe, dans le
- * panneau, au-dessus de la feuille et de la photo volante par son `z-index` (`card.css`). Cachée hors
- * de ses vols (`project.css`), qui montrent ses bandes.
- */
-function strapFlyerOf(strap: HTMLElement, panel: HTMLElement): HTMLElement {
-  const flyer = strap.cloneNode(true) as HTMLElement
-  flyer.dataset.strapFlyer = ''
-  panel.append(flyer)
-  return flyer
-}
-
-/**
  * Ce que la copie de la sangle tient de sa carte, hors de laquelle elle vole : son cadre, d'où vient
  * son angle, et sa place au coin sur une intention (`card.css`).
  */
 const STRAP_STATE = ['--card-frame', '--strap-cornered']
 
 /**
- * Pose la copie de la sangle sur la sangle de la carte, telle qu'elle est à l'instant : sa boîte
- * (`place`), sa taille, et l'état qu'elle tient de sa carte. La pose de la carte est ignorée, comme
- * pour la photo, dont le départ est une boîte englobante non tournée.
+ * La copie volante de la sangle d'une carte (spec §4.6), `aria-hidden` comme elle : fixe, dans le
+ * panneau, au-dessus de la feuille et de la photo volante par son `z-index` (`card.css`). Posée sur
+ * la sangle telle qu'elle est à l'instant — sa boîte (`place`), sa taille, l'état qu'elle tient de sa
+ * carte — avant d'entrer dans le document, elle y entre d'emblée dans cet état. La pose de la carte
+ * est ignorée, comme pour la photo, dont le départ est une boîte englobante non tournée. Hors de son
+ * vol, ôtée de sa boîte et cachée (`project.css`).
  */
-function placeStrap(flyer: HTMLElement, strap: HTMLElement) {
+function strapFlyerOf(strap: HTMLElement, panel: HTMLElement): HTMLElement {
+  const flyer = strap.cloneNode(true) as HTMLElement
+  flyer.dataset.strapFlyer = ''
   place(flyer, strap)
   const style = getComputedStyle(strap)
   Object.assign(flyer.style, { width: style.width, height: style.height })
   for (const name of STRAP_STATE) flyer.style.setProperty(name, style.getPropertyValue(name))
+  panel.append(flyer)
+  return flyer
 }
 
 /** La transformation que montre à l'instant la bande d'une boîte de la sangle, carte ou copie. */
@@ -400,48 +385,27 @@ function hideContent(elements: Element[], reveals: Animation[], { fast, easing }
 }
 
 /**
- * La sangle arrachée puis remise (spec §4.6) : sa copie volante (`strapFlyerOf`) prend sa place sur
- * la carte, et ses deux bandes, la tranche et les rayures, glissent ensemble le long de leur axe hors
- * de leurs boîtes (`BAND_OUT`), en `--dur-open`, sans retard, puis restent dehors tant que la fiche
- * est posée. Au retour, elles reviennent sur la sangle de la carte, remesurée ; la boîte de la copie l'y
- * suit, d'où elle était : la carte a pu perdre sa levée entre-temps. Le départ est la bande de la
- * carte à l'instant, transition comprise ; l'arrivée, la sangle telle que la carte la montrera, à sa
- * place au coin ou non. Le retour part de ce que montre la copie (`relay`) : une fermeture en plein
- * vol repart sans saut.
+ * La sangle ôtée de sa carte (spec §4.6). Sa copie volante (`strapFlyerOf`) prend la bande que la
+ * carte montre à l'instant, transition comprise, avant de l'ôter (`data-origin`, `card.css`) ; à
+ * l'ouverture, ses deux bandes, la tranche et les rayures, glissent ensemble perpendiculairement à
+ * leur axe, vers le coin haut-gauche, jusqu'à quitter leur boîte, où la copie se tient ôtée
+ * (`project.css`), en `--dur-open`, sans retard. Au retour, en plein vol comme posée, la copie est
+ * retirée : la carte réapparue fait glisser sa propre sangle en place.
  */
 function strapTrip(panel: HTMLElement, strap: HTMLElement, { open, easing }: Motion) {
+  const start = bandOf(strap)
   const flyer = strapFlyerOf(strap, panel)
-  const bands = [flyer, flyer.querySelector(STRIPES)!]
-  const timing = { duration: open, easing }
-  const slide = (from: string, to: string, fill: FillMode) =>
-    bands.map((box) =>
-      box.animate([{ ...SEEN, transform: from }, { ...SEEN, transform: to }], {
-        ...timing,
-        fill,
-        pseudoElement: BAND,
-      }),
-    )
-  let slides: Animation[] = []
   return {
     out: () => {
-      placeStrap(flyer, strap)
-      const rest = bandOf(strap)
-      slides = slide(`${BAND_IN} ${rest}`, `${BAND_OUT} ${rest}`, 'forwards')
-      return slides
+      const keyframes = [
+        { ...SEEN, transform: start },
+        { ...SEEN, transform: bandOf(flyer) },
+      ]
+      return [flyer, flyer.querySelector(STRIPES)!].map((box) =>
+        box.animate(keyframes, { duration: open, easing, pseudoElement: BAND }),
+      )
     },
-    back: () =>
-      relay(slides, [{ transform: bandOf(flyer) }], ([{ transform }]) => {
-        const from = flyer.getBoundingClientRect()
-        placeStrap(flyer, strap)
-        const to = flyer.getBoundingClientRect()
-        return [
-          flyer.animate(
-            [{ translate: `${from.left - to.left}px ${from.top - to.top}px` }, { translate: NO_SHIFT }],
-            timing,
-          ),
-          ...slide(String(transform), bandOf(flyer), 'both'),
-        ]
-      }),
+    back: () => flyer.remove(),
   }
 }
 
@@ -450,8 +414,8 @@ function strapTrip(panel: HTMLElement, strap: HTMLElement, { open, easing }: Mot
  * et la photo, le post-it et les rubans posés sur leurs homologues ; la carte se cache d'un coup, sa
  * sangle passant à sa copie (`strapTrip`), et tout part ensemble, la feuille en tête. Au retour, le
  * contenu s'efface ; puis le panneau redevient transparent sur sa feuille, et tout repart vers la
- * carte, mesurée de nouveau. Chaque ruban part de sa place à l'instant, défilée hors de vue ou non :
- * aucun test de visibilité.
+ * carte, mesurée de nouveau, sauf la sangle, que la carte remet elle-même. Chaque ruban part de sa
+ * place à l'instant, défilée hors de vue ou non : aucun test de visibilité.
  */
 function flying(panel: HTMLElement, card: HTMLElement, motion: Motion): Steps {
   const route = legs(panel, card, motion)
@@ -479,14 +443,14 @@ function flying(panel: HTMLElement, card: HTMLElement, motion: Motion): Steps {
     clear: () => hideContent(contentOf(panel, kept), reveals, motion),
     back: () => {
       panel.setAttribute('data-flight', '')
+      strapFlight?.back()
       placeFlyers()
-      const flights = relay(
+      return relay(
         outbound,
         route.map(({ element, ribbon }) => shown(element, ribbon ? RIBBON_FLIGHT : FLIGHT)),
         (froms) =>
           route.flatMap((leg, index) => fly(leg, froms[index], cardEnd(leg), motion, 'both')),
       )
-      return [...flights, ...(strapFlight?.back() ?? [])]
     },
   }
 }
@@ -574,8 +538,8 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
    * Le retour à la carte (spec §4.6, §6.3) : ce qui s'efface d'abord, puis le reste, pendant que les
    * cartes de la table reviennent. Une fermeture en plein vol repart de là où est chaque élément, et
    * n'attend pas le contenu, qui n'est pas apparu (décision de #22). Au bout du dernier, la carte
-   * réapparaît d'un coup sous la photo et la sangle posées. Une carte sortie du document n'a plus de
-   * place où revenir : la fiche se retire alors par le fondu de sortie.
+   * réapparaît d'un coup sous la photo posée, et sa sangle y glisse en place (`card.css`). Une carte
+   * sortie du document n'a plus de place où revenir : la fiche se retire alors par le fondu de sortie.
    */
   const comeHome = async () => {
     if (!card.isConnected) {
