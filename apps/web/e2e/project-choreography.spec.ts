@@ -400,36 +400,37 @@ test('chaque ruban vole roulé : au bout carte, sa copie a la largeur et la marg
   page,
 }) => {
   await openEnteredTable(page, [ficheProject(RIBBONED_FIELDS)])
+  const rolls = (at: number) => page.evaluate(readRolls, { path: FICHE_PATH, at })
   const resume = await openFrozen(page, FICHE_PATH)
-  const opening = await page.evaluate(readRolls, { path: FICHE_PATH, at: 0 })
+  const opening = [await rolls(0), await rolls(0.5), await rolls(1)]
   await resume()
   await settle(page)
   await freezeAnimations(page)
   await page.keyboard.press('Escape')
   await finishAnimations(page)
-  const leaving = await page.evaluate(readRolls, { path: FICHE_PATH, at: 0 })
-  const halfway = await page.evaluate(readRolls, { path: FICHE_PATH, at: 0.5 })
-  const landing = await page.evaluate(readRolls, { path: FICHE_PATH, at: 1 })
+  const closing = [await rolls(1), await rolls(0.5), await rolls(0)]
 
-  expect(opening).toHaveLength(RIBBON_PLACES.length)
-  for (const { name, scale, width, padding, label, homologue } of [...opening, ...landing]) {
-    const [sx, sy] = scale
-    expect(sy, name).toBe(sx)
-    expect({ width, padding }, name).toEqual(homologue)
-    expect(label, name).toBe(NAMED.includes(name) ? '0' : null)
-  }
-  for (const { name, width, padding, label, ribbon } of leaving) {
-    expect({ width, padding }, name).toEqual(ribbon)
-    expect(label, name).toBe(NAMED.includes(name) ? '1' : null)
-  }
-  // Le nom s'interpole (`card.css`, sa propriété enregistrée), la largeur avec lui.
-  const named = halfway.filter(({ label }) => label)
-  expect(named).toHaveLength(NAMED.length)
-  for (const { name, width, label, homologue, ribbon } of named) {
-    expect(Number(label), name).toBeGreaterThan(0)
-    expect(Number(label), name).toBeLessThan(1)
-    expect(width, name).toBeGreaterThan(homologue.width)
-    expect(width, name).toBeLessThan(ribbon.width)
+  // Chaque vol, du bout carte au bout fiche.
+  for (const [onCard, halfway, onFiche] of [opening, closing]) {
+    expect(onCard).toHaveLength(RIBBON_PLACES.length)
+    for (const { name, scale: [sx, sy], width, padding, label, homologue } of onCard) {
+      expect(sy, name).toBe(sx)
+      expect({ width, padding }, name).toEqual(homologue)
+      expect(label, name).toBe(NAMED.includes(name) ? '0' : null)
+    }
+    for (const { name, width, padding, label, ribbon } of onFiche) {
+      expect({ width, padding }, name).toEqual(ribbon)
+      expect(label, name).toBe(NAMED.includes(name) ? '1' : null)
+    }
+    // Le nom s'interpole (`card.css`, sa propriété enregistrée), la largeur avec lui.
+    const named = halfway.filter(({ label }) => label)
+    expect(named).toHaveLength(NAMED.length)
+    for (const { name, width, label, homologue, ribbon } of named) {
+      expect(Number(label), name).toBeGreaterThan(0)
+      expect(Number(label), name).toBeLessThan(1)
+      expect(width, name).toBeGreaterThan(homologue.width)
+      expect(width, name).toBeLessThan(ribbon.width)
+    }
   }
 })
 
@@ -625,7 +626,7 @@ test('les rubans passent par 35 % d’opacité entre 30 % et 70 % du trajet', as
   ])
 })
 
-test('la carte se cache d’un coup, sa sangle passant à sa copie, sauf son trombone, qui monte de 14 px en s’effaçant, et sa pose revient à 0°', async ({
+test('la carte se cache d’un coup, sauf son trombone, qui monte de 14 px en s’effaçant, et sa pose revient à 0°', async ({
   page,
 }) => {
   await openEnteredTable(page, PROJECTS)
@@ -733,9 +734,6 @@ function readStrap({ path, at }: { path: string; at?: number | 'end' }) {
   return { copy, card }
 }
 
-/** Une sangle lue par `readStrap` : sa largeur de mise en page et ses bandes. */
-type StrapReading = { width: number; bands: { transform: string; rotate: string; thickness: number }[] }
-
 /** Les six nombres d'une transformation calculée, `matrix(a, b, c, d, e, f)`. */
 const matrixOf = (transform: string) => transform.slice('matrix('.length, -1).split(',').map(Number)
 
@@ -756,7 +754,7 @@ function expectSlid(transform: string, rest: string, shift: number) {
  * haut-gauche, négative : de son centre, celui de la photo, au coin, la moitié de la largeur de la
  * boîte × (sin + cos) de son angle sur cet axe, plus la moitié de son épaisseur.
  */
-function clearOf({ width, bands: [{ rotate, thickness }] }: StrapReading) {
+function clearOf({ width, bands: [{ rotate, thickness }] }: ReturnType<typeof readStrap>['card']) {
   const angle = (-parseFloat(rotate) * Math.PI) / 180
   return -((width / 2) * (Math.sin(angle) + Math.cos(angle)) + thickness / 2)
 }
@@ -1231,11 +1229,10 @@ test('à la fermeture, les autres cartes reviennent à leur place en réapparais
 })
 
 /*
- * Ce que tient le remplissage (`fill`) de chaque animation de `useChoreography`, dénombré dans sa
- * source le 2026-11-03, deux fois le 2026-11-09 (#255), puis deux fois le 2026-11-10 : douze
- * animations, une par sens de chaque mouvement, les deux bandes de la sangle n'en faisant qu'un.
+ * Ce que tient le remplissage (`fill`) de chaque animation de `useChoreography`, une par sens de
+ * chaque mouvement, les deux bandes de la sangle n'en faisant qu'une.
  *
- * - tiennent quelque chose, neuf : le vol à l'aller (`backwards`, la copie d'un ruban qui attend son
+ * - tiennent quelque chose : le vol à l'aller (`backwards`, la copie d'un ruban qui attend son
  *   retard reste sur son homologue : test « … partent de leur homologue », lu au temps 0) ; le vol
  *   au retour (`both` : sur la carte jusqu'au retrait, et, pendant son retard, là où le ruban était :
  *   test « … en plein vol … », lu au temps 0) ; le ruban caché tant que sa copie vole, à l'aller
@@ -1245,13 +1242,12 @@ test('à la fermeture, les autres cartes reviennent à leur place en réapparais
  *   l'apparition du contenu (`backwards`, caché jusqu'à la pose : test « à la pose, le contenu
  *   monte… », lu au temps 0) ; son effacement (`forwards`) ; en mouvement réduit, l'effacement des
  *   enfants du panneau puis du panneau (`forwards`, jusqu'au retrait) ;
- * - ne tiennent rien, leur fin étant leur repos, trois : le retour des cartes, l'apparition du
- *   panneau en mouvement réduit, le glissement de la copie de la sangle, ôtée hors de ses vols
- *   (`project.css`).
+ * - ne tiennent rien, leur fin étant leur repos : le retour des cartes, l'apparition du panneau en
+ *   mouvement réduit, le glissement de la copie de la sangle, ôtée hors de ses vols (`project.css`).
  *
- * Les six qui tiennent jusqu'au retrait ou tant que la fiche est ouverte sont épinglés ici ; chacun
- * des neuf rougit son test quand son remplissage est retiré (mutations du 2026-11-03 ; du 2026-11-09
- * pour les deux du ruban caché).
+ * Ceux qui tiennent jusqu'au retrait ou tant que la fiche est ouverte sont épinglés ici ; chacun de
+ * ceux qui tiennent quelque chose rougit son test quand son remplissage est retiré (mutations du
+ * 2026-11-03 ; du 2026-11-09 pour le ruban caché).
  */
 
 /** Dans la page : la couche d'entrée des cartes autres que `opened`, dans l'écran ou non, et sa pose. */
