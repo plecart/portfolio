@@ -542,13 +542,33 @@ for (const [size, projects] of STRAPPED_TABLES) {
     expect(onFace.filter(([, y]) => y < top - 1 || y > bottom + 1)).toEqual([])
     expectNear(Math.max(...column(0)), bottom, 'bord gauche')
     expectNear(Math.min(...column(box.width - 1)), top, 'bord droit')
-    expectNear(-Math.min(...abscissas), OVERHANG, 'tranche à gauche')
-    expectNear(Math.max(...abscissas) - box.width, OVERHANG, 'tranche à droite')
+    // Réduites et non étalées : épaisse de 10 %, la sangle de la vitrine sur téléphone peint plus de
+    // points qu'un appel ne prend d'arguments (`RangeError`, mesuré le 2026-11-10).
+    expectNear(-abscissas.reduce((a, b) => Math.min(a, b)), OVERHANG, 'tranche à gauche')
+    expectNear(abscissas.reduce((a, b) => Math.max(a, b)) - box.width, OVERHANG, 'tranche à droite')
     expect(yellows.filter((distance) => distance <= -1).length).toBeGreaterThan(0)
     expect(yellows.filter((distance) => distance >= 1)).toEqual([])
     expect(tranches.filter((distance) => distance <= -1)).toEqual([])
     expect(tranches.filter((distance) => distance >= 1).length).toBeGreaterThan(0)
     expect(stripes.map((pixels) => pixels.length > 0)).toEqual([true, true])
+  })
+
+  test(`carte ${size} : la sangle épaisse de 10 % de la largeur de sa boîte, la face et ses deux tranches, sur ses deux bandes (spec §4.1)`, async ({
+    page,
+  }) => {
+    await openTable(page, [...projects])
+
+    const ratios = await strap(cards(page).first()).evaluate((box) => {
+      const width = parseFloat(getComputedStyle(box).width)
+      return [box, box.querySelector('.card-strap-stripes')!].map(
+        (band) => parseFloat(getComputedStyle(band, '::before').height) / width,
+      )
+    })
+
+    expect(ratios).toHaveLength(2)
+    // Au millième : 18,1875 px pour 18,2 sur la carte simple à 400 px, au 1/64 de px (Chromium,
+    // mesuré le 2026-11-10).
+    for (const ratio of ratios) expect(ratio).toBeCloseTo(0.1, 3)
   })
 }
 
@@ -594,7 +614,7 @@ test('les rubans : trois technologies au plus, icône, nom masqué et infobulle 
     await expect(ribbon).toHaveAttribute('title', name)
     await expect(ribbon.locator('img')).toHaveAttribute('src', icon)
     await expect(ribbon.locator('img')).toHaveAttribute('alt', '')
-    await expect(ribbon.getByText(name)).toHaveClass('sr-only')
+    await expect(ribbon.getByText(name)).toContainClass('sr-only')
   }
   expect(await Promise.all((await ribbons.all()).map(rotationOf))).toEqual([-1.5, 1, -1.5])
 })
@@ -659,8 +679,9 @@ test('à 320 px, la carte simple la plus chargée garde ses rubans dans sa bande
 /**
  * Dans la page : la sangle d'une carte face au pointeur, puis dans l'ordre d'empilement. Sur une
  * grille de 2 px, les points de la face où elle est l'élément touché ; puis, pour chaque couche de
- * `layers`, ses points — la sangle hors du test de touche — et ceux où la sangle l'emporte, son
- * pointeur rétabli le temps de la mesure : le test de touche suit l'ordre de peinture.
+ * `layers`, ses points — la sangle hors du test de touche —, et, son pointeur rétabli le temps de la
+ * mesure, ceux que sa boîte couvre aussi et ceux où elle l'emporte : le test de touche suit l'ordre
+ * de peinture.
  */
 function strapLayering({ path, layers }: { path: string; layers: string[] }) {
   const card = document.querySelector(`.card[href="${path}"]`)!
@@ -674,6 +695,8 @@ function strapLayering({ path, layers }: { path: string; layers: string[] }) {
     return points
   }
   const onStrap = ([x, y]: [number, number]) => strap.contains(document.elementFromPoint(x, y))
+  const underStrap = ([x, y]: [number, number]) =>
+    document.elementsFromPoint(x, y).some((element) => strap.contains(element))
   const intercepted = grid(card.querySelector('.card-face')!).filter(onStrap).length
   return {
     intercepted,
@@ -682,16 +705,19 @@ function strapLayering({ path, layers }: { path: string; layers: string[] }) {
       strap.style.pointerEvents = 'none'
       const points = grid(layer).filter(([x, y]) => layer.contains(document.elementFromPoint(x, y)))
       strap.style.pointerEvents = 'auto'
+      const shared = points.filter(underStrap).length
       const covered = points.filter(onStrap).length
       strap.style.removeProperty('pointer-events')
-      return { selector, points: points.length, covered }
+      return { selector, points: points.length, shared, covered }
     }),
   }
 }
 
-/** Ce que la sangle recouvre (spec §4.1) : la photo ; ce qui la recouvre : trombone, post-it, bande. */
-const UNDER_STRAP = ['.card-photo']
-const OVER_STRAP = ['.card-clip', '.card-postit', '.card-band']
+/**
+ * Ce que la boîte de la sangle recouvre (spec §4.1) : tout ce que porte la face — la photo, le
+ * trombone, le post-it, et la bande basse, que sa bande ne croise pas.
+ */
+const UNDER_STRAP = ['.card-photo', '.card-clip', '.card-postit', '.card-band']
 
 /** La sangle au repos, puis au coin : le survol au bureau, le toucher sur un téléphone. */
 const STRAP_STATES: [string, (card: Locator, isMobile: boolean) => Promise<unknown>][] = [
@@ -700,7 +726,7 @@ const STRAP_STATES: [string, (card: Locator, isMobile: boolean) => Promise<unkno
 ]
 
 for (const [state, act] of STRAP_STATES) {
-  test(`la sangle ${state}, à 375 px et au bureau : au-dessus de la photo, sous le trombone, le post-it et la bande, et sans prendre le pointeur (spec §4.1)`, async ({
+  test(`la sangle ${state}, à 375 px et au bureau : au-dessus de la photo, du trombone, du post-it et de la bande, et sans prendre le pointeur (spec §4.1)`, async ({
     page,
     isMobile,
   }) => {
@@ -713,13 +739,14 @@ for (const [state, act] of STRAP_STATES) {
 
     const { intercepted, layers } = await page.evaluate(strapLayering, {
       path: (await card.getAttribute('href'))!,
-      layers: [...UNDER_STRAP, ...OVER_STRAP],
+      layers: UNDER_STRAP,
     })
 
     expect(intercepted).toBe(0)
-    for (const { selector, points, covered } of layers) {
+    for (const { selector, points, shared, covered } of layers) {
       expect(points, selector).toBeGreaterThan(0)
-      expect(covered, selector).toBe(UNDER_STRAP.includes(selector) ? points : 0)
+      expect(shared, selector).toBeGreaterThan(0)
+      expect(covered, selector).toBe(shared)
     }
   })
 }

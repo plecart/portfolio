@@ -8,6 +8,7 @@ import {
   milliseconds,
   pivotIn,
   recoil,
+  rolledStart,
 } from '../src/project/choreography.ts'
 
 /** Une boîte de `getBoundingClientRect`, par ses quatre nombres. */
@@ -129,6 +130,54 @@ describe('le vol d’un élément depuis son homologue', () => {
 
   test('au repos, ni translation ni échelle', () => {
     expect(AT_REST).toEqual({ translate: '0px 0px', scale: '1 1' })
+  })
+})
+
+describe('le vol d’un ruban roulé depuis son homologue (spec §4.6)', () => {
+  /** La copie d'un ruban, déjà roulée à la largeur de son homologue, inclinée comme son ruban. */
+  const ROLLED = box(600, 100, 42, 32)
+  const TILT = rotation(-1.5)
+  /** Son homologue sur la carte, de même mise en page, à sa place. */
+  const ON_CARD = box(40, 500, 42, 32)
+  /** Le centre de l'un et de l'autre, leur origine de transformation. */
+  const MIDDLE = { x: 21, y: 16 }
+
+  /** Le centre d'une boîte. */
+  const centerOf = ({ left, top, width, height }: Box) => [left + width / 2, top + height / 2]
+
+  /** La boîte où le premier instant pose la copie, son pivot à `origin`. */
+  function landed(origin: Point, scale: number, homologue: Box) {
+    const keyframe = rolledStart(
+      homologue,
+      boxAtRest(ROLLED, TILT, origin),
+      pivotIn(TILT, ROLLED.width, ROLLED.height, origin),
+      scale,
+    )
+    return { keyframe, box: boxInFlight(ROLLED, TILT, origin, keyframe) }
+  }
+
+  test('son échelle est uniforme : celle qu’on lui donne, sur ses deux axes', () => {
+    expect(landed(MIDDLE, 1.02, ON_CARD).keyframe.scale).toBe('1.02 1.02')
+  })
+
+  for (const [name, origin, scale] of [
+    ['pivot au centre, à sa taille', MIDDLE, 1],
+    ['pivot haut gauche, levée de 2 %', { x: 0, y: 0 }, 1.02],
+  ] as const) {
+    test(`${name} : le premier instant pose son centre sur celui de son homologue, que la pose de la carte incline autrement`, () => {
+      const homologue = boxAtRest(ON_CARD, rotation(2), MIDDLE)
+
+      const [x, y] = centerOf(landed(origin, scale, homologue).box)
+
+      expect(x).toBeCloseTo(centerOf(homologue)[0], 6)
+      expect(y).toBeCloseTo(centerOf(homologue)[1], 6)
+    })
+  }
+
+  test('inclinés de même, à leur taille, la copie se pose exactement sur son homologue', () => {
+    const homologue = boxAtRest(ON_CARD, TILT, MIDDLE)
+
+    expectSameBox(landed(MIDDLE, 1, homologue).box, homologue)
   })
 })
 

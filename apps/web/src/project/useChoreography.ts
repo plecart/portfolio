@@ -7,6 +7,7 @@ import {
   NO_SHIFT,
   pivotIn,
   recoil,
+  rolledStart,
   type Frame,
 } from './choreography.ts'
 
@@ -30,6 +31,29 @@ const RIBBON = '[data-ribbon]'
 /** La copie volante d'un ruban, par l'identité de son ruban (`flyerOf`). */
 const FLYER = '[data-flyer]'
 
+/** L'opacité du nom d'une technologie sur son ruban (`card.css`), qu'un ruban roulé efface. */
+const RIBBON_NAME = '--card-ribbon-name'
+
+/** La sangle d'un projet en cours (`Strap`), puis la boîte de ses rayures, qui y est. */
+const STRAP = '.card-strap'
+const STRIPES = '.card-strap-stripes'
+
+/** La bande que porte chacune des deux boîtes de la sangle (`card.css`). */
+const BAND = '::before'
+
+/** La copie volante de la sangle (`strapFlyerOf`). */
+const STRAP_FLYER = '[data-strap-flyer]'
+
+/**
+ * Une bande de la sangle à sa place, puis glissée de toute sa longueur le long de son axe, vers le
+ * haut droit : une translation en tête de sa transformation, que sa rotation oriente et que l'échelle
+ * du coin ne réduit pas. Sa queue passe alors à 75cqw au moins au-delà du centre de la photo sur cet
+ * axe, et sa boîte n'en dépasse jamais 50√2cqw, soit 70,7cqw (`card.css`) : elle en sort entière, au
+ * repos comme au coin.
+ */
+const BAND_IN = 'translateX(0%)'
+const BAND_OUT = 'translateX(100%)'
+
 /**
  * Le reste de la fiche hors de la colonne défilante, qui apparaît à la pose et s'efface le premier
  * (spec §4.6) ; la colonne, `COLUMN`, en fait autant autour des rubans visés (`contentOf`).
@@ -51,9 +75,12 @@ const HIDDEN: Frame = { opacity: 0 }
 const SEEN: Frame = { visibility: 'visible' }
 const UNSEEN: Frame[] = [{ visibility: 'hidden' }, { visibility: 'hidden' }]
 
-/** Ce que change un vol : la translation et l'échelle, et l'opacité d'un ruban (spec §4.6). */
+/**
+ * Ce que change un vol : la translation et l'échelle ; d'un ruban, en plus, ce qu'il roule — sa
+ * largeur, sa marge en ligne, son nom (`rollOf`) — et son opacité (spec §4.6).
+ */
 const FLIGHT = ['translate', 'scale']
-const DIMMED_FLIGHT = [...FLIGHT, 'opacity']
+const RIBBON_FLIGHT = [...FLIGHT, 'width', 'paddingInline', RIBBON_NAME, 'opacity']
 
 /**
  * Le mouvement réduit (spec §6.3), et les durées et la courbe de spec §2.7, lues dans les jetons au
@@ -79,7 +106,7 @@ type Motion = ReturnType<typeof readMotion>
  * Un élément de la fiche qui vole : son homologue sur la carte et son retard. Un ruban vole par sa
  * copie (`flyerOf`), `element`, qui passe par le creux d'opacité, et reste caché tant qu'elle vole.
  */
-type Leg = { element: HTMLElement; homologue: Element; delay: number; ribbon?: HTMLElement }
+type Leg = { element: HTMLElement; homologue: HTMLElement; delay: number; ribbon?: HTMLElement }
 
 /** Une carte de la table : la couche qui s'efface, et son effacement, recul compris s'il y en a un. */
 type Move = { layer: HTMLElement; keyframes: Keyframe[] }
@@ -98,14 +125,47 @@ type Steps = {
   back: () => Animation[]
 }
 
-/** L'image clé qui pose `element`, au repos, sur `homologue`, mesurés à l'instant. */
-function startOn(element: HTMLElement, homologue: Element): Frame {
+/**
+ * L'image clé qui pose `element`, au repos, sur `homologue`, mesurés à l'instant.
+ *
+ * @param start La pose, d'une boîte sur l'autre : `flightStart` par défaut.
+ */
+function startOn(element: HTMLElement, homologue: Element, start = flightStart): Frame {
   const style = getComputedStyle(element)
   const [x, y] = style.transformOrigin.split(' ').map(parseFloat)
   const matrix = new DOMMatrix(style.transform)
   const pivot = pivotIn(matrix, element.offsetWidth, element.offsetHeight, { x, y })
-  return flightStart(homologue.getBoundingClientRect(), element.getBoundingClientRect(), pivot)
+  return start(homologue.getBoundingClientRect(), element.getBoundingClientRect(), pivot)
 }
+
+/** La largeur d'un ruban et sa marge en ligne, mesurées : ce qu'un ruban roulé prend de l'autre. */
+function rollOf(ribbon: HTMLElement) {
+  return { width: `${ribbon.offsetWidth}px`, paddingInline: getComputedStyle(ribbon).paddingInline }
+}
+
+/**
+ * L'image clé qui pose la copie d'un ruban, roulée, sur son homologue de la carte (spec §4.6) : à sa
+ * largeur et à sa marge en ligne, son nom effacé, sous une échelle uniforme, le rapport de leurs
+ * hauteurs (`rolledStart`). La translation se mesure sur la copie à cette largeur, que la mesure lui
+ * rend aussitôt : le bout carte tombe sur le ruban de la carte, et ce qui dépasse de la copie est
+ * coupé (`project.css`). La levée de la carte est ignorée, comme sa pose.
+ */
+function rolledOn(flyer: HTMLElement, homologue: HTMLElement): Frame {
+  const roll = rollOf(homologue)
+  const scale = homologue.offsetHeight / flyer.offsetHeight
+  Object.assign(flyer.style, roll)
+  const start = startOn(flyer, homologue, (from, to, pivot) => rolledStart(from, to, pivot, scale))
+  Object.assign(flyer.style, { width: '', paddingInline: '' })
+  return { ...start, ...roll, [RIBBON_NAME]: 0 }
+}
+
+/** Le bout carte d'un vol : l'élément posé sur son homologue ; la copie d'un ruban, roulée. */
+const cardEnd = ({ element, homologue, ribbon }: Leg) =>
+  ribbon ? rolledOn(element, homologue) : startOn(element, homologue)
+
+/** Le bout fiche d'un vol : l'élément à sa place ; la copie d'un ruban, déroulée, son nom visible. */
+const panelEnd = ({ element, ribbon }: Leg): Frame =>
+  ribbon ? { ...AT_REST, ...rollOf(element), [RIBBON_NAME]: 1 } : AT_REST
 
 /**
  * La copie volante d'un ruban de la fiche (spec §4.6) : fixe, elle vole hors de la colonne
@@ -125,15 +185,49 @@ function flyerOf(ribbon: HTMLElement): HTMLElement {
 }
 
 /**
- * Pose une copie volante sur son ruban, là où il est à l'instant, défilé hors de vue compris : sa
- * boîte, que son inclinaison fait tourner autour de son centre, comme celle de la copie.
+ * Pose une copie volante sur son original, là où il est à l'instant, défilé hors de vue compris : sa
+ * boîte, centrée sur celle qu'il occupe à l'écran, que son inclinaison fait tourner autour de son
+ * centre, comme celle de la copie.
  */
-function place(flyer: HTMLElement, ribbon: HTMLElement) {
-  const { left, top, width, height } = ribbon.getBoundingClientRect()
-  const layout = getComputedStyle(ribbon)
+function place(flyer: HTMLElement, original: HTMLElement) {
+  const { left, top, width, height } = original.getBoundingClientRect()
+  const layout = getComputedStyle(original)
   flyer.style.left = `${left + (width - parseFloat(layout.width)) / 2}px`
   flyer.style.top = `${top + (height - parseFloat(layout.height)) / 2}px`
 }
+
+/**
+ * La copie volante de la sangle d'une carte (spec §4.6), `aria-hidden` comme elle : fixe, dans le
+ * panneau, au-dessus de la feuille et de la photo volante par son `z-index` (`card.css`). Cachée hors
+ * de ses vols (`project.css`), qui montrent ses bandes.
+ */
+function strapFlyerOf(strap: HTMLElement, panel: HTMLElement): HTMLElement {
+  const flyer = strap.cloneNode(true) as HTMLElement
+  flyer.dataset.strapFlyer = ''
+  panel.append(flyer)
+  return flyer
+}
+
+/**
+ * Ce que la copie de la sangle tient de sa carte, hors de laquelle elle vole : son cadre, d'où vient
+ * son angle, et sa place au coin sur une intention (`card.css`).
+ */
+const STRAP_STATE = ['--card-frame', '--strap-cornered']
+
+/**
+ * Pose la copie de la sangle sur la sangle de la carte, telle qu'elle est à l'instant : sa boîte
+ * (`place`), sa taille, et l'état qu'elle tient de sa carte. La pose de la carte est ignorée, comme
+ * pour la photo, dont le départ est une boîte englobante non tournée.
+ */
+function placeStrap(flyer: HTMLElement, strap: HTMLElement) {
+  place(flyer, strap)
+  const style = getComputedStyle(strap)
+  Object.assign(flyer.style, { width: style.width, height: style.height })
+  for (const name of STRAP_STATE) flyer.style.setProperty(name, style.getPropertyValue(name))
+}
+
+/** La transformation que montre à l'instant la bande d'une boîte de la sangle, carte ou copie. */
+const bandOf = (box: Element) => getComputedStyle(box, BAND).transform
 
 /**
  * Les trajets de la fiche (spec §4.6) : la feuille, la photo, le post-it, puis chaque ruban de la
@@ -143,7 +237,7 @@ function place(flyer: HTMLElement, ribbon: HTMLElement) {
 function legs(panel: HTMLElement, card: HTMLElement, { ribbonDelay }: Motion): Leg[] {
   const travelers = TRAVELERS.map(([inPanel, onCard]) => ({
     element: panel.querySelector<HTMLElement>(inPanel)!,
-    homologue: card.querySelector(onCard)!,
+    homologue: card.querySelector<HTMLElement>(onCard)!,
     delay: 0,
   }))
   const panelRibbons = new Map(
@@ -159,11 +253,16 @@ function legs(panel: HTMLElement, card: HTMLElement, { ribbonDelay }: Motion): L
   return [...travelers, ...ribbons]
 }
 
-/** Ce que montre `element` à l'instant dans ces propriétés, animations comprises. */
+/**
+ * Ce que montre `element` à l'instant dans ces propriétés, animations comprises, chacune sous son nom
+ * d'image clé : `paddingInline` se lit `padding-inline`.
+ */
 function shown(element: Element, properties: readonly string[]): Frame {
   const style = getComputedStyle(element)
+  const cssName = (property: string) =>
+    property.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)
   return Object.fromEntries(
-    properties.map((property) => [property, style.getPropertyValue(property)]),
+    properties.map((property) => [property, style.getPropertyValue(cssName(property))]),
   )
 }
 
@@ -183,8 +282,8 @@ function relay(relayed: Animation[], from: Frame[], next: (from: Frame[]) => Ani
 
 /**
  * Le vol d'un élément de `start` à `end` en `--dur-open`, après son retard (spec §4.6). Un ruban vole
- * par sa copie, montrée le temps du vol, retard compris, et passe par son creux d'opacité ; le ruban
- * reste caché autant.
+ * par sa copie, montrée le temps du vol, retard compris, qui se roule et passe par son creux
+ * d'opacité ; le ruban reste caché autant.
  */
 function fly(
   { element, delay, ribbon }: Leg,
@@ -301,14 +400,63 @@ function hideContent(elements: Element[], reveals: Animation[], { fast, easing }
 }
 
 /**
+ * La sangle arrachée puis remise (spec §4.6) : sa copie volante (`strapFlyerOf`) prend sa place sur
+ * la carte, et ses deux bandes, la tranche et les rayures, glissent ensemble le long de leur axe hors
+ * de leurs boîtes (`BAND_OUT`), en `--dur-open`, sans retard, puis restent dehors tant que la fiche
+ * est posée. Au retour, elles reviennent sur la sangle de la carte, remesurée ; la boîte de la copie l'y
+ * suit, d'où elle était : la carte a pu perdre sa levée entre-temps. Le départ est la bande de la
+ * carte à l'instant, transition comprise ; l'arrivée, la sangle telle que la carte la montrera, à sa
+ * place au coin ou non. Le retour part de ce que montre la copie (`relay`) : une fermeture en plein
+ * vol repart sans saut.
+ */
+function strapTrip(panel: HTMLElement, strap: HTMLElement, { open, easing }: Motion) {
+  const flyer = strapFlyerOf(strap, panel)
+  const bands = [flyer, flyer.querySelector(STRIPES)!]
+  const timing = { duration: open, easing }
+  const slide = (from: string, to: string, fill: FillMode) =>
+    bands.map((box) =>
+      box.animate([{ ...SEEN, transform: from }, { ...SEEN, transform: to }], {
+        ...timing,
+        fill,
+        pseudoElement: BAND,
+      }),
+    )
+  let slides: Animation[] = []
+  return {
+    out: () => {
+      placeStrap(flyer, strap)
+      const rest = bandOf(strap)
+      slides = slide(`${BAND_IN} ${rest}`, `${BAND_OUT} ${rest}`, 'forwards')
+      return slides
+    },
+    back: () =>
+      relay(slides, [{ transform: bandOf(flyer) }], ([{ transform }]) => {
+        const from = flyer.getBoundingClientRect()
+        placeStrap(flyer, strap)
+        const to = flyer.getBoundingClientRect()
+        return [
+          flyer.animate(
+            [{ translate: `${from.left - to.left}px ${from.top - to.top}px` }, { translate: NO_SHIFT }],
+            timing,
+          ),
+          ...slide(String(transform), bandOf(flyer), 'both'),
+        ]
+      }),
+  }
+}
+
+/**
  * Le vol (spec §4.6) : à l'ouverture, le panneau, transparent, montre sa feuille posée sur la carte,
- * et la photo, le post-it et les rubans posés sur leurs homologues ; la carte se cache d'un coup, et
- * tout part ensemble, la feuille en tête. Au retour, le contenu s'efface ; puis le panneau redevient
- * transparent sur sa feuille, et tout repart vers la carte, mesurée de nouveau. Chaque ruban part de
- * sa place à l'instant, défilée hors de vue ou non : aucun test de visibilité.
+ * et la photo, le post-it et les rubans posés sur leurs homologues ; la carte se cache d'un coup, sa
+ * sangle passant à sa copie (`strapTrip`), et tout part ensemble, la feuille en tête. Au retour, le
+ * contenu s'efface ; puis le panneau redevient transparent sur sa feuille, et tout repart vers la
+ * carte, mesurée de nouveau. Chaque ruban part de sa place à l'instant, défilée hors de vue ou non :
+ * aucun test de visibilité.
  */
 function flying(panel: HTMLElement, card: HTMLElement, motion: Motion): Steps {
   const route = legs(panel, card, motion)
+  const strap = card.querySelector<HTMLElement>(STRAP)
+  const strapFlight = strap && strapTrip(panel, strap, motion)
   const kept = route.flatMap(({ element, ribbon }) => (ribbon ? [element, ribbon] : []))
   // Au départ d'un vol, chaque copie volante sur son ruban.
   const placeFlyers = () => {
@@ -321,23 +469,24 @@ function flying(panel: HTMLElement, card: HTMLElement, motion: Motion): Steps {
       panel.setAttribute('data-flight', '')
       card.setAttribute('data-origin', '')
       placeFlyers()
-      const starts = route.map(({ element, homologue }) => startOn(element, homologue))
-      outbound = route.flatMap((leg, index) => fly(leg, starts[index], AT_REST, motion, 'backwards'))
+      const [starts, rests] = [route.map(cardEnd), route.map(panelEnd)]
+      outbound = route.flatMap((leg, index) =>
+        fly(leg, starts[index], rests[index], motion, 'backwards'),
+      )
       reveals = revealContent(contentOf(panel, kept), motion)
-      return [...outbound, ...reveals]
+      return [...outbound, ...(strapFlight?.out() ?? []), ...reveals]
     },
     clear: () => hideContent(contentOf(panel, kept), reveals, motion),
     back: () => {
       panel.setAttribute('data-flight', '')
       placeFlyers()
-      return relay(
+      const flights = relay(
         outbound,
-        route.map(({ element, ribbon }) => shown(element, ribbon ? DIMMED_FLIGHT : FLIGHT)),
+        route.map(({ element, ribbon }) => shown(element, ribbon ? RIBBON_FLIGHT : FLIGHT)),
         (froms) =>
-          route.flatMap((leg, index) =>
-            fly(leg, froms[index], startOn(leg.element, leg.homologue), motion, 'both'),
-          ),
+          route.flatMap((leg, index) => fly(leg, froms[index], cardEnd(leg), motion, 'both')),
       )
+      return [...flights, ...(strapFlight?.back() ?? [])]
     },
   }
 }
@@ -413,8 +562,8 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
     if (phase === 'gone') return
     phase = 'gone'
     for (const animation of [...flights, ...receding]) animation.cancel()
-    // Les copies volantes des rubans (`flyerOf`), que la fiche abandonnée ne fera plus voler.
-    for (const flyer of panel.querySelectorAll(FLYER)) flyer.remove()
+    // Les copies volantes des rubans et de la sangle, que la fiche abandonnée ne fera plus voler.
+    for (const flyer of panel.querySelectorAll(`${FLYER}, ${STRAP_FLYER}`)) flyer.remove()
     card.removeAttribute('data-origin')
     for (const attribute of ['data-inactive', 'data-flight', 'data-choreography']) {
       panel.removeAttribute(attribute)
@@ -425,8 +574,8 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
    * Le retour à la carte (spec §4.6, §6.3) : ce qui s'efface d'abord, puis le reste, pendant que les
    * cartes de la table reviennent. Une fermeture en plein vol repart de là où est chaque élément, et
    * n'attend pas le contenu, qui n'est pas apparu (décision de #22). Au bout du dernier, la carte
-   * réapparaît d'un coup sous la photo posée. Une carte sortie du document n'a plus de place où
-   * revenir : la fiche se retire alors par le fondu de sortie.
+   * réapparaît d'un coup sous la photo et la sangle posées. Une carte sortie du document n'a plus de
+   * place où revenir : la fiche se retire alors par le fondu de sortie.
    */
   const comeHome = async () => {
     if (!card.isConnected) {
