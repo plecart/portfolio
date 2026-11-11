@@ -19,6 +19,24 @@
 	}
 }
 
+# Les en-têtes de sécurité de l'hôte du site (PRD « Sécurité », brief de #16, décision 3), importés
+# deux fois : sur ce que Caddy sert ou relaie, puis dans la route d'erreur, où ceux du site ne
+# s'écrivent pas (mesuré, Caddy 2.11.9). Le préfixe `>` diffère leur écriture après celle de l'amont
+# (doc Caddy « header ») : ceux de Django sont remplacés, pas doublés — deux politiques de sécurité
+# s'additionneraient. La politique n'admet que des fichiers servis par le site, les appels à l'API
+# et les images de `media`, sans `unsafe-inline` (OWASP « Content Security Policy ») ni `data:` :
+# les icônes du site sont des fichiers servis ici (#237). `X-Frame-Options` double `frame-ancestors`
+# pour les navigateurs qui l'ignorent (OWASP « Clickjacking Defense »). Pas de HSTS : le domaine
+# `.dev` l'impose déjà.
+(site_security_headers) {
+	header {
+		>Content-Security-Policy "default-src 'self'; connect-src https://{$API_HOST}; img-src 'self' https://{$MEDIA_HOST}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		>X-Frame-Options DENY
+		>X-Content-Type-Options nosniff
+		>Referrer-Policy strict-origin-when-cross-origin
+	}
+}
+
 # L'hôte du site : le front compilé, que l'image copie dans `/usr/share/caddy` (ADR 0014).
 http://{$SITE_HOST} {
 	root * /usr/share/caddy
@@ -29,33 +47,24 @@ http://{$SITE_HOST} {
 	# (`net/http.ServeContent`) ; les routes `reverse_proxy` transmettent l'en-tête sans le lire.
 	# Rien ici n'a besoin d'un téléchargement partiel : Caddy ne sert que le front compilé, et les
 	# médias vivent sur R2 (cadrage, surfaces exposées). Le test de fumée de l'image vérifie qu'un
-	# `Range` sur un fichier haché rend 200 et le corps entier, jamais 206.
+	# `Range` rend le corps entier, jamais 206 : en 200 sur un fichier haché, en 404 sur une adresse
+	# sans fichier, que la route d'erreur sert par `file_server` elle aussi.
 	request_header -Range
 
-	# Les en-têtes de sécurité de l'hôte du site (PRD « Sécurité », brief de #16, décision 3) — sur
-	# ce que Caddy sert comme sur `/projets/*` qu'il relaie. Le préfixe `>` diffère leur écriture
-	# après celle de l'amont (doc Caddy « header ») : ceux de Django sont remplacés, pas doublés —
-	# deux politiques de sécurité s'additionneraient. La politique n'admet que des fichiers servis
-	# par le site, les appels à l'API et les images de `media`, sans `unsafe-inline` (OWASP
-	# « Content Security Policy ») ni `data:` : les icônes du site sont des fichiers servis ici
-	# (#237). `X-Frame-Options` double `frame-ancestors` pour les navigateurs qui l'ignorent
-	# (OWASP « Clickjacking Defense »). Pas de HSTS : le domaine `.dev` l'impose déjà.
-	header {
-		>Content-Security-Policy "default-src 'self'; connect-src https://{$API_HOST}; img-src 'self' https://{$MEDIA_HOST}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
-		>X-Frame-Options DENY
-		>X-Content-Type-Options nosniff
-		>Referrer-Policy strict-origin-when-cross-origin
-	}
+	import site_security_headers
 
-	# La seule sortie HTML du back : la vue des aperçus de lien (ADR 0011, #14) répond sur l'adresse
-	# d'une fiche, en injectant ses balises, ou redirige.
-	handle /projets/* {
+	# Ce que Django sert sur l'hôte du site (ADR 0030) : la fiche d'un projet, seule sortie HTML du
+	# back — la vue des aperçus de lien (ADR 0011, #14) y injecte ses balises et la fiche pré-rendue,
+	# ou redirige —, puis le plan du site et `llms.txt`, tirés de la base à chaque publication.
+	@api path /projets/* /sitemap.xml /llms.txt
+	handle @api {
 		reverse_proxy api:8000
 	}
 
 	# Les fichiers hachés de la compilation : leur nom porte une empreinte de leur contenu, il ne
-	# désigne jamais qu'un contenu — mis en cache un an, sans revalidation. Un nom absent rend 404,
-	# jamais `index.html` : servie sous un nom de script, la page resterait un an dans les caches.
+	# désigne jamais qu'un contenu — mis en cache un an, sans revalidation. Un nom absent rend 404
+	# sans corps, jamais `index.html` (route d'erreur ci-dessous) : servie sous un nom de script, la
+	# page resterait un an dans les caches.
 	handle /assets/* {
 		@exists file
 		header @exists Cache-Control "public, max-age=31536000, immutable"
@@ -67,9 +76,25 @@ http://{$SITE_HOST} {
 		# à chaque visite, jamais servi périmé.
 		header Cache-Control no-cache
 
-		# Le front route lui-même : un chemin qu'aucun fichier ne porte rend `index.html`.
-		try_files {path} /index.html
+		# Une adresse qu'aucun fichier du front ne porte rend 404 (ADR 0030), une erreur que la route
+		# d'erreur ci-dessous reçoit (doc Caddy « try_files », `=<status>`). `{path}/index.html` sert
+		# l'accueil sous `/` : `{path}` n'y désigne pas le dossier racine (mesuré, Caddy 2.11.9).
+		try_files {path} {path}/index.html =404
 		file_server
+	}
+
+	# Le 404 d'une adresse sans fichier, hors de `/assets/` : le corps d'`index.html`, où le front
+	# montre l'accueil (ADR 0009), sous le statut de l'erreur, que `file_server` garde dans une route
+	# d'erreur (doc Caddy « handle_errors »). Un robot lit le statut, un humain voit l'accueil. Le
+	# `no-cache` d'`index.html` y est déjà, posé par le bloc qui a levé le 404 (mesuré). Borné au
+	# 404 : une autre erreur, comme le `502` d'un `api` tombé, garde sa réponse vide.
+	handle_errors 404 {
+		@shell not path /assets/*
+		handle @shell {
+			import site_security_headers
+			rewrite /index.html
+			file_server
+		}
 	}
 }
 
