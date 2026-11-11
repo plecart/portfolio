@@ -219,8 +219,9 @@ Docker attribue — et la supprime en partant, volumes compris.
 **Fumée de la pile complète.** `make smoke IMAGE_TAG=latest`, après `make build`, démarre la pile
 de production depuis ces images — `caddy`, `api`, `worker`, leurs données, et un témoin S3 à la
 place de R2 —, la sème d'un projet publié, puis la fait éprouver par Playwright sur Chromium
-([apps/web/smoke/](apps/web/smoke/)) : la table, la fiche, les aperçus de lien, la CSP du vrai
-Caddyfile, le cache contre le vrai Redis. Le navigateur y voit les origines de production, que
+([apps/web/smoke/](apps/web/smoke/)) : la table, la fiche, les aperçus de lien, le plan du site et
+`llms.txt` servis par Django, le 404 d'une adresse sans fichier, la CSP du vrai Caddyfile, le cache
+contre le vrai Redis. Le navigateur y voit les origines de production, que
 Playwright relaie vers la pile : aucune requête n'en sort. Des images construites sous un autre
 préfixe se nomment de même : `make smoke IMAGE_PREFIX=<préfixe> IMAGE_TAG=latest`. La pile tourne
 sous son propre nom de projet Compose, ses ports sur `127.0.0.1`, et se jette, verte ou rouge. En
