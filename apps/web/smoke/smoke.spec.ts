@@ -7,7 +7,7 @@
  * de la CSP posée par Caddy aussi. L'épreuve du cache vient en tête, dans l'ordre du fichier : le
  * démarrage global l'a préparée, et aucun appel de la liste ne doit la précéder.
  */
-import { test as base, expect, type APIRequestContext } from '@playwright/test'
+import { test as base, expect, type APIRequestContext, type Page } from '@playwright/test'
 import {
   compose,
   env,
@@ -140,6 +140,33 @@ test("la fiche porte ses balises d'aperçu, son image servie par l'hôte des mé
   const image = (await og('image').getAttribute('content')) ?? ''
   expect(image.startsWith(`${origin('MEDIA_HOST')}/`), image).toBe(true)
   expect((await relay(stackClient, image)).status()).toBe(200)
+})
+
+/** La fiche que la vue des aperçus pré-rend dans `#root` (`apps/api/content/link_preview.py`). */
+const prerendered = (page: Page) => page.locator('#root > .prerender')
+
+test.describe('sans JavaScript', () => {
+  test.use({ javaScriptEnabled: false })
+
+  test('la fiche arrive pré-rendue dans #root, masquée à l’œil', async ({ page }) => {
+    const { slug, title, section } = seeded()
+    await page.goto(`/projets/${slug}`)
+
+    // Ce que lit un robot qui n'exécute pas le JavaScript (#265).
+    await expect(prerendered(page).locator('h2')).toHaveText(title)
+    await expect(prerendered(page).locator('h3')).toHaveText([section])
+    // La feuille du site la masque à l'œil : une boîte d'un pixel au plus.
+    const box = (await prerendered(page).boundingBox())!
+    expect(Math.max(box.width, box.height)).toBeLessThanOrEqual(1)
+  })
+})
+
+test('avec JavaScript, la fiche du site remplace la fiche pré-rendue', async ({ page }) => {
+  const { slug, title } = seeded()
+  await page.goto(`/projets/${slug}`)
+
+  await expect(page.getByRole('dialog', { name: title })).toBeVisible()
+  await expect(prerendered(page)).toHaveCount(0)
 })
 
 test('un slug inconnu redirige vers la table', async ({ stackClient }) => {
