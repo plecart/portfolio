@@ -584,7 +584,8 @@ test.describe('les sections', () => {
     const sections = panel(page).locator('details')
 
     await expect(sections).toHaveCount(2)
-    await expect(sections.locator('summary')).toHaveText(['Architecture', 'Résultats'])
+    // Le titre d'une section est un titre de niveau 3, au rang de « Technologies » et « Outils ».
+    await expect(sections.locator('summary > h3')).toHaveText(['Architecture', 'Résultats'])
     await expect(sections.nth(0)).toHaveAttribute('id', 's-architecture')
     await expect(sections.nth(1)).toHaveAttribute('id', 's-resultats')
     await expect(sections.nth(0)).not.toHaveAttribute('open')
@@ -619,6 +620,12 @@ test.describe('les sections', () => {
     await expect(summary).toHaveCSS('font-weight', '700')
     await expect(summary).toHaveCSS('color', ink)
     await expect(summary).toHaveCSS('list-style-type', 'none')
+    // Son titre `<h3>` garde la typographie du `<summary>`, sans marge ; la hauteur de 47 px et le
+    // signe à droite tiennent la ligne unique.
+    const heading = summary.locator('h3')
+    await expect(heading).toHaveCSS('font-size', '15px')
+    await expect(heading).toHaveCSS('font-weight', '700')
+    await expect(heading).toHaveCSS('margin', '0px')
     const sign = summary.locator('[aria-hidden="true"]')
     await expect(sign).toHaveCSS('font-size', '18px')
     await expect(sign).toHaveCSS('color', ink2)
