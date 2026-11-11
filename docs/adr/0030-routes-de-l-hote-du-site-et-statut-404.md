@@ -42,7 +42,8 @@ inconnue répondent `200` avec la coquille du front (« soft 404 »).
 
 **Option 1.** Caddy relaie `/projets/*`, `/sitemap.xml` et `/llms.txt` vers `api`, et sert tout le
 reste en statique. Une adresse qu'aucun fichier du front ne porte rend `404` : `try_files {path}
-=404`, puis `handle_errors` sert `index.html` par `file_server`, qui garde le statut de l'erreur
+{path}/index.html =404` — le second candidat sert l'accueil sous `/`, que `try_files {path} =404`
+seul rendait en `404` (mesuré le 2026-11-11, Caddy 2.11.9) —, puis `handle_errors 404` sert `index.html` par `file_server`, qui garde le statut de l'erreur
 (doc Caddy, directive `handle_errors`, lue le 2026-11-10 : « `file_server` preserves the error's
 HTTP status code when run in `handle_errors` »), avec les en-têtes de sécurité et le
 `Cache-Control: no-cache` d'`index.html`. Sous `/assets/`, une adresse absente reste un `404` sans
