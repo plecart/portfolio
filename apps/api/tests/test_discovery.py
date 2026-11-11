@@ -13,12 +13,16 @@ from xml.etree import ElementTree
 
 import pytest
 from content.models import Project
-from content.site import SiteTemplateError
 from django.test import Client
 from factories import project, saved
 from pytest_django import DjangoAssertNumQueries, DjangoCaptureOnCommitCallbacks
-from test_link_preview import BROKEN_TEMPLATES, UNSAFE_METHODS
-from test_site import CANONICAL, SITE, TEMPLATE
+from test_link_preview import (
+    BROKEN_TEMPLATES,
+    UNSAFE_METHODS,
+    assert_template_error_logged,
+    served,
+)
+from test_site import CANONICAL_LINK, SITE, TEMPLATE
 
 SITEMAP = "/sitemap.xml"
 LLMS = "/llms.txt"
@@ -54,17 +58,6 @@ def modified(slug: str, published: bool, updated_at: datetime) -> None:
         project(slug=slug, title=slug.capitalize(), summary=f"Résumé {slug}.", published=published)
     )
     Project.objects.filter(slug=slug).update(updated_at=updated_at)
-
-
-def served(client: Client, path: str) -> tuple[object, ...]:
-    """Ce que `client` reçoit du fichier `path` : statut, en-têtes de contenu et de cache, corps."""
-    response = client.get(path)
-    return (
-        response.status_code,
-        response["Content-Type"],
-        response["Cache-Control"],
-        response.content,
-    )
 
 
 def sitemap_entries(client: Client) -> list[tuple[str | None, str | None]]:
@@ -136,7 +129,7 @@ def test_les_adresses_du_plan_du_site_sont_echappees_pour_xml(
     intacte."""
     template.write_bytes(
         TEMPLATE.replace(
-            CANONICAL, b'<link rel="canonical" href="https://site.test/?a=1&amp;b=2" />'
+            CANONICAL_LINK, b'<link rel="canonical" href="https://site.test/?a=1&amp;b=2" />'
         )
     )
 
@@ -189,7 +182,7 @@ def test_un_gabarit_change_n_est_jamais_servi_depuis_l_entree_de_l_ancien(
     client.get(path)
 
     template.write_bytes(
-        TEMPLATE.replace(CANONICAL, b'<link rel="canonical" href="https://autre.test/" />')
+        TEMPLATE.replace(CANONICAL_LINK, b'<link rel="canonical" href="https://autre.test/" />')
     )
 
     assert f"https://autre.test/projets/{LISTED_SLUG}" in client.get(path).content.decode()
@@ -203,15 +196,7 @@ def test_un_gabarit_defectueux_est_une_erreur_journalisee_jamais_un_fichier(
 ) -> None:
     """Introuvable, mal marqué ou sans l'identité du site : `500`, comme la fiche, et l'erreur,
     qui nomme le gabarit, est journalisée par Django — jamais une adresse devinée."""
-    if content is not None:
-        template.write_bytes(content)
-
-    response = Client(raise_request_exception=False).get(path)
-
-    errors = [record.exc_info[1] for record in caplog.records if record.exc_info]
-    assert response.status_code == 500
-    assert [type(error) for error in errors] == [SiteTemplateError]
-    assert str(template) in str(errors[0])
+    assert_template_error_logged(template, caplog, content, path)
 
 
 @pytest.mark.django_db

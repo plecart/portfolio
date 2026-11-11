@@ -31,7 +31,7 @@ SITE = Site(
 )
 
 # Les éléments de l'identité dans le gabarit de fixture, tels qu'il les écrit.
-CANONICAL = b'<link rel="canonical" href="https://site.test/" />'
+CANONICAL_LINK = b'<link rel="canonical" href="https://site.test/" />'
 DESCRIPTION = '<meta name="description" content="Portfolio de l’auteur." />'.encode()
 JSON_LD_START = b'<script type="application/ld+json">'
 JSON_LD = JSON_LD_START + TEMPLATE.partition(JSON_LD_START)[2].partition(b"</script>")[0]
@@ -78,14 +78,14 @@ BROKEN_TEMPLATES: dict[str, tuple[bytes, str]] = {
         "<!--page:start-->",
     ),
     "pas en UTF-8": (TEMPLATE + bytes([0xFF]), "UTF-8"),
-    "sans canonical": (TEMPLATE.replace(CANONICAL, b""), "canonical"),
+    "sans canonical": (TEMPLATE.replace(CANONICAL_LINK, b""), "canonical"),
     "canonical hors de la paire page": (
-        TEMPLATE.replace(CANONICAL, b"").replace(b"</head>", CANONICAL + b"</head>"),
+        TEMPLATE.replace(CANONICAL_LINK, b"").replace(b"</head>", CANONICAL_LINK + b"</head>"),
         "canonical",
     ),
-    "deux canonical": (TEMPLATE.replace(CANONICAL, CANONICAL * 2), "canonical"),
+    "deux canonical": (TEMPLATE.replace(CANONICAL_LINK, CANONICAL_LINK * 2), "canonical"),
     "canonical sans adresse": (
-        TEMPLATE.replace(CANONICAL, b'<link rel="canonical" />'),
+        TEMPLATE.replace(CANONICAL_LINK, b'<link rel="canonical" />'),
         "canonical",
     ),
     "sans description": (TEMPLATE.replace(DESCRIPTION, b""), "description"),

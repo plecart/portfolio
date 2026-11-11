@@ -26,7 +26,7 @@ from content.models import (
     TechnologyKind,
     Variant,
 )
-from content.site import SLOTS, SiteTemplateError
+from content.site import SiteTemplateError
 from content.variants import VARIANT_WIDTHS
 from django.test import Client
 from django.utils.html import escape
@@ -35,10 +35,7 @@ from pytest_django import DjangoAssertNumQueries, DjangoCaptureOnCommitCallbacks
 from test_cache import OTHER_ORIGINS
 from test_markdown_preview import tags
 from test_site import BROKEN_TEMPLATES as TEMPLATE_DEFECTS
-from test_site import SITE
-
-# Le gabarit de fixture de test : la forme de l'`index.html` compilé du front.
-TEMPLATE = Path(__file__).with_name("gabarit-apercu.html").read_bytes()
+from test_site import PAIRS, SITE, TEMPLATE, markers
 
 # Les deux fins de ligne qu'un gabarit peut porter : LF, celle du dépôt, et CRLF, celle d'une copie
 # de travail Windows sous `core.autocrlf` (`.gitattributes`).
@@ -46,10 +43,6 @@ LINE_ENDINGS = {"LF": b"\n", "CRLF": b"\r\n"}
 
 # Le gabarit d'une autre compilation : d'autres octets hors des paires marquées.
 DEPLOYED = TEMPLATE + b"<!-- La compilation suivante. -->"
-
-# Les deux marqueurs du bloc d'aperçu, écrits ici sans les lire dans le module de la vue.
-START = b"<!--meta:start-->"
-END = b"<!--meta:end-->"
 
 # Le projet publié du brief : un titre qui casserait le HTML sans échappement, puis tel qu'échappé.
 SLUG = "portfolio"
@@ -169,7 +162,7 @@ BROKEN_TEMPLATES: dict[str, bytes | None] = {
 def marked_block(document: bytes, name: str = "meta") -> str:
     """Le contenu de la paire `name` de `document`, entre ses deux marqueurs : par défaut, le bloc
     d'aperçu."""
-    start, end = f"<!--{name}:start-->".encode(), f"<!--{name}:end-->".encode()
+    start, end = markers(name)
     return document.partition(start)[2].partition(end)[0].decode()
 
 
@@ -179,8 +172,8 @@ def outside(document: bytes) -> list[bytes]:
     puis la fin."""
     pieces: list[bytes] = []
     rest = document
-    for name in SLOTS:
-        start, end = f"<!--{name}:start-->".encode(), f"<!--{name}:end-->".encode()
+    for name in PAIRS:
+        start, end = markers(name)
         before, _, after = rest.partition(start)
         pieces.append(before + start)
         rest = end + after.partition(end)[2]
@@ -199,15 +192,38 @@ def json_ld(document: bytes) -> dict[str, object]:
     return json.loads(json_ld_source(document))
 
 
-def served(client: Client) -> tuple[object, ...]:
-    """Ce que `client` reçoit de la page : statut, en-têtes de contenu et de cache, corps."""
-    response = client.get(PAGE)
+def served(client: Client, path: str = PAGE) -> tuple[object, ...]:
+    """Ce que `client` reçoit de `path`, par défaut la page : statut, en-têtes de contenu et
+    de cache, corps."""
+    response = client.get(path)
     return (
         response.status_code,
         response["Content-Type"],
         response["Cache-Control"],
         response.content,
     )
+
+
+def assert_template_error_logged(
+    template: Path, caplog: pytest.LogCaptureFixture, content: bytes | None, path: str
+) -> None:
+    """Sous le gabarit `template`, écrit de `content` — absent pour `None` —, `path` rend `500`, et
+    Django journalise une seule erreur, `SiteTemplateError` avec sa trace, qui nomme le gabarit."""
+    if content is not None:
+        template.write_bytes(content)
+
+    response = Client(raise_request_exception=False).get(path)
+
+    logged = [
+        (record.name, record.levelno, record.exc_info[1])
+        for record in caplog.records
+        if record.exc_info
+    ]
+    assert response.status_code == 500
+    assert [(name, level, type(error)) for name, level, error in logged] == [
+        ("django.request", logging.ERROR, SiteTemplateError)
+    ]
+    assert str(template) in str(logged[0][2])
 
 
 @pytest.fixture
@@ -701,21 +717,7 @@ def test_un_gabarit_defectueux_est_une_erreur_journalisee_jamais_une_page(
 ) -> None:
     """Introuvable, mal marqué ou sans l'identité du site : `500`, et l'erreur, qui nomme le
     gabarit, est journalisée par Django avec sa trace (décision 8)."""
-    if content is not None:
-        template.write_bytes(content)
-
-    response = Client(raise_request_exception=False).get(PAGE)
-
-    logged = [
-        (record.name, record.levelno, record.exc_info[1])
-        for record in caplog.records
-        if record.exc_info
-    ]
-    assert response.status_code == 500
-    assert [(name, level, type(error)) for name, level, error in logged] == [
-        ("django.request", logging.ERROR, SiteTemplateError)
-    ]
-    assert str(template) in str(logged[0][2])
+    assert_template_error_logged(template, caplog, content, PAGE)
 
 
 @pytest.mark.django_db
