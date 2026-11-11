@@ -84,6 +84,9 @@ SITE_SECURITY_HEADERS = {
     "Referrer-Policy": "strict-origin-when-cross-origin",
 }
 
+# Chaque en-tête de sécurité de l'hôte du site, posé une fois.
+SECURED = {name: [value] for name, value in SITE_SECURITY_HEADERS.items()}
+
 # Des adresses qu'aucun fichier du front ne porte ni aucune route ne relaie, dont celles qu'un robot
 # demande à un site (#265) : `404`, avec le corps d'`index.html` (ADR 0030).
 UNSERVED_PATHS = ["/nimporte", "/llms-full.txt", "/index.md", "/.well-known/ai-catalog.json"]
@@ -148,10 +151,6 @@ def site_security_headers(reply: Reply) -> dict[str, list[str]]:
     """Les en-têtes de sécurité de l'hôte du site dans `reply`, chacun avec toutes ses valeurs —
     un doublon s'y voit —, à comparer à `SECURED`."""
     return {name: reply.headers.get_all(name) or [] for name in SITE_SECURITY_HEADERS}
-
-
-# Chaque en-tête de sécurité de l'hôte du site, posé une fois.
-SECURED = {name: [value] for name, value in SITE_SECURITY_HEADERS.items()}
 
 
 def compose_command(*arguments: str) -> list[str]:
@@ -500,7 +499,9 @@ def test_caddy_ne_sert_aucun_telechargement_partiel(
 
     tranche = stack.get(SITE, chemin, {"Range": "bytes=0-10"})
 
-    assert entier.status == status, "le montage ne prouve rien si le fichier n'est pas servi"
+    assert entier.status == status, (
+        f"le montage ne prouve rien si {chemin} n'est pas servi en {status} : {entier.status}"
+    )
     assert tranche.status == status, f"206 attendu nulle part : {tranche.status}"
     assert tranche.body == entier.body, "le corps doit être entier, pas une tranche"
     assert "Content-Range" not in tranche.headers
