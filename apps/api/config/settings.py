@@ -100,7 +100,7 @@ DATABASES = {"default": database_settings(env.DATABASE_URL)}
 MEDIA_ROOT = env.MEDIA_ROOT
 MEDIA_URL = "media/"
 
-# Le gabarit des aperçus de lien (ADR 0011, `content/site.py`) : l'`index.html` du front, qui porte
+# Le gabarit du site (ADR 0011, `content/site.py`) : l'`index.html` du front, qui porte
 # l'identité du site (#265), relu à chaque requête de `/projets/<slug>`, `/sitemap.xml` et
 # `/llms.txt`.
 LINK_PREVIEW_TEMPLATE = env.LINK_PREVIEW_TEMPLATE

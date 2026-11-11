@@ -74,7 +74,7 @@ WEB_BUILD_OUTPUT = {"apps/web/dist/index.html", "apps/web/dist/assets/index.js"}
 # sous l'exception `!apps/web/dist`, que l'image `caddy` sert telle quelle.
 LOCAL_ENV_FILES = {".env", "apps/api/.env", "apps/web/dist/.env", "infra/caddy/.env"}
 
-# Ce que l'image `api` sert, là où l'application le lit : le gabarit des aperçus de lien (ADR
+# Ce que l'image `api` sert, là où l'application le lit : le gabarit du site (ADR
 # 0011), chemin par défaut du réglage de #14 (brief de #15, décision 10), et les fichiers
 # statiques collectés au build, que WhiteNoise sert depuis `STATIC_ROOT` (ADR 0014). Copiés
 # après le `chown` de `/app` : ils restent à `root`, en lecture seule pour l'application.
