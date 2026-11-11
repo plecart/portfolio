@@ -402,8 +402,8 @@ await browser.close()
 
 `sizes=[(32, 32)]` garde une seule image : sans lui, Pillow écrit aussi le 16 et le 24 (doc Pillow
 13, format ICO). Caddy sert les trois sous leur nom, sans empreinte, en `no-cache` comme
-`index.html` ; un fichier absent n'y rendrait pas 404 mais `index.html` (`try_files`), et c'est un
-test de l'image qui les demande. L'icône vide partie, la CSP de l'hôte du site n'admet plus `data:`
+`index.html` ; un fichier absent y rendrait 404 avec le corps d'`index.html` (ADR 0030), et c'est
+un test de l'image qui les demande. L'icône vide partie, la CSP de l'hôte du site n'admet plus `data:`
 en `img-src`.
 
 L'admin, sur l'hôte de l'API, en porte le pendant sur fond orange (#256) : les trois mêmes fichiers
@@ -469,7 +469,7 @@ items se sont révélés partiellement faux à l'exécution ; l'écart est consi
 ### Build et déploiement
 
 - Build dans GitHub Actions ; `apps/web/dist` copié dans l'image Caddy publiée sur GHCR (D43) ; pas de conteneur `web` (cadrage §5.3).
-- Caddy : `try_files {path} /index.html` pour les routes côté client ; en-têtes `Cache-Control: immutable` sur les fichiers hachés, `no-cache` sur `index.html`.
+- Caddy : `/projets/*`, `/sitemap.xml` et `/llms.txt` relayés vers `api` ; toute autre adresse sans fichier rend 404 — `try_files {path} {path}/index.html =404`, le second candidat pour l'accueil sous `/`, puis `handle_errors 404` sert `index.html` sous ce statut, hors de `/assets/` (ADR 0030) ; en-têtes `Cache-Control: immutable` sur les fichiers hachés, `no-cache` sur `index.html`.
 
 ## 4. Comptes à créer (par l'auteur)
 

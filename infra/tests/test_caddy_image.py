@@ -40,8 +40,9 @@ SITE, API, MEDIA = HOSTS["SITE_HOST"], HOSTS["API_HOST"], HOSTS["MEDIA_HOST"]
 # Le temps laissé à Caddy pour ouvrir son port, une fois son conteneur démarré.
 STARTUP_DEADLINE = 10.0
 
-# La coquille de l'application, que toute route du front doit rendre.
-APP_SHELL = '<div id="root"></div>'
+# La coquille de l'application, `#root` d'`index.html` : le corps de l'accueil. L'ouverture seule,
+# que suit la paire marquée `root` du gabarit (`apps/api/content/site.py`).
+APP_SHELL = '<div id="root">'
 
 # Le cache d'un fichier haché par la compilation : un nom ne désigne jamais qu'un contenu.
 IMMUTABLE = "public, max-age=31536000, immutable"
@@ -82,6 +83,13 @@ SITE_SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
 }
+
+# Des adresses qu'aucun fichier du front ne porte ni aucune route ne relaie, dont celles qu'un robot
+# demande à un site (#265) : `404`, avec le corps d'`index.html` (ADR 0030).
+UNSERVED_PATHS = ["/nimporte", "/llms-full.txt", "/index.md", "/.well-known/ai-catalog.json"]
+
+# Ce que l'hôte du site relaie vers `api` (ADR 0030) : les fiches, le plan du site, `llms.txt`.
+RELAYED_PATHS = ["/projets/x", "/sitemap.xml", "/llms.txt"]
 
 
 class ScriptSources(HTMLParser):
@@ -136,6 +144,16 @@ class Stack:
             connection.close()
 
 
+def site_security_headers(reply: Reply) -> dict[str, list[str]]:
+    """Les en-têtes de sécurité de l'hôte du site dans `reply`, chacun avec toutes ses valeurs —
+    un doublon s'y voit —, à comparer à `SECURED`."""
+    return {name: reply.headers.get_all(name) or [] for name in SITE_SECURITY_HEADERS}
+
+
+# Chaque en-tête de sécurité de l'hôte du site, posé une fois.
+SECURED = {name: [value] for name, value in SITE_SECURITY_HEADERS.items()}
+
+
 def compose_command(*arguments: str) -> list[str]:
     """La commande `docker compose` sur la pile du test, sous son nom de projet."""
     return ["docker", "compose", "--project-name", PROJECT, "--file", str(STACK), *arguments]
@@ -151,8 +169,9 @@ def compose(*arguments: str, environment: Mapping[str, str]) -> str:
     return run_bounded(compose_command(*arguments), environment=environment).stdout.decode()
 
 
-def wait_until_serving(stack: Stack) -> None:
-    """Attend la première réponse HTTP de Caddy : son conteneur démarre avant son serveur.
+def wait_until_serving(stack: Stack, path: str = "/") -> None:
+    """Attend que l'hôte du site serve `path` en `200` : le conteneur de Caddy démarre avant son
+    serveur, et un `api` redémarré rend `502` tant qu'il n'écoute pas.
 
     Une connexion TCP ne suffit pas : le port publié est tenu par le proxy de Docker, qui
     l'accepte avant que Caddy n'écoute, puis la coupe.
@@ -160,12 +179,13 @@ def wait_until_serving(stack: Stack) -> None:
     deadline = time.monotonic() + STARTUP_DEADLINE
     while True:
         try:
-            stack.get(SITE, "/")
+            outcome: object = stack.get(SITE, path).status
+        except (OSError, HTTPException) as error:
+            outcome = error
+        if outcome == 200:
             return
-        except (OSError, HTTPException):
-            if time.monotonic() > deadline:
-                raise
-            time.sleep(0.2)
+        assert time.monotonic() < deadline, f"{path} n'est pas servi en 200 : {outcome!r}"
+        time.sleep(0.2)
 
 
 def hashed_script(stack: Stack) -> str:
@@ -227,14 +247,27 @@ def test_l_accueil_est_servi_sans_cache(stack: Stack) -> None:
     assert reply.headers.get_all("Cache-Control") == ["no-cache"]
 
 
-def test_une_route_du_front_rend_l_accueil(stack: Stack) -> None:
-    """Le front route lui-même (`/projets/<slug>` mis à part, que `api` sert) : un chemin qu'aucun
-    fichier ne porte rend `index.html`, sans cache comme lui."""
-    reply = stack.get(SITE, "/une/route/du/front")
+@pytest.mark.parametrize("path", UNSERVED_PATHS)
+def test_une_adresse_sans_fichier_rend_404_avec_le_corps_de_l_accueil(
+    stack: Stack, path: str
+) -> None:
+    """Un robot lit `404`, un humain voit l'accueil, que le front montre à toute adresse (ADR 0030,
+    ADR 0009) : le corps d'`index.html`, sans cache comme lui et sous les en-têtes de sécurité du
+    site, que la route d'erreur repose."""
+    reply = stack.get(SITE, path)
 
-    assert reply.status == 200
+    assert reply.status == 404
     assert APP_SHELL in reply.body
     assert reply.headers.get_all("Cache-Control") == ["no-cache"]
+    assert site_security_headers(reply) == SECURED
+
+
+def test_le_fichier_des_robots_est_servi(stack: Stack) -> None:
+    """Un fichier du front à la racine, servi tel quel : `try_files` le trouve."""
+    reply = stack.get(SITE, "/robots.txt")
+
+    assert reply.status == 200
+    assert reply.body.startswith("User-agent: *")
 
 
 def test_un_hote_inconnu_ne_recoit_pas_le_site(stack: Stack) -> None:
@@ -280,8 +313,8 @@ SITE_ICONS = {
 def test_les_icones_du_site_sont_servies_sans_cache(
     stack: Stack, path: str, types: tuple[str, ...]
 ) -> None:
-    """Une icône absente de l'image ne rend pas 404 : `try_files` rend `index.html` sous son nom.
-    Leurs noms sont stables, comme `/theme.js` : revalidées à chaque visite, jamais immuables."""
+    """Une icône absente de l'image rendrait 404, le corps d'`index.html` sous son nom. Leurs noms
+    sont stables, comme `/theme.js` : revalidées à chaque visite, jamais immuables."""
     reply = stack.get(SITE, path)
 
     assert reply.status == 200
@@ -302,14 +335,31 @@ def test_un_fichier_hache_absent_rend_404_sans_cache_long(stack: Stack) -> None:
     assert IMMUTABLE not in (reply.headers.get_all("Cache-Control") or [])
 
 
-def test_les_fiches_projet_sont_relayees_vers_api(stack: Stack) -> None:
+@pytest.mark.parametrize("path", RELAYED_PATHS)
+def test_les_fiches_et_les_fichiers_de_decouverte_sont_relayes_vers_api(
+    stack: Stack, path: str
+) -> None:
     """`/projets/<slug>` est la seule sortie HTML du back : la vue des aperçus de lien (#14, ADR
-    0011) y injecte les balises du projet, ou redirige. Caddy la relaie au lieu de servir le
-    front."""
-    reply = stack.get(SITE, "/projets/x")
+    0011) y injecte les balises du projet, ou redirige. Le plan du site et `llms.txt` suivent la
+    base (ADR 0030). Caddy les relaie au lieu de servir le front."""
+    reply = stack.get(SITE, path)
 
     assert reply.status == 200
     assert reply.body == UPSTREAM["UPSTREAM_BODY"]
+
+
+def test_une_autre_erreur_que_404_ne_recoit_pas_l_accueil(stack: Stack) -> None:
+    """La route d'erreur est bornée au 404 : `api` tombé, une fiche rend le `502` de Caddy, jamais
+    `index.html`, qui le masquerait. `api` repart ensuite, pour les tests qui suivent."""
+    compose("stop", "api", environment=stack.environment)
+    try:
+        reply = stack.get(SITE, "/projets/x")
+    finally:
+        compose("start", "api", environment=stack.environment)
+        wait_until_serving(stack, "/projets/x")
+
+    assert reply.status == 502
+    assert APP_SHELL not in reply.body
 
 
 def test_l_hote_de_l_api_est_relaye_vers_api(stack: Stack) -> None:
@@ -393,9 +443,7 @@ def test_l_hote_du_site_pose_ses_en_tetes_de_securite(
     reply = stack.get(SITE, path(stack))
 
     assert reply.status == 200
-    assert {name: reply.headers.get_all(name) for name in SITE_SECURITY_HEADERS} == {
-        name: [value] for name, value in SITE_SECURITY_HEADERS.items()
-    }
+    assert site_security_headers(reply) == SECURED
 
 
 def test_l_hote_de_l_api_garde_les_en_tetes_de_django(stack: Stack) -> None:
@@ -427,19 +475,33 @@ H2C_PREFACE = b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 SETTINGS_FRAME_TYPE = 0x04
 
 
-def test_caddy_ne_sert_aucun_telechargement_partiel(stack: Stack) -> None:
+# Ce que `file_server` sert sur l'hôte du site, et sous quel statut : un fichier, puis l'`index.html`
+# de la route d'erreur.
+FILE_SERVER_RESPONSES: dict[str, tuple[Callable[[Stack], str], int]] = {
+    "fichier haché": (hashed_script, 200),
+    "adresse sans fichier": (lambda stack: "/nimporte", 404),
+}
+
+
+@pytest.mark.parametrize(
+    ("path", "status"), FILE_SERVER_RESPONSES.values(), ids=FILE_SERVER_RESPONSES.keys()
+)
+def test_caddy_ne_sert_aucun_telechargement_partiel(
+    stack: Stack, path: Callable[[Stack], str], status: int
+) -> None:
     """`Range` est retiré des requêtes de l'hôte du site, et c'est la configuration que visait
     CVE-2026-78667, corrigée depuis dans le Go qui compile `caddy` (ADR 0018) : l'absence de borne
     sur la taille d'un `Range` analysé par un serveur. Le seul analyseur de l'image est
-    `file_server` ; sans cette garde il rendrait 206 et une tranche. Rien ici n'a besoin de
-    téléchargement partiel — le front compilé est servi entier, les médias vivent sur R2."""
-    chemin = hashed_script(stack)
+    `file_server`, dans la route d'erreur aussi ; sans cette garde il rendrait une tranche, en 206
+    sur un fichier, sous le 404 dans la route d'erreur (mesuré, Caddy 2.11.9). Rien ici n'a besoin
+    de téléchargement partiel — le front compilé est servi entier, les médias vivent sur R2."""
+    chemin = path(stack)
     entier = stack.get(SITE, chemin)
 
     tranche = stack.get(SITE, chemin, {"Range": "bytes=0-10"})
 
-    assert entier.status == 200, "le montage ne prouve rien si le fichier n'est pas servi"
-    assert tranche.status == 200, f"206 attendu nulle part : {tranche.status}"
+    assert entier.status == status, "le montage ne prouve rien si le fichier n'est pas servi"
+    assert tranche.status == status, f"206 attendu nulle part : {tranche.status}"
     assert tranche.body == entier.body, "le corps doit être entier, pas une tranche"
     assert "Content-Range" not in tranche.headers
 
