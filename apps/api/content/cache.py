@@ -1,6 +1,6 @@
-"""L'espace du cache du contenu : les réponses de l'API publique et les pages des aperçus de lien,
-gardées telles que rendues, et vidées à chaque écriture du contenu (ADR 0006, rôle 1 ; brief de
-#11, décisions 3 et 8 à 10 ; brief de #14, décision 4).
+"""L'espace du cache du contenu : les réponses de l'API publique, les pages des aperçus de lien et
+les fichiers de découverte du site, gardés tels que rendus, et vidés à chaque écriture du contenu
+(ADR 0006, rôle 1 ; brief de #11, décisions 3 et 8 à 10 ; brief de #14, décision 4 ; ADR 0030).
 
 Vider l'espace, c'est changer de génération : chaque clé porte la génération courante, et en poser
 une neuve rend toutes les entrées précédentes injoignables ; elles expirent à leur durée de vie
@@ -49,7 +49,8 @@ def content_key(request: HttpRequest, name: str) -> str | None:
         request: la requête servie.
         name: le nom de la réponse dans l'espace — `projets` pour la liste,
             `apercu:<slug>:<empreinte du gabarit>` pour la page d'une fiche
-            (`content/link_preview.py`).
+            (`content/link_preview.py`), `sitemap:<empreinte du gabarit>` et
+            `llms:<empreinte du gabarit>` pour les fichiers de découverte (`content/discovery.py`).
 
     Returns:
         La clé, par exemple `contenu:<génération>:projets:http://testserver` sous le client de

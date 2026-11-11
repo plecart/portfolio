@@ -2,15 +2,15 @@
 
 L'admin à `/admin/` (ADR 0001), avec l'aperçu Markdown de ses champs (brief de #8, décision 2) ;
 l'API publique à `/api/` (brief de #10, décision 1). Ce que Caddy relaie depuis l'hôte du site :
-`/projets/*`, la vue des aperçus de lien (ADR 0011), puis `/sitemap.xml` (ADR 0030). L'URLconf ne
-distingue pas les hôtes : sur celui de l'API, ces routes répondent aussi, avec les adresses du
-site, que le gabarit porte. Les fichiers téléversés sont servis par Django en développement
-seulement : `static()` ne rend aucune route hors `DEBUG`, et en production ils vivent sur R2 (ADR
-0004).
+`/projets/*`, la vue des aperçus de lien (ADR 0011), puis `/sitemap.xml` et `/llms.txt` (ADR
+0030). L'URLconf ne distingue pas les hôtes : sur celui de l'API, ces routes répondent aussi, avec
+les adresses du site, que le gabarit porte. Les fichiers téléversés sont servis par Django en
+développement seulement : `static()` ne rend aucune route hors `DEBUG`, et en production ils vivent
+sur R2 (ADR 0004).
 """
 
 from content.api import api
-from content.discovery import sitemap
+from content.discovery import llms, sitemap
 from content.link_preview import link_preview
 from content.preview import PREVIEW_ROUTE, preview
 from django.conf import settings
@@ -31,5 +31,6 @@ urlpatterns: list[URLPattern | URLResolver] = [
     # échouer chaque `reverse` de la table (`normalize`, `django/utils/regex_helper.py`).
     re_path(r"^projets/(?P<slug>(?s:.*))", link_preview),
     path("sitemap.xml", sitemap),
+    path("llms.txt", llms),
     *static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT),
 ]
