@@ -125,6 +125,15 @@ def empty_cache() -> None:
 
 
 @pytest.fixture
+def template(tmp_path: Path) -> Generator[Path]:
+    """Le gabarit du site que les vues lisent le temps du test, à la place de la fixture de test :
+    absent tant que le test ne l'écrit pas."""
+    path = tmp_path / "index.html"
+    with override_settings(LINK_PREVIEW_TEMPLATE=path):
+        yield path
+
+
+@pytest.fixture
 def admin_client(admin_user: "User") -> Client:
     """Le client de pytest-django, connecté en superutilisateur et vérifié par un second facteur.
 

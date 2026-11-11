@@ -17,6 +17,7 @@ from collections.abc import Mapping
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import NamedTuple, cast
+from urllib.parse import urljoin
 
 # Les paires de marqueurs du gabarit, dans l'ordre où elles s'y suivent : une paire de plus est une
 # entrée de plus.
@@ -46,6 +47,11 @@ class Site(NamedTuple):
     """Ses profils (`sameAs`), dans l'ordre du gabarit."""
     description: str
     """La description de l'accueil, celle de la paire `meta`."""
+
+    def project_url(self, slug: str) -> str:
+        """L'adresse canonique de la fiche `slug`, sous celle de l'accueil :
+        `https://pacome.dev/projets/<slug>`."""
+        return urljoin(self.home, f"projets/{slug}")
 
 
 class Template(NamedTuple):

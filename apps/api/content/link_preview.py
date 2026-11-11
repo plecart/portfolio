@@ -16,7 +16,6 @@ Un en-tête, et non une balise : le bloc d'aperçu s'en tient à ses cinq balise
 
 import hashlib
 import json
-from urllib.parse import urljoin
 
 from django.conf import settings
 from django.core.validators import slug_re
@@ -159,7 +158,7 @@ def page_tags(project: Project, site: Site, image: str | None) -> bytes:
     Returns:
         Les balises, en UTF-8.
     """
-    url = urljoin(site.home, f"projets/{project.slug}")
+    url = site.project_url(project.slug)
     # Les technologies, puis les outils, chaque groupe dans l'ordre de l'admin — l'ordre de la
     # fiche (`splitStack`, `apps/web/src/project/project.ts`) : le tri est stable.
     technologies = sorted(
