@@ -1,13 +1,15 @@
-"""Tests des aperçus de lien des fiches projet : `/projets/<slug>` rend le gabarit du front, son
-bloc marqué remplacé par les balises du projet publié, ou redirige vers l'accueil ; la page
-précharge l'image de tête de la galerie par un en-tête `Link` (#27) ; la page rendue est gardée
-dans l'espace du cache du contenu, en-têtes compris ; un gabarit défectueux est une erreur, jamais
-une page sans balises ; et l'API publique ne répond jamais en HTML (brief de #14, décisions 1 à 8).
+"""Tests des aperçus de lien des fiches projet : `/projets/<slug>` rend le gabarit du front, ses
+paires marquées remplies — les balises d'aperçu du projet publié, son adresse canonique et son
+JSON-LD, sa fiche pré-rendue (#265) —, ou redirige vers l'accueil ; la page précharge l'image de
+tête de la galerie par un en-tête `Link` (#27) ; la page rendue est gardée dans l'espace du cache du
+contenu, en-têtes compris ; un gabarit défectueux est une erreur, jamais une page sans balises ; et
+l'API publique ne répond jamais en HTML (brief de #14, décisions 1 à 8).
 
 Le gabarit est un fichier de fixture de test, que désigne l'environnement de test
 (`process_environment.py`) — jamais l'`index.html` du front.
 """
 
+import json
 import logging
 from collections.abc import Iterator
 from pathlib import Path
@@ -16,19 +18,25 @@ from typing import Any, cast
 import pytest
 from content.api import api
 from content.cache import purge
-from content.link_preview import (
-    GALLERY_SIZES,
-    OG_IMAGE_WIDTH,
-    LinkPreviewTemplateError,
-    meta_tags,
+from content.link_preview import GALLERY_SIZES, OG_IMAGE_WIDTH, meta_tags
+from content.models import (
+    GalleryImage,
+    ProcessingState,
+    Project,
+    ProjectTechnology,
+    TechnologyKind,
+    Variant,
 )
-from content.models import GalleryImage, ProcessingState, Project, Variant
+from content.site import SLOTS, LinkPreviewTemplateError
 from content.variants import VARIANT_WIDTHS
 from django.test import Client, override_settings
-from factories import gallery_image, project, saved
+from django.utils.html import escape
+from factories import STARTED_ON, gallery_image, project, saved, section, technology
 from pytest_django import DjangoAssertNumQueries, DjangoCaptureOnCommitCallbacks
 from test_cache import OTHER_ORIGINS
 from test_markdown_preview import tags
+from test_site import BROKEN_TEMPLATES as TEMPLATE_DEFECTS
+from test_site import SITE
 
 # Le gabarit de fixture de test : la forme de l'`index.html` compilé du front.
 TEMPLATE = Path(__file__).with_name("gabarit-apercu.html").read_bytes()
@@ -37,10 +45,10 @@ TEMPLATE = Path(__file__).with_name("gabarit-apercu.html").read_bytes()
 # de travail Windows sous `core.autocrlf` (`.gitattributes`).
 LINE_ENDINGS = {"LF": b"\n", "CRLF": b"\r\n"}
 
-# Le gabarit d'une autre compilation : d'autres octets hors du bloc marqué.
+# Le gabarit d'une autre compilation : d'autres octets hors des paires marquées.
 DEPLOYED = TEMPLATE + b"<!-- La compilation suivante. -->"
 
-# Les deux marqueurs du bloc, écrits ici sans les lire dans le module de la vue.
+# Les deux marqueurs du bloc d'aperçu, écrits ici sans les lire dans le module de la vue.
 START = b"<!--meta:start-->"
 END = b"<!--meta:end-->"
 
@@ -50,6 +58,28 @@ PAGE = f"/projets/{SLUG}"
 TITLE = 'A <b> & "c"'
 ESCAPED_TITLE = "A &lt;b&gt; &amp; &quot;c&quot;"
 SUMMARY = "R"
+
+# L'adresse canonique de la fiche : sous l'adresse de l'accueil que porte le gabarit, jamais sous
+# l'origine de la requête.
+CANONICAL = f"{SITE.home}projets/{SLUG}"
+
+# Du balisage qu'un champ saisi peut porter : un script et une balise. Échappé, il n'est que du
+# texte. Assez court pour un titre de projet (30 caractères), sans mot de 21 pour un résumé.
+MARKUP = "<script>x</script> <b>y</b>"
+
+# Chaque champ que la fiche pré-rendue montre, seul porteur du balisage : un champ du projet, ou
+# un champ de sa section.
+PRERENDERED_FIELDS: dict[str, tuple[dict[str, str], dict[str, str]]] = {
+    "titre": ({"title": MARKUP}, {}),
+    "résumé": ({"summary": MARKUP}, {}),
+    "description": ({"description": MARKUP}, {}),
+    "titre de section": ({}, {"title": MARKUP}),
+    "corps de section": ({}, {"body": MARKUP}),
+}
+
+# Un corps de section que le site ne montre pas (`visibleSections`, `body.trim() !== ''`) et que la
+# base accepte : `\S` y suit la locale libc, où l'espace insécable est un texte (`Section`).
+NBSP_BODY = chr(0xA0)
 
 # Une valeur qui casse le HTML sans échappement, texte comme attribut ; puis chaque valeur injectée
 # qui la porte : les champs du projet, puis l'adresse de l'image.
@@ -128,31 +158,46 @@ REDIRECTED = {
 # le refuse avant la vue.
 UNSAFE_METHODS = ["PUT", "PATCH", "DELETE", "OPTIONS"]
 
-# Les gabarits défectueux (décision 8) : leur contenu, `None` pour un fichier absent.
+# Les gabarits défectueux (décision 8) : leur contenu, `None` pour un fichier absent. Chaque défaut
+# du gabarit s'éprouve sur lui (`test_site.py`) ; la vue en reçoit un par voie : le fichier, ses
+# marqueurs, l'identité du site.
 BROKEN_TEMPLATES: dict[str, bytes | None] = {
     "introuvable": None,
-    "sans marqueur": TEMPLATE.replace(START, b"").replace(END, b""),
-    "marqueur de début doublé": TEMPLATE.replace(START, START * 2),
-    "marqueur de fin doublé": TEMPLATE.replace(END, END * 2),
-    "sans marqueur de début": TEMPLATE.replace(START, b""),
-    "sans marqueur de fin": TEMPLATE.replace(END, b""),
-    "marqueurs inversés": TEMPLATE.replace(START, b"INVERSION")
-    .replace(END, START)
-    .replace(b"INVERSION", END),
+    **{key: TEMPLATE_DEFECTS[key][0] for key in ("meta marqueurs inversés", "sans Person")},
 }
 
 
-def marked_block(document: bytes) -> str:
-    """Le bloc marqué de `document`, entre ses deux marqueurs."""
-    return document.partition(START)[2].partition(END)[0].decode()
+def marked_block(document: bytes, name: str = "meta") -> str:
+    """Le contenu de la paire `name` de `document`, entre ses deux marqueurs : par défaut, le bloc
+    d'aperçu."""
+    start, end = f"<!--{name}:start-->".encode(), f"<!--{name}:end-->".encode()
+    return document.partition(start)[2].partition(end)[0].decode()
 
 
-def outside(document: bytes) -> tuple[bytes, bytes]:
-    """Ce que `document` porte hors de son bloc marqué : jusqu'au marqueur de début compris, puis
-    depuis le marqueur de fin compris."""
-    head, _, rest = document.partition(START)
-    tail = rest.partition(END)[2]
-    return head + START, END + tail
+def outside(document: bytes) -> list[bytes]:
+    """Ce que `document` porte hors du contenu de ses paires marquées : jusqu'au premier marqueur
+    de début compris, puis d'un marqueur de fin au marqueur de début suivant, marqueurs compris,
+    puis la fin."""
+    pieces: list[bytes] = []
+    rest = document
+    for name in SLOTS:
+        start, end = f"<!--{name}:start-->".encode(), f"<!--{name}:end-->".encode()
+        before, _, after = rest.partition(start)
+        pieces.append(before + start)
+        rest = end + after.partition(end)[2]
+    return [*pieces, rest]
+
+
+def json_ld_source(document: bytes) -> str:
+    """Le texte du script JSON-LD de la paire `page` de `document`, jusqu'à la première balise
+    fermante : celle où le navigateur le clôt."""
+    script = marked_block(document, "page").partition('<script type="application/ld+json">')[2]
+    return script.partition("</script>")[0]
+
+
+def json_ld(document: bytes) -> dict[str, object]:
+    """Le JSON-LD de la paire `page` de `document`, lu."""
+    return json.loads(json_ld_source(document))
 
 
 def served(client: Client) -> tuple[object, ...]:
@@ -225,15 +270,149 @@ def test_chaque_valeur_injectee_est_echappee(fields: dict[str, str], image: str 
 @pytest.mark.django_db
 @pytest.mark.usefixtures("covered")
 @pytest.mark.parametrize("newline", LINE_ENDINGS.values(), ids=LINE_ENDINGS.keys())
-def test_hors_du_bloc_marque_la_page_est_le_gabarit_octet_pour_octet(
+def test_hors_des_paires_marquees_la_page_est_le_gabarit_octet_pour_octet(
     client: Client, template: Path, newline: bytes
 ) -> None:
-    """Les fichiers hachés de la compilation, le reste du `<head>` et le `<body>` sont ceux du
-    gabarit, marqueurs et fins de ligne compris : seul le bloc change."""
+    """Les fichiers hachés de la compilation, l'identité du site, le reste du `<head>` et du
+    `<body>` sont ceux du gabarit, marqueurs et fins de ligne compris : seul le contenu des paires
+    change."""
     content = TEMPLATE.replace(b"\r\n", b"\n").replace(b"\n", newline)
     template.write_bytes(content)
 
     assert outside(client.get(PAGE).content) == outside(content)
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("published")
+def test_la_fiche_porte_son_adresse_canonique_sous_celle_de_l_accueil(client: Client) -> None:
+    """Le `canonical` de l'accueil cède la place à celui de la fiche (#265) : une seule adresse
+    canonique dans la page, sous l'adresse de l'accueil que porte le gabarit."""
+    page = client.get(PAGE).content.decode()
+
+    canonicals = [
+        attributes["href"]
+        for tag, attributes in tags(page)
+        if tag == "link" and attributes.get("rel") == "canonical"
+    ]
+    assert canonicals == [CANONICAL]
+
+
+@pytest.mark.django_db
+def test_le_json_ld_d_un_projet_sans_depot_est_une_oeuvre_de_son_auteur(
+    client: Client, published: Project
+) -> None:
+    """`CreativeWork` (#265) : l'adresse canonique pour `@id` et `url`, l'auteur par renvoi au
+    `Person` du gabarit, les dates du projet en ISO 8601 ; sans couverture ni technologie, aucune
+    image et aucun mot-clé."""
+    updated_at = Project.objects.get(pk=published.pk).updated_at
+
+    assert json_ld(client.get(PAGE).content) == {
+        "@context": "https://schema.org",
+        "@type": "CreativeWork",
+        "@id": CANONICAL,
+        "url": CANONICAL,
+        "name": TITLE,
+        "author": {"@id": SITE.person},
+        "dateCreated": STARTED_ON.isoformat(),
+        "dateModified": updated_at.isoformat(),
+        "keywords": [],
+    }
+
+
+@pytest.mark.django_db
+def test_le_json_ld_d_un_projet_a_depot_est_du_code_source(
+    client: Client, published: Project
+) -> None:
+    """`SoftwareSourceCode` dès que `repository_url` est rempli, son dépôt en `codeRepository`."""
+    Project.objects.filter(pk=published.pk).update(repository_url="https://depot.test/portfolio")
+
+    data = json_ld(client.get(PAGE).content)
+
+    assert (data["@type"], data["codeRepository"]) == (
+        "SoftwareSourceCode",
+        "https://depot.test/portfolio",
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("covered")
+def test_le_json_ld_porte_la_couverture_de_l_apercu(client: Client) -> None:
+    """L'image du JSON-LD est celle de l'`og:image` : la variante de 1200 px de la couverture."""
+    assert json_ld(client.get(PAGE).content)["image"] == COVER_URL
+
+
+@pytest.mark.django_db
+def test_les_mots_cles_sont_les_technologies_dans_l_ordre_de_la_fiche(
+    client: Client, published: Project
+) -> None:
+    """Les technologies, puis les outils, chaque groupe dans l'ordre de l'admin : l'ordre où la
+    fiche les montre (`splitStack`, `apps/web/src/project/project.ts`)."""
+    lines = [
+        ("Vite", TechnologyKind.TOOL),
+        ("Django", TechnologyKind.FRAMEWORK),
+        ("Python", TechnologyKind.LANGUAGE),
+    ]
+    for position, (name, kind) in enumerate(lines):
+        used = saved(technology(name=name, kind=kind))
+        saved(ProjectTechnology(project=published, technology=used, position=position))
+
+    assert json_ld(client.get(PAGE).content)["keywords"] == ["Django", "Python", "Vite"]
+
+
+@pytest.mark.django_db
+def test_une_balise_fermante_dans_un_champ_ne_ferme_pas_le_json_ld(
+    client: Client, published: Project
+) -> None:
+    """`<`, `>` et `&` sont échappés dans le JSON, comme `json_script` de Django : un `</script>`
+    saisi ne clôt pas le script, et le JSON se relit intact."""
+    hostile = "A </script> & <!--"
+    Project.objects.filter(pk=published.pk).update(title=hostile)
+
+    page = client.get(PAGE).content
+
+    assert json_ld(page)["name"] == hostile
+    assert not {"<", ">", "&"} & set(json_ld_source(page))
+
+
+@pytest.mark.django_db
+def test_la_fiche_pre_rendue_porte_titre_resume_description_puis_ses_sections(
+    client: Client, published: Project
+) -> None:
+    """Dans `#root`, masquée à l'œil par sa classe jusqu'au montage du site (#265) : le titre en
+    `<h2>`, le résumé, la description, puis chaque section non vide, son titre en `<h3>` suivi de
+    son texte, dans l'ordre de l'admin. Le texte est le Markdown source, jamais rendu (ADR 0010)."""
+    saved(
+        section(published, title="Résultats", anchor="resultats", body="- un\n- deux", position=2)
+    )
+    saved(section(published, title="Vide", anchor="vide", body=NBSP_BODY, position=3))
+    saved(section(published, position=1))
+
+    assert marked_block(client.get(PAGE).content, "root") == (
+        '<article class="prerender">'
+        f"<h2>{ESCAPED_TITLE}</h2>"
+        f"<p>{SUMMARY}</p>"
+        "<p>Une table de projets et leurs fiches.</p>"
+        "<h3>Contexte et objectif</h3><p>Pourquoi ce projet.</p>"
+        "<h3>Résultats</h3><p>- un\n- deux</p>"
+        "</article>"
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("fields", "section_fields"), PRERENDERED_FIELDS.values(), ids=PRERENDERED_FIELDS.keys()
+)
+def test_chaque_champ_pre_rendu_est_echappe(
+    client: Client, fields: dict[str, str], section_fields: dict[str, str]
+) -> None:
+    """Un script ou une balise saisis dans un champ ressortent en texte, jamais en balise."""
+    owner = saved(project(slug=SLUG, published=True, **fields))
+    saved(section(owner, **section_fields))
+
+    block = marked_block(client.get(PAGE).content, "root")
+
+    assert escape(MARKUP) in block
+    assert not {"script", "b"} & {tag for tag, _ in tags(block)}
 
 
 @pytest.mark.django_db
@@ -530,8 +709,8 @@ def test_un_gabarit_change_n_est_jamais_servi_depuis_l_entree_de_l_ancien(
 def test_un_gabarit_defectueux_est_une_erreur_journalisee_jamais_une_page(
     template: Path, caplog: pytest.LogCaptureFixture, content: bytes | None
 ) -> None:
-    """Introuvable, ou sans ses deux marqueurs uniques dans l'ordre : `500`, et l'erreur, qui nomme
-    le gabarit, est journalisée par Django avec sa trace (décision 8)."""
+    """Introuvable, mal marqué ou sans l'identité du site : `500`, et l'erreur, qui nomme le
+    gabarit, est journalisée par Django avec sa trace (décision 8)."""
     if content is not None:
         template.write_bytes(content)
 

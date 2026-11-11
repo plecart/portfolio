@@ -5,6 +5,7 @@
  * publiera. Aucun test unitaire ne peut les remplacer : ils mesurent le HTML final, le trafic
  * réseau du navigateur et l'arbre d'accessibilité rendu.
  */
+import { readFileSync } from 'node:fs'
 // Import nommé, pas défaut : le paquet expose `export { AxeBuilder, AxeBuilder as default }`
 // (`dist/index.d.ts`), et la forme par défaut n'est pas constructible sans `esModuleInterop`,
 // que le projet n'active pas.
@@ -136,23 +137,59 @@ test('le projet mobile émule un appareil tactile de 400 px', async ({ page }, t
   ).toEqual({ width: 400, touch: true })
 })
 
-test("l'index compilé porte le bloc d'aperçu une seule fois", async ({ request }) => {
+/**
+ * Les paires de marqueurs du gabarit, dans leur ordre : sur une fiche, Django remplace le contenu de
+ * chacune (`apps/api/content/site.py`, `docs/frontend-outillage.md` §2.4).
+ */
+const MARKER_PAIRS = ['meta', 'page', 'root']
+
+/** Le contenu de la paire `name` dans `html`, entre ses deux marqueurs. */
+const pairContent = (html: string, name: string) =>
+  html.split(`<!--${name}:start-->`)[1]?.split(`<!--${name}:end-->`)[0]
+
+/** Le JSON-LD de `html`, lu ; `null` sans JSON-LD. */
+const jsonLd = (html: string): unknown =>
+  JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)?.[1] ?? 'null')
+
+test("l'index compilé porte chaque paire de marqueurs une seule fois, dans l'ordre", async ({
+  request,
+}) => {
   const html = await (await request.get('/')).text()
 
-  // Les deux marqueurs sont comptés séparément : compter les blocs bien formés laisserait
-  // passer un marqueur orphelin, et c'est sur les marqueurs que #14 découpera.
-  expect(html.match(/<!--meta:start-->/g)).toHaveLength(1)
-  expect(html.match(/<!--meta:end-->/g)).toHaveLength(1)
+  // Chaque marqueur est compté seul : compter les paires bien formées laisserait passer un
+  // marqueur orphelin, et c'est sur les marqueurs que Django découpe.
+  const markers = MARKER_PAIRS.flatMap((name) => [`<!--${name}:start-->`, `<!--${name}:end-->`])
+  expect(markers.map((marker) => html.split(marker).length - 1)).toEqual(markers.map(() => 1))
+  const positions = markers.map((marker) => html.indexOf(marker))
+  expect(positions).toEqual(positions.toSorted((a, b) => a - b))
 
   // Les **quatre** balises du contrat, vérifiées à l'intérieur du bloc — c'est la population du
   // contrat écrit dans #14, pas un échantillon. `name="description"` en fait partie : un test qui
   // la cherche par sélecteur DOM la trouverait n'importe où dans le document, et #14 pourrait la
   // laisser hors du bloc, donc en double après remplacement.
-  const [block] = html.match(/<!--meta:start-->[\s\S]*<!--meta:end-->/) ?? []
+  const block = pairContent(html, 'meta')
   expect(block).toContain('<title>')
   expect(block).toContain('name="description"')
   expect(block).toContain('property="og:title"')
   expect(block).toContain('property="og:description"')
+  // Propre à l'accueil : une fiche le remplace par le sien, jamais en double.
+  expect(pairContent(html, 'page')).toContain('rel="canonical"')
+})
+
+test("l'identité du site survit à la compilation, hors des paires de marqueurs", async ({
+  request,
+}) => {
+  const html = await (await request.get('/')).text()
+  const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
+
+  // Hors des paires, dont une fiche remplace le contenu : l'identité reste sur chaque page, et
+  // Django la lit là.
+  const outside = MARKER_PAIRS.reduce(
+    (rest, name) => rest.replace(`<!--${name}:start-->${pairContent(rest, name)}`, ''),
+    html,
+  )
+  expect(jsonLd(source)).not.toBeNull()
+  expect(jsonLd(outside)).toEqual(jsonLd(source))
 })
 
 test('la licence de la police voyage avec la distribution', async ({ request }) => {
@@ -165,17 +202,21 @@ test('la licence de la police voyage avec la distribution', async ({ request }) 
   expect(await response.text()).toContain('SIL OPEN FONT LICENSE Version 1.1')
 })
 
-test('les deux descriptions du bloc portent le même texte', async ({ page }) => {
+test('les deux descriptions du bloc portent le même texte, de 150 à 160 caractères', async ({
+  page,
+}) => {
   await page.goto('/')
 
   const contentOf = (selector: string) => page.locator(selector).getAttribute('content')
+  const description = (await contentOf('meta[name="description"]')) ?? ''
 
   // Le HTML statique ne sait pas factoriser une chaîne : `description` et `og:description` sont
   // écrites deux fois, et #14 les réécrira toutes les deux. L'égalité est donc un invariant du
   // gabarit, pas une coïncidence — sans ce test, rien ne la tiendrait.
-  expect(await contentOf('meta[property="og:description"]')).toBe(
-    await contentOf('meta[name="description"]'),
-  )
+  expect(await contentOf('meta[property="og:description"]')).toBe(description)
+  // La longueur du critère « Description de l'accueil » de #265.
+  expect(description.length).toBeGreaterThanOrEqual(150)
+  expect(description.length).toBeLessThanOrEqual(160)
 })
 
 // Dans les deux modes, entête en haut de page et décollée — son fond change le contraste du nom

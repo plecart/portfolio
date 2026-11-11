@@ -316,13 +316,13 @@ for (const path of ['/', '/projets/exemple']) {
 
       const [first, root] = await page.evaluate(() => [
         (globalThis as unknown as { firstRender: string[] }).firstRender,
-        document.getElementById('root')?.innerHTML,
+        document.getElementById('root')?.childElementCount,
       ])
       const [background] = await resolveAll(page, [
         ['background-color', specValue(SPEC_TOKENS['--bg'], stored)],
       ])
-      // `#root` vide : le témoin que l'application n'a pas tourné.
-      expect([first, root]).toEqual([[stored, background], ''])
+      // Aucun élément dans `#root`, que ses marqueurs : le témoin que l'application n'a pas tourné.
+      expect([first, root]).toEqual([[stored, background], 0])
     })
   }
 }
@@ -379,7 +379,11 @@ test("l'index compilé ne porte que des scripts servis en fichier, la restaurati
     const index = restore ? headNodes.indexOf(restore) : -1
 
     return {
-      inlineScripts: [...doc.scripts].filter((script) => !script.hasAttribute('src')).length,
+      // Le JSON-LD du site n'en est pas : un bloc de données, que le navigateur n'exécute jamais
+      // (spec HTML, élément `script`, « data block »).
+      inlineScripts: [...doc.scripts].filter(
+        (script) => !script.hasAttribute('src') && script.type !== 'application/ld+json',
+      ).length,
       styles: doc.querySelectorAll('style').length,
       styleAttributes: elements.filter((element) => element.hasAttribute('style')).length,
       handlers: elements.flatMap((element) =>
