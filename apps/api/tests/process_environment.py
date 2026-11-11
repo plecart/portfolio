@@ -33,7 +33,7 @@ VALID_ENVIRONMENT = {
     # Relatif à dessein : c'est la forme que `.env.example` propose, donc celle que la plupart
     # des clones porteront, et la seule qui éprouve l'ancrage sur la racine du dépôt.
     "MEDIA_ROOT": "fichiers-de-test",
-    # Le gabarit des aperçus de lien : un fichier de fixture de test, jamais l'`index.html` du
+    # Le gabarit du site : un fichier de fixture de test, jamais l'`index.html` du
     # front ; relatif, comme sur le poste.
     "LINK_PREVIEW_TEMPLATE": "apps/api/tests/gabarit-apercu.html",
     # Le disque, comme sur le poste : les variables du stockage R2 y sont vides, et sans effet.

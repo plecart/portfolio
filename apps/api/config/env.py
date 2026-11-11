@@ -197,7 +197,7 @@ class Env(BaseSettings):
             les variables du stockage R2 : le `collectstatic` du build de l'image et `make openapi`
             chargent `Env` sans avoir l'usage du compte. C'est la commande qui refuse un compte
             vide, et Compose qui exige les deux en production.
-        LINK_PREVIEW_TEMPLATE: le gabarit des aperçus de lien (ADR 0011) : l'`index.html` du
+        LINK_PREVIEW_TEMPLATE: le gabarit du site (ADR 0011) : l'`index.html` du
             front, dont la vue de `/projets/<slug>` remplit les paires marquées pour le projet,
             et qui porte l'identité du site, que lisent aussi `/sitemap.xml` et `/llms.txt`
             (`content/site.py`, #265). Par défaut
