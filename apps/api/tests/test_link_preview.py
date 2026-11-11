@@ -26,7 +26,7 @@ from content.models import (
     TechnologyKind,
     Variant,
 )
-from content.site import SLOTS, LinkPreviewTemplateError
+from content.site import SLOTS, SiteTemplateError
 from content.variants import VARIANT_WIDTHS
 from django.test import Client
 from django.utils.html import escape
@@ -713,7 +713,7 @@ def test_un_gabarit_defectueux_est_une_erreur_journalisee_jamais_une_page(
     ]
     assert response.status_code == 500
     assert [(name, level, type(error)) for name, level, error in logged] == [
-        ("django.request", logging.ERROR, LinkPreviewTemplateError)
+        ("django.request", logging.ERROR, SiteTemplateError)
     ]
     assert str(template) in str(logged[0][2])
 

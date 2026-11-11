@@ -13,7 +13,7 @@ from xml.etree import ElementTree
 
 import pytest
 from content.models import Project
-from content.site import LinkPreviewTemplateError
+from content.site import SiteTemplateError
 from django.test import Client
 from factories import project, saved
 from pytest_django import DjangoAssertNumQueries, DjangoCaptureOnCommitCallbacks
@@ -210,7 +210,7 @@ def test_un_gabarit_defectueux_est_une_erreur_journalisee_jamais_un_fichier(
 
     errors = [record.exc_info[1] for record in caplog.records if record.exc_info]
     assert response.status_code == 500
-    assert [type(error) for error in errors] == [LinkPreviewTemplateError]
+    assert [type(error) for error in errors] == [SiteTemplateError]
     assert str(template) in str(errors[0])
 
 

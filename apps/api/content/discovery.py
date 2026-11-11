@@ -95,7 +95,7 @@ def discovery_view(
     change l'identité n'est jamais servi depuis l'entrée d'avant. `no-cache` et `require_safe`,
     comme la fiche (`content/link_preview.py`) : revalidée à chaque visite, l'en-tête reposé sur la
     réponse que sert le cache ; `405` à toute méthode qui ne lit pas. La vue lève
-    `LinkPreviewTemplateError` si le gabarit est illisible, mal marqué ou sans l'identité du site
+    `SiteTemplateError` si le gabarit est illisible, mal marqué ou sans l'identité du site
     (`read_template`).
     """
 

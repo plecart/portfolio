@@ -9,7 +9,7 @@ poste sert tel quel (`.env.example`), doit se lire.
 from pathlib import Path
 
 import pytest
-from content.site import SLOTS, LinkPreviewTemplateError, Site, read_template
+from content.site import SLOTS, Site, SiteTemplateError, read_template
 from system_commands import REPOSITORY_ROOT
 
 # Le gabarit de fixture de test, puis ses octets.
@@ -182,7 +182,7 @@ def test_un_gabarit_defectueux_est_une_erreur_qui_nomme_le_fichier_et_le_defaut(
     path = tmp_path / "index.html"
     path.write_bytes(content)
 
-    with pytest.raises(LinkPreviewTemplateError) as raised:
+    with pytest.raises(SiteTemplateError) as raised:
         read_template(path)
 
     assert str(path) in str(raised.value)
