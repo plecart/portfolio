@@ -16,6 +16,10 @@ from system_commands import REPOSITORY_ROOT
 FIXTURE = Path(__file__).with_name("gabarit-apercu.html")
 TEMPLATE = FIXTURE.read_bytes()
 
+# Les paires du gabarit, dans leur ordre, écrites ici sans les lire dans le module : une paire
+# retirée de `SLOTS` y garde ses cas, qui rougissent, au lieu de les emporter.
+PAIRS = ("meta", "page", "root")
+
 # L'identité du site que porte le gabarit de fixture : d'autres valeurs que celles du front, pour
 # qu'aucune ne puisse venir d'ailleurs.
 SITE = Site(
@@ -31,6 +35,8 @@ CANONICAL = b'<link rel="canonical" href="https://site.test/" />'
 DESCRIPTION = '<meta name="description" content="Portfolio de l’auteur." />'.encode()
 JSON_LD_START = b'<script type="application/ld+json">'
 JSON_LD = JSON_LD_START + TEMPLATE.partition(JSON_LD_START)[2].partition(b"</script>")[0]
+# Le script JSON-LD entier, fermé : celui qui porte le `Person`.
+JSON_LD_SCRIPT = JSON_LD + b"</script>"
 
 
 def markers(name: str) -> tuple[bytes, bytes]:
@@ -64,7 +70,7 @@ def marker_defects(name: str) -> dict[str, tuple[bytes, str]]:
 # Les gabarits défectueux, chacun avec ce que le message doit nommer en plus du fichier : la paire
 # en défaut pour chaque défaut de ses marqueurs, l'élément en défaut pour l'identité du site.
 BROKEN_TEMPLATES: dict[str, tuple[bytes, str]] = {
-    **{key: value for name in SLOTS for key, value in marker_defects(name).items()},
+    **{key: value for name in PAIRS for key, value in marker_defects(name).items()},
     "paires meta et page inversées": (
         TEMPLATE.replace(pair("meta"), b"PAIRE")
         .replace(pair("page"), pair("meta"))
@@ -91,11 +97,18 @@ BROKEN_TEMPLATES: dict[str, tuple[bytes, str]] = {
         TEMPLATE.replace(DESCRIPTION, b'<meta name="description" />'),
         "description",
     ),
-    "sans JSON-LD": (TEMPLATE.replace(JSON_LD, b""), "Person"),
-    "JSON-LD dans une paire": (
-        TEMPLATE.replace(JSON_LD, b"").replace(b"<!--page:end-->", JSON_LD + b"<!--page:end-->"),
-        "Person",
-    ),
+    "sans JSON-LD": (TEMPLATE.replace(JSON_LD_SCRIPT, b""), "Person"),
+    # L'identité ne se lit que hors des paires : une vue en remplace le contenu, et une fiche qui
+    # remplit `page` ôterait à son `author` le `Person` qu'il cite.
+    **{
+        f"JSON-LD dans la paire {name}": (
+            TEMPLATE.replace(JSON_LD_SCRIPT, b"").replace(
+                markers(name)[1], JSON_LD_SCRIPT + markers(name)[1]
+            ),
+            "Person",
+        )
+        for name in PAIRS
+    },
     "JSON-LD illisible": (TEMPLATE.replace(b'"@context"', b"@context"), "JSON-LD"),
     "JSON-LD qui n'est pas un objet": (
         TEMPLATE.replace(JSON_LD, JSON_LD_START + b"[]"),
@@ -122,6 +135,12 @@ BROKEN_TEMPLATES: dict[str, tuple[bytes, str]] = {
         "sameAs",
     ),
 }
+
+
+def test_le_gabarit_a_trois_paires_dans_leur_ordre() -> None:
+    """L'autre sens des cas écrits pour chaque paire (`PAIRS`) : une paire ajoutée au module en
+    réclame les siens."""
+    assert SLOTS == PAIRS
 
 
 def test_le_gabarit_porte_l_identite_du_site() -> None:
