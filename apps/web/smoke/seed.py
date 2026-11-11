@@ -1,5 +1,5 @@
-"""La semence de la fumée (#26) : un projet publié, sa couverture et une technologie, écrits dans
-la pile par le conteneur `api`, qui lit ce fichier sur son entrée standard
+"""La semence de la fumée (#26) : un projet publié, sa couverture, une technologie et une section,
+écrits dans la pile par le conteneur `api`, qui lit ce fichier sur son entrée standard
 (`docker compose exec -T api python -`, depuis `global-setup.ts`). L'image publiée ne porte aucun
 test, et aucune fixture n'entre dans `apps/api` : la donnée appartient au test (brief de #26,
 décision 6).
@@ -33,6 +33,7 @@ def main() -> None:
         ProjectKind,
         ProjectStatus,
         ProjectTechnology,
+        Section,
         Technology,
         TechnologyKind,
     )
@@ -53,6 +54,13 @@ def main() -> None:
         published=True,
     )
     ProjectTechnology.objects.create(project=project, technology=technology, position=0)
+    section = Section.objects.create(
+        project=project,
+        title="Architecture",
+        anchor="architecture",
+        body="La pile complète, semée puis jetée.",
+        position=0,
+    )
     # Une vraie image, carrée et au côté minimal de la couverture (spec §1.11) : le worker en tire
     # toutes les variantes, celle de l'`og:image` comprise.
     cover = io.BytesIO()
@@ -67,6 +75,7 @@ def main() -> None:
         "slug": project.slug,
         "title": project.title,
         "summary": project.summary,
+        "section": section.title,
         "bucket": os.environ["MEDIA_R2_BUCKET"],
     }
     print(json.dumps(seeded))
