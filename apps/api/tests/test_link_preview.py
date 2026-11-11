@@ -11,7 +11,6 @@ Le gabarit est un fichier de fixture de test, que désigne l'environnement de te
 
 import json
 import logging
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, cast
 
@@ -29,7 +28,7 @@ from content.models import (
 )
 from content.site import SLOTS, LinkPreviewTemplateError
 from content.variants import VARIANT_WIDTHS
-from django.test import Client, override_settings
+from django.test import Client
 from django.utils.html import escape
 from factories import STARTED_ON, gallery_image, project, saved, section, technology
 from pytest_django import DjangoAssertNumQueries, DjangoCaptureOnCommitCallbacks
@@ -209,15 +208,6 @@ def served(client: Client) -> tuple[object, ...]:
         response["Cache-Control"],
         response.content,
     )
-
-
-@pytest.fixture
-def template(tmp_path: Path) -> Iterator[Path]:
-    """Le gabarit que la vue lit le temps du test, à la place de la fixture de test : absent tant
-    que le test ne l'écrit pas."""
-    path = tmp_path / "index.html"
-    with override_settings(LINK_PREVIEW_TEMPLATE=path):
-        yield path
 
 
 @pytest.fixture
