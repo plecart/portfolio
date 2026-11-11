@@ -1,7 +1,8 @@
 /**
  * L'identité du site dans le gabarit `index.html` (#265) : le JSON-LD `Person` et `WebSite` qu'un
  * robot lit sur chaque page, et que Django relit comme seule source (`apps/api/content/site.py`).
- * Ses liens et son adresse sont des copies, chacune tenue égale à sa vérité.
+ * Ses liens et son adresse sont des copies, chacune tenue égale à sa vérité — l'adresse du plan du
+ * site dans `robots.txt` aussi.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -26,9 +27,25 @@ test('le JSON-LD du site lie les profils des liens de l’auteur, dans leur ordr
   expect(graph().Person.sameAs).toEqual(hrefs)
 })
 
-test('l’adresse de l’accueil est la même dans le canonical et dans le JSON-LD', () => {
+/** L'adresse de l'accueil, celle du `canonical` du gabarit. */
+function home(): string {
   const [, canonical] = TEMPLATE.match(/<link rel="canonical" href="([^"]+)"/) ?? []
+  return canonical
+}
+
+test('l’adresse de l’accueil est la même dans le canonical et dans le JSON-LD', () => {
   const { Person, WebSite } = graph()
 
-  expect([Person.url, WebSite.url]).toEqual([canonical, canonical])
+  expect([Person.url, WebSite.url]).toEqual([home(), home()])
+})
+
+test('robots.txt autorise tout robot et annonce le plan du site sous l’adresse de l’accueil', () => {
+  const robots = readFileSync(join(APP_ROOT, 'public/robots.txt'), 'utf8')
+
+  // Ni groupe nommé ni `Content-Signal` : tout robot est admis, entraînement compris (#265).
+  expect(robots.split(/\r?\n/).filter(Boolean)).toEqual([
+    'User-agent: *',
+    'Allow: /',
+    `Sitemap: ${new URL('sitemap.xml', home()).href}`,
+  ])
 })
