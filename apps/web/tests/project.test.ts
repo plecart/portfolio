@@ -200,6 +200,12 @@ test('l’image de tête se précharge à la taille de la galerie : la vue des a
   expect(readFileSync(LINK_PREVIEW, 'utf8')).toContain(`"${GALLERY_SIZES}"`)
 })
 
+test('la classe de la fiche que pré-rend la vue des aperçus est une règle de la feuille du site', () => {
+  const [, name] = readFileSync(LINK_PREVIEW, 'utf8').match(/PRERENDER_CLASS = "([^"]+)"/) ?? []
+
+  expect(readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')).toContain(`.${name} {`)
+})
+
 test.each([
   ['39 px vers la gauche : rien', -39, 0, 0],
   ['40 px tout juste : rien', -40, 0, 0],

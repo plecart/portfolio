@@ -198,10 +198,10 @@ class Env(BaseSettings):
             chargent `Env` sans avoir l'usage du compte. C'est la commande qui refuse un compte
             vide, et Compose qui exige les deux en production.
         LINK_PREVIEW_TEMPLATE: le gabarit des aperçus de lien (ADR 0011) : l'`index.html` du
-            front, dont la vue de `/projets/<slug>` remplace le bloc marqué par les balises du
-            projet (`content/link_preview.py`). Par défaut `/app/web/index.html`, où l'image `api`
-            copie la compilation (ADR 0014) ; sur le poste, un chemin relatif est ancré sur la
-            racine du dépôt, comme `MEDIA_ROOT`.
+            front, dont la vue de `/projets/<slug>` remplit les paires marquées pour le projet,
+            et qui porte l'identité du site (`content/site.py`, #265). Par défaut
+            `/app/web/index.html`, où l'image `api` copie la compilation (ADR 0014) ; sur le
+            poste, un chemin relatif est ancré sur la racine du dépôt, comme `MEDIA_ROOT`.
         SENTRY_DSN: le DSN du projet Sentry qui reçoit les erreurs de `api` et de `worker`
             (ADR 0027, `config/observability.py`). Vide par défaut, et hors de la production :
             Sentry ne s'initialise pas, rien ne part. `SecretStr` comme `SECRET_KEY` : qui le

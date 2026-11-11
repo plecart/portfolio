@@ -13,25 +13,49 @@
          par un chemin absolu — docs/frontend-outillage.md §2.4. -->
     <script src="/theme.js"></script>
 
-    <!-- Emplacement marqué du gabarit : #14 remplace tout le bloc entre les deux marqueurs.
-         Contrat, valeurs par défaut et absence d'`og:image` : ADR 0008 « Aperçus de lien » et
-         docs/frontend-outillage.md §2.4. Ce fichier part chez chaque visiteur — l'explication
-         longue vit dans la doc, pas ici. -->
+    <!-- Paires marquées du gabarit — meta, page, root — et identité du site : contrat et valeurs
+         par défaut dans docs/frontend-outillage.md §2.4. Ce fichier part chez chaque visiteur —
+         l'explication longue vit dans la doc, pas ici. -->
     <!--meta:start-->
     <title>Pacôme Bernier</title>
     <meta
       name="description"
-      content="Portfolio de Pacôme Bernier : projets de conception, développement, données et exploitation."
+      content="Pacôme Bernier, ingénieur IA en Île-de-France : conception, développement, données et exploitation d’applications web, présentées ici projet par projet."
     />
     <meta property="og:title" content="Pacôme Bernier" />
     <meta
       property="og:description"
-      content="Portfolio de Pacôme Bernier : projets de conception, développement, données et exploitation."
+      content="Pacôme Bernier, ingénieur IA en Île-de-France : conception, développement, données et exploitation d’applications web, présentées ici projet par projet."
     />
     <!--meta:end-->
+    <!--page:start-->
+    <link rel="canonical" href="https://pacome.dev/" />
+    <!--page:end-->
+
+    <!-- Identité du site, sur chaque page, relue par Django : docs/frontend-outillage.md §2.4. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Person",
+            "@id": "https://pacome.dev/#person",
+            "name": "Pacôme Bernier",
+            "url": "https://pacome.dev/",
+            "sameAs": ["https://github.com/plecart", "https://www.linkedin.com/in/pacomebernier98/"]
+          },
+          {
+            "@type": "WebSite",
+            "url": "https://pacome.dev/",
+            "name": "Pacôme Bernier",
+            "inLanguage": "fr"
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><!--root:start--><!--root:end--></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

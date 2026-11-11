@@ -2,19 +2,21 @@
 l'API publique ne rend jamais (ADR 0008, 0009 et 0011 ; brief de #14, décision 7).
 
 Caddy relaie `/projets/*` vers `api`. Pour un projet publié, la vue rend le gabarit du front —
-l'`index.html` compilé, `LINK_PREVIEW_TEMPLATE` — dont le bloc marqué porte les balises du projet,
-celles que lit un robot d'aperçu ; un navigateur y charge le site, qui affiche la fiche. Toute
-autre adresse redirige vers l'accueil (décision 1). La CSP et les en-têtes de sécurité restent
-ceux de Caddy (décision 5).
+l'`index.html` compilé, `LINK_PREVIEW_TEMPLATE`, lu par `content/site.py` — et en remplit les trois
+paires marquées : le bloc d'aperçu `meta` de ses cinq balises, celles que lit un robot d'aperçu
+(D53, ADR 0011) ; la paire `page` de son adresse canonique et de son JSON-LD ; la paire `root`,
+dans `#root`, de la fiche pré-rendue, masquée à l'œil, qu'un robot lit sans JavaScript (#265). Un
+navigateur y charge le site, qui remplace `#root` et affiche la fiche. Toute autre adresse redirige
+vers l'accueil (décision 1). La CSP et les en-têtes de sécurité restent ceux de Caddy (décision 5).
 
 La page porte aussi un en-tête `Link` qui précharge l'image de tête de la galerie (`preload_link`,
 #27) : le navigateur la demande dès la page reçue, sans attendre le JS ni la liste des projets.
-Un en-tête, et non une balise : le bloc marqué s'en tient à ses cinq balises (D53, ADR 0011).
+Un en-tête, et non une balise : le bloc d'aperçu s'en tient à ses cinq balises.
 """
 
 import hashlib
-from pathlib import Path
-from typing import NamedTuple
+import json
+from urllib.parse import urljoin
 
 from django.conf import settings
 from django.core.validators import slug_re
@@ -26,16 +28,21 @@ from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_safe
 
 from content.cache import cached_response
-from content.models import Project
+from content.models import Project, TechnologyKind
 from content.schemas import variant_url
-
-# Les deux marqueurs du bloc d'aperçu, chacun une fois dans le gabarit compilé
-# (`docs/frontend-outillage.md` §2.4) : la vue remplace ce qui est entre eux, et les garde.
-START = b"<!--meta:start-->"
-END = b"<!--meta:end-->"
+from content.site import JSON_LD, Site, read_template
 
 # Le gabarit est en UTF-8, et la page en reprend les octets tels quels.
 CONTENT_TYPE = "text/html; charset=utf-8"
+
+# La classe qui masque la fiche pré-rendue à l'œil (`apps/web/src/index.css`) : un robot la lit, un
+# visiteur voit la fiche du site, qui la remplace au montage (#265).
+PRERENDER_CLASS = "prerender"
+
+# Ce qui fermerait le script d'un JSON-LD ou y ouvrirait un commentaire, échappé dans le JSON en
+# séquence Unicode — `chr(92)` est l'antislash — comme le fait `django.utils.html.json_script`
+# (`_json_script_escapes`, Django 6.1) : le JSON relu reste le même.
+JSON_SCRIPT_ESCAPES = {ord(char): f"{chr(92)}u{ord(char):04X}" for char in "<>&"}
 
 # La largeur de la variante de l'`og:image`, 1200 px (spec §1.11, ADR 0011) : un barreau de
 # l'échelle des variantes (`VARIANT_WIDTHS`), découplé du dernier (ADR 0028).
@@ -47,52 +54,6 @@ OG_IMAGE_WIDTH = 1200
 GALLERY_SIZES = (
     "(min-width: 600px) min(100vh - 96px, 660px, (100vw - 92px) / 2), calc(100vw - 16px)"
 )
-
-
-class LinkPreviewTemplateError(RuntimeError):
-    """Le gabarit est illisible, ou n'a pas ses deux marqueurs une fois chacun, dans l'ordre
-    (décision 8). Levée par la vue, journalisée par Django (`django.request`) avec sa trace et
-    rendue en `500` : jamais une page servie sans les balises du projet."""
-
-
-class Template(NamedTuple):
-    """Le gabarit, découpé autour de son bloc marqué."""
-
-    head: bytes
-    """Jusqu'au marqueur de début compris."""
-    tail: bytes
-    """Depuis le marqueur de fin compris."""
-    digest: str
-    """L'empreinte SHA-256 du fichier entier."""
-
-
-def read_template(path: Path) -> Template:
-    """Lit et découpe le gabarit `path`, relu à chaque appel : rien ne garde un gabarit qu'un
-    déploiement a remplacé.
-
-    Args:
-        path: le gabarit, `LINK_PREVIEW_TEMPLATE`.
-
-    Returns:
-        Le gabarit découpé, octets tels quels : aucun décodage, aucune fin de ligne réécrite.
-
-    Raises:
-        LinkPreviewTemplateError: le fichier ne se lit pas, ou n'a pas exactement un marqueur de
-            début suivi d'un marqueur de fin ; le message nomme le fichier.
-    """
-    try:
-        content = path.read_bytes()
-    except OSError as error:
-        raise LinkPreviewTemplateError(f"gabarit des aperçus de lien illisible : {path}") from error
-    starts, ends = content.count(START), content.count(END)
-    if (starts, ends) != (1, 1) or content.index(START) > content.index(END):
-        raise LinkPreviewTemplateError(
-            f"le gabarit des aperçus de lien {path} doit porter {START.decode()} puis "
-            f"{END.decode()}, une fois chacun ; il en porte {starts} et {ends}"
-        )
-    head, _, rest = content.partition(START)
-    tail = rest.partition(END)[2]
-    return Template(head + START, END + tail, hashlib.sha256(content).hexdigest())
 
 
 def cover_url(request: HttpRequest, project: Project) -> str | None:
@@ -178,6 +139,76 @@ def meta_tags(project: Project, image: str | None) -> bytes:
     return "".join(tags).encode()
 
 
+def json_ld_script(data: dict[str, object]) -> str:
+    """Le script JSON-LD de `data`, `<`, `>` et `&` échappés dans le JSON (`JSON_SCRIPT_ESCAPES`) :
+    un `</script>` saisi dans un champ ne clôt pas le script."""
+    text = json.dumps(data, ensure_ascii=False).translate(JSON_SCRIPT_ESCAPES)
+    return f'<script type="{JSON_LD}">{text}</script>'
+
+
+def page_tags(project: Project, site: Site, image: str | None) -> bytes:
+    """La paire `page` d'une fiche (#265) : son adresse canonique, sous celle de l'accueil, puis son
+    JSON-LD — `SoftwareSourceCode` s'il a un dépôt, `CreativeWork` sinon —, son auteur par renvoi
+    au `Person` du gabarit et ses technologies en mots-clés.
+
+    Args:
+        project: le projet de la page.
+        site: l'identité du site, qui donne l'adresse de l'accueil et l'auteur.
+        image: l'adresse de l'`og:image` (`cover_url`), ou `None` pour l'omettre.
+
+    Returns:
+        Les balises, en UTF-8.
+    """
+    url = urljoin(site.home, f"projets/{project.slug}")
+    # Les technologies, puis les outils, chaque groupe dans l'ordre de l'admin — l'ordre de la
+    # fiche (`splitStack`, `apps/web/src/project/project.ts`) : le tri est stable.
+    technologies = sorted(
+        (line.technology for line in project.projecttechnology_set.select_related("technology")),
+        key=lambda technology: technology.kind == TechnologyKind.TOOL.value,
+    )
+    data: dict[str, object] = {
+        "@context": "https://schema.org",
+        "@type": "SoftwareSourceCode" if project.repository_url else "CreativeWork",
+        "@id": url,
+        "url": url,
+        "name": project.title,
+        "author": {"@id": site.person},
+        "dateCreated": project.started_on.isoformat(),
+        "dateModified": project.updated_at.isoformat(),
+        "keywords": [technology.name for technology in technologies],
+    }
+    if image is not None:
+        data["image"] = image
+    if project.repository_url:
+        data["codeRepository"] = project.repository_url
+    return f'<link rel="canonical" href="{escape(url)}" />{json_ld_script(data)}'.encode()
+
+
+def prerender(project: Project) -> bytes:
+    """La paire `root` d'une fiche (#265) : la fiche pré-rendue, qu'un robot lit sans JavaScript,
+    sous `PRERENDER_CLASS` — le titre en `<h2>`, le résumé, la description, puis chaque section non
+    vide, son titre en `<h3>` suivi de son texte, dans l'ordre de l'admin. Le texte est le Markdown
+    source échappé, jamais rendu en HTML (ADR 0010).
+
+    Args:
+        project: le projet de la page.
+
+    Returns:
+        La fiche, en UTF-8.
+    """
+    # Une section au corps blanc n'est pas montrée, comme sur le site (`visibleSections`).
+    # ponytail: `strip()` pour le `trim()` de JS ; ils divergent sur U+FEFF, U+001C à U+001F et
+    # U+0085, dont aucun corps saisi n'est fait seul ; une liste commune le jour où l'un l'est.
+    sections = [section for section in project.section_set.all() if section.body.strip()]
+    texts = [
+        f"<h2>{escape(project.title)}</h2>",
+        f"<p>{escape(project.summary)}</p>",
+        f"<p>{escape(project.description)}</p>",
+        *(f"<h3>{escape(section.title)}</h3><p>{escape(section.body)}</p>" for section in sections),
+    ]
+    return f'<article class="{PRERENDER_CLASS}">{"".join(texts)}</article>'.encode()
+
+
 # `no-cache`, comme l'`index.html` que Caddy sert : la page cite les fichiers hachés de la
 # compilation du moment (décision 5). Autour de la réponse en cache, comme pour la liste
 # (`content/api.py`) : l'en-tête se repose sur la page que sert le cache. `require_safe` : la page
@@ -185,9 +216,10 @@ def meta_tags(project: Project, image: str | None) -> bytes:
 @require_safe
 @cache_control(no_cache=True)
 def link_preview(request: HttpRequest, slug: str) -> HttpResponseBase:
-    """`GET /projets/<slug>` : le gabarit, son bloc marqué remplacé par les balises du projet
-    publié `slug`, et l'en-tête qui précharge son image de tête s'il en a une (`preload_link`) ;
-    `302 Found` vers `/` sans projet publié à cette adresse (décision 1).
+    """`GET /projets/<slug>` : le gabarit, ses paires marquées remplies pour le projet publié
+    `slug` — balises d'aperçu (`meta_tags`), adresse canonique et JSON-LD (`page_tags`), fiche
+    pré-rendue (`prerender`) —, et l'en-tête qui précharge son image de tête s'il en a une
+    (`preload_link`) ; `302 Found` vers `/` sans projet publié à cette adresse (décision 1).
 
     `slug` est tout ce qui suit `projets/`, une barre finale ôtée : `/projets/<slug>/` est la même
     fiche, comme pour le site (`PROJECT_PATH`, `apps/web/src/project/project.ts`). Ce qui n'a pas
@@ -197,7 +229,8 @@ def link_preview(request: HttpRequest, slug: str) -> HttpResponseBase:
     slug, l'origine et l'empreinte du gabarit (décision 4) ; une redirection ne l'est jamais.
 
     Raises:
-        LinkPreviewTemplateError: le gabarit est illisible ou mal marqué (`read_template`).
+        LinkPreviewTemplateError: le gabarit est illisible, mal marqué ou sans l'identité du site
+            (`read_template`).
     """
     slug = slug.removesuffix("/")
     if not slug_re.match(slug):
@@ -208,8 +241,15 @@ def link_preview(request: HttpRequest, slug: str) -> HttpResponseBase:
         project = Project.objects.filter(slug=slug, published=True).first()
         if project is None:
             return HttpResponseRedirect("/")
-        block = meta_tags(project, cover_url(request, project))
-        response = HttpResponse(template.head + block + template.tail, content_type=CONTENT_TYPE)
+        image = cover_url(request, project)
+        page = template.fill(
+            {
+                "meta": meta_tags(project, image),
+                "page": page_tags(project, template.site, image),
+                "root": prerender(project),
+            }
+        )
+        response = HttpResponse(page, content_type=CONTENT_TYPE)
         if (link := preload_link(request, project)) is not None:
             response["Link"] = link
             # L'`ETag` que poserait `ConditionalGetMiddleware` n'emprunte qu'au corps : un `Link`

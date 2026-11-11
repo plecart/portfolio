@@ -141,3 +141,21 @@
     outline-offset: 3px;
   }
 }
+
+/* La fiche que Django pré-rend dans `#root` (`apps/api/content/link_preview.py`, #265) : un robot
+   la lit sans JavaScript ; à l'œil, masquée et hors du flux jusqu'au montage du site, qui la
+   remplace par la fiche en fondu (spec §1.3). Une classe à elle, en feuille : la CSP refuse
+   l'attribut `style`, et Tailwind n'émet `sr-only` que tant qu'un fichier qu'il lit l'écrit (doc
+   Tailwind, « Detecting classes in source files »). */
+.prerender {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

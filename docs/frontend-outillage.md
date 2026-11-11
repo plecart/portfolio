@@ -81,7 +81,7 @@ Tout conservé. Les signalements, relus un par un, sont des faux positifs :
 | `prototype` | CAUTION | « never judge » : consigne de présentation des variantes |
 | autres | SAFE / CAUTION sans signalement | — |
 
-### 2.4 Application `apps/web` — 2026-09-23, amendée les 2026-09-25, 26, 2026-10-02, 04, 16, 2026-11-01 et 08
+### 2.4 Application `apps/web` — 2026-09-23, amendée les 2026-09-25, 26, 2026-10-02, 04, 16, 2026-11-01, 08 et 11
 
 Node **24.21.0**, LTS active du jour, épinglée par `.nvmrc` et par `engines` (valeurs égales,
 vérifiées par un test). `@types/node` suit sa majeure, vérifiée par un autre test : des types d'une
@@ -135,6 +135,30 @@ avant de toucher au bloc :
 - Le bloc porte **quatre** balises, pas trois : `<meta name="description">` accompagne
   `og:description` et porte le même texte — un test verrouille leur égalité. Sans elle, le score
   SEO plafonne à 91, sous le seuil bloquant de la spec §1.16. #14 doit donc en produire quatre.
+
+**Paires `page` et `root`, et identité du site (#265).** Deux paires de plus suivent le contrat du
+bloc d'aperçu — chaque marqueur unique dans le fichier compilé, les trois paires dans l'ordre
+`meta`, `page`, `root`, vérifiés par le même scénario : `<!--page:start-->` … `<!--page:end-->`
+dans le `<head>`, pour ce qui est propre à la page — sur l'accueil, son `<link rel="canonical">` —,
+et `<!--root:start-->` … `<!--root:end-->` dans `<div id="root">`, vide sur l'accueil. Sur
+`/projets/<slug>`, la vue remplit les trois : `page` reçoit l'adresse canonique de la fiche et son
+JSON-LD (`SoftwareSourceCode` s'il a un dépôt, `CreativeWork` sinon) ; `root` reçoit la fiche
+pré-rendue — titre en `<h2>`, résumé, description, puis chaque section non vide, son titre en
+`<h3>` suivi de son texte, en Markdown source échappé (ADR 0010) —, sous la classe `prerender`
+d'`src/index.css` : masquée à l'œil, hors du flux, jusqu'au montage du site, dont le premier rendu
+vide `#root` (doc React, `createRoot`, `root.render`). Un robot la lit sans JavaScript.
+
+Hors de toute paire, un JSON-LD porte l'identité du site sur chaque page : `Person` (`@id`, nom,
+adresse, et en `sameAs` les deux liens d'`AuthorLinks.tsx`, dans leur ordre) et `WebSite` (adresse,
+nom, `inLanguage`). Ni `jobTitle` ni `description` : la page ne les montre pas (*General structured
+data guidelines* de Google, « Don't mark up content that is not visible »). Django relit l'identité
+dans ce gabarit, seule source (`apps/api/content/site.py`) : l'adresse de l'accueil dans le
+`canonical` de `page`, la description dans `meta`, l'`@id`, le nom et les profils du `Person` ; un
+gabarit qui en manque une est une erreur, rendue en `500` comme un gabarit mal marqué.
+`tests/site-identity.test.ts` tient `sameAs` égal aux liens de l'auteur et l'adresse du JSON-LD
+égale au `canonical` ; un scénario vérifie que le JSON-LD survit à la compilation, hors des paires.
+C'est un bloc de données, que le navigateur n'exécute jamais : la CSP ne le vise pas, et le contrôle
+des scripts en ligne l'écarte.
 
 L'explication vit ici et non dans l'`index.html` : ce fichier est servi à chaque visite et recopié
 dans l'image `api`, chaque ligne de commentaire y voyage sur le réseau.
