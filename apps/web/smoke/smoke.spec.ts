@@ -175,6 +175,43 @@ test('un slug inconnu redirige vers la table', async ({ stackClient }) => {
   expect(response.headers().location).toBe('/')
 })
 
+/**
+ * L'adresse canonique de la fiche semée, sous l'accueil que porte le gabarit : `make smoke` donne
+ * au site son nom de production, celui du `canonical` d'`index.html`.
+ */
+const seededCanonical = () => `${origin('SITE_HOST')}/projets/${seeded().slug}`
+
+test('le plan du site liste la fiche semée, servi par Django à travers Caddy', async ({
+  stackClient,
+}) => {
+  const response = await relay(stackClient, `${origin('SITE_HOST')}/sitemap.xml`)
+
+  expect(response.status()).toBe(200)
+  expect(response.headers()['content-type']).toBe('application/xml; charset=utf-8')
+  expect(await response.text()).toContain(`<loc>${seededCanonical()}</loc>`)
+})
+
+test('llms.txt présente la fiche semée, servi par Django à travers Caddy', async ({
+  stackClient,
+}) => {
+  const { title, summary } = seeded()
+  const response = await relay(stackClient, `${origin('SITE_HOST')}/llms.txt`)
+
+  expect(response.status()).toBe(200)
+  expect(response.headers()['content-type']).toBe('text/plain; charset=utf-8')
+  expect(await response.text()).toContain(`- [${title}](${seededCanonical()}): ${summary}\n`)
+})
+
+test('une adresse sans fichier rend 404, et la page montre la table', async ({ page }) => {
+  const response = await page.goto('/nimporte')
+
+  // Un robot lit le statut (ADR 0030) ; un humain voit l'accueil, sans page 404 (ADR 0009).
+  expect(response?.status()).toBe(404)
+  const cards = page.getByRole('main').getByRole('link')
+  await expect(cards).toHaveCount(1)
+  await expect(cards).toContainText(seeded().title)
+})
+
 test("le site appelle l'API sans cookie, sous son CORS", async ({ page, stackClient }) => {
   const listed = page.waitForRequest(projectsUrl())
   await page.goto('/')
