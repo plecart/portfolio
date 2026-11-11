@@ -101,8 +101,8 @@ RUN useradd --system --create-home --shell /usr/sbin/nologin api \
     && chmod +x /usr/local/bin/entrypoint.sh
 
 # Après le `chown` : les fichiers servis restent à `root`, en lecture seule pour l'application.
-# `index.html`, compilé par `make web-build`, est le gabarit des aperçus de lien (ADR 0011), que
-# la vue de #14 lit à ce chemin.
+# `index.html`, compilé par `make web-build`, est le gabarit du site (ADR 0011, ADR 0030), que
+# lisent à ce chemin la vue des fiches et celles de `/sitemap.xml` et `/llms.txt`.
 COPY --from=build /app/static /app/static
 COPY apps/web/dist/index.html /app/web/index.html
 
