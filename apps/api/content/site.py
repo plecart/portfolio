@@ -27,11 +27,11 @@ SLOTS = ("meta", "page", "root")
 JSON_LD = "application/ld+json"
 
 
-class LinkPreviewTemplateError(RuntimeError):
+class SiteTemplateError(RuntimeError):
     """Le gabarit est illisible, n'a pas les marqueurs de chaque paire une fois chacun dans l'ordre,
-    ou pas l'identité du site (décision 8 de #14, #265). Levée par la vue, journalisée par Django
-    (`django.request`) avec sa trace et rendue en `500` : jamais une page servie sans les balises
-    du projet."""
+    ou pas l'identité du site (décision 8 de #14, #265). Levée par chaque vue qui le lit — la fiche,
+    les fichiers de découverte —, journalisée par Django (`django.request`) avec sa trace et rendue
+    en `500` : jamais une page servie sans les balises du projet, ni une identité devinée."""
 
 
 class Site(NamedTuple):
@@ -120,9 +120,9 @@ class _Elements(HTMLParser):
         ]
 
 
-def _error(path: Path, problem: str) -> LinkPreviewTemplateError:
+def _error(path: Path, problem: str) -> SiteTemplateError:
     """L'erreur du gabarit `path`, que le message nomme."""
-    return LinkPreviewTemplateError(f"le gabarit des aperçus de lien {path} {problem}")
+    return SiteTemplateError(f"le gabarit du site {path} {problem}")
 
 
 def _one[T](path: Path, found: list[T], what: str) -> T:
@@ -134,7 +134,7 @@ def _one[T](path: Path, found: list[T], what: str) -> T:
 
 def _cut(path: Path, content: bytes) -> tuple[tuple[bytes, ...], dict[str, bytes]]:
     """Le gabarit `content` découpé autour du contenu de ses paires (`Template.outside` et
-    `Template.inside`) ; `LinkPreviewTemplateError` qui nomme la paire dont les marqueurs ne
+    `Template.inside`) ; `SiteTemplateError` qui nomme la paire dont les marqueurs ne
     sont pas une fois chacun, le début avant la fin, après la paire précédente."""
     outside: list[bytes] = []
     inside: dict[str, bytes] = {}
@@ -215,14 +215,14 @@ def read_template(path: Path) -> Template:
         path: le gabarit, `LINK_PREVIEW_TEMPLATE`.
 
     Raises:
-        LinkPreviewTemplateError: le fichier ne se lit pas, n'a pas les deux marqueurs de chaque
+        SiteTemplateError: le fichier ne se lit pas, n'a pas les deux marqueurs de chaque
             paire une fois chacun, dans l'ordre de `SLOTS`, ou n'a pas l'identité du site (`Site`)
             une fois, de ses types ; le message nomme le fichier, et la paire ou l'élément en défaut.
     """
     try:
         content = path.read_bytes()
     except OSError as error:
-        raise LinkPreviewTemplateError(f"gabarit des aperçus de lien illisible : {path}") from error
+        raise _error(path, "ne se lit pas") from error
     outside, inside = _cut(path, content)
     return Template(
         outside, inside, hashlib.sha256(content).hexdigest(), _site(path, outside, inside)

@@ -115,9 +115,9 @@ def preload_link(request: HttpRequest, project: Project) -> str | None:
 
 
 def meta_tags(project: Project, image: str | None) -> bytes:
-    """Les balises du bloc marqué (ADR 0011) : le titre dans `<title>` et `og:title`, le résumé
-    dans `description` et `og:description`, et l'`og:image` s'il y a une `image`. Chaque valeur
-    est échappée pour HTML, texte comme attribut (décision 6).
+    """Les balises du bloc d'aperçu, la paire `meta` (ADR 0011) : le titre dans `<title>` et
+    `og:title`, le résumé dans `description` et `og:description`, et l'`og:image` s'il y a une
+    `image`. Chaque valeur est échappée pour HTML, texte comme attribut (décision 6).
 
     Args:
         project: le projet de la page.
@@ -228,7 +228,7 @@ def link_preview(request: HttpRequest, slug: str) -> HttpResponseBase:
     slug, l'origine et l'empreinte du gabarit (décision 4) ; une redirection ne l'est jamais.
 
     Raises:
-        LinkPreviewTemplateError: le gabarit est illisible, mal marqué ou sans l'identité du site
+        SiteTemplateError: le gabarit est illisible, mal marqué ou sans l'identité du site
             (`read_template`).
     """
     slug = slug.removesuffix("/")

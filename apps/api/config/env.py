@@ -199,7 +199,8 @@ class Env(BaseSettings):
             vide, et Compose qui exige les deux en production.
         LINK_PREVIEW_TEMPLATE: le gabarit des aperçus de lien (ADR 0011) : l'`index.html` du
             front, dont la vue de `/projets/<slug>` remplit les paires marquées pour le projet,
-            et qui porte l'identité du site (`content/site.py`, #265). Par défaut
+            et qui porte l'identité du site, que lisent aussi `/sitemap.xml` et `/llms.txt`
+            (`content/site.py`, #265). Par défaut
             `/app/web/index.html`, où l'image `api` copie la compilation (ADR 0014) ; sur le
             poste, un chemin relatif est ancré sur la racine du dépôt, comme `MEDIA_ROOT`.
         SENTRY_DSN: le DSN du projet Sentry qui reçoit les erreurs de `api` et de `worker`
