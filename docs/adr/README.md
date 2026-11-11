@@ -26,7 +26,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0005](0005-postgres-sur-le-vps.md) | Postgres 16 + pgvector sur le VPS | D32 | accepté ; argument « un seul fichier Compose » remplacé par 0012 |
 | [0006](0006-redis-des-la-phase-1.md) | Redis dès la phase 1 | D20 | accepté ; règle « outbox » remplacée par 0015 pour le worker d'images ; rôle 2 « broker » avancé en phase 1 par 0015 |
 | [0007](0007-sauvegardes-et-plan-de-reprise.md) | Sauvegardes et plan de reprise | D26, D33, D38, D42 | accepté ; geste « pointer le DNS » du point 6 remplacé par le Tunnel de 0003 (D45, D58) ; nom `backups` remplacé par 0021 ; mention « Bitwarden ou 1Password » remplacée par 0022 |
-| [0008](0008-frontend-statique-vite-react.md) | Frontend statique Vite + React + TypeScript + Tailwind CSS + shadcn/ui | D44 (remplace D15) | accepté ; point « slug inconnu » remplacé par 0009 ; condition « Vitest » levée par 0010 ; point « balises injectées » remplacé par 0011 |
+| [0008](0008-frontend-statique-vite-react.md) | Frontend statique Vite + React + TypeScript + Tailwind CSS + shadcn/ui | D44 (remplace D15) | accepté ; point « slug inconnu » remplacé par 0009 ; condition « Vitest » levée par 0010 ; point « balises injectées » remplacé par 0011 ; repli `try_files` et point « routage » remplacés par 0030 |
 | [0009](0009-adresse-de-fiche-inconnue.md) | Adresse de fiche inconnue : redirection vers l'accueil | D50 (remplace le point « slug inconnu » de 0008) | accepté |
 | [0010](0010-rendu-markdown-dans-le-front.md) | Rendu du Markdown dans le front ; Vitest en phase 1 | D51 (remplace le point « Rendu Markdown » de 0001) | accepté ; décompte « quatre balises » corrigé par 0011 ; poids et HTML brut par défaut corrigés par 0024 |
 | [0011](0011-balises-d-apercu-du-gabarit.md) | Balises d'aperçu du gabarit : cinq, dont la description SEO | D53 (remplace le point « balises injectées » de 0008) | accepté |
@@ -48,6 +48,7 @@ indexé dans le RAG de la phase 2 et cité par la fiche du méta-projet.
 | [0027](0027-remontee-d-erreurs-sentry-et-logs-structures.md) | Remontée d'erreurs Sentry et logs structurés | D71 | accepté |
 | [0028](0028-couverture-et-schema-a-2400-px.md) | La couverture et le schéma d'architecture à 2400 px de côté | D72 (remplace le point « échelle … 1200 px plafonnent » de 0015, les points « 1200 × 1200 px » et « facteur d'échelle 1 » de 0026, et le point du côté de D70) | accepté |
 | [0029](0029-fusion-explicite-du-trunk-dans-les-runs-de-pr.md) | Les runs de PR fusionnent eux-mêmes la tête au trunk courant | D73 (remplace le point 1 de § Décision et un point de § Conséquences de 0019) | accepté |
+| [0030](0030-routes-de-l-hote-du-site-et-statut-404.md) | Routes de l'hôte du site : fichiers de découverte servis par Django, statut 404 | D74 (remplace le repli `try_files` et le point « routage » de 0008) | accepté |
 
 ## À écrire à leur phase
 
