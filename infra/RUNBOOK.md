@@ -365,8 +365,13 @@ protégé par un TOTP, que la connexion Google demande aussi.
   `portfolio-medias` ; `www` CNAME vers `pacome.dev` ; tous Proxied. TXT `@` `v=spf1 -all` et TXT
   `_dmarc` `v=DMARC1;p=reject;sp=reject;adkim=s;aspf=s`, en DNS only : le domaine n'envoie aucun
   e-mail.
-- **Redirection** — Redirect Rule `www-vers-apex` : `https://www.pacome.dev/*` vers
-  `https://pacome.dev/${1}`, 301, chaîne de requête conservée.
+- **Redirections** — « Always Use HTTPS » activé : `http://` rend 301 vers `https://`. Redirect
+  Rule `www-vers-apex` : hôte `www.pacome.dev`, quel que soit le protocole, vers
+  `concat("https://pacome.dev", http.request.uri.path)`, 301, chaîne de requête conservée — un seul
+  saut. Sans elles, la Search Console signalait `http://pacome.dev/` en doublon et
+  `http://www.pacome.dev/` en 404, faute de route `www` au tunnel (constaté le 2026-11-16).
+  `https://api.pacome.dev/` et `https://media.pacome.dev/` y restent en 404 : ni l'API ni R2 n'ont
+  de page d'accueil, voulu.
 - **R2** — `portfolio-medias`, public par `media.pacome.dev` seul, URL `r2.dev` désactivée ;
   `portfolio-backups`, privé. WEUR par indice, classe Standard. Trois jetons bornés à un bucket :
   `portfolio-medias-rw`, `portfolio-backups-rw`, `portfolio-backups-ro` (« Où vit chaque secret »).
