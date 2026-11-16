@@ -353,8 +353,8 @@ absente, l'onglet Network montre le détour par `cloudflareaccess.com` et GitHub
 
 ## Cloudflare — l'état attendu
 
-L'état constaté du 2026-10-30 au 2026-11-02 (cadrage §6.7, point 7 ; ADR 0003 ; #25). Compte
-protégé par un TOTP, que la connexion Google demande aussi.
+L'état constaté du 2026-10-30 au 2026-11-02 (cadrage §6.7, point 7 ; ADR 0003 ; #25),
+redirections le 2026-11-16. Compte protégé par un TOTP, que la connexion Google demande aussi.
 
 - **Domaine** — `pacome.dev`, Cloudflare Registrar, renouvellement automatique, expiration en
   octobre 2027.
@@ -368,10 +368,10 @@ protégé par un TOTP, que la connexion Google demande aussi.
 - **Redirections** — « Always Use HTTPS » activé : `http://` rend 301 vers `https://`. Redirect
   Rule `www-vers-apex` : hôte `www.pacome.dev`, quel que soit le protocole, vers
   `concat("https://pacome.dev", http.request.uri.path)`, 301, chaîne de requête conservée — un seul
-  saut. Sans elles, la Search Console signalait `http://pacome.dev/` en doublon et
-  `http://www.pacome.dev/` en 404, faute de route `www` au tunnel (constaté le 2026-11-16).
-  `https://api.pacome.dev/` et `https://media.pacome.dev/` y restent en 404 : ni l'API ni R2 n'ont
-  de page d'accueil, voulu.
+  saut (mesuré le 2026-11-16). Sans elles, la Search Console signalait `http://pacome.dev/` en
+  doublon et `http://www.pacome.dev/` en 404 (constaté le 2026-11-16), faute de route `www` au
+  tunnel (déduit). `https://api.pacome.dev/` et `https://media.pacome.dev/` rendent 404 à la
+  racine : ni l'API ni R2 n'ont de page d'accueil, voulu.
 - **R2** — `portfolio-medias`, public par `media.pacome.dev` seul, URL `r2.dev` désactivée ;
   `portfolio-backups`, privé. WEUR par indice, classe Standard. Trois jetons bornés à un bucket :
   `portfolio-medias-rw`, `portfolio-backups-rw`, `portfolio-backups-ro` (« Où vit chaque secret »).
