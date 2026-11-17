@@ -200,6 +200,8 @@ for (const width of [480, 599]) {
     test(`à ${width} px, la pose extrême d'une carte ${name} n'élargit pas la page`, async ({ page }) => {
       await page.setViewportSize({ width, height: 800 })
       await openTable(page, projects)
+      // Sa pose atteinte : la carte entre droite.
+      await enterCards(page)
 
       const { innerWidth, overflow } = await page.evaluate(() => ({
         innerWidth: window.innerWidth,

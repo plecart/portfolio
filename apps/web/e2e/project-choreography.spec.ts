@@ -40,6 +40,7 @@ import {
   straighten,
   strap,
   strapPixels,
+  watchPoseAnimations,
 } from './table.ts'
 
 /** Trois projets ; la première carte, celle d'un projet en cours, à une seule image. */
@@ -1417,6 +1418,23 @@ for (const [name, close] of CLOSINGS) {
     expect(await animations()).toEqual([])
   })
 }
+
+test('revenue de la fiche, la carte d’origine ne rejoue pas son entrée : sa pose ne tourne plus', async ({
+  page,
+}) => {
+  const turns = await watchPoseAnimations(page)
+  await openEnteredTable(page, PROJECTS)
+  const entered = await turns()
+  const card = cardAt(page, FIRST_PATH)
+
+  await openProject(card)
+  await page.keyboard.press('Escape')
+  await expectLanded(page, card)
+  await settle(page)
+
+  expect(entered.map(({ card: path }) => path)).toContain(FIRST_PATH)
+  expect(await turns()).toEqual(entered)
+})
 
 /**
  * Une animation annulée en route — son `finished` rejette, son `finish` ne part pas — n'arrête pas

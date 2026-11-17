@@ -351,6 +351,43 @@ export async function watchTransitions(page: Page) {
   }
 }
 
+/**
+ * Une animation partie sur la pose d'une carte : l'adresse de sa carte, son retard et sa durée en
+ * ms, sa courbe.
+ */
+type PoseAnimation = { card: string; delay: number; duration: number; easing: string }
+
+/**
+ * Consigne, dès le chargement, les animations CSS qui partent sur la pose d'une carte, lues sur
+ * l'animation elle-même à son départ : une lecture de `getAnimations()` après coup la manquerait,
+ * finie. Appelée avant d'ouvrir la page.
+ *
+ * @returns De quoi lire celles parties, dans l'ordre de leur départ.
+ */
+export async function watchPoseAnimations(page: Page) {
+  await page.addInitScript(() => {
+    const seen: PoseAnimation[] = []
+    Object.defineProperty(window, 'poseAnimations', { value: seen })
+    addEventListener('animationstart', ({ target, animationName }) => {
+      const layer = target as Element
+      if (!layer.classList.contains('card-pose')) return
+      const animation = layer
+        .getAnimations()
+        .find((candidate) => (candidate as CSSAnimation).animationName === animationName)!
+      const effect = animation.effect as KeyframeEffect
+      const { delay, duration } = effect.getTiming()
+      seen.push({
+        card: layer.closest('.card')!.getAttribute('href')!,
+        delay: delay!,
+        duration: duration as number,
+        easing: effect.getKeyframes()[0].easing,
+      })
+    })
+  })
+  return () =>
+    page.evaluate(() => (window as unknown as { poseAnimations: PoseAnimation[] }).poseAnimations)
+}
+
 /** Focalise une carte au clavier : une touche d'abord, pour que `:focus-visible` s'applique. */
 export async function focusByKeyboard(card: Locator) {
   await card.page().keyboard.press('Tab')
