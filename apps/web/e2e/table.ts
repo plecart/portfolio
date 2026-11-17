@@ -400,6 +400,10 @@ export async function watchPoseAnimations(page: Page) {
     page.evaluate(() => (window as unknown as { poseAnimations: PoseAnimation[] }).poseAnimations)
 }
 
+/** L'intention sur une carte (spec §1.7) : le survol au bureau, le toucher sur un téléphone. */
+export const intend = (card: Locator, isMobile: boolean) =>
+  isMobile ? card.tap() : card.hover()
+
 /** Focalise une carte au clavier : une touche d'abord, pour que `:focus-visible` s'applique. */
 export async function focusByKeyboard(card: Locator) {
   await card.page().keyboard.press('Tab')
