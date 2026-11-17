@@ -201,7 +201,7 @@ Page, colonne de lecture de la fiche et, sur téléphone, son panneau : `scrollb
 
 | Mouvement | Durée | Courbe |
 |---|---|---|
-| Entrée d'une carte (montée de 8 px + fondu) | 240 ms, + 40 ms par colonne | `--ease-out` |
+| Entrée d'une carte (montée de 8 px + fondu + rotation de 0° à sa pose) | 240 ms, + 40 ms par colonne | `--ease-out` |
 | Redressement, recul et retour d'une carte | 240 ms | `--ease-out` |
 | Soulèvement d'une carte (−6 px, ×1,02) | 240 ms | `--ease-spring` |
 | Ombre soulevée (opacité) | 240 ms | `--ease-out` |
@@ -231,7 +231,7 @@ Mouvement réduit : §6.3.
 De haut en bas : l'entête (§3.3), la table (`<main>`), les liens de l'auteur (§3.4), en pied de page ou en colonne fixe.
 
 - **Table** : conteneur à marge intérieure 24 px 16 px 32 px ; grille `repeat(auto-fit, 240px)` centrée, gouttière 28 px, largeur maximale 1200 px, remplissage dense. Quatre colonnes au plus (1044 px) dès 1076 px de large ; trois (776 px) de 808 à 1075 px ; deux (508 px) de 600 à 807 px. En dessous de 600 px : deux colonnes `1fr`, gouttière 16 px (cartes de 176 px à 400 px de large). La carte vitrine occupe deux colonnes et deux rangées ; sur mobile, la première rangée entière. Repère à 1280 px : table de 1044 px, marge de 118 px de chaque côté.
-- **Entrée des cartes** : une carte apparaît quand 15 % de sa surface entre dans l'écran (`IntersectionObserver`, seuil 0,15) : montée de 8 px et fondu de 240 ms, retardés de 40 ms par indice de colonne. Défilement continu, sans pagination (§1.3) ; images en `loading="lazy"`.
+- **Entrée des cartes** : une carte apparaît quand 15 % de sa surface entre dans l'écran (`IntersectionObserver`, seuil 0,15) : montée de 8 px et fondu de 240 ms ; dans le même temps, elle part droite (0°, décalage nul) et tourne jusqu'à sa pose (§1.3), le geste inverse du redressement ; les trois sont retardés de 40 ms par indice de colonne. Défilement continu, sans pagination (§1.3) ; images en `loading="lazy"`.
 - **Adresses** : `/` pour la table ; `/projets/<slug>` pour une fiche ouverte, avec une entrée d'historique par ouverture (le retour du navigateur ferme la fiche) ; adresse sans projet : §5.4.
 - **Ordre des cartes** : §1.9.
 
@@ -356,7 +356,7 @@ Mouvement réduit : §6.3.
 
 ### 5.1 Chargement
 
-Autant de cadres vides que de projets publiés, à la place des cartes et dans la disposition de la table qu'ils annoncent (§5.5) : un cadre seul prend la taille et la piste de la carte seule, centré ; à partir de deux, un cadre double aux dimensions de la carte vitrine puis des simples (§4.1). Le nombre est tenu à la main dans le front et sa mise à jour est facultative : un écart ne casse rien, la table prend sa forme à l'arrivée des cartes. Les cadres sont `aria-hidden` et inertes (aucune réaction au survol, au focus ni au clic), sans post-it ni ruban ; papier, zone image `--line`, une barre `--line` de 40 % × 10 px (rayon 999 px) dans la bande ; pulsation de 1,8 s (opacité jusqu'à 55 %, `--ease-in-out`, infinie). À l'arrivée des données, les cartes les remplacent avec leur animation d'entrée ; sans projet vitrine, le cadre double laisse place à deux cartes simples.
+Autant de cadres vides que de projets publiés, à la place des cartes et dans la disposition de la table qu'ils annoncent (§5.5) : un cadre seul prend la taille et la piste de la carte seule, centré ; à partir de deux, un cadre double aux dimensions de la carte vitrine puis des simples (§4.1). Le nombre est tenu à la main dans le front et sa mise à jour est facultative : un écart ne casse rien, la table prend sa forme à l'arrivée des cartes. Les cadres sont `aria-hidden` et inertes (aucune réaction au survol, au focus ni au clic), sans post-it ni ruban ; papier, zone image `--line`, une barre `--line` de 40 % × 10 px (rayon 999 px) dans la bande ; pulsation de 1,8 s (opacité jusqu'à 55 %, `--ease-in-out`, infinie). Les cadres sont droits, sans pose : ils ne connaissent pas encore le projet qu'ils annoncent. À l'arrivée des données, les cartes les remplacent avec leur animation d'entrée, qui part droite et prend leur pose (§3.1) ; sans projet vitrine, le cadre double laisse place à deux cartes simples.
 
 ### 5.2 Erreur
 
@@ -407,7 +407,7 @@ Repères mesurés : 1280 × 800 → table 1044 px, carte 240 / 508 px, fiche 123
 
 ### 6.3 Mouvement réduit (`prefers-reduced-motion: reduce`)
 
-- Cartes : entrée par fondu de 150 ms sans montée ; ni redressement, ni soulèvement ; bandeau de résumé par fondu seul ; sangle d'un projet « en cours » : fondu croisé de 150 ms (`--ease-out`) entre la pose et le coin, sans glissement ; pas de pulsation des cadres vides.
+- Cartes : entrée par fondu de 150 ms sans montée ni rotation, directement à leur pose ; ni redressement, ni soulèvement ; bandeau de résumé par fondu seul ; sangle d'un projet « en cours » : fondu croisé de 150 ms (`--ease-out`) entre la pose et le coin, sans glissement ; pas de pulsation des cadres vides.
 - Fiche : le ruban-bouton de la stack ne monte pas au survol.
 - Ouverture : la face de la carte s'efface (150 ms) pendant que la fiche apparaît (150 ms), sans feuille ni vol ; les autres cartes s'effacent (150 ms) sans reculer ; la fiche est active à 160 ms. Fermeture : contenu en 160 ms, puis fiche en 160 ms, les cartes réapparaissent (150 ms).
 - Entête : sortie et retour par fondu de 150 ms, sans translation.
