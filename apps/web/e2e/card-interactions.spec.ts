@@ -278,7 +278,7 @@ test('entrée, une carte de deuxième colonne se redresse à l’intention sans 
  */
 const INTERRUPTIONS: [string, (card: Locator, isMobile: boolean) => Promise<unknown>][] = [
   ['une intention', intend],
-  ['l’envol de sa fiche', (card) => card.evaluate((cell) => cell.setAttribute('data-origin', ''))],
+  ['l’envol de sa fiche', (card) => card.evaluate((link) => link.setAttribute('data-origin', ''))],
 ]
 
 for (const [cause, interrupt] of INTERRUPTIONS) {
