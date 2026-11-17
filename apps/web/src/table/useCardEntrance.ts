@@ -6,8 +6,9 @@ const ENTRY_THRESHOLD = 0.15
 
 /**
  * L'entrée des cartes (spec §1.3, §3.1) : un seul `IntersectionObserver`, sur les cellules, immobiles
- * — seule la couche d'entrée qu'elles contiennent bouge. Une cellule à 15 % dans l'écran reçoit
- * `data-entered`, que la feuille lit, et n'est plus observée : une carte n'entre qu'une fois.
+ * — seules bougent la couche d'entrée qu'elles contiennent et la pose qu'elle porte. Une cellule à
+ * 15 % dans l'écran reçoit `data-entered`, que la feuille lit, et n'est plus observée : une carte
+ * n'entre qu'une fois.
  *
  * Le retard vaut l'indice de colonne mesuré × `--delay-column`, et l'indice se relit à chaque
  * redimensionnement.

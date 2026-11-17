@@ -82,6 +82,20 @@
     transition: transform var(--dur) var(--ease-out);
   }
 
+  /* Hors mouvement réduit, la carte entre droite, puis tourne jusqu'à sa pose avec sa montée, au même
+     retard : par une animation, jouée une fois, et non par la transition, que le redressement d'une
+     intention prend sans ce retard. Son remplissage tient la carte droite pendant le retard. En
+     mouvement réduit, la carte est à sa pose dès le départ. */
+  @media (prefers-reduced-motion: no-preference) {
+    .card:not([data-entered]) .card-pose {
+      transform: none;
+    }
+
+    .card[data-entered] .card-pose {
+      animation: card-pose-entry var(--dur) var(--ease-out) var(--card-delay) backwards;
+    }
+  }
+
   /* La face : papier et ombre au repos ; l'ombre soulevée, prête, s'y superpose à opacité 0. */
   .card-face {
     position: relative;
@@ -570,6 +584,16 @@
         opacity var(--dur-fast) var(--ease-out),
         translate var(--dur-content) var(--ease-out);
     }
+  }
+}
+
+/* L'entrée de la pose : de droite à la pose que la feuille lui donne à l'instant — la sienne, ou 0° si
+   une intention ou l'envol de la fiche (`[data-origin]`) la redressent en route, sans transition
+   ajoutée (Chromium 156, `[data-revealed]` et `[data-origin]` posés à mi-animation, mesuré le
+   2026-11-17). */
+@keyframes card-pose-entry {
+  from {
+    transform: none;
   }
 }
 

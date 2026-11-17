@@ -28,6 +28,7 @@ import {
   STRAPPED,
   summary,
   TWO_CARDS,
+  watchPoseAnimations,
   watchTransitions,
 } from './table.ts'
 
@@ -150,6 +151,103 @@ test('en mouvement réduit, une carte entre par un fondu de 150 ms, sans montée
   await expect(entry(card)).toHaveCSS('opacity', '1')
 })
 
+/** Le projet type (`buildProject`), plus ancien que les douze : la dernière carte, sous l'écran. */
+const BELOW_THE_FOLD = [
+  ...PROJECT_SETS.twelveWithShowcase,
+  buildProject({ started_on: '2013-03-01', finished_on: '2013-11-15' }),
+]
+
+/**
+ * La pose de la carte `projet`, calculée hors de JavaScript, par une empreinte FNV-1a 32 bits de
+ * référence en Python (2026-11-17).
+ */
+const PROJET_POSE = 'rotate(-1.728deg) translate(3.528px, 5.232px)'
+
+/**
+ * Ouvre la table de `BELOW_THE_FOLD`.
+ *
+ * @returns Sa dernière carte, `projet`, pas encore entrée, et sa pose, résolue.
+ */
+async function openBelowTheFold(page: Page) {
+  await openTable(page, BELOW_THE_FOLD)
+  const card = cards(page).last()
+  await expect(card).toHaveAttribute('href', '/projets/projet')
+  await expect(card).not.toHaveAttribute('data-entered')
+  const [posed] = await resolveAll(page, [['transform', PROJET_POSE]])
+  return { card, posed }
+}
+
+/** La transformation calculée de la pose d'une carte. */
+const poseTransform = (card: Locator) =>
+  pose(card).evaluate((layer) => getComputedStyle(layer).transform)
+
+test('une carte entre droite, puis tourne jusqu’à sa pose', async ({ page }) => {
+  const { card, posed } = await openBelowTheFold(page)
+
+  expect(await poseTransform(card)).toBe('none')
+
+  await card.scrollIntoViewIfNeeded()
+  await expect(card).toHaveAttribute('data-entered')
+  await settle(page)
+
+  expect(await poseTransform(card)).toBe(posed)
+})
+
+test('la pose tourne avec la montée, au même retard de 40 ms par colonne, en 240 ms et `--ease-out`', async ({
+  page,
+}) => {
+  await page.setViewportSize(COLUMN_VIEWPORT)
+  const turns = await watchPoseAnimations(page)
+  await openTable(page, TWO_CARDS)
+  const [curve] = await resolveAll(page, [['animation-timing-function', 'var(--ease-out)']])
+
+  await expect(page.locator('.card[data-entered]')).toHaveCount(2)
+  await settle(page)
+
+  expect(await turns()).toEqual([
+    { card: '/projets/pleine', delay: 0, duration: 240, easing: curve },
+    { card: '/projets/voisine', delay: 40, duration: 240, easing: curve },
+  ])
+})
+
+test('en mouvement réduit, une carte est à sa pose avant d’entrer, et sa pose ne s’anime pas', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const turns = await watchPoseAnimations(page)
+  const { card, posed } = await openBelowTheFold(page)
+
+  expect(await poseTransform(card)).toBe(posed)
+
+  await card.scrollIntoViewIfNeeded()
+  await expect(card).toHaveAttribute('data-entered')
+  await settle(page)
+
+  expect(await poseTransform(card)).toBe(posed)
+  expect(await turns()).toEqual([])
+})
+
+test('entrée, une carte de deuxième colonne se redresse à l’intention sans le retard de son entrée', async ({
+  page,
+  isMobile,
+}) => {
+  await page.setViewportSize(COLUMN_VIEWPORT)
+  await openTable(page, TWO_CARDS)
+  await enterCards(page)
+  const card = cards(page).last()
+  const [duration] = await resolveAll(page, [['transition-duration', 'var(--dur)']])
+  const transitions = await watchTransitions(page)
+  await expect(entry(card)).toHaveCSS('transition-delay', '0.04s, 0.04s')
+
+  await (isMobile ? card.tap() : card.hover())
+
+  await expect(pose(card)).toHaveCSS('transform', 'none')
+  await expect(pose(card)).toHaveCSS('transition-delay', '0s')
+  expect(await transitions('card-pose')).toEqual([
+    { layer: 'card-pose', property: 'transform', duration },
+  ])
+})
+
 test('les cartes remplacent les cadres en entrant, sans changer la forme des liens de l’auteur', async ({
   page,
   isMobile,
@@ -177,7 +275,8 @@ test('les cartes remplacent les cadres en entrant, sans changer la forme des lie
 
   expect(await forms.jsonValue()).toEqual({ count: 0 })
   await expectPlacement(page, 'column')
-  // Rien ne bouge que la couche d'entrée : ni la cellule, que les liens mesurent, ni ses voisines.
+  // Rien ne transite que la couche d'entrée, dont la pose tourne par son animation : ni la cellule,
+  // que les liens mesurent, ni ses voisines.
   const moved = new Set((await transitions()).map(({ layer }) => layer))
   expect([...moved]).toEqual(['card-entry'])
 })
