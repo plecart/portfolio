@@ -28,6 +28,7 @@ import {
   expectPlacement,
   face,
   focusByKeyboard,
+  intend,
   LIVE_CARD,
   NARROW_VIEWPORT,
   openTable,
@@ -363,7 +364,7 @@ test('dans l’arbre d’accessibilité de Chromium, le résumé et les rubans r
   const link = ['Atelier. En cours.', 'Un atelier. TypeScript']
   expect((await accessibilityTree(page)).links).toContainEqual(link)
 
-  await (isMobile ? card.tap() : card.hover())
+  await intend(card, isMobile)
   await expect(summary(card)).toHaveCSS('opacity', '1')
 
   const { links, headings } = await accessibilityTree(page)
@@ -721,10 +722,10 @@ function strapLayering({ path, layers }: { path: string; layers: string[] }) {
  */
 const UNDER_STRAP = ['.card-photo', '.card-clip', '.card-postit', '.card-band']
 
-/** La sangle au repos, puis au coin : le survol au bureau, le toucher sur un téléphone. */
+/** La sangle au repos, puis au coin, sous une intention. */
 const STRAP_STATES: [string, (card: Locator, isMobile: boolean) => Promise<unknown>][] = [
   ['au repos', async () => {}],
-  ['au coin', (card, isMobile) => (isMobile ? card.tap() : card.hover())],
+  ['au coin', intend],
 ]
 
 for (const [state, act] of STRAP_STATES) {

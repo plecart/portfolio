@@ -17,6 +17,7 @@ import {
   face,
   focusByKeyboard,
   FULL_CARD,
+  intend,
   openTable,
   pixelDistances,
   pose,
@@ -262,7 +263,7 @@ test('entrée, une carte de deuxième colonne se redresse à l’intention sans 
   const transitions = await watchTransitions(page)
   await expect(entry(card)).toHaveCSS('transition-delay', '0.04s, 0.04s')
 
-  await (isMobile ? card.tap() : card.hover())
+  await intend(card, isMobile)
 
   await expect(pose(card)).toHaveCSS('transform', 'none')
   await expect(pose(card)).toHaveCSS('transition-delay', '0s')
@@ -276,7 +277,7 @@ test('entrée, une carte de deuxième colonne se redresse à l’intention sans 
  * `useChoreography` marque de `data-origin`.
  */
 const INTERRUPTIONS: [string, (card: Locator, isMobile: boolean) => Promise<unknown>][] = [
-  ['une intention', (card, isMobile) => (isMobile ? card.tap() : card.hover())],
+  ['une intention', intend],
   ['l’envol de sa fiche', (card) => card.evaluate((cell) => cell.setAttribute('data-origin', ''))],
 ]
 
@@ -906,7 +907,7 @@ test.describe('en mouvement réduit', () => {
     await straighten(card)
     const transitions = await watchTransitions(page)
 
-    await (isMobile ? card.tap() : card.hover())
+    await intend(card, isMobile)
     await expectRevealed(card, true)
     await settle(page)
 
@@ -947,7 +948,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await enterCards(page)
     const card = cards(page).first()
 
-    await (isMobile ? card.tap() : card.hover())
+    await intend(card, isMobile)
     await expectRevealed(card, true)
     await settle(page)
 
