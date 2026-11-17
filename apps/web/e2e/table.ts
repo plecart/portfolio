@@ -352,10 +352,18 @@ export async function watchTransitions(page: Page) {
 }
 
 /**
- * Une animation partie sur la pose d'une carte : l'adresse de sa carte, son retard et sa durée en
- * ms, sa courbe.
+ * Une animation partie sur la pose d'une carte : l'adresse de sa carte ; son nom, sa transformation
+ * de départ et son remplissage ; son retard et sa durée en ms, sa courbe.
  */
-type PoseAnimation = { card: string; delay: number; duration: number; easing: string }
+type PoseAnimation = {
+  card: string
+  name: string
+  from: ComputedKeyframe['transform']
+  fill: FillMode | undefined
+  delay: number
+  duration: number
+  easing: string
+}
 
 /**
  * Consigne, dès le chargement, les animations CSS qui partent sur la pose d'une carte, lues sur
@@ -375,12 +383,16 @@ export async function watchPoseAnimations(page: Page) {
         .getAnimations()
         .find((candidate) => (candidate as CSSAnimation).animationName === animationName)!
       const effect = animation.effect as KeyframeEffect
-      const { delay, duration } = effect.getTiming()
+      const [start] = effect.getKeyframes()
+      const { delay, duration, fill } = effect.getTiming()
       seen.push({
         card: layer.closest('.card')!.getAttribute('href')!,
+        name: animationName,
+        from: start.transform,
+        fill,
         delay: delay!,
         duration: duration as number,
-        easing: effect.getKeyframes()[0].easing,
+        easing: start.easing,
       })
     })
   })

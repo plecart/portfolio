@@ -76,13 +76,17 @@ test('à 15 % de sa surface dans l’écran, une carte entre : 8 px de montée e
 })
 
 test('une carte n’entre qu’une fois : la revoir ne rejoue rien', async ({ page }) => {
+  const turns = await watchPoseAnimations(page)
   await openTable(page, PROJECT_SETS.twelveWithShowcase)
   await enterCards(page)
+  const entered = await turns()
   const transitions = await watchTransitions(page)
   const bottom = await pageBottom(page)
 
   await scrollThrough(page, bottom, 0, bottom)
+  await settle(page)
 
+  expect(await turns()).toEqual(entered)
   expect(await transitions('card-entry')).toEqual([])
 })
 
@@ -181,19 +185,28 @@ async function openBelowTheFold(page: Page) {
 const poseTransform = (card: Locator) =>
   pose(card).evaluate((layer) => getComputedStyle(layer).transform)
 
-test('une carte entre droite, puis tourne jusqu’à sa pose', async ({ page }) => {
+test('une carte entre droite, puis tourne jusqu’à sa pose, une fois entrée seulement', async ({
+  page,
+}) => {
+  const turns = await watchPoseAnimations(page)
   const { card, posed } = await openBelowTheFold(page)
+  const ownTurns = async () =>
+    (await turns()).filter(({ card: path }) => path === '/projets/projet')
 
+  // Ni relevée, ni en cours : posée dès le rendu, l'animation serait l'une ou l'autre.
   expect(await poseTransform(card)).toBe('none')
+  expect(await pose(card).evaluate((layer) => layer.getAnimations().length)).toBe(0)
+  expect(await ownTurns()).toEqual([])
 
   await card.scrollIntoViewIfNeeded()
   await expect(card).toHaveAttribute('data-entered')
   await settle(page)
 
   expect(await poseTransform(card)).toBe(posed)
+  expect(await ownTurns()).toHaveLength(1)
 })
 
-test('la pose tourne avec la montée, au même retard de 40 ms par colonne, en 240 ms et `--ease-out`', async ({
+test('la pose part de 0°, tenue droite pendant le retard de la montée — 40 ms par colonne —, puis tourne en 240 ms et `--ease-out`', async ({
   page,
 }) => {
   await page.setViewportSize(COLUMN_VIEWPORT)
@@ -204,9 +217,19 @@ test('la pose tourne avec la montée, au même retard de 40 ms par colonne, en 2
   await expect(page.locator('.card[data-entered]')).toHaveCount(2)
   await settle(page)
 
+  // `backwards` tient la pose droite pendant le retard : sans lui, l'entrée change sa transformation,
+  // et sa transition part aussitôt, sans retard, par-dessus l'animation (Chromium 156, mesuré le
+  // 2026-11-17).
+  const turn = {
+    name: 'card-pose-entry',
+    from: 'none',
+    fill: 'backwards',
+    duration: 240,
+    easing: curve,
+  }
   expect(await turns()).toEqual([
-    { card: '/projets/pleine', delay: 0, duration: 240, easing: curve },
-    { card: '/projets/voisine', delay: 40, duration: 240, easing: curve },
+    { ...turn, card: '/projets/pleine', delay: 0 },
+    { ...turn, card: '/projets/voisine', delay: 40 },
   ])
 })
 
@@ -247,6 +270,46 @@ test('entrée, une carte de deuxième colonne se redresse à l’intention sans 
     { layer: 'card-pose', property: 'transform', duration },
   ])
 })
+
+/**
+ * Ce qui redresse une carte en pleine entrée : une intention, et l'envol de sa fiche, que
+ * `useChoreography` marque de `data-origin`.
+ */
+const INTERRUPTIONS: [string, (card: Locator, isMobile: boolean) => Promise<unknown>][] = [
+  ['une intention', (card, isMobile) => (isMobile ? card.tap() : card.hover())],
+  ['l’envol de sa fiche', (card) => card.evaluate((cell) => cell.setAttribute('data-origin', ''))],
+]
+
+for (const [cause, interrupt] of INTERRUPTIONS) {
+  test(`redressée en pleine entrée par ${cause}, la pose vise 0° et non plus sa pose, sans transition ajoutée`, async ({
+    page,
+    isMobile,
+  }) => {
+    // Chaque animation figée dès son départ : placée à mi-course, elle se lit à loisir.
+    await page.addInitScript(() =>
+      addEventListener('animationstart', ({ target }) => {
+        for (const animation of (target as Element).getAnimations()) animation.pause()
+      }),
+    )
+    await openTable(page, TWO_CARDS)
+    const card = cards(page).first()
+    const states = () =>
+      pose(card).evaluate((layer) => layer.getAnimations().map(({ playState }) => playState))
+    const midway = () =>
+      pose(card).evaluate((layer) => {
+        const [turn] = layer.getAnimations()
+        turn.currentTime = (turn.effect!.getComputedTiming().endTime as number) / 2
+        return getComputedStyle(layer).transform
+      })
+    await expect.poll(states).toEqual(['paused'])
+    expect(await midway()).not.toBe('none')
+
+    await interrupt(card, isMobile)
+
+    expect(await midway()).toBe('none')
+    expect(await states()).toEqual(['paused'])
+  })
+}
 
 test('les cartes remplacent les cadres en entrant, sans changer la forme des liens de l’auteur', async ({
   page,

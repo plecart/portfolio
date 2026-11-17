@@ -312,9 +312,9 @@ test('arrivée directe : un clic hors du panneau la ferme par son fondu, sans at
   await expectClosed(page)
   await settle(page)
   await expect(page).toHaveURL('/')
-  // Les fondus de la fiche seuls : fermée, elle laisse entrer les cartes, dont la pose s'anime.
+  // Fermée, la fiche laisse entrer les cartes, dont la pose s'anime : rien d'autre ne part.
   const names = (await animations()).map(({ name }) => name)
-  expect(names.filter((name) => name.startsWith('project-'))).toEqual(['project-out'])
+  expect(names.filter((name) => name !== 'card-pose-entry')).toEqual(['project-out'])
 })
 
 test.describe('l’historique, à partir de `/`', () => {
