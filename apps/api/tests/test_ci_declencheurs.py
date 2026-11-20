@@ -628,9 +628,12 @@ AVIS_TRIGGERS = {
     "workflow_call": None,
 }
 AVIS_PERMISSIONS = {"contents": "read"}
+# Le pas qui libère le disque du runner avant le build, nommé comme le pas de fusion : sa commande
+# tient sur plusieurs lignes.
+DISQUE_NAME = "Disque"
 # Les pas de son seul job, dans l'ordre — ce que chacun lance, `launched` : le checkout et le pas de
-# fusion, qui ne joue qu'appelé sur une PR, l'audit Python, l'audit npm, puis le build des images et
-# leur scan, chaque porte après ce qu'elle lit. Le cache des couches est celui du job `infra`,
+# fusion, qui ne joue qu'appelé sur une PR, l'audit Python, l'audit npm, puis le disque libéré, le
+# build des images et leur scan, chaque porte après ce qu'elle lit. Le cache des couches est celui du job `infra`,
 # restauré et jamais réécrit, comme dans `publish`.
 AVIS_STEPS = [
     "actions/checkout",
@@ -641,6 +644,7 @@ AVIS_STEPS = [
     "actions/setup-node",
     "make web-install",
     "make web-audit",
+    DISQUE_NAME,
     "docker/setup-buildx-action",
     "actions/cache/restore",
     "make build",
@@ -649,10 +653,10 @@ AVIS_STEPS = [
 
 
 def launched(step: dict[str, Any]) -> str:
-    """Ce qu'un pas lance : le pas de fusion, son nom ; une commande, telle quelle ; une action,
-    sans son empreinte."""
-    if step.get("name") == FUSION_NAME:
-        return FUSION_NAME
+    """Ce qu'un pas lance : le pas de fusion ou du disque, son nom ; une commande, telle quelle ;
+    une action, sans son empreinte."""
+    if step.get("name") in (FUSION_NAME, DISQUE_NAME):
+        return step["name"]
     return step.get("run") or str(step.get("uses", "")).split("@")[0]
 
 
@@ -706,6 +710,7 @@ jobs:
       - run: make install
       - run: make audit
 {AVIS_NPM_LINES}\
+      - name: {DISQUE_NAME}
       - uses: docker/setup-buildx-action@v0
       - uses: actions/cache/restore@v0
       - run: make build
@@ -740,6 +745,7 @@ AVIS_CHANGES = {
         True,
     ),
     "cache réécrit": ("actions/cache/restore@v0", "actions/cache@v0", True),
+    "sans le disque libéré": (f"      - name: {DISQUE_NAME}\n", "", True),
 }
 
 
