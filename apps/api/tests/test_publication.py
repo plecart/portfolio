@@ -22,6 +22,7 @@ from test_infra import (
     BUILD_COMMAND,
     CACHED_BUILDS,
     CI_WORKFLOW,
+    DISQUE_RUN,
     PUBLISH_PREFIX,
     built_images,
     ci_build_flags,
@@ -128,6 +129,7 @@ WORKFLOW_TOKEN_ENV = {"GH_TOKEN": "${{ github.token }}"}
 PUBLISH_STEPS: list[tuple[str, dict[str, str] | None]] = [
     ("actions/checkout", None),
     ("actions/download-artifact", None),
+    (DISQUE_RUN, None),
     ("docker/setup-buildx-action", None),
     ("actions/cache/restore", None),
     (PUBLISH_BUILD, {"DOCKER_BUILD_FLAGS": PUBLISH_BUILD_FLAGS}),
@@ -354,6 +356,7 @@ jobs:
     steps:
 {CHECKOUT_LINE}\
       - uses: actions/download-artifact@v0
+      - run: {json.dumps(DISQUE_RUN)}
       - uses: docker/setup-buildx-action@v0
       - uses: actions/cache/restore@v0
       - run: {PUBLISH_BUILD}
@@ -374,6 +377,7 @@ def granted(job: str, permissions: dict[str, str]) -> tuple[str, str]:
 PUBLISH_CHANGES = {
     "conforme": ("", "", False),
     "sans le job": ("  publish:", "  autre:", True),
+    "sans le disque libéré": (f"      - run: {json.dumps(DISQUE_RUN)}\n", "", True),
     "needs sans web": ("[api, web, infra, avis]", "[api, infra, avis]", True),
     # Un avis Python ou npm neuf sur `main` n'arrêterait plus la publication : `publish` ne rejoue
     # que le scan.

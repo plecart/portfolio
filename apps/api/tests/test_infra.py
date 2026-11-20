@@ -51,6 +51,14 @@ DOCKERIGNORE = REPOSITORY_ROOT / ".dockerignore"
 CI_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
 # Les portes d'avis : planifiées chaque jour, et appelées par le job `avis` de `CI_WORKFLOW`.
 AVIS_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "avis.yml"
+# La commande du pas qui libère le disque du runner avant le build des images, mot pour mot :
+# la même dans `avis.yml` et dans `publish`, qui scannent tous deux (`test_ci_declencheurs.py`,
+# `test_publication.py`).
+DISQUE_RUN = (
+    "df -h /\n"
+    "sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL\n"
+    "df -h /\n"
+)
 
 # Les Dockerfiles des images du dépôt, un par dossier `infra/<service>/` (ADR 0014).
 IMAGE_DOCKERFILES = sorted(REPOSITORY_ROOT.glob("infra/*/Dockerfile"))
