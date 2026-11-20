@@ -186,8 +186,9 @@ class Env(BaseSettings):
         MEDIA_R2_ACCESS_KEY_ID: l'identifiant du jeton R2 borné à ce bucket, qui doit pouvoir
             le lister — la suppression d'une image liste le dossier de son original.
         MEDIA_R2_SECRET_ACCESS_KEY: le secret de ce jeton, `SecretStr` comme `SECRET_KEY`.
-        CORS_ALLOWED_ORIGINS: les origines admises à appeler l'API publique — celle du site
-            (ADR 0008, « CORS restreint à l'origine du site »), liste JSON comme `ALLOWED_HOSTS`.
+        CORS_ALLOWED_ORIGINS: les origines admises à appeler l'API publique, et en `DEBUG` à
+            charger les fichiers téléversés qu'elle sert — celle du site (ADR 0008, « CORS
+            restreint à l'origine du site »), liste JSON comme `ALLOWED_HOSTS`.
             Une origine est un schéma et un hôte, rien d'autre ; au moins une, en `DEBUG` aussi :
             le site ne peut pas appeler l'API sans elle.
         ADMIN_USERNAME: le nom de l'unique superutilisateur de l'admin, que la commande
