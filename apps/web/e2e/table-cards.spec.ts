@@ -629,8 +629,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme })
     await serveUnderCsp(page)
     await openTable(page, [LIVE_CARD])
-    const [ink] = await resolveAll(page, [['color', 'var(--tape-ink)']])
-    const inked = inkedIcons(LIVE_CARD.technologies, ink)
+    const inked = await inkedIcons(page, LIVE_CARD.technologies)
 
     expect(await ribbonIcons(cards(page))).toEqual(inked)
     await openProject(cards(page).first())
