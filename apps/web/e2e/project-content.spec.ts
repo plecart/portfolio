@@ -761,35 +761,24 @@ test.describe('les ancres', () => {
     await settle(page)
   }
 
-  // Les chemins fermés du dénombrement D2 de la PR #275 — la hauteur au-dessus de la section change
-  // après le calcul de la cible —, chacun provoqué par son arrivée.
-  for (const [name, viewport, reducedMotion, arrive] of [
-    [
-      'la stack repliée, à 1280 × 720',
-      { width: 1280, height: 720 },
-      'no-preference',
-      arriveAfterTheFont,
-    ],
-    [
-      'la stack repliée, à 1024 × 768',
-      { width: 1024, height: 768 },
-      'no-preference',
-      arriveAfterTheFont,
-    ],
-    [
-      'la stack repliée, à 1280 × 720, en mouvement réduit',
-      { width: 1280, height: 720 },
-      'reduce',
-      arriveAfterTheFont,
-    ],
-    [
-      'la police arrivée en route, à 1280 × 720',
-      { width: 1280, height: 720 },
-      'no-preference',
-      arriveBeforeTheFont,
-    ],
+  /** La fenêtre du projet `desktop` (`Desktop Chrome`). */
+  const DESKTOP = { width: 1280, height: 720 }
+
+  // Le dénombrement D2 de la PR #275 — la hauteur au-dessus de la section change après le calcul de
+  // la cible — : chaque chemin fermé, provoqué par son arrivée. Le mouvement réduit, vert sans le
+  // correctif (l'ancrage du défilement rattrape le saut instantané), tient le critère sans épingler.
+  for (const [path, viewport, reducedMotion, arrive] of [
+    ['la stack repliée', DESKTOP, 'no-preference', arriveAfterTheFont],
+    ['la stack repliée', { width: 1024, height: 768 }, 'no-preference', arriveAfterTheFont],
+    ['la stack repliée', DESKTOP, 'reduce', arriveAfterTheFont],
+    ['la police arrivée en route', DESKTOP, 'no-preference', arriveBeforeTheFont],
   ] as const) {
-    test(`une arrivée directe pose la section à 8 px, ${name}`, async ({ page, isMobile }) => {
+    const { width, height } = viewport
+    const motion = reducedMotion === 'reduce' ? ', en mouvement réduit' : ''
+    test(`une arrivée directe pose la section à 8 px, ${path}, à ${width} × ${height}${motion}`, async ({
+      page,
+      isMobile,
+    }) => {
       test.skip(isMobile, 'au bureau : la colonne défile, à la taille imposée')
       await page.emulateMedia({ reducedMotion })
       await page.setViewportSize(viewport)
