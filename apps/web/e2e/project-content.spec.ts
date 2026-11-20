@@ -4,7 +4,7 @@
  * adresses et ses fermetures : `project.spec.ts`.
  */
 import type { Locator, Page } from '@playwright/test'
-import { expect, serveProjects, test } from './api.ts'
+import { expect, holdProjects, serveProjects, serving, test } from './api.ts'
 import { resolveAll, rotationOf, settle } from './css.ts'
 import {
   arriveAt,
@@ -204,34 +204,34 @@ test.describe('ce qui défile', () => {
   })
 })
 
-test.describe('la stack repliée à deux rangées', () => {
-  /** Douze technologies et quatorze outils : plus de deux rangées par groupe, à 1280 et à 375 px. */
-  const MANY = {
-    technologies: [
-      ...['TypeScript', 'Python', 'Rust', 'Go', 'Kotlin', 'Swift'].map((name) =>
-        buildTechnology(name, 'language'),
-      ),
-      ...['React', 'Django', 'Vue', 'Svelte'].map((name) => buildTechnology(name, 'framework')),
-      ...['Docker', 'Kubernetes'].map((name) => buildTechnology(name, 'infrastructure')),
-      ...[
-        'Figma',
-        'Git',
-        'Vite',
-        'Vitest',
-        'Playwright',
-        'ESLint',
-        'Storybook',
-        'Sentry',
-        'Prettier',
-        'Webpack',
-        'Jest',
-        'Postman',
-        'Notion',
-        'Jira',
-      ].map((name) => buildTechnology(name, 'tool')),
-    ],
-  }
+/** Douze technologies et quatorze outils : plus de deux rangées par groupe, à 1280 et à 375 px. */
+const MANY = {
+  technologies: [
+    ...['TypeScript', 'Python', 'Rust', 'Go', 'Kotlin', 'Swift'].map((name) =>
+      buildTechnology(name, 'language'),
+    ),
+    ...['React', 'Django', 'Vue', 'Svelte'].map((name) => buildTechnology(name, 'framework')),
+    ...['Docker', 'Kubernetes'].map((name) => buildTechnology(name, 'infrastructure')),
+    ...[
+      'Figma',
+      'Git',
+      'Vite',
+      'Vitest',
+      'Playwright',
+      'ESLint',
+      'Storybook',
+      'Sentry',
+      'Prettier',
+      'Webpack',
+      'Jest',
+      'Postman',
+      'Notion',
+      'Jira',
+    ].map((name) => buildTechnology(name, 'tool')),
+  ],
+}
 
+test.describe('la stack repliée à deux rangées', () => {
   /** Chaque groupe : la fin du nom de son ruban-bouton, au pluriel et au singulier, et ses rubans. */
   const GROUPS = [
     ['technologies', 'technologie', 12],
@@ -703,6 +703,107 @@ test.describe('les ancres', () => {
     await expect(section(page, 'resultats')).toHaveAttribute('open')
     await expectScrolledTo(page, 'resultats', isMobile)
   })
+
+  /** Des mots de longueurs mêlées : leurs retours à la ligne suivent la largeur des lettres. */
+  const WORDS = (
+    'le projet est une application web de gestion des tâches avec authentification par jeton, ' +
+    'déploiement continu, conteneurs, base relationnelle, cache distribué et interface réactive ' +
+    'accessible au clavier'
+  ).split(' ')
+
+  /** Vingt paragraphes de plus en plus longs, dont la hauteur change avec la police. */
+  const PROSE = Array.from({ length: 20 }, (_, paragraph) =>
+    Array.from(
+      { length: 30 + paragraph * 9 },
+      (_, word) => WORDS[(paragraph * 13 + word * 7 + word * word) % WORDS.length],
+    ).join(' '),
+  ).join('\n\n')
+
+  /** La position de la section dans ce qui défile, quel que soit son défilement. */
+  const offsetInColumn = (page: Page) =>
+    section(page, 'resultats').evaluate((element) => {
+      const column = element.closest('[role="region"]')!
+      return (
+        element.getBoundingClientRect().top - column.getBoundingClientRect().top + column.scrollTop
+      )
+    })
+
+  /**
+   * Le repli de la stack, seul : la police chargée avant que la liste ne soit servie, les deux
+   * groupes, mesurés tout dépliés au montage, se replient après les effets des sections.
+   */
+  async function arriveAfterTheFont(page: Page) {
+    const release = await holdProjects(page)
+    await page.goto('/projets/fiche#s-resultats')
+    await page.evaluate(async () => void (await document.fonts.load('1em Manrope')))
+
+    await release(serving([ficheProject({ ...FICHE, ...MANY })]))
+
+    await expect(panel(page)).toBeVisible()
+    await settle(page)
+  }
+
+  /**
+   * La police, seule : retenue jusqu'à la section ouverte, elle arrive en route
+   * (`font-display: swap`) et déplace la section — vérifié, sans quoi le cas n'éprouverait rien.
+   */
+  async function arriveBeforeTheFont(page: Page) {
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    await page.route('**/*.woff2', async (route) => {
+      await held
+      await route.continue()
+    })
+    await serveProjects(page, [ficheProject({ ...FICHE, description: PROSE })])
+    await page.goto('/projets/fiche#s-resultats')
+    await expect(section(page, 'resultats')).toHaveAttribute('open')
+    const before = await offsetInColumn(page)
+
+    release()
+
+    await page.evaluate(async () => void (await document.fonts.ready))
+    expect(await offsetInColumn(page)).not.toBe(before)
+    await settle(page)
+  }
+
+  // Les chemins fermés du dénombrement D2 de la PR #275 — la hauteur au-dessus de la section change
+  // après le calcul de la cible —, chacun provoqué par son arrivée.
+  for (const [name, viewport, reducedMotion, arrive] of [
+    [
+      'la stack repliée, à 1280 × 720',
+      { width: 1280, height: 720 },
+      'no-preference',
+      arriveAfterTheFont,
+    ],
+    [
+      'la stack repliée, à 1024 × 768',
+      { width: 1024, height: 768 },
+      'no-preference',
+      arriveAfterTheFont,
+    ],
+    [
+      'la stack repliée, à 1280 × 720, en mouvement réduit',
+      { width: 1280, height: 720 },
+      'reduce',
+      arriveAfterTheFont,
+    ],
+    [
+      'la police arrivée en route, à 1280 × 720',
+      { width: 1280, height: 720 },
+      'no-preference',
+      arriveBeforeTheFont,
+    ],
+  ] as const) {
+    test(`une arrivée directe pose la section à 8 px, ${name}`, async ({ page, isMobile }) => {
+      test.skip(isMobile, 'au bureau : la colonne défile, à la taille imposée')
+      await page.emulateMedia({ reducedMotion })
+      await page.setViewportSize(viewport)
+
+      await arrive(page)
+
+      await expectScrolledTo(page, 'resultats', false)
+    })
+  }
 
   for (const [name, hash] of [
     ['une ancre inconnue', '#s-inconnue'],
