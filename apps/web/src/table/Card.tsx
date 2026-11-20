@@ -1,6 +1,5 @@
 import {
   useId,
-  type ComponentProps,
   type CSSProperties,
   type MouseEventHandler,
   type Ref,
@@ -49,20 +48,16 @@ function Clip() {
   )
 }
 
-/** Une image de la carte : le nom du lien porte le sens, jamais son texte alternatif. */
-function CardImage(props: ComponentProps<'img'>) {
-  return <img alt="" loading="lazy" {...props} />
-}
-
 /**
- * La photo (spec §4.1) : le carré `--line` et l'image de couverture si elle a des variantes. Le
- * bandeau de résumé la recouvre, masqué : le résumé est dans la description du lien.
+ * La photo (spec §4.1) : le carré `--line` et l'image de couverture si elle a des variantes, sans
+ * texte alternatif : le nom du lien porte le sens. Le bandeau de résumé la recouvre, masqué : le
+ * résumé est dans la description du lien.
  */
 function Photo({ project, size }: { project: Project; size: CardSize }) {
   const cover = coverImage(project)
   return (
     <div className="card-photo">
-      {cover && <CardImage {...cover} sizes={coverSizes(size)} />}
+      {cover && <img alt="" loading="lazy" {...cover} sizes={coverSizes(size)} />}
       <p className="card-summary" aria-hidden>
         <span className="card-summary-text">{project.summary}</span>
       </p>

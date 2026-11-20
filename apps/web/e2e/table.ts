@@ -324,11 +324,13 @@ export const ribbonIcons = (container: Locator) =>
   )
 
 /**
- * Ce que `ribbonIcons` lit sur les rubans de ces technologies : chaque icône peinte à l'encre `ink`
- * du ruban, et découpée par l'icône de sa technologie (#271).
+ * Ce que `ribbonIcons` lit sur les rubans de ces technologies, dans le mode de la page : chaque
+ * icône peinte à l'encre du ruban, `--tape-ink`, et découpée par l'icône de sa technologie (#271).
  */
-export const inkedIcons = (technologies: Project['technologies'], ink: string) =>
-  technologies.map(({ name, icon }) => ({ name, ink, paint: ink, mask: `url("${icon}")` }))
+export async function inkedIcons(page: Page, technologies: Project['technologies']) {
+  const [ink] = await resolveAll(page, [['color', 'var(--tape-ink)']])
+  return technologies.map(({ name, icon }) => ({ name, ink, paint: ink, mask: `url("${icon}")` }))
+}
 
 /**
  * Ouvre la table sur un jeu de projets, ses cartes rendues et sa police arrivée : `font-display:

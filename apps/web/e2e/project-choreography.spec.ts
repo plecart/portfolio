@@ -457,9 +457,8 @@ test('sous la CSP de production, la copie volante d’un ruban de technologie po
   await serveUnderCsp(page)
   await openEnteredTable(page, [ficheProject(RIBBONED_FIELDS)])
   await openFrozen(page, FICHE_PATH)
-  const [ink] = await resolveAll(page, [['color', 'var(--tape-ink)']])
   const flown = RIBBONED_FIELDS.technologies.filter(({ name }) => NAMED.includes(name))
-  const inked = inkedIcons(flown, ink)
+  const inked = await inkedIcons(page, flown)
   const targets = readingColumn(page).locator('.project-stack').first().locator(TARGETED)
 
   expect(await ribbonIcons(panel(page).locator('[data-flyer]'))).toEqual(inked)
