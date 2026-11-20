@@ -56,7 +56,7 @@ AVIS_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "avis.yml"
 # `test_publication.py`).
 DISQUE_RUN = (
     "df -h /\n"
-    "sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL\n"
+    "sudo rm -rf /usr/local/lib/android /usr/share/dotnet /usr/local/.ghcup /opt/hostedtoolcache/CodeQL\n"
     "df -h /\n"
 )
 
