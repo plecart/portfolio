@@ -5,9 +5,11 @@
  * Toute page sert `[]` par défaut — le `test` de ce module, que chaque scénario importe à la place
  * de celui de Playwright : sans lui, la version compilée appellerait l'API de production. Un geste
  * posé par le scénario l'emporte, Playwright jouant les routes dans l'ordre inverse de leur pose.
- * Les gestes visent le chemin de la liste sur toute origine. Leurs réponses ne portent pas
- * d'en-tête CORS : Chromium ne l'exige pas d'une réponse interceptée (mesuré le 2026-10-16, en-tête
- * retiré, scénarios verts) ; la politique CORS réelle de l'API est éprouvée côté back (#10).
+ * Les gestes visent le chemin de la liste sur toute origine. Leurs réponses, comme celles des
+ * fichiers, ne posent aucun en-tête CORS : Playwright ajoute `Access-Control-Allow-Origin` à toute
+ * réponse interceptée d'une requête d'une autre origine (`Route.fulfill`, `_maybeAddCorsHeaders`,
+ * playwright-core 1.64.1, lu le 2026-11-20) — la liste, et l'icône qu'un masque CSS charge en CORS
+ * (#271). La politique CORS réelle de l'API est éprouvée côté back (#10).
  */
 import { join } from 'node:path'
 import { test as base, type Page, type Route } from '@playwright/test'

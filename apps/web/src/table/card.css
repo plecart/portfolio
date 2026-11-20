@@ -425,10 +425,16 @@
     transform: rotate(1deg);
   }
 
-  /* L'icône laisse 4 px en haut et en bas du ruban. */
-  .card-ribbon img {
+  /* L'icône laisse 4 px en haut et en bas du ruban. Monochrome, à l'encre du ruban (spec §4.1) : le
+     fichier de sa technologie (`--icon`, `TechnologyRibbon`) n'en donne que la forme. Le préfixe
+     `-webkit-` vient de la compilation, pour les navigateurs que la cible de Vite en prive. Vide,
+     elle n'a pas la largeur minimale d'une image : la copie volante roulée l'écraserait. */
+  .card-ribbon-icon {
+    flex-shrink: 0;
     width: calc(var(--height) - 2 * var(--s-1));
     height: calc(var(--height) - 2 * var(--s-1));
+    background-color: currentColor;
+    mask: var(--icon) center / contain no-repeat;
   }
 
   /* Le nom d'une technologie, entier, sauf sur la copie volante d'un ruban de la fiche roulée vers

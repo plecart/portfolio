@@ -376,7 +376,17 @@ redirections le 2026-11-16. Compte protégé par un TOTP, que la connexion Googl
   `portfolio-backups`, privé. WEUR par indice, classe Standard. Trois jetons bornés à un bucket :
   `portfolio-medias-rw`, `portfolio-backups-rw`, `portfolio-backups-ro` (« Où vit chaque secret »).
   `media.pacome.dev` n'ajoute ni `X-Content-Type-Options` ni CSP, SVG compris : ses fichiers ne
-  viennent que de l'auteur, et cet hôte ne porte aucun cookie (`<img>` n'exécute pas un SVG).
+  viennent que de l'auteur, et cet hôte ne porte aucun cookie (ni `<img>` ni un masque CSS
+  n'exécutent un SVG ; le masque, mesuré le 2026-11-20 sur Chromium 156 contre un `<iframe>`
+  témoin).
+  CORS : le site charge les icônes du ruban en masque CSS, donc en CORS (#271), refusé sans la
+  règle de `portfolio-medias`, posée dans le tableau de bord (R2 › `portfolio-medias` › Settings ›
+  CORS Policy) : `[{ "AllowedOrigins": ["https://pacome.dev"], "AllowedMethods": ["GET", "HEAD"] }]`.
+  Propagée en 30 s au plus, elle demande ensuite un Cache Purge de `media.pacome.dev`, dont le cache
+  garde les réponses d'avant, sans en-tête ([CORS](https://developers.cloudflare.com/r2/buckets/cors/),
+  lue le 2026-11-20). Contrôle — l'en-tête `Access-Control-Allow-Origin` y vaut
+  `https://pacome.dev`, absent le 2026-11-20, avant la règle :
+  `curl -sI -H "Origin: https://pacome.dev" https://media.pacome.dev/technologies/django.svg`.
 - **Access** — équipe `pacome`, fournisseur GitHub (application OAuth `Portfolio Cloudflare
   Access`). Application `portfolio-admin`, chemin `api.pacome.dev/admin`, GitHub seul, session 24 h ;
   politique `admin-mainteneur` : Allow, l'adresse e-mail que GitHub transmet pour le mainteneur. Le

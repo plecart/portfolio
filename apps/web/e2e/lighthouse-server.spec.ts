@@ -13,6 +13,7 @@ import lighthouse from '../lighthouserc.json' with { type: 'json' }
 import { API_ORIGIN } from './api.ts'
 import { gallery } from './project.ts'
 import { pageBottom, scrollThrough } from './scroll.ts'
+import { ribbonIcons } from './table.ts'
 
 /** Les adresses de la collecte : la table, à la racine du serveur, puis la fiche du premier projet. */
 const [SERVER, PROJECT_PAGE] = lighthouse.ci.collect.url
@@ -27,7 +28,10 @@ function undecoded(images: Locator): Promise<string[]> {
   )
 }
 
-test('la collecte mesure la table à douze cartes, images comprises', async ({ page }) => {
+test('la collecte mesure la table à douze cartes, images et icônes comprises', async ({
+  page,
+  request,
+}) => {
   await page.route(`${API_ORIGIN}/**`, (route) => route.abort())
 
   await page.goto(SERVER)
@@ -37,9 +41,16 @@ test('la collecte mesure la table à douze cartes, images comprises', async ({ p
   // `lazy` : une image ne part qu'à l'approche de l'écran.
   await scrollThrough(page, await pageBottom(page))
   const images = table.locator('img')
-  // Onze couvertures, vingt icônes : toute la population.
-  await expect(images).toHaveCount(11 + 20)
+  // Onze couvertures : toute la population.
+  await expect(images).toHaveCount(11)
   await expect.poll(() => undecoded(images)).toEqual([])
+  // Vingt icônes, des masques (#271) : chacune servie en SVG, et non par le repli SPA.
+  const masks = (await ribbonIcons(table)).map(({ mask }) => mask)
+  expect(masks).toHaveLength(20)
+  for (const mask of new Set(masks)) {
+    const icon = mask.slice('url("'.length, -'")'.length)
+    expect((await request.get(icon)).headers()['content-type']).toBe('image/svg+xml')
+  }
 })
 
 test('la collecte mesure la fiche, la première image de sa galerie décodée', async ({ page }) => {

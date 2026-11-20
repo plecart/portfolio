@@ -297,12 +297,38 @@ export const ribbonSizes = (container: Locator) =>
         }),
       ),
     ]
-    const icons = ribbons.flatMap((ribbon) => [...ribbon.querySelectorAll('img')])
+    const icons = ribbons.flatMap((ribbon) => [...ribbon.querySelectorAll('.card-ribbon-icon')])
     return {
       ribbons: distinct(ribbons, ['height', 'font-size']),
       icons: distinct(icons, ['width', 'height']),
     }
   })
+
+/**
+ * L'icône de chaque ruban de technologie sous un élément, dans l'ordre (spec §4.1) : le nom de sa
+ * technologie, l'encre du ruban, la couleur qui la peint et l'image qui la découpe. Un ruban d'état
+ * n'a pas d'icône.
+ */
+export const ribbonIcons = (container: Locator) =>
+  container.locator('.card-ribbon-icon').evaluateAll((icons) =>
+    icons.map((icon) => {
+      const ribbon = icon.parentElement!
+      const { backgroundColor, maskImage } = getComputedStyle(icon)
+      return {
+        name: ribbon.textContent,
+        ink: getComputedStyle(ribbon).color,
+        paint: backgroundColor,
+        mask: maskImage,
+      }
+    }),
+  )
+
+/**
+ * Ce que `ribbonIcons` lit sur les rubans de ces technologies : chaque icône peinte à l'encre `ink`
+ * du ruban, et découpée par l'icône de sa technologie (#271).
+ */
+export const inkedIcons = (technologies: Project['technologies'], ink: string) =>
+  technologies.map(({ name, icon }) => ({ name, ink, paint: ink, mask: `url("${icon}")` }))
 
 /**
  * Ouvre la table sur un jeu de projets, ses cartes rendues et sa police arrivée : `font-display:
