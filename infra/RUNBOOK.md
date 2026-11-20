@@ -382,10 +382,16 @@ redirections le 2026-11-16. Compte protégé par un TOTP, que la connexion Googl
   CORS : le site charge les icônes du ruban en masque CSS, donc en CORS (#271), refusé sans la
   règle de `portfolio-medias`, posée dans le tableau de bord (R2 › `portfolio-medias` › Settings ›
   CORS Policy) : `[{ "AllowedOrigins": ["https://pacome.dev"], "AllowedMethods": ["GET", "HEAD"] }]`.
-  Propagée en 30 s au plus, elle demande ensuite un Cache Purge de `media.pacome.dev`, dont le cache
-  garde les réponses d'avant, sans en-tête ([CORS](https://developers.cloudflare.com/r2/buckets/cors/),
-  lue le 2026-11-20). Contrôle — l'en-tête `Access-Control-Allow-Origin` y vaut
-  `https://pacome.dev`, absent le 2026-11-20, avant la règle :
+  Propagée en 30 s au plus, elle demande ensuite un Cache Purge de `media.pacome.dev`, que la doc
+  prescrit ([CORS](https://developers.cloudflare.com/r2/buckets/cors/), lue le 2026-11-20) — l'arête
+  ne gardait pourtant pas ces fichiers (`cf-cache-status: DYNAMIC` le 2026-11-20, avant la règle).
+  Posée le 2026-11-20, la règle fait porter à toute réponse `Vary: Origin` et
+  `Cache-Control: max-age=14400` : un navigateur ne ressert plus au masque une icône chargée sans
+  `Origin` (mesuré le même jour sur le site en ligne, une `<img>` puis le masque de la même adresse :
+  200, aucune erreur). Les réponses mises en cache avant elle n'avaient ni l'un ni l'autre : leur
+  fraîcheur heuristique, un dixième de leur âge, ne dépassait pas 31 h (22 icônes relevées).
+  Contrôle — l'en-tête `Access-Control-Allow-Origin` y vaut `https://pacome.dev`, absent le
+  2026-11-20 avant la règle, présent après :
   `curl -sI -H "Origin: https://pacome.dev" https://media.pacome.dev/technologies/django.svg`.
 - **Access** — équipe `pacome`, fournisseur GitHub (application OAuth `Portfolio Cloudflare
   Access`). Application `portfolio-admin`, chemin `api.pacome.dev/admin`, GitHub seul, session 24 h ;
