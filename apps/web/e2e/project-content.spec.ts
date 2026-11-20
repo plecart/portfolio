@@ -4,7 +4,7 @@
  * adresses et ses fermetures : `project.spec.ts`.
  */
 import type { Locator, Page } from '@playwright/test'
-import { expect, holdProjects, serveProjects, serving, test } from './api.ts'
+import { expect, holdProjects, holdRequests, serveProjects, serving, test } from './api.ts'
 import { resolveAll, rotationOf, settle } from './css.ts'
 import {
   arriveAt,
@@ -748,12 +748,7 @@ test.describe('les ancres', () => {
    * (`font-display: swap`) et déplace la section — vérifié, sans quoi le cas n'éprouverait rien.
    */
   async function arriveBeforeTheFont(page: Page) {
-    let release!: () => void
-    const held = new Promise<void>((resolve) => (release = resolve))
-    await page.route('**/*.woff2', async (route) => {
-      await held
-      await route.continue()
-    })
+    const release = await holdRequests(page, '**/*.woff2')
     await serveProjects(page, [ficheProject({ ...FICHE, description: PROSE })])
     await page.goto('/projets/fiche#s-resultats')
     await expect(section(page, 'resultats')).toHaveAttribute('open')
