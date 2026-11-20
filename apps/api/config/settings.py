@@ -173,8 +173,9 @@ INSTALLED_APPS = [
 # « Enable WhiteNoise ») : ses en-têtes — `nosniff`, `Referrer-Policy` et
 # `Cross-Origin-Opener-Policy`, aux défauts de Django — couvrent aussi les fichiers statiques. Puis
 # WhiteNoise : une requête de fichier statique s'arrête là, sans ouvrir de session. Puis CORS, borné
-# aux routes de l'API (`CORS_URLS_REGEX`) — après WhiteNoise, et non avant comme le propose
-# django-cors-headers : aucun fichier statique n'est servi sous `/api/`.
+# aux routes de l'API et des fichiers téléversés (`CORS_URLS_REGEX`) — après WhiteNoise, et non
+# avant comme le propose django-cors-headers : aucun fichier statique n'est servi sous `/api/` ni
+# sous `/media/`.
 # Puis le `GET` conditionnel : `ETag` d'empreinte du corps et `304` sur
 # `If-None-Match` (cadrage §6.7), pour toute réponse qui n'est pas `no-store` — l'admin, en
 # `never_cache`, n'en reçoit pas ; **après** CORS, parce que le `304` qu'il construit ne recopie pas
@@ -200,11 +201,15 @@ MIDDLEWARE = [
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
 ]
 
-# CORS restreint à l'origine du site (ADR 0008), pour les seules routes de l'API publique : l'admin
-# n'a pas vocation à être appelé depuis le site. Un `GET` sans cookie : aucune autre option de
+# CORS restreint à l'origine du site (ADR 0008), pour les seules routes de l'API publique et les
+# fichiers téléversés : l'admin n'a pas vocation à être appelé depuis le site. Les routes `/media/`
+# n'existent qu'en `DEBUG` (`static()`, `config/urls.py`) : sur le poste, l'API rend des adresses
+# absolues sur sa propre origine (`absolute_url`, `content/schemas.py`), que le site, sur celle de
+# Vite, charge en masque CSS — en CORS (#271). En production, R2 sert les fichiers, sous sa propre
+# règle CORS (`infra/RUNBOOK.md`, « R2 »). Un `GET` sans cookie : aucune autre option de
 # django-cors-headers n'est nécessaire.
 CORS_ALLOWED_ORIGINS = env.CORS_ALLOWED_ORIGINS
-CORS_URLS_REGEX = r"^/api/"
+CORS_URLS_REGEX = r"^/(api|media)/"
 
 # Le dossier de ce module, qui porte les gabarits du projet et les fichiers servis à la racine.
 CONFIG_DIR = Path(__file__).resolve().parent

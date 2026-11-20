@@ -1,8 +1,10 @@
 """Tests de l'API publique : la liste des projets publiés, `GET /api/projets` (brief de #10,
 décisions 1 à 5 et 12), et sa politique HTTP (décisions 6 à 9)."""
 
+import json
 from collections.abc import Iterator
 from datetime import date
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
@@ -21,6 +23,7 @@ from django.test import Client, override_settings
 from django.test.utils import CaptureQueriesContext
 from factories import gallery_image, project, saved, section, technology
 from pytest_django import DjangoCaptureOnCommitCallbacks
+from test_django_project import run_python
 from test_markdown_preview import importers
 
 PROJECTS = "/api/projets"
@@ -293,6 +296,43 @@ def test_cors_est_borne_aux_routes_de_l_api(client: Client) -> None:
 
     assert response.status_code == 200
     assert not response.has_header(ALLOW_ORIGIN)
+
+
+# Demande une icône téléversée depuis chaque origine passée en argument, et imprime, par origine, le
+# statut et l'en-tête CORS reçus. Dans un processus neuf : `config.urls` ne rend la route `/media/`
+# qu'en `DEBUG`, une fois, à l'import (`test_django_project.py`), et le processus de test tourne
+# sans. L'hôte est celui qu'admet l'environnement de test.
+MEDIA_CORS = """
+import json, os, sys, django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
+from django.test import Client
+answers = {}
+for origin in sys.argv[1:]:
+    response = Client().get(
+        '/media/technologies/icone.svg', headers={'host': 'portfolio.test', 'origin': origin}
+    )
+    answers[origin] = [response.status_code, response.headers.get('Access-Control-Allow-Origin')]
+print(json.dumps(answers))
+"""
+
+
+def test_un_media_servi_en_developpement_n_admet_que_l_origine_du_site(
+    variables: dict[str, str], tmp_path: Path
+) -> None:
+    """Sur le poste, le site affiche les icônes en masque CSS, qui se charge en CORS, depuis
+    l'origine de l'API (#271) : la seule origine du site les reçoit, comme la liste."""
+    icon = tmp_path / "technologies" / "icone.svg"
+    icon.parent.mkdir()
+    icon.write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
+
+    result = run_python(
+        ["-c", MEDIA_CORS, SITE_ORIGIN, OTHER_ORIGIN],
+        variables | {"DEBUG": "true", "MEDIA_ROOT": str(tmp_path)},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {SITE_ORIGIN: [200, SITE_ORIGIN], OTHER_ORIGIN: [200, None]}
 
 
 @pytest.mark.django_db
