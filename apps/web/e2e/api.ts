@@ -62,6 +62,21 @@ export async function holdProjects(page: Page): Promise<(answer: Answer) => Prom
 }
 
 /**
+ * Retient les requêtes d'une adresse ; relâchées, elles passent à la route suivante, ou au réseau.
+ *
+ * @returns Le geste qui les laisse passer.
+ */
+export async function holdRequests(page: Page, url: string): Promise<() => void> {
+  let release!: () => void
+  const released = new Promise<void>((resolve) => (release = resolve))
+  await page.route(url, async (route) => {
+    await released
+    await route.fallback()
+  })
+  return release
+}
+
+/**
  * Compte les requêtes de la liste à partir de maintenant, servies ou non.
  *
  * @returns De quoi lire le compte.

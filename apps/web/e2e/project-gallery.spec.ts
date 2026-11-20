@@ -4,7 +4,7 @@
  * la légende, l'accessibilité et la position disent laquelle est montrée.
  */
 import type { Page } from '@playwright/test'
-import { expect, serveProjects, test } from './api.ts'
+import { expect, holdRequests, serveProjects, test } from './api.ts'
 import { resolveAll, settle } from './css.ts'
 import {
   arriveAt,
@@ -421,20 +421,8 @@ test.describe('les repères de §3.2 et §4.4', () => {
     await expectNoOverflow(panel(page))
   })
 
-  /**
-   * Retient les images : ce que le cadre réserve ne doit rien leur devoir.
-   *
-   * @returns Le geste qui les laisse arriver.
-   */
-  async function holdImages(page: Page) {
-    let release!: () => void
-    const released = new Promise<void>((resolve) => (release = resolve))
-    await page.route(`${FILES_ORIGIN}/images/**`, async (route) => {
-      await released
-      await route.fallback()
-    })
-    return release
-  }
+  /** Retient les images : ce que le cadre réserve ne doit rien leur devoir. */
+  const holdImages = (page: Page) => holdRequests(page, `${FILES_ORIGIN}/images/**`)
 
   test('le cadre réserve son carré avant toute image, quel que soit le format déclaré', async ({
     page,
