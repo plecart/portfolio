@@ -631,8 +631,8 @@ AVIS_TRIGGERS = {
 AVIS_PERMISSIONS = {"contents": "read"}
 # Les pas de son seul job, dans l'ordre — ce que chacun lance, `launched` : le checkout et le pas de
 # fusion, qui ne joue qu'appelé sur une PR, l'audit Python, l'audit npm, puis le disque libéré, le
-# build des images et leur scan, chaque porte après ce qu'elle lit. Le cache des couches est celui du job `infra`,
-# restauré et jamais réécrit, comme dans `publish`.
+# build des images et leur scan, chaque porte après ce qu'elle lit. Le cache des couches est celui
+# du job `infra`, restauré et jamais réécrit, comme dans `publish`.
 AVIS_STEPS = [
     "actions/checkout",
     FUSION_NAME,
@@ -744,7 +744,7 @@ AVIS_CHANGES = {
     ),
     "cache réécrit": ("actions/cache/restore@v0", "actions/cache@v0", True),
     "sans le disque libéré": (f"      - run: {json.dumps(DISQUE_RUN)}\n", "", True),
-    "disque à moitié libéré": ("/opt/ghc ", "", True),
+    "disque à moitié libéré": ("/usr/local/.ghcup ", "", True),
 }
 
 

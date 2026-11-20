@@ -412,7 +412,7 @@ jobs:
       - name: Disque
         run: |
           df -h /
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
           df -h /
 
       # Même builder que le job `infra`, pour lire le même cache local.
