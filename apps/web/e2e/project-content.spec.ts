@@ -764,9 +764,18 @@ test.describe('les ancres', () => {
   /** La fenêtre du projet `desktop` (`Desktop Chrome`). */
   const DESKTOP = { width: 1280, height: 720 }
 
-  // Le dénombrement D2 de la PR #275 — la hauteur au-dessus de la section change après le calcul de
-  // la cible — : chaque chemin fermé, provoqué par son arrivée. Le mouvement réduit, vert sans le
-  // correctif (l'ancrage du défilement rattrape le saut instantané), tient le critère sans épingler.
+  // Les chemins par lesquels la hauteur au-dessus de la section change après le calcul de la cible
+  // (#272, D2 ; recensement de `ProjectDialog`, `ProjectContent`, `useStackFold`, `ProjectGallery`,
+  // `ProjectMarkdown` et de la police) — 7 recensés, 2 fuyaient, fermés et provoqués ici :
+  // - le repli initial de la stack : fermé, ci-dessous ;
+  // - la police arrivée en route : fermé, ci-dessous ;
+  // - l'image de galerie arrivée sur téléphone : fermé avant, cadre fixe (`project-gallery.spec.ts`) ;
+  // - la re-mesure du repli par son `ResizeObserver` : écarté, mesuré à 8 px sans correctif (même tâche) ;
+  // - une section ou un groupe déplié : écarté, geste de l'utilisateur ;
+  // - une image dans le Markdown : écarté, le contenu n'en admet pas (spec §7) ;
+  // - l'envol des rubans : écarté, des transformations, sans effet sur la mise en page.
+  // Le mouvement réduit, vert sans le correctif (l'ancrage du défilement rattrape le saut
+  // instantané), tient le critère sans épingler.
   for (const [path, viewport, reducedMotion, arrive] of [
     ['la stack repliée', DESKTOP, 'no-preference', arriveAfterTheFont],
     ['la stack repliée', { width: 1024, height: 768 }, 'no-preference', arriveAfterTheFont],
