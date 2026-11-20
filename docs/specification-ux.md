@@ -141,7 +141,7 @@ Les jetons sont des propriétés CSS déclarées sur `:root` (la palette l'est a
 | `--postit-ink` | `#2A2622` | `#1C1A17` | texte des post-its |
 | `--postit-link` | `color-mix(in srgb, var(--accent) 22%, var(--postit))`, soit `#E6C184` | même formule, soit `#C09A57` | post-its de lien de la fiche |
 | `--tape` | `#E8DFCF` | `#3D372F` | rubans |
-| `--tape-ink` | `#2A2622` | `#D8CFC0` | texte des rubans |
+| `--tape-ink` | `#2A2622` | `#D8CFC0` | texte et icônes des rubans |
 | `--ongoing` | `#9A6A0E` | `#C98A12` | point « en cours », seul usage (§1.14) |
 | `--strap` | `#F0C23A` | `#CCA531` | rayures jaunes de la sangle de chantier |
 | `--strap-ink` | `#2A2622` | `#1C1A17` | rayures encre de la sangle |
