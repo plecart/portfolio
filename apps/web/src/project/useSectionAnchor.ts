@@ -9,7 +9,8 @@ const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
  *
  * Le défilement part à la résolution de `document.fonts.ready`, jamais dans l'appel : un défilement
  * animé garde la cible prise à son départ, et ce qui précède la section bouge encore. La police
- * arrive quand elle arrive (`font-display: swap`). Les groupes de la stack, eux, se replient à
+ * arrive quand elle arrive (`font-display: swap`) ; `fonts.ready` n'attend qu'un chargement déjà
+ * commencé, ce que fait le texte de la page sous la fiche, rendu avant elle. Les groupes de la stack, eux, se replient à
  * l'arrivée juste après les effets des sections (`useStackFold`) : React vide ces effets, puis rend
  * aussitôt, dans la même pile d'appels, la mise à jour que demande l'effet de mise en page du
  * repli — avant toute réaction de promesse.
