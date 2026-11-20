@@ -206,8 +206,8 @@ MIDDLEWARE = [
 # n'existent qu'en `DEBUG` (`static()`, `config/urls.py`) : sur le poste, l'API rend des adresses
 # absolues sur sa propre origine (`absolute_url`, `content/schemas.py`), que le site, sur celle de
 # Vite, charge en masque CSS — en CORS (#271). En production, R2 sert les fichiers, sous sa propre
-# règle CORS (`infra/RUNBOOK.md`, « R2 »). Un `GET` sans cookie : aucune autre option de
-# django-cors-headers n'est nécessaire.
+# règle CORS (`infra/RUNBOOK.md`, « Cloudflare — l'état attendu », R2). Un `GET` sans cookie :
+# aucune autre option de django-cors-headers n'est nécessaire.
 CORS_ALLOWED_ORIGINS = env.CORS_ALLOWED_ORIGINS
 CORS_URLS_REGEX = r"^/(api|media)/"
 
