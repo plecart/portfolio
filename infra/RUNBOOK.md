@@ -383,13 +383,14 @@ redirections le 2026-11-16. Compte protégé par un TOTP, que la connexion Googl
   règle de `portfolio-medias`, posée dans le tableau de bord (R2 › `portfolio-medias` › Settings ›
   CORS Policy) : `[{ "AllowedOrigins": ["https://pacome.dev"], "AllowedMethods": ["GET", "HEAD"] }]`.
   Propagée en 30 s au plus, elle demande ensuite un Cache Purge de `media.pacome.dev`, que la doc
-  prescrit ([CORS](https://developers.cloudflare.com/r2/buckets/cors/), lue le 2026-11-20) — l'arête
-  ne gardait pourtant pas ces fichiers (`cf-cache-status: DYNAMIC` le 2026-11-20, avant la règle).
-  Posée le 2026-11-20, la règle fait porter à toute réponse `Vary: Origin` et
-  `Cache-Control: max-age=14400` : un navigateur ne ressert plus au masque une icône chargée sans
-  `Origin` (mesuré le même jour sur le site en ligne, une `<img>` puis le masque de la même adresse :
-  200, aucune erreur). Les réponses mises en cache avant elle n'avaient ni l'un ni l'autre : leur
-  fraîcheur heuristique, un dixième de leur âge, ne dépassait pas 31 h (22 icônes relevées).
+  prescrit ([CORS](https://developers.cloudflare.com/r2/buckets/cors/), lue le 2026-11-20) : l'arête
+  garde les `GET` de ces fichiers, une entrée par `Origin` (`cf-cache-status: HIT`, mesuré le
+  2026-11-20 après la règle). Depuis la règle, posée le 2026-11-20, un `GET` rend `Vary: Origin`,
+  avec ou sans `Origin`, et `Cache-Control: max-age=14400` (mesuré le même jour) : un navigateur ne
+  ressert plus au masque une icône chargée sans `Origin` (mesuré sur le site en ligne, une `<img>`
+  puis le masque de la même adresse : 200, aucune erreur). Les en-têtes d'avant la règle ne se
+  mesurent plus ; sans `Cache-Control`, la fraîcheur heuristique d'une icône, un dixième de son
+  âge, n'aurait pas dépassé 31 h (22 icônes relevées).
   Contrôle — l'en-tête `Access-Control-Allow-Origin` y vaut `https://pacome.dev`, absent le
   2026-11-20 avant la règle, présent après :
   `curl -sI -H "Origin: https://pacome.dev" https://media.pacome.dev/technologies/django.svg`.
