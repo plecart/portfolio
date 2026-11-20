@@ -97,6 +97,18 @@ jobs:
       - name: Audit npm
         run: make web-audit
 
+      # Le disque du runner : la build 20261111.196.1 de l'image `ubuntu-26.04` ne laisse plus de
+      # place à la base de Trivy après le build des images (« no space left on device », les 14 et
+      # 15 novembre 2026 puis à chaque run depuis le 17 ; le même commit feab473 passait le 16 sur
+      # la build 20261111.82.6). Les
+      # chaînes d'outils préinstallées que le job n'emploie pas s'effacent ; `df` chiffre le gain
+      # au journal. Même pas dans le job `publish` de `ci.yml`, qui scanne aussi.
+      - name: Disque
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
       # Le pilote `docker-container`, comme dans le job `infra` de `ci.yml`, pour lire son cache.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
