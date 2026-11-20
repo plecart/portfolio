@@ -10,7 +10,7 @@ import type { Locator, Page } from '@playwright/test'
 import { cardPose, LOADING_FRAME_COUNT } from '../src/table/cards.ts'
 import { expect, FAILURES, holdProjects, serving, test, type Answer } from './api.ts'
 import { resolveAll, rotationOf, settle } from './css.ts'
-import { arriveAt, panel } from './project.ts'
+import { arriveAt, openProject, panel } from './project.ts'
 import {
   buildImage,
   buildProject,
@@ -28,6 +28,7 @@ import {
   expectPlacement,
   face,
   focusByKeyboard,
+  inkedIcons,
   intend,
   LIVE_CARD,
   NARROW_VIEWPORT,
@@ -36,6 +37,7 @@ import {
   pose,
   probeTranche,
   type Rect,
+  ribbonIcons,
   RIBBON_SIZES,
   ribbonSizes,
   serveUnderCsp,
@@ -381,9 +383,8 @@ test('une carte porte son titre en `<h2>`, ses éléments décoratifs masqués',
   await expect(card.getByText('. En cours.')).toHaveClass('sr-only')
   await expect(card.locator('svg')).toHaveAttribute('aria-hidden', 'true')
   // La couverture, l'icône : le nom du lien les porte.
-  expect(
-    await card.locator('img').evaluateAll((images) => images.map((image) => image.getAttribute('alt'))),
-  ).toEqual(['', ''])
+  await expect(card.locator('img')).toHaveAttribute('alt', '')
+  await expect(card.locator('.card-ribbon-icon')).toHaveAttribute('aria-hidden', 'true')
   await expect(strap(card)).toHaveAttribute('aria-hidden', 'true')
   await expect(card.locator('.card-band')).toHaveAttribute('aria-hidden', 'true')
 })
@@ -402,8 +403,8 @@ test('toutes les cartes sont des cibles de 36 px au moins, et toutes leurs image
     .evaluateAll((images: HTMLImageElement[]) => images.map((image) => image.loading))
 
   expect(Math.min(...boxes.flat())).toBeGreaterThanOrEqual(36)
-  // Onze couvertures, vingt icônes : toute la population.
-  expect(loading).toEqual(Array(11 + 20).fill('lazy'))
+  // Onze couvertures : toute la population ; les icônes sont des masques, sans image (#271).
+  expect(loading).toEqual(Array(11).fill('lazy'))
 })
 
 test('un post-it long tient sur deux lignes au plus, large de la carte moins 28 px (spec §4.1)', async ({
@@ -612,15 +613,30 @@ test('les rubans : trois technologies au plus, icône, nom masqué et infobulle 
   const ribbons = cards(page).locator('li')
 
   await expect(ribbons).toHaveText(shown.map(({ name }) => name))
-  for (const [index, { name, icon }] of shown.entries()) {
+  for (const [index, { name }] of shown.entries()) {
     const ribbon = ribbons.nth(index)
     await expect(ribbon).toHaveAttribute('title', name)
-    await expect(ribbon.locator('img')).toHaveAttribute('src', icon)
-    await expect(ribbon.locator('img')).toHaveAttribute('alt', '')
+    await expect(ribbon.locator('.card-ribbon-icon')).toHaveAttribute('aria-hidden', 'true')
     await expect(ribbon.getByText(name)).toContainClass('sr-only')
   }
   expect(await Promise.all((await ribbons.all()).map(rotationOf))).toEqual([-1.5, 1, -1.5])
 })
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`(${colorScheme}) sous la CSP de production, l’icône d’un ruban de technologie est peinte à l’encre du ruban et découpée par l’icône de sa technologie, sur la carte comme dans la stack de la fiche (spec §4.1, #271)`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme })
+    await serveUnderCsp(page)
+    await openTable(page, [LIVE_CARD])
+    const [ink] = await resolveAll(page, [['color', 'var(--tape-ink)']])
+    const inked = inkedIcons(LIVE_CARD.technologies, ink)
+
+    expect(await ribbonIcons(cards(page))).toEqual(inked)
+    await openProject(cards(page).first())
+    expect(await ribbonIcons(panel(page).locator('.project-stack [data-ribbon]'))).toEqual(inked)
+  })
+}
 
 /** Un projet en cours et en ligne, sans technologie : ses deux rubans d'état, seuls. */
 const STATES_ONLY = { ...ONGOING, demo_url: 'https://demo.test/projet', technologies: [] }

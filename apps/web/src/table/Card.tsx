@@ -88,6 +88,10 @@ function Strap() {
  * celui de la fiche qui porte la même, et la copie de celui-ci efface le sien en se roulant à la
  * largeur du premier (`useChoreography`).
  *
+ * L'icône, décorative, n'est que la forme du fichier téléversé : un masque sur l'encre du ruban
+ * (`card.css`, #271). Son adresse passe par la prop `style`, comme la pose de `Card`, et la copie
+ * volante la reçoit avec l'attribut que `cloneNode` recopie.
+ *
  * @param technology La technologie.
  * @param labelled Son nom en clair, sans infobulle : la stack de la fiche (§4.3).
  */
@@ -100,7 +104,11 @@ export function TechnologyRibbon({
 }) {
   return (
     <li className="card-ribbon" data-ribbon={name} title={labelled ? undefined : name}>
-      <CardImage src={icon} />
+      <span
+        className="card-ribbon-icon"
+        style={{ '--icon': `url("${icon}")` } as CSSProperties}
+        aria-hidden
+      />
       <span className={labelled ? 'card-ribbon-name' : 'card-ribbon-name sr-only'}>{name}</span>
     </li>
   )

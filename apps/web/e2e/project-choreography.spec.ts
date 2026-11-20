@@ -36,7 +36,12 @@ import {
   expectPlacement,
   face,
   focusByKeyboard,
+  inkedIcons,
   openTable,
+  ribbonIcons,
+  RIBBON_SIZES,
+  ribbonSizes,
+  serveUnderCsp,
   straighten,
   strap,
   strapPixels,
@@ -444,6 +449,23 @@ test('chaque ruban vole roulé : au bout carte, sa copie a la largeur et la marg
       expect(width, name).toBeLessThan(ribbon.width)
     }
   }
+})
+
+test('sous la CSP de production, la copie volante d’un ruban de technologie porte son icône entière, à l’encre du ruban, même roulée au bout carte : rien ne change à l’atterrissage (#271)', async ({
+  page,
+}) => {
+  await serveUnderCsp(page)
+  await openEnteredTable(page, [ficheProject(RIBBONED_FIELDS)])
+  await openFrozen(page, FICHE_PATH)
+  const [ink] = await resolveAll(page, [['color', 'var(--tape-ink)']])
+  const flown = RIBBONED_FIELDS.technologies.filter(({ name }) => NAMED.includes(name))
+  const inked = inkedIcons(flown, ink)
+  const targets = readingColumn(page).locator('.project-stack').first().locator(TARGETED)
+
+  expect(await ribbonIcons(panel(page).locator('[data-flyer]'))).toEqual(inked)
+  expect(await ribbonIcons(targets)).toEqual(inked)
+  // Les copies, roulées à la largeur de leur homologue, comme les rubans de la fiche.
+  expect(await ribbonSizes(panel(page))).toEqual(RIBBON_SIZES)
 })
 
 /**
