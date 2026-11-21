@@ -240,7 +240,8 @@ jobs:
     name: Infra — configuration Compose, images, tests des images
     runs-on: ubuntu-latest
 
-    # Même conditionnement que le job `web` : voir son commentaire.
+    # Même conditionnement que le job `web` : voir son commentaire. Ses fichiers, sur une PR : ce que
+    # les images définissent ou exécutent, liste d'inclusion `INFRA` du script (ADR 0031).
     needs: api
     if: ${{ github.event_name != 'pull_request' || needs.api.outputs.infra == 'true' }}
 

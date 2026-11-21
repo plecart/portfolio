@@ -205,9 +205,10 @@ dont le format est en tête du fichier ; la date passée, l'audit rebloque. `npm
 fichier d'exceptions : son arbre se nettoie par les `overrides` du manifeste
 ([docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4).
 
-**Tests des images.** `make image-test`, porte de CI sur chaque PR qui touche un fichier hors du
-harnais de la pipeline et sur chaque push vers `main`
-([ADR 0017](docs/adr/0017-jobs-de-la-ci-selon-le-delta.md)), démarre les images que `make build` a
+**Tests des images.** `make image-test`, porte de CI sur chaque PR qui touche ce que les images
+définissent ou exécutent — liste `INFRA` de [infra/ci/changed_jobs.py](infra/ci/changed_jobs.py)
+([ADR 0031](docs/adr/0031-chaque-verification-de-la-ci-a-un-seul-endroit.md)) — et sur chaque push
+vers `main`, démarre les images que `make build` a
 chargées et les interroge ([infra/tests/](infra/tests/)) : le test de fumée du Caddyfile de
 production, la chaîne de sauvegarde de l'image `backup`, jouée dans le Compose de
 production contre un témoin S3 et un témoin de ping, et la restauration de ses sauvegardes par

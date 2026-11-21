@@ -770,10 +770,13 @@ CHANGED_JOBS = REPOSITORY_ROOT / "infra" / "ci" / "changed_jobs.py"
 
 # Delta → (`web`, `infra`, `avis`, `pipeline`) attendus. En littéraux, jamais dérivés des motifs du
 # script : une table tirée de l'artefact sous test perdrait son cas avec le motif retiré (obs 80).
-# Chaque motif du script a au moins un témoin qui rougit s'il disparaît : `.claude/*` et `docs/*`
-# ont le leur hors Markdown, que `*.md` couvrirait seul. Les entrées témoins du corps de #124 y sont
-# — il en annonce 11, sa liste en compte 10 —, plus quatre : pipeline et documentation hors
-# Markdown, Dependabot et test mensuel, chemin non ASCII. Pour `avis`, une par entrée de l'ADR 0019,
+# Chaque motif du script a au moins un témoin qui rougit s'il disparaît. Les entrées témoins du
+# corps de #124 y sont — il en annonce 11, sa liste en compte 10 —, plus quatre : pipeline et
+# documentation hors Markdown, Dependabot et test mensuel, chemin non ASCII. Pour `infra`
+# (ADR 0031, décision 2), une par motif de `INFRA` — `infra/`, les manifestes, les verrous,
+# `.python-version`, une migration du back, `.dockerignore`, `.env.example` —, un module d'appui des
+# tests des images, et les témoins du back, du front et du schéma de l'API, qui ne le font pas
+# tourner. Pour `avis`, une par entrée de l'ADR 0019,
 # décision 2 — onze, dont le `Makefile` et le verrou Python, déjà là —, une par chemin de `ALL` et
 # le chemin cité ; les autres sont hors entrées. Pour `pipeline` (ADR 0025), un par motif de
 # `PIPELINE` — `.claude/` hors Markdown, `CLAUDE.md`, `CONTRIBUTING.md`, `.github/` hors `ci.yml`,
@@ -782,7 +785,7 @@ CHANGED_JOBS = REPOSITORY_ROOT / "infra" / "ci" / "changed_jobs.py"
 # ne la fait pas tourner.
 JOBS_WITNESSES: dict[str, tuple[list[str], bool, bool, bool, bool]] = {
     "delta vide": ([], False, False, False, False),
-    "harnais seul": (
+    "pipeline, test du back et documentation": (
         [".claude/skills/x/SKILL.md", "apps/api/tests/test_x.py", "docs/a.md", "CLAUDE.md"],
         False,
         False,
@@ -807,9 +810,16 @@ JOBS_WITNESSES: dict[str, tuple[list[str], bool, bool, bool, bool]] = {
         False,
         True,
     ),
-    "front": (["apps/web/src/a.tsx"], True, True, False, False),
-    "back": (["apps/api/content/models.py"], False, True, False, False),
-    "schéma de l'API": (["apps/api/openapi.json"], True, True, False, False),
+    "front": (["apps/web/src/main.tsx"], True, False, False, False),
+    "back": (["apps/api/content/models.py"], False, False, False, False),
+    "schéma de l'API": (["apps/api/openapi.json"], True, False, False, False),
+    "migration du back": (
+        ["apps/api/content/migrations/0001_initial.py"],
+        False,
+        True,
+        False,
+        False,
+    ),
     "Makefile": (["Makefile"], True, True, True, True),
     "workflow de CI": ([".github/workflows/ci.yml"], True, True, True, True),
     "le script lui-même": (["infra/ci/changed_jobs.py"], True, True, True, True),
@@ -820,7 +830,10 @@ JOBS_WITNESSES: dict[str, tuple[list[str], bool, bool, bool, bool]] = {
     "manifeste du front": (["apps/web/package.json"], True, True, True, False),
     "verrou du front": (["apps/web/package-lock.json"], True, True, True, False),
     "Dockerfile d'une image": (["infra/caddy/Dockerfile"], False, True, True, False),
-    "exceptions du scan": ([".trivyignore.yaml"], False, True, True, False),
+    "configuration de Caddy": (["infra/caddy/Caddyfile"], False, True, False, False),
+    "contexte de build des images": ([".dockerignore"], False, True, False, False),
+    "modèle de l'environnement": ([".env.example"], False, True, False, False),
+    "exceptions du scan": ([".trivyignore.yaml"], False, False, True, False),
     "exceptions de l'audit Python": (
         ["infra/ci/pip-audit-exceptions.toml"],
         False,
@@ -840,7 +853,7 @@ JOBS_WITNESSES: dict[str, tuple[list[str], bool, bool, bool, bool]] = {
     ),
     # `fnmatchcase` : les chemins de git sont sensibles à la casse. Rouge sous Windows seulement
     # si `fnmatch` revenait : sous Linux, les deux coïncident.
-    "casse distincte du front": (["APPS/WEB/a.tsx"], False, True, False, False),
+    "casse distincte du front": (["APPS/WEB/a.tsx"], False, False, False, False),
     "chemin non ASCII, mis entre guillemets par git": (
         [r'"docs/caf\303\251.md"'],
         True,
