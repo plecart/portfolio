@@ -8,22 +8,25 @@
 # et les actions de mise en place les lisent. Un second canal qui déclarerait une version
 # finirait par diverger du premier.
 #
-# Trois jobs, un par pile. Ils n'ont pas les mêmes prérequis — `uv`, Node, Docker — et les
-# séparer évite qu'un rouge du front masque un rouge de l'infra, ou l'inverse. `web` et `infra`
-# attendent un `api` vert, dont la première étape lit le delta : sur une PR, ils ne tournent que
-# s'il touche leurs fichiers (ADR 0017) ; un `api` rouge appelle un push, et ce push les montrera
-# (ADR 0019). Le job `infra` installe aussi Node : les images copient le front compilé, qu'il
-# compile lui-même plutôt que d'attendre le job `web` (ADR 0014) ; et `uv`, pour les tests des
-# images qu'il vient de construire. Un quatrième, `avis`, joue les portes à base d'avis — audit
-# Python, audit npm, scan des images — en appelant `avis.yml`, qui les joue aussi chaque jour sur
-# `main` : leur verdict change sans commit, quand une base d'avis se publie. Il attend `api` comme
-# les deux autres, et sur une PR ne tourne que si le delta touche leurs entrées (ADR 0019,
-# décision 2). Un cinquième, `publish`, ne tourne qu'après un push sur `main`, une fois les
-# quatre autres verts : il publie les images sur GHCR. Un sixième, `fumee`, démarre la pile de
-# production depuis ces images et la fait éprouver par Playwright ; un septième, `deploy`, ne les
-# déploie sur le VPS, une fois celui-ci prêt, qu'après une fumée verte. Sur une PR, le job `api`
-# refuse aussi un commit d'auteur Claude : un pas, et non un job à lui (ADR 0031). L'e2e du job
-# `web` ne joue que le projet `desktop`, sur le front que le job vient de compiler (même ADR).
+# Chaque vérification tourne à un seul endroit (ADR 0031) : la PR juge, le push sur `main` livre.
+#
+# Sur une PR prête, trois jobs, un par pile. Ils n'ont pas les mêmes prérequis — `uv`, Node,
+# Docker — et les séparer évite qu'un rouge du front masque un rouge de l'infra, ou l'inverse.
+# `web` et `infra` attendent un `api` vert, dont la première étape lit le delta : ils ne tournent
+# que s'il touche leurs fichiers (ADR 0017, ADR 0031) ; un `api` rouge appelle un push, et ce push
+# les montrera (ADR 0019). Le job `infra` installe aussi Node : les images copient le front
+# compilé, qu'il compile lui-même plutôt que d'attendre le job `web` (ADR 0014) ; et `uv`, pour les
+# tests des images qu'il vient de construire. Un quatrième, `avis`, joue les portes à base d'avis —
+# audit Python, audit npm, scan des images — en appelant `avis.yml`, qui les joue aussi chaque jour
+# sur `main` : leur verdict change sans commit, quand une base d'avis se publie. Il attend `api`
+# comme les deux autres, et ne tourne que si le delta touche leurs entrées (ADR 0019, décision 2).
+# Le job `api` refuse aussi un commit d'auteur Claude : un pas, et non un job à lui ; l'e2e du job
+# `web` ne joue que le projet `desktop`, sur le front que le job vient de compiler (ADR 0031).
+#
+# Sur un push vers `main`, aucun de ces quatre : `publish` compile le front, construit les images,
+# les scanne et les publie sur GHCR ; `fumee` démarre la pile de production depuis ces images et la
+# fait éprouver par Playwright ; `deploy` ne les déploie sur le VPS, une fois celui-ci prêt,
+# qu'après une fumée verte.
 #
 # Sur une PR, chaque job qui extrait le dépôt en extrait la tête, clone complet, puis la fusionne
 # lui-même au trunk courant (le pas « Fusion explicite du trunk » du job `api`, qui dit pourquoi) :
@@ -75,16 +78,18 @@ jobs:
     name: Back — lint, format, types, tests
     runs-on: ubuntu-latest
 
-    # Aucune PR en draft ne tourne, quel que soit l'événement — ouverture, push, réouverture : une
-    # draft change à chaque commit, et la CI ne paie un run que là où son verdict peut tenir — au
-    # passage en ready, puis à chaque push (ADR 0019). Un rouge propre à la plateforme cible se voit
-    # donc au passage en ready, après la relecture (`cycle-pr`, Étape 4) : le prix assumé. Une PR
-    # ouverte prête — un bot de dépendances, une branche déjà écrite — tourne dès l'ouverture.
+    # Une PR prête seulement. Aucune draft ne tourne, quel que soit l'événement — ouverture, push,
+    # réouverture : une draft change à chaque commit, et la CI ne paie un run que là où son verdict
+    # peut tenir — au passage en ready, puis à chaque push (ADR 0019). Un rouge propre à la
+    # plateforme cible se voit donc au passage en ready, après la relecture (`cycle-pr`, Étape 4) :
+    # le prix assumé. Une PR ouverte prête — un bot de dépendances, une branche déjà écrite — tourne
+    # dès l'ouverture. Aucun push vers `main` : il ne fait que livrer (ADR 0031).
     #
-    # La condition sur `event_name` est nécessaire : sur un push vers `main`, l'objet
-    # `pull_request` n'existe pas. Les jobs `web`, `infra` et `avis` ne portent pas ce garde : ils
-    # attendent ce job, et un job sauté saute ceux qui l'attendent.
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # La condition sur `event_name` est nécessaire : sur un push, l'objet `pull_request` manque, et
+    # GitHub compare son `draft`, nul, à `false` en nombres — 0 contre 0, vrai (doc « Expressions »,
+    # « Operators », lue le 2026-11-21). Les jobs `web`, `infra` et `avis` ne portent pas ce garde :
+    # ils attendent ce job, et un job sauté saute ceux qui l'attendent.
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
 
     # Les jobs que le delta de la PR concerne, lus par `web`, `infra` et `avis`. La sortie
     # `pipeline` de l'étape `jobs` n'en est pas : l'étape « Tests pipeline » la lit dans ce job.
@@ -94,9 +99,8 @@ jobs:
       avis: ${{ steps.jobs.outputs.avis }}
 
     steps:
-      # Sur une PR, la tête, que le pas suivant fusionne au trunk courant : `HEAD^1` est le trunk
-      # qu'il combine, et `HEAD^1..HEAD` le delta de la PR. Sur un push vers `main`, ce n'est que
-      # le dernier commit : `web`, `infra` et `avis` n'y lisent pas la réponse.
+      # La tête de la PR, que le pas suivant fusionne au trunk courant : `HEAD^1` est le trunk qu'il
+      # combine, et `HEAD^1..HEAD` le delta de la PR.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -160,7 +164,6 @@ jobs:
       # compterait une minute pour quelques secondes (ADR 0031) ; rouge, il saute aussi les jobs
       # qui attendent `api`, et le push qui corrige l'auteur les relance.
       - name: Refuser un auteur Claude
-        if: github.event_name == 'pull_request'
         shell: bash
         run: |
           commits=$(git log --no-mailmap -i -F --author='<noreply@anthropic.com>' --format='%h %s' HEAD^1..HEAD^2)
@@ -183,24 +186,24 @@ jobs:
       - name: Tests
         run: make test
 
-      # Les tests de la pipeline (`.claude/tests`) : sur une PR, seulement si le delta la concerne
-      # — la sortie `pipeline` de l'étape `jobs` ; sur un push vers `main`, toujours (ADR 0025).
-      # Une étape et non un job : un job vide coûte une minute facturée (ADR 0017).
+      # Les tests de la pipeline (`.claude/tests`) : seulement si le delta la concerne — la sortie
+      # `pipeline` de l'étape `jobs` (ADR 0025, ADR 0031). Une étape et non un job : un job vide
+      # coûte une minute facturée (ADR 0017).
       - name: Tests pipeline
-        if: github.event_name != 'pull_request' || steps.jobs.outputs.pipeline == 'true'
+        if: steps.jobs.outputs.pipeline == 'true'
         run: make test-pipeline
 
   web:
     name: Front — lint, types, tests, build, e2e, lighthouse
     runs-on: ubuntu-latest
 
-    # Après un job `api` vert, qui a lu le delta. Sur une PR, seulement si le delta touche ses
-    # fichiers (`infra/ci/changed_jobs.py`) ; sur un push vers `main`, toujours. Sans fonction
-    # d'état, GitHub applique `success()` à ce `if` : un `api` rouge, sauté ou annulé saute ce
-    # job, sur une PR comme sur `main` ; ce rouge appelle un push, et ce push le montrera
-    # (ADR 0019). `apps/api/tests/test_ci_declencheurs.py` tient ces réglages.
+    # Après un job `api` vert, qui a lu le delta, et seulement si le delta touche ses fichiers
+    # (`infra/ci/changed_jobs.py`). Sans fonction d'état, GitHub applique `success()` à ce `if` :
+    # un `api` rouge, sauté ou annulé saute ce job — un rouge appelle un push, et ce push le
+    # montrera (ADR 0019) ; un push vers `main`, où `api` est sauté, ne le lance pas (ADR 0031).
+    # `apps/api/tests/test_ci_declencheurs.py` tient ces réglages.
     needs: api
-    if: ${{ github.event_name != 'pull_request' || needs.api.outputs.web == 'true' }}
+    if: needs.api.outputs.web == 'true'
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -231,16 +234,6 @@ jobs:
       - name: Build
         run: make web-build
 
-      # Le front compilé, que le job `publish` copie dans les images au lieu de le compiler une
-      # troisième fois. Un jour de rétention : il ne sert que dans ce run, et l'espace des
-      # artefacts se partage avec celui des paquets.
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: dist
-          path: apps/web/dist
-          if-no-files-found: error
-          retention-days: 1
-
       - name: Browsers
         run: make web-browsers
 
@@ -260,7 +253,7 @@ jobs:
     # Même conditionnement que le job `web` : voir son commentaire. Ses fichiers, sur une PR : ce que
     # les images définissent ou exécutent, liste d'inclusion `INFRA` du script (ADR 0031).
     needs: api
-    if: ${{ github.event_name != 'pull_request' || needs.api.outputs.infra == 'true' }}
+    if: needs.api.outputs.infra == 'true'
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -283,7 +276,8 @@ jobs:
         run: make compose-config
 
       # Le front compilé entre dans les images (ADR 0014) : `make build` le compile s'il manque.
-      # Le front se compile donc ici, comme dans `web` et dans `avis` : ce job n'attend pas `web`.
+      # Le front se compile donc ici, comme dans `web`, `avis` et `publish` : ce job n'attend pas
+      # `web`.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: apps/web/.nvmrc
@@ -347,24 +341,22 @@ jobs:
 
   avis:
     name: Avis — audit Python, audit npm, scan des images
-    # Même conditionnement que le job `web` : voir son commentaire. Sur une PR, seulement si le
-    # delta touche une entrée d'un avis — manifestes, verrous, Dockerfiles, exceptions datées,
-    # porte de `pip-audit`, `avis.yml` — ou ce qui décide des jobs (`Makefile`, `ci.yml`,
-    # `changed_jobs.py`) ; sur un push vers `main`, toujours : `publish` l'attend, et aucune
-    # porte ne quitte le chemin vers la production (ADR 0019, § Facteurs de décision). Les étapes
-    # sont celles du workflow planifié, au commit même de ce run (doc GitHub « Reuse workflows »).
+    # Même conditionnement que le job `web` : voir son commentaire. Seulement si le delta touche
+    # une entrée d'un avis — manifestes, verrous, Dockerfiles, exceptions datées, porte de
+    # `pip-audit`, `avis.yml` — ou ce qui décide des jobs (`Makefile`, `ci.yml`,
+    # `changed_jobs.py`). Les étapes sont celles du workflow planifié, au commit même de ce run (doc
+    # GitHub « Reuse workflows ») ; sur `main`, le scan de `publish` reste avant chaque publication.
     needs: api
-    if: ${{ github.event_name != 'pull_request' || needs.api.outputs.avis == 'true' }}
+    if: needs.api.outputs.avis == 'true'
     uses: ./.github/workflows/avis.yml
 
   publish:
     name: Publication — images sur GHCR
     runs-on: ubuntu-latest
 
-    # Après les quatre autres jobs, sur un push vers `main` seulement : une image publiée vient d'un
-    # commit dont toute la CI est verte, portes d'avis comprises (ADR 0014, ADR 0019).
-    # `apps/api/tests/test_publication.py` tient ces réglages.
-    needs: [api, web, infra, avis]
+    # Sur un push vers `main` seulement, sans attendre aucun job : la PR a joué les vérifications,
+    # fusionnée au trunk courant, et le push ne fait que livrer (ADR 0031, décision 1). Le scan
+    # reste avant chaque publication. `apps/api/tests/test_publication.py` tient ces réglages.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     # Le seul job qui écrit, et seulement dans le registre : pousser les images, supprimer leurs
@@ -391,14 +383,16 @@ jobs:
         with:
           persist-credentials: false
 
-      # Le front que le job `web` a compilé et testé : `make build` le trouve et ne le recompile
-      # pas — ce job n'installe pas Node. Téléchargé après le checkout, il est daté après ses
-      # sources : le téléchargement ne restaure aucune date (`@actions/artifact` et `unzip-stream`,
-      # lus le 2026-11-08), et `make build` ne recompile qu'un front plus ancien qu'elles.
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      # Le front compilé entre dans les images (ADR 0014) : `make build` le compile, comme dans
+      # `infra`. Les scripts d'installation des paquets npm passent avant la connexion au registre.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          name: dist
-          path: apps/web/dist
+          node-version-file: apps/web/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Front
+        run: make web-install
 
       # Le disque du runner, libéré avant le build pour que la base de Trivy tienne : le pas
       # « Disque » d'`avis.yml` dit pourquoi.
@@ -408,12 +402,16 @@ jobs:
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
           df -h /
 
-      # Même builder que le job `infra`, pour lire le même cache local.
+      # Même builder que le job `infra`, pour écrire le même cache local.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      # L'entrée du job `infra`, sous la même clé — celle qu'il a restaurée, ou écrite si la clé
-      # manquait : restaurée ici, jamais réécrite.
-      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Le cache des couches, sous la clé du job `infra` : restauré, puis écrit si la clé manquait.
+      # Ce job l'écrit : `infra` ne tourne que sur une PR, et une entrée écrite sur une PR ne se
+      # relit que de ses propres runs — « Workflow runs can restore caches created in either the
+      # current branch or the default branch », et le cache d'une PR « cannot be restored by the
+      # base branch » (doc GitHub « Dependency caching », « Restrictions for accessing a cache »,
+      # lue le 2026-11-21). Écrite sur `main`, l'entrée se relit des PR et des runs planifiés.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/buildx-cache
           key: >-
@@ -422,9 +420,9 @@ jobs:
           restore-keys: buildx-images-
 
       # Le build du job `infra`, sous le nom GHCR (brief de #15, décision 8) : même commande,
-      # même cache par image (`tag=$*`). Ni provenance ni SBOM (décision 7) : chacune ferait de
-      # l'image un index, dont chaque manifeste entrerait au paquet comme une version sans
-      # étiquette — que la rétention, qui compte toute version, supprimerait sous l'index.
+      # même cache par image (`tag=$*`), lu et écrit. Ni provenance ni SBOM (décision 7) : chacune
+      # ferait de l'image un index, dont chaque manifeste entrerait au paquet comme une version
+      # sans étiquette — que la rétention, qui compte toute version, supprimerait sous l'index.
       - name: Images
         run: make build IMAGE_PREFIX=ghcr.io/plecart/portfolio-
         env:
@@ -432,6 +430,7 @@ jobs:
             --load
             --no-cache-filter paquets
             --cache-from type=local,src=/tmp/buildx-cache,tag=$*
+            --cache-to type=local,dest=/tmp/buildx-cache,tag=$*,mode=max
             --provenance=false
             --sbom=false
 

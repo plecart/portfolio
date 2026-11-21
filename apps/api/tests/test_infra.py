@@ -540,11 +540,12 @@ def build_flags(steps: list[dict[str, Any]]) -> list[str]:
 
 
 # Les jobs qui construisent les images avec le cache local — tous : un test le tient —, le
-# workflow de chacun et s'il écrit le cache : `infra` le lit et l'écrit ; `publish` et `avis` le
-# lisent seulement — ils restaurent l'entrée d'`infra`, sous la même clé (ADR 0014, ADR 0019).
+# workflow de chacun et s'il écrit le cache, sous une même clé : `infra` le lit et l'écrit, sur une
+# PR ; `publish` aussi, sur `main` — l'entrée d'une PR n'est lisible que d'elle (ADR 0031) ;
+# `avis` le lit seulement (ADR 0014, ADR 0019).
 CACHED_BUILDS = {
     "infra": (CI_WORKFLOW, True),
-    "publish": (CI_WORKFLOW, False),
+    "publish": (CI_WORKFLOW, True),
     "avis": (AVIS_WORKFLOW, False),
 }
 
@@ -589,7 +590,7 @@ def test_le_job_infra_teste_les_images_qu_il_vient_de_construire() -> None:
 @pytest.mark.parametrize("job", CACHED_BUILDS)
 def test_la_ci_donne_a_chaque_image_son_entree_de_cache(job: str) -> None:
     """Les drapeaux du job, passés par l'environnement comme en CI puis développés par `make` :
-    chaque image lit — et, dans `infra` seulement, écrit — son entrée du cache local, à son nom.
+    chaque image lit — et, dans `infra` et `publish`, écrit — son entrée du cache local, à son nom.
     Sous une même étiquette — le défaut, `latest` —, la dernière image construite remplace l'entrée
     des autres (doc Docker, « Local cache » ; mesuré à la relecture de la PR #53). Rouge aussi si le
     `Makefile` cesse de prendre ces drapeaux dans l'environnement (`=` au lieu de `?=`)."""

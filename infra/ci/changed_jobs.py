@@ -9,10 +9,10 @@ Lancé par la première étape du job `api` de `.github/workflows/ci.yml`, sur l
 déplacé du front vers `docs/` fait donc tourner `web`.
 
 Lit sur l'entrée standard les chemins du delta, un par ligne, lignes vides ignorées, et écrit
-`web=true|false`, `infra=true|false`, `avis=true|false`, puis `pipeline=true|false`. Sur une PR,
-les jobs `web`, `infra` et `avis`, et l'étape « Tests pipeline » du job `api`, ne tournent que si
-leur réponse vaut `true` ; sur un push vers `main`, le workflow ne la lit pas et tout tourne
-(ADR 0017, ADR 0019, ADR 0025). Le job `api` tourne sur chaque push.
+`web=true|false`, `infra=true|false`, `avis=true|false`, puis `pipeline=true|false`. Les jobs
+`web`, `infra` et `avis`, et l'étape « Tests pipeline » du job `api`, ne tournent que si leur
+réponse vaut `true` (ADR 0017, ADR 0019, ADR 0025). Le job `api` tourne sur chaque push d'une PR
+prête ; un push vers `main` ne lance aucun d'eux : il ne fait que livrer (ADR 0031).
 
 Règles, par motif `fnmatch` — où `*` traverse `/` :
 

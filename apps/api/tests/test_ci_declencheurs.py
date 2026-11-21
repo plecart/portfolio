@@ -1,13 +1,14 @@
 """Tests de ce qui déclenche les jobs de la CI (`.github/workflows/ci.yml`, issue #124).
 
-La CI ne dépense des minutes que là où un verdict peut changer (ADR 0017, ADR 0019) : une PR en
-draft ne tourne pas, son premier run vient du passage en ready, puis de chaque push ; le run encore
-en cours d'une PR s'annule au push suivant de la même PR, jamais sur `main` ; `web`, `infra` et
-`avis` attendent un `api` vert et, sur une PR, ne tournent que si le delta touche leurs fichiers —
-règle de `infra/ci/changed_jobs.py`, lue par la première étape du job `api`. Le job `avis` appelle
-`.github/workflows/avis.yml`, qui joue aussi les portes d'avis chaque jour sur `main`. Sur une PR,
-chaque job qui extrait le dépôt fusionne lui-même la tête au trunk courant, par le pas
-« Fusion explicite du trunk », écrit dans la définition du workflow et joué ici (ADR 0029).
+La CI ne dépense des minutes que là où un verdict peut changer (ADR 0017, ADR 0019, ADR 0031) :
+une PR en draft ne tourne pas, son premier run vient du passage en ready, puis de chaque push ; le
+run encore en cours d'une PR s'annule au push suivant de la même PR, jamais sur `main`, où le push
+ne fait que livrer ; `web`, `infra` et `avis` attendent un `api` vert et ne tournent que si le
+delta de la PR touche leurs fichiers — règle de `infra/ci/changed_jobs.py`, lue par la première
+étape du job `api`. Le job `avis` appelle `.github/workflows/avis.yml`, qui joue aussi les portes
+d'avis chaque jour sur `main`. Sur une PR, chaque job qui extrait le dépôt fusionne lui-même la
+tête au trunk courant, par le pas « Fusion explicite du trunk », écrit dans la définition du
+workflow et joué ici (ADR 0029).
 
 Mesure qui fonde ces réglages, relevée le 2026-10-18 sur les runs du 2026-10-04 au 2026-10-17 —
 `gh api --paginate "repos/plecart/portfolio/actions/runs?created=%3E%3D2026-10-04&per_page=100"`,
@@ -66,9 +67,10 @@ def concurrency_findings(workflow: str) -> list[str]:
     return []
 
 
-# Le garde du job `api` : il saute toute PR en draft, quel que soit l'événement (ADR 0019) ; un push
-# vers `main`, où l'objet `pull_request` n'existe pas, tourne toujours.
-API_IF = "github.event_name != 'pull_request' || github.event.pull_request.draft == false"
+# Le garde du job `api` : une PR prête seulement — il saute toute draft, quel que soit l'événement
+# (ADR 0019), et tout push vers `main`, qui ne fait que livrer (ADR 0031, décision 1). Les jobs qui
+# l'attendent sautent avec lui.
+API_IF = "github.event_name == 'pull_request' && github.event.pull_request.draft == false"
 # Les jobs que le delta d'une PR conditionne, et la sortie du job `api` que chacun lit.
 GATED_JOBS = ("web", "infra", "avis")
 API_OUTPUTS = {job: f"${{{{ steps.jobs.outputs.{job} }}}}" for job in GATED_JOBS}
@@ -106,15 +108,16 @@ JOBS_STEP = {"id": "jobs", "shell": "bash", "run": CHANGED_JOBS_COMMAND}
 
 
 def gated_if(job: str) -> str:
-    """Le `if` d'un job conditionné : sur une PR, la réponse du script pour ce job ; sur un push
-    vers `main`, toujours — `publish` y attend chacun d'eux. Sans fonction d'état, GitHub y
-    applique `success()` (doc « Expressions », « Status check functions », lue le 2026-10-28) : un
-    `api` rouge, sauté ou annulé saute ce job, sur une PR comme sur `main` (ADR 0019, décision 3)."""
-    return f"${{{{ github.event_name != 'pull_request' || needs.api.outputs.{job} == 'true' }}}}"
+    """Le `if` d'un job conditionné : la réponse du script pour ce job. Sans fonction d'état,
+    GitHub y applique `success()` (doc « Expressions », « Status check functions », lue le
+    2026-10-28) : un `api` rouge, sauté ou annulé saute ce job (ADR 0019, décision 3) — et `api`
+    saute tout push vers `main` (ADR 0031)."""
+    return f"needs.api.outputs.{job} == 'true'"
 
 
 def gating_findings(workflow: str) -> list[str]:
-    """Ce qui, dans un workflow, écarte le conditionnement de `GATED_JOBS` des ADR 0017 et 0019.
+    """Ce qui, dans un workflow, écarte le conditionnement de `GATED_JOBS` des ADR 0017, 0019 et
+    0031.
 
     Returns:
         Un constat par propriété altérée : un job `changes` (un job de plus coûte une minute
@@ -242,10 +245,10 @@ def trigger_findings(workflow: str) -> list[str]:
     )
 
 
-# L'étape des tests de la pipeline, dans le job `api`, après celle de la suite du back : sur une PR,
-# seulement si le delta la concerne — la sortie `pipeline` de l'étape `jobs` ; sur un push vers
-# `main`, toujours (ADR 0025). Aucun job neuf : un job vide coûte une minute facturée (ADR 0017).
-PIPELINE_IF = "github.event_name != 'pull_request' || steps.jobs.outputs.pipeline == 'true'"
+# L'étape des tests de la pipeline, dans le job `api`, après celle de la suite du back : seulement si
+# le delta de la PR la concerne — la sortie `pipeline` de l'étape `jobs` (ADR 0025, ADR 0031). Aucun
+# job neuf : un job vide coûte une minute facturée (ADR 0017).
+PIPELINE_IF = "steps.jobs.outputs.pipeline == 'true'"
 PIPELINE_STEP = {"name": "Tests pipeline", "if": PIPELINE_IF, "run": "make test-pipeline"}
 
 
@@ -324,24 +327,23 @@ Form = tuple[Guard, str, str, bool]
 
 
 def gated_forms(job: str) -> dict[str, Form]:
-    """Les formes qui écartent le job `job` de `GATED_JOBS` du conditionnement des ADR 0017 et
-    0019, chacune signalée."""
-    old_if = f"(github.event_name != 'pull_request' || needs.api.outputs.{job} == 'true')"
+    """Les formes qui écartent le job `job` de `GATED_JOBS` du conditionnement des ADR 0017, 0019
+    et 0031, chacune signalée. Une fonction d'état remplace le `success()` implicite."""
     return {
         f"{job} sans needs": (gating_findings, f"  {job}:\n    needs: api\n", f"  {job}:\n", True),
-        # Sur `main`, le job ne tournerait qu'au commit qui touche ses fichiers, et `publish`, qui
-        # l'attend, sauterait à chaque autre.
-        f"{job} : if qui ignore le push": (
-            gating_findings,
-            gated_if(job),
-            f"${{{{ needs.api.outputs.{job} == 'true' }}}}",
-            True,
-        ),
         # Le `if` de l'ADR 0017 : derrière un `api` rouge, un run paierait ce job.
         f"{job} : if avec !cancelled()": (
             gating_findings,
             gated_if(job),
-            f"${{{{ !cancelled() && {old_if} }}}}",
+            f"${{{{ !cancelled() && {gated_if(job)} }}}}",
+            True,
+        ),
+        # Le `if` de l'ADR 0019 sous `!cancelled()` : sur un push vers `main`, où `api` est sauté,
+        # le job tournerait.
+        f"{job} : if qui tourne sur un push": (
+            gating_findings,
+            gated_if(job),
+            f"${{{{ !cancelled() && (github.event_name != 'pull_request' || {gated_if(job)}) }}}}",
             True,
         ),
     }
@@ -377,6 +379,22 @@ FORMS: dict[str, Form] = {
     "un job changes": (gating_findings, "jobs:\n", "jobs:\n  changes:\n    steps: []\n", True),
     "api avec needs": (gating_findings, "  api:\n", "  api:\n    needs: changes\n", True),
     "api sans garde draft": (gating_findings, API_IF_LINE, "", True),
+    # L'ancien garde (ADR 0019) : sur un push vers `main`, `api` tournerait, et les jobs qui
+    # l'attendent avec lui.
+    "api aussi sur un push": (
+        gating_findings,
+        API_IF_LINE,
+        "    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false\n",
+        True,
+    ),
+    # Sur un push, `draft` est nul, et GitHub compare `null` à `false` en nombres, 0 contre 0 (doc
+    # « Expressions », « Operators », lue le 2026-11-21) : `api` tournerait.
+    "api sans la condition d'événement": (
+        gating_findings,
+        "github.event_name == 'pull_request' && ",
+        "",
+        True,
+    ),
     # L'ancien garde (ADR 0017) : chaque push d'une draft payait un run.
     "garde sur l'ouverture seule": (
         gating_findings,
@@ -525,13 +543,6 @@ FORMS: dict[str, Form] = {
         "",
         True,
     ),
-    # Sur `main`, la suite ne tournerait qu'au commit qui touche la pipeline.
-    "garde de la pipeline qui ignore le push": (
-        pipeline_step_findings,
-        PIPELINE_IF,
-        "steps.jobs.outputs.pipeline == 'true'",
-        True,
-    ),
     "garde qui lit la sortie de web": (
         pipeline_step_findings,
         "steps.jobs.outputs.pipeline",
@@ -631,8 +642,8 @@ AVIS_TRIGGERS = {
 AVIS_PERMISSIONS = {"contents": "read"}
 # Les pas de son seul job, dans l'ordre — ce que chacun lance, `launched` : le checkout et le pas de
 # fusion, qui ne joue qu'appelé sur une PR, l'audit Python, l'audit npm, puis le disque libéré, le
-# build des images et leur scan, chaque porte après ce qu'elle lit. Le cache des couches est celui
-# du job `infra`, restauré et jamais réécrit, comme dans `publish`.
+# build des images et leur scan, chaque porte après ce qu'elle lit. Le cache des couches, sous la
+# clé du job `infra`, est restauré et jamais réécrit.
 AVIS_STEPS = [
     "actions/checkout",
     FUSION_NAME,
@@ -1237,15 +1248,14 @@ def test_le_controle_des_auteurs_ignore_le_mailmap(tmp_path: Path, bash_de_ce_sy
     assert play_author_step(tmp_path, bash_de_ce_systeme) == 1
 
 
-def test_le_controle_des_auteurs_est_le_pas_d_api_qui_suit_l_etape_jobs_sur_une_pr() -> None:
+def test_le_controle_des_auteurs_est_le_pas_d_api_qui_suit_l_etape_jobs() -> None:
     """Un pas, non un job : un job compte au moins une minute (ADR 0031, décision 5). Juste après
-    l'étape `jobs`, avant toute installation, et sur une PR seulement : sur un push vers `main`,
-    rien ne se fusionne, et `HEAD^1..HEAD^2` ne désigne pas les commits d'une PR. Hors draft et
-    sur un clone complet fusionné au trunk, comme tout le job `api` — `gating_findings` tient son
-    garde et ses trois premiers pas."""
+    l'étape `jobs`, avant toute installation, et sans `if` qui le sauterait : il tourne avec tout
+    le job `api`, sur une PR prête seulement, clone complet fusionné au trunk — `gating_findings`
+    tient son garde et ses trois premiers pas."""
     steps, step = api_steps(), author_step()
     assert steps.index(step) == [each.get("id") for each in steps].index("jobs") + 1
-    assert step["if"] == "github.event_name == 'pull_request'"
+    assert "if" not in step
 
 
 # --- La fusion explicite du trunk : le pas « Fusion explicite du trunk » de `ci.yml` ------------
