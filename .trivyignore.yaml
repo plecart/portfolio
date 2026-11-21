@@ -252,7 +252,7 @@ vulnerabilities:
       Debian 12 non touché, mais rouvrirait le choix de Debian 13 (ADR 0014).
     expired_at: 2026-12-21
 
-  # --- Image `caddy` : le binaire `caddy` 2.11.9, compilé par le projet avec Go 1.27.3 ---------
+  # --- Image `caddy` : le binaire `caddy` 2.11.9, compilé par le projet avec Go 1.27.4 ---------
   #
   # Ce qui tourne : le Caddyfile de production (`infra/caddy/Caddyfile`) — un serveur de fichiers
   # statiques et un reverse proxy interne vers `api`, routés par nom d'hôte, en HTTP, sans TLS ni

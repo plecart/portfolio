@@ -29,7 +29,7 @@ FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c
 # caches de Go — modules et objets de compilation — sont montés hors du layer, qui garde les
 # binaires sans eux : le cache de la CI (`mode=max`) n'en grossit pas. Un étage par outil : monter
 # l'un ne recompile pas l'autre, et BuildKit compile les deux en parallèle.
-FROM golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS go
+FROM golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS go
 ENV CGO_ENABLED=0
 
 # `age`, comme son workflow de release (`.github/workflows/build.yml`) : `-trimpath`, sans
