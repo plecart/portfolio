@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { major } from 'semver'
 import * as ts from 'typescript'
-import { beforeAll, expect, test } from 'vitest'
+import { beforeAll, expect, test, vi } from 'vitest'
 import viteConfig from '../vite.config.ts'
 import {
   APP_ROOT,
@@ -151,4 +151,32 @@ test("la compilation échoue sans l'origine de l'API ou sur une adresse mal form
   expect(() => compile('sans-api', 'api.pacome.dev')).toThrow('VITE_API_URL')
   expect(() => compile('sans-api', 'localhost:8000')).toThrow('VITE_API_URL')
   expect(() => compile('production')).not.toThrow()
+})
+
+/**
+ * La commande du serveur des scénarios, le premier `webServer` de `playwright.config.ts`, relue
+ * sous la valeur de `CI` donnée : la configuration la lit à son chargement.
+ *
+ * @param ci La valeur de `CI`, ou `undefined` pour une variable absente, comme sur le poste.
+ */
+async function e2eServerCommand(ci: string | undefined): Promise<string | undefined> {
+  vi.stubEnv('CI', ci)
+  vi.resetModules()
+  try {
+    const { default: config } = await import('../playwright.config.ts')
+
+    return [config.webServer].flat()[0]?.command
+  } finally {
+    vi.unstubAllEnvs()
+  }
+}
+
+test("sous CI, les scénarios jouent le front déjà compilé ; sur le poste, il se compile d'abord", async () => {
+  // Sous `CI`, le job `web` a compilé le front au pas précédent (`make web-build`) : le recompiler
+  // ne ferait que payer la compilation deux fois (ADR 0031). Sur le poste, `make web-e2e` éprouve
+  // le front courant, quel que soit l'état de `dist`.
+  const preview = 'npm run preview -- --port 4173 --strictPort'
+
+  expect(await e2eServerCommand('true')).toBe(preview)
+  expect(await e2eServerCommand(undefined)).toBe(`npm run build && ${preview}`)
 })
