@@ -22,7 +22,8 @@
 # quatre autres verts : il publie les images sur GHCR. Un sixième, `fumee`, démarre la pile de
 # production depuis ces images et la fait éprouver par Playwright ; un septième, `deploy`, ne les
 # déploie sur le VPS, une fois celui-ci prêt, qu'après une fumée verte. Sur une PR, le job `api`
-# refuse aussi un commit d'auteur Claude : un pas, et non un job à lui (ADR 0031).
+# refuse aussi un commit d'auteur Claude : un pas, et non un job à lui (ADR 0031). L'e2e du job
+# `web` ne joue que le projet `desktop`, sur le front que le job vient de compiler (même ADR).
 #
 # Sur une PR, chaque job qui extrait le dépôt en extrait la tête, clone complet, puis la fusionne
 # lui-même au trunk courant (le pas « Fusion explicite du trunk » du job `api`, qui dit pourquoi) :
@@ -243,8 +244,11 @@ jobs:
       - name: Browsers
         run: make web-browsers
 
+      # Le seul projet `desktop` (ADR 0031, décision 3) ; le `mobile` est au run hebdomadaire
+      # (décision 4). Sous `CI`, Playwright sert le front que le pas « Build » a compilé, sans le
+      # recompiler (`apps/web/playwright.config.ts`).
       - name: End-to-end + axe
-        run: make web-e2e
+        run: make web-e2e E2E_PROJECTS=desktop
 
       - name: Lighthouse
         run: make web-lighthouse

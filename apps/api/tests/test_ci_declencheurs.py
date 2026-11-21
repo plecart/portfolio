@@ -37,6 +37,7 @@ from typing import Any, cast
 import pytest
 import yaml
 from changed_jobs import IMAGE_TESTS, PIPELINE_TESTS, jobs_for
+from system_commands import run_make
 from test_infra import AVIS_WORKFLOW, CI_WORKFLOW, DISQUE_RUN, REPOSITORY_ROOT
 from test_restore_workflow import triggers
 from test_supply_chain import repository_files, texte_normalise
@@ -1239,8 +1240,9 @@ def test_le_controle_des_auteurs_ignore_le_mailmap(tmp_path: Path, bash_de_ce_sy
 def test_le_controle_des_auteurs_est_le_pas_d_api_qui_suit_l_etape_jobs_sur_une_pr() -> None:
     """Un pas, non un job : un job compte au moins une minute (ADR 0031, décision 5). Juste après
     l'étape `jobs`, avant toute installation, et sur une PR seulement : sur un push vers `main`,
-    rien ne se fusionne et `HEAD^2` n'existe pas. Hors draft et sur un clone complet fusionné au
-    trunk, comme tout le job `api` — `gating_findings` tient son garde et ses trois premiers pas."""
+    rien ne se fusionne, et `HEAD^1..HEAD^2` ne désigne pas les commits d'une PR. Hors draft et
+    sur un clone complet fusionné au trunk, comme tout le job `api` — `gating_findings` tient son
+    garde et ses trois premiers pas."""
     steps, step = api_steps(), author_step()
     assert steps.index(step) == [each.get("id") for each in steps].index("jobs") + 1
     assert step["if"] == "github.event_name == 'pull_request'"
@@ -1414,3 +1416,39 @@ def test_le_pas_echoue_sur_une_tete_que_le_trunk_contient_deja(
     assert len(errors) == 1, played.stdout
     assert all(part in errors[0] for part in (head, f"origin/main ({trunk})")), errors
     assert trace_lines(played.stdout + played.stderr) == []
+
+
+# --- L'e2e du job `web` : le seul projet `desktop` (ADR 0031, décision 3) -----------------------
+
+E2E_PROJECT_OPTION = "--project="
+
+
+def e2e_projects(*variables: str) -> list[str]:
+    """Les projets Playwright que `make web-e2e` nomme, lancé avec `variables` — des affectations,
+    telles qu'une ligne de commande les écrit ; aucun : Playwright joue tous ceux de sa
+    configuration."""
+    printed = run_make("--dry-run", "web-e2e", *variables)
+    printed.check_returncode()
+    words = printed.stdout.split()
+    return [
+        word.removeprefix(E2E_PROJECT_OPTION)
+        for word in words
+        if word.startswith(E2E_PROJECT_OPTION)
+    ]
+
+
+def test_le_job_web_ne_joue_que_le_projet_desktop_du_front_qu_il_a_compile() -> None:
+    """Le pas e2e du job `web` lance `make web-e2e` avec la variable qui choisit les projets, que le
+    `Makefile` développe en `--project=desktop` seul : le projet `mobile` est au run hebdomadaire
+    (ADR 0031, décisions 3 et 4). Il suit `make web-build` : sous `CI`, Playwright sert ce front
+    sans le recompiler (`apps/web/playwright.config.ts`)."""
+    steps = workflow_steps(CI_WORKFLOW.read_text(encoding="utf-8"))["web"]
+    runs = [str(step.get("run", "")).split() for step in steps]
+    (e2e,) = [index for index, run in enumerate(runs) if run[:2] == ["make", "web-e2e"]]
+    assert runs.index(["make", "web-build"]) < e2e
+    assert e2e_projects(*runs[e2e][2:]) == ["desktop"]
+
+
+def test_sur_le_poste_make_web_e2e_joue_tous_les_projets() -> None:
+    """Sans variable, `make web-e2e` ne nomme aucun projet : Playwright les joue tous."""
+    assert e2e_projects() == []

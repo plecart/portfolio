@@ -171,7 +171,11 @@ la racine et rendant 0, sauf `web-lighthouse`, seule cible qui ne tourne pas sur
 - format:check : n/a
 - typecheck    : make web-typecheck               # tsc -b, mode strict
 - build        : make web-build                   # typecheck puis `vite build` → apps/web/dist
-- e2e          : make web-e2e                     # Playwright + axe, projets desktop et mobile
+- e2e          : make web-e2e                     # Playwright + axe, projets desktop et mobile ;
+                                                  # `E2E_PROJECTS=desktop` n'en joue qu'un — le
+                                                  # job `web` de la CI ; sous `CI=1`, le serveur
+                                                  # sert `dist` sans le compiler :
+                                                  # `make web-build` d'abord
 - e2e ciblé    : cd apps/web && npx playwright test   # une seule spec, et la seule forme à
                                                   # laquelle on peut ajouter les options d'un
                                                   # rapport : `make web-e2e` les refuserait,
