@@ -32,7 +32,8 @@ WEB_INPUTS := $(call tree,$(wildcard $(addprefix $(WEB)/,src public index.html v
 	tsconfig.node.json .env .env.production)))
 
 # Les projets Playwright que `make web-e2e` joue, par leur nom (`apps/web/playwright.config.ts`) ;
-# vide, tous. Le job `web` de la CI n'y joue que `desktop` (ADR 0031).
+# vide, tous. Le job `web` de la CI n'y joue que `desktop`, le job `mobile` du run hebdomadaire que
+# `mobile` (ADR 0031).
 E2E_PROJECTS ?=
 
 # `cd` plutôt que `npm --prefix` : mesuré, `--prefix` ne déplace pas le répertoire courant, et

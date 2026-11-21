@@ -49,8 +49,10 @@ COMPOSE_DEV = REPOSITORY_ROOT / "infra" / "compose.dev.yml"
 PYTHON_VERSION_FILE = REPOSITORY_ROOT / ".python-version"
 DOCKERIGNORE = REPOSITORY_ROOT / ".dockerignore"
 CI_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
-# Les portes d'avis : planifiées chaque jour, et appelées par le job `avis` de `CI_WORKFLOW`.
+# Les portes d'avis, appelées par le job `avis` de `CI_WORKFLOW` et par le run hebdomadaire.
 AVIS_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "avis.yml"
+# Le run hebdomadaire (ADR 0031, décision 4) : portes d'avis, tests des images, e2e mobile.
+HEBDO_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "hebdo.yml"
 # La commande du pas qui libère le disque du runner avant le build des images, mot pour mot :
 # la même dans `avis.yml` et dans `publish`, qui scannent tous deux (`test_ci_declencheurs.py`,
 # `test_publication.py`).
@@ -542,11 +544,12 @@ def build_flags(steps: list[dict[str, Any]]) -> list[str]:
 # Les jobs qui construisent les images avec le cache local — tous : un test le tient —, le
 # workflow de chacun et s'il écrit le cache, sous une même clé : `infra` le lit et l'écrit, sur une
 # PR ; `publish` aussi, sur `main` — l'entrée d'une PR n'est lisible que d'elle (ADR 0031) ;
-# `avis` le lit seulement (ADR 0014, ADR 0019).
+# `avis` et le job `images` du run hebdomadaire le lisent seulement (ADR 0014, ADR 0019).
 CACHED_BUILDS = {
     "infra": (CI_WORKFLOW, True),
     "publish": (CI_WORKFLOW, True),
     "avis": (AVIS_WORKFLOW, False),
+    "images": (HEBDO_WORKFLOW, False),
 }
 
 
@@ -572,13 +575,19 @@ def test_chaque_build_en_cache_de_la_ci_est_recense() -> None:
     assert building == {(workflow, job) for job, (workflow, _) in CACHED_BUILDS.items()}
 
 
-def test_le_job_infra_teste_les_images_qu_il_vient_de_construire() -> None:
+# Les jobs qui testent les images qu'ils viennent de construire, et leur workflow : `infra` sur une
+# PR, `images` au run hebdomadaire (ADR 0031, décision 4).
+IMAGE_TEST_JOBS = {"infra": CI_WORKFLOW, "images": HEBDO_WORKFLOW}
+
+
+@pytest.mark.parametrize("job", IMAGE_TEST_JOBS)
+def test_chaque_job_des_tests_des_images_les_lance_apres_leur_build(job: str) -> None:
     """`make image-test` démarre les images que `make build` a chargées : avant le build, il n'a
     rien à démarrer ; absent, le Caddyfile de production n'est éprouvé nulle part en CI — mesuré à
     la relecture de la PR #67, l'étape retirée laissait toute la suite verte. Son étape ne porte
     que son nom et sa commande : ni `if` qui la sauterait, ni `continue-on-error` qui tolérerait
-    son échec."""
-    steps = job_steps(CI_WORKFLOW, "infra")
+    son échec, ni `env` qui réglerait `make` (`MAKEFLAGS: -i`)."""
+    steps = job_steps(IMAGE_TEST_JOBS[job], job)
     commands = [step.get("run") for step in steps]
 
     assert "make build" in commands and "make image-test" in commands, commands
@@ -609,8 +618,8 @@ def test_la_ci_donne_a_chaque_image_son_entree_de_cache(job: str) -> None:
 
 @pytest.mark.parametrize("job", CACHED_BUILDS)
 def test_la_ci_charge_dans_le_moteur_les_images_qu_elle_construit(job: str) -> None:
-    """Sans `--load`, le pilote conteneurisé construit et jette : les tests des images d'`infra`,
-    le scan d'`avis` et celui de `publish` ne trouveraient rien à lire."""
+    """Sans `--load`, le pilote conteneurisé construit et jette : les tests des images d'`infra` et
+    d'`images`, le scan d'`avis` et celui de `publish` ne trouveraient rien à lire."""
     assert "--load" in ci_build_flags(job).split()
 
 
@@ -649,9 +658,8 @@ def test_les_paquets_du_systeme_s_installent_dans_l_etage_paquets() -> None:
 
 @pytest.mark.parametrize("job", CACHED_BUILDS)
 def test_la_ci_reconstruit_l_etage_paquets_a_chaque_build(job: str) -> None:
-    """Chaque job reconstruit l'étage `paquets` sans le cache. `publish` et `avis` aussi : quand la
-    clé d'`infra` existait déjà, `infra` ne réécrit pas l'entrée, et ils restaureraient l'ancienne
-    couche."""
+    """Chaque job reconstruit l'étage `paquets` sans le cache : quand la clé existait déjà, aucun
+    job ne réécrit l'entrée, et chacun restaurerait l'ancienne couche."""
     assert f"--no-cache-filter {PACKAGE_STAGE}" in " ".join(ci_build_flags(job).split())
 
 

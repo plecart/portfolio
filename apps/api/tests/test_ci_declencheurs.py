@@ -5,10 +5,10 @@ une PR en draft ne tourne pas, son premier run vient du passage en ready, puis d
 run encore en cours d'une PR s'annule au push suivant de la même PR, jamais sur `main`, où le push
 ne fait que livrer ; `web`, `infra` et `avis` attendent un `api` vert et ne tournent que si le
 delta de la PR touche leurs fichiers — règle de `infra/ci/changed_jobs.py`, lue par la première
-étape du job `api`. Le job `avis` appelle `.github/workflows/avis.yml`, qui joue aussi les portes
-d'avis chaque jour sur `main`. Sur une PR, chaque job qui extrait le dépôt fusionne lui-même la
-tête au trunk courant, par le pas « Fusion explicite du trunk », écrit dans la définition du
-workflow et joué ici (ADR 0029).
+étape du job `api`. Le job `avis` appelle `.github/workflows/avis.yml`, que le run hebdomadaire
+(`.github/workflows/hebdo.yml`) appelle aussi sur `main`, avec les tests des images et l'e2e
+mobile. Sur une PR, chaque job qui extrait le dépôt fusionne lui-même la tête au trunk courant, par
+le pas « Fusion explicite du trunk », écrit dans la définition du workflow et joué ici (ADR 0029).
 
 Mesure qui fonde ces réglages, relevée le 2026-10-18 sur les runs du 2026-10-04 au 2026-10-17 —
 `gh api --paginate "repos/plecart/portfolio/actions/runs?created=%3E%3D2026-10-04&per_page=100"`,
@@ -39,7 +39,7 @@ import pytest
 import yaml
 from changed_jobs import IMAGE_TESTS, PIPELINE_TESTS, jobs_for
 from system_commands import run_make
-from test_infra import AVIS_WORKFLOW, CI_WORKFLOW, DISQUE_RUN, REPOSITORY_ROOT
+from test_infra import AVIS_WORKFLOW, CI_WORKFLOW, DISQUE_RUN, HEBDO_WORKFLOW, REPOSITORY_ROOT
 from test_restore_workflow import triggers
 from test_supply_chain import repository_files, texte_normalise
 
@@ -630,16 +630,11 @@ def test_chaque_pas_de_fusion_est_celui_du_job_api() -> None:
 
 # --- Le workflow des portes d'avis : `.github/workflows/avis.yml` ------------------------------
 
-# Ses déclencheurs (ADR 0019, décision 2) : chaque jour sur `main`, à une minute que le début
-# d'heure n'encombre pas — GitHub y retarde, voire abandonne, les runs planifiés en période de
-# charge (doc « Events that trigger workflows », `schedule`, lue le 2026-10-29) —, à la main, et
-# appelé par le job `avis` de `ci.yml`. Ses permissions : la lecture du dépôt, rien d'autre.
-AVIS_TRIGGERS = {
-    "schedule": [{"cron": "37 5 * * *"}],
-    "workflow_dispatch": None,
-    "workflow_call": None,
-}
-AVIS_PERMISSIONS = {"contents": "read"}
+# Son seul déclencheur (ADR 0019, décision 2 ; ADR 0031, décision 4) : l'appel — par le job `avis`
+# de `ci.yml` et par le run hebdomadaire, qui portent le reste. Ses permissions, comme celles du
+# run hebdomadaire : la lecture du dépôt, rien d'autre.
+AVIS_TRIGGERS = {"workflow_call": None}
+READ_ONLY = {"contents": "read"}
 # Les pas de son seul job, dans l'ordre — ce que chacun lance, `launched` : le checkout et le pas de
 # fusion, qui ne joue qu'appelé sur une PR, l'audit Python, l'audit npm, puis le disque libéré, le
 # build des images et leur scan, chaque porte après ce qu'elle lit. Le cache des couches, sous la
@@ -681,10 +676,8 @@ def avis_findings(text: str) -> list[str]:
     findings: list[str] = []
     if triggers(workflow) != AVIS_TRIGGERS:
         findings.append(f"déclencheurs {triggers(workflow)}, attendu {AVIS_TRIGGERS}")
-    if workflow.get("permissions") != AVIS_PERMISSIONS:
-        findings.append(
-            f"`permissions` vaut {workflow.get('permissions')}, attendu {AVIS_PERMISSIONS}"
-        )
+    if workflow.get("permissions") != READ_ONLY:
+        findings.append(f"`permissions` vaut {workflow.get('permissions')}, attendu {READ_ONLY}")
     jobs: dict[str, Any] = workflow.get("jobs") or {}
     if list(jobs) != ["avis"]:
         return [*findings, f"jobs {list(jobs)}, attendu le seul job `avis`"]
@@ -703,9 +696,6 @@ AVIS_NPM_LINES = (
 )
 AVIS_CONFORMING = f"""\
 on:
-  schedule:
-    - cron: "37 5 * * *"
-  workflow_dispatch:
   workflow_call:
 permissions:
   contents: read
@@ -731,10 +721,15 @@ jobs:
 # la ferait rougir.
 AVIS_CHANGES = {
     "conforme": ("", "", False),
-    "sans planning": ('  schedule:\n    - cron: "37 5 * * *"\n', "", True),
-    "chaque semaine": ('"37 5 * * *"', '"37 5 * * 1"', True),
-    "sans lancement à la main": ("  workflow_dispatch:\n", "", True),
-    # Le job `avis` de `ci.yml` ne pourrait plus l'appeler.
+    # Planifié ou lancé à la main pour lui-même : le run hebdomadaire le fait, avec les tests des
+    # images et l'e2e mobile (ADR 0031, décision 4).
+    "chaque semaine": (
+        "  workflow_call:\n",
+        '  workflow_call:\n  schedule:\n    - cron: "37 5 * * 1"\n',
+        True,
+    ),
+    "lancé à la main": ("  workflow_call:\n", "  workflow_call:\n  workflow_dispatch:\n", True),
+    # Ni le job `avis` de `ci.yml` ni le run hebdomadaire ne pourraient plus l'appeler.
     "sans appel par la CI": ("  workflow_call:\n", "", True),
     "écriture sur le dépôt": ("  contents: read\n", "  contents: write\n", True),
     "un second job": ("jobs:\n", "jobs:\n  autre:\n    steps: []\n", True),
@@ -770,9 +765,152 @@ def test_la_garde_du_workflow_des_portes_d_avis_rend_son_verdict_sur_chaque_form
 
 
 def test_le_workflow_des_portes_d_avis_est_conforme() -> None:
-    """L'`avis.yml` du dépôt : planifié, à la main et appelé par la CI, en lecture seule, ses
-    quatre cibles dans l'ordre."""
+    """L'`avis.yml` du dépôt : appelé seulement — par la CI et par le run hebdomadaire —, en
+    lecture seule, ses quatre cibles dans l'ordre."""
     assert avis_findings(AVIS_WORKFLOW.read_text(encoding="utf-8")) == []
+
+
+# --- Le run hebdomadaire : `.github/workflows/hebdo.yml` ---------------------------------------
+
+# Ses déclencheurs (ADR 0031, décision 4) : le lundi à 05:37 UTC, une minute que le début d'heure
+# n'encombre pas — GitHub y retarde, voire abandonne, les runs planifiés en période de charge (doc
+# « Events that trigger workflows », `schedule`, lue le 2026-10-29) —, et à la main ; jamais sur une
+# PR. Ses permissions : `READ_ONLY`, que `avis.yml` reçoit.
+HEBDO_TRIGGERS = {"schedule": [{"cron": "37 5 * * 1"}], "workflow_dispatch": None}
+# Ses trois jobs, et ce que chacun lance, `launched` : `avis` appelle les portes d'avis ; `images`
+# construit les images chargées, depuis le cache des couches restauré, puis les teste ; `mobile`
+# compile le front, puis joue l'e2e du seul projet `mobile`.
+HEBDO_JOBS: dict[str, str | list[str]] = {
+    "avis": AVIS_CALL,
+    "images": [
+        "actions/checkout",
+        "actions/setup-node",
+        "make web-install",
+        "docker/setup-buildx-action",
+        "actions/cache/restore",
+        "make build",
+        "astral-sh/setup-uv",
+        "make install",
+        "make image-test",
+    ],
+    "mobile": [
+        "actions/checkout",
+        "actions/setup-node",
+        "make web-install",
+        "make web-build",
+        "make web-browsers",
+        "make web-e2e E2E_PROJECTS=mobile",
+    ],
+}
+# Ce qui, sur un job ou un pas, le ferait attendre un autre job, sauter ou tolérer son échec :
+# chaque job tourne à chaque run, et un rouge de l'un ne masque pas l'autre.
+UNCONDITIONAL = {"needs", "if", "continue-on-error"}
+
+
+def hebdo_findings(text: str) -> list[str]:
+    """Ce qui, dans un workflow, écarte sa forme de celle du run hebdomadaire (ADR 0031).
+
+    Returns:
+        Un constat par propriété altérée — déclencheurs, `permissions` du workflow, des jobs
+        autres que ceux de `HEBDO_JOBS`, et pour chacun ce qu'il lance, ou une clé
+        d'`UNCONDITIONAL` sur lui ou l'un de ses pas. Liste vide : le workflow est conforme.
+    """
+    workflow: dict[Any, Any] = yaml.safe_load(text)
+    findings: list[str] = []
+    if triggers(workflow) != HEBDO_TRIGGERS:
+        findings.append(f"déclencheurs {triggers(workflow)}, attendu {HEBDO_TRIGGERS}")
+    if workflow.get("permissions") != READ_ONLY:
+        findings.append(f"`permissions` vaut {workflow.get('permissions')}, attendu {READ_ONLY}")
+    jobs: dict[str, dict[str, Any]] = workflow.get("jobs") or {}
+    if set(jobs) != set(HEBDO_JOBS):
+        return [*findings, f"jobs {list(jobs)}, attendu {list(HEBDO_JOBS)}"]
+    for name, expected in HEBDO_JOBS.items():
+        steps = cast(list[dict[str, Any]], jobs[name].get("steps") or [])
+        found = jobs[name].get("uses") or [launched(step) for step in steps]
+        if found != expected:
+            findings.append(f"`{name}` lance {found}, attendu, dans cet ordre, {expected}")
+        findings += [
+            f"`{name}` porte {sorted(UNCONDITIONAL & set(part))}"
+            for part in (jobs[name], *steps)
+            if UNCONDITIONAL & set(part)
+        ]
+    return findings
+
+
+IMAGE_TEST_LINE = "      - run: make image-test\n"
+MOBILE_LINES = (
+    "  mobile:\n    runs-on: ubuntu-latest\n    steps:\n"
+    "      - uses: actions/checkout@v0\n      - uses: actions/setup-node@v0\n"
+    "      - run: make web-install\n      - run: make web-build\n      - run: make web-browsers\n"
+    "      - run: make web-e2e E2E_PROJECTS=mobile\n"
+)
+HEBDO_CONFORMING = f"""\
+on:
+  schedule:
+    - cron: "37 5 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  avis:
+    uses: {AVIS_CALL}
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v0
+      - uses: actions/setup-node@v0
+      - run: make web-install
+      - uses: docker/setup-buildx-action@v0
+      - uses: actions/cache/restore@v0
+      - run: make build
+      - uses: astral-sh/setup-uv@v0
+      - run: make install
+{IMAGE_TEST_LINE}{MOBILE_LINES}"""
+
+# Forme → (texte remplacé, remplacement, constat attendu), pris dans `HEBDO_CONFORMING`, comme
+# pour `AVIS_CHANGES`.
+HEBDO_CHANGES = {
+    "conforme": ("", "", False),
+    # Les tests des images et l'e2e mobile chaque jour : le coût que l'ADR 0031 retire.
+    "chaque jour": ('"37 5 * * 1"', '"37 5 * * *"', True),
+    "sans planning": ('  schedule:\n    - cron: "37 5 * * 1"\n', "", True),
+    "sans lancement à la main": ("  workflow_dispatch:\n", "", True),
+    # Les mêmes, sur chaque PR.
+    "sur une PR": ("  workflow_dispatch:\n", "  workflow_dispatch:\n  pull_request:\n", True),
+    "écriture sur le dépôt": ("  contents: read\n", "  contents: write\n", True),
+    "sans le job mobile": (MOBILE_LINES, "", True),
+    "un job de plus": ("jobs:\n", "jobs:\n  autre:\n    steps: []\n", True),
+    "portes d'avis non appelées": (f"    uses: {AVIS_CALL}\n", "    steps: []\n", True),
+    # Un rouge des portes d'avis sauterait les tests des images.
+    "images après avis": ("  images:\n", "  images:\n    needs: avis\n", True),
+    "job sauté": ("  mobile:\n", "  mobile:\n    if: false\n", True),
+    "tests des images tolérés en échec": (
+        IMAGE_TEST_LINE,
+        IMAGE_TEST_LINE + "        continue-on-error: true\n",
+        True,
+    ),
+    "sans tests des images": (IMAGE_TEST_LINE, "", True),
+    "e2e sans le front compilé": ("      - run: make web-build\n", "", True),
+    "e2e d'un autre projet": ("E2E_PROJECTS=mobile", "E2E_PROJECTS=desktop", True),
+}
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "expected"), HEBDO_CHANGES.values(), ids=HEBDO_CHANGES.keys()
+)
+def test_la_garde_du_run_hebdomadaire_rend_son_verdict_sur_chaque_forme(
+    old: str, new: str, expected: bool
+) -> None:
+    """Chaque forme recensée : signalée si, et seulement si, elle s'écarte de l'ADR 0031."""
+    assert old in HEBDO_CONFORMING, f"forme absente de la forme conforme : {old!r}"
+    findings = hebdo_findings(HEBDO_CONFORMING.replace(old, new, 1))
+    assert bool(findings) is expected, findings
+
+
+def test_le_run_hebdomadaire_est_conforme() -> None:
+    """Le `hebdo.yml` du dépôt : le lundi et à la main, en lecture seule, ses trois jobs
+    indépendants — portes d'avis, tests des images après leur build, e2e mobile."""
+    assert hebdo_findings(HEBDO_WORKFLOW.read_text(encoding="utf-8")) == []
 
 
 # --- Le script qui lit le delta : `infra/ci/changed_jobs.py` -----------------------------------
@@ -1428,9 +1566,12 @@ def test_le_pas_echoue_sur_une_tete_que_le_trunk_contient_deja(
     assert trace_lines(played.stdout + played.stderr) == []
 
 
-# --- L'e2e du job `web` : le seul projet `desktop` (ADR 0031, décision 3) -----------------------
+# --- L'e2e de la CI : un projet par job (ADR 0031, décisions 3 et 4) ----------------------------
 
 E2E_PROJECT_OPTION = "--project="
+# Les jobs qui jouent l'e2e, chacun avec son workflow et les projets qu'il joue : `desktop` sur une
+# PR, `mobile` au run hebdomadaire.
+E2E_JOBS = {"web": (CI_WORKFLOW, ["desktop"]), "mobile": (HEBDO_WORKFLOW, ["mobile"])}
 
 
 def e2e_projects(*variables: str) -> list[str]:
@@ -1447,16 +1588,19 @@ def e2e_projects(*variables: str) -> list[str]:
     ]
 
 
-def test_le_job_web_ne_joue_que_le_projet_desktop_du_front_qu_il_a_compile() -> None:
-    """Le pas e2e du job `web` lance `make web-e2e` avec la variable qui choisit les projets, que le
-    `Makefile` développe en `--project=desktop` seul : le projet `mobile` est au run hebdomadaire
-    (ADR 0031, décisions 3 et 4). Il suit `make web-build` : sur un runner GitHub, Playwright sert
-    ce front sans le recompiler (`apps/web/playwright.config.ts`)."""
-    steps = workflow_steps(CI_WORKFLOW.read_text(encoding="utf-8"))["web"]
+@pytest.mark.parametrize("job", E2E_JOBS)
+def test_chaque_job_e2e_ne_joue_que_son_projet_sur_le_front_qu_il_a_compile(job: str) -> None:
+    """Le pas e2e du job lance `make web-e2e` avec la variable qui choisit les projets, que le
+    `Makefile` développe en `--project=<projet>` : `desktop` seul dans le job `web` d'une PR,
+    `mobile` seul dans le job `mobile` du run hebdomadaire (ADR 0031, décisions 3 et 4). Il suit
+    `make web-build` : sur un runner GitHub, Playwright sert ce front sans le recompiler
+    (`apps/web/playwright.config.ts`)."""
+    workflow, projects = E2E_JOBS[job]
+    steps = workflow_steps(workflow.read_text(encoding="utf-8"))[job]
     runs = [str(step.get("run", "")).split() for step in steps]
     (e2e,) = [index for index, run in enumerate(runs) if run[:2] == ["make", "web-e2e"]]
     assert runs.index(["make", "web-build"]) < e2e
-    assert e2e_projects(*runs[e2e][2:]) == ["desktop"]
+    assert e2e_projects(*runs[e2e][2:]) == projects
 
 
 def test_sur_le_poste_make_web_e2e_joue_tous_les_projets() -> None:

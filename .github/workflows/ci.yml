@@ -17,16 +17,20 @@
 # les montrera (ADR 0019). Le job `infra` installe aussi Node : les images copient le front
 # compilé, qu'il compile lui-même plutôt que d'attendre le job `web` (ADR 0014) ; et `uv`, pour les
 # tests des images qu'il vient de construire. Un quatrième, `avis`, joue les portes à base d'avis —
-# audit Python, audit npm, scan des images — en appelant `avis.yml`, qui les joue aussi chaque jour
-# sur `main` : leur verdict change sans commit, quand une base d'avis se publie. Il attend `api`
-# comme les deux autres, et ne tourne que si le delta touche leurs entrées (ADR 0019, décision 2).
-# Le job `api` refuse aussi un commit d'auteur Claude : un pas, et non un job à lui ; l'e2e du job
-# `web` ne joue que le projet `desktop`, sur le front que le job vient de compiler (ADR 0031).
+# audit Python, audit npm, scan des images — en appelant `avis.yml` : leur verdict change sans
+# commit, quand une base d'avis se publie. Il attend `api` comme les deux autres, et ne tourne que
+# si le delta touche leurs entrées (ADR 0019, décision 2). Le job `api` refuse aussi un commit
+# d'auteur Claude : un pas, et non un job à lui ; l'e2e du job `web` ne joue que le projet
+# `desktop`, sur le front que le job vient de compiler (ADR 0031).
 #
 # Sur un push vers `main`, aucun de ces quatre : `publish` compile le front, construit les images,
 # les scanne et les publie sur GHCR ; `fumee` démarre la pile de production depuis ces images et la
 # fait éprouver par Playwright ; `deploy` ne les déploie sur le VPS, une fois celui-ci prêt,
 # qu'après une fumée verte.
+#
+# Ce qui ne dépend d'aucun changement tourne chaque lundi sur `main`, dans `hebdo.yml` : les portes
+# d'avis, par le même `avis.yml`, les tests des images et l'e2e du projet `mobile` (ADR 0031,
+# décision 4).
 #
 # Sur une PR, chaque job qui extrait le dépôt en extrait la tête, clone complet, puis la fusionne
 # lui-même au trunk courant (le pas « Fusion explicite du trunk » du job `api`, qui dit pourquoi) :
@@ -237,8 +241,8 @@ jobs:
       - name: Browsers
         run: make web-browsers
 
-      # Le seul projet `desktop` (ADR 0031, décision 3) ; le `mobile` est au run hebdomadaire
-      # (décision 4). Sur un runner GitHub (`GITHUB_ACTIONS`), Playwright sert le front que le pas
+      # Le seul projet `desktop` (ADR 0031, décision 3) ; le `mobile` est au run hebdomadaire,
+      # `hebdo.yml` (décision 4). Sur un runner GitHub (`GITHUB_ACTIONS`), Playwright sert le front que le pas
       # « Build » a compilé, sans le recompiler (`apps/web/playwright.config.ts`).
       - name: End-to-end + axe
         run: make web-e2e E2E_PROJECTS=desktop
@@ -298,9 +302,9 @@ jobs:
       # ce qui évite aussi que le cache soit réécrit, et grossisse, à chaque run. Les paquets du
       # système, eux, suivent les dépôts de la distribution et non un fichier : l'étage
       # `paquets` qui les installe se reconstruit à chaque build (`--no-cache-filter`, ci-dessous,
-      # dans `publish` et dans `avis.yml`), sans quoi le cache garderait la couche de son premier
-      # build et des paquets corrigés depuis — mesuré le 2026-10-24, `backup` rouge au scan (run
-      # 40103586324).
+      # dans `publish`, `avis.yml` et `hebdo.yml`), sans quoi le cache garderait la couche de son
+      # premier build et des paquets corrigés depuis — mesuré le 2026-10-24, `backup` rouge au scan
+      # (run 40103586324).
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/buildx-cache
@@ -313,7 +317,7 @@ jobs:
       # `Makefile`, le cache et le chargement passent par des drapeaux. `--load` matérialise
       # vraiment les images — sans lui, le pilote conteneurisé construit et jette, et les
       # étiquettes ne désigneraient rien : les tests des images les démarrent. Le job `publish`
-      # reprend ce build pour publier, `avis.yml` pour scanner.
+      # reprend ce build pour publier, `avis.yml` pour scanner, `hebdo.yml` pour ses tests.
       #
       # `tag=$*` : une entrée de cache par image, dans le même dossier. `make` développe `$*` en
       # nom du service, dans la recette de `build-<service>` ; sans lui, chaque image exporterait
@@ -344,8 +348,9 @@ jobs:
     # Même conditionnement que le job `web` : voir son commentaire. Seulement si le delta touche
     # une entrée d'un avis — manifestes, verrous, Dockerfiles, exceptions datées, porte de
     # `pip-audit`, `avis.yml` — ou ce qui décide des jobs (`Makefile`, `ci.yml`,
-    # `changed_jobs.py`). Les étapes sont celles du workflow planifié, au commit même de ce run (doc
-    # GitHub « Reuse workflows ») ; sur `main`, le scan de `publish` reste avant chaque publication.
+    # `changed_jobs.py`). Les étapes sont celles d'`avis.yml`, que le run hebdomadaire appelle aussi,
+    # au commit même de ce run (doc GitHub « Reuse workflows ») ; sur `main`, le scan de `publish`
+    # reste avant chaque publication.
     needs: api
     if: needs.api.outputs.avis == 'true'
     uses: ./.github/workflows/avis.yml
