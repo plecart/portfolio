@@ -84,3 +84,7 @@ ont le droit de décider, et un humain qui garde les décisions de produit et le
 - [`.claude/rules/`](.claude/rules/) porte les règles toujours actives.
 
 L'historique des issues et des PR montre la pipeline au travail.
+
+## Licence
+
+Code et contenu : tous droits réservés. Le dépôt est public pour être lu, pas pour être réutilisé.
