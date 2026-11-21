@@ -419,7 +419,7 @@ Coût constaté (2026-11-02) : environ 15 € par mois, pour une cible d'une diz
 | Zero Trust (Access, Tunnel) | 0 $, offre Free, 50 utilisateurs, un seul ici | caisse, [Pricing](https://www.cloudflare.com/plans/sase-zero-trust.md) |
 | healthchecks.io | 0 $, 1 contrôle sur 20 | [Pricing](https://healthchecks.io/pricing/) |
 | Sentry | 0 $, offre *Developer* : 5 000 erreurs, un utilisateur, 30 jours d'historique ; au-delà du quota, les événements sont refusés, rien n'est facturé | [Pricing](https://sentry.io/pricing/), [Quotas](https://docs.sentry.io/pricing/quotas/), lues le 2026-11-05 par l'ADR 0027 |
-| GitHub Pro | abonnement du compte, hors de ce total, prix non relevé ; requis : sur un dépôt privé, sans lui, l'environnement `production` tombe, et avec lui `deploy` et le test mensuel | [Managing environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments) |
+| GitHub Pro | abonnement du compte, hors de ce total, prix non relevé ; plus requis depuis que le dépôt est public (D76) : l'offre Free y donne l'environnement `production`, et ce dépôt redevenu privé le perdrait sans lui, avec `deploy` et le test mensuel | [Managing environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments) |
 
 ## Sentry — les erreurs
 
