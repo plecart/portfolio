@@ -1,4 +1,7 @@
-# Contribuer
+# La pipeline de développement
+
+Ce dépôt est un portfolio personnel : il n'accepte pas de contributions extérieures.
+Ce document décrit comment il est développé, par un humain et des agents IA.
 
 Le développement suit une pipeline pilotée par les issues. **La source de vérité du process n'est
 pas ce fichier** : c'est le skill `cycle-pr` (déroulé pas à pas) et les règles permanentes dans
