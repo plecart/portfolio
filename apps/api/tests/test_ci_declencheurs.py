@@ -40,6 +40,7 @@ import yaml
 from changed_jobs import IMAGE_TESTS, PIPELINE_TESTS, jobs_for
 from system_commands import run_make
 from test_infra import AVIS_WORKFLOW, CI_WORKFLOW, DISQUE_RUN, HEBDO_WORKFLOW, REPOSITORY_ROOT
+from test_publication import READ_ONLY
 from test_restore_workflow import triggers
 from test_supply_chain import repository_files, texte_normalise
 
@@ -84,8 +85,8 @@ STACK_JOBS = ("api", "web", "infra")
 # Sur une PR, chaque job qui extrait le dépôt en extrait la tête, puis la fusionne lui-même au trunk
 # courant par le pas de ce nom : la référence de fusion de la forge n'est pas recalculée quand le
 # trunk avance, et un `gh run rerun` la réutilise (ADR 0029). Clone complet : la fusion exige
-# l'ancêtre commun. Sur un push vers `main`, `ref` est vide et le checkout prend son défaut, le
-# commit de l'événement (`src/input-helper.ts` d'`actions/checkout`, lu le 2026-11-08). Le pas vit
+# l'ancêtre commun. Appelé par `hebdo.yml`, planifié ou à la main, `ref` est vide et le checkout
+# prend son défaut, le commit de l'événement (`src/input-helper.ts` d'`actions/checkout`, lu le 2026-11-08). Le pas vit
 # dans la définition du workflow, lue au commit du run, jamais dans l'arbre extrait : une action
 # locale se lirait dans la tête, qu'une PR ouverte avant elle ne porte pas.
 FUSION_NAME = "Fusion explicite du trunk"
@@ -632,9 +633,8 @@ def test_chaque_pas_de_fusion_est_celui_du_job_api() -> None:
 
 # Son seul déclencheur (ADR 0019, décision 2 ; ADR 0031, décision 4) : l'appel — par le job `avis`
 # de `ci.yml` et par le run hebdomadaire, qui portent le reste. Ses permissions, comme celles du
-# run hebdomadaire : la lecture du dépôt, rien d'autre.
+# run hebdomadaire : `READ_ONLY`, la lecture du dépôt, rien d'autre.
 AVIS_TRIGGERS = {"workflow_call": None}
-READ_ONLY = {"contents": "read"}
 # Les pas de son seul job, dans l'ordre — ce que chacun lance, `launched` : le checkout et le pas de
 # fusion, qui ne joue qu'appelé sur une PR, l'audit Python, l'audit npm, puis le disque libéré, le
 # build des images et leur scan, chaque porte après ce qu'elle lit. Le cache des couches, sous la
@@ -664,6 +664,17 @@ def launched(step: dict[str, Any]) -> str:
     return step.get("run") or str(step.get("uses", "")).split("@")[0]
 
 
+def header_findings(workflow: dict[Any, Any], expected_triggers: dict[str, Any]) -> list[str]:
+    """Un constat par écart de l'en-tête d'un workflow à part : des déclencheurs autres que
+    `expected_triggers`, des `permissions` autres que `READ_ONLY`."""
+    findings: list[str] = []
+    if triggers(workflow) != expected_triggers:
+        findings.append(f"déclencheurs {triggers(workflow)}, attendu {expected_triggers}")
+    if workflow.get("permissions") != READ_ONLY:
+        findings.append(f"`permissions` vaut {workflow.get('permissions')}, attendu {READ_ONLY}")
+    return findings
+
+
 def avis_findings(text: str) -> list[str]:
     """Ce qui, dans un workflow, écarte sa forme de celle des portes d'avis (ADR 0019).
 
@@ -673,11 +684,7 @@ def avis_findings(text: str) -> list[str]:
         scan indicatif, `test_image_scan.py` le tient. Liste vide : le workflow est conforme.
     """
     workflow: dict[Any, Any] = yaml.safe_load(text)
-    findings: list[str] = []
-    if triggers(workflow) != AVIS_TRIGGERS:
-        findings.append(f"déclencheurs {triggers(workflow)}, attendu {AVIS_TRIGGERS}")
-    if workflow.get("permissions") != READ_ONLY:
-        findings.append(f"`permissions` vaut {workflow.get('permissions')}, attendu {READ_ONLY}")
+    findings = header_findings(workflow, AVIS_TRIGGERS)
     jobs: dict[str, Any] = workflow.get("jobs") or {}
     if list(jobs) != ["avis"]:
         return [*findings, f"jobs {list(jobs)}, attendu le seul job `avis`"]
@@ -816,11 +823,7 @@ def hebdo_findings(text: str) -> list[str]:
         d'`UNCONDITIONAL` sur lui ou l'un de ses pas. Liste vide : le workflow est conforme.
     """
     workflow: dict[Any, Any] = yaml.safe_load(text)
-    findings: list[str] = []
-    if triggers(workflow) != HEBDO_TRIGGERS:
-        findings.append(f"déclencheurs {triggers(workflow)}, attendu {HEBDO_TRIGGERS}")
-    if workflow.get("permissions") != READ_ONLY:
-        findings.append(f"`permissions` vaut {workflow.get('permissions')}, attendu {READ_ONLY}")
+    findings = header_findings(workflow, HEBDO_TRIGGERS)
     jobs: dict[str, dict[str, Any]] = workflow.get("jobs") or {}
     if set(jobs) != set(HEBDO_JOBS):
         return [*findings, f"jobs {list(jobs)}, attendu {list(HEBDO_JOBS)}"]
@@ -925,9 +928,9 @@ CHANGED_JOBS = REPOSITORY_ROOT / "infra" / "ci" / "changed_jobs.py"
 # (ADR 0031, décision 2), une par motif de `INFRA` — `infra/`, les manifestes, les verrous,
 # `.python-version`, une migration du back, `.dockerignore`, `.env.example` —, un module d'appui des
 # tests des images, et les témoins du back, du front et du schéma de l'API, qui ne le font pas
-# tourner. Pour `avis`, une par entrée de l'ADR 0019,
-# décision 2 — onze, dont le `Makefile` et le verrou Python, déjà là —, une par chemin de `ALL` et
-# le chemin cité ; les autres sont hors entrées. Pour `pipeline` (ADR 0025), un par motif de
+# tourner. Pour `avis`, une par entrée de l'ADR 0019, décision 2 — onze, dont le `Makefile` et le
+# verrou Python, déjà là —, une par chemin de `ALL` et le chemin cité ; les autres sont hors
+# entrées. Pour `pipeline` (ADR 0025), un par motif de
 # `PIPELINE` — `.claude/` hors Markdown, `CLAUDE.md`, `CONTRIBUTING.md`, `.github/` hors `ci.yml`,
 # la description du schéma d'architecture, le manifeste racine, le verrou et la version de Python —
 # et par chemin de `ALL`, le chemin cité, et le témoin du back, `apps/api/content/models.py`, qui
@@ -1107,8 +1110,8 @@ def pipeline_test_modules() -> set[str]:
 
 def test_chaque_module_que_charge_image_test_fait_tourner_infra() -> None:
     """Un module d'appui des tests des images, changé seul, fait tourner `infra` : sans lui, une PR
-    qui ne touche que lui sauterait les tests des images, et le rouge n'apparaîtrait qu'au push
-    vers `main`, où il bloquerait `publish`. L'égalité garde aussi l'autre sens : un module qui
+    qui ne touche que lui sauterait les tests des images, et le rouge n'apparaîtrait qu'au run
+    hebdomadaire, après le merge (ADR 0031). L'égalité garde aussi l'autre sens : un module qui
     cesse d'être chargé sort de la liste."""
     modules = image_test_modules()
     assert modules == set(IMAGE_TESTS)

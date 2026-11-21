@@ -284,8 +284,10 @@ Le test d'égalité de `make image-test` rougit tant que la version du
 `go mod edit -require=github.com/caddyserver/caddy/v2@v<x.y.z>` ne suit pas l'étiquette : la changer
 dans la même PR, puis `make build-caddy scan-caddy`, puis `make build image-test`.
 
-**Publication des images.** Rien à faire à la main : à chaque push sur `main`, une fois la CI
-verte, le job `publish` reconstruit les images, les scanne par `make scan`, puis les pousse sur
+**Publication des images.** Rien à faire à la main : à chaque push sur `main`, sans attendre
+d'autre job — la PR a joué les vérifications
+([ADR 0031](docs/adr/0031-chaque-verification-de-la-ci-a-un-seul-endroit.md)) —, le job `publish`
+compile le front, reconstruit les images, les scanne par `make scan`, puis les pousse sur
 GHCR — `ghcr.io/plecart/portfolio-<service>`, paquets privés — sous le SHA complet du commit et
 sous `latest` (`make push`) ; chaque paquet garde ses trois versions les plus récentes
 (`make prune`). Le jeton du workflow suffit, aucun secret n'est à créer

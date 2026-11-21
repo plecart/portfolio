@@ -720,8 +720,8 @@ ses jobs,
     le workflow, surveiller en fond et **rendre la main au mainteneur**. Les runs `skipped`
     (garde `if:`) se terminent sans runner et ne prouvent rien sur la disponibilité de la CI.
   - *Rouge d'avis* : le step d'audit ou de scan rougit — au run hebdomadaire du trunk
-    (`hebdo.yml`, ADR 0031), ou au job des portes d'avis d'une PR sur un paquet que son diff ne touche pas (`.claude/pipeline.config.md`,
-    « Qualité ») → une base d'avis a changé sans commit. C'est une **procédure du trunk**, pas de
+    (`hebdo.yml`, ADR 0031), ou au job des portes d'avis d'une PR sur un paquet que son diff ne
+    touche pas (`.claude/pipeline.config.md`, « Qualité ») → une base d'avis a changé sans commit. C'est une **procédure du trunk**, pas de
     la PR (ADR 0019, décision 2) : l'avis porte sur l'état du monde, et se corrige sur le trunk par
     la voie courte (« Voie courte — correctif évident ») — une montée de version ou une exception
     datée —, jamais par d'autres pushes sur la PR, qui repaieraient le même verdict. Pour un rouge
