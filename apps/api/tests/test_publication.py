@@ -663,8 +663,9 @@ def cache_inputs(job: str, action: str) -> object:
 
 @pytest.mark.parametrize("job", [job for job in CACHED_BUILDS if job != "infra"])
 def test_chaque_build_en_cache_prend_la_cle_du_job_infra(job: str) -> None:
-    """`publish`, qui écrit l'entrée que `main` lit, et `avis`, qui la restaure pour scanner,
-    prennent la clé d'`infra` — celle qu'une PR restaure, ou écrit si elle manque. Deux clés qui
-    dériveraient feraient reconstruire à froid, sans un signal."""
+    """`publish`, qui écrit l'entrée que `main` lit, et ceux qui la restaurent — `avis` pour
+    scanner, `images` pour les tests du run hebdomadaire — prennent la clé d'`infra`, celle qu'une
+    PR restaure, ou écrit si elle manque. Deux clés qui dériveraient feraient reconstruire à
+    froid, sans un signal."""
     action = "actions/cache" if CACHED_BUILDS[job][1] else "actions/cache/restore"
     assert cache_inputs(job, action) == cache_inputs("infra", "actions/cache")
