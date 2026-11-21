@@ -239,13 +239,17 @@ vulnerabilities:
       - "**/portfolio-api (debian 13.*)"
     statement: >-
       Place : `libssl3t64`, `openssl` et `openssl-provider-legacy` (OpenSSL 3.5.7), venus de
-      l'image de base, dont dépendent les modules `ssl` et `hashlib` de Python. Atteinte : non —
-      le défaut est dans le serveur QUIC d'OpenSSL ; `gunicorn` écoute en clair sur TCP
-      (`--bind 0.0.0.0:8000`, Caddy termine TLS), et le module `ssl` de Python 3.12.16 n'expose
-      aucun symbole QUIC (relevé dans l'image, 2026-11-21). Alternatives : corrigé en amont par
-      OpenSSL 3.5.10, annoncé pour le 2026-12-01 (avis du 2026-11-17, sévérité « Low ») ; Debian 13
-      vulnérable, sans correctif ; Debian 12 non touché, mais rouvrirait le choix de Debian 13
-      (ADR 0014).
+      l'image de base, impossibles à retirer — `coreutils`, paquet essentiel, pré-dépend de
+      `libssl3t64`, qui dépend d'`openssl-provider-legacy` ; `ca-certificates` dépend
+      d'`openssl` —, et dont dépendent les modules `ssl` et `hashlib` de Python. Atteinte : non
+      — le défaut est dans le serveur QUIC d'OpenSSL ; `gunicorn` écoute en clair sur TCP
+      (`--bind 0.0.0.0:8000`, Caddy termine TLS), le module `ssl` de Python 3.12.16 n'expose
+      aucune API QUIC, et aucun objet ELF de l'image, `libssl` mise à part, ne référence
+      `OSSL_QUIC_server_method` ni `SSL_new_listener` ; `openssl` ne porte que le client QUIC
+      (relevé dans l'image, 2026-11-21). Alternatives : corrigé en amont par OpenSSL 3.5.10,
+      annoncé pour le 2026-12-01 (avis du 2026-11-17, sévérité « Low ») ; Debian 13 vulnérable,
+      sans correctif : l'exception attend sa publication et la reconstruction de l'image de base ;
+      Debian 12 non touché, mais rouvrirait le choix de Debian 13 (ADR 0014).
     expired_at: 2026-12-21
 
   # --- Image `caddy` : le binaire `caddy` 2.11.9, compilé par le projet avec Go 1.27.3 ---------
