@@ -27,8 +27,8 @@ export default defineConfig({
   // Sur un runner GitHub — `GITHUB_ACTIONS`, « Always set to `true` when GitHub Actions is
   // running the workflow » (doc GitHub « Variables », lue le 2026-11-21) —, le job qui lance l'e2e
   // vient de la compiler (`make web-build`) : elle est servie telle quelle (ADR 0031). Ailleurs,
-  // elle se compile d'abord : `make web-e2e` éprouve le front courant. Pas `CI`, que le poste pose
-  // aussi : le saut y servirait un `dist` périmé ou absent.
+  // elle se compile d'abord : `make web-e2e` éprouve le front courant. Pas `CI`, qu'un poste peut
+  // poser aussi : le saut y servirait un `dist` périmé ou absent.
   webServer: [
     {
       command: process.env.GITHUB_ACTIONS ? PREVIEW : `npm run build && ${PREVIEW}`,

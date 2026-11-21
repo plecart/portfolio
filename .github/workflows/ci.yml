@@ -112,8 +112,8 @@ jobs:
 
       # La fusion explicite du trunk (ADR 0029), écrite ici en entier sous l'ancre `fusion`, que
       # `web` et `infra` reprennent par `*fusion` (doc GitHub « Reusing workflow configurations ») ;
-      # `avis.yml` en porte une copie, une ancre ne valant que dans son fichier,
-      # et `apps/api/tests/test_ci_declencheurs.py` les tient égales. Elle vit dans la définition du
+      # `avis.yml` en porte une copie, une ancre ne valant que dans son fichier, et
+      # `apps/api/tests/test_ci_declencheurs.py` les tient égales. Elle vit dans la définition du
       # workflow, que le run lit à son commit, jamais dans l'arbre extrait : une action locale se
       # lirait dans la tête, qu'une PR ouverte avant elle ne porte pas.
       #
@@ -242,8 +242,8 @@ jobs:
         run: make web-browsers
 
       # Le seul projet `desktop` (ADR 0031, décision 3) ; le `mobile` est au run hebdomadaire,
-      # `hebdo.yml` (décision 4). Sur un runner GitHub (`GITHUB_ACTIONS`), Playwright sert le front que le pas
-      # « Build » a compilé, sans le recompiler (`apps/web/playwright.config.ts`).
+      # `hebdo.yml` (décision 4). Sur un runner GitHub (`GITHUB_ACTIONS`), Playwright sert le front
+      # que le pas « Build » a compilé, sans le recompiler (`apps/web/playwright.config.ts`).
       - name: End-to-end + axe
         run: make web-e2e E2E_PROJECTS=desktop
 

@@ -179,7 +179,7 @@ test("sur un runner GitHub, les scénarios jouent le front déjà compilé ; ail
   // Sur un runner GitHub, le job qui lance l'e2e a compilé le front au pas précédent
   // (`make web-build`) : le recompiler ne ferait que payer la compilation deux fois (ADR 0031).
   // Ailleurs, `make web-e2e` éprouve le front courant, quel que soit l'état de `dist` — y compris
-  // sous `CI=1`, que le poste pose aussi : lu sur `CI`, le saut servirait un `dist` périmé.
+  // sous `CI=1`, qu'un poste peut poser aussi : lu sur `CI`, le saut servirait un `dist` périmé.
   const preview = 'npm run preview -- --port 4173 --strictPort'
   const build = `npm run build && ${preview}`
 
