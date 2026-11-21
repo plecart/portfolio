@@ -21,8 +21,8 @@
 # décision 2). Un cinquième, `publish`, ne tourne qu'après un push sur `main`, une fois les
 # quatre autres verts : il publie les images sur GHCR. Un sixième, `fumee`, démarre la pile de
 # production depuis ces images et la fait éprouver par Playwright ; un septième, `deploy`, ne les
-# déploie sur le VPS, une fois celui-ci prêt, qu'après une fumée verte. Un huitième, `auteurs`, ne
-# tourne que sur une PR hors draft, sans attendre `api`.
+# déploie sur le VPS, une fois celui-ci prêt, qu'après une fumée verte. Sur une PR, le job `api`
+# refuse aussi un commit d'auteur Claude : un pas, et non un job à lui (ADR 0031).
 #
 # Sur une PR, chaque job qui extrait le dépôt en extrait la tête, clone complet, puis la fusionne
 # lui-même au trunk courant (le pas « Fusion explicite du trunk » du job `api`, qui dit pourquoi) :
@@ -102,8 +102,8 @@ jobs:
           fetch-depth: 0
 
       # La fusion explicite du trunk (ADR 0029), écrite ici en entier sous l'ancre `fusion`, que
-      # `web`, `infra` et `auteurs` reprennent par `*fusion` (doc GitHub « Reusing workflow
-      # configurations ») ; `avis.yml` en porte une copie, une ancre ne valant que dans son fichier,
+      # `web` et `infra` reprennent par `*fusion` (doc GitHub « Reusing workflow configurations ») ;
+      # `avis.yml` en porte une copie, une ancre ne valant que dans son fichier,
       # et `apps/api/tests/test_ci_declencheurs.py` les tient égales. Elle vit dans la définition du
       # workflow, que le run lit à son commit, jamais dans l'arbre extrait : une action locale se
       # lirait dans la tête, qu'une PR ouverte avant elle ne porte pas.
@@ -151,6 +151,19 @@ jobs:
         id: jobs
         shell: bash
         run: git diff --name-only --no-renames HEAD^1 HEAD | python3 infra/ci/changed_jobs.py >> "$GITHUB_OUTPUT"
+
+      # Aucun commit de la PR d'auteur Claude : six ont atteint `main` et son panneau des
+      # contributeurs, et un hook local ne couvre pas une session cloud — ce contrôle vaut pour toute
+      # PR, d'où que viennent ses commits. Le pas de fusion a combiné la tête de la PR (`HEAD^2`) au
+      # trunk courant (`HEAD^1`) : `HEAD^1..HEAD^2` lit ses commits. Un pas et non un job, qui
+      # compterait une minute pour quelques secondes (ADR 0031) ; rouge, il saute aussi les jobs
+      # qui attendent `api`, et le push qui corrige l'auteur les relance.
+      - name: Refuser un auteur Claude
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          commits=$(git log --no-mailmap -i -F --author='<noreply@anthropic.com>' --format='%h %s' HEAD^1..HEAD^2)
+          if [ -n "$commits" ]; then echo "$commits"; exit 1; fi
 
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
 
@@ -339,31 +352,6 @@ jobs:
     needs: api
     if: ${{ github.event_name != 'pull_request' || needs.api.outputs.avis == 'true' }}
     uses: ./.github/workflows/avis.yml
-
-  auteurs:
-    name: Auteurs — aucun commit d'auteur Claude
-    runs-on: ubuntu-latest
-
-    # Six commits d'auteur Claude ont atteint `main` et son panneau des contributeurs : un hook local
-    # ne couvre pas une session cloud, ce contrôle vaut pour toute PR, d'où que viennent ses commits.
-    # Hors draft (ADR 0019).
-    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
-
-    steps:
-      # Le pas de fusion combine la tête de la PR (`HEAD^2`) au trunk courant (`HEAD^1`), et
-      # `HEAD^1..HEAD^2` lit ses commits.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-
-      - *fusion
-
-      - name: Refuser un auteur Claude
-        shell: bash
-        run: |
-          commits=$(git log --no-mailmap -i -F --author='<noreply@anthropic.com>' --format='%h %s' HEAD^1..HEAD^2)
-          if [ -n "$commits" ]; then echo "$commits"; exit 1; fi
 
   publish:
     name: Publication — images sur GHCR

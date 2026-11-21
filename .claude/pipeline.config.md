@@ -356,7 +356,7 @@ session PR lance avant tout push d'un delta sur `.claude/` ou `CLAUDE.md` (`cycl
     imposition (mesuré le 2026-10-21) ; sur un runner Linux, rouge par la même imposition, non
     mesuré
 - gates bloquants en CI — sur une PR, `web`, `infra` et `avis` ne tournent que si le delta touche leurs fichiers (règle dans `infra/ci/changed_jobs.py`, lue par la première étape du job `api`), `api` toujours, et les trois attendent un `api` vert ; sur un push vers `main`, les quatre (ADR 0017, ADR 0019) :
-  - auteurs : aucun commit de la PR d'auteur `noreply@anthropic.com` (job `auteurs`, sur une PR hors draft seulement)
+  - auteurs : aucun commit de la PR d'auteur `noreply@anthropic.com` (pas « Refuser un auteur Claude » du job `api`, sur une PR hors draft seulement ; ADR 0031)
   - back : lint, format:check, typecheck, test, puis test-pipeline — sur une PR, seulement si le delta touche la pipeline (sortie `pipeline` de `infra/ci/changed_jobs.py`), sur un push vers `main` toujours (ADR 0025)
   - front : lint, typecheck, test, build, e2e (Playwright + axe), lighthouse
   - infra : compose (résolution de `infra/compose.dev.yml` et `infra/compose.yml`), build des images `api`, `backup` et `caddy` sans publication, tests des images (`make image-test`) — des piles d'image seulement, sans `up --wait` sur la pile de développement : le démarrage de la pile se prouve par la fumée
