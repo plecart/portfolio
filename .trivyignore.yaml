@@ -252,6 +252,24 @@ vulnerabilities:
       Debian 12 non touché, mais rouvrirait le choix de Debian 13 (ADR 0014).
     expired_at: 2026-12-21
 
+  # --- Image `backup` : le binaire `supercronic` v0.2.51, fichier de sa release (ADR 0018) ------
+
+  - id: CVE-2026-97054
+    paths:
+      - usr/local/bin/supercronic
+    statement: >-
+      Place : `supercronic` est le processus du conteneur (`CMD ["supercronic", "/etc/crontab"]`),
+      fichier de sa release v0.2.51, compilé avec Go 1.27.3 (`stdlib` v1.27.3 lue par Trivy,
+      2026-11-21). Atteinte : non établie — le défaut touche un serveur HTTP/1 qui borne un corps
+      par `MaxBytesReader` ; `supercronic` n'ouvre de serveur `net/http` que sous
+      `-prometheus-listen-address`, vide par défaut et jamais lu dans l'environnement (`main.go`
+      de v0.2.51), que ni le `CMD` de l'image ni le service `backup` de `infra/compose.yml` ne
+      passent ; aucun test d'image ne l'exerce, d'où 30 jours. Alternatives : corrigé par Go
+      1.26.11 et 1.27.4, absent de toute release de `supercronic` au 2026-11-21 (v0.2.51, du
+      2026-10-21, est la dernière) : l'exception attend la suivante. Le compiler dans l'étage
+      `golang`, comme `age`, rouvrirait la décision de l'ADR 0018.
+    expired_at: 2026-12-21
+
   # --- Image `caddy` : le binaire `caddy` 2.11.9, compilé par le projet avec Go 1.27.4 ---------
   #
   # Ce qui tourne : le Caddyfile de production (`infra/caddy/Caddyfile`) — un serveur de fichiers
