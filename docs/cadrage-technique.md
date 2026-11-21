@@ -21,7 +21,7 @@ _Le design (UI/UX) est hors périmètre de ce document._
 | P4 | Code minimal | Chaque ligne sert un but. Aucun résidu de squelette, aucune abstraction « au cas où », aucune fonctionnalité inutilisée. |
 | P5 | Sécurité maximale sur les surfaces publiques | Chatbot et MCP exposés au public : la sécurisation est une démonstration en soi. |
 | P6 | Incassable | Tests, CI, supervision, sauvegardes testées, dégradation gracieuse : le site vit sans le service IA. |
-| P7 | Conçu comme si le code était public | Aucun secret dans le code ; sécurité par authentification et limitations, jamais par obscurité. Le dépôt reste privé, décision révisable. |
+| P7 | Conçu comme si le code était public | Aucun secret dans le code ; sécurité par authentification et limitations, jamais par obscurité. Le dépôt est public (D76). |
 | P8 | Pédagogique | Apprendre LangGraph et LangSmith en les utilisant ; chaque concept expliqué au moment où il sert, dans `docs/learning/`. |
 | P9 | Livraison incrémentale | Pas de délai ; blocs livrés un par un via des issues ; première version en production tôt. |
 
@@ -33,7 +33,7 @@ _Le design (UI/UX) est hors périmètre de ce document._
 - **Trafic** : un ou deux visiteurs occasionnels. On conçoit pour un faible trafic avec des protections robustes.
 - **Contenu** : public par nature. Les projets privés ne montrent que captures d'écran, langages et outils, sans lien. Le CV fourni au chatbot est une version publique, sans téléphone ni adresse.
 - **Frontend** : application statique compilée en CI et servie par Caddy ; aucun runtime Node en production (D44).
-- **Dépôt** : privé.
+- **Dépôt** : public, code et contenu sous tous droits réservés (D76).
 
 ## 4. Phases
 
@@ -229,7 +229,7 @@ Identifiants hérités du cadrage v0 (D1 à D38), sans trou ni renumérotation. 
 | D8 | ADR dès le début | Format MADR dans `docs/adr/`. |
 | D9 | Budget global ≈ 50 € / mois maximum | Sans brider le projet. |
 | D10 | Pas de délai, livraison incrémentale | Blocs assemblés via des issues. |
-| D11 | Dépôt privé (révisable) | Conçu comme s'il était public. |
+| D11 | (remplacée par D76) | — |
 | D12 | Repartir de zéro | Ancien historique Django + Flutter supprimé localement le 2026-09-10 ; reste sur GitHub, sans valeur de référence. |
 | D14 | Contenu public par nature | Projets privés : captures, langages, outils ; CV en version publique. |
 | D15 | (remplacée par D44) | — |
@@ -287,6 +287,7 @@ Identifiants hérités du cadrage v0 (D1 à D38), sans trou ni renumérotation. 
 | D73 | Les runs de PR fusionnent eux-mêmes la tête au trunk courant | Sur une PR, chaque job qui extrait le dépôt en extrait la tête, clone complet, et la fusionne à `origin/<branche cible>` à son démarrage, par un pas écrit en ligne dans le workflow (jamais une action lue dans la tête) : le trunk en premier parent, la tête en second, si bien que `HEAD^1..HEAD` et `HEAD^1..HEAD^2` gardent leur sens ; un conflit fait échouer le job ; chaque job écrit `Fusion explicite : <commit> Merge <tête> into <trunk> (workflow <GITHUB_SHA>)`, que `porte-merge.py trunk` lit pour exiger que chacun ait fusionné le trunk courant et que la définition jouée soit à jour de `.github/workflows/` ; sur un push vers `main`, aucune fusion. La relance après un trunk avancé est `gh run rerun` ; la fermeture-réouverture ne reste que pour un événement perdu ou une définition de workflow changée sur le trunk. Écartés : une porte fondée sur le risque (remise à une vague mesurée), un ordre de merge en vague, la file de merge de GitHub (protection de `main`, offre payante, auto-merge). Remplace, dans l'ADR 0019, le run de PR « sur la référence de fusion que GitHub calcule » (§ Décision, point 1) et la porte de fraîcheur « seule preuve de l'état combiné » (§ Conséquences) (interrogatoire de #249, 2026-11-08 ; ADR 0029). |
 | D74 | L'hôte du site relaie à Django ses fichiers de découverte et rend 404 sur une adresse inconnue | Caddy relaie `/projets/*`, `/sitemap.xml` et `/llms.txt` vers `api`, que Django sert depuis la base, sans recompilation ; tout le reste est servi en statique, et une adresse qu'aucun fichier du front ne porte rend `404` avec le corps d'`index.html` (`try_files {path} {path}/index.html =404`, puis `handle_errors 404`), le front y affichant l'accueil ; sous `/assets/`, un `404` sans `index.html`. L'accueil reste statique. Écartés : fichiers générés au build, écrits dans un volume partagé, `200` + `index.html`, `404` nu. Remplace, dans l'ADR 0008, le repli « `try_files {path} /index.html` » (§ Décision, « Servi en statique ») et la phrase « Caddy route `/projets/*` vers `api` et sert tout le reste en statique » (« Aperçus de lien ») (interrogatoire de #265, 2026-11-10 ; ADR 0030). |
 | D75 | Chaque vérification de la CI tourne à un seul endroit | Sur une PR prête, `api` — tests de la pipeline et contrôle des auteurs compris —, puis, selon le delta, `web` — e2e du seul projet `desktop`, Lighthouse —, `infra` — par liste d'inclusion : ce que les images définissent ou exécutent — et `avis` ; le push sur `main` ne fait que livrer : `publish` compile le front, construit, scanne, pousse, puis `fumee` et `deploy` ; un run hebdomadaire sur `main`, le lundi et à la main, joue les portes d'avis, les tests des images et l'e2e mobile. Remplace, dans D61, « liste d'exclusion pour `infra` » et « sur un push vers `main`, tout tourne » ; dans D63, « planifiés chaque jour sur `main` (…) et avant chaque publication » ; dans D69, « et sur chaque push vers `main` » (décision du mainteneur et interrogatoire de #278, 2026-11-21 ; ADR 0031). |
+| D76 | Dépôt public | Les runners standard de GitHub Actions y sont gratuits : privé, le dépôt dépassait les ≈ 3 000 minutes comprises dans GitHub Pro, et la CI ne démarrait plus depuis le 2026-11-20. Le code était déjà écrit comme s'il était public (P7). Code et contenu sous tous droits réservés, sans licence ; détection de secrets et blocage au push activés ; `main` refuse le force-push et la suppression. Remplace D11 (décision du mainteneur, 2026-11-21). |
 | D29 | (remplacée par D36, D37) | — |
 | D21 | (remplacée par D25) | — |
 
