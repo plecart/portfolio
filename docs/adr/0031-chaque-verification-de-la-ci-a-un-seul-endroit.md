@@ -19,7 +19,7 @@
 La CI tourne deux fois par changement : sur la PR, puis de nouveau au push sur `main`, où tout
 rejoue avant `publish` (ADR 0017, ADR 0019). Le dépôt est privé (cadrage D11), et ses minutes sont
 facturées au-delà des ≈ 3 000 comprises dans GitHub Pro ; depuis le 2026-11-20, les jobs ne
-démarrent plus (limite de dépenses).
+démarrent plus (limite de dépenses ou paiement refusé).
 
 Mesure de départ — **population vivante**, relevée le 2026-11-21 vers 09 h UTC : 639 runs créés
 du 2026-10-22T04:37Z au 2026-11-21T05:38Z (30,0 jours). Commande, dans le dossier de l'étude
@@ -70,8 +70,9 @@ doc « Actions runner pricing », lue le 2026-11-21 :
    la branche d'une PR n'est pas lisible depuis `main`.
 2. **`infra` par inclusion** : sur une PR, il tourne si le delta touche ce que les images
    définissent ou exécutent — `infra/`, les Dockerfiles, les fichiers Compose, les manifestes et
-   verrous, les migrations du back, les modules d'appui des tests des images, ce qui décide des
-   jobs — ou un chemin entre guillemets (`infra/ci/changed_jobs.py`).
+   verrous, `.python-version`, `.dockerignore`, `.env.example`, les migrations du back, les
+   modules d'appui des tests des images, ce qui décide des jobs — ou un chemin entre guillemets
+   (`infra/ci/changed_jobs.py`).
 3. **Sur une PR, l'e2e ne joue que le projet `desktop`** ; Lighthouse reste sur la PR.
 4. **Un run hebdomadaire sur `main`**, le lundi à 05:37 UTC et à la main (`hebdo.yml`) : les
    portes d'avis (`avis.yml` — `make audit`, `make web-audit`, `make build`, `make scan`), les
