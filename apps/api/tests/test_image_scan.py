@@ -72,12 +72,12 @@ SCAN_MOUNTS = [
 TRIVY_REPOSITORY = "ghcr.io/aquasecurity/trivy:"
 
 # Les jobs de la CI qui construisent puis scannent les images, chacun avec le workflow où il vit et
-# ses deux commandes, mot pour mot : `avis`, chaque jour sur `main`, sur une PR qui touche une
-# entrée d'un avis et sur chaque push vers `main` (ADR 0019, décision 2), sous le nom du poste ;
-# `publish` avant de pousser, sous le nom GHCR. L'image y est nommée sans étiquette : les
-# exceptions des paquets du système suivent la cible `…/portfolio-<service> (<système> <version>)`
-# du rapport de Trivy, qu'une étiquette changerait (mesuré à la PR #62). Mot pour mot, parce
-# qu'une variable de plus sur la ligne de commande (`SCAN_FLAGS=`) prime sur le `Makefile`.
+# ses deux commandes, mot pour mot : `avis`, chaque jour sur `main` et sur une PR qui touche une
+# entrée d'un avis (ADR 0019, décision 2), sous le nom du poste ; `publish` avant de pousser, sous
+# le nom GHCR. L'image y est nommée sans étiquette : les exceptions des paquets du système suivent
+# la cible `…/portfolio-<service> (<système> <version>)` du rapport de Trivy, qu'une étiquette
+# changerait (mesuré à la PR #62). Mot pour mot, parce qu'une variable de plus sur la ligne de
+# commande (`SCAN_FLAGS=`) prime sur le `Makefile`.
 SCANNING_JOBS = {
     "avis": (AVIS_WORKFLOW, "make build", "make scan"),
     "publish": (
@@ -563,10 +563,10 @@ def test_make_scan_echoue_quand_trivy_echoue() -> None:
 
 @pytest.mark.parametrize("name", SCANNING_JOBS)
 def test_la_ci_scanne_les_images_qu_elle_vient_de_construire(name: str) -> None:
-    """Le job `avis` scanne chaque jour sur `main`, sur une PR qui touche une entrée d'un avis et
-    sur chaque push vers `main` (ADR 0019), le job `publish` avant de pousser — chacun après le
-    build qui charge les images dans le moteur (`--load`) : avant lui, Trivy ne trouverait rien à
-    lire. Aucune image n'est publiée sans avoir été scannée (ADR 0014).
+    """Le job `avis` scanne chaque jour sur `main` et sur une PR qui touche une entrée d'un avis
+    (ADR 0019), le job `publish` avant de pousser — chacun après le build qui charge les images
+    dans le moteur (`--load`) : avant lui, Trivy ne trouverait rien à lire. Aucune image n'est
+    publiée sans avoir été scannée (ADR 0014).
 
     L'étape ne porte que son nom et sa commande. Un `continue-on-error` la rendrait indicative, un
     `if:` la ferait sauter, un `env:` pourrait régler `make` lui-même (`MAKEFLAGS: -i` ignore
