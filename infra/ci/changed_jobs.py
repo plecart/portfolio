@@ -18,10 +18,9 @@ Règles, par motif `fnmatch` — où `*` traverse `/` :
 
 - `web` : un chemin du front, ou le schéma de l'API, dont `make web-test` vérifie que les types
   générés du front sont à jour (`WEB`) ;
-- `infra` : un chemin hors du harnais (`HARNESS`). Liste d'exclusion, jamais d'inclusion : un
-  fichier inconnu fait tourner le job. Les images copient `apps/api` et `apps/web/dist`
-  (`infra/api/Dockerfile`, `infra/caddy/Dockerfile`), et les tests du back tournent dans `api` —
-  sauf les modules d'appui que `make image-test` charge aussi (`IMAGE_TESTS`), qui le font tourner ;
+- `infra` : ce que les images définissent ou exécutent (`INFRA`, ADR 0031, décision 2), ou un
+  module d'appui que `make image-test` charge (`IMAGE_TESTS`). Liste d'inclusion : le code du back
+  et celui du front, que les images copient aussi, ont leurs jobs, `api` et `web` ;
 - `avis` : une entrée des portes d'avis — ce que lisent `make audit`, `make web-audit` et
   `make scan`, et ce qui les définit (`AVIS`, ADR 0019, décision 2) ;
 - `pipeline` : ce que la suite de la pipeline (`make test-pipeline`) lit, et ce qui la lance
@@ -29,8 +28,7 @@ Règles, par motif `fnmatch` — où `*` traverse `/` :
 - tous : un chemin de `ALL`, qui décide des jobs eux-mêmes, ou un chemin que `git` a mis
   entre guillemets (`QUOTED`) — il le fait pour tout chemin non ASCII, que plus aucun motif
   n'apparie ; un job sauté à tort cacherait un rouge, un job lancé pour rien ne coûte que des
-  minutes. Ces chemins sont hors du harnais : `infra` les prend déjà, `web`, `avis` et
-  `pipeline` les ajoutent.
+  minutes. Les quatre les ajoutent à leurs motifs (`JOB_PATTERNS`).
 
 Liste vide : aucun des quatre. Code de sortie 0 ; l'étape qui le lance tourne sous `pipefail`, et
 un `git diff` en échec y fait rougir le job `api` au lieu de rendre `false` en silence.
@@ -41,14 +39,22 @@ from collections.abc import Iterable
 from fnmatch import fnmatchcase
 
 WEB = ("apps/web/*", "apps/api/openapi.json")
-HARNESS = (
-    ".claude/*",
-    "docs/*",
-    "*.md",
-    "apps/api/tests/*",
-    ".github/dependabot.yml",
-    ".github/workflows/avis.yml",
-    ".github/workflows/restore.yml",
+# Ce que les images définissent ou exécutent : `infra/` — Dockerfiles, fichiers Compose, ce que les
+# images copient, leurs tests ; ce que l'image `api` copie avant son code — manifestes, verrou,
+# `.python-version` — et les manifestes du front, dont `make build` compile `dist` ; les migrations
+# du back, que l'image `api` joue à son démarrage, et la chaîne de sauvegarde des tests des images
+# avec elle.
+INFRA = (
+    "infra/*",
+    "pyproject.toml",
+    "apps/api/pyproject.toml",
+    "uv.lock",
+    ".python-version",
+    "apps/web/package.json",
+    "apps/web/package-lock.json",
+    "apps/api/*/migrations/*",
+    ".dockerignore",  # ce que porte le contexte de build, dont les images copient des dossiers
+    ".env.example",  # copié en `.env` par le job `infra` : `compose.dev.yml` le cite
 )
 # Les modules de `apps/api/tests/` que `make image-test` (job `infra`) charge : son greffon
 # `process_environment` et ce que `infra/tests/` importe, directement ou non. Recalculés par
@@ -99,6 +105,14 @@ PIPELINE_TESTS = ("apps/api/tests/system_commands.py", "apps/api/tests/test_supp
 ALL = ("Makefile", ".github/workflows/ci.yml", "infra/ci/changed_jobs.py")
 # Un chemin que `git` a mis entre guillemets : non ASCII, aucun autre motif ne l'apparie plus.
 QUOTED = '"*'
+# Les motifs propres à chaque job, dans l'ordre de la réponse ; `ALL` et `QUOTED` s'ajoutent à
+# chacun. Un module d'appui est un chemin sans joker, que `fnmatchcase` n'apparie qu'à lui-même.
+JOB_PATTERNS = {
+    "web": WEB,
+    "infra": (*INFRA, *IMAGE_TESTS),
+    "avis": AVIS,
+    "pipeline": (*PIPELINE, *PIPELINE_TESTS),
+}
 
 
 def matches(path: str, patterns: Iterable[str]) -> bool:
@@ -119,17 +133,13 @@ def jobs_for(paths: Iterable[str]) -> dict[str, bool]:
         quatre sur un delta vide.
 
     Example:
-        >>> jobs_for(["apps/api/content/models.py"])
+        >>> jobs_for(["apps/api/content/migrations/0001_initial.py"])
         {'web': False, 'infra': True, 'avis': False, 'pipeline': False}
     """
     delta = [path for path in paths if path]
     return {
-        "web": any(matches(path, (*WEB, *ALL, QUOTED)) for path in delta),
-        "infra": any(path in IMAGE_TESTS or not matches(path, HARNESS) for path in delta),
-        "avis": any(matches(path, (*AVIS, *ALL, QUOTED)) for path in delta),
-        "pipeline": any(
-            path in PIPELINE_TESTS or matches(path, (*PIPELINE, *ALL, QUOTED)) for path in delta
-        ),
+        job: any(matches(path, (*patterns, *ALL, QUOTED)) for path in delta)
+        for job, patterns in JOB_PATTERNS.items()
     }
 
 
