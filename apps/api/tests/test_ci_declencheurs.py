@@ -86,9 +86,9 @@ STACK_JOBS = ("api", "web", "infra")
 # courant par le pas de ce nom : la référence de fusion de la forge n'est pas recalculée quand le
 # trunk avance, et un `gh run rerun` la réutilise (ADR 0029). Clone complet : la fusion exige
 # l'ancêtre commun. Appelé par `hebdo.yml`, planifié ou à la main, `ref` est vide et le checkout
-# prend son défaut, le commit de l'événement (`src/input-helper.ts` d'`actions/checkout`, lu le 2026-11-08). Le pas vit
-# dans la définition du workflow, lue au commit du run, jamais dans l'arbre extrait : une action
-# locale se lirait dans la tête, qu'une PR ouverte avant elle ne porte pas.
+# prend son défaut, le commit de l'événement (`src/input-helper.ts` d'`actions/checkout`, lu le
+# 2026-11-08). Le pas vit dans la définition du workflow, lue au commit du run, jamais dans l'arbre
+# extrait : une action locale se lirait dans la tête, qu'une PR ouverte avant elle ne porte pas.
 FUSION_NAME = "Fusion explicite du trunk"
 PR_HEAD = "${{ github.event.pull_request.head.sha }}"
 FUSION_CHECKOUT = {"ref": PR_HEAD, "fetch-depth": 0}

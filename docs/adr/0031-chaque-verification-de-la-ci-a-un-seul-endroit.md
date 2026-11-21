@@ -5,13 +5,16 @@
 - **Décisions du cadrage** : D75 (`docs/cadrage-technique.md` §7) ; remplace, dans l'ADR 0014,
   « après `api`, `web` et `infra` » et « il récupère `dist` du job `web` par artefact » (§ Décision,
   point « Publication ») et « Une image publiée a passé toute la CI » (§ Conséquences) ; dans
-  l'ADR 0017, « Un push vers `main` publie et déploie : tout y tourne », « Dans le doute, le job
-  tourne » et « Aucune porte retirée ni allégée » (§ Facteurs de décision), « liste d'exclusion »
+  l'ADR 0017, « Un push vers `main` publie et déploie : tout y tourne », « et `publish` attend
+  toujours les trois jobs », « Dans le doute, le job tourne » et « Aucune porte retirée ni
+  allégée » (§ Facteurs de décision), « liste d'exclusion »
   et « Sur un push vers `main`, tout tourne » (§ Décision), « ou au push vers `main` suivant »
   (§ Conséquences) ; dans l'ADR 0019, « **Aucune porte retirée du chemin vers la production** :
   le push sur `main` joue tout avant `publish` » et « Un avis neuf doit être vu sous un jour »
   (§ Facteurs de décision), « chaque jour sur `main` » et « Sur un push vers `main`, tout tourne »
-  (§ Décision, point 2), « sur une PR comme sur `main` » (§ Décision, point 3) ; dans
+  (§ Décision, point 2), « sur une PR comme sur `main` » (§ Décision, point 3), « Un avis neuf
+  est vu par le run planifié du lendemain » et « Sur `main`, un `api` rouge cache `web` et
+  `infra` jusqu'au push correctif » (§ Conséquences) ; dans
   l'ADR 0025, « sur un push vers `main`, toujours » et « et sur chaque push vers `main` »
   (§ Décision) ; ces ADR restent acceptés pour le reste ; décision du
   mainteneur du 2026-11-21 (étude du coût de la CI), interrogatoire et go du briefing de #278
