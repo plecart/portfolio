@@ -575,7 +575,6 @@ FUSING_JOBS = {
     ("ci.yml", "api"),
     ("ci.yml", "web"),
     ("ci.yml", "infra"),
-    ("ci.yml", "auteurs"),
     ("avis.yml", "avis"),
 }
 
@@ -1120,18 +1119,22 @@ def test_l_etape_5_traite_chaque_issue_de_la_lecture_du_run(anchor: str) -> None
     assert step.index(anchor) > step.index("scripts/attente-ci.py <numéro>")
 
 
-# --- Auteurs des commits d'une PR ---
+# --- Auteurs des commits d'une PR : un pas du job `api` ---
 
 AUTHOR_STEP = "Refuser un auteur Claude"
 CLAUDE_AUTHOR = "Claude <noreply@anthropic.com>"
 HUMAN_AUTHOR = "plecart <pacome@lecart.dev>"
 
 
-def author_gate() -> dict[str, Any]:
-    """Le job `auteurs` de `ci.yml`, sous sa forme analysée."""
-    return cast(
-        dict[str, Any], yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["auteurs"]
-    )
+def api_steps() -> list[dict[str, Any]]:
+    """Les pas du job `api` de `ci.yml`, sous leur forme analysée."""
+    return workflow_steps(CI_WORKFLOW.read_text(encoding="utf-8"))["api"]
+
+
+def author_step() -> dict[str, Any]:
+    """Le pas du contrôle des auteurs, dans le job `api` de `ci.yml`."""
+    (step,) = [step for step in api_steps() if step.get("name") == AUTHOR_STEP]
+    return step
 
 
 def git(repo: Path, *args: str) -> str:
@@ -1188,8 +1191,7 @@ def play_step(
 
 def play_author_step(repo: Path, bash: str) -> int:
     """Le code de sortie du pas tel que `ci.yml` l'écrit, sous le shell d'Actions."""
-    step = next(s for s in author_gate()["steps"] if s.get("name") == AUTHOR_STEP)
-    return play_step(step, repo, bash).returncode
+    return play_step(author_step(), repo, bash).returncode
 
 
 @pytest.mark.parametrize(
@@ -1209,7 +1211,7 @@ def play_author_step(repo: Path, bash: str) -> int:
         "adresse plus longue",
     ],
 )
-def test_le_job_auteurs_refuse_un_commit_de_pr_d_auteur_claude(
+def test_le_controle_des_auteurs_refuse_un_commit_de_pr_d_auteur_claude(
     tmp_path: Path, author: str, code: int, bash_de_ce_systeme: str
 ) -> None:
     """Joué sur un commit de fusion réel."""
@@ -1217,7 +1219,7 @@ def test_le_job_auteurs_refuse_un_commit_de_pr_d_auteur_claude(
     assert play_author_step(tmp_path, bash_de_ce_systeme) == code
 
 
-def test_le_job_auteurs_echoue_ferme_si_git_log_echoue(
+def test_le_controle_des_auteurs_echoue_ferme_si_git_log_echoue(
     tmp_path: Path, bash_de_ce_systeme: str
 ) -> None:
     """Dans un dépôt sans commit, `git log` échoue : le pas rougit au lieu de passer sans rien lire."""
@@ -1225,7 +1227,7 @@ def test_le_job_auteurs_echoue_ferme_si_git_log_echoue(
     assert play_author_step(tmp_path, bash_de_ce_systeme) != 0
 
 
-def test_le_job_auteurs_ignore_le_mailmap(tmp_path: Path, bash_de_ce_systeme: str) -> None:
+def test_le_controle_des_auteurs_ignore_le_mailmap(tmp_path: Path, bash_de_ce_systeme: str) -> None:
     """`--author` lit `.mailmap` : une PR qui en apporte un ne masque pas un commit Claude."""
     pr_merge_commit(tmp_path, CLAUDE_AUTHOR)
     (tmp_path / ".mailmap").write_text(
@@ -1234,14 +1236,14 @@ def test_le_job_auteurs_ignore_le_mailmap(tmp_path: Path, bash_de_ce_systeme: st
     assert play_author_step(tmp_path, bash_de_ce_systeme) == 1
 
 
-def test_le_job_auteurs_tourne_sur_une_pr_prete_avec_tout_l_historique() -> None:
-    """Hors draft comme les autres jobs (ADR 0019), et un clone complet de la tête : `fetch-depth: 2`
-    ne verrait pas les commits de la PR."""
-    job = author_gate()
-    assert job["if"] == (
-        "github.event_name == 'pull_request' && github.event.pull_request.draft == false"
-    )
-    assert job["steps"][0]["with"] == FUSION_CHECKOUT
+def test_le_controle_des_auteurs_est_le_pas_d_api_qui_suit_l_etape_jobs_sur_une_pr() -> None:
+    """Un pas, non un job : un job compte au moins une minute (ADR 0031, décision 5). Juste après
+    l'étape `jobs`, avant toute installation, et sur une PR seulement : sur un push vers `main`,
+    rien ne se fusionne et `HEAD^2` n'existe pas. Hors draft et sur un clone complet fusionné au
+    trunk, comme tout le job `api` — `gating_findings` tient son garde et ses trois premiers pas."""
+    steps, step = api_steps(), author_step()
+    assert steps.index(step) == [each.get("id") for each in steps].index("jobs") + 1
+    assert step["if"] == "github.event_name == 'pull_request'"
 
 
 # --- La fusion explicite du trunk : le pas « Fusion explicite du trunk » de `ci.yml` ------------
