@@ -1450,8 +1450,8 @@ def e2e_projects(*variables: str) -> list[str]:
 def test_le_job_web_ne_joue_que_le_projet_desktop_du_front_qu_il_a_compile() -> None:
     """Le pas e2e du job `web` lance `make web-e2e` avec la variable qui choisit les projets, que le
     `Makefile` développe en `--project=desktop` seul : le projet `mobile` est au run hebdomadaire
-    (ADR 0031, décisions 3 et 4). Il suit `make web-build` : sous `CI`, Playwright sert ce front
-    sans le recompiler (`apps/web/playwright.config.ts`)."""
+    (ADR 0031, décisions 3 et 4). Il suit `make web-build` : sur un runner GitHub, Playwright sert
+    ce front sans le recompiler (`apps/web/playwright.config.ts`)."""
     steps = workflow_steps(CI_WORKFLOW.read_text(encoding="utf-8"))["web"]
     runs = [str(step.get("run", "")).split() for step in steps]
     (e2e,) = [index for index, run in enumerate(runs) if run[:2] == ["make", "web-e2e"]]

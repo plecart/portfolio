@@ -155,12 +155,16 @@ test("la compilation échoue sans l'origine de l'API ou sur une adresse mal form
 
 /**
  * La commande du serveur des scénarios, le premier `webServer` de `playwright.config.ts`, relue
- * sous la valeur de `CI` donnée : la configuration la lit à son chargement.
+ * sous l'environnement donné : la configuration le lit à son chargement.
  *
- * @param ci La valeur de `CI`, ou `undefined` pour une variable absente, comme sur le poste.
+ * @param environment `CI` et `GITHUB_ACTIONS`, chacune `undefined` quand elle manque, comme sur
+ *   le poste.
  */
-async function e2eServerCommand(ci: string | undefined): Promise<string | undefined> {
-  vi.stubEnv('CI', ci)
+async function e2eServerCommand(environment: {
+  CI: string | undefined
+  GITHUB_ACTIONS: string | undefined
+}): Promise<string | undefined> {
+  for (const [name, value] of Object.entries(environment)) vi.stubEnv(name, value)
   vi.resetModules()
   try {
     const { default: config } = await import('../playwright.config.ts')
@@ -171,12 +175,16 @@ async function e2eServerCommand(ci: string | undefined): Promise<string | undefi
   }
 }
 
-test("sous CI, les scénarios jouent le front déjà compilé ; sur le poste, il se compile d'abord", async () => {
-  // Sous `CI`, le job `web` a compilé le front au pas précédent (`make web-build`) : le recompiler
-  // ne ferait que payer la compilation deux fois (ADR 0031). Sur le poste, `make web-e2e` éprouve
-  // le front courant, quel que soit l'état de `dist`.
+test("sur un runner GitHub, les scénarios jouent le front déjà compilé ; ailleurs, il se compile d'abord", async () => {
+  // Sur un runner GitHub, le job qui lance l'e2e a compilé le front au pas précédent
+  // (`make web-build`) : le recompiler ne ferait que payer la compilation deux fois (ADR 0031).
+  // Ailleurs, `make web-e2e` éprouve le front courant, quel que soit l'état de `dist` — y compris
+  // sous `CI=1`, que le poste pose aussi : lu sur `CI`, le saut servirait un `dist` périmé.
   const preview = 'npm run preview -- --port 4173 --strictPort'
+  const build = `npm run build && ${preview}`
 
-  expect(await e2eServerCommand('true')).toBe(preview)
-  expect(await e2eServerCommand(undefined)).toBe(`npm run build && ${preview}`)
+  expect(await e2eServerCommand({ CI: 'true', GITHUB_ACTIONS: 'true' })).toBe(preview)
+  expect(await e2eServerCommand({ CI: undefined, GITHUB_ACTIONS: 'true' })).toBe(preview)
+  expect(await e2eServerCommand({ CI: '1', GITHUB_ACTIONS: undefined })).toBe(build)
+  expect(await e2eServerCommand({ CI: undefined, GITHUB_ACTIONS: undefined })).toBe(build)
 })

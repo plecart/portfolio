@@ -238,8 +238,8 @@ jobs:
         run: make web-browsers
 
       # Le seul projet `desktop` (ADR 0031, décision 3) ; le `mobile` est au run hebdomadaire
-      # (décision 4). Sous `CI`, Playwright sert le front que le pas « Build » a compilé, sans le
-      # recompiler (`apps/web/playwright.config.ts`).
+      # (décision 4). Sur un runner GitHub (`GITHUB_ACTIONS`), Playwright sert le front que le pas
+      # « Build » a compilé, sans le recompiler (`apps/web/playwright.config.ts`).
       - name: End-to-end + axe
         run: make web-e2e E2E_PROJECTS=desktop
 
