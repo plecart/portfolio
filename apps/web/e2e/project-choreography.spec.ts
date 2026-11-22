@@ -29,6 +29,7 @@ import {
 } from './project.ts'
 import { buildImage, buildTechnology, ONGOING, PROJECT_SETS } from './projects.ts'
 import {
+  cardAt,
   cards,
   COLUMN_VIEWPORT,
   countCellReads,
@@ -48,9 +49,9 @@ import {
   watchPoseAnimations,
 } from './table.ts'
 
-/** Trois projets ; la première carte, celle d'un projet en cours, à une seule image. */
+/** Trois projets ; parmi eux, la carte d'un projet en cours, à une seule image. */
 const PROJECTS = PROJECT_SETS.threeWithoutShowcase
-const FIRST_PATH = '/projets/projet-02'
+const ONGOING_PATH = '/projets/projet-02'
 
 /** Le chemin de toute fiche de `ficheProject`. */
 const FICHE_PATH = '/projets/fiche'
@@ -129,12 +130,6 @@ async function openEnteredTable(page: Page, projects: Parameters<typeof openTabl
   await openTable(page, projects)
   await enterCards(page)
 }
-
-/**
- * La carte d'un projet, par son adresse : la fiche ouverte, Radix cache les cartes des technologies
- * d'assistance, et `cards` ne les trouve plus.
- */
-const cardAt = (page: Page, path: string) => page.locator(`.card[href="${path}"]`)
 
 /**
  * Ouvre, page figée, la fiche d'une carte par son activation seule, comme une technologie
@@ -286,9 +281,9 @@ test('la feuille, la photo, le post-it et les rubans partent de leur homologue s
 }) => {
   await openEnteredTable(page, PROJECTS)
   const { open, ribbon, easing } = await motion(page)
-  await openFrozen(page, FIRST_PATH)
+  await openFrozen(page, ONGOING_PATH)
 
-  const flights = await page.evaluate(readFlights, { path: FIRST_PATH })
+  const flights = await page.evaluate(readFlights, { path: ONGOING_PATH })
   const panelBox = await boxOf(panel(page))
 
   expect(flights.length).toBeGreaterThan(3)
@@ -640,7 +635,7 @@ test('un ruban de la carte dont la stack replie l’homologue n’a pas de traje
 
 test('les rubans passent par 35 % d’opacité entre 30 % et 70 % du trajet', async ({ page }) => {
   await openEnteredTable(page, PROJECTS)
-  await openFrozen(page, FIRST_PATH)
+  await openFrozen(page, ONGOING_PATH)
 
   const keyframes = await panel(page)
     .locator('[data-flyer]')
@@ -664,7 +659,7 @@ test('la carte se cache d’un coup, sauf son trombone, qui monte de 14 px en s�
 }) => {
   await openEnteredTable(page, PROJECTS)
   const { open, content, fast } = await motion(page)
-  const card = cardAt(page, FIRST_PATH)
+  const card = cardAt(page, ONGOING_PATH)
   await freezeAnimations(page)
 
   await card.dispatchEvent('click', { detail: 0 })
@@ -859,14 +854,14 @@ for (const [state, prepare] of STRAP_STARTS) {
     await openEnteredTable(page, PROJECTS)
     const { open, fast, easing } = await motion(page)
     const midway = open * MID_COURSE
-    await prepare(cardAt(page, FIRST_PATH))
-    const { card: before } = await page.evaluate(readStrap, { path: FIRST_PATH })
-    const resume = await openFrozen(page, FIRST_PATH)
+    await prepare(cardAt(page, ONGOING_PATH))
+    const { card: before } = await page.evaluate(readStrap, { path: ONGOING_PATH })
+    const resume = await openFrozen(page, ONGOING_PATH)
 
-    const { copy: start, card: hidden } = await page.evaluate(readStrap, { path: FIRST_PATH, at: 0 })
-    const { copy: middle } = await page.evaluate(readStrap, { path: FIRST_PATH, at: midway })
-    const { copy: end } = await page.evaluate(readStrap, { path: FIRST_PATH, at: 'end' as const })
-    const [copy, photo, sheet] = await page.evaluate(strapCopyRanks, FIRST_PATH)
+    const { copy: start, card: hidden } = await page.evaluate(readStrap, { path: ONGOING_PATH, at: 0 })
+    const { copy: middle } = await page.evaluate(readStrap, { path: ONGOING_PATH, at: midway })
+    const { copy: end } = await page.evaluate(readStrap, { path: ONGOING_PATH, at: 'end' as const })
+    const [copy, photo, sheet] = await page.evaluate(strapCopyRanks, ONGOING_PATH)
     const clear = clearOf(before)
 
     // Elle se voit au départ, encore dans la face à mi-course, et plus du tout au bout.
@@ -914,17 +909,17 @@ test('ouverte pendant que sa sangle glisse vers le coin, la carte la passe à sa
 }) => {
   await openEnteredTable(page, PROJECTS)
   const { strap: glide } = await motion(page)
-  const card = cardAt(page, FIRST_PATH)
+  const card = cardAt(page, ONGOING_PATH)
   // Révélée page figée (`reveal`, sans attendre sa fin), sa sangle arrêtée à mi-course.
   await freezeAnimations(page)
   await card.evaluate((cell) => cell.setAttribute('data-revealed', ''))
   await strap(card).evaluate((box, time) => {
     for (const transition of box.getAnimations({ subtree: true })) transition.currentTime = time
   }, glide * MID_COURSE)
-  const { card: sliding } = await page.evaluate(readStrap, { path: FIRST_PATH })
-  await openFrozen(page, FIRST_PATH)
+  const { card: sliding } = await page.evaluate(readStrap, { path: ONGOING_PATH })
+  await openFrozen(page, ONGOING_PATH)
 
-  const { copy: start } = await page.evaluate(readStrap, { path: FIRST_PATH, at: 0 })
+  const { copy: start } = await page.evaluate(readStrap, { path: ONGOING_PATH, at: 0 })
   expect(sliding.transitions).toHaveLength(2)
   for (const [index, { transform }] of sliding.bands.entries()) {
     const { from: rest, to: corner } = sliding.transitions[index]
@@ -941,24 +936,24 @@ test('à la fermeture, la copie de la sangle retirée, la sangle de la carte res
 }) => {
   await openEnteredTable(page, PROJECTS)
   const { strap: glide, easing } = await motion(page)
-  const card = cardAt(page, FIRST_PATH)
+  const card = cardAt(page, ONGOING_PATH)
   // Tenue hors de toute intention, que le focus rendu à la carte lui donnerait : à son repos.
   await strap(card).evaluate((box: HTMLElement) =>
     box.style.setProperty('--strap-cornered', '0', 'important'),
   )
-  const { card: before } = await page.evaluate(readStrap, { path: FIRST_PATH })
+  const { card: before } = await page.evaluate(readStrap, { path: ONGOING_PATH })
   await openProject(card)
   const resume = await freezeAnimations(page)
   await page.keyboard.press('Escape')
   await finishAnimations(page)
-  const { copy, card: returning } = await page.evaluate(readStrap, { path: FIRST_PATH })
+  const { copy, card: returning } = await page.evaluate(readStrap, { path: ONGOING_PATH })
   await finishAnimations(page)
   await expect(card).not.toHaveAttribute('data-origin')
-  const { card: appearing } = await page.evaluate(readStrap, { path: FIRST_PATH })
+  const { card: appearing } = await page.evaluate(readStrap, { path: ONGOING_PATH })
   await resume()
   await expectLanded(page, card)
   await settle(page)
-  const { card: landed } = await page.evaluate(readStrap, { path: FIRST_PATH })
+  const { card: landed } = await page.evaluate(readStrap, { path: ONGOING_PATH })
 
   const clear = clearOf(before)
   expect(copy).toBeNull()
@@ -982,14 +977,14 @@ test('fermée en plein vol, la copie de la sangle est retirée, et la sangle de 
 }) => {
   await openEnteredTable(page, PROJECTS)
   const { open } = await motion(page)
-  const { card: before } = await page.evaluate(readStrap, { path: FIRST_PATH })
-  await openFrozen(page, FIRST_PATH)
+  const { card: before } = await page.evaluate(readStrap, { path: ONGOING_PATH })
+  await openFrozen(page, ONGOING_PATH)
   await page.evaluate(seekAnimations, open / 2)
   await expect(panel(page).locator('[data-strap-flyer]')).toHaveCount(1)
 
   await page.keyboard.press('Escape')
 
-  const { copy, card: returning } = await page.evaluate(readStrap, { path: FIRST_PATH })
+  const { copy, card: returning } = await page.evaluate(readStrap, { path: ONGOING_PATH })
   expect(copy).toBeNull()
   for (const [index, { transform }] of before.bands.entries()) {
     expectSlid(returning.bands[index].transform, transform, clearOf(before))
@@ -1009,8 +1004,8 @@ test('un projet en cours : sa photo vole en couleur, à l’aller comme au retou
   page,
 }) => {
   await openEnteredTable(page, PROJECTS)
-  const card = cardAt(page, FIRST_PATH)
-  const resume = await openFrozen(page, FIRST_PATH)
+  const card = cardAt(page, ONGOING_PATH)
+  const resume = await openFrozen(page, ONGOING_PATH)
 
   await expectColorFrame(page)
   // Sa seule sangle est la copie de celle de la carte.
@@ -1161,7 +1156,7 @@ test('sous 600 px, pendant le vol, ni le panneau ni ses ancêtres ne se transfor
   test.skip(!isMobile, 'le bouton Fermer est fixe sous 600 px')
   await openEnteredTable(page, PROJECTS)
   const { open } = await motion(page)
-  const resume = await openFrozen(page, FIRST_PATH)
+  const resume = await openFrozen(page, ONGOING_PATH)
   const instants = []
 
   for (const time of [0, open / 4, open / 2, (open * 3) / 4]) {
@@ -1254,7 +1249,7 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
   }) => {
     await page.emulateMedia({ reducedMotion })
     await openEnteredTable(page, PROJECTS)
-    const resume = await openFrozen(page, FIRST_PATH)
+    const resume = await openFrozen(page, ONGOING_PATH)
     // Le panneau réagit, une fois que Radix l'a écrit sur lui : ses enfants, non.
     await expect(panel(page)).toHaveCSS('pointer-events', 'auto')
 
@@ -1273,7 +1268,7 @@ test('à la fermeture, le contenu s’efface en `--dur-fast`, puis la feuille, l
 }) => {
   await openEnteredTable(page, PROJECTS)
   const { open, fast, ribbon, easing } = await motion(page)
-  await openProject(cardAt(page, FIRST_PATH))
+  await openProject(cardAt(page, ONGOING_PATH))
   const panelBox = await boxOf(panel(page))
   const [paper] = await resolveAll(page, [['background-color', 'var(--paper)']])
   await freezeAnimations(page)
@@ -1295,7 +1290,7 @@ test('à la fermeture, le contenu s’efface en `--dur-fast`, puis la feuille, l
   await finishAnimations(page)
 
   await expect(panel(page)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
-  const flights = await page.evaluate(readFlights, { path: FIRST_PATH })
+  const flights = await page.evaluate(readFlights, { path: ONGOING_PATH })
   expect(flights.length).toBeGreaterThan(3)
   for (const flight of flights) {
     expect(flight.count).toBe(1)
@@ -1378,7 +1373,7 @@ test('au bout du retour, jusqu’au retrait du panneau, la feuille, la photo, le
   page,
 }) => {
   await openEnteredTable(page, PROJECTS)
-  await openProject(cardAt(page, FIRST_PATH))
+  await openProject(cardAt(page, ONGOING_PATH))
   await freezeAnimations(page)
 
   await page.keyboard.press('Escape')
@@ -1387,7 +1382,7 @@ test('au bout du retour, jusqu’au retrait du panneau, la feuille, la photo, le
   for (const element of contentSample(page)) {
     await expect(element).toHaveCSS('opacity', '0')
   }
-  const held = await page.evaluate(readFlights, { path: FIRST_PATH, finish: true })
+  const held = await page.evaluate(readFlights, { path: ONGOING_PATH, finish: true })
   expect(held.length).toBeGreaterThan(3)
   for (const flight of held) {
     expectOnHomologue(flight.now, flight)
@@ -1421,7 +1416,7 @@ for (const [name, close] of CLOSINGS) {
   }) => {
     test.skip(isMobile && name === OUTSIDE, NO_OUTSIDE)
     await openEnteredTable(page, PROJECTS)
-    const card = cardAt(page, FIRST_PATH)
+    const card = cardAt(page, ONGOING_PATH)
     await openProject(card)
     const animations = await watchAnimations(page)
     const resume = await freezeAnimations(page)
@@ -1446,14 +1441,14 @@ test('revenue de la fiche, la carte d’origine ne rejoue pas son entrée : sa p
   const turns = await watchPoseAnimations(page)
   await openEnteredTable(page, PROJECTS)
   const entered = await turns()
-  const card = cardAt(page, FIRST_PATH)
+  const card = cardAt(page, ONGOING_PATH)
 
   await openProject(card)
   await page.keyboard.press('Escape')
   await expectLanded(page, card)
   await settle(page)
 
-  expect(entered.map(({ card: path }) => path)).toContain(FIRST_PATH)
+  expect(entered.map(({ card: path }) => path)).toContain(ONGOING_PATH)
   expect(await turns()).toEqual(entered)
 })
 
@@ -1480,7 +1475,7 @@ test('une animation annulée pendant le vol : la fiche se pose quand même, « F
 }) => {
   await openEnteredTable(page, PROJECTS)
   const [paper] = await resolveAll(page, [['background-color', 'var(--paper)']])
-  const resume = await openFrozen(page, FIRST_PATH)
+  const resume = await openFrozen(page, ONGOING_PATH)
 
   await page.evaluate(cancelAnimations)
   await resume()
@@ -1492,7 +1487,7 @@ test('une animation annulée pendant le vol : la fiche se pose quand même, « F
 for (const [moment, reach] of CANCELLATIONS) {
   test(`une animation annulée ${moment} : la fermeture va à son terme`, async ({ page }) => {
     await openEnteredTable(page, PROJECTS)
-    const card = cardAt(page, FIRST_PATH)
+    const card = cardAt(page, ONGOING_PATH)
     await openProject(card)
     const resume = await freezeAnimations(page)
 
@@ -1516,19 +1511,19 @@ for (const [name, close] of INTERRUPTIONS) {
     test.skip(isMobile && name === OUTSIDE, NO_OUTSIDE)
     await openEnteredTable(page, PROJECTS)
     const { open, easing } = await motion(page)
-    const card = cardAt(page, FIRST_PATH)
-    const resume = await openFrozen(page, FIRST_PATH)
+    const card = cardAt(page, ONGOING_PATH)
+    const resume = await openFrozen(page, ONGOING_PATH)
     await page.evaluate(seekAnimations, open / 2)
-    const flying = await page.evaluate(readFlights, { path: FIRST_PATH })
-    const rolling = await page.evaluate(readRolls, { path: FIRST_PATH })
-    const receding = await page.evaluate(readEntries, FIRST_PATH)
+    const flying = await page.evaluate(readFlights, { path: ONGOING_PATH })
+    const rolling = await page.evaluate(readRolls, { path: ONGOING_PATH })
+    const receding = await page.evaluate(readEntries, ONGOING_PATH)
 
     await close(page)
 
     // La pose n'arrive plus : le panneau reste transparent, le focus loin de « Fermer la fiche ».
     await expect(panel(page)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
     await expect(closeButton(page)).not.toBeFocused()
-    const returning = await page.evaluate(readFlights, { path: FIRST_PATH })
+    const returning = await page.evaluate(readFlights, { path: ONGOING_PATH })
     expect(returning).toHaveLength(flying.length)
     for (const [index, flight] of returning.entries()) {
       expect(flight.count).toBe(1)
@@ -1539,13 +1534,13 @@ for (const [name, close] of INTERRUPTIONS) {
       expect(flight).toMatchObject({ duration: open, easing })
     }
     // Ce que la boîte d'une copie de ruban ne dit pas : sa marge en ligne et son nom.
-    const rolled = await page.evaluate(readRolls, { path: FIRST_PATH })
+    const rolled = await page.evaluate(readRolls, { path: ONGOING_PATH })
     expect(rolled.map((roll) => roll.name)).toEqual(rolling.map((roll) => roll.name))
     for (const [index, { name: ribbon, padding, label }] of rolled.entries()) {
       expect(parseFloat(padding), ribbon).toBeCloseTo(parseFloat(rolling[index].padding), 2)
       expect(Number(label), ribbon).toBeCloseTo(Number(rolling[index].label), 2)
     }
-    expect(await page.evaluate(readEntries, FIRST_PATH)).toEqual(receding)
+    expect(await page.evaluate(readEntries, ONGOING_PATH)).toEqual(receding)
     for (const element of contentSample(page)) {
       await expect(element).toHaveCSS('opacity', '0')
     }
@@ -1573,11 +1568,11 @@ test('levée par le focus, fermée en plein vol : chaque élément revient sur l
   test.skip(isMobile, 'la levée suit un appareil à survol')
   await openEnteredTable(page, PROJECTS)
   const { open } = await motion(page)
-  const card = cardAt(page, FIRST_PATH)
+  const card = cardAt(page, ONGOING_PATH)
   await focusByKeyboard(card)
   await settle(page)
   await expect(face(card)).not.toHaveCSS('transform', 'none')
-  await openFrozen(page, FIRST_PATH)
+  await openFrozen(page, ONGOING_PATH)
   await page.evaluate(seekAnimations, open / 2)
 
   await page.keyboard.press('Escape')
@@ -1586,7 +1581,7 @@ test('levée par le focus, fermée en plein vol : chaque élément revient sur l
     for (const transition of cell.getAnimations({ subtree: true })) transition.finish()
   })
 
-  const returning = await page.evaluate(readFlights, { path: FIRST_PATH })
+  const returning = await page.evaluate(readFlights, { path: ONGOING_PATH })
   expect(returning.length).toBeGreaterThan(3)
   for (const flight of returning) expectOnHomologue(flight.end, flight)
 })
@@ -1606,7 +1601,7 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
   }) => {
     await page.emulateMedia({ reducedMotion })
     await openEnteredTable(page, PROJECTS)
-    const card = cardAt(page, FIRST_PATH)
+    const card = cardAt(page, ONGOING_PATH)
     const otherPath = (await cards(page).nth(1).getAttribute('href'))!
     const other = cardAt(page, otherPath)
     await openProject(card)
@@ -1632,7 +1627,7 @@ test('« suivant » de l’historique pendant le retour : la fiche se rouvre une
 }) => {
   await openEnteredTable(page, PROJECTS)
   const [paper] = await resolveAll(page, [['background-color', 'var(--paper)']])
-  await openProject(cardAt(page, FIRST_PATH))
+  await openProject(cardAt(page, ONGOING_PATH))
   const resume = await freezeAnimations(page)
   await page.keyboard.press('Escape')
   await expect(page).toHaveURL('/')
@@ -1643,7 +1638,7 @@ test('« suivant » de l’historique pendant le retour : la fiche se rouvre une
   await expect(page.locator('html')).not.toHaveAttribute('data-choreography')
   await settle(page)
 
-  await expect(page).toHaveURL(FIRST_PATH)
+  await expect(page).toHaveURL(ONGOING_PATH)
   await expect(closeButton(page)).toBeFocused()
   await expect(panel(page)).toHaveCSS('background-color', paper)
   await expect(closeButton(page)).toHaveCSS('opacity', '1')
@@ -1654,7 +1649,7 @@ test('« suivant » puis « précédent » pendant le retour : un seul retour, q
   page,
 }) => {
   await openEnteredTable(page, PROJECTS)
-  const card = cardAt(page, FIRST_PATH)
+  const card = cardAt(page, ONGOING_PATH)
   await openProject(card)
   const resume = await freezeAnimations(page)
   await page.keyboard.press('Escape')
@@ -1664,7 +1659,7 @@ test('« suivant » puis « précédent » pendant le retour : un seul retour, q
   await page.goForward()
   await page.goBack()
 
-  for (const flight of await page.evaluate(readFlights, { path: FIRST_PATH })) {
+  for (const flight of await page.evaluate(readFlights, { path: ONGOING_PATH })) {
     expect(flight.count).toBe(1)
   }
   await resume()
@@ -1693,7 +1688,7 @@ test('sa carte d’origine sortie du document, la fiche se retire sans laisser u
   page,
 }) => {
   await openEnteredTable(page, PROJECTS)
-  const card = cardAt(page, FIRST_PATH)
+  const card = cardAt(page, ONGOING_PATH)
   await openProject(card)
   await card.evaluate((cell) => cell.remove())
   const resume = await freezeAnimations(page)
@@ -1710,7 +1705,7 @@ test('sa carte d’origine sortie du document, la fiche se retire sans laisser u
 
 test('sa carte d’origine sortie du document, la fiche se ferme par le fondu de sortie', async ({ page }) => {
   await openEnteredTable(page, PROJECTS)
-  const card = cardAt(page, FIRST_PATH)
+  const card = cardAt(page, ONGOING_PATH)
   await openProject(card)
   await card.evaluate((cell) => cell.remove())
   const animations = await watchAnimations(page)
@@ -1792,7 +1787,7 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
   }) => {
     await openEnteredTable(page, PROJECTS)
     const { fast, reduced } = await motion(page)
-    const card = cardAt(page, FIRST_PATH)
+    const card = cardAt(page, ONGOING_PATH)
     await openProject(card)
     const resume = await freezeAnimations(page)
 
@@ -1815,7 +1810,7 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
     const returns = fades.filter(({ card }) => card)
     expect(returns).toHaveLength(PROJECTS.length)
     for (const fade of returns) {
-      const target = fade.card === FIRST_PATH ? 'card-face' : 'card-entry'
+      const target = fade.card === ONGOING_PATH ? 'card-face' : 'card-entry'
       expect(fade).toMatchObject({ target, opacities: ['0', '1'], duration: fast })
     }
 
@@ -1831,8 +1826,8 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
   }) => {
     await openEnteredTable(page, PROJECTS)
     const { fast, reduced } = await motion(page)
-    const card = cardAt(page, FIRST_PATH)
-    const resume = await openFrozen(page, FIRST_PATH)
+    const card = cardAt(page, ONGOING_PATH)
+    const resume = await openFrozen(page, ONGOING_PATH)
     await page.evaluate(seekAnimations, fast / 2)
     const appearing = await panel(page).evaluate((element) => getComputedStyle(element).opacity)
     const fading = await page.evaluate(readCardOpacities)
@@ -1855,7 +1850,7 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
     page,
   }) => {
     await openEnteredTable(page, PROJECTS)
-    await openProject(cardAt(page, FIRST_PATH))
+    await openProject(cardAt(page, ONGOING_PATH))
     await freezeAnimations(page)
 
     await page.keyboard.press('Escape')

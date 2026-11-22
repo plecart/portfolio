@@ -42,6 +42,7 @@ import {
 import { buildImage, PROJECT_SETS } from './projects.ts'
 import { scrollGesture, scrollThrough, scrollTop } from './scroll.ts'
 import {
+  cardAt,
   cards,
   COLUMN_VIEWPORT,
   enterCards,
@@ -51,9 +52,12 @@ import {
   watchTransitions,
 } from './table.ts'
 
-/** Trois projets aux titres distincts. La première carte, celle du projet en cours : `projet-02`. */
+/**
+ * Trois projets aux titres distincts. La première carte, celle du plus récent des projets
+ * terminés ou archivés : `projet-03` (spec §1.9).
+ */
 const PROJECTS = PROJECT_SETS.threeWithoutShowcase
-const FIRST = { title: 'Projet 02', path: '/projets/projet-02' }
+const FIRST = { title: 'Projet 03', path: '/projets/projet-03' }
 
 test('la fiche est un dialogue modal nommé par son titre, le focus sur « Fermer la fiche »', async ({
   page,
@@ -179,7 +183,8 @@ test('une carte coupée par le bord de la fenêtre ne fait pas défiler la page 
 
 test('une carte hors de la fenêtre après une arrivée directe y vient avec le focus', async ({ page }) => {
   await serveProjects(page, PROJECT_SETS.twelveWithShowcase)
-  await page.goto('/projets/projet-01')
+  // La dernière carte : le plus ancien des projets en cours (spec §1.9).
+  await page.goto('/projets/projet-05')
 
   await closeButton(page).click()
   await expectClosed(page)
@@ -529,7 +534,7 @@ test('au toucher, le premier révèle, le second ouvre et finit la révélation'
   test.skip(!isMobile, 'un appareil sans survol : le projet mobile')
   await openTable(page, PROJECTS)
   const card = cards(page).first()
-  const cell = page.locator(`.card[href="${FIRST.path}"]`)
+  const cell = cardAt(page, FIRST.path)
 
   await card.tap()
 

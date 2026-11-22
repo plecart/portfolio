@@ -32,6 +32,7 @@ import {
   intend,
   LIVE_CARD,
   NARROW_VIEWPORT,
+  ONGOING_NEIGHBOUR,
   openTable,
   pixelDistances,
   pose,
@@ -268,7 +269,7 @@ test('une cellule s’arrête à sa face : la rangée n’ajoute aucun vide cliq
   expect(gaps).toEqual(Array(12).fill(0))
 })
 
-test('les cartes suivent l’ordre de la spec §1.9 : vitrine, en cours, puis du plus récent au plus ancien', async ({
+test('les cartes suivent l’ordre de la spec §1.9 : vitrine, terminés et archivés, puis en cours', async ({
   page,
 }) => {
   await openTable(page, PROJECT_SETS.twelveWithShowcase)
@@ -277,9 +278,10 @@ test('les cartes suivent l’ordre de la spec §1.9 : vitrine, en cours, puis du
     links.map((link) => link.getAttribute('href')),
   )
 
-  // `projet-02`, la vitrine ; les trois autres en cours (05, 08, 11), puis les autres.
+  // `projet-02`, la vitrine ; puis les projets terminés et archivés ; puis les trois autres, en
+  // cours (11, 08, 05).
   expect(slugs).toEqual(
-    ['02', '11', '08', '05', '12', '10', '09', '07', '06', '04', '03', '01'].map(
+    ['02', '12', '10', '09', '07', '06', '04', '03', '01', '11', '08', '05'].map(
       (number) => `/projets/projet-${number}`,
     ),
   )
@@ -473,7 +475,7 @@ test('la sangle de chantier : sur chaque projet en cours, carte simple et vitrin
   await openTable(page, PROJECT_SETS.twelveWithShowcase)
   const ongoing = cards(page).filter({ has: page.locator('[data-ribbon="ongoing"]') })
 
-  // La vitrine en tête, puis les trois projets en cours du jeu (spec §1.9).
+  // La vitrine en tête, et les trois autres projets en cours du jeu.
   await expect(ongoing).toHaveCount(4)
   await expect(page.locator('.card-strap')).toHaveCount(4)
   for (const card of await ongoing.all()) await expect(strap(card)).toHaveCount(1)
@@ -481,10 +483,17 @@ test('la sangle de chantier : sur chaque projet en cours, carte simple et vitrin
   await expect(strap(cards(page).first())).toHaveCount(1)
 })
 
-/** Un projet ni en cours ni couvert, voisin de la carte sanglée. */
-const NEIGHBOUR = buildProject({ slug: 'voisine', gallery: [] })
+/**
+ * La voisine de la carte sanglée, sans couverture. Sa sangle reste à 12 px au moins de la face
+ * mesurée, hors des 8 px capturés autour (Chromium 156, mesuré le 2026-11-23).
+ */
+const NEIGHBOUR = { ...ONGOING_NEIGHBOUR, gallery: [] }
 
-/** Une carte sanglée par taille, en tête de sa table ; seule, elle prend la taille « seule ». */
+/**
+ * Une carte sanglée par taille, en tête de sa table ; seule, elle prend la taille « seule ». En
+ * tête, car en seconde colonne sur téléphone `strapPixels` voit changer cinq pixels du point « en
+ * cours » de sa bande, hors de la portée de la sangle (Chromium 156, mesuré le 2026-11-23).
+ */
 const STRAPPED_TABLES = [
   ['simple', [STRAPPED, NEIGHBOUR]],
   ['vitrine', [{ ...STRAPPED, showcase: true }, NEIGHBOUR]],
@@ -853,7 +862,7 @@ async function openFailed(page: Page): Promise<(answer: Answer) => Promise<void>
 
 for (const [name, projects, href] of [
   ['la vitrine', PROJECT_SETS.threeWithShowcase, '/projets/projet-02'],
-  ['la première carte', PROJECT_SETS.threeWithoutShowcase, '/projets/projet-02'],
+  ['la première carte', PROJECT_SETS.threeWithoutShowcase, '/projets/projet-03'],
 ] as const) {
   test(`après une relance réussie au clavier, le focus va sur ${name}`, async ({ page }) => {
     const retry = await openFailed(page)

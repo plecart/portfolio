@@ -6,9 +6,10 @@ import { AxeBuilder } from '@axe-core/playwright'
 import type { Locator, Page } from '@playwright/test'
 import { expect, holdProjects, serving, test } from './api.ts'
 import { resolveAll, settle } from './css.ts'
-import { buildProject, PROJECT_SETS } from './projects.ts'
+import { buildProject, ONGOING, PROJECT_SETS } from './projects.ts'
 import { pageBottom, scrollThrough } from './scroll.ts'
 import {
+  cardAt,
   cards,
   COLUMN_VIEWPORT,
   enterCards,
@@ -156,10 +157,13 @@ test('en mouvement réduit, une carte entre par un fondu de 150 ms, sans montée
   await expect(entry(card)).toHaveCSS('opacity', '1')
 })
 
-/** Le projet type (`buildProject`), plus ancien que les douze : la dernière carte, sous l'écran. */
+/**
+ * Le projet type (`buildProject`), en cours et commencé avant les douze : la dernière carte, sous
+ * l'écran (spec §1.9).
+ */
 const BELOW_THE_FOLD = [
   ...PROJECT_SETS.twelveWithShowcase,
-  buildProject({ started_on: '2013-03-01', finished_on: '2013-11-15' }),
+  buildProject({ ...ONGOING, started_on: '2013-03-01' }),
 ]
 
 /**
@@ -542,7 +546,7 @@ const STRAPPED_LONGEST = [{ ...STRAPPED, summary: LONGEST_SUMMARY[0].summary }, 
 async function openStrappedCard(page: Page): Promise<Locator> {
   await openTable(page, STRAPPED_LONGEST)
   await enterCards(page)
-  return cards(page).first()
+  return cardAt(page, '/projets/chantier')
 }
 
 /**
@@ -750,7 +754,7 @@ test.describe('au toucher', () => {
       page,
     }) => {
       await openTable(page, [buildProject({ slug: 'voisine' }), project])
-      const card = cards(page).first()
+      const card = cardAt(page, '/projets/pleine')
       const height = () => face(card).evaluate((element: HTMLElement) => element.offsetHeight)
       const before = await height()
 

@@ -65,13 +65,13 @@ describe("l'ordre des cartes", () => {
     expect(orderedSlugs(projects)).toEqual(['debut-2026', 'debut-2025', 'debut-2024'])
   })
 
-  test('range les projets terminés et archivés après tous les projets en cours', () => {
+  test('range les projets en cours après tous les projets terminés et archivés', () => {
     const projects = [
-      ended('fin-2026', '2026-03-01'),
-      ended('archive-2026', '2026-02-01', 'archived'),
-      ongoing('debut-2019', '2019-01-01'),
+      ongoing('debut-2026', '2026-06-01'),
+      ended('fin-2019', '2019-03-01'),
+      ended('archive-2018', '2018-02-01', 'archived'),
     ]
-    expect(orderedSlugs(projects)[0]).toBe('debut-2019')
+    expect(orderedSlugs(projects)).toEqual(['fin-2019', 'archive-2018', 'debut-2026'])
   })
 
   test('range terminés et archivés ensemble, de la fin la plus récente à la plus ancienne', () => {
@@ -105,8 +105,8 @@ describe("l'ordre des cartes", () => {
       { ...ongoing('vitrine-en-cours', '2020-01-01'), showcase: true },
     ]
     expect(orderedSlugs([ongoing('en-cours', '2026-02-01'), ...showcases])).toEqual([
-      'vitrine-en-cours',
       'vitrine-terminee',
+      'vitrine-en-cours',
       'en-cours',
     ])
   })
@@ -121,7 +121,7 @@ describe("l'ordre des cartes", () => {
     expect(orderProjects([])).toEqual([])
   })
 
-  test("range l'entrée A–F du brief en A, B, D, F, C, E, sans la modifier", () => {
+  test("range l'entrée A–F du brief en A, F, C, E, B, D, sans la modifier", () => {
     const e = buildProject({
       slug: 'e',
       status: 'archived',
@@ -137,7 +137,7 @@ describe("l'ordre des cartes", () => {
       e,
       ended('ab', '2025-06-30'),
     ]
-    expect(orderedSlugs(projects)).toEqual(['a', 'b', 'd', 'ab', 'c', 'e'])
+    expect(orderedSlugs(projects)).toEqual(['a', 'ab', 'c', 'e', 'b', 'd'])
     expect(projects.map((project) => project.slug)).toEqual(['a', 'b', 'c', 'd', 'e', 'ab'])
   })
 })
