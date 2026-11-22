@@ -53,6 +53,12 @@ export async function countCellReads(page: Page) {
 /** Les cartes de la table, dans son ordre : ses liens. */
 export const cards = (page: Page) => page.getByRole('main').getByRole('link')
 
+/**
+ * La carte d'un projet, par son adresse : la fiche ouverte, Radix cache les cartes des technologies
+ * d'assistance, et `cards` ne les trouve plus.
+ */
+export const cardAt = (page: Page, path: string) => page.locator(`.card[href="${path}"]`)
+
 /** Les couches d'une carte qui bougent, et son bandeau de résumé. */
 export const entry = (card: Locator) => card.locator('.card-entry')
 export const pose = (card: Locator) => card.locator('.card-pose')
@@ -275,8 +281,18 @@ export const LIVE_CARD = buildProject({
   technologies: THREE_TECHNOLOGIES,
 })
 
-/** Deux cartes sur une rangée : la carte pleine, en cours donc en tête, et sa voisine. */
-export const TWO_CARDS = [FULL_CARD, buildProject({ slug: 'voisine' })]
+/**
+ * La voisine d'une carte en cours aux dates du projet type (`buildProject`) : en cours aussi mais
+ * commencée avant elle, elle la suit (spec §1.9).
+ */
+export const ONGOING_NEIGHBOUR = buildProject({
+  ...ONGOING,
+  slug: 'voisine',
+  started_on: '2024-01-15',
+})
+
+/** Deux cartes sur une rangée : la carte pleine, en tête, et sa voisine. */
+export const TWO_CARDS = [FULL_CARD, ONGOING_NEIGHBOUR]
 
 /** Les tailles de tout ruban, de carte ou de fiche (spec §4.1, §4.3), lues par `ribbonSizes`. */
 export const RIBBON_SIZES = { ribbons: ['32px 13px'], icons: ['24px 24px'] }

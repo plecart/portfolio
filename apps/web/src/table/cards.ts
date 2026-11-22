@@ -78,14 +78,14 @@ function datedOn(project: Project): string {
 }
 
 /**
- * L'ordre de la table (spec §1.9) : la vitrine, puis les projets en cours, puis les autres —
- * terminés et archivés ensemble —, chaque groupe du plus récent au plus ancien, et à date égale
- * par slug croissant. Le slug étant unique, l'ordre est total.
+ * L'ordre de la table (spec §1.9) : la vitrine, puis les projets terminés et archivés ensemble,
+ * puis les projets en cours, chaque groupe du plus récent au plus ancien, et à date égale par slug
+ * croissant. Le slug étant unique, l'ordre est total.
  */
 function compareProjects(a: Project, b: Project): number {
   return (
     Number(b.showcase) - Number(a.showcase) ||
-    Number(b.status === 'ongoing') - Number(a.status === 'ongoing') ||
+    Number(a.status === 'ongoing') - Number(b.status === 'ongoing') ||
     compareText(datedOn(b), datedOn(a)) ||
     compareText(a.slug, b.slug)
   )

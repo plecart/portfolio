@@ -59,7 +59,7 @@ _Document normatif de rang 2 (`.claude/pipeline.config.md`, « Sources de vérit
 
 ### 1.9 Ordre des cartes
 
-- Le projet **« vitrine » d'abord** (booléen de l'admin, un seul projet à la fois, carte double : §1.3) ; puis les projets **« en cours »** ; puis les autres **du plus récent au plus ancien** (date de fin, sinon date de début). Aucun champ de position : le seul choix manuel est le booléen « vitrine ». Contrainte induite : toute fiche a une date de début. Ancres vérifiées : cadrage §6.1 « dates », « statut », « mise en avant » (D48) conformes ; D3 conforme (le méta-projet ouvre la table s'il porte le booléen).
+- Le projet **« vitrine » d'abord** (booléen de l'admin, un seul projet à la fois, carte double : §1.3) ; puis les projets **terminés et archivés**, ensemble ; puis les projets **« en cours »** ; chaque groupe **du plus récent au plus ancien** (date de fin, sinon date de début), et à date égale par slug (amendé le 2026-11-22 : les terminés passent devant les en cours, ordre provisoire). Aucun champ de position : le seul choix manuel est le booléen « vitrine ». Contrainte induite : toute fiche a une date de début. Ancres vérifiées : cadrage §6.1 « dates », « statut », « mise en avant » (D48) conformes ; D3 conforme (le méta-projet ouvre la table s'il porte le booléen).
 
 ### 1.10 Fiche projet
 
