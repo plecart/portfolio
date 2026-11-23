@@ -21,7 +21,7 @@ _Document normatif de rang 2 (`.claude/pipeline.config.md`, « Sources de vérit
 
 ### 1.3 Accueil : la table de polaroids
 
-- **Une carte par projet, de style polaroid** : image en haut, titre, et en bas deux ou trois icônes de technologies plus un indicateur « en ligne » (choix des technologies et sens de « en ligne » : §1.4). Le projet marqué « vitrine » dans l'admin (un seul à la fois, §1.9) occupe deux colonnes en tête de table ; sans projet vitrine, toutes les cartes ont la même taille.
+- **Une carte par projet, de style polaroid** : image en haut, titre, et en bas deux ou trois icônes de technologies plus un indicateur « en ligne » (choix des technologies et sens de « en ligne » : §1.4). Le projet marqué « vitrine » dans l'admin (un seul à la fois, §1.9) occupe deux colonnes à son rang dans la table ; sans projet vitrine, toutes les cartes ont la même taille.
 - **Disposition** : grille fluide sur le fond de page, sans table dessinée ni 3D. Chaque carte porte une rotation légère (−3° à +3°) et un décalage de quelques pixels, déterminés par le projet, identiques à chaque visite. Le relief vient des ombres des cartes seulement.
 - **Survol / focus** : la carte se redresse à 0°, se soulève, l'ombre s'élargit ; son contenu reste immobile.
 - **Défilement** : vertical, continu, sans pagination ni limite ; toutes les fiches publiées sont chargées d'un coup, images en `loading="lazy"`. Chaque carte apparaît à l'entrée dans l'écran (montée de quelques pixels + fondu, décalage entre voisines).
@@ -59,7 +59,7 @@ _Document normatif de rang 2 (`.claude/pipeline.config.md`, « Sources de vérit
 
 ### 1.9 Ordre des cartes
 
-- Le projet **« vitrine » d'abord** (booléen de l'admin, un seul projet à la fois, carte double : §1.3) ; puis les projets **terminés et archivés**, ensemble ; puis les projets **« en cours »** ; chaque groupe **du plus récent au plus ancien** (date de fin, sinon date de début), et à date égale par slug (amendé le 2026-11-22 : les terminés passent devant les en cours, ordre provisoire). Aucun champ de position : le seul choix manuel est le booléen « vitrine ». Contrainte induite : toute fiche a une date de début. Ancres vérifiées : cadrage §6.1 « dates », « statut », « mise en avant » (D48) conformes ; D3 conforme (le méta-projet ouvre la table s'il porte le booléen).
+- **L'ordre choisi dans l'admin** : la liste des projets se réordonne par glisser-déposer, celui du haut s'affiche en premier. Le projet « vitrine » (carte double : §1.3) prend son rang comme les autres. Un projet neuf se range en dernier. Ancres vérifiées : cadrage D77 et §6.1 « position ».
 
 ### 1.10 Fiche projet
 
@@ -117,7 +117,7 @@ Ancres vérifiées : frontend-outillage §3 item 12 (seuils annoncés sans valeu
 - Résumé : **120 caractères** au plus (sept lignes au plus sur la carte simple mobile, moins sous 400 px, §7) ; sert aussi d'`og:description`.
 - Couverture : **carrée, ≥ 2400 px de côté**, une par projet ; autres images libres, chacune avec une légende (texte alternatif).
 - Technologies : au moins une, ordonnées ; les trois premières de type langage / framework / infra vont sur la carte.
-- Dates : date de début obligatoire ; date de fin pour les projets terminés (ordre §1.9).
+- Dates : date de début obligatoire ; date de fin pour les projets terminés.
 - Liens : dépôt et démo facultatifs ; « en ligne » découle de la démo.
 - Vitrine : un projet au plus porte le booléen ; l'admin refuse un second.
 - Sections : autant que l'auteur en crée, titre de **40 caractères** au plus, ancre unique dans le projet.
@@ -230,7 +230,7 @@ Mouvement réduit : §6.3.
 
 De haut en bas : l'entête (§3.3), la table (`<main>`), les liens de l'auteur (§3.4), en pied de page ou en colonne fixe.
 
-- **Table** : conteneur à marge intérieure 24 px 16 px 32 px ; grille `repeat(auto-fit, 240px)` centrée, gouttière 28 px, largeur maximale 1200 px, remplissage dense. Quatre colonnes au plus (1044 px) dès 1076 px de large ; trois (776 px) de 808 à 1075 px ; deux (508 px) de 600 à 807 px. En dessous de 600 px : deux colonnes `1fr`, gouttière 16 px (cartes de 176 px à 400 px de large). La carte vitrine occupe deux colonnes et deux rangées ; sur mobile, la première rangée entière. Repère à 1280 px : table de 1044 px, marge de 118 px de chaque côté.
+- **Table** : conteneur à marge intérieure 24 px 16 px 32 px ; grille `repeat(auto-fit, 240px)` centrée, gouttière 28 px, largeur maximale 1200 px, remplissage dense. Quatre colonnes au plus (1044 px) dès 1076 px de large ; trois (776 px) de 808 à 1075 px ; deux (508 px) de 600 à 807 px. En dessous de 600 px : deux colonnes `1fr`, gouttière 16 px (cartes de 176 px à 400 px de large). La carte vitrine occupe deux colonnes et deux rangées ; sur mobile, une rangée entière. Repère à 1280 px : table de 1044 px, marge de 118 px de chaque côté.
 - **Entrée des cartes** : une carte apparaît quand 15 % de sa surface entre dans l'écran (`IntersectionObserver`, seuil 0,15) : montée de 8 px et fondu de 240 ms ; dans le même temps, elle part droite (0°, décalage nul) et tourne jusqu'à sa pose (§1.3), le geste inverse du redressement ; les trois sont retardés de 40 ms par indice de colonne. Défilement continu, sans pagination (§1.3) ; images en `loading="lazy"`.
 - **Adresses** : `/` pour la table ; `/projets/<slug>` pour une fiche ouverte, avec une entrée d'historique par ouverture (le retour du navigateur ferme la fiche) ; adresse sans projet : §5.4.
 - **Ordre des cartes** : §1.9.
@@ -373,8 +373,9 @@ Le serveur répond par une redirection `302` vers `/` (ADR 0009) : le visiteur v
 ### 5.5 Table à 1, 3 et 12 cartes
 
 - **1 carte** : la carte seule (§4.1), centrée ; la carte vitrine n'existe pas à cette taille.
-- **3 cartes** : avec un projet vitrine, la double occupe les colonnes 1 et 2 sur deux rangées ; à partir de 1076 px, les deux simples occupent les colonnes 3 et 4 de la première rangée (bloc de 1044 px) ; de 808 à 1075 px, elles s'empilent dans la colonne 3 (776 px) ; de 600 à 807 px, la double prend les deux colonnes et les simples la rangée suivante (508 px). Sans projet vitrine, trois simples en rangée dès 808 px. Mobile : la vitrine sur la première rangée, les deux simples dessous.
-- **12 cartes** : quatre colonnes ; avec la vitrine, quinze cellules sur quatre rangées, la dernière de trois cartes ; le remplissage dense ne laisse aucun trou avant la dernière rangée. Mobile : deux colonnes, la vitrine en tête, puis six rangées.
+- **3 cartes** : avec le projet vitrine rangé en premier, la double occupe les colonnes 1 et 2 sur deux rangées ; à partir de 1076 px, les deux simples occupent les colonnes 3 et 4 de la première rangée (bloc de 1044 px) ; de 808 à 1075 px, elles s'empilent dans la colonne 3 (776 px) ; de 600 à 807 px, la double prend les deux colonnes et les simples la rangée suivante (508 px). Sans projet vitrine, trois simples en rangée dès 808 px. Mobile : la vitrine sur la première rangée, les deux simples dessous.
+- **12 cartes** : quatre colonnes ; avec la vitrine rangée en premier, quinze cellules sur quatre rangées, la dernière de trois cartes ; le remplissage dense ne laisse aucun trou avant la dernière rangée. Mobile : deux colonnes, la vitrine en tête, puis six rangées.
+- **Vitrine rangée plus loin** : la double se place à la première position où ses deux colonnes et deux rangées tiennent à partir de son rang ; le remplissage dense remonte les cartes simples suivantes dans les cellules laissées libres avant elle, si bien que l'ordre affiché peut s'écarter de l'ordre de l'admin autour de la vitrine, sans trou avant la dernière rangée. Mobile : la vitrine prend une rangée entière à son rang, et le dense comble la cellule laissée libre avant elle.
 
 ## 6. Responsive, accessibilité, performance
 
