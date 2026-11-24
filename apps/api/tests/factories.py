@@ -4,6 +4,7 @@ Le motif que le PRD fixe aux tests du back (« fabriques minimales, un test par 
 attendu ne peut venir que du champ que le test remplace.
 """
 
+from collections.abc import Mapping
 from datetime import date
 from io import BytesIO
 
@@ -17,6 +18,7 @@ from content.models import (
     Technology,
     TechnologyKind,
 )
+from django.apps.registry import Apps
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import Model
 from PIL import Image
@@ -26,6 +28,18 @@ SVG = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"/>'
 
 # Le début du projet de la fabrique : les tests de dates se placent par rapport à lui.
 STARTED_ON = date(2026, 9, 1)
+
+# Les champs d'un projet valide, en cours ; les autres prennent leur valeur par défaut. Les états
+# d'avant d'un test de migration les connaissent tous (`historical_project`).
+PROJECT_DEFAULTS: Mapping[str, object] = {
+    "title": "Portfolio",
+    "slug": "portfolio",
+    "summary": "Le site qui présente mes projets.",
+    "description": "Une table de projets et leurs fiches.",
+    "kind": ProjectKind.PERSONAL,
+    "status": ProjectStatus.ONGOING,
+    "started_on": STARTED_ON,
+}
 
 # Un texte fait d'espaces seulement — espace, retour à la ligne, tabulation : vide pour l'auteur
 # comme pour le site (décision 7 du brief de #8).
@@ -81,17 +95,15 @@ def technology(**fields: object) -> Technology:
 
 def project(**fields: object) -> Project:
     """Un projet valide, en cours, non enregistré ; `fields` en remplace des champs."""
-    return Project(
-        **{
-            "title": "Portfolio",
-            "slug": "portfolio",
-            "summary": "Le site qui présente mes projets.",
-            "description": "Une table de projets et leurs fiches.",
-            "kind": ProjectKind.PERSONAL,
-            "status": ProjectStatus.ONGOING,
-            "started_on": STARTED_ON,
-            **fields,
-        }
+    return Project(**{**PROJECT_DEFAULTS, **fields})
+
+
+def historical_project(apps: Apps, **fields: object) -> Model:
+    """Le projet de `project`, enregistré par le modèle historique de `apps` : l'état où un test
+    de migration a mené la base (`migrate`), qui n'a pas encore toutes les colonnes du modèle
+    d'aujourd'hui ; `fields` en remplacent des champs."""
+    return apps.get_model("content", "Project")._default_manager.create(
+        **{**PROJECT_DEFAULTS, **fields}
     )
 
 

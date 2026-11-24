@@ -8,14 +8,10 @@ from typing import Any
 import pytest
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-from factories import image_upload, project
+from factories import historical_project, image_upload
 
 BEFORE = [("content", "0005_cover_galleryimage")]
 AFTER = [("content", "0006_cover_to_gallery")]
-
-# Les champs du projet de la fabrique que les règles de l'état d'avant exigent ; les autres y
-# prennent leur valeur par défaut.
-PROJECT_FIELDS = ["title", "slug", "summary", "description", "kind", "status", "started_on"]
 
 # Les variantes d'une couverture déjà traitée : ni l'état ni elles ne sont les valeurs par défaut
 # d'une image, qu'une recopie oubliée rendrait aussi.
@@ -38,10 +34,7 @@ def test_la_migration_fait_de_chaque_couverture_la_premiere_image_de_sa_galerie(
     écrit par le modèle historique : le modèle d'aujourd'hui porte des colonnes que cet état n'a
     pas encore."""
     before = migrate(BEFORE)
-    factory = project()
-    portfolio = before.get_model("content", "Project").objects.create(
-        **{field: getattr(factory, field) for field in PROJECT_FIELDS}
-    )
+    portfolio = historical_project(before)
     stored = default_storage.save(
         "images/couverture/original.png", ContentFile(image_upload().read())
     )
