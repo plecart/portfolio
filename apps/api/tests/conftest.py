@@ -1,8 +1,8 @@
 """Fixtures communes aux tests de `apps/api`."""
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import system_commands
@@ -12,6 +12,8 @@ from containers import postgres, running
 from django.conf import settings
 from django.core.cache import cache
 from django.core.management import call_command
+from django.db import connection
+from django.db.migrations.executor import MigrationExecutor
 from django.test import Client, override_settings
 from process_environment import VALID_ENVIRONMENT
 from pydantic import PostgresDsn, TypeAdapter
@@ -131,6 +133,23 @@ def template(tmp_path: Path) -> Generator[Path]:
     path = tmp_path / "index.html"
     with override_settings(LINK_PREVIEW_TEMPLATE=path):
         yield path
+
+
+@pytest.fixture
+def migrate() -> Generator[Callable[[list[tuple[str, str]]], Any]]:
+    """Le test d'une migration de données : `migrate(targets)` mène la base de test à l'état
+    `targets` et rend les modèles historiques de cet état, que le test garnit puis relit. Après le
+    test, la base revient à la dernière migration de chaque application, celle des tests suivants.
+    """
+
+    def to(targets: list[tuple[str, str]]) -> Any:
+        executor = MigrationExecutor(connection)
+        executor.migrate(targets)
+        return executor.loader.project_state(targets).apps
+
+    yield to
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
 
 
 @pytest.fixture

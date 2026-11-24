@@ -30,8 +30,8 @@ CREATED_AT = datetime(2026, 9, 1, 9, 0, tzinfo=UTC)
 UPDATED_AT = datetime(2026, 9, 2, 18, 30, tzinfo=UTC)
 
 # Les champs d'un projet, dans l'ordre de leur déclaration : ceux du PRD (« Modèle de contenu »),
-# moins la couverture, qui est la première image de sa galerie (`GalleryImage`), plus la clé et
-# les horodatages.
+# moins la couverture, qui est la première image de sa galerie (`GalleryImage`), plus la clé, la
+# position (cadrage §6.1, D77) et les horodatages.
 PROJECT_FIELDS = [
     "id",
     "title",
@@ -47,6 +47,7 @@ PROJECT_FIELDS = [
     "demo_url",
     "showcase",
     "published",
+    "position",
     "created_at",
     "updated_at",
 ]
@@ -441,6 +442,30 @@ def test_un_projet_nait_brouillon() -> None:
     created.refresh_from_db()
 
     assert created.published is False
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("stored", "expected"),
+    [([1, 2, 5], 6), ([], 1)],
+    ids=["après le dernier, brouillon compris", "base vide"],
+)
+def test_un_projet_enregistre_sans_position_se_range_apres_tous_les_projets(
+    stored: list[int], expected: int
+) -> None:
+    """Spec §1.9 : un projet neuf se range en dernier, sur tous les projets — le dernier enregistré
+    est un brouillon, qui garde son rang ; les projets enregistrés avec une position la gardent."""
+    for position in stored:
+        project(
+            slug=f"projet-{position}", position=position, published=position != stored[-1]
+        ).save()
+
+    created = project(slug="neuf")
+    created.save()
+    created.refresh_from_db()
+
+    assert created.position == expected
+    assert list(Project.objects.exclude(pk=created.pk).values_list("position", flat=True)) == stored
 
 
 @pytest.mark.django_db

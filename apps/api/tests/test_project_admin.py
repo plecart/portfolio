@@ -225,6 +225,22 @@ def test_la_description_d_un_projet_garde_son_texte_tel_que_saisi(admin_client: 
 
 
 @pytest.mark.django_db
+def test_un_projet_ajoute_dans_l_admin_se_range_en_dernier(admin_client: Client) -> None:
+    """Spec §1.9 : la position ne se saisit pas sur l'écran, et un projet neuf arrive après tous
+    les projets, brouillon compris — ici le dernier."""
+    django = saved(technology(name="Django"))
+    for position in (1, 2, 5):
+        saved_project(django, slug=f"projet-{position}", position=position, published=position != 5)
+
+    response = admin_client.post(
+        reverse("admin:content_project_add"), new_project_data(admin_client, **line(0, django, 1))
+    )
+
+    assert response.status_code == 302
+    assert Project.objects.get(slug=project().slug).position == 6
+
+
+@pytest.mark.django_db
 def test_l_admin_refuse_une_description_faite_d_espaces(admin_client: Client) -> None:
     """Gardée telle que saisie, une description d'espaces n'est plus retaillée en description vide :
     l'admin la refuse avec le message du catalogue, sans rien enregistrer."""
