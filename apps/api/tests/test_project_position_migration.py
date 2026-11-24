@@ -7,6 +7,7 @@ from datetime import date
 from typing import Any
 
 import pytest
+from factories import historical_project
 
 BEFORE = [("content", "0006_cover_to_gallery")]
 AFTER = [("content", "0008_number_projects")]
@@ -52,12 +53,9 @@ def test_la_migration_numerote_les_projets_dans_l_ordre_de_la_table_d_avant(
     assert [slug for slug, *_ in rows] != expected
     before = migrate(BEFORE)
     for slug, showcase, status, started_on, finished_on, published in rows:
-        before.get_model("content", "Project").objects.create(
-            title=slug,
+        historical_project(
+            before,
             slug=slug,
-            summary="Un résumé.",
-            description="Une description.",
-            kind="personal",
             status=status,
             started_on=started_on,
             finished_on=finished_on,

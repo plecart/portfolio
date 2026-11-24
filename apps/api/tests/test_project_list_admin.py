@@ -49,11 +49,16 @@ def stored() -> dict[str, int]:
     return dict(Project.objects.values_list("slug", POSITION))
 
 
+def placed(slug: str, position: int, **fields: object) -> None:
+    """Un projet enregistré à `position`, son titre pour slug ; `fields` en remplacent des
+    champs."""
+    saved(project(slug=slug, title=slug, position=position, **fields))
+
+
 def projects(*slugs: str) -> None:
-    """Un projet enregistré par slug, son titre pour slug, aux positions 1, 2, 3… dans l'ordre des
-    slugs."""
+    """Un projet enregistré par slug, aux positions 1, 2, 3… dans l'ordre des slugs."""
     for position, slug in enumerate(slugs, start=1):
-        saved(project(slug=slug, title=slug, position=position))
+        placed(slug, position)
 
 
 def shown(response: Any) -> list[str]:
@@ -156,7 +161,7 @@ def test_enregistrer_ne_reecrit_que_les_positions_des_lignes_affichees(
         ("w", 7, False),
         ("z", 9, True),
     ]:
-        saved(project(slug=slug, title=slug, position=position, published=published))
+        placed(slug, position, published=published)
     filtered = f"{changelist()}?published__exact=1"
     response = admin_client.get(filtered)
     assert shown(response) == ["x", "y", "z"]
@@ -177,7 +182,7 @@ def test_une_liste_envoyee_sans_deplacement_ne_change_rien(
     change d'ordre, et aucun projet n'est enregistré : sa date de modification, que lit le plan du
     site, reste la sienne."""
     for slug, position in [("p", 3), ("q", 3), ("r", 7)]:
-        saved(project(slug=slug, title=slug, position=position))
+        placed(slug, position)
     before = list(Project.objects.values_list("slug", POSITION, "updated_at"))
     response = admin_client.get(changelist())
     data = sent(response)
