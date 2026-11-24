@@ -42,12 +42,15 @@ UNEXPOSED_KEYS = {
     "cover",
     "original",
     "published",
-    "position",
     "id",
     "created_at",
     "updated_at",
     "website",
 }
+
+# Les listes d'un projet : aucune de leurs lignes n'expose sa position, l'ordre est celui de la
+# liste. Le projet expose la sienne, l'ordre des cartes (#288).
+PROJECT_LISTS = ("technologies", "gallery", "sections")
 
 
 def linked(owner: Project, *employed: Technology) -> None:
@@ -163,6 +166,7 @@ def test_la_liste_rend_un_projet_publie_dans_le_contrat(client: Client) -> None:
         "repository_url": "",
         "demo_url": "",
         "showcase": False,
+        "position": 1,
     }
 
 
@@ -219,28 +223,38 @@ def test_un_projet_termine_rend_ses_deux_dates_iso(client: Client) -> None:
 
 
 @pytest.mark.django_db
-def test_la_liste_suit_l_ordre_des_slugs(client: Client) -> None:
-    """Un même contenu rend toujours le même corps : la liste suit le slug, pas l'ordre physique
-    des lignes. Réenregistrer « alpha » le place après « zeta » dans la table — Postgres écrit une
-    nouvelle version de la ligne —, si bien qu'une liste sans tri rendrait l'ordre inverse."""
-    employed = saved(technology())
-    alpha = complete_project("alpha", employed)
-    complete_project("zeta", employed)
-    alpha.save()
+def test_la_liste_suit_les_positions_puis_l_ordre_de_saisie(client: Client) -> None:
+    """La liste suit la position, l'ordre choisi dans l'admin (D77), puis l'ordre de saisie à
+    position égale : un même contenu rend toujours le même corps, quel que soit l'ordre physique
+    des lignes. Entrée nommée : « alpha » en 2, puis « zeta » et « beta » en 1 ; réenregistrer
+    « zeta » le place après « beta » dans la table — Postgres écrit une nouvelle version de la
+    ligne. La liste rend « zeta », « beta », « alpha » : ni l'ordre des slugs, ni celui de la
+    table, ni celui de la saisie."""
+    saved(project(slug="alpha", position=2, published=True))
+    zeta = saved(project(slug="zeta", position=1, published=True))
+    saved(project(slug="beta", position=1, published=True))
+    zeta.save()
 
-    assert [listed_project["slug"] for listed_project in listed(client)] == ["alpha", "zeta"]
+    assert [listed_project["slug"] for listed_project in listed(client)] == [
+        "zeta",
+        "beta",
+        "alpha",
+    ]
 
 
 @pytest.mark.django_db
 def test_le_contrat_n_expose_aucun_champ_ecarte(client: Client) -> None:
     """Aucune clé écartée par les décisions 2 et 3, à aucun niveau du corps — projet,
-    technologies, galerie, variantes, sections."""
+    technologies, galerie, variantes, sections —, ni la position d'une ligne d'une liste du
+    projet."""
     project_with_variant("complet")
 
-    body = listed(client)
+    [listed_project] = listed(client)
+    rows = [listed_project.pop(name) for name in PROJECT_LISTS]
 
-    assert {"technologies", "gallery", "url", "sections", "anchor"} <= set(keys(body))
-    assert UNEXPOSED_KEYS.isdisjoint(keys(body))
+    assert {"icon", "caption", "url", "anchor"} <= set(keys(rows))
+    assert UNEXPOSED_KEYS.isdisjoint(keys(listed_project))
+    assert (UNEXPOSED_KEYS | {"position"}).isdisjoint(keys(rows))
 
 
 @pytest.mark.django_db

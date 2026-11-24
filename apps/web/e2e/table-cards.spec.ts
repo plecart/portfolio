@@ -17,6 +17,7 @@ import {
   buildTechnology,
   ONGOING,
   PROJECT_SETS,
+  projectSet,
   type Project,
 } from './projects.ts'
 import { scrollThrough } from './scroll.ts'
@@ -182,15 +183,15 @@ function farthestSlug(side: -1 | 1): string {
 
 /**
  * Chaque taille de carte sous la pose extrême, de chaque côté : son nom, sa table, et son indice
- * dans celle-ci. Le voisin d'une carte simple la place dans la colonne de son côté, l'ordre suivant
- * le slug.
+ * dans celle-ci. Le voisin d'une carte simple la place dans la colonne de son côté : avant elle à
+ * droite, après elle à gauche, à position égale.
  */
 const EXTREME_TABLES = ([-1, 1] as const).flatMap((side): [string, Project[], number][] => {
   const name = side < 0 ? 'à gauche' : 'à droite'
   const extreme = buildProject({ slug: farthestSlug(side) })
   const neighbor = buildProject({ slug: side < 0 ? 'voisin' : 'atelier' })
   return [
-    [`simple ${name}`, [extreme, neighbor], side < 0 ? 0 : 1],
+    [`simple ${name}`, side < 0 ? [extreme, neighbor] : [neighbor, extreme], side < 0 ? 0 : 1],
     [`vitrine ${name}`, [{ ...extreme, showcase: true }, neighbor], 0],
     [`seule ${name}`, [extreme], 0],
   ]
@@ -269,7 +270,7 @@ test('une cellule s’arrête à sa face : la rangée n’ajoute aucun vide cliq
   expect(gaps).toEqual(Array(12).fill(0))
 })
 
-test('les cartes suivent l’ordre de la spec §1.9 : vitrine, terminés et archivés, puis en cours', async ({
+test('les cartes suivent leurs positions (spec §1.9) : numérotées comme la migration, les douze gardent l’ordre d’avant', async ({
   page,
 }) => {
   await openTable(page, PROJECT_SETS.twelveWithShowcase)
@@ -278,13 +279,55 @@ test('les cartes suivent l’ordre de la spec §1.9 : vitrine, terminés et arch
     links.map((link) => link.getAttribute('href')),
   )
 
-  // `projet-02`, la vitrine ; puis les projets terminés et archivés ; puis les trois autres, en
-  // cours (11, 08, 05).
+  // L'ordre que la table calculait avant les positions (`projectSet`) : `projet-02`, la vitrine ;
+  // puis les projets terminés et archivés ; puis les trois autres, en cours (11, 08, 05).
   expect(slugs).toEqual(
     ['02', '12', '10', '09', '07', '06', '04', '03', '01', '11', '08', '05'].map(
       (number) => `/projets/projet-${number}`,
     ),
   )
+})
+
+/** Une largeur de trois colonnes : de 808 à 1075 px (spec §5.5). */
+const THREE_COLUMNS_VIEWPORT = { ...COLUMN_VIEWPORT, width: 1000 }
+
+/** Sept projets, la vitrine en 3e (spec §5.5, « Vitrine rangée plus loin »). */
+const SHOWCASE_THIRD = projectSet(7, false).map((project) => ({
+  ...project,
+  showcase: project.position === 3,
+}))
+
+test('la vitrine rangée en 3e sur trois colonnes : la carte 4 comble la première rangée, la vitrine prend les colonnes 1 et 2 des rangées 2 et 3, sans trou avant la dernière (spec §5.5)', async ({
+  page,
+}) => {
+  await page.setViewportSize(THREE_COLUMNS_VIEWPORT)
+  await openTable(page, SHOWCASE_THIRD)
+
+  const boxes = await cards(page).evaluateAll((links) =>
+    links.map((link) => {
+      const { top, left, right, bottom } = link.getBoundingClientRect()
+      return { top, left, right, bottom }
+    }),
+  )
+  const rows = [...new Set(boxes.map(({ top }) => top))].sort((a, b) => a - b)
+  const columns = [...new Set(boxes.map(({ left }) => left))].sort((a, b) => a - b)
+
+  // Rangée et colonne de chaque carte, dans l'ordre des positions : la vitrine descend en rangée 2,
+  // la carte 4 remonte en 3e colonne de la rangée 1, 5 et 6 longent la vitrine, et 7 ne trouve de
+  // place qu'en rangée 4 — aucune cellule libre avant elle.
+  expect(boxes.map(({ top, left }) => [rows.indexOf(top), columns.indexOf(left)])).toEqual([
+    [0, 0],
+    [0, 1],
+    [1, 0],
+    [0, 2],
+    [1, 2],
+    [2, 2],
+    [3, 0],
+  ])
+  // La double couvre la 2e colonne et descend dans la rangée 3, celle de la carte 6.
+  const [, second, showcase, , , sixth] = boxes
+  expect(showcase.right).toBe(second.right)
+  expect(showcase.bottom).toBeGreaterThan(sixth.top)
 })
 
 test('les cartes remplacent les cadres à l’arrivée de la liste', async ({ page }) => {

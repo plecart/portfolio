@@ -64,44 +64,21 @@ const COVER_WIDTHS: Record<CardSize, { mobile: string; desktop: string }> = {
 /** La ponctuation qui finit déjà une phrase. */
 const SENTENCE_END = /[.!?…]$/
 
-/** Compare deux chaînes par unités de code — dates ISO, slugs —, sans dépendre de la locale. */
-function compareText(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0
-}
-
 /**
- * La date qui situe un projet dans son groupe : sa fin, à défaut son début. Un projet en cours n'a
- * pas de fin (contrat de `ProjectOut`) : il se situe par son début.
- */
-function datedOn(project: Project): string {
-  return project.finished_on ?? project.started_on
-}
-
-/**
- * L'ordre de la table (spec §1.9) : la vitrine, puis les projets terminés et archivés ensemble,
- * puis les projets en cours, chaque groupe du plus récent au plus ancien, et à date égale par slug
- * croissant. Le slug étant unique, l'ordre est total.
- */
-function compareProjects(a: Project, b: Project): number {
-  return (
-    Number(b.showcase) - Number(a.showcase) ||
-    Number(a.status === 'ongoing') - Number(b.status === 'ongoing') ||
-    compareText(datedOn(b), datedOn(a)) ||
-    compareText(a.slug, b.slug)
-  )
-}
-
-/**
- * Les projets dans l'ordre de la table.
+ * Les projets dans l'ordre de la table (spec §1.9) : celui de leurs positions, choisi dans l'admin,
+ * la vitrine comprise ; à position égale, celui de la liste reçue — l'ordre de saisie, que l'API
+ * sert.
  *
- * Plusieurs vitrines — que la base refuse — passent toutes en tête, rangées entre elles comme les
- * autres projets.
+ * Une liste reçue sans positions — celle d'avant elles, que le cache de l'API peut servir encore
+ * après leur déploiement, le temps de vie d'une entrée (300 s, `CACHES` du back) — reste dans son
+ * ordre : une différence `NaN` compte pour une égalité, et le tri est stable (ECMA-262,
+ * `Array.prototype.sort`).
  *
  * @param projects Les projets, dans l'ordre de l'API ; la liste n'est pas modifiée.
  * @returns Une nouvelle liste, ordonnée.
  */
 export function orderProjects(projects: readonly Project[]): Project[] {
-  return [...projects].sort(compareProjects)
+  return [...projects].sort((a, b) => a.position - b.position)
 }
 
 /**
@@ -204,9 +181,8 @@ export function cardSize(project: Project, count: number): CardSize {
 
 /**
  * La taille de chaque cadre de chargement (spec §5.1) : celle de la carte qu'il annonce, par la
- * règle des cellules (`cellSize`), le premier tenant le rôle de la vitrine, que la table met en
- * tête (§1.9, §5.5). Sans projet vitrine, le cadre double laisse place à deux cartes simples
- * (§5.1).
+ * règle des cellules (`cellSize`), le premier tenant le rôle de la vitrine. Sans projet vitrine,
+ * le cadre double laisse place à deux cartes simples (§5.1).
  *
  * @param count Le nombre de cadres.
  * @returns Une taille par cadre, dans l'ordre de la table.

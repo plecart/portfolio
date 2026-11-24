@@ -90,7 +90,7 @@
         "type": "string"
       },
       "ProjectOut": {
-        "description": "Un projet publié, complet : ses faits, ses technologies, sa galerie — dont la première\nimage est la couverture — et les sections de sa fiche, chaque liste dans l'ordre de l'admin.\n\n`finished_on` vaut `null` tant que le projet est en cours ; un lien absent est une chaîne\nvide, comme stocké.",
+        "description": "Un projet publié, complet : ses faits, ses technologies, sa galerie — dont la première\nimage est la couverture — et les sections de sa fiche, chaque liste dans l'ordre de l'admin.\n\n`finished_on` vaut `null` tant que le projet est en cours ; un lien absent est une chaîne\nvide, comme stocké. `position` est son rang dans la table, choisi dans l'admin : la liste suit\nles positions, puis l'ordre de saisie à position égale.",
         "properties": {
           "slug": {
             "title": "Slug",
@@ -147,6 +147,10 @@
             "title": "Showcase",
             "type": "boolean"
           },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
           "technologies": {
             "items": {
               "$ref": "#/components/schemas/TechnologyOut"
@@ -182,6 +186,7 @@
           "repository_url",
           "demo_url",
           "showcase",
+          "position",
           "technologies",
           "gallery",
           "sections"

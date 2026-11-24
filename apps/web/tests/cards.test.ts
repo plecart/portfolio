@@ -29,116 +29,62 @@ import {
   type Technology,
 } from '../src/table/cards.ts'
 
-/** Un projet en cours, commencé à `started_on`. */
-function ongoing(slug: string, started_on: string): Project {
-  return buildProject({ ...ONGOING, slug, started_on })
+/** Un projet terminé à la position `position`. */
+function placed(slug: string, position: number): Project {
+  return buildProject({ slug, position })
 }
 
-/**
- * Un projet terminé ou archivé, fini à `finished_on` ; commencé avant toutes les dates de ces
- * tests, une fin n'étant jamais avant le début.
- */
-function ended(slug: string, finished_on: string, status: Project['status'] = 'finished'): Project {
-  return buildProject({ slug, status, started_on: '2000-01-01', finished_on })
+/** Un projet tel que l'API le servait avant les positions : sans la clé `position`. */
+function unplaced(slug: string): Project {
+  const project: Partial<Project> = buildProject({ slug })
+  delete project.position
+  return project as Project
 }
 
 /** Les slugs des projets, dans l'ordre de la table. */
-function orderedSlugs(projects: Project[]): string[] {
+function orderedSlugs(projects: readonly Project[]): string[] {
   return orderProjects(projects).map((project) => project.slug)
 }
 
 describe("l'ordre des cartes", () => {
-  test('met la vitrine devant un projet en cours plus récent', () => {
-    const showcase = { ...ended('vitrine', '2020-06-01'), showcase: true }
-    expect(orderedSlugs([ongoing('en-cours', '2026-01-01'), showcase])).toEqual([
-      'vitrine',
-      'en-cours',
+  test('suit les positions, ni le slug, ni le statut, ni les dates, ni l’ordre reçu', () => {
+    const projects = [
+      placed('a', 3),
+      { ...placed('b', 1), ...ONGOING, started_on: '2020-01-01' },
+      placed('c', 2),
+    ]
+    expect(orderedSlugs(projects)).toEqual(['b', 'c', 'a'])
+  })
+
+  test('range la vitrine à sa position, comme les autres projets (spec §1.9)', () => {
+    const projects = [placed('a', 1), placed('b', 2), { ...placed('vitrine', 3), showcase: true }]
+    expect(orderedSlugs(projects)).toEqual(['a', 'b', 'vitrine'])
+  })
+
+  test('garde l’ordre reçu à position égale : celui de la saisie, que l’API sert', () => {
+    expect(orderedSlugs([placed('zeta', 2), placed('beta', 2), placed('alpha', 1)])).toEqual([
+      'alpha',
+      'zeta',
+      'beta',
     ])
   })
 
-  test('range les projets en cours de la date de début la plus récente à la plus ancienne', () => {
-    const projects = [
-      ongoing('debut-2024', '2024-03-01'),
-      ongoing('debut-2026', '2026-01-10'),
-      ongoing('debut-2025', '2025-07-20'),
-    ]
-    expect(orderedSlugs(projects)).toEqual(['debut-2026', 'debut-2025', 'debut-2024'])
-  })
-
-  test('range les projets en cours après tous les projets terminés et archivés', () => {
-    const projects = [
-      ongoing('debut-2026', '2026-06-01'),
-      ended('fin-2019', '2019-03-01'),
-      ended('archive-2018', '2018-02-01', 'archived'),
-    ]
-    expect(orderedSlugs(projects)).toEqual(['fin-2019', 'archive-2018', 'debut-2026'])
-  })
-
-  test('range terminés et archivés ensemble, de la fin la plus récente à la plus ancienne', () => {
-    const projects = [
-      ended('fin-2024', '2024-11-30'),
-      ended('archive-2025', '2025-05-01', 'archived'),
-      ended('fin-2026', '2026-01-15'),
-    ]
-    expect(orderedSlugs(projects)).toEqual(['fin-2026', 'archive-2025', 'fin-2024'])
-  })
-
-  test('situe par sa date de début un projet archivé sans date de fin, que la base refuse', () => {
-    const undated = buildProject({
-      slug: 'debut-2025',
-      status: 'archived',
-      started_on: '2025-03-01',
-      finished_on: null,
-    })
-    const projects = [ended('fin-2024', '2024-06-01'), undated, ended('fin-2026', '2026-01-01')]
-    expect(orderedSlugs(projects)).toEqual(['fin-2026', 'debut-2025', 'fin-2024'])
-  })
-
-  test('départage deux projets de même date par slug croissant', () => {
-    const projects = [ended('beta', '2025-06-01'), ended('alpha', '2025-06-01')]
-    expect(orderedSlugs(projects)).toEqual(['alpha', 'beta'])
-  })
-
-  test('range plusieurs vitrines, que la base refuse, entre elles comme les autres projets', () => {
-    const showcases = [
-      { ...ended('vitrine-terminee', '2026-01-01'), showcase: true },
-      { ...ongoing('vitrine-en-cours', '2020-01-01'), showcase: true },
-    ]
-    expect(orderedSlugs([ongoing('en-cours', '2026-02-01'), ...showcases])).toEqual([
-      'vitrine-terminee',
-      'vitrine-en-cours',
-      'en-cours',
+  test('garde l’ordre reçu d’une liste sans positions, que le cache de l’API sert encore au déploiement', () => {
+    expect(orderedSlugs(['zeta', 'alpha', 'beta'].map(unplaced))).toEqual([
+      'zeta',
+      'alpha',
+      'beta',
     ])
   })
 
   test('laisse la liste reçue dans son ordre', () => {
-    const projects = [ended('fin-2024', '2024-01-01'), ended('fin-2025', '2025-01-01')]
+    const projects = [placed('second', 2), placed('premier', 1)]
     orderProjects(projects)
-    expect(projects.map((project) => project.slug)).toEqual(['fin-2024', 'fin-2025'])
+    expect(projects.map((project) => project.slug)).toEqual(['second', 'premier'])
   })
 
   test('rend une table vide pour une liste vide', () => {
     expect(orderProjects([])).toEqual([])
-  })
-
-  test("range l'entrée A–F du brief en A, F, C, E, B, D, sans la modifier", () => {
-    const e = buildProject({
-      slug: 'e',
-      status: 'archived',
-      started_on: '2022-02-01',
-      finished_on: null,
-    })
-    // F, slug « ab », passe avant C à date de fin égale.
-    const projects = [
-      { ...ended('a', '2024-01-10'), showcase: true },
-      ongoing('b', '2026-01-05'),
-      ended('c', '2025-06-30'),
-      ongoing('d', '2025-03-01'),
-      e,
-      ended('ab', '2025-06-30'),
-    ]
-    expect(orderedSlugs(projects)).toEqual(['a', 'ab', 'c', 'e', 'b', 'd'])
-    expect(projects.map((project) => project.slug)).toEqual(['a', 'b', 'c', 'd', 'e', 'ab'])
   })
 })
 
@@ -273,8 +219,7 @@ describe('les états de la carte', () => {
   })
 
   test('« en cours » suit le statut, « en ligne » le lien démo, indépendants', () => {
-    expect(cardStates(ongoing('en-cours', '2026-01-01')).ongoing).toBe(true)
-    expect(cardStates(ongoing('en-cours', '2026-01-01')).live).toBe(false)
+    expect(cardStates(buildProject(ONGOING))).toEqual({ ongoing: true, live: false })
     expect(cardStates(buildProject({ demo_url: 'https://demo.test' }))).toEqual({
       ongoing: false,
       live: true,

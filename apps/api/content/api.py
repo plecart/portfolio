@@ -24,24 +24,21 @@ def published_projects() -> QuerySet[Project]:
     """Les projets publiés, chacun avec ses technologies, sa galerie et ses sections.
 
     Un nombre de requêtes indépendant du nombre de projets (décision 12) : celle des projets, puis
-    une par liste préchargée — les technologies jointes à leurs lignes de projet. Chaque liste
-    préchargée garde l'ordre de son modèle, l'ordre de l'admin (`position`, puis `id`).
+    une par liste préchargée — les technologies jointes à leurs lignes de projet.
 
-    Triés par slug : le front calcule l'ordre des cartes (ADR 0010), mais un même contenu doit
-    toujours rendre le même corps — l'`ETag` du lot 2 en est l'empreinte (décision 6), et sans
-    ordre Postgres peut rendre les lignes dans un ordre ou un autre.
+    Les projets suivent l'ordre de leur modèle (`position`, puis `id`), celui des cartes de la table
+    choisi dans l'admin (D77), et chaque liste préchargée celui du sien, l'ordre de l'admin. Des
+    ordres totaux : un même contenu rend toujours le même corps, dont l'`ETag` du lot 2 est
+    l'empreinte (décision 6), là où, sans ordre, Postgres peut rendre les lignes dans un ordre ou un
+    autre.
     """
-    return (
-        Project.objects.filter(published=True)
-        .order_by("slug")
-        .prefetch_related(
-            Prefetch(
-                "projecttechnology_set",
-                queryset=ProjectTechnology.objects.select_related("technology"),
-            ),
-            "gallery",
-            "section_set",
-        )
+    return Project.objects.filter(published=True).prefetch_related(
+        Prefetch(
+            "projecttechnology_set",
+            queryset=ProjectTechnology.objects.select_related("technology"),
+        ),
+        "gallery",
+        "section_set",
     )
 
 

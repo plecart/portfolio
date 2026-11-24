@@ -99,17 +99,17 @@ def test_une_methode_qui_ne_lit_pas_est_refusee(client: Client, path: str, metho
 
 @pytest.mark.django_db
 def test_le_plan_du_site_liste_l_accueil_puis_chaque_fiche_publiee(client: Client) -> None:
-    """L'accueil, daté de la fiche la plus récente, puis chaque fiche publiée par slug, à son
-    adresse canonique sous l'accueil du gabarit et datée de sa dernière modification (W3C) ; un
-    brouillon n'y est pas."""
+    """L'accueil, daté de la fiche la plus récente, puis chaque fiche publiée dans l'ordre de
+    l'API publique — celui des positions, ici de la saisie —, à son adresse canonique sous l'accueil
+    du gabarit et datée de sa dernière modification (W3C) ; un brouillon n'y est pas."""
     modified("zeta", True, EARLIER)
     modified("alpha", True, LATER)
     modified("brouillon", False, LATER)
 
     assert sitemap_entries(client) == [
         (SITE.home, LATER_W3C),
-        (f"{SITE.home}projets/alpha", LATER_W3C),
         (f"{SITE.home}projets/zeta", EARLIER_W3C),
+        (f"{SITE.home}projets/alpha", LATER_W3C),
     ]
 
 
@@ -202,9 +202,9 @@ def test_un_gabarit_defectueux_est_une_erreur_journalisee_jamais_un_fichier(
 @pytest.mark.django_db
 def test_llms_txt_presente_l_auteur_puis_ses_fiches_et_ses_profils(client: Client) -> None:
     """Au format de llmstxt.org : le nom de l'auteur en titre, la description de l'accueil en
-    citation ; sous `## Projets`, chaque fiche publiée par slug, un lien Markdown à son adresse
-    canonique suivi de son résumé ; sous `## Liens`, ses profils dans l'ordre du gabarit, leur hôte
-    pour libellé faute d'un nom connu."""
+    citation ; sous `## Projets`, chaque fiche publiée dans l'ordre de l'API publique, un lien
+    Markdown à son adresse canonique suivi de son résumé ; sous `## Liens`, ses profils dans l'ordre
+    du gabarit, leur hôte pour libellé faute d'un nom connu."""
     modified("zeta", True, EARLIER)
     modified("alpha", True, LATER)
     modified("brouillon", False, LATER)
@@ -216,8 +216,8 @@ def test_llms_txt_presente_l_auteur_puis_ses_fiches_et_ses_profils(client: Clien
         "\n"
         "## Projets\n"
         "\n"
-        f"- [Alpha]({SITE.home}projets/alpha): Résumé alpha.\n"
         f"- [Zeta]({SITE.home}projets/zeta): Résumé zeta.\n"
+        f"- [Alpha]({SITE.home}projets/alpha): Résumé alpha.\n"
         "\n"
         "## Liens\n"
         "\n"

@@ -92,18 +92,20 @@ for (const [name, projects] of Object.entries(PROJECT_SETS)) {
     expect(projects.flatMap(glossaryViolations)).toEqual([])
   })
 
-  test(`le jeu ${name} est trié par slug, sans doublon, comme l'API le sert`, () => {
+  test(`le jeu ${name} est numéroté de 1 à N et servi dans cet ordre, comme l'API, sans doublon de slug`, () => {
     const slugs = projects.map((project) => project.slug)
 
-    expect(slugs).toEqual([...new Set(slugs)].sort())
+    expect(projects.map((project) => project.position)).toEqual(slugs.map((_, index) => index + 1))
+    expect(new Set(slugs).size).toBe(slugs.length)
   })
 }
 
 test('le jeu de douze varie types, statuts et années, et porte une image en attente', () => {
   const projects = PROJECT_SETS.twelveWithShowcase
 
-  // L'ordre des cartes se trie sur ces champs (spec §1.9) ; une image en attente n'a pas de
-  // variante (glossaire, « Image de galerie »), et la carte la rend en carré `--line`.
+  // Les positions du jeu viennent de ces champs, comme celles de la migration (`projectSet`) ;
+  // une image en attente n'a pas de variante (glossaire, « Image de galerie »), et la carte la rend
+  // en carré `--line`.
   expect({
     kinds: new Set(projects.map((project) => project.kind)).size,
     statuses: new Set(projects.map((project) => project.status)).size,

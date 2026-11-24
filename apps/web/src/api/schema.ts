@@ -67,7 +67,8 @@ export interface components {
          *     image est la couverture — et les sections de sa fiche, chaque liste dans l'ordre de l'admin.
          *
          *     `finished_on` vaut `null` tant que le projet est en cours ; un lien absent est une chaîne
-         *     vide, comme stocké.
+         *     vide, comme stocké. `position` est son rang dans la table, choisi dans l'admin : la liste suit
+         *     les positions, puis l'ordre de saisie à position égale.
          */
         ProjectOut: {
             /** Slug */
@@ -95,6 +96,8 @@ export interface components {
             demo_url: string;
             /** Showcase */
             showcase: boolean;
+            /** Position */
+            position: number;
             /** Technologies */
             technologies: components["schemas"]["TechnologyOut"][];
             /** Gallery */

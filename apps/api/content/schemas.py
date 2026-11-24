@@ -3,12 +3,13 @@ décisions 2 à 5).
 
 Des données brutes, jamais de présentation (ADR 0010) : Markdown tel que saisi, valeurs stockées
 en anglais, dates ISO 8601, chaque fichier par son adresse absolue. L'ordre de chaque liste est
-celui de l'admin ; le front calcule le reste — ordre des cartes, libellés, technologies de carte.
+celui de l'admin, et le projet expose sa `position`, sur laquelle le front range les cartes (D77) ;
+le front calcule le reste — libellés, technologies de carte.
 
 Ce qui n'est pas exposé l'est par omission, champ par champ : `published` (toujours vrai ici), les
-horodatages, `position` et `id` (l'ordre est celui de la liste), `Technology.website` (glossaire)
-et `GalleryImage.original` (le site sert les variantes). La couverture n'a pas de clé : c'est
-`gallery[0]` (décision 3).
+horodatages, l'`id`, la `position` d'une ligne de liste — technologie, image, section — (l'ordre
+est celui de la liste), `Technology.website` (glossaire) et `GalleryImage.original` (le site sert
+les variantes). La couverture n'a pas de clé : c'est `gallery[0]` (décision 3).
 
 Un résolveur qui déclare `context` reçoit la requête dans le contexte de validation que
 django-ninja passe à pydantic (`context["request"]`, « What's new in Django Ninja 1.0 ») : c'est
@@ -121,7 +122,8 @@ class ProjectOut(Schema):
     image est la couverture — et les sections de sa fiche, chaque liste dans l'ordre de l'admin.
 
     `finished_on` vaut `null` tant que le projet est en cours ; un lien absent est une chaîne
-    vide, comme stocké.
+    vide, comme stocké. `position` est son rang dans la table, choisi dans l'admin : la liste suit
+    les positions, puis l'ordre de saisie à position égale.
     """
 
     slug: str
@@ -136,6 +138,7 @@ class ProjectOut(Schema):
     repository_url: str
     demo_url: str
     showcase: bool
+    position: int
     technologies: list[TechnologyOut]
     gallery: list[GalleryImageOut]
     sections: list[SectionOut]
