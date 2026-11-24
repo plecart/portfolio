@@ -14,8 +14,9 @@
   Dependabot mergées d'affilée ne sont plus éprouvées ensemble », « Un avis neuf est vu sous une
   semaine » et « Une régression des images ou du mobile […] est vue à la fumée ou au run
   hebdomadaire » (§ Conséquences), « Re-mesure quatre semaines après le merge de la PR #279 » et
-  « Un rouge du run hebdomadaire naît d'une PR mergée » (§ Conditions de réexamen) ; ces ADR restent acceptés pour le reste ; interrogatoire de #285
-  du 2026-11-24, décisions D1 à D8 du corps de l'issue
+  « Un rouge du run hebdomadaire naît d'une PR mergée » (§ Conditions de réexamen) ; ces ADR
+  restent acceptés pour le reste ; interrogatoire de #285 du 2026-11-24, décisions D1 à D8 du
+  corps de l'issue
 
 ## Contexte
 
@@ -117,7 +118,11 @@ fixait l'ADR 0031, sans facture à mesurer.
   qu'un `publish` suivi de la fumée ; nul pour un merge de pipeline ou de back.
 - Un rouge d'avis planifié envoie un mail chaque matin tant que l'avis n'est pas traité.
 - `infra` et `publish` écrivent sur `main` la même entrée du cache des couches, sous la même clé :
-  le second à finir ne l'écrit pas.
+  le second à finir ne l'écrit pas — « You cannot change the contents of an existing cache » (doc
+  GitHub « Dependency caching », lue le 2026-11-24).
+- Deux merges à moins d'un run d'écart, le second rouge : aucun ne se déploie — le premier cède
+  la place à la tête de `main`, que le second ne déploie pas —, et la production reste sur le
+  dernier commit déployé, jusqu'au merge vert suivant.
 
 ## Comparaison des options
 

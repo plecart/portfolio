@@ -465,7 +465,8 @@ jobs:
       # be restored by the base branch » (doc GitHub « Dependency caching », « Restrictions for
       # accessing a cache », lue le 2026-11-21). Écrite sur `main`, l'entrée se relit des PR et des
       # runs planifiés. Quand `infra` tourne aussi sur le push, le second des deux à finir ne la
-      # réécrit pas (ADR 0032, § Conséquences, « Risques acceptés »).
+      # réécrit pas : « You cannot change the contents of an existing cache » (même doc, lue le
+      # 2026-11-24 ; ADR 0032, § Conséquences, « Risques acceptés »).
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/buildx-cache
