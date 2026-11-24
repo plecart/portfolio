@@ -157,8 +157,6 @@ CHECKOUT_LINES = (
 )
 CONCURRENCY_LINES = "    concurrency:\n      group: deploy\n      cancel-in-progress: false\n"
 NEEDS_LINE = "    needs: [fumee, api, web, mobile, infra]\n"
-# Une vérification acceptée verte ou sautée, dans `DEPLOY_IF`.
-WEB_SUCCESS_OR_SKIPPED = "(needs.web.result == 'success' || needs.web.result == 'skipped')"
 CONFORMING_WORKFLOW = f"""\
 jobs:
   deploy:
@@ -170,6 +168,25 @@ jobs:
 {CONCURRENCY_LINES}\
     steps:
 {CHECKOUT_LINES}{SCRIPT_LINE}"""
+
+
+def success_or_skipped(job: str) -> str:
+    """La clause de `DEPLOY_IF` qui accepte le job `job` vert ou sauté."""
+    return f"(needs.{job}.result == 'success' || needs.{job}.result == 'skipped')"
+
+
+def verification_forms(job: str) -> dict[str, tuple[str, str, bool]]:
+    """Les formes qui écartent la vérification `job`, que le delta peut sauter, de `DEPLOY_IF` ou
+    de `DEPLOY_NEEDS` : rouge, elle laisserait partir le déploiement ; exigée verte, un merge qui
+    ne la lance pas ne se déploierait plus."""
+    clause = success_or_skipped(job)
+    return {
+        f"sans attendre {job}": (f", {job}", "", True),
+        f"sans condition sur {job}": (f" && {clause}", "", True),
+        f"{job} exigé vert": (clause, f"needs.{job}.result == 'success'", True),
+        f"{job} toléré rouge": (clause, f"needs.{job}.result != 'cancelled'", True),
+    }
+
 
 # Forme → (texte remplacé, remplacement, constat attendu). Le texte remplacé est pris dans
 # `CONFORMING_WORKFLOW` : une forme qui ne le changerait pas resterait conforme, et son verdict
@@ -183,30 +200,19 @@ DEPLOY_CHANGES = {
     "sans attendre la fumée": ("[fumee, ", "[", True),
     # Le `needs` d'avant l'ADR 0032 : un merge qui casse le commit livré se déploierait.
     "sans attendre les vérifications": (NEEDS_LINE, "    needs: fumee\n", True),
-    "sans attendre mobile": (", mobile", "", True),
+    "sans attendre api": (", api", "", True),
     # Sous le `success()` implicite, une vérification sautée sauterait le déploiement : un merge
     # sans front ni image ne se déploierait plus.
     "sans !cancelled()": ("!cancelled() && ", "", True),
     # `always()` déploierait aussi un run annulé (doc « Expressions », `always`).
     "always() au lieu de !cancelled()": ("!cancelled()", "always()", True),
-    "api accepté sauté": (
-        "needs.api.result == 'success'",
-        "(needs.api.result == 'success' || needs.api.result == 'skipped')",
-        True,
-    ),
-    "fumée acceptée sautée": (
-        "needs.fumee.result == 'success'",
-        "(needs.fumee.result == 'success' || needs.fumee.result == 'skipped')",
-        True,
-    ),
-    "web exigé vert": (WEB_SUCCESS_OR_SKIPPED, "needs.web.result == 'success'", True),
-    "web toléré rouge": (WEB_SUCCESS_OR_SKIPPED, "needs.web.result != 'cancelled'", True),
-    # Un e2e mobile rouge laisserait partir le déploiement.
-    "sans condition sur mobile": (
-        " && (needs.mobile.result == 'success' || needs.mobile.result == 'skipped')",
-        "",
-        True,
-    ),
+    "api accepté sauté": ("needs.api.result == 'success'", success_or_skipped("api"), True),
+    "fumée acceptée sautée": ("needs.fumee.result == 'success'", success_or_skipped("fumee"), True),
+    **{
+        name: form
+        for job in ("web", "mobile", "infra")
+        for name, form in verification_forms(job).items()
+    },
     "sans la variable du VPS prêt": (" && vars.DEPLOY_ENABLED == 'true'", "", True),
     "variable lue dans les secrets": ("vars.DEPLOY_ENABLED", "secrets.DEPLOY_ENABLED", True),
     "sur un push vers toute branche": (" && github.ref == 'refs/heads/main'", "", True),

@@ -26,7 +26,8 @@
 # Sur un push vers `main`, ces vérifications rejouent le commit livré pendant que `publish` compile
 # le front, construit les images, les scanne et les publie sur GHCR ; `fumee` démarre la pile de
 # production depuis ces images et la fait éprouver par Playwright ; `deploy` ne les déploie sur le
-# VPS, une fois celui-ci prêt, qu'après une fumée verte et des vérifications vertes ou sautées.
+# VPS, une fois celui-ci prêt, qu'après une fumée verte, un `api` vert, et `web`, `mobile` et
+# `infra` verts ou sautés.
 # `avis` n'y tourne pas : `publish` scanne avant de pousser, et `avis.yml` rejoue ses portes chaque
 # jour sur `main`.
 #
@@ -107,8 +108,11 @@ jobs:
     steps:
       # La tête de la PR, que le pas suivant fusionne au trunk courant : `HEAD^1` est le trunk qu'il
       # combine, et `HEAD^1..HEAD` le delta de la PR. Sur un push, `ref` est vide : le commit
-      # poussé, et le clone complet porte aussi la base du push.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # poussé, et le clone complet porte aussi la base du push. Écrit ici sous l'ancre
+      # `extraction`, que les autres jobs de vérification reprennent par `*extraction`, comme le pas
+      # suivant.
+      - &extraction
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
@@ -178,10 +182,7 @@ jobs:
     needs: changes
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
+      - *extraction
 
       - *fusion
 
@@ -236,14 +237,14 @@ jobs:
     if: needs.changes.outputs.web == 'true'
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
+      - *extraction
 
       - *fusion
 
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      # Node, à la version de `apps/web/.nvmrc`, et le cache npm : écrit ici sous l'ancre `node`,
+      # que `mobile`, `infra`, `publish` et `fumee` reprennent par `*node`.
+      - &node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: apps/web/.nvmrc
           cache: npm
@@ -286,18 +287,11 @@ jobs:
     if: needs.changes.outputs.web == 'true'
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
+      - *extraction
 
       - *fusion
 
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: apps/web/.nvmrc
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+      - *node
 
       - name: Install
         run: make web-install
@@ -324,10 +318,7 @@ jobs:
     if: needs.changes.outputs.infra == 'true'
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
+      - *extraction
 
       - *fusion
 
@@ -346,11 +337,7 @@ jobs:
       # Le front compilé entre dans les images (ADR 0014) : `make build` le compile s'il manque.
       # Le front se compile donc ici, comme dans `web`, `avis` et `publish` : ce job n'attend pas
       # `web`.
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: apps/web/.nvmrc
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+      - *node
 
       - name: Front
         run: make web-install
@@ -455,11 +442,7 @@ jobs:
 
       # Le front compilé entre dans les images (ADR 0014) : `make build` le compile, comme dans
       # `infra`. Les scripts d'installation des paquets npm passent avant la connexion au registre.
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: apps/web/.nvmrc
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+      - *node
 
       - name: Front
         run: make web-install
@@ -561,11 +544,7 @@ jobs:
 
       # Playwright et Chromium, comme dans le job `web`. Pas le front compilé : il est dans l'image
       # `caddy`.
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: apps/web/.nvmrc
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+      - *node
 
       - name: Install
         run: make web-install
@@ -629,10 +608,8 @@ jobs:
       && vars.DEPLOY_ENABLED == 'true'
       && needs.fumee.result == 'success' && needs.api.result == 'success'
       && (needs.web.result == 'success' || needs.web.result == 'skipped')
-      && (needs.mobile.result == 'success'
-      || needs.mobile.result == 'skipped')
-      && (needs.infra.result == 'success'
-      || needs.infra.result == 'skipped') }}
+      && (needs.mobile.result == 'success' || needs.mobile.result == 'skipped')
+      && (needs.infra.result == 'success' || needs.infra.result == 'skipped') }}
     # Les secrets du VPS sont ceux de cet environnement, restreint à `main` : un workflow lancé
     # depuis une autre branche ne les lit pas, même modifié (doc GitHub « Deployments and
     # environments »).
