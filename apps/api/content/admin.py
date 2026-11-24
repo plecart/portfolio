@@ -15,7 +15,7 @@ from django.utils.html import format_html
 from django.utils.safestring import SafeString, mark_safe
 from django_stubs_ext import StrOrPromise
 
-from content.inlines import SortableFormSet, SortableInline
+from content.inlines import SortableFormSet, SortableInline, SortableListAdmin
 from content.models import (
     COVER_MIN_SIDE,
     GalleryImage,
@@ -276,15 +276,17 @@ class SectionInline(MarkdownFieldsAdmin[Section], SortableInline[Section, Projec
 
 
 @admin.register(Project)
-class ProjectAdmin(MarkdownFieldsAdmin[Project], admin.ModelAdmin[Project]):
+class ProjectAdmin(MarkdownFieldsAdmin[Project], SortableListAdmin[Project]):
     """Écran Projet : tous les champs du projet, ses technologies en ligne, sa galerie — dont la
     première image est la couverture —, puis sa fiche technique, en un seul écran (PRD, US 34). Le
     slug se remplit depuis le titre à la saisie et reste modifiable (décision 3) ; la description,
-    en Markdown, a son aperçu."""
+    en Markdown, a son aperçu.
 
-    list_display = ("title", "kind", "status", "showcase", "published")
-    # La position ne se saisit pas sur l'écran : un projet neuf se range en dernier (`Project.save`).
-    exclude = ("position",)
+    Sa liste est l'ordre des cartes de la table : l'auteur la réordonne par glisser-déposer, ou au
+    clavier, puis l'enregistre une fois (D77, spec §1.9) ; un projet neuf y arrive en dernier."""
+
+    list_display = ("move", "title", "kind", "status", "showcase", "published", "position")
+    list_display_links = ("title",)
     markdown_fields = ("description",)
     prepopulated_fields: ClassVar[dict[str, Sequence[str]]] = {"slug": ("title",)}
     inlines = (ProjectTechnologyInline, GalleryInline, SectionInline)

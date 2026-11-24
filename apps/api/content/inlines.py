@@ -1,4 +1,5 @@
-"""Tableaux en ligne de l'admin dont l'auteur ordonne les lignes par glisser-déposer (ADR 0013).
+"""Lignes de l'admin que l'auteur ordonne par glisser-déposer (ADR 0013) : celles d'un tableau en
+ligne, et celles de la liste d'un écran.
 
 Un tableau en ligne hérite de `SortableInline`, et son modèle porte un entier `position` : chaque
 ligne, enregistrée ou neuve, reçoit une poignée ; `inline_rows.js` réordonne les lignes, remplit
@@ -7,20 +8,27 @@ replace les lignes dans cet ordre quand l'écran revient en erreur, et donne à 
 bouton de suppression. On manipule les lignes — ajouter, retirer, déplacer —, puis on enregistre
 une fois.
 
+Un écran hérite de `SortableListAdmin`, et son modèle porte le même entier : chaque ligne de sa
+liste reçoit la même poignée, le même script remplit les mêmes positions cachées, et à
+l'enregistrement les lignes affichées reprennent entre elles leurs positions, dans l'ordre affiché.
+Ce que les deux partagent vit dans `SortableRows`.
+
 Le script et sa feuille valent pour tout tableau en ligne de l'écran qui les charge, ordonnable ou
 non : bouton unique de suppression et libellé des lignes enregistrées retiré compris.
 
-Les technologies, la galerie et les sections d'un projet s'en servent.
+Les technologies, la galerie et les sections d'un projet s'en servent, et la liste des projets.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, ClassVar
 
 from config import strings
 from django.contrib import admin
+from django.contrib.admin.options import BaseModelAdmin
+from django.contrib.admin.views.main import ChangeList
 from django.core.exceptions import ValidationError
 from django.db.models import Field, Max, Model
-from django.forms import BaseInlineFormSet, HiddenInput, ModelForm
+from django.forms import BaseInlineFormSet, BaseModelFormSet, HiddenInput, ModelForm
 from django.forms import Field as FormField
 from django.forms.formsets import DELETION_FIELD_NAME
 from django.forms.models import InlineForeignKeyField
@@ -180,7 +188,41 @@ class SortableFormSet[ChildT: Model, ParentT: Model](
         return super().save_existing(form, obj, commit=commit)
 
 
-class SortableInline[ChildT: Model, ParentT: Model](admin.TabularInline[ChildT, ParentT]):
+class SortableRows[ModelT: Model](BaseModelAdmin[ModelT]):
+    """Ce que partagent les lignes ordonnables d'un tableau en ligne et d'une liste : la poignée
+    `move`, la position cachée, le script et sa feuille."""
+
+    class Media:
+        css: ClassVar[dict[str, tuple[str, ...]]] = {"all": ("content/admin/inline_rows.css",)}
+        js = ("content/admin/inline_rows.js",)
+
+    @admin.display(description=strings.ADMIN_ROW_ORDER)
+    def move(self, row: ModelT) -> SafeString:
+        """La poignée de la ligne : un bouton, pour le clavier, que `inline_rows.js` rend
+        glissable."""
+        return format_html(
+            '<button type="button" class="{handle}" aria-label="{label}" title="{label}">'
+            '<span aria-hidden="true">⠿</span></button>',
+            handle=HANDLE_CLASS,
+            label=strings.ADMIN_ROW_MOVE,
+        )
+
+    def formfield_for_dbfield(
+        self, db_field: Field[Any, Any], request: HttpRequest, **kwargs: Any
+    ) -> FormField | None:
+        """La position, cachée et facultative : `inline_rows.js` la remplit dans l'ordre affiché ;
+        une ligne enregistrée arrivée sans elle se range à la sienne, une ligne neuve après les
+        autres (`SortableFormSet`, `SortableListFormSet`)."""
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if formfield is not None and db_field.name == POSITION:
+            formfield.widget = HiddenInput(attrs={"class": POSITION_CLASS})
+            formfield.required = False
+        return formfield
+
+
+class SortableInline[ChildT: Model, ParentT: Model](
+    SortableRows[ChildT], admin.TabularInline[ChildT, ParentT]
+):
     """Un tableau en ligne dont les lignes s'ordonnent par glisser-déposer, ou au clavier.
 
     Ses `fields` commencent par `move`, la poignée, et contiennent `position`, qui y est caché. Un
@@ -195,21 +237,6 @@ class SortableInline[ChildT: Model, ParentT: Model](admin.TabularInline[ChildT, 
     formset = SortableFormSet
     readonly_fields = ("move",)
 
-    class Media:
-        css: ClassVar[dict[str, tuple[str, ...]]] = {"all": ("content/admin/inline_rows.css",)}
-        js = ("content/admin/inline_rows.js",)
-
-    @admin.display(description=strings.ADMIN_ROW_ORDER)
-    def move(self, row: ChildT) -> SafeString:
-        """La poignée de la ligne : un bouton, pour le clavier, que `inline_rows.js` rend
-        glissable."""
-        return format_html(
-            '<button type="button" class="{handle}" aria-label="{label}" title="{label}">'
-            '<span aria-hidden="true">⠿</span></button>',
-            handle=HANDLE_CLASS,
-            label=strings.ADMIN_ROW_MOVE,
-        )
-
     def get_formset(
         self, request: HttpRequest, obj: ParentT | None = None, **kwargs: Any
     ) -> type[BaseInlineFormSet[ChildT, ParentT, ModelForm[ChildT]]]:
@@ -219,14 +246,84 @@ class SortableInline[ChildT: Model, ParentT: Model](admin.TabularInline[ChildT, 
         enregistrées contournent. Sans `min_num`, le minimum est nul : rien ne change."""
         return super().get_formset(request, obj, validate_min=True, **kwargs)
 
-    def formfield_for_dbfield(
-        self, db_field: Field[Any, Any], request: HttpRequest, **kwargs: Any
-    ) -> FormField | None:
-        """La position, cachée et facultative : `inline_rows.js` la remplit dans l'ordre affiché ;
-        une ligne neuve arrivée sans elle se range après les autres, une ligne enregistrée garde la
-        sienne (`SortableFormSet`)."""
-        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
-        if formfield is not None and db_field.name == POSITION:
-            formfield.widget = HiddenInput(attrs={"class": POSITION_CLASS})
-            formfield.required = False
-        return formfield
+
+class SortableListForm[ModelT: Model](ModelForm[ModelT]):
+    """Une ligne d'une liste ordonnable : la position qu'elle enregistre est celle que la liste lui
+    rend (`SortableListFormSet.clean`), et non celle qu'elle envoie."""
+
+    # Une propriété, là où Django garde un `cached_property` : il le lit une première fois avant
+    # que la liste ne rende les positions (`BaseFormSet.full_clean`), et garderait cette lecture.
+    @property
+    def changed_data(self) -> list[str]:  # pyright: ignore[reportIncompatibleVariableOverride]
+        """Les champs que l'enregistrement change : la position, quand celle que la ligne reçoit
+        diffère de la sienne ; tout autre champ, quand l'envoi le change. Django en tire le besoin
+        d'enregistrer la ligne (`has_changed`) et ce qu'en dit l'historique."""
+        changed = [name for name in super().changed_data if name != POSITION]
+        if getattr(self.instance, POSITION) != self.initial[POSITION]:
+            changed.append(POSITION)
+        return changed
+
+
+class SortableListFormSet[ModelT: Model](BaseModelFormSet[ModelT, ModelForm[ModelT]]):
+    """Les lignes affichées d'une liste ordonnable : celles de la page, filtrée ou non, et non
+    toute la liste."""
+
+    def clean(self) -> None:
+        """Les règles de Django, puis l'ordre : les lignes affichées reprennent entre elles
+        l'ensemble des positions qu'elles portaient, dans l'ordre de celles qu'elles envoient — à
+        égalité, l'ordre affiché. Le script envoie 1 à n dans l'ordre affiché ; une liste paginée
+        ou filtrée ne heurte jamais une ligne qu'elle ne montre pas ; sans le script, chaque ligne
+        envoie la sienne, et rien ne bouge."""
+        super().clean()
+        if any(self.errors):
+            return
+        positions = sorted(form.initial[POSITION] for form in self.forms)
+        for form, position in zip(sorted(self.forms, key=self._sent), positions, strict=True):
+            setattr(form.instance, POSITION, position)
+
+    @staticmethod
+    def _sent(form: ModelForm[Any]) -> int:
+        """La position qu'une ligne envoie ; à défaut — champ caché vidé —, la sienne."""
+        sent: int | None = form.cleaned_data.get(POSITION)
+        return form.initial[POSITION] if sent is None else sent
+
+
+class StoredOrderChangeList(ChangeList):
+    """Une liste à l'ordre stocké, quel que soit le tri que demande l'adresse."""
+
+    def get_ordering_field(self, field_name: Callable[..., Any] | str) -> None:
+        """Aucune colonne ne se trie : Django saute le tri que l'adresse demande (`o`), et garde
+        l'ordre de l'écran (`ModelAdmin.ordering`)."""
+
+
+class SortableListAdmin[ModelT: Model](SortableRows[ModelT], admin.ModelAdmin[ModelT]):
+    """Un écran dont la liste s'ordonne par glisser-déposer, ou au clavier, puis s'enregistre en
+    une fois.
+
+    Son `list_display` commence par `move`, la poignée, et contient `position`, éditable et cachée
+    — sa colonne aussi (`inline_rows.css`) ; son `list_display_links` nomme la colonne du lien, que
+    Django poserait sinon sur la poignée. La liste suit toujours l'ordre stocké, puisque l'ordre
+    affiché est celui qu'on enregistre : ni ses en-têtes ni l'adresse ne la trient. La position ne
+    se saisit pas sur la fiche, qui l'enverrait telle qu'à son ouverture, par-dessus un ordre
+    enregistré entre-temps : un objet neuf la reçoit de son modèle, comme un projet
+    (`Project.save`).
+    """
+
+    exclude = (POSITION,)
+    list_editable = (POSITION,)
+    ordering = (POSITION, "id")
+    sortable_by = ()
+
+    def get_changelist(self, request: HttpRequest, **kwargs: Any) -> type[ChangeList]:
+        """La liste, à l'ordre stocké."""
+        return StoredOrderChangeList
+
+    def get_changelist_form(self, request: HttpRequest, **kwargs: Any) -> type[ModelForm[ModelT]]:
+        """Le formulaire d'une ligne, dont la position est celle que la liste lui rend."""
+        return super().get_changelist_form(request, form=SortableListForm, **kwargs)
+
+    def get_changelist_formset(
+        self, request: HttpRequest, **kwargs: Any
+    ) -> type[BaseModelFormSet[ModelT, ModelForm[ModelT]]]:
+        """Les lignes affichées, qui reprennent entre elles leurs positions."""
+        return super().get_changelist_formset(request, formset=SortableListFormSet, **kwargs)
