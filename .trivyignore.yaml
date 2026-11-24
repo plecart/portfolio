@@ -262,9 +262,11 @@ vulnerabilities:
       ELF de l'image chargent `libssl.so.3`, le module `_ssl` de Python, la méthode `http` d'apt et
       `openssl` ; seul `openssl` importe une fonction QUIC (`OSSL_QUIC_client_method`), et rien de
       ce qui tourne ne le lance (relevé des imports dynamiques, 2026-11-24, sur une image `api`
-      à OpenSSL 3.5.7-1~deb13u3, la version scannée). Alternatives : sans correctif dans
-      Debian 13 au 2026-11-24 (Trivy : « affected ») ; l'exception attend sa publication et la
-      reconstruction de l'image de base.
+      à OpenSSL 3.5.7-1~deb13u3, la version scannée). Alternatives : corrigé en amont par
+      OpenSSL 3.5.10, annoncé pour le 2026-12-01 (avis du 2026-11-24, sévérité « Low ») ;
+      Debian 13 vulnérable, sans correctif au 2026-11-24 (Trivy : « affected ») : l'exception
+      attend sa publication et la reconstruction de l'image de base ; OpenSSL 3.0, donc Debian 12,
+      non touché, mais rouvrirait le choix de Debian 13 (ADR 0014).
     expired_at: 2026-12-24
 
   # --- Image `backup` : le binaire `supercronic` v0.2.51, fichier de sa release (ADR 0018) ------
