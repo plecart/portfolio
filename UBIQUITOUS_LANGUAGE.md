@@ -112,13 +112,13 @@ la couverture, et lui en applique les règles.
 L'unique point d'entrée de la phase 1 : `GET /api/projets`, la liste nue des projets publiés —
 un tableau JSON, `[]` s'il n'y en a aucun, sans pagination ni route par slug (PRD « Hors
 périmètre »). Un brouillon n'y figure jamais. Le site la charge en une fois et calcule le reste :
-ordre des cartes, libellés, technologies de carte (ADR 0010). Son contrat est le schéma
-`apps/api/openapi.json`, régénéré par `make openapi` ; le front en dérive ses types,
+ordre des cartes (sur leurs positions), libellés, technologies de carte (ADR 0010). Son contrat
+est le schéma `apps/api/openapi.json`, régénéré par `make openapi` ; le front en dérive ses types,
 `apps/web/src/api/schema.ts`, régénéré par `make web-openapi` (#19).
 
 | Terme | Identifiant | Règle |
 |---|---|---|
-| projet | `ProjectOut` | `slug`, `title`, `summary`, `description` (Markdown brut), `kind`, `status`, `started_on`, `finished_on` (`null` tant que le projet est en cours), `client`, `repository_url`, `demo_url` (chaîne vide quand absent, comme stocké), `showcase`, puis ses trois listes ; les projets sont triés par slug |
+| projet | `ProjectOut` | `slug`, `title`, `summary`, `description` (Markdown brut), `kind`, `status`, `started_on`, `finished_on` (`null` tant que le projet est en cours), `client`, `repository_url`, `demo_url` (chaîne vide quand absent, comme stocké), `showcase`, `position`, puis ses trois listes ; les projets sont triés par position, puis dans l'ordre de saisie à position égale |
 | technologie | `TechnologyOut` | `name`, `kind`, `icon` — l'adresse de l'icône SVG, jamais le SVG lui-même ; dans l'ordre de l'admin |
 | image | `GalleryImageOut` | `caption`, `width`, `height`, `state`, `variants` ; dans l'ordre de l'admin ; une image en attente ou en échec figure avec son état et sans variante |
 | variante | `VariantOut` | `url`, `width`, `height` — l'adresse à la place du nom de stockage |
@@ -126,8 +126,9 @@ ordre des cartes, libellés, technologies de carte (ADR 0010). Son contrat est l
 | couverture | `gallery[0]` | aucune clé à part : c'est la première image de la galerie |
 | adresse | — | chaque fichier par son adresse absolue : celle du stockage, complétée du schéma et de l'hôte de la requête quand elle est relative (disque en développement) |
 
-Ne sont pas exposés : `published`, `created_at` et `updated_at`, `position` et `id` (l'ordre est
-celui de la liste), le site d'une technologie (`website`) et l'original d'une image (`original`).
+Ne sont pas exposés : `published`, `created_at` et `updated_at`, l'`id`, la `position` d'une
+technologie, d'une image ou d'une section (l'ordre est celui de la liste), le site d'une technologie
+(`website`) et l'original d'une image (`original`).
 Ni HTML ni libellé : les valeurs stockées, en anglais, telles quelles.
 
 Politique HTTP de la liste : appelable depuis la seule origine du site (CORS, `CORS_ALLOWED_ORIGINS`),

@@ -281,15 +281,8 @@ export const LIVE_CARD = buildProject({
   technologies: THREE_TECHNOLOGIES,
 })
 
-/**
- * La voisine d'une carte en cours aux dates du projet type (`buildProject`) : en cours aussi mais
- * commencée avant elle, elle la suit (spec §1.9).
- */
-export const ONGOING_NEIGHBOUR = buildProject({
-  ...ONGOING,
-  slug: 'voisine',
-  started_on: '2024-01-15',
-})
+/** La voisine d'une carte en cours, en cours aussi : à position égale, elle la suit dans la liste. */
+export const ONGOING_NEIGHBOUR = buildProject({ ...ONGOING, slug: 'voisine' })
 
 /** Deux cartes sur une rangée : la carte pleine, en tête, et sa voisine. */
 export const TWO_CARDS = [FULL_CARD, ONGOING_NEIGHBOUR]

@@ -158,12 +158,12 @@ test('en mouvement réduit, une carte entre par un fondu de 150 ms, sans montée
 })
 
 /**
- * Le projet type (`buildProject`), en cours et commencé avant les douze : la dernière carte, sous
- * l'écran (spec §1.9).
+ * Le projet type (`buildProject`), en cours, à la position qui suit les douze : la dernière carte,
+ * sous l'écran (spec §1.9).
  */
 const BELOW_THE_FOLD = [
   ...PROJECT_SETS.twelveWithShowcase,
-  buildProject({ ...ONGOING, started_on: '2013-03-01' }),
+  buildProject({ ...ONGOING, position: 13 }),
 ]
 
 /**
@@ -537,10 +537,10 @@ for (const [width, maxLines] of [
 }
 
 /**
- * La carte sanglée au résumé le plus long, et sa voisine : son bandeau, le plus haut, est celui qui
- * approche le plus le coin où va la sangle.
+ * Une voisine, puis la carte sanglée au résumé le plus long : son bandeau, le plus haut, est celui
+ * qui approche le plus le coin où va la sangle.
  */
-const STRAPPED_LONGEST = [{ ...STRAPPED, summary: LONGEST_SUMMARY[0].summary }, LONGEST_SUMMARY[1]]
+const STRAPPED_LONGEST = [LONGEST_SUMMARY[1], { ...STRAPPED, summary: LONGEST_SUMMARY[0].summary }]
 
 /** Ouvre la table de `STRAPPED_LONGEST`, ses cartes entrées : rend la carte sanglée. */
 async function openStrappedCard(page: Page): Promise<Locator> {

@@ -89,7 +89,8 @@ def discovery_view(
     name: str, content_type: str, write: Callable[[Site, list[Project]], str]
 ) -> View:
     """La vue du fichier de découverte `name`, de type `content_type`, que `write` tire de
-    l'identité du site et des projets publiés, par slug — l'ordre de l'API publique.
+    l'identité du site et des projets publiés, dans l'ordre de l'API publique — celui des cartes
+    de la table (`published_projects`).
 
     La réponse est gardée dans l'espace du contenu sous l'empreinte du gabarit : un déploiement qui
     change l'identité n'est jamais servi depuis l'entrée d'avant. `no-cache` et `require_safe`,

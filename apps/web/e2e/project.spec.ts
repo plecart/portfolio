@@ -53,8 +53,8 @@ import {
 } from './table.ts'
 
 /**
- * Trois projets aux titres distincts. La première carte, celle du plus récent des projets
- * terminés ou archivés : `projet-03` (spec §1.9).
+ * Trois projets aux titres distincts. La première carte, à la position 1 : `projet-03`, le plus
+ * récent des projets terminés ou archivés (`projectSet`).
  */
 const PROJECTS = PROJECT_SETS.threeWithoutShowcase
 const FIRST = { title: 'Projet 03', path: '/projets/projet-03' }
@@ -183,7 +183,7 @@ test('une carte coupée par le bord de la fenêtre ne fait pas défiler la page 
 
 test('une carte hors de la fenêtre après une arrivée directe y vient avec le focus', async ({ page }) => {
   await serveProjects(page, PROJECT_SETS.twelveWithShowcase)
-  // La dernière carte : le plus ancien des projets en cours (spec §1.9).
+  // La dernière carte, à la dernière position : le plus ancien des projets en cours (`projectSet`).
   await page.goto('/projets/projet-05')
 
   await closeButton(page).click()

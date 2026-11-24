@@ -88,6 +88,7 @@ export function buildProject(overrides: Partial<Project> = {}): Project {
     repository_url: '',
     demo_url: '',
     showcase: false,
+    position: 1,
     technologies: TECHNOLOGIES.slice(0, 1),
     gallery: [buildImage(slug, 'Écran d’accueil')],
     sections: [],
@@ -100,7 +101,8 @@ const STATUSES: Project['status'][] = ['finished', 'ongoing', 'archived']
 
 /**
  * Le i-ième projet d'un jeu : types, statuts, années, technologies, liens et sections varient d'un
- * projet à l'autre, pour l'ordre et le contenu des cartes ; le septième a sa couverture en attente.
+ * projet à l'autre, pour la position (`projectSet`) et le contenu des cartes ; le septième a sa
+ * couverture en attente.
  */
 function numberedProject(index: number, showcase: boolean): Project {
   const number = String(index + 1).padStart(2, '0')
@@ -129,9 +131,19 @@ function numberedProject(index: number, showcase: boolean): Project {
   })
 }
 
-/** Un jeu de `count` projets, triés par slug comme l'API les sert ; la vitrine, si elle y est, en second. */
+/**
+ * Un jeu de `count` projets ; la vitrine, s'il en a une, est `projet-02`. Ils sont numérotés de 1 à
+ * N comme la migration des positions numérote les projets (`0008_number_projects`), dans l'ordre que
+ * la table calculait avant elles — la vitrine, puis les terminés et archivés, puis les en cours,
+ * chaque groupe du plus récent au plus ancien, soit ici du dernier numéro au premier — et servis
+ * dans l'ordre de leurs positions, comme l'API les sert.
+ */
 export function projectSet(count: number, showcase: boolean): Project[] {
+  const group = (project: Project) => (project.showcase ? 0 : project.status === 'ongoing' ? 2 : 1)
   return Array.from({ length: count }, (_, index) => numberedProject(index, showcase && index === 1))
+    .reverse()
+    .sort((a, b) => group(a) - group(b))
+    .map((project, index) => ({ ...project, position: index + 1 }))
 }
 
 /**
