@@ -212,7 +212,7 @@ tourne sur un schéma plus récent que le sien. Le prochain déploiement de la C
 - **« Host key verification failed »** — l'hôte n'a plus la clé épinglée : VPS reconstruit, ou
   autre machine. Vérifie l'empreinte comme à l'amorçage avant de remplacer `DEPLOY_KNOWN_HOSTS`.
 - **« main est passée à … »** — pas une erreur : un commit plus récent se déploie par son propre
-  run.
+  run, s'il est vert ; sinon, entrée suivante.
 - **`deploy` sauté derrière un `fumee` ou une vérification rouge** (`api`, `web`, `mobile`,
   `infra`, ADR 0032) — les images du commit sont publiées, jamais déployées : le journal du job
   nomme l'étape ou le scénario, `make smoke`, ou la cible du job rouge, le rejoue sur le poste
