@@ -69,6 +69,12 @@
         if (errors) {
             row.before(errors);
         }
+        // Seul un `change` arme l'avertissement de Django avant une action (`admin/js/actions.js`).
+        if (row.closest("#result_list")) {
+            row.querySelector("input.sortable-position")?.dispatchEvent(
+                new Event("change", { bubbles: true }),
+            );
+        }
     };
 
     // La poignée ne rend la ligne glissable que le temps d'un glisser : relâchée sans glisser, la
