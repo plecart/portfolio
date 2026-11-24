@@ -213,6 +213,25 @@ def test_une_ligne_de_la_liste_arrivee_sans_position_se_range_a_la_sienne(
 
 
 @pytest.mark.django_db
+def test_une_liste_envoyee_apres_la_disparition_d_un_projet_affiche_est_reaffichee_en_erreur(
+    admin_client: Client,
+) -> None:
+    """Un projet affiché est supprimé — par un autre onglet — avant l'envoi de la liste : sa ligne
+    arrive sans objet et le formulaire la refuse. `SortableListFormSet.clean` rend alors la main
+    avant de lire les positions de cette ligne, qu'elle n'a pas : la liste se réaffiche avec son
+    erreur, au lieu d'une 500, et les projets restants gardent leur position."""
+    projects("a", "b", "c")
+    data = sent(admin_client.get(changelist()))
+    Project.objects.filter(slug="b").delete()
+
+    reshown = admin_client.post(changelist(), data)
+
+    assert reshown.status_code == 200
+    assert any(reshown.context["cl"].formset.errors)
+    assert stored() == {"a": 1, "c": 3}
+
+
+@pytest.mark.django_db
 def test_enregistrer_la_liste_vide_le_cache_de_l_api(
     admin_client: Client,
     client: Client,
@@ -242,7 +261,10 @@ def test_la_liste_des_projets_livre_au_script_les_prises_qu_il_lit(admin_client:
     script remplit, le script et sa feuille, et ce que rend le gabarit de Django
     (`admin/change_list.html`, `admin/change_list_results.html`), qu'une montée de version peut
     déplacer : le formulaire, le tableau et ses lignes, les classes de la colonne de la position que
-    la feuille cache, et le bouton « Enregistrer »."""
+    la feuille cache, et le bouton « Enregistrer ». Le script émet aussi un `change` sur la position
+    d'une ligne déplacée : seul cet événement arme l'avertissement de Django avant une action
+    (`admin/js/actions.js`, `list_editable_changed`), que le glisser et les flèches ne produisent
+    pas."""
     projects("a", "b", "c")
     script, style = code(INLINE_ROWS_SCRIPT), code(INLINE_ROWS_STYLE)
 
@@ -250,6 +272,10 @@ def test_la_liste_des_projets_livre_au_script_les_prises_qu_il_lit(admin_client:
 
     for hook in (f".{HANDLE_CLASS}", f"input.{POSITION_CLASS}", "#result_list > tbody > tr"):
         assert hook in script
+    assert re.search(
+        rf'input\.{POSITION_CLASS}"\)\?\.dispatchEvent\(\s*new Event\("change", \{{ bubbles: true \}}\)',
+        script,
+    )
     for hook in ("#result_list", f".column-{POSITION}", f".field-{POSITION}"):
         assert hook in style
     for asset in (INLINE_ROWS_SCRIPT, INLINE_ROWS_STYLE):

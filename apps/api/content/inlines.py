@@ -257,9 +257,11 @@ class SortableListForm[ModelT: Model](ModelForm[ModelT]):
     def changed_data(self) -> list[str]:  # pyright: ignore[reportIncompatibleVariableOverride]
         """Les champs que l'enregistrement change : la position, quand celle que la ligne reçoit
         diffère de la sienne ; tout autre champ, quand l'envoi le change. Django en tire le besoin
-        d'enregistrer la ligne (`has_changed`) et ce qu'en dit l'historique."""
+        d'enregistrer la ligne (`has_changed`) et ce qu'en dit l'historique. Une ligne dont le
+        projet a disparu depuis l'affichage n'a pas de position initiale : son formulaire la
+        refuse, et la liste se réaffiche en erreur (`SortableListFormSet.clean`)."""
         changed = [name for name in super().changed_data if name != POSITION]
-        if getattr(self.instance, POSITION) != self.initial[POSITION]:
+        if getattr(self.instance, POSITION) != self.initial.get(POSITION):
             changed.append(POSITION)
         return changed
 
