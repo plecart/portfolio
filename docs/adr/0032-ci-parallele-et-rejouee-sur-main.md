@@ -8,10 +8,13 @@
   (§ Conséquences), les verdicts « Écartée : le coût » et « **Retenue** » (§ Comparaison des
   options) ; dans l'ADR 0019, « `web` et `infra` attendent un `api` vert » (§ Décision,
   point 3) ; dans l'ADR 0031, « **Une vérification tourne à un seul endroit.** » et « Le push sur
-  `main` livre. » (§ Facteurs de décision), les points 1, 3 et 4 (§ Décision), « Un avis neuf est
-  vu sous une semaine » et « Une régression des images ou du mobile […] est vue à la fumée ou au
-  run hebdomadaire » (§ Conséquences), « Re-mesure quatre semaines après le merge de la PR #279 »
-  (§ Conditions de réexamen) ; ces ADR restent acceptés pour le reste ; interrogatoire de #285
+  `main` livre. » (§ Facteurs de décision), les points 1, 3 et 4 (§ Décision), « Le push sur
+  `main` publie et déploie plus vite : ses jobs de vérification ne le précèdent plus », « Un merge
+  dont le trunk a bougé après le run de PR n'est plus retesté avant la livraison », « Des PR de
+  Dependabot mergées d'affilée ne sont plus éprouvées ensemble », « Un avis neuf est vu sous une
+  semaine » et « Une régression des images ou du mobile […] est vue à la fumée ou au run
+  hebdomadaire » (§ Conséquences), « Re-mesure quatre semaines après le merge de la PR #279 » et
+  « Un rouge du run hebdomadaire naît d'une PR mergée » (§ Conditions de réexamen) ; ces ADR restent acceptés pour le reste ; interrogatoire de #285
   du 2026-11-24, décisions D1 à D8 du corps de l'issue
 
 ## Contexte
@@ -40,7 +43,7 @@ vivante**, relevée le 2026-11-24, un ordre de grandeur : `api` 3 min, `web` 13,
   livré est le commit poussé : c'est lui qu'une vérification rejouée juge.
 - La fumée reste la seule preuve en CI que la pile de production démarre (ADR 0031).
 - Un avis neuf doit être vu sous un jour (ADR 0019, § Facteurs de décision) : motif de sécurité,
-  que l'ADR 0031 n'avait reculé au lundi que pour le quota.
+  que l'ADR 0031 avait reculé au lundi pour le seul quota, et que cet ADR rétablit.
 - Chaque rouge réveille la session PR : un rouge qui ne porte pas sur ce que la PR change coûte
   des jetons sans rien juger (ADR 0019, § Contexte, « Jetons »).
 
