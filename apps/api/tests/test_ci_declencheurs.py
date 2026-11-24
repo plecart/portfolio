@@ -411,8 +411,8 @@ FORMS: dict[str, Form] = {
     "changes après api": (gating_findings, "  changes:\n", "  changes:\n    needs: api\n", True),
     # Chaque push d'une draft lancerait un run (ADR 0019).
     "changes sans garde draft": (gating_findings, CHANGES_IF_LINE, "", True),
-    # Le garde de l'ADR 0031 : un push vers `main` ne rejouerait aucune vérification, et `deploy`
-    # partirait sur le seul vert de la fumée.
+    # Le garde de l'ADR 0031 : un push vers `main` ne rejouerait aucune vérification, et `deploy`,
+    # qui exige un `api` vert, ne partirait plus.
     "changes sur une PR seulement": (
         gating_findings,
         CHANGES_IF_LINE,
