@@ -13,9 +13,9 @@ Chaque étape ci-dessous s'invoque par le nom de son skill (`/triage`, `/cycle-p
 ## Démarrer en local
 
 Le dépôt porte trois piles, provisionnées séparément : le back (`uv`), le front (Node) et la pile
-de développement (Docker). Elles n'ont pas les mêmes prérequis, et la CI les tient dans trois jobs
-distincts, pour qu'un rouge du front ne masque pas un rouge de l'infra, ni l'inverse ; les deux
-attendent un back vert.
+de développement (Docker). Elles n'ont pas les mêmes prérequis, et la CI les tient dans des jobs
+distincts, pour qu'un rouge du front ne masque pas un rouge de l'infra, ni l'inverse ; tous partent
+ensemble.
 
 **Back (`apps/api`)** — Python 3.12, épinglé par `.python-version` et lu par `uv` :
 
@@ -194,13 +194,12 @@ poste.
 
 **Audit des dépendances.** `make audit` (Python) et `make web-audit` (front) ne sont pas des portes
 de chaque PR : leur verdict change sans commit, quand un avis se publie. Le workflow
-[`avis.yml`](.github/workflows/avis.yml) les joue chaque lundi sur `main`, appelé par le run
-hebdomadaire [`hebdo.yml`](.github/workflows/hebdo.yml), et la CI les joue sur une PR qui touche
-leurs entrées — manifestes, verrous, Dockerfiles, exceptions datées, porte de `pip-audit`,
-`avis.yml` — ou ce qui décide des jobs (`Makefile`, `ci.yml`, `changed_jobs.py`)
-([ADR 0019](docs/adr/0019-runs-de-ci-au-ready-et-avis-planifies.md), décision 2) ; le push sur
-`main` ne fait que livrer, son scan des images avant chaque publication
-([ADR 0031](docs/adr/0031-chaque-verification-de-la-ci-a-un-seul-endroit.md)). Un rouge d'avis
+[`avis.yml`](.github/workflows/avis.yml) les joue chaque jour sur `main`, et la CI les joue sur une
+PR qui touche leurs entrées — manifestes, verrous, Dockerfiles, exceptions datées, porte de
+`pip-audit`, `avis.yml` — ou ce qui décide des jobs (`Makefile`, `ci.yml`, `changed_jobs.py`)
+([ADR 0019](docs/adr/0019-runs-de-ci-au-ready-et-avis-planifies.md), décision 2) ; pas sur un push
+vers `main`, qui scanne les images avant chaque publication
+([ADR 0032](docs/adr/0032-ci-parallele-et-rejouee-sur-main.md)). Un rouge d'avis
 se corrige sur le trunk, par la voie courte — une montée de version ou une exception datée —,
 jamais par d'autres pushes sur une PR. Côté Python, tout avis de sécurité connu rougit l'audit —
 `pip-audit` n'expose pas de sévérité ; côté front, les avis `high` et `critical`. Un avis Python
@@ -210,13 +209,14 @@ dont le format est en tête du fichier ; la date passée, l'audit rebloque. `npm
 fichier d'exceptions : son arbre se nettoie par les `overrides` du manifeste
 ([docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4).
 
-**Tests des images.** `make image-test`, porte de CI sur chaque PR qui touche ce que les images
-définissent ou exécutent — liste `INFRA` de [infra/ci/changed_jobs.py](infra/ci/changed_jobs.py)
-([ADR 0031](docs/adr/0031-chaque-verification-de-la-ci-a-un-seul-endroit.md)) — et chaque lundi
-sur `main`, dans [`hebdo.yml`](.github/workflows/hebdo.yml), démarre les images que `make build` a
-chargées et les interroge ([infra/tests/](infra/tests/)) : le test de fumée du Caddyfile de
-production, la chaîne de sauvegarde de l'image `backup`, jouée dans le Compose de production contre
-un témoin S3 et un témoin de ping, et la restauration de ses sauvegardes par
+**Tests des images.** `make image-test`, porte de CI du job `infra` sur chaque PR, et chaque push
+vers `main`, qui touche ce que les images définissent ou exécutent — liste `INFRA` de
+[infra/ci/changed_jobs.py](infra/ci/changed_jobs.py)
+([ADR 0031](docs/adr/0031-chaque-verification-de-la-ci-a-un-seul-endroit.md), décision 2 ;
+[ADR 0032](docs/adr/0032-ci-parallele-et-rejouee-sur-main.md)) —, démarre les images que
+`make build` a chargées et les interroge ([infra/tests/](infra/tests/)) : le test de fumée du
+Caddyfile de production, la chaîne de sauvegarde de l'image `backup`, jouée dans le Compose de
+production contre un témoin S3 et un témoin de ping, et la restauration de ses sauvegardes par
 [infra/restore.sh](infra/restore.sh), `api` compris. Il ne fait pas partie de `make test` : il lui
 faut les images construites, donc le front compilé. Sur le poste, `make build` d'abord. Chaque test
 démarre sa pile sous son propre nom de projet Compose — sans port publié, ou sur un port hôte que
@@ -288,8 +288,8 @@ Le test d'égalité de `make image-test` rougit tant que la version du
 dans la même PR, puis `make build-caddy scan-caddy`, puis `make build image-test`.
 
 **Publication des images.** Rien à faire à la main : à chaque push sur `main`, sans attendre
-d'autre job — la PR a joué les vérifications
-([ADR 0031](docs/adr/0031-chaque-verification-de-la-ci-a-un-seul-endroit.md)) —, le job `publish`
+d'autre job — les vérifications rejouent le commit en parallèle, et le déploiement attend leur vert
+([ADR 0032](docs/adr/0032-ci-parallele-et-rejouee-sur-main.md)) —, le job `publish`
 compile le front, reconstruit les images, les scanne par `make scan`, puis les pousse sur
 GHCR — `ghcr.io/plecart/portfolio-<service>`, paquets privés — sous le SHA complet du commit et
 sous `latest` (`make push`) ; chaque paquet garde ses trois versions les plus récentes

@@ -1,12 +1,13 @@
 # Les portes à base d'avis (ADR 0019, décision 2) : `make audit` (pip-audit), `make web-audit`
 # (npm audit), puis `make build` et `make scan` (Trivy). Leur verdict change sans commit, quand une
-# base d'avis se publie. Ce workflow ne se lance pas seul : le run hebdomadaire (`hebdo.yml`)
-# l'appelle chaque lundi sur `main`, et le job `avis` de `ci.yml` sur une PR qui touche leurs
-# entrées (`infra/ci/changed_jobs.py`) (ADR 0031, décision 4). Une seule définition des cibles et
-# de leur ordre, pour les deux.
+# base d'avis se publie : ce workflow se lance seul chaque jour sur `main`, et à la main ; le job
+# `avis` de `ci.yml` l'appelle sur une PR qui touche leurs entrées (`infra/ci/changed_jobs.py`)
+# (ADR 0032, décision 5). Une seule définition des cibles et de leur ordre, pour les deux.
 #
 # Un rouge d'avis se corrige sur le trunk, par la voie courte — une montée de version ou une
 # exception datée —, jamais par d'autres pushes sur une PR (`cycle-pr` Étape 6, « Rouge d'avis »).
+# L'échec d'un run planifié est notifié à qui a créé le workflow, ou changé sa ligne `cron` en
+# dernier (doc GitHub « Notifications for workflow runs », lue le 2026-11-21).
 #
 # Chaque action est épinglée par empreinte (`apps/api/tests/test_supply_chain.py`). `apps/api/tests/test_ci_declencheurs.py` tient la forme
 # du workflow, `apps/api/tests/test_image_scan.py` son scan.
@@ -15,14 +16,21 @@ name: Avis
 
 # La lecture du dépôt, rien d'autre. Appelé, il reçoit le jeton de son appelant, que ses
 # permissions ne peuvent que restreindre (doc GitHub « Reusing workflow configurations »). Ni `env`
-# — un `MAKEFLAGS` y atteindrait `make` —, ni `concurrency` : il prend le contexte `github` de son
-# appelant, et `github.workflow` y vaut le nom de celui-ci (même doc).
+# — un `MAKEFLAGS` y atteindrait `make` —, ni `concurrency` : appelé, il prend le contexte `github`
+# de son appelant, et `github.workflow` y vaut le nom de celui-ci (même doc).
 permissions:
   contents: read
 
 on:
-  # Par le job `avis` de `ci.yml` et par `hebdo.yml`, au commit même du workflow qui l'appelle (doc
-  # GitHub « Reuse workflows »). Planifié ou à la main, c'est `hebdo.yml` qui se lance.
+  # Chaque jour à 05:37 UTC, sur le dernier commit de `main` : un avis neuf se voit sous un jour
+  # (ADR 0032, décision 5). Hors du début d'heure, où GitHub retarde, voire abandonne, les runs
+  # planifiés en période de charge (doc GitHub « Events that trigger workflows »).
+  schedule:
+    - cron: "37 5 * * *"
+  # À la main : vérifier qu'un correctif du trunk lève le rouge, sans attendre le lendemain.
+  workflow_dispatch:
+  # Par le job `avis` de `ci.yml`, sur une PR, au commit même du workflow qui l'appelle (doc GitHub
+  # « Reuse workflows »).
   workflow_call:
 
 jobs:
@@ -34,16 +42,16 @@ jobs:
       # Appelé par `ci.yml` sur une PR, il en hérite l'événement et le `GITHUB_SHA` (doc GitHub
       # « Events that trigger workflows », `workflow_call`, lue le 2026-11-08) : la tête, fusionnée
       # au trunk courant comme dans les jobs de `ci.yml`, et la ligne de fusion nomme le même
-      # workflow qu'eux. Appelé par `hebdo.yml`, planifié ou à la main, `ref` est vide — le checkout
-      # prend le commit de l'événement — et le pas de fusion ne joue pas.
+      # workflow qu'eux. Lancé seul, planifié ou à la main, `ref` est vide — le checkout prend le
+      # commit de l'événement — et le pas de fusion ne joue pas.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      # Copie du pas « Fusion explicite du trunk » du job `api` de `ci.yml`, qui dit pourquoi : une
-      # ancre YAML ne traverse pas les fichiers, et `apps/api/tests/test_ci_declencheurs.py` tient
-      # les deux égaux.
+      # Copie du pas « Fusion explicite du trunk » du job `changes` de `ci.yml`, qui dit pourquoi :
+      # une ancre YAML ne traverse pas les fichiers, et `apps/api/tests/test_ci_declencheurs.py`
+      # tient les deux égaux.
       - name: Fusion explicite du trunk
         if: github.event_name == 'pull_request'
         shell: bash

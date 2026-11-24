@@ -82,9 +82,10 @@ RETENTION_CASES: dict[str, tuple[list[dict[str, object]], list[int]]] = {
 }
 
 # Ce que porte le job `publish` (brief de #15, décision 5) : il ne tourne que sur un push vers
-# `main`, et n'attend aucun job de vérification — la PR, fusionnée au trunk, les a joués (ADR 0031,
-# décision 1) ; seul à écrire dans le registre, il lit le dépôt sans y écrire, et le reste du
-# workflow ne fait que lire ; une publication attend la fin de la précédente, sans l'annuler.
+# `main`, et n'attend aucun job de vérification — elles rejouent le commit pendant la publication,
+# et `deploy` attend leur vert (ADR 0032, décision 2) ; seul à écrire dans le registre, il lit le
+# dépôt sans y écrire, et le reste du workflow ne fait que lire ; une publication attend la fin de
+# la précédente, sans l'annuler.
 PUBLISH_IF = "github.event_name == 'push' && github.ref == 'refs/heads/main'"
 READ_ONLY = {"contents": "read"}
 PUBLISH_PERMISSIONS = {"contents": "read", "packages": "write"}
@@ -111,7 +112,7 @@ PUBLISH_PRUNE = f"make prune IMAGE_PREFIX={PUBLISH_PREFIX}"
 
 # Les drapeaux du build, seule variable de son étape : l'image chargée dans le moteur, où Trivy la
 # lit, sans attestation (décision 7), depuis le cache des couches sauf l'étage `paquets`, et ce
-# cache écrit pour `main` (ADR 0031). Mot pour mot : un drapeau de plus (`--push`,
+# cache écrit pour `main` (ADR 0032). Mot pour mot : un drapeau de plus (`--push`,
 # `--output type=registry`) enverrait l'image au registre avant son scan.
 PUBLISH_BUILD_FLAGS = (
     "--load --no-cache-filter paquets --cache-from type=local,src=/tmp/buildx-cache,tag=$*"
@@ -125,7 +126,7 @@ WORKFLOW_TOKEN_ENV = {"GH_TOKEN": "${{ github.token }}"}
 # son environnement, et aucune autre : rien n'atteint le registre avant le scan. Une connexion
 # placée plus tôt donnerait son identifiant au build, une étape de plus pourrait pousser, une
 # variable de plus (`MAKEFLAGS: -i`) ferait ignorer un échec. Le front, installé ici, que
-# `make build` compile : aucun artefact d'un job de vérification (ADR 0031) ; le cache des couches,
+# `make build` compile : aucun artefact d'un job de vérification (ADR 0032) ; le cache des couches,
 # restauré puis écrit.
 PUBLISH_STEPS: list[tuple[str, dict[str, str] | None]] = [
     ("actions/checkout", None),
@@ -258,7 +259,7 @@ def publish_findings(workflow: str) -> list[str]:
         return ["aucun job `publish`"]
     findings: list[str] = []
     if needs := needed(job):
-        findings.append(f"`publish` attend {needs} : il n'attend aucun job (ADR 0031)")
+        findings.append(f"`publish` attend {needs} : il n'attend aucun job (ADR 0032)")
     if job.get("if") != PUBLISH_IF:
         findings.append(f"`if` vaut {job.get('if')!r}, attendu {PUBLISH_IF!r}")
     if document.get("permissions") != READ_ONLY:
@@ -379,22 +380,24 @@ PUBLISH_CHANGES = {
     "conforme": ("", "", False),
     "sans le job": ("  publish:", "  autre:", True),
     "sans le disque libéré": (f"      - run: {json.dumps(DISQUE_RUN)}\n", "", True),
-    # Un job de vérification attendu : il ne tourne plus sur un push vers `main`, et `publish`
-    # sauterait avec lui (ADR 0031, décision 1).
+    # Un job de vérification attendu : la publication partirait après les vérifications, l'option
+    # écartée pour sa durée — 13 à 16 min de plus à chaque merge (ADR 0032, b2).
     "attend un job": ("  publish:\n", "  publish:\n    needs: api\n", True),
     "attend les quatre jobs": (
         "  publish:\n",
         "  publish:\n    needs: [api, web, infra, avis]\n",
         True,
     ),
-    # Le front du job `web`, par artefact : il n'y en a plus sur `main`.
+    # Le front du job `web`, par artefact : `publish` ne l'attend pas, et `web` ne tourne sur `main`
+    # que si le delta touche le front.
     "télécharge le front": (
         INSTALL_LINES,
         "      - uses: actions/download-artifact@v0\n",
         True,
     ),
     "sans le front installé": ("      - run: make web-install\n", "", True),
-    # Un cache que seule une PR écrirait : `main` ne le lit pas (ADR 0031, décision 1).
+    # `infra` ne tourne sur `main` que si le delta touche les images : une entrée absente de `main`
+    # ne s'y écrirait qu'au prochain changement d'image, et celle d'une PR ne s'y lit pas.
     "cache restauré sans être écrit": ("actions/cache@v0", "actions/cache/restore@v0", True),
     "build qui n'écrit pas le cache": (
         " --cache-to type=local,dest=/tmp/buildx-cache,tag=$*,mode=max",
@@ -617,10 +620,10 @@ def test_la_garde_du_job_publish_rend_son_verdict_sur_chaque_forme(
 
 
 def test_le_job_publish_ne_publie_qu_un_commit_de_main_une_fois_scanne() -> None:
-    """Aucun `needs` : la PR a joué les vérifications, fusionnée au trunk (ADR 0031) ; push vers
-    `main` seulement, `packages: write` sur ce seul job, publications sans annulation ; le front
-    installé ici, build qui écrit le cache des couches, scan, connexion, push puis rétention, et
-    rien n'atteint le registre avant le scan (brief de #15, décision 5).
+    """Aucun `needs` : les vérifications rejouent le commit pendant la publication (ADR 0032) ;
+    push vers `main` seulement, `packages: write` sur ce seul job, publications sans annulation ;
+    le front installé ici, build qui écrit le cache des couches, scan, connexion, push puis
+    rétention, et rien n'atteint le registre avant le scan (brief de #15, décision 5).
     Un `workflow_run` est écarté : il publierait depuis le workflow de la branche par défaut
     (ADR 0014)."""
     assert publish_findings(CI_WORKFLOW.read_text(encoding="utf-8")) == []
@@ -663,9 +666,8 @@ def cache_inputs(job: str, action: str) -> object:
 
 @pytest.mark.parametrize("job", [job for job in CACHED_BUILDS if job != "infra"])
 def test_chaque_build_en_cache_prend_la_cle_du_job_infra(job: str) -> None:
-    """`publish`, qui écrit l'entrée que `main` lit, et ceux qui la restaurent — `avis` pour
-    scanner, `images` pour les tests du run hebdomadaire — prennent la clé d'`infra`, celle qu'une
-    PR restaure, ou écrit si elle manque. Deux clés qui dériveraient feraient reconstruire à
-    froid, sans un signal."""
+    """`publish`, qui écrit l'entrée que `main` lit, et `avis`, qui la restaure pour scanner,
+    prennent la clé d'`infra`, celle qu'une PR restaure, ou écrit si elle manque. Deux clés qui
+    dériveraient feraient reconstruire à froid, sans un signal."""
     action = "actions/cache" if CACHED_BUILDS[job][1] else "actions/cache/restore"
     assert cache_inputs(job, action) == cache_inputs("infra", "actions/cache")
