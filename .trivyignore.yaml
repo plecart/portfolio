@@ -252,6 +252,21 @@ vulnerabilities:
       Debian 12 non touché, mais rouvrirait le choix de Debian 13 (ADR 0014).
     expired_at: 2026-12-21
 
+  - id: CVE-2026-107494
+    paths:
+      - "**/portfolio-api (debian 13.*)"
+    statement: >-
+      Place : `libssl3t64`, `openssl` et `openssl-provider-legacy` (OpenSSL 3.5.7), comme pour
+      CVE-2026-124709 : impossibles à retirer, et nécessaires aux modules `ssl` et `hashlib` de
+      Python. Atteinte : non — le défaut est dans la file des trames QUIC d'OpenSSL ; trois objets
+      ELF de l'image chargent `libssl.so.3`, le module `_ssl` de Python, la méthode `http` d'apt et
+      `openssl` ; seul `openssl` importe une fonction QUIC (`OSSL_QUIC_client_method`), et rien de
+      ce qui tourne ne le lance (relevé des imports dynamiques, 2026-11-24, sur une image `api`
+      à OpenSSL 3.5.7-1~deb13u3, la version scannée). Alternatives : sans correctif dans
+      Debian 13 au 2026-11-24 (Trivy : « affected ») ; l'exception attend sa publication et la
+      reconstruction de l'image de base.
+    expired_at: 2026-12-24
+
   # --- Image `backup` : le binaire `supercronic` v0.2.51, fichier de sa release (ADR 0018) ------
 
   - id: CVE-2026-97054
