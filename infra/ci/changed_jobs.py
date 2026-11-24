@@ -1,18 +1,22 @@
-"""Ce que concerne un delta de PR — les jobs `web`, `infra`, `avis`, et les tests de la
-pipeline —, en `$GITHUB_OUTPUT`.
+"""Ce que concerne un delta — les jobs `web`, `infra`, `avis`, et les tests de la pipeline —, en
+`$GITHUB_OUTPUT`.
 
-Lancé par la première étape du job `api` de `.github/workflows/ci.yml`, sur le delta de la PR :
+Lancé par le job `changes` de `.github/workflows/ci.yml`, sur le delta d'une PR ou d'un push vers
+`main` :
 
-    git diff --name-only --no-renames HEAD^1 HEAD | python3 infra/ci/changed_jobs.py >> "$GITHUB_OUTPUT"
+    git diff --name-only --no-renames "$BASE" HEAD | python3 infra/ci/changed_jobs.py >> "$GITHUB_OUTPUT"
 
-`--no-renames` : un renommage y figure sous ses deux chemins, l'ancien et le nouveau — un fichier
-déplacé du front vers `docs/` fait donc tourner `web`.
+`BASE` : sur une PR, `HEAD^1`, le trunk que le pas de fusion a combiné ; sur un push,
+`github.event.before`, un push pouvant porter plusieurs commits. `--no-renames` : un renommage y
+figure sous ses deux chemins, l'ancien et le nouveau — un fichier déplacé du front vers `docs/`
+fait donc tourner `web`.
 
 Lit sur l'entrée standard les chemins du delta, un par ligne, lignes vides ignorées, et écrit
 `web=true|false`, `infra=true|false`, `avis=true|false`, puis `pipeline=true|false`. Les jobs
-`web`, `infra` et `avis`, et l'étape « Tests pipeline » du job `api`, ne tournent que si leur
-réponse vaut `true` (ADR 0017, ADR 0019, ADR 0025). Le job `api` tourne sur chaque push d'une PR
-prête ; un push vers `main` ne lance aucun d'eux : il ne fait que livrer (ADR 0031).
+`web` et `mobile` — sur la réponse `web` —, `infra` et `avis`, et l'étape « Tests pipeline » du
+job `api`, ne tournent que si leur réponse vaut `true` (ADR 0017, ADR 0019, ADR 0025,
+ADR 0032) ; `api` tourne toujours. `avis` ne tourne pas sur un push, quelle que soit sa réponse :
+la condition est dans `ci.yml`.
 
 Règles, par motif `fnmatch` — où `*` traverse `/` :
 
@@ -31,7 +35,7 @@ Règles, par motif `fnmatch` — où `*` traverse `/` :
   minutes. Les quatre les ajoutent à leurs motifs (`JOB_PATTERNS`).
 
 Liste vide : aucun des quatre. Code de sortie 0 ; l'étape qui le lance tourne sous `pipefail`, et
-un `git diff` en échec y fait rougir le job `api` au lieu de rendre `false` en silence.
+un `git diff` en échec y fait rougir le job `changes` au lieu de rendre `false` en silence.
 """
 
 import sys

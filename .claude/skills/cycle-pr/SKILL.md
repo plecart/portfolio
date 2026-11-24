@@ -656,10 +656,10 @@ et rend une ligne — le verdict, le run, le SHA court et le paragraphe à suivr
 - sortie 3, draft — la PR est encore en draft, aucun run lu → `gh pr ready <numéro>` d'abord,
   puis relancer le script ;
 - sortie 3 → « Si aucun run n'apparaît », ci-dessous : `skipped` resté le plus récent au délai,
-  la draft jamais repoussée — le run sauté d'un push en draft, que le garde du job `api` saute
-  (mesuré le 2026-10-20 sur l'amorce de la PR #137), sans run du passage en ready ; `cancelled`
-  sans nouvelle tête, annulé sans remplaçant ; aucun run au délai, un événement émis pendant une
-  panne d'Actions ;
+  la draft jamais repoussée — le run sauté d'un push en draft, que le garde de la CI saute (job
+  `api` mesuré le 2026-10-20 sur l'amorce de la PR #137, job `changes` depuis l'ADR 0032), sans
+  run du passage en ready ; `cancelled` sans nouvelle tête, annulé sans remplaçant ; aucun run au
+  délai, un événement émis pendant une panne d'Actions ;
 - sortie 124, délai dépassé : Étape 6, « CI qui ne démarre pas ».
 
 Jamais une fin de tour nue : le moniteur de PR de l'application ne réveille que sur un échec, un
@@ -719,15 +719,15 @@ ses jobs,
     le job n'a aucun step → allocation de runner (quota, incident fournisseur) — ne pas modifier
     le workflow, surveiller en fond et **rendre la main au mainteneur**. Les runs `skipped`
     (garde `if:`) se terminent sans runner et ne prouvent rien sur la disponibilité de la CI.
-  - *Rouge d'avis* : le step d'audit ou de scan rougit — au run hebdomadaire du trunk
-    (`hebdo.yml`, ADR 0031), ou au job des portes d'avis d'une PR sur un paquet que son diff ne
+  - *Rouge d'avis* : le step d'audit ou de scan rougit — au run quotidien du trunk
+    (`avis.yml`, ADR 0032), ou au job des portes d'avis d'une PR sur un paquet que son diff ne
     touche pas (`.claude/pipeline.config.md`, « Qualité ») → une base d'avis a changé sans
     commit. C'est une **procédure du trunk**, pas de la PR (ADR 0019, décision 2) : l'avis porte
     sur l'état du monde, et se corrige sur le trunk par la voie courte (« Voie courte — correctif
     évident ») — une montée de version ou une exception datée —, jamais par d'autres pushes sur
     la PR, qui repaieraient le même verdict. Pour un rouge
-    de PR, vérifier d'abord que le trunk rougit aussi — le dernier run hebdomadaire, ou un
-    `workflow_dispatch` de `hebdo.yml`, sinon la porte elle-même, sa commande du projet
+    de PR, vérifier d'abord que le trunk rougit aussi — le dernier run quotidien, ou un
+    `workflow_dispatch` d'`avis.yml`, sinon la porte elle-même, sa commande du projet
     lancée sur `origin/<trunk>` dans un worktree jetable — et pour un scan d'images, précédée de
     leur construction depuis ce worktree sous un nom propre au trunk : le démon de conteneurs est
     partagé, et un scan sous le nom par défaut lirait les images de la branche, celles mêmes qu'il

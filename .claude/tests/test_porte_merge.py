@@ -430,8 +430,8 @@ def test_un_run_qui_n_a_pas_eprouve_la_tete_visee_refuse_le_merge_en_2(
     )
 
 
-# Le pas qui écrit la ligne de fusion : celui du job `api` de `ci.yml`, que les autres jobs de la CI
-# reprennent (ADR 0029).
+# Le pas qui écrit la ligne de fusion : celui du job `changes` de `ci.yml`, que les autres jobs de
+# la CI reprennent (ADR 0029).
 CI_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
 PAS_DE_FUSION = "Fusion explicite du trunk"
 IDENTITE_GIT = (
@@ -444,8 +444,8 @@ IDENTITE_GIT = (
 
 
 def pas_de_fusion() -> dict[str, Any]:
-    """Le pas de fusion du job `api` de `ci.yml`, sous sa forme analysée."""
-    steps = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["api"]["steps"]
+    """Le pas de fusion du job `changes` de `ci.yml`, sous sa forme analysée."""
+    steps = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["changes"]["steps"]
     (pas,) = [pas for pas in steps if pas.get("name") == PAS_DE_FUSION]
     return pas
 

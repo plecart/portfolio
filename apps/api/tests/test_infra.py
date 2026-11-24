@@ -49,10 +49,8 @@ COMPOSE_DEV = REPOSITORY_ROOT / "infra" / "compose.dev.yml"
 PYTHON_VERSION_FILE = REPOSITORY_ROOT / ".python-version"
 DOCKERIGNORE = REPOSITORY_ROOT / ".dockerignore"
 CI_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
-# Les portes d'avis, appelées par le job `avis` de `CI_WORKFLOW` et par le run hebdomadaire.
+# Les portes d'avis, chaque jour sur `main` et appelées par le job `avis` de `CI_WORKFLOW`.
 AVIS_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "avis.yml"
-# Le run hebdomadaire (ADR 0031, décision 4) : portes d'avis, tests des images, e2e mobile.
-HEBDO_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "hebdo.yml"
 # La commande du pas qui libère le disque du runner avant le build des images, mot pour mot :
 # la même dans `avis.yml` et dans `publish`, qui scannent tous deux (`test_ci_declencheurs.py`,
 # `test_publication.py`).
@@ -543,13 +541,13 @@ def build_flags(steps: list[dict[str, Any]]) -> list[str]:
 
 # Les jobs qui construisent les images avec le cache local — tous : un test le tient —, le
 # workflow de chacun et s'il écrit le cache, sous une même clé : `infra` le lit et l'écrit, sur une
-# PR ; `publish` aussi, sur `main` — l'entrée d'une PR n'est lisible que d'elle (ADR 0031) ;
-# `avis` et le job `images` du run hebdomadaire le lisent seulement (ADR 0014, ADR 0019).
+# PR et sur `main` selon le delta (ADR 0032) ; `publish` aussi, sur chaque push vers `main` —
+# l'entrée d'une PR n'est lisible que d'elle (doc GitHub « Dependency caching », citée au job
+# `publish` de `ci.yml`) ; `avis` le lit seulement (ADR 0014, ADR 0019).
 CACHED_BUILDS = {
     "infra": (CI_WORKFLOW, True),
     "publish": (CI_WORKFLOW, True),
     "avis": (AVIS_WORKFLOW, False),
-    "images": (HEBDO_WORKFLOW, False),
 }
 
 
@@ -575,19 +573,14 @@ def test_chaque_build_en_cache_de_la_ci_est_recense() -> None:
     assert building == {(workflow, job) for job, (workflow, _) in CACHED_BUILDS.items()}
 
 
-# Les jobs qui testent les images qu'ils viennent de construire, et leur workflow : `infra` sur une
-# PR, `images` au run hebdomadaire (ADR 0031, décision 4).
-IMAGE_TEST_JOBS = {"infra": CI_WORKFLOW, "images": HEBDO_WORKFLOW}
-
-
-@pytest.mark.parametrize("job", IMAGE_TEST_JOBS)
-def test_chaque_job_des_tests_des_images_les_lance_apres_leur_build(job: str) -> None:
-    """`make image-test` démarre les images que `make build` a chargées : avant le build, il n'a
+def test_le_job_infra_lance_les_tests_des_images_apres_leur_build() -> None:
+    """Les tests des images vivent dans `infra`, sur une PR comme sur `main` (ADR 0032, décision
+    4). `make image-test` démarre les images que `make build` a chargées : avant le build, il n'a
     rien à démarrer ; absent, le Caddyfile de production n'est éprouvé nulle part en CI — mesuré à
     la relecture de la PR #67, l'étape retirée laissait toute la suite verte. Son étape ne porte
     que son nom et sa commande : ni `if` qui la sauterait, ni `continue-on-error` qui tolérerait
     son échec, ni `env` qui réglerait `make` (`MAKEFLAGS: -i`)."""
-    steps = job_steps(IMAGE_TEST_JOBS[job], job)
+    steps = job_steps(CI_WORKFLOW, "infra")
     commands = [step.get("run") for step in steps]
 
     assert "make build" in commands and "make image-test" in commands, commands

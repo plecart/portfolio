@@ -1,14 +1,15 @@
 """Tests de ce qui déclenche les jobs de la CI (`.github/workflows/ci.yml`, issue #124).
 
-La CI ne dépense des minutes que là où un verdict peut changer (ADR 0017, ADR 0019, ADR 0031) :
-une PR en draft ne tourne pas, son premier run vient du passage en ready, puis de chaque push ; le
-run encore en cours d'une PR s'annule au push suivant de la même PR, jamais sur `main`, où le push
-ne fait que livrer ; `web`, `infra` et `avis` attendent un `api` vert et ne tournent que si le
-delta de la PR touche leurs fichiers — règle de `infra/ci/changed_jobs.py`, lue par la première
-étape du job `api`. Le job `avis` appelle `.github/workflows/avis.yml`, que le run hebdomadaire
-(`.github/workflows/hebdo.yml`) appelle aussi sur `main`, avec les tests des images et l'e2e
-mobile. Sur une PR, chaque job qui extrait le dépôt fusionne lui-même la tête au trunk courant, par
-le pas « Fusion explicite du trunk », écrit dans la définition du workflow et joué ici (ADR 0029).
+Le dépôt est public : les minutes ne coûtent rien, et chaque vérification part dès qu'elle peut
+(ADR 0032). Une PR en draft ne tourne pas, son premier run vient du passage en ready, puis de
+chaque push (ADR 0019) ; le run encore en cours d'une PR s'annule au push suivant de la même PR,
+jamais sur `main`. Un premier job, `changes`, lit le delta — celui de la PR, ou celui d'un push vers
+`main` — par `infra/ci/changed_jobs.py` ; `api`, `web`, `mobile`, `infra` et `avis` l'attendent, lui
+seul, et partent ensemble, chacun si le delta touche ses fichiers — `api` toujours, `avis` sur une
+PR seulement. Le job `avis` appelle `.github/workflows/avis.yml`, qui se lance aussi seul chaque
+jour sur `main`. Sur une PR, chaque job qui extrait le dépôt fusionne lui-même la tête au trunk
+courant, par le pas « Fusion explicite du trunk », écrit dans la définition du workflow et joué ici
+(ADR 0029).
 
 Mesure qui fonde ces réglages, relevée le 2026-10-18 sur les runs du 2026-10-04 au 2026-10-17 —
 `gh api --paginate "repos/plecart/portfolio/actions/runs?created=%3E%3D2026-10-04&per_page=100"`,
@@ -39,8 +40,8 @@ import pytest
 import yaml
 from changed_jobs import IMAGE_TESTS, PIPELINE_TESTS, jobs_for
 from system_commands import run_make
-from test_infra import AVIS_WORKFLOW, CI_WORKFLOW, DISQUE_RUN, HEBDO_WORKFLOW, REPOSITORY_ROOT
-from test_publication import READ_ONLY
+from test_infra import AVIS_WORKFLOW, CI_WORKFLOW, DISQUE_RUN, REPOSITORY_ROOT
+from test_publication import READ_ONLY, needed
 from test_restore_workflow import triggers
 from test_supply_chain import repository_files, texte_normalise
 
@@ -68,24 +69,42 @@ def concurrency_findings(workflow: str) -> list[str]:
     return []
 
 
-# Le garde du job `api` : une PR prête seulement — il saute toute draft, quel que soit l'événement
-# (ADR 0019), et tout push vers `main`, qui ne fait que livrer (ADR 0031, décision 1). Les jobs qui
-# l'attendent sautent avec lui.
-API_IF = "github.event_name == 'pull_request' && github.event.pull_request.draft == false"
-# Les jobs que le delta d'une PR conditionne, et la sortie du job `api` que chacun lit.
-GATED_JOBS = ("web", "infra", "avis")
-API_OUTPUTS = {job: f"${{{{ steps.jobs.outputs.{job} }}}}" for job in GATED_JOBS}
+# Le garde du job `changes` : une PR prête, ou un push vers `main` — aucune draft ne tourne, quel
+# que soit l'événement (ADR 0019), et un push vers `main` rejoue les vérifications du commit livré
+# (ADR 0032, décision 2). Les vérifications l'attendent, et sautent avec lui. La clause `push` est
+# écrite : seule, la comparaison de `draft` serait vraie aussi sur un push, où l'objet
+# `pull_request` manque — GitHub compare `null` à `false` en nombres, 0 contre 0 (doc
+# « Expressions », « Operators », lue le 2026-11-21) —, par une coercion qu'aucun lecteur n'attend.
+CHANGES_IF = "github.event_name == 'push' || github.event.pull_request.draft == false"
+# Les sorties du job `changes`, une par réponse du script.
+CHANGES_OUTPUTS = {
+    output: f"${{{{ steps.jobs.outputs.{output} }}}}"
+    for output in ("web", "infra", "avis", "pipeline")
+}
+# Les vérifications que le delta conditionne, et leur `if` : la sortie du job `changes` que chacune
+# lit — `mobile`, celle de `web` (ADR 0032, décision 3) —, `avis` sur une PR seulement (décision 2).
+# Sans fonction d'état, GitHub applique `success()` à ce `if` (doc « Expressions », « Status check
+# functions », lue le 2026-10-28) : un `changes` rouge ou sauté saute la vérification.
+GATED_IF = {
+    "web": "needs.changes.outputs.web == 'true'",
+    "mobile": "needs.changes.outputs.web == 'true'",
+    "infra": "needs.changes.outputs.infra == 'true'",
+    "avis": "github.event_name == 'pull_request' && needs.changes.outputs.avis == 'true'",
+}
+# Chaque vérification attend `changes`, et lui seul : aucune n'en attend une autre (ADR 0032,
+# décision 1). `api`, sans `if`, tourne toujours.
+VERIFICATION_JOBS = ("api", *GATED_IF)
 # Le job `avis` appelle le workflow des portes d'avis, du même commit que `ci.yml` (doc GitHub
 # « Reuse workflows », lue le 2026-10-29) : une seule définition de leurs cibles et de leur ordre,
 # pour le run planifié comme pour la CI (ADR 0019, décision 2). Les cibles de ces portes, aucun
 # job de pile ne les lance plus.
 AVIS_CALL = "./.github/workflows/avis.yml"
 ADVISORY_TARGETS = {"audit", "web-audit", "scan"}
-STACK_JOBS = ("api", "web", "infra")
+STACK_JOBS = ("api", "web", "mobile", "infra")
 # Sur une PR, chaque job qui extrait le dépôt en extrait la tête, puis la fusionne lui-même au trunk
 # courant par le pas de ce nom : la référence de fusion de la forge n'est pas recalculée quand le
 # trunk avance, et un `gh run rerun` la réutilise (ADR 0029). Clone complet : la fusion exige
-# l'ancêtre commun. Appelé par `hebdo.yml`, planifié ou à la main, `ref` est vide et le checkout
+# l'ancêtre commun. Sur un push, et pour `avis.yml` lancé seul, `ref` est vide et le checkout
 # prend son défaut, le commit de l'événement (`src/input-helper.ts` d'`actions/checkout`, lu le
 # 2026-11-08). Le pas vit dans la définition du workflow, lue au commit du run, jamais dans l'arbre
 # extrait : une action locale se lirait dans la tête, qu'une PR ouverte avant elle ne porte pas.
@@ -95,68 +114,65 @@ FUSION_CHECKOUT = {"ref": PR_HEAD, "fetch-depth": 0}
 # Les jobs qui ne tournent que sur un push vers `main`, où rien ne se fusionne : leur `if`, ce sont
 # `test_publication.py` et `test_deployment.py` qui le tiennent.
 PUSH_ONLY_JOBS = ("publish", "fumee", "deploy")
-# L'étape `jobs`, sans son nom : le delta de la PR contre le trunk qu'elle a fusionné — `HEAD^1`,
-# premier parent du commit du pas de fusion —, passé au script. `shell: bash` lance
-# `bash -eo pipefail` (doc GitHub « Workflow syntax », `jobs.<job_id>.steps[*].shell`) : sans lui,
-# un `git diff` en échec rendrait `false` pour chaque job, en silence. `--no-renames` : sans lui,
-# un renommage ne s'écrit que sous son nouveau chemin (mesuré le 2026-10-20 : `apps/web/a.tsx`
-# déplacé vers `docs/` ne rend que `docs/a.tsx`).
+# L'étape `jobs` du job `changes`, sans son nom : le delta passé au script. Sa base : sur une PR,
+# `HEAD^1`, premier parent du commit du pas de fusion, le trunk combiné ; sur un push vers `main`,
+# `github.event.before` — un merge par rebase pousse plusieurs commits d'un coup, et le dernier seul
+# en cacherait (ADR 0032, décision 2). Elle passe par l'environnement, jamais développée dans le
+# script. `shell: bash` lance `bash -eo pipefail` (doc GitHub « Workflow syntax »,
+# `jobs.<job_id>.steps[*].shell`) : sans lui, un `git diff` en échec rendrait `false` pour chaque
+# job, en silence. `--no-renames` : sans lui, un renommage ne s'écrit que sous son nouveau chemin
+# (mesuré le 2026-10-20 : `apps/web/a.tsx` déplacé vers `docs/` ne rend que `docs/a.tsx`).
+DELTA_BASE = "${{ github.event_name == 'push' && github.event.before || 'HEAD^1' }}"
 CHANGED_JOBS_COMMAND = (
-    "git diff --name-only --no-renames HEAD^1 HEAD"
+    'git diff --name-only --no-renames "$BASE" HEAD'
     ' | python3 infra/ci/changed_jobs.py >> "$GITHUB_OUTPUT"'
 )
-JOBS_STEP = {"id": "jobs", "shell": "bash", "run": CHANGED_JOBS_COMMAND}
-
-
-def gated_if(job: str) -> str:
-    """Le `if` d'un job conditionné : la réponse du script pour ce job. Sans fonction d'état,
-    GitHub y applique `success()` (doc « Expressions », « Status check functions », lue le
-    2026-10-28) : un `api` rouge, sauté ou annulé saute ce job (ADR 0019, décision 3) — et `api`
-    saute tout push vers `main` (ADR 0031)."""
-    return f"needs.api.outputs.{job} == 'true'"
+JOBS_STEP = {
+    "id": "jobs",
+    "shell": "bash",
+    "env": {"BASE": DELTA_BASE},
+    "run": CHANGED_JOBS_COMMAND,
+}
 
 
 def gating_findings(workflow: str) -> list[str]:
-    """Ce qui, dans un workflow, écarte le conditionnement de `GATED_JOBS` des ADR 0017, 0019 et
-    0031.
+    """Ce qui, dans un workflow, écarte le conditionnement des vérifications de l'ADR 0032.
 
     Returns:
-        Un constat par propriété altérée : un job `changes` (un job de plus coûte une minute
-        facturée par run), un `needs` sur `api`, son garde, ses `outputs`, son premier pas qui
-        n'est pas le checkout `FUSION_CHECKOUT`, son second qui n'est pas le pas `FUSION_NAME` — le
-        trunk en premier parent, `HEAD^1..HEAD` le delta —, son troisième qui n'est pas l'étape
-        `JOBS_STEP` ; puis, pour chaque job de `GATED_JOBS`, un `needs` autre que `api` ou un `if`
-        autre que `gated_if`. Liste vide : le workflow est conforme.
+        Un constat par propriété altérée du job `changes` : un `needs`, son garde, ses `outputs`,
+        son premier pas qui n'est pas le checkout `FUSION_CHECKOUT`, son second qui n'est pas le
+        pas `FUSION_NAME` — le trunk en premier parent, `HEAD^1..HEAD` le delta d'une PR —, son
+        troisième qui n'est pas l'étape `JOBS_STEP` ; puis, pour chaque job de
+        `VERIFICATION_JOBS`, un `needs` autre que `changes` seul, ou un `if` autre que celui de
+        `GATED_IF` — aucun pour `api`. Liste vide : le workflow est conforme.
     """
     jobs = cast(dict[str, dict[str, Any]], yaml.safe_load(workflow)["jobs"])
-    findings = (
-        ["un job `changes` : l'ADR 0017 lit le delta dans `api`"] if "changes" in jobs else []
-    )
-    api = jobs.get("api") or {}
-    if "needs" in api:
-        findings.append(f"`api` attend {api['needs']} : il doit partir le premier")
-    if api.get("if") != API_IF:
-        findings.append(f"`api` porte le garde {api.get('if')!r}, attendu {API_IF!r}")
-    if api.get("outputs") != API_OUTPUTS:
-        findings.append(f"`api` rend {api.get('outputs')}, attendu {API_OUTPUTS}")
-    steps = cast(list[dict[str, Any]], api.get("steps") or [])
+    changes = jobs.get("changes") or {}
+    findings: list[str] = []
+    if "needs" in changes:
+        findings.append(f"`changes` attend {changes['needs']} : il doit partir le premier")
+    if changes.get("if") != CHANGES_IF:
+        findings.append(f"`changes` porte le garde {changes.get('if')!r}, attendu {CHANGES_IF!r}")
+    if changes.get("outputs") != CHANGES_OUTPUTS:
+        findings.append(f"`changes` rend {changes.get('outputs')}, attendu {CHANGES_OUTPUTS}")
+    steps = cast(list[dict[str, Any]], changes.get("steps") or [])
     checkout, fusion, step = [*steps, {}, {}, {}][:3]
     if not str(checkout.get("uses")).startswith("actions/checkout@") or (
         checkout.get("with") != FUSION_CHECKOUT
     ):
         findings.append(
-            f"le premier pas d'`api` est {checkout}, attendu un checkout {FUSION_CHECKOUT}"
+            f"le premier pas de `changes` est {checkout}, attendu un checkout {FUSION_CHECKOUT}"
         )
     if fusion.get("name") != FUSION_NAME:
-        findings.append(f"le second pas d'`api` est {fusion}, attendu le pas « {FUSION_NAME} »")
+        findings.append(f"le second pas de `changes` est {fusion}, attendu « {FUSION_NAME} »")
     if {key: value for key, value in step.items() if key != "name"} != JOBS_STEP:
-        findings.append(f"le troisième pas d'`api` est {step}, attendu {JOBS_STEP}")
-    for name in GATED_JOBS:
+        findings.append(f"le troisième pas de `changes` est {step}, attendu {JOBS_STEP}")
+    for name in VERIFICATION_JOBS:
         job = jobs.get(name) or {}
-        if job.get("needs") != "api":
-            findings.append(f"`{name}` attend {job.get('needs')}, attendu `api`")
-        if job.get("if") != gated_if(name):
-            findings.append(f"`{name}` porte {job.get('if')!r}, attendu {gated_if(name)!r}")
+        if needed(job) != ["changes"]:
+            findings.append(f"`{name}` attend {job.get('needs')}, attendu `changes` seul")
+        if job.get("if") != GATED_IF.get(name):
+            findings.append(f"`{name}` porte {job.get('if')!r}, attendu {GATED_IF.get(name)!r}")
     return findings
 
 
@@ -173,7 +189,7 @@ def fusion_findings(workflow: str) -> list[str]:
         Pour chaque job hors de `PUSH_ONLY_JOBS`, un constat par checkout qui ne porte pas la paire
         `FUSION_CHECKOUT`, et un si le pas `FUSION_NAME` ne suit pas immédiatement chaque checkout,
         et lui seul ; pour chaque job de `PUSH_ONLY_JOBS`, un constat s'il le porte. Que ce pas soit
-        celui du job `api`, `test_chaque_pas_de_fusion_est_celui_du_job_api` le tient. Liste
+        celui du job `changes`, `test_chaque_pas_de_fusion_est_celui_du_job_changes` le tient. Liste
         vide : le workflow est conforme.
     """
     findings: list[str] = []
@@ -247,9 +263,9 @@ def trigger_findings(workflow: str) -> list[str]:
 
 
 # L'étape des tests de la pipeline, dans le job `api`, après celle de la suite du back : seulement si
-# le delta de la PR la concerne — la sortie `pipeline` de l'étape `jobs` (ADR 0025, ADR 0031). Aucun
-# job neuf : un job vide coûte une minute facturée (ADR 0017).
-PIPELINE_IF = "steps.jobs.outputs.pipeline == 'true'"
+# le delta la concerne — la sortie `pipeline` du job `changes` (ADR 0025, ADR 0032). Une étape et
+# non un job : elle reprend l'installation du job `api`.
+PIPELINE_IF = "needs.changes.outputs.pipeline == 'true'"
 PIPELINE_STEP = {"name": "Tests pipeline", "if": PIPELINE_IF, "run": "make test-pipeline"}
 
 
@@ -281,45 +297,52 @@ TRIGGERS_BLOCK = f"on:\n  pull_request:\n{TYPES_LINE}  push:\n{BRANCHES_LINE}"
 GROUP_LINE = f"  group: {CONCURRENCY['group']}\n"
 CANCEL_LINE = f"  cancel-in-progress: {CONCURRENCY['cancel-in-progress']}\n"
 CONCURRENCY_BLOCK = f"concurrency:\n{GROUP_LINE}{CANCEL_LINE}"
-# Le job `api` conforme, ses trois premiers pas en tête, puis l'installation.
-API_IF_LINE = f"    if: {API_IF}\n"
-OUTPUTS_LINES = "    outputs:\n" + "".join(f"      {k}: {v}\n" for k, v in API_OUTPUTS.items())
+# Le job `changes` conforme : son garde, ses sorties, puis ses trois pas.
+CHANGES_IF_LINE = f"    if: {CHANGES_IF}\n"
+OUTPUTS_LINES = "    outputs:\n" + "".join(f"      {k}: {v}\n" for k, v in CHANGES_OUTPUTS.items())
 REF_LINE = f"          ref: {PR_HEAD}\n"
 DEPTH_LINE = "          fetch-depth: 0\n"
 CHECKOUT_LINES = f"      - uses: actions/checkout@v0\n        with:\n{REF_LINE}{DEPTH_LINE}"
-# Le pas de fusion, par son seul nom : son contenu, `test_chaque_pas_de_fusion_est_celui_du_job_api`
-# le tient sur les fichiers du dépôt.
+# Le pas de fusion, par son seul nom : son contenu,
+# `test_chaque_pas_de_fusion_est_celui_du_job_changes` le tient sur les fichiers du dépôt.
 FUSION_STEP_LINE = f"      - name: {FUSION_NAME}\n"
+BASE_LINE = f"          BASE: {DELTA_BASE}\n"
+RUN_LINE = f"        run: {CHANGED_JOBS_COMMAND}\n"
 JOBS_STEP_LINES = (
     "      - name: Jobs à lancer\n        id: jobs\n        shell: bash\n"
-    f"        run: {CHANGED_JOBS_COMMAND}\n"
+    f"        env:\n{BASE_LINE}{RUN_LINE}"
 )
+# Le job `api` conforme : il attend `changes`, sans garde ni extraction — `fusion_findings` tient
+# celle des jobs qui extraient —, puis l'installation et les deux suites, celle du back puis celle
+# de la pipeline.
+API_NEEDS_LINES = "  api:\n    needs: changes\n"
 INSTALL_LINES = "      - uses: astral-sh/setup-uv@v0\n      - run: make install\n"
-# Les deux suites, celle du back puis celle de la pipeline.
 TESTS_LINE = "      - run: make test\n"
 PIPELINE_STEP_LINES = (
     f"      - name: Tests pipeline\n        if: {PIPELINE_IF}\n        run: make test-pipeline\n"
 )
-# Les jobs conditionnés : `web` et `infra` sans pas, `avis` qui appelle son workflow.
-GATED_LINES = "".join(
-    f"  {name}:\n    needs: api\n    if: {gated_if(name)}\n"
-    + (f"    uses: {AVIS_CALL}\n" if name == "avis" else "    steps: []\n")
-    for name in GATED_JOBS
-)
+
+
+def gated_job(name: str) -> str:
+    """Le job conditionné `name` tel que `CONFORMING_WORKFLOW` l'écrit : `avis` appelle son
+    workflow, les autres n'ont pas de pas."""
+    body = f"    uses: {AVIS_CALL}\n" if name == "avis" else "    steps: []\n"
+    return f"  {name}:\n    needs: changes\n    if: {GATED_IF[name]}\n{body}"
+
+
 CONFORMING_WORKFLOW = (
-    f"{TRIGGERS_BLOCK}{CONCURRENCY_BLOCK}jobs:\n  api:\n{API_IF_LINE}{OUTPUTS_LINES}    steps:\n"
-    f"{CHECKOUT_LINES}{FUSION_STEP_LINE}{JOBS_STEP_LINES}{INSTALL_LINES}"
-    f"{TESTS_LINE}{PIPELINE_STEP_LINES}{GATED_LINES}"
+    f"{TRIGGERS_BLOCK}{CONCURRENCY_BLOCK}jobs:\n  changes:\n{CHANGES_IF_LINE}{OUTPUTS_LINES}"
+    f"    steps:\n{CHECKOUT_LINES}{FUSION_STEP_LINE}{JOBS_STEP_LINES}"
+    f"{API_NEEDS_LINES}    steps:\n{INSTALL_LINES}{TESTS_LINE}{PIPELINE_STEP_LINES}"
+    + "".join(map(gated_job, GATED_IF))
 )
 
 
 def stack_step(name: str, lines: str) -> tuple[str, str]:
     """Le couple (texte remplacé, remplacement) qui donne les pas `lines` au job `name`, sans pas
     dans `CONFORMING_WORKFLOW`."""
-    return (
-        f"{gated_if(name)}\n    steps: []\n",
-        f"{gated_if(name)}\n    steps:\n{lines}",
-    )
+    job = gated_job(name)
+    return job, job.replace("    steps: []\n", f"    steps:\n{lines}")
 
 
 Guard = Callable[[str], list[str]]
@@ -328,23 +351,30 @@ Form = tuple[Guard, str, str, bool]
 
 
 def gated_forms(job: str) -> dict[str, Form]:
-    """Les formes qui écartent le job `job` de `GATED_JOBS` du conditionnement des ADR 0017, 0019
-    et 0031, chacune signalée. Une fonction d'état remplace le `success()` implicite."""
+    """Les formes qui écartent la vérification `job` de `GATED_IF` de son conditionnement, chacune
+    signalée, et la forme en liste de son `needs`, qui ne l'en écarte pas."""
+    needs = f"  {job}:\n    needs: changes\n"
     return {
-        f"{job} sans needs": (gating_findings, f"  {job}:\n    needs: api\n", f"  {job}:\n", True),
-        # Le `if` de l'ADR 0017 : derrière un `api` rouge, un run paierait ce job.
-        f"{job} : if avec !cancelled()": (
+        f"{job} : needs en liste": (
             gating_findings,
-            gated_if(job),
-            f"${{{{ !cancelled() && {gated_if(job)} }}}}",
+            needs,
+            f"  {job}:\n    needs: [changes]\n",
+            False,
+        ),
+        f"{job} sans needs": (gating_findings, needs, f"  {job}:\n", True),
+        # L'ordre des ADR 0017 et 0019 : la vérification attendrait `api`, ≈ 3 min (ADR 0032).
+        f"{job} après api": (gating_findings, needs, f"  {job}:\n    needs: api\n", True),
+        f"{job} après changes et api": (
+            gating_findings,
+            needs,
+            f"  {job}:\n    needs: [changes, api]\n",
             True,
         ),
-        # Le `if` de l'ADR 0019 sous `!cancelled()` : sur un push vers `main`, où `api` est sauté,
-        # le job tournerait.
-        f"{job} : if qui tourne sur un push": (
+        # Sans `if`, la vérification tournerait sur chaque run, que le delta la concerne ou non.
+        f"{job} sans if": (
             gating_findings,
-            gated_if(job),
-            f"${{{{ !cancelled() && (github.event_name != 'pull_request' || {gated_if(job)}) }}}}",
+            f"{needs}    if: {GATED_IF[job]}\n",
+            needs,
             True,
         ),
     }
@@ -377,41 +407,50 @@ FORMS: dict[str, Form] = {
         "      - id",
         False,
     ),
-    "un job changes": (gating_findings, "jobs:\n", "jobs:\n  changes:\n    steps: []\n", True),
-    "api avec needs": (gating_findings, "  api:\n", "  api:\n    needs: changes\n", True),
-    "api sans garde draft": (gating_findings, API_IF_LINE, "", True),
-    # L'ancien garde (ADR 0019) : sur un push vers `main`, `api` tournerait, et les jobs qui
-    # l'attendent avec lui.
-    "api aussi sur un push": (
+    "sans job changes": (gating_findings, "  changes:\n", "  delta:\n", True),
+    "changes après api": (gating_findings, "  changes:\n", "  changes:\n    needs: api\n", True),
+    # Chaque push d'une draft lancerait un run (ADR 0019).
+    "changes sans garde draft": (gating_findings, CHANGES_IF_LINE, "", True),
+    # Le garde de l'ADR 0031 : un push vers `main` ne rejouerait aucune vérification, et `deploy`
+    # partirait sur le seul vert de la fumée.
+    "changes sur une PR seulement": (
         gating_findings,
-        API_IF_LINE,
-        "    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false\n",
+        CHANGES_IF_LINE,
+        "    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false\n",
         True,
     ),
-    # Sur un push, `draft` est nul, et GitHub compare `null` à `false` en nombres, 0 contre 0 (doc
-    # « Expressions », « Operators », lue le 2026-11-21) : `api` tournerait.
-    "api sans la condition d'événement": (
-        gating_findings,
-        "github.event_name == 'pull_request' && ",
-        "",
-        True,
-    ),
-    # L'ancien garde (ADR 0017) : chaque push d'une draft payait un run.
+    # Vrai aussi sur un push, mais par la seule coercion de `null` en 0 : un garde qui ne se lit
+    # pas.
+    "changes sans la clause push": (gating_findings, "github.event_name == 'push' || ", "", True),
+    # L'ancien garde (ADR 0017) : chaque push d'une draft lançait un run.
     "garde sur l'ouverture seule": (
         gating_findings,
-        API_IF_LINE,
+        CHANGES_IF_LINE,
         (
             "    if: github.event_name != 'pull_request' || github.event.action != 'opened'"
             " || github.event.pull_request.draft == false\n"
         ),
         True,
     ),
-    "api sans outputs": (gating_findings, OUTPUTS_LINES, "", True),
+    "changes sans outputs": (gating_findings, OUTPUTS_LINES, "", True),
+    "changes sans la sortie avis": (
+        gating_findings,
+        f"      avis: {CHANGES_OUTPUTS['avis']}\n",
+        "",
+        True,
+    ),
+    # L'étape « Tests pipeline » d'`api` ne tournerait jamais.
+    "changes sans la sortie pipeline": (
+        gating_findings,
+        f"      pipeline: {CHANGES_OUTPUTS['pipeline']}\n",
+        "",
+        True,
+    ),
     "checkout sans ref": (gating_findings, REF_LINE, "", True),
     "checkout sans fetch-depth": (gating_findings, DEPTH_LINE, "", True),
     # L'ancienne profondeur, et celle que rendrait `cond && 0 || 2` : `0` y est faux.
     "checkout à profondeur 2": (gating_findings, DEPTH_LINE, "          fetch-depth: 2\n", True),
-    "api sans pas de fusion": (gating_findings, FUSION_STEP_LINE, "", True),
+    "changes sans pas de fusion": (gating_findings, FUSION_STEP_LINE, "", True),
     # L'étape `jobs` lirait le delta avant la fusion : `HEAD^1` serait le parent de la tête.
     "pas de fusion après l'étape jobs": (
         gating_findings,
@@ -419,32 +458,65 @@ FORMS: dict[str, Form] = {
         JOBS_STEP_LINES + FUSION_STEP_LINE,
         True,
     ),
-    "étape jobs après make install": (
-        gating_findings,
-        JOBS_STEP_LINES + INSTALL_LINES,
-        INSTALL_LINES + JOBS_STEP_LINES,
-        True,
-    ),
     "étape jobs sans shell bash": (gating_findings, "        shell: bash\n", "", True),
     "commande sans GITHUB_OUTPUT": (gating_findings, ' >> "$GITHUB_OUTPUT"', "", True),
     "commande qui suit les renommages": (gating_findings, " --no-renames", "", True),
-    **{name: form for job in GATED_JOBS for name, form in gated_forms(job).items()},
+    # Le delta d'un push lu sur son dernier commit : un merge par rebase en pousse plusieurs, et
+    # les fichiers des autres ne lanceraient rien (ADR 0032, décision 2).
+    "push lu sur son dernier commit": (
+        gating_findings,
+        BASE_LINE,
+        "          BASE: HEAD^1\n",
+        True,
+    ),
+    "base développée dans le script": (
+        gating_findings,
+        f"        env:\n{BASE_LINE}{RUN_LINE}",
+        RUN_LINE.replace('"$BASE"', DELTA_BASE),
+        True,
+    ),
+    # `api` tournerait sur une draft, sans la sortie `pipeline`.
+    "api sans needs": (gating_findings, API_NEEDS_LINES, "  api:\n", True),
+    # Le garde de l'ADR 0031 : `api` sauterait sur un push vers `main`, et `deploy` avec lui.
+    "api gardé sur une PR": (
+        gating_findings,
+        API_NEEDS_LINES,
+        f"{API_NEEDS_LINES}    if: github.event_name == 'pull_request'\n",
+        True,
+    ),
+    **{name: form for job in GATED_IF for name, form in gated_forms(job).items()},
     "if de web inversé": (
         gating_findings,
-        "needs.api.outputs.web == 'true'",
-        "needs.api.outputs.web != 'true'",
+        "needs.changes.outputs.web == 'true'",
+        "needs.changes.outputs.web != 'true'",
         True,
     ),
     "infra qui lit la sortie de web": (
         gating_findings,
-        "needs.api.outputs.infra",
-        "needs.api.outputs.web",
+        "needs.changes.outputs.infra",
+        "needs.changes.outputs.web",
         True,
     ),
-    "api sans la sortie avis": (
+    # `mobile` suit `web` : une sortie à lui, que `changes` ne rend pas, ne le lancerait jamais.
+    "mobile qui lit sa propre sortie": (
         gating_findings,
-        f"      avis: {API_OUTPUTS['avis']}\n",
-        "",
+        "  mobile:\n    needs: changes\n    if: needs.changes.outputs.web",
+        "  mobile:\n    needs: changes\n    if: needs.changes.outputs.mobile",
+        True,
+    ),
+    # Un merge du front se déploierait sans son e2e rejoué sur le commit livré (ADR 0032).
+    "web sur une PR seulement": (
+        gating_findings,
+        "if: needs.changes.outputs.web",
+        "if: github.event_name == 'pull_request' && needs.changes.outputs.web",
+        True,
+    ),
+    # Un avis porte sur l'état du monde, pas sur le merge, et `publish` scanne avant de pousser
+    # (ADR 0032, décision 2).
+    "avis aussi sur un push": (
+        gating_findings,
+        "github.event_name == 'pull_request' && needs.changes.outputs.avis",
+        "needs.changes.outputs.avis",
         True,
     ),
     "portes d'avis à leur place": (advisory_findings, "", "", False),
@@ -546,8 +618,15 @@ FORMS: dict[str, Form] = {
     ),
     "garde qui lit la sortie de web": (
         pipeline_step_findings,
+        "needs.changes.outputs.pipeline",
+        "needs.changes.outputs.web",
+        True,
+    ),
+    # Le garde d'avant l'ADR 0032 : `api` n'a plus d'étape `jobs`, et la suite ne tournerait jamais.
+    "garde qui lit une étape absente d'api": (
+        pipeline_step_findings,
+        "needs.changes.outputs.pipeline",
         "steps.jobs.outputs.pipeline",
-        "steps.jobs.outputs.web",
         True,
     ),
     "étape de la pipeline avant la suite du back": (
@@ -585,8 +664,10 @@ def test_le_workflow_de_ci_est_conforme(guard: Guard) -> None:
 # sur une PR, et le job de `avis.yml`, que `ci.yml` appelle sur une PR.
 FUSING_WORKFLOWS = (CI_WORKFLOW, AVIS_WORKFLOW)
 FUSING_JOBS = {
+    ("ci.yml", "changes"),
     ("ci.yml", "api"),
     ("ci.yml", "web"),
+    ("ci.yml", "mobile"),
     ("ci.yml", "infra"),
     ("avis.yml", "avis"),
 }
@@ -604,9 +685,9 @@ def fusion_steps() -> list[tuple[str, str, dict[str, Any]]]:
 
 
 def fusion_step() -> dict[str, Any]:
-    """Le pas de fusion du job `api` de `ci.yml`, sous sa forme analysée : celui que les autres
+    """Le pas de fusion du job `changes` de `ci.yml`, sous sa forme analysée : celui que les autres
     jobs reprennent."""
-    (step,) = [step for name, job, step in fusion_steps() if (name, job) == ("ci.yml", "api")]
+    (step,) = [step for name, job, step in fusion_steps() if (name, job) == ("ci.yml", "changes")]
     return step
 
 
@@ -620,9 +701,9 @@ def test_chaque_job_qui_peut_tourner_sur_une_pr_fusionne_la_tete_au_trunk_couran
     assert {(name, job) for name, job, _ in fusion_steps()} == FUSING_JOBS
 
 
-def test_chaque_pas_de_fusion_est_celui_du_job_api() -> None:
-    """Le pas du job `api` de `ci.yml` est le seul écrit en entier : les autres jobs de `ci.yml` le
-    reprennent par alias (doc GitHub « Reusing workflow configurations », lue le 2026-11-08), et
+def test_chaque_pas_de_fusion_est_celui_du_job_changes() -> None:
+    """Le pas du job `changes` de `ci.yml` est le seul écrit en entier : les autres jobs de `ci.yml`
+    le reprennent par alias (doc GitHub « Reusing workflow configurations », lue le 2026-11-08), et
     `avis.yml` en porte une copie, une ancre ne valant que dans son fichier. Analysés, ils lui sont
     égaux."""
     canonical = fusion_step()
@@ -631,10 +712,18 @@ def test_chaque_pas_de_fusion_est_celui_du_job_api() -> None:
 
 # --- Le workflow des portes d'avis : `.github/workflows/avis.yml` ------------------------------
 
-# Son seul déclencheur (ADR 0019, décision 2 ; ADR 0031, décision 4) : l'appel — par le job `avis`
-# de `ci.yml` et par le run hebdomadaire, qui portent le reste. Ses permissions, comme celles du
-# run hebdomadaire : `READ_ONLY`, la lecture du dépôt, rien d'autre.
-AVIS_TRIGGERS = {"workflow_call": None}
+# Ses déclencheurs (ADR 0032, décision 5) : chaque jour sur `main` — un avis neuf se voit sous un
+# jour (ADR 0019) —, à 05:37 UTC, une minute que le début d'heure n'encombre pas — GitHub y
+# retarde, voire abandonne, les runs planifiés en période de charge (doc « Events that trigger
+# workflows », `schedule`, lue le 2026-10-29) — ; à la main ; et l'appel, par le job `avis` de
+# `ci.yml` sur une PR. Jamais `pull_request` ni `push` : sur une PR, le delta de `ci.yml` décide.
+# Ses permissions : `READ_ONLY`, la lecture du dépôt, rien d'autre.
+AVIS_TRIGGERS = {
+    "schedule": [{"cron": "37 5 * * *"}],
+    "workflow_dispatch": None,
+    "workflow_call": None,
+}
+SCHEDULE_LINES = '  schedule:\n    - cron: "37 5 * * *"\n'
 # Les pas de son seul job, dans l'ordre — ce que chacun lance, `launched` : le checkout et le pas de
 # fusion, qui ne joue qu'appelé sur une PR, l'audit Python, l'audit npm, puis le disque libéré, le
 # build des images et leur scan, chaque porte après ce qu'elle lit. Le cache des couches, sous la
@@ -703,6 +792,8 @@ AVIS_NPM_LINES = (
 )
 AVIS_CONFORMING = f"""\
 on:
+{SCHEDULE_LINES}\
+  workflow_dispatch:
   workflow_call:
 permissions:
   contents: read
@@ -728,16 +819,16 @@ jobs:
 # la ferait rougir.
 AVIS_CHANGES = {
     "conforme": ("", "", False),
-    # Planifié ou lancé à la main pour lui-même : le run hebdomadaire le fait, avec les tests des
-    # images et l'e2e mobile (ADR 0031, décision 4).
-    "chaque semaine": (
-        "  workflow_call:\n",
-        '  workflow_call:\n  schedule:\n    - cron: "37 5 * * 1"\n',
-        True,
-    ),
-    "lancé à la main": ("  workflow_call:\n", "  workflow_call:\n  workflow_dispatch:\n", True),
-    # Ni le job `avis` de `ci.yml` ni le run hebdomadaire ne pourraient plus l'appeler.
+    # La cadence de l'ADR 0031, le lundi : un avis neuf attendrait jusqu'à une semaine.
+    "chaque semaine": ('"37 5 * * *"', '"37 5 * * 1"', True),
+    "en début d'heure": ('"37 5 * * *"', '"0 5 * * *"', True),
+    "sans planning": (SCHEDULE_LINES, "", True),
+    # Un correctif du trunk attendrait le lendemain pour se voir.
+    "sans lancement à la main": ("  workflow_dispatch:\n", "", True),
+    # Le job `avis` de `ci.yml` ne pourrait plus l'appeler sur une PR.
     "sans appel par la CI": ("  workflow_call:\n", "", True),
+    # Sur chaque PR, quel que soit son delta, en plus de l'appel de `ci.yml`.
+    "sur une PR": ("  workflow_call:\n", "  workflow_call:\n  pull_request:\n", True),
     "écriture sur le dépôt": ("  contents: read\n", "  contents: write\n", True),
     "un second job": ("jobs:\n", "jobs:\n  autre:\n    steps: []\n", True),
     "sans fusion du trunk": (FUSION_STEP_LINE, "", True),
@@ -772,148 +863,9 @@ def test_la_garde_du_workflow_des_portes_d_avis_rend_son_verdict_sur_chaque_form
 
 
 def test_le_workflow_des_portes_d_avis_est_conforme() -> None:
-    """L'`avis.yml` du dépôt : appelé seulement — par la CI et par le run hebdomadaire —, en
-    lecture seule, ses quatre cibles dans l'ordre."""
+    """L'`avis.yml` du dépôt : chaque jour, à la main et appelé par la CI, en lecture seule, ses
+    quatre cibles dans l'ordre."""
     assert avis_findings(AVIS_WORKFLOW.read_text(encoding="utf-8")) == []
-
-
-# --- Le run hebdomadaire : `.github/workflows/hebdo.yml` ---------------------------------------
-
-# Ses déclencheurs (ADR 0031, décision 4) : le lundi à 05:37 UTC, une minute que le début d'heure
-# n'encombre pas — GitHub y retarde, voire abandonne, les runs planifiés en période de charge (doc
-# « Events that trigger workflows », `schedule`, lue le 2026-10-29) —, et à la main ; jamais sur une
-# PR. Ses permissions : `READ_ONLY`, que `avis.yml` reçoit.
-HEBDO_TRIGGERS = {"schedule": [{"cron": "37 5 * * 1"}], "workflow_dispatch": None}
-# Ses trois jobs, et ce que chacun lance, `launched` : `avis` appelle les portes d'avis ; `images`
-# construit les images chargées, depuis le cache des couches restauré, puis les teste ; `mobile`
-# compile le front, puis joue l'e2e du seul projet `mobile`.
-HEBDO_JOBS: dict[str, str | list[str]] = {
-    "avis": AVIS_CALL,
-    "images": [
-        "actions/checkout",
-        "actions/setup-node",
-        "make web-install",
-        "docker/setup-buildx-action",
-        "actions/cache/restore",
-        "make build",
-        "astral-sh/setup-uv",
-        "make install",
-        "make image-test",
-    ],
-    "mobile": [
-        "actions/checkout",
-        "actions/setup-node",
-        "make web-install",
-        "make web-build",
-        "make web-browsers",
-        "make web-e2e E2E_PROJECTS=mobile",
-    ],
-}
-# Ce qui, sur un job ou un pas, le ferait attendre un autre job, sauter ou tolérer son échec :
-# chaque job tourne à chaque run, et un rouge de l'un ne masque pas l'autre.
-UNCONDITIONAL = {"needs", "if", "continue-on-error"}
-
-
-def hebdo_findings(text: str) -> list[str]:
-    """Ce qui, dans un workflow, écarte sa forme de celle du run hebdomadaire (ADR 0031).
-
-    Returns:
-        Un constat par propriété altérée — déclencheurs, `permissions` du workflow, des jobs
-        autres que ceux de `HEBDO_JOBS`, et pour chacun ce qu'il lance, ou une clé
-        d'`UNCONDITIONAL` sur lui ou l'un de ses pas. Liste vide : le workflow est conforme.
-    """
-    workflow: dict[Any, Any] = yaml.safe_load(text)
-    findings = header_findings(workflow, HEBDO_TRIGGERS)
-    jobs: dict[str, dict[str, Any]] = workflow.get("jobs") or {}
-    if set(jobs) != set(HEBDO_JOBS):
-        return [*findings, f"jobs {list(jobs)}, attendu {list(HEBDO_JOBS)}"]
-    for name, expected in HEBDO_JOBS.items():
-        steps = cast(list[dict[str, Any]], jobs[name].get("steps") or [])
-        found = jobs[name].get("uses") or [launched(step) for step in steps]
-        if found != expected:
-            findings.append(f"`{name}` lance {found}, attendu, dans cet ordre, {expected}")
-        findings += [
-            f"`{name}` porte {sorted(UNCONDITIONAL & set(part))}"
-            for part in (jobs[name], *steps)
-            if UNCONDITIONAL & set(part)
-        ]
-    return findings
-
-
-IMAGE_TEST_LINE = "      - run: make image-test\n"
-MOBILE_LINES = (
-    "  mobile:\n    runs-on: ubuntu-latest\n    steps:\n"
-    "      - uses: actions/checkout@v0\n      - uses: actions/setup-node@v0\n"
-    "      - run: make web-install\n      - run: make web-build\n      - run: make web-browsers\n"
-    "      - run: make web-e2e E2E_PROJECTS=mobile\n"
-)
-HEBDO_CONFORMING = f"""\
-on:
-  schedule:
-    - cron: "37 5 * * 1"
-  workflow_dispatch:
-permissions:
-  contents: read
-jobs:
-  avis:
-    uses: {AVIS_CALL}
-  images:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v0
-      - uses: actions/setup-node@v0
-      - run: make web-install
-      - uses: docker/setup-buildx-action@v0
-      - uses: actions/cache/restore@v0
-      - run: make build
-      - uses: astral-sh/setup-uv@v0
-      - run: make install
-{IMAGE_TEST_LINE}{MOBILE_LINES}"""
-
-# Forme → (texte remplacé, remplacement, constat attendu), pris dans `HEBDO_CONFORMING`, comme
-# pour `AVIS_CHANGES`.
-HEBDO_CHANGES = {
-    "conforme": ("", "", False),
-    # Les tests des images et l'e2e mobile chaque jour : le coût que l'ADR 0031 retire.
-    "chaque jour": ('"37 5 * * 1"', '"37 5 * * *"', True),
-    "sans planning": ('  schedule:\n    - cron: "37 5 * * 1"\n', "", True),
-    "sans lancement à la main": ("  workflow_dispatch:\n", "", True),
-    # Les mêmes, sur chaque PR.
-    "sur une PR": ("  workflow_dispatch:\n", "  workflow_dispatch:\n  pull_request:\n", True),
-    "écriture sur le dépôt": ("  contents: read\n", "  contents: write\n", True),
-    "sans le job mobile": (MOBILE_LINES, "", True),
-    "un job de plus": ("jobs:\n", "jobs:\n  autre:\n    steps: []\n", True),
-    "portes d'avis non appelées": (f"    uses: {AVIS_CALL}\n", "    steps: []\n", True),
-    # Un rouge des portes d'avis sauterait les tests des images.
-    "images après avis": ("  images:\n", "  images:\n    needs: avis\n", True),
-    "job sauté": ("  mobile:\n", "  mobile:\n    if: false\n", True),
-    "tests des images tolérés en échec": (
-        IMAGE_TEST_LINE,
-        IMAGE_TEST_LINE + "        continue-on-error: true\n",
-        True,
-    ),
-    "sans tests des images": (IMAGE_TEST_LINE, "", True),
-    "e2e sans le front compilé": ("      - run: make web-build\n", "", True),
-    "e2e d'un autre projet": ("E2E_PROJECTS=mobile", "E2E_PROJECTS=desktop", True),
-}
-
-
-@pytest.mark.parametrize(
-    ("old", "new", "expected"), HEBDO_CHANGES.values(), ids=HEBDO_CHANGES.keys()
-)
-def test_la_garde_du_run_hebdomadaire_rend_son_verdict_sur_chaque_forme(
-    old: str, new: str, expected: bool
-) -> None:
-    """Chaque forme recensée : signalée si, et seulement si, elle s'écarte de l'ADR 0031."""
-    assert old in HEBDO_CONFORMING, f"forme absente de la forme conforme : {old!r}"
-    findings = hebdo_findings(HEBDO_CONFORMING.replace(old, new, 1))
-    assert bool(findings) is expected, findings
-
-
-def test_le_run_hebdomadaire_est_conforme() -> None:
-    """Le `hebdo.yml` du dépôt : le lundi et à la main, en lecture seule, ses trois jobs
-    indépendants — portes d'avis, tests des images après leur build, e2e mobile."""
-    assert hebdo_findings(HEBDO_WORKFLOW.read_text(encoding="utf-8")) == []
 
 
 # --- Le script qui lit le delta : `infra/ci/changed_jobs.py` -----------------------------------
@@ -1110,9 +1062,10 @@ def pipeline_test_modules() -> set[str]:
 
 def test_chaque_module_que_charge_image_test_fait_tourner_infra() -> None:
     """Un module d'appui des tests des images, changé seul, fait tourner `infra` : sans lui, une PR
-    qui ne touche que lui sauterait les tests des images, et le rouge n'apparaîtrait qu'au run
-    hebdomadaire, après le merge (ADR 0031). L'égalité garde aussi l'autre sens : un module qui
-    cesse d'être chargé sort de la liste."""
+    qui ne touche que lui sauterait les tests des images — le push de son merge aussi, même règle
+    sur le même delta (ADR 0032) —, et le rouge n'apparaîtrait qu'à la PR suivante qui touche les
+    images. L'égalité garde aussi l'autre sens : un module qui cesse d'être chargé sort de la
+    liste."""
     modules = image_test_modules()
     assert modules == set(IMAGE_TESTS)
     assert all(jobs_for([module])["infra"] for module in modules)
@@ -1389,14 +1342,19 @@ def test_le_controle_des_auteurs_ignore_le_mailmap(tmp_path: Path, bash_de_ce_sy
     assert play_author_step(tmp_path, bash_de_ce_systeme) == 1
 
 
-def test_le_controle_des_auteurs_est_le_pas_d_api_qui_suit_l_etape_jobs() -> None:
-    """Un pas, non un job : un job compte au moins une minute (ADR 0031, décision 5). Juste après
-    l'étape `jobs`, avant toute installation, et sans `if` qui le sauterait : il tourne avec tout
-    le job `api`, sur une PR prête seulement, clone complet fusionné au trunk — `gating_findings`
-    tient son garde et ses trois premiers pas."""
+# Le garde du pas : sur une PR seulement. Sur un push vers `main`, rien ne se fusionne, et
+# `HEAD^1..HEAD^2` ne désigne pas les commits d'une PR.
+AUTHOR_IF = "github.event_name == 'pull_request'"
+
+
+def test_le_controle_des_auteurs_est_le_pas_d_api_qui_suit_la_fusion_sur_une_pr() -> None:
+    """Un pas, non un job : rien à gagner à en faire un (ADR 0032). Juste après le pas de fusion,
+    avant toute installation, sous `AUTHOR_IF` et rien d'autre : sur une PR prête, clone complet
+    fusionné au trunk — `gating_findings` tient le garde du job `changes`, que `api` attend, et
+    `fusion_findings` son checkout."""
     steps, step = api_steps(), author_step()
-    assert steps.index(step) == [each.get("id") for each in steps].index("jobs") + 1
-    assert "if" not in step
+    assert steps.index(step) == [each.get("name") for each in steps].index(FUSION_NAME) + 1
+    assert step.get("if") == AUTHOR_IF
 
 
 # --- La fusion explicite du trunk : le pas « Fusion explicite du trunk » de `ci.yml` ------------
@@ -1569,12 +1527,11 @@ def test_le_pas_echoue_sur_une_tete_que_le_trunk_contient_deja(
     assert trace_lines(played.stdout + played.stderr) == []
 
 
-# --- L'e2e de la CI : un projet par job (ADR 0031, décisions 3 et 4) ----------------------------
+# --- L'e2e de la CI : un projet par job (ADR 0032, décision 3) ---------------------------------
 
 E2E_PROJECT_OPTION = "--project="
-# Les jobs qui jouent l'e2e, chacun avec son workflow et les projets qu'il joue : `desktop` sur une
-# PR, `mobile` au run hebdomadaire.
-E2E_JOBS = {"web": (CI_WORKFLOW, ["desktop"]), "mobile": (HEBDO_WORKFLOW, ["mobile"])}
+# Les jobs de `ci.yml` qui jouent l'e2e, en parallèle, et les projets que chacun joue.
+E2E_JOBS = {"web": ["desktop"], "mobile": ["mobile"]}
 
 
 def e2e_projects(*variables: str) -> list[str]:
@@ -1594,12 +1551,11 @@ def e2e_projects(*variables: str) -> list[str]:
 @pytest.mark.parametrize("job", E2E_JOBS)
 def test_chaque_job_e2e_ne_joue_que_son_projet_sur_le_front_qu_il_a_compile(job: str) -> None:
     """Le pas e2e du job lance `make web-e2e` avec la variable qui choisit les projets, que le
-    `Makefile` développe en `--project=<projet>` : `desktop` seul dans le job `web` d'une PR,
-    `mobile` seul dans le job `mobile` du run hebdomadaire (ADR 0031, décisions 3 et 4). Il suit
-    `make web-build` : sur un runner GitHub, Playwright sert ce front sans le recompiler
-    (`apps/web/playwright.config.ts`)."""
-    workflow, projects = E2E_JOBS[job]
-    steps = workflow_steps(workflow.read_text(encoding="utf-8"))[job]
+    `Makefile` développe en `--project=<projet>` : `desktop` seul dans le job `web`, `mobile` seul
+    dans le job `mobile` (ADR 0032, décision 3). Il suit `make web-build` : sur un runner GitHub,
+    Playwright sert ce front sans le recompiler (`apps/web/playwright.config.ts`)."""
+    projects = E2E_JOBS[job]
+    steps = workflow_steps(CI_WORKFLOW.read_text(encoding="utf-8"))[job]
     runs = [str(step.get("run", "")).split() for step in steps]
     (e2e,) = [index for index, run in enumerate(runs) if run[:2] == ["make", "web-e2e"]]
     assert runs.index(["make", "web-build"]) < e2e

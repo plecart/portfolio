@@ -21,15 +21,26 @@ from test_publication import SHA, STEP_KEYS, WORKFLOW_TOKEN_ENV, forms, needed
 
 # Ce que porte le job (décision 6) : il suit la fumée des images du commit, elle-même après leur
 # publication — une image rouge à la fumée reste publiée, jamais déployée (brief de #26,
-# décision 2) ; il ne tourne que sur un push vers `main`, et seulement une fois le VPS prêt — la
-# variable de dépôt `DEPLOY_ENABLED`, qu'un `if` de job lit dans `vars`, jamais dans `secrets`
-# (doc GitHub « Contexts »). Aucun `permissions` : le jeton du workflow, en lecture, suffit. Ses
-# secrets sont ceux de l'environnement `production`, que seule `main` peut viser
-# (`infra/RUNBOOK.md`) : un run d'une autre branche ne les lit pas.
-DEPLOY_NEEDS = ["fumee"]
+# décision 2) —, et les vérifications que le push rejoue : `api` vert, `web`, `mobile` et `infra`
+# verts ou sautés selon le delta ; un rouge le bloque (ADR 0032, décision 2). Une vérification
+# sautée sauterait ce job sous le `success()` que GitHub applique à un `if` sans fonction d'état :
+# `!cancelled()` le remplace — « If a job fails or is skipped, all jobs that need it are skipped
+# unless the jobs use a conditional expression that causes the job to continue » (doc « Workflow
+# syntax », `jobs.<job_id>.needs`, lue le 2026-11-24), et `needs.<job_id>.result` vaut `success`,
+# `failure`, `cancelled` ou `skipped` (doc « Contexts », `needs`, même date). Il ne tourne que sur
+# un push vers `main`, et seulement une fois le VPS prêt — la variable de dépôt `DEPLOY_ENABLED`,
+# qu'un `if` de job lit dans `vars`, jamais dans `secrets` (doc GitHub « Contexts »). Aucun
+# `permissions` : le jeton du workflow, en lecture, suffit. Ses secrets sont ceux de
+# l'environnement `production`, que seule `main` peut viser (`infra/RUNBOOK.md`) : un run d'une
+# autre branche ne les lit pas.
+DEPLOY_NEEDS = {"fumee", "api", "web", "mobile", "infra"}
 DEPLOY_IF = (
-    "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    "${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main'"
     " && vars.DEPLOY_ENABLED == 'true'"
+    " && needs.fumee.result == 'success' && needs.api.result == 'success'"
+    " && (needs.web.result == 'success' || needs.web.result == 'skipped')"
+    " && (needs.mobile.result == 'success' || needs.mobile.result == 'skipped')"
+    " && (needs.infra.result == 'success' || needs.infra.result == 'skipped') }}"
 )
 DEPLOY_ENVIRONMENT = "production"
 DEPLOY_JOB_KEYS = {
@@ -81,8 +92,8 @@ def deploy_findings(workflow: str) -> list[str]:
     if job is None:
         return ["aucun job `deploy`"]
     findings: list[str] = []
-    if needed(job) != DEPLOY_NEEDS:
-        findings.append(f"`needs` vaut {job.get('needs')}, attendu {DEPLOY_NEEDS}")
+    if set(needed(job)) != DEPLOY_NEEDS:
+        findings.append(f"`needs` vaut {job.get('needs')}, attendu {sorted(DEPLOY_NEEDS)}")
     if job.get("if") != DEPLOY_IF:
         findings.append(f"`if` vaut {job.get('if')!r}, attendu {DEPLOY_IF!r}")
     if job.get("environment") != DEPLOY_ENVIRONMENT:
@@ -145,11 +156,14 @@ CHECKOUT_LINES = (
     "      - uses: actions/checkout@v0\n        with:\n          persist-credentials: false\n"
 )
 CONCURRENCY_LINES = "    concurrency:\n      group: deploy\n      cancel-in-progress: false\n"
+NEEDS_LINE = "    needs: [fumee, api, web, mobile, infra]\n"
+# Une vérification acceptée verte ou sautée, dans `DEPLOY_IF`.
+WEB_SUCCESS_OR_SKIPPED = "(needs.web.result == 'success' || needs.web.result == 'skipped')"
 CONFORMING_WORKFLOW = f"""\
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    needs: fumee
+{NEEDS_LINE}\
     if: {DEPLOY_IF}
     environment: {DEPLOY_ENVIRONMENT}
     timeout-minutes: 15
@@ -162,11 +176,37 @@ jobs:
 # attendu la ferait rougir.
 DEPLOY_CHANGES = {
     "conforme": ("", "", False),
-    "needs en liste": ("needs: fumee", "needs: [fumee]", False),
+    "needs dans un autre ordre": ("[fumee, api, ", "[api, fumee, ", False),
     "sans le job": ("  deploy:", "  autre:", True),
-    "après un autre job": ("needs: fumee", "needs: infra", True),
-    "après la publication, sans la fumée": ("needs: fumee", "needs: publish", True),
-    "sans attendre la fumée": ("    needs: fumee\n", "", True),
+    "sans aucun needs": (NEEDS_LINE, "", True),
+    "après la publication, sans la fumée": ("[fumee, ", "[publish, ", True),
+    "sans attendre la fumée": ("[fumee, ", "[", True),
+    # Le `needs` d'avant l'ADR 0032 : un merge qui casse le commit livré se déploierait.
+    "sans attendre les vérifications": (NEEDS_LINE, "    needs: fumee\n", True),
+    "sans attendre mobile": (", mobile", "", True),
+    # Sous le `success()` implicite, une vérification sautée sauterait le déploiement : un merge
+    # sans front ni image ne se déploierait plus.
+    "sans !cancelled()": ("!cancelled() && ", "", True),
+    # `always()` déploierait aussi un run annulé (doc « Expressions », `always`).
+    "always() au lieu de !cancelled()": ("!cancelled()", "always()", True),
+    "api accepté sauté": (
+        "needs.api.result == 'success'",
+        "(needs.api.result == 'success' || needs.api.result == 'skipped')",
+        True,
+    ),
+    "fumée acceptée sautée": (
+        "needs.fumee.result == 'success'",
+        "(needs.fumee.result == 'success' || needs.fumee.result == 'skipped')",
+        True,
+    ),
+    "web exigé vert": (WEB_SUCCESS_OR_SKIPPED, "needs.web.result == 'success'", True),
+    "web toléré rouge": (WEB_SUCCESS_OR_SKIPPED, "needs.web.result != 'cancelled'", True),
+    # Un e2e mobile rouge laisserait partir le déploiement.
+    "sans condition sur mobile": (
+        " && (needs.mobile.result == 'success' || needs.mobile.result == 'skipped')",
+        "",
+        True,
+    ),
     "sans la variable du VPS prêt": (" && vars.DEPLOY_ENABLED == 'true'", "", True),
     "variable lue dans les secrets": ("vars.DEPLOY_ENABLED", "secrets.DEPLOY_ENABLED", True),
     "sur un push vers toute branche": (" && github.ref == 'refs/heads/main'", "", True),
@@ -215,9 +255,10 @@ def test_la_garde_du_job_deploy_rend_son_verdict_sur_chaque_forme(
     assert bool(deploy_findings(workflow)) is expected, deploy_findings(workflow)
 
 
-def test_le_job_deploy_suit_la_fumee_d_un_push_sur_main_une_fois_le_vps_pret() -> None:
-    """`needs: fumee`, push vers `main`, `DEPLOY_ENABLED` lue dans `vars`, aucun `permissions`,
-    un déploiement à la fois, et rien qui saute ou tolère l'échec de son script."""
+def test_le_job_deploy_suit_la_fumee_et_les_verifications_d_un_push_sur_main() -> None:
+    """Après la fumée et les vérifications rejouées — `api` vert, `web`, `mobile` et `infra` verts
+    ou sautés —, push vers `main`, une fois le VPS prêt — `DEPLOY_ENABLED` lue dans `vars` —, aucun
+    `permissions`, un déploiement à la fois, et rien qui saute ou tolère l'échec de son script."""
     assert deploy_findings(CI_WORKFLOW.read_text(encoding="utf-8")) == []
 
 
