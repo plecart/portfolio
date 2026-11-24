@@ -114,9 +114,10 @@ def test_la_liste_des_projets_montre_poignee_titre_type_statut_vitrine_et_public
 def test_la_liste_des_projets_suit_toujours_les_positions(admin_client: Client, query: str) -> None:
     """L'ordre affiché est celui qu'on enregistre : une liste triée par une adresse — un favori,
     l'historique du navigateur, un retour de fiche qui garde le tri d'avant — enregistrerait un
-    autre ordre que celui des cartes. Ni les titres ni les clés ne donnent ici celui des
-    positions."""
-    projects("c", "a", "b")
+    autre ordre que celui des cartes. Ni les titres, croissants ou décroissants, ni les clés —
+    l'ordre de saisie — ne donnent ici celui des positions."""
+    for slug, position in [("a", 2), ("b", 3), ("c", 1)]:
+        placed(slug, position)
 
     response = admin_client.get(changelist() + query)
 
