@@ -13,11 +13,11 @@ from typing import Any
 import pytest
 from config import strings
 from content.preview import FIELD_CLASS, PREVIEW_CLASS, PREVIEW_ROUTE, render_markdown
-from django.contrib.staticfiles import finders
 from django.templatetags.static import static
 from django.test import Client
 from django.urls import URLPattern, URLResolver, get_resolver, reverse
 from factories import saved, section, technology
+from static_code import code
 from test_project_admin import saved_project
 
 # Le dossier de l'application, et celui de ses tests : tout le reste est ce qu'une route peut
@@ -357,11 +357,7 @@ def test_le_script_d_apercu_lit_les_prises_que_l_ecran_lui_livre() -> None:
     Il garde aussi la forme de ses gardes hors du chemin nominal — pause relancée à chaque frappe,
     requête précédente annulée, redirection refusée, statut hors 2xx en échec : leur effet ne se
     voit qu'au navigateur, éprouvé à l'écran (PR #70, Test plan)."""
-    found = finders.find(PREVIEW_SCRIPT)
-    assert isinstance(found, str)
-    # Le code seul : une prise que seul un commentaire nomme encore ne tient rien.
-    source = Path(found).read_text(encoding="utf-8")
-    script = re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.DOTALL)
+    script = code(PREVIEW_SCRIPT)
 
     for hook in (
         f".{FIELD_CLASS}",

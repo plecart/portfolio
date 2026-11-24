@@ -4,7 +4,6 @@ glisser-déposer, supprimées par un seul bouton —, et les refus qu'il affiche
 import html
 import json
 import re
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -12,7 +11,6 @@ from config import strings
 from content.inlines import HANDLE_CLASS, POSITION_CLASS
 from content.models import Project, ProjectTechnology, Technology
 from django.contrib.admin.helpers import InlineAdminFormSet
-from django.contrib.staticfiles import finders
 from django.core.files import File
 from django.forms import FileField
 from django.templatetags.static import static
@@ -22,6 +20,7 @@ from django.utils.html import escape
 from django.utils.text import capfirst
 from django.utils.translation import gettext
 from factories import BLANK, gallery_image, image_upload, project, saved, technology
+from static_code import code
 
 # Chaque champ de l'écran d'ajout d'un projet, dans l'ordre de l'écran, et son libellé du
 # catalogue ; puis ceux d'une ligne de technologie.
@@ -521,26 +520,6 @@ def test_le_slug_d_un_projet_publie_se_modifie_a_l_ecran(admin_client: Client) -
 
 
 @pytest.mark.django_db
-def test_la_liste_des_projets_montre_titre_type_statut_vitrine_et_publication(
-    admin_client: Client,
-) -> None:
-    saved_project(saved(technology(name="Django")))
-
-    page = admin_client.get(reverse("admin:content_project_changelist")).content.decode()
-
-    columns = [
-        strings.PROJECT_TITLE,
-        strings.PROJECT_KIND,
-        strings.PROJECT_STATUS,
-        strings.PROJECT_SHOWCASE,
-        strings.PROJECT_PUBLISHED,
-    ]
-    positions = [page.find(f">{escape(capfirst(column))}</") for column in columns]
-    assert -1 not in positions
-    assert positions == sorted(positions)
-
-
-@pytest.mark.django_db
 def test_chaque_ligne_de_technologie_porte_une_poignee_de_tri(admin_client: Client) -> None:
     """Décision 2 amendée (ADR 0013) : l'auteur fait glisser une ligne, enregistrée ou neuve, par
     sa poignée — ou la déplace au clavier. La position ne se saisit plus : elle voyage dans un champ
@@ -613,11 +592,7 @@ def test_l_ecran_projet_livre_au_script_les_prises_qu_il_lit(admin_client: Clien
     django = saved(technology(name="Django"))
     portfolio = saved_project(django)
     url = reverse("admin:content_project_change", args=[portfolio.pk])
-    found = finders.find(INLINE_ROWS_SCRIPT)
-    assert isinstance(found, str)
-    # Le code seul : une prise que seul un commentaire nomme encore ne tient rien.
-    source = Path(found).read_text(encoding="utf-8")
-    script = re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.DOTALL)
+    script = code(INLINE_ROWS_SCRIPT)
     refused = rendered_data(admin_client, url) | {
         "title": "",
         f"{LINES}-0-DELETE": "on",

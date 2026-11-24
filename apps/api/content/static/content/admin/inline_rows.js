@@ -1,7 +1,8 @@
 /*
- * Lignes des tableaux en ligne de l'admin : les ordonner et les supprimer avant l'enregistrement
- * (ADR 0013). Générique : vaut pour tout tableau en ligne dont l'écran charge ce script, ce que fait
- * `SortableInline` (`content/inlines.py`).
+ * Lignes de l'admin : celles des tableaux en ligne, qu'on ordonne et supprime avant
+ * l'enregistrement, et celles de la liste d'un écran, qu'on ordonne (ADR 0013). Générique : vaut
+ * pour tout tableau en ligne dont l'écran charge ce script, ce que fait `SortableInline`, et pour la
+ * liste d'un écran qui hérite de `SortableListAdmin` (`content/inlines.py`).
  *
  * Tri. Chaque ligne, enregistrée ou neuve, porte une poignée (`.sortable-handle`). On fait glisser
  * la ligne par sa poignée — glisser-déposer natif du navigateur, sans bibliothèque —, ou on la
@@ -9,16 +10,18 @@
  * ligne affichée reçoit sa position dans l'ordre affiché, dans son champ caché
  * (`.sortable-position`) ; le serveur ignore une ligne neuve dont seule la position est remplie
  * (`InlineRowForm.has_changed`), la première comprise quand le minimum du tableau se compte sur
- * les lignes remplies (`validate_min`, `SortableFormSet.get_form_kwargs`). Quand l'écran revient
- * en erreur, Django réaffiche les lignes dans l'ordre de leurs index : le script les replace dans
- * l'ordre de leurs positions.
+ * les lignes remplies (`validate_min`, `SortableFormSet.get_form_kwargs`). Les lignes affichées
+ * d'une liste reprennent entre elles, dans cet ordre, les positions qu'elles portaient
+ * (`SortableListFormSet`). Quand l'écran revient en erreur, Django réaffiche les lignes dans
+ * l'ordre de leurs index : le script les replace dans l'ordre de leurs positions.
  *
- * Index. Django lit une ligne enregistrée aux premiers index, autant qu'il y a de lignes
- * enregistrées, et une ligne neuve au-delà ; quand on retire une ligne neuve, il renumérote les
- * lignes dans l'ordre affiché (`admin/js/inlines.js`), et une ligne neuve glissée plus haut
- * prendrait l'index d'une ligne enregistrée. À l'envoi, le script renumérote les lignes
+ * Index. Dans un tableau en ligne, Django lit une ligne enregistrée aux premiers index, autant
+ * qu'il y a de lignes enregistrées, et une ligne neuve au-delà ; quand on retire une ligne neuve,
+ * il renumérote les lignes dans l'ordre affiché (`admin/js/inlines.js`), et une ligne neuve glissée
+ * plus haut prendrait l'index d'une ligne enregistrée. À l'envoi, le script renumérote les lignes
  * enregistrées d'abord, puis les neuves, chacune dans l'ordre affiché : les positions portent
- * l'ordre, les index n'en portent aucun.
+ * l'ordre, les index n'en portent aucun. Une liste n'a que des lignes enregistrées, que Django
+ * retrouve par leur clé : ses index restent.
  *
  * Suppression. Django donne à une ligne neuve un bouton qui la retire de l'écran, et à une ligne
  * enregistrée une case « Supprimer ? » (`admin/edit_inline/tabular.html`, `admin/js/inlines.js`).
@@ -29,7 +32,9 @@
  */
 "use strict";
 {
-    const ROW = "tr.form-row:not(.empty-form)";
+    // Une ligne ordonnable : celle d'un tableau en ligne, hors de la ligne modèle que l'admin clone
+    // pour une ligne neuve, ou celle de la liste d'un écran (`admin/change_list_results.html`).
+    const ROW = "tr.form-row:not(.empty-form), #result_list > tbody > tr";
 
     // Les corps des tableaux ordonnables sous `root` : ceux dont les lignes portent une poignée.
     const sortableBodies = (root) =>
@@ -154,8 +159,8 @@
         });
     };
 
-    // À l'envoi, les positions suivent l'ordre affiché des lignes gardées, puis les index sont
-    // remis à la place où Django les lit.
+    // À l'envoi, les positions suivent l'ordre affiché des lignes gardées, puis les index d'un
+    // tableau en ligne sont remis à la place où Django les lit.
     document.addEventListener("submit", (event) => {
         sortableBodies(event.target).forEach((body) => {
             let position = 0;
@@ -166,7 +171,9 @@
                     field.value = `${position}`;
                 }
             });
-            renumber(body);
+            if (body.closest(".js-inline-admin-formset")) {
+                renumber(body);
+            }
         });
     });
 

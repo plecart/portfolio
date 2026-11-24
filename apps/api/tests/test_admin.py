@@ -1,5 +1,6 @@
 """Tests de l'admin Django : monté à `/admin/`, en français, fermé aux anonymes, ses fichiers
-statiques, et l'écran Technologie. L'écran Projet a les siens (`test_project_admin.py`)."""
+statiques, et l'écran Technologie. L'écran Projet a les siens (`test_project_admin.py`), et sa
+liste aussi (`test_project_list_admin.py`)."""
 
 import re
 

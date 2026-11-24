@@ -1,6 +1,7 @@
 /*
- * Lignes en ligne de l'admin : leur poignée de tri (`inline_rows.js`) et leur libellé. Couleurs de
- * l'admin, que le thème sombre redéfinit ; aucune valeur de couleur propre.
+ * Lignes ordonnables de l'admin, en ligne ou en liste : leur poignée de tri (`inline_rows.js`), le
+ * libellé des lignes en ligne, la colonne de position des listes. Couleurs de l'admin, que le thème
+ * sombre redéfinit ; aucune valeur de couleur propre.
  */
 .sortable-handle {
     background: none;
@@ -33,4 +34,13 @@
 
 .inline-group .tabular tr.has_original td {
     padding-top: 8px;
+}
+
+/*
+ * La position d'une liste ordonnable (`SortableListAdmin`) : Django n'édite dans une liste qu'un
+ * champ qui en est une colonne (`list_editable`), et son champ est caché ; sa colonne l'est aussi.
+ */
+#result_list .column-position,
+#result_list .field-position {
+    display: none;
 }

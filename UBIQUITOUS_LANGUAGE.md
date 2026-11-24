@@ -42,7 +42,7 @@ un champ : le front le déduit de la présence du lien de la démo.
 | lien de la démo | `demo_url` | adresse facultative, 200 caractères au plus ; sa présence rend le projet « en ligne » |
 | vitrine | `showcase` | un seul projet au plus |
 | publié | `published` | faux par défaut : un projet naît brouillon |
-| position | `position` | entier de 0 à 32 767, l'ordre des cartes de la table (D77) ; un projet enregistré sans position se range après tous les projets, brouillons compris ; l'ordre stocké suit la position, puis l'ordre de saisie |
+| position | `position` | entier de 0 à 32 767, l'ordre des cartes de la table (D77), caché : l'auteur fait glisser les lignes de la liste des projets de l'admin, qui suit toujours cet ordre, et à l'enregistrement les lignes affichées reprennent entre elles leurs positions dans l'ordre affiché ; un projet enregistré sans position se range après tous les projets, brouillons compris ; l'ordre stocké suit la position, puis l'ordre de saisie |
 | créé le, modifié le | `created_at`, `updated_at` | « créé le » posé au premier enregistrement, « modifié le » à chaque enregistrement |
 
 ## Technologie de projet — `ProjectTechnology`
