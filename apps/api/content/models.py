@@ -11,7 +11,7 @@ messages pour une même faute.
 
 from collections.abc import Mapping
 from datetime import date, datetime
-from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
+from typing import TYPE_CHECKING, Any, ClassVar, TypedDict, cast
 
 from config import strings
 from django.db import models
@@ -164,6 +164,12 @@ class Project(models.Model):
     published: models.BooleanField[bool, bool] = models.BooleanField(
         strings.PROJECT_PUBLISHED, default=False
     )
+    # L'ordre des cartes de la table, celui de la liste des projets de l'admin (D77, spec §1.9).
+    # Sans valeur par défaut, comme la position d'une ligne : un projet enregistré sans elle prend
+    # la suivante (`save`). Facultative à la validation pour la même raison — la base l'exige.
+    position: models.PositiveSmallIntegerField[int, int] = models.PositiveSmallIntegerField(
+        strings.PROJECT_POSITION, blank=True
+    )
     created_at: models.DateTimeField[datetime, datetime] = models.DateTimeField(
         strings.PROJECT_CREATED_AT, auto_now_add=True
     )
@@ -180,6 +186,8 @@ class Project(models.Model):
     class Meta:
         verbose_name = strings.PROJECT
         verbose_name_plural = strings.PROJECTS
+        # L'ordre de l'admin est l'ordre stocké ; à position égale, l'ordre de saisie.
+        ordering = ("position", "id")
         constraints = (
             # Une contrainte, et non `unique=True` : le refus porte un code propre, là où
             # `unique=True` impose le code `unique` de Django (décision 10). Revers : l'admin affiche
@@ -294,6 +302,21 @@ class Project(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+    def save(self, **kwargs: Any) -> None:
+        """Enregistre le projet. Sans position, il se range après tous les projets, brouillons
+        compris — à la première sur une base vide —, comme une ligne neuve d'un tableau en ligne
+        (`SortableFormSet.save_new`) : un projet neuf arrive en dernier (spec §1.9).
+
+        Args:
+            kwargs: ceux de `Model.save`.
+        """
+        # Typée `int` comme la colonne, la position d'un projet vaut `None` tant qu'on ne l'a pas
+        # posée.
+        if cast("int | None", self.position) is None:
+            last = Project.objects.aggregate(last=models.Max("position"))["last"]
+            self.position = (last or 0) + 1
+        super().save(**kwargs)
 
 
 class ProjectTechnology(models.Model):

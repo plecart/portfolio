@@ -283,6 +283,8 @@ class ProjectAdmin(MarkdownFieldsAdmin[Project], admin.ModelAdmin[Project]):
     en Markdown, a son aperçu."""
 
     list_display = ("title", "kind", "status", "showcase", "published")
+    # La position ne se saisit pas sur l'écran : un projet neuf se range en dernier (`Project.save`).
+    exclude = ("position",)
     markdown_fields = ("description",)
     prepopulated_fields: ClassVar[dict[str, Sequence[str]]] = {"slug": ("title",)}
     inlines = (ProjectTechnologyInline, GalleryInline, SectionInline)

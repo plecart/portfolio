@@ -2,28 +2,24 @@
 (`content/migrations/0006_cover_to_gallery.py`, brief de #9, décision 4) : elle tourne sur une base
 de test ramenée à l'état d'avant, garnie par les modèles historiques de cet état."""
 
+from collections.abc import Callable
 from typing import Any
 
 import pytest
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-from django.db import connection
-from django.db.migrations.executor import MigrationExecutor
-from factories import image_upload, project, saved
+from factories import image_upload, project
 
 BEFORE = [("content", "0005_cover_galleryimage")]
 AFTER = [("content", "0006_cover_to_gallery")]
 
+# Les champs du projet de la fabrique que les règles de l'état d'avant exigent ; les autres y
+# prennent leur valeur par défaut.
+PROJECT_FIELDS = ["title", "slug", "summary", "description", "kind", "status", "started_on"]
+
 # Les variantes d'une couverture déjà traitée : ni l'état ni elles ne sont les valeurs par défaut
 # d'une image, qu'une recopie oubliée rendrait aussi.
 READY_VARIANTS = [{"name": "images/couverture/w600.webp", "width": 600, "height": 600}]
-
-
-def migrate(targets: list[tuple[str, str]]) -> Any:
-    """Migre la base de test vers `targets`, et rend les modèles historiques de cet état."""
-    executor = MigrationExecutor(connection)
-    executor.migrate(targets)
-    return executor.loader.project_state(targets).apps
 
 
 def image_fields(**fields: object) -> dict[str, object]:
@@ -32,14 +28,20 @@ def image_fields(**fields: object) -> dict[str, object]:
 
 
 @pytest.mark.django_db(transaction=True)
-def test_la_migration_fait_de_chaque_couverture_la_premiere_image_de_sa_galerie() -> None:
+def test_la_migration_fait_de_chaque_couverture_la_premiere_image_de_sa_galerie(
+    migrate: Callable[[list[tuple[str, str]]], Any],
+) -> None:
     """La couverture passe en tête, les images de la galerie reculent d'une place — même celle
     qui tenait la place 0, que la couverture prend : à place égale, l'ordre de saisie la mettrait
     devant. Même fichier, mêmes dimensions, même légende, même état, mêmes variantes ; le fichier
-    reste dans le stockage, qu'aucune suppression n'atteint. Le projet ne change pas entre les
-    deux états : la fabrique l'écrit."""
+    reste dans le stockage, qu'aucune suppression n'atteint. Le projet est celui de la fabrique,
+    écrit par le modèle historique : le modèle d'aujourd'hui porte des colonnes que cet état n'a
+    pas encore."""
     before = migrate(BEFORE)
-    portfolio = saved(project())
+    factory = project()
+    portfolio = before.get_model("content", "Project").objects.create(
+        **{field: getattr(factory, field) for field in PROJECT_FIELDS}
+    )
     stored = default_storage.save(
         "images/couverture/original.png", ContentFile(image_upload().read())
     )
