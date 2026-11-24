@@ -629,7 +629,7 @@ jobs:
 
       # Seule la tête de `main` se déploie : la publication range les runs par ordre d'arrivée, et
       # un run plus lent que le suivant redéploierait l'ancien code sur un schéma déjà migré — le
-      # run du commit plus récent déploie à sa place.
+      # run du commit plus récent déploie à sa place, s'il est vert.
       #
       # Puis le Compose du commit sur le VPS, son étiquette — le SHA complet, jamais `latest` —
       # dans le `.env` que `infra/bootstrap.sh` y a écrit, `pull` et `up --wait`. `--wait` échoue
@@ -650,7 +650,7 @@ jobs:
         run: |
           main=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
           if [ "$main" != "$GITHUB_SHA" ]; then
-            echo "::notice::main est passée à $main, que son propre run déploie."
+            echo "::notice::main est passée à $main, que son propre run déploie s'il est vert."
             exit 0
           fi
           key="$RUNNER_TEMP/deploy_key"
