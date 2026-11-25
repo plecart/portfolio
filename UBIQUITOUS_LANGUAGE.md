@@ -99,8 +99,10 @@ n'en supprime aucun.
 
 ## Couverture
 
-La première image de la galerie d'un projet : la photo de sa carte, la première image de sa fiche
-et son `og:image` (spec §1.11). Ce n'est pas un modèle : glisser une autre image en tête en fait
+La première image de la galerie d'un projet, côté API et admin : la photo de sa carte et son
+`og:image` (spec §1.11). La fiche ne la montre pas, sauf quand le projet n'a pas d'autre image
+prête (spec §4.4) ; à l'ouverture, elle vole jusqu'au cadre de la galerie et s'y change en sa
+première image (spec §4.6). Ce n'est pas un modèle : glisser une autre image en tête en fait
 la couverture, et lui en applique les règles.
 
 | Terme | Identifiant | Règle |
