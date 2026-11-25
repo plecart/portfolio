@@ -24,9 +24,10 @@ import {
   openProject,
   panel,
   readingColumn,
+  TWO_IMAGES,
   watchCspViolations,
 } from './project.ts'
-import { buildImage, buildTechnology, FILES_ORIGIN, ONGOING } from './projects.ts'
+import { buildTechnology, FILES_ORIGIN, ONGOING } from './projects.ts'
 import { scrollTop } from './scroll.ts'
 import {
   cards,
@@ -1116,7 +1117,7 @@ test('sous la CSP de production, une fiche complète et sa navigation ne produis
   await openTable(page, [
     ficheProject({
       ...LINKS,
-      gallery: [buildImage('fiche', 'Une'), buildImage('fiche', 'Deux')],
+      gallery: TWO_IMAGES,
       description: `[Voir](#s-resultats)\n\n${LONG_DESCRIPTION}`,
       technologies: THREE_TECHNOLOGIES_AND_A_TOOL,
       sections: SECTIONS,

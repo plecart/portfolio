@@ -347,7 +347,7 @@ test.describe('le retour du navigateur, couche ouverte', () => {
     await expect(page).toHaveURL('/')
     const leaving = page.locator('.image-viewer')
     await expect(leaving).toHaveAttribute('data-state', 'closed')
-    // La galerie revient à sa première image, la photo de la carte (spec §4.6) ; la couche qui
+    // La galerie garde l'image vue, où la couverture reparaît en fondu (spec §4.6) ; la couche qui
     // s'efface garde la sienne.
     await expect(leaving.locator('.project-gallery-counter')).toHaveText('3 / 3')
   })

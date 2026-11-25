@@ -191,17 +191,28 @@ export function isPageFragment(href: string, page: string): boolean {
   return href.includes('#') && href.split('#')[0] === page.split('#')[0]
 }
 
-/**
- * Les images que la galerie montre, dans l'ordre (spec §4.4) : celles qui ont des variantes.
- *
- * @param gallery Les images du projet, prêtes ou non.
- * @returns La légende et les sources (`imageSources`) de chacune.
- */
-export function readyImages(gallery: readonly GalleryImage[]) {
+/** Les images prêtes, dans l'ordre : celles qui ont des variantes, avec leurs sources. */
+function readyImages(gallery: readonly GalleryImage[]) {
   return gallery.flatMap(({ caption, variants }) => {
     const sources = imageSources(variants)
     return sources ? [{ caption, ...sources }] : []
   })
+}
+
+/**
+ * Les images que la galerie de la fiche montre, dans l'ordre (spec §4.4) : les images prêtes, sauf
+ * la couverture (§1.11) ; sans aucune, la couverture seule, si elle est prête. Le plein écran et le
+ * compteur comptent les mêmes.
+ *
+ * @param gallery Les images du projet, prêtes ou non, la couverture en tête (`gallery[0]`).
+ * @returns `images`, la légende et les sources (`imageSources`) de chacune ; `coverOnly`, elles ne
+ *   sont que la couverture : la chorégraphie ne la change alors en rien (§4.6).
+ */
+export function shownImages(gallery: readonly GalleryImage[]) {
+  const others = readyImages(gallery.slice(1))
+  if (others.length > 0) return { images: others, coverOnly: false }
+  const cover = readyImages(gallery.slice(0, 1))
+  return { images: cover, coverOnly: cover.length > 0 }
 }
 
 /**
