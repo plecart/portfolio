@@ -1,6 +1,6 @@
 ---
 name: schema-architecture
-description: "Produit le schéma d'architecture d'un projet en image PNG carrée de 2400 × 2400 px — une fenêtre de 1200 au facteur d'échelle 2 —, pour la galerie de sa fiche — lire le projet (Compose, infra, CI, configuration), faire valider par le mainteneur la liste des sections, cartes et liens, l'écrire en `docs/schema/architecture.json`, la dessiner avec le rendu du skill, puis exporter l'image et la montrer. À utiliser dans le dépôt du projet quand l'utilisateur demande son schéma d'architecture ou l'image de ce schéma — « fais le schéma d'architecture », « dessine l'architecture du projet », « image du schéma pour la fiche », « régénère le schéma d'architecture »."
+description: "Produit le schéma d'architecture d'un projet en image PNG carrée de 2400 × 2400 px — une fenêtre de 1200 au facteur d'échelle 2 —, pour la galerie de sa fiche — lire le projet (Compose, infra, CI, configuration), faire valider par le mainteneur la liste des sections, cartes et liens, en écrire 2 à 4 variantes de mise en page, les dessiner avec le rendu du skill en propositions montrées sur une planche d'aperçu, faire choisir le mainteneur, écrire la variante choisie en `docs/schema/architecture.json`, puis exporter l'image choisie et la montrer. À utiliser dans le dépôt du projet quand l'utilisateur demande son schéma d'architecture ou l'image de ce schéma — « fais le schéma d'architecture », « dessine l'architecture du projet », « image du schéma pour la fiche », « régénère le schéma d'architecture »."
 ---
 
 # Schéma d'architecture
@@ -8,7 +8,12 @@ description: "Produit le schéma d'architecture d'un projet en image PNG carrée
 Le skill se lance dans le dépôt du projet à dessiner, depuis sa racine. Il ne suppose **aucune
 architecture** : un projet peut n'avoir ni front ni back, aucune section n'est imposée, et le
 nombre de colonnes vient du projet. Il **s'arrête à l'étape 2** : rien ne s'écrit dans le dépôt —
-ni la description, ni l'image — avant que le mainteneur ait validé la liste.
+ni la description, ni l'image — avant que le mainteneur ait validé la liste ; puis **à l'étape 4**,
+le temps qu'il choisisse une proposition.
+
+**Plusieurs propositions, jamais une seule image** (`CLAUDE.md`, « Skills de la pipeline ») : le
+skill dessine de 2 à 4 variantes de mise en page de la liste validée, montrées numérotées sur une
+planche d'aperçu ; le mainteneur choisit, et seule l'image choisie s'exporte.
 
 La session fait tout elle-même ; trois scripts du dossier du skill, en bibliothèque standard,
 valident, exportent et tirent une icône. Ils se lancent par `python`, sans `-I` : `export.py` et
@@ -39,29 +44,42 @@ Montrer la liste au mainteneur, les éléments non établis en tête, et **s'arr
 s'écrit avant son accord. Ses corrections reviennent dans la liste, qui se remontre jusqu'à
 l'accord.
 
-### 3. Écrire la description
+### 3. Écrire les variantes
 
-Écrire `docs/schema/architecture.json` dans le dépôt du projet. C'est la documentation du dépôt,
-pas un contenu du site, et la seule source versionnée du schéma. Puis la valider :
+Écrire de 2 à 4 variantes de la liste validée dans le dépôt du projet,
+`docs/schema/propositions/variante-<k>.json`, k = 1… Ce dossier n'est pas versionné : si le
+`.gitignore` du projet ne l'ignore pas encore, y ajouter la ligne `docs/schema/propositions/`.
+
+Le rendu du skill, `rendu/page.html`, dessine une description telle quelle : aucun code par
+projet. Le dessin se règle donc dans la description, sous les règles de style ci-dessous, et les
+variantes ne diffèrent que par lui — la colonne de chaque carte (une demi-colonne centre une
+rangée), le `span` des sections posées côte à côte, la `route` d'un lien qui doit faire un
+détour ; leur contenu reste celui de l'étape 2. La forme est résumée plus bas, « La
+description ».
+
+### 4. Montrer les propositions — arrêt
+
+Depuis la racine du projet, une variante par argument, dans l'ordre de leur numéro :
 
 ```
-python <répertoire de ce skill>/scripts/description.py docs/schema/architecture.json
+python <répertoire de ce skill>/scripts/export.py --propositions docs/schema/propositions/variante-1.json docs/schema/propositions/variante-2.json
 ```
 
-Sortie 0 et `valide` ; sinon une ligne `<chemin> : <message>` par erreur, toutes en une passe —
-les corriger toutes, puis relancer. Une icône absente du dossier se tire par `scripts/icones.py`
-(« Icônes »), jamais en la remplaçant par une icône présente. La forme est résumée plus bas,
-« La description ».
+Le script valide d'abord toutes les variantes, en une passe, comme `scripts/description.py` en
+valide une : sortie 1 et une ligne `<fichier> : <chemin> : <message>` par erreur — les corriger
+toutes, puis relancer. Une icône absente du dossier se tire par `scripts/icones.py` (« Icônes »),
+jamais en la remplaçant par une icône présente. Puis il écrit chaque proposition,
+`docs/schema/propositions/proposition-<k>.png`, le dessin de la variante de même numéro, et leur
+planche d'aperçu, `docs/schema/propositions/planche.png` : chaque proposition numérotée, dans le
+cadre d'une carte polaroid de 220 et de 160 px (spec UX §4.1), sur le fond clair puis sombre ;
+ses sorties sont dans sa docstring.
 
-### 4. Dessiner
+Montrer la planche au mainteneur, et **s'arrêter** jusqu'à son choix ; une retouche qu'il demande
+revient dans les variantes, qui s'exportent de nouveau. La variante choisie se copie en
+`docs/schema/architecture.json` : la documentation du dépôt, pas un contenu du site, et la seule
+source versionnée du schéma.
 
-Le rendu du skill, `rendu/page.html`, dessine la description telle quelle : aucun code par
-projet. Le dessin se règle donc dans la description, sous les règles de style ci-dessous — la
-colonne de chaque carte (une demi-colonne centre une rangée), le `span` des sections posées côte
-à côte, la `route` d'un lien qui doit faire un détour. Chaque retouche se valide de nouveau
-(étape 3).
-
-### 5. Exporter et montrer
+### 5. Exporter l'image choisie et la montrer
 
 L'image s'écrit dans `docs/schema/architecture.png`, qui n'est pas versionnée : si le
 `.gitignore` du projet ne l'ignore pas encore, y ajouter la ligne `docs/schema/architecture.png`.
@@ -74,7 +92,7 @@ python <répertoire de ce skill>/scripts/export.py
 Le script valide, assemble la page hors ligne, la capture et écrit l'image, 2400 × 2400 px — la
 mise en page d'une fenêtre de 1200 × 1200 px au facteur d'échelle 2 —, quel que soit le zoom du
 poste ; ses sorties sont dans sa docstring. Montrer l'image au mainteneur, et la relire contre
-les règles de style : un écart se corrige dans la description (étapes 3 et 4), puis s'exporte
+les règles de style : un écart se corrige dans `docs/schema/architecture.json`, puis s'exporte
 de nouveau. L'auteur dépose ensuite l'image dans la galerie de la fiche, depuis l'admin.
 
 ## Les règles de style

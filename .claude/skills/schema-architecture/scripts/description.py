@@ -485,10 +485,10 @@ class Passe:
         self.parmi(lien, chemin, "route", ROUTES, f"l'une des routes {', '.join(ROUTES)}")
 
 
-def verifier_fichier(chemin: Path) -> tuple[int, object, dict[str, Path]]:
+def verifier_fichier(chemin: Path, prefixe: str = "") -> tuple[int, object, dict[str, Path]]:
     """Lit et valide le fichier `chemin` contre le dossier d'icônes du skill, en écrivant ce qui
-    l'arrête : le motif d'un `Abandon` sur la sortie d'erreur, ou les erreurs, une ligne
-    `<chemin> : <message>` chacune, sur la sortie standard.
+    l'arrête, chaque ligne après `prefixe` : le motif d'un `Abandon` sur la sortie d'erreur, ou
+    les erreurs, une ligne `<chemin> : <message>` chacune, sur la sortie standard.
 
     Returns:
         Le code de sortie — 0, 1 sur des erreurs, 2 sur un `Abandon` —, puis la description lue
@@ -498,11 +498,11 @@ def verifier_fichier(chemin: Path) -> tuple[int, object, dict[str, Path]]:
         description = lire_description(chemin)
         icones = icones_disponibles()
     except Abandon as motif:
-        print(motif, file=sys.stderr)
+        print(f"{prefixe}{motif}", file=sys.stderr)
         return 2, None, {}
     erreurs = valider(description, icones)
     for erreur in erreurs:
-        print(erreur)
+        print(f"{prefixe}{erreur}")
     return (1 if erreurs else 0), description, icones
 
 

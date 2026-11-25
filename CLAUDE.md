@@ -190,3 +190,9 @@ automatiquement sur sa description.
 | `/bug-vers-issue` | Consigner un bug en issue |
 | `/audit-spec-ui` | Audit mécanique d'une spec d'interface ou d'un document normatif |
 | `/schema-architecture` | Schéma d'architecture d'un projet en image carrée, pour la galerie de sa fiche |
+
+**Un skill qui génère une image en propose plusieurs, jamais une seule** (issue #290,
+décision 5) : de 2 à 4 propositions, montrées numérotées sur une planche d'aperçu, parmi
+lesquelles le mainteneur choisit ; seule l'image choisie s'exporte. La planche se code une
+fois, `planche` de `.claude/skills/schema-architecture/scripts/export.py`, que tout skill
+d'image appelle par ce chemin.
