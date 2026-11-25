@@ -261,6 +261,28 @@ def test_la_page_assemblee_pose_le_marqueur_qu_attend_la_capture_une_fois_rendue
     assert page.count("""render(); document.body.setAttribute("data-rendu-pret", '');""") == 1
 
 
+def test_un_gabarit_rempli_garde_l_attribut_qu_attend_la_capture(tmp_path: Path) -> None:
+    """Une ressource `PRET` de l'appelant ne remplace pas l'attribut que la capture attend."""
+    gabarit = tmp_path / "gabarit.html"
+    gabarit.write_text("<body>/*PRET*/</body>", encoding="utf-8")
+
+    page = export.remplir(gabarit, {"PRET": '"autre"'})
+
+    assert page == '<body>"data-rendu-pret"</body>'
+
+
+def test_un_marqueur_du_gabarit_sans_ressource_abandonne_en_le_nommant(tmp_path: Path) -> None:
+    """Un motif d'une ligne qui nomme le premier marqueur sans ressource et le gabarit, jamais
+    une `KeyError` nue."""
+    gabarit = tmp_path / "gabarit.html"
+    gabarit.write_text("<body>/*IMAGES*/ /*PRET*/ /*MANROPE*/</body>", encoding="utf-8")
+
+    with pytest.raises(export.Abandon) as abandon:
+        export.remplir(gabarit, {})
+
+    assert str(abandon.value) == f"{gabarit} : marqueur /*IMAGES*/ sans ressource"
+
+
 ERREUR_CHROMIUM = b"""Error: Executable doesn't exist at /x/chromium_headless_shell-1248/headless_shell
 Looks like Playwright was just installed or updated."""
 ERREUR_ATTENTE = b"""TimeoutError: page.waitForSelector: Timeout 30000ms exceeded.
@@ -473,6 +495,48 @@ def test_le_mode_propositions_ecrit_chaque_proposition_puis_leur_planche(
         **dict.fromkeys(ecrites, CARRE),
         "planche.png": PLANCHE,
     }
+
+
+def test_un_lancement_retire_les_propositions_et_la_planche_du_precedent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Deux propositions après quatre : ni la troisième ni la quatrième d'avant ne restent à côté
+    de la nouvelle planche ; les variantes du dossier, elles, restent."""
+    dossier = tmp_path / "propositions"
+    dossier.mkdir()
+    for perime in ("proposition-1.png", "proposition-3.png", "proposition-4.png", "planche.png"):
+        (dossier / perime).write_bytes(b"perime")
+    descriptions = variantes(dossier, 2)
+    remplacer(monkeypatch, Capture())
+
+    rendu = export.main(["--propositions", *descriptions, "--dossier", str(dossier)])
+
+    assert (rendu, {fichier.name: fichier.read_bytes() for fichier in dossier.iterdir()}) == (
+        0,
+        {
+            "variante-1.json": Path(descriptions[0]).read_bytes(),
+            "variante-2.json": Path(descriptions[1]).read_bytes(),
+            "proposition-1.png": CARRE,
+            "proposition-2.png": CARRE,
+            "planche.png": PLANCHE,
+        },
+    )
+
+
+def test_une_capture_en_echec_ne_laisse_aucune_proposition_du_lancement_precedent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le dossier se vide avant la première capture : un échec ne laisse pas d'anciennes images
+    passer pour celles du lancement."""
+    dossier = tmp_path / "propositions"
+    dossier.mkdir()
+    for perime in ("proposition-1.png", "proposition-2.png", "planche.png"):
+        (dossier / perime).write_bytes(b"perime")
+    remplacer(monkeypatch, Capture(code=1, erreur=ERREUR_ATTENTE))
+
+    rendu = export.main(["--propositions", *[str(PACOME_DEV)] * 2, "--dossier", str(dossier)])
+
+    assert (rendu, list(dossier.iterdir())) == (1, [])
 
 
 def test_une_description_invalide_parmi_les_propositions_sort_en_1_sans_capture_ni_fichier(

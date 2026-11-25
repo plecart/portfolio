@@ -67,12 +67,15 @@ python <répertoire de ce skill>/scripts/export.py --propositions docs/schema/pr
 
 Le script valide d'abord toutes les variantes, en une passe, comme `scripts/description.py` en
 valide une : sortie 1 et une ligne `<fichier> : <chemin> : <message>` par erreur — les corriger
-toutes, puis relancer. Une icône absente du dossier se tire par `scripts/icones.py` (« Icônes »),
-jamais en la remplaçant par une icône présente. Puis il écrit chaque proposition,
-`docs/schema/propositions/proposition-<k>.png`, le dessin de la variante de même numéro, et leur
-planche d'aperçu, `docs/schema/propositions/planche.png` : chaque proposition numérotée, dans le
-cadre d'une carte polaroid de 220 et de 160 px (spec UX §4.1), sur le fond clair puis sombre ;
-ses sorties sont dans sa docstring.
+toutes, puis relancer. Sortie 2 et son motif sur la sortie d'erreur pour une variante illisible
+ou dont le JSON est mal formé, `<fichier> : ` en tête — la réécrire —, ou pour un nombre de
+variantes hors de 2 à 4 — en nommer de 2 à 4 —, puis relancer. Une icône absente du
+dossier se tire par `scripts/icones.py` (« Icônes »), jamais en la remplaçant par une icône
+présente. Puis il retire du dossier les propositions et la planche d'un lancement précédent,
+écrit chaque proposition, `docs/schema/propositions/proposition-<k>.png`, le dessin de la
+variante de même numéro, et leur planche d'aperçu, `docs/schema/propositions/planche.png` :
+chaque proposition numérotée, dans le cadre d'une carte polaroid de 220 et de 160 px (spec UX
+§4.1), sur le fond clair puis sombre ; ses sorties sont dans sa docstring.
 
 Montrer la planche au mainteneur, et **s'arrêter** jusqu'à son choix ; une retouche qu'il demande
 revient dans les variantes, qui s'exportent de nouveau. La variante choisie se copie en

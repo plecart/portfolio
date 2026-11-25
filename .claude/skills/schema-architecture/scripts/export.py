@@ -40,8 +40,9 @@ fautive, et rien n'est capturé ni écrit. Puis chacune s'exporte, dans l'ordre 
 `<dossier>/planche.png` : le gabarit `rendu/planche.html`, chaque proposition en URL `data:`,
 numérotée, dans le cadre d'une carte polaroid simple desktop puis mobile (spec UX §4.1), sur le
 fond de page clair puis sombre (§2.1) ; capturée de même, dans une fenêtre de 2000 × 840 px
-(`FENETRE_PLANCHE`) au même facteur. La première capture en échec arrête l'export ; les
-propositions déjà écrites le restent.
+(`FENETRE_PLANCHE`) au même facteur. Les propositions et la planche d'un lancement précédent
+sont d'abord retirées du dossier, le reste y demeure ; puis la première capture en échec arrête
+l'export, les propositions déjà écrites restant.
 
 Prérequis, une fois par poste : `uv`, puis Chromium pour cette version de Playwright,
 `uv run --no-project --with playwright==<PLAYWRIGHT> playwright install chromium`.
@@ -51,10 +52,10 @@ Sortie : 0 et une ligne `<fichier> : <largeur> × <hauteur>` par image écrite �
 `<chemin> : <message>` par erreur de la description, sur la sortie standard, ou le motif en une
 ligne sur la sortie d'erreur — prérequis absent, capture en échec ou d'une autre taille ; 2 et
 son motif en une ligne sur la sortie d'erreur, description ou fichier des couleurs illisible ou
-mal formé, nom d'icône présent dans les deux jeux — ou appel mal formé, nombre de propositions
-compris. En propositions, chaque erreur et chaque motif d'une description ou d'une image est
-préfixé de son fichier, `<fichier> : `. Python 3.11 ou plus, bibliothèque standard seule : aucun
-`import playwright`.
+mal formé, nom d'icône présent dans les deux jeux, marqueur du gabarit sans ressource — ou appel
+mal formé, nombre de propositions compris. En propositions, chaque erreur et chaque motif d'une
+description ou d'une image est préfixé de son fichier, `<fichier> : `. Python 3.11 ou plus,
+bibliothèque standard seule : aucun `import playwright`.
 """
 
 import argparse
@@ -102,6 +103,8 @@ MANROPE = POLICES / "manrope-latin.woff2"
 DESCRIPTION = Path("docs/schema/architecture.json")
 IMAGE = Path("docs/schema/architecture.png")
 DOSSIER = Path("docs/schema/propositions")
+# Le nom de la k-ième proposition d'un dossier ; `*` les désigne toutes.
+PROPOSITION = "proposition-{}.png"
 # L'attribut que la page pose sur `<body>` une fois rendue, polices chargées : l'export l'injecte
 # dans le gabarit (`/*PRET*/`) et attend `MARQUEUR` avant de capturer — une seule source.
 PRET = "data-rendu-pret"
@@ -152,12 +155,20 @@ def remplir(gabarit: Path, ressources: Mapping[str, str]) -> str:
 
     Args:
         gabarit: le fichier HTML du gabarit.
-        ressources: le texte de chaque marqueur, par son nom, hors `PRET`.
+        ressources: le texte de chaque marqueur, par son nom ; un `PRET` y est ignoré.
+
+    Raises:
+        Abandon: un marqueur du gabarit n'a pas de ressource — le motif nomme le premier.
     """
-    toutes = {"PRET": en_js(PRET), **ressources}
-    texte = gabarit.read_text(encoding="utf-8")
+    toutes = {**ressources, "PRET": en_js(PRET)}
+
+    def ressource(marqueur: re.Match[str]) -> str:
+        if marqueur[1] not in toutes:
+            raise Abandon(f"{gabarit} : marqueur {marqueur[0]} sans ressource")
+        return toutes[marqueur[1]]
+
     # Une seule passe : une ressource qui porterait un `/*NOM*/` n'est pas relue.
-    return re.sub("/[*]([A-Z_]+)[*]/", lambda marqueur: toutes[marqueur[1]], texte)
+    return re.sub("/[*]([A-Z_]+)[*]/", ressource, gabarit.read_text(encoding="utf-8"))
 
 
 def assembler(description: object, icones: Mapping[str, Path]) -> str:
@@ -169,7 +180,8 @@ def assembler(description: object, icones: Mapping[str, Path]) -> str:
         icones: le fichier de chaque icône disponible — `icones_disponibles()`.
 
     Raises:
-        Abandon: le fichier des couleurs des logos est illisible (`lire_couleurs`).
+        Abandon: le fichier des couleurs des logos est illisible (`lire_couleurs`), ou un
+            marqueur du gabarit est sans ressource (`remplir`).
     """
     couleurs = lire_couleurs(ICONES)
     return remplir(
@@ -198,6 +210,7 @@ def assembler_planche(images: Sequence[Path]) -> str:
 
     Raises:
         OSError: une image est illisible.
+        Abandon: un marqueur du gabarit est sans ressource (`remplir`).
     """
     return remplir(
         RENDU / "planche.html",
@@ -273,16 +286,16 @@ def en_texte(taille: tuple[int, int]) -> str:
     return f"{taille[0]} × {taille[1]}"
 
 
-def capturer(page: str, png: Path, fenetre: Fenetre = FENETRE) -> str | None:
-    """Capture la page autonome `page` — son HTML, rempli par `remplir` — dans une fenêtre de
+def capturer(html: str, png: Path, fenetre: Fenetre = FENETRE) -> str | None:
+    """Capture la page autonome `html` — son texte, rempli par `remplir` — dans une fenêtre de
     `fenetre` px CSS, et l'écrit à `png` ; le motif de l'échec en une ligne, `None` si elle
     aboutit. `png` n'est écrit qu'à la fin, à la taille `taille_attendue(fenetre)` relue dans
     l'en-tête du PNG."""
     attendue = taille_attendue(fenetre)
     with tempfile.TemporaryDirectory() as dossier:
-        html, capture = Path(dossier) / "page.html", Path(dossier) / "capture.png"
-        html.write_text(page, encoding="utf-8")
-        motif = lancer_capture(html, capture, fenetre)
+        page, capture = Path(dossier) / "page.html", Path(dossier) / "capture.png"
+        page.write_text(html, encoding="utf-8")
+        motif = lancer_capture(page, capture, fenetre)
         if motif:
             return motif
         taille = taille_png(capture)
@@ -319,6 +332,7 @@ def planche(images: Sequence[Path], sortie: Path) -> str | None:
 
     Raises:
         OSError: une image est illisible.
+        Abandon: un marqueur du gabarit est sans ressource (`remplir`).
     """
     motif = refus_du_nombre(len(images))
     if motif:
@@ -337,39 +351,53 @@ def signaler(motif: str | None, png: Path, fenetre: Fenetre, prefixe: str) -> in
     return 0
 
 
-def exporter(paires: Sequence[tuple[Path, Path]]) -> int:
-    """Exporte chaque description de `paires` à son image, dans l'ordre : toutes se valident
-    d'abord, puis s'assemblent, avant la première capture, que son échec arrête. À plusieurs
+def ecrire_propositions(pages: Sequence[str], dossier: Path) -> int:
+    """Capture chaque page de `pages` en proposition `<dossier>/proposition-<k>.png`, k = 1…,
+    puis leur planche `<dossier>/planche.png` ; la première capture en échec arrête, chaque
+    motif préfixé de son fichier. Les propositions et la planche d'un lancement précédent sont
+    d'abord retirées — deux après quatre n'en laissent pas d'anciennes —, le reste du dossier
+    demeure. Rend le code de sortie, 0 ou 1."""
+    sortie = dossier / "planche.png"
+    for perimee in [*dossier.glob(PROPOSITION.format("*")), sortie]:
+        perimee.unlink(missing_ok=True)
+    images = [dossier / PROPOSITION.format(numero) for numero in range(1, len(pages) + 1)]
+    for page, image in zip(pages, images, strict=True):
+        if signaler(capturer(page, image), image, FENETRE, f"{image} : "):
+            return 1
+    return signaler(planche(images, sortie), sortie, FENETRE_PLANCHE, f"{sortie} : ")
+
+
+def assembler_fichiers(chemins: Sequence[Path]) -> tuple[int, list[str]]:
+    """Valide chaque description de `chemins`, toutes d'abord, puis les assemble ; à plusieurs
     descriptions, chaque erreur et chaque motif est préfixé de son fichier. Rend le code de
-    sortie — voir le module."""
+    sortie de la validation ou de l'assemblage — voir le module — et les pages, aucune sur un
+    code non nul."""
 
     def prefixe(chemin: Path) -> str:
-        return f"{chemin} : " if len(paires) > 1 else ""
+        return f"{chemin} : " if len(chemins) > 1 else ""
 
-    verifiees = [verifier_fichier(chemin, prefixe(chemin)) for chemin, _ in paires]
+    verifiees = [verifier_fichier(chemin, prefixe(chemin)) for chemin in chemins]
     code = max(code for code, _, _ in verifiees)
     if code:
-        return code
+        return code, []
     try:
-        pages = [assembler(description, icones) for _, description, icones in verifiees]
+        return 0, [assembler(description, icones) for _, description, icones in verifiees]
     except Abandon as abandon:
         print(abandon, file=sys.stderr)
-        return 2
-    for page, (_, png) in zip(pages, paires, strict=True):
-        if signaler(capturer(page, png), png, FENETRE, prefixe(png)):
-            return 1
-    return 0
+        return 2, []
+
+
+def exporter(description: Path, png: Path) -> int:
+    """Exporte la description `description` à l'image `png` ; rend le code de sortie."""
+    code, pages = assembler_fichiers([description])
+    return code or signaler(capturer(pages[0], png), png, FENETRE, "")
 
 
 def exporter_propositions(descriptions: Sequence[Path], dossier: Path) -> int:
-    """Exporte chaque description de `descriptions` en proposition `<dossier>/proposition-<k>.png`
-    (`exporter`), puis leur planche `<dossier>/planche.png` ; rend le code de sortie."""
-    images = [dossier / f"proposition-{numero}.png" for numero in range(1, len(descriptions) + 1)]
-    code = exporter(list(zip(descriptions, images, strict=True)))
-    if code:
-        return code
-    sortie = dossier / "planche.png"
-    return signaler(planche(images, sortie), sortie, FENETRE_PLANCHE, f"{sortie} : ")
+    """Exporte chaque description de `descriptions` en proposition de `dossier`, puis leur
+    planche (`ecrire_propositions`) ; rend le code de sortie."""
+    code, pages = assembler_fichiers(descriptions)
+    return code or ecrire_propositions(pages, dossier)
 
 
 def main(argv: Sequence[str]) -> int:
@@ -404,7 +432,7 @@ def main(argv: Sequence[str]) -> int:
     if arguments.propositions is None:
         if arguments.dossier is not None:
             parser.error("--dossier ne vaut qu'avec --propositions")
-        return exporter([(arguments.description or DESCRIPTION, arguments.png or IMAGE)])
+        return exporter(arguments.description or DESCRIPTION, arguments.png or IMAGE)
     if arguments.description is not None:
         parser.error("--propositions ne prend ni <description> ni <png>")
     motif = refus_du_nombre(len(arguments.propositions))
