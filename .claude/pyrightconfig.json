@@ -3,6 +3,10 @@
   "pythonVersion": "3.11",
   "include": ["skills/**/scripts", "tests"],
   "executionEnvironments": [
-    { "root": "tests", "pythonVersion": "3.12", "extraPaths": ["../apps/api/tests"] }
+    { "root": "tests", "pythonVersion": "3.12", "extraPaths": ["../apps/api/tests"] },
+    {
+      "root": "skills/miniature-projet/scripts",
+      "extraPaths": ["skills/schema-architecture/scripts"]
+    }
   ]
 }
