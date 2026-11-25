@@ -485,10 +485,15 @@ class Passe:
         self.parmi(lien, chemin, "route", ROUTES, f"l'une des routes {', '.join(ROUTES)}")
 
 
-def verifier_fichier(chemin: Path, prefixe: str = "") -> tuple[int, object, dict[str, Path]]:
-    """Lit et valide le fichier `chemin` contre le dossier d'icônes du skill, en écrivant ce qui
-    l'arrête, chaque ligne après `prefixe` : le motif d'un `Abandon` sur la sortie d'erreur, ou
-    les erreurs, une ligne `<chemin> : <message>` chacune, sur la sortie standard.
+def verifier_fichier(
+    chemin: Path,
+    prefixe: str = "",
+    valider: Callable[[object, Collection[str]], list[Erreur]] = valider,
+) -> tuple[int, object, dict[str, Path]]:
+    """Lit le fichier `chemin` et le valide par `valider` — la forme du schéma par défaut, celle
+    d'une miniature pour `miniature-projet` — contre le dossier d'icônes du skill, en écrivant ce
+    qui l'arrête, chaque ligne après `prefixe` : le motif d'un `Abandon` sur la sortie d'erreur,
+    ou les erreurs, une ligne `<chemin> : <message>` chacune, sur la sortie standard.
 
     Returns:
         Le code de sortie — 0, 1 sur des erreurs, 2 sur un `Abandon` —, puis la description lue
