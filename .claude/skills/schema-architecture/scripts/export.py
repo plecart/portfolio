@@ -1,10 +1,13 @@
-"""Exporte le schéma d'architecture d'un projet en image PNG carrée de 2400 × 2400 px.
+"""Exporte le schéma d'architecture d'un projet en image PNG carrée de 2400 × 2400 px — ou ses
+propositions, de 2 à 4 variantes de sa mise en page, et leur planche d'aperçu.
 
 Usage :
     python export.py [<description> [<png>]]
+    python export.py --propositions <description> <description> [...] [--dossier <dossier>]
 
 Lancé depuis la racine du dépôt du projet décrit : `<description>` vaut par défaut
-`docs/schema/architecture.json`, `<png>` `docs/schema/architecture.png`.
+`docs/schema/architecture.json`, `<png>` `docs/schema/architecture.png`, `<dossier>`
+`docs/schema/propositions`.
 
 Trois temps, chacun arrêté par un échec :
 
@@ -30,15 +33,28 @@ Trois temps, chacun arrêté par un échec :
 
 L'image n'est écrite à `<png>` qu'à la fin, à la bonne taille.
 
+**Propositions** (`--propositions`) : de 2 à 4 descriptions (`NOMBRE_DE_PROPOSITIONS`), les
+variantes de mise en page d'une même liste. Toutes se valident d'abord, en une passe : une seule
+fautive, et rien n'est capturé ni écrit. Puis chacune s'exporte, dans l'ordre des arguments, en
+`<dossier>/proposition-<k>.png` (k = 1…), et la planche d'aperçu (`planche`) les montre en
+`<dossier>/planche.png` : le gabarit `rendu/planche.html`, chaque proposition en URL `data:`,
+numérotée, dans le cadre d'une carte polaroid simple desktop puis mobile (spec UX §4.1), sur le
+fond de page clair puis sombre (§2.1) ; capturée de même, dans une fenêtre de 2000 × 840 px
+(`FENETRE_PLANCHE`) au même facteur. La première capture en échec arrête l'export ; les
+propositions déjà écrites le restent.
+
 Prérequis, une fois par poste : `uv`, puis Chromium pour cette version de Playwright,
 `uv run --no-project --with playwright==<PLAYWRIGHT> playwright install chromium`.
 
-Sortie : 0 et la ligne `<png> : 2400 × 2400` ; 1 et une ligne `<chemin> : <message>` par erreur
-de la description, sur la sortie standard, ou le motif en une ligne sur la sortie d'erreur —
-prérequis absent, capture en échec ou d'une autre taille ; 2 et son motif en une ligne sur la
-sortie d'erreur, description ou fichier des couleurs illisible ou mal formé, nom d'icône présent
-dans les deux jeux — ou appel mal formé. Python 3.11 ou plus, bibliothèque standard seule :
-aucun `import playwright`.
+Sortie : 0 et une ligne `<fichier> : <largeur> × <hauteur>` par image écrite — `<png>`, de
+2400 × 2400, ou chaque proposition puis la planche, de 4000 × 1680 ; 1 et une ligne
+`<chemin> : <message>` par erreur de la description, sur la sortie standard, ou le motif en une
+ligne sur la sortie d'erreur — prérequis absent, capture en échec ou d'une autre taille ; 2 et
+son motif en une ligne sur la sortie d'erreur, description ou fichier des couleurs illisible ou
+mal formé, nom d'icône présent dans les deux jeux — ou appel mal formé, nombre de propositions
+compris. En propositions, chaque erreur et chaque motif d'une description ou d'une image est
+préfixé de son fichier, `<fichier> : `. Python 3.11 ou plus, bibliothèque standard seule : aucun
+`import playwright`.
 """
 
 import argparse
@@ -63,15 +79,29 @@ from description import (
 )
 
 PLAYWRIGHT = "1.64.1"
-# La fenêtre de la capture, en px CSS : la mise en page du dessin.
-FENETRE = 1200
+# Une fenêtre de capture, largeur et hauteur en px CSS : la mise en page de la page capturée.
+Fenetre = tuple[int, int]
+# La fenêtre du schéma : la mise en page du dessin.
+FENETRE: Fenetre = (1200, 1200)
+# La fenêtre de la planche d'aperçu (`rendu/planche.html`) : une bande claire sur une sombre,
+# 420 px chacune ; dans chaque bande, jusqu'à quatre propositions côte à côte, chacune son
+# numéro au-dessus de ses deux cartes, 436 × 322 px, 48 px entre deux — 1888 px pour quatre
+# (calculé sur le CSS du gabarit). Mesuré le 2026-11-25 sur le poste, quatre propositions, aux
+# pixels de la planche de 4000 × 1680 : cartes de 240 × 282 et 176 × 216 px CSS, 56 de marge.
+FENETRE_PLANCHE: Fenetre = (2000, 840)
 # Le descripteur de la capture, et le facteur d'échelle qu'il fixe (docstring, temps 3).
 APPAREIL = "Desktop Chrome HiDPI"
 FACTEUR = 2
-# Le côté de l'image, en pixels, que l'en-tête du PNG doit porter.
-COTE = FENETRE * FACTEUR
+# Le nombre de propositions que montre une planche, bornes comprises.
+NOMBRE_DE_PROPOSITIONS = (2, 4)
 PREREQUIS = f"uv run --no-project --with playwright=={PLAYWRIGHT} playwright install chromium"
 RENDU = Path(__file__).resolve().parent.parent / "rendu"
+POLICES = RENDU / "polices"
+MANROPE = POLICES / "manrope-latin.woff2"
+# Les chemins par défaut, depuis la racine du projet décrit.
+DESCRIPTION = Path("docs/schema/architecture.json")
+IMAGE = Path("docs/schema/architecture.png")
+DOSSIER = Path("docs/schema/propositions")
 # L'attribut que la page pose sur `<body>` une fois rendue, polices chargées : l'export l'injecte
 # dans le gabarit (`/*PRET*/`) et attend `MARQUEUR` avant de capturer — une seule source.
 PRET = "data-rendu-pret"
@@ -115,9 +145,24 @@ def en_data(chemin: Path, type_mime: str) -> str:
     return f"data:{type_mime};base64,{base64.b64encode(chemin.read_bytes()).decode('ascii')}"
 
 
+def remplir(gabarit: Path, ressources: Mapping[str, str]) -> str:
+    """La page autonome du gabarit `gabarit` : chaque marqueur `/*NOM*/` remplacé par sa
+    ressource, `/*PRET*/` compris — le nom de l'attribut que la page pose sur `<body>` une fois
+    rendue, et que la capture attend (`capturer`).
+
+    Args:
+        gabarit: le fichier HTML du gabarit.
+        ressources: le texte de chaque marqueur, par son nom, hors `PRET`.
+    """
+    toutes = {"PRET": en_js(PRET), **ressources}
+    texte = gabarit.read_text(encoding="utf-8")
+    # Une seule passe : une ressource qui porterait un `/*NOM*/` n'est pas relue.
+    return re.sub("/[*]([A-Z_]+)[*]/", lambda marqueur: toutes[marqueur[1]], texte)
+
+
 def assembler(description: object, icones: Mapping[str, Path]) -> str:
-    """La page autonome qui dessine `description` : le gabarit, chaque marqueur `/*NOM*/`
-    remplacé par sa ressource.
+    """La page autonome qui dessine `description` : le gabarit `rendu/page.html` rempli
+    (`remplir`).
 
     Args:
         description: la description validée.
@@ -127,27 +172,45 @@ def assembler(description: object, icones: Mapping[str, Path]) -> str:
         Abandon: le fichier des couleurs des logos est illisible (`lire_couleurs`).
     """
     couleurs = lire_couleurs(ICONES)
-    polices = RENDU / "polices"
-    ressources = {
-        "MANROPE": en_data(polices / "manrope-latin.woff2", "font/woff2"),
-        "SHANTELL_SANS": en_data(polices / "shantell-sans-latin-wght-normal.woff2", "font/woff2"),
-        "ROUGH": (RENDU / "rough.js").read_text(encoding="utf-8"),
-        "DESCRIPTION": en_js(description),
-        "PRET": en_js(PRET),
-        "ICONES": en_js(
-            {
-                nom: svg_en_ligne(icones[nom], couleurs.get(nom))
-                for nom in sorted(icones_utilisees(description))
-            }
-        ),
-    }
-    gabarit = (RENDU / "page.html").read_text(encoding="utf-8")
-    # Une seule passe : une ressource qui porterait un `/*NOM*/` n'est pas relue.
-    return re.sub("/[*]([A-Z_]+)[*]/", lambda marqueur: ressources[marqueur[1]], gabarit)
+    return remplir(
+        RENDU / "page.html",
+        {
+            "MANROPE": en_data(MANROPE, "font/woff2"),
+            "SHANTELL_SANS": en_data(
+                POLICES / "shantell-sans-latin-wght-normal.woff2", "font/woff2"
+            ),
+            "ROUGH": (RENDU / "rough.js").read_text(encoding="utf-8"),
+            "DESCRIPTION": en_js(description),
+            "ICONES": en_js(
+                {
+                    nom: svg_en_ligne(icones[nom], couleurs.get(nom))
+                    for nom in sorted(icones_utilisees(description))
+                }
+            ),
+        },
+    )
 
 
-def capturer(page: Path, png: Path) -> str | None:
-    """Capture `page` dans `png` ; le motif de l'échec en une ligne, `None` si elle aboutit."""
+def assembler_planche(images: Sequence[Path]) -> str:
+    """La page autonome de la planche d'aperçu : le gabarit `rendu/planche.html` rempli
+    (`remplir`), Manrope et chaque image de `images` en URL `data:` — la page numérote les images
+    par leur rang, à partir de 1.
+
+    Raises:
+        OSError: une image est illisible.
+    """
+    return remplir(
+        RENDU / "planche.html",
+        {
+            "MANROPE": en_data(MANROPE, "font/woff2"),
+            "IMAGES": en_js([en_data(image, "image/png") for image in images]),
+        },
+    )
+
+
+def lancer_capture(page: Path, png: Path, fenetre: Fenetre) -> str | None:
+    """Lance la CLI de Playwright, qui capture le fichier `page` dans `png`, fenêtre `fenetre` ;
+    le motif de l'échec en une ligne, `None` si elle aboutit."""
     uv = shutil.which("uv")
     if uv is None:
         return f"uv introuvable — prérequis : installer uv, puis {PREREQUIS}"
@@ -165,7 +228,7 @@ def capturer(page: Path, png: Path) -> str | None:
             "--device",
             APPAREIL,
             "--viewport-size",
-            f"{FENETRE},{FENETRE}",
+            f"{fenetre[0]},{fenetre[1]}",
             "--color-scheme",
             "light",
             "--wait-for-selector",
@@ -200,31 +263,118 @@ def taille_png(chemin: Path) -> tuple[int, int] | None:
     return int.from_bytes(tete[16:20], "big"), int.from_bytes(tete[20:24], "big")
 
 
-def exporter(description: object, icones: Mapping[str, Path], png: Path) -> str | None:
-    """Dessine `description` et l'écrit à `png`, à la bonne taille ; le motif de l'échec en une
-    ligne, `None` si l'export aboutit.
+def taille_attendue(fenetre: Fenetre) -> tuple[int, int]:
+    """La taille en pixels de la capture d'une fenêtre `fenetre`, au facteur `FACTEUR`."""
+    return fenetre[0] * FACTEUR, fenetre[1] * FACTEUR
 
-    Raises:
-        Abandon: la page ne s'assemble pas (`assembler`) ; rien n'est capturé ni écrit.
-    """
+
+def en_texte(taille: tuple[int, int]) -> str:
+    """`taille`, largeur et hauteur, en texte : `2400 × 2400`."""
+    return f"{taille[0]} × {taille[1]}"
+
+
+def capturer(page: str, png: Path, fenetre: Fenetre = FENETRE) -> str | None:
+    """Capture la page autonome `page` — son HTML, rempli par `remplir` — dans une fenêtre de
+    `fenetre` px CSS, et l'écrit à `png` ; le motif de l'échec en une ligne, `None` si elle
+    aboutit. `png` n'est écrit qu'à la fin, à la taille `taille_attendue(fenetre)` relue dans
+    l'en-tête du PNG."""
+    attendue = taille_attendue(fenetre)
     with tempfile.TemporaryDirectory() as dossier:
-        page, capture = Path(dossier) / "schema.html", Path(dossier) / "schema.png"
-        page.write_text(assembler(description, icones), encoding="utf-8")
-        motif = capturer(page, capture)
+        html, capture = Path(dossier) / "page.html", Path(dossier) / "capture.png"
+        html.write_text(page, encoding="utf-8")
+        motif = lancer_capture(html, capture, fenetre)
         if motif:
             return motif
         taille = taille_png(capture)
         if taille is None:
-            return f"capture illisible : {capture.name} n'est pas un PNG"
-        if taille != (COTE, COTE):
-            return f"capture de {taille[0]} × {taille[1]} px, attendu {COTE} × {COTE}"
+            return "capture illisible : pas un PNG"
+        if taille != attendue:
+            return f"capture de {en_texte(taille)} px, attendu {en_texte(attendue)}"
         png.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(capture, png)
     return None
 
 
+def refus_du_nombre(nombre: int) -> str | None:
+    """Le motif du refus de `nombre` propositions, `None` s'il est dans les bornes
+    `NOMBRE_DE_PROPOSITIONS`."""
+    minimum, maximum = NOMBRE_DE_PROPOSITIONS
+    if minimum <= nombre <= maximum:
+        return None
+    return f"de {minimum} à {maximum} propositions, reçu {nombre}"
+
+
+def planche(images: Sequence[Path], sortie: Path) -> str | None:
+    """Capture la planche d'aperçu des propositions `images` (`assembler_planche`), et l'écrit à
+    `sortie`.
+
+    Args:
+        images: de 2 à 4 PNG carrés (`NOMBRE_DE_PROPOSITIONS`), numérotés par leur rang.
+        sortie: le PNG de la planche, écrit seulement si la capture aboutit à sa taille
+            (`capturer`, fenêtre `FENETRE_PLANCHE`).
+
+    Returns:
+        Le motif de l'échec en une ligne — nombre d'images refusé, capture impossible ou d'une
+        autre taille —, `None` si la planche est écrite.
+
+    Raises:
+        OSError: une image est illisible.
+    """
+    motif = refus_du_nombre(len(images))
+    if motif:
+        return motif
+    return capturer(assembler_planche(images), sortie, FENETRE_PLANCHE)
+
+
+def signaler(motif: str | None, png: Path, fenetre: Fenetre, prefixe: str) -> int:
+    """Écrit l'issue de la capture de `png` dans `fenetre` : le motif de l'échec, après
+    `prefixe`, sur la sortie d'erreur, ou la ligne `<png> : <largeur> × <hauteur>` ; rend son
+    code de sortie, 1 ou 0."""
+    if motif:
+        print(f"{prefixe}{motif}", file=sys.stderr)
+        return 1
+    print(f"{png} : {en_texte(taille_attendue(fenetre))}")
+    return 0
+
+
+def exporter(paires: Sequence[tuple[Path, Path]]) -> int:
+    """Exporte chaque description de `paires` à son image, dans l'ordre : toutes se valident
+    d'abord, puis s'assemblent, avant la première capture, que son échec arrête. À plusieurs
+    descriptions, chaque erreur et chaque motif est préfixé de son fichier. Rend le code de
+    sortie — voir le module."""
+
+    def prefixe(chemin: Path) -> str:
+        return f"{chemin} : " if len(paires) > 1 else ""
+
+    verifiees = [verifier_fichier(chemin, prefixe(chemin)) for chemin, _ in paires]
+    code = max(code for code, _, _ in verifiees)
+    if code:
+        return code
+    try:
+        pages = [assembler(description, icones) for _, description, icones in verifiees]
+    except Abandon as abandon:
+        print(abandon, file=sys.stderr)
+        return 2
+    for page, (_, png) in zip(pages, paires, strict=True):
+        if signaler(capturer(page, png), png, FENETRE, prefixe(png)):
+            return 1
+    return 0
+
+
+def exporter_propositions(descriptions: Sequence[Path], dossier: Path) -> int:
+    """Exporte chaque description de `descriptions` en proposition `<dossier>/proposition-<k>.png`
+    (`exporter`), puis leur planche `<dossier>/planche.png` ; rend le code de sortie."""
+    images = [dossier / f"proposition-{numero}.png" for numero in range(1, len(descriptions) + 1)]
+    code = exporter(list(zip(descriptions, images, strict=True)))
+    if code:
+        return code
+    sortie = dossier / "planche.png"
+    return signaler(planche(images, sortie), sortie, FENETRE_PLANCHE, f"{sortie} : ")
+
+
 def main(argv: Sequence[str]) -> int:
     """Point d'entrée ; voir le module pour les sorties."""
+    minimum, maximum = NOMBRE_DE_PROPOSITIONS
     parser = argparse.ArgumentParser(
         prog="export.py",
         description=__doc__,
@@ -234,30 +384,33 @@ def main(argv: Sequence[str]) -> int:
         "description",
         type=Path,
         nargs="?",
-        default=Path("docs/schema/architecture.json"),
-        help="le fichier JSON de la description (défaut : %(default)s)",
+        help=f"le fichier JSON de la description (défaut : {DESCRIPTION})",
+    )
+    parser.add_argument("png", type=Path, nargs="?", help=f"l'image à écrire (défaut : {IMAGE})")
+    parser.add_argument(
+        "--propositions",
+        type=Path,
+        nargs="+",
+        metavar="DESCRIPTION",
+        help=f"de {minimum} à {maximum} descriptions, chacune exportée en proposition, puis leur "
+        "planche",
     )
     parser.add_argument(
-        "png",
+        "--dossier",
         type=Path,
-        nargs="?",
-        default=Path("docs/schema/architecture.png"),
-        help="l'image à écrire (défaut : %(default)s)",
+        help=f"le dossier des propositions et de leur planche (défaut : {DOSSIER})",
     )
     arguments = parser.parse_args(argv)
-    code, description, icones = verifier_fichier(arguments.description)
-    if code:
-        return code
-    try:
-        motif = exporter(description, icones, arguments.png)
-    except Abandon as abandon:
-        print(abandon, file=sys.stderr)
-        return 2
+    if arguments.propositions is None:
+        if arguments.dossier is not None:
+            parser.error("--dossier ne vaut qu'avec --propositions")
+        return exporter([(arguments.description or DESCRIPTION, arguments.png or IMAGE)])
+    if arguments.description is not None:
+        parser.error("--propositions ne prend ni <description> ni <png>")
+    motif = refus_du_nombre(len(arguments.propositions))
     if motif:
-        print(motif, file=sys.stderr)
-        return 1
-    print(f"{arguments.png} : {COTE} × {COTE}")
-    return 0
+        parser.error(motif)
+    return exporter_propositions(arguments.propositions, arguments.dossier or DOSSIER)
 
 
 if __name__ == "__main__":

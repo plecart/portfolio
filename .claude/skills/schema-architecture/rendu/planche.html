@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<title>Planche d'aperçu</title>
+<!--
+  La planche d'aperçu des propositions d'une image, parmi lesquelles le mainteneur choisit :
+  chacune numérotée, dans le cadre d'une carte polaroid simple desktop puis mobile (spec UX §4.1),
+  sur le fond de page clair puis sombre (§2.1) — une bande par mode, la moitié de la fenêtre
+  chacune. `scripts/export.py` remplace chaque marqueur en majuscules entre `/*` et `*/` par sa
+  ressource en ligne : Manrope et les propositions en `data:`, et l'attribut que la page pose une
+  fois rendue. Aucune requête.
+-->
+<style>
+@font-face { font-family: 'Manrope'; font-weight: 200 800; src: url("/*MANROPE*/") format('woff2'); }
+/* Les jetons de la spec UX, §2.1 et ombre de repos, dans chaque mode. */
+.clair { --bg: #F3EDE4; --paper: #FBF8F2; --ink: #2A2622;
+  --shadow-rest: 0 1px 2px rgba(42,38,34,.08), 0 4px 12px rgba(42,38,34,.10); }
+.sombre { --bg: #1C1A17; --paper: #2B2724; --ink: #EDE6DA;
+  --shadow-rest: 0 1px 2px rgba(0,0,0,.30), 0 4px 12px rgba(0,0,0,.35); }
+
+body { margin: 0; overflow: hidden; }
+.mode { height: 50vh; display: flex; justify-content: center; align-items: center; gap: 48px; background: var(--bg); }
+.proposition { display: grid; grid-template-columns: auto auto; align-items: start; gap: 12px 20px; }
+.numero { grid-column: 1 / -1; font: 800 28px/1 'Manrope', sans-serif; color: var(--ink); }
+/* La face d'une carte simple (§4.1) : le cadre autour de la photo, puis la bande basse, vide. */
+.carte { background: var(--paper); border-radius: 2px; box-shadow: var(--shadow-rest);
+  padding: var(--cadre) var(--cadre) var(--bande); }
+.carte img { display: block; width: var(--photo); height: var(--photo); object-fit: cover; }
+.desktop { --cadre: 10px; --photo: 220px; --bande: 52px; }
+.mobile { --cadre: 8px; --photo: 160px; --bande: 48px; }
+</style>
+
+<section class="mode clair"></section>
+<section class="mode sombre"></section>
+
+<script>
+// Chaque proposition, en URL `data:`, dans l'ordre de son numéro.
+const IMAGES = /*IMAGES*/;
+
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+for (const mode of document.querySelectorAll('.mode'))
+  IMAGES.forEach((image, i) => {
+    const proposition = el('div', 'proposition');
+    proposition.append(el('div', 'numero', i + 1));
+    for (const carte of ['desktop', 'mobile']) {
+      const face = el('div', 'carte ' + carte), photo = el('img');
+      photo.src = image; photo.alt = '';
+      face.append(photo);
+      proposition.append(face);
+    }
+    mode.append(proposition);
+  });
+
+// Les images décodées et la police chargée, la page pose sur `<body>` l'attribut que l'export
+// injecte ici et attend avant de capturer.
+Promise.all([...[...document.fonts].map(f => f.load()), ...[...document.images].map(i => i.decode())])
+  .then(() => document.body.setAttribute(/*PRET*/, ''));
+</script>
