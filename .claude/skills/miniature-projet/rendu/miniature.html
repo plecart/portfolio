@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<title>Miniature</title>
+<!--
+  Le gabarit de la miniature d'un projet : un carré qui remplit la fenêtre, en aplats et sans
+  texte. `scripts/exporter.py` remplace chaque marqueur en majuscules entre `/*` et `*/` par sa
+  ressource en ligne : la miniature à dessiner — son gabarit, les couleurs de sa teinte, les
+  paramètres de sa composition en fractions du côté, les SVG de ses icônes ou l'image de son
+  premier plan en `data:` — et l'attribut que la page pose une fois rendue. Le rendu ne connaît
+  aucun nom de teinte ni de composition. Aucune requête.
+-->
+<style>
+:root { --ink: #2A2622; --paper: #FBF8F2; --tape: #E8DFCF; --shadow: rgba(42,38,34,.28); }
+body { margin: 0; overflow: hidden; }
+#carre { position: relative; width: 100vmin; height: 100vmin; overflow: hidden; }
+#carre > * { position: absolute; }
+/* « chantier » : le cône derrière, puis les quatre icônes en grille 2 × 2 centrée, chacune sur un
+   badge clair — une hypothèse de lisibilité sur la carte de 160 px, que la planche juge. */
+.cone svg { display: block; width: 100%; height: 100%; }
+.grille { --badge: 25vmin; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid;
+  grid-template-columns: repeat(2, var(--badge)); gap: 5vmin; }
+.badge { height: var(--badge); border-radius: 5.5vmin; background: var(--paper); color: var(--ink);
+  display: grid; place-items: center; box-shadow: 0 .6vmin 2vmin var(--shadow); }
+.badge svg { width: 15vmin; height: 15vmin; }
+/* « mise en scène » : le disque, puis le premier plan centré sur lui, inscrit dans son carré. */
+.disque { border-radius: 50%; }
+.plan { display: grid; place-items: center; }
+.telephone { position: relative; color: var(--ink);
+  filter: drop-shadow(0 1.2vmin 2.4vmin var(--shadow)); }
+/* L'image déborde un peu l'écran que perce le corps du téléphone (`#telephone`, 5 à 95 sur 100,
+   5 à 195 sur 200) : le corps en recouvre le bord. */
+.telephone img { position: absolute; left: 4%; top: 2%; width: 92%; height: 96%; object-fit: cover;
+  border-radius: 12% / 6%; }
+.telephone svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fenetre { display: flex; flex-direction: column; background: var(--paper); border-radius: 1.2vmin;
+  overflow: hidden; box-shadow: 0 1.2vmin 3.6vmin var(--shadow); }
+.barre { flex: none; width: 100%; box-sizing: border-box; display: flex; align-items: center;
+  gap: 1vmin; padding: 0 2vmin; background: var(--tape); }
+.barre span { width: 1.6vmin; height: 1.6vmin; border-radius: 50%; background: var(--paper); }
+.fenetre img { flex: 1; min-height: 0; width: 100%; object-fit: cover; }
+.schema { box-shadow: 0 1.2vmin 3.6vmin var(--shadow); }
+</style>
+
+<div id="carre"></div>
+
+<!-- Le téléphone, générique et sans marque : son corps percé de l'écran, puis l'îlot de la
+     caméra ; l'image se pose dessous. -->
+<template id="telephone">
+  <svg viewBox="0 0 100 200">
+    <mask id="ecran">
+      <rect width="100" height="200" fill="#fff"/>
+      <rect x="5" y="5" width="90" height="190" rx="10.5" fill="#000"/>
+    </mask>
+    <rect width="100" height="200" rx="15" fill="currentColor" mask="url(#ecran)"/>
+    <rect x="40" y="11" width="20" height="6" rx="3" fill="currentColor"/>
+  </svg>
+</template>
+
+<script>
+const MINIATURE = /*MINIATURE*/;
+// La barre haute de la fenêtre d'une capture, en fraction de la largeur de la fenêtre.
+const BARRE = .06;
+
+const carre = document.getElementById('carre');
+const C = MINIATURE.composition, couleurs = MINIATURE.couleurs;
+const vmin = fraction => fraction * 100 + 'vmin';
+function el(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }
+function svg(cls, code) { const e = el('div', cls); e.innerHTML = code; return e; }
+// Pose `e` en carré de côté `cote`, centré en (`x`, `y`) : tout en fractions du côté de l'image.
+function poser(e, x, y, cote) {
+  Object.assign(e.style, {
+    left: vmin(x - cote / 2), top: vmin(y - cote / 2), width: vmin(cote), height: vmin(cote),
+  });
+  return e;
+}
+
+// Chaque premier plan : le cadre qu'il pose autour de l'image décodée, et le rapport de la
+// largeur à la hauteur de ce cadre.
+const PREMIERS_PLANS = {
+  telephone(image) {
+    const cadre = el('div', 'telephone');
+    cadre.append(image, document.getElementById('telephone').content.cloneNode(true));
+    return [cadre, 1 / 2];
+  },
+  capture(image) {
+    const cadre = el('div', 'fenetre'), barre = el('div', 'barre');
+    barre.style.aspectRatio = 1 / BARRE;
+    barre.append(el('span'), el('span'), el('span'));
+    cadre.append(barre, image);
+    return [cadre, 1 / (image.naturalHeight / image.naturalWidth + BARRE)];
+  },
+  schema(image) {
+    image.className = 'schema';
+    return [image, image.naturalWidth / image.naturalHeight];
+  },
+};
+
+// Chaque gabarit : ce qu'il dessine sur le fond ; une promesse s'il attend une image.
+const GABARITS = {
+  chantier() {
+    const cone = poser(svg('cone', MINIATURE.cone), C.x, C.y, C.taille);
+    const grille = el('div', 'grille');
+    cone.style.color = couleurs.cone;
+    grille.append(...MINIATURE.icones.map(code => svg('badge', code)));
+    carre.append(cone, grille);
+  },
+  'mise-en-scene'() {
+    const disque = poser(el('div', 'disque'), C.x, C.y, C.diametre);
+    const plan = poser(el('div', 'plan'), C.x, C.y, C.premierPlan), image = el('img');
+    disque.style.background = couleurs.disque;
+    carre.append(disque, plan);
+    image.alt = '';
+    image.src = MINIATURE.premierPlan.image;
+    return image.decode().then(() => {
+      // Le cadre inscrit dans le carré du premier plan, à son rapport.
+      const [cadre, rapport] = PREMIERS_PLANS[MINIATURE.premierPlan.type](image);
+      cadre.style.width = vmin(C.premierPlan * Math.min(1, rapport));
+      cadre.style.height = vmin(C.premierPlan * Math.min(1, 1 / rapport));
+      plan.append(cadre);
+    });
+  },
+};
+
+carre.style.background = couleurs.fond;
+// Le dessin fait, image décodée, la page pose sur `<body>` l'attribut que l'export injecte ici et
+// attend avant de capturer.
+Promise.resolve(GABARITS[MINIATURE.gabarit]()).then(() => document.body.setAttribute(/*PRET*/, ''));
+</script>

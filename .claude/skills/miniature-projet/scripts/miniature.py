@@ -18,7 +18,8 @@ même objet :
   Lucide ou de Simple Icons ;
 - `premierPlan` (« mise en scène » seulement, requis) : un objet — `type`, l'un de
   `TYPES_DE_PREMIER_PLAN` ; `image`, le chemin d'un fichier relatif au répertoire courant, la
-  racine du projet, et qui est un PNG ou un JPEG, reconnu à ses premiers octets (`type_d_image`),
+  racine du projet, qui n'en sort pas (`dans_le_depot`) — ni chemin absolu, ni `..` qui remonte
+  au-dessus —, et qui est un PNG ou un JPEG, reconnu à ses premiers octets (`type_d_image`),
   jamais à son extension ;
 - `teinte` et `composition` (optionnels) : le choix du mainteneur, présents ensemble ou absents
   ensemble — `teinte`, un nom de `PALETTE` ; `composition`, un nom des `COMPOSITIONS` du gabarit.
@@ -126,6 +127,17 @@ def type_d_image(chemin: Path) -> str | None:
     return next((mime for mime, debut in SIGNATURES.items() if tete.startswith(debut)), None)
 
 
+def dans_le_depot(chemin: Path) -> bool:
+    """`chemin` est-il relatif — sans racine ni lecteur — et reste-t-il dans le répertoire
+    courant, la racine du projet, ses `..` et ses liens résolus ?
+
+    Raises:
+        OSError: le chemin ne se résout pas.
+        ValueError: le chemin porte un caractère nul.
+    """
+    return not chemin.anchor and chemin.resolve().is_relative_to(Path.cwd().resolve())
+
+
 def lire_icones(passe: Passe, valeur: object, chemin: str) -> None:
     """Lit les icônes de « chantier » : `NOMBRE_D_ICONES` noms distincts du dossier d'icônes —
     chaque nom lu même quand leur nombre est faux."""
@@ -159,13 +171,17 @@ def lire_premier_plan(passe: Passe, valeur: object, chemin: str) -> None:
     image = passe.lire(plan, chemin, "image", TEXTE)
     if image is None:
         return
+    fichier, sous = Path(image), champ(chemin, "image")
     try:
-        format_reconnu = type_d_image(Path(image)) is not None
+        if not dans_le_depot(fichier):
+            passe.refuser(sous, "attendu un chemin relatif qui reste dans le dépôt", image)
+            return
+        format_reconnu = type_d_image(fichier) is not None
     except (OSError, ValueError):
-        passe.refuser(champ(chemin, "image"), "aucun fichier lisible à ce chemin", image)
+        passe.refuser(sous, "aucun fichier lisible à ce chemin", image)
         return
     if not format_reconnu:
-        passe.refuser(champ(chemin, "image"), "attendu une image PNG ou JPEG", image)
+        passe.refuser(sous, "attendu une image PNG ou JPEG", image)
 
 
 # Les champs propres à chaque gabarit, tous requis par lui, chacun avec sa lecture.

@@ -190,6 +190,7 @@ automatiquement sur sa description.
 | `/bug-vers-issue` | Consigner un bug en issue |
 | `/audit-spec-ui` | Audit mécanique d'une spec d'interface ou d'un document normatif |
 | `/schema-architecture` | Schéma d'architecture d'un projet en image carrée, pour la galerie de sa fiche |
+| `/miniature-projet` | Miniature d'un projet, la couverture carrée de sa carte, gabarit « chantier » ou « mise en scène » |
 
 **Un skill qui génère une image en propose plusieurs, jamais une seule** (issue #290,
 décision 5) : de 2 à 4 propositions, montrées numérotées sur une planche d'aperçu, parmi
