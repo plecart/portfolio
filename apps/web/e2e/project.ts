@@ -54,9 +54,21 @@ export const gallery = (page: Page) => page.getByRole('group', { name: 'Images d
 export const previousImage = (page: Page) => page.getByRole('button', { name: 'Image précédente' })
 export const nextImage = (page: Page) => page.getByRole('button', { name: 'Image suivante' })
 
-/** Les légendes des trois images de la fiche des scénarios de galerie, et ces images. */
+/**
+ * La couverture des fiches des scénarios : la galerie ne la montre pas dès qu'une autre image est
+ * prête (spec §4.4).
+ */
+export const COVER = buildImage('fiche', 'Couverture')
+
+/**
+ * Les légendes des trois images que montre la fiche des scénarios de galerie, et sa galerie : la
+ * couverture, puis ces trois images.
+ */
 export const CAPTIONS = ['Écran d’accueil', 'Détail de l’interface', 'Vue d’ensemble']
-export const THREE_IMAGES = CAPTIONS.map((caption) => buildImage('fiche', caption))
+export const THREE_IMAGES = [COVER, ...CAPTIONS.map((caption) => buildImage('fiche', caption))]
+
+/** La galerie d'une fiche qui montre deux images, flèches et compteur : la couverture, puis elles. */
+export const TWO_IMAGES = [COVER, ...['Une', 'Deux'].map((caption) => buildImage('fiche', caption))]
 
 /** Le centre d'un élément. */
 export async function center(element: Locator): Promise<Point> {

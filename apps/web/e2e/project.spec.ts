@@ -36,10 +36,11 @@ import {
   panel,
   previousImage,
   readingColumn,
+  TWO_IMAGES,
   watchAnimations,
   watchCspViolations,
 } from './project.ts'
-import { buildImage, PROJECT_SETS } from './projects.ts'
+import { PROJECT_SETS } from './projects.ts'
 import { scrollGesture, scrollThrough, scrollTop } from './scroll.ts'
 import {
   cardAt,
@@ -75,7 +76,7 @@ test('parcours clavier complet : Tab boucle sur tous les arrêts, Maj+Tab à l�
 }) => {
   await arriveAt(page, {
     ...LINKS,
-    gallery: [buildImage('fiche', 'Une'), buildImage('fiche', 'Deux')],
+    gallery: TWO_IMAGES,
     sections: ['Architecture', 'Résultats'].map((title, index) => ({
       title,
       anchor: `section-${index}`,

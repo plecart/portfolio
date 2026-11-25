@@ -17,6 +17,7 @@ import {
   expectClosed,
   ficheProject,
   freezeAnimations,
+  gallery,
   LINKS,
   LONG_DESCRIPTION,
   nextImage,
@@ -25,6 +26,8 @@ import {
   OUTSIDE,
   panel,
   readingColumn,
+  TWO_IMAGES,
+  viewer,
   watchAnimations,
 } from './project.ts'
 import { buildImage, buildTechnology, ONGOING, PROJECT_SETS } from './projects.ts'
@@ -56,11 +59,8 @@ const ONGOING_PATH = '/projets/projet-02'
 /** Le chemin de toute fiche de `ficheProject`. */
 const FICHE_PATH = '/projets/fiche'
 
-/** Une fiche à deux images et deux liens : tout son contenu apparaît à la pose. */
-const FULL_FICHE = ficheProject({
-  ...LINKS,
-  gallery: [buildImage('fiche', 'Une'), buildImage('fiche', 'Deux')],
-})
+/** Une fiche qui montre deux images, avec deux liens : tout son contenu apparaît à la pose. */
+const FULL_FICHE = ficheProject({ ...LINKS, gallery: TWO_IMAGES })
 
 /** Une boîte, par ses quatre nombres. */
 type Box = { left: number; top: number; width: number; height: number }
@@ -1022,49 +1022,183 @@ test('un projet en cours : sa photo vole en couleur, à l’aller comme au retou
   await expectLanded(page, card)
 })
 
+/** La couverture volante, dans le cadre de la galerie (`coverTrip`). */
+const flyingCover = (page: Page) => panel(page).locator('.project-gallery-cover')
+
 /**
- * Dans le cadre de la galerie, la couverture posée en vol — la copie de la première image —, sa
- * boîte et son fondu.
+ * Dans la page : la couverture volante du cadre de la galerie et la photo de la carte `path` — si
+ * elles ont les mêmes sources, ce que la copie offre aux technologies d'assistance, si elle suit la
+ * piste, les boutons posés sur elle, sa boîte et celle du cadre, ce qu'elle montre à l'instant, et
+ * son fondu.
+ *
+ * @param finish Achève d'abord les animations de la page et lit aussitôt, avant que la fiche n'en
+ *   tire la suite au microtâche suivant : ce que tient leur remplissage.
  */
-function readCoverLayer(frame: Element) {
-  const [image, ...others] = frame.querySelectorAll('img')
-  const cover = others.find((other) => other.getAnimations().length > 0)!
+function readCover({ path, finish = false }: { path: string; finish?: boolean }) {
+  if (finish) {
+    for (const animation of document.getAnimations()) {
+      if (animation.constructor === Animation) animation.finish()
+    }
+  }
+  const frame = document.querySelector('.project-gallery-frame')!
+  const cover = frame.querySelector<HTMLImageElement>('.project-gallery-cover')!
+  const photo = document.querySelector<HTMLImageElement>(`.card[href="${path}"] .card-photo img`)!
+  const sources = (image: HTMLImageElement) =>
+    ['src', 'srcset', 'sizes'].map((name) => image.getAttribute(name)).join(' | ')
+  const box = (element: Element) => {
+    const { left, top, width, height } = element.getBoundingClientRect()
+    return { left, top, width, height }
+  }
+  const { opacity, pointerEvents } = getComputedStyle(cover)
+  const above = [...frame.children].slice([...frame.children].indexOf(cover) + 1)
   const [fade] = cover.getAnimations()
   return {
-    same: cover.src === image.src,
-    box: cover.getBoundingClientRect().toJSON(),
+    sameSources: sources(cover) === sources(photo),
+    alt: cover.getAttribute('alt'),
     hidden: cover.getAttribute('aria-hidden'),
-    duration: fade.effect!.getTiming().duration,
-    opacities: (fade.effect as KeyframeEffect).getKeyframes().map(({ opacity }) => Number(opacity)),
+    afterTrack: cover.previousElementSibling?.matches('.project-gallery-track'),
+    buttonsAbove: above.map((button) => button.getAttribute('aria-label')),
+    box: box(cover),
+    frame: box(frame),
+    opacity: Number(opacity),
+    pointerEvents,
+    timing: fade?.effect!.getTiming(),
+    opacities: ((fade?.effect as KeyframeEffect | undefined)?.getKeyframes() ?? []).map(
+      ({ opacity }) => Number(opacity),
+    ),
   }
 }
 
-test('fermée depuis sa deuxième image, la galerie la garde, flèches du clavier comprises, et la couverture y apparaît en fondu pendant le vol', async ({
+test('à l’ouverture, la couverture de la carte vole sur tout le cadre de la galerie et s’y efface en `--dur-open`, `--ease-out`, sans retard : le cadre arrive sur la première image de la galerie ; posée, la couverture reste effacée et laisse le pointeur à l’image', async ({
+  page,
+}) => {
+  await openEnteredTable(page, [FULL_FICHE])
+  const { open, easing } = await motion(page)
+  const resume = await openFrozen(page, FICHE_PATH)
+
+  const leaving = await page.evaluate(readCover, { path: FICHE_PATH })
+
+  expect(leaving).toMatchObject({
+    sameSources: true,
+    alt: '',
+    hidden: 'true',
+    afterTrack: true,
+    buttonsAbove: ['Image précédente', 'Image suivante', 'Agrandir l’image'],
+    opacity: 1,
+    pointerEvents: 'none',
+    timing: { duration: open, delay: 0, easing },
+    opacities: [1, 0],
+  })
+  expectSameBox(leaving.box, leaving.frame)
+  await expect(gallery(page).getByRole('img')).toHaveAccessibleName('Une')
+
+  await resume()
+
+  await expect(closeButton(page)).toBeFocused()
+  await expect(flyingCover(page)).toHaveCSS('opacity', '0')
+  await gallery(page).getByRole('img').click()
+  await expect(viewer(page)).toBeVisible()
+})
+
+for (const [shown, steps] of [
+  ['sa première image', 0],
+  ['sa deuxième image', 1],
+] as const) {
+  test(`fermée depuis ${shown}, la galerie la garde, flèches du clavier comprises, et la couverture y reparaît en fondu pendant le vol, en \`--dur-open\`, jusqu’au retrait du panneau ; revenue, la carte la montre`, async ({
+    page,
+  }) => {
+    await openEnteredTable(page, [FULL_FICHE])
+    const { open, easing } = await motion(page)
+    const card = cardAt(page, FICHE_PATH)
+    await openProject(card)
+    for (let step = 0; step < steps; step += 1) await nextImage(page).click()
+    await settle(page)
+    const resume = await freezeAnimations(page)
+    const frame = panel(page).locator('.project-gallery-frame')
+    const track = panel(page).locator('.project-gallery-track')
+    const image = frame.locator('.project-gallery-image').nth(steps)
+
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('ArrowRight')
+
+    expect(await track.evaluate((element) => element.getAnimations().length)).toBe(0)
+    expectSameBox(await boxOf(image), await boxOf(frame))
+    await finishAnimations(page)
+    await expect.poll(() => frame.evaluate((element) => element.getAnimations().length)).toBe(1)
+    const returning = await page.evaluate(readCover, { path: FICHE_PATH })
+    expect(returning).toMatchObject({
+      timing: { duration: open, delay: 0, easing },
+      opacities: [0, 1],
+    })
+    expectSameBox(returning.box, await boxOf(image))
+    expectSameBox(await boxOf(image), await boxOf(frame))
+    const held = await page.evaluate(readCover, { path: FICHE_PATH, finish: true })
+    expect(held.opacity).toBe(1)
+
+    await resume()
+
+    await expectLanded(page, card)
+  })
+}
+
+test('fermée en plein vol, la couverture repart sans saut de l’opacité qu’elle montre, et reparaît en `--dur-open`', async ({
+  page,
+}) => {
+  await openEnteredTable(page, [FULL_FICHE])
+  const { open } = await motion(page)
+  const card = cardAt(page, FICHE_PATH)
+  const resume = await openFrozen(page, FICHE_PATH)
+  await page.evaluate(seekAnimations, open / 2)
+  const { opacity } = await page.evaluate(readCover, { path: FICHE_PATH })
+  expect(opacity).toBeGreaterThan(0)
+  expect(opacity).toBeLessThan(1)
+
+  await page.keyboard.press('Escape')
+
+  const returning = await page.evaluate(readCover, { path: FICHE_PATH })
+  expect(returning.opacity).toBeCloseTo(opacity, 2)
+  expect(returning.opacities[0]).toBeCloseTo(opacity, 2)
+  expect(returning.opacities[1]).toBe(1)
+  expect(returning.timing?.duration).toBe(open)
+
+  await resume()
+
+  await expectLanded(page, card)
+})
+
+test('une fiche qui ne montre que sa couverture : aucun fondu, ni à l’ouverture ni au retour', async ({
+  page,
+}) => {
+  await openEnteredTable(page, [ficheProject()])
+  const card = cardAt(page, FICHE_PATH)
+  const resume = await openFrozen(page, FICHE_PATH)
+
+  await expect(flyingCover(page)).toHaveCount(0)
+  await resume()
+  await settle(page)
+  const resumeReturn = await freezeAnimations(page)
+  await page.keyboard.press('Escape')
+  await finishAnimations(page)
+
+  await expect(flyingCover(page)).toHaveCount(0)
+  await resumeReturn()
+  await expectLanded(page, card)
+})
+
+test('une carte sans photo, sa couverture en attente : le cadre vole sans couverture, et la fiche se pose sur la première image', async ({
   page,
 }) => {
   await openEnteredTable(page, [
-    ficheProject({ gallery: [buildImage('une', 'Une'), buildImage('deux', 'Deux')] }),
+    ficheProject({
+      gallery: [buildImage('fiche', 'Couverture', 'pending'), buildImage('fiche', 'Une')],
+    }),
   ])
-  const { open } = await motion(page)
+
   await openProject(cardAt(page, FICHE_PATH))
-  await nextImage(page).click()
-  await settle(page)
-  await freezeAnimations(page)
-  const frame = panel(page).locator('.project-gallery-frame')
-  const track = panel(page).locator('.project-gallery-track')
-  const second = frame.locator('img').nth(1)
 
-  await page.keyboard.press('Escape')
-  await page.keyboard.press('ArrowRight')
-
-  expect(await track.evaluate((element) => element.getAnimations().length)).toBe(0)
-  expectSameBox(await boxOf(second), await boxOf(frame))
-  await finishAnimations(page)
-  await expect.poll(() => frame.evaluate((element) => element.getAnimations().length)).toBe(1)
-  const cover = await frame.evaluate(readCoverLayer)
-  expect(cover).toMatchObject({ same: true, hidden: 'true', duration: open, opacities: [0, 1] })
-  expectSameBox(cover.box, await boxOf(second))
-  expectSameBox(await boxOf(second), await boxOf(frame))
+  await expect(closeButton(page)).toBeFocused()
+  await expect(flyingCover(page)).toHaveCount(0)
+  await expect(gallery(page).getByRole('img')).toHaveAccessibleName('Une')
 })
 
 test('les autres cartes de l’écran reculent de 48 px à l’opposé de la carte ouverte et s’effacent ; hors de l’écran, rien ne bouge', async ({
@@ -1350,14 +1484,16 @@ test('à la fermeture, les autres cartes reviennent à leur place en réapparais
  *   (`both` : test « à la fermeture, la colonne s’efface d’abord… », lu au temps 0, et jusqu'au
  *   retrait) ; l'effacement des cartes à l'aller (`forwards`, tant que la fiche est ouverte) ;
  *   l'apparition du contenu (`backwards`, caché jusqu'à la pose : test « à la pose, le contenu
- *   monte… », lu au temps 0) ; son effacement (`forwards`) ; en mouvement réduit, l'effacement des
- *   enfants du panneau puis du panneau (`forwards`, jusqu'au retrait) ;
+ *   monte… », lu au temps 0) ; son effacement (`forwards`) ; la couverture volante au retour
+ *   (`forwards`, jusqu'au retrait : test « fermée depuis … », lu au bout) ; en mouvement réduit,
+ *   l'effacement des enfants du panneau puis du panneau (`forwards`, jusqu'au retrait) ;
  * - ne tiennent rien, leur fin étant leur repos : le retour des cartes, l'apparition du panneau en
- *   mouvement réduit, le glissement de la copie de la sangle, ôtée hors de ses vols (`project.css`).
+ *   mouvement réduit, le glissement de la copie de la sangle, ôtée hors de ses vols, l'effacement
+ *   de la couverture volante à l'aller, effacée au repos (`project.css`).
  *
  * Ceux qui tiennent jusqu'au retrait ou tant que la fiche est ouverte sont épinglés ici ; chacun de
  * ceux qui tiennent quelque chose rougit son test quand son remplissage est retiré (mutations du
- * 2026-11-03 ; du 2026-11-09 pour le ruban caché).
+ * 2026-11-03 ; du 2026-11-09 pour le ruban caché ; du 2026-11-25 pour la couverture volante).
  */
 
 /** Dans la page : la couche d'entrée des cartes autres que `opened`, dans l'écran ou non, et sa pose. */
@@ -1684,12 +1820,13 @@ test('un clic hors du panneau sur une autre carte ramène la fiche à la sienne,
   await expect(card).toBeFocused()
 })
 
-test('sa carte d’origine sortie du document, la fiche se retire sans laisser une copie volante, de ruban ni de sangle', async ({
+test('sa carte d’origine sortie du document, la fiche se retire sans laisser une copie volante, de ruban, de sangle ni de couverture', async ({
   page,
 }) => {
-  await openEnteredTable(page, PROJECTS)
-  const card = cardAt(page, ONGOING_PATH)
+  await openEnteredTable(page, [ficheProject({ ...ONGOING, gallery: TWO_IMAGES })])
+  const card = cardAt(page, FICHE_PATH)
   await openProject(card)
+  await expect(flyingCover(page)).toHaveCount(1)
   await card.evaluate((cell) => cell.remove())
   const resume = await freezeAnimations(page)
 
@@ -1698,7 +1835,8 @@ test('sa carte d’origine sortie du document, la fiche se retire sans laisser u
   // Abandonnée, la fiche part par son fondu de sortie, figé : le panneau est encore là.
   const fiche = page.locator('.project-panel')
   await expect(fiche).toHaveAttribute('data-state', 'closed')
-  await expect(fiche.locator('[data-flyer], [data-strap-flyer]')).toHaveCount(0)
+  const flyers = fiche.locator('[data-flyer], [data-strap-flyer], .project-gallery-cover')
+  await expect(flyers).toHaveCount(0)
   await resume()
   await expectClosed(page)
 })
@@ -1844,6 +1982,17 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
 
     await expectClosed(page)
     await expect(card).toBeFocused()
+  })
+
+  test('aucune couverture ne vole : la fiche apparaît sur la première image de sa galerie', async ({
+    page,
+  }) => {
+    await openEnteredTable(page, [FULL_FICHE])
+
+    await openFrozen(page, FICHE_PATH)
+
+    await expect(flyingCover(page)).toHaveCount(0)
+    await expect(gallery(page).getByRole('img')).toHaveAccessibleName('Une')
   })
 
   test('au bout de la fermeture, jusqu’au retrait du panneau, la fiche et son contenu restent effacés', async ({

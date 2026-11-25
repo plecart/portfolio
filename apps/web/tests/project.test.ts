@@ -12,8 +12,8 @@ import {
   projectDates,
   projectFacts,
   projectPath,
-  readyImages,
   sectionId,
+  shownImages,
   slugFromPath,
   splitStack,
   stackButtonName,
@@ -23,6 +23,7 @@ import {
 import { cardTechnologies } from '../src/table/cards.ts'
 import { buildImage, buildProject, buildTechnology, FILES_ORIGIN, ONGOING } from '../e2e/projects.ts'
 
+type GalleryImage = components['schemas']['GalleryImageOut']
 type Section = components['schemas']['SectionOut']
 
 /** La vue des aperçus de lien : elle précharge l’image de tête à la taille de la galerie (#27). */
@@ -170,8 +171,17 @@ test.each([
   expect(isPageFragment(href, page)).toBe(expected)
 })
 
-test('une image prête donne sa légende et ses sources, en largeurs', () => {
-  expect(readyImages([buildImage('projet', 'Écran')])).toEqual([
+/** Une image de la galerie d'un projet : prête, en attente, en échec. */
+const ready = (caption: string) => buildImage('projet', caption)
+const pending = (caption: string) => buildImage('projet', caption, 'pending')
+const failed = (caption: string) => buildImage('projet', caption, 'failed')
+
+/** Les légendes des images que la fiche montre (`shownImages`). */
+const shownCaptions = (gallery: GalleryImage[]) =>
+  shownImages(gallery).images.map(({ caption }) => caption)
+
+test('une image montrée donne sa légende et ses sources, en largeurs', () => {
+  expect(shownImages([buildImage('projet', 'Écran')]).images).toEqual([
     {
       caption: 'Écran',
       src: `${FILES_ORIGIN}/images/projet/480.webp`,
@@ -182,18 +192,38 @@ test('une image prête donne sa légende et ses sources, en largeurs', () => {
   ])
 })
 
-test.each(['pending', 'failed'] as const)('une image à l’état %s n’entre pas', (state) => {
-  const gallery = [
-    buildImage('projet', 'Avant'),
-    buildImage('projet', 'Sans variante', state),
-    buildImage('projet', 'Après'),
-  ]
+test.each<[string, GalleryImage[], string[], boolean]>([
+  ['A, B et C prêtes : B puis C', [ready('A'), ready('B'), ready('C')], ['B', 'C'], false],
+  ['A et B prêtes : B seule', [ready('A'), ready('B')], ['B'], false],
+  ['A seule : la couverture seule', [ready('A')], ['A'], true],
+  ['A prête, B en attente : la couverture seule', [ready('A'), pending('B')], ['A'], true],
+  ['A prête, B en échec : la couverture seule', [ready('A'), failed('B')], ['A'], true],
+  ['A en attente, B prête : B seule', [pending('A'), ready('B')], ['B'], false],
+  ['aucune prête : rien', [pending('A'), failed('B')], [], false],
+  ['une galerie vide : rien', [], [], false],
+])('la couverture A ne se montre que sans autre image prête — %s', (_, gallery, captions, coverOnly) => {
+  const shown = shownImages(gallery)
 
-  expect(readyImages(gallery).map(({ caption }) => caption)).toEqual(['Avant', 'Après'])
+  expect(shown.images.map(({ caption }) => caption)).toEqual(captions)
+  expect(shown.coverOnly).toBe(coverOnly)
 })
 
-test('la condition lit les variantes : une image prête sans variante n’entre pas', () => {
-  expect(readyImages([{ ...buildImage('projet', 'Écran'), variants: [] }])).toEqual([])
+test.each(['pending', 'failed'] as const)('une image à l’état %s n’entre pas', (state) => {
+  const gallery = [
+    ready('Couverture'),
+    ready('Avant'),
+    buildImage('projet', 'Sans variante', state),
+    ready('Après'),
+  ]
+
+  expect(shownCaptions(gallery)).toEqual(['Avant', 'Après'])
+})
+
+test.each<[string, GalleryImage[], string[]]>([
+  ['une autre image', [ready('A'), { ...ready('B'), variants: [] }], ['A']],
+  ['la couverture', [{ ...ready('A'), variants: [] }], []],
+])('la condition lit les variantes : %s prête sans variante n’entre pas', (_, gallery, captions) => {
+  expect(shownCaptions(gallery)).toEqual(captions)
 })
 
 test('l’image de tête se précharge à la taille de la galerie : la vue des aperçus en porte la copie', () => {

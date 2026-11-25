@@ -11,13 +11,16 @@ import {
   type Frame,
 } from './choreography.ts'
 
+/** Le cadre de la galerie, où vole la photo de la carte et se pose sa couverture (`coverTrip`). */
+const FRAME = '.project-gallery-frame'
+
 /**
  * Ce qui vole entre la carte et la fiche (spec §4.6) : chaque élément de la fiche, puis son
  * homologue sur la carte. La feuille en tête : sa fin est la pose. Les rubans à part (`RIBBON`).
  */
 const TRAVELERS = [
   ['.project-sheet', '.card-face'],
-  ['.project-gallery-frame', '.card-photo'],
+  [FRAME, '.card-photo'],
   ['.project-title', '.card-postit'],
 ] as const
 
@@ -43,6 +46,14 @@ const BAND = '::before'
 
 /** La copie volante de la sangle (`strapFlyerOf`). */
 const STRAP_FLYER = '[data-strap-flyer]'
+
+/**
+ * La photo de la carte, que copie la couverture volante (`coverTrip`), la piste de la galerie,
+ * après laquelle elle se pose, et la classe de la copie.
+ */
+const PHOTO = '.card-photo img'
+const TRACK = '.project-gallery-track'
+const COVER = 'project-gallery-cover'
 
 /**
  * Le reste de la fiche hors de la colonne défilante, qui apparaît à la pose et s'efface le premier
@@ -352,24 +363,36 @@ function around(root: Element, kept: readonly Element[]): Element[] {
 }
 
 /**
- * La couverture de la carte au retour (spec §4.6) : quand la galerie montre une autre image que la
- * première, une copie de la première, posée sur l'image montrée, y apparaît en fondu pendant le vol,
- * et part avec le panneau.
+ * La couverture volante (spec §4.6) : une copie de la photo de la carte, déjà chargée — mêmes
+ * sources, à la même taille : complète dès son insertion, sans requête, différée ou non (Chromium
+ * 156, sonde du 2026-11-25) —, `aria-hidden`, posée dans le cadre de la galerie juste après sa
+ * piste : au-dessus des images, sous les flèches et la loupe, sur tout le cadre, avec lequel elle
+ * vole, et effacée au repos (`project.css`). À l'ouverture, elle s'efface en `--dur-open`, sans retard : le
+ * cadre part avec la couverture et arrive avec la première image de la galerie. Au retour, elle
+ * revient de ce qu'elle montre (`relay`) et reparaît en `--dur-open` sur l'image montrée, quelle
+ * qu'elle soit, jusqu'au retrait du panneau.
  *
- * @returns Son fondu ; aucun quand la galerie montre la première image, ou n'en a pas.
+ * @returns Ses deux fondus ; `null` sans photo sur la carte, ou quand la galerie ne montre que la
+ *   couverture (`data-cover`, `ProjectGallery`) : rien ne change alors dans le cadre.
  */
-function fadeCover(panel: HTMLElement, { open, easing }: Motion) {
-  const images = [...panel.querySelectorAll<HTMLImageElement>('.project-gallery-image')]
-  // L'image montrée : la seule que la galerie laisse aux technologies d'assistance.
-  const current = images.findIndex((image) => image.ariaHidden !== 'true')
-  if (current < 1) return []
-  const cover = images[0].cloneNode() as HTMLImageElement
-  cover.classList.add('project-gallery-cover')
+function coverTrip(panel: HTMLElement, card: HTMLElement, { open, easing }: Motion) {
+  const photo = card.querySelector<HTMLImageElement>(PHOTO)
+  const frame = panel.querySelector(FRAME)!
+  if (!photo || frame.hasAttribute('data-cover')) return null
+  const cover = photo.cloneNode() as HTMLImageElement
+  cover.className = COVER
   cover.alt = ''
   cover.ariaHidden = 'true'
-  cover.style.left = `${current * 100}%`
-  images[current].after(cover)
-  return [cover.animate([HIDDEN, SHOWN], { duration: open, easing })]
+  frame.querySelector(TRACK)!.after(cover)
+  const timing = { duration: open, easing }
+  let fading: Animation[] = []
+  return {
+    out: () => (fading = [cover.animate([SHOWN, HIDDEN], timing)]),
+    back: () =>
+      relay(fading, [shown(cover, ['opacity'])], ([from]) => [
+        cover.animate([from, SHOWN], { ...timing, fill: 'forwards' }),
+      ]),
+  }
 }
 
 /**
@@ -444,12 +467,15 @@ function strapTrip(panel: HTMLElement, strap: HTMLElement, { open, fast, easing 
  * sangle passant à sa copie (`strapTrip`), et tout part ensemble, la feuille en tête. Au retour, le
  * contenu s'efface ; puis le panneau redevient transparent sur sa feuille, et tout repart vers la
  * carte, mesurée de nouveau, sauf la sangle, que la carte remet elle-même. Chaque ruban part de sa
- * place à l'instant, défilée hors de vue ou non : aucun test de visibilité.
+ * place à l'instant, défilée hors de vue ou non : aucun test de visibilité. La photo vole avec le
+ * cadre de la galerie, sa couverture s'y effaçant à l'aller et y reparaissant au retour
+ * (`coverTrip`).
  */
 function flying(panel: HTMLElement, card: HTMLElement, motion: Motion): Steps {
   const route = legs(panel, card, motion)
   const strap = card.querySelector<HTMLElement>(STRAP)
   const strapFlight = strap && strapTrip(panel, strap, motion)
+  const coverFlight = coverTrip(panel, card, motion)
   const kept = route.flatMap(({ element, ribbon }) => (ribbon ? [element, ribbon] : []))
   // Au départ d'un vol, chaque copie volante sur son ruban.
   const placeFlyers = () => {
@@ -467,7 +493,12 @@ function flying(panel: HTMLElement, card: HTMLElement, motion: Motion): Steps {
         fly(leg, starts[index], rests[index], motion, 'backwards'),
       )
       reveals = revealContent(contentOf(panel, kept), motion)
-      return [...outbound, ...(strapFlight?.out() ?? []), ...reveals]
+      return [
+        ...outbound,
+        ...(strapFlight?.out() ?? []),
+        ...(coverFlight?.out() ?? []),
+        ...reveals,
+      ]
     },
     clear: () => hideContent(contentOf(panel, kept), reveals, motion),
     back: () => {
@@ -481,7 +512,7 @@ function flying(panel: HTMLElement, card: HTMLElement, motion: Motion): Steps {
           (froms) =>
             route.flatMap((leg, index) => fly(leg, froms[index], cardEnd(leg), motion, 'both')),
         ),
-        ...fadeCover(panel, motion),
+        ...(coverFlight?.back() ?? []),
       ]
     },
   }
@@ -558,8 +589,10 @@ function takeOff(panel: HTMLElement, card: HTMLElement) {
     if (phase === 'gone') return
     phase = 'gone'
     for (const animation of [...flights, ...receding]) animation.cancel()
-    // Les copies volantes des rubans et de la sangle, que la fiche abandonnée ne fera plus voler.
-    for (const flyer of panel.querySelectorAll(`${FLYER}, ${STRAP_FLYER}`)) flyer.remove()
+    // Les copies volantes des rubans, de la sangle et de la couverture, que la fiche abandonnée ne
+    // fera plus voler.
+    const flyers = panel.querySelectorAll(`${FLYER}, ${STRAP_FLYER}, .${COVER}`)
+    for (const flyer of flyers) flyer.remove()
     card.removeAttribute('data-origin')
     for (const attribute of ['data-inactive', 'data-flight', 'data-choreography']) {
       panel.removeAttribute(attribute)

@@ -4,14 +4,14 @@ import { CloseIcon } from '../chrome/icons.tsx'
 import { strings } from '../strings.ts'
 import { GalleryArrows } from './GalleryArrows.tsx'
 import { GalleryCaption } from './GalleryCaption.tsx'
-import { PAPER_BUTTON, type readyImages } from './project.ts'
+import { PAPER_BUTTON, type shownImages } from './project.ts'
 import { useGestures } from './useGestures.ts'
 import { useZoomView } from './useZoomView.ts'
 import { keyCommand } from './viewerKeys.ts'
 import { MIN_SCALE, panBy, snapToFit, stepZoom, toggleZoom, zoomAt } from './zoom.ts'
 
-/** Une image prête de la galerie : sa légende et ses sources. */
-type Image = ReturnType<typeof readyImages>[number]
+/** Une image que montre la galerie : sa légende et ses sources. */
+type Image = ReturnType<typeof shownImages>['images'][number]
 
 type ViewerProps = {
   images: Image[]
@@ -25,7 +25,7 @@ type ViewerProps = {
  * dans le `Dialog` qui la tient ouverte. Sans `DialogOverlay`, comme la fiche : son `RemoveScroll`
  * poserait un `<style>` que la CSP de production bloque.
  *
- * @param images Les images prêtes de la galerie, une au moins.
+ * @param images Les images que montre la galerie (`shownImages`), une au moins.
  * @param index Le rang de l'image montrée, celui que la galerie a choisi.
  * @param onStep Change l'image de la galerie, du pas reçu, en boucle.
  * @param onClose La fermeture par un toucher du fond, hors de l'image ; Radix tient les autres.

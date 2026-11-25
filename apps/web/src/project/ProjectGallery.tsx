@@ -6,7 +6,7 @@ import { strings } from '../strings.ts'
 import { GalleryArrows } from './GalleryArrows.tsx'
 import { GalleryCaption } from './GalleryCaption.tsx'
 import { ImageViewer } from './ImageViewer.tsx'
-import { directionStep, GALLERY_SIZES, hasModifier, readyImages } from './project.ts'
+import { directionStep, GALLERY_SIZES, hasModifier, shownImages } from './project.ts'
 import { useClickWithoutSwipe, useSwipe } from './useSwipe.ts'
 
 /**
@@ -45,7 +45,9 @@ function useImageIndex(count: number, listening: boolean) {
 /**
  * La galerie d'une fiche (spec §4.4, §6.2) : une piste translatée dans un cadre carré, sa barre
  * dessous. Le carré et ses 20 px de barre se réservent en CSS : ni une image pas encore chargée, ni
- * une galerie sans image prête ne changent la hauteur du panneau (§3.2).
+ * une galerie sans image prête ne changent la hauteur du panneau (§3.2). Elle montre les images
+ * prêtes sauf la couverture, ou la couverture seule (`shownImages`) ; son cadre le dit alors
+ * (`data-cover`).
  *
  * Le `style` de la piste s'écrit par le CSSOM, que la CSP de production laisse passer. Les images
  * que la piste met hors du cadre sont retirées de l'arbre d'accessibilité.
@@ -56,14 +58,15 @@ function useImageIndex(count: number, listening: boolean) {
  * d'entrée d'historique : elle se ferme avec la fiche, au même rendu, et montre pendant son fondu de
  * sortie l'image choisie.
  *
- * Sur le retour à sa carte, elle garde l'image choisie, sur laquelle la couverture de la carte
- * apparaît en fondu pendant le vol (`useChoreography`, spec §4.6).
+ * Ouverte depuis sa carte, la photo de la carte s'y change en fondu en sa première image pendant le
+ * vol ; sur le retour, elle garde l'image choisie, sur laquelle la photo réapparaît en fondu — sauf
+ * quand son cadre ne montre que la couverture (`useChoreography`, spec §4.6).
  *
  * @param gallery Les images du projet, prêtes ou non.
  * @param open La fiche est ouverte ; fermée, elle ferme la couche avec elle.
  */
 export function ProjectGallery({ gallery, open }: { gallery: Project['gallery']; open: boolean }) {
-  const images = readyImages(gallery)
+  const { images, coverOnly } = shownImages(gallery)
   const [viewing, setViewing] = useState(false)
   if (viewing && !open) setViewing(false)
   const { index, go, navigable } = useImageIndex(images.length, open && !viewing)
@@ -74,7 +77,11 @@ export function ProjectGallery({ gallery, open }: { gallery: Project['gallery'];
   return (
     <Dialog open={viewing} onOpenChange={setViewing}>
       <div role="group" aria-label={strings.projectImages} className="project-gallery">
-        <div className="project-gallery-frame" {...(navigable && swipe)}>
+        <div
+          className="project-gallery-frame"
+          data-cover={coverOnly || undefined}
+          {...(navigable && swipe)}
+        >
           {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- « Agrandir l'image » porte le geste au clavier */}
           <div
             className="project-gallery-track"

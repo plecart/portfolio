@@ -12,8 +12,8 @@ import { readFileSync } from 'node:fs'
 import { AxeBuilder } from '@axe-core/playwright'
 import type { Locator, Page } from '@playwright/test'
 import { API_ORIGIN, expect, FAILURES, holdProjects, serveProjects, test } from './api.ts'
-import { arriveAt, closeButton, nextImage, panel, previousImage } from './project.ts'
-import { buildImage, FILES_ORIGIN, PROJECT_SETS } from './projects.ts'
+import { arriveAt, closeButton, nextImage, panel, previousImage, TWO_IMAGES } from './project.ts'
+import { FILES_ORIGIN, PROJECT_SETS } from './projects.ts'
 import { detachHeader, pageBottom, scrollThrough } from './scroll.ts'
 
 /** L'origine que le site sert lui-même. */
@@ -239,10 +239,10 @@ for (const colorScheme of ['light', 'dark'] as const) {
   }
 }
 
-/** Ouvre la fiche d'un projet à deux images et une section : chacun de ses boutons y est. */
+/** Ouvre une fiche qui montre deux images, avec une section : chacun de ses boutons y est. */
 const arriveAtFullFiche = (page: Page) =>
   arriveAt(page, {
-    gallery: [buildImage('fiche', 'Une'), buildImage('fiche', 'Deux')],
+    gallery: TWO_IMAGES,
     sections: [{ title: 'Architecture', anchor: 'architecture', body: 'Les briques du projet.' }],
   })
 

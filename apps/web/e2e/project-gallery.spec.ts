@@ -1,7 +1,7 @@
 /**
- * La galerie de la fiche (spec §3.2, §4.4, §6.2, §6.3 ; issue #170) : ses images, ses commandes et ce
- * qu'elle tient du panneau, aux deux largeurs. Toutes les images d'une fiche partagent leur fichier ;
- * la légende, l'accessibilité et la position disent laquelle est montrée.
+ * La galerie de la fiche (spec §3.2, §4.4, §6.2, §6.3 ; issues #170, #289) : ses images, ses
+ * commandes et ce qu'elle tient du panneau, aux deux largeurs. Toutes les images d'une fiche
+ * partagent leur fichier ; la légende, l'accessibilité et la position disent laquelle est montrée.
  */
 import type { Page } from '@playwright/test'
 import { expect, holdRequests, serveProjects, test } from './api.ts'
@@ -11,6 +11,7 @@ import {
   CAPTIONS,
   center,
   closeButton,
+  COVER,
   expectNoOverflow,
   expectNoViolations,
   expectPanelBox,
@@ -19,12 +20,16 @@ import {
   gallery,
   LONG_DESCRIPTION,
   nextImage,
+  openViewer,
   panel,
   penDrag,
   previousImage,
   readingColumn,
   THREE_IMAGES,
   viewer,
+  viewerButton,
+  viewerCounter,
+  viewerImage,
 } from './project.ts'
 import { buildImage, FILES_ORIGIN } from './projects.ts'
 import { COLUMN_VIEWPORT, watchTransitions } from './table.ts'
@@ -51,6 +56,12 @@ async function expectImage(page: Page, position: number, count = CAPTIONS.length
     })
     .toBe(0)
 }
+
+/** Les légendes des images de la piste, montrée ou non. */
+const trackCaptions = (page: Page) =>
+  page
+    .locator('.project-gallery-image')
+    .evaluateAll((images: HTMLImageElement[]) => images.map(({ alt }) => alt))
 
 /** Attend le cadre sans commande : ni flèches ni compteur. */
 async function expectNoCommands(page: Page) {
@@ -250,12 +261,66 @@ test.describe('le balayage', () => {
   })
 })
 
+test.describe('la couverture ne se montre que sans autre image prête', () => {
+  test('la couverture, puis deux images : la galerie montre les deux, « 1 / 2 » puis « 2 / 2 », et le plein écran les parcourt', async ({
+    page,
+  }) => {
+    const [first, second] = CAPTIONS.map((text) => buildImage('fiche', text))
+    await arriveAt(page, { gallery: [COVER, first, second] })
+
+    await expectImage(page, 0, 2)
+    expect(await trackCaptions(page)).toEqual(CAPTIONS.slice(0, 2))
+
+    await nextImage(page).click()
+    await expectImage(page, 1, 2)
+
+    await openViewer(page)
+    await expect(viewerImage(page)).toHaveAccessibleName(CAPTIONS[1])
+    await expect(viewerCounter(page)).toHaveText('2 / 2')
+    await viewerButton(page, 'Image suivante').click()
+    await expect(viewerImage(page)).toHaveAccessibleName(CAPTIONS[0])
+    await expect(viewerCounter(page)).toHaveText('1 / 2')
+  })
+
+  test('la couverture, puis une image : la galerie ne montre qu’elle, sans flèches ni compteur', async ({
+    page,
+  }) => {
+    await arriveAt(page, { gallery: [COVER, buildImage('fiche', CAPTIONS[0])] })
+
+    await expectNoCommands(page)
+    expect(await trackCaptions(page)).toEqual([CAPTIONS[0]])
+    await expect(caption(page)).toHaveText(CAPTIONS[0])
+  })
+
+  for (const [name, others] of [
+    ['seule', []],
+    ['et une image en échec', [buildImage('fiche', 'Échec', 'failed')]],
+  ] as const) {
+    test(`la couverture ${name} : la galerie la montre, sans flèches ni compteur, la barre garde la légende`, async ({
+      page,
+    }) => {
+      await arriveAt(page, { gallery: [COVER, ...others] })
+      const keys = await watchKeys(page)
+
+      await page.keyboard.press('ArrowLeft')
+
+      await expectNoCommands(page)
+      await expect(caption(page)).toHaveText(COVER.caption)
+      await expect(gallery(page).getByRole('img')).toHaveAccessibleName(COVER.caption)
+      expect((await bar(page).boundingBox())!.height).toBe(20)
+      expect(await keys()).toEqual([false])
+      await expectNoViolations(page)
+    })
+  }
+})
+
 test.describe('les images prêtes seules comptent', () => {
-  test('trois images dont une en attente : « 1 / 2 », et la boucle ne la voit pas', async ({
+  test('après la couverture, trois images dont une en attente : « 1 / 2 », et la boucle ne la voit pas', async ({
     page,
   }) => {
     await arriveAt(page, {
       gallery: [
+        COVER,
         buildImage('fiche', CAPTIONS[0]),
         buildImage('fiche', 'En attente', 'pending'),
         buildImage('fiche', CAPTIONS[1]),
@@ -269,24 +334,6 @@ test.describe('les images prêtes seules comptent', () => {
 
     await nextImage(page).click()
     await expectImage(page, 0, 2)
-  })
-
-  test('une prête et une en échec : ni flèches ni compteur, la barre garde la légende', async ({
-    page,
-  }) => {
-    await arriveAt(page, {
-      gallery: [buildImage('fiche', CAPTIONS[0]), buildImage('fiche', 'Échec', 'failed')],
-    })
-    const keys = await watchKeys(page)
-
-    await page.keyboard.press('ArrowLeft')
-
-    await expectNoCommands(page)
-    await expect(caption(page)).toHaveText(CAPTIONS[0])
-    await expect(gallery(page).getByRole('img')).toHaveAccessibleName(CAPTIONS[0])
-    expect((await bar(page).boundingBox())!.height).toBe(20)
-    expect(await keys()).toEqual([false])
-    await expectNoViolations(page)
   })
 
   for (const [name, images] of [
@@ -390,9 +437,12 @@ test.describe('les repères de §3.2 et §4.4', () => {
     expect(counterBox.x + counterBox.width).toBe(box.x + box.width)
   })
 
-  /** Une légende de 50 caractères, la borne de §7, sur douze images. */
+  /** Une légende de 50 caractères, la borne de §7, sur douze images après la couverture. */
   const LONGEST_CAPTION = 'Écran de suivi des expéditions, vue par entrepôts.'
-  const TWELVE_LONG_CAPTIONS = Array.from({ length: 12 }, () => buildImage('fiche', LONGEST_CAPTION))
+  const TWELVE_LONG_CAPTIONS = [
+    COVER,
+    ...Array.from({ length: 12 }, () => buildImage('fiche', LONGEST_CAPTION)),
+  ]
 
   test('une légende de 50 caractères tient sur la barre, compteur à deux chiffres compris', async ({
     page,
@@ -506,7 +556,7 @@ test.describe('d’une fiche à l’autre', () => {
   const OTHER = {
     slug: 'autre',
     title: 'Autre',
-    gallery: CAPTIONS.slice(0, 2).map((text) => buildImage('autre', text)),
+    gallery: [COVER, ...CAPTIONS.slice(0, 2).map((text) => buildImage('autre', text))],
   }
 
   test('une autre fiche ouverte pendant le fondu de sortie d’une arrivée directe repart de la première image', async ({
