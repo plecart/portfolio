@@ -732,6 +732,7 @@ HOUSE_SKILLS = (
     "bug-vers-issue",
     "audit-spec-ui",
     "schema-architecture",
+    "miniature-projet",
 )
 
 

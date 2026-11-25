@@ -10,7 +10,7 @@ Ordre de normativité : **en cas de contradiction, le rang le plus haut l'emport
 
 | Rang | Fichier | Portée | Où s'inscrit un amendement |
 |---|---|---|---|
-| 1 | `docs/cadrage-technique.md` | périmètre, phases, architecture, contraintes, registre des décisions D1-D78 (§7) | le § concerné + une ligne au registre §7 (une décision remplacée y reste, marquée « remplacée par ») |
+| 1 | `docs/cadrage-technique.md` | périmètre, phases, architecture, contraintes, registre des décisions D1-D79 (§7) | le § concerné + une ligne au registre §7 (une décision remplacée y reste, marquée « remplacée par ») |
 | 2 | `docs/specification-ux.md` | interface du site : direction (§1), jetons, écrans, composants, états, responsive, accessibilité, performance, contraintes de contenu (§2-§7, valeurs mesurées sur les prototypes retenus) | le § concerné, puis le prototype HTML correspondant (hors dépôt, `E:/Projets/Portfolio-prototypes/`, README de reprise) : les deux restent alignés |
 | 3 | `docs/adr/` (index et conventions : `docs/adr/README.md`) | le pourquoi d'une brique, options écartées | un nouvel ADR qui remplace l'ancien (statut MADR « remplacé par »), jamais l'édition d'un ADR accepté |
 | 4 | `docs/frontend-outillage.md` | inventaire installé et plan d'installation de `apps/web/` (le pourquoi de D44 est dans l'ADR 0008), provisoire | le § concerné |
@@ -428,7 +428,7 @@ des skills marqués « modifié localement » ci-dessous (`git log -p -- .claude
 homonyme : un skill le masquerait) :
 `init-projet`, `vers-prd`, `vers-issues`, `triage`, `interroge-moi`, `cycle-pr`, `contradiction`,
 `repercussions`, `pr-paralleles`, `plan-qa`, `execution-qa`, `bug-vers-issue`, `audit-spec-ui`,
-`schema-architecture`.
+`schema-architecture`, `miniature-projet`.
 
 **Minimalisme** : `ponytail`, `ponytail-review`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`,
 `ponytail-help` — activés dans `CLAUDE.md` (section « Minimalisme »), doctrine D27.

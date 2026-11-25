@@ -147,6 +147,21 @@ FORMES: dict[str, dict[str, Cas]] = {
             "premierPlan.image", "captures/accueil.png" + chr(0), "captures/accueil.png", base=SCENE
         ),
     },
+    # Le message nomme la borne, pas l'absence : aucun des deux fichiers n'existe.
+    "image hors du dépôt": {
+        "image-chemin-absolu": Cas(
+            "premierPlan.image",
+            "/captures/accueil.png",
+            'reste dans le dépôt, reçu "/captures/accueil.png"',
+            base=SCENE,
+        ),
+        "image-hors-de-la-racine": Cas(
+            "premierPlan.image",
+            "../captures/accueil.png",
+            'reste dans le dépôt, reçu "../captures/accueil.png"',
+            base=SCENE,
+        ),
+    },
     "clé inconnue": {
         "racine-cle-inconnue": Cas("titre", "x", '"titre"'),
         "cle-de-mise-en-scene-dans-chantier": Cas(
@@ -168,7 +183,7 @@ def test_une_forme_d_erreur_rend_une_erreur_au_chemin_du_champ_fautif(
     Population : la forme verrouillée de la description (docstring du module) — 2 objets (racine,
     `premierPlan`), 7 champs dont 5 requis selon le gabarit (`gabarit`, `icones` en « chantier »,
     `premierPlan` en « mise en scène », `type`, `image`), 1 liste d'icônes, et les contraintes
-    qui lient ses champs. **34 formes**, une par cas de `FORMES`, et une 35e, la clé en double,
+    qui lient ses champs. **36 formes**, une par cas de `FORMES`, et une 37e, la clé en double,
     éprouvée par la CLI (`test_la_cli_releve_une_cle_en_double_que_json_loads_ecraserait`) :
 
     - champ requis manquant : 5, un par champ requis ;
@@ -180,6 +195,7 @@ def test_une_forme_d_erreur_rend_une_erreur_au_chemin_du_champ_fautif(
     - icônes : 4 — 3 ou 5 noms, un nom absent du dossier, un nom répété ;
     - image illisible ou d'un autre format : 4 — absente, dossier, ni PNG ni JPEG à l'extension
       d'un PNG, caractère nul dans le chemin ;
+    - image hors du dépôt : 2 — un chemin absolu, un chemin qui sort de la racine par `..` ;
     - clé inconnue : 4 — à la racine, d'un gabarit dans l'autre (2), dans `premierPlan`.
 
     Chaque cas rend **une** erreur, au chemin exact, dont le message nomme la valeur fautive.
@@ -204,9 +220,10 @@ def test_les_cas_d_erreur_comptent_les_formes_de_leur_docstring() -> None:
         "valeur hors de son ensemble": 5,
         "icônes": 4,
         "image illisible ou d'un autre format": 4,
+        "image hors du dépôt": 2,
         "clé inconnue": 4,
     }
-    assert len(CAS) == 34
+    assert len(CAS) == 36
 
 
 def test_les_tables_de_la_forme_comptent_les_champs_de_la_docstring() -> None:
@@ -267,6 +284,10 @@ VALIDES: dict[str, dict[str, Any]] = {
     "capture-png": premier_plan("capture", "captures/accueil.png"),
     # Reconnu à sa signature, pas à son extension.
     "schema-png-sans-extension": premier_plan("schema", "captures/schema"),
+    # Un `..` qui ne sort pas de la racine.
+    "capture-par-un-detour-dans-le-depot": premier_plan(
+        "capture", "captures/../captures/accueil.png"
+    ),
 }
 
 
@@ -278,6 +299,24 @@ def test_une_description_de_chaque_gabarit_et_de_chaque_premier_plan_est_valide(
     projet_temoin(tmp_path, monkeypatch)
 
     assert miniature.valider(valide, ICONES_TEMOINS) == []
+
+
+def test_une_image_du_depot_nommee_par_son_chemin_absolu_est_refusee(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """L'image existe et est dans le dépôt, mais la description, versionnée, ne nomme ses
+    images que depuis la racine du projet."""
+    projet_temoin(tmp_path, monkeypatch)
+    absolue = str(tmp_path / "captures" / "accueil.png")
+
+    erreurs = miniature.valider(premier_plan("capture", absolue), ICONES_TEMOINS)
+
+    assert [str(erreur) for erreur in erreurs] == [
+        (
+            "premierPlan.image : attendu un chemin relatif qui reste dans le dépôt, "
+            f"reçu {json.dumps(absolue)}"
+        )
+    ]
 
 
 # Les papiers du cadre polaroid, clair et sombre (spec UX, jeton `--paper`).
@@ -315,6 +354,19 @@ def test_le_cone_de_chaque_teinte_est_plus_clair_que_son_fond(teinte: str) -> No
     couleurs = miniature.PALETTE[teinte]
 
     assert miniature.luminance(couleurs["cone"]) > miniature.luminance(couleurs["fond"])
+
+
+@pytest.mark.parametrize("teinte", TEINTES)
+def test_le_cone_et_le_disque_de_chaque_teinte_melent_son_fond_de_blanc(teinte: str) -> None:
+    """Le commentaire de `PALETTE`, recompté : le cône est le fond mêlé à 25 % de blanc, le
+    disque à 14 % — `round(c + (255 - c) * part)` sur chaque canal."""
+    couleurs = miniature.PALETTE[teinte]
+
+    def melee(part: float) -> str:
+        canaux = bytes.fromhex(couleurs["fond"][1:])
+        return "#" + "".join(f"{round(c + (255 - c) * part):02X}" for c in canaux)
+
+    assert (couleurs["cone"], couleurs["disque"]) == (melee(0.25), melee(0.14))
 
 
 CONTRASTES = {

@@ -1,0 +1,450 @@
+"""Tests de l'export de la miniature d'un projet
+(`.claude/skills/miniature-projet/scripts/exporter.py`) et de la page qu'il assemble
+(`rendu/miniature.html`).
+
+La capture passe par la frontière de l'export du schéma, `subprocess.run`, que ces tests
+remplacent par son témoin (`Capture`, `test_schema_architecture_export.py`) : un navigateur
+n'entre pas dans la suite. Chaque test se place à la racine d'un projet témoin sous `tmp_path`
+(`projet`), où vivent la description et les images du premier plan. Les cas s'écrivent en
+littéraux, jamais tirés des constantes des scripts (`cycle-pr/references/tests.md`, « Le rouge
+se constate, il ne se suppose pas »).
+"""
+
+import base64
+import json
+import re
+from pathlib import Path
+from typing import Any
+
+import pytest
+from conftest import load_script, run_in_pipe
+from test_schema_architecture_export import (
+    CARRE,
+    ERREUR_ATTENTE,
+    PLANCHE,
+    Capture,
+    fenetre,
+    png_temoin,
+    remplacer,
+)
+
+exporter = load_script("miniature-projet", "exporter")
+description = load_script("schema-architecture", "description")
+
+# Les images du premier plan du projet témoin : un PNG de 1200 × 800 px et un JPEG — leur début
+# seul, que le rendu ne décode pas ici.
+PNG = png_temoin(1200, 800)
+JPEG = bytes((0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0))
+
+# Trois logos, puis une icône neutre, tous du dossier d'icônes de `schema-architecture`.
+CHANTIER: dict[str, Any] = {
+    "gabarit": "chantier",
+    "icones": ["django", "postgresql", "docker", "globe"],
+}
+
+
+def scene(type_: str, image: str = "captures/accueil.png") -> dict[str, Any]:
+    """Une description « mise en scène » sans choix, de ce premier plan."""
+    return {"gabarit": "mise-en-scene", "premierPlan": {"type": type_, "image": image}}
+
+
+DESCRIPTIONS = {
+    "chantier": CHANTIER,
+    "telephone": scene("telephone", "captures/mobile.jpg"),
+    "capture": scene("capture"),
+    "schema": scene("schema"),
+}
+DESCRIPTION = Path("docs/miniature/miniature.json")
+DOSSIER = Path("docs/miniature/propositions")
+IMAGE = Path("docs/miniature/miniature.png")
+
+
+def projet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, decrite: dict[str, Any]) -> None:
+    """Se place à la racine d'un projet témoin : ses images, `captures/accueil.png` et
+    `captures/mobile.jpg`, et sa description `decrite` à son chemin par défaut."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "captures").mkdir()
+    (tmp_path / "captures" / "accueil.png").write_bytes(PNG)
+    (tmp_path / "captures" / "mobile.jpg").write_bytes(JPEG)
+    DESCRIPTION.parent.mkdir(parents=True)
+    DESCRIPTION.write_text(json.dumps(decrite), encoding="utf-8")
+
+
+def page(decrite: dict[str, Any], teinte: str, composition: str) -> str:
+    """La page que l'export assemble pour `decrite`, dans cette teinte et cette composition."""
+    return exporter.assembler(decrite, description.icones_disponibles(), teinte, composition)
+
+
+def injectee(rendue: str) -> dict[str, Any]:
+    """La miniature que dessine la page `rendue` : l'objet que l'export injecte à son marqueur,
+    seul sur sa ligne — la page capturée se relit avec les fins de ligne du poste."""
+    prefixe = "const MINIATURE = "
+    [ligne] = [ligne for ligne in rendue.splitlines() if ligne.startswith(prefixe)]
+    return json.loads(ligne.removeprefix(prefixe).removesuffix(";"))
+
+
+def en_data(image: bytes, type_mime: str) -> str:
+    """`image` en URL `data:`."""
+    return f"data:{type_mime};base64,{base64.b64encode(image).decode('ascii')}"
+
+
+@pytest.mark.parametrize("decrite", DESCRIPTIONS.values(), ids=DESCRIPTIONS.keys())
+def test_la_page_assemblee_ne_charge_rien_hors_d_elle(
+    decrite: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Chaque gabarit et chaque premier plan : aucune URL hors de l'espace de noms XML de SVG, et
+    ni `url()`, ni `src`, ni `href` qui vise autre chose qu'une URL `data:` ou un fragment de la
+    page. Un marqueur sans ressource, lui, arrête `remplir`."""
+    projet(tmp_path, monkeypatch, decrite)
+
+    rendue = page(decrite, "sauge", "centre")
+
+    assert set(re.findall("https?://[-./a-zA-Z0-9]+", rendue)) <= {"http://www.w3.org/2000/svg"}
+    assert re.findall("url[(](?!#)|(?:src|href)=.(?!data:|#)", rendue) == []
+
+
+def test_la_page_assemblee_pose_le_marqueur_qu_attend_la_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le marqueur de fin de rendu, que l'export injecte comme dans la page du schéma."""
+    projet(tmp_path, monkeypatch, CHANTIER)
+
+    rendue = page(CHANTIER, "sauge", "centre")
+
+    assert rendue.count("""document.body.setAttribute("data-rendu-pret", '')""") == 1
+
+
+CHOIX: dict[str, tuple[dict[str, Any], str, str, dict[str, str], dict[str, float]]] = {
+    "chantier": (
+        CHANTIER,
+        "sauge",
+        "bas-droite",
+        {"fond": "#66885F", "cone": "#8CA687", "disque": "#7B9975"},
+        {"x": 0.72, "y": 0.68, "taille": 0.7},
+    ),
+    "mise-en-scene": (
+        scene("capture"),
+        "prune",
+        "coin-haut-droit",
+        {"fond": "#A46C99", "cone": "#BB91B2", "disque": "#B181A7"},
+        {"x": 0.64, "y": 0.36, "diametre": 0.96, "premierPlan": 0.56},
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("decrite", "teinte", "composition", "couleurs", "parametres"),
+    CHOIX.values(),
+    ids=CHOIX.keys(),
+)
+def test_la_page_porte_les_couleurs_de_la_teinte_et_les_parametres_de_la_composition(
+    decrite: dict[str, Any],
+    teinte: str,
+    composition: str,
+    couleurs: dict[str, str],
+    parametres: dict[str, float],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Le rendu reçoit des couleurs et des fractions du côté, jamais un nom de teinte ni de
+    composition."""
+    projet(tmp_path, monkeypatch, decrite)
+
+    rendue = page(decrite, teinte, composition)
+
+    miniature = injectee(rendue)
+    assert (miniature["couleurs"], miniature["composition"]) == (couleurs, parametres)
+    assert [nom for nom in (teinte, composition) if nom in rendue] == []
+
+
+def test_la_page_d_un_chantier_porte_ses_quatre_icones_dans_l_ordre_et_le_cone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le SVG de chaque icône, dans l'ordre de la description — chaque logo à sa couleur
+    (`couleurs.json`), l'icône neutre telle quelle —, et celui du cône de Lucide."""
+    projet(tmp_path, monkeypatch, CHANTIER)
+
+    miniature = injectee(page(CHANTIER, "sauge", "centre"))
+
+    premieres = [
+        re.search('fill="#[0-9A-F]{6}"|lucide lucide-[a-z-]+', svg) for svg in miniature["icones"]
+    ]
+    assert [trouvee[0] if trouvee else None for trouvee in premieres] == [
+        'fill="#092E20"',
+        'fill="#4169E1"',
+        'fill="#2496ED"',
+        "lucide lucide-globe",
+    ]
+    assert "lucide lucide-traffic-cone" in miniature["cone"]
+
+
+PREMIERS_PLANS = {
+    "telephone-jpeg": ("telephone", "captures/mobile.jpg", en_data(JPEG, "image/jpeg")),
+    "capture-png": ("capture", "captures/accueil.png", en_data(PNG, "image/png")),
+    "schema-png": ("schema", "captures/accueil.png", en_data(PNG, "image/png")),
+}
+
+
+@pytest.mark.parametrize(
+    ("type_", "image", "attendue"), PREMIERS_PLANS.values(), ids=PREMIERS_PLANS.keys()
+)
+def test_la_page_d_une_mise_en_scene_porte_son_premier_plan_en_ligne(
+    type_: str, image: str, attendue: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le type du premier plan, et son image en URL `data:`, du type reconnu à ses octets."""
+    decrite = scene(type_, image)
+    projet(tmp_path, monkeypatch, decrite)
+
+    miniature = injectee(page(decrite, "sauge", "centre"))
+
+    assert miniature["premierPlan"] == {"type": type_, "image": attendue}
+
+
+# Le fond et la composition de chaque proposition par défaut, dans l'ordre de son numéro.
+PROPOSITIONS = {
+    "chantier": (
+        CHANTIER,
+        [
+            ("#C06649", {"x": 0.5, "y": 0.5, "taille": 0.8}),
+            ("#66885F", {"x": 0.5, "y": 0.6, "taille": 1.25}),
+            ("#6381AA", {"x": 0.72, "y": 0.68, "taille": 0.7}),
+            ("#A46C99", {"x": 0.28, "y": 0.68, "taille": 0.7}),
+        ],
+    ),
+    "mise-en-scene": (
+        scene("telephone"),
+        [
+            ("#C06649", {"x": 0.5, "y": 0.5, "diametre": 0.8, "premierPlan": 0.64}),
+            ("#66885F", {"x": 0.5, "y": 0.5, "diametre": 1.25, "premierPlan": 0.72}),
+            ("#6381AA", {"x": 0.64, "y": 0.36, "diametre": 0.96, "premierPlan": 0.56}),
+            ("#A46C99", {"x": 0.36, "y": 0.64, "diametre": 0.96, "premierPlan": 0.56}),
+        ],
+    ),
+}
+
+
+@pytest.mark.parametrize(("decrite", "attendues"), PROPOSITIONS.values(), ids=PROPOSITIONS.keys())
+def test_sans_choix_l_export_ecrit_quatre_propositions_puis_leur_planche(
+    decrite: dict[str, Any],
+    attendues: list[tuple[str, dict[str, float]]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Aux chemins par défaut : quatre propositions, chacune d'une teinte et d'une composition
+    distinctes, puis leur planche ; une ligne par fichier écrit, chaque capture à la taille de
+    sa fenêtre, et aucune image choisie."""
+    projet(tmp_path, monkeypatch, decrite)
+    capture = Capture()
+    remplacer(monkeypatch, capture)
+    ecrites = [f"proposition-{numero}.png" for numero in range(1, 5)]
+
+    rendu = exporter.main([])
+
+    assert (rendu, capsys.readouterr().out.splitlines()) == (
+        0,
+        [
+            *(f"{DOSSIER / nom} : 2400 × 2400" for nom in ecrites),
+            f"{DOSSIER / 'planche.png'} : 4000 × 1680",
+        ],
+    )
+    assert [fenetre(commande) for commande in capture.commandes] == ["1200,1200"] * 4 + ["2000,840"]
+    assert [
+        (miniature["couleurs"]["fond"], miniature["composition"])
+        for miniature in map(injectee, capture.pages[:4])
+    ] == attendues
+    assert {fichier.name: fichier.read_bytes() for fichier in DOSSIER.iterdir()} == {
+        **dict.fromkeys(ecrites, CARRE),
+        "planche.png": PLANCHE,
+    }
+    assert not IMAGE.exists()
+
+
+def test_les_teintes_nommees_remplacent_celles_par_defaut_dans_leur_ordre(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`--teintes` : la k-ième teinte nommée pour la k-ième proposition."""
+    projet(tmp_path, monkeypatch, CHANTIER)
+    capture = Capture()
+    remplacer(monkeypatch, capture)
+
+    rendu = exporter.main(["--teintes", "prune,ocre,sarcelle,ardoise"])
+
+    assert rendu == 0
+    assert [injectee(rendue)["couleurs"]["fond"] for rendue in capture.pages[:4]] == [
+        "#A46C99",
+        "#9F792A",
+        "#348A8D",
+        "#6381AA",
+    ]
+
+
+def test_le_choix_de_la_teinte_de_2_et_de_la_composition_de_3_exporte_cette_seule_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """La teinte de la proposition 2 et la composition de la proposition 3, inscrites dans la
+    description : une seule capture, exactement ces paramètres, l'image à son chemin par défaut
+    et aucune proposition."""
+    projet(tmp_path, monkeypatch, {**CHANTIER, "teinte": "sauge", "composition": "bas-droite"})
+    capture = Capture()
+    remplacer(monkeypatch, capture)
+
+    rendu = exporter.main([])
+
+    assert (rendu, capsys.readouterr().out.splitlines()) == (0, [f"{IMAGE} : 2400 × 2400"])
+    [miniature] = map(injectee, capture.pages)
+    assert (miniature["couleurs"]["fond"], miniature["composition"]) == (
+        "#66885F",
+        {"x": 0.72, "y": 0.68, "taille": 0.7},
+    )
+    assert [fenetre(commande) for commande in capture.commandes] == ["1200,1200"]
+    assert (IMAGE.read_bytes(), DOSSIER.exists()) == (CARRE, False)
+
+
+def test_l_image_choisie_s_ecrit_au_chemin_nomme(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`--png` : l'image choisie à ce chemin, et nulle part ailleurs."""
+    projet(tmp_path, monkeypatch, {**scene("schema"), "teinte": "ocre", "composition": "centre"})
+    remplacer(monkeypatch, Capture())
+    png = tmp_path / "ailleurs" / "miniature.png"
+
+    rendu = exporter.main(["--png", str(png)])
+
+    assert (rendu, png.read_bytes(), IMAGE.exists()) == (0, CARRE, False)
+
+
+INVALIDES = {
+    "gabarit-inconnu": (
+        {**CHANTIER, "gabarit": "affiche"},
+        f"gabarit : attendu l'un des gabarits chantier, mise-en-scene, reçu {json.dumps('affiche')}",
+    ),
+    "teinte-hors-palette": (
+        {**CHANTIER, "teinte": "fuchsia", "composition": "centre"},
+        (
+            "teinte : attendu l'une des teintes terracotta, sauge, ardoise, prune, ocre, sarcelle, "
+            'reçu "fuchsia"'
+        ),
+    ),
+    "image-absente": (
+        scene("capture", "captures/absente.png"),
+        'premierPlan.image : aucun fichier lisible à ce chemin, reçu "captures/absente.png"',
+    ),
+}
+
+
+@pytest.mark.parametrize(("decrite", "ligne"), INVALIDES.values(), ids=INVALIDES.keys())
+def test_une_description_invalide_sort_en_1_sans_capture_ni_image(
+    decrite: dict[str, Any],
+    ligne: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Valider d'abord : une ligne par erreur, aucun navigateur, ni proposition ni image."""
+    projet(tmp_path, monkeypatch, decrite)
+    capture = Capture()
+    remplacer(monkeypatch, capture)
+
+    rendu = exporter.main([])
+
+    assert (rendu, capsys.readouterr().out.splitlines()) == (1, [ligne])
+    assert (capture.commandes, DOSSIER.exists(), IMAGE.exists()) == ([], False, False)
+
+
+ECHECS = {
+    "capture-en-echec": (None, 1, "Timeout 30000ms exceeded."),
+    # La fenêtre sans le facteur d'échelle du descripteur.
+    "autre-taille": (png_temoin(1200, 1200), 0, "capture de 1200 × 1200 px"),
+}
+
+
+@pytest.mark.parametrize(("png", "code", "fragment"), ECHECS.values(), ids=ECHECS.keys())
+def test_une_capture_en_echec_ou_d_une_autre_taille_n_ecrit_rien(
+    png: bytes | None,
+    code: int,
+    fragment: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Sortie 1, le motif en une ligne, et rien à la destination."""
+    projet(tmp_path, monkeypatch, {**CHANTIER, "teinte": "sauge", "composition": "centre"})
+    remplacer(monkeypatch, Capture(png=png, code=code, erreur=ERREUR_ATTENTE))
+
+    rendu = exporter.main([])
+
+    lignes = capsys.readouterr().err.splitlines()
+    assert (rendu, len(lignes), IMAGE.exists()) == (1, 1, False)
+    assert fragment in lignes[0]
+
+
+AVEC_CHOIX = {**CHANTIER, "teinte": "sauge", "composition": "centre"}
+APPELS_MAL_FORMES = {
+    "teintes-avec-choix": (
+        AVEC_CHOIX,
+        ["--teintes", "prune,ocre,sarcelle,ardoise"],
+        "--teintes ne vaut que sans choix dans la description",
+    ),
+    "dossier-avec-choix": (
+        AVEC_CHOIX,
+        ["--dossier", "d"],
+        "--dossier ne vaut que sans choix dans la description",
+    ),
+    "png-sans-choix": (
+        CHANTIER,
+        ["--png", "x.png"],
+        "--png ne vaut qu'avec un choix dans la description",
+    ),
+    "trois-teintes": (
+        CHANTIER,
+        ["--teintes", "prune,ocre,sarcelle"],
+        "attendu 4 teintes distinctes de la palette",
+    ),
+    "teinte-hors-palette": (
+        CHANTIER,
+        ["--teintes", "prune,ocre,sarcelle,fuchsia"],
+        "attendu 4 teintes distinctes de la palette",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("decrite", "argv", "fragment"), APPELS_MAL_FORMES.values(), ids=APPELS_MAL_FORMES.keys()
+)
+def test_un_appel_mal_forme_sort_en_2_sans_capture_ni_fichier(
+    decrite: dict[str, Any],
+    argv: list[str],
+    fragment: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Une option hors de son mode, ou des teintes qui ne font pas quatre noms distincts de la
+    palette : le motif sur la sortie d'erreur, rien de capturé ni d'écrit."""
+    projet(tmp_path, monkeypatch, decrite)
+    capture = Capture()
+    remplacer(monkeypatch, capture)
+
+    with pytest.raises(SystemExit) as sortie:
+        exporter.main(argv)
+
+    assert (sortie.value.code, capture.commandes) == (2, [])
+    assert fragment in capsys.readouterr().err
+    assert (DOSSIER.exists(), IMAGE.exists()) == (False, False)
+
+
+def test_la_cli_rend_ses_erreurs_en_utf_8_dans_un_tube(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le script lancé comme la session le lit, flux de l'enfant en cp1252 (`run_in_pipe`) :
+    sortie 1, la ligne d'erreur lisible en UTF-8, aucune image."""
+    projet(tmp_path, monkeypatch, scene("capture", "captures/absente-é.png"))
+
+    done = run_in_pipe("miniature-projet", "exporter")
+
+    assert done.returncode == 1
+    assert done.stdout.decode("utf-8").splitlines() == [
+        'premierPlan.image : aucun fichier lisible à ce chemin, reçu "captures/absente-é.png"'
+    ]
+    assert not DOSSIER.exists()
