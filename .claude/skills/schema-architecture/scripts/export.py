@@ -66,7 +66,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 
 from description import (
@@ -143,6 +143,21 @@ def svg_en_ligne(chemin: Path, couleur: str | None) -> str:
     return svg.replace("<svg", f'<svg fill="{couleur}"', 1) if couleur else svg
 
 
+def icones_en_ligne(noms: Iterable[str], icones: Mapping[str, Path]) -> dict[str, str]:
+    """Le SVG de chaque icône de `noms`, par son nom dans leur ordre, chaque logo peint à sa
+    couleur (`couleurs.json`, `svg_en_ligne`).
+
+    Args:
+        noms: des noms d'icônes disponibles.
+        icones: le fichier de chaque icône disponible — `icones_disponibles()`.
+
+    Raises:
+        Abandon: le fichier des couleurs des logos est illisible (`lire_couleurs`).
+    """
+    couleurs = lire_couleurs(ICONES)
+    return {nom: svg_en_ligne(icones[nom], couleurs.get(nom)) for nom in noms}
+
+
 def en_data(chemin: Path, type_mime: str) -> str:
     """Le fichier `chemin` en URL `data:`, encodé en base64."""
     return f"data:{type_mime};base64,{base64.b64encode(chemin.read_bytes()).decode('ascii')}"
@@ -180,10 +195,9 @@ def assembler(description: object, icones: Mapping[str, Path]) -> str:
         icones: le fichier de chaque icône disponible — `icones_disponibles()`.
 
     Raises:
-        Abandon: le fichier des couleurs des logos est illisible (`lire_couleurs`), ou un
+        Abandon: le fichier des couleurs des logos est illisible (`icones_en_ligne`), ou un
             marqueur du gabarit est sans ressource (`remplir`).
     """
-    couleurs = lire_couleurs(ICONES)
     return remplir(
         RENDU / "page.html",
         {
@@ -193,12 +207,7 @@ def assembler(description: object, icones: Mapping[str, Path]) -> str:
             ),
             "ROUGH": (RENDU / "rough.js").read_text(encoding="utf-8"),
             "DESCRIPTION": en_js(description),
-            "ICONES": en_js(
-                {
-                    nom: svg_en_ligne(icones[nom], couleurs.get(nom))
-                    for nom in sorted(icones_utilisees(description))
-                }
-            ),
+            "ICONES": en_js(icones_en_ligne(sorted(icones_utilisees(description)), icones)),
         },
     )
 
@@ -351,6 +360,12 @@ def signaler(motif: str | None, png: Path, fenetre: Fenetre, prefixe: str) -> in
     return 0
 
 
+def ecrire_image(page: str, png: Path, prefixe: str = "") -> int:
+    """Capture la page autonome `page` dans la fenêtre `FENETRE` et l'écrit à `png` (`capturer`),
+    puis en écrit l'issue (`signaler`, `prefixe`) ; rend le code de sortie, 0 ou 1."""
+    return signaler(capturer(page, png), png, FENETRE, prefixe)
+
+
 def ecrire_propositions(pages: Sequence[str], dossier: Path) -> int:
     """Capture chaque page de `pages` en proposition `<dossier>/proposition-<k>.png`, k = 1…,
     puis leur planche `<dossier>/planche.png` ; la première capture en échec arrête, chaque
@@ -362,7 +377,7 @@ def ecrire_propositions(pages: Sequence[str], dossier: Path) -> int:
         perimee.unlink(missing_ok=True)
     images = [dossier / PROPOSITION.format(numero) for numero in range(1, len(pages) + 1)]
     for page, image in zip(pages, images, strict=True):
-        if signaler(capturer(page, image), image, FENETRE, f"{image} : "):
+        if ecrire_image(page, image, f"{image} : "):
             return 1
     return signaler(planche(images, sortie), sortie, FENETRE_PLANCHE, f"{sortie} : ")
 
@@ -390,7 +405,7 @@ def assembler_fichiers(chemins: Sequence[Path]) -> tuple[int, list[str]]:
 def exporter(description: Path, png: Path) -> int:
     """Exporte la description `description` à l'image `png` ; rend le code de sortie."""
     code, pages = assembler_fichiers([description])
-    return code or signaler(capturer(pages[0], png), png, FENETRE, "")
+    return code or ecrire_image(pages[0], png)
 
 
 def exporter_propositions(descriptions: Sequence[Path], dossier: Path) -> int:
