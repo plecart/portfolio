@@ -6,7 +6,6 @@
  * trouve plus par son rôle, seulement avant l'ouverture ou après la fermeture.
  */
 import type { Locator, Page } from '@playwright/test'
-import { LOADING_FRAME_COUNT } from '../src/table/cards.ts'
 import {
   countProjectRequests,
   expect,
@@ -404,7 +403,8 @@ test.describe('l’arrivée directe', () => {
     const release = await holdProjects(page)
     await page.goto(FIRST.path)
 
-    await expect(page.locator('[data-table-cell]')).toHaveCount(LOADING_FRAME_COUNT)
+    // Ce que le chargement montre ici, le cadre de fiche : `project-loading.spec.ts`.
+    await expect(page.getByRole('main')).toHaveAttribute('aria-busy', 'true')
     await expect(panel(page)).toHaveCount(0)
 
     await release(serving(PROJECTS))

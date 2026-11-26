@@ -18,11 +18,12 @@
     }
   }
 
-  /* Mobile : le panneau est la fenêtre, une colonne, et tout y défile ; ses deux rangées, calées en
-     haut, ne s'étirent pas sur sa hauteur. Dès 600 px, deux colonnes de la largeur de la photo, au
-     centre de la fenêtre : `left` se compte en `vw`, car la place gardée à la barre sort de la boîte
-     qu'`inset` et les marges automatiques connaissent. */
-  .project-panel {
+  /* La boîte du panneau, que le cadre de fiche partage (§5.1). Mobile : la fenêtre, une colonne ; ses
+     deux rangées, calées en haut, ne s'étirent pas sur sa hauteur. Dès 600 px, deux colonnes de la
+     largeur de la photo, au centre de la fenêtre : `left` se compte en `vw`, car la place gardée à la
+     barre sort de la boîte qu'`inset` et les marges automatiques connaissent. */
+  .project-panel,
+  .project-frame {
     --photo: min(100vh - 96px, 660px, (100vw - 92px) / 2);
     position: fixed;
     inset: 0;
@@ -31,10 +32,8 @@
     align-content: start;
     gap: var(--s-3);
     padding: var(--s-2);
-    overflow-y: auto;
     background-color: var(--paper);
     box-shadow: var(--shadow-lift);
-    animation: project-in var(--dur-content) var(--ease-out);
 
     @variant sm {
       grid-template-columns: repeat(2, var(--photo));
@@ -45,8 +44,17 @@
       height: calc(var(--photo) + 48px);
       margin-block: auto;
       padding: 10px;
-      overflow-y: visible;
       border-radius: var(--r-card);
+    }
+  }
+
+  /* Le panneau seul : tout y défile sur téléphone, et il entre par son fondu. */
+  .project-panel {
+    overflow-y: auto;
+    animation: project-in var(--dur-content) var(--ease-out);
+
+    @variant sm {
+      overflow-y: visible;
     }
   }
 
@@ -269,7 +277,9 @@
     }
   }
 
-  .project-reading {
+  /* La colonne de lecture (§3.2), de la fiche et de son cadre. */
+  .project-reading,
+  .project-frame-reading {
     min-width: 0;
     padding: var(--s-3) 0 var(--s-6);
 
@@ -295,11 +305,29 @@
     }
   }
 
+  /* Le post-it du titre (§4.3) ; sa taille et ses marges, sous l'interligne de `.postit`, font
+     aussi le bloc du cadre. */
+  .project-title,
+  .project-frame-title {
+    padding: var(--s-2) 14px var(--s-2) var(--s-4);
+    font-size: 22px;
+  }
+
   .project-title {
     max-width: 100%;
     margin-bottom: var(--s-2);
-    padding: var(--s-2) 14px var(--s-2) var(--s-4);
-    font-size: 22px;
+  }
+
+  /* Le bloc du titre du cadre (§5.1) : la hauteur du post-it sur une ligne — une espace insécable y
+     tient la ligne —, la moitié de la colonne, droit, en `--line`, 16 px au-dessus des barres. */
+  .project-frame-title {
+    width: 50%;
+    margin-bottom: var(--s-4);
+    background-color: var(--line);
+
+    &::before {
+      content: '\00a0';
+    }
   }
 
   /* Rotation −4° dans tous les états (§4.3) : la montée s'y ajoute, seule à bouger. */

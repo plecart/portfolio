@@ -48,17 +48,20 @@ function focusCard(slug: string) {
  * @param origin La carte d'où la fiche s'ouvre, jusqu'à son retour ; `null` sans carte d'origine.
  * @param onClose La demande de fermeture : le bouton, Échap ou un clic hors du panneau.
  * @param onLanded La fiche est revenue à sa carte d'origine.
+ * @param onEntered Le panneau a fini son fondu d'entrée : une ouverture sans carte d'origine.
  */
 export function ProjectDialog({
   project,
   origin,
   onClose,
   onLanded,
+  onEntered,
 }: {
   project: Project | undefined
   origin: HTMLElement | null
   onClose: () => void
   onLanded: () => void
+  onEntered: () => void
 }) {
   const [shown, setShown] = useState(project)
   if (project && project !== shown) setShown(project)
@@ -94,6 +97,13 @@ export function ProjectDialog({
           onCloseAutoFocus={(event) => {
             event.preventDefault()
             focusCard(shown.slug)
+          }}
+          // Le fondu du panneau seul : ni celui d'un enfant, ni celui de la couche plein écran, que
+          // son portail laisse remonter jusqu'ici dans l'arbre de React.
+          onAnimationEnd={(event) => {
+            if (event.animationName === 'project-in' && event.target === event.currentTarget) {
+              onEntered()
+            }
           }}
         >
           <div className="project-sheet" aria-hidden />
