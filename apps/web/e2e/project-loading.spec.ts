@@ -11,7 +11,13 @@ import { projectPath } from '../src/project/project.ts'
 import { LOADING_FRAME_COUNT } from '../src/table/cards.ts'
 import { expect, FAILURES, holdProjects, serving, test } from './api.ts'
 import { resolveAll, settle } from './css.ts'
-import { expectNoViolations, expectPanelBox, openFromTable, panel } from './project.ts'
+import {
+  expectClosed,
+  expectNoViolations,
+  expectPanelBox,
+  openFromTable,
+  panel,
+} from './project.ts'
 import { PROJECT_SETS } from './projects.ts'
 import { cards, COLUMN_VIEWPORT, expectPlacement } from './table.ts'
 
@@ -248,6 +254,16 @@ test('témoin : ouverte depuis une carte, l’entête sort et la colonne des lie
   )
 })
 
+/** Fige le fondu d'entrée de la fiche dès son départ : le cadre reste dessous tant qu'il dure. */
+const freezeFicheFade = (page: Page) =>
+  page.evaluate(() =>
+    addEventListener('animationstart', ({ target, animationName }) => {
+      const element = target as Element
+      if (animationName !== 'project-in' || !element.matches('[role="dialog"]')) return
+      for (const animation of element.getAnimations()) animation.pause()
+    }),
+  )
+
 test('la fiche apparaît par-dessus le cadre par son fondu de 200 ms, puis le cadre est retiré (spec §4.6, §5.1)', async ({
   page,
 }) => {
@@ -257,14 +273,8 @@ test('la fiche apparaît par-dessus le cadre par son fondu de 200 ms, puis le ca
     ['animation-duration', 'var(--dur-content)'],
     ['animation-timing-function', 'var(--ease-out)'],
   ])
-  // Le fondu de la fiche, figé dès son départ : placé à mi-course, il se lit à loisir.
-  await page.evaluate(() =>
-    addEventListener('animationstart', ({ target, animationName }) => {
-      const element = target as Element
-      if (animationName !== 'project-in' || !element.matches('[role="dialog"]')) return
-      for (const animation of element.getAnimations()) animation.pause()
-    }),
-  )
+  // Figé, puis placé à mi-course, le fondu se lit à loisir.
+  await freezeFicheFade(page)
 
   await release(serving(PROJECTS))
 
@@ -314,6 +324,22 @@ test('la fiche apparaît par-dessus le cadre par son fondu de 200 ms, puis le ca
 
   await expect(frame(page)).toHaveCount(0)
   await expect(panel(page)).toHaveCSS('opacity', '1')
+})
+
+test('fermée avant la fin de son fondu, la fiche emporte le cadre : la table s’affiche (spec §5.1)', async ({
+  page,
+}) => {
+  const release = await openLoading(page)
+  await freezeFicheFade(page)
+  await release(serving(PROJECTS))
+  await expect(panel(page)).toBeVisible()
+  await expect(frame(page)).toHaveCount(1)
+
+  await page.keyboard.press('Escape')
+
+  await expectClosed(page)
+  await expect(frame(page)).toHaveCount(0)
+  await expect(cards(page)).toHaveCount(PROJECTS.length)
 })
 
 test('un slug inconnu retire le cadre : l’adresse devient `/`, et la table s’affiche', async ({ page }) => {
