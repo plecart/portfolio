@@ -1069,7 +1069,7 @@ function readCover({ path, finish = false }: { path: string; finish?: boolean })
   }
 }
 
-test('à l’ouverture, la couverture de la carte vole sur tout le cadre de la galerie et s’y efface en `--dur-open`, `--ease-out`, sans retard : le cadre arrive sur la première image de la galerie ; posée, la couverture reste effacée et laisse le pointeur à l’image', async ({
+test('à l’ouverture, la couverture de la carte vole sur tout le cadre de la galerie et s’y efface en `--dur-open`, `--ease-out`, sans retard : le cadre arrive sur la première image que montre la galerie ; posée, la couverture reste effacée et laisse le pointeur à l’image', async ({
   page,
 }) => {
   await openEnteredTable(page, [FULL_FICHE])
@@ -1984,7 +1984,7 @@ test.describe('en mouvement réduit (spec §6.3)', () => {
     await expect(card).toBeFocused()
   })
 
-  test('aucune couverture ne vole : la fiche apparaît sur la première image de sa galerie', async ({
+  test('aucune couverture ne vole : la fiche apparaît sur la première image que montre sa galerie', async ({
     page,
   }) => {
     await openEnteredTable(page, [FULL_FICHE])
