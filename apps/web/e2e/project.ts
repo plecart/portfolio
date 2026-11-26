@@ -221,7 +221,8 @@ export async function expectClosed(page: Page) {
 /**
  * Attend le panneau à ses repères (spec §3.2) : la fenêtre sous 600 px, sinon ceux de 1280 × 800.
  *
- * @param box La boîte mesurée : le panneau, ou ce qui en partage la boîte — le cadre de fiche (§5.1).
+ * @param box La boîte mesurée : le panneau, ou ce qui en partage la boîte — le cadre de fiche
+ *   (§5.1).
  */
 export async function expectPanelBox(page: Page, box: Locator = panel(page)) {
   const viewport = page.viewportSize()!

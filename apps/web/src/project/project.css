@@ -18,10 +18,10 @@
     }
   }
 
-  /* La boîte du panneau, que le cadre de fiche partage (§5.1). Mobile : la fenêtre, une colonne ; ses
-     deux rangées, calées en haut, ne s'étirent pas sur sa hauteur. Dès 600 px, deux colonnes de la
-     largeur de la photo, au centre de la fenêtre : `left` se compte en `vw`, car la place gardée à la
-     barre sort de la boîte qu'`inset` et les marges automatiques connaissent. */
+  /* La boîte du panneau, que le cadre de fiche partage (§5.1). Mobile : la fenêtre, une colonne ;
+     ses deux rangées, calées en haut, ne s'étirent pas sur sa hauteur. Dès 600 px, deux colonnes de
+     la largeur de la photo, au centre de la fenêtre : `left` se compte en `vw`, car la place gardée
+     à la barre sort de la boîte qu'`inset` et les marges automatiques connaissent. */
   .project-panel,
   .project-frame {
     --photo: min(100vh - 96px, 660px, (100vw - 92px) / 2);
