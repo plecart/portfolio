@@ -77,9 +77,9 @@ FOND = "#F3EDE4"
 # Les six teintes de la palette, par nom, dans l'ordre où les propositions les prennent : chacune
 # n'est que le trait d'accent — le cône de « chantier », l'anneau de « mise en scène » — à peine
 # plus soutenu que `FOND`. Terracotta est le cône des couvertures en ligne, mesuré `#EBDBCE` ; les
-# cinq autres, d'une autre teinte, ont sa luminance relative à 0,5 % près (calculé par `luminance`
-# le 2026-11-26). Chacune contraste de 1,10:1 à 1,30:1 avec le fond (#290, critère 6), vérifié
-# par les tests de la miniature.
+# cinq autres, d'une autre teinte, ont sa luminance relative à 0,5 % près (calculé le 2026-11-26).
+# Chacune contraste de 1,10:1 à 1,30:1 avec le fond (#290, critère 6), vérifié par les tests de la
+# miniature (`test_miniature_projet.py`).
 PALETTE = {
     "terracotta": "#EBDBCE",
     "sauge": "#D5E2CF",
@@ -275,25 +275,6 @@ def valider(description: object, icones: Collection[str]) -> list[Erreur]:
     return passe.erreurs
 
 
-def luminance(couleur: str) -> float:
-    """La luminance relative de `couleur`, `#RRGGBB`, de 0 à 1 (WCAG 2.2, définition « relative
-    luminance »)."""
-
-    def lineaire(octet: int) -> float:
-        valeur = octet / 255
-        return valeur / 12.92 if valeur <= 0.04045 else ((valeur + 0.055) / 1.055) ** 2.4
-
-    rouge, vert, bleu = map(lineaire, bytes.fromhex(couleur[1:]))
-    return 0.2126 * rouge + 0.7152 * vert + 0.0722 * bleu
-
-
-def contraste(a: str, b: str) -> float:
-    """Le rapport de contraste de deux couleurs `#RRGGBB`, de 1 à 21, dans un sens comme dans
-    l'autre (WCAG 2.2, définition « contrast ratio »)."""
-    claire, sombre = sorted(map(luminance, (a, b)), reverse=True)
-    return (claire + 0.05) / (sombre + 0.05)
-
-
 def propositions(
     description: object, teintes: Sequence[str] | None = None
 ) -> list[tuple[str, str]]:
@@ -319,13 +300,6 @@ def propositions(
             f"({', '.join(PALETTE)}), reçu {', '.join(retenues)}"
         )
     return list(zip(retenues, COMPOSITIONS[gabarit], strict=True))
-
-
-def choisir(description: Mapping[str, object], teinte: str, composition: str) -> dict[str, object]:
-    """`description` augmentée du choix du mainteneur — la teinte d'une proposition, la
-    composition d'une autre, ou celles d'une seule —, à valider avant de l'écrire ; `description`
-    reste telle quelle."""
-    return {**description, "teinte": teinte, "composition": composition}
 
 
 def main(argv: Sequence[str]) -> int:

@@ -323,6 +323,25 @@ FOND = "#F3EDE4"
 TEINTES = ("terracotta", "sauge", "ardoise", "prune", "ocre", "sarcelle")
 
 
+def luminance(couleur: str) -> float:
+    """La luminance relative de `couleur`, `#RRGGBB`, de 0 à 1 (WCAG 2.2, définition « relative
+    luminance »)."""
+
+    def lineaire(octet: int) -> float:
+        valeur = octet / 255
+        return valeur / 12.92 if valeur <= 0.04045 else ((valeur + 0.055) / 1.055) ** 2.4
+
+    rouge, vert, bleu = map(lineaire, bytes.fromhex(couleur[1:]))
+    return 0.2126 * rouge + 0.7152 * vert + 0.0722 * bleu
+
+
+def contraste(a: str, b: str) -> float:
+    """Le rapport de contraste de deux couleurs `#RRGGBB`, de 1 à 21, dans un sens comme dans
+    l'autre (WCAG 2.2, définition « contrast ratio ») : l'instrument des tests de la palette."""
+    claire, sombre = sorted(map(luminance, (a, b)), reverse=True)
+    return (claire + 0.05) / (sombre + 0.05)
+
+
 def test_la_palette_porte_ses_six_teintes_dans_l_ordre() -> None:
     """L'ordre compte : les propositions prennent les premières teintes par défaut."""
     assert list(miniature.PALETTE) == list(TEINTES)
@@ -344,7 +363,7 @@ def test_l_accent_de_chaque_teinte_contraste_de_1_10_a_1_30_avec_le_fond(teinte:
     accent = miniature.PALETTE[teinte]
 
     assert re.fullmatch("#[0-9A-F]{6}", accent)
-    assert 1.10 <= miniature.contraste(accent, FOND) <= 1.30
+    assert 1.10 <= contraste(accent, FOND) <= 1.30
 
 
 CONTRASTES = {
@@ -360,7 +379,7 @@ CONTRASTES = {
 def test_le_contraste_suit_la_definition_wcag(a: str, b: str, attendu: float) -> None:
     """WCAG 2.2, définitions « contrast ratio » et « relative luminance » : de 1 à 21, dans un
     sens comme dans l'autre."""
-    assert miniature.contraste(a, b) == pytest.approx(attendu, abs=0.005)
+    assert contraste(a, b) == pytest.approx(attendu, abs=0.005)
 
 
 CHANTIER_PARAMETRES = {"cone": ["taille", "x", "y"], "icones": ["places", "taille"]}
@@ -465,28 +484,6 @@ def test_des_propositions_impossibles_sont_refusees_avec_leur_motif(
     """Les teintes nommées sont 4 noms distincts de la palette, et le gabarit est connu."""
     with pytest.raises(ValueError, match=motif):
         miniature.propositions(description, teintes)
-
-
-def test_le_choix_de_la_teinte_de_2_et_de_la_composition_de_3_s_ecrit_dans_la_description() -> None:
-    """#290, décision 5 : la description garde teinte et composition séparément."""
-    sans_choix = {"gabarit": "chantier", "icones": TROIS_ICONES}
-    proposees = miniature.propositions(sans_choix)
-
-    assert miniature.choisir(sans_choix, proposees[1][0], proposees[2][1]) == {
-        "gabarit": "chantier",
-        "icones": ["globe", "vault", "cable"],
-        "teinte": "sauge",
-        "composition": "cone-a-droite",
-    }
-
-
-def test_le_choix_remplace_celui_de_la_description_sans_la_modifier() -> None:
-    """Une fonction pure : la description reçue reste telle quelle."""
-    avant = copy.deepcopy(CHANTIER)
-
-    choisie = miniature.choisir(CHANTIER, "ocre", "grand-cone")
-
-    assert (choisie["teinte"], choisie["composition"], CHANTIER) == ("ocre", "grand-cone", avant)
 
 
 def ecrite(chemin: Path, description: object) -> Path:
