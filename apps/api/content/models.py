@@ -483,8 +483,9 @@ class GalleryImage(StoredFiles):
     """Une image de la galerie d'un projet, à sa place dans la galerie (`project.gallery`). Le
     site l'affiche entière dans le cadre carré, sur fond neutre (spec §1.11).
 
-    La première est la couverture : la photo de la carte, la première image de la fiche et
-    l'`og:image` (spec §1.11 et §7, ADR 0011), carrée, d'au moins `COVER_MIN_SIDE` px de côté.
+    La première est la couverture : la photo de la carte et l'`og:image` (spec §1.11 et §7, ADR
+    0011), que la fiche ne montre que si le projet n'a pas d'autre image prête (spec §4.4, #289),
+    carrée, d'au moins `COVER_MIN_SIDE` px de côté.
     Ces règles lisent l'ordre des images d'un projet, comme « une image au moins » : la base ne
     peut pas les porter, l'écran Projet les tient (brief de #9, décision 4).
 
