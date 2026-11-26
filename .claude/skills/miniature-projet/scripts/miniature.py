@@ -59,7 +59,7 @@ from description import (
 from export import SIGNATURE_PNG
 
 DESCRIPTION = Path("docs/miniature/miniature.json")
-NOMBRE_D_ICONES = 4
+NOMBRE_D_ICONES = 3
 NOMBRE_DE_PROPOSITIONS = 4
 TYPES_DE_PREMIER_PLAN = ("telephone", "capture", "schema")
 # Les clés de la racine communes aux deux gabarits, chacune requise ou non.
@@ -71,42 +71,71 @@ PREMIER_PLAN = {"type": True, "image": True}
 # l'image en URL `data:`.
 SIGNATURES = {"image/png": SIGNATURE_PNG, "image/jpeg": bytes((0xFF, 0xD8, 0xFF))}
 
-# Les six teintes moyennes de la palette, par nom, dans l'ordre où les propositions les prennent
-# (#290, décision 3) — une hypothèse de travail que le mainteneur juge sur les planches. Chacune
-# porte trois couleurs : `fond`, le fond de l'image ; `cone`, le cône dessiné derrière les icônes
-# de « chantier », plus clair que le fond (le fond mêlé à 25 % de blanc) ; `disque`, le disque de
-# « mise en scène », un ton voisin du fond (mêlé à 14 % de blanc). Chaque `fond` a une luminance
-# relative de 0,21 environ, et un contraste d'au moins 3:1 — de 3,77 à 3,83 contre `#FBF8F2`, de
-# 3,64 à 3,70 contre `#2B2724` — contre les deux papiers du cadre polaroid, `--paper` (calculé
-# par `contraste` le 2026-11-25 ; le seuil, vérifié par les tests de la miniature).
+# Le fond fixe des deux gabarits, le `--bg` clair de la spec UX — mesuré `#F2EDE3` sur les
+# couvertures en ligne de Spell Army et de Badge Mie, 2400 px, le 2026-11-26 (#290, décision 3 bis).
+FOND = "#F3EDE4"
+# Les six teintes de la palette, par nom, dans l'ordre où les propositions les prennent : chacune
+# n'est que le trait d'accent — le cône de « chantier », l'anneau de « mise en scène » — à peine
+# plus soutenu que `FOND`. Terracotta est le cône des couvertures en ligne, mesuré `#EBDBCE` ; les
+# cinq autres, d'une autre teinte, ont sa luminance relative à 0,5 % près (calculé par `luminance`
+# le 2026-11-26). Chacune contraste de 1,10:1 à 1,30:1 avec le fond (#290, critère 6), vérifié
+# par les tests de la miniature.
 PALETTE = {
-    "terracotta": {"fond": "#C06649", "cone": "#D08C76", "disque": "#C97B62"},
-    "sauge": {"fond": "#66885F", "cone": "#8CA687", "disque": "#7B9975"},
-    "ardoise": {"fond": "#6381AA", "cone": "#8AA0BF", "disque": "#7993B6"},
-    "prune": {"fond": "#A46C99", "cone": "#BB91B2", "disque": "#B181A7"},
-    "ocre": {"fond": "#9F792A", "cone": "#B79A5F", "disque": "#AC8C48"},
-    "sarcelle": {"fond": "#348A8D", "cone": "#67A7AA", "disque": "#509A9D"},
+    "terracotta": "#EBDBCE",
+    "sauge": "#D5E2CF",
+    "ardoise": "#D7DFE9",
+    "prune": "#E8D9E6",
+    "ocre": "#E9DDBE",
+    "sarcelle": "#CCE2E2",
 }
 
 # Les quatre compositions de chaque gabarit, par nom, dans l'ordre où les propositions les
 # prennent : des paramètres que le rendu lit tels quels, sans connaître les noms, en fractions du
-# côté de l'image. « chantier » : `x` et `y`, le centre du cône ; `taille`, le côté du carré où il
-# s'inscrit — les quatre icônes restent en grille 2 × 2 centrée. « mise en scène » : `x` et `y`,
-# le centre du disque et du premier plan ; `diametre`, celui du disque ; `premierPlan`, le côté du
-# carré où le premier plan s'inscrit, qui ne sort jamais de l'image. Les quatre d'un gabarit
-# doivent se distinguer à l'œil sur la carte de 160 px : la planche d'aperçu en juge.
+# côté de l'image. La première calque la couverture en ligne du gabarit (mesurée le 2026-11-26) ;
+# les trois autres s'en distinguent sur la carte de 160 px, ce dont la planche d'aperçu juge.
+#
+# « chantier » (Spell Army, l'assistant IA) : `cone`, le centre et le côté du carré où s'inscrit le
+# `traffic-cone` de Lucide, qui peut sortir de l'image ; `icones`, le côté du carré de chaque
+# icône et le centre de chacune, en triangle, qui reste dans l'image. « mise en scène » (Badge
+# Mie) : `anneau`, son centre, son diamètre extérieur et son épaisseur ; `plan`, le premier plan,
+# le milieu de son haut, sa largeur — celle du téléphone, que le rendu élargit pour une capture ou
+# un schéma —, et son angle en degrés, tourné autour de ce milieu.
 COMPOSITIONS = {
     "chantier": {
-        "centre": {"x": 0.5, "y": 0.5, "taille": 0.8},
-        "debordant": {"x": 0.5, "y": 0.6, "taille": 1.25},
-        "bas-droite": {"x": 0.72, "y": 0.68, "taille": 0.7},
-        "bas-gauche": {"x": 0.28, "y": 0.68, "taille": 0.7},
+        "modele": {
+            "cone": {"x": 0.5, "y": 0.474, "taille": 1.02},
+            "icones": {"taille": 0.34, "places": [[0.5, 0.33], [0.265, 0.655], [0.735, 0.655]]},
+        },
+        "cone-a-gauche": {
+            "cone": {"x": 0.36, "y": 0.5, "taille": 1.02},
+            "icones": {"taille": 0.32, "places": [[0.6, 0.3], [0.4, 0.68], [0.78, 0.64]]},
+        },
+        "cone-a-droite": {
+            "cone": {"x": 0.64, "y": 0.5, "taille": 1.02},
+            "icones": {"taille": 0.32, "places": [[0.4, 0.3], [0.22, 0.64], [0.6, 0.68]]},
+        },
+        "grand-cone": {
+            "cone": {"x": 0.5, "y": 0.62, "taille": 1.4},
+            "icones": {"taille": 0.3, "places": [[0.5, 0.4], [0.27, 0.72], [0.73, 0.72]]},
+        },
     },
     "mise-en-scene": {
-        "centre": {"x": 0.5, "y": 0.5, "diametre": 0.8, "premierPlan": 0.64},
-        "grand-disque": {"x": 0.5, "y": 0.5, "diametre": 1.25, "premierPlan": 0.72},
-        "coin-haut-droit": {"x": 0.64, "y": 0.36, "diametre": 0.96, "premierPlan": 0.56},
-        "coin-bas-gauche": {"x": 0.36, "y": 0.64, "diametre": 0.96, "premierPlan": 0.56},
+        "modele": {
+            "anneau": {"x": 0.5, "y": 0.585, "diametre": 0.896, "epaisseur": 0.02},
+            "plan": {"x": 0.5, "haut": 0.114, "largeur": 0.606, "angle": -3},
+        },
+        "plan-a-gauche": {
+            "anneau": {"x": 0.62, "y": 0.5, "diametre": 0.9, "epaisseur": 0.02},
+            "plan": {"x": 0.42, "haut": 0.14, "largeur": 0.6, "angle": -4},
+        },
+        "plan-a-droite": {
+            "anneau": {"x": 0.38, "y": 0.5, "diametre": 0.9, "epaisseur": 0.02},
+            "plan": {"x": 0.58, "haut": 0.14, "largeur": 0.6, "angle": 4},
+        },
+        "grand-anneau": {
+            "anneau": {"x": 0.5, "y": 0.5, "diametre": 1.2, "epaisseur": 0.03},
+            "plan": {"x": 0.5, "haut": 0.2, "largeur": 0.66, "angle": 0},
+        },
     },
 }
 

@@ -4,120 +4,133 @@
 <title>Miniature</title>
 <!--
   Le gabarit de la miniature d'un projet : un carré qui remplit la fenêtre, en aplats et sans
-  texte. `scripts/exporter.py` remplace chaque marqueur en majuscules entre `/*` et `*/` par sa
-  ressource en ligne : la miniature à dessiner — son gabarit, les couleurs de sa teinte, les
-  paramètres de sa composition en fractions du côté, les SVG de ses icônes ou l'image de son
+  texte, calqué sur les couvertures en ligne (#290, décision 4 bis). `scripts/exporter.py`
+  remplace chaque marqueur en majuscules entre `/*` et `*/` par sa ressource en ligne : la
+  miniature à dessiner — son gabarit, son fond et sa couleur d'accent, les paramètres de sa
+  composition en fractions du côté, les SVG de son cône et de ses icônes ou l'image de son
   premier plan en `data:` — et l'attribut que la page pose une fois rendue. Le rendu ne connaît
   aucun nom de teinte ni de composition. Aucune requête.
 -->
 <style>
-:root { --ink: #2A2622; --paper: #FBF8F2; --tape: #E8DFCF; --shadow: rgba(42,38,34,.28); }
+:root { --ink: #2A2622; --paper: #FBF8F2; --shadow: rgba(42,38,34,.22); }
 body { margin: 0; overflow: hidden; }
 #carre { position: relative; width: 100vmin; height: 100vmin; overflow: hidden; }
 #carre > * { position: absolute; }
-/* « chantier » : le cône derrière, puis les quatre icônes en grille 2 × 2 centrée, chacune sur un
-   badge clair — une hypothèse de lisibilité sur la carte de 160 px, que la planche juge. */
-.cone svg { display: block; width: 100%; height: 100%; }
-.grille { --badge: 25vmin; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid;
-  grid-template-columns: repeat(2, var(--badge)); gap: 5vmin; }
-.badge { height: var(--badge); border-radius: 5.5vmin; background: var(--paper); color: var(--ink);
-  display: grid; place-items: center; box-shadow: 0 .6vmin 2vmin var(--shadow); }
-.badge svg { width: 15vmin; height: 15vmin; }
-/* « mise en scène » : le disque, puis le premier plan centré sur lui, inscrit dans son carré. */
-.disque { border-radius: 50%; }
-.plan { display: grid; place-items: center; }
-.telephone { position: relative; color: var(--ink);
-  filter: drop-shadow(0 1.2vmin 2.4vmin var(--shadow)); }
-/* L'image déborde un peu l'écran que perce le corps du téléphone (`#telephone`, 5 à 95 sur 100,
-   5 à 195 sur 200) : le corps en recouvre le bord. */
-.telephone img { position: absolute; left: 4%; top: 2%; width: 92%; height: 96%; object-fit: cover;
-  border-radius: 12% / 6%; }
-.telephone svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.fenetre { display: flex; flex-direction: column; background: var(--paper); border-radius: 1.2vmin;
-  overflow: hidden; box-shadow: 0 1.2vmin 3.6vmin var(--shadow); }
-.barre { flex: none; width: 100%; box-sizing: border-box; display: flex; align-items: center;
-  gap: 1vmin; padding: 0 2vmin; background: var(--tape); }
-.barre span { width: 1.6vmin; height: 1.6vmin; border-radius: 50%; background: var(--paper); }
-.fenetre img { flex: 1; min-height: 0; width: 100%; object-fit: cover; }
-.schema { box-shadow: 0 1.2vmin 3.6vmin var(--shadow); }
+#carre svg { display: block; width: 100%; height: 100%; }
+/* « chantier » : les icônes sans cadre ; une icône Lucide trace à l'encre, un logo garde sa
+   couleur. */
+.icone { color: var(--ink); }
+/* « mise en scène » : l'anneau, puis le premier plan, tourné autour du milieu de son haut. */
+.anneau { box-sizing: border-box; border-style: solid; border-radius: 50%; }
+.plan { transform-origin: 50% 0; filter: drop-shadow(0 .8vmin 2.4vmin var(--shadow)); }
+.telephone { color: var(--ink); }
+.telephone img { position: absolute; }
+.telephone img, .fenetre img { object-fit: cover; object-position: top; }
+/* La fenêtre d'une capture, au cadre sombre comme le corps du téléphone : sa barre sans texte,
+   trois points. */
+.fenetre { display: flex; flex-direction: column; overflow: hidden; background: var(--ink); }
+.barre { flex: none; display: flex; align-items: center; gap: calc(var(--barre) * .25);
+  height: var(--barre); padding: 0 calc(var(--barre) * .4); }
+.barre span { width: calc(var(--barre) * .25); height: calc(var(--barre) * .25); border-radius: 50%;
+  background: var(--paper); }
+.fenetre img { flex: 1; min-height: 0; }
 </style>
 
 <div id="carre"></div>
 
-<!-- Le téléphone, générique et sans marque : son corps percé de l'écran, puis l'îlot de la
-     caméra ; l'image se pose dessous. -->
-<template id="telephone">
-  <svg viewBox="0 0 100 200">
-    <mask id="ecran">
-      <rect width="100" height="200" fill="#fff"/>
-      <rect x="5" y="5" width="90" height="190" rx="10.5" fill="#000"/>
-    </mask>
-    <rect width="100" height="200" rx="15" fill="currentColor" mask="url(#ecran)"/>
-    <rect x="40" y="11" width="20" height="6" rx="3" fill="currentColor"/>
-  </svg>
-</template>
-
 <script>
 const MINIATURE = /*MINIATURE*/;
-// La barre haute de la fenêtre d'une capture, en fraction de la largeur de la fenêtre.
-const BARRE = .06;
+// En fraction du côté de l'image : le trait du cône de « chantier », quelle que soit sa taille,
+// mesuré sur les couvertures de Spell Army et de l'assistant IA (2026-11-26) ; ce qui dépasse
+// sous le bas de l'image d'un premier plan coupé, assez pour que ses coins du bas n'y paraissent
+// pas, tourné de quelques degrés ; la marge qu'une capture ou un schéma garde aux côtés de
+// l'image, et qu'un schéma garde au-dessus du bas.
+const TRAIT = .042, DEBORD = .15, MARGE = .06;
+// En fraction de la largeur du premier plan, celle du téléphone : l'épaisseur du cadre sombre —
+// le corps du téléphone, le bord de la fenêtre —, mesurée sur la couverture de Badge Mie, et le
+// rayon des coins du téléphone, estimé sur elle (2026-11-26) ; la hauteur de la barre de la
+// fenêtre et le rayon de ses coins ; la largeur d'une capture ou d'un schéma, plus larges qu'un
+// téléphone — un écran de bureau, un schéma carré.
+const CADRE = {bord: .034, rayon: .17, barre: .1, coin: .03, large: 1.4};
 
 const carre = document.getElementById('carre');
 const C = MINIATURE.composition, couleurs = MINIATURE.couleurs;
 const vmin = fraction => fraction * 100 + 'vmin';
 function el(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }
 function svg(cls, code) { const e = el('div', cls); e.innerHTML = code; return e; }
-// Pose `e` en carré de côté `cote`, centré en (`x`, `y`) : tout en fractions du côté de l'image.
-function poser(e, x, y, cote) {
-  Object.assign(e.style, {
-    left: vmin(x - cote / 2), top: vmin(y - cote / 2), width: vmin(cote), height: vmin(cote),
-  });
+// Pose `e` dans le rectangle de largeur `l` et de hauteur `h` dont le milieu du haut est en
+// (`x`, `haut`) ; `centrer`, dans le carré de côté `cote` centré en (`x`, `y`). Tout en fractions
+// du côté de l'image.
+function poser(e, x, haut, l, h) {
+  Object.assign(e.style, {left: vmin(x - l / 2), top: vmin(haut), width: vmin(l), height: vmin(h)});
   return e;
 }
+const centrer = (e, x, y, cote) => poser(e, x, y - cote / 2, cote, cote);
+// La hauteur d'un premier plan coupé, `P` : de son haut jusque sous le bas de l'image.
+const coupe = P => 1 - P.haut + DEBORD;
+// La largeur d'une capture ou d'un schéma, qui garde sa marge aux côtés de l'image.
+const large = P => Math.min(CADRE.large * P.largeur, 1 - 2 * (Math.abs(P.x - .5) + MARGE));
 
-// Chaque premier plan : le cadre qu'il pose autour de l'image décodée, et le rapport de la
-// largeur à la hauteur de ce cadre.
+// Chaque premier plan : le cadre qu'il pose autour de l'image décodée, à la place et à la largeur
+// du premier plan `P`. Le téléphone et la capture sont coupés par le bas, l'image couvrant le
+// cadre depuis son haut ; le schéma est entier.
 const PREMIERS_PLANS = {
-  telephone(image) {
-    const cadre = el('div', 'telephone');
-    cadre.append(image, document.getElementById('telephone').content.cloneNode(true));
-    return [cadre, 1 / 2];
+  // Le téléphone, générique et sans marque : son corps en SVG, l'écran posé dans son bord.
+  telephone(image, P) {
+    const l = P.largeur, h = coupe(P), bord = CADRE.bord * l, rayon = CADRE.rayon * l;
+    const corps = `<rect width="${l}" height="${h}" rx="${rayon}" fill="currentColor"/>`;
+    const cadre = svg('telephone', `<svg viewBox="0 0 ${l} ${h}">${corps}</svg>`);
+    Object.assign(image.style, {
+      left: vmin(bord), top: vmin(bord), width: vmin(l - 2 * bord), height: vmin(h - 2 * bord),
+      borderRadius: vmin(rayon - bord),
+    });
+    cadre.append(image);
+    return poser(cadre, P.x, P.haut, l, h);
   },
-  capture(image) {
+  // La capture dans un cadre de fenêtre.
+  capture(image, P) {
     const cadre = el('div', 'fenetre'), barre = el('div', 'barre');
-    barre.style.aspectRatio = 1 / BARRE;
+    cadre.style.setProperty('--barre', vmin(CADRE.barre * P.largeur));
+    Object.assign(cadre.style, {
+      borderRadius: vmin(CADRE.coin * P.largeur), padding: `0 ${vmin(CADRE.bord * P.largeur)}`,
+    });
     barre.append(el('span'), el('span'), el('span'));
     cadre.append(barre, image);
-    return [cadre, 1 / (image.naturalHeight / image.naturalWidth + BARRE)];
+    return poser(cadre, P.x, P.haut, large(P), coupe(P));
   },
-  schema(image) {
-    image.className = 'schema';
-    return [image, image.naturalWidth / image.naturalHeight];
+  // Le schéma tel quel, entier : moins large s'il sortait par le bas.
+  schema(image, P) {
+    const rapport = image.naturalWidth / image.naturalHeight;
+    const l = Math.min(large(P), (1 - MARGE - P.haut) * rapport);
+    return poser(image, P.x, P.haut, l, l / rapport);
   },
 };
 
 // Chaque gabarit : ce qu'il dessine sur le fond ; une promesse s'il attend une image.
 const GABARITS = {
   chantier() {
-    const cone = poser(svg('cone', MINIATURE.cone), C.x, C.y, C.taille);
-    const grille = el('div', 'grille');
-    cone.style.color = couleurs.cone;
-    grille.append(...MINIATURE.icones.map(code => svg('badge', code)));
-    carre.append(cone, grille);
+    const {cone: K, icones: I} = C;
+    const cone = centrer(svg('cone', MINIATURE.cone), K.x, K.y, K.taille);
+    const trace = cone.querySelector('svg');
+    // Le trait, en unités du dessin : le même à l'image, quelle que soit la taille du cône.
+    trace.setAttribute('stroke-width', TRAIT * trace.viewBox.baseVal.width / K.taille);
+    cone.style.color = couleurs.accent;
+    const icones = MINIATURE.icones.map((code, k) =>
+      centrer(svg('icone', code), ...I.places[k], I.taille));
+    carre.append(cone, ...icones);
   },
   'mise-en-scene'() {
-    const disque = poser(el('div', 'disque'), C.x, C.y, C.diametre);
-    const plan = poser(el('div', 'plan'), C.x, C.y, C.premierPlan), image = el('img');
-    disque.style.background = couleurs.disque;
-    carre.append(disque, plan);
+    const {anneau: A, plan: P} = C, anneau = el('div', 'anneau'), image = el('img');
+    centrer(anneau, A.x, A.y, A.diametre);
+    Object.assign(anneau.style, {borderWidth: vmin(A.epaisseur), borderColor: couleurs.accent});
+    carre.append(anneau);
     image.alt = '';
     image.src = MINIATURE.premierPlan.image;
     return image.decode().then(() => {
-      // Le cadre inscrit dans le carré du premier plan, à son rapport.
-      const [cadre, rapport] = PREMIERS_PLANS[MINIATURE.premierPlan.type](image);
-      cadre.style.width = vmin(C.premierPlan * Math.min(1, rapport));
-      cadre.style.height = vmin(C.premierPlan * Math.min(1, 1 / rapport));
-      plan.append(cadre);
+      const plan = PREMIERS_PLANS[MINIATURE.premierPlan.type](image, P);
+      plan.classList.add('plan');
+      plan.style.transform = `rotate(${P.angle}deg)`;
+      carre.append(plan);
     });
   },
 };

@@ -14,9 +14,9 @@ Trois temps, chacun arrêté par un échec :
 1. **valider** la description (`miniature.py`). Des erreurs : elles sortent toutes, aucun
    navigateur ne démarre, et rien ne s'écrit ;
 2. **assembler** une page autonome par image : le gabarit `rendu/miniature.html` rempli
-   (`remplir` de l'export du schéma) — le gabarit de la description, les couleurs de la teinte
-   et les paramètres de la composition, puis pour « chantier » le SVG du cône et ceux des
-   quatre icônes en ligne, chaque logo peint à sa couleur (`couleurs.json`), pour « mise en
+   (`remplir` de l'export du schéma) — le gabarit de la description, le fond fixe et l'accent
+   de la teinte, les paramètres de la composition, puis pour « chantier » le SVG du cône et ceux
+   des trois icônes en ligne, chaque logo peint à sa couleur (`couleurs.json`), pour « mise en
    scène » le type du premier plan et son image en URL `data:`. La page ne fait aucune requête ;
 3. **capturer** chaque page par `capturer` de l'export du schéma — fenêtre de 1200 × 1200 px au
    facteur d'échelle 2, la taille relue dans l'en-tête du PNG, l'image écrite seulement à cette
@@ -67,7 +67,7 @@ from export import (
     signaler,
     svg_en_ligne,
 )
-from miniature import COMPOSITIONS, PALETTE, propositions, type_d_image, valider
+from miniature import COMPOSITIONS, FOND, PALETTE, propositions, type_d_image, valider
 
 GABARIT = Path(__file__).resolve().parents[1] / "rendu" / "miniature.html"
 # Les chemins par défaut, depuis la racine du projet.
@@ -79,7 +79,7 @@ CONE = "traffic-cone"
 
 
 def chantier(description: Mapping[str, Any], icones: Mapping[str, Path]) -> dict[str, object]:
-    """Ce que « chantier » dessine en propre : le SVG du cône, puis ceux des quatre icônes dans
+    """Ce que « chantier » dessine en propre : le SVG du cône, puis ceux des trois icônes dans
     l'ordre de la description, chaque logo peint à sa couleur.
 
     Raises:
@@ -134,7 +134,7 @@ def assembler(
     gabarit = description["gabarit"]
     miniature = {
         "gabarit": gabarit,
-        "couleurs": PALETTE[teinte],
+        "couleurs": {"fond": FOND, "accent": PALETTE[teinte]},
         "composition": COMPOSITIONS[gabarit][composition],
         **CONTENUS[gabarit](description, icones),
     }
@@ -142,8 +142,8 @@ def assembler(
 
 
 def teintes(texte: str) -> list[str]:
-    """Les noms de `--teintes`, séparés par des virgules."""
-    return texte.split(",")
+    """Les noms de `--teintes`, séparés par des virgules, chacun sans les espaces qui le bordent."""
+    return [nom.strip() for nom in texte.split(",")]
 
 
 def analyseur() -> argparse.ArgumentParser:
