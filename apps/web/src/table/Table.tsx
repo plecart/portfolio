@@ -85,10 +85,10 @@ function LoadError({ onRetry, focusRetry }: { onRetry: () => void; focusRetry: b
 
 /**
  * La table (`<main>`, spec §3.1) et ses états (§5.1-5.3) : `LOADING_FRAME_COUNT` cadres pendant le
- * chargement, aux tailles de `frameSizes`, le message d'erreur en échec, puis les cartes dans
- * l'ordre de `orderProjects` — rien pour une liste vide. Elle s'étire entre l'entête et les liens
- * de l'auteur, fait entrer ses cartes (`useCardEntrance`) et tient la seule révélée au toucher
- * (`useTouchReveal`).
+ * chargement, aux tailles de `frameSizes` — aucun quand la fiche est déjà à l'écran, attendue à son
+ * adresse —, le message d'erreur en échec, puis les cartes dans l'ordre de `orderProjects` — rien
+ * pour une liste vide. Elle s'étire entre l'entête et les liens de l'auteur, fait entrer ses cartes
+ * (`useCardEntrance`) et tient la seule révélée au toucher (`useTouchReveal`).
  *
  * @param ref La table, que les liens de l'auteur mesurent.
  * @param status L'état du chargement ; `loading` rend la table occupée (`aria-busy`).
@@ -97,8 +97,9 @@ function LoadError({ onRetry, focusRetry }: { onRetry: () => void; focusRetry: b
  * @param retried Une relance a déjà eu lieu : le message qui revient reprend le focus, et la table
  *   qui arrive le donne à sa première carte, le bouton activé ayant disparu.
  * @param onOpen Ouvre la fiche d'un projet, depuis le clic sur sa carte, qu'il reçoit.
- * @param projectOpen La fiche est à l'écran, retour à sa carte compris : les cartes attendent
- *   qu'elle en parte pour entrer.
+ * @param projectOpen La fiche est à l'écran, retour à sa carte compris, ou attendue à son adresse,
+ *   que son cadre annonce (spec §5.1) : la table ne montre pas ses cadres de chargement, et ses
+ *   cartes attendent que la fiche en parte pour entrer.
  */
 export function Table({
   ref,
@@ -120,7 +121,7 @@ export function Table({
   const firstCard = useRef<HTMLAnchorElement>(null)
   const grid = useRef<HTMLDivElement>(null)
   const ordered = orderProjects(projects)
-  const frames = status === 'loading' ? frameSizes(LOADING_FRAME_COUNT) : []
+  const frames = status === 'loading' && !projectOpen ? frameSizes(LOADING_FRAME_COUNT) : []
   const tracks = frames.length + ordered.length === 1 ? SOLO_TRACK_CLASSES : TRACK_CLASSES
 
   const { revealed, revealOnTouch } = useTouchReveal()

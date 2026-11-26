@@ -3,6 +3,7 @@ import { useProjects } from './api/useProjects.ts'
 import { AuthorLinks } from './chrome/AuthorLinks.tsx'
 import { SiteHeader } from './chrome/SiteHeader.tsx'
 import { ProjectDialog } from './project/ProjectDialog.tsx'
+import { ProjectFrame } from './project/ProjectFrame.tsx'
 import { useProjectAddress } from './project/useProjectAddress.ts'
 import { strings } from './strings.ts'
 import { Table } from './table/Table.tsx'
@@ -15,7 +16,14 @@ export default function App() {
   // La carte d'où la fiche s'ouvre, jusqu'à ce qu'elle y revienne : la fiche est à l'écran tout ce
   // temps, à l'adresse ou non.
   const [origin, setOrigin] = useState<HTMLElement | null>(null)
-  const onScreen = project !== undefined || origin !== null
+  // À l'adresse d'une fiche, la liste en route : la fiche est déjà à l'écran, par son cadre (§5.1).
+  const awaiting = status === 'loading' && slug !== null
+  const onScreen = awaiting || project !== undefined || origin !== null
+  // Le cadre de fiche, posé pendant l'attente, reste sous la fiche arrivée jusqu'à la fin de son
+  // fondu, qui le recouvre (`onEntered`) ; sans fiche — slug inconnu, échec, fermeture —, il part.
+  const [framed, setFramed] = useState(awaiting)
+  const stillFramed = awaiting || (framed && project !== undefined)
+  if (stillFramed !== framed) setFramed(stillFramed)
 
   const unknownAddress = status === 'loaded' && slug !== null && project === undefined
 
@@ -63,11 +71,13 @@ export default function App() {
         projectOpen={onScreen}
       />
       <AuthorLinks table={table} />
+      {framed && <ProjectFrame />}
       <ProjectDialog
         project={project}
         origin={origin}
         onClose={close}
         onLanded={() => setOrigin(null)}
+        onEntered={() => setFramed(false)}
       />
     </>
   )

@@ -214,11 +214,15 @@ export async function expectClosed(page: Page) {
   await expect(page).toHaveURL('/')
 }
 
-/** Attend le panneau à ses repères (spec §3.2) : la fenêtre sous 600 px, sinon ceux de 1280 × 800. */
-export async function expectPanelBox(page: Page) {
+/**
+ * Attend le panneau à ses repères (spec §3.2) : la fenêtre sous 600 px, sinon ceux de 1280 × 800.
+ *
+ * @param box La boîte mesurée : le panneau, ou ce qui en partage la boîte — le cadre de fiche (§5.1).
+ */
+export async function expectPanelBox(page: Page, box: Locator = panel(page)) {
   const viewport = page.viewportSize()!
 
-  expect(await panel(page).boundingBox()).toEqual(
+  expect(await box.boundingBox()).toEqual(
     viewport.width < 600
       ? { x: 0, y: 0, ...viewport }
       : { x: 24, y: 79, width: 1232, height: 642 },
