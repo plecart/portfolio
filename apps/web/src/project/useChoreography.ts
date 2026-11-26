@@ -368,7 +368,7 @@ function around(root: Element, kept: readonly Element[]): Element[] {
  * 156, sonde du 2026-11-25) —, `aria-hidden`, posée dans le cadre de la galerie juste après sa
  * piste : au-dessus des images, sous les flèches et la loupe, sur tout le cadre, avec lequel elle
  * vole, et effacée au repos (`project.css`). À l'ouverture, elle s'efface en `--dur-open`, sans retard : le
- * cadre part avec la couverture et arrive avec la première image de la galerie. Au retour, elle
+ * cadre part avec la couverture et arrive avec la première image que montre la galerie. Au retour, elle
  * revient de ce qu'elle montre (`relay`) et reparaît en `--dur-open` sur l'image montrée, quelle
  * qu'elle soit, jusqu'au retrait du panneau.
  *
