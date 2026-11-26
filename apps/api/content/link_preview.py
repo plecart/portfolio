@@ -82,12 +82,13 @@ def cover_url(request: HttpRequest, project: Project) -> str | None:
 
 
 def preload_link(request: HttpRequest, project: Project) -> str | None:
-    """L'en-tête `Link` qui précharge l'image de tête de la galerie de `project` : la première
-    image prête, celle que le site montre en premier (`readyImages`,
-    `apps/web/src/project/project.ts`) ; `None` sans image prête.
+    """L'en-tête `Link` qui précharge l'image de tête de la galerie de la fiche de `project`, celle
+    que le site montre en premier (`shownImages`, `apps/web/src/project/project.ts`) : la première
+    image prête après la couverture ; sans autre image prête, la couverture si elle l'est (spec
+    §4.4, #289) ; `None` sans image prête.
 
     Prête veut dire qui a des variantes, comme pour le site : une image en attente ou en échec plus
-    tôt dans la galerie cède la tête à la suivante — à l'inverse de la couverture (`cover_url`).
+    tôt dans la galerie cède la tête à la suivante — à l'inverse de l'`og:image` (`cover_url`).
     Les sources sont celles que le site lui donne (`imageSources`, `apps/web/src/table/cards.ts`) :
     la première variante, puis chacune dans l'ordre stocké avec sa largeur, aux adresses de l'API
     publique (`variant_url`) — l'image que le site demande ensuite est celle déjà reçue.
@@ -101,7 +102,9 @@ def preload_link(request: HttpRequest, project: Project) -> str | None:
         fetchpriority=high; imagesrcset="http://testserver/media/images/x/320.webp 320w, …";
         imagesizes="<GALLERY_SIZES>"` sous le client de test.
     """
-    image = project.gallery.exclude(variants=[]).first()
+    cover = project.gallery.first()
+    ready = project.gallery.exclude(variants=[])
+    image = cover and (ready.exclude(pk=cover.pk).first() or ready.first())
     if image is None:
         return None
     urls = [variant_url({"request": request}, image, variant) for variant in image.variants]

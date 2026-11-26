@@ -500,6 +500,32 @@ def test_l_image_prechargee_est_la_premiere_prete_de_la_galerie(
 
 
 @pytest.mark.django_db
+def test_une_couverture_prete_cede_la_tete_a_la_premiere_autre_image_prete(
+    client: Client, covered: Project
+) -> None:
+    """La fiche ne montre pas la couverture quand une autre image est prête (spec §4.4, #289) :
+    la page précharge cette autre image, et l'`og:image` reste la couverture."""
+    saved(gallery_image(covered, position=2, state=ProcessingState.READY, variants=HEAD_VARIANTS))
+
+    response = client.get(PAGE)
+
+    assert response.get("Link") == PRELOAD
+    assert OG_IMAGE in tags(marked_block(response.content))
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("state", UNREADY_STATES.values(), ids=UNREADY_STATES.keys())
+def test_une_couverture_seule_prete_reste_l_image_prechargee(
+    client: Client, published: Project, state: ProcessingState
+) -> None:
+    """Sans autre image prête, la fiche montre la couverture (spec §4.4) : la page la précharge."""
+    saved(gallery_image(published, state=ProcessingState.READY, variants=HEAD_VARIANTS))
+    saved(gallery_image(published, position=2, state=state))
+
+    assert client.get(PAGE).get("Link") == PRELOAD
+
+
+@pytest.mark.django_db
 def test_un_en_tete_link_change_sous_un_corps_inchange_n_est_pas_valide_par_un_304(
     client: Client, published: Project
 ) -> None:
