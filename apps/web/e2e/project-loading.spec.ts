@@ -16,10 +16,11 @@ import {
   expectNoViolations,
   expectPanelBox,
   openFromTable,
+  openProject,
   panel,
 } from './project.ts'
 import { PROJECT_SETS } from './projects.ts'
-import { cards, COLUMN_VIEWPORT, expectPlacement } from './table.ts'
+import { cards, COLUMN_VIEWPORT, expectPlacement, openTable } from './table.ts'
 
 /** Trois projets, dont `projet-03`, à l'adresse `FICHE`. */
 const PROJECTS = PROJECT_SETS.threeWithoutShowcase
@@ -340,6 +341,22 @@ test('fermée avant la fin de son fondu, la fiche emporte le cadre : la table s�
   await expectClosed(page)
   await expect(frame(page)).toHaveCount(0)
   await expect(cards(page)).toHaveCount(PROJECTS.length)
+})
+
+// Le pendant de `project-scrollbar.spec.ts`, qui lance une barre classique : ici la barre est
+// masquée (`--hide-scrollbars`), et une page qui défile ne lui garde aucune place.
+test('barre masquée, page qui défile : aucune place gardée à la barre, la table ne bouge pas', async ({
+  page,
+}) => {
+  await openTable(page, PROJECT_SETS.twelveWithShowcase)
+  // Par la classe : sous la fiche, les cartes sortent de l'arbre d'accessibilité que `cards` lit.
+  const firstCard = page.locator('.card').first()
+  const left = (await firstCard.boundingBox())!.x
+
+  await openProject(cards(page).first())
+
+  await expect(root(page)).toHaveAttribute('data-project-open', '')
+  expect((await firstCard.boundingBox())!.x).toBe(left)
 })
 
 test('un slug inconnu retire le cadre : l’adresse devient `/`, et la table s’affiche', async ({ page }) => {
