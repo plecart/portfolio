@@ -94,7 +94,7 @@ _Document normatif de rang 2 (`.claude/pipeline.config.md`, « Sources de vérit
 
 ### 1.15 États
 
-- **Chargement** : des cadres de polaroid vides, dans la gamme du fond, à la place des cartes — autant que de projets publiés, nombre tenu à la main (§5.1) ; remplacés par les cartes avec l'animation d'apparition.
+- **Chargement** : des cadres de polaroid vides, dans la gamme du fond, à la place des cartes — autant que de projets publiés, nombre tenu à la main (§5.1) ; remplacés par les cartes avec l'animation d'apparition. À l'adresse d'une fiche, un cadre de fiche seul, que la fiche recouvre en fondu (§5.1).
 - **Erreur** (API injoignable) : un texte centré, « Les projets ne se chargent pas. », suivi d'un lien « Réessayer » qui relance le chargement ; aucun polaroid.
 - **Vide** (aucun projet publié) : rien — entête et liens seuls, table vide, aucun message.
 - **Adresse inconnue** (`/projets/<slug>` sans projet, ADR 0009) : le serveur redirige vers l'accueil ; aucune page 404.
@@ -358,6 +358,8 @@ Mouvement réduit : §6.3.
 ### 5.1 Chargement
 
 Autant de cadres vides que de projets publiés, à la place des cartes et dans la disposition de la table qu'ils annoncent (§5.5) : un cadre seul prend la taille et la piste de la carte seule, centré ; à partir de deux, un cadre double aux dimensions de la carte vitrine puis des simples (§4.1). Le nombre est tenu à la main dans le front et sa mise à jour est facultative : un écart ne casse rien, la table prend sa forme à l'arrivée des cartes. Les cadres sont `aria-hidden` et inertes (aucune réaction au survol, au focus ni au clic), sans post-it ni ruban ; papier, zone image `--line`, une barre `--line` de 40 % × 10 px (rayon 999 px) dans la bande ; pulsation de 1,8 s (opacité jusqu'à 55 %, `--ease-in-out`, infinie). Les cadres sont droits, sans pose : ils ne connaissent pas encore le projet qu'ils annoncent. À l'arrivée des données, les cartes les remplacent avec leur animation d'entrée, qui part droite et prend leur pose (§3.1) ; sans projet vitrine, le cadre double laisse place à deux cartes simples.
+
+**À l'adresse d'une fiche** (`/projets/<slug>`, arrivée directe ; #292) : aucun cadre de table, mais un cadre de fiche seul, sur le fond vide, là où la fiche va paraître. Il a la boîte du panneau (§3.2 : centré, papier, rayon 2 px, `--shadow-lift`, marge intérieure 10 px, deux colonnes ; sous 600 px, plein écran, une colonne, marge 8 px) : une zone photo carrée `--line` de `--photo`, et dans la colonne de lecture (marges de §3.2) un bloc `--line` à la forme du post-it du titre — sa hauteur sur une ligne, la moitié de la colonne en largeur —, puis trois barres `--line` de 10 px (rayon 999 px), à 100 %, 85 % et 60 % de la colonne, à 12 px l'une de l'autre et 16 px sous le bloc. Comme les cadres de la table, il est droit, `aria-hidden` et inerte, sans bouton « Fermer », et pulse en 1,8 s, sans pulsation en mouvement réduit (§6.3). L'entête et les liens de l'auteur sont déjà dans l'état « fiche ouverte » (§3.3, §3.4), défilement verrouillé : ils ne bougent pas à l'arrivée de la fiche. À l'arrivée des données, la fiche apparaît **par-dessus** le cadre par le fondu d'arrivée directe (200 ms, §4.6), puis le cadre est retiré : le fond n'est jamais vide entre les deux. Un slug inconnu retire le cadre, l'adresse devient `/` et la table s'affiche ; un échec affiche le message d'erreur (§5.2) sans cadre de fiche, et « Réessayer » repasse par ce cadre.
 
 ### 5.2 Erreur
 
