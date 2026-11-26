@@ -98,8 +98,8 @@ export function ProjectDialog({
             event.preventDefault()
             focusCard(shown.slug)
           }}
-          // Le fondu du panneau seul : ni celui d'un enfant, ni celui de la couche plein écran, que
-          // son portail laisse remonter jusqu'ici dans l'arbre de React.
+          // Le fondu du panneau seul : ni celui d'un enfant, dont l'événement remonte jusqu'ici, ni
+          // une autre animation du panneau.
           onAnimationEnd={(event) => {
             if (event.animationName === 'project-in' && event.target === event.currentTarget) {
               onEntered()
