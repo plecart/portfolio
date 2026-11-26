@@ -7,12 +7,13 @@
  * cadre de table ; à `/`, l'inverse — tient dans les deux premiers scénarios.
  */
 import type { Page } from '@playwright/test'
+import { projectPath } from '../src/project/project.ts'
 import { LOADING_FRAME_COUNT } from '../src/table/cards.ts'
 import { expect, FAILURES, holdProjects, serving, test } from './api.ts'
 import { resolveAll, settle } from './css.ts'
-import { expectNoViolations, expectPanelBox, panel } from './project.ts'
+import { expectNoViolations, expectPanelBox, openFromTable, panel } from './project.ts'
 import { PROJECT_SETS } from './projects.ts'
-import { cards, COLUMN_VIEWPORT } from './table.ts'
+import { cards, COLUMN_VIEWPORT, expectPlacement } from './table.ts'
 
 /** Trois projets, dont `projet-03`, à l'adresse `FICHE`. */
 const PROJECTS = PROJECT_SETS.threeWithoutShowcase
@@ -175,6 +176,76 @@ test('pendant le chargement, la page est déjà « fiche ouverte », et le reste
 
   expect(await changes.jsonValue()).not.toContain(null)
   await expect(root(page)).toHaveAttribute('data-project-open')
+})
+
+/**
+ * Consigne, dès le chargement de la page, les transitions qui partent dans l'entête et les liens de
+ * l'auteur : balise et propriété.
+ *
+ * @returns De quoi les lire.
+ */
+async function watchChromeTransitions(page: Page) {
+  await page.addInitScript(() => {
+    const seen: string[] = []
+    Object.assign(window, { chromeTransitions: seen })
+    addEventListener('transitionrun', ({ target, propertyName }) => {
+      const element = target as Element
+      if (element.closest('header, footer')) seen.push(`${element.tagName}:${propertyName}`)
+    })
+  })
+  return () =>
+    page.evaluate(() => (window as unknown as { chromeTransitions: string[] }).chromeTransitions)
+}
+
+/**
+ * La forme des liens de l'auteur à l'arrivée de la liste, au bureau (spec §3.4) : la table vide de
+ * l'attente leur laisse la colonne ; trois cartes à 1280 px aussi, quatre colonnes de cartes à
+ * 1100 px les font passer au pied de page. Sous 600 px, le pied de page de bout en bout.
+ */
+const ARRIVAL_FORMS = [
+  ['les liens restent en colonne', COLUMN_VIEWPORT, PROJECTS, 'column'],
+  [
+    'les liens passent au pied de page',
+    { width: 1100, height: 800 },
+    PROJECT_SETS.twelveWithShowcase,
+    'footer',
+  ],
+] as const
+
+for (const [form, viewport, projects, placement] of ARRIVAL_FORMS) {
+  test(`à l’adresse d’une fiche, ${form} : ni l’entête ni les liens ne bougent, au chargement comme à l’arrivée de la fiche (spec §5.1)`, async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile && placement === 'footer', 'largeur de bureau : le projet desktop la porte')
+    if (!isMobile) await page.setViewportSize(viewport)
+    const transitions = await watchChromeTransitions(page)
+    const release = await openLoading(page, projectPath(projects[0].slug))
+    await expect(frame(page)).toHaveCount(1)
+    await expectPlacement(page, isMobile ? 'footer' : 'column')
+
+    await release(serving(projects))
+    await expect(panel(page)).toBeVisible()
+    await settle(page)
+
+    await expectPlacement(page, isMobile ? 'footer' : placement)
+    expect(await transitions()).toEqual([])
+  })
+}
+
+test('témoin : ouverte depuis une carte, l’entête sort et la colonne des liens s’efface, en transition (spec §3.3, §3.4)', async ({
+  page,
+  isMobile,
+}) => {
+  if (!isMobile) await page.setViewportSize(COLUMN_VIEWPORT)
+  const transitions = await watchChromeTransitions(page)
+
+  await openFromTable(page, PROJECTS)
+
+  // Sous 600 px, les liens sont au pied de page, qui reste sous le plein écran (spec §3.4).
+  expect((await transitions()).sort()).toEqual(
+    isMobile ? ['HEADER:translate'] : ['FOOTER:opacity', 'HEADER:translate'],
+  )
 })
 
 test('la fiche apparaît par-dessus le cadre par son fondu de 200 ms, puis le cadre est retiré (spec §4.6, §5.1)', async ({

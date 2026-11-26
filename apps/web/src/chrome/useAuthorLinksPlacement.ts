@@ -33,7 +33,9 @@ function mayMoveCells(record: MutationRecord): boolean {
 export function useAuthorLinksPlacement(
   table: RefObject<HTMLElement | null>,
 ): AuthorLinksPlacement {
-  const [placement, setPlacement] = useState<AuthorLinksPlacement>('footer')
+  // Avant la première mesure, la forme d'une table sans cellule : celle de l'attente à l'adresse
+  // d'une fiche (§5.1), que la mesure ne fait donc pas changer sous la page « fiche ouverte ».
+  const [placement, setPlacement] = useState(() => authorLinksPlacement(window.innerWidth, null))
 
   useLayoutEffect(() => {
     const root = table.current
