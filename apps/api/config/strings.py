@@ -144,8 +144,13 @@ GALLERY_IMAGE = "image de galerie"
 GALLERY_IMAGES = "images de galerie"
 GALLERY_IMAGE_POSITION = "position"
 
-# Image de galerie : le titre de leur tableau dans l'écran Projet
+# Image de galerie : le titre de leur tableau dans l'écran Projet, et la ligne d'aide au-dessus,
+# sur la couverture et ce qui la montre (#289)
 GALLERY_HEADING = "Galerie"
+GALLERY_COVER_HELP = (
+    "La première image est la couverture : la photo de la carte et l’aperçu de lien. "
+    "La fiche ne la montre que si le projet n’a pas d’autre image."
+)
 
 # Image de galerie : refus de la première, la couverture ; le second écrit `COVER_MIN_SIDE`
 # (`content/models.py`), que le catalogue ne peut pas importer — le modèle importe le catalogue —,

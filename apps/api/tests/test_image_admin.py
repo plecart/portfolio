@@ -135,6 +135,29 @@ def test_l_ecran_projet_montre_la_galerie_en_tableau_ordonnable(admin_client: Cl
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("screen", ["ajout", "modification"])
+def test_l_ecran_projet_dit_au_dessus_de_la_galerie_ce_qui_montre_la_couverture(
+    admin_client: Client, screen: str
+) -> None:
+    """Une ligne d'aide du catalogue, au style d'aide de l'admin, juste au-dessus du bloc de la
+    galerie : la première image est la couverture, que la carte et l'aperçu de lien montrent, et la
+    fiche seulement sans autre image (#289)."""
+    if screen == "ajout":
+        url = reverse("admin:content_project_add")
+    else:
+        portfolio = saved_project(saved(technology()))
+        url = reverse("admin:content_project_change", args=[portfolio.pk])
+
+    page = admin_client.get(url).content.decode()
+
+    help_line = f'<p class="help">{escape(strings.GALLERY_COVER_HELP)}</p>'
+    assert help_line in page
+    # De la ligne au bloc de la galerie, rien d'autre qu'elle.
+    gallery = page.rindex("<div", 0, page.index(f'id="{GALLERY}-group"'))
+    assert page[page.index(help_line) : gallery].strip() == help_line
+
+
+@pytest.mark.django_db
 def test_l_ecran_d_ajout_ne_montre_qu_une_ligne_de_galerie(admin_client: Client) -> None:
     """À l'ajout, la ligne obligatoire est la seule, vide (arrêt visuel du 2026-10-14) ; un projet
     enregistré montre ses images et une ligne neuve en plus."""
