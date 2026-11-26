@@ -269,8 +269,9 @@ def test_une_passe_rend_toutes_les_erreurs(
     assert sorted(erreur.chemin for erreur in erreurs) == chemins
 
 
-def premier_plan(type_: str, image: str) -> dict[str, Any]:
-    """`SCENE` sans choix, son premier plan remplacé."""
+def premier_plan(type_: str, image: str = "captures/accueil.png") -> dict[str, Any]:
+    """`SCENE` sans choix, son premier plan remplacé — l'image `captures/accueil.png` du projet
+    témoin par défaut."""
     return {"gabarit": "mise-en-scene", "premierPlan": {"type": type_, "image": image}}
 
 
@@ -279,7 +280,7 @@ VALIDES: dict[str, dict[str, Any]] = {
     "chantier-sans-choix": {"gabarit": "chantier", "icones": TROIS_ICONES},
     "mise-en-scene-choisie": SCENE,
     "telephone-jpeg": premier_plan("telephone", "captures/mobile.jpg"),
-    "capture-png": premier_plan("capture", "captures/accueil.png"),
+    "capture-png": premier_plan("capture"),
     # Reconnu à sa signature, pas à son extension.
     "schema-png-sans-extension": premier_plan("schema", "captures/schema"),
     # Un `..` qui ne sort pas de la racine.
