@@ -1,6 +1,6 @@
 ---
 name: miniature-projet
-description: "Produit la miniature d'un projet — la couverture carrée de sa carte sur l'accueil, image PNG de 2400 × 2400 px sans texte — en gabarit « chantier » (quatre icônes des éléments phares devant un cône de travaux) ou « mise en scène » (fond teinté, disque, et un téléphone, une capture ou un schéma au premier plan) : lire le projet, faire valider les quatre icônes ou choisir le premier plan, écrire `docs/miniature/miniature.json`, dessiner quatre propositions montrées sur une planche d'aperçu, inscrire le choix du mainteneur, puis exporter l'image choisie. À utiliser dans le dépôt du projet quand l'utilisateur demande sa miniature, sa couverture ou l'image de sa carte — « fais la miniature du projet », « image de couverture pour la carte », « miniature chantier », « régénère la miniature »."
+description: "Produit la miniature d'un projet — la couverture carrée de sa carte sur l'accueil, image PNG de 2400 × 2400 px sans texte — en gabarit « chantier » (trois icônes des éléments phares devant un cône de travaux) ou « mise en scène » (un anneau, et au premier plan un téléphone, une capture ou un schéma) : lire le projet, faire valider les trois icônes ou choisir le premier plan, écrire `docs/miniature/miniature.json`, dessiner quatre propositions montrées sur une planche d'aperçu, inscrire le choix du mainteneur, puis exporter l'image choisie. À utiliser dans le dépôt du projet quand l'utilisateur demande sa miniature, sa couverture ou l'image de sa carte — « fais la miniature du projet », « image de couverture pour la carte », « miniature chantier », « régénère la miniature »."
 ---
 
 # Miniature de projet
@@ -23,18 +23,23 @@ lancent par `python`, sans `-I`, comme ceux du schéma (`schema-architecture/SKI
 
 ## Les deux gabarits
 
-Sans texte sur l'image, au trait net et en aplats : les icônes Lucide telles quelles, sans
-rough.js.
+Calqués sur les couvertures en ligne de pacome.dev : un fond pâle fixe, le même pour les deux,
+et un trait d'accent à peine plus soutenu, de la teinte choisie. Sans texte sur l'image, au trait
+net et en aplats : les icônes Lucide telles quelles, sans rough.js.
 
-- **chantier** — un projet en cours, sans image : quatre icônes en grille 2 × 2 centrée, chacune
-  sur un badge clair, devant le cône de travaux de Lucide, agrandi, d'un ton plus clair que le
-  fond.
-- **mise en scène** — un fond teinté, un disque d'un ton voisin, et centré sur lui le premier
-  plan : un **téléphone** générique, dessiné par le rendu, l'image à l'écran ; une **capture**,
-  l'image dans un cadre de fenêtre ; ou un **schéma**, l'image telle quelle.
+- **chantier** — un projet en cours, sans image : le cône de travaux de Lucide en grand trait
+  d'accent, qui remplit presque l'image, et devant lui trois icônes grandes, sans cadre, en
+  triangle — une en haut, deux en bas —, chaque logo à sa couleur, chaque icône Lucide à l'encre.
+  Modèles : les couvertures de Spell Army et de l'assistant IA.
+- **mise en scène** — un anneau en trait d'accent, et devant lui le premier plan, grand : un
+  **téléphone** générique, dessiné par le rendu, l'image à l'écran ; une **capture**, l'image
+  dans un cadre de fenêtre sans texte — l'un et l'autre descendus et coupés par le bas, l'image
+  couvrant le cadre depuis son haut ; ou un **schéma**, l'image telle quelle et entière. Modèle :
+  la couverture de Badge Mie.
 
-La palette, ses six teintes et leur contraste, et les quatre compositions de chaque gabarit
-vivent dans `scripts/miniature.py` (`PALETTE`, `COMPOSITIONS`), **seule source**.
+Le fond, la palette — six teintes, chacune un trait d'accent — et les quatre compositions de
+chaque gabarit, la première calquée sur son modèle, vivent dans `scripts/miniature.py` (`FOND`,
+`PALETTE`, `COMPOSITIONS`), **seule source**.
 
 ## Les cinq étapes
 
@@ -49,13 +54,23 @@ Rien ne s'écrit à cette étape.
 
 Montrer au mainteneur le gabarit retenu et son contenu :
 
-- **chantier** : proposer quatre éléments phares du projet — pas forcément ses technologies —,
+- **chantier** : proposer trois éléments phares du projet — pas forcément ses technologies —,
   chacun avec son icône, Lucide ou Simple Icons, et le fichier qui l'établit, puis **s'arrêter**
   jusqu'à l'accord du mainteneur. Ses corrections reviennent dans la liste, qui se remontre.
 - **mise en scène** : faire choisir le premier plan — téléphone, capture ou schéma — et son image,
-  un PNG ou un JPEG sous la racine du projet, puis **s'arrêter** jusqu'au choix. Un petit schéma se
-  fait d'abord par `schema-architecture`, sur une description réduite à trois ou quatre cartes :
-  son PNG devient l'image.
+  un PNG ou un JPEG sous la racine du projet, puis **s'arrêter** jusqu'au choix. L'image est un
+  fichier du dépôt, que la description nomme : elle se **versionne**.
+
+Un petit schéma se fait d'abord par `schema-architecture`, sur sa propre description, réduite à
+trois ou quatre cartes, `docs/miniature/schema.json` ; puis, depuis la racine du projet, son
+export la dessine seule à son propre chemin, qui devient l'image du premier plan :
+
+```
+python <répertoire de ce skill>/../schema-architecture/scripts/export.py docs/miniature/schema.json docs/miniature/schema.png
+```
+
+Jamais à ses chemins par défaut : la description réduite écraserait celle du schéma
+d'architecture du projet, `docs/schema/architecture.json`, et l'export son image.
 
 Une icône est le nom, sans extension, d'un SVG du dossier d'icônes de `schema-architecture`. Une
 icône de la liste acceptée qui manque à ce dossier se tire par son script, jamais en la remplaçant

@@ -32,15 +32,15 @@ JPEG = bytes((0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0))
 
 CHANTIER: dict[str, Any] = {
     "gabarit": "chantier",
-    "icones": ["globe", "vault", "cable", "docker"],
+    "icones": ["globe", "vault", "cable"],
     "teinte": "sauge",
-    "composition": "centre",
+    "composition": "modele",
 }
 SCENE: dict[str, Any] = {
     "gabarit": "mise-en-scene",
     "premierPlan": {"type": "capture", "image": "captures/accueil.png"},
     "teinte": "prune",
-    "composition": "grand-disque",
+    "composition": "grand-anneau",
 }
 
 
@@ -90,7 +90,7 @@ class Cas(NamedTuple):
     base: dict[str, Any] = CHANTIER
 
 
-QUATRE_ICONES = ["globe", "vault", "cable", "docker"]
+TROIS_ICONES = ["globe", "vault", "cable"]
 
 FORMES: dict[str, dict[str, Cas]] = {
     "champ requis manquant": {
@@ -108,7 +108,7 @@ FORMES: dict[str, dict[str, Cas]] = {
         "racine-liste": Cas("", [], "[]"),
         "gabarit-nombre": Cas("gabarit", 7, "7"),
         "icones-chaine": Cas("icones", "globe", '"globe"'),
-        "icone-nombre": Cas("icones", ["globe", "vault", "cable", 7], "7", "icones[3]"),
+        "icone-nombre": Cas("icones", ["globe", "vault", 7], "7", "icones[2]"),
         "premier-plan-chaine": Cas("premierPlan", "x.png", '"x.png"', base=SCENE),
         "type-nombre": Cas("premierPlan.type", 7, "7", base=SCENE),
         "image-nombre": Cas("premierPlan.image", 7, "7", base=SCENE),
@@ -123,15 +123,13 @@ FORMES: dict[str, dict[str, Cas]] = {
         "type-inconnu": Cas("premierPlan.type", "video", '"video"', base=SCENE),
         "teinte-hors-palette": Cas("teinte", "fuchsia", '"fuchsia"'),
         "composition-inconnue": Cas("composition", "spirale", '"spirale"'),
-        "composition-d-un-autre-gabarit": Cas("composition", "grand-disque", '"grand-disque"'),
+        "composition-d-un-autre-gabarit": Cas("composition", "grand-anneau", '"grand-anneau"'),
     },
     "icônes": {
-        "trois-icones": Cas("icones", ["globe", "vault", "cable"], '["globe", "vault", "cable"]'),
-        "cinq-icones": Cas("icones", [*QUATRE_ICONES, "archive"], '"archive"]'),
-        "icone-absente": Cas("icones", ["globe", "vault", "cable", "x"], '"x"', "icones[3]"),
-        "icone-repetee": Cas(
-            "icones", ["globe", "vault", "globe", "docker"], "icones[0]", "icones[2]"
-        ),
+        "deux-icones": Cas("icones", ["globe", "vault"], '["globe", "vault"]'),
+        "quatre-icones": Cas("icones", [*TROIS_ICONES, "archive"], '"archive"]'),
+        "icone-absente": Cas("icones", ["globe", "vault", "x"], '"x"', "icones[2]"),
+        "icone-repetee": Cas("icones", ["globe", "vault", "globe"], "icones[0]", "icones[2]"),
     },
     "image illisible ou d'un autre format": {
         "image-absente": Cas("premierPlan.image", "captures/x.png", '"captures/x.png"', base=SCENE),
@@ -167,7 +165,7 @@ FORMES: dict[str, dict[str, Cas]] = {
         "cle-de-mise-en-scene-dans-chantier": Cas(
             "premierPlan", SCENE["premierPlan"], '"premierPlan"'
         ),
-        "cle-de-chantier-dans-mise-en-scene": Cas("icones", QUATRE_ICONES, '"icones"', base=SCENE),
+        "cle-de-chantier-dans-mise-en-scene": Cas("icones", TROIS_ICONES, '"icones"', base=SCENE),
         "premier-plan-cle-inconnue": Cas("premierPlan.cadre", "noir", '"cadre"', base=SCENE),
     },
 }
@@ -192,7 +190,7 @@ def test_une_forme_d_erreur_rend_une_erreur_au_chemin_du_champ_fautif(
     - valeur vide : 1, l'`image`, seule chaîne libre ;
     - valeur hors de son ensemble : 5 — `gabarit`, `type`, `teinte`, `composition` inconnue ou
       d'un autre gabarit ;
-    - icônes : 4 — 3 ou 5 noms, un nom absent du dossier, un nom répété ;
+    - icônes : 4 — 2 ou 4 noms, un nom absent du dossier, un nom répété ;
     - image illisible ou d'un autre format : 4 — absente, dossier, ni PNG ni JPEG à l'extension
       d'un PNG, caractère nul dans le chemin ;
     - image hors du dépôt : 2 — un chemin absolu, un chemin qui sort de la racine par `..` ;
@@ -239,7 +237,7 @@ def test_les_tables_de_la_forme_comptent_les_champs_de_la_docstring() -> None:
 
 PASSES: dict[str, tuple[dict[str, Any], list[str]]] = {
     "chantier": (
-        {"gabarit": "chantier", "icones": ["globe", "x", "vault"], "teinte": "fuchsia", "y": 1},
+        {"gabarit": "chantier", "icones": ["globe", "x"], "teinte": "fuchsia", "y": 1},
         ["composition", "icones", "icones[1]", "teinte", "y"],
     ),
     # Les deux champs de `premierPlan` : un type fautif n'arrête pas la lecture de l'image.
@@ -278,7 +276,7 @@ def premier_plan(type_: str, image: str) -> dict[str, Any]:
 
 VALIDES: dict[str, dict[str, Any]] = {
     "chantier-choisi": CHANTIER,
-    "chantier-sans-choix": {"gabarit": "chantier", "icones": QUATRE_ICONES},
+    "chantier-sans-choix": {"gabarit": "chantier", "icones": TROIS_ICONES},
     "mise-en-scene-choisie": SCENE,
     "telephone-jpeg": premier_plan("telephone", "captures/mobile.jpg"),
     "capture-png": premier_plan("capture", "captures/accueil.png"),
@@ -319,8 +317,9 @@ def test_une_image_du_depot_nommee_par_son_chemin_absolu_est_refusee(
     ]
 
 
-# Les papiers du cadre polaroid, clair et sombre (spec UX, jeton `--paper`).
-PAPIERS = {"clair": "#FBF8F2", "sombre": "#2B2724"}
+# Le fond des deux gabarits, et les six teintes de la palette dans leur ordre (#290, décision
+# 3 bis) : le `--bg` clair de la spec UX, mesuré `#F2EDE3` sur les couvertures en ligne.
+FOND = "#F3EDE4"
 TEINTES = ("terracotta", "sauge", "ardoise", "prune", "ocre", "sarcelle")
 
 
@@ -329,44 +328,23 @@ def test_la_palette_porte_ses_six_teintes_dans_l_ordre() -> None:
     assert list(miniature.PALETTE) == list(TEINTES)
 
 
-@pytest.mark.parametrize("teinte", TEINTES)
-def test_chaque_teinte_porte_ses_trois_couleurs_en_hexadecimal(teinte: str) -> None:
-    """Le fond, le cône de « chantier » et le disque de « mise en scène », `#RRGGBB`."""
-    couleurs = miniature.PALETTE[teinte]
-
-    assert sorted(couleurs) == ["cone", "disque", "fond"]
-    assert all(re.fullmatch("#[0-9A-F]{6}", couleur) for couleur in couleurs.values())
+def test_le_fond_est_le_fond_pale_des_couvertures_en_ligne() -> None:
+    assert miniature.FOND == FOND
 
 
-@pytest.mark.parametrize("papier", PAPIERS.values(), ids=PAPIERS.keys())
-@pytest.mark.parametrize("teinte", TEINTES)
-def test_le_fond_de_chaque_teinte_contraste_a_3_pour_1_au_moins_avec_le_papier(
-    teinte: str, papier: str
-) -> None:
-    """WCAG 2.2, critère 1.4.11 (contraste non textuel) : la photo contre son cadre polaroid,
-    dans les deux modes (#290, décision 3)."""
-    assert miniature.contraste(miniature.PALETTE[teinte]["fond"], papier) >= 3
+def test_l_accent_de_terracotta_est_celui_du_cone_des_couvertures_en_ligne() -> None:
+    """Mesuré `#EBDBCE` sur le cône de Spell Army, 2400 px, le 2026-11-26 (#290, décision 3 bis)."""
+    assert miniature.PALETTE["terracotta"] == "#EBDBCE"
 
 
 @pytest.mark.parametrize("teinte", TEINTES)
-def test_le_cone_de_chaque_teinte_est_plus_clair_que_son_fond(teinte: str) -> None:
-    """#290, décision 4 (c) : le cône, « dans un ton plus clair que le fond »."""
-    couleurs = miniature.PALETTE[teinte]
+def test_l_accent_de_chaque_teinte_contraste_de_1_10_a_1_30_avec_le_fond(teinte: str) -> None:
+    """Un trait d'accent `#RRGGBB` à peine plus soutenu que le fond pâle : critère 6 de #290,
+    amendé le 2026-11-26 — le cône du modèle, 1,16:1."""
+    accent = miniature.PALETTE[teinte]
 
-    assert miniature.luminance(couleurs["cone"]) > miniature.luminance(couleurs["fond"])
-
-
-@pytest.mark.parametrize("teinte", TEINTES)
-def test_le_cone_et_le_disque_de_chaque_teinte_melent_son_fond_de_blanc(teinte: str) -> None:
-    """Le commentaire de `PALETTE`, recompté : le cône est le fond mêlé à 25 % de blanc, le
-    disque à 14 % — `round(c + (255 - c) * part)` sur chaque canal."""
-    couleurs = miniature.PALETTE[teinte]
-
-    def melee(part: float) -> str:
-        canaux = bytes.fromhex(couleurs["fond"][1:])
-        return "#" + "".join(f"{round(c + (255 - c) * part):02X}" for c in canaux)
-
-    assert (couleurs["cone"], couleurs["disque"]) == (melee(0.25), melee(0.14))
+    assert re.fullmatch("#[0-9A-F]{6}", accent)
+    assert 1.10 <= miniature.contraste(accent, FOND) <= 1.30
 
 
 CONTRASTES = {
@@ -385,62 +363,79 @@ def test_le_contraste_suit_la_definition_wcag(a: str, b: str, attendu: float) ->
     assert miniature.contraste(a, b) == pytest.approx(attendu, abs=0.005)
 
 
-def test_chaque_gabarit_porte_quatre_compositions_et_les_parametres_que_le_rendu_lit() -> None:
-    """« chantier » : le centre et la taille du cône ; « mise en scène » : le centre et le
-    diamètre du disque, et la taille du premier plan, centré sur lui."""
-    cone = ["taille", "x", "y"]
-    disque = ["diametre", "premierPlan", "x", "y"]
+CHANTIER_PARAMETRES = {"cone": ["taille", "x", "y"], "icones": ["places", "taille"]}
+SCENE_PARAMETRES = {
+    "anneau": ["diametre", "epaisseur", "x", "y"],
+    "plan": ["angle", "haut", "largeur", "x"],
+}
 
+
+def test_chaque_gabarit_porte_quatre_compositions_et_les_parametres_que_le_rendu_lit() -> None:
+    """« chantier » : le centre et la taille du cône, la taille et la place des icônes ; « mise en
+    scène » : le centre, le diamètre et l'épaisseur de l'anneau, et le milieu du haut, la largeur
+    et l'angle du premier plan."""
     assert {
-        gabarit: {nom: sorted(parametres) for nom, parametres in compositions.items()}
+        gabarit: {
+            nom: {groupe: sorted(valeurs) for groupe, valeurs in parametres.items()}
+            for nom, parametres in compositions.items()
+        }
         for gabarit, compositions in miniature.COMPOSITIONS.items()
     } == {
-        "chantier": {"centre": cone, "debordant": cone, "bas-droite": cone, "bas-gauche": cone},
-        "mise-en-scene": {
-            "centre": disque,
-            "grand-disque": disque,
-            "coin-haut-droit": disque,
-            "coin-bas-gauche": disque,
-        },
+        "chantier": dict.fromkeys(
+            ["modele", "cone-a-gauche", "cone-a-droite", "grand-cone"], CHANTIER_PARAMETRES
+        ),
+        "mise-en-scene": dict.fromkeys(
+            ["modele", "plan-a-gauche", "plan-a-droite", "grand-anneau"], SCENE_PARAMETRES
+        ),
     }
 
 
-@pytest.mark.parametrize("nom", ["centre", "grand-disque", "coin-haut-droit", "coin-bas-gauche"])
-def test_le_premier_plan_de_chaque_composition_tient_dans_l_image(nom: str) -> None:
-    """Le carré du premier plan, centré sur le disque, ne sort pas de l'image : le disque peut
-    déborder, pas le téléphone ni la capture."""
-    composition = miniature.COMPOSITIONS["mise-en-scene"][nom]
-    demi = composition["premierPlan"] / 2
+@pytest.mark.parametrize("nom", ["modele", "cone-a-gauche", "cone-a-droite", "grand-cone"])
+def test_les_trois_icones_de_chaque_composition_tiennent_dans_l_image(nom: str) -> None:
+    """Trois places, une par icône, chacune un carré qui ne sort pas de l'image : le cône peut
+    déborder, pas les icônes."""
+    icones = miniature.COMPOSITIONS["chantier"][nom]["icones"]
+    demi = icones["taille"] / 2
 
-    assert 0 <= composition["x"] - demi and composition["x"] + demi <= 1
-    assert 0 <= composition["y"] - demi and composition["y"] + demi <= 1
+    assert len(icones["places"]) == 3
+    assert all(demi <= x <= 1 - demi and demi <= y <= 1 - demi for x, y in icones["places"])
+
+
+@pytest.mark.parametrize("nom", ["modele", "plan-a-gauche", "plan-a-droite", "grand-anneau"])
+def test_le_premier_plan_de_chaque_composition_tient_en_largeur_dans_l_image(nom: str) -> None:
+    """Le téléphone ne sort pas par les côtés — le rendu tient de même la capture et le schéma, plus
+    larges ; seul le bas le coupe."""
+    plan = miniature.COMPOSITIONS["mise-en-scene"][nom]["plan"]
+    demi = plan["largeur"] / 2
+
+    assert demi <= plan["x"] <= 1 - demi
 
 
 def test_un_chantier_propose_quatre_teintes_et_quatre_compositions_dans_l_ordre() -> None:
     """Quatre teintes distinctes, quatre compositions distinctes, dans l'ordre."""
     assert miniature.propositions(CHANTIER) == [
-        ("terracotta", "centre"),
-        ("sauge", "debordant"),
-        ("ardoise", "bas-droite"),
-        ("prune", "bas-gauche"),
+        ("terracotta", "modele"),
+        ("sauge", "cone-a-gauche"),
+        ("ardoise", "cone-a-droite"),
+        ("prune", "grand-cone"),
     ]
 
 
 def test_les_propositions_d_une_mise_en_scene_prennent_les_compositions_de_son_gabarit() -> None:
     assert miniature.propositions(SCENE) == [
-        ("terracotta", "centre"),
-        ("sauge", "grand-disque"),
-        ("ardoise", "coin-haut-droit"),
-        ("prune", "coin-bas-gauche"),
+        ("terracotta", "modele"),
+        ("sauge", "plan-a-gauche"),
+        ("ardoise", "plan-a-droite"),
+        ("prune", "grand-anneau"),
     ]
 
 
 def test_les_teintes_nommees_remplacent_celles_par_defaut_dans_leur_ordre() -> None:
     assert miniature.propositions(SCENE, ["ocre", "sarcelle", "terracotta", "sauge"]) == [
-        ("ocre", "centre"),
-        ("sarcelle", "grand-disque"),
-        ("terracotta", "coin-haut-droit"),
-        ("sauge", "coin-bas-gauche"),
+        ("ocre", "modele"),
+        ("sarcelle", "plan-a-gauche"),
+        ("terracotta", "plan-a-droite"),
+        ("sauge", "grand-anneau"),
     ]
 
 
@@ -474,14 +469,14 @@ def test_des_propositions_impossibles_sont_refusees_avec_leur_motif(
 
 def test_le_choix_de_la_teinte_de_2_et_de_la_composition_de_3_s_ecrit_dans_la_description() -> None:
     """#290, décision 5 : la description garde teinte et composition séparément."""
-    sans_choix = {"gabarit": "chantier", "icones": QUATRE_ICONES}
+    sans_choix = {"gabarit": "chantier", "icones": TROIS_ICONES}
     proposees = miniature.propositions(sans_choix)
 
     assert miniature.choisir(sans_choix, proposees[1][0], proposees[2][1]) == {
         "gabarit": "chantier",
-        "icones": ["globe", "vault", "cable", "docker"],
+        "icones": ["globe", "vault", "cable"],
         "teinte": "sauge",
-        "composition": "bas-droite",
+        "composition": "cone-a-droite",
     }
 
 
@@ -489,9 +484,9 @@ def test_le_choix_remplace_celui_de_la_description_sans_la_modifier() -> None:
     """Une fonction pure : la description reçue reste telle quelle."""
     avant = copy.deepcopy(CHANTIER)
 
-    choisie = miniature.choisir(CHANTIER, "ocre", "bas-gauche")
+    choisie = miniature.choisir(CHANTIER, "ocre", "grand-cone")
 
-    assert (choisie["teinte"], choisie["composition"], CHANTIER) == ("ocre", "bas-gauche", avant)
+    assert (choisie["teinte"], choisie["composition"], CHANTIER) == ("ocre", "grand-cone", avant)
 
 
 def ecrite(chemin: Path, description: object) -> Path:
@@ -523,13 +518,13 @@ def test_la_cli_lit_par_defaut_la_description_du_projet_courant(
 
 def test_la_cli_rend_une_ligne_par_erreur_en_utf_8_dans_un_tube(tmp_path: Path) -> None:
     """Sortie 1, une ligne `<chemin> : <message>` par erreur, accents lisibles."""
-    fautive = modifiee(CHANTIER, "icones", ["globe", "vault", "cable", "fantome"])
+    fautive = modifiee(CHANTIER, "icones", ["globe", "vault", "fantome"])
 
     done = run_in_pipe("miniature-projet", "miniature", str(ecrite(tmp_path / "m.json", fautive)))
 
     assert (done.returncode, done.stdout.decode("utf-8").splitlines()) == (
         1,
-        [f"icones[3] : attendu une icône du dossier d'icônes, reçu {json.dumps('fantome')}"],
+        [f"icones[2] : attendu une icône du dossier d'icônes, reçu {json.dumps('fantome')}"],
     )
 
 
