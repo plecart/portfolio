@@ -449,13 +449,17 @@ for (const [motion, pulse] of [
   ['no-preference', 'frame-pulse'],
   ['reduce', 'none'],
 ] as const) {
-  test(`le cadre pulse comme ceux de la table, jamais en mouvement réduit — ${motion} (spec §5.1, §6.3)`, async ({
+  test(`le contenu du cadre pulse comme les cadres de la table, son papier jamais, ni rien en mouvement réduit — ${motion} (spec §5.1, §6.3)`, async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: motion })
     await openLoading(page)
+    // La photo, puis la colonne de lecture, qui porte le bloc du titre et les barres.
+    const parts = frame(page).locator(':scope > *')
+    await expect(parts).toHaveCount(2)
 
-    await expect(frame(page)).toHaveCSS('animation-name', pulse)
+    await expect(frame(page)).toHaveCSS('animation-name', 'none')
+    for (const part of await parts.all()) await expect(part).toHaveCSS('animation-name', pulse)
   })
 }
 
