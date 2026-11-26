@@ -11,7 +11,6 @@ jamais tirés des constantes des scripts (`cycle-pr/references/tests.md`, « Le 
 il ne se suppose pas »).
 """
 
-import base64
 import json
 import re
 from pathlib import Path
@@ -24,7 +23,9 @@ from test_schema_architecture_export import (
     CARRE,
     ERREUR_ATTENTE,
     PLANCHE,
+    POSE_DU_MARQUEUR,
     Capture,
+    en_data,
     fenetre,
     png_temoin,
     remplacer,
@@ -118,11 +119,6 @@ def injectee(rendue: str) -> dict[str, Any]:
     return json.loads(ligne.removeprefix(prefixe).removesuffix(";"))
 
 
-def en_data(image: bytes, type_mime: str) -> str:
-    """`image` en URL `data:`."""
-    return f"data:{type_mime};base64,{base64.b64encode(image).decode('ascii')}"
-
-
 @pytest.mark.parametrize("decrite", DESCRIPTIONS.values(), ids=DESCRIPTIONS.keys())
 def test_la_page_assemblee_ne_charge_rien_hors_d_elle(
     decrite: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -146,7 +142,7 @@ def test_la_page_assemblee_pose_le_marqueur_qu_attend_la_capture(
 
     rendue = page(CHANTIER, "sauge", "modele")
 
-    assert rendue.count("""document.body.setAttribute("data-rendu-pret", '')""") == 1
+    assert rendue.count(POSE_DU_MARQUEUR) == 1
 
 
 # Une description de chaque gabarit, la teinte et la composition qu'elle reçoit.

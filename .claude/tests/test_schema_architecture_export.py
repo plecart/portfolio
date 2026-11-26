@@ -45,6 +45,15 @@ def fenetre(commande: list[str]) -> str:
     return dict(pairwise(commande))["--viewport-size"]
 
 
+def en_data(image: bytes, type_mime: str) -> str:
+    """`image` en URL `data:`, encodée en base64."""
+    return f"data:{type_mime};base64,{base64.b64encode(image).decode('ascii')}"
+
+
+# La pose du marqueur de fin de rendu, telle que l'export l'injecte dans une page (`/*PRET*/`).
+POSE_DU_MARQUEUR = """document.body.setAttribute("data-rendu-pret", '')"""
+
+
 class Capture:
     """`subprocess.run` remplacé : note chaque commande et le texte de la page qu'elle capture,
     lu à son URL pendant la capture — l'export la jette ensuite —, et rend `code` avec `erreur`
@@ -258,7 +267,7 @@ def test_la_page_assemblee_pose_le_marqueur_qu_attend_la_capture_une_fois_rendue
     précédent) ; l'export l'injecte dans le gabarit, qui n'en porte aucun en propre."""
     page = page_de_pacome_dev()
 
-    assert page.count("""render(); document.body.setAttribute("data-rendu-pret", '');""") == 1
+    assert page.count(f"render(); {POSE_DU_MARQUEUR};") == 1
 
 
 def test_un_gabarit_rempli_garde_l_attribut_qu_attend_la_capture(tmp_path: Path) -> None:
@@ -380,8 +389,7 @@ def test_la_planche_assemblee_porte_chaque_proposition_au_rang_de_son_numero(
     page = export.assembler_planche(images)
 
     assert re.findall("data:image/png;base64,[A-Za-z0-9+/=]*", page) == [
-        f"data:image/png;base64,{base64.b64encode(image.read_bytes()).decode('ascii')}"
-        for image in images
+        en_data(image.read_bytes(), "image/png") for image in images
     ]
 
 
@@ -389,7 +397,7 @@ def test_la_planche_assemblee_pose_le_marqueur_qu_attend_la_capture(tmp_path: Pa
     """Le marqueur de fin de rendu, que l'export injecte comme dans la page du schéma."""
     page = export.assembler_planche(propositions(tmp_path, 2))
 
-    assert page.count("""document.body.setAttribute("data-rendu-pret", '')""") == 1
+    assert page.count(POSE_DU_MARQUEUR) == 1
 
 
 @pytest.mark.parametrize("nombre", [1, 5])
