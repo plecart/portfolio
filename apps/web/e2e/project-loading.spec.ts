@@ -335,6 +335,102 @@ test('un échec affiche le message d’erreur sans cadre de fiche, et « Réessa
   await expect(panel(page)).toBeVisible()
 })
 
+/**
+ * Ce que Tab atteint sur la page hors d'une fiche (spec §6.2), dans l'ordre : l'entête, la table —
+ * vide pendant l'attente, ou de cadres inertes —, puis les liens de l'auteur.
+ */
+const PAGE_STOPS = [
+  'Pacôme Bernier',
+  'Passer en mode sombre',
+  'GitHub de Pacôme Bernier',
+  'LinkedIn de Pacôme Bernier',
+]
+
+/** Le nom de ce qui a le focus, ou `BODY` quand rien ne l'a. */
+const focused = (page: Page) =>
+  page.evaluate(() => {
+    const element = document.activeElement
+    if (!element || element === document.body) return 'BODY'
+    return element.getAttribute('aria-label') ?? element.textContent!.trim()
+  })
+
+for (const [path, reached, state] of [
+  [FICHE, [], 'à l’adresse d’une fiche, Tab n’atteint rien sous le cadre'],
+  ['/', PAGE_STOPS, 'à `/`, Tab parcourt l’entête puis les liens de l’auteur (témoin)'],
+] as const) {
+  test(`pendant le chargement ${state} (spec §5.1, §6.2)`, async ({ page }) => {
+    await openLoading(page, path)
+    // La population : tout lien ou bouton de l'entête, de la table et du pied de page.
+    const population = await page
+      .locator('header :is(a, button), main :is(a, button), footer a')
+      .evaluateAll((elements) =>
+        elements.map((node) => node.getAttribute('aria-label') ?? node.textContent!.trim()),
+      )
+    expect(population).toEqual(PAGE_STOPS)
+
+    const stops: string[] = []
+    for (let step = 0; step <= population.length; step++) {
+      await page.keyboard.press('Tab')
+      stops.push(await focused(page))
+    }
+
+    expect(stops.filter((stop) => population.includes(stop))).toEqual(reached)
+  })
+}
+
+/**
+ * Consigne les clics qui tombent sur un lien, sans les laisser naviguer.
+ *
+ * @returns De quoi lire l'adresse de chaque lien atteint.
+ */
+async function watchLinkClicks(page: Page) {
+  const hrefs = await page.evaluateHandle(() => {
+    const seen: string[] = []
+    addEventListener('click', (event) => {
+      const link = (event.target as Element).closest('a')
+      if (!link) return
+      event.preventDefault()
+      seen.push(link.href)
+    })
+    return seen
+  })
+  return () => hrefs.jsonValue()
+}
+
+for (const [state, reach, reaches] of [
+  ['pendant le chargement à l’adresse d’une fiche', openLoading, false],
+  [
+    'après l’échec qui retire le cadre (témoin)',
+    async (page: Page) => {
+      const failure = await openLoading(page)
+      await failure(FAILURES['réseau injoignable'])
+      await expect(frame(page)).toHaveCount(0)
+    },
+    true,
+  ],
+] as const) {
+  test(`sous 600 px, ${state}, un toucher au centre d’un lien du pied de page ${reaches ? 'l’ouvre' : 'ne l’ouvre pas'} (spec §5.1)`, async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(!isMobile, 'le pied de page sous le plein écran : le projet mobile le porte')
+    await reach(page)
+    const links = await page.locator('footer a').all()
+    const clicks = await watchLinkClicks(page)
+
+    for (const link of links) {
+      await expect(link).toBeInViewport()
+      const { x, y, width, height } = (await link.boundingBox())!
+      await page.touchscreen.tap(x + width / 2, y + height / 2)
+    }
+
+    const hrefs = await Promise.all(
+      links.map((link) => link.evaluate((anchor: HTMLAnchorElement) => anchor.href)),
+    )
+    expect(await clicks()).toEqual(reaches ? hrefs : [])
+  })
+}
+
 for (const [motion, pulse] of [
   ['no-preference', 'frame-pulse'],
   ['reduce', 'none'],
@@ -357,6 +453,30 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await openLoading(page)
     await expect(frame(page)).toHaveCount(1)
 
-    await expectNoViolations(page)
+    // L'entête est inerte sous le cadre, comme sous la fiche, son titre de niveau 1 avec elle. Axe
+    // n'exige pas ce titre sous un dialogue modal (`passForModal` de `page-has-heading-one`,
+    // axe-core 4.14.0, lu le 2026-11-26) ; il n'en voit aucun dans le cadre, inerte.
+    await expectNoViolations(page, ['page-has-heading-one'])
   })
 }
+
+test('pendant l’attente, seule la table, occupée, reste exposée aux technologies d’assistance (spec §5.1)', async ({
+  page,
+}) => {
+  await openLoading(page)
+  await expect(frame(page)).toHaveCount(1)
+
+  // L'arbre d'accessibilité de Chromium : Playwright, lui, voit encore un élément inerte.
+  const client = await page.context().newCDPSession(page)
+  const { nodes } = await client.send('Accessibility.getFullAXTree')
+  const landmarks = nodes
+    .filter(
+      ({ ignored, role }) => !ignored && ['banner', 'main', 'contentinfo'].includes(role?.value),
+    )
+    .map(({ role, properties }) => [
+      role!.value,
+      Boolean(properties?.find(({ name }) => name === 'busy')?.value.value),
+    ])
+
+  expect(landmarks).toEqual([['main', true]])
+})
