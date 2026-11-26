@@ -199,7 +199,8 @@ class GalleryInline(SortableInline[GalleryImage, Project]):
     fields = ("move", "preview", "original", "caption", "state", "position")
     readonly_fields = ("move", "preview", "state")
     verbose_name_plural = strings.GALLERY_HEADING
-    # La ligne d'aide, que le gabarit pose au-dessus du tableau de Django.
+    # La ligne d'aide, que le gabarit pose au-dessus du tableau de Django : un attribut à nous, que
+    # Django n'a pas sur un inline.
     help_text = strings.GALLERY_COVER_HELP
     template = "content/admin/tabular_help.html"
     min_num = 1

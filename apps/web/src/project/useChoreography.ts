@@ -367,10 +367,10 @@ function around(root: Element, kept: readonly Element[]): Element[] {
  * sources, à la même taille : complète dès son insertion, sans requête, différée ou non (Chromium
  * 156, sonde du 2026-11-25) —, `aria-hidden`, posée dans le cadre de la galerie juste après sa
  * piste : au-dessus des images, sous les flèches et la loupe, sur tout le cadre, avec lequel elle
- * vole, et effacée au repos (`project.css`). À l'ouverture, elle s'efface en `--dur-open`, sans retard : le
- * cadre part avec la couverture et arrive avec la première image que montre la galerie. Au retour, elle
- * revient de ce qu'elle montre (`relay`) et reparaît en `--dur-open` sur l'image montrée, quelle
- * qu'elle soit, jusqu'au retrait du panneau.
+ * vole, et effacée au repos (`project.css`). À l'ouverture, elle s'efface en `--dur-open`, sans
+ * retard : le cadre part avec la couverture et arrive avec la première image que montre la galerie.
+ * Au retour, elle revient de ce qu'elle montre (`relay`) et reparaît en `--dur-open` sur l'image
+ * montrée, quelle qu'elle soit, jusqu'au retrait du panneau.
  *
  * @returns Ses deux fondus ; `null` sans photo sur la carte, ou quand la galerie ne montre que la
  *   couverture (`data-cover`, `ProjectGallery`) : rien ne change alors dans le cadre.

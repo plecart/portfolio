@@ -9,8 +9,9 @@ dans `#root`, de la fiche pré-rendue, masquée à l'œil, qu'un robot lit sans 
 navigateur y charge le site, qui remplace `#root` et affiche la fiche. Toute autre adresse redirige
 vers l'accueil (décision 1). La CSP et les en-têtes de sécurité restent ceux de Caddy (décision 5).
 
-La page porte aussi un en-tête `Link` qui précharge l'image de tête de la galerie (`preload_link`,
-#27) : le navigateur la demande dès la page reçue, sans attendre le JS ni la liste des projets.
+La page porte aussi un en-tête `Link` qui précharge l'image que la fiche montre en premier
+(`preload_link`, #27) : le navigateur la demande dès la page reçue, sans attendre le JS ni la liste
+des projets.
 Un en-tête, et non une balise : le bloc d'aperçu s'en tient à ses cinq balises.
 """
 
