@@ -8,6 +8,26 @@ import { useProjectAddress } from './project/useProjectAddress.ts'
 import { strings } from './strings.ts'
 import { Table } from './table/Table.tsx'
 
+/**
+ * La valeur de `data-project-open` (spec §3.2) : `scrollbar` quand la page défile sous une barre
+ * classique, que le verrou retire et dont la feuille garde la place ; vide sans défilement, ou sous
+ * une barre qui ne prend pas de place, superposée ou masquée. Se lit sur la page déjà verrouillée :
+ * sa hauteur, puis la barre d'une sonde qui défile toujours — 15 px sous une barre classique, 0 sous
+ * `--hide-scrollbars` comme sous `OverlayScrollbar` (Chromium de Playwright 1.64.1, mesuré le
+ * 2026-11-26) ; `scrollbar-gutter` seul garde 10 px aux barres masquées.
+ */
+function scrollbarToKeep(): 'scrollbar' | '' {
+  const root = document.documentElement
+  if (root.scrollHeight <= root.clientHeight) return ''
+  const probe = document.createElement('div')
+  probe.style.position = 'absolute'
+  probe.style.overflow = 'scroll'
+  document.body.append(probe)
+  const classic = probe.offsetWidth > probe.clientWidth
+  probe.remove()
+  return classic ? 'scrollbar' : ''
+}
+
 export default function App() {
   const table = useRef<HTMLElement>(null)
   const { status, projects, retry, retried } = useProjects()
@@ -36,16 +56,16 @@ export default function App() {
   }, [origin])
 
   // La feuille lit l'attribut : le verrou de défilement, les cartes, l'entête et les liens de
-  // l'auteur n'ont ni prop ni état de plus. Sa valeur dit si une barre classique a sa place à garder,
-  // lue avant le verrou, qui la retire.
+  // l'auteur n'ont ni prop ni état de plus. Sa valeur, `scrollbarToKeep`, se relit à l'arrivée de la
+  // liste, qui fait la hauteur de la page sous une fiche attendue à son adresse.
   useEffect(() => {
     const root = document.documentElement
     if (onScreen) {
-      root.setAttribute('data-project-open', innerWidth > root.clientWidth ? 'scrollbar' : '')
+      root.setAttribute('data-project-open', scrollbarToKeep())
     } else {
       root.removeAttribute('data-project-open')
     }
-  }, [onScreen])
+  }, [onScreen, projects])
 
   useEffect(() => {
     document.title = project?.title ?? strings.siteName
