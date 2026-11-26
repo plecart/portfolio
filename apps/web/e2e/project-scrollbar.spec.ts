@@ -15,7 +15,7 @@ test.use({ launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] } })
 
 test.skip(({ isMobile }) => isMobile, 'barre classique : le projet desktop la porte')
 
-/** Une table haute, qui fait défiler la page sous sa barre, et une table qui tient dans la fenêtre. */
+/** Une table haute, qui fait défiler la page sous sa barre, et une qui tient dans la fenêtre. */
 const PAGES = [
   ['la page défile', PROJECT_SETS.twelveWithShowcase, true],
   ['la page ne défile pas', PROJECT_SETS.threeWithoutShowcase, false],

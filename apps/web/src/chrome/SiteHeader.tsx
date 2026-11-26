@@ -31,12 +31,16 @@ const HEADER_CLASSES = [
  * en phase 1 : la place « Chat » est absente du DOM. Transparente en haut de page, elle se
  * décolle au défilement, sort en descendant, revient en remontant, et reste visible tant qu'elle
  * contient le focus clavier. Fiche ouverte, elle sort aussi, le temps de la fiche.
+ *
+ * @param inert Recouverte par le cadre d'une fiche attendue à son adresse (§5.1) : ni le focus ni
+ *   le pointeur ne l'atteignent.
  */
-export function SiteHeader() {
+export function SiteHeader({ inert }: { inert: boolean }) {
   const { detached, hidden } = useHeaderScroll()
 
   return (
     <header
+      inert={inert}
       data-detached={detached || undefined}
       data-hidden={hidden || undefined}
       className={HEADER_CLASSES}

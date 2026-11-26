@@ -188,9 +188,13 @@ export async function expectNoOverflow(element: Locator) {
   expect(scrollWidth).toBeLessThanOrEqual(clientWidth)
 }
 
-/** Aucune violation d'axe sur ce qui est rendu. */
-export async function expectNoViolations(page: Page) {
-  const { violations } = await new AxeBuilder({ page }).analyze()
+/**
+ * Aucune violation d'axe sur ce qui est rendu.
+ *
+ * @param disabled Les règles écartées, chacune pour le motif que le scénario écrit.
+ */
+export async function expectNoViolations(page: Page, disabled: string[] = []) {
+  const { violations } = await new AxeBuilder({ page }).disableRules(disabled).analyze()
 
   expect(violations.map((violation) => violation.id)).toEqual([])
 }

@@ -29,9 +29,11 @@ const FOOTER_CLASSES = [
   // Colonne : fixe en bas à droite, à 24 px des bords, 8 px entre deux disques, sans filet.
   'data-docked:fixed data-docked:right-(--s-5) data-docked:bottom-(--s-5) data-docked:z-40',
   'data-docked:flex-col data-docked:gap-(--s-2) data-docked:p-0 data-docked:before:hidden',
-  // Fiche ouverte, la colonne s'efface en 150 ms (§2.7, §3.4) ; le pied de page reste. La transition
-  // est à la colonne seule : passée au pied de page sous la fiche, la forme paraît sans fondu.
-  'data-docked:transition-opacity data-docked:project-open:pointer-events-none data-docked:project-open:opacity-0',
+  // Fiche ouverte, la colonne s'efface en 150 ms (§2.7, §3.4) ; le pied de page reste. La
+  // transition est à la colonne seule : passée au pied de page sous la fiche, la forme paraît sans
+  // fondu.
+  'data-docked:transition-opacity',
+  'data-docked:project-open:pointer-events-none data-docked:project-open:opacity-0',
 ].join(' ')
 
 /** Classes d'un lien, sous les deux mêmes formes (`group-data-docked:` lit celle du `<footer>`). */
@@ -53,12 +55,20 @@ const LINK_CLASSES = [
  * colonne s'efface.
  *
  * @param table La table, dont les cellules décident de la forme (`useAuthorLinksPlacement`).
+ * @param inert Recouverts par le cadre d'une fiche attendue à son adresse (§5.1) : ni le focus ni
+ *   le pointeur ne les atteignent, pas même au pied de page sous le plein écran.
  */
-export function AuthorLinks({ table }: { table: RefObject<HTMLElement | null> }) {
+export function AuthorLinks({
+  table,
+  inert,
+}: {
+  table: RefObject<HTMLElement | null>
+  inert: boolean
+}) {
   const docked = useAuthorLinksPlacement(table) === 'column'
 
   return (
-    <footer data-docked={docked || undefined} className={FOOTER_CLASSES}>
+    <footer inert={inert} data-docked={docked || undefined} className={FOOTER_CLASSES}>
       {LINKS.map(({ href, label, Icon }) => (
         <a key={href} href={href} aria-label={label} className={LINK_CLASSES}>
           <Icon />
