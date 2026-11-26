@@ -40,8 +40,9 @@ proposition, de 2400 × 2400, puis la planche, de 4000 × 1680 ; 1 et une ligne
 `<chemin> : <message>` par erreur de la description, sur la sortie standard, ou le motif en une
 ligne sur la sortie d'erreur — prérequis absent, capture en échec ou d'une autre taille,
 préfixé du fichier en propositions ; 2 et son motif sur la sortie d'erreur, description ou
-fichier des couleurs illisible ou mal formé, nom d'icône présent dans les deux jeux — ou appel
-mal formé, une option hors de son mode ou des teintes qui ne font pas quatre noms distincts de
+fichier des couleurs illisible ou mal formé, nom d'icône présent dans les deux jeux, image du
+premier plan qui n'est plus un PNG ni un JPEG depuis sa validation, marqueur du gabarit sans
+ressource — ou appel mal formé, une option hors de son mode ou des teintes qui ne font pas quatre noms distincts de
 la palette compris, lu une fois la description validée. Python 3.11 ou plus, bibliothèque
 standard seule : aucun `import playwright`.
 """
@@ -56,22 +57,29 @@ from typing import Any, cast
 # `miniature.py` pour les noms qu'aucun script de ce dossier ne doit porter.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "schema-architecture" / "scripts"))
 
-from description import ICONES, Abandon, lire_couleurs, sorties_en_utf_8, verifier_fichier
+from description import Abandon, sorties_en_utf_8, verifier_fichier
 from export import (
-    FENETRE,
-    capturer,
+    ecrire_image,
     ecrire_propositions,
     en_data,
     en_js,
+    icones_en_ligne,
     remplir,
-    signaler,
     svg_en_ligne,
 )
-from miniature import COMPOSITIONS, FOND, PALETTE, propositions, type_d_image, valider
+from miniature import (
+    COMPOSITIONS,
+    DESCRIPTION,
+    FOND,
+    PALETTE,
+    propositions,
+    type_d_image,
+    valider,
+)
 
 GABARIT = Path(__file__).resolve().parents[1] / "rendu" / "miniature.html"
-# Les chemins par défaut, depuis la racine du projet.
-DESCRIPTION = Path("docs/miniature/miniature.json")
+# Les chemins par défaut, depuis la racine du projet ; celui de la description, `DESCRIPTION`,
+# est celui de `miniature.py`.
 DOSSIER = Path("docs/miniature/propositions")
 IMAGE = Path("docs/miniature/miniature.png")
 # L'icône Lucide dessinée derrière les icônes de « chantier ».
@@ -79,16 +87,15 @@ CONE = "traffic-cone"
 
 
 def chantier(description: Mapping[str, Any], icones: Mapping[str, Path]) -> dict[str, object]:
-    """Ce que « chantier » dessine en propre : le SVG du cône, puis ceux des trois icônes dans
-    l'ordre de la description, chaque logo peint à sa couleur.
+    """Ce que « chantier » dessine en propre : le SVG du cône, puis ceux des trois icônes —
+    distinctes, validées — dans l'ordre de la description, chaque logo peint à sa couleur.
 
     Raises:
-        Abandon: le fichier des couleurs des logos est illisible (`lire_couleurs`).
+        Abandon: le fichier des couleurs des logos est illisible (`icones_en_ligne`).
     """
-    couleurs = lire_couleurs(ICONES)
     return {
         "cone": svg_en_ligne(icones[CONE], None),
-        "icones": [svg_en_ligne(icones[nom], couleurs.get(nom)) for nom in description["icones"]],
+        "icones": list(icones_en_ligne(description["icones"], icones).values()),
     }
 
 
@@ -212,8 +219,7 @@ def main(argv: Sequence[str]) -> int:
         return 2
     if not choix:
         return ecrire_propositions(pages, arguments.dossier or DOSSIER)
-    png = arguments.png or IMAGE
-    return signaler(capturer(pages[0], png), png, FENETRE, "")
+    return ecrire_image(pages[0], arguments.png or IMAGE)
 
 
 if __name__ == "__main__":
