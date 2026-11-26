@@ -183,7 +183,7 @@ class GalleryInline(SortableInline[GalleryImage, Project]):
     """La galerie d'un projet, sous ses technologies : des images que l'auteur ajoute, retire et
     ordonne par glisser-déposer, puis enregistre une fois ; la première est la couverture
     (décision 11, ADR 0013). Son modèle n'a aucune unicité qui lise le projet : à position égale,
-    l'ordre de saisie.
+    l'ordre de saisie. Une ligne d'aide, au-dessus, dit ce qui montre la couverture (#289).
 
     Chaque image enregistrée montre son aperçu, et son état en texte, sous son libellé : seul le
     worker de #12 le fait avancer (décision 5).
@@ -199,6 +199,9 @@ class GalleryInline(SortableInline[GalleryImage, Project]):
     fields = ("move", "preview", "original", "caption", "state", "position")
     readonly_fields = ("move", "preview", "state")
     verbose_name_plural = strings.GALLERY_HEADING
+    # La ligne d'aide, que le gabarit pose au-dessus du tableau de Django.
+    help_text = strings.GALLERY_COVER_HELP
+    template = "content/admin/tabular_help.html"
     min_num = 1
     # Une ligne neuve en plus des images enregistrées, comme la fiche technique : l'auteur en
     # ajoute d'autres par le bouton de l'écran. Aucune à l'ajout (`get_extra`).

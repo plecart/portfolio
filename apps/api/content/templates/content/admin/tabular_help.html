@@ -1,0 +1,8 @@
+{% comment %}
+Un tableau en ligne précédé de sa ligne d'aide, le `help_text` de l'inline, au style d'aide de
+l'admin (`.help`, `admin/css/base.css`), puis le gabarit de Django tel quel : il n'a aucun bloc à
+surcharger (`admin/edit_inline/tabular.html`, Django 6.1), et la ligne se pose au-dessus de tout
+son bloc, titre compris.
+{% endcomment %}
+<p class="help">{{ inline_admin_formset.opts.help_text }}</p>
+{% include "admin/edit_inline/tabular.html" %}
