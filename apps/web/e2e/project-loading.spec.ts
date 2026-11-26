@@ -293,6 +293,20 @@ test('la fiche apparaît par-dessus le cadre par son fondu de 200 ms, puis le ca
   expect(midway.opacity).toBeLessThan(1)
   expect(midway.layers).toEqual(['30', '30'])
   expect(midway.before).toBe(true)
+  // Seule la fin de son propre fondu retire le cadre : ni celle d'un enfant, dont l'événement
+  // remonte au panneau, ni celle d'une autre animation du panneau. Deux images laissent à React le
+  // temps de rendre ce qu'elles déclencheraient.
+  const framesAfterStrayEnds = await panel(page).evaluate(async (element) => {
+    element.firstElementChild!.dispatchEvent(
+      new AnimationEvent('animationend', { animationName: 'project-in', bubbles: true }),
+    )
+    element.dispatchEvent(
+      new AnimationEvent('animationend', { animationName: 'project-out', bubbles: true }),
+    )
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    return document.querySelectorAll('[data-project-frame]').length
+  })
+  expect(framesAfterStrayEnds).toBe(1)
 
   await panel(page).evaluate((element) => {
     for (const animation of element.getAnimations()) animation.play()
