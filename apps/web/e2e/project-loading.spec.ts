@@ -155,8 +155,9 @@ test('pendant le chargement, la page est déjà « fiche ouverte », et le reste
   // Sous 600 px, le pied de page reste sous le plein écran (spec §3.4).
   if (!isMobile) await expect(page.locator('footer')).toHaveCSS('opacity', '0')
 
-  // Un témoin posé dans la page : tout changement de l'attribut, retrait compris, y laisse une
-  // trace.
+  // Un témoin posé dans la page : chaque écriture de l'attribut y laisse sa valeur d'avant, `null`
+  // quand il était absent. Sa valeur peut changer à l'arrivée de la liste, qui fait la hauteur de
+  // la page (`project-scrollbar.spec.ts`) ; sa présence, jamais.
   const changes = await page.evaluateHandle(() => {
     const seen: (string | null)[] = []
     const witness = new MutationObserver((records) =>
@@ -172,7 +173,8 @@ test('pendant le chargement, la page est déjà « fiche ouverte », et le reste
   await expect(panel(page)).toBeVisible()
   await settle(page)
 
-  expect(await changes.jsonValue()).toEqual([])
+  expect(await changes.jsonValue()).not.toContain(null)
+  await expect(root(page)).toHaveAttribute('data-project-open')
 })
 
 test('la fiche apparaît par-dessus le cadre par son fondu de 200 ms, puis le cadre est retiré (spec §4.6, §5.1)', async ({
