@@ -202,7 +202,8 @@ function readyImages(gallery: readonly GalleryImage[]) {
 /**
  * Les images que la galerie de la fiche montre, dans l'ordre (spec §4.4) : les images prêtes, sauf
  * la couverture (§1.11) ; sans aucune, la couverture seule, si elle est prête. Le plein écran et le
- * compteur comptent les mêmes.
+ * compteur comptent les mêmes. La vue des aperçus de lien recopie la règle pour précharger la
+ * première (`preload_link`, `apps/api/content/link_preview.py`).
  *
  * @param gallery Les images du projet, prêtes ou non, la couverture en tête (`gallery[0]`).
  * @returns `images`, la légende et les sources (`imageSources`) de chacune ; `coverOnly`, elles ne

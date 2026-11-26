@@ -181,7 +181,7 @@ const shownCaptions = (gallery: GalleryImage[]) =>
   shownImages(gallery).images.map(({ caption }) => caption)
 
 test('une image montrée donne sa légende et ses sources, en largeurs', () => {
-  expect(shownImages([buildImage('projet', 'Écran')]).images).toEqual([
+  expect(shownImages([ready('Écran')]).images).toEqual([
     {
       caption: 'Écran',
       src: `${FILES_ORIGIN}/images/projet/480.webp`,
@@ -202,10 +202,8 @@ test.each<[string, GalleryImage[], string[], boolean]>([
   ['aucune prête : rien', [pending('A'), failed('B')], [], false],
   ['une galerie vide : rien', [], [], false],
 ])('la couverture A ne se montre que sans autre image prête — %s', (_, gallery, captions, coverOnly) => {
-  const shown = shownImages(gallery)
-
-  expect(shown.images.map(({ caption }) => caption)).toEqual(captions)
-  expect(shown.coverOnly).toBe(coverOnly)
+  expect(shownCaptions(gallery)).toEqual(captions)
+  expect(shownImages(gallery).coverOnly).toBe(coverOnly)
 })
 
 test.each(['pending', 'failed'] as const)('une image à l’état %s n’entre pas', (state) => {

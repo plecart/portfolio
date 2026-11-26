@@ -67,7 +67,9 @@ export const COVER = buildImage('fiche', 'Couverture')
 export const CAPTIONS = ['Écran d’accueil', 'Détail de l’interface', 'Vue d’ensemble']
 export const THREE_IMAGES = [COVER, ...CAPTIONS.map((caption) => buildImage('fiche', caption))]
 
-/** La galerie d'une fiche qui montre deux images, flèches et compteur : la couverture, puis elles. */
+/**
+ * La galerie d'une fiche qui montre deux images, flèches et compteur : la couverture, puis elles.
+ */
 export const TWO_IMAGES = [COVER, ...['Une', 'Deux'].map((caption) => buildImage('fiche', caption))]
 
 /** Le centre d'un élément. */
