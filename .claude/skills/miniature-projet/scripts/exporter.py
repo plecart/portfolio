@@ -42,8 +42,8 @@ ligne sur la sortie d'erreur — prérequis absent, capture en échec ou d'une a
 préfixé du fichier en propositions ; 2 et son motif sur la sortie d'erreur, description ou
 fichier des couleurs illisible ou mal formé, nom d'icône présent dans les deux jeux, image du
 premier plan qui n'est plus un PNG ni un JPEG depuis sa validation, marqueur du gabarit sans
-ressource — ou appel mal formé, une option hors de son mode ou des teintes qui ne font pas quatre noms distincts de
-la palette compris, lu une fois la description validée. Python 3.11 ou plus, bibliothèque
+ressource — ou appel mal formé, une option hors de son mode ou des teintes qui ne font pas
+quatre noms distincts de la palette compris, lu une fois la description validée. Python 3.11 ou plus, bibliothèque
 standard seule : aucun `import playwright`.
 """
 
