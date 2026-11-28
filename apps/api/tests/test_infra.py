@@ -541,9 +541,10 @@ def build_flags(steps: list[dict[str, Any]]) -> list[str]:
 
 # Les jobs qui construisent les images avec le cache local — tous : un test le tient —, le
 # workflow de chacun et s'il écrit le cache, sous une même clé : `infra` le lit et l'écrit, sur une
-# PR et sur `main` selon le delta (ADR 0032) ; `publish` aussi, sur chaque push vers `main` —
-# l'entrée d'une PR n'est lisible que d'elle (doc GitHub « Dependency caching », citée au job
-# `publish` de `ci.yml`) ; `avis` le lit seulement (ADR 0014, ADR 0019).
+# PR et sur `main` selon le delta (ADR 0032) ; `publish` aussi, sur chaque release, sous la portée
+# de son tag — l'entrée d'une PR n'est lisible que d'elle, celle d'un tag que de lui (doc GitHub
+# « Dependency caching », citée au job `publish` de `ci.yml`) ; `avis` le lit seulement (ADR 0014,
+# ADR 0019).
 CACHED_BUILDS = {
     "infra": (CI_WORKFLOW, True),
     "publish": (CI_WORKFLOW, True),

@@ -1,10 +1,10 @@
 """Tests de la publication des images sur GHCR : `make push`, `make prune`, le job `publish`, et le
 job de fumée qui éprouve ses images avant leur déploiement (#26).
 
-La publication tourne sur GitHub Actions, après chaque push sur `main` (ADR 0014) ; le poste n'a ni
-le jeton ni le registre. Ces tests lisent donc ce que `make` exécuterait — `make --dry-run`, ou la
-recette lancée sur un `gh` témoin —, sans rien pousser ni supprimer, et le workflow tel que
-l'analyseur YAML le lit. Comme dans `test_image_scan.py`, la garde de chaque job est une fonction
+La publication tourne sur GitHub Actions, à la publication de chaque release (ADR 0014,
+ADR 0033) ; le poste n'a ni le jeton ni le registre. Ces tests lisent donc ce que `make`
+exécuterait — `make --dry-run`, ou la recette lancée sur un `gh` témoin —, sans rien pousser ni
+supprimer, et le workflow tel que l'analyseur YAML le lit. Comme dans `test_image_scan.py`, la garde de chaque job est une fonction
 sur du texte, appliquée au dépôt et à un recueil de formes, `PUBLISH_FORMS` et `SMOKE_FORMS`.
 """
 
@@ -32,6 +32,8 @@ from test_infra import (
 
 # Le SHA complet d'un commit, étiquette de l'image publiée à côté de `latest`.
 SHA = "0123456789abcdef0123456789abcdef01234567"
+# Le tag d'une release, celui du run qui la met en production (ADR 0033).
+RELEASE_TAG = "v1.0.0"
 
 # Une recette de `make prune` telle que `make --dry-run` l'imprime : la lecture des versions d'un
 # paquet par `gh`, avec son filtre, puis la suppression de chacune de celles qu'il rend.
@@ -81,17 +83,40 @@ RETENTION_CASES: dict[str, tuple[list[dict[str, object]], list[int]]] = {
     "une version": ([version(1, "01", "c1", "latest")], []),
 }
 
-# Ce que porte le job `publish` (brief de #15, décision 5) : il ne tourne que sur un push vers
-# `main`, et n'attend aucun job de vérification — elles rejouent le commit pendant la publication,
-# et `deploy` attend leur vert (ADR 0032, décision 2) ; seul à écrire dans le registre, il lit le
-# dépôt sans y écrire, et le reste du workflow ne fait que lire ; une publication attend la fin de
-# la précédente, sans l'annuler.
-PUBLISH_IF = "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+# Le garde des trois jobs de livraison — `publish`, `fumee` et `deploy` : une release publiée,
+# hors prerelease (ADR 0033). La clause `release` est écrite : sur un push, `github.event.release`
+# manque, et `null == false` y serait vrai — GitHub compare l'un à l'autre en nombres, 0 contre 0
+# (doc « Expressions », « Operators », lue le 2026-11-21).
+RELEASE_IF = "github.event_name == 'release' && github.event.release.prerelease == false"
+# Les formes qui écartent un job de livraison de `RELEASE_IF`, communes aux recueils des trois :
+# chacune remplace un morceau du garde dans leur forme conforme.
+RELEASE_CHANGES = {
+    # Le garde d'avant l'ADR 0033 : chaque merge partirait en production.
+    "sur un push vers main": (
+        RELEASE_IF,
+        "github.event_name == 'push' && github.ref == 'refs/heads/main'",
+        True,
+    ),
+    # Une prerelease partirait en production.
+    "sur une prerelease": (" && github.event.release.prerelease == false", "", True),
+    # Vrai aussi sur un push, par la seule coercion de `null` en 0 : chaque merge partirait en
+    # production.
+    "sans la clause release": ("github.event_name == 'release' && ", "", True),
+    "sur tout événement": (RELEASE_IF, "always()", True),
+}
+
+# Ce que porte le job `publish` (brief de #15, décision 5) : il ne tourne que sur une release
+# publiée, après `changes`, dont le pas « Tag issu de main » refuse le commit d'un tag hors de
+# `main` (ADR 0033), et n'attend aucun job de vérification — elles rejouent le commit pendant la
+# publication, et `deploy` attend leur vert (ADR 0032, décision 2) ; seul à écrire dans le
+# registre, il lit le dépôt sans y écrire, et le reste du workflow ne fait que lire ; une
+# publication attend la fin de la précédente, sans l'annuler.
+PUBLISH_NEEDS = ["changes"]
 READ_ONLY = {"contents": "read"}
 PUBLISH_PERMISSIONS = {"contents": "read", "packages": "write"}
 
 # Ce que porte le job de fumée (brief de #26) : il éprouve les images que `publish` vient de
-# pousser, avant que `deploy` ne les tire — sur un push vers `main` seulement, la condition de
+# pousser, avant que `deploy` ne les tire — sur une release publiée seulement, la condition de
 # `publish`. Il tire les images privées du registre (ADR 0014) : la lecture des paquets, seule
 # permission admise hors de `publish`, sur ce seul job. Les images du commit, jamais `latest`
 # (décision 2). Ni `continue-on-error` ni `if` d'étape : rouge, il doit sauter `deploy`.
@@ -111,9 +136,9 @@ PUBLISH_PUSH = f'make push IMAGE_PREFIX={PUBLISH_PREFIX} IMAGE_TAG="$GITHUB_SHA"
 PUBLISH_PRUNE = f"make prune IMAGE_PREFIX={PUBLISH_PREFIX}"
 
 # Les drapeaux du build, seule variable de son étape : l'image chargée dans le moteur, où Trivy la
-# lit, sans attestation (décision 7), depuis le cache des couches sauf l'étage `paquets`, et ce
-# cache écrit pour `main` (ADR 0032). Mot pour mot : un drapeau de plus (`--push`,
-# `--output type=registry`) enverrait l'image au registre avant son scan.
+# lit, sans attestation (décision 7), depuis le cache des couches sauf l'étage `paquets`, qu'il
+# écrit aussi (ADR 0032). Mot pour mot : un drapeau de plus (`--push`, `--output type=registry`)
+# enverrait l'image au registre avant son scan.
 PUBLISH_BUILD_FLAGS = (
     "--load --no-cache-filter paquets --cache-from type=local,src=/tmp/buildx-cache,tag=$*"
     " --cache-to type=local,dest=/tmp/buildx-cache,tag=$*,mode=max"
@@ -247,10 +272,10 @@ def publish_findings(workflow: str) -> list[str]:
     """Ce qui, dans un workflow, écarte le job `publish` de ce que le brief de #15 exige.
 
     Returns:
-        Un constat si le job manque ; sinon un par propriété altérée — un `needs`, `if`,
-        permissions du job, du workflow ou d'un autre job, hors `SMOKE_PERMISSIONS` sur le job de
-        fumée, `concurrency`, et ses étapes (`steps_findings`, `PUBLISH_STEPS`). Liste vide : le
-        job est conforme.
+        Un constat si le job manque ; sinon un par propriété altérée — un `needs` autre que
+        `PUBLISH_NEEDS`, `if`, permissions du job, du workflow ou d'un autre job, hors
+        `SMOKE_PERMISSIONS` sur le job de fumée, `concurrency`, et ses étapes (`steps_findings`,
+        `PUBLISH_STEPS`). Liste vide : le job est conforme.
     """
     document = yaml.safe_load(workflow)
     jobs = document["jobs"]
@@ -258,10 +283,13 @@ def publish_findings(workflow: str) -> list[str]:
     if job is None:
         return ["aucun job `publish`"]
     findings: list[str] = []
-    if needs := needed(job):
-        findings.append(f"`publish` attend {needs} : il n'attend aucun job (ADR 0032)")
-    if job.get("if") != PUBLISH_IF:
-        findings.append(f"`if` vaut {job.get('if')!r}, attendu {PUBLISH_IF!r}")
+    if (needs := needed(job)) != PUBLISH_NEEDS:
+        findings.append(
+            f"`publish` attend {needs}, attendu `changes` seul : le contrôle d'ascendance d'une"
+            " release le précède, et aucune vérification (ADR 0032, ADR 0033)"
+        )
+    if job.get("if") != RELEASE_IF:
+        findings.append(f"`if` vaut {job.get('if')!r}, attendu {RELEASE_IF!r}")
     if document.get("permissions") != READ_ONLY:
         findings.append(f"le workflow donne {document.get('permissions')}, attendu {READ_ONLY}")
     if job.get("permissions") != PUBLISH_PERMISSIONS:
@@ -302,8 +330,8 @@ def smoke_findings(workflow: str) -> list[str]:
     findings: list[str] = []
     if needed(job) != SMOKE_NEEDS:
         findings.append(f"`needs` vaut {job.get('needs')}, attendu {SMOKE_NEEDS}")
-    if job.get("if") != PUBLISH_IF:
-        findings.append(f"`if` vaut {job.get('if')!r}, attendu {PUBLISH_IF!r}")
+    if job.get("if") != RELEASE_IF:
+        findings.append(f"`if` vaut {job.get('if')!r}, attendu {RELEASE_IF!r}")
     if job.get("permissions") != SMOKE_PERMISSIONS:
         findings.append(f"le job donne {job.get('permissions')}, attendu {SMOKE_PERMISSIONS}")
     if extra := sorted(set(job) - SMOKE_JOB_KEYS):
@@ -349,7 +377,8 @@ jobs:
   {SMOKE_JOB}:
     steps: []
   publish:
-    if: {PUBLISH_IF}
+    needs: changes
+    if: {RELEASE_IF}
     permissions:
       contents: read
       packages: write
@@ -380,33 +409,31 @@ PUBLISH_CHANGES = {
     "conforme": ("", "", False),
     "sans le job": ("  publish:", "  autre:", True),
     "sans le disque libéré": (f"      - run: {json.dumps(DISQUE_RUN)}\n", "", True),
+    "needs en liste": ("needs: changes", "needs: [changes]", False),
+    # Le commit d'un tag hors de `main` se publierait avant que `changes` ne le refuse (ADR 0033).
+    "sans attendre changes": ("    needs: changes\n", "", True),
     # Un job de vérification attendu : la publication partirait après les vérifications, l'option
     # écartée pour sa durée — 13 à 16 min de plus à chaque merge (ADR 0032, b2).
-    "attend un job": ("  publish:\n", "  publish:\n    needs: api\n", True),
-    "attend les quatre jobs": (
-        "  publish:\n",
-        "  publish:\n    needs: [api, web, infra, avis]\n",
-        True,
-    ),
-    # Le front du job `web`, par artefact : `publish` ne l'attend pas, et `web` ne tourne sur `main`
-    # que si le delta touche le front.
+    "attend un job de vérification": ("needs: changes", "needs: [changes, api]", True),
+    "attend les quatre jobs": ("needs: changes", "needs: [changes, api, web, infra, avis]", True),
+    # Le front du job `web`, par artefact : `publish` ne l'attend pas (ADR 0032, décision 2).
     "télécharge le front": (
         INSTALL_LINES,
         "      - uses: actions/download-artifact@v0\n",
         True,
     ),
     "sans le front installé": ("      - run: make web-install\n", "", True),
-    # `infra` ne tourne sur `main` que si le delta touche les images : une entrée absente de `main`
-    # ne s'y écrirait qu'au prochain changement d'image, et celle d'une PR ne s'y lit pas.
+    # L'entrée qu'écrit un run de release ne se relit que d'une relance de ce run, sous la portée
+    # de son tag (doc GitHub « Dependency caching », citée au job `publish` de `ci.yml`) : sans
+    # elle, une relance d'une release que l'entrée de `main` ne couvre pas reconstruirait à froid.
     "cache restauré sans être écrit": ("actions/cache@v0", "actions/cache/restore@v0", True),
     "build qui n'écrit pas le cache": (
         " --cache-to type=local,dest=/tmp/buildx-cache,tag=$*,mode=max",
         "",
         True,
     ),
-    "sans if": (f"    if: {PUBLISH_IF}\n", "", True),
-    "sur un push vers toute branche": (PUBLISH_IF, "github.event_name == 'push'", True),
-    "sur tout événement": (PUBLISH_IF, "always()", True),
+    "sans if": (f"    if: {RELEASE_IF}\n", "", True),
+    **RELEASE_CHANGES,
     "écriture des paquets pour tout le workflow": (
         "  contents: read\njobs:",
         "  contents: read\n  packages: write\njobs:",
@@ -487,7 +514,7 @@ jobs:
   {SMOKE_JOB}:
     runs-on: ubuntu-latest
     needs: publish
-    if: {PUBLISH_IF}
+    if: {RELEASE_IF}
     permissions:
       contents: read
       packages: read
@@ -501,7 +528,7 @@ SMOKE_CHANGES = {
     "needs en liste": ("needs: publish", "needs: [publish]", False),
     "sans le job": (f"  {SMOKE_JOB}:", "  autre:", True),
     "avant la publication": ("needs: publish", "needs: infra", True),
-    "sur un push vers toute branche": (PUBLISH_IF, "github.event_name == 'push'", True),
+    **RELEASE_CHANGES,
     "sans la lecture des paquets": ("      packages: read\n", "", True),
     "écriture des paquets": ("packages: read", "packages: write", True),
     "job toléré en échec": (
@@ -619,9 +646,10 @@ def test_la_garde_du_job_publish_rend_son_verdict_sur_chaque_forme(
     assert bool(publish_findings(workflow)) is expected, publish_findings(workflow)
 
 
-def test_le_job_publish_ne_publie_qu_un_commit_de_main_une_fois_scanne() -> None:
-    """Aucun `needs` : les vérifications rejouent le commit pendant la publication (ADR 0032) ;
-    push vers `main` seulement, `packages: write` sur ce seul job, publications sans annulation ;
+def test_le_job_publish_ne_publie_qu_une_release_de_main_une_fois_scannee() -> None:
+    """Après `changes` seul, qui refuse un tag hors de `main` (ADR 0033) : les vérifications
+    rejouent le commit pendant la publication (ADR 0032) ; release publiée, hors prerelease,
+    seulement, `packages: write` sur ce seul job, publications sans annulation ;
     le front installé ici, build qui écrit le cache des couches, scan, connexion, push puis
     rétention, et rien n'atteint le registre avant le scan (brief de #15, décision 5).
     Un `workflow_run` est écarté : il publierait depuis le workflow de la branche par défaut
@@ -638,7 +666,7 @@ def test_la_garde_du_job_de_fumee_rend_son_verdict_sur_chaque_forme(
 
 
 def test_le_job_de_fumee_eprouve_les_images_du_commit_apres_leur_publication() -> None:
-    """Après `publish`, sur un push vers `main` seulement, la lecture du dépôt et des paquets et
+    """Après `publish`, sur une release publiée seulement, la lecture du dépôt et des paquets et
     rien d'autre, `make smoke` sur les images GHCR du commit — jamais `latest` —, et rien qui saute
     ou tolère son échec : rouge, il saute `deploy` (brief de #26, décision 2)."""
     assert smoke_findings(CI_WORKFLOW.read_text(encoding="utf-8")) == []
@@ -666,8 +694,8 @@ def cache_inputs(job: str, action: str) -> object:
 
 @pytest.mark.parametrize("job", [job for job in CACHED_BUILDS if job != "infra"])
 def test_chaque_build_en_cache_prend_la_cle_du_job_infra(job: str) -> None:
-    """`publish`, qui écrit l'entrée que `main` lit, et `avis`, qui la restaure pour scanner,
-    prennent la clé d'`infra`, celle qu'une PR restaure, ou écrit si elle manque. Deux clés qui
-    dériveraient feraient reconstruire à froid, sans un signal."""
+    """`publish`, qui restaure l'entrée qu'`infra` écrit sur `main`, et `avis`, qui la restaure
+    pour scanner, prennent la clé d'`infra`, celle qu'une PR restaure, ou écrit si elle manque. Deux
+    clés qui dériveraient feraient reconstruire à froid, sans un signal."""
     action = "actions/cache" if CACHED_BUILDS[job][1] else "actions/cache/restore"
     assert cache_inputs(job, action) == cache_inputs("infra", "actions/cache")

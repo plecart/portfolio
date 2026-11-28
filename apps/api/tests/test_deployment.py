@@ -1,9 +1,9 @@
 """Tests du job `deploy` de la CI : le déploiement de la production par SSH (brief de #16,
 décision 6).
 
-Le déploiement tourne sur GitHub Actions, après chaque publication sur `main` et la fumée de ses
-images (#26) ; le poste n'a ni la clé ni le VPS. Ces tests lisent le job tel que l'analyseur YAML
-le lit, et exécutent son script avec des témoins à la place de `gh`, `scp` et `ssh` : ce qu'il
+Le déploiement tourne sur GitHub Actions, sur chaque release publiée, après la publication des
+images de son commit et leur fumée (#26, ADR 0033) ; le poste n'a ni la clé ni le VPS. Ces tests
+lisent le job tel que l'analyseur YAML le lit, et exécutent son script avec des témoins à la place de `gh`, `scp` et `ssh` : ce qu'il
 déposerait et lancerait sur le VPS se lit dans leurs appels, argument par argument. Comme pour
 `publish`, la garde de la forme du job est une fonction sur du texte, appliquée au dépôt et à un
 recueil de formes, `DEPLOY_FORMS`.
@@ -17,7 +17,16 @@ from typing import Any, cast
 import pytest
 import yaml
 from test_infra import CI_WORKFLOW, REPOSITORY_ROOT
-from test_publication import SHA, STEP_KEYS, WORKFLOW_TOKEN_ENV, forms, needed
+from test_publication import (
+    RELEASE_CHANGES,
+    RELEASE_IF,
+    RELEASE_TAG,
+    SHA,
+    STEP_KEYS,
+    WORKFLOW_TOKEN_ENV,
+    forms,
+    needed,
+)
 
 # Ce que porte le job (décision 6) : il suit la fumée des images du commit, elle-même après leur
 # publication — une image rouge à la fumée reste publiée, jamais déployée (brief de #26,
@@ -28,14 +37,15 @@ from test_publication import SHA, STEP_KEYS, WORKFLOW_TOKEN_ENV, forms, needed
 # unless the jobs use a conditional expression that causes the job to continue » (doc « Workflow
 # syntax », `jobs.<job_id>.needs`, lue le 2026-11-24), et `needs.<job_id>.result` vaut `success`,
 # `failure`, `cancelled` ou `skipped` (doc « Contexts », `needs`, même date). Il ne tourne que sur
-# un push vers `main`, et seulement une fois le VPS prêt — la variable de dépôt `DEPLOY_ENABLED`,
-# qu'un `if` de job lit dans `vars`, jamais dans `secrets` (doc GitHub « Contexts »). Aucun
-# `permissions` : le jeton du workflow, en lecture, suffit. Ses secrets sont ceux de
-# l'environnement `production`, que seule `main` peut viser (`infra/RUNBOOK.md`) : un run d'une
-# autre branche ne les lit pas.
+# une release publiée, hors prerelease — `RELEASE_IF`, le garde de `publish` (ADR 0033) —, et
+# seulement une fois le VPS prêt — la variable de dépôt `DEPLOY_ENABLED`, qu'un `if` de job lit
+# dans `vars`, jamais dans `secrets` (doc GitHub « Contexts »). Aucun `permissions` : le jeton du
+# workflow, en lecture, suffit. Ses secrets sont ceux de l'environnement `production`, que seuls
+# les tags `v*` peuvent viser, réglage de GitHub hors du dépôt (ADR 0033) : un run d'une branche
+# ne les lit pas.
 DEPLOY_NEEDS = {"fumee", "api", "web", "mobile", "infra"}
 DEPLOY_IF = (
-    "${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    f"${{{{ !cancelled() && {RELEASE_IF}"
     " && vars.DEPLOY_ENABLED == 'true'"
     " && needs.fumee.result == 'success' && needs.api.result == 'success'"
     " && (needs.web.result == 'success' || needs.web.result == 'skipped')"
@@ -54,7 +64,7 @@ DEPLOY_JOB_KEYS = {
     "steps",
 }
 
-# L'environnement du script, et lui seul : le jeton du workflow pour lire la tête de `main`, et
+# L'environnement du script, et lui seul : le jeton du workflow pour lire la dernière release, et
 # les quatre secrets du VPS — la clé dédiée, l'empreinte de l'hôte, l'utilisateur et l'hôte.
 DEPLOY_ENV = WORKFLOW_TOKEN_ENV | {
     "SSH_KEY": "${{ secrets.DEPLOY_SSH_KEY }}",
@@ -67,6 +77,8 @@ DEPLOY_ENV = WORKFLOW_TOKEN_ENV | {
 TARGET = "deploy@vps.example"
 REPOSITORY = "plecart/portfolio"
 DEPLOY_DIRECTORY = "/srv/portfolio"
+# L'adresse de l'API qui rend le tag de la dernière release — la seule où le script cite `latest`.
+LATEST_RELEASE = "repos/$GITHUB_REPOSITORY/releases/latest"
 
 
 def deploy_job(workflow: str) -> dict[str, Any] | None:
@@ -215,7 +227,7 @@ DEPLOY_CHANGES = {
     },
     "sans la variable du VPS prêt": (" && vars.DEPLOY_ENABLED == 'true'", "", True),
     "variable lue dans les secrets": ("vars.DEPLOY_ENABLED", "secrets.DEPLOY_ENABLED", True),
-    "sur un push vers toute branche": (" && github.ref == 'refs/heads/main'", "", True),
+    **RELEASE_CHANGES,
     "sans environnement": (f"    environment: {DEPLOY_ENVIRONMENT}\n", "", True),
     "autre environnement": (f"environment: {DEPLOY_ENVIRONMENT}", "environment: essai", True),
     "permissions sur le job": (
@@ -261,10 +273,11 @@ def test_la_garde_du_job_deploy_rend_son_verdict_sur_chaque_forme(
     assert bool(deploy_findings(workflow)) is expected, deploy_findings(workflow)
 
 
-def test_le_job_deploy_suit_la_fumee_et_les_verifications_d_un_push_sur_main() -> None:
+def test_le_job_deploy_suit_la_fumee_et_les_verifications_d_une_release() -> None:
     """Après la fumée et les vérifications rejouées — `api` vert, `web`, `mobile` et `infra` verts
-    ou sautés —, push vers `main`, une fois le VPS prêt — `DEPLOY_ENABLED` lue dans `vars` —, aucun
-    `permissions`, un déploiement à la fois, et rien qui saute ou tolère l'échec de son script."""
+    ou sautés —, release publiée hors prerelease, une fois le VPS prêt — `DEPLOY_ENABLED` lue dans
+    `vars` —, aucun `permissions`, un déploiement à la fois, et rien qui saute ou tolère l'échec de
+    son script."""
     assert deploy_findings(CI_WORKFLOW.read_text(encoding="utf-8")) == []
 
 
@@ -281,7 +294,7 @@ def deploy_script() -> str:
 
 
 def run_deploy(
-    root: Path, main: str = SHA, failing: str | None = None
+    root: Path, latest: str = RELEASE_TAG, failing: str | None = None
 ) -> tuple[subprocess.CompletedProcess[str], list[list[str]]]:
     """Exécute le script du job avec `-e`, comme GitHub Actions — qui le lance par `bash -e` ; le
     script reste POSIX, donc `sh -e` ici —, avec des témoins de `gh`, `scp` et `ssh` qui
@@ -289,7 +302,8 @@ def run_deploy(
 
     Args:
         root: un dossier vide — témoins, appels consignés et `RUNNER_TEMP` y vivent.
-        main: le SHA que le témoin de `gh` rend pour la tête de `main`.
+        latest: le tag que le témoin de `gh` rend pour la dernière release ; celui du run est
+            `RELEASE_TAG`.
         failing: le témoin qui sort en erreur — `scp` qui ne dépose pas le Compose, `ssh` dont la
             commande échoue sur le VPS —, ou aucun.
 
@@ -300,7 +314,7 @@ def run_deploy(
     tools.mkdir()
     log = calls.as_posix()
     record = f'printf "%s\\t" "$(basename "$0")" "$@" >> "{log}"\necho >> "{log}"\n'
-    replies = {"gh": f"echo {main}\n", "scp": "", "ssh": ""}
+    replies = {"gh": f"echo {latest}\n", "scp": "", "ssh": ""}
     if failing:
         replies[failing] += "exit 1\n"
     for tool, reply in replies.items():
@@ -309,6 +323,7 @@ def run_deploy(
     environment = os.environ | {
         "PATH": f"{tools}{os.pathsep}{os.environ['PATH']}",
         "GITHUB_SHA": SHA,
+        "GITHUB_REF_NAME": RELEASE_TAG,
         "GITHUB_REPOSITORY": REPOSITORY,
         "RUNNER_TEMP": root.as_posix(),
         "GH_TOKEN": "jeton-du-workflow",
@@ -359,7 +374,7 @@ def test_le_deploiement_depose_le_compose_puis_relance_la_pile_a_l_etiquette_du_
 
     assert finished.returncode == 0, finished.stderr
     assert calls == [
-        ["gh", "api", f"repos/{REPOSITORY}/commits/main", "--jq", ".sha"],
+        ["gh", "api", f"repos/{REPOSITORY}/releases/latest", "--jq", ".tag_name"],
         ["scp", *options, "infra/compose.yml", f"{TARGET}:{DEPLOY_DIRECTORY}/compose.yml"],
         ["ssh", *options, TARGET, remote],
     ]
@@ -369,21 +384,23 @@ def test_le_deploiement_depose_le_compose_puis_relance_la_pile_a_l_etiquette_du_
     ) == "vps.example ssh-ed25519 AAAA\n"
 
 
-def test_un_commit_que_main_a_depasse_ne_se_deploie_pas(tmp_path: Path) -> None:
-    """La publication range les runs par ordre d'arrivée (`ci.yml`, job `publish`) : un run plus
-    lent que le suivant arriverait après lui et redéploierait l'ancien code sur un schéma déjà
-    migré. Seule la tête de `main` se déploie — le run du commit qui l'a dépassée s'en charge."""
-    finished, calls = run_deploy(tmp_path, main="f" * 40)
+def test_une_release_que_la_derniere_a_depassee_ne_se_deploie_pas(tmp_path: Path) -> None:
+    """La publication range les runs par ordre d'arrivée (`ci.yml`, job `publish`) : le run d'une
+    release plus lent que celui de la suivante arriverait après lui et redéploierait l'ancien code
+    sur un schéma déjà migré. Seule la dernière release se déploie — le run de celle qui l'a
+    dépassée s'en charge —, et une notice nomme celle-ci ; rien ne touche le VPS."""
+    finished, calls = run_deploy(tmp_path, latest="v1.0.1")
 
     assert finished.returncode == 0, finished.stderr
     assert [call[0] for call in calls] == ["gh"]
+    assert finished.stdout.startswith("::notice::") and "v1.0.1" in finished.stdout
 
 
 @pytest.mark.parametrize("failing", ["scp", "ssh"])
 def test_un_echec_vers_le_vps_fait_echouer_le_job(tmp_path: Path, failing: str) -> None:
     """Un Compose qui n'a pas été déposé — les nouvelles images tourneraient sous l'ancien —, ou
     un service qui ne devient pas sain, dont `up --wait` sort en erreur et dont `ssh` rend le code :
-    le job rougit au lieu de laisser `main` verte sur une pile en panne."""
+    le job rougit au lieu de laisser la release verte sur une pile en panne."""
     finished, calls = run_deploy(tmp_path, failing=failing)
 
     assert finished.returncode != 0
@@ -399,8 +416,9 @@ def test_l_amorcage_prepare_le_dossier_ou_le_job_depose_la_pile() -> None:
     assert f"\nSTACK_DIR={DEPLOY_DIRECTORY}\n" in bootstrap
 
 
-def test_le_script_de_deploiement_ne_cite_jamais_latest() -> None:
-    """`latest` peut désigner l'avant-dernier commit quand deux publications se croisent (job
-    `publish`) : le déploiement vise toujours l'étiquette du commit. Le runner du job,
-    `ubuntu-latest`, n'est pas une image déployée."""
-    assert "latest" not in deploy_script()
+def test_le_script_de_deploiement_ne_deploie_jamais_l_image_latest() -> None:
+    """`latest` peut désigner l'avant-dernière release quand deux publications se croisent (job
+    `publish`) : le déploiement vise toujours l'étiquette du commit. Le script ne cite `latest`
+    qu'à l'adresse `LATEST_RELEASE`, qui rend le tag de la dernière release, pas une image ; le
+    runner du job, `ubuntu-latest`, n'en est pas une non plus."""
+    assert "latest" not in deploy_script().replace(LATEST_RELEASE, "")

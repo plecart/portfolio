@@ -11,30 +11,34 @@
 # Le dépôt est public : les minutes ne coûtent rien, et chaque vérification part dès qu'elle peut
 # (ADR 0032).
 #
-# Un premier job, `changes`, lit le delta par `infra/ci/changed_jobs.py` : celui d'une PR prête, ou
-# celui d'un push vers `main`. Les vérifications l'attendent, lui seul, et partent ensemble, chacune
-# si le delta touche ses fichiers (ADR 0017) : `api` toujours — lint, types et tests du back, ceux
-# de la pipeline selon le delta, et le refus d'un commit d'auteur Claude ; `web` — lint, tests,
-# build, e2e du projet `desktop`, Lighthouse ; `mobile` — e2e du projet `mobile`, sur la sortie de
-# `web` ; `infra` — configuration Compose, images et leurs tests ; `avis` — les portes à base
-# d'avis, audit Python, audit npm et scan des images, en appelant `avis.yml`, sur une PR seulement.
+# Un premier job, `changes`, lit le delta par `infra/ci/changed_jobs.py` : celui d'une PR prête,
+# celui d'un push vers `main`, ou l'arbre entier du commit d'une release, qu'il refuse si ce commit
+# n'est pas sur `main` (ADR 0033). Les vérifications l'attendent, lui seul, et partent ensemble,
+# chacune si le delta touche ses fichiers (ADR 0017) : `api` toujours — lint, types et tests du
+# back, ceux de la pipeline selon le delta, et le refus d'un commit d'auteur Claude ; `web` — lint,
+# tests, build, e2e du projet `desktop`, Lighthouse ; `mobile` — e2e du projet `mobile`, sur la
+# sortie de `web` ; `infra` — configuration Compose, images et leurs tests ; `avis` — les portes à
+# base d'avis, audit Python, audit npm et scan des images, en appelant `avis.yml`, sur une PR
+# seulement.
 # Un job par pile : elles n'ont pas les mêmes prérequis — `uv`, Node, Docker —, et un rouge du front
 # ne masque pas un rouge de l'infra, ni l'inverse. Le job `infra` installe aussi Node : les images
 # copient le front compilé, qu'il compile lui-même plutôt que d'attendre `web` (ADR 0014) ; et
 # `uv`, pour les tests des images qu'il vient de construire.
 #
-# Sur un push vers `main`, ces vérifications rejouent le commit livré pendant que `publish` compile
-# le front, construit les images, les scanne et les publie sur GHCR ; `fumee` démarre la pile de
+# Un push vers `main` rejoue ces vérifications sur le commit mergé, et rien d'autre : la mise en
+# production part de la publication d'une release, pas d'un merge (ADR 0033). Sur une release
+# publiée, hors prerelease, elles rejouent le commit de son tag pendant que `publish` compile le
+# front, construit les images, les scanne et les publie sur GHCR ; `fumee` démarre la pile de
 # production depuis ces images et la fait éprouver par Playwright ; `deploy` ne les déploie sur le
 # VPS, une fois celui-ci prêt, qu'après une fumée verte, un `api` vert, et `web`, `mobile` et
-# `infra` verts ou sautés.
+# `infra` verts ou sautés — et seulement si la release est la dernière publiée.
 # `avis` n'y tourne pas : `publish` scanne avant de pousser, et `avis.yml` rejoue ses portes chaque
 # jour sur `main`.
 #
 # Sur une PR, chaque job qui extrait le dépôt en extrait la tête, clone complet, puis la fusionne
 # lui-même au trunk courant (le pas « Fusion explicite du trunk » du job `changes`, qui dit
 # pourquoi) : le trunk en premier parent, la tête en second. Sur un push vers `main`, le checkout
-# prend le commit poussé, et rien ne se fusionne.
+# prend le commit poussé, sur une release le commit de son tag, et rien ne se fusionne.
 #
 # Chaque action est épinglée par **empreinte de commit**, sa version en commentaire : une
 # étiquette peut être déplacée par son propriétaire ou par un attaquant, et le déplacement
@@ -63,17 +67,26 @@ on:
     # l'événement s'est perdu, ou dont le trunk a changé la définition du workflow depuis le
     # déclenchement : seul un événement neuf la relit (ADR 0029).
     types: [opened, synchronize, reopened, ready_for_review]
+  # Rejoue les vérifications du commit mergé, sans rien publier (ADR 0032, ADR 0033).
   push:
     branches: [main]
+  # La publication d'une release, et elle seule, met en production le commit de son tag
+  # (ADR 0033). Seul `published` est écouté : un brouillon ne lance rien, et l'édition d'une release
+  # publiée ne la redéploie pas ; une prerelease publiée lance le run, et le garde des jobs de
+  # livraison la saute (doc GitHub « Events that trigger workflows », `release`, lue le 2026-11-28).
+  release:
+    types: [published]
 
 # Un run par PR, le plus récent : un push qui en suit un autre annule le run encore en cours de la
 # même PR, qui ne vérifiait plus la tête. Mesuré du 2026-10-04 au 2026-10-17 : 70 runs de PR suivis
-# d'un autre run de la même branche en moins de 5 minutes (#124). Sur un push vers `main`,
-# `github.event.pull_request` est vide : le groupe se replie sur le SHA, propre à chaque commit, et
-# rien ne s'annule — ce run publie et déploie. Les groupes des jobs `publish` et `deploy`
-# s'ajoutent à celui-ci. `apps/api/tests/test_ci_declencheurs.py` tient ces réglages.
+# d'un autre run de la même branche en moins de 5 minutes (#124). Sur un push vers `main` ou une
+# release, `github.event.pull_request` est vide : le groupe se replie sur le SHA, propre à chaque
+# commit, et rien ne s'annule — le run de `main` vérifie le commit mergé, celui d'une release le met
+# en production. L'événement préfixe le groupe : le run d'une release n'attend pas celui du push de
+# son commit (ADR 0033). Les groupes des jobs `publish` et `deploy` s'ajoutent à celui-ci.
+# `apps/api/tests/test_ci_declencheurs.py` tient ces réglages.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.sha }}
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -81,21 +94,24 @@ jobs:
     name: Delta — jobs à lancer
     runs-on: ubuntu-latest
 
-    # Une PR prête, ou un push vers `main`. Aucune draft ne tourne, quel que soit l'événement —
-    # ouverture, push, réouverture : une draft change à chaque commit, et un run ne vaut que là où
-    # son verdict peut tenir — au passage en ready, puis à chaque push (ADR 0019). Un rouge propre
-    # à la plateforme cible se voit donc au passage en ready, après la relecture (`cycle-pr`,
-    # Étape 4) : le prix assumé. Une PR ouverte prête — un bot de dépendances, une branche déjà
-    # écrite — tourne dès l'ouverture. Un push vers `main` tourne : il rejoue les vérifications du
-    # commit livré (ADR 0032).
+    # Une PR prête, un push vers `main` ou une release publiée. Aucune draft ne tourne, quel que
+    # soit l'événement — ouverture, push, réouverture : une draft change à chaque commit, et un run
+    # ne vaut que là où son verdict peut tenir — au passage en ready, puis à chaque push
+    # (ADR 0019). Un rouge propre à la plateforme cible se voit donc au passage en ready, après la
+    # relecture (`cycle-pr`, Étape 4) : le prix assumé. Une PR ouverte prête — un bot de
+    # dépendances, une branche déjà écrite — tourne dès l'ouverture. Un push vers `main` tourne : il
+    # rejoue les vérifications du commit mergé (ADR 0032). Une release tourne : elle rejoue toutes
+    # les vérifications sur le commit de son tag, avant de le mettre en production (ADR 0033).
     #
-    # La clause `push` est écrite : seule, la comparaison de `draft` serait vraie aussi sur un push,
-    # où l'objet `pull_request` manque — GitHub compare son `draft`, nul, à `false` en nombres,
-    # 0 contre 0 (doc « Expressions », « Operators », lue le 2026-11-21) —, par une coercion
-    # qu'aucun lecteur n'attend. Les vérifications ne portent pas ce garde : elles attendent ce job,
-    # et un job sauté saute ceux qui l'attendent (doc « Workflow syntax », `jobs.<job_id>.needs`,
-    # lue le 2026-11-24).
-    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    # Les clauses `push` et `release` sont écrites : seule, la comparaison de `draft` serait vraie
+    # aussi sur l'un et l'autre, où l'objet `pull_request` manque — GitHub compare son `draft`, nul,
+    # à `false` en nombres, 0 contre 0 (doc « Expressions », « Operators », lue le 2026-11-21) —,
+    # par une coercion qu'aucun lecteur n'attend. Les vérifications ne portent pas ce garde : elles
+    # attendent ce job, et un job sauté saute ceux qui l'attendent (doc « Workflow syntax »,
+    # `jobs.<job_id>.needs`, lue le 2026-11-24).
+    if: >-
+      github.event_name == 'push' || github.event_name == 'release'
+      || github.event.pull_request.draft == false
 
     # Ce que le delta concerne, lu par les vérifications : `web` par `web` et `mobile`, `infra` et
     # `avis` par leur job, `pipeline` par l'étape « Tests pipeline » d'`api`.
@@ -107,8 +123,9 @@ jobs:
 
     steps:
       # La tête de la PR, que le pas suivant fusionne au trunk courant : `HEAD^1` est le trunk qu'il
-      # combine, et `HEAD^1..HEAD` le delta de la PR. Sur un push, `ref` est vide : le commit
-      # poussé, et le clone complet porte aussi la base du push. Écrit ici sous l'ancre
+      # combine, et `HEAD^1..HEAD` le delta de la PR. Sur un push ou une release, `ref` est vide :
+      # le commit poussé ou celui du tag, et le clone complet porte aussi la base du push et
+      # `refs/remotes/origin/main`, que lit le pas « Tag issu de main ». Écrit ici sous l'ancre
       # `extraction`, que les autres jobs de vérification reprennent par `*extraction`, comme le pas
       # suivant.
       - &extraction
@@ -158,18 +175,40 @@ jobs:
           fi
           printf 'Fusion explicite : %s Merge %s into %s (workflow %s)\n' "$(git rev-parse HEAD)" "$(git rev-parse HEAD^2)" "$(git rev-parse HEAD^1)" "$GITHUB_SHA"
 
+      # Sur une release, le commit du tag doit être sur `main` (ADR 0033) : rouge, ce job saute les
+      # vérifications et `publish`, qui l'attendent — rien ne se publie ni ne se déploie. Le clone
+      # complet écrit `refs/remotes/origin/main` : `fetch-depth: 0` « fetch all history for all
+      # branches and tags », par `+refs/heads/*:refs/remotes/origin/*` (README et
+      # `getRefSpecForAllHistory` d'`actions/checkout` v7.0.1, lus le 2026-11-28). La référence est
+      # écrite en entier : `origin/main` nu se lirait d'abord un tag de ce nom (doc git
+      # « gitrevisions »). Un `merge-base` en erreur échoue fermé, comme un commit hors de `main`.
+      - name: Tag issu de main
+        if: github.event_name == 'release'
+        shell: bash
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main; then
+            echo "::error::Le commit $GITHUB_SHA du tag $GITHUB_REF_NAME n'est pas sur main : la release ne se publie pas."
+            exit 1
+          fi
+
       # Le delta, passé au script, où vit la règle (ADR 0017). Sa base : sur une PR, `HEAD^1`, le
       # trunk que le pas de fusion a combiné ; sur un push, `github.event.before` — un merge par
-      # rebase pousse plusieurs commits d'un coup, et le dernier seul en cacherait (ADR 0032). Elle
-      # passe par l'environnement, jamais développée dans le script. `shell: bash` lance
-      # `bash -eo pipefail` : sans lui, un `git diff` en échec rendrait `false` pour chaque job, en
-      # silence. `--no-renames` : un renommage s'écrit sous ses deux chemins — sans lui, un fichier
-      # déplacé du front vers `docs/` ne laisserait que `docs/…`, et `web` sauterait.
+      # rebase pousse plusieurs commits d'un coup, et le dernier seul en cacherait (ADR 0032) ; sur
+      # une release, l'arbre vide, que git connaît sans l'avoir stocké : le delta est l'arbre entier
+      # du commit, et chaque vérification le rejoue — `avis` excepté, gardé sur une PR (ADR 0033).
+      # Chaque `&&` se lit avant les `||` qui l'entourent (`expressions/src/parser.ts`
+      # d'`actions/languageservices`, lu le 2026-11-28). La base passe par l'environnement, jamais
+      # développée dans le script. `shell: bash` lance `bash -eo pipefail` : sans lui, un
+      # `git diff` en échec rendrait `false` pour chaque job, en silence. `--no-renames` : un
+      # renommage s'écrit sous ses deux chemins — sans lui, un fichier déplacé du front vers
+      # `docs/` ne laisserait que `docs/…`, et `web` sauterait.
       - name: Jobs à lancer
         id: jobs
         shell: bash
         env:
-          BASE: ${{ github.event_name == 'push' && github.event.before || 'HEAD^1' }}
+          BASE: >-
+            ${{ github.event_name == 'release' && '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+            || github.event_name == 'push' && github.event.before || 'HEAD^1' }}
         run: git diff --name-only --no-renames "$BASE" HEAD | python3 infra/ci/changed_jobs.py >> "$GITHUB_OUTPUT"
 
   api:
@@ -177,8 +216,8 @@ jobs:
     runs-on: ubuntu-latest
 
     # Après `changes`, sans garde propre : un `changes` sauté — une draft — le saute. Il tourne sur
-    # chaque PR prête et chaque push vers `main`, quel que soit le delta (ADR 0032).
-    # `apps/api/tests/test_ci_declencheurs.py` tient ces réglages.
+    # chaque PR prête, chaque push vers `main` et chaque release, quel que soit le delta (ADR 0032,
+    # ADR 0033). `apps/api/tests/test_ci_declencheurs.py` tient ces réglages.
     needs: changes
 
     steps:
@@ -190,8 +229,9 @@ jobs:
       # contributeurs, et un hook local ne couvre pas une session cloud — ce contrôle vaut pour toute
       # PR, d'où que viennent ses commits. Le pas de fusion a combiné la tête de la PR (`HEAD^2`) au
       # trunk courant (`HEAD^1`) : `HEAD^1..HEAD^2` lit ses commits. Sur une PR seulement : un push
-      # vers `main` n'a rien fusionné, et ses commits ont passé ce pas sur leur PR. Un pas et non un
-      # job : rien à gagner à en faire un (ADR 0032) ; rouge, il rougit `api`, et le push qui
+      # vers `main` ou une release n'a rien fusionné, et ses commits ont passé ce pas sur leur PR —
+      # ceux d'une release sont sur `main`, ou le pas « Tag issu de main » la refuse. Un pas et non
+      # un job : rien à gagner à en faire un (ADR 0032) ; rouge, il rougit `api`, et le push qui
       # corrige l'auteur relance le run.
       - name: Refuser un auteur Claude
         if: github.event_name == 'pull_request'
@@ -229,10 +269,11 @@ jobs:
     runs-on: ubuntu-latest
 
     # Après `changes`, et seulement si le delta touche ses fichiers (`infra/ci/changed_jobs.py`) —
-    # sur une PR comme sur un push vers `main`, où `deploy` attend son vert (ADR 0032). Sans
-    # fonction d'état, GitHub applique `success()` à ce `if` (doc « Expressions », « Status check
-    # functions », lue le 2026-10-28) : un `changes` rouge ou sauté saute ce job. `mobile`, `infra`
-    # et `avis` suivent la même règle ; `apps/api/tests/test_ci_declencheurs.py` la tient.
+    # sur une PR, un push vers `main` ou une release, où `deploy` attend son vert (ADR 0032,
+    # ADR 0033). Sans fonction d'état, GitHub applique `success()` à ce `if` (doc « Expressions »,
+    # « Status check functions », lue le 2026-10-28) : un `changes` rouge ou sauté saute ce job.
+    # `mobile`, `infra` et `avis` suivent la même règle ; `apps/api/tests/test_ci_declencheurs.py`
+    # la tient.
     needs: changes
     if: needs.changes.outputs.web == 'true'
 
@@ -313,7 +354,7 @@ jobs:
 
     # Même conditionnement que le job `web` : voir son commentaire. Ses fichiers : ce que les images
     # définissent ou exécutent, liste d'inclusion `INFRA` du script (ADR 0031, décision 2). Ses
-    # tests des images suivent la PR et `main` (ADR 0032, décision 4).
+    # tests des images suivent la PR, `main` et la release (ADR 0032, décision 4).
     needs: changes
     if: needs.changes.outputs.infra == 'true'
 
@@ -399,10 +440,10 @@ jobs:
     # Même conditionnement que le job `web` : voir son commentaire. Seulement si le delta touche
     # une entrée d'un avis — manifestes, verrous, Dockerfiles, exceptions datées, porte de
     # `pip-audit`, `avis.yml` — ou ce qui décide des jobs (`Makefile`, `ci.yml`,
-    # `changed_jobs.py`), et sur une PR seulement : sur `main`, `publish` scanne avant de pousser,
-    # et un avis porte sur l'état du monde, pas sur le merge — `avis.yml` rejoue ses portes chaque
-    # jour (ADR 0032, décisions 2 et 5). Les étapes sont celles d'`avis.yml`, au commit même de ce
-    # run (doc GitHub « Reuse workflows »).
+    # `changed_jobs.py`), et sur une PR seulement, jamais sur `main` ni sur une release : un avis
+    # porte sur l'état du monde, pas sur le merge — `avis.yml` rejoue ses portes chaque jour —, et
+    # `publish` scanne avant de pousser (ADR 0032, décisions 2 et 5 ; ADR 0033). Les étapes sont
+    # celles d'`avis.yml`, au commit même de ce run (doc GitHub « Reuse workflows »).
     needs: changes
     if: github.event_name == 'pull_request' && needs.changes.outputs.avis == 'true'
     uses: ./.github/workflows/avis.yml
@@ -411,10 +452,15 @@ jobs:
     name: Publication — images sur GHCR
     runs-on: ubuntu-latest
 
-    # Sur un push vers `main` seulement, sans attendre aucun job : les vérifications rejouent le
-    # commit pendant la publication, et `deploy` attend leur vert (ADR 0032, décision 2). Le scan
-    # reste avant chaque publication. `apps/api/tests/test_publication.py` tient ces réglages.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Sur une release publiée seulement, hors prerelease (ADR 0033), après `changes` : son pas
+    # « Tag issu de main » refuse le commit d'un tag hors de `main`, et un `changes` rouge saute ce
+    # job. Aucune vérification attendue : elles rejouent le commit pendant la publication, et
+    # `deploy` attend leur vert (ADR 0032, décision 2). La clause `release` est écrite : sur un
+    # push, `github.event.release` manque, et `null == false` y serait vrai, par la coercion que dit
+    # le garde de `changes`. Le scan reste avant chaque publication.
+    # `apps/api/tests/test_publication.py` tient ces réglages.
+    needs: changes
+    if: github.event_name == 'release' && github.event.release.prerelease == false
 
     # Le seul job qui écrit, et seulement dans le registre : pousser les images, supprimer leurs
     # anciennes versions. `contents: read` se répète ici — des permissions de job remplacent
@@ -426,9 +472,10 @@ jobs:
     # Une publication à la fois : la suivante attend la fin de celle en cours, sans l'annuler —
     # une publication coupée entre le push et la rétention laisserait un paquet à moitié tenu.
     # GitHub ne garde qu'une publication en attente : une plus récente la remplace, et seule la
-    # plus récente compte. L'ordre est celui d'arrivée au job, pas celui des commits : si deux
-    # pushes se suivent de près et que le premier finit sa CI après le second, `latest` désigne
-    # l'avant-dernier commit jusqu'au push suivant — un déploiement vise l'étiquette du commit.
+    # plus récente compte. L'ordre est celui d'arrivée au job, pas celui des releases : si deux
+    # releases se suivent de près et que la première arrive au job après la seconde, `latest`
+    # désigne l'avant-dernière jusqu'à la release suivante — un déploiement vise l'étiquette du
+    # commit, et seule la dernière release se déploie (job `deploy`).
     concurrency:
       group: publish
       cancel-in-progress: false
@@ -459,14 +506,14 @@ jobs:
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       # Le cache des couches, sous la clé du job `infra` : restauré, puis écrit si la clé manquait.
-      # Ce job l'écrit : `infra` ne tourne sur `main` que si le delta le concerne, et une entrée
-      # écrite sur une PR ne se relit que de ses propres runs — « Workflow runs can restore caches
-      # created in either the current branch or the default branch », et le cache d'une PR « cannot
-      # be restored by the base branch » (doc GitHub « Dependency caching », « Restrictions for
-      # accessing a cache », lue le 2026-11-21). Écrite sur `main`, l'entrée se relit des PR et des
-      # runs planifiés. Quand `infra` tourne aussi sur le push, le second des deux à finir ne la
-      # réécrit pas : « You cannot change the contents of an existing cache » (même doc, lue le
-      # 2026-11-24 ; ADR 0032, § Conséquences, « Risques acceptés »).
+      # Un run de release lit l'entrée de `main`, la branche par défaut, et écrit la sienne sous la
+      # portée de son tag, que seule une relance de ce run relit — « Workflow runs can restore
+      # caches created in either the current branch or the default branch », et « cannot restore
+      # caches created for different tag names » (doc GitHub « Dependency caching », « Restrictions
+      # for accessing a cache », lue le 2026-11-28). L'entrée de `main`, `infra` l'écrit au push
+      # qui change la clé : chaque fichier de la clé est dans sa liste `INFRA` (ADR 0031,
+      # décision 2), et une entrée existante ne se réécrit pas — « You cannot change the contents of
+      # an existing cache » (même doc, lue le 2026-11-24).
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/buildx-cache
@@ -517,13 +564,13 @@ jobs:
     name: Fumée — pile de production par Playwright
     runs-on: ubuntu-latest
 
-    # Après la publication, sur un push vers `main` seulement — la condition de `publish` : la pile
-    # de production démarre des images que `publish` vient de pousser, celles mêmes que `deploy`
-    # tire ensuite. Rouge, il saute `deploy`. La seule preuve en CI que la pile démarre : `infra` ne
-    # démarre que des piles d'image (brief de #26). `apps/api/tests/test_publication.py` tient ces
-    # réglages.
+    # Après la publication, sur une release publiée seulement, hors prerelease — la condition de
+    # `publish` (ADR 0033) : la pile de production démarre des images que `publish` vient de
+    # pousser, celles mêmes que `deploy` tire ensuite. Rouge, il saute `deploy`. La seule preuve en
+    # CI que la pile démarre : `infra` ne démarre que des piles d'image (brief de #26).
+    # `apps/api/tests/test_publication.py` tient ces réglages.
     needs: publish
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'release' && github.event.release.prerelease == false
 
     # Tirer les images privées du registre (ADR 0014). `contents: read` se répète, comme dans
     # `publish` : des permissions de job remplacent celles du workflow, et un scope non nommé vaut
@@ -587,8 +634,8 @@ jobs:
 
     # Publication, fumée, puis déploiement : après la fumée des images du commit, elle-même après
     # leur publication — une image rouge à la fumée reste publiée, `latest` compris, mais n'est
-    # jamais déployée (brief de #26, décision 2) —, et après les vérifications que le push rejoue :
-    # `api` vert, `web`, `mobile` et `infra` verts ou sautés selon le delta ; un rouge le bloque,
+    # jamais déployée (brief de #26, décision 2) —, et après les vérifications que la release
+    # rejoue : `api` vert, `web`, `mobile` et `infra` verts ou sautés ; un rouge le bloque,
     # l'image restant publiée (ADR 0032, décision 2). `!cancelled()` remplace le `success()` que
     # GitHub applique à un `if` sans fonction d'état, sous lequel une vérification sautée sauterait
     # ce job — « If a job fails or is skipped, all jobs that need it are skipped unless the jobs use
@@ -597,23 +644,26 @@ jobs:
     # `failure`, `cancelled` ou `skipped` (doc « Contexts », `needs`, même date), et une expression
     # qui commence par `!` s'écrit dans `${{ }}` (doc « Workflow syntax », `jobs.<job_id>.if`).
     #
-    # Sur un push vers `main`, et seulement une fois le VPS prêt : la variable de dépôt
-    # `DEPLOY_ENABLED` vaut `true` quand ses secrets existent (`infra/RUNBOOK.md`). Avant, le job
-    # est sauté et `main` ne rougit pas ; après, un secret manquant le fait échouer. Le `if` d'un
-    # job lit `vars`, jamais `secrets` (doc GitHub « Contexts »). Aucun `permissions` : le jeton du
-    # workflow, en lecture, suffit à lire la tête de `main` ; le VPS tire les images avec son propre
-    # jeton. `apps/api/tests/test_deployment.py` tient ces réglages et exécute le script.
+    # Sur une release publiée, hors prerelease — la condition de `publish` (ADR 0033) —, et
+    # seulement une fois le VPS prêt : la variable de dépôt `DEPLOY_ENABLED` vaut `true` quand ses
+    # secrets existent (`infra/RUNBOOK.md`). Avant, le job est sauté et le run de la release ne
+    # rougit pas ; après, un secret manquant le fait échouer. Le `if` d'un job lit `vars`, jamais `secrets` (doc
+    # GitHub « Contexts »). Aucun `permissions` : le jeton du workflow, en lecture, suffit à lire la
+    # dernière release ; le VPS tire les images avec son propre jeton.
+    # `apps/api/tests/test_deployment.py` tient ces réglages et exécute le script.
     needs: [fumee, api, web, mobile, infra]
     if: >-
-      ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      ${{ !cancelled()
+      && github.event_name == 'release' && github.event.release.prerelease == false
       && vars.DEPLOY_ENABLED == 'true'
       && needs.fumee.result == 'success' && needs.api.result == 'success'
       && (needs.web.result == 'success' || needs.web.result == 'skipped')
       && (needs.mobile.result == 'success' || needs.mobile.result == 'skipped')
       && (needs.infra.result == 'success' || needs.infra.result == 'skipped') }}
-    # Les secrets du VPS sont ceux de cet environnement, restreint à `main` : un workflow lancé
-    # depuis une autre branche ne les lit pas, même modifié (doc GitHub « Deployments and
-    # environments »).
+    # Les secrets du VPS sont ceux de cet environnement, restreint aux tags `v*` — réglage de
+    # GitHub, hors du dépôt (ADR 0033) : la règle se compare au `GITHUB_REF` du run, et un workflow
+    # lancé depuis une branche ne les lit pas, même modifié (doc GitHub « Deployments and
+    # environments », « Deployment branches and tags », lue le 2026-11-28).
     environment: production
     timeout-minutes: 15
 
@@ -627,9 +677,11 @@ jobs:
         with:
           persist-credentials: false
 
-      # Seule la tête de `main` se déploie : la publication range les runs par ordre d'arrivée, et
-      # un run plus lent que le suivant redéploierait l'ancien code sur un schéma déjà migré — le
-      # run du commit plus récent déploie à sa place, s'il est vert.
+      # Seule la dernière release se déploie : la publication range les runs par ordre d'arrivée, et
+      # le run d'une release plus lent que celui de la suivante redéploierait l'ancien code sur un
+      # schéma déjà migré — le run de la dernière déploie à sa place, s'il est vert. La dernière,
+      # c'est `releases/latest` : « the most recent non-prerelease, non-draft release » (doc REST
+      # « Get the latest release », lue le 2026-11-28), comparée au tag du run.
       #
       # Puis le Compose du commit sur le VPS, son étiquette — le SHA complet, jamais `latest` —
       # dans le `.env` que `infra/bootstrap.sh` y a écrit, `pull` et `up --wait`. `--wait` échoue
@@ -648,9 +700,9 @@ jobs:
           KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
           TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
         run: |
-          main=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
-          if [ "$main" != "$GITHUB_SHA" ]; then
-            echo "::notice::main est passée à $main, que son propre run déploie s'il est vert."
+          newest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
+          if [ "$newest" != "$GITHUB_REF_NAME" ]; then
+            echo "::notice::La dernière release est $newest, que son propre run déploie s'il est vert."
             exit 0
           fi
           key="$RUNNER_TEMP/deploy_key"
