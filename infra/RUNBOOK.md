@@ -293,9 +293,9 @@ code à jour.
   `sudo bash bootstrap.sh GHCR_TOKEN` (« Tourner un secret »), puis relance le job.
 - **« Host key verification failed »** — l'hôte n'a plus la clé épinglée : VPS reconstruit, ou
   autre machine. Vérifie l'empreinte comme à l'amorçage avant de remplacer `DEPLOY_KNOWN_HOSTS`.
-- **« La dernière release est … »** — pas une erreur : une release plus récente existe, et se
-  déploie par son propre run, s'il est vert ; sinon, entrée suivante. Si la notice nomme une
-  release plus *ancienne*, c'est la release du run qui a été publiée sans « Set as the latest
+- **« La release … n'est pas la dernière (…) »** — pas une erreur : une release plus récente existe, et se
+  déploie par son propre run, s'il est vert ; sinon, entrée suivante. Si la release entre
+  parenthèses est plus *ancienne*, c'est la release du run qui a été publiée sans « Set as the latest
   release » : coche la case dans son édition, puis relance le job `deploy` de son run — l'édition
   seule ne relance rien.
 - **« Not Found (HTTP 404) » au pas « Déploiement »** — aucune release n'est la dernière : la
