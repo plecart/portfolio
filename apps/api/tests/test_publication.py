@@ -137,9 +137,9 @@ PUBLISH_PUSH = f'make push IMAGE_PREFIX={PUBLISH_PREFIX} IMAGE_TAG="$GITHUB_SHA"
 PUBLISH_PRUNE = f"make prune IMAGE_PREFIX={PUBLISH_PREFIX}"
 
 # Les drapeaux du build, seule variable de son étape : l'image chargée dans le moteur, où Trivy la
-# lit, sans attestation (décision 7), depuis le cache des couches sauf l'étage `paquets`, qu'il
-# écrit aussi (ADR 0032). Mot pour mot : un drapeau de plus (`--push`, `--output type=registry`)
-# enverrait l'image au registre avant son scan.
+# lit, sans attestation (décision 7), depuis le cache des couches, qu'il écrit aussi, sauf pour
+# l'étage `paquets` (ADR 0032). Mot pour mot : un drapeau de plus (`--push`,
+# `--output type=registry`) enverrait l'image au registre avant son scan.
 PUBLISH_BUILD_FLAGS = (
     "--load --no-cache-filter paquets --cache-from type=local,src=/tmp/buildx-cache,tag=$*"
     " --cache-to type=local,dest=/tmp/buildx-cache,tag=$*,mode=max"

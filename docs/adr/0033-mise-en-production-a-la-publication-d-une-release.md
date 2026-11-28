@@ -100,11 +100,15 @@ merge, sans que le mainteneur ait décidé de livrer.
   suivante.** Une urgence se livre aussitôt par une release CORRECTIF qui ne porte qu'elle.
 - **Le cache des couches de `main` n'est plus rafraîchi par `publish`.** Le run d'une release
   lit l'entrée de `main`, la branche par défaut, et écrit la sienne sous la portée de son tag,
-  qu'aucun autre run ne relit — « cannot restore caches created for different tag names » (doc
-  GitHub « Dependency caching », « Restrictions for accessing a cache », lue le 2026-11-28).
-  L'entrée de `main`, `infra` seul l'écrit, au push qui change la clé : chaque fichier de la clé
-  est dans sa liste `INFRA` (ADR 0031, décision 2). Le risque que l'ADR 0032 acceptait — deux
-  écritures concurrentes de la même entrée — disparaît.
+  que seule une relance de ce run relit — « cannot restore caches created for different tag
+  names » (doc GitHub « Dependency caching », « Restrictions for accessing a cache », lue le
+  2026-11-28). L'entrée de `main`, `infra` seul l'écrit, au push où il tourne et ne la trouve
+  pas : chaque fichier de la clé est dans sa liste `INFRA` (ADR 0031, décision 2). GitHub retire
+  une entrée que rien n'a lue depuis 7 jours (même doc, « Usage limits and eviction policy », lue
+  le 2026-11-28) : retirée, l'entrée de `main` manque jusqu'au prochain push où `infra` tourne, et
+  une release publiée entre-temps construit ses images sans elle — des minutes de plus, gratuites
+  sur un dépôt public (ADR 0032). Le risque que l'ADR 0032 acceptait — deux écritures
+  concurrentes de la même entrée — disparaît.
 - **`releases/latest` dépend de la case « Set as the latest release »** (`make_latest`, doc REST
   « Create a release »). Décochée, la release est verte sans se déployer, sur une notice ; sans
   aucune autre release, l'appel rend 404 et `deploy` rougit.

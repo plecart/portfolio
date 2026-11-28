@@ -44,9 +44,9 @@ L'environnement GitHub `production` n'admet que la branche `main` et les tags `v
 workflow lancé depuis une autre branche ne lit pas ses secrets, même modifié. `main` y reste pour
 « Le test mensuel » ; seul le job `deploy` d'une release publiée déploie, par son garde. Le pas
 « Tag issu de main » vit dans le `ci.yml` du commit taggé : il garde contre l'erreur, il ne protège
-pas ces secrets. Un tag et une release se créent avec l'écriture sur le dépôt, qu'a aujourd'hui le
-seul mainteneur (`gh api repos/plecart/portfolio/collaborators`, relevé le 2026-11-28) : la même
-confiance qu'un push sur `main`.
+pas ces secrets. Un tag et une release se créent avec l'écriture sur le dépôt (doc REST « Create a
+release »), qu'a aujourd'hui le seul mainteneur (`gh api repos/plecart/portfolio/collaborators`,
+relevé le 2026-11-28) : la même confiance qu'un push sur `main`.
 
 Le gestionnaire est KeePassXC (ADR 0022), un fichier chiffré local : copie-le hors du poste, sur un
 support distinct, une fois rangés les secrets d'un chantier, et toujours avant `bootstrap.sh`. Le
@@ -213,13 +213,13 @@ troisième commande, puis sa lecture : `main branch` et `v* tag`). Sans elle, le
 release est refusé par l'environnement.
 
 **Le brouillon**, par la session, depuis un clone à jour :
-1. Le commit à livrer, la tête de `main` vérifiée — son run de push vert, `gh run list --branch
-   main --event push --limit 1` : `completed success` ? —, et la version précédente, aucune avant
-   `v1.0.0` :
+1. Le commit à livrer, la tête de `main`, la version précédente — aucune avant `v1.0.0` —, puis
+   le run de push de cette tête : `completed success` ?
    ```
    git fetch origin --tags
    git rev-parse origin/main
    gh release view --json tagName --jq .tagName
+   gh run list --branch main --event push --limit 1
    ```
 2. Les PR mergées depuis cette version, que les notes reprennent — GitHub les liste sans rien
    écrire (doc REST « Generate release notes content for a release ») ; sans version précédente,
@@ -295,9 +295,9 @@ code à jour.
   autre machine. Vérifie l'empreinte comme à l'amorçage avant de remplacer `DEPLOY_KNOWN_HOSTS`.
 - **« La dernière release est … »** — pas une erreur : une release plus récente existe, et se
   déploie par son propre run, s'il est vert ; sinon, entrée suivante. Si la notice nomme une
-  release plus *ancienne*, celle-ci a été publiée sans « Set as the latest release » : coche-la
-  dans l'édition de la release, puis relance le job `deploy` de son run — l'édition seule ne
-  relance rien.
+  release plus *ancienne*, c'est la release du run qui a été publiée sans « Set as the latest
+  release » : coche la case dans son édition, puis relance le job `deploy` de son run — l'édition
+  seule ne relance rien.
 - **« Not Found (HTTP 404) » au pas « Déploiement »** — aucune release n'est la dernière : la
   première a été publiée sans « Set as the latest release ». Coche-la, puis relance le job
   `deploy`.
@@ -321,8 +321,7 @@ Remets `--body true` une fois la rotation faite ; une release publiée entre-tem
 qu'à la suivante, ou par « Déployer à la main ».
 
 Copie ensuite sur le VPS les trois fichiers du commit de la dernière release (étapes 3 et 4 de
-l'amorçage), et
-`sudo bash bootstrap.sh <NOM>…` : il redemande ou réengendre les valeurs nommées,
+l'amorçage), et `sudo bash bootstrap.sh <NOM>…` : il redemande ou réengendre les valeurs nommées,
 garde les autres, et relance la pile, qui recrée les services touchés — sans mettre Docker à
 niveau ni tirer d'image déjà présente.
 

@@ -27,7 +27,7 @@
 #
 # Un push vers `main` rejoue ces vérifications sur le commit mergé, et rien d'autre : la mise en
 # production part de la publication d'une release, pas d'un merge (ADR 0033). Sur une release
-# publiée, hors prerelease, elles rejouent le commit de son tag pendant que `publish` compile le
+# publiée, elles rejouent le commit de son tag ; hors prerelease, pendant que `publish` compile le
 # front, construit les images, les scanne et les publie sur GHCR ; `fumee` démarre la pile de
 # production depuis ces images et la fait éprouver par Playwright ; `deploy` ne les déploie sur le
 # VPS, une fois celui-ci prêt, qu'après une fumée verte, un `api` vert, et `web`, `mobile` et
@@ -511,9 +511,12 @@ jobs:
       # caches created in either the current branch or the default branch », et « cannot restore
       # caches created for different tag names » (doc GitHub « Dependency caching », « Restrictions
       # for accessing a cache », lue le 2026-11-28). L'entrée de `main`, `infra` l'écrit au push
-      # qui change la clé : chaque fichier de la clé est dans sa liste `INFRA` (ADR 0031,
-      # décision 2), et une entrée existante ne se réécrit pas — « You cannot change the contents of
-      # an existing cache » (même doc, lue le 2026-11-24).
+      # où il tourne et ne la trouve pas — chaque fichier de la clé est dans sa liste `INFRA`
+      # (ADR 0031, décision 2) —, et une entrée existante ne se réécrit pas — « You cannot change
+      # the contents of an existing cache » (même doc, lue le 2026-11-24). GitHub retire une entrée
+      # que rien n'a lue depuis 7 jours (même doc, « Usage limits and eviction policy », lue le
+      # 2026-11-28) : une release publiée avant le push qui la réécrit construit sans elle
+      # (ADR 0033).
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/buildx-cache
