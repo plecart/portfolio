@@ -187,7 +187,7 @@ jobs:
         shell: bash
         run: |
           if ! git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main; then
-            echo "::error::Le commit $GITHUB_SHA du tag $GITHUB_REF_NAME n'est pas sur main : la release ne se publie pas."
+            echo "::error::Le commit $GITHUB_SHA du tag $GITHUB_REF_NAME n'est pas sur main : ses images ne se publient pas."
             exit 1
           fi
 
@@ -716,7 +716,7 @@ jobs:
         run: |
           newest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
           if [ "$newest" != "$GITHUB_REF_NAME" ]; then
-            echo "::notice::La dernière release est $newest, que son propre run déploie s'il est vert."
+            echo "::notice::La release $GITHUB_REF_NAME n'est pas la dernière ($newest) : elle ne se déploie pas."
             exit 0
           fi
           key="$RUNNER_TEMP/deploy_key"
