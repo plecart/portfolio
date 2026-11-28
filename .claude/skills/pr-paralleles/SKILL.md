@@ -694,6 +694,11 @@ remonter au mainteneur, pas un résultat. Vérifier aussi que chaque issue réal
 lots affiche autant de PR liées que `cycle-pr` Étape 8 en attend (cas découpé) : chaque session a
 obéi à « un seul `Closes` », et le trou ne se voit qu'en regardant la population.
 
+**Brouillon de release.** Si la vague a mergé du code depuis la dernière version, proposer au
+mainteneur d'écrire la release en brouillon — numéro, sous-titre, notes —, par la procédure de
+`infra/RUNBOOK.md`, « Livrer une version » ; seul son clic « Publish » met en production
+(ADR 0033).
+
 **Revue de la règle du sujet, au bilan de la vague 2** (`.claude/rules/taille-pr.md`, point 8).
 Le lead agrège les lignes « échappements » des bilans de cycle de la vague (`cycle-pr` Étape 8,
 « Bilan chiffré du cycle ») par taille de leur PR d'origine, refait l'ajustement du coût d'une PR

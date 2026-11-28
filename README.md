@@ -61,8 +61,8 @@ flowchart LR
 - **Analyse statique** : Ruff et Pyright côté Python, ESLint et TypeScript strict côté front.
 - **Sécurité** : en-têtes et CSP stricts, images scannées par Trivy avant publication,
   dépendances suivies par Dependabot.
-- **Livraison continue** : chaque merge sur `main` construit les images, les vérifie sur une pile
-  de fumée, puis les déploie.
+- **Livraison par version** : chaque merge sur `main` est vérifié ; une release publiée construit
+  les images, les vérifie sur une pile de fumée, puis les déploie.
 
 ## Les décisions
 

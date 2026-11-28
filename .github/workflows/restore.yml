@@ -34,7 +34,8 @@ jobs:
 
     # Sauté tant que la production n'existe pas — la garde du job `deploy` de `ci.yml`, un seul
     # interrupteur : avant, le bucket est vide et le job serait rouge chaque mois. Les secrets sont
-    # ceux de l'environnement `production`, restreint à `main` (`infra/RUNBOOK.md`).
+    # ceux de l'environnement `production`, que lisent `main`, d'où ce workflow tourne, et les tags
+    # `v*` des releases (`infra/RUNBOOK.md`, ADR 0033).
     if: vars.DEPLOY_ENABLED == 'true'
     environment: production
     timeout-minutes: 30

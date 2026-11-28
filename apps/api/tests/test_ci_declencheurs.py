@@ -3,13 +3,14 @@
 Le dépôt est public : les minutes ne coûtent rien, et chaque vérification part dès qu'elle peut
 (ADR 0032). Une PR en draft ne tourne pas, son premier run vient du passage en ready, puis de
 chaque push (ADR 0019) ; le run encore en cours d'une PR s'annule au push suivant de la même PR,
-jamais sur `main`. Un premier job, `changes`, lit le delta — celui de la PR, ou celui d'un push vers
-`main` — par `infra/ci/changed_jobs.py` ; `api`, `web`, `mobile`, `infra` et `avis` l'attendent, lui
-seul, et partent ensemble, chacun si le delta touche ses fichiers — `api` toujours, `avis` sur une
-PR seulement. Le job `avis` appelle `.github/workflows/avis.yml`, qui se lance aussi seul chaque
-jour sur `main`. Sur une PR, chaque job qui extrait le dépôt fusionne lui-même la tête au trunk
-courant, par le pas « Fusion explicite du trunk », écrit dans la définition du workflow et joué ici
-(ADR 0029).
+jamais sur `main`. Un premier job, `changes`, lit le delta — celui de la PR, celui d'un push vers
+`main`, ou l'arbre entier du commit d'une release (ADR 0033) — par `infra/ci/changed_jobs.py`, et
+refuse une release dont le commit n'est pas sur `main` ; `api`, `web`, `mobile`, `infra` et `avis`
+l'attendent, lui seul, et partent ensemble, chacun si le delta touche ses fichiers — `api`
+toujours, `avis` sur une PR seulement. Le job `avis` appelle `.github/workflows/avis.yml`, qui se
+lance aussi seul chaque jour sur `main`. Sur une PR, chaque job qui extrait le dépôt fusionne
+lui-même la tête au trunk courant, par le pas « Fusion explicite du trunk », écrit dans la
+définition du workflow et joué ici (ADR 0029).
 
 Mesure qui fonde ces réglages, relevée le 2026-10-18 sur les runs du 2026-10-04 au 2026-10-17 —
 `gh api --paginate "repos/plecart/portfolio/actions/runs?created=%3E%3D2026-10-04&per_page=100"`,
@@ -41,16 +42,17 @@ import yaml
 from changed_jobs import IMAGE_TESTS, PIPELINE_TESTS, jobs_for
 from system_commands import run_make
 from test_infra import AVIS_WORKFLOW, CI_WORKFLOW, DISQUE_RUN, REPOSITORY_ROOT
-from test_publication import READ_ONLY, needed
+from test_publication import READ_ONLY, RELEASE_TAG, needed
 from test_restore_workflow import triggers
 from test_supply_chain import repository_files, texte_normalise
 
-# Un run par PR, le plus récent : le groupe est le numéro de la PR. Sur un push vers `main`,
-# `github.event.pull_request` est vide (doc GitHub « Contexts ») : le groupe se replie sur le SHA,
-# propre à chaque commit, et l'annulation n'y vaut que sur `pull_request` — un push vers `main`
-# publie et déploie, il ne s'annule jamais.
+# Un run par PR, le plus récent : le groupe est le numéro de la PR. Sur un push vers `main` ou une
+# release, `github.event.pull_request` est vide (doc GitHub « Contexts ») : le groupe se replie sur
+# le SHA, propre à chaque commit, et l'annulation n'y vaut que sur `pull_request` — un run de `main`
+# vérifie le commit mergé, celui d'une release le met en production, aucun ne s'annule. L'événement
+# préfixe le groupe : le run d'une release n'attend pas celui du push de son commit (ADR 0033).
 CONCURRENCY = {
-    "group": "ci-${{ github.event.pull_request.number || github.sha }}",
+    "group": "ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}",
     "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
 }
 
@@ -69,13 +71,17 @@ def concurrency_findings(workflow: str) -> list[str]:
     return []
 
 
-# Le garde du job `changes` : une PR prête, ou un push vers `main` — aucune draft ne tourne, quel
-# que soit l'événement (ADR 0019), et un push vers `main` rejoue les vérifications du commit livré
-# (ADR 0032, décision 2). Les vérifications l'attendent, et sautent avec lui. La clause `push` est
-# écrite : seule, la comparaison de `draft` serait vraie aussi sur un push, où l'objet
-# `pull_request` manque — GitHub compare `null` à `false` en nombres, 0 contre 0 (doc
+# Le garde du job `changes` : une PR prête, un push vers `main` ou une release publiée — aucune
+# draft ne tourne, quel que soit l'événement (ADR 0019) ; un push vers `main` rejoue les
+# vérifications du commit mergé (ADR 0032, décision 2), une release celles du commit qu'elle met en
+# production (ADR 0033). Les vérifications l'attendent, et sautent avec lui. Les clauses `push` et
+# `release` sont écrites : seule, la comparaison de `draft` serait vraie aussi sur l'un et l'autre,
+# où l'objet `pull_request` manque — GitHub compare `null` à `false` en nombres, 0 contre 0 (doc
 # « Expressions », « Operators », lue le 2026-11-21) —, par une coercion qu'aucun lecteur n'attend.
-CHANGES_IF = "github.event_name == 'push' || github.event.pull_request.draft == false"
+CHANGES_IF = (
+    "github.event_name == 'push' || github.event_name == 'release'"
+    " || github.event.pull_request.draft == false"
+)
 # Les sorties du job `changes`, une par réponse du script.
 CHANGES_OUTPUTS = {
     output: f"${{{{ steps.jobs.outputs.{output} }}}}"
@@ -104,25 +110,41 @@ STACK_JOBS = ("api", "web", "mobile", "infra")
 # Sur une PR, chaque job qui extrait le dépôt en extrait la tête, puis la fusionne lui-même au trunk
 # courant par le pas de ce nom : la référence de fusion de la forge n'est pas recalculée quand le
 # trunk avance, et un `gh run rerun` la réutilise (ADR 0029). Clone complet : la fusion exige
-# l'ancêtre commun. Sur un push, et pour `avis.yml` lancé seul, `ref` est vide et le checkout
-# prend son défaut, le commit de l'événement (`src/input-helper.ts` d'`actions/checkout`, lu le
-# 2026-11-08). Le pas vit dans la définition du workflow, lue au commit du run, jamais dans l'arbre
-# extrait : une action locale se lirait dans la tête, qu'une PR ouverte avant elle ne porte pas.
+# l'ancêtre commun. Sur un push, une release, et pour `avis.yml` lancé seul, `ref` est vide et le
+# checkout prend son défaut, le commit de l'événement (`src/input-helper.ts` d'`actions/checkout`,
+# lu le 2026-11-08, relu à v7.0.1 le 2026-11-28). Le pas vit dans la définition du workflow, lue au
+# commit du run, jamais dans l'arbre extrait : une action locale se lirait dans la tête, qu'une PR
+# ouverte avant elle ne porte pas.
 FUSION_NAME = "Fusion explicite du trunk"
+# Le pas du job `changes` qui refuse une release dont le commit n'est pas sur `main` (ADR 0033) :
+# après la fusion, avant le delta ; rouge, il saute les vérifications et `publish`, qui attendent
+# `changes`.
+ANCESTRY_NAME = "Tag issu de main"
 PR_HEAD = "${{ github.event.pull_request.head.sha }}"
 FUSION_CHECKOUT = {"ref": PR_HEAD, "fetch-depth": 0}
-# Les jobs qui ne tournent que sur un push vers `main`, où rien ne se fusionne : leur `if`, ce sont
-# `test_publication.py` et `test_deployment.py` qui le tiennent.
-PUSH_ONLY_JOBS = ("publish", "fumee", "deploy")
+# Les jobs de livraison, qui ne tournent que sur une release, où rien ne se fusionne : leur `if`,
+# ce sont `test_publication.py` et `test_deployment.py` qui le tiennent.
+DELIVERY_JOBS = ("publish", "fumee", "deploy")
 # L'étape `jobs` du job `changes`, sans son nom : le delta passé au script. Sa base : sur une PR,
 # `HEAD^1`, premier parent du commit du pas de fusion, le trunk combiné ; sur un push vers `main`,
 # `github.event.before` — un merge par rebase pousse plusieurs commits d'un coup, et le dernier seul
-# en cacherait (ADR 0032, décision 2). Elle passe par l'environnement, jamais développée dans le
-# script. `shell: bash` lance `bash -eo pipefail` (doc GitHub « Workflow syntax »,
-# `jobs.<job_id>.steps[*].shell`) : sans lui, un `git diff` en échec rendrait `false` pour chaque
-# job, en silence. `--no-renames` : sans lui, un renommage ne s'écrit que sous son nouveau chemin
-# (mesuré le 2026-10-20 : `apps/web/a.tsx` déplacé vers `docs/` ne rend que `docs/a.tsx`).
-DELTA_BASE = "${{ github.event_name == 'push' && github.event.before || 'HEAD^1' }}"
+# en cacherait (ADR 0032, décision 2) ; sur une release, l'arbre vide `EMPTY_TREE` — le delta est
+# l'arbre entier du commit taggé, que chaque vérification rejoue (ADR 0033). Chaque `&&` se lit
+# avant les `||` qui l'entourent : `logicalOr` descend dans `logicalAnd`
+# (`expressions/src/parser.ts` d'`actions/languageservices`, lu le 2026-11-28). La base passe par
+# l'environnement, jamais développée dans le script. `shell: bash` lance `bash -eo pipefail` (doc
+# GitHub « Workflow syntax », `jobs.<job_id>.steps[*].shell`) : sans lui, un `git diff` en échec
+# rendrait `false` pour chaque job, en silence. `--no-renames` : sans lui, un renommage ne s'écrit
+# que sous son nouveau chemin (mesuré le 2026-10-20 : `apps/web/a.tsx` déplacé vers `docs/` ne rend
+# que `docs/a.tsx`).
+#
+# L'arbre vide de git : `git hash-object -t tree /dev/null` le rend, et git le connaît sans l'avoir
+# stocké — mesuré le 2026-11-28, git 2.47.1, sur un dépôt neuf dont `.git/objects/4b` manque.
+EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+DELTA_BASE = (
+    f"${{{{ github.event_name == 'release' && '{EMPTY_TREE}'"
+    " || github.event_name == 'push' && github.event.before || 'HEAD^1' }}"
+)
 CHANGED_JOBS_COMMAND = (
     'git diff --name-only --no-renames "$BASE" HEAD'
     ' | python3 infra/ci/changed_jobs.py >> "$GITHUB_OUTPUT"'
@@ -142,9 +164,10 @@ def gating_findings(workflow: str) -> list[str]:
         Un constat par propriété altérée du job `changes` : un `needs`, son garde, ses `outputs`,
         son premier pas qui n'est pas le checkout `FUSION_CHECKOUT`, son second qui n'est pas le
         pas `FUSION_NAME` — le trunk en premier parent, `HEAD^1..HEAD` le delta d'une PR —, son
-        troisième qui n'est pas l'étape `JOBS_STEP` ; puis, pour chaque job de
-        `VERIFICATION_JOBS`, un `needs` autre que `changes` seul, ou un `if` autre que celui de
-        `GATED_IF` — aucun pour `api`. Liste vide : le workflow est conforme.
+        troisième qui n'est pas le pas `ANCESTRY_NAME`, son quatrième qui n'est pas l'étape
+        `JOBS_STEP` ; puis, pour chaque job de `VERIFICATION_JOBS`, un `needs` autre que
+        `changes` seul, ou un `if` autre que celui de `GATED_IF` — aucun pour `api`. Liste vide :
+        le workflow est conforme.
     """
     jobs = cast(dict[str, dict[str, Any]], yaml.safe_load(workflow)["jobs"])
     changes = jobs.get("changes") or {}
@@ -156,7 +179,7 @@ def gating_findings(workflow: str) -> list[str]:
     if changes.get("outputs") != CHANGES_OUTPUTS:
         findings.append(f"`changes` rend {changes.get('outputs')}, attendu {CHANGES_OUTPUTS}")
     steps = cast(list[dict[str, Any]], changes.get("steps") or [])
-    checkout, fusion, step = [*steps, {}, {}, {}][:3]
+    checkout, fusion, ancestry, step = [*steps, {}, {}, {}, {}][:4]
     if not str(checkout.get("uses")).startswith("actions/checkout@") or (
         checkout.get("with") != FUSION_CHECKOUT
     ):
@@ -165,8 +188,12 @@ def gating_findings(workflow: str) -> list[str]:
         )
     if fusion.get("name") != FUSION_NAME:
         findings.append(f"le second pas de `changes` est {fusion}, attendu « {FUSION_NAME} »")
+    if ancestry.get("name") != ANCESTRY_NAME:
+        findings.append(
+            f"le troisième pas de `changes` est {ancestry}, attendu « {ANCESTRY_NAME} »"
+        )
     if {key: value for key, value in step.items() if key != "name"} != JOBS_STEP:
-        findings.append(f"le troisième pas de `changes` est {step}, attendu {JOBS_STEP}")
+        findings.append(f"le quatrième pas de `changes` est {step}, attendu {JOBS_STEP}")
     for name in VERIFICATION_JOBS:
         job = jobs.get(name) or {}
         if needed(job) != ["changes"]:
@@ -186,9 +213,9 @@ def fusion_findings(workflow: str) -> list[str]:
     """Ce qui, dans un workflow, écarte un job de la fusion explicite du trunk (issue #249).
 
     Returns:
-        Pour chaque job hors de `PUSH_ONLY_JOBS`, un constat par checkout qui ne porte pas la paire
+        Pour chaque job hors de `DELIVERY_JOBS`, un constat par checkout qui ne porte pas la paire
         `FUSION_CHECKOUT`, et un si le pas `FUSION_NAME` ne suit pas immédiatement chaque checkout,
-        et lui seul ; pour chaque job de `PUSH_ONLY_JOBS`, un constat s'il le porte. Que ce pas soit
+        et lui seul ; pour chaque job de `DELIVERY_JOBS`, un constat s'il le porte. Que ce pas soit
         celui du job `changes`, `test_chaque_pas_de_fusion_est_celui_du_job_changes` le tient. Liste
         vide : le workflow est conforme.
     """
@@ -196,9 +223,9 @@ def fusion_findings(workflow: str) -> list[str]:
     for name, steps in workflow_steps(workflow).items():
         uses = [str(step.get("uses", "")) for step in steps]
         fusions = [index for index, step in enumerate(steps) if step.get("name") == FUSION_NAME]
-        if name in PUSH_ONLY_JOBS:
+        if name in DELIVERY_JOBS:
             if fusions:
-                findings.append(f"`{name}`, qui ne tourne que sur un push, fusionne")
+                findings.append(f"`{name}`, qui ne tourne que sur une release, fusionne")
             continue
         checkouts = [
             index for index, action in enumerate(uses) if action.startswith("actions/checkout@")
@@ -242,10 +269,15 @@ def advisory_findings(workflow: str) -> list[str]:
 # ayant (ADR 0019) : `cycle-pr` sort du draft, puis attend ce run (Étape 5). `reopened` reste :
 # c'est la voie de relance d'une PR dont un événement s'est perdu pendant une panne d'Actions (même
 # Étape), ou dont le trunk a changé la définition du workflow depuis le déclenchement — seul un
-# événement neuf la relit (ADR 0029).
+# événement neuf la relit (ADR 0029). Un push vers `main` rejoue les vérifications du commit mergé
+# (ADR 0032) ; la publication d'une release, et elle seule, met en production le commit de son tag
+# (ADR 0033) : seul `published` est écouté — un brouillon ne lance rien, et l'édition d'une release
+# publiée ne la redéploie pas (doc GitHub « Events that trigger workflows », `release`, lue le
+# 2026-11-28).
 TRIGGERS = {
     "pull_request": {"types": ["opened", "synchronize", "reopened", "ready_for_review"]},
     "push": {"branches": ["main"]},
+    "release": {"types": ["published"]},
 }
 
 
@@ -291,7 +323,8 @@ def pipeline_step_findings(workflow: str) -> list[str]:
 
 TYPES_LINE = "    types: [opened, synchronize, reopened, ready_for_review]\n"
 BRANCHES_LINE = "    branches: [main]\n"
-TRIGGERS_BLOCK = f"on:\n  pull_request:\n{TYPES_LINE}  push:\n{BRANCHES_LINE}"
+RELEASE_LINES = "  release:\n    types: [published]\n"
+TRIGGERS_BLOCK = f"on:\n  pull_request:\n{TYPES_LINE}  push:\n{BRANCHES_LINE}{RELEASE_LINES}"
 
 # Les lignes de la concurrence conforme, telles que le workflow les écrit.
 GROUP_LINE = f"  group: {CONCURRENCY['group']}\n"
@@ -306,6 +339,9 @@ CHECKOUT_LINES = f"      - uses: actions/checkout@v0\n        with:\n{REF_LINE}{
 # Le pas de fusion, par son seul nom : son contenu,
 # `test_chaque_pas_de_fusion_est_celui_du_job_changes` le tient sur les fichiers du dépôt.
 FUSION_STEP_LINE = f"      - name: {FUSION_NAME}\n"
+# Le contrôle d'ascendance, de même par son seul nom : son cadre et son script, les tests de sa
+# section les tiennent sur le dépôt.
+ANCESTRY_STEP_LINE = f"      - name: {ANCESTRY_NAME}\n"
 BASE_LINE = f"          BASE: {DELTA_BASE}\n"
 RUN_LINE = f"        run: {CHANGED_JOBS_COMMAND}\n"
 JOBS_STEP_LINES = (
@@ -332,7 +368,7 @@ def gated_job(name: str) -> str:
 
 CONFORMING_WORKFLOW = (
     f"{TRIGGERS_BLOCK}{CONCURRENCY_BLOCK}jobs:\n  changes:\n{CHANGES_IF_LINE}{OUTPUTS_LINES}"
-    f"    steps:\n{CHECKOUT_LINES}{FUSION_STEP_LINE}{JOBS_STEP_LINES}"
+    f"    steps:\n{CHECKOUT_LINES}{FUSION_STEP_LINE}{ANCESTRY_STEP_LINE}{JOBS_STEP_LINES}"
     f"{API_NEEDS_LINES}    steps:\n{INSTALL_LINES}{TESTS_LINE}{PIPELINE_STEP_LINES}"
     + "".join(map(gated_job, GATED_IF))
 )
@@ -386,6 +422,14 @@ FORMS: dict[str, Form] = {
     "concurrence conforme": (concurrency_findings, "", "", False),
     "sans concurrence": (concurrency_findings, CONCURRENCY_BLOCK, "", True),
     "groupe constant": (concurrency_findings, GROUP_LINE, "  group: ci\n", True),
+    # Le groupe d'avant l'ADR 0033 : le run d'une release attendrait, dans le groupe du SHA de son
+    # tag, la fin du run du push de ce commit.
+    "groupe sans l'événement": (
+        concurrency_findings,
+        GROUP_LINE,
+        "  group: ci-${{ github.event.pull_request.number || github.sha }}\n",
+        True,
+    ),
     "groupe par branche": (
         concurrency_findings,
         GROUP_LINE,
@@ -422,6 +466,13 @@ FORMS: dict[str, Form] = {
     # Vrai aussi sur un push, mais par la seule coercion de `null` en 0 : un garde qui ne se lit
     # pas.
     "changes sans la clause push": (gating_findings, "github.event_name == 'push' || ", "", True),
+    # Même coercion sur une release.
+    "changes sans la clause release": (
+        gating_findings,
+        "github.event_name == 'release' || ",
+        "",
+        True,
+    ),
     # L'ancien garde (ADR 0017) : chaque push d'une draft lançait un run.
     "garde sur l'ouverture seule": (
         gating_findings,
@@ -454,10 +505,12 @@ FORMS: dict[str, Form] = {
     # L'étape `jobs` lirait le delta avant la fusion : `HEAD^1` serait le parent de la tête.
     "pas de fusion après l'étape jobs": (
         gating_findings,
-        FUSION_STEP_LINE + JOBS_STEP_LINES,
-        JOBS_STEP_LINES + FUSION_STEP_LINE,
+        FUSION_STEP_LINE + ANCESTRY_STEP_LINE + JOBS_STEP_LINES,
+        ANCESTRY_STEP_LINE + JOBS_STEP_LINES + FUSION_STEP_LINE,
         True,
     ),
+    # Le commit d'un tag hors de `main` se publierait et se déploierait (ADR 0033).
+    "changes sans contrôle d'ascendance": (gating_findings, ANCESTRY_STEP_LINE, "", True),
     "étape jobs sans shell bash": (gating_findings, "        shell: bash\n", "", True),
     "commande sans GITHUB_OUTPUT": (gating_findings, ' >> "$GITHUB_OUTPUT"', "", True),
     "commande qui suit les renommages": (gating_findings, " --no-renames", "", True),
@@ -467,6 +520,14 @@ FORMS: dict[str, Form] = {
         gating_findings,
         BASE_LINE,
         "          BASE: HEAD^1\n",
+        True,
+    ),
+    # Sans sa clause, une release tomberait sur `HEAD^1` : le seul dernier commit du tag, et les
+    # vérifications que ses fichiers ne lancent pas ne rejoueraient pas le commit mis en production.
+    "release lue sur son dernier commit": (
+        gating_findings,
+        f"github.event_name == 'release' && '{EMPTY_TREE}' || ",
+        "",
         True,
     ),
     "base développée dans le script": (
@@ -556,8 +617,8 @@ FORMS: dict[str, Form] = {
     "fusion : pas absent": (fusion_findings, FUSION_STEP_LINE, "", True),
     "fusion : pas qui ne suit pas le checkout": (
         fusion_findings,
-        FUSION_STEP_LINE + JOBS_STEP_LINES,
-        JOBS_STEP_LINES + FUSION_STEP_LINE,
+        FUSION_STEP_LINE + ANCESTRY_STEP_LINE + JOBS_STEP_LINES,
+        ANCESTRY_STEP_LINE + JOBS_STEP_LINES + FUSION_STEP_LINE,
         True,
     ),
     # La garde vaut pour tout job qui peut tourner sur une PR, pas pour `api` seul.
@@ -602,6 +663,20 @@ FORMS: dict[str, Form] = {
     # workflows », relue le 2026-10-28) : `ready_for_review` en sortirait.
     "sans types": (trigger_findings, "  pull_request:\n" + TYPES_LINE, "  pull_request:\n", True),
     "push sur toute branche": (trigger_findings, "  push:\n" + BRANCHES_LINE, "  push:\n", True),
+    # `main` ne rejouerait plus ses vérifications (ADR 0032).
+    "sans push": (trigger_findings, "  push:\n" + BRANCHES_LINE, "", True),
+    # Plus rien ne mettrait en production (ADR 0033).
+    "sans release": (trigger_findings, RELEASE_LINES, "", True),
+    # Sans `types`, chaque activité d'une release lancerait un run — création, édition, suppression
+    # (doc « Events that trigger workflows », `release`, lue le 2026-11-28).
+    "release sans types": (trigger_findings, RELEASE_LINES, "  release:\n", True),
+    # Corriger les notes d'une release publiée la redéploierait.
+    "release aussi à l'édition": (
+        trigger_findings,
+        "[published]",
+        "[published, edited]",
+        True,
+    ),
     "étape des tests de la pipeline conforme": (pipeline_step_findings, "", "", False),
     "sans étape des tests de la pipeline": (
         pipeline_step_findings,
@@ -1003,6 +1078,15 @@ def test_le_script_ecrit_sa_reponse_au_format_github_output(
     assert completed.stdout == "".join(
         f"{job}={str(runs).lower()}\n" for job, runs in answers.items()
     )
+
+
+@pytest.mark.usefixtures("git_isole")
+def test_sur_une_release_le_delta_contre_l_arbre_vide_lance_chaque_verification() -> None:
+    """La base `EMPTY_TREE` d'une release : `git diff` rend l'arbre entier du commit, et le script
+    lance chaque vérification — `avis` aussi, que son job, gardé sur une PR, saute (ADR 0033).
+    Une base qui ne serait pas un arbre connu de git ferait échouer l'étape, et ce test."""
+    delta = git(REPOSITORY_ROOT, "diff", "--name-only", "--no-renames", EMPTY_TREE, "HEAD")
+    assert jobs_for(delta.splitlines()) == dict.fromkeys(("web", "infra", "avis", "pipeline"), True)
 
 
 def loaded_modules(seeds: list[Path], folders: tuple[str, ...]) -> set[str]:
@@ -1525,6 +1609,92 @@ def test_le_pas_echoue_sur_une_tete_que_le_trunk_contient_deja(
     assert len(errors) == 1, played.stdout
     assert all(part in errors[0] for part in (head, f"origin/main ({trunk})")), errors
     assert trace_lines(played.stdout + played.stderr) == []
+
+
+# --- Le contrôle d'ascendance d'une release : le pas « Tag issu de main » du job `changes` -------
+
+# Son cadre : sur une release seulement, et rien qui tolérerait son échec.
+ANCESTRY_FRAME = {"name": ANCESTRY_NAME, "if": "github.event_name == 'release'", "shell": "bash"}
+# Les commits du clone témoin que le pas accepte : ceux de `main`.
+ACCEPTED_COMMITS = {"commit de main": "base", "tête de main": "tête"}
+# Ceux qu'il refuse, chacun avec les gestes qui écartent le clone de ce que le checkout laisse.
+# `origin/main` nu se lirait un tag de ce nom, qui passe avant la branche distante (doc git
+# « gitrevisions », lue le 2026-11-28, git 2.47.1) : le pas lit `refs/remotes/origin/main`. Sans
+# la branche distante, il échoue fermé.
+REFUSED_COMMITS: dict[str, tuple[str, tuple[tuple[str, ...], ...]]] = {
+    "commit hors de main": ("autre", ()),
+    "tag nommé origin/main sur le commit": ("autre", (("tag", "origin/main", "autre"),)),
+    "clone sans origin/main": ("base", (("update-ref", "-d", "refs/remotes/origin/main"),)),
+}
+
+
+def ancestry_step() -> dict[str, Any]:
+    """Le pas du contrôle d'ascendance, dans le job `changes` de `ci.yml`."""
+    steps = workflow_steps(CI_WORKFLOW.read_text(encoding="utf-8"))["changes"]
+    (step,) = [step for step in steps if step.get("name") == ANCESTRY_NAME]
+    return step
+
+
+def play_ancestry(
+    repo: Path, bash: str, commit: str, *gestures: tuple[str, ...]
+) -> tuple[subprocess.CompletedProcess[str], str]:
+    """Le pas joué dans un clone témoin posé dans `repo` — `main` de deux commits, `base` et
+    `tête`, en `refs/remotes/origin/main` comme le clone complet l'écrit (`getRefSpecForAllHistory`
+    d'`actions/checkout` v7.0.1, lu le 2026-11-28), et une branche `autre` partie de `base` —,
+    écarté par `gestures`, sur le tag `RELEASE_TAG` du commit `commit`.
+
+    Returns:
+        Le pas terminé, et le SHA complet du commit du tag.
+    """
+    git(repo, "init", "-b", "main")
+    git(repo, "commit", "--allow-empty", "-m", "base")
+    git(repo, "checkout", "-b", "autre")
+    git(repo, "commit", "--allow-empty", "-m", "hors de main")
+    git(repo, "checkout", "main")
+    git(repo, "commit", "--allow-empty", "-m", "tête")
+    git(repo, "update-ref", "refs/remotes/origin/main", "main")
+    shas = git(repo, "rev-parse", "main~1", "main", "autre").split()
+    commits: dict[str, str] = dict(zip(("base", "tête", "autre"), shas, strict=True))
+    for gesture in gestures:
+        git(repo, *gesture)
+    sha = commits[commit]
+    return play_step(ancestry_step(), repo, bash, GITHUB_SHA=sha, GITHUB_REF_NAME=RELEASE_TAG), sha
+
+
+def test_le_controle_d_ascendance_ne_joue_que_sur_une_release() -> None:
+    """`ANCESTRY_FRAME`, son script, et aucune autre clé ; aucune expression dans le script : le nom
+    du tag y serait développé en shell. Sa place dans `changes`, `gating_findings` la tient."""
+    step = ancestry_step()
+    assert {key: step.get(key) for key in ANCESTRY_FRAME} == ANCESTRY_FRAME
+    assert set(step) == {*ANCESTRY_FRAME, "run"}
+    assert "${{" not in step["run"]
+
+
+@pytest.mark.usefixtures("git_isole")
+@pytest.mark.parametrize("commit", ACCEPTED_COMMITS.values(), ids=ACCEPTED_COMMITS.keys())
+def test_le_controle_d_ascendance_accepte_le_commit_d_un_tag_de_main(
+    tmp_path: Path, commit: str, bash_de_ce_systeme: str
+) -> None:
+    """Un commit de `main`, sa tête comprise : le pas passe, sans annotation d'erreur."""
+    played, _ = play_ancestry(tmp_path, bash_de_ce_systeme, commit)
+
+    assert (played.returncode, error_lines(played)) == (0, []), played.stderr
+
+
+@pytest.mark.usefixtures("git_isole")
+@pytest.mark.parametrize(
+    ("commit", "gestures"), REFUSED_COMMITS.values(), ids=REFUSED_COMMITS.keys()
+)
+def test_le_controle_d_ascendance_refuse_le_commit_d_un_tag_hors_de_main(
+    tmp_path: Path, commit: str, gestures: tuple[tuple[str, ...], ...], bash_de_ce_systeme: str
+) -> None:
+    """Le pas échoue, et une annotation d'erreur nomme le commit et le tag."""
+    played, sha = play_ancestry(tmp_path, bash_de_ce_systeme, commit, *gestures)
+
+    errors = error_lines(played)
+    assert played.returncode != 0
+    assert len(errors) == 1, played.stdout
+    assert sha in errors[0] and RELEASE_TAG in errors[0], errors
 
 
 # --- L'e2e de la CI : un projet par job (ADR 0032, décision 3) ---------------------------------

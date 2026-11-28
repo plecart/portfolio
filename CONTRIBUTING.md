@@ -209,8 +209,9 @@ dont le format est en tête du fichier ; la date passée, l'audit rebloque. `npm
 fichier d'exceptions : son arbre se nettoie par les `overrides` du manifeste
 ([docs/frontend-outillage.md](docs/frontend-outillage.md) §2.4).
 
-**Tests des images.** `make image-test`, porte de CI du job `infra` sur chaque PR, et chaque push
-vers `main`, qui touche ce que les images définissent ou exécutent — liste `INFRA` de
+**Tests des images.** `make image-test`, porte de CI du job `infra` sur chaque release, et sur
+chaque PR et chaque push vers `main` qui touche ce que les images définissent ou exécutent — liste
+`INFRA` de
 [infra/ci/changed_jobs.py](infra/ci/changed_jobs.py)
 ([ADR 0031](docs/adr/0031-chaque-verification-de-la-ci-a-un-seul-endroit.md), décision 2 ;
 [ADR 0032](docs/adr/0032-ci-parallele-et-rejouee-sur-main.md)) —, démarre les images que
@@ -231,8 +232,8 @@ contre le vrai Redis. Le navigateur y voit les origines de production, que
 Playwright relaie vers la pile : aucune requête n'en sort. Des images construites sous un autre
 préfixe se nomment de même : `make smoke IMAGE_PREFIX=<préfixe> IMAGE_TAG=latest`. La pile tourne
 sous son propre nom de projet Compose, ses ports sur `127.0.0.1`, et se jette, verte ou rouge. En
-CI, le job `fumee` la joue après chaque publication sur `main`, sur les images du commit tirées de
-GHCR : rouge, il bloque le déploiement.
+CI, le job `fumee` la joue dans le run d'une release, après la publication, sur les images du
+commit tirées de GHCR : rouge, il bloque le déploiement.
 
 **Scan des images.** `make scan` scanne avec Trivy chaque image que `make build` a construite :
 toute vulnérabilité HIGH ou CRITICAL bloque, corrigeable ou non, comme une image de base en fin
@@ -287,23 +288,26 @@ Le test d'égalité de `make image-test` rougit tant que la version du
 `go mod edit -require=github.com/caddyserver/caddy/v2@v<x.y.z>` ne suit pas l'étiquette : la changer
 dans la même PR, puis `make build-caddy scan-caddy`, puis `make build image-test`.
 
-**Publication des images.** Rien à faire à la main : à chaque push sur `main`, sans attendre
-d'autre job — les vérifications rejouent le commit en parallèle, et le déploiement attend leur vert
+**Publication des images.** Elle part de la publication d'une release `vX.Y.Z`, jamais d'un merge
+([ADR 0033](docs/adr/0033-mise-en-production-a-la-publication-d-une-release.md)) ; un push sur
+`main` ne fait que rejouer les vérifications. Sur la release, après le job `changes`, qui refuse
+un tag hors de `main`, et sans attendre les vérifications — elles rejouent le commit de son tag en
+parallèle, et le déploiement attend leur vert
 ([ADR 0032](docs/adr/0032-ci-parallele-et-rejouee-sur-main.md)) —, le job `publish`
 compile le front, reconstruit les images, les scanne par `make scan`, puis les pousse sur
 GHCR — `ghcr.io/plecart/portfolio-<service>`, paquets privés — sous le SHA complet du commit et
 sous `latest` (`make push`) ; chaque paquet garde ses trois versions les plus récentes
 (`make prune`). Le jeton du workflow suffit, aucun secret n'est à créer
 ([ADR 0014](docs/adr/0014-ci-cd-github-actions-et-ghcr.md)). Un déploiement vise l'étiquette du
-commit : `latest` peut désigner l'avant-dernier quand deux pushes se suivent de près.
+commit : `latest` désigne la dernière image publiée, pas forcément celle en production.
 
-**Déploiement.** Rien à faire à la main non plus : après chaque publication sur `main`, une fois la
-fumée de ses images verte (job `fumee`), le job `deploy` se connecte au VPS par SSH, y dépose
+**Déploiement.** Dans le même run de release, une fois la fumée de ses images verte (job
+`fumee`) et les vérifications vertes, le job `deploy` se connecte au VPS par SSH, y dépose
 `infra/compose.yml`, fixe `IMAGE_TAG` au SHA du commit dans son `.env`, puis lance
 `docker compose pull` et `up -d --wait` — il rougit si un service ne devient pas sain. Il ne
-déploie que la tête de `main`, et reste sauté tant que la variable de dépôt `DEPLOY_ENABLED` ne
-vaut pas `true`. Amorçage du VPS, secrets et déploiement de secours :
-[infra/RUNBOOK.md](infra/RUNBOOK.md).
+déploie que la dernière release, et reste sauté tant que la variable de dépôt `DEPLOY_ENABLED` ne
+vaut pas `true`. Écrire et publier une release, amorçage du VPS, secrets et déploiement de
+secours : [infra/RUNBOOK.md](infra/RUNBOOK.md), « Livrer une version » pour la release.
 
 **Test de restauration.** Rien à faire à la main : le 1ᵉʳ de chaque mois, le workflow
 [`restore.yml`](.github/workflows/restore.yml) restaure la dernière sauvegarde dans une pile
