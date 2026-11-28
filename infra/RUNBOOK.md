@@ -261,7 +261,7 @@ release publiée ne se republie pas : en corriger les notes ne relance rien, seu
 ## Déployer à la main
 
 Quand la CI ne peut pas le faire, ou pour revenir à un commit antérieur. Seuls les commits des
-trois dernières releases publiées ont encore leurs images (`make prune`, ADR 0033) :
+trois dernières releases arrivées à `publish` ont encore leurs images (`make prune`, ADR 0033) :
 `gh api users/plecart/packages/container/portfolio-api/versions --jq '.[].metadata.container.tags'`.
 
 1. Le Compose de ce commit, depuis le poste :

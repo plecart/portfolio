@@ -66,7 +66,8 @@ merge, sans que le mainteneur ait décidé de livrer.
    comparaison à la tête de `main`, pour le même motif.
 6. **Les images ne changent pas** : étiquette au SHA complet, puis `latest`, trois versions par
    paquet. Publiées aux seules releases, les trois versions gardées sont celles des trois
-   dernières releases publiées. Le retour arrière reste hors de cet ADR : un défaut se corrige par
+   dernières releases arrivées à `publish` — ni une prerelease ni un tag hors de `main` n'y
+   arrivent. Le retour arrière reste hors de cet ADR : un défaut se corrige par
    une release CORRECTIF.
 7. **Le run d'une release a son groupe de concurrence**, préfixé de l'événement : il n'attend
    pas le run du push de son commit. `publish` et `deploy` gardent les leurs.
