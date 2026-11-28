@@ -3,10 +3,10 @@ décision 6).
 
 Le déploiement tourne sur GitHub Actions, sur chaque release publiée, après la publication des
 images de son commit et leur fumée (#26, ADR 0033) ; le poste n'a ni la clé ni le VPS. Ces tests
-lisent le job tel que l'analyseur YAML le lit, et exécutent son script avec des témoins à la place de `gh`, `scp` et `ssh` : ce qu'il
-déposerait et lancerait sur le VPS se lit dans leurs appels, argument par argument. Comme pour
-`publish`, la garde de la forme du job est une fonction sur du texte, appliquée au dépôt et à un
-recueil de formes, `DEPLOY_FORMS`.
+lisent le job tel que l'analyseur YAML le lit, et exécutent son script avec des témoins à la place
+de `gh`, `scp` et `ssh` : ce qu'il déposerait et lancerait sur le VPS se lit dans leurs appels,
+argument par argument. Comme pour `publish`, la garde de la forme du job est une fonction sur du
+texte, appliquée au dépôt et à un recueil de formes, `DEPLOY_FORMS`.
 """
 
 import os
@@ -40,9 +40,9 @@ from test_publication import (
 # une release publiée, hors prerelease — `RELEASE_IF`, le garde de `publish` (ADR 0033) —, et
 # seulement une fois le VPS prêt — la variable de dépôt `DEPLOY_ENABLED`, qu'un `if` de job lit
 # dans `vars`, jamais dans `secrets` (doc GitHub « Contexts »). Aucun `permissions` : le jeton du
-# workflow, en lecture, suffit. Ses secrets sont ceux de l'environnement `production`, que seuls
-# les tags `v*` peuvent viser, réglage de GitHub hors du dépôt (ADR 0033) : un run d'une branche
-# ne les lit pas.
+# workflow, en lecture, suffit. Ses secrets sont ceux de l'environnement `production`, que lisent
+# `main` — pour `restore.yml` — et les tags `v*`, réglage de GitHub hors du dépôt (ADR 0033) : seul
+# ce garde réserve le déploiement à une release publiée.
 DEPLOY_NEEDS = {"fumee", "api", "web", "mobile", "infra"}
 DEPLOY_IF = (
     f"${{{{ !cancelled() && {RELEASE_IF}"

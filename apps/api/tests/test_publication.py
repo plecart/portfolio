@@ -4,8 +4,9 @@ job de fumée qui éprouve ses images avant leur déploiement (#26).
 La publication tourne sur GitHub Actions, à la publication de chaque release (ADR 0014,
 ADR 0033) ; le poste n'a ni le jeton ni le registre. Ces tests lisent donc ce que `make`
 exécuterait — `make --dry-run`, ou la recette lancée sur un `gh` témoin —, sans rien pousser ni
-supprimer, et le workflow tel que l'analyseur YAML le lit. Comme dans `test_image_scan.py`, la garde de chaque job est une fonction
-sur du texte, appliquée au dépôt et à un recueil de formes, `PUBLISH_FORMS` et `SMOKE_FORMS`.
+supprimer, et le workflow tel que l'analyseur YAML le lit. Comme dans `test_image_scan.py`, la
+garde de chaque job est une fonction sur du texte, appliquée au dépôt et à un recueil de formes,
+`PUBLISH_FORMS` et `SMOKE_FORMS`.
 """
 
 import json

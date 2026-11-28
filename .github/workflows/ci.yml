@@ -647,9 +647,9 @@ jobs:
     # Sur une release publiée, hors prerelease — la condition de `publish` (ADR 0033) —, et
     # seulement une fois le VPS prêt : la variable de dépôt `DEPLOY_ENABLED` vaut `true` quand ses
     # secrets existent (`infra/RUNBOOK.md`). Avant, le job est sauté et le run de la release ne
-    # rougit pas ; après, un secret manquant le fait échouer. Le `if` d'un job lit `vars`, jamais `secrets` (doc
-    # GitHub « Contexts »). Aucun `permissions` : le jeton du workflow, en lecture, suffit à lire la
-    # dernière release ; le VPS tire les images avec son propre jeton.
+    # rougit pas ; après, un secret manquant le fait échouer. Le `if` d'un job lit `vars`, jamais
+    # `secrets` (doc GitHub « Contexts »). Aucun `permissions` : le jeton du workflow, en lecture,
+    # suffit à lire la dernière release ; le VPS tire les images avec son propre jeton.
     # `apps/api/tests/test_deployment.py` tient ces réglages et exécute le script.
     needs: [fumee, api, web, mobile, infra]
     if: >-
@@ -660,10 +660,16 @@ jobs:
       && (needs.web.result == 'success' || needs.web.result == 'skipped')
       && (needs.mobile.result == 'success' || needs.mobile.result == 'skipped')
       && (needs.infra.result == 'success' || needs.infra.result == 'skipped') }}
-    # Les secrets du VPS sont ceux de cet environnement, restreint aux tags `v*` — réglage de
-    # GitHub, hors du dépôt (ADR 0033) : la règle se compare au `GITHUB_REF` du run, et un workflow
-    # lancé depuis une branche ne les lit pas, même modifié (doc GitHub « Deployments and
-    # environments », « Deployment branches and tags », lue le 2026-11-28).
+    # Les secrets du VPS sont ceux de cet environnement, que lisent la branche `main` — pour le test
+    # de restauration mensuel, `restore.yml` — et les tags `v*`, réglage de GitHub hors du dépôt
+    # (ADR 0033) : la règle se compare au `GITHUB_REF` du run, et un workflow lancé depuis une autre
+    # branche ne les lit pas, même modifié (doc GitHub « Deployments and environments »,
+    # « Deployment branches and tags », lue le 2026-11-28). Seul ce job déploie, et son garde le
+    # réserve à une release publiée. Le pas « Tag issu de main » vit dans le `ci.yml` du commit
+    # taggé : il garde contre l'erreur, il ne protège pas ces secrets. Un tag et une release se
+    # créent avec l'écriture sur le dépôt (doc REST « Create a release »), qu'a aujourd'hui le seul
+    # mainteneur (`gh api repos/{owner}/{repo}/collaborators`, relevé le 2026-11-28) : la même
+    # confiance qu'un push sur `main`.
     environment: production
     timeout-minutes: 15
 
@@ -681,7 +687,12 @@ jobs:
       # le run d'une release plus lent que celui de la suivante redéploierait l'ancien code sur un
       # schéma déjà migré — le run de la dernière déploie à sa place, s'il est vert. La dernière,
       # c'est `releases/latest` : « the most recent non-prerelease, non-draft release » (doc REST
-      # « Get the latest release », lue le 2026-11-28), comparée au tag du run.
+      # « Get the latest release », lue le 2026-11-28), comparée au tag du run. Une release publiée
+      # sans « Set as the latest release » (`make_latest`, doc REST « Create a release ») ne l'est
+      # pas : son run est vert sans déployer, sur la notice ; sans autre release, l'appel rend 404,
+      # `gh` sort en 1 (mesuré le 2026-11-28) et le pas rougit sous `bash -e`, le shell d'un pas
+      # qui n'en nomme pas (doc « Workflow syntax », `shell`) — `infra/RUNBOOK.md`, « Livrer une
+      # version ».
       #
       # Puis le Compose du commit sur le VPS, son étiquette — le SHA complet, jamais `latest` —
       # dans le `.env` que `infra/bootstrap.sh` y a écrit, `pull` et `up --wait`. `--wait` échoue
