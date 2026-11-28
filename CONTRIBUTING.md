@@ -287,23 +287,25 @@ Le test d'égalité de `make image-test` rougit tant que la version du
 `go mod edit -require=github.com/caddyserver/caddy/v2@v<x.y.z>` ne suit pas l'étiquette : la changer
 dans la même PR, puis `make build-caddy scan-caddy`, puis `make build image-test`.
 
-**Publication des images.** Rien à faire à la main : à chaque push sur `main`, sans attendre
-d'autre job — les vérifications rejouent le commit en parallèle, et le déploiement attend leur vert
+**Publication des images.** Elle part de la publication d'une release `vX.Y.Z`, jamais d'un merge
+([ADR 0033](docs/adr/0033-mise-en-production-a-la-publication-d-une-release.md)) ; un push sur
+`main` ne fait que rejouer les vérifications. Sur la release, sans attendre d'autre job — les
+vérifications rejouent le commit de son tag en parallèle, et le déploiement attend leur vert
 ([ADR 0032](docs/adr/0032-ci-parallele-et-rejouee-sur-main.md)) —, le job `publish`
 compile le front, reconstruit les images, les scanne par `make scan`, puis les pousse sur
 GHCR — `ghcr.io/plecart/portfolio-<service>`, paquets privés — sous le SHA complet du commit et
 sous `latest` (`make push`) ; chaque paquet garde ses trois versions les plus récentes
 (`make prune`). Le jeton du workflow suffit, aucun secret n'est à créer
 ([ADR 0014](docs/adr/0014-ci-cd-github-actions-et-ghcr.md)). Un déploiement vise l'étiquette du
-commit : `latest` peut désigner l'avant-dernier quand deux pushes se suivent de près.
+commit : `latest` désigne la dernière image publiée, pas forcément celle en production.
 
-**Déploiement.** Rien à faire à la main non plus : après chaque publication sur `main`, une fois la
-fumée de ses images verte (job `fumee`), le job `deploy` se connecte au VPS par SSH, y dépose
+**Déploiement.** Dans le même run de release, une fois la fumée de ses images verte (job
+`fumee`) et les vérifications vertes, le job `deploy` se connecte au VPS par SSH, y dépose
 `infra/compose.yml`, fixe `IMAGE_TAG` au SHA du commit dans son `.env`, puis lance
 `docker compose pull` et `up -d --wait` — il rougit si un service ne devient pas sain. Il ne
-déploie que la tête de `main`, et reste sauté tant que la variable de dépôt `DEPLOY_ENABLED` ne
-vaut pas `true`. Amorçage du VPS, secrets et déploiement de secours :
-[infra/RUNBOOK.md](infra/RUNBOOK.md).
+déploie que la dernière release, et reste sauté tant que la variable de dépôt `DEPLOY_ENABLED` ne
+vaut pas `true`. Écrire et publier une release, amorçage du VPS, secrets et déploiement de
+secours : [infra/RUNBOOK.md](infra/RUNBOOK.md), « Livrer une version » en tête.
 
 **Test de restauration.** Rien à faire à la main : le 1ᵉʳ de chaque mois, le workflow
 [`restore.yml`](.github/workflows/restore.yml) restaure la dernière sauvegarde dans une pile

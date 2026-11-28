@@ -40,8 +40,13 @@ entrée (D45). L'utilisateur `deploy` possède le dossier et tire les images de 
 | Clé privée `age` des sauvegardes | gestionnaire ; secret `BACKUP_AGE_IDENTITY` de `production`, pour le test mensuel — ni le dépôt, ni une image (ADR 0007, point 2) ; jamais stockée sur le VPS : elle transite par `ssh` vers la mémoire d'un conteneur jetable, le temps d'une restauration | le mainteneur, sur le poste | une nouvelle paire, sa clé publique à `bootstrap.sh BACKUP_AGE_RECIPIENT`, sa clé privée à `BACKUP_AGE_IDENTITY` ; l'ancienne gardée |
 | Jeton du bucket en lecture seule (`RESTORE_R2_ACCESS_KEY_ID`, `RESTORE_R2_SECRET_ACCESS_KEY`) | gestionnaire ; secrets de `production` — le test mensuel seul s'en sert, jamais le VPS | le mainteneur | un nouveau jeton R2, les deux secrets remplacés, puis l'ancien révoqué |
 
-L'environnement GitHub `production` n'admet que `main` : un workflow lancé depuis une autre branche
-ne lit pas ses secrets, même modifié.
+L'environnement GitHub `production` n'admet que la branche `main` et les tags `v*` (ADR 0033) : un
+workflow lancé depuis une autre branche ne lit pas ses secrets, même modifié. `main` y reste pour
+« Le test mensuel » ; seul le job `deploy` d'une release publiée déploie, par son garde. Le pas
+« Tag issu de main » vit dans le `ci.yml` du commit taggé : il garde contre l'erreur, il ne protège
+pas ces secrets. Un tag et une release se créent avec l'écriture sur le dépôt, qu'a aujourd'hui le
+seul mainteneur (`gh api repos/plecart/portfolio/collaborators`, relevé le 2026-11-28) : la même
+confiance qu'un push sur `main`.
 
 Le gestionnaire est KeePassXC (ADR 0022), un fichier chiffré local : copie-le hors du poste, sur un
 support distinct, une fois rangés les secrets d'un chantier, et toujours avant `bootstrap.sh`. Le
@@ -107,9 +112,9 @@ Sous Windows, chaque geste du poste se lance dans **Git Bash** : PowerShell 5.1 
    `https://github.com/settings/tokens/new?scopes=read:packages`, rangé dans le gestionnaire, son
    expiration dans ton agenda : un jeton expiré ne se restaure pas, et un `pull` échoue alors
    (« Un déploiement rouge »). Le premier expire vers le 2027-11-01.
-3. **Le commit à déployer** : la tête de `main`, si son run a publié (`gh run list --branch main
-   --limit 1` : `completed success` ?). Son SHA complet : `git fetch origin && git rev-parse
-   origin/main`.
+3. **Le commit à déployer** : celui de la dernière release, si son run a publié (`gh release view
+   --json tagName --jq .tagName`, puis `gh run list --event release --limit 1` : `completed
+   success` ?). Son SHA complet : `git fetch origin --tags && git rev-list -n 1 <tag>`.
 4. **Les trois fichiers de ce commit**, tirés dans le clone sans changer de branche, puis copiés
    sur le VPS :
    ```
@@ -139,11 +144,13 @@ Sous Windows, chaque geste du poste se lance dans **Git Bash** : PowerShell 5.1 
    s'arrête sur « cloudflared is unhealthy ». Un noyau neuf installé en chemin attend un
    redémarrage (`needrestart` le dit) : `ssh portfolio reboot`, et la pile revient seule.
 6. **L'environnement `production` et ses secrets**, depuis le poste, dans le dépôt — d'abord
-   l'environnement restreint à `main` (doc GitHub « Deployments and environments »), puis les
-   quatre secrets :
+   l'environnement restreint à la branche `main` et aux tags `v*` (doc GitHub « Deployments and
+   environments », « Deployment branches and tags » ; ADR 0033), puis les quatre secrets :
    ```
    echo '{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}' | gh api -X PUT repos/plecart/portfolio/environments/production --input -
    gh api -X POST repos/plecart/portfolio/environments/production/deployment-branch-policies -f name=main -f type=branch
+   gh api -X POST repos/plecart/portfolio/environments/production/deployment-branch-policies -f name='v*' -f type=tag
+   gh api repos/plecart/portfolio/environments/production/deployment-branch-policies --jq '.branch_policies[] | [.name, .type] | @tsv'
    gh secret set DEPLOY_SSH_KEY --env production < deploy_key
    ssh portfolio "cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub" | sed "s/^/<ip> /" | gh secret set DEPLOY_KNOWN_HOSTS --env production
    gh secret set DEPLOY_HOST --env production --body <ip>
@@ -151,12 +158,14 @@ Sous Windows, chaque geste du poste se lance dans **Git Bash** : PowerShell 5.1 
    ssh -i deploy_key deploy@<ip> "cd /srv/portfolio && docker compose ps"
    rm deploy_key deploy_key.pub
    ```
-   Le `ssh -i` répond-il sans phrase de passe, chaque service `healthy` ? Sinon, ne supprime pas la
+   La lecture des règles rend-elle `main branch` et `v* tag`, et rien d'autre ? Le `ssh -i`
+   répond-il sans phrase de passe, chaque service `healthy` ? Sinon, ne supprime pas la
    clé : elle ne se relit plus depuis GitHub. `gh secret list --env production` liste-t-il les
    quatre noms ? (Il n'affiche jamais les valeurs, et `gh secret set` écrit « for plecart/portfolio »
    même pour un secret d'environnement : c'est cette liste qui fait foi.)
-7. **Le déploiement continu** : `gh variable set DEPLOY_ENABLED --body true`. Le prochain push sur
-   `main` déploie ; tant que la variable ne vaut pas `true`, le job `deploy` est sauté.
+7. **Le déploiement des releases** : `gh variable set DEPLOY_ENABLED --body true`. La prochaine
+   release publiée se déploie (« Livrer une version ») ; tant que la variable ne vaut pas `true`,
+   le job `deploy` est sauté.
 
 ## Commandes sur le VPS
 
@@ -176,10 +185,83 @@ commit le temps d'une commande, l'environnement l'emporte sur le `.env` :
 `IMAGE_TAG=<sha> docker compose …` — un SHA complet, jamais `latest`, que deux publications
 croisées peuvent laisser sur l'avant-dernier commit.
 
+## Livrer une version
+
+Ce qui part en ligne, c'est une release GitHub `vX.Y.Z` publiée (ADR 0033) : son run rejoue toutes
+les vérifications sur le commit de son tag, publie ses images, les éprouve (`fumee`), puis les
+déploie. Un merge sur `main` ne déploie rien. Le contenu édité dans l'admin — fiches, projets — est
+en ligne aussitôt, sans release : seul le code attend une version.
+
+**Qui fait quoi.** Une session écrit la release en brouillon, à la demande du mainteneur ou sur
+proposition du bilan de vague (`pr-paralleles`, Étape 8, « Bilan de vague »). Seul le mainteneur la
+publie, et son clic « Publish » vaut go de mise en production. Une release créée par la CI, avec le
+`GITHUB_TOKEN`, ne lancerait aucun run (doc GitHub « Triggering a workflow from a workflow », lue
+le 2026-11-28).
+
+**Le numéro**, en SemVer :
+- MAJEUR (`2.0.0`) — une refonte qui change toute l'expérience ; rare.
+- MINEUR (`1.1.0`) — une fonctionnalité ou une page visible de plus.
+- CORRECTIF (`1.0.1`) — correctifs, sécurité, dépendances, retouches.
+
+Un merge de Dependabot ou un correctif de sécurité n'est en ligne qu'à la release suivante. Une
+urgence se livre aussitôt, par une release CORRECTIF qui ne porte qu'elle, écrite dès son merge ;
+ce que `main` portait déjà depuis la dernière version part avec elle, et ses notes le disent.
+
+**Avant la première release**, une fois, avec l'accord du mainteneur : la règle de tag `v*` de
+l'environnement `production`, à côté de celle de `main` (« Amorcer un VPS neuf », étape 6, la
+troisième commande, puis sa lecture : `main branch` et `v* tag`). Sans elle, le job `deploy` de la
+release est refusé par l'environnement.
+
+**Le brouillon**, par la session, depuis un clone à jour :
+1. Le commit à livrer, la tête de `main` vérifiée — son run de push vert, `gh run list --branch
+   main --event push --limit 1` : `completed success` ? —, et la version précédente, aucune avant
+   `v1.0.0` :
+   ```
+   git fetch origin --tags
+   git rev-parse origin/main
+   gh release view --json tagName --jq .tagName
+   ```
+2. Les PR mergées depuis cette version, que les notes reprennent — GitHub les liste sans rien
+   écrire (doc REST « Generate release notes content for a release ») ; sans version précédente,
+   sans `previous_tag_name` :
+   ```
+   gh api -X POST repos/plecart/portfolio/releases/generate-notes -f tag_name=vX.Y.Z -f target_commitish=<sha> -f previous_tag_name=vA.B.C --jq .body
+   ```
+3. Les notes, en français, dans un fichier hors du clone, sur ce modèle :
+   ```
+   <Une accroche : ce que la version change pour qui visite le site.>
+
+   Depuis la A.B.C :
+   - <un changement, en une ligne, dit pour un visiteur>
+   - <…>
+
+   Non vérifié : <ce qu'aucun test ni aucune vérification n'a vu, ou « rien »>.
+
+   Livré par #<n>, #<n>.
+   ```
+4. Le brouillon, taggé au SHA relevé — `--target main` prendrait la tête de `main` au moment où
+   le tag se crée, peut-être plus loin que les notes —, puis relu :
+   ```
+   gh release create vX.Y.Z --draft --target <sha> --title "Portfolio X.Y.Z — <sous-titre>" --notes-file <fichier>
+   gh release view vX.Y.Z --json isDraft,name,targetCommitish,body --jq '.isDraft, .name, .targetCommitish, (.body | length)'
+   ```
+   `true`, le titre, le SHA, une longueur plausible ? Puis le lien du brouillon au mainteneur.
+
+**La publication**, par le mainteneur, sur GitHub (Releases, le brouillon, « Edit ») :
+- « Set as a pre-release » **décochée** : le run d'une prerelease saute `publish`, `fumee` et
+  `deploy` ;
+- « Set as the latest release » **cochée** : le job `deploy` ne déploie que `releases/latest`, et
+  une release qui ne l'est pas finit verte sans déployer (« Un déploiement rouge ») ;
+- « Publish release ».
+
+Puis `gh run list --event release --limit 1` jusqu'à `completed success`, et le site vérifié. Une
+release publiée ne se republie pas : en corriger les notes ne relance rien, seul `published` est
+écouté.
+
 ## Déployer à la main
 
-Quand la CI ne peut pas le faire, ou pour revenir à un commit antérieur. Seuls les trois derniers
-commits publiés ont encore leurs images (`make prune`) :
+Quand la CI ne peut pas le faire, ou pour revenir à un commit antérieur. Seuls les commits des
+trois dernières releases publiées ont encore leurs images (`make prune`, ADR 0033) :
 `gh api users/plecart/packages/container/portfolio-api/versions --jq '.[].metadata.container.tags'`.
 
 1. Le Compose de ce commit, depuis le poste :
@@ -196,8 +278,8 @@ commits publiés ont encore leurs images (`make prune`) :
    ```
 
 Revenir en arrière ne défait aucune migration : un commit antérieur à une migration déjà jouée
-tourne sur un schéma plus récent que le sien. Le prochain déploiement de la CI remet la tête de
-`main`.
+tourne sur un schéma plus récent que le sien. La prochaine release déployée par la CI remet le
+code à jour.
 
 ## Un déploiement rouge
 
@@ -211,25 +293,35 @@ tourne sur un schéma plus récent que le sien. Le prochain déploiement de la C
   `sudo bash bootstrap.sh GHCR_TOKEN` (« Tourner un secret »), puis relance le job.
 - **« Host key verification failed »** — l'hôte n'a plus la clé épinglée : VPS reconstruit, ou
   autre machine. Vérifie l'empreinte comme à l'amorçage avant de remplacer `DEPLOY_KNOWN_HOSTS`.
-- **« main est passée à … »** — pas une erreur : un commit plus récent se déploie par son propre
-  run, s'il est vert ; sinon, entrée suivante.
+- **« La dernière release est … »** — pas une erreur : une release plus récente existe, et se
+  déploie par son propre run, s'il est vert ; sinon, entrée suivante. Si la notice nomme une
+  release plus *ancienne*, celle-ci a été publiée sans « Set as the latest release » : coche-la
+  dans l'édition de la release, puis relance le job `deploy` de son run — l'édition seule ne
+  relance rien.
+- **« Not Found (HTTP 404) » au pas « Déploiement »** — aucune release n'est la dernière : la
+  première a été publiée sans « Set as the latest release ». Coche-la, puis relance le job
+  `deploy`.
+- **`changes` rouge au pas « Tag issu de main »** — le commit du tag n'est pas sur `main` : rien
+  n'est publié. Supprime la release et son tag — `gh release delete vX.Y.Z --cleanup-tag --yes`
+  —, puis réécris le brouillon sur un commit de `main` (« Livrer une version »).
 - **`deploy` sauté derrière un `fumee` ou une vérification rouge** (`api`, `web`, `mobile`,
   `infra`, ADR 0032) — les images du commit sont publiées, jamais déployées : le journal du job
   nomme l'étape ou le scénario, `make smoke`, ou la cible du job rouge, le rejoue sur le poste
-  (`CONTRIBUTING.md`) et le correctif passe par une PR ; ne relance le job que sur un rouge du
-  runner — tirage, délai.
+  (`CONTRIBUTING.md`) ; le correctif passe par une PR, puis une release CORRECTIF. Ne relance le
+  job que sur un rouge du runner — tirage, délai.
 
 ## Tourner un secret
 
 Pour toutes les entrées sauf `RESTORE_R2_*` — la dernière, qui se tourne sans rien de ce qui suit
 — : jamais pendant un déploiement ; le job et le script écrivent le même `.env`, et le script
-remettrait l'étiquette qu'il a lue avant le job. Suspends d'abord le déploiement continu —
-`gh variable set DEPLOY_ENABLED --body false` —, puis vérifie qu'aucun run de `main` ne tourne ni
-n'attend : `gh run list --branch main --status in_progress`, puis `--status queued`, vides ?
-Remets `--body true` une fois la rotation faite ; un push arrivé entre-temps se déploie au suivant,
-ou par « Déployer à la main ».
+remettrait l'étiquette qu'il a lue avant le job. Suspends d'abord le déploiement des releases —
+`gh variable set DEPLOY_ENABLED --body false` —, puis vérifie qu'aucun run de release ne tourne ni
+n'attend : `gh run list --event release --status in_progress`, puis `--status queued`, vides ?
+Remets `--body true` une fois la rotation faite ; une release publiée entre-temps ne se déploie
+qu'à la suivante, ou par « Déployer à la main ».
 
-Copie ensuite sur le VPS les trois fichiers de la tête de `main` (étape 4 de l'amorçage), et
+Copie ensuite sur le VPS les trois fichiers du commit de la dernière release (étapes 3 et 4 de
+l'amorçage), et
 `sudo bash bootstrap.sh <NOM>…` : il redemande ou réengendre les valeurs nommées,
 garde les autres, et relance la pile, qui recrée les services touchés — sans mettre Docker à
 niveau ni tirer d'image déjà présente.
@@ -283,7 +375,9 @@ puis `docker compose ps` en `deploy` — le démon redémarre, la pile revient s
 
 - **Le groupe `docker` vaut `root`** (doc Docker « Docker Engine security ») : `deploy`, qui en est
   membre, et donc la clé de la CI, ont tout pouvoir sur le VPS. Cette clé ne vit que dans le secret
-  de l'environnement `production`, que seule `main` lit ; aucune copie ne reste sur un poste.
+  de l'environnement `production`, que lisent la seule branche `main` et les tags `v*`, et que
+  seul le job `deploy` d'une release publiée emploie (« Où vit chaque secret ») ; aucune copie ne
+  reste sur un poste.
 - SSH par clés seulement ; `root` par clé seulement ; `ufw` n'ouvre que SSH ; `fail2ban` bannit
   les adresses qui échouent sur SSH.
 - Aucun port de la pile n'est publié (`apps/api/tests/test_compose.py`) : Docker contournerait
@@ -571,14 +665,15 @@ Reconstruire la production sur une machine neuve, en une heure au plus (cadrage 
 temps visé par étape. Les noms d'hôte ne changent pas : le Tunnel suit son jeton (D58), aucun geste
 DNS.
 
-1. **Suspendre le déploiement continu** (1 min) — sinon chaque push vise l'ancien hôte :
+1. **Suspendre le déploiement des releases** (1 min) — sinon une release publiée entre-temps vise
+   l'ancien hôte :
    `gh variable set DEPLOY_ENABLED --body false`.
 2. **Louer un VPS** x86 sous Ubuntu LTS en UE (ADR 0002, 0023), joignable en `root` par la clé
    `portfolio_admin`, puis remettre le `HostName` de l'alias `portfolio` à sa nouvelle adresse
    (« Amorcer un VPS neuf », « L'accès `root` ») (10 min).
 3. **L'amorcer** : « Amorcer un VPS neuf », étapes 1 à 5 (25 min) — une clé de déploiement neuve,
    le jeton GHCR, `bootstrap.sh` —, puis, de son étape 6, les trois secrets que la machine change
-   seulement, l'environnement `production` et sa règle de branche existant déjà :
+   seulement, l'environnement `production` et ses règles de déploiement existant déjà :
    `gh secret set DEPLOY_SSH_KEY …`, `DEPLOY_KNOWN_HOSTS …` et `DEPLOY_HOST …`, suivis de
    `rm deploy_key deploy_key.pub`. `docker compose ps` dit `cloudflared` `healthy` : le Tunnel a
    repris les noms d'hôte. La base est vide, migrée par `api`.
@@ -587,7 +682,7 @@ DNS.
    (Access, puis la page de connexion) ; la restauration a écrit `projets publiés` et `migrate
    --check` vert. Le lendemain : la sauvegarde de la nuit est arrivée (« Vérifier qu'une
    sauvegarde est arrivée »).
-6. **Reprendre le déploiement continu** (1 min) : `gh variable set DEPLOY_ENABLED --body true`.
+6. **Reprendre le déploiement des releases** (1 min) : `gh variable set DEPLOY_ENABLED --body true`.
 
 Les médias : sur R2, rien à restaurer — un VPS reconstruit les retrouve dans leur bucket, par les
 variables `MEDIA_R2_*` que `bootstrap.sh` redemande.
@@ -597,9 +692,10 @@ variables `MEDIA_R2_*` que `bootstrap.sh` redemande.
 Le 1ᵉʳ de chaque mois à 04:00 UTC, le workflow « Test de restauration »
 ([`restore.yml`](../.github/workflows/restore.yml)) rejoue la chaîne de « Restaurer une
 sauvegarde » — `restore.sh derniere` — dans une pile jetable du runner : la dernière sauvegarde du
-bucket, dans un Postgres vide, migrée par les images publiées sous `latest`. Il écrit les mêmes
-étapes, `arrêtés : aucun` et `redémarrés : aucun` compris. Il est sauté tant que `DEPLOY_ENABLED`
-ne vaut pas `true`.
+bucket, dans un Postgres vide, migrée par les images publiées sous `latest` — la dernière image
+publiée, pas forcément celle en production : `make push` pose `latest` avant la fumée et le
+déploiement (ADR 0033). Il écrit les mêmes étapes, `arrêtés : aucun` et `redémarrés : aucun`
+compris. Il est sauté tant que `DEPLOY_ENABLED` ne vaut pas `true`.
 
 Ce qu'il lit, dans l'environnement `production` : les secrets `BACKUP_AGE_IDENTITY` (le fichier
 `age.key`), `RESTORE_R2_ACCESS_KEY_ID` et `RESTORE_R2_SECRET_ACCESS_KEY` — un second jeton R2,
@@ -617,8 +713,9 @@ ou jeton en lecture seule refusé ; `déchiffrement` : `BACKUP_AGE_IDENTITY` d'u
 seuil.
 
 **Le lancer à la main** — après une rotation, ou pour vérifier une correction ; sur `main`, la
-branche par défaut de `gh workflow run` : l'environnement `production` refuse toute autre branche,
-et le run y est rouge sans avoir rien restauré.
+branche par défaut de `gh workflow run` : l'environnement `production` n'admet que `main` et les
+tags `v*` (« Où vit chaque secret »), et le run d'une autre branche y est rouge sans avoir rien
+restauré.
 ```
 gh workflow run restore.yml
 gh run watch
